@@ -1,0 +1,25 @@
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: capsule-cluster-admin
+subjects:
+- kind: ServiceAccount
+  name: capsule
+  namespace: capsule-system
+roleRef:
+  kind: ClusterRole
+  name: admin
+  apiGroup: rbac.authorization.k8s.io
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: capsule
+subjects:
+  - kind: ServiceAccount
+    name: capsule
+    namespace: capsule-system
+roleRef:
+  kind: ClusterRole
+  name: capsule
+  apiGroup: rbac.authorization.k8s.io

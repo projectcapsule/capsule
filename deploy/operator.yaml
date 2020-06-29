@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: capsule
+  namespace: capsule-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      name: capsule
+  template:
+    metadata:
+      labels:
+        name: capsule
+    spec:
+      serviceAccountName: capsule
+      containers:
+        - name: capsule
+          image: quay.io/clastix/capsule:latest
+          command:
+          - capsule
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: WATCH_NAMESPACE
+              value: ""
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: OPERATOR_NAME
+              value: "capsule"
+          volumeMounts:
+            - name: tls
+              mountPath: /tmp/k8s-webhook-server/serving-certs
+      volumes:
+        - name: tls
+          secret:
+            secretName: capsule-tls
