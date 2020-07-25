@@ -38,7 +38,7 @@ func (c CapsuleCa) ExpiresIn(now time.Time) (time.Duration, error) {
 	if !c.isAlreadyValid(now) {
 		return time.Nanosecond, CaNotYetValidError{}
 	}
-	return time.Duration(c.ca.NotAfter.Unix() - now.Unix()) * time.Second, nil
+	return time.Duration(c.ca.NotAfter.Unix()-now.Unix()) * time.Second, nil
 }
 
 func (c CapsuleCa) CaCertificatePem() (b *bytes.Buffer, err error) {
@@ -108,7 +108,7 @@ func NewCertificateAuthorityFromBytes(certBytes, keyBytes []byte) (s *CapsuleCa,
 	}
 
 	s = &CapsuleCa{
-		ca: cert,
+		ca:         cert,
 		privateKey: key,
 	}
 

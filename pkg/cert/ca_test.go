@@ -19,7 +19,7 @@ func TestNewCertificateAuthorityFromBytes(t *testing.T) {
 	assert.Nil(t, err)
 
 	var crt *bytes.Buffer
-	crt, err =ca.CaCertificatePem()
+	crt, err = ca.CaCertificatePem()
 	assert.Nil(t, err)
 
 	var key *bytes.Buffer

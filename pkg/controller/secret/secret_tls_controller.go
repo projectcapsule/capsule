@@ -130,7 +130,7 @@ func tlsReconcile(r *ReconcileSecret, request reconcile.Request) (reconcile.Resu
 	}
 
 	var res controllerutil.OperationResult
-	t := &corev1.Secret{ObjectMeta: instance.ObjectMeta,}
+	t := &corev1.Secret{ObjectMeta: instance.ObjectMeta}
 	res, err = controllerutil.CreateOrUpdate(context.TODO(), r.client, t, func() error {
 		t.Data = instance.Data
 		return nil
