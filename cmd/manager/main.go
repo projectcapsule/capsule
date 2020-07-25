@@ -71,7 +71,6 @@ func main() {
 	// controller-runtime)
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 
-
 	var v bool
 	pflag.BoolVarP(&v, "version", "v", false, "Print the Capsule version and exit")
 

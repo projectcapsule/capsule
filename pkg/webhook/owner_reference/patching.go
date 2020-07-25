@@ -56,7 +56,6 @@ func (r *ownerRef) Handle(ctx context.Context, req admission.Request) admission.
 		return admission.Errored(http.StatusBadRequest, err)
 	}
 
-
 	g := utils.UserGroupList(req.UserInfo.Groups)
 	if !g.IsInCapsuleGroup() {
 		// user requested NS creation is not a Capsule user, so skipping the validation checks
