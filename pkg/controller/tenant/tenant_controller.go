@@ -62,7 +62,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to primary resource Tenant
-	err = c.Watch(&source.Kind{Type: &capsulev1alpha1.Tenant{}}, &handler.EnqueueRequestForObject{}, )
+	err = c.Watch(&source.Kind{Type: &capsulev1alpha1.Tenant{}}, &handler.EnqueueRequestForObject{})
 	if err != nil {
 		return err
 	}

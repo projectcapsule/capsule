@@ -63,17 +63,7 @@ func (r *ReconcileSecret) GetCertificateAuthority() (ca cert.Ca, err error) {
 	}
 
 	if instance.Data == nil {
-		ca, err = cert.GenerateCertificateAuthority()
-		if err != nil {
-			return
-		}
-
-		instance.Data = map[string][]byte{}
-
-		crt, _ := ca.CaCertificatePem()
-		instance.Data[Cert] = crt.Bytes()
-		key, _ := ca.CaPrivateKeyPem()
-		instance.Data[PrivateKey] = key.Bytes()
+		return nil, MissingCaError{}
 	}
 
 	ca, err = cert.NewCertificateAuthorityFromBytes(instance.Data[Cert], instance.Data[PrivateKey])

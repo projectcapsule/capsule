@@ -16,6 +16,7 @@ package secret
 import (
 	"bytes"
 	"context"
+	"errors"
 	"time"
 
 	v1 "k8s.io/api/admissionregistration/v1"
@@ -89,7 +90,12 @@ func caReconcile(r *ReconcileSecret, request reconcile.Request) (reconcile.Resul
 	var ca cert.Ca
 	var rq time.Duration
 	ca, err = r.GetCertificateAuthority()
-	if err != nil {
+	if err != nil && errors.Is(err, MissingCaError{}) {
+		ca, err = cert.GenerateCertificateAuthority()
+		if err != nil {
+			return reconcile.Result{}, err
+		}
+	} else if err != nil {
 		return reconcile.Result{}, err
 	}
 
@@ -150,7 +156,7 @@ func caReconcile(r *ReconcileSecret, request reconcile.Request) (reconcile.Resul
 		r.logger.Info("Capsule CA has been updated, we need to trigger TLS update too")
 		tls := &corev1.Secret{}
 		err = r.client.Get(context.TODO(), types.NamespacedName{
-			Namespace: "capsuel-system",
+			Namespace: "capsule-system",
 			Name:      TlsSecretName,
 		}, tls)
 		if err != nil {
