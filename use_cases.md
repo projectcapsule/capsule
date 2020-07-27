@@ -1,15 +1,14 @@
-# Use cases for Capsule
-
+# Use cases for Capsule 
 ## Acme Corp. Public Container as a Service (CaaS) platform
 
-Acme Corp. is a cloud provider that wants to enhance their public offer with a
-new CaaS service based on Kubernetes.
-Acme Corp. already provides an _Infrastructure as a Service_ (IaaS) platform
-with VMs, Storage, DBaaS, and other managed traditional services.
+Acme Corp. is a cloud provider that wants to enhance its public offer with a
+A new CaaS service based on Kubernetes.
+Acme Corp. has already provided an _Infrastructure as a Service_ (IaaS) platform
+With VMs, Storage, DBaaS, and other managed traditional services.
 
 ### The background
 
-The new CaaS service from Acme Corp. will include:
+The new CaaS service from Acme Corp. will include:-
 
 - **Shared CaaS**:
 
@@ -19,14 +18,15 @@ The new CaaS service from Acme Corp. will include:
   * Shared Public IP addresses.
   * Shared Persistent Storage.
   * Automatic backup of volumes.
-  * Shared routing layer with shared wildcard certificate.
-  * Multiple Namespaces isolation.
+  * Shared routing layer with a shared wildcard certificate.
+  * Multiple Namespaces isolations.
   * Single user account.
   * Resources Quotas and Limits.
   * Self Service Provisioning portal.
   * Shared Application Catalog.
 
 - **Private CaaS**:
+
 
   * Dedicated infra and worker nodes.
   * Dedicated registry.
@@ -35,35 +35,33 @@ The new CaaS service from Acme Corp. will include:
   * Dedicated Persistent Storage.
   * Automatic backup of volumes.
   * Shared control plane.
-  * Multiple Namespaces isolation.
+  * Multiple Namespaces isolations.
   * Resources Quotas and Limits.
   * Self Service Provisioning portal.
   * Dedicated Application Catalog.
   * Multiple user accounts.
-  * Optional access to VMs, Storage, Networks, DBaaS, and other managed
-    traditional services from the IaaS offer.
+  Optional access to VMs, Storage, Networks, DBaaS, and other managed traditional services from the IaaS offering.
 
 ### Involved actors
 
-To simplify the design of Capsule, we'll work with following actors:
+To simplify the design of Capsule, we'll work with the following actors:
 
 * *Bill*:
-  he is the cluster administrator from the operations department of Acme Corp.
-  and he is in charge of admin and mantain the CaaS platform.
-  Bill is also responsible for the onboarding of new customers and of the
-  daily work to support all customers.
+  He is the cluster administrator of the operations department of Acme Corp.
+  And he is in charge of admin and maintains the CaaS platform.
+  Bill is also responsible for the onboarding of new customers and the
+  Daily work to support all customers.
 
-* *Joe*:
-  he works as DevOps engineer at Oil & Stracci Inc., a new customer of the
+**Joe*:   he works as a DevOps engineer at Oil & Stracci Inc., a new customer of the
   Shared CaaS service.
-  Joe is responsible for deploying and mantaining container based applications
-  on the CaaS platform.
+  Joe is responsible for deploying and maintaining container-based applications
+  On the CaaS platform.
 
 * *Alice*:
-  she works as IT Project Leader at Bastard Bank Inc.,
-  a new Private CaaS customer. Alice is responsible for a stategic IT project
-  and she is responsible also for a large team made of different background
-  (developers, administrators, SRE engineers, etc.) and organised in separated
+  She works as IT Project Leader at Bastard Bank Inc.,
+  A new Private CaaS customer. Alice is responsible for a strategic IT project
+  And she is responsible also for a large team made of different background
+  (Developers, Administrators, SRE Engineers, etc.) and organized in separated
   departments.
 
 
@@ -92,7 +90,7 @@ resources: namespaces, CPU, memory, storage, ...
 Bill creates a new user account id `Joe` in the Acme Corp. identity management
 system and assign Joe to the group of the Shared CaaS user. To keep the things
 simple, we assume that Bill just creates a certificate for authentication on
-the CaaS platform using X.509 certificate, so the Joe's certificate has
+the CaaS platform using an X.509 certificate, so Joe's certificate has
 `"/CN=joe/O=capsule.clastix.io"`.
 
 Bill creates a new tenant `oil-and-stracci-inc` in the CaaS manangement portal
@@ -176,7 +174,7 @@ spec:
 
 > Note that namespaces are not yet assigned to the tenant.
 > The CaaS users are free to create their namespaces in a self-service fashion
-> and without any intervent from Bill.
+> and without any intervention from Bill.
 
 Once the new tenant `oil-and-stracci-inc` is in place, Bill sends the login
 credentials to Joe along with the tenant details, for logging into the CaaS.
@@ -208,7 +206,7 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
 ```
 
-Joe can login to the CaaS platform and checks if he can create a namespace.
+Joe can log in to the CaaS platform and checks if he can create a namespace.
 
 ```
 # kubectl auth can-i create namespaces
@@ -227,8 +225,8 @@ no
 Warning: resource 'nodes' is not namespace scoped
 no
 
-# kubectl auth can-i get persistentvolumes
-Warning: resource 'persistentvolumes' is not namespace scoped
+# kubectl auth can-i get persistent volumes
+Warning: resource 'persistent volumes' is not namespace scoped
 no
 ```
 
@@ -249,7 +247,7 @@ Joe can create a new namespace in his tenant, as simply:
 ```
 
 > Note that Joe started the name of his namespace with an identifier of his
-> tenant: this is not a strict requirement but it is higly suggested because
+> tenant: this is not a strict requirement but it is highly suggested because
 > it is likely that many different users would like to call their namespaces
 > as `production`, `test`, or `demo`, etc.
 > 
@@ -257,7 +255,7 @@ Joe can create a new namespace in his tenant, as simply:
 > controller and it is left to a policy engine.
 
 When Joe creates the namespace, the Capsule controller, listening for creation
-and deletion events, assigns to Joe the following roles:
+and deletion events assigns to Joe the following roles:
 
 ```yaml
 ---
@@ -272,7 +270,7 @@ subjects:
 roleRef:
   kind: ClusterRole
   name: admin
-  apiGroup: rbac.authorization.k8s.io
+  API groups: rbac.authorization.k8s.io
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
@@ -285,7 +283,7 @@ subjects:
 roleRef:
   kind: ClusterRole
   name: namespace:deleter
-  apiGroup: rbac.authorization.k8s.io
+  API groups: rbac.authorization.k8s.io
 ```
 
 If Joe inspects the namespace, he will see something like this:
@@ -323,7 +321,7 @@ namespace:deleter ClusterRole/admin   9m5s
 ```
 
 The said Role Binding resources are automatically created by the Capsule
-controller when Joe creates a namespace in his tenant.
+the controller when Joe creates a namespace in his tenant.
 
 Joe can deploy any resource in his namespace, according to the predefined
 [`admin` cluster role](https://kubernetes.io/docs/reference/access-authn-authz/rbac/#user-facing-roles). 
@@ -467,7 +465,7 @@ capsule-oil-2   42h   requests.storage: 0/100Gi
 and inspecting the Quota annotations:
 
 ```yaml
-# kubectl get resourcequotas capsule-oil-1 -o yaml
+# kubectl get resource quotas capsule-oil-1 -o yaml
 apiVersion: v1
 kind: ResourceQuota
 metadata:
@@ -493,12 +491,12 @@ Namespace resources in the `oil-and-stracci-inc` Tenant namespaces:
 - `oil-test` 
 
 When the aggregate usage reaches the hard quota limits,
-then the ResourceQuota Admission Controller denies the Joe's request.
+then the ResourceQuota Admission Controller denies Joe's request.
 
 > In addition to Resource Quota, the Capsule controller create limits ranges in
 > each namespace according to the tenant manifest.
 >
-> Limit ranges enforcement for single pod, container, and persistent volume
+> Limit ranges enforcement for a single pod, container, and persistent volume
 > claim is done by the default _LimitRanger Admission Controller_ enabled on
 > the Kubernetes API server: using the flag
 > `--enable-admission-plugins=LimitRanger`.
@@ -506,7 +504,7 @@ then the ResourceQuota Admission Controller denies the Joe's request.
 Joe can inspect Limit Ranges for his namespaces:
 
 ```
-# kubectl -n oil-production get limitranges
+# kubectl -n oil-production get limit ranges
 NAME            CREATED AT
 capsule-oil-0   2020-07-20T18:41:15Z
 
@@ -530,14 +528,14 @@ Being the limit range specific of single resources:
 
 there is no aggregate to count.
 
-Having access to resource quota and limits, however Joe is not able to change
+Having access to resource quota and limits, however, Joe is not able to change
 or delete it according to his RBAC profile.
 
 ```
-# kubectl -n oil-production auth can-i patch resourcequota
+# kubectl -n oil-production auth can-i patch resource quota
 no - no RBAC policy matched
 
-# kubectl -n oil-production auth can-i patch limitranges
+# kubectl -n oil-production auth can-i patch limit ranges
 no - no RBAC policy matched
 ```
 
@@ -546,7 +544,7 @@ no - no RBAC policy matched
 A Tenant assigned to a shared CaaS tenant, shares infra and worker nodes with
 all the other shared CaaS tenants.
 
-Bill, the cluster admin of the CaaS, dedicated a set of infra and worker nodes
+Bill, the cluster-admin of the CaaS, dedicated a set of infra and worker nodes
 to shared CaaS tenants.
 
 These nodes have been previously labeled as `node-role.kubernetes.io/capsule=caas`
@@ -581,7 +579,7 @@ worker07.acme.com         Ready    worker            8d    v1.18.2   node-role.k
 worker08.acme.com         Ready    worker            8d    v1.18.2   node-role.kubernetes.io/capsule=qos
 ```
 
-Bill should assure that all workload deployed by a shared CaaS users are
+Bill should assure that all workload deployed by a shared CaaS user is
 assigned to worker nodes labeled as `node-role.kubernetes.io/capsule=caas`.
 
 On the Kubernetes API servers of the CaaS platform, Bill must enable the
@@ -605,11 +603,11 @@ nodeSelector:
 ...
 ```
 
-Any temptative to change the selector, will result in the following error from
+Any temptation to change the selector will result in the following error from
 the `PodNodeSelector` Admission Controller plugin:
 
 ```
-Error from server (Forbidden): error when creating "podshell.yaml": pods "busybox" is forbidden:
+Error from server (Forbidden): error when creating "pod shell.yaml": pods "busybox" is forbidden:
 pod node label selector conflicts with its namespace node label selector
 ```
 
@@ -617,7 +615,7 @@ and no additional actions are required to the Capsule controller.
 
 On the other side, a private CaaS tenant receives a dedicated set of infra e
 worker nodes. Bill has to make sure that these nodes are labeled according,
-for example `node-role.kubernetes.io/capsule=qos` to be separated from nodes
+for example, `node-role.kubernetes.io/capsule=qos` to be separated from nodes
 dedicated to other private CaaS tenants and the shared CaaS tenants.
 
 The Capsule controller must assure that any namespace created in the tenant has
@@ -654,7 +652,7 @@ order to be published on the CaaS Ingress Controller.
 The Capsule operator must assure that all ingresses created in any tenant
 belonging to the shared CaaS, have the annotation
 `kubernetes.io/ingress.class: caas` where the selector is specified in the
-tenant resouce manifest:
+tenant resource manifest:
 
 ```yaml
 apiVersion: capsule.clastix.io/v1alpha1
@@ -699,17 +697,17 @@ On the other side, a private CaaS tenant receives a dedicated Ingress Controller
 running on the infra nodes dedicated to that tenant only.
 Bill provisions the dedicated Ingress Controller to use a dedicated ingress
 class: `--ingress-class=evil-corp` as ingress selector and a dedicated wildcard
-certificate, for example `*.evilcorp.com`. All ingresses created in the private
-tenant must use this selector in order to be published on the dedicated Ingress
+certificate, for example, `*.evilcorp.com`. All ingresses created in the private
+tenant must use this selector to be published on the dedicated Ingress
 Controller.
 
 The Capsule operator must assure that all ingresses created in the tenant,
 have the annotation `kubernetes.io/ingress.class: evil-corp` where the selector
-is specified into the tenant resouce manifest.
+is specified into the tenant resource manifest.
 
 ### Network policies for a tenant
 
-Kubernetes network policies allow to control network traffic between namespaces
+Kubernetes network policies allow controlling network traffic between namespaces
 and between pods in the same namespace. The CaaS platform must enforce network
 traffic isolation between different tenants while leaving to the tenant user
 the freedom to set isolation between namespaces in the same tenant or even
@@ -719,7 +717,7 @@ To meet this requirement, Bill, the CaaS platform administrator, needs to
 define network policies that deny pods belonging to a tenant namespace to
 access pods in namespaces belonging to other tenants or in system namespaces,
 (e.g. `kube-system`).
-Also Bill must assure that pods belonging to a tenant namespace cannot access
+Also, Bill must assure that pods belonging to a tenant namespace cannot access
 other network infrastructure like cluster nodes, load balancers, and virtual
 machines running other services.  
 
@@ -752,10 +750,10 @@ according to the CaaS platform requirements:
 The Capsule controller, watching for Namespace creation,
 creates the Network Policies for each Namespace in the tenant.
 
-The tenat user (e.g. Joe) has access these network policies:
+The tenat user (e.g. Joe) has to access these network policies:
 
 ```
-# kubectl -n oil-production get networkpolicies
+# kubectl -n oil-production get network policies
 NAME            POD-SELECTOR   AGE
 capsule-oil-0   <none>         42h
 
@@ -788,28 +786,28 @@ Spec:
   Policy Types: Ingress, Egress  
 ```
 
-and he can create, patch, and delete Nework Policies
+and he can create, patch, and delete Network Policies
 
 ```
-# kubectl -n oil-production auth can-i get networkpolicies
+# kubectl -n oil-production auth can-i get network policies
 yes
 # kubectl -n oil-production auth can-i delete networkpolicies
 yes
-# kubectl -n oil-production auth can-i patch networkpolicies
+# kubectl -n oil-production auth can-i patch network policies
 yes
 ```
 
-However, the Caspule controller enforces the Tenant Network Policie resources
+However, the Capsule controller enforces the Tenant Network Policy resources
 above and prevents Joe to change, or delete them.
 
 ### Storage Class for a tenant
 
 The CaaS platform provides persistent storage infrastructure for shared and
 private tenants. Different type of storage requirements, with different level
-of QoS, eg. SSD versus HDD, can be provided by the platform according to the
-tenants profile and needs. To meet these dirrerent requirements, Bill, the
-admin of the CaaS platform, has to provision different storage classes and
-assign a proper storage class to the tenants, by specifing it into the tenant
+of QoS, eg. SSD versus HDD can be provided by the platform according to the
+tenant's profile and needs. To meet these different requirements, Bill, the
+admin of the CaaS platform has to provision different storage classes and
+assign a proper storage class to the tenants, by specifying it into the tenant
 manifest:
 
 ```yaml
@@ -846,7 +844,7 @@ spec:
       storage: 12Gi
 ```
 
-The creation of the said PVC will fail as following:
+The creation of the said PVC will fail as follows:
 ```
 # kubectl apply -f my_pvc.yaml
 Error from server: error when creating "/tmp/pvc.yaml":
