@@ -250,6 +250,11 @@ func (r *ReconcileTenant) syncResourceQuotas(tenant *capsulev1alpha1.Tenant) err
 					r.logger.Info("Computed " + rn.String() + " quota for the whole Tenant is " + qt.String())
 
 					switch qt.Cmp(q.Hard[rn]) {
+					case 0:
+						// The Tenant is matching exactly the Quota:
+						// falling through next case since we have to block further
+						// resource allocations.
+						fallthrough
 					case 1:
 						// The Tenant is OverQuota:
 						// updating all the related ResourceQuota with the current
@@ -257,7 +262,6 @@ func (r *ReconcileTenant) syncResourceQuotas(tenant *capsulev1alpha1.Tenant) err
 						for i := range rql.Items {
 							rql.Items[i].Spec.Hard[rn] = rql.Items[i].Status.Used[rn]
 						}
-						println("")
 					default:
 						// The Tenant is respecting the Hard quota:
 						// restoring the default one for all the elements,
@@ -272,12 +276,18 @@ func (r *ReconcileTenant) syncResourceQuotas(tenant *capsulev1alpha1.Tenant) err
 					// TODO(prometherion): this is too expensive, should be performed via a recursion
 					for _, oj := range rql.Items {
 						err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-							_ = r.client.Get(context.TODO(), types.NamespacedName{Namespace: oj.Namespace, Name: oj.Name}, &oj)
+							// Retrieving from the cache the actual ResourceQuota
+							found := &corev1.ResourceQuota{}
+							_ = r.client.Get(context.TODO(), types.NamespacedName{Namespace: oj.Namespace, Name: oj.Name}, found)
+							// Ensuring annotation map is there to avoid uninitialized map error and
+							// assigning the overall usage
 							if oj.Annotations == nil {
 								oj.Annotations = make(map[string]string)
 							}
 							oj.Annotations[capsulev1alpha1.UsedQuotaFor(rn)] = qt.String()
-							return r.client.Update(context.TODO(), &oj, &client.UpdateOptions{})
+							// Updating the Resource according to the qt.Cmp result
+							found.Spec.Hard = oj.Spec.Hard
+							return r.client.Update(context.TODO(), found, &client.UpdateOptions{})
 						})
 						if err != nil {
 							return err
