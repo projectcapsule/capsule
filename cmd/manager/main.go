@@ -41,7 +41,6 @@ import (
 
 	"github.com/clastix/capsule/pkg/apis"
 	"github.com/clastix/capsule/pkg/controller"
-	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	"github.com/clastix/capsule/pkg/indexer"
 	"github.com/clastix/capsule/pkg/webhook"
 	"github.com/clastix/capsule/version"

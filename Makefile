@@ -9,3 +9,11 @@ crds:
 .PHONY: docker-image
 docker-image:
 	operator-sdk build quay.io/clastix/capsule:latest
+
+.PHONY: goimports
+goimports:
+	goimports -w -l -local "github.com/clastix/capsule" .
+
+.PHONY: golint
+golint:
+	golangci-lint run

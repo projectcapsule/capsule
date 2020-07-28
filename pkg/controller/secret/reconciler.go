@@ -16,16 +16,17 @@ package secret
 import (
 	"context"
 	"fmt"
-	"k8s.io/apimachinery/pkg/types"
 
-	"github.com/clastix/capsule/pkg/cert"
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+
+	"github.com/clastix/capsule/pkg/cert"
 )
 
 type secretReconciliationFunc func(reconciler *ReconcileSecret, request reconcile.Request) (reconcile.Result, error)

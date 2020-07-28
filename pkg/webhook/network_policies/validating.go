@@ -15,7 +15,6 @@ package network_policies
 
 import (
 	"context"
-	"github.com/clastix/capsule/pkg/webhook/utils"
 	"net/http"
 
 	"k8s.io/api/admission/v1beta1"
@@ -27,6 +26,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	"github.com/clastix/capsule/pkg/apis/capsule/v1alpha1"
+	"github.com/clastix/capsule/pkg/webhook/utils"
 )
 
 func Add(mgr manager.Manager) error {
