@@ -15,20 +15,24 @@ package namespace
 
 import (
 	"context"
+	"sort"
+
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
-	"sort"
 
 	"github.com/clastix/capsule/pkg/apis/capsule/v1alpha1"
 )
@@ -47,6 +51,15 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 	}
 }
 
+func getCapsuleReference(refs []v1.OwnerReference) (ok bool, reference *v1.OwnerReference) {
+	for _, r := range refs {
+		if r.APIVersion == v1alpha1.SchemeGroupVersion.String() {
+			return true, r.DeepCopy()
+		}
+	}
+	return false, nil
+}
+
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
 func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Create a new controller
@@ -56,7 +69,24 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to primary resource Namespace
-	err = c.Watch(&source.Kind{Type: &corev1.Namespace{}}, &handler.EnqueueRequestForObject{})
+	err = c.Watch(&source.Kind{Type: &corev1.Namespace{}}, &handler.EnqueueRequestForObject{}, predicate.Funcs{
+		CreateFunc: func(event event.CreateEvent) (ok bool) {
+			ok, _ = getCapsuleReference(event.Meta.GetOwnerReferences())
+			return
+		},
+		DeleteFunc: func(deleteEvent event.DeleteEvent) (ok bool) {
+			ok, _ = getCapsuleReference(deleteEvent.Meta.GetOwnerReferences())
+			return
+		},
+		UpdateFunc: func(updateEvent event.UpdateEvent) (ok bool) {
+			ok, _ = getCapsuleReference(updateEvent.MetaNew.GetOwnerReferences())
+			return
+		},
+		GenericFunc: func(genericEvent event.GenericEvent) (ok bool) {
+			ok, _ = getCapsuleReference(genericEvent.Meta.GetOwnerReferences())
+			return
+		},
+	})
 	if err != nil {
 		return err
 	}
@@ -129,13 +159,9 @@ func (r *ReconcileNamespace) Reconcile(request reconcile.Request) (res reconcile
 		return reconcile.Result{}, err
 	}
 
-	// Skipping NS non referenced to a Tenant
-	if len(ns.OwnerReferences) == 0 {
-		return reconcile.Result{}, nil
-	}
-
+	_, or := getCapsuleReference(ns.OwnerReferences)
 	t := &v1alpha1.Tenant{}
-	if err := r.client.Get(context.TODO(), types.NamespacedName{Name: ns.OwnerReferences[0].Name}, t); err != nil {
+	if err := r.client.Get(context.TODO(), types.NamespacedName{Name: or.Name}, t); err != nil {
 		// Error reading the object - requeue the request.
 		return reconcile.Result{}, err
 	}
