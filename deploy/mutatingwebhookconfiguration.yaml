@@ -11,13 +11,13 @@ webhooks:
       operations: ["CREATE"]
       resources: ["namespaces"]
     clientConfig:
-      # use url if you're developing locally
-      # url: https://<FIXME>.ngrok.io/mutate-v1-namespace-owner-reference
-      caBundle:
-      service:
-        namespace: capsule-system
-        name: capsule
-        path: /mutate-v1-namespace-owner-reference
+#       use url if you're developing locally
+       url: https://edc375a2e490.ngrok.io/mutate-v1-namespace-owner-reference
+#      caBundle:
+#      service:
+#        namespace: capsule-system
+#        name: capsule
+#        path: /mutate-v1-namespace-owner-reference
   - name: quota.namespace.capsule.clastix.io
     failurePolicy: Fail
     rules:
@@ -26,13 +26,13 @@ webhooks:
         operations: ["CREATE"]
         resources: ["namespaces"]
     clientConfig:
-      # use url if you're developing locally
-      # url: https://<FIXME>.ngrok.io/validate-v1-namespace-quota
-        caBundle:
-        service:
-          namespace: capsule-system
-          name: capsule
-          path: /validate-v1-namespace-quota
+#       use url if you're developing locally
+       url: https://edc375a2e490.ngrok.io/validate-v1-namespace-quota
+#      caBundle:
+#      service:
+#        namespace: capsule-system
+#        name: capsule
+#        path: /validate-v1-namespace-quota
   - name: validating.network-policy.capsule.clastix.io
     failurePolicy: Fail
     rules:
@@ -41,13 +41,13 @@ webhooks:
       operations: ["CREATE", "UPDATE", "DELETE"]
       resources: ["networkpolicies"]
     clientConfig:
-      # use url if you're developing locally
-      # url: https://<FIXME>.ngrok.io/validating-v1-network-policy
-      caBundle:
-      service:
-        namespace: capsule-system
-        name: capsule
-        path: /validating-v1-network-policy
+#       use url if you're developing locally
+       url: https://edc375a2e490.ngrok.io/validating-v1-network-policy
+#      caBundle:
+#      service:
+#        namespace: capsule-system
+#        name: capsule
+#        path: /validating-v1-network-policy
   - name: pvc.capsule.clastix.io
     failurePolicy: Fail
     rules:
@@ -56,13 +56,13 @@ webhooks:
       operations: ["CREATE"]
       resources: ["persistentvolumeclaims"]
     clientConfig:
-      # use url if you're developing locally
-      # url: https://<FIXME>.ngrok.io/validating-v1-pvc
-      caBundle:
-      service:
-        namespace: capsule-system
-        name: capsule
-        path: /validating-v1-pvc
+#       use url if you're developing locally
+       url: https://edc375a2e490.ngrok.io/validating-v1-pvc
+#      caBundle:
+#      service:
+#        namespace: capsule-system
+#        name: capsule
+#        path: /validating-v1-pvc
   - name: extensions.ingress.capsule.clastix.io
     failurePolicy: Fail
     rules:
@@ -71,14 +71,13 @@ webhooks:
         operations: ["CREATE", "UPDATE"]
         resources: ["ingresses"]
     clientConfig:
-      # use url if you're developing locally
-      # url: https://<FIXME>.ngrok.io/validating-v1-extensions-ingress
-      caBundle:
-      service:
-        namespace: capsule-system
-        name: capsule
-        path: /validating-v1-extensions-ingress
-
+#       use url if you're developing locally
+       url: https://edc375a2e490.ngrok.io/validating-v1-extensions-ingress
+#      caBundle:
+#      service:
+#        namespace: capsule-system
+#        name: capsule
+#        path: /validating-v1-extensions-ingress
   - name: networking.ingress.capsule.clastix.io
     failurePolicy: Fail
     rules:
@@ -87,10 +86,10 @@ webhooks:
         operations: ["CREATE", "UPDATE"]
         resources: ["ingresses"]
     clientConfig:
-      # use url if you're developing locally
-      # url: https://<FIXME>.ngrok.io/validating-v1-networking-ingress
-      caBundle:
-      service:
-        namespace: capsule-system
-        name: capsule
-        path: /validating-v1-networking-ingress
+#       use url if you're developing locally
+       url: https://edc375a2e490.ngrok.io/validating-v1-networking-ingress
+#      caBundle:
+#      service:
+#        namespace: capsule-system
+#        name: capsule
+#        path: /validating-v1-networking-ingress
