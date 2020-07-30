@@ -6,10 +6,10 @@ webhooks:
   - name: owner.namespace.capsule.clastix.io
     failurePolicy: Fail
     rules:
-    - apiGroups: [""]
-      apiVersions: ["v1"]
-      operations: ["CREATE"]
-      resources: ["namespaces"]
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        operations: ["CREATE"]
+        resources: ["namespaces"]
     clientConfig:
       # use url if you're developing locally
       # url: https://<FIXME>.ngrok.io/mutate-v1-namespace-owner-reference
@@ -28,18 +28,18 @@ webhooks:
     clientConfig:
       # use url if you're developing locally
       # url: https://<FIXME>.ngrok.io/validate-v1-namespace-quota
-        caBundle:
-        service:
-          namespace: capsule-system
-          name: capsule
-          path: /validate-v1-namespace-quota
+      caBundle:
+      service:
+        namespace: capsule-system
+        name: capsule
+        path: /validate-v1-namespace-quota
   - name: validating.network-policy.capsule.clastix.io
     failurePolicy: Fail
     rules:
-    - apiGroups: ["networking.k8s.io"]
-      apiVersions: ["v1"]
-      operations: ["CREATE", "UPDATE", "DELETE"]
-      resources: ["networkpolicies"]
+      - apiGroups: ["networking.k8s.io"]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE", "DELETE"]
+        resources: ["networkpolicies"]
     clientConfig:
       # use url if you're developing locally
       # url: https://<FIXME>.ngrok.io/validating-v1-network-policy
@@ -51,10 +51,10 @@ webhooks:
   - name: pvc.capsule.clastix.io
     failurePolicy: Fail
     rules:
-    - apiGroups: [""]
-      apiVersions: ["v1"]
-      operations: ["CREATE"]
-      resources: ["persistentvolumeclaims"]
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        operations: ["CREATE"]
+        resources: ["persistentvolumeclaims"]
     clientConfig:
       # use url if you're developing locally
       # url: https://<FIXME>.ngrok.io/validating-v1-pvc
