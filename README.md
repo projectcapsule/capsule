@@ -113,6 +113,10 @@ cluster admin.
 
 Please refer to the corresponding [section](use_cases.md)
 
+# How to contribute
+
+Please refer to the corresponding [section](contributing.md)
+
 # Production Grade status
 
 Capsule is still in an _alpha_ stage, so **don't use it in production**!
