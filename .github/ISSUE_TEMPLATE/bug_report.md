@@ -35,7 +35,7 @@ A clear and concise description of what you expected to happen.
 If applicable, please provide logs of `capsule`.
 
 In a standard stand-alone installation of Capsule,
-you'd get this by running `kubectl -n capsule-system logs deploy/capsule`.
+you'd get this by running `kubectl -n capsule-system logs deploy/capsule-controller-manager`.
 
 # Additional context
 

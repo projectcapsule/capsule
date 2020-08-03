@@ -36,7 +36,7 @@ func TestCapsuleCa_GenerateCertificate(t *testing.T) {
 	}
 	for name, c := range map[string]testCase{
 		"foo.tld": {[]string{"foo.tld"}},
-		"SAN":     {[]string{"capsule.capsule-system.svc", "capsule.capsule-system.default.cluster"}},
+		"SAN":     {[]string{"capsule-webhook-service.capsule-system.svc", "capsule-webhook-service.capsule-system.default.cluster"}},
 	} {
 		t.Run(name, func(t *testing.T) {
 			var ca *CapsuleCa

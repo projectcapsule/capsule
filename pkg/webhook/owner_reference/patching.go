@@ -1,9 +1,12 @@
 /*
 Copyright 2020 Clastix Labs.
+
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
+
     http://www.apache.org/licenses/LICENSE-2.0
+
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -24,42 +27,35 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"sigs.k8s.io/controller-runtime/pkg/manager"
-	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	"github.com/clastix/capsule/pkg/apis/capsule/v1alpha1"
-	"github.com/clastix/capsule/pkg/webhook/utils"
+	"github.com/clastix/capsule/api/v1alpha1"
+	"github.com/clastix/capsule/pkg/webhook"
 )
 
-func Add(mgr manager.Manager) error {
-	mgr.GetWebhookServer()
-	mgr.GetWebhookServer().Register("/mutate-v1-namespace-owner-reference", &webhook.Admission{
-		Handler: &ownerRef{
-			schema: mgr.GetScheme(),
-		},
-	})
-	return nil
+// +kubebuilder:webhook:path=/mutate-v1-namespace-owner-reference,mutating=true,failurePolicy=fail,groups="",resources=namespaces,verbs=create,versions=v1,name=owner.namespace.capsule.clastix.io
+
+type Webhook struct{}
+
+func (o Webhook) GetHandler() webhook.Handler {
+	return &handler{}
 }
 
-type ownerRef struct {
-	client  client.Client
-	decoder *admission.Decoder
-	// injecting the runtime.Scheme for controllerutil.SetOwnerReference
-	schema *runtime.Scheme
+func (o Webhook) GetName() string {
+	return "OwnerReference"
 }
 
-func (r *ownerRef) Handle(ctx context.Context, req admission.Request) admission.Response {
-	// Decoding the NS
+func (o Webhook) GetPath() string {
+	return "/mutate-v1-namespace-owner-reference"
+}
+
+type handler struct {
+}
+
+func (r *handler) OnCreate(ctx context.Context, req admission.Request, clt client.Client, decoder *admission.Decoder) admission.Response {
 	ns := &corev1.Namespace{}
-	if err := r.decoder.Decode(req, ns); err != nil {
+	if err := decoder.Decode(req, ns); err != nil {
 		return admission.Errored(http.StatusBadRequest, err)
-	}
-
-	g := utils.UserGroupList(req.UserInfo.Groups)
-	if !g.IsInCapsuleGroup() {
-		// user requested NS creation is not a Capsule user, so skipping the validation checks
-		return admission.Allowed("")
 	}
 
 	if len(ns.ObjectMeta.Labels) > 0 {
@@ -72,7 +68,7 @@ func (r *ownerRef) Handle(ctx context.Context, req admission.Request) admission.
 		if ok {
 			// retrieving the selected Tenant
 			t := &v1alpha1.Tenant{}
-			if err := r.client.Get(ctx, types.NamespacedName{Name: l}, t); err != nil {
+			if err := clt.Get(ctx, types.NamespacedName{Name: l}, t); err != nil {
 				return admission.Errored(http.StatusBadRequest, err)
 			}
 			// Tenant owner must adhere to user that asked for NS creation
@@ -86,7 +82,7 @@ func (r *ownerRef) Handle(ctx context.Context, req admission.Request) admission.
 	}
 
 	tl := &v1alpha1.TenantList{}
-	if err := r.client.List(ctx, tl, client.MatchingFieldsSelector{
+	if err := clt.List(ctx, tl, client.MatchingFieldsSelector{
 		Selector: fields.OneTermEqualSelector(".spec.owner", req.UserInfo.Username),
 	}); err != nil {
 		return admission.Errored(http.StatusBadRequest, err)
@@ -99,21 +95,23 @@ func (r *ownerRef) Handle(ctx context.Context, req admission.Request) admission.
 	return admission.Denied("You do not have any Tenant assigned: please, reach out the system administrators")
 }
 
-func (r *ownerRef) patchResponseForOwnerRef(tenant *v1alpha1.Tenant, ns *corev1.Namespace) admission.Response {
+func (r *handler) OnDelete(ctx context.Context, req admission.Request, client client.Client, decoder *admission.Decoder) admission.Response {
+	return admission.Allowed("")
+}
+
+func (r *handler) OnUpdate(ctx context.Context, req admission.Request, client client.Client, decoder *admission.Decoder) admission.Response {
+	return admission.Denied("Capsule user cannot update a Namespace")
+}
+
+func (r *handler) patchResponseForOwnerRef(tenant *v1alpha1.Tenant, ns *corev1.Namespace) admission.Response {
+	scheme := runtime.NewScheme()
+	_ = v1alpha1.AddToScheme(scheme)
+	_ = corev1.AddToScheme(scheme)
+
 	o, _ := json.Marshal(ns.DeepCopy())
-	if err := controllerutil.SetControllerReference(tenant, ns, r.schema); err != nil {
+	if err := controllerutil.SetControllerReference(tenant, ns, scheme); err != nil {
 		return admission.Errored(http.StatusInternalServerError, err)
 	}
 	c, _ := json.Marshal(ns)
 	return admission.PatchResponseFromRaw(o, c)
-}
-
-func (r *ownerRef) InjectDecoder(d *admission.Decoder) error {
-	r.decoder = d
-	return nil
-}
-
-func (r *ownerRef) InjectClient(c client.Client) error {
-	r.client = c
-	return nil
 }
