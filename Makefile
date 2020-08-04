@@ -116,3 +116,13 @@ bundle: manifests
 # Build the bundle image.
 bundle-build:
 	docker build -f bundle.Dockerfile -t $(BUNDLE_IMG) .
+
+# Sorting imports
+.PHONY: goimports
+goimports:
+	goimports -w -l -local "github.com/clastix/capsule" .
+
+# Linting code as PR is expecting
+.PHONY: golint
+golint:
+	golangci-lint run
