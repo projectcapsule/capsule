@@ -9,7 +9,8 @@ The first step is to setup your local development environment
 The following dependencies are mandatory:
 
 - [Go 1.13.8](https://golang.org/dl/)
-- [OperatorSDK 1.8](https://github.com/operator-framework/operator-sdk)
+- [OperatorSDK 1.9](https://github.com/operator-framework/operator-sdk)
+- [Kubebuilder](https://github.com/kubernetes-sigs/kubebuilder)
 - [KinD](https://github.com/kubernetes-sigs/kind)
 - [ngrok](https://ngrok.com/) (if you want to run locally)
 - [golangci-lint](https://github.com/golangci/golangci-lint)
@@ -28,6 +29,13 @@ go mod download
 Some operations, like the Docker image build process or the code-generation of
 the CRDs manifests, as well the deep copy functions, require _Operator SDK_:
 the binary has to be installed into your `PATH`.
+
+### Installing Kubebuilder
+
+With the latest release of OperatorSDK there's a more tightly integration with
+Kubebuilder and its opinionated testing suite: ensure to download the latest
+binaries available from the _Releases_ GitHub page and place them into the
+`/usr/local/kubebuilder/bin` folder, ensuring this is also in your `PATH`.
 
 ### Installing KinD
 
@@ -68,37 +76,63 @@ certificates and the context changed to the just born Kubernetes cluster.
 From the root path, issue the _make_ recipe:
 
 ```
-# make docker-image
-operator-sdk build quay.io/clastix/capsule:latest
-INFO[0001] Building OCI image quay.io/clastix/capsule:latest 
-Sending build context to Docker daemon  89.26MB
-Step 1/7 : FROM registry.access.redhat.com/ubi8/ubi-minimal:latest
- ---> 75a64ccf990b
-Step 2/7 : ENV OPERATOR=/usr/local/bin/capsule     USER_UID=0     USER_NAME=capsule
+# make docker-build
+/home/prometherion/go/bin/controller-gen object:headerFile="hack/boilerplate.go.txt" paths="./..."
+go fmt ./...
+main.go
+go vet ./...
+/home/prometherion/go/bin/controller-gen "crd:trivialVersions=true" rbac:roleName=manager-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases
+go test ./... -coverprofile cover.out
+...
+docker build . -t quay.io/clastix/capsule:latest
+Sending build context to Docker daemon  43.21MB
+Step 1/15 : FROM golang:1.13 as builder
+ ---> 67d10cb69049
+Step 2/15 : WORKDIR /workspace
  ---> Using cache
- ---> e4610bd8596f
-Step 3/7 : COPY build/_output/bin/capsule ${OPERATOR}
+ ---> d783cc2b7c33
+Step 3/15 : COPY go.mod go.mod
  ---> Using cache
- ---> 1f6196485c28
-Step 4/7 : COPY build/bin /usr/local/bin
+ ---> 0fec3ca39e50
+Step 4/15 : COPY go.sum go.sum
  ---> Using cache
- ---> b517a62ca352
-Step 5/7 : RUN  /usr/local/bin/user_setup
+ ---> de15be20dbe7
+Step 5/15 : RUN go mod download
  ---> Using cache
- ---> e879394010d5
-Step 6/7 : ENTRYPOINT ["/usr/local/bin/entrypoint"]
+ ---> b525cd9abc67
+Step 6/15 : COPY main.go main.go
+ ---> 67d9d6538ffc
+Step 7/15 : COPY api/ api/
+ ---> 6243b250d170
+Step 8/15 : COPY controllers/ controllers/
+ ---> 4abf8ce85484
+Step 9/15 : COPY pkg/ pkg/
+ ---> 2cd289b1d496
+Step 10/15 : RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -a -o manager main.go
+ ---> Running in dac9a1e3b23f
+Removing intermediate container dac9a1e3b23f
+ ---> bb650a8efcb2
+Step 11/15 : FROM gcr.io/distroless/static:nonroot
+ ---> 131713291b92
+Step 12/15 : WORKDIR /
  ---> Using cache
- ---> 6e740290e0e4
-Step 7/7 : USER ${USER_UID}
- ---> Using cache
- ---> ebb8f640dda1
-Successfully built ebb8f640dda1
+ ---> 677a73ab94d3
+Step 13/15 : COPY --from=builder /workspace/manager .
+ ---> 6ecb58a82c0a
+Step 14/15 : USER nonroot:nonroot
+ ---> Running in a0b8c95f85d4
+Removing intermediate container a0b8c95f85d4
+ ---> c4897d60a094
+Step 15/15 : ENTRYPOINT ["/manager"]
+ ---> Running in 1a42bab52aa7
+Removing intermediate container 1a42bab52aa7
+ ---> 37d2adbe2669
+Successfully built 37d2adbe2669
 Successfully tagged quay.io/clastix/capsule:latest
-INFO[0004] Operator build complete. 
 ```
 
 The image `quay.io/clastix/capsule:latest` will be available locally, you just
-need to push it to kind with the following command.
+need to push it to _KinD_ with the following command.
 
 ```
 # kind load docker-image --nodes capsule-control-plane --name capsule quay.io/clastix/capsule:latest
@@ -107,45 +141,34 @@ Image: "quay.io/clastix/capsule:latest" with ID "sha256:ebb8f640dda129a795ddc68b
 
 ### Deploy the Kubernetes manifests
 
-With the current `kind-capsule` context enabled, create the `capsule-system`
-Namespace that will contain all the Kubernetes resources.
+With the current `kind-capsule` context enabled, deploy all the required
+manifests issuing the following command:
 
 ```
-# kubectl create namespace capsule-system
-namespace/capsule-system created
+make deploy
 ```
 
-Now it's time to install the _Custom Resource Definition_:
+This will install all the required Kubernetes resources, automatically.
+
+You can check if Capsule is running tailing the logs:
 
 ```
-# kubectl apply -f deploy/crds/capsule.clastix.io_tenants_crd.yaml
-customresourcedefinition.apiextensions.k8s.io/tenants.capsule.clastix.io created
-```
-
-Finally, install the required manifests issuing the following command:
-
-```
-# kubectl apply -f deploy
-mutatingwebhookconfiguration.admissionregistration.k8s.io/capsule created
-clusterrole.rbac.authorization.k8s.io/namespace:deleter created
-clusterrole.rbac.authorization.k8s.io/namespace:provisioner created
-clusterrolebinding.rbac.authorization.k8s.io/namespace:provisioner created
-deployment.apps/capsule created
-clusterrole.rbac.authorization.k8s.io/capsule created
-clusterrolebinding.rbac.authorization.k8s.io/capsule-cluster-admin created
-clusterrolebinding.rbac.authorization.k8s.io/capsule created
-secret/capsule-ca created
-secret/capsule-tls created
-service/capsule created
-serviceaccount/capsule created
-```
-
-You can check if Capsule is running checking the logs:
-
-```
-# kubectl -n capsule-system logs -f -l name=capsule
+# kubectl -n capsule-system logs --all-containers -f -l control-plane=controller-manager
 ...
-{"level":"info","ts":1596125071.5951712,"logger":"controller-runtime.controller","msg":"Starting workers","controller":"tenant-controller","worker count":1}
+2020-08-03T15:37:44.031Z        INFO    controllers.Tenant      Role Binding sync result: unchanged     {"Request.Name": "oil", "name": "namespace:deleter", "namespace": "oil-dev"}
+2020-08-03T15:37:44.032Z        INFO    controllers.Tenant      Role Binding sync result: unchanged     {"Request.Name": "oil", "name": "namespace:admin", "namespace": "oil-production"}
+2020-08-03T15:37:44.032Z        INFO    controllers.Tenant      Role Binding sync result: unchanged     {"Request.Name": "oil", "name": "namespace:deleter", "namespace": "oil-production"}
+2020-08-03T15:37:44.032Z        INFO    controllers.Tenant      Tenant reconciling completed    {"Request.Name": "oil"}
+2020-08-03T15:37:44.032Z        DEBUG   controller-runtime.controller   Successfully Reconciled {"controller": "tenant", "request": "/oil"}
+2020-08-03T15:37:46.945Z        INFO    controllers.Namespace   Reconciling Namespace   {"Request.Name": "oil-staging"}
+2020-08-03T15:37:46.953Z        INFO    controllers.Namespace   Namespace reconciliation processed      {"Request.Name": "oil-staging"}
+2020-08-03T15:37:46.953Z        DEBUG   controller-runtime.controller   Successfully Reconciled {"controller": "namespace", "request": "/oil-staging"}
+2020-08-03T15:37:46.957Z        INFO    controllers.Namespace   Reconciling Namespace   {"Request.Name": "oil-staging"}
+2020-08-03T15:37:46.957Z        DEBUG   controller-runtime.controller   Successfully Reconciled {"controller": "namespace", "request": "/oil-staging"}
+I0803 15:16:01.763606       1 main.go:186] Valid token audiences: 
+I0803 15:16:01.763689       1 main.go:232] Generating self signed cert as no cert is provided
+I0803 15:16:02.042022       1 main.go:281] Starting TCP socket on 0.0.0.0:8443
+I0803 15:16:02.042364       1 main.go:288] Listening securely on 0.0.0.0:8443
 ```
 
 Since Capsule is built using _OperatorSDK_, logging is handled by the zap
@@ -169,8 +192,8 @@ access to the Kubernetes API Server.
 First, ensure the Capsule pod is not running scaling down the Deployment.
 
 ```
-# kubectl -n capsule-system scale deployment capsule --replicas=0
-deployment.apps/capsule scaled
+# kubectl -n capsule-system scale deployment capsule-controller-manager --replicas=0
+deployment.apps/capsule-controller-manager scaled
 ```
 
 > This is mandatory since Capsule uses Leader Election
@@ -197,7 +220,7 @@ In another session we need a `ngrok` session, mandatory to debug also webhooks
 (YMMV).
 
 ```
-# ngrok http localhost:443
+# ngrok http https://localhost:9443
 ngrok by @inconshreveable
 
 Session Status                online
@@ -205,8 +228,8 @@ Account                       Dario Tranchitella (Plan: Free)
 Version                       2.3.35
 Region                        United States (us)
 Web Interface                 http://127.0.01:4040
-Forwarding                    http://cdb72b99348c.ngrok.io -> https://localhost:443
-Forwarding                    https://cdb72b99348c.ngrok.io -> https://localhost:443
+Forwarding                    http://cdb72b99348c.ngrok.io -> https://localhost:9443
+Forwarding                    https://cdb72b99348c.ngrok.io -> https://localhost:9443
 Connections                   ttl     opn     rt1     rt5     p50     p90 
                               0       0       0.00    0.00    0.00    0.00
 ```
@@ -217,14 +240,15 @@ _Dynamic Admissions Control Webhooks_.
 
 #### Patching the MutatingWebhookConfiguration
 
-Now it's time to patch the _MutatingWebhookConfiguration_, adding the said
-`ngrok` URL as base for each defined webhook, as following:
+Now it's time to patch the _MutatingWebhookConfiguration_ and the
+_ValidatingWebhookConfiguration_ too, adding the said `ngrok` URL as base for
+each defined webhook, as following:
 
 ```diff
 apiVersion: admissionregistration.k8s.io/v1beta1
 kind: MutatingWebhookConfiguration
 metadata:
-  name: capsule
+  name: capsule-mutating-webhook-configuration
 webhooks:
   - name: owner.namespace.capsule.clastix.io
     failurePolicy: Fail
@@ -237,7 +261,7 @@ webhooks:
 +     url: https://cdb72b99348c.ngrok.io/mutate-v1-namespace-owner-reference
 -     caBundle:
 -     service:
--       namespace: capsule-system
+-       namespace: system
 -       name: capsule
 -       path: /mutate-v1-namespace-owner-reference
 ...
@@ -249,7 +273,7 @@ Finally, it's time to run locally Capsule using your preferred IDE (or not):
 from the project root path you can issue the following command.
 
 ```
-WATCH_NAMESPACE= KUBECONFIG=/path/to/your/kubeconfig OPERATOR_NAME=capsule go run cmd/manager/main.go
+make run
 ```
 
 All the logs will start to flow in your standard output, feel free to attach

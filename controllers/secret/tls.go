@@ -1,0 +1,127 @@
+/*
+Copyright 2020 Clastix Labs.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package secret
+
+import (
+	"context"
+	"crypto/x509"
+	"encoding/pem"
+	"syscall"
+	"time"
+
+	"github.com/go-logr/logr"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+
+	"github.com/clastix/capsule/pkg/cert"
+)
+
+type TlsReconciler struct {
+	client.Client
+	Log    logr.Logger
+	Scheme *runtime.Scheme
+}
+
+func (r *TlsReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	return ctrl.NewControllerManagedBy(mgr).
+		For(&corev1.Secret{}, forOptionPerInstanceName(tlsSecretName)).
+		Complete(r)
+}
+
+func (r TlsReconciler) Reconcile(request ctrl.Request) (ctrl.Result, error) {
+	var err error
+
+	r.Log = r.Log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
+	r.Log.Info("Reconciling TLS Secret")
+
+	// Fetch the Secret instance
+	instance := &corev1.Secret{}
+	err = r.Get(context.TODO(), request.NamespacedName, instance)
+	if err != nil {
+		// Error reading the object - requeue the request.
+		return reconcile.Result{}, err
+	}
+
+	var ca cert.Ca
+	var rq time.Duration
+
+	ca, err = getCertificateAuthority(r.Client)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+
+	var shouldCreate bool
+	for _, key := range []string{certSecretKey, privateKeySecretKey} {
+		if _, ok := instance.Data[key]; !ok {
+			shouldCreate = true
+		}
+	}
+
+	if shouldCreate {
+		r.Log.Info("Missing Capsule TLS certificate")
+		rq = 6 * 30 * 24 * time.Hour
+
+		opts := cert.NewCertOpts(time.Now().Add(rq), "capsule-webhook-service.capsule-system.svc")
+		crt, key, err := ca.GenerateCertificate(opts)
+		if err != nil {
+			r.Log.Error(err, "Cannot generate new TLS certificate")
+			return reconcile.Result{}, err
+		}
+		instance.Data = map[string][]byte{
+			certSecretKey:       crt.Bytes(),
+			privateKeySecretKey: key.Bytes(),
+		}
+	} else {
+		var c *x509.Certificate
+		var b *pem.Block
+		b, _ = pem.Decode(instance.Data[certSecretKey])
+		c, err = x509.ParseCertificate(b.Bytes)
+		if err != nil {
+			r.Log.Error(err, "cannot parse Capsule TLS")
+			return reconcile.Result{}, err
+		}
+
+		rq = time.Duration(c.NotAfter.Unix()-time.Now().Unix()) * time.Second
+		if time.Now().After(c.NotAfter) {
+			r.Log.Info("Capsule TLS is expired, cleaning to obtain a new one")
+			instance.Data = map[string][]byte{}
+		}
+	}
+
+	var res controllerutil.OperationResult
+	t := &corev1.Secret{ObjectMeta: instance.ObjectMeta}
+	res, err = controllerutil.CreateOrUpdate(context.TODO(), r.Client, t, func() error {
+		t.Data = instance.Data
+		return nil
+	})
+	if err != nil {
+		r.Log.Error(err, "cannot update Capsule TLS")
+		return reconcile.Result{}, err
+	}
+
+	if instance.Name == tlsSecretName && res == controllerutil.OperationResultUpdated {
+		r.Log.Info("Capsule TLS certificates has been updated, we need to restart the Controller")
+		_ = syscall.Kill(syscall.Getpid(), syscall.SIGINT)
+	}
+
+	r.Log.Info("Reconciliation completed, processing back in " + rq.String())
+	return reconcile.Result{Requeue: true, RequeueAfter: rq}, nil
+}

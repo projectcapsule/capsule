@@ -8,24 +8,30 @@ _Container-as-a-Service_ (CaaS) platforms.
 
 # tl;dr; How to install
 
-As a Cluster Admin, ensure the `capsule-system` Namespace is already there.
+Ensure you have [`kustomize`](https://github.com/kubernetes-sigs/kustomize)
+installed in your `PATH`:
 
 ```
-# kubectl apply -f deploy
-mutatingwebhookconfiguration.admissionregistration.k8s.io/capsule created
-clusterrole.rbac.authorization.k8s.io/namespace:deleter created
-clusterrole.rbac.authorization.k8s.io/namespace:provisioner created
-clusterrolebinding.rbac.authorization.k8s.io/namespace:provisioner created
-deployment.apps/capsule created
-clusterrole.rbac.authorization.k8s.io/capsule created
-clusterrolebinding.rbac.authorization.k8s.io/capsule-cluster-admin created
-clusterrolebinding.rbac.authorization.k8s.io/capsule created
-secret/capsule-ca created
-secret/capsule-tls created
-service/capsule created
-serviceaccount/capsule created
-# kubectl apply -f deploy/crds/capsule.clastix.io_tenants_crd.yaml
-customresourcedefinition.apiextensions.k8s.io/tenants.capsule.clastix.io created
+make deploy
+# /home/prometherion/go/bin/controller-gen "crd:trivialVersions=true" rbac:roleName=manager-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases
+# cd config/manager && /usr/local/bin/kustomize edit set image controller=quay.io/clastix/capsule:latest
+# /usr/local/bin/kustomize build config/default | kubectl apply -f -
+# namespace/capsule-system created
+# customresourcedefinition.apiextensions.k8s.io/tenants.capsule.clastix.io created
+# clusterrole.rbac.authorization.k8s.io/capsule-namespace:deleter created
+# clusterrole.rbac.authorization.k8s.io/capsule-namespace:provisioner created
+# clusterrole.rbac.authorization.k8s.io/capsule-proxy-role created
+# clusterrole.rbac.authorization.k8s.io/capsule-metrics-reader created
+# clusterrolebinding.rbac.authorization.k8s.io/capsule-manager-rolebinding created
+# clusterrolebinding.rbac.authorization.k8s.io/capsule-namespace:provisioner created
+# clusterrolebinding.rbac.authorization.k8s.io/capsule-proxy-rolebinding created
+# secret/capsule-ca created
+# secret/capsule-tls created
+# service/capsule-controller-manager-metrics-service created
+# service/capsule-webhook-service created
+# deployment.apps/capsule-controller-manager created
+# mutatingwebhookconfiguration.admissionregistration.k8s.io/capsule-mutating-webhook-configuration created
+# validatingwebhookconfiguration.admissionregistration.k8s.io/capsule-validating-webhook-configuration created
 ```
 
 ## Webhooks and CA Bundle
@@ -64,11 +70,11 @@ All Tenant owner needs to be granted with a X.509 certificate with
 
 ## How to create a Tenant
 
-Use the [scaffold Tenant](deploy/crds/capsule.clastix.io_v1alpha1_tenant_cr.yaml)
+Use the [scaffold Tenant](config/samples/capsule_v1alpha1_tenant.yaml)
 and simply apply as Cluster Admin.
 
 ```
-# kubectl apply -f deploy/crds/capsule.clastix.io_v1alpha1_tenant_cr.yaml
+# kubectl apply -f config/samples/capsule_v1alpha1_tenant.yaml
 tenant.capsule.clastix.io/oil created
 ```
 
