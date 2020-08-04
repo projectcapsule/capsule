@@ -16,7 +16,14 @@ limitations under the License.
 
 package v1alpha1
 
-import corev1 "k8s.io/api/core/v1"
+import (
+	corev1 "k8s.io/api/core/v1"
+)
+
+const (
+	AvailableIngressClassesAnnotation = "capsule.clastix.io/ingress-classes"
+	AvailableStorageClassesAnnotation = "capsule.clastix.io/storage-classes"
+)
 
 func UsedQuotaFor(resource corev1.ResourceName) string {
 	return "quota.capsule.clastix.io/used-" + resource.String()

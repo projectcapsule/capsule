@@ -24,6 +24,7 @@ import (
 	"sync"
 
 	"github.com/go-logr/logr"
+	"github.com/hashicorp/go-multierror"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -53,6 +54,7 @@ type TenantReconciler struct {
 func (r *TenantReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&capsulev1alpha1.Tenant{}).
+		Owns(&corev1.Namespace{}).
 		Owns(&networkingv1.NetworkPolicy{}).
 		Owns(&corev1.LimitRange{}).
 		Owns(&corev1.ResourceQuota{}).
@@ -72,6 +74,12 @@ func (r TenantReconciler) Reconcile(request ctrl.Request) (ctrl.Result, error) {
 			return reconcile.Result{}, nil
 		}
 		r.Log.Error(err, "Error reading the object")
+		return reconcile.Result{}, err
+	}
+
+	r.Log.Info("Starting processing of Namespaces", "items", instance.Status.Namespaces.Len())
+	if err := r.syncNamespaces(instance); err != nil {
+		r.Log.Error(err, "Cannot sync Namespace items")
 		return reconcile.Result{}, err
 	}
 
@@ -356,6 +364,46 @@ func (r *TenantReconciler) syncLimitRanges(tenant *capsulev1alpha1.Tenant) error
 	}
 
 	return nil
+}
+
+func (r *TenantReconciler) syncNamespace(namespace string, ingressClasses []string, storageClasses []string, wg *sync.WaitGroup, channel chan error) {
+	defer wg.Done()
+
+	t := &corev1.Namespace{}
+	if err := r.Client.Get(context.TODO(), types.NamespacedName{Name: namespace}, t); err != nil {
+		channel <- err
+	}
+
+	channel <- retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		if t.Annotations == nil {
+			t.Annotations = make(map[string]string)
+		}
+		t.Annotations[capsulev1alpha1.AvailableIngressClassesAnnotation] = strings.Join(ingressClasses, ",")
+		t.Annotations[capsulev1alpha1.AvailableStorageClassesAnnotation] = strings.Join(storageClasses, ",")
+		return r.Client.Update(context.TODO(), t, &client.UpdateOptions{})
+	})
+}
+
+// Ensuring all annotations are applied to each Namespace handled by the Tenant.
+func (r *TenantReconciler) syncNamespaces(tenant *capsulev1alpha1.Tenant) (err error) {
+	ch := make(chan error, tenant.Status.Namespaces.Len())
+
+	wg := &sync.WaitGroup{}
+	wg.Add(tenant.Status.Namespaces.Len())
+
+	for _, ns := range tenant.Status.Namespaces {
+		go r.syncNamespace(ns, tenant.Spec.IngressClasses, tenant.Spec.StorageClasses, wg, ch)
+	}
+
+	wg.Wait()
+	close(ch)
+
+	for e := range ch {
+		if e != nil {
+			err = multierror.Append(e, err)
+		}
+	}
+	return
 }
 
 // Ensuring all the NetworkPolicies are applied to each Namespace handled by the Tenant.
