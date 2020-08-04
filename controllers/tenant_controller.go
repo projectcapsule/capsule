@@ -110,21 +110,25 @@ func (r TenantReconciler) Reconcile(request ctrl.Request) (ctrl.Result, error) {
 }
 
 // pruningResources is taking care of removing the no more requested sub-resources as LimitRange, ResourceQuota or
-// NetworkPolicy using the "notin" LabelSelector to perform an outer-join removal.
+// NetworkPolicy using the "exists" and "notin" LabelSelector to perform an outer-join removal.
 func (r *TenantReconciler) pruningResources(ns string, keys []string, obj runtime.Object) error {
 	capsuleLabel, err := capsulev1alpha1.GetTypeLabel(obj)
 	if err != nil {
 		return err
 	}
-	req, err := labels.NewRequirement(capsuleLabel, selection.NotIn, keys)
+	exists, err := labels.NewRequirement(capsuleLabel, selection.Exists, []string{})
 	if err != nil {
 		return err
 	}
-	r.Log.Info("Pruning objects with label selector " + req.String())
+	notIn, err := labels.NewRequirement(capsuleLabel, selection.NotIn, keys)
+	if err != nil {
+		return err
+	}
+	r.Log.Info("Pruning objects with label selector " + notIn.String())
 	err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		return r.DeleteAllOf(context.TODO(), obj, &client.DeleteAllOfOptions{
 			ListOptions: client.ListOptions{
-				LabelSelector: labels.NewSelector().Add(*req),
+				LabelSelector: labels.NewSelector().Add(*exists, *notIn),
 				Namespace:     ns,
 			},
 			DeleteOptions: client.DeleteOptions{},
