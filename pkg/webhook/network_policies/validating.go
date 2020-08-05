@@ -68,7 +68,7 @@ func (r *handler) OnDelete(ctx context.Context, req admission.Request, client cl
 	if err != nil {
 		return admission.Errored(http.StatusInternalServerError, err)
 	}
-	if !ok {
+	if ok {
 		return admission.Denied("Capsule Network Policies cannot be deleted: please, reach out the system administrators")
 	}
 
@@ -86,7 +86,7 @@ func (r *handler) OnUpdate(ctx context.Context, req admission.Request, client cl
 	if err != nil {
 		return admission.Errored(http.StatusInternalServerError, err)
 	}
-	if !ok {
+	if ok {
 		return admission.Denied("Capsule Network Policies cannot be updated: please, reach out the system administrators")
 	}
 
