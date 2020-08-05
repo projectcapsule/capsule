@@ -6,7 +6,7 @@ This project aims to provide a custom operator for implementing a strong
 multi-tenant environment in _Kubernetes_, especially suited for public
 _Container-as-a-Service_ (CaaS) platforms.
 
-# tl;dr; How to install
+# Installation
 
 Ensure you have [`kustomize`](https://github.com/kubernetes-sigs/kustomize)
 installed in your `PATH`:
@@ -122,6 +122,32 @@ Please refer to the corresponding [section](use_cases.md)
 # How to contribute
 
 Please refer to the corresponding [section](contributing.md)
+
+# Removal
+
+Similar to `deploy`, you can get rid of Capsule using the `remove` target.
+
+```
+make remove
+# /home/prometherion/go/bin/controller-gen "crd:trivialVersions=true" rbac:roleName=manager-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases
+# /usr/local/bin/kustomize build config/default | kubectl delete -f -
+# namespace "capsule-system" deleted
+# customresourcedefinition.apiextensions.k8s.io "tenants.capsule.clastix.io" deleted
+# clusterrole.rbac.authorization.k8s.io "capsule-namespace:deleter" deleted
+# clusterrole.rbac.authorization.k8s.io "capsule-namespace:provisioner" deleted
+# clusterrole.rbac.authorization.k8s.io "capsule-proxy-role" deleted
+# clusterrole.rbac.authorization.k8s.io "capsule-metrics-reader" deleted
+# clusterrolebinding.rbac.authorization.k8s.io "capsule-manager-rolebinding" deleted
+# clusterrolebinding.rbac.authorization.k8s.io "capsule-namespace:provisioner" deleted
+# clusterrolebinding.rbac.authorization.k8s.io "capsule-proxy-rolebinding" deleted
+# secret "capsule-ca" deleted
+# secret "capsule-tls" deleted
+# service "capsule-controller-manager-metrics-service" deleted
+# service "capsule-webhook-service" deleted
+# deployment.apps "capsule-controller-manager" deleted
+# mutatingwebhookconfiguration.admissionregistration.k8s.io "capsule-mutating-webhook-configuration" deleted
+# validatingwebhookconfiguration.admissionregistration.k8s.io "capsule-validating-webhook-configuration" deleted
+```
 
 # Production Grade status
 
