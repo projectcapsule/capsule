@@ -53,6 +53,8 @@ type TenantStatus struct {
 // +kubebuilder:resource:scope=Cluster
 // +kubebuilder:printcolumn:name="Namespace quota",type="integer",JSONPath=".spec.namespaceQuota",description="The max amount of Namespaces can be created"
 // +kubebuilder:printcolumn:name="Namespace count",type="integer",JSONPath=".status.size",description="The total amount of Namespaces in use"
+// +kubebuilder:printcolumn:name="Owner",type="string",JSONPath=".spec.owner",description="The assigned Tenant owner"
+// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp",description="Age"
 
 // Tenant is the Schema for the tenants API
 type Tenant struct {
