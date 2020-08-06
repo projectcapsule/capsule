@@ -113,6 +113,12 @@ func (r TenantReconciler) Reconcile(request ctrl.Request) (ctrl.Result, error) {
 		return reconcile.Result{}, err
 	}
 
+	r.Log.Info("Ensuring Namespace count")
+	if err := r.ensureNamespaceCount(instance); err != nil {
+		r.Log.Error(err, "Cannot sync Namespace count")
+		return reconcile.Result{}, err
+	}
+
 	r.Log.Info("Tenant reconciling completed")
 	return ctrl.Result{}, nil
 }
@@ -545,4 +551,11 @@ func (r *TenantReconciler) ensureNodeSelector(tenant *capsulev1alpha1.Tenant) (e
 	}
 
 	return
+}
+
+func (r *TenantReconciler) ensureNamespaceCount(tenant *capsulev1alpha1.Tenant) error {
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		tenant.Status.Size = uint(tenant.Status.Namespaces.Len())
+		return r.Client.Status().Update(context.TODO(), tenant, &client.UpdateOptions{})
+	})
 }
