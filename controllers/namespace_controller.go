@@ -112,13 +112,6 @@ func (r *NamespaceReconciler) addNamespace(name string, tenant *v1alpha1.Tenant)
 	tenant.Status.Namespaces = append(tenant.Status.Namespaces, c[i:]...)
 }
 
-func (r *NamespaceReconciler) updateNamespaceCount(tenant *v1alpha1.Tenant) error {
-	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		tenant.Status.Size = uint(len(tenant.Status.Namespaces))
-		return r.Client.Status().Update(context.TODO(), tenant, &client.UpdateOptions{})
-	})
-}
-
 func (r NamespaceReconciler) Reconcile(request ctrl.Request) (ctrl.Result, error) {
 	r.Log = r.Log.WithValues("Request.Name", request.Name)
 	r.Log.Info("Reconciling Namespace")
@@ -149,10 +142,6 @@ func (r NamespaceReconciler) Reconcile(request ctrl.Request) (ctrl.Result, error
 	}
 
 	r.updateTenantStatus(ns, t)
-
-	if err := r.updateNamespaceCount(t); err != nil {
-		r.Log.Error(err, "cannot update Namespace list", "tenant", t.Name)
-	}
 
 	r.Log.Info("Namespace reconciliation processed")
 	return reconcile.Result{}, nil
