@@ -1,0 +1,29 @@
+# This is a basic workflow to help you get started with Actions
+
+name: CI
+
+# Controls when the action will run. Triggers the workflow on push or pull request
+# events but only for the master branch
+on:
+  push:
+    branches: [ "*" ]
+  pull_request:
+    branches: [ "*" ]
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  # This workflow contains a single job called "build"
+  golangci:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Run golangci-lint
+      uses: golangci/golangci-lint-action@v2.2.0
+      with:
+        # version of golangci-lint to use in form of v1.2.3
+        version: latest
+        # if set to true and the action runs on a pull request - the action outputs only newly found issues
+        only-new-issues: false
+        args: --timeout 2m
