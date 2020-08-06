@@ -141,7 +141,10 @@ func (r NamespaceReconciler) Reconcile(request ctrl.Request) (ctrl.Result, error
 		return reconcile.Result{}, err
 	}
 
-	r.updateTenantStatus(ns, t)
+	if err := r.updateTenantStatus(ns, t); err != nil {
+		r.Log.Error(err, "cannot update Tenant status")
+		return reconcile.Result{}, err
+	}
 
 	r.Log.Info("Namespace reconciliation processed")
 	return reconcile.Result{}, nil
@@ -165,11 +168,15 @@ func (r *NamespaceReconciler) ensureLabel(ns *corev1.Namespace, tenantName strin
 	return nil
 }
 
-func (r *NamespaceReconciler) updateTenantStatus(ns *corev1.Namespace, tenant *v1alpha1.Tenant) {
-	switch ns.Status.Phase {
-	case corev1.NamespaceTerminating:
-		r.removeNamespace(ns.Name, tenant)
-	case corev1.NamespaceActive:
-		r.addNamespace(ns.Name, tenant)
-	}
+func (r *NamespaceReconciler) updateTenantStatus(ns *corev1.Namespace, tenant *v1alpha1.Tenant) error {
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		switch ns.Status.Phase {
+		case corev1.NamespaceTerminating:
+			r.removeNamespace(ns.Name, tenant)
+		case corev1.NamespaceActive:
+			r.addNamespace(ns.Name, tenant)
+		}
+
+		return r.Client.Status().Update(context.TODO(), tenant, &client.UpdateOptions{})
+	})
 }
