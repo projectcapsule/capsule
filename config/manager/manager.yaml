@@ -27,6 +27,8 @@ spec:
         - /manager
         args:
         - --enable-leader-election
+        - --zap-encoder=console
+        - --zap-log-level=debug
         image: quay.io/clastix/capsule:latest
         imagePullPolicy: IfNotPresent
         name: manager
