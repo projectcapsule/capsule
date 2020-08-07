@@ -171,9 +171,10 @@ I0803 15:16:02.042022       1 main.go:281] Starting TCP socket on 0.0.0.0:8443
 I0803 15:16:02.042364       1 main.go:288] Listening securely on 0.0.0.0:8443
 ```
 
-Since Capsule is built using _OperatorSDK_, logging is handled by the zap
+Since Capsule is built using _OperatorSDK_, logging is handled by the `zap`
 module: verbosity increase can be controlled using the CLI flag `--zap-level`
-with a value from `1` to `10` or the [basic keywords](https://godoc.org/go.uber.org/zap/zapcore#Level).
+with a value from `1` to `10` or the [basic keywords](https://godoc.org/go.uber.org/zap/zapcore#Level)
+although is suggested to use the `zap-devel` flag to get also stacktraces.
 
 > CA generation
 >
