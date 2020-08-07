@@ -32,11 +32,23 @@ type Ca interface {
 	CaCertificatePem() (b *bytes.Buffer, err error)
 	CaPrivateKeyPem() (b *bytes.Buffer, err error)
 	ExpiresIn(now time.Time) (time.Duration, error)
+	ValidateCert(certificate *x509.Certificate) error
 }
 
 type CapsuleCa struct {
 	ca         *x509.Certificate
 	privateKey *rsa.PrivateKey
+}
+
+func (c CapsuleCa) ValidateCert(certificate *x509.Certificate) (err error) {
+	pool := x509.NewCertPool()
+	pool.AddCert(c.ca)
+
+	_, err = certificate.Verify(x509.VerifyOptions{
+		Roots:       pool,
+		CurrentTime: time.Time{},
+	})
+	return
 }
 
 func (c CapsuleCa) isAlreadyValid(now time.Time) bool {
