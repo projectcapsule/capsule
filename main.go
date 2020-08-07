@@ -78,9 +78,11 @@ func main() {
 	flag.BoolVar(&forceTenantPrefix, "force-tenant-prefix", false, "Enforces the Tenant owner, "+
 		"during Namespace creation, to name it using the selected Tenant name as prefix, separated by a dash. "+
 		"This is useful to avoid Namespace name collision in a public CaaS environment.")
+	opts := zap.Options{}
+	opts.BindFlags(flag.CommandLine)
 	flag.Parse()
 
-	ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
+	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
 	printVersion()
 	if v {
