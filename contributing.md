@@ -172,7 +172,10 @@ I0803 15:16:02.042364       1 main.go:288] Listening securely on 0.0.0.0:8443
 ```
 
 Since Capsule is built using _OperatorSDK_, logging is handled by the zap
-module: log verbosity of the Capsule controller can be increased by passing the `--zap-log-level` option with a value from `1` to `10` or the [basic keywords](https://godoc.org/go.uber.org/zap/zapcore#Level) although it is suggested to use the `--zap-devel` flag to get also stack traces.
+module: log verbosity of the Capsule controller can be increased by passing
+the `--zap-log-level` option with a value from `1` to `10` or the
+[basic keywords](https://godoc.org/go.uber.org/zap/zapcore#Level) although
+it is suggested to use the `--zap-devel` flag to get also stack traces.
 
 > CA generation
 >

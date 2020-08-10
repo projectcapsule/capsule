@@ -40,6 +40,7 @@ import (
 	"github.com/clastix/capsule/pkg/webhook/network_policies"
 	"github.com/clastix/capsule/pkg/webhook/owner_reference"
 	"github.com/clastix/capsule/pkg/webhook/pvc"
+	"github.com/clastix/capsule/pkg/webhook/tenant_prefix"
 	"github.com/clastix/capsule/version"
 	// +kubebuilder:scaffold:imports
 )
@@ -66,15 +67,22 @@ func printVersion() {
 func main() {
 	var metricsAddr string
 	var enableLeaderElection bool
+	var forceTenantPrefix bool
 	var v bool
+
 	flag.StringVar(&metricsAddr, "metrics-addr", ":8080", "The address the metric endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "enable-leader-election", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
 	flag.BoolVar(&v, "version", false, "Print the Capsule version and exit")
+	flag.BoolVar(&forceTenantPrefix, "force-tenant-prefix", false, "Enforces the Tenant owner, "+
+		"during Namespace creation, to name it using the selected Tenant name as prefix, separated by a dash. "+
+		"This is useful to avoid Namespace name collision in a public CaaS environment.")
+	opts := zap.Options{}
+	opts.BindFlags(flag.CommandLine)
 	flag.Parse()
 
-	ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
+	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
 	printVersion()
 	if v {
@@ -104,7 +112,9 @@ func main() {
 	// +kubebuilder:scaffold:builder
 
 	//webhooks
-	err = webhook.Register(mgr, &ingress.ExtensionIngress{}, &ingress.NetworkIngress{}, pvc.Webhook{}, &owner_reference.Webhook{}, &namespace_quota.Webhook{}, network_policies.Webhook{})
+	wl := make([]webhook.Webhook, 0)
+	wl = append(wl, &ingress.ExtensionIngress{}, &ingress.NetworkIngress{}, pvc.Webhook{}, &owner_reference.Webhook{}, &namespace_quota.Webhook{}, network_policies.Webhook{}, tenant_prefix.Webhook{ForceTenantPrefix: forceTenantPrefix})
+	err = webhook.Register(mgr, wl...)
 	if err != nil {
 		setupLog.Error(err, "unable to setup webhooks")
 		os.Exit(1)

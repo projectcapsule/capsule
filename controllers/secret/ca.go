@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"sync"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -47,6 +48,50 @@ func (r *CaReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&corev1.Secret{}, forOptionPerInstanceName(caSecretName)).
 		Complete(r)
+}
+
+func (r CaReconciler) UpdateValidatingWebhookConfiguration(wg *sync.WaitGroup, ch chan error, caBundle []byte) {
+	defer wg.Done()
+
+	var err error
+
+	ch <- retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		vw := &v1.ValidatingWebhookConfiguration{}
+		err = r.Get(context.TODO(), types.NamespacedName{Name: "capsule-validating-webhook-configuration"}, vw)
+		if err != nil {
+			r.Log.Error(err, "cannot retrieve ValidatingWebhookConfiguration")
+			return err
+		}
+		for i, w := range vw.Webhooks {
+			// Updating CABundle only in case of an internal service reference
+			if w.ClientConfig.Service != nil {
+				vw.Webhooks[i].ClientConfig.CABundle = caBundle
+			}
+		}
+		return r.Update(context.TODO(), vw, &client.UpdateOptions{})
+	})
+}
+
+func (r CaReconciler) UpdateMutatingWebhookConfiguration(wg *sync.WaitGroup, ch chan error, caBundle []byte) {
+	defer wg.Done()
+
+	var err error
+
+	ch <- retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		mw := &v1.MutatingWebhookConfiguration{}
+		err = r.Get(context.TODO(), types.NamespacedName{Name: "capsule-mutating-webhook-configuration"}, mw)
+		if err != nil {
+			r.Log.Error(err, "cannot retrieve MutatingWebhookConfiguration")
+			return err
+		}
+		for i, w := range mw.Webhooks {
+			// Updating CABundle only in case of an internal service reference
+			if w.ClientConfig.Service != nil {
+				mw.Webhooks[i].ClientConfig.CABundle = caBundle
+			}
+		}
+		return r.Update(context.TODO(), mw, &client.UpdateOptions{})
+	})
 }
 
 func (r CaReconciler) Reconcile(request ctrl.Request) (ctrl.Result, error) {
@@ -93,48 +138,21 @@ func (r CaReconciler) Reconcile(request ctrl.Request) (ctrl.Result, error) {
 			certSecretKey:       crt.Bytes(),
 			privateKeySecretKey: key.Bytes(),
 		}
-		// Updating ValidatingWebhookConfiguration CA bundle
-		err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-			vw := &v1.ValidatingWebhookConfiguration{}
-			err = r.Get(context.TODO(), types.NamespacedName{Name: "capsule-validating-webhook-configuration"}, vw)
+
+		wg := &sync.WaitGroup{}
+		wg.Add(2)
+		ch := make(chan error, 2)
+
+		go r.UpdateMutatingWebhookConfiguration(wg, ch, crt.Bytes())
+		go r.UpdateValidatingWebhookConfiguration(wg, ch, crt.Bytes())
+
+		wg.Wait()
+		close(ch)
+
+		for err = range ch {
 			if err != nil {
-				r.Log.Error(err, "cannot retrieve ValidatingWebhookConfiguration")
-				return err
+				return reconcile.Result{}, err
 			}
-			for i, w := range vw.Webhooks {
-				// Updating CABundle only in case of an internal service reference
-				if w.ClientConfig.Service != nil {
-					vw.Webhooks[i].ClientConfig.CABundle = instance.Data[certSecretKey]
-				}
-			}
-			err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-				return r.Update(context.TODO(), vw, &client.UpdateOptions{})
-			})
-			if err != nil {
-				r.Log.Error(err, "cannot update MutatingWebhookConfiguration webhooks CA bundle")
-				return err
-			}
-			return r.Update(context.TODO(), vw, &client.UpdateOptions{})
-		})
-		// Updating MutatingWebhookConfiguration CA bundle
-		err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-			mw := &v1.MutatingWebhookConfiguration{}
-			err = r.Get(context.TODO(), types.NamespacedName{Name: "capsule-mutating-webhook-configuration"}, mw)
-			if err != nil {
-				r.Log.Error(err, "cannot retrieve MutatingWebhookConfiguration")
-				return err
-			}
-			for i, w := range mw.Webhooks {
-				// Updating CABundle only in case of an internal service reference
-				if w.ClientConfig.Service != nil {
-					mw.Webhooks[i].ClientConfig.CABundle = instance.Data[certSecretKey]
-				}
-			}
-			return r.Update(context.TODO(), mw, &client.UpdateOptions{})
-		})
-		if err != nil {
-			r.Log.Error(err, "cannot update MutatingWebhookConfiguration webhooks CA bundle")
-			return reconcile.Result{}, err
 		}
 	}
 

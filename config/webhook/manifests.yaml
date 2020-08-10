@@ -120,3 +120,20 @@ webhooks:
     - CREATE
     resources:
     - persistentvolumeclaims
+- clientConfig:
+    caBundle: Cg==
+    service:
+      name: webhook-service
+      namespace: system
+      path: /validating-v1-namespace-tenant-prefix
+  failurePolicy: Fail
+  name: prefix.namespace.capsule.clastix.io
+  rules:
+  - apiGroups:
+    - ""
+    apiVersions:
+    - v1
+    operations:
+    - CREATE
+    resources:
+    - namespaces

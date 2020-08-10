@@ -30,6 +30,8 @@ spec:
     kind: Tenant
     listKind: TenantList
     plural: tenants
+    shortNames:
+    - tnt
     singular: tenant
   scope: Cluster
   subresources:

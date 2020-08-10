@@ -72,6 +72,7 @@ func (r TlsReconciler) Reconcile(request ctrl.Request) (ctrl.Result, error) {
 	for _, key := range []string{certSecretKey, privateKeySecretKey} {
 		if _, ok := instance.Data[key]; !ok {
 			shouldCreate = true
+			break
 		}
 	}
 
@@ -99,9 +100,11 @@ func (r TlsReconciler) Reconcile(request ctrl.Request) (ctrl.Result, error) {
 			return reconcile.Result{}, err
 		}
 
-		rq = time.Duration(c.NotAfter.Unix()-time.Now().Unix()) * time.Second
-		if time.Now().After(c.NotAfter) {
-			r.Log.Info("Capsule TLS is expired, cleaning to obtain a new one")
+		rq = time.Until(c.NotAfter)
+
+		err = ca.ValidateCert(c)
+		if err != nil {
+			r.Log.Info("Capsule TLS is expired or invalid, cleaning to obtain a new one")
 			instance.Data = map[string][]byte{}
 		}
 	}
