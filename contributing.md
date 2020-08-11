@@ -1,8 +1,8 @@
 # How to contribute to Capsule
 
-First, thanks for your interest on Capsule, any contribution is welcome!
+First, thanks for your interest in Capsule, any contribution is welcome!
 
-The first step is to setup your local development environment
+The first step is to set up your local development environment
 
 ## Setting up the development environment
 
@@ -18,7 +18,7 @@ The following dependencies are mandatory:
 ### Installing Go dependencies
 
 After cloning Capsule on any folder, access it and issue the following command
-to ensure all dependencies are properly download.
+to ensure all dependencies are properly downloaded.
 
 ```
 go mod download
@@ -39,11 +39,11 @@ binaries available from the _Releases_ GitHub page and place them into the
 
 ### Installing KinD
 
-Capsule is able to run on any certified Kubernetes installation and locally
+Capsule can run on any certified Kubernetes installation and locally
 the whole development is performed on _KinD_, also knows as
 [Kubernetes in Docker](https://github.com/kubernetes-sigs/kind).
 
-> N.B.: Docker is hard requirement since it's based on it
+> N.B.: Docker is a hard requirement since it's based on it
 
 According to your operative system and architecture, download the right binary
 and place it on your `PATH`.
@@ -171,10 +171,11 @@ I0803 15:16:02.042022       1 main.go:281] Starting TCP socket on 0.0.0.0:8443
 I0803 15:16:02.042364       1 main.go:288] Listening securely on 0.0.0.0:8443
 ```
 
-Since Capsule is built using _OperatorSDK_, logging is handled by the `zap`
-module: verbosity increase can be controlled using the CLI flag `--zap-level`
-with a value from `1` to `10` or the [basic keywords](https://godoc.org/go.uber.org/zap/zapcore#Level)
-although is suggested to use the `zap-devel` flag to get also stacktraces.
+Since Capsule is built using _OperatorSDK_, logging is handled by the zap
+module: log verbosity of the Capsule controller can be increased by passing
+the `--zap-log-level` option with a value from `1` to `10` or the
+[basic keywords](https://godoc.org/go.uber.org/zap/zapcore#Level) although
+it is suggested to use the `--zap-devel` flag to get also stack traces.
 
 > CA generation
 >
@@ -217,7 +218,7 @@ kubectl -n capsule-system get secret capsule-tls -o jsonpath='{.data.tls\.key}' 
 
 #### Starting NGROK
 
-In another session we need a `ngrok` session, mandatory to debug also webhooks
+In another session, we need a `ngrok` session, mandatory to debug also webhooks
 (YMMV).
 
 ```
@@ -271,7 +272,7 @@ webhooks:
 #### Run Capsule
 
 Finally, it's time to run locally Capsule using your preferred IDE (or not):
-from the project root path you can issue the following command.
+from the project root path, you can issue the following command.
 
 ```
 make run
@@ -296,7 +297,7 @@ golangci-lint run
 
 ### goimports
 
-Also the Go import statements must be sorted following the best practice:
+Also, the Go import statements must be sorted following the best practice:
 
 ```
 <STANDARD LIBRARY>
@@ -315,10 +316,9 @@ goimports -w -l -local "github.com/clastix/capsule" .
 
 ### Commits
 
-All the Pull Requests must reference to an already open issue: this is the
-first phase to contribute also for informing maintainers about the issue.
+All the Pull Requests must refer to an already open issue: this is the first phase to contribute also for informing maintainers about the issue.
 
-Commit first line should not exceed 50 columns.
+Commit's first line should not exceed 50 columns.
 
 A commit description is welcomed to explain more the changes: just ensure
 to put a blank line and an arbitrary number of maximum 72 characters long
@@ -328,4 +328,4 @@ Please, split changes into several and documented small commits: this will help
 us to perform a better review.
 
 > In case of errors or need of changes to previous commits,
-> fix them squashing in order to make changes atomic.
+> fix them squashing to make changes atomic.
