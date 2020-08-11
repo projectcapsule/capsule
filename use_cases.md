@@ -133,7 +133,7 @@ Bill checks the new tenant is created and operational:
 bill@caas# kubectl get tenants
 NAME   NAMESPACE QUOTA   NAMESPACE COUNT   OWNER   AGE
 oil    3                 0                 alice   3m
-bod    10                9                 joe     30d
+foo    10                9                 bar     30d
 ```
 
 > Note that namespaces are not yet assigned to the new tenant.
@@ -267,7 +267,7 @@ metadata:
   annotations:
     capsule.clastix.io/ingress-classes: haproxy
     capsule.clastix.io/storage-classes: ceph-rbd
-    scheduler.alpha.kubernetes.io/node-selector: vpc=caas
+    scheduler.alpha.kubernetes.io/node-selector: vpc=oil
   creationTimestamp: "2020-05-27T13:49:30Z"
   labels:
     capsule.clastix.io/tenant: oil
@@ -506,7 +506,7 @@ Namespace resources in the `oil` tenant namespaces:
 - `oil-test` 
 
 When the aggregate usage reaches the hard quota limits,
-then the ResourceQuota Admission Controller denies Alice's request:
+then the ResourceQuota Admission Controller denies Alice's request.
 
 In addition to Resource Quota, the Capsule controller create limits ranges in each namespace according to the tenant manifest.
 

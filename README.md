@@ -40,7 +40,7 @@ installed in your `PATH`. Also, make sure you have access to a Kubernetes cluste
 Clone this repository and move to the repo folder:
 
 ```
-~/capsule$ make deploy
+make deploy
 # /home/prometherion/go/bin/controller-gen "crd:trivialVersions=true" rbac:roleName=manager-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases
 # cd config/manager && /usr/local/bin/kustomize edit set image controller=quay.io/clastix/capsule:latest
 # /usr/local/bin/kustomize build config/default | kubectl apply -f -
@@ -65,7 +65,7 @@ Clone this repository and move to the repo folder:
 Log verbosity of the Capsule controller can be increased by passing the `--zap-log-level` option with a value from `1` to `10` or the [basic keywords](https://godoc.org/go.uber.org/zap/zapcore#Level) although it is suggested to use the `--zap-devel` flag to get also stack traces.
 
 ## Admission Controllers
-Capsule implements Kubernetes multi-tenancy capabilities using a minimum set of standard [Admission Controllers](https://kubernetes.io/docs/reference/access-authn-authz/admission-controllers/) enabled on the Kubernetes APIs server: `--enable-admission-plugins=PodNodeSelector,LimitRanger,ResourceQuota`. In addition to these default controllers, Capsule implements its own set of Admission Controllers through the [Dynamic Admission Controller](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/), providing callbacks to add further validation or resource patching.
+Capsule implements Kubernetes multi-tenancy capabilities using a minimum set of standard [Admission Controllers](https://kubernetes.io/docs/reference/access-authn-authz/admission-controllers/) enabled on the Kubernetes APIs server: `--enable-admission-plugins=PodNodeSelector,LimitRanger,ResourceQuota,MutatingAdmissionWebhook,ValidatingAdmissionWebhook`. In addition to these default controllers, Capsule implements its own set of Admission Controllers through the [Dynamic Admission Controller](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/), providing callbacks to add further validation or resource patching.
 
 All these requests must be served via HTTPS and a CA must be provided to ensure that
 the API Server is communicating with the right client. Capsule upon installation is setting its custom Certificate Authority as a client certificate as well, updating all the required resources to minimize the operational tasks.
@@ -92,7 +92,7 @@ in their token.
 The [hack/create-user.sh](hack/create-user.sh) can help you set up a dummy `kubeconfig` for the `alice` user acting as owner of a tenant called `oil`
 
 ```bash
-~/capsule$ ./hack/create-user.sh alice oil
+./hack/create-user.sh alice oil
 creating certs in TMPDIR /tmp/tmp.4CLgpuime3 
 Generating RSA private key, 2048 bit long modulus (2 primes)
 ............+++++
@@ -109,7 +109,7 @@ Use the [scaffold Tenant](config/samples/capsule_v1alpha1_tenant.yaml)
 and simply apply as Cluster Admin.
 
 ```
-~/capsule$ kubectl apply -f config/samples/capsule_v1alpha1_tenant.yaml
+kubectl apply -f config/samples/capsule_v1alpha1_tenant.yaml
 tenant.capsule.clastix.io/oil created
 ```
 
@@ -119,7 +119,7 @@ The related Tenant owner `alice` can create Namespaces according to their assign
 Similar to `deploy`, you can get rid of Capsule using the `remove` target.
 
 ```
-~/capsule$ make remove
+make remove
 # /home/prometherion/go/bin/controller-gen "crd:trivialVersions=true" rbac:roleName=manager-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases
 # /usr/local/bin/kustomize build config/default | kubectl delete -f -
 # namespace "capsule-system" deleted
