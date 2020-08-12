@@ -130,19 +130,28 @@ func (r *TenantReconciler) pruningResources(ns string, keys []string, obj runtim
 	if err != nil {
 		return err
 	}
+
+	s := labels.NewSelector()
+
 	exists, err := labels.NewRequirement(capsuleLabel, selection.Exists, []string{})
 	if err != nil {
 		return err
 	}
-	notIn, err := labels.NewRequirement(capsuleLabel, selection.NotIn, keys)
-	if err != nil {
-		return err
+	s = s.Add(*exists)
+
+	if len(keys) > 0 {
+		notIn, err := labels.NewRequirement(capsuleLabel, selection.NotIn, keys)
+		if err != nil {
+			return err
+		}
+		s = s.Add(*notIn)
 	}
-	r.Log.Info("Pruning objects with label selector " + notIn.String())
+
+	r.Log.Info("Pruning objects with label selector " + s.String())
 	err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		return r.DeleteAllOf(context.TODO(), obj, &client.DeleteAllOfOptions{
 			ListOptions: client.ListOptions{
-				LabelSelector: labels.NewSelector().Add(*exists, *notIn),
+				LabelSelector: s,
 				Namespace:     ns,
 			},
 			DeleteOptions: client.DeleteOptions{},
