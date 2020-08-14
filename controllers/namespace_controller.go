@@ -151,21 +151,24 @@ func (r NamespaceReconciler) Reconcile(request ctrl.Request) (ctrl.Result, error
 }
 
 func (r *NamespaceReconciler) ensureLabel(ns *corev1.Namespace, tenantName string) error {
-	capsuleLabel, err := v1alpha1.GetTypeLabel(&v1alpha1.Tenant{})
-	if err != nil {
-		return err
-	}
-	if ns.Labels == nil {
-		ns.Labels = make(map[string]string)
-	}
-	tl, ok := ns.Labels[capsuleLabel]
-	if !ok || tl != tenantName {
-		return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		if err := r.Client.Get(context.TODO(), types.NamespacedName{Name: ns.GetName()}, ns); err != nil {
+			return err
+		}
+		capsuleLabel, err := v1alpha1.GetTypeLabel(&v1alpha1.Tenant{})
+		if err != nil {
+			return err
+		}
+		if ns.Labels == nil {
+			ns.Labels = make(map[string]string)
+		}
+		tl, ok := ns.Labels[capsuleLabel]
+		if !ok || tl != tenantName {
 			ns.Labels[capsuleLabel] = tenantName
 			return r.Client.Update(context.TODO(), ns, &client.UpdateOptions{})
-		})
-	}
-	return nil
+		}
+		return nil
+	})
 }
 
 func (r *NamespaceReconciler) updateTenantStatus(ns *corev1.Namespace, tenant *v1alpha1.Tenant) error {
@@ -177,6 +180,9 @@ func (r *NamespaceReconciler) updateTenantStatus(ns *corev1.Namespace, tenant *v
 			r.addNamespace(ns.Name, tenant)
 		}
 
+		if err := r.Client.Get(context.TODO(), types.NamespacedName{Name: tenant.GetName()}, tenant); err != nil {
+			return err
+		}
 		return r.Client.Status().Update(context.TODO(), tenant, &client.UpdateOptions{})
 	})
 }

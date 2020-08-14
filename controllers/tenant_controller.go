@@ -384,12 +384,11 @@ func (r *TenantReconciler) syncLimitRanges(tenant *capsulev1alpha1.Tenant) error
 func (r *TenantReconciler) syncNamespace(namespace string, ingressClasses []string, storageClasses []string, wg *sync.WaitGroup, channel chan error) {
 	defer wg.Done()
 
-	t := &corev1.Namespace{}
-	if err := r.Client.Get(context.TODO(), types.NamespacedName{Name: namespace}, t); err != nil {
-		channel <- err
-	}
-
 	channel <- retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		t := &corev1.Namespace{}
+		if err := r.Client.Get(context.TODO(), types.NamespacedName{Name: namespace}, t); err != nil {
+			return err
+		}
 		if t.Annotations == nil {
 			t.Annotations = make(map[string]string)
 		}
@@ -564,6 +563,9 @@ func (r *TenantReconciler) ensureNodeSelector(tenant *capsulev1alpha1.Tenant) (e
 
 func (r *TenantReconciler) ensureNamespaceCount(tenant *capsulev1alpha1.Tenant) error {
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		if err := r.Client.Get(context.TODO(), types.NamespacedName{Name: tenant.Name}, tenant); err != nil {
+			return err
+		}
 		tenant.Status.Size = uint(tenant.Status.Namespaces.Len())
 		return r.Client.Status().Update(context.TODO(), tenant, &client.UpdateOptions{})
 	})

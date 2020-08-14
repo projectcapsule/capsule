@@ -168,16 +168,16 @@ func (r CaReconciler) Reconcile(request ctrl.Request) (ctrl.Result, error) {
 	}
 
 	if res == controllerutil.OperationResultUpdated {
-		r.Log.Info("Capsule CA has been updated, we need to trigger TLS update too")
-		tls := &corev1.Secret{}
-		err = r.Get(context.TODO(), types.NamespacedName{
-			Namespace: "capsule-system",
-			Name:      tlsSecretName,
-		}, tls)
-		if err != nil {
-			r.Log.Error(err, "Capsule TLS Secret missing")
-		}
 		err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+			r.Log.Info("Capsule CA has been updated, we need to trigger TLS update too")
+			tls := &corev1.Secret{}
+			err = r.Get(context.TODO(), types.NamespacedName{
+				Namespace: "capsule-system",
+				Name:      tlsSecretName,
+			}, tls)
+			if err != nil {
+				r.Log.Error(err, "Capsule TLS Secret missing")
+			}
 			_, err = controllerutil.CreateOrUpdate(context.TODO(), r.Client, tls, func() error {
 				tls.Data = map[string][]byte{}
 				return nil
