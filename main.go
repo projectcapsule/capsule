@@ -28,6 +28,7 @@ import (
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	capsulev1alpha1 "github.com/clastix/capsule/api/v1alpha1"
@@ -90,16 +91,20 @@ func main() {
 	}
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-		Scheme:             scheme,
-		MetricsBindAddress: metricsAddr,
-		Port:               9443,
-		LeaderElection:     enableLeaderElection,
-		LeaderElectionID:   "42c733ea.clastix.capsule.io",
+		Scheme:                 scheme,
+		MetricsBindAddress:     metricsAddr,
+		Port:                   9443,
+		LeaderElection:         enableLeaderElection,
+		LeaderElectionID:       "42c733ea.clastix.capsule.io",
+		HealthProbeBindAddress: ":10080",
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
 		os.Exit(1)
 	}
+
+	_ = mgr.AddReadyzCheck("ping", healthz.Ping)
+	_ = mgr.AddHealthzCheck("ping", healthz.Ping)
 
 	if err = (&controllers.TenantReconciler{
 		Client: mgr.GetClient(),
