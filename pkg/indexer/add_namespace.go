@@ -16,8 +16,10 @@ limitations under the License.
 
 package indexer
 
-import "github.com/clastix/capsule/pkg/indexer/tenant"
+import (
+	"github.com/clastix/capsule/pkg/indexer/namespace"
+)
 
 func init() {
-	AddToIndexerFuncs = append(AddToIndexerFuncs, tenant.NamespacesReference{})
+	AddToIndexerFuncs = append(AddToIndexerFuncs, namespace.OwnerReference{})
 }

@@ -19,5 +19,6 @@ package indexer
 import "github.com/clastix/capsule/pkg/indexer/tenant"
 
 func init() {
+	AddToIndexerFuncs = append(AddToIndexerFuncs, tenant.NamespacesReference{})
 	AddToIndexerFuncs = append(AddToIndexerFuncs, tenant.OwnerReference{})
 }

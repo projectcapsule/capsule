@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/selection"
@@ -62,18 +63,25 @@ func (r *TenantReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-func (r TenantReconciler) Reconcile(request ctrl.Request) (ctrl.Result, error) {
+func (r TenantReconciler) Reconcile(request ctrl.Request) (result ctrl.Result, err error) {
 	r.Log = r.Log.WithValues("Request.Name", request.Name)
 
 	// Fetch the Tenant instance
 	instance := &capsulev1alpha1.Tenant{}
-	err := r.Get(context.TODO(), request.NamespacedName, instance)
+	err = r.Get(context.TODO(), request.NamespacedName, instance)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			r.Log.Info("Request object not found, could have been deleted after reconcile request")
 			return reconcile.Result{}, nil
 		}
 		r.Log.Error(err, "Error reading the object")
+		return reconcile.Result{}, err
+	}
+
+	// Ensuring all namespaces are collected
+	r.Log.Info("Ensuring all Namespaces are collected")
+	if err := r.collectNamespaces(instance); err != nil {
+		r.Log.Error(err, "Cannot collect Namespace resources")
 		return reconcile.Result{}, err
 	}
 
@@ -120,7 +128,7 @@ func (r TenantReconciler) Reconcile(request ctrl.Request) (ctrl.Result, error) {
 	}
 
 	r.Log.Info("Tenant reconciling completed")
-	return ctrl.Result{}, nil
+	return ctrl.Result{}, err
 }
 
 // pruningResources is taking care of removing the no more requested sub-resources as LimitRange, ResourceQuota or
@@ -202,8 +210,8 @@ func (r *TenantReconciler) resourceQuotasUpdate(resourceName corev1.ResourceName
 		if e != nil {
 			// We had an error and we mark the whole transaction as failed
 			// to process it another time acording to the Tenant controller back-off factor.
+			r.Log.Error(e, "Cannot update outer ResourceQuotas", "resourceName", resourceName.String())
 			err = fmt.Errorf("update of outer ResourceQuota items has failed")
-			r.Log.Error(err, "Cannot update outer ResourceQuotas", "resourceName", resourceName.String())
 		}
 	}
 	return
@@ -313,6 +321,9 @@ func (r *TenantReconciler) syncResourceQuotas(tenant *capsulev1alpha1.Tenant) er
 						// restoring the default one for all the elements,
 						// also for the reconciliated one.
 						for i := range rql.Items {
+							if rql.Items[i].Spec.Hard == nil {
+								rql.Items[i].Spec.Hard = map[corev1.ResourceName]resource.Quantity{}
+							}
 							rql.Items[i].Spec.Hard[rn] = q.Hard[rn]
 						}
 						target.Spec = q
@@ -381,7 +392,7 @@ func (r *TenantReconciler) syncLimitRanges(tenant *capsulev1alpha1.Tenant) error
 	return nil
 }
 
-func (r *TenantReconciler) syncNamespace(namespace string, ingressClasses []string, storageClasses []string, wg *sync.WaitGroup, channel chan error) {
+func (r *TenantReconciler) syncNamespace(namespace string, ingressClasses []string, storageClasses []string, tenantLabel string, wg *sync.WaitGroup, channel chan error) {
 	defer wg.Done()
 
 	t := &corev1.Namespace{}
@@ -395,6 +406,14 @@ func (r *TenantReconciler) syncNamespace(namespace string, ingressClasses []stri
 		}
 		t.Annotations[capsulev1alpha1.AvailableIngressClassesAnnotation] = strings.Join(ingressClasses, ",")
 		t.Annotations[capsulev1alpha1.AvailableStorageClassesAnnotation] = strings.Join(storageClasses, ",")
+		if t.Labels == nil {
+			t.Labels = make(map[string]string)
+		}
+		capsuleLabel, err := capsulev1alpha1.GetTypeLabel(&capsulev1alpha1.Tenant{})
+		if err != nil {
+			return err
+		}
+		t.Labels[capsuleLabel] = tenantLabel
 		return r.Client.Update(context.TODO(), t, &client.UpdateOptions{})
 	})
 }
@@ -407,7 +426,7 @@ func (r *TenantReconciler) syncNamespaces(tenant *capsulev1alpha1.Tenant) (err e
 	wg.Add(tenant.Status.Namespaces.Len())
 
 	for _, ns := range tenant.Status.Namespaces {
-		go r.syncNamespace(ns, tenant.Spec.IngressClasses, tenant.Spec.StorageClasses, wg, ch)
+		go r.syncNamespace(ns, tenant.Spec.IngressClasses, tenant.Spec.StorageClasses, tenant.GetName(), wg, ch)
 	}
 
 	wg.Wait()
@@ -565,6 +584,26 @@ func (r *TenantReconciler) ensureNodeSelector(tenant *capsulev1alpha1.Tenant) (e
 func (r *TenantReconciler) ensureNamespaceCount(tenant *capsulev1alpha1.Tenant) error {
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		tenant.Status.Size = uint(tenant.Status.Namespaces.Len())
+		found := &capsulev1alpha1.Tenant{}
+		if err := r.Client.Get(context.TODO(), types.NamespacedName{Name: tenant.GetName()}, found); err != nil {
+			return err
+		}
+		found.Status.Size = tenant.Status.Size
+		return r.Client.Status().Update(context.TODO(), found, &client.UpdateOptions{})
+	})
+}
+
+func (r *TenantReconciler) collectNamespaces(tenant *capsulev1alpha1.Tenant) (err error) {
+	nl := &corev1.NamespaceList{}
+	err = r.Client.List(context.TODO(), nl, client.MatchingFieldsSelector{
+		Selector: fields.OneTermEqualSelector(".metadata.ownerReferences[*].capsule", tenant.GetName()),
+	})
+	if err != nil {
+		return
+	}
+	tenant.AssignNamespaces(nl.Items)
+	_, err = controllerutil.CreateOrUpdate(context.TODO(), r.Client, tenant.DeepCopy(), func() error {
 		return r.Client.Status().Update(context.TODO(), tenant, &client.UpdateOptions{})
 	})
+	return
 }
