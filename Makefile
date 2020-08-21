@@ -130,3 +130,14 @@ goimports:
 .PHONY: golint
 golint:
 	golangci-lint run
+
+# Running e2e tests in a KinD instance
+.PHONY: e2e
+e2e:
+	kind create cluster --name capsule
+	make docker-build
+	kind load docker-image --nodes capsule-control-plane --name capsule quay.io/clastix/capsule:latest
+	make deploy
+	while [ -z $$(kubectl -n capsule-system get secret capsule-tls -o jsonpath='{.data.tls\.crt}') ]; do echo "waiting Capsule to be up and running..." && sleep 5; done
+	ginkgo -v -tags e2e ./e2e
+	kind delete cluster --name capsule
