@@ -20,7 +20,6 @@ package e2e
 
 import (
 	"context"
-	"time"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -82,7 +81,7 @@ var _ = Describe("when Tenant handles Ingress classes", func() {
 				}
 				_, err = cs.ExtensionsV1beta1().Ingresses(ns.GetName()).Create(context.TODO(), i, metav1.CreateOptions{})
 				return
-			}, 30*time.Second, time.Second).ShouldNot(Succeed())
+			}, defaultTimeoutInterval, defaultPollInterval).ShouldNot(Succeed())
 		})
 		By("specifying a forbidden class", func() {
 			Eventually(func() (err error) {
@@ -100,7 +99,7 @@ var _ = Describe("when Tenant handles Ingress classes", func() {
 				}
 				_, err = cs.ExtensionsV1beta1().Ingresses(ns.GetName()).Create(context.TODO(), i, metav1.CreateOptions{})
 				return
-			}, 30*time.Second, time.Second).ShouldNot(Succeed())
+			}, defaultTimeoutInterval, defaultPollInterval).ShouldNot(Succeed())
 		})
 	})
 	It("should allow enabled Ingress class", func() {
@@ -116,9 +115,11 @@ var _ = Describe("when Tenant handles Ingress classes", func() {
 					i := &v1beta12.Ingress{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: c,
+							Annotations: map[string]string{
+								"kubernetes.io/ingress.class": c,
+							},
 						},
 						Spec: v1beta12.IngressSpec{
-							IngressClassName: pointer.StringPtr(c),
 							Backend: &v1beta12.IngressBackend{
 								ServiceName: "foo",
 								ServicePort: intstr.FromInt(8080),
@@ -127,7 +128,7 @@ var _ = Describe("when Tenant handles Ingress classes", func() {
 					}
 					_, err = cs.ExtensionsV1beta1().Ingresses(ns.GetName()).Create(context.TODO(), i, metav1.CreateOptions{})
 					return
-				}, 30*time.Second, time.Second).Should(Succeed())
+				}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 			}
 		})
 	})
