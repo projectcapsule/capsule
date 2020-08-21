@@ -1,3 +1,5 @@
+//+build e2e
+
 /*
 Copyright 2020 Clastix Labs.
 
@@ -14,27 +16,28 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha1
+package e2e
 
 import (
-	"sort"
+	"context"
 
-	corev1 "k8s.io/api/core/v1"
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/clastix/capsule/api/v1alpha1"
 )
 
-func (t *Tenant) IsFull() bool {
-	return t.Status.Namespaces.Len() >= int(t.Spec.NamespaceQuota)
-}
-
-func (t *Tenant) AssignNamespaces(namespaces []corev1.Namespace) {
-	var l []string
-	for _, ns := range namespaces {
-		if ns.Status.Phase == corev1.NamespaceActive {
-			l = append(l, ns.GetName())
+var _ = Describe("Namespace creation with no Tenant assigned", func() {
+	It("should fail", func() {
+		tnt := &v1alpha1.Tenant{
+			Spec: v1alpha1.TenantSpec{
+				Owner: "missing",
+			},
 		}
-	}
-	sort.Strings(l)
-
-	t.Status.Namespaces = l
-	t.Status.Size = uint(len(l))
-}
+		ns := NewNamespace("no-namespace")
+		cs := ownerClient(tnt)
+		_, err := cs.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
+		Expect(err).ShouldNot(Succeed())
+	})
+})
