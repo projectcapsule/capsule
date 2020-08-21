@@ -18,7 +18,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
-
     - name: Run golangci-lint
       uses: golangci/golangci-lint-action@v2.2.0
       with:
@@ -27,3 +26,30 @@ jobs:
         # if set to true and the action runs on a pull request - the action outputs only newly found issues
         only-new-issues: false
         args: --timeout 2m
+  kind:
+    name: e2e
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@master
+    # Cache Go modules
+    - name: Cache Go Modules
+      uses: actions/cache@v1
+      env:
+        cache-name: cache-go-modules
+      with:
+        path: ~/go/pkg/mod
+        key: ${{ runner.os }}-build-${{ env.cache-name }}
+        restore-keys: |
+          ${{ runner.os }}-build-
+          ${{ runner.os }}-
+    # Installing Ginkgo
+    - name: installing Ginkgo
+      run: go get github.com/onsi/ginkgo/ginkgo
+    - uses: actions/setup-go@v2
+      with:
+        go-version: '^1.13.8'
+    - uses: engineerd/setup-kind@v0.4.0
+      with:
+        skipClusterCreation: true
+    - name: e2e testing
+      run: make e2e
