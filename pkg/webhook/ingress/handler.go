@@ -30,8 +30,10 @@ import (
 )
 
 func handleIngress(ctx context.Context, object metav1.Object, ic *string, c client.Client) admission.Response {
-	if v, ok := object.GetAnnotations()["kubernetes.io/ingress.class"]; ok {
-		ic = &v
+	if ic == nil {
+		if v, ok := object.GetAnnotations()["kubernetes.io/ingress.class"]; ok {
+			ic = &v
+		}
 	}
 
 	if ic == nil {
