@@ -20,6 +20,7 @@ package e2e
 
 import (
 	"context"
+	"strconv"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -28,6 +29,7 @@ import (
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/utils/pointer"
 
 	"github.com/clastix/capsule/api/v1alpha1"
@@ -39,17 +41,17 @@ var _ = Describe("when Tenant handles Ingress classes", func() {
 			Name: "ingress-class",
 		},
 		Spec: v1alpha1.TenantSpec{
-			Owner: "ingress",
+			Owner:          "ingress",
 			StorageClasses: []string{},
 			IngressClasses: []string{
 				"nginx",
 				"haproxy",
 			},
-			LimitRanges: []corev1.LimitRangeSpec{},
-			NamespaceQuota: 3,
-			NodeSelector:   map[string]string{},
+			LimitRanges:     []corev1.LimitRangeSpec{},
+			NamespaceQuota:  3,
+			NodeSelector:    map[string]string{},
 			NetworkPolicies: []networkingv1.NetworkPolicySpec{},
-			ResourceQuota: []corev1.ResourceQuotaSpec{},
+			ResourceQuota:   []corev1.ResourceQuotaSpec{},
 		},
 	}
 	JustBeforeEach(func() {
@@ -83,6 +85,26 @@ var _ = Describe("when Tenant handles Ingress classes", func() {
 				return
 			}, defaultTimeoutInterval, defaultPollInterval).ShouldNot(Succeed())
 		})
+		By("using a forbidden class as Annotation", func() {
+			Eventually(func() (err error) {
+				i := &v1beta12.Ingress{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "denied-ingress",
+						Annotations: map[string]string{
+							"kubernetes.io/ingress.class": "the-worst-ingress-available",
+						},
+					},
+					Spec: v1beta12.IngressSpec{
+						Backend: &v1beta12.IngressBackend{
+							ServiceName: "foo",
+							ServicePort: intstr.FromInt(8080),
+						},
+					},
+				}
+				_, err = cs.ExtensionsV1beta1().Ingresses(ns.GetName()).Create(context.TODO(), i, metav1.CreateOptions{})
+				return
+			}, defaultTimeoutInterval, defaultPollInterval).ShouldNot(Succeed())
+		})
 		By("specifying a forbidden class", func() {
 			Eventually(func() (err error) {
 				i := &v1beta12.Ingress{
@@ -102,34 +124,70 @@ var _ = Describe("when Tenant handles Ingress classes", func() {
 			}, defaultTimeoutInterval, defaultPollInterval).ShouldNot(Succeed())
 		})
 	})
-	It("should allow enabled Ingress class", func() {
-		ns := NewNamespace("ingress-class-allowed")
+	It("should allow enabled Ingress class using the deprecated Annotation", func() {
+		ns := NewNamespace("ingress-class-allowed-annotation")
 		cs := ownerClient(tnt)
 
 		NamespaceCreationShouldSucceed(ns, tnt)
 		NamespaceShouldBeManagedByTenant(ns, tnt)
 
-		By("using an available class", func() {
-			for _, c := range tnt.Spec.IngressClasses {
-				Eventually(func() (err error) {
-					i := &v1beta12.Ingress{
-						ObjectMeta: metav1.ObjectMeta{
-							Name: c,
-							Annotations: map[string]string{
-								"kubernetes.io/ingress.class": c,
-							},
+		for _, c := range tnt.Spec.IngressClasses {
+			Eventually(func() (err error) {
+				i := &v1beta12.Ingress{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: c,
+						Annotations: map[string]string{
+							"kubernetes.io/ingress.class": c,
 						},
-						Spec: v1beta12.IngressSpec{
-							Backend: &v1beta12.IngressBackend{
-								ServiceName: "foo",
-								ServicePort: intstr.FromInt(8080),
-							},
+					},
+					Spec: v1beta12.IngressSpec{
+						Backend: &v1beta12.IngressBackend{
+							ServiceName: "foo",
+							ServicePort: intstr.FromInt(8080),
 						},
-					}
-					_, err = cs.ExtensionsV1beta1().Ingresses(ns.GetName()).Create(context.TODO(), i, metav1.CreateOptions{})
-					return
-				}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
-			}
-		})
+					},
+				}
+				_, err = cs.ExtensionsV1beta1().Ingresses(ns.GetName()).Create(context.TODO(), i, metav1.CreateOptions{})
+				return
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		}
+	})
+	It("should allow enabled Ingress class using the IngressClassName field", func() {
+		ns := NewNamespace("ingress-class-allowed-annotation")
+		cs := ownerClient(tnt)
+
+		cs, err := kubernetes.NewForConfig(cfg)
+		Expect(err).ToNot(HaveOccurred())
+		v, err := cs.Discovery().ServerVersion()
+		Expect(err).ToNot(HaveOccurred())
+		major, err := strconv.Atoi(v.Major)
+		Expect(err).ToNot(HaveOccurred())
+		minor, err := strconv.Atoi(v.Minor)
+		Expect(err).ToNot(HaveOccurred())
+		if major == 1 && minor < 18 {
+			Skip("Running test ont Kubernetes " + v.String() + ", doesn't provide .spec.ingressClassName")
+		}
+
+		NamespaceCreationShouldSucceed(ns, tnt)
+		NamespaceShouldBeManagedByTenant(ns, tnt)
+
+		for _, c := range tnt.Spec.IngressClasses {
+			Eventually(func() (err error) {
+				i := &v1beta12.Ingress{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: c,
+					},
+					Spec: v1beta12.IngressSpec{
+						IngressClassName: &c,
+						Backend: &v1beta12.IngressBackend{
+							ServiceName: "foo",
+							ServicePort: intstr.FromInt(8080),
+						},
+					},
+				}
+				_, err = cs.ExtensionsV1beta1().Ingresses(ns.GetName()).Create(context.TODO(), i, metav1.CreateOptions{})
+				return
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		}
 	})
 })
