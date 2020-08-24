@@ -29,7 +29,7 @@ import (
 	"github.com/clastix/capsule/pkg/utils"
 )
 
-func Register(mgr controllerruntime.Manager, webhookList ...Webhook) error {
+func Register(mgr controllerruntime.Manager, capsuleGroup string, webhookList ...Webhook) error {
 	// skipping webhook setup if certificate is missing
 	dat, _ := ioutil.ReadFile("/tmp/k8s-webhook-server/serving-certs/tls.crt")
 	if len(dat) == 0 {
@@ -40,7 +40,8 @@ func Register(mgr controllerruntime.Manager, webhookList ...Webhook) error {
 	for _, wh := range webhookList {
 		s.Register(wh.GetPath(), &webhook.Admission{
 			Handler: &handlerRouter{
-				handler: wh.GetHandler(),
+				handler:      wh.GetHandler(),
+				capsuleGroup: capsuleGroup,
 			},
 		})
 	}
@@ -48,13 +49,14 @@ func Register(mgr controllerruntime.Manager, webhookList ...Webhook) error {
 }
 
 type handlerRouter struct {
-	handler Handler
-	client  client.Client
-	decoder *admission.Decoder
+	handler      Handler
+	capsuleGroup string
+	client       client.Client
+	decoder      *admission.Decoder
 }
 
 func (r *handlerRouter) Handle(ctx context.Context, req admission.Request) admission.Response {
-	if !utils.UserGroupList(req.UserInfo.Groups).IsInCapsuleGroup() {
+	if !utils.UserGroupList(req.UserInfo.Groups).IsInCapsuleGroup(r.capsuleGroup) {
 		// not a Capsule user, can be skipped
 		return admission.Allowed("")
 	}

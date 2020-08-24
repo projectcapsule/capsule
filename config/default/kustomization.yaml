@@ -18,7 +18,6 @@ bases:
 - ../manager
 - ../secret
 - ../webhook
-- ../tenants
 # [PROMETHEUS] To enable prometheus monitor, uncomment all sections with 'PROMETHEUS'.
 #- ../prometheus
 

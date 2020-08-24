@@ -46,12 +46,9 @@ make deploy
 # /usr/local/bin/kustomize build config/default | kubectl apply -f -
 # namespace/capsule-system created
 # customresourcedefinition.apiextensions.k8s.io/tenants.capsule.clastix.io created
-# clusterrole.rbac.authorization.k8s.io/capsule-namespace:deleter created
-# clusterrole.rbac.authorization.k8s.io/capsule-namespace:provisioner created
 # clusterrole.rbac.authorization.k8s.io/capsule-proxy-role created
 # clusterrole.rbac.authorization.k8s.io/capsule-metrics-reader created
 # clusterrolebinding.rbac.authorization.k8s.io/capsule-manager-rolebinding created
-# clusterrolebinding.rbac.authorization.k8s.io/capsule-namespace:provisioner created
 # clusterrolebinding.rbac.authorization.k8s.io/capsule-proxy-rolebinding created
 # secret/capsule-ca created
 # secret/capsule-tls created
@@ -64,6 +61,8 @@ make deploy
 
 Log verbosity of the Capsule controller can be increased by passing the `--zap-log-level` option with a value from `1` to `10` or the [basic keywords](https://godoc.org/go.uber.org/zap/zapcore#Level) although it is suggested to use the `--zap-devel` flag to get also stack traces.
 
+During startup Capsule controller will create additional ClusterRoles `capsule-namespace:deleter`, `capsule-namespace:provisioner` and ClusterRoleBinding `capsule-namespace:provisioner`. These resources are used in order to allow Capsule users to manage their namespaces in tenants.
+
 ## Admission Controllers
 Capsule implements Kubernetes multi-tenancy capabilities using a minimum set of standard [Admission Controllers](https://kubernetes.io/docs/reference/access-authn-authz/admission-controllers/) enabled on the Kubernetes APIs server: `--enable-admission-plugins=PodNodeSelector,LimitRanger,ResourceQuota,MutatingAdmissionWebhook,ValidatingAdmissionWebhook`. In addition to these default controllers, Capsule implements its own set of Admission Controllers through the [Dynamic Admission Controller](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/), providing callbacks to add further validation or resource patching.
 
@@ -73,9 +72,9 @@ the API Server is communicating with the right client. Capsule upon installation
 ## Tenant users
 Each tenant comes with a delegated user acting as the tenant admin. In the Capsule jargon, this user is called the _Tenant Owner_. Other users can operate inside a tenant with different levels of permissions and authorizations assigned directly by the Tenant owner.
 
-Capsule does not care about the authentication strategy used in the cluster and all the Kubernetes methods of [authentication](https://kubernetes.io/docs/reference/access-authn-authz/authentication/) are supported. The only requirement to use Capsule is to assign tenant users to the `capsule.clastix.io` group.
+Capsule does not care about the authentication strategy used in the cluster and all the Kubernetes methods of [authentication](https://kubernetes.io/docs/reference/access-authn-authz/authentication/) are supported. The only requirement to use Capsule is to assign tenant users to the the group defined by `--capsule-user-group` option, which defaults to `capsule.clastix.io`.
 
-Assignment to a group depends on the authentication strategy in your cluster. For example, users authenticated through a _X.509_ certificate must have `capsule.clastix.io` as _Organization_: `-subj "/CN=${USER}/O=capsule.clastix.io"`
+Assignment to a group depends on the authentication strategy in your cluster. For example, if you are using `capsule.clastix.io` as your `--capsule-user-group`, users authenticated through a _X.509_ certificate must have `capsule.clastix.io` as _Organization_: `-subj "/CN=${USER}/O=capsule.clastix.io"`
 
 Users authenticated through an _OIDC token_ must have
 

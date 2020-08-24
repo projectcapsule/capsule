@@ -27,6 +27,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
+
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
@@ -35,6 +36,7 @@ import (
 	"github.com/clastix/capsule/controllers"
 	"github.com/clastix/capsule/controllers/secret"
 	"github.com/clastix/capsule/pkg/indexer"
+	"github.com/clastix/capsule/pkg/rbac"
 	"github.com/clastix/capsule/pkg/webhook"
 	"github.com/clastix/capsule/pkg/webhook/ingress"
 	"github.com/clastix/capsule/pkg/webhook/namespace_quota"
@@ -70,8 +72,10 @@ func main() {
 	var enableLeaderElection bool
 	var forceTenantPrefix bool
 	var v bool
+	var capsuleGroup string
 
 	flag.StringVar(&metricsAddr, "metrics-addr", ":8080", "The address the metric endpoint binds to.")
+	flag.StringVar(&capsuleGroup, "capsule-user-group", capsulev1alpha1.GroupVersion.Group, "Name of the group for capsule users")
 	flag.BoolVar(&enableLeaderElection, "enable-leader-election", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
@@ -103,6 +107,14 @@ func main() {
 		os.Exit(1)
 	}
 
+	if err := mgr.Add(&rbac.Manager{
+		CapsuleGroup: capsuleGroup,
+		Log:          ctrl.Log.WithName("controllers").WithName("Rbac"),
+	}); err != nil {
+		setupLog.Error(err, "unable to create cluster roles")
+		os.Exit(1)
+	}
+
 	_ = mgr.AddReadyzCheck("ping", healthz.Ping)
 	_ = mgr.AddHealthzCheck("ping", healthz.Ping)
 
@@ -119,7 +131,7 @@ func main() {
 	//webhooks
 	wl := make([]webhook.Webhook, 0)
 	wl = append(wl, &ingress.ExtensionIngress{}, &ingress.NetworkIngress{}, pvc.Webhook{}, &owner_reference.Webhook{}, &namespace_quota.Webhook{}, network_policies.Webhook{}, tenant_prefix.Webhook{ForceTenantPrefix: forceTenantPrefix})
-	err = webhook.Register(mgr, wl...)
+	err = webhook.Register(mgr, capsuleGroup, wl...)
 	if err != nil {
 		setupLog.Error(err, "unable to setup webhooks")
 		os.Exit(1)

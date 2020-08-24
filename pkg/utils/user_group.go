@@ -19,8 +19,6 @@ package utils
 import (
 	"sort"
 	"strings"
-
-	"github.com/clastix/capsule/api/v1alpha1"
 )
 
 type UserGroupList []string
@@ -37,11 +35,9 @@ func (u UserGroupList) Swap(i, j int) {
 	u[i], u[j] = u[j], u[i]
 }
 
-func (u UserGroupList) IsInCapsuleGroup() (ok bool) {
-	v := v1alpha1.GroupVersion.Group
-
+func (u UserGroupList) IsInCapsuleGroup(capsuleGroup string) (ok bool) {
 	sort.Sort(u)
-	i := sort.SearchStrings(u, v)
-	ok = i < u.Len() && u[i] == v
+	i := sort.SearchStrings(u, capsuleGroup)
+	ok = i < u.Len() && u[i] == capsuleGroup
 	return
 }
