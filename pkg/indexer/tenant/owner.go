@@ -21,6 +21,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/clastix/capsule/api/v1alpha1"
+	"github.com/clastix/capsule/pkg/utils"
 )
 
 type OwnerReference struct {
@@ -31,12 +32,12 @@ func (o OwnerReference) Object() runtime.Object {
 }
 
 func (o OwnerReference) Field() string {
-	return ".spec.owner"
+	return ".spec.owner.ownerkind"
 }
 
 func (o OwnerReference) Func() client.IndexerFunc {
 	return func(object runtime.Object) []string {
 		tenant := object.(*v1alpha1.Tenant)
-		return []string{tenant.Spec.Owner}
+		return []string{utils.GetOwnerWithKind(tenant)}
 	}
 }

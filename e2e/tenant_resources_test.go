@@ -27,7 +27,7 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/networking/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -38,10 +38,13 @@ import (
 var _ = Describe("creating namespaces within a Tenant with resources", func() {
 	tnt := &v1alpha1.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "tenant-resources",
+			Name: "tenantresources",
 		},
 		Spec: v1alpha1.TenantSpec{
-			Owner:              "john",
+			Owner: v1alpha1.OwnerSpec{
+				Name: "john",
+				Kind: "User",
+			},
 			NamespacesMetadata: v1alpha1.AdditionalMetadata{},
 			ServicesMetadata:   v1alpha1.AdditionalMetadata{},
 			StorageClasses:     []string{},
@@ -91,11 +94,11 @@ var _ = Describe("creating namespaces within a Tenant with resources", func() {
 					},
 				},
 			},
-			NetworkPolicies: []v1.NetworkPolicySpec{
+			NetworkPolicies: []networkingv1.NetworkPolicySpec{
 				{
-					Ingress: []v1.NetworkPolicyIngressRule{
+					Ingress: []networkingv1.NetworkPolicyIngressRule{
 						{
-							From: []v1.NetworkPolicyPeer{
+							From: []networkingv1.NetworkPolicyPeer{
 								{
 									NamespaceSelector: &metav1.LabelSelector{
 										MatchLabels: map[string]string{
@@ -107,18 +110,18 @@ var _ = Describe("creating namespaces within a Tenant with resources", func() {
 									PodSelector: &metav1.LabelSelector{},
 								},
 								{
-									IPBlock: &v1.IPBlock{
+									IPBlock: &networkingv1.IPBlock{
 										CIDR: "192.168.0.0/12",
 									},
 								},
 							},
 						},
 					},
-					Egress: []v1.NetworkPolicyEgressRule{
+					Egress: []networkingv1.NetworkPolicyEgressRule{
 						{
-							To: []v1.NetworkPolicyPeer{
+							To: []networkingv1.NetworkPolicyPeer{
 								{
-									IPBlock: &v1.IPBlock{
+									IPBlock: &networkingv1.IPBlock{
 										CIDR: "0.0.0.0/0",
 										Except: []string{
 											"192.168.0.0/12",
@@ -129,9 +132,9 @@ var _ = Describe("creating namespaces within a Tenant with resources", func() {
 						},
 					},
 					PodSelector: metav1.LabelSelector{},
-					PolicyTypes: []v1.PolicyType{
-						v1.PolicyTypeIngress,
-						v1.PolicyTypeEgress,
+					PolicyTypes: []networkingv1.PolicyType{
+						networkingv1.PolicyTypeIngress,
+						networkingv1.PolicyTypeEgress,
 					},
 				},
 			},
@@ -195,7 +198,7 @@ var _ = Describe("creating namespaces within a Tenant with resources", func() {
 			By("checking Network Policy resources", func() {
 				for i, s := range tnt.Spec.NetworkPolicies {
 					n := fmt.Sprintf("capsule-%s-%d", tnt.GetName(), i)
-					np := &v1.NetworkPolicy{}
+					np := &networkingv1.NetworkPolicy{}
 					Eventually(func() error {
 						return k8sClient.Get(context.TODO(), types.NamespacedName{Name: n, Namespace: name}, np)
 					}, 10*time.Second, time.Second).Should(Succeed())

@@ -519,8 +519,8 @@ func (r *TenantReconciler) ownerRoleBinding(tenant *capsulev1alpha1.Tenant) erro
 	l := map[string]string{tl: tenant.Name}
 	s := []rbacv1.Subject{
 		{
-			Kind: "User",
-			Name: tenant.Spec.Owner,
+			Kind: tenant.Spec.Owner.Kind.String(),
+			Name: tenant.Spec.Owner.Name,
 		},
 	}
 

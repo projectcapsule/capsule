@@ -35,7 +35,10 @@ var _ = Describe("creating a Namespace with --protected-namespace-regex enabled"
 			Name: "tenantprotectednamespace",
 		},
 		Spec: v1alpha1.TenantSpec{
-			Owner:              "alice",
+			Owner: v1alpha1.OwnerSpec{
+				Name: "alice",
+				Kind: "User",
+			},
 			NamespacesMetadata: v1alpha1.AdditionalMetadata{},
 			ServicesMetadata:   v1alpha1.AdditionalMetadata{},
 			StorageClasses:     []string{},
@@ -61,8 +64,8 @@ var _ = Describe("creating a Namespace with --protected-namespace-regex enabled"
 		NamespaceShouldBeManagedByTenant(ns, tnt, podRecreationTimeoutInterval)
 	})
 	It("should fail", func() {
-		ModifyCapsuleManagerPodArgs(defaulManagerPodArgs)
 		ns := NewNamespace("test-system")
 		NamespaceCreationShouldNotSucceed(ns, tnt, podRecreationTimeoutInterval)
+		ModifyCapsuleManagerPodArgs(defaulManagerPodArgs)
 	})
 })

@@ -44,10 +44,11 @@ import (
 // http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
 
 var (
-	cfg                  *rest.Config
-	k8sClient            client.Client
-	testEnv              *envtest.Environment
-	defaulManagerPodArgs []string
+	cfg                    *rest.Config
+	k8sClient              client.Client
+	testEnv                *envtest.Environment
+	defaulManagerPodArgs   []string
+	tenantRoleBindingNames = []string{"namespace:admin", "namespace:deleter"}
 )
 
 const (
@@ -95,7 +96,6 @@ var _ = BeforeSuite(func(done Done) {
 		}
 	}
 	Expect(defaulManagerPodArgs).ToNot(BeEmpty())
-
 	close(done)
 }, 60)
 
@@ -107,8 +107,8 @@ var _ = AfterSuite(func() {
 func ownerClient(tenant *capsulev1alpha.Tenant) (cs kubernetes.Interface) {
 	c, err := config.GetConfig()
 	Expect(err).ToNot(HaveOccurred())
-	c.Impersonate.Groups = []string{capsulev1alpha.GroupVersion.Group}
-	c.Impersonate.UserName = tenant.Spec.Owner
+	c.Impersonate.Groups = []string{capsulev1alpha.GroupVersion.Group, tenant.Spec.Owner.Name}
+	c.Impersonate.UserName = tenant.Spec.Owner.Name
 	cs, err = kubernetes.NewForConfig(c)
 	Expect(err).ToNot(HaveOccurred())
 	return

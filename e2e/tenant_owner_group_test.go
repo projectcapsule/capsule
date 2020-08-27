@@ -29,44 +29,37 @@ import (
 	"github.com/clastix/capsule/api/v1alpha1"
 )
 
-var _ = Describe("creating a Namespace over-quota", func() {
+var _ = Describe("creating a Namespace with group Tenant owner", func() {
 	tnt := &v1alpha1.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "overquotatenant",
+			Name: "tenantgroupowner",
 		},
 		Spec: v1alpha1.TenantSpec{
 			Owner: v1alpha1.OwnerSpec{
-				Name: "bob",
-				Kind: "User",
+				Name: "alice",
+				Kind: "Group",
 			},
 			NamespacesMetadata: v1alpha1.AdditionalMetadata{},
 			ServicesMetadata:   v1alpha1.AdditionalMetadata{},
 			StorageClasses:     []string{},
 			IngressClasses:     []string{},
 			LimitRanges:        []corev1.LimitRangeSpec{},
-			NamespaceQuota:     3,
+			NamespaceQuota:     10,
 			NodeSelector:       map[string]string{},
 			ResourceQuota:      []corev1.ResourceQuotaSpec{},
 		},
 	}
 	JustBeforeEach(func() {
+		tnt.ResourceVersion = ""
 		Expect(k8sClient.Create(context.TODO(), tnt)).Should(Succeed())
 	})
 	JustAfterEach(func() {
 		Expect(k8sClient.Delete(context.TODO(), tnt)).Should(Succeed())
 	})
-	It("should fail", func() {
-		By("creating three Namespaces", func() {
-			for _, name := range []string{"bob-dev", "bob-staging", "bob-production"} {
-				ns := NewNamespace(name)
-				NamespaceCreationShouldSucceed(ns, tnt, defaultTimeoutInterval)
-				NamespaceShouldBeManagedByTenant(ns, tnt, defaultTimeoutInterval)
-			}
-		})
-
-		ns := NewNamespace("bob-fail")
-		cs := ownerClient(tnt)
-		_, err := cs.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
-		Expect(err).ShouldNot(Succeed())
+	It("should succeed and be available in Tenant namespaces list", func() {
+		ns := NewNamespace("gto-namespace")
+		NamespaceCreationShouldSucceed(ns, tnt, defaultTimeoutInterval)
+		NamespaceShouldBeManagedByTenant(ns, tnt, defaultTimeoutInterval)
+		GroupShouldBeUsedInTenantRoleBinding(ns, tnt, defaultTimeoutInterval)
 	})
 })
