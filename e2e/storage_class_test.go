@@ -60,8 +60,8 @@ var _ = Describe("when Tenant handles Storage classes", func() {
 	})
 	It("should block non allowed Storage Class", func() {
 		ns := NewNamespace("storage-class-disallowed")
-		NamespaceCreationShouldSucceed(ns, tnt)
-		NamespaceShouldBeManagedByTenant(ns, tnt)
+		NamespaceCreationShouldSucceed(ns, tnt, defaultTimeoutInterval)
+		NamespaceShouldBeManagedByTenant(ns, tnt, defaultTimeoutInterval)
 
 		By("non-specifying the class", func() {
 			Eventually(func() (err error) {
@@ -108,8 +108,8 @@ var _ = Describe("when Tenant handles Storage classes", func() {
 		ns := NewNamespace("storage-class-allowed")
 		cs := ownerClient(tnt)
 
-		NamespaceCreationShouldSucceed(ns, tnt)
-		NamespaceShouldBeManagedByTenant(ns, tnt)
+		NamespaceCreationShouldSucceed(ns, tnt, defaultTimeoutInterval)
+		NamespaceShouldBeManagedByTenant(ns, tnt, defaultTimeoutInterval)
 
 		for _, c := range tnt.Spec.StorageClasses {
 			Eventually(func() (err error) {

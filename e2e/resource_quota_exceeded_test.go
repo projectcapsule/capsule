@@ -91,8 +91,8 @@ var _ = Describe("exceeding Tenant resource quota", func() {
 				},
 			},
 			NetworkPolicies: []networkingv1.NetworkPolicySpec{},
-			NamespaceQuota: 2,
-			NodeSelector: map[string]string{},
+			NamespaceQuota:  2,
+			NodeSelector:    map[string]string{},
 			ResourceQuota: []corev1.ResourceQuotaSpec{
 				{
 					Hard: map[corev1.ResourceName]resource.Quantity{
@@ -125,8 +125,8 @@ var _ = Describe("exceeding Tenant resource quota", func() {
 		By("creating the Namespaces", func() {
 			for _, i := range nsl {
 				ns := NewNamespace(i)
-				NamespaceCreationShouldSucceed(ns, tnt)
-				NamespaceShouldBeManagedByTenant(ns, tnt)
+				NamespaceCreationShouldSucceed(ns, tnt, defaultTimeoutInterval)
+				NamespaceShouldBeManagedByTenant(ns, tnt, defaultTimeoutInterval)
 			}
 		})
 	})
@@ -157,7 +157,7 @@ var _ = Describe("exceeding Tenant resource quota", func() {
 							Spec: corev1.PodSpec{
 								Containers: []corev1.Container{
 									{
-										Name: "my-pause",
+										Name:  "my-pause",
 										Image: "gcr.io/google_containers/pause-amd64:3.0",
 									},
 								},
@@ -204,7 +204,7 @@ var _ = Describe("exceeding Tenant resource quota", func() {
 							Spec: corev1.PodSpec{
 								Containers: []corev1.Container{
 									{
-										Name: "my-exceeded",
+										Name:  "my-exceeded",
 										Image: "gcr.io/google_containers/pause-amd64:3.0",
 									},
 								},

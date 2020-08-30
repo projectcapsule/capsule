@@ -54,16 +54,16 @@ var _ = Describe("creating a Namespace as Tenant owner with custom --capsule-gro
 	It("should fail", func() {
 		args := append(defaulManagerPodArgs, []string{"--capsule-user-group=test"}...)
 		ModifyCapsuleManagerPodArgs(args)
-		CapsuleClusterGroupParamShouldBeUpdated("test")
+		CapsuleClusterGroupParamShouldBeUpdated("test", podRecreationTimeoutInterval)
 		ns := NewNamespace("cg-namespace-fail")
-		NamespaceCreationShouldNotSucceed(ns, tnt)
+		NamespaceCreationShouldNotSucceed(ns, tnt, podRecreationTimeoutInterval)
 	})
 	It("should succeed and be available in Tenant namespaces list", func() {
 		ModifyCapsuleManagerPodArgs(defaulManagerPodArgs)
-		CapsuleClusterGroupParamShouldBeUpdated("capsule.clastix.io")
+		CapsuleClusterGroupParamShouldBeUpdated("capsule.clastix.io", podRecreationTimeoutInterval)
 		ns := NewNamespace("cg-namespace")
-		NamespaceCreationShouldSucceed(ns, tnt)
-		NamespaceShouldBeManagedByTenant(ns, tnt)
+		NamespaceCreationShouldSucceed(ns, tnt, podRecreationTimeoutInterval)
+		NamespaceShouldBeManagedByTenant(ns, tnt, podRecreationTimeoutInterval)
 
 	})
 })

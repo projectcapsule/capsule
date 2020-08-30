@@ -27,7 +27,7 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/api/networking/v1"
+	v1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -170,8 +170,8 @@ var _ = Describe("creating namespaces within a Tenant with resources", func() {
 		By("creating the Namespaces", func() {
 			for _, i := range nsl {
 				ns := NewNamespace(i)
-				NamespaceCreationShouldSucceed(ns, tnt)
-				NamespaceShouldBeManagedByTenant(ns, tnt)
+				NamespaceCreationShouldSucceed(ns, tnt, defaultTimeoutInterval)
+				NamespaceShouldBeManagedByTenant(ns, tnt, defaultTimeoutInterval)
 			}
 		})
 	})

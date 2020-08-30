@@ -63,6 +63,8 @@ Log verbosity of the Capsule controller can be increased by passing the `--zap-l
 
 During startup Capsule controller will create additional ClusterRoles `capsule-namespace:deleter`, `capsule-namespace:provisioner` and ClusterRoleBinding `capsule-namespace:provisioner`. These resources are used in order to allow Capsule users to manage their namespaces in tenants.
 
+You can disallow users to create namespaces matching a particular regexp by passing `--protected-namespace-regex` option with a value of regular expression.
+
 ## Admission Controllers
 Capsule implements Kubernetes multi-tenancy capabilities using a minimum set of standard [Admission Controllers](https://kubernetes.io/docs/reference/access-authn-authz/admission-controllers/) enabled on the Kubernetes APIs server: `--enable-admission-plugins=PodNodeSelector,LimitRanger,ResourceQuota,MutatingAdmissionWebhook,ValidatingAdmissionWebhook`. In addition to these default controllers, Capsule implements its own set of Admission Controllers through the [Dynamic Admission Controller](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/), providing callbacks to add further validation or resource patching.
 

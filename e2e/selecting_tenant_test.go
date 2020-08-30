@@ -75,7 +75,7 @@ var _ = Describe("creating a Namespace with Tenant selector", func() {
 				l: t2.Name,
 			}
 		})
-		NamespaceCreationShouldSucceed(ns, t2)
-		NamespaceShouldBeManagedByTenant(ns, t2)
+		NamespaceCreationShouldSucceed(ns, t2, defaultTimeoutInterval)
+		NamespaceShouldBeManagedByTenant(ns, t2, defaultTimeoutInterval)
 	})
 })

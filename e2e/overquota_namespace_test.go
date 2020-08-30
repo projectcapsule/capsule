@@ -54,8 +54,8 @@ var _ = Describe("creating a Namespace over-quota", func() {
 		By("creating three Namespaces", func() {
 			for _, name := range []string{"bob-dev", "bob-staging", "bob-production"} {
 				ns := NewNamespace(name)
-				NamespaceCreationShouldSucceed(ns, tnt)
-				NamespaceShouldBeManagedByTenant(ns, tnt)
+				NamespaceCreationShouldSucceed(ns, tnt, defaultTimeoutInterval)
+				NamespaceShouldBeManagedByTenant(ns, tnt, defaultTimeoutInterval)
 			}
 		})
 
