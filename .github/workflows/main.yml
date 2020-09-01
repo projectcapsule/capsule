@@ -28,7 +28,7 @@ jobs:
         args: --timeout 2m
   kind:
     name: e2e
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-18.04
     steps:
     - uses: actions/checkout@master
     # Cache Go modules
