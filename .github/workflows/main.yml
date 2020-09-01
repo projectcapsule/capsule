@@ -28,22 +28,25 @@ jobs:
         args: --timeout 2m
   kind:
     name: e2e
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-18.04
     steps:
     - uses: actions/checkout@master
-    # Cache Go modules
-    - name: Cache Go Modules
+    - name: Cache Go modules and Docker images
       uses: actions/cache@v1
       env:
-        cache-name: cache-go-modules
+        cache-name: gomod-docker
       with:
-        path: ~/go/pkg/mod
+        path: |
+          ~/go/pkg/mod
+          /var/lib/docker
+          /home/runner/work/capsule/capsule
         key: ${{ runner.os }}-build-${{ env.cache-name }}
         restore-keys: |
           ${{ runner.os }}-build-
           ${{ runner.os }}-
-    # Installing Ginkgo
-    - name: installing Ginkgo
+    - name: Removing kustomize
+      run: sudo snap remove kustomize
+    - name: Installing Ginkgo
       run: go get github.com/onsi/ginkgo/ginkgo
     - uses: actions/setup-go@v2
       with:
