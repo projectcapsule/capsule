@@ -44,8 +44,9 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-build-
           ${{ runner.os }}-
-    # Installing Ginkgo
-    - name: installing Ginkgo
+    - name: Removing kustomize
+      run: sudo snap remove kustomize
+    - name: Installing Ginkgo
       run: go get github.com/onsi/ginkgo/ginkgo
     - uses: actions/setup-go@v2
       with:
