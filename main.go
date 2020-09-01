@@ -34,9 +34,9 @@ import (
 
 	capsulev1alpha1 "github.com/clastix/capsule/api/v1alpha1"
 	"github.com/clastix/capsule/controllers"
+	"github.com/clastix/capsule/controllers/rbac"
 	"github.com/clastix/capsule/controllers/secret"
 	"github.com/clastix/capsule/pkg/indexer"
-	"github.com/clastix/capsule/pkg/rbac"
 	"github.com/clastix/capsule/pkg/webhook"
 	"github.com/clastix/capsule/pkg/webhook/ingress"
 	"github.com/clastix/capsule/pkg/webhook/namespace_quota"
@@ -107,14 +107,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := mgr.Add(&rbac.Manager{
-		CapsuleGroup: capsuleGroup,
-		Log:          ctrl.Log.WithName("controllers").WithName("Rbac"),
-	}); err != nil {
-		setupLog.Error(err, "unable to create cluster roles")
-		os.Exit(1)
-	}
-
 	_ = mgr.AddReadyzCheck("ping", healthz.Ping)
 	_ = mgr.AddHealthzCheck("ping", healthz.Ping)
 
@@ -134,6 +126,19 @@ func main() {
 	err = webhook.Register(mgr, capsuleGroup, wl...)
 	if err != nil {
 		setupLog.Error(err, "unable to setup webhooks")
+		os.Exit(1)
+	}
+
+	rbacManager := &rbac.Manager{
+		Log:          ctrl.Log.WithName("controllers").WithName("Rbac"),
+		CapsuleGroup: capsuleGroup,
+	}
+	if err := mgr.Add(rbacManager); err != nil {
+		setupLog.Error(err, "unable to create cluster roles")
+		os.Exit(1)
+	}
+	if err = rbacManager.SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "Rbac")
 		os.Exit(1)
 	}
 

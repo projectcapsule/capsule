@@ -43,7 +43,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	capsulev1alpha1 "github.com/clastix/capsule/api/v1alpha1"
-	"github.com/clastix/capsule/pkg/rbac"
+	"github.com/clastix/capsule/controllers/rbac"
 )
 
 // TenantReconciler reconciles a Tenant object
