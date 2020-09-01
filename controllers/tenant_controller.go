@@ -43,6 +43,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	capsulev1alpha1 "github.com/clastix/capsule/api/v1alpha1"
+	"github.com/clastix/capsule/controllers/rbac"
 )
 
 // TenantReconciler reconciles a Tenant object
@@ -516,7 +517,7 @@ func (r *TenantReconciler) ownerRoleBinding(tenant *capsulev1alpha1.Tenant) erro
 		rbl[types.NamespacedName{Namespace: i, Name: "namespace:deleter"}] = rbacv1.RoleRef{
 			APIGroup: "rbac.authorization.k8s.io",
 			Kind:     "ClusterRole",
-			Name:     "capsule-namespace:deleter",
+			Name:     rbac.DeleterRoleName,
 		}
 	}
 

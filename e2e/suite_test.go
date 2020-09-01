@@ -19,11 +19,14 @@ limitations under the License.
 package e2e
 
 import (
+	"context"
 	"path/filepath"
 	"testing"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	appsv1 "k8s.io/api/apps/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
@@ -40,9 +43,18 @@ import (
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to
 // http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
 
-var cfg *rest.Config
-var k8sClient client.Client
-var testEnv *envtest.Environment
+var (
+	cfg                  *rest.Config
+	k8sClient            client.Client
+	testEnv              *envtest.Environment
+	defaulManagerPodArgs []string
+)
+
+const (
+	capsuleDeploymentName       = "capsule-controller-manager"
+	capsuleNamespace            = "capsule-system"
+	capsuleManagerContainerName = "manager"
+)
 
 func TestAPIs(t *testing.T) {
 	RegisterFailHandler(Fail)
@@ -74,6 +86,15 @@ var _ = BeforeSuite(func(done Done) {
 	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
 	Expect(err).ToNot(HaveOccurred())
 	Expect(k8sClient).ToNot(BeNil())
+
+	capsuleDeployment := &appsv1.Deployment{}
+	k8sClient.Get(context.TODO(), types.NamespacedName{Name: capsuleDeploymentName, Namespace: capsuleNamespace}, capsuleDeployment)
+	for _, container := range capsuleDeployment.Spec.Template.Spec.Containers {
+		if container.Name == capsuleManagerContainerName {
+			defaulManagerPodArgs = container.Args
+		}
+	}
+	Expect(defaulManagerPodArgs).ToNot(BeEmpty())
 
 	close(done)
 }, 60)

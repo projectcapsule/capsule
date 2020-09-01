@@ -14,30 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package utils
+package rbac
 
-import (
-	"sort"
-	"strings"
-)
-
-type UserGroupList []string
-
-func (u UserGroupList) Len() int {
-	return len(u)
+type ImmutableClusterRoleBindingError struct {
 }
 
-func (u UserGroupList) Less(i, j int) bool {
-	return strings.ToLower(u[i]) < strings.ToLower(u[j])
-}
-
-func (u UserGroupList) Swap(i, j int) {
-	u[i], u[j] = u[j], u[i]
-}
-
-func (u UserGroupList) IsInCapsuleGroup(capsuleGroup string) (ok bool) {
-	sort.Sort(u)
-	i := sort.SearchStrings(u, capsuleGroup)
-	ok = i < u.Len() && u[i] == capsuleGroup
-	return
+func (i ImmutableClusterRoleBindingError) Error() string {
+	return "The ClusterRoleBinding Role reference is immutable, deletion must be processed first"
 }
