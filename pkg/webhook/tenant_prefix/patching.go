@@ -19,6 +19,7 @@ package tenant_prefix
 import (
 	"context"
 	"net/http"
+	"regexp"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -33,11 +34,12 @@ import (
 // +kubebuilder:webhook:path=/validating-v1-namespace-tenant-prefix,mutating=false,failurePolicy=fail,groups="",resources=namespaces,verbs=create,versions=v1,name=prefix.namespace.capsule.clastix.io
 
 type Webhook struct {
-	ForceTenantPrefix bool
+	ForceTenantPrefix        bool
+	ProtectedNamespacesRegex *regexp.Regexp
 }
 
 func (o Webhook) GetHandler() webhook.Handler {
-	return &handler{forceTenantPrefix: o.ForceTenantPrefix}
+	return &handler{forceTenantPrefix: o.ForceTenantPrefix, protectedNamespacesRegex: o.ProtectedNamespacesRegex}
 }
 
 func (o Webhook) GetName() string {
@@ -49,16 +51,24 @@ func (o Webhook) GetPath() string {
 }
 
 type handler struct {
-	forceTenantPrefix bool
+	forceTenantPrefix        bool
+	protectedNamespacesRegex *regexp.Regexp
 }
 
 func (r *handler) OnCreate(ctx context.Context, req admission.Request, clt client.Client, decoder *admission.Decoder) admission.Response {
-	if !r.forceTenantPrefix {
-		return admission.Allowed("")
-	}
 	ns := &corev1.Namespace{}
 	if err := decoder.Decode(req, ns); err != nil {
 		return admission.Errored(http.StatusBadRequest, err)
+	}
+
+	if r.protectedNamespacesRegex != nil {
+		if matched := r.protectedNamespacesRegex.MatchString(ns.GetName()); matched {
+			return admission.Denied("Creating namespaces with name matching " + r.protectedNamespacesRegex.String() + " regexp is not allowed; please, reach out the system administrators")
+		}
+	}
+
+	if !r.forceTenantPrefix {
+		return admission.Allowed("")
 	}
 
 	t := &v1alpha1.Tenant{}

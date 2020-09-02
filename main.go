@@ -20,6 +20,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"regexp"
 	goRuntime "runtime"
 
 	corev1 "k8s.io/api/core/v1"
@@ -73,6 +74,8 @@ func main() {
 	var forceTenantPrefix bool
 	var v bool
 	var capsuleGroup string
+	var protectedNamespaceRegexpString string
+	var protectedNamespaceRegexp *regexp.Regexp
 
 	flag.StringVar(&metricsAddr, "metrics-addr", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&capsuleGroup, "capsule-user-group", capsulev1alpha1.GroupVersion.Group, "Name of the group for capsule users")
@@ -83,6 +86,7 @@ func main() {
 	flag.BoolVar(&forceTenantPrefix, "force-tenant-prefix", false, "Enforces the Tenant owner, "+
 		"during Namespace creation, to name it using the selected Tenant name as prefix, separated by a dash. "+
 		"This is useful to avoid Namespace name collision in a public CaaS environment.")
+	flag.StringVar(&protectedNamespaceRegexpString, "protected-namespace-regex", "", "Disallow creation of namespaces, whose name matches this regexp")
 	opts := zap.Options{}
 	opts.BindFlags(flag.CommandLine)
 	flag.Parse()
@@ -106,6 +110,13 @@ func main() {
 		setupLog.Error(err, "unable to start manager")
 		os.Exit(1)
 	}
+	if len(protectedNamespaceRegexpString) > 0 {
+		protectedNamespaceRegexp, err = regexp.Compile(protectedNamespaceRegexpString)
+		if err != nil {
+			setupLog.Error(err, "unable to compile protected-namespace-regex", "protected-namespace-regex", protectedNamespaceRegexp)
+			os.Exit(1)
+		}
+	}
 
 	_ = mgr.AddReadyzCheck("ping", healthz.Ping)
 	_ = mgr.AddHealthzCheck("ping", healthz.Ping)
@@ -122,7 +133,7 @@ func main() {
 
 	//webhooks
 	wl := make([]webhook.Webhook, 0)
-	wl = append(wl, &ingress.ExtensionIngress{}, &ingress.NetworkIngress{}, pvc.Webhook{}, &owner_reference.Webhook{}, &namespace_quota.Webhook{}, network_policies.Webhook{}, tenant_prefix.Webhook{ForceTenantPrefix: forceTenantPrefix})
+	wl = append(wl, &ingress.ExtensionIngress{}, &ingress.NetworkIngress{}, pvc.Webhook{}, &owner_reference.Webhook{}, &namespace_quota.Webhook{}, network_policies.Webhook{}, tenant_prefix.Webhook{ForceTenantPrefix: forceTenantPrefix, ProtectedNamespacesRegex: protectedNamespaceRegexp})
 	err = webhook.Register(mgr, capsuleGroup, wl...)
 	if err != nil {
 		setupLog.Error(err, "unable to setup webhooks")

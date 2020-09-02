@@ -103,8 +103,8 @@ var _ = Describe("when Tenant owner interacts with the webhooks", func() {
 	It("should disallow deletions", func() {
 		By("blocking Capsule Limit ranges", func() {
 			ns := NewNamespace("limit-range-disallow")
-			NamespaceCreationShouldSucceed(ns, tnt)
-			NamespaceShouldBeManagedByTenant(ns, tnt)
+			NamespaceCreationShouldSucceed(ns, tnt, defaultTimeoutInterval)
+			NamespaceShouldBeManagedByTenant(ns, tnt, defaultTimeoutInterval)
 
 			lr := &corev1.LimitRange{}
 			Eventually(func() error {
@@ -117,8 +117,8 @@ var _ = Describe("when Tenant owner interacts with the webhooks", func() {
 		})
 		By("blocking Capsule Network Policy", func() {
 			ns := NewNamespace("network-policy-disallow")
-			NamespaceCreationShouldSucceed(ns, tnt)
-			NamespaceShouldBeManagedByTenant(ns, tnt)
+			NamespaceCreationShouldSucceed(ns, tnt, defaultTimeoutInterval)
+			NamespaceShouldBeManagedByTenant(ns, tnt, defaultTimeoutInterval)
 
 			np := &networkingv1.NetworkPolicy{}
 			Eventually(func() error {
@@ -131,8 +131,8 @@ var _ = Describe("when Tenant owner interacts with the webhooks", func() {
 		})
 		By("blocking blocking Capsule Resource Quota", func() {
 			ns := NewNamespace("resource-quota-disallow")
-			NamespaceCreationShouldSucceed(ns, tnt)
-			NamespaceShouldBeManagedByTenant(ns, tnt)
+			NamespaceCreationShouldSucceed(ns, tnt, defaultTimeoutInterval)
+			NamespaceShouldBeManagedByTenant(ns, tnt, defaultTimeoutInterval)
 
 			rq := &corev1.ResourceQuota{}
 			Eventually(func() error {
@@ -147,8 +147,8 @@ var _ = Describe("when Tenant owner interacts with the webhooks", func() {
 	It("should allow listing", func() {
 		By("Limit Range resources", func() {
 			ns := NewNamespace("limit-range-list")
-			NamespaceCreationShouldSucceed(ns, tnt)
-			NamespaceShouldBeManagedByTenant(ns, tnt)
+			NamespaceCreationShouldSucceed(ns, tnt, defaultTimeoutInterval)
+			NamespaceShouldBeManagedByTenant(ns, tnt, defaultTimeoutInterval)
 
 			Eventually(func() (err error) {
 				cs := ownerClient(tnt)
@@ -158,8 +158,8 @@ var _ = Describe("when Tenant owner interacts with the webhooks", func() {
 		})
 		By("Network Policy resources", func() {
 			ns := NewNamespace("network-policy-list")
-			NamespaceCreationShouldSucceed(ns, tnt)
-			NamespaceShouldBeManagedByTenant(ns, tnt)
+			NamespaceCreationShouldSucceed(ns, tnt, defaultTimeoutInterval)
+			NamespaceShouldBeManagedByTenant(ns, tnt, defaultTimeoutInterval)
 
 			Eventually(func() (err error) {
 				cs := ownerClient(tnt)
@@ -169,8 +169,8 @@ var _ = Describe("when Tenant owner interacts with the webhooks", func() {
 		})
 		By("Resource Quota resources", func() {
 			ns := NewNamespace("resource-quota-list")
-			NamespaceCreationShouldSucceed(ns, tnt)
-			NamespaceShouldBeManagedByTenant(ns, tnt)
+			NamespaceCreationShouldSucceed(ns, tnt, defaultTimeoutInterval)
+			NamespaceShouldBeManagedByTenant(ns, tnt, defaultTimeoutInterval)
 
 			Eventually(func() (err error) {
 				cs := ownerClient(tnt)
@@ -181,8 +181,8 @@ var _ = Describe("when Tenant owner interacts with the webhooks", func() {
 	})
 	It("should allow all actions to Tenant owner Network Policy resources", func() {
 		ns := NewNamespace("network-policy-allow")
-		NamespaceCreationShouldSucceed(ns, tnt)
-		NamespaceShouldBeManagedByTenant(ns, tnt)
+		NamespaceCreationShouldSucceed(ns, tnt, defaultTimeoutInterval)
+		NamespaceShouldBeManagedByTenant(ns, tnt, defaultTimeoutInterval)
 
 		cs := ownerClient(tnt)
 		np := &networkingv1.NetworkPolicy{

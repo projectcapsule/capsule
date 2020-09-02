@@ -2,13 +2,10 @@
 
 /*
 Copyright 2020 Clastix Labs.
-
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
-
     http://www.apache.org/licenses/LICENSE-2.0
-
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -29,10 +26,10 @@ import (
 	"github.com/clastix/capsule/api/v1alpha1"
 )
 
-var _ = Describe("creating a Namespace as Tenant owner", func() {
+var _ = Describe("creating a Namespace with --protected-namespace-regex enabled", func() {
 	tnt := &v1alpha1.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "tenant-assigned",
+			Name: "tenantprotectednamespace",
 		},
 		Spec: v1alpha1.TenantSpec{
 			Owner:          "alice",
@@ -45,14 +42,22 @@ var _ = Describe("creating a Namespace as Tenant owner", func() {
 		},
 	}
 	JustBeforeEach(func() {
+		tnt.ResourceVersion = ""
 		Expect(k8sClient.Create(context.TODO(), tnt)).Should(Succeed())
 	})
 	JustAfterEach(func() {
 		Expect(k8sClient.Delete(context.TODO(), tnt)).Should(Succeed())
 	})
-	It("should be available in Tenant namespaces list", func() {
-		ns := NewNamespace("new-namespace")
-		NamespaceCreationShouldSucceed(ns, tnt, defaultTimeoutInterval)
-		NamespaceShouldBeManagedByTenant(ns, tnt, defaultTimeoutInterval)
+	It("should succeed and be available in Tenant namespaces list", func() {
+		args := append(defaulManagerPodArgs, []string{"--protected-namespace-regex=^.*[-.]system$"}...)
+		ModifyCapsuleManagerPodArgs(args)
+		ns := NewNamespace("test-ok")
+		NamespaceCreationShouldSucceed(ns, tnt, podRecreationTimeoutInterval)
+		NamespaceShouldBeManagedByTenant(ns, tnt, podRecreationTimeoutInterval)
+	})
+	It("should fail", func() {
+		ModifyCapsuleManagerPodArgs(defaulManagerPodArgs)
+		ns := NewNamespace("test-system")
+		NamespaceCreationShouldNotSucceed(ns, tnt, podRecreationTimeoutInterval)
 	})
 })

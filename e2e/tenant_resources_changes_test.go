@@ -168,8 +168,8 @@ var _ = Describe("changing Tenant managed Kubernetes resources", func() {
 		By("creating the Namespaces", func() {
 			for _, i := range nsl {
 				ns := NewNamespace(i)
-				NamespaceCreationShouldSucceed(ns, tnt)
-				NamespaceShouldBeManagedByTenant(ns, tnt)
+				NamespaceCreationShouldSucceed(ns, tnt, defaultTimeoutInterval)
+				NamespaceShouldBeManagedByTenant(ns, tnt, defaultTimeoutInterval)
 			}
 		})
 	})

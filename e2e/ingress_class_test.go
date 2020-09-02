@@ -65,8 +65,8 @@ var _ = Describe("when Tenant handles Ingress classes", func() {
 		ns := NewNamespace("ingress-class-disallowed")
 		cs := ownerClient(tnt)
 
-		NamespaceCreationShouldSucceed(ns, tnt)
-		NamespaceShouldBeManagedByTenant(ns, tnt)
+		NamespaceCreationShouldSucceed(ns, tnt, defaultTimeoutInterval)
+		NamespaceShouldBeManagedByTenant(ns, tnt, defaultTimeoutInterval)
 
 		By("non-specifying the class", func() {
 			Eventually(func() (err error) {
@@ -128,8 +128,8 @@ var _ = Describe("when Tenant handles Ingress classes", func() {
 		ns := NewNamespace("ingress-class-allowed-annotation")
 		cs := ownerClient(tnt)
 
-		NamespaceCreationShouldSucceed(ns, tnt)
-		NamespaceShouldBeManagedByTenant(ns, tnt)
+		NamespaceCreationShouldSucceed(ns, tnt, defaultTimeoutInterval)
+		NamespaceShouldBeManagedByTenant(ns, tnt, defaultTimeoutInterval)
 
 		for _, c := range tnt.Spec.IngressClasses {
 			Eventually(func() (err error) {
@@ -168,8 +168,8 @@ var _ = Describe("when Tenant handles Ingress classes", func() {
 			Skip("Running test ont Kubernetes " + v.String() + ", doesn't provide .spec.ingressClassName")
 		}
 
-		NamespaceCreationShouldSucceed(ns, tnt)
-		NamespaceShouldBeManagedByTenant(ns, tnt)
+		NamespaceCreationShouldSucceed(ns, tnt, defaultTimeoutInterval)
+		NamespaceShouldBeManagedByTenant(ns, tnt, defaultTimeoutInterval)
 
 		for _, c := range tnt.Spec.IngressClasses {
 			Eventually(func() (err error) {
