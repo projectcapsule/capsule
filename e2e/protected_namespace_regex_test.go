@@ -2,10 +2,13 @@
 
 /*
 Copyright 2020 Clastix Labs.
+
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
+
     http://www.apache.org/licenses/LICENSE-2.0
+
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -32,13 +35,14 @@ var _ = Describe("creating a Namespace with --protected-namespace-regex enabled"
 			Name: "tenantprotectednamespace",
 		},
 		Spec: v1alpha1.TenantSpec{
-			Owner:          "alice",
-			StorageClasses: []string{},
-			IngressClasses: []string{},
-			LimitRanges:    []corev1.LimitRangeSpec{},
-			NamespaceQuota: 10,
-			NodeSelector:   map[string]string{},
-			ResourceQuota:  []corev1.ResourceQuotaSpec{},
+			Owner:              "alice",
+			NamespacesMetadata: v1alpha1.NamespaceMetadata{},
+			StorageClasses:     []string{},
+			IngressClasses:     []string{},
+			LimitRanges:        []corev1.LimitRangeSpec{},
+			NamespaceQuota:     10,
+			NodeSelector:       map[string]string{},
+			ResourceQuota:      []corev1.ResourceQuotaSpec{},
 		},
 	}
 	JustBeforeEach(func() {

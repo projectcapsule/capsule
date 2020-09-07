@@ -38,7 +38,8 @@ var _ = Describe("when Tenant handles Storage classes", func() {
 			Name: "storage-class",
 		},
 		Spec: v1alpha1.TenantSpec{
-			Owner: "storage",
+			Owner:              "storage",
+			NamespacesMetadata: v1alpha1.NamespaceMetadata{},
 			StorageClasses: []string{
 				"cephfs",
 				"glusterfs",

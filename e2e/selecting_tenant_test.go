@@ -35,13 +35,14 @@ var _ = Describe("creating a Namespace with Tenant selector", func() {
 			Name: "tenant-one",
 		},
 		Spec: v1alpha1.TenantSpec{
-			Owner:          "john",
-			StorageClasses: []string{},
-			IngressClasses: []string{},
-			LimitRanges:    []corev1.LimitRangeSpec{},
-			NamespaceQuota: 10,
-			NodeSelector:   map[string]string{},
-			ResourceQuota:  []corev1.ResourceQuotaSpec{},
+			Owner:              "john",
+			NamespacesMetadata: v1alpha1.NamespaceMetadata{},
+			StorageClasses:     []string{},
+			IngressClasses:     []string{},
+			LimitRanges:        []corev1.LimitRangeSpec{},
+			NamespaceQuota:     10,
+			NodeSelector:       map[string]string{},
+			ResourceQuota:      []corev1.ResourceQuotaSpec{},
 		},
 	}
 	t2 := &v1alpha1.Tenant{
@@ -49,13 +50,14 @@ var _ = Describe("creating a Namespace with Tenant selector", func() {
 			Name: "tenant-two",
 		},
 		Spec: v1alpha1.TenantSpec{
-			Owner:          "john",
-			StorageClasses: []string{},
-			IngressClasses: []string{},
-			LimitRanges:    []corev1.LimitRangeSpec{},
-			NamespaceQuota: 10,
-			NodeSelector:   map[string]string{},
-			ResourceQuota:  []corev1.ResourceQuotaSpec{},
+			Owner:              "john",
+			NamespacesMetadata: v1alpha1.NamespaceMetadata{},
+			StorageClasses:     []string{},
+			IngressClasses:     []string{},
+			LimitRanges:        []corev1.LimitRangeSpec{},
+			NamespaceQuota:     10,
+			NodeSelector:       map[string]string{},
+			ResourceQuota:      []corev1.ResourceQuotaSpec{},
 		},
 	}
 	JustBeforeEach(func() {

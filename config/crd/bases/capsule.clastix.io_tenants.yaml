@@ -139,6 +139,22 @@ spec:
             namespaceQuota:
               minimum: 1
               type: integer
+            namespacesMetadata:
+              properties:
+                additionalAnnotations:
+                  additionalProperties:
+                    type: string
+                  nullable: true
+                  type: object
+                additionalLabels:
+                  additionalProperties:
+                    type: string
+                  nullable: true
+                  type: object
+              required:
+              - additionalAnnotations
+              - additionalLabels
+              type: object
             networkPolicies:
               items:
                 description: NetworkPolicySpec provides the specification of a NetworkPolicy

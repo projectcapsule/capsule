@@ -393,29 +393,46 @@ func (r *TenantReconciler) syncLimitRanges(tenant *capsulev1alpha1.Tenant) error
 	return nil
 }
 
-func (r *TenantReconciler) syncNamespace(namespace string, ingressClasses []string, storageClasses []string, tenantLabel string, wg *sync.WaitGroup, channel chan error) {
+func (r *TenantReconciler) syncNamespace(namespace string, ingressClasses []string, storageClasses []string, nsMetadata capsulev1alpha1.NamespaceMetadata, tenantLabel string, wg *sync.WaitGroup, channel chan error) {
 	defer wg.Done()
 
-	t := &corev1.Namespace{}
-	if err := r.Client.Get(context.TODO(), types.NamespacedName{Name: namespace}, t); err != nil {
+	ns := &corev1.Namespace{}
+	if err := r.Client.Get(context.TODO(), types.NamespacedName{Name: namespace}, ns); err != nil {
 		channel <- err
 	}
 
 	channel <- retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		if t.Annotations == nil {
-			t.Annotations = make(map[string]string)
+		a := ns.GetAnnotations()
+		if a == nil {
+			a = make(map[string]string)
 		}
-		t.Annotations[capsulev1alpha1.AvailableIngressClassesAnnotation] = strings.Join(ingressClasses, ",")
-		t.Annotations[capsulev1alpha1.AvailableStorageClassesAnnotation] = strings.Join(storageClasses, ",")
-		if t.Labels == nil {
-			t.Labels = make(map[string]string)
+		a[capsulev1alpha1.AvailableIngressClassesAnnotation] = strings.Join(ingressClasses, ",")
+		a[capsulev1alpha1.AvailableStorageClassesAnnotation] = strings.Join(storageClasses, ",")
+		if aa := nsMetadata.AdditionalAnnotations; aa != nil {
+			for k, v := range aa {
+				a[k] = v
+			}
+		}
+
+		l := ns.GetLabels()
+		if l == nil {
+			l = make(map[string]string)
 		}
 		capsuleLabel, err := capsulev1alpha1.GetTypeLabel(&capsulev1alpha1.Tenant{})
 		if err != nil {
 			return err
 		}
-		t.Labels[capsuleLabel] = tenantLabel
-		return r.Client.Update(context.TODO(), t, &client.UpdateOptions{})
+		l[capsuleLabel] = tenantLabel
+		if al := nsMetadata.AdditionalLabels; al != nil {
+			for k, v := range al {
+				l[k] = v
+			}
+		}
+
+		ns.SetLabels(l)
+		ns.SetAnnotations(a)
+
+		return r.Client.Update(context.TODO(), ns, &client.UpdateOptions{})
 	})
 }
 
@@ -427,7 +444,7 @@ func (r *TenantReconciler) syncNamespaces(tenant *capsulev1alpha1.Tenant) (err e
 	wg.Add(tenant.Status.Namespaces.Len())
 
 	for _, ns := range tenant.Status.Namespaces {
-		go r.syncNamespace(ns, tenant.Spec.IngressClasses, tenant.Spec.StorageClasses, tenant.GetName(), wg, ch)
+		go r.syncNamespace(ns, tenant.Spec.IngressClasses, tenant.Spec.StorageClasses, tenant.Spec.NamespacesMetadata, tenant.GetName(), wg, ch)
 	}
 
 	wg.Wait()
