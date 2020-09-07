@@ -28,25 +28,30 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	"github.com/clastix/capsule/api/v1alpha1"
-	"github.com/clastix/capsule/pkg/webhook"
+	capsulewebhook "github.com/clastix/capsule/pkg/webhook"
 )
 
 // +kubebuilder:webhook:path=/validating-v1-namespace-tenant-prefix,mutating=false,failurePolicy=fail,groups="",resources=namespaces,verbs=create,versions=v1,name=prefix.namespace.capsule.clastix.io
 
-type Webhook struct {
-	ForceTenantPrefix        bool
-	ProtectedNamespacesRegex *regexp.Regexp
+type webhook struct {
+	handler capsulewebhook.Handler
 }
 
-func (o Webhook) GetHandler() webhook.Handler {
-	return &handler{forceTenantPrefix: o.ForceTenantPrefix, protectedNamespacesRegex: o.ProtectedNamespacesRegex}
+func Webhook(handler capsulewebhook.Handler) *webhook {
+	return &webhook{
+		handler: handler,
+	}
 }
 
-func (o Webhook) GetName() string {
+func (o webhook) GetHandler() capsulewebhook.Handler {
+	return o.handler
+}
+
+func (o webhook) GetName() string {
 	return "OwnerReference"
 }
 
-func (o Webhook) GetPath() string {
+func (o webhook) GetPath() string {
 	return "/validating-v1-namespace-tenant-prefix"
 }
 
@@ -55,40 +60,58 @@ type handler struct {
 	protectedNamespacesRegex *regexp.Regexp
 }
 
-func (r *handler) OnCreate(ctx context.Context, req admission.Request, clt client.Client, decoder *admission.Decoder) admission.Response {
-	ns := &corev1.Namespace{}
-	if err := decoder.Decode(req, ns); err != nil {
-		return admission.Errored(http.StatusBadRequest, err)
+func Handler(forceTenantPrefix bool, protectedNamespacesRegex *regexp.Regexp) capsulewebhook.Handler {
+	return &handler{
+		forceTenantPrefix:        forceTenantPrefix,
+		protectedNamespacesRegex: protectedNamespacesRegex,
 	}
+}
 
-	if r.protectedNamespacesRegex != nil {
-		if matched := r.protectedNamespacesRegex.MatchString(ns.GetName()); matched {
-			return admission.Denied("Creating namespaces with name matching " + r.protectedNamespacesRegex.String() + " regexp is not allowed; please, reach out the system administrators")
-		}
-	}
-
-	if !r.forceTenantPrefix {
-		return admission.Allowed("")
-	}
-
-	t := &v1alpha1.Tenant{}
-	for _, or := range ns.ObjectMeta.OwnerReferences {
-		// retrieving the selected Tenant
-		if err := clt.Get(ctx, types.NamespacedName{Name: or.Name}, t); err != nil {
+func (r *handler) OnCreate(clt client.Client, decoder *admission.Decoder) capsulewebhook.Func {
+	return func(ctx context.Context, req admission.Request) admission.Response {
+		ns := &corev1.Namespace{}
+		if err := decoder.Decode(req, ns); err != nil {
 			return admission.Errored(http.StatusBadRequest, err)
 		}
-	}
+		if r.protectedNamespacesRegex != nil {
+			if matched := r.protectedNamespacesRegex.MatchString(ns.GetName()); matched {
+				return admission.Denied("Creating namespaces with name matching " + r.protectedNamespacesRegex.String() + " regexp is not allowed; please, reach out the system administrators")
+			}
+		}
 
-	if e := t.GetName() + "-" + ns.GetName(); !strings.HasPrefix(ns.GetName(), t.GetName()+"-") {
-		return admission.Denied("The namespace doesn't match the tenant prefix, expected " + e)
+		if !r.forceTenantPrefix {
+			return admission.Allowed("")
+		}
+
+		t := &v1alpha1.Tenant{}
+		for _, or := range ns.ObjectMeta.OwnerReferences {
+			// retrieving the selected Tenant
+			if err := clt.Get(ctx, types.NamespacedName{Name: or.Name}, t); err != nil {
+				return admission.Errored(http.StatusBadRequest, err)
+			}
+			t := &v1alpha1.Tenant{}
+			for _, or := range ns.ObjectMeta.OwnerReferences {
+				// retrieving the selected Tenant
+				if err := clt.Get(ctx, types.NamespacedName{Name: or.Name}, t); err != nil {
+					return admission.Errored(http.StatusBadRequest, err)
+				}
+			}
+			if e := t.GetName() + "-" + ns.GetName(); !strings.HasPrefix(ns.GetName(), t.GetName()+"-") {
+				return admission.Denied("The namespace doesn't match the tenant prefix, expected " + e)
+			}
+		}
+		return admission.Allowed("")
 	}
-	return admission.Allowed("")
 }
 
-func (r *handler) OnDelete(ctx context.Context, req admission.Request, client client.Client, decoder *admission.Decoder) admission.Response {
-	return admission.Allowed("")
+func (r *handler) OnDelete(client client.Client, decoder *admission.Decoder) capsulewebhook.Func {
+	return func(ctx context.Context, req admission.Request) admission.Response {
+		return admission.Allowed("")
+	}
 }
 
-func (r *handler) OnUpdate(ctx context.Context, req admission.Request, client client.Client, decoder *admission.Decoder) admission.Response {
-	return admission.Allowed("")
+func (r *handler) OnUpdate(client client.Client, decoder *admission.Decoder) capsulewebhook.Func {
+	return func(ctx context.Context, req admission.Request) admission.Response {
+		return admission.Allowed("")
+	}
 }

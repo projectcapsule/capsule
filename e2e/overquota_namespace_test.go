@@ -64,6 +64,5 @@ var _ = Describe("creating a Namespace over-quota", func() {
 		cs := ownerClient(tnt)
 		_, err := cs.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
 		Expect(err).ShouldNot(Succeed())
-
 	})
 })

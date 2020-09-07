@@ -21,47 +21,68 @@ import (
 	"net/http"
 
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	"github.com/clastix/capsule/pkg/webhook"
+	capsulewebhook "github.com/clastix/capsule/pkg/webhook"
 )
 
 // +kubebuilder:webhook:path=/validating-v1-networking-ingress,mutating=false,failurePolicy=fail,groups=networking.k8s.io,resources=ingresses,verbs=create;update,versions=v1beta1,name=networking.ingress.capsule.clastix.io
 
-type NetworkIngress struct{}
-
-func (r *NetworkIngress) GetHandler() webhook.Handler {
-	return &handler{}
+type webhook struct{
+	handler capsulewebhook.Handler
 }
 
-func (r *NetworkIngress) GetName() string {
+func NetworkingWebhook(handler capsulewebhook.Handler) capsulewebhook.Webhook {
+	return &webhook{handler: handler}
+}
+
+func (w *webhook) GetHandler() capsulewebhook.Handler {
+	return w.handler
+}
+
+func (w *webhook) GetName() string {
 	return "NetworkIngress"
 }
 
-func (r *NetworkIngress) GetPath() string {
+func (w *webhook) GetPath() string {
 	return "/validating-v1-networking-ingress"
 }
 
 type handler struct {
+	fn func(object metav1.Object, ingressClass *string) capsulewebhook.Handler
 }
 
-func (r *handler) OnCreate(ctx context.Context, req admission.Request, client client.Client, decoder *admission.Decoder) admission.Response {
-	i := &networkingv1beta1.Ingress{}
-	if err := decoder.Decode(req, i); err != nil {
-		return admission.Errored(http.StatusBadRequest, err)
+func NetworkingHandler(fn func(object metav1.Object, ingressClass *string) capsulewebhook.Handler) capsulewebhook.Handler {
+	return &handler{
+		fn: fn,
 	}
-	return handleIngress(ctx, i, i.Spec.IngressClassName, client)
 }
 
-func (r *handler) OnDelete(ctx context.Context, req admission.Request, client client.Client, decoder *admission.Decoder) admission.Response {
-	return admission.Allowed("")
-}
+func (r *handler) OnCreate(client client.Client, decoder *admission.Decoder) capsulewebhook.Func {
+	return func(ctx context.Context, req admission.Request) admission.Response {
+		i := &networkingv1beta1.Ingress{}
+		if err := decoder.Decode(req, i); err != nil {
+			return admission.Errored(http.StatusBadRequest, err)
+		}
 
-func (r *handler) OnUpdate(ctx context.Context, req admission.Request, client client.Client, decoder *admission.Decoder) admission.Response {
-	i := &networkingv1beta1.Ingress{}
-	if err := decoder.Decode(req, i); err != nil {
-		return admission.Errored(http.StatusBadRequest, err)
+		return r.fn(i, i.Spec.IngressClassName).OnCreate(client, decoder)(ctx, req)
 	}
-	return handleIngress(ctx, i, i.Spec.IngressClassName, client)
+}
+
+func (r *handler) OnDelete(client client.Client, decoder *admission.Decoder) capsulewebhook.Func {
+	return func(ctx context.Context, req admission.Request) admission.Response {
+		return admission.Allowed("")
+	}
+}
+
+func (r *handler) OnUpdate(client client.Client, decoder *admission.Decoder) capsulewebhook.Func {
+	return func(ctx context.Context, req admission.Request) admission.Response {
+		i := &networkingv1beta1.Ingress{}
+		if err := decoder.Decode(req, i); err != nil {
+			return admission.Errored(http.StatusBadRequest, err)
+		}
+		return r.fn(i, i.Spec.IngressClassName).OnUpdate(client, decoder)(ctx, req)
+	}
 }

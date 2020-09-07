@@ -25,11 +25,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
-
-	"github.com/clastix/capsule/pkg/utils"
 )
 
-func Register(mgr controllerruntime.Manager, capsuleGroup string, webhookList ...Webhook) error {
+func Register(mgr controllerruntime.Manager, webhookList ...Webhook) error {
 	// skipping webhook setup if certificate is missing
 	dat, _ := ioutil.ReadFile("/tmp/k8s-webhook-server/serving-certs/tls.crt")
 	if len(dat) == 0 {
@@ -40,8 +38,7 @@ func Register(mgr controllerruntime.Manager, capsuleGroup string, webhookList ..
 	for _, wh := range webhookList {
 		s.Register(wh.GetPath(), &webhook.Admission{
 			Handler: &handlerRouter{
-				handler:      wh.GetHandler(),
-				capsuleGroup: capsuleGroup,
+				handler: wh.GetHandler(),
 			},
 		})
 	}
@@ -49,28 +46,22 @@ func Register(mgr controllerruntime.Manager, capsuleGroup string, webhookList ..
 }
 
 type handlerRouter struct {
-	handler      Handler
-	capsuleGroup string
-	client       client.Client
-	decoder      *admission.Decoder
+	handler Handler
+	client  client.Client
+	decoder *admission.Decoder
 }
 
 func (r *handlerRouter) Handle(ctx context.Context, req admission.Request) admission.Response {
-	if !utils.UserGroupList(req.UserInfo.Groups).IsInCapsuleGroup(r.capsuleGroup) {
-		// not a Capsule user, can be skipped
-		return admission.Allowed("")
-	}
-
 	switch req.Operation {
 	case admissionv1beta1.Create:
-		return r.handler.OnCreate(ctx, req, r.client, r.decoder)
+		return r.handler.OnCreate(r.client, r.decoder)(ctx, req)
 	case admissionv1beta1.Update:
-		return r.handler.OnUpdate(ctx, req, r.client, r.decoder)
+		return r.handler.OnUpdate(r.client, r.decoder)(ctx, req)
 	case admissionv1beta1.Delete:
-		return r.handler.OnDelete(ctx, req, r.client, r.decoder)
+		return r.handler.OnDelete(r.client, r.decoder)(ctx, req)
+	default:
+		return admission.Allowed("")
 	}
-
-	return admission.Allowed("")
 }
 
 func (r *handlerRouter) InjectClient(c client.Client) error {

@@ -23,8 +23,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
+type Func func(ctx context.Context, req admission.Request) admission.Response
+
 type Handler interface {
-	OnCreate(ctx context.Context, req admission.Request, client client.Client, decoder *admission.Decoder) admission.Response
-	OnDelete(ctx context.Context, req admission.Request, client client.Client, decoder *admission.Decoder) admission.Response
-	OnUpdate(ctx context.Context, req admission.Request, client client.Client, decoder *admission.Decoder) admission.Response
+	OnCreate(client client.Client, decoder *admission.Decoder) Func
+	OnDelete(client client.Client, decoder *admission.Decoder) Func
+	OnUpdate(client client.Client, decoder *admission.Decoder) Func
 }

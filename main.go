@@ -45,6 +45,7 @@ import (
 	"github.com/clastix/capsule/pkg/webhook/owner_reference"
 	"github.com/clastix/capsule/pkg/webhook/pvc"
 	"github.com/clastix/capsule/pkg/webhook/tenant_prefix"
+	"github.com/clastix/capsule/pkg/webhook/utils"
 	"github.com/clastix/capsule/version"
 	// +kubebuilder:scaffold:imports
 )
@@ -131,10 +132,18 @@ func main() {
 	}
 	// +kubebuilder:scaffold:builder
 
-	//webhooks
-	wl := make([]webhook.Webhook, 0)
-	wl = append(wl, &ingress.ExtensionIngress{}, &ingress.NetworkIngress{}, pvc.Webhook{}, &owner_reference.Webhook{}, &namespace_quota.Webhook{}, network_policies.Webhook{}, tenant_prefix.Webhook{ForceTenantPrefix: forceTenantPrefix, ProtectedNamespacesRegex: protectedNamespaceRegexp})
-	err = webhook.Register(mgr, capsuleGroup, wl...)
+	// webhooks
+	wl := append(
+		make([]webhook.Webhook, 0),
+		ingress.ExtensionWebhook(utils.InCapsuleGroup(capsuleGroup, ingress.ExtensionHandler(ingress.NewHandlerIngress))),
+		ingress.NetworkingWebhook(utils.InCapsuleGroup(capsuleGroup, ingress.NetworkingHandler(ingress.NewHandlerIngress))),
+		pvc.Webhook(utils.InCapsuleGroup(capsuleGroup, pvc.Handler())),
+		owner_reference.Webhook(utils.InCapsuleGroup(capsuleGroup, owner_reference.Handler())),
+		namespace_quota.Webhook(utils.InCapsuleGroup(capsuleGroup, namespace_quota.Handler())),
+		network_policies.Webhook(utils.InCapsuleGroup(capsuleGroup, network_policies.Handler())),
+		tenant_prefix.Webhook(utils.InCapsuleGroup(capsuleGroup, tenant_prefix.Handler(forceTenantPrefix, protectedNamespaceRegexp))),
+	)
+	err = webhook.Register(mgr, wl...)
 	if err != nil {
 		setupLog.Error(err, "unable to setup webhooks")
 		os.Exit(1)

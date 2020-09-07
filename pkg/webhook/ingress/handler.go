@@ -27,9 +27,37 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	"github.com/clastix/capsule/api/v1alpha1"
+	capsulewebhook "github.com/clastix/capsule/pkg/webhook"
 )
 
-func handleIngress(ctx context.Context, object metav1.Object, ic *string, c client.Client) admission.Response {
+type HandlerIngress struct {
+	object       metav1.Object
+	ingressClass *string
+}
+
+func NewHandlerIngress(object metav1.Object, ingressClass *string) capsulewebhook.Handler {
+	return &HandlerIngress{object: object, ingressClass: ingressClass}
+}
+
+func (h HandlerIngress) OnCreate(client client.Client, decoder *admission.Decoder) capsulewebhook.Func {
+	return func(ctx context.Context, req admission.Request) admission.Response {
+		return h.handleIngress(ctx, h.object, h.ingressClass, client)
+	}
+}
+
+func (h HandlerIngress) OnDelete(client client.Client, decoder *admission.Decoder) capsulewebhook.Func {
+	return func(ctx context.Context, req admission.Request) admission.Response {
+		return admission.Allowed("")
+	}
+}
+
+func (h HandlerIngress) OnUpdate(client client.Client, decoder *admission.Decoder) capsulewebhook.Func {
+	return func(ctx context.Context, req admission.Request) admission.Response {
+		return h.handleIngress(ctx, h.object, h.ingressClass, client)
+	}
+}
+
+func (h HandlerIngress) handleIngress(ctx context.Context, object metav1.Object, ic *string, c client.Client) admission.Response {
 	if ic == nil {
 		if v, ok := object.GetAnnotations()["kubernetes.io/ingress.class"]; ok {
 			ic = &v

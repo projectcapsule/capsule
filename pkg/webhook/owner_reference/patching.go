@@ -29,83 +29,99 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	"github.com/clastix/capsule/api/v1alpha1"
-	"github.com/clastix/capsule/pkg/webhook"
+	capsulev1alpha1 "github.com/clastix/capsule/api/v1alpha1"
+	capsulewebhook "github.com/clastix/capsule/pkg/webhook"
 )
 
 // +kubebuilder:webhook:path=/mutate-v1-namespace-owner-reference,mutating=true,failurePolicy=fail,groups="",resources=namespaces,verbs=create,versions=v1,name=owner.namespace.capsule.clastix.io
 
-type Webhook struct{}
+type webhook struct {
+	handler capsulewebhook.Handler
+}
 
-func (o Webhook) GetHandler() webhook.Handler {
+func Webhook(handler capsulewebhook.Handler) capsulewebhook.Webhook {
+	return &webhook{handler: handler}
+}
+
+func (w webhook) GetHandler() capsulewebhook.Handler {
 	return &handler{}
 }
 
-func (o Webhook) GetName() string {
+func (w webhook) GetName() string {
 	return "OwnerReference"
 }
 
-func (o Webhook) GetPath() string {
+func (w webhook) GetPath() string {
 	return "/mutate-v1-namespace-owner-reference"
 }
 
 type handler struct {
 }
 
-func (r *handler) OnCreate(ctx context.Context, req admission.Request, clt client.Client, decoder *admission.Decoder) admission.Response {
-	ns := &corev1.Namespace{}
-	if err := decoder.Decode(req, ns); err != nil {
-		return admission.Errored(http.StatusBadRequest, err)
-	}
+func Handler() capsulewebhook.Handler {
+	return &handler{}
+}
 
-	if len(ns.ObjectMeta.Labels) > 0 {
-		ln, err := v1alpha1.GetTypeLabel(&v1alpha1.Tenant{})
-		if err != nil {
+func (h *handler) OnCreate(clt client.Client, decoder *admission.Decoder) capsulewebhook.Func {
+	return func(ctx context.Context, req admission.Request) admission.Response {
+		ns := &corev1.Namespace{}
+		if err := decoder.Decode(req, ns); err != nil {
 			return admission.Errored(http.StatusBadRequest, err)
 		}
-		l, ok := ns.ObjectMeta.Labels[ln]
-		// assigning namespace to Tenant in case of label
-		if ok {
-			// retrieving the selected Tenant
-			t := &v1alpha1.Tenant{}
-			if err := clt.Get(ctx, types.NamespacedName{Name: l}, t); err != nil {
+
+		if len(ns.ObjectMeta.Labels) > 0 {
+			ln, err := capsulev1alpha1.GetTypeLabel(&capsulev1alpha1.Tenant{})
+			if err != nil {
 				return admission.Errored(http.StatusBadRequest, err)
 			}
-			// Tenant owner must adhere to user that asked for NS creation
-			if t.Spec.Owner != req.UserInfo.Username {
-				return admission.Denied("Cannot assign the desired namespace to a non-owned Tenant")
+			l, ok := ns.ObjectMeta.Labels[ln]
+			// assigning namespace to Tenant in case of label
+			if ok {
+				// retrieving the selected Tenant
+				t := &capsulev1alpha1.Tenant{}
+				if err := clt.Get(ctx, types.NamespacedName{Name: l}, t); err != nil {
+					return admission.Errored(http.StatusBadRequest, err)
+				}
+				// Tenant owner must adhere to user that asked for NS creation
+				if t.Spec.Owner != req.UserInfo.Username {
+					return admission.Denied("Cannot assign the desired namespace to a non-owned Tenant")
+				}
+				// Patching the response
+				return h.patchResponseForOwnerRef(t, ns)
 			}
-			// Patching the response
-			return r.patchResponseForOwnerRef(t, ns)
+
 		}
 
-	}
+		tl := &capsulev1alpha1.TenantList{}
+		if err := clt.List(ctx, tl, client.MatchingFieldsSelector{
+			Selector: fields.OneTermEqualSelector(".spec.owner", req.UserInfo.Username),
+		}); err != nil {
+			return admission.Errored(http.StatusBadRequest, err)
+		}
 
-	tl := &v1alpha1.TenantList{}
-	if err := clt.List(ctx, tl, client.MatchingFieldsSelector{
-		Selector: fields.OneTermEqualSelector(".spec.owner", req.UserInfo.Username),
-	}); err != nil {
-		return admission.Errored(http.StatusBadRequest, err)
-	}
+		if len(tl.Items) > 0 {
+			return h.patchResponseForOwnerRef(&tl.Items[0], ns)
+		}
 
-	if len(tl.Items) > 0 {
-		return r.patchResponseForOwnerRef(&tl.Items[0], ns)
+		return admission.Denied("You do not have any Tenant assigned: please, reach out the system administrators")
 	}
-
-	return admission.Denied("You do not have any Tenant assigned: please, reach out the system administrators")
 }
 
-func (r *handler) OnDelete(ctx context.Context, req admission.Request, client client.Client, decoder *admission.Decoder) admission.Response {
-	return admission.Allowed("")
+func (h *handler) OnDelete(client client.Client, decoder *admission.Decoder) capsulewebhook.Func {
+	return func(ctx context.Context, req admission.Request) admission.Response {
+		return admission.Allowed("")
+	}
 }
 
-func (r *handler) OnUpdate(ctx context.Context, req admission.Request, client client.Client, decoder *admission.Decoder) admission.Response {
-	return admission.Denied("Capsule user cannot update a Namespace")
+func (h *handler) OnUpdate(client client.Client, decoder *admission.Decoder) capsulewebhook.Func {
+	return func(ctx context.Context, req admission.Request) admission.Response {
+		return admission.Denied("Capsule user cannot update a Namespace")
+	}
 }
 
-func (r *handler) patchResponseForOwnerRef(tenant *v1alpha1.Tenant, ns *corev1.Namespace) admission.Response {
+func (h *handler) patchResponseForOwnerRef(tenant *capsulev1alpha1.Tenant, ns *corev1.Namespace) admission.Response {
 	scheme := runtime.NewScheme()
-	_ = v1alpha1.AddToScheme(scheme)
+	_ = capsulev1alpha1.AddToScheme(scheme)
 	_ = corev1.AddToScheme(scheme)
 
 	o, _ := json.Marshal(ns.DeepCopy())
