@@ -41,8 +41,9 @@ var _ = Describe("when Tenant handles Ingress classes", func() {
 			Name: "ingress-class",
 		},
 		Spec: v1alpha1.TenantSpec{
-			Owner:          "ingress",
-			StorageClasses: []string{},
+			Owner:              "ingress",
+			NamespacesMetadata: v1alpha1.NamespaceMetadata{},
+			StorageClasses:     []string{},
 			IngressClasses: []string{
 				"nginx",
 				"haproxy",

@@ -25,9 +25,18 @@ import (
 // +kubebuilder:validation:Minimum=1
 type NamespaceQuota uint
 
+type NamespaceMetadata struct {
+	// +nullable
+	AdditionalLabels map[string]string `json:"additionalLabels"`
+	// +nullable
+	AdditionalAnnotations map[string]string `json:"additionalAnnotations"`
+}
+
 // TenantSpec defines the desired state of Tenant
 type TenantSpec struct {
 	Owner string `json:"owner"`
+	// +kubebuilder:validation:Optional
+	NamespacesMetadata NamespaceMetadata `json:"namespacesMetadata"`
 	// +kubebuilder:validation:Required
 	StorageClasses StorageClassList `json:"storageClasses"`
 	IngressClasses IngressClassList `json:"ingressClasses"`

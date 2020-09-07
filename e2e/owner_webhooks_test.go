@@ -39,7 +39,8 @@ var _ = Describe("when Tenant owner interacts with the webhooks", func() {
 			Name: "tenant-owner",
 		},
 		Spec: v1alpha1.TenantSpec{
-			Owner: "ruby",
+			Owner:              "ruby",
+			NamespacesMetadata: v1alpha1.NamespaceMetadata{},
 			StorageClasses: []string{
 				"cephfs",
 				"glusterfs",

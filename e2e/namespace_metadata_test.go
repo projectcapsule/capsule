@@ -25,20 +25,30 @@ import (
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/clastix/capsule/api/v1alpha1"
 )
 
-var _ = Describe("creating a Namespace as Tenant owner", func() {
+var _ = Describe("creating a Namespace for a Tenant with additional metadata", func() {
 	tnt := &v1alpha1.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "tenant-assigned",
+			Name: "tenant-metadata",
 		},
 		Spec: v1alpha1.TenantSpec{
-			Owner:          "alice",
+			Owner:          "gatsby",
 			StorageClasses: []string{},
 			IngressClasses: []string{},
-			NamespacesMetadata: v1alpha1.NamespaceMetadata{},
+			NamespacesMetadata: v1alpha1.NamespaceMetadata{
+				AdditionalLabels: map[string]string{
+					"k8s.io/custom-label":     "foo",
+					"clastix.io/custom-label": "bar",
+				},
+				AdditionalAnnotations: map[string]string{
+					"k8s.io/custom-annotation":     "bizz",
+					"clastix.io/custom-annotation": "buzz",
+				},
+			},
 			LimitRanges:    []corev1.LimitRangeSpec{},
 			NamespaceQuota: 10,
 			NodeSelector:   map[string]string{},
@@ -51,9 +61,21 @@ var _ = Describe("creating a Namespace as Tenant owner", func() {
 	JustAfterEach(func() {
 		Expect(k8sClient.Delete(context.TODO(), tnt)).Should(Succeed())
 	})
-	It("should be available in Tenant namespaces list", func() {
-		ns := NewNamespace("new-namespace")
+	It("should contains additional Namespace metadata", func() {
+		ns := NewNamespace("namespace-metadata")
 		NamespaceCreationShouldSucceed(ns, tnt, defaultTimeoutInterval)
 		NamespaceShouldBeManagedByTenant(ns, tnt, defaultTimeoutInterval)
+
+		Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: ns.GetName()}, ns)).Should(Succeed())
+		By("checking additional labels", func() {
+			for _, l := range tnt.Spec.NamespacesMetadata.AdditionalLabels {
+				Expect(ns.Labels).Should(ContainElement(l))
+			}
+		})
+		By("checking additional annotations", func() {
+			for _, a := range tnt.Spec.NamespacesMetadata.AdditionalAnnotations {
+				Expect(ns.Annotations).Should(ContainElement(a))
+			}
+		})
 	})
 })

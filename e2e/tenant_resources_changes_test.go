@@ -40,9 +40,10 @@ var _ = Describe("changing Tenant managed Kubernetes resources", func() {
 			Name: "tenant-resources-changes",
 		},
 		Spec: v1alpha1.TenantSpec{
-			Owner:          "laura",
-			StorageClasses: []string{},
-			IngressClasses: []string{},
+			Owner:              "laura",
+			NamespacesMetadata: v1alpha1.NamespaceMetadata{},
+			StorageClasses:     []string{},
+			IngressClasses:     []string{},
 			LimitRanges: []corev1.LimitRangeSpec{
 				{
 					Limits: []corev1.LimitRangeItem{

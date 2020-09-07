@@ -42,9 +42,10 @@ var _ = Describe("exceeding Tenant resource quota", func() {
 			Name: "tenant-resources-changes",
 		},
 		Spec: v1alpha1.TenantSpec{
-			Owner:          "bobby",
-			StorageClasses: []string{},
-			IngressClasses: []string{},
+			Owner:              "bobby",
+			NamespacesMetadata: v1alpha1.NamespaceMetadata{},
+			StorageClasses:     []string{},
+			IngressClasses:     []string{},
 			LimitRanges: []corev1.LimitRangeSpec{
 				{
 					Limits: []corev1.LimitRangeItem{

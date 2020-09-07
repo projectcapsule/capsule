@@ -35,13 +35,14 @@ var _ = Describe("creating a Namespace as Tenant owner with custom --capsule-gro
 			Name: "tenant-assigned-custom-group",
 		},
 		Spec: v1alpha1.TenantSpec{
-			Owner:          "alice",
-			StorageClasses: []string{},
-			IngressClasses: []string{},
-			LimitRanges:    []corev1.LimitRangeSpec{},
-			NamespaceQuota: 10,
-			NodeSelector:   map[string]string{},
-			ResourceQuota:  []corev1.ResourceQuotaSpec{},
+			Owner:              "alice",
+			NamespacesMetadata: v1alpha1.NamespaceMetadata{},
+			StorageClasses:     []string{},
+			IngressClasses:     []string{},
+			LimitRanges:        []corev1.LimitRangeSpec{},
+			NamespaceQuota:     10,
+			NodeSelector:       map[string]string{},
+			ResourceQuota:      []corev1.ResourceQuotaSpec{},
 		},
 	}
 	JustBeforeEach(func() {

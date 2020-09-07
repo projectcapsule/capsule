@@ -35,13 +35,14 @@ var _ = Describe("creating a Namespace over-quota", func() {
 			Name: "overquota-tenant",
 		},
 		Spec: v1alpha1.TenantSpec{
-			Owner:          "bob",
-			StorageClasses: []string{},
-			IngressClasses: []string{},
-			LimitRanges:    []corev1.LimitRangeSpec{},
-			NamespaceQuota: 3,
-			NodeSelector:   map[string]string{},
-			ResourceQuota:  []corev1.ResourceQuotaSpec{},
+			Owner:              "bob",
+			NamespacesMetadata: v1alpha1.NamespaceMetadata{},
+			StorageClasses:     []string{},
+			IngressClasses:     []string{},
+			LimitRanges:        []corev1.LimitRangeSpec{},
+			NamespaceQuota:     3,
+			NodeSelector:       map[string]string{},
+			ResourceQuota:      []corev1.ResourceQuotaSpec{},
 		},
 	}
 	JustBeforeEach(func() {
