@@ -143,8 +143,7 @@ func main() {
 		network_policies.Webhook(utils.InCapsuleGroup(capsuleGroup, network_policies.Handler())),
 		tenant_prefix.Webhook(utils.InCapsuleGroup(capsuleGroup, tenant_prefix.Handler(forceTenantPrefix, protectedNamespaceRegexp))),
 	)
-	err = webhook.Register(mgr, wl...)
-	if err != nil {
+	if err = webhook.Register(mgr, wl...); err != nil {
 		setupLog.Error(err, "unable to setup webhooks")
 		os.Exit(1)
 	}
@@ -153,7 +152,7 @@ func main() {
 		Log:          ctrl.Log.WithName("controllers").WithName("Rbac"),
 		CapsuleGroup: capsuleGroup,
 	}
-	if err := mgr.Add(rbacManager); err != nil {
+	if err = mgr.Add(rbacManager); err != nil {
 		setupLog.Error(err, "unable to create cluster roles")
 		os.Exit(1)
 	}
@@ -179,13 +178,13 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := indexer.AddToManager(mgr); err != nil {
+	if err = indexer.AddToManager(mgr); err != nil {
 		setupLog.Error(err, "unable to setup indexers")
 		os.Exit(1)
 	}
 
 	setupLog.Info("starting manager")
-	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
+	if err = mgr.Start(ctrl.SetupSignalHandler()); err != nil {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}
