@@ -30,11 +30,11 @@ import (
 	"github.com/clastix/capsule/pkg/cert"
 )
 
-func getCertificateAuthority(client client.Client) (ca cert.Ca, err error) {
+func getCertificateAuthority(client client.Client, namespace string) (ca cert.Ca, err error) {
 	instance := &corev1.Secret{}
 
 	err = client.Get(context.TODO(), types.NamespacedName{
-		Namespace: "capsule-system",
+		Namespace: namespace,
 		Name:      caSecretName,
 	}, instance)
 	if err != nil {
