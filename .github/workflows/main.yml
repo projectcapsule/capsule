@@ -45,7 +45,7 @@ jobs:
           ${{ runner.os }}-build-
           ${{ runner.os }}-
     - name: Removing kustomize
-      run: sudo snap remove kustomize
+      run: sudo snap remove kustomize && sudo rm -rf $(which kustomize)
     - name: Installing Ginkgo
       run: go get github.com/onsi/ginkgo/ginkgo
     - uses: actions/setup-go@v2

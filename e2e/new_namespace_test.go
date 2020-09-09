@@ -35,14 +35,15 @@ var _ = Describe("creating a Namespace as Tenant owner", func() {
 			Name: "tenant-assigned",
 		},
 		Spec: v1alpha1.TenantSpec{
-			Owner:          "alice",
-			StorageClasses: []string{},
-			IngressClasses: []string{},
-			NamespacesMetadata: v1alpha1.NamespaceMetadata{},
-			LimitRanges:    []corev1.LimitRangeSpec{},
-			NamespaceQuota: 10,
-			NodeSelector:   map[string]string{},
-			ResourceQuota:  []corev1.ResourceQuotaSpec{},
+			Owner:              "alice",
+			StorageClasses:     []string{},
+			IngressClasses:     []string{},
+			NamespacesMetadata: v1alpha1.AdditionalMetadata{},
+			ServicesMetadata:   v1alpha1.AdditionalMetadata{},
+			LimitRanges:        []corev1.LimitRangeSpec{},
+			NamespaceQuota:     10,
+			NodeSelector:       map[string]string{},
+			ResourceQuota:      []corev1.ResourceQuotaSpec{},
 		},
 	}
 	JustBeforeEach(func() {

@@ -42,7 +42,8 @@ var _ = Describe("creating namespaces within a Tenant with resources", func() {
 		},
 		Spec: v1alpha1.TenantSpec{
 			Owner:              "john",
-			NamespacesMetadata: v1alpha1.NamespaceMetadata{},
+			NamespacesMetadata: v1alpha1.AdditionalMetadata{},
+			ServicesMetadata:   v1alpha1.AdditionalMetadata{},
 			StorageClasses:     []string{},
 			IngressClasses:     []string{},
 			LimitRanges: []corev1.LimitRangeSpec{

@@ -44,6 +44,7 @@ import (
 	"github.com/clastix/capsule/pkg/webhook/network_policies"
 	"github.com/clastix/capsule/pkg/webhook/owner_reference"
 	"github.com/clastix/capsule/pkg/webhook/pvc"
+	"github.com/clastix/capsule/pkg/webhook/service_labels"
 	"github.com/clastix/capsule/pkg/webhook/tenant_prefix"
 	"github.com/clastix/capsule/pkg/webhook/utils"
 	"github.com/clastix/capsule/version"
@@ -146,6 +147,7 @@ func main() {
 		owner_reference.Webhook(utils.InCapsuleGroup(capsuleGroup, owner_reference.Handler())),
 		namespace_quota.Webhook(utils.InCapsuleGroup(capsuleGroup, namespace_quota.Handler())),
 		network_policies.Webhook(utils.InCapsuleGroup(capsuleGroup, network_policies.Handler())),
+		service_labels.Webhook(utils.InCapsuleGroup(capsuleGroup, service_labels.Handler())),
 		tenant_prefix.Webhook(utils.InCapsuleGroup(capsuleGroup, tenant_prefix.Handler(forceTenantPrefix, protectedNamespaceRegexp))),
 	)
 	if err = webhook.Register(mgr, wl...); err != nil {

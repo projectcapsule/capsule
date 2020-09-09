@@ -36,7 +36,8 @@ var _ = Describe("creating a Namespace trying to select a third Tenant", func() 
 		},
 		Spec: v1alpha1.TenantSpec{
 			Owner:              "undefined",
-			NamespacesMetadata: v1alpha1.NamespaceMetadata{},
+			NamespacesMetadata: v1alpha1.AdditionalMetadata{},
+			ServicesMetadata:   v1alpha1.AdditionalMetadata{},
 			StorageClasses:     []string{},
 			IngressClasses:     []string{},
 			LimitRanges:        []corev1.LimitRangeSpec{},

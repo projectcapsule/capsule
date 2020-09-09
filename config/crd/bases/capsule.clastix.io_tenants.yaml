@@ -683,6 +683,22 @@ spec:
                     type: array
                 type: object
               type: array
+            servicesMetadata:
+              properties:
+                additionalAnnotations:
+                  additionalProperties:
+                    type: string
+                  nullable: true
+                  type: object
+                additionalLabels:
+                  additionalProperties:
+                    type: string
+                  nullable: true
+                  type: object
+              required:
+              - additionalAnnotations
+              - additionalLabels
+              type: object
             storageClasses:
               items:
                 type: string
