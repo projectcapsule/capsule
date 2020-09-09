@@ -36,30 +36,13 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /validating-v1-extensions-ingress
+      path: /validating-ingress
   failurePolicy: Fail
-  name: extensions.ingress.capsule.clastix.io
-  rules:
-  - apiGroups:
-    - extensions
-    apiVersions:
-    - v1beta1
-    operations:
-    - CREATE
-    - UPDATE
-    resources:
-    - ingresses
-- clientConfig:
-    caBundle: Cg==
-    service:
-      name: webhook-service
-      namespace: system
-      path: /validating-v1-networking-ingress
-  failurePolicy: Fail
-  name: networking.ingress.capsule.clastix.io
+  name: ingress.capsule.clastix.io
   rules:
   - apiGroups:
     - networking.k8s.io
+    - extensions
     apiVersions:
     - v1beta1
     operations:

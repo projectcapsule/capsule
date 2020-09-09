@@ -135,8 +135,7 @@ func main() {
 	// webhooks
 	wl := append(
 		make([]webhook.Webhook, 0),
-		ingress.ExtensionWebhook(utils.InCapsuleGroup(capsuleGroup, ingress.ExtensionHandler(ingress.NewHandlerIngress))),
-		ingress.NetworkingWebhook(utils.InCapsuleGroup(capsuleGroup, ingress.NetworkingHandler(ingress.NewHandlerIngress))),
+		ingress.Webhook(utils.InCapsuleGroup(capsuleGroup, ingress.Handler())),
 		pvc.Webhook(utils.InCapsuleGroup(capsuleGroup, pvc.Handler())),
 		owner_reference.Webhook(utils.InCapsuleGroup(capsuleGroup, owner_reference.Handler())),
 		namespace_quota.Webhook(utils.InCapsuleGroup(capsuleGroup, namespace_quota.Handler())),
