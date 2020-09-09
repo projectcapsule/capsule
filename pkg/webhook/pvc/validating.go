@@ -25,59 +25,75 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	"github.com/clastix/capsule/api/v1alpha1"
-	"github.com/clastix/capsule/pkg/webhook"
+	capsulev1alpha1 "github.com/clastix/capsule/api/v1alpha1"
+	capsulewebhook "github.com/clastix/capsule/pkg/webhook"
 )
 
 // +kubebuilder:webhook:path=/validating-v1-pvc,mutating=false,failurePolicy=fail,groups="",resources=persistentvolumeclaims,verbs=create,versions=v1,name=pvc.capsule.clastix.io
 
-type Webhook struct{}
+type webhook struct {
+	handler capsulewebhook.Handler
+}
 
-func (p Webhook) GetName() string {
+func Webhook(handler capsulewebhook.Handler) capsulewebhook.Webhook {
+	return &webhook{handler: handler}
+}
+
+func (w webhook) GetName() string {
 	return "Pvc"
 }
 
-func (p Webhook) GetPath() string {
+func (w webhook) GetPath() string {
 	return "/validating-v1-pvc"
 }
 
-func (p Webhook) GetHandler() webhook.Handler {
-	return &handler{}
+func (w webhook) GetHandler() capsulewebhook.Handler {
+	return w.handler
 }
 
 type handler struct {
 }
 
-func (r *handler) OnCreate(ctx context.Context, req admission.Request, c client.Client, decoder *admission.Decoder) admission.Response {
-	pvc := &v1.PersistentVolumeClaim{}
-
-	if err := decoder.Decode(req, pvc); err != nil {
-		return admission.Errored(http.StatusBadRequest, err)
-	}
-
-	if pvc.Spec.StorageClassName == nil {
-		return admission.Errored(http.StatusBadRequest, NewValidStorageClassError())
-	}
-	sc := *pvc.Spec.StorageClassName
-
-	tl := &v1alpha1.TenantList{}
-	if err := c.List(ctx, tl, client.MatchingFieldsSelector{
-		Selector: fields.OneTermEqualSelector(".status.namespaces", pvc.Namespace),
-	}); err != nil {
-		return admission.Errored(http.StatusBadRequest, err)
-	}
-
-	if !tl.Items[0].Spec.StorageClasses.IsStringInList(sc) {
-		return admission.Errored(http.StatusBadRequest, NewForbiddenStorageClassError(*pvc.Spec.StorageClassName))
-	}
-
-	return admission.Allowed("")
+func Handler() capsulewebhook.Handler {
+	return &handler{}
 }
 
-func (r *handler) OnDelete(ctx context.Context, req admission.Request, client client.Client, decoder *admission.Decoder) admission.Response {
-	return admission.Allowed("")
+func (h *handler) OnCreate(c client.Client, decoder *admission.Decoder) capsulewebhook.Func {
+	return func(ctx context.Context, req admission.Request) admission.Response {
+		pvc := &v1.PersistentVolumeClaim{}
+
+		if err := decoder.Decode(req, pvc); err != nil {
+			return admission.Errored(http.StatusBadRequest, err)
+		}
+
+		if pvc.Spec.StorageClassName == nil {
+			return admission.Errored(http.StatusBadRequest, NewValidStorageClassError())
+		}
+		sc := *pvc.Spec.StorageClassName
+
+		tl := &capsulev1alpha1.TenantList{}
+		if err := c.List(ctx, tl, client.MatchingFieldsSelector{
+			Selector: fields.OneTermEqualSelector(".status.namespaces", pvc.Namespace),
+		}); err != nil {
+			return admission.Errored(http.StatusBadRequest, err)
+		}
+
+		if !tl.Items[0].Spec.StorageClasses.IsStringInList(sc) {
+			return admission.Errored(http.StatusBadRequest, NewForbiddenStorageClassError(*pvc.Spec.StorageClassName))
+		}
+
+		return admission.Allowed("")
+	}
 }
 
-func (r *handler) OnUpdate(ctx context.Context, req admission.Request, client client.Client, decoder *admission.Decoder) admission.Response {
-	return admission.Allowed("")
+func (h *handler) OnDelete(client client.Client, decoder *admission.Decoder) capsulewebhook.Func {
+	return func(ctx context.Context, req admission.Request) admission.Response {
+		return admission.Allowed("")
+	}
+}
+
+func (h *handler) OnUpdate(client client.Client, decoder *admission.Decoder) capsulewebhook.Func {
+	return func(ctx context.Context, req admission.Request) admission.Response {
+		return admission.Allowed("")
+	}
 }

@@ -26,30 +26,42 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	"github.com/clastix/capsule/api/v1alpha1"
-	"github.com/clastix/capsule/pkg/webhook"
+	capsulewebhook "github.com/clastix/capsule/pkg/webhook"
 )
 
 // +kubebuilder:webhook:path=/validating-v1-network-policy,mutating=false,failurePolicy=fail,groups=networking.k8s.io,resources=networkpolicies,verbs=create;update;delete,versions=v1,name=validating.network-policy.capsule.clastix.io
 
-type Webhook struct{}
-
-func (n Webhook) GetHandler() webhook.Handler {
-	return &handler{}
+type webhook struct{
+	handler capsulewebhook.Handler
 }
 
-func (n Webhook) GetName() string {
+func Webhook(handler capsulewebhook.Handler) capsulewebhook.Webhook {
+	return &webhook{handler: handler}
+}
+
+func (n webhook) GetHandler() capsulewebhook.Handler {
+	return n.handler
+}
+
+func (n webhook) GetName() string {
 	return "NetworkPolicy"
 }
 
-func (n Webhook) GetPath() string {
+func (n webhook) GetPath() string {
 	return "/validating-v1-network-policy"
 }
 
 type handler struct {
 }
 
-func (r *handler) OnCreate(ctx context.Context, req admission.Request, client client.Client, decoder *admission.Decoder) admission.Response {
-	return admission.Allowed("")
+func Handler() capsulewebhook.Handler {
+	return &handler{}
+}
+
+func (r *handler) OnCreate(client client.Client, decoder *admission.Decoder) capsulewebhook.Func {
+	return func(ctx context.Context, req admission.Request) admission.Response {
+		return admission.Allowed("")
+	}
 }
 
 func (r *handler) generic(ctx context.Context, req admission.Request, client client.Client, decoder *admission.Decoder) (bool, error) {
@@ -63,16 +75,18 @@ func (r *handler) generic(ctx context.Context, req admission.Request, client cli
 	return r.isCapsuleNetworkPolicy(np), nil
 }
 
-func (r *handler) OnDelete(ctx context.Context, req admission.Request, client client.Client, decoder *admission.Decoder) admission.Response {
-	ok, err := r.generic(ctx, req, client, decoder)
-	if err != nil {
-		return admission.Errored(http.StatusInternalServerError, err)
-	}
-	if ok {
-		return admission.Denied("Capsule Network Policies cannot be deleted: please, reach out the system administrators")
-	}
+func (r *handler) OnDelete(client client.Client, decoder *admission.Decoder) capsulewebhook.Func {
+	return func(ctx context.Context, req admission.Request) admission.Response {
+		ok, err := r.generic(ctx, req, client, decoder)
+		if err != nil {
+			return admission.Errored(http.StatusInternalServerError, err)
+		}
+		if ok {
+			return admission.Denied("Capsule Network Policies cannot be deleted: please, reach out the system administrators")
+		}
 
-	return admission.Allowed("")
+		return admission.Allowed("")
+	}
 }
 
 func (r *handler) isCapsuleNetworkPolicy(np *networkingv1.NetworkPolicy) (ok bool) {
@@ -81,14 +95,16 @@ func (r *handler) isCapsuleNetworkPolicy(np *networkingv1.NetworkPolicy) (ok boo
 	return
 }
 
-func (r *handler) OnUpdate(ctx context.Context, req admission.Request, client client.Client, decoder *admission.Decoder) admission.Response {
-	ok, err := r.generic(ctx, req, client, decoder)
-	if err != nil {
-		return admission.Errored(http.StatusInternalServerError, err)
-	}
-	if ok {
-		return admission.Denied("Capsule Network Policies cannot be updated: please, reach out the system administrators")
-	}
+func (r *handler) OnUpdate(client client.Client, decoder *admission.Decoder) capsulewebhook.Func {
+	return func(ctx context.Context, req admission.Request) admission.Response {
+		ok, err := r.generic(ctx, req, client, decoder)
+		if err != nil {
+			return admission.Errored(http.StatusInternalServerError, err)
+		}
+		if ok {
+			return admission.Denied("Capsule Network Policies cannot be updated: please, reach out the system administrators")
+		}
 
-	return admission.Allowed("")
+		return admission.Allowed("")
+	}
 }

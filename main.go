@@ -45,6 +45,7 @@ import (
 	"github.com/clastix/capsule/pkg/webhook/owner_reference"
 	"github.com/clastix/capsule/pkg/webhook/pvc"
 	"github.com/clastix/capsule/pkg/webhook/tenant_prefix"
+	"github.com/clastix/capsule/pkg/webhook/utils"
 	"github.com/clastix/capsule/version"
 	// +kubebuilder:scaffold:imports
 )
@@ -137,11 +138,17 @@ func main() {
 	}
 	// +kubebuilder:scaffold:builder
 
-	//webhooks
-	wl := make([]webhook.Webhook, 0)
-	wl = append(wl, &ingress.ExtensionIngress{}, &ingress.NetworkIngress{}, pvc.Webhook{}, &owner_reference.Webhook{}, &namespace_quota.Webhook{}, network_policies.Webhook{}, tenant_prefix.Webhook{ForceTenantPrefix: forceTenantPrefix, ProtectedNamespacesRegex: protectedNamespaceRegexp})
-	err = webhook.Register(mgr, capsuleGroup, wl...)
-	if err != nil {
+	// webhooks
+	wl := append(
+		make([]webhook.Webhook, 0),
+		ingress.Webhook(utils.InCapsuleGroup(capsuleGroup, ingress.Handler())),
+		pvc.Webhook(utils.InCapsuleGroup(capsuleGroup, pvc.Handler())),
+		owner_reference.Webhook(utils.InCapsuleGroup(capsuleGroup, owner_reference.Handler())),
+		namespace_quota.Webhook(utils.InCapsuleGroup(capsuleGroup, namespace_quota.Handler())),
+		network_policies.Webhook(utils.InCapsuleGroup(capsuleGroup, network_policies.Handler())),
+		tenant_prefix.Webhook(utils.InCapsuleGroup(capsuleGroup, tenant_prefix.Handler(forceTenantPrefix, protectedNamespaceRegexp))),
+	)
+	if err = webhook.Register(mgr, wl...); err != nil {
 		setupLog.Error(err, "unable to setup webhooks")
 		os.Exit(1)
 	}
@@ -150,7 +157,7 @@ func main() {
 		Log:          ctrl.Log.WithName("controllers").WithName("Rbac"),
 		CapsuleGroup: capsuleGroup,
 	}
-	if err := mgr.Add(rbacManager); err != nil {
+	if err = mgr.Add(rbacManager); err != nil {
 		setupLog.Error(err, "unable to create cluster roles")
 		os.Exit(1)
 	}
@@ -178,13 +185,13 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := indexer.AddToManager(mgr); err != nil {
+	if err = indexer.AddToManager(mgr); err != nil {
 		setupLog.Error(err, "unable to setup indexers")
 		os.Exit(1)
 	}
 
 	setupLog.Info("starting manager")
-	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
+	if err = mgr.Start(ctrl.SetupSignalHandler()); err != nil {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}
