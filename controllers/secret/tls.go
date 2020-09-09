@@ -36,8 +36,9 @@ import (
 
 type TlsReconciler struct {
 	client.Client
-	Log    logr.Logger
-	Scheme *runtime.Scheme
+	Log       logr.Logger
+	Scheme    *runtime.Scheme
+	Namespace string
 }
 
 func (r *TlsReconciler) SetupWithManager(mgr ctrl.Manager) error {
@@ -63,7 +64,7 @@ func (r TlsReconciler) Reconcile(request ctrl.Request) (ctrl.Result, error) {
 	var ca cert.Ca
 	var rq time.Duration
 
-	ca, err = getCertificateAuthority(r.Client)
+	ca, err = getCertificateAuthority(r.Client, r.Namespace)
 	if err != nil {
 		return reconcile.Result{}, err
 	}

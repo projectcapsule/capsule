@@ -32,7 +32,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"github.com/clastix/capsule/pkg/cert"
@@ -40,8 +39,9 @@ import (
 
 type CaReconciler struct {
 	client.Client
-	Log    logr.Logger
-	Scheme *runtime.Scheme
+	Log       logr.Logger
+	Scheme    *runtime.Scheme
+	Namespace string
 }
 
 func (r *CaReconciler) SetupWithManager(mgr ctrl.Manager) error {
@@ -97,7 +97,7 @@ func (r CaReconciler) UpdateMutatingWebhookConfiguration(wg *sync.WaitGroup, ch 
 func (r CaReconciler) Reconcile(request ctrl.Request) (ctrl.Result, error) {
 	var err error
 
-	r.Log = log.Log.WithName("controller_ca").WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
+	r.Log = r.Log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
 	r.Log.Info("Reconciling CA Secret")
 
 	// Fetch the CA instance
@@ -110,7 +110,7 @@ func (r CaReconciler) Reconcile(request ctrl.Request) (ctrl.Result, error) {
 
 	var ca cert.Ca
 	var rq time.Duration
-	ca, err = getCertificateAuthority(r.Client)
+	ca, err = getCertificateAuthority(r.Client, r.Namespace)
 	if err != nil && errors.Is(err, MissingCaError{}) {
 		ca, err = cert.GenerateCertificateAuthority()
 		if err != nil {
@@ -171,7 +171,7 @@ func (r CaReconciler) Reconcile(request ctrl.Request) (ctrl.Result, error) {
 		r.Log.Info("Capsule CA has been updated, we need to trigger TLS update too")
 		tls := &corev1.Secret{}
 		err = r.Get(context.TODO(), types.NamespacedName{
-			Namespace: "capsule-system",
+			Namespace: r.Namespace,
 			Name:      tlsSecretName,
 		}, tls)
 		if err != nil {
