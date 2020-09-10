@@ -58,7 +58,9 @@ metadata:
   annotations:
   name: oil
 spec:
-  owner: alice
+  owner:
+    name: alice
+    kind: User
   nodeSelector:
     vpc: oil
   ingressClasses:
@@ -127,13 +129,16 @@ spec:
             - 192.168.0.0/16
 ```
 
+> N.B.: Tenant name can only consist of alphanumeric characters. No other symbols are allowed.
+
+
 Bill checks the new tenant is created and operational:
 
 ```
 bill@caas# kubectl get tenants
-NAME   NAMESPACE QUOTA   NAMESPACE COUNT   OWNER   AGE
-oil    3                 0                 alice   3m
-foo    10                9                 bar     30d
+NAME   NAMESPACE QUOTA   NAMESPACE COUNT   OWNER NAME   OWNER KIND   AGE
+oil    3                 0                 alice        User         3m
+foo    10                9                 bar          User         30d
 ```
 
 > Note that namespaces are not yet assigned to the new tenant.

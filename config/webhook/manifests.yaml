@@ -130,6 +130,23 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
+      path: /validating-v1-tenant-name
+  failurePolicy: Fail
+  name: tenant.name.capsule.clastix.io
+  rules:
+  - apiGroups:
+    - capsule.clastix.io
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    resources:
+    - tenants
+- clientConfig:
+    caBundle: Cg==
+    service:
+      name: webhook-service
+      namespace: system
       path: /validating-v1-namespace-tenant-prefix
   failurePolicy: Fail
   name: prefix.namespace.capsule.clastix.io

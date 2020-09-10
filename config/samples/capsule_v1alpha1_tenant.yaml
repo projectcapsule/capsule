@@ -66,7 +66,9 @@ spec:
         - Egress
   nodeSelector:
     kubernetes.io/os: linux
-  owner: alice
+  owner:
+    name: alice
+    kind: User
   resourceQuotas:
     -
       hard:

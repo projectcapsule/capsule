@@ -32,10 +32,13 @@ import (
 var _ = Describe("creating a Namespace trying to select a third Tenant", func() {
 	tnt := &v1alpha1.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "tenant-non-owned",
+			Name: "tenantnonowned",
 		},
 		Spec: v1alpha1.TenantSpec{
-			Owner:              "undefined",
+			Owner: v1alpha1.OwnerSpec{
+				Name: "undefined",
+				Kind: "User",
+			},
 			NamespacesMetadata: v1alpha1.AdditionalMetadata{},
 			ServicesMetadata:   v1alpha1.AdditionalMetadata{},
 			StorageClasses:     []string{},
@@ -65,7 +68,7 @@ var _ = Describe("creating a Namespace trying to select a third Tenant", func() 
 			})
 		})
 
-		cs := ownerClient(&v1alpha1.Tenant{Spec: v1alpha1.TenantSpec{Owner: "dale"}})
+		cs := ownerClient(&v1alpha1.Tenant{Spec: v1alpha1.TenantSpec{Owner: v1alpha1.OwnerSpec{Name: "dale", Kind: "User"}}})
 		_, err := cs.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
 		Expect(err).ShouldNot(Succeed())
 	})

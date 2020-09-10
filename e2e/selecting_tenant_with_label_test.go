@@ -29,13 +29,16 @@ import (
 	"github.com/clastix/capsule/api/v1alpha1"
 )
 
-var _ = Describe("creating a Namespace with Tenant selector", func() {
+var _ = Describe("creating a Namespace with Tenant selector when user owns multiple tenants", func() {
 	t1 := &v1alpha1.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "tenant-one",
+			Name: "tenantone",
 		},
 		Spec: v1alpha1.TenantSpec{
-			Owner:              "john",
+			Owner: v1alpha1.OwnerSpec{
+				Name: "john",
+				Kind: "User",
+			},
 			NamespacesMetadata: v1alpha1.AdditionalMetadata{},
 			ServicesMetadata:   v1alpha1.AdditionalMetadata{},
 			StorageClasses:     []string{},
@@ -48,10 +51,13 @@ var _ = Describe("creating a Namespace with Tenant selector", func() {
 	}
 	t2 := &v1alpha1.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "tenant-two",
+			Name: "tenanttwo",
 		},
 		Spec: v1alpha1.TenantSpec{
-			Owner:              "john",
+			Owner: v1alpha1.OwnerSpec{
+				Name: "john",
+				Kind: "User",
+			},
 			NamespacesMetadata: v1alpha1.AdditionalMetadata{},
 			ServicesMetadata:   v1alpha1.AdditionalMetadata{},
 			StorageClasses:     []string{},

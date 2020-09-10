@@ -35,10 +35,13 @@ import (
 var _ = Describe("when Tenant handles Storage classes", func() {
 	tnt := &v1alpha1.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "storage-class",
+			Name: "storageclass",
 		},
 		Spec: v1alpha1.TenantSpec{
-			Owner:              "storage",
+			Owner: v1alpha1.OwnerSpec{
+				Name: "storage",
+				Kind: "User",
+			},
 			NamespacesMetadata: v1alpha1.AdditionalMetadata{},
 			ServicesMetadata:   v1alpha1.AdditionalMetadata{},
 			StorageClasses: []string{

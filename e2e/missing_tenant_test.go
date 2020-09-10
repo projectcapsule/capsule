@@ -32,7 +32,10 @@ var _ = Describe("Namespace creation with no Tenant assigned", func() {
 	It("should fail", func() {
 		tnt := &v1alpha1.Tenant{
 			Spec: v1alpha1.TenantSpec{
-				Owner: "missing",
+				Owner: v1alpha1.OwnerSpec{
+					Name: "missing",
+					Kind: "User",
+				},
 			},
 		}
 		ns := NewNamespace("no-namespace")

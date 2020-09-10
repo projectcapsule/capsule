@@ -34,10 +34,13 @@ import (
 var _ = Describe("creating a Service/Endpoint/EndpointSlice for a Tenant with additional metadata", func() {
 	tnt := &v1alpha1.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "service-metadata",
+			Name: "servicemetadata",
 		},
 		Spec: v1alpha1.TenantSpec{
-			Owner:              "gatsby",
+			Owner: v1alpha1.OwnerSpec{
+				Name: "gatsby",
+				Kind: "User",
+			},
 			StorageClasses:     []string{},
 			IngressClasses:     []string{},
 			NamespacesMetadata: v1alpha1.AdditionalMetadata{},

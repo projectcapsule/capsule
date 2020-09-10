@@ -17,9 +17,13 @@ spec:
     description: The total amount of Namespaces in use
     name: Namespace count
     type: integer
-  - JSONPath: .spec.owner
+  - JSONPath: .spec.owner.name
     description: The assigned Tenant owner
-    name: Owner
+    name: Owner name
+    type: string
+  - JSONPath: .spec.owner.kind
+    description: The assigned Tenant owner kind
+    name: Owner kind
     type: string
   - JSONPath: .metadata.creationTimestamp
     description: Age
@@ -617,7 +621,19 @@ spec:
                 type: string
               type: object
             owner:
-              type: string
+              description: OwnerSpec defines tenant owner name and kind
+              properties:
+                kind:
+                  enum:
+                  - User
+                  - Group
+                  type: string
+                name:
+                  type: string
+              required:
+              - kind
+              - name
+              type: object
             resourceQuotas:
               items:
                 description: ResourceQuotaSpec defines the desired hard limits to

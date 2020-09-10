@@ -34,7 +34,7 @@ type AdditionalMetadata struct {
 
 // TenantSpec defines the desired state of Tenant
 type TenantSpec struct {
-	Owner string `json:"owner"`
+	Owner OwnerSpec `json:"owner"`
 	// +kubebuilder:validation:Optional
 	NamespacesMetadata AdditionalMetadata `json:"namespacesMetadata"`
 	// +kubebuilder:validation:Optional
@@ -51,6 +51,19 @@ type TenantSpec struct {
 	ResourceQuota []corev1.ResourceQuotaSpec `json:"resourceQuotas"`
 }
 
+// OwnerSpec defines tenant owner name and kind
+type OwnerSpec struct {
+	Name string `json:"name"`
+	Kind Kind   `json:"kind"`
+}
+
+// +kubebuilder:validation:Enum=User;Group
+type Kind string
+
+func (k Kind) String() string {
+	return string(k)
+}
+
 // TenantStatus defines the observed state of Tenant
 type TenantStatus struct {
 	Size       uint          `json:"size"`
@@ -64,7 +77,8 @@ type TenantStatus struct {
 // +kubebuilder:resource:scope=Cluster,shortName=tnt
 // +kubebuilder:printcolumn:name="Namespace quota",type="integer",JSONPath=".spec.namespaceQuota",description="The max amount of Namespaces can be created"
 // +kubebuilder:printcolumn:name="Namespace count",type="integer",JSONPath=".status.size",description="The total amount of Namespaces in use"
-// +kubebuilder:printcolumn:name="Owner",type="string",JSONPath=".spec.owner",description="The assigned Tenant owner"
+// +kubebuilder:printcolumn:name="Owner name",type="string",JSONPath=".spec.owner.name",description="The assigned Tenant owner"
+// +kubebuilder:printcolumn:name="Owner kind",type="string",JSONPath=".spec.owner.kind",description="The assigned Tenant owner kind"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp",description="Age"
 
 // Tenant is the Schema for the tenants API
