@@ -53,7 +53,7 @@ func (w *webhook) GetPath() string {
 	return "/validating-ingress"
 }
 
-type handler struct {}
+type handler struct{}
 
 func Handler() capsulewebhook.Handler {
 	return &handler{}

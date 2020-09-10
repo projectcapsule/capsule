@@ -31,7 +31,7 @@ import (
 
 // +kubebuilder:webhook:path=/validating-v1-network-policy,mutating=false,failurePolicy=fail,groups=networking.k8s.io,resources=networkpolicies,verbs=create;update;delete,versions=v1,name=validating.network-policy.capsule.clastix.io
 
-type webhook struct{
+type webhook struct {
 	handler capsulewebhook.Handler
 }
 
