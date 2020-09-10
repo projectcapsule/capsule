@@ -43,7 +43,7 @@ func (h handler) isCapsuleUser(req admission.Request) bool {
 	return utils.UserGroupList(req.UserInfo.Groups).IsInCapsuleGroup(h.capsuleGroup)
 }
 
-func (h handler) OnCreate(client client.Client, decoder *admission.Decoder) webhook.Func {
+func (h *handler) OnCreate(client client.Client, decoder *admission.Decoder) webhook.Func {
 	return func(ctx context.Context, req admission.Request) admission.Response {
 		if !h.isCapsuleUser(req) {
 			return admission.Allowed("")
@@ -53,7 +53,7 @@ func (h handler) OnCreate(client client.Client, decoder *admission.Decoder) webh
 	}
 }
 
-func (h handler) OnDelete(client client.Client, decoder *admission.Decoder) webhook.Func {
+func (h *handler) OnDelete(client client.Client, decoder *admission.Decoder) webhook.Func {
 	return func(ctx context.Context, req admission.Request) admission.Response {
 		if !h.isCapsuleUser(req) {
 			return admission.Allowed("")
@@ -62,7 +62,7 @@ func (h handler) OnDelete(client client.Client, decoder *admission.Decoder) webh
 	}
 }
 
-func (h handler) OnUpdate(client client.Client, decoder *admission.Decoder) webhook.Func {
+func (h *handler) OnUpdate(client client.Client, decoder *admission.Decoder) webhook.Func {
 	return func(ctx context.Context, req admission.Request) admission.Response {
 		if !h.isCapsuleUser(req) {
 			return admission.Allowed("")

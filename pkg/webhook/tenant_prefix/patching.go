@@ -43,15 +43,15 @@ func Webhook(handler capsulewebhook.Handler) *webhook {
 	}
 }
 
-func (o webhook) GetHandler() capsulewebhook.Handler {
-	return o.handler
+func (w *webhook) GetHandler() capsulewebhook.Handler {
+	return w.handler
 }
 
-func (o webhook) GetName() string {
+func (w *webhook) GetName() string {
 	return "OwnerReference"
 }
 
-func (o webhook) GetPath() string {
+func (w *webhook) GetPath() string {
 	return "/validating-v1-namespace-tenant-prefix"
 }
 

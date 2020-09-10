@@ -42,15 +42,15 @@ func Webhook(handler capsulewebhook.Handler) capsulewebhook.Webhook {
 	return &webhook{handler: handler}
 }
 
-func (w webhook) GetHandler() capsulewebhook.Handler {
+func (w *webhook) GetHandler() capsulewebhook.Handler {
 	return w.handler
 }
 
-func (w webhook) GetName() string {
+func (w *webhook) GetName() string {
 	return "ServiceLabels"
 }
 
-func (w webhook) GetPath() string {
+func (w *webhook) GetPath() string {
 	return "/mutate-v1-service-labels"
 }
 

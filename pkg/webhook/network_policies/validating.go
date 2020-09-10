@@ -39,15 +39,15 @@ func Webhook(handler capsulewebhook.Handler) capsulewebhook.Webhook {
 	return &webhook{handler: handler}
 }
 
-func (n webhook) GetHandler() capsulewebhook.Handler {
-	return n.handler
+func (w *webhook) GetHandler() capsulewebhook.Handler {
+	return w.handler
 }
 
-func (n webhook) GetName() string {
+func (w *webhook) GetName() string {
 	return "NetworkPolicy"
 }
 
-func (n webhook) GetPath() string {
+func (w *webhook) GetPath() string {
 	return "/validating-v1-network-policy"
 }
 
