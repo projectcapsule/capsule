@@ -39,7 +39,7 @@ var _ = Describe("creating a Namespace for a Tenant with additional metadata", f
 			Owner:          "gatsby",
 			StorageClasses: []string{},
 			IngressClasses: []string{},
-			NamespacesMetadata: v1alpha1.NamespaceMetadata{
+			NamespacesMetadata: v1alpha1.AdditionalMetadata{
 				AdditionalLabels: map[string]string{
 					"k8s.io/custom-label":     "foo",
 					"clastix.io/custom-label": "bar",
@@ -49,10 +49,11 @@ var _ = Describe("creating a Namespace for a Tenant with additional metadata", f
 					"clastix.io/custom-annotation": "buzz",
 				},
 			},
-			LimitRanges:    []corev1.LimitRangeSpec{},
-			NamespaceQuota: 10,
-			NodeSelector:   map[string]string{},
-			ResourceQuota:  []corev1.ResourceQuotaSpec{},
+			ServicesMetadata: v1alpha1.AdditionalMetadata{},
+			LimitRanges:      []corev1.LimitRangeSpec{},
+			NamespaceQuota:   10,
+			NodeSelector:     map[string]string{},
+			ResourceQuota:    []corev1.ResourceQuotaSpec{},
 		},
 	}
 	JustBeforeEach(func() {

@@ -393,7 +393,7 @@ func (r *TenantReconciler) syncLimitRanges(tenant *capsulev1alpha1.Tenant) error
 	return nil
 }
 
-func (r *TenantReconciler) syncNamespace(namespace string, ingressClasses []string, storageClasses []string, nsMetadata capsulev1alpha1.NamespaceMetadata, tenantLabel string, wg *sync.WaitGroup, channel chan error) {
+func (r *TenantReconciler) syncNamespace(namespace string, ingressClasses []string, storageClasses []string, nsMetadata capsulev1alpha1.AdditionalMetadata, tenantLabel string, wg *sync.WaitGroup, channel chan error) {
 	defer wg.Done()
 
 	ns := &corev1.Namespace{}

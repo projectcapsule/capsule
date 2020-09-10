@@ -36,7 +36,8 @@ var _ = Describe("creating a Namespace over-quota", func() {
 		},
 		Spec: v1alpha1.TenantSpec{
 			Owner:              "bob",
-			NamespacesMetadata: v1alpha1.NamespaceMetadata{},
+			NamespacesMetadata: v1alpha1.AdditionalMetadata{},
+			ServicesMetadata:   v1alpha1.AdditionalMetadata{},
 			StorageClasses:     []string{},
 			IngressClasses:     []string{},
 			LimitRanges:        []corev1.LimitRangeSpec{},

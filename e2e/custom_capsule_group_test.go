@@ -36,7 +36,8 @@ var _ = Describe("creating a Namespace as Tenant owner with custom --capsule-gro
 		},
 		Spec: v1alpha1.TenantSpec{
 			Owner:              "alice",
-			NamespacesMetadata: v1alpha1.NamespaceMetadata{},
+			NamespacesMetadata: v1alpha1.AdditionalMetadata{},
+			ServicesMetadata:   v1alpha1.AdditionalMetadata{},
 			StorageClasses:     []string{},
 			IngressClasses:     []string{},
 			LimitRanges:        []corev1.LimitRangeSpec{},
