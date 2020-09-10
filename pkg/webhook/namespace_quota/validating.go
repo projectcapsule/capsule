@@ -41,15 +41,15 @@ func Webhook(handler capsulewebhook.Handler) capsulewebhook.Webhook {
 	}
 }
 
-func (r *webhook) GetHandler() capsulewebhook.Handler {
-	return r.handler
+func (w *webhook) GetHandler() capsulewebhook.Handler {
+	return w.handler
 }
 
-func (r *webhook) GetName() string {
+func (w *webhook) GetName() string {
 	return "NamespaceQuota"
 }
 
-func (r *webhook) GetPath() string {
+func (w *webhook) GetPath() string {
 	return "/validate-v1-namespace-quota"
 }
 

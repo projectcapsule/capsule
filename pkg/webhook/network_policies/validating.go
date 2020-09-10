@@ -31,7 +31,7 @@ import (
 
 // +kubebuilder:webhook:path=/validating-v1-network-policy,mutating=false,failurePolicy=fail,groups=networking.k8s.io,resources=networkpolicies,verbs=create;update;delete,versions=v1,name=validating.network-policy.capsule.clastix.io
 
-type webhook struct{
+type webhook struct {
 	handler capsulewebhook.Handler
 }
 
@@ -39,15 +39,15 @@ func Webhook(handler capsulewebhook.Handler) capsulewebhook.Webhook {
 	return &webhook{handler: handler}
 }
 
-func (n webhook) GetHandler() capsulewebhook.Handler {
-	return n.handler
+func (w *webhook) GetHandler() capsulewebhook.Handler {
+	return w.handler
 }
 
-func (n webhook) GetName() string {
+func (w *webhook) GetName() string {
 	return "NetworkPolicy"
 }
 
-func (n webhook) GetPath() string {
+func (w *webhook) GetPath() string {
 	return "/validating-v1-network-policy"
 }
 

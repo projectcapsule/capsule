@@ -39,15 +39,15 @@ func Webhook(handler capsulewebhook.Handler) capsulewebhook.Webhook {
 	return &webhook{handler: handler}
 }
 
-func (w webhook) GetName() string {
+func (w *webhook) GetName() string {
 	return "Pvc"
 }
 
-func (w webhook) GetPath() string {
+func (w *webhook) GetPath() string {
 	return "/validating-v1-pvc"
 }
 
-func (w webhook) GetHandler() capsulewebhook.Handler {
+func (w *webhook) GetHandler() capsulewebhook.Handler {
 	return w.handler
 }
 
