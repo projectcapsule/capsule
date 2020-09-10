@@ -21,7 +21,7 @@ A clear and concise description of what the bug is.
 
 # How to reproduce
 
-Steps to reproduce the behaviour:
+Steps to reproduce the behavior:
 
 1. Provide the Capsule Tenant YAML definitions
 2. Provide all managed Kubernetes resources
