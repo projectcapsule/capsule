@@ -2,13 +2,10 @@
 
 /*
 Copyright 2020 Clastix Labs.
-
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
-
     http://www.apache.org/licenses/LICENSE-2.0
-
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -44,11 +41,14 @@ var _ = Describe("when Tenant handles Storage classes", func() {
 			},
 			NamespacesMetadata: v1alpha1.AdditionalMetadata{},
 			ServicesMetadata:   v1alpha1.AdditionalMetadata{},
-			StorageClasses: []string{
-				"cephfs",
-				"glusterfs",
+			StorageClasses: v1alpha1.StorageClassesSpec{
+				Allowed: []string{
+					"cephfs",
+					"glusterfs",
+				},
+				AllowedRegex: "^oil-.*$",
 			},
-			IngressClasses:  []string{},
+			IngressClasses:  v1alpha1.IngressClassesSpec{},
 			LimitRanges:     []corev1.LimitRangeSpec{},
 			NamespaceQuota:  3,
 			NodeSelector:    map[string]string{},
@@ -115,15 +115,37 @@ var _ = Describe("when Tenant handles Storage classes", func() {
 
 		NamespaceCreationShouldSucceed(ns, tnt, defaultTimeoutInterval)
 		NamespaceShouldBeManagedByTenant(ns, tnt, defaultTimeoutInterval)
-
-		for _, c := range tnt.Spec.StorageClasses {
+		By("using allowed storageClass names", func() {
+			for _, c := range tnt.Spec.StorageClasses.Allowed {
+				Eventually(func() (err error) {
+					p := &corev1.PersistentVolumeClaim{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: c,
+						},
+						Spec: corev1.PersistentVolumeClaimSpec{
+							StorageClassName: pointer.StringPtr(c),
+							AccessModes:      []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+							Resources: corev1.ResourceRequirements{
+								Requests: map[corev1.ResourceName]resource.Quantity{
+									corev1.ResourceStorage: resource.MustParse("3Gi"),
+								},
+							},
+						},
+					}
+					_, err = cs.CoreV1().PersistentVolumeClaims(ns.GetName()).Create(context.TODO(), p, metav1.CreateOptions{})
+					return
+				}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+			}
+		})
+		By("using allowed storageClass regexp", func() {
+			allowedClass := "oil-storage"
 			Eventually(func() (err error) {
 				p := &corev1.PersistentVolumeClaim{
 					ObjectMeta: metav1.ObjectMeta{
-						Name: c,
+						Name: allowedClass,
 					},
 					Spec: corev1.PersistentVolumeClaimSpec{
-						StorageClassName: pointer.StringPtr(c),
+						StorageClassName: &allowedClass,
 						AccessModes:      []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
 						Resources: corev1.ResourceRequirements{
 							Requests: map[corev1.ResourceName]resource.Quantity{
@@ -135,6 +157,7 @@ var _ = Describe("when Tenant handles Storage classes", func() {
 				_, err = cs.CoreV1().PersistentVolumeClaims(ns.GetName()).Create(context.TODO(), p, metav1.CreateOptions{})
 				return
 			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
-		}
+
+		})
 	})
 })

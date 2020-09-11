@@ -31,3 +31,13 @@ func NewIngressClassForbidden(ingressClass string) error {
 func (i ingressClassForbidden) Error() string {
 	return fmt.Sprintf("Ingress Class %s is forbidden for the current Tenant", i.ingressClass)
 }
+
+type ingressClassNotValid struct{}
+
+func NewIngressClassNotValid() error {
+	return &ingressClassNotValid{}
+}
+
+func (ingressClassNotValid) Error() string {
+	return "A valid Ingress Class must be used"
+}

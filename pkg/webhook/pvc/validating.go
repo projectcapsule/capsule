@@ -19,6 +19,7 @@ package pvc
 import (
 	"context"
 	"net/http"
+	"regexp"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -60,6 +61,7 @@ func Handler() capsulewebhook.Handler {
 
 func (h *handler) OnCreate(c client.Client, decoder *admission.Decoder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) admission.Response {
+		var valid, matched bool
 		pvc := &v1.PersistentVolumeClaim{}
 
 		if err := decoder.Decode(req, pvc); err != nil {
@@ -67,9 +69,8 @@ func (h *handler) OnCreate(c client.Client, decoder *admission.Decoder) capsulew
 		}
 
 		if pvc.Spec.StorageClassName == nil {
-			return admission.Errored(http.StatusBadRequest, NewValidStorageClassError())
+			return admission.Errored(http.StatusBadRequest, NewStorageClassNotValid())
 		}
-		sc := *pvc.Spec.StorageClassName
 
 		tl := &capsulev1alpha1.TenantList{}
 		if err := c.List(ctx, tl, client.MatchingFieldsSelector{
@@ -78,11 +79,21 @@ func (h *handler) OnCreate(c client.Client, decoder *admission.Decoder) capsulew
 			return admission.Errored(http.StatusBadRequest, err)
 		}
 
-		if !tl.Items[0].Spec.StorageClasses.IsStringInList(sc) {
-			return admission.Errored(http.StatusBadRequest, NewForbiddenStorageClassError(*pvc.Spec.StorageClassName))
+		sc := *pvc.Spec.StorageClassName
+
+		if len(tl.Items[0].Spec.StorageClasses.Allowed) > 0 {
+			valid = tl.Items[0].Spec.StorageClasses.Allowed.IsStringInList(sc)
 		}
 
+		if len(tl.Items[0].Spec.StorageClasses.AllowedRegex) > 0 {
+			matched, _ = regexp.MatchString(tl.Items[0].Spec.StorageClasses.AllowedRegex, sc)
+		}
+
+		if !valid && !matched {
+			return admission.Errored(http.StatusBadRequest, NewStorageClassForbidden(*pvc.Spec.StorageClassName))
+		}
 		return admission.Allowed("")
+
 	}
 }
 

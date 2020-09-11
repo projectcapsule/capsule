@@ -64,9 +64,11 @@ spec:
   nodeSelector:
     vpc: oil
   ingressClasses:
-  - haproxy
+    allowed:
+    - haproxy
   storageClasses:
-  - ceph-rbd
+    allowed:
+    - ceph-rbd
   namespaceQuota: 3
   resourceQuotas:
     - hard:
@@ -627,7 +629,24 @@ metadata:
 spec:
   ...
   ingressClasses:
-  - oil
+     allowed:
+     - oil
+  ...
+```
+
+It is also possible to use regular expression for assigning Ingress Classes:
+
+```yaml
+apiVersion: capsule.clastix.io/v1alpha1
+kind: Tenant
+metadata:
+  labels:
+  annotations:
+  name: oil
+spec:
+  ...
+  ingressClasses:
+     allowedRegex: "^oil-.*$"
   ...
 ```
 
@@ -640,6 +659,7 @@ alice@caas# kubectl describe ns oil-production
 Name:         oil-production
 Labels:       capsule.clastix.io/tenant=oil
 Annotations:  capsule.clastix.io/ingress-classes: oil
+              capsule.clastix.io/ingress-classes-regexp: ^oil-.*$
 ...
 ```
 
@@ -684,8 +704,25 @@ metadata:
   name: oil
 spec:
   storageClasses:
-  - ceph-rbd
-  - ceph-nfs
+    allowed:
+    - ceph-rbd
+    - ceph-nfs
+  ...
+```
+
+It is also possible to use regular expression for assigning Storage Classes:
+
+```yaml
+apiVersion: capsule.clastix.io/v1alpha1
+kind: Tenant
+metadata:
+  labels:
+  annotations:
+  name: oil
+spec:
+  ...
+  storageClasses:
+     allowedRegex: "^ceph-.*$"
   ...
 ```
 
@@ -696,6 +733,7 @@ alice@caas# kubectl describe ns oil-production
 Name:         oil-production
 Labels:       capsule.clastix.io/tenant=oil
 Annotations:  capsule.clastix.io/storage-classes: ceph-rbd,ceph-nfs
+              capsule.clastix.io/storage-classes-regexp: ^ceph-.*$
 ...
 ```
 

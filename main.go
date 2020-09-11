@@ -45,7 +45,7 @@ import (
 	"github.com/clastix/capsule/pkg/webhook/owner_reference"
 	"github.com/clastix/capsule/pkg/webhook/pvc"
 	"github.com/clastix/capsule/pkg/webhook/service_labels"
-	"github.com/clastix/capsule/pkg/webhook/tenant_name"
+	"github.com/clastix/capsule/pkg/webhook/tenant"
 	"github.com/clastix/capsule/pkg/webhook/tenant_prefix"
 	"github.com/clastix/capsule/pkg/webhook/utils"
 	"github.com/clastix/capsule/version"
@@ -153,7 +153,7 @@ func main() {
 		network_policies.Webhook(utils.InCapsuleGroup(capsuleGroup, network_policies.Handler())),
 		service_labels.Webhook(utils.InCapsuleGroup(capsuleGroup, service_labels.Handler())),
 		tenant_prefix.Webhook(utils.InCapsuleGroup(capsuleGroup, tenant_prefix.Handler(forceTenantPrefix, protectedNamespaceRegexp))),
-		tenant_name.Webhook(tenant_name.Handler()),
+		tenant.Webhook(tenant.Handler()),
 	)
 	if err = webhook.Register(mgr, wl...); err != nil {
 		setupLog.Error(err, "unable to setup webhooks")

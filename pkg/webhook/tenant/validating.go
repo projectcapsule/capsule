@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package tenant_name
+package tenant
 
 import (
 	"context"
@@ -28,7 +28,7 @@ import (
 	capsulewebhook "github.com/clastix/capsule/pkg/webhook"
 )
 
-// +kubebuilder:webhook:path=/validating-v1-tenant-name,mutating=false,failurePolicy=fail,groups="capsule.clastix.io",resources=tenants,verbs=create,versions=v1alpha1,name=tenant.name.capsule.clastix.io
+// +kubebuilder:webhook:path=/validating-v1-tenant,mutating=false,failurePolicy=fail,groups="capsule.clastix.io",resources=tenants,verbs=create,versions=v1alpha1,name=tenant.capsule.clastix.io
 
 type webhook struct {
 	handler capsulewebhook.Handler
@@ -39,11 +39,11 @@ func Webhook(handler capsulewebhook.Handler) capsulewebhook.Webhook {
 }
 
 func (w webhook) GetName() string {
-	return "TenantName"
+	return "Tenant"
 }
 
 func (w webhook) GetPath() string {
-	return "/validating-v1-tenant-name"
+	return "/validating-v1-tenant"
 }
 
 func (w webhook) GetHandler() capsulewebhook.Handler {
@@ -68,6 +68,21 @@ func (r *handler) OnCreate(client client.Client, decoder *admission.Decoder) cap
 		if !matched {
 			return admission.Denied("Tenant name has forbidden characters")
 		}
+
+		// Validate ingressClasses regexp
+		if len(tnt.Spec.IngressClasses.AllowedRegex) > 0 {
+			if _, err := regexp.Compile(tnt.Spec.IngressClasses.AllowedRegex); err != nil {
+				return admission.Denied("Unable to compile ingressClasses allowedRegex")
+			}
+		}
+
+		// Validate storageClasses regexp
+		if len(tnt.Spec.StorageClasses.AllowedRegex) > 0 {
+			if _, err := regexp.Compile(tnt.Spec.StorageClasses.AllowedRegex); err != nil {
+				return admission.Denied("Unable to compile storageClasses allowedRegex")
+			}
+		}
+
 		return admission.Allowed("")
 	}
 }
