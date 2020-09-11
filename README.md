@@ -61,7 +61,7 @@ make deploy
 
 Log verbosity of the Capsule controller can be increased by passing the `--zap-log-level` option with a value from `1` to `10` or the [basic keywords](https://godoc.org/go.uber.org/zap/zapcore#Level) although it is suggested to use the `--zap-devel` flag to get also stack traces.
 
-During startup Capsule controller will create additional ClusterRoles `capsule-namespace:deleter`, `capsule-namespace:provisioner` and ClusterRoleBinding `capsule-namespace:provisioner`. These resources are used in order to allow Capsule users to manage their namespaces in tenants.
+During startup Capsule controller will create additional ClusterRoles `capsule-namespace-deleter`, `capsule-namespace-provisioner` and ClusterRoleBinding `capsule-namespace-provisioner`. These resources are used in order to allow Capsule users to manage their namespaces in tenants.
 
 You can disallow users to create namespaces matching a particular regexp by passing `--protected-namespace-regex` option with a value of regular expression.
 
@@ -125,12 +125,9 @@ make remove
 # /usr/local/bin/kustomize build config/default | kubectl delete -f -
 # namespace "capsule-system" deleted
 # customresourcedefinition.apiextensions.k8s.io "tenants.capsule.clastix.io" deleted
-# clusterrole.rbac.authorization.k8s.io "capsule-namespace:deleter" deleted
-# clusterrole.rbac.authorization.k8s.io "capsule-namespace:provisioner" deleted
 # clusterrole.rbac.authorization.k8s.io "capsule-proxy-role" deleted
 # clusterrole.rbac.authorization.k8s.io "capsule-metrics-reader" deleted
 # clusterrolebinding.rbac.authorization.k8s.io "capsule-manager-rolebinding" deleted
-# clusterrolebinding.rbac.authorization.k8s.io "capsule-namespace:provisioner" deleted
 # clusterrolebinding.rbac.authorization.k8s.io "capsule-proxy-rolebinding" deleted
 # secret "capsule-ca" deleted
 # secret "capsule-tls" deleted

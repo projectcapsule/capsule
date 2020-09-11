@@ -156,7 +156,7 @@ kind: ClusterRole
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   labels:
-  name: namespace:provisioner
+  name: namespace-provisioner
 rules:
 - apiGroups: [""]
   resources: ["namespaces"]
@@ -165,13 +165,13 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: namespace:provisioner
+  name: namespace-provisioner
 subjects:
   - kind: Group
     name: capsule.clastix.io
 roleRef:
   kind: ClusterRole
-  name: namespace:provisioner
+  name: namespace-provisioner
   apiGroup: rbac.authorization.k8s.io
 ```
 
@@ -250,14 +250,14 @@ roleRef:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: namespace:deleter
+  name: namespace-deleter
   namespace: oil-production
 subjects:
 - kind: User
   name: alice
 roleRef:
   kind: ClusterRole
-  name: namespace:deleter
+  name: namespace-deleter
   apiGroup: rbac.authorization.k8s.io
 ```
 
@@ -293,7 +293,7 @@ Alice is the admin of the namespace:
 alice@caas# kubectl get rolebindings -n oil-production
 NAME              ROLE                AGE
 namespace:admin   ClusterRole/admin   9m5s 
-namespace:deleter ClusterRole/admin   9m5s 
+namespace-deleter ClusterRole/admin   9m5s 
 ```
 
 The said Role Binding resources are automatically created by Capsule when Alice creates a namespace in the tenant.

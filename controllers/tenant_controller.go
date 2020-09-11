@@ -531,7 +531,7 @@ func (r *TenantReconciler) ownerRoleBinding(tenant *capsulev1alpha1.Tenant) erro
 			Kind:     "ClusterRole",
 			Name:     "admin",
 		}
-		rbl[types.NamespacedName{Namespace: i, Name: "namespace:deleter"}] = rbacv1.RoleRef{
+		rbl[types.NamespacedName{Namespace: i, Name: "namespace-deleter"}] = rbacv1.RoleRef{
 			APIGroup: "rbac.authorization.k8s.io",
 			Kind:     "ClusterRole",
 			Name:     rbac.DeleterRoleName,
