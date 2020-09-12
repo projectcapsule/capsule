@@ -155,9 +155,9 @@ You can check if Capsule is running tailing the logs:
 ```
 # kubectl -n capsule-system logs --all-containers -f -l control-plane=controller-manager
 ...
-2020-08-03T15:37:44.031Z        INFO    controllers.Tenant      Role Binding sync result: unchanged     {"Request.Name": "oil", "name": "namespace:deleter", "namespace": "oil-dev"}
+2020-08-03T15:37:44.031Z        INFO    controllers.Tenant      Role Binding sync result: unchanged     {"Request.Name": "oil", "name": "namespace-deleter", "namespace": "oil-dev"}
 2020-08-03T15:37:44.032Z        INFO    controllers.Tenant      Role Binding sync result: unchanged     {"Request.Name": "oil", "name": "namespace:admin", "namespace": "oil-production"}
-2020-08-03T15:37:44.032Z        INFO    controllers.Tenant      Role Binding sync result: unchanged     {"Request.Name": "oil", "name": "namespace:deleter", "namespace": "oil-production"}
+2020-08-03T15:37:44.032Z        INFO    controllers.Tenant      Role Binding sync result: unchanged     {"Request.Name": "oil", "name": "namespace-deleter", "namespace": "oil-production"}
 2020-08-03T15:37:44.032Z        INFO    controllers.Tenant      Tenant reconciling completed    {"Request.Name": "oil"}
 2020-08-03T15:37:44.032Z        DEBUG   controller-runtime.controller   Successfully Reconciled {"controller": "tenant", "request": "/oil"}
 2020-08-03T15:37:46.945Z        INFO    controllers.Namespace   Reconciling Namespace   {"Request.Name": "oil-staging"}

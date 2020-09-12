@@ -22,8 +22,8 @@ import (
 )
 
 const (
-	ProvisionerRoleName = "capsule-namespace:provisioner"
-	DeleterRoleName     = "capsule-namespace:deleter"
+	ProvisionerRoleName = "capsule-namespace-provisioner"
+	DeleterRoleName     = "capsule-namespace-deleter"
 )
 
 var (

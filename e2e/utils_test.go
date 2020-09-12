@@ -31,6 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/clastix/capsule/api/v1alpha1"
+	"github.com/clastix/capsule/controllers/rbac"
 )
 
 const (
@@ -74,7 +75,7 @@ func CapsuleClusterGroupParamShouldBeUpdated(capsuleClusterGroup string, timeout
 	capsuleCRB := &rbacv1.ClusterRoleBinding{}
 
 	Eventually(func() string {
-		Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: "capsule-namespace:provisioner"}, capsuleCRB)).Should(Succeed())
+		Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: rbac.ProvisionerRoleName}, capsuleCRB)).Should(Succeed())
 		return capsuleCRB.Subjects[0].Name
 	}, timeout, defaultPollInterval).Should(BeIdenticalTo(capsuleClusterGroup))
 

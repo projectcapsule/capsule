@@ -48,7 +48,7 @@ var (
 	k8sClient              client.Client
 	testEnv                *envtest.Environment
 	defaulManagerPodArgs   []string
-	tenantRoleBindingNames = []string{"namespace:admin", "namespace:deleter"}
+	tenantRoleBindingNames = []string{"namespace:admin", "namespace-deleter"}
 )
 
 const (
