@@ -226,8 +226,8 @@ spec:
                             if the traffic matches at least one item in the to list.
                           items:
                             description: NetworkPolicyPeer describes a peer to allow
-                              traffic from. Only certain combinations of fields are
-                              allowed
+                              traffic to/from. Only certain combinations of fields
+                              are allowed
                             properties:
                               ipBlock:
                                 description: IPBlock defines policy on a particular
@@ -388,8 +388,8 @@ spec:
                             if the traffic matches at least one item in the from list.
                           items:
                             description: NetworkPolicyPeer describes a peer to allow
-                              traffic from. Only certain combinations of fields are
-                              allowed
+                              traffic to/from. Only certain combinations of fields
+                              are allowed
                             properties:
                               ipBlock:
                                 description: IPBlock defines policy on a particular
