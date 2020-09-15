@@ -142,7 +142,8 @@ make remove
 Any contribution is welcome! Please refer to the corresponding [section](contributing.md).
 
 # Production Grade
-Capsule is still in an _alpha_ stage, so **don't use it in production!**
+
+Although under frequent development and improvements, Capsule is ready to be used in production environments: check out the **Release** page for a detailed list of available versions.
 
 # FAQ
 tbd
