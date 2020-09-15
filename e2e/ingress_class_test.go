@@ -2,13 +2,10 @@
 
 /*
 Copyright 2020 Clastix Labs.
-
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
-
     http://www.apache.org/licenses/LICENSE-2.0
-
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -47,10 +44,13 @@ var _ = Describe("when Tenant handles Ingress classes", func() {
 			},
 			NamespacesMetadata: v1alpha1.AdditionalMetadata{},
 			ServicesMetadata:   v1alpha1.AdditionalMetadata{},
-			StorageClasses:     []string{},
-			IngressClasses: []string{
-				"nginx",
-				"haproxy",
+			StorageClasses:     v1alpha1.StorageClassesSpec{},
+			IngressClasses: v1alpha1.IngressClassesSpec{
+				Allowed: []string{
+					"nginx",
+					"haproxy",
+				},
+				AllowedRegex: "^oil-.*$",
 			},
 			LimitRanges:     []corev1.LimitRangeSpec{},
 			NamespaceQuota:  3,
@@ -136,7 +136,7 @@ var _ = Describe("when Tenant handles Ingress classes", func() {
 		NamespaceCreationShouldSucceed(ns, tnt, defaultTimeoutInterval)
 		NamespaceShouldBeManagedByTenant(ns, tnt, defaultTimeoutInterval)
 
-		for _, c := range tnt.Spec.IngressClasses {
+		for _, c := range tnt.Spec.IngressClasses.Allowed {
 			Eventually(func() (err error) {
 				i := &v1beta12.Ingress{
 					ObjectMeta: metav1.ObjectMeta{
@@ -176,7 +176,7 @@ var _ = Describe("when Tenant handles Ingress classes", func() {
 		NamespaceCreationShouldSucceed(ns, tnt, defaultTimeoutInterval)
 		NamespaceShouldBeManagedByTenant(ns, tnt, defaultTimeoutInterval)
 
-		for _, c := range tnt.Spec.IngressClasses {
+		for _, c := range tnt.Spec.IngressClasses.Allowed {
 			Eventually(func() (err error) {
 				i := &v1beta12.Ingress{
 					ObjectMeta: metav1.ObjectMeta{
@@ -194,5 +194,69 @@ var _ = Describe("when Tenant handles Ingress classes", func() {
 				return
 			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		}
+	})
+	It("should allow enabled Ingress class regexp using the deprecated Annotation", func() {
+		ns := NewNamespace("ingress-class-allowed-annotation")
+		cs := ownerClient(tnt)
+		ingressClass := "oil-ingress"
+
+		NamespaceCreationShouldSucceed(ns, tnt, defaultTimeoutInterval)
+		NamespaceShouldBeManagedByTenant(ns, tnt, defaultTimeoutInterval)
+
+		Eventually(func() (err error) {
+			i := &v1beta12.Ingress{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: ingressClass,
+					Annotations: map[string]string{
+						"kubernetes.io/ingress.class": ingressClass,
+					},
+				},
+				Spec: v1beta12.IngressSpec{
+					Backend: &v1beta12.IngressBackend{
+						ServiceName: "foo",
+						ServicePort: intstr.FromInt(8080),
+					},
+				},
+			}
+			_, err = cs.ExtensionsV1beta1().Ingresses(ns.GetName()).Create(context.TODO(), i, metav1.CreateOptions{})
+			return
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+	})
+	It("should allow enabled Ingress class regexp using the IngressClassName field", func() {
+		ns := NewNamespace("ingress-class-allowed-annotation")
+		cs := ownerClient(tnt)
+		ingressClass := "oil-haproxy"
+
+		cs, err := kubernetes.NewForConfig(cfg)
+		Expect(err).ToNot(HaveOccurred())
+		v, err := cs.Discovery().ServerVersion()
+		Expect(err).ToNot(HaveOccurred())
+		major, err := strconv.Atoi(v.Major)
+		Expect(err).ToNot(HaveOccurred())
+		minor, err := strconv.Atoi(v.Minor)
+		Expect(err).ToNot(HaveOccurred())
+		if major == 1 && minor < 18 {
+			Skip("Running test ont Kubernetes " + v.String() + ", doesn't provide .spec.ingressClassName")
+		}
+
+		NamespaceCreationShouldSucceed(ns, tnt, defaultTimeoutInterval)
+		NamespaceShouldBeManagedByTenant(ns, tnt, defaultTimeoutInterval)
+
+		Eventually(func() (err error) {
+			i := &v1beta12.Ingress{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: ingressClass,
+				},
+				Spec: v1beta12.IngressSpec{
+					IngressClassName: &ingressClass,
+					Backend: &v1beta12.IngressBackend{
+						ServiceName: "foo",
+						ServicePort: intstr.FromInt(8080),
+					},
+				},
+			}
+			_, err = cs.ExtensionsV1beta1().Ingresses(ns.GetName()).Create(context.TODO(), i, metav1.CreateOptions{})
+			return
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 	})
 })

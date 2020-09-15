@@ -130,9 +130,9 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /validating-v1-tenant-name
+      path: /validating-v1-tenant
   failurePolicy: Fail
-  name: tenant.name.capsule.clastix.io
+  name: tenant.capsule.clastix.io
   rules:
   - apiGroups:
     - capsule.clastix.io

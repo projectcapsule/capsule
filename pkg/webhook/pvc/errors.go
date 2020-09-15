@@ -20,24 +20,24 @@ import (
 	"fmt"
 )
 
-type validStorageClassError struct{}
+type storageClassNotValid struct{}
 
-func NewValidStorageClassError() error {
-	return &validStorageClassError{}
+func NewStorageClassNotValid() error {
+	return &storageClassNotValid{}
 }
 
-func (validStorageClassError) Error() string {
-	return "A valid Strage Class must be used"
+func (storageClassNotValid) Error() string {
+	return "A valid Storage Class must be used"
 }
 
-type forbiddenStorageClassError struct {
+type storageClassForbidden struct {
 	storageClassName string
 }
 
-func NewForbiddenStorageClassError(storageClassName string) error {
-	return &forbiddenStorageClassError{storageClassName: storageClassName}
+func NewStorageClassForbidden(storageClassName string) error {
+	return &storageClassForbidden{storageClassName: storageClassName}
 }
 
-func (f forbiddenStorageClassError) Error() string {
+func (f storageClassForbidden) Error() string {
 	return fmt.Sprintf("Storage Class %s is forbidden for the current Tenant", f.storageClassName)
 }

@@ -41,8 +41,8 @@ var _ = Describe("creating a Service/Endpoint/EndpointSlice for a Tenant with ad
 				Name: "gatsby",
 				Kind: "User",
 			},
-			StorageClasses:     []string{},
-			IngressClasses:     []string{},
+			IngressClasses:     v1alpha1.IngressClassesSpec{},
+			StorageClasses:     v1alpha1.StorageClassesSpec{},
 			NamespacesMetadata: v1alpha1.AdditionalMetadata{},
 			ServicesMetadata: v1alpha1.AdditionalMetadata{
 				AdditionalLabels: map[string]string{

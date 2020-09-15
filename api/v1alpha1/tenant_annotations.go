@@ -21,8 +21,10 @@ import (
 )
 
 const (
-	AvailableIngressClassesAnnotation = "capsule.clastix.io/ingress-classes"
-	AvailableStorageClassesAnnotation = "capsule.clastix.io/storage-classes"
+	AvailableIngressClassesAnnotation       = "capsule.clastix.io/ingress-classes"
+	AvailableIngressClassesRegexpAnnotation = "capsule.clastix.io/ingress-classes-regexp"
+	AvailableStorageClassesAnnotation       = "capsule.clastix.io/storage-classes"
+	AvailableStorageClassesRegexpAnnotation = "capsule.clastix.io/storage-classes-regexp"
 )
 
 func UsedQuotaFor(resource corev1.ResourceName) string {

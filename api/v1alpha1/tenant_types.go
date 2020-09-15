@@ -32,6 +32,20 @@ type AdditionalMetadata struct {
 	AdditionalAnnotations map[string]string `json:"additionalAnnotations"`
 }
 
+type StorageClassesSpec struct {
+	// +nullable
+	Allowed StorageClassList `json:"allowed"`
+	// +nullable
+	AllowedRegex string `json:"allowedRegex"`
+}
+
+type IngressClassesSpec struct {
+	// +nullable
+	Allowed IngressClassList `json:"allowed"`
+	// +nullable
+	AllowedRegex string `json:"allowedRegex"`
+}
+
 // TenantSpec defines the desired state of Tenant
 type TenantSpec struct {
 	Owner OwnerSpec `json:"owner"`
@@ -39,9 +53,8 @@ type TenantSpec struct {
 	NamespacesMetadata AdditionalMetadata `json:"namespacesMetadata"`
 	// +kubebuilder:validation:Optional
 	ServicesMetadata AdditionalMetadata `json:"servicesMetadata"`
-	// +kubebuilder:validation:Required
-	StorageClasses StorageClassList `json:"storageClasses"`
-	IngressClasses IngressClassList `json:"ingressClasses"`
+	StorageClasses   StorageClassesSpec `json:"storageClasses"`
+	IngressClasses   IngressClassesSpec `json:"ingressClasses"`
 	// +kubebuilder:validation:Optional
 	NodeSelector    map[string]string                `json:"nodeSelector"`
 	NamespaceQuota  NamespaceQuota                   `json:"namespaceQuota"`

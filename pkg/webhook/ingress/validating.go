@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"regexp"
 
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
@@ -108,9 +109,11 @@ func (r *handler) ingressFromRequest(req admission.Request, decoder *admission.D
 }
 
 func (r *handler) validateIngress(ctx context.Context, c client.Client, object Ingress) admission.Response {
+	var valid, matched bool
 	ingressClass := object.IngressClass()
+
 	if ingressClass == nil {
-		return admission.Errored(http.StatusBadRequest, fmt.Errorf("A valid Ingress Class must be used"))
+		return admission.Errored(http.StatusBadRequest, NewIngressClassForbidden(*ingressClass))
 	}
 
 	tl := &v1alpha1.TenantList{}
@@ -120,9 +123,18 @@ func (r *handler) validateIngress(ctx context.Context, c client.Client, object I
 		return admission.Errored(http.StatusBadRequest, err)
 	}
 
-	if !tl.Items[0].Spec.IngressClasses.IsStringInList(*ingressClass) {
+	if len(tl.Items[0].Spec.IngressClasses.Allowed) > 0 {
+		valid = tl.Items[0].Spec.IngressClasses.Allowed.IsStringInList(*ingressClass)
+	}
+
+	if len(tl.Items[0].Spec.IngressClasses.AllowedRegex) > 0 {
+		matched, _ = regexp.MatchString(tl.Items[0].Spec.IngressClasses.AllowedRegex, *ingressClass)
+	}
+
+	if !valid && !matched {
 		return admission.Errored(http.StatusBadRequest, NewIngressClassForbidden(*ingressClass))
 	}
 
 	return admission.Allowed("")
+
 }

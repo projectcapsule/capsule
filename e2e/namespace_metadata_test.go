@@ -40,8 +40,8 @@ var _ = Describe("creating a Namespace for a Tenant with additional metadata", f
 				Name: "gatsby",
 				Kind: "User",
 			},
-			StorageClasses: []string{},
-			IngressClasses: []string{},
+			IngressClasses: v1alpha1.IngressClassesSpec{},
+			StorageClasses: v1alpha1.StorageClassesSpec{},
 			NamespacesMetadata: v1alpha1.AdditionalMetadata{
 				AdditionalLabels: map[string]string{
 					"k8s.io/custom-label":     "foo",

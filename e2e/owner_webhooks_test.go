@@ -45,11 +45,13 @@ var _ = Describe("when Tenant owner interacts with the webhooks", func() {
 			},
 			NamespacesMetadata: v1alpha1.AdditionalMetadata{},
 			ServicesMetadata:   v1alpha1.AdditionalMetadata{},
-			StorageClasses: []string{
-				"cephfs",
-				"glusterfs",
+			StorageClasses: v1alpha1.StorageClassesSpec{
+				Allowed: []string{
+					"cephfs",
+					"glusterfs",
+				},
 			},
-			IngressClasses: []string{},
+			IngressClasses: v1alpha1.IngressClassesSpec{},
 			LimitRanges: []corev1.LimitRangeSpec{
 				{
 					Limits: []corev1.LimitRangeItem{

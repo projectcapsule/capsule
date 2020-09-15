@@ -60,9 +60,19 @@ spec:
           description: TenantSpec defines the desired state of Tenant
           properties:
             ingressClasses:
-              items:
-                type: string
-              type: array
+              properties:
+                allowed:
+                  items:
+                    type: string
+                  nullable: true
+                  type: array
+                allowedRegex:
+                  nullable: true
+                  type: string
+              required:
+              - allowed
+              - allowedRegex
+              type: object
             limitRanges:
               items:
                 description: LimitRangeSpec defines a min/max usage limit for resources
@@ -716,9 +726,19 @@ spec:
               - additionalLabels
               type: object
             storageClasses:
-              items:
-                type: string
-              type: array
+              properties:
+                allowed:
+                  items:
+                    type: string
+                  nullable: true
+                  type: array
+                allowedRegex:
+                  nullable: true
+                  type: string
+              required:
+              - allowed
+              - allowedRegex
+              type: object
           required:
           - ingressClasses
           - limitRanges
