@@ -113,7 +113,7 @@ func (r *handler) validateIngress(ctx context.Context, c client.Client, object I
 	ingressClass := object.IngressClass()
 
 	if ingressClass == nil {
-		return admission.Errored(http.StatusBadRequest, NewIngressClassForbidden(*ingressClass))
+		return admission.Errored(http.StatusBadRequest, NewIngressClassNotValid())
 	}
 
 	tl := &v1alpha1.TenantList{}
