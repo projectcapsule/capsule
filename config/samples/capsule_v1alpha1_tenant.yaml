@@ -5,7 +5,9 @@ metadata:
   name: oil
 spec:
   ingressClasses:
-    - default
+    allowed:
+      - default
+    allowedRegex: ""
   limitRanges:
     -
       limits:
@@ -67,8 +69,8 @@ spec:
   nodeSelector:
     kubernetes.io/os: linux
   owner:
-    name: alice
     kind: User
+    name: alice
   resourceQuotas:
     -
       hard:
@@ -85,4 +87,6 @@ spec:
       hard:
         requests.storage: 100Gi
   storageClasses:
-    - standard
+    allowed:
+      - default
+    allowedRegex: ""
