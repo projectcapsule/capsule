@@ -44,6 +44,7 @@ import (
 	"github.com/clastix/capsule/pkg/webhook/network_policies"
 	"github.com/clastix/capsule/pkg/webhook/owner_reference"
 	"github.com/clastix/capsule/pkg/webhook/pvc"
+	"github.com/clastix/capsule/pkg/webhook/registry"
 	"github.com/clastix/capsule/pkg/webhook/tenant"
 	"github.com/clastix/capsule/pkg/webhook/tenant_prefix"
 	"github.com/clastix/capsule/pkg/webhook/utils"
@@ -148,11 +149,12 @@ func main() {
 	}
 	// +kubebuilder:scaffold:builder
 
-	// webhooks
+	// webhooks: the order matters, don't change it and just append
 	wl := append(
 		make([]webhook.Webhook, 0),
 		ingress.Webhook(ingress.Handler()),
 		pvc.Webhook(pvc.Handler()),
+		registry.Webhook(registry.Handler()),
 		owner_reference.Webhook(utils.InCapsuleGroup(capsuleGroup, owner_reference.Handler(forceTenantPrefix))),
 		namespace_quota.Webhook(utils.InCapsuleGroup(capsuleGroup, namespace_quota.Handler())),
 		network_policies.Webhook(utils.InCapsuleGroup(capsuleGroup, network_policies.Handler())),

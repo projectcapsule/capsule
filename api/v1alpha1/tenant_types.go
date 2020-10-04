@@ -47,15 +47,23 @@ type IngressClassesSpec struct {
 	AllowedRegex string `json:"allowedRegex"`
 }
 
+type ContainerRegistriesSpec struct {
+	// +nullable
+	Allowed RegistryList `json:"allowed"`
+	// +nullable
+	AllowedRegex string `json:"allowedRegex"`
+}
+
 // TenantSpec defines the desired state of Tenant
 type TenantSpec struct {
 	Owner OwnerSpec `json:"owner"`
 	// +kubebuilder:validation:Optional
 	NamespacesMetadata AdditionalMetadata `json:"namespacesMetadata"`
 	// +kubebuilder:validation:Optional
-	ServicesMetadata AdditionalMetadata `json:"servicesMetadata"`
-	StorageClasses   StorageClassesSpec `json:"storageClasses"`
-	IngressClasses   IngressClassesSpec `json:"ingressClasses"`
+	ServicesMetadata    AdditionalMetadata      `json:"servicesMetadata"`
+	StorageClasses      StorageClassesSpec      `json:"storageClasses"`
+	IngressClasses      IngressClassesSpec      `json:"ingressClasses"`
+	ContainerRegistries *ContainerRegistriesSpec `json:"containerRegistries,omitempty"`
 	// +kubebuilder:validation:Optional
 	NodeSelector    map[string]string                `json:"nodeSelector"`
 	NamespaceQuota  NamespaceQuota                   `json:"namespaceQuota"`

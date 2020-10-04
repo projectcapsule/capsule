@@ -33,7 +33,7 @@ Acme Corp. can use Capsule to address the following scenarios:
 * [Control the Ingress selector in the tenant](#control-the-ingress-selector-in-the-tenant)
 * [Assign Storage classes in the tenant](#assign-storage-classes-in-the-tenant)
 * [Set network policies in the tenant](#set-network-policies-in-the-tenant)
-
+* [Enforce Pod running images provided by a set of trusted registries](#enforce-pod-running-images-provided-by-a-set-of-trusted-registries)
 
 ### Onboarding of a new customer
 Bill receives a new request from the CaaS onboarding system that a new
@@ -963,3 +963,53 @@ the given subjects.
 > With the following example, Capsule is forbidding to any authenticated user
 > to run privileged pods and let them to performs privilege escalation as
 > declared by the Cluster Role `psp:privileged`.
+
+# Enforce Pod running images provided by a set of trusted registries
+
+Let's say you have a strict policy on the ownership running in a certain
+Tenant: you'd like to allow running just images hosted on a list of specific
+container registries.
+
+The spec `containerRegistries` addresses this task and can provide combination
+with hard enforcement using a list of allowed values as a valid regular
+expression for a maximum flexibility. 
+
+## Allowing using a regex
+
+This can be useful if you want to allow run images from any registry in your
+organization or for any other particular use case.
+
+```yaml
+apiVersion: capsule.clastix.io/v1alpha1
+kind: Tenant
+spec:
+  containerRegistries:
+    allowed: []
+    regex: "internal.registry.\\w.tld"
+```
+
+A Pod running `internal.registry.foo.tld` as registry will be allowed, as well
+`internal.registry.bar.tld` since these are matching the regular expression.
+
+> You can also set a catch-all as .* to allow every kind of registry,
+> that would be the same result of unsetting `containerRegistries` at all
+
+## Allowing from a list of registries
+
+For more strict requirements, you can specify an array of string.
+
+```yaml
+apiVersion: capsule.clastix.io/v1alpha1
+kind: Tenant
+spec:
+  containerRegistries:
+    allowed:
+    - docker.io
+    - quay.io
+    regex: ""
+```
+
+> In case of naked and official images hosted on Docker Hub, Capsule is going
+> to retrieve the registry even if it's not explicit: a `busybox:latest` Pod
+> running on a Tenant allowing `docker.io` will not blocked, even if the image
+> field is not explicit as `docker.io/busybox:latest`.
