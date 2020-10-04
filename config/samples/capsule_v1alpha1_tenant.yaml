@@ -90,3 +90,7 @@ spec:
     allowed:
       - default
     allowedRegex: ""
+  registryClasses:
+    allowed:
+      - default
+    allowedRegex: ""
