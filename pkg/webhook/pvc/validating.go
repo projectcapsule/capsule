@@ -68,15 +68,19 @@ func (h *handler) OnCreate(c client.Client, decoder *admission.Decoder) capsulew
 			return admission.Errored(http.StatusBadRequest, err)
 		}
 
-		if pvc.Spec.StorageClassName == nil {
-			return admission.Errored(http.StatusBadRequest, NewStorageClassNotValid())
-		}
-
 		tl := &capsulev1alpha1.TenantList{}
 		if err := c.List(ctx, tl, client.MatchingFieldsSelector{
 			Selector: fields.OneTermEqualSelector(".status.namespaces", pvc.Namespace),
 		}); err != nil {
 			return admission.Errored(http.StatusBadRequest, err)
+		}
+
+		if len(tl.Items) == 0 {
+			return admission.Allowed("")
+		}
+
+		if pvc.Spec.StorageClassName == nil {
+			return admission.Errored(http.StatusBadRequest, NewStorageClassNotValid())
 		}
 
 		sc := *pvc.Spec.StorageClassName

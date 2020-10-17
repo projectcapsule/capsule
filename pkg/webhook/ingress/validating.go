@@ -110,17 +110,21 @@ func (r *handler) ingressFromRequest(req admission.Request, decoder *admission.D
 
 func (r *handler) validateIngress(ctx context.Context, c client.Client, object Ingress) admission.Response {
 	var valid, matched bool
-	ingressClass := object.IngressClass()
-
-	if ingressClass == nil {
-		return admission.Errored(http.StatusBadRequest, NewIngressClassNotValid())
-	}
 
 	tl := &v1alpha1.TenantList{}
 	if err := c.List(ctx, tl, client.MatchingFieldsSelector{
 		Selector: fields.OneTermEqualSelector(".status.namespaces", object.Namespace()),
 	}); err != nil {
 		return admission.Errored(http.StatusBadRequest, err)
+	}
+
+	if len(tl.Items) == 0 {
+		return admission.Allowed("")
+	}
+
+	ingressClass := object.IngressClass()
+	if ingressClass == nil {
+		return admission.Errored(http.StatusBadRequest, NewIngressClassNotValid())
 	}
 
 	if len(tl.Items[0].Spec.IngressClasses.Allowed) > 0 {
