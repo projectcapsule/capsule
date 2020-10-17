@@ -170,7 +170,7 @@ var _ = Describe("when Tenant handles Ingress classes", func() {
 		minor, err := strconv.Atoi(v.Minor)
 		Expect(err).ToNot(HaveOccurred())
 		if major == 1 && minor < 18 {
-			Skip("Running test ont Kubernetes " + v.String() + ", doesn't provide .spec.ingressClassName")
+			Skip("Running test on Kubernetes " + v.String() + ", doesn't provide .spec.ingressClassName")
 		}
 
 		NamespaceCreationShouldSucceed(ns, tnt, defaultTimeoutInterval)
