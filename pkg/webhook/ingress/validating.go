@@ -23,6 +23,7 @@ import (
 	"regexp"
 
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
+	networkingv1 "k8s.io/api/networking/v1"
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	"k8s.io/apimachinery/pkg/fields"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -32,7 +33,8 @@ import (
 	capsulewebhook "github.com/clastix/capsule/pkg/webhook"
 )
 
-// +kubebuilder:webhook:path=/validating-ingress,mutating=false,failurePolicy=fail,groups=networking.k8s.io;extensions,resources=ingresses,verbs=create;update,versions=v1beta1,name=ingress.capsule.clastix.io
+// +kubebuilder:webhook:path=/validating-ingress,mutating=false,failurePolicy=fail,groups=networking.k8s.io;extensions,resources=ingresses,verbs=create;update,versions=v1beta1,name=ingress-v1beta1.capsule.clastix.io
+// +kubebuilder:webhook:path=/validating-ingress,mutating=false,failurePolicy=fail,groups=networking.k8s.io,resources=ingresses,verbs=create;update,versions=v1,name=ingress-v1.capsule.clastix.io
 
 type webhook struct {
 	handler capsulewebhook.Handler
@@ -90,12 +92,20 @@ func (r *handler) OnDelete(client client.Client, decoder *admission.Decoder) cap
 
 func (r *handler) ingressFromRequest(req admission.Request, decoder *admission.Decoder) (ingress Ingress, err error) {
 	switch req.Kind.Group {
-	case "networking":
+	case "networking.k8s.io":
+		if req.Kind.Version == "v1" {
+			n := &networkingv1.Ingress{}
+			if err := decoder.Decode(req, n); err != nil {
+				return nil, err
+			}
+			ingress = NetworkingV1{n}
+			break
+		}
 		n := &networkingv1beta1.Ingress{}
 		if err := decoder.Decode(req, n); err != nil {
 			return nil, err
 		}
-		ingress = Networking{n}
+		ingress = NetworkingV1Beta1{n}
 	case "extensions":
 		e := &extensionsv1beta1.Ingress{}
 		if err := decoder.Decode(req, e); err != nil {

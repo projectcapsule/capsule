@@ -18,7 +18,8 @@ package ingress
 
 import (
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
-	networking "k8s.io/api/networking/v1beta1"
+	networkingv1 "k8s.io/api/networking/v1"
+	networkingv1beta "k8s.io/api/networking/v1beta1"
 )
 
 const (
@@ -30,11 +31,11 @@ type Ingress interface {
 	Namespace() string
 }
 
-type Networking struct {
-	*networking.Ingress
+type NetworkingV1 struct {
+	*networkingv1.Ingress
 }
 
-func (n Networking) IngressClass() (res *string) {
+func (n NetworkingV1) IngressClass() (res *string) {
 	res = n.Spec.IngressClassName
 	if res == nil {
 		if a := n.GetAnnotations(); a != nil {
@@ -46,7 +47,27 @@ func (n Networking) IngressClass() (res *string) {
 	return
 }
 
-func (n Networking) Namespace() string {
+func (n NetworkingV1) Namespace() string {
+	return n.GetNamespace()
+}
+
+type NetworkingV1Beta1 struct {
+	*networkingv1beta.Ingress
+}
+
+func (n NetworkingV1Beta1) IngressClass() (res *string) {
+	res = n.Spec.IngressClassName
+	if res == nil {
+		if a := n.GetAnnotations(); a != nil {
+			if v, ok := a[annotationName]; ok {
+				res = &v
+			}
+		}
+	}
+	return
+}
+
+func (n NetworkingV1Beta1) Namespace() string {
 	return n.GetNamespace()
 }
 
