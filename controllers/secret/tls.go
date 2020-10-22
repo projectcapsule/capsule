@@ -47,7 +47,7 @@ func (r *TlsReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-func (r TlsReconciler) Reconcile(request ctrl.Request) (ctrl.Result, error) {
+func (r TlsReconciler) Reconcile(ctx context.Context, request ctrl.Request) (ctrl.Result, error) {
 	var err error
 
 	r.Log = r.Log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
@@ -55,7 +55,7 @@ func (r TlsReconciler) Reconcile(request ctrl.Request) (ctrl.Result, error) {
 
 	// Fetch the Secret instance
 	instance := &corev1.Secret{}
-	err = r.Get(context.TODO(), request.NamespacedName, instance)
+	err = r.Get(ctx, request.NamespacedName, instance)
 	if err != nil {
 		// Error reading the object - requeue the request.
 		return reconcile.Result{}, err
@@ -112,7 +112,7 @@ func (r TlsReconciler) Reconcile(request ctrl.Request) (ctrl.Result, error) {
 
 	var res controllerutil.OperationResult
 	t := &corev1.Secret{ObjectMeta: instance.ObjectMeta}
-	res, err = controllerutil.CreateOrUpdate(context.TODO(), r.Client, t, func() error {
+	res, err = controllerutil.CreateOrUpdate(ctx, r.Client, t, func() error {
 		t.Data = instance.Data
 		return nil
 	})

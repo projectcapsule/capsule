@@ -54,16 +54,17 @@ func (r *Manager) SetupWithManager(mgr ctrl.Manager) (err error) {
 	crErr := ctrl.NewControllerManagedBy(mgr).
 		For(&rbacv1.ClusterRole{}, builder.WithPredicates(predicate.Funcs{
 			CreateFunc: func(event event.CreateEvent) bool {
-				return r.filterByClusterRolesNames(event.Meta.GetName())
+
+				return r.filterByClusterRolesNames(event.Object.GetName())
 			},
 			DeleteFunc: func(deleteEvent event.DeleteEvent) bool {
-				return r.filterByClusterRolesNames(deleteEvent.Meta.GetName())
+				return r.filterByClusterRolesNames(deleteEvent.Object.GetName())
 			},
 			UpdateFunc: func(updateEvent event.UpdateEvent) bool {
-				return r.filterByClusterRolesNames(updateEvent.MetaNew.GetName())
+				return r.filterByClusterRolesNames(updateEvent.ObjectNew.GetName())
 			},
 			GenericFunc: func(genericEvent event.GenericEvent) bool {
-				return r.filterByClusterRolesNames(genericEvent.Meta.GetName())
+				return r.filterByClusterRolesNames(genericEvent.Object.GetName())
 			},
 		})).
 		Complete(r)
@@ -73,16 +74,16 @@ func (r *Manager) SetupWithManager(mgr ctrl.Manager) (err error) {
 	crbErr := ctrl.NewControllerManagedBy(mgr).
 		For(&rbacv1.ClusterRoleBinding{}, builder.WithPredicates(predicate.Funcs{
 			CreateFunc: func(event event.CreateEvent) bool {
-				return event.Meta.GetName() == ProvisionerRoleName
+				return event.Object.GetName() == ProvisionerRoleName
 			},
 			DeleteFunc: func(deleteEvent event.DeleteEvent) bool {
-				return deleteEvent.Meta.GetName() == ProvisionerRoleName
+				return deleteEvent.Object.GetName() == ProvisionerRoleName
 			},
 			UpdateFunc: func(updateEvent event.UpdateEvent) bool {
-				return updateEvent.MetaNew.GetName() == ProvisionerRoleName
+				return updateEvent.ObjectNew.GetName() == ProvisionerRoleName
 			},
 			GenericFunc: func(genericEvent event.GenericEvent) bool {
-				return genericEvent.Meta.GetName() == ProvisionerRoleName
+				return genericEvent.Object.GetName() == ProvisionerRoleName
 			},
 		})).
 		Complete(r)
@@ -94,7 +95,7 @@ func (r *Manager) SetupWithManager(mgr ctrl.Manager) (err error) {
 
 // This reconcile function is serving both ClusterRole and ClusterRoleBinding: that's ok, we're watching for multiple
 // Resource kinds and we're just interested to the ones with the said name since they're bounded together.
-func (r *Manager) Reconcile(request reconcile.Request) (res reconcile.Result, err error) {
+func (r *Manager) Reconcile(ctx context.Context, request reconcile.Request) (res reconcile.Result, err error) {
 	switch request.Name {
 	case ProvisionerRoleName:
 		if err = r.EnsureClusterRole(ProvisionerRoleName); err != nil {
@@ -169,7 +170,7 @@ func (r *Manager) EnsureClusterRole(roleName string) (err error) {
 // This is the Runnable function that is triggered upon Manager start-up to perform the first RBAC reconciliation
 // since we're not creating empty CR and CRB upon Capsule installation: it's a run-once task, since the reconciliation
 // is handled by the Reconciler implemented interface.
-func (r *Manager) Start(<-chan struct{}) (err error) {
+func (r *Manager) Start(ctx context.Context) (err error) {
 	for roleName := range clusterRoles {
 		r.Log.Info("setting up ClusterRoles", "ClusterRole", roleName)
 		if err = r.EnsureClusterRole(roleName); err != nil {

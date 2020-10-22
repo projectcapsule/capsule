@@ -19,13 +19,12 @@ package indexer
 import (
 	"context"
 
-	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
 
 type CustomIndexer interface {
-	Object() runtime.Object
+	Object() client.Object
 	Field() string
 	Func() client.IndexerFunc
 }

@@ -18,7 +18,7 @@ package ingress
 
 import (
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
-	networkingv1beta1 "k8s.io/api/networking/v1beta1"
+	networking "k8s.io/api/networking/v1beta1"
 )
 
 const (
@@ -31,7 +31,7 @@ type Ingress interface {
 }
 
 type Networking struct {
-	*networkingv1beta1.Ingress
+	*networking.Ingress
 }
 
 func (n Networking) IngressClass() (res *string) {

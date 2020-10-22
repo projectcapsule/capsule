@@ -56,16 +56,16 @@ func getCertificateAuthority(client client.Client, namespace string) (ca cert.Ca
 func forOptionPerInstanceName(instanceName string) builder.ForOption {
 	return builder.WithPredicates(predicate.Funcs{
 		CreateFunc: func(event event.CreateEvent) bool {
-			return filterByName(event.Meta.GetName(), instanceName)
+			return filterByName(event.Object.GetName(), instanceName)
 		},
 		DeleteFunc: func(deleteEvent event.DeleteEvent) bool {
-			return filterByName(deleteEvent.Meta.GetName(), instanceName)
+			return filterByName(deleteEvent.Object.GetName(), instanceName)
 		},
 		UpdateFunc: func(updateEvent event.UpdateEvent) bool {
-			return filterByName(updateEvent.MetaNew.GetName(), instanceName)
+			return filterByName(updateEvent.ObjectNew.GetName(), instanceName)
 		},
 		GenericFunc: func(genericEvent event.GenericEvent) bool {
-			return filterByName(genericEvent.Meta.GetName(), instanceName)
+			return filterByName(genericEvent.Object.GetName(), instanceName)
 		},
 	})
 }
