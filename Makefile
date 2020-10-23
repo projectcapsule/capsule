@@ -135,8 +135,8 @@ golint:
 
 # Running e2e tests in a KinD instance
 .PHONY: e2e
-e2e:
-	kind create cluster --name capsule --image=kindest/node:v1.18.0
+e2e/%:
+	kind create cluster --name capsule --image=kindest/node:$*
 	make docker-build
 	kind load docker-image --nodes capsule-control-plane --name capsule quay.io/clastix/capsule:latest
 	make deploy
