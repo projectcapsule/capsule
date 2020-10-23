@@ -18,7 +18,6 @@ package namespace
 
 import (
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/clastix/capsule/api/v1alpha1"
@@ -27,7 +26,7 @@ import (
 type OwnerReference struct {
 }
 
-func (o OwnerReference) Object() runtime.Object {
+func (o OwnerReference) Object() client.Object {
 	return &v1.Namespace{}
 }
 
@@ -36,7 +35,7 @@ func (o OwnerReference) Field() string {
 }
 
 func (o OwnerReference) Func() client.IndexerFunc {
-	return func(object runtime.Object) []string {
+	return func(object client.Object) []string {
 		var res []string
 		ns := object.(*v1.Namespace)
 		for _, or := range ns.OwnerReferences {

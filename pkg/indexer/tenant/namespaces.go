@@ -17,7 +17,6 @@ limitations under the License.
 package tenant
 
 import (
-	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/clastix/capsule/api/v1alpha1"
@@ -26,7 +25,7 @@ import (
 type NamespacesReference struct {
 }
 
-func (o NamespacesReference) Object() runtime.Object {
+func (o NamespacesReference) Object() client.Object {
 	return &v1alpha1.Tenant{}
 }
 
@@ -35,7 +34,7 @@ func (o NamespacesReference) Field() string {
 }
 
 func (o NamespacesReference) Func() client.IndexerFunc {
-	return func(object runtime.Object) (res []string) {
+	return func(object client.Object) []string {
 		tenant := object.(*v1alpha1.Tenant)
 		return tenant.Status.Namespaces.DeepCopy()
 	}

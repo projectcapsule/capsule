@@ -64,12 +64,12 @@ func (r *TenantReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-func (r TenantReconciler) Reconcile(request ctrl.Request) (result ctrl.Result, err error) {
+func (r TenantReconciler) Reconcile(ctx context.Context, request ctrl.Request) (result ctrl.Result, err error) {
 	r.Log = r.Log.WithValues("Request.Name", request.Name)
 
 	// Fetch the Tenant instance
 	instance := &capsulev1alpha1.Tenant{}
-	err = r.Get(context.TODO(), request.NamespacedName, instance)
+	err = r.Get(ctx, request.NamespacedName, instance)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			r.Log.Info("Request object not found, could have been deleted after reconcile request")
@@ -134,7 +134,7 @@ func (r TenantReconciler) Reconcile(request ctrl.Request) (result ctrl.Result, e
 
 // pruningResources is taking care of removing the no more requested sub-resources as LimitRange, ResourceQuota or
 // NetworkPolicy using the "exists" and "notin" LabelSelector to perform an outer-join removal.
-func (r *TenantReconciler) pruningResources(ns string, keys []string, obj runtime.Object) error {
+func (r *TenantReconciler) pruningResources(ns string, keys []string, obj client.Object) error {
 	capsuleLabel, err := capsulev1alpha1.GetTypeLabel(obj)
 	if err != nil {
 		return err
