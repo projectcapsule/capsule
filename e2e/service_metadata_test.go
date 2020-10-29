@@ -18,15 +18,15 @@ package e2e
 import (
 	"context"
 
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/intstr"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/clastix/capsule/api/v1alpha1"
 )
@@ -132,24 +132,8 @@ var _ = Describe("creating a Service/Endpoint/EndpointSlice for a Tenant with ad
 			},
 		}
 
-		epsName := "foo"
-		epsPort := int32(9999)
-		eps := &discoveryv1beta1.EndpointSlice{
-			ObjectMeta:  meta,
-			AddressType: discoveryv1beta1.AddressTypeIPv4,
-			Endpoints: []discoveryv1beta1.Endpoint{
-				{
-					Addresses: []string{"10.10.1.1"},
-				},
-			},
-			Ports: []discoveryv1beta1.EndpointPort{
-				{
-					Name: &epsName,
-					Port: &epsPort,
-				},
-			},
-		}
 		cs := ownerClient(tnt)
+
 		Eventually(func() (err error) {
 			_, err = cs.CoreV1().Services(ns.GetName()).Create(context.TODO(), svc, metav1.CreateOptions{})
 			return
@@ -158,13 +142,9 @@ var _ = Describe("creating a Service/Endpoint/EndpointSlice for a Tenant with ad
 			_, err = cs.CoreV1().Endpoints(ns.GetName()).Create(context.TODO(), ep, metav1.CreateOptions{})
 			return
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
-		Eventually(func() (err error) {
-			_, err = cs.DiscoveryV1beta1().EndpointSlices(ns.GetName()).Create(context.TODO(), eps, metav1.CreateOptions{})
-			return
-		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: svc.GetName(), Namespace: ns.GetName()}, svc)).Should(Succeed())
 		Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: ep.GetName(), Namespace: ns.GetName()}, ep)).Should(Succeed())
-		Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: eps.GetName(), Namespace: ns.GetName()}, eps)).Should(Succeed())
+
 		By("checking additional labels on service", func() {
 			for _, l := range tnt.Spec.ServicesMetadata.AdditionalLabels {
 				Expect(svc.Labels).Should(ContainElement(l))
@@ -185,15 +165,43 @@ var _ = Describe("creating a Service/Endpoint/EndpointSlice for a Tenant with ad
 				Expect(ep.Annotations).Should(ContainElement(a))
 			}
 		})
-		By("checking additional labels on endpointslices", func() {
-			for _, l := range tnt.Spec.ServicesMetadata.AdditionalLabels {
-				Expect(eps.Labels).Should(ContainElement(l))
+
+		epsName := "foo"
+		epsPort := int32(9999)
+		var eps client.Object
+
+		maj, min, _ := GetKubernetesSemVer()
+		if maj == 1 && min > 16 {
+			eps = &discoveryv1beta1.EndpointSlice{
+				ObjectMeta:  meta,
+				AddressType: discoveryv1beta1.AddressTypeIPv4,
+				Endpoints: []discoveryv1beta1.Endpoint{
+					{
+						Addresses: []string{"10.10.1.1"},
+					},
+				},
+				Ports: []discoveryv1beta1.EndpointPort{
+					{
+						Name: &epsName,
+						Port: &epsPort,
+					},
+				},
 			}
-		})
-		By("checking additional annotations endpointslices", func() {
-			for _, a := range tnt.Spec.NamespacesMetadata.AdditionalAnnotations {
-				Expect(eps.Annotations).Should(ContainElement(a))
-			}
-		})
+			Eventually(func() (err error) {
+				_, err = cs.DiscoveryV1beta1().EndpointSlices(ns.GetName()).Create(context.TODO(), eps.(*discoveryv1beta1.EndpointSlice), metav1.CreateOptions{})
+				return
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+			Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: eps.GetName(), Namespace: ns.GetName()}, eps)).Should(Succeed())
+			By("checking additional annotations endpointslices", func() {
+				for _, a := range tnt.Spec.NamespacesMetadata.AdditionalAnnotations {
+					Expect(eps.GetAnnotations()).Should(ContainElement(a))
+				}
+			})
+			By("checking additional labels on endpointslices", func() {
+				for _, l := range tnt.Spec.ServicesMetadata.AdditionalLabels {
+					Expect(eps.GetLabels()).Should(ContainElement(l))
+				}
+			})
+		}
 	})
 })

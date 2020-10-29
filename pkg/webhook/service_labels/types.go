@@ -18,7 +18,7 @@ package service_labels
 
 import (
 	corev1 "k8s.io/api/core/v1"
-	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type ServiceType interface {
@@ -60,7 +60,7 @@ func (ep Endpoints) Annotations() map[string]string {
 }
 
 type EndpointSlice struct {
-	*discoveryv1beta1.EndpointSlice
+	metav1.Object
 }
 
 func (eps EndpointSlice) Namespace() string {

@@ -17,16 +17,14 @@ package e2e
 
 import (
 	"context"
-	"strconv"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
-	v1beta12 "k8s.io/api/extensions/v1beta1"
+	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/client-go/kubernetes"
 	"k8s.io/utils/pointer"
 
 	"github.com/clastix/capsule/api/v1alpha1"
@@ -75,12 +73,12 @@ var _ = Describe("when Tenant handles Ingress classes", func() {
 
 		By("non-specifying the class", func() {
 			Eventually(func() (err error) {
-				i := &v1beta12.Ingress{
+				i := &extensionsv1beta1.Ingress{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "denied-ingress",
 					},
-					Spec: v1beta12.IngressSpec{
-						Backend: &v1beta12.IngressBackend{
+					Spec: extensionsv1beta1.IngressSpec{
+						Backend: &extensionsv1beta1.IngressBackend{
 							ServiceName: "foo",
 							ServicePort: intstr.FromInt(8080),
 						},
@@ -92,15 +90,15 @@ var _ = Describe("when Tenant handles Ingress classes", func() {
 		})
 		By("using a forbidden class as Annotation", func() {
 			Eventually(func() (err error) {
-				i := &v1beta12.Ingress{
+				i := &extensionsv1beta1.Ingress{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "denied-ingress",
 						Annotations: map[string]string{
 							"kubernetes.io/ingress.class": "the-worst-ingress-available",
 						},
 					},
-					Spec: v1beta12.IngressSpec{
-						Backend: &v1beta12.IngressBackend{
+					Spec: extensionsv1beta1.IngressSpec{
+						Backend: &extensionsv1beta1.IngressBackend{
 							ServiceName: "foo",
 							ServicePort: intstr.FromInt(8080),
 						},
@@ -112,13 +110,13 @@ var _ = Describe("when Tenant handles Ingress classes", func() {
 		})
 		By("specifying a forbidden class", func() {
 			Eventually(func() (err error) {
-				i := &v1beta12.Ingress{
+				i := &extensionsv1beta1.Ingress{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "denied-ingress",
 					},
-					Spec: v1beta12.IngressSpec{
+					Spec: extensionsv1beta1.IngressSpec{
 						IngressClassName: pointer.StringPtr("the-worst-ingress-available"),
-						Backend: &v1beta12.IngressBackend{
+						Backend: &extensionsv1beta1.IngressBackend{
 							ServiceName: "foo",
 							ServicePort: intstr.FromInt(8080),
 						},
@@ -138,15 +136,15 @@ var _ = Describe("when Tenant handles Ingress classes", func() {
 
 		for _, c := range tnt.Spec.IngressClasses.Allowed {
 			Eventually(func() (err error) {
-				i := &v1beta12.Ingress{
+				i := &extensionsv1beta1.Ingress{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: c,
 						Annotations: map[string]string{
 							"kubernetes.io/ingress.class": c,
 						},
 					},
-					Spec: v1beta12.IngressSpec{
-						Backend: &v1beta12.IngressBackend{
+					Spec: extensionsv1beta1.IngressSpec{
+						Backend: &extensionsv1beta1.IngressBackend{
 							ServiceName: "foo",
 							ServicePort: intstr.FromInt(8080),
 						},
@@ -161,16 +159,9 @@ var _ = Describe("when Tenant handles Ingress classes", func() {
 		ns := NewNamespace("ingress-class-allowed-annotation")
 		cs := ownerClient(tnt)
 
-		cs, err := kubernetes.NewForConfig(cfg)
-		Expect(err).ToNot(HaveOccurred())
-		v, err := cs.Discovery().ServerVersion()
-		Expect(err).ToNot(HaveOccurred())
-		major, err := strconv.Atoi(v.Major)
-		Expect(err).ToNot(HaveOccurred())
-		minor, err := strconv.Atoi(v.Minor)
-		Expect(err).ToNot(HaveOccurred())
-		if major == 1 && minor < 18 {
-			Skip("Running test on Kubernetes " + v.String() + ", doesn't provide .spec.ingressClassName")
+		maj, min, v := GetKubernetesSemVer()
+		if maj == 1 && min < 18 {
+			Skip("Running test on Kubernetes " + v + ", doesn't provide .spec.ingressClassName")
 		}
 
 		NamespaceCreationShouldSucceed(ns, tnt, defaultTimeoutInterval)
@@ -178,13 +169,13 @@ var _ = Describe("when Tenant handles Ingress classes", func() {
 
 		for _, c := range tnt.Spec.IngressClasses.Allowed {
 			Eventually(func() (err error) {
-				i := &v1beta12.Ingress{
+				i := &extensionsv1beta1.Ingress{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: c,
 					},
-					Spec: v1beta12.IngressSpec{
+					Spec: extensionsv1beta1.IngressSpec{
 						IngressClassName: &c,
-						Backend: &v1beta12.IngressBackend{
+						Backend: &extensionsv1beta1.IngressBackend{
 							ServiceName: "foo",
 							ServicePort: intstr.FromInt(8080),
 						},
@@ -204,15 +195,15 @@ var _ = Describe("when Tenant handles Ingress classes", func() {
 		NamespaceShouldBeManagedByTenant(ns, tnt, defaultTimeoutInterval)
 
 		Eventually(func() (err error) {
-			i := &v1beta12.Ingress{
+			i := &extensionsv1beta1.Ingress{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: ingressClass,
 					Annotations: map[string]string{
 						"kubernetes.io/ingress.class": ingressClass,
 					},
 				},
-				Spec: v1beta12.IngressSpec{
-					Backend: &v1beta12.IngressBackend{
+				Spec: extensionsv1beta1.IngressSpec{
+					Backend: &extensionsv1beta1.IngressBackend{
 						ServiceName: "foo",
 						ServicePort: intstr.FromInt(8080),
 					},
@@ -227,29 +218,25 @@ var _ = Describe("when Tenant handles Ingress classes", func() {
 		cs := ownerClient(tnt)
 		ingressClass := "oil-haproxy"
 
-		cs, err := kubernetes.NewForConfig(cfg)
-		Expect(err).ToNot(HaveOccurred())
-		v, err := cs.Discovery().ServerVersion()
-		Expect(err).ToNot(HaveOccurred())
-		major, err := strconv.Atoi(v.Major)
-		Expect(err).ToNot(HaveOccurred())
-		minor, err := strconv.Atoi(v.Minor)
-		Expect(err).ToNot(HaveOccurred())
-		if major == 1 && minor < 18 {
-			Skip("Running test ont Kubernetes " + v.String() + ", doesn't provide .spec.ingressClassName")
+		maj, min, v := GetKubernetesSemVer()
+		if maj == 1 && min < 18 {
+			Skip("Running test on Kubernetes " + v + ", doesn't provide .spec.ingressClassName")
+		}
+		if maj == 1 && min < 18 {
+			Skip("Running test ont Kubernetes " + v + ", doesn't provide .spec.ingressClassName")
 		}
 
 		NamespaceCreationShouldSucceed(ns, tnt, defaultTimeoutInterval)
 		NamespaceShouldBeManagedByTenant(ns, tnt, defaultTimeoutInterval)
 
 		Eventually(func() (err error) {
-			i := &v1beta12.Ingress{
+			i := &extensionsv1beta1.Ingress{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: ingressClass,
 				},
-				Spec: v1beta12.IngressSpec{
+				Spec: extensionsv1beta1.IngressSpec{
 					IngressClassName: &ingressClass,
-					Backend: &v1beta12.IngressBackend{
+					Backend: &extensionsv1beta1.IngressBackend{
 						ServiceName: "foo",
 						ServicePort: intstr.FromInt(8080),
 					},

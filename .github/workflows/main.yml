@@ -28,6 +28,9 @@ jobs:
         args: --timeout 2m
   kind:
     name: e2e
+    strategy:
+      matrix:
+        k8s-version: ['v1.16.15', 'v1.17.11', 'v1.18.8', 'v1.19.1']
     runs-on: ubuntu-18.04
     steps:
     - uses: actions/checkout@master
@@ -40,10 +43,10 @@ jobs:
           ~/go/pkg/mod
           /var/lib/docker
           /home/runner/work/capsule/capsule
-        key: ${{ runner.os }}-build-${{ env.cache-name }}
+        key: ${{ matrix.k8s-version }}-build-${{ env.cache-name }}
         restore-keys: |
-          ${{ runner.os }}-build-
-          ${{ runner.os }}-
+          ${{ matrix.k8s-version }}-build-
+          ${{ matrix.k8s-version }}-
     - name: Removing kustomize
       run: sudo snap remove kustomize && sudo rm -rf $(which kustomize)
     - name: Installing Ginkgo
@@ -55,4 +58,4 @@ jobs:
       with:
         skipClusterCreation: true
     - name: e2e testing
-      run: make e2e
+      run: make e2e/${{ matrix.k8s-version }}
