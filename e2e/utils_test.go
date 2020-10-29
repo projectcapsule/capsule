@@ -20,6 +20,7 @@ package e2e
 
 import (
 	"context"
+	"strconv"
 	"time"
 
 	. "github.com/onsi/gomega"
@@ -28,6 +29,8 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/version"
+	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/clastix/capsule/api/v1alpha1"
@@ -126,4 +129,23 @@ func GroupShouldBeUsedInTenantRoleBinding(ns *corev1.Namespace, t *v1alpha1.Tena
 		}, timeout, defaultPollInterval).Should(BeIdenticalTo("Group"))
 
 	}
+}
+
+func GetKubernetesSemVer() (major, minor int, ver string) {
+	var v *version.Info
+	var err error
+	var cs kubernetes.Interface
+
+	cs, err = kubernetes.NewForConfig(cfg)
+	Expect(err).ToNot(HaveOccurred())
+
+	v, err = cs.Discovery().ServerVersion()
+	Expect(err).ToNot(HaveOccurred())
+	major, err = strconv.Atoi(v.Major)
+	Expect(err).ToNot(HaveOccurred())
+	minor, err = strconv.Atoi(v.Minor)
+	Expect(err).ToNot(HaveOccurred())
+	ver = v.String()
+
+	return
 }
