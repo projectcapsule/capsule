@@ -22,14 +22,18 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/clastix/capsule/api/v1alpha1"
-	capsulewebhook "github.com/clastix/capsule/pkg/webhook"
 	"gomodules.xyz/jsonpatch/v2"
 	corev1 "k8s.io/api/core/v1"
+	discoveryv1alpha1 "k8s.io/api/discovery/v1alpha1"
 	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+
+	"github.com/clastix/capsule/api/v1alpha1"
+	capsulewebhook "github.com/clastix/capsule/pkg/webhook"
 )
 
 // +kubebuilder:webhook:path=/mutate-v1-service-labels,mutating=true,failurePolicy=ignore,groups="";discovery.k8s.io,resources=services;endpoints;endpointslices,verbs=create;update,versions=v1;v1beta1,name=service.labels.capsule.clastix.io
@@ -102,11 +106,22 @@ func (h *handler) svcFromRequest(req admission.Request, decoder *admission.Decod
 		}
 		svc = Endpoints{ep}
 	case "EndpointSlice":
-		eps := &discoveryv1beta1.EndpointSlice{}
-		if err := decoder.Decode(req, eps); err != nil {
-			return nil, err
+		var eps runtime.Object
+		if v := req.Kind.Version; v == "v1beta1" {
+			eps = &discoveryv1beta1.EndpointSlice{}
+			if err := decoder.Decode(req, eps); err != nil {
+				return nil, err
+			}
+
+		} else if v == "v1alpha1" {
+			eps = &discoveryv1alpha1.EndpointSlice{}
+			if err := decoder.Decode(req, eps); err != nil {
+				return nil, err
+			}
+		} else {
+			return nil, fmt.Errorf("unsupported EndpointSlice version: %s", v)
 		}
-		svc = EndpointSlice{eps}
+		svc = EndpointSlice{eps.(metav1.Object)}
 	default:
 		err = fmt.Errorf("cannot recognize type %s", req.Kind.Kind)
 	}
