@@ -64,7 +64,7 @@ func (r *handler) OnCreate(client client.Client, decoder *admission.Decoder) cap
 			return admission.Errored(http.StatusBadRequest, err)
 		}
 
-		matched, _ := regexp.MatchString(`^[a-z0-9]([a-z0-9]*[a-z0-9])?$`, tnt.GetName())
+		matched, _ := regexp.MatchString(`[a-z0-9]([-a-z0-9]*[a-z0-9])?`, tnt.GetName())
 		if !matched {
 			return admission.Denied("Tenant name has forbidden characters")
 		}

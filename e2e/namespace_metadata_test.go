@@ -33,7 +33,7 @@ import (
 var _ = Describe("creating a Namespace for a Tenant with additional metadata", func() {
 	tnt := &v1alpha1.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "tenantmetadata",
+			Name: "tenant-metadata",
 		},
 		Spec: v1alpha1.TenantSpec{
 			Owner: v1alpha1.OwnerSpec{

@@ -32,7 +32,7 @@ import (
 var _ = Describe("creating a Namespace with --protected-namespace-regex enabled", func() {
 	tnt := &v1alpha1.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "tenantprotectednamespace",
+			Name: "tenant-protected-namespace",
 		},
 		Spec: v1alpha1.TenantSpec{
 			Owner: v1alpha1.OwnerSpec{

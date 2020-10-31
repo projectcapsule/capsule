@@ -38,7 +38,7 @@ import (
 var _ = Describe("creating namespaces within a Tenant with resources", func() {
 	tnt := &v1alpha1.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "tenantresources",
+			Name: "tenant-resources",
 		},
 		Spec: v1alpha1.TenantSpec{
 			Owner: v1alpha1.OwnerSpec{

@@ -32,7 +32,7 @@ import (
 var _ = Describe("creating a Tenant with wrong name", func() {
 	tnt := &v1alpha1.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "wrong-name",
+			Name: "non_rfc_dns_1123",
 		},
 		Spec: v1alpha1.TenantSpec{
 			Owner: v1alpha1.OwnerSpec{

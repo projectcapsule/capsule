@@ -32,7 +32,7 @@ import (
 var _ = Describe("creating a Namespace with Tenant selector when user owns multiple tenants", func() {
 	t1 := &v1alpha1.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "tenantone",
+			Name: "tenant-one",
 		},
 		Spec: v1alpha1.TenantSpec{
 			Owner: v1alpha1.OwnerSpec{
@@ -51,7 +51,7 @@ var _ = Describe("creating a Namespace with Tenant selector when user owns multi
 	}
 	t2 := &v1alpha1.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "tenanttwo",
+			Name: "tenant-two",
 		},
 		Spec: v1alpha1.TenantSpec{
 			Owner: v1alpha1.OwnerSpec{
