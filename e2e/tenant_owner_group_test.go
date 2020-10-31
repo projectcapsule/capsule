@@ -50,16 +50,18 @@ var _ = Describe("creating a Namespace with group Tenant owner", func() {
 		},
 	}
 	JustBeforeEach(func() {
-		tnt.ResourceVersion = ""
-		Expect(k8sClient.Create(context.TODO(), tnt)).Should(Succeed())
+		EventuallyCreation(func() error {
+			tnt.ResourceVersion = ""
+			return k8sClient.Create(context.TODO(), tnt)
+		}).Should(Succeed())
 	})
 	JustAfterEach(func() {
 		Expect(k8sClient.Delete(context.TODO(), tnt)).Should(Succeed())
 	})
 	It("should succeed and be available in Tenant namespaces list", func() {
 		ns := NewNamespace("gto-namespace")
-		NamespaceCreationShouldSucceed(ns, tnt, defaultTimeoutInterval)
-		NamespaceShouldBeManagedByTenant(ns, tnt, defaultTimeoutInterval)
+		NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
+		TenantNamespaceList(tnt, podRecreationTimeoutInterval).Should(ContainElement(ns.GetName()))
 		GroupShouldBeUsedInTenantRoleBinding(ns, tnt, defaultTimeoutInterval)
 	})
 })

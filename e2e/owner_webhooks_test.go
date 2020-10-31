@@ -101,8 +101,10 @@ var _ = Describe("when Tenant owner interacts with the webhooks", func() {
 		},
 	}
 	JustBeforeEach(func() {
-		tnt.ResourceVersion = ""
-		Expect(k8sClient.Create(context.TODO(), tnt)).Should(Succeed())
+		EventuallyCreation(func() error {
+			tnt.ResourceVersion = ""
+			return k8sClient.Create(context.TODO(), tnt)
+		}).Should(Succeed())
 	})
 	JustAfterEach(func() {
 		Expect(k8sClient.Delete(context.TODO(), tnt)).Should(Succeed())
@@ -110,8 +112,8 @@ var _ = Describe("when Tenant owner interacts with the webhooks", func() {
 	It("should disallow deletions", func() {
 		By("blocking Capsule Limit ranges", func() {
 			ns := NewNamespace("limit-range-disallow")
-			NamespaceCreationShouldSucceed(ns, tnt, defaultTimeoutInterval)
-			NamespaceShouldBeManagedByTenant(ns, tnt, defaultTimeoutInterval)
+			NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
+			TenantNamespaceList(tnt, podRecreationTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 			lr := &corev1.LimitRange{}
 			Eventually(func() error {
@@ -124,8 +126,8 @@ var _ = Describe("when Tenant owner interacts with the webhooks", func() {
 		})
 		By("blocking Capsule Network Policy", func() {
 			ns := NewNamespace("network-policy-disallow")
-			NamespaceCreationShouldSucceed(ns, tnt, defaultTimeoutInterval)
-			NamespaceShouldBeManagedByTenant(ns, tnt, defaultTimeoutInterval)
+			NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
+			TenantNamespaceList(tnt, podRecreationTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 			np := &networkingv1.NetworkPolicy{}
 			Eventually(func() error {
@@ -138,8 +140,8 @@ var _ = Describe("when Tenant owner interacts with the webhooks", func() {
 		})
 		By("blocking blocking Capsule Resource Quota", func() {
 			ns := NewNamespace("resource-quota-disallow")
-			NamespaceCreationShouldSucceed(ns, tnt, defaultTimeoutInterval)
-			NamespaceShouldBeManagedByTenant(ns, tnt, defaultTimeoutInterval)
+			NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
+			TenantNamespaceList(tnt, podRecreationTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 			rq := &corev1.ResourceQuota{}
 			Eventually(func() error {
@@ -154,8 +156,8 @@ var _ = Describe("when Tenant owner interacts with the webhooks", func() {
 	It("should allow listing", func() {
 		By("Limit Range resources", func() {
 			ns := NewNamespace("limit-range-list")
-			NamespaceCreationShouldSucceed(ns, tnt, defaultTimeoutInterval)
-			NamespaceShouldBeManagedByTenant(ns, tnt, defaultTimeoutInterval)
+			NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
+			TenantNamespaceList(tnt, podRecreationTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 			Eventually(func() (err error) {
 				cs := ownerClient(tnt)
@@ -165,8 +167,8 @@ var _ = Describe("when Tenant owner interacts with the webhooks", func() {
 		})
 		By("Network Policy resources", func() {
 			ns := NewNamespace("network-policy-list")
-			NamespaceCreationShouldSucceed(ns, tnt, defaultTimeoutInterval)
-			NamespaceShouldBeManagedByTenant(ns, tnt, defaultTimeoutInterval)
+			NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
+			TenantNamespaceList(tnt, podRecreationTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 			Eventually(func() (err error) {
 				cs := ownerClient(tnt)
@@ -176,8 +178,8 @@ var _ = Describe("when Tenant owner interacts with the webhooks", func() {
 		})
 		By("Resource Quota resources", func() {
 			ns := NewNamespace("resource-quota-list")
-			NamespaceCreationShouldSucceed(ns, tnt, defaultTimeoutInterval)
-			NamespaceShouldBeManagedByTenant(ns, tnt, defaultTimeoutInterval)
+			NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
+			TenantNamespaceList(tnt, podRecreationTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 			Eventually(func() (err error) {
 				cs := ownerClient(tnt)
@@ -188,8 +190,8 @@ var _ = Describe("when Tenant owner interacts with the webhooks", func() {
 	})
 	It("should allow all actions to Tenant owner Network Policy resources", func() {
 		ns := NewNamespace("network-policy-allow")
-		NamespaceCreationShouldSucceed(ns, tnt, defaultTimeoutInterval)
-		NamespaceShouldBeManagedByTenant(ns, tnt, defaultTimeoutInterval)
+		NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
+		TenantNamespaceList(tnt, podRecreationTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 		cs := ownerClient(tnt)
 		np := &networkingv1.NetworkPolicy{

@@ -50,7 +50,9 @@ var _ = Describe("creating a Namespace trying to select a third Tenant", func() 
 		},
 	}
 	JustBeforeEach(func() {
-		Expect(k8sClient.Create(context.TODO(), tnt)).Should(Succeed())
+		EventuallyCreation(func() error {
+			return k8sClient.Create(context.TODO(), tnt)
+		}).Should(Succeed())
 	})
 	JustAfterEach(func() {
 		Expect(k8sClient.Delete(context.TODO(), tnt)).Should(Succeed())

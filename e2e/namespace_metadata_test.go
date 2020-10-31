@@ -60,15 +60,17 @@ var _ = Describe("creating a Namespace for a Tenant with additional metadata", f
 		},
 	}
 	JustBeforeEach(func() {
-		Expect(k8sClient.Create(context.TODO(), tnt)).Should(Succeed())
+		EventuallyCreation(func() error {
+			return k8sClient.Create(context.TODO(), tnt)
+		}).Should(Succeed())
 	})
 	JustAfterEach(func() {
 		Expect(k8sClient.Delete(context.TODO(), tnt)).Should(Succeed())
 	})
 	It("should contains additional Namespace metadata", func() {
 		ns := NewNamespace("namespace-metadata")
-		NamespaceCreationShouldSucceed(ns, tnt, defaultTimeoutInterval)
-		NamespaceShouldBeManagedByTenant(ns, tnt, defaultTimeoutInterval)
+		NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
+		TenantNamespaceList(tnt, podRecreationTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 		Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: ns.GetName()}, ns)).Should(Succeed())
 		By("checking additional labels", func() {

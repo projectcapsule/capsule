@@ -58,8 +58,10 @@ var _ = Describe("when Tenant handles Ingress classes", func() {
 		},
 	}
 	JustBeforeEach(func() {
-		tnt.ResourceVersion = ""
-		Expect(k8sClient.Create(context.TODO(), tnt)).Should(Succeed())
+		EventuallyCreation(func() error {
+			tnt.ResourceVersion = ""
+			return k8sClient.Create(context.TODO(), tnt)
+		}).Should(Succeed())
 	})
 	JustAfterEach(func() {
 		Expect(k8sClient.Delete(context.TODO(), tnt)).Should(Succeed())
@@ -68,8 +70,8 @@ var _ = Describe("when Tenant handles Ingress classes", func() {
 		ns := NewNamespace("ingress-class-disallowed")
 		cs := ownerClient(tnt)
 
-		NamespaceCreationShouldSucceed(ns, tnt, defaultTimeoutInterval)
-		NamespaceShouldBeManagedByTenant(ns, tnt, defaultTimeoutInterval)
+		NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
+		TenantNamespaceList(tnt, podRecreationTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 		By("non-specifying the class", func() {
 			Eventually(func() (err error) {
@@ -131,8 +133,8 @@ var _ = Describe("when Tenant handles Ingress classes", func() {
 		ns := NewNamespace("ingress-class-allowed-annotation")
 		cs := ownerClient(tnt)
 
-		NamespaceCreationShouldSucceed(ns, tnt, defaultTimeoutInterval)
-		NamespaceShouldBeManagedByTenant(ns, tnt, defaultTimeoutInterval)
+		NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
+		TenantNamespaceList(tnt, podRecreationTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 		for _, c := range tnt.Spec.IngressClasses.Allowed {
 			Eventually(func() (err error) {
@@ -164,8 +166,8 @@ var _ = Describe("when Tenant handles Ingress classes", func() {
 			Skip("Running test on Kubernetes " + v + ", doesn't provide .spec.ingressClassName")
 		}
 
-		NamespaceCreationShouldSucceed(ns, tnt, defaultTimeoutInterval)
-		NamespaceShouldBeManagedByTenant(ns, tnt, defaultTimeoutInterval)
+		NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
+		TenantNamespaceList(tnt, podRecreationTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 		for _, c := range tnt.Spec.IngressClasses.Allowed {
 			Eventually(func() (err error) {
@@ -191,8 +193,8 @@ var _ = Describe("when Tenant handles Ingress classes", func() {
 		cs := ownerClient(tnt)
 		ingressClass := "oil-ingress"
 
-		NamespaceCreationShouldSucceed(ns, tnt, defaultTimeoutInterval)
-		NamespaceShouldBeManagedByTenant(ns, tnt, defaultTimeoutInterval)
+		NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
+		TenantNamespaceList(tnt, podRecreationTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 		Eventually(func() (err error) {
 			i := &extensionsv1beta1.Ingress{
@@ -222,12 +224,9 @@ var _ = Describe("when Tenant handles Ingress classes", func() {
 		if maj == 1 && min < 18 {
 			Skip("Running test on Kubernetes " + v + ", doesn't provide .spec.ingressClassName")
 		}
-		if maj == 1 && min < 18 {
-			Skip("Running test ont Kubernetes " + v + ", doesn't provide .spec.ingressClassName")
-		}
 
-		NamespaceCreationShouldSucceed(ns, tnt, defaultTimeoutInterval)
-		NamespaceShouldBeManagedByTenant(ns, tnt, defaultTimeoutInterval)
+		NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
+		TenantNamespaceList(tnt, podRecreationTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 		Eventually(func() (err error) {
 			i := &extensionsv1beta1.Ingress{
@@ -244,6 +243,6 @@ var _ = Describe("when Tenant handles Ingress classes", func() {
 			}
 			_, err = cs.ExtensionsV1beta1().Ingresses(ns.GetName()).Create(context.TODO(), i, metav1.CreateOptions{})
 			return
-		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		}, 600, defaultPollInterval).Should(Succeed())
 	})
 })

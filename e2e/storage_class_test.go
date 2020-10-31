@@ -57,16 +57,18 @@ var _ = Describe("when Tenant handles Storage classes", func() {
 		},
 	}
 	JustBeforeEach(func() {
-		tnt.ResourceVersion = ""
-		Expect(k8sClient.Create(context.TODO(), tnt)).Should(Succeed())
+		EventuallyCreation(func() error {
+			tnt.ResourceVersion = ""
+			return k8sClient.Create(context.TODO(), tnt)
+		}).Should(Succeed())
 	})
 	JustAfterEach(func() {
 		Expect(k8sClient.Delete(context.TODO(), tnt)).Should(Succeed())
 	})
 	It("should block non allowed Storage Class", func() {
 		ns := NewNamespace("storage-class-disallowed")
-		NamespaceCreationShouldSucceed(ns, tnt, defaultTimeoutInterval)
-		NamespaceShouldBeManagedByTenant(ns, tnt, defaultTimeoutInterval)
+		NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
+		TenantNamespaceList(tnt, podRecreationTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 		By("non-specifying the class", func() {
 			Eventually(func() (err error) {
@@ -113,8 +115,8 @@ var _ = Describe("when Tenant handles Storage classes", func() {
 		ns := NewNamespace("storage-class-allowed")
 		cs := ownerClient(tnt)
 
-		NamespaceCreationShouldSucceed(ns, tnt, defaultTimeoutInterval)
-		NamespaceShouldBeManagedByTenant(ns, tnt, defaultTimeoutInterval)
+		NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
+		TenantNamespaceList(tnt, podRecreationTimeoutInterval).Should(ContainElement(ns.GetName()))
 		By("using allowed storageClass names", func() {
 			for _, c := range tnt.Spec.StorageClasses.Allowed {
 				Eventually(func() (err error) {
