@@ -79,73 +79,57 @@ func (h *handler) OnCreate(clt client.Client, decoder *admission.Decoder) capsul
 			return admission.Errored(http.StatusBadRequest, err)
 		}
 		// If we already had TenantName label on NS -> assign to it
-		if len(ns.ObjectMeta.Labels) > 0 {
-			l, ok := ns.ObjectMeta.Labels[ln]
-			// assigning namespace to Tenant in case of label
-			if ok {
-				// retrieving the selected Tenant
-				t := &capsulev1alpha1.Tenant{}
-				if err := clt.Get(ctx, types.NamespacedName{Name: l}, t); err != nil {
-					return admission.Errored(http.StatusBadRequest, err)
-				}
-				// Tenant owner must adhere to user that asked for NS creation
-				if !h.isTenantOwner(t.Spec.Owner, req.UserInfo) {
-					return admission.Denied("Cannot assign the desired namespace to a non-owned Tenant")
-				}
-				// Patching the response
-				return h.patchResponseForOwnerRef(t, ns)
-			}
-
-		}
-		// If we forceTenantPrefix -> find Tenant from NS name
-		if h.forceTenantPrefix {
-			t := &v1alpha1.Tenant{}
-			tenantName := strings.Split(ns.GetName(), "-")[0]
-			if err := clt.Get(ctx, types.NamespacedName{Name: tenantName}, t); err != nil {
+		if l, ok := ns.ObjectMeta.Labels[ln]; ok {
+			// retrieving the selected Tenant
+			t := &capsulev1alpha1.Tenant{}
+			if err := clt.Get(ctx, types.NamespacedName{Name: l}, t); err != nil {
 				return admission.Errored(http.StatusBadRequest, err)
 			}
+			// Tenant owner must adhere to user that asked for NS creation
+			if !h.isTenantOwner(t.Spec.Owner, req.UserInfo) {
+				return admission.Denied("Cannot assign the desired namespace to a non-owned Tenant")
+			}
+			// Patching the response
 			return h.patchResponseForOwnerRef(t, ns)
 		}
 
-		tenants := []*capsulev1alpha1.Tenant{}
+		// If we forceTenantPrefix -> find Tenant from NS name
+		var tenants []*capsulev1alpha1.Tenant
 
 		// Find tenants belonging to user
-		tlu, err := h.listTenantsForOwnerKind(ctx, "User", req.UserInfo.Username, clt)
-		if err != nil {
-			return admission.Errored(http.StatusBadRequest, err)
-		}
-		// No groups single tenant short-circuit
-		if len(req.UserInfo.Groups) == 0 && len(tlu.Items) == 1 {
-			return h.patchResponseForOwnerRef(&tlu.Items[0], ns)
-		}
-
-		switch userTenants := len(tlu.Items); {
-		case userTenants > 1:
-			return admission.Denied("Unable to assign namespace to tenant. Please use " + ln + " label when creating a namespace")
-		case userTenants == 1:
-			tenants = append(tenants, &tlu.Items[0])
-		}
-
-		for _, group := range req.UserInfo.Groups {
-			tl, err := h.listTenantsForOwnerKind(ctx, "Group", group, clt)
+		{
+			tl, err := h.listTenantsForOwnerKind(ctx, "User", req.UserInfo.Username, clt)
 			if err != nil {
 				return admission.Errored(http.StatusBadRequest, err)
 			}
-			for _, item := range tl.Items {
-				tenants = append(tenants, &item)
+			for _, tnt := range tl.Items {
+				tenants = append(tenants, &tnt)
 			}
-			// more than one tenant found, returning error
-			if len(tenants) > 1 {
-				return admission.Denied("Unable to assign namespace to tenant. Please use " + ln + " label when creating a namespace")
+		}
+		// Find tenants belonging to user groups
+		{
+			for _, group := range req.UserInfo.Groups {
+				tl, err := h.listTenantsForOwnerKind(ctx, "Group", group, clt)
+				if err != nil {
+					return admission.Errored(http.StatusBadRequest, err)
+				}
+				for _, tnt := range tl.Items {
+					tenants = append(tenants, &tnt)
+				}
 			}
 		}
 
-		// Single tenant found for group
-		if len(tenants) == 1 {
+		switch len(tenants) {
+		case 0:
+			return admission.Denied("You do not have any Tenant assigned: please, reach out the system administrators")
+		case 1:
+			if h.forceTenantPrefix && !strings.HasPrefix(ns.GetName(), tenants[0].GetName()) {
+				return admission.Denied("The namespace doesn't match any assigned tenants prefix. Please, use the desired tenant name as prefix followed by a dash when creating a namespace")
+			}
 			return h.patchResponseForOwnerRef(tenants[0], ns)
+		default:
+			return admission.Denied("Unable to assign namespace to tenant. Please use " + ln + " label when creating a namespace")
 		}
-
-		return admission.Denied("You do not have any Tenant assigned: please, reach out the system administrators")
 	}
 }
 

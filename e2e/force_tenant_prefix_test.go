@@ -49,52 +49,57 @@ var _ = Describe("creating a Namespace with --force-tenant-name flag", func() {
 			ResourceQuota:      []corev1.ResourceQuotaSpec{},
 		},
 	}
-	t2 := &v1alpha1.Tenant{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "second",
-		},
-		Spec: v1alpha1.TenantSpec{
-			Owner: v1alpha1.OwnerSpec{
-				Name: "john",
-				Kind: "User",
-			},
-			NamespacesMetadata: v1alpha1.AdditionalMetadata{},
-			ServicesMetadata:   v1alpha1.AdditionalMetadata{},
-			IngressClasses:     v1alpha1.IngressClassesSpec{},
-			StorageClasses:     v1alpha1.StorageClassesSpec{},
-			LimitRanges:        []corev1.LimitRangeSpec{},
-			NamespaceQuota:     10,
-			NodeSelector:       map[string]string{},
-			ResourceQuota:      []corev1.ResourceQuotaSpec{},
-		},
-	}
 	JustBeforeEach(func() {
 		EventuallyCreation(func() error {
 			t1.ResourceVersion = ""
 			return k8sClient.Create(context.TODO(), t1)
 		}).Should(Succeed())
-		EventuallyCreation(func() error {
-			t2.ResourceVersion = ""
-			return k8sClient.Create(context.TODO(), t2)
-		}).Should(Succeed())
+		ModifyCapsuleManagerPodArgs(append(defaulManagerPodArgs, []string{"--force-tenant-prefix"}...))
 	})
 	JustAfterEach(func() {
 		Expect(k8sClient.Delete(context.TODO(), t1)).Should(Succeed())
-		Expect(k8sClient.Delete(context.TODO(), t2)).Should(Succeed())
+		ModifyCapsuleManagerPodArgs(defaulManagerPodArgs)
 	})
-	It("should fail", func() {
-		args := append(defaulManagerPodArgs, []string{"--force-tenant-prefix"}...)
-		ModifyCapsuleManagerPodArgs(args)
+	It("should fail with missing prefix", func() {
 		ns := NewNamespace("test")
 		NamespaceCreation(ns, t1, podRecreationTimeoutInterval).ShouldNot(Succeed())
 	})
-	It("should be assigned to the second Tenant", func() {
+	It("should succeed using prefix", func() {
+		ns := NewNamespace("first-test")
+		NamespaceCreation(ns, t1, podRecreationTimeoutInterval).Should(Succeed())
+	})
+	It("should fail with multiple Tenant assigned to user", func() {
+		t2 := &v1alpha1.Tenant{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "second",
+			},
+			Spec: v1alpha1.TenantSpec{
+				Owner: v1alpha1.OwnerSpec{
+					Name: "john",
+					Kind: "User",
+				},
+				NamespacesMetadata: v1alpha1.AdditionalMetadata{},
+				ServicesMetadata:   v1alpha1.AdditionalMetadata{},
+				IngressClasses:     v1alpha1.IngressClassesSpec{},
+				StorageClasses:     v1alpha1.StorageClassesSpec{},
+				LimitRanges:        []corev1.LimitRangeSpec{},
+				NamespaceQuota:     10,
+				NodeSelector:       map[string]string{},
+				ResourceQuota:      []corev1.ResourceQuotaSpec{},
+			},
+		}
+
+		EventuallyCreation(func() error {
+			return k8sClient.Create(context.TODO(), t2)
+		}).Should(Succeed())
+
+		defer func() {
+			Expect(k8sClient.Delete(context.TODO(), t2)).Should(Succeed())
+		}()
+
 		ns := NewNamespace("second-test")
 		ns2 := NewNamespace("second-test2")
-		NamespaceCreation(ns, t2, podRecreationTimeoutInterval).Should(Succeed())
-		TenantNamespaceList(t2, podRecreationTimeoutInterval).Should(ContainElement(ns.GetName()))
+		NamespaceCreation(ns, t2, podRecreationTimeoutInterval).ShouldNot(Succeed())
 		NamespaceCreation(ns2, t1, podRecreationTimeoutInterval).ShouldNot(Succeed())
-		args := defaulManagerPodArgs
-		ModifyCapsuleManagerPodArgs(args)
 	})
 })
