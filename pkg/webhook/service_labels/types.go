@@ -47,8 +47,13 @@ type Endpoints struct {
 	*corev1.Endpoints
 }
 
-func (ep Endpoints) Namespace() string {
-	return ep.GetNamespace()
+func (ep Endpoints) Namespace() (namespace string) {
+	namespace = ep.GetNamespace()
+	// For ep, which are created automatically using service selector namespace will always be empty, so we had to take it from TargetRef
+	if len(namespace) == 0 {
+		namespace = ep.Subsets[0].Addresses[0].TargetRef.Namespace
+	}
+	return
 }
 
 func (ep Endpoints) Labels() map[string]string {
