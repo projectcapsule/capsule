@@ -32,7 +32,7 @@ import (
 var _ = Describe("creating a Namespace over-quota", func() {
 	tnt := &v1alpha1.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "overquotatenant",
+			Name: "over-quota-tenant",
 		},
 		Spec: v1alpha1.TenantSpec{
 			Owner: v1alpha1.OwnerSpec{

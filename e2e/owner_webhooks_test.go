@@ -36,7 +36,7 @@ import (
 var _ = Describe("when Tenant owner interacts with the webhooks", func() {
 	tnt := &v1alpha1.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "tenantowner",
+			Name: "tenant-owner",
 		},
 		Spec: v1alpha1.TenantSpec{
 			Owner: v1alpha1.OwnerSpec{

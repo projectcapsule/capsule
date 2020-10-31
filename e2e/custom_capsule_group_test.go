@@ -32,7 +32,7 @@ import (
 var _ = Describe("creating a Namespace as Tenant owner with custom --capsule-group", func() {
 	tnt := &v1alpha1.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "tenantassignedcustomgroup",
+			Name: "tenant-assigned-custom-group",
 		},
 		Spec: v1alpha1.TenantSpec{
 			Owner: v1alpha1.OwnerSpec{

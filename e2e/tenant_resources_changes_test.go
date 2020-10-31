@@ -37,7 +37,7 @@ import (
 var _ = Describe("changing Tenant managed Kubernetes resources", func() {
 	tnt := &v1alpha1.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "tenantresourceschanges",
+			Name: "tenant-resources-changes",
 		},
 		Spec: v1alpha1.TenantSpec{
 			Owner: v1alpha1.OwnerSpec{
