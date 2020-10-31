@@ -50,7 +50,9 @@ var _ = Describe("creating a Namespace over-quota", func() {
 		},
 	}
 	JustBeforeEach(func() {
-		Expect(k8sClient.Create(context.TODO(), tnt)).Should(Succeed())
+		EventuallyCreation(func() error {
+			return k8sClient.Create(context.TODO(), tnt)
+		}).Should(Succeed())
 	})
 	JustAfterEach(func() {
 		Expect(k8sClient.Delete(context.TODO(), tnt)).Should(Succeed())
@@ -59,8 +61,8 @@ var _ = Describe("creating a Namespace over-quota", func() {
 		By("creating three Namespaces", func() {
 			for _, name := range []string{"bob-dev", "bob-staging", "bob-production"} {
 				ns := NewNamespace(name)
-				NamespaceCreationShouldSucceed(ns, tnt, defaultTimeoutInterval)
-				NamespaceShouldBeManagedByTenant(ns, tnt, defaultTimeoutInterval)
+				NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
+				TenantNamespaceList(tnt, podRecreationTimeoutInterval).Should(ContainElement(ns.GetName()))
 			}
 		})
 

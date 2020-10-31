@@ -69,10 +69,14 @@ var _ = Describe("creating a Namespace with --force-tenant-name flag", func() {
 		},
 	}
 	JustBeforeEach(func() {
-		t1.ResourceVersion = ""
-		t2.ResourceVersion = ""
-		Expect(k8sClient.Create(context.TODO(), t1)).Should(Succeed())
-		Expect(k8sClient.Create(context.TODO(), t2)).Should(Succeed())
+		EventuallyCreation(func() error {
+			t1.ResourceVersion = ""
+			return k8sClient.Create(context.TODO(), t1)
+		}).Should(Succeed())
+		EventuallyCreation(func() error {
+			t2.ResourceVersion = ""
+			return k8sClient.Create(context.TODO(), t2)
+		}).Should(Succeed())
 	})
 	JustAfterEach(func() {
 		Expect(k8sClient.Delete(context.TODO(), t1)).Should(Succeed())
@@ -82,14 +86,14 @@ var _ = Describe("creating a Namespace with --force-tenant-name flag", func() {
 		args := append(defaulManagerPodArgs, []string{"--force-tenant-prefix"}...)
 		ModifyCapsuleManagerPodArgs(args)
 		ns := NewNamespace("test")
-		NamespaceCreationShouldNotSucceed(ns, t1, podRecreationTimeoutInterval)
+		NamespaceCreation(ns, t1, podRecreationTimeoutInterval).ShouldNot(Succeed())
 	})
 	It("should be assigned to the second Tenant", func() {
 		ns := NewNamespace("second-test")
 		ns2 := NewNamespace("second-test2")
-		NamespaceCreationShouldSucceed(ns, t2, podRecreationTimeoutInterval)
-		NamespaceShouldBeManagedByTenant(ns, t2, podRecreationTimeoutInterval)
-		NamespaceCreationShouldNotSucceed(ns2, t1, podRecreationTimeoutInterval)
+		NamespaceCreation(ns, t2, podRecreationTimeoutInterval).Should(Succeed())
+		TenantNamespaceList(t2, podRecreationTimeoutInterval).Should(ContainElement(ns.GetName()))
+		NamespaceCreation(ns2, t1, podRecreationTimeoutInterval).ShouldNot(Succeed())
 		args := defaulManagerPodArgs
 		ModifyCapsuleManagerPodArgs(args)
 	})

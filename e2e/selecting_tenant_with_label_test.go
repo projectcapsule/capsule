@@ -69,8 +69,12 @@ var _ = Describe("creating a Namespace with Tenant selector when user owns multi
 		},
 	}
 	JustBeforeEach(func() {
-		Expect(k8sClient.Create(context.TODO(), t1)).Should(Succeed())
-		Expect(k8sClient.Create(context.TODO(), t2)).Should(Succeed())
+		EventuallyCreation(func() error {
+			return k8sClient.Create(context.TODO(), t1)
+		}).Should(Succeed())
+		EventuallyCreation(func() error {
+			return k8sClient.Create(context.TODO(), t2)
+		}).Should(Succeed())
 	})
 	JustAfterEach(func() {
 		Expect(k8sClient.Delete(context.TODO(), t1)).Should(Succeed())
@@ -85,7 +89,7 @@ var _ = Describe("creating a Namespace with Tenant selector when user owns multi
 				l: t2.Name,
 			}
 		})
-		NamespaceCreationShouldSucceed(ns, t2, defaultTimeoutInterval)
-		NamespaceShouldBeManagedByTenant(ns, t2, defaultTimeoutInterval)
+		NamespaceCreation(ns, t2, defaultTimeoutInterval).Should(Succeed())
+		TenantNamespaceList(t2, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 	})
 })

@@ -76,8 +76,12 @@ var _ = Describe("creating a Service/Endpoint/EndpointSlice for a Tenant with ad
 		},
 	}
 	JustBeforeEach(func() {
-		Expect(k8sClient.Create(context.TODO(), tnt)).Should(Succeed())
-		Expect(k8sClient.Create(context.TODO(), epsCR)).Should(Succeed())
+		EventuallyCreation(func() error {
+			return k8sClient.Create(context.TODO(), tnt)
+		}).Should(Succeed())
+		EventuallyCreation(func() error {
+			return k8sClient.Create(context.TODO(), epsCR)
+		}).Should(Succeed())
 	})
 	JustAfterEach(func() {
 		Expect(k8sClient.Delete(context.TODO(), tnt)).Should(Succeed())
@@ -85,8 +89,8 @@ var _ = Describe("creating a Service/Endpoint/EndpointSlice for a Tenant with ad
 	})
 	It("service objects should contain additional metadata", func() {
 		ns := NewNamespace("serivce-metadata")
-		NamespaceCreationShouldSucceed(ns, tnt, defaultTimeoutInterval)
-		NamespaceShouldBeManagedByTenant(ns, tnt, defaultTimeoutInterval)
+		NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
+		TenantNamespaceList(tnt, podRecreationTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 		meta := metav1.ObjectMeta{
 			Name:      "test-svc",

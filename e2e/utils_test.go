@@ -38,7 +38,7 @@ import (
 )
 
 const (
-	defaultTimeoutInterval       = 15 * time.Second
+	defaultTimeoutInterval       = 20 * time.Second
 	podRecreationTimeoutInterval = 90 * time.Second
 	defaultPollInterval          = time.Second
 )
@@ -51,37 +51,32 @@ func NewNamespace(name string) *corev1.Namespace {
 	}
 }
 
-func NamespaceCreationShouldSucceed(ns *corev1.Namespace, t *v1alpha1.Tenant, timeout time.Duration) {
+func NamespaceCreation(ns *corev1.Namespace, t *v1alpha1.Tenant, timeout time.Duration) AsyncAssertion {
 	cs := ownerClient(t)
-	Eventually(func() (err error) {
+	return Eventually(func() (err error) {
 		_, err = cs.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
 		return
-	}, timeout, defaultPollInterval).Should(Succeed())
+	}, timeout, defaultPollInterval)
 }
 
-func NamespaceCreationShouldNotSucceed(ns *corev1.Namespace, t *v1alpha1.Tenant, timeout time.Duration) {
-	cs := ownerClient(t)
-	Eventually(func() (err error) {
-		_, err = cs.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
-		return
-	}, timeout, defaultPollInterval).ShouldNot(Succeed())
-}
-
-func NamespaceShouldBeManagedByTenant(ns *corev1.Namespace, t *v1alpha1.Tenant, timeout time.Duration) {
-	Eventually(func() v1alpha1.NamespaceList {
+func TenantNamespaceList(t *v1alpha1.Tenant, timeout time.Duration) AsyncAssertion {
+	return Eventually(func() v1alpha1.NamespaceList {
 		Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: t.GetName()}, t)).Should(Succeed())
 		return t.Status.Namespaces
-	}, timeout, defaultPollInterval).Should(ContainElement(ns.GetName()))
+	}, timeout, defaultPollInterval)
 }
 
-func CapsuleClusterGroupParamShouldBeUpdated(capsuleClusterGroup string, timeout time.Duration) {
+func EventuallyCreation(f interface{}) AsyncAssertion {
+	return Eventually(f, defaultTimeoutInterval, defaultPollInterval)
+}
+
+func CapsuleClusterGroupParam(timeout time.Duration) AsyncAssertion {
 	capsuleCRB := &rbacv1.ClusterRoleBinding{}
 
-	Eventually(func() string {
+	return Eventually(func() string {
 		Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: rbac.ProvisionerRoleName}, capsuleCRB)).Should(Succeed())
 		return capsuleCRB.Subjects[0].Name
-	}, timeout, defaultPollInterval).Should(BeIdenticalTo(capsuleClusterGroup))
-
+	}, timeout, defaultPollInterval)
 }
 
 func ModifyCapsuleManagerPodArgs(args []string) {

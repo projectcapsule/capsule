@@ -169,14 +169,14 @@ var _ = Describe("creating namespaces within a Tenant with resources", func() {
 	}
 	nsl := []string{"bim", "bum", "bam"}
 	JustBeforeEach(func() {
-		tnt.ResourceVersion = ""
-		Expect(k8sClient.Create(context.TODO(), tnt)).Should(Succeed())
-
+		EventuallyCreation(func() error {
+			return k8sClient.Create(context.TODO(), tnt)
+		}).Should(Succeed())
 		By("creating the Namespaces", func() {
 			for _, i := range nsl {
 				ns := NewNamespace(i)
-				NamespaceCreationShouldSucceed(ns, tnt, defaultTimeoutInterval)
-				NamespaceShouldBeManagedByTenant(ns, tnt, defaultTimeoutInterval)
+				NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
+				TenantNamespaceList(tnt, podRecreationTimeoutInterval).Should(ContainElement(ns.GetName()))
 			}
 		})
 	})
