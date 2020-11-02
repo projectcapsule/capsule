@@ -42,7 +42,7 @@ There are two ways to install Capsule:
 * Use [`kustomize`](https://github.com/kubernetes-sigs/kustomize)
 
 ## Install with kustomize
-Ensure you have `kubectl` and `kustomize`] installed in your `PATH`. 
+Ensure you have `kubectl` and `kustomize` installed in your `PATH`. 
 
 Clone this repository and move to the repo folder:
 
