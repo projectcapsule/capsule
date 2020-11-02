@@ -13,7 +13,7 @@ endif
 BUNDLE_METADATA_OPTS ?= $(BUNDLE_CHANNELS) $(BUNDLE_DEFAULT_CHANNEL)
 
 # Image URL to use all building/pushing image targets
-IMG ?= quay.io/clastix/capsule:latest
+IMG ?= quay.io/clastix/capsule:$(VERSION)
 # Produce CRDs that work back to Kubernetes 1.11 (no version conversion)
 CRD_OPTIONS ?= "crd:trivialVersions=true"
 
@@ -138,7 +138,7 @@ golint:
 e2e/%:
 	kind create cluster --name capsule --image=kindest/node:$*
 	make docker-build
-	kind load docker-image --nodes capsule-control-plane --name capsule quay.io/clastix/capsule:latest
+	kind load docker-image --nodes capsule-control-plane --name capsule $(IMG)
 	make deploy
 	while [ -z $$(kubectl -n capsule-system get secret capsule-tls -o jsonpath='{.data.tls\.crt}') ]; do echo "waiting Capsule to be up and running..." && sleep 5; done
 	ginkgo -v -tags e2e ./e2e
