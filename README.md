@@ -34,8 +34,15 @@ However, implementing advanced multi-tenancy scenarios, for example, a private o
 Please, refer to the corresponding [section](use_cases.md) for a more detailed list of use cases that Capsule can address.
 
 # Installation
-Ensure you have `kubectl` and [`kustomize`](https://github.com/kubernetes-sigs/kustomize)
-installed in your `PATH`. Also, make sure you have access to a Kubernetes cluster as an administrator.
+Make sure you have access to a Kubernetes cluster as an administrator.
+
+There are two ways to install Capsule:
+
+* Use the Helm Chart available [here](https://github.com/clastix/capsule-helm-chart)
+* Use [`kustomize`](https://github.com/kubernetes-sigs/kustomize)
+
+## Install with kustomize
+Ensure you have `kubectl` and `kustomize`] installed in your `PATH`. 
 
 Clone this repository and move to the repo folder:
 
