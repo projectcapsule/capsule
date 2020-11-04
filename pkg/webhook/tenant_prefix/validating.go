@@ -18,6 +18,7 @@ package tenant_prefix
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"regexp"
 	"strings"
@@ -89,7 +90,7 @@ func (r *handler) OnCreate(clt client.Client, decoder *admission.Decoder) capsul
 			if err := clt.Get(ctx, types.NamespacedName{Name: or.Name}, t); err != nil {
 				return admission.Errored(http.StatusBadRequest, err)
 			}
-			if e := t.GetName() + "-" + ns.GetName(); !strings.HasPrefix(ns.GetName(), t.GetName()+"-") {
+			if e := fmt.Sprintf("%s-%s", t.GetName(), ns.GetName()); !strings.HasPrefix(ns.GetName(), fmt.Sprintf("%s-", t.GetName())) {
 				return admission.Denied("The namespace doesn't match the tenant prefix, expected " + e)
 			}
 		}

@@ -32,7 +32,26 @@ import (
 var _ = Describe("creating a Namespace with --force-tenant-name flag", func() {
 	t1 := &v1alpha1.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "first",
+			Name: "awesome",
+		},
+		Spec: v1alpha1.TenantSpec{
+			Owner: v1alpha1.OwnerSpec{
+				Name: "john",
+				Kind: "User",
+			},
+			NamespacesMetadata: v1alpha1.AdditionalMetadata{},
+			ServicesMetadata:   v1alpha1.AdditionalMetadata{},
+			IngressClasses:     v1alpha1.IngressClassesSpec{},
+			StorageClasses:     v1alpha1.StorageClassesSpec{},
+			LimitRanges:        []corev1.LimitRangeSpec{},
+			NamespaceQuota:     10,
+			NodeSelector:       map[string]string{},
+			ResourceQuota:      []corev1.ResourceQuotaSpec{},
+		},
+	}
+	t2 := &v1alpha1.Tenant{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "awesome-tenant",
 		},
 		Spec: v1alpha1.TenantSpec{
 			Owner: v1alpha1.OwnerSpec{
@@ -54,52 +73,33 @@ var _ = Describe("creating a Namespace with --force-tenant-name flag", func() {
 			t1.ResourceVersion = ""
 			return k8sClient.Create(context.TODO(), t1)
 		}).Should(Succeed())
+		EventuallyCreation(func() error {
+			t2.ResourceVersion = ""
+			return k8sClient.Create(context.TODO(), t2)
+		}).Should(Succeed())
 		ModifyCapsuleManagerPodArgs(append(defaulManagerPodArgs, []string{"--force-tenant-prefix"}...))
 	})
 	JustAfterEach(func() {
 		Expect(k8sClient.Delete(context.TODO(), t1)).Should(Succeed())
+		Expect(k8sClient.Delete(context.TODO(), t2)).Should(Succeed())
 		ModifyCapsuleManagerPodArgs(defaulManagerPodArgs)
 	})
 	It("should fail with missing prefix", func() {
-		ns := NewNamespace("test")
-		NamespaceCreation(ns, t1, podRecreationTimeoutInterval).ShouldNot(Succeed())
+		ns := NewNamespace("awesome")
+		NamespaceCreation(ns, t1, defaultTimeoutInterval).ShouldNot(Succeed())
 	})
 	It("should succeed using prefix", func() {
-		ns := NewNamespace("first-test")
-		NamespaceCreation(ns, t1, podRecreationTimeoutInterval).Should(Succeed())
+		ns := NewNamespace("awesome-namespace")
+		NamespaceCreation(ns, t1, defaultTimeoutInterval).Should(Succeed())
 	})
-	It("should fail with multiple Tenant assigned to user", func() {
-		t2 := &v1alpha1.Tenant{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "second",
-			},
-			Spec: v1alpha1.TenantSpec{
-				Owner: v1alpha1.OwnerSpec{
-					Name: "john",
-					Kind: "User",
-				},
-				NamespacesMetadata: v1alpha1.AdditionalMetadata{},
-				ServicesMetadata:   v1alpha1.AdditionalMetadata{},
-				IngressClasses:     v1alpha1.IngressClassesSpec{},
-				StorageClasses:     v1alpha1.StorageClassesSpec{},
-				LimitRanges:        []corev1.LimitRangeSpec{},
-				NamespaceQuota:     10,
-				NodeSelector:       map[string]string{},
-				ResourceQuota:      []corev1.ResourceQuotaSpec{},
-			},
-		}
+	It("should be assigned according closest match", func() {
+		ns1 := NewNamespace("awesome-tenant")
+		ns2 := NewNamespace("awesome-tenant-namespace")
 
-		EventuallyCreation(func() error {
-			return k8sClient.Create(context.TODO(), t2)
-		}).Should(Succeed())
+		NamespaceCreation(ns1, t1, defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreation(ns2, t2, defaultTimeoutInterval).Should(Succeed())
 
-		defer func() {
-			Expect(k8sClient.Delete(context.TODO(), t2)).Should(Succeed())
-		}()
-
-		ns := NewNamespace("second-test")
-		ns2 := NewNamespace("second-test2")
-		NamespaceCreation(ns, t2, podRecreationTimeoutInterval).ShouldNot(Succeed())
-		NamespaceCreation(ns2, t1, podRecreationTimeoutInterval).ShouldNot(Succeed())
+		TenantNamespaceList(t1, defaultTimeoutInterval).Should(ContainElement(ns1.GetName()))
+		TenantNamespaceList(t2, defaultTimeoutInterval).Should(ContainElement(ns2.GetName()))
 	})
 })
