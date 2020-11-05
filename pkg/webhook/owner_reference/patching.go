@@ -21,8 +21,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sort"
 	"strings"
 
+	authenticationv1 "k8s.io/api/authentication/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -33,7 +35,6 @@ import (
 	"github.com/clastix/capsule/api/v1alpha1"
 	capsulev1alpha1 "github.com/clastix/capsule/api/v1alpha1"
 	capsulewebhook "github.com/clastix/capsule/pkg/webhook"
-	authenticationv1 "k8s.io/api/authentication/v1"
 )
 
 // +kubebuilder:webhook:path=/mutate-v1-namespace-owner-reference,mutating=true,failurePolicy=fail,groups="",resources=namespaces,verbs=create,versions=v1,name=owner.namespace.capsule.clastix.io
@@ -94,7 +95,7 @@ func (h *handler) OnCreate(clt client.Client, decoder *admission.Decoder) capsul
 		}
 
 		// If we forceTenantPrefix -> find Tenant from NS name
-		var tenants []*capsulev1alpha1.Tenant
+		var tenants sortedTenants
 
 		// Find tenants belonging to user
 		{
@@ -103,7 +104,7 @@ func (h *handler) OnCreate(clt client.Client, decoder *admission.Decoder) capsul
 				return admission.Errored(http.StatusBadRequest, err)
 			}
 			for _, tnt := range tl.Items {
-				tenants = append(tenants, &tnt)
+				tenants = append(tenants, tnt)
 			}
 		}
 		// Find tenants belonging to user groups
@@ -114,25 +115,33 @@ func (h *handler) OnCreate(clt client.Client, decoder *admission.Decoder) capsul
 					return admission.Errored(http.StatusBadRequest, err)
 				}
 				for _, tnt := range tl.Items {
-					tenants = append(tenants, &tnt)
+					tenants = append(tenants, tnt)
 				}
 			}
 		}
 
-		switch len(tenants) {
-		case 0:
+		sort.Sort(sort.Reverse(tenants))
+
+		if len(tenants) == 0 {
 			return admission.Denied("You do not have any Tenant assigned: please, reach out the system administrators")
-		case 1:
-			if h.forceTenantPrefix && !strings.HasPrefix(ns.GetName(), tenants[0].GetName()) {
-				return admission.Denied("The namespace doesn't match any assigned tenants prefix. Please, use the desired tenant name as prefix followed by a dash when creating a namespace")
-			}
-			return h.patchResponseForOwnerRef(tenants[0], ns)
-		default:
-			return admission.Denied("Unable to assign namespace to tenant. Please use " + ln + " label when creating a namespace")
 		}
+
+		if len(tenants) == 1 {
+			return h.patchResponseForOwnerRef(&tenants[0], ns)
+		}
+
+		if h.forceTenantPrefix {
+			for _, tnt := range tenants {
+				if strings.HasPrefix(ns.GetName(), fmt.Sprintf("%s-", tnt.GetName())) {
+					return h.patchResponseForOwnerRef(&tnt, ns)
+				}
+			}
+			admission.Denied("The Namespace prefix used doesn't match any available Tenant")
+		}
+
+		return admission.Denied("Unable to assign namespace to tenant. Please use " + ln + " label when creating a namespace")
 	}
 }
-
 func (h *handler) OnDelete(client client.Client, decoder *admission.Decoder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) admission.Response {
 		return admission.Allowed("")
@@ -179,4 +188,18 @@ func (h *handler) isTenantOwner(os v1alpha1.OwnerSpec, userInfo authenticationv1
 		}
 	}
 	return false
+}
+
+type sortedTenants []capsulev1alpha1.Tenant
+
+func (s sortedTenants) Len() int {
+	return len(s)
+}
+
+func (s sortedTenants) Less(i, j int) bool {
+	return len(s[i].GetName()) < len(s[j].GetName())
+}
+
+func (s sortedTenants) Swap(i, j int) {
+	s[i], s[j] = s[j], s[i]
 }
