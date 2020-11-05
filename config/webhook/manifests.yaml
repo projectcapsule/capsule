@@ -23,29 +23,6 @@ webhooks:
     - CREATE
     resources:
     - namespaces
-- clientConfig:
-    caBundle: Cg==
-    service:
-      name: webhook-service
-      namespace: system
-      path: /mutate-v1-service-labels
-  failurePolicy: Ignore
-  name: service.labels.capsule.clastix.io
-  rules:
-  - apiGroups:
-    - ""
-    - discovery.k8s.io
-    apiVersions:
-    - v1
-    - v1beta1
-    operations:
-    - CREATE
-    - UPDATE
-    resources:
-    - services
-    - endpoints
-    - endpointslices
-
 ---
 apiVersion: admissionregistration.k8s.io/v1beta1
 kind: ValidatingWebhookConfiguration

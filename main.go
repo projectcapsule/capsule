@@ -36,6 +36,7 @@ import (
 	"github.com/clastix/capsule/controllers"
 	"github.com/clastix/capsule/controllers/rbac"
 	"github.com/clastix/capsule/controllers/secret"
+	"github.com/clastix/capsule/controllers/service_labels"
 	"github.com/clastix/capsule/pkg/indexer"
 	"github.com/clastix/capsule/pkg/webhook"
 	"github.com/clastix/capsule/pkg/webhook/ingress"
@@ -43,7 +44,6 @@ import (
 	"github.com/clastix/capsule/pkg/webhook/network_policies"
 	"github.com/clastix/capsule/pkg/webhook/owner_reference"
 	"github.com/clastix/capsule/pkg/webhook/pvc"
-	"github.com/clastix/capsule/pkg/webhook/service_labels"
 	"github.com/clastix/capsule/pkg/webhook/tenant"
 	"github.com/clastix/capsule/pkg/webhook/tenant_prefix"
 	"github.com/clastix/capsule/pkg/webhook/utils"
@@ -126,6 +126,12 @@ func main() {
 		}
 	}
 
+	majorVer, minorVer, _, err := utils.GetK8sVersion()
+	if err != nil {
+		setupLog.Error(err, "unable to get kubernetes version")
+		os.Exit(1)
+	}
+
 	_ = mgr.AddReadyzCheck("ping", healthz.Ping)
 	_ = mgr.AddHealthzCheck("ping", healthz.Ping)
 
@@ -149,7 +155,6 @@ func main() {
 		owner_reference.Webhook(utils.InCapsuleGroup(capsuleGroup, owner_reference.Handler(forceTenantPrefix))),
 		namespace_quota.Webhook(utils.InCapsuleGroup(capsuleGroup, namespace_quota.Handler())),
 		network_policies.Webhook(utils.InCapsuleGroup(capsuleGroup, network_policies.Handler())),
-		service_labels.Webhook(utils.InCapsuleGroup(capsuleGroup, service_labels.Handler())),
 		tenant_prefix.Webhook(utils.InCapsuleGroup(capsuleGroup, tenant_prefix.Handler(forceTenantPrefix, protectedNamespaceRegexp))),
 		tenant.Webhook(tenant.Handler()),
 	)
@@ -188,6 +193,26 @@ func main() {
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Namespace")
 		os.Exit(1)
+	}
+
+	if err = (&service_labels.ServicesLabelsReconciler{
+		Log: ctrl.Log.WithName("controllers").WithName("ServiceLabels"),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "ServiceLabels")
+		os.Exit(1)
+	}
+	if err = (&service_labels.EndpointsLabelsReconciler{
+		Log: ctrl.Log.WithName("controllers").WithName("EndpointLabels"),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "EndpointLabels")
+		os.Exit(1)
+	}
+	if err = (&service_labels.EndpointSlicesLabelsReconciler{
+		Log:          ctrl.Log.WithName("controllers").WithName("EndpointSliceLabels"),
+		VersionMinor: minorVer,
+		VersionMajor: majorVer,
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "EndpointSliceLabels")
 	}
 
 	if err = indexer.AddToManager(mgr); err != nil {
