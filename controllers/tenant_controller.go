@@ -19,6 +19,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"hash/fnv"
 	"strconv"
 	"strings"
 	"sync"
@@ -113,6 +114,12 @@ func (r TenantReconciler) Reconcile(ctx context.Context, request ctrl.Request) (
 	r.Log.Info("Starting processing of Resource Quotas", "items", len(instance.Spec.ResourceQuota))
 	if err := r.syncResourceQuotas(instance); err != nil {
 		r.Log.Error(err, "Cannot sync ResourceQuota items")
+		return reconcile.Result{}, err
+	}
+
+	r.Log.Info("Ensuring PSP for owner")
+	if err := r.syncAdditionalRoleBindings(instance); err != nil {
+		r.Log.Error(err, "Cannot sync additional Role Bindings items")
 		return reconcile.Result{}, err
 	}
 
@@ -216,6 +223,70 @@ func (r *TenantReconciler) resourceQuotasUpdate(resourceName corev1.ResourceName
 		}
 	}
 	return
+}
+
+// Additional Role Bindings can be used in many ways: applying Pod Security Policies or giving
+// access to CRDs or specific API groups.
+func (r *TenantReconciler) syncAdditionalRoleBindings(tenant *capsulev1alpha1.Tenant) (err error) {
+	// hashing the RoleBinding name due to DNS RFC-1123 applied to Kubernetes labels
+	hash := func(value string) string {
+		h := fnv.New64a()
+		_, _ = h.Write([]byte(value))
+		return fmt.Sprintf("%x", h.Sum64())
+	}
+	// getting requested Role Binding keys
+	var keys []string
+	for _, i := range tenant.Spec.AdditionalRoleBindings {
+		keys = append(keys, hash(i.ClusterRoleName))
+	}
+
+	var tl, ll string
+	tl, err = capsulev1alpha1.GetTypeLabel(&capsulev1alpha1.Tenant{})
+	if err != nil {
+		return
+	}
+	ll, err = capsulev1alpha1.GetTypeLabel(&rbacv1.RoleBinding{})
+	if err != nil {
+		return
+	}
+
+	for _, ns := range tenant.Status.Namespaces {
+		if err = r.pruningResources(ns, keys, &rbacv1.RoleBinding{}); err != nil {
+			return err
+		}
+		for _, i := range tenant.Spec.AdditionalRoleBindings {
+			lv := hash(i.ClusterRoleName)
+			rb := &rbacv1.RoleBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      fmt.Sprintf("capsule-%s-%s", tenant.Name, i.ClusterRoleName),
+					Namespace: ns,
+				},
+			}
+			var res controllerutil.OperationResult
+			res, err = controllerutil.CreateOrUpdate(context.TODO(), r.Client, rb, func() error {
+				rb.ObjectMeta.Labels = map[string]string{
+					tl: tenant.Name,
+					ll: lv,
+				}
+				rb.RoleRef = rbacv1.RoleRef{
+					APIGroup: "rbac.authorization.k8s.io",
+					Kind:     "ClusterRole",
+					Name:     i.ClusterRoleName,
+				}
+				rb.Subjects = i.Subjects
+				return controllerutil.SetControllerReference(tenant, rb, r.Scheme)
+			})
+			if err != nil {
+				r.Log.Error(err, "Cannot sync Additional RoleBinding")
+			}
+			r.Log.Info(fmt.Sprintf("Additional RoleBindings sync result: %s", string(res)), "name", rb.Name, "namespace", rb.Namespace)
+			if err != nil {
+				return
+			}
+		}
+	}
+
+	return nil
 }
 
 // We're relying on the ResourceQuota resource to represent the resource quota for the single Tenant rather than the
