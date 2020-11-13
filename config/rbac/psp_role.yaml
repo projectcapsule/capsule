@@ -1,0 +1,9 @@
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: capsule-psp
+rules:
+  - apiGroups: ['extensions']
+    resources: ['podsecuritypolicies']
+    resourceNames: ['capsule-psp']
+    verbs: ['use']

@@ -1,0 +1,18 @@
+kind: PodSecurityPolicy
+apiVersion: policy/v1beta1
+metadata:
+  name: capsule
+spec:
+  fsGroup:
+    rule: RunAsAny
+  hostPorts:
+    - max: 0
+      min: 0
+  runAsUser:
+    rule: RunAsAny
+  seLinux:
+    rule: RunAsAny
+  supplementalGroups:
+    rule: RunAsAny
+  volumes:
+    - secret
