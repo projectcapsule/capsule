@@ -23,6 +23,7 @@ webhooks:
     - CREATE
     resources:
     - namespaces
+
 ---
 apiVersion: admissionregistration.k8s.io/v1beta1
 kind: ValidatingWebhookConfiguration

@@ -893,4 +893,73 @@ alice@caas# kubectl -n oil-production delete networkpolicy capsule-oil-0
 Error from server (Capsule Network Policies cannot be deleted: please, reach out the system administrators): admission webhook "validating.network-policy.capsule.clastix.io" denied the request: Capsule Network Policies cannot be deleted: please, reach out the system administrators
 ```
 
+### Adding additional Role Binding to Tenant Namespaces
 
+In a Container as a Service scenario could be useful to add some specific
+features or capabilities, like _interacting with a CRDs_ or enforcing the Pod
+policies using _Pod Security Policies_.
+
+In one case or the another, there are some mandatory steps:
+
+1. Install the _CRD_ or define the _Pod Security Policy_
+
+```yaml
+apiVersion: policy/v1beta1
+kind: PodSecurityPolicy
+metadata:
+  name: psp:restricted
+spec:
+  privileged: false
+  allowPrivilegeEscalation: false
+...
+```
+
+2. Create a _ClusterRole_ using or granting the said item
+
+```yaml
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: psp:restricted
+rules:
+- apiGroups: ['policy']
+  resources: ['podsecuritypolicies']
+  resourceNames: ['psp:restricted']
+  verbs: ['use']
+```
+
+3. For each Tenant Namespace, create a _RoleBinding_ pointing to the said
+   _ClusterRole_.
+
+```
+kubectl create rolebinding -n ${NAMESPACE} psp:privileged \
+    --clusterrole=psp:privileged --group=systems:authenticated
+```
+
+This can be easily achieved and automated using the Tenant\
+`additionalRoleBindings` specification.
+
+```yaml
+apiVersion: capsule.clastix.io/v1alpha1
+kind: Tenant
+metadata:
+  labels:
+  annotations:
+  name: oil
+spec:
+  additionalRoleBindings:
+  - clusterRoleName: psp:privileged
+    subjects:
+    - kind: "Group"
+      apiGroup: "rbac.authorization.k8s.io"
+      name: "system:authenticated"
+...
+```
+
+With the given specification, Capsule will ensure that each Namespace will
+contain the desired _RoleBinding_ for the specified _Cluster Role_ bounded to
+the given subjects.
+
+> With the following example, Capsule is forbidding to any authenticated user
+> to run privileged pods and let them to performs privilege escalation as
+> declared by the Cluster Role `psp:privileged`.

@@ -19,6 +19,7 @@ package v1alpha1
 import (
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -61,7 +62,14 @@ type TenantSpec struct {
 	NetworkPolicies []networkingv1.NetworkPolicySpec `json:"networkPolicies,omitempty"`
 	LimitRanges     []corev1.LimitRangeSpec          `json:"limitRanges"`
 	// +kubebuilder:validation:Optional
-	ResourceQuota []corev1.ResourceQuotaSpec `json:"resourceQuotas"`
+	ResourceQuota          []corev1.ResourceQuotaSpec `json:"resourceQuotas"`
+	AdditionalRoleBindings []AdditionalRoleBindings   `json:"additionalRoleBindings,omitempty"`
+}
+
+type AdditionalRoleBindings struct {
+	ClusterRoleName string `json:"clusterRoleName"`
+	// kubebuilder:validation:Minimum=1
+	Subjects []rbacv1.Subject `json:"subjects"`
 }
 
 // OwnerSpec defines tenant owner name and kind
