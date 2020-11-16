@@ -14,6 +14,19 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package version
+package main
 
-var Version = "dev"
+//GitRepo ...
+var GitRepo = ""
+
+//GitTag ...
+var GitTag = "dev"
+
+//GitCommit ...
+var GitCommit = ""
+
+//GitDirty ...
+var GitDirty = "dirty"
+
+//BuildTime ...
+var BuildTime = ""

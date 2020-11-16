@@ -47,7 +47,6 @@ import (
 	"github.com/clastix/capsule/pkg/webhook/tenant"
 	"github.com/clastix/capsule/pkg/webhook/tenant_prefix"
 	"github.com/clastix/capsule/pkg/webhook/utils"
-	"github.com/clastix/capsule/version"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -64,7 +63,9 @@ func init() {
 }
 
 func printVersion() {
-	setupLog.Info(fmt.Sprintf("Operator Version: %s", version.Version))
+	setupLog.Info(fmt.Sprintf("Capsule Version %s %s%s", GitTag, GitCommit, GitDirty))
+	setupLog.Info(fmt.Sprintf("Build from: %s", GitRepo))
+	setupLog.Info(fmt.Sprintf("Build date: %s", BuildTime))
 	setupLog.Info(fmt.Sprintf("Go Version: %s", goRuntime.Version()))
 	setupLog.Info(fmt.Sprintf("Go OS/Arch: %s/%s", goRuntime.GOOS, goRuntime.GOARCH))
 }
