@@ -25,6 +25,10 @@ spec:
     description: The assigned Tenant owner kind
     name: Owner kind
     type: string
+  - JSONPath: .spec.nodeSelector
+    description: Node Selector applied to Pods
+    name: Node selector
+    type: string
   - JSONPath: .metadata.creationTimestamp
     description: Age
     name: Age
