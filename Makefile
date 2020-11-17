@@ -1,5 +1,5 @@
 # Current Operator version
-VERSION ?= 0.0.1
+VERSION ?= $$(git describe --abbrev=0 --tags)
 
 # Default bundle image tag
 BUNDLE_IMG ?= quay.io/clastix/capsule:$(VERSION)-bundle
@@ -75,7 +75,7 @@ generate: controller-gen
 
 # Build the docker image
 docker-build: test
-	docker build . --build-arg=VERSION=${VERSION} -t ${IMG}
+	docker build . -t ${IMG}
 
 # Push the docker image
 docker-push:
