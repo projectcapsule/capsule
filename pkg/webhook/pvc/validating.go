@@ -80,21 +80,22 @@ func (h *handler) OnCreate(c client.Client, decoder *admission.Decoder) capsulew
 		}
 
 		if pvc.Spec.StorageClassName == nil {
-			return admission.Errored(http.StatusBadRequest, NewStorageClassNotValid())
+			return admission.Errored(http.StatusBadRequest, NewStorageClassNotValid(tl.Items[0].Spec.StorageClasses))
 		}
 
+		tnt := tl.Items[0]
 		sc := *pvc.Spec.StorageClassName
 
-		if len(tl.Items[0].Spec.StorageClasses.Allowed) > 0 {
-			valid = tl.Items[0].Spec.StorageClasses.Allowed.IsStringInList(sc)
+		if len(tnt.Spec.StorageClasses.Allowed) > 0 {
+			valid = tnt.Spec.StorageClasses.Allowed.IsStringInList(sc)
 		}
 
-		if len(tl.Items[0].Spec.StorageClasses.AllowedRegex) > 0 {
-			matched, _ = regexp.MatchString(tl.Items[0].Spec.StorageClasses.AllowedRegex, sc)
+		if len(tnt.Spec.StorageClasses.AllowedRegex) > 0 {
+			matched, _ = regexp.MatchString(tnt.Spec.StorageClasses.AllowedRegex, sc)
 		}
 
 		if !valid && !matched {
-			return admission.Errored(http.StatusBadRequest, NewStorageClassForbidden(*pvc.Spec.StorageClassName))
+			return admission.Errored(http.StatusBadRequest, NewStorageClassForbidden(*pvc.Spec.StorageClassName, tnt.Spec.StorageClasses))
 		}
 		return admission.Allowed("")
 

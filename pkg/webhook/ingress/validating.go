@@ -132,21 +132,23 @@ func (r *handler) validateIngress(ctx context.Context, c client.Client, object I
 		return admission.Allowed("")
 	}
 
+	tnt := tl.Items[0]
+
 	ingressClass := object.IngressClass()
 	if ingressClass == nil {
-		return admission.Errored(http.StatusBadRequest, NewIngressClassNotValid())
+		return admission.Errored(http.StatusBadRequest, NewIngressClassNotValid(tnt.Spec.IngressClasses))
 	}
 
-	if len(tl.Items[0].Spec.IngressClasses.Allowed) > 0 {
-		valid = tl.Items[0].Spec.IngressClasses.Allowed.IsStringInList(*ingressClass)
+	if len(tnt.Spec.IngressClasses.Allowed) > 0 {
+		valid = tnt.Spec.IngressClasses.Allowed.IsStringInList(*ingressClass)
 	}
 
-	if len(tl.Items[0].Spec.IngressClasses.AllowedRegex) > 0 {
-		matched, _ = regexp.MatchString(tl.Items[0].Spec.IngressClasses.AllowedRegex, *ingressClass)
+	if len(tnt.Spec.IngressClasses.AllowedRegex) > 0 {
+		matched, _ = regexp.MatchString(tnt.Spec.IngressClasses.AllowedRegex, *ingressClass)
 	}
 
 	if !valid && !matched {
-		return admission.Errored(http.StatusBadRequest, NewIngressClassForbidden(*ingressClass))
+		return admission.Errored(http.StatusBadRequest, NewIngressClassForbidden(*ingressClass, tnt.Spec.IngressClasses))
 	}
 
 	return admission.Allowed("")
