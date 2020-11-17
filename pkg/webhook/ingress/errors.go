@@ -18,26 +18,47 @@ package ingress
 
 import (
 	"fmt"
+	"strings"
+
+	"github.com/clastix/capsule/api/v1alpha1"
 )
 
 type ingressClassForbidden struct {
-	ingressClass string
+	className string
+	spec      v1alpha1.IngressClassesSpec
 }
 
-func NewIngressClassForbidden(ingressClass string) error {
-	return &ingressClassForbidden{ingressClass: ingressClass}
+func NewIngressClassForbidden(className string, spec v1alpha1.IngressClassesSpec) error {
+	return &ingressClassForbidden{
+		className: className,
+		spec:      spec,
+	}
 }
 
 func (i ingressClassForbidden) Error() string {
-	return fmt.Sprintf("Ingress Class %s is forbidden for the current Tenant", i.ingressClass)
+	return fmt.Sprintf("Ingress Class %s is forbidden for the current Tenant%s", i.className, appendError(i.spec))
 }
 
-type ingressClassNotValid struct{}
-
-func NewIngressClassNotValid() error {
-	return &ingressClassNotValid{}
+func appendError(spec v1alpha1.IngressClassesSpec) (append string) {
+	if len(spec.Allowed) > 0 {
+		append += fmt.Sprintf(", one of the following (%s)", strings.Join(spec.Allowed, ", "))
+	}
+	if len(spec.AllowedRegex) > 0 {
+		append += fmt.Sprintf(", or matching the regex %s", spec.AllowedRegex)
+	}
+	return
 }
 
-func (ingressClassNotValid) Error() string {
-	return "A valid Ingress Class must be used"
+type ingressClassNotValid struct {
+	spec v1alpha1.IngressClassesSpec
+}
+
+func NewIngressClassNotValid(spec v1alpha1.IngressClassesSpec) error {
+	return &ingressClassNotValid{
+		spec: spec,
+	}
+}
+
+func (i ingressClassNotValid) Error() string {
+	return "A valid Ingress Class must be used" + appendError(i.spec)
 }
