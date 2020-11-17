@@ -18,26 +18,47 @@ package pvc
 
 import (
 	"fmt"
+	"strings"
+
+	"github.com/clastix/capsule/api/v1alpha1"
 )
 
-type storageClassNotValid struct{}
-
-func NewStorageClassNotValid() error {
-	return &storageClassNotValid{}
+type storageClassNotValid struct {
+	spec v1alpha1.StorageClassesSpec
 }
 
-func (storageClassNotValid) Error() string {
-	return "A valid Storage Class must be used"
+func NewStorageClassNotValid(storageClasses v1alpha1.StorageClassesSpec) error {
+	return &storageClassNotValid{
+		spec: storageClasses,
+	}
+}
+
+func appendError(spec v1alpha1.StorageClassesSpec) (append string) {
+	if len(spec.Allowed) > 0 {
+		append += fmt.Sprintf(", one of the following (%s)", strings.Join(spec.Allowed, ", "))
+	}
+	if len(spec.AllowedRegex) > 0 {
+		append += fmt.Sprintf(", or matching the regex %s", spec.AllowedRegex)
+	}
+	return
+}
+
+func (s storageClassNotValid) Error() (err string) {
+	return "A valid Storage Class must be used" + appendError(s.spec)
 }
 
 type storageClassForbidden struct {
-	storageClassName string
+	className string
+	spec      v1alpha1.StorageClassesSpec
 }
 
-func NewStorageClassForbidden(storageClassName string) error {
-	return &storageClassForbidden{storageClassName: storageClassName}
+func NewStorageClassForbidden(className string, storageClasses v1alpha1.StorageClassesSpec) error {
+	return &storageClassForbidden{
+		className: className,
+		spec:      storageClasses,
+	}
 }
 
 func (f storageClassForbidden) Error() string {
-	return fmt.Sprintf("Storage Class %s is forbidden for the current Tenant", f.storageClassName)
+	return fmt.Sprintf("Storage Class %s is forbidden for the current Tenant%s", f.className, appendError(f.spec))
 }
