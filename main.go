@@ -23,11 +23,11 @@ import (
 	"regexp"
 	goRuntime "runtime"
 
+	"go.uber.org/zap/zapcore"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
-
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
@@ -90,8 +90,12 @@ func main() {
 		"during Namespace creation, to name it using the selected Tenant name as prefix, separated by a dash. "+
 		"This is useful to avoid Namespace name collision in a public CaaS environment.")
 	flag.StringVar(&protectedNamespaceRegexpString, "protected-namespace-regex", "", "Disallow creation of namespaces, whose name matches this regexp")
-	opts := zap.Options{}
 
+	opts := zap.Options{
+		EncoderConfigOptions: append([]zap.EncoderConfigOption{}, func(config *zapcore.EncoderConfig) {
+			config.EncodeTime = zapcore.ISO8601TimeEncoder
+		}),
+	}
 	opts.BindFlags(flag.CommandLine)
 	flag.Parse()
 
