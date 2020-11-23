@@ -106,6 +106,20 @@ spec:
                 - subjects
                 type: object
               type: array
+            containerRegistries:
+              properties:
+                allowed:
+                  items:
+                    type: string
+                  nullable: true
+                  type: array
+                allowedRegex:
+                  nullable: true
+                  type: string
+              required:
+              - allowed
+              - allowedRegex
+              type: object
             ingressClasses:
               properties:
                 allowed:

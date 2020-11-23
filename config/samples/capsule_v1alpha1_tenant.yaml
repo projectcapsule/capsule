@@ -90,3 +90,7 @@ spec:
     allowed:
       - default
     allowedRegex: ""
+  containerRegistries:
+    allowed:
+      - docker.io
+    allowedRegex: ""
