@@ -5,4 +5,4 @@ kind: Kustomization
 images:
 - name: controller
   newName: quay.io/clastix/capsule
-  newTag: v0.0.2
+  newTag: v0.0.3
