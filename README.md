@@ -14,24 +14,19 @@
 
 ---
 
-
-
-# A multi-tenant operator for Kubernetes
-This project provides a custom operator for implementing a strong
-multi-tenant environment in _Kubernetes_. **Capsule** is not intended to be yet another _PaaS_, instead, it has been designed as a lightweight tool with a minimalist approach leveraging only the standard features of upstream Kubernetes. 
+# Kubernetes multi-tenancy made simple
+This project provides a custom operator to implement multi-tenancy and policy control in your Kubernetes cluster. **Capsule** is not intended to be yet another _PaaS_, instead, it has been designed as a lightweight tool with a minimalist approach leveraging only the standard features of upstream Kubernetes. 
 
 # Which is the problem to solve?
-Kubernetes introduced the _namespace_ resource to create logical partitions of the
-cluster. A Kubernetes namespace creates a sort of isolated *slice* in the
-cluster: _Network and Security Policies_, _Resource Quota_, _Limit Ranges_, and
-_RBAC_ can be used to enforce isolation among different namespaces. Namespace isolation shines when Kubernetes is used to isolate the different environments or the different types of applications. Also, it works well to isolate applications serving different users when implementing the SaaS delivery model. 
+Kubernetes introduced the _Namespace_ resource to create logical partitions of the
+cluster as isolated *slices*. Namespace isolation shines when Kubernetes is used to isolate different environments or the different types of applications. Also, it works well to isolate applications serving different users when implementing the SaaS model. 
 
-However, implementing advanced multi-tenancy scenarios, for example, a private or public _Container-as-a-Service_ platform, it becomes soon complicated because of the flat structure of Kubernetes namespaces. In such scenarios, different groups of users get assigned a pool of namespaces with a limited amount of resources (e.g.: _nodes_, _vCPU_, _RAM_, _ephemeral and persistent storage_). When users need more namespaces or move resources from one namespace to another, they always need the intervention of the cluster admin because each namespace still works as an isolated environment. To work around this, and not being overwhelmed by continuous users' requests, cluster admins often choose to create multiple smaller clusters and assign a dedicated cluster to each organization or group of users leading to the well know and painful phenomena of the _clusters sprawl_.
+However, implementing advanced multi-tenancy scenarios, it becomes soon complicated because of the flat structure of Kubernetes namespaces. To overcome this, different groups of users or teams get assigned a dedicated cluster. As your organization grows, the number of clusters to manage and to keep aligned becomes a pain, leading to the well know phenomena of the _clusters sprawl_.
 
-**Capsule** takes a different approach. It aggregates multiple namespaces assigned to an organization or group of users in a lightweight abstraction called _Tenant_. Within each tenant, users are free to create their namespaces and share all the assigned resources between the namespaces of the tenant. The _Network and Security Policies_, _Resource Quota_, _Limit Ranges_, _RBAC_, and other constraints defined at the tenant level are automatically inherited by all the namespaces in the tenant leaving the tenant's users to freely allocate resources without any intervention of the cluster administrator.
+**Capsule** takes a different approach. In a single cluster, it aggregates multiple namespaces assigned to a team or group of users in a lightweight abstraction called _Tenant_. Within each tenant, users are free to create their namespaces and share all the resources in the tenant. The _Network and Security Policies_, _Resource Quota_, _Limit Ranges_, _RBAC_, and other constraints defined at the tenant level are automatically inherited by all the namespaces in the tenant. And users are free to admin their tenants in authonomy, without the intervention of the cluster administrator.
 
 # Use cases for Capsule
-Please, refer to the corresponding [section](use_cases.md) for a more detailed list of use cases that Capsule can address.
+Please, refer to the corresponding [section](documentation.md) in the documentation for a more detailed list of use cases that Capsule can address.
 
 # Installation
 Make sure you have access to a Kubernetes cluster as an administrator.
@@ -47,50 +42,50 @@ Ensure you have `kubectl` and `kustomize` installed in your `PATH`.
 Clone this repository and move to the repo folder:
 
 ```
-make deploy
-# /home/prometherion/go/bin/controller-gen "crd:trivialVersions=true" rbac:roleName=manager-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases
-# cd config/manager && /usr/local/bin/kustomize edit set image controller=quay.io/clastix/capsule:latest
-# /usr/local/bin/kustomize build config/default | kubectl apply -f -
-# namespace/capsule-system created
-# customresourcedefinition.apiextensions.k8s.io/tenants.capsule.clastix.io created
-# clusterrole.rbac.authorization.k8s.io/capsule-proxy-role created
-# clusterrole.rbac.authorization.k8s.io/capsule-metrics-reader created
-# clusterrolebinding.rbac.authorization.k8s.io/capsule-manager-rolebinding created
-# clusterrolebinding.rbac.authorization.k8s.io/capsule-proxy-rolebinding created
-# secret/capsule-ca created
-# secret/capsule-tls created
-# service/capsule-controller-manager-metrics-service created
-# service/capsule-webhook-service created
-# deployment.apps/capsule-controller-manager created
-# mutatingwebhookconfiguration.admissionregistration.k8s.io/capsule-mutating-webhook-configuration created
-# validatingwebhookconfiguration.admissionregistration.k8s.io/capsule-validating-webhook-configuration created
+$ git clone https://github.com/clastix/capsule
+$ cd capsule
+$ make deploy
 ```
 
-Log verbosity of the Capsule controller can be increased by passing the `--zap-log-level` option with a value from `1` to `10` or the [basic keywords](https://godoc.org/go.uber.org/zap/zapcore#Level) although it is suggested to use the `--zap-devel` flag to get also stack traces.
-
-During startup Capsule controller will create additional ClusterRoles `capsule-namespace-deleter`, `capsule-namespace-provisioner` and ClusterRoleBinding `capsule-namespace-provisioner`. These resources are used in order to allow Capsule users to manage their namespaces in tenants.
-
-You can disallow users to create namespaces matching a particular regexp by passing `--protected-namespace-regex` option with a value of regular expression.
+It will install the Capsule controller in a dedicated namespace `capsule-system`.
 
 ## Admission Controllers
-Capsule implements Kubernetes multi-tenancy capabilities using a minimum set of standard [Admission Controllers](https://kubernetes.io/docs/reference/access-authn-authz/admission-controllers/) enabled on the Kubernetes APIs server: `--enable-admission-plugins=PodNodeSelector,LimitRanger,ResourceQuota,MutatingAdmissionWebhook,ValidatingAdmissionWebhook`. In addition to these default controllers, Capsule implements its own set of Admission Controllers through the [Dynamic Admission Controller](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/), providing callbacks to add further validation or resource patching.
+Capsule implements Kubernetes multi-tenancy capabilities using a minimum set of standard [Admission Controllers](https://kubernetes.io/docs/reference/access-authn-authz/admission-controllers/) enabled on the Kubernetes APIs server. See the corresponding [section](documentation.md) in the documentation for a detailed list of required Admission Controllers.
 
-All these requests must be served via HTTPS and a CA must be provided to ensure that
-the API Server is communicating with the right client. Capsule upon installation is setting its custom Certificate Authority as a client certificate as well, updating all the required resources to minimize the operational tasks.
+In addition to the required controllers, Capsule implements its own set through the [Dynamic Admission Controller](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/) mechanism, providing callbacks to add further validation or resource patching.
+
+## How to create a Tenant
+Use the [scaffold Tenant](config/samples/capsule_v1alpha1_tenant.yaml)
+and simply apply as cluster admin.
+
+```
+$ kubectl apply -f config/samples/capsule_v1alpha1_tenant.yaml
+tenant.capsule.clastix.io/oil created
+```
+
+You can check the tenant just created as
+
+```
+$ kubectl get tenants
+NAME      NAMESPACE QUOTA   NAMESPACE COUNT   OWNER NAME   OWNER KIND   NODE SELECTOR    AGE
+oil       3                 0                 alice        User                          1m
+```
 
 ## Tenant users
-Each tenant comes with a delegated user acting as the tenant admin. In the Capsule jargon, this user is called the _Tenant Owner_. Other users can operate inside a tenant with different levels of permissions and authorizations assigned directly by the Tenant owner.
+Each tenant comes with a delegated user or group of users acting as the tenant admin. In the Capsule jargon, this is called the _Tenant Owner_. Other users can operate inside a tenant with different levels of permissions and authorizations assigned directly by the Tenant Owner.
 
 Capsule does not care about the authentication strategy used in the cluster and all the Kubernetes methods of [authentication](https://kubernetes.io/docs/reference/access-authn-authz/authentication/) are supported. The only requirement to use Capsule is to assign tenant users to the the group defined by `--capsule-user-group` option, which defaults to `capsule.clastix.io`.
 
-Assignment to a group depends on the authentication strategy in your cluster. For example, if you are using `capsule.clastix.io` as your `--capsule-user-group`, users authenticated through a _X.509_ certificate must have `capsule.clastix.io` as _Organization_: `-subj "/CN=${USER}/O=capsule.clastix.io"`
+Assignment to a group depends on the authentication strategy in your cluster.
+
+For example, if you are using `capsule.clastix.io`, users authenticated through a _X.509_ certificate must have `capsule.clastix.io` as _Organization_: `-subj "/CN=${USER}/O=capsule.clastix.io"`
 
 Users authenticated through an _OIDC token_ must have
 
 ```json
 ...
 "users_groups": [
-    "/capsule.clastix.io",
+    "capsule.clastix.io",
     "other_group"
   ]
 ```
@@ -112,51 +107,59 @@ kubeconfig file is: alice-oil.kubeconfig
 to use it as alice export KUBECONFIG=alice-oil.kubeconfig
 ```
 
-## How to create a Tenant
-Use the [scaffold Tenant](config/samples/capsule_v1alpha1_tenant.yaml)
-and simply apply as Cluster Admin.
+Log as tenant owner
 
 ```
-kubectl apply -f config/samples/capsule_v1alpha1_tenant.yaml
-tenant.capsule.clastix.io/oil created
+$ export KUBECONFIG=alice-oil.kubeconfig
 ```
 
-The related Tenant owner `alice` can create Namespaces according to their assigned quota: happy Kubernetes cluster administration!
+and create a couple of new namespaces
+
+```
+$ kubectl create namespace oil-production
+$ kubectl create namespace oil-development
+```
+
+As user `alice` you can operate with fully admin permissions:
+
+```
+$ kubectl -n oil-development run nginx --image=docker.io/nginx 
+$ kubectl -n oil-development get pods
+```
+
+but limited to only your own namespaces:
+
+```
+$ kubectl -n kube-system get pods
+Error from server (Forbidden): pods is forbidden: User "alice" cannot list resource "pods" in API group "" in the namespace "kube-system"
+```
+
+Please, check the [section](documentation.md) in the documentation for a list of more cool things you can do with Capsule.
 
 # Removal
 Similar to `deploy`, you can get rid of Capsule using the `remove` target.
 
 ```
-make remove
-# /home/prometherion/go/bin/controller-gen "crd:trivialVersions=true" rbac:roleName=manager-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases
-# /usr/local/bin/kustomize build config/default | kubectl delete -f -
-# namespace "capsule-system" deleted
-# customresourcedefinition.apiextensions.k8s.io "tenants.capsule.clastix.io" deleted
-# clusterrole.rbac.authorization.k8s.io "capsule-proxy-role" deleted
-# clusterrole.rbac.authorization.k8s.io "capsule-metrics-reader" deleted
-# clusterrolebinding.rbac.authorization.k8s.io "capsule-manager-rolebinding" deleted
-# clusterrolebinding.rbac.authorization.k8s.io "capsule-proxy-rolebinding" deleted
-# secret "capsule-ca" deleted
-# secret "capsule-tls" deleted
-# service "capsule-controller-manager-metrics-service" deleted
-# service "capsule-webhook-service" deleted
-# deployment.apps "capsule-controller-manager" deleted
-# mutatingwebhookconfiguration.admissionregistration.k8s.io "capsule-mutating-webhook-configuration" deleted
-# validatingwebhookconfiguration.admissionregistration.k8s.io "capsule-validating-webhook-configuration" deleted
+$ make remove
 ```
 
-# How to contribute
-Any contribution is welcome! Please refer to the corresponding [section](contributing.md).
-
-# Production Grade
-
-Although under frequent development and improvements, Capsule is ready to be used in production environments: check out the **Release** page for a detailed list of available versions.
-
 # FAQ
-tbd
+- Q. How to pronunce Capsule?
 
-# Changelog
-tbd
+  A. It should be pronounced as `/ˈkæpsjuːl/` with a bit of french accent.
 
-# Roadmap
-tbd
+- Q. Can I contribute?
+
+  A. Absolutely! Capsule is Open Source with Apache 2 license and any contribution is welcome. Please refer to the corresponding [section](documentation.md) in the documentation.
+
+- Q. Is it production grade?
+
+  A. Although under frequent development and improvements, Capsule is ready to be used in production environments as currently, people are using it in public and private deployments. Check out the **Release** page for a detailed list of available versions.
+
+- Q. Does it work with my Kuberentes XYZ distribution?
+
+  A. We tested Capsule with vanilla Kubernetes 1.16+ on private envirnments and public clouds. We expect it works smootly on any other distribution. Please, let us know if you find it doesn't.
+
+- Q. Do you provide commercial support?
+
+  A. Yes, we're available to help and provide commercial support. [Clastix](https://clastix.io) is the company behind Capsule. Please, contact us for a quote. 
