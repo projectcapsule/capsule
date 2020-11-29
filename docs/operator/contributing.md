@@ -1,11 +1,9 @@
 # How to contribute to Capsule
-
 First, thanks for your interest in Capsule, any contribution is welcome!
 
-The first step is to set up your local development environment
+The first step is to set up your local development environment as stated below:
 
 ## Setting up the development environment
-
 The following dependencies are mandatory:
 
 - [Go 1.13.8](https://golang.org/dl/)
@@ -16,7 +14,6 @@ The following dependencies are mandatory:
 - [golangci-lint](https://github.com/golangci/golangci-lint)
 
 ### Installing Go dependencies
-
 After cloning Capsule on any folder, access it and issue the following command
 to ensure all dependencies are properly downloaded.
 
@@ -25,20 +22,17 @@ go mod download
 ```
 
 ### Installing Operator SDK
-
 Some operations, like the Docker image build process or the code-generation of
 the CRDs manifests, as well the deep copy functions, require _Operator SDK_:
 the binary has to be installed into your `PATH`.
 
 ### Installing Kubebuilder
-
 With the latest release of OperatorSDK there's a more tightly integration with
 Kubebuilder and its opinionated testing suite: ensure to download the latest
 binaries available from the _Releases_ GitHub page and place them into the
 `/usr/local/kubebuilder/bin` folder, ensuring this is also in your `PATH`.
 
 ### Installing KinD
-
 Capsule can run on any certified Kubernetes installation and locally
 the whole development is performed on _KinD_, also knows as
 [Kubernetes in Docker](https://github.com/kubernetes-sigs/kind).
@@ -72,7 +66,6 @@ The current `KUBECONFIG` will be populated with the `cluster-admin`
 certificates and the context changed to the just born Kubernetes cluster.
 
 ### Build the Docker image and push it to KinD
-
 From the root path, issue the _make_ recipe:
 
 ```
@@ -140,7 +133,6 @@ Image: "quay.io/clastix/capsule:latest" with ID "sha256:ebb8f640dda129a795ddc68b
 ```
 
 ### Deploy the Kubernetes manifests
-
 With the current `kind-capsule` context enabled, deploy all the required
 manifests issuing the following command:
 
@@ -185,12 +177,10 @@ it is suggested to use the `--zap-devel` flag to get also stack traces.
 > application to serve properly HTTPS requests.
 
 ### Run Capsule locally
-
 Debugging remote applications is always struggling but Operators just need
 access to the Kubernetes API Server.
 
 #### Scaling down the remote Pod
-
 First, ensure the Capsule pod is not running scaling down the Deployment.
 
 ```
@@ -201,7 +191,6 @@ deployment.apps/capsule-controller-manager scaled
 > This is mandatory since Capsule uses Leader Election
 
 #### Providing TLS certificate for webhooks
-
 Next step is to replicate the same environment Capsule is expecting in the Pod,
 it means creating a fake certificate to handle HTTP requests.
 
@@ -217,7 +206,6 @@ kubectl -n capsule-system get secret capsule-tls -o jsonpath='{.data.tls\.key}' 
 > to provide a self-signed certificate in the said directory.
 
 #### Starting NGROK
-
 In another session, we need a `ngrok` session, mandatory to debug also webhooks
 (YMMV).
 
@@ -241,7 +229,6 @@ since we're going to use this default URL as the `url` parameter for the
 _Dynamic Admissions Control Webhooks_.
 
 #### Patching the MutatingWebhookConfiguration
-
 Now it's time to patch the _MutatingWebhookConfiguration_ and the
 _ValidatingWebhookConfiguration_ too, adding the said `ngrok` URL as base for
 each defined webhook, as following:
@@ -270,7 +257,6 @@ webhooks:
 ```
 
 #### Run Capsule
-
 Finally, it's time to run locally Capsule using your preferred IDE (or not):
 from the project root path, you can issue the following command.
 
@@ -282,12 +268,10 @@ All the logs will start to flow in your standard output, feel free to attach
 your debugger to set breakpoints as well!
 
 ## Code convention
-
 The changes must follow the Pull Request method where a _GitHub Action_ will
 check the `golangci-lint`, so ensure your changes respect the coding standard.
 
 ### golint
-
 You can easily check them issuing the _Make_ recipe `golint`.
 
 ```
@@ -296,7 +280,6 @@ golangci-lint run
 ```
 
 ### goimports
-
 Also, the Go import statements must be sorted following the best practice:
 
 ```
@@ -315,7 +298,6 @@ goimports -w -l -local "github.com/clastix/capsule" .
 ```
 
 ### Commits
-
 All the Pull Requests must refer to an already open issue: this is the first phase to contribute also for informing maintainers about the issue.
 
 Commit's first line should not exceed 50 columns.
