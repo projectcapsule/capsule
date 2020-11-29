@@ -29,7 +29,7 @@ However, implementing advanced multi-tenancy scenarios, it becomes soon complica
 Please, refer to the corresponding [section](documentation.md) in the documentation for a more detailed list of use cases that Capsule can address.
 
 # Installation
-Make sure you have access to a Kubernetes cluster as an administrator.
+Make sure you have access to a Kubernetes cluster as administrator.
 
 There are two ways to install Capsule:
 
@@ -49,11 +49,6 @@ $ make deploy
 
 It will install the Capsule controller in a dedicated namespace `capsule-system`.
 
-## Admission Controllers
-Capsule implements Kubernetes multi-tenancy capabilities using a minimum set of standard [Admission Controllers](https://kubernetes.io/docs/reference/access-authn-authz/admission-controllers/) enabled on the Kubernetes APIs server. See the corresponding [section](documentation.md) in the documentation for a detailed list of required Admission Controllers.
-
-In addition to the required controllers, Capsule implements its own set through the [Dynamic Admission Controller](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/) mechanism, providing callbacks to add further validation or resource patching.
-
 ## How to create a Tenant
 Use the [scaffold Tenant](config/samples/capsule_v1alpha1_tenant.yaml)
 and simply apply as cluster admin.
@@ -71,7 +66,7 @@ NAME      NAMESPACE QUOTA   NAMESPACE COUNT   OWNER NAME   OWNER KIND   NODE SEL
 oil       3                 0                 alice        User                          1m
 ```
 
-## Tenant users
+## Tenant owners
 Each tenant comes with a delegated user or group of users acting as the tenant admin. In the Capsule jargon, this is called the _Tenant Owner_. Other users can operate inside a tenant with different levels of permissions and authorizations assigned directly by the Tenant Owner.
 
 Capsule does not care about the authentication strategy used in the cluster and all the Kubernetes methods of [authentication](https://kubernetes.io/docs/reference/access-authn-authz/authentication/) are supported. The only requirement to use Capsule is to assign tenant users to the the group defined by `--capsule-user-group` option, which defaults to `capsule.clastix.io`.
@@ -87,7 +82,7 @@ Users authenticated through an _OIDC token_ must have
 "users_groups": [
     "capsule.clastix.io",
     "other_group"
-  ]
+]
 ```
 
 in their token.
@@ -134,7 +129,7 @@ $ kubectl -n kube-system get pods
 Error from server (Forbidden): pods is forbidden: User "alice" cannot list resource "pods" in API group "" in the namespace "kube-system"
 ```
 
-Please, check the [section](documentation.md) in the documentation for a list of more cool things you can do with Capsule.
+Please, check the [use cases](documentation.md) section in the documentation for a list of more cool things you can do with Capsule.
 
 # Removal
 Similar to `deploy`, you can get rid of Capsule using the `remove` target.
