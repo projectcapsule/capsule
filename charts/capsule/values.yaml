@@ -1,0 +1,54 @@
+# Default values for capsule.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+manager:
+  image:
+    repository: quay.io/clastix/capsule
+    pullPolicy: IfNotPresent
+    tag: ''
+  # Additional Capsule options
+  options:
+    logLevel: '4'
+    forceTenantPrefix:
+    capsuleUserGroup:
+    protectedNamespaceRegex:
+  resources:
+    limits:
+      cpu: 200m
+      memory: 128Mi
+    requests:
+      cpu: 200m
+      memory: 128Mi
+proxy:
+  image:
+    repository: gcr.io/kubebuilder/kube-rbac-proxy
+    pullPolicy: IfNotPresent
+    tag: "v0.5.0"
+  resources:
+    limits:
+      cpu: 100m
+      memory: 128Mi
+    requests:
+      cpu: 10m
+      memory: 64Mi
+mutatingWebhooksTimeoutSeconds: 30
+validatingWebhooksTimeoutSeconds: 30
+imagePullSecrets: []
+serviceAccount:
+  create: true
+  annotations: {}
+  name: "capsule"
+podAnnotations: {}
+priorityClassName: '' #system-cluster-critical
+nodeSelector: {}
+#  node-role.kubernetes.io/master: ""
+tolerations: []
+#- key: CriticalAddonsOnly
+#  operator: Exists
+#- effect: NoSchedule
+#  key: node-role.kubernetes.io/master
+replicaCount: 1
+affinity: {}
+podSecurityPolicy:
+  enabled: false

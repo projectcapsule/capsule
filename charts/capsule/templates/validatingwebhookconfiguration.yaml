@@ -1,0 +1,235 @@
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: {{ include "capsule.fullname" . }}-validating-webhook-configuration
+  labels:
+    {{- include "capsule.labels" . | nindent 4 }}
+webhooks:
+- admissionReviewVersions:
+  - v1beta1
+  clientConfig:
+    caBundle: Cg==
+    service:
+      name: {{ include "capsule.fullname" . }}-webhook-service
+      namespace: {{ .Release.Namespace }}
+      path: /validating-ingress
+      port: 443
+  failurePolicy: Fail
+  matchPolicy: Exact
+  name: ingress-v1beta1.capsule.clastix.io
+  namespaceSelector:
+    matchExpressions:
+    - key: capsule.clastix.io/tenant
+      operator: Exists
+  objectSelector: {}
+  rules:
+  - apiGroups:
+    - networking.k8s.io
+    - extensions
+    apiVersions:
+    - v1beta1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - ingresses
+    scope: '*'
+  sideEffects: NoneOnDryRun
+  timeoutSeconds: {{ .Values.validatingWebhooksTimeoutSeconds }}
+- admissionReviewVersions:
+  - v1beta1
+  clientConfig:
+    caBundle: Cg==
+    service:
+      name: {{ include "capsule.fullname" . }}-webhook-service
+      namespace: {{ .Release.Namespace }}
+      path: /validating-ingress
+      port: 443
+  failurePolicy: Fail
+  matchPolicy: Exact
+  name: ingress-v1.capsule.clastix.io
+  namespaceSelector:
+    matchExpressions:
+    - key: capsule.clastix.io/tenant
+      operator: Exists
+  objectSelector: {}
+  rules:
+  - apiGroups:
+    - networking.k8s.io
+    apiVersions:
+    - v1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - ingresses
+    scope: '*'
+  sideEffects: NoneOnDryRun
+  timeoutSeconds: {{ .Values.validatingWebhooksTimeoutSeconds }}
+- admissionReviewVersions:
+  - v1beta1
+  clientConfig:
+    caBundle: Cg==
+    service:
+      name: {{ include "capsule.fullname" . }}-webhook-service
+      namespace: {{ .Release.Namespace }}
+      path: /validate-v1-namespace-quota
+      port: 443
+  failurePolicy: Fail
+  matchPolicy: Exact
+  name: quota.namespace.capsule.clastix.io
+  namespaceSelector: {}
+  objectSelector: {}
+  rules:
+  - apiGroups:
+    - ""
+    apiVersions:
+    - v1
+    operations:
+    - CREATE
+    resources:
+    - namespaces
+    scope: '*'
+  sideEffects: NoneOnDryRun
+  timeoutSeconds: {{ .Values.validatingWebhooksTimeoutSeconds }}
+- admissionReviewVersions:
+  - v1beta1
+  clientConfig:
+    caBundle: Cg==
+    service:
+      name: {{ include "capsule.fullname" . }}-webhook-service
+      namespace: {{ .Release.Namespace }}
+      path: /validating-v1-network-policy
+      port: 443
+  failurePolicy: Fail
+  matchPolicy: Exact
+  name: validating.network-policy.capsule.clastix.io
+  namespaceSelector:
+    matchExpressions:
+    - key: capsule.clastix.io/tenant
+      operator: Exists
+  objectSelector: {}
+  rules:
+  - apiGroups:
+    - networking.k8s.io
+    apiVersions:
+    - v1
+    operations:
+    - CREATE
+    - UPDATE
+    - DELETE
+    resources:
+    - networkpolicies
+    scope: '*'
+  sideEffects: NoneOnDryRun
+  timeoutSeconds: {{ .Values.validatingWebhooksTimeoutSeconds }}
+- admissionReviewVersions:
+  - v1beta1
+  clientConfig:
+    caBundle: Cg==
+    service:
+      name: {{ include "capsule.fullname" . }}-webhook-service
+      namespace: {{ .Release.Namespace }}
+      path: /validating-v1-pvc
+      port: 443
+  failurePolicy: Fail
+  matchPolicy: Exact
+  name: pvc.capsule.clastix.io
+  namespaceSelector:
+    matchExpressions:
+    - key: capsule.clastix.io/tenant
+      operator: Exists
+  objectSelector: {}
+  rules:
+  - apiGroups:
+    - ""
+    apiVersions:
+    - v1
+    operations:
+    - CREATE
+    resources:
+    - persistentvolumeclaims
+    scope: '*'
+  sideEffects: NoneOnDryRun
+  timeoutSeconds: {{ .Values.validatingWebhooksTimeoutSeconds }}
+- admissionReviewVersions:
+  - v1beta1
+  clientConfig:
+    caBundle: Cg==
+    service:
+      name: {{ include "capsule.fullname" . }}-webhook-service
+      namespace: {{ .Release.Namespace }}
+      path: /validating-v1-tenant
+      port: 443
+  failurePolicy: Fail
+  matchPolicy: Exact
+  name: tenant.capsule.clastix.io
+  namespaceSelector: {}
+  objectSelector: {}
+  rules:
+  - apiGroups:
+    - capsule.clastix.io
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    resources:
+    - tenants
+    scope: '*'
+  sideEffects: NoneOnDryRun
+  timeoutSeconds: {{ .Values.validatingWebhooksTimeoutSeconds }}
+- admissionReviewVersions:
+  - v1beta1
+  clientConfig:
+    caBundle: Cg==
+    service:
+      name: {{ include "capsule.fullname" . }}-webhook-service
+      namespace: {{ .Release.Namespace }}
+      path: /validating-v1-namespace-tenant-prefix
+      port: 443
+  failurePolicy: Fail
+  matchPolicy: Exact
+  name: prefix.namespace.capsule.clastix.io
+  namespaceSelector: {}
+  objectSelector: {}
+  rules:
+  - apiGroups:
+    - ""
+    apiVersions:
+    - v1
+    operations:
+    - CREATE
+    resources:
+    - namespaces
+    scope: '*'
+  sideEffects: NoneOnDryRun
+  timeoutSeconds: {{ .Values.validatingWebhooksTimeoutSeconds }}
+- admissionReviewVersions:
+  - v1beta1
+  clientConfig:
+    caBundle: Cg==
+    service:
+      name: {{ include "capsule.fullname" . }}-webhook-service
+      namespace: {{ .Release.Namespace }}
+      path: /validating-v1-registry
+      port: 443
+  failurePolicy: Ignore
+  matchPolicy: Exact
+  name: pod.capsule.clastix.io
+  namespaceSelector:
+    matchExpressions:
+    - key: capsule.clastix.io/tenant
+      operator: Exists
+  objectSelector: {}
+  rules:
+  - apiGroups:
+    - ""
+    apiVersions:
+    - v1
+    operations:
+    - CREATE
+    resources:
+    - pods
+    scope: '*'
+  sideEffects: NoneOnDryRun
+  timeoutSeconds: {{ .Values.validatingWebhooksTimeoutSeconds }}

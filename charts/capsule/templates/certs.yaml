@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  labels:
+    {{- include "capsule.labels" . | nindent 4 }}
+  name: {{ include "capsule.fullname" . }}-tls
+data:
