@@ -20,13 +20,13 @@ Use the Capsule Operator for easily implementing, managing, and maintaining muti
 
 The Capsule Operator Chart can be used to instantly deploy the Capsule Operator on your Kubernetes cluster.
 
-1. Clone this repo:
+1. Add this repository:
 
-        $ git clone https://github.com/clastix/capsule-helm-chart
+        $ helm repo add clastix https://clastix.github.io/charts
 
 2. Install the Chart:
 
-        $ helm install capsule capsule-helm-chart -n capsule-system
+        $ helm install capsule capsule -n capsule-system
 
 3. Show the status:
 
