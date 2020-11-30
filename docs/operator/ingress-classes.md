@@ -9,6 +9,10 @@ kind: Tenant
 metadata:
   name: oil
 spec:
+  owner:
+    name: alice
+    kind: User
+  namespaceQuota: 3
   ingressClasses:
      allowed:
      - oil
@@ -23,6 +27,10 @@ kind: Tenant
 metadata:
   name: oil
 spec:
+  owner:
+    name: alice
+    kind: User
+  namespaceQuota: 3
   ingressClasses:
      allowedRegex: "^oil-.*$"
   ...

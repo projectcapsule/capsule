@@ -102,7 +102,8 @@ kubeconfig file is: alice-oil.kubeconfig
 to use it as alice export KUBECONFIG=alice-oil.kubeconfig
 ```
 
-Log as tenant owner
+## Working in a Tenant
+Log in to the Kubernetes cluster as `alice` tenant owner
 
 ```
 $ export KUBECONFIG=alice-oil.kubeconfig

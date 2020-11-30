@@ -69,7 +69,7 @@ alice@caas# kubectl create ns oil-development
 alice@caas# kubectl create ns oil-test
 ```
 
-While Alice creates Namespace resources, the Capsule controller updates the status of the tenant so Bill, the cluster admin, can check its status:
+While Alice creates namespace resources, the Capsule controller updates the status of the tenant so Bill, the cluster admin, can check its status:
 
 ```
 bill@caas# kubectl describe tenant oil

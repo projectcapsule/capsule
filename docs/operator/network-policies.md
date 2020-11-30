@@ -1,7 +1,7 @@
 # Set network policies in the tenant
 Kubernetes network policies allow controlling network traffic between namespaces and between pods in the same namespace. Bill, the cluster admin, can enforce network traffic isolation between different tenants while leaving to Alice, the tenant owner, the freedom to set isolation between namespaces in the same tenant or even between pods in the same namespace.
 
-To meet this requirement, Bill needs to define network policies that deny pods belonging to a tenant namespace to access pods in namespaces belonging to other tenants or in system namespaces, (e.g. `kube-system`).
+To meet this requirement, Bill needs to define network policies that deny pods belonging to Alice's namespaces to access pods in namespaces belonging to other tenants, e.g. Bob's tenant `water`, or in system namespaces, e.g. `kube-system`.
 
 Also, Bill can make sure pods belonging to a tenant namespace cannot access other network infrastructure like cluster nodes, load balancers, and virtual machines running other services.  
 
@@ -13,23 +13,29 @@ kind: Tenant
 metadata:
   name: oil
 spec:
+  owner:
+    name: alice
+    kind: User
+  namespaceQuota: 3
   networkPolicies:
-    - policyTypes:
-      - Ingress
-      - Egress
-      podSelector: {}
-      ingress:
-      - from:
-        - namespaceSelector: {}
-        - podSelector: {}
-        - ipBlock:
-            cidr: 192.168.0.0/16
-      egress:
-      - to:
-        - ipBlock:
-            cidr: 0.0.0.0/0
-            except:
-            - 192.168.0.0/16
+  - policyTypes:
+    - Ingress
+    - Egress
+    egress:
+    - to:
+      - ipBlock:
+          cidr: 0.0.0.0/0
+          except:
+            - 192.168.0.0/16 
+    ingress:
+    - from:
+      - namespaceSelector:
+          matchLabels:
+            capsule.clastix.io/tenant: oil
+      - podSelector: {}
+      - ipBlock:
+          cidr: 192.168.0.0/16
+    podSelector: {}
 ```
 
 The Capsule controller, watching for Namespace creation, creates the Network Policies for each Namespace in the tenant.
@@ -40,34 +46,6 @@ Alice has access to these network policies:
 alice@caas# kubectl -n oil-production get networkpolicies
 NAME            POD-SELECTOR   AGE
 capsule-oil-0   <none>         42h
-
-
-alice@caas# kubectl -n oil-production describe networkpolicy
-Name:         capsule-oil-0
-Namespace:    oil-production
-Created on:   2020-07-20 20:40:28 +0200 CEST
-Labels:       capsule.clastix.io/network-policy=0
-              capsule.clastix.io/tenant=oil
-Annotations:  <none>
-Spec:
-  PodSelector:     <none> (Allowing the specific traffic to all pods in this namespace)
-  Allowing ingress traffic:
-    To Port: <any> (traffic allowed to all ports)
-    From:
-      NamespaceSelector: <none>
-    From:
-      PodSelector: <none>
-    From:
-      IPBlock:
-        CIDR: 192.168.0.0/12
-        Except: 
-  Allowing egress traffic:
-    To Port: <any> (traffic allowed to all ports)
-    To:
-      IPBlock:
-        CIDR: 0.0.0.0/0
-        Except: 192.168.0.0/12
-  Policy Types: Ingress, Egress  
 ```
 
 Alice can create, patch, and delete additional network policies within her namespaces

@@ -8,9 +8,9 @@ metadata:
   name: oil
 spec:
   owner:
-    name: oil
-    kind: Group
-  namespaceQuota: 9
+    name: alice
+    kind: User
+  namespaceQuota: 3
   resourceQuotas:
   - hard:
       limits.cpu: "8"
@@ -121,9 +121,9 @@ metadata:
   name: oil
 spec:
   owner:
-    name: oil
-    kind: Group
-  namespaceQuota: 9
+    name: alice
+    kind: User
+  namespaceQuota: 3
   limitRanges:
   - limits:
     - max:

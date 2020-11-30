@@ -7,6 +7,10 @@ kind: Tenant
 metadata:
   name: oil
 spec:
+  owner:
+    name: alice
+    kind: User
+  namespaceQuota: 3
   storageClasses:
     allowed:
     - ceph-rbd
@@ -22,6 +26,10 @@ kind: Tenant
 metadata:
   name: oil
 spec:
+  owner:
+    name: alice
+    kind: User
+  namespaceQuota: 3
   storageClasses:
      allowedRegex: "^ceph-.*$"
   ...

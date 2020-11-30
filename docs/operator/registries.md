@@ -10,6 +10,10 @@ kind: Tenant
 metadata:
   name: oil
 spec:
+  owner:
+    name: alice
+    kind: User
+  namespaceQuota: 3
   containerRegistries:
     allowed:
     - docker.io
@@ -31,6 +35,10 @@ kind: Tenant
 metadata:
   name: oil
 spec:
+  owner:
+    name: alice
+    kind: User
+  namespaceQuota: 3
   containerRegistries:
     allowed: []
     regex: "internal.registry.\\w.tld"

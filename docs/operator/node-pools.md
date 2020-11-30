@@ -22,9 +22,9 @@ metadata:
   name: oil
 spec:
   owner:
-    name: oil
-    kind: Group
-  namespaceQuota: 9
+    name: alice
+    kind: User
+  namespaceQuota: 3
   nodeSelector:
     pool: oil
   ...

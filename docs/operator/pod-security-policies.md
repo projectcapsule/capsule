@@ -37,6 +37,10 @@ kind: Tenant
 metadata:
   name: oil
 spec:
+  owner:
+    name: alice
+    kind: User
+  namespaceQuota: 3
   additionalRoleBindings:
   - clusterRoleName: psp:privileged
     subjects:

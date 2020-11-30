@@ -32,6 +32,10 @@ kind: Tenant
 metadata:
   name: oil
 spec:
+  owner:
+    name: alice
+    kind: User
+  namespaceQuota: 3
   additionalRoleBindings:
     - clusterRoleName: 'argoproj-provisioner'
       subjects:
@@ -49,14 +53,18 @@ or in case of Group type owners:
 apiVersion: capsule.clastix.io/v1alpha1
 kind: Tenant
 metadata:
-  name: spectre
+  name: oil
 spec:
+  owner:
+    name: alice
+    kind: User
+  namespaceQuota: 3
   additionalRoleBindings:
     - clusterRoleName: 'argoproj-provisioner'
       subjects:
         - apiGroup: rbac.authorization.k8s.io
-          kind: Group
-          name: oil
+          kind: User
+          name: alice
 ```
 
 With the given specification, Capsule will ensure that all Alice's namespaces will contain a _RoleBinding_ for the specified _Cluster Role_. For example, in the `oil-production` namespace, Alice will see:
@@ -68,18 +76,18 @@ metadata:
   name: capsule-oil-argoproj-provisioner
   namespace: oil-production
 subjects:
-  - kind: Group
+  - kind: User
     apiGroup: rbac.authorization.k8s.io
-    name: oil
+    name: alice
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
   name: argoproj-provisioner
 ```
 
-With the above example, Capsule is leaving any tenant owner of `oil` tenant to create namespaced custom resources.
+With the above example, Capsule is leaving the tenant owner to create namespaced custom resources.
 
 > Nota bene: a tenant owner having the admin scope on its namespaces only, does not have the permission to create Custom Resources Definitions (CRDs) because this requires a cluster admin permission level. Only Bill, the cluster admin, can create CRDs. This is a known limitation of any multi-tenancy environment based on a single Kubernetes cluster.
 
 # What’s next
-See how Bill, the cluster admin, can assign to Alice the permissions to create custom resources in her tenant. [Create custom resources in a tenant]().
+See how Bill, the cluster admin, can set taints on the Alice's namespaces. [Taint namespaces]().
