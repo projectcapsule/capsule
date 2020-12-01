@@ -26,7 +26,7 @@ The Capsule Operator Chart can be used to instantly deploy the Capsule Operator 
 
 2. Install the Chart:
 
-        $ helm install capsule capsule -n capsule-system
+        $ helm install capsule clastix/capsule -n capsule-system
 
 3. Show the status:
 
@@ -34,7 +34,7 @@ The Capsule Operator Chart can be used to instantly deploy the Capsule Operator 
 
 4. Upgrade the Chart
 
-        $ helm upgrade capsule -n capsule-system
+        $ helm upgrade capsule clastix/capsule -n capsule-system
 
 5. Uninstall the Chart
    
