@@ -1,0 +1,34 @@
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  name: {{ include "capsule.fullname" . }}-mutating-webhook-configuration
+  labels:
+    {{- include "capsule.labels" . | nindent 4 }}
+webhooks:
+- admissionReviewVersions:
+  - v1beta1
+  clientConfig:
+    caBundle: Cg==
+    service:
+      name: {{ include "capsule.fullname" . }}-webhook-service
+      namespace: {{ .Release.Namespace }}
+      path: /mutate-v1-namespace-owner-reference
+      port: 443
+  failurePolicy: Fail
+  matchPolicy: Exact
+  name: owner.namespace.capsule.clastix.io
+  namespaceSelector: {}
+  objectSelector: {}
+  reinvocationPolicy: Never
+  rules:
+  - apiGroups:
+    - ""
+    apiVersions:
+    - v1
+    operations:
+    - CREATE
+    resources:
+    - namespaces
+    scope: '*'
+  sideEffects: NoneOnDryRun
+  timeoutSeconds: {{ .Values.mutatingWebhooksTimeoutSeconds }}

@@ -139,7 +139,7 @@ e2e/%:
 	kind create cluster --name capsule --image=kindest/node:$*
 	make docker-build
 	kind load docker-image --nodes capsule-control-plane --name capsule $(IMG)
-	make deploy
-	while [ -z $$(kubectl -n capsule-system get secret capsule-tls -o jsonpath='{.data.tls\.crt}') ]; do echo "waiting Capsule to be up and running..." && sleep 5; done
+	kubectl create namespace capsule-system
+	helm upgrade --install --namespace capsule-system capsule ./charts/capsule --set 'manager.image.pullPolicy=Never' --set 'manager.resources=null'
 	ginkgo -v -tags e2e ./e2e
 	kind delete cluster --name capsule

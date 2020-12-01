@@ -1,0 +1,35 @@
+name: Helm Chart
+
+on:
+  push:
+    branches: [ "*" ]
+  pull_request:
+    branches: [ "*" ]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: azure/setup-helm@v1
+        with:
+          version: 3.3.4
+      - name: Linting Chart
+        run: helm lint ./charts/capsule
+  release:
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Publish Helm chart
+        uses: stefanprodan/helm-gh-pages@master
+        with:
+          token: ${{ secrets.BOT_GITHUB_TOKEN }}
+          charts_dir: charts
+          charts_url: https://clastix.github.io/charts
+          owner: clastix
+          repository: charts
+          branch: gh-pages
+          target_dir: .
+          commit_username: prometherion
+          commit_email: dario@tranchitella.eu

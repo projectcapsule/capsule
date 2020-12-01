@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "capsule.fullname" . }}-controller-manager-metrics-service
+  labels:
+    {{- include "capsule.labels" . | nindent 4 }}
+spec:
+  ports:
+  - port: 8443
+    name: https
+    protocol: TCP
+    targetPort: https
+  selector:
+    {{- include "capsule.selectorLabels" . | nindent 4 }}
+  sessionAffinity: None
+  type: ClusterIP

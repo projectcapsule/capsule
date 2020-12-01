@@ -1,0 +1,97 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "capsule.fullname" . }}-controller-manager
+  labels:
+    {{- include "capsule.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "capsule.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+    {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
+      labels:
+        {{- include "capsule.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "capsule.serviceAccountName" . }}
+      priorityClassName: {{ .Values.priorityClassName }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      volumes:
+        - name: cert
+          secret:
+            defaultMode: 420
+            secretName: {{ include "capsule.fullname" . }}-tls
+      containers:
+        - name: manager
+          command:
+          - /manager
+          args:
+          - --metrics-addr=127.0.0.1:8080
+          - --enable-leader-election
+          - --zap-log-level={{ default 4 .Values.manager.options.logLevel }}
+          {{ if .Values.manager.options.forceTenantPrefix }}- --force-tenant-prefix={{ .Values.manager.options.forceTenantPrefix }}{{ end }}
+          {{ if .Values.manager.options.capsuleUserGroup }}- --capsule-user-group={{ .Values.manager.options.capsuleUserGroup }}{{ end }}
+          {{ if .Values.manager.options.protectedNamespaceRegex }}- --protected-namespace-regex={{ .Values.manager.options.protectedNamespaceRegex }}{{ end }}
+          image: {{ include "capsule.fullyQualifiedDockerImage" . }}
+          imagePullPolicy: {{ .Values.manager.image.pullPolicy }}
+          env:
+          - name: NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+          ports:
+            - name: webhook-server
+              containerPort: 9443
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 10080
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 10080
+          volumeMounts:
+          - mountPath: /tmp/k8s-webhook-server/serving-certs
+            name: cert
+            readOnly: true
+          resources:
+            {{- toYaml .Values.manager.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+        - name: kube-rbac-proxy
+          image: {{ .Values.proxy.image.repository }}:{{ .Values.proxy.image.tag }}
+          imagePullPolicy: IfNotPresent
+          args:
+          - --secure-listen-address=0.0.0.0:8443
+          - --upstream=http://127.0.0.1:8080/
+          - --logtostderr=true
+          - --v=10
+          ports:
+          - containerPort: 8443
+            name: https
+            protocol: TCP
+          resources:
+            {{- toYaml .Values.proxy.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false

@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+    branches: [ "*" ]
+  pull_request:
+    branches: [ "*" ]
+
+jobs:
+  golangci:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v2.3.0
+        with:
+          version: latest
+          only-new-issues: false
+          args: --timeout 2m
+  diff:
+    name: diff
+    runs-on: ubuntu-18.04
+    steps:
+      - uses: actions/checkout@v2
+      - name: Cache Go modules
+        uses: actions/cache@v1
+        env:
+          cache-name: go-mod
+        with:
+          path: |
+            ~/go/pkg/mod
+            /home/runner/work/capsule/capsule
+          key: ${{ runner.os }}-build-${{ env.cache-name }}
+          restore-keys: |
+            ${{ runner.os }}-build-
+            ${{ runner.os }}-
+      - run: make manifests
+      - name: Checking if manifests are disaligned
+        run: test -z "$(git diff 2> /dev/null)"
+      - name: Checking if manifests generated untracked files
+        run: test -z "$(git ls-files --others --exclude-standard 2> /dev/null)"
+      - run: make fmt vet
+      - name: Checking if source code is not formatted
+        run: test -z "$(git diff 2> /dev/null)"
