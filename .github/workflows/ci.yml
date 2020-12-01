@@ -40,3 +40,6 @@ jobs:
         run: test -z "$(git diff 2> /dev/null)"
       - name: Checking if manifests generated untracked files
         run: test -z "$(git ls-files --others --exclude-standard 2> /dev/null)"
+      - run: make fmt vet
+      - name: Checking if source code is not formatted
+        run: test -z "$(git diff 2> /dev/null)"
