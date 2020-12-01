@@ -104,11 +104,11 @@ func ModifyCapsuleManagerPodArgs(args []string) {
 
 	pl := &corev1.PodList{}
 	Eventually(func() []corev1.Pod {
-		Expect(k8sClient.List(context.TODO(), pl, client.MatchingLabels{"control-plane": "controller-manager"})).Should(Succeed())
+		Expect(k8sClient.List(context.TODO(), pl, client.MatchingLabels{"app.kubernetes.io/instance": "capsule"})).Should(Succeed())
 		return pl.Items
 	}, podRecreationTimeoutInterval, defaultPollInterval).Should(HaveLen(2))
 	Eventually(func() []corev1.Pod {
-		Expect(k8sClient.List(context.TODO(), pl, client.MatchingLabels{"control-plane": "controller-manager"})).Should(Succeed())
+		Expect(k8sClient.List(context.TODO(), pl, client.MatchingLabels{"app.kubernetes.io/instance": "capsule"})).Should(Succeed())
 		return pl.Items
 	}, podRecreationTimeoutInterval, defaultPollInterval).Should(HaveLen(1))
 	// had to add sleep in order to manager be started
