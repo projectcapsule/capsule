@@ -1,69 +1,42 @@
-# This is a basic workflow to help you get started with Actions
-
 name: CI
 
-# Controls when the action will run. Triggers the workflow on push or pull request
-# events but only for the master branch
 on:
   push:
     branches: [ "*" ]
   pull_request:
     branches: [ "*" ]
 
-# A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
-  # This workflow contains a single job called "build"
   golangci:
     name: lint
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
-    - name: Run golangci-lint
-      uses: golangci/golangci-lint-action@v2.3.0
-      with:
-        # version of golangci-lint to use in form of v1.2.3
-        version: latest
-        # if set to true and the action runs on a pull request - the action outputs only newly found issues
-        only-new-issues: false
-        args: --timeout 2m
-  kind:
-    name: e2e
-    strategy:
-      matrix:
-        k8s-version: ['v1.16.15', 'v1.17.11', 'v1.18.8', 'v1.19.1']
+      - uses: actions/checkout@v2
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v2.3.0
+        with:
+          version: latest
+          only-new-issues: false
+          args: --timeout 2m
+  diff:
+    name: diff
     runs-on: ubuntu-18.04
     steps:
-    - uses: actions/checkout@v2
-      with:
-        fetch-depth: 0
-    - name: Cache Go modules and Docker images
-      uses: actions/cache@v1
-      env:
-        cache-name: gomod-docker
-      with:
-        path: |
-          ~/go/pkg/mod
-          /var/lib/docker
-          /home/runner/work/capsule/capsule
-        key: ${{ matrix.k8s-version }}-build-${{ env.cache-name }}
-        restore-keys: |
-          ${{ matrix.k8s-version }}-build-
-          ${{ matrix.k8s-version }}-
-    - run: make manifests
-    - name: Checking if manifests are disaligned
-      run: test -z "$(git diff 2> /dev/null)"
-    - name: Checking if manifests generated untracked files
-      run: test -z "$(git ls-files --others --exclude-standard 2> /dev/null)"
-    - name: Installing Ginkgo
-      run: go get github.com/onsi/ginkgo/ginkgo
-    - uses: actions/setup-go@v2
-      with:
-        go-version: '^1.13.8'
-    - uses: engineerd/setup-kind@v0.5.0
-      with:
-        skipClusterCreation: true
-    - uses: azure/setup-helm@v1
-      with:
-        version: 3.3.4
-    - name: e2e testing
-      run: make e2e/${{ matrix.k8s-version }}
+      - uses: actions/checkout@v2
+      - name: Cache Go modules
+        uses: actions/cache@v1
+        env:
+          cache-name: go-mod
+        with:
+          path: |
+            ~/go/pkg/mod
+            /home/runner/work/capsule/capsule
+          key: ${{ runner.os }}-build-${{ env.cache-name }}
+          restore-keys: |
+            ${{ runner.os }}-build-
+            ${{ runner.os }}-
+      - run: make manifests
+      - name: Checking if manifests are disaligned
+        run: test -z "$(git diff 2> /dev/null)"
+      - name: Checking if manifests generated untracked files
+        run: test -z "$(git ls-files --others --exclude-standard 2> /dev/null)"
