@@ -19,22 +19,6 @@ $ make deploy
 
 It will install the Capsule controller in a dedicated namespace `capsule-system`.
 
-# Admission Controllers
-Capsule implements Kubernetes multi-tenancy capabilities using a minimum set of standard [Admission Controllers](https://kubernetes.io/docs/reference/access-authn-authz/admission-controllers/) enabled on the Kubernetes APIs server.
-
-Here the list of required Admission Controllers you have to enable to get full support from Capsule:
-
-* PodNodeSelector
-* LimitRanger
-* ResourceQuota
-* MutatingAdmissionWebhook
-* ValidatingAdmissionWebhook
-
-In addition to the required controllers above, Capsule implements its own set through the [Dynamic Admission Controller](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/) mechanism, providing callbacks to add further validation or resource patching:
-
-* capsule-mutating-webhook-configuration
-* capsule-validating-webhook-configuration
-
 # Create your first Tenant
 In Capsule, a _Tenant_ is an abstraction to group togheter multiple namespaces in a single entity within a set of bundaries defined by the Cluster Administrator. The tenant is then assigned to a user or group of users who are called _Tenant Owners_.
 

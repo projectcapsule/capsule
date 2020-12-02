@@ -97,11 +97,6 @@ metadata:
 ...
 ```
 
-> Nota Bene:
-> at Namespace level, the quota enforcement is under the control of the default
-> _ResourceQuota Admission Controller_ enabled on the Kubernetes API server
-> using the flag `--enable-admission-plugins=ResourceQuota`.
-
 At the tenant level, the Capsule controller watches the Resource Quota usage for each Tenant's namespace and adjusts it as an aggregate of all the namespaces using the said annotation pattern (`quota.capsule.clastix.io/<quota_name>`)
 
 The used Resource Quota counts all the used resources as an aggregate of all the namespace resources in the `oil` tenant namespaces:
@@ -229,12 +224,6 @@ no - no RBAC policy matched
 alice@caas# kubectl -n oil-production auth can-i patch limitranges
 no - no RBAC policy matched
 ```
-
-> Nota Bene:
-> Limit ranges enforcement for a single pod, container, and persistent volume
-> claim is done by the default _LimitRanger Admission Controller_ enabled on
-> the Kubernetes API server: using the flag
-> `--enable-admission-plugins=LimitRanger`.
 
 # What’s next
 See how Bill, the cluster admin, can assign a pool of nodes to Alice's tenant. [Assign nodes pool to a tenant]().

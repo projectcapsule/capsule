@@ -38,7 +38,7 @@ spec:
     podSelector: {}
 ```
 
-The Capsule controller, watching for Namespace creation, creates the Network Policies for each Namespace in the tenant.
+The Capsule controller, watching for namespace creation, creates the Network Policies for each namespace in the tenant.
 
 Alice has access to these network policies:
 
