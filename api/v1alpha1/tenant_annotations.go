@@ -25,6 +25,8 @@ const (
 	AvailableIngressClassesRegexpAnnotation = "capsule.clastix.io/ingress-classes-regexp"
 	AvailableStorageClassesAnnotation       = "capsule.clastix.io/storage-classes"
 	AvailableStorageClassesRegexpAnnotation = "capsule.clastix.io/storage-classes-regexp"
+	AllowedRegistriesAnnotation             = "capsule.clastix.io/allowed-registries"
+	AllowedRegistriesRegexpAnnotation       = "capsule.clastix.io/allowed-registries-regexp"
 )
 
 func UsedQuotaFor(resource corev1.ResourceName) string {

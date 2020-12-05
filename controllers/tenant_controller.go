@@ -464,7 +464,7 @@ func (r *TenantReconciler) syncLimitRanges(tenant *capsulev1alpha1.Tenant) error
 	return nil
 }
 
-func (r *TenantReconciler) syncNamespace(namespace string, ingressClassesSpec capsulev1alpha1.IngressClassesSpec, storageClassesSpec capsulev1alpha1.StorageClassesSpec, nsMetadata capsulev1alpha1.AdditionalMetadata, tenantLabel string, wg *sync.WaitGroup, channel chan error) {
+func (r *TenantReconciler) syncNamespace(namespace string, tnt *capsulev1alpha1.Tenant, wg *sync.WaitGroup, channel chan error) {
 	defer wg.Done()
 
 	ns := &corev1.Namespace{}
@@ -477,20 +477,26 @@ func (r *TenantReconciler) syncNamespace(namespace string, ingressClassesSpec ca
 		if a == nil {
 			a = make(map[string]string)
 		}
-		if len(ingressClassesSpec.Allowed) > 0 {
-			a[capsulev1alpha1.AvailableIngressClassesAnnotation] = strings.Join(ingressClassesSpec.Allowed, ",")
+		if len(tnt.Spec.IngressClasses.Allowed) > 0 {
+			a[capsulev1alpha1.AvailableIngressClassesAnnotation] = strings.Join(tnt.Spec.IngressClasses.Allowed, ",")
 		}
-		if len(ingressClassesSpec.AllowedRegex) > 0 {
-			a[capsulev1alpha1.AvailableIngressClassesRegexpAnnotation] = ingressClassesSpec.AllowedRegex
+		if len(tnt.Spec.IngressClasses.AllowedRegex) > 0 {
+			a[capsulev1alpha1.AvailableIngressClassesRegexpAnnotation] = tnt.Spec.IngressClasses.AllowedRegex
 		}
-		if len(storageClassesSpec.Allowed) > 0 {
-			a[capsulev1alpha1.AvailableStorageClassesAnnotation] = strings.Join(storageClassesSpec.Allowed, ",")
+		if len(tnt.Spec.StorageClasses.Allowed) > 0 {
+			a[capsulev1alpha1.AvailableStorageClassesAnnotation] = strings.Join(tnt.Spec.StorageClasses.Allowed, ",")
 		}
-		if len(storageClassesSpec.AllowedRegex) > 0 {
-			a[capsulev1alpha1.AvailableStorageClassesRegexpAnnotation] = storageClassesSpec.AllowedRegex
+		if len(tnt.Spec.StorageClasses.AllowedRegex) > 0 {
+			a[capsulev1alpha1.AvailableStorageClassesRegexpAnnotation] = tnt.Spec.StorageClasses.AllowedRegex
+		}
+		if tnt.Spec.ContainerRegistries != nil && len(tnt.Spec.ContainerRegistries.Allowed) > 0 {
+			a[capsulev1alpha1.AllowedRegistriesAnnotation] = strings.Join(tnt.Spec.ContainerRegistries.Allowed, ",")
+		}
+		if tnt.Spec.ContainerRegistries != nil && len(tnt.Spec.ContainerRegistries.AllowedRegex) > 0 {
+			a[capsulev1alpha1.AllowedRegistriesRegexpAnnotation] = tnt.Spec.ContainerRegistries.AllowedRegex
 		}
 
-		if aa := nsMetadata.AdditionalAnnotations; aa != nil {
+		if aa := tnt.Spec.NamespacesMetadata.AdditionalAnnotations; aa != nil {
 			for k, v := range aa {
 				a[k] = v
 			}
@@ -504,8 +510,8 @@ func (r *TenantReconciler) syncNamespace(namespace string, ingressClassesSpec ca
 		if err != nil {
 			return err
 		}
-		l[capsuleLabel] = tenantLabel
-		if al := nsMetadata.AdditionalLabels; al != nil {
+		l[capsuleLabel] = tnt.GetName()
+		if al := tnt.Spec.NamespacesMetadata.AdditionalLabels; al != nil {
 			for k, v := range al {
 				l[k] = v
 			}
@@ -526,7 +532,7 @@ func (r *TenantReconciler) syncNamespaces(tenant *capsulev1alpha1.Tenant) (err e
 	wg.Add(tenant.Status.Namespaces.Len())
 
 	for _, ns := range tenant.Status.Namespaces {
-		go r.syncNamespace(ns, tenant.Spec.IngressClasses, tenant.Spec.StorageClasses, tenant.Spec.NamespacesMetadata, tenant.GetName(), wg, ch)
+		go r.syncNamespace(ns, tenant, wg, ch)
 	}
 
 	wg.Wait()
