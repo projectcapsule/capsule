@@ -23,7 +23,6 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/clastix/capsule/api/v1alpha1"
@@ -39,14 +38,6 @@ var _ = Describe("creating a Namespace with group Tenant owner", func() {
 				Name: "alice",
 				Kind: "Group",
 			},
-			NamespacesMetadata: v1alpha1.AdditionalMetadata{},
-			ServicesMetadata:   v1alpha1.AdditionalMetadata{},
-			IngressClasses:     v1alpha1.IngressClassesSpec{},
-			StorageClasses:     v1alpha1.StorageClassesSpec{},
-			LimitRanges:        []corev1.LimitRangeSpec{},
-			NamespaceQuota:     10,
-			NodeSelector:       map[string]string{},
-			ResourceQuota:      []corev1.ResourceQuotaSpec{},
 		},
 	}
 	JustBeforeEach(func() {
@@ -62,6 +53,8 @@ var _ = Describe("creating a Namespace with group Tenant owner", func() {
 		ns := NewNamespace("gto-namespace")
 		NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(tnt, podRecreationTimeoutInterval).Should(ContainElement(ns.GetName()))
-		GroupShouldBeUsedInTenantRoleBinding(ns, tnt, defaultTimeoutInterval)
+		for _, a := range KindInTenantRoleBindingAssertions(ns, defaultTimeoutInterval) {
+			a.Should(BeIdenticalTo("Group"))
+		}
 	})
 })

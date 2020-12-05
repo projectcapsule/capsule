@@ -478,23 +478,29 @@ func (r *TenantReconciler) syncNamespace(namespace string, tnt *capsulev1alpha1.
 		if a == nil {
 			a = make(map[string]string)
 		}
-		if len(tnt.Spec.IngressClasses.Allowed) > 0 {
-			a[capsulev1alpha1.AvailableIngressClassesAnnotation] = strings.Join(tnt.Spec.IngressClasses.Allowed, ",")
+		if tnt.Spec.IngressClasses != nil {
+			if len(tnt.Spec.IngressClasses.Allowed) > 0 {
+				a[capsulev1alpha1.AvailableIngressClassesAnnotation] = strings.Join(tnt.Spec.IngressClasses.Allowed, ",")
+			}
+			if len(tnt.Spec.IngressClasses.AllowedRegex) > 0 {
+				a[capsulev1alpha1.AvailableIngressClassesRegexpAnnotation] = tnt.Spec.IngressClasses.AllowedRegex
+			}
 		}
-		if len(tnt.Spec.IngressClasses.AllowedRegex) > 0 {
-			a[capsulev1alpha1.AvailableIngressClassesRegexpAnnotation] = tnt.Spec.IngressClasses.AllowedRegex
+		if tnt.Spec.StorageClasses != nil {
+			if len(tnt.Spec.StorageClasses.Allowed) > 0 {
+				a[capsulev1alpha1.AvailableStorageClassesAnnotation] = strings.Join(tnt.Spec.StorageClasses.Allowed, ",")
+			}
+			if len(tnt.Spec.StorageClasses.AllowedRegex) > 0 {
+				a[capsulev1alpha1.AvailableStorageClassesRegexpAnnotation] = tnt.Spec.StorageClasses.AllowedRegex
+			}
 		}
-		if len(tnt.Spec.StorageClasses.Allowed) > 0 {
-			a[capsulev1alpha1.AvailableStorageClassesAnnotation] = strings.Join(tnt.Spec.StorageClasses.Allowed, ",")
-		}
-		if len(tnt.Spec.StorageClasses.AllowedRegex) > 0 {
-			a[capsulev1alpha1.AvailableStorageClassesRegexpAnnotation] = tnt.Spec.StorageClasses.AllowedRegex
-		}
-		if tnt.Spec.ContainerRegistries != nil && len(tnt.Spec.ContainerRegistries.Allowed) > 0 {
-			a[capsulev1alpha1.AllowedRegistriesAnnotation] = strings.Join(tnt.Spec.ContainerRegistries.Allowed, ",")
-		}
-		if tnt.Spec.ContainerRegistries != nil && len(tnt.Spec.ContainerRegistries.AllowedRegex) > 0 {
-			a[capsulev1alpha1.AllowedRegistriesRegexpAnnotation] = tnt.Spec.ContainerRegistries.AllowedRegex
+		if tnt.Spec.ContainerRegistries != nil {
+			if len(tnt.Spec.ContainerRegistries.Allowed) > 0 {
+				a[capsulev1alpha1.AllowedRegistriesAnnotation] = strings.Join(tnt.Spec.ContainerRegistries.Allowed, ",")
+			}
+			if len(tnt.Spec.ContainerRegistries.AllowedRegex) > 0 {
+				a[capsulev1alpha1.AllowedRegistriesRegexpAnnotation] = tnt.Spec.ContainerRegistries.AllowedRegex
+			}
 		}
 
 		if aa := tnt.Spec.NamespacesMetadata.AdditionalAnnotations; aa != nil {

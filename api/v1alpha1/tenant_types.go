@@ -23,55 +23,42 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// +kubebuilder:validation:Minimum=1
-type NamespaceQuota uint
-
 type AdditionalMetadata struct {
-	// +nullable
-	AdditionalLabels map[string]string `json:"additionalLabels"`
-	// +nullable
-	AdditionalAnnotations map[string]string `json:"additionalAnnotations"`
+	AdditionalLabels      map[string]string `json:"additionalLabels,omitempty"`
+	AdditionalAnnotations map[string]string `json:"additionalAnnotations,omitempty"`
 }
 
 type StorageClassesSpec struct {
-	// +nullable
-	Allowed StorageClassList `json:"allowed"`
-	// +nullable
-	AllowedRegex string `json:"allowedRegex"`
+	Allowed      StorageClassList `json:"allowed,omitempty"`
+	AllowedRegex string           `json:"allowedRegex,omitempty"`
 }
 
 type IngressClassesSpec struct {
-	// +nullable
-	Allowed IngressClassList `json:"allowed"`
-	// +nullable
-	AllowedRegex string `json:"allowedRegex"`
+	Allowed      IngressClassList `json:"allowed,omitempty"`
+	AllowedRegex string           `json:"allowedRegex,omitempty"`
 }
 
 type ContainerRegistriesSpec struct {
-	// +nullable
-	Allowed RegistryList `json:"allowed"`
-	// +nullable
-	AllowedRegex string `json:"allowedRegex"`
+	Allowed      RegistryList `json:"allowed,omitempty"`
+	AllowedRegex string       `json:"allowedRegex,omitempty"`
 }
 
 // TenantSpec defines the desired state of Tenant
 type TenantSpec struct {
 	Owner OwnerSpec `json:"owner"`
-	// +kubebuilder:validation:Optional
-	NamespacesMetadata AdditionalMetadata `json:"namespacesMetadata"`
-	// +kubebuilder:validation:Optional
-	ServicesMetadata    AdditionalMetadata       `json:"servicesMetadata"`
-	StorageClasses      StorageClassesSpec       `json:"storageClasses"`
-	IngressClasses      IngressClassesSpec       `json:"ingressClasses"`
-	ContainerRegistries *ContainerRegistriesSpec `json:"containerRegistries,omitempty"`
-	// +kubebuilder:validation:Optional
-	NodeSelector    map[string]string                `json:"nodeSelector"`
-	NamespaceQuota  NamespaceQuota                   `json:"namespaceQuota"`
-	NetworkPolicies []networkingv1.NetworkPolicySpec `json:"networkPolicies,omitempty"`
-	LimitRanges     []corev1.LimitRangeSpec          `json:"limitRanges"`
-	// +kubebuilder:validation:Optional
-	ResourceQuota          []corev1.ResourceQuotaSpec `json:"resourceQuotas"`
-	AdditionalRoleBindings []AdditionalRoleBindings   `json:"additionalRoleBindings,omitempty"`
+
+	//+kubebuilder:validation:Minimum=1
+	NamespaceQuota         *int32                           `json:"namespaceQuota,omitempty"`
+	NamespacesMetadata     AdditionalMetadata               `json:"namespacesMetadata,omitempty"`
+	ServicesMetadata       AdditionalMetadata               `json:"servicesMetadata,omitempty"`
+	StorageClasses         *StorageClassesSpec              `json:"storageClasses,omitempty"`
+	IngressClasses         *IngressClassesSpec              `json:"ingressClasses,omitempty"`
+	ContainerRegistries    *ContainerRegistriesSpec         `json:"containerRegistries,omitempty"`
+	NodeSelector           map[string]string                `json:"nodeSelector,omitempty"`
+	NetworkPolicies        []networkingv1.NetworkPolicySpec `json:"networkPolicies,omitempty"`
+	LimitRanges            []corev1.LimitRangeSpec          `json:"limitRanges,omitempty"`
+	ResourceQuota          []corev1.ResourceQuotaSpec       `json:"resourceQuotas,omitempty"`
+	AdditionalRoleBindings []AdditionalRoleBindings         `json:"additionalRoleBindings,omitempty"`
 }
 
 type AdditionalRoleBindings struct {
@@ -97,8 +84,6 @@ func (k Kind) String() string {
 type TenantStatus struct {
 	Size       uint          `json:"size"`
 	Namespaces NamespaceList `json:"namespaces,omitempty"`
-	Users      []string      `json:"users,omitempty"`
-	Groups     []string      `json:"groups,omitempty"`
 }
 
 // +kubebuilder:object:root=true

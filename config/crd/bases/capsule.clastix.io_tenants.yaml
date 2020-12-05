@@ -111,28 +111,18 @@ spec:
                 allowed:
                   items:
                     type: string
-                  nullable: true
                   type: array
                 allowedRegex:
-                  nullable: true
                   type: string
-              required:
-              - allowed
-              - allowedRegex
               type: object
             ingressClasses:
               properties:
                 allowed:
                   items:
                     type: string
-                  nullable: true
                   type: array
                 allowedRegex:
-                  nullable: true
                   type: string
-              required:
-              - allowed
-              - allowedRegex
               type: object
             limitRanges:
               items:
@@ -212,6 +202,7 @@ spec:
                 type: object
               type: array
             namespaceQuota:
+              format: int32
               minimum: 1
               type: integer
             namespacesMetadata:
@@ -219,16 +210,11 @@ spec:
                 additionalAnnotations:
                   additionalProperties:
                     type: string
-                  nullable: true
                   type: object
                 additionalLabels:
                   additionalProperties:
                     type: string
-                  nullable: true
                   type: object
-              required:
-              - additionalAnnotations
-              - additionalLabels
               type: object
             networkPolicies:
               items:
@@ -775,55 +761,33 @@ spec:
                 additionalAnnotations:
                   additionalProperties:
                     type: string
-                  nullable: true
                   type: object
                 additionalLabels:
                   additionalProperties:
                     type: string
-                  nullable: true
                   type: object
-              required:
-              - additionalAnnotations
-              - additionalLabels
               type: object
             storageClasses:
               properties:
                 allowed:
                   items:
                     type: string
-                  nullable: true
                   type: array
                 allowedRegex:
-                  nullable: true
                   type: string
-              required:
-              - allowed
-              - allowedRegex
               type: object
           required:
-          - ingressClasses
-          - limitRanges
-          - namespaceQuota
           - owner
-          - storageClasses
           type: object
         status:
           description: TenantStatus defines the observed state of Tenant
           properties:
-            groups:
-              items:
-                type: string
-              type: array
             namespaces:
               items:
                 type: string
               type: array
             size:
               type: integer
-            users:
-              items:
-                type: string
-              type: array
           required:
           - size
           type: object

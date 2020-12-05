@@ -46,10 +46,9 @@ var _ = Describe("enforcing a Container Registry", func() {
 			},
 			NamespacesMetadata: v1alpha1.AdditionalMetadata{},
 			ServicesMetadata:   v1alpha1.AdditionalMetadata{},
-			StorageClasses:     v1alpha1.StorageClassesSpec{},
-			IngressClasses:     v1alpha1.IngressClassesSpec{},
+			StorageClasses:     &v1alpha1.StorageClassesSpec{},
+			IngressClasses:     &v1alpha1.IngressClassesSpec{},
 			LimitRanges:        []corev1.LimitRangeSpec{},
-			NamespaceQuota:     10,
 			NodeSelector:       map[string]string{},
 			ResourceQuota:      []corev1.ResourceQuotaSpec{},
 		},
@@ -72,7 +71,7 @@ var _ = Describe("enforcing a Container Registry", func() {
 			}
 
 			for a, expected := range map[string]string{
-				"capsule.clastix.io/allowed-registries": "docker.io,docker.tld",
+				"capsule.clastix.io/allowed-registries":        "docker.io,docker.tld",
 				"capsule.clastix.io/allowed-registries-regexp": `quay\.\w+`,
 			} {
 				var v string

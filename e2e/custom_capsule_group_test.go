@@ -23,7 +23,6 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/clastix/capsule/api/v1alpha1"
@@ -39,14 +38,6 @@ var _ = Describe("creating a Namespace as Tenant owner with custom --capsule-gro
 				Name: "alice",
 				Kind: "User",
 			},
-			NamespacesMetadata: v1alpha1.AdditionalMetadata{},
-			ServicesMetadata:   v1alpha1.AdditionalMetadata{},
-			StorageClasses:     v1alpha1.StorageClassesSpec{},
-			IngressClasses:     v1alpha1.IngressClassesSpec{},
-			LimitRanges:        []corev1.LimitRangeSpec{},
-			NamespaceQuota:     10,
-			NodeSelector:       map[string]string{},
-			ResourceQuota:      []corev1.ResourceQuotaSpec{},
 		},
 	}
 	JustBeforeEach(func() {
