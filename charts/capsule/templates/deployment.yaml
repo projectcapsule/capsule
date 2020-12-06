@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "capsule.fullname" . }}-controller-manager
+  name: {{ include "capsule.deploymentName" . }}
   labels:
     {{- include "capsule.labels" . | nindent 4 }}
 spec:

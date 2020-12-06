@@ -1,3 +1,6 @@
+{{- $cmd := "while [ -z $$(kubectl -n $NAMESPACE get secret capsule-tls -o jsonpath='{.data.tls\\\\.crt}') ];" -}}
+{{- $cmd = printf "%s do echo 'waiting Capsule to be up and running...' && sleep 5;" $cmd -}}
+{{- $cmd = printf "%s done" $cmd -}}
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -26,7 +29,7 @@ spec:
       containers:
       - name: post-install-job
         image: "bitnami/kubectl:1.18"
-        command: ["sh", "-c", "while [ -z $$(kubectl -n $NAMESPACE get secret capsule-tls -o jsonpath='{.data.tls\\.crt}') ]; do echo 'waiting Capsule to be up and running...' && sleep 5; done"]
+        command: ["sh", "-c", "{{ $cmd }}"]
         env:
         - name: NAMESPACE
           valueFrom:
