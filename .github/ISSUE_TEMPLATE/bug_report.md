@@ -40,4 +40,5 @@ you'd get this by running `kubectl -n capsule-system logs deploy/capsule-control
 # Additional context
 
 - Capsule version: (`capsule --version`)
+- Helm Chart version: (`helm list -n capsule-system`)
 - Kubernetes version: (`kubectl version`)
