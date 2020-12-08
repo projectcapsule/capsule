@@ -492,7 +492,8 @@ apiVersion: v1
 kind: ResourceQuota
 metadata:
   annotations:
-    quota.capsule.clastix.io/used-pods: "1" 
+    quota.capsule.clastix.io/used-pods: "1"
+    quota.capsule.clastix.io/hard-pods: "10" 
 ...
 ```
 
