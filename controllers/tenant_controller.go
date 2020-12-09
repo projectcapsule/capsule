@@ -183,7 +183,7 @@ func (r *TenantReconciler) pruningResources(ns string, keys []string, obj client
 // Serial ResourceQuota processing is expensive: using Go routines we can speed it up.
 // In case of multiple errors these are logged properly, returning a generic error since we have to repush back the
 // reconciliation loop.
-func (r *TenantReconciler) resourceQuotasUpdate(resourceName corev1.ResourceName, qt resource.Quantity, list ...corev1.ResourceQuota) (err error) {
+func (r *TenantReconciler) resourceQuotasUpdate(resourceName corev1.ResourceName, actual, limit resource.Quantity, list ...corev1.ResourceQuota) (err error) {
 	ch := make(chan error, len(list))
 
 	wg := &sync.WaitGroup{}
@@ -201,8 +201,9 @@ func (r *TenantReconciler) resourceQuotasUpdate(resourceName corev1.ResourceName
 				found.Annotations = make(map[string]string)
 			}
 			found.Labels = rq.Labels
-			found.Annotations[capsulev1alpha1.UsedQuotaFor(resourceName)] = qt.String()
-			// Updating the Resource according to the qt.Cmp result
+			found.Annotations[capsulev1alpha1.UsedQuotaFor(resourceName)] = actual.String()
+			found.Annotations[capsulev1alpha1.HardQuotaFor(resourceName)] = limit.String()
+			// Updating the Resource according to the actual.Cmp result
 			found.Spec.Hard = rq.Spec.Hard
 			return r.Update(context.TODO(), found, &client.UpdateOptions{})
 		})
@@ -391,7 +392,7 @@ func (r *TenantReconciler) syncResourceQuotas(tenant *capsulev1alpha1.Tenant) er
 					default:
 						// The Tenant is respecting the Hard quota:
 						// restoring the default one for all the elements,
-						// also for the reconciliated one.
+						// also for the reconciled one.
 						for i := range rql.Items {
 							if rql.Items[i].Spec.Hard == nil {
 								rql.Items[i].Spec.Hard = map[corev1.ResourceName]resource.Quantity{}
@@ -400,7 +401,7 @@ func (r *TenantReconciler) syncResourceQuotas(tenant *capsulev1alpha1.Tenant) er
 						}
 						target.Spec = q
 					}
-					if err := r.resourceQuotasUpdate(rn, qt, rql.Items...); err != nil {
+					if err := r.resourceQuotasUpdate(rn, qt, q.Hard[rn], rql.Items...); err != nil {
 						r.Log.Error(err, "cannot proceed with outer ResourceQuota")
 						return err
 					}

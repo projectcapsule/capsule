@@ -30,3 +30,7 @@ const (
 func UsedQuotaFor(resource corev1.ResourceName) string {
 	return "quota.capsule.clastix.io/used-" + resource.String()
 }
+
+func HardQuotaFor(resource corev1.ResourceName) string {
+	return "quota.capsule.clastix.io/hard-" + resource.String()
+}
