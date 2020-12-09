@@ -3,7 +3,7 @@ Make sure you have access to a Kubernetes cluster as administrator.
 
 There are two ways to install Capsule:
 
-* Use the Helm Chart available [here](https://github.com/clastix/capsule-helm-chart)
+* Use the Helm Chart available [here](https://github.com/clastix/capsule/tree/master/charts/capsule)
 * Use [`kustomize`](https://github.com/kubernetes-sigs/kustomize)
 
 ## Install with kustomize

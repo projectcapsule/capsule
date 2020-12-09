@@ -7,25 +7,25 @@ Capsule operator uses a single Custom Resources Definition (CRD) for _Tenants_. 
 apiVersion: capsule.clastix.io/v1alpha1
 kind: Tenant
 metadata:
-  name: tenant
+  name:
   labels:
   annotations:
 spec:
   owner:                  # required
   nodeSelector:
-  namespaceQuota:         # required
+  namespaceQuota:
   namespacesMetadata:
   servicesMetadata:
-  ingressClasses:         # required
-  storageClasses:         # required
+  ingressClasses:
+  storageClasses:
   containerRegistries:
   additionalRoleBindings:
   resourceQuotas:
-  limitRanges:            # required 
+  limitRanges: 
   networkPolicies:
 status:
-  namespaces:
   size:
+  namespaces:
 ```
 
 In Caspule, Tenants are cluster wide resources. You need for cluster wide permissions to work with tenants.
@@ -50,12 +50,28 @@ oil       9                 4                 alice        User         {"pool":
 sample    9                 0                 alice        User         {"key":"value"}   29h
 ```
 
-Follows a reference for all the fields in the Tenant resource.
 
-### name
+* [metadata.name](#metadata.name)
+* [spec.owner](#spec.owner)
+* [spec.nodeSelector](#spec.nodeSelector)
+* [spec.namespaceQuota](#spec.namespaceQuota)
+* [spec.namespacesMetadata](#spec.namespacesMetadata)
+* [spec.servicesMetadata](#spec.servicesMetadata)
+* [spec.ingressClasses](#spec.ingressClasses)
+* [spec.storageClasses](#spec.storageClasses)
+* [spec.containerRegistries](#spec.containerRegistries)
+* [spec.additionalRoleBindings](#spec.additionalRoleBindings)
+* [spec.resourceQuotas](#spec.resourceQuotas)
+* [spec.limitRanges](#spec.limitRanges)
+* [spec.networkPolicies](#spec.networkPolicies)
+* [status.size](#status.size)
+* [status.namespaces](#status.namespaces)
+
+
+### metadata.name
 Metadata `name` can contain any valid symbol from the regex: `[a-z0-9]([-a-z0-9]*[a-z0-9])?`.
 
-### owner
+### spec.owner
 Field `owner` specify the ownership of the tenant:
 
 ```yaml
@@ -87,7 +103,7 @@ Users authenticated through an _OIDC token_ must have
 
 Permissions are controlled by RBAC.
 
-### nodeSelector
+### spec.nodeSelector
 Field `nodeSelector` specify the label to control the placement of pods on a given pool of worker nodes:
 
 ```yaml
@@ -97,7 +113,7 @@ metadata:
   name: tenant
 spec:
   nodeSelector:
-    key: value
+    <key>: <value>
 ```
 
 All namesapces created within the tenant will have the annotation:
@@ -119,14 +135,14 @@ metadata:
   name: sample
 spec:
   nodeSelector:
-    key: value
+    <key>: <value>
 ```
 
 Please, see how to [Assigning Pods to Nodes](https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/) documentation.
 
 The tenant owner is not allowed to change or remove the annotation from the namespace.
 
-### namespaceQuota
+### spec.namespaceQuota
 Field `namespaceQuota` specify the maximum number of namespaces allowed for that tenant.
 
 ```yaml
@@ -135,11 +151,11 @@ kind: Tenant
 metadata:
   name: tenant
 spec:
-  namespaceQuota: 10
+  namespaceQuota: <quota>
 ```
 Once the namespace quota assigned to the tenant has been reached, yhe tenant owner cannot create further namespaces.
 
-### namespacesMetadata
+### spec.namespacesMetadata
 Field `namespacesMetadata` specify additional labels and annotations the Capsule operator places on any _Namespace_ in the tenant.
 
 ```yaml
@@ -152,7 +168,7 @@ spec:
     additionalAnnotations:
       <annotations>
     additionalLabels:
-      key: value
+      <key>: <value>
 ```
 
 Al namespaces in the tenant will have:
@@ -164,12 +180,12 @@ metadata:
   annotations:
     <annotations>
   labels:
-    key: value
+    <key>: <value>
 ```
 
 The tenant owner is not allowed to change or remove such labels and annotations from the namespace.
 
-### servicesMetadata
+### spec.servicesMetadata
 Field `servicesMetadata` specify additional labels and annotations the Capsule operator places on any _Service_ in the tenant.
 
 ```yaml
@@ -182,7 +198,7 @@ spec:
     additionalAnnotations:
       <annotations>
     additionalLabels:
-      key: value
+      <key>: <value>
 ```
 
 Al services in the tenant will have:
@@ -194,12 +210,12 @@ metadata:
   annotations:
     <annotations>
   labels:
-    key: value
+    <key>: <value>
 ```
 
 The tenant owner is not allowed to change or remove such labels and annotations from the service objects.
 
-### ingressClasses
+### spec.ingressClasses
 Field `ingressClasses` specify the Ingress Classes assigned to the tenant.
 
 ```yaml
@@ -209,9 +225,9 @@ metadata:
   name: tenant
 spec:
   ingressClasses:
-     allowed:
-     - <class>
-     allowedRegex: "^.*$"
+    allowed:
+    - <class>
+    allowedRegex: <regex>
 ```
 
 Capsule assures that all _Ingresses_ resources created in the tenant can use only one of the allowed Ingress Classes.
@@ -235,10 +251,11 @@ apiVersion: v1
 metadata:
   annotations:
     capsule.clastix.io/ingress-classes: <class>
+    capsule.clastix.io/ingress-classes-regexp: <regex>
 ```
 Any tentative of tenant owner to use a not allowed Ingress Class will fail.
 
-### storageClasses
+### spec.storageClasses
 Field `storageClasses` specify the Storage Classes assigned to the tenant.
 
 ```yaml
@@ -248,9 +265,9 @@ metadata:
   name: tenant
 spec:
   storageClasses:
-     allowed:
-     - <class>
-     allowedRegex: "^.*$"
+    allowed:
+    - <class>
+    allowedRegex: <regex>
 ```
 
 Capsule assures that all _PersistentVolumeClaim_ resources created in the tenant can use only one of the allowed Storage Classes.
@@ -273,11 +290,12 @@ apiVersion: v1
 metadata:
   annotations:
     capsule.clastix.io/storage-classes: <class>
+    capsule.clastix.io/storage-classes-regexp: <regex>
 ```
 
 Any tentative of tenant owner to use a not allowed Storage Class will fail.
 
-### containerRegistries
+### spec.containerRegistries
 Field `containerRegistries` specify the Trusted Image Registries assigned to the tenant.
 
 ```yaml
@@ -289,7 +307,7 @@ spec:
   containerRegistries:
      allowed:
      - <registry>
-     allowedRegex: "^.*$"
+     allowedRegex: <regex>
 ```
 
 Capsule assures that all _Pods_ resources created in the tenant can use only one of the allowed trusted registries.
@@ -301,6 +319,7 @@ kind: Namespace
 apiVersion: v1
 metadata:
   annotations:
+    capsule.clastix.io/allowed-registries-regexp: <regex>
     capsule.clastix.io/registries: <registry>
 ```
 
@@ -311,7 +330,7 @@ Any tentative of tenant owner to use a not allowed registry will fail.
 > running on a Tenant allowing `docker.io` will not blocked, even if the image
 > field is not explicit as `docker.io/busybox:latest`.
 
-### additionalRoleBindings
+### spec.additionalRoleBindings
 Field `additionalRoleBindings` specify additional _RoleBindings_ assigned to the tenant.
 
 ```yaml
@@ -330,7 +349,7 @@ spec:
 
 Capsule will ensure that all namespaces in the tenant always contain the _RoleBinding_ for the given _ClusterRole_.
 
-### resourceQuotas
+### spec.resourceQuotas
 Field `resourceQuotas` specify a list of _ResourceQuota_ resources assigned to the tenant.
 
 ```yaml
@@ -347,9 +366,9 @@ spec:
       requests.memory: <hard_value>
 ```
 
-Please, refer to [ResourceQuota](https://kubernetes.io/docs/concepts/policy/resource-quotas/) documentation for the resource subjects.
+Please, refer to [ResourceQuota](https://kubernetes.io/docs/concepts/policy/resource-quotas/) documentation for the subject.
 
-The assigned quotas is inherited by any namespace created in the tenant
+The assigned quota are inherited by any namespace created in the tenant
 
 ```yaml
 kind: ResourceQuota
@@ -393,7 +412,7 @@ The annotations `quota.capsule.clastix.io/used-limits.resource=<tenant_used_valu
 
 The tenant owner is not allowed to change or remove ResourceQuota from the namespace.
 
-### limitRanges
+### spec.limitRanges
 Field `limitRanges` specify the _LimitRanges_ assigned to the tenant.
 
 ```yaml
@@ -431,7 +450,7 @@ spec:
         storage: <value>    
 ```
 
-Please, refer to [LimitRange](https://kubernetes.io/docs/concepts/policy/limit-range/) documentation for the types of limits you can assign.
+Please, refer to [LimitRange](https://kubernetes.io/docs/concepts/policy/limit-range/) documentation for the subject.
 
 The assigned LimitRange is inherited by any namespace created in the tenant
 
@@ -486,7 +505,7 @@ there is no aggregate to count.
 
 The tenant owner is not allowed to change or remove LimitRanges from the namespace.
 
-### networkPolicies
+### spec.networkPolicies
 Field `networkPolicies` specify the _NetworkPolicies_ assigned to the tenant.
 
 ```yaml
@@ -540,6 +559,24 @@ spec:
 ```
 
 The tenant owner can create, patch and delete additional NetworkPolicy to refine the assigned one. However, the tenant owner cannot delete the NetworkPolicy set at tenant level.
+
+### status.size
+Status field `size` reports the number of namespaces belonging to the tenant. It is reported as `NAMESPACE COUNT` in the `kubectl` output:
+
+```
+$ kubectl get tnt
+NAME      NAMESPACE QUOTA   NAMESPACE COUNT   OWNER NAME   OWNER KIND   NODE SELECTOR     AGE
+cap       9                 1                 joe          User         {"pool":"cmp"}    5d4h
+gas       6                 2                 alice        User         {"node":"worker"} 5d4h
+oil       9                 4                 alice        User         {"pool":"cmp"}    5d4h
+sample    9                 0                 alice        User         {"key":"value"}   29h
+```
+
+
+### status.namespaces
+
+
+
 
 ## RBAC
 

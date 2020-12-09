@@ -49,6 +49,17 @@ A Pod running `internal.registry.foo.tld` as registry will be allowed, as well `
 > You can also set a catch-all as .* to allow every kind of registry,
 > that would be the same result of unsetting `containerRegistries` at all
 
+As per Ingress and Storage classes, also the allowed registries can be inspected from the Tenant's namespace
+
+```
+alice@caas# kubectl describe ns oil-production
+Name:         oil-production
+Labels:       capsule.clastix.io/tenant=oil
+Annotations:  capsule.clastix.io/allowed-registries: docker.io
+              capsule.clastix.io/allowed-registries-regexp: ^registry\.internal\.\w+$
+...
+```
+
 # What’s next
 See how Bill, the cluster admin, can assign Pod Security Policies to Alice's tenant. [Assign Pod Security Policies to a tenant]().
 
