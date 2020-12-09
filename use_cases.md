@@ -986,7 +986,7 @@ kind: Tenant
 spec:
   containerRegistries:
     allowed: []
-    regex: "internal.registry.\\w.tld"
+    allowedRegex: "internal.registry.\\w.tld"
 ```
 
 A Pod running `internal.registry.foo.tld` as registry will be allowed, as well
@@ -1007,10 +1007,24 @@ spec:
     allowed:
     - docker.io
     - quay.io
-    regex: ""
+    allowedRegex: ""
 ```
 
 > In case of naked and official images hosted on Docker Hub, Capsule is going
 > to retrieve the registry even if it's not explicit: a `busybox:latest` Pod
 > running on a Tenant allowing `docker.io` will not blocked, even if the image
 > field is not explicit as `docker.io/busybox:latest`.
+
+## How a Tenant owner can inspect their enforced registries
+
+As per Ingress and Storage classes, also the allowed registries can be
+inspected from the Tenant's Namespaces resources
+
+```
+alice@caas# kubectl describe ns oil-production
+Name:         oil-production
+Labels:       capsule.clastix.io/tenant=oil
+Annotations:  capsule.clastix.io/allowed-registries: docker.io
+              capsule.clastix.io/allowed-registries-regexp: ^registry\.internal\.\w+$
+...
+```
