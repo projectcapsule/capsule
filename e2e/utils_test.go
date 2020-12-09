@@ -38,7 +38,7 @@ import (
 )
 
 const (
-	defaultTimeoutInterval       = 10 * time.Second
+	defaultTimeoutInterval       = 20 * time.Second
 	podRecreationTimeoutInterval = 90 * time.Second
 	defaultPollInterval          = time.Second
 )
