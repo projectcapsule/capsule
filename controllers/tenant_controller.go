@@ -478,6 +478,15 @@ func (r *TenantReconciler) syncNamespace(namespace string, tnt *capsulev1alpha1.
 		if a == nil {
 			a = make(map[string]string)
 		}
+
+		// resetting Capsule annotations
+		delete(a, capsulev1alpha1.AvailableIngressClassesAnnotation)
+		delete(a, capsulev1alpha1.AvailableIngressClassesRegexpAnnotation)
+		delete(a, capsulev1alpha1.AvailableStorageClassesAnnotation)
+		delete(a, capsulev1alpha1.AvailableStorageClassesRegexpAnnotation)
+		delete(a, capsulev1alpha1.AllowedRegistriesAnnotation)
+		delete(a, capsulev1alpha1.AllowedRegistriesRegexpAnnotation)
+
 		if tnt.Spec.IngressClasses != nil {
 			if len(tnt.Spec.IngressClasses.Allowed) > 0 {
 				a[capsulev1alpha1.AvailableIngressClassesAnnotation] = strings.Join(tnt.Spec.IngressClasses.Allowed, ",")
@@ -657,16 +666,7 @@ func (r *TenantReconciler) ownerRoleBinding(tenant *capsulev1alpha1.Tenant) erro
 }
 
 func (r *TenantReconciler) ensureNodeSelector(tenant *capsulev1alpha1.Tenant) (err error) {
-	if tenant.Spec.NodeSelector == nil {
-		return
-	}
-
 	for _, namespace := range tenant.Status.Namespaces {
-		selectorMap := tenant.Spec.NodeSelector
-		if selectorMap == nil {
-			return
-		}
-
 		ns := &corev1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: namespace,
@@ -679,7 +679,7 @@ func (r *TenantReconciler) ensureNodeSelector(tenant *capsulev1alpha1.Tenant) (e
 				ns.Annotations = make(map[string]string)
 			}
 			var selector []string
-			for k, v := range selectorMap {
+			for k, v := range tenant.Spec.NodeSelector {
 				selector = append(selector, fmt.Sprintf("%s=%s", k, v))
 			}
 			ns.Annotations["scheduler.alpha.kubernetes.io/node-selector"] = strings.Join(selector, ",")
