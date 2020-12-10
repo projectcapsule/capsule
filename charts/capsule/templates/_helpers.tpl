@@ -67,3 +67,24 @@ Create the fully-qualified Docker image to use
 {{- define "capsule.fullyQualifiedDockerImage" -}}
 {{- printf "%s:%s" .Values.manager.image.repository ( .Values.manager.image.tag | default (printf "v%s" .Chart.AppVersion) ) -}}
 {{- end }}
+
+{{/*
+Create the Capsule Deployment name to use
+*/}}
+{{- define "capsule.deploymentName" -}}
+{{- printf "%s-controller-manager" (include "capsule.fullname" .) -}}
+{{- end }}
+
+{{/*
+Create the Capsule CA Secret name to use
+*/}}
+{{- define "capsule.secretCaName" -}}
+{{- printf "%s-ca" (include "capsule.fullname" .) -}}
+{{- end }}
+
+{{/*
+Create the Capsule TLS Secret name to use
+*/}}
+{{- define "capsule.secretTlsName" -}}
+{{- printf "%s-tls" (include "capsule.fullname" .) -}}
+{{- end }}

@@ -1,5 +1,7 @@
-{{- $deploymentName := printf "%s-controller-manager" (include "capsule.fullname" .) -}}
-{{- $cmd := printf "kubectl scale deployment -n $NAMESPACE %s --replicas 0 && kubectl delete clusterroles.rbac.authorization.k8s.io capsule-namespace-deleter capsule-namespace-provisioner --ignore-not-found && kubectl delete clusterrolebindings.rbac.authorization.k8s.io capsule-namespace-provisioner --ignore-not-found" $deploymentName -}}
+{{- $cmd := printf "kubectl scale deployment -n $NAMESPACE %s --replicas 0 &&" (include "capsule.deploymentName" .) -}}
+{{- $cmd = printf "%s kubectl delete secret -n $NAMESPACE %s %s --ignore-not-found &&" $cmd (include "capsule.secretTlsName" .) (include "capsule.secretCaName" .) -}}
+{{- $cmd = printf "%s kubectl delete clusterroles.rbac.authorization.k8s.io capsule-namespace-deleter capsule-namespace-provisioner --ignore-not-found &&" $cmd -}}
+{{- $cmd = printf "%s kubectl delete clusterrolebindings.rbac.authorization.k8s.io capsule-namespace-provisioner --ignore-not-found" $cmd -}}
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -26,12 +28,12 @@ spec:
     spec:
       restartPolicy: Never
       containers:
-      - name: pre-delete-job
-        image: "bitnami/kubectl:1.18"
-        command: ["sh", "-c",  {{ $cmd | quote }}]
-        env:
-          - name: NAMESPACE
-            valueFrom:
-              fieldRef:
-                fieldPath: metadata.namespace
+        - name: pre-delete-job
+          image: "bitnami/kubectl:1.18"
+          command: [ "sh", "-c",  "{{ $cmd }}"]
+          env:
+            - name: NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
       serviceAccountName: {{ include "capsule.serviceAccountName" . }}
