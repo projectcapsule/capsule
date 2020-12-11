@@ -346,7 +346,7 @@ func (in *TenantSpec) DeepCopyInto(out *TenantSpec) {
 		*out = new(IngressClassesSpec)
 		(*in).DeepCopyInto(*out)
 	}
-	in.IngressHostnames.DeepCopyInto(&out.IngressHostnames)
+	in.IngressHostnames.DeepCopyInto(out.IngressHostnames)
 	if in.ContainerRegistries != nil {
 		in, out := &in.ContainerRegistries, &out.ContainerRegistries
 		*out = new(ContainerRegistriesSpec)

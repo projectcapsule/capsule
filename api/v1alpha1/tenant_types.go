@@ -60,13 +60,13 @@ type TenantSpec struct {
 	ServicesMetadata       AdditionalMetadata               `json:"servicesMetadata,omitempty"`
 	StorageClasses         *StorageClassesSpec              `json:"storageClasses,omitempty"`
 	IngressClasses         *IngressClassesSpec              `json:"ingressClasses,omitempty"`
+	IngressHostnames       *IngressHostnamesSpec     		`json:"ingressHostnames,omitempty"`
 	ContainerRegistries    *ContainerRegistriesSpec         `json:"containerRegistries,omitempty"`
 	NodeSelector           map[string]string                `json:"nodeSelector,omitempty"`
 	NetworkPolicies        []networkingv1.NetworkPolicySpec `json:"networkPolicies,omitempty"`
 	LimitRanges            []corev1.LimitRangeSpec          `json:"limitRanges,omitempty"`
 	ResourceQuota          []corev1.ResourceQuotaSpec       `json:"resourceQuotas,omitempty"`
 	AdditionalRoleBindings []AdditionalRoleBindings         `json:"additionalRoleBindings,omitempty"`
-	IngressHostnames    IngressHostnamesSpec     `json:"IngressHostnames"`
 }
 
 type AdditionalRoleBindings struct {

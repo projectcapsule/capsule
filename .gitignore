@@ -24,3 +24,5 @@ bin
 *~
 
 hack/*.kubeconfig
+
+alice-oil.kubeconfig

@@ -142,7 +142,7 @@ func (r *handler) validateIngress(ctx context.Context, apiClient client.Client, 
 		return admission.Allowed("")
 	}
 
-	ingressClass := object.IngressClass()
+	ingressClass := ingress.IngressClass()
 	if ingressClass == nil {
 		return admission.Errored(http.StatusBadRequest, NewIngressClassNotValid(*tnt.Spec.IngressClasses))
 	}
@@ -175,7 +175,7 @@ func (r *handler) validateIngress(ctx context.Context, apiClient client.Client, 
 	}
 
 	if !valid && !matched {
-		return admission.Errored(http.StatusBadRequest, NewIngressClassForbidden(*ingressClass, tnt.Spec.IngressClasses))
+		return admission.Errored(http.StatusBadRequest, NewIngressHostnamesNotValid(hostnames, *tnt.Spec.IngressHostnames))
 	}
 
 	//TODO extract logic above into a method
