@@ -24,39 +24,47 @@ import (
 
 type IngressHostnamesList []string
 
-func (n IngressHostnamesList) Len() int {
-	return len(n)
+func (hostnames IngressHostnamesList) Len() int {
+	return len(hostnames)
 }
 
-func (n IngressHostnamesList) Swap(i, j int) {
-	n[i], n[j] = n[j], n[i]
+func (hostnames IngressHostnamesList) Swap(i, j int) {
+
+	hostnames[i], hostnames[j] = hostnames[j], hostnames[i]
 }
 
-func (n IngressHostnamesList) Less(i, j int) bool {
-	return strings.ToLower(n[i]) < strings.ToLower(n[j])
+func (hostnames IngressHostnamesList) Less(i, j int) bool {
+
+	return strings.ToLower(hostnames[i]) < strings.ToLower(hostnames[j])
 }
 
-func (n IngressHostnamesList) IsStringInList(value string) (ok bool) {
+func (hostnames IngressHostnamesList) IsStringInList(value string) (ok bool) {
 
-	sort.Sort(n)
-	i := sort.SearchStrings(n, value)
-	ok = i < n.Len() && n[i] == value
+	sort.Sort(hostnames)
+	i := sort.SearchStrings(hostnames, value)
+	ok = i < hostnames.Len() && hostnames[i] == value
 	return
 }
 
-func (n IngressHostnamesList) AreStringsInList(values []string) bool {
+func (hostnames IngressHostnamesList) AreStringsInList(values []string) bool {
 
-	sort.Sort(n)
+	sort.Sort(hostnames)
 
 	for _, value := range values {
 
-		index := sort.SearchStrings(n, value)
-		isOk := index < n.Len() && n[index] == value
-		if isOk == false {
+		isPresent := hostnames.isPresent(value)
+		if isPresent == false {
 			return false
 		}
 	}
 	return true
+}
+
+func (hostnames IngressHostnamesList) isPresent(value string) bool {
+
+	index := sort.SearchStrings(hostnames, value)
+	isOk := index < hostnames.Len() && hostnames[index] == value
+	return isOk
 }
 
 type IngressRegex string

@@ -21,16 +21,19 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
+	ctrl "sigs.k8s.io/controller-runtime"
 
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	networkingv1 "k8s.io/api/networking/v1"
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	"k8s.io/apimachinery/pkg/fields"
+
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	"github.com/clastix/capsule/api/v1alpha1"
 	capsulewebhook "github.com/clastix/capsule/pkg/webhook"
+	"github.com/go-logr/logr"
 )
 
 // +kubebuilder:webhook:path=/validating-ingress,mutating=false,failurePolicy=fail,groups=networking.k8s.io;extensions,resources=ingresses,verbs=create;update,versions=v1beta1,name=ingress-v1beta1.capsule.clastix.io
@@ -56,10 +59,12 @@ func (w *webhook) GetPath() string {
 	return "/validating-ingress"
 }
 
-type handler struct{}
+type handler struct {
+	Log logr.Logger
+}
 
 func Handler() capsulewebhook.Handler {
-	return &handler{}
+	return &handler{Log: ctrl.Log.WithName("controllers").WithName("Tenant")}
 }
 
 func (r *handler) OnCreate(client client.Client, decoder *admission.Decoder) capsulewebhook.Func {
@@ -160,21 +165,30 @@ func (r *handler) validateIngress(ctx context.Context, apiClient client.Client, 
 	}
 
 	//TODO extract logic below into a method
+	if tnt.Spec.IngressHostnames == nil {
+		return admission.Allowed("")
+	}
 
 	valid = false
 	matched = false
 	hostnames := ingress.Hostnames()
+	r.Log.Info("Hostnames specified in the Ingress object", "items", hostnames)
 
 	if len(hostnames) > 0 {
 		valid = tnt.Spec.IngressHostnames.Allowed.AreStringsInList(hostnames)
+		r.Log.Info("valid:", "valid", valid)
+
 	}
 
 	allowedRegex := tnt.Spec.IngressHostnames.AllowedRegex
 	if len(allowedRegex) > 0 {
-		allowedRegex.MatchesAllStrings(hostnames)
+		matched = allowedRegex.MatchesAllStrings(hostnames)
+		r.Log.Info("matched", "matched", valid)
+
 	}
 
 	if !valid && !matched {
+		r.Log.Info("admission error")
 		return admission.Errored(http.StatusBadRequest, NewIngressHostnamesNotValid(hostnames, *tnt.Spec.IngressHostnames))
 	}
 
