@@ -107,20 +107,20 @@ func (r *handler) ingressFromRequest(req admission.Request, decoder *admission.D
 			if err := decoder.Decode(req, n); err != nil {
 				return nil, err
 			}
-			ingress = NetworkingV1{n}
+			ingress = NetworkingV1{Ingress: n}
 			break
 		}
 		n := &networkingv1beta1.Ingress{}
 		if err := decoder.Decode(req, n); err != nil {
 			return nil, err
 		}
-		ingress = NetworkingV1Beta1{n}
+		ingress = NetworkingV1Beta1{Ingress: n}
 	case "extensions":
 		e := &extensionsv1beta1.Ingress{}
 		if err := decoder.Decode(req, e); err != nil {
 			return nil, err
 		}
-		ingress = Extension{e}
+		ingress = Extension{Ingress: e}
 	default:
 		err = fmt.Errorf("cannot recognize type %s", req.Kind.Group)
 	}
@@ -172,23 +172,16 @@ func (r *handler) validateIngress(ctx context.Context, apiClient client.Client, 
 	valid = false
 	matched = false
 	hostnames := ingress.Hostnames()
-	r.Log.Info("Hostnames specified in the Ingress object", "items", hostnames)
-
 	if len(hostnames) > 0 {
 		valid = tnt.Spec.IngressHostnames.Allowed.AreStringsInList(hostnames)
-		r.Log.Info("valid:", "valid", valid)
-
 	}
 
 	allowedRegex := tnt.Spec.IngressHostnames.AllowedRegex
 	if len(allowedRegex) > 0 {
 		matched = allowedRegex.MatchesAllStrings(hostnames)
-		r.Log.Info("matched", "matched", valid)
-
 	}
 
 	if !valid && !matched {
-		r.Log.Info("admission error")
 		return admission.Errored(http.StatusBadRequest, NewIngressHostnamesNotValid(hostnames, *tnt.Spec.IngressHostnames))
 	}
 
