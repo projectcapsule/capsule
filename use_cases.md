@@ -1028,3 +1028,41 @@ Annotations:  capsule.clastix.io/allowed-registries: docker.io
               capsule.clastix.io/allowed-registries-regexp: ^registry\.internal\.\w+$
 ...
 ```
+
+# Mitigating CVE-2020-8554 (Man in the middle using LoadBalancer or ExternalIPs)
+
+__Capsule__ is able to enforce the external IPs an end-user would try to assign
+to a Service, mitigating the [CVE-2020-8554](https://github.com/kubernetes/kubernetes/issues/97076).
+
+```yaml
+apiVersion: capsule.clastix.io/v1alpha1
+kind: Tenant
+spec:
+  externalServiceIPs:
+    allowed:
+    - 10.0.0.1/32
+```
+
+Trying to create a __Service__ using an IP address non contained in the
+specified ranges will fail.
+
+```
+alice@caas# cat <<EOF | kubectl apply -f 
+apiVersion: v1
+kind: Service
+metadata:
+  name: my-evil-service
+spec:
+  selector:
+    app: my-evil-dns-server
+  ports:
+    - name: dns
+      protocol: UDP
+      port: 53
+      targetPort: 9053
+  externalIPs:
+    - 8.8.8.8
+    - 8.8.4.4
+EOF
+Error from server: error when creating "STDIN": admission webhook "validating-external-service-ips.capsule.clastix.io" denied the request: The External IP 8.8.8.8 is forbidden for the current Tenant, violating the CIDR 10.0.0.1/32
+```

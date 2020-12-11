@@ -143,6 +143,24 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
+      path: /validating-external-service-ips
+  failurePolicy: Fail
+  name: validating-external-service-ips.capsule.clastix.io
+  rules:
+  - apiGroups:
+    - ""
+    apiVersions:
+    - v1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - services
+- clientConfig:
+    caBundle: Cg==
+    service:
+      name: webhook-service
+      namespace: system
       path: /validating-v1-tenant
   failurePolicy: Fail
   name: tenant.capsule.clastix.io

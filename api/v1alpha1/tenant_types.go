@@ -50,6 +50,13 @@ type ContainerRegistriesSpec struct {
 	AllowedRegex string       `json:"allowedRegex,omitempty"`
 }
 
+// +kubebuilder:validation:Pattern="^([0-9]{1,3}.){3}[0-9]{1,3}(/([0-9]|[1-2][0-9]|3[0-2]))?$"
+type AllowedIp string
+
+type ExternalServiceIPs struct {
+	Allowed []AllowedIp `json:"allowed"`
+}
+
 // TenantSpec defines the desired state of Tenant
 type TenantSpec struct {
 	Owner OwnerSpec `json:"owner"`
@@ -67,6 +74,7 @@ type TenantSpec struct {
 	LimitRanges            []corev1.LimitRangeSpec          `json:"limitRanges,omitempty"`
 	ResourceQuota          []corev1.ResourceQuotaSpec       `json:"resourceQuotas,omitempty"`
 	AdditionalRoleBindings []AdditionalRoleBindings         `json:"additionalRoleBindings,omitempty"`
+	ExternalServiceIPs     *ExternalServiceIPs              `json:"externalServiceIPs,omitempty"`
 }
 
 type AdditionalRoleBindings struct {

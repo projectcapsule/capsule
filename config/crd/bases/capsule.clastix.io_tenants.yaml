@@ -115,6 +115,16 @@ spec:
                 allowedRegex:
                   type: string
               type: object
+            externalServiceIPs:
+              properties:
+                allowed:
+                  items:
+                    pattern: ^([0-9]{1,3}.){3}[0-9]{1,3}(/([0-9]|[1-2][0-9]|3[0-2]))?$
+                    type: string
+                  type: array
+              required:
+              - allowed
+              type: object
             ingressClasses:
               properties:
                 allowed:
