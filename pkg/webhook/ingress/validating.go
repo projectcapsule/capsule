@@ -191,8 +191,3 @@ func (r *handler) validateIngress(ctx context.Context, apiClient client.Client, 
 	return admission.Allowed("")
 
 }
-
-func (r *handler) verifyHostnames(hostnames []string) admission.Response {
-
-	return admission.Allowed("")
-}

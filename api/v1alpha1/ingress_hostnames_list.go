@@ -53,7 +53,7 @@ func (hostnames IngressHostnamesList) AreStringsInList(values []string) bool {
 	for _, value := range values {
 
 		isPresent := hostnames.isPresent(value)
-		if isPresent == false {
+		if !isPresent {
 			return false
 		}
 	}
@@ -74,7 +74,7 @@ func (ir IngressRegex) MatchesAllStrings(values []string) bool {
 	for _, value := range values {
 
 		matched, _ := regexp.MatchString(string(ir), value)
-		if matched == false {
+		if !matched {
 			return false
 		}
 	}
