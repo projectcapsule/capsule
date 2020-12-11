@@ -63,34 +63,38 @@ func Handler() capsulewebhook.Handler {
 }
 
 func (r *handler) OnCreate(client client.Client, decoder *admission.Decoder) capsulewebhook.Func {
+
 	return func(ctx context.Context, req admission.Request) admission.Response {
-		i, err := r.ingressFromRequest(req, decoder)
+		ingress, err := r.ingressFromRequest(req, decoder)
 		if err != nil {
 			return admission.Errored(http.StatusBadRequest, err)
 		}
 
-		return r.validateIngress(ctx, client, i)
+		return r.validateIngress(ctx, client, ingress)
 	}
 }
 
 func (r *handler) OnUpdate(client client.Client, decoder *admission.Decoder) capsulewebhook.Func {
+
 	return func(ctx context.Context, req admission.Request) admission.Response {
-		i, err := r.ingressFromRequest(req, decoder)
+		ingress, err := r.ingressFromRequest(req, decoder)
 		if err != nil {
 			return admission.Errored(http.StatusBadRequest, err)
 		}
 
-		return r.validateIngress(ctx, client, i)
+		return r.validateIngress(ctx, client, ingress)
 	}
 }
 
 func (r *handler) OnDelete(client client.Client, decoder *admission.Decoder) capsulewebhook.Func {
+
 	return func(ctx context.Context, req admission.Request) admission.Response {
 		return admission.Allowed("")
 	}
 }
 
 func (r *handler) ingressFromRequest(req admission.Request, decoder *admission.Decoder) (ingress Ingress, err error) {
+
 	switch req.Kind.Group {
 	case "networking.k8s.io":
 		if req.Kind.Version == "v1" {
@@ -118,12 +122,12 @@ func (r *handler) ingressFromRequest(req admission.Request, decoder *admission.D
 	return
 }
 
-func (r *handler) validateIngress(ctx context.Context, c client.Client, object Ingress) admission.Response {
+func (r *handler) validateIngress(ctx context.Context, apiClient client.Client, ingress Ingress) admission.Response {
 	var valid, matched bool
 
 	tl := &v1alpha1.TenantList{}
-	if err := c.List(ctx, tl, client.MatchingFieldsSelector{
-		Selector: fields.OneTermEqualSelector(".status.namespaces", object.Namespace()),
+	if err := apiClient.List(ctx, tl, client.MatchingFieldsSelector{
+		Selector: fields.OneTermEqualSelector(".status.namespaces", ingress.Namespace()),
 	}); err != nil {
 		return admission.Errored(http.StatusBadRequest, err)
 	}
@@ -155,6 +159,33 @@ func (r *handler) validateIngress(ctx context.Context, c client.Client, object I
 		return admission.Errored(http.StatusBadRequest, NewIngressClassForbidden(*ingressClass, *tnt.Spec.IngressClasses))
 	}
 
+	//TODO extract logic below into a method
+
+	valid = false
+	matched = false
+	hostnames := ingress.Hostnames()
+
+	if len(hostnames) > 0 {
+		valid = tnt.Spec.IngressHostnames.Allowed.AreStringsInList(hostnames)
+	}
+
+	allowedRegex := tnt.Spec.IngressHostnames.AllowedRegex
+	if len(allowedRegex) > 0 {
+		allowedRegex.MatchesAllStrings(hostnames)
+	}
+
+	if !valid && !matched {
+		return admission.Errored(http.StatusBadRequest, NewIngressClassForbidden(*ingressClass, tnt.Spec.IngressClasses))
+	}
+
+	//TODO extract logic above into a method
+	//r.verifyHostnames(hostnames)
+
 	return admission.Allowed("")
 
+}
+
+func (r *handler) verifyHostnames(hostnames []string) admission.Response {
+
+	return admission.Allowed("")
 }

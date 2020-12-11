@@ -4,6 +4,11 @@ kind: Tenant
 metadata:
   name: oil
 spec:
+  ingressHostnames:
+    allowed:
+      - my.oil.acmecorp.com
+      - my.gas.acmecorp.com
+    allowedRegex: "^.*$"
   ingressClasses:
     allowed:
       - default

@@ -21,6 +21,7 @@ import (
 	"io/ioutil"
 
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
+
 	controllerruntime "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
@@ -34,11 +35,11 @@ func Register(mgr controllerruntime.Manager, webhookList ...Webhook) error {
 		return nil
 	}
 
-	s := mgr.GetWebhookServer()
-	for _, wh := range webhookList {
-		s.Register(wh.GetPath(), &webhook.Admission{
+	whServer := mgr.GetWebhookServer()
+	for _, whook := range webhookList {
+		whServer.Register(whook.GetPath(), &webhook.Admission{
 			Handler: &handlerRouter{
-				handler: wh.GetHandler(),
+				handler: whook.GetHandler(),
 			},
 		})
 	}

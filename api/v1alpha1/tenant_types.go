@@ -38,6 +38,13 @@ type IngressClassesSpec struct {
 	AllowedRegex string           `json:"allowedRegex,omitempty"`
 }
 
+type IngressHostnamesSpec struct {
+	// +nullable
+	Allowed IngressHostnamesList `json:"allowed"`
+	// +nullable
+	AllowedRegex IngressRegex `json:"allowedRegex"`
+}
+
 type ContainerRegistriesSpec struct {
 	Allowed      RegistryList `json:"allowed,omitempty"`
 	AllowedRegex string       `json:"allowedRegex,omitempty"`
@@ -59,6 +66,7 @@ type TenantSpec struct {
 	LimitRanges            []corev1.LimitRangeSpec          `json:"limitRanges,omitempty"`
 	ResourceQuota          []corev1.ResourceQuotaSpec       `json:"resourceQuotas,omitempty"`
 	AdditionalRoleBindings []AdditionalRoleBindings         `json:"additionalRoleBindings,omitempty"`
+	IngressHostnames    IngressHostnamesSpec     `json:"IngressHostnames"`
 }
 
 type AdditionalRoleBindings struct {

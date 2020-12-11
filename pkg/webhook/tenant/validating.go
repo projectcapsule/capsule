@@ -57,7 +57,8 @@ func Handler() capsulewebhook.Handler {
 	return &handler{}
 }
 
-func (h *handler) OnCreate(client client.Client, decoder *admission.Decoder) capsulewebhook.Func {
+func (r *handler) OnCreate(client client.Client, decoder *admission.Decoder) capsulewebhook.Func {
+
 	return func(ctx context.Context, req admission.Request) admission.Response {
 		tnt := &v1alpha1.Tenant{}
 		if err := decoder.Decode(req, tnt); err != nil {
