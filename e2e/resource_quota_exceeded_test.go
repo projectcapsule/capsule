@@ -27,7 +27,6 @@ import (
 	. "github.com/onsi/gomega"
 	v1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -46,10 +45,6 @@ var _ = Describe("exceeding Tenant resource quota", func() {
 				Name: "bobby",
 				Kind: "User",
 			},
-			NamespacesMetadata: v1alpha1.AdditionalMetadata{},
-			ServicesMetadata:   v1alpha1.AdditionalMetadata{},
-			IngressClasses:     v1alpha1.IngressClassesSpec{},
-			StorageClasses:     v1alpha1.StorageClassesSpec{},
 			LimitRanges: []corev1.LimitRangeSpec{
 				{
 					Limits: []corev1.LimitRangeItem{
@@ -95,9 +90,6 @@ var _ = Describe("exceeding Tenant resource quota", func() {
 					},
 				},
 			},
-			NetworkPolicies: []networkingv1.NetworkPolicySpec{},
-			NamespaceQuota:  2,
-			NodeSelector:    map[string]string{},
 			ResourceQuota: []corev1.ResourceQuotaSpec{
 				{
 					Hard: map[corev1.ResourceName]resource.Quantity{

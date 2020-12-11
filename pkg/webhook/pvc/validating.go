@@ -79,11 +79,16 @@ func (h *handler) OnCreate(c client.Client, decoder *admission.Decoder) capsulew
 			return admission.Allowed("")
 		}
 
-		if pvc.Spec.StorageClassName == nil {
-			return admission.Errored(http.StatusBadRequest, NewStorageClassNotValid(tl.Items[0].Spec.StorageClasses))
+		tnt := tl.Items[0]
+
+		if tnt.Spec.StorageClasses == nil {
+			return admission.Allowed("")
 		}
 
-		tnt := tl.Items[0]
+		if pvc.Spec.StorageClassName == nil {
+			return admission.Errored(http.StatusBadRequest, NewStorageClassNotValid(*tl.Items[0].Spec.StorageClasses))
+		}
+
 		sc := *pvc.Spec.StorageClassName
 
 		if len(tnt.Spec.StorageClasses.Allowed) > 0 {
@@ -95,10 +100,9 @@ func (h *handler) OnCreate(c client.Client, decoder *admission.Decoder) capsulew
 		}
 
 		if !valid && !matched {
-			return admission.Errored(http.StatusBadRequest, NewStorageClassForbidden(*pvc.Spec.StorageClassName, tnt.Spec.StorageClasses))
+			return admission.Errored(http.StatusBadRequest, NewStorageClassForbidden(*pvc.Spec.StorageClassName, *tnt.Spec.StorageClasses))
 		}
 		return admission.Allowed("")
-
 	}
 }
 

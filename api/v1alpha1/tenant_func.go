@@ -23,7 +23,11 @@ import (
 )
 
 func (t *Tenant) IsFull() bool {
-	return t.Status.Namespaces.Len() >= int(t.Spec.NamespaceQuota)
+	// we don't have limits on assigned Namespaces
+	if t.Spec.NamespaceQuota == nil {
+		return false
+	}
+	return t.Status.Namespaces.Len() >= int(*t.Spec.NamespaceQuota)
 }
 
 func (t *Tenant) AssignNamespaces(namespaces []corev1.Namespace) {

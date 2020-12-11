@@ -20,9 +20,7 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	corev1 "k8s.io/api/core/v1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
-	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/pointer"
@@ -40,21 +38,13 @@ var _ = Describe("when Tenant handles Ingress classes", func() {
 				Name: "ingress",
 				Kind: "User",
 			},
-			NamespacesMetadata: v1alpha1.AdditionalMetadata{},
-			ServicesMetadata:   v1alpha1.AdditionalMetadata{},
-			StorageClasses:     v1alpha1.StorageClassesSpec{},
-			IngressClasses: v1alpha1.IngressClassesSpec{
+			IngressClasses: &v1alpha1.IngressClassesSpec{
 				Allowed: []string{
 					"nginx",
 					"haproxy",
 				},
 				AllowedRegex: "^oil-.*$",
 			},
-			LimitRanges:     []corev1.LimitRangeSpec{},
-			NamespaceQuota:  3,
-			NodeSelector:    map[string]string{},
-			NetworkPolicies: []networkingv1.NetworkPolicySpec{},
-			ResourceQuota:   []corev1.ResourceQuotaSpec{},
 		},
 	}
 	JustBeforeEach(func() {

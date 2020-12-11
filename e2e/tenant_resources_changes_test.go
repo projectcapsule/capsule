@@ -44,10 +44,6 @@ var _ = Describe("changing Tenant managed Kubernetes resources", func() {
 				Name: "laura",
 				Kind: "User",
 			},
-			NamespacesMetadata: v1alpha1.AdditionalMetadata{},
-			ServicesMetadata:   v1alpha1.AdditionalMetadata{},
-			IngressClasses:     v1alpha1.IngressClassesSpec{},
-			StorageClasses:     v1alpha1.StorageClassesSpec{},
 			LimitRanges: []corev1.LimitRangeSpec{
 				{
 					Limits: []corev1.LimitRangeItem{
@@ -137,7 +133,6 @@ var _ = Describe("changing Tenant managed Kubernetes resources", func() {
 					},
 				},
 			},
-			NamespaceQuota: 4,
 			NodeSelector: map[string]string{
 				"kubernetes.io/os": "linux",
 			},

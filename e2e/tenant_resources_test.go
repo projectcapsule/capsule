@@ -45,10 +45,6 @@ var _ = Describe("creating namespaces within a Tenant with resources", func() {
 				Name: "john",
 				Kind: "User",
 			},
-			NamespacesMetadata: v1alpha1.AdditionalMetadata{},
-			ServicesMetadata:   v1alpha1.AdditionalMetadata{},
-			IngressClasses:     v1alpha1.IngressClassesSpec{},
-			StorageClasses:     v1alpha1.StorageClassesSpec{},
 			LimitRanges: []corev1.LimitRangeSpec{
 				{
 					Limits: []corev1.LimitRangeItem{
@@ -138,7 +134,6 @@ var _ = Describe("creating namespaces within a Tenant with resources", func() {
 					},
 				},
 			},
-			NamespaceQuota: 3,
 			NodeSelector: map[string]string{
 				"kubernetes.io/os": "linux",
 			},

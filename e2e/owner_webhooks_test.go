@@ -43,15 +43,12 @@ var _ = Describe("when Tenant owner interacts with the webhooks", func() {
 				Name: "ruby",
 				Kind: "User",
 			},
-			NamespacesMetadata: v1alpha1.AdditionalMetadata{},
-			ServicesMetadata:   v1alpha1.AdditionalMetadata{},
-			StorageClasses: v1alpha1.StorageClassesSpec{
+			StorageClasses: &v1alpha1.StorageClassesSpec{
 				Allowed: []string{
 					"cephfs",
 					"glusterfs",
 				},
 			},
-			IngressClasses: v1alpha1.IngressClassesSpec{},
 			LimitRanges: []corev1.LimitRangeSpec{
 				{
 					Limits: []corev1.LimitRangeItem{
@@ -69,8 +66,6 @@ var _ = Describe("when Tenant owner interacts with the webhooks", func() {
 					},
 				},
 			},
-			NamespaceQuota: 3,
-			NodeSelector:   map[string]string{},
 			NetworkPolicies: []networkingv1.NetworkPolicySpec{
 				{
 					Egress: []networkingv1.NetworkPolicyEgressRule{

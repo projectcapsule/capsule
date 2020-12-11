@@ -39,14 +39,6 @@ var _ = Describe("creating a Namespace trying to select a third Tenant", func() 
 				Name: "undefined",
 				Kind: "User",
 			},
-			NamespacesMetadata: v1alpha1.AdditionalMetadata{},
-			ServicesMetadata:   v1alpha1.AdditionalMetadata{},
-			IngressClasses:     v1alpha1.IngressClassesSpec{},
-			StorageClasses:     v1alpha1.StorageClassesSpec{},
-			LimitRanges:        []corev1.LimitRangeSpec{},
-			NamespaceQuota:     10,
-			NodeSelector:       map[string]string{},
-			ResourceQuota:      []corev1.ResourceQuotaSpec{},
 		},
 	}
 	JustBeforeEach(func() {

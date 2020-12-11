@@ -41,9 +41,6 @@ var _ = Describe("creating a Service/Endpoint/EndpointSlice for a Tenant with ad
 				Name: "gatsby",
 				Kind: "User",
 			},
-			IngressClasses:     v1alpha1.IngressClassesSpec{},
-			StorageClasses:     v1alpha1.StorageClassesSpec{},
-			NamespacesMetadata: v1alpha1.AdditionalMetadata{},
 			ServicesMetadata: v1alpha1.AdditionalMetadata{
 				AdditionalLabels: map[string]string{
 					"k8s.io/custom-label":     "foo",
@@ -54,10 +51,6 @@ var _ = Describe("creating a Service/Endpoint/EndpointSlice for a Tenant with ad
 					"clastix.io/custom-annotation": "buzz",
 				},
 			},
-			LimitRanges:    []corev1.LimitRangeSpec{},
-			NamespaceQuota: 10,
-			NodeSelector:   map[string]string{},
-			ResourceQuota:  []corev1.ResourceQuotaSpec{},
 		},
 	}
 	epsCR := &rbacv1.ClusterRole{

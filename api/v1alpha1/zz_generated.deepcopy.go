@@ -290,10 +290,23 @@ func (in *TenantList) DeepCopyObject() runtime.Object {
 func (in *TenantSpec) DeepCopyInto(out *TenantSpec) {
 	*out = *in
 	out.Owner = in.Owner
+	if in.NamespaceQuota != nil {
+		in, out := &in.NamespaceQuota, &out.NamespaceQuota
+		*out = new(int32)
+		**out = **in
+	}
 	in.NamespacesMetadata.DeepCopyInto(&out.NamespacesMetadata)
 	in.ServicesMetadata.DeepCopyInto(&out.ServicesMetadata)
-	in.StorageClasses.DeepCopyInto(&out.StorageClasses)
-	in.IngressClasses.DeepCopyInto(&out.IngressClasses)
+	if in.StorageClasses != nil {
+		in, out := &in.StorageClasses, &out.StorageClasses
+		*out = new(StorageClassesSpec)
+		(*in).DeepCopyInto(*out)
+	}
+	if in.IngressClasses != nil {
+		in, out := &in.IngressClasses, &out.IngressClasses
+		*out = new(IngressClassesSpec)
+		(*in).DeepCopyInto(*out)
+	}
 	if in.ContainerRegistries != nil {
 		in, out := &in.ContainerRegistries, &out.ContainerRegistries
 		*out = new(ContainerRegistriesSpec)
@@ -352,16 +365,6 @@ func (in *TenantStatus) DeepCopyInto(out *TenantStatus) {
 	if in.Namespaces != nil {
 		in, out := &in.Namespaces, &out.Namespaces
 		*out = make(NamespaceList, len(*in))
-		copy(*out, *in)
-	}
-	if in.Users != nil {
-		in, out := &in.Users, &out.Users
-		*out = make([]string, len(*in))
-		copy(*out, *in)
-	}
-	if in.Groups != nil {
-		in, out := &in.Groups, &out.Groups
-		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
 }

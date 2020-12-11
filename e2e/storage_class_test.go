@@ -21,7 +21,6 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
-	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/pointer"
@@ -39,21 +38,13 @@ var _ = Describe("when Tenant handles Storage classes", func() {
 				Name: "storage",
 				Kind: "User",
 			},
-			NamespacesMetadata: v1alpha1.AdditionalMetadata{},
-			ServicesMetadata:   v1alpha1.AdditionalMetadata{},
-			StorageClasses: v1alpha1.StorageClassesSpec{
+			StorageClasses: &v1alpha1.StorageClassesSpec{
 				Allowed: []string{
 					"cephfs",
 					"glusterfs",
 				},
 				AllowedRegex: "^oil-.*$",
 			},
-			IngressClasses:  v1alpha1.IngressClassesSpec{},
-			LimitRanges:     []corev1.LimitRangeSpec{},
-			NamespaceQuota:  3,
-			NodeSelector:    map[string]string{},
-			NetworkPolicies: []networkingv1.NetworkPolicySpec{},
-			ResourceQuota:   []corev1.ResourceQuotaSpec{},
 		},
 	}
 	JustBeforeEach(func() {

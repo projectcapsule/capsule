@@ -23,8 +23,8 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/pointer"
 
 	"github.com/clastix/capsule/api/v1alpha1"
 )
@@ -39,14 +39,7 @@ var _ = Describe("creating a Namespace over-quota", func() {
 				Name: "bob",
 				Kind: "User",
 			},
-			NamespacesMetadata: v1alpha1.AdditionalMetadata{},
-			ServicesMetadata:   v1alpha1.AdditionalMetadata{},
-			IngressClasses:     v1alpha1.IngressClassesSpec{},
-			StorageClasses:     v1alpha1.StorageClassesSpec{},
-			LimitRanges:        []corev1.LimitRangeSpec{},
-			NamespaceQuota:     3,
-			NodeSelector:       map[string]string{},
-			ResourceQuota:      []corev1.ResourceQuotaSpec{},
+			NamespaceQuota: pointer.Int32Ptr(3),
 		},
 	}
 	JustBeforeEach(func() {

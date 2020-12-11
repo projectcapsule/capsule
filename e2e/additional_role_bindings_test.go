@@ -24,7 +24,6 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -41,14 +40,6 @@ var _ = Describe("creating a Namespace with additional Role Binding", func() {
 				Name: "dale",
 				Kind: "User",
 			},
-			NamespacesMetadata: v1alpha1.AdditionalMetadata{},
-			ServicesMetadata:   v1alpha1.AdditionalMetadata{},
-			IngressClasses:     v1alpha1.IngressClassesSpec{},
-			StorageClasses:     v1alpha1.StorageClassesSpec{},
-			LimitRanges:        []corev1.LimitRangeSpec{},
-			NamespaceQuota:     10,
-			NodeSelector:       map[string]string{},
-			ResourceQuota:      []corev1.ResourceQuotaSpec{},
 			AdditionalRoleBindings: []v1alpha1.AdditionalRoleBindings{
 				{
 					ClusterRoleName: "crds-rolebinding",

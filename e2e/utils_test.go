@@ -38,7 +38,7 @@ import (
 )
 
 const (
-	defaultTimeoutInterval       = 10 * time.Second
+	defaultTimeoutInterval       = 20 * time.Second
 	podRecreationTimeoutInterval = 90 * time.Second
 	defaultPollInterval          = time.Second
 )
@@ -115,15 +115,17 @@ func ModifyCapsuleManagerPodArgs(args []string) {
 	time.Sleep(defaultTimeoutInterval)
 }
 
-func GroupShouldBeUsedInTenantRoleBinding(ns *corev1.Namespace, t *v1alpha1.Tenant, timeout time.Duration) {
-	for _, roleBindingName := range tenantRoleBindingNames {
-		tenantRoleBindig := &rbacv1.RoleBinding{}
-		Eventually(func() string {
-			Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: roleBindingName, Namespace: ns.GetName()}, tenantRoleBindig)).Should(Succeed())
-			return tenantRoleBindig.Subjects[0].Kind
-		}, timeout, defaultPollInterval).Should(BeIdenticalTo("Group"))
-
+func KindInTenantRoleBindingAssertions(ns *corev1.Namespace, timeout time.Duration) (out []AsyncAssertion) {
+	for _, rbn := range tenantRoleBindingNames {
+		rb := &rbacv1.RoleBinding{}
+		out = append(out, Eventually(func() string {
+			if err := k8sClient.Get(context.TODO(), types.NamespacedName{Name: rbn, Namespace: ns.GetName()}, rb); err != nil {
+				return ""
+			}
+			return rb.Subjects[0].Kind
+		}, timeout, defaultPollInterval))
 	}
+	return
 }
 
 func GetKubernetesSemVer() (major, minor int, ver string) {

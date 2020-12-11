@@ -7,37 +7,37 @@ metadata:
   name: tenants.capsule.clastix.io
 spec:
   additionalPrinterColumns:
-  - JSONPath: .spec.namespaceQuota
-    description: The max amount of Namespaces can be created
-    name: Namespace quota
-    type: integer
-  - JSONPath: .status.size
-    description: The total amount of Namespaces in use
-    name: Namespace count
-    type: integer
-  - JSONPath: .spec.owner.name
-    description: The assigned Tenant owner
-    name: Owner name
-    type: string
-  - JSONPath: .spec.owner.kind
-    description: The assigned Tenant owner kind
-    name: Owner kind
-    type: string
-  - JSONPath: .spec.nodeSelector
-    description: Node Selector applied to Pods
-    name: Node selector
-    type: string
-  - JSONPath: .metadata.creationTimestamp
-    description: Age
-    name: Age
-    type: date
+    - JSONPath: .spec.namespaceQuota
+      description: The max amount of Namespaces can be created
+      name: Namespace quota
+      type: integer
+    - JSONPath: .status.size
+      description: The total amount of Namespaces in use
+      name: Namespace count
+      type: integer
+    - JSONPath: .spec.owner.name
+      description: The assigned Tenant owner
+      name: Owner name
+      type: string
+    - JSONPath: .spec.owner.kind
+      description: The assigned Tenant owner kind
+      name: Owner kind
+      type: string
+    - JSONPath: .spec.nodeSelector
+      description: Node Selector applied to Pods
+      name: Node selector
+      type: string
+    - JSONPath: .metadata.creationTimestamp
+      description: Age
+      name: Age
+      type: date
   group: capsule.clastix.io
   names:
     kind: Tenant
     listKind: TenantList
     plural: tenants
     shortNames:
-    - tnt
+      - tnt
     singular: tenant
   scope: Cluster
   subresources:
@@ -61,20 +61,6 @@ spec:
         spec:
           description: TenantSpec defines the desired state of Tenant
           properties:
-            containerRegistries:
-              properties:
-                allowed:
-                  items:
-                    type: string
-                  nullable: true
-                  type: array
-                allowedRegex:
-                  nullable: true
-                  type: string
-              required:
-              - allowed
-              - allowedRegex
-              type: object
             additionalRoleBindings:
               items:
                 properties:
@@ -109,28 +95,38 @@ spec:
                             an error.
                           type: string
                       required:
-                      - kind
-                      - name
+                        - kind
+                        - name
                       type: object
                     type: array
                 required:
-                - clusterRoleName
-                - subjects
+                  - clusterRoleName
+                  - subjects
                 type: object
               type: array
+            containerRegistries:
+              properties:
+                allowed:
+                  items:
+                    type: string
+                  type: array
+                allowedRegex:
+                  type: string
+              required:
+                - allowed
+                - allowedRegex
+              type: object
             ingressClasses:
               properties:
                 allowed:
                   items:
                     type: string
-                  nullable: true
                   type: array
                 allowedRegex:
-                  nullable: true
                   type: string
               required:
-              - allowed
-              - allowedRegex
+                - allowed
+                - allowedRegex
               type: object
             limitRanges:
               items:
@@ -147,8 +143,8 @@ spec:
                         default:
                           additionalProperties:
                             anyOf:
-                            - type: integer
-                            - type: string
+                              - type: integer
+                              - type: string
                             pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                             x-kubernetes-int-or-string: true
                           description: Default resource requirement limit value by
@@ -157,8 +153,8 @@ spec:
                         defaultRequest:
                           additionalProperties:
                             anyOf:
-                            - type: integer
-                            - type: string
+                              - type: integer
+                              - type: string
                             pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                             x-kubernetes-int-or-string: true
                           description: DefaultRequest is the default resource requirement
@@ -168,8 +164,8 @@ spec:
                         max:
                           additionalProperties:
                             anyOf:
-                            - type: integer
-                            - type: string
+                              - type: integer
+                              - type: string
                             pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                             x-kubernetes-int-or-string: true
                           description: Max usage constraints on this kind by resource
@@ -178,8 +174,8 @@ spec:
                         maxLimitRequestRatio:
                           additionalProperties:
                             anyOf:
-                            - type: integer
-                            - type: string
+                              - type: integer
+                              - type: string
                             pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                             x-kubernetes-int-or-string: true
                           description: MaxLimitRequestRatio if specified, the named
@@ -191,8 +187,8 @@ spec:
                         min:
                           additionalProperties:
                             anyOf:
-                            - type: integer
-                            - type: string
+                              - type: integer
+                              - type: string
                             pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                             x-kubernetes-int-or-string: true
                           description: Min usage constraints on this kind by resource
@@ -202,31 +198,29 @@ spec:
                           description: Type of resource that this limit applies to.
                           type: string
                       required:
-                      - type
+                        - type
                       type: object
                     type: array
                 required:
-                - limits
+                  - limits
                 type: object
               type: array
             namespaceQuota:
-              minimum: 1
+              format: int32
               type: integer
             namespacesMetadata:
               properties:
                 additionalAnnotations:
                   additionalProperties:
                     type: string
-                  nullable: true
                   type: object
                 additionalLabels:
                   additionalProperties:
                     type: string
-                  nullable: true
                   type: object
               required:
-              - additionalAnnotations
-              - additionalLabels
+                - additionalAnnotations
+                - additionalLabels
               type: object
             networkPolicies:
               items:
@@ -261,8 +255,8 @@ spec:
                             properties:
                               port:
                                 anyOf:
-                                - type: integer
-                                - type: string
+                                  - type: integer
+                                  - type: string
                                 description: The port on the given protocol. This
                                   can either be a numerical or named port on a pod.
                                   If this field is not provided, this matches all
@@ -308,7 +302,7 @@ spec:
                                       type: string
                                     type: array
                                 required:
-                                - cidr
+                                  - cidr
                                 type: object
                               namespaceSelector:
                                 description: "Selects Namespaces using cluster-scoped
@@ -349,8 +343,8 @@ spec:
                                             type: string
                                           type: array
                                       required:
-                                      - key
-                                      - operator
+                                        - key
+                                        - operator
                                       type: object
                                     type: array
                                   matchLabels:
@@ -403,8 +397,8 @@ spec:
                                             type: string
                                           type: array
                                       required:
-                                      - key
-                                      - operator
+                                        - key
+                                        - operator
                                       type: object
                                     type: array
                                   matchLabels:
@@ -470,7 +464,7 @@ spec:
                                       type: string
                                     type: array
                                 required:
-                                - cidr
+                                  - cidr
                                 type: object
                               namespaceSelector:
                                 description: "Selects Namespaces using cluster-scoped
@@ -511,8 +505,8 @@ spec:
                                             type: string
                                           type: array
                                       required:
-                                      - key
-                                      - operator
+                                        - key
+                                        - operator
                                       type: object
                                     type: array
                                   matchLabels:
@@ -565,8 +559,8 @@ spec:
                                             type: string
                                           type: array
                                       required:
-                                      - key
-                                      - operator
+                                        - key
+                                        - operator
                                       type: object
                                     type: array
                                   matchLabels:
@@ -596,8 +590,8 @@ spec:
                             properties:
                               port:
                                 anyOf:
-                                - type: integer
-                                - type: string
+                                  - type: integer
+                                  - type: string
                                 description: The port on the given protocol. This
                                   can either be a numerical or named port on a pod.
                                   If this field is not provided, this matches all
@@ -648,8 +642,8 @@ spec:
                                 type: string
                               type: array
                           required:
-                          - key
-                          - operator
+                            - key
+                            - operator
                           type: object
                         type: array
                       matchLabels:
@@ -682,7 +676,7 @@ spec:
                       type: string
                     type: array
                 required:
-                - podSelector
+                  - podSelector
                 type: object
               type: array
             nodeSelector:
@@ -694,14 +688,14 @@ spec:
               properties:
                 kind:
                   enum:
-                  - User
-                  - Group
+                    - User
+                    - Group
                   type: string
                 name:
                   type: string
               required:
-              - kind
-              - name
+                - kind
+                - name
               type: object
             resourceQuotas:
               items:
@@ -711,8 +705,8 @@ spec:
                   hard:
                     additionalProperties:
                       anyOf:
-                      - type: integer
-                      - type: string
+                        - type: integer
+                        - type: string
                       pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                       x-kubernetes-int-or-string: true
                     description: 'hard is the set of desired hard limits for each
@@ -752,8 +746,8 @@ spec:
                                 type: string
                               type: array
                           required:
-                          - operator
-                          - scopeName
+                            - operator
+                            - scopeName
                           type: object
                         type: array
                     type: object
@@ -773,37 +767,29 @@ spec:
                 additionalAnnotations:
                   additionalProperties:
                     type: string
-                  nullable: true
                   type: object
                 additionalLabels:
                   additionalProperties:
                     type: string
-                  nullable: true
                   type: object
               required:
-              - additionalAnnotations
-              - additionalLabels
+                - additionalAnnotations
+                - additionalLabels
               type: object
             storageClasses:
               properties:
                 allowed:
                   items:
                     type: string
-                  nullable: true
                   type: array
                 allowedRegex:
-                  nullable: true
                   type: string
               required:
-              - allowed
-              - allowedRegex
+                - allowed
+                - allowedRegex
               type: object
           required:
-          - ingressClasses
-          - limitRanges
-          - namespaceQuota
-          - owner
-          - storageClasses
+            - owner
           type: object
         status:
           description: TenantStatus defines the observed state of Tenant
@@ -823,14 +809,14 @@ spec:
                 type: string
               type: array
           required:
-          - size
+            - size
           type: object
       type: object
   version: v1alpha1
   versions:
-  - name: v1alpha1
-    served: true
-    storage: true
+    - name: v1alpha1
+      served: true
+      storage: true
 status:
   acceptedNames:
     kind: ""

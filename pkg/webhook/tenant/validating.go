@@ -57,7 +57,7 @@ func Handler() capsulewebhook.Handler {
 	return &handler{}
 }
 
-func (r *handler) OnCreate(client client.Client, decoder *admission.Decoder) capsulewebhook.Func {
+func (h *handler) OnCreate(client client.Client, decoder *admission.Decoder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) admission.Response {
 		tnt := &v1alpha1.Tenant{}
 		if err := decoder.Decode(req, tnt); err != nil {
@@ -70,16 +70,23 @@ func (r *handler) OnCreate(client client.Client, decoder *admission.Decoder) cap
 		}
 
 		// Validate ingressClasses regexp
-		if len(tnt.Spec.IngressClasses.AllowedRegex) > 0 {
+		if tnt.Spec.IngressClasses != nil && len(tnt.Spec.IngressClasses.AllowedRegex) > 0 {
 			if _, err := regexp.Compile(tnt.Spec.IngressClasses.AllowedRegex); err != nil {
 				return admission.Denied("Unable to compile ingressClasses allowedRegex")
 			}
 		}
 
 		// Validate storageClasses regexp
-		if len(tnt.Spec.StorageClasses.AllowedRegex) > 0 {
+		if tnt.Spec.StorageClasses != nil && len(tnt.Spec.StorageClasses.AllowedRegex) > 0 {
 			if _, err := regexp.Compile(tnt.Spec.StorageClasses.AllowedRegex); err != nil {
 				return admission.Denied("Unable to compile storageClasses allowedRegex")
+			}
+		}
+
+		// Validate containerRegistries regexp
+		if tnt.Spec.ContainerRegistries != nil && len(tnt.Spec.ContainerRegistries.AllowedRegex) > 0 {
+			if _, err := regexp.Compile(tnt.Spec.ContainerRegistries.AllowedRegex); err != nil {
+				return admission.Denied("Unable to compile containerRegistries allowedRegex")
 			}
 		}
 
