@@ -144,7 +144,8 @@ Error from server (Forbidden): pods is forbidden:
 User "alice" cannot list resource "pods" in API group "" in the namespace "kube-system"
 ```
 
-Please, see the [section](./docs/operator/use-cases/overview.md) in the project documentation for more cool things you can do with Capsule.
+# Documentation
+Please, check the project [documentation](./docs/index.md) for more cool things you can do with Capsule.
 
 # Removal
 Similar to `deploy`, you can get rid of Capsule using the `remove` target.
