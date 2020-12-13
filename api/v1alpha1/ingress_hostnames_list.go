@@ -29,17 +29,14 @@ func (hostnames IngressHostnamesList) Len() int {
 }
 
 func (hostnames IngressHostnamesList) Swap(i, j int) {
-
 	hostnames[i], hostnames[j] = hostnames[j], hostnames[i]
 }
 
 func (hostnames IngressHostnamesList) Less(i, j int) bool {
-
 	return strings.ToLower(hostnames[i]) < strings.ToLower(hostnames[j])
 }
 
 func (hostnames IngressHostnamesList) IsStringInList(value string) (ok bool) {
-
 	sort.Sort(hostnames)
 	i := sort.SearchStrings(hostnames, value)
 	ok = i < hostnames.Len() && hostnames[i] == value
@@ -47,7 +44,6 @@ func (hostnames IngressHostnamesList) IsStringInList(value string) (ok bool) {
 }
 
 func (hostnames IngressHostnamesList) AreStringsInList(values []string) bool {
-
 	sort.Sort(hostnames)
 
 	for _, value := range values {
@@ -61,7 +57,6 @@ func (hostnames IngressHostnamesList) AreStringsInList(values []string) bool {
 }
 
 func (hostnames IngressHostnamesList) isPresent(value string) bool {
-
 	index := sort.SearchStrings(hostnames, value)
 	isOk := index < hostnames.Len() && hostnames[index] == value
 	return isOk
@@ -70,7 +65,6 @@ func (hostnames IngressHostnamesList) isPresent(value string) bool {
 type IngressRegex string
 
 func (ir IngressRegex) MatchesAllStrings(values []string) bool {
-
 	for _, value := range values {
 
 		matched, _ := regexp.MatchString(string(ir), value)

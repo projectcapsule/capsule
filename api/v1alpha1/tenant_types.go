@@ -39,10 +39,8 @@ type IngressClassesSpec struct {
 }
 
 type IngressHostnamesSpec struct {
-	// +nullable
-	Allowed IngressHostnamesList `json:"allowed"`
-	// +nullable
-	AllowedRegex IngressRegex `json:"allowedRegex"`
+	Allowed IngressHostnamesList	`json:"allowed"`
+	AllowedRegex IngressRegex 		`json:"allowedRegex"`
 }
 
 type ContainerRegistriesSpec struct {

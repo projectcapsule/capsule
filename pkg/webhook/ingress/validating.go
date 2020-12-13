@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
-	ctrl "sigs.k8s.io/controller-runtime"
 
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	networkingv1 "k8s.io/api/networking/v1"
@@ -30,10 +29,13 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+	ctrl "sigs.k8s.io/controller-runtime"
+
+	"github.com/go-logr/logr"
 
 	"github.com/clastix/capsule/api/v1alpha1"
 	capsulewebhook "github.com/clastix/capsule/pkg/webhook"
-	"github.com/go-logr/logr"
+
 )
 
 // +kubebuilder:webhook:path=/validating-ingress,mutating=false,failurePolicy=fail,groups=networking.k8s.io;extensions,resources=ingresses,verbs=create;update,versions=v1beta1,name=ingress-v1beta1.capsule.clastix.io
@@ -68,7 +70,6 @@ func Handler() capsulewebhook.Handler {
 }
 
 func (r *handler) OnCreate(client client.Client, decoder *admission.Decoder) capsulewebhook.Func {
-
 	return func(ctx context.Context, req admission.Request) admission.Response {
 		ingress, err := r.ingressFromRequest(req, decoder)
 		if err != nil {
@@ -80,7 +81,6 @@ func (r *handler) OnCreate(client client.Client, decoder *admission.Decoder) cap
 }
 
 func (r *handler) OnUpdate(client client.Client, decoder *admission.Decoder) capsulewebhook.Func {
-
 	return func(ctx context.Context, req admission.Request) admission.Response {
 		ingress, err := r.ingressFromRequest(req, decoder)
 		if err != nil {
@@ -92,14 +92,12 @@ func (r *handler) OnUpdate(client client.Client, decoder *admission.Decoder) cap
 }
 
 func (r *handler) OnDelete(client client.Client, decoder *admission.Decoder) capsulewebhook.Func {
-
 	return func(ctx context.Context, req admission.Request) admission.Response {
 		return admission.Allowed("")
 	}
 }
 
 func (r *handler) ingressFromRequest(req admission.Request, decoder *admission.Decoder) (ingress Ingress, err error) {
-
 	switch req.Kind.Group {
 	case "networking.k8s.io":
 		if req.Kind.Version == "v1" {
@@ -164,7 +162,6 @@ func (r *handler) validateIngress(ctx context.Context, apiClient client.Client, 
 		return admission.Errored(http.StatusBadRequest, NewIngressClassForbidden(*ingressClass, *tnt.Spec.IngressClasses))
 	}
 
-	//TODO extract logic below into a method
 	if tnt.Spec.IngressHostnames == nil {
 		return admission.Allowed("")
 	}
@@ -184,9 +181,6 @@ func (r *handler) validateIngress(ctx context.Context, apiClient client.Client, 
 	if !valid && !matched {
 		return admission.Errored(http.StatusBadRequest, NewIngressHostnamesNotValid(hostnames, *tnt.Spec.IngressHostnames))
 	}
-
-	//TODO extract logic above into a method
-	//r.verifyHostnames(hostnames)
 
 	return admission.Allowed("")
 
