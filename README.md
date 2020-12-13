@@ -16,31 +16,31 @@
 # Kubernetes multi-tenancy made simple
 **Capsule** helps to implement a multi-tenancy and policy-based environment in your Kubernetes cluster. It is not intended to be yet another _PaaS_, instead, it has been designed as a micro-services based ecosystem with minimalist approach, leveraging only on upstream Kubernetes. 
 
-# Which is the problem to solve?
+# What's the problem with the current status?
 Kubernetes introduced the _Namespace_ resource to create logical partitions of the cluster as isolated *slices*. However, implementing advanced multi-tenancy scenarios, it becomes soon complicated because of the flat structure of Kubernetes namespaces. To overcome this, cluster admins tend to provision a dedicated cluster for each groups of users, teams, or departments. As an organization grows, the number of clusters to manage and keep aligned becomes an operational nightmare, described as the well know phenomena of the _clusters sprawl_.
 
 **Capsule** takes a different approach. In a single cluster, it aggregates multiple namespaces in a lightweight abstraction called _Tenant_. Within each tenant, users are free to create their namespaces and share all the resources while different tenants remain isolated from each other. The _Network and Security Policies_, _Resource Quota_, _Limit Ranges_, _RBAC_, and other policies defined at the tenant level are automatically inherited by all the namespaces in the tenant. And users are free to operate their tenants in authonomy, without the intervention of the cluster administrator.
 
-## Self-Service
+### Self-Service
 Leave to developers the freedom to self-provision their cluster resources according to the assigned boundaries.
 
-## Preventing Clusters Sprawl
+### Preventing Clusters Sprawl
 Share a single cluster with multiple teams, groups of users, or departments by saving operational and management efforts.
 
-## Governance
+### Governance
 Leverage Kubernetes Admission Controllers to enforce the industry security best practices and meet legal requirements.
 
-## Resources Control
+### Resources Control
 Take control of the resources consumed by users while preventing them to overtake.
 
-## Native Experience
+### Native Experience
 Provide multi-tenancy with a native Kubernetes experience without introducing additional management layers, plugins, or customised binaries.
 
-## Bring your own device (BYOD)
+### Bring your own device (BYOD)
 Assign to tenants a dedicated set of compute, storage, and network resources and avoid the noisy neighbors' effect.
 
-# Common usage for Capsule
-Please, refer to the corresponding [Use Cases](use-cases.md) section in the project documentation for a detailed list of common use cases that Capsule can address.
+# Common use cases for Capsule
+Please, refer to the corresponding [section](./docs/operator/use-cases/overview.md) in the project documentation for a detailed list of common use cases that Capsule can address.
 
 # Installation
 Make sure you have access to a Kubernetes cluster as administrator.
@@ -64,7 +64,7 @@ $ make deploy
 It will install the Capsule controller in a dedicated namespace `capsule-system`.
 
 ## How to create Tenants
-Use the [scaffold Tenant](config/samples/capsule_v1alpha1_tenant.yaml) and simply apply as cluster admin.
+Use the scaffold [Tenant](config/samples/capsule_v1alpha1_tenant.yaml) and simply apply as cluster admin.
 
 ```
 $ kubectl apply -f config/samples/capsule_v1alpha1_tenant.yaml
@@ -140,10 +140,11 @@ but limited to only your own namespaces:
 
 ```
 $ kubectl -n kube-system get pods
-Error from server (Forbidden): pods is forbidden: User "alice" cannot list resource "pods" in API group "" in the namespace "kube-system"
+Error from server (Forbidden): pods is forbidden:
+User "alice" cannot list resource "pods" in API group "" in the namespace "kube-system"
 ```
 
-Please, check the [use cases](documentation.md) section in the documentation for a list of more cool things you can do with Capsule.
+Please, see the [section](./docs/operator/use-cases/overview.md) in the project documentation for more cool things you can do with Capsule.
 
 # Removal
 Similar to `deploy`, you can get rid of Capsule using the `remove` target.
@@ -159,7 +160,7 @@ $ make remove
 
 - Q. Can I contribute?
 
-  A. Absolutely! Capsule is Open Source with Apache 2 license and any contribution is welcome. Please refer to the corresponding [section](documentation.md) in the documentation.
+  A. Absolutely! Capsule is Open Source with Apache 2 license and any contribution is welcome. Please refer to the corresponding [section](./docs/operator/contributing.md) in the documentation.
 
 - Q. Is it production grade?
 
