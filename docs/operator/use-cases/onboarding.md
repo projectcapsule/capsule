@@ -1,4 +1,4 @@
-# Onboarding of a new tenant
+# Onboard a new tenant
 Bill receives a new request from the Acme Corp.'s CTO asking a new tenant for Alice's organization has to be on board. Bill assigns the Alice's identity `alice` in the Acme Corp. identity management system. And because, Alice is a tenant owner, Bill needs to assign `alice` the Capsule group defined by `--capsule-user-group` option, which defaults to `capsule.clastix.io`.
 
 To keep the things simple, we assume that Bill just creates a client certificate for authentication using X.509 Certificate Signing Request, so Alice's certificate has `"/CN=alice/O=capsule.clastix.io"`.
@@ -93,4 +93,4 @@ spec:
 With the snippet above, any user belonging to the Alice's organization will be owner of the `oil` tenant with the same permissions of Alice.
 
 # What’s next
-See how Alice, the tenant owner, creates new namespaces in her tenants [Create multiple namespaces in a tenant]().
+See how Alice, the tenant owner, creates new namespaces. [Create namespaces](./create-namespaces.md).

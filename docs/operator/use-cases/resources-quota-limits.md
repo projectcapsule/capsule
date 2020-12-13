@@ -1,4 +1,4 @@
-# Resources quota and limits enforcement for a tenant
+# Enforce resources quota and limits
 With help of Capsule, Bill, the cluster admin, can set and enforce resources quota and limits for the Alice's tenant
 
 ```yaml
@@ -10,7 +10,6 @@ spec:
   owner:
     name: alice
     kind: User
-  namespaceQuota: 3
   resourceQuotas:
   - hard:
       limits.cpu: "8"
@@ -54,8 +53,7 @@ metadata:
     tenant: oil
 spec:
   hard:
-    pods : "100"
-    services: "50"
+    pods : "10"
 ---
 kind: ResourceQuota
 apiVersion: v1
@@ -69,23 +67,23 @@ spec:
     requests.storage: "10Gi"
 ```
 
-In her namespaces, Alice can create any resource according to the assigned Resource Quota:
+Alice can create any resource according to the assigned quotas:
 
 ```
 alice@caas# kubectl -n oil-production create deployment nginx --image=nginx:latest 
 ```
 
-To check the remaining quota in the `oil-production` namespace, she gets the list of resource quotas:
+To check the remaining resources in the `oil-production` namespace, she gets the ResourceQuota:
 
 ```
 alice@caas# kubectl -n oil-production get resourcequota
 NAME            AGE   REQUEST                                      LIMIT
 capsule-oil-0   42h   requests.cpu: 1/8, requests.memory: 1/16Gi   limits.cpu: 1/8, limits.memory: 1/16Gi
-capsule-oil-1   42h   pods: 2/10                                   
+capsule-oil-1   42h   pods: 1/10                                   
 capsule-oil-2   42h   requests.storage: 0/100Gi
 ```
 
-and inspecting the quota annotations:
+By inspecting the annotations in ResourceQuota, Alice can see the used resources at tenant level and the related hard quota:
 
 ```yaml
 alice@caas# kubectl get resourcequotas capsule-oil-1 -o yaml
@@ -93,19 +91,12 @@ apiVersion: v1
 kind: ResourceQuota
 metadata:
   annotations:
-    quota.capsule.clastix.io/used-pods: "1" 
+    quota.capsule.clastix.io/used-pods: "1"
+    quota.capsule.clastix.io/hard-pods: "10"
 ...
 ```
 
-At the tenant level, the Capsule controller watches the Resource Quota usage for each Tenant's namespace and adjusts it as an aggregate of all the namespaces using the said annotation pattern (`quota.capsule.clastix.io/<quota_name>`)
-
-The used Resource Quota counts all the used resources as an aggregate of all the namespace resources in the `oil` tenant namespaces:
-
-- `oil-production`
-- `oil-development`
-- `oil-test` 
-
-When the aggregate usage reaches the hard quota limits, then the ResourceQuota Admission Controller denies Alice's request.
+At the tenant level, the Capsule controller watches the resources usage for each Tenant namespace and adjusts it as an aggregate of all the namespaces using the said annotations. When the aggregate usage reaches the hard quota, then the native `ResourceQuota` Admission Controller in Kubernetes denies the Alice's request.
 
 Bill, the cluster admin, can also set Limit Ranges for each namespace in the Alice's tenant by defining limits in the tenant spec:
 
@@ -118,7 +109,6 @@ spec:
   owner:
     name: alice
     kind: User
-  namespaceQuota: 3
   limitRanges:
   - limits:
     - max:
@@ -207,13 +197,7 @@ Container              memory    5Mi  1Gi   10Mi             100Mi          -
 PersistentVolumeClaim  storage   1Gi  10Gi  -                -              -
 ```
 
-Being the limit range specific of single resources:
-
-- Pod
-- Container
-- Persistent Volume Claim
-
-there is no aggregate to count.
+Being the limit range specific of single resources, there is no aggregate to count.
 
 Having access to resource quota and limits, however, Alice is not able to change or delete it according to the assigned RBAC profile.
 
@@ -226,4 +210,4 @@ no - no RBAC policy matched
 ```
 
 # What’s next
-See how Bill, the cluster admin, can assign a pool of nodes to Alice's tenant. [Assign nodes pool to a tenant]().
+See how Bill, the cluster admin, can assign a pool of nodes to Alice's tenant. [Assign a nodes pool](./nodes-pool.md).

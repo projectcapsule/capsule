@@ -1,4 +1,4 @@
-# Assign Storage Classes to a tenant
+# Assign Storage Classes
 The Acme Corp. can provide persistent storage infrastructure to their tenants. Different types of storage requirements, with different levels of QoS, eg. SSD versus HDD, are available for different tenants according to the tenant's profile. To meet these different requirements, Bill, the cluster admin can provision different Storage Classes and assign them to the tenant:
 
 ```yaml
@@ -10,7 +10,6 @@ spec:
   owner:
     name: alice
     kind: User
-  namespaceQuota: 3
   storageClasses:
     allowed:
     - ceph-rbd
@@ -29,7 +28,6 @@ spec:
   owner:
     name: alice
     kind: User
-  namespaceQuota: 3
   storageClasses:
      allowedRegex: "^ceph-.*$"
   ...
@@ -73,4 +71,4 @@ Storage Class default is forbidden for the current Tenant
 ```
 
 # What’s next
-See how Bill, the cluster admin, can assign Network Policies to Alice's tenant. [Assign Network Policies to a tenant]().
+See how Bill, the cluster admin, can assign Network Policies to Alice's tenant. [Assign Network Policies](./network-policies.md).

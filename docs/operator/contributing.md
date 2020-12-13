@@ -70,66 +70,13 @@ From the root path, issue the _make_ recipe:
 
 ```
 # make docker-build
-/home/prometherion/go/bin/controller-gen object:headerFile="hack/boilerplate.go.txt" paths="./..."
-go fmt ./...
-main.go
-go vet ./...
-/home/prometherion/go/bin/controller-gen "crd:trivialVersions=true" rbac:roleName=manager-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases
-go test ./... -coverprofile cover.out
-...
-docker build . -t quay.io/clastix/capsule:latest
-Sending build context to Docker daemon  43.21MB
-Step 1/15 : FROM golang:1.13 as builder
- ---> 67d10cb69049
-Step 2/15 : WORKDIR /workspace
- ---> Using cache
- ---> d783cc2b7c33
-Step 3/15 : COPY go.mod go.mod
- ---> Using cache
- ---> 0fec3ca39e50
-Step 4/15 : COPY go.sum go.sum
- ---> Using cache
- ---> de15be20dbe7
-Step 5/15 : RUN go mod download
- ---> Using cache
- ---> b525cd9abc67
-Step 6/15 : COPY main.go main.go
- ---> 67d9d6538ffc
-Step 7/15 : COPY api/ api/
- ---> 6243b250d170
-Step 8/15 : COPY controllers/ controllers/
- ---> 4abf8ce85484
-Step 9/15 : COPY pkg/ pkg/
- ---> 2cd289b1d496
-Step 10/15 : RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -a -o manager main.go
- ---> Running in dac9a1e3b23f
-Removing intermediate container dac9a1e3b23f
- ---> bb650a8efcb2
-Step 11/15 : FROM gcr.io/distroless/static:nonroot
- ---> 131713291b92
-Step 12/15 : WORKDIR /
- ---> Using cache
- ---> 677a73ab94d3
-Step 13/15 : COPY --from=builder /workspace/manager .
- ---> 6ecb58a82c0a
-Step 14/15 : USER nonroot:nonroot
- ---> Running in a0b8c95f85d4
-Removing intermediate container a0b8c95f85d4
- ---> c4897d60a094
-Step 15/15 : ENTRYPOINT ["/manager"]
- ---> Running in 1a42bab52aa7
-Removing intermediate container 1a42bab52aa7
- ---> 37d2adbe2669
-Successfully built 37d2adbe2669
-Successfully tagged quay.io/clastix/capsule:latest
 ```
 
-The image `quay.io/clastix/capsule:latest` will be available locally, you just
+The image `quay.io/clastix/capsule` will be available locally, you just
 need to push it to _KinD_ with the following command.
 
 ```
-# kind load docker-image --nodes capsule-control-plane --name capsule quay.io/clastix/capsule:latest
-Image: "quay.io/clastix/capsule:latest" with ID "sha256:ebb8f640dda129a795ddc68bad125cb50af6bfb8803be210b56314ded6355759" not yet present on node "capsule-control-plane", loading...
+# kind load docker-image --nodes capsule-control-plane --name capsule quay.io/clastix/capsule
 ```
 
 ### Deploy the Kubernetes manifests
@@ -146,21 +93,6 @@ You can check if Capsule is running tailing the logs:
 
 ```
 # kubectl -n capsule-system logs --all-containers -f -l control-plane=controller-manager
-...
-2020-08-03T15:37:44.031Z        INFO    controllers.Tenant      Role Binding sync result: unchanged     {"Request.Name": "oil", "name": "namespace-deleter", "namespace": "oil-dev"}
-2020-08-03T15:37:44.032Z        INFO    controllers.Tenant      Role Binding sync result: unchanged     {"Request.Name": "oil", "name": "namespace:admin", "namespace": "oil-production"}
-2020-08-03T15:37:44.032Z        INFO    controllers.Tenant      Role Binding sync result: unchanged     {"Request.Name": "oil", "name": "namespace-deleter", "namespace": "oil-production"}
-2020-08-03T15:37:44.032Z        INFO    controllers.Tenant      Tenant reconciling completed    {"Request.Name": "oil"}
-2020-08-03T15:37:44.032Z        DEBUG   controller-runtime.controller   Successfully Reconciled {"controller": "tenant", "request": "/oil"}
-2020-08-03T15:37:46.945Z        INFO    controllers.Namespace   Reconciling Namespace   {"Request.Name": "oil-staging"}
-2020-08-03T15:37:46.953Z        INFO    controllers.Namespace   Namespace reconciliation processed      {"Request.Name": "oil-staging"}
-2020-08-03T15:37:46.953Z        DEBUG   controller-runtime.controller   Successfully Reconciled {"controller": "namespace", "request": "/oil-staging"}
-2020-08-03T15:37:46.957Z        INFO    controllers.Namespace   Reconciling Namespace   {"Request.Name": "oil-staging"}
-2020-08-03T15:37:46.957Z        DEBUG   controller-runtime.controller   Successfully Reconciled {"controller": "namespace", "request": "/oil-staging"}
-I0803 15:16:01.763606       1 main.go:186] Valid token audiences: 
-I0803 15:16:01.763689       1 main.go:232] Generating self signed cert as no cert is provided
-I0803 15:16:02.042022       1 main.go:281] Starting TCP socket on 0.0.0.0:8443
-I0803 15:16:02.042364       1 main.go:288] Listening securely on 0.0.0.0:8443
 ```
 
 Since Capsule is built using _OperatorSDK_, logging is handled by the zap

@@ -1,4 +1,4 @@
-# Set network policies in the tenant
+# Assign Network Policies
 Kubernetes network policies allow controlling network traffic between namespaces and between pods in the same namespace. Bill, the cluster admin, can enforce network traffic isolation between different tenants while leaving to Alice, the tenant owner, the freedom to set isolation between namespaces in the same tenant or even between pods in the same namespace.
 
 To meet this requirement, Bill needs to define network policies that deny pods belonging to Alice's namespaces to access pods in namespaces belonging to other tenants, e.g. Bob's tenant `water`, or in system namespaces, e.g. `kube-system`.
@@ -16,7 +16,6 @@ spec:
   owner:
     name: alice
     kind: User
-  namespaceQuota: 3
   networkPolicies:
   - policyTypes:
     - Ingress
@@ -101,4 +100,4 @@ Error from server (Capsule Network Policies cannot be deleted: please, reach out
 ```
 
 # What’s next
-See how Bill, the cluster admin, can assign trusted images registries to Alice's tenant. [Assign Trusted Images Registries to a tenant]().
+See how Bill, the cluster admin, can assign trusted images registries to Alice's tenant. [Assign Trusted Images Registries](./images-registries.md).

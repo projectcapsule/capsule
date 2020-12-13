@@ -1,4 +1,4 @@
-# Create custom resources in a tenant
+# Create Custom Resources
 Capsule operator the admin permissions to the tenant's users but only limited to their namespaces. To achieve that, it assign the ClusterRole [admin](https://kubernetes.io/docs/reference/access-authn-authz/rbac/#user-facing-roles) to the tenant owner. This ClusterRole does not permit the installation of custom resources in the namespaces.
 
 In order to leave the tenant owner to create Custom Resources in their namespaces, the cluster admin defines a proper Cluster Role. For example:
@@ -35,7 +35,6 @@ spec:
   owner:
     name: alice
     kind: User
-  namespaceQuota: 3
   additionalRoleBindings:
     - clusterRoleName: 'argoproj-provisioner'
       subjects:
@@ -58,7 +57,6 @@ spec:
   owner:
     name: alice
     kind: User
-  namespaceQuota: 3
   additionalRoleBindings:
     - clusterRoleName: 'argoproj-provisioner'
       subjects:
@@ -90,4 +88,4 @@ With the above example, Capsule is leaving the tenant owner to create namespaced
 > Nota bene: a tenant owner having the admin scope on its namespaces only, does not have the permission to create Custom Resources Definitions (CRDs) because this requires a cluster admin permission level. Only Bill, the cluster admin, can create CRDs. This is a known limitation of any multi-tenancy environment based on a single Kubernetes cluster.
 
 # What’s next
-See how Bill, the cluster admin, can set taints on the Alice's namespaces. [Taint namespaces]().
+See how Bill, the cluster admin, can set taints on the Alice's namespaces. [Taint namespaces](./taint-namespaces.md).

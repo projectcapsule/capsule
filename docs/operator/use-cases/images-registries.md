@@ -1,4 +1,4 @@
-# Assign Trusted Images Registries to a tenant
+# Assign Trusted Images Registries
 Bill, the cluster admin, can set a strict policy on the applications running into Alice's tenant: he'd like to allow running just images hosted on a list of specific container registries.
 
 The spec `containerRegistries` addresses this task and can provide combination with hard enforcement using a list of allowed values.
@@ -13,7 +13,6 @@ spec:
   owner:
     name: alice
     kind: User
-  namespaceQuota: 3
   containerRegistries:
     allowed:
     - docker.io
@@ -38,7 +37,6 @@ spec:
   owner:
     name: alice
     kind: User
-  namespaceQuota: 3
   containerRegistries:
     allowed: []
     regex: "internal.registry.\\w.tld"
@@ -61,5 +59,5 @@ Annotations:  capsule.clastix.io/allowed-registries: docker.io
 ```
 
 # What’s next
-See how Bill, the cluster admin, can assign Pod Security Policies to Alice's tenant. [Assign Pod Security Policies to a tenant]().
+See how Bill, the cluster admin, can assign Pod Security Policies to Alice's tenant. [Assign Pod Security Policies](./pod-security-policies.md).
 

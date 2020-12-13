@@ -1,4 +1,7 @@
-# Installation
+# Getting started
+Thanks for giving Capsule a try.
+
+## Installation
 Make sure you have access to a Kubernetes cluster as administrator.
 
 There are two ways to install Capsule:
@@ -6,7 +9,7 @@ There are two ways to install Capsule:
 * Use the Helm Chart available [here](https://github.com/clastix/capsule/tree/master/charts/capsule)
 * Use [`kustomize`](https://github.com/kubernetes-sigs/kustomize)
 
-## Install with kustomize
+### Install with kustomize
 Ensure you have `kubectl` and `kustomize` installed in your `PATH`. 
 
 Clone this repository and move to the repo folder:
@@ -20,7 +23,7 @@ $ make deploy
 It will install the Capsule controller in a dedicated namespace `capsule-system`.
 
 # Create your first Tenant
-In Capsule, a _Tenant_ is an abstraction to group togheter multiple namespaces in a single entity within a set of bundaries defined by the Cluster Administrator. The tenant is then assigned to a user or group of users who are called _Tenant Owners_.
+In Capsule, a _Tenant_ is an abstraction to group togheter multiple namespaces in a single entity within a set of bundaries defined by the Cluster Administrator. The tenant is then assigned to a user or group of users who is called _Tenant Owner_.
 
 Capsule defines a Tenant as Custom Resource with cluster scope:
 
@@ -117,4 +120,4 @@ Error from server (Forbidden): pods is forbidden: User "alice" cannot list resou
 ```
 
 # What’s next
-The Tenant Owners have full administrative permissions limited to only the namespaces in the assigned tenant. However, their permissions can be controlled by the Cluster Admin by setting rules and policies on the assigned tenant. See [use cases]() for more cool things you can do with Capsule.
+The Tenant Owners have full administrative permissions limited to only the namespaces in the assigned tenant. However, their permissions can be controlled by the Cluster Admin by setting rules and policies on the assigned tenant. See the [use cases](./use-cases/overview.md) page for more getting more cool things you can do with Capsule.

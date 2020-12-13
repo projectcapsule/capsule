@@ -1,4 +1,4 @@
-# Create namespaces in the tenant
+# Create namespaces
 Alice can create a new namespace in her tenant, as simply:
 
 ```
@@ -77,12 +77,12 @@ bill@caas# kubectl describe tenant oil
 
 ```yaml
 ...
-Status:
-  Namespaces:
+status:
+  namespaces:
     oil-development
     oil-production
     oil-test
-  Size:  3 # current namespace count
+  size:  3 # current namespace count
 ...
 ```
 
@@ -96,4 +96,4 @@ Error from server (Cannot exceed Namespace quota: please, reach out the system a
 The enforcement on the maximum number of Namespace resources per Tenant is in charge of the Capsule controller via its Dynamic Admission Webhook capability.
 
 # What’s next
-See how Alice, the tenant owner, can assign different user roles in her tenants. [Assign permissions roles in a tenant]().
+See how Alice, the tenant owner, can assign different user roles in the tenant. [Assign permissions](./permissions.md).

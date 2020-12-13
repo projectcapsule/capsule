@@ -1,4 +1,4 @@
-# Assign permissions roles in a tenant
+# Assign permissions
 Alice acts as the tenant admin. Other users can operate inside the tenant with different levels of permissions and authorizations. Alice is responsible for creating additional roles and assigning these roles to other users to work in the same tenant.
 
 One of the key design principles of the Capsule is the self-provisioning management from the tenant owner's perspective. Alice, the tenant owner, does not need to interact with Bill, the cluster admin, to complete her day-by-day duties. On the other side, Bill has not to deal with multiple requests coming from multiple tenant owners that probably will overwhelm him.
@@ -40,4 +40,4 @@ subjects:
 Joe now can operate on the namespace `oil-development` as admin but he has no access to the other namespaces `oil-production`, and `oil-test` that are part of the same tenant. 
 
 # What’s next
-See how Bill, the cluster admin, set resources quota and limits for Alice's tenant. [Resources quota and limits enforcement for a tenant]().
+See how Bill, the cluster admin, set resources quota and limits for Alice's tenant. [Enforce resources quota and limits](./resources-quota-limits.md).

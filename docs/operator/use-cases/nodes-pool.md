@@ -1,4 +1,4 @@
-# Assign nodes pool to a tenant
+# Assign a nodes pool
 Bill, the cluster admin, can dedicate a pool of worker nodes to the `oil` tenant, to isolate the tenant applications from other noisy neighbors.
 
 These nodes are labeled by Bill as `pool=oil`
@@ -24,7 +24,6 @@ spec:
   owner:
     name: alice
     kind: User
-  namespaceQuota: 3
   nodeSelector:
     pool: oil
   ...
@@ -51,4 +50,4 @@ no
 ```
 
 # What’s next
-See how Bill, the cluster admin, can assign an Ingress Class to Alice's tenant. [Assign Ingress Classes to a tenant]().
+See how Bill, the cluster admin, can assign an Ingress Class to Alice's tenant. [Assign Ingress Classes](./ingress-classes.md).

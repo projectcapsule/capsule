@@ -1,4 +1,4 @@
-# Assign Pod Security Policies to a tenant
+# Assign Pod Security Policies
 Bill, the cluster admin, can assign a dedicated Pod Security Policy (PSP) to the Alice's tenant. This is likely to be a requirement in a multi-tenancy environment.
 
 The cluster admin creates a PSP:
@@ -40,7 +40,6 @@ spec:
   owner:
     name: alice
     kind: User
-  namespaceQuota: 3
   additionalRoleBindings:
   - clusterRoleName: psp:privileged
     subjects:
@@ -74,4 +73,4 @@ roleRef:
 With the above example, Capsule is forbidding to any authenticated user in `oil-production` namespace to run privileged pods and let them to performs privilege escalation as declared by the Cluster Role `psp:privileged`.
 
 # What’s next
-See how Bill, the cluster admin, can assign to Alice the permissions to create custom resources in her tenant. [Create custom resources in a tenant]().
+See how Bill, the cluster admin, can assign to Alice the permissions to create custom resources in her tenant. [Create Custom Resources](./custom-resources.md).

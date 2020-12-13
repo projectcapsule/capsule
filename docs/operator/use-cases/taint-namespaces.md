@@ -12,7 +12,6 @@ spec:
   owner:
     name: alice
     kind: User
-  namespaceQuota: 3
   namespacesMetadata:
     additionalLabels:
       capsule.clastix.io/backup: "true"
@@ -29,7 +28,6 @@ spec:
   owner:
     name: alice
     kind: User
-  namespaceQuota: 3
   namespacesMetadata:
     additionalAnnotations:
       capsule.clastix.io/do_stuff: backup
@@ -50,4 +48,4 @@ metadata:
 ```
 
 # What’s next
-See how Bill, the cluster admin, can assign multiple tenants to the same owner. [Multiple tenants owned by the same user]().
+See how Bill, the cluster admin, can assign multiple tenants to Alice. [Assign multiple tenants to an owner](./multiple-tenants.md).
