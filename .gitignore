@@ -23,6 +23,5 @@ bin
 *.swo
 *~
 
-hack/*.kubeconfig
+**/*.kubeconfig
 
-alice-oil.kubeconfig
