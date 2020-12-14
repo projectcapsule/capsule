@@ -35,11 +35,11 @@ func Register(mgr controllerruntime.Manager, webhookList ...Webhook) error {
 		return nil
 	}
 
-	wh := mgr.GetWebhookServer()
-	for _, whook := range webhookList {
-		wh.Register(whook.GetPath(), &webhook.Admission{
+	s := mgr.GetWebhookServer()
+	for _, wh := range webhookList {
+		s.Register(wh.GetPath(), &webhook.Admission{
 			Handler: &handlerRouter{
-				handler: whook.GetHandler(),
+				handler: wh.GetHandler(),
 			},
 		})
 	}
