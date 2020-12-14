@@ -20,8 +20,6 @@ import (
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	networkingv1 "k8s.io/api/networking/v1"
 	networkingv1beta "k8s.io/api/networking/v1beta1"
-
-	"github.com/go-logr/logr"
 )
 
 const (
@@ -36,7 +34,6 @@ type Ingress interface {
 
 type NetworkingV1 struct {
 	*networkingv1.Ingress
-	Log logr.Logger
 }
 
 func (n NetworkingV1) IngressClass() (res *string) {
@@ -68,7 +65,6 @@ func (n NetworkingV1) Hostnames() []string {
 
 type NetworkingV1Beta1 struct {
 	*networkingv1beta.Ingress
-	Log logr.Logger
 }
 
 func (n NetworkingV1Beta1) IngressClass() (res *string) {
@@ -100,7 +96,6 @@ func (n NetworkingV1Beta1) Hostnames() []string {
 
 type Extension struct {
 	*extensionsv1beta1.Ingress
-	Log logr.Logger
 }
 
 func (e Extension) IngressClass() (res *string) {

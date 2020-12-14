@@ -27,7 +27,6 @@ import (
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	"k8s.io/apimachinery/pkg/fields"
 
-	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
@@ -65,7 +64,7 @@ type handler struct {
 }
 
 func Handler() capsulewebhook.Handler {
-	return &handler{Log: ctrl.Log.WithName("controllers").WithName("Tenant")}
+	return &handler{}
 }
 
 func (r *handler) OnCreate(client client.Client, decoder *admission.Decoder) capsulewebhook.Func {
