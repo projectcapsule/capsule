@@ -1,53 +1,41 @@
 # Reference
 
+* [Custom Resource Definition](#customer-resource-definition)
+  * [Metadata](#metadata)
+    * [name](#name)
+  * [Spec](#spec)
+    * [owner](#owner)
+    * [nodeSelector](#nodeSelector)
+    * [namespaceQuota](#namespaceQuota)
+    * [namespacesMetadata](#namespacesMetadata)
+    * [servicesMetadata](#servicesMetadata)
+    * [ingressClasses](#ingressClasses)
+    * [ingressHostNames](#ingressHostNames)
+    * [storageClasses](#storageClasses)
+    * [containerRegistries](#containerRegistries)
+    * [additionalRoleBindings](#additionalRoleBindings)
+    * [resourceQuotas](#resourceQuotas)
+    * [limitRanges](#limitRanges)
+    * [networkPolicies](#networkPolicies)
+    * [externalServiceIPs](#externalServiceIPs)
+  * [Status](#status)
+    * [size](#size)
+    * [namespaces](#namespaces)
+* [Role Based Access Control](#role-based-access-control)
+* [Admission Controllers](#admission-controller)
+* [Command Options](#command-options)
+* [Created Resources](#created-resources)
+
+
 ## Custom Resource Definition
-Capsule operator uses a single Custom Resources Definition (CRD) for _Tenants_. Please, see the [Tenant Custom Resource Definition](https://github.com/clastix/capsule/blob/master/config/crd/bases/capsule.clastix.io_tenants.yaml).
+Capsule operator uses a single Custom Resources Definition (CRD) for _Tenants_. Please, see the [Tenant Custom Resource Definition](https://github.com/clastix/capsule/blob/master/config/crd/bases/capsule.clastix.io_tenants.yaml). In Caspule, Tenants are cluster wide resources. You need for cluster level permissions to work with tenants.
 
-In Caspule, Tenants are cluster wide resources. You need for cluster level permissions to work with tenants.
-
-```
-$ kubectl get tenants
-NAME      NAMESPACE QUOTA   NAMESPACE COUNT   OWNER NAME   OWNER KIND   NODE SELECTOR     AGE
-cap       9                 1                 joe          User         {"pool":"cmp"}    5d4h
-gas       6                 2                 alice        User         {"node":"worker"} 5d4h
-oil       9                 4                 alice        User         {"pool":"cmp"}    5d4h
-sample    9                 0                 alice        User         {"key":"value"}   29h
-```
-
-using the short name:
-
-```
-$ kubectl get tnt
-NAME      NAMESPACE QUOTA   NAMESPACE COUNT   OWNER NAME   OWNER KIND   NODE SELECTOR     AGE
-cap       9                 1                 joe          User         {"pool":"cmp"}    5d4h
-gas       6                 2                 alice        User         {"node":"worker"} 5d4h
-oil       9                 4                 alice        User         {"pool":"cmp"}    5d4h
-sample    9                 0                 alice        User         {"key":"value"}   29h
-```
-
-
-* [metadata.name](#metadata.name)
-* [spec.owner](#spec.owner)
-* [spec.nodeSelector](#spec.nodeSelector)
-* [spec.namespaceQuota](#spec.namespaceQuota)
-* [spec.namespacesMetadata](#spec.namespacesMetadata)
-* [spec.servicesMetadata](#spec.servicesMetadata)
-* [spec.ingressClasses](#spec.ingressClasses)
-* [spec.ingressHostNames](#spec.ingressHostNames)
-* [spec.storageClasses](#spec.storageClasses)
-* [spec.containerRegistries](#spec.containerRegistries)
-* [spec.additionalRoleBindings](#spec.additionalRoleBindings)
-* [spec.resourceQuotas](#spec.resourceQuotas)
-* [spec.limitRanges](#spec.limitRanges)
-* [spec.networkPolicies](#spec.networkPolicies)
-* [spec.externalServiceIPs](#spec.externalServiceIPs)
-* [status.size](#status.size)
-* [status.namespaces](#status.namespaces)
-
-### metadata.name
+### Metadata
+#### name
 Metadata `name` can contain any valid symbol from the regex: `[a-z0-9]([-a-z0-9]*[a-z0-9])?`.
 
-### spec.owner
+### Spec
+#### owner
 The field `owner` is the only mandatory spec in a _Tenant_ manifest. It specifies the ownership of the tenant:
 
 ```yaml
@@ -79,7 +67,7 @@ Users authenticated through an _OIDC token_ must have
 
 Permissions are controlled by RBAC.
 
-### spec.nodeSelector
+#### nodeSelector
 Field `nodeSelector` specifies the label to control the placement of pods on a given pool of worker nodes:
 
 ```yaml
@@ -123,7 +111,7 @@ Please, see how to [Assigning Pods to Nodes](https://kubernetes.io/docs/concepts
 
 The tenant owner is not allowed to change or remove the annotation above from the namespace.
 
-### spec.namespaceQuota
+#### namespaceQuota
 Field `namespaceQuota` specifies the maximum number of namespaces allowed for that tenant.
 
 ```yaml
@@ -136,7 +124,7 @@ spec:
 ```
 Once the namespace quota assigned to the tenant has been reached, yhe tenant owner cannot create further namespaces.
 
-### spec.namespacesMetadata
+#### namespacesMetadata
 Field `namespacesMetadata` specifies additional labels and annotations the Capsule operator places on any _Namespace_ in the tenant.
 
 ```yaml
@@ -166,7 +154,7 @@ metadata:
 
 The tenant owner is not allowed to change or remove such labels and annotations from the namespace.
 
-### spec.servicesMetadata
+#### servicesMetadata
 Field `servicesMetadata` specifies additional labels and annotations the Capsule operator places on any _Service_ in the tenant.
 
 ```yaml
@@ -196,7 +184,7 @@ metadata:
 
 The tenant owner is not allowed to change or remove such labels and annotations from the _Service_.
 
-### spec.ingressClasses
+#### ingressClasses
 Field `ingressClasses` specifies the _IngressClass_ assigned to the tenant.
 
 ```yaml
@@ -237,7 +225,7 @@ metadata:
 ```
 Any tentative of tenant owner to use a not allowed _IngressClass_ will fail.
 
-### spec.ingressHostNames
+#### ingressHostNames
 Field `ingressHostNames` specifies the allowed hostnames in _Ingresses_ for the given tenant.
 
 ```yaml
@@ -271,7 +259,7 @@ spec:
 
 Any tentative of tenant owner to use one of not allowed hostnames will fail.
 
-### spec.storageClasses
+#### storageClasses
 Field `storageClasses` specifies the _StorageClasses_ assigned to the tenant.
 
 ```yaml
@@ -311,7 +299,7 @@ metadata:
 
 Any tentative of tenant owner to use a not allowed _StorageClass_ will fail.
 
-### spec.containerRegistries
+#### containerRegistries
 Field `containerRegistries` specifies the ttrusted image registries assigned to the tenant.
 
 ```yaml
@@ -347,7 +335,7 @@ Any tentative of tenant owner to use a not allowed registry will fail.
 > running on a Tenant allowing `docker.io` will not blocked, even if the image
 > field is not explicit as `docker.io/busybox:latest`.
 
-### spec.additionalRoleBindings
+#### additionalRoleBindings
 Field `additionalRoleBindings` specifies additional _RoleBindings_ assigned to the tenant.
 
 ```yaml
@@ -366,7 +354,7 @@ spec:
 
 Capsule will ensure that all namespaces in the tenant always contain the _RoleBinding_ for the given _ClusterRole_.
 
-### spec.resourceQuotas
+#### resourceQuotas
 Field `resourceQuotas` specifies a list of _ResourceQuota_ resources assigned to the tenant.
 
 ```yaml
@@ -444,7 +432,7 @@ are updated in realtime by Capsule, according to the actual aggredated usage of 
 
 The tenant owner is not allowed to change or remove the _ResourceQuota_ from the namespace.
 
-### spec.limitRanges
+#### limitRanges
 Field `limitRanges` specifies the _LimitRanges_ assigned to the tenant.
 
 ```yaml
@@ -531,7 +519,7 @@ Being the limit range specific of single resources, there is no aggregate to cou
 
 The tenant owner is not allowed to change or remove _LimitRanges_ from the namespace.
 
-### spec.networkPolicies
+#### networkPolicies
 Field `networkPolicies` specifies the _NetworkPolicies_ assigned to the tenant.
 
 ```yaml
@@ -586,7 +574,7 @@ spec:
 
 The tenant owner can create, patch and delete additional _NetworkPolicy_ to refine the assigned one. However, the tenant owner cannot delete the _NetworkPolicies_ set at tenant level.
 
-### externalServiceIPs
+#### externalServiceIPs
 Field `externalServiceIPs` specifies the external IPs that can be used in _Services_ with type `ClusterIP`.
 
 ```yaml
@@ -616,7 +604,8 @@ spec:
 
 > NB: Missing of this controller, it exposes your cluster to the vulnerability [_CVE-2020-8554_].
 
-### status.size
+### Status
+#### size
 Status field `size` reports the number of namespaces belonging to the tenant. It is reported as `NAMESPACE COUNT` in the `kubectl` output:
 
 ```
@@ -628,7 +617,7 @@ oil       9                 3                 alice        User         {"pool":
 sample    9                 0                 alice        User         {"key":"value"}   29h
 ```
 
-### status.namespaces
+#### namespaces
 Status field `namespaces` reports the list of all namespaces belonging to the tenant.
 
 ```yaml
@@ -647,10 +636,8 @@ status:
   size: 3
 ```
 
-## RBAC
+## Role Based Access Control
 In the current implementation, the Capsule operator requires cluster admin permissions to fully operate.
-
-
 
 ## Admission Controllers
 Capsule implements Kubernetes multi-tenancy capabilities using a minimum set of standard [Admission Controllers](https://kubernetes.io/docs/reference/access-authn-authz/admission-controllers/) enabled on the Kubernetes APIs server.
@@ -677,7 +664,7 @@ NAME                                       WEBHOOKS   AGE
 capsule-mutating-webhook-configuration     1          2h
 ```
 
-## Command options
+## Command Options
 The Capsule operator provides following command options:
 
 Option | Description | Default
@@ -690,7 +677,7 @@ Option | Description | Default
 `--capsule-user-group` | Override the Capsule group to which all tenant owners must belong. | `capsule.clastix.io`
 `--protected-namespace-regex` | Disallows creation of namespaces matching the passed regexp. | `null`
 
-## Created resources
+## Created Resources
 Once installed, the Capsule operator creates the following resources in your cluster:
 
 ```

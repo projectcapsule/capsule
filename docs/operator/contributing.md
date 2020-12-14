@@ -72,11 +72,12 @@ From the root path, issue the _make_ recipe:
 # make docker-build
 ```
 
-The image `quay.io/clastix/capsule` will be available locally, you just
-need to push it to _KinD_ with the following command.
+The image `quay.io/clastix/capsule:<tag>` will be available locally. Built image `<tag>` is resulting last one available [release](https://github.com/clastix/capsule/releases).
+
+Push it to _KinD_ with the following command:
 
 ```
-# kind load docker-image --nodes capsule-control-plane --name capsule quay.io/clastix/capsule
+# kind load docker-image --nodes capsule-control-plane --name capsule quay.io/clastix/capsule:<tag>
 ```
 
 ### Deploy the Kubernetes manifests
