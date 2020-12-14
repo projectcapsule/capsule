@@ -27,15 +27,14 @@ import (
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	"k8s.io/apimachinery/pkg/fields"
 
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
-	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/go-logr/logr"
 
 	"github.com/clastix/capsule/api/v1alpha1"
 	capsulewebhook "github.com/clastix/capsule/pkg/webhook"
-
 )
 
 // +kubebuilder:webhook:path=/validating-ingress,mutating=false,failurePolicy=fail,groups=networking.k8s.io;extensions,resources=ingresses,verbs=create;update,versions=v1beta1,name=ingress-v1beta1.capsule.clastix.io
