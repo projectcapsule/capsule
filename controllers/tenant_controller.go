@@ -704,17 +704,19 @@ func (r *TenantReconciler) ensureNamespaceCount(tenant *capsulev1alpha1.Tenant) 
 	})
 }
 
-func (r *TenantReconciler) collectNamespaces(tenant *capsulev1alpha1.Tenant) (err error) {
-	nl := &corev1.NamespaceList{}
-	err = r.Client.List(context.TODO(), nl, client.MatchingFieldsSelector{
-		Selector: fields.OneTermEqualSelector(".metadata.ownerReferences[*].capsule", tenant.GetName()),
-	})
-	if err != nil {
+func (r *TenantReconciler) collectNamespaces(tenant *capsulev1alpha1.Tenant) error {
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
+		nl := &corev1.NamespaceList{}
+		err = r.Client.List(context.TODO(), nl, client.MatchingFieldsSelector{
+			Selector: fields.OneTermEqualSelector(".metadata.ownerReferences[*].capsule", tenant.GetName()),
+		})
+		if err != nil {
+			return
+		}
+		_, err = controllerutil.CreateOrUpdate(context.TODO(), r.Client, tenant.DeepCopy(), func() error {
+			tenant.AssignNamespaces(nl.Items)
+			return r.Client.Status().Update(context.TODO(), tenant, &client.UpdateOptions{})
+		})
 		return
-	}
-	tenant.AssignNamespaces(nl.Items)
-	_, err = controllerutil.CreateOrUpdate(context.TODO(), r.Client, tenant.DeepCopy(), func() error {
-		return r.Client.Status().Update(context.TODO(), tenant, &client.UpdateOptions{})
 	})
-	return
 }
