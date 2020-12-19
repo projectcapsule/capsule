@@ -9,7 +9,7 @@ require (
 	github.com/onsi/gomega v1.10.2
 	github.com/stretchr/testify v1.5.1
 	go.uber.org/zap v1.15.0
-	gomodules.xyz/jsonpatch/v2 v2.1.0
+	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
 	k8s.io/api v0.19.3
 	k8s.io/apimachinery v0.19.3
 	k8s.io/client-go v0.19.3
