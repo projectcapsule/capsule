@@ -22,10 +22,8 @@ import (
 	"hash/fnv"
 	"strconv"
 	"strings"
-	"sync"
 
 	"github.com/go-logr/logr"
-	"github.com/hashicorp/go-multierror"
 	"golang.org/x/sync/errgroup"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
@@ -463,20 +461,16 @@ func (r *TenantReconciler) syncLimitRanges(tenant *capsulev1alpha1.Tenant) error
 	return nil
 }
 
-func (r *TenantReconciler) syncNamespace(namespace string, tnt *capsulev1alpha1.Tenant, wg *sync.WaitGroup, channel chan error) {
-	defer wg.Done()
-
-	ns := &corev1.Namespace{}
-	if err := r.Client.Get(context.TODO(), types.NamespacedName{Name: namespace}, ns); err != nil {
-		channel <- err
-	}
-
-	channel <- retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+func (r *TenantReconciler) syncNamespace(namespace string, tnt *capsulev1alpha1.Tenant) error {
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
+		ns := &corev1.Namespace{}
+		if err = r.Client.Get(context.TODO(), types.NamespacedName{Name: namespace}, ns); err != nil {
+			return
+		}
 		a := ns.GetAnnotations()
 		if a == nil {
 			a = make(map[string]string)
 		}
-
 		// resetting Capsule annotations
 		delete(a, capsulev1alpha1.AvailableIngressClassesAnnotation)
 		delete(a, capsulev1alpha1.AvailableIngressClassesRegexpAnnotation)
@@ -540,22 +534,18 @@ func (r *TenantReconciler) syncNamespace(namespace string, tnt *capsulev1alpha1.
 
 // Ensuring all annotations are applied to each Namespace handled by the Tenant.
 func (r *TenantReconciler) syncNamespaces(tenant *capsulev1alpha1.Tenant) (err error) {
-	ch := make(chan error, tenant.Status.Namespaces.Len())
+	group := errgroup.Group{}
 
-	wg := &sync.WaitGroup{}
-	wg.Add(tenant.Status.Namespaces.Len())
-
-	for _, ns := range tenant.Status.Namespaces {
-		go r.syncNamespace(ns, tenant, wg, ch)
+	for _, item := range tenant.Status.Namespaces {
+		namespace := item
+		group.Go(func() error {
+			return r.syncNamespace(namespace, tenant)
+		})
 	}
 
-	wg.Wait()
-	close(ch)
-
-	for e := range ch {
-		if e != nil {
-			err = multierror.Append(e, err)
-		}
+	if err = group.Wait(); err != nil {
+		r.Log.Error(err, "Cannot sync Namespaces")
+		err = fmt.Errorf("cannot sync Namespaces: %s", err.Error())
 	}
 	return
 }
