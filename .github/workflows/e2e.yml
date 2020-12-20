@@ -11,7 +11,7 @@ jobs:
     name: Kubernetes
     strategy:
       matrix:
-        k8s-version: ['v1.16.15', 'v1.17.11', 'v1.18.8', 'v1.19.1']
+        k8s-version: ['v1.16.15', 'v1.17.11', 'v1.18.8', 'v1.19.1', 'v1.20.0']
     runs-on: ubuntu-18.04
     steps:
       - uses: actions/checkout@v2
