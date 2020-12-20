@@ -22,10 +22,9 @@ import (
 	"hash/fnv"
 	"strconv"
 	"strings"
-	"sync"
 
 	"github.com/go-logr/logr"
-	"github.com/hashicorp/go-multierror"
+	"golang.org/x/sync/errgroup"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -184,46 +183,43 @@ func (r *TenantReconciler) pruningResources(ns string, keys []string, obj client
 // In case of multiple errors these are logged properly, returning a generic error since we have to repush back the
 // reconciliation loop.
 func (r *TenantReconciler) resourceQuotasUpdate(resourceName corev1.ResourceName, actual, limit resource.Quantity, list ...corev1.ResourceQuota) (err error) {
-	ch := make(chan error, len(list))
+	g := errgroup.Group{}
 
-	wg := &sync.WaitGroup{}
-	wg.Add(len(list))
-
-	f := func(rq corev1.ResourceQuota, wg *sync.WaitGroup, ch chan error) {
-		defer wg.Done()
-		ch <- retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-			// Retrieving from the cache the actual ResourceQuota
+	for _, item := range list {
+		rq := item
+		g.Go(func() error {
 			found := &corev1.ResourceQuota{}
-			_ = r.Get(context.TODO(), types.NamespacedName{Namespace: rq.Namespace, Name: rq.Name}, found)
-			// Ensuring annotation map is there to avoid uninitialized map error and
-			// assigning the overall usage
-			if found.Annotations == nil {
-				found.Annotations = make(map[string]string)
+			if err := r.Get(context.TODO(), types.NamespacedName{Namespace: rq.Namespace, Name: rq.Name}, found); err != nil {
+				return err
 			}
-			found.Labels = rq.Labels
-			found.Annotations[capsulev1alpha1.UsedQuotaFor(resourceName)] = actual.String()
-			found.Annotations[capsulev1alpha1.HardQuotaFor(resourceName)] = limit.String()
-			// Updating the Resource according to the actual.Cmp result
-			found.Spec.Hard = rq.Spec.Hard
-			return r.Update(context.TODO(), found, &client.UpdateOptions{})
+
+			return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+				_, err := controllerutil.CreateOrUpdate(context.TODO(), r.Client, found, func() error {
+					// Ensuring annotation map is there to avoid uninitialized map error and
+					// assigning the overall usage
+					if found.Annotations == nil {
+						found.Annotations = make(map[string]string)
+					}
+					found.Labels = rq.Labels
+					found.Annotations[capsulev1alpha1.UsedQuotaFor(resourceName)] = actual.String()
+					found.Annotations[capsulev1alpha1.HardQuotaFor(resourceName)] = limit.String()
+					// Updating the Resource according to the actual.Cmp result
+					found.Spec.Hard = rq.Spec.Hard
+					return nil
+				})
+				return err
+			})
 		})
 	}
 
-	for _, rq := range list {
-		go f(rq, wg, ch)
+	if err = g.Wait(); err != nil {
+		// We had an error and we mark the whole transaction as failed
+		// to process it another time according to the Tenant controller back-off factor.
+		r.Log.Error(err, "Cannot update outer ResourceQuotas", "resourceName", resourceName.String())
+		err = fmt.Errorf("update of outer ResourceQuota items has failed: %s", err.Error())
 	}
-	wg.Wait()
-	close(ch)
 
-	for e := range ch {
-		if e != nil {
-			// We had an error and we mark the whole transaction as failed
-			// to process it another time acording to the Tenant controller back-off factor.
-			r.Log.Error(e, "Cannot update outer ResourceQuotas", "resourceName", resourceName.String())
-			err = fmt.Errorf("update of outer ResourceQuota items has failed")
-		}
-	}
-	return
+	return err
 }
 
 // Additional Role Bindings can be used in many ways: applying Pod Security Policies or giving
@@ -465,20 +461,16 @@ func (r *TenantReconciler) syncLimitRanges(tenant *capsulev1alpha1.Tenant) error
 	return nil
 }
 
-func (r *TenantReconciler) syncNamespace(namespace string, tnt *capsulev1alpha1.Tenant, wg *sync.WaitGroup, channel chan error) {
-	defer wg.Done()
-
-	ns := &corev1.Namespace{}
-	if err := r.Client.Get(context.TODO(), types.NamespacedName{Name: namespace}, ns); err != nil {
-		channel <- err
-	}
-
-	channel <- retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+func (r *TenantReconciler) syncNamespace(namespace string, tnt *capsulev1alpha1.Tenant) error {
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
+		ns := &corev1.Namespace{}
+		if err = r.Client.Get(context.TODO(), types.NamespacedName{Name: namespace}, ns); err != nil {
+			return
+		}
 		a := ns.GetAnnotations()
 		if a == nil {
 			a = make(map[string]string)
 		}
-
 		// resetting Capsule annotations
 		delete(a, capsulev1alpha1.AvailableIngressClassesAnnotation)
 		delete(a, capsulev1alpha1.AvailableIngressClassesRegexpAnnotation)
@@ -542,22 +534,18 @@ func (r *TenantReconciler) syncNamespace(namespace string, tnt *capsulev1alpha1.
 
 // Ensuring all annotations are applied to each Namespace handled by the Tenant.
 func (r *TenantReconciler) syncNamespaces(tenant *capsulev1alpha1.Tenant) (err error) {
-	ch := make(chan error, tenant.Status.Namespaces.Len())
+	group := errgroup.Group{}
 
-	wg := &sync.WaitGroup{}
-	wg.Add(tenant.Status.Namespaces.Len())
-
-	for _, ns := range tenant.Status.Namespaces {
-		go r.syncNamespace(ns, tenant, wg, ch)
+	for _, item := range tenant.Status.Namespaces {
+		namespace := item
+		group.Go(func() error {
+			return r.syncNamespace(namespace, tenant)
+		})
 	}
 
-	wg.Wait()
-	close(ch)
-
-	for e := range ch {
-		if e != nil {
-			err = multierror.Append(e, err)
-		}
+	if err = group.Wait(); err != nil {
+		r.Log.Error(err, "Cannot sync Namespaces")
+		err = fmt.Errorf("cannot sync Namespaces: %s", err.Error())
 	}
 	return
 }
@@ -706,17 +694,19 @@ func (r *TenantReconciler) ensureNamespaceCount(tenant *capsulev1alpha1.Tenant) 
 	})
 }
 
-func (r *TenantReconciler) collectNamespaces(tenant *capsulev1alpha1.Tenant) (err error) {
-	nl := &corev1.NamespaceList{}
-	err = r.Client.List(context.TODO(), nl, client.MatchingFieldsSelector{
-		Selector: fields.OneTermEqualSelector(".metadata.ownerReferences[*].capsule", tenant.GetName()),
-	})
-	if err != nil {
+func (r *TenantReconciler) collectNamespaces(tenant *capsulev1alpha1.Tenant) error {
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
+		nl := &corev1.NamespaceList{}
+		err = r.Client.List(context.TODO(), nl, client.MatchingFieldsSelector{
+			Selector: fields.OneTermEqualSelector(".metadata.ownerReferences[*].capsule", tenant.GetName()),
+		})
+		if err != nil {
+			return
+		}
+		_, err = controllerutil.CreateOrUpdate(context.TODO(), r.Client, tenant.DeepCopy(), func() error {
+			tenant.AssignNamespaces(nl.Items)
+			return r.Client.Status().Update(context.TODO(), tenant, &client.UpdateOptions{})
+		})
 		return
-	}
-	tenant.AssignNamespaces(nl.Items)
-	_, err = controllerutil.CreateOrUpdate(context.TODO(), r.Client, tenant.DeepCopy(), func() error {
-		return r.Client.Status().Update(context.TODO(), tenant, &client.UpdateOptions{})
 	})
-	return
 }
