@@ -21,7 +21,6 @@ package e2e
 import (
 	"context"
 	"fmt"
-	"time"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -35,7 +34,7 @@ import (
 	"github.com/clastix/capsule/api/v1alpha1"
 )
 
-var _ = Describe("exceeding Tenant resource quota", func() {
+var _ = Describe("exceeding a Tenant resource quota", func() {
 	tnt := &v1alpha1.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "tenant-resources-changes",
@@ -115,6 +114,7 @@ var _ = Describe("exceeding Tenant resource quota", func() {
 			},
 		},
 	}
+
 	nsl := []string{"easy", "peasy"}
 	JustBeforeEach(func() {
 		EventuallyCreation(func() error {
@@ -132,7 +132,8 @@ var _ = Describe("exceeding Tenant resource quota", func() {
 	JustAfterEach(func() {
 		Expect(k8sClient.Delete(context.TODO(), tnt)).Should(Succeed())
 	})
-	It("should block new Pods if limit is reached", func() {
+
+	It("should block new Pods", func() {
 		cs := ownerClient(tnt)
 		for _, namespace := range nsl {
 			Eventually(func() (err error) {
@@ -166,7 +167,7 @@ var _ = Describe("exceeding Tenant resource quota", func() {
 				}
 				_, err = cs.AppsV1().Deployments(namespace).Create(context.TODO(), d, metav1.CreateOptions{})
 				return
-			}, 15*time.Second, time.Second).Should(Succeed())
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		}
 		for _, ns := range nsl {
 			n := fmt.Sprintf("capsule-%s-1", tnt.GetName())
@@ -174,55 +175,33 @@ var _ = Describe("exceeding Tenant resource quota", func() {
 			By("retrieving the Resource Quota", func() {
 				Eventually(func() error {
 					return k8sClient.Get(context.TODO(), types.NamespacedName{Name: n, Namespace: ns}, rq)
-				}, 15*time.Second, time.Second).Should(Succeed())
+				}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 			})
 			By("ensuring the status has been blocked with actual usage", func() {
 				Eventually(func() corev1.ResourceList {
 					_ = k8sClient.Get(context.TODO(), types.NamespacedName{Name: n, Namespace: ns}, rq)
 					return rq.Status.Hard
-				}, 15*time.Second, time.Second).Should(Equal(rq.Status.Used))
+				}, defaultTimeoutInterval, defaultPollInterval).Should(Equal(rq.Status.Used))
 			})
 			By("creating an exceeded Pod", func() {
-				d := &v1.Deployment{
+				pod := &corev1.Pod{
 					ObjectMeta: metav1.ObjectMeta{
-						Name: "my-exceeded",
+						Name: "container",
 					},
-					Spec: v1.DeploymentSpec{
-						Replicas: pointer.Int32Ptr(5),
-						Selector: &metav1.LabelSelector{
-							MatchLabels: map[string]string{
-								"app": "exceeded",
-							},
-						},
-						Template: corev1.PodTemplateSpec{
-							ObjectMeta: metav1.ObjectMeta{
-								Labels: map[string]string{
-									"app": "exceeded",
-								},
-							},
-							Spec: corev1.PodSpec{
-								Containers: []corev1.Container{
-									{
-										Name:  "my-exceeded",
-										Image: "gcr.io/google_containers/pause-amd64:3.0",
-									},
-								},
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{
+							{
+								Name:  "container",
+								Image: "quay.io/google-containers/pause-amd64:3.0",
 							},
 						},
 					},
 				}
-				_, err := cs.AppsV1().Deployments(ns).Create(context.TODO(), d, metav1.CreateOptions{})
-				Expect(err).Should(Succeed())
-				Eventually(func() (condition *v1.DeploymentCondition) {
-					Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: d.GetName(), Namespace: ns}, d)).Should(Succeed())
-					for _, i := range d.Status.Conditions {
-						if i.Type == v1.DeploymentReplicaFailure {
-							condition = &i
-							break
-						}
-					}
-					return
-				}, 30*time.Second, time.Second).ShouldNot(BeNil())
+				cs := ownerClient(tnt)
+				EventuallyCreation(func() error {
+					_, err := cs.CoreV1().Pods(ns).Create(context.Background(), pod, metav1.CreateOptions{})
+					return err
+				}).ShouldNot(Succeed())
 			})
 		}
 	})

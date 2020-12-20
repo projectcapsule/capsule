@@ -180,7 +180,7 @@ var _ = Describe("changing Tenant managed Kubernetes resources", func() {
 	})
 	It("should reapply the original resources upon third party change", func() {
 		for _, ns := range nsl {
-			By("changing Limit Range resources", func() {
+			By("changing Limit Range", func() {
 				for i, s := range tnt.Spec.LimitRanges {
 					n := fmt.Sprintf("capsule-%s-%d", tnt.GetName(), i)
 					lr := &corev1.LimitRange{}
@@ -198,7 +198,7 @@ var _ = Describe("changing Tenant managed Kubernetes resources", func() {
 					}, defaultTimeoutInterval, defaultPollInterval).Should(Equal(s))
 				}
 			})
-			By("changing Network Policy resources", func() {
+			By("changing Network Policy", func() {
 				for i, s := range tnt.Spec.NetworkPolicies {
 					n := fmt.Sprintf("capsule-%s-%d", tnt.GetName(), i)
 					np := &networkingv1.NetworkPolicy{}
@@ -218,7 +218,7 @@ var _ = Describe("changing Tenant managed Kubernetes resources", func() {
 					}, defaultTimeoutInterval, defaultPollInterval).Should(Equal(s))
 				}
 			})
-			By("changing Resource Quota resources", func() {
+			By("changing Resource Quota", func() {
 				for i, s := range tnt.Spec.ResourceQuota {
 					n := fmt.Sprintf("capsule-%s-%d", tnt.GetName(), i)
 					rq := &corev1.ResourceQuota{}

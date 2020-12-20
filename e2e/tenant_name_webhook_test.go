@@ -40,6 +40,7 @@ var _ = Describe("creating a Tenant with wrong name", func() {
 			},
 		},
 	}
+
 	It("should fail", func() {
 		Expect(k8sClient.Create(context.TODO(), tnt)).ShouldNot(Succeed())
 	})

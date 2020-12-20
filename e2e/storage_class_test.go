@@ -2,10 +2,13 @@
 
 /*
 Copyright 2020 Clastix Labs.
+
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
+
     http://www.apache.org/licenses/LICENSE-2.0
+
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -47,6 +50,7 @@ var _ = Describe("when Tenant handles Storage classes", func() {
 			},
 		},
 	}
+
 	JustBeforeEach(func() {
 		EventuallyCreation(func() error {
 			tnt.ResourceVersion = ""
@@ -56,12 +60,13 @@ var _ = Describe("when Tenant handles Storage classes", func() {
 	JustAfterEach(func() {
 		Expect(k8sClient.Delete(context.TODO(), tnt)).Should(Succeed())
 	})
-	It("should block non allowed Storage Class", func() {
+
+	It("should fails", func() {
 		ns := NewNamespace("storage-class-disallowed")
 		NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(tnt, podRecreationTimeoutInterval).Should(ContainElement(ns.GetName()))
 
-		By("non-specifying the class", func() {
+		By("non-specifying it", func() {
 			Eventually(func() (err error) {
 				cs := ownerClient(tnt)
 				p := &corev1.PersistentVolumeClaim{
@@ -81,7 +86,7 @@ var _ = Describe("when Tenant handles Storage classes", func() {
 				return
 			}, defaultTimeoutInterval, defaultPollInterval).ShouldNot(Succeed())
 		})
-		By("specifying a forbidden class", func() {
+		By("specifying a forbidden one", func() {
 			Eventually(func() (err error) {
 				cs := ownerClient(tnt)
 				p := &corev1.PersistentVolumeClaim{
@@ -102,13 +107,14 @@ var _ = Describe("when Tenant handles Storage classes", func() {
 			}, defaultTimeoutInterval, defaultPollInterval).ShouldNot(Succeed())
 		})
 	})
-	It("should allow enabled Storage Class", func() {
+
+	It("should allow", func() {
 		ns := NewNamespace("storage-class-allowed")
 		cs := ownerClient(tnt)
 
 		NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(tnt, podRecreationTimeoutInterval).Should(ContainElement(ns.GetName()))
-		By("using allowed storageClass names", func() {
+		By("using exact matches", func() {
 			for _, c := range tnt.Spec.StorageClasses.Allowed {
 				Eventually(func() (err error) {
 					p := &corev1.PersistentVolumeClaim{
@@ -130,7 +136,7 @@ var _ = Describe("when Tenant handles Storage classes", func() {
 				}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 			}
 		})
-		By("using allowed storageClass regexp", func() {
+		By("using a regex match", func() {
 			allowedClass := "oil-storage"
 			Eventually(func() (err error) {
 				p := &corev1.PersistentVolumeClaim{
@@ -150,7 +156,6 @@ var _ = Describe("when Tenant handles Storage classes", func() {
 				_, err = cs.CoreV1().PersistentVolumeClaims(ns.GetName()).Create(context.TODO(), p, metav1.CreateOptions{})
 				return
 			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
-
 		})
 	})
 })

@@ -40,6 +40,7 @@ var _ = Describe("creating a Namespace as Tenant owner with custom --capsule-gro
 			},
 		},
 	}
+
 	JustBeforeEach(func() {
 		EventuallyCreation(func() error {
 			tnt.ResourceVersion = ""
@@ -49,19 +50,20 @@ var _ = Describe("creating a Namespace as Tenant owner with custom --capsule-gro
 	JustAfterEach(func() {
 		Expect(k8sClient.Delete(context.TODO(), tnt)).Should(Succeed())
 	})
-	It("should fail", func() {
+
+	It("should fail using a User non matching the capsule-user-group flag", func() {
 		args := append(defaulManagerPodArgs, []string{"--capsule-user-group=test"}...)
 		ModifyCapsuleManagerPodArgs(args)
 		CapsuleClusterGroupParam(podRecreationTimeoutInterval).Should(BeIdenticalTo("test"))
 		ns := NewNamespace("cg-namespace-fail")
 		NamespaceCreation(ns, tnt, podRecreationTimeoutInterval).ShouldNot(Succeed())
 	})
+
 	It("should succeed and be available in Tenant namespaces list", func() {
 		ModifyCapsuleManagerPodArgs(defaulManagerPodArgs)
 		CapsuleClusterGroupParam(podRecreationTimeoutInterval).Should(BeIdenticalTo("capsule.clastix.io"))
 		ns := NewNamespace("cg-namespace")
 		NamespaceCreation(ns, tnt, podRecreationTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(tnt, podRecreationTimeoutInterval).Should(ContainElement(ns.GetName()))
-
 	})
 })

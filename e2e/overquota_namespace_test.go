@@ -29,7 +29,7 @@ import (
 	"github.com/clastix/capsule/api/v1alpha1"
 )
 
-var _ = Describe("creating a Namespace over-quota", func() {
+var _ = Describe("creating a Namespace in over-quota of three", func() {
 	tnt := &v1alpha1.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "over-quota-tenant",
@@ -42,6 +42,7 @@ var _ = Describe("creating a Namespace over-quota", func() {
 			NamespaceQuota: pointer.Int32Ptr(3),
 		},
 	}
+
 	JustBeforeEach(func() {
 		EventuallyCreation(func() error {
 			return k8sClient.Create(context.TODO(), tnt)
@@ -50,6 +51,7 @@ var _ = Describe("creating a Namespace over-quota", func() {
 	JustAfterEach(func() {
 		Expect(k8sClient.Delete(context.TODO(), tnt)).Should(Succeed())
 	})
+
 	It("should fail", func() {
 		By("creating three Namespaces", func() {
 			for _, name := range []string{"bob-dev", "bob-staging", "bob-production"} {

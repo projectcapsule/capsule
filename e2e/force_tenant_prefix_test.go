@@ -51,6 +51,7 @@ var _ = Describe("creating a Namespace with --force-tenant-name flag", func() {
 			},
 		},
 	}
+
 	JustBeforeEach(func() {
 		EventuallyCreation(func() error {
 			t1.ResourceVersion = ""
@@ -67,15 +68,18 @@ var _ = Describe("creating a Namespace with --force-tenant-name flag", func() {
 		Expect(k8sClient.Delete(context.TODO(), t2)).Should(Succeed())
 		ModifyCapsuleManagerPodArgs(defaulManagerPodArgs)
 	})
-	It("should fail with missing prefix", func() {
+
+	It("should fail when non using prefix", func() {
 		ns := NewNamespace("awesome")
 		NamespaceCreation(ns, t1, defaultTimeoutInterval).ShouldNot(Succeed())
 	})
+
 	It("should succeed using prefix", func() {
 		ns := NewNamespace("awesome-namespace")
 		NamespaceCreation(ns, t1, defaultTimeoutInterval).Should(Succeed())
 	})
-	It("should be assigned according closest match", func() {
+
+	It("should succeed and assigned according to closest match", func() {
 		ns1 := NewNamespace("awesome-tenant")
 		ns2 := NewNamespace("awesome-tenant-namespace")
 

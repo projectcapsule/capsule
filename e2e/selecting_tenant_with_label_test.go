@@ -51,6 +51,7 @@ var _ = Describe("creating a Namespace with Tenant selector when user owns multi
 			},
 		},
 	}
+
 	JustBeforeEach(func() {
 		EventuallyCreation(func() error {
 			return k8sClient.Create(context.TODO(), t1)
@@ -63,6 +64,7 @@ var _ = Describe("creating a Namespace with Tenant selector when user owns multi
 		Expect(k8sClient.Delete(context.TODO(), t1)).Should(Succeed())
 		Expect(k8sClient.Delete(context.TODO(), t2)).Should(Succeed())
 	})
+
 	It("should be assigned to the selected Tenant", func() {
 		ns := NewNamespace("tenant-2-ns")
 		By("assigning to the Namespace the Capsule Tenant label", func() {

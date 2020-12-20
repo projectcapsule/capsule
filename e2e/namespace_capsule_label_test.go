@@ -42,14 +42,17 @@ var _ = Describe("creating several Namespaces for a Tenant", func() {
 			},
 		},
 	}
+
 	JustBeforeEach(func() {
 		EventuallyCreation(func() error {
-			return k8sClient.Create(context.TODO(), tnt.DeepCopy())
+			tnt.ResourceVersion = ""
+			return k8sClient.Create(context.TODO(), tnt)
 		}).Should(Succeed())
 	})
 	JustAfterEach(func() {
 		Expect(k8sClient.Delete(context.TODO(), tnt)).Should(Succeed())
 	})
+
 	It("should contains the default Capsule label", func() {
 		namespaces := []*v1.Namespace{
 			NewNamespace("first-capsule-ns"),
@@ -58,10 +61,11 @@ var _ = Describe("creating several Namespaces for a Tenant", func() {
 		}
 		for _, ns := range namespaces {
 			NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
-			TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
-
-			Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: ns.GetName()}, ns)).Should(Succeed())
-			Expect(ns.Labels).Should(HaveKeyWithValue("capsule.clastix.io/tenant", tnt.Name))
+			Eventually(func() (ok bool) {
+				Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: ns.GetName()}, ns)).Should(Succeed())
+				ok, _ = HaveKeyWithValue("capsule.clastix.io/tenant", tnt.Name).Match(ns.Labels)
+				return
+			}, defaultTimeoutInterval, defaultPollInterval).Should(BeTrue())
 		}
 	})
 })
