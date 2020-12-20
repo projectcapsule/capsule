@@ -72,22 +72,22 @@ func (h *handler) OnCreate(clt client.Client, decoder *admission.Decoder) capsul
 		}
 
 		// Validate ingressClasses regexp
-		if tnt.Spec.IngressClasses != nil && len(tnt.Spec.IngressClasses.AllowedRegex) > 0 {
-			if _, err := regexp.Compile(tnt.Spec.IngressClasses.AllowedRegex); err != nil {
+		if tnt.Spec.IngressClasses != nil && len(tnt.Spec.IngressClasses.Regex) > 0 {
+			if _, err := regexp.Compile(tnt.Spec.IngressClasses.Regex); err != nil {
 				return admission.Denied("Unable to compile ingressClasses allowedRegex")
 			}
 		}
 
 		// Validate storageClasses regexp
-		if tnt.Spec.StorageClasses != nil && len(tnt.Spec.StorageClasses.AllowedRegex) > 0 {
-			if _, err := regexp.Compile(tnt.Spec.StorageClasses.AllowedRegex); err != nil {
+		if tnt.Spec.StorageClasses != nil && len(tnt.Spec.StorageClasses.Regex) > 0 {
+			if _, err := regexp.Compile(tnt.Spec.StorageClasses.Regex); err != nil {
 				return admission.Denied("Unable to compile storageClasses allowedRegex")
 			}
 		}
 
 		// Validate containerRegistries regexp
-		if tnt.Spec.ContainerRegistries != nil && len(tnt.Spec.ContainerRegistries.AllowedRegex) > 0 {
-			if _, err := regexp.Compile(tnt.Spec.ContainerRegistries.AllowedRegex); err != nil {
+		if tnt.Spec.ContainerRegistries != nil && len(tnt.Spec.ContainerRegistries.Regex) > 0 {
+			if _, err := regexp.Compile(tnt.Spec.ContainerRegistries.Regex); err != nil {
 				return admission.Denied("Unable to compile containerRegistries allowedRegex")
 			}
 		}

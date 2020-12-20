@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package network_policies
+package networkpolicies
 
 import (
 	"context"
@@ -64,7 +64,7 @@ func (r *handler) OnCreate(client client.Client, decoder *admission.Decoder) cap
 	}
 }
 
-func (r *handler) generic(ctx context.Context, req admission.Request, client client.Client, decoder *admission.Decoder) (bool, error) {
+func (r *handler) generic(ctx context.Context, req admission.Request, client client.Client, _ *admission.Decoder) (bool, error) {
 	var err error
 	np := &networkingv1.NetworkPolicy{}
 	err = client.Get(ctx, types.NamespacedName{Namespace: req.AdmissionRequest.Namespace, Name: req.AdmissionRequest.Name}, np)

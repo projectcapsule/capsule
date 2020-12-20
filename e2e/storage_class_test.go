@@ -41,12 +41,12 @@ var _ = Describe("when Tenant handles Storage classes", func() {
 				Name: "storage",
 				Kind: "User",
 			},
-			StorageClasses: &v1alpha1.StorageClassesSpec{
-				Allowed: []string{
+			StorageClasses: &v1alpha1.AllowedListSpec{
+				Exact: []string{
 					"cephfs",
 					"glusterfs",
 				},
-				AllowedRegex: "^oil-.*$",
+				Regex: "^oil-.*$",
 			},
 		},
 	}
@@ -115,7 +115,7 @@ var _ = Describe("when Tenant handles Storage classes", func() {
 		NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(tnt, podRecreationTimeoutInterval).Should(ContainElement(ns.GetName()))
 		By("using exact matches", func() {
-			for _, c := range tnt.Spec.StorageClasses.Allowed {
+			for _, c := range tnt.Spec.StorageClasses.Exact {
 				Eventually(func() (err error) {
 					p := &corev1.PersistentVolumeClaim{
 						ObjectMeta: metav1.ObjectMeta{

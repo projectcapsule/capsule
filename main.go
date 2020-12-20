@@ -36,18 +36,18 @@ import (
 	"github.com/clastix/capsule/controllers"
 	"github.com/clastix/capsule/controllers/rbac"
 	"github.com/clastix/capsule/controllers/secret"
-	"github.com/clastix/capsule/controllers/service_labels"
+	"github.com/clastix/capsule/controllers/servicelabels"
 	"github.com/clastix/capsule/pkg/indexer"
 	"github.com/clastix/capsule/pkg/webhook"
 	"github.com/clastix/capsule/pkg/webhook/ingress"
-	"github.com/clastix/capsule/pkg/webhook/namespace_quota"
-	"github.com/clastix/capsule/pkg/webhook/network_policies"
-	"github.com/clastix/capsule/pkg/webhook/owner_reference"
+	"github.com/clastix/capsule/pkg/webhook/namespacequota"
+	"github.com/clastix/capsule/pkg/webhook/networkpolicies"
+	"github.com/clastix/capsule/pkg/webhook/ownerreference"
 	"github.com/clastix/capsule/pkg/webhook/pvc"
 	"github.com/clastix/capsule/pkg/webhook/registry"
 	"github.com/clastix/capsule/pkg/webhook/services"
 	"github.com/clastix/capsule/pkg/webhook/tenant"
-	"github.com/clastix/capsule/pkg/webhook/tenant_prefix"
+	"github.com/clastix/capsule/pkg/webhook/tenantprefix"
 	"github.com/clastix/capsule/pkg/webhook/utils"
 	// +kubebuilder:scaffold:imports
 )
@@ -161,10 +161,10 @@ func main() {
 		pvc.Webhook(pvc.Handler()),
 		registry.Webhook(registry.Handler()),
 		services.Webhook(services.Handler()),
-		owner_reference.Webhook(utils.InCapsuleGroup(capsuleGroup, owner_reference.Handler(forceTenantPrefix))),
-		namespace_quota.Webhook(utils.InCapsuleGroup(capsuleGroup, namespace_quota.Handler())),
-		network_policies.Webhook(utils.InCapsuleGroup(capsuleGroup, network_policies.Handler())),
-		tenant_prefix.Webhook(utils.InCapsuleGroup(capsuleGroup, tenant_prefix.Handler(forceTenantPrefix, protectedNamespaceRegexp))),
+		ownerreference.Webhook(utils.InCapsuleGroup(capsuleGroup, ownerreference.Handler(forceTenantPrefix))),
+		namespacequota.Webhook(utils.InCapsuleGroup(capsuleGroup, namespacequota.Handler())),
+		networkpolicies.Webhook(utils.InCapsuleGroup(capsuleGroup, networkpolicies.Handler())),
+		tenantprefix.Webhook(utils.InCapsuleGroup(capsuleGroup, tenantprefix.Handler(forceTenantPrefix, protectedNamespaceRegexp))),
 		tenant.Webhook(tenant.Handler()),
 	)
 	if err = webhook.Register(mgr, wl...); err != nil {
@@ -185,7 +185,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&secret.CaReconciler{
+	if err = (&secret.CAReconciler{
 		Client:    mgr.GetClient(),
 		Log:       ctrl.Log.WithName("controllers").WithName("CA"),
 		Scheme:    mgr.GetScheme(),
@@ -194,7 +194,7 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "Namespace")
 		os.Exit(1)
 	}
-	if err = (&secret.TlsReconciler{
+	if err = (&secret.TLSReconciler{
 		Client:    mgr.GetClient(),
 		Log:       ctrl.Log.WithName("controllers").WithName("Tls"),
 		Scheme:    mgr.GetScheme(),
@@ -204,19 +204,19 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&service_labels.ServicesLabelsReconciler{
+	if err = (&servicelabels.ServicesLabelsReconciler{
 		Log: ctrl.Log.WithName("controllers").WithName("ServiceLabels"),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ServiceLabels")
 		os.Exit(1)
 	}
-	if err = (&service_labels.EndpointsLabelsReconciler{
+	if err = (&servicelabels.EndpointsLabelsReconciler{
 		Log: ctrl.Log.WithName("controllers").WithName("EndpointLabels"),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "EndpointLabels")
 		os.Exit(1)
 	}
-	if err = (&service_labels.EndpointSlicesLabelsReconciler{
+	if err = (&servicelabels.EndpointSlicesLabelsReconciler{
 		Log:          ctrl.Log.WithName("controllers").WithName("EndpointSliceLabels"),
 		VersionMinor: minorVer,
 		VersionMajor: majorVer,

@@ -27,22 +27,22 @@ import (
 	"time"
 )
 
-type Ca interface {
+type CA interface {
 	GenerateCertificate(opts CertificateOptions) (certificatePem *bytes.Buffer, certificateKey *bytes.Buffer, err error)
-	CaCertificatePem() (b *bytes.Buffer, err error)
-	CaPrivateKeyPem() (b *bytes.Buffer, err error)
+	CACertificatePem() (b *bytes.Buffer, err error)
+	CAPrivateKeyPem() (b *bytes.Buffer, err error)
 	ExpiresIn(now time.Time) (time.Duration, error)
 	ValidateCert(certificate *x509.Certificate) error
 }
 
-type CapsuleCa struct {
-	ca         *x509.Certificate
-	privateKey *rsa.PrivateKey
+type CapsuleCA struct {
+	certificate *x509.Certificate
+	key         *rsa.PrivateKey
 }
 
-func (c CapsuleCa) ValidateCert(certificate *x509.Certificate) (err error) {
+func (c CapsuleCA) ValidateCert(certificate *x509.Certificate) (err error) {
 	pool := x509.NewCertPool()
-	pool.AddCert(c.ca)
+	pool.AddCert(c.certificate)
 
 	_, err = certificate.Verify(x509.VerifyOptions{
 		Roots:       pool,
@@ -51,27 +51,27 @@ func (c CapsuleCa) ValidateCert(certificate *x509.Certificate) (err error) {
 	return
 }
 
-func (c CapsuleCa) isAlreadyValid(now time.Time) bool {
-	return now.After(c.ca.NotBefore)
+func (c CapsuleCA) isAlreadyValid(now time.Time) bool {
+	return now.After(c.certificate.NotBefore)
 }
 
-func (c CapsuleCa) isExpired(now time.Time) bool {
-	return now.Before(c.ca.NotAfter)
+func (c CapsuleCA) isExpired(now time.Time) bool {
+	return now.Before(c.certificate.NotAfter)
 }
 
-func (c CapsuleCa) ExpiresIn(now time.Time) (time.Duration, error) {
+func (c CapsuleCA) ExpiresIn(now time.Time) (time.Duration, error) {
 	if !c.isExpired(now) {
 		return time.Nanosecond, CaExpiredError{}
 	}
 	if !c.isAlreadyValid(now) {
 		return time.Nanosecond, CaNotYetValidError{}
 	}
-	return time.Duration(c.ca.NotAfter.Unix()-now.Unix()) * time.Second, nil
+	return time.Duration(c.certificate.NotAfter.Unix()-now.Unix()) * time.Second, nil
 }
 
-func (c CapsuleCa) CaCertificatePem() (b *bytes.Buffer, err error) {
+func (c CapsuleCA) CACertificatePem() (b *bytes.Buffer, err error) {
 	var crtBytes []byte
-	crtBytes, err = x509.CreateCertificate(rand.Reader, c.ca, c.ca, &c.privateKey.PublicKey, c.privateKey)
+	crtBytes, err = x509.CreateCertificate(rand.Reader, c.certificate, c.certificate, &c.key.PublicKey, c.key)
 	if err != nil {
 		return
 	}
@@ -83,17 +83,17 @@ func (c CapsuleCa) CaCertificatePem() (b *bytes.Buffer, err error) {
 	return b, err
 }
 
-func (c CapsuleCa) CaPrivateKeyPem() (b *bytes.Buffer, err error) {
+func (c CapsuleCA) CAPrivateKeyPem() (b *bytes.Buffer, err error) {
 	b = new(bytes.Buffer)
 	return b, pem.Encode(b, &pem.Block{
 		Type:  "RSA PRIVATE KEY",
-		Bytes: x509.MarshalPKCS1PrivateKey(c.privateKey),
+		Bytes: x509.MarshalPKCS1PrivateKey(c.key),
 	})
 }
 
-func GenerateCertificateAuthority() (s *CapsuleCa, err error) {
-	s = &CapsuleCa{
-		ca: &x509.Certificate{
+func GenerateCertificateAuthority() (s *CapsuleCA, err error) {
+	s = &CapsuleCA{
+		certificate: &x509.Certificate{
 			SerialNumber: big.NewInt(2019),
 			Subject: pkix.Name{
 				Organization:  []string{"Clastix"},
@@ -112,7 +112,7 @@ func GenerateCertificateAuthority() (s *CapsuleCa, err error) {
 		},
 	}
 
-	s.privateKey, err = rsa.GenerateKey(rand.Reader, 4096)
+	s.key, err = rsa.GenerateKey(rand.Reader, 4096)
 	if err != nil {
 		return nil, err
 	}
@@ -120,7 +120,7 @@ func GenerateCertificateAuthority() (s *CapsuleCa, err error) {
 	return
 }
 
-func NewCertificateAuthorityFromBytes(certBytes, keyBytes []byte) (s *CapsuleCa, err error) {
+func NewCertificateAuthorityFromBytes(certBytes, keyBytes []byte) (s *CapsuleCA, err error) {
 	var b *pem.Block
 
 	b, _ = pem.Decode(certBytes)
@@ -135,16 +135,17 @@ func NewCertificateAuthorityFromBytes(certBytes, keyBytes []byte) (s *CapsuleCa,
 		return
 	}
 
-	s = &CapsuleCa{
-		ca:         cert,
-		privateKey: key,
+	s = &CapsuleCA{
+		certificate: cert,
+		key:         key,
 	}
 
 	return
 }
 
-func (c *CapsuleCa) GenerateCertificate(opts CertificateOptions) (certificatePem *bytes.Buffer, certificateKey *bytes.Buffer, err error) {
-	certPrivKey, err := rsa.GenerateKey(rand.Reader, 4096)
+func (c *CapsuleCA) GenerateCertificate(opts CertificateOptions) (certificatePem *bytes.Buffer, certificateKey *bytes.Buffer, err error) {
+	var certPrivKey *rsa.PrivateKey
+	certPrivKey, err = rsa.GenerateKey(rand.Reader, 4096)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -159,7 +160,7 @@ func (c *CapsuleCa) GenerateCertificate(opts CertificateOptions) (certificatePem
 			StreetAddress: []string{"27, Old Gloucester Street"},
 			PostalCode:    []string{"WC1N 3AX"},
 		},
-		DNSNames:     opts.DnsNames(),
+		DNSNames:     opts.DNSNames(),
 		NotBefore:    time.Now().AddDate(0, 0, -1),
 		NotAfter:     opts.ExpirationDate(),
 		SubjectKeyId: []byte{1, 2, 3, 4, 6},
@@ -167,7 +168,8 @@ func (c *CapsuleCa) GenerateCertificate(opts CertificateOptions) (certificatePem
 		KeyUsage:     x509.KeyUsageDigitalSignature,
 	}
 
-	certBytes, err := x509.CreateCertificate(rand.Reader, cert, c.ca, &certPrivKey.PublicKey, c.privateKey)
+	var certBytes []byte
+	certBytes, err = x509.CreateCertificate(rand.Reader, cert, c.certificate, &certPrivKey.PublicKey, c.key)
 	if err != nil {
 		return nil, nil, err
 	}

@@ -54,7 +54,6 @@ func (r *Manager) SetupWithManager(mgr ctrl.Manager) (err error) {
 	crErr := ctrl.NewControllerManagedBy(mgr).
 		For(&rbacv1.ClusterRole{}, builder.WithPredicates(predicate.Funcs{
 			CreateFunc: func(event event.CreateEvent) bool {
-
 				return r.filterByClusterRolesNames(event.Object.GetName())
 			},
 			DeleteFunc: func(deleteEvent event.DeleteEvent) bool {
@@ -153,7 +152,7 @@ func (r *Manager) EnsureClusterRoleBinding() (err error) {
 func (r *Manager) EnsureClusterRole(roleName string) (err error) {
 	role, ok := clusterRoles[roleName]
 	if !ok {
-		return fmt.Errorf("ClusterRole %s is not mapped", roleName)
+		return fmt.Errorf("clusterRole %s is not mapped", roleName)
 	}
 	clusterRole := &rbacv1.ClusterRole{
 		ObjectMeta: v1.ObjectMeta{

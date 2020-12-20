@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package tenant_prefix
+package tenantprefix
 
 import (
 	"context"
@@ -38,7 +38,7 @@ type webhook struct {
 	handler capsulewebhook.Handler
 }
 
-func Webhook(handler capsulewebhook.Handler) *webhook {
+func Webhook(handler capsulewebhook.Handler) capsulewebhook.Webhook {
 	return &webhook{
 		handler: handler,
 	}

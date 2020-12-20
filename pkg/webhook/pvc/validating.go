@@ -19,7 +19,6 @@ package pvc
 import (
 	"context"
 	"net/http"
-	"regexp"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -90,15 +89,8 @@ func (h *handler) OnCreate(c client.Client, decoder *admission.Decoder) capsulew
 		}
 
 		sc := *pvc.Spec.StorageClassName
-
-		if len(tnt.Spec.StorageClasses.Allowed) > 0 {
-			valid = tnt.Spec.StorageClasses.Allowed.IsStringInList(sc)
-		}
-
-		if len(tnt.Spec.StorageClasses.AllowedRegex) > 0 {
-			matched, _ = regexp.MatchString(tnt.Spec.StorageClasses.AllowedRegex, sc)
-		}
-
+		valid = tnt.Spec.StorageClasses.ExactMatch(sc)
+		matched = tnt.Spec.StorageClasses.RegexMatch(sc)
 		if !valid && !matched {
 			return admission.Errored(http.StatusBadRequest, NewStorageClassForbidden(*pvc.Spec.StorageClassName, *tnt.Spec.StorageClasses))
 		}

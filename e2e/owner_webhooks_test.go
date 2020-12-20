@@ -43,8 +43,8 @@ var _ = Describe("when Tenant owner interacts with the webhooks", func() {
 				Name: "ruby",
 				Kind: "User",
 			},
-			StorageClasses: &v1alpha1.StorageClassesSpec{
-				Allowed: []string{
+			StorageClasses: &v1alpha1.AllowedListSpec{
+				Exact: []string{
 					"cephfs",
 					"glusterfs",
 				},

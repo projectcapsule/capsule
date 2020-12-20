@@ -35,7 +35,6 @@ func (o NamespacesReference) Field() string {
 
 func (o NamespacesReference) Func() client.IndexerFunc {
 	return func(object client.Object) []string {
-		tenant := object.(*v1alpha1.Tenant)
-		return tenant.Status.Namespaces.DeepCopy()
+		return object.(*v1alpha1.Tenant).DeepCopy().Status.Namespaces
 	}
 }

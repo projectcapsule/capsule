@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package service_labels
+package servicelabels
 
 import (
 	"github.com/go-logr/logr"
@@ -22,18 +22,19 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
-type ServicesLabelsReconciler struct {
+type EndpointsLabelsReconciler struct {
 	abstractServiceLabelsReconciler
 
 	Log logr.Logger
 }
 
-func (r *ServicesLabelsReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *EndpointsLabelsReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	r.abstractServiceLabelsReconciler = abstractServiceLabelsReconciler{
-		obj:    &corev1.Service{},
+		obj:    &corev1.Endpoints{},
 		scheme: mgr.GetScheme(),
 		log:    r.Log,
 	}
+
 	return ctrl.NewControllerManagedBy(mgr).
 		For(r.abstractServiceLabelsReconciler.obj, r.abstractServiceLabelsReconciler.forOptionPerInstanceName()).
 		Complete(r)

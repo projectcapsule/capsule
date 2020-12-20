@@ -40,9 +40,9 @@ var _ = Describe("enforcing a Container Registry", func() {
 				Name: "matt",
 				Kind: "User",
 			},
-			ContainerRegistries: &v1alpha1.ContainerRegistriesSpec{
-				Allowed:      []string{"docker.io", "docker.tld"},
-				AllowedRegex: `quay\.\w+`,
+			ContainerRegistries: &v1alpha1.AllowedListSpec{
+				Exact: []string{"docker.io", "docker.tld"},
+				Regex: `quay\.\w+`,
 			},
 		},
 	}

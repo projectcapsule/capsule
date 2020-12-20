@@ -58,7 +58,7 @@ func Handler() capsulewebhook.Handler {
 	return &handler{}
 }
 
-func (r *handler) handleService(clt client.Client, decoder *admission.Decoder, ctx context.Context, req admission.Request) admission.Response {
+func (r *handler) handleService(ctx context.Context, clt client.Client, decoder *admission.Decoder, req admission.Request) admission.Response {
 	s := &corev1.Service{}
 	if err := decoder.Decode(req, s); err != nil {
 		return admission.Errored(http.StatusBadRequest, err)
@@ -84,10 +84,10 @@ func (r *handler) handleService(clt client.Client, decoder *admission.Decoder, c
 	}
 
 	for _, allowed := range tnt.Spec.ExternalServiceIPs.Allowed {
-		_, allowedIp, _ := net.ParseCIDR(string(allowed))
-		for _, externalIp := range s.Spec.ExternalIPs {
-			IP := net.ParseIP(externalIp)
-			if allowedIp.Contains(IP) {
+		_, allowedIP, _ := net.ParseCIDR(string(allowed))
+		for _, externalIP := range s.Spec.ExternalIPs {
+			IP := net.ParseIP(externalIP)
+			if allowedIP.Contains(IP) {
 				return admission.Allowed("")
 			}
 		}
@@ -98,13 +98,13 @@ func (r *handler) handleService(clt client.Client, decoder *admission.Decoder, c
 
 func (r *handler) OnCreate(client client.Client, decoder *admission.Decoder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) admission.Response {
-		return r.handleService(client, decoder, ctx, req)
+		return r.handleService(ctx, client, decoder, req)
 	}
 }
 
 func (r *handler) OnUpdate(client client.Client, decoder *admission.Decoder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) admission.Response {
-		return r.handleService(client, decoder, ctx, req)
+		return r.handleService(ctx, client, decoder, req)
 	}
 }
 
