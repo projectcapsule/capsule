@@ -180,7 +180,7 @@ var _ = Describe("creating namespaces within a Tenant with resources", func() {
 	})
 	It("should contains all replicated resources", func() {
 		for _, name := range nsl {
-			By("checking Limit Range resources", func() {
+			By("checking Limit Range", func() {
 				for i, s := range tnt.Spec.LimitRanges {
 					n := fmt.Sprintf("capsule-%s-%d", tnt.GetName(), i)
 					lr := &corev1.LimitRange{}
@@ -190,7 +190,7 @@ var _ = Describe("creating namespaces within a Tenant with resources", func() {
 					Expect(lr.Spec).Should(Equal(s))
 				}
 			})
-			By("checking Network Policy resources", func() {
+			By("checking Network Policy", func() {
 				for i, s := range tnt.Spec.NetworkPolicies {
 					n := fmt.Sprintf("capsule-%s-%d", tnt.GetName(), i)
 					np := &networkingv1.NetworkPolicy{}
@@ -211,7 +211,7 @@ var _ = Describe("creating namespaces within a Tenant with resources", func() {
 					return ns.GetAnnotations()["scheduler.alpha.kubernetes.io/node-selector"]
 				}, 10*time.Second, time.Second).Should(Equal(strings.Join(selector, ",")))
 			})
-			By("checking the Resource Quota resources", func() {
+			By("checking the Resource Quota", func() {
 				for i, s := range tnt.Spec.ResourceQuota {
 					n := fmt.Sprintf("capsule-%s-%d", tnt.GetName(), i)
 					rq := &corev1.ResourceQuota{}

@@ -40,6 +40,7 @@ var _ = Describe("creating a Namespace with group Tenant owner", func() {
 			},
 		},
 	}
+
 	JustBeforeEach(func() {
 		EventuallyCreation(func() error {
 			tnt.ResourceVersion = ""
@@ -49,6 +50,7 @@ var _ = Describe("creating a Namespace with group Tenant owner", func() {
 	JustAfterEach(func() {
 		Expect(k8sClient.Delete(context.TODO(), tnt)).Should(Succeed())
 	})
+
 	It("should succeed and be available in Tenant namespaces list", func() {
 		ns := NewNamespace("gto-namespace")
 		NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())

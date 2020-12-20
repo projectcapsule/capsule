@@ -51,6 +51,7 @@ var _ = Describe("creating a Namespace for a Tenant with additional metadata", f
 			},
 		},
 	}
+
 	JustBeforeEach(func() {
 		EventuallyCreation(func() error {
 			return k8sClient.Create(context.TODO(), tnt)
@@ -59,21 +60,33 @@ var _ = Describe("creating a Namespace for a Tenant with additional metadata", f
 	JustAfterEach(func() {
 		Expect(k8sClient.Delete(context.TODO(), tnt)).Should(Succeed())
 	})
-	It("should contains additional Namespace metadata", func() {
+
+	It("should contain additional Namespace metadata", func() {
 		ns := NewNamespace("namespace-metadata")
 		NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(tnt, podRecreationTimeoutInterval).Should(ContainElement(ns.GetName()))
 
-		Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: ns.GetName()}, ns)).Should(Succeed())
 		By("checking additional labels", func() {
-			for _, l := range tnt.Spec.NamespacesMetadata.AdditionalLabels {
-				Expect(ns.Labels).Should(ContainElement(l))
-			}
+			Eventually(func() (ok bool) {
+				Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: ns.GetName()}, ns)).Should(Succeed())
+				for k, v := range tnt.Spec.NamespacesMetadata.AdditionalLabels {
+					if ok = Expect(ns.Labels).Should(HaveKeyWithValue(k, v)); !ok {
+						return
+					}
+				}
+				return
+			}, defaultTimeoutInterval, defaultPollInterval).Should(BeTrue())
 		})
 		By("checking additional annotations", func() {
-			for _, a := range tnt.Spec.NamespacesMetadata.AdditionalAnnotations {
-				Expect(ns.Annotations).Should(ContainElement(a))
-			}
+			Eventually(func() (ok bool) {
+				Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: ns.GetName()}, ns)).Should(Succeed())
+				for k, v := range tnt.Spec.NamespacesMetadata.AdditionalAnnotations {
+					if ok = Expect(ns.Annotations).Should(HaveKeyWithValue(k, v)); !ok {
+						return
+					}
+				}
+				return
+			}, defaultTimeoutInterval, defaultPollInterval).Should(BeTrue())
 		})
 	})
 })

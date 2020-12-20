@@ -41,6 +41,7 @@ var _ = Describe("creating a Namespace trying to select a third Tenant", func() 
 			},
 		},
 	}
+
 	JustBeforeEach(func() {
 		EventuallyCreation(func() error {
 			return k8sClient.Create(context.TODO(), tnt)
@@ -49,6 +50,7 @@ var _ = Describe("creating a Namespace trying to select a third Tenant", func() 
 	JustAfterEach(func() {
 		Expect(k8sClient.Delete(context.TODO(), tnt)).Should(Succeed())
 	})
+
 	It("should fail", func() {
 		var ns *corev1.Namespace
 
@@ -64,6 +66,6 @@ var _ = Describe("creating a Namespace trying to select a third Tenant", func() 
 
 		cs := ownerClient(&v1alpha1.Tenant{Spec: v1alpha1.TenantSpec{Owner: v1alpha1.OwnerSpec{Name: "dale", Kind: "User"}}})
 		_, err := cs.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
-		Expect(err).ShouldNot(Succeed())
+		Expect(err).To(HaveOccurred())
 	})
 })

@@ -30,7 +30,7 @@ import (
 	"github.com/clastix/capsule/api/v1alpha1"
 )
 
-var _ = Describe("creating a Namespace with additional Role Binding", func() {
+var _ = Describe("creating a Namespace with an additional Role Binding", func() {
 	tnt := &v1alpha1.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "additional-role-binding",
@@ -54,6 +54,7 @@ var _ = Describe("creating a Namespace with additional Role Binding", func() {
 			},
 		},
 	}
+
 	JustBeforeEach(func() {
 		EventuallyCreation(func() error {
 			tnt.ResourceVersion = ""
@@ -63,7 +64,8 @@ var _ = Describe("creating a Namespace with additional Role Binding", func() {
 	JustAfterEach(func() {
 		Expect(k8sClient.Delete(context.TODO(), tnt)).Should(Succeed())
 	})
-	It("should be assigned on each Namespace", func() {
+
+	It("should be assigned to each Namespace", func() {
 		for _, ns := range []string{"rb-1", "rb-2", "rb-3"} {
 			ns := NewNamespace(ns)
 			NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
