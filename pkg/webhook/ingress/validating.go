@@ -184,7 +184,9 @@ func (r *handler) validateIngress(ctx context.Context, apiClient client.Client, 
 				invalidHostnames = append(invalidHostnames, currentHostname)
 			}
 		}
-		return admission.Errored(http.StatusBadRequest, NewIngressHostnamesNotValid(hostnames, *tnt.Spec.IngressHostnames))
+		if len(invalidHostnames) > 0 {
+			return admission.Errored(http.StatusBadRequest, NewIngressHostnamesNotValid(hostnames, *tnt.Spec.IngressHostnames))
+		}
 	}
 
 	return admission.Allowed("")
