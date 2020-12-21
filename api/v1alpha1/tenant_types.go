@@ -40,7 +40,7 @@ type IngressClassesSpec struct {
 
 type IngressHostnamesSpec struct {
 	Allowed      IngressHostnamesList `json:"allowed"`
-	AllowedRegex IngressRegex         `json:"allowedRegex"`
+	AllowedRegex string               `json:"allowedRegex"`
 }
 
 type ContainerRegistriesSpec struct {

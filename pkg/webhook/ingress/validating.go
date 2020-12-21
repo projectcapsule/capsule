@@ -162,19 +162,28 @@ func (r *handler) validateIngress(ctx context.Context, apiClient client.Client, 
 		return admission.Allowed("")
 	}
 
-	valid = false
-	matched = false
+	var invalidHostnames []string
 	hostnames := ingress.Hostnames()
 	if len(hostnames) > 0 {
-		valid = tnt.Spec.IngressHostnames.Allowed.AreStringsInList(hostnames)
+		for _, currentHostname := range hostnames {
+			isPresent := tnt.Spec.IngressHostnames.Allowed.IsStringInList(currentHostname)
+			if !isPresent {
+				invalidHostnames = append(invalidHostnames, currentHostname)
+			}
+		}
+		if len(invalidHostnames) > 0 {
+			return admission.Errored(http.StatusBadRequest, NewIngressHostnamesNotValid(hostnames, *tnt.Spec.IngressHostnames))
+		}
 	}
 
 	allowedRegex := tnt.Spec.IngressHostnames.AllowedRegex
 	if len(allowedRegex) > 0 {
-		matched = allowedRegex.MatchesAllStrings(hostnames)
-	}
-
-	if !valid && !matched {
+		for _, currentHostname := range hostnames {
+			matched, _ := regexp.MatchString(tnt.Spec.IngressHostnames.AllowedRegex, currentHostname)
+			if !matched {
+				invalidHostnames = append(invalidHostnames, currentHostname)
+			}
+		}
 		return admission.Errored(http.StatusBadRequest, NewIngressHostnamesNotValid(hostnames, *tnt.Spec.IngressHostnames))
 	}
 

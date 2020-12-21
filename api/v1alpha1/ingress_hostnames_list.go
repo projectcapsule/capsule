@@ -17,7 +17,6 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"regexp"
 	"sort"
 	"strings"
 )
@@ -41,36 +40,4 @@ func (hostnames IngressHostnamesList) IsStringInList(value string) (ok bool) {
 	i := sort.SearchStrings(hostnames, value)
 	ok = i < hostnames.Len() && hostnames[i] == value
 	return
-}
-
-func (hostnames IngressHostnamesList) AreStringsInList(values []string) bool {
-	sort.Sort(hostnames)
-
-	for _, value := range values {
-
-		isPresent := hostnames.isPresent(value)
-		if !isPresent {
-			return false
-		}
-	}
-	return true
-}
-
-func (hostnames IngressHostnamesList) isPresent(value string) bool {
-	index := sort.SearchStrings(hostnames, value)
-	isOk := index < hostnames.Len() && hostnames[index] == value
-	return isOk
-}
-
-type IngressRegex string
-
-func (ir IngressRegex) MatchesAllStrings(values []string) bool {
-	for _, value := range values {
-
-		matched, _ := regexp.MatchString(string(ir), value)
-		if !matched {
-			return false
-		}
-	}
-	return true
 }

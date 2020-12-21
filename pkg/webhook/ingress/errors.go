@@ -50,7 +50,7 @@ func NewIngressHostnamesNotValid(hostnames []string, spec v1alpha1.IngressHostna
 }
 
 func (i ingressHostnameNotValid) Error() string {
-	return fmt.Sprintf("Ingress Class %s is forbidden for the current Tenant%s", i.hostnames, appendHostnameError(i.spec))
+	return fmt.Sprintf("Hostnames %s are not valid for the current Tenant%s", i.hostnames, appendHostnameError(i.spec))
 }
 
 type ingressClassNotValid struct {
