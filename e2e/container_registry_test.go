@@ -33,7 +33,7 @@ import (
 var _ = Describe("enforcing a Container Registry", func() {
 	tnt := &v1alpha1.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "additional-role-binding",
+			Name: "container-registry",
 		},
 		Spec: v1alpha1.TenantSpec{
 			Owner: v1alpha1.OwnerSpec{
@@ -44,51 +44,36 @@ var _ = Describe("enforcing a Container Registry", func() {
 				Allowed:      []string{"docker.io", "docker.tld"},
 				AllowedRegex: `quay\.\w+`,
 			},
-			NamespacesMetadata: v1alpha1.AdditionalMetadata{},
-			ServicesMetadata:   v1alpha1.AdditionalMetadata{},
-			StorageClasses:     &v1alpha1.StorageClassesSpec{},
-			IngressClasses:     &v1alpha1.IngressClassesSpec{},
-			LimitRanges:        []corev1.LimitRangeSpec{},
-			NodeSelector:       map[string]string{},
-			ResourceQuota:      []corev1.ResourceQuotaSpec{},
 		},
 	}
+
 	JustBeforeEach(func() {
 		EventuallyCreation(func() error {
-			return k8sClient.Create(context.TODO(), tnt.DeepCopy())
+			tnt.ResourceVersion = ""
+			return k8sClient.Create(context.TODO(), tnt)
 		}).Should(Succeed())
 	})
 	JustAfterEach(func() {
-		Expect(k8sClient.Delete(context.TODO(), tnt.DeepCopy())).Should(Succeed())
+		Expect(k8sClient.Delete(context.TODO(), tnt)).Should(Succeed())
 	})
+
 	It("should add labels to Namespace", func() {
 		ns := NewNamespace("registry-labels")
 		NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
-
-		Eventually(func() bool {
-			if err := k8sClient.Get(context.Background(), types.NamespacedName{Name: ns.Name}, ns); err != nil {
-				return false
+		Eventually(func() (ok bool) {
+			Expect(k8sClient.Get(context.Background(), types.NamespacedName{Name: ns.Name}, ns)).Should(Succeed())
+			ok, _ = HaveKeyWithValue("capsule.clastix.io/allowed-registries", "docker.io,docker.tld").Match(ns.Annotations)
+			if !ok {
+				return
 			}
-
-			for a, expected := range map[string]string{
-				"capsule.clastix.io/allowed-registries":        "docker.io,docker.tld",
-				"capsule.clastix.io/allowed-registries-regexp": `quay\.\w+`,
-			} {
-				var v string
-				var ok bool
-
-				v, ok = ns.Annotations[a]
-				if !ok {
-					return false
-				}
-				if ok = v == expected; !ok {
-					return false
-				}
+			ok, _ = HaveKeyWithValue("capsule.clastix.io/allowed-registries-regexp", `quay\.\w+`).Match(ns.Annotations)
+			if !ok {
+				return
 			}
-
 			return true
 		}, defaultTimeoutInterval, defaultPollInterval).Should(BeTrue())
 	})
+
 	It("should deny running a gcr.io container", func() {
 		ns := NewNamespace("registry-deny")
 		NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
@@ -110,7 +95,8 @@ var _ = Describe("enforcing a Container Registry", func() {
 		_, err := cs.CoreV1().Pods(ns.Name).Create(context.Background(), pod, metav1.CreateOptions{})
 		Expect(err).ShouldNot(Succeed())
 	})
-	It("should allow using an item in the list", func() {
+
+	It("should allow using an exact match", func() {
 		ns := NewNamespace("registry-list")
 		NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
 
@@ -134,7 +120,8 @@ var _ = Describe("enforcing a Container Registry", func() {
 			return err
 		}).Should(Succeed())
 	})
-	It("should allow using a registry from regex", func() {
+
+	It("should allow using a regex match", func() {
 		ns := NewNamespace("registry-regex")
 		NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
 

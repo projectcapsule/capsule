@@ -40,6 +40,7 @@ var _ = Describe("creating a Namespace as Tenant owner", func() {
 			},
 		},
 	}
+
 	JustBeforeEach(func() {
 		EventuallyCreation(func() error {
 			return k8sClient.Create(context.TODO(), tnt)
@@ -48,6 +49,7 @@ var _ = Describe("creating a Namespace as Tenant owner", func() {
 	JustAfterEach(func() {
 		Expect(k8sClient.Delete(context.TODO(), tnt)).Should(Succeed())
 	})
+
 	It("should be available in Tenant namespaces list", func() {
 		ns := NewNamespace("new-namespace")
 		NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())

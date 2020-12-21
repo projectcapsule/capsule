@@ -20,10 +20,10 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"sync"
 	"time"
 
 	"github.com/go-logr/logr"
+	"golang.org/x/sync/errgroup"
 	v1 "k8s.io/api/admissionregistration/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -50,12 +50,8 @@ func (r *CaReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-func (r CaReconciler) UpdateValidatingWebhookConfiguration(wg *sync.WaitGroup, ch chan error, caBundle []byte) {
-	defer wg.Done()
-
-	var err error
-
-	ch <- retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+func (r CaReconciler) UpdateValidatingWebhookConfiguration(caBundle []byte) error {
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
 		vw := &v1.ValidatingWebhookConfiguration{}
 		err = r.Get(context.TODO(), types.NamespacedName{Name: "capsule-validating-webhook-configuration"}, vw)
 		if err != nil {
@@ -72,12 +68,8 @@ func (r CaReconciler) UpdateValidatingWebhookConfiguration(wg *sync.WaitGroup, c
 	})
 }
 
-func (r CaReconciler) UpdateMutatingWebhookConfiguration(wg *sync.WaitGroup, ch chan error, caBundle []byte) {
-	defer wg.Done()
-
-	var err error
-
-	ch <- retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+func (r CaReconciler) UpdateMutatingWebhookConfiguration(caBundle []byte) error {
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
 		mw := &v1.MutatingWebhookConfiguration{}
 		err = r.Get(context.TODO(), types.NamespacedName{Name: "capsule-mutating-webhook-configuration"}, mw)
 		if err != nil {
@@ -139,20 +131,16 @@ func (r CaReconciler) Reconcile(ctx context.Context, request ctrl.Request) (ctrl
 			privateKeySecretKey: key.Bytes(),
 		}
 
-		wg := &sync.WaitGroup{}
-		wg.Add(2)
-		ch := make(chan error, 2)
+		group := errgroup.Group{}
+		group.Go(func() error {
+			return r.UpdateMutatingWebhookConfiguration(crt.Bytes())
+		})
+		group.Go(func() error {
+			return r.UpdateValidatingWebhookConfiguration(crt.Bytes())
+		})
 
-		go r.UpdateMutatingWebhookConfiguration(wg, ch, crt.Bytes())
-		go r.UpdateValidatingWebhookConfiguration(wg, ch, crt.Bytes())
-
-		wg.Wait()
-		close(ch)
-
-		for err = range ch {
-			if err != nil {
-				return reconcile.Result{}, err
-			}
+		if err := group.Wait(); err != nil {
+			return reconcile.Result{}, err
 		}
 	}
 

@@ -40,6 +40,7 @@ var _ = Describe("creating a Namespace with --protected-namespace-regex enabled"
 			},
 		},
 	}
+
 	JustBeforeEach(func() {
 		EventuallyCreation(func() error {
 			tnt.ResourceVersion = ""
@@ -49,6 +50,7 @@ var _ = Describe("creating a Namespace with --protected-namespace-regex enabled"
 	JustAfterEach(func() {
 		Expect(k8sClient.Delete(context.TODO(), tnt)).Should(Succeed())
 	})
+
 	It("should succeed and be available in Tenant namespaces list", func() {
 		args := append(defaulManagerPodArgs, []string{"--protected-namespace-regex=^.*[-.]system$"}...)
 		ModifyCapsuleManagerPodArgs(args)
@@ -56,7 +58,8 @@ var _ = Describe("creating a Namespace with --protected-namespace-regex enabled"
 		NamespaceCreation(ns, tnt, podRecreationTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(tnt, podRecreationTimeoutInterval).Should(ContainElement(ns.GetName()))
 	})
-	It("should fail", func() {
+
+	It("should fail using a value non matching the regex", func() {
 		ns := NewNamespace("test-system")
 		NamespaceCreation(ns, tnt, podRecreationTimeoutInterval).ShouldNot(Succeed())
 		ModifyCapsuleManagerPodArgs(defaulManagerPodArgs)

@@ -30,7 +30,7 @@ import (
 	"github.com/clastix/capsule/api/v1alpha1"
 )
 
-var _ = Describe("enforcing an allowed set of Service External IPs", func() {
+var _ = Describe("enforcing an allowed set of Service external IPs", func() {
 	tnt := &v1alpha1.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "allowed-external-ip",
@@ -48,14 +48,17 @@ var _ = Describe("enforcing an allowed set of Service External IPs", func() {
 			},
 		},
 	}
+
 	JustBeforeEach(func() {
 		EventuallyCreation(func() error {
-			return k8sClient.Create(context.TODO(), tnt.DeepCopy())
+			tnt.ResourceVersion = ""
+			return k8sClient.Create(context.TODO(), tnt)
 		}).Should(Succeed())
 	})
 	JustAfterEach(func() {
-		Expect(k8sClient.Delete(context.TODO(), tnt.DeepCopy())).Should(Succeed())
+		Expect(k8sClient.Delete(context.TODO(), tnt)).Should(Succeed())
 	})
+
 	It("should fail creating an evil service", func() {
 		ns := NewNamespace("evil-service")
 		NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
@@ -88,6 +91,7 @@ var _ = Describe("enforcing an allowed set of Service External IPs", func() {
 			return err
 		}).ShouldNot(Succeed())
 	})
+
 	It("should allow the first CIDR block", func() {
 		ns := NewNamespace("allowed-service-cidr")
 		NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())

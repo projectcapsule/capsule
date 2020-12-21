@@ -2,10 +2,13 @@
 
 /*
 Copyright 2020 Clastix Labs.
+
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
+
     http://www.apache.org/licenses/LICENSE-2.0
+
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -47,6 +50,7 @@ var _ = Describe("when Tenant handles Ingress classes", func() {
 			},
 		},
 	}
+
 	JustBeforeEach(func() {
 		EventuallyCreation(func() error {
 			tnt.ResourceVersion = ""
@@ -56,14 +60,15 @@ var _ = Describe("when Tenant handles Ingress classes", func() {
 	JustAfterEach(func() {
 		Expect(k8sClient.Delete(context.TODO(), tnt)).Should(Succeed())
 	})
-	It("should block non allowed Ingress class", func() {
+
+	It("should block a non allowed class", func() {
 		ns := NewNamespace("ingress-class-disallowed")
 		cs := ownerClient(tnt)
 
 		NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(tnt, podRecreationTimeoutInterval).Should(ContainElement(ns.GetName()))
 
-		By("non-specifying the class", func() {
+		By("non-specifying at all", func() {
 			Eventually(func() (err error) {
 				i := &extensionsv1beta1.Ingress{
 					ObjectMeta: metav1.ObjectMeta{
@@ -80,7 +85,7 @@ var _ = Describe("when Tenant handles Ingress classes", func() {
 				return
 			}, defaultTimeoutInterval, defaultPollInterval).ShouldNot(Succeed())
 		})
-		By("using a forbidden class as Annotation", func() {
+		By("defining as deprecated annotation", func() {
 			Eventually(func() (err error) {
 				i := &extensionsv1beta1.Ingress{
 					ObjectMeta: metav1.ObjectMeta{
@@ -100,7 +105,7 @@ var _ = Describe("when Tenant handles Ingress classes", func() {
 				return
 			}, defaultTimeoutInterval, defaultPollInterval).ShouldNot(Succeed())
 		})
-		By("specifying a forbidden class", func() {
+		By("using the ingressClassName", func() {
 			Eventually(func() (err error) {
 				i := &extensionsv1beta1.Ingress{
 					ObjectMeta: metav1.ObjectMeta{
@@ -119,7 +124,8 @@ var _ = Describe("when Tenant handles Ingress classes", func() {
 			}, defaultTimeoutInterval, defaultPollInterval).ShouldNot(Succeed())
 		})
 	})
-	It("should allow enabled Ingress class using the deprecated Annotation", func() {
+
+	It("should allow enabled class using the deprecated annotation", func() {
 		ns := NewNamespace("ingress-class-allowed-annotation")
 		cs := ownerClient(tnt)
 
@@ -147,7 +153,8 @@ var _ = Describe("when Tenant handles Ingress classes", func() {
 			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		}
 	})
-	It("should allow enabled Ingress class using the IngressClassName field", func() {
+
+	It("should allow enabled class using the ingressClassName field", func() {
 		ns := NewNamespace("ingress-class-allowed-annotation")
 		cs := ownerClient(tnt)
 
@@ -178,7 +185,8 @@ var _ = Describe("when Tenant handles Ingress classes", func() {
 			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		}
 	})
-	It("should allow enabled Ingress class regexp using the deprecated Annotation", func() {
+
+	It("should allow enabled Ingress by regex using the deprecated annotation", func() {
 		ns := NewNamespace("ingress-class-allowed-annotation")
 		cs := ownerClient(tnt)
 		ingressClass := "oil-ingress"
@@ -205,7 +213,8 @@ var _ = Describe("when Tenant handles Ingress classes", func() {
 			return
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 	})
-	It("should allow enabled Ingress class regexp using the IngressClassName field", func() {
+
+	It("should allow enabled Ingress by regex using the ingressClassName field", func() {
 		ns := NewNamespace("ingress-class-allowed-annotation")
 		cs := ownerClient(tnt)
 		ingressClass := "oil-haproxy"

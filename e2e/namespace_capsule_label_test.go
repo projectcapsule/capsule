@@ -23,20 +23,21 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/clastix/capsule/api/v1alpha1"
 )
 
-var _ = Describe("creating a Namespace trying to select a third Tenant", func() {
+var _ = Describe("creating several Namespaces for a Tenant", func() {
 	tnt := &v1alpha1.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "tenant-non-owned",
+			Name: "capsule-labels",
 		},
 		Spec: v1alpha1.TenantSpec{
 			Owner: v1alpha1.OwnerSpec{
-				Name: "undefined",
+				Name: "charlie",
 				Kind: "User",
 			},
 		},
@@ -44,6 +45,7 @@ var _ = Describe("creating a Namespace trying to select a third Tenant", func() 
 
 	JustBeforeEach(func() {
 		EventuallyCreation(func() error {
+			tnt.ResourceVersion = ""
 			return k8sClient.Create(context.TODO(), tnt)
 		}).Should(Succeed())
 	})
@@ -51,21 +53,19 @@ var _ = Describe("creating a Namespace trying to select a third Tenant", func() 
 		Expect(k8sClient.Delete(context.TODO(), tnt)).Should(Succeed())
 	})
 
-	It("should fail", func() {
-		var ns *corev1.Namespace
-
-		By("assigning to the Namespace the Capsule Tenant label", func() {
-			l, err := v1alpha1.GetTypeLabel(&v1alpha1.Tenant{})
-			Expect(err).ToNot(HaveOccurred())
-
-			ns := NewNamespace("tenant-non-owned-ns")
-			ns.SetLabels(map[string]string{
-				l: tnt.Name,
-			})
-		})
-
-		cs := ownerClient(&v1alpha1.Tenant{Spec: v1alpha1.TenantSpec{Owner: v1alpha1.OwnerSpec{Name: "dale", Kind: "User"}}})
-		_, err := cs.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
-		Expect(err).To(HaveOccurred())
+	It("should contains the default Capsule label", func() {
+		namespaces := []*v1.Namespace{
+			NewNamespace("first-capsule-ns"),
+			NewNamespace("second-capsule-ns"),
+			NewNamespace("third-capsule-ns"),
+		}
+		for _, ns := range namespaces {
+			NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
+			Eventually(func() (ok bool) {
+				Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: ns.GetName()}, ns)).Should(Succeed())
+				ok, _ = HaveKeyWithValue("capsule.clastix.io/tenant", tnt.Name).Match(ns.Labels)
+				return
+			}, defaultTimeoutInterval, defaultPollInterval).Should(BeTrue())
+		}
 	})
 })
