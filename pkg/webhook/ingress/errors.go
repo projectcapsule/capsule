@@ -79,7 +79,7 @@ func appendClassError(spec v1alpha1.IngressClassesSpec) (append string) {
 
 func appendHostnameError(spec v1alpha1.IngressHostnamesSpec) (append string) {
 	if len(spec.Allowed) > 0 {
-		append += fmt.Sprintf(", one of the following (%s)", strings.Join(spec.Allowed, ", "))
+		append += fmt.Sprintf(", specify one of the following (%s)", strings.Join(spec.Allowed, ", "))
 	}
 	if len(spec.AllowedRegex) > 0 {
 		append += fmt.Sprintf(", or matching the regex %s", spec.AllowedRegex)

@@ -172,7 +172,7 @@ func (r *handler) validateIngress(ctx context.Context, apiClient client.Client, 
 			}
 		}
 		if len(invalidHostnames) > 0 {
-			return admission.Errored(http.StatusBadRequest, NewIngressHostnamesNotValid(hostnames, *tnt.Spec.IngressHostnames))
+			return admission.Errored(http.StatusBadRequest, NewIngressHostnamesNotValid(invalidHostnames, *tnt.Spec.IngressHostnames))
 		}
 	}
 
@@ -185,7 +185,7 @@ func (r *handler) validateIngress(ctx context.Context, apiClient client.Client, 
 			}
 		}
 		if len(invalidHostnames) > 0 {
-			return admission.Errored(http.StatusBadRequest, NewIngressHostnamesNotValid(hostnames, *tnt.Spec.IngressHostnames))
+			return admission.Errored(http.StatusBadRequest, NewIngressHostnamesNotValid(invalidHostnames, *tnt.Spec.IngressHostnames))
 		}
 	}
 
