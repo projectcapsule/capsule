@@ -1,39 +1,65 @@
 # Standalone Installation
-The `capsule-ns-filter` can be deployed in standalone mode, e.g. running as a pod bridging any Kubernetes client to the `kube-apiserver`. Use this way to provide access to client-side command line tools like `kubectl` or even client-side dashboards.
+The `capsule-proxy` can be deployed in standalone mode, e.g. running as a pod bridging any Kubernetes client to the `kube-apiserver`. Use this way to provide access to client-side command line tools like `kubectl` or even client-side dashboards.
 
-You can use an Ingress Controller to expose the `capsule-ns-filter` endpoint or, depending on your environment, you can expose it with either a `NodePort`, or a `LoadBalancer` service. As alternatives, use `HostPort` or `HostNetwork` mode.
+You can use an Ingress Controller to expose the `capsule-proxy` endpoint in SSL passthrough, or,depending on your environment, you can expose it with either a `NodePort`, or a `LoadBalancer` service. As further alternatives, use `HostPort` or `HostNetwork` mode.
 
 ```
                 +-----------+          +-----------+         +-----------+
  kubectl ------>|:443       |--------->|:9001      |-------->|:6443      |
                 +-----------+          +-----------+         +-----------+
-                ingress-controller     capsule-ns-filter     kube-apiserver
+                ingress-controller     capsule-proxy         kube-apiserver
                 (ssl-passthrough)
 ``` 
 
-The [standalone-setup.yaml](../deploy/standalone-setup.yaml) manifest contains an example for deploying with Ingress Controller in ssl-passthrough mode.
+## Configure Capsule
+Make sure to have a working instance of the Capsule Operator in your Kubernetes cluster before to attempt to use `capsule-proxy`. Please, refer to the Capsule Operator [documentation](../operator/overview.md) for instructions.
 
-## Arguments
-Arguments to be passed to the `capsule-ns-filter` proxy:
+You should also have one or more tenants defined, e.g. `oil` and `gas` and they are assigned to the user `alice`.
+
+As cluster admin, check there are the tenants:
 
 ```
---listening-port         HTTP port the proxy listens to, default: 9001
---k8s-control-plane-url  Kubernetes control plane URL, default: https://kubernetes.default.svc
---capsule-user-group     The Capsule User Group, default: capsule.clastix.io
---zap-devel              Enable debug
---zap-log-level          Set log verbosity, from 1 to 10
---enable-ssl             Enable the bind on HTTPS for secure communication, default: false
---ssl-cert-path          Path to the TLS certificate, default: /opt/capsule-ns-filter/tls.crt
---ssl-key-path           Path to the TLS certificate key, default: /opt/capsule-ns-filter/tls.key
+$ kubectl get tenants
+NAME   NAMESPACE QUOTA   NAMESPACE COUNT   OWNER NAME   OWNER KIND   AGE
+foo    3                 1                 joe          User         4d
+gas    3                 0                 alice        User         1d
+oil    9                 0                 alice        User         1d
 ```
+
+## Install Capsule Proxy
+Create a secret in the target namespace containing the SSL certificate which `capsule-proxy` will use.
+
+```
+$ kubectl -n capsule-system create secret tls capsule-proxy --cert=tls.cert --key=tls.key
+```
+
+Then use the Helm Chart to install the `capsule-proxy` in such namespace:
+
+```bash
+$ cat <<EOF | sudo tee custom-values.yaml
+options:
+  enableSSL: true
+ingress:
+  enabled: true
+  annotations:
+    ingress.kubernetes.io/ssl-passthrough: 'true'
+  hosts:
+    - host: kube.clastix.io
+      paths: [ "/" ]
+EOF
+
+$ helm install capsule-proxy capsule-proxy \
+  --valuecustom-values.yaml \
+  -n capsule-system
+```
+
+The `capsule-proxy` should be exposed with an Ingress in SSL passthrough mode and reachable at `https://kube.clastix.io`.
 
 ## TLS Client Authentication
-Users using a TLS client based authentication with certificate and key are able to talks with `capsule-ns-filter` since the current implementation of the reverse proxy is able to forward client certificates to the Kubernetes APIs server.
+Users using a TLS client based authentication with certificate and key are able to talks with `capsule-proxy` since the current implementation of the reverse proxy is able to forward client certificates to the Kubernetes APIs server.
 
 ## OIDC Authentication
-The `capsule-ns-filter` works with `kubectl` users with a token-based authentication, e.g. OIDC or Bearer Token.
-
-In the following example, we'll use an OIDC server, e.g. [Keycloak](https://www.keycloak.org/), capable to provides JWT tokens.
+The `capsule-proxy` works with `kubectl` users with a token-based authentication, e.g. OIDC or Bearer Token. In the following example, we'll use Keycloak as OIDC server capable to provides JWT tokens.
 
 ### Configuring Keycloak
 Configure Keycloak as OIDC server:
@@ -70,7 +96,6 @@ The result will include an `ACCESS_TOKEN`, a `REFRESH_TOKEN`, and an `ID_TOKEN`.
    "id_token": "ID_TOKEN",
    "token_type":"bearer",
    "scope": "openid groups profile email"
-   ...
 }
 ```
 
@@ -85,7 +110,6 @@ The result will be like the following:
 
 ```json
 {
-    ...
   "exp": 1601323086,
   "iat": 1601322186,
   "aud": "kubernetes",
@@ -100,7 +124,6 @@ The result will be like the following:
   "client_id": "kubernetes",
   "username": "alice",
   "active": true
-    ...
 }
 ```
 
@@ -108,7 +131,6 @@ The result will be like the following:
 Configuring Kubernetes for OIDC Authentication requires adding several parameters to the API Server. Please, refer to the [documentation](https://kubernetes.io/docs/reference/access-authn-authz/authentication/#openid-connect-tokens) for details and examples. Most likely, your `kube-apiserver.yaml` manifest will looks like the following:
 
 ```yaml
-...
 spec:
   containers:
   - command:
@@ -120,21 +142,6 @@ spec:
     - --oidc-username-claim=preferred_username
     - --oidc-groups-claim=groups
     - --oidc-username-prefix=-
-```
-
-### Configuring Capsule
-Make sure to have a working instance of the Capsule Operator in your Kubernetes cluster before to attempt to use `capsule-ns-filter`. Please, refer to the Capsule [documentation](https://github.com/clastix/capsule) for details and examples.
-
-You should have one or more tenants defined, e.g. `oil` and `gas` and they are assigned to the user `alice`.
-
-As cluster admin, check there are the tenants:
-
-```
-$ kubectl get tenants
-NAME   NAMESPACE QUOTA   NAMESPACE COUNT   OWNER NAME   OWNER KIND   AGE
-foo    3                 1                 joe          User         4d
-gas    3                 0                 alice        User         1d
-oil    9                 0                 alice        User         1d
 ```
 
 ### Configuring kubectl
@@ -161,7 +168,7 @@ To use the --token option:
 $ kubectl config set-credentials oidc --token=${ID_TOKEN}
 ```
 
-Point the kubectl to the URL where the `capsule-ns-filter` service is reachable:
+Point the kubectl to the URL where the `capsule-proxy` service is reachable:
 ```
 $ kubectl config set-cluster mycluster \
     --server=https://kube.clastix.io \
@@ -204,14 +211,12 @@ oil-development     Active   2m
 oil-production      Active   2m
 ```
 
-_Nota Bene_: once your `ID_TOKEN` expires, the `kubectl` OIDC Authenticator will attempt to refresh automatically your `ID_TOKEN` using the `REFRESH_TOKEN`, the `OIDC_CLIENT_ID` and the `OIDC_CLIENT_SECRET` storing the new values for the `REFRESH_TOKEN` and `ID_TOKEN` in your `kubeconfig` file.
+_Nota Bene_: once your `ID_TOKEN` expires, the `kubectl` OIDC Authenticator will attempt to refresh automatically your `ID_TOKEN` using the `REFRESH_TOKEN`, the `OIDC_CLIENT_ID` and the `OIDC_CLIENT_SECRET` storing the new values for the `REFRESH_TOKEN` and `ID_TOKEN` in your `kubeconfig` file. In case the OIDC uses a self signed CA certificate, make sure to specify it with the `idp-certificate-authority` option in your `kubeconfig` file, otherwise you'll not able to refresh the tokens. Once the `REFRESH_TOKEN` is expired, you will need to refresh tokens manually.
 
-In case the OIDC uses a self signed CA certificate, make sure to specify it with the `idp-certificate-authority` option in your `kubeconfig` file, otherwise you'll not able to refresh the tokens. Once the `REFRESH_TOKEN` is expired, you will need to refresh tokens manually.
-
-## RBAC
-The service account used for `capsule-ns-filter` needs to have `cluster-admin` permissions.
+## RBAC Considerations
+Currently, the service account used for `capsule-proxy` needs to have `cluster-admin` permissions.
 
 ## Configuring client-only dashboards
-If you're using a client-only dashboard, for example [Mirantis Lens](https://k8slens.dev/), the `capsule-ns-filter` can be used as in the previous `kubectl` example since Lens just needs for a `kubeconfig` file. Assuming to use a `kubeconfig` file containing a valid OIDC token released for the `alice` user, you can access the cluster with Lens dashboard and see only namespaces belonging to the Alice's tenants.
+If you're using a client-only dashboard, for example [Lens](https://k8slens.dev/), the `capsule-proxy` can be used as in the previous `kubectl` example since Lens just needs for a `kubeconfig` file. Assuming to use a `kubeconfig` file containing a valid OIDC token released for the `alice` user, you can access the cluster with Lens dashboard and see only namespaces belonging to the Alice's tenants.
 
-For web based dashboards, like the [Kubernetes Dashboard](https://github.com/kubernetes/dashboard), the `capsule-ns-filter` can be installed as sidecar container. See [Sidecar Installation](./sidecar.md).
+For web based dashboards, like the [Kubernetes Dashboard](https://github.com/kubernetes/dashboard), the `capsule-proxy` can be installed as sidecar container. See [Sidecar Installation](./sidecar.md).

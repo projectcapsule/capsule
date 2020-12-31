@@ -1,21 +1,21 @@
 # Sidecar Installation
-The `capsule-ns-filter` can be deployed as sidecar container for server-side Kubernetes dashboards. It will intercept all requests sent from the client side to the server-side of the dashboard and it will proxy them to the Kubernetes APIs server.
+The `capsule-proxy` can be deployed as sidecar container for server-side Kubernetes dashboards. It will intercept all requests sent from the client side to the server-side of the dashboard and it will proxy them to the Kubernetes APIs server.
 
 ```
-                                      capsule-ns-filter
-                                      +------------+
-                                      |:9001       +--------+
-                                      +------------+        v
-                +-----------+         |            |        +------------+
-browser +------>+:443       +-------->+:8443       |        |:6443       |
-                +-----------+         +------------+        +------------+
-                ingress-controller    dashboard             kube-apiserver
-                (ssl-passthrough)     server-side backend
+                                      capsule-proxy
+                                      +------------+        +------------+
+                                      |:9001       +------->|:6443       |
+                                      +------------+        +------------+
+                +-----------+         |            |        kube-apiserver
+browser +------>+:443       +-------->+:8443       |
+                +-----------+         +------------+ 
+                ingress-controller    dashboard backend            
+                (ssl-passthrough)     
 ```
 
-The server-side backend of the dashboard must leave to specify the URL of the Kubernetes APIs server. For example the [sidecar-setup.yaml](../deploy/sidecar-setup.yaml) manifest contains an example for deploying with [Kubernetes Dashboard](https://github.com/kubernetes/dashboard), and the ingress controller in ssl-passthrough mode.
+In order to use this pattern, the server-side backend of your dashboard must permit to specify the URL of the Kubernetes APIs server. For example, the following manifest contains an excerpt for deploying with [Kubernetes Dashboard](https://github.com/kubernetes/dashboard), and the Ingress Controller in ssl-passthrough mode.
 
-Place the `capsule-ns-filter` in a pod with SSL mode, i.e. `--enable-ssl=true` and passing valid certificate and key files in a secret.
+Place the `capsule-proxy` in a pod with SSL mode, i.e. `--enable-ssl=true` and passing valid certificate and key files in a secret.
 
 ```yaml
 ...
@@ -26,10 +26,10 @@ Place the `capsule-ns-filter` in a pod with SSL mode, i.e. `--enable-ssl=true` a
     spec:
       containers:
         - name: ns-filter
-          image: quay.io/clastix/capsule-ns-filter
+          image: quay.io/clastix/capsule-proxy
           imagePullPolicy: IfNotPresent 
           command:
-          - /capsule-ns-filter
+          - /capsule-proxy
           - --k8s-control-plane-url=https://kubernetes.default.svc
           - --capsule-user-group=capsule.clastix.io
           - --zap-log-level=5
@@ -46,7 +46,7 @@ Place the `capsule-ns-filter` in a pod with SSL mode, i.e. `--enable-ssl=true` a
 ...
 ```
 
-In the same pod, place the Kubernetes Dashboard in _"out-of-cluster"_ mode with `--apiserver-host=https://localhost:9001` to send all the requests to the `capsule-ns-filter` sidecar container:
+In the same pod, place the Kubernetes Dashboard in _"out-of-cluster"_ mode with `--apiserver-host=https://localhost:9001` to send all the requests to the `capsule-proxy` sidecar container:
 
 
 ```yaml
@@ -81,7 +81,7 @@ In the same pod, place the Kubernetes Dashboard in _"out-of-cluster"_ mode with 
 ...
 ```
 
-Make sure you pass a valid `kubeconfig` file to the dashboard pointing to the `capsule-ns-filter` sidecar container instead of the `kube-apiserver` directly:
+Make sure you pass a valid `kubeconfig` file to the dashboard pointing to the `capsule-proxy` sidecar container instead of the `kube-apiserver` directly:
 
 ```yaml
 apiVersion: v1
@@ -96,7 +96,7 @@ data:
     clusters:
     - cluster:
         insecure-skip-tls-verify: true
-        server: https://localhost:9001  # <- point to the capsule-ns-filter
+        server: https://localhost:9001  # <- point to the capsule-proxy
       name: localhost
     contexts:
     - context:
@@ -114,5 +114,5 @@ data:
 
 After starting the dashboard, login as a Tenant Owner user, e.g. `alice` according to the used authentication method, and check you can see only owned namespaces.
 
-The `capsule-ns-filter` can be deployed in standalone mode, e.g. running as a pod bridging any Kubernetes client, a command line tools like `kubectl`, to the `kube-apiserver`. See [Standalone Installation](./standalone.md).
+The `capsule-proxy` can be deployed in standalone mode, in order to be used with a command line tools like `kubectl`. See [Standalone Installation](./standalone.md).
 
