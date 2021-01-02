@@ -10,7 +10,7 @@ spec:
   owner:
     name: alice
     kind: User
-  ingressHostNames:
+  ingressHostnames:
      allowed:
      - *.oil.acmecorp.com
   ...
@@ -27,7 +27,7 @@ spec:
   owner:
     name: alice
     kind: User
-  ingressHostNames:
+  ingressHostnames:
      allowedRegex: "^oil-acmecorp.*$"
   ...
 ```

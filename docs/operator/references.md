@@ -10,7 +10,7 @@
     * [namespacesMetadata](#namespacesMetadata)
     * [servicesMetadata](#servicesMetadata)
     * [ingressClasses](#ingressClasses)
-    * [ingressHostNames](#ingressHostNames)
+    * [ingressHostnames](#ingressHostnames)
     * [storageClasses](#storageClasses)
     * [containerRegistries](#containerRegistries)
     * [additionalRoleBindings](#additionalRoleBindings)
@@ -225,8 +225,8 @@ metadata:
 ```
 Any tentative of tenant owner to use a not allowed _IngressClass_ will fail.
 
-#### ingressHostNames
-Field `ingressHostNames` specifies the allowed hostnames in _Ingresses_ for the given tenant.
+#### ingressHostnames
+Field `ingressHostnames` specifies the allowed hostnames in _Ingresses_ for the given tenant.
 
 ```yaml
 apiVersion: capsule.clastix.io/v1alpha1
@@ -234,7 +234,7 @@ kind: Tenant
 metadata:
   name: tenant
 spec:
-  ingressHostNames:
+  ingressHostnames:
      allowed:
      - <hostname>
      allowedRegex: <regex>

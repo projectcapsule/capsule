@@ -4,7 +4,7 @@
 Currently, the Capsule ecosystem comprises the following:
 
 * [Capsule Operator](./operator/overview.md)
-* [Capsule ns-filter](./ns-filter/overview.md)
+* [Capsule Proxy](./proxy/overview.md)
 * [Capsule Lens extension](lens-extension/overview.md)  Coming soon!
 
 ## Documents structure
@@ -13,7 +13,7 @@ docs
 ├── index.md
 ├── lens-extension
 │   └── overview.md
-├── ns-filter
+├── proxy
 │   ├── overview.md
 │   ├── sidecar.md
 │   └── standalone.md
