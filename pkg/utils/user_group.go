@@ -18,7 +18,6 @@ package utils
 
 import (
 	"sort"
-	"strings"
 )
 
 type UserGroupList []string
@@ -28,7 +27,7 @@ func (u UserGroupList) Len() int {
 }
 
 func (u UserGroupList) Less(i, j int) bool {
-	return strings.ToLower(u[i]) < strings.ToLower(u[j])
+	return u[i] < u[j]
 }
 
 func (u UserGroupList) Swap(i, j int) {
