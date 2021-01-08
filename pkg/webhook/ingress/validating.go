@@ -121,11 +121,11 @@ func (r *handler) ingressFromRequest(req admission.Request, decoder *admission.D
 	return
 }
 
-func (r *handler) validateIngress(ctx context.Context, apiClient client.Client, ingress Ingress) admission.Response {
+func (r *handler) validateIngress(ctx context.Context, c client.Client, ingress Ingress) admission.Response {
 	var valid, matched bool
 
 	tl := &v1alpha1.TenantList{}
-	if err := apiClient.List(ctx, tl, client.MatchingFieldsSelector{
+	if err := c.List(ctx, tl, client.MatchingFieldsSelector{
 		Selector: fields.OneTermEqualSelector(".status.namespaces", ingress.Namespace()),
 	}); err != nil {
 		return admission.Errored(http.StatusBadRequest, err)

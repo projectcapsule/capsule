@@ -77,16 +77,16 @@ var _ = Describe("creating a Namespace without a Tenant selector when user owns 
 	It("should fail", func() {
 		ns := NewNamespace("fail-ns")
 		By("user owns 2 tenants", func() {
-			EventuallyCreation(func() error { return k8sClient.Create(context.TODO(), t1) }).Should(Succeed())
-			EventuallyCreation(func() error { return k8sClient.Create(context.TODO(), t2) }).Should(Succeed())
+			EventuallyCreation(func() error { return k8sClient.Create(context.TODO(), t1)}).Should(Succeed())
+			EventuallyCreation(func() error { return k8sClient.Create(context.TODO(), t2)}).Should(Succeed())
 			NamespaceCreation(ns, t1, defaultTimeoutInterval).ShouldNot(Succeed())
 			NamespaceCreation(ns, t2, defaultTimeoutInterval).ShouldNot(Succeed())
 			Expect(k8sClient.Delete(context.TODO(), t1)).Should(Succeed())
 			Expect(k8sClient.Delete(context.TODO(), t2)).Should(Succeed())
 		})
 		By("group owns 2 tenants", func() {
-			EventuallyCreation(func() error { return k8sClient.Create(context.TODO(), t3) }).Should(Succeed())
-			EventuallyCreation(func() error { return k8sClient.Create(context.TODO(), t4) }).Should(Succeed())
+			EventuallyCreation(func() error { return k8sClient.Create(context.TODO(), t3)}).Should(Succeed())
+			EventuallyCreation(func() error { return k8sClient.Create(context.TODO(), t4)}).Should(Succeed())
 			NamespaceCreation(ns, t3, defaultTimeoutInterval).ShouldNot(Succeed())
 			NamespaceCreation(ns, t4, defaultTimeoutInterval).ShouldNot(Succeed())
 			Expect(k8sClient.Delete(context.TODO(), t3)).Should(Succeed())
@@ -94,10 +94,10 @@ var _ = Describe("creating a Namespace without a Tenant selector when user owns 
 		})
 		By("user and group owns 4 tenants", func() {
 			t1.ResourceVersion, t2.ResourceVersion, t3.ResourceVersion, t4.ResourceVersion = "", "", "", ""
-			EventuallyCreation(func() error { return k8sClient.Create(context.TODO(), t1) }).Should(Succeed())
-			EventuallyCreation(func() error { return k8sClient.Create(context.TODO(), t2) }).Should(Succeed())
-			EventuallyCreation(func() error { return k8sClient.Create(context.TODO(), t3) }).Should(Succeed())
-			EventuallyCreation(func() error { return k8sClient.Create(context.TODO(), t4) }).Should(Succeed())
+			EventuallyCreation(func() error { return k8sClient.Create(context.TODO(), t1)}).Should(Succeed())
+			EventuallyCreation(func() error { return k8sClient.Create(context.TODO(), t2)}).Should(Succeed())
+			EventuallyCreation(func() error { return k8sClient.Create(context.TODO(), t3)}).Should(Succeed())
+			EventuallyCreation(func() error { return k8sClient.Create(context.TODO(), t4)}).Should(Succeed())
 			NamespaceCreation(ns, t1, defaultTimeoutInterval).ShouldNot(Succeed())
 			NamespaceCreation(ns, t2, defaultTimeoutInterval).ShouldNot(Succeed())
 			NamespaceCreation(ns, t3, defaultTimeoutInterval).ShouldNot(Succeed())

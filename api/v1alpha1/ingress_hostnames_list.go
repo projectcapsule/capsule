@@ -18,7 +18,6 @@ package v1alpha1
 
 import (
 	"sort"
-	"strings"
 )
 
 type IngressHostnamesList []string
@@ -32,7 +31,7 @@ func (hostnames IngressHostnamesList) Swap(i, j int) {
 }
 
 func (hostnames IngressHostnamesList) Less(i, j int) bool {
-	return strings.ToLower(hostnames[i]) < strings.ToLower(hostnames[j])
+	return hostnames[i] < hostnames[j]
 }
 
 func (hostnames IngressHostnamesList) IsStringInList(value string) (ok bool) {
