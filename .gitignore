@@ -24,4 +24,5 @@ bin
 *~
 
 **/*.kubeconfig
+.DS_Store
 

@@ -70,7 +70,7 @@ var _ = Describe("creating a Namespace for a Tenant with additional metadata", f
 			Eventually(func() (ok bool) {
 				Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: ns.GetName()}, ns)).Should(Succeed())
 				for k, v := range tnt.Spec.NamespacesMetadata.AdditionalLabels {
-					if ok = Expect(ns.Labels).Should(HaveKeyWithValue(k, v)); !ok {
+					if ok, _ = HaveKeyWithValue(k, v).Match(ns.Labels); !ok {
 						return
 					}
 				}
@@ -81,7 +81,7 @@ var _ = Describe("creating a Namespace for a Tenant with additional metadata", f
 			Eventually(func() (ok bool) {
 				Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: ns.GetName()}, ns)).Should(Succeed())
 				for k, v := range tnt.Spec.NamespacesMetadata.AdditionalAnnotations {
-					if ok = Expect(ns.Annotations).Should(HaveKeyWithValue(k, v)); !ok {
+					if ok, _ = HaveKeyWithValue(k, v).Match(ns.Annotations); !ok {
 						return
 					}
 				}

@@ -163,7 +163,7 @@ func (r *TenantReconciler) pruningResources(ns string, keys []string, obj client
 	}
 
 	r.Log.Info("Pruning objects with label selector " + s.String())
-	err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		return r.DeleteAllOf(context.TODO(), obj, &client.DeleteAllOfOptions{
 			ListOptions: client.ListOptions{
 				LabelSelector: s,
@@ -172,11 +172,6 @@ func (r *TenantReconciler) pruningResources(ns string, keys []string, obj client
 			DeleteOptions: client.DeleteOptions{},
 		})
 	})
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
 
 // Serial ResourceQuota processing is expensive: using Go routines we can speed it up.
