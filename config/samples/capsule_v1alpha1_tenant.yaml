@@ -8,7 +8,7 @@ spec:
     allowed:
       - my.oil.acmecorp.com
       - my.gas.acmecorp.com
-    allowedRegex: "^.*clastix.io$"
+    allowedRegex: "^.*acmecorp.com$"
   ingressClasses:
     allowed:
       - default

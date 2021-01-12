@@ -40,17 +40,19 @@ func (i ingressClassForbidden) Error() string {
 }
 
 type ingressHostnameNotValid struct {
-	hostnames []string
-	spec      v1alpha1.IngressHostnamesSpec
+	invalidHostnames     []string
+	notMatchingHostnames []string
+	spec                 v1alpha1.IngressHostnamesSpec
 }
 
-func NewIngressHostnamesNotValid(hostnames []string, spec v1alpha1.IngressHostnamesSpec) error {
+func NewIngressHostnamesNotValid(invalidHostnames []string, notMatchingHostnames []string, spec v1alpha1.IngressHostnamesSpec) error {
 
-	return &ingressHostnameNotValid{hostnames: hostnames, spec: spec}
+	return &ingressHostnameNotValid{invalidHostnames: invalidHostnames, notMatchingHostnames: notMatchingHostnames, spec: spec}
 }
 
 func (i ingressHostnameNotValid) Error() string {
-	return fmt.Sprintf("Hostnames %s are not valid for the current Tenant%s", i.hostnames, appendHostnameError(i.spec))
+	return fmt.Sprintf("Hostnames %s are not valid for the current Tenant. Hostnames %s not matching for the current Tenant%s",
+		i.invalidHostnames, i.notMatchingHostnames, appendHostnameError(i.spec))
 }
 
 type ingressClassNotValid struct {

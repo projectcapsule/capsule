@@ -46,14 +46,18 @@ metadata:
     kubernetes.io/ingress.class: oil
 spec:
   rules:
-  - host: web.oil.acmecorp.com
-    http:
-      paths:
-      - backend:
-          serviceName: nginx
-          servicePort: 80
-        path: /
+    - host: web.oil.acmecorp.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: nginx
+                port:
+                  number: 80
 ```
+
 
 Any tentative of Alice to use a not valid hostname, e.g. `web.gas.acmecorp.org`, will fail.
 
