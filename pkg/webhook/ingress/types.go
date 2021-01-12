@@ -54,7 +54,6 @@ func (n NetworkingV1) Namespace() string {
 }
 
 func (n NetworkingV1) Hostnames() []string {
-
 	rules := n.Spec.Rules
 	var hostnames []string
 	for _, el := range rules {
@@ -85,7 +84,6 @@ func (n NetworkingV1Beta1) Namespace() string {
 }
 
 func (n NetworkingV1Beta1) Hostnames() []string {
-
 	rules := n.Spec.Rules
 	var hostnames []string
 	for _, rule := range rules {
@@ -114,9 +112,8 @@ func (e Extension) Namespace() string {
 	return e.GetNamespace()
 }
 
-func (n Extension) Hostnames() []string {
-
-	rules := n.Spec.Rules
+func (e Extension) Hostnames() []string {
+	rules := e.Spec.Rules
 	var hostnames []string
 	for _, el := range rules {
 		hostnames = append(hostnames, el.Host)

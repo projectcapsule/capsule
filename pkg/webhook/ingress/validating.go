@@ -162,9 +162,6 @@ func (r *handler) validateIngress(ctx context.Context, c client.Client, ingress 
 		return admission.Allowed("")
 	}
 
-	valid = false
-	matched = false
-
 	var invalidHostnames []string
 	hostnames := ingress.Hostnames()
 	if len(hostnames) > 0 {
