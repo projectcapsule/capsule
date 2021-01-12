@@ -57,8 +57,7 @@ func Handler() capsulewebhook.Handler {
 	return &handler{}
 }
 
-func (r *handler) OnCreate(client client.Client, decoder *admission.Decoder) capsulewebhook.Func {
-
+func (h *handler) OnCreate(client client.Client, decoder *admission.Decoder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) admission.Response {
 		tnt := &v1alpha1.Tenant{}
 		if err := decoder.Decode(req, tnt); err != nil {
@@ -88,6 +87,13 @@ func (r *handler) OnCreate(client client.Client, decoder *admission.Decoder) cap
 		if tnt.Spec.ContainerRegistries != nil && len(tnt.Spec.ContainerRegistries.AllowedRegex) > 0 {
 			if _, err := regexp.Compile(tnt.Spec.ContainerRegistries.AllowedRegex); err != nil {
 				return admission.Denied("Unable to compile containerRegistries allowedRegex")
+			}
+		}
+
+		// Validate ingressHostnames regexp
+		if tnt.Spec.IngressHostnames != nil && len(tnt.Spec.IngressHostnames.AllowedRegex) > 0 {
+			if _, err := regexp.Compile(tnt.Spec.IngressHostnames.AllowedRegex); err != nil {
+				return admission.Denied("Unable to compile ingressHostnames allowedRegex")
 			}
 		}
 
