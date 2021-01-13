@@ -163,7 +163,7 @@ func (r *handler) validateIngress(ctx context.Context, c client.Client, ingress 
 	hostnames := ingress.Hostnames()
 	if len(hostnames) > 0 {
 		for _, currentHostname := range hostnames {
-			isPresent := tnt.Spec.IngressHostnames.Allowed.IsStringInList(currentHostname)
+			isPresent := v1alpha1.IngressHostnamesList(tnt.Spec.IngressHostnames.Exact).IsStringInList(currentHostname)
 			if !isPresent {
 				invalidHostnames = append(invalidHostnames, currentHostname)
 			}
@@ -174,10 +174,10 @@ func (r *handler) validateIngress(ctx context.Context, c client.Client, ingress 
 	}
 
 	var notMatchingHostnames []string
-	allowedRegex := tnt.Spec.IngressHostnames.AllowedRegex
+	allowedRegex := tnt.Spec.IngressHostnames.Regex
 	if len(allowedRegex) > 0 {
 		for _, currentHostname := range hostnames {
-			matched, _ = regexp.MatchString(tnt.Spec.IngressHostnames.AllowedRegex, currentHostname)
+			matched, _ = regexp.MatchString(tnt.Spec.IngressHostnames.Regex, currentHostname)
 			if !matched {
 				notMatchingHostnames = append(notMatchingHostnames, currentHostname)
 			}

@@ -42,9 +42,9 @@ var _ = Describe("when Tenant handles Ingress hostnames", func() {
 				Name: "hostname",
 				Kind: "User",
 			},
-			IngressHostnames: &v1alpha1.IngressHostnamesSpec{
-				Allowed:      []string{"sigs.k8s.io", "operator.sdk", "domain.tld"},
-				AllowedRegex: `.*\.clastix\.io`,
+			IngressHostnames: &v1alpha1.AllowedListSpec{
+				Exact:      []string{"sigs.k8s.io", "operator.sdk", "domain.tld"},
+				Regex: `.*\.clastix\.io`,
 			},
 		},
 	}
@@ -165,7 +165,7 @@ var _ = Describe("when Tenant handles Ingress hostnames", func() {
 
 		if maj == 1 && min > 18 {
 			By("testing networking.k8s.io", func() {
-				for i, h := range tnt.Spec.IngressHostnames.Allowed {
+				for i, h := range tnt.Spec.IngressHostnames.Exact {
 					Eventually(func() (err error) {
 						obj := networkingIngress(fmt.Sprintf("allowed-networking-%d", i), h)
 						_, err = cs.NetworkingV1().Ingresses(ns.GetName()).Create(context.TODO(), obj, metav1.CreateOptions{})
@@ -177,7 +177,7 @@ var _ = Describe("when Tenant handles Ingress hostnames", func() {
 
 		if maj == 1 && min < 22 {
 			By("testing extensions", func() {
-				for i, h := range tnt.Spec.IngressHostnames.Allowed {
+				for i, h := range tnt.Spec.IngressHostnames.Exact {
 					Eventually(func() (err error) {
 						obj := extensionsIngress(fmt.Sprintf("allowed-extensions-%d", i), h)
 						_, err = cs.ExtensionsV1beta1().Ingresses(ns.GetName()).Create(context.TODO(), obj, metav1.CreateOptions{})

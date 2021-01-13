@@ -38,8 +38,8 @@ var _ = Describe("when a second Tenant contains an already declared allowed Ingr
 				Name: "first-user",
 				Kind: "User",
 			},
-			IngressHostnames: &v1alpha1.IngressHostnamesSpec{
-				Allowed: []string{"capsule.clastix.io", "docs.capsule.k8s", "42.clatix.io"},
+			IngressHostnames: &v1alpha1.AllowedListSpec{
+				Exact: []string{"capsule.clastix.io", "docs.capsule.k8s", "42.clatix.io"},
 			},
 		},
 	}
@@ -55,7 +55,7 @@ var _ = Describe("when a second Tenant contains an already declared allowed Ingr
 	})
 
 	It("should block creation if contains collided Ingress hostnames", func() {
-		for _, h := range tnt.Spec.IngressHostnames.Allowed {
+		for _, h := range tnt.Spec.IngressHostnames.Exact {
 			tnt2 := &v1alpha1.Tenant{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "second-ingress-hostnames",
@@ -65,8 +65,8 @@ var _ = Describe("when a second Tenant contains an already declared allowed Ingr
 						Name: "second-user",
 						Kind: "User",
 					},
-					IngressHostnames: &v1alpha1.IngressHostnamesSpec{
-						Allowed: []string{h},
+					IngressHostnames: &v1alpha1.AllowedListSpec{
+						Exact: []string{h},
 					},
 				},
 			}

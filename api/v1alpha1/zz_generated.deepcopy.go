@@ -252,7 +252,7 @@ func (in *TenantSpec) DeepCopyInto(out *TenantSpec) {
 	}
 	if in.IngressHostnames != nil {
 		in, out := &in.IngressHostnames, &out.IngressHostnames
-		*out = new(IngressHostnamesSpec)
+		*out = new(AllowedListSpec)
 		(*in).DeepCopyInto(*out)
 	}
 	if in.ContainerRegistries != nil {

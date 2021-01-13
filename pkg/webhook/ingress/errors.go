@@ -42,10 +42,10 @@ func (i ingressClassForbidden) Error() string {
 type ingressHostnameNotValid struct {
 	invalidHostnames     []string
 	notMatchingHostnames []string
-	spec                 v1alpha1.IngressHostnamesSpec
+	spec                 v1alpha1.AllowedListSpec
 }
 
-func NewIngressHostnamesNotValid(invalidHostnames []string, notMatchingHostnames []string, spec v1alpha1.IngressHostnamesSpec) error {
+func NewIngressHostnamesNotValid(invalidHostnames []string, notMatchingHostnames []string, spec v1alpha1.AllowedListSpec) error {
 	return &ingressHostnameNotValid{invalidHostnames: invalidHostnames, notMatchingHostnames: notMatchingHostnames, spec: spec}
 }
 
@@ -78,12 +78,12 @@ func appendClassError(spec v1alpha1.AllowedListSpec) (append string) {
 	return
 }
 
-func appendHostnameError(spec v1alpha1.IngressHostnamesSpec) (append string) {
-	if len(spec.Allowed) > 0 {
-		append += fmt.Sprintf(", specify one of the following (%s)", strings.Join(spec.Allowed, ", "))
+func appendHostnameError(spec v1alpha1.AllowedListSpec) (append string) {
+	if len(spec.Exact) > 0 {
+		append += fmt.Sprintf(", specify one of the following (%s)", strings.Join(spec.Exact, ", "))
 	}
-	if len(spec.AllowedRegex) > 0 {
-		append += fmt.Sprintf(", or matching the regex %s", spec.AllowedRegex)
+	if len(spec.Regex) > 0 {
+		append += fmt.Sprintf(", or matching the regex %s", spec.Regex)
 	}
 	return
 }

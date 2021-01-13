@@ -34,11 +34,11 @@ func (IngressHostnames) Field() string {
 }
 
 func (IngressHostnames) Func() client.IndexerFunc {
-	return func(object client.Object) []string {
+	return func(object client.Object) (out []string) {
 		tenant := object.(*v1alpha1.Tenant)
 		if tenant.Spec.IngressHostnames != nil {
-			return tenant.Spec.IngressHostnames.Allowed.DeepCopy()
+			out = append(out, tenant.Spec.IngressHostnames.Exact...)
 		}
-		return nil
+		return
 	}
 }

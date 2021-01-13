@@ -93,14 +93,14 @@ func (h *handler) OnCreate(clt client.Client, decoder *admission.Decoder) capsul
 		}
 
 		// Validate ingressHostnames regexp
-		if tnt.Spec.IngressHostnames != nil && len(tnt.Spec.IngressHostnames.AllowedRegex) > 0 {
-			if _, err := regexp.Compile(tnt.Spec.IngressHostnames.AllowedRegex); err != nil {
+		if tnt.Spec.IngressHostnames != nil && len(tnt.Spec.IngressHostnames.Regex) > 0 {
+			if _, err := regexp.Compile(tnt.Spec.IngressHostnames.Regex); err != nil {
 				return admission.Denied("Unable to compile ingressHostnames allowedRegex")
 			}
 		}
 
-		if tnt.Spec.IngressHostnames != nil && len(tnt.Spec.IngressHostnames.Allowed) > 0 {
-			for _, h := range tnt.Spec.IngressHostnames.Allowed {
+		if tnt.Spec.IngressHostnames != nil && len(tnt.Spec.IngressHostnames.Exact) > 0 {
+			for _, h := range tnt.Spec.IngressHostnames.Exact {
 				tl := &v1alpha1.TenantList{}
 				err := clt.List(ctx, tl, client.MatchingFieldsSelector{
 					Selector: fields.OneTermEqualSelector(".spec.ingressHostnames", h),
@@ -113,7 +113,7 @@ func (h *handler) OnCreate(clt client.Client, decoder *admission.Decoder) capsul
 				}
 			}
 
-			if _, err := regexp.Compile(tnt.Spec.IngressHostnames.AllowedRegex); err != nil {
+			if _, err := regexp.Compile(tnt.Spec.IngressHostnames.Regex); err != nil {
 				return admission.Denied("Unable to compile ingressHostnames allowedRegex")
 			}
 		}

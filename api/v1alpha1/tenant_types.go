@@ -50,7 +50,7 @@ type TenantSpec struct {
 	ServicesMetadata       AdditionalMetadata               `json:"servicesMetadata,omitempty"`
 	StorageClasses         *AllowedListSpec                 `json:"storageClasses,omitempty"`
 	IngressClasses         *AllowedListSpec                 `json:"ingressClasses,omitempty"`
-	IngressHostnames       *IngressHostnamesSpec            `json:"ingressHostnames,omitempty"`
+	IngressHostnames       *AllowedListSpec                 `json:"ingressHostnames,omitempty"`
 	ContainerRegistries    *AllowedListSpec                 `json:"containerRegistries,omitempty"`
 	NodeSelector           map[string]string                `json:"nodeSelector,omitempty"`
 	NetworkPolicies        []networkingv1.NetworkPolicySpec `json:"networkPolicies,omitempty"`
