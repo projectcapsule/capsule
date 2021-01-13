@@ -17,7 +17,7 @@ jobs:
         with:
           version: latest
           only-new-issues: false
-          args: --timeout 2m
+          args: --timeout 2m --config .golangci.yml
   diff:
     name: diff
     runs-on: ubuntu-18.04

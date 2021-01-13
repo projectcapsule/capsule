@@ -41,7 +41,7 @@ var _ = Describe("enforcing an allowed set of Service external IPs", func() {
 				Kind: "User",
 			},
 			ExternalServiceIPs: &v1alpha1.ExternalServiceIPs{
-				Allowed: []v1alpha1.AllowedIp{
+				Allowed: []v1alpha1.AllowedIP{
 					"10.20.0.0/16",
 					"192.168.1.2/32",
 				},

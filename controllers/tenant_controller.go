@@ -76,62 +76,62 @@ func (r TenantReconciler) Reconcile(ctx context.Context, request ctrl.Request) (
 			return reconcile.Result{}, nil
 		}
 		r.Log.Error(err, "Error reading the object")
-		return reconcile.Result{}, err
+		return
 	}
 
 	// Ensuring all namespaces are collected
 	r.Log.Info("Ensuring all Namespaces are collected")
-	if err := r.collectNamespaces(instance); err != nil {
+	if err = r.collectNamespaces(instance); err != nil {
 		r.Log.Error(err, "Cannot collect Namespace resources")
-		return reconcile.Result{}, err
+		return
 	}
 
-	r.Log.Info("Starting processing of Namespaces", "items", instance.Status.Namespaces.Len())
-	if err := r.syncNamespaces(instance); err != nil {
+	r.Log.Info("Starting processing of Namespaces", "items", len(instance.Status.Namespaces))
+	if err = r.syncNamespaces(instance); err != nil {
 		r.Log.Error(err, "Cannot sync Namespace items")
-		return reconcile.Result{}, err
+		return
 	}
 
 	r.Log.Info("Starting processing of Network Policies", "items", len(instance.Spec.NetworkPolicies))
-	if err := r.syncNetworkPolicies(instance); err != nil {
+	if err = r.syncNetworkPolicies(instance); err != nil {
 		r.Log.Error(err, "Cannot sync NetworkPolicy items")
-		return reconcile.Result{}, err
+		return
 	}
 
 	r.Log.Info("Starting processing of Node Selector")
-	if err := r.ensureNodeSelector(instance); err != nil {
+	if err = r.ensureNodeSelector(instance); err != nil {
 		r.Log.Error(err, "Cannot sync Namespaces Node Selector items")
-		return reconcile.Result{}, err
+		return
 	}
 
 	r.Log.Info("Starting processing of Limit Ranges", "items", len(instance.Spec.LimitRanges))
-	if err := r.syncLimitRanges(instance); err != nil {
+	if err = r.syncLimitRanges(instance); err != nil {
 		r.Log.Error(err, "Cannot sync LimitRange items")
-		return reconcile.Result{}, err
+		return
 	}
 
 	r.Log.Info("Starting processing of Resource Quotas", "items", len(instance.Spec.ResourceQuota))
-	if err := r.syncResourceQuotas(instance); err != nil {
+	if err = r.syncResourceQuotas(instance); err != nil {
 		r.Log.Error(err, "Cannot sync ResourceQuota items")
-		return reconcile.Result{}, err
+		return
 	}
 
 	r.Log.Info("Ensuring PSP for owner")
-	if err := r.syncAdditionalRoleBindings(instance); err != nil {
+	if err = r.syncAdditionalRoleBindings(instance); err != nil {
 		r.Log.Error(err, "Cannot sync additional Role Bindings items")
-		return reconcile.Result{}, err
+		return
 	}
 
 	r.Log.Info("Ensuring RoleBinding for owner")
-	if err := r.ownerRoleBinding(instance); err != nil {
+	if err = r.ownerRoleBinding(instance); err != nil {
 		r.Log.Error(err, "Cannot sync owner RoleBinding")
-		return reconcile.Result{}, err
+		return
 	}
 
 	r.Log.Info("Ensuring Namespace count")
-	if err := r.ensureNamespaceCount(instance); err != nil {
+	if err = r.ensureNamespaceCount(instance); err != nil {
 		r.Log.Error(err, "Cannot sync Namespace count")
-		return reconcile.Result{}, err
+		return
 	}
 
 	r.Log.Info("Tenant reconciling completed")
@@ -155,7 +155,8 @@ func (r *TenantReconciler) pruningResources(ns string, keys []string, obj client
 	s = s.Add(*exists)
 
 	if len(keys) > 0 {
-		notIn, err := labels.NewRequirement(capsuleLabel, selection.NotIn, keys)
+		var notIn *labels.Requirement
+		notIn, err = labels.NewRequirement(capsuleLabel, selection.NotIn, keys)
 		if err != nil {
 			return err
 		}
@@ -177,7 +178,7 @@ func (r *TenantReconciler) pruningResources(ns string, keys []string, obj client
 // Serial ResourceQuota processing is expensive: using Go routines we can speed it up.
 // In case of multiple errors these are logged properly, returning a generic error since we have to repush back the
 // reconciliation loop.
-func (r *TenantReconciler) resourceQuotasUpdate(resourceName corev1.ResourceName, actual, limit resource.Quantity, list ...corev1.ResourceQuota) (err error) {
+func (r *TenantReconciler) resourceQuotasUpdate(resourceName corev1.ResourceName, actual, limit resource.Quantity, list ...corev1.ResourceQuota) error {
 	g := errgroup.Group{}
 
 	for _, item := range list {
@@ -207,6 +208,7 @@ func (r *TenantReconciler) resourceQuotasUpdate(resourceName corev1.ResourceName
 		})
 	}
 
+	var err error
 	if err = g.Wait(); err != nil {
 		// We had an error and we mark the whole transaction as failed
 		// to process it another time according to the Tenant controller back-off factor.
@@ -475,27 +477,27 @@ func (r *TenantReconciler) syncNamespace(namespace string, tnt *capsulev1alpha1.
 		delete(a, capsulev1alpha1.AllowedRegistriesRegexpAnnotation)
 
 		if tnt.Spec.IngressClasses != nil {
-			if len(tnt.Spec.IngressClasses.Allowed) > 0 {
-				a[capsulev1alpha1.AvailableIngressClassesAnnotation] = strings.Join(tnt.Spec.IngressClasses.Allowed, ",")
+			if len(tnt.Spec.IngressClasses.Exact) > 0 {
+				a[capsulev1alpha1.AvailableIngressClassesAnnotation] = strings.Join(tnt.Spec.IngressClasses.Exact, ",")
 			}
-			if len(tnt.Spec.IngressClasses.AllowedRegex) > 0 {
-				a[capsulev1alpha1.AvailableIngressClassesRegexpAnnotation] = tnt.Spec.IngressClasses.AllowedRegex
+			if len(tnt.Spec.IngressClasses.Regex) > 0 {
+				a[capsulev1alpha1.AvailableIngressClassesRegexpAnnotation] = tnt.Spec.IngressClasses.Regex
 			}
 		}
 		if tnt.Spec.StorageClasses != nil {
-			if len(tnt.Spec.StorageClasses.Allowed) > 0 {
-				a[capsulev1alpha1.AvailableStorageClassesAnnotation] = strings.Join(tnt.Spec.StorageClasses.Allowed, ",")
+			if len(tnt.Spec.StorageClasses.Exact) > 0 {
+				a[capsulev1alpha1.AvailableStorageClassesAnnotation] = strings.Join(tnt.Spec.StorageClasses.Exact, ",")
 			}
-			if len(tnt.Spec.StorageClasses.AllowedRegex) > 0 {
-				a[capsulev1alpha1.AvailableStorageClassesRegexpAnnotation] = tnt.Spec.StorageClasses.AllowedRegex
+			if len(tnt.Spec.StorageClasses.Regex) > 0 {
+				a[capsulev1alpha1.AvailableStorageClassesRegexpAnnotation] = tnt.Spec.StorageClasses.Regex
 			}
 		}
 		if tnt.Spec.ContainerRegistries != nil {
-			if len(tnt.Spec.ContainerRegistries.Allowed) > 0 {
-				a[capsulev1alpha1.AllowedRegistriesAnnotation] = strings.Join(tnt.Spec.ContainerRegistries.Allowed, ",")
+			if len(tnt.Spec.ContainerRegistries.Exact) > 0 {
+				a[capsulev1alpha1.AllowedRegistriesAnnotation] = strings.Join(tnt.Spec.ContainerRegistries.Exact, ",")
 			}
-			if len(tnt.Spec.ContainerRegistries.AllowedRegex) > 0 {
-				a[capsulev1alpha1.AllowedRegistriesRegexpAnnotation] = tnt.Spec.ContainerRegistries.AllowedRegex
+			if len(tnt.Spec.ContainerRegistries.Regex) > 0 {
+				a[capsulev1alpha1.AllowedRegistriesRegexpAnnotation] = tnt.Spec.ContainerRegistries.Regex
 			}
 		}
 
@@ -509,10 +511,7 @@ func (r *TenantReconciler) syncNamespace(namespace string, tnt *capsulev1alpha1.
 		if l == nil {
 			l = make(map[string]string)
 		}
-		capsuleLabel, err := capsulev1alpha1.GetTypeLabel(&capsulev1alpha1.Tenant{})
-		if err != nil {
-			return err
-		}
+		capsuleLabel, _ := capsulev1alpha1.GetTypeLabel(&capsulev1alpha1.Tenant{})
 		l[capsuleLabel] = tnt.GetName()
 		if al := tnt.Spec.NamespacesMetadata.AdditionalLabels; al != nil {
 			for k, v := range al {
@@ -679,7 +678,7 @@ func (r *TenantReconciler) ensureNodeSelector(tenant *capsulev1alpha1.Tenant) (e
 
 func (r *TenantReconciler) ensureNamespaceCount(tenant *capsulev1alpha1.Tenant) error {
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		tenant.Status.Size = uint(tenant.Status.Namespaces.Len())
+		tenant.Status.Size = uint(len(tenant.Status.Namespaces))
 		found := &capsulev1alpha1.Tenant{}
 		if err := r.Client.Get(context.TODO(), types.NamespacedName{Name: tenant.GetName()}, found); err != nil {
 			return err

@@ -209,8 +209,10 @@ You can easily check them issuing the _Make_ recipe `golint`.
 
 ```
 # make golint
-golangci-lint run
+golangci-lint run -c .golangci.yml
 ```
+
+> Enabled linters and related options are defined in the [.golanci.yml file](../../.golangci.yml)
 
 ### goimports
 Also, the Go import statements must be sorted following the best practice:

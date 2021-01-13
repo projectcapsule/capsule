@@ -17,7 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
-	corev1 "k8s.io/api/core/v1"
+	"fmt"
 )
 
 const (
@@ -29,10 +29,10 @@ const (
 	AllowedRegistriesRegexpAnnotation       = "capsule.clastix.io/allowed-registries-regexp"
 )
 
-func UsedQuotaFor(resource corev1.ResourceName) string {
+func UsedQuotaFor(resource fmt.Stringer) string {
 	return "quota.capsule.clastix.io/used-" + resource.String()
 }
 
-func HardQuotaFor(resource corev1.ResourceName) string {
+func HardQuotaFor(resource fmt.Stringer) string {
 	return "quota.capsule.clastix.io/hard-" + resource.String()
 }

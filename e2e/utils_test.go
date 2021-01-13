@@ -60,7 +60,7 @@ func NamespaceCreation(ns *corev1.Namespace, t *v1alpha1.Tenant, timeout time.Du
 }
 
 func TenantNamespaceList(t *v1alpha1.Tenant, timeout time.Duration) AsyncAssertion {
-	return Eventually(func() v1alpha1.NamespaceList {
+	return Eventually(func() []string {
 		Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: t.GetName()}, t)).Should(Succeed())
 		return t.Status.Namespaces
 	}, timeout, defaultPollInterval)

@@ -41,12 +41,12 @@ var _ = Describe("when Tenant handles Ingress classes", func() {
 				Name: "ingress",
 				Kind: "User",
 			},
-			IngressClasses: &v1alpha1.IngressClassesSpec{
-				Allowed: []string{
+			IngressClasses: &v1alpha1.AllowedListSpec{
+				Exact: []string{
 					"nginx",
 					"haproxy",
 				},
-				AllowedRegex: "^oil-.*$",
+				Regex: "^oil-.*$",
 			},
 		},
 	}
@@ -132,7 +132,7 @@ var _ = Describe("when Tenant handles Ingress classes", func() {
 		NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(tnt, podRecreationTimeoutInterval).Should(ContainElement(ns.GetName()))
 
-		for _, c := range tnt.Spec.IngressClasses.Allowed {
+		for _, c := range tnt.Spec.IngressClasses.Exact {
 			Eventually(func() (err error) {
 				i := &extensionsv1beta1.Ingress{
 					ObjectMeta: metav1.ObjectMeta{
@@ -166,7 +166,7 @@ var _ = Describe("when Tenant handles Ingress classes", func() {
 		NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(tnt, podRecreationTimeoutInterval).Should(ContainElement(ns.GetName()))
 
-		for _, c := range tnt.Spec.IngressClasses.Allowed {
+		for _, c := range tnt.Spec.IngressClasses.Exact {
 			Eventually(func() (err error) {
 				i := &extensionsv1beta1.Ingress{
 					ObjectMeta: metav1.ObjectMeta{

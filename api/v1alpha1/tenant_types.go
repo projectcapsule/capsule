@@ -28,31 +28,16 @@ type AdditionalMetadata struct {
 	AdditionalAnnotations map[string]string `json:"additionalAnnotations,omitempty"`
 }
 
-type StorageClassesSpec struct {
-	Allowed      StorageClassList `json:"allowed,omitempty"`
-	AllowedRegex string           `json:"allowedRegex,omitempty"`
-}
-
-type IngressClassesSpec struct {
-	Allowed      IngressClassList `json:"allowed,omitempty"`
-	AllowedRegex string           `json:"allowedRegex,omitempty"`
-}
-
 type IngressHostnamesSpec struct {
 	Allowed      IngressHostnamesList `json:"allowed"`
 	AllowedRegex string               `json:"allowedRegex"`
 }
 
-type ContainerRegistriesSpec struct {
-	Allowed      RegistryList `json:"allowed,omitempty"`
-	AllowedRegex string       `json:"allowedRegex,omitempty"`
-}
-
 // +kubebuilder:validation:Pattern="^([0-9]{1,3}.){3}[0-9]{1,3}(/([0-9]|[1-2][0-9]|3[0-2]))?$"
-type AllowedIp string
+type AllowedIP string
 
 type ExternalServiceIPs struct {
-	Allowed []AllowedIp `json:"allowed"`
+	Allowed []AllowedIP `json:"allowed"`
 }
 
 // TenantSpec defines the desired state of Tenant
@@ -63,10 +48,10 @@ type TenantSpec struct {
 	NamespaceQuota         *int32                           `json:"namespaceQuota,omitempty"`
 	NamespacesMetadata     AdditionalMetadata               `json:"namespacesMetadata,omitempty"`
 	ServicesMetadata       AdditionalMetadata               `json:"servicesMetadata,omitempty"`
-	StorageClasses         *StorageClassesSpec              `json:"storageClasses,omitempty"`
-	IngressClasses         *IngressClassesSpec              `json:"ingressClasses,omitempty"`
-	IngressHostnames       *IngressHostnamesSpec            `json:"ingressHostnames,omitempty"`
-	ContainerRegistries    *ContainerRegistriesSpec         `json:"containerRegistries,omitempty"`
+	StorageClasses         *AllowedListSpec                 `json:"storageClasses,omitempty"`
+	IngressClasses         *AllowedListSpec                 `json:"ingressClasses,omitempty"`
+	IngressHostnames       *AllowedListSpec                 `json:"ingressHostnames,omitempty"`
+	ContainerRegistries    *AllowedListSpec                 `json:"containerRegistries,omitempty"`
 	NodeSelector           map[string]string                `json:"nodeSelector,omitempty"`
 	NetworkPolicies        []networkingv1.NetworkPolicySpec `json:"networkPolicies,omitempty"`
 	LimitRanges            []corev1.LimitRangeSpec          `json:"limitRanges,omitempty"`
@@ -96,8 +81,8 @@ func (k Kind) String() string {
 
 // TenantStatus defines the observed state of Tenant
 type TenantStatus struct {
-	Size       uint          `json:"size"`
-	Namespaces NamespaceList `json:"namespaces,omitempty"`
+	Size       uint     `json:"size"`
+	Namespaces []string `json:"namespaces,omitempty"`
 }
 
 // +kubebuilder:object:root=true

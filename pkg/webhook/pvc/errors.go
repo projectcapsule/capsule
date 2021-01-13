@@ -24,21 +24,21 @@ import (
 )
 
 type storageClassNotValid struct {
-	spec v1alpha1.StorageClassesSpec
+	spec v1alpha1.AllowedListSpec
 }
 
-func NewStorageClassNotValid(storageClasses v1alpha1.StorageClassesSpec) error {
+func NewStorageClassNotValid(storageClasses v1alpha1.AllowedListSpec) error {
 	return &storageClassNotValid{
 		spec: storageClasses,
 	}
 }
 
-func appendError(spec v1alpha1.StorageClassesSpec) (append string) {
-	if len(spec.Allowed) > 0 {
-		append += fmt.Sprintf(", one of the following (%s)", strings.Join(spec.Allowed, ", "))
+func appendError(spec v1alpha1.AllowedListSpec) (append string) {
+	if len(spec.Exact) > 0 {
+		append += fmt.Sprintf(", one of the following (%s)", strings.Join(spec.Exact, ", "))
 	}
-	if len(spec.AllowedRegex) > 0 {
-		append += fmt.Sprintf(", or matching the regex %s", spec.AllowedRegex)
+	if len(spec.Regex) > 0 {
+		append += fmt.Sprintf(", or matching the regex %s", spec.Regex)
 	}
 	return
 }
@@ -49,10 +49,10 @@ func (s storageClassNotValid) Error() (err string) {
 
 type storageClassForbidden struct {
 	className string
-	spec      v1alpha1.StorageClassesSpec
+	spec      v1alpha1.AllowedListSpec
 }
 
-func NewStorageClassForbidden(className string, storageClasses v1alpha1.StorageClassesSpec) error {
+func NewStorageClassForbidden(className string, storageClasses v1alpha1.AllowedListSpec) error {
 	return &storageClassForbidden{
 		className: className,
 		spec:      storageClasses,

@@ -14,30 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha1
+package namespacequota
 
-import (
-	"sort"
-	"strings"
-)
+type namespaceQuotaExceededError struct{}
 
-type IngressClassList []string
-
-func (n IngressClassList) Len() int {
-	return len(n)
+func NewNamespaceQuotaExceededError() error {
+	return &namespaceQuotaExceededError{}
 }
 
-func (n IngressClassList) Swap(i, j int) {
-	n[i], n[j] = n[j], n[i]
-}
-
-func (n IngressClassList) Less(i, j int) bool {
-	return strings.ToLower(n[i]) < strings.ToLower(n[j])
-}
-
-func (n IngressClassList) IsStringInList(value string) (ok bool) {
-	sort.Sort(n)
-	i := sort.SearchStrings(n, value)
-	ok = i < n.Len() && n[i] == value
-	return
+func (namespaceQuotaExceededError) Error() string {
+	return "Cannot exceed Namespace quota: please, reach out the system administrators"
 }

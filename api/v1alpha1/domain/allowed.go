@@ -14,14 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package namespace_quota
+package domain
 
-type namespaceQuotaExceededError struct{}
-
-func NewNamespaceQuotaExceededError() error {
-	return &namespaceQuotaExceededError{}
-}
-
-func (namespaceQuotaExceededError) Error() string {
-	return "Cannot exceed Namespace quota: please, reach out the system administrators"
+type AllowedList interface {
+	ExactMatch(value string) bool
+	RegexMatch(value string) bool
 }

@@ -17,6 +17,7 @@ limitations under the License.
 package secret
 
 import (
+	"bytes"
 	"context"
 	"crypto/x509"
 	"encoding/pem"
@@ -34,20 +35,20 @@ import (
 	"github.com/clastix/capsule/pkg/cert"
 )
 
-type TlsReconciler struct {
+type TLSReconciler struct {
 	client.Client
 	Log       logr.Logger
 	Scheme    *runtime.Scheme
 	Namespace string
 }
 
-func (r *TlsReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *TLSReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&corev1.Secret{}, forOptionPerInstanceName(tlsSecretName)).
 		Complete(r)
 }
 
-func (r TlsReconciler) Reconcile(ctx context.Context, request ctrl.Request) (ctrl.Result, error) {
+func (r TLSReconciler) Reconcile(ctx context.Context, request ctrl.Request) (ctrl.Result, error) {
 	var err error
 
 	r.Log = r.Log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
@@ -61,7 +62,7 @@ func (r TlsReconciler) Reconcile(ctx context.Context, request ctrl.Request) (ctr
 		return reconcile.Result{}, err
 	}
 
-	var ca cert.Ca
+	var ca cert.CA
 	var rq time.Duration
 
 	ca, err = getCertificateAuthority(r.Client, r.Namespace)
@@ -82,7 +83,8 @@ func (r TlsReconciler) Reconcile(ctx context.Context, request ctrl.Request) (ctr
 		rq = 6 * 30 * 24 * time.Hour
 
 		opts := cert.NewCertOpts(time.Now().Add(rq), "capsule-webhook-service.capsule-system.svc")
-		crt, key, err := ca.GenerateCertificate(opts)
+		var crt, key *bytes.Buffer
+		crt, key, err = ca.GenerateCertificate(opts)
 		if err != nil {
 			r.Log.Error(err, "Cannot generate new TLS certificate")
 			return reconcile.Result{}, err

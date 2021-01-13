@@ -37,7 +37,6 @@ type NetworkingV1 struct {
 }
 
 func (n NetworkingV1) IngressClass() (res *string) {
-
 	res = n.Spec.IngressClassName
 	if res == nil {
 		if a := n.GetAnnotations(); a != nil {
@@ -67,7 +66,6 @@ type NetworkingV1Beta1 struct {
 }
 
 func (n NetworkingV1Beta1) IngressClass() (res *string) {
-
 	res = n.Spec.IngressClassName
 	if res == nil {
 		if a := n.GetAnnotations(); a != nil {

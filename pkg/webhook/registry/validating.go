@@ -19,7 +19,6 @@ package registry
 import (
 	"context"
 	"net/http"
-	"regexp"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -81,13 +80,10 @@ func (h *handler) OnCreate(c client.Client, decoder *admission.Decoder) capsulew
 
 		if tnt.Spec.ContainerRegistries != nil {
 			var valid, matched bool
-			regex := regexp.MustCompile(tnt.Spec.ContainerRegistries.AllowedRegex)
 			for _, container := range pod.Spec.Containers {
 				r := domain.NewRegistry(container.Image)
-				valid = tnt.Spec.ContainerRegistries.Allowed.IsStringInList(r.Registry())
-				if len(tnt.Spec.ContainerRegistries.AllowedRegex) > 0 {
-					matched = regex.MatchString(r.Registry())
-				}
+				valid = tnt.Spec.ContainerRegistries.ExactMatch(r.Registry())
+				matched = tnt.Spec.ContainerRegistries.RegexMatch(r.Registry())
 				if !valid && !matched {
 					return admission.Errored(http.StatusBadRequest, NewContainerRegistryForbidden(container.Image, *tnt.Spec.ContainerRegistries))
 				}

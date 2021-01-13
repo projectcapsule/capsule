@@ -98,21 +98,21 @@ func (r *handler) ingressFromRequest(req admission.Request, decoder *admission.D
 	case "networking.k8s.io":
 		if req.Kind.Version == "v1" {
 			n := &networkingv1.Ingress{}
-			if err := decoder.Decode(req, n); err != nil {
-				return nil, err
+			if err = decoder.Decode(req, n); err != nil {
+				return
 			}
 			ingress = NetworkingV1{Ingress: n}
 			break
 		}
 		n := &networkingv1beta1.Ingress{}
-		if err := decoder.Decode(req, n); err != nil {
-			return nil, err
+		if err = decoder.Decode(req, n); err != nil {
+			return
 		}
 		ingress = NetworkingV1Beta1{Ingress: n}
 	case "extensions":
 		e := &extensionsv1beta1.Ingress{}
-		if err := decoder.Decode(req, e); err != nil {
-			return nil, err
+		if err = decoder.Decode(req, e); err != nil {
+			return
 		}
 		ingress = Extension{Ingress: e}
 	default:
@@ -146,13 +146,10 @@ func (r *handler) validateIngress(ctx context.Context, c client.Client, ingress 
 		return admission.Errored(http.StatusBadRequest, NewIngressClassNotValid(*tnt.Spec.IngressClasses))
 	}
 
-	if len(tnt.Spec.IngressClasses.Allowed) > 0 {
-		valid = tnt.Spec.IngressClasses.Allowed.IsStringInList(*ingressClass)
+	if len(tnt.Spec.IngressClasses.Exact) > 0 {
+		valid = tnt.Spec.IngressClasses.ExactMatch(*ingressClass)
 	}
-
-	if len(tnt.Spec.IngressClasses.AllowedRegex) > 0 {
-		matched, _ = regexp.MatchString(tnt.Spec.IngressClasses.AllowedRegex, *ingressClass)
-	}
+	matched = tnt.Spec.IngressClasses.RegexMatch(*ingressClass)
 
 	if !valid && !matched {
 		return admission.Errored(http.StatusBadRequest, NewIngressClassForbidden(*ingressClass, *tnt.Spec.IngressClasses))
@@ -166,7 +163,7 @@ func (r *handler) validateIngress(ctx context.Context, c client.Client, ingress 
 	hostnames := ingress.Hostnames()
 	if len(hostnames) > 0 {
 		for _, currentHostname := range hostnames {
-			isPresent := tnt.Spec.IngressHostnames.Allowed.IsStringInList(currentHostname)
+			isPresent := v1alpha1.IngressHostnamesList(tnt.Spec.IngressHostnames.Exact).IsStringInList(currentHostname)
 			if !isPresent {
 				invalidHostnames = append(invalidHostnames, currentHostname)
 			}
@@ -177,10 +174,10 @@ func (r *handler) validateIngress(ctx context.Context, c client.Client, ingress 
 	}
 
 	var notMatchingHostnames []string
-	allowedRegex := tnt.Spec.IngressHostnames.AllowedRegex
+	allowedRegex := tnt.Spec.IngressHostnames.Regex
 	if len(allowedRegex) > 0 {
 		for _, currentHostname := range hostnames {
-			matched, _ := regexp.MatchString(tnt.Spec.IngressHostnames.AllowedRegex, currentHostname)
+			matched, _ = regexp.MatchString(tnt.Spec.IngressHostnames.Regex, currentHostname)
 			if !matched {
 				notMatchingHostnames = append(notMatchingHostnames, currentHostname)
 			}
@@ -195,5 +192,4 @@ func (r *handler) validateIngress(ctx context.Context, c client.Client, ingress 
 	}
 
 	return admission.Allowed("")
-
 }

@@ -14,28 +14,36 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package service_labels
+package servicelabels
 
 import (
 	"github.com/go-logr/logr"
-	corev1 "k8s.io/api/core/v1"
+	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
-type EndpointsLabelsReconciler struct {
+type EndpointSlicesLabelsReconciler struct {
 	abstractServiceLabelsReconciler
 
-	Log logr.Logger
+	Log          logr.Logger
+	VersionMinor int
+	VersionMajor int
 }
 
-func (r *EndpointsLabelsReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *EndpointSlicesLabelsReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	r.scheme = mgr.GetScheme()
 	r.abstractServiceLabelsReconciler = abstractServiceLabelsReconciler{
-		obj:    &corev1.Endpoints{},
 		scheme: mgr.GetScheme(),
 		log:    r.Log,
 	}
 
+	if r.VersionMajor == 1 && r.VersionMinor <= 16 {
+		r.Log.Info("Skipping controller setup, as EndpointSlices are not supported on current kubernetes version", "VersionMajor", r.VersionMajor, "VersionMinor", r.VersionMinor)
+		return nil
+	}
+
+	r.abstractServiceLabelsReconciler.obj = &discoveryv1beta1.EndpointSlice{}
 	return ctrl.NewControllerManagedBy(mgr).
-		For(r.abstractServiceLabelsReconciler.obj, r.abstractServiceLabelsReconciler.forOptionPerInstanceName()).
+		For(r.obj, r.abstractServiceLabelsReconciler.forOptionPerInstanceName()).
 		Complete(r)
 }

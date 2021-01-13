@@ -17,27 +17,30 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"regexp"
 	"sort"
 	"strings"
 )
 
-type NamespaceList []string
-
-func (n NamespaceList) Len() int {
-	return len(n)
+type AllowedListSpec struct {
+	Exact []string `json:"allowed,omitempty"`
+	Regex string   `json:"allowedRegex,omitempty"`
 }
 
-func (n NamespaceList) Swap(i, j int) {
-	n[i], n[j] = n[j], n[i]
+func (in *AllowedListSpec) ExactMatch(value string) (ok bool) {
+	if len(in.Exact) > 0 {
+		sort.SliceStable(in.Exact, func(i, j int) bool {
+			return strings.ToLower(in.Exact[i]) < strings.ToLower(in.Exact[j])
+		})
+		i := sort.SearchStrings(in.Exact, value)
+		ok = i < len(in.Exact) && in.Exact[i] == value
+	}
+	return
 }
 
-func (n NamespaceList) Less(i, j int) bool {
-	return strings.ToLower(n[i]) < strings.ToLower(n[j])
-}
-
-func (n NamespaceList) IsStringInList(value string) (ok bool) {
-	sort.Sort(n)
-	i := sort.SearchStrings(n, value)
-	ok = i < n.Len() && n[i] == value
+func (in AllowedListSpec) RegexMatch(value string) (ok bool) {
+	if len(in.Regex) > 0 {
+		ok = regexp.MustCompile(in.Regex).MatchString(value)
+	}
 	return
 }

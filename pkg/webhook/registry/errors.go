@@ -25,10 +25,10 @@ import (
 
 type registryClassForbidden struct {
 	fqdi string
-	spec v1alpha1.ContainerRegistriesSpec
+	spec v1alpha1.AllowedListSpec
 }
 
-func NewContainerRegistryForbidden(image string, spec v1alpha1.ContainerRegistriesSpec) error {
+func NewContainerRegistryForbidden(image string, spec v1alpha1.AllowedListSpec) error {
 	return &registryClassForbidden{
 		fqdi: image,
 		spec: spec,
@@ -38,11 +38,11 @@ func NewContainerRegistryForbidden(image string, spec v1alpha1.ContainerRegistri
 func (f registryClassForbidden) Error() (err string) {
 	err = fmt.Sprintf("Container image %s registry is forbidden for the current Tenant: ", f.fqdi)
 	var extra []string
-	if len(f.spec.Allowed) > 0 {
-		extra = append(extra, fmt.Sprintf("use one from the following list (%s)", strings.Join(f.spec.Allowed, ", ")))
+	if len(f.spec.Exact) > 0 {
+		extra = append(extra, fmt.Sprintf("use one from the following list (%s)", strings.Join(f.spec.Exact, ", ")))
 	}
-	if len(f.spec.AllowedRegex) > 0 {
-		extra = append(extra, fmt.Sprintf(" use one matching the following regex (%s)", f.spec.AllowedRegex))
+	if len(f.spec.Regex) > 0 {
+		extra = append(extra, fmt.Sprintf(" use one matching the following regex (%s)", f.spec.Regex))
 	}
 	err += strings.Join(extra, " or ")
 	return

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package service_labels
+package servicelabels
 
 import "fmt"
 

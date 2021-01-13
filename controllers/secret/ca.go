@@ -37,20 +37,21 @@ import (
 	"github.com/clastix/capsule/pkg/cert"
 )
 
-type CaReconciler struct {
+type CAReconciler struct {
 	client.Client
 	Log       logr.Logger
 	Scheme    *runtime.Scheme
 	Namespace string
 }
 
-func (r *CaReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *CAReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&corev1.Secret{}, forOptionPerInstanceName(caSecretName)).
 		Complete(r)
 }
 
-func (r CaReconciler) UpdateValidatingWebhookConfiguration(caBundle []byte) error {
+//nolint:dupl
+func (r CAReconciler) UpdateValidatingWebhookConfiguration(caBundle []byte) error {
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
 		vw := &v1.ValidatingWebhookConfiguration{}
 		err = r.Get(context.TODO(), types.NamespacedName{Name: "capsule-validating-webhook-configuration"}, vw)
@@ -68,7 +69,8 @@ func (r CaReconciler) UpdateValidatingWebhookConfiguration(caBundle []byte) erro
 	})
 }
 
-func (r CaReconciler) UpdateMutatingWebhookConfiguration(caBundle []byte) error {
+//nolint:dupl
+func (r CAReconciler) UpdateMutatingWebhookConfiguration(caBundle []byte) error {
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
 		mw := &v1.MutatingWebhookConfiguration{}
 		err = r.Get(context.TODO(), types.NamespacedName{Name: "capsule-mutating-webhook-configuration"}, mw)
@@ -86,7 +88,7 @@ func (r CaReconciler) UpdateMutatingWebhookConfiguration(caBundle []byte) error 
 	})
 }
 
-func (r CaReconciler) Reconcile(ctx context.Context, request ctrl.Request) (ctrl.Result, error) {
+func (r CAReconciler) Reconcile(ctx context.Context, request ctrl.Request) (ctrl.Result, error) {
 	var err error
 
 	r.Log = r.Log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
@@ -100,7 +102,7 @@ func (r CaReconciler) Reconcile(ctx context.Context, request ctrl.Request) (ctrl
 		return reconcile.Result{}, err
 	}
 
-	var ca cert.Ca
+	var ca cert.CA
 	var rq time.Duration
 	ca, err = getCertificateAuthority(r.Client, r.Namespace)
 	if err != nil && errors.Is(err, MissingCaError{}) {
@@ -123,8 +125,8 @@ func (r CaReconciler) Reconcile(ctx context.Context, request ctrl.Request) (ctrl
 
 		var crt *bytes.Buffer
 		var key *bytes.Buffer
-		crt, _ = ca.CaCertificatePem()
-		key, _ = ca.CaPrivateKeyPem()
+		crt, _ = ca.CACertificatePem()
+		key, _ = ca.CAPrivateKeyPem()
 
 		instance.Data = map[string][]byte{
 			certSecretKey:       crt.Bytes(),
@@ -139,7 +141,7 @@ func (r CaReconciler) Reconcile(ctx context.Context, request ctrl.Request) (ctrl
 			return r.UpdateValidatingWebhookConfiguration(crt.Bytes())
 		})
 
-		if err := group.Wait(); err != nil {
+		if err = group.Wait(); err != nil {
 			return reconcile.Result{}, err
 		}
 	}

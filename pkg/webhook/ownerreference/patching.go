@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package owner_reference
+package ownerreference
 
 import (
 	"context"
@@ -32,7 +32,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	"github.com/clastix/capsule/api/v1alpha1"
 	capsulev1alpha1 "github.com/clastix/capsule/api/v1alpha1"
 	capsulewebhook "github.com/clastix/capsule/pkg/webhook"
 )
@@ -133,7 +132,7 @@ func (h *handler) OnCreate(clt client.Client, decoder *admission.Decoder) capsul
 		if h.forceTenantPrefix {
 			for _, tnt := range tenants {
 				if strings.HasPrefix(ns.GetName(), fmt.Sprintf("%s-", tnt.GetName())) {
-					return h.patchResponseForOwnerRef(&tnt, ns)
+					return h.patchResponseForOwnerRef(tnt.DeepCopy(), ns)
 				}
 			}
 			admission.Denied("The Namespace prefix used doesn't match any available Tenant")
@@ -167,8 +166,8 @@ func (h *handler) patchResponseForOwnerRef(tenant *capsulev1alpha1.Tenant, ns *c
 	return admission.PatchResponseFromRaw(o, c)
 }
 
-func (h *handler) listTenantsForOwnerKind(ctx context.Context, ownerKind string, ownerName string, clt client.Client) (*v1alpha1.TenantList, error) {
-	tl := &v1alpha1.TenantList{}
+func (h *handler) listTenantsForOwnerKind(ctx context.Context, ownerKind string, ownerName string, clt client.Client) (*capsulev1alpha1.TenantList, error) {
+	tl := &capsulev1alpha1.TenantList{}
 	f := client.MatchingFields{
 		".spec.owner.ownerkind": fmt.Sprintf("%s:%s", ownerKind, ownerName),
 	}
@@ -176,7 +175,7 @@ func (h *handler) listTenantsForOwnerKind(ctx context.Context, ownerKind string,
 	return tl, err
 }
 
-func (h *handler) isTenantOwner(os v1alpha1.OwnerSpec, userInfo authenticationv1.UserInfo) bool {
+func (h *handler) isTenantOwner(os capsulev1alpha1.OwnerSpec, userInfo authenticationv1.UserInfo) bool {
 	if os.Kind == "User" && userInfo.Username == os.Name {
 		return true
 	}

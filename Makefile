@@ -131,7 +131,7 @@ goimports:
 # Linting code as PR is expecting
 .PHONY: golint
 golint:
-	golangci-lint run
+	golangci-lint run -c .golangci.yml
 
 # Running e2e tests in a KinD instance
 .PHONY: e2e
