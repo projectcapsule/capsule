@@ -22,6 +22,7 @@ import (
 	"net/http"
 	"regexp"
 
+	"github.com/go-logr/logr"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	networkingv1 "k8s.io/api/networking/v1"
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
@@ -56,7 +57,9 @@ func (w *webhook) GetPath() string {
 	return "/validating-ingress"
 }
 
-type handler struct{}
+type handler struct {
+	Log logr.Logger
+}
 
 func Handler() capsulewebhook.Handler {
 	return &handler{}
@@ -64,23 +67,23 @@ func Handler() capsulewebhook.Handler {
 
 func (r *handler) OnCreate(client client.Client, decoder *admission.Decoder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) admission.Response {
-		i, err := r.ingressFromRequest(req, decoder)
+		ingress, err := r.ingressFromRequest(req, decoder)
 		if err != nil {
 			return admission.Errored(http.StatusBadRequest, err)
 		}
 
-		return r.validateIngress(ctx, client, i)
+		return r.validateIngress(ctx, client, ingress)
 	}
 }
 
 func (r *handler) OnUpdate(client client.Client, decoder *admission.Decoder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) admission.Response {
-		i, err := r.ingressFromRequest(req, decoder)
+		ingress, err := r.ingressFromRequest(req, decoder)
 		if err != nil {
 			return admission.Errored(http.StatusBadRequest, err)
 		}
 
-		return r.validateIngress(ctx, client, i)
+		return r.validateIngress(ctx, client, ingress)
 	}
 }
 
@@ -98,32 +101,32 @@ func (r *handler) ingressFromRequest(req admission.Request, decoder *admission.D
 			if err := decoder.Decode(req, n); err != nil {
 				return nil, err
 			}
-			ingress = NetworkingV1{n}
+			ingress = NetworkingV1{Ingress: n}
 			break
 		}
 		n := &networkingv1beta1.Ingress{}
 		if err := decoder.Decode(req, n); err != nil {
 			return nil, err
 		}
-		ingress = NetworkingV1Beta1{n}
+		ingress = NetworkingV1Beta1{Ingress: n}
 	case "extensions":
 		e := &extensionsv1beta1.Ingress{}
 		if err := decoder.Decode(req, e); err != nil {
 			return nil, err
 		}
-		ingress = Extension{e}
+		ingress = Extension{Ingress: e}
 	default:
 		err = fmt.Errorf("cannot recognize type %s", req.Kind.Group)
 	}
 	return
 }
 
-func (r *handler) validateIngress(ctx context.Context, c client.Client, object Ingress) admission.Response {
+func (r *handler) validateIngress(ctx context.Context, c client.Client, ingress Ingress) admission.Response {
 	var valid, matched bool
 
 	tl := &v1alpha1.TenantList{}
 	if err := c.List(ctx, tl, client.MatchingFieldsSelector{
-		Selector: fields.OneTermEqualSelector(".status.namespaces", object.Namespace()),
+		Selector: fields.OneTermEqualSelector(".status.namespaces", ingress.Namespace()),
 	}); err != nil {
 		return admission.Errored(http.StatusBadRequest, err)
 	}
@@ -138,7 +141,7 @@ func (r *handler) validateIngress(ctx context.Context, c client.Client, object I
 		return admission.Allowed("")
 	}
 
-	ingressClass := object.IngressClass()
+	ingressClass := ingress.IngressClass()
 	if ingressClass == nil {
 		return admission.Errored(http.StatusBadRequest, NewIngressClassNotValid(*tnt.Spec.IngressClasses))
 	}
@@ -153,6 +156,42 @@ func (r *handler) validateIngress(ctx context.Context, c client.Client, object I
 
 	if !valid && !matched {
 		return admission.Errored(http.StatusBadRequest, NewIngressClassForbidden(*ingressClass, *tnt.Spec.IngressClasses))
+	}
+
+	if tnt.Spec.IngressHostnames == nil {
+		return admission.Allowed("")
+	}
+
+	var invalidHostnames []string
+	hostnames := ingress.Hostnames()
+	if len(hostnames) > 0 {
+		for _, currentHostname := range hostnames {
+			isPresent := tnt.Spec.IngressHostnames.Allowed.IsStringInList(currentHostname)
+			if !isPresent {
+				invalidHostnames = append(invalidHostnames, currentHostname)
+			}
+		}
+		if len(invalidHostnames) == 0 {
+			valid = true
+		}
+	}
+
+	var notMatchingHostnames []string
+	allowedRegex := tnt.Spec.IngressHostnames.AllowedRegex
+	if len(allowedRegex) > 0 {
+		for _, currentHostname := range hostnames {
+			matched, _ := regexp.MatchString(tnt.Spec.IngressHostnames.AllowedRegex, currentHostname)
+			if !matched {
+				notMatchingHostnames = append(notMatchingHostnames, currentHostname)
+			}
+		}
+		if len(notMatchingHostnames) == 0 {
+			matched = true
+		}
+	}
+
+	if !valid && !matched {
+		return admission.Errored(http.StatusBadRequest, NewIngressHostnamesNotValid(invalidHostnames, notMatchingHostnames, *tnt.Spec.IngressHostnames))
 	}
 
 	return admission.Allowed("")

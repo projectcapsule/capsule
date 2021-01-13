@@ -132,6 +132,18 @@ spec:
                 allowedRegex:
                   type: string
               type: object
+            ingressHostnames:
+              properties:
+                allowed:
+                  items:
+                    type: string
+                  type: array
+                allowedRegex:
+                  type: string
+              required:
+                - allowed
+                - allowedRegex
+              type: object
             limitRanges:
               items:
                 description: LimitRangeSpec defines a min/max usage limit for resources

@@ -23,5 +23,6 @@ bin
 *.swo
 *~
 
-hack/*.kubeconfig
+**/*.kubeconfig
 .DS_Store
+

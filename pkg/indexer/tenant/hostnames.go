@@ -14,12 +14,31 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package indexer
+package tenant
 
-import "github.com/clastix/capsule/pkg/indexer/tenant"
+import (
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
-func init() {
-	AddToIndexerFuncs = append(AddToIndexerFuncs, tenant.IngressHostnames{})
-	AddToIndexerFuncs = append(AddToIndexerFuncs, tenant.NamespacesReference{})
-	AddToIndexerFuncs = append(AddToIndexerFuncs, tenant.OwnerReference{})
+	"github.com/clastix/capsule/api/v1alpha1"
+)
+
+type IngressHostnames struct {
+}
+
+func (IngressHostnames) Object() client.Object {
+	return &v1alpha1.Tenant{}
+}
+
+func (IngressHostnames) Field() string {
+	return ".spec.ingressHostnames"
+}
+
+func (IngressHostnames) Func() client.IndexerFunc {
+	return func(object client.Object) []string {
+		tenant := object.(*v1alpha1.Tenant)
+		if tenant.Spec.IngressHostnames != nil {
+			return tenant.Spec.IngressHostnames.Allowed.DeepCopy()
+		}
+		return nil
+	}
 }

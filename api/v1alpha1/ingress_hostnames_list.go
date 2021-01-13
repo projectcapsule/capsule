@@ -14,12 +14,29 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package indexer
+package v1alpha1
 
-import "github.com/clastix/capsule/pkg/indexer/tenant"
+import (
+	"sort"
+)
 
-func init() {
-	AddToIndexerFuncs = append(AddToIndexerFuncs, tenant.IngressHostnames{})
-	AddToIndexerFuncs = append(AddToIndexerFuncs, tenant.NamespacesReference{})
-	AddToIndexerFuncs = append(AddToIndexerFuncs, tenant.OwnerReference{})
+type IngressHostnamesList []string
+
+func (hostnames IngressHostnamesList) Len() int {
+	return len(hostnames)
+}
+
+func (hostnames IngressHostnamesList) Swap(i, j int) {
+	hostnames[i], hostnames[j] = hostnames[j], hostnames[i]
+}
+
+func (hostnames IngressHostnamesList) Less(i, j int) bool {
+	return hostnames[i] < hostnames[j]
+}
+
+func (hostnames IngressHostnamesList) IsStringInList(value string) (ok bool) {
+	sort.Sort(hostnames)
+	i := sort.SearchStrings(hostnames, value)
+	ok = i < hostnames.Len() && hostnames[i] == value
+	return
 }

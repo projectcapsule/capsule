@@ -18,9 +18,11 @@ package tenant
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"regexp"
 
+	"k8s.io/apimachinery/pkg/fields"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
@@ -57,7 +59,7 @@ func Handler() capsulewebhook.Handler {
 	return &handler{}
 }
 
-func (h *handler) OnCreate(client client.Client, decoder *admission.Decoder) capsulewebhook.Func {
+func (h *handler) OnCreate(clt client.Client, decoder *admission.Decoder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) admission.Response {
 		tnt := &v1alpha1.Tenant{}
 		if err := decoder.Decode(req, tnt); err != nil {
@@ -87,6 +89,32 @@ func (h *handler) OnCreate(client client.Client, decoder *admission.Decoder) cap
 		if tnt.Spec.ContainerRegistries != nil && len(tnt.Spec.ContainerRegistries.AllowedRegex) > 0 {
 			if _, err := regexp.Compile(tnt.Spec.ContainerRegistries.AllowedRegex); err != nil {
 				return admission.Denied("Unable to compile containerRegistries allowedRegex")
+			}
+		}
+
+		// Validate ingressHostnames regexp
+		if tnt.Spec.IngressHostnames != nil && len(tnt.Spec.IngressHostnames.AllowedRegex) > 0 {
+			if _, err := regexp.Compile(tnt.Spec.IngressHostnames.AllowedRegex); err != nil {
+				return admission.Denied("Unable to compile ingressHostnames allowedRegex")
+			}
+		}
+
+		if tnt.Spec.IngressHostnames != nil && len(tnt.Spec.IngressHostnames.Allowed) > 0 {
+			for _, h := range tnt.Spec.IngressHostnames.Allowed {
+				tl := &v1alpha1.TenantList{}
+				err := clt.List(ctx, tl, client.MatchingFieldsSelector{
+					Selector: fields.OneTermEqualSelector(".spec.ingressHostnames", h),
+				})
+				if err != nil {
+					return admission.Errored(http.StatusBadRequest, err)
+				}
+				if len(tl.Items) > 0 {
+					return admission.Denied(fmt.Sprintf("The allowed hostname %s is already used by the Tenant %s, cannot proceed", h, tl.Items[0].GetName()))
+				}
+			}
+
+			if _, err := regexp.Compile(tnt.Spec.IngressHostnames.AllowedRegex); err != nil {
+				return admission.Denied("Unable to compile ingressHostnames allowedRegex")
 			}
 		}
 

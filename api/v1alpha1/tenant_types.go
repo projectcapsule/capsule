@@ -38,6 +38,11 @@ type IngressClassesSpec struct {
 	AllowedRegex string           `json:"allowedRegex,omitempty"`
 }
 
+type IngressHostnamesSpec struct {
+	Allowed      IngressHostnamesList `json:"allowed"`
+	AllowedRegex string               `json:"allowedRegex"`
+}
+
 type ContainerRegistriesSpec struct {
 	Allowed      RegistryList `json:"allowed,omitempty"`
 	AllowedRegex string       `json:"allowedRegex,omitempty"`
@@ -60,6 +65,7 @@ type TenantSpec struct {
 	ServicesMetadata       AdditionalMetadata               `json:"servicesMetadata,omitempty"`
 	StorageClasses         *StorageClassesSpec              `json:"storageClasses,omitempty"`
 	IngressClasses         *IngressClassesSpec              `json:"ingressClasses,omitempty"`
+	IngressHostnames       *IngressHostnamesSpec            `json:"ingressHostnames,omitempty"`
 	ContainerRegistries    *ContainerRegistriesSpec         `json:"containerRegistries,omitempty"`
 	NodeSelector           map[string]string                `json:"nodeSelector,omitempty"`
 	NetworkPolicies        []networkingv1.NetworkPolicySpec `json:"networkPolicies,omitempty"`
