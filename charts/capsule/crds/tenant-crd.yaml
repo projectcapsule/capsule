@@ -140,9 +140,6 @@ spec:
                   type: array
                 allowedRegex:
                   type: string
-              required:
-                - allowed
-                - allowedRegex
               type: object
             limitRanges:
               items:
