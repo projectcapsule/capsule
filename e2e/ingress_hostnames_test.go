@@ -200,7 +200,7 @@ var _ = Describe("when Tenant handles Ingress hostnames", func() {
 			By("testing networking.k8s.io", func() {
 				for _, h := range []string{"foo", "bar", "bizz"} {
 					Eventually(func() (err error) {
-						obj := networkingIngress(fmt.Sprintf("allowed-networking-%s", h), h)
+						obj := networkingIngress(fmt.Sprintf("allowed-networking-%s", h), fmt.Sprintf("%s.clastix.io", h))
 						_, err = cs.NetworkingV1().Ingresses(ns.GetName()).Create(context.TODO(), obj, metav1.CreateOptions{})
 						return
 					}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
@@ -212,7 +212,7 @@ var _ = Describe("when Tenant handles Ingress hostnames", func() {
 			By("testing extensions", func() {
 				for _, h := range []string{"foo", "bar", "bizz"} {
 					Eventually(func() (err error) {
-						obj := extensionsIngress(fmt.Sprintf("allowed-extensions-%s", h), h)
+						obj := extensionsIngress(fmt.Sprintf("allowed-extensions-%s", h), fmt.Sprintf("%s.clastix.io", h))
 						_, err = cs.ExtensionsV1beta1().Ingresses(ns.GetName()).Create(context.TODO(), obj, metav1.CreateOptions{})
 						return
 					}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
