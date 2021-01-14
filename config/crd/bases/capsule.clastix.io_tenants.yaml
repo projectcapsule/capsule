@@ -41,6 +41,7 @@ spec:
     shortNames:
     - tnt
     singular: tenant
+  preserveUnknownFields: false
   scope: Cluster
   subresources:
     status: {}
