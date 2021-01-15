@@ -121,49 +121,40 @@ func (r *handler) ingressFromRequest(req admission.Request, decoder *admission.D
 	return
 }
 
-func (r *handler) validateIngress(ctx context.Context, c client.Client, ingress Ingress) admission.Response {
+func (r *handler) validateClass(tenant v1alpha1.Tenant, ingressClass *string) error {
+	if tenant.Spec.IngressClasses == nil {
+		return nil
+	}
+
+	if ingressClass == nil {
+		return NewIngressClassNotValid(*tenant.Spec.IngressClasses)
+	}
+
 	var valid, matched bool
 
-	tl := &v1alpha1.TenantList{}
-	if err := c.List(ctx, tl, client.MatchingFieldsSelector{
-		Selector: fields.OneTermEqualSelector(".status.namespaces", ingress.Namespace()),
-	}); err != nil {
-		return admission.Errored(http.StatusBadRequest, err)
+	if len(tenant.Spec.IngressClasses.Exact) > 0 {
+		valid = tenant.Spec.IngressClasses.ExactMatch(*ingressClass)
 	}
-
-	if len(tl.Items) == 0 {
-		return admission.Allowed("")
-	}
-
-	tnt := tl.Items[0]
-
-	if tnt.Spec.IngressClasses == nil {
-		return admission.Allowed("")
-	}
-
-	ingressClass := ingress.IngressClass()
-	if ingressClass == nil {
-		return admission.Errored(http.StatusBadRequest, NewIngressClassNotValid(*tnt.Spec.IngressClasses))
-	}
-
-	if len(tnt.Spec.IngressClasses.Exact) > 0 {
-		valid = tnt.Spec.IngressClasses.ExactMatch(*ingressClass)
-	}
-	matched = tnt.Spec.IngressClasses.RegexMatch(*ingressClass)
+	matched = tenant.Spec.IngressClasses.RegexMatch(*ingressClass)
 
 	if !valid && !matched {
-		return admission.Errored(http.StatusBadRequest, NewIngressClassForbidden(*ingressClass, *tnt.Spec.IngressClasses))
+		return NewIngressClassForbidden(*ingressClass, *tenant.Spec.IngressClasses)
 	}
 
-	if tnt.Spec.IngressHostnames == nil {
-		return admission.Allowed("")
+	return nil
+}
+
+func (r *handler) validateHostnames(tenant v1alpha1.Tenant, hostnames []string) error {
+	if tenant.Spec.IngressHostnames == nil {
+		return nil
 	}
+
+	var valid, matched bool
 
 	var invalidHostnames []string
-	hostnames := ingress.Hostnames()
 	if len(hostnames) > 0 {
 		for _, currentHostname := range hostnames {
-			isPresent := v1alpha1.IngressHostnamesList(tnt.Spec.IngressHostnames.Exact).IsStringInList(currentHostname)
+			isPresent := v1alpha1.IngressHostnamesList(tenant.Spec.IngressHostnames.Exact).IsStringInList(currentHostname)
 			if !isPresent {
 				invalidHostnames = append(invalidHostnames, currentHostname)
 			}
@@ -174,10 +165,10 @@ func (r *handler) validateIngress(ctx context.Context, c client.Client, ingress 
 	}
 
 	var notMatchingHostnames []string
-	allowedRegex := tnt.Spec.IngressHostnames.Regex
+	allowedRegex := tenant.Spec.IngressHostnames.Regex
 	if len(allowedRegex) > 0 {
 		for _, currentHostname := range hostnames {
-			matched, _ = regexp.MatchString(tnt.Spec.IngressHostnames.Regex, currentHostname)
+			matched, _ = regexp.MatchString(tenant.Spec.IngressHostnames.Regex, currentHostname)
 			if !matched {
 				notMatchingHostnames = append(notMatchingHostnames, currentHostname)
 			}
@@ -188,7 +179,31 @@ func (r *handler) validateIngress(ctx context.Context, c client.Client, ingress 
 	}
 
 	if !valid && !matched {
-		return admission.Errored(http.StatusBadRequest, NewIngressHostnamesNotValid(invalidHostnames, notMatchingHostnames, *tnt.Spec.IngressHostnames))
+		return NewIngressHostnamesNotValid(invalidHostnames, notMatchingHostnames, *tenant.Spec.IngressHostnames)
+	}
+
+	return nil
+}
+
+func (r *handler) validateIngress(ctx context.Context, c client.Client, ingress Ingress) admission.Response {
+	tl := &v1alpha1.TenantList{}
+	if err := c.List(ctx, tl, client.MatchingFieldsSelector{
+		Selector: fields.OneTermEqualSelector(".status.namespaces", ingress.Namespace()),
+	}); err != nil {
+		return admission.Errored(http.StatusBadRequest, err)
+	}
+
+	if len(tl.Items) == 0 {
+		return admission.Allowed("")
+	}
+	tnt := tl.Items[0]
+
+	if err := r.validateClass(tnt, ingress.IngressClass()); err != nil {
+		return admission.Errored(http.StatusBadRequest, err)
+	}
+
+	if err := r.validateHostnames(tnt, ingress.Hostnames()); err != nil {
+		return admission.Errored(http.StatusBadRequest, err)
 	}
 
 	return admission.Allowed("")
