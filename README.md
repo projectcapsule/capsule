@@ -14,15 +14,15 @@
 ---
 
 # Kubernetes multi-tenancy made simple
-**Capsule** helps to implement a multi-tenancy and policy-based environment in your Kubernetes cluster. It is not intended to be yet another _PaaS_, instead, it has been designed as a micro-services based ecosystem with minimalist approach, leveraging only on upstream Kubernetes. 
+**Capsule** helps to implement a multi-tenancy and policy-based environment in your Kubernetes cluster. It is not intended to be yet another _PaaS_, instead, it has been designed as a micro-services-based ecosystem with the minimalist approach, leveraging only on upstream Kubernetes.
 
 # What's the problem with the current status?
-Kubernetes introduces the _Namespace_ object type to create logical partitions of the cluster as isolated *slices*. However, implementing advanced multi-tenancy scenarios, it becomes soon complicated because of the flat structure of Kubernetes namespaces and the impossibility to share resources among namespaces belonging to the same tenant. To overcome this, cluster admins tend to provision a dedicated cluster for each groups of users, teams, or departments. As an organization grows, the number of clusters to manage and keep aligned becomes an operational nightmare, described as the well know phenomena of the _clusters sprawl_.
+Kubernetes introduces the _Namespace_ object type to create logical partitions of the cluster as isolated *slices*. However, implementing advanced multi-tenancy scenarios, it becomes soon complicated because of the flat structure of Kubernetes namespaces and the impossibility to share resources among namespaces belonging to the same tenant. To overcome this, cluster admins tend to provision a dedicated cluster for each group of users, teams, or departments. As an organization grows, the number of clusters to manage and keep aligned becomes an operational nightmare, described as the well know phenomena of the _clusters sprawl_.
 
 # Entering Capsule
-Capsule takes a different approach. In a single cluster, the Capsule Controller aggregates multiple namespaces in a lightweight abstraction called _Tenant_. Within each tenant, users are free to create their namespaces and share all the assigned resources while the Capsule Policy Engine keeps the different tenants isolated from each other.
+Capsule takes a different approach. In a single cluster, the Capsule Controller aggregates multiple namespaces in a lightweight abstraction called _Tenant_ basically a grouping of Kubernetes Namespaces. Within each tenant, users are free to create their namespaces and share all the assigned resources while the Capsule Policy Engine keeps the different tenants isolated from each other.
 
-The _Network and Security Policies_, _Resource Quota_, _Limit Ranges_, _RBAC_, and other policies defined at the tenant level are automatically inherited by all the namespaces in the tenant. And users are free to operate their tenants in authonomy, without the intervention of the cluster administrator. Take a look at following diagram:
+The _Network and Security Policies_, _Resource Quota_, _Limit Ranges_, _RBAC_, and other policies defined at the tenant level are automatically inherited by all the namespaces in the tenant. Then users are free to operate their tenants in autonomy, without the intervention of the cluster administrator. Take a look at following diagram:
 
 <p align="center" style="padding: 60px 20px">
   <img src="assets/capsule-operator.svg" />
@@ -42,7 +42,7 @@ Leverage Kubernetes Admission Controllers to enforce the industry security best 
 Take control of the resources consumed by users while preventing them to overtake.
 
 ## Native Experience
-Provide multi-tenancy with a native Kubernetes experience without introducing additional management layers, plugins, or customised binaries.
+Provide multi-tenancy with a native Kubernetes experience without introducing additional management layers, plugins, or customized binaries.
 
 ## GitOps ready
 Capsule is completely declarative and GitOps ready.
@@ -166,7 +166,7 @@ $ make remove
 ```
 
 # FAQ
-- Q. How to pronunce Capsule?
+- Q. How to pronounce Capsule?
 
   A. It should be pronounced as `/ˈkæpsjuːl/`.
 
@@ -180,7 +180,7 @@ $ make remove
 
 - Q. Does it work with my Kuberentes XYZ distribution?
 
-  A. We tested Capsule with vanilla Kubernetes 1.16+ on private envirnments and public clouds. We expect it works smootly on any other distribution. Please, let us know if you find it doesn't.
+  A. We tested Capsule with vanilla Kubernetes 1.16+ on private environments and public clouds. We expect it to work smoothly on any other k8s distribution. Please, let us know if you find it doesn't.
 
 - Q. Do you provide commercial support?
 
