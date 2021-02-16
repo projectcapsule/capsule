@@ -17,15 +17,15 @@ To simplify the usage of Capsule in this scenario, we'll work with the following
   Joe is responsible for developing a mission-critical project in the Oil market.
 
 * ***Bob***:
-  he is the head of Engineering for the Water Business Unit, the main and historichal line of business at Acme Corp. He is responsible for development, deployment, and operating multiple digital products in production for a large set of customers.
+  he is the head of Engineering for the main and historical line of business at Acme Corp, the Water Business Unit. He is responsible for development, deployment, and operating multiple digital products in production for a large set of customers.
 
 Bill, at Acme Corp. can use Capsule to address any of the following scenarios:
 
-* [Onboard a new tenant](./onboarding.md)
-* [Create namespaces](./create-namespaces.md)
-* [Assign permissions](./permissions.md)
-* [Enforce resources quota and limits](./resources-quota-limits.md)
-* [Assign a nodes pool](./nodes-pool.md)
+* [Onboard a New Tenant](./onboarding.md)
+* [Create Namespaces](./create-namespaces.md)
+* [Assign Permissions](./permissions.md)
+* [Enforce Resource Quotas and Limits](./resources-quota-limits.md)
+* [Assign a Node's Pool](./nodes-pool.md)
 * [Assign Ingress Classes](./ingress-classes.md)
 * [Assign Ingress Hostnames](./ingress-hostnames.md)
 * [Assign Storage Classes](./storage-classes.md)
@@ -33,8 +33,8 @@ Bill, at Acme Corp. can use Capsule to address any of the following scenarios:
 * [Assign Trusted Images Registries](./images-registries.md)
 * [Assign Pod Security Policies](./pod-security-policies.md)
 * [Create Custom Resources](./custom-resources.md)
-* [Taint namespaces](./taint-namespaces.md)
-* [Assign multiple tenants to an owner](./multiple-tenants.md)
+* [Taint Namespaces](./taint-namespaces.md)
+* [Assign Multiple Tenants to an Owner](./multiple-tenants.md)
 
 > NB: as we improve Capsule, more use cases about multi-tenancy and cluster governance will be covered.
 

@@ -1,4 +1,4 @@
-# Assign a nodes pool
+# Assign a node's pool
 Bill, the cluster admin, can dedicate a pool of worker nodes to the `oil` tenant, to isolate the tenant applications from other noisy neighbors.
 
 These nodes are labeled by Bill as `pool=oil`
