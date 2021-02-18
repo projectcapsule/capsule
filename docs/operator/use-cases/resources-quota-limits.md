@@ -1,5 +1,5 @@
 # Enforce resources quota and limits
-With help of Capsule, Bill, the cluster admin, can set and enforce resources quota and limits for the Alice's tenant
+With help of Capsule, Bill and the cluster admin can set and enforce resources quota and limits for the Alice's tenant
 
 ```yaml
 apiVersion: capsule.clastix.io/v1alpha1
@@ -199,7 +199,7 @@ PersistentVolumeClaim  storage   1Gi  10Gi  -                -              -
 
 Being the limit range specific of single resources, there is no aggregate to count.
 
-Having access to resource quota and limits, however, Alice is not able to change or delete it according to the assigned RBAC profile.
+Having access to resource quotas and limits, Alice still doesn't have permissions to change or delete the resources according to the assigned RBAC profile.
 
 ```
 alice@caas# kubectl -n oil-production auth can-i patch resourcequota
