@@ -17,7 +17,7 @@ spec:
   ...
 ```
 
-It is also possible to use regular expression for assigning Storage Classes:
+It is also possible to use a regular expression for assigning Storage Classes:
 
 ```yaml
 apiVersion: capsule.clastix.io/v1alpha1
@@ -63,7 +63,7 @@ spec:
       storage: 12Gi
 ```
 
-Any tentative of Alice to use a not valid Storage Class, e.g. `default`, will fail::
+Any attempt of Alice to use a non valid Storage Class, e.g. `default`, will fail::
 ```
 Error from server: error when creating persistent volume claim pvc:
 admission webhook "pvc.capsule.clastix.io" denied the request:
