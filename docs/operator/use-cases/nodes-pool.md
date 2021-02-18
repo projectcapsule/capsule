@@ -33,7 +33,7 @@ The Capsule controller makes sure that any namespace created in the tenant has t
 
 The effect is that all the pods deployed by Alice are placed only on the designated pool of nodes.
 
-Any tentative of Alice to change the selector on the pods will result in the following error from
+Any attempt of Alice to change the selector on the pods will result in the following error from
 the `PodNodeSelector` Admission Controller plugin:
 
 ```
