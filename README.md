@@ -182,7 +182,7 @@ $ make remove
 
 - Q. Does it work with my Kuberentes XYZ distribution?
 
-  A. We tested Capsule with vanilla Kubernetes 1.16+ on private environments and public clouds. We expect it to work smoothly on any other k8s distribution. Please, let us know if you find it doesn't.
+  A. We tested Capsule with vanilla Kubernetes 1.16+ on private environments and public clouds. We expect it to work smoothly on any other Kubernetes distribution. Please, let us know if you find it doesn't.
 
 - Q. Do you provide commercial support?
 
