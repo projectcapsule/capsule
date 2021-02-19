@@ -59,7 +59,7 @@ spec:
 ```
 
 
-Any tentative of Alice to use a not valid hostname, e.g. `web.gas.acmecorp.org`, will fail.
+Any attempt of Alice to use a non valid hostname, e.g. `web.gas.acmecorp.org`, will fail.
 
 # What’s next
 See how Bill, the cluster admin, can assign a Storage Class to Alice's tenant. [Assign Storage Classes](./storage-classes.md).

@@ -20,9 +20,9 @@ spec:
     allowedRegex: ''
 ```
 
-> In case of naked and official images hosted on Docker Hub, Capsule is going
+> In case of `non FQDI`  (non fully qualified Docker image) and official images hosted on Docker Hub, Capsule is going
 > to retrieve the registry even if it's not explicit: a `busybox:latest` Pod
-> running on a Tenant allowing `docker.io` will not blocked, even if the image
+> running on a Tenant allowing `docker.io` will not be blocked, even if the image
 > field is not explicit as `docker.io/busybox:latest`.
 
 
@@ -44,10 +44,10 @@ spec:
 
 A Pod running `internal.registry.foo.tld` as registry will be allowed, as well `internal.registry.bar.tld` since these are matching the regular expression.
 
-> You can also set a catch-all as .* to allow every kind of registry,
+> You can also set a catch-all regex entry as .* to allow every kind of registry,
 > that would be the same result of unsetting `containerRegistries` at all
 
-As per Ingress and Storage classes, also the allowed registries can be inspected from the Tenant's namespace
+As per Ingress and Storage classes the allowed registries can be inspected from the Tenant's namespace
 
 ```
 alice@caas# kubectl describe ns oil-production
@@ -60,4 +60,3 @@ Annotations:  capsule.clastix.io/allowed-registries: docker.io
 
 # What’s next
 See how Bill, the cluster admin, can assign Pod Security Policies to Alice's tenant. [Assign Pod Security Policies](./pod-security-policies.md).
-
