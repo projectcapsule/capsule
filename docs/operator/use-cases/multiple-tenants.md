@@ -1,5 +1,5 @@
 # Assign multiple tenants to an owner
-In some scenarios, it's likely that a single team is responsible for multiple lines of business. For example, in our sample organization Acme Corp., Alice is responsible for both the Oil and Gas lines of business. Ans it's more probable that Alice requires two different tenants, for example `oil` and `gas` to keep things isolated.
+In some scenarios, it's likely that a single team is responsible for multiple lines of business. For example, in our sample organization Acme Corp., Alice is responsible for both the Oil and Gas lines of business. It's more likely that Alice requires two different tenants, for example `oil` and `gas` to keep things isolated.
 
 By design, the Capsule operator does not permit hierarchy of tenants, since all tenants are at the same levels. However, we can assign the ownership of multiple tenants to the same user or group of users.
 
