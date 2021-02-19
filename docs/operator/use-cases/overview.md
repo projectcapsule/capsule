@@ -16,6 +16,7 @@ To simplify the usage of Capsule in this scenario, we'll work with the following
   he works at Acme Corp, as a lead developer of a distributed team in Alice's organization. Joe is responsible for developing a mission-critical project in the Oil market.
 
 * ***Bob***:
+
   he is the head of Engineering for the Water Business Unit, the main and historical line of business at Acme Corp. He is responsible for development, deployment, and operating multiple digital products in production for a large set of customers.
 
 Bill, at Acme Corp. can use Capsule to address any of the following scenarios:
@@ -33,6 +34,7 @@ Bill, at Acme Corp. can use Capsule to address any of the following scenarios:
 * [Assign Pod Security Policies](./pod-security-policies.md)
 * [Create Custom Resources](./custom-resources.md)
 * [Taint Namespaces](./taint-namespaces.md)
+
 * [Assign multiple Tenants to an owner](./multiple-tenants.md)
 
 > NB: as we improve Capsule, more use cases about multi-tenancy and cluster governance will be covered.
