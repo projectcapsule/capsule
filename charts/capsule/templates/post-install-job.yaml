@@ -28,7 +28,7 @@ spec:
       restartPolicy: Never
       containers:
       - name: post-install-job
-        image: {{ .Values.jobs.image.repository }}:{{ .Values.jobs.image.tag }}
+        image: {{ include "capsule.jobsFullyQualifiedDockerImage" . }}
         imagePullPolicy: {{ .Values.jobs.image.pullPolicy }}
         command: ["sh", "-c", "{{ $cmd }}"]
         env:

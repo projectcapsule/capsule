@@ -52,7 +52,7 @@ spec:
           {{ if .Values.manager.options.forceTenantPrefix }}- --force-tenant-prefix={{ .Values.manager.options.forceTenantPrefix }}{{ end }}
           {{ if .Values.manager.options.capsuleUserGroup }}- --capsule-user-group={{ .Values.manager.options.capsuleUserGroup }}{{ end }}
           {{ if .Values.manager.options.protectedNamespaceRegex }}- --protected-namespace-regex={{ .Values.manager.options.protectedNamespaceRegex }}{{ end }}
-          image: {{ include "capsule.fullyQualifiedDockerImage" . }}
+          image: {{ include "capsule.managerFullyQualifiedDockerImage" . }}
           imagePullPolicy: {{ .Values.manager.image.pullPolicy }}
           env:
           - name: NAMESPACE
@@ -80,7 +80,7 @@ spec:
           securityContext:
             allowPrivilegeEscalation: false
         - name: kube-rbac-proxy
-          image: {{ .Values.proxy.image.repository }}:{{ .Values.proxy.image.tag }}
+          image: {{ include "capsule.proxyFullyQualifiedDockerImage" . }}
           imagePullPolicy: {{ .Values.proxy.image.pullPolicy }}
           args:
           - --secure-listen-address=0.0.0.0:8443
