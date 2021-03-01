@@ -62,10 +62,24 @@ Create the name of the service account to use
 {{- end }}
 
 {{/*
-Create the fully-qualified Docker image to use
+Create the manager fully-qualified Docker image to use
 */}}
-{{- define "capsule.fullyQualifiedDockerImage" -}}
+{{- define "capsule.managerFullyQualifiedDockerImage" -}}
 {{- printf "%s:%s" .Values.manager.image.repository ( .Values.manager.image.tag | default (printf "v%s" .Chart.AppVersion) ) -}}
+{{- end }}
+
+{{/*
+Create the proxy fully-qualified Docker image to use
+*/}}
+{{- define "capsule.proxyFullyQualifiedDockerImage" -}}
+{{- printf "%s:%s" .Values.proxy.image.repository .Values.proxy.image.tag -}}
+{{- end }}
+
+{{/*
+Create the jobs fully-qualified Docker image to use
+*/}}
+{{- define "capsule.jobsFullyQualifiedDockerImage" -}}
+{{- printf "%s:%s" .Values.jobs.image.repository .Values.jobs.image.tag -}}
 {{- end }}
 
 {{/*
