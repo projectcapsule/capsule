@@ -81,7 +81,7 @@ spec:
             allowPrivilegeEscalation: false
         - name: kube-rbac-proxy
           image: {{ .Values.proxy.image.repository }}:{{ .Values.proxy.image.tag }}
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: {{ .Values.proxy.image.pullPolicy }}
           args:
           - --secure-listen-address=0.0.0.0:8443
           - --upstream=http://127.0.0.1:8080/

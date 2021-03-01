@@ -28,7 +28,8 @@ spec:
       restartPolicy: Never
       containers:
       - name: post-install-job
-        image: "bitnami/kubectl:1.18"
+        image: {{ .Values.jobs.image.repository }}:{{ .Values.jobs.image.tag }}
+        imagePullPolicy: {{ .Values.jobs.image.pullPolicy }}
         command: ["sh", "-c", "{{ $cmd }}"]
         env:
         - name: NAMESPACE
