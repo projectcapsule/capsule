@@ -464,7 +464,8 @@ func (r *TenantReconciler) syncNamespace(namespace string, tnt *capsulev1alpha1.
 		if err = r.Client.Get(context.TODO(), types.NamespacedName{Name: namespace}, ns); err != nil {
 			return
 		}
-		a := ns.GetAnnotations()
+
+		a := tnt.Spec.NamespacesMetadata.AdditionalAnnotations
 		if a == nil {
 			a = make(map[string]string)
 		}
@@ -475,7 +476,7 @@ func (r *TenantReconciler) syncNamespace(namespace string, tnt *capsulev1alpha1.
 		delete(a, capsulev1alpha1.AvailableStorageClassesRegexpAnnotation)
 		delete(a, capsulev1alpha1.AllowedRegistriesAnnotation)
 		delete(a, capsulev1alpha1.AllowedRegistriesRegexpAnnotation)
-
+		// assigning back Capsule annotations, if required
 		if tnt.Spec.IngressClasses != nil {
 			if len(tnt.Spec.IngressClasses.Exact) > 0 {
 				a[capsulev1alpha1.AvailableIngressClassesAnnotation] = strings.Join(tnt.Spec.IngressClasses.Exact, ",")
@@ -500,27 +501,15 @@ func (r *TenantReconciler) syncNamespace(namespace string, tnt *capsulev1alpha1.
 				a[capsulev1alpha1.AllowedRegistriesRegexpAnnotation] = tnt.Spec.ContainerRegistries.Regex
 			}
 		}
+		ns.SetAnnotations(a)
 
-		if aa := tnt.Spec.NamespacesMetadata.AdditionalAnnotations; aa != nil {
-			for k, v := range aa {
-				a[k] = v
-			}
-		}
-
-		l := ns.GetLabels()
+		l := tnt.Spec.NamespacesMetadata.AdditionalLabels
 		if l == nil {
 			l = make(map[string]string)
 		}
 		capsuleLabel, _ := capsulev1alpha1.GetTypeLabel(&capsulev1alpha1.Tenant{})
 		l[capsuleLabel] = tnt.GetName()
-		if al := tnt.Spec.NamespacesMetadata.AdditionalLabels; al != nil {
-			for k, v := range al {
-				l[k] = v
-			}
-		}
-
 		ns.SetLabels(l)
-		ns.SetAnnotations(a)
 
 		return r.Client.Update(context.TODO(), ns, &client.UpdateOptions{})
 	})
