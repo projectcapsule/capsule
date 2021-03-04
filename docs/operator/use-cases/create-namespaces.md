@@ -90,7 +90,7 @@ Once the namespace quota assigned to the tenant has been reached, Alice cannot c
 
 ```
 alice@caas# kubectl create ns oil-training
-Error from server (Cannot exceed Namespace quota: please, reach out the system administrators): admission webhook "quota.namespace.capsule.clastix.io" denied the request.
+Error from server (Cannot exceed Namespace quota: please, reach out to the system administrators): admission webhook "quota.namespace.capsule.clastix.io" denied the request.
 ```
 The enforcement on the maximum number of Namespace resources per Tenant is the responsibility of the Capsule controller via its Dynamic Admission Webhook capability.
 

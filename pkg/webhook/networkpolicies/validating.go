@@ -82,7 +82,7 @@ func (r *handler) OnDelete(client client.Client, decoder *admission.Decoder) cap
 			return admission.Errored(http.StatusInternalServerError, err)
 		}
 		if ok {
-			return admission.Denied("Capsule Network Policies cannot be deleted: please, reach out the system administrators")
+			return admission.Denied("Capsule Network Policies cannot be deleted: please, reach out to the system administrators")
 		}
 
 		return admission.Allowed("")
@@ -102,7 +102,7 @@ func (r *handler) OnUpdate(client client.Client, decoder *admission.Decoder) cap
 			return admission.Errored(http.StatusInternalServerError, err)
 		}
 		if ok {
-			return admission.Denied("Capsule Network Policies cannot be updated: please, reach out the system administrators")
+			return admission.Denied("Capsule Network Policies cannot be updated: please, reach out to the system administrators")
 		}
 
 		return admission.Allowed("")

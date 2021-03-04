@@ -96,7 +96,7 @@ However, the Capsule controller prevents Alice to delete the tenant network poli
 
 ```
 alice@caas# kubectl -n oil-production delete networkpolicy capsule-oil-0
-Error from server (Capsule Network Policies cannot be deleted: please, reach out the system administrators): admission webhook "validating.network-policy.capsule.clastix.io" denied the request: Capsule Network Policies cannot be deleted: please, reach out the system administrators
+Error from server (Capsule Network Policies cannot be deleted: please, reach out to the system administrators): admission webhook "validating.network-policy.capsule.clastix.io" denied the request: Capsule Network Policies cannot be deleted: please, reach out to the system administrators
 ```
 
 # What’s next
