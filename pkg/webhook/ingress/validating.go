@@ -22,7 +22,7 @@ import (
 	"net/http"
 	"regexp"
 
-	"github.com/go-logr/logr"
+	"github.com/pkg/errors"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	networkingv1 "k8s.io/api/networking/v1"
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
@@ -58,11 +58,11 @@ func (w *webhook) GetPath() string {
 }
 
 type handler struct {
-	Log logr.Logger
+	allowHostnamesCollision bool
 }
 
-func Handler() capsulewebhook.Handler {
-	return &handler{}
+func Handler(allowIngressHostnamesCollision bool) capsulewebhook.Handler {
+	return &handler{allowHostnamesCollision: allowIngressHostnamesCollision}
 }
 
 func (r *handler) OnCreate(client client.Client, decoder *admission.Decoder) capsulewebhook.Func {
@@ -206,5 +206,74 @@ func (r *handler) validateIngress(ctx context.Context, c client.Client, ingress 
 		return admission.Errored(http.StatusBadRequest, err)
 	}
 
+	if err := r.validateCollision(ctx, c, ingress); err != nil {
+		return admission.Errored(http.StatusBadRequest, err)
+	}
+
 	return admission.Allowed("")
+}
+
+func (r *handler) validateCollision(ctx context.Context, clt client.Client, ingress Ingress) error {
+	if r.allowHostnamesCollision {
+		return nil
+	}
+	for _, hostname := range ingress.Hostnames() {
+		collisionErr := NewIngressHostnameCollision(hostname)
+		var err error
+		// Listing for networking.k8s.io/v1 Ingress resources
+		nl := &networkingv1.IngressList{}
+		err = clt.List(ctx, nl, client.MatchingFieldsSelector{
+			Selector: fields.OneTermEqualSelector(".spec.rules[*].host", hostname),
+		})
+		if err != nil {
+			return errors.Wrap(err, "cannot list *networkingv1.IngressList by MatchingFieldsSelector")
+		}
+		switch len(nl.Items) {
+		case 0:
+			continue
+		case 1:
+			if nl.Items[0].GetName() != ingress.Name() {
+				return collisionErr
+			}
+		default:
+			return collisionErr
+		}
+		// Listing for networking.k8s.io/v1beta1 Ingress resources
+		nlb := &networkingv1beta1.IngressList{}
+		err = clt.List(ctx, nlb, client.MatchingFieldsSelector{
+			Selector: fields.OneTermEqualSelector(".spec.rules[*].host", hostname),
+		})
+		if err != nil {
+			return errors.Wrap(err, "cannot list *networkingv1beta1.IngressList by MatchingFieldsSelector")
+		}
+		switch len(nlb.Items) {
+		case 0:
+			continue
+		case 1:
+			if nlb.Items[0].GetName() != ingress.Name() {
+				return collisionErr
+			}
+		default:
+			return collisionErr
+		}
+		// Listing for extensions.k8s.io Ingress resources
+		el := &extensionsv1beta1.IngressList{}
+		err = clt.List(ctx, nl, client.MatchingFieldsSelector{
+			Selector: fields.OneTermEqualSelector(".spec.rules[*].host", hostname),
+		})
+		if err != nil {
+			return err
+		}
+		switch len(el.Items) {
+		case 0:
+			continue
+		case 1:
+			if el.Items[0].GetName() != ingress.Name() {
+				return collisionErr
+			}
+		default:
+			return collisionErr
+		}
+	}
+	return nil
 }
