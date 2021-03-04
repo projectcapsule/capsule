@@ -23,5 +23,5 @@ func NewNamespaceQuotaExceededError() error {
 }
 
 func (namespaceQuotaExceededError) Error() string {
-	return "Cannot exceed Namespace quota: please, reach out the system administrators"
+	return "Cannot exceed Namespace quota: please, reach out to the system administrators"
 }

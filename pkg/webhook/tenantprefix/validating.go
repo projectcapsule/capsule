@@ -76,7 +76,7 @@ func (r *handler) OnCreate(clt client.Client, decoder *admission.Decoder) capsul
 		}
 		if r.protectedNamespacesRegex != nil {
 			if matched := r.protectedNamespacesRegex.MatchString(ns.GetName()); matched {
-				return admission.Denied("Creating namespaces with name matching " + r.protectedNamespacesRegex.String() + " regexp is not allowed; please, reach out the system administrators")
+				return admission.Denied("Creating namespaces with name matching " + r.protectedNamespacesRegex.String() + " regexp is not allowed; please, reach out to the system administrators")
 			}
 		}
 
