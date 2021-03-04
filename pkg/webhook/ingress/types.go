@@ -29,11 +29,16 @@ const (
 type Ingress interface {
 	IngressClass() *string
 	Namespace() string
+	Name() string
 	Hostnames() []string
 }
 
 type NetworkingV1 struct {
 	*networkingv1.Ingress
+}
+
+func (n NetworkingV1) Name() string {
+	return n.GetName()
 }
 
 func (n NetworkingV1) IngressClass() (res *string) {
@@ -65,6 +70,10 @@ type NetworkingV1Beta1 struct {
 	*networkingv1beta.Ingress
 }
 
+func (n NetworkingV1Beta1) Name() string {
+	return n.GetName()
+}
+
 func (n NetworkingV1Beta1) IngressClass() (res *string) {
 	res = n.Spec.IngressClassName
 	if res == nil {
@@ -92,6 +101,10 @@ func (n NetworkingV1Beta1) Hostnames() []string {
 
 type Extension struct {
 	*extensionsv1beta1.Ingress
+}
+
+func (e Extension) Name() string {
+	return e.GetName()
 }
 
 func (e Extension) IngressClass() (res *string) {
