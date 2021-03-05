@@ -24,6 +24,15 @@ else
 GOBIN=$(shell go env GOBIN)
 endif
 
+# Get information about git current status
+GIT_HEAD_COMMIT ?= $$(git rev-parse --short HEAD)
+GIT_TAG_COMMIT  ?= $$(git rev-parse --short $(VERSION))
+GIT_MODIFIED_1  ?= $$(git diff $(GIT_HEAD_COMMIT) $(GIT_TAG_COMMIT) --quiet && echo "" || echo ".dev")
+GIT_MODIFIED_2  ?= $$(git diff --quiet && echo "" || echo ".dirty")
+GIT_MODIFIED    ?= $$(echo "$(GIT_MODIFIED_1)$(GIT_MODIFIED_2)")
+GIT_REPO        ?= $$(git config --get remote.origin.url)
+BUILD_DATE      ?= $$(date '+%Y-%m-%dT%H:%M:%S')
+
 all: manager
 
 # Run tests
@@ -75,7 +84,12 @@ generate: controller-gen
 
 # Build the docker image
 docker-build: test
-	docker build . -t ${IMG}
+	docker build . -t ${IMG} --build-arg GIT_HEAD_COMMIT=$(GIT_HEAD_COMMIT) \
+ 							 --build-arg GIT_TAG_COMMIT=$(GIT_TAG_COMMIT) \
+ 							 --build-arg GIT_MODIFIED=$(GIT_MODIFIED) \
+ 							 --build-arg GIT_REPO=$(GIT_REPO) \
+ 							 --build-arg GIT_LAST_TAG=$(VERSION) \
+ 							 --build-arg BUILD_DATE=$(BUILD_DATE)
 
 # Push the docker image
 docker-push:
