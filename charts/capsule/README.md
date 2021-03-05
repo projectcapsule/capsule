@@ -64,6 +64,7 @@ Parameter | Description | Default
 `manager.options.forceTenantPrefix` | Boolean, enforces the Tenant owner, during Namespace creation, to name it using the selected Tenant name as prefix, separated by a dash | `false`
 `manager.options.capsuleUserGroup` | Override the Capsule user group | `capsule.clastix.io`
 `manager.options.protectedNamespaceRegex` | If specified, disallows creation of namespaces matching the passed regexp | `null`
+`manager.options.allowIngressHostnameCollision` | Allow the Ingress hostname collision at Ingress resource level across all the Tenants | `true`
 `manager.image.repository` | Set the image repository of the controller. | `quay.io/clastix/capsule`
 `manager.image.tag` | Overrides the image tag whose default is the chart. `appVersion` | `null`
 `manager.image.pullPolicy` | Set the image pull policy. | `IfNotPresent`

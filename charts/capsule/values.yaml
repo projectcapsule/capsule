@@ -13,6 +13,7 @@ manager:
     forceTenantPrefix:
     capsuleUserGroup:
     protectedNamespaceRegex:
+    allowIngressHostnameCollision:
   resources:
     limits:
       cpu: 200m
