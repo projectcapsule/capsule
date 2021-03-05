@@ -676,6 +676,7 @@ Option | Description | Default
 `--zap-devel` | The flag to get the stack traces for deep debugging.  | `null`
 `--capsule-user-group` | Override the Capsule group to which all tenant owners must belong. | `capsule.clastix.io`
 `--protected-namespace-regex` | Disallows creation of namespaces matching the passed regexp. | `null`
+`--allow-ingress-hostname-collision` | By default, Capsule allows Ingress hostname collision: set to `false` to enforce this policy. | `true`
 
 ## Created Resources
 Once installed, the Capsule operator creates the following resources in your cluster:
