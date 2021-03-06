@@ -80,6 +80,7 @@ func main() {
 	var capsuleGroup string
 	var protectedNamespaceRegexpString string
 	var protectedNamespaceRegexp *regexp.Regexp
+	var allowTenantIngressHostnamesCollision bool
 	var allowIngressHostnamesCollision bool
 	var namespace string
 
@@ -93,6 +94,14 @@ func main() {
 		"during Namespace creation, to name it using the selected Tenant name as prefix, separated by a dash. "+
 		"This is useful to avoid Namespace name collision in a public CaaS environment.")
 	flag.StringVar(&protectedNamespaceRegexpString, "protected-namespace-regex", "", "Disallow creation of namespaces, whose name matches this regexp")
+	flag.BoolVar(
+		&allowTenantIngressHostnamesCollision,
+		"allow-tenant-ingress-hostnames-collision",
+		false,
+		"When defining the exact match for allowed Ingress hostnames at Tenant level, a collision is not allowed. "+
+			"Toggling this, Capsule will not check if a hostname collision is in place, allowing the creation of "+
+			"two or more Tenant resources although sharing the same allowed hostname(s).",
+	)
 	flag.BoolVar(&allowIngressHostnamesCollision, "allow-ingress-hostname-collision", true, "Allow the Ingress hostname collision at Ingress resource level across all the Tenants.")
 
 	opts := zap.Options{
@@ -167,7 +176,7 @@ func main() {
 		namespacequota.Webhook(utils.InCapsuleGroup(capsuleGroup, namespacequota.Handler())),
 		networkpolicies.Webhook(utils.InCapsuleGroup(capsuleGroup, networkpolicies.Handler())),
 		tenantprefix.Webhook(utils.InCapsuleGroup(capsuleGroup, tenantprefix.Handler(forceTenantPrefix, protectedNamespaceRegexp))),
-		tenant.Webhook(tenant.Handler()),
+		tenant.Webhook(tenant.Handler(allowTenantIngressHostnamesCollision)),
 	)
 	if err = webhook.Register(mgr, wl...); err != nil {
 		setupLog.Error(err, "unable to setup webhooks")

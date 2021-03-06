@@ -52,10 +52,11 @@ func (w webhook) GetHandler() capsulewebhook.Handler {
 }
 
 type handler struct {
+	checkIngressHostnamesExact bool
 }
 
-func Handler() capsulewebhook.Handler {
-	return &handler{}
+func Handler(allowTenantIngressHostnamesCollision bool) capsulewebhook.Handler {
+	return &handler{checkIngressHostnamesExact: !allowTenantIngressHostnamesCollision}
 }
 
 // Validate Tenant name
@@ -109,7 +110,7 @@ func (h *handler) validateIngressHostnamesRegex(tenant *v1alpha1.Tenant) error {
 
 // Check Ingress hostnames collision across all available Tenants
 func (h *handler) validateIngressHostnamesCollision(context context.Context, clt client.Client, tenant *v1alpha1.Tenant) error {
-	if tenant.Spec.IngressHostnames != nil && len(tenant.Spec.IngressHostnames.Exact) > 0 {
+	if h.checkIngressHostnamesExact && tenant.Spec.IngressHostnames != nil && len(tenant.Spec.IngressHostnames.Exact) > 0 {
 		for _, h := range tenant.Spec.IngressHostnames.Exact {
 			tl := &v1alpha1.TenantList{}
 			if err := clt.List(context, tl, client.MatchingFieldsSelector{
