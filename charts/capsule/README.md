@@ -68,6 +68,8 @@ Parameter | Description | Default
 `manager.image.repository` | Set the image repository of the controller. | `quay.io/clastix/capsule`
 `manager.image.tag` | Overrides the image tag whose default is the chart. `appVersion` | `null`
 `manager.image.pullPolicy` | Set the image pull policy. | `IfNotPresent`
+`manager.livenessProbe` | Configure the liveness probe using Deployment probe spec | `GET :10080/healthz`
+`manager.readinessProbe` | Configure the readiness probe using Deployment probe spec | `GET :10080/readyz`
 `manager.resources.requests/cpu` | Set the CPU requests assigned to the controller. | `200m`
 `manager.resources.requests/memory` | Set the memory requests assigned to the controller. | `128Mi`
 `manager.resources.limits/cpu` | Set the CPU limits assigned to the controller. | `200m`
