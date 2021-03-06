@@ -677,6 +677,7 @@ Option | Description | Default
 `--capsule-user-group` | Override the Capsule group to which all tenant owners must belong. | `capsule.clastix.io`
 `--protected-namespace-regex` | Disallows creation of namespaces matching the passed regexp. | `null`
 `--allow-ingress-hostname-collision` | By default, Capsule allows Ingress hostname collision: set to `false` to enforce this policy. | `true`
+`--allow-tenant-ingress-hostnames-collision` | Toggling this, Capsule will not check if a hostname collision is in place, allowing the creation of two or more Tenant resources although sharing the same allowed hostname(s). | `false`
 
 ## Created Resources
 Once installed, the Capsule operator creates the following resources in your cluster:
