@@ -153,6 +153,16 @@ e2e/%:
 	kind create cluster --name capsule --image=kindest/node:$*
 	make docker-build
 	kind load docker-image --nodes capsule-control-plane --name capsule $(IMG)
-	helm upgrade --debug --install --namespace capsule-system --create-namespace capsule ./charts/capsule --set 'manager.image.pullPolicy=Never' --set 'manager.resources=null' --set "manager.image.tag=$(VERSION)"
+	helm upgrade \
+		--debug \
+		--install \
+		--namespace capsule-system \
+		--create-namespace capsule \
+		--set 'manager.image.pullPolicy=Never' \
+		--set 'manager.resources=null'\
+		--set "manager.image.tag=$(VERSION)" \
+		--set 'manager.livenessProbe.failureThreshold=10' \
+		--set 'manager.readinessProbe.failureThreshold=10' \
+		./charts/capsule
 	ginkgo -v -tags e2e ./e2e
 	kind delete cluster --name capsule
