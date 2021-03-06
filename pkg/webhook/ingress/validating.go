@@ -218,9 +218,9 @@ func (r *handler) validateCollision(ctx context.Context, clt client.Client, ingr
 		return nil
 	}
 	for _, hostname := range ingress.Hostnames() {
-		var err error
 		collisionErr := NewIngressHostnameCollision(hostname)
 
+		var err error
 		switch ingress.(type) {
 		case Extension:
 			el := &extensionsv1beta1.IngressList{}
@@ -231,11 +231,12 @@ func (r *handler) validateCollision(ctx context.Context, clt client.Client, ingr
 			}
 			switch len(el.Items) {
 			case 0:
-				continue
+				break
 			case 1:
-				if el.Items[0].GetName() != ingress.Name() {
-					return collisionErr
+				if f := el.Items[0]; f.GetName() == ingress.Name() && f.GetNamespace() == ingress.Namespace() {
+					break
 				}
+				fallthrough
 			default:
 				return collisionErr
 			}
@@ -249,11 +250,12 @@ func (r *handler) validateCollision(ctx context.Context, clt client.Client, ingr
 			}
 			switch len(nl.Items) {
 			case 0:
-				continue
+				break
 			case 1:
-				if nl.Items[0].GetName() != ingress.Name() {
-					return collisionErr
+				if f := nl.Items[0]; f.GetName() == ingress.Name() && f.GetNamespace() == ingress.Namespace() {
+					break
 				}
+				fallthrough
 			default:
 				return collisionErr
 			}
@@ -267,11 +269,12 @@ func (r *handler) validateCollision(ctx context.Context, clt client.Client, ingr
 			}
 			switch len(nlb.Items) {
 			case 0:
-				continue
+				break
 			case 1:
-				if nlb.Items[0].GetName() != ingress.Name() {
-					return collisionErr
+				if f := nlb.Items[0]; f.GetName() == ingress.Name() && f.GetNamespace() == ingress.Namespace() {
+					break
 				}
+				fallthrough
 			default:
 				return collisionErr
 			}
