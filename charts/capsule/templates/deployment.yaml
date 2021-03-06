@@ -53,6 +53,7 @@ spec:
           {{ if .Values.manager.options.capsuleUserGroup }}- --capsule-user-group={{ .Values.manager.options.capsuleUserGroup }}{{ end }}
           {{ if .Values.manager.options.protectedNamespaceRegex }}- --protected-namespace-regex={{ .Values.manager.options.protectedNamespaceRegex }}{{ end }}
           - --allow-ingress-hostname-collision={{ .Values.manager.options.allowIngressHostnameCollision | default "true" }}
+          - --allow-tenant-ingress-hostnames-collision={{ .Values.manager.allowTenantIngressHostnamesCollision | default "false" }}
           image: {{ include "capsule.managerFullyQualifiedDockerImage" . }}
           imagePullPolicy: {{ .Values.manager.image.pullPolicy }}
           env:

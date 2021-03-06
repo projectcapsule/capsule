@@ -65,6 +65,7 @@ Parameter | Description | Default
 `manager.options.capsuleUserGroup` | Override the Capsule user group | `capsule.clastix.io`
 `manager.options.protectedNamespaceRegex` | If specified, disallows creation of namespaces matching the passed regexp | `null`
 `manager.options.allowIngressHostnameCollision` | Allow the Ingress hostname collision at Ingress resource level across all the Tenants | `true`
+`manager.options.allowTenantIngressHostnamesCollision` | Skip the validation check at Tenant level for colliding Ingress hostnames | `false`
 `manager.image.repository` | Set the image repository of the controller. | `quay.io/clastix/capsule`
 `manager.image.tag` | Overrides the image tag whose default is the chart. `appVersion` | `null`
 `manager.image.pullPolicy` | Set the image pull policy. | `IfNotPresent`
