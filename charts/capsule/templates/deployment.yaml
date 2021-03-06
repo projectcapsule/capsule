@@ -65,13 +65,9 @@ spec:
               containerPort: 9443
               protocol: TCP
           livenessProbe:
-            httpGet:
-              path: /healthz
-              port: 10080
+            {{- toYaml .Values.manager.livenessProbe | nindent 12}}
           readinessProbe:
-            httpGet:
-              path: /readyz
-              port: 10080
+            {{- toYaml .Values.manager.readinessProbe | nindent 12}}
           volumeMounts:
           - mountPath: /tmp/k8s-webhook-server/serving-certs
             name: cert
