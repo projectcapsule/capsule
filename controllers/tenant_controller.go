@@ -98,12 +98,6 @@ func (r TenantReconciler) Reconcile(ctx context.Context, request ctrl.Request) (
 		return
 	}
 
-	r.Log.Info("Starting processing of Node Selector")
-	if err = r.ensureNodeSelector(instance); err != nil {
-		r.Log.Error(err, "Cannot sync Namespaces Node Selector items")
-		return
-	}
-
 	r.Log.Info("Starting processing of Limit Ranges", "items", len(instance.Spec.LimitRanges))
 	if err = r.syncLimitRanges(instance); err != nil {
 		r.Log.Error(err, "Cannot sync LimitRange items")
@@ -458,7 +452,7 @@ func (r *TenantReconciler) syncLimitRanges(tenant *capsulev1alpha1.Tenant) error
 	return nil
 }
 
-func (r *TenantReconciler) syncNamespace(namespace string, tnt *capsulev1alpha1.Tenant) error {
+func (r *TenantReconciler) syncNamespaceMetadata(namespace string, tnt *capsulev1alpha1.Tenant) error {
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
 		ns := &corev1.Namespace{}
 		if err = r.Client.Get(context.TODO(), types.NamespacedName{Name: namespace}, ns); err != nil {
@@ -469,14 +463,13 @@ func (r *TenantReconciler) syncNamespace(namespace string, tnt *capsulev1alpha1.
 		if a == nil {
 			a = make(map[string]string)
 		}
-		// resetting Capsule annotations
-		delete(a, capsulev1alpha1.AvailableIngressClassesAnnotation)
-		delete(a, capsulev1alpha1.AvailableIngressClassesRegexpAnnotation)
-		delete(a, capsulev1alpha1.AvailableStorageClassesAnnotation)
-		delete(a, capsulev1alpha1.AvailableStorageClassesRegexpAnnotation)
-		delete(a, capsulev1alpha1.AllowedRegistriesAnnotation)
-		delete(a, capsulev1alpha1.AllowedRegistriesRegexpAnnotation)
-		// assigning back Capsule annotations, if required
+		if tnt.Spec.NodeSelector != nil {
+			var selector []string
+			for k, v := range tnt.Spec.NodeSelector {
+				selector = append(selector, fmt.Sprintf("%s=%s", k, v))
+			}
+			a["scheduler.alpha.kubernetes.io/node-selector"] = strings.Join(selector, ",")
+		}
 		if tnt.Spec.IngressClasses != nil {
 			if len(tnt.Spec.IngressClasses.Exact) > 0 {
 				a[capsulev1alpha1.AvailableIngressClassesAnnotation] = strings.Join(tnt.Spec.IngressClasses.Exact, ",")
@@ -522,7 +515,7 @@ func (r *TenantReconciler) syncNamespaces(tenant *capsulev1alpha1.Tenant) (err e
 	for _, item := range tenant.Status.Namespaces {
 		namespace := item
 		group.Go(func() error {
-			return r.syncNamespace(namespace, tenant)
+			return r.syncNamespaceMetadata(namespace, tenant)
 		})
 	}
 
@@ -634,35 +627,6 @@ func (r *TenantReconciler) ownerRoleBinding(tenant *capsulev1alpha1.Tenant) erro
 		}
 	}
 	return nil
-}
-
-func (r *TenantReconciler) ensureNodeSelector(tenant *capsulev1alpha1.Tenant) (err error) {
-	for _, namespace := range tenant.Status.Namespaces {
-		ns := &corev1.Namespace{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: namespace,
-			},
-		}
-
-		var res controllerutil.OperationResult
-		res, err = controllerutil.CreateOrUpdate(context.TODO(), r.Client, ns, func() error {
-			if ns.Annotations == nil {
-				ns.Annotations = make(map[string]string)
-			}
-			var selector []string
-			for k, v := range tenant.Spec.NodeSelector {
-				selector = append(selector, fmt.Sprintf("%s=%s", k, v))
-			}
-			ns.Annotations["scheduler.alpha.kubernetes.io/node-selector"] = strings.Join(selector, ",")
-			return nil
-		})
-		r.Log.Info("Namespace Node  sync result: "+string(res), "name", ns.Name)
-		if err != nil {
-			return err
-		}
-	}
-
-	return
 }
 
 func (r *TenantReconciler) ensureNamespaceCount(tenant *capsulev1alpha1.Tenant) error {
