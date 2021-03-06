@@ -218,61 +218,63 @@ func (r *handler) validateCollision(ctx context.Context, clt client.Client, ingr
 		return nil
 	}
 	for _, hostname := range ingress.Hostnames() {
-		collisionErr := NewIngressHostnameCollision(hostname)
 		var err error
-		// Listing for networking.k8s.io/v1 Ingress resources
-		nl := &networkingv1.IngressList{}
-		err = clt.List(ctx, nl, client.MatchingFieldsSelector{
-			Selector: fields.OneTermEqualSelector(".spec.rules[*].host", hostname),
-		})
-		if err != nil {
-			return errors.Wrap(err, "cannot list *networkingv1.IngressList by MatchingFieldsSelector")
-		}
-		switch len(nl.Items) {
-		case 0:
-			continue
-		case 1:
-			if nl.Items[0].GetName() != ingress.Name() {
+		collisionErr := NewIngressHostnameCollision(hostname)
+
+		switch ingress.(type) {
+		case Extension:
+			el := &extensionsv1beta1.IngressList{}
+			if err = clt.List(ctx, el, client.MatchingFieldsSelector{
+				Selector: fields.OneTermEqualSelector(".spec.rules[*].host", hostname),
+			}); err != nil {
+				return err
+			}
+			switch len(el.Items) {
+			case 0:
+				continue
+			case 1:
+				if el.Items[0].GetName() != ingress.Name() {
+					return collisionErr
+				}
+			default:
 				return collisionErr
 			}
-		default:
-			return collisionErr
-		}
-		// Listing for networking.k8s.io/v1beta1 Ingress resources
-		nlb := &networkingv1beta1.IngressList{}
-		err = clt.List(ctx, nlb, client.MatchingFieldsSelector{
-			Selector: fields.OneTermEqualSelector(".spec.rules[*].host", hostname),
-		})
-		if err != nil {
-			return errors.Wrap(err, "cannot list *networkingv1beta1.IngressList by MatchingFieldsSelector")
-		}
-		switch len(nlb.Items) {
-		case 0:
-			continue
-		case 1:
-			if nlb.Items[0].GetName() != ingress.Name() {
+		case NetworkingV1:
+			nl := &networkingv1.IngressList{}
+			err = clt.List(ctx, nl, client.MatchingFieldsSelector{
+				Selector: fields.OneTermEqualSelector(".spec.rules[*].host", hostname),
+			})
+			if err != nil {
+				return errors.Wrap(err, "cannot list *networkingv1.IngressList by MatchingFieldsSelector")
+			}
+			switch len(nl.Items) {
+			case 0:
+				continue
+			case 1:
+				if nl.Items[0].GetName() != ingress.Name() {
+					return collisionErr
+				}
+			default:
 				return collisionErr
 			}
-		default:
-			return collisionErr
-		}
-		// Listing for extensions.k8s.io Ingress resources
-		el := &extensionsv1beta1.IngressList{}
-		err = clt.List(ctx, nl, client.MatchingFieldsSelector{
-			Selector: fields.OneTermEqualSelector(".spec.rules[*].host", hostname),
-		})
-		if err != nil {
-			return err
-		}
-		switch len(el.Items) {
-		case 0:
-			continue
-		case 1:
-			if el.Items[0].GetName() != ingress.Name() {
+		case NetworkingV1Beta1:
+			nlb := &networkingv1beta1.IngressList{}
+			err = clt.List(ctx, nlb, client.MatchingFieldsSelector{
+				Selector: fields.OneTermEqualSelector(".spec.rules[*].host", hostname),
+			})
+			if err != nil {
+				return errors.Wrap(err, "cannot list *networkingv1beta1.IngressList by MatchingFieldsSelector")
+			}
+			switch len(nlb.Items) {
+			case 0:
+				continue
+			case 1:
+				if nlb.Items[0].GetName() != ingress.Name() {
+					return collisionErr
+				}
+			default:
 				return collisionErr
 			}
-		default:
-			return collisionErr
 		}
 	}
 	return nil
