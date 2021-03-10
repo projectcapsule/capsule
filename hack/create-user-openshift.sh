@@ -4,7 +4,7 @@
 # certificate signed by the Kubernetes CA itself.
 # It requires cluster admin permission.
 #
-# e.g.: ./create-user.sh alice oil
+# e.g.: ./create-user-openshift.sh alice oil
 #       where `oil` is the Tenant and `alice` the owner
 
 # Check if OpenSSL is installed
