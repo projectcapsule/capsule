@@ -26,21 +26,28 @@ import (
 	"github.com/clastix/capsule/pkg/webhook"
 )
 
-func InCapsuleGroup(capsuleGroup string, webhookHandler webhook.Handler) webhook.Handler {
+func InCapsuleGroup(capsuleGroup string, systemGroup string, webhookHandler webhook.Handler) webhook.Handler {
 	return &handler{
 		handler:      webhookHandler,
 		capsuleGroup: capsuleGroup,
+		systemGroup:  systemGroup,
 	}
 }
 
 type handler struct {
 	capsuleGroup string
+	systemGroup  string
 	handler      webhook.Handler
 }
 
 // If the user performing action is not a Capsule user, can be skipped
 func (h handler) isCapsuleUser(req admission.Request) bool {
-	return utils.UserGroupList(req.UserInfo.Groups).IsInCapsuleGroup(h.capsuleGroup)
+	return utils.UserGroupList(req.UserInfo.Groups).IsInGroup(h.capsuleGroup)
+}
+
+// If the user performing action is in a system group, can be skipped
+func (h handler) isSystemUser(req admission.Request) bool {
+	return utils.UserGroupList(req.UserInfo.Groups).IsInGroup(h.systemGroup)
 }
 
 func (h *handler) OnCreate(client client.Client, decoder *admission.Decoder) webhook.Func {
@@ -55,7 +62,7 @@ func (h *handler) OnCreate(client client.Client, decoder *admission.Decoder) web
 
 func (h *handler) OnDelete(client client.Client, decoder *admission.Decoder) webhook.Func {
 	return func(ctx context.Context, req admission.Request) admission.Response {
-		if !h.isCapsuleUser(req) {
+		if !h.isCapsuleUser(req) || h.isSystemUser(req) {
 			return admission.Allowed("")
 		}
 		return h.handler.OnDelete(client, decoder)(ctx, req)

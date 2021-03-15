@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestIsInCapsuleGroup(t *testing.T) {
+func TestIsInGroup(t *testing.T) {
 	groups := []string{
 		"DPS-QQ-DeparEE-Upload_RW",
 		"vsphere - glonqqqq-devopsq",
@@ -19,5 +19,5 @@ func TestIsInCapsuleGroup(t *testing.T) {
 
 	capsuleGroup := "kubernetes-abilitytologin"
 
-	assert.True(t, UserGroupList(groups).IsInCapsuleGroup(capsuleGroup), nil)
+	assert.True(t, UserGroupList(groups).IsInGroup(capsuleGroup), nil)
 }

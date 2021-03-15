@@ -78,12 +78,14 @@ func main() {
 	var forceTenantPrefix bool
 	var v bool
 	var capsuleGroup string
+	var systemGroup string
 	var protectedNamespaceRegexpString string
 	var protectedNamespaceRegexp *regexp.Regexp
 	var namespace string
 
 	flag.StringVar(&metricsAddr, "metrics-addr", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&capsuleGroup, "capsule-user-group", capsulev1alpha1.GroupVersion.Group, "Name of the group for capsule users")
+	flag.StringVar(&systemGroup, "system-user-group", "", "Name of the group for system users")
 	flag.BoolVar(&enableLeaderElection, "enable-leader-election", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
@@ -161,10 +163,10 @@ func main() {
 		pvc.Webhook(pvc.Handler()),
 		registry.Webhook(registry.Handler()),
 		services.Webhook(services.Handler()),
-		ownerreference.Webhook(utils.InCapsuleGroup(capsuleGroup, ownerreference.Handler(forceTenantPrefix))),
-		namespacequota.Webhook(utils.InCapsuleGroup(capsuleGroup, namespacequota.Handler())),
-		networkpolicies.Webhook(utils.InCapsuleGroup(capsuleGroup, networkpolicies.Handler())),
-		tenantprefix.Webhook(utils.InCapsuleGroup(capsuleGroup, tenantprefix.Handler(forceTenantPrefix, protectedNamespaceRegexp))),
+		ownerreference.Webhook(utils.InCapsuleGroup(capsuleGroup, systemGroup, ownerreference.Handler(forceTenantPrefix))),
+		namespacequota.Webhook(utils.InCapsuleGroup(capsuleGroup, systemGroup, namespacequota.Handler())),
+		networkpolicies.Webhook(utils.InCapsuleGroup(capsuleGroup, systemGroup, networkpolicies.Handler())),
+		tenantprefix.Webhook(utils.InCapsuleGroup(capsuleGroup, systemGroup, tenantprefix.Handler(forceTenantPrefix, protectedNamespaceRegexp))),
 		tenant.Webhook(tenant.Handler()),
 	)
 	if err = webhook.Register(mgr, wl...); err != nil {

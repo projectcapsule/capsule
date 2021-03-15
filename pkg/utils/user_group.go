@@ -34,7 +34,7 @@ func (u UserGroupList) Swap(i, j int) {
 	u[i], u[j] = u[j], u[i]
 }
 
-func (u UserGroupList) IsInCapsuleGroup(capsuleGroup string) (ok bool) {
+func (u UserGroupList) IsInGroup(capsuleGroup string) (ok bool) {
 	sort.Sort(u)
 	i := sort.SearchStrings(u, capsuleGroup)
 	ok = i < u.Len() && u[i] == capsuleGroup
