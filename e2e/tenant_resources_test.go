@@ -22,7 +22,6 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"time"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -186,7 +185,7 @@ var _ = Describe("creating namespaces within a Tenant with resources", func() {
 					lr := &corev1.LimitRange{}
 					Eventually(func() error {
 						return k8sClient.Get(context.TODO(), types.NamespacedName{Name: n, Namespace: name}, lr)
-					}, 10*time.Second, time.Second).Should(Succeed())
+					}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 					Expect(lr.Spec).Should(Equal(s))
 				}
 			})
@@ -196,7 +195,7 @@ var _ = Describe("creating namespaces within a Tenant with resources", func() {
 					np := &networkingv1.NetworkPolicy{}
 					Eventually(func() error {
 						return k8sClient.Get(context.TODO(), types.NamespacedName{Name: n, Namespace: name}, np)
-					}, 10*time.Second, time.Second).Should(Succeed())
+					}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 					Expect(np.Spec).Should(Equal(s))
 				}
 			})
@@ -209,7 +208,7 @@ var _ = Describe("creating namespaces within a Tenant with resources", func() {
 					ns := &corev1.Namespace{}
 					Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: name}, ns)).Should(Succeed())
 					return ns.GetAnnotations()["scheduler.alpha.kubernetes.io/node-selector"]
-				}, 10*time.Second, time.Second).Should(Equal(strings.Join(selector, ",")))
+				}, defaultTimeoutInterval, defaultPollInterval).Should(Equal(strings.Join(selector, ",")))
 			})
 			By("checking the Resource Quota", func() {
 				for i, s := range tnt.Spec.ResourceQuota {
@@ -217,7 +216,7 @@ var _ = Describe("creating namespaces within a Tenant with resources", func() {
 					rq := &corev1.ResourceQuota{}
 					Eventually(func() error {
 						return k8sClient.Get(context.TODO(), types.NamespacedName{Name: n, Namespace: name}, rq)
-					}, 10*time.Second, time.Second).Should(Succeed())
+					}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 					Expect(rq.Spec).Should(Equal(s))
 				}
 			})

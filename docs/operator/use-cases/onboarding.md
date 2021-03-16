@@ -1,5 +1,5 @@
 # Onboard a new tenant
-Bill receives a new request from the Acme Corp.'s CTO asking a new tenant for Alice's organization has to be on board. Bill assigns the Alice's identity `alice` in the Acme Corp. identity management system. And because, Alice is a tenant owner, Bill needs to assign `alice` the Capsule group defined by `--capsule-user-group` option, which defaults to `capsule.clastix.io`.
+Bill receives a new request from Acme Corp.'s CTO asking for a new tenant to be onboarded in Alice’s organization. Bill then assigns Alice's identity of `alice` in Acme Corp. identity management system. Since Alice is a tenant owner, Bill needs to assign `alice` the Capsule group defined by `--capsule-user-group` option, which defaults to `capsule.clastix.io`.
 
 To keep the things simple, we assume that Bill just creates a client certificate for authentication using X.509 Certificate Signing Request, so Alice's certificate has `"/CN=alice/O=capsule.clastix.io"`.
 
@@ -17,7 +17,7 @@ spec:
   namespaceQuota: 3
 ```
 
-Bill checks the new tenant is created and operational:
+Bill checks if the new tenant is created and operational:
 
 ```
 bill@caas# kubectl get tenant oil
@@ -31,7 +31,7 @@ oil    9                 0                 alice        User                    
 
 Once the new tenant `oil` is in place, Bill sends the login credentials to Alice.
 
-Alice can log in to the CaaS platform and checks if she can create a namespace
+Alice can log in to the CaaS platform and check if she can create a namespace
 
 ```
 alice@caas# kubectl auth can-i create namespaces
@@ -72,7 +72,7 @@ no
 ```
 
 ## Assign a group of users as tenant owner
-In the example above, Bill assigned the ownership of `oil` tenant to `alice` user. However, is more likely that multiple users in the Alice's oraganization, need to admin the `oil` tenant. In such cases, Bill can assign the ownership of the `oil` tenant to a group of users instead of a single one.
+In the example above, Bill assigned the ownership of `oil` tenant to `alice` user. However, is more likely that multiple users in the Alice's organization, need to administer the `oil` tenant. In such cases, Bill can assign the ownership of the `oil` tenant to a group of users instead of a single one.
 
 Bill creates a new group account `oil` in the Acme Corp. identity management system and then he assigns Alice's identity `alice` to the `oil` group.
 

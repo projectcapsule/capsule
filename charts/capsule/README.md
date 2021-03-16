@@ -64,9 +64,13 @@ Parameter | Description | Default
 `manager.options.forceTenantPrefix` | Boolean, enforces the Tenant owner, during Namespace creation, to name it using the selected Tenant name as prefix, separated by a dash | `false`
 `manager.options.capsuleUserGroup` | Override the Capsule user group | `capsule.clastix.io`
 `manager.options.protectedNamespaceRegex` | If specified, disallows creation of namespaces matching the passed regexp | `null`
+`manager.options.allowIngressHostnameCollision` | Allow the Ingress hostname collision at Ingress resource level across all the Tenants | `true`
+`manager.options.allowTenantIngressHostnamesCollision` | Skip the validation check at Tenant level for colliding Ingress hostnames | `false`
 `manager.image.repository` | Set the image repository of the controller. | `quay.io/clastix/capsule`
 `manager.image.tag` | Overrides the image tag whose default is the chart. `appVersion` | `null`
 `manager.image.pullPolicy` | Set the image pull policy. | `IfNotPresent`
+`manager.livenessProbe` | Configure the liveness probe using Deployment probe spec | `GET :10080/healthz`
+`manager.readinessProbe` | Configure the readiness probe using Deployment probe spec | `GET :10080/readyz`
 `manager.resources.requests/cpu` | Set the CPU requests assigned to the controller. | `200m`
 `manager.resources.requests/memory` | Set the memory requests assigned to the controller. | `128Mi`
 `manager.resources.limits/cpu` | Set the CPU limits assigned to the controller. | `200m`

@@ -10,9 +10,9 @@ alice@caas# kubectl create ns oil-production
 > it is likely that many different tenants would like to call their namespaces
 > as `production`, `test`, or `demo`, etc.
 > 
-> The enforcement of this naming convention, however, is optional and can be controlled by the cluster administrator with the `--force-tenant-prefix` option as argument of the Capsule controller.
+> The enforcement of this naming convention is optional and can be controlled by the cluster administrator with the `--force-tenant-prefix` option as an argument of the Capsule controller.
 
-When Alice creates the namespace, the Capsule controller, listening for creation and deletion events assigns to Alice the following roles:
+When Alice creates the namespace, the Capsule controller listening for creation and deletion events assigns to Alice the following roles:
 
 ```yaml
 ---
@@ -69,7 +69,7 @@ alice@caas# kubectl create ns oil-development
 alice@caas# kubectl create ns oil-test
 ```
 
-While Alice creates namespace resources, the Capsule controller updates the status of the tenant so Bill, the cluster admin, can check its status:
+While Alice creates namespace resources the Capsule controller updates the status of the tenant so Bill, the cluster admin, can check its status:
 
 ```
 bill@caas# kubectl describe tenant oil
@@ -90,10 +90,9 @@ Once the namespace quota assigned to the tenant has been reached, Alice cannot c
 
 ```
 alice@caas# kubectl create ns oil-training
-Error from server (Cannot exceed Namespace quota: please, reach out the system administrators): admission webhook "quota.namespace.capsule.clastix.io" denied the request.
+Error from server (Cannot exceed Namespace quota: please, reach out to the system administrators): admission webhook "quota.namespace.capsule.clastix.io" denied the request.
 ```
-
-The enforcement on the maximum number of Namespace resources per Tenant is in charge of the Capsule controller via its Dynamic Admission Webhook capability.
+The enforcement on the maximum number of Namespace resources per Tenant is the responsibility of the Capsule controller via its Dynamic Admission Webhook capability.
 
 # What’s next
 See how Alice, the tenant owner, can assign different user roles in the tenant. [Assign permissions](./permissions.md).

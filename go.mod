@@ -7,6 +7,7 @@ require (
 	github.com/hashicorp/go-multierror v1.1.0
 	github.com/onsi/ginkgo v1.14.1
 	github.com/onsi/gomega v1.10.2
+	github.com/pkg/errors v0.9.1
 	github.com/stretchr/testify v1.5.1
 	go.uber.org/zap v1.15.0
 	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e

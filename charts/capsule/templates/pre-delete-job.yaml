@@ -29,7 +29,8 @@ spec:
       restartPolicy: Never
       containers:
         - name: pre-delete-job
-          image: "bitnami/kubectl:1.18"
+          image: {{ include "capsule.jobsFullyQualifiedDockerImage" . }}
+          imagePullPolicy: {{ .Values.jobs.image.pullPolicy }}
           command: [ "sh", "-c",  "{{ $cmd }}"]
           env:
             - name: NAMESPACE

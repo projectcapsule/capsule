@@ -19,7 +19,6 @@ package tenant
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"regexp"
 
 	"k8s.io/apimachinery/pkg/fields"
@@ -30,7 +29,7 @@ import (
 	capsulewebhook "github.com/clastix/capsule/pkg/webhook"
 )
 
-// +kubebuilder:webhook:path=/validating-v1-tenant,mutating=false,failurePolicy=fail,groups="capsule.clastix.io",resources=tenants,verbs=create,versions=v1alpha1,name=tenant.capsule.clastix.io
+// +kubebuilder:webhook:path=/validating-v1-tenant,mutating=false,failurePolicy=fail,groups="capsule.clastix.io",resources=tenants,verbs=create;update,versions=v1alpha1,name=tenant.capsule.clastix.io
 
 type webhook struct {
 	handler capsulewebhook.Handler
@@ -53,83 +52,139 @@ func (w webhook) GetHandler() capsulewebhook.Handler {
 }
 
 type handler struct {
+	checkIngressHostnamesExact bool
 }
 
-func Handler() capsulewebhook.Handler {
-	return &handler{}
+func Handler(allowTenantIngressHostnamesCollision bool) capsulewebhook.Handler {
+	return &handler{checkIngressHostnamesExact: !allowTenantIngressHostnamesCollision}
 }
 
-func (h *handler) OnCreate(clt client.Client, decoder *admission.Decoder) capsulewebhook.Func {
+// Validate Tenant name
+func (h *handler) validateTenantName(tenant *v1alpha1.Tenant) error {
+	matched, _ := regexp.MatchString(`[a-z0-9]([-a-z0-9]*[a-z0-9])?`, tenant.GetName())
+	if !matched {
+		return fmt.Errorf("tenant name has forbidden characters")
+	}
+	return nil
+}
+
+// Validate ingressClasses regexp
+func (h *handler) validateIngressClassesRegex(tenant *v1alpha1.Tenant) error {
+	if tenant.Spec.IngressClasses != nil && len(tenant.Spec.IngressClasses.Regex) > 0 {
+		if _, err := regexp.Compile(tenant.Spec.IngressClasses.Regex); err != nil {
+			return fmt.Errorf("unable to compile ingressClasses allowedRegex")
+		}
+	}
+	return nil
+}
+
+// Validate storageClasses regexp
+func (h *handler) validateStorageClassesRegex(tenant *v1alpha1.Tenant) error {
+	if tenant.Spec.StorageClasses != nil && len(tenant.Spec.StorageClasses.Regex) > 0 {
+		if _, err := regexp.Compile(tenant.Spec.StorageClasses.Regex); err != nil {
+			return fmt.Errorf("unable to compile storageClasses allowedRegex")
+		}
+	}
+	return nil
+}
+
+// Validate containerRegistries regexp
+func (h *handler) validateContainerRegistriesRegex(tenant *v1alpha1.Tenant) error {
+	if tenant.Spec.ContainerRegistries != nil && len(tenant.Spec.ContainerRegistries.Regex) > 0 {
+		if _, err := regexp.Compile(tenant.Spec.ContainerRegistries.Regex); err != nil {
+			return fmt.Errorf("unable to compile containerRegistries allowedRegex")
+		}
+	}
+	return nil
+}
+
+// Validate containerRegistries regexp
+func (h *handler) validateIngressHostnamesRegex(tenant *v1alpha1.Tenant) error {
+	if tenant.Spec.IngressHostnames != nil && len(tenant.Spec.IngressHostnames.Regex) > 0 {
+		if _, err := regexp.Compile(tenant.Spec.IngressHostnames.Regex); err != nil {
+			return fmt.Errorf("unable to compile ingressHostnames allowedRegex")
+		}
+	}
+	return nil
+}
+
+// Check Ingress hostnames collision across all available Tenants
+func (h *handler) validateIngressHostnamesCollision(context context.Context, clt client.Client, tenant *v1alpha1.Tenant) error {
+	if h.checkIngressHostnamesExact && tenant.Spec.IngressHostnames != nil && len(tenant.Spec.IngressHostnames.Exact) > 0 {
+		for _, h := range tenant.Spec.IngressHostnames.Exact {
+			tl := &v1alpha1.TenantList{}
+			if err := clt.List(context, tl, client.MatchingFieldsSelector{
+				Selector: fields.OneTermEqualSelector(".spec.ingressHostnames", h),
+			}); err != nil {
+				return fmt.Errorf("cannot retrieve Tenant list using .spec.ingressHostnames field selector: %w", err)
+			}
+			switch {
+			case len(tl.Items) == 1 && tl.Items[0].GetName() == tenant.GetName():
+				continue
+			case len(tl.Items) > 0:
+				return fmt.Errorf("the allowed hostname %s is already used by the Tenant %s, cannot proceed", h, tl.Items[0].GetName())
+			default:
+				continue
+			}
+		}
+	}
+	return nil
+}
+
+func (h *handler) validateTenant(ctx context.Context, req admission.Request, client client.Client, decoder *admission.Decoder) error {
+	tenant := &v1alpha1.Tenant{}
+	if err := decoder.Decode(req, tenant); err != nil {
+		return err
+	}
+	if err := h.validateTenantByRegex(tenant); err != nil {
+		return err
+	}
+	if err := h.validateIngressHostnamesCollision(ctx, client, tenant); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (h *handler) validateTenantByRegex(tenant *v1alpha1.Tenant) error {
+	if err := h.validateTenantName(tenant); err != nil {
+		return err
+	}
+	if err := h.validateIngressClassesRegex(tenant); err != nil {
+		return err
+	}
+	if err := h.validateStorageClassesRegex(tenant); err != nil {
+		return err
+	}
+	if err := h.validateContainerRegistriesRegex(tenant); err != nil {
+		return err
+	}
+	if err := h.validateIngressHostnamesRegex(tenant); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (h *handler) OnCreate(client client.Client, decoder *admission.Decoder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) admission.Response {
-		tnt := &v1alpha1.Tenant{}
-		if err := decoder.Decode(req, tnt); err != nil {
-			return admission.Errored(http.StatusBadRequest, err)
+		if err := h.validateTenant(ctx, req, client, decoder); err != nil {
+			return admission.Denied(err.Error())
 		}
-
-		matched, _ := regexp.MatchString(`[a-z0-9]([-a-z0-9]*[a-z0-9])?`, tnt.GetName())
-		if !matched {
-			return admission.Denied("Tenant name has forbidden characters")
-		}
-
-		// Validate ingressClasses regexp
-		if tnt.Spec.IngressClasses != nil && len(tnt.Spec.IngressClasses.Regex) > 0 {
-			if _, err := regexp.Compile(tnt.Spec.IngressClasses.Regex); err != nil {
-				return admission.Denied("Unable to compile ingressClasses allowedRegex")
-			}
-		}
-
-		// Validate storageClasses regexp
-		if tnt.Spec.StorageClasses != nil && len(tnt.Spec.StorageClasses.Regex) > 0 {
-			if _, err := regexp.Compile(tnt.Spec.StorageClasses.Regex); err != nil {
-				return admission.Denied("Unable to compile storageClasses allowedRegex")
-			}
-		}
-
-		// Validate containerRegistries regexp
-		if tnt.Spec.ContainerRegistries != nil && len(tnt.Spec.ContainerRegistries.Regex) > 0 {
-			if _, err := regexp.Compile(tnt.Spec.ContainerRegistries.Regex); err != nil {
-				return admission.Denied("Unable to compile containerRegistries allowedRegex")
-			}
-		}
-
-		// Validate ingressHostnames regexp
-		if tnt.Spec.IngressHostnames != nil && len(tnt.Spec.IngressHostnames.Regex) > 0 {
-			if _, err := regexp.Compile(tnt.Spec.IngressHostnames.Regex); err != nil {
-				return admission.Denied("Unable to compile ingressHostnames allowedRegex")
-			}
-		}
-
-		if tnt.Spec.IngressHostnames != nil && len(tnt.Spec.IngressHostnames.Exact) > 0 {
-			for _, h := range tnt.Spec.IngressHostnames.Exact {
-				tl := &v1alpha1.TenantList{}
-				err := clt.List(ctx, tl, client.MatchingFieldsSelector{
-					Selector: fields.OneTermEqualSelector(".spec.ingressHostnames", h),
-				})
-				if err != nil {
-					return admission.Errored(http.StatusBadRequest, err)
-				}
-				if len(tl.Items) > 0 {
-					return admission.Denied(fmt.Sprintf("The allowed hostname %s is already used by the Tenant %s, cannot proceed", h, tl.Items[0].GetName()))
-				}
-			}
-
-			if _, err := regexp.Compile(tnt.Spec.IngressHostnames.Regex); err != nil {
-				return admission.Denied("Unable to compile ingressHostnames allowedRegex")
-			}
-		}
-
 		return admission.Allowed("")
 	}
 }
 
-func (h *handler) OnDelete(client client.Client, decoder *admission.Decoder) capsulewebhook.Func {
-	return func(ctx context.Context, req admission.Request) admission.Response {
+func (h *handler) OnDelete(client.Client, *admission.Decoder) capsulewebhook.Func {
+	return func(context.Context, admission.Request) admission.Response {
 		return admission.Allowed("")
 	}
 }
 
 func (h *handler) OnUpdate(client client.Client, decoder *admission.Decoder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) admission.Response {
+		if err := h.validateTenant(ctx, req, client, decoder); err != nil {
+			return admission.Denied(err.Error())
+		}
 		return admission.Allowed("")
 	}
 }

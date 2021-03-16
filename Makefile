@@ -15,7 +15,7 @@ BUNDLE_METADATA_OPTS ?= $(BUNDLE_CHANNELS) $(BUNDLE_DEFAULT_CHANNEL)
 # Image URL to use all building/pushing image targets
 IMG ?= quay.io/clastix/capsule:$(VERSION)
 # Produce CRDs that work back to Kubernetes 1.11 (no version conversion)
-CRD_OPTIONS ?= "crd:trivialVersions=true"
+CRD_OPTIONS ?= "crd:trivialVersions=true,preserveUnknownFields=false"
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
@@ -23,6 +23,15 @@ GOBIN=$(shell go env GOPATH)/bin
 else
 GOBIN=$(shell go env GOBIN)
 endif
+
+# Get information about git current status
+GIT_HEAD_COMMIT ?= $$(git rev-parse --short HEAD)
+GIT_TAG_COMMIT  ?= $$(git rev-parse --short $(VERSION))
+GIT_MODIFIED_1  ?= $$(git diff $(GIT_HEAD_COMMIT) $(GIT_TAG_COMMIT) --quiet && echo "" || echo ".dev")
+GIT_MODIFIED_2  ?= $$(git diff --quiet && echo "" || echo ".dirty")
+GIT_MODIFIED    ?= $$(echo "$(GIT_MODIFIED_1)$(GIT_MODIFIED_2)")
+GIT_REPO        ?= $$(git config --get remote.origin.url)
+BUILD_DATE      ?= $$(date '+%Y-%m-%dT%H:%M:%S')
 
 all: manager
 
@@ -75,7 +84,12 @@ generate: controller-gen
 
 # Build the docker image
 docker-build: test
-	docker build . -t ${IMG}
+	docker build . -t ${IMG} --build-arg GIT_HEAD_COMMIT=$(GIT_HEAD_COMMIT) \
+ 							 --build-arg GIT_TAG_COMMIT=$(GIT_TAG_COMMIT) \
+ 							 --build-arg GIT_MODIFIED=$(GIT_MODIFIED) \
+ 							 --build-arg GIT_REPO=$(GIT_REPO) \
+ 							 --build-arg GIT_LAST_TAG=$(VERSION) \
+ 							 --build-arg BUILD_DATE=$(BUILD_DATE)
 
 # Push the docker image
 docker-push:
@@ -139,7 +153,16 @@ e2e/%:
 	kind create cluster --name capsule --image=kindest/node:$*
 	make docker-build
 	kind load docker-image --nodes capsule-control-plane --name capsule $(IMG)
-	kubectl create namespace capsule-system
-	helm upgrade --install --namespace capsule-system capsule ./charts/capsule --set 'manager.image.pullPolicy=Never' --set 'manager.resources=null'
+	helm upgrade \
+		--debug \
+		--install \
+		--namespace capsule-system \
+		--create-namespace capsule \
+		--set 'manager.image.pullPolicy=Never' \
+		--set 'manager.resources=null'\
+		--set "manager.image.tag=$(VERSION)" \
+		--set 'manager.livenessProbe.failureThreshold=10' \
+		--set 'manager.readinessProbe.failureThreshold=10' \
+		./charts/capsule
 	ginkgo -v -tags e2e ./e2e
 	kind delete cluster --name capsule

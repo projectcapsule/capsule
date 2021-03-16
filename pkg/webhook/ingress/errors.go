@@ -45,6 +45,18 @@ type ingressHostnameNotValid struct {
 	spec                 v1alpha1.AllowedListSpec
 }
 
+type ingressHostnameCollision struct {
+	hostname string
+}
+
+func (i ingressHostnameCollision) Error() string {
+	return fmt.Sprintf("hostname %s is already used across the cluster: please, reach out to the system administrators", i.hostname)
+}
+
+func NewIngressHostnameCollision(hostname string) error {
+	return ingressHostnameCollision{hostname: hostname}
+}
+
 func NewIngressHostnamesNotValid(invalidHostnames []string, notMatchingHostnames []string, spec v1alpha1.AllowedListSpec) error {
 	return &ingressHostnameNotValid{invalidHostnames: invalidHostnames, notMatchingHostnames: notMatchingHostnames, spec: spec}
 }

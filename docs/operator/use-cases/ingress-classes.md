@@ -66,7 +66,7 @@ spec:
         path: /
 ```
 
-Any tentative of Alice to use a not valid Ingress Class, e.g. `default`, will fail.
+Any attempt of Alice to use a non valid Ingress Class, e.g. `default`, will fail.
 
 > The effect of this policy is that the services created in the tenant will be published
 > only on the Ingress Controller designated by Bill to accept one of the allowed Ingress Classes.

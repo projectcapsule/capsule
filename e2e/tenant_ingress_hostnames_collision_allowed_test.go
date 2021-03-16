@@ -20,6 +20,7 @@ package e2e
 
 import (
 	"context"
+	"fmt"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -31,7 +32,7 @@ import (
 var _ = Describe("when a second Tenant contains an already declared allowed Ingress hostname", func() {
 	tnt := &v1alpha1.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "first-ingress-hostnames",
+			Name: "allowed-collision-ingress-hostnames",
 		},
 		Spec: v1alpha1.TenantSpec{
 			Owner: v1alpha1.OwnerSpec{
@@ -49,16 +50,18 @@ var _ = Describe("when a second Tenant contains an already declared allowed Ingr
 			tnt.ResourceVersion = ""
 			return k8sClient.Create(context.TODO(), tnt)
 		}).Should(Succeed())
+		ModifyCapsuleManagerPodArgs(append(defaulManagerPodArgs, []string{"--allow-tenant-ingress-hostnames-collision=true"}...))
 	})
 	JustAfterEach(func() {
 		Expect(k8sClient.Delete(context.TODO(), tnt)).Should(Succeed())
+		ModifyCapsuleManagerPodArgs(defaulManagerPodArgs)
 	})
 
-	It("should block creation if contains collided Ingress hostnames", func() {
-		for _, h := range tnt.Spec.IngressHostnames.Exact {
+	It("should not block creation if contains collided Ingress hostnames", func() {
+		for i, h := range tnt.Spec.IngressHostnames.Exact {
 			tnt2 := &v1alpha1.Tenant{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "second-ingress-hostnames",
+					Name: fmt.Sprintf("%s-%d", tnt.GetName(), i),
 				},
 				Spec: v1alpha1.TenantSpec{
 					Owner: v1alpha1.OwnerSpec{
@@ -70,7 +73,10 @@ var _ = Describe("when a second Tenant contains an already declared allowed Ingr
 					},
 				},
 			}
-			Expect(k8sClient.Delete(context.TODO(), tnt2)).ShouldNot(Succeed())
+			EventuallyCreation(func() error {
+				return k8sClient.Create(context.TODO(), tnt2)
+			}).Should(Succeed())
+			_ = k8sClient.Delete(context.TODO(), tnt2)
 		}
 	})
 })

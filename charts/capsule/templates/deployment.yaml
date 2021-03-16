@@ -52,7 +52,9 @@ spec:
           {{ if .Values.manager.options.forceTenantPrefix }}- --force-tenant-prefix={{ .Values.manager.options.forceTenantPrefix }}{{ end }}
           {{ if .Values.manager.options.capsuleUserGroup }}- --capsule-user-group={{ .Values.manager.options.capsuleUserGroup }}{{ end }}
           {{ if .Values.manager.options.protectedNamespaceRegex }}- --protected-namespace-regex={{ .Values.manager.options.protectedNamespaceRegex }}{{ end }}
-          image: {{ include "capsule.fullyQualifiedDockerImage" . }}
+          - --allow-ingress-hostname-collision={{ .Values.manager.options.allowIngressHostnameCollision | default "true" }}
+          - --allow-tenant-ingress-hostnames-collision={{ .Values.manager.allowTenantIngressHostnamesCollision | default "false" }}
+          image: {{ include "capsule.managerFullyQualifiedDockerImage" . }}
           imagePullPolicy: {{ .Values.manager.image.pullPolicy }}
           env:
           - name: NAMESPACE
@@ -64,13 +66,9 @@ spec:
               containerPort: 9443
               protocol: TCP
           livenessProbe:
-            httpGet:
-              path: /healthz
-              port: 10080
+            {{- toYaml .Values.manager.livenessProbe | nindent 12}}
           readinessProbe:
-            httpGet:
-              path: /readyz
-              port: 10080
+            {{- toYaml .Values.manager.readinessProbe | nindent 12}}
           volumeMounts:
           - mountPath: /tmp/k8s-webhook-server/serving-certs
             name: cert
@@ -80,8 +78,8 @@ spec:
           securityContext:
             allowPrivilegeEscalation: false
         - name: kube-rbac-proxy
-          image: {{ .Values.proxy.image.repository }}:{{ .Values.proxy.image.tag }}
-          imagePullPolicy: IfNotPresent
+          image: {{ include "capsule.proxyFullyQualifiedDockerImage" . }}
+          imagePullPolicy: {{ .Values.proxy.image.pullPolicy }}
           args:
           - --secure-listen-address=0.0.0.0:8443
           - --upstream=http://127.0.0.1:8080/

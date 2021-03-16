@@ -3,9 +3,9 @@ Alice acts as the tenant admin. Other users can operate inside the tenant with d
 
 One of the key design principles of the Capsule is the self-provisioning management from the tenant owner's perspective. Alice, the tenant owner, does not need to interact with Bill, the cluster admin, to complete her day-by-day duties. On the other side, Bill has not to deal with multiple requests coming from multiple tenant owners that probably will overwhelm him.
 
-Capsule leaves Alice the freedom to create RBAC roles at the namespace level, or using the pre-defined cluster roles already available in Kubernetes, and assign them to other users in the tenant. Being roles and rolebindings, limited to a namespace scope, Alice can assign the roles to the other users accessing the same tenant only after the namespace is created. This gives Alice the power to admin the tenant without the inteervention of the cluster admin.
+Capsule leaves Alice the freedom to create RBAC roles at the namespace level, or using the pre-defined cluster roles already available in Kubernetes, and assign them to other users in the tenant. Since roles and rolebindings are limited to a namespace scope, Alice can assign the roles to the other users accessing the same tenant only after the namespace is created. This gives Alice the power to administer the tenant without the intervention of the cluster admin.
 
-From the cluster admin perspective, the only required action to Bill is to provision the other identities, eg. `joe` in the Identity Management system of Acme Corp. But this task can be done once, when onboarding the tenant and the users accessing the tenant can be part of the tenant business profile.
+From the cluster admin perspective, the only required action for Bill is to provision the other identities, eg. `joe` in the Identity Management system of Acme Corp. but this task can be done once, when onboarding the tenant and the users accessing the tenant can be part of the tenant business profile.
 
 Alice can create Roles and RoleBindings only in the namespaces she owns
 

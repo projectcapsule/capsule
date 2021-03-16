@@ -1,4 +1,4 @@
-# Assign a nodes pool
+# Assign a node's pool
 Bill, the cluster admin, can dedicate a pool of worker nodes to the `oil` tenant, to isolate the tenant applications from other noisy neighbors.
 
 These nodes are labeled by Bill as `pool=oil`
@@ -33,7 +33,7 @@ The Capsule controller makes sure that any namespace created in the tenant has t
 
 The effect is that all the pods deployed by Alice are placed only on the designated pool of nodes.
 
-Any tentative of Alice to change the selector on the pods will result in the following error from
+Any attempt of Alice to change the selector on the pods will result in the following error from
 the `PodNodeSelector` Admission Controller plugin:
 
 ```

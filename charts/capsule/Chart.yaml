@@ -3,7 +3,7 @@ type: application
 description: A Helm chart to deploy the Capsule Operator for easily implementing,
   managing, and maintaining mutitenancy and access control in Kubernetes.
 home: https://github.com/clastix/capsule
-icon: https://github.com/clastix/capsule/blob/master/assets/logo/space-capsule3.png
+icon: https://github.com/clastix/capsule/raw/master/assets/logo/capsule_small.png
 keywords:
 - kubernetes
 - operator
@@ -21,8 +21,8 @@ sources:
 
 # This is the chart version. This version number should be incremented each time you make changes
 # to the chart and its templates, including the app version.
-version: 0.0.7
+version: 0.0.17
 
 # This is the version number of the application being deployed.
 # This version number should be incremented each time you make changes to the application.
-appVersion: 0.0.3
+appVersion: 0.0.4

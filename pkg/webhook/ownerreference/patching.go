@@ -122,7 +122,7 @@ func (h *handler) OnCreate(clt client.Client, decoder *admission.Decoder) capsul
 		sort.Sort(sort.Reverse(tenants))
 
 		if len(tenants) == 0 {
-			return admission.Denied("You do not have any Tenant assigned: please, reach out the system administrators")
+			return admission.Denied("You do not have any Tenant assigned: please, reach out to the system administrators")
 		}
 
 		if len(tenants) == 1 {

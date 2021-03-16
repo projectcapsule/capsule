@@ -13,6 +13,17 @@ manager:
     forceTenantPrefix:
     capsuleUserGroup:
     protectedNamespaceRegex:
+    allowIngressHostnameCollision:
+    allowTenantIngressHostnamesCollision:
+  livenessProbe:
+    httpGet:
+      path: /healthz
+      port: 10080
+  readinessProbe:
+    httpGet:
+      path: /readyz
+      port: 10080
+
   resources:
     limits:
       cpu: 200m
@@ -32,6 +43,11 @@ proxy:
     requests:
       cpu: 10m
       memory: 64Mi
+jobs:
+  image:
+    repository: bitnami/kubectl
+    pullPolicy: IfNotPresent
+    tag: "1.18"
 mutatingWebhooksTimeoutSeconds: 30
 validatingWebhooksTimeoutSeconds: 30
 imagePullSecrets: []

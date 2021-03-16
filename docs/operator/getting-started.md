@@ -77,7 +77,7 @@ Users authenticated through an _OIDC token_ must have
 
 in their token.
 
-The [hack/create-user.sh](hack/create-user.sh) can help you set up a dummy `kubeconfig` for the `alice` user acting as owner of a tenant called `oil`
+The [hack/create-user.sh](../../hack/create-user.sh) can help you set up a dummy `kubeconfig` for the `alice` user acting as owner of a tenant called `oil`
 
 ```bash
 ./hack/create-user.sh alice oil
