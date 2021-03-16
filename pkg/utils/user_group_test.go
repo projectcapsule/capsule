@@ -19,5 +19,5 @@ func TestIsInCapsuleGroup(t *testing.T) {
 
 	capsuleGroup := "kubernetes-abilitytologin"
 
-	assert.True(t, UserGroupList(groups).IsInCapsuleGroup(capsuleGroup), nil)
+	assert.True(t, NewUserGroupList(groups).Find(capsuleGroup), nil)
 }

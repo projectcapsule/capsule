@@ -20,23 +20,29 @@ import (
 	"sort"
 )
 
-type UserGroupList []string
-
-func (u UserGroupList) Len() int {
-	return len(u)
+type UserGroupList interface {
+	Find(needle string) (found bool)
 }
 
-func (u UserGroupList) Less(i, j int) bool {
-	return u[i] < u[j]
+type userGroupList []string
+
+func NewUserGroupList(groups []string) UserGroupList {
+	list := make(userGroupList, len(groups))
+	for k, v := range groups {
+		list[k] = v
+	}
+	sort.SliceStable(list, func(i, j int) bool {
+		return list[i] < list[j]
+	})
+	return list
 }
 
-func (u UserGroupList) Swap(i, j int) {
-	u[i], u[j] = u[j], u[i]
-}
-
-func (u UserGroupList) IsInCapsuleGroup(capsuleGroup string) (ok bool) {
-	sort.Sort(u)
-	i := sort.SearchStrings(u, capsuleGroup)
-	ok = i < u.Len() && u[i] == capsuleGroup
+// Find sorts itself using the SliceStable and perform a binary-search for the given string.
+func (u userGroupList) Find(needle string) (found bool) {
+	sort.SliceStable(u, func(i, j int) bool {
+		return i < j
+	})
+	i := sort.SearchStrings(u, needle)
+	found = i < len(u) && u[i] == needle
 	return
 }
