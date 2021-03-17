@@ -37,7 +37,7 @@ The Capsule Operator Chart can be used to instantly deploy the Capsule Operator 
         $ helm upgrade capsule clastix/capsule -n capsule-system
 
 5. Uninstall the Chart
-   
+
         $ helm uninstall capsule -n capsule-system
 
 ## Customize the installation
@@ -48,7 +48,7 @@ The `--values` option is the preferred method because it allows you to keep your
 
 Specify your overrides file when you install the chart:
 
-        $ helm install capsule capsule-helm-chart --values myvalues.yaml -n capsule-system   
+        $ helm install capsule capsule-helm-chart --values myvalues.yaml -n capsule-system
 
 The values in your overrides file `myvalues.yaml` will override their counterparts in the chart’s values.yaml file. Any values in `values.yaml` that weren’t overridden will keep their defaults.
 
@@ -64,8 +64,6 @@ Parameter | Description | Default
 `manager.options.forceTenantPrefix` | Boolean, enforces the Tenant owner, during Namespace creation, to name it using the selected Tenant name as prefix, separated by a dash | `false`
 `manager.options.capsuleUserGroup` | Override the Capsule user group | `capsule.clastix.io`
 `manager.options.protectedNamespaceRegex` | If specified, disallows creation of namespaces matching the passed regexp | `null`
-`manager.options.allowIngressHostnameCollision` | Allow the Ingress hostname collision at Ingress resource level across all the Tenants | `true`
-`manager.options.allowTenantIngressHostnamesCollision` | Skip the validation check at Tenant level for colliding Ingress hostnames | `false`
 `manager.image.repository` | Set the image repository of the controller. | `quay.io/clastix/capsule`
 `manager.image.tag` | Overrides the image tag whose default is the chart. `appVersion` | `null`
 `manager.image.pullPolicy` | Set the image pull policy. | `IfNotPresent`

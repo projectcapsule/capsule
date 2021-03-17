@@ -13,8 +13,6 @@ manager:
     forceTenantPrefix:
     capsuleUserGroup:
     protectedNamespaceRegex:
-    allowIngressHostnameCollision:
-    allowTenantIngressHostnamesCollision:
   livenessProbe:
     httpGet:
       path: /healthz
