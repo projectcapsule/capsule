@@ -37,8 +37,8 @@ GROUP=capsule.clastix.io
 TMPDIR=$(mktemp -d)
 echo "creating certs in TMPDIR ${TMPDIR} "
 
-openssl genrsa -out ${TMPDIR}/tls.key 2048
-openssl req -new -key ${TMPDIR}/tls.key -subj "/CN=${USER}/O=${GROUP}" -out ${TMPDIR}/${USER}-${TENANT}.csr
+openssl genrsa -out ${USER}-${TENANT}.key 2048
+openssl req -new -key ${USER}-${TENANT}.key -subj "/CN=${USER}/O=${GROUP}" -out ${TMPDIR}/${USER}-${TENANT}.csr
 
 # Clean any previously created CSR for the same user.
 kubectl delete csr ${USER}-${TENANT} 2>/dev/null || true
@@ -64,7 +64,7 @@ kubectl apply -f ${TMPDIR}/${USER}-${TENANT}-csr.yaml
 
 # Approve and fetch the signed certificate
 kubectl certificate approve ${USER}-${TENANT}
-kubectl get csr ${USER}-${TENANT} -o jsonpath='{.status.certificate}' | base64 --decode > ${TMPDIR}/tls.crt
+kubectl get csr ${USER}-${TENANT} -o jsonpath='{.status.certificate}' | base64 --decode > ${USER}-${TENANT}.crt
 
 # Create the kubeconfig file
 CONTEXT=$(kubectl config current-context)
@@ -90,8 +90,8 @@ preferences: {}
 users:
 - name: ${USER}
   user:
-    client-certificate-data: $(cat ${TMPDIR}/tls.crt | base64 | tr -d '\n')
-    client-key-data: $(cat ${TMPDIR}/tls.key | base64 | tr -d '\n')
+    client-certificate: ${USER}-${TENANT}.crt
+    client-key: ${USER}-${TENANT}.key
 EOF
 
 echo "kubeconfig file is:" ${USER}-${TENANT}.kubeconfig
