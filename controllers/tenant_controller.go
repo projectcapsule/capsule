@@ -500,6 +500,7 @@ func (r *TenantReconciler) syncNamespaceMetadata(namespace string, tnt *capsulev
 		if l == nil {
 			l = make(map[string]string)
 		}
+		l["name"] = namespace
 		capsuleLabel, _ := capsulev1alpha1.GetTypeLabel(&capsulev1alpha1.Tenant{})
 		l[capsuleLabel] = tnt.GetName()
 		ns.SetLabels(l)
