@@ -27,16 +27,16 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
-func Register(mgr controllerruntime.Manager, webhookList ...Webhook) error {
+func Register(manager controllerruntime.Manager, webhookList ...Webhook) error {
 	// skipping webhook setup if certificate is missing
-	dat, _ := ioutil.ReadFile("/tmp/k8s-webhook-server/serving-certs/tls.crt")
-	if len(dat) == 0 {
+	certData, _ := ioutil.ReadFile("/tmp/k8s-webhook-server/serving-certs/tls.crt")
+	if len(certData) == 0 {
 		return nil
 	}
 
-	s := mgr.GetWebhookServer()
+	server := manager.GetWebhookServer()
 	for _, wh := range webhookList {
-		s.Register(wh.GetPath(), &webhook.Admission{
+		server.Register(wh.GetPath(), &webhook.Admission{
 			Handler: &handlerRouter{
 				handler: wh.GetHandler(),
 			},
