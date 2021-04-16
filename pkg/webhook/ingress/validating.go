@@ -97,24 +97,24 @@ func (r *handler) ingressFromRequest(req admission.Request, decoder *admission.D
 	switch req.Kind.Group {
 	case "networking.k8s.io":
 		if req.Kind.Version == "v1" {
-			n := &networkingv1.Ingress{}
-			if err = decoder.Decode(req, n); err != nil {
+			ingressObj := &networkingv1.Ingress{}
+			if err = decoder.Decode(req, ingressObj); err != nil {
 				return
 			}
-			ingress = NetworkingV1{Ingress: n}
+			ingress = NetworkingV1{Ingress: ingressObj}
 			break
 		}
-		n := &networkingv1beta1.Ingress{}
-		if err = decoder.Decode(req, n); err != nil {
+		ingressObj := &networkingv1beta1.Ingress{}
+		if err = decoder.Decode(req, ingressObj); err != nil {
 			return
 		}
-		ingress = NetworkingV1Beta1{Ingress: n}
+		ingress = NetworkingV1Beta1{Ingress: ingressObj}
 	case "extensions":
-		e := &extensionsv1beta1.Ingress{}
-		if err = decoder.Decode(req, e); err != nil {
+		ingressObj := &extensionsv1beta1.Ingress{}
+		if err = decoder.Decode(req, ingressObj); err != nil {
 			return
 		}
-		ingress = Extension{Ingress: e}
+		ingress = Extension{Ingress: ingressObj}
 	default:
 		err = fmt.Errorf("cannot recognize type %s", req.Kind.Group)
 	}
@@ -186,23 +186,23 @@ func (r *handler) validateHostnames(tenant v1alpha1.Tenant, hostnames []string) 
 }
 
 func (r *handler) validateIngress(ctx context.Context, c client.Client, ingress Ingress) admission.Response {
-	tl := &v1alpha1.TenantList{}
-	if err := c.List(ctx, tl, client.MatchingFieldsSelector{
+	tenantList := &v1alpha1.TenantList{}
+	if err := c.List(ctx, tenantList, client.MatchingFieldsSelector{
 		Selector: fields.OneTermEqualSelector(".status.namespaces", ingress.Namespace()),
 	}); err != nil {
 		return admission.Errored(http.StatusBadRequest, err)
 	}
 
-	if len(tl.Items) == 0 {
+	if len(tenantList.Items) == 0 {
 		return admission.Allowed("")
 	}
-	tnt := tl.Items[0]
+	tenant := tenantList.Items[0]
 
-	if err := r.validateClass(tnt, ingress.IngressClass()); err != nil {
+	if err := r.validateClass(tenant, ingress.IngressClass()); err != nil {
 		return admission.Errored(http.StatusBadRequest, err)
 	}
 
-	if err := r.validateHostnames(tnt, ingress.Hostnames()); err != nil {
+	if err := r.validateHostnames(tenant, ingress.Hostnames()); err != nil {
 		return admission.Errored(http.StatusBadRequest, err)
 	}
 
@@ -223,17 +223,17 @@ func (r *handler) validateCollision(ctx context.Context, clt client.Client, ingr
 		var err error
 		switch ingress.(type) {
 		case Extension:
-			el := &extensionsv1beta1.IngressList{}
-			if err = clt.List(ctx, el, client.MatchingFieldsSelector{
+			ingressObjList := &extensionsv1beta1.IngressList{}
+			if err = clt.List(ctx, ingressObjList, client.MatchingFieldsSelector{
 				Selector: fields.OneTermEqualSelector(".spec.rules[*].host", hostname),
 			}); err != nil {
 				return err
 			}
-			switch len(el.Items) {
+			switch len(ingressObjList.Items) {
 			case 0:
 				break
 			case 1:
-				if f := el.Items[0]; f.GetName() == ingress.Name() && f.GetNamespace() == ingress.Namespace() {
+				if ingressObj := ingressObjList.Items[0]; ingressObj.GetName() == ingress.Name() && ingressObj.GetNamespace() == ingress.Namespace() {
 					break
 				}
 				fallthrough
@@ -241,18 +241,18 @@ func (r *handler) validateCollision(ctx context.Context, clt client.Client, ingr
 				return collisionErr
 			}
 		case NetworkingV1:
-			nl := &networkingv1.IngressList{}
-			err = clt.List(ctx, nl, client.MatchingFieldsSelector{
+			ingressObjList := &networkingv1.IngressList{}
+			err = clt.List(ctx, ingressObjList, client.MatchingFieldsSelector{
 				Selector: fields.OneTermEqualSelector(".spec.rules[*].host", hostname),
 			})
 			if err != nil {
 				return errors.Wrap(err, "cannot list *networkingv1.IngressList by MatchingFieldsSelector")
 			}
-			switch len(nl.Items) {
+			switch len(ingressObjList.Items) {
 			case 0:
 				break
 			case 1:
-				if f := nl.Items[0]; f.GetName() == ingress.Name() && f.GetNamespace() == ingress.Namespace() {
+				if ingressObj := ingressObjList.Items[0]; ingressObj.GetName() == ingress.Name() && ingressObj.GetNamespace() == ingress.Namespace() {
 					break
 				}
 				fallthrough
@@ -260,18 +260,18 @@ func (r *handler) validateCollision(ctx context.Context, clt client.Client, ingr
 				return collisionErr
 			}
 		case NetworkingV1Beta1:
-			nlb := &networkingv1beta1.IngressList{}
-			err = clt.List(ctx, nlb, client.MatchingFieldsSelector{
+			ingressObjList := &networkingv1beta1.IngressList{}
+			err = clt.List(ctx, ingressObjList, client.MatchingFieldsSelector{
 				Selector: fields.OneTermEqualSelector(".spec.rules[*].host", hostname),
 			})
 			if err != nil {
 				return errors.Wrap(err, "cannot list *networkingv1beta1.IngressList by MatchingFieldsSelector")
 			}
-			switch len(nlb.Items) {
+			switch len(ingressObjList.Items) {
 			case 0:
 				break
 			case 1:
-				if f := nlb.Items[0]; f.GetName() == ingress.Name() && f.GetNamespace() == ingress.Namespace() {
+				if ingressObj := ingressObjList.Items[0]; ingressObj.GetName() == ingress.Name() && ingressObj.GetNamespace() == ingress.Namespace() {
 					break
 				}
 				fallthrough
