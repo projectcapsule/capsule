@@ -76,7 +76,7 @@ func main() {
 	var metricsAddr string
 	var enableLeaderElection bool
 	var forceTenantPrefix bool
-	var v bool
+	var version bool
 	var capsuleGroup string
 	var protectedNamespaceRegexpString string
 	var protectedNamespaceRegexp *regexp.Regexp
@@ -89,7 +89,7 @@ func main() {
 	flag.BoolVar(&enableLeaderElection, "enable-leader-election", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
-	flag.BoolVar(&v, "version", false, "Print the Capsule version and exit")
+	flag.BoolVar(&version, "version", false, "Print the Capsule version and exit")
 	flag.BoolVar(&forceTenantPrefix, "force-tenant-prefix", false, "Enforces the Tenant owner, "+
 		"during Namespace creation, to name it using the selected Tenant name as prefix, separated by a dash. "+
 		"This is useful to avoid Namespace name collision in a public CaaS environment.")
@@ -115,7 +115,7 @@ func main() {
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
 	printVersion()
-	if v {
+	if version {
 		os.Exit(0)
 	}
 
@@ -124,7 +124,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
+	manager, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:                 scheme,
 		MetricsBindAddress:     metricsAddr,
 		Port:                   9443,
@@ -150,23 +150,23 @@ func main() {
 		os.Exit(1)
 	}
 
-	_ = mgr.AddReadyzCheck("ping", healthz.Ping)
-	_ = mgr.AddHealthzCheck("ping", healthz.Ping)
+	_ = manager.AddReadyzCheck("ping", healthz.Ping)
+	_ = manager.AddHealthzCheck("ping", healthz.Ping)
 
 	setupLog.Info("starting with following options:", "metricsAddr", metricsAddr, "enableLeaderElection", enableLeaderElection, "forceTenantPrefix", forceTenantPrefix)
 
 	if err = (&controllers.TenantReconciler{
-		Client: mgr.GetClient(),
+		Client: manager.GetClient(),
 		Log:    ctrl.Log.WithName("controllers").WithName("Tenant"),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
+		Scheme: manager.GetScheme(),
+	}).SetupWithManager(manager); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Tenant")
 		os.Exit(1)
 	}
 	// +kubebuilder:scaffold:builder
 
 	// webhooks: the order matters, don't change it and just append
-	wl := append(
+	webhooksList := append(
 		make([]webhook.Webhook, 0),
 		ingress.Webhook(ingress.Handler(allowIngressHostnamesCollision)),
 		pvc.Webhook(pvc.Handler()),
@@ -178,7 +178,7 @@ func main() {
 		tenantprefix.Webhook(utils.InCapsuleGroup(capsuleGroup, tenantprefix.Handler(forceTenantPrefix, protectedNamespaceRegexp))),
 		tenant.Webhook(tenant.Handler(allowTenantIngressHostnamesCollision)),
 	)
-	if err = webhook.Register(mgr, wl...); err != nil {
+	if err = webhook.Register(manager, webhooksList...); err != nil {
 		setupLog.Error(err, "unable to setup webhooks")
 		os.Exit(1)
 	}
@@ -187,43 +187,43 @@ func main() {
 		Log:          ctrl.Log.WithName("controllers").WithName("Rbac"),
 		CapsuleGroup: capsuleGroup,
 	}
-	if err = mgr.Add(rbacManager); err != nil {
+	if err = manager.Add(rbacManager); err != nil {
 		setupLog.Error(err, "unable to create cluster roles")
 		os.Exit(1)
 	}
-	if err = rbacManager.SetupWithManager(mgr); err != nil {
+	if err = rbacManager.SetupWithManager(manager); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Rbac")
 		os.Exit(1)
 	}
 
 	if err = (&secret.CAReconciler{
-		Client:    mgr.GetClient(),
+		Client:    manager.GetClient(),
 		Log:       ctrl.Log.WithName("controllers").WithName("CA"),
-		Scheme:    mgr.GetScheme(),
+		Scheme:    manager.GetScheme(),
 		Namespace: namespace,
-	}).SetupWithManager(mgr); err != nil {
+	}).SetupWithManager(manager); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Namespace")
 		os.Exit(1)
 	}
 	if err = (&secret.TLSReconciler{
-		Client:    mgr.GetClient(),
+		Client:    manager.GetClient(),
 		Log:       ctrl.Log.WithName("controllers").WithName("Tls"),
-		Scheme:    mgr.GetScheme(),
+		Scheme:    manager.GetScheme(),
 		Namespace: namespace,
-	}).SetupWithManager(mgr); err != nil {
+	}).SetupWithManager(manager); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Namespace")
 		os.Exit(1)
 	}
 
 	if err = (&servicelabels.ServicesLabelsReconciler{
 		Log: ctrl.Log.WithName("controllers").WithName("ServiceLabels"),
-	}).SetupWithManager(mgr); err != nil {
+	}).SetupWithManager(manager); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ServiceLabels")
 		os.Exit(1)
 	}
 	if err = (&servicelabels.EndpointsLabelsReconciler{
 		Log: ctrl.Log.WithName("controllers").WithName("EndpointLabels"),
-	}).SetupWithManager(mgr); err != nil {
+	}).SetupWithManager(manager); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "EndpointLabels")
 		os.Exit(1)
 	}
@@ -231,17 +231,17 @@ func main() {
 		Log:          ctrl.Log.WithName("controllers").WithName("EndpointSliceLabels"),
 		VersionMinor: minorVer,
 		VersionMajor: majorVer,
-	}).SetupWithManager(mgr); err != nil {
+	}).SetupWithManager(manager); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "EndpointSliceLabels")
 	}
 
-	if err = indexer.AddToManager(mgr); err != nil {
+	if err = indexer.AddToManager(manager); err != nil {
 		setupLog.Error(err, "unable to setup indexers")
 		os.Exit(1)
 	}
 
 	setupLog.Info("starting manager")
-	if err = mgr.Start(ctrl.SetupSignalHandler()); err != nil {
+	if err = manager.Start(ctrl.SetupSignalHandler()); err != nil {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}
