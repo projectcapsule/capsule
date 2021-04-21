@@ -67,13 +67,13 @@ func (r *handler) OnCreate(client client.Client, decoder *admission.Decoder) cap
 			return admission.Errored(http.StatusBadRequest, err)
 		}
 
-		for _, or := range ns.ObjectMeta.OwnerReferences {
+		for _, objectRef := range ns.ObjectMeta.OwnerReferences {
 			// retrieving the selected Tenant
-			t := &capsulev1alpha1.Tenant{}
-			if err := client.Get(ctx, types.NamespacedName{Name: or.Name}, t); err != nil {
+			tnt := &capsulev1alpha1.Tenant{}
+			if err := client.Get(ctx, types.NamespacedName{Name: objectRef.Name}, tnt); err != nil {
 				return admission.Errored(http.StatusBadRequest, err)
 			}
-			if t.IsFull() {
+			if tnt.IsFull() {
 				return admission.Denied(NewNamespaceQuotaExceededError().Error())
 			}
 		}
