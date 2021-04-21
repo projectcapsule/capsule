@@ -40,14 +40,14 @@ type handler struct {
 
 // If the user performing action is not a Capsule user, can be skipped
 func (h handler) isCapsuleUser(req admission.Request) bool {
-	g := utils.NewUserGroupList(req.UserInfo.Groups)
+	groupList := utils.NewUserGroupList(req.UserInfo.Groups)
 	// if the user is a ServiceAccount belonging to the kube-system namespace, definitely, it's not a Capsule user
 	// and we can skip the check in case of Capsule user group assigned to system:authenticated
 	// (ref: https://github.com/clastix/capsule/issues/234)
-	if g.Find("system:serviceaccounts:kube-system") {
+	if groupList.Find("system:serviceaccounts:kube-system") {
 		return false
 	}
-	return g.Find(h.capsuleGroup)
+	return groupList.Find(h.capsuleGroup)
 }
 
 func (h *handler) OnCreate(client client.Client, decoder *admission.Decoder) webhook.Func {

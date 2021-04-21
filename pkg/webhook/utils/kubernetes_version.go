@@ -24,12 +24,12 @@ func GetK8sVersion() (major, minor int, ver string, err error) {
 		return 0, 0, "", err
 	}
 
-	v, err := client.Discovery().ServerVersion()
+	version, err := client.Discovery().ServerVersion()
 	if err != nil {
 		return 0, 0, "", err
 	}
-	major, _ = strconv.Atoi(v.Major)
-	minor, _ = strconv.Atoi(v.Minor)
-	ver = v.String()
+	major, _ = strconv.Atoi(version.Major)
+	minor, _ = strconv.Atoi(version.Minor)
+	ver = version.String()
 	return
 }
