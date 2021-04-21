@@ -66,24 +66,24 @@ func (h *handler) OnCreate(c client.Client, decoder *admission.Decoder) capsulew
 			return admission.Errored(http.StatusBadRequest, err)
 		}
 
-		tl := &capsulev1alpha1.TenantList{}
-		if err := c.List(ctx, tl, client.MatchingFieldsSelector{
+		tntList := &capsulev1alpha1.TenantList{}
+		if err := c.List(ctx, tntList, client.MatchingFieldsSelector{
 			Selector: fields.OneTermEqualSelector(".status.namespaces", pod.Namespace),
 		}); err != nil {
 			return admission.Errored(http.StatusBadRequest, err)
 		}
-		if len(tl.Items) == 0 {
+		if len(tntList.Items) == 0 {
 			return admission.Allowed("")
 		}
 
-		tnt := tl.Items[0]
+		tnt := tntList.Items[0]
 
 		if tnt.Spec.ContainerRegistries != nil {
 			var valid, matched bool
 			for _, container := range pod.Spec.Containers {
-				r := domain.NewRegistry(container.Image)
-				valid = tnt.Spec.ContainerRegistries.ExactMatch(r.Registry())
-				matched = tnt.Spec.ContainerRegistries.RegexMatch(r.Registry())
+				registry := domain.NewRegistry(container.Image)
+				valid = tnt.Spec.ContainerRegistries.ExactMatch(registry.Registry())
+				matched = tnt.Spec.ContainerRegistries.RegexMatch(registry.Registry())
 				if !valid && !matched {
 					return admission.Errored(http.StatusBadRequest, NewContainerRegistryForbidden(container.Image, *tnt.Spec.ContainerRegistries))
 				}
