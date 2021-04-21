@@ -112,17 +112,17 @@ func (h *handler) validateIngressHostnamesRegex(tenant *v1alpha1.Tenant) error {
 func (h *handler) validateIngressHostnamesCollision(context context.Context, clt client.Client, tenant *v1alpha1.Tenant) error {
 	if h.checkIngressHostnamesExact && tenant.Spec.IngressHostnames != nil && len(tenant.Spec.IngressHostnames.Exact) > 0 {
 		for _, h := range tenant.Spec.IngressHostnames.Exact {
-			tl := &v1alpha1.TenantList{}
-			if err := clt.List(context, tl, client.MatchingFieldsSelector{
+			tntList := &v1alpha1.TenantList{}
+			if err := clt.List(context, tntList, client.MatchingFieldsSelector{
 				Selector: fields.OneTermEqualSelector(".spec.ingressHostnames", h),
 			}); err != nil {
 				return fmt.Errorf("cannot retrieve Tenant list using .spec.ingressHostnames field selector: %w", err)
 			}
 			switch {
-			case len(tl.Items) == 1 && tl.Items[0].GetName() == tenant.GetName():
+			case len(tntList.Items) == 1 && tntList.Items[0].GetName() == tenant.GetName():
 				continue
-			case len(tl.Items) > 0:
-				return fmt.Errorf("the allowed hostname %s is already used by the Tenant %s, cannot proceed", h, tl.Items[0].GetName())
+			case len(tntList.Items) > 0:
+				return fmt.Errorf("the allowed hostname %s is already used by the Tenant %s, cannot proceed", h, tntList.Items[0].GetName())
 			default:
 				continue
 			}
