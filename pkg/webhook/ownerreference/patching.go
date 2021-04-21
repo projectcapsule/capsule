@@ -79,18 +79,18 @@ func (h *handler) OnCreate(clt client.Client, decoder *admission.Decoder) capsul
 			return admission.Errored(http.StatusBadRequest, err)
 		}
 		// If we already had TenantName label on NS -> assign to it
-		if l, ok := ns.ObjectMeta.Labels[ln]; ok {
+		if label, ok := ns.ObjectMeta.Labels[ln]; ok {
 			// retrieving the selected Tenant
-			t := &capsulev1alpha1.Tenant{}
-			if err := clt.Get(ctx, types.NamespacedName{Name: l}, t); err != nil {
+			tnt := &capsulev1alpha1.Tenant{}
+			if err := clt.Get(ctx, types.NamespacedName{Name: label}, tnt); err != nil {
 				return admission.Errored(http.StatusBadRequest, err)
 			}
 			// Tenant owner must adhere to user that asked for NS creation
-			if !h.isTenantOwner(t.Spec.Owner, req.UserInfo) {
+			if !h.isTenantOwner(tnt.Spec.Owner, req.UserInfo) {
 				return admission.Denied("Cannot assign the desired namespace to a non-owned Tenant")
 			}
 			// Patching the response
-			return h.patchResponseForOwnerRef(t, ns)
+			return h.patchResponseForOwnerRef(tnt, ns)
 		}
 
 		// If we forceTenantPrefix -> find Tenant from NS name
@@ -98,22 +98,22 @@ func (h *handler) OnCreate(clt client.Client, decoder *admission.Decoder) capsul
 
 		// Find tenants belonging to user
 		{
-			tl, err := h.listTenantsForOwnerKind(ctx, "User", req.UserInfo.Username, clt)
+			tntList, err := h.listTenantsForOwnerKind(ctx, "User", req.UserInfo.Username, clt)
 			if err != nil {
 				return admission.Errored(http.StatusBadRequest, err)
 			}
-			for _, tnt := range tl.Items {
+			for _, tnt := range tntList.Items {
 				tenants = append(tenants, tnt)
 			}
 		}
 		// Find tenants belonging to user groups
 		{
 			for _, group := range req.UserInfo.Groups {
-				tl, err := h.listTenantsForOwnerKind(ctx, "Group", group, clt)
+				tntList, err := h.listTenantsForOwnerKind(ctx, "Group", group, clt)
 				if err != nil {
 					return admission.Errored(http.StatusBadRequest, err)
 				}
-				for _, tnt := range tl.Items {
+				for _, tnt := range tntList.Items {
 					tenants = append(tenants, tnt)
 				}
 			}
@@ -167,21 +167,21 @@ func (h *handler) patchResponseForOwnerRef(tenant *capsulev1alpha1.Tenant, ns *c
 }
 
 func (h *handler) listTenantsForOwnerKind(ctx context.Context, ownerKind string, ownerName string, clt client.Client) (*capsulev1alpha1.TenantList, error) {
-	tl := &capsulev1alpha1.TenantList{}
-	f := client.MatchingFields{
+	tntList := &capsulev1alpha1.TenantList{}
+	fields := client.MatchingFields{
 		".spec.owner.ownerkind": fmt.Sprintf("%s:%s", ownerKind, ownerName),
 	}
-	err := clt.List(ctx, tl, f)
-	return tl, err
+	err := clt.List(ctx, tntList, fields)
+	return tntList, err
 }
 
-func (h *handler) isTenantOwner(os capsulev1alpha1.OwnerSpec, userInfo authenticationv1.UserInfo) bool {
-	if os.Kind == "User" && userInfo.Username == os.Name {
+func (h *handler) isTenantOwner(ownerSpec capsulev1alpha1.OwnerSpec, userInfo authenticationv1.UserInfo) bool {
+	if ownerSpec.Kind == "User" && userInfo.Username == ownerSpec.Name {
 		return true
 	}
-	if os.Kind == "Group" {
+	if ownerSpec.Kind == "Group" {
 		for _, group := range userInfo.Groups {
-			if group == os.Name {
+			if group == ownerSpec.Name {
 				return true
 			}
 		}
