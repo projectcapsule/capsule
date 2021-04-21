@@ -84,13 +84,13 @@ func (r *handler) OnCreate(clt client.Client, decoder *admission.Decoder) capsul
 			return admission.Allowed("")
 		}
 
-		t := &v1alpha1.Tenant{}
+		tnt := &v1alpha1.Tenant{}
 		for _, or := range ns.ObjectMeta.OwnerReferences {
 			// retrieving the selected Tenant
-			if err := clt.Get(ctx, types.NamespacedName{Name: or.Name}, t); err != nil {
+			if err := clt.Get(ctx, types.NamespacedName{Name: or.Name}, tnt); err != nil {
 				return admission.Errored(http.StatusBadRequest, err)
 			}
-			if e := fmt.Sprintf("%s-%s", t.GetName(), ns.GetName()); !strings.HasPrefix(ns.GetName(), fmt.Sprintf("%s-", t.GetName())) {
+			if e := fmt.Sprintf("%s-%s", tnt.GetName(), ns.GetName()); !strings.HasPrefix(ns.GetName(), fmt.Sprintf("%s-", tnt.GetName())) {
 				return admission.Denied("The namespace doesn't match the tenant prefix, expected " + e)
 			}
 		}
