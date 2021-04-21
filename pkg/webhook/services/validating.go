@@ -59,25 +59,25 @@ func Handler() capsulewebhook.Handler {
 }
 
 func (r *handler) handleService(ctx context.Context, clt client.Client, decoder *admission.Decoder, req admission.Request) admission.Response {
-	s := &corev1.Service{}
-	if err := decoder.Decode(req, s); err != nil {
+	svc := &corev1.Service{}
+	if err := decoder.Decode(req, svc); err != nil {
 		return admission.Errored(http.StatusBadRequest, err)
 	}
 
-	if s.Spec.ExternalIPs == nil {
+	if svc.Spec.ExternalIPs == nil {
 		return admission.Allowed("")
 	}
 
-	tl := &v1alpha1.TenantList{}
-	if err := clt.List(ctx, tl, client.MatchingFieldsSelector{
-		Selector: fields.OneTermEqualSelector(".status.namespaces", s.GetNamespace()),
+	tntList := &v1alpha1.TenantList{}
+	if err := clt.List(ctx, tntList, client.MatchingFieldsSelector{
+		Selector: fields.OneTermEqualSelector(".status.namespaces", svc.GetNamespace()),
 	}); err != nil {
 		return admission.Errored(http.StatusBadRequest, err)
 	}
-	if len(tl.Items) == 0 {
+	if len(tntList.Items) == 0 {
 		return admission.Allowed("")
 	}
-	tnt := tl.Items[0]
+	tnt := tntList.Items[0]
 
 	if tnt.Spec.ExternalServiceIPs == nil {
 		return admission.Allowed("")
@@ -85,7 +85,7 @@ func (r *handler) handleService(ctx context.Context, clt client.Client, decoder 
 
 	for _, allowed := range tnt.Spec.ExternalServiceIPs.Allowed {
 		_, allowedIP, _ := net.ParseCIDR(string(allowed))
-		for _, externalIP := range s.Spec.ExternalIPs {
+		for _, externalIP := range svc.Spec.ExternalIPs {
 			IP := net.ParseIP(externalIP)
 			if allowedIP.Contains(IP) {
 				return admission.Allowed("")
