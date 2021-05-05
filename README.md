@@ -180,7 +180,7 @@ $ make remove
 
   A. Although under frequent development and improvements, Capsule is ready to be used in production environments as currently, people are using it in public and private deployments. Check out the [release](https://github.com/clastix/capsule/releases) page for a detailed list of available versions.
 
-- Q. Does it work with my Kuberentes XYZ distribution?
+- Q. Does it work with my Kubernetes XYZ distribution?
 
   A. We tested Capsule with vanilla Kubernetes 1.16+ on private environments and public clouds. We expect it to work smoothly on any other Kubernetes distribution. Please, let us know if you find it doesn't.
 
