@@ -46,7 +46,6 @@ spec:
           command:
           - /manager
           args:
-          - --metrics-addr=127.0.0.1:8080
           - --enable-leader-election
           - --zap-log-level={{ default 4 .Values.manager.options.logLevel }}
           {{ if .Values.manager.options.forceTenantPrefix }}- --force-tenant-prefix={{ .Values.manager.options.forceTenantPrefix }}{{ end }}
@@ -65,6 +64,9 @@ spec:
             - name: webhook-server
               containerPort: 9443
               protocol: TCP
+            - name: metrics
+              containerPort: 8080
+              protocol: TCP
           livenessProbe:
             {{- toYaml .Values.manager.livenessProbe | nindent 12}}
           readinessProbe:
@@ -75,21 +77,5 @@ spec:
             readOnly: true
           resources:
             {{- toYaml .Values.manager.resources | nindent 12 }}
-          securityContext:
-            allowPrivilegeEscalation: false
-        - name: kube-rbac-proxy
-          image: {{ include "capsule.proxyFullyQualifiedDockerImage" . }}
-          imagePullPolicy: {{ .Values.proxy.image.pullPolicy }}
-          args:
-          - --secure-listen-address=0.0.0.0:8443
-          - --upstream=http://127.0.0.1:8080/
-          - --logtostderr=true
-          - --v=10
-          ports:
-          - containerPort: 8443
-            name: https
-            protocol: TCP
-          resources:
-            {{- toYaml .Values.proxy.resources | nindent 12 }}
           securityContext:
             allowPrivilegeEscalation: false

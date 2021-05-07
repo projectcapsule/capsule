@@ -75,13 +75,6 @@ Parameter | Description | Default
 `manager.resources.requests/memory` | Set the memory requests assigned to the controller. | `128Mi`
 `manager.resources.limits/cpu` | Set the CPU limits assigned to the controller. | `200m`
 `manager.resources.limits/cpu` | Set the memory limits assigned to the controller. | `128Mi`
-`proxy.image.repository` | Set the image repository of the rbac proxy. | `gcr.io/kubebuilder/kube-rbac-proxy`
-`proxy.image.tag` | Set the image tag of the rbac proxy. | `v0.5.0`
-`proxy.image.pullPolicy` | Set the image pull policy. | `IfNotPresent`
-`proxy.resources.requests/cpu` | Set the CPU requests assigned to the rbac proxy. | `10m`
-`proxy.resources.requests/memory` | Set the memory requests assigned to the rbac proxy. | `64Mi`
-`proxy.resources.limits/cpu` | Set the CPU limits assigned to the rbac proxy. | `100m`
-`proxy.resources.limits/cpu` | Set the memory limits assigned to the rbac proxy. | `128Mi`
 `mutatingWebhooksTimeoutSeconds` | Timeout in seconds for mutating webhooks. | `30`
 `validatingWebhooksTimeoutSeconds` | Timeout in seconds for validating webhooks. | `30`
 `imagePullSecrets` | Configuration for `imagePullSecrets` so that you can use a private images registry. | `[]`
