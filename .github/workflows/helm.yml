@@ -17,7 +17,7 @@ jobs:
       - name: Linting Chart
         run: helm lint ./charts/capsule
   release:
-    if: github.ref == 'refs/heads/master'
+    if: startsWith(github.ref, 'refs/tags/helm-v')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
