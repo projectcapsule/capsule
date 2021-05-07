@@ -28,9 +28,7 @@ Place the `capsule-proxy` in a pod with SSL mode, i.e. `--enable-ssl=true` and p
         - name: ns-filter
           image: quay.io/clastix/capsule-proxy
           imagePullPolicy: IfNotPresent 
-          command:
-          - /capsule-proxy
-          - --k8s-control-plane-url=https://kubernetes.default.svc
+          args:
           - --capsule-user-group=capsule.clastix.io
           - --zap-log-level=5
           - --enable-ssl=true
