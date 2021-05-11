@@ -32,7 +32,7 @@ import (
 	capsulewebhook "github.com/clastix/capsule/pkg/webhook"
 )
 
-// +kubebuilder:webhook:path=/validating-v1-namespace-tenant-prefix,mutating=false,failurePolicy=fail,groups="",resources=namespaces,verbs=create,versions=v1,name=prefix.namespace.capsule.clastix.io
+// +kubebuilder:webhook:path=/validating-v1-namespace-tenant-prefix,sideEffects=None,admissionReviewVersions=v1,mutating=false,failurePolicy=fail,groups="",resources=namespaces,verbs=create,versions=v1,name=prefix.namespace.capsule.clastix.io
 
 type webhook struct {
 	handler capsulewebhook.Handler

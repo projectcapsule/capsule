@@ -20,7 +20,7 @@ import (
 	"context"
 	"io/ioutil"
 
-	admissionv1beta1 "k8s.io/api/admission/v1beta1"
+	admissionv1 "k8s.io/api/admission/v1"
 	controllerruntime "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
@@ -53,11 +53,11 @@ type handlerRouter struct {
 
 func (r *handlerRouter) Handle(ctx context.Context, req admission.Request) admission.Response {
 	switch req.Operation {
-	case admissionv1beta1.Create:
+	case admissionv1.Create:
 		return r.handler.OnCreate(r.client, r.decoder)(ctx, req)
-	case admissionv1beta1.Update:
+	case admissionv1.Update:
 		return r.handler.OnUpdate(r.client, r.decoder)(ctx, req)
-	case admissionv1beta1.Delete:
+	case admissionv1.Delete:
 		return r.handler.OnDelete(r.client, r.decoder)(ctx, req)
 	default:
 		return admission.Allowed("")
