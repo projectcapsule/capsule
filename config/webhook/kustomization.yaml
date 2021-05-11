@@ -7,7 +7,7 @@ patchesJson6902:
     group: admissionregistration.k8s.io
     kind: ValidatingWebhookConfiguration
     name: validating-webhook-configuration
-    version: v1beta1
+    version: v1
   path: patch_ns_selector.yaml
 
 configurations:
