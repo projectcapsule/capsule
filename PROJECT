@@ -2,9 +2,13 @@ domain: github.com/clastix/capsule
 layout: go.kubebuilder.io/v2
 repo: github.com/clastix/capsule
 resources:
-- group: capsule.clastix.io
+-
+  controller: true
+  domain: github.com/clastix/capsule
+  group: capsule.clastix.io
   kind: Tenant
+  path: github.com/clastix/capsule/api/v1alpha1
   version: v1alpha1
-version: 3-alpha
+version: "3"
 plugins:
   go.operator-sdk.io/v2-alpha: {}
