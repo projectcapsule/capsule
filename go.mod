@@ -1,6 +1,6 @@
 module github.com/clastix/capsule
 
-go 1.13
+go 1.16
 
 require (
 	github.com/go-logr/logr v0.3.0
