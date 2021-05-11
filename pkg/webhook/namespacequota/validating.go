@@ -29,7 +29,7 @@ import (
 	capsulewebhook "github.com/clastix/capsule/pkg/webhook"
 )
 
-// +kubebuilder:webhook:path=/validate-v1-namespace-quota,mutating=false,failurePolicy=fail,groups="",resources=namespaces,verbs=create,versions=v1,name=quota.namespace.capsule.clastix.io
+// +kubebuilder:webhook:path=/validate-v1-namespace-quota,mutating=false,sideEffects=None,admissionReviewVersions=v1,failurePolicy=fail,groups="",resources=namespaces,verbs=create,versions=v1,name=quota.namespace.capsule.clastix.io
 
 type webhook struct {
 	handler capsulewebhook.Handler

@@ -29,7 +29,7 @@ import (
 	capsulewebhook "github.com/clastix/capsule/pkg/webhook"
 )
 
-// +kubebuilder:webhook:path=/validating-v1-network-policy,mutating=false,failurePolicy=fail,groups=networking.k8s.io,resources=networkpolicies,verbs=create;update;delete,versions=v1,name=validating.network-policy.capsule.clastix.io
+// +kubebuilder:webhook:path=/validating-v1-network-policy,mutating=false,sideEffects=None,admissionReviewVersions=v1,failurePolicy=fail,groups=networking.k8s.io,resources=networkpolicies,verbs=create;update;delete,versions=v1,name=validating.network-policy.capsule.clastix.io
 
 type webhook struct {
 	handler capsulewebhook.Handler
