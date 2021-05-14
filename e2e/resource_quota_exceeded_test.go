@@ -178,10 +178,10 @@ var _ = Describe("exceeding a Tenant resource quota", func() {
 				}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 			})
 			By("ensuring the status has been blocked with actual usage", func() {
-				Eventually(func() corev1.ResourceList {
+				Eventually(func() bool {
 					_ = k8sClient.Get(context.TODO(), types.NamespacedName{Name: n, Namespace: ns}, rq)
-					return rq.Status.Hard
-				}, defaultTimeoutInterval, defaultPollInterval).Should(Equal(rq.Status.Used))
+					return rq.Status.Hard.Pods().String() == rq.Status.Used.Pods().String()
+				}, defaultTimeoutInterval, defaultPollInterval).Should(BeTrue())
 			})
 			By("creating an exceeded Pod", func() {
 				pod := &corev1.Pod{
