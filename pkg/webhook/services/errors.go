@@ -40,3 +40,13 @@ func NewExternalServiceIPForbidden(allowedIps []v1alpha1.AllowedIP) error {
 func (e externalServiceIPForbidden) Error() string {
 	return fmt.Sprintf("The selected external IPs for the current Service are violating the following enforced CIDRs: %s", strings.Join(e.cidr, ", "))
 }
+
+type nodePortDisabled struct{}
+
+func NewNodePortDisabledError() error {
+	return &nodePortDisabled{}
+}
+
+func (nodePortDisabled) Error() string {
+	return "NodePort service types are disabled for a tenant: please, reach out to the system administrators"
+}

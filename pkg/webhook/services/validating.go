@@ -32,6 +32,10 @@ import (
 
 // +kubebuilder:webhook:path=/validating-external-service-ips,mutating=false,sideEffects=None,admissionReviewVersions=v1,failurePolicy=fail,groups="",resources=services,verbs=create;update,versions=v1,name=validating-external-service-ips.capsule.clastix.io
 
+const (
+	enableNodePortsAnnotation = "capsule.clastix.io/enable-node-ports"
+)
+
 type webhook struct {
 	handler capsulewebhook.Handler
 }
@@ -91,6 +95,10 @@ func (r *handler) handleService(ctx context.Context, clt client.Client, decoder 
 				return admission.Allowed("")
 			}
 		}
+	}
+
+	if svc.Spec.Type == corev1.ServiceTypeNodePort && tnt.GetAnnotations()[enableNodePortsAnnotation] == "false" {
+		return admission.Errored(http.StatusBadRequest, NewNodePortDisabledError())
 	}
 
 	return admission.Errored(http.StatusBadRequest, NewExternalServiceIPForbidden(tnt.Spec.ExternalServiceIPs.Allowed))
