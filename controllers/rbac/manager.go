@@ -20,6 +20,8 @@ import (
 	"context"
 	"fmt"
 
+	b64 "encoding/base64"
+
 	"github.com/go-logr/logr"
 	"github.com/hashicorp/go-multierror"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -34,10 +36,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
+const (
+	rbacLabel = "capsule.clastix.io/rbac"
+)
+
 type Manager struct {
-	CapsuleGroup string
-	Log          logr.Logger
-	Client       client.Client
+	CapsuleGroups []string
+	Log           logr.Logger
+	Client        client.Client
 }
 
 // Using the Client interface, required by the Runnable interface
@@ -115,36 +121,42 @@ func (r *Manager) Reconcile(ctx context.Context, request reconcile.Request) (res
 }
 
 func (r *Manager) EnsureClusterRoleBinding() (err error) {
-	crb := &rbacv1.ClusterRoleBinding{
-		ObjectMeta: v1.ObjectMeta{
-			Name: ProvisionerRoleName,
-		},
-	}
-
-	_, err = controllerutil.CreateOrUpdate(context.TODO(), r.Client, crb, func() error {
-		// RoleRef is immutable, so we need to delete and recreate ClusterRoleBinding if it changed
-		if crb.ResourceVersion != "" && !equality.Semantic.DeepDerivative(provisionerClusterRoleBinding.RoleRef, crb.RoleRef) {
-			return ImmutableClusterRoleBindingError{}
-		}
-		crb.RoleRef = provisionerClusterRoleBinding.RoleRef
-		crb.Subjects = []rbacv1.Subject{
-			{
-				Kind: "Group",
-				Name: r.CapsuleGroup,
+	for _, group := range r.CapsuleGroups {
+		name := b64.RawStdEncoding.EncodeToString([]byte(group))
+		crb := &rbacv1.ClusterRoleBinding{
+			ObjectMeta: v1.ObjectMeta{
+				Name: fmt.Sprintf("%s-%v", ProvisionerRoleName, name),
+				Labels: map[string]string{
+					rbacLabel: fmt.Sprintf("%s-%v", ProvisionerRoleName, name),
+				},
 			},
 		}
-		return nil
-	})
-	if err != nil {
-		if _, ok := err.(ImmutableClusterRoleBindingError); ok {
-			if err = r.Client.Delete(context.TODO(), crb); err != nil {
-				r.Log.Error(err, "Cannot delete CRB during reset due to RoleRef change")
-				return
+
+		_, err = controllerutil.CreateOrUpdate(context.TODO(), r.Client, crb, func() error {
+			// RoleRef is immutable, so we need to delete and recreate ClusterRoleBinding if it changed
+			if crb.ResourceVersion != "" && !equality.Semantic.DeepDerivative(provisionerClusterRoleBinding.RoleRef, crb.RoleRef) {
+				return ImmutableClusterRoleBindingError{}
 			}
-			return r.Client.Create(context.TODO(), provisionerClusterRoleBinding, &client.CreateOptions{})
+			crb.RoleRef = provisionerClusterRoleBinding.RoleRef
+			crb.Subjects = []rbacv1.Subject{
+				{
+					Kind: "Group",
+					Name: group,
+				},
+			}
+			return nil
+		})
+		if err != nil {
+			if _, ok := err.(ImmutableClusterRoleBindingError); ok {
+				if err = r.Client.Delete(context.TODO(), crb); err != nil {
+					r.Log.Error(err, "Cannot delete CRB during reset due to RoleRef change")
+					return
+				}
+				return r.Client.Create(context.TODO(), provisionerClusterRoleBinding, &client.CreateOptions{})
+			}
+			r.Log.Error(err, "Cannot CreateOrUpdate CRB")
+			return
 		}
-		r.Log.Error(err, "Cannot CreateOrUpdate CRB")
-		return
 	}
 	return
 }

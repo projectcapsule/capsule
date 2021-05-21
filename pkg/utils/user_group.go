@@ -39,9 +39,6 @@ func NewUserGroupList(groups []string) UserGroupList {
 
 // Find sorts itself using the SliceStable and perform a binary-search for the given string.
 func (u userGroupList) Find(needle string) (found bool) {
-	sort.SliceStable(u, func(i, j int) bool {
-		return i < j
-	})
 	i := sort.SearchStrings(u, needle)
 	found = i < len(u) && u[i] == needle
 	return

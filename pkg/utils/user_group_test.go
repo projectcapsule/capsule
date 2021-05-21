@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestIsInCapsuleGroup(t *testing.T) {
+func TestIsInCapsuleGroups(t *testing.T) {
 	groups := []string{
 		"DPS-QQ-DeparEE-Upload_RW",
 		"vsphere - glonqqqq-devopsq",
