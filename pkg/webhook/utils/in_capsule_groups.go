@@ -26,16 +26,16 @@ import (
 	"github.com/clastix/capsule/pkg/webhook"
 )
 
-func InCapsuleGroup(capsuleGroup string, webhookHandler webhook.Handler) webhook.Handler {
+func InCapsuleGroups(capsuleGroups []string, webhookHandler webhook.Handler) webhook.Handler {
 	return &handler{
-		handler:      webhookHandler,
-		capsuleGroup: capsuleGroup,
+		handler:       webhookHandler,
+		capsuleGroups: capsuleGroups,
 	}
 }
 
 type handler struct {
-	capsuleGroup string
-	handler      webhook.Handler
+	capsuleGroups []string
+	handler       webhook.Handler
 }
 
 // If the user performing action is not a Capsule user, can be skipped
@@ -47,7 +47,12 @@ func (h handler) isCapsuleUser(req admission.Request) bool {
 	if groupList.Find("system:serviceaccounts:kube-system") {
 		return false
 	}
-	return groupList.Find(h.capsuleGroup)
+	for _, group := range h.capsuleGroups {
+		if groupList.Find(group) {
+			return true
+		}
+	}
+	return false
 }
 
 func (h *handler) OnCreate(client client.Client, decoder *admission.Decoder) webhook.Func {

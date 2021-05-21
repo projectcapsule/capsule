@@ -17,11 +17,13 @@ limitations under the License.
 package main
 
 import (
-	"flag"
+	goflag "flag"
 	"fmt"
 	"os"
 	"regexp"
 	goRuntime "runtime"
+
+	flag "github.com/spf13/pflag"
 
 	"go.uber.org/zap/zapcore"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -77,15 +79,16 @@ func main() {
 	var enableLeaderElection bool
 	var forceTenantPrefix bool
 	var version bool
-	var capsuleGroup string
+	var capsuleGroups []string
 	var protectedNamespaceRegexpString string
 	var protectedNamespaceRegexp *regexp.Regexp
 	var allowTenantIngressHostnamesCollision bool
 	var allowIngressHostnamesCollision bool
 	var namespace string
+	var goFlagSet goflag.FlagSet
 
 	flag.StringVar(&metricsAddr, "metrics-addr", ":8080", "The address the metric endpoint binds to.")
-	flag.StringVar(&capsuleGroup, "capsule-user-group", capsulev1alpha1.GroupVersion.Group, "Name of the group for capsule users")
+	flag.StringSliceVar(&capsuleGroups, "capsule-user-group", []string{capsulev1alpha1.GroupVersion.Group}, "Names of the groups for capsule users")
 	flag.BoolVar(&enableLeaderElection, "enable-leader-election", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
@@ -109,7 +112,9 @@ func main() {
 			config.EncodeTime = zapcore.ISO8601TimeEncoder
 		}),
 	}
-	opts.BindFlags(flag.CommandLine)
+
+	opts.BindFlags(&goFlagSet)
+	flag.CommandLine.AddGoFlagSet(&goFlagSet)
 	flag.Parse()
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
@@ -172,10 +177,10 @@ func main() {
 		pvc.Webhook(pvc.Handler()),
 		registry.Webhook(registry.Handler()),
 		services.Webhook(services.Handler()),
-		ownerreference.Webhook(utils.InCapsuleGroup(capsuleGroup, ownerreference.Handler(forceTenantPrefix))),
-		namespacequota.Webhook(utils.InCapsuleGroup(capsuleGroup, namespacequota.Handler())),
-		networkpolicies.Webhook(utils.InCapsuleGroup(capsuleGroup, networkpolicies.Handler())),
-		tenantprefix.Webhook(utils.InCapsuleGroup(capsuleGroup, tenantprefix.Handler(forceTenantPrefix, protectedNamespaceRegexp))),
+		ownerreference.Webhook(utils.InCapsuleGroups(capsuleGroups, ownerreference.Handler(forceTenantPrefix))),
+		namespacequota.Webhook(utils.InCapsuleGroups(capsuleGroups, namespacequota.Handler())),
+		networkpolicies.Webhook(utils.InCapsuleGroups(capsuleGroups, networkpolicies.Handler())),
+		tenantprefix.Webhook(utils.InCapsuleGroups(capsuleGroups, tenantprefix.Handler(forceTenantPrefix, protectedNamespaceRegexp))),
 		tenant.Webhook(tenant.Handler(allowTenantIngressHostnamesCollision)),
 	)
 	if err = webhook.Register(manager, webhooksList...); err != nil {
@@ -184,8 +189,8 @@ func main() {
 	}
 
 	rbacManager := &rbac.Manager{
-		Log:          ctrl.Log.WithName("controllers").WithName("Rbac"),
-		CapsuleGroup: capsuleGroup,
+		Log:           ctrl.Log.WithName("controllers").WithName("Rbac"),
+		CapsuleGroups: capsuleGroups,
 	}
 	if err = manager.Add(rbacManager); err != nil {
 		setupLog.Error(err, "unable to create cluster roles")

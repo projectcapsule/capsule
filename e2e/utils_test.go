@@ -20,6 +20,8 @@ package e2e
 
 import (
 	"context"
+	b64 "encoding/base64"
+	"fmt"
 	"strconv"
 	"time"
 
@@ -70,21 +72,29 @@ func EventuallyCreation(f interface{}) AsyncAssertion {
 	return Eventually(f, defaultTimeoutInterval, defaultPollInterval)
 }
 
-func CapsuleClusterGroupParam(timeout time.Duration) AsyncAssertion {
+func CapsuleClusterGroupParam(timeout time.Duration, groups []string) AsyncAssertion {
 	capsuleCRB := &rbacv1.ClusterRoleBinding{}
 
-	return Eventually(func() string {
-		Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: rbac.ProvisionerRoleName}, capsuleCRB)).Should(Succeed())
-		return capsuleCRB.Subjects[0].Name
+	return Eventually(func() []string {
+		var subjectNames []string
+		for _, group := range groups {
+			name := b64.RawStdEncoding.EncodeToString([]byte(group))
+			Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: fmt.Sprintf("%s-%v", rbac.ProvisionerRoleName, name)}, capsuleCRB)).Should(Succeed())
+			subjectNames = append(subjectNames, capsuleCRB.Subjects[0].Name)
+		}
+		return subjectNames
 	}, timeout, defaultPollInterval)
 }
 
 func ModifyCapsuleManagerPodArgs(args []string) {
 	capsuleDeployment := &appsv1.Deployment{}
 	k8sClient.Get(context.TODO(), types.NamespacedName{Name: capsuleDeploymentName, Namespace: capsuleNamespace}, capsuleDeployment)
+
 	for i, container := range capsuleDeployment.Spec.Template.Spec.Containers {
 		if container.Name == capsuleManagerContainerName {
 			capsuleDeployment.Spec.Template.Spec.Containers[i].Args = args
+			capsuleDeployment.Spec.Template.Spec.Containers[i].LivenessProbe.FailureThreshold = 4
+			capsuleDeployment.Spec.Template.Spec.Containers[i].LivenessProbe.PeriodSeconds = 3
 		}
 	}
 	capsuleDeployment.ResourceVersion = ""

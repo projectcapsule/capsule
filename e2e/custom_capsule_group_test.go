@@ -20,6 +20,7 @@ package e2e
 
 import (
 	"context"
+	"fmt"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -52,18 +53,41 @@ var _ = Describe("creating a Namespace as Tenant owner with custom --capsule-gro
 	})
 
 	It("should fail using a User non matching the capsule-user-group flag", func() {
-		args := append(defaulManagerPodArgs, []string{"--capsule-user-group=test"}...)
+		var managerPodArgs []string
+		capsuleGroups := []string{"test"}
+		for _, group := range capsuleGroups {
+			managerPodArgs = append(managerPodArgs, fmt.Sprintf("--capsule-user-group=%s", group))
+		}
+
+		args := append(defaulManagerPodArgs, managerPodArgs...)
 		ModifyCapsuleManagerPodArgs(args)
-		CapsuleClusterGroupParam(podRecreationTimeoutInterval).Should(BeIdenticalTo("test"))
+		CapsuleClusterGroupParam(podRecreationTimeoutInterval, capsuleGroups).Should(ContainElements(capsuleGroups))
 		ns := NewNamespace("cg-namespace-fail")
 		NamespaceCreation(ns, tnt, podRecreationTimeoutInterval).ShouldNot(Succeed())
 	})
 
-	It("should succeed and be available in Tenant namespaces list", func() {
-		ModifyCapsuleManagerPodArgs(defaulManagerPodArgs)
-		CapsuleClusterGroupParam(podRecreationTimeoutInterval).Should(BeIdenticalTo("capsule.clastix.io"))
-		ns := NewNamespace("cg-namespace")
+	It("should succeed and be available in Tenant namespaces list with multiple groups", func() {
+		var managerPodArgs []string
+		capsuleGroups := []string{"test", "alice"}
+		for _, group := range capsuleGroups {
+			managerPodArgs = append(managerPodArgs, fmt.Sprintf("--capsule-user-group=%s", group))
+		}
+
+		args := append(defaulManagerPodArgs, managerPodArgs...)
+		ModifyCapsuleManagerPodArgs(args)
+		CapsuleClusterGroupParam(podRecreationTimeoutInterval, capsuleGroups).Should(ContainElements(capsuleGroups))
+		ns := NewNamespace("cg-namespace-1")
 		NamespaceCreation(ns, tnt, podRecreationTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(tnt, podRecreationTimeoutInterval).Should(ContainElement(ns.GetName()))
 	})
+
+	It("should succeed and be available in Tenant namespaces list with default single group", func() {
+		capsuleGroups := []string{"capsule.clastix.io"}
+		ModifyCapsuleManagerPodArgs(defaulManagerPodArgs)
+		CapsuleClusterGroupParam(podRecreationTimeoutInterval, capsuleGroups).Should(ContainElements("capsule.clastix.io"))
+		ns := NewNamespace("cg-namespace-2")
+		NamespaceCreation(ns, tnt, podRecreationTimeoutInterval).Should(Succeed())
+		TenantNamespaceList(tnt, podRecreationTimeoutInterval).Should(ContainElement(ns.GetName()))
+	})
+
 })
