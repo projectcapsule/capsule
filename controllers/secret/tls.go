@@ -21,6 +21,7 @@ import (
 	"context"
 	"crypto/x509"
 	"encoding/pem"
+	"fmt"
 	"syscall"
 	"time"
 
@@ -82,7 +83,7 @@ func (r TLSReconciler) Reconcile(ctx context.Context, request ctrl.Request) (ctr
 		r.Log.Info("Missing Capsule TLS certificate")
 		rq = 6 * 30 * 24 * time.Hour
 
-		opts := cert.NewCertOpts(time.Now().Add(rq), "capsule-webhook-service.capsule-system.svc")
+		opts := cert.NewCertOpts(time.Now().Add(rq), fmt.Sprintf("capsule-webhook-service.%s.svc", r.Namespace))
 		var crt, key *bytes.Buffer
 		crt, key, err = ca.GenerateCertificate(opts)
 		if err != nil {
