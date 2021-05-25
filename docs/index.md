@@ -35,6 +35,7 @@ docs
         ├── onboarding.md
         ├── overview.md
         ├── permissions.md
+        ├── pod-priority-class.md
         ├── pod-security-policies.md
         ├── resources-quota-limits.md
         ├── storage-classes.md

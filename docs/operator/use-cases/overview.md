@@ -25,6 +25,7 @@ Bill, at Acme Corp. can use Capsule to address any of the following scenarios:
 * [Create Namespaces](./create-namespaces.md)
 * [Assign Permissions](./permissions.md)
 * [Enforce Resources Quotas and Limits](./resources-quota-limits.md)
+* [Enforce Pod Priority Classes](./pod-priority-class.md)
 * [Assign specific Node Pools](./nodes-pool.md)
 * [Assign Ingress Classes](./ingress-classes.md)
 * [Assign Ingress Hostnames](./ingress-hostnames.md)
@@ -34,7 +35,6 @@ Bill, at Acme Corp. can use Capsule to address any of the following scenarios:
 * [Assign Pod Security Policies](./pod-security-policies.md)
 * [Create Custom Resources](./custom-resources.md)
 * [Taint Namespaces](./taint-namespaces.md)
-
 * [Assign multiple Tenants to an owner](./multiple-tenants.md)
 
 > NB: as we improve Capsule, more use cases about multi-tenancy and cluster governance will be covered.
