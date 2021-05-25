@@ -31,6 +31,7 @@ docs
         ├── ingress-hostnames.md
         ├── multiple-tenants.md
         ├── network-policies.md
+        ├── node-ports.md
         ├── nodes-pool.md
         ├── onboarding.md
         ├── overview.md

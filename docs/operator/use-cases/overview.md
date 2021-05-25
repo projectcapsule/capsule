@@ -30,6 +30,7 @@ Bill, at Acme Corp. can use Capsule to address any of the following scenarios:
 * [Assign Ingress Classes](./ingress-classes.md)
 * [Assign Ingress Hostnames](./ingress-hostnames.md)
 * [Assign Storage Classes](./storage-classes.md)
+* [Disable NodePort Services](./node-ports.md)
 * [Assign Network Policies](./network-policies.md)
 * [Assign Trusted Images Registries](./images-registries.md)
 * [Assign Pod Security Policies](./pod-security-policies.md)
