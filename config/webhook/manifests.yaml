@@ -120,6 +120,25 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
+      path: /validating-v1-podpriority
+  failurePolicy: Ignore
+  name: podpriority.capsule.clastix.io
+  rules:
+  - apiGroups:
+    - ""
+    apiVersions:
+    - v1
+    operations:
+    - CREATE
+    resources:
+    - pods
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
       path: /validating-v1-pvc
   failurePolicy: Fail
   name: pvc.capsule.clastix.io
