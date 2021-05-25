@@ -24,7 +24,6 @@ import (
 	goRuntime "runtime"
 
 	flag "github.com/spf13/pflag"
-
 	"go.uber.org/zap/zapcore"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -45,6 +44,7 @@ import (
 	"github.com/clastix/capsule/pkg/webhook/namespacequota"
 	"github.com/clastix/capsule/pkg/webhook/networkpolicies"
 	"github.com/clastix/capsule/pkg/webhook/ownerreference"
+	"github.com/clastix/capsule/pkg/webhook/podpriority"
 	"github.com/clastix/capsule/pkg/webhook/pvc"
 	"github.com/clastix/capsule/pkg/webhook/registry"
 	"github.com/clastix/capsule/pkg/webhook/services"
@@ -176,6 +176,7 @@ func main() {
 		ingress.Webhook(ingress.Handler(allowIngressHostnamesCollision)),
 		pvc.Webhook(pvc.Handler()),
 		registry.Webhook(registry.Handler()),
+		podpriority.Webhook(podpriority.Handler()),
 		services.Webhook(services.Handler()),
 		ownerreference.Webhook(utils.InCapsuleGroups(capsuleGroups, ownerreference.Handler(forceTenantPrefix))),
 		namespacequota.Webhook(utils.InCapsuleGroups(capsuleGroups, namespacequota.Handler())),
