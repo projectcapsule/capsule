@@ -68,10 +68,6 @@ func (r *handler) handleService(ctx context.Context, clt client.Client, decoder 
 		return admission.Errored(http.StatusBadRequest, err)
 	}
 
-	if svc.Spec.ExternalIPs == nil {
-		return admission.Allowed("")
-	}
-
 	tntList := &v1alpha1.TenantList{}
 	if err := clt.List(ctx, tntList, client.MatchingFieldsSelector{
 		Selector: fields.OneTermEqualSelector(".status.namespaces", svc.GetNamespace()),
@@ -83,7 +79,11 @@ func (r *handler) handleService(ctx context.Context, clt client.Client, decoder 
 	}
 	tnt := tntList.Items[0]
 
-	if tnt.Spec.ExternalServiceIPs == nil {
+	if svc.Spec.Type == corev1.ServiceTypeNodePort && tnt.GetAnnotations()[enableNodePortsAnnotation] == "false" {
+		return admission.Errored(http.StatusBadRequest, NewNodePortDisabledError())
+	}
+
+	if svc.Spec.ExternalIPs == nil || tnt.Spec.ExternalServiceIPs == nil {
 		return admission.Allowed("")
 	}
 
@@ -95,10 +95,6 @@ func (r *handler) handleService(ctx context.Context, clt client.Client, decoder 
 				return admission.Allowed("")
 			}
 		}
-	}
-
-	if svc.Spec.Type == corev1.ServiceTypeNodePort && tnt.GetAnnotations()[enableNodePortsAnnotation] == "false" {
-		return admission.Errored(http.StatusBadRequest, NewNodePortDisabledError())
 	}
 
 	return admission.Errored(http.StatusBadRequest, NewExternalServiceIPForbidden(tnt.Spec.ExternalServiceIPs.Allowed))
