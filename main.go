@@ -20,7 +20,6 @@ import (
 	goflag "flag"
 	"fmt"
 	"os"
-	"regexp"
 	goRuntime "runtime"
 
 	flag "github.com/spf13/pflag"
@@ -35,9 +34,11 @@ import (
 
 	capsulev1alpha1 "github.com/clastix/capsule/api/v1alpha1"
 	"github.com/clastix/capsule/controllers"
+	config "github.com/clastix/capsule/controllers/config"
 	"github.com/clastix/capsule/controllers/rbac"
 	"github.com/clastix/capsule/controllers/secret"
 	"github.com/clastix/capsule/controllers/servicelabels"
+	"github.com/clastix/capsule/pkg/configuration"
 	"github.com/clastix/capsule/pkg/indexer"
 	"github.com/clastix/capsule/pkg/webhook"
 	"github.com/clastix/capsule/pkg/webhook/ingress"
@@ -77,35 +78,16 @@ func printVersion() {
 func main() {
 	var metricsAddr string
 	var enableLeaderElection bool
-	var forceTenantPrefix bool
 	var version bool
-	var capsuleGroups []string
-	var protectedNamespaceRegexpString string
-	var protectedNamespaceRegexp *regexp.Regexp
-	var allowTenantIngressHostnamesCollision bool
-	var allowIngressHostnamesCollision bool
-	var namespace string
+	var namespace, configurationName string
 	var goFlagSet goflag.FlagSet
 
 	flag.StringVar(&metricsAddr, "metrics-addr", ":8080", "The address the metric endpoint binds to.")
-	flag.StringSliceVar(&capsuleGroups, "capsule-user-group", []string{capsulev1alpha1.GroupVersion.Group}, "Names of the groups for capsule users")
 	flag.BoolVar(&enableLeaderElection, "enable-leader-election", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
 	flag.BoolVar(&version, "version", false, "Print the Capsule version and exit")
-	flag.BoolVar(&forceTenantPrefix, "force-tenant-prefix", false, "Enforces the Tenant owner, "+
-		"during Namespace creation, to name it using the selected Tenant name as prefix, separated by a dash. "+
-		"This is useful to avoid Namespace name collision in a public CaaS environment.")
-	flag.StringVar(&protectedNamespaceRegexpString, "protected-namespace-regex", "", "Disallow creation of namespaces, whose name matches this regexp")
-	flag.BoolVar(
-		&allowTenantIngressHostnamesCollision,
-		"allow-tenant-ingress-hostnames-collision",
-		false,
-		"When defining the exact match for allowed Ingress hostnames at Tenant level, a collision is not allowed. "+
-			"Toggling this, Capsule will not check if a hostname collision is in place, allowing the creation of "+
-			"two or more Tenant resources although sharing the same allowed hostname(s).",
-	)
-	flag.BoolVar(&allowIngressHostnamesCollision, "allow-ingress-hostname-collision", true, "Allow the Ingress hostname collision at Ingress resource level across all the Tenants.")
+	flag.StringVar(&configurationName, "configuration-name", "default", "The CapsuleConfiguration resource name to use")
 
 	opts := zap.Options{
 		EncoderConfigOptions: append([]zap.EncoderConfigOption{}, func(config *zapcore.EncoderConfig) {
@@ -129,6 +111,11 @@ func main() {
 		os.Exit(1)
 	}
 
+	if len(configurationName) == 0 {
+		setupLog.Error(fmt.Errorf("missing CapsuleConfiguration resource name"), "unable to start manager")
+		os.Exit(1)
+	}
+
 	manager, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:                 scheme,
 		MetricsBindAddress:     metricsAddr,
@@ -141,13 +128,6 @@ func main() {
 		setupLog.Error(err, "unable to start manager")
 		os.Exit(1)
 	}
-	if len(protectedNamespaceRegexpString) > 0 {
-		protectedNamespaceRegexp, err = regexp.Compile(protectedNamespaceRegexpString)
-		if err != nil {
-			setupLog.Error(err, "unable to compile protected-namespace-regex", "protected-namespace-regex", protectedNamespaceRegexp)
-			os.Exit(1)
-		}
-	}
 
 	majorVer, minorVer, _, err := utils.GetK8sVersion()
 	if err != nil {
@@ -157,8 +137,6 @@ func main() {
 
 	_ = manager.AddReadyzCheck("ping", healthz.Ping)
 	_ = manager.AddHealthzCheck("ping", healthz.Ping)
-
-	setupLog.Info("starting with following options:", "metricsAddr", metricsAddr, "enableLeaderElection", enableLeaderElection, "forceTenantPrefix", forceTenantPrefix)
 
 	if err = (&controllers.TenantReconciler{
 		Client: manager.GetClient(),
@@ -170,19 +148,21 @@ func main() {
 	}
 	// +kubebuilder:scaffold:builder
 
+	cfg := configuration.NewCapsuleConfiguration(manager.GetClient(), configurationName)
+
 	// webhooks: the order matters, don't change it and just append
 	webhooksList := append(
 		make([]webhook.Webhook, 0),
-		ingress.Webhook(ingress.Handler(allowIngressHostnamesCollision)),
+		ingress.Webhook(ingress.Handler(cfg)),
 		pvc.Webhook(pvc.Handler()),
 		registry.Webhook(registry.Handler()),
 		podpriority.Webhook(podpriority.Handler()),
 		services.Webhook(services.Handler()),
-		ownerreference.Webhook(utils.InCapsuleGroups(capsuleGroups, ownerreference.Handler(forceTenantPrefix))),
-		namespacequota.Webhook(utils.InCapsuleGroups(capsuleGroups, namespacequota.Handler())),
-		networkpolicies.Webhook(utils.InCapsuleGroups(capsuleGroups, networkpolicies.Handler())),
-		tenantprefix.Webhook(utils.InCapsuleGroups(capsuleGroups, tenantprefix.Handler(forceTenantPrefix, protectedNamespaceRegexp))),
-		tenant.Webhook(tenant.Handler(allowTenantIngressHostnamesCollision)),
+		ownerreference.Webhook(utils.InCapsuleGroups(cfg, ownerreference.Handler(cfg))),
+		namespacequota.Webhook(utils.InCapsuleGroups(cfg, namespacequota.Handler())),
+		networkpolicies.Webhook(utils.InCapsuleGroups(cfg, networkpolicies.Handler())),
+		tenantprefix.Webhook(utils.InCapsuleGroups(cfg, tenantprefix.Handler(cfg))),
+		tenant.Webhook(tenant.Handler(cfg)),
 	)
 	if err = webhook.Register(manager, webhooksList...); err != nil {
 		setupLog.Error(err, "unable to setup webhooks")
@@ -191,13 +171,13 @@ func main() {
 
 	rbacManager := &rbac.Manager{
 		Log:           ctrl.Log.WithName("controllers").WithName("Rbac"),
-		CapsuleGroups: capsuleGroups,
+		Configuration: cfg,
 	}
 	if err = manager.Add(rbacManager); err != nil {
 		setupLog.Error(err, "unable to create cluster roles")
 		os.Exit(1)
 	}
-	if err = rbacManager.SetupWithManager(manager); err != nil {
+	if err = rbacManager.SetupWithManager(manager, configurationName); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Rbac")
 		os.Exit(1)
 	}
@@ -239,6 +219,13 @@ func main() {
 		VersionMajor: majorVer,
 	}).SetupWithManager(manager); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "EndpointSliceLabels")
+	}
+
+	if err = (&config.Manager{
+		Log: ctrl.Log.WithName("controllers").WithName("CapsuleConfiguration"),
+	}).SetupWithManager(manager, configurationName); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "CapsuleConfiguration")
+		os.Exit(1)
 	}
 
 	if err = indexer.AddToManager(manager); err != nil {

@@ -31,6 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	"github.com/clastix/capsule/api/v1alpha1"
+	"github.com/clastix/capsule/pkg/configuration"
 	capsulewebhook "github.com/clastix/capsule/pkg/webhook"
 )
 
@@ -58,11 +59,11 @@ func (w *webhook) GetPath() string {
 }
 
 type handler struct {
-	allowHostnamesCollision bool
+	configuration configuration.Configuration
 }
 
-func Handler(allowIngressHostnamesCollision bool) capsulewebhook.Handler {
-	return &handler{allowHostnamesCollision: allowIngressHostnamesCollision}
+func Handler(configuration configuration.Configuration) capsulewebhook.Handler {
+	return &handler{configuration: configuration}
 }
 
 func (r *handler) OnCreate(client client.Client, decoder *admission.Decoder) capsulewebhook.Func {
@@ -214,7 +215,7 @@ func (r *handler) validateIngress(ctx context.Context, c client.Client, ingress 
 }
 
 func (r *handler) validateCollision(ctx context.Context, clt client.Client, ingress Ingress) error {
-	if r.allowHostnamesCollision {
+	if r.configuration.AllowIngressHostnameCollision() {
 		return nil
 	}
 	for _, hostname := range ingress.Hostnames() {

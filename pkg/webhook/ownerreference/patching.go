@@ -33,6 +33,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1alpha1 "github.com/clastix/capsule/api/v1alpha1"
+	"github.com/clastix/capsule/pkg/configuration"
 	capsulewebhook "github.com/clastix/capsule/pkg/webhook"
 )
 
@@ -59,12 +60,12 @@ func (w *webhook) GetPath() string {
 }
 
 type handler struct {
-	forceTenantPrefix bool
+	cfg configuration.Configuration
 }
 
-func Handler(forceTenantPrefix bool) capsulewebhook.Handler {
+func Handler(cfg configuration.Configuration) capsulewebhook.Handler {
 	return &handler{
-		forceTenantPrefix: forceTenantPrefix,
+		cfg: cfg,
 	}
 }
 
@@ -129,7 +130,7 @@ func (h *handler) OnCreate(clt client.Client, decoder *admission.Decoder) capsul
 			return h.patchResponseForOwnerRef(&tenants[0], ns)
 		}
 
-		if h.forceTenantPrefix {
+		if h.cfg.ForceTenantPrefix() {
 			for _, tnt := range tenants {
 				if strings.HasPrefix(ns.GetName(), fmt.Sprintf("%s-", tnt.GetName())) {
 					return h.patchResponseForOwnerRef(tnt.DeepCopy(), ns)

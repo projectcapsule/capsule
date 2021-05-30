@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"regexp"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -29,6 +28,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	"github.com/clastix/capsule/api/v1alpha1"
+	"github.com/clastix/capsule/pkg/configuration"
 	capsulewebhook "github.com/clastix/capsule/pkg/webhook"
 )
 
@@ -57,14 +57,12 @@ func (w *webhook) GetPath() string {
 }
 
 type handler struct {
-	forceTenantPrefix        bool
-	protectedNamespacesRegex *regexp.Regexp
+	configuration configuration.Configuration
 }
 
-func Handler(forceTenantPrefix bool, protectedNamespacesRegex *regexp.Regexp) capsulewebhook.Handler {
+func Handler(configuration configuration.Configuration) capsulewebhook.Handler {
 	return &handler{
-		forceTenantPrefix:        forceTenantPrefix,
-		protectedNamespacesRegex: protectedNamespacesRegex,
+		configuration: configuration,
 	}
 }
 
@@ -74,13 +72,13 @@ func (r *handler) OnCreate(clt client.Client, decoder *admission.Decoder) capsul
 		if err := decoder.Decode(req, ns); err != nil {
 			return admission.Errored(http.StatusBadRequest, err)
 		}
-		if r.protectedNamespacesRegex != nil {
-			if matched := r.protectedNamespacesRegex.MatchString(ns.GetName()); matched {
-				return admission.Denied("Creating namespaces with name matching " + r.protectedNamespacesRegex.String() + " regexp is not allowed; please, reach out to the system administrators")
+		if exp, _ := r.configuration.ProtectedNamespaceRegexp(); exp != nil {
+			if matched := exp.MatchString(ns.GetName()); matched {
+				return admission.Denied("Creating namespaces with name matching " + exp.String() + " regexp is not allowed; please, reach out to the system administrators")
 			}
 		}
 
-		if !r.forceTenantPrefix {
+		if !r.configuration.ForceTenantPrefix() {
 			return admission.Allowed("")
 		}
 
