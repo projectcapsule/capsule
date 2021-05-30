@@ -64,7 +64,7 @@ var _ = Describe("when Tenant handles Storage classes", func() {
 	It("should fails", func() {
 		ns := NewNamespace("storage-class-disallowed")
 		NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
-		TenantNamespaceList(tnt, podRecreationTimeoutInterval).Should(ContainElement(ns.GetName()))
+		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 		By("non-specifying it", func() {
 			Eventually(func() (err error) {
@@ -113,7 +113,7 @@ var _ = Describe("when Tenant handles Storage classes", func() {
 		cs := ownerClient(tnt)
 
 		NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
-		TenantNamespaceList(tnt, podRecreationTimeoutInterval).Should(ContainElement(ns.GetName()))
+		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 		By("using exact matches", func() {
 			for _, c := range tnt.Spec.StorageClasses.Exact {
 				Eventually(func() (err error) {

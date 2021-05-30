@@ -69,7 +69,7 @@ var _ = Describe("creating a Namespace with an additional Role Binding", func() 
 		for _, ns := range []string{"rb-1", "rb-2", "rb-3"} {
 			ns := NewNamespace(ns)
 			NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
-			TenantNamespaceList(tnt, podRecreationTimeoutInterval).Should(ContainElement(ns.GetName()))
+			TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 			var rb *rbacv1.RoleBinding
 

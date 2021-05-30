@@ -28,7 +28,7 @@ import (
 	"github.com/clastix/capsule/api/v1alpha1"
 )
 
-var _ = Describe("creating a Namespace with --protected-namespace-regex enabled", func() {
+var _ = Describe("creating a Namespace with a protected Namespace regex enabled", func() {
 	tnt := &v1alpha1.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "tenant-protected-namespace",
@@ -52,16 +52,22 @@ var _ = Describe("creating a Namespace with --protected-namespace-regex enabled"
 	})
 
 	It("should succeed and be available in Tenant namespaces list", func() {
-		args := append(defaulManagerPodArgs, []string{"--protected-namespace-regex=^.*[-.]system$"}...)
-		ModifyCapsuleManagerPodArgs(args)
+		ModifyCapsuleConfigurationOpts(func(configuration *v1alpha1.CapsuleConfiguration) {
+			configuration.Spec.ProtectedNamespaceRegexpString = `^.*[-.]system$`
+		})
+
 		ns := NewNamespace("test-ok")
-		NamespaceCreation(ns, tnt, podRecreationTimeoutInterval).Should(Succeed())
-		TenantNamespaceList(tnt, podRecreationTimeoutInterval).Should(ContainElement(ns.GetName()))
+
+		NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
+		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 	})
 
 	It("should fail using a value non matching the regex", func() {
 		ns := NewNamespace("test-system")
-		NamespaceCreation(ns, tnt, podRecreationTimeoutInterval).ShouldNot(Succeed())
-		ModifyCapsuleManagerPodArgs(defaulManagerPodArgs)
+		NamespaceCreation(ns, tnt, defaultTimeoutInterval).ShouldNot(Succeed())
+
+		ModifyCapsuleConfigurationOpts(func(configuration *v1alpha1.CapsuleConfiguration) {
+			configuration.Spec.ProtectedNamespaceRegexpString = ""
+		})
 	})
 })

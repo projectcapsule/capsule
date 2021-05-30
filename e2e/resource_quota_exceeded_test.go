@@ -125,7 +125,7 @@ var _ = Describe("exceeding a Tenant resource quota", func() {
 			for _, i := range nsl {
 				ns := NewNamespace(i)
 				NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
-				TenantNamespaceList(tnt, podRecreationTimeoutInterval).Should(ContainElement(ns.GetName()))
+				TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 			}
 		})
 	})

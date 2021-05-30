@@ -79,11 +79,17 @@ var _ = Describe("when handling Ingress hostnames collision", func() {
 		EventuallyCreation(func() error {
 			return k8sClient.Create(context.TODO(), tnt)
 		}).Should(Succeed())
-		ModifyCapsuleManagerPodArgs(append(defaulManagerPodArgs, []string{"--allow-ingress-hostname-collision=false"}...))
+
+		ModifyCapsuleConfigurationOpts(func(configuration *v1alpha1.CapsuleConfiguration) {
+			configuration.Spec.AllowIngressHostnameCollision = true
+		})
 	})
 	JustAfterEach(func() {
 		Expect(k8sClient.Delete(context.TODO(), tnt)).Should(Succeed())
-		ModifyCapsuleManagerPodArgs(defaulManagerPodArgs)
+
+		ModifyCapsuleConfigurationOpts(func(configuration *v1alpha1.CapsuleConfiguration) {
+			configuration.Spec.AllowIngressHostnameCollision = false
+		})
 	})
 
 	It("should not allow creating several Ingress with same hostname", func() {
@@ -93,7 +99,7 @@ var _ = Describe("when handling Ingress hostnames collision", func() {
 		cs := ownerClient(tnt)
 
 		NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
-		TenantNamespaceList(tnt, podRecreationTimeoutInterval).Should(ContainElement(ns.GetName()))
+		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 		if maj == 1 && min > 18 {
 			By("testing networking.k8s.io", func() {

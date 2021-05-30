@@ -57,7 +57,7 @@ var _ = Describe("creating a Namespace in over-quota of three", func() {
 			for _, name := range []string{"bob-dev", "bob-staging", "bob-production"} {
 				ns := NewNamespace(name)
 				NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
-				TenantNamespaceList(tnt, podRecreationTimeoutInterval).Should(ContainElement(ns.GetName()))
+				TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 			}
 		})
 

@@ -109,7 +109,7 @@ var _ = Describe("when Tenant owner interacts with the webhooks", func() {
 		By("blocking Capsule Limit ranges", func() {
 			ns := NewNamespace("limit-range-disallow")
 			NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
-			TenantNamespaceList(tnt, podRecreationTimeoutInterval).Should(ContainElement(ns.GetName()))
+			TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 			lr := &corev1.LimitRange{}
 			Eventually(func() error {
@@ -123,7 +123,7 @@ var _ = Describe("when Tenant owner interacts with the webhooks", func() {
 		By("blocking Capsule Network Policy", func() {
 			ns := NewNamespace("network-policy-disallow")
 			NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
-			TenantNamespaceList(tnt, podRecreationTimeoutInterval).Should(ContainElement(ns.GetName()))
+			TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 			np := &networkingv1.NetworkPolicy{}
 			Eventually(func() error {
@@ -137,7 +137,7 @@ var _ = Describe("when Tenant owner interacts with the webhooks", func() {
 		By("blocking Capsule Resource Quota", func() {
 			ns := NewNamespace("resource-quota-disallow")
 			NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
-			TenantNamespaceList(tnt, podRecreationTimeoutInterval).Should(ContainElement(ns.GetName()))
+			TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 			rq := &corev1.ResourceQuota{}
 			Eventually(func() error {
@@ -154,7 +154,7 @@ var _ = Describe("when Tenant owner interacts with the webhooks", func() {
 		By("listing Limit Range", func() {
 			ns := NewNamespace("limit-range-list")
 			NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
-			TenantNamespaceList(tnt, podRecreationTimeoutInterval).Should(ContainElement(ns.GetName()))
+			TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 			Eventually(func() (err error) {
 				cs := ownerClient(tnt)
@@ -165,7 +165,7 @@ var _ = Describe("when Tenant owner interacts with the webhooks", func() {
 		By("listing Network Policy", func() {
 			ns := NewNamespace("network-policy-list")
 			NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
-			TenantNamespaceList(tnt, podRecreationTimeoutInterval).Should(ContainElement(ns.GetName()))
+			TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 			Eventually(func() (err error) {
 				cs := ownerClient(tnt)
@@ -176,7 +176,7 @@ var _ = Describe("when Tenant owner interacts with the webhooks", func() {
 		By("listin Resource Quota", func() {
 			ns := NewNamespace("resource-quota-list")
 			NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
-			TenantNamespaceList(tnt, podRecreationTimeoutInterval).Should(ContainElement(ns.GetName()))
+			TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 			Eventually(func() (err error) {
 				cs := ownerClient(tnt)
@@ -189,7 +189,7 @@ var _ = Describe("when Tenant owner interacts with the webhooks", func() {
 	It("should allow all actions to Tenant owner Network Policy", func() {
 		ns := NewNamespace("network-policy-allow")
 		NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
-		TenantNamespaceList(tnt, podRecreationTimeoutInterval).Should(ContainElement(ns.GetName()))
+		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 		cs := ownerClient(tnt)
 		np := &networkingv1.NetworkPolicy{
