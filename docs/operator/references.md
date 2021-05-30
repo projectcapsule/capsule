@@ -671,13 +671,37 @@ Option | Description | Default
 --- | --- | ---
 `--metrics-addr` | The address and port where `/metrics` are exposed. | `127.0.0.1:8080`
 `--enable-leader-election` | Start a leader election client and gain leadership before executing the main loop. | `true`
-`--force-tenant-prefix` | Force the tenant name as prefix for namespaces: `<tenant_name>-<namespace>`.  | `false`
 `--zap-log-level` | The log verbosity with a value from 1 to 10 or the basic keywords.  | `4`
 `--zap-devel` | The flag to get the stack traces for deep debugging.  | `null`
-`--capsule-user-group` | Override the Capsule group to which all tenant owners must belong. | `capsule.clastix.io`
-`--protected-namespace-regex` | Disallows creation of namespaces matching the passed regexp. | `null`
-`--allow-ingress-hostname-collision` | By default, Capsule allows Ingress hostname collision: set to `false` to enforce this policy. | `true`
-`--allow-tenant-ingress-hostnames-collision` | Toggling this, Capsule will not check if a hostname collision is in place, allowing the creation of two or more Tenant resources although sharing the same allowed hostname(s). | `false`
+`--configuration-name` | The Capsule Configuration CRD name, a default is installed automatically | `default`
+
+## Capsule Configuration
+
+The Capsule configuration can be piloted by a Custom Resource definition named `CapsuleConfiguration`.
+
+```yaml
+apiVersion: capsule.clastix.io/v1alpha1
+kind: CapsuleConfiguration
+metadata:
+  name: default
+spec:
+  userGroups: ["capsule.clastix.io"]
+  forceTenantPrefix: false
+  protectedNamespaceRegex: ""
+  allowTenantIngressHostnamesCollision: false
+  allowIngressHostnameCollision: false
+```
+
+Option | Description | Default
+--- | --- | ---
+`.spec.forceTenantPrefix` | Force the tenant name as prefix for namespaces: `<tenant_name>-<namespace>`.  | `false`
+`.spec.userGroups` | Array of Capsule groups to which all tenant owners must belong. | `[capsule.clastix.io]`
+`.spec.protectedNamespaceRegex` | Disallows creation of namespaces matching the passed regexp. | `null`
+`.spec.allowTenantIngressHostnamesCollision` | By default, Capsule allows Ingress hostname collision: set to `false` to enforce this policy. | `true`
+`.spec.allowIngressHostnameCollision` | Toggling this, Capsule will not check if a hostname collision is in place, allowing the creation of two or more Tenant resources although sharing the same allowed hostname(s). | `false`
+
+Upon installation using Kustomize or Helm, a `default` resource will be created.
+The reference to this configuration is managed by the CLI flag `--configuration-name`. 
 
 ## Created Resources
 Once installed, the Capsule operator creates the following resources in your cluster:
