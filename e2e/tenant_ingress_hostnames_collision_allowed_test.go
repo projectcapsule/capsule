@@ -50,11 +50,17 @@ var _ = Describe("when a second Tenant contains an already declared allowed Ingr
 			tnt.ResourceVersion = ""
 			return k8sClient.Create(context.TODO(), tnt)
 		}).Should(Succeed())
-		ModifyCapsuleManagerPodArgs(append(defaulManagerPodArgs, []string{"--allow-tenant-ingress-hostnames-collision=true"}...))
+
+		ModifyCapsuleConfigurationOpts(func(configuration *v1alpha1.CapsuleConfiguration) {
+			configuration.Spec.AllowTenantIngressHostnamesCollision = true
+		})
 	})
 	JustAfterEach(func() {
 		Expect(k8sClient.Delete(context.TODO(), tnt)).Should(Succeed())
-		ModifyCapsuleManagerPodArgs(defaulManagerPodArgs)
+
+		ModifyCapsuleConfigurationOpts(func(configuration *v1alpha1.CapsuleConfiguration) {
+			configuration.Spec.AllowTenantIngressHostnamesCollision = false
+		})
 	})
 
 	It("should not block creation if contains collided Ingress hostnames", func() {

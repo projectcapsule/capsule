@@ -81,7 +81,7 @@ var _ = Describe("adding metadata to Service objects", func() {
 	It("should apply them to Service", func() {
 		ns := NewNamespace("service-metadata")
 		NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
-		TenantNamespaceList(tnt, podRecreationTimeoutInterval).Should(ContainElement(ns.GetName()))
+		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 		svc := &corev1.Service{
 			ObjectMeta: metav1.ObjectMeta{
@@ -135,7 +135,7 @@ var _ = Describe("adding metadata to Service objects", func() {
 	It("should apply them to Endpoints", func() {
 		ns := NewNamespace("endpoints-metadata")
 		NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
-		TenantNamespaceList(tnt, podRecreationTimeoutInterval).Should(ContainElement(ns.GetName()))
+		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 		ep := &corev1.Endpoints{
 			ObjectMeta: metav1.ObjectMeta{
@@ -195,7 +195,7 @@ var _ = Describe("adding metadata to Service objects", func() {
 
 		ns := NewNamespace("endpointslice-metadata")
 		NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
-		TenantNamespaceList(tnt, podRecreationTimeoutInterval).Should(ContainElement(ns.GetName()))
+		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 		eps := &discoveryv1beta1.EndpointSlice{
 			ObjectMeta: metav1.ObjectMeta{

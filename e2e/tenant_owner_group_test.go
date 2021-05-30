@@ -54,7 +54,7 @@ var _ = Describe("creating a Namespace with group Tenant owner", func() {
 	It("should succeed and be available in Tenant namespaces list", func() {
 		ns := NewNamespace("gto-namespace")
 		NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
-		TenantNamespaceList(tnt, podRecreationTimeoutInterval).Should(ContainElement(ns.GetName()))
+		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 		for _, a := range KindInTenantRoleBindingAssertions(ns, defaultTimeoutInterval) {
 			a.Should(BeIdenticalTo("Group"))
 		}

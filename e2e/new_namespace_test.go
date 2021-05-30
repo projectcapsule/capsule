@@ -53,6 +53,6 @@ var _ = Describe("creating a Namespace as Tenant owner", func() {
 	It("should be available in Tenant namespaces list", func() {
 		ns := NewNamespace("new-namespace")
 		NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
-		TenantNamespaceList(tnt, podRecreationTimeoutInterval).Should(ContainElement(ns.GetName()))
+		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 	})
 })

@@ -28,7 +28,7 @@ import (
 	"github.com/clastix/capsule/api/v1alpha1"
 )
 
-var _ = Describe("creating a Namespace with --force-tenant-name flag", func() {
+var _ = Describe("creating a Namespace with Tenant name prefix enforcement", func() {
 	t1 := &v1alpha1.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "awesome",
@@ -61,12 +61,18 @@ var _ = Describe("creating a Namespace with --force-tenant-name flag", func() {
 			t2.ResourceVersion = ""
 			return k8sClient.Create(context.TODO(), t2)
 		}).Should(Succeed())
-		ModifyCapsuleManagerPodArgs(append(defaulManagerPodArgs, []string{"--force-tenant-prefix"}...))
+
+		ModifyCapsuleConfigurationOpts(func(configuration *v1alpha1.CapsuleConfiguration) {
+			configuration.Spec.ForceTenantPrefix = true
+		})
 	})
 	JustAfterEach(func() {
 		Expect(k8sClient.Delete(context.TODO(), t1)).Should(Succeed())
 		Expect(k8sClient.Delete(context.TODO(), t2)).Should(Succeed())
-		ModifyCapsuleManagerPodArgs(defaulManagerPodArgs)
+
+		ModifyCapsuleConfigurationOpts(func(configuration *v1alpha1.CapsuleConfiguration) {
+			configuration.Spec.ForceTenantPrefix = false
+		})
 	})
 
 	It("should fail when non using prefix", func() {

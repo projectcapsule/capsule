@@ -20,28 +20,21 @@ package e2e
 
 import (
 	"context"
-	b64 "encoding/base64"
-	"fmt"
 	"strconv"
 	"time"
 
+	"github.com/clastix/capsule/api/v1alpha1"
 	. "github.com/onsi/gomega"
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/client-go/kubernetes"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	"github.com/clastix/capsule/api/v1alpha1"
-	"github.com/clastix/capsule/controllers/rbac"
 )
 
 const (
 	defaultTimeoutInterval       = 20 * time.Second
-	podRecreationTimeoutInterval = 90 * time.Second
 	defaultPollInterval          = time.Second
 )
 
@@ -72,57 +65,15 @@ func EventuallyCreation(f interface{}) AsyncAssertion {
 	return Eventually(f, defaultTimeoutInterval, defaultPollInterval)
 }
 
-func CapsuleClusterGroupParam(timeout time.Duration, groups []string) AsyncAssertion {
-	capsuleCRB := &rbacv1.ClusterRoleBinding{}
+func ModifyCapsuleConfigurationOpts(fn func(configuration *v1alpha1.CapsuleConfiguration)) {
+	config := &v1alpha1.CapsuleConfiguration{}
+	Expect(k8sClient.Get(context.Background(), types.NamespacedName{Name: "default"}, config)).ToNot(HaveOccurred())
 
-	return Eventually(func() []string {
-		var subjectNames []string
-		for _, group := range groups {
-			name := b64.RawStdEncoding.EncodeToString([]byte(group))
-			Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: fmt.Sprintf("%s-%v", rbac.ProvisionerRoleName, name)}, capsuleCRB)).Should(Succeed())
-			subjectNames = append(subjectNames, capsuleCRB.Subjects[0].Name)
-		}
-		return subjectNames
-	}, timeout, defaultPollInterval)
-}
+	fn(config)
 
-func ModifyCapsuleManagerPodArgs(args []string) {
-	capsuleDeployment := &appsv1.Deployment{}
-	k8sClient.Get(context.TODO(), types.NamespacedName{Name: capsuleDeploymentName, Namespace: capsuleNamespace}, capsuleDeployment)
+	Expect(k8sClient.Update(context.Background(), config)).ToNot(HaveOccurred())
 
-	for i, container := range capsuleDeployment.Spec.Template.Spec.Containers {
-		if container.Name == capsuleManagerContainerName {
-			capsuleDeployment.Spec.Template.Spec.Containers[i].Args = args
-			capsuleDeployment.Spec.Template.Spec.Containers[i].LivenessProbe.FailureThreshold = 4
-			capsuleDeployment.Spec.Template.Spec.Containers[i].LivenessProbe.PeriodSeconds = 3
-		}
-	}
-	capsuleDeployment.ResourceVersion = ""
-	err := k8sClient.Update(context.TODO(), capsuleDeployment)
-	Expect(err).ToNot(HaveOccurred())
-
-	Eventually(func() []string {
-		var containerArgs []string
-		Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: capsuleDeploymentName, Namespace: capsuleNamespace}, capsuleDeployment)).Should(Succeed())
-		for i, container := range capsuleDeployment.Spec.Template.Spec.Containers {
-			if container.Name == capsuleManagerContainerName {
-				containerArgs = capsuleDeployment.Spec.Template.Spec.Containers[i].Args
-			}
-		}
-		return containerArgs
-	}, podRecreationTimeoutInterval, defaultPollInterval).Should(HaveLen(len(args)))
-
-	pl := &corev1.PodList{}
-	Eventually(func() []corev1.Pod {
-		Expect(k8sClient.List(context.TODO(), pl, client.MatchingLabels{"app.kubernetes.io/instance": "capsule"})).Should(Succeed())
-		return pl.Items
-	}, podRecreationTimeoutInterval, defaultPollInterval).Should(HaveLen(2))
-	Eventually(func() []corev1.Pod {
-		Expect(k8sClient.List(context.TODO(), pl, client.MatchingLabels{"app.kubernetes.io/instance": "capsule"})).Should(Succeed())
-		return pl.Items
-	}, podRecreationTimeoutInterval, defaultPollInterval).Should(HaveLen(1))
-	// had to add sleep in order to manager be started
-	time.Sleep(defaultTimeoutInterval)
+	time.Sleep(time.Second)
 }
 
 func KindInTenantRoleBindingAssertions(ns *corev1.Namespace, timeout time.Duration) (out []AsyncAssertion) {

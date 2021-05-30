@@ -132,7 +132,7 @@ var _ = Describe("when Tenant handles Ingress hostnames", func() {
 		cs := ownerClient(tnt)
 
 		NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
-		TenantNamespaceList(tnt, podRecreationTimeoutInterval).Should(ContainElement(ns.GetName()))
+		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 		if maj == 1 && min > 18 {
 			By("testing networking.k8s.io", func() {
@@ -161,7 +161,7 @@ var _ = Describe("when Tenant handles Ingress hostnames", func() {
 		cs := ownerClient(tnt)
 
 		NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
-		TenantNamespaceList(tnt, podRecreationTimeoutInterval).Should(ContainElement(ns.GetName()))
+		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 		if maj == 1 && min > 18 {
 			By("testing networking.k8s.io", func() {
@@ -194,7 +194,7 @@ var _ = Describe("when Tenant handles Ingress hostnames", func() {
 		cs := ownerClient(tnt)
 
 		NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
-		TenantNamespaceList(tnt, podRecreationTimeoutInterval).Should(ContainElement(ns.GetName()))
+		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 		if maj == 1 && min > 18 {
 			By("testing networking.k8s.io", func() {

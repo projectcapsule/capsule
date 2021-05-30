@@ -64,7 +64,7 @@ var _ = Describe("creating a Namespace for a Tenant with additional metadata", f
 	It("should contain additional Namespace metadata", func() {
 		ns := NewNamespace("namespace-metadata")
 		NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
-		TenantNamespaceList(tnt, podRecreationTimeoutInterval).Should(ContainElement(ns.GetName()))
+		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 		By("checking additional labels", func() {
 			Eventually(func() (ok bool) {

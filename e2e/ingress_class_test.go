@@ -66,7 +66,7 @@ var _ = Describe("when Tenant handles Ingress classes", func() {
 		cs := ownerClient(tnt)
 
 		NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
-		TenantNamespaceList(tnt, podRecreationTimeoutInterval).Should(ContainElement(ns.GetName()))
+		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 		By("non-specifying at all", func() {
 			Eventually(func() (err error) {
@@ -130,7 +130,7 @@ var _ = Describe("when Tenant handles Ingress classes", func() {
 		cs := ownerClient(tnt)
 
 		NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
-		TenantNamespaceList(tnt, podRecreationTimeoutInterval).Should(ContainElement(ns.GetName()))
+		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 		for _, c := range tnt.Spec.IngressClasses.Exact {
 			Eventually(func() (err error) {
@@ -164,7 +164,7 @@ var _ = Describe("when Tenant handles Ingress classes", func() {
 		}
 
 		NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
-		TenantNamespaceList(tnt, podRecreationTimeoutInterval).Should(ContainElement(ns.GetName()))
+		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 		for _, c := range tnt.Spec.IngressClasses.Exact {
 			Eventually(func() (err error) {
@@ -192,7 +192,7 @@ var _ = Describe("when Tenant handles Ingress classes", func() {
 		ingressClass := "oil-ingress"
 
 		NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
-		TenantNamespaceList(tnt, podRecreationTimeoutInterval).Should(ContainElement(ns.GetName()))
+		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 		Eventually(func() (err error) {
 			i := &extensionsv1beta1.Ingress{
@@ -225,7 +225,7 @@ var _ = Describe("when Tenant handles Ingress classes", func() {
 		}
 
 		NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
-		TenantNamespaceList(tnt, podRecreationTimeoutInterval).Should(ContainElement(ns.GetName()))
+		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 		Eventually(func() (err error) {
 			i := &extensionsv1beta1.Ingress{
