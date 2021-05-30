@@ -40,6 +40,5 @@ jobs:
         run: if [[ $(git diff | wc -l) -gt 0 ]]; then echo ">>> Untracked generated files have not been committed" && git --no-pager diff && exit 1; fi
       - name: Checking if manifests generated untracked files
         run: test -z "$(git ls-files --others --exclude-standard 2> /dev/null)"
-      - run: make fmt vet
       - name: Checking if source code is not formatted
         run: test -z "$(git diff 2> /dev/null)"
