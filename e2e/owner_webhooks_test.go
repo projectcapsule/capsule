@@ -173,7 +173,7 @@ var _ = Describe("when Tenant owner interacts with the webhooks", func() {
 				return
 			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		})
-		By("listin Resource Quota", func() {
+		By("listing Resource Quota", func() {
 			ns := NewNamespace("resource-quota-list")
 			NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
 			TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
