@@ -1,8 +1,18 @@
 domain: github.com/clastix/capsule
-layout: go.kubebuilder.io/v2
+layout: go.kubebuilder.io/v3
+projectName: capsule
 repo: github.com/clastix/capsule
 resources:
--
+- api:
+    crdVersion: v1
+  controller: false
+  domain: github.com/clastix/capsule
+  group: capsule.clastix.io
+  kind: CapsuleConfiguration
+  path: github.com/clastix/capsule/api/v1alpha1
+  version: v1alpha1
+- api:
+    crdVersion: v1
   controller: true
   domain: github.com/clastix/capsule
   group: capsule.clastix.io
@@ -11,4 +21,5 @@ resources:
   version: v1alpha1
 version: "3"
 plugins:
-  go.operator-sdk.io/v2-alpha: {}
+  manifests.sdk.operatorframework.io/v2: {}
+  scorecard.sdk.operatorframework.io/v2: {}
