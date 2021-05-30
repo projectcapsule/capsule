@@ -149,12 +149,13 @@ e2e/%:
 		--debug \
 		--install \
 		--namespace capsule-system \
-		--create-namespace capsule \
+		--create-namespace \
 		--set 'manager.image.pullPolicy=Never' \
 		--set 'manager.resources=null'\
 		--set "manager.image.tag=$(VERSION)" \
 		--set 'manager.livenessProbe.failureThreshold=10' \
 		--set 'manager.readinessProbe.failureThreshold=10' \
+		capsule \
 		./charts/capsule
 	ginkgo -v -tags e2e ./e2e
 	kind delete cluster --name capsule
