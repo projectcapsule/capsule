@@ -10,11 +10,11 @@ manager:
   # Additional Capsule options
   options:
     logLevel: '4'
-    forceTenantPrefix:
-    capsuleUserGroup:
-    protectedNamespaceRegex:
-    allowIngressHostnameCollision:
-    allowTenantIngressHostnamesCollision:
+    forceTenantPrefix: false
+    capsuleUserGroups: ["capsule.clastix.io"]
+    protectedNamespaceRegex: ""
+    allowIngressHostnameCollision: true
+    allowTenantIngressHostnamesCollision: false
   livenessProbe:
     httpGet:
       path: /healthz
