@@ -64,7 +64,7 @@ deploy: manifests kustomize
 remove: manifests kustomize
 	$(KUSTOMIZE) build config/default | kubectl delete -f -
 	kubectl delete clusterroles.rbac.authorization.k8s.io capsule-namespace-deleter capsule-namespace-provisioner --ignore-not-found
-	kubectl delete clusterrolebindings.rbac.authorization.k8s.io -l capsule.clastix.io/rbac --ignore-not-found
+	kubectl delete clusterrolebindings.rbac.authorization.k8s.io capsule-namespace-deleter capsule-namespace-provisioner --ignore-not-found
 
 # Generate manifests e.g. CRD, RBAC etc.
 manifests: controller-gen
