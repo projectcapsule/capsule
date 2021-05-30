@@ -22,19 +22,20 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
+	"github.com/clastix/capsule/pkg/configuration"
 	"github.com/clastix/capsule/pkg/utils"
 	"github.com/clastix/capsule/pkg/webhook"
 )
 
-func InCapsuleGroups(capsuleGroups []string, webhookHandler webhook.Handler) webhook.Handler {
+func InCapsuleGroups(configuration configuration.Configuration, webhookHandler webhook.Handler) webhook.Handler {
 	return &handler{
+		configuration: configuration,
 		handler:       webhookHandler,
-		capsuleGroups: capsuleGroups,
 	}
 }
 
 type handler struct {
-	capsuleGroups []string
+	configuration configuration.Configuration
 	handler       webhook.Handler
 }
 
@@ -47,7 +48,7 @@ func (h handler) isCapsuleUser(req admission.Request) bool {
 	if groupList.Find("system:serviceaccounts:kube-system") {
 		return false
 	}
-	for _, group := range h.capsuleGroups {
+	for _, group := range h.configuration.UserGroups() {
 		if groupList.Find(group) {
 			return true
 		}

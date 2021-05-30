@@ -14,11 +14,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package rbac
+package configuration
 
-type ImmutableClusterRoleBindingError struct {
-}
+import (
+	"regexp"
+)
 
-func (i ImmutableClusterRoleBindingError) Error() string {
-	return "The ClusterRoleBinding Role reference is immutable, deletion must be processed first"
+type Configuration interface {
+	AllowIngressHostnameCollision() bool
+	AllowTenantIngressHostnamesCollision() bool
+	ProtectedNamespaceRegexp() (*regexp.Regexp, error)
+	ForceTenantPrefix() bool
+	UserGroups() []string
 }
