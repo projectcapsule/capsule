@@ -1,0 +1,11 @@
+---
+apiVersion: capsule.clastix.io/v1alpha1
+kind: CapsuleConfiguration
+metadata:
+  name: default
+spec:
+  userGroups: ["capsule.clastix.io"]
+  forceTenantPrefix: false
+  protectedNamespaceRegex: ""
+  allowTenantIngressHostnamesCollision: false
+  allowIngressHostnameCollision: false

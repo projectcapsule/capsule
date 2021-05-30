@@ -29,6 +29,7 @@ spec:
         - --enable-leader-election
         - --zap-encoder=console
         - --zap-log-level=debug
+        - --configuration-name=capsule-default
         env:
         - name: NAMESPACE
           valueFrom:
