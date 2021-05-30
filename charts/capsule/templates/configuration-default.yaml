@@ -1,0 +1,13 @@
+apiVersion: capsule.clastix.io/v1alpha1
+kind: CapsuleConfiguration
+metadata:
+  name: default
+spec:
+  forceTenantPrefix: {{ .Values.manager.options.forceTenantPrefix }}
+  userGroups:
+{{- range .Values.manager.options.capsuleUserGroups }}
+    - {{ . }}
+{{- end}}
+  protectedNamespaceRegex: {{ .Values.manager.options.protectedNamespaceRegex | quote }}
+  allowTenantIngressHostnamesCollision: {{ .Values.manager.options.allowIngressHostnameCollision }}
+  allowIngressHostnameCollision: {{ .Values.manager.options.allowTenantIngressHostnamesCollision }}

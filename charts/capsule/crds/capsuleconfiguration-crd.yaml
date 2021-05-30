@@ -1,0 +1,62 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.5.0
+  creationTimestamp: null
+  name: capsuleconfigurations.capsule.clastix.io
+spec:
+  group: capsule.clastix.io
+  names:
+    kind: CapsuleConfiguration
+    listKind: CapsuleConfigurationList
+    plural: capsuleconfigurations
+    singular: capsuleconfiguration
+  scope: Cluster
+  versions:
+    - name: v1alpha1
+      schema:
+        openAPIV3Schema:
+          description: CapsuleConfiguration is the Schema for the Capsule configuration API
+          properties:
+            apiVersion:
+              description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+              type: string
+            kind:
+              description: 'Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+              type: string
+            metadata:
+              type: object
+            spec:
+              description: CapsuleConfigurationSpec defines the Capsule configuration
+              properties:
+                allowIngressHostnameCollision:
+                  default: true
+                  description: Allow the collision of Ingress resource hostnames across all the Tenants.
+                  type: boolean
+                allowTenantIngressHostnamesCollision:
+                  description: "When defining the exact match for allowed Ingress hostnames at Tenant level, a collision is not allowed. Toggling this, Capsule will not check if a hostname collision is in place, allowing the creation of two or more Tenant resources although sharing the same allowed hostname(s). \n The JSON path of the resource is: /spec/ingressHostnames/allowed"
+                  type: boolean
+                forceTenantPrefix:
+                  description: Enforces the Tenant owner, during Namespace creation, to name it using the selected Tenant name as prefix, separated by a dash. This is useful to avoid Namespace name collision in a public CaaS environment.
+                  type: boolean
+                protectedNamespaceRegex:
+                  description: Disallow creation of namespaces, whose name matches this regexp
+                  type: string
+                userGroups:
+                  default:
+                    - capsule.clastix.io
+                  description: Names of the groups for Capsule users.
+                  items:
+                    type: string
+                  type: array
+              type: object
+          type: object
+      served: true
+      storage: true
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
