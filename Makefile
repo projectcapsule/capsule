@@ -31,7 +31,7 @@ GIT_MODIFIED_1  ?= $$(git diff $(GIT_HEAD_COMMIT) $(GIT_TAG_COMMIT) --quiet && e
 GIT_MODIFIED_2  ?= $$(git diff --quiet && echo "" || echo ".dirty")
 GIT_MODIFIED    ?= $$(echo "$(GIT_MODIFIED_1)$(GIT_MODIFIED_2)")
 GIT_REPO        ?= $$(git config --get remote.origin.url)
-BUILD_DATE      ?= $$(date '+%Y-%m-%dT%H:%M:%S')
+BUILD_DATE      ?= $$(git log -1 --format="%at" | xargs -I{} date -d @{} +%Y-%m-%dT%H:%M:%S)
 
 all: manager
 
