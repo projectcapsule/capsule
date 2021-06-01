@@ -7,7 +7,7 @@ The first step is to set up your local development environment as stated below:
 The following dependencies are mandatory:
 
 - [Go 1.13.8](https://golang.org/dl/)
-- [OperatorSDK 1.9](https://github.com/operator-framework/operator-sdk)
+- [OperatorSDK 1.7.2](https://github.com/operator-framework/operator-sdk)
 - [Kubebuilder](https://github.com/kubernetes-sigs/kubebuilder)
 - [KinD](https://github.com/kubernetes-sigs/kind)
 - [ngrok](https://ngrok.com/) (if you want to run locally)
