@@ -33,9 +33,9 @@ manager:
       memory: 128Mi
 jobs:
   image:
-    repository: bitnami/kubectl
+    repository: quay.io/clastix/kubectl
     pullPolicy: IfNotPresent
-    tag: "1.18"
+    tag: "v1.20.7"
 mutatingWebhooksTimeoutSeconds: 30
 validatingWebhooksTimeoutSeconds: 30
 imagePullSecrets: []
