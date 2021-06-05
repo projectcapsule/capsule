@@ -9,6 +9,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
@@ -41,10 +42,13 @@ func (w *webhook) GetPath() string {
 }
 
 type handler struct {
+	recorder record.EventRecorder
 }
 
-func Handler() capsulewebhook.Handler {
-	return &handler{}
+func Handler(recorder record.EventRecorder) capsulewebhook.Handler {
+	return &handler{
+		recorder: recorder,
+	}
 }
 
 func (r *handler) OnCreate(client client.Client, decoder *admission.Decoder) capsulewebhook.Func {
@@ -61,6 +65,8 @@ func (r *handler) OnCreate(client client.Client, decoder *admission.Decoder) cap
 				return admission.Errored(http.StatusBadRequest, err)
 			}
 			if tnt.IsFull() {
+				r.recorder.Eventf(tnt, corev1.EventTypeWarning, "Error", "the Namespace quota has been exceeded, Namespace %s cannot been attached", ns.GetName())
+
 				return admission.Denied(NewNamespaceQuotaExceededError().Error())
 			}
 		}

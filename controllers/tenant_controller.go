@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -36,8 +37,9 @@ import (
 // TenantReconciler reconciles a Tenant object
 type TenantReconciler struct {
 	client.Client
-	Log    logr.Logger
-	Scheme *runtime.Scheme
+	Log      logr.Logger
+	Scheme   *runtime.Scheme
+	Recorder record.EventRecorder
 }
 
 func (r *TenantReconciler) SetupWithManager(mgr ctrl.Manager) error {
@@ -251,6 +253,9 @@ func (r *TenantReconciler) syncAdditionalRoleBindings(tenant *capsulev1alpha1.Te
 				rb.Subjects = i.Subjects
 				return controllerutil.SetControllerReference(tenant, rb, r.Scheme)
 			})
+
+			r.emitEvent(tenant, rb.GetNamespace(), res, fmt.Sprintf("ensuring additional RoleBinding %s", rb.GetName()), err)
+
 			if err != nil {
 				r.Log.Error(err, "Cannot sync Additional RoleBinding")
 			}
@@ -299,6 +304,7 @@ func (r *TenantReconciler) syncResourceQuotas(tenant *capsulev1alpha1.Tenant) er
 					Name:        fmt.Sprintf("capsule-%s-%d", tenant.Name, i),
 					Namespace:   ns,
 					Annotations: make(map[string]string),
+					// TODO(prometherion): labels should be moved to mutateFn
 					Labels: map[string]string{
 						tenantLabel: tenant.Name,
 						typeLabel:   strconv.Itoa(i),
@@ -382,6 +388,9 @@ func (r *TenantReconciler) syncResourceQuotas(tenant *capsulev1alpha1.Tenant) er
 				}
 				return controllerutil.SetControllerReference(tenant, target, r.Scheme)
 			})
+
+			r.emitEvent(tenant, target.GetNamespace(), res, fmt.Sprintf("ensuring ResourceQuota %s", target.GetName()), err)
+
 			r.Log.Info("Resource Quota sync result: "+string(res), "name", target.Name, "namespace", target.Namespace)
 			if err != nil {
 				return err
@@ -429,6 +438,9 @@ func (r *TenantReconciler) syncLimitRanges(tenant *capsulev1alpha1.Tenant) error
 				t.Spec = spec
 				return controllerutil.SetControllerReference(tenant, t, r.Scheme)
 			})
+
+			r.emitEvent(tenant, t.GetNamespace(), res, fmt.Sprintf("ensuring LimitRange %s", t.GetName()), err)
+
 			r.Log.Info("LimitRange sync result: "+string(res), "name", t.Name, "namespace", t.Namespace)
 			if err != nil {
 				return err
@@ -439,61 +451,76 @@ func (r *TenantReconciler) syncLimitRanges(tenant *capsulev1alpha1.Tenant) error
 	return nil
 }
 
-func (r *TenantReconciler) syncNamespaceMetadata(namespace string, tnt *capsulev1alpha1.Tenant) error {
-	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
+func (r *TenantReconciler) syncNamespaceMetadata(namespace string, tnt *capsulev1alpha1.Tenant) (err error) {
+	var res controllerutil.OperationResult
+
+	err = retry.RetryOnConflict(retry.DefaultBackoff, func() (conflictErr error) {
 		ns := &corev1.Namespace{}
-		if err = r.Client.Get(context.TODO(), types.NamespacedName{Name: namespace}, ns); err != nil {
+		if conflictErr = r.Client.Get(context.TODO(), types.NamespacedName{Name: namespace}, ns); err != nil {
 			return
 		}
 
-		a := tnt.Spec.NamespacesMetadata.AdditionalAnnotations
-		if a == nil {
-			a = make(map[string]string)
-		}
-		if tnt.Spec.NodeSelector != nil {
-			var selector []string
-			for k, v := range tnt.Spec.NodeSelector {
-				selector = append(selector, fmt.Sprintf("%s=%s", k, v))
+		res, conflictErr = controllerutil.CreateOrUpdate(context.TODO(), r.Client, ns, func() error {
+			a := tnt.Spec.NamespacesMetadata.AdditionalAnnotations
+			if a == nil {
+				a = make(map[string]string)
 			}
-			a["scheduler.alpha.kubernetes.io/node-selector"] = strings.Join(selector, ",")
-		}
-		if tnt.Spec.IngressClasses != nil {
-			if len(tnt.Spec.IngressClasses.Exact) > 0 {
-				a[capsulev1alpha1.AvailableIngressClassesAnnotation] = strings.Join(tnt.Spec.IngressClasses.Exact, ",")
-			}
-			if len(tnt.Spec.IngressClasses.Regex) > 0 {
-				a[capsulev1alpha1.AvailableIngressClassesRegexpAnnotation] = tnt.Spec.IngressClasses.Regex
-			}
-		}
-		if tnt.Spec.StorageClasses != nil {
-			if len(tnt.Spec.StorageClasses.Exact) > 0 {
-				a[capsulev1alpha1.AvailableStorageClassesAnnotation] = strings.Join(tnt.Spec.StorageClasses.Exact, ",")
-			}
-			if len(tnt.Spec.StorageClasses.Regex) > 0 {
-				a[capsulev1alpha1.AvailableStorageClassesRegexpAnnotation] = tnt.Spec.StorageClasses.Regex
-			}
-		}
-		if tnt.Spec.ContainerRegistries != nil {
-			if len(tnt.Spec.ContainerRegistries.Exact) > 0 {
-				a[capsulev1alpha1.AllowedRegistriesAnnotation] = strings.Join(tnt.Spec.ContainerRegistries.Exact, ",")
-			}
-			if len(tnt.Spec.ContainerRegistries.Regex) > 0 {
-				a[capsulev1alpha1.AllowedRegistriesRegexpAnnotation] = tnt.Spec.ContainerRegistries.Regex
-			}
-		}
-		ns.SetAnnotations(a)
 
-		l := tnt.Spec.NamespacesMetadata.AdditionalLabels
-		if l == nil {
-			l = make(map[string]string)
-		}
-		l["name"] = namespace
-		capsuleLabel, _ := capsulev1alpha1.GetTypeLabel(&capsulev1alpha1.Tenant{})
-		l[capsuleLabel] = tnt.GetName()
-		ns.SetLabels(l)
+			if tnt.Spec.NodeSelector != nil {
+				var selector []string
+				for k, v := range tnt.Spec.NodeSelector {
+					selector = append(selector, fmt.Sprintf("%s=%s", k, v))
+				}
+				a["scheduler.alpha.kubernetes.io/node-selector"] = strings.Join(selector, ",")
+			}
 
-		return r.Client.Update(context.TODO(), ns, &client.UpdateOptions{})
+			if tnt.Spec.IngressClasses != nil {
+				if len(tnt.Spec.IngressClasses.Exact) > 0 {
+					a[capsulev1alpha1.AvailableIngressClassesAnnotation] = strings.Join(tnt.Spec.IngressClasses.Exact, ",")
+				}
+				if len(tnt.Spec.IngressClasses.Regex) > 0 {
+					a[capsulev1alpha1.AvailableIngressClassesRegexpAnnotation] = tnt.Spec.IngressClasses.Regex
+				}
+			}
+
+			if tnt.Spec.StorageClasses != nil {
+				if len(tnt.Spec.StorageClasses.Exact) > 0 {
+					a[capsulev1alpha1.AvailableStorageClassesAnnotation] = strings.Join(tnt.Spec.StorageClasses.Exact, ",")
+				}
+				if len(tnt.Spec.StorageClasses.Regex) > 0 {
+					a[capsulev1alpha1.AvailableStorageClassesRegexpAnnotation] = tnt.Spec.StorageClasses.Regex
+				}
+			}
+
+			if tnt.Spec.ContainerRegistries != nil {
+				if len(tnt.Spec.ContainerRegistries.Exact) > 0 {
+					a[capsulev1alpha1.AllowedRegistriesAnnotation] = strings.Join(tnt.Spec.ContainerRegistries.Exact, ",")
+				}
+				if len(tnt.Spec.ContainerRegistries.Regex) > 0 {
+					a[capsulev1alpha1.AllowedRegistriesRegexpAnnotation] = tnt.Spec.ContainerRegistries.Regex
+				}
+			}
+
+			ns.SetAnnotations(a)
+
+			l := tnt.Spec.NamespacesMetadata.AdditionalLabels
+			if l == nil {
+				l = make(map[string]string)
+			}
+			l["name"] = namespace
+			capsuleLabel, _ := capsulev1alpha1.GetTypeLabel(&capsulev1alpha1.Tenant{})
+			l[capsuleLabel] = tnt.GetName()
+			ns.SetLabels(l)
+
+			return nil
+		})
+
+		return
 	})
+
+	r.emitEvent(tnt, namespace, res, "ensuring Namespace metadata", err)
+
+	return
 }
 
 // Ensuring all annotations are applied to each Namespace handled by the Tenant.
@@ -541,6 +568,7 @@ func (r *TenantReconciler) syncNetworkPolicies(tenant *capsulev1alpha1.Tenant) e
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      fmt.Sprintf("capsule-%s-%d", tenant.Name, i),
 					Namespace: ns,
+					// TODO(prometherion): updating Labels in the mutateFn
 					Labels: map[string]string{
 						tl: tenant.Name,
 						nl: strconv.Itoa(i),
@@ -549,8 +577,12 @@ func (r *TenantReconciler) syncNetworkPolicies(tenant *capsulev1alpha1.Tenant) e
 			}
 			res, err := controllerutil.CreateOrUpdate(context.TODO(), r.Client, t, func() (err error) {
 				t.Spec = spec
+
 				return controllerutil.SetControllerReference(tenant, t, r.Scheme)
 			})
+
+			r.emitEvent(tenant, t.GetNamespace(), res, fmt.Sprintf("ensuring NetworkPolicy %s", t.GetName()), err)
+
 			r.Log.Info("Network Policy sync result: "+string(res), "name", t.Name, "namespace", t.Namespace)
 			if err != nil {
 				return err
@@ -609,6 +641,9 @@ func (r *TenantReconciler) ownerRoleBinding(tenant *capsulev1alpha1.Tenant) erro
 			target.RoleRef = rr
 			return controllerutil.SetControllerReference(tenant, target, r.Scheme)
 		})
+
+		r.emitEvent(tenant, target.GetNamespace(), res, fmt.Sprintf("ensuring Capsule RoleBinding %s", target.GetName()), err)
+
 		r.Log.Info("Role Binding sync result: "+string(res), "name", target.Name, "namespace", target.Namespace)
 		if err != nil {
 			return err
@@ -627,6 +662,16 @@ func (r *TenantReconciler) ensureNamespaceCount(tenant *capsulev1alpha1.Tenant) 
 		found.Status.Size = tenant.Status.Size
 		return r.Client.Status().Update(context.TODO(), found, &client.UpdateOptions{})
 	})
+}
+
+func (r *TenantReconciler) emitEvent(object runtime.Object, namespace string, res controllerutil.OperationResult, msg string, err error) {
+	var eventType = corev1.EventTypeNormal
+	if err != nil {
+		eventType = corev1.EventTypeWarning
+		res = "Error"
+	}
+
+	r.Recorder.AnnotatedEventf(object, map[string]string{"OperationResult": string(res)}, eventType, namespace, msg)
 }
 
 func (r *TenantReconciler) collectNamespaces(tenant *capsulev1alpha1.Tenant) error {

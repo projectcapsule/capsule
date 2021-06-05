@@ -15,6 +15,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -47,12 +48,14 @@ func (w *webhook) GetPath() string {
 }
 
 type handler struct {
-	cfg configuration.Configuration
+	cfg      configuration.Configuration
+	recorder record.EventRecorder
 }
 
-func Handler(cfg configuration.Configuration) capsulewebhook.Handler {
+func Handler(cfg configuration.Configuration, recorder record.EventRecorder) capsulewebhook.Handler {
 	return &handler{
-		cfg: cfg,
+		cfg:      cfg,
+		recorder: recorder,
 	}
 }
 
@@ -148,8 +151,13 @@ func (h *handler) patchResponseForOwnerRef(tenant *capsulev1alpha1.Tenant, ns *c
 
 	o, _ := json.Marshal(ns.DeepCopy())
 	if err := controllerutil.SetControllerReference(tenant, ns, scheme); err != nil {
+		h.recorder.Eventf(tenant, corev1.EventTypeWarning, "Error", "namespace %s cannot be assigned to the desired Tenant", ns.GetName())
+
 		return admission.Errored(http.StatusInternalServerError, err)
 	}
+
+	h.recorder.Eventf(tenant, corev1.EventTypeNormal, "NamespaceCreationWebhook", "namespace %s has been assigned to the desired Tenant", ns.GetName())
+
 	c, _ := json.Marshal(ns)
 	return admission.PatchResponseFromRaw(o, c)
 }
