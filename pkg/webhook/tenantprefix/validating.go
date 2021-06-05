@@ -11,6 +11,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
@@ -45,11 +46,13 @@ func (w *webhook) GetPath() string {
 
 type handler struct {
 	configuration configuration.Configuration
+	recorder      record.EventRecorder
 }
 
-func Handler(configuration configuration.Configuration) capsulewebhook.Handler {
+func Handler(configuration configuration.Configuration, recorder record.EventRecorder) capsulewebhook.Handler {
 	return &handler{
 		configuration: configuration,
+		recorder:      recorder,
 	}
 }
 
@@ -76,6 +79,8 @@ func (r *handler) OnCreate(clt client.Client, decoder *admission.Decoder) capsul
 				return admission.Errored(http.StatusBadRequest, err)
 			}
 			if e := fmt.Sprintf("%s-%s", tnt.GetName(), ns.GetName()); !strings.HasPrefix(ns.GetName(), fmt.Sprintf("%s-", tnt.GetName())) {
+				r.recorder.Eventf(tnt, corev1.EventTypeWarning, "TenantPrefix", "Namespace %s does not match the expected prefix", ns.GetName())
+
 				return admission.Denied("The namespace doesn't match the tenant prefix, expected " + e)
 			}
 		}

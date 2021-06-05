@@ -126,9 +126,10 @@ func main() {
 	_ = manager.AddHealthzCheck("ping", healthz.Ping)
 
 	if err = (&controllers.TenantReconciler{
-		Client: manager.GetClient(),
-		Log:    ctrl.Log.WithName("controllers").WithName("Tenant"),
-		Scheme: manager.GetScheme(),
+		Client:   manager.GetClient(),
+		Log:      ctrl.Log.WithName("controllers").WithName("Tenant"),
+		Scheme:   manager.GetScheme(),
+		Recorder: manager.GetEventRecorderFor("tenant-controller"),
 	}).SetupWithManager(manager); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Tenant")
 		os.Exit(1)
@@ -136,6 +137,8 @@ func main() {
 	// +kubebuilder:scaffold:builder
 
 	cfg := configuration.NewCapsuleConfiguration(manager.GetClient(), configurationName)
+
+	webhookRecorder := manager.GetEventRecorderFor("tenant-webhook")
 
 	// webhooks: the order matters, don't change it and just append
 	webhooksList := append(
@@ -145,10 +148,10 @@ func main() {
 		registry.Webhook(registry.Handler()),
 		podpriority.Webhook(podpriority.Handler()),
 		services.Webhook(services.Handler()),
-		ownerreference.Webhook(utils.InCapsuleGroups(cfg, ownerreference.Handler(cfg))),
-		namespacequota.Webhook(utils.InCapsuleGroups(cfg, namespacequota.Handler())),
+		ownerreference.Webhook(utils.InCapsuleGroups(cfg, ownerreference.Handler(cfg, webhookRecorder))),
+		namespacequota.Webhook(utils.InCapsuleGroups(cfg, namespacequota.Handler(webhookRecorder))),
 		networkpolicies.Webhook(utils.InCapsuleGroups(cfg, networkpolicies.Handler())),
-		tenantprefix.Webhook(utils.InCapsuleGroups(cfg, tenantprefix.Handler(cfg))),
+		tenantprefix.Webhook(utils.InCapsuleGroups(cfg, tenantprefix.Handler(cfg, webhookRecorder))),
 		tenant.Webhook(tenant.Handler(cfg)),
 	)
 	if err = webhook.Register(manager, webhooksList...); err != nil {
