@@ -301,17 +301,15 @@ func (r *TenantReconciler) syncResourceQuotas(tenant *capsulev1alpha1.Tenant) er
 		for i, q := range tenant.Spec.ResourceQuota {
 			target := &corev1.ResourceQuota{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:        fmt.Sprintf("capsule-%s-%d", tenant.Name, i),
-					Namespace:   ns,
-					Annotations: make(map[string]string),
-					// TODO(prometherion): labels should be moved to mutateFn
-					Labels: map[string]string{
-						tenantLabel: tenant.Name,
-						typeLabel:   strconv.Itoa(i),
-					},
+					Name:      fmt.Sprintf("capsule-%s-%d", tenant.Name, i),
+					Namespace: ns,
 				},
 			}
 			res, err := controllerutil.CreateOrUpdate(context.TODO(), r.Client, target, func() (err error) {
+				target.SetLabels(map[string]string{
+					tenantLabel: tenant.Name,
+					typeLabel:   strconv.Itoa(i),
+				})
 				// Requirement to list ResourceQuota of the current Tenant
 				tr, err := labels.NewRequirement(tenantLabel, selection.Equals, []string{tenant.Name})
 				if err != nil {
@@ -568,14 +566,13 @@ func (r *TenantReconciler) syncNetworkPolicies(tenant *capsulev1alpha1.Tenant) e
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      fmt.Sprintf("capsule-%s-%d", tenant.Name, i),
 					Namespace: ns,
-					// TODO(prometherion): updating Labels in the mutateFn
-					Labels: map[string]string{
-						tl: tenant.Name,
-						nl: strconv.Itoa(i),
-					},
 				},
 			}
 			res, err := controllerutil.CreateOrUpdate(context.TODO(), r.Client, t, func() (err error) {
+				t.SetLabels(map[string]string{
+					tl: tenant.Name,
+					nl: strconv.Itoa(i),
+				})
 				t.Spec = spec
 
 				return controllerutil.SetControllerReference(tenant, t, r.Scheme)
