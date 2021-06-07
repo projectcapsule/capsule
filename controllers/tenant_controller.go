@@ -99,9 +99,9 @@ func (r TenantReconciler) Reconcile(ctx context.Context, request ctrl.Request) (
 		return
 	}
 
-	r.Log.Info("Ensuring PSP for owner")
+	r.Log.Info("Ensuring additional RoleBindings for owner")
 	if err = r.syncAdditionalRoleBindings(instance); err != nil {
-		r.Log.Error(err, "Cannot sync additional Role Bindings items")
+		r.Log.Error(err, "Cannot sync additional RoleBindings items")
 		return
 	}
 
