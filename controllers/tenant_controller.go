@@ -206,15 +206,21 @@ func (r *TenantReconciler) resourceQuotasUpdate(resourceName corev1.ResourceName
 // access to CRDs or specific API groups.
 func (r *TenantReconciler) syncAdditionalRoleBindings(tenant *capsulev1alpha1.Tenant) (err error) {
 	// hashing the RoleBinding name due to DNS RFC-1123 applied to Kubernetes labels
-	hash := func(value string) string {
+	hash := func(binding capsulev1alpha1.AdditionalRoleBindings) string {
 		h := fnv.New64a()
-		_, _ = h.Write([]byte(value))
+
+		_, _ = h.Write([]byte(binding.ClusterRoleName))
+
+		for _, sub := range binding.Subjects {
+			_, _ = h.Write([]byte(sub.Kind + sub.Name))
+		}
+
 		return fmt.Sprintf("%x", h.Sum64())
 	}
 	// getting requested Role Binding keys
 	var keys []string
 	for _, i := range tenant.Spec.AdditionalRoleBindings {
-		keys = append(keys, hash(i.ClusterRoleName))
+		keys = append(keys, hash(i))
 	}
 
 	var tl, ll string
@@ -231,11 +237,11 @@ func (r *TenantReconciler) syncAdditionalRoleBindings(tenant *capsulev1alpha1.Te
 		if err = r.pruningResources(ns, keys, &rbacv1.RoleBinding{}); err != nil {
 			return err
 		}
-		for _, i := range tenant.Spec.AdditionalRoleBindings {
-			lv := hash(i.ClusterRoleName)
+		for i, roleBinding := range tenant.Spec.AdditionalRoleBindings {
+			lv := hash(roleBinding)
 			rb := &rbacv1.RoleBinding{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      fmt.Sprintf("capsule-%s-%s", tenant.Name, i.ClusterRoleName),
+					Name:      fmt.Sprintf("capsule-%s-%d-%s", tenant.Name, i, roleBinding.ClusterRoleName),
 					Namespace: ns,
 				},
 			}
@@ -248,9 +254,10 @@ func (r *TenantReconciler) syncAdditionalRoleBindings(tenant *capsulev1alpha1.Te
 				rb.RoleRef = rbacv1.RoleRef{
 					APIGroup: "rbac.authorization.k8s.io",
 					Kind:     "ClusterRole",
-					Name:     i.ClusterRoleName,
+					Name:     roleBinding.ClusterRoleName,
 				}
-				rb.Subjects = i.Subjects
+				rb.Subjects = roleBinding.Subjects
+
 				return controllerutil.SetControllerReference(tenant, rb, r.Scheme)
 			})
 
