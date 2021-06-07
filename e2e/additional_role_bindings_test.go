@@ -62,7 +62,7 @@ var _ = Describe("creating a Namespace with an additional Role Binding", func() 
 
 			Eventually(func() (err error) {
 				cs := ownerClient(tnt)
-				rb, err = cs.RbacV1().RoleBindings(ns.Name).Get(context.Background(), fmt.Sprintf("capsule-%s-%s", tnt.Name, "crds-rolebinding"), metav1.GetOptions{})
+				rb, err = cs.RbacV1().RoleBindings(ns.Name).Get(context.Background(), fmt.Sprintf("capsule-%s-0-%s", tnt.Name, "crds-rolebinding"), metav1.GetOptions{})
 				return err
 			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 			Expect(rb.RoleRef.Name).Should(Equal(tnt.Spec.AdditionalRoleBindings[0].ClusterRoleName))
