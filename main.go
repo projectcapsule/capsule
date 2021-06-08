@@ -28,6 +28,7 @@ import (
 	"github.com/clastix/capsule/pkg/configuration"
 	"github.com/clastix/capsule/pkg/indexer"
 	"github.com/clastix/capsule/pkg/webhook"
+	"github.com/clastix/capsule/pkg/webhook/imagepullpolicy"
 	"github.com/clastix/capsule/pkg/webhook/ingress"
 	"github.com/clastix/capsule/pkg/webhook/namespacequota"
 	"github.com/clastix/capsule/pkg/webhook/networkpolicies"
@@ -153,6 +154,7 @@ func main() {
 		networkpolicies.Webhook(utils.InCapsuleGroups(cfg, networkpolicies.Handler())),
 		tenantprefix.Webhook(utils.InCapsuleGroups(cfg, tenantprefix.Handler(cfg, webhookRecorder))),
 		tenant.Webhook(tenant.Handler(cfg)),
+		imagepullpolicy.Webhook(imagepullpolicy.Handler()),
 	)
 	if err = webhook.Register(manager, webhooksList...); err != nil {
 		setupLog.Error(err, "unable to setup webhooks")
