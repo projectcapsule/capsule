@@ -31,3 +31,7 @@ With the said Tenant specification Alice can create Pod resource if `spec.priori
 - `tier-gold`, `tier-silver`, or `tier-bronze`, since these compile the regex declared in the annotation `priorityclass.capsule.clastix.io/allowed-regex`
 
 If a Pod is going to use a non-allowed _Priority Class_, it will be rejected by the Validation Webhook enforcing it.
+
+# What’s next
+
+See how Bill, the cluster admin, can assign a pool of nodes to Alice's tenant. [Assign a nodes pool](./nodes-pool.md).
