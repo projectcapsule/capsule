@@ -46,3 +46,6 @@
     matchExpressions:
       - key: capsule.clastix.io/tenant
         operator: Exists
+- op: add
+  path: /webhooks/8/rules/0/scope
+  value: Namespaced
