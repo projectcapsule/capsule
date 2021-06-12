@@ -20,36 +20,36 @@ import (
 
 // +kubebuilder:webhook:path=/validating-v1-tenant,mutating=false,sideEffects=None,admissionReviewVersions=v1,failurePolicy=fail,groups="capsule.clastix.io",resources=tenants,verbs=create;update,versions=v1alpha1,name=tenant.capsule.clastix.io
 
-type webhook struct {
+type validating struct {
 	handler capsulewebhook.Handler
 }
 
-func Webhook(handler capsulewebhook.Handler) capsulewebhook.Webhook {
-	return &webhook{handler: handler}
+func Validating(handler capsulewebhook.Handler) capsulewebhook.Webhook {
+	return &validating{handler: handler}
 }
 
-func (w webhook) GetName() string {
+func (w validating) GetName() string {
 	return "Tenant"
 }
 
-func (w webhook) GetPath() string {
+func (w validating) GetPath() string {
 	return "/validating-v1-tenant"
 }
 
-func (w webhook) GetHandler() capsulewebhook.Handler {
+func (w validating) GetHandler() capsulewebhook.Handler {
 	return w.handler
 }
 
-type handler struct {
+type validatingHandler struct {
 	configuration configuration.Configuration
 }
 
-func Handler(configuration configuration.Configuration) capsulewebhook.Handler {
-	return &handler{configuration: configuration}
+func ValidatingHandler(configuration configuration.Configuration) capsulewebhook.Handler {
+	return &validatingHandler{configuration: configuration}
 }
 
 // Validate Tenant name
-func (h *handler) validateTenantName(tenant *v1alpha1.Tenant) error {
+func (h *validatingHandler) validateTenantName(tenant *v1alpha1.Tenant) error {
 	matched, _ := regexp.MatchString(`[a-z0-9]([-a-z0-9]*[a-z0-9])?`, tenant.GetName())
 	if !matched {
 		return fmt.Errorf("tenant name has forbidden characters")
@@ -58,7 +58,7 @@ func (h *handler) validateTenantName(tenant *v1alpha1.Tenant) error {
 }
 
 // Validate ingressClasses regexp
-func (h *handler) validateIngressClassesRegex(tenant *v1alpha1.Tenant) error {
+func (h *validatingHandler) validateIngressClassesRegex(tenant *v1alpha1.Tenant) error {
 	if tenant.Spec.IngressClasses != nil && len(tenant.Spec.IngressClasses.Regex) > 0 {
 		if _, err := regexp.Compile(tenant.Spec.IngressClasses.Regex); err != nil {
 			return fmt.Errorf("unable to compile ingressClasses allowedRegex")
@@ -68,7 +68,7 @@ func (h *handler) validateIngressClassesRegex(tenant *v1alpha1.Tenant) error {
 }
 
 // Validate storageClasses regexp
-func (h *handler) validateStorageClassesRegex(tenant *v1alpha1.Tenant) error {
+func (h *validatingHandler) validateStorageClassesRegex(tenant *v1alpha1.Tenant) error {
 	if tenant.Spec.StorageClasses != nil && len(tenant.Spec.StorageClasses.Regex) > 0 {
 		if _, err := regexp.Compile(tenant.Spec.StorageClasses.Regex); err != nil {
 			return fmt.Errorf("unable to compile storageClasses allowedRegex")
@@ -78,7 +78,7 @@ func (h *handler) validateStorageClassesRegex(tenant *v1alpha1.Tenant) error {
 }
 
 // Validate containerRegistries regexp
-func (h *handler) validateContainerRegistriesRegex(tenant *v1alpha1.Tenant) error {
+func (h *validatingHandler) validateContainerRegistriesRegex(tenant *v1alpha1.Tenant) error {
 	if tenant.Spec.ContainerRegistries != nil && len(tenant.Spec.ContainerRegistries.Regex) > 0 {
 		if _, err := regexp.Compile(tenant.Spec.ContainerRegistries.Regex); err != nil {
 			return fmt.Errorf("unable to compile containerRegistries allowedRegex")
@@ -88,7 +88,7 @@ func (h *handler) validateContainerRegistriesRegex(tenant *v1alpha1.Tenant) erro
 }
 
 // Validate containerRegistries regexp
-func (h *handler) validateIngressHostnamesRegex(tenant *v1alpha1.Tenant) error {
+func (h *validatingHandler) validateIngressHostnamesRegex(tenant *v1alpha1.Tenant) error {
 	if tenant.Spec.IngressHostnames != nil && len(tenant.Spec.IngressHostnames.Regex) > 0 {
 		if _, err := regexp.Compile(tenant.Spec.IngressHostnames.Regex); err != nil {
 			return fmt.Errorf("unable to compile ingressHostnames allowedRegex")
@@ -98,7 +98,7 @@ func (h *handler) validateIngressHostnamesRegex(tenant *v1alpha1.Tenant) error {
 }
 
 // Check Ingress hostnames collision across all available Tenants
-func (h *handler) validateIngressHostnamesCollision(context context.Context, clt client.Client, tenant *v1alpha1.Tenant) error {
+func (h *validatingHandler) validateIngressHostnamesCollision(context context.Context, clt client.Client, tenant *v1alpha1.Tenant) error {
 	if !h.configuration.AllowTenantIngressHostnamesCollision() && tenant.Spec.IngressHostnames != nil && len(tenant.Spec.IngressHostnames.Exact) > 0 {
 		for _, h := range tenant.Spec.IngressHostnames.Exact {
 			tntList := &v1alpha1.TenantList{}
@@ -120,7 +120,7 @@ func (h *handler) validateIngressHostnamesCollision(context context.Context, clt
 	return nil
 }
 
-func (h *handler) validateTenant(ctx context.Context, req admission.Request, client client.Client, decoder *admission.Decoder) error {
+func (h *validatingHandler) validateTenant(ctx context.Context, req admission.Request, client client.Client, decoder *admission.Decoder) error {
 	tenant := &v1alpha1.Tenant{}
 	if err := decoder.Decode(req, tenant); err != nil {
 		return err
@@ -134,7 +134,7 @@ func (h *handler) validateTenant(ctx context.Context, req admission.Request, cli
 	return nil
 }
 
-func (h *handler) validateTenantByRegex(tenant *v1alpha1.Tenant) error {
+func (h *validatingHandler) validateTenantByRegex(tenant *v1alpha1.Tenant) error {
 	if err := h.validateTenantName(tenant); err != nil {
 		return err
 	}
@@ -154,7 +154,7 @@ func (h *handler) validateTenantByRegex(tenant *v1alpha1.Tenant) error {
 	return nil
 }
 
-func (h *handler) OnCreate(client client.Client, decoder *admission.Decoder, _ record.EventRecorder) capsulewebhook.Func {
+func (h *validatingHandler) OnCreate(client client.Client, decoder *admission.Decoder, _ record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) admission.Response {
 		if err := h.validateTenant(ctx, req, client, decoder); err != nil {
 			return admission.Denied(err.Error())
@@ -163,13 +163,13 @@ func (h *handler) OnCreate(client client.Client, decoder *admission.Decoder, _ r
 	}
 }
 
-func (h *handler) OnDelete(client.Client, *admission.Decoder, record.EventRecorder) capsulewebhook.Func {
+func (h *validatingHandler) OnDelete(client.Client, *admission.Decoder, record.EventRecorder) capsulewebhook.Func {
 	return func(context.Context, admission.Request) admission.Response {
 		return admission.Allowed("")
 	}
 }
 
-func (h *handler) OnUpdate(client client.Client, decoder *admission.Decoder, _ record.EventRecorder) capsulewebhook.Func {
+func (h *validatingHandler) OnUpdate(client client.Client, decoder *admission.Decoder, _ record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) admission.Response {
 		if err := h.validateTenant(ctx, req, client, decoder); err != nil {
 			return admission.Denied(err.Error())
