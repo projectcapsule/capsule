@@ -151,7 +151,7 @@ func main() {
 		namespacequota.Webhook(utils.InCapsuleGroups(cfg, namespacequota.Handler())),
 		networkpolicies.Webhook(utils.InCapsuleGroups(cfg, networkpolicies.Handler())),
 		tenantprefix.Webhook(utils.InCapsuleGroups(cfg, tenantprefix.Handler(cfg))),
-		tenant.Webhook(tenant.Handler(cfg)),
+		tenant.Validating(tenant.ValidatingHandler(cfg)),
 		imagepullpolicy.Webhook(imagepullpolicy.Handler()),
 	)
 	if err = webhook.Register(manager, webhooksList...); err != nil {
