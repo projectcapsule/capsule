@@ -38,6 +38,7 @@ Bill, at Acme Corp. can use Capsule to address any of the following scenarios:
 * [Create Custom Resources](./custom-resources.md)
 * [Taint Namespaces](./taint-namespaces.md)
 * [Assign multiple Tenants to an owner](./multiple-tenants.md)
+* [Cordoning a Tenant](./cordoning-tenant.md)
 
 > NB: as we improve Capsule, more use cases about multi-tenancy and cluster governance will be covered.
 
