@@ -100,4 +100,5 @@ Error from server (Capsule Network Policies cannot be deleted: please, reach out
 ```
 
 # What’s next
-See how Bill, the cluster admin, can assign trusted images registries to Alice's tenant. [Assign Trusted Images Registries](./images-registries.md).
+See how Bill can enforce the Pod containers image pull policy to `Always` to avoid leaking of private images when running on shared nodes.
+[Enforcing Pod containers image PullPolicy](./images-pullpolicy.md)
