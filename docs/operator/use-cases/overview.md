@@ -32,6 +32,7 @@ Bill, at Acme Corp. can use Capsule to address any of the following scenarios:
 * [Assign Storage Classes](./storage-classes.md)
 * [Disable NodePort Services](./node-ports.md)
 * [Assign Network Policies](./network-policies.md)
+* [Enforcing Pod containers image PullPolicy](./images-pullpolicy.md)
 * [Assign Trusted Images Registries](./images-registries.md)
 * [Assign Pod Security Policies](./pod-security-policies.md)
 * [Create Custom Resources](./custom-resources.md)
