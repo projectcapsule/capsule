@@ -216,6 +216,27 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
+      path: /tenant-cordoning
+  failurePolicy: Fail
+  name: cordoning.tenant.capsule.clastix.io
+  rules:
+  - apiGroups:
+    - '*'
+    apiVersions:
+    - '*'
+    operations:
+    - CREATE
+    - UPDATE
+    - DELETE
+    resources:
+    - '*'
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
       path: /validating-v1-tenant
   failurePolicy: Fail
   name: tenant.capsule.clastix.io
