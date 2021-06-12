@@ -210,4 +210,5 @@ no - no RBAC policy matched
 ```
 
 # What’s next
-See how Bill, the cluster admin, can assign a pool of nodes to Alice's tenant. [Assign a nodes pool](./nodes-pool.md).
+
+See how Bill, the cluster admin, can enforce the PriorityClass of Pods running of Alice's tenant Namespaces. [Enforce Pod Priority Classes](./pod-priority-class.md)
