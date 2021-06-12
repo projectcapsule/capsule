@@ -61,10 +61,16 @@ func (r *handler) OnCreate(client client.Client, decoder *admission.Decoder, rec
 			if err := client.Get(ctx, types.NamespacedName{Name: objectRef.Name}, tnt); err != nil {
 				return admission.Errored(http.StatusBadRequest, err)
 			}
-			if tnt.IsFull() {
+
+			switch {
+			case tnt.IsFull():
 				recorder.Eventf(tnt, corev1.EventTypeWarning, "NamespaceQuotaExceded", "Namespace %s cannot be attached, quota exceeded for the current Tenant", ns.GetName())
 
 				return admission.Denied(NewNamespaceQuotaExceededError().Error())
+			case tnt.IsCordoned():
+				recorder.Eventf(tnt, corev1.EventTypeWarning, "TenantFreezed", "Namespace %s cannot be attached, the current Tenant is freezed", ns.GetName())
+
+				return admission.Denied("the selected Tenant is freezed")
 			}
 		}
 		// creating NS that is not bounded to any Tenant

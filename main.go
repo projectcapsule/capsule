@@ -153,6 +153,7 @@ func main() {
 		tenantprefix.Webhook(utils.InCapsuleGroups(cfg, tenantprefix.Handler(cfg))),
 		tenant.Validating(tenant.ValidatingHandler(cfg)),
 		imagepullpolicy.Webhook(imagepullpolicy.Handler()),
+		tenant.Cordoning(tenant.CordoningHandler()),
 	)
 	if err = webhook.Register(manager, webhooksList...); err != nil {
 		setupLog.Error(err, "unable to setup webhooks")
