@@ -107,4 +107,5 @@ kubectl create -f gas-production-ns.yaml
 >`Unable to assign namespace to tenant. Please use capsule.clastix.io/tenant label when creating a namespace.`
 
 # What’s next
-This end our tour in Capsule use cases. As we improve Capsule, more use cases about multi-tenancy, policy admission control, and cluster governance will be covered in the future. Stay tuned!
+
+See how Bill, the cluster admin, can cordon all the Namespaces belonging to a Tenant. [Cordoning a Tenant](./cordoning-tenant.md).
