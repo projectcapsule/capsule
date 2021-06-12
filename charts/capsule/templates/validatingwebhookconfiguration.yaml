@@ -318,3 +318,32 @@ webhooks:
     scope: '*'
   sideEffects: NoneOnDryRun
   timeoutSeconds: {{ .Values.validatingWebhooksTimeoutSeconds }}
+- admissionReviewVersions:
+    - v1beta1
+  clientConfig:
+    caBundle: Cg==
+    service:
+      name: {{ include "capsule.fullname" . }}-webhook-service
+      namespace: {{ .Release.Namespace }}
+      path: /tenant-cordoning
+      port: 443
+  failurePolicy: Ignore
+  name: cordoning.tenant.capsule.clastix.io
+  namespaceSelector:
+    matchExpressions:
+      - key: capsule.clastix.io/tenant
+        operator: Exists
+  rules:
+    - apiGroups:
+        - '*'
+      apiVersions:
+        - '*'
+      operations:
+        - CREATE
+        - UPDATE
+        - DELETE
+      resources:
+        - '*'
+      scope: Namespaced
+  sideEffects: NoneOnDryRun
+  timeoutSeconds: {{ .Values.validatingWebhooksTimeoutSeconds }}
