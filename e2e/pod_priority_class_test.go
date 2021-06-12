@@ -22,7 +22,7 @@ var _ = Describe("enforcing a Priority Class", func() {
 			Name: "priority-class",
 			Annotations: map[string]string{
 				"priorityclass.capsule.clastix.io/allowed":       "gold",
-				"priorityclass.capsule.clastix.io/allowed-regex": "pc-silver,pc-bronze-pc-gold",
+				"priorityclass.capsule.clastix.io/allowed-regex": "pc\\-\\w+",
 			},
 		},
 		Spec: v1alpha1.TenantSpec{
