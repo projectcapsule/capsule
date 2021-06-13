@@ -9,6 +9,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
@@ -45,7 +46,7 @@ func Handler() capsulewebhook.Handler {
 	return &handler{}
 }
 
-func (r *handler) OnCreate(c client.Client, decoder *admission.Decoder) capsulewebhook.Func {
+func (r *handler) OnCreate(c client.Client, decoder *admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) admission.Response {
 		var pod = &corev1.Pod{}
 
@@ -77,6 +78,8 @@ func (r *handler) OnCreate(c client.Client, decoder *admission.Decoder) capsulew
 			usedPullPolicy := string(container.ImagePullPolicy)
 
 			if !policy.IsPolicySupported(usedPullPolicy) {
+				recorder.Eventf(&tnt, corev1.EventTypeWarning, "PullPolicy", "Pod %s/%s pull policy %s is not allowed", req.Namespace, req.Name, usedPullPolicy)
+
 				return admission.Denied(NewImagePullPolicyForbidden(usedPullPolicy, container.Name, policy.AllowedPullPolicies()).Error())
 			}
 		}
@@ -85,13 +88,13 @@ func (r *handler) OnCreate(c client.Client, decoder *admission.Decoder) capsulew
 	}
 }
 
-func (r *handler) OnUpdate(client client.Client, decoder *admission.Decoder) capsulewebhook.Func {
+func (r *handler) OnUpdate(client.Client, *admission.Decoder, record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) admission.Response {
 		return admission.Allowed("")
 	}
 }
 
-func (r *handler) OnDelete(client client.Client, decoder *admission.Decoder) capsulewebhook.Func {
+func (r *handler) OnDelete(client.Client, *admission.Decoder, record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) admission.Response {
 		return admission.Allowed("")
 	}

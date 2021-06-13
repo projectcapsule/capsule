@@ -7,9 +7,11 @@ import (
 	"context"
 	"net"
 	"net/http"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
@@ -49,7 +51,7 @@ func Handler() capsulewebhook.Handler {
 	return &handler{}
 }
 
-func (r *handler) handleService(ctx context.Context, clt client.Client, decoder *admission.Decoder, req admission.Request) admission.Response {
+func (r *handler) handleService(ctx context.Context, clt client.Client, decoder *admission.Decoder, req admission.Request, recorder record.EventRecorder) admission.Response {
 	svc := &corev1.Service{}
 	if err := decoder.Decode(req, svc); err != nil {
 		return admission.Errored(http.StatusBadRequest, err)
@@ -67,6 +69,8 @@ func (r *handler) handleService(ctx context.Context, clt client.Client, decoder 
 	tnt := tntList.Items[0]
 
 	if svc.Spec.Type == corev1.ServiceTypeNodePort && tnt.GetAnnotations()[enableNodePortsAnnotation] == "false" {
+		recorder.Eventf(&tnt, corev1.EventTypeWarning, "NodePort", "Service %s/%s cannot be type of NodePort", req.Namespace, req.Name)
+
 		return admission.Errored(http.StatusBadRequest, NewNodePortDisabledError())
 	}
 
@@ -84,22 +88,24 @@ func (r *handler) handleService(ctx context.Context, clt client.Client, decoder 
 		}
 	}
 
+	recorder.Eventf(&tnt, corev1.EventTypeWarning, "NodePort", "Service %s/%s external IPs %s are not in the expected range for the current Tenant", req.Namespace, req.Name, strings.Join(svc.Spec.ExternalIPs, ","))
+
 	return admission.Errored(http.StatusBadRequest, NewExternalServiceIPForbidden(tnt.Spec.ExternalServiceIPs.Allowed))
 }
 
-func (r *handler) OnCreate(client client.Client, decoder *admission.Decoder) capsulewebhook.Func {
+func (r *handler) OnCreate(client client.Client, decoder *admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) admission.Response {
-		return r.handleService(ctx, client, decoder, req)
+		return r.handleService(ctx, client, decoder, req, recorder)
 	}
 }
 
-func (r *handler) OnUpdate(client client.Client, decoder *admission.Decoder) capsulewebhook.Func {
+func (r *handler) OnUpdate(client client.Client, decoder *admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) admission.Response {
-		return r.handleService(ctx, client, decoder, req)
+		return r.handleService(ctx, client, decoder, req, recorder)
 	}
 }
 
-func (r *handler) OnDelete(client client.Client, decoder *admission.Decoder) capsulewebhook.Func {
+func (r *handler) OnDelete(client.Client, *admission.Decoder, record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) admission.Response {
 		return admission.Allowed("")
 	}

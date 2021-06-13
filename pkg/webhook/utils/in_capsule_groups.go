@@ -6,6 +6,7 @@ package utils
 import (
 	"context"
 
+	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
@@ -43,30 +44,30 @@ func (h handler) isCapsuleUser(req admission.Request) bool {
 	return false
 }
 
-func (h *handler) OnCreate(client client.Client, decoder *admission.Decoder) webhook.Func {
+func (h *handler) OnCreate(client client.Client, decoder *admission.Decoder, recorder record.EventRecorder) webhook.Func {
 	return func(ctx context.Context, req admission.Request) admission.Response {
 		if !h.isCapsuleUser(req) {
 			return admission.Allowed("")
 		}
 
-		return h.handler.OnCreate(client, decoder)(ctx, req)
+		return h.handler.OnCreate(client, decoder, recorder)(ctx, req)
 	}
 }
 
-func (h *handler) OnDelete(client client.Client, decoder *admission.Decoder) webhook.Func {
+func (h *handler) OnDelete(client client.Client, decoder *admission.Decoder, recorder record.EventRecorder) webhook.Func {
 	return func(ctx context.Context, req admission.Request) admission.Response {
 		if !h.isCapsuleUser(req) {
 			return admission.Allowed("")
 		}
-		return h.handler.OnDelete(client, decoder)(ctx, req)
+		return h.handler.OnDelete(client, decoder, recorder)(ctx, req)
 	}
 }
 
-func (h *handler) OnUpdate(client client.Client, decoder *admission.Decoder) webhook.Func {
+func (h *handler) OnUpdate(client client.Client, decoder *admission.Decoder, recorder record.EventRecorder) webhook.Func {
 	return func(ctx context.Context, req admission.Request) admission.Response {
 		if !h.isCapsuleUser(req) {
 			return admission.Allowed("")
 		}
-		return h.handler.OnUpdate(client, decoder)(ctx, req)
+		return h.handler.OnUpdate(client, decoder, recorder)(ctx, req)
 	}
 }

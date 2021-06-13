@@ -7,8 +7,9 @@ import (
 	"context"
 	"net/http"
 
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
@@ -46,9 +47,9 @@ func Handler() capsulewebhook.Handler {
 	return &handler{}
 }
 
-func (h *handler) OnCreate(c client.Client, decoder *admission.Decoder) capsulewebhook.Func {
+func (h *handler) OnCreate(c client.Client, decoder *admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) admission.Response {
-		var pod = &v1.Pod{}
+		var pod = &corev1.Pod{}
 
 		if err := decoder.Decode(req, pod); err != nil {
 			return admission.Errored(http.StatusBadRequest, err)
@@ -78,6 +79,8 @@ func (h *handler) OnCreate(c client.Client, decoder *admission.Decoder) capsulew
 			// We don't have to force Pod to specify a Priority Class
 			return admission.Allowed("")
 		case !allowed.ExactMatch(priorityClassName) && !allowed.RegexMatch(priorityClassName):
+			recorder.Eventf(&tntList.Items[0], corev1.EventTypeWarning, "PriorityClass", "Pod %s/%s is using Priority Class %s not allowed for the current Tenant", pod.Namespace, pod.Name, priorityClassName)
+
 			return admission.Errored(http.StatusBadRequest, NewPodPriorityClassForbidden(priorityClassName, *allowed))
 		default:
 			return admission.Allowed("")
@@ -85,13 +88,13 @@ func (h *handler) OnCreate(c client.Client, decoder *admission.Decoder) capsulew
 	}
 }
 
-func (h *handler) OnDelete(client client.Client, decoder *admission.Decoder) capsulewebhook.Func {
+func (h *handler) OnDelete(client.Client, *admission.Decoder, record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) admission.Response {
 		return admission.Allowed("")
 	}
 }
 
-func (h *handler) OnUpdate(client client.Client, decoder *admission.Decoder) capsulewebhook.Func {
+func (h *handler) OnUpdate(client.Client, *admission.Decoder, record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) admission.Response {
 		return admission.Allowed("")
 	}

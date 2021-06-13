@@ -261,7 +261,7 @@ func (r *TenantReconciler) syncAdditionalRoleBindings(tenant *capsulev1alpha1.Te
 				return controllerutil.SetControllerReference(tenant, rb, r.Scheme)
 			})
 
-			r.emitEvent(tenant, rb.GetNamespace(), res, fmt.Sprintf("ensuring additional RoleBinding %s", rb.GetName()), err)
+			r.emitEvent(tenant, rb.GetNamespace(), res, fmt.Sprintf("Ensuring additional RoleBinding %s", rb.GetName()), err)
 
 			if err != nil {
 				r.Log.Error(err, "Cannot sync Additional RoleBinding")
@@ -394,7 +394,7 @@ func (r *TenantReconciler) syncResourceQuotas(tenant *capsulev1alpha1.Tenant) er
 				return controllerutil.SetControllerReference(tenant, target, r.Scheme)
 			})
 
-			r.emitEvent(tenant, target.GetNamespace(), res, fmt.Sprintf("ensuring ResourceQuota %s", target.GetName()), err)
+			r.emitEvent(tenant, target.GetNamespace(), res, fmt.Sprintf("Ensuring ResourceQuota %s", target.GetName()), err)
 
 			r.Log.Info("Resource Quota sync result: "+string(res), "name", target.Name, "namespace", target.Namespace)
 			if err != nil {
@@ -444,7 +444,7 @@ func (r *TenantReconciler) syncLimitRanges(tenant *capsulev1alpha1.Tenant) error
 				return controllerutil.SetControllerReference(tenant, t, r.Scheme)
 			})
 
-			r.emitEvent(tenant, t.GetNamespace(), res, fmt.Sprintf("ensuring LimitRange %s", t.GetName()), err)
+			r.emitEvent(tenant, t.GetNamespace(), res, fmt.Sprintf("Ensuring LimitRange %s", t.GetName()), err)
 
 			r.Log.Info("LimitRange sync result: "+string(res), "name", t.Name, "namespace", t.Namespace)
 			if err != nil {
@@ -523,7 +523,7 @@ func (r *TenantReconciler) syncNamespaceMetadata(namespace string, tnt *capsulev
 		return
 	})
 
-	r.emitEvent(tnt, namespace, res, "ensuring Namespace metadata", err)
+	r.emitEvent(tnt, namespace, res, "Ensuring Namespace metadata", err)
 
 	return
 }
@@ -585,7 +585,7 @@ func (r *TenantReconciler) syncNetworkPolicies(tenant *capsulev1alpha1.Tenant) e
 				return controllerutil.SetControllerReference(tenant, t, r.Scheme)
 			})
 
-			r.emitEvent(tenant, t.GetNamespace(), res, fmt.Sprintf("ensuring NetworkPolicy %s", t.GetName()), err)
+			r.emitEvent(tenant, t.GetNamespace(), res, fmt.Sprintf("Ensuring NetworkPolicy %s", t.GetName()), err)
 
 			r.Log.Info("Network Policy sync result: "+string(res), "name", t.Name, "namespace", t.Namespace)
 			if err != nil {
@@ -646,7 +646,7 @@ func (r *TenantReconciler) ownerRoleBinding(tenant *capsulev1alpha1.Tenant) erro
 			return controllerutil.SetControllerReference(tenant, target, r.Scheme)
 		})
 
-		r.emitEvent(tenant, target.GetNamespace(), res, fmt.Sprintf("ensuring Capsule RoleBinding %s", target.GetName()), err)
+		r.emitEvent(tenant, target.GetNamespace(), res, fmt.Sprintf("Ensuring Capsule RoleBinding %s", target.GetName()), err)
 
 		r.Log.Info("Role Binding sync result: "+string(res), "name", target.Name, "namespace", target.Namespace)
 		if err != nil {

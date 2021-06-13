@@ -42,16 +42,13 @@ func (w *webhook) GetPath() string {
 }
 
 type handler struct {
-	recorder record.EventRecorder
 }
 
-func Handler(recorder record.EventRecorder) capsulewebhook.Handler {
-	return &handler{
-		recorder: recorder,
-	}
+func Handler() capsulewebhook.Handler {
+	return &handler{}
 }
 
-func (r *handler) OnCreate(client client.Client, decoder *admission.Decoder) capsulewebhook.Func {
+func (r *handler) OnCreate(client client.Client, decoder *admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) admission.Response {
 		ns := &corev1.Namespace{}
 		if err := decoder.Decode(req, ns); err != nil {
@@ -65,7 +62,7 @@ func (r *handler) OnCreate(client client.Client, decoder *admission.Decoder) cap
 				return admission.Errored(http.StatusBadRequest, err)
 			}
 			if tnt.IsFull() {
-				r.recorder.Eventf(tnt, corev1.EventTypeWarning, "Error", "the Namespace quota has been exceeded, Namespace %s cannot been attached", ns.GetName())
+				recorder.Eventf(tnt, corev1.EventTypeWarning, "NamespaceQuota", "Namespace %s cannot be attached, quota exceeded", ns.GetName())
 
 				return admission.Denied(NewNamespaceQuotaExceededError().Error())
 			}
@@ -75,13 +72,13 @@ func (r *handler) OnCreate(client client.Client, decoder *admission.Decoder) cap
 	}
 }
 
-func (r *handler) OnDelete(client client.Client, decoder *admission.Decoder) capsulewebhook.Func {
+func (r *handler) OnDelete(client client.Client, decoder *admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) admission.Response {
 		return admission.Allowed("")
 	}
 }
 
-func (r *handler) OnUpdate(client client.Client, decoder *admission.Decoder) capsulewebhook.Func {
+func (r *handler) OnUpdate(client client.Client, decoder *admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) admission.Response {
 		return admission.Allowed("")
 	}
