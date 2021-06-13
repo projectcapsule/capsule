@@ -11,7 +11,7 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	v1 "k8s.io/api/apps/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -124,11 +124,11 @@ var _ = Describe("exceeding a Tenant resource quota", func() {
 		cs := ownerClient(tnt)
 		for _, namespace := range nsl {
 			Eventually(func() (err error) {
-				d := &v1.Deployment{
+				d := &appsv1.Deployment{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "my-pause",
 					},
-					Spec: v1.DeploymentSpec{
+					Spec: appsv1.DeploymentSpec{
 						Replicas: pointer.Int32Ptr(5),
 						Selector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
