@@ -46,17 +46,15 @@ func (w *webhook) GetPath() string {
 
 type handler struct {
 	configuration configuration.Configuration
-	recorder      record.EventRecorder
 }
 
-func Handler(configuration configuration.Configuration, recorder record.EventRecorder) capsulewebhook.Handler {
+func Handler(configuration configuration.Configuration) capsulewebhook.Handler {
 	return &handler{
 		configuration: configuration,
-		recorder:      recorder,
 	}
 }
 
-func (r *handler) OnCreate(clt client.Client, decoder *admission.Decoder) capsulewebhook.Func {
+func (r *handler) OnCreate(clt client.Client, decoder *admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) admission.Response {
 		ns := &corev1.Namespace{}
 		if err := decoder.Decode(req, ns); err != nil {
@@ -79,7 +77,7 @@ func (r *handler) OnCreate(clt client.Client, decoder *admission.Decoder) capsul
 				return admission.Errored(http.StatusBadRequest, err)
 			}
 			if e := fmt.Sprintf("%s-%s", tnt.GetName(), ns.GetName()); !strings.HasPrefix(ns.GetName(), fmt.Sprintf("%s-", tnt.GetName())) {
-				r.recorder.Eventf(tnt, corev1.EventTypeWarning, "TenantPrefix", "Namespace %s does not match the expected prefix", ns.GetName())
+				recorder.Eventf(tnt, corev1.EventTypeWarning, "TenantPrefix", "Namespace %s does not match the expected Tenant prefix", ns.GetName())
 
 				return admission.Denied("The namespace doesn't match the tenant prefix, expected " + e)
 			}
@@ -88,13 +86,13 @@ func (r *handler) OnCreate(clt client.Client, decoder *admission.Decoder) capsul
 	}
 }
 
-func (r *handler) OnDelete(client client.Client, decoder *admission.Decoder) capsulewebhook.Func {
+func (r *handler) OnDelete(client.Client, *admission.Decoder, record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) admission.Response {
 		return admission.Allowed("")
 	}
 }
 
-func (r *handler) OnUpdate(client client.Client, decoder *admission.Decoder) capsulewebhook.Func {
+func (r *handler) OnUpdate(client.Client, *admission.Decoder, record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) admission.Response {
 		return admission.Allowed("")
 	}

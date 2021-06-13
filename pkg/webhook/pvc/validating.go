@@ -7,8 +7,9 @@ import (
 	"context"
 	"net/http"
 
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
@@ -45,10 +46,10 @@ func Handler() capsulewebhook.Handler {
 	return &handler{}
 }
 
-func (h *handler) OnCreate(c client.Client, decoder *admission.Decoder) capsulewebhook.Func {
+func (h *handler) OnCreate(c client.Client, decoder *admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) admission.Response {
 		var valid, matched bool
-		pvc := &v1.PersistentVolumeClaim{}
+		pvc := &corev1.PersistentVolumeClaim{}
 
 		if err := decoder.Decode(req, pvc); err != nil {
 			return admission.Errored(http.StatusBadRequest, err)
@@ -72,6 +73,8 @@ func (h *handler) OnCreate(c client.Client, decoder *admission.Decoder) capsulew
 		}
 
 		if pvc.Spec.StorageClassName == nil {
+			recorder.Eventf(&tnt, corev1.EventTypeWarning, "StorageClassInvalid", "PersistentVolumeClaim %s/%s is missing StorageClass", req.Namespace, req.Name)
+
 			return admission.Errored(http.StatusBadRequest, NewStorageClassNotValid(*tntList.Items[0].Spec.StorageClasses))
 		}
 
@@ -79,19 +82,21 @@ func (h *handler) OnCreate(c client.Client, decoder *admission.Decoder) capsulew
 		valid = tnt.Spec.StorageClasses.ExactMatch(sc)
 		matched = tnt.Spec.StorageClasses.RegexMatch(sc)
 		if !valid && !matched {
+			recorder.Eventf(&tnt, corev1.EventTypeWarning, "StorageClassForbidden", "PersistentVolumeClaim %s/%s StorageClass %s is forbidden for the current Tenant", req.Namespace, req.Name, sc)
+
 			return admission.Errored(http.StatusBadRequest, NewStorageClassForbidden(*pvc.Spec.StorageClassName, *tnt.Spec.StorageClasses))
 		}
 		return admission.Allowed("")
 	}
 }
 
-func (h *handler) OnDelete(client client.Client, decoder *admission.Decoder) capsulewebhook.Func {
+func (h *handler) OnDelete(client.Client, *admission.Decoder, record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) admission.Response {
 		return admission.Allowed("")
 	}
 }
 
-func (h *handler) OnUpdate(client client.Client, decoder *admission.Decoder) capsulewebhook.Func {
+func (h *handler) OnUpdate(client.Client, *admission.Decoder, record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) admission.Response {
 		return admission.Allowed("")
 	}

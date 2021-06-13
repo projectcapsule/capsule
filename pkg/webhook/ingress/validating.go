@@ -8,12 +8,15 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
+	"strings"
 
 	"github.com/pkg/errors"
+	corev1 "k8s.io/api/core/v1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	networkingv1 "k8s.io/api/networking/v1"
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
@@ -53,29 +56,29 @@ func Handler(configuration configuration.Configuration) capsulewebhook.Handler {
 	return &handler{configuration: configuration}
 }
 
-func (r *handler) OnCreate(client client.Client, decoder *admission.Decoder) capsulewebhook.Func {
+func (r *handler) OnCreate(client client.Client, decoder *admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) admission.Response {
 		ingress, err := r.ingressFromRequest(req, decoder)
 		if err != nil {
 			return admission.Errored(http.StatusBadRequest, err)
 		}
 
-		return r.validateIngress(ctx, client, ingress)
+		return r.validateIngress(ctx, client, ingress, recorder)
 	}
 }
 
-func (r *handler) OnUpdate(client client.Client, decoder *admission.Decoder) capsulewebhook.Func {
+func (r *handler) OnUpdate(client client.Client, decoder *admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) admission.Response {
 		ingress, err := r.ingressFromRequest(req, decoder)
 		if err != nil {
 			return admission.Errored(http.StatusBadRequest, err)
 		}
 
-		return r.validateIngress(ctx, client, ingress)
+		return r.validateIngress(ctx, client, ingress, recorder)
 	}
 }
 
-func (r *handler) OnDelete(client client.Client, decoder *admission.Decoder) capsulewebhook.Func {
+func (r *handler) OnDelete(client client.Client, decoder *admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) admission.Response {
 		return admission.Allowed("")
 	}
@@ -173,7 +176,7 @@ func (r *handler) validateHostnames(tenant v1alpha1.Tenant, hostnames []string) 
 	return nil
 }
 
-func (r *handler) validateIngress(ctx context.Context, c client.Client, ingress Ingress) admission.Response {
+func (r *handler) validateIngress(ctx context.Context, c client.Client, ingress Ingress, recorder record.EventRecorder) admission.Response {
 	tenantList := &v1alpha1.TenantList{}
 	if err := c.List(ctx, tenantList, client.MatchingFieldsSelector{
 		Selector: fields.OneTermEqualSelector(".status.namespaces", ingress.Namespace()),
@@ -187,14 +190,24 @@ func (r *handler) validateIngress(ctx context.Context, c client.Client, ingress 
 	tenant := tenantList.Items[0]
 
 	if err := r.validateClass(tenant, ingress.IngressClass()); err != nil {
+		if ic := ingress.IngressClass(); ic != nil {
+			recorder.Eventf(&tenant, corev1.EventTypeWarning, "InvalidIngressClass", "Ingress %s/%s class %s is forbidden for the current Tenant", ingress.Namespace(), ingress.Name(), *ic)
+		} else {
+			recorder.Eventf(&tenant, corev1.EventTypeWarning, "MissingIngressClass", "Ingress %s/%s is missing required class for the current Tenant", ingress.Namespace(), ingress.Name())
+		}
+
 		return admission.Errored(http.StatusBadRequest, err)
 	}
 
 	if err := r.validateHostnames(tenant, ingress.Hostnames()); err != nil {
+		recorder.Eventf(&tenant, corev1.EventTypeWarning, "InvalidHostname", "Ingress %s/%s hostnames %s is forbidden for the current Tenant", ingress.Namespace(), ingress.Name(), strings.Join(ingress.Hostnames(), ","))
+
 		return admission.Errored(http.StatusBadRequest, err)
 	}
 
 	if err := r.validateCollision(ctx, c, ingress); err != nil {
+		recorder.Eventf(&tenant, corev1.EventTypeWarning, "HostnameCollision", "Ingress %s/%s hostnames collision for %s ", ingress.Namespace(), ingress.Name(), strings.Join(ingress.Hostnames(), ","))
+
 		return admission.Errored(http.StatusBadRequest, err)
 	}
 

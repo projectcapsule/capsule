@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 
 	admissionv1 "k8s.io/api/admission/v1"
+	"k8s.io/client-go/tools/record"
 	controllerruntime "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
@@ -21,11 +22,14 @@ func Register(manager controllerruntime.Manager, webhookList ...Webhook) error {
 		return nil
 	}
 
+	recorder := manager.GetEventRecorderFor("tenant-webhook")
+
 	server := manager.GetWebhookServer()
 	for _, wh := range webhookList {
 		server.Register(wh.GetPath(), &webhook.Admission{
 			Handler: &handlerRouter{
-				handler: wh.GetHandler(),
+				recorder: recorder,
+				handler:  wh.GetHandler(),
 			},
 		})
 	}
@@ -33,19 +37,20 @@ func Register(manager controllerruntime.Manager, webhookList ...Webhook) error {
 }
 
 type handlerRouter struct {
-	handler Handler
-	client  client.Client
-	decoder *admission.Decoder
+	handler  Handler
+	client   client.Client
+	decoder  *admission.Decoder
+	recorder record.EventRecorder
 }
 
 func (r *handlerRouter) Handle(ctx context.Context, req admission.Request) admission.Response {
 	switch req.Operation {
 	case admissionv1.Create:
-		return r.handler.OnCreate(r.client, r.decoder)(ctx, req)
+		return r.handler.OnCreate(r.client, r.decoder, r.recorder)(ctx, req)
 	case admissionv1.Update:
-		return r.handler.OnUpdate(r.client, r.decoder)(ctx, req)
+		return r.handler.OnUpdate(r.client, r.decoder, r.recorder)(ctx, req)
 	case admissionv1.Delete:
-		return r.handler.OnDelete(r.client, r.decoder)(ctx, req)
+		return r.handler.OnDelete(r.client, r.decoder, r.recorder)(ctx, req)
 	default:
 		return admission.Allowed("")
 	}

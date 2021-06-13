@@ -48,18 +48,16 @@ func (w *webhook) GetPath() string {
 }
 
 type handler struct {
-	cfg      configuration.Configuration
-	recorder record.EventRecorder
+	cfg configuration.Configuration
 }
 
-func Handler(cfg configuration.Configuration, recorder record.EventRecorder) capsulewebhook.Handler {
+func Handler(cfg configuration.Configuration) capsulewebhook.Handler {
 	return &handler{
-		cfg:      cfg,
-		recorder: recorder,
+		cfg: cfg,
 	}
 }
 
-func (h *handler) OnCreate(clt client.Client, decoder *admission.Decoder) capsulewebhook.Func {
+func (h *handler) OnCreate(clt client.Client, decoder *admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) admission.Response {
 		ns := &corev1.Namespace{}
 		if err := decoder.Decode(req, ns); err != nil {
@@ -78,10 +76,12 @@ func (h *handler) OnCreate(clt client.Client, decoder *admission.Decoder) capsul
 			}
 			// Tenant owner must adhere to user that asked for NS creation
 			if !h.isTenantOwner(tnt.Spec.Owner, req.UserInfo) {
+				recorder.Eventf(tnt, corev1.EventTypeWarning, "NonOwnedTenant", "Namespace %s cannot be assigned to the current Tenant", ns.GetName())
+
 				return admission.Denied("Cannot assign the desired namespace to a non-owned Tenant")
 			}
 			// Patching the response
-			return h.patchResponseForOwnerRef(tnt, ns)
+			return h.patchResponseForOwnerRef(tnt, ns, recorder)
 		}
 
 		// If we forceTenantPrefix -> find Tenant from NS name
@@ -117,13 +117,13 @@ func (h *handler) OnCreate(clt client.Client, decoder *admission.Decoder) capsul
 		}
 
 		if len(tenants) == 1 {
-			return h.patchResponseForOwnerRef(&tenants[0], ns)
+			return h.patchResponseForOwnerRef(&tenants[0], ns, recorder)
 		}
 
 		if h.cfg.ForceTenantPrefix() {
 			for _, tnt := range tenants {
 				if strings.HasPrefix(ns.GetName(), fmt.Sprintf("%s-", tnt.GetName())) {
-					return h.patchResponseForOwnerRef(tnt.DeepCopy(), ns)
+					return h.patchResponseForOwnerRef(tnt.DeepCopy(), ns, recorder)
 				}
 			}
 			admission.Denied("The Namespace prefix used doesn't match any available Tenant")
@@ -132,31 +132,31 @@ func (h *handler) OnCreate(clt client.Client, decoder *admission.Decoder) capsul
 		return admission.Denied("Unable to assign namespace to tenant. Please use " + ln + " label when creating a namespace")
 	}
 }
-func (h *handler) OnDelete(client client.Client, decoder *admission.Decoder) capsulewebhook.Func {
+func (h *handler) OnDelete(client client.Client, decoder *admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) admission.Response {
 		return admission.Allowed("")
 	}
 }
 
-func (h *handler) OnUpdate(client client.Client, decoder *admission.Decoder) capsulewebhook.Func {
+func (h *handler) OnUpdate(client client.Client, decoder *admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) admission.Response {
 		return admission.Denied("Capsule user cannot update a Namespace")
 	}
 }
 
-func (h *handler) patchResponseForOwnerRef(tenant *capsulev1alpha1.Tenant, ns *corev1.Namespace) admission.Response {
+func (h *handler) patchResponseForOwnerRef(tenant *capsulev1alpha1.Tenant, ns *corev1.Namespace, recorder record.EventRecorder) admission.Response {
 	scheme := runtime.NewScheme()
 	_ = capsulev1alpha1.AddToScheme(scheme)
 	_ = corev1.AddToScheme(scheme)
 
 	o, _ := json.Marshal(ns.DeepCopy())
 	if err := controllerutil.SetControllerReference(tenant, ns, scheme); err != nil {
-		h.recorder.Eventf(tenant, corev1.EventTypeWarning, "Error", "namespace %s cannot be assigned to the desired Tenant", ns.GetName())
+		recorder.Eventf(tenant, corev1.EventTypeWarning, "Error", "Namespace %s cannot be assigned to the desired Tenant", ns.GetName())
 
 		return admission.Errored(http.StatusInternalServerError, err)
 	}
 
-	h.recorder.Eventf(tenant, corev1.EventTypeNormal, "NamespaceCreationWebhook", "namespace %s has been assigned to the desired Tenant", ns.GetName())
+	recorder.Eventf(tenant, corev1.EventTypeNormal, "NamespaceCreationWebhook", "Namespace %s has been assigned to the desired Tenant", ns.GetName())
 
 	c, _ := json.Marshal(ns)
 	return admission.PatchResponseFromRaw(o, c)

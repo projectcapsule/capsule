@@ -9,6 +9,7 @@ import (
 	"regexp"
 
 	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
@@ -153,7 +154,7 @@ func (h *handler) validateTenantByRegex(tenant *v1alpha1.Tenant) error {
 	return nil
 }
 
-func (h *handler) OnCreate(client client.Client, decoder *admission.Decoder) capsulewebhook.Func {
+func (h *handler) OnCreate(client client.Client, decoder *admission.Decoder, _ record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) admission.Response {
 		if err := h.validateTenant(ctx, req, client, decoder); err != nil {
 			return admission.Denied(err.Error())
@@ -162,13 +163,13 @@ func (h *handler) OnCreate(client client.Client, decoder *admission.Decoder) cap
 	}
 }
 
-func (h *handler) OnDelete(client.Client, *admission.Decoder) capsulewebhook.Func {
+func (h *handler) OnDelete(client.Client, *admission.Decoder, record.EventRecorder) capsulewebhook.Func {
 	return func(context.Context, admission.Request) admission.Response {
 		return admission.Allowed("")
 	}
 }
 
-func (h *handler) OnUpdate(client client.Client, decoder *admission.Decoder) capsulewebhook.Func {
+func (h *handler) OnUpdate(client client.Client, decoder *admission.Decoder, _ record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) admission.Response {
 		if err := h.validateTenant(ctx, req, client, decoder); err != nil {
 			return admission.Denied(err.Error())

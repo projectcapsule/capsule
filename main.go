@@ -139,8 +139,6 @@ func main() {
 
 	cfg := configuration.NewCapsuleConfiguration(manager.GetClient(), configurationName)
 
-	webhookRecorder := manager.GetEventRecorderFor("tenant-webhook")
-
 	// webhooks: the order matters, don't change it and just append
 	webhooksList := append(
 		make([]webhook.Webhook, 0),
@@ -149,10 +147,10 @@ func main() {
 		registry.Webhook(registry.Handler()),
 		podpriority.Webhook(podpriority.Handler()),
 		services.Webhook(services.Handler()),
-		ownerreference.Webhook(utils.InCapsuleGroups(cfg, ownerreference.Handler(cfg, webhookRecorder))),
-		namespacequota.Webhook(utils.InCapsuleGroups(cfg, namespacequota.Handler(webhookRecorder))),
+		ownerreference.Webhook(utils.InCapsuleGroups(cfg, ownerreference.Handler(cfg))),
+		namespacequota.Webhook(utils.InCapsuleGroups(cfg, namespacequota.Handler())),
 		networkpolicies.Webhook(utils.InCapsuleGroups(cfg, networkpolicies.Handler())),
-		tenantprefix.Webhook(utils.InCapsuleGroups(cfg, tenantprefix.Handler(cfg, webhookRecorder))),
+		tenantprefix.Webhook(utils.InCapsuleGroups(cfg, tenantprefix.Handler(cfg))),
 		tenant.Webhook(tenant.Handler(cfg)),
 		imagepullpolicy.Webhook(imagepullpolicy.Handler()),
 	)
