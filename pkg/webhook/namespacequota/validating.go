@@ -62,7 +62,7 @@ func (r *handler) OnCreate(client client.Client, decoder *admission.Decoder, rec
 				return admission.Errored(http.StatusBadRequest, err)
 			}
 			if tnt.IsFull() {
-				recorder.Eventf(tnt, corev1.EventTypeWarning, "NamespaceQuota", "Namespace %s cannot be attached, quota exceeded", ns.GetName())
+				recorder.Eventf(tnt, corev1.EventTypeWarning, "NamespaceQuotaExceded", "Namespace %s cannot be attached, quota exceededi for the current Tenant", ns.GetName())
 
 				return admission.Denied(NewNamespaceQuotaExceededError().Error())
 			}

@@ -79,7 +79,7 @@ func (h *handler) OnCreate(c client.Client, decoder *admission.Decoder, recorder
 			// We don't have to force Pod to specify a Priority Class
 			return admission.Allowed("")
 		case !allowed.ExactMatch(priorityClassName) && !allowed.RegexMatch(priorityClassName):
-			recorder.Eventf(&tntList.Items[0], corev1.EventTypeWarning, "PriorityClass", "Pod %s/%s is using Priority Class %s not allowed for the current Tenant", pod.Namespace, pod.Name, priorityClassName)
+			recorder.Eventf(&tntList.Items[0], corev1.EventTypeWarning, "ForbiddenPriorityClass", "Pod %s/%s is using Priority Class %s is forbidden for the current Tenant", pod.Namespace, pod.Name, priorityClassName)
 
 			return admission.Errored(http.StatusBadRequest, NewPodPriorityClassForbidden(priorityClassName, *allowed))
 		default:

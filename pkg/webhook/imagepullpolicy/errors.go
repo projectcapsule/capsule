@@ -23,5 +23,5 @@ func NewImagePullPolicyForbidden(usedPullPolicy, containerName string, allowedPu
 }
 
 func (f podPriorityClassForbidden) Error() (err string) {
-	return fmt.Sprintf("the ImagePullPolicy %s for container %s is not allowed, use one of the followings: %s", f.usedPullPolicy, f.containerName, strings.Join(f.allowedPullPolicies, ", "))
+	return fmt.Sprintf("the ImagePullPolicy %s for container %s is forbidden, use one of the followings: %s", f.usedPullPolicy, f.containerName, strings.Join(f.allowedPullPolicies, ", "))
 }

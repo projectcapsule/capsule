@@ -191,16 +191,16 @@ func (r *handler) validateIngress(ctx context.Context, c client.Client, ingress 
 
 	if err := r.validateClass(tenant, ingress.IngressClass()); err != nil {
 		if ic := ingress.IngressClass(); ic != nil {
-			recorder.Eventf(&tenant, corev1.EventTypeWarning, "InvalidIngressClass", "Ingress %s/%s class %s is forbidden for the current Tenant", ingress.Namespace(), ingress.Name(), *ic)
+			recorder.Eventf(&tenant, corev1.EventTypeWarning, "ForbidenIngressClass", "Ingress %s/%s class %s is forbidden for the current Tenant", ingress.Namespace(), ingress.Name(), *ic)
 		} else {
-			recorder.Eventf(&tenant, corev1.EventTypeWarning, "MissingIngressClass", "Ingress %s/%s is missing required class for the current Tenant", ingress.Namespace(), ingress.Name())
+			recorder.Eventf(&tenant, corev1.EventTypeWarning, "MissingIngressClass", "Ingress %s/%s is missing IngressClass", ingress.Namespace(), ingress.Name())
 		}
 
 		return admission.Errored(http.StatusBadRequest, err)
 	}
 
 	if err := r.validateHostnames(tenant, ingress.Hostnames()); err != nil {
-		recorder.Eventf(&tenant, corev1.EventTypeWarning, "InvalidHostname", "Ingress %s/%s hostnames %s is forbidden for the current Tenant", ingress.Namespace(), ingress.Name(), strings.Join(ingress.Hostnames(), ","))
+		recorder.Eventf(&tenant, corev1.EventTypeWarning, "ForbiddenHostname", "Ingress %s/%s hostnames %s is forbidden for the current Tenant", ingress.Namespace(), ingress.Name(), strings.Join(ingress.Hostnames(), ","))
 
 		return admission.Errored(http.StatusBadRequest, err)
 	}
