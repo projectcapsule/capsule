@@ -73,7 +73,7 @@ func (h *handler) OnCreate(c client.Client, decoder *admission.Decoder, recorder
 				valid = tnt.Spec.ContainerRegistries.ExactMatch(registry.Registry())
 				matched = tnt.Spec.ContainerRegistries.RegexMatch(registry.Registry())
 				if !valid && !matched {
-					recorder.Eventf(&tnt, corev1.EventTypeWarning, "ContainerRegistry", "Pod %s/%s is using a forbidden registry %s", req.Namespace, req.Name, registry.Registry())
+					recorder.Eventf(&tnt, corev1.EventTypeWarning, "ForbiddenContainerRegistry", "Pod %s/%s is using a forbidden registry %s is forbidden for the current Tenant", req.Namespace, req.Name, registry.Registry())
 
 					return admission.Errored(http.StatusBadRequest, NewContainerRegistryForbidden(container.Image, *tnt.Spec.ContainerRegistries))
 				}

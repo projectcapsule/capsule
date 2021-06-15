@@ -78,7 +78,7 @@ func (r *handler) OnCreate(c client.Client, decoder *admission.Decoder, recorder
 			usedPullPolicy := string(container.ImagePullPolicy)
 
 			if !policy.IsPolicySupported(usedPullPolicy) {
-				recorder.Eventf(&tnt, corev1.EventTypeWarning, "PullPolicy", "Pod %s/%s pull policy %s is not allowed", req.Namespace, req.Name, usedPullPolicy)
+				recorder.Eventf(&tnt, corev1.EventTypeWarning, "ForbiddenPullPolicy", "Pod %s/%s pull policy %s is forbidden for the current Tenant", req.Namespace, req.Name, usedPullPolicy)
 
 				return admission.Denied(NewImagePullPolicyForbidden(usedPullPolicy, container.Name, policy.AllowedPullPolicies()).Error())
 			}

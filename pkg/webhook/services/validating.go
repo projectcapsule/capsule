@@ -69,7 +69,7 @@ func (r *handler) handleService(ctx context.Context, clt client.Client, decoder 
 	tnt := tntList.Items[0]
 
 	if svc.Spec.Type == corev1.ServiceTypeNodePort && tnt.GetAnnotations()[enableNodePortsAnnotation] == "false" {
-		recorder.Eventf(&tnt, corev1.EventTypeWarning, "NodePort", "Service %s/%s cannot be type of NodePort", req.Namespace, req.Name)
+		recorder.Eventf(&tnt, corev1.EventTypeWarning, "ForbiddenNodePort", "Service %s/%s cannot be type of NodePort for the current Tenant", req.Namespace, req.Name)
 
 		return admission.Errored(http.StatusBadRequest, NewNodePortDisabledError())
 	}
@@ -88,7 +88,7 @@ func (r *handler) handleService(ctx context.Context, clt client.Client, decoder 
 		}
 	}
 
-	recorder.Eventf(&tnt, corev1.EventTypeWarning, "NodePort", "Service %s/%s external IPs %s are not in the expected range for the current Tenant", req.Namespace, req.Name, strings.Join(svc.Spec.ExternalIPs, ","))
+	recorder.Eventf(&tnt, corev1.EventTypeWarning, "ExternalServiceIP", "Service %s/%s external IPs %s are not in the expected range for the current Tenant", req.Namespace, req.Name, strings.Join(svc.Spec.ExternalIPs, ","))
 
 	return admission.Errored(http.StatusBadRequest, NewExternalServiceIPForbidden(tnt.Spec.ExternalServiceIPs.Allowed))
 }

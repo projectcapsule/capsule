@@ -77,7 +77,7 @@ func (r *handler) OnCreate(clt client.Client, decoder *admission.Decoder, record
 				return admission.Errored(http.StatusBadRequest, err)
 			}
 			if e := fmt.Sprintf("%s-%s", tnt.GetName(), ns.GetName()); !strings.HasPrefix(ns.GetName(), fmt.Sprintf("%s-", tnt.GetName())) {
-				recorder.Eventf(tnt, corev1.EventTypeWarning, "TenantPrefix", "Namespace %s does not match the expected Tenant prefix", ns.GetName())
+				recorder.Eventf(tnt, corev1.EventTypeWarning, "InvalidTenantPrefix", "Namespace %s does not match the expected prefix for the current Tenant", ns.GetName())
 
 				return admission.Denied("The namespace doesn't match the tenant prefix, expected " + e)
 			}

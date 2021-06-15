@@ -73,7 +73,7 @@ func (h *handler) OnCreate(c client.Client, decoder *admission.Decoder, recorder
 		}
 
 		if pvc.Spec.StorageClassName == nil {
-			recorder.Eventf(&tnt, corev1.EventTypeWarning, "StorageClassInvalid", "PersistentVolumeClaim %s/%s is missing StorageClass", req.Namespace, req.Name)
+			recorder.Eventf(&tnt, corev1.EventTypeWarning, "MissingStorageClass", "PersistentVolumeClaim %s/%s is missing StorageClass", req.Namespace, req.Name)
 
 			return admission.Errored(http.StatusBadRequest, NewStorageClassNotValid(*tntList.Items[0].Spec.StorageClasses))
 		}
@@ -82,7 +82,7 @@ func (h *handler) OnCreate(c client.Client, decoder *admission.Decoder, recorder
 		valid = tnt.Spec.StorageClasses.ExactMatch(sc)
 		matched = tnt.Spec.StorageClasses.RegexMatch(sc)
 		if !valid && !matched {
-			recorder.Eventf(&tnt, corev1.EventTypeWarning, "StorageClassForbidden", "PersistentVolumeClaim %s/%s StorageClass %s is forbidden for the current Tenant", req.Namespace, req.Name, sc)
+			recorder.Eventf(&tnt, corev1.EventTypeWarning, "ForbiddenStorageClass", "PersistentVolumeClaim %s/%s StorageClass %s is forbidden for the current Tenant", req.Namespace, req.Name, sc)
 
 			return admission.Errored(http.StatusBadRequest, NewStorageClassForbidden(*pvc.Spec.StorageClassName, *tnt.Spec.StorageClasses))
 		}

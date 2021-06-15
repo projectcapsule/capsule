@@ -35,5 +35,5 @@ func NewNodePortDisabledError() error {
 }
 
 func (nodePortDisabled) Error() string {
-	return "NodePort service types are disabled for a tenant: please, reach out to the system administrators"
+	return "NodePort service types are forbidden for the tenant: please, reach out to the system administrators"
 }
