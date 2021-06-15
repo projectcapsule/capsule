@@ -108,20 +108,22 @@ var _ = Describe("when Tenant handles Ingress hostnames", func() {
 			return k8sClient.Create(context.TODO(), tnt)
 		}).Should(Succeed())
 	})
+
 	JustAfterEach(func() {
 		Expect(k8sClient.Delete(context.TODO(), tnt)).Should(Succeed())
 	})
 
+
 	It("should block a non allowed Hostname", func() {
-		maj, min, _ := GetKubernetesSemVer()
-
-		ns := NewNamespace("disallowed-hostname")
-		cs := ownerClient(tnt)
-
-		NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
-		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
+		maj, min, v := GetKubernetesSemVer()
 
 		if maj == 1 && min > 18 {
+			ns := NewNamespace("disallowed-hostname-networking")
+			cs := ownerClient(tnt)
+
+			NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
+			TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
+
 			By("testing networking.k8s.io", func() {
 				Eventually(func() (err error) {
 					obj := networkingIngress("denied-networking", "kubernetes.io")
@@ -129,28 +131,47 @@ var _ = Describe("when Tenant handles Ingress hostnames", func() {
 					return
 				}, defaultTimeoutInterval, defaultPollInterval).ShouldNot(Succeed())
 			})
+
+			return
 		}
+
+		Skip("Running test on Kubernetes " + v + ", doesn't provide networking.k8s.io")
+	})
+
+	It("should block a non allowed Hostname", func() {
+		maj, min, v := GetKubernetesSemVer()
 
 		if maj == 1 && min < 22 {
 			By("testing extensions", func() {
+				ns := NewNamespace("disallowed-hostname-extensions")
+				cs := ownerClient(tnt)
+
+				NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
+				TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
+
 				Eventually(func() (err error) {
 					obj := extensionsIngress("denied-extensions", "kubernetes.io")
 					_, err = cs.ExtensionsV1beta1().Ingresses(ns.GetName()).Create(context.TODO(), obj, metav1.CreateOptions{})
 					return
 				}, defaultTimeoutInterval, defaultPollInterval).ShouldNot(Succeed())
 			})
+
+			return
 		}
+
+		Skip("Running test on Kubernetes " + v + ", extensions is deprecated")
 	})
 
 	It("should allow Hostnames in list", func() {
-		maj, min, _ := GetKubernetesSemVer()
-		ns := NewNamespace("allowed-hostname-list")
-		cs := ownerClient(tnt)
-
-		NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
-		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
+		maj, min, v := GetKubernetesSemVer()
 
 		if maj == 1 && min > 18 {
+			ns := NewNamespace("allowed-hostname-list-networking")
+			cs := ownerClient(tnt)
+
+			NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
+			TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
+
 			By("testing networking.k8s.io", func() {
 				for i, h := range tnt.Spec.IngressHostnames.Exact {
 					Eventually(func() (err error) {
@@ -160,9 +181,23 @@ var _ = Describe("when Tenant handles Ingress hostnames", func() {
 					}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 				}
 			})
+
+			return
 		}
 
+		Skip("Running test on Kubernetes " + v + ", doesn't provide networking.k8s.io")
+	})
+
+	It("should allow Hostnames in list", func() {
+		maj, min, v := GetKubernetesSemVer()
+
 		if maj == 1 && min < 22 {
+			ns := NewNamespace("allowed-hostname-list-extensions")
+			cs := ownerClient(tnt)
+
+			NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
+			TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
+
 			By("testing extensions", func() {
 				for i, h := range tnt.Spec.IngressHostnames.Exact {
 					Eventually(func() (err error) {
@@ -172,18 +207,23 @@ var _ = Describe("when Tenant handles Ingress hostnames", func() {
 					}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 				}
 			})
+
+			return
 		}
+
+		Skip("Running test on Kubernetes " + v + ", extensions is deprecated")
 	})
 
 	It("should allow Hostnames in regex", func() {
-		maj, min, _ := GetKubernetesSemVer()
-		ns := NewNamespace("allowed-hostname-regex")
-		cs := ownerClient(tnt)
-
-		NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
-		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
+		maj, min, v := GetKubernetesSemVer()
 
 		if maj == 1 && min > 18 {
+			ns := NewNamespace("allowed-hostname-regex-networking")
+			cs := ownerClient(tnt)
+
+			NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
+			TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
+
 			By("testing networking.k8s.io", func() {
 				for _, h := range []string{"foo", "bar", "bizz"} {
 					Eventually(func() (err error) {
@@ -193,10 +233,24 @@ var _ = Describe("when Tenant handles Ingress hostnames", func() {
 					}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 				}
 			})
+
+			return
 		}
+
+		Skip("Running test on Kubernetes " + v + ", doesn't provide networking.k8s.io")
+	})
+
+	It("should allow Hostnames in regex", func() {
+		maj, min, v := GetKubernetesSemVer()
 
 		if maj == 1 && min < 22 {
 			By("testing extensions", func() {
+				ns := NewNamespace("allowed-hostname-regex-extensions")
+				cs := ownerClient(tnt)
+
+				NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
+				TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
+
 				for _, h := range []string{"foo", "bar", "bizz"} {
 					Eventually(func() (err error) {
 						obj := extensionsIngress(fmt.Sprintf("allowed-extensions-%s", h), fmt.Sprintf("%s.clastix.io", h))
@@ -206,5 +260,7 @@ var _ = Describe("when Tenant handles Ingress hostnames", func() {
 				}
 			})
 		}
+
+		Skip("Running test on Kubernetes " + v + ", extensions is deprecated")
 	})
 })
