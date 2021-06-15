@@ -466,9 +466,10 @@ func (r *TenantReconciler) syncNamespaceMetadata(namespace string, tnt *capsulev
 		}
 
 		res, conflictErr = controllerutil.CreateOrUpdate(context.TODO(), r.Client, ns, func() error {
-			a := tnt.Spec.NamespacesMetadata.AdditionalAnnotations
-			if a == nil {
-				a = make(map[string]string)
+			a := make(map[string]string)
+
+			for k, v := range tnt.Spec.NamespacesMetadata.AdditionalAnnotations {
+				a[k] = v
 			}
 
 			if tnt.Spec.NodeSelector != nil {
@@ -508,10 +509,12 @@ func (r *TenantReconciler) syncNamespaceMetadata(namespace string, tnt *capsulev
 
 			ns.SetAnnotations(a)
 
-			l := tnt.Spec.NamespacesMetadata.AdditionalLabels
-			if l == nil {
-				l = make(map[string]string)
+			l := make(map[string]string)
+
+			for k, v := range tnt.Spec.NamespacesMetadata.AdditionalLabels {
+				l[k] = v
 			}
+
 			l["name"] = namespace
 			capsuleLabel, _ := capsulev1alpha1.GetTypeLabel(&capsulev1alpha1.Tenant{})
 			l[capsuleLabel] = tnt.GetName()
