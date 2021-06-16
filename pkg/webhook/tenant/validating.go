@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"regexp"
 
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -169,11 +170,29 @@ func (h *validatingHandler) OnDelete(client.Client, *admission.Decoder, record.E
 	}
 }
 
-func (h *validatingHandler) OnUpdate(client client.Client, decoder *admission.Decoder, _ record.EventRecorder) capsulewebhook.Func {
+func (h *validatingHandler) OnUpdate(client client.Client, decoder *admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) admission.Response {
 		if err := h.validateTenant(ctx, req, client, decoder); err != nil {
 			return admission.Denied(err.Error())
 		}
+
+		oldTnt := &v1alpha1.Tenant{}
+		if err := decoder.DecodeRaw(req.OldObject, oldTnt); err != nil {
+			return admission.Denied(err.Error())
+		}
+
+		newTnt := &v1alpha1.Tenant{}
+		if err := decoder.Decode(req, newTnt); err != nil {
+			return admission.Denied(err.Error())
+		}
+
+		switch {
+		case !oldTnt.IsCordoned() && newTnt.IsCordoned():
+			recorder.Eventf(newTnt, v1.EventTypeNormal, "TenantCordoned", "Tenant has been cordoned")
+		case oldTnt.IsCordoned() && !newTnt.IsCordoned():
+			recorder.Eventf(newTnt, v1.EventTypeNormal, "TenantUncordoned", "Tenant has been uncordoned")
+		}
+
 		return admission.Allowed("")
 	}
 }
