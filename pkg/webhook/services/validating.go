@@ -78,22 +78,32 @@ func (r *handler) handleService(ctx context.Context, clt client.Client, decoder 
 		return admission.Allowed("")
 	}
 
-	for _, allowed := range tnt.Spec.ExternalServiceIPs.Allowed {
-		if !strings.Contains(string(allowed), "/") {
-			allowed += "/32"
-		}
-		_, allowedIP, _ := net.ParseCIDR(string(allowed))
-		for _, externalIP := range svc.Spec.ExternalIPs {
-			IP := net.ParseIP(externalIP)
-			if allowedIP.Contains(IP) {
-				return admission.Allowed("")
+	ipInCIDR := func(ip net.IP) bool {
+		for _, allowed := range tnt.Spec.ExternalServiceIPs.Allowed {
+			if !strings.Contains(string(allowed), "/") {
+				allowed += "/32"
 			}
+
+			_, allowedIP, _ := net.ParseCIDR(string(allowed))
+
+			if allowedIP.Contains(ip) {
+				return true
+			}
+		}
+		return false
+	}
+
+	for _, externalIP := range svc.Spec.ExternalIPs {
+		ip := net.ParseIP(externalIP)
+
+		if !ipInCIDR(ip) {
+			recorder.Eventf(&tnt, corev1.EventTypeWarning, "ForbiddenExternalServiceIP", "Service %s/%s external IP %s is forbidden for the current Tenant", req.Namespace, req.Name, ip.String())
+
+			return admission.Errored(http.StatusBadRequest, NewExternalServiceIPForbidden(tnt.Spec.ExternalServiceIPs.Allowed))
 		}
 	}
 
-	recorder.Eventf(&tnt, corev1.EventTypeWarning, "ExternalServiceIP", "Service %s/%s external IPs %s are not in the expected range for the current Tenant", req.Namespace, req.Name, strings.Join(svc.Spec.ExternalIPs, ","))
-
-	return admission.Errored(http.StatusBadRequest, NewExternalServiceIPForbidden(tnt.Spec.ExternalServiceIPs.Allowed))
+	return admission.Allowed("")
 }
 
 func (r *handler) OnCreate(client client.Client, decoder *admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
