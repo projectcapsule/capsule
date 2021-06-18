@@ -79,6 +79,9 @@ func (r *handler) handleService(ctx context.Context, clt client.Client, decoder 
 	}
 
 	for _, allowed := range tnt.Spec.ExternalServiceIPs.Allowed {
+		if !strings.Contains(string(allowed), "/") {
+			allowed += "/32"
+		}
 		_, allowedIP, _ := net.ParseCIDR(string(allowed))
 		for _, externalIP := range svc.Spec.ExternalIPs {
 			IP := net.ParseIP(externalIP)
