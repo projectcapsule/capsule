@@ -25,6 +25,10 @@ func NewExternalServiceIPForbidden(allowedIps []v1alpha1.AllowedIP) error {
 }
 
 func (e externalServiceIPForbidden) Error() string {
+	if len(e.cidr) == 0 {
+		return "The current Tenant does not allow the use of Service with external IPs"
+	}
+
 	return fmt.Sprintf("The selected external IPs for the current Service are violating the following enforced CIDRs: %s", strings.Join(e.cidr, ", "))
 }
 
