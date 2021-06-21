@@ -99,6 +99,27 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
+      path: /validate-v1-namespace-freezed
+  failurePolicy: Fail
+  name: freezed.namespace.capsule.clastix.io
+  rules:
+  - apiGroups:
+    - ""
+    apiVersions:
+    - v1
+    operations:
+    - CREATE
+    - UPDATE
+    - DELETE
+    resources:
+    - namespaces
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
       path: /validate-v1-namespace-quota
   failurePolicy: Fail
   name: quota.namespace.capsule.clastix.io
