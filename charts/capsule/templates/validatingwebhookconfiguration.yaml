@@ -65,7 +65,7 @@ webhooks:
   sideEffects: NoneOnDryRun
   timeoutSeconds: {{ .Values.validatingWebhooksTimeoutSeconds }}
 - admissionReviewVersions:
-  - v1beta1
+    - v1beta1
   clientConfig:
     caBundle: Cg==
     service:
@@ -78,21 +78,49 @@ webhooks:
   name: ingress-v1.capsule.clastix.io
   namespaceSelector:
     matchExpressions:
-    - key: capsule.clastix.io/tenant
-      operator: Exists
+      - key: capsule.clastix.io/tenant
+        operator: Exists
+  objectSelector: {}
+  rules:
+    - apiGroups:
+        - networking.k8s.io
+      apiVersions:
+        - v1
+      operations:
+        - CREATE
+        - UPDATE
+      resources:
+        - ingresses
+      scope: '*'
+  sideEffects: NoneOnDryRun
+  timeoutSeconds: {{ .Values.validatingWebhooksTimeoutSeconds }}
+- admissionReviewVersions:
+  - v1beta1
+  clientConfig:
+    caBundle: Cg==
+    service:
+      name: {{ include "capsule.fullname" . }}-webhook-service
+      namespace: {{ .Release.Namespace }}
+      path: /validate-v1-namespace-freezed
+      port: 443
+  failurePolicy: Fail
+  matchPolicy: Exact
+  name: freezed.namespace.capsule.clastix.io
+  namespaceSelector: {}
   objectSelector: {}
   rules:
   - apiGroups:
-    - networking.k8s.io
+    - ""
     apiVersions:
     - v1
     operations:
     - CREATE
     - UPDATE
+    - DELETE
     resources:
-    - ingresses
+    - namespaces
     scope: '*'
-  sideEffects: NoneOnDryRun
+  sideEffects: None
   timeoutSeconds: {{ .Values.validatingWebhooksTimeoutSeconds }}
 - admissionReviewVersions:
   - v1beta1
