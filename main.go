@@ -30,7 +30,7 @@ import (
 	"github.com/clastix/capsule/pkg/webhook"
 	"github.com/clastix/capsule/pkg/webhook/imagepullpolicy"
 	"github.com/clastix/capsule/pkg/webhook/ingress"
-	"github.com/clastix/capsule/pkg/webhook/namespacequota"
+	namespacewebhook "github.com/clastix/capsule/pkg/webhook/namespace"
 	"github.com/clastix/capsule/pkg/webhook/networkpolicies"
 	"github.com/clastix/capsule/pkg/webhook/ownerreference"
 	"github.com/clastix/capsule/pkg/webhook/podpriority"
@@ -148,12 +148,13 @@ func main() {
 		podpriority.Webhook(podpriority.Handler()),
 		services.Webhook(services.Handler()),
 		ownerreference.Webhook(utils.InCapsuleGroups(cfg, ownerreference.Handler(cfg))),
-		namespacequota.Webhook(utils.InCapsuleGroups(cfg, namespacequota.Handler())),
+		namespacewebhook.QuotaWebhook(utils.InCapsuleGroups(cfg, namespacewebhook.QuotaHandler())),
+		namespacewebhook.FreezedWebhook(utils.InCapsuleGroups(cfg, namespacewebhook.FreezeHandler(cfg))),
 		networkpolicies.Webhook(utils.InCapsuleGroups(cfg, networkpolicies.Handler())),
 		tenantprefix.Webhook(utils.InCapsuleGroups(cfg, tenantprefix.Handler(cfg))),
 		tenant.Validating(tenant.ValidatingHandler(cfg)),
 		imagepullpolicy.Webhook(imagepullpolicy.Handler()),
-		tenant.Cordoning(tenant.CordoningHandler()),
+		tenant.Cordoning(tenant.CordoningHandler(cfg)),
 	)
 	if err = webhook.Register(manager, webhooksList...); err != nil {
 		setupLog.Error(err, "unable to setup webhooks")

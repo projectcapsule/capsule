@@ -1,7 +1,7 @@
 // Copyright 2020-2021 Clastix Labs
 // SPDX-License-Identifier: Apache-2.0
 
-package namespacequota
+package namespace
 
 import (
 	"context"
@@ -19,36 +19,36 @@ import (
 
 // +kubebuilder:webhook:path=/validate-v1-namespace-quota,mutating=false,sideEffects=None,admissionReviewVersions=v1,failurePolicy=fail,groups="",resources=namespaces,verbs=create,versions=v1,name=quota.namespace.capsule.clastix.io
 
-type webhook struct {
+type quotaWebhook struct {
 	handler capsulewebhook.Handler
 }
 
-func Webhook(handler capsulewebhook.Handler) capsulewebhook.Webhook {
-	return &webhook{
+func QuotaWebhook(handler capsulewebhook.Handler) capsulewebhook.Webhook {
+	return &quotaWebhook{
 		handler: handler,
 	}
 }
 
-func (w *webhook) GetHandler() capsulewebhook.Handler {
+func (w *quotaWebhook) GetHandler() capsulewebhook.Handler {
 	return w.handler
 }
 
-func (w *webhook) GetName() string {
+func (w *quotaWebhook) GetName() string {
 	return "NamespaceQuota"
 }
 
-func (w *webhook) GetPath() string {
+func (w *quotaWebhook) GetPath() string {
 	return "/validate-v1-namespace-quota"
 }
 
-type handler struct {
+type quotaHandler struct {
 }
 
-func Handler() capsulewebhook.Handler {
-	return &handler{}
+func QuotaHandler() capsulewebhook.Handler {
+	return &quotaHandler{}
 }
 
-func (r *handler) OnCreate(client client.Client, decoder *admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
+func (r *quotaHandler) OnCreate(client client.Client, decoder *admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) admission.Response {
 		ns := &corev1.Namespace{}
 		if err := decoder.Decode(req, ns); err != nil {
@@ -78,13 +78,13 @@ func (r *handler) OnCreate(client client.Client, decoder *admission.Decoder, rec
 	}
 }
 
-func (r *handler) OnDelete(client client.Client, decoder *admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
+func (r *quotaHandler) OnDelete(client client.Client, decoder *admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) admission.Response {
 		return admission.Allowed("")
 	}
 }
 
-func (r *handler) OnUpdate(client client.Client, decoder *admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
+func (r *quotaHandler) OnUpdate(client client.Client, decoder *admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) admission.Response {
 		return admission.Allowed("")
 	}
