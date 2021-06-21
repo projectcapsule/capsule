@@ -17,8 +17,8 @@ import (
 
 	capsulev1alpha1 "github.com/clastix/capsule/api/v1alpha1"
 	"github.com/clastix/capsule/pkg/configuration"
-	"github.com/clastix/capsule/pkg/utils"
 	capsulewebhook "github.com/clastix/capsule/pkg/webhook"
+	"github.com/clastix/capsule/pkg/webhook/utils"
 )
 
 // +kubebuilder:webhook:path=/tenant-cordoning,mutating=false,sideEffects=None,admissionReviewVersions=v1,failurePolicy=fail,groups="*",resources="*",verbs=create;update;delete,versions="*",name=cordoning.tenant.capsule.clastix.io
@@ -47,29 +47,10 @@ type cordoningHandler struct {
 	configuration configuration.Configuration
 }
 
-func CordoningHandler() capsulewebhook.Handler {
-	return &cordoningHandler{}
-}
-
-func (h *cordoningHandler) requestFromOwnerOrSA(tenant capsulev1alpha1.Tenant, req admission.Request) bool {
-	switch {
-	case tenant.Spec.Owner.Kind == "User" && req.UserInfo.Username == tenant.Spec.Owner.Name:
-		return true
-	case tenant.Spec.Owner.Kind == "Group":
-		groupList := utils.NewUserGroupList(req.UserInfo.Groups)
-		for _, group := range h.configuration.UserGroups() {
-			if groupList.Find(group) {
-				return true
-			}
-		}
-	default:
-		for _, group := range req.UserInfo.Groups {
-			if len(req.Namespace) > 0 && strings.HasPrefix(group, "system:serviceaccounts:"+req.Namespace) {
-				return true
-			}
-		}
+func CordoningHandler(configuration configuration.Configuration) capsulewebhook.Handler {
+	return &cordoningHandler{
+		configuration: configuration,
 	}
-	return false
 }
 
 func (h *cordoningHandler) cordonHandler(ctx context.Context, clt client.Client, req admission.Request, recorder record.EventRecorder) admission.Response {
@@ -88,7 +69,7 @@ func (h *cordoningHandler) cordonHandler(ctx context.Context, clt client.Client,
 	tnt := tntList.Items[0]
 
 	if tnt.IsCordoned() {
-		if h.requestFromOwnerOrSA(tnt, req) {
+		if utils.RequestFromOwnerOrSA(tnt, req, h.configuration.UserGroups()) {
 			recorder.Eventf(&tnt, corev1.EventTypeWarning, "TenantFreezed", "%s %s/%s cannot be %sd, current Tenant is freezed", req.Kind.String(), req.Namespace, req.Name, strings.ToLower(string(req.Operation)))
 
 			return admission.Denied(fmt.Sprintf("tenant %s is freezed: please, reach out to the system administrator", tnt.GetName()))
