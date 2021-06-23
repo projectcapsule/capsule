@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# This script uses Kubernetes CertificateSigningRequest (CSR) to a generate a
+# This script uses Kubernetes CertificateSigningRequest (CSR) to generate a
 # certificate signed by the Kubernetes CA itself.
 # It requires cluster admin permission.
 #
