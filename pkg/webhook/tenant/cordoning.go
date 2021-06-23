@@ -89,7 +89,7 @@ func (h *cordoningHandler) cordonHandler(ctx context.Context, clt client.Client,
 
 	if tnt.IsCordoned() {
 		if h.requestFromOwnerOrSA(tnt, req) {
-			recorder.Eventf(&tnt, corev1.EventTypeWarning, "TenantFreezed", "%s %s/%s cannot be %sed, current Tenant is freezed", req.Kind.String(), req.Namespace, req.Name, strings.ToLower(string(req.Operation)))
+			recorder.Eventf(&tnt, corev1.EventTypeWarning, "TenantFreezed", "%s %s/%s cannot be %sd, current Tenant is freezed", req.Kind.String(), req.Namespace, req.Name, strings.ToLower(string(req.Operation)))
 
 			return admission.Denied(fmt.Sprintf("tenant %s is freezed: please, reach out to the system administrator", tnt.GetName()))
 		}
