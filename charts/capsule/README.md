@@ -88,6 +88,9 @@ Parameter | Description | Default
 `replicaCount` | Set the replica count for Capsule pod. | `1`
 `affinity` | Set affinity rules for the Capsule pod. | `{}`
 `podSecurityPolicy.enabled` | Specify if a Pod Security Policy must be created. | `false`
+`serviceMonitor.enabled` | Specify if a Service Monitor must be created. | `false`
+`serviceMonitor.serviceAccount.name` | Specify Service Account name for metrics scrape. | `capsule`
+`serviceMonitor.serviceAccount.namespace` | Specify Service Account namespace for metrics scrape. | `capsule-system`
 
 ## Created resources
 
@@ -107,8 +110,10 @@ This Helm Chart cretes the following Kubernetes resources in the release namespa
 And optionally, depending on the values set:
 
 * Capsule ServiceAccount
+* Capsule Service Monitor
 * PodSecurityPolicy
 * RBAC ClusterRole and RoleBinding for pod security policy
+* RBAC Role and Rolebinding for metrics scrape
 
 ## Notes on installing Custom Resource Definitions with Helm3
 
