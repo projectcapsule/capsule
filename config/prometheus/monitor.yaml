@@ -1,16 +1,18 @@
-
 # Prometheus Monitor Service (Metrics)
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
   labels:
     control-plane: controller-manager
-  name: controller-manager-metrics-monitor
+  name: capsule-monitor
   namespace: system
 spec:
   endpoints:
-    - path: /metrics
+    - interval: 15s
+      path: /metrics
       port: metrics
+  jobLabel: controller-manager
+  namespaceSelector:
   selector:
     matchLabels:
       control-plane: controller-manager
