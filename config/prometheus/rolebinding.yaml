@@ -1,0 +1,15 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  labels:
+    control-plane: controller-manager
+  name: capsule-metrics-rolebinding
+  namespace: system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: capsule-metrics-role
+subjects:
+- kind: ServiceAccount
+  name: capsule
+  namespace: capsule-system
