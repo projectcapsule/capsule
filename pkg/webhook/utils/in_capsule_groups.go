@@ -15,16 +15,16 @@ import (
 	"github.com/clastix/capsule/pkg/webhook"
 )
 
-func InCapsuleGroups(configuration configuration.Configuration, webhookHandler webhook.Handler) webhook.Handler {
+func InCapsuleGroups(configuration configuration.Configuration, handlers ...webhook.Handler) webhook.Handler {
 	return &handler{
 		configuration: configuration,
-		handler:       webhookHandler,
+		handlers:      handlers,
 	}
 }
 
 type handler struct {
 	configuration configuration.Configuration
-	handler       webhook.Handler
+	handlers      []webhook.Handler
 }
 
 // If the user performing action is not a Capsule user, can be skipped
@@ -45,29 +45,49 @@ func (h handler) isCapsuleUser(req admission.Request) bool {
 }
 
 func (h *handler) OnCreate(client client.Client, decoder *admission.Decoder, recorder record.EventRecorder) webhook.Func {
-	return func(ctx context.Context, req admission.Request) admission.Response {
+	return func(ctx context.Context, req admission.Request) *admission.Response {
 		if !h.isCapsuleUser(req) {
-			return admission.Allowed("")
+			return nil
 		}
 
-		return h.handler.OnCreate(client, decoder, recorder)(ctx, req)
+		for _, hndl := range h.handlers {
+			if response := hndl.OnCreate(client, decoder, recorder)(ctx, req); response != nil {
+				return response
+			}
+		}
+
+		return nil
 	}
 }
 
 func (h *handler) OnDelete(client client.Client, decoder *admission.Decoder, recorder record.EventRecorder) webhook.Func {
-	return func(ctx context.Context, req admission.Request) admission.Response {
+	return func(ctx context.Context, req admission.Request) *admission.Response {
 		if !h.isCapsuleUser(req) {
-			return admission.Allowed("")
+			return nil
 		}
-		return h.handler.OnDelete(client, decoder, recorder)(ctx, req)
+
+		for _, hndl := range h.handlers {
+			if response := hndl.OnDelete(client, decoder, recorder)(ctx, req); response != nil {
+				return response
+			}
+		}
+
+		return nil
 	}
 }
 
 func (h *handler) OnUpdate(client client.Client, decoder *admission.Decoder, recorder record.EventRecorder) webhook.Func {
-	return func(ctx context.Context, req admission.Request) admission.Response {
+	return func(ctx context.Context, req admission.Request) *admission.Response {
 		if !h.isCapsuleUser(req) {
-			return admission.Allowed("")
+			return nil
 		}
-		return h.handler.OnUpdate(client, decoder, recorder)(ctx, req)
+
+		for _, hndl := range h.handlers {
+			if response := hndl.OnUpdate(client, decoder, recorder)(ctx, req); response != nil {
+				return response
+			}
+		}
+
+		return nil
 	}
 }
