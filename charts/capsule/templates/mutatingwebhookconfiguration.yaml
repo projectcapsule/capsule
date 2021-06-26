@@ -6,7 +6,8 @@ metadata:
     {{- include "capsule.labels" . | nindent 4 }}
 webhooks:
 - admissionReviewVersions:
-  - v1beta1
+    - v1
+    - v1beta1
   clientConfig:
     caBundle: Cg==
     service:

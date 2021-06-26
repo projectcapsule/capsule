@@ -6,6 +6,7 @@ metadata:
     {{- include "capsule.labels" . | nindent 4 }}
 webhooks:
 - admissionReviewVersions:
+    - v1
     - v1beta1
   clientConfig:
     caBundle: Cg==
@@ -37,6 +38,7 @@ webhooks:
   sideEffects: None
   timeoutSeconds: {{ .Values.validatingWebhooksTimeoutSeconds }}
 - admissionReviewVersions:
+    - v1
     - v1beta1
   clientConfig:
     caBundle: Cg==
@@ -58,8 +60,8 @@ webhooks:
         - networking.k8s.io
         - extensions
       apiVersions:
-        - v1beta1
         - v1
+        - v1beta1
       operations:
         - CREATE
         - UPDATE
@@ -69,6 +71,7 @@ webhooks:
   sideEffects: None
   timeoutSeconds: {{ .Values.validatingWebhooksTimeoutSeconds }}
 - admissionReviewVersions:
+    - v1
     - v1beta1
   clientConfig:
     caBundle: Cg==
@@ -97,7 +100,8 @@ webhooks:
   sideEffects: None
   timeoutSeconds: {{ .Values.validatingWebhooksTimeoutSeconds }}
 - admissionReviewVersions:
-  - v1beta1
+    - v1
+    - v1beta1
   clientConfig:
     caBundle: Cg==
     service:
@@ -127,6 +131,7 @@ webhooks:
   sideEffects: None
   timeoutSeconds: {{ .Values.validatingWebhooksTimeoutSeconds }}
 - admissionReviewVersions:
+    - v1
     - v1beta1
   clientConfig:
     caBundle: Cg==
@@ -156,6 +161,7 @@ webhooks:
   sideEffects: None
   timeoutSeconds: {{ .Values.validatingWebhooksTimeoutSeconds }}
 - admissionReviewVersions:
+    - v1
     - v1beta1
   clientConfig:
     caBundle: Cg==
@@ -183,6 +189,7 @@ webhooks:
   sideEffects: None
   timeoutSeconds: {{ .Values.validatingWebhooksTimeoutSeconds }}
 - admissionReviewVersions:
+    - v1
     - v1beta1
   clientConfig:
     caBundle: Cg==
@@ -213,7 +220,8 @@ webhooks:
   sideEffects: None
   timeoutSeconds: {{ .Values.validatingWebhooksTimeoutSeconds }}
 - admissionReviewVersions:
-  - v1beta1
+    - v1
+    - v1beta1
   clientConfig:
     caBundle: Cg==
     service:
