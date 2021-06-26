@@ -12,7 +12,7 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /mutate-v1-namespace-owner-reference
+      path: /namespace-owner-reference
   failurePolicy: Fail
   name: owner.namespace.capsule.clastix.io
   rules:
@@ -39,205 +39,7 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /validating-imagepullpolicy
-  failurePolicy: Fail
-  name: validating-image-pull-policy.capsule.clastix.io
-  rules:
-  - apiGroups:
-    - ""
-    apiVersions:
-    - v1
-    operations:
-    - CREATE
-    resources:
-    - pods
-  sideEffects: None
-- admissionReviewVersions:
-  - v1
-  clientConfig:
-    service:
-      name: webhook-service
-      namespace: system
-      path: /validating-ingress
-  failurePolicy: Fail
-  name: ingress-v1beta1.capsule.clastix.io
-  rules:
-  - apiGroups:
-    - networking.k8s.io
-    - extensions
-    apiVersions:
-    - v1beta1
-    operations:
-    - CREATE
-    - UPDATE
-    resources:
-    - ingresses
-  sideEffects: None
-- admissionReviewVersions:
-  - v1
-  clientConfig:
-    service:
-      name: webhook-service
-      namespace: system
-      path: /validating-ingress
-  failurePolicy: Fail
-  name: ingress-v1.capsule.clastix.io
-  rules:
-  - apiGroups:
-    - networking.k8s.io
-    apiVersions:
-    - v1
-    operations:
-    - CREATE
-    - UPDATE
-    resources:
-    - ingresses
-  sideEffects: None
-- admissionReviewVersions:
-  - v1
-  clientConfig:
-    service:
-      name: webhook-service
-      namespace: system
-      path: /validate-v1-namespace-freezed
-  failurePolicy: Fail
-  name: freezed.namespace.capsule.clastix.io
-  rules:
-  - apiGroups:
-    - ""
-    apiVersions:
-    - v1
-    operations:
-    - CREATE
-    - UPDATE
-    - DELETE
-    resources:
-    - namespaces
-  sideEffects: None
-- admissionReviewVersions:
-  - v1
-  clientConfig:
-    service:
-      name: webhook-service
-      namespace: system
-      path: /validate-v1-namespace-quota
-  failurePolicy: Fail
-  name: quota.namespace.capsule.clastix.io
-  rules:
-  - apiGroups:
-    - ""
-    apiVersions:
-    - v1
-    operations:
-    - CREATE
-    resources:
-    - namespaces
-  sideEffects: None
-- admissionReviewVersions:
-  - v1
-  clientConfig:
-    service:
-      name: webhook-service
-      namespace: system
-      path: /validating-v1-network-policy
-  failurePolicy: Fail
-  name: validating.network-policy.capsule.clastix.io
-  rules:
-  - apiGroups:
-    - networking.k8s.io
-    apiVersions:
-    - v1
-    operations:
-    - CREATE
-    - UPDATE
-    - DELETE
-    resources:
-    - networkpolicies
-  sideEffects: None
-- admissionReviewVersions:
-  - v1
-  clientConfig:
-    service:
-      name: webhook-service
-      namespace: system
-      path: /validating-v1-podpriority
-  failurePolicy: Ignore
-  name: podpriority.capsule.clastix.io
-  rules:
-  - apiGroups:
-    - ""
-    apiVersions:
-    - v1
-    operations:
-    - CREATE
-    resources:
-    - pods
-  sideEffects: None
-- admissionReviewVersions:
-  - v1
-  clientConfig:
-    service:
-      name: webhook-service
-      namespace: system
-      path: /validating-v1-pvc
-  failurePolicy: Fail
-  name: pvc.capsule.clastix.io
-  rules:
-  - apiGroups:
-    - ""
-    apiVersions:
-    - v1
-    operations:
-    - CREATE
-    resources:
-    - persistentvolumeclaims
-  sideEffects: None
-- admissionReviewVersions:
-  - v1
-  clientConfig:
-    service:
-      name: webhook-service
-      namespace: system
-      path: /validating-v1-registry
-  failurePolicy: Ignore
-  name: pod.capsule.clastix.io
-  rules:
-  - apiGroups:
-    - ""
-    apiVersions:
-    - v1
-    operations:
-    - CREATE
-    resources:
-    - pods
-  sideEffects: None
-- admissionReviewVersions:
-  - v1
-  clientConfig:
-    service:
-      name: webhook-service
-      namespace: system
-      path: /validating-external-service-ips
-  failurePolicy: Fail
-  name: validating-external-service-ips.capsule.clastix.io
-  rules:
-  - apiGroups:
-    - ""
-    apiVersions:
-    - v1
-    operations:
-    - CREATE
-    - UPDATE
-    resources:
-    - services
-  sideEffects: None
-- admissionReviewVersions:
-  - v1
-  clientConfig:
-    service:
-      name: webhook-service
-      namespace: system
-      path: /tenant-cordoning
+      path: /cordoning
   failurePolicy: Fail
   name: cordoning.tenant.capsule.clastix.io
   rules:
@@ -258,19 +60,21 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /validating-v1-tenant
+      path: /ingresses
   failurePolicy: Fail
-  name: tenant.capsule.clastix.io
+  name: ingress.capsule.clastix.io
   rules:
   - apiGroups:
-    - capsule.clastix.io
+    - networking.k8s.io
+    - extensions
     apiVersions:
-    - v1alpha1
+    - v1beta1
+    - v1
     operations:
     - CREATE
     - UPDATE
     resources:
-    - tenants
+    - ingresses
   sideEffects: None
 - admissionReviewVersions:
   - v1
@@ -278,9 +82,50 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /validating-v1-namespace-tenant-prefix
+      path: /namespaces
   failurePolicy: Fail
-  name: prefix.namespace.capsule.clastix.io
+  name: namespaces.capsule.clastix.io
+  rules:
+  - apiGroups:
+    - ""
+    apiVersions:
+    - v1
+    operations:
+    - CREATE
+    - UPDATE
+    - DELETE
+    resources:
+    - namespaces
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /networkpolicies
+  failurePolicy: Fail
+  name: networkpolicies.capsule.clastix.io
+  rules:
+  - apiGroups:
+    - networking.k8s.io
+    apiVersions:
+    - v1
+    operations:
+    - UPDATE
+    - DELETE
+    resources:
+    - networkpolicies
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /pods
+  failurePolicy: Fail
+  name: pods.capsule.clastix.io
   rules:
   - apiGroups:
     - ""
@@ -289,5 +134,65 @@ webhooks:
     operations:
     - CREATE
     resources:
-    - namespaces
+    - pods
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /persistentvolumeclaims
+  failurePolicy: Fail
+  name: pvc.capsule.clastix.io
+  rules:
+  - apiGroups:
+    - ""
+    apiVersions:
+    - v1
+    operations:
+    - CREATE
+    resources:
+    - persistentvolumeclaims
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /services
+  failurePolicy: Fail
+  name: services.capsule.clastix.io
+  rules:
+  - apiGroups:
+    - ""
+    apiVersions:
+    - v1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - services
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /tenants
+  failurePolicy: Fail
+  name: tenants.capsule.clastix.io
+  rules:
+  - apiGroups:
+    - capsule.clastix.io
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    - DELETE
+    resources:
+    - tenants
   sideEffects: None
