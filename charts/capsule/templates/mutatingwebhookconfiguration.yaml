@@ -12,23 +12,23 @@ webhooks:
     service:
       name: {{ include "capsule.fullname" . }}-webhook-service
       namespace: {{ .Release.Namespace }}
-      path: /mutate-v1-namespace-owner-reference
+      path: /namespace-owner-reference
       port: 443
   failurePolicy: Fail
-  matchPolicy: Exact
+  matchPolicy: Equivalent
   name: owner.namespace.capsule.clastix.io
   namespaceSelector: {}
   objectSelector: {}
   reinvocationPolicy: Never
   rules:
-  - apiGroups:
-    - ""
-    apiVersions:
-    - v1
-    operations:
-    - CREATE
-    resources:
-    - namespaces
-    scope: '*'
+    - apiGroups:
+      - ""
+      apiVersions:
+      - v1
+      operations:
+      - CREATE
+      resources:
+      - namespaces
+      scope: '*'
   sideEffects: NoneOnDryRun
   timeoutSeconds: {{ .Values.mutatingWebhooksTimeoutSeconds }}
