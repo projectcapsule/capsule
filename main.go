@@ -28,17 +28,15 @@ import (
 	"github.com/clastix/capsule/pkg/configuration"
 	"github.com/clastix/capsule/pkg/indexer"
 	"github.com/clastix/capsule/pkg/webhook"
-	"github.com/clastix/capsule/pkg/webhook/imagepullpolicy"
 	"github.com/clastix/capsule/pkg/webhook/ingress"
 	namespacewebhook "github.com/clastix/capsule/pkg/webhook/namespace"
-	"github.com/clastix/capsule/pkg/webhook/networkpolicies"
+	"github.com/clastix/capsule/pkg/webhook/networkpolicy"
 	"github.com/clastix/capsule/pkg/webhook/ownerreference"
-	"github.com/clastix/capsule/pkg/webhook/podpriority"
+	"github.com/clastix/capsule/pkg/webhook/pod"
 	"github.com/clastix/capsule/pkg/webhook/pvc"
-	"github.com/clastix/capsule/pkg/webhook/registry"
-	"github.com/clastix/capsule/pkg/webhook/services"
+	"github.com/clastix/capsule/pkg/webhook/route"
+	"github.com/clastix/capsule/pkg/webhook/service"
 	"github.com/clastix/capsule/pkg/webhook/tenant"
-	"github.com/clastix/capsule/pkg/webhook/tenantprefix"
 	"github.com/clastix/capsule/pkg/webhook/utils"
 	// +kubebuilder:scaffold:imports
 )
@@ -142,19 +140,15 @@ func main() {
 	// webhooks: the order matters, don't change it and just append
 	webhooksList := append(
 		make([]webhook.Webhook, 0),
-		ingress.Webhook(ingress.Handler(cfg)),
-		pvc.Webhook(pvc.Handler()),
-		registry.Webhook(registry.Handler()),
-		podpriority.Webhook(podpriority.Handler()),
-		services.Webhook(services.Handler()),
-		ownerreference.Webhook(utils.InCapsuleGroups(cfg, ownerreference.Handler(cfg))),
-		namespacewebhook.QuotaWebhook(utils.InCapsuleGroups(cfg, namespacewebhook.QuotaHandler())),
-		namespacewebhook.FreezedWebhook(utils.InCapsuleGroups(cfg, namespacewebhook.FreezeHandler(cfg))),
-		networkpolicies.Webhook(utils.InCapsuleGroups(cfg, networkpolicies.Handler())),
-		tenantprefix.Webhook(utils.InCapsuleGroups(cfg, tenantprefix.Handler(cfg))),
-		tenant.Validating(tenant.ValidatingHandler(cfg)),
-		imagepullpolicy.Webhook(imagepullpolicy.Handler()),
-		tenant.Cordoning(tenant.CordoningHandler(cfg)),
+		route.Pod(pod.ImagePullPolicy(), pod.ContainerRegistry(), pod.PriorityClass()),
+		route.Namespace(utils.InCapsuleGroups(cfg, namespacewebhook.QuotaHandler(), namespacewebhook.FreezeHandler(cfg), namespacewebhook.PrefixHandler(cfg))),
+		route.Ingress(ingress.Class(cfg), ingress.Hostnames(cfg), ingress.Collision(cfg)),
+		route.PVC(pvc.Handler()),
+		route.Service(service.Handler()),
+		route.NetworkPolicy(utils.InCapsuleGroups(cfg, networkpolicy.Handler())),
+		route.Tenant(tenant.NameHandler(), tenant.IngressClassRegexHandler(), tenant.StorageClassRegexHandler(), tenant.ContainerRegistryRegexHandler(), tenant.HostnameRegexHandler(), tenant.HostnamesCollisionHandler(cfg), tenant.FreezedEmitter()),
+		route.OwnerReference(utils.InCapsuleGroups(cfg, ownerreference.Handler(cfg))),
+		route.Cordoning(tenant.CordoningHandler(cfg)),
 	)
 	if err = webhook.Register(manager, webhooksList...); err != nil {
 		setupLog.Error(err, "unable to setup webhooks")

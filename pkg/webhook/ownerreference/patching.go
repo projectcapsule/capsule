@@ -25,28 +25,6 @@ import (
 	capsulewebhook "github.com/clastix/capsule/pkg/webhook"
 )
 
-// +kubebuilder:webhook:path=/mutate-v1-namespace-owner-reference,mutating=true,sideEffects=None,admissionReviewVersions=v1,failurePolicy=fail,groups="",resources=namespaces,verbs=create,versions=v1,name=owner.namespace.capsule.clastix.io
-
-type webhook struct {
-	handler capsulewebhook.Handler
-}
-
-func Webhook(handler capsulewebhook.Handler) capsulewebhook.Webhook {
-	return &webhook{handler: handler}
-}
-
-func (w *webhook) GetHandler() capsulewebhook.Handler {
-	return w.handler
-}
-
-func (w *webhook) GetName() string {
-	return "OwnerReference"
-}
-
-func (w *webhook) GetPath() string {
-	return "/mutate-v1-namespace-owner-reference"
-}
-
 type handler struct {
 	cfg configuration.Configuration
 }
@@ -58,30 +36,40 @@ func Handler(cfg configuration.Configuration) capsulewebhook.Handler {
 }
 
 func (h *handler) OnCreate(clt client.Client, decoder *admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
-	return func(ctx context.Context, req admission.Request) admission.Response {
+	return func(ctx context.Context, req admission.Request) *admission.Response {
 		ns := &corev1.Namespace{}
 		if err := decoder.Decode(req, ns); err != nil {
-			return admission.Errored(http.StatusBadRequest, err)
+			response := admission.Errored(http.StatusBadRequest, err)
+
+			return &response
 		}
 		ln, err := capsulev1alpha1.GetTypeLabel(&capsulev1alpha1.Tenant{})
 		if err != nil {
-			return admission.Errored(http.StatusBadRequest, err)
+			response := admission.Errored(http.StatusBadRequest, err)
+
+			return &response
 		}
 		// If we already had TenantName label on NS -> assign to it
 		if label, ok := ns.ObjectMeta.Labels[ln]; ok {
 			// retrieving the selected Tenant
 			tnt := &capsulev1alpha1.Tenant{}
-			if err := clt.Get(ctx, types.NamespacedName{Name: label}, tnt); err != nil {
-				return admission.Errored(http.StatusBadRequest, err)
+			if err = clt.Get(ctx, types.NamespacedName{Name: label}, tnt); err != nil {
+				response := admission.Errored(http.StatusBadRequest, err)
+
+				return &response
 			}
 			// Tenant owner must adhere to user that asked for NS creation
 			if !h.isTenantOwner(tnt.Spec.Owner, req.UserInfo) {
 				recorder.Eventf(tnt, corev1.EventTypeWarning, "NonOwnedTenant", "Namespace %s cannot be assigned to the current Tenant", ns.GetName())
 
-				return admission.Denied("Cannot assign the desired namespace to a non-owned Tenant")
+				response := admission.Denied("Cannot assign the desired namespace to a non-owned Tenant")
+
+				return &response
 			}
 			// Patching the response
-			return h.patchResponseForOwnerRef(tnt, ns, recorder)
+			response := h.patchResponseForOwnerRef(tnt, ns, recorder)
+
+			return &response
 		}
 
 		// If we forceTenantPrefix -> find Tenant from NS name
@@ -89,10 +77,14 @@ func (h *handler) OnCreate(clt client.Client, decoder *admission.Decoder, record
 
 		// Find tenants belonging to user
 		{
-			tntList, err := h.listTenantsForOwnerKind(ctx, "User", req.UserInfo.Username, clt)
-			if err != nil {
-				return admission.Errored(http.StatusBadRequest, err)
+			var tntList *capsulev1alpha1.TenantList
+
+			if tntList, err = h.listTenantsForOwnerKind(ctx, "User", req.UserInfo.Username, clt); err != nil {
+				response := admission.Errored(http.StatusBadRequest, err)
+
+				return &response
 			}
+
 			for _, tnt := range tntList.Items {
 				tenants = append(tenants, tnt)
 			}
@@ -102,8 +94,11 @@ func (h *handler) OnCreate(clt client.Client, decoder *admission.Decoder, record
 			for _, group := range req.UserInfo.Groups {
 				tntList, err := h.listTenantsForOwnerKind(ctx, "Group", group, clt)
 				if err != nil {
-					return admission.Errored(http.StatusBadRequest, err)
+					response := admission.Errored(http.StatusBadRequest, err)
+
+					return &response
 				}
+
 				for _, tnt := range tntList.Items {
 					tenants = append(tenants, tnt)
 				}
@@ -113,34 +108,44 @@ func (h *handler) OnCreate(clt client.Client, decoder *admission.Decoder, record
 		sort.Sort(sort.Reverse(tenants))
 
 		if len(tenants) == 0 {
-			return admission.Denied("You do not have any Tenant assigned: please, reach out to the system administrators")
+			response := admission.Denied("You do not have any Tenant assigned: please, reach out to the system administrators")
+
+			return &response
 		}
 
 		if len(tenants) == 1 {
-			return h.patchResponseForOwnerRef(&tenants[0], ns, recorder)
+			response := h.patchResponseForOwnerRef(&tenants[0], ns, recorder)
+
+			return &response
 		}
 
 		if h.cfg.ForceTenantPrefix() {
 			for _, tnt := range tenants {
 				if strings.HasPrefix(ns.GetName(), fmt.Sprintf("%s-", tnt.GetName())) {
-					return h.patchResponseForOwnerRef(tnt.DeepCopy(), ns, recorder)
+					response := h.patchResponseForOwnerRef(tnt.DeepCopy(), ns, recorder)
+
+					return &response
 				}
 			}
-			admission.Denied("The Namespace prefix used doesn't match any available Tenant")
+			response := admission.Denied("The Namespace prefix used doesn't match any available Tenant")
+
+			return &response
 		}
 
-		return admission.Denied("Unable to assign namespace to tenant. Please use " + ln + " label when creating a namespace")
+		response := admission.Denied("Unable to assign namespace to tenant. Please use " + ln + " label when creating a namespace")
+
+		return &response
 	}
 }
 func (h *handler) OnDelete(client client.Client, decoder *admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
-	return func(ctx context.Context, req admission.Request) admission.Response {
-		return admission.Allowed("")
+	return func(ctx context.Context, req admission.Request) *admission.Response {
+		return nil
 	}
 }
 
 func (h *handler) OnUpdate(client client.Client, decoder *admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
-	return func(ctx context.Context, req admission.Request) admission.Response {
-		return admission.Denied("Capsule user cannot update a Namespace")
+	return func(ctx context.Context, req admission.Request) *admission.Response {
+		return nil
 	}
 }
 

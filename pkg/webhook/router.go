@@ -25,11 +25,12 @@ func Register(manager controllerruntime.Manager, webhookList ...Webhook) error {
 	recorder := manager.GetEventRecorderFor("tenant-webhook")
 
 	server := manager.GetWebhookServer()
+
 	for _, wh := range webhookList {
 		server.Register(wh.GetPath(), &webhook.Admission{
 			Handler: &handlerRouter{
 				recorder: recorder,
-				handler:  wh.GetHandler(),
+				handlers: wh.GetHandlers(),
 			},
 		})
 	}
@@ -37,31 +38,46 @@ func Register(manager controllerruntime.Manager, webhookList ...Webhook) error {
 }
 
 type handlerRouter struct {
-	handler  Handler
 	client   client.Client
 	decoder  *admission.Decoder
 	recorder record.EventRecorder
+
+	handlers []Handler
 }
 
 func (r *handlerRouter) Handle(ctx context.Context, req admission.Request) admission.Response {
 	switch req.Operation {
 	case admissionv1.Create:
-		return r.handler.OnCreate(r.client, r.decoder, r.recorder)(ctx, req)
+		for _, h := range r.handlers {
+			if response := h.OnCreate(r.client, r.decoder, r.recorder)(ctx, req); response != nil {
+				return *response
+			}
+		}
 	case admissionv1.Update:
-		return r.handler.OnUpdate(r.client, r.decoder, r.recorder)(ctx, req)
+		for _, h := range r.handlers {
+			if response := h.OnUpdate(r.client, r.decoder, r.recorder)(ctx, req); response != nil {
+				return *response
+			}
+		}
 	case admissionv1.Delete:
-		return r.handler.OnDelete(r.client, r.decoder, r.recorder)(ctx, req)
-	default:
-		return admission.Allowed("")
+		for _, h := range r.handlers {
+			if response := h.OnDelete(r.client, r.decoder, r.recorder)(ctx, req); response != nil {
+				return *response
+			}
+		}
 	}
+
+	return admission.Allowed("")
 }
 
 func (r *handlerRouter) InjectClient(c client.Client) error {
 	r.client = c
+
 	return nil
 }
 
 func (r *handlerRouter) InjectDecoder(d *admission.Decoder) error {
 	r.decoder = d
+
 	return nil
 }

@@ -11,7 +11,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
-type Func func(ctx context.Context, req admission.Request) admission.Response
+type Func func(ctx context.Context, req admission.Request) *admission.Response
 
 type Handler interface {
 	OnCreate(client client.Client, decoder *admission.Decoder, recorder record.EventRecorder) Func

@@ -4,7 +4,6 @@
 package webhook
 
 type Webhook interface {
-	GetName() string
 	GetPath() string
-	GetHandler() Handler
+	GetHandlers() []Handler
 }

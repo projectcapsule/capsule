@@ -6,7 +6,7 @@ package ingress
 import (
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	networkingv1 "k8s.io/api/networking/v1"
-	networkingv1beta "k8s.io/api/networking/v1beta1"
+	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 )
 
 const (
@@ -54,7 +54,7 @@ func (n NetworkingV1) Hostnames() []string {
 }
 
 type NetworkingV1Beta1 struct {
-	*networkingv1beta.Ingress
+	*networkingv1beta1.Ingress
 }
 
 func (n NetworkingV1Beta1) Name() string {
