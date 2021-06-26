@@ -37,11 +37,8 @@ var _ = Describe("when a second Tenant contains an already declared allowed Ingr
 			tnt.ResourceVersion = ""
 			return k8sClient.Create(context.TODO(), tnt)
 		}).Should(Succeed())
-
-		ModifyCapsuleConfigurationOpts(func(configuration *v1alpha1.CapsuleConfiguration) {
-			configuration.Spec.AllowTenantIngressHostnamesCollision = true
-		})
 	})
+
 	JustAfterEach(func() {
 		Expect(k8sClient.Delete(context.TODO(), tnt)).Should(Succeed())
 
@@ -50,7 +47,33 @@ var _ = Describe("when a second Tenant contains an already declared allowed Ingr
 		})
 	})
 
+	It("should block creation if contains collided Ingress hostnames", func() {
+		for i, h := range tnt.Spec.IngressHostnames.Exact {
+			tnt2 := &v1alpha1.Tenant{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: fmt.Sprintf("%s-%d", tnt.GetName(), i),
+				},
+				Spec: v1alpha1.TenantSpec{
+					Owner: v1alpha1.OwnerSpec{
+						Name: "second-user",
+						Kind: "User",
+					},
+					IngressHostnames: &v1alpha1.AllowedListSpec{
+						Exact: []string{h},
+					},
+				},
+			}
+			EventuallyCreation(func() error {
+				return k8sClient.Create(context.TODO(), tnt2)
+			}).ShouldNot(Succeed())
+		}
+	})
+
 	It("should not block creation if contains collided Ingress hostnames", func() {
+		ModifyCapsuleConfigurationOpts(func(configuration *v1alpha1.CapsuleConfiguration) {
+			configuration.Spec.AllowTenantIngressHostnamesCollision = true
+		})
+
 		for i, h := range tnt.Spec.IngressHostnames.Exact {
 			tnt2 := &v1alpha1.Tenant{
 				ObjectMeta: metav1.ObjectMeta{

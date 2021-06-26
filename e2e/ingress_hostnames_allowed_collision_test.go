@@ -72,12 +72,58 @@ var _ = Describe("when handling Ingress hostnames collision", func() {
 			configuration.Spec.AllowIngressHostnameCollision = true
 		})
 	})
+
 	JustAfterEach(func() {
 		Expect(k8sClient.Delete(context.TODO(), tnt)).Should(Succeed())
 
 		ModifyCapsuleConfigurationOpts(func(configuration *v1alpha1.CapsuleConfiguration) {
 			configuration.Spec.AllowIngressHostnameCollision = false
 		})
+	})
+
+	It("should not allow creating several Ingress with same hostname", func() {
+		ModifyCapsuleConfigurationOpts(func(configuration *v1alpha1.CapsuleConfiguration) {
+			configuration.Spec.AllowIngressHostnameCollision = false
+		})
+
+		maj, min, _ := GetKubernetesSemVer()
+
+		ns := NewNamespace("denied-collision")
+		cs := ownerClient(tnt)
+
+		NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
+		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
+
+		if maj == 1 && min > 18 {
+			By("testing networking.k8s.io", func() {
+				EventuallyCreation(func() (err error) {
+					obj := networkingIngress("networking-1", "kubernetes.io")
+					_, err = cs.NetworkingV1().Ingresses(ns.GetName()).Create(context.TODO(), obj, metav1.CreateOptions{})
+					return
+				}).Should(Succeed())
+				EventuallyCreation(func() (err error) {
+					obj := networkingIngress("networking-2", "kubernetes.io")
+					_, err = cs.NetworkingV1().Ingresses(ns.GetName()).Create(context.TODO(), obj, metav1.CreateOptions{})
+					return
+				}).ShouldNot(Succeed())
+			})
+		}
+
+		if maj == 1 && min < 22 {
+			By("testing extensions", func() {
+				EventuallyCreation(func() (err error) {
+					obj := extensionsIngress("extensions-1", "cncf.io")
+					_, err = cs.ExtensionsV1beta1().Ingresses(ns.GetName()).Create(context.TODO(), obj, metav1.CreateOptions{})
+					return
+				}).Should(Succeed())
+				EventuallyCreation(func() (err error) {
+					obj := extensionsIngress("extensions-2", "cncf.io")
+					_, err = cs.ExtensionsV1beta1().Ingresses(ns.GetName()).Create(context.TODO(), obj, metav1.CreateOptions{})
+					return
+				}).ShouldNot(Succeed())
+			})
+		}
+
 	})
 
 	It("should allow creating several Ingress with same hostname", func() {
@@ -91,31 +137,31 @@ var _ = Describe("when handling Ingress hostnames collision", func() {
 
 		if maj == 1 && min > 18 {
 			By("testing networking.k8s.io", func() {
-				Eventually(func() (err error) {
+				EventuallyCreation(func() (err error) {
 					obj := networkingIngress("networking-1", "kubernetes.io")
 					_, err = cs.NetworkingV1().Ingresses(ns.GetName()).Create(context.TODO(), obj, metav1.CreateOptions{})
 					return
-				}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
-				Eventually(func() (err error) {
+				}).Should(Succeed())
+				EventuallyCreation(func() (err error) {
 					obj := networkingIngress("networking-2", "kubernetes.io")
 					_, err = cs.NetworkingV1().Ingresses(ns.GetName()).Create(context.TODO(), obj, metav1.CreateOptions{})
 					return
-				}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+				}).Should(Succeed())
 			})
 		}
 
 		if maj == 1 && min < 22 {
 			By("testing extensions", func() {
-				Eventually(func() (err error) {
-					obj := extensionsIngress("extensions-1", "kubernetes.io")
+				EventuallyCreation(func() (err error) {
+					obj := extensionsIngress("extensions-1", "cncf.io")
 					_, err = cs.ExtensionsV1beta1().Ingresses(ns.GetName()).Create(context.TODO(), obj, metav1.CreateOptions{})
 					return
-				}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
-				Eventually(func() (err error) {
-					obj := extensionsIngress("extensions-2", "kubernetes.io")
+				}).Should(Succeed())
+				EventuallyCreation(func() (err error) {
+					obj := extensionsIngress("extensions-2", "cncf.io")
 					_, err = cs.ExtensionsV1beta1().Ingresses(ns.GetName()).Create(context.TODO(), obj, metav1.CreateOptions{})
 					return
-				}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+				}).Should(Succeed())
 			})
 		}
 	})
