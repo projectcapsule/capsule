@@ -9,3 +9,6 @@ resources:
 # the following config is for teaching kustomize how to do kustomization for CRDs.
 configurations:
 - kustomizeconfig.yaml
+
+patchesStrategicMerge:
+- patches/webhook_in_tenants.yaml
