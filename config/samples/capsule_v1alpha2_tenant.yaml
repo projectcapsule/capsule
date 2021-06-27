@@ -1,0 +1,7 @@
+apiVersion: capsule.clastix.io/v1alpha2
+kind: Tenant
+metadata:
+  name: tenant-sample
+spec:
+  # Add fields here
+  foo: bar
