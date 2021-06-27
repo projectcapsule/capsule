@@ -20,6 +20,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	capsulev1alpha1 "github.com/clastix/capsule/api/v1alpha1"
+	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
 	"github.com/clastix/capsule/controllers"
 	config "github.com/clastix/capsule/controllers/config"
 	"github.com/clastix/capsule/controllers/rbac"
@@ -50,6 +51,7 @@ func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
 	utilruntime.Must(capsulev1alpha1.AddToScheme(scheme))
+	utilruntime.Must(capsulev1beta1.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 }
 
