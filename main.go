@@ -135,6 +135,10 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "Tenant")
 		os.Exit(1)
 	}
+	if err = (&capsulev1alpha1.Tenant{}).SetupWebhookWithManager(manager); err != nil {
+		setupLog.Error(err, "unable to create webhook", "webhook", "Tenant")
+		os.Exit(1)
+	}
 	// +kubebuilder:scaffold:builder
 
 	cfg := configuration.NewCapsuleConfiguration(manager.GetClient(), configurationName)
