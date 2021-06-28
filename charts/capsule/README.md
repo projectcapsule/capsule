@@ -60,6 +60,7 @@ Here the values you can override:
 
 Parameter | Description | Default
 --- | --- | ---
+`manager.hostNetwork` | Specifies if the container should be started in `hostNetwork` mode. | `false` 
 `manager.options.logLevel` | Set the log verbosity of the controller with a value from 1 to 10.| `4`
 `manager.options.forceTenantPrefix` | Boolean, enforces the Tenant owner, during Namespace creation, to name it using the selected Tenant name as prefix, separated by a dash | `false`
 `manager.options.capsuleUserGroup` | Override the Capsule user group | `capsule.clastix.io`
