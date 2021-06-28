@@ -7,27 +7,47 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
-
 // TenantSpec defines the desired state of Tenant
 type TenantSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	Owner OwnerSpec `json:"owner"`
 
-	// Foo is an example field of Tenant. Edit tenant_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+	//+kubebuilder:validation:Minimum=1
+	NamespaceQuota         *int32                       `json:"namespaceQuota,omitempty"`
+	NamespacesMetadata     *AdditionalMetadataSpec      `json:"namespacesMetadata,omitempty"`
+	ServicesMetadata       *AdditionalMetadataSpec      `json:"servicesMetadata,omitempty"`
+	StorageClasses         *AllowedListSpec             `json:"storageClasses,omitempty"`
+	IngressClasses         *AllowedListSpec             `json:"ingressClasses,omitempty"`
+	IngressHostnames       *AllowedListSpec             `json:"ingressHostnames,omitempty"`
+	ContainerRegistries    *AllowedListSpec             `json:"containerRegistries,omitempty"`
+	NodeSelector           map[string]string            `json:"nodeSelector,omitempty"`
+	NetworkPolicies        *NetworkPolicySpec           `json:"networkPolicies,omitempty"`
+	LimitRanges            *LimitRangesSpec             `json:"limitRanges,omitempty"`
+	ResourceQuota          *ResourceQuotaSpec           `json:"resourceQuotas,omitempty"`
+	AdditionalRoleBindings []AdditionalRoleBindingsSpec `json:"additionalRoleBindings,omitempty"`
+	ExternalServiceIPs     *ExternalServiceIPsSpec      `json:"externalServiceIPs,omitempty"`
+	ImagePullPolicies      []ImagePullPolicySpec        `json:"imagePullPolicies,omitempty"`
+	PriorityClasses        *AllowedListSpec             `json:"priorityClasses,omitempty"`
+
+	//+kubebuilder:default=true
+	EnableNodePorts bool `json:"enableNodePorts,omitempty"`
 }
 
 // TenantStatus defines the observed state of Tenant
 type TenantStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	Size       uint     `json:"size"`
+	Namespaces []string `json:"namespaces,omitempty"`
 }
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 //+kubebuilder:storageversion
+// +kubebuilder:resource:scope=Cluster,shortName=tnt
+// +kubebuilder:printcolumn:name="Namespace quota",type="integer",JSONPath=".spec.namespaceQuota",description="The max amount of Namespaces can be created"
+// +kubebuilder:printcolumn:name="Namespace count",type="integer",JSONPath=".status.size",description="The total amount of Namespaces in use"
+// +kubebuilder:printcolumn:name="Owner name",type="string",JSONPath=".spec.owner.name",description="The assigned Tenant owner"
+// +kubebuilder:printcolumn:name="Owner kind",type="string",JSONPath=".spec.owner.kind",description="The assigned Tenant owner kind"
+// +kubebuilder:printcolumn:name="Node selector",type="string",JSONPath=".spec.nodeSelector",description="Node Selector applied to Pods"
+// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp",description="Age"
 
 // Tenant is the Schema for the tenants API
 type Tenant struct {
@@ -38,9 +58,7 @@ type Tenant struct {
 	Status TenantStatus `json:"status,omitempty"`
 }
 
-func (in *Tenant) Hub() {
-	return
-}
+func (t *Tenant) Hub() {}
 
 //+kubebuilder:object:root=true
 

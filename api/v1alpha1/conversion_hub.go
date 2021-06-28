@@ -4,8 +4,9 @@
 package v1alpha1
 
 import (
-	"github.com/clastix/capsule/api/v1alpha2"
 	"sigs.k8s.io/controller-runtime/pkg/conversion"
+
+	"github.com/clastix/capsule/api/v1alpha2"
 )
 
 func (t *Tenant) ConvertTo(dstRaw conversion.Hub) error {
@@ -23,4 +24,3 @@ func (t *Tenant) ConvertFrom(srcRaw conversion.Hub) error {
 
 	return nil
 }
-
