@@ -7,6 +7,14 @@ manager:
     repository: quay.io/clastix/capsule
     pullPolicy: IfNotPresent
     tag: ''
+
+  # Specifies if the container should be started in hostNetwork mode.
+  #
+  # Required for use in some managed kubernetes clusters (such as AWS EKS) with custom
+  # CNI (such as calico), because control-plane managed by AWS cannot communicate
+  # with pods' IP CIDR and admission webhooks are not working
+  hostNetwork: false
+
   # Additional Capsule options
   options:
     logLevel: '4'

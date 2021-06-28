@@ -23,6 +23,9 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       serviceAccountName: {{ include "capsule.serviceAccountName" . }}
+      {{- if .Values.manager.hostNetwork }}
+      hostNetwork: true
+      {{- end }}
       priorityClassName: {{ .Values.priorityClassName }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
