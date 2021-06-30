@@ -12,8 +12,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
+	apiutils "github.com/clastix/capsule/api/utils"
 	"github.com/clastix/capsule/api/v1alpha1"
-	"github.com/clastix/capsule/api/v1alpha1/domain"
 	capsulewebhook "github.com/clastix/capsule/pkg/webhook"
 	"github.com/clastix/capsule/pkg/webhook/utils"
 )
@@ -44,7 +44,7 @@ func (r *imagePullPolicy) OnCreate(c client.Client, decoder *admission.Decoder, 
 
 		tnt := tntList.Items[0]
 
-		policy := domain.NewImagePullPolicy(&tnt)
+		policy := apiutils.NewImagePullPolicy(&tnt)
 		// if Tenant doesn't enforce the pull policy, exit
 		if policy == nil {
 			return nil
