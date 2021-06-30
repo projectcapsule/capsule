@@ -1,7 +1,7 @@
 // Copyright 2020-2021 Clastix Labs
 // SPDX-License-Identifier: Apache-2.0
 
-package domain
+package utils
 
 type AllowedList interface {
 	ExactMatch(value string) bool

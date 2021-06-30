@@ -12,8 +12,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
+	apiutils "github.com/clastix/capsule/api/utils"
 	capsulev1alpha1 "github.com/clastix/capsule/api/v1alpha1"
-	"github.com/clastix/capsule/api/v1alpha1/domain"
 	capsulewebhook "github.com/clastix/capsule/pkg/webhook"
 	"github.com/clastix/capsule/pkg/webhook/utils"
 )
@@ -44,7 +44,7 @@ func (h *priorityClass) OnCreate(c client.Client, decoder *admission.Decoder, re
 			return nil
 		}
 
-		var allowed = domain.NewPodPriority(&tntList.Items[0])
+		var allowed = apiutils.NewPodPriority(&tntList.Items[0])
 
 		var priorityClassName = pod.Spec.PriorityClassName
 
