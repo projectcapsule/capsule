@@ -11,9 +11,9 @@ import (
 // log is for logging in this package.
 var tenantlog = logf.Log.WithName("tenant-resource")
 
-func (r *Tenant) SetupWebhookWithManager(mgr ctrl.Manager) error {
+func (t *Tenant) SetupWebhookWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewWebhookManagedBy(mgr).
-		For(r).
+		For(t).
 		Complete()
 }
 
