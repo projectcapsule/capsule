@@ -206,7 +206,7 @@ func (r *TenantReconciler) resourceQuotasUpdate(resourceName corev1.ResourceName
 // access to CRDs or specific API groups.
 func (r *TenantReconciler) syncAdditionalRoleBindings(tenant *capsulev1alpha1.Tenant) (err error) {
 	// hashing the RoleBinding name due to DNS RFC-1123 applied to Kubernetes labels
-	hash := func(binding capsulev1alpha1.AdditionalRoleBindings) string {
+	hash := func(binding capsulev1alpha1.AdditionalRoleBindingsSpec) string {
 		h := fnv.New64a()
 
 		_, _ = h.Write([]byte(binding.ClusterRoleName))
