@@ -10,7 +10,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/clastix/capsule/api/v1alpha1"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -18,11 +17,14 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/client-go/kubernetes"
+
+	capsulev1alpha1 "github.com/clastix/capsule/api/v1alpha1"
+	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
 )
 
 const (
-	defaultTimeoutInterval       = 20 * time.Second
-	defaultPollInterval          = time.Second
+	defaultTimeoutInterval = 20 * time.Second
+	defaultPollInterval    = time.Second
 )
 
 func NewNamespace(name string) *corev1.Namespace {
@@ -33,7 +35,7 @@ func NewNamespace(name string) *corev1.Namespace {
 	}
 }
 
-func NamespaceCreation(ns *corev1.Namespace, t *v1alpha1.Tenant, timeout time.Duration) AsyncAssertion {
+func NamespaceCreation(ns *corev1.Namespace, t *capsulev1beta1.Tenant, timeout time.Duration) AsyncAssertion {
 	cs := ownerClient(t)
 	return Eventually(func() (err error) {
 		_, err = cs.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
@@ -41,7 +43,7 @@ func NamespaceCreation(ns *corev1.Namespace, t *v1alpha1.Tenant, timeout time.Du
 	}, timeout, defaultPollInterval)
 }
 
-func TenantNamespaceList(t *v1alpha1.Tenant, timeout time.Duration) AsyncAssertion {
+func TenantNamespaceList(t *capsulev1beta1.Tenant, timeout time.Duration) AsyncAssertion {
 	return Eventually(func() []string {
 		Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: t.GetName()}, t)).Should(Succeed())
 		return t.Status.Namespaces
@@ -52,8 +54,8 @@ func EventuallyCreation(f interface{}) AsyncAssertion {
 	return Eventually(f, defaultTimeoutInterval, defaultPollInterval)
 }
 
-func ModifyCapsuleConfigurationOpts(fn func(configuration *v1alpha1.CapsuleConfiguration)) {
-	config := &v1alpha1.CapsuleConfiguration{}
+func ModifyCapsuleConfigurationOpts(fn func(configuration *capsulev1alpha1.CapsuleConfiguration)) {
+	config := &capsulev1alpha1.CapsuleConfiguration{}
 	Expect(k8sClient.Get(context.Background(), types.NamespacedName{Name: "default"}, config)).ToNot(HaveOccurred())
 
 	fn(config)

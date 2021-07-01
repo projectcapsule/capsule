@@ -12,27 +12,29 @@ import (
 	. "github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/clastix/capsule/api/v1alpha1"
+	capsulev1alpha1 "github.com/clastix/capsule/api/v1alpha1"
+
+	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
 )
 
 var _ = Describe("creating a Namespace with Tenant name prefix enforcement", func() {
-	t1 := &v1alpha1.Tenant{
+	t1 := &capsulev1beta1.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "awesome",
 		},
-		Spec: v1alpha1.TenantSpec{
-			Owner: v1alpha1.OwnerSpec{
+		Spec: capsulev1beta1.TenantSpec{
+			Owner: capsulev1beta1.OwnerSpec{
 				Name: "john",
 				Kind: "User",
 			},
 		},
 	}
-	t2 := &v1alpha1.Tenant{
+	t2 := &capsulev1beta1.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "awesome-tenant",
 		},
-		Spec: v1alpha1.TenantSpec{
-			Owner: v1alpha1.OwnerSpec{
+		Spec: capsulev1beta1.TenantSpec{
+			Owner: capsulev1beta1.OwnerSpec{
 				Name: "john",
 				Kind: "User",
 			},
@@ -49,7 +51,7 @@ var _ = Describe("creating a Namespace with Tenant name prefix enforcement", fun
 			return k8sClient.Create(context.TODO(), t2)
 		}).Should(Succeed())
 
-		ModifyCapsuleConfigurationOpts(func(configuration *v1alpha1.CapsuleConfiguration) {
+		ModifyCapsuleConfigurationOpts(func(configuration *capsulev1alpha1.CapsuleConfiguration) {
 			configuration.Spec.ForceTenantPrefix = true
 		})
 	})
@@ -57,7 +59,7 @@ var _ = Describe("creating a Namespace with Tenant name prefix enforcement", fun
 		Expect(k8sClient.Delete(context.TODO(), t1)).Should(Succeed())
 		Expect(k8sClient.Delete(context.TODO(), t2)).Should(Succeed())
 
-		ModifyCapsuleConfigurationOpts(func(configuration *v1alpha1.CapsuleConfiguration) {
+		ModifyCapsuleConfigurationOpts(func(configuration *capsulev1alpha1.CapsuleConfiguration) {
 			configuration.Spec.ForceTenantPrefix = false
 		})
 	})

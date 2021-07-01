@@ -18,20 +18,20 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/clastix/capsule/api/v1alpha1"
+	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
 )
 
 var _ = Describe("changing Tenant managed Kubernetes resources", func() {
-	tnt := &v1alpha1.Tenant{
+	tnt := &capsulev1beta1.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "tenant-resources-changes",
 		},
-		Spec: v1alpha1.TenantSpec{
-			Owner: v1alpha1.OwnerSpec{
+		Spec: capsulev1beta1.TenantSpec{
+			Owner: capsulev1beta1.OwnerSpec{
 				Name: "laura",
 				Kind: "User",
 			},
-			LimitRanges: []corev1.LimitRangeSpec{
+			LimitRanges: &capsulev1beta1.LimitRangesSpec{Items: []corev1.LimitRangeSpec{
 				{
 					Limits: []corev1.LimitRangeItem{
 						{
@@ -76,7 +76,8 @@ var _ = Describe("changing Tenant managed Kubernetes resources", func() {
 					},
 				},
 			},
-			NetworkPolicies: []networkingv1.NetworkPolicySpec{
+			},
+			NetworkPolicies: &capsulev1beta1.NetworkPolicySpec{Items: []networkingv1.NetworkPolicySpec{
 				{
 					Ingress: []networkingv1.NetworkPolicyIngressRule{
 						{
@@ -120,10 +121,11 @@ var _ = Describe("changing Tenant managed Kubernetes resources", func() {
 					},
 				},
 			},
+			},
 			NodeSelector: map[string]string{
 				"kubernetes.io/os": "linux",
 			},
-			ResourceQuota: []corev1.ResourceQuotaSpec{
+			ResourceQuota: &capsulev1beta1.ResourceQuotaSpec{Items: []corev1.ResourceQuotaSpec{
 				{
 					Hard: map[corev1.ResourceName]resource.Quantity{
 						corev1.ResourceLimitsCPU:      resource.MustParse("8"),
@@ -145,6 +147,7 @@ var _ = Describe("changing Tenant managed Kubernetes resources", func() {
 						corev1.ResourceRequestsStorage: resource.MustParse("100Gi"),
 					},
 				},
+			},
 			},
 		},
 	}
@@ -168,7 +171,7 @@ var _ = Describe("changing Tenant managed Kubernetes resources", func() {
 	It("should reapply the original resources upon third party change", func() {
 		for _, ns := range nsl {
 			By("changing Limit Range", func() {
-				for i, s := range tnt.Spec.LimitRanges {
+				for i, s := range tnt.Spec.LimitRanges.Items {
 					n := fmt.Sprintf("capsule-%s-%d", tnt.GetName(), i)
 					lr := &corev1.LimitRange{}
 					Eventually(func() error {
@@ -186,7 +189,7 @@ var _ = Describe("changing Tenant managed Kubernetes resources", func() {
 				}
 			})
 			By("changing Network Policy", func() {
-				for i, s := range tnt.Spec.NetworkPolicies {
+				for i, s := range tnt.Spec.NetworkPolicies.Items {
 					n := fmt.Sprintf("capsule-%s-%d", tnt.GetName(), i)
 					np := &networkingv1.NetworkPolicy{}
 					Eventually(func() error {
@@ -206,7 +209,7 @@ var _ = Describe("changing Tenant managed Kubernetes resources", func() {
 				}
 			})
 			By("changing Resource Quota", func() {
-				for i, s := range tnt.Spec.ResourceQuota {
+				for i, s := range tnt.Spec.ResourceQuota.Items {
 					n := fmt.Sprintf("capsule-%s-%d", tnt.GetName(), i)
 					rq := &corev1.ResourceQuota{}
 					Eventually(func() error {

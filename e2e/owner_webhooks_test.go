@@ -17,26 +17,26 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
-	"github.com/clastix/capsule/api/v1alpha1"
+	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
 )
 
 var _ = Describe("when Tenant owner interacts with the webhooks", func() {
-	tnt := &v1alpha1.Tenant{
+	tnt := &capsulev1beta1.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "tenant-owner",
 		},
-		Spec: v1alpha1.TenantSpec{
-			Owner: v1alpha1.OwnerSpec{
+		Spec: capsulev1beta1.TenantSpec{
+			Owner: capsulev1beta1.OwnerSpec{
 				Name: "ruby",
 				Kind: "User",
 			},
-			StorageClasses: &v1alpha1.AllowedListSpec{
+			StorageClasses: &capsulev1beta1.AllowedListSpec{
 				Exact: []string{
 					"cephfs",
 					"glusterfs",
 				},
 			},
-			LimitRanges: []corev1.LimitRangeSpec{
+			LimitRanges: &capsulev1beta1.LimitRangesSpec{Items: []corev1.LimitRangeSpec{
 				{
 					Limits: []corev1.LimitRangeItem{
 						{
@@ -53,7 +53,8 @@ var _ = Describe("when Tenant owner interacts with the webhooks", func() {
 					},
 				},
 			},
-			NetworkPolicies: []networkingv1.NetworkPolicySpec{
+			},
+			NetworkPolicies: &capsulev1beta1.NetworkPolicySpec{Items: []networkingv1.NetworkPolicySpec{
 				{
 					Egress: []networkingv1.NetworkPolicyEgressRule{
 						{
@@ -73,12 +74,14 @@ var _ = Describe("when Tenant owner interacts with the webhooks", func() {
 					},
 				},
 			},
-			ResourceQuota: []corev1.ResourceQuotaSpec{
+			},
+			ResourceQuota: &capsulev1beta1.ResourceQuotaSpec{Items: []corev1.ResourceQuotaSpec{
 				{
 					Hard: map[corev1.ResourceName]resource.Quantity{
 						corev1.ResourcePods: resource.MustParse("10"),
 					},
 				},
+			},
 			},
 		},
 	}
@@ -183,7 +186,7 @@ var _ = Describe("when Tenant owner interacts with the webhooks", func() {
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "custom-network-policy",
 			},
-			Spec: tnt.Spec.NetworkPolicies[0],
+			Spec: tnt.Spec.NetworkPolicies.Items[0],
 		}
 		By("creating", func() {
 			Eventually(func() (err error) {
