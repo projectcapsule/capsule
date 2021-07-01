@@ -14,21 +14,21 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
-	"github.com/clastix/capsule/api/v1alpha1"
+	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
 )
 
 var _ = Describe("enforcing an allowed set of Service external IPs", func() {
-	tnt := &v1alpha1.Tenant{
+	tnt := &capsulev1beta1.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "allowed-external-ip",
 		},
-		Spec: v1alpha1.TenantSpec{
-			Owner: v1alpha1.OwnerSpec{
+		Spec: capsulev1beta1.TenantSpec{
+			Owner: capsulev1beta1.OwnerSpec{
 				Name: "google",
 				Kind: "User",
 			},
-			ExternalServiceIPs: &v1alpha1.ExternalServiceIPs{
-				Allowed: []v1alpha1.AllowedIP{
+			ExternalServiceIPs: &capsulev1beta1.ExternalServiceIPsSpec{
+				Allowed: []capsulev1beta1.AllowedIP{
 					"10.20.0.0/16",
 					"192.168.1.2/32",
 				},

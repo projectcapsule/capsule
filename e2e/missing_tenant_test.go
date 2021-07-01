@@ -12,14 +12,14 @@ import (
 	. "github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/clastix/capsule/api/v1alpha1"
+	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
 )
 
 var _ = Describe("creating a Namespace creation with no Tenant assigned", func() {
 	It("should fail", func() {
-		tnt := &v1alpha1.Tenant{
-			Spec: v1alpha1.TenantSpec{
-				Owner: v1alpha1.OwnerSpec{
+		tnt := &capsulev1beta1.Tenant{
+			Spec: capsulev1beta1.TenantSpec{
+				Owner: capsulev1beta1.OwnerSpec{
 					Name: "missing",
 					Kind: "User",
 				},

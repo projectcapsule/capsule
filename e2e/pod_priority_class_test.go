@@ -8,27 +8,28 @@ package e2e
 import (
 	"context"
 
-	"github.com/clastix/capsule/api/v1alpha1"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/scheduling/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
 )
 
 var _ = Describe("enforcing a Priority Class", func() {
-	tnt := &v1alpha1.Tenant{
+	tnt := &capsulev1beta1.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "priority-class",
-			Annotations: map[string]string{
-				"priorityclass.capsule.clastix.io/allowed":       "gold",
-				"priorityclass.capsule.clastix.io/allowed-regex": "pc\\-\\w+",
-			},
 		},
-		Spec: v1alpha1.TenantSpec{
-			Owner: v1alpha1.OwnerSpec{
+		Spec: capsulev1beta1.TenantSpec{
+			Owner: capsulev1beta1.OwnerSpec{
 				Name: "george",
 				Kind: "User",
+			},
+			PriorityClasses: &capsulev1beta1.AllowedListSpec{
+				Exact: []string{"gold"},
+				Regex: "pc\\-\\w+",
 			},
 		},
 	}
@@ -113,7 +114,7 @@ var _ = Describe("enforcing a Priority Class", func() {
 
 		NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
 
-	for i, pc := range []string{"pc-bronze", "pc-silver", "pc-gold"} {
+		for i, pc := range []string{"pc-bronze", "pc-silver", "pc-gold"} {
 			class := &v1.PriorityClass{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: pc,

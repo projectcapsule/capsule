@@ -15,20 +15,20 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/pointer"
 
-	"github.com/clastix/capsule/api/v1alpha1"
+	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
 )
 
 var _ = Describe("when Tenant handles Ingress classes", func() {
-	tnt := &v1alpha1.Tenant{
+	tnt := &capsulev1beta1.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "ingress-class",
 		},
-		Spec: v1alpha1.TenantSpec{
-			Owner: v1alpha1.OwnerSpec{
+		Spec: capsulev1beta1.TenantSpec{
+			Owner: capsulev1beta1.OwnerSpec{
 				Name: "ingress",
 				Kind: "User",
 			},
-			IngressClasses: &v1alpha1.AllowedListSpec{
+			IngressClasses: &capsulev1beta1.AllowedListSpec{
 				Exact: []string{
 					"nginx",
 					"haproxy",

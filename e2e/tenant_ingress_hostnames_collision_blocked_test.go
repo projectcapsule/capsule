@@ -13,20 +13,20 @@ import (
 	. "github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/clastix/capsule/api/v1alpha1"
+	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
 )
 
 var _ = Describe("when a second Tenant contains an already declared allowed Ingress hostname", func() {
-	tnt := &v1alpha1.Tenant{
+	tnt := &capsulev1beta1.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "no-collision-ingress-hostnames",
 		},
-		Spec: v1alpha1.TenantSpec{
-			Owner: v1alpha1.OwnerSpec{
+		Spec: capsulev1beta1.TenantSpec{
+			Owner: capsulev1beta1.OwnerSpec{
 				Name: "first-user",
 				Kind: "User",
 			},
-			IngressHostnames: &v1alpha1.AllowedListSpec{
+			IngressHostnames: &capsulev1beta1.AllowedListSpec{
 				Exact: []string{"capsule.clastix.io", "docs.capsule.k8s", "42.clatix.io"},
 			},
 		},
@@ -44,16 +44,16 @@ var _ = Describe("when a second Tenant contains an already declared allowed Ingr
 
 	It("should block creation if contains collided Ingress hostnames", func() {
 		for i, h := range tnt.Spec.IngressHostnames.Exact {
-			tnt2 := &v1alpha1.Tenant{
+			tnt2 := &capsulev1beta1.Tenant{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: fmt.Sprintf("%s-%d", tnt.GetName(), i),
 				},
-				Spec: v1alpha1.TenantSpec{
-					Owner: v1alpha1.OwnerSpec{
+				Spec: capsulev1beta1.TenantSpec{
+					Owner: capsulev1beta1.OwnerSpec{
 						Name: "second-user",
 						Kind: "User",
 					},
-					IngressHostnames: &v1alpha1.AllowedListSpec{
+					IngressHostnames: &capsulev1beta1.AllowedListSpec{
 						Exact: []string{h},
 					},
 				},

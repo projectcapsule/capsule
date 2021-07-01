@@ -18,20 +18,20 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
-	"github.com/clastix/capsule/api/v1alpha1"
+	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
 )
 
 var _ = Describe("creating namespaces within a Tenant with resources", func() {
-	tnt := &v1alpha1.Tenant{
+	tnt := &capsulev1beta1.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "tenant-resources",
 		},
-		Spec: v1alpha1.TenantSpec{
-			Owner: v1alpha1.OwnerSpec{
+		Spec: capsulev1beta1.TenantSpec{
+			Owner: capsulev1beta1.OwnerSpec{
 				Name: "john",
 				Kind: "User",
 			},
-			LimitRanges: []corev1.LimitRangeSpec{
+			LimitRanges: &capsulev1beta1.LimitRangesSpec{Items: []corev1.LimitRangeSpec{
 				{
 					Limits: []corev1.LimitRangeItem{
 						{
@@ -76,7 +76,8 @@ var _ = Describe("creating namespaces within a Tenant with resources", func() {
 					},
 				},
 			},
-			NetworkPolicies: []networkingv1.NetworkPolicySpec{
+			},
+			NetworkPolicies: &capsulev1beta1.NetworkPolicySpec{Items: []networkingv1.NetworkPolicySpec{
 				{
 					Ingress: []networkingv1.NetworkPolicyIngressRule{
 						{
@@ -120,10 +121,11 @@ var _ = Describe("creating namespaces within a Tenant with resources", func() {
 					},
 				},
 			},
+			},
 			NodeSelector: map[string]string{
 				"kubernetes.io/os": "linux",
 			},
-			ResourceQuota: []corev1.ResourceQuotaSpec{
+			ResourceQuota: &capsulev1beta1.ResourceQuotaSpec{Items: []corev1.ResourceQuotaSpec{
 				{
 					Hard: map[corev1.ResourceName]resource.Quantity{
 						corev1.ResourceLimitsCPU:      resource.MustParse("8"),
@@ -146,6 +148,7 @@ var _ = Describe("creating namespaces within a Tenant with resources", func() {
 					},
 				},
 			},
+			},
 		},
 	}
 	nsl := []string{"bim", "bum", "bam"}
@@ -167,7 +170,7 @@ var _ = Describe("creating namespaces within a Tenant with resources", func() {
 	It("should contains all replicated resources", func() {
 		for _, name := range nsl {
 			By("checking Limit Range", func() {
-				for i, s := range tnt.Spec.LimitRanges {
+				for i, s := range tnt.Spec.LimitRanges.Items {
 					n := fmt.Sprintf("capsule-%s-%d", tnt.GetName(), i)
 					lr := &corev1.LimitRange{}
 					Eventually(func() error {
@@ -177,7 +180,7 @@ var _ = Describe("creating namespaces within a Tenant with resources", func() {
 				}
 			})
 			By("checking Network Policy", func() {
-				for i, s := range tnt.Spec.NetworkPolicies {
+				for i, s := range tnt.Spec.NetworkPolicies.Items {
 					n := fmt.Sprintf("capsule-%s-%d", tnt.GetName(), i)
 					np := &networkingv1.NetworkPolicy{}
 					Eventually(func() error {
@@ -198,7 +201,7 @@ var _ = Describe("creating namespaces within a Tenant with resources", func() {
 				}, defaultTimeoutInterval, defaultPollInterval).Should(Equal(strings.Join(selector, ",")))
 			})
 			By("checking the Resource Quota", func() {
-				for i, s := range tnt.Spec.ResourceQuota {
+				for i, s := range tnt.Spec.ResourceQuota.Items {
 					n := fmt.Sprintf("capsule-%s-%d", tnt.GetName(), i)
 					rq := &corev1.ResourceQuota{}
 					Eventually(func() error {

@@ -12,16 +12,18 @@ import (
 	. "github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/clastix/capsule/api/v1alpha1"
+	capsulev1alpha1 "github.com/clastix/capsule/api/v1alpha1"
+
+	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
 )
 
 var _ = Describe("creating a Namespace as Tenant owner with custom --capsule-group", func() {
-	tnt := &v1alpha1.Tenant{
+	tnt := &capsulev1beta1.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "tenant-assigned-custom-group",
 		},
-		Spec: v1alpha1.TenantSpec{
-			Owner: v1alpha1.OwnerSpec{
+		Spec: capsulev1beta1.TenantSpec{
+			Owner: capsulev1beta1.OwnerSpec{
 				Name: "alice",
 				Kind: "User",
 			},
@@ -39,7 +41,7 @@ var _ = Describe("creating a Namespace as Tenant owner with custom --capsule-gro
 	})
 
 	It("should fail using a User non matching the capsule-user-group flag", func() {
-		ModifyCapsuleConfigurationOpts(func(configuration *v1alpha1.CapsuleConfiguration) {
+		ModifyCapsuleConfigurationOpts(func(configuration *capsulev1alpha1.CapsuleConfiguration) {
 			configuration.Spec.UserGroups = []string{"test"}
 		})
 
@@ -48,7 +50,7 @@ var _ = Describe("creating a Namespace as Tenant owner with custom --capsule-gro
 	})
 
 	It("should succeed and be available in Tenant namespaces list with multiple groups", func() {
-		ModifyCapsuleConfigurationOpts(func(configuration *v1alpha1.CapsuleConfiguration) {
+		ModifyCapsuleConfigurationOpts(func(configuration *capsulev1alpha1.CapsuleConfiguration) {
 			configuration.Spec.UserGroups = []string{"test", "alice"}
 		})
 
@@ -59,7 +61,7 @@ var _ = Describe("creating a Namespace as Tenant owner with custom --capsule-gro
 	})
 
 	It("should succeed and be available in Tenant namespaces list with default single group", func() {
-		ModifyCapsuleConfigurationOpts(func(configuration *v1alpha1.CapsuleConfiguration) {
+		ModifyCapsuleConfigurationOpts(func(configuration *capsulev1alpha1.CapsuleConfiguration) {
 			configuration.Spec.UserGroups = []string{"capsule.clastix.io"}
 		})
 
