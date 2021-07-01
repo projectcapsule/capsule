@@ -4,6 +4,8 @@
 package ingress
 
 import (
+	"sort"
+
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	networkingv1 "k8s.io/api/networking/v1"
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
@@ -117,4 +119,25 @@ func (e Extension) Hostnames() []string {
 		hostnames = append(hostnames, el.Host)
 	}
 	return hostnames
+}
+
+type HostnamesList []string
+
+func (hostnames HostnamesList) Len() int {
+	return len(hostnames)
+}
+
+func (hostnames HostnamesList) Swap(i, j int) {
+	hostnames[i], hostnames[j] = hostnames[j], hostnames[i]
+}
+
+func (hostnames HostnamesList) Less(i, j int) bool {
+	return hostnames[i] < hostnames[j]
+}
+
+func (hostnames HostnamesList) IsStringInList(value string) (ok bool) {
+	sort.Sort(hostnames)
+	i := sort.SearchStrings(hostnames, value)
+	ok = i < hostnames.Len() && hostnames[i] == value
+	return
 }

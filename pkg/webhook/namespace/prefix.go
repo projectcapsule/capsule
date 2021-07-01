@@ -14,7 +14,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	"github.com/clastix/capsule/api/v1alpha1"
+	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
+
 	"github.com/clastix/capsule/pkg/configuration"
 	capsulewebhook "github.com/clastix/capsule/pkg/webhook"
 	"github.com/clastix/capsule/pkg/webhook/utils"
@@ -46,7 +47,7 @@ func (r *prefixHandler) OnCreate(clt client.Client, decoder *admission.Decoder, 
 		}
 
 		if r.configuration.ForceTenantPrefix() {
-			tnt := &v1alpha1.Tenant{}
+			tnt := &capsulev1beta1.Tenant{}
 
 			for _, or := range ns.ObjectMeta.OwnerReferences {
 				// retrieving the selected Tenant

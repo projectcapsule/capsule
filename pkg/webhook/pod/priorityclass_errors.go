@@ -8,15 +8,15 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/clastix/capsule/api/v1alpha1"
+	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
 )
 
 type podPriorityClassForbidden struct {
 	priorityClassName string
-	spec              v1alpha1.AllowedListSpec
+	spec              capsulev1beta1.AllowedListSpec
 }
 
-func NewPodPriorityClassForbidden(priorityClassName string, spec v1alpha1.AllowedListSpec) error {
+func NewPodPriorityClassForbidden(priorityClassName string, spec capsulev1beta1.AllowedListSpec) error {
 	return &podPriorityClassForbidden{
 		priorityClassName: priorityClassName,
 		spec:              spec,

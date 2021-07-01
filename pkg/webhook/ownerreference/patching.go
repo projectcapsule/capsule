@@ -20,7 +20,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	capsulev1alpha1 "github.com/clastix/capsule/api/v1alpha1"
+	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
 	"github.com/clastix/capsule/pkg/configuration"
 	capsulewebhook "github.com/clastix/capsule/pkg/webhook"
 )
@@ -43,7 +43,7 @@ func (h *handler) OnCreate(clt client.Client, decoder *admission.Decoder, record
 
 			return &response
 		}
-		ln, err := capsulev1alpha1.GetTypeLabel(&capsulev1alpha1.Tenant{})
+		ln, err := capsulev1beta1.GetTypeLabel(&capsulev1beta1.Tenant{})
 		if err != nil {
 			response := admission.Errored(http.StatusBadRequest, err)
 
@@ -52,7 +52,7 @@ func (h *handler) OnCreate(clt client.Client, decoder *admission.Decoder, record
 		// If we already had TenantName label on NS -> assign to it
 		if label, ok := ns.ObjectMeta.Labels[ln]; ok {
 			// retrieving the selected Tenant
-			tnt := &capsulev1alpha1.Tenant{}
+			tnt := &capsulev1beta1.Tenant{}
 			if err = clt.Get(ctx, types.NamespacedName{Name: label}, tnt); err != nil {
 				response := admission.Errored(http.StatusBadRequest, err)
 
@@ -77,7 +77,7 @@ func (h *handler) OnCreate(clt client.Client, decoder *admission.Decoder, record
 
 		// Find tenants belonging to user
 		{
-			var tntList *capsulev1alpha1.TenantList
+			var tntList *capsulev1beta1.TenantList
 
 			if tntList, err = h.listTenantsForOwnerKind(ctx, "User", req.UserInfo.Username, clt); err != nil {
 				response := admission.Errored(http.StatusBadRequest, err)
@@ -149,9 +149,9 @@ func (h *handler) OnUpdate(client client.Client, decoder *admission.Decoder, rec
 	}
 }
 
-func (h *handler) patchResponseForOwnerRef(tenant *capsulev1alpha1.Tenant, ns *corev1.Namespace, recorder record.EventRecorder) admission.Response {
+func (h *handler) patchResponseForOwnerRef(tenant *capsulev1beta1.Tenant, ns *corev1.Namespace, recorder record.EventRecorder) admission.Response {
 	scheme := runtime.NewScheme()
-	_ = capsulev1alpha1.AddToScheme(scheme)
+	_ = capsulev1beta1.AddToScheme(scheme)
 	_ = corev1.AddToScheme(scheme)
 
 	o, _ := json.Marshal(ns.DeepCopy())
@@ -167,8 +167,8 @@ func (h *handler) patchResponseForOwnerRef(tenant *capsulev1alpha1.Tenant, ns *c
 	return admission.PatchResponseFromRaw(o, c)
 }
 
-func (h *handler) listTenantsForOwnerKind(ctx context.Context, ownerKind string, ownerName string, clt client.Client) (*capsulev1alpha1.TenantList, error) {
-	tntList := &capsulev1alpha1.TenantList{}
+func (h *handler) listTenantsForOwnerKind(ctx context.Context, ownerKind string, ownerName string, clt client.Client) (*capsulev1beta1.TenantList, error) {
+	tntList := &capsulev1beta1.TenantList{}
 	fields := client.MatchingFields{
 		".spec.owner.ownerkind": fmt.Sprintf("%s:%s", ownerKind, ownerName),
 	}
@@ -176,7 +176,7 @@ func (h *handler) listTenantsForOwnerKind(ctx context.Context, ownerKind string,
 	return tntList, err
 }
 
-func (h *handler) isTenantOwner(ownerSpec capsulev1alpha1.OwnerSpec, userInfo authenticationv1.UserInfo) bool {
+func (h *handler) isTenantOwner(ownerSpec capsulev1beta1.OwnerSpec, userInfo authenticationv1.UserInfo) bool {
 	if ownerSpec.Kind == "User" && userInfo.Username == ownerSpec.Name {
 		return true
 	}
@@ -190,7 +190,7 @@ func (h *handler) isTenantOwner(ownerSpec capsulev1alpha1.OwnerSpec, userInfo au
 	return false
 }
 
-type sortedTenants []capsulev1alpha1.Tenant
+type sortedTenants []capsulev1beta1.Tenant
 
 func (s sortedTenants) Len() int {
 	return len(s)

@@ -5,11 +5,11 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	"github.com/clastix/capsule/api/v1alpha1"
+	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
 	"github.com/clastix/capsule/pkg/utils"
 )
 
-func RequestFromOwnerOrSA(tenant v1alpha1.Tenant, req admission.Request, userGroups []string) bool {
+func RequestFromOwnerOrSA(tenant capsulev1beta1.Tenant, req admission.Request, userGroups []string) bool {
 	switch {
 	case tenant.Spec.Owner.Kind == "User" && req.UserInfo.Username == tenant.Spec.Owner.Name:
 		return true

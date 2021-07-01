@@ -12,8 +12,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	apiutils "github.com/clastix/capsule/api/utils"
-	"github.com/clastix/capsule/api/v1alpha1"
+	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
 	capsulewebhook "github.com/clastix/capsule/pkg/webhook"
 	"github.com/clastix/capsule/pkg/webhook/utils"
 )
@@ -31,7 +30,7 @@ func (r *imagePullPolicy) OnCreate(c client.Client, decoder *admission.Decoder, 
 			return utils.ErroredResponse(err)
 		}
 
-		var tntList = &v1alpha1.TenantList{}
+		var tntList = &capsulev1beta1.TenantList{}
 		if err := c.List(ctx, tntList, client.MatchingFieldsSelector{
 			Selector: fields.OneTermEqualSelector(".status.namespaces", pod.Namespace),
 		}); err != nil {
@@ -44,7 +43,7 @@ func (r *imagePullPolicy) OnCreate(c client.Client, decoder *admission.Decoder, 
 
 		tnt := tntList.Items[0]
 
-		policy := apiutils.NewImagePullPolicy(&tnt)
+		policy := NewPullPolicy(&tnt)
 		// if Tenant doesn't enforce the pull policy, exit
 		if policy == nil {
 			return nil

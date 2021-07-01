@@ -7,20 +7,20 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/clastix/capsule/api/v1alpha1"
+	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
 )
 
 type storageClassNotValid struct {
-	spec v1alpha1.AllowedListSpec
+	spec capsulev1beta1.AllowedListSpec
 }
 
-func NewStorageClassNotValid(storageClasses v1alpha1.AllowedListSpec) error {
+func NewStorageClassNotValid(storageClasses capsulev1beta1.AllowedListSpec) error {
 	return &storageClassNotValid{
 		spec: storageClasses,
 	}
 }
 
-func appendError(spec v1alpha1.AllowedListSpec) (append string) {
+func appendError(spec capsulev1beta1.AllowedListSpec) (append string) {
 	if len(spec.Exact) > 0 {
 		append += fmt.Sprintf(", one of the following (%s)", strings.Join(spec.Exact, ", "))
 	}
@@ -36,10 +36,10 @@ func (s storageClassNotValid) Error() (err string) {
 
 type storageClassForbidden struct {
 	className string
-	spec      v1alpha1.AllowedListSpec
+	spec      capsulev1beta1.AllowedListSpec
 }
 
-func NewStorageClassForbidden(className string, storageClasses v1alpha1.AllowedListSpec) error {
+func NewStorageClassForbidden(className string, storageClasses capsulev1beta1.AllowedListSpec) error {
 	return &storageClassForbidden{
 		className: className,
 		spec:      storageClasses,

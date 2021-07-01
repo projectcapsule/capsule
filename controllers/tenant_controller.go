@@ -30,7 +30,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	capsulev1alpha1 "github.com/clastix/capsule/api/v1alpha1"
+	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
 	"github.com/clastix/capsule/controllers/rbac"
 )
 
@@ -44,7 +44,7 @@ type TenantReconciler struct {
 
 func (r *TenantReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&capsulev1alpha1.Tenant{}).
+		For(&capsulev1beta1.Tenant{}).
 		Owns(&corev1.Namespace{}).
 		Owns(&networkingv1.NetworkPolicy{}).
 		Owns(&corev1.LimitRange{}).
@@ -57,7 +57,7 @@ func (r TenantReconciler) Reconcile(ctx context.Context, request ctrl.Request) (
 	r.Log = r.Log.WithValues("Request.Name", request.Name)
 
 	// Fetch the Tenant instance
-	instance := &capsulev1alpha1.Tenant{}
+	instance := &capsulev1beta1.Tenant{}
 	err = r.Get(ctx, request.NamespacedName, instance)
 	if err != nil {
 		if errors.IsNotFound(err) {
@@ -81,22 +81,28 @@ func (r TenantReconciler) Reconcile(ctx context.Context, request ctrl.Request) (
 		return
 	}
 
-	r.Log.Info("Starting processing of Network Policies", "items", len(instance.Spec.NetworkPolicies))
-	if err = r.syncNetworkPolicies(instance); err != nil {
-		r.Log.Error(err, "Cannot sync NetworkPolicy items")
-		return
+	if instance.Spec.NetworkPolicies != nil {
+		r.Log.Info("Starting processing of Network Policies", "items", len(instance.Spec.NetworkPolicies.Items))
+		if err = r.syncNetworkPolicies(instance); err != nil {
+			r.Log.Error(err, "Cannot sync NetworkPolicy items")
+			return
+		}
 	}
 
-	r.Log.Info("Starting processing of Limit Ranges", "items", len(instance.Spec.LimitRanges))
-	if err = r.syncLimitRanges(instance); err != nil {
-		r.Log.Error(err, "Cannot sync LimitRange items")
-		return
+	if instance.Spec.LimitRanges != nil {
+		r.Log.Info("Starting processing of Limit Ranges", "items", len(instance.Spec.LimitRanges.Items))
+		if err = r.syncLimitRanges(instance); err != nil {
+			r.Log.Error(err, "Cannot sync LimitRange items")
+			return
+		}
 	}
 
-	r.Log.Info("Starting processing of Resource Quotas", "items", len(instance.Spec.ResourceQuota))
-	if err = r.syncResourceQuotas(instance); err != nil {
-		r.Log.Error(err, "Cannot sync ResourceQuota items")
-		return
+	if instance.Spec.ResourceQuota != nil {
+		r.Log.Info("Starting processing of Resource Quotas", "items", len(instance.Spec.ResourceQuota.Items))
+		if err = r.syncResourceQuotas(instance); err != nil {
+			r.Log.Error(err, "Cannot sync ResourceQuota items")
+			return
+		}
 	}
 
 	r.Log.Info("Ensuring additional RoleBindings for owner")
@@ -124,7 +130,7 @@ func (r TenantReconciler) Reconcile(ctx context.Context, request ctrl.Request) (
 // pruningResources is taking care of removing the no more requested sub-resources as LimitRange, ResourceQuota or
 // NetworkPolicy using the "exists" and "notin" LabelSelector to perform an outer-join removal.
 func (r *TenantReconciler) pruningResources(ns string, keys []string, obj client.Object) error {
-	capsuleLabel, err := capsulev1alpha1.GetTypeLabel(obj)
+	capsuleLabel, err := capsulev1beta1.GetTypeLabel(obj)
 	if err != nil {
 		return err
 	}
@@ -180,8 +186,8 @@ func (r *TenantReconciler) resourceQuotasUpdate(resourceName corev1.ResourceName
 						found.Annotations = make(map[string]string)
 					}
 					found.Labels = rq.Labels
-					found.Annotations[capsulev1alpha1.UsedQuotaFor(resourceName)] = actual.String()
-					found.Annotations[capsulev1alpha1.HardQuotaFor(resourceName)] = limit.String()
+					found.Annotations[capsulev1beta1.UsedQuotaFor(resourceName)] = actual.String()
+					found.Annotations[capsulev1beta1.HardQuotaFor(resourceName)] = limit.String()
 					// Updating the Resource according to the actual.Cmp result
 					found.Spec.Hard = rq.Spec.Hard
 					return nil
@@ -204,9 +210,9 @@ func (r *TenantReconciler) resourceQuotasUpdate(resourceName corev1.ResourceName
 
 // Additional Role Bindings can be used in many ways: applying Pod Security Policies or giving
 // access to CRDs or specific API groups.
-func (r *TenantReconciler) syncAdditionalRoleBindings(tenant *capsulev1alpha1.Tenant) (err error) {
+func (r *TenantReconciler) syncAdditionalRoleBindings(tenant *capsulev1beta1.Tenant) (err error) {
 	// hashing the RoleBinding name due to DNS RFC-1123 applied to Kubernetes labels
-	hash := func(binding capsulev1alpha1.AdditionalRoleBindingsSpec) string {
+	hash := func(binding capsulev1beta1.AdditionalRoleBindingsSpec) string {
 		h := fnv.New64a()
 
 		_, _ = h.Write([]byte(binding.ClusterRoleName))
@@ -224,11 +230,11 @@ func (r *TenantReconciler) syncAdditionalRoleBindings(tenant *capsulev1alpha1.Te
 	}
 
 	var tl, ll string
-	tl, err = capsulev1alpha1.GetTypeLabel(&capsulev1alpha1.Tenant{})
+	tl, err = capsulev1beta1.GetTypeLabel(&capsulev1beta1.Tenant{})
 	if err != nil {
 		return
 	}
-	ll, err = capsulev1alpha1.GetTypeLabel(&rbacv1.RoleBinding{})
+	ll, err = capsulev1beta1.GetTypeLabel(&rbacv1.RoleBinding{})
 	if err != nil {
 		return
 	}
@@ -284,19 +290,19 @@ func (r *TenantReconciler) syncAdditionalRoleBindings(tenant *capsulev1alpha1.Te
 // .Status.Used value as the .Hard value.
 // This will trigger a following reconciliation but that's ok: the mutateFn will re-use the same business logic, letting
 // the mutateFn along with the CreateOrUpdate to don't perform the update since resources are identical.
-func (r *TenantReconciler) syncResourceQuotas(tenant *capsulev1alpha1.Tenant) error {
+func (r *TenantReconciler) syncResourceQuotas(tenant *capsulev1beta1.Tenant) error {
 	// getting requested ResourceQuota keys
-	keys := make([]string, 0, len(tenant.Spec.ResourceQuota))
-	for i := range tenant.Spec.ResourceQuota {
+	keys := make([]string, 0, len(tenant.Spec.ResourceQuota.Items))
+	for i := range tenant.Spec.ResourceQuota.Items {
 		keys = append(keys, strconv.Itoa(i))
 	}
 
 	// getting ResourceQuota labels for the mutateFn
-	tenantLabel, err := capsulev1alpha1.GetTypeLabel(&capsulev1alpha1.Tenant{})
+	tenantLabel, err := capsulev1beta1.GetTypeLabel(&capsulev1beta1.Tenant{})
 	if err != nil {
 		return err
 	}
-	typeLabel, err := capsulev1alpha1.GetTypeLabel(&corev1.ResourceQuota{})
+	typeLabel, err := capsulev1beta1.GetTypeLabel(&corev1.ResourceQuota{})
 	if err != nil {
 		return err
 	}
@@ -305,7 +311,7 @@ func (r *TenantReconciler) syncResourceQuotas(tenant *capsulev1alpha1.Tenant) er
 		if err := r.pruningResources(ns, keys, &corev1.ResourceQuota{}); err != nil {
 			return err
 		}
-		for i, q := range tenant.Spec.ResourceQuota {
+		for i, q := range tenant.Spec.ResourceQuota.Items {
 			target := &corev1.ResourceQuota{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      fmt.Sprintf("capsule-%s-%d", tenant.Name, i),
@@ -407,19 +413,19 @@ func (r *TenantReconciler) syncResourceQuotas(tenant *capsulev1alpha1.Tenant) er
 }
 
 // Ensuring all the LimitRange are applied to each Namespace handled by the Tenant.
-func (r *TenantReconciler) syncLimitRanges(tenant *capsulev1alpha1.Tenant) error {
+func (r *TenantReconciler) syncLimitRanges(tenant *capsulev1beta1.Tenant) error {
 	// getting requested LimitRange keys
-	keys := make([]string, 0, len(tenant.Spec.LimitRanges))
-	for i := range tenant.Spec.LimitRanges {
+	keys := make([]string, 0, len(tenant.Spec.LimitRanges.Items))
+	for i := range tenant.Spec.LimitRanges.Items {
 		keys = append(keys, strconv.Itoa(i))
 	}
 
 	// getting LimitRange labels for the mutateFn
-	tl, err := capsulev1alpha1.GetTypeLabel(&capsulev1alpha1.Tenant{})
+	tl, err := capsulev1beta1.GetTypeLabel(&capsulev1beta1.Tenant{})
 	if err != nil {
 		return err
 	}
-	ll, err := capsulev1alpha1.GetTypeLabel(&corev1.LimitRange{})
+	ll, err := capsulev1beta1.GetTypeLabel(&corev1.LimitRange{})
 	if err != nil {
 		return err
 	}
@@ -428,7 +434,7 @@ func (r *TenantReconciler) syncLimitRanges(tenant *capsulev1alpha1.Tenant) error
 		if err := r.pruningResources(ns, keys, &corev1.LimitRange{}); err != nil {
 			return err
 		}
-		for i, spec := range tenant.Spec.LimitRanges {
+		for i, spec := range tenant.Spec.LimitRanges.Items {
 			t := &corev1.LimitRange{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      fmt.Sprintf("capsule-%s-%d", tenant.Name, i),
@@ -456,7 +462,7 @@ func (r *TenantReconciler) syncLimitRanges(tenant *capsulev1alpha1.Tenant) error
 	return nil
 }
 
-func (r *TenantReconciler) syncNamespaceMetadata(namespace string, tnt *capsulev1alpha1.Tenant) (err error) {
+func (r *TenantReconciler) syncNamespaceMetadata(namespace string, tnt *capsulev1beta1.Tenant) (err error) {
 	var res controllerutil.OperationResult
 
 	err = retry.RetryOnConflict(retry.DefaultBackoff, func() (conflictErr error) {
@@ -468,8 +474,10 @@ func (r *TenantReconciler) syncNamespaceMetadata(namespace string, tnt *capsulev
 		res, conflictErr = controllerutil.CreateOrUpdate(context.TODO(), r.Client, ns, func() error {
 			a := make(map[string]string)
 
-			for k, v := range tnt.Spec.NamespacesMetadata.AdditionalAnnotations {
-				a[k] = v
+			if tnt.Spec.NamespacesMetadata != nil {
+				for k, v := range tnt.Spec.NamespacesMetadata.AdditionalAnnotations {
+					a[k] = v
+				}
 			}
 
 			if tnt.Spec.NodeSelector != nil {
@@ -482,28 +490,28 @@ func (r *TenantReconciler) syncNamespaceMetadata(namespace string, tnt *capsulev
 
 			if tnt.Spec.IngressClasses != nil {
 				if len(tnt.Spec.IngressClasses.Exact) > 0 {
-					a[capsulev1alpha1.AvailableIngressClassesAnnotation] = strings.Join(tnt.Spec.IngressClasses.Exact, ",")
+					a[capsulev1beta1.AvailableIngressClassesAnnotation] = strings.Join(tnt.Spec.IngressClasses.Exact, ",")
 				}
 				if len(tnt.Spec.IngressClasses.Regex) > 0 {
-					a[capsulev1alpha1.AvailableIngressClassesRegexpAnnotation] = tnt.Spec.IngressClasses.Regex
+					a[capsulev1beta1.AvailableIngressClassesRegexpAnnotation] = tnt.Spec.IngressClasses.Regex
 				}
 			}
 
 			if tnt.Spec.StorageClasses != nil {
 				if len(tnt.Spec.StorageClasses.Exact) > 0 {
-					a[capsulev1alpha1.AvailableStorageClassesAnnotation] = strings.Join(tnt.Spec.StorageClasses.Exact, ",")
+					a[capsulev1beta1.AvailableStorageClassesAnnotation] = strings.Join(tnt.Spec.StorageClasses.Exact, ",")
 				}
 				if len(tnt.Spec.StorageClasses.Regex) > 0 {
-					a[capsulev1alpha1.AvailableStorageClassesRegexpAnnotation] = tnt.Spec.StorageClasses.Regex
+					a[capsulev1beta1.AvailableStorageClassesRegexpAnnotation] = tnt.Spec.StorageClasses.Regex
 				}
 			}
 
 			if tnt.Spec.ContainerRegistries != nil {
 				if len(tnt.Spec.ContainerRegistries.Exact) > 0 {
-					a[capsulev1alpha1.AllowedRegistriesAnnotation] = strings.Join(tnt.Spec.ContainerRegistries.Exact, ",")
+					a[capsulev1beta1.AllowedRegistriesAnnotation] = strings.Join(tnt.Spec.ContainerRegistries.Exact, ",")
 				}
 				if len(tnt.Spec.ContainerRegistries.Regex) > 0 {
-					a[capsulev1alpha1.AllowedRegistriesRegexpAnnotation] = tnt.Spec.ContainerRegistries.Regex
+					a[capsulev1beta1.AllowedRegistriesRegexpAnnotation] = tnt.Spec.ContainerRegistries.Regex
 				}
 			}
 
@@ -511,12 +519,14 @@ func (r *TenantReconciler) syncNamespaceMetadata(namespace string, tnt *capsulev
 
 			l := make(map[string]string)
 
-			for k, v := range tnt.Spec.NamespacesMetadata.AdditionalLabels {
-				l[k] = v
+			if tnt.Spec.NamespacesMetadata != nil {
+				for k, v := range tnt.Spec.NamespacesMetadata.AdditionalLabels {
+					l[k] = v
+				}
 			}
 
 			l["name"] = namespace
-			capsuleLabel, _ := capsulev1alpha1.GetTypeLabel(&capsulev1alpha1.Tenant{})
+			capsuleLabel, _ := capsulev1beta1.GetTypeLabel(&capsulev1beta1.Tenant{})
 			l[capsuleLabel] = tnt.GetName()
 			ns.SetLabels(l)
 
@@ -532,7 +542,7 @@ func (r *TenantReconciler) syncNamespaceMetadata(namespace string, tnt *capsulev
 }
 
 // Ensuring all annotations are applied to each Namespace handled by the Tenant.
-func (r *TenantReconciler) syncNamespaces(tenant *capsulev1alpha1.Tenant) (err error) {
+func (r *TenantReconciler) syncNamespaces(tenant *capsulev1beta1.Tenant) (err error) {
 	group := errgroup.Group{}
 
 	for _, item := range tenant.Status.Namespaces {
@@ -550,19 +560,19 @@ func (r *TenantReconciler) syncNamespaces(tenant *capsulev1alpha1.Tenant) (err e
 }
 
 // Ensuring all the NetworkPolicies are applied to each Namespace handled by the Tenant.
-func (r *TenantReconciler) syncNetworkPolicies(tenant *capsulev1alpha1.Tenant) error {
+func (r *TenantReconciler) syncNetworkPolicies(tenant *capsulev1beta1.Tenant) error {
 	// getting requested NetworkPolicy keys
-	keys := make([]string, 0, len(tenant.Spec.NetworkPolicies))
-	for i := range tenant.Spec.NetworkPolicies {
+	keys := make([]string, 0, len(tenant.Spec.NetworkPolicies.Items))
+	for i := range tenant.Spec.NetworkPolicies.Items {
 		keys = append(keys, strconv.Itoa(i))
 	}
 
 	// getting NetworkPolicy labels for the mutateFn
-	tl, err := capsulev1alpha1.GetTypeLabel(&capsulev1alpha1.Tenant{})
+	tl, err := capsulev1beta1.GetTypeLabel(&capsulev1beta1.Tenant{})
 	if err != nil {
 		return err
 	}
-	nl, err := capsulev1alpha1.GetTypeLabel(&networkingv1.NetworkPolicy{})
+	nl, err := capsulev1beta1.GetTypeLabel(&networkingv1.NetworkPolicy{})
 	if err != nil {
 		return err
 	}
@@ -571,7 +581,7 @@ func (r *TenantReconciler) syncNetworkPolicies(tenant *capsulev1alpha1.Tenant) e
 		if err := r.pruningResources(ns, keys, &networkingv1.NetworkPolicy{}); err != nil {
 			return err
 		}
-		for i, spec := range tenant.Spec.NetworkPolicies {
+		for i, spec := range tenant.Spec.NetworkPolicies.Items {
 			t := &networkingv1.NetworkPolicy{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      fmt.Sprintf("capsule-%s-%d", tenant.Name, i),
@@ -604,9 +614,9 @@ func (r *TenantReconciler) syncNetworkPolicies(tenant *capsulev1alpha1.Tenant) e
 // Since RBAC is based on deny all first, some specific actions like editing Capsule resources are going to be blocked
 // via Dynamic Admission Webhooks.
 // TODO(prometherion): we could create a capsule:admin role rather than hitting webhooks for each action
-func (r *TenantReconciler) ownerRoleBinding(tenant *capsulev1alpha1.Tenant) error {
+func (r *TenantReconciler) ownerRoleBinding(tenant *capsulev1beta1.Tenant) error {
 	// getting RoleBinding label for the mutateFn
-	tl, err := capsulev1alpha1.GetTypeLabel(&capsulev1alpha1.Tenant{})
+	tl, err := capsulev1beta1.GetTypeLabel(&capsulev1beta1.Tenant{})
 	if err != nil {
 		return err
 	}
@@ -659,10 +669,10 @@ func (r *TenantReconciler) ownerRoleBinding(tenant *capsulev1alpha1.Tenant) erro
 	return nil
 }
 
-func (r *TenantReconciler) ensureNamespaceCount(tenant *capsulev1alpha1.Tenant) error {
+func (r *TenantReconciler) ensureNamespaceCount(tenant *capsulev1beta1.Tenant) error {
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		tenant.Status.Size = uint(len(tenant.Status.Namespaces))
-		found := &capsulev1alpha1.Tenant{}
+		found := &capsulev1beta1.Tenant{}
 		if err := r.Client.Get(context.TODO(), types.NamespacedName{Name: tenant.GetName()}, found); err != nil {
 			return err
 		}
@@ -681,7 +691,7 @@ func (r *TenantReconciler) emitEvent(object runtime.Object, namespace string, re
 	r.Recorder.AnnotatedEventf(object, map[string]string{"OperationResult": string(res)}, eventType, namespace, msg)
 }
 
-func (r *TenantReconciler) collectNamespaces(tenant *capsulev1alpha1.Tenant) error {
+func (r *TenantReconciler) collectNamespaces(tenant *capsulev1beta1.Tenant) error {
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
 		nl := &corev1.NamespaceList{}
 		err = r.Client.List(context.TODO(), nl, client.MatchingFieldsSelector{

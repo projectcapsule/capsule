@@ -11,7 +11,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	"github.com/clastix/capsule/api/v1alpha1"
+	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
 	capsulewebhook "github.com/clastix/capsule/pkg/webhook"
 	"github.com/clastix/capsule/pkg/webhook/utils"
 )
@@ -25,7 +25,7 @@ func NameHandler() capsulewebhook.Handler {
 
 func (h *nameHandler) OnCreate(_ client.Client, decoder *admission.Decoder, _ record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		tenant := &v1alpha1.Tenant{}
+		tenant := &capsulev1beta1.Tenant{}
 		if err := decoder.Decode(req, tenant); err != nil {
 			return utils.ErroredResponse(err)
 		}

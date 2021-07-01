@@ -13,7 +13,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	"github.com/clastix/capsule/api/v1alpha1"
+	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
+
 	"github.com/clastix/capsule/pkg/configuration"
 	capsulewebhook "github.com/clastix/capsule/pkg/webhook"
 	"github.com/clastix/capsule/pkg/webhook/utils"
@@ -34,7 +35,7 @@ func (r *hostnames) OnCreate(c client.Client, decoder *admission.Decoder, record
 			return utils.ErroredResponse(err)
 		}
 
-		var tenant *v1alpha1.Tenant
+		var tenant *capsulev1beta1.Tenant
 
 		tenant, err = tenantFromIngress(ctx, c, ingress)
 		if err != nil {
@@ -70,7 +71,7 @@ func (r *hostnames) OnUpdate(c client.Client, decoder *admission.Decoder, record
 			return utils.ErroredResponse(err)
 		}
 
-		var tenant *v1alpha1.Tenant
+		var tenant *capsulev1beta1.Tenant
 
 		tenant, err = tenantFromIngress(ctx, c, ingress)
 		if err != nil {
@@ -103,7 +104,7 @@ func (r *hostnames) OnDelete(client.Client, *admission.Decoder, record.EventReco
 	}
 }
 
-func (r *hostnames) validateHostnames(tenant v1alpha1.Tenant, hostnames []string) error {
+func (r *hostnames) validateHostnames(tenant capsulev1beta1.Tenant, hostnames []string) error {
 	if tenant.Spec.IngressHostnames == nil {
 		return nil
 	}
@@ -113,7 +114,7 @@ func (r *hostnames) validateHostnames(tenant v1alpha1.Tenant, hostnames []string
 	var invalidHostnames []string
 	if len(hostnames) > 0 {
 		for _, currentHostname := range hostnames {
-			isPresent := v1alpha1.IngressHostnamesList(tenant.Spec.IngressHostnames.Exact).IsStringInList(currentHostname)
+			isPresent := HostnamesList(tenant.Spec.IngressHostnames.Exact).IsStringInList(currentHostname)
 			if !isPresent {
 				invalidHostnames = append(invalidHostnames, currentHostname)
 			}

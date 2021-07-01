@@ -23,7 +23,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
-	"github.com/clastix/capsule/api/v1alpha1"
+	capsulev1alpha1 "github.com/clastix/capsule/api/v1alpha1"
 	"github.com/clastix/capsule/pkg/configuration"
 )
 
@@ -79,7 +79,7 @@ func (r *Manager) SetupWithManager(mgr ctrl.Manager, configurationName string) (
 				return r.filterByNames(genericEvent.Object.GetName())
 			},
 		})).
-		Watches(source.NewKindWithCache(&v1alpha1.CapsuleConfiguration{}, mgr.GetCache()), handler.Funcs{
+		Watches(source.NewKindWithCache(&capsulev1alpha1.CapsuleConfiguration{}, mgr.GetCache()), handler.Funcs{
 			UpdateFunc: func(updateEvent event.UpdateEvent, limitingInterface workqueue.RateLimitingInterface) {
 				if updateEvent.ObjectNew.GetName() == configurationName {
 					if crbErr := r.EnsureClusterRoleBindings(); crbErr != nil {

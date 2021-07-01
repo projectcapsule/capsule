@@ -6,14 +6,14 @@ package tenant
 import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/clastix/capsule/api/v1alpha1"
+	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
 )
 
 type NamespacesReference struct {
 }
 
 func (o NamespacesReference) Object() client.Object {
-	return &v1alpha1.Tenant{}
+	return &capsulev1beta1.Tenant{}
 }
 
 func (o NamespacesReference) Field() string {
@@ -22,6 +22,6 @@ func (o NamespacesReference) Field() string {
 
 func (o NamespacesReference) Func() client.IndexerFunc {
 	return func(object client.Object) []string {
-		return object.(*v1alpha1.Tenant).DeepCopy().Status.Namespaces
+		return object.(*capsulev1beta1.Tenant).DeepCopy().Status.Namespaces
 	}
 }
