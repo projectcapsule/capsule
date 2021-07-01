@@ -7,11 +7,7 @@ import (
 	"io/ioutil"
 
 	ctrl "sigs.k8s.io/controller-runtime"
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
-
-// log is for logging in this package.
-var tenantlog = logf.Log.WithName("tenant-resource")
 
 func (t *Tenant) SetupWebhookWithManager(mgr ctrl.Manager) error {
 	certData, _ := ioutil.ReadFile("/tmp/k8s-webhook-server/serving-certs/tls.crt")
