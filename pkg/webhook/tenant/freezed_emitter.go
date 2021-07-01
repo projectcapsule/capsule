@@ -11,7 +11,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	"github.com/clastix/capsule/api/v1alpha1"
+	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
 	capsulewebhook "github.com/clastix/capsule/pkg/webhook"
 	"github.com/clastix/capsule/pkg/webhook/utils"
 )
@@ -37,12 +37,12 @@ func (h *freezedEmitterHandler) OnDelete(client.Client, *admission.Decoder, reco
 
 func (h *freezedEmitterHandler) OnUpdate(_ client.Client, decoder *admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		oldTnt := &v1alpha1.Tenant{}
+		oldTnt := &capsulev1beta1.Tenant{}
 		if err := decoder.DecodeRaw(req.OldObject, oldTnt); err != nil {
 			return utils.ErroredResponse(err)
 		}
 
-		newTnt := &v1alpha1.Tenant{}
+		newTnt := &capsulev1beta1.Tenant{}
 		if err := decoder.Decode(req, newTnt); err != nil {
 			return utils.ErroredResponse(err)
 		}

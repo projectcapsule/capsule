@@ -13,7 +13,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	"github.com/clastix/capsule/api/v1alpha1"
+	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
 	"github.com/clastix/capsule/pkg/configuration"
 	capsulewebhook "github.com/clastix/capsule/pkg/webhook"
 	"github.com/clastix/capsule/pkg/webhook/utils"
@@ -28,14 +28,14 @@ func HostnamesCollisionHandler(configuration configuration.Configuration) capsul
 }
 
 func (h *hostnamesCollisionHandler) validateTenant(ctx context.Context, req admission.Request, clt client.Client, decoder *admission.Decoder) *admission.Response {
-	tenant := &v1alpha1.Tenant{}
+	tenant := &capsulev1beta1.Tenant{}
 	if err := decoder.Decode(req, tenant); err != nil {
 		return utils.ErroredResponse(err)
 	}
 
 	if !h.configuration.AllowTenantIngressHostnamesCollision() && tenant.Spec.IngressHostnames != nil && len(tenant.Spec.IngressHostnames.Exact) > 0 {
 		for _, h := range tenant.Spec.IngressHostnames.Exact {
-			tntList := &v1alpha1.TenantList{}
+			tntList := &capsulev1beta1.TenantList{}
 			if err := clt.List(ctx, tntList, client.MatchingFieldsSelector{
 				Selector: fields.OneTermEqualSelector(".spec.ingressHostnames", h),
 			}); err != nil {

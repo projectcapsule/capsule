@@ -7,15 +7,15 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/clastix/capsule/api/v1alpha1"
+	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
 )
 
 type ingressClassForbidden struct {
 	className string
-	spec      v1alpha1.AllowedListSpec
+	spec      capsulev1beta1.AllowedListSpec
 }
 
-func NewIngressClassForbidden(className string, spec v1alpha1.AllowedListSpec) error {
+func NewIngressClassForbidden(className string, spec capsulev1beta1.AllowedListSpec) error {
 	return &ingressClassForbidden{
 		className: className,
 		spec:      spec,
@@ -29,7 +29,7 @@ func (i ingressClassForbidden) Error() string {
 type ingressHostnameNotValid struct {
 	invalidHostnames     []string
 	notMatchingHostnames []string
-	spec                 v1alpha1.AllowedListSpec
+	spec                 capsulev1beta1.AllowedListSpec
 }
 
 type ingressHostnameCollision struct {
@@ -44,7 +44,7 @@ func NewIngressHostnameCollision(hostname string) error {
 	return ingressHostnameCollision{hostname: hostname}
 }
 
-func NewIngressHostnamesNotValid(invalidHostnames []string, notMatchingHostnames []string, spec v1alpha1.AllowedListSpec) error {
+func NewIngressHostnamesNotValid(invalidHostnames []string, notMatchingHostnames []string, spec capsulev1beta1.AllowedListSpec) error {
 	return &ingressHostnameNotValid{invalidHostnames: invalidHostnames, notMatchingHostnames: notMatchingHostnames, spec: spec}
 }
 
@@ -54,10 +54,10 @@ func (i ingressHostnameNotValid) Error() string {
 }
 
 type ingressClassNotValid struct {
-	spec v1alpha1.AllowedListSpec
+	spec capsulev1beta1.AllowedListSpec
 }
 
-func NewIngressClassNotValid(spec v1alpha1.AllowedListSpec) error {
+func NewIngressClassNotValid(spec capsulev1beta1.AllowedListSpec) error {
 	return &ingressClassNotValid{
 		spec: spec,
 	}
@@ -67,7 +67,7 @@ func (i ingressClassNotValid) Error() string {
 	return "A valid Ingress Class must be used" + appendClassError(i.spec)
 }
 
-func appendClassError(spec v1alpha1.AllowedListSpec) (append string) {
+func appendClassError(spec capsulev1beta1.AllowedListSpec) (append string) {
 	if len(spec.Exact) > 0 {
 		append += fmt.Sprintf(", one of the following (%s)", strings.Join(spec.Exact, ", "))
 	}
@@ -77,7 +77,7 @@ func appendClassError(spec v1alpha1.AllowedListSpec) (append string) {
 	return
 }
 
-func appendHostnameError(spec v1alpha1.AllowedListSpec) (append string) {
+func appendHostnameError(spec capsulev1beta1.AllowedListSpec) (append string) {
 	if len(spec.Exact) > 0 {
 		append += fmt.Sprintf(", specify one of the following (%s)", strings.Join(spec.Exact, ", "))
 	}

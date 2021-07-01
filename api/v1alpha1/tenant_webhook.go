@@ -4,6 +4,8 @@
 package v1alpha1
 
 import (
+	"io/ioutil"
+
 	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -12,9 +14,12 @@ import (
 var tenantlog = logf.Log.WithName("tenant-resource")
 
 func (t *Tenant) SetupWebhookWithManager(mgr ctrl.Manager) error {
+	certData, _ := ioutil.ReadFile("/tmp/k8s-webhook-server/serving-certs/tls.crt")
+	if len(certData) == 0 {
+		return nil
+	}
+
 	return ctrl.NewWebhookManagedBy(mgr).
 		For(t).
 		Complete()
 }
-
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!

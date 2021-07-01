@@ -11,8 +11,10 @@ import (
 
 	"github.com/go-logr/logr"
 	"golang.org/x/sync/errgroup"
-	v1 "k8s.io/api/admissionregistration/v1"
+	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	corev1 "k8s.io/api/core/v1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
@@ -37,10 +39,45 @@ func (r *CAReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
+// By default helm doesn't allow to use templates in CRD (https://helm.sh/docs/chart_best_practices/custom_resource_definitions/#method-1-let-helm-do-it-for-you).
+// In order to overcome this, we are setting conversion strategy in helm chart to None, and then update it with CA and namespace information.
+func (r CAReconciler) UpdateCustomResourceDefinition(caBundle []byte) error {
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
+		crd := &apiextensionsv1.CustomResourceDefinition{}
+		err = r.Get(context.TODO(), types.NamespacedName{Name: "tenants.capsule.clastix.io"}, crd)
+		if err != nil {
+			r.Log.Error(err, "cannot retrieve CustomResourceDefinition")
+			return err
+		}
+
+		if crd.Spec.Conversion.Strategy == "None" {
+			var path = "/convert"
+			var port int32 = 443
+			crd.Spec.Conversion = &apiextensionsv1.CustomResourceConversion{
+				Strategy: "Webhook",
+				Webhook: &apiextensionsv1.WebhookConversion{
+					ClientConfig: &apiextensionsv1.WebhookClientConfig{
+						Service: &apiextensionsv1.ServiceReference{
+							Namespace: r.Namespace,
+							Name:      "capsule-webhook-service",
+							Path:      &path,
+							Port:      &port,
+						},
+						CABundle: caBundle,
+					},
+					ConversionReviewVersions: []string{"v1alpha1", "v1beta1"},
+				},
+			}
+		}
+
+		return r.Update(context.TODO(), crd, &client.UpdateOptions{})
+	})
+}
+
 //nolint:dupl
 func (r CAReconciler) UpdateValidatingWebhookConfiguration(caBundle []byte) error {
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
-		vw := &v1.ValidatingWebhookConfiguration{}
+		vw := &admissionregistrationv1.ValidatingWebhookConfiguration{}
 		err = r.Get(context.TODO(), types.NamespacedName{Name: "capsule-validating-webhook-configuration"}, vw)
 		if err != nil {
 			r.Log.Error(err, "cannot retrieve ValidatingWebhookConfiguration")
@@ -59,7 +96,7 @@ func (r CAReconciler) UpdateValidatingWebhookConfiguration(caBundle []byte) erro
 //nolint:dupl
 func (r CAReconciler) UpdateMutatingWebhookConfiguration(caBundle []byte) error {
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
-		mw := &v1.MutatingWebhookConfiguration{}
+		mw := &admissionregistrationv1.MutatingWebhookConfiguration{}
 		err = r.Get(context.TODO(), types.NamespacedName{Name: "capsule-mutating-webhook-configuration"}, mw)
 		if err != nil {
 			r.Log.Error(err, "cannot retrieve MutatingWebhookConfiguration")
@@ -126,6 +163,9 @@ func (r CAReconciler) Reconcile(ctx context.Context, request ctrl.Request) (ctrl
 		})
 		group.Go(func() error {
 			return r.UpdateValidatingWebhookConfiguration(crt.Bytes())
+		})
+		group.Go(func() error {
+			return r.UpdateCustomResourceDefinition(crt.Bytes())
 		})
 
 		if err = group.Wait(); err != nil {

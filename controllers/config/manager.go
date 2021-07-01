@@ -15,7 +15,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	"github.com/clastix/capsule/api/v1alpha1"
+	capsulev1alpha1 "github.com/clastix/capsule/api/v1alpha1"
 	"github.com/clastix/capsule/pkg/configuration"
 )
 
@@ -54,7 +54,7 @@ func forOptionPerInstanceName(instanceName string) builder.ForOption {
 
 func (r *Manager) SetupWithManager(mgr ctrl.Manager, configurationName string) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&v1alpha1.CapsuleConfiguration{}, forOptionPerInstanceName(configurationName)).
+		For(&capsulev1alpha1.CapsuleConfiguration{}, forOptionPerInstanceName(configurationName)).
 		Complete(r)
 }
 
