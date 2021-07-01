@@ -21,7 +21,8 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	capsulev1alpha "github.com/clastix/capsule/api/v1alpha1"
+	capsulev1alpha1 "github.com/clastix/capsule/api/v1alpha1"
+	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
 )
 
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to
@@ -32,12 +33,6 @@ var (
 	k8sClient              client.Client
 	testEnv                *envtest.Environment
 	tenantRoleBindingNames = []string{"namespace:admin", "namespace-deleter"}
-)
-
-const (
-	capsuleDeploymentName       = "capsule-controller-manager"
-	capsuleNamespace            = "capsule-system"
-	capsuleManagerContainerName = "manager"
 )
 
 func TestAPIs(t *testing.T) {
@@ -64,7 +59,10 @@ var _ = BeforeSuite(func(done Done) {
 	Expect(err).ToNot(HaveOccurred())
 	Expect(cfg).ToNot(BeNil())
 
-	err = capsulev1alpha.AddToScheme(scheme.Scheme)
+	err = capsulev1beta1.AddToScheme(scheme.Scheme)
+	Expect(err).NotTo(HaveOccurred())
+
+	err = capsulev1alpha1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
 	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
@@ -79,10 +77,10 @@ var _ = AfterSuite(func() {
 	Expect(testEnv.Stop()).ToNot(HaveOccurred())
 })
 
-func ownerClient(tenant *capsulev1alpha.Tenant) (cs kubernetes.Interface) {
+func ownerClient(tenant *capsulev1beta1.Tenant) (cs kubernetes.Interface) {
 	c, err := config.GetConfig()
 	Expect(err).ToNot(HaveOccurred())
-	c.Impersonate.Groups = []string{capsulev1alpha.GroupVersion.Group, tenant.Spec.Owner.Name}
+	c.Impersonate.Groups = []string{capsulev1beta1.GroupVersion.Group, tenant.Spec.Owner.Name}
 	c.Impersonate.UserName = tenant.Spec.Owner.Name
 	cs, err = kubernetes.NewForConfig(c)
 	Expect(err).ToNot(HaveOccurred())

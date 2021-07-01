@@ -14,16 +14,18 @@ import (
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/clastix/capsule/api/v1alpha1"
+	capsulev1alpha1 "github.com/clastix/capsule/api/v1alpha1"
+
+	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
 )
 
 var _ = Describe("when handling Ingress hostnames collision", func() {
-	tnt := &v1alpha1.Tenant{
+	tnt := &capsulev1beta1.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "ingress-hostnames-allowed-collision",
 		},
-		Spec: v1alpha1.TenantSpec{
-			Owner: v1alpha1.OwnerSpec{
+		Spec: capsulev1beta1.TenantSpec{
+			Owner: capsulev1beta1.OwnerSpec{
 				Name: "ingress-allowed",
 				Kind: "User",
 			},
@@ -68,7 +70,7 @@ var _ = Describe("when handling Ingress hostnames collision", func() {
 			return k8sClient.Create(context.TODO(), tnt)
 		}).Should(Succeed())
 
-		ModifyCapsuleConfigurationOpts(func(configuration *v1alpha1.CapsuleConfiguration) {
+		ModifyCapsuleConfigurationOpts(func(configuration *capsulev1alpha1.CapsuleConfiguration) {
 			configuration.Spec.AllowIngressHostnameCollision = true
 		})
 	})
@@ -76,13 +78,13 @@ var _ = Describe("when handling Ingress hostnames collision", func() {
 	JustAfterEach(func() {
 		Expect(k8sClient.Delete(context.TODO(), tnt)).Should(Succeed())
 
-		ModifyCapsuleConfigurationOpts(func(configuration *v1alpha1.CapsuleConfiguration) {
+		ModifyCapsuleConfigurationOpts(func(configuration *capsulev1alpha1.CapsuleConfiguration) {
 			configuration.Spec.AllowIngressHostnameCollision = false
 		})
 	})
 
 	It("should not allow creating several Ingress with same hostname", func() {
-		ModifyCapsuleConfigurationOpts(func(configuration *v1alpha1.CapsuleConfiguration) {
+		ModifyCapsuleConfigurationOpts(func(configuration *capsulev1alpha1.CapsuleConfiguration) {
 			configuration.Spec.AllowIngressHostnameCollision = false
 		})
 

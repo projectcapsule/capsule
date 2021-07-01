@@ -12,27 +12,27 @@ import (
 	. "github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/clastix/capsule/api/v1alpha1"
+	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
 )
 
 var _ = Describe("creating a Namespace with Tenant selector when user owns multiple tenants", func() {
-	t1 := &v1alpha1.Tenant{
+	t1 := &capsulev1beta1.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "tenant-one",
 		},
-		Spec: v1alpha1.TenantSpec{
-			Owner: v1alpha1.OwnerSpec{
+		Spec: capsulev1beta1.TenantSpec{
+			Owner: capsulev1beta1.OwnerSpec{
 				Name: "john",
 				Kind: "User",
 			},
 		},
 	}
-	t2 := &v1alpha1.Tenant{
+	t2 := &capsulev1beta1.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "tenant-two",
 		},
-		Spec: v1alpha1.TenantSpec{
-			Owner: v1alpha1.OwnerSpec{
+		Spec: capsulev1beta1.TenantSpec{
+			Owner: capsulev1beta1.OwnerSpec{
 				Name: "john",
 				Kind: "User",
 			},
@@ -55,7 +55,7 @@ var _ = Describe("creating a Namespace with Tenant selector when user owns multi
 	It("should be assigned to the selected Tenant", func() {
 		ns := NewNamespace("tenant-2-ns")
 		By("assigning to the Namespace the Capsule Tenant label", func() {
-			l, err := v1alpha1.GetTypeLabel(&v1alpha1.Tenant{})
+			l, err := capsulev1beta1.GetTypeLabel(&capsulev1beta1.Tenant{})
 			Expect(err).ToNot(HaveOccurred())
 			ns.Labels = map[string]string{
 				l: t2.Name,

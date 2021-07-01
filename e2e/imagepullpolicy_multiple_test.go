@@ -13,22 +13,20 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/clastix/capsule/api/v1alpha1"
+	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
 )
 
 var _ = Describe("enforcing some defined ImagePullPolicy", func() {
-	tnt := &v1alpha1.Tenant{
+	tnt := &capsulev1beta1.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "image-pull-policies",
-			Annotations: map[string]string{
-				"capsule.clastix.io/allowed-image-pull-policy": "Always,IfNotPresent",
-			},
 		},
-		Spec: v1alpha1.TenantSpec{
-			Owner: v1alpha1.OwnerSpec{
+		Spec: capsulev1beta1.TenantSpec{
+			Owner: capsulev1beta1.OwnerSpec{
 				Name: "alex",
 				Kind: "User",
 			},
+			ImagePullPolicies: []capsulev1beta1.ImagePullPolicySpec{"Always", "IfNotPresent"},
 		},
 	}
 
@@ -57,8 +55,8 @@ var _ = Describe("enforcing some defined ImagePullPolicy", func() {
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
 						{
-							Name:  "container",
-							Image: "gcr.io/google_containers/pause-amd64:3.0",
+							Name:            "container",
+							Image:           "gcr.io/google_containers/pause-amd64:3.0",
 							ImagePullPolicy: corev1.PullAlways,
 						},
 					},
@@ -72,7 +70,6 @@ var _ = Describe("enforcing some defined ImagePullPolicy", func() {
 			}).Should(Succeed())
 		})
 
-
 		By("allowing IfNotPresent", func() {
 			pod := &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
@@ -81,8 +78,8 @@ var _ = Describe("enforcing some defined ImagePullPolicy", func() {
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
 						{
-							Name:  "container",
-							Image: "gcr.io/google_containers/pause-amd64:3.0",
+							Name:            "container",
+							Image:           "gcr.io/google_containers/pause-amd64:3.0",
 							ImagePullPolicy: corev1.PullIfNotPresent,
 						},
 					},
@@ -104,8 +101,8 @@ var _ = Describe("enforcing some defined ImagePullPolicy", func() {
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
 						{
-							Name:  "container",
-							Image: "gcr.io/google_containers/pause-amd64:3.0",
+							Name:            "container",
+							Image:           "gcr.io/google_containers/pause-amd64:3.0",
 							ImagePullPolicy: corev1.PullNever,
 						},
 					},

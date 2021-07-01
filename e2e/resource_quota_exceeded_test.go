@@ -18,20 +18,20 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/pointer"
 
-	"github.com/clastix/capsule/api/v1alpha1"
+	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
 )
 
 var _ = Describe("exceeding a Tenant resource quota", func() {
-	tnt := &v1alpha1.Tenant{
+	tnt := &capsulev1beta1.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "tenant-resources-changes",
 		},
-		Spec: v1alpha1.TenantSpec{
-			Owner: v1alpha1.OwnerSpec{
+		Spec: capsulev1beta1.TenantSpec{
+			Owner: capsulev1beta1.OwnerSpec{
 				Name: "bobby",
 				Kind: "User",
 			},
-			LimitRanges: []corev1.LimitRangeSpec{
+			LimitRanges: &capsulev1beta1.LimitRangesSpec{Items: []corev1.LimitRangeSpec{
 				{
 					Limits: []corev1.LimitRangeItem{
 						{
@@ -76,7 +76,8 @@ var _ = Describe("exceeding a Tenant resource quota", func() {
 					},
 				},
 			},
-			ResourceQuota: []corev1.ResourceQuotaSpec{
+			},
+			ResourceQuota: &capsulev1beta1.ResourceQuotaSpec{Items: []corev1.ResourceQuotaSpec{
 				{
 					Hard: map[corev1.ResourceName]resource.Quantity{
 						corev1.ResourceLimitsCPU:      resource.MustParse("8"),
@@ -98,6 +99,7 @@ var _ = Describe("exceeding a Tenant resource quota", func() {
 						corev1.ResourceRequestsStorage: resource.MustParse("100Gi"),
 					},
 				},
+			},
 			},
 		},
 	}
