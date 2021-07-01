@@ -6,11 +6,11 @@ package v1alpha1
 import (
 	"sigs.k8s.io/controller-runtime/pkg/conversion"
 
-	"github.com/clastix/capsule/api/v1beta1"
+	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
 )
 
 func (t *Tenant) ConvertTo(dstRaw conversion.Hub) error {
-	dst := dstRaw.(*v1beta1.Tenant)
+	dst := dstRaw.(*capsulev1beta1.Tenant)
 
 	println(dst)
 
@@ -18,7 +18,7 @@ func (t *Tenant) ConvertTo(dstRaw conversion.Hub) error {
 }
 
 func (t *Tenant) ConvertFrom(srcRaw conversion.Hub) error {
-	src := srcRaw.(*v1beta1.Tenant)
+	src := srcRaw.(*capsulev1beta1.Tenant)
 
 	println(src)
 

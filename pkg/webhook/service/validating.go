@@ -14,13 +14,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	"github.com/clastix/capsule/api/v1alpha1"
+	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
 	capsulewebhook "github.com/clastix/capsule/pkg/webhook"
 	"github.com/clastix/capsule/pkg/webhook/utils"
-)
-
-const (
-	enableNodePortsAnnotation = "capsule.clastix.io/enable-node-ports"
 )
 
 type handler struct{}
@@ -35,7 +31,7 @@ func (r *handler) handleService(ctx context.Context, clt client.Client, decoder 
 		return utils.ErroredResponse(err)
 	}
 
-	tntList := &v1alpha1.TenantList{}
+	tntList := &capsulev1beta1.TenantList{}
 	if err := clt.List(ctx, tntList, client.MatchingFieldsSelector{
 		Selector: fields.OneTermEqualSelector(".status.namespaces", svc.GetNamespace()),
 	}); err != nil {
@@ -48,7 +44,7 @@ func (r *handler) handleService(ctx context.Context, clt client.Client, decoder 
 
 	tnt := tntList.Items[0]
 
-	if svc.Spec.Type == corev1.ServiceTypeNodePort && tnt.GetAnnotations()[enableNodePortsAnnotation] == "false" {
+	if svc.Spec.Type == corev1.ServiceTypeNodePort && !tnt.Spec.EnableNodePorts {
 		recorder.Eventf(&tnt, corev1.EventTypeWarning, "ForbiddenNodePort", "Service %s/%s cannot be type of NodePort for the current Tenant", req.Namespace, req.Name)
 
 		response := admission.Denied(NewNodePortDisabledError().Error())

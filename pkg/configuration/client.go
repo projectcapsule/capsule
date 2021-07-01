@@ -12,23 +12,23 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/clastix/capsule/api/v1alpha1"
+	capsulev1alpha1 "github.com/clastix/capsule/api/v1alpha1"
 )
 
 // capsuleConfiguration is the Capsule Configuration retrieval mode
 // using a closure that provides the desired configuration.
 type capsuleConfiguration struct {
-	retrievalFn func() *v1alpha1.CapsuleConfiguration
+	retrievalFn func() *capsulev1alpha1.CapsuleConfiguration
 }
 
 func NewCapsuleConfiguration(client client.Client, name string) Configuration {
-	return &capsuleConfiguration{retrievalFn: func() *v1alpha1.CapsuleConfiguration {
-		config := &v1alpha1.CapsuleConfiguration{}
+	return &capsuleConfiguration{retrievalFn: func() *capsulev1alpha1.CapsuleConfiguration {
+		config := &capsulev1alpha1.CapsuleConfiguration{}
 
 		if err := client.Get(context.Background(), types.NamespacedName{Name: name}, config); err != nil {
 			if machineryerr.IsNotFound(err) {
-				return &v1alpha1.CapsuleConfiguration{
-					Spec: v1alpha1.CapsuleConfigurationSpec{
+				return &capsulev1alpha1.CapsuleConfiguration{
+					Spec: capsulev1alpha1.CapsuleConfigurationSpec{
 						UserGroups:                           []string{"capsule.clastix.io"},
 						ForceTenantPrefix:                    false,
 						ProtectedNamespaceRegexpString:       "",

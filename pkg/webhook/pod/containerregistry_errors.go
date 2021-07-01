@@ -8,15 +8,15 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/clastix/capsule/api/v1alpha1"
+	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
 )
 
 type registryClassForbidden struct {
 	fqdi string
-	spec v1alpha1.AllowedListSpec
+	spec capsulev1beta1.AllowedListSpec
 }
 
-func NewContainerRegistryForbidden(image string, spec v1alpha1.AllowedListSpec) error {
+func NewContainerRegistryForbidden(image string, spec capsulev1beta1.AllowedListSpec) error {
 	return &registryClassForbidden{
 		fqdi: image,
 		spec: spec,

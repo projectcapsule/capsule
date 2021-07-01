@@ -13,7 +13,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	"github.com/clastix/capsule/api/v1alpha1"
+	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
 	capsulewebhook "github.com/clastix/capsule/pkg/webhook"
 	"github.com/clastix/capsule/pkg/webhook/utils"
 )
@@ -31,7 +31,7 @@ func (r *handler) OnCreate(client.Client, *admission.Decoder, record.EventRecord
 	}
 }
 
-func (r *handler) generic(ctx context.Context, req admission.Request, client client.Client, _ *admission.Decoder) (*v1alpha1.Tenant, error) {
+func (r *handler) generic(ctx context.Context, req admission.Request, client client.Client, _ *admission.Decoder) (*capsulev1beta1.Tenant, error) {
 	var err error
 	np := &networkingv1.NetworkPolicy{}
 	err = client.Get(ctx, types.NamespacedName{Namespace: req.AdmissionRequest.Namespace, Name: req.AdmissionRequest.Name}, np)
@@ -39,9 +39,9 @@ func (r *handler) generic(ctx context.Context, req admission.Request, client cli
 		return nil, err
 	}
 
-	tnt := &v1alpha1.Tenant{}
+	tnt := &capsulev1beta1.Tenant{}
 
-	l, _ := v1alpha1.GetTypeLabel(&v1alpha1.Tenant{})
+	l, _ := capsulev1beta1.GetTypeLabel(&capsulev1beta1.Tenant{})
 	if v, ok := np.GetLabels()[l]; ok {
 		if err = client.Get(ctx, types.NamespacedName{Name: v}, tnt); err != nil {
 			return nil, err

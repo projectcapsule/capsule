@@ -12,8 +12,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	apiutils "github.com/clastix/capsule/api/utils"
-	capsulev1alpha1 "github.com/clastix/capsule/api/v1alpha1"
+	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
 	capsulewebhook "github.com/clastix/capsule/pkg/webhook"
 	"github.com/clastix/capsule/pkg/webhook/utils"
 )
@@ -32,7 +31,7 @@ func (h *priorityClass) OnCreate(c client.Client, decoder *admission.Decoder, re
 			return utils.ErroredResponse(err)
 		}
 
-		var tntList = &capsulev1alpha1.TenantList{}
+		var tntList = &capsulev1beta1.TenantList{}
 
 		if err := c.List(ctx, tntList, client.MatchingFieldsSelector{
 			Selector: fields.OneTermEqualSelector(".status.namespaces", pod.Namespace),
@@ -44,8 +43,7 @@ func (h *priorityClass) OnCreate(c client.Client, decoder *admission.Decoder, re
 			return nil
 		}
 
-		var allowed = apiutils.NewPodPriority(&tntList.Items[0])
-
+		allowed := tntList.Items[0].Spec.PriorityClasses
 		var priorityClassName = pod.Spec.PriorityClassName
 
 		switch {

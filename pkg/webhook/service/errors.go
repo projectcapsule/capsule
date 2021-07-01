@@ -7,14 +7,14 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/clastix/capsule/api/v1alpha1"
+	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
 )
 
 type externalServiceIPForbidden struct {
 	cidr []string
 }
 
-func NewExternalServiceIPForbidden(allowedIps []v1alpha1.AllowedIP) error {
+func NewExternalServiceIPForbidden(allowedIps []capsulev1beta1.AllowedIP) error {
 	var cidr []string
 	for _, i := range allowedIps {
 		cidr = append(cidr, string(i))

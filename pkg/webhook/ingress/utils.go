@@ -14,11 +14,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	capsulev1alpha1 "github.com/clastix/capsule/api/v1alpha1"
+	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
 )
 
-func tenantFromIngress(ctx context.Context, c client.Client, ingress Ingress) (*capsulev1alpha1.Tenant, error) {
-	tenantList := &capsulev1alpha1.TenantList{}
+func tenantFromIngress(ctx context.Context, c client.Client, ingress Ingress) (*capsulev1beta1.Tenant, error) {
+	tenantList := &capsulev1beta1.TenantList{}
 	if err := c.List(ctx, tenantList, client.MatchingFieldsSelector{
 		Selector: fields.OneTermEqualSelector(".status.namespaces", ingress.Namespace()),
 	}); err != nil {
