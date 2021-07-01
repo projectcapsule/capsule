@@ -38,7 +38,6 @@ func NewPullPolicy(tenant *capsulev1beta1.Tenant) PullPolicy {
 		return nil
 	}
 
-
 	var allowedPolicies []string
 	for _, policy := range tenant.Spec.ImagePullPolicies {
 		allowedPolicies = append(allowedPolicies, policy.String())
