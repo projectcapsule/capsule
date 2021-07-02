@@ -39,6 +39,7 @@ Bill, at Acme Corp. can use Capsule to address any of the following scenarios:
 * [Taint Namespaces](./taint-namespaces.md)
 * [Assign multiple Tenants to an owner](./multiple-tenants.md)
 * [Cordoning a Tenant](./cordoning-tenant.md)
+* [Velero Backup Restoration](./velero-backup-restoration.md)
 
 > NB: as we improve Capsule, more use cases about multi-tenancy and cluster governance will be covered.
 

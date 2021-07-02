@@ -14,6 +14,11 @@ KUBECFGFILE="~/.kube/config"
 KUBEOPTIONS="--kubeconfig=$KUBECFGFILE"
 TMPDIR=/tmp
 
+# Print usage to stdout.
+# Arguments:
+#   None
+# Outputs:
+#   print usage with examples.
 usage () {
    printf "Usage: $0 [flags] commands\n" 
    printf "Flags:\n" 
