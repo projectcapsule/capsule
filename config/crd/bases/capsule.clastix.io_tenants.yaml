@@ -567,6 +567,10 @@ spec:
     subresources:
       status: {}
   - additionalPrinterColumns:
+    - description: The actual state of the Tenant
+      jsonPath: .status.state
+      name: State
+      type: string
     - description: The max amount of Namespaces can be created
       jsonPath: .spec.namespaceQuota
       name: Namespace quota
@@ -1135,8 +1139,15 @@ spec:
                 type: array
               size:
                 type: integer
+              state:
+                default: active
+                enum:
+                - cordoned
+                - active
+                type: string
             required:
             - size
+            - state
             type: object
         type: object
     served: true
