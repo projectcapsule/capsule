@@ -32,16 +32,11 @@ type TenantSpec struct {
 	EnableNodePorts bool `json:"enableNodePorts,omitempty"`
 }
 
-// TenantStatus defines the observed state of Tenant
-type TenantStatus struct {
-	Size       uint     `json:"size"`
-	Namespaces []string `json:"namespaces,omitempty"`
-}
-
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 //+kubebuilder:storageversion
 // +kubebuilder:resource:scope=Cluster,shortName=tnt
+// +kubebuilder:printcolumn:name="State",type="string",JSONPath=".status.state",description="The actual state of the Tenant"
 // +kubebuilder:printcolumn:name="Namespace quota",type="integer",JSONPath=".spec.namespaceQuota",description="The max amount of Namespaces can be created"
 // +kubebuilder:printcolumn:name="Namespace count",type="integer",JSONPath=".status.size",description="The total amount of Namespaces in use"
 // +kubebuilder:printcolumn:name="Owner name",type="string",JSONPath=".spec.owner.name",description="The assigned Tenant owner"
