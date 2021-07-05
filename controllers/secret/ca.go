@@ -14,10 +14,10 @@ import (
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	corev1 "k8s.io/api/core/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
+	"k8s.io/utils/pointer"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -41,7 +41,7 @@ func (r *CAReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 // By default helm doesn't allow to use templates in CRD (https://helm.sh/docs/chart_best_practices/custom_resource_definitions/#method-1-let-helm-do-it-for-you).
 // In order to overcome this, we are setting conversion strategy in helm chart to None, and then update it with CA and namespace information.
-func (r CAReconciler) UpdateCustomResourceDefinition(caBundle []byte) error {
+func (r *CAReconciler) UpdateCustomResourceDefinition(caBundle []byte) error {
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
 		crd := &apiextensionsv1.CustomResourceDefinition{}
 		err = r.Get(context.TODO(), types.NamespacedName{Name: "tenants.capsule.clastix.io"}, crd)
@@ -50,9 +50,7 @@ func (r CAReconciler) UpdateCustomResourceDefinition(caBundle []byte) error {
 			return err
 		}
 
-		if crd.Spec.Conversion.Strategy == "None" {
-			var path = "/convert"
-			var port int32 = 443
+		_, err = controllerutil.CreateOrUpdate(context.TODO(), r.Client, crd, func() error {
 			crd.Spec.Conversion = &apiextensionsv1.CustomResourceConversion{
 				Strategy: "Webhook",
 				Webhook: &apiextensionsv1.WebhookConversion{
@@ -60,17 +58,19 @@ func (r CAReconciler) UpdateCustomResourceDefinition(caBundle []byte) error {
 						Service: &apiextensionsv1.ServiceReference{
 							Namespace: r.Namespace,
 							Name:      "capsule-webhook-service",
-							Path:      &path,
-							Port:      &port,
+							Path:      pointer.StringPtr("/convert"),
+							Port:      pointer.Int32Ptr(443),
 						},
 						CABundle: caBundle,
 					},
 					ConversionReviewVersions: []string{"v1alpha1", "v1beta1"},
 				},
 			}
-		}
 
-		return r.Update(context.TODO(), crd, &client.UpdateOptions{})
+			return nil
+		})
+
+		return err
 	})
 }
 
