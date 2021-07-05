@@ -67,6 +67,11 @@ func (r TenantReconciler) Reconcile(ctx context.Context, request ctrl.Request) (
 		r.Log.Error(err, "Error reading the object")
 		return
 	}
+	// Ensuring the Tenant Status
+	if err = r.updateTenantStatus(instance); err != nil {
+		r.Log.Error(err, "Cannot update Tenant status")
+		return
+	}
 
 	// Ensuring all namespaces are collected
 	r.Log.Info("Ensuring all Namespaces are collected")
@@ -706,5 +711,17 @@ func (r *TenantReconciler) collectNamespaces(tenant *capsulev1beta1.Tenant) erro
 			return r.Client.Status().Update(context.TODO(), tenant, &client.UpdateOptions{})
 		})
 		return
+	})
+}
+
+func (r *TenantReconciler) updateTenantStatus(tnt *capsulev1beta1.Tenant) error {
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
+		if tnt.IsCordoned() {
+			tnt.Status.State = capsulev1beta1.TenantStateCordoned
+		} else {
+			tnt.Status.State = capsulev1beta1.TenantStateActive
+		}
+
+		return r.Client.Status().Update(context.Background(), tnt)
 	})
 }
