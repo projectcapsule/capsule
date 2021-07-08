@@ -35,8 +35,8 @@ func NewNamespace(name string) *corev1.Namespace {
 	}
 }
 
-func NamespaceCreation(ns *corev1.Namespace, t *capsulev1beta1.Tenant, timeout time.Duration) AsyncAssertion {
-	cs := ownerClient(t)
+func NamespaceCreation(ns *corev1.Namespace, owner capsulev1beta1.OwnerSpec, timeout time.Duration) AsyncAssertion {
+	cs := ownerClient(owner)
 	return Eventually(func() (err error) {
 		_, err = cs.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
 		return
@@ -68,11 +68,15 @@ func ModifyCapsuleConfigurationOpts(fn func(configuration *capsulev1alpha1.Capsu
 func KindInTenantRoleBindingAssertions(ns *corev1.Namespace, timeout time.Duration) (out []AsyncAssertion) {
 	for _, rbn := range tenantRoleBindingNames {
 		rb := &rbacv1.RoleBinding{}
-		out = append(out, Eventually(func() string {
+		out = append(out, Eventually(func() []string {
 			if err := k8sClient.Get(context.TODO(), types.NamespacedName{Name: rbn, Namespace: ns.GetName()}, rb); err != nil {
-				return ""
+				return nil
 			}
-			return rb.Subjects[0].Kind
+			var subjects []string
+			for _, subject := range rb.Subjects {
+				subjects = append(subjects, subject.Kind)
+			}
+			return subjects
 		}, timeout, defaultPollInterval))
 	}
 	return

@@ -22,9 +22,11 @@ var _ = Describe("creating a Namespace in over-quota of three", func() {
 			Name: "over-quota-tenant",
 		},
 		Spec: capsulev1beta1.TenantSpec{
-			Owner: capsulev1beta1.OwnerSpec{
-				Name: "bob",
-				Kind: "User",
+			Owners: []capsulev1beta1.OwnerSpec{
+				{
+					Name: "bob",
+					Kind: "User",
+				},
 			},
 			NamespaceQuota: pointer.Int32Ptr(3),
 		},
@@ -43,13 +45,13 @@ var _ = Describe("creating a Namespace in over-quota of three", func() {
 		By("creating three Namespaces", func() {
 			for _, name := range []string{"bob-dev", "bob-staging", "bob-production"} {
 				ns := NewNamespace(name)
-				NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
+				NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 				TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 			}
 		})
 
 		ns := NewNamespace("bob-fail")
-		cs := ownerClient(tnt)
+		cs := ownerClient(tnt.Spec.Owners[0])
 		_, err := cs.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
 		Expect(err).ShouldNot(Succeed())
 	})

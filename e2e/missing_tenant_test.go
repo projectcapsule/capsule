@@ -19,14 +19,16 @@ var _ = Describe("creating a Namespace creation with no Tenant assigned", func()
 	It("should fail", func() {
 		tnt := &capsulev1beta1.Tenant{
 			Spec: capsulev1beta1.TenantSpec{
-				Owner: capsulev1beta1.OwnerSpec{
-					Name: "missing",
-					Kind: "User",
+				Owners: []capsulev1beta1.OwnerSpec{
+					{
+						Name: "missing",
+						Kind: "User",
+					},
 				},
 			},
 		}
 		ns := NewNamespace("no-namespace")
-		cs := ownerClient(tnt)
+		cs := ownerClient(tnt.Spec.Owners[0])
 		_, err := cs.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
 		Expect(err).ShouldNot(Succeed())
 	})

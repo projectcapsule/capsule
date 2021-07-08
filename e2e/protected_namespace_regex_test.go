@@ -23,9 +23,11 @@ var _ = Describe("creating a Namespace with a protected Namespace regex enabled"
 			Name: "tenant-protected-namespace",
 		},
 		Spec: capsulev1beta1.TenantSpec{
-			Owner: capsulev1beta1.OwnerSpec{
-				Name: "alice",
-				Kind: "User",
+			Owners: []capsulev1beta1.OwnerSpec{
+				{
+					Name: "alice",
+					Kind: "User",
+				},
 			},
 		},
 	}
@@ -47,13 +49,13 @@ var _ = Describe("creating a Namespace with a protected Namespace regex enabled"
 
 		ns := NewNamespace("test-ok")
 
-		NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 	})
 
 	It("should fail using a value non matching the regex", func() {
 		ns := NewNamespace("test-system")
-		NamespaceCreation(ns, tnt, defaultTimeoutInterval).ShouldNot(Succeed())
+		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).ShouldNot(Succeed())
 
 		ModifyCapsuleConfigurationOpts(func(configuration *capsulev1alpha1.CapsuleConfiguration) {
 			configuration.Spec.ProtectedNamespaceRegexpString = ""

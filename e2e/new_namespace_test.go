@@ -15,21 +15,32 @@ import (
 	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
 )
 
-var _ = Describe("creating a Namespace as Tenant owner", func() {
+var _ = Describe("creating a Namespaces as different type of Tenant owners", func() {
 	tnt := &capsulev1beta1.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "tenant-assigned",
 		},
 		Spec: capsulev1beta1.TenantSpec{
-			Owner: capsulev1beta1.OwnerSpec{
-				Name: "alice",
-				Kind: "User",
+			Owners: []capsulev1beta1.OwnerSpec{
+				{
+					Name: "alice",
+					Kind: "User",
+				},
+				{
+					Name: "bob",
+					Kind: "Group",
+				},
+				{
+					Name: "system:serviceaccount:new-namespace-sa:default",
+					Kind: "ServiceAccount",
+				},
 			},
 		},
 	}
 
 	JustBeforeEach(func() {
 		EventuallyCreation(func() error {
+			tnt.ResourceVersion = ""
 			return k8sClient.Create(context.TODO(), tnt)
 		}).Should(Succeed())
 	})
@@ -37,9 +48,28 @@ var _ = Describe("creating a Namespace as Tenant owner", func() {
 		Expect(k8sClient.Delete(context.TODO(), tnt)).Should(Succeed())
 	})
 
-	It("should be available in Tenant namespaces list", func() {
-		ns := NewNamespace("new-namespace")
-		NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
-		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
+	It("should be available in Tenant namespaces list and rolebindigs should present when created as User", func() {
+		ns := NewNamespace("new-namespace-user")
+		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElements(ns.GetName()))
+		for _, a := range KindInTenantRoleBindingAssertions(ns, defaultTimeoutInterval) {
+			a.Should(ContainElements("User", "Group", "ServiceAccount"))
+		}
+	})
+	It("should be available in Tenant namespaces list and rolebindigs should present when created as Group", func() {
+		ns := NewNamespace("new-namespace-group")
+		NamespaceCreation(ns, tnt.Spec.Owners[1], defaultTimeoutInterval).Should(Succeed())
+		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElements(ns.GetName()))
+		for _, a := range KindInTenantRoleBindingAssertions(ns, defaultTimeoutInterval) {
+			a.Should(ContainElements("User", "Group", "ServiceAccount"))
+		}
+	})
+	It("should be available in Tenant namespaces list and rolebindigs should present when created as ServiceAccount", func() {
+		ns := NewNamespace("new-namespace-sa")
+		NamespaceCreation(ns, tnt.Spec.Owners[2], defaultTimeoutInterval).Should(Succeed())
+		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElements(ns.GetName()))
+		for _, a := range KindInTenantRoleBindingAssertions(ns, defaultTimeoutInterval) {
+			a.Should(ContainElements("User", "Group", "ServiceAccount"))
+		}
 	})
 })

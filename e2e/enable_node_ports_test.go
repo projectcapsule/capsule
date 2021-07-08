@@ -23,9 +23,11 @@ var _ = Describe("creating a nodePort service when it is enabled for Tenant", fu
 			Name: "enable-node-ports",
 		},
 		Spec: capsulev1beta1.TenantSpec{
-			Owner: capsulev1beta1.OwnerSpec{
-				Name: "google",
-				Kind: "User",
+			Owners: []capsulev1beta1.OwnerSpec{
+				{
+					Name: "google",
+					Kind: "User",
+				},
 			},
 		},
 	}
@@ -42,7 +44,7 @@ var _ = Describe("creating a nodePort service when it is enabled for Tenant", fu
 
 	It("should allow creating a service with NodePort type", func() {
 		ns := NewNamespace("enable-node-ports")
-		NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 
 		svc := &corev1.Service{
 			ObjectMeta: metav1.ObjectMeta{
@@ -64,7 +66,7 @@ var _ = Describe("creating a nodePort service when it is enabled for Tenant", fu
 			},
 		}
 		EventuallyCreation(func() error {
-			cs := ownerClient(tnt)
+			cs := ownerClient(tnt.Spec.Owners[0])
 			_, err := cs.CoreV1().Services(ns.Name).Create(context.Background(), svc, metav1.CreateOptions{})
 			return err
 		}).Should(Succeed())

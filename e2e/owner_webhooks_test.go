@@ -26,9 +26,11 @@ var _ = Describe("when Tenant owner interacts with the webhooks", func() {
 			Name: "tenant-owner",
 		},
 		Spec: capsulev1beta1.TenantSpec{
-			Owner: capsulev1beta1.OwnerSpec{
-				Name: "ruby",
-				Kind: "User",
+			Owners: []capsulev1beta1.OwnerSpec{
+				{
+					Name: "ruby",
+					Kind: "User",
+				},
 			},
 			StorageClasses: &capsulev1beta1.AllowedListSpec{
 				Exact: []string{
@@ -98,7 +100,7 @@ var _ = Describe("when Tenant owner interacts with the webhooks", func() {
 	It("should disallow deletions", func() {
 		By("blocking Capsule Limit ranges", func() {
 			ns := NewNamespace("limit-range-disallow")
-			NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
+			NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 			TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 			lr := &corev1.LimitRange{}
@@ -107,12 +109,12 @@ var _ = Describe("when Tenant owner interacts with the webhooks", func() {
 				return k8sClient.Get(context.TODO(), types.NamespacedName{Name: n, Namespace: ns.GetName()}, lr)
 			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 
-			cs := ownerClient(tnt)
+			cs := ownerClient(tnt.Spec.Owners[0])
 			Expect(cs.CoreV1().LimitRanges(ns.GetName()).Delete(context.TODO(), lr.Name, metav1.DeleteOptions{})).ShouldNot(Succeed())
 		})
 		By("blocking Capsule Network Policy", func() {
 			ns := NewNamespace("network-policy-disallow")
-			NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
+			NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 			TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 			np := &networkingv1.NetworkPolicy{}
@@ -121,12 +123,12 @@ var _ = Describe("when Tenant owner interacts with the webhooks", func() {
 				return k8sClient.Get(context.TODO(), types.NamespacedName{Name: n, Namespace: ns.GetName()}, np)
 			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 
-			cs := ownerClient(tnt)
+			cs := ownerClient(tnt.Spec.Owners[0])
 			Expect(cs.NetworkingV1().NetworkPolicies(ns.GetName()).Delete(context.TODO(), np.Name, metav1.DeleteOptions{})).ShouldNot(Succeed())
 		})
 		By("blocking Capsule Resource Quota", func() {
 			ns := NewNamespace("resource-quota-disallow")
-			NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
+			NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 			TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 			rq := &corev1.ResourceQuota{}
@@ -135,7 +137,7 @@ var _ = Describe("when Tenant owner interacts with the webhooks", func() {
 				return k8sClient.Get(context.TODO(), types.NamespacedName{Name: n, Namespace: ns.GetName()}, rq)
 			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 
-			cs := ownerClient(tnt)
+			cs := ownerClient(tnt.Spec.Owners[0])
 			Expect(cs.NetworkingV1().NetworkPolicies(ns.GetName()).Delete(context.TODO(), rq.Name, metav1.DeleteOptions{})).ShouldNot(Succeed())
 		})
 	})
@@ -143,33 +145,33 @@ var _ = Describe("when Tenant owner interacts with the webhooks", func() {
 	It("should allow", func() {
 		By("listing Limit Range", func() {
 			ns := NewNamespace("limit-range-list")
-			NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
+			NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 			TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 			Eventually(func() (err error) {
-				cs := ownerClient(tnt)
+				cs := ownerClient(tnt.Spec.Owners[0])
 				_, err = cs.CoreV1().LimitRanges(ns.GetName()).List(context.TODO(), metav1.ListOptions{})
 				return
 			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		})
 		By("listing Network Policy", func() {
 			ns := NewNamespace("network-policy-list")
-			NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
+			NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 			TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 			Eventually(func() (err error) {
-				cs := ownerClient(tnt)
+				cs := ownerClient(tnt.Spec.Owners[0])
 				_, err = cs.NetworkingV1().NetworkPolicies(ns.GetName()).List(context.TODO(), metav1.ListOptions{})
 				return
 			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		})
 		By("listing Resource Quota", func() {
 			ns := NewNamespace("resource-quota-list")
-			NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
+			NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 			TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 			Eventually(func() (err error) {
-				cs := ownerClient(tnt)
+				cs := ownerClient(tnt.Spec.Owners[0])
 				_, err = cs.NetworkingV1().NetworkPolicies(ns.GetName()).List(context.TODO(), metav1.ListOptions{})
 				return
 			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
@@ -178,10 +180,10 @@ var _ = Describe("when Tenant owner interacts with the webhooks", func() {
 
 	It("should allow all actions to Tenant owner Network Policy", func() {
 		ns := NewNamespace("network-policy-allow")
-		NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
-		cs := ownerClient(tnt)
+		cs := ownerClient(tnt.Spec.Owners[0])
 		np := &networkingv1.NetworkPolicy{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "custom-network-policy",

@@ -25,9 +25,11 @@ var _ = Describe("when handling Ingress hostnames collision", func() {
 			Name: "ingress-hostnames-denied-collision",
 		},
 		Spec: capsulev1beta1.TenantSpec{
-			Owner: capsulev1beta1.OwnerSpec{
-				Name: "ingress-denied",
-				Kind: "User",
+			Owners: []capsulev1beta1.OwnerSpec{
+				{
+					Name: "ingress-denied",
+					Kind: "User",
+				},
 			},
 		},
 	}
@@ -85,9 +87,9 @@ var _ = Describe("when handling Ingress hostnames collision", func() {
 		maj, min, _ := GetKubernetesSemVer()
 
 		ns := NewNamespace("allowed-collision")
-		cs := ownerClient(tnt)
+		cs := ownerClient(tnt.Spec.Owners[0])
 
-		NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 		if maj == 1 && min > 18 {

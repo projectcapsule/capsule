@@ -21,9 +21,11 @@ var _ = Describe("creating a Namespace with Tenant selector when user owns multi
 			Name: "tenant-one",
 		},
 		Spec: capsulev1beta1.TenantSpec{
-			Owner: capsulev1beta1.OwnerSpec{
-				Name: "john",
-				Kind: "User",
+			Owners: []capsulev1beta1.OwnerSpec{
+				{
+					Name: "john",
+					Kind: "User",
+				},
 			},
 		},
 	}
@@ -32,9 +34,11 @@ var _ = Describe("creating a Namespace with Tenant selector when user owns multi
 			Name: "tenant-two",
 		},
 		Spec: capsulev1beta1.TenantSpec{
-			Owner: capsulev1beta1.OwnerSpec{
-				Name: "john",
-				Kind: "User",
+			Owners: []capsulev1beta1.OwnerSpec{
+				{
+					Name: "john",
+					Kind: "User",
+				},
 			},
 		},
 	}
@@ -61,7 +65,7 @@ var _ = Describe("creating a Namespace with Tenant selector when user owns multi
 				l: t2.Name,
 			}
 		})
-		NamespaceCreation(ns, t2, defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreation(ns, t2.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(t2, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 	})
 })

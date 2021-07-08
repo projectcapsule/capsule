@@ -77,11 +77,11 @@ var _ = AfterSuite(func() {
 	Expect(testEnv.Stop()).ToNot(HaveOccurred())
 })
 
-func ownerClient(tenant *capsulev1beta1.Tenant) (cs kubernetes.Interface) {
+func ownerClient(owner capsulev1beta1.OwnerSpec) (cs kubernetes.Interface) {
 	c, err := config.GetConfig()
 	Expect(err).ToNot(HaveOccurred())
-	c.Impersonate.Groups = []string{capsulev1beta1.GroupVersion.Group, tenant.Spec.Owner.Name}
-	c.Impersonate.UserName = tenant.Spec.Owner.Name
+	c.Impersonate.Groups = []string{capsulev1beta1.GroupVersion.Group, owner.Name}
+	c.Impersonate.UserName = owner.Name
 	cs, err = kubernetes.NewForConfig(c)
 	Expect(err).ToNot(HaveOccurred())
 	return

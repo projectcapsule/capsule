@@ -25,9 +25,11 @@ var _ = Describe("when Tenant handles Ingress hostnames", func() {
 			Name: "ingress-hostnames",
 		},
 		Spec: capsulev1beta1.TenantSpec{
-			Owner: capsulev1beta1.OwnerSpec{
-				Name: "hostname",
-				Kind: "User",
+			Owners: []capsulev1beta1.OwnerSpec{
+				{
+					Name: "hostname",
+					Kind: "User",
+				},
 			},
 			IngressHostnames: &capsulev1beta1.AllowedListSpec{
 				Exact: []string{"sigs.k8s.io", "operator.sdk", "domain.tld"},
@@ -118,9 +120,9 @@ var _ = Describe("when Tenant handles Ingress hostnames", func() {
 
 		if maj == 1 && min > 18 {
 			ns := NewNamespace("disallowed-hostname-networking")
-			cs := ownerClient(tnt)
+			cs := ownerClient(tnt.Spec.Owners[0])
 
-			NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
+			NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 			TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 			By("testing networking.k8s.io", func() {
@@ -143,9 +145,9 @@ var _ = Describe("when Tenant handles Ingress hostnames", func() {
 		if maj == 1 && min < 22 {
 			By("testing extensions", func() {
 				ns := NewNamespace("disallowed-hostname-extensions")
-				cs := ownerClient(tnt)
+				cs := ownerClient(tnt.Spec.Owners[0])
 
-				NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
+				NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 				TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 				Eventually(func() (err error) {
@@ -166,9 +168,9 @@ var _ = Describe("when Tenant handles Ingress hostnames", func() {
 
 		if maj == 1 && min > 18 {
 			ns := NewNamespace("allowed-hostname-list-networking")
-			cs := ownerClient(tnt)
+			cs := ownerClient(tnt.Spec.Owners[0])
 
-			NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
+			NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 			TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 			By("testing networking.k8s.io", func() {
@@ -192,9 +194,9 @@ var _ = Describe("when Tenant handles Ingress hostnames", func() {
 
 		if maj == 1 && min < 22 {
 			ns := NewNamespace("allowed-hostname-list-extensions")
-			cs := ownerClient(tnt)
+			cs := ownerClient(tnt.Spec.Owners[0])
 
-			NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
+			NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 			TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 			By("testing extensions", func() {
@@ -218,9 +220,9 @@ var _ = Describe("when Tenant handles Ingress hostnames", func() {
 
 		if maj == 1 && min > 18 {
 			ns := NewNamespace("allowed-hostname-regex-networking")
-			cs := ownerClient(tnt)
+			cs := ownerClient(tnt.Spec.Owners[0])
 
-			NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
+			NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 			TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 			By("testing networking.k8s.io", func() {
@@ -245,9 +247,9 @@ var _ = Describe("when Tenant handles Ingress hostnames", func() {
 		if maj == 1 && min < 22 {
 			By("testing extensions", func() {
 				ns := NewNamespace("allowed-hostname-regex-extensions")
-				cs := ownerClient(tnt)
+				cs := ownerClient(tnt.Spec.Owners[0])
 
-				NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
+				NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 				TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 				for _, h := range []string{"foo", "bar", "bizz"} {

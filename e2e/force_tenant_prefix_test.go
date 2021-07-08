@@ -23,9 +23,11 @@ var _ = Describe("creating a Namespace with Tenant name prefix enforcement", fun
 			Name: "awesome",
 		},
 		Spec: capsulev1beta1.TenantSpec{
-			Owner: capsulev1beta1.OwnerSpec{
-				Name: "john",
-				Kind: "User",
+			Owners: []capsulev1beta1.OwnerSpec{
+				{
+					Name: "john",
+					Kind: "User",
+				},
 			},
 		},
 	}
@@ -34,9 +36,11 @@ var _ = Describe("creating a Namespace with Tenant name prefix enforcement", fun
 			Name: "awesome-tenant",
 		},
 		Spec: capsulev1beta1.TenantSpec{
-			Owner: capsulev1beta1.OwnerSpec{
-				Name: "john",
-				Kind: "User",
+			Owners: []capsulev1beta1.OwnerSpec{
+				{
+					Name: "john",
+					Kind: "User",
+				},
 			},
 		},
 	}
@@ -66,20 +70,20 @@ var _ = Describe("creating a Namespace with Tenant name prefix enforcement", fun
 
 	It("should fail when non using prefix", func() {
 		ns := NewNamespace("awesome")
-		NamespaceCreation(ns, t1, defaultTimeoutInterval).ShouldNot(Succeed())
+		NamespaceCreation(ns, t1.Spec.Owners[0], defaultTimeoutInterval).ShouldNot(Succeed())
 	})
 
 	It("should succeed using prefix", func() {
 		ns := NewNamespace("awesome-namespace")
-		NamespaceCreation(ns, t1, defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreation(ns, t1.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 	})
 
 	It("should succeed and assigned according to closest match", func() {
 		ns1 := NewNamespace("awesome-tenant")
 		ns2 := NewNamespace("awesome-tenant-namespace")
 
-		NamespaceCreation(ns1, t1, defaultTimeoutInterval).Should(Succeed())
-		NamespaceCreation(ns2, t2, defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreation(ns1, t1.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreation(ns2, t2.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 
 		TenantNamespaceList(t1, defaultTimeoutInterval).Should(ContainElement(ns1.GetName()))
 		TenantNamespaceList(t2, defaultTimeoutInterval).Should(ContainElement(ns2.GetName()))
