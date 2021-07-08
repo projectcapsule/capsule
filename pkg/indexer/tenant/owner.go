@@ -24,6 +24,6 @@ func (o OwnerReference) Field() string {
 func (o OwnerReference) Func() client.IndexerFunc {
 	return func(object client.Object) []string {
 		tenant := object.(*capsulev1beta1.Tenant)
-		return []string{utils.GetOwnerWithKind(tenant)}
+		return utils.GetOwnersWithKinds(tenant)
 	}
 }

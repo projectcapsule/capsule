@@ -3,8 +3,15 @@
 
 package utils
 
-import capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
+import (
+	"fmt"
 
-func GetOwnerWithKind(tenant *capsulev1beta1.Tenant) string {
-	return tenant.Spec.Owner.Kind.String() + ":" + tenant.Spec.Owner.Name
+	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
+)
+
+func GetOwnersWithKinds(tenant *capsulev1beta1.Tenant) (owners []string) {
+	for _, owner := range tenant.Spec.Owners {
+		owners = append(owners, fmt.Sprintf("%s:%s", owner.Kind.String(), owner.Name))
+	}
+	return
 }
