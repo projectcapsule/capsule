@@ -9,7 +9,7 @@ import (
 
 // TenantSpec defines the desired state of Tenant
 type TenantSpec struct {
-	Owner OwnerSpec `json:"owner"`
+	Owners []OwnerSpec `json:"owners"`
 
 	//+kubebuilder:validation:Minimum=1
 	NamespaceQuota         *int32                       `json:"namespaceQuota,omitempty"`
@@ -39,8 +39,6 @@ type TenantSpec struct {
 // +kubebuilder:printcolumn:name="State",type="string",JSONPath=".status.state",description="The actual state of the Tenant"
 // +kubebuilder:printcolumn:name="Namespace quota",type="integer",JSONPath=".spec.namespaceQuota",description="The max amount of Namespaces can be created"
 // +kubebuilder:printcolumn:name="Namespace count",type="integer",JSONPath=".status.size",description="The total amount of Namespaces in use"
-// +kubebuilder:printcolumn:name="Owner name",type="string",JSONPath=".spec.owner.name",description="The assigned Tenant owner"
-// +kubebuilder:printcolumn:name="Owner kind",type="string",JSONPath=".spec.owner.kind",description="The assigned Tenant owner kind"
 // +kubebuilder:printcolumn:name="Node selector",type="string",JSONPath=".spec.nodeSelector",description="Node Selector applied to Pods"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp",description="Age"
 

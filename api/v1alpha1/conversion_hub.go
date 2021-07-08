@@ -17,10 +17,111 @@ import (
 
 const (
 	podAllowedImagePullPolicyAnnotation = "capsule.clastix.io/allowed-image-pull-policy"
-	podPriorityAllowedAnnotation        = "priorityclass.capsule.clastix.io/allowed"
-	podPriorityAllowedRegexAnnotation   = "priorityclass.capsule.clastix.io/allowed-regex"
-	enableNodePortsAnnotation           = "capsule.clastix.io/enable-node-ports"
+
+	podPriorityAllowedAnnotation      = "priorityclass.capsule.clastix.io/allowed"
+	podPriorityAllowedRegexAnnotation = "priorityclass.capsule.clastix.io/allowed-regex"
+
+	enableNodePortsAnnotation = "capsule.clastix.io/enable-node-ports"
+
+	ownerGroupsAnnotation         = "owners.capsule.clastix.io/group"
+	ownerUsersAnnotation          = "owners.capsule.clastix.io/user"
+	ownerServiceAccountAnnotation = "owners.capsule.clastix.io/serviceaccount"
+
+	enableNodeListingAnnotation          = "capsule.clastix.io/enable-node-listing"
+	enableNodeUpdateAnnotation           = "capsule.clastix.io/enable-node-update"
+	enableNodeDeletionAnnotation         = "capsule.clastix.io/enable-node-deletion"
+	enableStorageClassListingAnnotation  = "capsule.clastix.io/enable-storageclass-listing"
+	enableStorageClassUpdateAnnotation   = "capsule.clastix.io/enable-storageclass-update"
+	enableStorageClassDeletionAnnotation = "capsule.clastix.io/enable-storageclass-deletion"
+	enableIngressClassListingAnnotation  = "capsule.clastix.io/enable-ingressclass-listing"
+	enableIngressClassUpdateAnnotation   = "capsule.clastix.io/enable-ingressclass-update"
+	enableIngressClassDeletionAnnotation = "capsule.clastix.io/enable-ingressclass-deletion"
+
+	listOperation   = "List"
+	updateOperation = "Update"
+	deleteOperation = "Delete"
+
+	nodesServiceKind          = "Nodes"
+	storageClassesServiceKind = "StorageClasses"
+	ingressClassesServiceKind = "IngressClasses"
 )
+
+func (t *Tenant) convertV1Alpha1OwnerToV1Beta1() []capsulev1beta1.OwnerSpec {
+	var serviceKindToAnnotationMap = map[capsulev1beta1.ProxyServiceKind][]string{
+		nodesServiceKind:          {enableNodeListingAnnotation, enableNodeUpdateAnnotation, enableNodeDeletionAnnotation},
+		storageClassesServiceKind: {enableStorageClassListingAnnotation, enableStorageClassUpdateAnnotation, enableStorageClassDeletionAnnotation},
+		ingressClassesServiceKind: {enableIngressClassListingAnnotation, enableIngressClassUpdateAnnotation, enableIngressClassDeletionAnnotation},
+	}
+	var annotationToOperationMap = map[string]capsulev1beta1.ProxyOperation{
+		enableNodeListingAnnotation:          listOperation,
+		enableNodeUpdateAnnotation:           updateOperation,
+		enableNodeDeletionAnnotation:         deleteOperation,
+		enableStorageClassListingAnnotation:  listOperation,
+		enableStorageClassUpdateAnnotation:   updateOperation,
+		enableStorageClassDeletionAnnotation: deleteOperation,
+		enableIngressClassListingAnnotation:  listOperation,
+		enableIngressClassUpdateAnnotation:   updateOperation,
+		enableIngressClassDeletionAnnotation: deleteOperation,
+	}
+	var annotationToOwnerKindMap = map[string]capsulev1beta1.OwnerKind{
+		ownerUsersAnnotation:          "User",
+		ownerGroupsAnnotation:         "Group",
+		ownerServiceAccountAnnotation: "ServiceAccount",
+	}
+	annotations := t.GetAnnotations()
+
+	var operations = make(map[string]map[capsulev1beta1.ProxyServiceKind][]capsulev1beta1.ProxyOperation)
+
+	for serviceKind, operationAnnotations := range serviceKindToAnnotationMap {
+		for _, operationAnnotation := range operationAnnotations {
+			val, ok := annotations[operationAnnotation]
+			if ok {
+				for _, owner := range strings.Split(val, ",") {
+					if _, exists := operations[owner]; !exists {
+						operations[owner] = make(map[capsulev1beta1.ProxyServiceKind][]capsulev1beta1.ProxyOperation)
+					}
+					operations[owner][serviceKind] = append(operations[owner][serviceKind], annotationToOperationMap[operationAnnotation])
+				}
+			}
+		}
+	}
+
+	var owners []capsulev1beta1.OwnerSpec
+
+	var getProxySettingsForOwner = func(ownerName string) (settings []capsulev1beta1.ProxySettings) {
+		ownerOperations, ok := operations[ownerName]
+		if ok {
+			for k, v := range ownerOperations {
+				settings = append(settings, capsulev1beta1.ProxySettings{
+					Kind:       k,
+					Operations: v,
+				})
+			}
+		}
+		return
+	}
+
+	owners = append(owners, capsulev1beta1.OwnerSpec{
+		Kind:            capsulev1beta1.OwnerKind(t.Spec.Owner.Kind),
+		Name:            t.Spec.Owner.Name,
+		ProxyOperations: getProxySettingsForOwner(t.Spec.Owner.Name),
+	})
+
+	for ownerAnnotation, ownerKind := range annotationToOwnerKindMap {
+		val, ok := annotations[ownerAnnotation]
+		if ok {
+			for _, owner := range strings.Split(val, ",") {
+				owners = append(owners, capsulev1beta1.OwnerSpec{
+					Kind:            ownerKind,
+					Name:            owner,
+					ProxyOperations: getProxySettingsForOwner(owner),
+				})
+			}
+		}
+	}
+
+	return owners
+}
 
 func (t *Tenant) ConvertTo(dstRaw conversion.Hub) error {
 	dst := dstRaw.(*capsulev1beta1.Tenant)
@@ -33,10 +134,7 @@ func (t *Tenant) ConvertTo(dstRaw conversion.Hub) error {
 	dst.Spec.NamespaceQuota = t.Spec.NamespaceQuota
 	dst.Spec.NodeSelector = t.Spec.NodeSelector
 
-	dst.Spec.Owner = capsulev1beta1.OwnerSpec{
-		Name: t.Spec.Owner.Name,
-		Kind: capsulev1beta1.Kind(t.Spec.Owner.Kind),
-	}
+	dst.Spec.Owners = t.convertV1Alpha1OwnerToV1Beta1()
 
 	if t.Spec.NamespacesMetadata != nil {
 		dst.Spec.NamespacesMetadata = &capsulev1beta1.AdditionalMetadataSpec{
@@ -150,8 +248,107 @@ func (t *Tenant) ConvertTo(dstRaw conversion.Hub) error {
 	delete(dst.ObjectMeta.Annotations, podPriorityAllowedAnnotation)
 	delete(dst.ObjectMeta.Annotations, podPriorityAllowedRegexAnnotation)
 	delete(dst.ObjectMeta.Annotations, enableNodePortsAnnotation)
+	delete(dst.ObjectMeta.Annotations, ownerGroupsAnnotation)
+	delete(dst.ObjectMeta.Annotations, ownerUsersAnnotation)
+	delete(dst.ObjectMeta.Annotations, ownerServiceAccountAnnotation)
+	delete(dst.ObjectMeta.Annotations, enableNodeListingAnnotation)
+	delete(dst.ObjectMeta.Annotations, enableNodeUpdateAnnotation)
+	delete(dst.ObjectMeta.Annotations, enableNodeDeletionAnnotation)
+	delete(dst.ObjectMeta.Annotations, enableStorageClassListingAnnotation)
+	delete(dst.ObjectMeta.Annotations, enableStorageClassUpdateAnnotation)
+	delete(dst.ObjectMeta.Annotations, enableStorageClassDeletionAnnotation)
+	delete(dst.ObjectMeta.Annotations, enableIngressClassListingAnnotation)
+	delete(dst.ObjectMeta.Annotations, enableIngressClassUpdateAnnotation)
+	delete(dst.ObjectMeta.Annotations, enableIngressClassDeletionAnnotation)
 
 	return nil
+}
+
+func (t *Tenant) convertV1Beta1OwnerToV1Alpha1(src *capsulev1beta1.Tenant) {
+	var ownersAnnotations = map[string][]string{
+		ownerGroupsAnnotation:         nil,
+		ownerUsersAnnotation:          nil,
+		ownerServiceAccountAnnotation: nil,
+	}
+
+	var proxyAnnotations = map[string][]string{
+		enableNodeListingAnnotation:          nil,
+		enableNodeUpdateAnnotation:           nil,
+		enableNodeDeletionAnnotation:         nil,
+		enableStorageClassListingAnnotation:  nil,
+		enableStorageClassUpdateAnnotation:   nil,
+		enableStorageClassDeletionAnnotation: nil,
+		enableIngressClassListingAnnotation:  nil,
+		enableIngressClassUpdateAnnotation:   nil,
+		enableIngressClassDeletionAnnotation: nil,
+	}
+
+
+	for i, owner := range src.Spec.Owners {
+		if i == 0 {
+			t.Spec.Owner = OwnerSpec{
+				Name: owner.Name,
+				Kind: Kind(owner.Kind),
+			}
+		} else {
+			switch owner.Kind {
+			case "User":
+				ownersAnnotations[ownerUsersAnnotation] = append(ownersAnnotations[ownerUsersAnnotation], owner.Name)
+			case "Group":
+				ownersAnnotations[ownerGroupsAnnotation] = append(ownersAnnotations[ownerGroupsAnnotation], owner.Name)
+			case "ServiceAccount":
+				ownersAnnotations[ownerServiceAccountAnnotation] = append(ownersAnnotations[ownerServiceAccountAnnotation], owner.Name)
+			}
+		}
+		for _, setting := range owner.ProxyOperations {
+			switch setting.Kind {
+			case nodesServiceKind:
+				for _, operation := range setting.Operations {
+					switch operation {
+					case listOperation:
+						proxyAnnotations[enableNodeListingAnnotation] = append(proxyAnnotations[enableNodeListingAnnotation], owner.Name)
+					case updateOperation:
+						proxyAnnotations[enableNodeUpdateAnnotation] = append(proxyAnnotations[enableNodeUpdateAnnotation], owner.Name)
+					case deleteOperation:
+						proxyAnnotations[enableNodeDeletionAnnotation] = append(proxyAnnotations[enableNodeDeletionAnnotation], owner.Name)
+					}
+				}
+			case storageClassesServiceKind:
+				for _, operation := range setting.Operations {
+					switch operation {
+					case listOperation:
+						proxyAnnotations[enableStorageClassListingAnnotation] = append(proxyAnnotations[enableStorageClassListingAnnotation], owner.Name)
+					case updateOperation:
+						proxyAnnotations[enableStorageClassUpdateAnnotation] = append(proxyAnnotations[enableStorageClassUpdateAnnotation], owner.Name)
+					case deleteOperation:
+						proxyAnnotations[enableStorageClassDeletionAnnotation] = append(proxyAnnotations[enableStorageClassDeletionAnnotation], owner.Name)
+					}
+				}
+			case ingressClassesServiceKind:
+				for _, operation := range setting.Operations {
+					switch operation {
+					case listOperation:
+						proxyAnnotations[enableIngressClassListingAnnotation] = append(proxyAnnotations[enableIngressClassListingAnnotation], owner.Name)
+					case updateOperation:
+						proxyAnnotations[enableIngressClassUpdateAnnotation] = append(proxyAnnotations[enableIngressClassUpdateAnnotation], owner.Name)
+					case deleteOperation:
+						proxyAnnotations[enableIngressClassDeletionAnnotation] = append(proxyAnnotations[enableIngressClassDeletionAnnotation], owner.Name)
+					}
+				}
+			}
+		}
+	}
+
+	for k, v := range ownersAnnotations {
+		if len(v) > 0 {
+			t.Annotations[k] = strings.Join(v, ",")
+		}
+	}
+	for k, v := range proxyAnnotations {
+		if len(v) > 0 {
+			t.Annotations[k] = strings.Join(v, ",")
+		}
+	}
 }
 
 func (t *Tenant) ConvertFrom(srcRaw conversion.Hub) error {
@@ -164,10 +361,11 @@ func (t *Tenant) ConvertFrom(srcRaw conversion.Hub) error {
 	t.Spec.NamespaceQuota = src.Spec.NamespaceQuota
 	t.Spec.NodeSelector = src.Spec.NodeSelector
 
-	t.Spec.Owner = OwnerSpec{
-		Name: src.Spec.Owner.Name,
-		Kind: Kind(src.Spec.Owner.Kind),
+	if t.Annotations == nil {
+		t.Annotations = make(map[string]string)
 	}
+
+	t.convertV1Beta1OwnerToV1Alpha1(src)
 
 	if src.Spec.NamespacesMetadata != nil {
 		t.Spec.NamespacesMetadata = &AdditionalMetadataSpec{

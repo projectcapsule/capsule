@@ -579,14 +579,6 @@ spec:
       jsonPath: .status.size
       name: Namespace count
       type: integer
-    - description: The assigned Tenant owner
-      jsonPath: .spec.owner.name
-      name: Owner name
-      type: string
-    - description: The assigned Tenant owner kind
-      jsonPath: .spec.owner.kind
-      name: Owner kind
-      type: string
     - description: Node Selector applied to Pods
       jsonPath: .spec.nodeSelector
       name: Node selector
@@ -1035,20 +1027,45 @@ spec:
                 additionalProperties:
                   type: string
                 type: object
-              owner:
-                description: OwnerSpec defines tenant owner name and kind
-                properties:
-                  kind:
-                    enum:
-                    - User
-                    - Group
-                    type: string
-                  name:
-                    type: string
-                required:
-                - kind
-                - name
-                type: object
+              owners:
+                items:
+                  description: OwnerSpec defines tenant owner name and kind
+                  properties:
+                    kind:
+                      enum:
+                      - User
+                      - Group
+                      - ServiceAccount
+                      type: string
+                    name:
+                      type: string
+                    proxySettings:
+                      items:
+                        properties:
+                          kind:
+                            enum:
+                            - Nodes
+                            - StorageClasses
+                            - IngressClasses
+                            type: string
+                          operations:
+                            items:
+                              enum:
+                              - List
+                              - Update
+                              - Delete
+                              type: string
+                            type: array
+                        required:
+                        - kind
+                        - operations
+                        type: object
+                      type: array
+                  required:
+                  - kind
+                  - name
+                  type: object
+                type: array
               priorityClasses:
                 properties:
                   allowed:
@@ -1128,7 +1145,7 @@ spec:
                     type: string
                 type: object
             required:
-            - owner
+            - owners
             type: object
           status:
             description: TenantStatus defines the observed state of Tenant

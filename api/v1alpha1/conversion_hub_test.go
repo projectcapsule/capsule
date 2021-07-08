@@ -4,6 +4,7 @@
 package v1alpha1
 
 import (
+	"sort"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -113,9 +114,101 @@ func generateTenantsSpecs() (Tenant, capsulev1beta1.Tenant) {
 			},
 		},
 		Spec: capsulev1beta1.TenantSpec{
-			Owner: capsulev1beta1.OwnerSpec{
-				Name: "alice",
-				Kind: "User",
+			Owners: []capsulev1beta1.OwnerSpec{
+				{
+					Kind: "User",
+					Name: "alice",
+					ProxyOperations: []capsulev1beta1.ProxySettings{
+						{
+							Kind:       "IngressClasses",
+							Operations: []capsulev1beta1.ProxyOperation{"List", "Update", "Delete"},
+						},
+						{
+							Kind:       "Nodes",
+							Operations: []capsulev1beta1.ProxyOperation{"Update", "Delete"},
+						},
+						{
+							Kind:       "StorageClasses",
+							Operations: []capsulev1beta1.ProxyOperation{"Update", "Delete"},
+						},
+					},
+				},
+				{
+					Kind: "User",
+					Name: "bob",
+					ProxyOperations: []capsulev1beta1.ProxySettings{
+						{
+							Kind:       "IngressClasses",
+							Operations: []capsulev1beta1.ProxyOperation{"Update"},
+						},
+						{
+							Kind:       "StorageClasses",
+							Operations: []capsulev1beta1.ProxyOperation{"List"},
+						},
+					},
+				},
+				{
+					Kind: "User",
+					Name: "jack",
+					ProxyOperations: []capsulev1beta1.ProxySettings{
+						{
+							Kind:       "IngressClasses",
+							Operations: []capsulev1beta1.ProxyOperation{"Delete"},
+						},
+						{
+							Kind:       "Nodes",
+							Operations: []capsulev1beta1.ProxyOperation{"Delete"},
+						},
+						{
+							Kind:       "StorageClasses",
+							Operations: []capsulev1beta1.ProxyOperation{"List"},
+						},
+					},
+				},
+				{
+					Kind: "Group",
+					Name: "owner-foo",
+					ProxyOperations: []capsulev1beta1.ProxySettings{
+						{
+							Kind:       "IngressClasses",
+							Operations: []capsulev1beta1.ProxyOperation{"List"},
+						},
+					},
+				},
+				{
+					Kind: "Group",
+					Name: "owner-bar",
+					ProxyOperations: []capsulev1beta1.ProxySettings{
+						{
+							Kind:       "IngressClasses",
+							Operations: []capsulev1beta1.ProxyOperation{"List"},
+						},
+						{
+							Kind:       "StorageClasses",
+							Operations: []capsulev1beta1.ProxyOperation{"Delete"},
+						},
+					},
+				},
+				{
+					Kind: "ServiceAccount",
+					Name: "system:serviceaccount:oil-production:default",
+					ProxyOperations: []capsulev1beta1.ProxySettings{
+						{
+							Kind:       "Nodes",
+							Operations: []capsulev1beta1.ProxyOperation{"Update"},
+						},
+					},
+				},
+				{
+					Kind: "ServiceAccount",
+					Name: "system:serviceaccount:gas-production:gas",
+					ProxyOperations: []capsulev1beta1.ProxySettings{
+						{
+							Kind:       "StorageClasses",
+							Operations: []capsulev1beta1.ProxyOperation{"Update"},
+						},
+					},
+				},
 			},
 			NamespaceQuota:      &namespaceQuota,
 			NamespacesMetadata:  v1beta1AdditionalMetadataSpec,
@@ -170,11 +263,22 @@ func generateTenantsSpecs() (Tenant, capsulev1beta1.Tenant) {
 				"foo": "bar",
 			},
 			Annotations: map[string]string{
-				"foo":                               "bar",
-				podAllowedImagePullPolicyAnnotation: "Always,IfNotPresent",
-				enableNodePortsAnnotation:           "false",
-				podPriorityAllowedAnnotation:        "default",
-				podPriorityAllowedRegexAnnotation:   "^tier-.*$",
+				"foo":                                "bar",
+				podAllowedImagePullPolicyAnnotation:  "Always,IfNotPresent",
+				enableNodePortsAnnotation:            "false",
+				podPriorityAllowedAnnotation:         "default",
+				podPriorityAllowedRegexAnnotation:    "^tier-.*$",
+				ownerGroupsAnnotation:                "owner-foo,owner-bar",
+				ownerUsersAnnotation:                 "bob,jack",
+				ownerServiceAccountAnnotation:        "system:serviceaccount:oil-production:default,system:serviceaccount:gas-production:gas",
+				enableNodeUpdateAnnotation:           "alice,system:serviceaccount:oil-production:default",
+				enableNodeDeletionAnnotation:         "alice,jack",
+				enableStorageClassListingAnnotation:  "bob,jack",
+				enableStorageClassUpdateAnnotation:   "alice,system:serviceaccount:gas-production:gas",
+				enableStorageClassDeletionAnnotation: "alice,owner-bar",
+				enableIngressClassListingAnnotation:  "alice,owner-foo,owner-bar",
+				enableIngressClassUpdateAnnotation:   "alice,bob",
+				enableIngressClassDeletionAnnotation: "alice,jack",
 			},
 		},
 		Spec: TenantSpec{
@@ -224,7 +328,24 @@ func TestConversionHub_ConvertTo(t *testing.T) {
 	v1alpha1Tnt, v1beta1tnt := generateTenantsSpecs()
 	err := v1alpha1Tnt.ConvertTo(&v1beta1ConvertedTnt)
 	if assert.NoError(t, err) {
-		assert.Equal(t, v1beta1ConvertedTnt, v1beta1tnt)
+		sort.Slice(v1beta1tnt.Spec.Owners, func(i, j int) bool {
+			return v1beta1tnt.Spec.Owners[i].Name < v1beta1tnt.Spec.Owners[j].Name
+		})
+		sort.Slice(v1beta1ConvertedTnt.Spec.Owners, func(i, j int) bool {
+			return v1beta1ConvertedTnt.Spec.Owners[i].Name < v1beta1ConvertedTnt.Spec.Owners[j].Name
+		})
+
+		for _, owner := range v1beta1tnt.Spec.Owners {
+			sort.Slice(owner.ProxyOperations, func(i, j int) bool {
+				return owner.ProxyOperations[i].Kind < owner.ProxyOperations[j].Kind
+			})
+		}
+		for _, owner := range v1beta1ConvertedTnt.Spec.Owners {
+			sort.Slice(owner.ProxyOperations, func(i, j int) bool {
+				return owner.ProxyOperations[i].Kind < owner.ProxyOperations[j].Kind
+			})
+		}
+		assert.Equal(t, v1beta1tnt, v1beta1ConvertedTnt)
 	}
 }
 
@@ -234,6 +355,6 @@ func TestConversionHub_ConvertFrom(t *testing.T) {
 
 	err := v1alpha1ConvertedTnt.ConvertFrom(&v1beta1tnt)
 	if assert.NoError(t, err) {
-		assert.Equal(t, v1alpha1ConvertedTnt, v1alpha1Tnt)
+		assert.EqualValues(t, v1alpha1Tnt, v1alpha1ConvertedTnt)
 	}
 }

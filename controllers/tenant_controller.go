@@ -621,18 +621,30 @@ func (r *TenantReconciler) syncNetworkPolicies(tenant *capsulev1beta1.Tenant) er
 // TODO(prometherion): we could create a capsule:admin role rather than hitting webhooks for each action
 func (r *TenantReconciler) ownerRoleBinding(tenant *capsulev1beta1.Tenant) error {
 	// getting RoleBinding label for the mutateFn
+	var subjects []rbacv1.Subject
+
 	tl, err := capsulev1beta1.GetTypeLabel(&capsulev1beta1.Tenant{})
 	if err != nil {
 		return err
 	}
 
 	l := map[string]string{tl: tenant.Name}
-	s := []rbacv1.Subject{
-		{
-			APIGroup: "rbac.authorization.k8s.io",
-			Kind:     tenant.Spec.Owner.Kind.String(),
-			Name:     tenant.Spec.Owner.Name,
-		},
+
+	for _, owner := range tenant.Spec.Owners {
+		if owner.Kind == "ServiceAccount" {
+			splitName := strings.Split(owner.Name, ":")
+			subjects = append(subjects, rbacv1.Subject{
+				Kind:      owner.Kind.String(),
+				Name:      splitName[len(splitName)-1],
+				Namespace: splitName[len(splitName)-2],
+			})
+		} else {
+			subjects = append(subjects, rbacv1.Subject{
+				APIGroup: "rbac.authorization.k8s.io",
+				Kind:     owner.Kind.String(),
+				Name:     owner.Name,
+			})
+		}
 	}
 
 	rbl := make(map[types.NamespacedName]rbacv1.RoleRef)
@@ -660,7 +672,7 @@ func (r *TenantReconciler) ownerRoleBinding(tenant *capsulev1beta1.Tenant) error
 		var res controllerutil.OperationResult
 		res, err = controllerutil.CreateOrUpdate(context.TODO(), r.Client, target, func() (err error) {
 			target.ObjectMeta.Labels = l
-			target.Subjects = s
+			target.Subjects = subjects
 			target.RoleRef = rr
 			return controllerutil.SetControllerReference(tenant, target, r.Scheme)
 		})

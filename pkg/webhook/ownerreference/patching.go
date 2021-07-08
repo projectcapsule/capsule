@@ -59,7 +59,7 @@ func (h *handler) OnCreate(clt client.Client, decoder *admission.Decoder, record
 				return &response
 			}
 			// Tenant owner must adhere to user that asked for NS creation
-			if !h.isTenantOwner(tnt.Spec.Owner, req.UserInfo) {
+			if !h.isTenantOwner(tnt.Spec.Owners, req.UserInfo) {
 				recorder.Eventf(tnt, corev1.EventTypeWarning, "NonOwnedTenant", "Namespace %s cannot be assigned to the current Tenant", ns.GetName())
 
 				response := admission.Denied("Cannot assign the desired namespace to a non-owned Tenant")
@@ -75,8 +75,20 @@ func (h *handler) OnCreate(clt client.Client, decoder *admission.Decoder, record
 		// If we forceTenantPrefix -> find Tenant from NS name
 		var tenants sortedTenants
 
-		// Find tenants belonging to user
-		{
+		// Find tenants belonging to user (it can be regular user or ServiceAccount)
+		if strings.HasPrefix(req.UserInfo.Username, "system:serviceaccount:") {
+			var tntList *capsulev1beta1.TenantList
+
+			if tntList, err = h.listTenantsForOwnerKind(ctx, "ServiceAccount", req.UserInfo.Username, clt); err != nil {
+				response := admission.Errored(http.StatusBadRequest, err)
+
+				return &response
+			}
+
+			for _, tnt := range tntList.Items {
+				tenants = append(tenants, tnt)
+			}
+		} else {
 			var tntList *capsulev1beta1.TenantList
 
 			if tntList, err = h.listTenantsForOwnerKind(ctx, "User", req.UserInfo.Username, clt); err != nil {
@@ -89,6 +101,7 @@ func (h *handler) OnCreate(clt client.Client, decoder *admission.Decoder, record
 				tenants = append(tenants, tnt)
 			}
 		}
+
 		// Find tenants belonging to user groups
 		{
 			for _, group := range req.UserInfo.Groups {
@@ -176,17 +189,22 @@ func (h *handler) listTenantsForOwnerKind(ctx context.Context, ownerKind string,
 	return tntList, err
 }
 
-func (h *handler) isTenantOwner(ownerSpec capsulev1beta1.OwnerSpec, userInfo authenticationv1.UserInfo) bool {
-	if ownerSpec.Kind == "User" && userInfo.Username == ownerSpec.Name {
-		return true
-	}
-	if ownerSpec.Kind == "Group" {
-		for _, group := range userInfo.Groups {
-			if group == ownerSpec.Name {
+func (h *handler) isTenantOwner(owners []capsulev1beta1.OwnerSpec, userInfo authenticationv1.UserInfo) bool {
+	for _, owner := range owners {
+		switch owner.Kind {
+		case "User", "ServiceAccount":
+			if userInfo.Username == owner.Name {
 				return true
+			}
+		case "Group":
+			for _, group := range userInfo.Groups {
+				if group == owner.Name {
+					return true
+				}
 			}
 		}
 	}
+
 	return false
 }
 
