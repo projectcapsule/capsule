@@ -48,14 +48,10 @@ spec:
           description: Tenant is the Schema for the tenants API
           properties:
             apiVersion:
-              description: 'APIVersion defines the versioned schema of this representation
-              of an object. Servers should convert recognized schemas to the latest
-              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+              description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
               type: string
             kind:
-              description: 'Kind is a string value representing the REST resource this
-              object represents. Servers may infer this from the endpoint the client
-              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+              description: 'Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
               type: string
             metadata:
               type: object
@@ -70,31 +66,19 @@ spec:
                       subjects:
                         description: kubebuilder:validation:Minimum=1
                         items:
-                          description: Subject contains a reference to the object or
-                            user identities a role binding applies to.  This can either
-                            hold a direct API object reference, or a value for non-objects
-                            such as user and group names.
+                          description: Subject contains a reference to the object or user identities a role binding applies to.  This can either hold a direct API object reference, or a value for non-objects such as user and group names.
                           properties:
                             apiGroup:
-                              description: APIGroup holds the API group of the referenced
-                                subject. Defaults to "" for ServiceAccount subjects.
-                                Defaults to "rbac.authorization.k8s.io" for User and
-                                Group subjects.
+                              description: APIGroup holds the API group of the referenced subject. Defaults to "" for ServiceAccount subjects. Defaults to "rbac.authorization.k8s.io" for User and Group subjects.
                               type: string
                             kind:
-                              description: Kind of object being referenced. Values defined
-                                by this API group are "User", "Group", and "ServiceAccount".
-                                If the Authorizer does not recognized the kind value,
-                                the Authorizer should report an error.
+                              description: Kind of object being referenced. Values defined by this API group are "User", "Group", and "ServiceAccount". If the Authorizer does not recognized the kind value, the Authorizer should report an error.
                               type: string
                             name:
                               description: Name of the object being referenced.
                               type: string
                             namespace:
-                              description: Namespace of the referenced object.  If the
-                                object kind is non-namespace, such as "User" or "Group",
-                                and this value is not empty the Authorizer should report
-                                an error.
+                              description: Namespace of the referenced object.  If the object kind is non-namespace, such as "User" or "Group", and this value is not empty the Authorizer should report an error.
                               type: string
                           required:
                             - kind
@@ -145,15 +129,12 @@ spec:
                   type: object
                 limitRanges:
                   items:
-                    description: LimitRangeSpec defines a min/max usage limit for resources
-                      that match on kind.
+                    description: LimitRangeSpec defines a min/max usage limit for resources that match on kind.
                     properties:
                       limits:
-                        description: Limits is the list of LimitRangeItem objects that
-                          are enforced.
+                        description: Limits is the list of LimitRangeItem objects that are enforced.
                         items:
-                          description: LimitRangeItem defines a min/max usage limit
-                            for any resource that matches on kind.
+                          description: LimitRangeItem defines a min/max usage limit for any resource that matches on kind.
                           properties:
                             default:
                               additionalProperties:
@@ -162,8 +143,7 @@ spec:
                                   - type: string
                                 pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                                 x-kubernetes-int-or-string: true
-                              description: Default resource requirement limit value
-                                by resource name if resource limit is omitted.
+                              description: Default resource requirement limit value by resource name if resource limit is omitted.
                               type: object
                             defaultRequest:
                               additionalProperties:
@@ -172,9 +152,7 @@ spec:
                                   - type: string
                                 pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                                 x-kubernetes-int-or-string: true
-                              description: DefaultRequest is the default resource requirement
-                                request value by resource name if resource request is
-                                omitted.
+                              description: DefaultRequest is the default resource requirement request value by resource name if resource request is omitted.
                               type: object
                             max:
                               additionalProperties:
@@ -183,8 +161,7 @@ spec:
                                   - type: string
                                 pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                                 x-kubernetes-int-or-string: true
-                              description: Max usage constraints on this kind by resource
-                                name.
+                              description: Max usage constraints on this kind by resource name.
                               type: object
                             maxLimitRequestRatio:
                               additionalProperties:
@@ -193,11 +170,7 @@ spec:
                                   - type: string
                                 pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                                 x-kubernetes-int-or-string: true
-                              description: MaxLimitRequestRatio if specified, the named
-                                resource must have a request and limit that are both
-                                non-zero where limit divided by request is less than
-                                or equal to the enumerated value; this represents the
-                                max burst for the named resource.
+                              description: MaxLimitRequestRatio if specified, the named resource must have a request and limit that are both non-zero where limit divided by request is less than or equal to the enumerated value; this represents the max burst for the named resource.
                               type: object
                             min:
                               additionalProperties:
@@ -206,12 +179,10 @@ spec:
                                   - type: string
                                 pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                                 x-kubernetes-int-or-string: true
-                              description: Min usage constraints on this kind by resource
-                                name.
+                              description: Min usage constraints on this kind by resource name.
                               type: object
                             type:
-                              description: Type of resource that this limit applies
-                                to.
+                              description: Type of resource that this limit applies to.
                               type: string
                           required:
                             - type
@@ -241,80 +212,40 @@ spec:
                     description: NetworkPolicySpec provides the specification of a NetworkPolicy
                     properties:
                       egress:
-                        description: List of egress rules to be applied to the selected
-                          pods. Outgoing traffic is allowed if there are no NetworkPolicies
-                          selecting the pod (and cluster policy otherwise allows the
-                          traffic), OR if the traffic matches at least one egress rule
-                          across all of the NetworkPolicy objects whose podSelector
-                          matches the pod. If this field is empty then this NetworkPolicy
-                          limits all outgoing traffic (and serves solely to ensure that
-                          the pods it selects are isolated by default). This field is
-                          beta-level in 1.8
+                        description: List of egress rules to be applied to the selected pods. Outgoing traffic is allowed if there are no NetworkPolicies selecting the pod (and cluster policy otherwise allows the traffic), OR if the traffic matches at least one egress rule across all of the NetworkPolicy objects whose podSelector matches the pod. If this field is empty then this NetworkPolicy limits all outgoing traffic (and serves solely to ensure that the pods it selects are isolated by default). This field is beta-level in 1.8
                         items:
-                          description: NetworkPolicyEgressRule describes a particular
-                            set of traffic that is allowed out of pods matched by a
-                            NetworkPolicySpec's podSelector. The traffic must match
-                            both ports and to. This type is beta-level in 1.8
+                          description: NetworkPolicyEgressRule describes a particular set of traffic that is allowed out of pods matched by a NetworkPolicySpec's podSelector. The traffic must match both ports and to. This type is beta-level in 1.8
                           properties:
                             ports:
-                              description: List of destination ports for outgoing traffic.
-                                Each item in this list is combined using a logical OR.
-                                If this field is empty or missing, this rule matches
-                                all ports (traffic not restricted by port). If this
-                                field is present and contains at least one item, then
-                                this rule allows traffic only if the traffic matches
-                                at least one port in the list.
+                              description: List of destination ports for outgoing traffic. Each item in this list is combined using a logical OR. If this field is empty or missing, this rule matches all ports (traffic not restricted by port). If this field is present and contains at least one item, then this rule allows traffic only if the traffic matches at least one port in the list.
                               items:
-                                description: NetworkPolicyPort describes a port to allow
-                                  traffic on
+                                description: NetworkPolicyPort describes a port to allow traffic on
                                 properties:
                                   port:
                                     anyOf:
                                       - type: integer
                                       - type: string
-                                    description: The port on the given protocol. This
-                                      can either be a numerical or named port on a pod.
-                                      If this field is not provided, this matches all
-                                      port names and numbers.
+                                    description: The port on the given protocol. This can either be a numerical or named port on a pod. If this field is not provided, this matches all port names and numbers.
                                     x-kubernetes-int-or-string: true
                                   protocol:
                                     default: TCP
-                                    description: The protocol (TCP, UDP, or SCTP) which
-                                      traffic must match. If not specified, this field
-                                      defaults to TCP.
+                                    description: The protocol (TCP, UDP, or SCTP) which traffic must match. If not specified, this field defaults to TCP.
                                     type: string
                                 type: object
                               type: array
                             to:
-                              description: List of destinations for outgoing traffic
-                                of pods selected for this rule. Items in this list are
-                                combined using a logical OR operation. If this field
-                                is empty or missing, this rule matches all destinations
-                                (traffic not restricted by destination). If this field
-                                is present and contains at least one item, this rule
-                                allows traffic only if the traffic matches at least
-                                one item in the to list.
+                              description: List of destinations for outgoing traffic of pods selected for this rule. Items in this list are combined using a logical OR operation. If this field is empty or missing, this rule matches all destinations (traffic not restricted by destination). If this field is present and contains at least one item, this rule allows traffic only if the traffic matches at least one item in the to list.
                               items:
-                                description: NetworkPolicyPeer describes a peer to allow
-                                  traffic to/from. Only certain combinations of fields
-                                  are allowed
+                                description: NetworkPolicyPeer describes a peer to allow traffic to/from. Only certain combinations of fields are allowed
                                 properties:
                                   ipBlock:
-                                    description: IPBlock defines policy on a particular
-                                      IPBlock. If this field is set then neither of
-                                      the other fields can be.
+                                    description: IPBlock defines policy on a particular IPBlock. If this field is set then neither of the other fields can be.
                                     properties:
                                       cidr:
-                                        description: CIDR is a string representing the
-                                          IP Block Valid examples are "192.168.1.1/24"
-                                          or "2001:db9::/64"
+                                        description: CIDR is a string representing the IP Block Valid examples are "192.168.1.1/24" or "2001:db9::/64"
                                         type: string
                                       except:
-                                        description: Except is a slice of CIDRs that
-                                          should not be included within an IP Block
-                                          Valid examples are "192.168.1.1/24" or "2001:db9::/64"
-                                          Except values will be rejected if they are
-                                          outside the CIDR range
+                                        description: Except is a slice of CIDRs that should not be included within an IP Block Valid examples are "192.168.1.1/24" or "2001:db9::/64" Except values will be rejected if they are outside the CIDR range
                                         items:
                                           type: string
                                         type: array
@@ -322,43 +253,21 @@ spec:
                                       - cidr
                                     type: object
                                   namespaceSelector:
-                                    description: "Selects Namespaces using cluster-scoped
-                                    labels. This field follows standard label selector
-                                    semantics; if present but empty, it selects all
-                                    namespaces. \n If PodSelector is also set, then
-                                    the NetworkPolicyPeer as a whole selects the Pods
-                                    matching PodSelector in the Namespaces selected
-                                    by NamespaceSelector. Otherwise it selects all
-                                    Pods in the Namespaces selected by NamespaceSelector."
+                                    description: "Selects Namespaces using cluster-scoped labels. This field follows standard label selector semantics; if present but empty, it selects all namespaces. \n If PodSelector is also set, then the NetworkPolicyPeer as a whole selects the Pods matching PodSelector in the Namespaces selected by NamespaceSelector. Otherwise it selects all Pods in the Namespaces selected by NamespaceSelector."
                                     properties:
                                       matchExpressions:
-                                        description: matchExpressions is a list of label
-                                          selector requirements. The requirements are
-                                          ANDed.
+                                        description: matchExpressions is a list of label selector requirements. The requirements are ANDed.
                                         items:
-                                          description: A label selector requirement
-                                            is a selector that contains values, a key,
-                                            and an operator that relates the key and
-                                            values.
+                                          description: A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.
                                           properties:
                                             key:
-                                              description: key is the label key that
-                                                the selector applies to.
+                                              description: key is the label key that the selector applies to.
                                               type: string
                                             operator:
-                                              description: operator represents a key's
-                                                relationship to a set of values. Valid
-                                                operators are In, NotIn, Exists and
-                                                DoesNotExist.
+                                              description: operator represents a key's relationship to a set of values. Valid operators are In, NotIn, Exists and DoesNotExist.
                                               type: string
                                             values:
-                                              description: values is an array of string
-                                                values. If the operator is In or NotIn,
-                                                the values array must be non-empty.
-                                                If the operator is Exists or DoesNotExist,
-                                                the values array must be empty. This
-                                                array is replaced during a strategic
-                                                merge patch.
+                                              description: values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.
                                               items:
                                                 type: string
                                               type: array
@@ -370,53 +279,25 @@ spec:
                                       matchLabels:
                                         additionalProperties:
                                           type: string
-                                        description: matchLabels is a map of {key,value}
-                                          pairs. A single {key,value} in the matchLabels
-                                          map is equivalent to an element of matchExpressions,
-                                          whose key field is "key", the operator is
-                                          "In", and the values array contains only "value".
-                                          The requirements are ANDed.
+                                        description: matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is "key", the operator is "In", and the values array contains only "value". The requirements are ANDed.
                                         type: object
                                     type: object
                                   podSelector:
-                                    description: "This is a label selector which selects
-                                    Pods. This field follows standard label selector
-                                    semantics; if present but empty, it selects all
-                                    pods. \n If NamespaceSelector is also set, then
-                                    the NetworkPolicyPeer as a whole selects the Pods
-                                    matching PodSelector in the Namespaces selected
-                                    by NamespaceSelector. Otherwise it selects the
-                                    Pods matching PodSelector in the policy's own
-                                    Namespace."
+                                    description: "This is a label selector which selects Pods. This field follows standard label selector semantics; if present but empty, it selects all pods. \n If NamespaceSelector is also set, then the NetworkPolicyPeer as a whole selects the Pods matching PodSelector in the Namespaces selected by NamespaceSelector. Otherwise it selects the Pods matching PodSelector in the policy's own Namespace."
                                     properties:
                                       matchExpressions:
-                                        description: matchExpressions is a list of label
-                                          selector requirements. The requirements are
-                                          ANDed.
+                                        description: matchExpressions is a list of label selector requirements. The requirements are ANDed.
                                         items:
-                                          description: A label selector requirement
-                                            is a selector that contains values, a key,
-                                            and an operator that relates the key and
-                                            values.
+                                          description: A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.
                                           properties:
                                             key:
-                                              description: key is the label key that
-                                                the selector applies to.
+                                              description: key is the label key that the selector applies to.
                                               type: string
                                             operator:
-                                              description: operator represents a key's
-                                                relationship to a set of values. Valid
-                                                operators are In, NotIn, Exists and
-                                                DoesNotExist.
+                                              description: operator represents a key's relationship to a set of values. Valid operators are In, NotIn, Exists and DoesNotExist.
                                               type: string
                                             values:
-                                              description: values is an array of string
-                                                values. If the operator is In or NotIn,
-                                                the values array must be non-empty.
-                                                If the operator is Exists or DoesNotExist,
-                                                the values array must be empty. This
-                                                array is replaced during a strategic
-                                                merge patch.
+                                              description: values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.
                                               items:
                                                 type: string
                                               type: array
@@ -428,12 +309,7 @@ spec:
                                       matchLabels:
                                         additionalProperties:
                                           type: string
-                                        description: matchLabels is a map of {key,value}
-                                          pairs. A single {key,value} in the matchLabels
-                                          map is equivalent to an element of matchExpressions,
-                                          whose key field is "key", the operator is
-                                          "In", and the values array contains only "value".
-                                          The requirements are ANDed.
+                                        description: matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is "key", the operator is "In", and the values array contains only "value". The requirements are ANDed.
                                         type: object
                                     type: object
                                 type: object
@@ -441,51 +317,23 @@ spec:
                           type: object
                         type: array
                       ingress:
-                        description: List of ingress rules to be applied to the selected
-                          pods. Traffic is allowed to a pod if there are no NetworkPolicies
-                          selecting the pod (and cluster policy otherwise allows the
-                          traffic), OR if the traffic source is the pod's local node,
-                          OR if the traffic matches at least one ingress rule across
-                          all of the NetworkPolicy objects whose podSelector matches
-                          the pod. If this field is empty then this NetworkPolicy does
-                          not allow any traffic (and serves solely to ensure that the
-                          pods it selects are isolated by default)
+                        description: List of ingress rules to be applied to the selected pods. Traffic is allowed to a pod if there are no NetworkPolicies selecting the pod (and cluster policy otherwise allows the traffic), OR if the traffic source is the pod's local node, OR if the traffic matches at least one ingress rule across all of the NetworkPolicy objects whose podSelector matches the pod. If this field is empty then this NetworkPolicy does not allow any traffic (and serves solely to ensure that the pods it selects are isolated by default)
                         items:
-                          description: NetworkPolicyIngressRule describes a particular
-                            set of traffic that is allowed to the pods matched by a
-                            NetworkPolicySpec's podSelector. The traffic must match
-                            both ports and from.
+                          description: NetworkPolicyIngressRule describes a particular set of traffic that is allowed to the pods matched by a NetworkPolicySpec's podSelector. The traffic must match both ports and from.
                           properties:
                             from:
-                              description: List of sources which should be able to access
-                                the pods selected for this rule. Items in this list
-                                are combined using a logical OR operation. If this field
-                                is empty or missing, this rule matches all sources (traffic
-                                not restricted by source). If this field is present
-                                and contains at least one item, this rule allows traffic
-                                only if the traffic matches at least one item in the
-                                from list.
+                              description: List of sources which should be able to access the pods selected for this rule. Items in this list are combined using a logical OR operation. If this field is empty or missing, this rule matches all sources (traffic not restricted by source). If this field is present and contains at least one item, this rule allows traffic only if the traffic matches at least one item in the from list.
                               items:
-                                description: NetworkPolicyPeer describes a peer to allow
-                                  traffic to/from. Only certain combinations of fields
-                                  are allowed
+                                description: NetworkPolicyPeer describes a peer to allow traffic to/from. Only certain combinations of fields are allowed
                                 properties:
                                   ipBlock:
-                                    description: IPBlock defines policy on a particular
-                                      IPBlock. If this field is set then neither of
-                                      the other fields can be.
+                                    description: IPBlock defines policy on a particular IPBlock. If this field is set then neither of the other fields can be.
                                     properties:
                                       cidr:
-                                        description: CIDR is a string representing the
-                                          IP Block Valid examples are "192.168.1.1/24"
-                                          or "2001:db9::/64"
+                                        description: CIDR is a string representing the IP Block Valid examples are "192.168.1.1/24" or "2001:db9::/64"
                                         type: string
                                       except:
-                                        description: Except is a slice of CIDRs that
-                                          should not be included within an IP Block
-                                          Valid examples are "192.168.1.1/24" or "2001:db9::/64"
-                                          Except values will be rejected if they are
-                                          outside the CIDR range
+                                        description: Except is a slice of CIDRs that should not be included within an IP Block Valid examples are "192.168.1.1/24" or "2001:db9::/64" Except values will be rejected if they are outside the CIDR range
                                         items:
                                           type: string
                                         type: array
@@ -493,43 +341,21 @@ spec:
                                       - cidr
                                     type: object
                                   namespaceSelector:
-                                    description: "Selects Namespaces using cluster-scoped
-                                    labels. This field follows standard label selector
-                                    semantics; if present but empty, it selects all
-                                    namespaces. \n If PodSelector is also set, then
-                                    the NetworkPolicyPeer as a whole selects the Pods
-                                    matching PodSelector in the Namespaces selected
-                                    by NamespaceSelector. Otherwise it selects all
-                                    Pods in the Namespaces selected by NamespaceSelector."
+                                    description: "Selects Namespaces using cluster-scoped labels. This field follows standard label selector semantics; if present but empty, it selects all namespaces. \n If PodSelector is also set, then the NetworkPolicyPeer as a whole selects the Pods matching PodSelector in the Namespaces selected by NamespaceSelector. Otherwise it selects all Pods in the Namespaces selected by NamespaceSelector."
                                     properties:
                                       matchExpressions:
-                                        description: matchExpressions is a list of label
-                                          selector requirements. The requirements are
-                                          ANDed.
+                                        description: matchExpressions is a list of label selector requirements. The requirements are ANDed.
                                         items:
-                                          description: A label selector requirement
-                                            is a selector that contains values, a key,
-                                            and an operator that relates the key and
-                                            values.
+                                          description: A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.
                                           properties:
                                             key:
-                                              description: key is the label key that
-                                                the selector applies to.
+                                              description: key is the label key that the selector applies to.
                                               type: string
                                             operator:
-                                              description: operator represents a key's
-                                                relationship to a set of values. Valid
-                                                operators are In, NotIn, Exists and
-                                                DoesNotExist.
+                                              description: operator represents a key's relationship to a set of values. Valid operators are In, NotIn, Exists and DoesNotExist.
                                               type: string
                                             values:
-                                              description: values is an array of string
-                                                values. If the operator is In or NotIn,
-                                                the values array must be non-empty.
-                                                If the operator is Exists or DoesNotExist,
-                                                the values array must be empty. This
-                                                array is replaced during a strategic
-                                                merge patch.
+                                              description: values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.
                                               items:
                                                 type: string
                                               type: array
@@ -541,53 +367,25 @@ spec:
                                       matchLabels:
                                         additionalProperties:
                                           type: string
-                                        description: matchLabels is a map of {key,value}
-                                          pairs. A single {key,value} in the matchLabels
-                                          map is equivalent to an element of matchExpressions,
-                                          whose key field is "key", the operator is
-                                          "In", and the values array contains only "value".
-                                          The requirements are ANDed.
+                                        description: matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is "key", the operator is "In", and the values array contains only "value". The requirements are ANDed.
                                         type: object
                                     type: object
                                   podSelector:
-                                    description: "This is a label selector which selects
-                                    Pods. This field follows standard label selector
-                                    semantics; if present but empty, it selects all
-                                    pods. \n If NamespaceSelector is also set, then
-                                    the NetworkPolicyPeer as a whole selects the Pods
-                                    matching PodSelector in the Namespaces selected
-                                    by NamespaceSelector. Otherwise it selects the
-                                    Pods matching PodSelector in the policy's own
-                                    Namespace."
+                                    description: "This is a label selector which selects Pods. This field follows standard label selector semantics; if present but empty, it selects all pods. \n If NamespaceSelector is also set, then the NetworkPolicyPeer as a whole selects the Pods matching PodSelector in the Namespaces selected by NamespaceSelector. Otherwise it selects the Pods matching PodSelector in the policy's own Namespace."
                                     properties:
                                       matchExpressions:
-                                        description: matchExpressions is a list of label
-                                          selector requirements. The requirements are
-                                          ANDed.
+                                        description: matchExpressions is a list of label selector requirements. The requirements are ANDed.
                                         items:
-                                          description: A label selector requirement
-                                            is a selector that contains values, a key,
-                                            and an operator that relates the key and
-                                            values.
+                                          description: A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.
                                           properties:
                                             key:
-                                              description: key is the label key that
-                                                the selector applies to.
+                                              description: key is the label key that the selector applies to.
                                               type: string
                                             operator:
-                                              description: operator represents a key's
-                                                relationship to a set of values. Valid
-                                                operators are In, NotIn, Exists and
-                                                DoesNotExist.
+                                              description: operator represents a key's relationship to a set of values. Valid operators are In, NotIn, Exists and DoesNotExist.
                                               type: string
                                             values:
-                                              description: values is an array of string
-                                                values. If the operator is In or NotIn,
-                                                the values array must be non-empty.
-                                                If the operator is Exists or DoesNotExist,
-                                                the values array must be empty. This
-                                                array is replaced during a strategic
-                                                merge patch.
+                                              description: values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.
                                               items:
                                                 type: string
                                               type: array
@@ -599,80 +397,46 @@ spec:
                                       matchLabels:
                                         additionalProperties:
                                           type: string
-                                        description: matchLabels is a map of {key,value}
-                                          pairs. A single {key,value} in the matchLabels
-                                          map is equivalent to an element of matchExpressions,
-                                          whose key field is "key", the operator is
-                                          "In", and the values array contains only "value".
-                                          The requirements are ANDed.
+                                        description: matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is "key", the operator is "In", and the values array contains only "value". The requirements are ANDed.
                                         type: object
                                     type: object
                                 type: object
                               type: array
                             ports:
-                              description: List of ports which should be made accessible
-                                on the pods selected for this rule. Each item in this
-                                list is combined using a logical OR. If this field is
-                                empty or missing, this rule matches all ports (traffic
-                                not restricted by port). If this field is present and
-                                contains at least one item, then this rule allows traffic
-                                only if the traffic matches at least one port in the
-                                list.
+                              description: List of ports which should be made accessible on the pods selected for this rule. Each item in this list is combined using a logical OR. If this field is empty or missing, this rule matches all ports (traffic not restricted by port). If this field is present and contains at least one item, then this rule allows traffic only if the traffic matches at least one port in the list.
                               items:
-                                description: NetworkPolicyPort describes a port to allow
-                                  traffic on
+                                description: NetworkPolicyPort describes a port to allow traffic on
                                 properties:
                                   port:
                                     anyOf:
                                       - type: integer
                                       - type: string
-                                    description: The port on the given protocol. This
-                                      can either be a numerical or named port on a pod.
-                                      If this field is not provided, this matches all
-                                      port names and numbers.
+                                    description: The port on the given protocol. This can either be a numerical or named port on a pod. If this field is not provided, this matches all port names and numbers.
                                     x-kubernetes-int-or-string: true
                                   protocol:
                                     default: TCP
-                                    description: The protocol (TCP, UDP, or SCTP) which
-                                      traffic must match. If not specified, this field
-                                      defaults to TCP.
+                                    description: The protocol (TCP, UDP, or SCTP) which traffic must match. If not specified, this field defaults to TCP.
                                     type: string
                                 type: object
                               type: array
                           type: object
                         type: array
                       podSelector:
-                        description: Selects the pods to which this NetworkPolicy object
-                          applies. The array of ingress rules is applied to any pods
-                          selected by this field. Multiple network policies can select
-                          the same set of pods. In this case, the ingress rules for
-                          each are combined additively. This field is NOT optional and
-                          follows standard label selector semantics. An empty podSelector
-                          matches all pods in this namespace.
+                        description: Selects the pods to which this NetworkPolicy object applies. The array of ingress rules is applied to any pods selected by this field. Multiple network policies can select the same set of pods. In this case, the ingress rules for each are combined additively. This field is NOT optional and follows standard label selector semantics. An empty podSelector matches all pods in this namespace.
                         properties:
                           matchExpressions:
-                            description: matchExpressions is a list of label selector
-                              requirements. The requirements are ANDed.
+                            description: matchExpressions is a list of label selector requirements. The requirements are ANDed.
                             items:
-                              description: A label selector requirement is a selector
-                                that contains values, a key, and an operator that relates
-                                the key and values.
+                              description: A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.
                               properties:
                                 key:
-                                  description: key is the label key that the selector
-                                    applies to.
+                                  description: key is the label key that the selector applies to.
                                   type: string
                                 operator:
-                                  description: operator represents a key's relationship
-                                    to a set of values. Valid operators are In, NotIn,
-                                    Exists and DoesNotExist.
+                                  description: operator represents a key's relationship to a set of values. Valid operators are In, NotIn, Exists and DoesNotExist.
                                   type: string
                                 values:
-                                  description: values is an array of string values.
-                                    If the operator is In or NotIn, the values array
-                                    must be non-empty. If the operator is Exists or
-                                    DoesNotExist, the values array must be empty. This
-                                    array is replaced during a strategic merge patch.
+                                  description: values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.
                                   items:
                                     type: string
                                   type: array
@@ -684,30 +448,13 @@ spec:
                           matchLabels:
                             additionalProperties:
                               type: string
-                            description: matchLabels is a map of {key,value} pairs.
-                              A single {key,value} in the matchLabels map is equivalent
-                              to an element of matchExpressions, whose key field is
-                              "key", the operator is "In", and the values array contains
-                              only "value". The requirements are ANDed.
+                            description: matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is "key", the operator is "In", and the values array contains only "value". The requirements are ANDed.
                             type: object
                         type: object
                       policyTypes:
-                        description: List of rule types that the NetworkPolicy relates
-                          to. Valid options are "Ingress", "Egress", or "Ingress,Egress".
-                          If this field is not specified, it will default based on the
-                          existence of Ingress or Egress rules; policies that contain
-                          an Egress section are assumed to affect Egress, and all policies
-                          (whether or not they contain an Ingress section) are assumed
-                          to affect Ingress. If you want to write an egress-only policy,
-                          you must explicitly specify policyTypes [ "Egress" ]. Likewise,
-                          if you want to write a policy that specifies that no egress
-                          is allowed, you must specify a policyTypes value that include
-                          "Egress" (since such a policy would not include an Egress
-                          section and would otherwise default to just [ "Ingress" ]).
-                          This field is beta-level in 1.8
+                        description: List of rule types that the NetworkPolicy relates to. Valid options are "Ingress", "Egress", or "Ingress,Egress". If this field is not specified, it will default based on the existence of Ingress or Egress rules; policies that contain an Egress section are assumed to affect Egress, and all policies (whether or not they contain an Ingress section) are assumed to affect Ingress. If you want to write an egress-only policy, you must explicitly specify policyTypes [ "Egress" ]. Likewise, if you want to write a policy that specifies that no egress is allowed, you must specify a policyTypes value that include "Egress" (since such a policy would not include an Egress section and would otherwise default to just [ "Ingress" ]). This field is beta-level in 1.8
                         items:
-                          description: Policy Type string describes the NetworkPolicy
-                            type This type is beta-level in 1.8
+                          description: Policy Type string describes the NetworkPolicy type This type is beta-level in 1.8
                           type: string
                         type: array
                     required:
@@ -734,8 +481,7 @@ spec:
                   type: object
                 resourceQuotas:
                   items:
-                    description: ResourceQuotaSpec defines the desired hard limits to
-                      enforce for Quota.
+                    description: ResourceQuotaSpec defines the desired hard limits to enforce for Quota.
                     properties:
                       hard:
                         additionalProperties:
@@ -744,39 +490,24 @@ spec:
                             - type: string
                           pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                           x-kubernetes-int-or-string: true
-                        description: 'hard is the set of desired hard limits for each
-                        named resource. More info: https://kubernetes.io/docs/concepts/policy/resource-quotas/'
+                        description: 'hard is the set of desired hard limits for each named resource. More info: https://kubernetes.io/docs/concepts/policy/resource-quotas/'
                         type: object
                       scopeSelector:
-                        description: scopeSelector is also a collection of filters like
-                          scopes that must match each object tracked by a quota but
-                          expressed using ScopeSelectorOperator in combination with
-                          possible values. For a resource to match, both scopes AND
-                          scopeSelector (if specified in spec), must be matched.
+                        description: scopeSelector is also a collection of filters like scopes that must match each object tracked by a quota but expressed using ScopeSelectorOperator in combination with possible values. For a resource to match, both scopes AND scopeSelector (if specified in spec), must be matched.
                         properties:
                           matchExpressions:
-                            description: A list of scope selector requirements by scope
-                              of the resources.
+                            description: A list of scope selector requirements by scope of the resources.
                             items:
-                              description: A scoped-resource selector requirement is
-                                a selector that contains values, a scope name, and an
-                                operator that relates the scope name and values.
+                              description: A scoped-resource selector requirement is a selector that contains values, a scope name, and an operator that relates the scope name and values.
                               properties:
                                 operator:
-                                  description: Represents a scope's relationship to
-                                    a set of values. Valid operators are In, NotIn,
-                                    Exists, DoesNotExist.
+                                  description: Represents a scope's relationship to a set of values. Valid operators are In, NotIn, Exists, DoesNotExist.
                                   type: string
                                 scopeName:
-                                  description: The name of the scope that the selector
-                                    applies to.
+                                  description: The name of the scope that the selector applies to.
                                   type: string
                                 values:
-                                  description: An array of string values. If the operator
-                                    is In or NotIn, the values array must be non-empty.
-                                    If the operator is Exists or DoesNotExist, the values
-                                    array must be empty. This array is replaced during
-                                    a strategic merge patch.
+                                  description: An array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.
                                   items:
                                     type: string
                                   type: array
@@ -787,12 +518,9 @@ spec:
                             type: array
                         type: object
                       scopes:
-                        description: A collection of filters that must match each object
-                          tracked by a quota. If not specified, the quota matches all
-                          objects.
+                        description: A collection of filters that must match each object tracked by a quota. If not specified, the quota matches all objects.
                         items:
-                          description: A ResourceQuotaScope defines a filter that must
-                            match each object tracked by a quota
+                          description: A ResourceQuotaScope defines a filter that must match each object tracked by a quota
                           type: string
                         type: array
                     type: object
@@ -836,7 +564,7 @@ spec:
       served: true
       storage: false
       subresources:
-        status: {}
+        status: { }
     - additionalPrinterColumns:
         - description: The actual state of the Tenant
           jsonPath: .status.state
@@ -850,14 +578,6 @@ spec:
           jsonPath: .status.size
           name: Namespace count
           type: integer
-        - description: The assigned Tenant owner
-          jsonPath: .spec.owner.name
-          name: Owner name
-          type: string
-        - description: The assigned Tenant owner kind
-          jsonPath: .spec.owner.kind
-          name: Owner kind
-          type: string
         - description: Node Selector applied to Pods
           jsonPath: .spec.nodeSelector
           name: Node selector
@@ -872,14 +592,10 @@ spec:
           description: Tenant is the Schema for the tenants API
           properties:
             apiVersion:
-              description: 'APIVersion defines the versioned schema of this representation
-              of an object. Servers should convert recognized schemas to the latest
-              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+              description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
               type: string
             kind:
-              description: 'Kind is a string value representing the REST resource this
-              object represents. Servers may infer this from the endpoint the client
-              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+              description: 'Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
               type: string
             metadata:
               type: object
@@ -894,31 +610,19 @@ spec:
                       subjects:
                         description: kubebuilder:validation:Minimum=1
                         items:
-                          description: Subject contains a reference to the object or
-                            user identities a role binding applies to.  This can either
-                            hold a direct API object reference, or a value for non-objects
-                            such as user and group names.
+                          description: Subject contains a reference to the object or user identities a role binding applies to.  This can either hold a direct API object reference, or a value for non-objects such as user and group names.
                           properties:
                             apiGroup:
-                              description: APIGroup holds the API group of the referenced
-                                subject. Defaults to "" for ServiceAccount subjects.
-                                Defaults to "rbac.authorization.k8s.io" for User and
-                                Group subjects.
+                              description: APIGroup holds the API group of the referenced subject. Defaults to "" for ServiceAccount subjects. Defaults to "rbac.authorization.k8s.io" for User and Group subjects.
                               type: string
                             kind:
-                              description: Kind of object being referenced. Values defined
-                                by this API group are "User", "Group", and "ServiceAccount".
-                                If the Authorizer does not recognized the kind value,
-                                the Authorizer should report an error.
+                              description: Kind of object being referenced. Values defined by this API group are "User", "Group", and "ServiceAccount". If the Authorizer does not recognized the kind value, the Authorizer should report an error.
                               type: string
                             name:
                               description: Name of the object being referenced.
                               type: string
                             namespace:
-                              description: Namespace of the referenced object.  If the
-                                object kind is non-namespace, such as "User" or "Group",
-                                and this value is not empty the Authorizer should report
-                                an error.
+                              description: Namespace of the referenced object.  If the object kind is non-namespace, such as "User" or "Group", and this value is not empty the Authorizer should report an error.
                               type: string
                           required:
                             - kind
@@ -982,15 +686,12 @@ spec:
                   properties:
                     items:
                       items:
-                        description: LimitRangeSpec defines a min/max usage limit for
-                          resources that match on kind.
+                        description: LimitRangeSpec defines a min/max usage limit for resources that match on kind.
                         properties:
                           limits:
-                            description: Limits is the list of LimitRangeItem objects
-                              that are enforced.
+                            description: Limits is the list of LimitRangeItem objects that are enforced.
                             items:
-                              description: LimitRangeItem defines a min/max usage limit
-                                for any resource that matches on kind.
+                              description: LimitRangeItem defines a min/max usage limit for any resource that matches on kind.
                               properties:
                                 default:
                                   additionalProperties:
@@ -999,8 +700,7 @@ spec:
                                       - type: string
                                     pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                                     x-kubernetes-int-or-string: true
-                                  description: Default resource requirement limit value
-                                    by resource name if resource limit is omitted.
+                                  description: Default resource requirement limit value by resource name if resource limit is omitted.
                                   type: object
                                 defaultRequest:
                                   additionalProperties:
@@ -1009,9 +709,7 @@ spec:
                                       - type: string
                                     pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                                     x-kubernetes-int-or-string: true
-                                  description: DefaultRequest is the default resource
-                                    requirement request value by resource name if resource
-                                    request is omitted.
+                                  description: DefaultRequest is the default resource requirement request value by resource name if resource request is omitted.
                                   type: object
                                 max:
                                   additionalProperties:
@@ -1020,8 +718,7 @@ spec:
                                       - type: string
                                     pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                                     x-kubernetes-int-or-string: true
-                                  description: Max usage constraints on this kind by
-                                    resource name.
+                                  description: Max usage constraints on this kind by resource name.
                                   type: object
                                 maxLimitRequestRatio:
                                   additionalProperties:
@@ -1030,11 +727,7 @@ spec:
                                       - type: string
                                     pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                                     x-kubernetes-int-or-string: true
-                                  description: MaxLimitRequestRatio if specified, the
-                                    named resource must have a request and limit that
-                                    are both non-zero where limit divided by request
-                                    is less than or equal to the enumerated value; this
-                                    represents the max burst for the named resource.
+                                  description: MaxLimitRequestRatio if specified, the named resource must have a request and limit that are both non-zero where limit divided by request is less than or equal to the enumerated value; this represents the max burst for the named resource.
                                   type: object
                                 min:
                                   additionalProperties:
@@ -1043,12 +736,10 @@ spec:
                                       - type: string
                                     pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                                     x-kubernetes-int-or-string: true
-                                  description: Min usage constraints on this kind by
-                                    resource name.
+                                  description: Min usage constraints on this kind by resource name.
                                   type: object
                                 type:
-                                  description: Type of resource that this limit applies
-                                    to.
+                                  description: Type of resource that this limit applies to.
                                   type: string
                               required:
                                 - type
@@ -1078,87 +769,43 @@ spec:
                   properties:
                     items:
                       items:
-                        description: NetworkPolicySpec provides the specification of
-                          a NetworkPolicy
+                        description: NetworkPolicySpec provides the specification of a NetworkPolicy
                         properties:
                           egress:
-                            description: List of egress rules to be applied to the selected
-                              pods. Outgoing traffic is allowed if there are no NetworkPolicies
-                              selecting the pod (and cluster policy otherwise allows
-                              the traffic), OR if the traffic matches at least one egress
-                              rule across all of the NetworkPolicy objects whose podSelector
-                              matches the pod. If this field is empty then this NetworkPolicy
-                              limits all outgoing traffic (and serves solely to ensure
-                              that the pods it selects are isolated by default). This
-                              field is beta-level in 1.8
+                            description: List of egress rules to be applied to the selected pods. Outgoing traffic is allowed if there are no NetworkPolicies selecting the pod (and cluster policy otherwise allows the traffic), OR if the traffic matches at least one egress rule across all of the NetworkPolicy objects whose podSelector matches the pod. If this field is empty then this NetworkPolicy limits all outgoing traffic (and serves solely to ensure that the pods it selects are isolated by default). This field is beta-level in 1.8
                             items:
-                              description: NetworkPolicyEgressRule describes a particular
-                                set of traffic that is allowed out of pods matched by
-                                a NetworkPolicySpec's podSelector. The traffic must
-                                match both ports and to. This type is beta-level in
-                                1.8
+                              description: NetworkPolicyEgressRule describes a particular set of traffic that is allowed out of pods matched by a NetworkPolicySpec's podSelector. The traffic must match both ports and to. This type is beta-level in 1.8
                               properties:
                                 ports:
-                                  description: List of destination ports for outgoing
-                                    traffic. Each item in this list is combined using
-                                    a logical OR. If this field is empty or missing,
-                                    this rule matches all ports (traffic not restricted
-                                    by port). If this field is present and contains
-                                    at least one item, then this rule allows traffic
-                                    only if the traffic matches at least one port in
-                                    the list.
+                                  description: List of destination ports for outgoing traffic. Each item in this list is combined using a logical OR. If this field is empty or missing, this rule matches all ports (traffic not restricted by port). If this field is present and contains at least one item, then this rule allows traffic only if the traffic matches at least one port in the list.
                                   items:
-                                    description: NetworkPolicyPort describes a port
-                                      to allow traffic on
+                                    description: NetworkPolicyPort describes a port to allow traffic on
                                     properties:
                                       port:
                                         anyOf:
                                           - type: integer
                                           - type: string
-                                        description: The port on the given protocol.
-                                          This can either be a numerical or named port
-                                          on a pod. If this field is not provided, this
-                                          matches all port names and numbers.
+                                        description: The port on the given protocol. This can either be a numerical or named port on a pod. If this field is not provided, this matches all port names and numbers.
                                         x-kubernetes-int-or-string: true
                                       protocol:
                                         default: TCP
-                                        description: The protocol (TCP, UDP, or SCTP)
-                                          which traffic must match. If not specified,
-                                          this field defaults to TCP.
+                                        description: The protocol (TCP, UDP, or SCTP) which traffic must match. If not specified, this field defaults to TCP.
                                         type: string
                                     type: object
                                   type: array
                                 to:
-                                  description: List of destinations for outgoing traffic
-                                    of pods selected for this rule. Items in this list
-                                    are combined using a logical OR operation. If this
-                                    field is empty or missing, this rule matches all
-                                    destinations (traffic not restricted by destination).
-                                    If this field is present and contains at least one
-                                    item, this rule allows traffic only if the traffic
-                                    matches at least one item in the to list.
+                                  description: List of destinations for outgoing traffic of pods selected for this rule. Items in this list are combined using a logical OR operation. If this field is empty or missing, this rule matches all destinations (traffic not restricted by destination). If this field is present and contains at least one item, this rule allows traffic only if the traffic matches at least one item in the to list.
                                   items:
-                                    description: NetworkPolicyPeer describes a peer
-                                      to allow traffic to/from. Only certain combinations
-                                      of fields are allowed
+                                    description: NetworkPolicyPeer describes a peer to allow traffic to/from. Only certain combinations of fields are allowed
                                     properties:
                                       ipBlock:
-                                        description: IPBlock defines policy on a particular
-                                          IPBlock. If this field is set then neither
-                                          of the other fields can be.
+                                        description: IPBlock defines policy on a particular IPBlock. If this field is set then neither of the other fields can be.
                                         properties:
                                           cidr:
-                                            description: CIDR is a string representing
-                                              the IP Block Valid examples are "192.168.1.1/24"
-                                              or "2001:db9::/64"
+                                            description: CIDR is a string representing the IP Block Valid examples are "192.168.1.1/24" or "2001:db9::/64"
                                             type: string
                                           except:
-                                            description: Except is a slice of CIDRs
-                                              that should not be included within an
-                                              IP Block Valid examples are "192.168.1.1/24"
-                                              or "2001:db9::/64" Except values will
-                                              be rejected if they are outside the CIDR
-                                              range
+                                            description: Except is a slice of CIDRs that should not be included within an IP Block Valid examples are "192.168.1.1/24" or "2001:db9::/64" Except values will be rejected if they are outside the CIDR range
                                             items:
                                               type: string
                                             type: array
@@ -1166,45 +813,21 @@ spec:
                                           - cidr
                                         type: object
                                       namespaceSelector:
-                                        description: "Selects Namespaces using cluster-scoped
-                                        labels. This field follows standard label
-                                        selector semantics; if present but empty,
-                                        it selects all namespaces. \n If PodSelector
-                                        is also set, then the NetworkPolicyPeer as
-                                        a whole selects the Pods matching PodSelector
-                                        in the Namespaces selected by NamespaceSelector.
-                                        Otherwise it selects all Pods in the Namespaces
-                                        selected by NamespaceSelector."
+                                        description: "Selects Namespaces using cluster-scoped labels. This field follows standard label selector semantics; if present but empty, it selects all namespaces. \n If PodSelector is also set, then the NetworkPolicyPeer as a whole selects the Pods matching PodSelector in the Namespaces selected by NamespaceSelector. Otherwise it selects all Pods in the Namespaces selected by NamespaceSelector."
                                         properties:
                                           matchExpressions:
-                                            description: matchExpressions is a list
-                                              of label selector requirements. The requirements
-                                              are ANDed.
+                                            description: matchExpressions is a list of label selector requirements. The requirements are ANDed.
                                             items:
-                                              description: A label selector requirement
-                                                is a selector that contains values,
-                                                a key, and an operator that relates
-                                                the key and values.
+                                              description: A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.
                                               properties:
                                                 key:
-                                                  description: key is the label key
-                                                    that the selector applies to.
+                                                  description: key is the label key that the selector applies to.
                                                   type: string
                                                 operator:
-                                                  description: operator represents a
-                                                    key's relationship to a set of values.
-                                                    Valid operators are In, NotIn, Exists
-                                                    and DoesNotExist.
+                                                  description: operator represents a key's relationship to a set of values. Valid operators are In, NotIn, Exists and DoesNotExist.
                                                   type: string
                                                 values:
-                                                  description: values is an array of
-                                                    string values. If the operator is
-                                                    In or NotIn, the values array must
-                                                    be non-empty. If the operator is
-                                                    Exists or DoesNotExist, the values
-                                                    array must be empty. This array
-                                                    is replaced during a strategic merge
-                                                    patch.
+                                                  description: values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.
                                                   items:
                                                     type: string
                                                   type: array
@@ -1216,54 +839,25 @@ spec:
                                           matchLabels:
                                             additionalProperties:
                                               type: string
-                                            description: matchLabels is a map of {key,value}
-                                              pairs. A single {key,value} in the matchLabels
-                                              map is equivalent to an element of matchExpressions,
-                                              whose key field is "key", the operator
-                                              is "In", and the values array contains
-                                              only "value". The requirements are ANDed.
+                                            description: matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is "key", the operator is "In", and the values array contains only "value". The requirements are ANDed.
                                             type: object
                                         type: object
                                       podSelector:
-                                        description: "This is a label selector which
-                                        selects Pods. This field follows standard
-                                        label selector semantics; if present but empty,
-                                        it selects all pods. \n If NamespaceSelector
-                                        is also set, then the NetworkPolicyPeer as
-                                        a whole selects the Pods matching PodSelector
-                                        in the Namespaces selected by NamespaceSelector.
-                                        Otherwise it selects the Pods matching PodSelector
-                                        in the policy's own Namespace."
+                                        description: "This is a label selector which selects Pods. This field follows standard label selector semantics; if present but empty, it selects all pods. \n If NamespaceSelector is also set, then the NetworkPolicyPeer as a whole selects the Pods matching PodSelector in the Namespaces selected by NamespaceSelector. Otherwise it selects the Pods matching PodSelector in the policy's own Namespace."
                                         properties:
                                           matchExpressions:
-                                            description: matchExpressions is a list
-                                              of label selector requirements. The requirements
-                                              are ANDed.
+                                            description: matchExpressions is a list of label selector requirements. The requirements are ANDed.
                                             items:
-                                              description: A label selector requirement
-                                                is a selector that contains values,
-                                                a key, and an operator that relates
-                                                the key and values.
+                                              description: A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.
                                               properties:
                                                 key:
-                                                  description: key is the label key
-                                                    that the selector applies to.
+                                                  description: key is the label key that the selector applies to.
                                                   type: string
                                                 operator:
-                                                  description: operator represents a
-                                                    key's relationship to a set of values.
-                                                    Valid operators are In, NotIn, Exists
-                                                    and DoesNotExist.
+                                                  description: operator represents a key's relationship to a set of values. Valid operators are In, NotIn, Exists and DoesNotExist.
                                                   type: string
                                                 values:
-                                                  description: values is an array of
-                                                    string values. If the operator is
-                                                    In or NotIn, the values array must
-                                                    be non-empty. If the operator is
-                                                    Exists or DoesNotExist, the values
-                                                    array must be empty. This array
-                                                    is replaced during a strategic merge
-                                                    patch.
+                                                  description: values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.
                                                   items:
                                                     type: string
                                                   type: array
@@ -1275,12 +869,7 @@ spec:
                                           matchLabels:
                                             additionalProperties:
                                               type: string
-                                            description: matchLabels is a map of {key,value}
-                                              pairs. A single {key,value} in the matchLabels
-                                              map is equivalent to an element of matchExpressions,
-                                              whose key field is "key", the operator
-                                              is "In", and the values array contains
-                                              only "value". The requirements are ANDed.
+                                            description: matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is "key", the operator is "In", and the values array contains only "value". The requirements are ANDed.
                                             type: object
                                         type: object
                                     type: object
@@ -1288,53 +877,23 @@ spec:
                               type: object
                             type: array
                           ingress:
-                            description: List of ingress rules to be applied to the
-                              selected pods. Traffic is allowed to a pod if there are
-                              no NetworkPolicies selecting the pod (and cluster policy
-                              otherwise allows the traffic), OR if the traffic source
-                              is the pod's local node, OR if the traffic matches at
-                              least one ingress rule across all of the NetworkPolicy
-                              objects whose podSelector matches the pod. If this field
-                              is empty then this NetworkPolicy does not allow any traffic
-                              (and serves solely to ensure that the pods it selects
-                              are isolated by default)
+                            description: List of ingress rules to be applied to the selected pods. Traffic is allowed to a pod if there are no NetworkPolicies selecting the pod (and cluster policy otherwise allows the traffic), OR if the traffic source is the pod's local node, OR if the traffic matches at least one ingress rule across all of the NetworkPolicy objects whose podSelector matches the pod. If this field is empty then this NetworkPolicy does not allow any traffic (and serves solely to ensure that the pods it selects are isolated by default)
                             items:
-                              description: NetworkPolicyIngressRule describes a particular
-                                set of traffic that is allowed to the pods matched by
-                                a NetworkPolicySpec's podSelector. The traffic must
-                                match both ports and from.
+                              description: NetworkPolicyIngressRule describes a particular set of traffic that is allowed to the pods matched by a NetworkPolicySpec's podSelector. The traffic must match both ports and from.
                               properties:
                                 from:
-                                  description: List of sources which should be able
-                                    to access the pods selected for this rule. Items
-                                    in this list are combined using a logical OR operation.
-                                    If this field is empty or missing, this rule matches
-                                    all sources (traffic not restricted by source).
-                                    If this field is present and contains at least one
-                                    item, this rule allows traffic only if the traffic
-                                    matches at least one item in the from list.
+                                  description: List of sources which should be able to access the pods selected for this rule. Items in this list are combined using a logical OR operation. If this field is empty or missing, this rule matches all sources (traffic not restricted by source). If this field is present and contains at least one item, this rule allows traffic only if the traffic matches at least one item in the from list.
                                   items:
-                                    description: NetworkPolicyPeer describes a peer
-                                      to allow traffic to/from. Only certain combinations
-                                      of fields are allowed
+                                    description: NetworkPolicyPeer describes a peer to allow traffic to/from. Only certain combinations of fields are allowed
                                     properties:
                                       ipBlock:
-                                        description: IPBlock defines policy on a particular
-                                          IPBlock. If this field is set then neither
-                                          of the other fields can be.
+                                        description: IPBlock defines policy on a particular IPBlock. If this field is set then neither of the other fields can be.
                                         properties:
                                           cidr:
-                                            description: CIDR is a string representing
-                                              the IP Block Valid examples are "192.168.1.1/24"
-                                              or "2001:db9::/64"
+                                            description: CIDR is a string representing the IP Block Valid examples are "192.168.1.1/24" or "2001:db9::/64"
                                             type: string
                                           except:
-                                            description: Except is a slice of CIDRs
-                                              that should not be included within an
-                                              IP Block Valid examples are "192.168.1.1/24"
-                                              or "2001:db9::/64" Except values will
-                                              be rejected if they are outside the CIDR
-                                              range
+                                            description: Except is a slice of CIDRs that should not be included within an IP Block Valid examples are "192.168.1.1/24" or "2001:db9::/64" Except values will be rejected if they are outside the CIDR range
                                             items:
                                               type: string
                                             type: array
@@ -1342,45 +901,21 @@ spec:
                                           - cidr
                                         type: object
                                       namespaceSelector:
-                                        description: "Selects Namespaces using cluster-scoped
-                                        labels. This field follows standard label
-                                        selector semantics; if present but empty,
-                                        it selects all namespaces. \n If PodSelector
-                                        is also set, then the NetworkPolicyPeer as
-                                        a whole selects the Pods matching PodSelector
-                                        in the Namespaces selected by NamespaceSelector.
-                                        Otherwise it selects all Pods in the Namespaces
-                                        selected by NamespaceSelector."
+                                        description: "Selects Namespaces using cluster-scoped labels. This field follows standard label selector semantics; if present but empty, it selects all namespaces. \n If PodSelector is also set, then the NetworkPolicyPeer as a whole selects the Pods matching PodSelector in the Namespaces selected by NamespaceSelector. Otherwise it selects all Pods in the Namespaces selected by NamespaceSelector."
                                         properties:
                                           matchExpressions:
-                                            description: matchExpressions is a list
-                                              of label selector requirements. The requirements
-                                              are ANDed.
+                                            description: matchExpressions is a list of label selector requirements. The requirements are ANDed.
                                             items:
-                                              description: A label selector requirement
-                                                is a selector that contains values,
-                                                a key, and an operator that relates
-                                                the key and values.
+                                              description: A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.
                                               properties:
                                                 key:
-                                                  description: key is the label key
-                                                    that the selector applies to.
+                                                  description: key is the label key that the selector applies to.
                                                   type: string
                                                 operator:
-                                                  description: operator represents a
-                                                    key's relationship to a set of values.
-                                                    Valid operators are In, NotIn, Exists
-                                                    and DoesNotExist.
+                                                  description: operator represents a key's relationship to a set of values. Valid operators are In, NotIn, Exists and DoesNotExist.
                                                   type: string
                                                 values:
-                                                  description: values is an array of
-                                                    string values. If the operator is
-                                                    In or NotIn, the values array must
-                                                    be non-empty. If the operator is
-                                                    Exists or DoesNotExist, the values
-                                                    array must be empty. This array
-                                                    is replaced during a strategic merge
-                                                    patch.
+                                                  description: values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.
                                                   items:
                                                     type: string
                                                   type: array
@@ -1392,54 +927,25 @@ spec:
                                           matchLabels:
                                             additionalProperties:
                                               type: string
-                                            description: matchLabels is a map of {key,value}
-                                              pairs. A single {key,value} in the matchLabels
-                                              map is equivalent to an element of matchExpressions,
-                                              whose key field is "key", the operator
-                                              is "In", and the values array contains
-                                              only "value". The requirements are ANDed.
+                                            description: matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is "key", the operator is "In", and the values array contains only "value". The requirements are ANDed.
                                             type: object
                                         type: object
                                       podSelector:
-                                        description: "This is a label selector which
-                                        selects Pods. This field follows standard
-                                        label selector semantics; if present but empty,
-                                        it selects all pods. \n If NamespaceSelector
-                                        is also set, then the NetworkPolicyPeer as
-                                        a whole selects the Pods matching PodSelector
-                                        in the Namespaces selected by NamespaceSelector.
-                                        Otherwise it selects the Pods matching PodSelector
-                                        in the policy's own Namespace."
+                                        description: "This is a label selector which selects Pods. This field follows standard label selector semantics; if present but empty, it selects all pods. \n If NamespaceSelector is also set, then the NetworkPolicyPeer as a whole selects the Pods matching PodSelector in the Namespaces selected by NamespaceSelector. Otherwise it selects the Pods matching PodSelector in the policy's own Namespace."
                                         properties:
                                           matchExpressions:
-                                            description: matchExpressions is a list
-                                              of label selector requirements. The requirements
-                                              are ANDed.
+                                            description: matchExpressions is a list of label selector requirements. The requirements are ANDed.
                                             items:
-                                              description: A label selector requirement
-                                                is a selector that contains values,
-                                                a key, and an operator that relates
-                                                the key and values.
+                                              description: A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.
                                               properties:
                                                 key:
-                                                  description: key is the label key
-                                                    that the selector applies to.
+                                                  description: key is the label key that the selector applies to.
                                                   type: string
                                                 operator:
-                                                  description: operator represents a
-                                                    key's relationship to a set of values.
-                                                    Valid operators are In, NotIn, Exists
-                                                    and DoesNotExist.
+                                                  description: operator represents a key's relationship to a set of values. Valid operators are In, NotIn, Exists and DoesNotExist.
                                                   type: string
                                                 values:
-                                                  description: values is an array of
-                                                    string values. If the operator is
-                                                    In or NotIn, the values array must
-                                                    be non-empty. If the operator is
-                                                    Exists or DoesNotExist, the values
-                                                    array must be empty. This array
-                                                    is replaced during a strategic merge
-                                                    patch.
+                                                  description: values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.
                                                   items:
                                                     type: string
                                                   type: array
@@ -1451,81 +957,46 @@ spec:
                                           matchLabels:
                                             additionalProperties:
                                               type: string
-                                            description: matchLabels is a map of {key,value}
-                                              pairs. A single {key,value} in the matchLabels
-                                              map is equivalent to an element of matchExpressions,
-                                              whose key field is "key", the operator
-                                              is "In", and the values array contains
-                                              only "value". The requirements are ANDed.
+                                            description: matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is "key", the operator is "In", and the values array contains only "value". The requirements are ANDed.
                                             type: object
                                         type: object
                                     type: object
                                   type: array
                                 ports:
-                                  description: List of ports which should be made accessible
-                                    on the pods selected for this rule. Each item in
-                                    this list is combined using a logical OR. If this
-                                    field is empty or missing, this rule matches all
-                                    ports (traffic not restricted by port). If this
-                                    field is present and contains at least one item,
-                                    then this rule allows traffic only if the traffic
-                                    matches at least one port in the list.
+                                  description: List of ports which should be made accessible on the pods selected for this rule. Each item in this list is combined using a logical OR. If this field is empty or missing, this rule matches all ports (traffic not restricted by port). If this field is present and contains at least one item, then this rule allows traffic only if the traffic matches at least one port in the list.
                                   items:
-                                    description: NetworkPolicyPort describes a port
-                                      to allow traffic on
+                                    description: NetworkPolicyPort describes a port to allow traffic on
                                     properties:
                                       port:
                                         anyOf:
                                           - type: integer
                                           - type: string
-                                        description: The port on the given protocol.
-                                          This can either be a numerical or named port
-                                          on a pod. If this field is not provided, this
-                                          matches all port names and numbers.
+                                        description: The port on the given protocol. This can either be a numerical or named port on a pod. If this field is not provided, this matches all port names and numbers.
                                         x-kubernetes-int-or-string: true
                                       protocol:
                                         default: TCP
-                                        description: The protocol (TCP, UDP, or SCTP)
-                                          which traffic must match. If not specified,
-                                          this field defaults to TCP.
+                                        description: The protocol (TCP, UDP, or SCTP) which traffic must match. If not specified, this field defaults to TCP.
                                         type: string
                                     type: object
                                   type: array
                               type: object
                             type: array
                           podSelector:
-                            description: Selects the pods to which this NetworkPolicy
-                              object applies. The array of ingress rules is applied
-                              to any pods selected by this field. Multiple network policies
-                              can select the same set of pods. In this case, the ingress
-                              rules for each are combined additively. This field is
-                              NOT optional and follows standard label selector semantics.
-                              An empty podSelector matches all pods in this namespace.
+                            description: Selects the pods to which this NetworkPolicy object applies. The array of ingress rules is applied to any pods selected by this field. Multiple network policies can select the same set of pods. In this case, the ingress rules for each are combined additively. This field is NOT optional and follows standard label selector semantics. An empty podSelector matches all pods in this namespace.
                             properties:
                               matchExpressions:
-                                description: matchExpressions is a list of label selector
-                                  requirements. The requirements are ANDed.
+                                description: matchExpressions is a list of label selector requirements. The requirements are ANDed.
                                 items:
-                                  description: A label selector requirement is a selector
-                                    that contains values, a key, and an operator that
-                                    relates the key and values.
+                                  description: A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.
                                   properties:
                                     key:
-                                      description: key is the label key that the selector
-                                        applies to.
+                                      description: key is the label key that the selector applies to.
                                       type: string
                                     operator:
-                                      description: operator represents a key's relationship
-                                        to a set of values. Valid operators are In,
-                                        NotIn, Exists and DoesNotExist.
+                                      description: operator represents a key's relationship to a set of values. Valid operators are In, NotIn, Exists and DoesNotExist.
                                       type: string
                                     values:
-                                      description: values is an array of string values.
-                                        If the operator is In or NotIn, the values array
-                                        must be non-empty. If the operator is Exists
-                                        or DoesNotExist, the values array must be empty.
-                                        This array is replaced during a strategic merge
-                                        patch.
+                                      description: values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.
                                       items:
                                         type: string
                                       type: array
@@ -1537,31 +1008,13 @@ spec:
                               matchLabels:
                                 additionalProperties:
                                   type: string
-                                description: matchLabels is a map of {key,value} pairs.
-                                  A single {key,value} in the matchLabels map is equivalent
-                                  to an element of matchExpressions, whose key field
-                                  is "key", the operator is "In", and the values array
-                                  contains only "value". The requirements are ANDed.
+                                description: matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is "key", the operator is "In", and the values array contains only "value". The requirements are ANDed.
                                 type: object
                             type: object
                           policyTypes:
-                            description: List of rule types that the NetworkPolicy relates
-                              to. Valid options are "Ingress", "Egress", or "Ingress,Egress".
-                              If this field is not specified, it will default based
-                              on the existence of Ingress or Egress rules; policies
-                              that contain an Egress section are assumed to affect Egress,
-                              and all policies (whether or not they contain an Ingress
-                              section) are assumed to affect Ingress. If you want to
-                              write an egress-only policy, you must explicitly specify
-                              policyTypes [ "Egress" ]. Likewise, if you want to write
-                              a policy that specifies that no egress is allowed, you
-                              must specify a policyTypes value that include "Egress"
-                              (since such a policy would not include an Egress section
-                              and would otherwise default to just [ "Ingress" ]). This
-                              field is beta-level in 1.8
+                            description: List of rule types that the NetworkPolicy relates to. Valid options are "Ingress", "Egress", or "Ingress,Egress". If this field is not specified, it will default based on the existence of Ingress or Egress rules; policies that contain an Egress section are assumed to affect Egress, and all policies (whether or not they contain an Ingress section) are assumed to affect Ingress. If you want to write an egress-only policy, you must explicitly specify policyTypes [ "Egress" ]. Likewise, if you want to write a policy that specifies that no egress is allowed, you must specify a policyTypes value that include "Egress" (since such a policy would not include an Egress section and would otherwise default to just [ "Ingress" ]). This field is beta-level in 1.8
                             items:
-                              description: Policy Type string describes the NetworkPolicy
-                                type This type is beta-level in 1.8
+                              description: Policy Type string describes the NetworkPolicy type This type is beta-level in 1.8
                               type: string
                             type: array
                         required:
@@ -1573,20 +1026,45 @@ spec:
                   additionalProperties:
                     type: string
                   type: object
-                owner:
-                  description: OwnerSpec defines tenant owner name and kind
-                  properties:
-                    kind:
-                      enum:
-                        - User
-                        - Group
-                      type: string
-                    name:
-                      type: string
-                  required:
-                    - kind
-                    - name
-                  type: object
+                owners:
+                  items:
+                    description: OwnerSpec defines tenant owner name and kind
+                    properties:
+                      kind:
+                        enum:
+                          - User
+                          - Group
+                          - ServiceAccount
+                        type: string
+                      name:
+                        type: string
+                      proxySettings:
+                        items:
+                          properties:
+                            kind:
+                              enum:
+                                - Nodes
+                                - StorageClasses
+                                - IngressClasses
+                              type: string
+                            operations:
+                              items:
+                                enum:
+                                  - List
+                                  - Update
+                                  - Delete
+                                type: string
+                              type: array
+                          required:
+                            - kind
+                            - operations
+                          type: object
+                        type: array
+                    required:
+                      - kind
+                      - name
+                    type: object
+                  type: array
                 priorityClasses:
                   properties:
                     allowed:
@@ -1600,8 +1078,7 @@ spec:
                   properties:
                     items:
                       items:
-                        description: ResourceQuotaSpec defines the desired hard limits
-                          to enforce for Quota.
+                        description: ResourceQuotaSpec defines the desired hard limits to enforce for Quota.
                         properties:
                           hard:
                             additionalProperties:
@@ -1610,40 +1087,24 @@ spec:
                                 - type: string
                               pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                               x-kubernetes-int-or-string: true
-                            description: 'hard is the set of desired hard limits for
-                            each named resource. More info: https://kubernetes.io/docs/concepts/policy/resource-quotas/'
+                            description: 'hard is the set of desired hard limits for each named resource. More info: https://kubernetes.io/docs/concepts/policy/resource-quotas/'
                             type: object
                           scopeSelector:
-                            description: scopeSelector is also a collection of filters
-                              like scopes that must match each object tracked by a quota
-                              but expressed using ScopeSelectorOperator in combination
-                              with possible values. For a resource to match, both scopes
-                              AND scopeSelector (if specified in spec), must be matched.
+                            description: scopeSelector is also a collection of filters like scopes that must match each object tracked by a quota but expressed using ScopeSelectorOperator in combination with possible values. For a resource to match, both scopes AND scopeSelector (if specified in spec), must be matched.
                             properties:
                               matchExpressions:
-                                description: A list of scope selector requirements by
-                                  scope of the resources.
+                                description: A list of scope selector requirements by scope of the resources.
                                 items:
-                                  description: A scoped-resource selector requirement
-                                    is a selector that contains values, a scope name,
-                                    and an operator that relates the scope name and
-                                    values.
+                                  description: A scoped-resource selector requirement is a selector that contains values, a scope name, and an operator that relates the scope name and values.
                                   properties:
                                     operator:
-                                      description: Represents a scope's relationship
-                                        to a set of values. Valid operators are In,
-                                        NotIn, Exists, DoesNotExist.
+                                      description: Represents a scope's relationship to a set of values. Valid operators are In, NotIn, Exists, DoesNotExist.
                                       type: string
                                     scopeName:
-                                      description: The name of the scope that the selector
-                                        applies to.
+                                      description: The name of the scope that the selector applies to.
                                       type: string
                                     values:
-                                      description: An array of string values. If the
-                                        operator is In or NotIn, the values array must
-                                        be non-empty. If the operator is Exists or DoesNotExist,
-                                        the values array must be empty. This array is
-                                        replaced during a strategic merge patch.
+                                      description: An array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.
                                       items:
                                         type: string
                                       type: array
@@ -1654,12 +1115,9 @@ spec:
                                 type: array
                             type: object
                           scopes:
-                            description: A collection of filters that must match each
-                              object tracked by a quota. If not specified, the quota
-                              matches all objects.
+                            description: A collection of filters that must match each object tracked by a quota. If not specified, the quota matches all objects.
                             items:
-                              description: A ResourceQuotaScope defines a filter that
-                                must match each object tracked by a quota
+                              description: A ResourceQuotaScope defines a filter that must match each object tracked by a quota
                               type: string
                             type: array
                         type: object
@@ -1686,7 +1144,7 @@ spec:
                       type: string
                   type: object
               required:
-                - owner
+                - owners
               type: object
             status:
               description: TenantStatus defines the observed state of Tenant
@@ -1711,7 +1169,7 @@ spec:
       served: true
       storage: true
       subresources:
-        status: {}
+        status: { }
 status:
   acceptedNames:
     kind: ""
