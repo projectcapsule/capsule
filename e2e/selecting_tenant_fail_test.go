@@ -21,9 +21,11 @@ var _ = Describe("creating a Namespace without a Tenant selector when user owns 
 			Name: "tenant-one",
 		},
 		Spec: capsulev1beta1.TenantSpec{
-			Owner: capsulev1beta1.OwnerSpec{
-				Name: "john",
-				Kind: "User",
+			Owners: []capsulev1beta1.OwnerSpec{
+				{
+					Name: "john",
+					Kind: "User",
+				},
 			},
 		},
 	}
@@ -32,9 +34,11 @@ var _ = Describe("creating a Namespace without a Tenant selector when user owns 
 			Name: "tenant-two",
 		},
 		Spec: capsulev1beta1.TenantSpec{
-			Owner: capsulev1beta1.OwnerSpec{
-				Name: "john",
-				Kind: "User",
+			Owners: []capsulev1beta1.OwnerSpec{
+				{
+					Name: "john",
+					Kind: "User",
+				},
 			},
 		},
 	}
@@ -43,9 +47,11 @@ var _ = Describe("creating a Namespace without a Tenant selector when user owns 
 			Name: "tenant-three",
 		},
 		Spec: capsulev1beta1.TenantSpec{
-			Owner: capsulev1beta1.OwnerSpec{
-				Name: "john",
-				Kind: "Group",
+			Owners: []capsulev1beta1.OwnerSpec{
+				{
+					Name: "john",
+					Kind: "Group",
+				},
 			},
 		},
 	}
@@ -54,9 +60,11 @@ var _ = Describe("creating a Namespace without a Tenant selector when user owns 
 			Name: "tenant-four",
 		},
 		Spec: capsulev1beta1.TenantSpec{
-			Owner: capsulev1beta1.OwnerSpec{
-				Name: "john",
-				Kind: "Group",
+			Owners: []capsulev1beta1.OwnerSpec{
+				{
+					Name: "john",
+					Kind: "Group",
+				},
 			},
 		},
 	}
@@ -66,16 +74,16 @@ var _ = Describe("creating a Namespace without a Tenant selector when user owns 
 		By("user owns 2 tenants", func() {
 			EventuallyCreation(func() error { return k8sClient.Create(context.TODO(), t1) }).Should(Succeed())
 			EventuallyCreation(func() error { return k8sClient.Create(context.TODO(), t2) }).Should(Succeed())
-			NamespaceCreation(ns, t1, defaultTimeoutInterval).ShouldNot(Succeed())
-			NamespaceCreation(ns, t2, defaultTimeoutInterval).ShouldNot(Succeed())
+			NamespaceCreation(ns, t1.Spec.Owners[0], defaultTimeoutInterval).ShouldNot(Succeed())
+			NamespaceCreation(ns, t2.Spec.Owners[0], defaultTimeoutInterval).ShouldNot(Succeed())
 			Expect(k8sClient.Delete(context.TODO(), t1)).Should(Succeed())
 			Expect(k8sClient.Delete(context.TODO(), t2)).Should(Succeed())
 		})
 		By("group owns 2 tenants", func() {
 			EventuallyCreation(func() error { return k8sClient.Create(context.TODO(), t3) }).Should(Succeed())
 			EventuallyCreation(func() error { return k8sClient.Create(context.TODO(), t4) }).Should(Succeed())
-			NamespaceCreation(ns, t3, defaultTimeoutInterval).ShouldNot(Succeed())
-			NamespaceCreation(ns, t4, defaultTimeoutInterval).ShouldNot(Succeed())
+			NamespaceCreation(ns, t3.Spec.Owners[0], defaultTimeoutInterval).ShouldNot(Succeed())
+			NamespaceCreation(ns, t4.Spec.Owners[0], defaultTimeoutInterval).ShouldNot(Succeed())
 			Expect(k8sClient.Delete(context.TODO(), t3)).Should(Succeed())
 			Expect(k8sClient.Delete(context.TODO(), t4)).Should(Succeed())
 		})
@@ -85,10 +93,10 @@ var _ = Describe("creating a Namespace without a Tenant selector when user owns 
 			EventuallyCreation(func() error { return k8sClient.Create(context.TODO(), t2) }).Should(Succeed())
 			EventuallyCreation(func() error { return k8sClient.Create(context.TODO(), t3) }).Should(Succeed())
 			EventuallyCreation(func() error { return k8sClient.Create(context.TODO(), t4) }).Should(Succeed())
-			NamespaceCreation(ns, t1, defaultTimeoutInterval).ShouldNot(Succeed())
-			NamespaceCreation(ns, t2, defaultTimeoutInterval).ShouldNot(Succeed())
-			NamespaceCreation(ns, t3, defaultTimeoutInterval).ShouldNot(Succeed())
-			NamespaceCreation(ns, t4, defaultTimeoutInterval).ShouldNot(Succeed())
+			NamespaceCreation(ns, t1.Spec.Owners[0], defaultTimeoutInterval).ShouldNot(Succeed())
+			NamespaceCreation(ns, t2.Spec.Owners[0], defaultTimeoutInterval).ShouldNot(Succeed())
+			NamespaceCreation(ns, t3.Spec.Owners[0], defaultTimeoutInterval).ShouldNot(Succeed())
+			NamespaceCreation(ns, t4.Spec.Owners[0], defaultTimeoutInterval).ShouldNot(Succeed())
 			Expect(k8sClient.Delete(context.TODO(), t1)).Should(Succeed())
 			Expect(k8sClient.Delete(context.TODO(), t2)).Should(Succeed())
 			Expect(k8sClient.Delete(context.TODO(), t3)).Should(Succeed())

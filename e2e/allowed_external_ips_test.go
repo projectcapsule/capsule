@@ -23,9 +23,11 @@ var _ = Describe("enforcing an allowed set of Service external IPs", func() {
 			Name: "allowed-external-ip",
 		},
 		Spec: capsulev1beta1.TenantSpec{
-			Owner: capsulev1beta1.OwnerSpec{
-				Name: "google",
-				Kind: "User",
+			Owners: []capsulev1beta1.OwnerSpec{
+				{
+					Name: "google",
+					Kind: "User",
+				},
 			},
 			ExternalServiceIPs: &capsulev1beta1.ExternalServiceIPsSpec{
 				Allowed: []capsulev1beta1.AllowedIP{
@@ -48,7 +50,7 @@ var _ = Describe("enforcing an allowed set of Service external IPs", func() {
 
 	It("should fail creating an evil service", func() {
 		ns := NewNamespace("evil-service")
-		NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 
 		svc := &corev1.Service{
 			ObjectMeta: metav1.ObjectMeta{
@@ -73,7 +75,7 @@ var _ = Describe("enforcing an allowed set of Service external IPs", func() {
 			},
 		}
 		EventuallyCreation(func() error {
-			cs := ownerClient(tnt)
+			cs := ownerClient(tnt.Spec.Owners[0])
 			_, err := cs.CoreV1().Services(ns.Name).Create(context.Background(), svc, metav1.CreateOptions{})
 			return err
 		}).ShouldNot(Succeed())
@@ -81,7 +83,7 @@ var _ = Describe("enforcing an allowed set of Service external IPs", func() {
 
 	It("should allow the first CIDR block", func() {
 		ns := NewNamespace("allowed-service-cidr")
-		NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 
 		svc := &corev1.Service{
 			ObjectMeta: metav1.ObjectMeta{
@@ -106,7 +108,7 @@ var _ = Describe("enforcing an allowed set of Service external IPs", func() {
 			},
 		}
 		EventuallyCreation(func() error {
-			cs := ownerClient(tnt)
+			cs := ownerClient(tnt.Spec.Owners[0])
 			_, err := cs.CoreV1().Services(ns.Name).Create(context.Background(), svc, metav1.CreateOptions{})
 			return err
 		}).Should(Succeed())
@@ -114,7 +116,7 @@ var _ = Describe("enforcing an allowed set of Service external IPs", func() {
 
 	It("should allow the /32 CIDR block", func() {
 		ns := NewNamespace("allowed-service-strict")
-		NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 
 		svc := &corev1.Service{
 			ObjectMeta: metav1.ObjectMeta{
@@ -138,7 +140,7 @@ var _ = Describe("enforcing an allowed set of Service external IPs", func() {
 			},
 		}
 		EventuallyCreation(func() error {
-			cs := ownerClient(tnt)
+			cs := ownerClient(tnt.Spec.Owners[0])
 			_, err := cs.CoreV1().Services(ns.Name).Create(context.Background(), svc, metav1.CreateOptions{})
 			return err
 		}).Should(Succeed())

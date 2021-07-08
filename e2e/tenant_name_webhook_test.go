@@ -21,9 +21,11 @@ var _ = Describe("creating a Tenant with wrong name", func() {
 			Name: "non_rfc_dns_1123",
 		},
 		Spec: capsulev1beta1.TenantSpec{
-			Owner: capsulev1beta1.OwnerSpec{
-				Name: "john",
-				Kind: "User",
+			Owners: []capsulev1beta1.OwnerSpec{
+				{
+					Name: "john",
+					Kind: "User",
+				},
 			},
 		},
 	}

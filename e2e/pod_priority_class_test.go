@@ -23,9 +23,11 @@ var _ = Describe("enforcing a Priority Class", func() {
 			Name: "priority-class",
 		},
 		Spec: capsulev1beta1.TenantSpec{
-			Owner: capsulev1beta1.OwnerSpec{
-				Name: "george",
-				Kind: "User",
+			Owners: []capsulev1beta1.OwnerSpec{
+				{
+					Name: "george",
+					Kind: "User",
+				},
 			},
 			PriorityClasses: &capsulev1beta1.AllowedListSpec{
 				Exact: []string{"gold"},
@@ -46,7 +48,7 @@ var _ = Describe("enforcing a Priority Class", func() {
 
 	It("should block non allowed Priority Class", func() {
 		ns := NewNamespace("system-node-critical")
-		NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 
 		pod := &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
@@ -63,7 +65,7 @@ var _ = Describe("enforcing a Priority Class", func() {
 			},
 		}
 
-		cs := ownerClient(tnt)
+		cs := ownerClient(tnt.Spec.Owners[0])
 		EventuallyCreation(func() error {
 			_, err := cs.CoreV1().Pods(ns.GetName()).Create(context.Background(), pod, metav1.CreateOptions{})
 			return err
@@ -85,7 +87,7 @@ var _ = Describe("enforcing a Priority Class", func() {
 		}()
 
 		ns := NewNamespace("pc-exact-match")
-		NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 
 		pod := &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
@@ -102,7 +104,7 @@ var _ = Describe("enforcing a Priority Class", func() {
 			},
 		}
 
-		cs := ownerClient(tnt)
+		cs := ownerClient(tnt.Spec.Owners[0])
 		EventuallyCreation(func() error {
 			_, err := cs.CoreV1().Pods(ns.GetName()).Create(context.Background(), pod, metav1.CreateOptions{})
 			return err
@@ -112,7 +114,7 @@ var _ = Describe("enforcing a Priority Class", func() {
 	It("should allow regex match", func() {
 		ns := NewNamespace("pc-regex-match")
 
-		NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 
 		for i, pc := range []string{"pc-bronze", "pc-silver", "pc-gold"} {
 			class := &v1.PriorityClass{
@@ -140,7 +142,7 @@ var _ = Describe("enforcing a Priority Class", func() {
 				},
 			}
 
-			cs := ownerClient(tnt)
+			cs := ownerClient(tnt.Spec.Owners[0])
 
 			EventuallyCreation(func() error {
 				_, err := cs.CoreV1().Pods(ns.GetName()).Create(context.Background(), pod, metav1.CreateOptions{})

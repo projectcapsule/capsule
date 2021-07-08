@@ -24,9 +24,11 @@ var _ = Describe("when Tenant handles Storage classes", func() {
 			Name: "storage-class",
 		},
 		Spec: capsulev1beta1.TenantSpec{
-			Owner: capsulev1beta1.OwnerSpec{
-				Name: "storage",
-				Kind: "User",
+			Owners: []capsulev1beta1.OwnerSpec{
+				{
+					Name: "storage",
+					Kind: "User",
+				},
 			},
 			StorageClasses: &capsulev1beta1.AllowedListSpec{
 				Exact: []string{
@@ -50,12 +52,12 @@ var _ = Describe("when Tenant handles Storage classes", func() {
 
 	It("should fails", func() {
 		ns := NewNamespace("storage-class-disallowed")
-		NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 		By("non-specifying it", func() {
 			Eventually(func() (err error) {
-				cs := ownerClient(tnt)
+				cs := ownerClient(tnt.Spec.Owners[0])
 				p := &corev1.PersistentVolumeClaim{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "denied-pvc",
@@ -75,7 +77,7 @@ var _ = Describe("when Tenant handles Storage classes", func() {
 		})
 		By("specifying a forbidden one", func() {
 			Eventually(func() (err error) {
-				cs := ownerClient(tnt)
+				cs := ownerClient(tnt.Spec.Owners[0])
 				p := &corev1.PersistentVolumeClaim{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "mighty-storage",
@@ -97,9 +99,9 @@ var _ = Describe("when Tenant handles Storage classes", func() {
 
 	It("should allow", func() {
 		ns := NewNamespace("storage-class-allowed")
-		cs := ownerClient(tnt)
+		cs := ownerClient(tnt.Spec.Owners[0])
 
-		NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 		By("using exact matches", func() {
 			for _, c := range tnt.Spec.StorageClasses.Exact {

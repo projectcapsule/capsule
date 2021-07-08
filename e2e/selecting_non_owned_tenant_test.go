@@ -22,9 +22,11 @@ var _ = Describe("creating a Namespace trying to select a third Tenant", func() 
 			Name: "tenant-non-owned",
 		},
 		Spec: capsulev1beta1.TenantSpec{
-			Owner: capsulev1beta1.OwnerSpec{
-				Name: "undefined",
-				Kind: "User",
+			Owners: []capsulev1beta1.OwnerSpec{
+				{
+					Name: "undefined",
+					Kind: "User",
+				},
 			},
 		},
 	}
@@ -51,7 +53,7 @@ var _ = Describe("creating a Namespace trying to select a third Tenant", func() 
 			})
 		})
 
-		cs := ownerClient(&capsulev1beta1.Tenant{Spec: capsulev1beta1.TenantSpec{Owner: capsulev1beta1.OwnerSpec{Name: "dale", Kind: "User"}}})
+		cs := ownerClient(capsulev1beta1.OwnerSpec{Name: "dale", Kind: "User"})
 		_, err := cs.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
 		Expect(err).To(HaveOccurred())
 	})

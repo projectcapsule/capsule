@@ -23,9 +23,11 @@ var _ = Describe("creating a Namespace with an additional Role Binding", func() 
 			Name: "additional-role-binding",
 		},
 		Spec: capsulev1beta1.TenantSpec{
-			Owner: capsulev1beta1.OwnerSpec{
-				Name: "dale",
-				Kind: "User",
+			Owners: []capsulev1beta1.OwnerSpec{
+				{
+					Name: "dale",
+					Kind: "User",
+				},
 			},
 			AdditionalRoleBindings: []capsulev1beta1.AdditionalRoleBindingsSpec{
 				{
@@ -55,13 +57,13 @@ var _ = Describe("creating a Namespace with an additional Role Binding", func() 
 	It("should be assigned to each Namespace", func() {
 		for _, ns := range []string{"rb-1", "rb-2", "rb-3"} {
 			ns := NewNamespace(ns)
-			NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
+			NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 			TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 			var rb *rbacv1.RoleBinding
 
 			Eventually(func() (err error) {
-				cs := ownerClient(tnt)
+				cs := ownerClient(tnt.Spec.Owners[0])
 				rb, err = cs.RbacV1().RoleBindings(ns.Name).Get(context.Background(), fmt.Sprintf("capsule-%s-0-%s", tnt.Name, "crds-rolebinding"), metav1.GetOptions{})
 				return err
 			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())

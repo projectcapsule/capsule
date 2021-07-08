@@ -24,9 +24,11 @@ var _ = Describe("when Tenant handles Ingress classes", func() {
 			Name: "ingress-class",
 		},
 		Spec: capsulev1beta1.TenantSpec{
-			Owner: capsulev1beta1.OwnerSpec{
-				Name: "ingress",
-				Kind: "User",
+			Owners: []capsulev1beta1.OwnerSpec{
+				{
+					Name: "ingress",
+					Kind: "User",
+				},
 			},
 			IngressClasses: &capsulev1beta1.AllowedListSpec{
 				Exact: []string{
@@ -50,9 +52,9 @@ var _ = Describe("when Tenant handles Ingress classes", func() {
 
 	It("should block a non allowed class", func() {
 		ns := NewNamespace("ingress-class-disallowed")
-		cs := ownerClient(tnt)
+		cs := ownerClient(tnt.Spec.Owners[0])
 
-		NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 		By("non-specifying at all", func() {
@@ -114,9 +116,9 @@ var _ = Describe("when Tenant handles Ingress classes", func() {
 
 	It("should allow enabled class using the deprecated annotation", func() {
 		ns := NewNamespace("ingress-class-allowed-annotation")
-		cs := ownerClient(tnt)
+		cs := ownerClient(tnt.Spec.Owners[0])
 
-		NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 		for _, c := range tnt.Spec.IngressClasses.Exact {
@@ -143,14 +145,14 @@ var _ = Describe("when Tenant handles Ingress classes", func() {
 
 	It("should allow enabled class using the ingressClassName field", func() {
 		ns := NewNamespace("ingress-class-allowed-annotation")
-		cs := ownerClient(tnt)
+		cs := ownerClient(tnt.Spec.Owners[0])
 
 		maj, min, v := GetKubernetesSemVer()
 		if maj == 1 && min < 18 {
 			Skip("Running test on Kubernetes " + v + ", doesn't provide .spec.ingressClassName")
 		}
 
-		NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 		for _, c := range tnt.Spec.IngressClasses.Exact {
@@ -175,10 +177,10 @@ var _ = Describe("when Tenant handles Ingress classes", func() {
 
 	It("should allow enabled Ingress by regex using the deprecated annotation", func() {
 		ns := NewNamespace("ingress-class-allowed-annotation")
-		cs := ownerClient(tnt)
+		cs := ownerClient(tnt.Spec.Owners[0])
 		ingressClass := "oil-ingress"
 
-		NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 		Eventually(func() (err error) {
@@ -203,7 +205,7 @@ var _ = Describe("when Tenant handles Ingress classes", func() {
 
 	It("should allow enabled Ingress by regex using the ingressClassName field", func() {
 		ns := NewNamespace("ingress-class-allowed-annotation")
-		cs := ownerClient(tnt)
+		cs := ownerClient(tnt.Spec.Owners[0])
 		ingressClass := "oil-haproxy"
 
 		maj, min, v := GetKubernetesSemVer()
@@ -211,7 +213,7 @@ var _ = Describe("when Tenant handles Ingress classes", func() {
 			Skip("Running test on Kubernetes " + v + ", doesn't provide .spec.ingressClassName")
 		}
 
-		NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 		Eventually(func() (err error) {

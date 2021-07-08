@@ -24,9 +24,11 @@ var _ = Describe("cordoning a Tenant", func() {
 			Name: "tenant-cordoning",
 		},
 		Spec: capsulev1beta1.TenantSpec{
-			Owner: capsulev1beta1.OwnerSpec{
-				Name: "jim",
-				Kind: "User",
+			Owners: []capsulev1beta1.OwnerSpec{
+				{
+					Name: "jim",
+					Kind: "User",
+				},
 			},
 		},
 	}
@@ -42,7 +44,7 @@ var _ = Describe("cordoning a Tenant", func() {
 	})
 
 	It("should block or allow operations", func() {
-		cs := ownerClient(tnt)
+		cs := ownerClient(tnt.Spec.Owners[0])
 
 		ns := NewNamespace("cordoned-namespace")
 
@@ -61,7 +63,7 @@ var _ = Describe("cordoning a Tenant", func() {
 		}
 
 		By("creating a Namespace", func() {
-			NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
+			NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 
 			EventuallyCreation(func() error {
 				_, err := cs.CoreV1().Pods(ns.Name).Create(context.Background(), pod, metav1.CreateOptions{})

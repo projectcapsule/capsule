@@ -23,9 +23,11 @@ var _ = Describe("enforcing a Container Registry", func() {
 			Name: "container-registry",
 		},
 		Spec: capsulev1beta1.TenantSpec{
-			Owner: capsulev1beta1.OwnerSpec{
-				Name: "matt",
-				Kind: "User",
+			Owners: []capsulev1beta1.OwnerSpec{
+				{
+					Name: "matt",
+					Kind: "User",
+				},
 			},
 			ContainerRegistries: &capsulev1beta1.AllowedListSpec{
 				Exact: []string{"docker.io", "docker.tld"},
@@ -46,7 +48,7 @@ var _ = Describe("enforcing a Container Registry", func() {
 
 	It("should add labels to Namespace", func() {
 		ns := NewNamespace("registry-labels")
-		NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 		Eventually(func() (ok bool) {
 			Expect(k8sClient.Get(context.Background(), types.NamespacedName{Name: ns.Name}, ns)).Should(Succeed())
 			ok, _ = HaveKeyWithValue("capsule.clastix.io/allowed-registries", "docker.io,docker.tld").Match(ns.Annotations)
@@ -63,7 +65,7 @@ var _ = Describe("enforcing a Container Registry", func() {
 
 	It("should deny running a gcr.io container", func() {
 		ns := NewNamespace("registry-deny")
-		NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 
 		pod := &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
@@ -78,14 +80,14 @@ var _ = Describe("enforcing a Container Registry", func() {
 				},
 			},
 		}
-		cs := ownerClient(tnt)
+		cs := ownerClient(tnt.Spec.Owners[0])
 		_, err := cs.CoreV1().Pods(ns.Name).Create(context.Background(), pod, metav1.CreateOptions{})
 		Expect(err).ShouldNot(Succeed())
 	})
 
 	It("should allow using an exact match", func() {
 		ns := NewNamespace("registry-list")
-		NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 
 		pod := &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
@@ -101,7 +103,7 @@ var _ = Describe("enforcing a Container Registry", func() {
 			},
 		}
 
-		cs := ownerClient(tnt)
+		cs := ownerClient(tnt.Spec.Owners[0])
 		EventuallyCreation(func() error {
 			_, err := cs.CoreV1().Pods(ns.Name).Create(context.Background(), pod, metav1.CreateOptions{})
 			return err
@@ -110,7 +112,7 @@ var _ = Describe("enforcing a Container Registry", func() {
 
 	It("should allow using a regex match", func() {
 		ns := NewNamespace("registry-regex")
-		NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 
 		pod := &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
@@ -126,7 +128,7 @@ var _ = Describe("enforcing a Container Registry", func() {
 			},
 		}
 
-		cs := ownerClient(tnt)
+		cs := ownerClient(tnt.Spec.Owners[0])
 		EventuallyCreation(func() error {
 			_, err := cs.CoreV1().Pods(ns.Name).Create(context.Background(), pod, metav1.CreateOptions{})
 			return err

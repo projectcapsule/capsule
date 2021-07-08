@@ -23,9 +23,11 @@ var _ = Describe("creating several Namespaces for a Tenant", func() {
 			Name: "capsule-labels",
 		},
 		Spec: capsulev1beta1.TenantSpec{
-			Owner: capsulev1beta1.OwnerSpec{
-				Name: "charlie",
-				Kind: "User",
+			Owners: []capsulev1beta1.OwnerSpec{
+				{
+					Name: "charlie",
+					Kind: "User",
+				},
 			},
 		},
 	}
@@ -47,7 +49,7 @@ var _ = Describe("creating several Namespaces for a Tenant", func() {
 			NewNamespace("third-capsule-ns"),
 		}
 		for _, ns := range namespaces {
-			NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
+			NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 			Eventually(func() (ok bool) {
 				Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: ns.GetName()}, ns)).Should(Succeed())
 				ok, _ = HaveKeyWithValue("capsule.clastix.io/tenant", tnt.Name).Match(ns.Labels)

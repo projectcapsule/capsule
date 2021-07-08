@@ -22,9 +22,11 @@ var _ = Describe("when a second Tenant contains an already declared allowed Ingr
 			Name: "no-collision-ingress-hostnames",
 		},
 		Spec: capsulev1beta1.TenantSpec{
-			Owner: capsulev1beta1.OwnerSpec{
-				Name: "first-user",
-				Kind: "User",
+			Owners: []capsulev1beta1.OwnerSpec{
+				{
+					Name: "first-user",
+					Kind: "User",
+				},
 			},
 			IngressHostnames: &capsulev1beta1.AllowedListSpec{
 				Exact: []string{"capsule.clastix.io", "docs.capsule.k8s", "42.clatix.io"},
@@ -51,9 +53,11 @@ var _ = Describe("when a second Tenant contains an already declared allowed Ingr
 					Name: fmt.Sprintf("%s-%d", tnt.GetName(), i),
 				},
 				Spec: capsulev1beta1.TenantSpec{
-					Owner: capsulev1beta1.OwnerSpec{
-						Name: "second-user",
-						Kind: "User",
+					Owners: []capsulev1beta1.OwnerSpec{
+						{
+							Name: "second-user",
+							Kind: "User",
+						},
 					},
 					IngressHostnames: &capsulev1beta1.AllowedListSpec{
 						Exact: []string{h},

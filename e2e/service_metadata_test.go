@@ -27,9 +27,11 @@ var _ = Describe("adding metadata to Service objects", func() {
 			Name: "service-metadata",
 		},
 		Spec: capsulev1beta1.TenantSpec{
-			Owner: capsulev1beta1.OwnerSpec{
-				Name: "gatsby",
-				Kind: "User",
+			Owners: []capsulev1beta1.OwnerSpec{
+				{
+					Name: "gatsby",
+					Kind: "User",
+				},
 			},
 			ServicesMetadata: &capsulev1beta1.AdditionalMetadataSpec{
 				AdditionalLabels: map[string]string{
@@ -67,7 +69,7 @@ var _ = Describe("adding metadata to Service objects", func() {
 
 	It("should apply them to Service", func() {
 		ns := NewNamespace("service-metadata")
-		NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 		svc := &corev1.Service{
@@ -121,7 +123,7 @@ var _ = Describe("adding metadata to Service objects", func() {
 
 	It("should apply them to Endpoints", func() {
 		ns := NewNamespace("endpoints-metadata")
-		NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 		ep := &corev1.Endpoints{
@@ -181,7 +183,7 @@ var _ = Describe("adding metadata to Service objects", func() {
 		}
 
 		ns := NewNamespace("endpointslice-metadata")
-		NamespaceCreation(ns, tnt, defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 		eps := &discoveryv1beta1.EndpointSlice{
