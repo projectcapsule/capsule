@@ -283,7 +283,6 @@ func (t *Tenant) convertV1Beta1OwnerToV1Alpha1(src *capsulev1beta1.Tenant) {
 		enableIngressClassDeletionAnnotation: nil,
 	}
 
-
 	for i, owner := range src.Spec.Owners {
 		if i == 0 {
 			t.Spec.Owner = OwnerSpec{
