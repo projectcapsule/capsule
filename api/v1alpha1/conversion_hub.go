@@ -196,13 +196,12 @@ func (t *Tenant) ConvertTo(dstRaw conversion.Hub) error {
 		}
 	}
 	if t.Spec.ExternalServiceIPs != nil {
-		var allowedIPs []capsulev1beta1.AllowedIP
-		for _, IP := range t.Spec.ExternalServiceIPs.Allowed {
-			allowedIPs = append(allowedIPs, capsulev1beta1.AllowedIP(IP))
+		dst.Spec.ExternalServiceIPs = &capsulev1beta1.ExternalServiceIPsSpec{
+			Allowed: make([]capsulev1beta1.AllowedIP, len(t.Spec.ExternalServiceIPs.Allowed)),
 		}
 
-		dst.Spec.ExternalServiceIPs = &capsulev1beta1.ExternalServiceIPsSpec{
-			Allowed: allowedIPs,
+		for i, IP := range t.Spec.ExternalServiceIPs.Allowed {
+			dst.Spec.ExternalServiceIPs.Allowed[i] = capsulev1beta1.AllowedIP(IP)
 		}
 	}
 
@@ -420,13 +419,12 @@ func (t *Tenant) ConvertFrom(srcRaw conversion.Hub) error {
 		}
 	}
 	if src.Spec.ExternalServiceIPs != nil {
-		var allowedIPs []AllowedIP
-		for _, IP := range src.Spec.ExternalServiceIPs.Allowed {
-			allowedIPs = append(allowedIPs, AllowedIP(IP))
+		t.Spec.ExternalServiceIPs = &ExternalServiceIPsSpec{
+			Allowed: make([]AllowedIP, len(src.Spec.ExternalServiceIPs.Allowed)),
 		}
 
-		t.Spec.ExternalServiceIPs = &ExternalServiceIPsSpec{
-			Allowed: allowedIPs,
+		for i, IP := range src.Spec.ExternalServiceIPs.Allowed {
+			t.Spec.ExternalServiceIPs.Allowed[i] = AllowedIP(IP)
 		}
 	}
 	if len(src.Spec.ImagePullPolicies) != 0 {
