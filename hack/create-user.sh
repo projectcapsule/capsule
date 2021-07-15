@@ -55,7 +55,7 @@ kubectl delete csr ${USER}-${TENANT} 2>/dev/null || true
 
 # Create a new CSR file.
 cat <<EOF > ${TMPDIR}/${USER}-${TENANT}-csr.yaml
-apiVersion: certificates.k8s.io/v1beta1
+apiVersion: certificates.k8s.io/v1
 kind: CertificateSigningRequest
 metadata:
   name: ${USER}-${TENANT}
