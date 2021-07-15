@@ -13,13 +13,14 @@ import (
 )
 
 func init() {
-	AddToIndexerFuncs = append(AddToIndexerFuncs, ingress.Hostname{Obj: &extensionsv1beta1.Ingress{}})
-	// ingresses.networking.k8s.io/v1 introduced by 1.19
-	{
-		majorVer, minorVer, _, _ := utils.GetK8sVersion()
-		if majorVer == 1 && minorVer >= 19 {
-			AddToIndexerFuncs = append(AddToIndexerFuncs, ingress.Hostname{Obj: &networkingv1.Ingress{}})
-		}
+	majorVer, minorVer, _, _ := utils.GetK8sVersion()
+
+	switch {
+	case majorVer == 1 && minorVer >= 19:
+		AddToIndexerFuncs = append(AddToIndexerFuncs, ingress.Hostname{Obj: &networkingv1.Ingress{}})
+	case majorVer == 1 && (minorVer >= 19 && minorVer < 22):
+		AddToIndexerFuncs = append(AddToIndexerFuncs, ingress.Hostname{Obj: &networkingv1beta1.Ingress{}})
+	case majorVer == 1 && minorVer < 22:
+		AddToIndexerFuncs = append(AddToIndexerFuncs, ingress.Hostname{Obj: &extensionsv1beta1.Ingress{}})
 	}
-	AddToIndexerFuncs = append(AddToIndexerFuncs, ingress.Hostname{Obj: &networkingv1beta1.Ingress{}})
 }
