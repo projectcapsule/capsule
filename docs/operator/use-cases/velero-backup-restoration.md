@@ -17,3 +17,11 @@ In case of a data loss, the right thing to do is to restore the cluster with **V
 ```
 
 Running this command, we are going to patch the tenant's namespaces manifests that are actually `ownerReferences`-less. Once the command has finished its run, you got the cluster back.
+
+Additionally you can also specify a selected range of tenants to be restored:
+
+```bash
+./velero-restore.sh --tenant "gas oil" restore
+```
+
+In this way, only the tenants **gas** and **oil** will be restored.
