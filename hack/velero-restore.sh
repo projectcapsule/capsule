@@ -13,6 +13,7 @@
 KUBECFGFILE="$HOME/.kube/config"
 KUBEOPTIONS="--kubeconfig=$KUBECFGFILE"
 TMPDIR=/tmp
+TENANTS=""
 
 # Print usage to stdout.
 # Arguments:
@@ -59,9 +60,15 @@ check_prerequisite () {
 # Outputs:
 #   list of the tenants.
 get_tenant_list () {
-    tenants=$(kubectl "$KUBEOPTIONS" get tnt \
-        --no-headers -o custom-columns=":.metadata.name")
-    echo $tenants
+    if [ ! -z "$TENANTS" ]; then
+        echo "$TENANTS"
+        return
+    else
+        tenants=$(kubectl "$KUBEOPTIONS" get tnt \
+            --no-headers -o custom-columns=":.metadata.name")
+        echo $tenants
+    fi
+    return
 }
 
 # Retrive namespace list.
@@ -93,7 +100,7 @@ cluster_backup () {
     while IFS= read -r line; do
         apiVersion=$(echo "$line" | awk '{ print $1 }')
         tnt=$(echo "$line" | awk '{ print $2 }')
-        d=$(echo "$line" | awk '{ print $3 }')
+        uid=$(echo "$line" | awk '{ print $3 }')
 
         cat <<EOF > "$TMPDIR/tenant_$tnt"
 {
@@ -167,6 +174,10 @@ while :; do
             KUBECFGFILE="${2}"
             printf "Using config file: %s\n" "$KUBECFGFILE"
             update_kube_options
+            shift
+            ;;
+        -t|--tenant)
+            TENANTS="${2}"
             shift
             ;;
         *)
