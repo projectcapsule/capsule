@@ -23,11 +23,13 @@ TENANTS=""
 usage () {
    printf "Usage: $0 [flags] commands\n" 
    printf "Flags:\n" 
-   printf "\t-c, --kubeconfig\tPath to the kubeconfig file to use for CLI requests.\n" 
+   printf "\t-c, --kubeconfig /path/to/config\tPath to the kubeconfig file to use for CLI requests.\n" 
+   printf "\t-t, --tenant \"gas oil\"\t\tSpecify one or more tenants to be restored.\n" 
    printf "Commands:\n" 
    printf "\trestore\t\t\tPerform the restore on the cluster, patching the right object fields.\n" 
    printf "\n"
    printf "E.g. [restore]:\t$0 -c /path/to/kubeconfig restore\n"
+   printf "E.g. [restore]:\t$0 -t \"oil\" restore\n"
 }
 
 # Update KUBEOPTIONS global var.
