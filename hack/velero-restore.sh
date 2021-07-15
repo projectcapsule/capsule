@@ -10,7 +10,7 @@
 # let script exit if an unsed variable is used
 #set -o nounset
 
-KUBECFGFILE="~/.kube/config"
+KUBECFGFILE="$HOME/.kube/config"
 KUBEOPTIONS="--kubeconfig=$KUBECFGFILE"
 TMPDIR=/tmp
 
