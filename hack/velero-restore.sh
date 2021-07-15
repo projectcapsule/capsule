@@ -87,12 +87,13 @@ get_namespace_list () {
 cluster_backup () {
     # Retrieve tenant names and uids.
     owner_reference=$(kubectl "$KUBEOPTIONS" get tenants.capsule.clastix.io --no-headers \
-        -o custom-columns=":.metadata.name,:.metadata.uid")
+        -o custom-columns=":apiVersion,:.metadata.name,:.metadata.uid")
 
     # Store information inside /tmp/tenant_$(tenant_name).
     while IFS= read -r line; do
-        tnt=$(echo "$line" | awk '{ print $1 }')
-        uid=$(echo "$line" | awk '{ print $2 }')
+        apiVersion=$(echo "$line" | awk '{ print $1 }')
+        tnt=$(echo "$line" | awk '{ print $2 }')
+        d=$(echo "$line" | awk '{ print $3 }')
 
         cat <<EOF > "$TMPDIR/tenant_$tnt"
 {
@@ -100,7 +101,7 @@ cluster_backup () {
   "path": "/metadata/ownerReferences",
   "value": [
     {
-      "apiVersion": "capsule.clastix.io/v1alpha1",
+      "apiVersion": "${apiVersion}",
       "blockOwnerDeletion": true,
       "controller": true,
       "kind": "Tenant",
