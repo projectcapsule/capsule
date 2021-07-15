@@ -53,7 +53,7 @@ var _ = Describe("when Tenant handles Ingress classes with extensions/v1beta1", 
 	It("should block a non allowed class for extensions/v1beta1", func() {
 		maj, min, v := GetKubernetesSemVer()
 
-		if maj == 1 && min > 22 {
+		if maj == 1 && min >= 22 {
 			Skip("Running test on Kubernetes " + v + ", extensions/v1beta1 has been deprecated")
 		}
 
@@ -123,7 +123,7 @@ var _ = Describe("when Tenant handles Ingress classes with extensions/v1beta1", 
 	It("should allow enabled class using the deprecated annotation", func() {
 		maj, min, v := GetKubernetesSemVer()
 
-		if maj == 1 && min > 22 {
+		if maj == 1 && min >= 22 {
 			Skip("Running test on Kubernetes " + v + ", extensions/v1beta1 has been deprecated")
 		}
 
@@ -158,8 +158,11 @@ var _ = Describe("when Tenant handles Ingress classes with extensions/v1beta1", 
 	It("should allow enabled class using the ingressClassName field", func() {
 		maj, min, v := GetKubernetesSemVer()
 
-		if maj == 1 && min < 18 {
+		switch {
+		case maj == 1 && min < 18:
 			Skip("Running test on Kubernetes " + v + ", doesn't provide .spec.ingressClassName")
+		case maj == 1 && min >= 22:
+			Skip("Running test on Kubernetes " + v + ", extensions/v1beta1 has been deprecated")
 		}
 
 		ns := NewNamespace("ingress-class-allowed-annotation-extensions-v1beta1")
@@ -191,7 +194,7 @@ var _ = Describe("when Tenant handles Ingress classes with extensions/v1beta1", 
 	It("should allow enabled Ingress by regex using the deprecated annotation", func() {
 		maj, min, v := GetKubernetesSemVer()
 
-		if maj == 1 && min > 22 {
+		if maj == 1 && min >= 22 {
 			Skip("Running test on Kubernetes " + v + ", extensions/v1beta1 has been deprecated")
 		}
 
@@ -225,11 +228,10 @@ var _ = Describe("when Tenant handles Ingress classes with extensions/v1beta1", 
 	It("should allow enabled Ingress by regex using the ingressClassName field", func() {
 		maj, min, v := GetKubernetesSemVer()
 
-		if maj == 1 && min > 22 {
+		switch {
+		case maj == 1 && min >= 22:
 			Skip("Running test on Kubernetes " + v + ", extensions/v1beta1 has been deprecated")
-		}
-
-		if maj == 1 && min < 18 {
+		case maj == 1 && min < 18:
 			Skip("Running test on Kubernetes " + v + ", doesn't provide .spec.ingressClassName")
 		}
 
