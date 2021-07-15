@@ -167,9 +167,10 @@ _ValidatingWebhookConfiguration_ too, adding the said `ngrok` URL as base for
 each defined webhook, as following:
 
 ```diff
-apiVersion: admissionregistration.k8s.io/v1beta1
+apiVersion: admissionregistration.k8s.io/v1
 kind: MutatingWebhookConfiguration
 metadata:
+
   name: capsule-mutating-webhook-configuration
 webhooks:
   - name: owner.namespace.capsule.clastix.io
