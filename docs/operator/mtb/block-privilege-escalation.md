@@ -1,4 +1,4 @@
-# Block add capabilities
+# Block privilege escalation
 
 **Profile Applicability:** L1
 
@@ -6,13 +6,13 @@
 
 **Category:** Control Plane Isolation
 
-**Description:** Control Linux capabilities.
+**Description:** Control container permissions.
 
-**Rationale:** Linux allows defining fine-grained permissions using capabilities. With Kubernetes, it is possible to add capabilities for pods that escalate the level of kernel access and allow other potentially dangerous behaviors.
+**Rationale:** The security `allowPrivilegeEscalation` setting allows a process to gain more privileges from its parent process. Processes in tenant containers should not be allowed to gain additional priviliges.
 
 **Audit:**
 
-As cluster admin, define a `PodSecurityPolicy` with `allowedCapabilities` and map the policy to a tenant:
+As cluster admin, define a `PodSecurityPolicy` that sets `allowPrivilegeEscalation=false` and map the policy to a tenant:
 
 ```yaml
 kubectl create -f - << EOF
@@ -24,9 +24,6 @@ spec:
   privileged: false
   # Required to prevent escalations to root.
   allowPrivilegeEscalation: false
-  # The default set of capabilities are implicitly allowed
-  # The empty set means that no additional capabilities may be added beyond the default set
-  allowedCapabilities: []
   runAsUser:
     rule: RunAsAny
   seLinux:
@@ -64,7 +61,6 @@ apiVersion: capsule.clastix.io/v1beta1
 kind: Tenant
 metadata:
   name: oil
-  namespace: oil-production
 spec:
   owners:
   - kind: User
@@ -87,15 +83,15 @@ kubectl --kubeconfig alice create ns oil-production
 kubectl --kubeconfig alice config set-context --current --namespace oil-production
 ```
 
-As tenant owner, create a pod and see new capabilities cannot be added in the tenant namespaces
+As tenant owner, create a pod or container that sets `allowPrivilegeEscalation=true` in its `securityContext`. 
 
 ```yaml 
 kubectl --kubeconfig alice apply -f - << EOF 
 apiVersion: v1
 kind: Pod
 metadata:
-  name: pod-with-settime-cap
-  namespace:
+  name: pod-priviliged-mode
+  namespace: oil-production
   labels:
 spec:
   containers:
@@ -103,13 +99,11 @@ spec:
     image: busybox:latest
     command: ["/bin/sleep", "3600"]
     securityContext:
-      capabilities:
-        add:
-        - SYS_TIME
+      allowPrivilegeEscalation: true
 EOF
 ```
 
-You should have the pod blocked by PodSecurityPolicy.
+You should have the pod blocked by `PodSecurityPolicy`.
 
 **Cleanup:**
 As cluster admin, delete all the created resources
