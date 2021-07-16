@@ -19,7 +19,7 @@ spec:
     scopes:
     - NotTerminating
   - hard:
-      pods: "100"
+      pods: "10"
       services: "50"
   - hard:
       requests.storage: 10Gi

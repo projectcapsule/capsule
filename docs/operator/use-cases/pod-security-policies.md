@@ -70,7 +70,7 @@ roleRef:
   name: 'psp:privileged'
 ```
 
-With the above example, Capsule is forbidding to any authenticated user in `oil-production` namespace to run privileged pods and let them to performs privilege escalation as declared by the Cluster Role `psp:privileged`.
+With the above example, Capsule is forbidding any authenticated user in `oil-production` namespace to run privileged pods and to perform privilege escalation as declared by the Cluster Role `psp:privileged`.
 
 # What’s next
 See how Bill, the cluster admin, can assign to Alice the permissions to create custom resources in her tenant. [Create Custom Resources](./custom-resources.md).
