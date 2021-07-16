@@ -10,17 +10,17 @@ Actually, there's no yet a real standard for the multi-tenancy model in Kubernet
 |[Block access to other tenant resources](block-access-to-other-tenant-resources.md)|L1|v0.1.0|✓|MTB draft|
 |[Block add capabilities](block-add-capabilities.md)|L1|v0.1.0|✓|---|
 |[Require always imagePullPolicy](require-always-imagepullpolicy.md)|L1|v0.1.0|✓|---|
-|Require run as non-root user|L1|v0.1.0|✓|---|
-|Block privileged containers|L1|v0.1.0|✓|---|
-|Block privilege escalation|L1|v0.1.0|✓|---|
-|Configure namespace resource quotas|L1|v0.1.0|✓|---|
-|Configure namespace object limits|L1|v0.1.0|✓|---|
-|Block use of host path volumes|L1|v0.1.0|✓|---|
-|Block use of NodePort services|L1|v0.1.0|✓|---|
-|Block use of host networking and ports|L1|v0.1.0|✓|---|
+|[Require run as non-root user](require-run-as-non-root-user.md)|L1|v0.1.0|✓|---|
+|[Block privileged containers](block-privileged-containers.md)|L1|v0.1.0|✓|---|
+|[Block privilege escalation](block-privilege-escalation.md)|L1|v0.1.0|✓|---|
+|[Configure namespace resource quotas](configure-namespace-resource-quotas.md)|L1|v0.1.0|✓|---|
+|[Block modification of resource quotas](block-modification-of-resource-quotas.md)|L1|v0.1.0|✓|---|
+|[Configure namespace object limits](configure-namespace-object-limits.md)|L1|v0.1.0|✓|---|
+|[Block use of host path volumes](block-use-of-host-path-volumes.md)|L1|v0.1.0|✓|---|
+|[Block use of host networking and ports](block-use-of-host-networking-and-ports.md)|L1|v0.1.0|✓|---|
 |Block use of host PID|L1|v0.1.0|✓|---|
 |Block use of host IPC|L1|v0.1.0|✓|---|
-|Block modification of resource quotas|L1|v0.1.0|✓|---|
+|Block use of NodePort services|L1|v0.1.0|✓|---|
 |Require PersistentVolumeClaim for storage|L1|v0.1.0|✓|MTB draft|
 |Require PV reclaim policy of delete|L1|v0.1.0|✓|MTB draft|
 |Block use of existing PVs|L1|v0.1.0|✓|MTB draft|

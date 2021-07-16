@@ -1,18 +1,18 @@
-# Block add capabilities
+# Block use of host path volumes
 
 **Profile Applicability:** L1
 
 **Type:** Behavioral Check
 
-**Category:** Control Plane Isolation
+**Category:** Host Protection
 
-**Description:** Control Linux capabilities.
+**Description:** Tenants should not be able to mount host volumes and directories.
 
-**Rationale:** Linux allows defining fine-grained permissions using capabilities. With Kubernetes, it is possible to add capabilities for pods that escalate the level of kernel access and allow other potentially dangerous behaviors.
+**Rationale:** The use of host volumes and directories can be used to access shared data or escalate priviliges and also creates a tight coupling between a tenant workload and a host.
 
 **Audit:**
 
-As cluster admin, define a `PodSecurityPolicy` with `allowedCapabilities` and map the policy to a tenant:
+As cluster admin, define a `PodSecurityPolicy` that restricts `hostPath` volumes and map the policy to a tenant:
 
 ```yaml
 kubectl create -f - << EOF
@@ -22,11 +22,13 @@ metadata:
   name: tenant
 spec:
   privileged: false
-  # Required to prevent escalations to root.
-  allowPrivilegeEscalation: false
-  # The default set of capabilities are implicitly allowed
-  # The empty set means that no additional capabilities may be added beyond the default set
-  allowedCapabilities: []
+  volumes: # hostPath is not permitted
+    - 'configMap'
+    - 'emptyDir'
+    - 'projected'
+    - 'secret'
+    - 'downwardAPI'
+    - 'persistentVolumeClaim'
   runAsUser:
     rule: RunAsAny
   seLinux:
@@ -87,29 +89,33 @@ kubectl --kubeconfig alice create ns oil-production
 kubectl --kubeconfig alice config set-context --current --namespace oil-production
 ```
 
-As tenant owner, create a pod and see new capabilities cannot be added in the tenant namespaces
+As tenant owner, create a pod defining a volume of type `hostpath`. 
 
 ```yaml 
 kubectl --kubeconfig alice apply -f - << EOF 
 apiVersion: v1
 kind: Pod
 metadata:
-  name: pod-with-settime-cap
-  namespace:
-  labels:
+  name: pod-with-hostpath-volume
+  namespace: oil-production
 spec:
   containers:
   - name: busybox
     image: busybox:latest
     command: ["/bin/sleep", "3600"]
-    securityContext:
-      capabilities:
-        add:
-        - SYS_TIME
+    volumeMounts:
+    - mountPath: /tmp
+      name: volume
+  volumes:
+  - name: volume
+    hostPath:
+      # directory location on host
+      path: /data
+      type: Directory
 EOF
 ```
 
-You should have the pod blocked by PodSecurityPolicy.
+You should have the pod blocked by `PodSecurityPolicy`.
 
 **Cleanup:**
 As cluster admin, delete all the created resources

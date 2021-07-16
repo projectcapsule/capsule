@@ -1,18 +1,18 @@
-# Block add capabilities
+# Block use of host networking and ports
 
 **Profile Applicability:** L1
 
 **Type:** Behavioral Check
 
-**Category:** Control Plane Isolation
+**Category:** Host Isolation
 
-**Description:** Control Linux capabilities.
+**Description:** Tenants should not be allowed to use host networking and host ports for their workloads.
 
-**Rationale:** Linux allows defining fine-grained permissions using capabilities. With Kubernetes, it is possible to add capabilities for pods that escalate the level of kernel access and allow other potentially dangerous behaviors.
+**Rationale:** Using `hostPort` and `hostNetwork` allows tenants workloads to share the host networking stack allowing potential snooping of network traffic across application pods.
 
 **Audit:**
 
-As cluster admin, define a `PodSecurityPolicy` with `allowedCapabilities` and map the policy to a tenant:
+As cluster admin, define a `PodSecurityPolicy` that restricts `hostPort` and `hostNetwork` and map the policy to a tenant:
 
 ```yaml
 kubectl create -f - << EOF
@@ -22,11 +22,8 @@ metadata:
   name: tenant
 spec:
   privileged: false
-  # Required to prevent escalations to root.
-  allowPrivilegeEscalation: false
-  # The default set of capabilities are implicitly allowed
-  # The empty set means that no additional capabilities may be added beyond the default set
-  allowedCapabilities: []
+  hostNetwork: false
+  hostPorts: [] # empty means no allowed host ports
   runAsUser:
     rule: RunAsAny
   seLinux:
@@ -87,29 +84,45 @@ kubectl --kubeconfig alice create ns oil-production
 kubectl --kubeconfig alice config set-context --current --namespace oil-production
 ```
 
-As tenant owner, create a pod and see new capabilities cannot be added in the tenant namespaces
+As tenant owner, create a pod using `hostNetwork`
 
 ```yaml 
 kubectl --kubeconfig alice apply -f - << EOF 
 apiVersion: v1
 kind: Pod
 metadata:
-  name: pod-with-settime-cap
-  namespace:
-  labels:
+  name: pod-with-hostnetwork
+  namespace: oil-production
 spec:
+  hostNetwork: true
   containers:
-  - name: busybox
-    image: busybox:latest
-    command: ["/bin/sleep", "3600"]
-    securityContext:
-      capabilities:
-        add:
-        - SYS_TIME
+  - name: nginx
+    image: nginx:latest
+    ports:
+    - containerPort: 80
 EOF
 ```
 
-You should have the pod blocked by PodSecurityPolicy.
+As tenant owner, create a pod defining a container using `hostPort`
+
+```yaml 
+kubectl --kubeconfig alice apply -f - << EOF 
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-with-hostport
+  namespace: oil-production
+spec:
+  containers:
+  - name: nginx
+    image: nginx:latest
+    ports:
+    - containerPort: 80
+      hostPort: 9090
+EOF
+```
+
+In both the cases, you should have the pod blocked by `PodSecurityPolicy`.
 
 **Cleanup:**
 As cluster admin, delete all the created resources
