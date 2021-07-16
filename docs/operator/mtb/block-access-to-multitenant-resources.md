@@ -75,7 +75,8 @@ kubectl --kubeconfig alice delete networkpolicies capsule-oil-0
 You should receive an error message denying the edit/delete request
 
 ```bash 
-Error from server (Forbidden): networkpolicies.networking.k8s.io "capsule-oil-0" is forbidden: User "oil" cannot delete resource "networkpolicies" in API group "networking.k8s.io" in the namespace "oil-production"
+Error from server (Forbidden): networkpolicies.networking.k8s.io "capsule-oil-0" is forbidden:
+User "oil" cannot delete resource "networkpolicies" in API group "networking.k8s.io" in the namespace "oil-production"
 ```
 
 As tenant owner, you can create an additional networkpolicy inside the namespace

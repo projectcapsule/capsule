@@ -8,8 +8,8 @@ Actually, there's no yet a real standard for the multi-tenancy model in Kubernet
 |[Block access to cluster resources](block-access-to-cluster-resources.md)|L1|v0.1.0|✓|---|
 |[Block access to multitenant resources](block-access-to-multitenant-resources.md)|L1|v0.1.0|✓|---|
 |[Block access to other tenant resources](block-access-to-other-tenant-resources.md)|L1|v0.1.0|✓|MTB draft|
-|Block add capabilities|L1|v0.1.0|✓|---|
-|Require always imagePullPolicy|L1|v0.1.0|✓|---|
+|[Block add capabilities](block-add-capabilities.md)|L1|v0.1.0|✓|---|
+|[Require always imagePullPolicy](require-always-imagepullpolicy.md)|L1|v0.1.0|✓|---|
 |Require run as non-root user|L1|v0.1.0|✓|---|
 |Block privileged containers|L1|v0.1.0|✓|---|
 |Block privilege escalation|L1|v0.1.0|✓|---|
