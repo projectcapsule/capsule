@@ -85,14 +85,14 @@ capsule-oil-0               <none>         42h
 production-network-policy   <none>         3m
 ```
 
-an delete the namespace network-policies
+And delete the namespace network policies
 
 ```
 alice@caas# kubectl -n oil-production delete networkpolicy production-network-policy
 ```
 
 
-However, the Capsule controller prevents Alice to delete the tenant network policy:
+However, the Capsule controller prevents Alice from deleting the tenant network policy:
 
 ```
 alice@caas# kubectl -n oil-production delete networkpolicy capsule-oil-0

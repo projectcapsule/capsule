@@ -23,11 +23,11 @@ spec:
     kind: User
 ```
 
-> If you need to address specific use-case, the said annotation supports multiple values comme separated
-> 
-> ```yaml
-> capsule.clastix.io/allowed-image-pull-policy: Always,IfNotPresent
-> ```
+If you need to address specific use-case, the said annotation supports multiple values comma separated
+
+```yaml
+capsule.clastix.io/allowed-image-pull-policy: Always,IfNotPresent
+```
 
 # What’s next
 
