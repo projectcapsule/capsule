@@ -47,22 +47,26 @@ manager: generate fmt vet
 run: generate manifests
 	go run ./main.go
 
+# Creates the single file to install Capsule without any external dependency
+installer: manifests kustomize
+	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
+	$(KUSTOMIZE) build config/default > config/install.yaml
+
 # Install CRDs into a cluster
-install: manifests kustomize
+install: installer
 	$(KUSTOMIZE) build config/crd | kubectl apply -f -
 
 # Uninstall CRDs from a cluster
-uninstall: manifests kustomize
+uninstall: installer
 	$(KUSTOMIZE) build config/crd | kubectl delete -f -
 
 # Deploy controller in the configured Kubernetes cluster in ~/.kube/config
-deploy: manifests kustomize
-	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
-	$(KUSTOMIZE) build config/default | kubectl apply -f -
+deploy: installer
+	kubectl apply -f config/install.yaml
 
 # Remove controller in the configured Kubernetes cluster in ~/.kube/config
-remove: manifests kustomize
-	$(KUSTOMIZE) build config/default | kubectl delete -f -
+remove: installer
+	kubectl delete -f config/install.yaml
 	kubectl delete clusterroles.rbac.authorization.k8s.io capsule-namespace-deleter capsule-namespace-provisioner --ignore-not-found
 	kubectl delete clusterrolebindings.rbac.authorization.k8s.io capsule-namespace-deleter capsule-namespace-provisioner --ignore-not-found
 
