@@ -22,6 +22,8 @@ metadata:
   name: tenant
 spec:
   privileged: false
+  # Required to prevent escalations to root.
+  allowPrivilegeEscalation: false
   hostNetwork: false
   hostPorts: [] # empty means no allowed host ports
   runAsUser:
@@ -122,7 +124,7 @@ spec:
 EOF
 ```
 
-In both the cases, you should have the pod blocked by `PodSecurityPolicy`.
+In both the cases above, you must have the pod blocked by `PodSecurityPolicy`.
 
 **Cleanup:**
 As cluster admin, delete all the created resources

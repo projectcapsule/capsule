@@ -1,18 +1,18 @@
-# Block privilege escalation
+# Require PersistentVolumeClaim for storage
 
 **Profile Applicability:** L1
 
 **Type:** Behavioral Check
 
-**Category:** Control Plane Isolation
+**Category:** na
 
-**Description:** Control container permissions.
+**Description:** Tenants should not be able to use all volume types except `PersistentVolumeClaims`.
 
-**Rationale:** The security `allowPrivilegeEscalation` setting allows a process to gain more privileges from its parent process. Processes in tenant containers should not be allowed to gain additional priviliges.
+**Rationale:** In some scenarios, it would be required to disallow usage of any core volume types except PVCs.
 
 **Audit:**
 
-As cluster admin, define a `PodSecurityPolicy` that sets `allowPrivilegeEscalation=false` and map the policy to a tenant:
+As cluster admin, define a `PodSecurityPolicy` allowing only `PersistentVolumeClaim` volumes and map the policy to a tenant:
 
 ```yaml
 kubectl create -f - << EOF
@@ -24,6 +24,8 @@ spec:
   privileged: false
   # Required to prevent escalations to root.
   allowPrivilegeEscalation: false
+  volumes: 
+    - 'persistentVolumeClaim'
   runAsUser:
     rule: RunAsAny
   seLinux:
@@ -61,6 +63,7 @@ apiVersion: capsule.clastix.io/v1beta1
 kind: Tenant
 metadata:
   name: oil
+  namespace: oil-production
 spec:
   owners:
   - kind: User
@@ -83,23 +86,29 @@ kubectl --kubeconfig alice create ns oil-production
 kubectl --kubeconfig alice config set-context --current --namespace oil-production
 ```
 
-As tenant owner, create a pod or container that sets `allowPrivilegeEscalation=true` in its `securityContext`. 
+As tenant owner, create a pod defining a volume of any of the core type except `PersistentVolumeClaim`. For example:
 
 ```yaml 
 kubectl --kubeconfig alice apply -f - << EOF 
 apiVersion: v1
 kind: Pod
 metadata:
-  name: pod-priviliged-mode
+  name: pod-with-hostpath-volume
   namespace: oil-production
-  labels:
 spec:
   containers:
   - name: busybox
     image: busybox:latest
     command: ["/bin/sleep", "3600"]
-    securityContext:
-      allowPrivilegeEscalation: true
+    volumeMounts:
+    - mountPath: /tmp
+      name: volume
+  volumes:
+  - name: volume
+    hostPath:
+      # directory location on host
+      path: /data
+      type: Directory
 EOF
 ```
 

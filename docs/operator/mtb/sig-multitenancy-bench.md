@@ -18,13 +18,13 @@ Actually, there's no yet a real standard for the multi-tenancy model in Kubernet
 |[Configure namespace object limits](configure-namespace-object-limits.md)|L1|v0.1.0|✓|---|
 |[Block use of host path volumes](block-use-of-host-path-volumes.md)|L1|v0.1.0|✓|---|
 |[Block use of host networking and ports](block-use-of-host-networking-and-ports.md)|L1|v0.1.0|✓|---|
-|Block use of host PID|L1|v0.1.0|✓|---|
-|Block use of host IPC|L1|v0.1.0|✓|---|
-|Block use of NodePort services|L1|v0.1.0|✓|---|
-|Require PersistentVolumeClaim for storage|L1|v0.1.0|✓|MTB draft|
-|Require PV reclaim policy of delete|L1|v0.1.0|✓|MTB draft|
-|Block use of existing PVs|L1|v0.1.0|✓|MTB draft|
-|Block network access across tenant namespaces|L1|v0.1.0|✓|MTB draft|
-|Allow self-service management of Network PoliciesL2|v0.1.0|✓|---|
-|Allow self-service management of RolesL2|v0.1.0|✓|MTB draft|
-|Allow self-service management of Roles Bindings|L2|v0.1.0|✓|MTB draft|
+|[Block use of host PID](block-use-of-host-pid.md)|L1|v0.1.0|✓|---|
+|[Block use of host IPC](block-use-of-host-ipc.md)|L1|v0.1.0|✓|---|
+|[Block use of NodePort services](block-use-of-nodeport-services.md)|L1|v0.1.0|✓|---|
+|[Require PersistentVolumeClaim for storage](require-persistentvolumeclaim-for-storage.md)|L1|v0.1.0|✓|MTB draft|
+|[Require PV reclaim policy of delete](require-reclaim-policy-of-delete.md)|L1|v0.1.0|✓|MTB draft|
+|[Block use of existing PVs](block-use-of-existing-persistent-volumes.md)|L1|v0.1.0|✓|MTB draft|
+|[Block network access across tenant namespaces](block-network-access-across-tenant-namespaces.md)|L1|v0.1.0|✓|MTB draft|
+|[Allow self-service management of Network Policies](allow-self-service-management-of-network-policies.md)|L2|v0.1.0|✓|---|
+|[Allow self-service management of Roles](allow-self-service-management-of-roles.md)|L2|v0.1.0|✓|MTB draft|
+|[Allow self-service management of Role Bindings](allow-self-service-management-of-rolebindings.md)|L2|v0.1.0|✓|MTB draft|

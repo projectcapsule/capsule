@@ -116,7 +116,7 @@ As tenant owner, try to change/delete  the rolebindings in order to escalate per
 kubectl --kubeconfig alice edit/delete rolebinding namespace:admin
 ```
 
-You should receive an error message:
+You must receive an error message:
 
 ```
 error: rolebindings.rbac.authorization.k8s.io "namespace:admin" could not be patched:
