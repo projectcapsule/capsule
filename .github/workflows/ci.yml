@@ -23,6 +23,8 @@ jobs:
     runs-on: ubuntu-18.04
     steps:
       - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
       - name: Cache Go modules
         uses: actions/cache@v1
         env:
@@ -35,10 +37,10 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-build-
             ${{ runner.os }}-
-      - run: make manifests
-      - name: Checking if manifests are disaligned
+      - run: make installer
+      - name: Checking if YAML installer file is not aligned
         run: if [[ $(git diff | wc -l) -gt 0 ]]; then echo ">>> Untracked generated files have not been committed" && git --no-pager diff && exit 1; fi
-      - name: Checking if manifests generated untracked files
+      - name: Checking if YAML installer generated untracked files
         run: test -z "$(git ls-files --others --exclude-standard 2> /dev/null)"
       - name: Checking if source code is not formatted
         run: test -z "$(git diff 2> /dev/null)"
