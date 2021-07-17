@@ -61,17 +61,28 @@ Make sure you have access to a Kubernetes cluster as administrator.
 There are two ways to install Capsule:
 
 * Use the Helm Chart available [here](./charts/capsule/README.md)
-* Use [`kustomize`](https://github.com/kubernetes-sigs/kustomize)
+* Use the [single YAML file installer](./config/install.yaml)
 
-## Install with kustomize
-Ensure you have `kubectl` and `kustomize` installed in your `PATH`. 
+## Install with the single YAML file installer
+
+Ensure you have `kubectl` installed in your `PATH`. 
 
 Clone this repository and move to the repo folder:
 
 ```
-$ git clone https://github.com/clastix/capsule
-$ cd capsule
-$ make deploy
+$ kubectl apply -f https://raw.githubusercontent.com/clastix/capsule/master/config/install.yaml
+namespace/capsule-system created
+customresourcedefinition.apiextensions.k8s.io/capsuleconfigurations.capsule.clastix.io created
+customresourcedefinition.apiextensions.k8s.io/tenants.capsule.clastix.io created
+clusterrolebinding.rbac.authorization.k8s.io/capsule-manager-rolebinding created
+secret/capsule-ca created
+secret/capsule-tls created
+service/capsule-controller-manager-metrics-service created
+service/capsule-webhook-service created
+deployment.apps/capsule-controller-manager created
+capsuleconfiguration.capsule.clastix.io/capsule-default created
+mutatingwebhookconfiguration.admissionregistration.k8s.io/capsule-mutating-webhook-configuration created
+validatingwebhookconfiguration.admissionregistration.k8s.io/capsule-validating-webhook-configuration created
 ```
 
 It will install the Capsule controller in a dedicated namespace `capsule-system`.
