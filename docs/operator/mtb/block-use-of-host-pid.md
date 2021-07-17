@@ -1,18 +1,18 @@
-# Block privilege escalation
+# Block use of host PID
 
 **Profile Applicability:** L1
 
 **Type:** Behavioral Check
 
-**Category:** Control Plane Isolation
+**Category:** Host Isolation
 
-**Description:** Control container permissions.
+**Description:** Tenants should not be allowed to share the host process ID (PID) namespace.
 
-**Rationale:** The security `allowPrivilegeEscalation` setting allows a process to gain more privileges from its parent process. Processes in tenant containers should not be allowed to gain additional priviliges.
+**Rationale:** The `hostPID` setting allows pods to share the host process ID namespace allowing potential privilege escalation. Tenant pods should not be allowed to share the host PID namespace.
 
 **Audit:**
 
-As cluster admin, define a `PodSecurityPolicy` that sets `allowPrivilegeEscalation=false` and map the policy to a tenant:
+As cluster admin, define a `PodSecurityPolicy` that restricts `hostPID` usage and map the policy to a tenant:
 
 ```yaml
 kubectl create -f - << EOF
@@ -24,6 +24,7 @@ spec:
   privileged: false
   # Required to prevent escalations to root.
   allowPrivilegeEscalation: false
+  hostPID: false
   runAsUser:
     rule: RunAsAny
   seLinux:
@@ -61,6 +62,7 @@ apiVersion: capsule.clastix.io/v1beta1
 kind: Tenant
 metadata:
   name: oil
+  namespace: oil-production
 spec:
   owners:
   - kind: User
@@ -83,23 +85,21 @@ kubectl --kubeconfig alice create ns oil-production
 kubectl --kubeconfig alice config set-context --current --namespace oil-production
 ```
 
-As tenant owner, create a pod or container that sets `allowPrivilegeEscalation=true` in its `securityContext`. 
+As tenant owner, create a pod mounting the host PID namespace. 
 
 ```yaml 
 kubectl --kubeconfig alice apply -f - << EOF 
 apiVersion: v1
 kind: Pod
 metadata:
-  name: pod-priviliged-mode
+  name: pod-with-host-pid
   namespace: oil-production
-  labels:
 spec:
+  hostPID: true
   containers:
   - name: busybox
     image: busybox:latest
     command: ["/bin/sleep", "3600"]
-    securityContext:
-      allowPrivilegeEscalation: true
 EOF
 ```
 

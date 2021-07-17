@@ -55,7 +55,7 @@ spec:
 EOF
 ```
 
-You should receive an error message denying the request:
+You must receive an error message denying the request:
 
 ```
 Error from server

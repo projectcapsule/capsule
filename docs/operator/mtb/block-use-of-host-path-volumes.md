@@ -22,6 +22,8 @@ metadata:
   name: tenant
 spec:
   privileged: false
+  # Required to prevent escalations to root.
+  allowPrivilegeEscalation: false
   volumes: # hostPath is not permitted
     - 'configMap'
     - 'emptyDir'
@@ -115,7 +117,7 @@ spec:
 EOF
 ```
 
-You should have the pod blocked by `PodSecurityPolicy`.
+You must have the pod blocked by `PodSecurityPolicy`.
 
 **Cleanup:**
 As cluster admin, delete all the created resources

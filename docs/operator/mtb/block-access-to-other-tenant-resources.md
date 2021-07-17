@@ -69,7 +69,7 @@ As `oil` tenant owner, try to retrieve the resources in the `gas` tenant namespa
 kubectl --kubeconfig alice get serviceaccounts --namespace  gas-production 
 ```
 
-You should receive an eror message:
+You must receive an eror message:
 
 ```
 Error from server (Forbidden): serviceaccounts is forbidden:
@@ -82,7 +82,7 @@ As `gas` tenant owner, try to retrieve the resources in the `oil` tenant namespa
 kubectl --kubeconfig joe get serviceaccounts --namespace  oil-production 
 ```
 
-You should receive an eror message:
+You must receive an eror message:
 
 ```
 Error from server (Forbidden): serviceaccounts is forbidden:

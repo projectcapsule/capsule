@@ -104,7 +104,7 @@ spec:
 EOF
 ```
 
-You should have the pod blocked by `PodSecurityPolicy`.
+You must have the pod blocked by `PodSecurityPolicy`.
 
 **Cleanup:**
 As cluster admin, delete all the created resources
