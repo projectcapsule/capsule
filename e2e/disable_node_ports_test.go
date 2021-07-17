@@ -13,6 +13,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/utils/pointer"
 
 	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
 )
@@ -29,7 +30,7 @@ var _ = Describe("creating a nodePort service when it is disabled for Tenant", f
 					Kind: "User",
 				},
 			},
-			EnableNodePorts: false,
+			EnableNodePorts: pointer.BoolPtr(false),
 		},
 	}
 

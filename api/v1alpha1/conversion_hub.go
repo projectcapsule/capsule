@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/conversion"
 
 	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
@@ -233,7 +234,7 @@ func (t *Tenant) ConvertTo(dstRaw conversion.Hub) error {
 		if err != nil {
 			return errors.Wrap(err, fmt.Sprintf("unable to parse %s annotation on tenant %s", enableNodePortsAnnotation, t.GetName()))
 		}
-		dst.Spec.EnableNodePorts = val
+		dst.Spec.EnableNodePorts = pointer.BoolPtr(val)
 	}
 
 	// Status
@@ -444,7 +445,7 @@ func (t *Tenant) ConvertFrom(srcRaw conversion.Hub) error {
 		}
 	}
 
-	t.Annotations[enableNodePortsAnnotation] = strconv.FormatBool(src.Spec.EnableNodePorts)
+	t.Annotations[enableNodePortsAnnotation] = strconv.FormatBool(*src.Spec.EnableNodePorts)
 
 	// Status
 	t.Status = TenantStatus{
