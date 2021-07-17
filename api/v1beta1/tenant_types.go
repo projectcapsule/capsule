@@ -29,7 +29,7 @@ type TenantSpec struct {
 	PriorityClasses        *AllowedListSpec             `json:"priorityClasses,omitempty"`
 
 	//+kubebuilder:default=true
-	EnableNodePorts bool `json:"enableNodePorts,omitempty"`
+	EnableNodePorts *bool `json:"enableNodePorts,omitempty"`
 }
 
 //+kubebuilder:object:root=true

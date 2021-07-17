@@ -44,7 +44,7 @@ func (r *handler) handleService(ctx context.Context, clt client.Client, decoder 
 
 	tnt := tntList.Items[0]
 
-	if svc.Spec.Type == corev1.ServiceTypeNodePort && !tnt.Spec.EnableNodePorts {
+	if svc.Spec.Type == corev1.ServiceTypeNodePort && tnt.Spec.EnableNodePorts != nil && !*tnt.Spec.EnableNodePorts {
 		recorder.Eventf(&tnt, corev1.EventTypeWarning, "ForbiddenNodePort", "Service %s/%s cannot be type of NodePort for the current Tenant", req.Namespace, req.Name)
 
 		response := admission.Denied(NewNodePortDisabledError().Error())
