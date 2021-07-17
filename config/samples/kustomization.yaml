@@ -2,3 +2,4 @@
 resources:
 - capsule_v1alpha1_capsuleconfiguration.yaml
 - capsule_v1alpha1_tenant.yaml
+- capsule_v1beta1_tenant.yaml
