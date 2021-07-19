@@ -604,6 +604,7 @@ spec:
             description: TenantSpec defines the desired state of Tenant
             properties:
               additionalRoleBindings:
+                description: Specifies additional RoleBindings assigned to the Tenant. Capsule will ensure that all namespaces in the Tenant always contain the RoleBinding for the given ClusterRole. Optional.
                 items:
                   properties:
                     clusterRoleName:
@@ -636,6 +637,7 @@ spec:
                   type: object
                 type: array
               containerRegistries:
+                description: Specifies the trusted Image Registries assigned to the Tenant. Capsule assures that all Pods resources created in the Tenant can use only one of the allowed trusted registries. Optional.
                 properties:
                   allowed:
                     items:
@@ -646,8 +648,10 @@ spec:
                 type: object
               enableNodePorts:
                 default: true
+                description: Specifies if NodePort service type resources are allowed for the Tenant. Default is true. Optional.
                 type: boolean
               externalServiceIPs:
+                description: Specifies the external IPs that can be used in Services with type ClusterIP. An empty list means all the IPs are allowed. Optional.
                 properties:
                   allowed:
                     items:
@@ -658,6 +662,7 @@ spec:
                 - allowed
                 type: object
               imagePullPolicies:
+                description: Specify the allowed values for the imagePullPolicies option in Pod resources. Capsule assures that all Pod resources created in the Tenant can use only one of the allowed policy. Optional.
                 items:
                   enum:
                   - Always
@@ -666,6 +671,7 @@ spec:
                   type: string
                 type: array
               ingressClasses:
+                description: Specifies the allowed IngressClasses assigned to the Tenant. Capsule assures that all Ingress resources created in the Tenant can use only one of the allowed IngressClasses. Optional.
                 properties:
                   allowed:
                     items:
@@ -675,6 +681,7 @@ spec:
                     type: string
                 type: object
               ingressHostnames:
+                description: Specifies the allowed hostnames in Ingresses for the given Tenant. Capsule assures that all Ingress resources created in the Tenant can use only one of the allowed hostnames. Optional.
                 properties:
                   allowed:
                     items:
@@ -684,6 +691,7 @@ spec:
                     type: string
                 type: object
               limitRanges:
+                description: Specifies the NetworkPolicies assigned to the Tenant. The assigned NetworkPolicies are inherited by any namespace created in the Tenant. Optional.
                 properties:
                   items:
                     items:
@@ -752,10 +760,12 @@ spec:
                     type: array
                 type: object
               namespaceQuota:
+                description: Specifies the maximum number of namespaces allowed for that Tenant. Once the namespace quota assigned to the Tenant has been reached, the Tenant owner cannot create further namespaces. Optional.
                 format: int32
                 minimum: 1
                 type: integer
               namespacesMetadata:
+                description: Specifies additional labels and annotations the Capsule operator places on any Namespace resource in the Tenant. Optional.
                 properties:
                   additionalAnnotations:
                     additionalProperties:
@@ -767,6 +777,7 @@ spec:
                     type: object
                 type: object
               networkPolicies:
+                description: Specifies the NetworkPolicies assigned to the Tenant. The assigned NetworkPolicies are inherited by any namespace created in the Tenant. Optional.
                 properties:
                   items:
                     items:
@@ -1026,20 +1037,24 @@ spec:
               nodeSelector:
                 additionalProperties:
                   type: string
+                description: Specifies the label to control the placement of pods on a given pool of worker nodes. All namesapces created within the Tenant will have the node selector annotation. This annotation tells the Kubernetes scheduler to place pods on the nodes having the selector label. Optional.
                 type: object
               owners:
+                description: Specifies the owners of the Tenant. Mandatory.
                 items:
-                  description: OwnerSpec defines tenant owner name and kind
                   properties:
                     kind:
+                      description: Kind of tenant owner. Possible values are "User", "Group", and "ServiceAccount"
                       enum:
                       - User
                       - Group
                       - ServiceAccount
                       type: string
                     name:
+                      description: Name of tenant owner.
                       type: string
                     proxySettings:
+                      description: Proxy settings for tenant owner.
                       items:
                         properties:
                           kind:
@@ -1067,6 +1082,7 @@ spec:
                   type: object
                 type: array
               priorityClasses:
+                description: Specifies the allowed IngressClasses assigned to the Tenant. Capsule assures that all Ingress resources created in the Tenant can use only one of the allowed IngressClasses. Optional.
                 properties:
                   allowed:
                     items:
@@ -1076,6 +1092,7 @@ spec:
                     type: string
                 type: object
               resourceQuotas:
+                description: Specifies a list of ResourceQuota resources assigned to the Tenant. The assigned values are inherited by any namespace created in the Tenant. The Capsule operator aggregates ResourceQuota at Tenant level, so that the hard quota is never crossed for the given Tenant. This permits the Tenant owner to consume resources in the Tenant regardless of the namespace. Optional.
                 properties:
                   items:
                     items:
@@ -1125,6 +1142,7 @@ spec:
                     type: array
                 type: object
               servicesMetadata:
+                description: Specifies additional labels and annotations the Capsule operator places on any Service resource in the Tenant. Optional.
                 properties:
                   additionalAnnotations:
                     additionalProperties:
@@ -1136,6 +1154,7 @@ spec:
                     type: object
                 type: object
               storageClasses:
+                description: Specifies the allowed StorageClasses assigned to the Tenant. Capsule assures that all PersistentVolumeClaim resources created in the Tenant can use only one of the allowed StorageClasses. Optional.
                 properties:
                   allowed:
                     items:
@@ -1148,16 +1167,19 @@ spec:
             - owners
             type: object
           status:
-            description: TenantStatus defines the observed state of Tenant
+            description: Returns the observed state of the Tenant
             properties:
               namespaces:
+                description: List of namespaces assigned to the Tenant.
                 items:
                   type: string
                 type: array
               size:
+                description: How many namespaces are assigned to the Tenant.
                 type: integer
               state:
                 default: active
+                description: The operational state of the Tenant. Possible values are "active", "cordoned".
                 enum:
                 - cordoned
                 - active
