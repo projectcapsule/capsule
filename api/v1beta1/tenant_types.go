@@ -9,26 +9,43 @@ import (
 
 // TenantSpec defines the desired state of Tenant
 type TenantSpec struct {
+	// Specifies the owners of the Tenant. Mandatory.
 	Owners []OwnerSpec `json:"owners"`
 
 	//+kubebuilder:validation:Minimum=1
-	NamespaceQuota         *int32                       `json:"namespaceQuota,omitempty"`
-	NamespacesMetadata     *AdditionalMetadataSpec      `json:"namespacesMetadata,omitempty"`
-	ServicesMetadata       *AdditionalMetadataSpec      `json:"servicesMetadata,omitempty"`
-	StorageClasses         *AllowedListSpec             `json:"storageClasses,omitempty"`
-	IngressClasses         *AllowedListSpec             `json:"ingressClasses,omitempty"`
-	IngressHostnames       *AllowedListSpec             `json:"ingressHostnames,omitempty"`
-	ContainerRegistries    *AllowedListSpec             `json:"containerRegistries,omitempty"`
-	NodeSelector           map[string]string            `json:"nodeSelector,omitempty"`
-	NetworkPolicies        *NetworkPolicySpec           `json:"networkPolicies,omitempty"`
-	LimitRanges            *LimitRangesSpec             `json:"limitRanges,omitempty"`
-	ResourceQuota          *ResourceQuotaSpec           `json:"resourceQuotas,omitempty"`
+	// Specifies the maximum number of namespaces allowed for that Tenant. Once the namespace quota assigned to the Tenant has been reached, the Tenant owner cannot create further namespaces. Optional.
+	NamespaceQuota *int32 `json:"namespaceQuota,omitempty"`
+	// Specifies additional labels and annotations the Capsule operator places on any Namespace resource in the Tenant. Optional.
+	NamespacesMetadata *AdditionalMetadataSpec `json:"namespacesMetadata,omitempty"`
+	// Specifies additional labels and annotations the Capsule operator places on any Service resource in the Tenant. Optional.
+	ServicesMetadata *AdditionalMetadataSpec `json:"servicesMetadata,omitempty"`
+	// Specifies the allowed StorageClasses assigned to the Tenant. Capsule assures that all PersistentVolumeClaim resources created in the Tenant can use only one of the allowed StorageClasses. Optional.
+	StorageClasses *AllowedListSpec `json:"storageClasses,omitempty"`
+	// Specifies the allowed IngressClasses assigned to the Tenant. Capsule assures that all Ingress resources created in the Tenant can use only one of the allowed IngressClasses. Optional.
+	IngressClasses *AllowedListSpec `json:"ingressClasses,omitempty"`
+	// Specifies the allowed hostnames in Ingresses for the given Tenant. Capsule assures that all Ingress resources created in the Tenant can use only one of the allowed hostnames. Optional.
+	IngressHostnames *AllowedListSpec `json:"ingressHostnames,omitempty"`
+	// Specifies the trusted Image Registries assigned to the Tenant. Capsule assures that all Pods resources created in the Tenant can use only one of the allowed trusted registries. Optional.
+	ContainerRegistries *AllowedListSpec `json:"containerRegistries,omitempty"`
+	// Specifies the label to control the placement of pods on a given pool of worker nodes. All namesapces created within the Tenant will have the node selector annotation. This annotation tells the Kubernetes scheduler to place pods on the nodes having the selector label. Optional.
+	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
+	// Specifies the NetworkPolicies assigned to the Tenant. The assigned NetworkPolicies are inherited by any namespace created in the Tenant. Optional.
+	NetworkPolicies *NetworkPolicySpec `json:"networkPolicies,omitempty"`
+	// Specifies the NetworkPolicies assigned to the Tenant. The assigned NetworkPolicies are inherited by any namespace created in the Tenant. Optional.
+	LimitRanges *LimitRangesSpec `json:"limitRanges,omitempty"`
+	// Specifies a list of ResourceQuota resources assigned to the Tenant. The assigned values are inherited by any namespace created in the Tenant. The Capsule operator aggregates ResourceQuota at Tenant level, so that the hard quota is never crossed for the given Tenant. This permits the Tenant owner to consume resources in the Tenant regardless of the namespace. Optional.
+	ResourceQuota *ResourceQuotaSpec `json:"resourceQuotas,omitempty"`
+	// Specifies additional RoleBindings assigned to the Tenant. Capsule will ensure that all namespaces in the Tenant always contain the RoleBinding for the given ClusterRole. Optional.
 	AdditionalRoleBindings []AdditionalRoleBindingsSpec `json:"additionalRoleBindings,omitempty"`
-	ExternalServiceIPs     *ExternalServiceIPsSpec      `json:"externalServiceIPs,omitempty"`
-	ImagePullPolicies      []ImagePullPolicySpec        `json:"imagePullPolicies,omitempty"`
-	PriorityClasses        *AllowedListSpec             `json:"priorityClasses,omitempty"`
+	// Specifies the external IPs that can be used in Services with type ClusterIP. An empty list means all the IPs are allowed. Optional.
+	ExternalServiceIPs *ExternalServiceIPsSpec `json:"externalServiceIPs,omitempty"`
+	// Specify the allowed values for the imagePullPolicies option in Pod resources. Capsule assures that all Pod resources created in the Tenant can use only one of the allowed policy. Optional.
+	ImagePullPolicies []ImagePullPolicySpec `json:"imagePullPolicies,omitempty"`
+	// Specifies the allowed IngressClasses assigned to the Tenant. Capsule assures that all Ingress resources created in the Tenant can use only one of the allowed IngressClasses. Optional.
+	PriorityClasses *AllowedListSpec `json:"priorityClasses,omitempty"`
 
 	//+kubebuilder:default=true
+	// Specifies if NodePort service type resources are allowed for the Tenant. Default is true. Optional.
 	EnableNodePorts *bool `json:"enableNodePorts,omitempty"`
 }
 

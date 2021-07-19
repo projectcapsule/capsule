@@ -11,10 +11,13 @@ const (
 	TenantStateCordoned tenantState = "cordoned"
 )
 
-// TenantStatus defines the observed state of Tenant
+// Returns the observed state of the Tenant
 type TenantStatus struct {
 	//+kubebuilder:default=active
-	State      tenantState `json:"state"`
-	Size       uint        `json:"size"`
-	Namespaces []string    `json:"namespaces,omitempty"`
+	// The operational state of the Tenant. Possible values are "active", "cordoned".
+	State tenantState `json:"state"`
+	// How many namespaces are assigned to the Tenant.
+	Size uint `json:"size"`
+	// List of namespaces assigned to the Tenant.
+	Namespaces []string `json:"namespaces,omitempty"`
 }
