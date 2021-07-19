@@ -3,10 +3,12 @@
 
 package v1beta1
 
-// OwnerSpec defines tenant owner name and kind
 type OwnerSpec struct {
-	Kind            OwnerKind       `json:"kind"`
-	Name            string          `json:"name"`
+	// Kind of tenant owner. Possible values are "User", "Group", and "ServiceAccount"
+	Kind OwnerKind `json:"kind"`
+	// Name of tenant owner.
+	Name string `json:"name"`
+	// Proxy settings for tenant owner.
 	ProxyOperations []ProxySettings `json:"proxySettings,omitempty"`
 }
 
