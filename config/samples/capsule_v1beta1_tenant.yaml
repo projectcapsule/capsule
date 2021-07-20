@@ -16,7 +16,15 @@ spec:
       - docker.io
       - quay.io
     allowedRegex: ^\w+.gcr.io$
-  enableNodePorts: false
+  serviceOptions:
+    additionalMetadata:
+      additionalAnnotations:
+        capsule.clastix.io/bgp: "true"
+      additionalLabels:
+        capsule.clastix.io/pool: gas
+    allowedServices:
+      nodePort: false
+      externalName: false
   externalServiceIPs:
     allowed:
       - 10.20.0.0/16
@@ -122,11 +130,6 @@ spec:
       -
         hard:
           requests.storage: 100Gi
-  servicesMetadata:
-    additionalAnnotations:
-      capsule.clastix.io/bgp: "true"
-    additionalLabels:
-      capsule.clastix.io/pool: gas
   storageClasses:
     allowed:
       - default
