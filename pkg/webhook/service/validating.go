@@ -44,10 +44,18 @@ func (r *handler) handleService(ctx context.Context, clt client.Client, decoder 
 
 	tnt := tntList.Items[0]
 
-	if svc.Spec.Type == corev1.ServiceTypeNodePort && tnt.Spec.EnableNodePorts != nil && !*tnt.Spec.EnableNodePorts {
+	if svc.Spec.Type == corev1.ServiceTypeNodePort && tnt.Spec.ServiceOptions != nil && tnt.Spec.ServiceOptions.AllowedServices != nil && !*tnt.Spec.ServiceOptions.AllowedServices.NodePort {
 		recorder.Eventf(&tnt, corev1.EventTypeWarning, "ForbiddenNodePort", "Service %s/%s cannot be type of NodePort for the current Tenant", req.Namespace, req.Name)
 
 		response := admission.Denied(NewNodePortDisabledError().Error())
+
+		return &response
+	}
+
+	if svc.Spec.Type == corev1.ServiceTypeExternalName && tnt.Spec.ServiceOptions != nil && tnt.Spec.ServiceOptions.AllowedServices != nil && !*tnt.Spec.ServiceOptions.AllowedServices.ExternalName {
+		recorder.Eventf(&tnt, corev1.EventTypeWarning, "ForbiddenExternalName", "Service %s/%s cannot be type of ExternalName for the current Tenant", req.Namespace, req.Name)
+
+		response := admission.Denied(NewExternalNameDisabledError().Error())
 
 		return &response
 	}

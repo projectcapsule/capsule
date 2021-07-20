@@ -22,7 +22,8 @@ const (
 	podPriorityAllowedAnnotation      = "priorityclass.capsule.clastix.io/allowed"
 	podPriorityAllowedRegexAnnotation = "priorityclass.capsule.clastix.io/allowed-regex"
 
-	enableNodePortsAnnotation = "capsule.clastix.io/enable-node-ports"
+	enableNodePortsAnnotation    = "capsule.clastix.io/enable-node-ports"
+	enableExternalNameAnnotation = "capsule.clastix.io/enable-external-name"
 
 	ownerGroupsAnnotation         = "owners.capsule.clastix.io/group"
 	ownerUsersAnnotation          = "owners.capsule.clastix.io/user"
@@ -136,9 +137,13 @@ func (t *Tenant) ConvertTo(dstRaw conversion.Hub) error {
 		}
 	}
 	if t.Spec.ServicesMetadata != nil {
-		dst.Spec.ServicesMetadata = &capsulev1beta1.AdditionalMetadataSpec{
-			AdditionalLabels:      t.Spec.ServicesMetadata.AdditionalLabels,
-			AdditionalAnnotations: t.Spec.ServicesMetadata.AdditionalAnnotations,
+		if dst.Spec.ServiceOptions == nil {
+			dst.Spec.ServiceOptions = &capsulev1beta1.ServiceOptions{
+				AdditionalMetadata: &capsulev1beta1.AdditionalMetadataSpec{
+					AdditionalLabels:      t.Spec.ServicesMetadata.AdditionalLabels,
+					AdditionalAnnotations: t.Spec.ServicesMetadata.AdditionalAnnotations,
+				},
+			}
 		}
 	}
 	if t.Spec.StorageClasses != nil {
@@ -226,7 +231,28 @@ func (t *Tenant) ConvertTo(dstRaw conversion.Hub) error {
 		if err != nil {
 			return errors.Wrap(err, fmt.Sprintf("unable to parse %s annotation on tenant %s", enableNodePortsAnnotation, t.GetName()))
 		}
-		dst.Spec.EnableNodePorts = pointer.BoolPtr(val)
+		if dst.Spec.ServiceOptions == nil {
+			dst.Spec.ServiceOptions = &capsulev1beta1.ServiceOptions{}
+		}
+		if dst.Spec.ServiceOptions.AllowedServices == nil {
+			dst.Spec.ServiceOptions.AllowedServices = &capsulev1beta1.AllowedServices{}
+		}
+		dst.Spec.ServiceOptions.AllowedServices.NodePort = pointer.BoolPtr(val)
+	}
+
+	enableExternalName, ok := annotations[enableExternalNameAnnotation]
+	if ok {
+		val, err := strconv.ParseBool(enableExternalName)
+		if err != nil {
+			return errors.Wrap(err, fmt.Sprintf("unable to parse %s annotation on tenant %s", enableExternalNameAnnotation, t.GetName()))
+		}
+		if dst.Spec.ServiceOptions == nil {
+			dst.Spec.ServiceOptions = &capsulev1beta1.ServiceOptions{}
+		}
+		if dst.Spec.ServiceOptions.AllowedServices == nil {
+			dst.Spec.ServiceOptions.AllowedServices = &capsulev1beta1.AllowedServices{}
+		}
+		dst.Spec.ServiceOptions.AllowedServices.ExternalName = pointer.BoolPtr(val)
 	}
 
 	// Status
@@ -240,6 +266,7 @@ func (t *Tenant) ConvertTo(dstRaw conversion.Hub) error {
 	delete(dst.ObjectMeta.Annotations, podPriorityAllowedAnnotation)
 	delete(dst.ObjectMeta.Annotations, podPriorityAllowedRegexAnnotation)
 	delete(dst.ObjectMeta.Annotations, enableNodePortsAnnotation)
+	delete(dst.ObjectMeta.Annotations, enableExternalNameAnnotation)
 	delete(dst.ObjectMeta.Annotations, ownerGroupsAnnotation)
 	delete(dst.ObjectMeta.Annotations, ownerUsersAnnotation)
 	delete(dst.ObjectMeta.Annotations, ownerServiceAccountAnnotation)
@@ -364,10 +391,10 @@ func (t *Tenant) ConvertFrom(srcRaw conversion.Hub) error {
 			AdditionalAnnotations: src.Spec.NamespacesMetadata.AdditionalAnnotations,
 		}
 	}
-	if src.Spec.ServicesMetadata != nil {
+	if src.Spec.ServiceOptions != nil && src.Spec.ServiceOptions.AdditionalMetadata != nil {
 		t.Spec.ServicesMetadata = &AdditionalMetadataSpec{
-			AdditionalLabels:      src.Spec.ServicesMetadata.AdditionalLabels,
-			AdditionalAnnotations: src.Spec.ServicesMetadata.AdditionalAnnotations,
+			AdditionalLabels:      src.Spec.ServiceOptions.AdditionalMetadata.AdditionalLabels,
+			AdditionalAnnotations: src.Spec.ServiceOptions.AdditionalMetadata.AdditionalAnnotations,
 		}
 	}
 	if src.Spec.StorageClasses != nil {
@@ -437,7 +464,10 @@ func (t *Tenant) ConvertFrom(srcRaw conversion.Hub) error {
 		}
 	}
 
-	t.Annotations[enableNodePortsAnnotation] = strconv.FormatBool(*src.Spec.EnableNodePorts)
+	if src.Spec.ServiceOptions != nil && src.Spec.ServiceOptions.AllowedServices != nil {
+		t.Annotations[enableNodePortsAnnotation] = strconv.FormatBool(*src.Spec.ServiceOptions.AllowedServices.NodePort)
+		t.Annotations[enableExternalNameAnnotation] = strconv.FormatBool(*src.Spec.ServiceOptions.AllowedServices.ExternalName)
+	}
 
 	// Status
 	t.Status = TenantStatus{

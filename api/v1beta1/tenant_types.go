@@ -17,8 +17,8 @@ type TenantSpec struct {
 	NamespaceQuota *int32 `json:"namespaceQuota,omitempty"`
 	// Specifies additional labels and annotations the Capsule operator places on any Namespace resource in the Tenant. Optional.
 	NamespacesMetadata *AdditionalMetadataSpec `json:"namespacesMetadata,omitempty"`
-	// Specifies additional labels and annotations the Capsule operator places on any Service resource in the Tenant. Optional.
-	ServicesMetadata *AdditionalMetadataSpec `json:"servicesMetadata,omitempty"`
+	// Specifies options for the Service, such as additional metadata or block of certain type of Services. Optional.
+	ServiceOptions *ServiceOptions `json:"serviceOptions,omitempty"`
 	// Specifies the allowed StorageClasses assigned to the Tenant. Capsule assures that all PersistentVolumeClaim resources created in the Tenant can use only one of the allowed StorageClasses. Optional.
 	StorageClasses *AllowedListSpec `json:"storageClasses,omitempty"`
 	// Specifies the allowed IngressClasses assigned to the Tenant. Capsule assures that all Ingress resources created in the Tenant can use only one of the allowed IngressClasses. Optional.
@@ -43,10 +43,6 @@ type TenantSpec struct {
 	ImagePullPolicies []ImagePullPolicySpec `json:"imagePullPolicies,omitempty"`
 	// Specifies the allowed IngressClasses assigned to the Tenant. Capsule assures that all Ingress resources created in the Tenant can use only one of the allowed IngressClasses. Optional.
 	PriorityClasses *AllowedListSpec `json:"priorityClasses,omitempty"`
-
-	//+kubebuilder:default=true
-	// Specifies if NodePort service type resources are allowed for the Tenant. Default is true. Optional.
-	EnableNodePorts *bool `json:"enableNodePorts,omitempty"`
 }
 
 //+kubebuilder:object:root=true

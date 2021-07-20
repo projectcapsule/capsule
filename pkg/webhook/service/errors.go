@@ -41,3 +41,13 @@ func NewNodePortDisabledError() error {
 func (nodePortDisabled) Error() string {
 	return "NodePort service types are forbidden for the tenant: please, reach out to the system administrators"
 }
+
+type externalNameDisabled struct{}
+
+func NewExternalNameDisabledError() error {
+	return &externalNameDisabled{}
+}
+
+func (externalNameDisabled) Error() string {
+	return "ExternalName service types are forbidden for the tenant: please, reach out to the system administrators"
+}
