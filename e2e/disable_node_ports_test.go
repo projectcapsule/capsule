@@ -30,7 +30,11 @@ var _ = Describe("creating a nodePort service when it is disabled for Tenant", f
 					Kind: "User",
 				},
 			},
-			EnableNodePorts: pointer.BoolPtr(false),
+			ServiceOptions: &capsulev1beta1.ServiceOptions{
+				AllowedServices: &capsulev1beta1.AllowedServices{
+					NodePort: pointer.BoolPtr(false),
+				},
+			},
 		},
 	}
 
