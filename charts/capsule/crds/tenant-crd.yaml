@@ -646,10 +646,6 @@ spec:
                     allowedRegex:
                       type: string
                   type: object
-                enableNodePorts:
-                  default: true
-                  description: Specifies if NodePort service type resources are allowed for the Tenant. Default is true. Optional.
-                  type: boolean
                 externalServiceIPs:
                   description: Specifies the external IPs that can be used in Services with type ClusterIP. An empty list means all the IPs are allowed. Optional.
                   properties:
@@ -1141,16 +1137,32 @@ spec:
                         type: object
                       type: array
                   type: object
-                servicesMetadata:
-                  description: Specifies additional labels and annotations the Capsule operator places on any Service resource in the Tenant. Optional.
+                serviceOptions:
+                  description: Specifies options for the Service, such as additional metadata or block of certain type of Services. Optional.
                   properties:
-                    additionalAnnotations:
-                      additionalProperties:
-                        type: string
+                    additionalMetadata:
+                      description: Specifies additional labels and annotations the Capsule operator places on any Service resource in the Tenant. Optional.
+                      properties:
+                        additionalAnnotations:
+                          additionalProperties:
+                            type: string
+                          type: object
+                        additionalLabels:
+                          additionalProperties:
+                            type: string
+                          type: object
                       type: object
-                    additionalLabels:
-                      additionalProperties:
-                        type: string
+                    allowedServices:
+                      description: Block or deny certain type of Services. Optional.
+                      properties:
+                        externalName:
+                          default: true
+                          description: Specifies if ExternalName service type resources are allowed for the Tenant. Default is true. Optional.
+                          type: boolean
+                        nodePort:
+                          default: true
+                          description: Specifies if NodePort service type resources are allowed for the Tenant. Default is true. Optional.
+                          type: boolean
                       type: object
                   type: object
                 storageClasses:
