@@ -24,6 +24,7 @@ fi
 
 USER=$1
 TENANT=$2
+GROUP=$3
 
 if [[ -z ${USER} ]]; then
     echo "User has not been specified!"
@@ -35,13 +36,19 @@ if [[ -z ${TENANT} ]]; then
     exit 1
 fi
 
-GROUP=capsule.clastix.io
+if [[ -z ${GROUP} ]]; then
+    GROUP=capsule.clastix.io
+fi
+
 
 TMPDIR=$(mktemp -d)
 echo "creating certs in TMPDIR ${TMPDIR} "
 
+MERGED_GROUPS=$(echo "/O=$GROUP" | sed "s/,/\/O=/g")
+echo "merging groups ${MERGED_GROUPS}"
+
 openssl genrsa -out ${USER}-${TENANT}.key 2048
-openssl req -new -key ${USER}-${TENANT}.key -subj "/CN=${USER}/O=${GROUP}" -out ${TMPDIR}/${USER}-${TENANT}.csr
+openssl req -new -key ${USER}-${TENANT}.key -subj "/CN=${USER}${MERGED_GROUPS}" -out ${TMPDIR}/${USER}-${TENANT}.csr
 
 # Clean any previously created CSR for the same user.
 kubectl delete csr ${USER}-${TENANT} 2>/dev/null || true
