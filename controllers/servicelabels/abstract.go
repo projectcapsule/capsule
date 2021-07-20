@@ -53,8 +53,8 @@ func (r *abstractServiceLabelsReconciler) Reconcile(ctx context.Context, request
 	}
 
 	_, err = controllerutil.CreateOrUpdate(ctx, r.client, r.obj, func() (err error) {
-		r.obj.SetLabels(r.sync(r.obj.GetLabels(), tenant.Spec.ServicesMetadata.AdditionalLabels))
-		r.obj.SetAnnotations(r.sync(r.obj.GetAnnotations(), tenant.Spec.ServicesMetadata.AdditionalAnnotations))
+		r.obj.SetLabels(r.sync(r.obj.GetLabels(), tenant.Spec.ServiceOptions.AdditionalMetadata.AdditionalLabels))
+		r.obj.SetAnnotations(r.sync(r.obj.GetAnnotations(), tenant.Spec.ServiceOptions.AdditionalMetadata.AdditionalAnnotations))
 		return nil
 	})
 
@@ -78,7 +78,7 @@ func (r *abstractServiceLabelsReconciler) getTenant(ctx context.Context, namespa
 		return nil, err
 	}
 
-	if tenant.Spec.ServicesMetadata == nil {
+	if tenant.Spec.ServiceOptions == nil || tenant.Spec.ServiceOptions.AdditionalMetadata == nil {
 		return nil, NewNoServicesMetadata(namespacedName.Name)
 	}
 
