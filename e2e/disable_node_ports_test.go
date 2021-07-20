@@ -24,7 +24,7 @@ var _ = Describe("creating a nodePort service when it is disabled for Tenant", f
 			Name: "disable-node-ports",
 		},
 		Spec: capsulev1beta1.TenantSpec{
-			Owners: []capsulev1beta1.OwnerSpec{
+			Owners: capsulev1beta1.OwnerListSpec{
 				{
 					Name: "google",
 					Kind: "User",

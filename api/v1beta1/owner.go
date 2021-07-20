@@ -37,3 +37,17 @@ type ProxyServiceKind string
 func (p ProxyServiceKind) String() string {
 	return string(p)
 }
+
+const (
+	NodesProxy          ProxyServiceKind = "Nodes"
+	StorageClassesProxy ProxyServiceKind = "StorageClasses"
+	IngressClassesProxy ProxyServiceKind = "IngressClasses"
+
+	ListOperation   ProxyOperation = "List"
+	UpdateOperation ProxyOperation = "Update"
+	DeleteOperation ProxyOperation = "Delete"
+
+	UserOwner           OwnerKind = "User"
+	GroupOwner          OwnerKind = "Group"
+	ServiceAccountOwner OwnerKind = "ServiceAccount"
+)

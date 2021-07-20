@@ -23,7 +23,7 @@ var _ = Describe("creating a Namespace with Tenant name prefix enforcement", fun
 			Name: "awesome",
 		},
 		Spec: capsulev1beta1.TenantSpec{
-			Owners: []capsulev1beta1.OwnerSpec{
+			Owners: capsulev1beta1.OwnerListSpec{
 				{
 					Name: "john",
 					Kind: "User",
@@ -36,7 +36,7 @@ var _ = Describe("creating a Namespace with Tenant name prefix enforcement", fun
 			Name: "awesome-tenant",
 		},
 		Spec: capsulev1beta1.TenantSpec{
-			Owners: []capsulev1beta1.OwnerSpec{
+			Owners: capsulev1beta1.OwnerListSpec{
 				{
 					Name: "john",
 					Kind: "User",

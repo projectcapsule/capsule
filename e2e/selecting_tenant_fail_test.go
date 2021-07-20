@@ -21,7 +21,7 @@ var _ = Describe("creating a Namespace without a Tenant selector when user owns 
 			Name: "tenant-one",
 		},
 		Spec: capsulev1beta1.TenantSpec{
-			Owners: []capsulev1beta1.OwnerSpec{
+			Owners: capsulev1beta1.OwnerListSpec{
 				{
 					Name: "john",
 					Kind: "User",
@@ -34,7 +34,7 @@ var _ = Describe("creating a Namespace without a Tenant selector when user owns 
 			Name: "tenant-two",
 		},
 		Spec: capsulev1beta1.TenantSpec{
-			Owners: []capsulev1beta1.OwnerSpec{
+			Owners: capsulev1beta1.OwnerListSpec{
 				{
 					Name: "john",
 					Kind: "User",
@@ -47,7 +47,7 @@ var _ = Describe("creating a Namespace without a Tenant selector when user owns 
 			Name: "tenant-three",
 		},
 		Spec: capsulev1beta1.TenantSpec{
-			Owners: []capsulev1beta1.OwnerSpec{
+			Owners: capsulev1beta1.OwnerListSpec{
 				{
 					Name: "john",
 					Kind: "Group",
@@ -60,7 +60,7 @@ var _ = Describe("creating a Namespace without a Tenant selector when user owns 
 			Name: "tenant-four",
 		},
 		Spec: capsulev1beta1.TenantSpec{
-			Owners: []capsulev1beta1.OwnerSpec{
+			Owners: capsulev1beta1.OwnerListSpec{
 				{
 					Name: "john",
 					Kind: "Group",

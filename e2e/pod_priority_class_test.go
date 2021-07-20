@@ -23,7 +23,7 @@ var _ = Describe("enforcing a Priority Class", func() {
 			Name: "priority-class",
 		},
 		Spec: capsulev1beta1.TenantSpec{
-			Owners: []capsulev1beta1.OwnerSpec{
+			Owners: capsulev1beta1.OwnerListSpec{
 				{
 					Name: "george",
 					Kind: "User",

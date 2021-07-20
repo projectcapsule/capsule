@@ -22,7 +22,7 @@ var _ = Describe("enforcing a defined ImagePullPolicy", func() {
 			Name: "image-pull-policy",
 		},
 		Spec: capsulev1beta1.TenantSpec{
-			Owners: []capsulev1beta1.OwnerSpec{
+			Owners: capsulev1beta1.OwnerListSpec{
 				{
 					Name: "axel",
 					Kind: "User",

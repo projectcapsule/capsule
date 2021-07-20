@@ -24,7 +24,7 @@ var _ = Describe("when Tenant handles Ingress classes", func() {
 			Name: "ingress-class",
 		},
 		Spec: capsulev1beta1.TenantSpec{
-			Owners: []capsulev1beta1.OwnerSpec{
+			Owners: capsulev1beta1.OwnerListSpec{
 				{
 					Name: "ingress",
 					Kind: "User",

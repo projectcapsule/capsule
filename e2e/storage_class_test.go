@@ -24,7 +24,7 @@ var _ = Describe("when Tenant handles Storage classes", func() {
 			Name: "storage-class",
 		},
 		Spec: capsulev1beta1.TenantSpec{
-			Owners: []capsulev1beta1.OwnerSpec{
+			Owners: capsulev1beta1.OwnerListSpec{
 				{
 					Name: "storage",
 					Kind: "User",

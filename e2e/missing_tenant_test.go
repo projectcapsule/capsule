@@ -19,7 +19,7 @@ var _ = Describe("creating a Namespace creation with no Tenant assigned", func()
 	It("should fail", func() {
 		tnt := &capsulev1beta1.Tenant{
 			Spec: capsulev1beta1.TenantSpec{
-				Owners: []capsulev1beta1.OwnerSpec{
+				Owners: capsulev1beta1.OwnerListSpec{
 					{
 						Name: "missing",
 						Kind: "User",

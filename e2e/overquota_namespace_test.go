@@ -22,7 +22,7 @@ var _ = Describe("creating a Namespace in over-quota of three", func() {
 			Name: "over-quota-tenant",
 		},
 		Spec: capsulev1beta1.TenantSpec{
-			Owners: []capsulev1beta1.OwnerSpec{
+			Owners: capsulev1beta1.OwnerListSpec{
 				{
 					Name: "bob",
 					Kind: "User",

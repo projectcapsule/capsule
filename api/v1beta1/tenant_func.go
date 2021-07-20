@@ -36,3 +36,7 @@ func (t *Tenant) AssignNamespaces(namespaces []corev1.Namespace) {
 	t.Status.Namespaces = l
 	t.Status.Size = uint(len(l))
 }
+
+func (t *Tenant) GetOwnerProxySettings(name string, kind OwnerKind) []ProxySettings {
+	return t.Spec.Owners.FindOwner(name, kind).ProxyOperations
+}
