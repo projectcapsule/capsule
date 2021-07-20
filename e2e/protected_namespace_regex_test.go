@@ -23,7 +23,7 @@ var _ = Describe("creating a Namespace with a protected Namespace regex enabled"
 			Name: "tenant-protected-namespace",
 		},
 		Spec: capsulev1beta1.TenantSpec{
-			Owners: []capsulev1beta1.OwnerSpec{
+			Owners: capsulev1beta1.OwnerListSpec{
 				{
 					Name: "alice",
 					Kind: "User",

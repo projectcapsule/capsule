@@ -23,7 +23,7 @@ var _ = Describe("creating a Namespace as Tenant owner with custom --capsule-gro
 			Name: "tenant-assigned-custom-group",
 		},
 		Spec: capsulev1beta1.TenantSpec{
-			Owners: []capsulev1beta1.OwnerSpec{
+			Owners: capsulev1beta1.OwnerListSpec{
 				{
 					Name: "alice",
 					Kind: "User",

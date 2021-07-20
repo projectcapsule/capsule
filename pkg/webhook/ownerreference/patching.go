@@ -189,7 +189,7 @@ func (h *handler) listTenantsForOwnerKind(ctx context.Context, ownerKind string,
 	return tntList, err
 }
 
-func (h *handler) isTenantOwner(owners []capsulev1beta1.OwnerSpec, userInfo authenticationv1.UserInfo) bool {
+func (h *handler) isTenantOwner(owners capsulev1beta1.OwnerListSpec, userInfo authenticationv1.UserInfo) bool {
 	for _, owner := range owners {
 		switch owner.Kind {
 		case "User", "ServiceAccount":

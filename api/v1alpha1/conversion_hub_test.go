@@ -115,7 +115,7 @@ func generateTenantsSpecs() (Tenant, capsulev1beta1.Tenant) {
 			},
 		},
 		Spec: capsulev1beta1.TenantSpec{
-			Owners: []capsulev1beta1.OwnerSpec{
+			Owners: capsulev1beta1.OwnerListSpec{
 				{
 					Kind: "User",
 					Name: "alice",

@@ -10,7 +10,7 @@ import (
 // TenantSpec defines the desired state of Tenant
 type TenantSpec struct {
 	// Specifies the owners of the Tenant. Mandatory.
-	Owners []OwnerSpec `json:"owners"`
+	Owners OwnerListSpec `json:"owners"`
 
 	//+kubebuilder:validation:Minimum=1
 	// Specifies the maximum number of namespaces allowed for that Tenant. Once the namespace quota assigned to the Tenant has been reached, the Tenant owner cannot create further namespaces. Optional.

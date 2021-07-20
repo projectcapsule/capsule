@@ -21,7 +21,7 @@ var _ = Describe("creating a Namespaces as different type of Tenant owners", fun
 			Name: "tenant-assigned",
 		},
 		Spec: capsulev1beta1.TenantSpec{
-			Owners: []capsulev1beta1.OwnerSpec{
+			Owners: capsulev1beta1.OwnerListSpec{
 				{
 					Name: "alice",
 					Kind: "User",

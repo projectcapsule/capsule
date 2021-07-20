@@ -22,7 +22,7 @@ var _ = Describe("creating a Namespace for a Tenant with additional metadata", f
 			Name: "tenant-metadata",
 		},
 		Spec: capsulev1beta1.TenantSpec{
-			Owners: []capsulev1beta1.OwnerSpec{
+			Owners: capsulev1beta1.OwnerListSpec{
 				{
 					Name: "gatsby",
 					Kind: "User",

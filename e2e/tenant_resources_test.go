@@ -27,7 +27,7 @@ var _ = Describe("creating namespaces within a Tenant with resources", func() {
 			Name: "tenant-resources",
 		},
 		Spec: capsulev1beta1.TenantSpec{
-			Owners: []capsulev1beta1.OwnerSpec{
+			Owners: capsulev1beta1.OwnerListSpec{
 				{
 					Name: "john",
 					Kind: "User",

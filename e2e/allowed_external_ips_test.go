@@ -23,7 +23,7 @@ var _ = Describe("enforcing an allowed set of Service external IPs", func() {
 			Name: "allowed-external-ip",
 		},
 		Spec: capsulev1beta1.TenantSpec{
-			Owners: []capsulev1beta1.OwnerSpec{
+			Owners: capsulev1beta1.OwnerListSpec{
 				{
 					Name: "google",
 					Kind: "User",

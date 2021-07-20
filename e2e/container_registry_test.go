@@ -23,7 +23,7 @@ var _ = Describe("enforcing a Container Registry", func() {
 			Name: "container-registry",
 		},
 		Spec: capsulev1beta1.TenantSpec{
-			Owners: []capsulev1beta1.OwnerSpec{
+			Owners: capsulev1beta1.OwnerListSpec{
 				{
 					Name: "matt",
 					Kind: "User",

@@ -24,7 +24,7 @@ var _ = Describe("cordoning a Tenant", func() {
 			Name: "tenant-cordoning",
 		},
 		Spec: capsulev1beta1.TenantSpec{
-			Owners: []capsulev1beta1.OwnerSpec{
+			Owners: capsulev1beta1.OwnerListSpec{
 				{
 					Name: "jim",
 					Kind: "User",

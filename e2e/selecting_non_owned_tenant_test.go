@@ -22,7 +22,7 @@ var _ = Describe("creating a Namespace trying to select a third Tenant", func() 
 			Name: "tenant-non-owned",
 		},
 		Spec: capsulev1beta1.TenantSpec{
-			Owners: []capsulev1beta1.OwnerSpec{
+			Owners: capsulev1beta1.OwnerListSpec{
 				{
 					Name: "undefined",
 					Kind: "User",

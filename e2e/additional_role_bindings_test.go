@@ -23,7 +23,7 @@ var _ = Describe("creating a Namespace with an additional Role Binding", func() 
 			Name: "additional-role-binding",
 		},
 		Spec: capsulev1beta1.TenantSpec{
-			Owners: []capsulev1beta1.OwnerSpec{
+			Owners: capsulev1beta1.OwnerListSpec{
 				{
 					Name: "dale",
 					Kind: "User",

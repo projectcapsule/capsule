@@ -25,7 +25,7 @@ var _ = Describe("when handling Ingress hostnames collision", func() {
 			Name: "ingress-hostnames-allowed-collision",
 		},
 		Spec: capsulev1beta1.TenantSpec{
-			Owners: []capsulev1beta1.OwnerSpec{
+			Owners: capsulev1beta1.OwnerListSpec{
 				{
 					Name: "ingress-allowed",
 					Kind: "User",
