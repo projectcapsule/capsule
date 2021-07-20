@@ -43,6 +43,13 @@ func generateTenantsSpecs() (Tenant, capsulev1beta1.Tenant) {
 			"foo": "bar",
 		},
 	}
+	var v1beta1ServiceOptions = &capsulev1beta1.ServiceOptions{
+		AdditionalMetadata: v1beta1AdditionalMetadataSpec,
+		AllowedServices: &capsulev1beta1.AllowedServices{
+			NodePort:     pointer.BoolPtr(false),
+			ExternalName: pointer.BoolPtr(false),
+		},
+	}
 	var v1beta1AllowedListSpec = &capsulev1beta1.AllowedListSpec{
 		Exact: []string{"foo", "bar"},
 		Regex: "^foo*",
@@ -213,7 +220,7 @@ func generateTenantsSpecs() (Tenant, capsulev1beta1.Tenant) {
 			},
 			NamespaceQuota:      &namespaceQuota,
 			NamespacesMetadata:  v1beta1AdditionalMetadataSpec,
-			ServicesMetadata:    v1beta1AdditionalMetadataSpec,
+			ServiceOptions:      v1beta1ServiceOptions,
 			StorageClasses:      v1beta1AllowedListSpec,
 			IngressClasses:      v1beta1AllowedListSpec,
 			IngressHostnames:    v1beta1AllowedListSpec,
@@ -248,7 +255,6 @@ func generateTenantsSpecs() (Tenant, capsulev1beta1.Tenant) {
 				Exact: []string{"default"},
 				Regex: "^tier-.*$",
 			},
-			EnableNodePorts: pointer.BoolPtr(false),
 		},
 		Status: capsulev1beta1.TenantStatus{
 			Size:       1,
@@ -266,6 +272,7 @@ func generateTenantsSpecs() (Tenant, capsulev1beta1.Tenant) {
 			Annotations: map[string]string{
 				"foo":                                "bar",
 				podAllowedImagePullPolicyAnnotation:  "Always,IfNotPresent",
+				enableExternalNameAnnotation:         "false",
 				enableNodePortsAnnotation:            "false",
 				podPriorityAllowedAnnotation:         "default",
 				podPriorityAllowedRegexAnnotation:    "^tier-.*$",
