@@ -29,33 +29,40 @@ const (
 	ownerUsersAnnotation          = "owners.capsule.clastix.io/user"
 	ownerServiceAccountAnnotation = "owners.capsule.clastix.io/serviceaccount"
 
-	enableNodeListingAnnotation          = "capsule.clastix.io/enable-node-listing"
-	enableNodeUpdateAnnotation           = "capsule.clastix.io/enable-node-update"
-	enableNodeDeletionAnnotation         = "capsule.clastix.io/enable-node-deletion"
-	enableStorageClassListingAnnotation  = "capsule.clastix.io/enable-storageclass-listing"
-	enableStorageClassUpdateAnnotation   = "capsule.clastix.io/enable-storageclass-update"
-	enableStorageClassDeletionAnnotation = "capsule.clastix.io/enable-storageclass-deletion"
-	enableIngressClassListingAnnotation  = "capsule.clastix.io/enable-ingressclass-listing"
-	enableIngressClassUpdateAnnotation   = "capsule.clastix.io/enable-ingressclass-update"
-	enableIngressClassDeletionAnnotation = "capsule.clastix.io/enable-ingressclass-deletion"
+	enableNodeListingAnnotation           = "capsule.clastix.io/enable-node-listing"
+	enableNodeUpdateAnnotation            = "capsule.clastix.io/enable-node-update"
+	enableNodeDeletionAnnotation          = "capsule.clastix.io/enable-node-deletion"
+	enableStorageClassListingAnnotation   = "capsule.clastix.io/enable-storageclass-listing"
+	enableStorageClassUpdateAnnotation    = "capsule.clastix.io/enable-storageclass-update"
+	enableStorageClassDeletionAnnotation  = "capsule.clastix.io/enable-storageclass-deletion"
+	enableIngressClassListingAnnotation   = "capsule.clastix.io/enable-ingressclass-listing"
+	enableIngressClassUpdateAnnotation    = "capsule.clastix.io/enable-ingressclass-update"
+	enableIngressClassDeletionAnnotation  = "capsule.clastix.io/enable-ingressclass-deletion"
+	enablePriorityClassListingAnnotation  = "capsule.clastix.io/enable-priorityclass-listing"
+	enablePriorityClassUpdateAnnotation   = "capsule.clastix.io/enable-priorityclass-update"
+	enablePriorityClassDeletionAnnotation = "capsule.clastix.io/enable-priorityclass-deletion"
 )
 
 func (t *Tenant) convertV1Alpha1OwnerToV1Beta1() capsulev1beta1.OwnerListSpec {
 	var serviceKindToAnnotationMap = map[capsulev1beta1.ProxyServiceKind][]string{
-		capsulev1beta1.NodesProxy:          {enableNodeListingAnnotation, enableNodeUpdateAnnotation, enableNodeDeletionAnnotation},
-		capsulev1beta1.StorageClassesProxy: {enableStorageClassListingAnnotation, enableStorageClassUpdateAnnotation, enableStorageClassDeletionAnnotation},
-		capsulev1beta1.IngressClassesProxy: {enableIngressClassListingAnnotation, enableIngressClassUpdateAnnotation, enableIngressClassDeletionAnnotation},
+		capsulev1beta1.NodesProxy:           {enableNodeListingAnnotation, enableNodeUpdateAnnotation, enableNodeDeletionAnnotation},
+		capsulev1beta1.StorageClassesProxy:  {enableStorageClassListingAnnotation, enableStorageClassUpdateAnnotation, enableStorageClassDeletionAnnotation},
+		capsulev1beta1.IngressClassesProxy:  {enableIngressClassListingAnnotation, enableIngressClassUpdateAnnotation, enableIngressClassDeletionAnnotation},
+		capsulev1beta1.PriorityClassesProxy: {enablePriorityClassListingAnnotation, enablePriorityClassUpdateAnnotation, enablePriorityClassDeletionAnnotation},
 	}
 	var annotationToOperationMap = map[string]capsulev1beta1.ProxyOperation{
-		enableNodeListingAnnotation:          capsulev1beta1.ListOperation,
-		enableNodeUpdateAnnotation:           capsulev1beta1.UpdateOperation,
-		enableNodeDeletionAnnotation:         capsulev1beta1.DeleteOperation,
-		enableStorageClassListingAnnotation:  capsulev1beta1.ListOperation,
-		enableStorageClassUpdateAnnotation:   capsulev1beta1.UpdateOperation,
-		enableStorageClassDeletionAnnotation: capsulev1beta1.DeleteOperation,
-		enableIngressClassListingAnnotation:  capsulev1beta1.ListOperation,
-		enableIngressClassUpdateAnnotation:   capsulev1beta1.UpdateOperation,
-		enableIngressClassDeletionAnnotation: capsulev1beta1.DeleteOperation,
+		enableNodeListingAnnotation:           capsulev1beta1.ListOperation,
+		enableNodeUpdateAnnotation:            capsulev1beta1.UpdateOperation,
+		enableNodeDeletionAnnotation:          capsulev1beta1.DeleteOperation,
+		enableStorageClassListingAnnotation:   capsulev1beta1.ListOperation,
+		enableStorageClassUpdateAnnotation:    capsulev1beta1.UpdateOperation,
+		enableStorageClassDeletionAnnotation:  capsulev1beta1.DeleteOperation,
+		enableIngressClassListingAnnotation:   capsulev1beta1.ListOperation,
+		enableIngressClassUpdateAnnotation:    capsulev1beta1.UpdateOperation,
+		enableIngressClassDeletionAnnotation:  capsulev1beta1.DeleteOperation,
+		enablePriorityClassListingAnnotation:  capsulev1beta1.ListOperation,
+		enablePriorityClassUpdateAnnotation:   capsulev1beta1.UpdateOperation,
+		enablePriorityClassDeletionAnnotation: capsulev1beta1.DeleteOperation,
 	}
 	var annotationToOwnerKindMap = map[string]capsulev1beta1.OwnerKind{
 		ownerUsersAnnotation:          capsulev1beta1.UserOwner,
@@ -279,6 +286,9 @@ func (t *Tenant) ConvertTo(dstRaw conversion.Hub) error {
 	delete(dst.ObjectMeta.Annotations, enableIngressClassListingAnnotation)
 	delete(dst.ObjectMeta.Annotations, enableIngressClassUpdateAnnotation)
 	delete(dst.ObjectMeta.Annotations, enableIngressClassDeletionAnnotation)
+	delete(dst.ObjectMeta.Annotations, enablePriorityClassListingAnnotation)
+	delete(dst.ObjectMeta.Annotations, enablePriorityClassUpdateAnnotation)
+	delete(dst.ObjectMeta.Annotations, enablePriorityClassDeletionAnnotation)
 
 	return nil
 }
@@ -329,6 +339,17 @@ func (t *Tenant) convertV1Beta1OwnerToV1Alpha1(src *capsulev1beta1.Tenant) {
 						proxyAnnotations[enableNodeUpdateAnnotation] = append(proxyAnnotations[enableNodeUpdateAnnotation], owner.Name)
 					case capsulev1beta1.DeleteOperation:
 						proxyAnnotations[enableNodeDeletionAnnotation] = append(proxyAnnotations[enableNodeDeletionAnnotation], owner.Name)
+					}
+				}
+			case capsulev1beta1.PriorityClassesProxy:
+				for _, operation := range setting.Operations {
+					switch operation {
+					case capsulev1beta1.ListOperation:
+						proxyAnnotations[enablePriorityClassListingAnnotation] = append(proxyAnnotations[enablePriorityClassListingAnnotation], owner.Name)
+					case capsulev1beta1.UpdateOperation:
+						proxyAnnotations[enablePriorityClassUpdateAnnotation] = append(proxyAnnotations[enablePriorityClassUpdateAnnotation], owner.Name)
+					case capsulev1beta1.DeleteOperation:
+						proxyAnnotations[enablePriorityClassDeletionAnnotation] = append(proxyAnnotations[enablePriorityClassDeletionAnnotation], owner.Name)
 					}
 				}
 			case capsulev1beta1.StorageClassesProxy:
