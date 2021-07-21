@@ -31,7 +31,7 @@ func (p ProxyOperation) String() string {
 	return string(p)
 }
 
-// +kubebuilder:validation:Enum=Nodes;StorageClasses;IngressClasses
+// +kubebuilder:validation:Enum=Nodes;StorageClasses;IngressClasses;PriorityClasses
 type ProxyServiceKind string
 
 func (p ProxyServiceKind) String() string {
@@ -39,9 +39,10 @@ func (p ProxyServiceKind) String() string {
 }
 
 const (
-	NodesProxy          ProxyServiceKind = "Nodes"
-	StorageClassesProxy ProxyServiceKind = "StorageClasses"
-	IngressClassesProxy ProxyServiceKind = "IngressClasses"
+	NodesProxy           ProxyServiceKind = "Nodes"
+	StorageClassesProxy  ProxyServiceKind = "StorageClasses"
+	IngressClassesProxy  ProxyServiceKind = "IngressClasses"
+	PriorityClassesProxy ProxyServiceKind = "PriorityClasses"
 
 	ListOperation   ProxyOperation = "List"
 	UpdateOperation ProxyOperation = "Update"
