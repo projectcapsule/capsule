@@ -1058,6 +1058,7 @@ spec:
                                 - Nodes
                                 - StorageClasses
                                 - IngressClasses
+                                - PriorityClasses
                               type: string
                             operations:
                               items:
