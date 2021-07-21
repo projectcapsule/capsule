@@ -171,6 +171,10 @@ func generateTenantsSpecs() (Tenant, capsulev1beta1.Tenant) {
 							Kind:       "StorageClasses",
 							Operations: []capsulev1beta1.ProxyOperation{"List"},
 						},
+						{
+							Kind:       "PriorityClasses",
+							Operations: []capsulev1beta1.ProxyOperation{"List"},
+						},
 					},
 				},
 				{
@@ -287,6 +291,7 @@ func generateTenantsSpecs() (Tenant, capsulev1beta1.Tenant) {
 				enableIngressClassListingAnnotation:  "alice,owner-foo,owner-bar",
 				enableIngressClassUpdateAnnotation:   "alice,bob",
 				enableIngressClassDeletionAnnotation: "alice,jack",
+				enablePriorityClassListingAnnotation: "jack",
 			},
 		},
 		Spec: TenantSpec{
