@@ -17,6 +17,8 @@ import (
 )
 
 const (
+	resourceQuotaScopeAnnotation = "capsule.clastix.io/resource-quota-scope"
+
 	podAllowedImagePullPolicyAnnotation = "capsule.clastix.io/allowed-image-pull-policy"
 
 	podPriorityAllowedAnnotation      = "priorityclass.capsule.clastix.io/allowed"
@@ -189,6 +191,17 @@ func (t *Tenant) ConvertTo(dstRaw conversion.Hub) error {
 	}
 	if len(t.Spec.ResourceQuota) > 0 {
 		dst.Spec.ResourceQuota = &capsulev1beta1.ResourceQuotaSpec{
+			Scope: func() capsulev1beta1.ResourceQuotaScope {
+				if v, ok := t.GetAnnotations()[resourceQuotaScopeAnnotation]; ok {
+					switch v {
+					case string(capsulev1beta1.ResourceQuotaScopeNamespace):
+						return capsulev1beta1.ResourceQuotaScopeNamespace
+					case string(capsulev1beta1.ResourceQuotaScopeTenant):
+						return capsulev1beta1.ResourceQuotaScopeTenant
+					}
+				}
+				return capsulev1beta1.ResourceQuotaScopeTenant
+			}(),
 			Items: t.Spec.ResourceQuota,
 		}
 	}
@@ -289,6 +302,7 @@ func (t *Tenant) ConvertTo(dstRaw conversion.Hub) error {
 	delete(dst.ObjectMeta.Annotations, enablePriorityClassListingAnnotation)
 	delete(dst.ObjectMeta.Annotations, enablePriorityClassUpdateAnnotation)
 	delete(dst.ObjectMeta.Annotations, enablePriorityClassDeletionAnnotation)
+	delete(dst.ObjectMeta.Annotations, resourceQuotaScopeAnnotation)
 
 	return nil
 }
@@ -449,6 +463,7 @@ func (t *Tenant) ConvertFrom(srcRaw conversion.Hub) error {
 		t.Spec.LimitRanges = src.Spec.LimitRanges.Items
 	}
 	if src.Spec.ResourceQuota != nil {
+		t.Annotations[resourceQuotaScopeAnnotation] = string(src.Spec.ResourceQuota.Scope)
 		t.Spec.ResourceQuota = src.Spec.ResourceQuota.Items
 	}
 	if len(src.Spec.AdditionalRoleBindings) > 0 {
