@@ -49,6 +49,9 @@ func generateTenantsSpecs() (Tenant, capsulev1beta1.Tenant) {
 			NodePort:     pointer.BoolPtr(false),
 			ExternalName: pointer.BoolPtr(false),
 		},
+		ExternalServiceIPs: &capsulev1beta1.ExternalServiceIPsSpec{
+			Allowed: []capsulev1beta1.AllowedIP{"192.168.0.1"},
+		},
 	}
 	var v1beta1AllowedListSpec = &capsulev1beta1.AllowedListSpec{
 		Exact: []string{"foo", "bar"},
@@ -250,9 +253,6 @@ func generateTenantsSpecs() (Tenant, capsulev1beta1.Tenant) {
 						},
 					},
 				},
-			},
-			ExternalServiceIPs: &capsulev1beta1.ExternalServiceIPsSpec{
-				Allowed: []capsulev1beta1.AllowedIP{"192.168.0.1"},
 			},
 			ImagePullPolicies: []capsulev1beta1.ImagePullPolicySpec{"Always", "IfNotPresent"},
 			PriorityClasses: &capsulev1beta1.AllowedListSpec{
