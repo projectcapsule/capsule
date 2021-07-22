@@ -5,6 +5,17 @@ package v1beta1
 
 import corev1 "k8s.io/api/core/v1"
 
+// +kubebuilder:validation:Enum=Tenant;Namespace
+type ResourceQuotaScope string
+
+const (
+	ResourceQuotaScopeTenant    ResourceQuotaScope = "Tenant"
+	ResourceQuotaScopeNamespace ResourceQuotaScope = "Namespace"
+)
+
 type ResourceQuotaSpec struct {
+	// +kubebuilder:default=Tenant
+	// Define if the Resource Budget should compute resource across all Namespaces in the Tenant or individually per cluster. Default is Tenant
+	Scope ResourceQuotaScope         `json:"scope,omitempty"`
 	Items []corev1.ResourceQuotaSpec `json:"items,omitempty"`
 }
