@@ -29,10 +29,12 @@ var _ = Describe("enforcing an allowed set of Service external IPs", func() {
 					Kind: "User",
 				},
 			},
-			ExternalServiceIPs: &capsulev1beta1.ExternalServiceIPsSpec{
-				Allowed: []capsulev1beta1.AllowedIP{
-					"10.20.0.0/16",
-					"192.168.1.2/32",
+			ServiceOptions: &capsulev1beta1.ServiceOptions{
+				ExternalServiceIPs: &capsulev1beta1.ExternalServiceIPsSpec{
+					Allowed: []capsulev1beta1.AllowedIP{
+						"10.20.0.0/16",
+						"192.168.1.2/32",
+					},
 				},
 			},
 		},
