@@ -25,10 +25,10 @@ spec:
     allowedServices:
       nodePort: false
       externalName: false
-  externalServiceIPs:
-    allowed:
-      - 10.20.0.0/16
-      - "10.96.42.42"
+    externalIPs:
+      allowed:
+        - 10.20.0.0/16
+        - "10.96.42.42"
   imagePullPolicies:
     - Always
   ingressClasses:

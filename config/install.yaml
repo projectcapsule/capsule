@@ -725,17 +725,6 @@ spec:
                   allowedRegex:
                     type: string
                 type: object
-              externalServiceIPs:
-                description: Specifies the external IPs that can be used in Services with type ClusterIP. An empty list means all the IPs are allowed. Optional.
-                properties:
-                  allowed:
-                    items:
-                      pattern: ^([0-9]{1,3}.){3}[0-9]{1,3}(/([0-9]|[1-2][0-9]|3[0-2]))?$
-                      type: string
-                    type: array
-                required:
-                - allowed
-                type: object
               imagePullPolicies:
                 description: Specify the allowed values for the imagePullPolicies option in Pod resources. Capsule assures that all Pod resources created in the Tenant can use only one of the allowed policy. Optional.
                 items:
@@ -1243,6 +1232,17 @@ spec:
                         default: true
                         description: Specifies if NodePort service type resources are allowed for the Tenant. Default is true. Optional.
                         type: boolean
+                    type: object
+                  externalIPs:
+                    description: Specifies the external IPs that can be used in Services with type ClusterIP. An empty list means all the IPs are allowed. Optional.
+                    properties:
+                      allowed:
+                        items:
+                          pattern: ^([0-9]{1,3}.){3}[0-9]{1,3}(/([0-9]|[1-2][0-9]|3[0-2]))?$
+                          type: string
+                        type: array
+                    required:
+                    - allowed
                     type: object
                 type: object
               storageClasses:
