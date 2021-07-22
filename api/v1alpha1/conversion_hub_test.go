@@ -240,6 +240,7 @@ func generateTenantsSpecs() (Tenant, capsulev1beta1.Tenant) {
 				Items: limitRanges,
 			},
 			ResourceQuota: &capsulev1beta1.ResourceQuotaSpec{
+				Scope: capsulev1beta1.ResourceQuotaScopeNamespace,
 				Items: resourceQuotas,
 			},
 			AdditionalRoleBindings: []capsulev1beta1.AdditionalRoleBindingsSpec{
@@ -292,6 +293,7 @@ func generateTenantsSpecs() (Tenant, capsulev1beta1.Tenant) {
 				enableIngressClassUpdateAnnotation:   "alice,bob",
 				enableIngressClassDeletionAnnotation: "alice,jack",
 				enablePriorityClassListingAnnotation: "jack",
+				resourceQuotaScopeAnnotation:         "Namespace",
 			},
 		},
 		Spec: TenantSpec{
