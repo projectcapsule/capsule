@@ -1126,6 +1126,13 @@ spec:
                             type: array
                         type: object
                       type: array
+                    scope:
+                      default: Tenant
+                      description: Define if the Resource Budget should compute resource across all Namespaces in the Tenant or individually per cluster. Default is Tenant
+                      enum:
+                        - Tenant
+                        - Namespace
+                      type: string
                   type: object
                 serviceOptions:
                   description: Specifies options for the Service, such as additional metadata or block of certain type of Services. Optional.
