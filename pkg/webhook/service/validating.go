@@ -60,12 +60,12 @@ func (r *handler) handleService(ctx context.Context, clt client.Client, decoder 
 		return &response
 	}
 
-	if svc.Spec.ExternalIPs == nil || tnt.Spec.ExternalServiceIPs == nil {
+	if svc.Spec.ExternalIPs == nil || (tnt.Spec.ServiceOptions == nil || tnt.Spec.ServiceOptions.ExternalServiceIPs == nil) {
 		return nil
 	}
 
 	ipInCIDR := func(ip net.IP) bool {
-		for _, allowed := range tnt.Spec.ExternalServiceIPs.Allowed {
+		for _, allowed := range tnt.Spec.ServiceOptions.ExternalServiceIPs.Allowed {
 			if !strings.Contains(string(allowed), "/") {
 				allowed += "/32"
 			}
@@ -85,7 +85,7 @@ func (r *handler) handleService(ctx context.Context, clt client.Client, decoder 
 		if !ipInCIDR(ip) {
 			recorder.Eventf(&tnt, corev1.EventTypeWarning, "ForbiddenExternalServiceIP", "Service %s/%s external IP %s is forbidden for the current Tenant", req.Namespace, req.Name, ip.String())
 
-			response := admission.Denied(NewExternalServiceIPForbidden(tnt.Spec.ExternalServiceIPs.Allowed).Error())
+			response := admission.Denied(NewExternalServiceIPForbidden(tnt.Spec.ServiceOptions.ExternalServiceIPs.Allowed).Error())
 
 			return &response
 		}

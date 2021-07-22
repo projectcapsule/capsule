@@ -37,8 +37,6 @@ type TenantSpec struct {
 	ResourceQuota *ResourceQuotaSpec `json:"resourceQuotas,omitempty"`
 	// Specifies additional RoleBindings assigned to the Tenant. Capsule will ensure that all namespaces in the Tenant always contain the RoleBinding for the given ClusterRole. Optional.
 	AdditionalRoleBindings []AdditionalRoleBindingsSpec `json:"additionalRoleBindings,omitempty"`
-	// Specifies the external IPs that can be used in Services with type ClusterIP. An empty list means all the IPs are allowed. Optional.
-	ExternalServiceIPs *ExternalServiceIPsSpec `json:"externalServiceIPs,omitempty"`
 	// Specify the allowed values for the imagePullPolicies option in Pod resources. Capsule assures that all Pod resources created in the Tenant can use only one of the allowed policy. Optional.
 	ImagePullPolicies []ImagePullPolicySpec `json:"imagePullPolicies,omitempty"`
 	// Specifies the allowed IngressClasses assigned to the Tenant. Capsule assures that all Ingress resources created in the Tenant can use only one of the allowed IngressClasses. Optional.

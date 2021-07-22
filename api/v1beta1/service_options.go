@@ -8,13 +8,6 @@ type ServiceOptions struct {
 	AdditionalMetadata *AdditionalMetadataSpec `json:"additionalMetadata,omitempty"`
 	// Block or deny certain type of Services. Optional.
 	AllowedServices *AllowedServices `json:"allowedServices,omitempty"`
-}
-
-type AllowedServices struct {
-	//+kubebuilder:default=true
-	// Specifies if NodePort service type resources are allowed for the Tenant. Default is true. Optional.
-	NodePort *bool `json:"nodePort,omitempty"`
-	//+kubebuilder:default=true
-	// Specifies if ExternalName service type resources are allowed for the Tenant. Default is true. Optional.
-	ExternalName *bool `json:"externalName,omitempty"`
+	// Specifies the external IPs that can be used in Services with type ClusterIP. An empty list means all the IPs are allowed. Optional.
+	ExternalServiceIPs *ExternalServiceIPsSpec `json:"externalIPs,omitempty"`
 }
