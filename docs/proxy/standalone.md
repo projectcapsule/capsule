@@ -48,8 +48,8 @@ ingress:
       paths: [ "/" ]
 EOF
 
-$ helm install capsule-proxy capsule-proxy \
-  --valuecustom-values.yaml \
+$ helm install capsule-proxy clastix/capsule-proxy \
+  --values custom-values.yaml \
   -n capsule-system
 ```
 
