@@ -1143,7 +1143,7 @@ spec:
                           type: object
                       type: object
                     externalIPs:
-                      description: Specifies the external IPs that can be used in Services with type ClusterIP. An empty list means all the IPs are allowed. Optional.
+                      description: Specifies the external IPs that can be used in Services with type ClusterIP. An empty list means no IPs are allowed. Optional.
                       properties:
                         allowed:
                           items:
