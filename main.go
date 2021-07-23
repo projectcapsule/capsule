@@ -153,7 +153,7 @@ func main() {
 		route.Ingress(ingress.Class(cfg), ingress.Hostnames(cfg), ingress.Collision(cfg)),
 		route.PVC(pvc.Handler()),
 		route.Service(service.Handler()),
-		route.NetworkPolicy(utils.InCapsuleGroups(cfg, networkpolicy.Handler())),
+		route.NetworkPolicy(networkpolicy.Handler()),
 		route.Tenant(tenant.NameHandler(), tenant.IngressClassRegexHandler(), tenant.StorageClassRegexHandler(), tenant.ContainerRegistryRegexHandler(), tenant.HostnameRegexHandler(), tenant.HostnamesCollisionHandler(cfg), tenant.FreezedEmitter()),
 		route.OwnerReference(utils.InCapsuleGroups(cfg, ownerreference.Handler(cfg))),
 		route.Cordoning(tenant.CordoningHandler(cfg)),
