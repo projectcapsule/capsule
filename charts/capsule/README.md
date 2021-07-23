@@ -24,19 +24,23 @@ The Capsule Operator Chart can be used to instantly deploy the Capsule Operator 
 
         $ helm repo add clastix https://clastix.github.io/charts
 
-2. Install the Chart:
+2. Create the Namespace:
+
+        $ kubectl create namespace capsule-system
+
+3. Install the Chart:
 
         $ helm install capsule clastix/capsule -n capsule-system
 
-3. Show the status:
+4. Show the status:
 
         $ helm status capsule -n capsule-system
 
-4. Upgrade the Chart
+5. Upgrade the Chart
 
         $ helm upgrade capsule clastix/capsule -n capsule-system
 
-5. Uninstall the Chart
+6. Uninstall the Chart
 
         $ helm uninstall capsule -n capsule-system
 
