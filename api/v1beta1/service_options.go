@@ -8,6 +8,6 @@ type ServiceOptions struct {
 	AdditionalMetadata *AdditionalMetadataSpec `json:"additionalMetadata,omitempty"`
 	// Block or deny certain type of Services. Optional.
 	AllowedServices *AllowedServices `json:"allowedServices,omitempty"`
-	// Specifies the external IPs that can be used in Services with type ClusterIP. An empty list means all the IPs are allowed. Optional.
+	// Specifies the external IPs that can be used in Services with type ClusterIP. An empty list means no IPs are allowed. Optional.
 	ExternalServiceIPs *ExternalServiceIPsSpec `json:"externalIPs,omitempty"`
 }
