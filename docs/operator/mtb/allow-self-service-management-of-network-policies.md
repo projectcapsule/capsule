@@ -26,7 +26,7 @@ spec:
     name: alice
   networkPolicies:
     items:
-      ingress:
+    - ingress:
       - from:
         - namespaceSelector:
             matchLabels:
