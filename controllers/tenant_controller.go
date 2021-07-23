@@ -405,7 +405,6 @@ func (r *TenantReconciler) syncResourceQuotas(tenant *capsulev1beta1.Tenant) err
 								}
 								rql.Items[i].Spec.Hard[rn] = q.Hard[rn]
 							}
-							target.Spec = q
 						}
 						if err := r.resourceQuotasUpdate(rn, qt, q.Hard[rn], rql.Items...); err != nil {
 							r.Log.Error(err, "cannot proceed with outer ResourceQuota")
