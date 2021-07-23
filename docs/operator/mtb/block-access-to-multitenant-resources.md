@@ -116,12 +116,13 @@ As tenant owner, try to change/delete  the rolebindings in order to escalate per
 kubectl --kubeconfig alice edit/delete rolebinding namespace:admin
 ```
 
-You must receive an error message:
+The rolebindings is immediately recreated by Capsule:
 
 ```
-error: rolebindings.rbac.authorization.k8s.io "namespace:admin" could not be patched:
-rolebindings.rbac.authorization.k8s.io "namespace:admin" is forbidden:
-...
+kubectl --kubeconfig alice get rolebindings
+NAME                ROLE                                    AGE
+namespace-deleter   ClusterRole/capsule-namespace-deleter   11h
+namespace:admin     ClusterRole/admin                       2s
 ```
 
 However, the tenant owner can create and assign permissions inside namespace she owns
