@@ -204,12 +204,14 @@ var _ = Describe("creating namespaces within a Tenant with resources", func() {
 			})
 			By("checking the Resource Quota", func() {
 				for i, s := range tnt.Spec.ResourceQuota.Items {
-					n := fmt.Sprintf("capsule-%s-%d", tnt.GetName(), i)
-					rq := &corev1.ResourceQuota{}
-					Eventually(func() error {
-						return k8sClient.Get(context.TODO(), types.NamespacedName{Name: n, Namespace: name}, rq)
-					}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
-					Expect(rq.Spec).Should(Equal(s))
+					Eventually(func() corev1.ResourceQuotaSpec {
+						n := fmt.Sprintf("capsule-%s-%d", tnt.GetName(), i)
+
+						rq := &corev1.ResourceQuota{}
+						Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: n, Namespace: name}, rq)).Should(Succeed())
+
+						return rq.Spec
+					}, defaultTimeoutInterval, defaultPollInterval).Should(Equal(s))
 				}
 			})
 		}
