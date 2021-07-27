@@ -157,7 +157,7 @@ func (r CAReconciler) Reconcile(ctx context.Context, request ctrl.Request) (ctrl
 			privateKeySecretKey: key.Bytes(),
 		}
 
-		group := errgroup.Group{}
+		group := new(errgroup.Group)
 		group.Go(func() error {
 			return r.UpdateMutatingWebhookConfiguration(crt.Bytes())
 		})

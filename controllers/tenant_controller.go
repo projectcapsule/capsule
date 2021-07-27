@@ -58,8 +58,7 @@ func (r TenantReconciler) Reconcile(ctx context.Context, request ctrl.Request) (
 
 	// Fetch the Tenant instance
 	instance := &capsulev1beta1.Tenant{}
-	err = r.Get(ctx, request.NamespacedName, instance)
-	if err != nil {
+	if err = r.Get(ctx, request.NamespacedName, instance); err != nil {
 		if errors.IsNotFound(err) {
 			r.Log.Info("Request object not found, could have been deleted after reconcile request")
 			return reconcile.Result{}, nil
@@ -134,34 +133,35 @@ func (r TenantReconciler) Reconcile(ctx context.Context, request ctrl.Request) (
 
 // pruningResources is taking care of removing the no more requested sub-resources as LimitRange, ResourceQuota or
 // NetworkPolicy using the "exists" and "notin" LabelSelector to perform an outer-join removal.
-func (r *TenantReconciler) pruningResources(ns string, keys []string, obj client.Object) error {
-	capsuleLabel, err := capsulev1beta1.GetTypeLabel(obj)
-	if err != nil {
-		return err
+func (r *TenantReconciler) pruningResources(ns string, keys []string, obj client.Object) (err error) {
+	var capsuleLabel string
+	if capsuleLabel, err = capsulev1beta1.GetTypeLabel(obj); err != nil {
+		return
 	}
 
-	s := labels.NewSelector()
+	selector := labels.NewSelector()
 
-	exists, err := labels.NewRequirement(capsuleLabel, selection.Exists, []string{})
-	if err != nil {
-		return err
+	var exists *labels.Requirement
+	if exists, err = labels.NewRequirement(capsuleLabel, selection.Exists, []string{}); err != nil {
+		return
 	}
-	s = s.Add(*exists)
+	selector = selector.Add(*exists)
 
 	if len(keys) > 0 {
 		var notIn *labels.Requirement
-		notIn, err = labels.NewRequirement(capsuleLabel, selection.NotIn, keys)
-		if err != nil {
+		if notIn, err = labels.NewRequirement(capsuleLabel, selection.NotIn, keys); err != nil {
 			return err
 		}
-		s = s.Add(*notIn)
+
+		selector = selector.Add(*notIn)
 	}
 
-	r.Log.Info("Pruning objects with label selector " + s.String())
+	r.Log.Info("Pruning objects with label selector " + selector.String())
+
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		return r.DeleteAllOf(context.TODO(), obj, &client.DeleteAllOfOptions{
 			ListOptions: client.ListOptions{
-				LabelSelector: s,
+				LabelSelector: selector,
 				Namespace:     ns,
 			},
 			DeleteOptions: client.DeleteOptions{},
@@ -172,19 +172,20 @@ func (r *TenantReconciler) pruningResources(ns string, keys []string, obj client
 // Serial ResourceQuota processing is expensive: using Go routines we can speed it up.
 // In case of multiple errors these are logged properly, returning a generic error since we have to repush back the
 // reconciliation loop.
-func (r *TenantReconciler) resourceQuotasUpdate(resourceName corev1.ResourceName, actual, limit resource.Quantity, list ...corev1.ResourceQuota) error {
-	g := errgroup.Group{}
+func (r *TenantReconciler) resourceQuotasUpdate(resourceName corev1.ResourceName, actual, limit resource.Quantity, list ...corev1.ResourceQuota) (err error) {
+	group := new(errgroup.Group)
 
 	for _, item := range list {
 		rq := item
-		g.Go(func() error {
+
+		group.Go(func() (err error) {
 			found := &corev1.ResourceQuota{}
-			if err := r.Get(context.TODO(), types.NamespacedName{Namespace: rq.Namespace, Name: rq.Name}, found); err != nil {
-				return err
+			if err = r.Get(context.TODO(), types.NamespacedName{Namespace: rq.Namespace, Name: rq.Name}, found); err != nil {
+				return
 			}
 
-			return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-				_, err := controllerutil.CreateOrUpdate(context.TODO(), r.Client, found, func() error {
+			return retry.RetryOnConflict(retry.DefaultBackoff, func() (retryErr error) {
+				_, retryErr = controllerutil.CreateOrUpdate(context.TODO(), r.Client, found, func() error {
 					// Ensuring annotation map is there to avoid uninitialized map error and
 					// assigning the overall usage
 					if found.Annotations == nil {
@@ -197,13 +198,13 @@ func (r *TenantReconciler) resourceQuotasUpdate(resourceName corev1.ResourceName
 					found.Spec.Hard = rq.Spec.Hard
 					return nil
 				})
-				return err
+
+				return retryErr
 			})
 		})
 	}
 
-	var err error
-	if err = g.Wait(); err != nil {
+	if err = group.Wait(); err != nil {
 		// We had an error and we mark the whole transaction as failed
 		// to process it another time according to the Tenant controller back-off factor.
 		r.Log.Error(err, "Cannot update outer ResourceQuotas", "resourceName", resourceName.String())
@@ -213,11 +214,66 @@ func (r *TenantReconciler) resourceQuotasUpdate(resourceName corev1.ResourceName
 	return err
 }
 
+func (r *TenantReconciler) syncAdditionalRoleBinding(tenant *capsulev1beta1.Tenant, ns string, keys []string, hashFn func(binding capsulev1beta1.AdditionalRoleBindingsSpec) string) (err error) {
+	var tenantLabel, roleBindingLabel string
+
+	if tenantLabel, err = capsulev1beta1.GetTypeLabel(&capsulev1beta1.Tenant{}); err != nil {
+		return
+	}
+
+	if roleBindingLabel, err = capsulev1beta1.GetTypeLabel(&rbacv1.RoleBinding{}); err != nil {
+		return
+	}
+
+	if err = r.pruningResources(ns, keys, &rbacv1.RoleBinding{}); err != nil {
+		return
+	}
+
+	for i, roleBinding := range tenant.Spec.AdditionalRoleBindings {
+		roleBindingHashLabel := hashFn(roleBinding)
+
+		target := &rbacv1.RoleBinding{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      fmt.Sprintf("capsule-%s-%d-%s", tenant.Name, i, roleBinding.ClusterRoleName),
+				Namespace: ns,
+			},
+		}
+
+		var res controllerutil.OperationResult
+		res, err = controllerutil.CreateOrUpdate(context.TODO(), r.Client, target, func() error {
+			target.ObjectMeta.Labels = map[string]string{
+				tenantLabel:      tenant.Name,
+				roleBindingLabel: roleBindingHashLabel,
+			}
+			target.RoleRef = rbacv1.RoleRef{
+				APIGroup: "rbac.authorization.k8s.io",
+				Kind:     "ClusterRole",
+				Name:     roleBinding.ClusterRoleName,
+			}
+			target.Subjects = roleBinding.Subjects
+
+			return controllerutil.SetControllerReference(tenant, target, r.Scheme)
+		})
+
+		r.emitEvent(tenant, target.GetNamespace(), res, fmt.Sprintf("Ensuring additional RoleBinding %s", target.GetName()), err)
+
+		if err != nil {
+			r.Log.Error(err, "Cannot sync Additional RoleBinding")
+		}
+		r.Log.Info(fmt.Sprintf("Additional RoleBindings sync result: %s", string(res)), "name", target.Name, "namespace", target.Namespace)
+		if err != nil {
+			return
+		}
+	}
+
+	return nil
+}
+
 // Additional Role Bindings can be used in many ways: applying Pod Security Policies or giving
 // access to CRDs or specific API groups.
 func (r *TenantReconciler) syncAdditionalRoleBindings(tenant *capsulev1beta1.Tenant) (err error) {
 	// hashing the RoleBinding name due to DNS RFC-1123 applied to Kubernetes labels
-	hash := func(binding capsulev1beta1.AdditionalRoleBindingsSpec) string {
+	hashFn := func(binding capsulev1beta1.AdditionalRoleBindingsSpec) string {
 		h := fnv.New64a()
 
 		_, _ = h.Write([]byte(binding.ClusterRoleName))
@@ -231,56 +287,72 @@ func (r *TenantReconciler) syncAdditionalRoleBindings(tenant *capsulev1beta1.Ten
 	// getting requested Role Binding keys
 	var keys []string
 	for _, i := range tenant.Spec.AdditionalRoleBindings {
-		keys = append(keys, hash(i))
+		keys = append(keys, hashFn(i))
 	}
 
-	var tl, ll string
-	tl, err = capsulev1beta1.GetTypeLabel(&capsulev1beta1.Tenant{})
-	if err != nil {
-		return
-	}
-	ll, err = capsulev1beta1.GetTypeLabel(&rbacv1.RoleBinding{})
-	if err != nil {
-		return
-	}
+	group := new(errgroup.Group)
 
 	for _, ns := range tenant.Status.Namespaces {
-		if err = r.pruningResources(ns, keys, &rbacv1.RoleBinding{}); err != nil {
-			return err
-		}
-		for i, roleBinding := range tenant.Spec.AdditionalRoleBindings {
-			lv := hash(roleBinding)
-			rb := &rbacv1.RoleBinding{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      fmt.Sprintf("capsule-%s-%d-%s", tenant.Name, i, roleBinding.ClusterRoleName),
-					Namespace: ns,
-				},
-			}
-			var res controllerutil.OperationResult
-			res, err = controllerutil.CreateOrUpdate(context.TODO(), r.Client, rb, func() error {
-				rb.ObjectMeta.Labels = map[string]string{
-					tl: tenant.Name,
-					ll: lv,
-				}
-				rb.RoleRef = rbacv1.RoleRef{
-					APIGroup: "rbac.authorization.k8s.io",
-					Kind:     "ClusterRole",
-					Name:     roleBinding.ClusterRoleName,
-				}
-				rb.Subjects = roleBinding.Subjects
+		namespace := ns
 
-				return controllerutil.SetControllerReference(tenant, rb, r.Scheme)
+		group.Go(func() error {
+			return r.syncAdditionalRoleBinding(tenant, namespace, keys, hashFn)
+		})
+	}
+
+	return group.Wait()
+}
+
+func (r *TenantReconciler) syncResourceQuota(tenant *capsulev1beta1.Tenant, namespace string, keys []string) (err error) {
+	// getting ResourceQuota labels for the mutateFn
+	var tenantLabel, typeLabel string
+
+	if tenantLabel, err = capsulev1beta1.GetTypeLabel(&capsulev1beta1.Tenant{}); err != nil {
+		return err
+	}
+
+	if typeLabel, err = capsulev1beta1.GetTypeLabel(&corev1.ResourceQuota{}); err != nil {
+		return err
+	}
+	// Pruning resource of non-requested resources
+	if err = r.pruningResources(namespace, keys, &corev1.ResourceQuota{}); err != nil {
+		return err
+	}
+
+	for index, resQuota := range tenant.Spec.ResourceQuota.Items {
+		target := &corev1.ResourceQuota{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      fmt.Sprintf("capsule-%s-%d", tenant.Name, index),
+				Namespace: namespace,
+			},
+		}
+
+		var res controllerutil.OperationResult
+		err = retry.RetryOnConflict(retry.DefaultBackoff, func() (retryErr error) {
+			res, retryErr = controllerutil.CreateOrUpdate(context.TODO(), r.Client, target, func() (err error) {
+				target.SetLabels(map[string]string{
+					tenantLabel: tenant.Name,
+					typeLabel:   strconv.Itoa(index),
+				})
+				target.Spec.Scopes = resQuota.Scopes
+				target.Spec.ScopeSelector = resQuota.ScopeSelector
+				// In case of Namespace scope for the ResourceQuota we can easily apply the bare specification
+				if tenant.Spec.ResourceQuota.Scope == capsulev1beta1.ResourceQuotaScopeNamespace {
+					target.Spec.Hard = resQuota.Hard
+				}
+
+				return controllerutil.SetControllerReference(tenant, target, r.Scheme)
 			})
 
-			r.emitEvent(tenant, rb.GetNamespace(), res, fmt.Sprintf("Ensuring additional RoleBinding %s", rb.GetName()), err)
+			return retryErr
+		})
 
-			if err != nil {
-				r.Log.Error(err, "Cannot sync Additional RoleBinding")
-			}
-			r.Log.Info(fmt.Sprintf("Additional RoleBindings sync result: %s", string(res)), "name", rb.Name, "namespace", rb.Namespace)
-			if err != nil {
-				return
-			}
+		r.emitEvent(tenant, target.GetNamespace(), res, fmt.Sprintf("Ensuring ResourceQuota %s", target.GetName()), err)
+
+		r.Log.Info("Resource Quota sync result: "+string(res), "name", target.Name, "namespace", target.Namespace)
+
+		if err != nil {
+			return
 		}
 	}
 
@@ -292,192 +364,195 @@ func (r *TenantReconciler) syncAdditionalRoleBindings(tenant *capsulev1beta1.Ten
 // so abusing of this API although its Namespaced scope.
 //
 // Since a Namespace could take-up all the available resource quota, the Namespace ResourceQuota will be a 1:1 mapping
-// to the Tenant one: in a second time Capsule is going to sum all the analogous ResourceQuota resources on other Tenant
+// to the Tenant one: in first time Capsule is going to sum all the analogous ResourceQuota resources on other Tenant
 // namespaces to check if the Tenant quota has been exceeded or not, reusing the native Kubernetes policy putting the
 // .Status.Used value as the .Hard value.
-// This will trigger a following reconciliation but that's ok: the mutateFn will re-use the same business logic, letting
+// This will trigger following reconciliations but that's ok: the mutateFn will re-use the same business logic, letting
 // the mutateFn along with the CreateOrUpdate to don't perform the update since resources are identical.
 //
 // In case of Namespace-scoped Resource Budget, we're just replicating the resources across all registered Namespaces.
-func (r *TenantReconciler) syncResourceQuotas(tenant *capsulev1beta1.Tenant) error {
+func (r *TenantReconciler) syncResourceQuotas(tenant *capsulev1beta1.Tenant) (err error) {
+	// getting ResourceQuota labels for the mutateFn
+	var tenantLabel, typeLabel string
+
+	if tenantLabel, err = capsulev1beta1.GetTypeLabel(&capsulev1beta1.Tenant{}); err != nil {
+		return err
+	}
+
+	if typeLabel, err = capsulev1beta1.GetTypeLabel(&corev1.ResourceQuota{}); err != nil {
+		return err
+	}
+
+	if tenant.Spec.ResourceQuota.Scope == capsulev1beta1.ResourceQuotaScopeTenant {
+		group := new(errgroup.Group)
+
+		for i, q := range tenant.Spec.ResourceQuota.Items {
+			index := i
+
+			resourceQuota := q
+
+			group.Go(func() (scopeErr error) {
+				// Calculating the Resource Budget at Tenant scope just if this is put in place.
+				// Requirement to list ResourceQuota of the current Tenant
+				var tntRequirement *labels.Requirement
+				if tntRequirement, scopeErr = labels.NewRequirement(tenantLabel, selection.Equals, []string{tenant.Name}); scopeErr != nil {
+					r.Log.Error(scopeErr, "Cannot build ResourceQuota Tenant requirement")
+				}
+				// Requirement to list ResourceQuota for the current index
+				var indexRequirement *labels.Requirement
+				if indexRequirement, scopeErr = labels.NewRequirement(typeLabel, selection.Equals, []string{strconv.Itoa(index)}); scopeErr != nil {
+					r.Log.Error(scopeErr, "Cannot build ResourceQuota index requirement")
+				}
+				// Listing all the ResourceQuota according to the said requirements.
+				// These are required since Capsule is going to sum all the used quota to
+				// sum them and get the Tenant one.
+				list := &corev1.ResourceQuotaList{}
+				if scopeErr = r.List(context.TODO(), list, &client.ListOptions{LabelSelector: labels.NewSelector().Add(*tntRequirement).Add(*indexRequirement)}); scopeErr != nil {
+					r.Log.Error(scopeErr, "Cannot list ResourceQuota", "tenantFilter", tntRequirement.String(), "indexFilter", indexRequirement.String())
+					return
+				}
+				// Iterating over all the options declared for the ResourceQuota,
+				// summing all the used quota across different Namespaces to determinate
+				// if we're hitting a Hard quota at Tenant level.
+				// For this case, we're going to block the Quota setting the Hard as the
+				// used one.
+				for name, hardQuota := range resourceQuota.Hard {
+					r.Log.Info("Desired hard " + name.String() + " quota is " + hardQuota.String())
+
+					// Getting the whole usage across all the Tenant Namespaces
+					var quantity resource.Quantity
+					for _, item := range list.Items {
+						quantity.Add(item.Status.Used[name])
+					}
+					r.Log.Info("Computed " + name.String() + " quota for the whole Tenant is " + quantity.String())
+
+					switch quantity.Cmp(resourceQuota.Hard[name]) {
+					case 0:
+						// The Tenant is matching exactly the Quota:
+						// falling through next case since we have to block further
+						// resource allocations.
+						fallthrough
+					case 1:
+						// The Tenant is OverQuota:
+						// updating all the related ResourceQuota with the current
+						// used Quota to block further creations.
+						for item := range list.Items {
+							if _, ok := list.Items[item].Status.Used[name]; ok {
+								list.Items[item].Spec.Hard[name] = list.Items[item].Status.Used[name]
+							} else {
+								um := make(map[corev1.ResourceName]resource.Quantity)
+								um[name] = resource.Quantity{}
+								list.Items[item].Spec.Hard = um
+							}
+						}
+					default:
+						// The Tenant is respecting the Hard quota:
+						// restoring the default one for all the elements,
+						// also for the reconciled one.
+						for item := range list.Items {
+							if list.Items[item].Spec.Hard == nil {
+								list.Items[item].Spec.Hard = map[corev1.ResourceName]resource.Quantity{}
+							}
+							list.Items[item].Spec.Hard[name] = resourceQuota.Hard[name]
+						}
+					}
+					if scopeErr = r.resourceQuotasUpdate(name, quantity, resourceQuota.Hard[name], list.Items...); scopeErr != nil {
+						r.Log.Error(scopeErr, "cannot proceed with outer ResourceQuota")
+						return
+					}
+				}
+				return
+			})
+		}
+		// Waiting the update of all ResourceQuotas
+		if err = group.Wait(); err != nil {
+			return
+		}
+	}
 	// getting requested ResourceQuota keys
 	keys := make([]string, 0, len(tenant.Spec.ResourceQuota.Items))
+
 	for i := range tenant.Spec.ResourceQuota.Items {
 		keys = append(keys, strconv.Itoa(i))
 	}
 
-	// getting ResourceQuota labels for the mutateFn
-	tenantLabel, err := capsulev1beta1.GetTypeLabel(&capsulev1beta1.Tenant{})
-	if err != nil {
-		return err
-	}
-	typeLabel, err := capsulev1beta1.GetTypeLabel(&corev1.ResourceQuota{})
-	if err != nil {
-		return err
-	}
+	group := new(errgroup.Group)
 
 	for _, ns := range tenant.Status.Namespaces {
-		if err := r.pruningResources(ns, keys, &corev1.ResourceQuota{}); err != nil {
-			return err
+		namespace := ns
+
+		group.Go(func() error {
+			return r.syncResourceQuota(tenant, namespace, keys)
+		})
+	}
+
+	return group.Wait()
+}
+
+func (r *TenantReconciler) syncLimitRange(tenant *capsulev1beta1.Tenant, namespace string, keys []string) (err error) {
+	// getting LimitRange labels for the mutateFn
+	var tenantLabel, limitRangeLabel string
+
+	if tenantLabel, err = capsulev1beta1.GetTypeLabel(&capsulev1beta1.Tenant{}); err != nil {
+		return
+	}
+	if limitRangeLabel, err = capsulev1beta1.GetTypeLabel(&corev1.LimitRange{}); err != nil {
+		return
+	}
+
+	if err = r.pruningResources(namespace, keys, &corev1.LimitRange{}); err != nil {
+		return
+	}
+
+	for i, spec := range tenant.Spec.LimitRanges.Items {
+		target := &corev1.LimitRange{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      fmt.Sprintf("capsule-%s-%d", tenant.Name, i),
+				Namespace: namespace,
+			},
 		}
-		for i, q := range tenant.Spec.ResourceQuota.Items {
-			target := &corev1.ResourceQuota{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      fmt.Sprintf("capsule-%s-%d", tenant.Name, i),
-					Namespace: ns,
-				},
+
+		var res controllerutil.OperationResult
+		res, err = controllerutil.CreateOrUpdate(context.TODO(), r.Client, target, func() (err error) {
+			target.ObjectMeta.Labels = map[string]string{
+				tenantLabel:     tenant.Name,
+				limitRangeLabel: strconv.Itoa(i),
 			}
+			target.Spec = spec
+			return controllerutil.SetControllerReference(tenant, target, r.Scheme)
+		})
 
-			res, err := controllerutil.CreateOrUpdate(context.TODO(), r.Client, target, func() (err error) {
-				target.SetLabels(map[string]string{
-					tenantLabel: tenant.Name,
-					typeLabel:   strconv.Itoa(i),
-				})
+		r.emitEvent(tenant, target.GetNamespace(), res, fmt.Sprintf("Ensuring LimitRange %s", target.GetName()), err)
 
-				target.Spec.Scopes = q.Scopes
-				target.Spec.ScopeSelector = q.ScopeSelector
-
-				switch tenant.Spec.ResourceQuota.Scope {
-				case capsulev1beta1.ResourceQuotaScopeTenant:
-					// Calculating the Resource Budget at Tenant scope just if this is put in place.
-					// Requirement to list ResourceQuota of the current Tenant
-					tr, err := labels.NewRequirement(tenantLabel, selection.Equals, []string{tenant.Name})
-					if err != nil {
-						r.Log.Error(err, "Cannot build ResourceQuota Tenant requirement")
-					}
-					// Requirement to list ResourceQuota for the current index
-					ir, err := labels.NewRequirement(typeLabel, selection.Equals, []string{strconv.Itoa(i)})
-					if err != nil {
-						r.Log.Error(err, "Cannot build ResourceQuota index requirement")
-					}
-					// Listing all the ResourceQuota according to the said requirements.
-					// These are required since Capsule is going to sum all the used quota to
-					// sum them and get the Tenant one.
-					rql := &corev1.ResourceQuotaList{}
-					err = r.List(context.TODO(), rql, &client.ListOptions{
-						LabelSelector: labels.NewSelector().Add(*tr).Add(*ir),
-					})
-					if err != nil {
-						r.Log.Error(err, "Cannot list ResourceQuota", "tenantFilter", tr.String(), "indexFilter", ir.String())
-						return err
-					}
-					// Iterating over all the options declared for the ResourceQuota,
-					// summing all the used quota across different Namespaces to determinate
-					// if we're hitting a Hard quota at Tenant level.
-					// For this case, we're going to block the Quota setting the Hard as the
-					// used one.
-					for rn, rq := range q.Hard {
-						r.Log.Info("Desired hard " + rn.String() + " quota is " + rq.String())
-
-						// Getting the whole usage across all the Tenant Namespaces
-						var qt resource.Quantity
-						for _, rq := range rql.Items {
-							qt.Add(rq.Status.Used[rn])
-						}
-						r.Log.Info("Computed " + rn.String() + " quota for the whole Tenant is " + qt.String())
-
-						switch qt.Cmp(q.Hard[rn]) {
-						case 0:
-							// The Tenant is matching exactly the Quota:
-							// falling through next case since we have to block further
-							// resource allocations.
-							fallthrough
-						case 1:
-							// The Tenant is OverQuota:
-							// updating all the related ResourceQuota with the current
-							// used Quota to block further creations.
-							for i := range rql.Items {
-								if _, ok := rql.Items[i].Status.Used[rn]; ok {
-									rql.Items[i].Spec.Hard[rn] = rql.Items[i].Status.Used[rn]
-								} else {
-									um := make(map[corev1.ResourceName]resource.Quantity)
-									um[rn] = resource.Quantity{}
-									rql.Items[i].Spec.Hard = um
-								}
-							}
-						default:
-							// The Tenant is respecting the Hard quota:
-							// restoring the default one for all the elements,
-							// also for the reconciled one.
-							for i := range rql.Items {
-								if rql.Items[i].Spec.Hard == nil {
-									rql.Items[i].Spec.Hard = map[corev1.ResourceName]resource.Quantity{}
-								}
-								rql.Items[i].Spec.Hard[rn] = q.Hard[rn]
-							}
-						}
-						if err := r.resourceQuotasUpdate(rn, qt, q.Hard[rn], rql.Items...); err != nil {
-							r.Log.Error(err, "cannot proceed with outer ResourceQuota")
-							return err
-						}
-					}
-				case capsulev1beta1.ResourceQuotaScopeNamespace:
-					target.Spec.Hard = q.Hard
-				}
-
-				return controllerutil.SetControllerReference(tenant, target, r.Scheme)
-			})
-
-			r.emitEvent(tenant, target.GetNamespace(), res, fmt.Sprintf("Ensuring ResourceQuota %s", target.GetName()), err)
-
-			r.Log.Info("Resource Quota sync result: "+string(res), "name", target.Name, "namespace", target.Namespace)
-			if err != nil {
-				return err
-			}
+		r.Log.Info("LimitRange sync result: "+string(res), "name", target.Name, "namespace", target.Namespace)
+		if err != nil {
+			return
 		}
 	}
 
-	return nil
+	return
 }
 
 // Ensuring all the LimitRange are applied to each Namespace handled by the Tenant.
 func (r *TenantReconciler) syncLimitRanges(tenant *capsulev1beta1.Tenant) error {
 	// getting requested LimitRange keys
 	keys := make([]string, 0, len(tenant.Spec.LimitRanges.Items))
+
 	for i := range tenant.Spec.LimitRanges.Items {
 		keys = append(keys, strconv.Itoa(i))
 	}
 
-	// getting LimitRange labels for the mutateFn
-	tl, err := capsulev1beta1.GetTypeLabel(&capsulev1beta1.Tenant{})
-	if err != nil {
-		return err
-	}
-	ll, err := capsulev1beta1.GetTypeLabel(&corev1.LimitRange{})
-	if err != nil {
-		return err
-	}
+	group := new(errgroup.Group)
 
 	for _, ns := range tenant.Status.Namespaces {
-		if err := r.pruningResources(ns, keys, &corev1.LimitRange{}); err != nil {
-			return err
-		}
-		for i, spec := range tenant.Spec.LimitRanges.Items {
-			t := &corev1.LimitRange{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      fmt.Sprintf("capsule-%s-%d", tenant.Name, i),
-					Namespace: ns,
-				},
-			}
-			res, err := controllerutil.CreateOrUpdate(context.TODO(), r.Client, t, func() (err error) {
-				t.ObjectMeta.Labels = map[string]string{
-					tl: tenant.Name,
-					ll: strconv.Itoa(i),
-				}
-				t.Spec = spec
-				return controllerutil.SetControllerReference(tenant, t, r.Scheme)
-			})
+		namespace := ns
 
-			r.emitEvent(tenant, t.GetNamespace(), res, fmt.Sprintf("Ensuring LimitRange %s", t.GetName()), err)
-
-			r.Log.Info("LimitRange sync result: "+string(res), "name", t.Name, "namespace", t.Namespace)
-			if err != nil {
-				return err
-			}
-		}
+		group.Go(func() error {
+			return r.syncLimitRange(tenant, namespace, keys)
+		})
 	}
 
-	return nil
+	return group.Wait()
 }
 
 func (r *TenantReconciler) syncNamespaceMetadata(namespace string, tnt *capsulev1beta1.Tenant) (err error) {
@@ -489,12 +564,14 @@ func (r *TenantReconciler) syncNamespaceMetadata(namespace string, tnt *capsulev
 			return
 		}
 
+		capsuleLabel, _ := capsulev1beta1.GetTypeLabel(&capsulev1beta1.Tenant{})
+
 		res, conflictErr = controllerutil.CreateOrUpdate(context.TODO(), r.Client, ns, func() error {
-			a := make(map[string]string)
+			annotations := make(map[string]string)
 
 			if tnt.Spec.NamespacesMetadata != nil {
 				for k, v := range tnt.Spec.NamespacesMetadata.AdditionalAnnotations {
-					a[k] = v
+					annotations[k] = v
 				}
 			}
 
@@ -503,50 +580,50 @@ func (r *TenantReconciler) syncNamespaceMetadata(namespace string, tnt *capsulev
 				for k, v := range tnt.Spec.NodeSelector {
 					selector = append(selector, fmt.Sprintf("%s=%s", k, v))
 				}
-				a["scheduler.alpha.kubernetes.io/node-selector"] = strings.Join(selector, ",")
+				annotations["scheduler.alpha.kubernetes.io/node-selector"] = strings.Join(selector, ",")
 			}
 
 			if tnt.Spec.IngressClasses != nil {
 				if len(tnt.Spec.IngressClasses.Exact) > 0 {
-					a[capsulev1beta1.AvailableIngressClassesAnnotation] = strings.Join(tnt.Spec.IngressClasses.Exact, ",")
+					annotations[capsulev1beta1.AvailableIngressClassesAnnotation] = strings.Join(tnt.Spec.IngressClasses.Exact, ",")
 				}
 				if len(tnt.Spec.IngressClasses.Regex) > 0 {
-					a[capsulev1beta1.AvailableIngressClassesRegexpAnnotation] = tnt.Spec.IngressClasses.Regex
+					annotations[capsulev1beta1.AvailableIngressClassesRegexpAnnotation] = tnt.Spec.IngressClasses.Regex
 				}
 			}
 
 			if tnt.Spec.StorageClasses != nil {
 				if len(tnt.Spec.StorageClasses.Exact) > 0 {
-					a[capsulev1beta1.AvailableStorageClassesAnnotation] = strings.Join(tnt.Spec.StorageClasses.Exact, ",")
+					annotations[capsulev1beta1.AvailableStorageClassesAnnotation] = strings.Join(tnt.Spec.StorageClasses.Exact, ",")
 				}
 				if len(tnt.Spec.StorageClasses.Regex) > 0 {
-					a[capsulev1beta1.AvailableStorageClassesRegexpAnnotation] = tnt.Spec.StorageClasses.Regex
+					annotations[capsulev1beta1.AvailableStorageClassesRegexpAnnotation] = tnt.Spec.StorageClasses.Regex
 				}
 			}
 
 			if tnt.Spec.ContainerRegistries != nil {
 				if len(tnt.Spec.ContainerRegistries.Exact) > 0 {
-					a[capsulev1beta1.AllowedRegistriesAnnotation] = strings.Join(tnt.Spec.ContainerRegistries.Exact, ",")
+					annotations[capsulev1beta1.AllowedRegistriesAnnotation] = strings.Join(tnt.Spec.ContainerRegistries.Exact, ",")
 				}
 				if len(tnt.Spec.ContainerRegistries.Regex) > 0 {
-					a[capsulev1beta1.AllowedRegistriesRegexpAnnotation] = tnt.Spec.ContainerRegistries.Regex
+					annotations[capsulev1beta1.AllowedRegistriesRegexpAnnotation] = tnt.Spec.ContainerRegistries.Regex
 				}
 			}
 
-			ns.SetAnnotations(a)
+			ns.SetAnnotations(annotations)
 
-			l := make(map[string]string)
+			newLabels := map[string]string{
+				"name":       namespace,
+				capsuleLabel: tnt.GetName(),
+			}
 
 			if tnt.Spec.NamespacesMetadata != nil {
 				for k, v := range tnt.Spec.NamespacesMetadata.AdditionalLabels {
-					l[k] = v
+					newLabels[k] = v
 				}
 			}
 
-			l["name"] = namespace
-			capsuleLabel, _ := capsulev1beta1.GetTypeLabel(&capsulev1beta1.Tenant{})
-			l[capsuleLabel] = tnt.GetName()
-			ns.SetLabels(l)
+			ns.SetLabels(newLabels)
 
 			return nil
 		})
@@ -561,10 +638,11 @@ func (r *TenantReconciler) syncNamespaceMetadata(namespace string, tnt *capsulev
 
 // Ensuring all annotations are applied to each Namespace handled by the Tenant.
 func (r *TenantReconciler) syncNamespaces(tenant *capsulev1beta1.Tenant) (err error) {
-	group := errgroup.Group{}
+	group := new(errgroup.Group)
 
 	for _, item := range tenant.Status.Namespaces {
 		namespace := item
+
 		group.Go(func() error {
 			return r.syncNamespaceMetadata(namespace, tenant)
 		})
@@ -572,8 +650,55 @@ func (r *TenantReconciler) syncNamespaces(tenant *capsulev1beta1.Tenant) (err er
 
 	if err = group.Wait(); err != nil {
 		r.Log.Error(err, "Cannot sync Namespaces")
+
 		err = fmt.Errorf("cannot sync Namespaces: %s", err.Error())
 	}
+	return
+}
+
+func (r *TenantReconciler) syncNetworkPolicy(tenant *capsulev1beta1.Tenant, namespace string, keys []string) (err error) {
+	if err = r.pruningResources(namespace, keys, &networkingv1.NetworkPolicy{}); err != nil {
+		return
+	}
+	// getting NetworkPolicy labels for the mutateFn
+	var tenantLabel, networkPolicyLabel string
+
+	if tenantLabel, err = capsulev1beta1.GetTypeLabel(&capsulev1beta1.Tenant{}); err != nil {
+		return
+	}
+
+	if networkPolicyLabel, err = capsulev1beta1.GetTypeLabel(&networkingv1.NetworkPolicy{}); err != nil {
+		return
+	}
+
+	for i, spec := range tenant.Spec.NetworkPolicies.Items {
+		target := &networkingv1.NetworkPolicy{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      fmt.Sprintf("capsule-%s-%d", tenant.Name, i),
+				Namespace: namespace,
+			},
+		}
+
+		var res controllerutil.OperationResult
+		res, err = controllerutil.CreateOrUpdate(context.TODO(), r.Client, target, func() (err error) {
+			target.SetLabels(map[string]string{
+				tenantLabel:        tenant.Name,
+				networkPolicyLabel: strconv.Itoa(i),
+			})
+			target.Spec = spec
+
+			return controllerutil.SetControllerReference(tenant, target, r.Scheme)
+		})
+
+		r.emitEvent(tenant, target.GetNamespace(), res, fmt.Sprintf("Ensuring NetworkPolicy %s", target.GetName()), err)
+
+		r.Log.Info("Network Policy sync result: "+string(res), "name", target.Name, "namespace", target.Namespace)
+
+		if err != nil {
+			return
+		}
+	}
+
 	return
 }
 
@@ -581,51 +706,22 @@ func (r *TenantReconciler) syncNamespaces(tenant *capsulev1beta1.Tenant) (err er
 func (r *TenantReconciler) syncNetworkPolicies(tenant *capsulev1beta1.Tenant) error {
 	// getting requested NetworkPolicy keys
 	keys := make([]string, 0, len(tenant.Spec.NetworkPolicies.Items))
+
 	for i := range tenant.Spec.NetworkPolicies.Items {
 		keys = append(keys, strconv.Itoa(i))
 	}
 
-	// getting NetworkPolicy labels for the mutateFn
-	tl, err := capsulev1beta1.GetTypeLabel(&capsulev1beta1.Tenant{})
-	if err != nil {
-		return err
-	}
-	nl, err := capsulev1beta1.GetTypeLabel(&networkingv1.NetworkPolicy{})
-	if err != nil {
-		return err
-	}
+	group := new(errgroup.Group)
 
 	for _, ns := range tenant.Status.Namespaces {
-		if err := r.pruningResources(ns, keys, &networkingv1.NetworkPolicy{}); err != nil {
-			return err
-		}
-		for i, spec := range tenant.Spec.NetworkPolicies.Items {
-			t := &networkingv1.NetworkPolicy{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      fmt.Sprintf("capsule-%s-%d", tenant.Name, i),
-					Namespace: ns,
-				},
-			}
-			res, err := controllerutil.CreateOrUpdate(context.TODO(), r.Client, t, func() (err error) {
-				t.SetLabels(map[string]string{
-					tl: tenant.Name,
-					nl: strconv.Itoa(i),
-				})
-				t.Spec = spec
+		namespace := ns
 
-				return controllerutil.SetControllerReference(tenant, t, r.Scheme)
-			})
-
-			r.emitEvent(tenant, t.GetNamespace(), res, fmt.Sprintf("Ensuring NetworkPolicy %s", t.GetName()), err)
-
-			r.Log.Info("Network Policy sync result: "+string(res), "name", t.Name, "namespace", t.Namespace)
-			if err != nil {
-				return err
-			}
-		}
+		group.Go(func() error {
+			return r.syncNetworkPolicy(tenant, namespace, keys)
+		})
 	}
 
-	return nil
+	return group.Wait()
 }
 
 // Each Tenant owner needs the admin Role attached to each Namespace, otherwise no actions on it can be performed.
@@ -641,7 +737,7 @@ func (r *TenantReconciler) ownerRoleBinding(tenant *capsulev1beta1.Tenant) error
 		return err
 	}
 
-	l := map[string]string{tl: tenant.Name}
+	newLabels := map[string]string{tl: tenant.Name}
 
 	for _, owner := range tenant.Spec.Owners {
 		if owner.Kind == "ServiceAccount" {
@@ -660,33 +756,34 @@ func (r *TenantReconciler) ownerRoleBinding(tenant *capsulev1beta1.Tenant) error
 		}
 	}
 
-	rbl := make(map[types.NamespacedName]rbacv1.RoleRef)
+	list := make(map[types.NamespacedName]rbacv1.RoleRef)
+
 	for _, i := range tenant.Status.Namespaces {
-		rbl[types.NamespacedName{Namespace: i, Name: "namespace:admin"}] = rbacv1.RoleRef{
+		list[types.NamespacedName{Namespace: i, Name: "namespace:admin"}] = rbacv1.RoleRef{
 			APIGroup: "rbac.authorization.k8s.io",
 			Kind:     "ClusterRole",
 			Name:     "admin",
 		}
-		rbl[types.NamespacedName{Namespace: i, Name: "namespace-deleter"}] = rbacv1.RoleRef{
+		list[types.NamespacedName{Namespace: i, Name: "namespace-deleter"}] = rbacv1.RoleRef{
 			APIGroup: "rbac.authorization.k8s.io",
 			Kind:     "ClusterRole",
 			Name:     rbac.DeleterRoleName,
 		}
 	}
 
-	for nn, rr := range rbl {
+	for namespacedName, roleRef := range list {
 		target := &rbacv1.RoleBinding{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      nn.Name,
-				Namespace: nn.Namespace,
+				Name:      namespacedName.Name,
+				Namespace: namespacedName.Namespace,
 			},
 		}
 
 		var res controllerutil.OperationResult
 		res, err = controllerutil.CreateOrUpdate(context.TODO(), r.Client, target, func() (err error) {
-			target.ObjectMeta.Labels = l
+			target.ObjectMeta.Labels = newLabels
 			target.Subjects = subjects
-			target.RoleRef = rr
+			target.RoleRef = roleRef
 			return controllerutil.SetControllerReference(tenant, target, r.Scheme)
 		})
 
@@ -703,11 +800,14 @@ func (r *TenantReconciler) ownerRoleBinding(tenant *capsulev1beta1.Tenant) error
 func (r *TenantReconciler) ensureNamespaceCount(tenant *capsulev1beta1.Tenant) error {
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		tenant.Status.Size = uint(len(tenant.Status.Namespaces))
+
 		found := &capsulev1beta1.Tenant{}
 		if err := r.Client.Get(context.TODO(), types.NamespacedName{Name: tenant.GetName()}, found); err != nil {
 			return err
 		}
+
 		found.Status.Size = tenant.Status.Size
+
 		return r.Client.Status().Update(context.TODO(), found, &client.UpdateOptions{})
 	})
 }
@@ -724,15 +824,18 @@ func (r *TenantReconciler) emitEvent(object runtime.Object, namespace string, re
 
 func (r *TenantReconciler) collectNamespaces(tenant *capsulev1beta1.Tenant) error {
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
-		nl := &corev1.NamespaceList{}
-		err = r.Client.List(context.TODO(), nl, client.MatchingFieldsSelector{
+		list := &corev1.NamespaceList{}
+		err = r.Client.List(context.TODO(), list, client.MatchingFieldsSelector{
 			Selector: fields.OneTermEqualSelector(".metadata.ownerReferences[*].capsule", tenant.GetName()),
 		})
+
 		if err != nil {
 			return
 		}
+
 		_, err = controllerutil.CreateOrUpdate(context.TODO(), r.Client, tenant.DeepCopy(), func() error {
-			tenant.AssignNamespaces(nl.Items)
+			tenant.AssignNamespaces(list.Items)
+
 			return r.Client.Status().Update(context.TODO(), tenant, &client.UpdateOptions{})
 		})
 		return
