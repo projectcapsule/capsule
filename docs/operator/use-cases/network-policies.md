@@ -1,5 +1,5 @@
 # Assign Network Policies
-Kubernetes network policies allow controlling network traffic between namespaces and between pods in the same namespace. Bill, the cluster admin, can enforce network traffic isolation between different tenants while leaving to Alice, the tenant owner, the freedom to set isolation between namespaces in the same tenant or even between pods in the same namespace.
+Kubernetes network policies control network traffic between namespaces and between pods in the same namespace. Bill, the cluster admin, can enforce network traffic isolation between different tenants while leaving to Alice, the tenant owner, the freedom to set isolation between namespaces in the same tenant or even between pods in the same namespace.
 
 To meet this requirement, Bill needs to define network policies that deny pods belonging to Alice's namespaces to access pods in namespaces belonging to other tenants, e.g. Bob's tenant `water`, or in system namespaces, e.g. `kube-system`.
 
@@ -8,41 +8,44 @@ Also, Bill can make sure pods belonging to a tenant namespace cannot access othe
 Bill can set network policies in the tenant manifest, according to the requirements:
 
 ```yaml
-apiVersion: capsule.clastix.io/v1alpha1
+kubectl -n oil-production apply -f - << EOF
+apiVersion: capsule.clastix.io/v1beta1
 kind: Tenant
 metadata:
   name: oil
 spec:
-  owner:
-    name: alice
+  owners:
+  - name: alice
     kind: User
   networkPolicies:
-  - policyTypes:
-    - Ingress
-    - Egress
-    egress:
-    - to:
-      - ipBlock:
-          cidr: 0.0.0.0/0
-          except:
-            - 192.168.0.0/16 
-    ingress:
-    - from:
-      - namespaceSelector:
-          matchLabels:
-            capsule.clastix.io/tenant: oil
-      - podSelector: {}
-      - ipBlock:
-          cidr: 192.168.0.0/16
-    podSelector: {}
+    items:
+    - policyTypes:
+      - Ingress
+      - Egress
+      egress:
+      - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 192.168.0.0/16 
+      ingress:
+      - from:
+        - namespaceSelector:
+            matchLabels:
+              capsule.clastix.io/tenant: oil
+        - podSelector: {}
+        - ipBlock:
+            cidr: 192.168.0.0/16
+      podSelector: {}
+EOF
 ```
 
 The Capsule controller, watching for namespace creation, creates the Network Policies for each namespace in the tenant.
 
-Alice has access to these network policies:
+Alice has access to network policies:
 
 ```
-alice@caas# kubectl -n oil-production get networkpolicies
+kubectl -n oil-production get networkpolicies
 NAME            POD-SELECTOR   AGE
 capsule-oil-0   <none>         42h
 ```
@@ -50,19 +53,20 @@ capsule-oil-0   <none>         42h
 Alice can create, patch, and delete additional network policies within her namespaces
 
 ```
-alice@caas# kubectl -n oil-production auth can-i get networkpolicies
+kubectl -n oil-production auth can-i get networkpolicies
 yes
 
-alice@caas# kubectl -n oil-production auth can-i delete networkpolicies
+kubectl -n oil-production auth can-i delete networkpolicies
 yes
 
-alice@caas# kubectl -n oil-production auth can-i patch networkpolicies
+kubectl -n oil-production auth can-i patch networkpolicies
 yes
 ```
 
 For example, she can create
 
 ```yaml
+kubectl -n oil-production apply -f - << EOF
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -74,12 +78,13 @@ spec:
   policyTypes:
   - Ingress
   - Egress
+EOF
 ```
 
 Check all the network policies
 
 ```
-alice@caas# kubectl -n oil-production get networkpolicies
+kubectl -n oil-production get networkpolicies
 NAME                        POD-SELECTOR   AGE
 capsule-oil-0               <none>         42h
 production-network-policy   <none>         3m
@@ -88,17 +93,10 @@ production-network-policy   <none>         3m
 And delete the namespace network policies
 
 ```
-alice@caas# kubectl -n oil-production delete networkpolicy production-network-policy
+kubectl -n oil-production delete networkpolicy production-network-policy
 ```
 
-
-However, the Capsule controller prevents Alice from deleting the tenant network policy:
-
-```
-alice@caas# kubectl -n oil-production delete networkpolicy capsule-oil-0
-Error from server (Capsule Network Policies cannot be deleted: please, reach out to the system administrators): admission webhook "validating.network-policy.capsule.clastix.io" denied the request: Capsule Network Policies cannot be deleted: please, reach out to the system administrators
-```
+Any attempt of Alice to delete the tenant network policy defined in the tenant manifest, is denied by the Validation Webhook enforcing it.
 
 # What’s next
-See how Bill can enforce the Pod containers image pull policy to `Always` to avoid leaking of private images when running on shared nodes.
-[Enforcing Pod containers image PullPolicy](./images-pullpolicy.md)
+See how Bill can enforce the Pod containers image pull policy to `Always` to avoid leaking of private images when running on shared nodes. [Enforcing Pod containers image PullPolicy](./images-pullpolicy.md)

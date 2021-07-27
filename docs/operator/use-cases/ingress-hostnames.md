@@ -1,42 +1,30 @@
 # Assign Ingress Hostnames
-Bill can assign a set of dedicated ingress hostnames to the `oil` tenant in order to force the applications in the tenant to be published only using the given hostnames: 
+Bill can control ingress hostnames to the `oil` tenant in order to force the applications to be published only using the given hostname or set of hostnames: 
 
 ```yaml
-apiVersion: capsule.clastix.io/v1alpha1
+kubectl apply -f - << EOF
+apiVersion: capsule.clastix.io/v1beta1
 kind: Tenant
 metadata:
   name: oil
 spec:
-  owner:
-    name: alice
+  owners:
+  - name: alice
     kind: User
-  ingressHostnames:
-     allowed:
-     - *.oil.acmecorp.com
-  ...
+  ingressOptions:
+    allowedHostnames:
+      allowed:
+        - oil.acmecorp.com
+      allowedRegex: ^.*acmecorp.com$
+EOF
 ```
 
-It is also possible to use regular expression for assigning Ingress Classes:
+The Capsule controller assures that all Ingresses created in the tenant can use only one of the valid hostnames.
+
+Alice can create an Ingress using any allowed hostname
 
 ```yaml
-apiVersion: capsule.clastix.io/v1alpha1
-kind: Tenant
-metadata:
-  name: oil
-spec:
-  owner:
-    name: alice
-    kind: User
-  ingressHostnames:
-     allowedRegex: "^oil-acmecorp.*$"
-  ...
-```
-
-The Capsule controller assures that all Ingresses created in the tenant can use only one of the valid hostnames. 
-
-Alice creates an Ingress using an allowed hostname
-
-```yaml
+kubectl apply -f - << EOF
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -46,20 +34,20 @@ metadata:
     kubernetes.io/ingress.class: oil
 spec:
   rules:
-    - host: web.oil.acmecorp.com
-      http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: nginx
-                port:
-                  number: 80
+  - host: web.oil.acmecorp.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: nginx
+            port:
+              number: 80
+EOF
 ```
 
-
-Any attempt of Alice to use a non valid hostname, e.g. `web.gas.acmecorp.org`, will fail.
+Any attempt of Alice to use a non valid hostname is denied by the Validation Webhook enforcing it.
 
 # What’s next
-See how Bill, the cluster admin, can assign a Storage Class to Alice's tenant. [Assign Storage Classes](./storage-classes.md).
+See how Bill, the cluster admin, can control the hostname collision in Ingresses. [Control hostname collision in ingresses](./hostname-collision.md).

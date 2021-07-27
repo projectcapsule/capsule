@@ -6,54 +6,47 @@ Make sure you have access to a Kubernetes cluster as administrator.
 
 There are two ways to install Capsule:
 
-* Use the Helm Chart available [here](https://github.com/clastix/capsule/tree/master/charts/capsule)
-* Use [`kustomize`](https://github.com/kubernetes-sigs/kustomize)
+* Use the [single YAML file installer](https://raw.githubusercontent.com/clastix/capsule/master/config/install.yaml)
+* Use the [Capsule Helm Chart](https://github.com/clastix/capsule/blob/master/charts/capsule/README.md)
 
-### Install with kustomize
-Ensure you have `kubectl` and `kustomize` installed in your `PATH`. 
-
-Clone this repository and move to the repo folder:
+### Install with the single YAML file installer
+Ensure you have `kubectl` installed in your `PATH`. Clone this repository and move to the repo folder:
 
 ```
-$ git clone https://github.com/clastix/capsule
-$ cd capsule
-$ make deploy
+$ kubectl apply -f https://raw.githubusercontent.com/clastix/capsule/master/config/install.yaml
 ```
 
 It will install the Capsule controller in a dedicated namespace `capsule-system`.
 
+### Install with Helm Chart
+Please, refer to the instructions reported into the Capsule Helm Chart [README](https://github.com/clastix/capsule/blob/master/charts/capsule/README.md). 
+
 # Create your first Tenant
 In Capsule, a _Tenant_ is an abstraction to group togheter multiple namespaces in a single entity within a set of bundaries defined by the Cluster Administrator. The tenant is then assigned to a user or group of users who is called _Tenant Owner_.
 
-Capsule defines a Tenant as Custom Resource with cluster scope:
+Capsule defines a Tenant as Custom Resource with cluster scope.
+
+Create the tenant as cluster admin:
 
 ```yaml
-cat <<EOF > oil_tenant.yaml
-apiVersion: capsule.clastix.io/v1alpha1
+kubectl create -f - << EOF
+apiVersion: capsule.clastix.io/v1beta1
 kind: Tenant
 metadata:
   name: oil
 spec:
-  owner:
-    name: alice
+  owners:
+  - name: alice
     kind: User
-  namespaceQuota: 3
 EOF
 ```
 
-Apply as cluster admin:
-
-```
-$ kubectl apply -f oil_tenant.yaml
-tenant.capsule.clastix.io/oil created
-```
-
-You can check the tenant just created as cluster admin
+You can check the tenant just created
 
 ```
 $ kubectl get tenants
-NAME      NAMESPACE QUOTA   NAMESPACE COUNT   OWNER NAME   OWNER KIND   NODE SELECTOR    AGE
-oil       3                 0                 alice        User                          1m
+NAME   STATE    NAMESPACE QUOTA   NAMESPACE COUNT   NODE SELECTOR   AGE
+oil    Active                     0                                 10s
 ```
 
 ## Tenant owners
@@ -65,27 +58,21 @@ Assignment to a group depends on the authentication strategy in your cluster.
 
 For example, if you are using `capsule.clastix.io`, users authenticated through a _X.509_ certificate must have `capsule.clastix.io` as _Organization_: `-subj "/CN=${USER}/O=capsule.clastix.io"`
 
-Users authenticated through an _OIDC token_ must have
+Users authenticated through an _OIDC token_ must have in their token:
 
 ```json
 ...
 "users_groups": [
-    "capsule.clastix.io",
-    "other_group"
+  "capsule.clastix.io",
+  "other_group"
 ]
 ```
-
-in their token.
 
 The [hack/create-user.sh](../../hack/create-user.sh) can help you set up a dummy `kubeconfig` for the `alice` user acting as owner of a tenant called `oil`
 
 ```bash
 ./hack/create-user.sh alice oil
-creating certs in TMPDIR /tmp/tmp.4CLgpuime3 
-Generating RSA private key, 2048 bit long modulus (2 primes)
-............+++++
-........................+++++
-e is 65537 (0x010001)
+...
 certificatesigningrequest.certificates.k8s.io/alice-oil created
 certificatesigningrequest.certificates.k8s.io/alice-oil approved
 kubeconfig file is: alice-oil.kubeconfig

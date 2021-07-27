@@ -4,7 +4,7 @@ Bill, the cluster admin, can dedicate a pool of worker nodes to the `oil` tenant
 These nodes are labeled by Bill as `pool=oil`
 
 ```
-bill@caas# kubectl get nodes --show-labels
+kubectl get nodes --show-labels
 
 NAME                      STATUS   ROLES             AGE   VERSION   LABELS
 ...
@@ -16,36 +16,47 @@ worker08.acme.com         Ready    worker            8d    v1.18.2   pool=oil
 The label `pool=oil` is defined as node selector in the tenant manifest:
 
 ```yaml
-apiVersion: capsule.clastix.io/v1alpha1
+kubectl apply -f - << EOF
+apiVersion: capsule.clastix.io/v1beta1
 kind: Tenant
 metadata:
   name: oil
 spec:
-  owner:
-    name: alice
+  owners:
+  - name: alice
     kind: User
   nodeSelector:
     pool: oil
-  ...
+    kubernetes.io/os: linux
+EOF
 ```
 
-The Capsule controller makes sure that any namespace created in the tenant has the annotation: `scheduler.alpha.kubernetes.io/node-selector: pool=oil`. This annotation tells the scheduler of Kubernetes to assign the node selector `pool=oil` to all the pods deployed in the tenant.
+The Capsule controller makes sure that any namespace created in the tenant has the annotation: `scheduler.alpha.kubernetes.io/node-selector: pool=oil`. This annotation tells the scheduler of Kubernetes to assign the node selector `pool=oil` to all the pods deployed in the tenant. The effect is that all the pods deployed by Alice are placed only on the designated pool of nodes.
 
-The effect is that all the pods deployed by Alice are placed only on the designated pool of nodes.
+Multiple node selector labels can be defined as in the following snippet:
 
-Any attempt of Alice to change the selector on the pods will result in the following error from
-the `PodNodeSelector` Admission Controller plugin:
+```yaml
+apiVersion: capsule.clastix.io/v1beta1
+kind: Tenant
+metadata:
+  name: oil
+spec:
+  owners:
+  - name: alice
+    kind: User
+  nodeSelector:
+    pool: oil
+    kubernetes.io/os: linux
+    kubernetes.io/arch: amd64
+    hardware: gpu
+```
+
+Any attempt of Alice to change the selector on the pods will result an error from the `PodNodeSelector` Admission Controller plugin.
+
+Also RBAC prevents Alice to change the annotation on the namespace:
 
 ```
-Error from server (Forbidden): pods "busybox" is forbidden:
-pod node label selector conflicts with its namespace node label selector
-```
-
-RBAC prevents Alice to change the annotation on the namespace:
-
-```
-alice@caas# kubectl auth can-i edit ns -n production
-Warning: resource 'namespaces' is not namespace scoped
+kubectl auth can-i edit ns -n oil-production
 no
 ```
 

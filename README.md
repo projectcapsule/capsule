@@ -13,7 +13,7 @@
 
 ---
 
-# Kubernetes multi-tenancy made simple
+# Kubernetes multi-tenancy made easy
 **Capsule** helps to implement a multi-tenancy and policy-based environment in your Kubernetes cluster. It is not intended to be yet another _PaaS_, instead, it has been designed as a micro-services-based ecosystem with the minimalist approach, leveraging only on upstream Kubernetes.
 
 # What's the problem with the current status?
@@ -71,36 +71,24 @@ Clone this repository and move to the repo folder:
 
 ```
 $ kubectl apply -f https://raw.githubusercontent.com/clastix/capsule/master/config/install.yaml
-namespace/capsule-system created
-customresourcedefinition.apiextensions.k8s.io/capsuleconfigurations.capsule.clastix.io created
-customresourcedefinition.apiextensions.k8s.io/tenants.capsule.clastix.io created
-clusterrolebinding.rbac.authorization.k8s.io/capsule-manager-rolebinding created
-secret/capsule-ca created
-secret/capsule-tls created
-service/capsule-controller-manager-metrics-service created
-service/capsule-webhook-service created
-deployment.apps/capsule-controller-manager created
-capsuleconfiguration.capsule.clastix.io/capsule-default created
-mutatingwebhookconfiguration.admissionregistration.k8s.io/capsule-mutating-webhook-configuration created
-validatingwebhookconfiguration.admissionregistration.k8s.io/capsule-validating-webhook-configuration created
 ```
 
 It will install the Capsule controller in a dedicated namespace `capsule-system`.
 
 ## How to create Tenants
-Use the scaffold [Tenant](config/samples/capsule_v1alpha1_tenant.yaml) and simply apply as cluster admin.
+Use the scaffold [Tenant](config/samples/capsule_v1beta1_tenant.yaml) and simply apply as cluster admin.
 
 ```
-$ kubectl apply -f config/samples/capsule_v1alpha1_tenant.yaml
-tenant.capsule.clastix.io/oil created
+$ kubectl apply -f config/samples/capsule_v1beta1_tenant.yaml
+tenant.capsule.clastix.io/gas created
 ```
 
 You can check the tenant just created as
 
 ```
 $ kubectl get tenants
-NAME      NAMESPACE QUOTA   NAMESPACE COUNT   OWNER NAME   OWNER KIND   NODE SELECTOR    AGE
-oil       3                 0                 alice        User                          1m
+NAME   STATE    NAMESPACE QUOTA   NAMESPACE COUNT   NODE SELECTOR                  AGE
+gas    Active   3                 0                 {"kubernetes.io/os":"linux"}   25s
 ```
 
 ## Tenant owners
@@ -112,52 +100,46 @@ Assignment to a group depends on the authentication strategy in your cluster.
 
 For example, if you are using `capsule.clastix.io`, users authenticated through a _X.509_ certificate must have `capsule.clastix.io` as _Organization_: `-subj "/CN=${USER}/O=capsule.clastix.io"`
 
-Users authenticated through an _OIDC token_ must have
+Users authenticated through an _OIDC token_ must have in their token:
 
 ```json
 ...
 "users_groups": [
-    "capsule.clastix.io",
-    "other_group"
+  "capsule.clastix.io",
+  "other_group"
 ]
 ```
 
-in their token.
-
-The [hack/create-user.sh](hack/create-user.sh) can help you set up a dummy `kubeconfig` for the `alice` user acting as owner of a tenant called `oil`
+The [hack/create-user.sh](hack/create-user.sh) can help you set up a dummy `kubeconfig` for the `bob` user acting as owner of a tenant called `gas`
 
 ```bash
-./hack/create-user.sh alice oil
-creating certs in TMPDIR /tmp/tmp.4CLgpuime3 
-Generating RSA private key, 2048 bit long modulus (2 primes)
-............+++++
-........................+++++
-e is 65537 (0x010001)
-certificatesigningrequest.certificates.k8s.io/alice-oil created
-certificatesigningrequest.certificates.k8s.io/alice-oil approved
-kubeconfig file is: alice-oil.kubeconfig
-to use it as alice export KUBECONFIG=alice-oil.kubeconfig
+./hack/create-user.sh bob gas
+...
+certificatesigningrequest.certificates.k8s.io/bob-gas created
+certificatesigningrequest.certificates.k8s.io/bob-gas approved
+kubeconfig file is: bob-gas.kubeconfig
+to use it as bob export KUBECONFIG=bob-gas.kubeconfig
 ```
 
 ## Working with Tenants
-Log in to the Kubernetes cluster as `alice` tenant owner
+Log in to the Kubernetes cluster as `bob` tenant owner
 
 ```
-$ export KUBECONFIG=alice-oil.kubeconfig
+$ export KUBECONFIG=bob-gas.kubeconfig
 ```
 
 and create a couple of new namespaces
 
 ```
-$ kubectl create namespace oil-production
-$ kubectl create namespace oil-development
+$ kubectl create namespace gas-production
+$ kubectl create namespace gas-development
 ```
 
-As user `alice` you can operate with fully admin permissions:
+As user `bob` you can operate with fully admin permissions:
 
 ```
-$ kubectl -n oil-development run nginx --image=docker.io/nginx 
-$ kubectl -n oil-development get pods
+$ kubectl -n gas-development run nginx --image=docker.io/nginx 
+$ kubectl -n gas-development get pods
 ```
 
 but limited to only your own namespaces:
@@ -165,7 +147,7 @@ but limited to only your own namespaces:
 ```
 $ kubectl -n kube-system get pods
 Error from server (Forbidden): pods is forbidden:
-User "alice" cannot list resource "pods" in API group "" in the namespace "kube-system"
+User "bob" cannot list resource "pods" in API group "" in the namespace "kube-system"
 ```
 
 # Documentation

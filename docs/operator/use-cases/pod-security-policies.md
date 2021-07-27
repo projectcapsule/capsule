@@ -4,6 +4,7 @@ Bill, the cluster admin, can assign a dedicated Pod Security Policy (PSP) to the
 The cluster admin creates a PSP:
 
 ```yaml
+kubectl -n oil-production apply -f - << EOF
 apiVersion: policy/v1beta1
 kind: PodSecurityPolicy
 metadata:
@@ -13,11 +14,13 @@ spec:
   # Required to prevent escalations to root.
   allowPrivilegeEscalation: false
   ...
+EOF
 ```
 
 Then create a _ClusterRole_ using or granting the said item
 
 ```yaml
+kubectl -n oil-production apply -f - << EOF
 kind: ClusterRole
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
@@ -27,18 +30,20 @@ rules:
   resources: ['podsecuritypolicies']
   resourceNames: ['psp:restricted']
   verbs: ['use']
+EOF
 ```
 
-Bill can assign this role to any namespace in the Alice's tenant by setting it in the tenant manifest:
+Bill can assign this role to all namespaces in the Alice's tenant by setting it in the tenant manifest:
 
 ```yaml
-apiVersion: capsule.clastix.io/v1alpha1
+kubectl -n oil-production apply -f - << EOF
+apiVersion: capsule.clastix.io/v1beta1
 kind: Tenant
 metadata:
   name: oil
 spec:
-  owner:
-    name: alice
+  owners:
+  - name: alice
     kind: User
   additionalRoleBindings:
   - clusterRoleName: psp:privileged
@@ -46,10 +51,12 @@ spec:
     - kind: "Group"
       apiGroup: "rbac.authorization.k8s.io"
       name: "system:authenticated"
-  ...
+EOF
 ```
 
-With the given specification, Capsule will ensure that all Alice's namespaces will contain a _RoleBinding_ for the specified _Cluster Role_. For example, in the `oil-production` namespace, Alice will see:
+With the given specification, Capsule will ensure that all Alice's namespaces will contain a _RoleBinding_ for the specified _Cluster Role_.
+
+For example, in the `oil-production` namespace, Alice will see:
 
 ```yaml
 kind: RoleBinding

@@ -5,58 +5,32 @@ The spec `containerRegistries` addresses this task and can provide combination w
 
 
 ```yaml
-apiVersion: capsule.clastix.io/v1alpha1
+kubectl -n oil-production apply -f - << EOF
+apiVersion: capsule.clastix.io/v1beta1
 kind: Tenant
 metadata:
   name: oil
 spec:
-  owner:
-    name: alice
+  owners:
+  - name: alice
     kind: User
   containerRegistries:
     allowed:
     - docker.io
     - quay.io
-    allowedRegex: ''
+    allowedRegex: 'internal.registry.\\w.tld'
 ```
 
-> In case of `non FQDI`  (non fully qualified Docker image) and official images hosted on Docker Hub, Capsule is going
-> to retrieve the registry even if it's not explicit: a `busybox:latest` Pod
+> In case of `non FQDI` (non fully qualified Docker image) and official images hosted on Docker Hub,
+> Capsule is going to retrieve the registry even if it's not explicit: a `busybox:latest` Pod
 > running on a Tenant allowing `docker.io` will not be blocked, even if the image
 > field is not explicit as `docker.io/busybox:latest`.
 
-
-Alternatively, use a valid regular expression for a maximum flexibility
-
-```yaml
-apiVersion: capsule.clastix.io/v1alpha1
-kind: Tenant
-metadata:
-  name: oil
-spec:
-  owner:
-    name: alice
-    kind: User
-  containerRegistries:
-    allowed: []
-    regex: "internal.registry.\\w.tld"
-```
-
 A Pod running `internal.registry.foo.tld` as registry will be allowed, as well `internal.registry.bar.tld` since these are matching the regular expression.
 
-> You can also set a catch-all regex entry as .* to allow every kind of registry,
-> that would be the same result of unsetting `containerRegistries` at all
+> A catch-all regex entry as `.*` allows every kind of registry, that would be the same result of unsetting `containerRegistries` at all.
 
-As per Ingress and Storage classes the allowed registries can be inspected from the Tenant's namespace
-
-```
-alice@caas# kubectl describe ns oil-production
-Name:         oil-production
-Labels:       capsule.clastix.io/tenant=oil
-Annotations:  capsule.clastix.io/allowed-registries: docker.io
-              capsule.clastix.io/allowed-registries-regexp: ^registry\.internal\.\w+$
-...
-```
+Any attempt of Alice to use a not allowed `containerRegistries` value is denied by the Validation Webhook enforcing it.
 
 # What’s next
 See how Bill, the cluster admin, can assign Pod Security Policies to Alice's tenant. [Assign Pod Security Policies](./pod-security-policies.md).

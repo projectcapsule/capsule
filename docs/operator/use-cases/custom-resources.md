@@ -1,9 +1,10 @@
 # Create Custom Resources
-Capsule operator can grant the admin permissions to the tenant's users but only limited to their namespaces. To achieve that, it assigns the ClusterRole [admin](https://kubernetes.io/docs/reference/access-authn-authz/rbac/#user-facing-roles) to the tenant owner. This ClusterRole does not permit the installation of custom resources in the namespaces.
+Capsule grants admin permissions to the tenant owners but only limited to their namespaces. To achieve that, it assigns the ClusterRole [admin](https://kubernetes.io/docs/reference/access-authn-authz/rbac/#user-facing-roles) to the tenant owner. This ClusterRole does not permit the installation of custom resources in the namespaces.
 
 In order to leave the tenant owner to create Custom Resources in their namespaces, the cluster admin defines a proper Cluster Role. For example:
 
 ```yaml
+kubectl -n oil-production apply -f - << EOF
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
@@ -22,18 +23,22 @@ rules:
   - update
   - patch
   - delete
+EOF
 ```
 
 Bill can assign this role to any namespace in the Alice's tenant by setting it in the tenant manifest:
 
 ```yaml
-apiVersion: capsule.clastix.io/v1alpha1
+kubectl -n oil-production apply -f - << EOF
+apiVersion: capsule.clastix.io/v1beta1
 kind: Tenant
 metadata:
   name: oil
 spec:
-  owner:
-    name: alice
+  owners:
+  - name: alice
+    kind: User
+  - name: joe
     kind: User
   additionalRoleBindings:
     - clusterRoleName: 'argoproj-provisioner'
@@ -44,25 +49,7 @@ spec:
         - apiGroup: rbac.authorization.k8s.io
           kind: User
           name: joe
-```
-
-or in case of Group type owners:
-
-```yaml
-apiVersion: capsule.clastix.io/v1alpha1
-kind: Tenant
-metadata:
-  name: oil
-spec:
-  owner:
-    name: alice
-    kind: User
-  additionalRoleBindings:
-    - clusterRoleName: 'argoproj-provisioner'
-      subjects:
-        - apiGroup: rbac.authorization.k8s.io
-          kind: User
-          name: alice
+EOF
 ```
 
 With the given specification, Capsule will ensure that all Alice's namespaces will contain a _RoleBinding_ for the specified _Cluster Role_. For example, in the `oil-production` namespace, Alice will see:

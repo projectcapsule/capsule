@@ -6,91 +6,77 @@ By design, the Capsule operator does not permit hierarchy of tenants, since all 
 Bill, the cluster admin, creates multiple tenants having `alice` as owner:
 
 ```yaml
-apiVersion: capsule.clastix.io/v1alpha1
+kubectl apply -f - << EOF
+apiVersion: capsule.clastix.io/v1beta1
 kind: Tenant
 metadata:
   name: oil
 spec:
-  owner:
-    name: alice
+  owners:
+  - name: alice
     kind: User
-  namespaceQuota: 3
+EOF
 ```
 
 and
 
 ```yaml
-apiVersion: capsule.clastix.io/v1alpha1
+kubectl apply -f - << EOF
+apiVersion: capsule.clastix.io/v1beta1
 kind: Tenant
 metadata:
   name: gas
 spec:
-  owner:
-    name: alice
+  owners:
+  - name: alice
     kind: User
-  namespaceQuota: 9
-```
-
-So that
-
-```
-bill@caas# kubectl get tenants
-NAME   NAMESPACE QUOTA   NAMESPACE COUNT   OWNER NAME   OWNER KIND   NODE SELECTOR   AGE
-oil    3                 3                 alice        User                         3h
-gas    9                 0                 alice        User                         1m
+EOF
 ```
 
 Alternatively, the ownership can be assigned to a group called `oil-and-gas`:
 
 ```yaml
-apiVersion: capsule.clastix.io/v1alpha1
+kubectl apply -f - << EOF
+apiVersion: capsule.clastix.io/v1beta1
 kind: Tenant
 metadata:
   name: oil
 spec:
-  owner:
-    name: oil-and-gas
+  owners:
+  - name: oil-and-gas
     kind: Group
-  namespaceQuota: 3
+EOF
 ```
 
 and
 
 ```yaml
-apiVersion: capsule.clastix.io/v1alpha1
+kubectl apply -f - << EOF
+apiVersion: capsule.clastix.io/v1beta1
 kind: Tenant
 metadata:
   name: gas
 spec:
-  owner:
-    name: oil-and-gas
+  owners:
+  - name: oil-and-gas
     kind: Group
-  namespaceQuota: 9
-```
-
-So that
-
-```
-bill@caas# kubectl get tenants
-NAME   NAMESPACE QUOTA   NAMESPACE COUNT   OWNER NAME   OWNER KIND   NODE SELECTOR   AGE
-oil    3                 3                 oil-and-gas  Group                         3h
-gas    9                 0                 oil-and-gas  Group                         1m
+EOF
 ```
 
 The two tenants still remain isolated each other in terms of resources assignments, e.g. _ResourceQuota_, _Nodes Pool_, _Storage Calsses_ and _Ingress Classes_, and in terms of governance, e.g. _NetworkPolicies_, _PodSecurityPolicies_, _Trusted Registries_, etc.
 
 
-When Alice logs in CaaS platform, she has access to all namespaces belonging to both the `oil` and `gas` tenants.
+When Alice logs in, she has access to all namespaces belonging to both the `oil` and `gas` tenants.
 
 ```
-alice@caas# kubectl create ns oil-production
-alice@caas# kubectl create ns gas-production
+kubectl create ns oil-production
+kubectl create ns gas-production
 ```
 
 When the enforcement of the naming convention with the `--force-tenant-prefix` option, is enabled, the namespaces are automatically assigned to the right tenant by Capsule because the operator does a lookups on the tenant names. If the `--force-tenant-prefix` option, is not set,   Alice needs to specify the tenant name as a label `capsule.clastix.io/tenant=<desired_tenant>` in the namespace manifest:
 
 ```yaml
-cat <<EOF > gas-production-ns.yaml
+kubectl apply -f - << EOF
 kind: Namespace
 apiVersion: v1
 metadata:
@@ -98,12 +84,9 @@ metadata:
   labels:
     capsule.clastix.io/tenant: gas
 EOF
-
-kubectl create -f gas-production-ns.yaml
 ```
 
 > If not specified, Capsule will deny with the following message:
->
 >`Unable to assign namespace to tenant. Please use capsule.clastix.io/tenant label when creating a namespace.`
 
 # What’s next
