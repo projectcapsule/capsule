@@ -16,33 +16,33 @@ To simplify the usage of Capsule in this scenario, we'll work with the following
   he works at Acme Corp, as a lead developer of a distributed team in Alice's organization. Joe is responsible for developing a mission-critical project in the Oil market.
 
 * ***Bob***:
-
   he is the head of Engineering for the Water Business Unit, the main and historical line of business at Acme Corp. He is responsible for development, deployment, and operating multiple digital products in production for a large set of customers.
 
-Bill, at Acme Corp. can use Capsule to address any of the following scenarios:
+Use Capsule to address any of the following scenarios:
 
-* [Onboard a new Tenant](./onboarding.md)
+* [Onboard Tenants](./onboarding.md)
 * [Create Namespaces](./create-namespaces.md)
 * [Assign Permissions](./permissions.md)
 * [Enforce Resources Quotas and Limits](./resources-quota-limits.md)
-* [Enforce Pod Priority Classes](./pod-priority-class.md)
+* [Enforce Pod Priority Classes](./pod-priority-classes.md)
 * [Assign specific Node Pools](./nodes-pool.md)
 * [Assign Ingress Classes](./ingress-classes.md)
 * [Assign Ingress Hostnames](./ingress-hostnames.md)
+* [Control hostname collision in Ingresses](./hostname-collision.md)
 * [Assign Storage Classes](./storage-classes.md)
-* [Disable NodePort Services](./node-ports.md)
 * [Assign Network Policies](./network-policies.md)
-* [Enforcing Pod containers image PullPolicy](./images-pullpolicy.md)
+* [Enforce Containers image PullPolicy](./images-pullpolicy.md)
 * [Assign Trusted Images Registries](./images-registries.md)
 * [Assign Pod Security Policies](./pod-security-policies.md)
 * [Create Custom Resources](./custom-resources.md)
 * [Taint Namespaces](./taint-namespaces.md)
-* [Assign multiple Tenants to an owner](./multiple-tenants.md)
-* [Cordoning a Tenant](./cordoning-tenant.md)
+* [Assign multiple Tenants](./multiple-tenants.md)
+* [Cordon Tenants](./cordoning-tenant.md)
+* [Disable Service Types](./service-type.md)
+* [Taint Services](./taint-services.md)
 * [Velero Backup Restoration](./velero-backup-restoration.md)
 
 > NB: as we improve Capsule, more use cases about multi-tenancy and cluster governance will be covered.
-
 
 # What’s next
 Now let's see how the cluster admin onboards a new tenant. [Onboarding a new tenant](./onboarding.md).

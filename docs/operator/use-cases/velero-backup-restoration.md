@@ -6,10 +6,6 @@ Using this in a Kubernetes cluster where Capsule is installed can lead to an inc
 
 To avoid this problem you can use the script `velero-restore.sh` under the `hack/` folder.
 
-Below are some examples on how to use the script to avoid incomplete restorations.
-
-## Getting Started
-
 In case of a data loss, the right thing to do is to restore the cluster with **Velero** at first. Once Velero has finished, you can proceed using the script to complete the restoration.
 
 ```bash

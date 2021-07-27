@@ -1,38 +1,51 @@
 # Enforce resources quota and limits
-With help of Capsule, Bill and the cluster admin can set and enforce resources quota and limits for the Alice's tenant
+With help of Capsule, Bill, the cluster admin, can set and enforce resources quota and limits for the Alice's tenant.
+
+## Resources quota
+Set resources quota for each namespace in the Alice's tenant by defining them in the tenant spec:
 
 ```yaml
-apiVersion: capsule.clastix.io/v1alpha1
+kubectl apply -f - << EOF
+apiVersion: capsule.clastix.io/v1beta1
 kind: Tenant
 metadata:
   name: oil
 spec:
-  owner:
-    name: alice
+  owners:
+  - name: alice
     kind: User
+  namespaceOptions:
+    quota: 3
   resourceQuotas:
-  - hard:
-      limits.cpu: "8"
-      limits.memory: 16Gi
-      requests.cpu: "8"
-      requests.memory: 16Gi
-    scopes:
-    - NotTerminating
-  - hard:
-      pods: "10"
-      services: "50"
-  - hard:
-      requests.storage: 10Gi
-  ...
+    scope: Tenant
+    items:
+    - hard:
+        limits.cpu: "8"
+        limits.memory: 16Gi
+        requests.cpu: "8"
+        requests.memory: 16Gi
+    - hard:
+        pods: "10"
+  limitRanges:
+    items:
+    - limits:
+      - default:
+          cpu: 500m
+          memory: 512Mi
+        defaultRequest:
+          cpu: 100m
+          memory: 10Mi
+        type: Container
+EOF
 ```
 
-The resources quotas above will be inherited by all the namespaces created by Alice. In our case, when Alice creates the namespace `oil-production`, Capsule creates three resource quotas:
+The resources quotas above will be inherited by all the namespaces created by Alice. In our case, when Alice creates the namespace `oil-production`, Capsule creates following resource quotas:
 
 ```yaml
 kind: ResourceQuota
 apiVersion: v1
 metadata:
-  name: compute
+  name: capsule-oil-0
   namespace: oil-production
   labels:
     tenant: oil
@@ -42,63 +55,107 @@ spec:
     limits.memory: 16Gi
     requests.cpu: "8"
     requests.memory: 16Gi
-  scopes: ["NotTerminating"]
 ---
 kind: ResourceQuota
 apiVersion: v1
 metadata:
-  name: count
+  name: capsule-oil-1
   namespace: oil-production
   labels:
     tenant: oil
 spec:
   hard:
     pods : "10"
----
-kind: ResourceQuota
-apiVersion: v1
-metadata:
-  name: storage
-  namespace: oil-production
-  labels:
-    tenant: oil
-spec:
-  hard:
-    requests.storage: "10Gi"
 ```
 
 Alice can create any resource according to the assigned quotas:
 
 ```
-alice@caas# kubectl -n oil-production create deployment nginx --image=nginx:latest 
+kubectl -n oil-production create deployment nginx --image nginx:latest --replicas 4
 ```
 
-To check the remaining resources in the `oil-production` namespace, she gets the ResourceQuota:
-
-```
-alice@caas# kubectl -n oil-production get resourcequota
-NAME            AGE   REQUEST                                      LIMIT
-capsule-oil-0   42h   requests.cpu: 1/8, requests.memory: 1/16Gi   limits.cpu: 1/8, limits.memory: 1/16Gi
-capsule-oil-1   42h   pods: 1/10                                   
-capsule-oil-2   42h   requests.storage: 0/100Gi
-```
-
-By inspecting the annotations in ResourceQuota, Alice can see the used resources at tenant level and the related hard quota:
+At namespace `oil-production` level, Alice can see the used resources by inspecting the `status` in ResourceQuota:
 
 ```yaml
-alice@caas# kubectl get resourcequotas capsule-oil-1 -o yaml
+kubectl -n oil-production get resourcequota capsule-oil-1 -o yaml
+...
+status:
+  hard:
+    pods: "10"
+    services: "50"
+  used:
+    pods: "4"
+```
+
+At tenant level, the behaviour is controlled by the `spec.resourceQuotas.scope` value:
+
+* Tenant (default)
+* Namespace
+
+### Enforcement at tenant level
+By setting enforcement at tenant level, i.e. `spec.resourceQuotas.scope=Tenant`, Capsule aggregates resources usage for all namespaces in the tenant and adjusts all the `ResourceQuota` usage as aggregate. In such case, Alice can check the used resources at tenant level by inspecting the `annotations` in ResourceQuota object of any namespace in the tenant:
+
+```yaml
+kubectl -n oil-production get resourcequotas capsule-oil-1 -o yaml
 apiVersion: v1
 kind: ResourceQuota
 metadata:
   annotations:
-    quota.capsule.clastix.io/used-pods: "1"
+    quota.capsule.clastix.io/used-pods: "4"
     quota.capsule.clastix.io/hard-pods: "10"
 ...
 ```
 
-At the tenant level, the Capsule controller watches the resources usage for each Tenant namespace and adjusts it as an aggregate of all the namespaces using the said annotations. When the aggregate usage reaches the hard quota, then the native `ResourceQuota` Admission Controller in Kubernetes denies the Alice's request.
+or
 
-Bill, the cluster admin, can also set Limit Ranges for each namespace in the Alice's tenant by defining limits in the tenant spec:
+```yaml
+kubectl -n oil-development get resourcequotas capsule-oil-1 -o yaml
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  annotations:
+    quota.capsule.clastix.io/used-pods: "4"
+    quota.capsule.clastix.io/hard-pods: "10"
+...
+```
+
+When the aggregate usage for all namespaces crosses the hard quota, then the native `ResourceQuota` Admission Controller in Kubernetes denies the Alice's request to create resources exceeding the quota: 
+
+```
+kubectl -n oil-development create deployment nginx --image nginx:latest --replicas 10
+```
+
+Alice cannot schedule more pods than the admitted at tenant aggregate level.
+
+```
+kubectl -n oil-development get pods
+NAME                     READY   STATUS    RESTARTS   AGE
+nginx-55649fd747-6fzcx   1/1     Running   0          12s
+nginx-55649fd747-7q6x6   1/1     Running   0          12s
+nginx-55649fd747-86wr5   1/1     Running   0          12s
+nginx-55649fd747-h6kbs   1/1     Running   0          12s
+nginx-55649fd747-mlhlq   1/1     Running   0          12s
+nginx-55649fd747-t48s5   1/1     Running   0          7s
+```
+
+and 
+
+```
+kubectl -n oil-production get pods
+NAME                     READY   STATUS    RESTARTS   AGE
+nginx-55649fd747-52fsq   1/1     Running   0          22m
+nginx-55649fd747-9q8n5   1/1     Running   0          22m
+nginx-55649fd747-r8vzr   1/1     Running   0          22m
+nginx-55649fd747-tkv7m   1/1     Running   0          22m
+```
+
+### Enforcement at namespace level
+
+By setting enforcement at namespace level, i.e. `spec.resourceQuotas.scope=Namespace`, Capsule does not aggregate the resources usage and all enforcement is done at namespace level.
+
+## Pods and containers limits
+
+Bill, the cluster admin, can also set Limit Ranges for each namespace in the Alice's tenant by defining limits for pods and containers in the tenant spec:
 
 ```yaml
 apiVersion: capsule.clastix.io/v1alpha1
@@ -106,37 +163,34 @@ kind: Tenant
 metadata:
   name: oil
 spec:
-  owner:
-    name: alice
-    kind: User
+...
   limitRanges:
-  - limits:
-    - max:
-        cpu: "1"
-        memory: 1Gi
+    items:
+    - type: Pod
       min:
-        cpu: 50m
-        memory: 5Mi
-      type: Pod
-    - default:
-        cpu: 200m
-        memory: 100Mi
-      defaultRequest:
-        cpu: 100m
-        memory: 10Mi
+        cpu: "50m"
+        memory: "5Mi"
       max:
         cpu: "1"
-        memory: 1Gi
+        memory: "1Gi"
+    - type: Container
+      defaultRequest:
+        cpu: "100m"
+        memory: "10Mi"
+      default:
+        cpu: "200m"
+        memory: "100Mi"
       min:
-        cpu: 50m
-        memory: 5Mi
-      type: Container          
-    - max:
-        storage: 10Gi
+        cpu: "50m"
+        memory: "5Mi"
+      max:
+        cpu: "1"
+        memory: "1Gi"
+    - type: PersistentVolumeClaim
       min:
-        storage: 1Gi
-      type: PersistentVolumeClaim 
-  ...
+        storage: "1Gi"
+      max:
+        storage: "10Gi"
 ```
 
 Limits will be inherited by all the namespaces created by Alice. In our case, when Alice creates the namespace `oil-production`, Capsule creates the following:
@@ -178,37 +232,18 @@ spec:
       storage: "10Gi"
 ```
 
-Alice can inspect Limit Ranges for her namespaces:
+> Note: being the limit range specific of single resources, there is no aggregate to count.
+
+Alice doesn't have permissions to change or delete the resources according to the assigned RBAC profile.
 
 ```
-alice@caas# kubectl -n oil-production get limitranges
-NAME            CREATED AT
-capsule-oil-0   2020-07-20T18:41:15Z
-
-# kubectl -n oil-production describe limitranges limits
-Name:                  capsule-oil-0
-Namespace:             oil-production
-Type                   Resource  Min  Max   Default Request  Default Limit  Max Limit/Request Ratio
-----                   --------  ---  ---   ---------------  -------------  -----------------------
-Pod                    cpu       50m  1     -                -              -
-Pod                    memory    5Mi  1Gi   -                -              -
-Container              cpu       50m  1     100m             200m           -
-Container              memory    5Mi  1Gi   10Mi             100Mi          -
-PersistentVolumeClaim  storage   1Gi  10Gi  -                -              -
-```
-
-Being the limit range specific of single resources, there is no aggregate to count.
-
-Having access to resource quotas and limits, Alice still doesn't have permissions to change or delete the resources according to the assigned RBAC profile.
-
-```
-alice@caas# kubectl -n oil-production auth can-i patch resourcequota
+kubectl -n oil-production auth can-i patch resourcequota
 no - no RBAC policy matched
 
-alice@caas# kubectl -n oil-production auth can-i patch limitranges
+kubectl -n oil-production auth can-i patch limitranges
 no - no RBAC policy matched
 ```
 
 # What’s next
 
-See how Bill, the cluster admin, can enforce the PriorityClass of Pods running of Alice's tenant Namespaces. [Enforce Pod Priority Classes](./pod-priority-class.md)
+See how Bill, the cluster admin, can enforce the PriorityClass of Pods running of Alice's tenant namespaces. [Enforce Pod Priority Classes](./pod-priority-class.md)

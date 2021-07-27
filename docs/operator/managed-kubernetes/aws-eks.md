@@ -1,7 +1,6 @@
-# Capsule with Amazon EKS
-
-This is an example how to install Amazon EKS cluster and one user
-manged by capsule.
+# Capsule on AWS EKS
+This is an example how to install AWS EKS cluster and one user
+manged by Capsule.
 
 It is based on [Using IAM Groups to manage Kubernetes access](https://www.eksworkshop.com/beginner/091_iam-groups/intro/)
 
@@ -115,7 +114,7 @@ EOF
 
 ----
 
-Export "admin" kubeconfig to be able to install capsule:
+Export "admin" kubeconfig to be able to install Capsule:
 
 ```bash
 export KUBECONFIG=kubeconfig.conf
@@ -131,7 +130,7 @@ helm upgrade --install --version 0.0.19 --namespace capsule-system --create-name
 Use the default Tenant example:
 
 ```bash
-kubectl apply -f https://raw.githubusercontent.com/clastix/capsule/master/config/samples/capsule_v1alpha1_tenant.yaml
+kubectl apply -f https://raw.githubusercontent.com/clastix/capsule/master/config/samples/capsule_v1beta1_tenant.yaml
 ```
 
 Based on the tenant configuration above the user `alice` should be able

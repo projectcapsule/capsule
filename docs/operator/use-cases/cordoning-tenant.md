@@ -12,7 +12,7 @@ With this said, the Tenant Owner and the related Service Account living into man
 This is possible just labelling the Tenant as follows:
 
 ```shell
-$ kubectl label tenant oil capsule.clastix.io/cordon=enabled
+kubectl label tenant oil capsule.clastix.io/cordon=enabled
 tenant oil labeled
 ```
 
@@ -36,8 +36,17 @@ $ kubectl --as alice --as-group capsule.clastix.io -n oil-dev create deployment 
 deployment.apps/nginx created
 ```
 
+Status of cordoning is also reported in the `state` of the tenant:
+
+```shell
+kubectl get tenants
+NAME     STATE    NAMESPACE QUOTA   NAMESPACE COUNT   NODE SELECTOR    AGE
+bronze   Active                     2                                  3d13h
+gold     Active                     2                                  3d13h
+oil      Cordoned                   4                                  2d11h
+silver   Active                     2                                  3d13h
+```
+
 # What’s next
 
-This end our tour in Capsule use cases.
-As we improve Capsule, more use cases about multi-tenancy, policy admission control, and cluster governance will be covered in the future.
-Stay tuned!
+See how Bill, the cluster admin, can prevent creating services with specific service types. [Disabling Service Types](./service-type.md).

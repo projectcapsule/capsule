@@ -4,72 +4,49 @@ An Ingress Controller is used in Kubernetes to publish services and applications
 Bill can assign a set of dedicated Ingress Classes to the `oil` tenant to force the applications in the `oil` tenant to be published only by the assigned Ingress Controller: 
 
 ```yaml
-apiVersion: capsule.clastix.io/v1alpha1
+kubectl apply -f - << EOF
+apiVersion: capsule.clastix.io/v1beta1
 kind: Tenant
 metadata:
   name: oil
 spec:
-  owner:
-    name: alice
+  owners:
+  - name: alice
     kind: User
-  ingressClasses:
-     allowed:
-     - oil
-  ...
+  ingressOptions:
+    allowedClasses:
+      allowed:
+      - default
+      allowedRegex: ^\w+-lb$
+EOF
 ```
 
-It is also possible to use regular expression for assigning Ingress Classes:
+Capsule assures that all Ingresses created in the tenant can use only one of the valid Ingress Classes.
+
+Alice can create an Ingress using only an allowed Ingress Class:
 
 ```yaml
-apiVersion: capsule.clastix.io/v1alpha1
-kind: Tenant
-metadata:
-  name: oil
-spec:
-  owner:
-    name: alice
-    kind: User
-  ingressClasses:
-     allowedRegex: "^oil-.*$"
-  ...
-```
-
-The Capsule controller assures that all Ingresses created in the tenant can use only one of the valid Ingress Classes. Alice, as tenant owner, gets the list of valid Ingress Classes by checking any of her namespaces:
-
-```
-alice@caas# kubectl describe ns oil-production
-Name:         oil-production
-Labels:       capsule.clastix.io/tenant=oil
-Annotations:  capsule.clastix.io/ingress-classes: oil
-              capsule.clastix.io/ingress-classes-regexp: ^oil-.*$
-...
-```
-
-Alice creates an Ingress using a valid Ingress Class in the annotation:
-
-```yaml
+kubectl -n oil-production apply -f - << EOF
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: nginx
   namespace: oil-production
   annotations:
-    kubernetes.io/ingress.class: oil
+    kubernetes.io/ingress.class: default
 spec:
   rules:
-  - host: web.oil-inc.com
+  - host: oil.acmecorp.com
     http:
       paths:
       - backend:
           serviceName: nginx
           servicePort: 80
         path: /
+EOF
 ```
 
-Any attempt of Alice to use a non valid Ingress Class, e.g. `default`, will fail.
-
-> The effect of this policy is that the services created in the tenant will be published
-> only on the Ingress Controller designated by Bill to accept one of the allowed Ingress Classes.
+Any attempt of Alice to use a non valid Ingress Class, or missing it, is denied by the Validation Webhook enforcing it.
 
 # What’s next
 See how Bill, the cluster admin, can assign a set of dedicated ingress hostnames to Alice's tenant. [Assign Ingress Hostnames](./ingress-hostnames.md).

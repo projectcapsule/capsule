@@ -1,645 +1,184 @@
 # Reference
 
 * [Custom Resource Definition](#customer-resource-definition)
-  * [Metadata](#metadata)
-    * [name](#name)
-  * [Spec](#spec)
-    * [owner](#owner)
-    * [nodeSelector](#nodeSelector)
-    * [namespaceQuota](#namespaceQuota)
-    * [namespacesMetadata](#namespacesMetadata)
-    * [servicesMetadata](#servicesMetadata)
-    * [ingressClasses](#ingressClasses)
-    * [ingressHostnames](#ingressHostnames)
-    * [storageClasses](#storageClasses)
-    * [containerRegistries](#containerRegistries)
-    * [additionalRoleBindings](#additionalRoleBindings)
-    * [resourceQuotas](#resourceQuotas)
-    * [limitRanges](#limitRanges)
-    * [networkPolicies](#networkPolicies)
-    * [externalServiceIPs](#externalServiceIPs)
-  * [Status](#status)
-    * [size](#size)
-    * [namespaces](#namespaces)
-* [Role Based Access Control](#role-based-access-control)
+* [Capsule Configuration](#capsule-configuration)
+* [Capsule Permissions](#capsule-permissions)
 * [Admission Controllers](#admission-controller)
 * [Command Options](#command-options)
 * [Created Resources](#created-resources)
 
-
 ## Custom Resource Definition
-Capsule operator uses a single Custom Resources Definition (CRD) for _Tenants_. Please, see the [Tenant Custom Resource Definition](https://github.com/clastix/capsule/blob/master/config/crd/bases/capsule.clastix.io_tenants.yaml). In Caspule, Tenants are cluster wide resources. You need for cluster level permissions to work with tenants.
 
-### Metadata
-#### name
-Metadata `name` can contain any valid symbol from the regex: `[a-z0-9]([-a-z0-9]*[a-z0-9])?`.
+Capsule operator uses a Custom Resources Definition (CRD) for _Tenants_. In Caspule, Tenants are cluster wide resources. You need for cluster level permissions to work with tenants.
 
-### Spec
-#### owner
-The field `owner` is the only mandatory spec in a _Tenant_ manifest. It specifies the ownership of the tenant:
+You can learn about tenant CRD by the `kubectl explain` command:
+
+```command
+kubectl explain tenant
+
+KIND:     Tenant
+VERSION:  capsule.clastix.io/v1beta1
+
+DESCRIPTION:
+     Tenant is the Schema for the tenants API
+
+FIELDS:
+   apiVersion   <string>
+     APIVersion defines the versioned schema of this representation of an
+     object. Servers should convert recognized schemas to the latest internal
+     value, and may reject unrecognized values. More info:
+     https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+
+   kind <string>
+     Kind is a string value representing the REST resource this object
+     represents. Servers may infer this from the endpoint the client submits
+     requests to. Cannot be updated. In CamelCase. More info:
+     https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+
+   metadata     <Object>
+     Standard object's metadata. More info:
+     https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+
+   spec <Object>
+     TenantSpec defines the desired state of Tenant
+
+   status       <Object>
+     Returns the observed state of the Tenant
+```
+
+For Tenant spec:
+
+```command
+kubectl explain tenant.spec
+
+KIND:     Tenant
+VERSION:  capsule.clastix.io/v1beta1
+
+RESOURCE: spec <Object>
+
+DESCRIPTION:
+     TenantSpec defines the desired state of Tenant
+
+FIELDS:
+   additionalRoleBindings       <[]Object>
+     Specifies additional RoleBindings assigned to the Tenant. Capsule will
+     ensure that all namespaces in the Tenant always contain the RoleBinding for
+     the given ClusterRole. Optional.
+
+   containerRegistries  <Object>
+     Specifies the trusted Image Registries assigned to the Tenant. Capsule
+     assures that all Pods resources created in the Tenant can use only one of
+     the allowed trusted registries. Optional.
+
+   imagePullPolicies    <[]string>
+     Specify the allowed values for the imagePullPolicies option in Pod
+     resources. Capsule assures that all Pod resources created in the Tenant can
+     use only one of the allowed policy. Optional.
+
+   ingressOptions       <Object>
+     Specifies options for the Ingress resources, such as allowed hostnames and
+     IngressClass. Optional.
+
+   limitRanges  <Object>
+     Specifies the NetworkPolicies assigned to the Tenant. The assigned
+     NetworkPolicies are inherited by any namespace created in the Tenant.
+     Optional.
+
+   namespaceOptions     <Object>
+     Specifies options for the Namespaces, such as additional metadata or
+     maximum number of namespaces allowed for that Tenant. Once the namespace
+     quota assigned to the Tenant has been reached, the Tenant owner cannot
+     create further namespaces. Optional.
+
+   networkPolicies      <Object>
+     Specifies the NetworkPolicies assigned to the Tenant. The assigned
+     NetworkPolicies are inherited by any namespace created in the Tenant.
+     Optional.
+
+   nodeSelector <map[string]string>
+     Specifies the label to control the placement of pods on a given pool of
+     worker nodes. All namesapces created within the Tenant will have the node
+     selector annotation. This annotation tells the Kubernetes scheduler to
+     place pods on the nodes having the selector label. Optional.
+
+   owners       <[]Object> -required-
+     Specifies the owners of the Tenant. Mandatory.
+
+   priorityClasses      <Object>
+     Specifies the allowed priorityClasses assigned to the Tenant. Capsule
+     assures that all pods created in the Tenant can use only one
+     of the allowed priorityClasses. Optional.
+
+   resourceQuotas       <Object>
+     Specifies a list of ResourceQuota resources assigned to the Tenant. The
+     assigned values are inherited by any namespace created in the Tenant. The
+     Capsule operator aggregates ResourceQuota at Tenant level, so that the hard
+     quota is never crossed for the given Tenant. This permits the Tenant owner
+     to consume resources in the Tenant regardless of the namespace. Optional.
+
+   serviceOptions       <Object>
+     Specifies options for the Service, such as additional metadata or block of
+     certain type of Services. Optional.
+
+   storageClasses       <Object>
+     Specifies the allowed StorageClasses assigned to the Tenant. Capsule
+     assures that all PersistentVolumeClaim resources created in the Tenant can
+     use only one of the allowed StorageClasses. Optional.
+```
+
+and Tenant status:
+
+```command
+kubectl explain tenant.status
+KIND:     Tenant
+VERSION:  capsule.clastix.io/v1beta1
+
+RESOURCE: status <Object>
+
+DESCRIPTION:
+     Returns the observed state of the Tenant
+
+FIELDS:
+   namespaces   <[]string>
+     List of namespaces assigned to the Tenant.
+
+   size <integer> -required-
+     How many namespaces are assigned to the Tenant.
+
+   state        <string> -required-
+     The operational state of the Tenant. Possible values are "Active",
+     "Cordoned".
+```
+
+## Capsule Configuration
+
+The Capsule configuration can be piloted by a Custom Resource definition named `CapsuleConfiguration`.
 
 ```yaml
 apiVersion: capsule.clastix.io/v1alpha1
-kind: Tenant
+kind: CapsuleConfiguration
 metadata:
-  name: tenant
+  name: default
 spec:
-  owner: # required
-    name: <name>
-    kind: <User|Group>
+  userGroups: ["capsule.clastix.io"]
+  forceTenantPrefix: false
+  protectedNamespaceRegex: ""
 ```
 
-The user and group names should be valid identities. Capsule does not care about the authentication strategy used in the cluster and all the Kubernetes methods of [Authentication](https://kubernetes.io/docs/reference/access-authn-authz/authentication/) are supported. The only requirement to use Capsule is to assign tenant users to the the group defined by `--capsule-user-group` option, which defaults to `capsule.clastix.io`.
-
-Assignment to a group depends on the used authentication strategy.
-
-For example, if you are using `capsule.clastix.io`, users authenticated through a _X.509_ certificate must have `capsule.clastix.io` as _Organization_: `-subj "/CN=${USER}/O=capsule.clastix.io"`
-
-Users authenticated through an _OIDC token_ must have
-
-```json
-...
-"users_groups": [
-    "capsule.clastix.io",
-    "other_group"
-]
-```
-
-Permissions are controlled by RBAC.
-
-#### nodeSelector
-Field `nodeSelector` specifies the label to control the placement of pods on a given pool of worker nodes:
-
-```yaml
-apiVersion: capsule.clastix.io/v1alpha1
-kind: Tenant
-metadata:
-  name: tenant
-spec:
-  nodeSelector:
-    <key>: <value>
-```
-
-All namesapces created within the tenant will have the annotation:
-
-```yaml
-kind: Namespace
-apiVersion: v1
-metadata:
-  annotations:
-    scheduler.alpha.kubernetes.io/node-selector: 'key=value'
-```
-
-This annotation tells the Kubernetes scheduler to place pods on the nodes having that label:
-
-```yaml
-kind: Pod
-apiVersion: v1
-metadata:
-  name: sample
-spec:
-  nodeSelector:
-    <key>: <value>
-```
-
-> NB:
-> While Capsule just enforces the annotation `scheduler.alpha.kubernetes.io/node-selector` at namespace level,
-> the `nodeSelector` field in the pod template is under the control of the default _PodNodeSelector_ enabled
-> on the Kubernetes API server using the flag `--enable-admission-plugins=PodNodeSelector`.
-
-Please, see how to [Assigning Pods to Nodes](https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/) documentation.
-
-The tenant owner is not allowed to change or remove the annotation above from the namespace.
-
-#### namespaceQuota
-Field `namespaceQuota` specifies the maximum number of namespaces allowed for that tenant.
-
-```yaml
-apiVersion: capsule.clastix.io/v1alpha1
-kind: Tenant
-metadata:
-  name: tenant
-spec:
-  namespaceQuota: <quota>
-```
-Once the namespace quota assigned to the tenant has been reached, yhe tenant owner cannot create further namespaces.
-
-#### namespacesMetadata
-Field `namespacesMetadata` specifies additional labels and annotations the Capsule operator places on any _Namespace_ in the tenant.
-
-```yaml
-apiVersion: capsule.clastix.io/v1alpha1
-kind: Tenant
-metadata:
-  name: tenant
-spec:
-  namespacesMetadata:
-    additionalAnnotations:
-      <annotations>
-    additionalLabels:
-      <key>: <value>
-```
-
-Al namespaces in the tenant will have:
-
-```yaml
-kind: Namespace
-apiVersion: v1
-metadata:
-  annotations:
-    <annotations>
-  labels:
-    <key>: <value>
-```
-
-The tenant owner is not allowed to change or remove such labels and annotations from the namespace.
-
-#### servicesMetadata
-Field `servicesMetadata` specifies additional labels and annotations the Capsule operator places on any _Service_ in the tenant.
-
-```yaml
-apiVersion: capsule.clastix.io/v1alpha1
-kind: Tenant
-metadata:
-  name: tenant
-spec:
-  servicesMetadata:
-    additionalAnnotations:
-      <annotations>
-    additionalLabels:
-      <key>: <value>
-```
-
-Al services in the tenant will have:
-
-```yaml
-kind: Service
-apiVersion: v1
-metadata:
-  annotations:
-    <annotations>
-  labels:
-    <key>: <value>
-```
-
-The tenant owner is not allowed to change or remove such labels and annotations from the _Service_.
-
-#### ingressClasses
-Field `ingressClasses` specifies the _IngressClass_ assigned to the tenant.
-
-```yaml
-apiVersion: capsule.clastix.io/v1alpha1
-kind: Tenant
-metadata:
-  name: tenant
-spec:
-  ingressClasses:
-    allowed:
-    - <class>
-    allowedRegex: <regex>
-```
-
-Capsule assures that all the _Ingress_ resources created in the tenant can use only one of the allowed _IngressClass_.
-
-```yaml
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: <name>
-  namespace:
-  annotations:
-    kubernetes.io/ingress.class: <class>
-```
-
-> NB: _Ingress_ resources are supported in both the versions, `networking.k8s.io/v1beta1` and `networking.k8s.io/v1`.
-
-Allowed _IngressClasses_ are reported into namespaces as annotations, so the tenant owner can check them
-
-```yaml
-kind: Namespace
-apiVersion: v1
-metadata:
-  annotations:
-    capsule.clastix.io/ingress-classes: <class>
-    capsule.clastix.io/ingress-classes-regexp: <regex>
-```
-Any tentative of tenant owner to use a not allowed _IngressClass_ will fail.
-
-#### ingressHostnames
-Field `ingressHostnames` specifies the allowed hostnames in _Ingresses_ for the given tenant.
-
-```yaml
-apiVersion: capsule.clastix.io/v1alpha1
-kind: Tenant
-metadata:
-  name: tenant
-spec:
-  ingressHostnames:
-     allowed:
-     - <hostname>
-     allowedRegex: <regex>
-```
-
-Capsule assures that all _Ingress_ resources created in the tenant can use only one of the allowed hostnames.
-
-```yaml
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: <name>
-  namespace:
-  annotations:
-spec:
-  rules:
-  - host: <hostname>
-    http: {}
-```
-
-> NB: _Ingress_ resources are supported in both the versions, `networking.k8s.io/v1beta1` and `networking.k8s.io/v1`.
-
-Any tentative of tenant owner to use one of not allowed hostnames will fail.
-
-#### storageClasses
-Field `storageClasses` specifies the _StorageClasses_ assigned to the tenant.
-
-```yaml
-apiVersion: capsule.clastix.io/v1alpha1
-kind: Tenant
-metadata:
-  name: tenant
-spec:
-  storageClasses:
-    allowed:
-    - <class>
-    allowedRegex: <regex>
-```
-
-Capsule assures that all _PersistentVolumeClaim_ resources created in the tenant can use only one of the allowed _StorageClasses_.
-
-```yaml
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: <name>
-  namespace:
-spec:
-  storageClassName: <class>
-```
-
-Allowed _StorageClasses_ are reported into namespaces as annotations, so the tenant owner can check them
-
-```yaml
-kind: Namespace
-apiVersion: v1
-metadata:
-  annotations:
-    capsule.clastix.io/storage-classes: <class>
-    capsule.clastix.io/storage-classes-regexp: <regex>
-```
-
-Any tentative of tenant owner to use a not allowed _StorageClass_ will fail.
-
-#### containerRegistries
-Field `containerRegistries` specifies the ttrusted image registries assigned to the tenant.
-
-```yaml
-apiVersion: capsule.clastix.io/v1alpha1
-kind: Tenant
-metadata:
-  name: tenant
-spec:
-  containerRegistries:
-     allowed:
-     - <registry>
-     allowedRegex: <regex>
-```
-
-Capsule assures that all _Pods_ resources created in the tenant can use only one of the allowed trusted registries.
-
-Allowed registries are reported into namespaces as annotations, so the tenant owner can check them
-
-```yaml
-kind: Namespace
-apiVersion: v1
-metadata:
-  annotations:
-    capsule.clastix.io/allowed-registries-regexp: <regex>
-    capsule.clastix.io/registries: <registry>
-```
-
-Any tentative of tenant owner to use a not allowed registry will fail.
-
-> NB:
-> In case of naked and official images hosted on Docker Hub, Capsule is going
-> to retrieve the registry even if it's not explicit: a `busybox:latest` Pod
-> running on a Tenant allowing `docker.io` will not blocked, even if the image
-> field is not explicit as `docker.io/busybox:latest`.
-
-#### additionalRoleBindings
-Field `additionalRoleBindings` specifies additional _RoleBindings_ assigned to the tenant.
-
-```yaml
-apiVersion: capsule.clastix.io/v1alpha1
-kind: Tenant
-metadata:
-  name: tenant
-spec:
-  additionalRoleBindings:
-  - clusterRoleName: <ClusterRole>
-    subjects:
-    - kind: <Group|User|ServiceAccount>
-      apiGroup: rbac.authorization.k8s.io
-      name: <name>
-```
-
-Capsule will ensure that all namespaces in the tenant always contain the _RoleBinding_ for the given _ClusterRole_.
-
-#### resourceQuotas
-Field `resourceQuotas` specifies a list of _ResourceQuota_ resources assigned to the tenant.
-
-```yaml
-apiVersion: capsule.clastix.io/v1alpha1
-kind: Tenant
-metadata:
-  name: tenant
-spec:
-  resourceQuotas:
-  - hard:
-      limits.cpu: <hard_value>
-      limits.memory: <hard_value>
-      requests.cpu: <hard_value>
-      requests.memory: <hard_value>
-```
-
-Please, refer to [ResourceQuota](https://kubernetes.io/docs/concepts/policy/resource-quotas/) documentation for the subject.
-
-The assigned quota are inherited by any namespace created in the tenant
-
-```yaml
-kind: ResourceQuota
-apiVersion: v1
-metadata:
-  name: compute
-  namespace:
-  labels:
-    capsule.clastix.io/resource-quota=0
-    capsule.clastix.io/tenant=tenant  
-  annotations:
-    # used resources in the tenant
-    quota.capsule.clastix.io/used-limits.cpu=<tenant_used_value>       
-    quota.capsule.clastix.io/used-limits.memory=<tenant_used_value>
-    quota.capsule.clastix.io/used-requests.cpu=<tenant_used_value>
-    quota.capsule.clastix.io/used-requests.memory=<tenant_used_value>
-    # hard quota for the tenant
-    quota.capsule.clastix.io/hard-limits.cpu=<tenant_hard_value>       
-    quota.capsule.clastix.io/hard-limits.memory=<tenant_hard_value>
-    quota.capsule.clastix.io/hard-requests.cpu=<tenant_hard_value>
-    quota.capsule.clastix.io/hard-requests.memory=<tenant_hard_value>
-spec:
-  hard:
-    limits.cpu: <hard_value>
-    limits.memory: <hard_value>
-    requests.cpu: <hard_value>
-    requests.memory: <hard_value>
-status:
-  hard:
-    limits.cpu: <namespace_hard_value>
-    limits.memory: <namespace_hard_value>
-    requests.cpu: <namespace_hard_value>
-    requests.memory: <namespace_hard_value>
-  used:
-    limits.cpu: <namespace_used_value>
-    limits.memory: <namespace_used_value>
-    requests.cpu: <namespace_used_value>
-    requests.memory: <namespace_used_value>
-```
-
-The Capsule operator aggregates _ResourceQuota_ at tenant level, so that the hard quota is never crossed for the given tenant. This permits the tenant owner to consume resources in the tenant regardless of the namespace.
-
-The annotations
-
-```yaml
-quota.capsule.clastix.io/used-<resource>=<tenant_used_value>
-quota.capsule.clastix.io/hard-<resource>=<tenant_hard_value>
-```
-
-are updated in realtime by Capsule, according to the actual aggredated usage of resource in the tenant.
-
-> NB:
-> While Capsule controls quota at tenant level, at namespace level the quota enforcement
-> is under the control of the default _ResourceQuota Admission Controller_ enabled on the
-> Kubernetes API server using the flag `--enable-admission-plugins=ResourceQuota`.
-
-The tenant owner is not allowed to change or remove the _ResourceQuota_ from the namespace.
-
-#### limitRanges
-Field `limitRanges` specifies the _LimitRanges_ assigned to the tenant.
-
-```yaml
-apiVersion: capsule.clastix.io/v1alpha1
-kind: Tenant
-metadata:
-  name: tenant
-spec:
-  limitRanges:
-  - limits:
-    - type: Pod
-      max:
-        cpu: <value>
-        memory: <value>
-      min:
-        cpu: <value>
-        memory: <value> 
-    - type: Container
-      default:
-        cpu: <value>
-        memory: <value>
-      defaultRequest:
-        cpu: <value>
-        memory: <value>
-      max:
-        cpu: <value>
-        memory: <value>
-      min:
-        cpu: <value>
-        memory: <value>          
-    - type: PersistentVolumeClaim
-      max:
-        storage: <value>
-      min:
-        storage: <value>    
-```
-
-Please, refer to [LimitRange](https://kubernetes.io/docs/concepts/policy/limit-range/) documentation for the subject.
-
-The assigned _LimitRanges_ are inherited by any namespace created in the tenant
-
-```yaml
-kind: LimitRange
-apiVersion: v1
-metadata:
-  name: <name>
-  namespace:
-spec:
-  limits:
-  - type: Pod
-    max:
-      cpu: <value>
-      memory: <value>
-    min:
-      cpu: <value>
-      memory: <value> 
-  - type: Container
-    default:
-      cpu: <value>
-      memory: <value>
-    defaultRequest:
-      cpu: <value>
-      memory: <value>
-    max:
-      cpu: <value>
-      memory: <value>
-    min:
-      cpu: <value>
-      memory: <value>          
-  - type: PersistentVolumeClaim
-    max:
-      storage: <value>
-    min:
-      storage: <value>  
-```
-
-> NB:
-> Limit ranges enforcement for a single pod, container, and persistent volume
-> claim is done by the default _LimitRanger Admission Controller_ enabled on
-> the Kubernetes API server: using the flag
-> `--enable-admission-plugins=LimitRanger`.
-
-Being the limit range specific of single resources, there is no aggregate to count.
-
-The tenant owner is not allowed to change or remove _LimitRanges_ from the namespace.
-
-#### networkPolicies
-Field `networkPolicies` specifies the _NetworkPolicies_ assigned to the tenant.
-
-```yaml
-apiVersion: capsule.clastix.io/v1alpha1
-kind: Tenant
-metadata:
-  name: tenant
-spec:
-  networkPolicies:
-  - policyTypes:
-    - Ingress
-    - Egress
-    egress:
-    - to:
-      - ipBlock:
-          cidr: <value>
-    ingress:
-    - from:
-      - namespaceSelector: {}
-      - podSelector: {}
-      - ipBlock:
-          cidr: <value>
-    podSelector: {}
-```
-
-Please, refer to [NetworkPolicies](https://kubernetes.io/docs/concepts/services-networking/network-policies/) documentation for the subjects of a _NetworkPolicy_.
-
-The assigned _NetworkPolicies_ are inherited by any namespace created in the tenant.
-
-```yaml
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: <name>
-  namespace:
-spec:
-  podSelector: {}
-  ingress:
-  - from:
-    - namespaceSelector: {}
-    - podSelector: {}
-    - ipBlock:
-        cidr: <value>
-  egress:
-  - to:
-    - ipBlock:
-        cidr: <value>
-  policyTypes:
-  - Ingress
-  - Egress
-```
-
-The tenant owner can create, patch and delete additional _NetworkPolicy_ to refine the assigned one. However, the tenant owner cannot delete the _NetworkPolicies_ set at tenant level.
-
-#### externalServiceIPs
-Field `externalServiceIPs` specifies the external IPs that can be used in _Services_ with type `ClusterIP`.
-
-```yaml
-apiVersion: capsule.clastix.io/v1alpha1
-kind: Tenant
-metadata:
-  name: tenant
-spec:
-  externalServiceIPs:
-    allowed:
-    - <cidr>
-```
-
-Capsule will ensure that all _Services_ in the tenant can contain only the allowed external IPs. This mitigate the [_CVE-2020-8554_] vulnerability where a potential attacker, able to create a _Service_ with type `ClusterIP` and set the `externalIPs` field, can intercept traffic to that IP. Leave only the allowed CIDRs list to be set as `externalIPs` field in a _Service_ with type `ClusterIP`.
-
-To prevent users to set the `externalIPs` field, use an empty allowed list:
-
-```yaml
-apiVersion: capsule.clastix.io/v1alpha1
-kind: Tenant
-metadata:
-  name: tenant
-spec:
-  externalServiceIPs:
-    allowed: []
-```
-
-> NB: Missing of this controller, it exposes your cluster to the vulnerability [_CVE-2020-8554_].
-
-### Status
-#### size
-Status field `size` reports the number of namespaces belonging to the tenant. It is reported as `NAMESPACE COUNT` in the `kubectl` output:
-
-```
-$ kubectl get tnt
-NAME      NAMESPACE QUOTA   NAMESPACE COUNT   OWNER NAME   OWNER KIND   NODE SELECTOR     AGE
-cap       9                 1                 joe          User         {"pool":"cmp"}    5d4h
-gas       6                 2                 alice        User         {"node":"worker"} 5d4h
-oil       9                 3                 alice        User         {"pool":"cmp"}    5d4h
-sample    9                 0                 alice        User         {"key":"value"}   29h
-```
-
-#### namespaces
-Status field `namespaces` reports the list of all namespaces belonging to the tenant.
-
-```yaml
-...
-apiVersion: capsule.clastix.io/v1alpha1
-kind: Tenant
-metadata:
-  name: tenant
-spec:
-...
-status:
-  namespaces: 
-    oil-development
-    oil-production
-    oil-marketing
-  size: 3
-```
-
-## Role Based Access Control
-In the current implementation, the Capsule operator requires cluster admin permissions to fully operate.
+Option | Description | Default
+--- | --- | ---
+`.spec.forceTenantPrefix` | Force the tenant name as prefix for namespaces: `<tenant_name>-<namespace>`.  | `false`
+`.spec.userGroups` | Array of Capsule groups to which all tenant owners must belong. | `[capsule.clastix.io]`
+`.spec.protectedNamespaceRegex` | Disallows creation of namespaces matching the passed regexp. | `null`
+
+Upon installation using Kustomize or Helm, a `capsule-default` resource will be created.
+The reference to this configuration is managed by the CLI flag `--configuration-name`.  
+
+## Capsule Permissions
+In the current implementation, the Capsule operator requires cluster admin permissions to fully operate. Make sure you deploy Capsule having access to the default `cluster-admin` ClusterRole.
 
 ## Admission Controllers
+
 Capsule implements Kubernetes multi-tenancy capabilities using a minimum set of standard [Admission Controllers](https://kubernetes.io/docs/reference/access-authn-authz/admission-controllers/) enabled on the Kubernetes APIs server.
 
 Here the list of required Admission Controllers you have to enable to get full support from Capsule:
@@ -665,6 +204,7 @@ capsule-mutating-webhook-configuration     1          2h
 ```
 
 ## Command Options
+
 The Capsule operator provides following command options:
 
 Option | Description | Default
@@ -673,7 +213,7 @@ Option | Description | Default
 `--enable-leader-election` | Start a leader election client and gain leadership before executing the main loop. | `true`
 `--zap-log-level` | The log verbosity with a value from 1 to 10 or the basic keywords.  | `4`
 `--zap-devel` | The flag to get the stack traces for deep debugging.  | `null`
-`--configuration-name` | The Capsule Configuration CRD name, a default is installed automatically | `default`
+`--configuration-name` | The Capsule Configuration CRD name, a default is installed automatically | `capsule-default`
 
 ## Capsule Configuration
 
@@ -699,14 +239,19 @@ Option | Description | Default
 Upon installation using Kustomize or Helm, a `default` resource will be created.
 The reference to this configuration is managed by the CLI flag `--configuration-name`. 
 
+>>>>>>> 0f3f6da... docs: updates structure for documentation
+
 ## Created Resources
 Once installed, the Capsule operator creates the following resources in your cluster:
 
 ```
 NAMESPACE       RESOURCE
+                namespace/capsule-system
                 customresourcedefinition.apiextensions.k8s.io/tenants.capsule.clastix.io
+                customresourcedefinition.apiextensions.k8s.io/capsuleconfigurations.capsule.clastix.io
                 clusterrole.rbac.authorization.k8s.io/capsule-proxy-role
                 clusterrole.rbac.authorization.k8s.io/capsule-metrics-reader
+                capsuleconfiguration.capsule.clastix.io/capsule-default
                 mutatingwebhookconfiguration.admissionregistration.k8s.io/capsule-mutating-webhook-configuration
                 validatingwebhookconfiguration.admissionregistration.k8s.io/capsule-validating-webhook-configuration
 capsule-system  clusterrolebinding.rbac.authorization.k8s.io/capsule-manager-rolebinding
