@@ -17,10 +17,8 @@ type TenantSpec struct {
 	ServiceOptions *ServiceOptions `json:"serviceOptions,omitempty"`
 	// Specifies the allowed StorageClasses assigned to the Tenant. Capsule assures that all PersistentVolumeClaim resources created in the Tenant can use only one of the allowed StorageClasses. Optional.
 	StorageClasses *AllowedListSpec `json:"storageClasses,omitempty"`
-	// Specifies the allowed IngressClasses assigned to the Tenant. Capsule assures that all Ingress resources created in the Tenant can use only one of the allowed IngressClasses. Optional.
-	IngressClasses *AllowedListSpec `json:"ingressClasses,omitempty"`
-	// Specifies the allowed hostnames in Ingresses for the given Tenant. Capsule assures that all Ingress resources created in the Tenant can use only one of the allowed hostnames. Optional.
-	IngressHostnames *AllowedListSpec `json:"ingressHostnames,omitempty"`
+	// Specifies options for the Ingress resources, such as allowed hostnames and IngressClass. Optional.
+	IngressOptions *IngressOptions `json:"ingressOptions,omitempty"`
 	// Specifies the trusted Image Registries assigned to the Tenant. Capsule assures that all Pods resources created in the Tenant can use only one of the allowed trusted registries. Optional.
 	ContainerRegistries *AllowedListSpec `json:"containerRegistries,omitempty"`
 	// Specifies the label to control the placement of pods on a given pool of worker nodes. All namesapces created within the Tenant will have the node selector annotation. This annotation tells the Kubernetes scheduler to place pods on the nodes having the selector label. Optional.
