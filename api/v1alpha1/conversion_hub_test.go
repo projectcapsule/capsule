@@ -229,11 +229,13 @@ func generateTenantsSpecs() (Tenant, capsulev1beta1.Tenant) {
 					},
 				},
 			},
-			NamespaceOptions:    v1beta1NamespaceOptions,
-			ServiceOptions:      v1beta1ServiceOptions,
-			StorageClasses:      v1beta1AllowedListSpec,
-			IngressClasses:      v1beta1AllowedListSpec,
-			IngressHostnames:    v1beta1AllowedListSpec,
+			NamespaceOptions: v1beta1NamespaceOptions,
+			ServiceOptions:   v1beta1ServiceOptions,
+			StorageClasses:   v1beta1AllowedListSpec,
+			IngressOptions: &capsulev1beta1.IngressOptions{
+				IngressClasses:   v1beta1AllowedListSpec,
+				IngressHostnames: v1beta1AllowedListSpec,
+			},
 			ContainerRegistries: v1beta1AllowedListSpec,
 			NodeSelector:        nodeSelector,
 			NetworkPolicies: &capsulev1beta1.NetworkPolicySpec{

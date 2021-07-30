@@ -64,12 +64,12 @@ func (r *Manager) syncNamespaceMetadata(namespace string, tnt *capsulev1beta1.Te
 				annotations["scheduler.alpha.kubernetes.io/node-selector"] = strings.Join(selector, ",")
 			}
 
-			if tnt.Spec.IngressClasses != nil {
-				if len(tnt.Spec.IngressClasses.Exact) > 0 {
-					annotations[capsulev1beta1.AvailableIngressClassesAnnotation] = strings.Join(tnt.Spec.IngressClasses.Exact, ",")
+			if tnt.Spec.IngressOptions != nil && tnt.Spec.IngressOptions.IngressClasses != nil {
+				if len(tnt.Spec.IngressOptions.IngressClasses.Exact) > 0 {
+					annotations[capsulev1beta1.AvailableIngressClassesAnnotation] = strings.Join(tnt.Spec.IngressOptions.IngressClasses.Exact, ",")
 				}
-				if len(tnt.Spec.IngressClasses.Regex) > 0 {
-					annotations[capsulev1beta1.AvailableIngressClassesRegexpAnnotation] = tnt.Spec.IngressClasses.Regex
+				if len(tnt.Spec.IngressOptions.IngressClasses.Regex) > 0 {
+					annotations[capsulev1beta1.AvailableIngressClassesRegexpAnnotation] = tnt.Spec.IngressOptions.IngressClasses.Regex
 				}
 			}
 

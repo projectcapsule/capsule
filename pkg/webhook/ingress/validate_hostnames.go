@@ -14,7 +14,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
-
 	"github.com/clastix/capsule/pkg/configuration"
 	capsulewebhook "github.com/clastix/capsule/pkg/webhook"
 	"github.com/clastix/capsule/pkg/webhook/utils"
@@ -105,7 +104,7 @@ func (r *hostnames) OnDelete(client.Client, *admission.Decoder, record.EventReco
 }
 
 func (r *hostnames) validateHostnames(tenant capsulev1beta1.Tenant, hostnames []string) error {
-	if tenant.Spec.IngressHostnames == nil {
+	if tenant.Spec.IngressOptions == nil || tenant.Spec.IngressOptions.IngressHostnames == nil {
 		return nil
 	}
 
@@ -114,7 +113,7 @@ func (r *hostnames) validateHostnames(tenant capsulev1beta1.Tenant, hostnames []
 	var invalidHostnames []string
 	if len(hostnames) > 0 {
 		for _, currentHostname := range hostnames {
-			isPresent := HostnamesList(tenant.Spec.IngressHostnames.Exact).IsStringInList(currentHostname)
+			isPresent := HostnamesList(tenant.Spec.IngressOptions.IngressHostnames.Exact).IsStringInList(currentHostname)
 			if !isPresent {
 				invalidHostnames = append(invalidHostnames, currentHostname)
 			}
@@ -125,10 +124,10 @@ func (r *hostnames) validateHostnames(tenant capsulev1beta1.Tenant, hostnames []
 	}
 
 	var notMatchingHostnames []string
-	allowedRegex := tenant.Spec.IngressHostnames.Regex
+	allowedRegex := tenant.Spec.IngressOptions.IngressHostnames.Regex
 	if len(allowedRegex) > 0 {
 		for _, currentHostname := range hostnames {
-			matched, _ = regexp.MatchString(tenant.Spec.IngressHostnames.Regex, currentHostname)
+			matched, _ = regexp.MatchString(allowedRegex, currentHostname)
 			if !matched {
 				notMatchingHostnames = append(notMatchingHostnames, currentHostname)
 			}
@@ -139,7 +138,7 @@ func (r *hostnames) validateHostnames(tenant capsulev1beta1.Tenant, hostnames []
 	}
 
 	if !valid && !matched {
-		return NewIngressHostnamesNotValid(invalidHostnames, notMatchingHostnames, *tenant.Spec.IngressHostnames)
+		return NewIngressHostnamesNotValid(invalidHostnames, notMatchingHostnames, *tenant.Spec.IngressOptions.IngressHostnames)
 	}
 
 	return nil

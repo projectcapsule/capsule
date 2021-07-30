@@ -33,8 +33,8 @@ func (h *hostnamesCollisionHandler) validateTenant(ctx context.Context, req admi
 		return utils.ErroredResponse(err)
 	}
 
-	if !h.configuration.AllowTenantIngressHostnamesCollision() && tenant.Spec.IngressHostnames != nil && len(tenant.Spec.IngressHostnames.Exact) > 0 {
-		for _, h := range tenant.Spec.IngressHostnames.Exact {
+	if !h.configuration.AllowTenantIngressHostnamesCollision() && tenant.Spec.IngressOptions != nil && tenant.Spec.IngressOptions.IngressHostnames != nil && len(tenant.Spec.IngressOptions.IngressHostnames.Exact) > 0 {
+		for _, h := range tenant.Spec.IngressOptions.IngressHostnames.Exact {
 			tntList := &capsulev1beta1.TenantList{}
 			if err := clt.List(ctx, tntList, client.MatchingFieldsSelector{
 				Selector: fields.OneTermEqualSelector(".spec.ingressHostnames", h),
