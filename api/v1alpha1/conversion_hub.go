@@ -174,7 +174,7 @@ func (t *Tenant) ConvertTo(dstRaw conversion.Hub) error {
 		if dst.Spec.IngressOptions == nil {
 			dst.Spec.IngressOptions = &capsulev1beta1.IngressOptions{}
 		}
-		dst.Spec.IngressOptions.IngressClasses = &capsulev1beta1.AllowedListSpec{
+		dst.Spec.IngressOptions.AllowedClasses = &capsulev1beta1.AllowedListSpec{
 			Exact: t.Spec.IngressClasses.Exact,
 			Regex: t.Spec.IngressClasses.Regex,
 		}
@@ -183,7 +183,7 @@ func (t *Tenant) ConvertTo(dstRaw conversion.Hub) error {
 		if dst.Spec.IngressOptions == nil {
 			dst.Spec.IngressOptions = &capsulev1beta1.IngressOptions{}
 		}
-		dst.Spec.IngressOptions.IngressHostnames = &capsulev1beta1.AllowedListSpec{
+		dst.Spec.IngressOptions.AllowedHostnames = &capsulev1beta1.AllowedListSpec{
 			Exact: t.Spec.IngressHostnames.Exact,
 			Regex: t.Spec.IngressHostnames.Regex,
 		}
@@ -459,16 +459,16 @@ func (t *Tenant) ConvertFrom(srcRaw conversion.Hub) error {
 			Regex: src.Spec.StorageClasses.Regex,
 		}
 	}
-	if src.Spec.IngressOptions != nil && src.Spec.IngressOptions.IngressClasses != nil {
+	if src.Spec.IngressOptions != nil && src.Spec.IngressOptions.AllowedClasses != nil {
 		t.Spec.IngressClasses = &AllowedListSpec{
-			Exact: src.Spec.IngressOptions.IngressClasses.Exact,
-			Regex: src.Spec.IngressOptions.IngressClasses.Regex,
+			Exact: src.Spec.IngressOptions.AllowedClasses.Exact,
+			Regex: src.Spec.IngressOptions.AllowedClasses.Regex,
 		}
 	}
-	if src.Spec.IngressOptions != nil && src.Spec.IngressOptions.IngressHostnames != nil {
+	if src.Spec.IngressOptions != nil && src.Spec.IngressOptions.AllowedHostnames != nil {
 		t.Spec.IngressHostnames = &AllowedListSpec{
-			Exact: src.Spec.IngressOptions.IngressHostnames.Exact,
-			Regex: src.Spec.IngressOptions.IngressHostnames.Regex,
+			Exact: src.Spec.IngressOptions.AllowedHostnames.Exact,
+			Regex: src.Spec.IngressOptions.AllowedHostnames.Regex,
 		}
 	}
 	if src.Spec.ContainerRegistries != nil {
