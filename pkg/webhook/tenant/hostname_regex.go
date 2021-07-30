@@ -30,8 +30,8 @@ func (h *hostnameRegexHandler) validate(decoder *admission.Decoder, req admissio
 		return utils.ErroredResponse(err)
 	}
 
-	if tenant.Spec.IngressOptions.IngressHostnames != nil && len(tenant.Spec.IngressOptions.IngressHostnames.Regex) > 0 {
-		if _, err := regexp.Compile(tenant.Spec.IngressOptions.IngressHostnames.Regex); err != nil {
+	if tenant.Spec.IngressOptions.AllowedHostnames != nil && len(tenant.Spec.IngressOptions.AllowedHostnames.Regex) > 0 {
+		if _, err := regexp.Compile(tenant.Spec.IngressOptions.AllowedHostnames.Regex); err != nil {
 			response := admission.Denied("unable to compile allowedHostnames allowedRegex")
 
 			return &response

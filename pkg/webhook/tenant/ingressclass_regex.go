@@ -30,8 +30,8 @@ func (h *ingressClassRegexHandler) validate(decoder *admission.Decoder, req admi
 		return utils.ErroredResponse(err)
 	}
 
-	if tenant.Spec.IngressOptions != nil && tenant.Spec.IngressOptions.IngressClasses != nil && len(tenant.Spec.IngressOptions.IngressClasses.Regex) > 0 {
-		if _, err := regexp.Compile(tenant.Spec.IngressOptions.IngressClasses.Regex); err != nil {
+	if tenant.Spec.IngressOptions != nil && tenant.Spec.IngressOptions.AllowedClasses != nil && len(tenant.Spec.IngressOptions.AllowedClasses.Regex) > 0 {
+		if _, err := regexp.Compile(tenant.Spec.IngressOptions.AllowedClasses.Regex); err != nil {
 			response := admission.Denied("unable to compile ingressClasses allowedRegex")
 
 			return &response

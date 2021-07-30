@@ -104,7 +104,7 @@ func (r *hostnames) OnDelete(client.Client, *admission.Decoder, record.EventReco
 }
 
 func (r *hostnames) validateHostnames(tenant capsulev1beta1.Tenant, hostnames []string) error {
-	if tenant.Spec.IngressOptions == nil || tenant.Spec.IngressOptions.IngressHostnames == nil {
+	if tenant.Spec.IngressOptions == nil || tenant.Spec.IngressOptions.AllowedHostnames == nil {
 		return nil
 	}
 
@@ -113,7 +113,7 @@ func (r *hostnames) validateHostnames(tenant capsulev1beta1.Tenant, hostnames []
 	var invalidHostnames []string
 	if len(hostnames) > 0 {
 		for _, currentHostname := range hostnames {
-			isPresent := HostnamesList(tenant.Spec.IngressOptions.IngressHostnames.Exact).IsStringInList(currentHostname)
+			isPresent := HostnamesList(tenant.Spec.IngressOptions.AllowedHostnames.Exact).IsStringInList(currentHostname)
 			if !isPresent {
 				invalidHostnames = append(invalidHostnames, currentHostname)
 			}
@@ -124,7 +124,7 @@ func (r *hostnames) validateHostnames(tenant capsulev1beta1.Tenant, hostnames []
 	}
 
 	var notMatchingHostnames []string
-	allowedRegex := tenant.Spec.IngressOptions.IngressHostnames.Regex
+	allowedRegex := tenant.Spec.IngressOptions.AllowedHostnames.Regex
 	if len(allowedRegex) > 0 {
 		for _, currentHostname := range hostnames {
 			matched, _ = regexp.MatchString(allowedRegex, currentHostname)
@@ -138,7 +138,7 @@ func (r *hostnames) validateHostnames(tenant capsulev1beta1.Tenant, hostnames []
 	}
 
 	if !valid && !matched {
-		return NewIngressHostnamesNotValid(invalidHostnames, notMatchingHostnames, *tenant.Spec.IngressOptions.IngressHostnames)
+		return NewIngressHostnamesNotValid(invalidHostnames, notMatchingHostnames, *tenant.Spec.IngressOptions.AllowedHostnames)
 	}
 
 	return nil

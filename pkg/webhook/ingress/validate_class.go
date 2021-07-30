@@ -111,23 +111,23 @@ func (r *class) OnDelete(client.Client, *admission.Decoder, record.EventRecorder
 }
 
 func (r *class) validateClass(tenant capsulev1beta1.Tenant, ingressClass *string) error {
-	if tenant.Spec.IngressOptions.IngressClasses == nil {
+	if tenant.Spec.IngressOptions.AllowedClasses == nil {
 		return nil
 	}
 
 	if ingressClass == nil {
-		return NewIngressClassNotValid(*tenant.Spec.IngressOptions.IngressClasses)
+		return NewIngressClassNotValid(*tenant.Spec.IngressOptions.AllowedClasses)
 	}
 
 	var valid, matched bool
 
-	if len(tenant.Spec.IngressOptions.IngressClasses.Exact) > 0 {
-		valid = tenant.Spec.IngressOptions.IngressClasses.ExactMatch(*ingressClass)
+	if len(tenant.Spec.IngressOptions.AllowedClasses.Exact) > 0 {
+		valid = tenant.Spec.IngressOptions.AllowedClasses.ExactMatch(*ingressClass)
 	}
-	matched = tenant.Spec.IngressOptions.IngressClasses.RegexMatch(*ingressClass)
+	matched = tenant.Spec.IngressOptions.AllowedClasses.RegexMatch(*ingressClass)
 
 	if !valid && !matched {
-		return NewIngressClassForbidden(*ingressClass, *tenant.Spec.IngressOptions.IngressClasses)
+		return NewIngressClassForbidden(*ingressClass, *tenant.Spec.IngressOptions.AllowedClasses)
 	}
 
 	return nil
