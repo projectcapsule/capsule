@@ -232,9 +232,10 @@ func generateTenantsSpecs() (Tenant, capsulev1beta1.Tenant) {
 			NamespaceOptions: v1beta1NamespaceOptions,
 			ServiceOptions:   v1beta1ServiceOptions,
 			StorageClasses:   v1beta1AllowedListSpec,
-			IngressOptions: &capsulev1beta1.IngressOptions{
-				AllowedClasses:   v1beta1AllowedListSpec,
-				AllowedHostnames: v1beta1AllowedListSpec,
+			IngressOptions: capsulev1beta1.IngressOptions{
+				HostnameCollisionScope: capsulev1beta1.HostnameCollisionScopeDisabled,
+				AllowedClasses:         v1beta1AllowedListSpec,
+				AllowedHostnames:       v1beta1AllowedListSpec,
 			},
 			ContainerRegistries: v1beta1AllowedListSpec,
 			NodeSelector:        nodeSelector,
@@ -299,6 +300,7 @@ func generateTenantsSpecs() (Tenant, capsulev1beta1.Tenant) {
 				enableIngressClassDeletionAnnotation: "alice,jack",
 				enablePriorityClassListingAnnotation: "jack",
 				resourceQuotaScopeAnnotation:         "Namespace",
+				ingressHostnameCollisionScope:        "Disabled",
 			},
 		},
 		Spec: TenantSpec{

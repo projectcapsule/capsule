@@ -22,6 +22,12 @@ func (o NamespacesReference) Field() string {
 
 func (o NamespacesReference) Func() client.IndexerFunc {
 	return func(object client.Object) []string {
-		return object.(*capsulev1beta1.Tenant).DeepCopy().Status.Namespaces
+		namespaces := object.(*capsulev1beta1.Tenant).DeepCopy().Status.Namespaces
+
+		if namespaces == nil {
+			return []string{}
+		}
+
+		return namespaces
 	}
 }

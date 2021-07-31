@@ -26,6 +26,7 @@ func Class(configuration configuration.Configuration) capsulewebhook.Handler {
 	return &class{configuration: configuration}
 }
 
+// nolint:dupl
 func (r *class) OnCreate(client client.Client, decoder *admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		ingress, err := ingressFromRequest(req, decoder)
@@ -66,6 +67,7 @@ func (r *class) OnCreate(client client.Client, decoder *admission.Decoder, recor
 	}
 }
 
+// nolint:dupl
 func (r *class) OnUpdate(client client.Client, decoder *admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		ingress, err := ingressFromRequest(req, decoder)
@@ -84,7 +86,9 @@ func (r *class) OnUpdate(client client.Client, decoder *admission.Decoder, recor
 			return nil
 		}
 
-		err = r.validateClass(*tenant, ingress.IngressClass())
+		if err = r.validateClass(*tenant, ingress.IngressClass()); err == nil {
+			return nil
+		}
 
 		var forbiddenErr *ingressClassForbidden
 

@@ -9,6 +9,7 @@ import (
 
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -41,11 +42,16 @@ func (r *hostnames) OnCreate(c client.Client, decoder *admission.Decoder, record
 			return utils.ErroredResponse(err)
 		}
 
-		if tenant == nil {
+		if tenant == nil || tenant.Spec.IngressOptions.AllowedHostnames == nil {
 			return nil
 		}
 
-		if err = r.validateHostnames(*tenant, ingress.Hostnames()); err == nil {
+		hostnameList := sets.NewString()
+		for hostname := range ingress.HostnamePathsPairs() {
+			hostnameList.Insert(hostname)
+		}
+
+		if err = r.validateHostnames(*tenant, hostnameList); err == nil {
 			return nil
 		}
 
@@ -81,7 +87,14 @@ func (r *hostnames) OnUpdate(c client.Client, decoder *admission.Decoder, record
 			return nil
 		}
 
-		err = r.validateHostnames(*tenant, ingress.Hostnames())
+		hostnameSet := sets.NewString()
+		for hostname := range ingress.HostnamePathsPairs() {
+			hostnameSet.Insert(hostname)
+		}
+
+		if err = r.validateHostnames(*tenant, hostnameSet); err == nil {
+			return nil
+		}
 
 		var hostnameNotValidErr *ingressHostnameNotValid
 
@@ -103,20 +116,19 @@ func (r *hostnames) OnDelete(client.Client, *admission.Decoder, record.EventReco
 	}
 }
 
-func (r *hostnames) validateHostnames(tenant capsulev1beta1.Tenant, hostnames []string) error {
-	if tenant.Spec.IngressOptions == nil || tenant.Spec.IngressOptions.AllowedHostnames == nil {
+func (r *hostnames) validateHostnames(tenant capsulev1beta1.Tenant, hostnames sets.String) error {
+	if tenant.Spec.IngressOptions.AllowedHostnames == nil {
 		return nil
 	}
 
 	var valid, matched bool
 
+	tenantHostnameSet := sets.NewString(tenant.Spec.IngressOptions.AllowedHostnames.Exact...)
+
 	var invalidHostnames []string
 	if len(hostnames) > 0 {
-		for _, currentHostname := range hostnames {
-			isPresent := HostnamesList(tenant.Spec.IngressOptions.AllowedHostnames.Exact).IsStringInList(currentHostname)
-			if !isPresent {
-				invalidHostnames = append(invalidHostnames, currentHostname)
-			}
+		if diff := hostnames.Difference(tenantHostnameSet); len(diff) > 0 {
+			invalidHostnames = append(invalidHostnames, diff.List()...)
 		}
 		if len(invalidHostnames) == 0 {
 			valid = true
@@ -126,7 +138,7 @@ func (r *hostnames) validateHostnames(tenant capsulev1beta1.Tenant, hostnames []
 	var notMatchingHostnames []string
 	allowedRegex := tenant.Spec.IngressOptions.AllowedHostnames.Regex
 	if len(allowedRegex) > 0 {
-		for _, currentHostname := range hostnames {
+		for currentHostname := range hostnames {
 			matched, _ = regexp.MatchString(allowedRegex, currentHostname)
 			if !matched {
 				notMatchingHostnames = append(notMatchingHostnames, currentHostname)
