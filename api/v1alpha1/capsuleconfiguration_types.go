@@ -18,15 +18,6 @@ type CapsuleConfigurationSpec struct {
 	ForceTenantPrefix bool `json:"forceTenantPrefix,omitempty"`
 	// Disallow creation of namespaces, whose name matches this regexp
 	ProtectedNamespaceRegexpString string `json:"protectedNamespaceRegex,omitempty"`
-	// When defining the exact match for allowed Ingress hostnames at Tenant level, a collision is not allowed.
-	// Toggling this, Capsule will not check if a hostname collision is in place, allowing the creation of
-	// two or more Tenant resources although sharing the same allowed hostname(s).
-	//
-	// The JSON path of the resource is: /spec/ingressHostnames/allowed
-	AllowTenantIngressHostnamesCollision bool `json:"allowTenantIngressHostnamesCollision,omitempty"`
-	// Allow the collision of Ingress resource hostnames across all the Tenants.
-	// +kubebuilder:default=true
-	AllowIngressHostnameCollision bool `json:"allowIngressHostnameCollision,omitempty"`
 }
 
 // +kubebuilder:object:root=true
