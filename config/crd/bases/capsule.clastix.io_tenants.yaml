@@ -663,24 +663,37 @@ spec:
                   - IfNotPresent
                   type: string
                 type: array
-              ingressClasses:
-                description: Specifies the allowed IngressClasses assigned to the Tenant. Capsule assures that all Ingress resources created in the Tenant can use only one of the allowed IngressClasses. Optional.
+              ingressOptions:
+                description: Specifies options for the Ingress resources, such as allowed hostnames and IngressClass. Optional.
                 properties:
-                  allowed:
-                    items:
-                      type: string
-                    type: array
-                  allowedRegex:
-                    type: string
-                type: object
-              ingressHostnames:
-                description: Specifies the allowed hostnames in Ingresses for the given Tenant. Capsule assures that all Ingress resources created in the Tenant can use only one of the allowed hostnames. Optional.
-                properties:
-                  allowed:
-                    items:
-                      type: string
-                    type: array
-                  allowedRegex:
+                  allowedClasses:
+                    description: Specifies the allowed IngressClasses assigned to the Tenant. Capsule assures that all Ingress resources created in the Tenant can use only one of the allowed IngressClasses. Optional.
+                    properties:
+                      allowed:
+                        items:
+                          type: string
+                        type: array
+                      allowedRegex:
+                        type: string
+                    type: object
+                  allowedHostnames:
+                    description: Specifies the allowed hostnames in Ingresses for the given Tenant. Capsule assures that all Ingress resources created in the Tenant can use only one of the allowed hostnames. Optional.
+                    properties:
+                      allowed:
+                        items:
+                          type: string
+                        type: array
+                      allowedRegex:
+                        type: string
+                    type: object
+                  hostnameCollisionScope:
+                    default: Disabled
+                    description: "Defines the scope of hostname collision check performed when Tenant Owners create Ingress with allowed hostnames. \n - Cluster: disallow the creation of an Ingress if the pair hostname and path is already used across the Namespaces managed by Capsule. \n - Tenant: disallow the creation of an Ingress if the pair hostname and path is already used across the Namespaces of the Tenant. \n - Namespace: disallow the creation of an Ingress if the pair hostname and path is already used in the Ingress Namespace. \n Optional."
+                    enum:
+                    - Cluster
+                    - Tenant
+                    - Namespace
+                    - Disabled
                     type: string
                 type: object
               limitRanges:

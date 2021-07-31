@@ -31,14 +31,16 @@ spec:
         - "10.96.42.42"
   imagePullPolicies:
     - Always
-  ingressClasses:
-    allowed:
-      - default
-    allowedRegex: ^\w+-lb$
-  ingressHostnames:
-    allowed:
-      - gas.acmecorp.com
-    allowedRegex: ^.*acmecorp.com$
+  ingressOptions:
+    hostnameCollisionScope: Cluster
+    allowedClasses:
+      allowed:
+        - default
+      allowedRegex: ^\w+-lb$
+    allowedHostnames:
+      allowed:
+        - gas.acmecorp.com
+      allowedRegex: ^.*acmecorp.com$
   limitRanges:
     items:
       -
