@@ -442,11 +442,7 @@ func (in *TenantSpec) DeepCopyInto(out *TenantSpec) {
 		*out = new(AllowedListSpec)
 		(*in).DeepCopyInto(*out)
 	}
-	if in.IngressOptions != nil {
-		in, out := &in.IngressOptions, &out.IngressOptions
-		*out = new(IngressOptions)
-		(*in).DeepCopyInto(*out)
-	}
+	in.IngressOptions.DeepCopyInto(&out.IngressOptions)
 	if in.ContainerRegistries != nil {
 		in, out := &in.ContainerRegistries, &out.ContainerRegistries
 		*out = new(AllowedListSpec)

@@ -222,13 +222,15 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = indexer.AddToManager(manager); err != nil {
+	ctx := ctrl.SetupSignalHandler()
+
+	if err = indexer.AddToManager(manager, ctx); err != nil {
 		setupLog.Error(err, "unable to setup indexers")
 		os.Exit(1)
 	}
 
 	setupLog.Info("starting manager")
-	if err = manager.Start(ctrl.SetupSignalHandler()); err != nil {
+	if err = manager.Start(ctx); err != nil {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}

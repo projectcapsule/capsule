@@ -23,7 +23,7 @@ func (o OwnerReference) Field() string {
 
 func (o OwnerReference) Func() client.IndexerFunc {
 	return func(object client.Object) []string {
-		var res []string
+		res := []string{}
 		ns := object.(*v1.Namespace)
 		for _, or := range ns.OwnerReferences {
 			if or.APIVersion == capsulev1beta1.GroupVersion.String() {

@@ -9,6 +9,7 @@ import (
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	networkingv1 "k8s.io/api/networking/v1"
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 const (
@@ -19,7 +20,7 @@ type Ingress interface {
 	IngressClass() *string
 	Namespace() string
 	Name() string
-	Hostnames() []string
+	HostnamePathsPairs() map[string]sets.String
 }
 
 type NetworkingV1 struct {
@@ -46,13 +47,31 @@ func (n NetworkingV1) Namespace() string {
 	return n.GetNamespace()
 }
 
-func (n NetworkingV1) Hostnames() []string {
-	rules := n.Spec.Rules
-	var hostnames []string
-	for _, el := range rules {
-		hostnames = append(hostnames, el.Host)
+// nolint:dupl
+func (n NetworkingV1) HostnamePathsPairs() (pairs map[string]sets.String) {
+	pairs = make(map[string]sets.String)
+
+	for _, rule := range n.Spec.Rules {
+		host := rule.Host
+
+		if _, ok := pairs[host]; !ok {
+			pairs[host] = sets.NewString()
+		}
+
+		if http := rule.IngressRuleValue.HTTP; http != nil {
+			for _, path := range http.Paths {
+				pairs[host].Insert(path.Path)
+			}
+		}
+
+		if http := rule.HTTP; http != nil {
+			for _, path := range http.Paths {
+				pairs[host].Insert(path.Path)
+			}
+		}
 	}
-	return hostnames
+
+	return pairs
 }
 
 type NetworkingV1Beta1 struct {
@@ -79,13 +98,31 @@ func (n NetworkingV1Beta1) Namespace() string {
 	return n.GetNamespace()
 }
 
-func (n NetworkingV1Beta1) Hostnames() []string {
-	rules := n.Spec.Rules
-	var hostnames []string
-	for _, rule := range rules {
-		hostnames = append(hostnames, rule.Host)
+// nolint:dupl
+func (n NetworkingV1Beta1) HostnamePathsPairs() (pairs map[string]sets.String) {
+	pairs = make(map[string]sets.String)
+
+	for _, rule := range n.Spec.Rules {
+		host := rule.Host
+
+		if _, ok := pairs[host]; !ok {
+			pairs[host] = sets.NewString()
+		}
+
+		if http := rule.IngressRuleValue.HTTP; http != nil {
+			for _, path := range http.Paths {
+				pairs[host].Insert(path.Path)
+			}
+		}
+
+		if http := rule.HTTP; http != nil {
+			for _, path := range http.Paths {
+				pairs[host].Insert(path.Path)
+			}
+		}
 	}
-	return hostnames
+
+	return pairs
 }
 
 type Extension struct {
@@ -112,32 +149,50 @@ func (e Extension) Namespace() string {
 	return e.GetNamespace()
 }
 
-func (e Extension) Hostnames() []string {
-	rules := e.Spec.Rules
-	var hostnames []string
-	for _, el := range rules {
-		hostnames = append(hostnames, el.Host)
+// nolint:dupl
+func (e Extension) HostnamePathsPairs() (pairs map[string]sets.String) {
+	pairs = make(map[string]sets.String)
+
+	for _, rule := range e.Spec.Rules {
+		host := rule.Host
+
+		if _, ok := pairs[host]; !ok {
+			pairs[host] = sets.NewString()
+		}
+
+		if http := rule.IngressRuleValue.HTTP; http != nil {
+			for _, path := range http.Paths {
+				pairs[host].Insert(path.Path)
+			}
+		}
+
+		if http := rule.HTTP; http != nil {
+			for _, path := range http.Paths {
+				pairs[host].Insert(path.Path)
+			}
+		}
 	}
-	return hostnames
+
+	return pairs
 }
 
 type HostnamesList []string
 
-func (hostnames HostnamesList) Len() int {
-	return len(hostnames)
+func (h HostnamesList) Len() int {
+	return len(h)
 }
 
-func (hostnames HostnamesList) Swap(i, j int) {
-	hostnames[i], hostnames[j] = hostnames[j], hostnames[i]
+func (h HostnamesList) Swap(i, j int) {
+	h[i], h[j] = h[j], h[i]
 }
 
-func (hostnames HostnamesList) Less(i, j int) bool {
-	return hostnames[i] < hostnames[j]
+func (h HostnamesList) Less(i, j int) bool {
+	return h[i] < h[j]
 }
 
-func (hostnames HostnamesList) IsStringInList(value string) (ok bool) {
-	sort.Sort(hostnames)
-	i := sort.SearchStrings(hostnames, value)
-	ok = i < hostnames.Len() && hostnames[i] == value
+func (h HostnamesList) IsStringInList(value string) (ok bool) {
+	sort.Sort(h)
+	i := sort.SearchStrings(h, value)
+	ok = i < h.Len() && h[i] == value
 	return
 }

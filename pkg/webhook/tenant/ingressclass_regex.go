@@ -30,7 +30,7 @@ func (h *ingressClassRegexHandler) validate(decoder *admission.Decoder, req admi
 		return utils.ErroredResponse(err)
 	}
 
-	if tenant.Spec.IngressOptions != nil && tenant.Spec.IngressOptions.AllowedClasses != nil && len(tenant.Spec.IngressOptions.AllowedClasses.Regex) > 0 {
+	if tenant.Spec.IngressOptions.AllowedClasses != nil && len(tenant.Spec.IngressOptions.AllowedClasses.Regex) > 0 {
 		if _, err := regexp.Compile(tenant.Spec.IngressOptions.AllowedClasses.Regex); err != nil {
 			response := admission.Denied("unable to compile ingressClasses allowedRegex")
 

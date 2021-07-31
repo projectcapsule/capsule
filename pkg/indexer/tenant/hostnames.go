@@ -23,7 +23,7 @@ func (IngressHostnames) Field() string {
 func (IngressHostnames) Func() client.IndexerFunc {
 	return func(object client.Object) (out []string) {
 		tenant := object.(*capsulev1beta1.Tenant)
-		if tenant.Spec.IngressOptions != nil && tenant.Spec.IngressOptions.AllowedHostnames != nil {
+		if tenant.Spec.IngressOptions.AllowedHostnames != nil {
 			out = append(out, tenant.Spec.IngressOptions.AllowedHostnames.Exact...)
 		}
 		return

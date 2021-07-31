@@ -43,6 +43,8 @@ const (
 	enablePriorityClassListingAnnotation  = "capsule.clastix.io/enable-priorityclass-listing"
 	enablePriorityClassUpdateAnnotation   = "capsule.clastix.io/enable-priorityclass-update"
 	enablePriorityClassDeletionAnnotation = "capsule.clastix.io/enable-priorityclass-deletion"
+
+	ingressHostnameCollisionScope = "ingress.capsule.clastix.io/hostname-collision-scope"
 )
 
 func (t *Tenant) convertV1Alpha1OwnerToV1Beta1() capsulev1beta1.OwnerListSpec {
@@ -170,19 +172,21 @@ func (t *Tenant) ConvertTo(dstRaw conversion.Hub) error {
 			Regex: t.Spec.StorageClasses.Regex,
 		}
 	}
-	if t.Spec.IngressClasses != nil {
-		if dst.Spec.IngressOptions == nil {
-			dst.Spec.IngressOptions = &capsulev1beta1.IngressOptions{}
+	if v, ok := t.Annotations[ingressHostnameCollisionScope]; ok {
+		switch v {
+		case string(capsulev1beta1.HostnameCollisionScopeCluster), string(capsulev1beta1.HostnameCollisionScopeTenant), string(capsulev1beta1.HostnameCollisionScopeNamespace):
+			dst.Spec.IngressOptions.HostnameCollisionScope = capsulev1beta1.HostnameCollisionScope(v)
+		default:
+			dst.Spec.IngressOptions.HostnameCollisionScope = capsulev1beta1.HostnameCollisionScopeDisabled
 		}
+	}
+	if t.Spec.IngressClasses != nil {
 		dst.Spec.IngressOptions.AllowedClasses = &capsulev1beta1.AllowedListSpec{
 			Exact: t.Spec.IngressClasses.Exact,
 			Regex: t.Spec.IngressClasses.Regex,
 		}
 	}
 	if t.Spec.IngressHostnames != nil {
-		if dst.Spec.IngressOptions == nil {
-			dst.Spec.IngressOptions = &capsulev1beta1.IngressOptions{}
-		}
 		dst.Spec.IngressOptions.AllowedHostnames = &capsulev1beta1.AllowedListSpec{
 			Exact: t.Spec.IngressHostnames.Exact,
 			Regex: t.Spec.IngressHostnames.Regex,
@@ -321,6 +325,7 @@ func (t *Tenant) ConvertTo(dstRaw conversion.Hub) error {
 	delete(dst.ObjectMeta.Annotations, enablePriorityClassUpdateAnnotation)
 	delete(dst.ObjectMeta.Annotations, enablePriorityClassDeletionAnnotation)
 	delete(dst.ObjectMeta.Annotations, resourceQuotaScopeAnnotation)
+	delete(dst.ObjectMeta.Annotations, ingressHostnameCollisionScope)
 
 	return nil
 }
@@ -459,13 +464,14 @@ func (t *Tenant) ConvertFrom(srcRaw conversion.Hub) error {
 			Regex: src.Spec.StorageClasses.Regex,
 		}
 	}
-	if src.Spec.IngressOptions != nil && src.Spec.IngressOptions.AllowedClasses != nil {
+	t.Annotations[ingressHostnameCollisionScope] = string(src.Spec.IngressOptions.HostnameCollisionScope)
+	if src.Spec.IngressOptions.AllowedClasses != nil {
 		t.Spec.IngressClasses = &AllowedListSpec{
 			Exact: src.Spec.IngressOptions.AllowedClasses.Exact,
 			Regex: src.Spec.IngressOptions.AllowedClasses.Regex,
 		}
 	}
-	if src.Spec.IngressOptions != nil && src.Spec.IngressOptions.AllowedHostnames != nil {
+	if src.Spec.IngressOptions.AllowedHostnames != nil {
 		t.Spec.IngressHostnames = &AllowedListSpec{
 			Exact: src.Spec.IngressOptions.AllowedHostnames.Exact,
 			Regex: src.Spec.IngressOptions.AllowedHostnames.Regex,
