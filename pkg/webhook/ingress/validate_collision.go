@@ -111,10 +111,6 @@ func (r *collision) OnDelete(client.Client, *admission.Decoder, record.EventReco
 }
 
 func (r *collision) validateCollision(ctx context.Context, clt client.Client, ing Ingress, scope capsulev1beta1.HostnameCollisionScope) error {
-	if r.configuration.AllowIngressHostnameCollision() {
-		return nil
-	}
-
 	for hostname, paths := range ing.HostnamePathsPairs() {
 		for path := range paths {
 			var ingressObjList client.ObjectList

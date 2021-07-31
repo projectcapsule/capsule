@@ -8,8 +8,6 @@ import (
 )
 
 type Configuration interface {
-	AllowIngressHostnameCollision() bool
-	AllowTenantIngressHostnamesCollision() bool
 	ProtectedNamespaceRegexp() (*regexp.Regexp, error)
 	ForceTenantPrefix() bool
 	UserGroups() []string

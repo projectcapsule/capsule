@@ -24,9 +24,8 @@ type CustomIndexer interface {
 	Func() client.IndexerFunc
 }
 
-func AddToManager(m manager.Manager, ctx context.Context) error {
+func AddToManager(ctx context.Context, mgr manager.Manager) error {
 	indexers := append([]CustomIndexer{},
-		tenant.IngressHostnames{},
 		tenant.NamespacesReference{},
 		tenant.OwnerReference{},
 		namespace.OwnerReference{},
@@ -44,7 +43,7 @@ func AddToManager(m manager.Manager, ctx context.Context) error {
 	}
 
 	for _, f := range indexers {
-		if err := m.GetFieldIndexer().IndexField(ctx, f.Object(), f.Field(), f.Func()); err != nil {
+		if err := mgr.GetFieldIndexer().IndexField(ctx, f.Object(), f.Field(), f.Func()); err != nil {
 			return err
 		}
 	}

@@ -29,11 +29,9 @@ func NewCapsuleConfiguration(client client.Client, name string) Configuration {
 			if machineryerr.IsNotFound(err) {
 				return &capsulev1alpha1.CapsuleConfiguration{
 					Spec: capsulev1alpha1.CapsuleConfigurationSpec{
-						UserGroups:                           []string{"capsule.clastix.io"},
-						ForceTenantPrefix:                    false,
-						ProtectedNamespaceRegexpString:       "",
-						AllowTenantIngressHostnamesCollision: false,
-						AllowIngressHostnameCollision:        true,
+						UserGroups:                     []string{"capsule.clastix.io"},
+						ForceTenantPrefix:              false,
+						ProtectedNamespaceRegexpString: "",
 					},
 				}
 			}
@@ -42,14 +40,6 @@ func NewCapsuleConfiguration(client client.Client, name string) Configuration {
 
 		return config
 	}}
-}
-
-func (c capsuleConfiguration) AllowIngressHostnameCollision() bool {
-	return c.retrievalFn().Spec.AllowIngressHostnameCollision
-}
-
-func (c capsuleConfiguration) AllowTenantIngressHostnamesCollision() bool {
-	return c.retrievalFn().Spec.AllowTenantIngressHostnamesCollision
 }
 
 func (c capsuleConfiguration) ProtectedNamespaceRegexp() (*regexp.Regexp, error) {
