@@ -11,6 +11,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+const (
+	HostnameFieldSelector = "host"
+)
+
 type Hostname struct {
 	Obj metav1.Object
 }
@@ -20,26 +24,23 @@ func (h Hostname) Object() client.Object {
 }
 
 func (h Hostname) Field() string {
-	return ".spec.rules[*].host"
+	return HostnameFieldSelector
 }
 
 func (h Hostname) Func() client.IndexerFunc {
 	return func(object client.Object) (hostnames []string) {
-		switch h.Obj.(type) {
+		switch ing := h.Obj.(type) {
 		case *networkingv1.Ingress:
-			ing := object.(*networkingv1.Ingress)
 			for _, r := range ing.Spec.Rules {
 				hostnames = append(hostnames, r.Host)
 			}
 			return
 		case *networkingv1beta1.Ingress:
-			ing := object.(*networkingv1beta1.Ingress)
 			for _, r := range ing.Spec.Rules {
 				hostnames = append(hostnames, r.Host)
 			}
 			return
 		case *extensionsv1beta1.Ingress:
-			ing := object.(*extensionsv1beta1.Ingress)
 			for _, r := range ing.Spec.Rules {
 				hostnames = append(hostnames, r.Host)
 			}
