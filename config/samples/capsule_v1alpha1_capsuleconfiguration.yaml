@@ -7,5 +7,3 @@ spec:
   userGroups: ["capsule.clastix.io"]
   forceTenantPrefix: false
   protectedNamespaceRegex: ""
-  allowTenantIngressHostnamesCollision: false
-  allowIngressHostnameCollision: false
