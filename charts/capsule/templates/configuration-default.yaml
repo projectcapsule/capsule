@@ -9,5 +9,3 @@ spec:
     - {{ . }}
 {{- end}}
   protectedNamespaceRegex: {{ .Values.manager.options.protectedNamespaceRegex | quote }}
-  allowTenantIngressHostnamesCollision: {{ .Values.manager.options.allowTenantIngressHostnamesCollision }}
-  allowIngressHostnameCollision: {{ .Values.manager.options.allowIngressHostnameCollision }}
