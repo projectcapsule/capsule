@@ -21,8 +21,6 @@ manager:
     forceTenantPrefix: false
     capsuleUserGroups: ["capsule.clastix.io"]
     protectedNamespaceRegex: ""
-    allowIngressHostnameCollision: true
-    allowTenantIngressHostnamesCollision: false
   livenessProbe:
     httpGet:
       path: /healthz
