@@ -30,12 +30,14 @@ var _ = Describe("when Tenant handles Ingress classes with extensions/v1beta1", 
 					Kind: "User",
 				},
 			},
-			IngressClasses: &capsulev1beta1.AllowedListSpec{
-				Exact: []string{
-					"nginx",
-					"haproxy",
+			IngressOptions: capsulev1beta1.IngressOptions{
+				AllowedClasses: &capsulev1beta1.AllowedListSpec{
+					Exact: []string{
+						"nginx",
+						"haproxy",
+					},
+					Regex: "^oil-.*$",
 				},
-				Regex: "^oil-.*$",
 			},
 		},
 	}
@@ -133,7 +135,7 @@ var _ = Describe("when Tenant handles Ingress classes with extensions/v1beta1", 
 		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
-		for _, c := range tnt.Spec.IngressClasses.Exact {
+		for _, c := range tnt.Spec.IngressOptions.AllowedClasses.Exact {
 			Eventually(func() (err error) {
 				i := &extensionsv1beta1.Ingress{
 					ObjectMeta: metav1.ObjectMeta{
@@ -171,7 +173,7 @@ var _ = Describe("when Tenant handles Ingress classes with extensions/v1beta1", 
 		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
-		for _, c := range tnt.Spec.IngressClasses.Exact {
+		for _, c := range tnt.Spec.IngressOptions.AllowedClasses.Exact {
 			Eventually(func() (err error) {
 				i := &extensionsv1beta1.Ingress{
 					ObjectMeta: metav1.ObjectMeta{

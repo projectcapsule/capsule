@@ -208,7 +208,9 @@ var _ = Describe("creating namespaces within a Tenant with resources", func() {
 						n := fmt.Sprintf("capsule-%s-%d", tnt.GetName(), i)
 
 						rq := &corev1.ResourceQuota{}
-						Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: n, Namespace: name}, rq)).Should(Succeed())
+						if err := k8sClient.Get(context.TODO(), types.NamespacedName{Name: n, Namespace: name}, rq); err != nil {
+							return corev1.ResourceQuotaSpec{}
+						}
 
 						return rq.Spec
 					}, defaultTimeoutInterval, defaultPollInterval).Should(Equal(s))
