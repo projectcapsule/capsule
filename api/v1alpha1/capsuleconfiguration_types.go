@@ -8,7 +8,6 @@ import (
 )
 
 // CapsuleConfigurationSpec defines the Capsule configuration
-// nolint:maligned
 type CapsuleConfigurationSpec struct {
 	// Names of the groups for Capsule users.
 	// +kubebuilder:default={capsule.clastix.io}
