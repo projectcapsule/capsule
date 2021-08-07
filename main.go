@@ -22,11 +22,11 @@ import (
 
 	capsulev1alpha1 "github.com/clastix/capsule/api/v1alpha1"
 	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
-	"github.com/clastix/capsule/controllers"
-	"github.com/clastix/capsule/controllers/config"
-	"github.com/clastix/capsule/controllers/rbac"
-	"github.com/clastix/capsule/controllers/secret"
-	"github.com/clastix/capsule/controllers/servicelabels"
+	configcontroller "github.com/clastix/capsule/controllers/config"
+	rbaccontroller "github.com/clastix/capsule/controllers/rbac"
+	secretcontroller "github.com/clastix/capsule/controllers/secret"
+	servicelabelscontroller "github.com/clastix/capsule/controllers/servicelabels"
+	tenantcontroller "github.com/clastix/capsule/controllers/tenant"
 	"github.com/clastix/capsule/pkg/configuration"
 	"github.com/clastix/capsule/pkg/indexer"
 	"github.com/clastix/capsule/pkg/webhook"
@@ -128,7 +128,7 @@ func main() {
 	_ = manager.AddReadyzCheck("ping", healthz.Ping)
 	_ = manager.AddHealthzCheck("ping", healthz.Ping)
 
-	if err = (&controllers.TenantReconciler{
+	if err = (&tenantcontroller.Manager{
 		Client:   manager.GetClient(),
 		Log:      ctrl.Log.WithName("controllers").WithName("Tenant"),
 		Scheme:   manager.GetScheme(),
@@ -163,7 +163,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	rbacManager := &rbac.Manager{
+	rbacManager := &rbaccontroller.Manager{
 		Log:           ctrl.Log.WithName("controllers").WithName("Rbac"),
 		Configuration: cfg,
 	}
@@ -176,7 +176,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&secret.CAReconciler{
+	if err = (&secretcontroller.CAReconciler{
 		Client:    manager.GetClient(),
 		Log:       ctrl.Log.WithName("controllers").WithName("CA"),
 		Scheme:    manager.GetScheme(),
@@ -185,7 +185,7 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "Namespace")
 		os.Exit(1)
 	}
-	if err = (&secret.TLSReconciler{
+	if err = (&secretcontroller.TLSReconciler{
 		Client:    manager.GetClient(),
 		Log:       ctrl.Log.WithName("controllers").WithName("Tls"),
 		Scheme:    manager.GetScheme(),
@@ -195,19 +195,19 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&servicelabels.ServicesLabelsReconciler{
+	if err = (&servicelabelscontroller.ServicesLabelsReconciler{
 		Log: ctrl.Log.WithName("controllers").WithName("ServiceLabels"),
 	}).SetupWithManager(manager); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ServiceLabels")
 		os.Exit(1)
 	}
-	if err = (&servicelabels.EndpointsLabelsReconciler{
+	if err = (&servicelabelscontroller.EndpointsLabelsReconciler{
 		Log: ctrl.Log.WithName("controllers").WithName("EndpointLabels"),
 	}).SetupWithManager(manager); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "EndpointLabels")
 		os.Exit(1)
 	}
-	if err = (&servicelabels.EndpointSlicesLabelsReconciler{
+	if err = (&servicelabelscontroller.EndpointSlicesLabelsReconciler{
 		Log:          ctrl.Log.WithName("controllers").WithName("EndpointSliceLabels"),
 		VersionMinor: minorVer,
 		VersionMajor: majorVer,
@@ -215,7 +215,7 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "EndpointSliceLabels")
 	}
 
-	if err = (&config.Manager{
+	if err = (&configcontroller.Manager{
 		Log: ctrl.Log.WithName("controllers").WithName("CapsuleConfiguration"),
 	}).SetupWithManager(manager, configurationName); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "CapsuleConfiguration")
