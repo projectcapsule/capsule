@@ -17,19 +17,9 @@ jobs:
       - uses: actions/checkout@v2
         with:
           fetch-depth: 0
-      - name: Cache Go modules and Docker images
-        uses: actions/cache@v1
-        env:
-          cache-name: gomod-docker
+      - uses: actions/setup-go@v2
         with:
-          path: |
-            ~/go/pkg/mod
-            /var/lib/docker
-            /home/runner/work/capsule/capsule
-          key: ${{ matrix.k8s-version }}-build-${{ env.cache-name }}
-          restore-keys: |
-            ${{ matrix.k8s-version }}-build-
-            ${{ matrix.k8s-version }}-
+          go-version: '^1.16'
       - run: make manifests
       - name: Checking if manifests are disaligned
         run: test -z "$(git diff 2> /dev/null)"
@@ -39,7 +29,7 @@ jobs:
         run: go get github.com/onsi/ginkgo/ginkgo
       - uses: actions/setup-go@v2
         with:
-          go-version: '^1.6'
+          go-version: '^1.16'
       - uses: engineerd/setup-kind@v0.5.0
         with:
           skipClusterCreation: true
