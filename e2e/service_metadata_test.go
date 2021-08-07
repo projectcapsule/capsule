@@ -8,17 +8,15 @@ package e2e
 import (
 	"context"
 
+	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
-	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/pointer"
-
-	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
 )
 
 var _ = Describe("adding metadata to Service objects", func() {
@@ -45,26 +43,17 @@ var _ = Describe("adding metadata to Service objects", func() {
 					},
 				},
 			},
-			AdditionalRoleBindings: []capsulev1beta1.AdditionalRoleBindingsSpec{
-				{
-					ClusterRoleName: "system:controller:endpointslice-controller",
-					Subjects: []rbacv1.Subject{
-						{
-							Kind: "User",
-							Name: "gatsby",
-						},
-					},
-				},
-			},
 		},
 	}
 
 	JustBeforeEach(func() {
 		EventuallyCreation(func() error {
+
 			tnt.ResourceVersion = ""
 			return k8sClient.Create(context.TODO(), tnt)
 		}).Should(Succeed())
 	})
+
 	JustAfterEach(func() {
 		Expect(k8sClient.Delete(context.TODO(), tnt)).Should(Succeed())
 	})
@@ -93,8 +82,30 @@ var _ = Describe("adding metadata to Service objects", func() {
 				},
 			},
 		}
-		EventuallyCreation(func() error {
-			return k8sClient.Create(context.TODO(), svc)
+		// Waiting for the reconciliation of required RBAC
+		EventuallyCreation(func() (err error) {
+			pod := &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "container",
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:  "container",
+							Image: "quay.io/google-containers/pause-amd64:3.0",
+						},
+					},
+				},
+			}
+			_, err = ownerClient(tnt.Spec.Owners[0]).CoreV1().Pods(ns.GetName()).Create(context.Background(), pod, metav1.CreateOptions{})
+
+			return
+		}).Should(Succeed())
+
+		EventuallyCreation(func() (err error) {
+			_, err = ownerClient(tnt.Spec.Owners[0]).CoreV1().Services(ns.GetName()).Create(context.Background(), svc, metav1.CreateOptions{})
+
+			return
 		}).Should(Succeed())
 
 		By("checking additional labels", func() {
@@ -109,6 +120,7 @@ var _ = Describe("adding metadata to Service objects", func() {
 				return true
 			}, defaultTimeoutInterval, defaultPollInterval).Should(BeTrue())
 		})
+
 		By("checking additional annotations", func() {
 			Eventually(func() (ok bool) {
 				Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: svc.GetName(), Namespace: ns.GetName()}, svc)).Should(Succeed())
@@ -149,9 +161,30 @@ var _ = Describe("adding metadata to Service objects", func() {
 				},
 			},
 		}
-		EventuallyCreation(func() error {
+		// Waiting for the reconciliation of required RBAC
+		EventuallyCreation(func() (err error) {
+			pod := &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "container",
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:  "container",
+							Image: "quay.io/google-containers/pause-amd64:3.0",
+						},
+					},
+				},
+			}
+			_, err = ownerClient(tnt.Spec.Owners[0]).CoreV1().Pods(ns.GetName()).Create(context.Background(), pod, metav1.CreateOptions{})
+
+			return
+		}).Should(Succeed())
+
+		EventuallyCreation(func() (err error) {
 			return k8sClient.Create(context.TODO(), ep)
 		}).Should(Succeed())
+
 		By("checking additional labels", func() {
 			Eventually(func() (ok bool) {
 				Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: ep.GetName(), Namespace: ns.GetName()}, ep)).Should(Succeed())
@@ -164,6 +197,7 @@ var _ = Describe("adding metadata to Service objects", func() {
 				return true
 			}, defaultTimeoutInterval, defaultPollInterval).Should(BeTrue())
 		})
+
 		By("checking additional annotations", func() {
 			Eventually(func() (ok bool) {
 				Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: ep.GetName(), Namespace: ns.GetName()}, ep)).Should(Succeed())
@@ -179,8 +213,7 @@ var _ = Describe("adding metadata to Service objects", func() {
 	})
 
 	It("should apply them to EndpointSlice", func() {
-		maj, min, v := GetKubernetesSemVer()
-		if maj == 1 && min <= 16 {
+		if maj, min, v := GetKubernetesSemVer(); maj == 1 && min <= 16 {
 			Skip("Running test on Kubernetes " + v + ", doesn't provide EndpointSlice resource")
 		}
 
@@ -206,8 +239,27 @@ var _ = Describe("adding metadata to Service objects", func() {
 				},
 			},
 		}
+		// Waiting for the reconciliation of required RBAC
+		EventuallyCreation(func() (err error) {
+			pod := &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "container",
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:  "container",
+							Image: "quay.io/google-containers/pause-amd64:3.0",
+						},
+					},
+				},
+			}
+			_, err = ownerClient(tnt.Spec.Owners[0]).CoreV1().Pods(ns.GetName()).Create(context.Background(), pod, metav1.CreateOptions{})
 
-		EventuallyCreation(func() error {
+			return
+		}).Should(Succeed())
+
+		EventuallyCreation(func() (err error) {
 			return k8sClient.Create(context.TODO(), eps)
 		}).Should(Succeed())
 
@@ -223,6 +275,7 @@ var _ = Describe("adding metadata to Service objects", func() {
 				return true
 			}, defaultTimeoutInterval, defaultPollInterval).Should(BeTrue())
 		})
+
 		By("checking additional labels on EndpointSlice", func() {
 			Eventually(func() (ok bool) {
 				Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: eps.GetName(), Namespace: ns.GetName()}, eps)).Should(Succeed())
