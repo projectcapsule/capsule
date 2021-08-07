@@ -1,7 +1,7 @@
 // Copyright 2020-2021 Clastix Labs
 // SPDX-License-Identifier: Apache-2.0
 
-package rbac
+package config
 
 import (
 	"context"
@@ -25,8 +25,8 @@ type Manager struct {
 }
 
 // InjectClient injects the Client interface, required by the Runnable interface
-func (r *Manager) InjectClient(c client.Client) error {
-	r.Client = c
+func (c *Manager) InjectClient(client client.Client) error {
+	c.Client = client
 
 	return nil
 }
@@ -52,22 +52,22 @@ func forOptionPerInstanceName(instanceName string) builder.ForOption {
 	})
 }
 
-func (r *Manager) SetupWithManager(mgr ctrl.Manager, configurationName string) error {
+func (c *Manager) SetupWithManager(mgr ctrl.Manager, configurationName string) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&capsulev1alpha1.CapsuleConfiguration{}, forOptionPerInstanceName(configurationName)).
-		Complete(r)
+		Complete(c)
 }
 
-func (r *Manager) Reconcile(ctx context.Context, request reconcile.Request) (res reconcile.Result, err error) {
-	r.Log.Info("CapsuleConfiguration reconciliation started", "request.name", request.Name)
+func (c *Manager) Reconcile(ctx context.Context, request reconcile.Request) (res reconcile.Result, err error) {
+	c.Log.Info("CapsuleConfiguration reconciliation started", "request.name", request.Name)
 
-	cfg := configuration.NewCapsuleConfiguration(r.Client, request.Name)
+	cfg := configuration.NewCapsuleConfiguration(c.Client, request.Name)
 	// Validating the Capsule Configuration options
 	if _, err = cfg.ProtectedNamespaceRegexp(); err != nil {
 		panic(errors.Wrap(err, "Invalid configuration for protected Namespace regex"))
 	}
 
-	r.Log.Info("CapsuleConfiguration reconciliation finished", "request.name", request.Name)
+	c.Log.Info("CapsuleConfiguration reconciliation finished", "request.name", request.Name)
 
 	return
 }
