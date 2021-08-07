@@ -5,6 +5,7 @@ package servicelabels
 
 import (
 	"github.com/go-logr/logr"
+	discoveryv1 "k8s.io/api/discovery/v1"
 	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
@@ -24,12 +25,16 @@ func (r *EndpointSlicesLabelsReconciler) SetupWithManager(mgr ctrl.Manager) erro
 		log:    r.Log,
 	}
 
-	if r.VersionMajor == 1 && r.VersionMinor <= 16 {
+	switch {
+	case r.VersionMajor == 1 && r.VersionMinor <= 16:
 		r.Log.Info("Skipping controller setup, as EndpointSlices are not supported on current kubernetes version", "VersionMajor", r.VersionMajor, "VersionMinor", r.VersionMinor)
 		return nil
+	case r.VersionMajor == 1 && r.VersionMinor >= 21:
+		r.abstractServiceLabelsReconciler.obj = &discoveryv1.EndpointSlice{}
+	default:
+		r.abstractServiceLabelsReconciler.obj = &discoveryv1beta1.EndpointSlice{}
 	}
 
-	r.abstractServiceLabelsReconciler.obj = &discoveryv1beta1.EndpointSlice{}
 	return ctrl.NewControllerManagedBy(mgr).
 		For(r.obj, r.abstractServiceLabelsReconciler.forOptionPerInstanceName()).
 		Complete(r)
