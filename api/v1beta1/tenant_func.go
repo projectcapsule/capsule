@@ -18,10 +18,10 @@ func (t *Tenant) IsCordoned() bool {
 
 func (t *Tenant) IsFull() bool {
 	// we don't have limits on assigned Namespaces
-	if t.Spec.NamespaceQuota == nil {
+	if t.Spec.NamespaceOptions == nil || t.Spec.NamespaceOptions.Quota == nil {
 		return false
 	}
-	return len(t.Status.Namespaces) >= int(*t.Spec.NamespaceQuota)
+	return len(t.Status.Namespaces) >= int(*t.Spec.NamespaceOptions.Quota)
 }
 
 func (t *Tenant) AssignNamespaces(namespaces []corev1.Namespace) {

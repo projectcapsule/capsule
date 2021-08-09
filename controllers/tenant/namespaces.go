@@ -50,8 +50,8 @@ func (r *Manager) syncNamespaceMetadata(namespace string, tnt *capsulev1beta1.Te
 		res, conflictErr = controllerutil.CreateOrUpdate(context.TODO(), r.Client, ns, func() error {
 			annotations := make(map[string]string)
 
-			if tnt.Spec.NamespacesMetadata != nil {
-				for k, v := range tnt.Spec.NamespacesMetadata.AdditionalAnnotations {
+			if tnt.Spec.NamespaceOptions != nil && tnt.Spec.NamespaceOptions.AdditionalMetadata != nil {
+				for k, v := range tnt.Spec.NamespaceOptions.AdditionalMetadata.AdditionalAnnotations {
 					annotations[k] = v
 				}
 			}
@@ -98,8 +98,8 @@ func (r *Manager) syncNamespaceMetadata(namespace string, tnt *capsulev1beta1.Te
 				capsuleLabel: tnt.GetName(),
 			}
 
-			if tnt.Spec.NamespacesMetadata != nil {
-				for k, v := range tnt.Spec.NamespacesMetadata.AdditionalLabels {
+			if tnt.Spec.NamespaceOptions != nil && tnt.Spec.NamespaceOptions.AdditionalMetadata != nil {
+				for k, v := range tnt.Spec.NamespaceOptions.AdditionalMetadata.AdditionalLabels {
 					newLabels[k] = v
 				}
 			}

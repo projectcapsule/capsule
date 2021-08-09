@@ -11,12 +11,8 @@ import (
 type TenantSpec struct {
 	// Specifies the owners of the Tenant. Mandatory.
 	Owners OwnerListSpec `json:"owners"`
-
-	//+kubebuilder:validation:Minimum=1
-	// Specifies the maximum number of namespaces allowed for that Tenant. Once the namespace quota assigned to the Tenant has been reached, the Tenant owner cannot create further namespaces. Optional.
-	NamespaceQuota *int32 `json:"namespaceQuota,omitempty"`
-	// Specifies additional labels and annotations the Capsule operator places on any Namespace resource in the Tenant. Optional.
-	NamespacesMetadata *AdditionalMetadataSpec `json:"namespacesMetadata,omitempty"`
+	// Specifies options for the Namespaces, such as additional metadata or maximum number of namespaces allowed for that Tenant. Once the namespace quota assigned to the Tenant has been reached, the Tenant owner cannot create further namespaces. Optional.
+	NamespaceOptions *NamespaceOptions `json:"namespaceOptions,omitempty"`
 	// Specifies options for the Service, such as additional metadata or block of certain type of Services. Optional.
 	ServiceOptions *ServiceOptions `json:"serviceOptions,omitempty"`
 	// Specifies the allowed StorageClasses assigned to the Tenant. Capsule assures that all PersistentVolumeClaim resources created in the Tenant can use only one of the allowed StorageClasses. Optional.
@@ -48,7 +44,7 @@ type TenantSpec struct {
 //+kubebuilder:storageversion
 // +kubebuilder:resource:scope=Cluster,shortName=tnt
 // +kubebuilder:printcolumn:name="State",type="string",JSONPath=".status.state",description="The actual state of the Tenant"
-// +kubebuilder:printcolumn:name="Namespace quota",type="integer",JSONPath=".spec.namespaceQuota",description="The max amount of Namespaces can be created"
+// +kubebuilder:printcolumn:name="Namespace quota",type="integer",JSONPath=".spec.namespaceOptions.quota",description="The max amount of Namespaces can be created"
 // +kubebuilder:printcolumn:name="Namespace count",type="integer",JSONPath=".status.size",description="The total amount of Namespaces in use"
 // +kubebuilder:printcolumn:name="Node selector",type="string",JSONPath=".spec.nodeSelector",description="Node Selector applied to Pods"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp",description="Age"

@@ -43,6 +43,10 @@ func generateTenantsSpecs() (Tenant, capsulev1beta1.Tenant) {
 			"foo": "bar",
 		},
 	}
+	var v1beta1NamespaceOptions = &capsulev1beta1.NamespaceOptions{
+		Quota:              &namespaceQuota,
+		AdditionalMetadata: v1beta1AdditionalMetadataSpec,
+	}
 	var v1beta1ServiceOptions = &capsulev1beta1.ServiceOptions{
 		AdditionalMetadata: v1beta1AdditionalMetadataSpec,
 		AllowedServices: &capsulev1beta1.AllowedServices{
@@ -225,8 +229,7 @@ func generateTenantsSpecs() (Tenant, capsulev1beta1.Tenant) {
 					},
 				},
 			},
-			NamespaceQuota:      &namespaceQuota,
-			NamespacesMetadata:  v1beta1AdditionalMetadataSpec,
+			NamespaceOptions:    v1beta1NamespaceOptions,
 			ServiceOptions:      v1beta1ServiceOptions,
 			StorageClasses:      v1beta1AllowedListSpec,
 			IngressClasses:      v1beta1AllowedListSpec,
