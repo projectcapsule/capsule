@@ -134,13 +134,22 @@ func (t *Tenant) ConvertTo(dstRaw conversion.Hub) error {
 	dst.ObjectMeta = t.ObjectMeta
 
 	// Spec
-	dst.Spec.NamespaceQuota = t.Spec.NamespaceQuota
+	if t.Spec.NamespaceQuota != nil {
+		if dst.Spec.NamespaceOptions == nil {
+			dst.Spec.NamespaceOptions = &capsulev1beta1.NamespaceOptions{}
+		}
+		dst.Spec.NamespaceOptions.Quota = t.Spec.NamespaceQuota
+	}
+
 	dst.Spec.NodeSelector = t.Spec.NodeSelector
 
 	dst.Spec.Owners = t.convertV1Alpha1OwnerToV1Beta1()
 
 	if t.Spec.NamespacesMetadata != nil {
-		dst.Spec.NamespacesMetadata = &capsulev1beta1.AdditionalMetadataSpec{
+		if dst.Spec.NamespaceOptions == nil {
+			dst.Spec.NamespaceOptions = &capsulev1beta1.NamespaceOptions{}
+		}
+		dst.Spec.NamespaceOptions.AdditionalMetadata = &capsulev1beta1.AdditionalMetadataSpec{
 			AdditionalLabels:      t.Spec.NamespacesMetadata.AdditionalLabels,
 			AdditionalAnnotations: t.Spec.NamespacesMetadata.AdditionalAnnotations,
 		}
@@ -414,7 +423,10 @@ func (t *Tenant) ConvertFrom(srcRaw conversion.Hub) error {
 	t.ObjectMeta = src.ObjectMeta
 
 	// Spec
-	t.Spec.NamespaceQuota = src.Spec.NamespaceQuota
+	if src.Spec.NamespaceOptions != nil && src.Spec.NamespaceOptions.Quota != nil {
+		t.Spec.NamespaceQuota = src.Spec.NamespaceOptions.Quota
+	}
+
 	t.Spec.NodeSelector = src.Spec.NodeSelector
 
 	if t.Annotations == nil {
@@ -423,10 +435,10 @@ func (t *Tenant) ConvertFrom(srcRaw conversion.Hub) error {
 
 	t.convertV1Beta1OwnerToV1Alpha1(src)
 
-	if src.Spec.NamespacesMetadata != nil {
+	if src.Spec.NamespaceOptions != nil && src.Spec.NamespaceOptions.AdditionalMetadata != nil {
 		t.Spec.NamespacesMetadata = &AdditionalMetadataSpec{
-			AdditionalLabels:      src.Spec.NamespacesMetadata.AdditionalLabels,
-			AdditionalAnnotations: src.Spec.NamespacesMetadata.AdditionalAnnotations,
+			AdditionalLabels:      src.Spec.NamespaceOptions.AdditionalMetadata.AdditionalLabels,
+			AdditionalAnnotations: src.Spec.NamespaceOptions.AdditionalMetadata.AdditionalAnnotations,
 		}
 	}
 	if src.Spec.ServiceOptions != nil && src.Spec.ServiceOptions.AdditionalMetadata != nil {
