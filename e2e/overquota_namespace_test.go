@@ -29,7 +29,7 @@ var _ = Describe("creating a Namespace in over-quota of three", func() {
 				},
 			},
 			NamespaceOptions: &capsulev1beta1.NamespaceOptions{
-				Quota:              pointer.Int32Ptr(3),
+				Quota: pointer.Int32Ptr(3),
 			},
 		},
 	}
