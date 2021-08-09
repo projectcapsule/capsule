@@ -150,16 +150,16 @@ func (t *Tenant) ConvertTo(dstRaw conversion.Hub) error {
 			dst.Spec.NamespaceOptions = &capsulev1beta1.NamespaceOptions{}
 		}
 		dst.Spec.NamespaceOptions.AdditionalMetadata = &capsulev1beta1.AdditionalMetadataSpec{
-			AdditionalLabels:      t.Spec.NamespacesMetadata.AdditionalLabels,
-			AdditionalAnnotations: t.Spec.NamespacesMetadata.AdditionalAnnotations,
+			Labels:      t.Spec.NamespacesMetadata.AdditionalLabels,
+			Annotations: t.Spec.NamespacesMetadata.AdditionalAnnotations,
 		}
 	}
 	if t.Spec.ServicesMetadata != nil {
 		if dst.Spec.ServiceOptions == nil {
 			dst.Spec.ServiceOptions = &capsulev1beta1.ServiceOptions{
 				AdditionalMetadata: &capsulev1beta1.AdditionalMetadataSpec{
-					AdditionalLabels:      t.Spec.ServicesMetadata.AdditionalLabels,
-					AdditionalAnnotations: t.Spec.ServicesMetadata.AdditionalAnnotations,
+					Labels:      t.Spec.ServicesMetadata.AdditionalLabels,
+					Annotations: t.Spec.ServicesMetadata.AdditionalAnnotations,
 				},
 			}
 		}
@@ -437,14 +437,14 @@ func (t *Tenant) ConvertFrom(srcRaw conversion.Hub) error {
 
 	if src.Spec.NamespaceOptions != nil && src.Spec.NamespaceOptions.AdditionalMetadata != nil {
 		t.Spec.NamespacesMetadata = &AdditionalMetadataSpec{
-			AdditionalLabels:      src.Spec.NamespaceOptions.AdditionalMetadata.AdditionalLabels,
-			AdditionalAnnotations: src.Spec.NamespaceOptions.AdditionalMetadata.AdditionalAnnotations,
+			AdditionalLabels:      src.Spec.NamespaceOptions.AdditionalMetadata.Labels,
+			AdditionalAnnotations: src.Spec.NamespaceOptions.AdditionalMetadata.Annotations,
 		}
 	}
 	if src.Spec.ServiceOptions != nil && src.Spec.ServiceOptions.AdditionalMetadata != nil {
 		t.Spec.ServicesMetadata = &AdditionalMetadataSpec{
-			AdditionalLabels:      src.Spec.ServiceOptions.AdditionalMetadata.AdditionalLabels,
-			AdditionalAnnotations: src.Spec.ServiceOptions.AdditionalMetadata.AdditionalAnnotations,
+			AdditionalLabels:      src.Spec.ServiceOptions.AdditionalMetadata.Labels,
+			AdditionalAnnotations: src.Spec.ServiceOptions.AdditionalMetadata.Annotations,
 		}
 	}
 	if src.Spec.StorageClasses != nil {

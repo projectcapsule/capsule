@@ -51,7 +51,7 @@ func (r *Manager) syncNamespaceMetadata(namespace string, tnt *capsulev1beta1.Te
 			annotations := make(map[string]string)
 
 			if tnt.Spec.NamespaceOptions != nil && tnt.Spec.NamespaceOptions.AdditionalMetadata != nil {
-				for k, v := range tnt.Spec.NamespaceOptions.AdditionalMetadata.AdditionalAnnotations {
+				for k, v := range tnt.Spec.NamespaceOptions.AdditionalMetadata.Annotations {
 					annotations[k] = v
 				}
 			}
@@ -99,7 +99,7 @@ func (r *Manager) syncNamespaceMetadata(namespace string, tnt *capsulev1beta1.Te
 			}
 
 			if tnt.Spec.NamespaceOptions != nil && tnt.Spec.NamespaceOptions.AdditionalMetadata != nil {
-				for k, v := range tnt.Spec.NamespaceOptions.AdditionalMetadata.AdditionalLabels {
+				for k, v := range tnt.Spec.NamespaceOptions.AdditionalMetadata.Labels {
 					newLabels[k] = v
 				}
 			}

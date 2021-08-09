@@ -53,8 +53,8 @@ func (r *abstractServiceLabelsReconciler) Reconcile(ctx context.Context, request
 	}
 
 	_, err = controllerutil.CreateOrUpdate(ctx, r.client, r.obj, func() (err error) {
-		r.obj.SetLabels(r.sync(r.obj.GetLabels(), tenant.Spec.ServiceOptions.AdditionalMetadata.AdditionalLabels))
-		r.obj.SetAnnotations(r.sync(r.obj.GetAnnotations(), tenant.Spec.ServiceOptions.AdditionalMetadata.AdditionalAnnotations))
+		r.obj.SetLabels(r.sync(r.obj.GetLabels(), tenant.Spec.ServiceOptions.AdditionalMetadata.Labels))
+		r.obj.SetAnnotations(r.sync(r.obj.GetAnnotations(), tenant.Spec.ServiceOptions.AdditionalMetadata.Annotations))
 		return nil
 	})
 
