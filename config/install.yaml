@@ -651,7 +651,7 @@ spec:
       name: State
       type: string
     - description: The max amount of Namespaces can be created
-      jsonPath: .spec.namespaceQuota
+      jsonPath: .spec.namespaceOptions.quota
       name: Namespace quota
       type: integer
     - description: The total amount of Namespaces in use
@@ -823,22 +823,26 @@ spec:
                       type: object
                     type: array
                 type: object
-              namespaceQuota:
-                description: Specifies the maximum number of namespaces allowed for that Tenant. Once the namespace quota assigned to the Tenant has been reached, the Tenant owner cannot create further namespaces. Optional.
-                format: int32
-                minimum: 1
-                type: integer
-              namespacesMetadata:
-                description: Specifies additional labels and annotations the Capsule operator places on any Namespace resource in the Tenant. Optional.
+              namespaceOptions:
+                description: Specifies options for the Namespaces, such as additional metadata or maximum number of namespaces allowed for that Tenant. Once the namespace quota assigned to the Tenant has been reached, the Tenant owner cannot create further namespaces. Optional.
                 properties:
-                  additionalAnnotations:
-                    additionalProperties:
-                      type: string
+                  additionalMetadata:
+                    description: Specifies additional labels and annotations the Capsule operator places on any Namespace resource in the Tenant. Optional.
+                    properties:
+                      additionalAnnotations:
+                        additionalProperties:
+                          type: string
+                        type: object
+                      additionalLabels:
+                        additionalProperties:
+                          type: string
+                        type: object
                     type: object
-                  additionalLabels:
-                    additionalProperties:
-                      type: string
-                    type: object
+                  quota:
+                    description: Specifies the maximum number of namespaces allowed for that Tenant. Once the namespace quota assigned to the Tenant has been reached, the Tenant owner cannot create further namespaces. Optional.
+                    format: int32
+                    minimum: 1
+                    type: integer
                 type: object
               networkPolicies:
                 description: Specifies the NetworkPolicies assigned to the Tenant. The assigned NetworkPolicies are inherited by any namespace created in the Tenant. Optional.
