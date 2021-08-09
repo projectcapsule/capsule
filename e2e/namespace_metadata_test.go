@@ -30,11 +30,11 @@ var _ = Describe("creating a Namespace for a Tenant with additional metadata", f
 			},
 			NamespaceOptions: &capsulev1beta1.NamespaceOptions{
 				AdditionalMetadata: &capsulev1beta1.AdditionalMetadataSpec{
-					AdditionalLabels: map[string]string{
+					Labels: map[string]string{
 						"k8s.io/custom-label":     "foo",
 						"clastix.io/custom-label": "bar",
 					},
-					AdditionalAnnotations: map[string]string{
+					Annotations: map[string]string{
 						"k8s.io/custom-annotation":     "bizz",
 						"clastix.io/custom-annotation": "buzz",
 					},
@@ -60,7 +60,7 @@ var _ = Describe("creating a Namespace for a Tenant with additional metadata", f
 		By("checking additional labels", func() {
 			Eventually(func() (ok bool) {
 				Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: ns.GetName()}, ns)).Should(Succeed())
-				for k, v := range tnt.Spec.NamespaceOptions.AdditionalMetadata.AdditionalLabels {
+				for k, v := range tnt.Spec.NamespaceOptions.AdditionalMetadata.Labels {
 					if ok, _ = HaveKeyWithValue(k, v).Match(ns.Labels); !ok {
 						return
 					}
@@ -71,7 +71,7 @@ var _ = Describe("creating a Namespace for a Tenant with additional metadata", f
 		By("checking additional annotations", func() {
 			Eventually(func() (ok bool) {
 				Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: ns.GetName()}, ns)).Should(Succeed())
-				for k, v := range tnt.Spec.NamespaceOptions.AdditionalMetadata.AdditionalAnnotations {
+				for k, v := range tnt.Spec.NamespaceOptions.AdditionalMetadata.Annotations {
 					if ok, _ = HaveKeyWithValue(k, v).Match(ns.Annotations); !ok {
 						return
 					}
