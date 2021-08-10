@@ -1218,11 +1218,11 @@ spec:
                   description: How many namespaces are assigned to the Tenant.
                   type: integer
                 state:
-                  default: active
-                  description: The operational state of the Tenant. Possible values are "active", "cordoned".
+                  default: Active
+                  description: The operational state of the Tenant. Possible values are "Active", "Cordoned".
                   enum:
-                    - cordoned
-                    - active
+                    - Cordoned
+                    - Active
                   type: string
               required:
                 - size
