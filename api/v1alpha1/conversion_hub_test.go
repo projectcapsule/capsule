@@ -36,10 +36,10 @@ func generateTenantsSpecs() (Tenant, capsulev1beta1.Tenant) {
 		Regex: "^foo*",
 	}
 	var v1beta1AdditionalMetadataSpec = &capsulev1beta1.AdditionalMetadataSpec{
-		AdditionalLabels: map[string]string{
+		Labels: map[string]string{
 			"foo": "bar",
 		},
-		AdditionalAnnotations: map[string]string{
+		Annotations: map[string]string{
 			"foo": "bar",
 		},
 	}

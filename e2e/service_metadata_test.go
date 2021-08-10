@@ -35,11 +35,11 @@ var _ = Describe("adding metadata to Service objects", func() {
 			},
 			ServiceOptions: &capsulev1beta1.ServiceOptions{
 				AdditionalMetadata: &capsulev1beta1.AdditionalMetadataSpec{
-					AdditionalLabels: map[string]string{
+					Labels: map[string]string{
 						"k8s.io/custom-label":     "foo",
 						"clastix.io/custom-label": "bar",
 					},
-					AdditionalAnnotations: map[string]string{
+					Annotations: map[string]string{
 						"k8s.io/custom-annotation":     "bizz",
 						"clastix.io/custom-annotation": "buzz",
 					},
@@ -100,7 +100,7 @@ var _ = Describe("adding metadata to Service objects", func() {
 		By("checking additional labels", func() {
 			Eventually(func() (ok bool) {
 				Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: svc.GetName(), Namespace: ns.GetName()}, svc)).Should(Succeed())
-				for k, v := range tnt.Spec.ServiceOptions.AdditionalMetadata.AdditionalLabels {
+				for k, v := range tnt.Spec.ServiceOptions.AdditionalMetadata.Labels {
 					ok, _ = HaveKeyWithValue(k, v).Match(svc.Labels)
 					if !ok {
 						return false
@@ -112,7 +112,7 @@ var _ = Describe("adding metadata to Service objects", func() {
 		By("checking additional annotations", func() {
 			Eventually(func() (ok bool) {
 				Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: svc.GetName(), Namespace: ns.GetName()}, svc)).Should(Succeed())
-				for k, v := range tnt.Spec.ServiceOptions.AdditionalMetadata.AdditionalAnnotations {
+				for k, v := range tnt.Spec.ServiceOptions.AdditionalMetadata.Annotations {
 					ok, _ = HaveKeyWithValue(k, v).Match(svc.Annotations)
 					if !ok {
 						return false
@@ -155,7 +155,7 @@ var _ = Describe("adding metadata to Service objects", func() {
 		By("checking additional labels", func() {
 			Eventually(func() (ok bool) {
 				Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: ep.GetName(), Namespace: ns.GetName()}, ep)).Should(Succeed())
-				for k, v := range tnt.Spec.ServiceOptions.AdditionalMetadata.AdditionalLabels {
+				for k, v := range tnt.Spec.ServiceOptions.AdditionalMetadata.Labels {
 					ok, _ = HaveKeyWithValue(k, v).Match(ep.Labels)
 					if !ok {
 						return false
@@ -167,7 +167,7 @@ var _ = Describe("adding metadata to Service objects", func() {
 		By("checking additional annotations", func() {
 			Eventually(func() (ok bool) {
 				Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: ep.GetName(), Namespace: ns.GetName()}, ep)).Should(Succeed())
-				for k, v := range tnt.Spec.ServiceOptions.AdditionalMetadata.AdditionalAnnotations {
+				for k, v := range tnt.Spec.ServiceOptions.AdditionalMetadata.Annotations {
 					ok, _ = HaveKeyWithValue(k, v).Match(ep.Annotations)
 					if !ok {
 						return false
@@ -214,7 +214,7 @@ var _ = Describe("adding metadata to Service objects", func() {
 		By("checking additional annotations EndpointSlice", func() {
 			Eventually(func() (ok bool) {
 				Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: eps.GetName(), Namespace: ns.GetName()}, eps)).Should(Succeed())
-				for k, v := range tnt.Spec.ServiceOptions.AdditionalMetadata.AdditionalAnnotations {
+				for k, v := range tnt.Spec.ServiceOptions.AdditionalMetadata.Annotations {
 					ok, _ = HaveKeyWithValue(k, v).Match(eps.Annotations)
 					if !ok {
 						return false
@@ -226,7 +226,7 @@ var _ = Describe("adding metadata to Service objects", func() {
 		By("checking additional labels on EndpointSlice", func() {
 			Eventually(func() (ok bool) {
 				Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: eps.GetName(), Namespace: ns.GetName()}, eps)).Should(Succeed())
-				for k, v := range tnt.Spec.ServiceOptions.AdditionalMetadata.AdditionalLabels {
+				for k, v := range tnt.Spec.ServiceOptions.AdditionalMetadata.Labels {
 					ok, _ = HaveKeyWithValue(k, v).Match(eps.Labels)
 					if !ok {
 						return false

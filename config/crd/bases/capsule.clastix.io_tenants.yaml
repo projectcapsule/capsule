@@ -750,11 +750,11 @@ spec:
                   additionalMetadata:
                     description: Specifies additional labels and annotations the Capsule operator places on any Namespace resource in the Tenant. Optional.
                     properties:
-                      additionalAnnotations:
+                      annotations:
                         additionalProperties:
                           type: string
                         type: object
-                      additionalLabels:
+                      labels:
                         additionalProperties:
                           type: string
                         type: object
@@ -1144,11 +1144,11 @@ spec:
                   additionalMetadata:
                     description: Specifies additional labels and annotations the Capsule operator places on any Service resource in the Tenant. Optional.
                     properties:
-                      additionalAnnotations:
+                      annotations:
                         additionalProperties:
                           type: string
                         type: object
-                      additionalLabels:
+                      labels:
                         additionalProperties:
                           type: string
                         type: object
