@@ -41,7 +41,7 @@ func (i ingressHostnameCollision) Error() string {
 }
 
 func NewIngressHostnameCollision(hostname string) error {
-	return ingressHostnameCollision{hostname: hostname}
+	return &ingressHostnameCollision{hostname: hostname}
 }
 
 func NewIngressHostnamesNotValid(invalidHostnames []string, notMatchingHostnames []string, spec capsulev1beta1.AllowedListSpec) error {
