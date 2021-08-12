@@ -688,8 +688,6 @@ spec:
   userGroups: ["capsule.clastix.io"]
   forceTenantPrefix: false
   protectedNamespaceRegex: ""
-  allowTenantIngressHostnamesCollision: false
-  allowIngressHostnameCollision: false
 ```
 
 Option | Description | Default
@@ -697,8 +695,6 @@ Option | Description | Default
 `.spec.forceTenantPrefix` | Force the tenant name as prefix for namespaces: `<tenant_name>-<namespace>`.  | `false`
 `.spec.userGroups` | Array of Capsule groups to which all tenant owners must belong. | `[capsule.clastix.io]`
 `.spec.protectedNamespaceRegex` | Disallows creation of namespaces matching the passed regexp. | `null`
-`.spec.allowTenantIngressHostnamesCollision` | By default, Capsule allows Ingress hostname collision: set to `false` to enforce this policy. | `true`
-`.spec.allowIngressHostnameCollision` | Toggling this, Capsule will not check if a hostname collision is in place, allowing the creation of two or more Tenant resources although sharing the same allowed hostname(s). | `false`
 
 Upon installation using Kustomize or Helm, a `default` resource will be created.
 The reference to this configuration is managed by the CLI flag `--configuration-name`. 
