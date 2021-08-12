@@ -18,9 +18,9 @@ spec:
     allowedRegex: ^\w+.gcr.io$
   serviceOptions:
     additionalMetadata:
-      additionalAnnotations:
+      annotations:
         capsule.clastix.io/bgp: "true"
-      additionalLabels:
+      labels:
         capsule.clastix.io/pool: gas
     allowedServices:
       nodePort: false
@@ -73,12 +73,13 @@ spec:
             min:
               storage: 1Gi
             type: PersistentVolumeClaim
-  namespaceQuota: 3
-  namespacesMetadata:
-    additionalAnnotations:
-      capsule.clastix.io/backup: "false"
-    additionalLabels:
-      capsule.clastix.io/tenant: gas
+  namespaceOptions:
+    quota: 3
+    additionalMetadata:
+      annotations:
+        capsule.clastix.io/backup: "false"
+      labels:
+        capsule.clastix.io/tenant: gas
   networkPolicies:
     items:
       -
