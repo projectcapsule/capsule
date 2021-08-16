@@ -6,9 +6,13 @@ metadata:
   namespace: {{ .Values.serviceMonitor.namespace | default .Release.Namespace }}
   labels:
     {{- include "capsule.labels" . | nindent 4 }}
-    {{- if .Values.serviceMonitor.labels }}
-    {{- toYaml .Values.serviceMonitor.labels | nindent 4 }}
+    {{- with .Values.serviceMonitor.labels }}
+    {{- toYaml . | nindent 4 }}
     {{- end }}
+  {{- with .Values.serviceMonitor.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 spec:
   endpoints:
   - interval: 15s
@@ -16,7 +20,11 @@ spec:
     path: /metrics
   jobLabel: app.kubernetes.io/name
   selector:
-    matchLabels: {{ include "capsule.labels" . | nindent 6 }}
+    matchLabels:
+    {{- include "capsule.labels" . | nindent 6 }}
+    {{- with .Values.serviceMonitor.matchLabels }}
+    {{- toYaml . | nindent 6 }}
+    {{- end }}
   namespaceSelector:
     matchNames:
       - {{ .Release.Namespace }}
