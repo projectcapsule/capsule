@@ -5,6 +5,10 @@ metadata:
   name: {{ include "capsule.fullname" . }}
   labels:
     {{- include "capsule.labels" . | nindent 4 }}
+  {{- with .Values.customAnnotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 spec:
   fsGroup:
     rule: RunAsAny

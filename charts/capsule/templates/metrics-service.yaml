@@ -4,6 +4,10 @@ metadata:
   name: {{ include "capsule.fullname" . }}-controller-manager-metrics-service
   labels:
     {{- include "capsule.labels" . | nindent 4 }}
+  {{- with .Values.customAnnotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 spec:
   ports:
   - port: 8080

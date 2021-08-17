@@ -2,6 +2,12 @@ apiVersion: capsule.clastix.io/v1alpha1
 kind: CapsuleConfiguration
 metadata:
   name: default
+  labels:
+  {{- include "capsule.labels" . | nindent 4 }}
+  {{- with .Values.customAnnotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 spec:
   forceTenantPrefix: {{ .Values.manager.options.forceTenantPrefix }}
   userGroups:
