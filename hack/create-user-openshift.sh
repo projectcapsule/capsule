@@ -65,6 +65,7 @@ kind: CertificateSigningRequest
 metadata:
   name: ${USER}-${TENANT}
 spec:
+  signerName: kubernetes.io/kube-apiserver-client
   groups:
   - system:authenticated
   request: $(cat ${TMPDIR}/${USER}-${TENANT}.csr | base64 | tr -d '\n')
