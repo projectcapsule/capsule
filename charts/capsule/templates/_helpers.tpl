@@ -40,6 +40,9 @@ helm.sh/chart: {{ include "capsule.chart" . }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 {{- end }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
+{{- if .Values.customLabels }}
+{{ toYaml .Values.customLabels }}
+{{- end }}
 {{- end }}
 
 {{/*
@@ -49,6 +52,19 @@ Selector labels
 app.kubernetes.io/name: {{ include "capsule.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
+
+{{/*
+ServiceAccount annotations
+*/}}
+{{- define "capsule.serviceAccountAnnotations" -}}
+{{- if .Values.serviceAccount.annotations }}
+{{- toYaml .Values.serviceAccount.annotations }}
+{{- end }}
+{{- if .Values.customAnnotations }}
+{{ toYaml .Values.customAnnotations }}
+{{- end }}
+{{- end }}
+
 
 {{/*
 Create the name of the service account to use

@@ -3,5 +3,9 @@ kind: Secret
 metadata:
   labels:
     {{- include "capsule.labels" . | nindent 4 }}
+  {{- with .Values.customAnnotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
   name: {{ include "capsule.secretCaName" . }}
 data:

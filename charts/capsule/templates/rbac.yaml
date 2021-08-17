@@ -4,6 +4,10 @@ metadata:
   name: {{ include "capsule.fullname" . }}-proxy-role
   labels:
     {{- include "capsule.labels" . | nindent 4 }}
+  {{- with .Values.customAnnotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 rules:
 - apiGroups:
   - authentication.k8s.io
@@ -24,6 +28,10 @@ metadata:
   name: {{ include "capsule.fullname" . }}-metrics-reader
   labels:
     {{- include "capsule.labels" . | nindent 4 }}
+  {{- with .Values.customAnnotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 rules:
 - nonResourceURLs:
   - /metrics
@@ -36,6 +44,10 @@ metadata:
   name: {{ include "capsule.fullname" . }}-proxy-rolebinding
   labels:
     {{- include "capsule.labels" . | nindent 4 }}
+  {{- with .Values.customAnnotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
@@ -51,6 +63,10 @@ metadata:
   name: {{ include "capsule.fullname" . }}-manager-rolebinding
   labels:
     {{- include "capsule.labels" . | nindent 4 }}
+  {{- with .Values.customAnnotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole

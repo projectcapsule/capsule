@@ -4,9 +4,13 @@ kind: Role
 metadata:
   labels:
     {{- include "capsule.labels" . | nindent 4 }}
-    {{- if .Values.serviceMonitor.labels }}
+  {{- if .Values.serviceMonitor.labels }}
     {{- toYaml .Values.serviceMonitor.labels | nindent 4 }}
-    {{- end }}
+  {{- end }}
+  {{- with .Values.customAnnotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
   name: {{ include "capsule.fullname" . }}-metrics-role
   namespace: {{ .Values.serviceMonitor.namespace | default .Release.Namespace }}
 rules:

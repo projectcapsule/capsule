@@ -94,7 +94,8 @@ Parameter | Description | Default
 `serviceMonitor.enabled` | Specify if a Service Monitor must be created. | `false`
 `serviceMonitor.serviceAccount.name` | Specify Service Account name for metrics scrape. | `capsule`
 `serviceMonitor.serviceAccount.namespace` | Specify Service Account namespace for metrics scrape. | `capsule-system`
-
+`customLabels` | Additional labels which will be added to all resources created by Capsule helm chart . | `{}`
+`customAnnotations` | Additional annotations which will be added to all resources created by Capsule helm chart . | `{}`
 ## Created resources
 
 This Helm Chart cretes the following Kubernetes resources in the release namespace:

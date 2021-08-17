@@ -4,6 +4,10 @@ metadata:
   name: {{ include "capsule.fullname" . }}-validating-webhook-configuration
   labels:
     {{- include "capsule.labels" . | nindent 4 }}
+  {{- with .Values.customAnnotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 webhooks:
 - admissionReviewVersions:
     - v1
