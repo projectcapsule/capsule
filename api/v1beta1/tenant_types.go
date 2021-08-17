@@ -33,7 +33,7 @@ type TenantSpec struct {
 	AdditionalRoleBindings []AdditionalRoleBindingsSpec `json:"additionalRoleBindings,omitempty"`
 	// Specify the allowed values for the imagePullPolicies option in Pod resources. Capsule assures that all Pod resources created in the Tenant can use only one of the allowed policy. Optional.
 	ImagePullPolicies []ImagePullPolicySpec `json:"imagePullPolicies,omitempty"`
-	// Specifies the allowed IngressClasses assigned to the Tenant. Capsule assures that all Ingress resources created in the Tenant can use only one of the allowed IngressClasses. Optional.
+	// Specifies the allowed priorityClasses assigned to the Tenant. Capsule assures that all Pods resources created in the Tenant can use only one of the allowed PriorityClasses. Optional.
 	PriorityClasses *AllowedListSpec `json:"priorityClasses,omitempty"`
 }
 
