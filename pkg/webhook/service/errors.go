@@ -51,3 +51,13 @@ func NewExternalNameDisabledError() error {
 func (externalNameDisabled) Error() string {
 	return "ExternalName service types are forbidden for the tenant: please, reach out to the system administrators"
 }
+
+type loadBalancerDisabled struct{}
+
+func NewLoadBalancerDisabled() error {
+	return &loadBalancerDisabled{}
+}
+
+func (loadBalancerDisabled) Error() string {
+	return "LoadBalancer service types are forbidden for the tenant: please, reach out to the system administrators"
+}

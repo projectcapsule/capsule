@@ -52,6 +52,7 @@ func generateTenantsSpecs() (Tenant, capsulev1beta1.Tenant) {
 		AllowedServices: &capsulev1beta1.AllowedServices{
 			NodePort:     pointer.BoolPtr(false),
 			ExternalName: pointer.BoolPtr(false),
+			LoadBalancer: pointer.BoolPtr(false),
 		},
 		ExternalServiceIPs: &capsulev1beta1.ExternalServiceIPsSpec{
 			Allowed: []capsulev1beta1.AllowedIP{"192.168.0.1"},
@@ -285,6 +286,7 @@ func generateTenantsSpecs() (Tenant, capsulev1beta1.Tenant) {
 				podAllowedImagePullPolicyAnnotation:  "Always,IfNotPresent",
 				enableExternalNameAnnotation:         "false",
 				enableNodePortsAnnotation:            "false",
+				enableLoadBalancerAnnotation:         "false",
 				podPriorityAllowedAnnotation:         "default",
 				podPriorityAllowedRegexAnnotation:    "^tier-.*$",
 				ownerGroupsAnnotation:                "owner-foo,owner-bar",

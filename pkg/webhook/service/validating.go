@@ -60,6 +60,14 @@ func (r *handler) handleService(ctx context.Context, clt client.Client, decoder 
 		return &response
 	}
 
+	if svc.Spec.Type == corev1.ServiceTypeLoadBalancer && tnt.Spec.ServiceOptions != nil && tnt.Spec.ServiceOptions.AllowedServices != nil && !*tnt.Spec.ServiceOptions.AllowedServices.LoadBalancer {
+		recorder.Eventf(&tnt, corev1.EventTypeWarning, "ForbiddenLoadBalancer", "Service %s/%s cannot be type of LoadBalancer for the current Tenant", req.Namespace, req.Name)
+
+		response := admission.Denied(NewLoadBalancerDisabled().Error())
+
+		return &response
+	}
+
 	if svc.Spec.ExternalIPs == nil || (tnt.Spec.ServiceOptions == nil || tnt.Spec.ServiceOptions.ExternalServiceIPs == nil) {
 		return nil
 	}
