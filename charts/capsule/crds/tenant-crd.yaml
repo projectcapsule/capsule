@@ -1189,6 +1189,10 @@ spec:
                           default: true
                           description: Specifies if ExternalName service type resources are allowed for the Tenant. Default is true. Optional.
                           type: boolean
+                        loadBalancer:
+                          default: true
+                          description: Specifies if LoadBalancer service type resources are allowed for the Tenant. Default is true. Optional.
+                          type: boolean
                         nodePort:
                           default: true
                           description: Specifies if NodePort service type resources are allowed for the Tenant. Default is true. Optional.
