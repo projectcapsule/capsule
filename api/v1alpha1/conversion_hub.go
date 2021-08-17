@@ -26,6 +26,7 @@ const (
 
 	enableNodePortsAnnotation    = "capsule.clastix.io/enable-node-ports"
 	enableExternalNameAnnotation = "capsule.clastix.io/enable-external-name"
+	enableLoadBalancerAnnotation = "capsule.clastix.io/enable-loadbalancer-service"
 
 	ownerGroupsAnnotation         = "owners.capsule.clastix.io/group"
 	ownerUsersAnnotation          = "owners.capsule.clastix.io/user"
@@ -297,6 +298,21 @@ func (t *Tenant) ConvertTo(dstRaw conversion.Hub) error {
 		dst.Spec.ServiceOptions.AllowedServices.ExternalName = pointer.BoolPtr(val)
 	}
 
+	loadBalancerService, ok := annotations[enableLoadBalancerAnnotation]
+	if ok {
+		val, err := strconv.ParseBool(loadBalancerService)
+		if err != nil {
+			return errors.Wrap(err, fmt.Sprintf("unable to parse %s annotation on tenant %s", enableLoadBalancerAnnotation, t.GetName()))
+		}
+		if dst.Spec.ServiceOptions == nil {
+			dst.Spec.ServiceOptions = &capsulev1beta1.ServiceOptions{}
+		}
+		if dst.Spec.ServiceOptions.AllowedServices == nil {
+			dst.Spec.ServiceOptions.AllowedServices = &capsulev1beta1.AllowedServices{}
+		}
+		dst.Spec.ServiceOptions.AllowedServices.LoadBalancer = pointer.BoolPtr(val)
+	}
+
 	// Status
 	dst.Status = capsulev1beta1.TenantStatus{
 		Size:       t.Status.Size,
@@ -309,6 +325,7 @@ func (t *Tenant) ConvertTo(dstRaw conversion.Hub) error {
 	delete(dst.ObjectMeta.Annotations, podPriorityAllowedRegexAnnotation)
 	delete(dst.ObjectMeta.Annotations, enableNodePortsAnnotation)
 	delete(dst.ObjectMeta.Annotations, enableExternalNameAnnotation)
+	delete(dst.ObjectMeta.Annotations, enableLoadBalancerAnnotation)
 	delete(dst.ObjectMeta.Annotations, ownerGroupsAnnotation)
 	delete(dst.ObjectMeta.Annotations, ownerUsersAnnotation)
 	delete(dst.ObjectMeta.Annotations, ownerServiceAccountAnnotation)
@@ -530,6 +547,7 @@ func (t *Tenant) ConvertFrom(srcRaw conversion.Hub) error {
 	if src.Spec.ServiceOptions != nil && src.Spec.ServiceOptions.AllowedServices != nil {
 		t.Annotations[enableNodePortsAnnotation] = strconv.FormatBool(*src.Spec.ServiceOptions.AllowedServices.NodePort)
 		t.Annotations[enableExternalNameAnnotation] = strconv.FormatBool(*src.Spec.ServiceOptions.AllowedServices.ExternalName)
+		t.Annotations[enableLoadBalancerAnnotation] = strconv.FormatBool(*src.Spec.ServiceOptions.AllowedServices.LoadBalancer)
 	}
 
 	// Status
