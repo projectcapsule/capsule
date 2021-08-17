@@ -1173,7 +1173,7 @@ spec:
                   type: object
                 type: array
               priorityClasses:
-                description: Specifies the allowed IngressClasses assigned to the Tenant. Capsule assures that all Ingress resources created in the Tenant can use only one of the allowed IngressClasses. Optional.
+                description: Specifies the allowed priorityClasses assigned to the Tenant. Capsule assures that all Pods resources created in the Tenant can use only one of the allowed PriorityClasses. Optional.
                 properties:
                   allowed:
                     items:
