@@ -7,6 +7,15 @@ on:
     branches: [ "*" ]
 
 jobs:
+  commit_lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - uses: wagoid/commitlint-github-action@v2
+        with:
+          firstParent: true
   golangci:
     name: lint
     runs-on: ubuntu-latest
