@@ -67,7 +67,7 @@ Parameter | Description | Default
 `manager.hostNetwork` | Specifies if the container should be started in `hostNetwork` mode. | `false` 
 `manager.options.logLevel` | Set the log verbosity of the controller with a value from 1 to 10.| `4`
 `manager.options.forceTenantPrefix` | Boolean, enforces the Tenant owner, during Namespace creation, to name it using the selected Tenant name as prefix, separated by a dash | `false`
-`manager.options.capsuleUserGroup` | Override the Capsule user group | `capsule.clastix.io`
+`manager.options.capsuleUserGroups` | Override the Capsule user groups | `[capsule.clastix.io]`
 `manager.options.protectedNamespaceRegex` | If specified, disallows creation of namespaces matching the passed regexp | `null`
 `manager.image.repository` | Set the image repository of the controller. | `quay.io/clastix/capsule`
 `manager.image.tag` | Overrides the image tag whose default is the chart. `appVersion` | `null`
@@ -91,11 +91,12 @@ Parameter | Description | Default
 `replicaCount` | Set the replica count for Capsule pod. | `1`
 `affinity` | Set affinity rules for the Capsule pod. | `{}`
 `podSecurityPolicy.enabled` | Specify if a Pod Security Policy must be created. | `false`
-`serviceMonitor.enabled` | Specify if a Service Monitor must be created. | `false`
+`serviceMonitor.enabled` | Specify if a Service Monitor must be created. You must have the Prometheus Operator installed when enabled. | `false`
 `serviceMonitor.serviceAccount.name` | Specify Service Account name for metrics scrape. | `capsule`
 `serviceMonitor.serviceAccount.namespace` | Specify Service Account namespace for metrics scrape. | `capsule-system`
 `customLabels` | Additional labels which will be added to all resources created by Capsule helm chart . | `{}`
 `customAnnotations` | Additional annotations which will be added to all resources created by Capsule helm chart . | `{}`
+
 ## Created resources
 
 This Helm Chart cretes the following Kubernetes resources in the release namespace:
