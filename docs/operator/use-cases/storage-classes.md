@@ -38,7 +38,7 @@ spec:
 EOF
 ```
 
-Any attempt of Alice to use a non valid Storage Class, or missing it, is denied by the Validation Webhook enforcing it.
+Any attempt of Alice to use a non-valid Storage Class, or missing it, is denied by the Validation Webhook enforcing it.
 
 # What’s next
 See how Bill, the cluster admin, can assign Network Policies to Alice's tenant. [Assign Network Policies](./network-policies.md).

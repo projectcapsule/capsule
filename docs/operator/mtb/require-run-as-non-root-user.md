@@ -8,7 +8,7 @@
 
 **Description:** Control container permissions.
 
-**Rationale:** Processes in containers run as the root user (uid 0), by default. To prevent potential compromise of container hosts, specify a least privileged user ID when building the container image and require that application containers run as non root users.
+**Rationale:** Processes in containers run as the root user (uid 0), by default. To prevent potential compromise of container hosts, specify a least-privileged user ID when building the container image and require that application containers run as non-root users.
 
 **Audit:**
 

@@ -1,5 +1,5 @@
 # Control hostname collision in ingresses
-In a multi-tenant environment, as more and more ingresses are defined, there is a chance of collision on the hostname leading to an unpredictable behaviour of the Ingress Controller. Bill, the cluster admin, can enforce hostname collision detection at different scope level:
+In a multi-tenant environment, as more and more ingresses are defined, there is a chance of collision on the hostname leading to unpredictable behavior of the Ingress Controller. Bill, the cluster admin, can enforce hostname collision detection at different scope levels:
 
 1. Cluster
 2. Tenant
@@ -25,7 +25,7 @@ EOF
 
 When a tenant owner creates an Ingress resource, Capsule will check the collision of hostname in the current ingress with all the hostnames already used, depending on the defined scope.
 
-For example, Alice, one of the tenant owner, creates an Ingress
+For example, Alice, one of the tenant owners, creates an Ingress
 
 
 ```yaml

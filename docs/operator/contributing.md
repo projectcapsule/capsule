@@ -27,7 +27,7 @@ the CRDs manifests, as well the deep copy functions, require _Operator SDK_:
 the binary has to be installed into your `PATH`.
 
 ### Installing Kubebuilder
-With the latest release of OperatorSDK there's a more tightly integration with
+With the latest release of OperatorSDK there's a more tighten integration with
 Kubebuilder and its opinionated testing suite: ensure to download the latest
 binaries available from the _Releases_ GitHub page and place them into the
 `/usr/local/kubebuilder/bin` folder, ensuring this is also in your `PATH`.
@@ -97,7 +97,7 @@ You can check if Capsule is running tailing the logs:
 ```
 
 Since Capsule is built using _OperatorSDK_, logging is handled by the zap
-module: log verbosity of the Capsule controller can be increased by passing
+module: log verbosity of the Capsule controller can be increased passing
 the `--zap-log-level` option with a value from `1` to `10` or the
 [basic keywords](https://godoc.org/go.uber.org/zap/zapcore#Level) although
 it is suggested to use the `--zap-devel` flag to get also stack traces.
@@ -124,7 +124,7 @@ deployment.apps/capsule-controller-manager scaled
 > This is mandatory since Capsule uses Leader Election
 
 #### Providing TLS certificate for webhooks
-Next step is to replicate the same environment Capsule is expecting in the Pod,
+The next step is to replicate the same environment Capsule is expecting in the Pod,
 it means creating a fake certificate to handle HTTP requests.
 
 ``` bash
@@ -133,8 +133,8 @@ kubectl -n capsule-system get secret capsule-tls -o jsonpath='{.data.tls\.crt}' 
 kubectl -n capsule-system get secret capsule-tls -o jsonpath='{.data.tls\.key}' | base64 -d > /tmp/k8s-webhook-server/serving-certs/tls.key
 ```
 
-> We're using the certificates generate upon first installation of Capsule:
-> it means the Secret will be populated at first start-up.
+> We're using the certificates generate upon the first installation of Capsule:
+> it means the Secret will be populated at the first start-up.
 > If you plan to run it locally since the beginning, it means you will require
 > to provide a self-signed certificate in the said directory.
 
@@ -242,10 +242,10 @@ A commit description is welcomed to explain more the changes: just ensure
 to put a blank line and an arbitrary number of maximum 72 characters long
 lines, at most one blank line between them.
 
-Please, split changes into several and documented small commits: this will help us to perform a better review. Commits must follow the the Conventional Commits Specification, a lightweight convention on top of commit messages. It provides an easy set of rules for creating an explicit commit history; which makes it easier to write automated tools on top of. This convention dovetails with Semantic Versioning, by describing the features, fixes, and breaking changes made in commit messages. See [Conventional Commits Specification](https://www.conventionalcommits.org) to learn about Conventional Commits.
+Please, split changes into several and documented small commits: this will help us to perform a better review. Commits must follow the Conventional Commits Specification, a lightweight convention on top of commit messages. It provides an easy set of rules for creating an explicit commit history; which makes it easier to write automated tools on top of. This convention dovetails with Semantic Versioning, by describing the features, fixes, and breaking changes made in commit messages. See [Conventional Commits Specification](https://www.conventionalcommits.org) to learn about Conventional Commits.
 
 > In case of errors or need of changes to previous commits,
 > fix them squashing to make changes atomic.
 
 ### Miscellanea
-Please, add a new single line at end of any file as current coding style.
+Please, add a new single line at end of any file as the current coding style.

@@ -6,7 +6,7 @@
 
 **Category:** Self-Service Operations
 
-**Description:** Tenants should be able to perform self-service operations by creating own rolebindings in their namespaces.
+**Description:** Tenants should be able to perform self-service operations by creating their rolebindings in their namespaces.
 
 **Rationale:** Enables self-service management of roles.
 

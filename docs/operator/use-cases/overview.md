@@ -1,8 +1,8 @@
 # Use cases for Capsule
-Using Capsule, a cluster admin can implement complex multi-tenant scenarios for both public and private deployments. Here a list of common scenarios addressed by Capsule.
+Using Capsule, a cluster admin can implement complex multi-tenant scenarios for both public and private deployments. Here is a list of common scenarios addressed by Capsule.
 
 # Container as a Service (CaaS)
-***Acme Corp***, our sample organization, built a Container as a Service platform (CaaS), based on Kubernetes to serve multiple lines of business. Each line of business, has its own team of engineers that are responsible for development, deployment, and operating their digital products.
+***Acme Corp***, our sample organization, built a Container as a Service platform (CaaS), based on Kubernetes to serve multiple lines of business. Each line of business has its team of engineers that are responsible for the development, deployment, and operating of their digital products.
 
 To simplify the usage of Capsule in this scenario, we'll work with the following actors:
 
@@ -10,13 +10,13 @@ To simplify the usage of Capsule in this scenario, we'll work with the following
   he is the cluster administrator from the operations department of Acme Corp. and he is in charge of administration and maintains the CaaS platform.
 
 * ***Alice***:
-  she works as the IT Project Leader in the Oil & Gas Business Units. These are two new lines of business at Acme Corp. Alice is responsible for all the strategic IT projects in the two LOB's. She also is responsible for a team made of different job responsibilities (developers, administrators, SRE engineers, etc.) working in separate departments.
+  she works as the IT Project Leader in the Oil & Gas Business Units. These are two new lines of business at Acme Corp. Alice is responsible for all the strategic IT projects in the two LOBs. She also is responsible for a team made of different job responsibilities (developers, administrators, SRE engineers, etc.) working in separate departments.
   
 * ***Joe***:
   he works at Acme Corp, as a lead developer of a distributed team in Alice's organization. Joe is responsible for developing a mission-critical project in the Oil market.
 
 * ***Bob***:
-  he is the head of Engineering for the Water Business Unit, the main and historical line of business at Acme Corp. He is responsible for development, deployment, and operating multiple digital products in production for a large set of customers.
+  he is the head of Engineering for the Water Business Unit, the main and historical line of business at Acme Corp. He is responsible for the development, deployment, and operation of multiple digital products in production for a large set of customers.
 
 Use Capsule to address any of the following scenarios:
 

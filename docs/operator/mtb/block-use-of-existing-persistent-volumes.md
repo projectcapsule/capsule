@@ -8,7 +8,7 @@
 
 **Description:** Avoid a tenant to mount existing volumes`.
 
-**Rationale:** Tenants have to be assured that their Persisten Volumes cannot be reclaimed by other tenants.
+**Rationale:** Tenants have to be assured that their Persistent Volumes cannot be reclaimed by other tenants.
 
 **Audit:**
 

@@ -6,7 +6,7 @@
 
 **Category:** Self-Service Operations
 
-**Description:** Tenants should be able to perform self-service operations by creating own network policies in their namespaces.
+**Description:** Tenants should be able to perform self-service operations by creating their own network policies in their namespaces.
 
 **Rationale:** Enables self-service management of network-policies.
 
@@ -56,7 +56,7 @@ NAME            POD-SELECTOR   AGE
 capsule-oil-0   <none>         7m5s
 ```
 
-As tenant owner check for permissions to manage networkpolicy for each verb
+As a tenant, checks for permissions to manage networkpolicy for each verb
 
 ```bash 
 kubectl --kubeconfig alice auth can-i get networkpolicies

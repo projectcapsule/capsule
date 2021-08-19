@@ -6,7 +6,7 @@
 
 **Category:** Tenant Isolation
 
-**Description:** Each tenant has its own set of resources, such as namespaces, service accounts, secrets, pods, services, etc. Tenants should not be allowed to access eachother's resources.
+**Description:** Each tenant has its own set of resources, such as namespaces, service accounts, secrets, pods, services, etc. Tenants should not be allowed to access each other's resources.
 
 **Rationale:** Tenant's resources must be not accessible by other tenants.
 
@@ -69,10 +69,10 @@ As `oil` tenant owner, try to retrieve the resources in the `gas` tenant namespa
 kubectl --kubeconfig alice get serviceaccounts --namespace  gas-production 
 ```
 
-You must receive an eror message:
+You must receive an error message:
 
 ```
-Error from server (Forbidden): serviceaccounts is forbidden:
+Error from server (Forbidden): serviceaccount is forbidden:
 User "oil" cannot list resource "serviceaccounts" in API group "" in the namespace "gas-production"
 ```
 
@@ -82,10 +82,10 @@ As `gas` tenant owner, try to retrieve the resources in the `oil` tenant namespa
 kubectl --kubeconfig joe get serviceaccounts --namespace  oil-production 
 ```
 
-You must receive an eror message:
+You must receive an error message:
 
 ```
-Error from server (Forbidden): serviceaccounts is forbidden:
+Error from server (Forbidden): serviceaccount is forbidden:
 User "joe" cannot list resource "serviceaccounts" in API group "" in the namespace "oil-production"
 ```
 

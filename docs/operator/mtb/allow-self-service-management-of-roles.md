@@ -6,7 +6,7 @@
 
 **Category:** Self-Service Operations
 
-**Description:** Tenants should be able to perform self-service operations by creating own roles in their namespaces.
+**Description:** Tenants should be able to perform self-service operations by creating their own roles in their namespaces.
 
 **Rationale:** Enables self-service management of roles.
 
@@ -37,7 +37,7 @@ kubectl --kubeconfig alice create ns oil-production
 kubectl --kubeconfig alice config set-context --current --namespace oil-production
 ```
 
-As tenant owner check for permissions to manage roles for each verb
+As tenant owner, check for permissions to manage roles for each verb
 
 ```bash 
 kubectl --kubeconfig alice auth can-i get roles
