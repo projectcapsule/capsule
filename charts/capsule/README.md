@@ -1,6 +1,6 @@
 # Deploying the Capsule Operator
 
-Use the Capsule Operator for easily implementing, managing, and maintaining mutitenancy and access control in Kubernetes.
+Use the Capsule Operator for easily implementing, managing, and maintaining multitenancy and access control in Kubernetes.
 
 ## Requirements
 
@@ -91,21 +91,24 @@ Parameter | Description | Default
 `replicaCount` | Set the replica count for Capsule pod. | `1`
 `affinity` | Set affinity rules for the Capsule pod. | `{}`
 `podSecurityPolicy.enabled` | Specify if a Pod Security Policy must be created. | `false`
-`serviceMonitor.enabled` | Specify if a Service Monitor must be created. You must have the Prometheus Operator installed when enabled. | `false`
-`serviceMonitor.serviceAccount.name` | Specify Service Account name for metrics scrape. | `capsule`
-`serviceMonitor.serviceAccount.namespace` | Specify Service Account namespace for metrics scrape. | `capsule-system`
+`serviceMonitor.enabled` | Specifies if a service monitor must be created. | `false`
+`serviceMonitor.labels` | Additional labels which will be added to service monitor. | `{}`
+`serviceMonitor.annotations` | Additional annotations which will be added to service monitor. | `{}`
+`serviceMonitor.matchLabels` | Additional matchLabels which will be added to service monitor. | `{}`
+`serviceMonitor.serviceAccount.name` | Specifies service account name for metrics scrape. | `capsule`
+`serviceMonitor.serviceAccount.namespace` | Specifies service account namespace for metrics scrape. | `capsule-system`
 `customLabels` | Additional labels which will be added to all resources created by Capsule helm chart . | `{}`
 `customAnnotations` | Additional annotations which will be added to all resources created by Capsule helm chart . | `{}`
 
 ## Created resources
 
-This Helm Chart cretes the following Kubernetes resources in the release namespace:
+This Helm Chart creates the following Kubernetes resources in the release namespace:
 
 * Capsule Namespace
 * Capsule Operator Deployment
 * Capsule Service
 * CA Secret
-* Certfificate Secret
+* Certificate Secret
 * Tenant Custom Resource Definition
 * MutatingWebHookConfiguration
 * ValidatingWebHookConfiguration
