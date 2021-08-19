@@ -242,8 +242,7 @@ A commit description is welcomed to explain more the changes: just ensure
 to put a blank line and an arbitrary number of maximum 72 characters long
 lines, at most one blank line between them.
 
-Please, split changes into several and documented small commits: this will help
-us to perform a better review.
+Please, split changes into several and documented small commits: this will help us to perform a better review. Commits must follow the the Conventional Commits Specification, a lightweight convention on top of commit messages. It provides an easy set of rules for creating an explicit commit history; which makes it easier to write automated tools on top of. This convention dovetails with Semantic Versioning, by describing the features, fixes, and breaking changes made in commit messages. See [Conventional Commits Specification](https://www.conventionalcommits.org) to learn about Conventional Commits.
 
 > In case of errors or need of changes to previous commits,
 > fix them squashing to make changes atomic.
