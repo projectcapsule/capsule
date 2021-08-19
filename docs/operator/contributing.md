@@ -246,3 +246,6 @@ Please, split changes into several and documented small commits: this will help 
 
 > In case of errors or need of changes to previous commits,
 > fix them squashing to make changes atomic.
+
+### Miscellanea
+Please, add a new single line at end of any file as current coding style.
