@@ -58,7 +58,10 @@ openssl req -new -key ${TMPDIR}/tls.key -subj "/CN=${USER}${MERGED_GROUPS}" -out
 # Clean any previously created CSR for the same user.
 kubectl delete csr ${USER}-${TENANT} 2>/dev/null || true
 
+#
 # Create a new CSR file.
+#
+if [ $(kubectl version -o json | jq -r .serverVersion.minor) -gt 19 ]; then
 cat <<EOF > ${TMPDIR}/${USER}-${TENANT}-csr.yaml
 apiVersion: certificates.k8s.io/v1
 kind: CertificateSigningRequest
@@ -74,6 +77,22 @@ spec:
   - key encipherment
   - client auth
 EOF
+else
+cat <<EOF > ${TMPDIR}/${USER}-${TENANT}-csr.yaml
+apiVersion: certificates.k8s.io/v1beta1
+kind: CertificateSigningRequest
+metadata:
+  name: ${USER}-${TENANT}
+spec:
+  groups:
+  - system:authenticated
+  request: $(cat ${TMPDIR}/${USER}-${TENANT}.csr | base64 | tr -d '\n')
+  usages:
+  - digital signature
+  - key encipherment
+  - client auth
+EOF
+fi
 
 # Create the CSR
 kubectl apply -f ${TMPDIR}/${USER}-${TENANT}-csr.yaml
