@@ -1,5 +1,5 @@
 # Capsule on AWS EKS
-This is an example how to install AWS EKS cluster and one user
+This is an example of how to install AWS EKS cluster and one user
 manged by Capsule.
 
 It is based on [Using IAM Groups to manage Kubernetes access](https://www.eksworkshop.com/beginner/091_iam-groups/intro/)

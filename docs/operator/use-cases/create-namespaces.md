@@ -1,11 +1,11 @@
 # Create namespaces
-Alice, once logged with her own credentials, can create a new namespace in her tenant, as simply issuing:
+Alice, once logged with her credentials, can create a new namespace in her tenant, as simply issuing:
 
 ```
 kubectl create ns oil-production
 ```
 
-Alice started the name of the namespace prepended by the name of the tenant: this is not a strict requirement but it is highly suggested because it is likely that many different tenants would like to call their namespaces as `production`, `test`, or `demo`, etc.
+Alice started the name of the namespace prepended by the name of the tenant: this is not a strict requirement but it is highly suggested because it is likely that many different tenants would like to call their namespaces `production`, `test`, or `demo`, etc.
 
 The enforcement of this naming convention is optional and can be controlled by the cluster administrator with the `--force-tenant-prefix` option as an argument of the Capsule controller.
 

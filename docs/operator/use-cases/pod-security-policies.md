@@ -1,5 +1,5 @@
 # Assign Pod Security Policies
-Bill, the cluster admin, can assign a dedicated Pod Security Policy (PSP) to the Alice's tenant. This is likely to be a requirement in a multi-tenancy environment.
+Bill, the cluster admin, can assign a dedicated Pod Security Policy (PSP) to Alice's tenant. This is likely to be a requirement in a multi-tenancy environment.
 
 The cluster admin creates a PSP:
 

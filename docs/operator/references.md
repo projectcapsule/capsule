@@ -9,7 +9,7 @@
 
 ## Custom Resource Definition
 
-Capsule operator uses a Custom Resources Definition (CRD) for _Tenants_. In Caspule, Tenants are cluster wide resources. You need for cluster level permissions to work with tenants.
+Capsule operator uses a Custom Resources Definition (CRD) for _Tenants_. In Capsule, Tenants are cluster wide resources. You need cluster level permissions to work with tenants.
 
 You can learn about tenant CRD by the `kubectl explain` command:
 
@@ -24,15 +24,11 @@ DESCRIPTION:
 
 FIELDS:
    apiVersion   <string>
-     APIVersion defines the versioned schema of this representation of an
-     object. Servers should convert recognized schemas to the latest internal
-     value, and may reject unrecognized values. More info:
+     APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info:
      https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
 
    kind <string>
-     Kind is a string value representing the REST resource this object
-     represents. Servers may infer this from the endpoint the client submits
-     requests to. Cannot be updated. In CamelCase. More info:
+     Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info:
      https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
 
    metadata     <Object>
@@ -205,7 +201,7 @@ capsule-mutating-webhook-configuration     1          2h
 
 ## Command Options
 
-The Capsule operator provides following command options:
+The Capsule operator provides the following command options:
 
 Option | Description | Default
 --- | --- | ---
@@ -213,33 +209,8 @@ Option | Description | Default
 `--enable-leader-election` | Start a leader election client and gain leadership before executing the main loop. | `true`
 `--zap-log-level` | The log verbosity with a value from 1 to 10 or the basic keywords.  | `4`
 `--zap-devel` | The flag to get the stack traces for deep debugging.  | `null`
-`--configuration-name` | The Capsule Configuration CRD name, a default is installed automatically | `capsule-default`
+`--configuration-name` | The Capsule Configuration CRD name, default is installed automatically | `capsule-default`
 
-## Capsule Configuration
-
-The Capsule configuration can be piloted by a Custom Resource definition named `CapsuleConfiguration`.
-
-```yaml
-apiVersion: capsule.clastix.io/v1alpha1
-kind: CapsuleConfiguration
-metadata:
-  name: default
-spec:
-  userGroups: ["capsule.clastix.io"]
-  forceTenantPrefix: false
-  protectedNamespaceRegex: ""
-```
-
-Option | Description | Default
---- | --- | ---
-`.spec.forceTenantPrefix` | Force the tenant name as prefix for namespaces: `<tenant_name>-<namespace>`.  | `false`
-`.spec.userGroups` | Array of Capsule groups to which all tenant owners must belong. | `[capsule.clastix.io]`
-`.spec.protectedNamespaceRegex` | Disallows creation of namespaces matching the passed regexp. | `null`
-
-Upon installation using Kustomize or Helm, a `default` resource will be created.
-The reference to this configuration is managed by the CLI flag `--configuration-name`. 
-
->>>>>>> 0f3f6da... docs: updates structure for documentation
 
 ## Created Resources
 Once installed, the Capsule operator creates the following resources in your cluster:

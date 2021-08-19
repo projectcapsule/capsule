@@ -1,5 +1,5 @@
 # Taint namespaces
-With Capsule, Bill can _"taint"_ the namespaces created by Alice with an additional labels and/or annotations. There is no specific semantic assigned to these labels and annotations: they just will be assigned to the namespaces in the tenant as they are created by Alice. This can help the cluster admin to implement specific use cases. As for example, it can be used to implement backup as a service for namespaces in the tenant.
+With Capsule, Bill can _"taint"_ the namespaces created by Alice with additional labels and/or annotations. There is no specific semantic assigned to these labels and annotations: they just will be assigned to the namespaces in the tenant as they are created by Alice. This can help the cluster admin to implement specific use cases. As it can be used to implement backup as a service for namespaces in the tenant.
 
 Bill assigns additional labels and annotations to all namespaces created in the `oil` tenant: 
 

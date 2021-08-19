@@ -8,7 +8,7 @@
 
 **Description:** Control container permissions.
 
-**Rationale:** The security `allowPrivilegeEscalation` setting allows a process to gain more privileges from its parent process. Processes in tenant containers should not be allowed to gain additional priviliges.
+**Rationale:** The security `allowPrivilegeEscalation` setting allows a process to gain more privileges from its parent process. Processes in tenant containers should not be allowed to gain additional privileges.
 
 **Audit:**
 

@@ -8,7 +8,7 @@
 
 **Description:** Force a tenant to use a Storage Class with `reclaimPolicy=Delete`.
 
-**Rationale:** Tenants have to be assured that their Persisten Volumes cannot be reclaimed by other tenants.
+**Rationale:** Tenants have to be assured that their Persistent Volumes cannot be reclaimed by other tenants.
 
 **Audit:**
 

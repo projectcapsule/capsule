@@ -1,6 +1,6 @@
 # Monitoring Capsule
 
-The Capsule dashboard allows you to track the health and performance of Capsule manager and tenants, with particular attention to resources saturation, server responses and latencies.
+The Capsule dashboard allows you to track the health and performance of Capsule manager and tenants, with particular attention to resources saturation, server responses, and latencies.
 
 ## Requirements
 
@@ -76,7 +76,7 @@ making sure to select the correct Prometheus data source:
 
 ##### Description
 
-This section provides information about the medium time delay between manager client input, side effects and new state determination (reconciliation).
+This section provides information about the medium time delay between manager client input, side effects, and new state determination (reconciliation).
 
 ##### Dependant variables and available values
 
@@ -117,7 +117,7 @@ This section provides information about webhook requests response, mainly focusi
 
 ##### Description
 
-This section provides information about the medium time delay between webhook trigger, side effects and data written on etcd.
+This section provides information about the medium time delay between webhook trigger, side effects, and data written on etcd.
 
 ##### Dependant variables and available values
 
@@ -139,7 +139,7 @@ This section provides information about the medium time delay between webhook tr
 ##### Description
 
 This section provides information about the medium time delay between all the calls done by the controller and the API server.
-Data display may depends on the REST client verb considered and on available REST client URLs.
+Data display may depend on the REST client verb considered and on available REST client URLs.
 
 YMMV
 
@@ -175,7 +175,7 @@ This section provides information about resources, giving a detailed picture of 
 
 ##### Description
 
-This section provides information about "actions" in queue, particularly:
+This section provides information about "actions" in the queue, particularly:
 - Workqueue latency: time to complete a series of actions in the queue ;
 - Workqueue rate: number of actions per unit time ;
 - Workqueue depth: number of pending actions waiting in the queue.

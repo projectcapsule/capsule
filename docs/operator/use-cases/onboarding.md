@@ -1,9 +1,9 @@
 # Onboard a new tenant
-Bill, the cluster admin, receives a new request from Acme Corp.'s CTO asking for a new tenant to be onboarded and Alice user will be the tenant owner. Bill then assigns Alice's identity of `alice` in Acme Corp. identity management system. Since Alice is a tenant owner, Bill needs to assign `alice` the Capsule group defined by `--capsule-user-group` option, which defaults to `capsule.clastix.io`.
+Bill, the cluster admin, receives a new request from Acme Corp.'s CTO asking for a new tenant to be onboarded and Alice user will be the tenant owner. Bill then assigns Alice's identity of `alice` in the Acme Corp. identity management system. Since Alice is a tenant owner, Bill needs to assign `alice` the Capsule group defined by `--capsule-user-group` option, which defaults to `capsule.clastix.io`.
 
-To keep the things simple, we assume that Bill just creates a client certificate for authentication using X.509 Certificate Signing Request, so Alice's certificate has `"/CN=alice/O=capsule.clastix.io"`.
+To keep things simple, we assume that Bill just creates a client certificate for authentication using X.509 Certificate Signing Request, so Alice's certificate has `"/CN=alice/O=capsule.clastix.io"`.
 
-Bill creates a new tenant `oil` in the CaaS manangement portal according to the tenant's profile:
+Bill creates a new tenant `oil` in the CaaS management portal according to the tenant's profile:
 
 ```yaml
 kubectl create -f - << EOF
@@ -32,7 +32,7 @@ oil    Active                     0                                 33m
 
 Once the new tenant `oil` is in place, Bill sends the login credentials to Alice.
 
-Alice can log in using her own credentials and check if she can create a namespace
+Alice can log in using her credentials and check if she can create a namespace
 
 ```
 kubectl auth can-i create namespaces
@@ -84,7 +84,7 @@ spec:
 EOF
 ```
 
-However, it's more likely thet Bill assigns the ownership of the `oil` tenant to a group of users instead of a single one. Bill creates a new group account `oil-users` in the Acme Corp. identity management system and then he assigns Alice and Bob identities to the `oil-users` group.
+However, it's more likely that Bill assigns the ownership of the `oil` tenant to a group of users instead of a single one. Bill creates a new group account `oil-users` in the Acme Corp. identity management system and then he assigns Alice and Bob identities to the `oil-users` group.
 
 The tenant manifest is modified as in the following:
 
@@ -101,7 +101,7 @@ spec:
 EOF
 ```
 
-With the configuration above, any user belonging to the `oil-users` group will be owner of the `oil` tenant with the same permissions of Alice. For example, Bob can login with his own credentials and issue
+With the configuration above, any user belonging to the `oil-users` group will be the owner of the `oil` tenant with the same permissions of Alice. For example, Bob can log in with his credentials and issue
 
 ```
 kubectl auth can-i create namespaces
@@ -109,7 +109,7 @@ yes
 ```
 
 ## Assign a robot account as tenant owner
-As GitOps metodology is gaining more and more adoption everywhere, it's more likely that an application (Service Account) should act as Tenant Owner. In Capsule, a Tenant can also be owned by a Kubernetes _ServiceAccount_ identity.
+As GitOps methodology is gaining more and more adoption everywhere, it's more likely that an application (Service Account) should act as Tenant Owner. In Capsule, a Tenant can also be owned by a Kubernetes _ServiceAccount_ identity.
 
 The tenant manifest is modified as in the following:
 

@@ -6,9 +6,9 @@
 
 **Category:** Tenant Isolation
 
-**Description:** Each tenant namespace may contain resources setup by the cluster administrator for multi-tenancy, such as role bindings, and network policies. Tenants should not be allowed to modify the namespaced resources created by the cluster administrator for multi-tenancy. However, for some resources such as network policies, tenants can configure additional instances of the resource for their workloads.
+**Description:** Each tenant namespace may contain resources set up by the cluster administrator for multi-tenancy, such as role bindings, and network policies. Tenants should not be allowed to modify the namespaced resources created by the cluster administrator for multi-tenancy. However, for some resources such as network policies, tenants can configure additional instances of the resource for their workloads.
 
-**Rationale:** Tenants can escalate priviliges and impact other tenants if they are able to delete or modify required multi-tenancy resources such as namespace resource quotas or default network policy.
+**Rationale:** Tenants can escalate privileges and impact other tenants if they can delete or modify required multi-tenancy resources such as namespace resource quotas or default network policy.
 
 **Audit:**
 
@@ -99,7 +99,7 @@ spec:
 EOF
 ```
 
-However, due the additive nature of networkpolicies, the `DENY ALL` policy set by the cluster admin, prevents the hijacking.
+However, due to the additive nature of networkpolicies, the `DENY ALL` policy set by the cluster admin, prevents hijacking.
 
 As tenant owner list RBAC permissions set by Capsule
 
@@ -110,13 +110,13 @@ namespace-deleter   ClusterRole/capsule-namespace-deleter   11h
 namespace:admin     ClusterRole/admin                       11h
 ```
 
-As tenant owner, try to change/delete  the rolebindings in order to escalate permissions
+As tenant owner, try to change/delete  the rolebinding to escalate permissions
 
 ```bash 
 kubectl --kubeconfig alice edit/delete rolebinding namespace:admin
 ```
 
-The rolebindings is immediately recreated by Capsule:
+The rolebinding is immediately recreated by Capsule:
 
 ```
 kubectl --kubeconfig alice get rolebindings
@@ -125,7 +125,7 @@ namespace-deleter   ClusterRole/capsule-namespace-deleter   11h
 namespace:admin     ClusterRole/admin                       2s
 ```
 
-However, the tenant owner can create and assign permissions inside namespace she owns
+However, the tenant owner can create and assign permissions inside the namespace she owns
 
 ```yaml
 kubectl create -f - << EOF

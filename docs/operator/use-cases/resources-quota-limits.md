@@ -1,5 +1,5 @@
 # Enforce resources quota and limits
-With help of Capsule, Bill, the cluster admin, can set and enforce resources quota and limits for the Alice's tenant.
+With help of Capsule, Bill, the cluster admin, can set and enforce resources quota and limits for Alice's tenant.
 
 ## Resources quota
 Set resources quota for each namespace in the Alice's tenant by defining them in the tenant spec:
@@ -39,7 +39,7 @@ spec:
 EOF
 ```
 
-The resources quotas above will be inherited by all the namespaces created by Alice. In our case, when Alice creates the namespace `oil-production`, Capsule creates following resource quotas:
+The resource quotas above will be inherited by all the namespaces created by Alice. In our case, when Alice creates the namespace `oil-production`, Capsule creates the following resource quotas:
 
 ```yaml
 kind: ResourceQuota
@@ -93,7 +93,7 @@ At tenant level, the behaviour is controlled by the `spec.resourceQuotas.scope` 
 * Namespace
 
 ### Enforcement at tenant level
-By setting enforcement at tenant level, i.e. `spec.resourceQuotas.scope=Tenant`, Capsule aggregates resources usage for all namespaces in the tenant and adjusts all the `ResourceQuota` usage as aggregate. In such case, Alice can check the used resources at tenant level by inspecting the `annotations` in ResourceQuota object of any namespace in the tenant:
+By setting enforcement at tenant level, i.e. `spec.resourceQuotas.scope=Tenant`, Capsule aggregates resources usage for all namespaces in the tenant and adjusts all the `ResourceQuota` usage as aggregate. In such case, Alice can check the used resources at the tenant level by inspecting the `annotations` in ResourceQuota object of any namespace in the tenant:
 
 ```yaml
 kubectl -n oil-production get resourcequotas capsule-oil-1 -o yaml
@@ -119,7 +119,7 @@ metadata:
 ...
 ```
 
-When the aggregate usage for all namespaces crosses the hard quota, then the native `ResourceQuota` Admission Controller in Kubernetes denies the Alice's request to create resources exceeding the quota: 
+When the aggregate usage for all namespaces crosses the hard quota, then the native `ResourceQuota` Admission Controller in Kubernetes denies Alice's request to create resources exceeding the quota: 
 
 ```
 kubectl -n oil-development create deployment nginx --image nginx:latest --replicas 10
@@ -151,11 +151,11 @@ nginx-55649fd747-tkv7m   1/1     Running   0          22m
 
 ### Enforcement at namespace level
 
-By setting enforcement at namespace level, i.e. `spec.resourceQuotas.scope=Namespace`, Capsule does not aggregate the resources usage and all enforcement is done at namespace level.
+By setting enforcement at the namespace level, i.e. `spec.resourceQuotas.scope=Namespace`, Capsule does not aggregate the resources usage and all enforcement is done at the namespace level.
 
 ## Pods and containers limits
 
-Bill, the cluster admin, can also set Limit Ranges for each namespace in the Alice's tenant by defining limits for pods and containers in the tenant spec:
+Bill, the cluster admin, can also set Limit Ranges for each namespace in Alice's tenant by defining limits for pods and containers in the tenant spec:
 
 ```yaml
 apiVersion: capsule.clastix.io/v1alpha1
@@ -234,7 +234,7 @@ spec:
 
 > Note: being the limit range specific of single resources, there is no aggregate to count.
 
-Alice doesn't have permissions to change or delete the resources according to the assigned RBAC profile.
+Alice doesn't have permission to change or delete the resources according to the assigned RBAC profile.
 
 ```
 kubectl -n oil-production auth can-i patch resourcequota

@@ -19,10 +19,10 @@ $ kubectl apply -f https://raw.githubusercontent.com/clastix/capsule/master/conf
 It will install the Capsule controller in a dedicated namespace `capsule-system`.
 
 ### Install with Helm Chart
-Please, refer to the instructions reported into the Capsule Helm Chart [README](https://github.com/clastix/capsule/blob/master/charts/capsule/README.md). 
+Please, refer to the instructions reported in the Capsule Helm Chart [README](https://github.com/clastix/capsule/blob/master/charts/capsule/README.md). 
 
 # Create your first Tenant
-In Capsule, a _Tenant_ is an abstraction to group togheter multiple namespaces in a single entity within a set of bundaries defined by the Cluster Administrator. The tenant is then assigned to a user or group of users who is called _Tenant Owner_.
+In Capsule, a _Tenant_ is an abstraction to group multiple namespaces in a single entity within a set of boundaries defined by the Cluster Administrator. The tenant is then assigned to a user or group of users who is called _Tenant Owner_.
 
 Capsule defines a Tenant as Custom Resource with cluster scope.
 
@@ -99,7 +99,7 @@ $ kubectl -n oil-development run nginx --image=docker.io/nginx
 $ kubectl -n oil-development get pods
 ```
 
-but limited to only your own namespaces:
+but limited to only your namespaces:
 
 ```
 $ kubectl -n kube-system get pods

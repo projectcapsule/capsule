@@ -51,9 +51,9 @@ spec:
     hardware: gpu
 ```
 
-Any attempt of Alice to change the selector on the pods will result an error from the `PodNodeSelector` Admission Controller plugin.
+Any attempt of Alice to change the selector on the pods will result in an error from the `PodNodeSelector` Admission Controller plugin.
 
-Also RBAC prevents Alice to change the annotation on the namespace:
+Also, RBAC prevents Alice to change the annotation on the namespace:
 
 ```
 kubectl auth can-i edit ns -n oil-production

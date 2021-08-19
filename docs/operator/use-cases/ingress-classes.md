@@ -46,7 +46,7 @@ spec:
 EOF
 ```
 
-Any attempt of Alice to use a non valid Ingress Class, or missing it, is denied by the Validation Webhook enforcing it.
+Any attempt of Alice to use a non-valid Ingress Class, or missing it, is denied by the Validation Webhook enforcing it.
 
 # What’s next
 See how Bill, the cluster admin, can assign a set of dedicated ingress hostnames to Alice's tenant. [Assign Ingress Hostnames](./ingress-hostnames.md).

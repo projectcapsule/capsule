@@ -8,7 +8,7 @@
 
 **Description:** Tenants should not be able to mount host volumes and directories.
 
-**Rationale:** The use of host volumes and directories can be used to access shared data or escalate priviliges and also creates a tight coupling between a tenant workload and a host.
+**Rationale:** The use of host volumes and directories can be used to access shared data or escalate privileges and also creates a tight coupling between a tenant workload and a host.
 
 **Audit:**
 

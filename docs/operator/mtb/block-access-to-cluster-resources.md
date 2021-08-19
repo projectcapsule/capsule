@@ -6,7 +6,7 @@
 
 **Category:** Control Plane Isolation
 
-**Description:** Tenants should not be able to view, edit, create, or delete cluster (non-namespaced) resources such Node, ClusterRole, ClusterRoleBinding, etc.
+**Description:** Tenants should not be able to view, edit, create or delete cluster (non-namespaced) resources such Node, ClusterRole, ClusterRoleBinding, etc.
 
 **Rationale:** Access controls should be configured for tenants so that a tenant cannot list, create, modify or delete cluster resources
 
@@ -53,7 +53,7 @@ kubectl --kubeconfig alice auth can-i create namespaces
 yes
 ```
 
-Any kubernetes user can create `SelfSubjectAccessReview` and `SelfSubjectRulesReviews` to checks whether he/she can perform an action. First two exceptions are not an issue.
+Any kubernetes user can create `SelfSubjectAccessReview` and `SelfSubjectRulesReviews` to checks whether he/she can act. First, two exceptions are not an issue.
 
 ```bash 
 kubectl --anyuser auth can-i --list
@@ -78,7 +78,7 @@ selfsubjectrulesreviews.authorization.k8s.io    []                  []          
                                                 [/version]          []               [get]
 ```
 
-In order to enable namespace self-service provisioning, Capsule intentionally gives permissions to create namespaces to all users belonging to the Capsule group:
+To enable namespace self-service provisioning, Capsule intentionally gives permissions to create namespaces to all users belonging to the Capsule group:
 
 ```bash
 kubectl describe clusterrolebindings capsule-namespace-provisioner

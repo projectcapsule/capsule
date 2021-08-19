@@ -3,7 +3,7 @@ Kubernetes network policies control network traffic between namespaces and betwe
 
 To meet this requirement, Bill needs to define network policies that deny pods belonging to Alice's namespaces to access pods in namespaces belonging to other tenants, e.g. Bob's tenant `water`, or in system namespaces, e.g. `kube-system`.
 
-Also, Bill can make sure pods belonging to a tenant namespace cannot access other network infrastructure like cluster nodes, load balancers, and virtual machines running other services.  
+Also, Bill can make sure pods belonging to a tenant namespace cannot access other network infrastructures like cluster nodes, load balancers, and virtual machines running other services.  
 
 Bill can set network policies in the tenant manifest, according to the requirements:
 
@@ -96,7 +96,7 @@ And delete the namespace network policies
 kubectl -n oil-production delete networkpolicy production-network-policy
 ```
 
-Any attempt of Alice to delete the tenant network policy defined in the tenant manifest, is denied by the Validation Webhook enforcing it.
+Any attempt of Alice to delete the tenant network policy defined in the tenant manifest is denied by the Validation Webhook enforcing it.
 
 # What’s next
 See how Bill can enforce the Pod containers image pull policy to `Always` to avoid leaking of private images when running on shared nodes. [Enforcing Pod containers image PullPolicy](./images-pullpolicy.md)

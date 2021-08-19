@@ -3,13 +3,13 @@
 Bill needs to cordon a Tenant and its Namespaces for several reasons:
 
 - Avoid accidental resource modification(s) including deletion during a Production Freeze Window
-- During Kubernetes upgrade, to prevent any workload updates
+- During the Kubernetes upgrade, to prevent any workload updates
 - During incidents or outages
 - During planned maintenance of a dedicated nodes pool in a BYOD scenario
 
 With this said, the Tenant Owner and the related Service Account living into managed Namespaces, cannot proceed to any update, create or delete action.
 
-This is possible just labelling the Tenant as follows:
+This is possible just labeling the Tenant as follows:
 
 ```shell
 kubectl label tenant oil capsule.clastix.io/cordon=enabled
@@ -20,13 +20,13 @@ Any operation performed by Alice, the Tenant Owner, will be rejected.
 
 ```shell
 $ kubectl --as alice --as-group capsule.clastix.io -n oil-dev create deployment nginx --image nginx
-error: failed to create deployment: admission webhook "cordoning.tenant.capsule.clastix.io" denied the request: tenant oil is freezed: please, reach out to the system administrator
+error: failed to create deployment: admission webhook "cordoning.tenant.capsule.clastix.io" denied the request: tenant oil is frozen: please, reach out to the system administrator
 
 $ kubectl --as alice --as-group capsule.clastix.io -n oil-dev delete ingress,deployment,serviceaccount --all
-error: failed to create deployment: admission webhook "cordoning.tenant.capsule.clastix.io" denied the request: tenant oil is freezed: please, reach out to the system administrator
+error: failed to create deployment: admission webhook "cordoning.tenant.capsule.clastix.io" denied the request: tenant oil is frozen: please, reach out to the system administrator
 ```
 
-Uncordoning can be done removing the said label:
+Uncordoning can be done by removing the said label:
 
 ```shell
 $ kubectl label tenant oil capsule.clastix.io/cordon-

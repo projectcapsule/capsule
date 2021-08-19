@@ -1,7 +1,7 @@
 # Meet the multi-tenancy benchmark MTB
-Actually, there's no yet a real standard for the multi-tenancy model in Kubernetes, although the [SIG multi-tenancy group](https://github.com/kubernetes-sigs/multi-tenancy) is working on that. SIG multi-tenancy drafted a generic validation schema appliable to generic multi-tenancy projects. Multi-Tenancy Benchmarks [MTB](https://github.com/kubernetes-sigs/multi-tenancy/tree/master/benchmarks) are guidelines for multi-tenant configuration of Kubernetes clusters. Capsule is an open source multi-tenacy operator and we decided to meet the requirements of MTB.
+Actually, there's no yet a real standard for the multi-tenancy model in Kubernetes, although the [SIG multi-tenancy group](https://github.com/kubernetes-sigs/multi-tenancy) is working on that. SIG multi-tenancy drafted a generic validation schema appliable to generic multi-tenancy projects. Multi-Tenancy Benchmarks [MTB](https://github.com/kubernetes-sigs/multi-tenancy/tree/master/benchmarks) are guidelines for multi-tenant configuration of Kubernetes clusters. Capsule is an open source multi-tenancy operator and we decided to meet the requirements of MTB.
 
-> N.B. At time of writing, the MTB are in development and not ready for usage. Strictly speaking, we do not claim an official conformance to MTB, but just to adhere to the multi-tenancy requirements and best practices promoted by MTB.
+> N.B. At the time of writing, the MTB is in development and not ready for usage. Strictly speaking, we do not claim official conformance to MTB, but just to adhere to the multi-tenancy requirements and best practices promoted by MTB.
 
 |MTB Benchmark |MTB Profile|Capsule Version|Conformance|Notes  |
 |--------------|-----------|---------------|-----------|-------|

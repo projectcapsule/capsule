@@ -1,5 +1,5 @@
 # Assign Ingress Hostnames
-Bill can control ingress hostnames to the `oil` tenant in order to force the applications to be published only using the given hostname or set of hostnames: 
+Bill can control ingress hostnames to the `oil` tenant to force the applications to be published only using the given hostname or set of hostnames: 
 
 ```yaml
 kubectl apply -f - << EOF
@@ -47,7 +47,7 @@ spec:
 EOF
 ```
 
-Any attempt of Alice to use a non valid hostname is denied by the Validation Webhook enforcing it.
+Any attempt of Alice to use a non-valid hostname is denied by the Validation Webhook enforcing it.
 
 # What’s next
 See how Bill, the cluster admin, can control the hostname collision in Ingresses. [Control hostname collision in ingresses](./hostname-collision.md).
