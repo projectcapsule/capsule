@@ -14,7 +14,7 @@
       "type": "grafana",
       "id": "grafana",
       "name": "Grafana",
-      "version": "7.5.5"
+      "version": "7.5.4"
     },
     {
       "type": "panel",
@@ -58,7 +58,7 @@
   "gnetId": null,
   "graphTooltip": 0,
   "id": null,
-  "iteration": 1627970615905,
+  "iteration": 1629463154511,
   "links": [],
   "panels": [
     {
@@ -96,7 +96,7 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 24,
+        "w": 12,
         "x": 0,
         "y": 1
       },
@@ -149,864 +149,104 @@
       "yBucketSize": null
     },
     {
-      "collapsed": true,
+      "collapsed": false,
       "datasource": null,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 9
+        "y": 33
       },
       "id": 58,
-      "panels": [
-        {
-          "datasource": "${DS_PROMETHEUS}",
-          "fieldConfig": {
-            "defaults": {
-              "color": {
-                "mode": "palette-classic"
-              },
-              "custom": {
-                "axisLabel": "",
-                "axisPlacement": "auto",
-                "barAlignment": 0,
-                "drawStyle": "line",
-                "fillOpacity": 10,
-                "gradientMode": "none",
-                "hideFrom": {
-                  "graph": false,
-                  "legend": false,
-                  "tooltip": false
-                },
-                "lineInterpolation": "linear",
-                "lineWidth": 1,
-                "pointSize": 5,
-                "scaleDistribution": {
-                  "type": "linear"
-                },
-                "showPoints": "never",
-                "spanNulls": true
-              },
-              "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  {
-                    "color": "green",
-                    "value": null
-                  },
-                  {
-                    "color": "red",
-                    "value": 80
-                  }
-                ]
-              },
-              "unit": "short"
-            },
-            "overrides": []
-          },
-          "gridPos": {
-            "h": 11,
-            "w": 6,
-            "x": 0,
-            "y": 10
-          },
-          "id": 59,
-          "options": {
-            "graph": {},
-            "legend": {
-              "calcs": [],
-              "displayMode": "list",
-              "placement": "bottom"
-            },
-            "tooltip": {
-              "mode": "single"
-            },
-            "tooltipOptions": {
-              "mode": "single"
-            }
-          },
-          "pluginVersion": "7.5.5",
-          "repeat": "webhook",
-          "scopedVars": {
-            "webhook": {
-              "selected": false,
-              "text": "/cordoning",
-              "value": "/cordoning"
-            }
-          },
-          "targets": [
-            {
-              "exemplar": false,
-              "expr": "sum(irate(controller_runtime_webhook_requests_total{job=\"capsule\", webhook=\"$webhook\"}[$__rate_interval])) by (webhook, code)",
-              "format": "time_series",
-              "hide": false,
-              "interval": "",
-              "legendFormat": "{{ code }}",
-              "queryType": "randomWalk",
-              "refId": "A"
-            }
-          ],
-          "timeFrom": null,
-          "timeShift": null,
-          "title": "$webhook status code",
-          "type": "timeseries"
-        },
-        {
-          "datasource": "${DS_PROMETHEUS}",
-          "fieldConfig": {
-            "defaults": {
-              "color": {
-                "mode": "palette-classic"
-              },
-              "custom": {
-                "axisLabel": "",
-                "axisPlacement": "auto",
-                "barAlignment": 0,
-                "drawStyle": "line",
-                "fillOpacity": 10,
-                "gradientMode": "none",
-                "hideFrom": {
-                  "graph": false,
-                  "legend": false,
-                  "tooltip": false
-                },
-                "lineInterpolation": "linear",
-                "lineWidth": 1,
-                "pointSize": 5,
-                "scaleDistribution": {
-                  "type": "linear"
-                },
-                "showPoints": "never",
-                "spanNulls": true
-              },
-              "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  {
-                    "color": "green",
-                    "value": null
-                  },
-                  {
-                    "color": "red",
-                    "value": 80
-                  }
-                ]
-              },
-              "unit": "short"
-            },
-            "overrides": []
-          },
-          "gridPos": {
-            "h": 11,
-            "w": 6,
-            "x": 6,
-            "y": 10
-          },
-          "id": 87,
-          "options": {
-            "graph": {},
-            "legend": {
-              "calcs": [],
-              "displayMode": "list",
-              "placement": "bottom"
-            },
-            "tooltip": {
-              "mode": "single"
-            },
-            "tooltipOptions": {
-              "mode": "single"
-            }
-          },
-          "pluginVersion": "7.5.5",
-          "repeatIteration": 1627832445863,
-          "repeatPanelId": 59,
-          "scopedVars": {
-            "webhook": {
-              "selected": false,
-              "text": "/ingresses",
-              "value": "/ingresses"
-            }
-          },
-          "targets": [
-            {
-              "exemplar": false,
-              "expr": "sum(irate(controller_runtime_webhook_requests_total{job=\"capsule\", webhook=\"$webhook\"}[$__rate_interval])) by (webhook, code)",
-              "format": "time_series",
-              "hide": false,
-              "interval": "",
-              "legendFormat": "{{ code }}",
-              "queryType": "randomWalk",
-              "refId": "A"
-            }
-          ],
-          "timeFrom": null,
-          "timeShift": null,
-          "title": "$webhook status code",
-          "type": "timeseries"
-        },
-        {
-          "datasource": "${DS_PROMETHEUS}",
-          "fieldConfig": {
-            "defaults": {
-              "color": {
-                "mode": "palette-classic"
-              },
-              "custom": {
-                "axisLabel": "",
-                "axisPlacement": "auto",
-                "barAlignment": 0,
-                "drawStyle": "line",
-                "fillOpacity": 10,
-                "gradientMode": "none",
-                "hideFrom": {
-                  "graph": false,
-                  "legend": false,
-                  "tooltip": false
-                },
-                "lineInterpolation": "linear",
-                "lineWidth": 1,
-                "pointSize": 5,
-                "scaleDistribution": {
-                  "type": "linear"
-                },
-                "showPoints": "never",
-                "spanNulls": true
-              },
-              "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  {
-                    "color": "green",
-                    "value": null
-                  },
-                  {
-                    "color": "red",
-                    "value": 80
-                  }
-                ]
-              },
-              "unit": "short"
-            },
-            "overrides": []
-          },
-          "gridPos": {
-            "h": 11,
-            "w": 6,
-            "x": 12,
-            "y": 10
-          },
-          "id": 88,
-          "options": {
-            "graph": {},
-            "legend": {
-              "calcs": [],
-              "displayMode": "list",
-              "placement": "bottom"
-            },
-            "tooltip": {
-              "mode": "single"
-            },
-            "tooltipOptions": {
-              "mode": "single"
-            }
-          },
-          "pluginVersion": "7.5.5",
-          "repeatIteration": 1627832445863,
-          "repeatPanelId": 59,
-          "scopedVars": {
-            "webhook": {
-              "selected": false,
-              "text": "/namespace-owner-reference",
-              "value": "/namespace-owner-reference"
-            }
-          },
-          "targets": [
-            {
-              "exemplar": false,
-              "expr": "sum(irate(controller_runtime_webhook_requests_total{job=\"capsule\", webhook=\"$webhook\"}[$__rate_interval])) by (webhook, code)",
-              "format": "time_series",
-              "hide": false,
-              "interval": "",
-              "legendFormat": "{{ code }}",
-              "queryType": "randomWalk",
-              "refId": "A"
-            }
-          ],
-          "timeFrom": null,
-          "timeShift": null,
-          "title": "$webhook status code",
-          "type": "timeseries"
-        },
-        {
-          "datasource": "${DS_PROMETHEUS}",
-          "fieldConfig": {
-            "defaults": {
-              "color": {
-                "mode": "palette-classic"
-              },
-              "custom": {
-                "axisLabel": "",
-                "axisPlacement": "auto",
-                "barAlignment": 0,
-                "drawStyle": "line",
-                "fillOpacity": 10,
-                "gradientMode": "none",
-                "hideFrom": {
-                  "graph": false,
-                  "legend": false,
-                  "tooltip": false
-                },
-                "lineInterpolation": "linear",
-                "lineWidth": 1,
-                "pointSize": 5,
-                "scaleDistribution": {
-                  "type": "linear"
-                },
-                "showPoints": "never",
-                "spanNulls": true
-              },
-              "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  {
-                    "color": "green",
-                    "value": null
-                  },
-                  {
-                    "color": "red",
-                    "value": 80
-                  }
-                ]
-              },
-              "unit": "short"
-            },
-            "overrides": []
-          },
-          "gridPos": {
-            "h": 11,
-            "w": 6,
-            "x": 18,
-            "y": 10
-          },
-          "id": 89,
-          "options": {
-            "graph": {},
-            "legend": {
-              "calcs": [],
-              "displayMode": "list",
-              "placement": "bottom"
-            },
-            "tooltip": {
-              "mode": "single"
-            },
-            "tooltipOptions": {
-              "mode": "single"
-            }
-          },
-          "pluginVersion": "7.5.5",
-          "repeatIteration": 1627832445863,
-          "repeatPanelId": 59,
-          "scopedVars": {
-            "webhook": {
-              "selected": false,
-              "text": "/namespaces",
-              "value": "/namespaces"
-            }
-          },
-          "targets": [
-            {
-              "exemplar": false,
-              "expr": "sum(irate(controller_runtime_webhook_requests_total{job=\"capsule\", webhook=\"$webhook\"}[$__rate_interval])) by (webhook, code)",
-              "format": "time_series",
-              "hide": false,
-              "interval": "",
-              "legendFormat": "{{ code }}",
-              "queryType": "randomWalk",
-              "refId": "A"
-            }
-          ],
-          "timeFrom": null,
-          "timeShift": null,
-          "title": "$webhook status code",
-          "type": "timeseries"
-        },
-        {
-          "datasource": "${DS_PROMETHEUS}",
-          "fieldConfig": {
-            "defaults": {
-              "color": {
-                "mode": "palette-classic"
-              },
-              "custom": {
-                "axisLabel": "",
-                "axisPlacement": "auto",
-                "barAlignment": 0,
-                "drawStyle": "line",
-                "fillOpacity": 10,
-                "gradientMode": "none",
-                "hideFrom": {
-                  "graph": false,
-                  "legend": false,
-                  "tooltip": false
-                },
-                "lineInterpolation": "linear",
-                "lineWidth": 1,
-                "pointSize": 5,
-                "scaleDistribution": {
-                  "type": "linear"
-                },
-                "showPoints": "never",
-                "spanNulls": true
-              },
-              "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  {
-                    "color": "green",
-                    "value": null
-                  },
-                  {
-                    "color": "red",
-                    "value": 80
-                  }
-                ]
-              },
-              "unit": "short"
-            },
-            "overrides": []
-          },
-          "gridPos": {
-            "h": 11,
-            "w": 6,
-            "x": 0,
-            "y": 21
-          },
-          "id": 90,
-          "options": {
-            "graph": {},
-            "legend": {
-              "calcs": [],
-              "displayMode": "list",
-              "placement": "bottom"
-            },
-            "tooltip": {
-              "mode": "single"
-            },
-            "tooltipOptions": {
-              "mode": "single"
-            }
-          },
-          "pluginVersion": "7.5.5",
-          "repeatIteration": 1627832445863,
-          "repeatPanelId": 59,
-          "scopedVars": {
-            "webhook": {
-              "selected": false,
-              "text": "/networkpolicies",
-              "value": "/networkpolicies"
-            }
-          },
-          "targets": [
-            {
-              "exemplar": false,
-              "expr": "sum(irate(controller_runtime_webhook_requests_total{job=\"capsule\", webhook=\"$webhook\"}[$__rate_interval])) by (webhook, code)",
-              "format": "time_series",
-              "hide": false,
-              "interval": "",
-              "legendFormat": "{{ code }}",
-              "queryType": "randomWalk",
-              "refId": "A"
-            }
-          ],
-          "timeFrom": null,
-          "timeShift": null,
-          "title": "$webhook status code",
-          "type": "timeseries"
-        },
-        {
-          "datasource": "${DS_PROMETHEUS}",
-          "fieldConfig": {
-            "defaults": {
-              "color": {
-                "mode": "palette-classic"
-              },
-              "custom": {
-                "axisLabel": "",
-                "axisPlacement": "auto",
-                "barAlignment": 0,
-                "drawStyle": "line",
-                "fillOpacity": 10,
-                "gradientMode": "none",
-                "hideFrom": {
-                  "graph": false,
-                  "legend": false,
-                  "tooltip": false
-                },
-                "lineInterpolation": "linear",
-                "lineWidth": 1,
-                "pointSize": 5,
-                "scaleDistribution": {
-                  "type": "linear"
-                },
-                "showPoints": "never",
-                "spanNulls": true
-              },
-              "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  {
-                    "color": "green",
-                    "value": null
-                  },
-                  {
-                    "color": "red",
-                    "value": 80
-                  }
-                ]
-              },
-              "unit": "short"
-            },
-            "overrides": []
-          },
-          "gridPos": {
-            "h": 11,
-            "w": 6,
-            "x": 6,
-            "y": 21
-          },
-          "id": 91,
-          "options": {
-            "graph": {},
-            "legend": {
-              "calcs": [],
-              "displayMode": "list",
-              "placement": "bottom"
-            },
-            "tooltip": {
-              "mode": "single"
-            },
-            "tooltipOptions": {
-              "mode": "single"
-            }
-          },
-          "pluginVersion": "7.5.5",
-          "repeatIteration": 1627832445863,
-          "repeatPanelId": 59,
-          "scopedVars": {
-            "webhook": {
-              "selected": false,
-              "text": "/persistentvolumeclaims",
-              "value": "/persistentvolumeclaims"
-            }
-          },
-          "targets": [
-            {
-              "exemplar": false,
-              "expr": "sum(irate(controller_runtime_webhook_requests_total{job=\"capsule\", webhook=\"$webhook\"}[$__rate_interval])) by (webhook, code)",
-              "format": "time_series",
-              "hide": false,
-              "interval": "",
-              "legendFormat": "{{ code }}",
-              "queryType": "randomWalk",
-              "refId": "A"
-            }
-          ],
-          "timeFrom": null,
-          "timeShift": null,
-          "title": "$webhook status code",
-          "type": "timeseries"
-        },
-        {
-          "datasource": "${DS_PROMETHEUS}",
-          "fieldConfig": {
-            "defaults": {
-              "color": {
-                "mode": "palette-classic"
-              },
-              "custom": {
-                "axisLabel": "",
-                "axisPlacement": "auto",
-                "barAlignment": 0,
-                "drawStyle": "line",
-                "fillOpacity": 10,
-                "gradientMode": "none",
-                "hideFrom": {
-                  "graph": false,
-                  "legend": false,
-                  "tooltip": false
-                },
-                "lineInterpolation": "linear",
-                "lineWidth": 1,
-                "pointSize": 5,
-                "scaleDistribution": {
-                  "type": "linear"
-                },
-                "showPoints": "never",
-                "spanNulls": true
-              },
-              "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  {
-                    "color": "green",
-                    "value": null
-                  },
-                  {
-                    "color": "red",
-                    "value": 80
-                  }
-                ]
-              },
-              "unit": "short"
-            },
-            "overrides": []
-          },
-          "gridPos": {
-            "h": 11,
-            "w": 6,
-            "x": 12,
-            "y": 21
-          },
-          "id": 92,
-          "options": {
-            "graph": {},
-            "legend": {
-              "calcs": [],
-              "displayMode": "list",
-              "placement": "bottom"
-            },
-            "tooltip": {
-              "mode": "single"
-            },
-            "tooltipOptions": {
-              "mode": "single"
-            }
-          },
-          "pluginVersion": "7.5.5",
-          "repeatIteration": 1627832445863,
-          "repeatPanelId": 59,
-          "scopedVars": {
-            "webhook": {
-              "selected": false,
-              "text": "/pods",
-              "value": "/pods"
-            }
-          },
-          "targets": [
-            {
-              "exemplar": false,
-              "expr": "sum(irate(controller_runtime_webhook_requests_total{job=\"capsule\", webhook=\"$webhook\"}[$__rate_interval])) by (webhook, code)",
-              "format": "time_series",
-              "hide": false,
-              "interval": "",
-              "legendFormat": "{{ code }}",
-              "queryType": "randomWalk",
-              "refId": "A"
-            }
-          ],
-          "timeFrom": null,
-          "timeShift": null,
-          "title": "$webhook status code",
-          "type": "timeseries"
-        },
-        {
-          "datasource": "${DS_PROMETHEUS}",
-          "fieldConfig": {
-            "defaults": {
-              "color": {
-                "mode": "palette-classic"
-              },
-              "custom": {
-                "axisLabel": "",
-                "axisPlacement": "auto",
-                "barAlignment": 0,
-                "drawStyle": "line",
-                "fillOpacity": 10,
-                "gradientMode": "none",
-                "hideFrom": {
-                  "graph": false,
-                  "legend": false,
-                  "tooltip": false
-                },
-                "lineInterpolation": "linear",
-                "lineWidth": 1,
-                "pointSize": 5,
-                "scaleDistribution": {
-                  "type": "linear"
-                },
-                "showPoints": "never",
-                "spanNulls": true
-              },
-              "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  {
-                    "color": "green",
-                    "value": null
-                  },
-                  {
-                    "color": "red",
-                    "value": 80
-                  }
-                ]
-              },
-              "unit": "short"
-            },
-            "overrides": []
-          },
-          "gridPos": {
-            "h": 11,
-            "w": 6,
-            "x": 18,
-            "y": 21
-          },
-          "id": 93,
-          "options": {
-            "graph": {},
-            "legend": {
-              "calcs": [],
-              "displayMode": "list",
-              "placement": "bottom"
-            },
-            "tooltip": {
-              "mode": "single"
-            },
-            "tooltipOptions": {
-              "mode": "single"
-            }
-          },
-          "pluginVersion": "7.5.5",
-          "repeatIteration": 1627832445863,
-          "repeatPanelId": 59,
-          "scopedVars": {
-            "webhook": {
-              "selected": false,
-              "text": "/services",
-              "value": "/services"
-            }
-          },
-          "targets": [
-            {
-              "exemplar": false,
-              "expr": "sum(irate(controller_runtime_webhook_requests_total{job=\"capsule\", webhook=\"$webhook\"}[$__rate_interval])) by (webhook, code)",
-              "format": "time_series",
-              "hide": false,
-              "interval": "",
-              "legendFormat": "{{ code }}",
-              "queryType": "randomWalk",
-              "refId": "A"
-            }
-          ],
-          "timeFrom": null,
-          "timeShift": null,
-          "title": "$webhook status code",
-          "type": "timeseries"
-        },
-        {
-          "datasource": "${DS_PROMETHEUS}",
-          "fieldConfig": {
-            "defaults": {
-              "color": {
-                "mode": "palette-classic"
-              },
-              "custom": {
-                "axisLabel": "",
-                "axisPlacement": "auto",
-                "barAlignment": 0,
-                "drawStyle": "line",
-                "fillOpacity": 10,
-                "gradientMode": "none",
-                "hideFrom": {
-                  "graph": false,
-                  "legend": false,
-                  "tooltip": false
-                },
-                "lineInterpolation": "linear",
-                "lineWidth": 1,
-                "pointSize": 5,
-                "scaleDistribution": {
-                  "type": "linear"
-                },
-                "showPoints": "never",
-                "spanNulls": true
-              },
-              "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  {
-                    "color": "green",
-                    "value": null
-                  },
-                  {
-                    "color": "red",
-                    "value": 80
-                  }
-                ]
-              },
-              "unit": "short"
-            },
-            "overrides": []
-          },
-          "gridPos": {
-            "h": 11,
-            "w": 6,
-            "x": 0,
-            "y": 32
-          },
-          "id": 94,
-          "options": {
-            "graph": {},
-            "legend": {
-              "calcs": [],
-              "displayMode": "list",
-              "placement": "bottom"
-            },
-            "tooltip": {
-              "mode": "single"
-            },
-            "tooltipOptions": {
-              "mode": "single"
-            }
-          },
-          "pluginVersion": "7.5.5",
-          "repeatIteration": 1627832445863,
-          "repeatPanelId": 59,
-          "scopedVars": {
-            "webhook": {
-              "selected": false,
-              "text": "/tenants",
-              "value": "/tenants"
-            }
-          },
-          "targets": [
-            {
-              "exemplar": false,
-              "expr": "sum(irate(controller_runtime_webhook_requests_total{job=\"capsule\", webhook=\"$webhook\"}[$__rate_interval])) by (webhook, code)",
-              "format": "time_series",
-              "hide": false,
-              "interval": "",
-              "legendFormat": "{{ code }}",
-              "queryType": "randomWalk",
-              "refId": "A"
-            }
-          ],
-          "timeFrom": null,
-          "timeShift": null,
-          "title": "$webhook status code",
-          "type": "timeseries"
-        }
-      ],
+      "panels": [],
       "title": "Webhook error rate",
       "type": "row"
+    },
+    {
+      "datasource": "${DS_PROMETHEUS}",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "graph": false,
+              "legend": false,
+              "tooltip": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 11,
+        "w": 6,
+        "x": 0,
+        "y": 34
+      },
+      "id": 59,
+      "options": {
+        "graph": {},
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "single"
+        },
+        "tooltipOptions": {
+          "mode": "single"
+        }
+      },
+      "pluginVersion": "7.5.5",
+      "repeat": "webhook",
+      "targets": [
+        {
+          "exemplar": false,
+          "expr": "sum(irate(controller_runtime_webhook_requests_total{job=\"capsule\", webhook=\"$webhook\"}[$__rate_interval])) by (webhook, code)",
+          "format": "time_series",
+          "hide": false,
+          "interval": "",
+          "legendFormat": "{{ code }}",
+          "queryType": "randomWalk",
+          "refId": "A"
+        }
+      ],
+      "timeFrom": null,
+      "timeShift": null,
+      "title": "$webhook status code",
+      "type": "timeseries"
     },
     {
       "collapsed": true,
@@ -1015,7 +255,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 10
+        "y": 67
       },
       "id": 35,
       "panels": [
@@ -1758,7 +998,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 11
+        "y": 68
       },
       "id": 26,
       "panels": [
@@ -2078,164 +1318,163 @@
       "type": "row"
     },
     {
-      "collapsed": true,
+      "collapsed": false,
       "datasource": null,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 12
+        "y": 69
       },
       "id": 17,
-      "panels": [
-        {
-          "datasource": "${DS_PROMETHEUS}",
-          "fieldConfig": {
-            "defaults": {
-              "color": {
-                "mode": "palette-classic"
-              },
-              "custom": {
-                "axisLabel": "",
-                "axisPlacement": "auto",
-                "barAlignment": 0,
-                "drawStyle": "line",
-                "fillOpacity": 0,
-                "gradientMode": "none",
-                "hideFrom": {
-                  "graph": false,
-                  "legend": false,
-                  "tooltip": false,
-                  "viz": false
-                },
-                "lineInterpolation": "linear",
-                "lineWidth": 1,
-                "pointSize": 5,
-                "scaleDistribution": {
-                  "type": "linear"
-                },
-                "showPoints": "auto",
-                "spanNulls": false
-              },
-              "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  {
-                    "color": "green",
-                    "value": null
-                  },
-                  {
-                    "color": "red",
-                    "value": 80
-                  }
-                ]
-              }
-            },
-            "overrides": []
-          },
-          "gridPos": {
-            "h": 11,
-            "w": 12,
-            "x": 0,
-            "y": 13
-          },
-          "id": 22,
-          "options": {
-            "legend": {
-              "calcs": [],
-              "displayMode": "list",
-              "placement": "bottom"
-            },
-            "tooltip": {
-              "mode": "single"
-            },
-            "tooltipOptions": {
-              "mode": "single"
-            }
-          },
-          "pluginVersion": "8.0.1",
-          "targets": [
-            {
-              "exemplar": false,
-              "expr": "sum(irate(rest_client_requests_total{job=\"capsule\"}[$__rate_interval])) by (code)",
-              "format": "time_series",
-              "hide": false,
-              "interval": "",
-              "legendFormat": "{{ code }}",
-              "queryType": "randomWalk",
-              "refId": "A"
-            }
-          ],
-          "title": "REST Client status code",
-          "type": "timeseries"
-        },
-        {
-          "datasource": "${DS_PROMETHEUS}",
-          "fieldConfig": {
-            "defaults": {
-              "color": {
-                "mode": "thresholds"
-              },
-              "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  {
-                    "color": "green",
-                    "value": null
-                  },
-                  {
-                    "color": "red",
-                    "value": 80
-                  }
-                ]
-              }
-            },
-            "overrides": []
-          },
-          "gridPos": {
-            "h": 11,
-            "w": 12,
-            "x": 12,
-            "y": 13
-          },
-          "id": 19,
-          "options": {
-            "colorMode": "value",
-            "graphMode": "none",
-            "justifyMode": "auto",
-            "orientation": "auto",
-            "reduceOptions": {
-              "calcs": [
-                "lastNotNull"
-              ],
-              "fields": "",
-              "values": false
-            },
-            "text": {},
-            "textMode": "auto"
-          },
-          "pluginVersion": "7.5.5",
-          "targets": [
-            {
-              "exemplar": false,
-              "expr": "sum(irate(rest_client_requests_total{job=\"capsule\"}[$__rate_interval])) by (code)",
-              "format": "time_series",
-              "hide": false,
-              "instant": false,
-              "interval": "",
-              "legendFormat": " {{ code }}",
-              "queryType": "randomWalk",
-              "refId": "A"
-            }
-          ],
-          "title": "Rate & Errors",
-          "type": "stat"
-        }
-      ],
+      "panels": [],
       "title": "REST client error rate",
       "type": "row"
+    },
+    {
+      "datasource": "${DS_PROMETHEUS}",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "graph": false,
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 11,
+        "w": 12,
+        "x": 0,
+        "y": 70
+      },
+      "id": 22,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "single"
+        },
+        "tooltipOptions": {
+          "mode": "single"
+        }
+      },
+      "pluginVersion": "8.0.1",
+      "targets": [
+        {
+          "exemplar": false,
+          "expr": "sum(irate(rest_client_requests_total{job=\"capsule\"}[$__rate_interval])) by (code)",
+          "format": "time_series",
+          "hide": false,
+          "interval": "",
+          "legendFormat": "{{ code }}",
+          "queryType": "randomWalk",
+          "refId": "A"
+        }
+      ],
+      "title": "REST Client status code",
+      "type": "timeseries"
+    },
+    {
+      "datasource": "${DS_PROMETHEUS}",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 11,
+        "w": 12,
+        "x": 12,
+        "y": 70
+      },
+      "id": 19,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "text": {},
+        "textMode": "auto"
+      },
+      "pluginVersion": "7.5.4",
+      "targets": [
+        {
+          "exemplar": false,
+          "expr": "sum(irate(rest_client_requests_total{job=\"capsule\"}[$__rate_interval])) by (code)",
+          "format": "time_series",
+          "hide": false,
+          "instant": false,
+          "interval": "",
+          "legendFormat": " {{ code }}",
+          "queryType": "randomWalk",
+          "refId": "A"
+        }
+      ],
+      "title": "Rate & Errors",
+      "type": "stat"
     },
     {
       "collapsed": false,
@@ -2244,7 +1483,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 13
+        "y": 81
       },
       "id": 12,
       "panels": [],
@@ -2301,7 +1540,7 @@
         "h": 8,
         "w": 7,
         "x": 0,
-        "y": 14
+        "y": 82
       },
       "id": 2,
       "options": {
@@ -2385,7 +1624,7 @@
         "h": 8,
         "w": 7,
         "x": 7,
-        "y": 14
+        "y": 82
       },
       "id": 24,
       "options": {
@@ -2469,7 +1708,7 @@
         "h": 8,
         "w": 7,
         "x": 14,
-        "y": 14
+        "y": 82
       },
       "id": 33,
       "options": {
@@ -2522,7 +1761,7 @@
         "h": 8,
         "w": 3,
         "x": 21,
-        "y": 14
+        "y": 82
       },
       "id": 5,
       "options": {
@@ -2542,7 +1781,7 @@
         },
         "textMode": "value_and_name"
       },
-      "pluginVersion": "7.5.5",
+      "pluginVersion": "7.5.4",
       "targets": [
         {
           "exemplar": true,
@@ -2564,7 +1803,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 22
+        "y": 90
       },
       "id": 10,
       "panels": [
@@ -2853,7 +2092,7 @@
         "allValue": null,
         "current": {},
         "datasource": "${DS_PROMETHEUS}",
-        "definition": "label_values(controller_runtime_webhook_latency_seconds_sum{job=\"capsule\"}, webhook)",
+        "definition": "label_values(controller_runtime_webhook_requests_in_flight{job=\"capsule\"}, webhook)",
         "description": "Capsule webhook",
         "error": null,
         "hide": 0,
@@ -2863,7 +2102,7 @@
         "name": "webhook",
         "options": [],
         "query": {
-          "query": "label_values(controller_runtime_webhook_latency_seconds_sum{job=\"capsule\"}, webhook)",
+          "query": "label_values(controller_runtime_webhook_requests_in_flight{job=\"capsule\"}, webhook)",
           "refId": "StandardVariableQuery"
         },
         "refresh": 1,
@@ -2886,5 +2125,5 @@
   "timezone": "",
   "title": "capsule",
   "uid": "nEFvaoR7z",
-  "version": 12
+  "version": 2
 }
