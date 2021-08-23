@@ -1,8 +1,10 @@
 # Capsule Proxy
-Capsule Proxy is an add-on for the Capsule Operator.
+
+Capsule Proxy is an add-on for [Capsule](https://github.com/clastix/capsule), the operator providing multi-tenancy in Kubernetes.
 
 ## The problem
-Kubernetes RBAC lacks the ability to list only the owned cluster-scoped resources since there are no ACL-filtered APIs. For example:
+
+Kubernetes RBAC cannot list only the owned cluster-scoped resources since there are no ACL-filtered APIs. For example:
 
 ```
 $ kubectl get namespaces
@@ -19,21 +21,24 @@ yes
 
 The reason, as the error message reported, is that the RBAC _list_ action is available only at Cluster-Scope and it is not granted to users without appropriate permissions.
 
-To overcome this problem, many Kubernetes distributions introduced mirrored custom resources supported by a custom set of ACL-filtered APIs. However, this leads to radically change the user's experience of Kubernetes by introducing hard customizations that make painfull to move from one distribution to another.
+To overcome this problem, many Kubernetes distributions introduced mirrored custom resources supported by a custom set of ACL-filtered APIs. However, this leads to radically change the user's experience of Kubernetes by introducing hard customizations that make it painful to move from one distribution to another.
 
-With **Capsule**, we taken a different approach. As one of the key goals, we want to keep the same user's experience on all the distributions of Kubernetes. We want people to use the standard tools they already know and love and it should just work.
+With **Capsule**, we took a different approach. As one of the key goals, we want to keep the same user's experience on all the distributions of Kubernetes. We want people to use the standard tools they already know and love and it should just work.
 
 ## How it works
-This project is an add-on of the Capsule Operator, so make sure you have a working instance of Caspule before to attempt to install it. Use the `capsule-proxy` only if you want Tenant Owners to list their own Cluster-Scope resources.
 
-The `capsule-proxy`  implements a simple reverse proxy that intercepts only specific requests to the APIs server and Capsule does all the magic behind the scenes. 
+This project is an add-on of the main [Capsule](https://github.com/clastix/capsule) operator, so make sure you have a working instance of Caspule before attempting to install it.
+Use the `capsule-proxy` only if you want Tenant Owners to list their own Cluster-Scope resources.
 
-Current implementation only filter two type of requests:
+The `capsule-proxy` implements a simple reverse proxy that intercepts only specific requests to the APIs server and Capsule does all the magic behind the scenes.
+
+Current implementation filters the following requests:
 
 * `api/v1/namespaces`
 * `api/v1/nodes`
 * `apis/storage.k8s.io/v1/storageclasses{/name}`
 * `apis/networking.k8s.io/{v1,v1beta1}/ingressclasses{/name}`
+* `api/scheduling.k8s.io/{v1}/priorityclasses{/name}`
 
 All other requestes are proxied transparently to the APIs server, so no side-effects are expected. We're planning to add new APIs in the future, so PRs are welcome!
 
@@ -48,6 +53,38 @@ An Helm Chart is available [here](./charts/capsule-proxy/README.md).
 ## Does it work with kubectl?
 
 Yes, it works by intercepting all the requests from the `kubectl` client directed to the APIs server. It works with both users who use the TLS certificate authentication and those who use OIDC.
+
+## How RBAC is put in place?
+
+Each Tenant owner can have their capabilities managed pretty similar to a standard RBAC.
+
+```yaml
+apiVersion: capsule.clastix.io/v1beta1
+kind: Tenant
+metadata:
+  name: my-tenant
+spec:
+  owners:
+  - kind: User
+    name: alice
+    proxySettings:
+    - kind: IngressClasses
+      operations:
+      - List
+```
+
+The proxy setting `kind` is an __enum__ accepting the supported resources:
+
+- `Nodes`
+- `StorageClasses`
+- `IngressClasses`
+- `PriorityClasses`
+
+Each Resource kind can be granted with several verbs, such as:
+
+- `List`
+- `Update`
+- `Delete`
 
 ### Namespaces
 
@@ -74,16 +111,18 @@ When a Tenant defines a `.spec.nodeSelector`, the nodes matching that labels can
 The annotation `capsule.clastix.io/enable-node-listing` allows the ability for the owners to retrieve the node list (useful in shared HW scenarios).
 
 ```yaml
-apiVersion: capsule.clastix.io/v1alpha1
+apiVersion: capsule.clastix.io/v1beta1
 kind: Tenant
 metadata:
   name: oil
-  annotations:
-    capsule.clastix.io/enable-node-listing: "true"
 spec:
-  owner:
-    kind: User
-    name: alice
+  owners:
+    - kind: User
+      name: alice
+      proxySettings:
+        - kind: Nodes
+          operations:
+            - List
   nodeSelector:
     kubernetes.io/hostname: capsule-gold-qwerty
 ```
@@ -94,27 +133,23 @@ NAME                    STATUS   ROLES    AGE   VERSION
 capsule-gold-qwerty     Ready    <none>   43h   v1.19.1
 ```
 
-> The following Tenant annotations allow a sort of RBAC on the operations of the nodes:
-> 
-> - `capsule.clastix.io/enable-node-listing`: allows listing of nodes and node retrieval
-> - `capsule.clastix.io/enable-node-update`: allows the update of the node (cordoning and uncording, node tainting)
-> - `capsule.clastix.io/enable-node-deletion`: allows deletion of the node
-
 ### Storage Classes
 
 A Tenant may be limited to use a set of allowed Storage Class resources, as follows.
 
 ```yaml
-apiVersion: capsule.clastix.io/v1alpha1
+apiVersion: capsule.clastix.io/v1beta1
 kind: Tenant
 metadata:
   name: oil
-  annotations:
-    capsule.clastix.io/enable-storageclass-listing: "true"
 spec:
-  owner:
-    kind: User
+  owners:
+  - kind: User
     name: alice
+    proxySettings:
+    - kind: StorageClasses
+      operations:
+      - List
   storageClasses:
     allowed:
       - custom
@@ -143,31 +178,28 @@ custom               custom.tls/provisioner   Delete          WaitForFirstConsum
 glusterfs            rook.io/glusterfs        Delete          WaitForFirstConsumer   false                  54m
 ```
 
-> The following Tenant annotations allow a sort of RBAC on the Storage Class operations:
->
-> - `capsule.clastix.io/enable-storageclass-listing`: allows listing of Storage Class and Storage Classes retrieval
-> - `capsule.clastix.io/enable-storageclass-update`: allows the update of the Storage Class
-> - `capsule.clastix.io/enable-storageclass-deletion`: allows deletion of the Storage Class
-
 ### Ingress Classes
 
 As for Storage Class, also Ingress Class can be enforced.
 
 ```yaml
-apiVersion: capsule.clastix.io/v1alpha1
+apiVersion: capsule.clastix.io/v1beta1
 kind: Tenant
 metadata:
   name: oil
-  annotations:
-    capsule.clastix.io/enable-ingressclass-listing: "true"
 spec:
-  owner:
-    kind: User
+  owners:
+  - kind: User
     name: alice
-  ingressClasses:
-    allowed:
-      - custom
-    allowedRegex: "\\w+-lb"
+    proxySettings:
+    - kind: IngressClasses
+      operations:
+      - List
+  ingressOptions:
+    allowedClasses:
+        allowed:
+          - custom
+        allowedRegex: "\\w+-lb"
 ```
 
 In the Kubernetes cluster we could have more Ingress Class resources, some of them forbidden and non-usable by the Tenant owner.
@@ -185,22 +217,62 @@ nginx             nginx.plus/ingress                                            
 The expected output using `capsule-proxy` is the retrieval of the `custom` Ingress Class as well the other ones matching the regex `\w+-lb`.
 
 ```bash
-$ kubectl --context admin@mycluster get ingressclasses
+$ kubectl --context alice-oidc@mycluster get ingressclasses
 NAME              CONTROLLER                 PARAMETERS                                      AGE
 custom            example.com/custom         IngressParameters.k8s.example.com/custom        24h
 external-lb       example.com/external       IngressParameters.k8s.example.com/external-lb   2s
 internal-lb       example.com/internal       IngressParameters.k8s.example.com/internal-lb   15m
 ```
 
-> The following Tenant annotations allow a sort of RBAC on the Ingress Class operations:
->
-> - `capsule.clastix.io/enable-ingressclass-listing`: allows listing of Ingress Class and Ingress Classes retrieval
-> - `capsule.clastix.io/enable-ingressclass-update`: allows the update of the Ingress Class
-> - `capsule.clastix.io/enable-ingressclass-deletion`: allows deletion of the Ingress Class
+### Priority Classes
 
-### Storage and Ingress class required label
+Allowed PriorityClasses assigned to a Tenant Owner can be enforced as follows.
 
-For Storage and Ingress Class resources, the `name` label reflecting the resource name is mandatory, otherwise filtering of resources cannot be put in place.
+```yaml
+apiVersion: capsule.clastix.io/v1beta1
+kind: Tenant
+metadata:
+  name: oil
+spec:
+  owners:
+  - kind: User
+    name: alice
+    proxySettings:
+    - kind: IngressClasses
+      operations:
+      - List
+  priorityClasses:
+    allowed:
+      - best-effort
+    allowedRegex: "\\w+priority"
+```
+
+In the Kubernetes cluster we could have more PriorityClasses resources, some of them forbidden and non-usable by the Tenant owner.
+
+```bash
+$ kubectl --context admin@mycluster get priorityclasses.scheduling.k8s.io
+NAME                      VALUE        GLOBAL-DEFAULT   AGE
+custom                    1000         false            18s
+maxpriority               1000         false            18s
+minpriority               1000         false            18s
+nonallowed                1000         false            8m54s
+system-cluster-critical   2000000000   false            3h40m
+system-node-critical      2000001000   false            3h40m
+```
+
+The expected output using `capsule-proxy` is the retrieval of the `custom` PriorityClass as well the other ones matching the regex `\w+priority`.
+
+```bash
+$ kubectl --context alice-oidc@mycluster get ingressclasses
+NAME                      VALUE        GLOBAL-DEFAULT   AGE
+custom                    1000         false            18s
+maxpriority               1000         false            18s
+minpriority               1000         false            18s
+```
+
+### Storage/Ingress class and PriorityClass required label
+
+For Storage Class, Ingress Class and Priority Class resources, the `name` label reflecting the resource name is mandatory, otherwise filtering of resources cannot be put in place.
 
 ```yaml
 ---
@@ -224,6 +296,16 @@ spec:
     apiGroup: k8s.example.com
     kind: IngressParameters
     name: external-lb
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  labels:
+    name: best-effort
+  name: best-effort
+value: 1000
+globalDefault: false
+description: "Priority class for best-effort Tenants"
 ```
 
 ## Does it work with kubectl?
