@@ -1,5 +1,5 @@
 # Current Operator version
-VERSION ?= $$(git describe --abbrev=0 --tags)
+VERSION ?= $$(git describe --abbrev=0 --tags --match "v*")
 
 # Default bundle image tag
 BUNDLE_IMG ?= quay.io/clastix/capsule:$(VERSION)-bundle
