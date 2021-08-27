@@ -9,12 +9,13 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
-	"syscall"
+	"os"
 	"time"
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -112,8 +113,38 @@ func (r TLSReconciler) Reconcile(ctx context.Context, request ctrl.Request) (ctr
 	}
 
 	if instance.Name == tlsSecretName && res == controllerutil.OperationResultUpdated {
-		r.Log.Info("Capsule TLS certificates has been updated, we need to restart the Controller")
-		_ = syscall.Kill(syscall.Getpid(), syscall.SIGINT)
+		r.Log.Info("Capsule TLS certificates has been updated, Controller pods must be restarted to load new certificate")
+
+		hostname, _ := os.Hostname()
+		leaderPod := &corev1.Pod{}
+		if err = r.Client.Get(ctx, types.NamespacedName{Namespace: os.Getenv("NAMESPACE"), Name: hostname}, leaderPod); err != nil {
+			r.Log.Error(err, "cannot retrieve the leader Pod, probably running in out of the cluster mode")
+
+			return reconcile.Result{}, nil
+		}
+
+		podList := &corev1.PodList{}
+		if err = r.Client.List(ctx, podList, client.MatchingLabels(leaderPod.ObjectMeta.Labels)); err != nil {
+			r.Log.Error(err, "cannot retrieve list of Capsule pods requiring restart upon TLS update")
+
+			return reconcile.Result{}, nil
+		}
+
+		for _, p := range podList.Items {
+			nonLeaderPod := p
+			// Skipping this Pod, must be deleted at the end
+			if nonLeaderPod.GetName() == leaderPod.GetName() {
+				continue
+			}
+
+			if err = r.Client.Delete(ctx, &nonLeaderPod); err != nil {
+				r.Log.Error(err, "cannot delete the non-leader Pod due to TLS update")
+			}
+		}
+
+		if err = r.Client.Delete(ctx, leaderPod); err != nil {
+			r.Log.Error(err, "cannot delete the leader Pod due to TLS update")
+		}
 	}
 
 	r.Log.Info("Reconciliation completed, processing back in " + rq.String())
