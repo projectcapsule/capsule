@@ -150,7 +150,7 @@ func main() {
 		make([]webhook.Webhook, 0),
 		route.Pod(pod.ImagePullPolicy(), pod.ContainerRegistry(), pod.PriorityClass()),
 		route.Namespace(utils.InCapsuleGroups(cfg, namespacewebhook.QuotaHandler(), namespacewebhook.FreezeHandler(cfg), namespacewebhook.PrefixHandler(cfg))),
-		route.Ingress(ingress.Class(cfg), ingress.Hostnames(cfg), ingress.Collision(cfg)),
+		route.Ingress(ingress.Class(cfg), ingress.Hostnames(cfg), ingress.Collision(cfg), ingress.Wildcard()),
 		route.PVC(pvc.Handler()),
 		route.Service(service.Handler()),
 		route.NetworkPolicy(utils.InCapsuleGroups(cfg, networkpolicy.Handler())),
