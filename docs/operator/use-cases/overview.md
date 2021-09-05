@@ -23,6 +23,7 @@ Use Capsule to address any of the following scenarios:
 * [Onboard Tenants](./onboarding.md)
 * [Create Namespaces](./create-namespaces.md)
 * [Assign Permissions](./permissions.md)
+* [Tenant Ownership](./ownership.md)
 * [Enforce Resources Quotas and Limits](./resources-quota-limits.md)
 * [Enforce Pod Priority Classes](./pod-priority-classes.md)
 * [Assign specific Node Pools](./nodes-pool.md)
