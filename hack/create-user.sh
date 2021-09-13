@@ -22,6 +22,12 @@ if [[ ! -x "$(command -v kubectl)" ]]; then
     exit 1
 fi
 
+# Check if jq is installed
+if [[ ! -x "$(command -v jq)" ]]; then
+    echo "Error: jq not found"
+    exit 1
+fi
+
 USER=$1
 TENANT=$2
 GROUP=$3
