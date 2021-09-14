@@ -224,7 +224,7 @@ func main() {
 
 	ctx := ctrl.SetupSignalHandler()
 
-	if err = indexer.AddToManager(ctx, manager); err != nil {
+	if err = indexer.AddToManager(ctx, setupLog, manager); err != nil {
 		setupLog.Error(err, "unable to setup indexers")
 		os.Exit(1)
 	}
