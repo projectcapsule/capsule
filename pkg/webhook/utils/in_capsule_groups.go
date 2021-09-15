@@ -11,7 +11,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	"github.com/clastix/capsule/pkg/configuration"
-	"github.com/clastix/capsule/pkg/utils"
 	"github.com/clastix/capsule/pkg/webhook"
 )
 
@@ -27,26 +26,9 @@ type handler struct {
 	handlers      []webhook.Handler
 }
 
-// If the user performing action is not a Capsule user, can be skipped
-func (h handler) isCapsuleUser(req admission.Request) bool {
-	groupList := utils.NewUserGroupList(req.UserInfo.Groups)
-	// if the user is a ServiceAccount belonging to the kube-system namespace, definitely, it's not a Capsule user
-	// and we can skip the check in case of Capsule user group assigned to system:authenticated
-	// (ref: https://github.com/clastix/capsule/issues/234)
-	if groupList.Find("system:serviceaccounts:kube-system") {
-		return false
-	}
-	for _, group := range h.configuration.UserGroups() {
-		if groupList.Find(group) {
-			return true
-		}
-	}
-	return false
-}
-
 func (h *handler) OnCreate(client client.Client, decoder *admission.Decoder, recorder record.EventRecorder) webhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		if !h.isCapsuleUser(req) {
+		if !IsCapsuleUser(req, h.configuration.UserGroups()) {
 			return nil
 		}
 
@@ -62,7 +44,7 @@ func (h *handler) OnCreate(client client.Client, decoder *admission.Decoder, rec
 
 func (h *handler) OnDelete(client client.Client, decoder *admission.Decoder, recorder record.EventRecorder) webhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		if !h.isCapsuleUser(req) {
+		if !IsCapsuleUser(req, h.configuration.UserGroups()) {
 			return nil
 		}
 
@@ -78,7 +60,7 @@ func (h *handler) OnDelete(client client.Client, decoder *admission.Decoder, rec
 
 func (h *handler) OnUpdate(client client.Client, decoder *admission.Decoder, recorder record.EventRecorder) webhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		if !h.isCapsuleUser(req) {
+		if !IsCapsuleUser(req, h.configuration.UserGroups()) {
 			return nil
 		}
 

@@ -44,15 +44,12 @@ func (h *cordoningHandler) cordonHandler(ctx context.Context, clt client.Client,
 	}
 
 	tnt := tntList.Items[0]
+	if tnt.IsCordoned() && utils.IsCapsuleUser(req, h.configuration.UserGroups()) {
+		recorder.Eventf(&tnt, corev1.EventTypeWarning, "TenantFreezed", "%s %s/%s cannot be %sd, current Tenant is freezed", req.Kind.String(), req.Namespace, req.Name, strings.ToLower(string(req.Operation)))
 
-	if tnt.IsCordoned() {
-		if utils.RequestFromOwnerOrSA(tnt, req, h.configuration.UserGroups()) {
-			recorder.Eventf(&tnt, corev1.EventTypeWarning, "TenantFreezed", "%s %s/%s cannot be %sd, current Tenant is freezed", req.Kind.String(), req.Namespace, req.Name, strings.ToLower(string(req.Operation)))
+		response := admission.Denied(fmt.Sprintf("tenant %s is freezed: please, reach out to the system administrator", tnt.GetName()))
 
-			response := admission.Denied(fmt.Sprintf("tenant %s is freezed: please, reach out to the system administrator", tnt.GetName()))
-
-			return &response
-		}
+		return &response
 	}
 
 	return nil
