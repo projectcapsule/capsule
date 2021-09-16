@@ -7,11 +7,14 @@ package e2e
 
 import (
 	"context"
+	"errors"
+	"fmt"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	networkingv1 "k8s.io/api/networking/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
@@ -116,89 +119,94 @@ var _ = Describe("when disabling Ingress hostnames collision", func() {
 	})
 
 	It("should not check any kind of collision", func() {
-		maj, min, _ := GetKubernetesSemVer()
-
 		ns1 := NewNamespace("namespace-collision-one")
-
 		ns2 := NewNamespace("namespace-collision-two")
-
 		cs := ownerClient(tnt.Spec.Owners[0])
-
 		NamespaceCreation(ns1, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 		NamespaceCreation(ns2, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns1.GetName()))
 		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns2.GetName()))
 
-		if maj == 1 && min > 18 {
-			By("testing networking.k8s.io", func() {
-				EventuallyCreation(func() (err error) {
-					obj := networkingIngress("networking-1", "kubernetes.io", "/path")
+		By("testing networking.k8s.io", func() {
+			if err := k8sClient.List(context.Background(), &networkingv1.IngressList{}); err != nil {
+				missingAPIError := &meta.NoKindMatchError{}
+				if errors.As(err, &missingAPIError) {
+					Skip(fmt.Sprintf("Running test due to unsupported API kind: %s", err.Error()))
+				}
+			}
 
-					_, err = cs.NetworkingV1().Ingresses(ns1.GetName()).Create(context.TODO(), obj, metav1.CreateOptions{})
+			EventuallyCreation(func() (err error) {
+				obj := networkingIngress("networking-1", "kubernetes.io", "/path")
 
-					return
-				}).Should(Succeed())
+				_, err = cs.NetworkingV1().Ingresses(ns1.GetName()).Create(context.TODO(), obj, metav1.CreateOptions{})
 
-				EventuallyCreation(func() (err error) {
-					obj := networkingIngress("networking-2", "kubernetes.io", "/path")
+				return
+			}).Should(Succeed())
 
-					_, err = cs.NetworkingV1().Ingresses(ns1.GetName()).Create(context.TODO(), obj, metav1.CreateOptions{})
+			EventuallyCreation(func() (err error) {
+				obj := networkingIngress("networking-2", "kubernetes.io", "/path")
 
-					return
-				}).Should(Succeed())
+				_, err = cs.NetworkingV1().Ingresses(ns1.GetName()).Create(context.TODO(), obj, metav1.CreateOptions{})
 
-				EventuallyCreation(func() (err error) {
-					obj := networkingIngress("networking-3", "kubernetes.io", "/path")
+				return
+			}).Should(Succeed())
 
-					_, err = cs.NetworkingV1().Ingresses(ns2.GetName()).Create(context.TODO(), obj, metav1.CreateOptions{})
+			EventuallyCreation(func() (err error) {
+				obj := networkingIngress("networking-3", "kubernetes.io", "/path")
 
-					return
-				}).Should(Succeed())
+				_, err = cs.NetworkingV1().Ingresses(ns2.GetName()).Create(context.TODO(), obj, metav1.CreateOptions{})
 
-				EventuallyCreation(func() (err error) {
-					obj := networkingIngress("networking-4", "kubernetes.io", "/path")
+				return
+			}).Should(Succeed())
 
-					_, err = cs.NetworkingV1().Ingresses(ns2.GetName()).Create(context.TODO(), obj, metav1.CreateOptions{})
+			EventuallyCreation(func() (err error) {
+				obj := networkingIngress("networking-4", "kubernetes.io", "/path")
 
-					return
-				}).Should(Succeed())
-			})
-		}
+				_, err = cs.NetworkingV1().Ingresses(ns2.GetName()).Create(context.TODO(), obj, metav1.CreateOptions{})
 
-		if maj == 1 && min < 22 {
-			By("testing extensions", func() {
-				EventuallyCreation(func() (err error) {
-					obj := extensionsIngress("extensions-1", "cncf.io", "/docs")
+				return
+			}).Should(Succeed())
+		})
 
-					_, err = cs.ExtensionsV1beta1().Ingresses(ns1.GetName()).Create(context.TODO(), obj, metav1.CreateOptions{})
+		By("testing extensions", func() {
+			if err := k8sClient.List(context.Background(), &extensionsv1beta1.IngressList{}); err != nil {
+				missingAPIError := &meta.NoKindMatchError{}
+				if errors.As(err, &missingAPIError) {
+					Skip(fmt.Sprintf("Running test due to unsupported API kind: %s", err.Error()))
+				}
+			}
 
-					return
-				}).Should(Succeed())
+			EventuallyCreation(func() (err error) {
+				obj := extensionsIngress("extensions-1", "cncf.io", "/docs")
 
-				EventuallyCreation(func() (err error) {
-					obj := extensionsIngress("extensions-2", "cncf.io", "/docs")
+				_, err = cs.ExtensionsV1beta1().Ingresses(ns1.GetName()).Create(context.TODO(), obj, metav1.CreateOptions{})
 
-					_, err = cs.ExtensionsV1beta1().Ingresses(ns2.GetName()).Create(context.TODO(), obj, metav1.CreateOptions{})
+				return
+			}).Should(Succeed())
 
-					return
-				}).Should(Succeed())
+			EventuallyCreation(func() (err error) {
+				obj := extensionsIngress("extensions-2", "cncf.io", "/docs")
 
-				EventuallyCreation(func() (err error) {
-					obj := extensionsIngress("extensions-3", "cncf.io", "/docs")
+				_, err = cs.ExtensionsV1beta1().Ingresses(ns2.GetName()).Create(context.TODO(), obj, metav1.CreateOptions{})
 
-					_, err = cs.ExtensionsV1beta1().Ingresses(ns1.GetName()).Create(context.TODO(), obj, metav1.CreateOptions{})
+				return
+			}).Should(Succeed())
 
-					return
-				}).Should(Succeed())
+			EventuallyCreation(func() (err error) {
+				obj := extensionsIngress("extensions-3", "cncf.io", "/docs")
 
-				EventuallyCreation(func() (err error) {
-					obj := extensionsIngress("extensions-4", "cncf.io", "/docs")
+				_, err = cs.ExtensionsV1beta1().Ingresses(ns1.GetName()).Create(context.TODO(), obj, metav1.CreateOptions{})
 
-					_, err = cs.ExtensionsV1beta1().Ingresses(ns2.GetName()).Create(context.TODO(), obj, metav1.CreateOptions{})
+				return
+			}).Should(Succeed())
 
-					return
-				}).Should(Succeed())
-			})
-		}
+			EventuallyCreation(func() (err error) {
+				obj := extensionsIngress("extensions-4", "cncf.io", "/docs")
+
+				_, err = cs.ExtensionsV1beta1().Ingresses(ns2.GetName()).Create(context.TODO(), obj, metav1.CreateOptions{})
+
+				return
+			}).Should(Succeed())
+		})
 	})
 })

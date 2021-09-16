@@ -7,12 +7,16 @@ package e2e
 
 import (
 	"context"
+	"errors"
+	"fmt"
 
 	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
+	networkingv1 "k8s.io/api/networking/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -213,8 +217,11 @@ var _ = Describe("adding metadata to Service objects", func() {
 	})
 
 	It("should apply them to EndpointSlice", func() {
-		if maj, min, v := GetKubernetesSemVer(); maj == 1 && min <= 16 {
-			Skip("Running test on Kubernetes " + v + ", doesn't provide EndpointSlice resource")
+		if err := k8sClient.List(context.Background(), &networkingv1.IngressList{}); err != nil {
+			missingAPIError := &meta.NoKindMatchError{}
+			if errors.As(err, &missingAPIError) {
+				Skip(fmt.Sprintf("Running test due to unsupported API kind: %s", err.Error()))
+			}
 		}
 
 		ns := NewNamespace("endpointslice-metadata")

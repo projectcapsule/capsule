@@ -7,12 +7,14 @@ package e2e
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	networkingv1 "k8s.io/api/networking/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
@@ -118,152 +120,148 @@ var _ = Describe("when Tenant handles Ingress hostnames", func() {
 	})
 
 	It("should block a non allowed Hostname", func() {
-		maj, min, v := GetKubernetesSemVer()
+		ns := NewNamespace("disallowed-hostname-networking")
+		cs := ownerClient(tnt.Spec.Owners[0])
 
-		if maj == 1 && min > 18 {
-			ns := NewNamespace("disallowed-hostname-networking")
-			cs := ownerClient(tnt.Spec.Owners[0])
+		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
-			NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
-			TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
+		By("testing networking.k8s.io", func() {
+			if err := k8sClient.List(context.Background(), &networkingv1.IngressList{}); err != nil {
+				missingAPIError := &meta.NoKindMatchError{}
+				if errors.As(err, &missingAPIError) {
+					Skip(fmt.Sprintf("Running test due to unsupported API kind: %s", err.Error()))
+				}
+			}
 
-			By("testing networking.k8s.io", func() {
-				Eventually(func() (err error) {
-					obj := networkingIngress("denied-networking", "kubernetes.io")
-					_, err = cs.NetworkingV1().Ingresses(ns.GetName()).Create(context.TODO(), obj, metav1.CreateOptions{})
-					return
-				}, defaultTimeoutInterval, defaultPollInterval).ShouldNot(Succeed())
-			})
-
-			return
-		}
-
-		Skip("Running test on Kubernetes " + v + ", doesn't provide networking.k8s.io")
+			Eventually(func() (err error) {
+				obj := networkingIngress("denied-networking", "kubernetes.io")
+				_, err = cs.NetworkingV1().Ingresses(ns.GetName()).Create(context.TODO(), obj, metav1.CreateOptions{})
+				return
+			}, defaultTimeoutInterval, defaultPollInterval).ShouldNot(Succeed())
+		})
 	})
 
 	It("should block a non allowed Hostname", func() {
-		maj, min, v := GetKubernetesSemVer()
+		ns := NewNamespace("disallowed-hostname-extensions")
+		cs := ownerClient(tnt.Spec.Owners[0])
 
-		if maj == 1 && min < 22 {
-			By("testing extensions", func() {
-				ns := NewNamespace("disallowed-hostname-extensions")
-				cs := ownerClient(tnt.Spec.Owners[0])
+		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
-				NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
-				TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
+		By("testing extensions", func() {
+			if err := k8sClient.List(context.Background(), &extensionsv1beta1.IngressList{}); err != nil {
+				missingAPIError := &meta.NoKindMatchError{}
+				if errors.As(err, &missingAPIError) {
+					Skip(fmt.Sprintf("Running test due to unsupported API kind: %s", err.Error()))
+				}
+			}
 
+			Eventually(func() (err error) {
+				obj := extensionsIngress("denied-extensions", "kubernetes.io")
+				_, err = cs.ExtensionsV1beta1().Ingresses(ns.GetName()).Create(context.TODO(), obj, metav1.CreateOptions{})
+				return
+			}, defaultTimeoutInterval, defaultPollInterval).ShouldNot(Succeed())
+		})
+	})
+
+	It("should allow Hostnames in list", func() {
+		ns := NewNamespace("allowed-hostname-list-networking")
+		cs := ownerClient(tnt.Spec.Owners[0])
+
+		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
+
+		By("testing networking.k8s.io", func() {
+			if err := k8sClient.List(context.Background(), &networkingv1.IngressList{}); err != nil {
+				missingAPIError := &meta.NoKindMatchError{}
+				if errors.As(err, &missingAPIError) {
+					Skip(fmt.Sprintf("Running test due to unsupported API kind: %s", err.Error()))
+				}
+			}
+
+			for i, h := range tnt.Spec.IngressOptions.AllowedHostnames.Exact {
 				Eventually(func() (err error) {
-					obj := extensionsIngress("denied-extensions", "kubernetes.io")
+					obj := networkingIngress(fmt.Sprintf("allowed-networking-%d", i), h)
+					_, err = cs.NetworkingV1().Ingresses(ns.GetName()).Create(context.TODO(), obj, metav1.CreateOptions{})
+					return
+				}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+			}
+		})
+	})
+
+	It("should allow Hostnames in list", func() {
+		ns := NewNamespace("allowed-hostname-list-extensions")
+		cs := ownerClient(tnt.Spec.Owners[0])
+
+		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
+
+		By("testing extensions", func() {
+			if err := k8sClient.List(context.Background(), &extensionsv1beta1.IngressList{}); err != nil {
+				missingAPIError := &meta.NoKindMatchError{}
+				if errors.As(err, &missingAPIError) {
+					Skip(fmt.Sprintf("Running test due to unsupported API kind: %s", err.Error()))
+				}
+			}
+
+			for i, h := range tnt.Spec.IngressOptions.AllowedHostnames.Exact {
+				Eventually(func() (err error) {
+					obj := extensionsIngress(fmt.Sprintf("allowed-extensions-%d", i), h)
 					_, err = cs.ExtensionsV1beta1().Ingresses(ns.GetName()).Create(context.TODO(), obj, metav1.CreateOptions{})
 					return
-				}, defaultTimeoutInterval, defaultPollInterval).ShouldNot(Succeed())
-			})
-
-			return
-		}
-
-		Skip("Running test on Kubernetes " + v + ", extensions is deprecated")
-	})
-
-	It("should allow Hostnames in list", func() {
-		maj, min, v := GetKubernetesSemVer()
-
-		if maj == 1 && min > 18 {
-			ns := NewNamespace("allowed-hostname-list-networking")
-			cs := ownerClient(tnt.Spec.Owners[0])
-
-			NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
-			TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
-
-			By("testing networking.k8s.io", func() {
-				for i, h := range tnt.Spec.IngressOptions.AllowedHostnames.Exact {
-					Eventually(func() (err error) {
-						obj := networkingIngress(fmt.Sprintf("allowed-networking-%d", i), h)
-						_, err = cs.NetworkingV1().Ingresses(ns.GetName()).Create(context.TODO(), obj, metav1.CreateOptions{})
-						return
-					}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
-				}
-			})
-
-			return
-		}
-
-		Skip("Running test on Kubernetes " + v + ", doesn't provide networking.k8s.io")
-	})
-
-	It("should allow Hostnames in list", func() {
-		maj, min, v := GetKubernetesSemVer()
-
-		if maj == 1 && min < 22 {
-			ns := NewNamespace("allowed-hostname-list-extensions")
-			cs := ownerClient(tnt.Spec.Owners[0])
-
-			NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
-			TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
-
-			By("testing extensions", func() {
-				for i, h := range tnt.Spec.IngressOptions.AllowedHostnames.Exact {
-					Eventually(func() (err error) {
-						obj := extensionsIngress(fmt.Sprintf("allowed-extensions-%d", i), h)
-						_, err = cs.ExtensionsV1beta1().Ingresses(ns.GetName()).Create(context.TODO(), obj, metav1.CreateOptions{})
-						return
-					}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
-				}
-			})
-
-			return
-		}
-
-		Skip("Running test on Kubernetes " + v + ", extensions is deprecated")
+				}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+			}
+		})
 	})
 
 	It("should allow Hostnames in regex", func() {
-		maj, min, v := GetKubernetesSemVer()
+		ns := NewNamespace("allowed-hostname-regex-networking")
+		cs := ownerClient(tnt.Spec.Owners[0])
 
-		if maj == 1 && min > 18 {
-			ns := NewNamespace("allowed-hostname-regex-networking")
-			cs := ownerClient(tnt.Spec.Owners[0])
+		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
-			NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
-			TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
-
-			By("testing networking.k8s.io", func() {
-				for _, h := range []string{"foo", "bar", "bizz"} {
-					Eventually(func() (err error) {
-						obj := networkingIngress(fmt.Sprintf("allowed-networking-%s", h), fmt.Sprintf("%s.clastix.io", h))
-						_, err = cs.NetworkingV1().Ingresses(ns.GetName()).Create(context.TODO(), obj, metav1.CreateOptions{})
-						return
-					}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		By("testing networking.k8s.io", func() {
+			if err := k8sClient.List(context.Background(), &networkingv1.IngressList{}); err != nil {
+				missingAPIError := &meta.NoKindMatchError{}
+				if errors.As(err, &missingAPIError) {
+					Skip(fmt.Sprintf("Running test due to unsupported API kind: %s", err.Error()))
 				}
-			})
+			}
 
-			return
-		}
-
-		Skip("Running test on Kubernetes " + v + ", doesn't provide networking.k8s.io")
+			for _, h := range []string{"foo", "bar", "bizz"} {
+				Eventually(func() (err error) {
+					obj := networkingIngress(fmt.Sprintf("allowed-networking-%s", h), fmt.Sprintf("%s.clastix.io", h))
+					_, err = cs.NetworkingV1().Ingresses(ns.GetName()).Create(context.TODO(), obj, metav1.CreateOptions{})
+					return
+				}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+			}
+		})
 	})
 
 	It("should allow Hostnames in regex", func() {
-		maj, min, v := GetKubernetesSemVer()
+		ns := NewNamespace("allowed-hostname-regex-extensions")
+		cs := ownerClient(tnt.Spec.Owners[0])
 
-		if maj == 1 && min < 22 {
-			By("testing extensions", func() {
-				ns := NewNamespace("allowed-hostname-regex-extensions")
-				cs := ownerClient(tnt.Spec.Owners[0])
+		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
-				NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
-				TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
-
-				for _, h := range []string{"foo", "bar", "bizz"} {
-					Eventually(func() (err error) {
-						obj := extensionsIngress(fmt.Sprintf("allowed-extensions-%s", h), fmt.Sprintf("%s.clastix.io", h))
-						_, err = cs.ExtensionsV1beta1().Ingresses(ns.GetName()).Create(context.TODO(), obj, metav1.CreateOptions{})
-						return
-					}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		By("testing extensions", func() {
+			if err := k8sClient.List(context.Background(), &extensionsv1beta1.IngressList{}); err != nil {
+				missingAPIError := &meta.NoKindMatchError{}
+				if errors.As(err, &missingAPIError) {
+					Skip(fmt.Sprintf("Running test due to unsupported API kind: %s", err.Error()))
 				}
-			})
-		}
+			}
 
-		Skip("Running test on Kubernetes " + v + ", extensions is deprecated")
+			for _, h := range []string{"foo", "bar", "bizz"} {
+				Eventually(func() (err error) {
+					obj := extensionsIngress(fmt.Sprintf("allowed-extensions-%s", h), fmt.Sprintf("%s.clastix.io", h))
+					_, err = cs.ExtensionsV1beta1().Ingresses(ns.GetName()).Create(context.TODO(), obj, metav1.CreateOptions{})
+					return
+				}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+			}
+		})
 	})
 })
