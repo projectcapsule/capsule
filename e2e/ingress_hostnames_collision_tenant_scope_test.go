@@ -7,11 +7,14 @@ package e2e
 
 import (
 	"context"
+	"errors"
+	"fmt"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	networkingv1 "k8s.io/api/networking/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
@@ -114,9 +117,7 @@ var _ = Describe("when handling Tenant scoped Ingress hostnames collision", func
 		Expect(k8sClient.Delete(context.TODO(), tnt)).Should(Succeed())
 	})
 
-
 	It("should ensure Tenant scope for Ingress hostname and path collision", func() {
-		maj, min, _ := GetKubernetesSemVer()
 
 		ns1 := NewNamespace("cluster-collision-one")
 
@@ -129,64 +130,74 @@ var _ = Describe("when handling Tenant scoped Ingress hostnames collision", func
 		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns1.GetName()))
 		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns2.GetName()))
 
-		if maj == 1 && min > 18 {
-			By("testing networking.k8s.io", func() {
-				EventuallyCreation(func() (err error) {
-					obj := networkingIngress("networking-1", "kubernetes.io", "/path")
+		By("testing networking.k8s.io", func() {
+			if err := k8sClient.List(context.Background(), &networkingv1.IngressList{}); err != nil {
+				missingAPIError := &meta.NoKindMatchError{}
+				if errors.As(err, &missingAPIError) {
+					Skip(fmt.Sprintf("Running test due to unsupported API kind: %s", err.Error()))
+				}
+			}
 
-					_, err = cs.NetworkingV1().Ingresses(ns1.GetName()).Create(context.TODO(), obj, metav1.CreateOptions{})
+			EventuallyCreation(func() (err error) {
+				obj := networkingIngress("networking-1", "kubernetes.io", "/path")
 
-					return
-				}).Should(Succeed())
-				// Creating a second Ingress with same hostname but a different path in a Namespace managed by the same
-				// Tenant should not trigger a collision...
-				EventuallyCreation(func() (err error) {
-					obj := networkingIngress("networking-2", "kubernetes.io", "/docs")
+				_, err = cs.NetworkingV1().Ingresses(ns1.GetName()).Create(context.TODO(), obj, metav1.CreateOptions{})
 
-					_, err = cs.NetworkingV1().Ingresses(ns2.GetName()).Create(context.TODO(), obj, metav1.CreateOptions{})
+				return
+			}).Should(Succeed())
+			// Creating a second Ingress with same hostname but a different path in a Namespace managed by the same
+			// Tenant should not trigger a collision...
+			EventuallyCreation(func() (err error) {
+				obj := networkingIngress("networking-2", "kubernetes.io", "/docs")
 
-					return
-				}).Should(Succeed())
-				// ...but it happens if hostname and path collide with the first Ingress,
-				// although in a different Namespace
-				EventuallyCreation(func() (err error) {
-					obj := networkingIngress("networking-3", "kubernetes.io", "/path")
+				_, err = cs.NetworkingV1().Ingresses(ns2.GetName()).Create(context.TODO(), obj, metav1.CreateOptions{})
 
-					_, err = cs.NetworkingV1().Ingresses(ns2.GetName()).Create(context.TODO(), obj, metav1.CreateOptions{})
+				return
+			}).Should(Succeed())
+			// ...but it happens if hostname and path collide with the first Ingress,
+			// although in a different Namespace
+			EventuallyCreation(func() (err error) {
+				obj := networkingIngress("networking-3", "kubernetes.io", "/path")
 
-					return
-				}).ShouldNot(Succeed())
-			})
-		}
+				_, err = cs.NetworkingV1().Ingresses(ns2.GetName()).Create(context.TODO(), obj, metav1.CreateOptions{})
 
-		if maj == 1 && min < 22 {
-			By("testing extensions", func() {
-				EventuallyCreation(func() (err error) {
-					obj := extensionsIngress("extensions-1", "cncf.io", "/foo")
+				return
+			}).ShouldNot(Succeed())
+		})
 
-					_, err = cs.ExtensionsV1beta1().Ingresses(ns1.GetName()).Create(context.TODO(), obj, metav1.CreateOptions{})
+		By("testing extensions", func() {
+			if err := k8sClient.List(context.Background(), &extensionsv1beta1.IngressList{}); err != nil {
+				missingAPIError := &meta.NoKindMatchError{}
+				if errors.As(err, &missingAPIError) {
+					Skip(fmt.Sprintf("Running test due to unsupported API kind: %s", err.Error()))
+				}
+			}
 
-					return
-				}).Should(Succeed())
-				// Creating a second Ingress with same hostname but a different path in a Namespace managed by the same
-				// Tenant should not trigger a collision...
-				EventuallyCreation(func() (err error) {
-					obj := extensionsIngress("extensions-2", "cncf.io", "/bar")
+			EventuallyCreation(func() (err error) {
+				obj := extensionsIngress("extensions-1", "cncf.io", "/foo")
 
-					_, err = cs.ExtensionsV1beta1().Ingresses(ns2.GetName()).Create(context.TODO(), obj, metav1.CreateOptions{})
+				_, err = cs.ExtensionsV1beta1().Ingresses(ns1.GetName()).Create(context.TODO(), obj, metav1.CreateOptions{})
 
-					return
-				}).Should(Succeed())
-				// ...but it happens if hostname and path collide with the first Ingress,
-				// although in a different Namespace
-				EventuallyCreation(func() (err error) {
-					obj := extensionsIngress("extensions-3", "cncf.io", "/foo")
+				return
+			}).Should(Succeed())
+			// Creating a second Ingress with same hostname but a different path in a Namespace managed by the same
+			// Tenant should not trigger a collision...
+			EventuallyCreation(func() (err error) {
+				obj := extensionsIngress("extensions-2", "cncf.io", "/bar")
 
-					_, err = cs.ExtensionsV1beta1().Ingresses(ns2.GetName()).Create(context.TODO(), obj, metav1.CreateOptions{})
+				_, err = cs.ExtensionsV1beta1().Ingresses(ns2.GetName()).Create(context.TODO(), obj, metav1.CreateOptions{})
 
-					return
-				}).ShouldNot(Succeed())
-			})
-		}
+				return
+			}).Should(Succeed())
+			// ...but it happens if hostname and path collide with the first Ingress,
+			// although in a different Namespace
+			EventuallyCreation(func() (err error) {
+				obj := extensionsIngress("extensions-3", "cncf.io", "/foo")
+
+				_, err = cs.ExtensionsV1beta1().Ingresses(ns2.GetName()).Create(context.TODO(), obj, metav1.CreateOptions{})
+
+				return
+			}).ShouldNot(Succeed())
+		})
 	})
 })

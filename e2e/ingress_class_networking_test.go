@@ -7,10 +7,13 @@ package e2e
 
 import (
 	"context"
+	"errors"
+	"fmt"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	networkingv1 "k8s.io/api/networking/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/pointer"
 
@@ -52,10 +55,11 @@ var _ = Describe("when Tenant handles Ingress classes with networking.k8s.io/v1"
 	})
 
 	It("should block a non allowed class", func() {
-		maj, min, v := GetKubernetesSemVer()
-
-		if maj == 1 && min < 19 {
-			Skip("Running test on Kubernetes " + v + ", doesn't provide networking.k8s.io/v1")
+		if err := k8sClient.List(context.Background(), &networkingv1.IngressList{}); err != nil {
+			missingAPIError := &meta.NoKindMatchError{}
+			if errors.As(err, &missingAPIError) {
+				Skip(fmt.Sprintf("Running test due to unsupported API kind: %s", err.Error()))
+			}
 		}
 
 		ns := NewNamespace("ingress-class-disallowed-networking-v1")
@@ -134,10 +138,11 @@ var _ = Describe("when Tenant handles Ingress classes with networking.k8s.io/v1"
 	})
 
 	It("should allow enabled class using the deprecated annotation for networking.k8s.io/v1", func() {
-		maj, min, v := GetKubernetesSemVer()
-
-		if maj == 1 && min < 19 {
-			Skip("Running test on Kubernetes " + v + ", doesn't provide networking.k8s.io/v1")
+		if err := k8sClient.List(context.Background(), &networkingv1.IngressList{}); err != nil {
+			missingAPIError := &meta.NoKindMatchError{}
+			if errors.As(err, &missingAPIError) {
+				Skip(fmt.Sprintf("Running test due to unsupported API kind: %s", err.Error()))
+			}
 		}
 
 		ns := NewNamespace("ingress-class-allowed-annotation-networking-v1")
@@ -173,10 +178,11 @@ var _ = Describe("when Tenant handles Ingress classes with networking.k8s.io/v1"
 	})
 
 	It("should allow enabled class using the ingressClassName field", func() {
-		maj, min, v := GetKubernetesSemVer()
-
-		if maj == 1 && min < 19 {
-			Skip("Running test on Kubernetes " + v + ", doesn't provide networking.k8s.io/v1")
+		if err := k8sClient.List(context.Background(), &networkingv1.IngressList{}); err != nil {
+			missingAPIError := &meta.NoKindMatchError{}
+			if errors.As(err, &missingAPIError) {
+				Skip(fmt.Sprintf("Running test due to unsupported API kind: %s", err.Error()))
+			}
 		}
 
 		ns := NewNamespace("ingress-class-allowed-annotation-networking-v1")
@@ -210,10 +216,11 @@ var _ = Describe("when Tenant handles Ingress classes with networking.k8s.io/v1"
 	})
 
 	It("should allow enabled Ingress by regex using the deprecated annotation", func() {
-		maj, min, v := GetKubernetesSemVer()
-
-		if maj == 1 && min < 19 {
-			Skip("Running test on Kubernetes " + v + ", doesn't provide networking.k8s.io/v1")
+		if err := k8sClient.List(context.Background(), &networkingv1.IngressList{}); err != nil {
+			missingAPIError := &meta.NoKindMatchError{}
+			if errors.As(err, &missingAPIError) {
+				Skip(fmt.Sprintf("Running test due to unsupported API kind: %s", err.Error()))
+			}
 		}
 
 		ns := NewNamespace("ingress-class-allowed-annotation-networking-v1")
@@ -248,10 +255,11 @@ var _ = Describe("when Tenant handles Ingress classes with networking.k8s.io/v1"
 	})
 
 	It("should allow enabled Ingress by regex using the ingressClassName field", func() {
-		maj, min, v := GetKubernetesSemVer()
-
-		if maj == 1 && min < 19 {
-			Skip("Running test on Kubernetes " + v + ", doesn't provide networking.k8s.io/v1")
+		if err := k8sClient.List(context.Background(), &networkingv1.IngressList{}); err != nil {
+			missingAPIError := &meta.NoKindMatchError{}
+			if errors.As(err, &missingAPIError) {
+				Skip(fmt.Sprintf("Running test due to unsupported API kind: %s", err.Error()))
+			}
 		}
 
 		ns := NewNamespace("ingress-class-allowed-annotation-networking-v1")
@@ -280,6 +288,6 @@ var _ = Describe("when Tenant handles Ingress classes with networking.k8s.io/v1"
 			}
 			_, err = cs.NetworkingV1().Ingresses(ns.GetName()).Create(context.TODO(), i, metav1.CreateOptions{})
 			return
-		}, 600, defaultPollInterval).Should(Succeed())
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 	})
 })

@@ -53,7 +53,7 @@ var _ = Describe("creating an Ingress with a wildcard when it is denied for the 
 	})
 
 	It("should fail creating an extensions/v1beta1 Ingress with a wildcard hostname", func() {
-		if err := k8sClient.List(context.Background(), &networkingv1.IngressList{}); err != nil {
+		if err := k8sClient.List(context.Background(), &extensionsv1beta1.IngressList{}); err != nil {
 			missingAPIError := &meta.NoKindMatchError{}
 			if errors.As(err, &missingAPIError) {
 				Skip(fmt.Sprintf("Running test due to unsupported API kind: %s", err.Error()))
@@ -134,7 +134,7 @@ var _ = Describe("creating an Ingress with a wildcard when it is denied for the 
 	})
 
 	It("should fail creating an networking.k8s.io/v1beta1 Ingress with a wildcard hostname", func() {
-		if err := k8sClient.List(context.Background(), &networkingv1.IngressList{}); err != nil {
+		if err := k8sClient.List(context.Background(), &networkingv1beta1.IngressList{}); err != nil {
 			missingAPIError := &meta.NoKindMatchError{}
 			if errors.As(err, &missingAPIError) {
 				Skip(fmt.Sprintf("Running test due to unsupported API kind: %s", err.Error()))
