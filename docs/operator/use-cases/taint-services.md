@@ -25,6 +25,4 @@ EOF
 When Alice creates a service in a namespace, this will inherit the given label and/or annotation.
 
 # What’s next
-This ends our tour in Capsule use cases. As we improve Capsule, more use cases about multi-tenancy, policy admission control, and cluster governance will be covered in the future.
-
-Stay tuned!
+See how Bill, the cluster admin, can allow Alice to use specific labels or annotations. [Allow adding labels and annotations on namespaces](./namespace-labels-and-annotations.md).
