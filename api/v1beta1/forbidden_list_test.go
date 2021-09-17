@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestAllowedListSpec_ExactMatch(t *testing.T) {
+func TestForbiddenListSpec_ExactMatch(t *testing.T) {
 	type tc struct {
 		In    []string
 		True  []string
@@ -32,7 +32,7 @@ func TestAllowedListSpec_ExactMatch(t *testing.T) {
 			[]string{"any", "value"},
 		},
 	} {
-		a := AllowedListSpec{
+		a := ForbiddenListSpec{
 			Exact: tc.In,
 		}
 		for _, ok := range tc.True {
@@ -44,7 +44,7 @@ func TestAllowedListSpec_ExactMatch(t *testing.T) {
 	}
 }
 
-func TestAllowedListSpec_RegexMatch(t *testing.T) {
+func TestForbiddenListSpec_RegexMatch(t *testing.T) {
 	type tc struct {
 		Regex string
 		True  []string
@@ -54,7 +54,7 @@ func TestAllowedListSpec_RegexMatch(t *testing.T) {
 		{`first-\w+-pattern`, []string{"first-date-pattern", "first-year-pattern"}, []string{"broken", "first-year", "second-date-pattern"}},
 		{``, nil, []string{"any", "value"}},
 	} {
-		a := AllowedListSpec{
+		a := ForbiddenListSpec{
 			Regex: tc.Regex,
 		}
 		for _, ok := range tc.True {
