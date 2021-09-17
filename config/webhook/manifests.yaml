@@ -22,6 +22,7 @@ webhooks:
     - v1
     operations:
     - CREATE
+    - UPDATE
     resources:
     - namespaces
   sideEffects: None
