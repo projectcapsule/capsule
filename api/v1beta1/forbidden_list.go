@@ -9,12 +9,12 @@ import (
 	"strings"
 )
 
-type AllowedListSpec struct {
-	Exact []string `json:"allowed,omitempty"`
-	Regex string   `json:"allowedRegex,omitempty"`
+type ForbiddenListSpec struct {
+	Exact []string `json:"denied,omitempty"`
+	Regex string   `json:"deniedRegex,omitempty"`
 }
 
-func (in *AllowedListSpec) ExactMatch(value string) (ok bool) {
+func (in *ForbiddenListSpec) ExactMatch(value string) (ok bool) {
 	if len(in.Exact) > 0 {
 		sort.SliceStable(in.Exact, func(i, j int) bool {
 			return strings.ToLower(in.Exact[i]) < strings.ToLower(in.Exact[j])
@@ -25,7 +25,7 @@ func (in *AllowedListSpec) ExactMatch(value string) (ok bool) {
 	return
 }
 
-func (in AllowedListSpec) RegexMatch(value string) (ok bool) {
+func (in ForbiddenListSpec) RegexMatch(value string) (ok bool) {
 	if len(in.Regex) > 0 {
 		ok = regexp.MustCompile(in.Regex).MatchString(value)
 	}
