@@ -109,6 +109,7 @@ yes
 ```
 
 ## Assign a robot account as tenant owner
+
 As GitOps methodology is gaining more and more adoption everywhere, it's more likely that an application (Service Account) should act as Tenant Owner. In Capsule, a Tenant can also be owned by a Kubernetes _ServiceAccount_ identity.
 
 The tenant manifest is modified as in the following:
@@ -123,7 +124,6 @@ spec:
   owners:
   - name: oil-users
     kind: Group
-  owners:
   - name: system:serviceaccount:default:robot
     kind: ServiceAccount
 EOF
@@ -132,7 +132,7 @@ EOF
 Bill can create a Service Account called `robot`, for example, in the `default` namespace and leave it to act as Tenant Owner of the `oil` tenant
 
 ```
-kubectl --as system:serviceaccount:default:robot --as-group capsule.clastix.io auth can-i create namesapces
+kubectl --as system:serviceaccount:default:robot --as-group capsule.clastix.io auth can-i create namespaces
 yes
 ```
 

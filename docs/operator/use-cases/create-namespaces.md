@@ -36,20 +36,20 @@ subjects:
   name: alice
 roleRef:
   kind: ClusterRole
-  name: namespace-deleter
+  name: capsule-namespace-deleter
   apiGroup: rbac.authorization.k8s.io
 ```
 
 So Alice is the admin of the namespaces:
 
 ```
-kubectl get rolebindings -n oil-production
-NAME              ROLE                AGE
-namespace:admin   ClusterRole/admin   9m5s 
-namespace-deleter ClusterRole/admin   9m5s 
+kubectl get rolebindings -n oil-development
+NAME                ROLE                                    AGE
+namespace:admin     ClusterRole/admin                       12s
+namespace-deleter   ClusterRole/capsule-namespace-deleter   12s
 ```
 
-The said Role Binding resources are automatically created by Capsule controller when Alice creates a namespace in the tenant.
+The said Role Binding resources are automatically created by Capsule controller when the tenant owner Alice creates a namespace in the tenant.
 
 Alice can deploy any resource in the namespace, according to the predefined
 [`admin` cluster role](https://kubernetes.io/docs/reference/access-authn-authz/rbac/#user-facing-roles).
