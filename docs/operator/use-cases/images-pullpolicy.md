@@ -25,7 +25,7 @@ EOF
 
 Allowed values are: `Always`, `IfNotPresent`, `Never`.
 
-Any attempt of Alice to use a not allowed `imagePullPolicies` value is denied by the Validation Webhook enforcing it.
+Any attempt of Alice to use a disallowed `imagePullPolicies` value is denied by the Validation Webhook enforcing it.
 
 # What’s next
 

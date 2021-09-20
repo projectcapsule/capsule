@@ -238,12 +238,15 @@ Alice doesn't have permission to change or delete the resources according to the
 
 ```
 kubectl -n oil-production auth can-i patch resourcequota
-no - no RBAC policy matched
-
+no
+kubectl -n oil-production auth can-i delete resourcequota
+no
 kubectl -n oil-production auth can-i patch limitranges
-no - no RBAC policy matched
+no
+kubectl -n oil-production auth can-i delete limitranges
+no
 ```
 
 # What’s next
 
-See how Bill, the cluster admin, can enforce the PriorityClass of Pods running of Alice's tenant namespaces. [Enforce Pod Priority Classes](./pod-priority-class.md)
+See how Bill, the cluster admin, can enforce the PriorityClass of Pods running of Alice's tenant namespaces. [Enforce Pod Priority Classes](./pod-priority-classes.md)
