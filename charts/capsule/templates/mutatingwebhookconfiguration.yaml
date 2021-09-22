@@ -19,7 +19,7 @@ webhooks:
       namespace: {{ .Release.Namespace }}
       path: /namespace-owner-reference
       port: 443
-  failurePolicy: Fail
+  failurePolicy: {{ .Values.webhooks.namespaceOwnerReference.failurePolicy }}
   matchPolicy: Equivalent
   name: owner.namespace.capsule.clastix.io
   namespaceSelector: {}
