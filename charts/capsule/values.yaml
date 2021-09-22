@@ -42,8 +42,6 @@ jobs:
     repository: quay.io/clastix/kubectl
     pullPolicy: IfNotPresent
     tag: "v1.20.7"
-mutatingWebhooksTimeoutSeconds: 30
-validatingWebhooksTimeoutSeconds: 30
 imagePullSecrets: []
 serviceAccount:
   create: true
@@ -80,3 +78,50 @@ customLabels: {}
 
 # Additional annotations
 customAnnotations: {}
+
+# Webhooks configurations
+webhooks:
+  namespaceOwnerReference:
+    failurePolicy: Fail
+  cordoning:
+    failurePolicy: Fail
+    namespaceSelector:
+      matchExpressions:
+        - key: capsule.clastix.io/tenant
+          operator: Exists
+  ingresses:
+    failurePolicy: Fail
+    namespaceSelector:
+      matchExpressions:
+        - key: capsule.clastix.io/tenant
+          operator: Exists
+  namespaces:
+    failurePolicy: Fail
+  networkpolicies:
+    failurePolicy: Fail
+    namespaceSelector:
+      matchExpressions:
+        - key: capsule.clastix.io/tenant
+          operator: Exists
+  pods:
+    failurePolicy: Fail
+    namespaceSelector:
+      matchExpressions:
+        - key: capsule.clastix.io/tenant
+          operator: Exists
+  persistentvolumeclaims:
+    failurePolicy: Fail
+    namespaceSelector:
+      matchExpressions:
+        - key: capsule.clastix.io/tenant
+          operator: Exists
+  tenants:
+    failurePolicy: Fail
+  services:
+    failurePolicy: Fail
+    namespaceSelector:
+      matchExpressions:
+        - key: capsule.clastix.io/tenant
+          operator: Exists
+mutatingWebhooksTimeoutSeconds: 30
+validatingWebhooksTimeoutSeconds: 30

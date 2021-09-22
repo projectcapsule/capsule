@@ -19,13 +19,11 @@ webhooks:
       namespace: {{ .Release.Namespace }}
       path: /cordoning
       port: 443
-  failurePolicy: Fail
+  failurePolicy: {{ .Values.webhooks.cordoning.failurePolicy }}
   matchPolicy: Equivalent
   name: cordoning.tenant.capsule.clastix.io
   namespaceSelector:
-    matchExpressions:
-      - key: capsule.clastix.io/tenant
-        operator: Exists
+    {{- toYaml .Values.webhooks.cordoning.namespaceSelector | nindent 4}}
   objectSelector: {}
   rules:
     - apiGroups:
@@ -51,10 +49,11 @@ webhooks:
       namespace: {{ .Release.Namespace }}
       path: /ingresses
       port: 443
-  failurePolicy: Fail
+  failurePolicy: {{ .Values.webhooks.ingresses.failurePolicy }}
   matchPolicy: Equivalent
   name: ingress.capsule.clastix.io
   namespaceSelector:
+    {{- toYaml .Values.webhooks.ingresses.namespaceSelector | nindent 4}}
     matchExpressions:
       - key: capsule.clastix.io/tenant
         operator: Exists
@@ -84,7 +83,7 @@ webhooks:
       namespace: {{ .Release.Namespace }}
       path: /namespaces
       port: 443
-  failurePolicy: Fail
+  failurePolicy: {{ .Values.webhooks.namespaces.failurePolicy }}
   matchPolicy: Equivalent
   name: namespaces.capsule.clastix.io
   namespaceSelector: {}
@@ -113,13 +112,11 @@ webhooks:
       namespace: {{ .Release.Namespace }}
       path: /networkpolicies
       port: 443
-  failurePolicy: Fail
+  failurePolicy: {{ .Values.webhooks.networkpolicies.failurePolicy }}
   matchPolicy: Equivalent
   name: networkpolicies.capsule.clastix.io
   namespaceSelector:
-    matchExpressions:
-      - key: capsule.clastix.io/tenant
-        operator: Exists
+  {{- toYaml .Values.webhooks.networkpolicies.namespaceSelector | nindent 4}}
   objectSelector: {}
   rules:
     - apiGroups:
@@ -144,13 +141,11 @@ webhooks:
       namespace: {{ .Release.Namespace }}
       path: /pods
       port: 443
-  failurePolicy: Fail
+  failurePolicy: {{ .Values.webhooks.pods.failurePolicy }}
   matchPolicy: Exact
   name: pods.capsule.clastix.io
   namespaceSelector:
-    matchExpressions:
-      - key: capsule.clastix.io/tenant
-        operator: Exists
+  {{- toYaml .Values.webhooks.pods.namespaceSelector | nindent 4}}
   objectSelector: {}
   rules:
     - apiGroups:
@@ -173,12 +168,10 @@ webhooks:
       name: {{ include "capsule.fullname" . }}-webhook-service
       namespace: capsule-system
       path: /persistentvolumeclaims
-  failurePolicy: Fail
+  failurePolicy: {{ .Values.webhooks.persistentvolumeclaims.failurePolicy }}
   name: pvc.capsule.clastix.io
   namespaceSelector:
-    matchExpressions:
-      - key: capsule.clastix.io/tenant
-        operator: Exists
+  {{- toYaml .Values.webhooks.persistentvolumeclaims.namespaceSelector | nindent 4}}
   objectSelector: {}
   rules:
     - apiGroups:
@@ -202,13 +195,11 @@ webhooks:
       namespace: {{ .Release.Namespace }}
       path: /services
       port: 443
-  failurePolicy: Fail
+  failurePolicy: {{ .Values.webhooks.services.failurePolicy }}
   matchPolicy: Exact
   name: services.capsule.clastix.io
   namespaceSelector:
-    matchExpressions:
-      - key: capsule.clastix.io/tenant
-        operator: Exists
+  {{- toYaml .Values.webhooks.services.namespaceSelector | nindent 4}}
   objectSelector: {}
   rules:
     - apiGroups:
@@ -233,7 +224,7 @@ webhooks:
       namespace: {{ .Release.Namespace }}
       path: /tenants
       port: 443
-  failurePolicy: Fail
+  failurePolicy:  {{ .Values.webhooks.tenants.failurePolicy }}
   matchPolicy: Exact
   name: tenants.capsule.clastix.io
   namespaceSelector: {}
