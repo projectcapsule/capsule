@@ -25,6 +25,4 @@ EOF
 ```
 
 # What’s next
-This ends our tour in Capsule use cases. As we improve Capsule, more use cases about multi-tenancy, policy admission control, and cluster governance will be covered in the future.
-
-Stay tuned!
+Let's check it out how to restore Tenants after a Velero Backup. [Velero Backup Restoration](./velero-backup-restoration.md).
