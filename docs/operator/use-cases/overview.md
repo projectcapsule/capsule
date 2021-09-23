@@ -42,6 +42,7 @@ Use Capsule to address any of the following scenarios:
 * [Taint Services](./taint-services.md)
 * [Allow adding labels and annotations on namespaces](./namespace-labels-and-annotations.md)
 * [Velero Backup Restoration](./velero-backup-restoration.md)
+* [Deny Wildcard Hostnames](./deny-wildcard-hostnames.md)
 
 > NB: as we improve Capsule, more use cases about multi-tenancy and cluster governance will be covered.
 
