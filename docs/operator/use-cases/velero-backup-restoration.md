@@ -21,3 +21,7 @@ Additionally, you can also specify a selected range of tenants to be restored:
 ```
 
 In this way, only the tenants **gas** and **oil** will be restored.
+
+# What's next
+
+See how Bill, the cluster admin, can deny wildcard hostnames to a Tenant. [Deny Wildcard Hostnames](./deny-wildcard-hostnames.md)
