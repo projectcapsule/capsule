@@ -3,9 +3,25 @@ name: e2e
 on:
   push:
     branches: [ "*" ]
+    paths:
+      - 'api/*'
+      - 'controllers/*'
+      - 'e2e/*'
+      - 'Dockerfile'
+      - 'go.*'
+      - 'main.go'
+      - 'Makefile'
   pull_request:
     branches: [ "*" ]
-
+    paths:
+      - 'api/*'
+      - 'controllers/*'
+      - 'e2e/*'
+      - 'Dockerfile'
+      - 'go.*'
+      - 'main.go'
+      - 'Makefile'
+      
 jobs:
   kind:
     name: Kubernetes
