@@ -3,8 +3,26 @@ name: e2e
 on:
   push:
     branches: [ "*" ]
+    paths:
+      - '.github/workflows/e2e.yml'
+      - 'api/*'
+      - 'controllers/*'
+      - 'e2e/*'
+      - 'Dockerfile'
+      - 'go.*'
+      - 'main.go'
+      - 'Makefile'
   pull_request:
     branches: [ "*" ]
+    paths:
+      - '.github/workflows/e2e.yml'
+      - 'api/*'
+      - 'controllers/*'
+      - 'e2e/*'
+      - 'Dockerfile'
+      - 'go.*'
+      - 'main.go'
+      - 'Makefile'
 
 jobs:
   kind:
