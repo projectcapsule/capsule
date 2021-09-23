@@ -3,10 +3,12 @@ name: Helm Chart
 on:
   push:
     branches: [ "*" ]
+    tags: [ "helm-v*" ]
   pull_request:
     branches: [ "*" ]
   create:
     branches: [ "*" ]
+    tags: [ "helm-v*" ]
 
 jobs:
   lint:
