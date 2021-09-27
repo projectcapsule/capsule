@@ -45,7 +45,7 @@ manager: generate fmt vet
 
 # Run against the configured Kubernetes cluster in ~/.kube/config
 run: generate manifests
-	go run ./main.go
+	go run .
 
 # Creates the single file to install Capsule without any external dependency
 installer: manifests kustomize
