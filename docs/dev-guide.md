@@ -89,18 +89,18 @@ CONTAINER ID   IMAGE                  COMMAND                  CREATED          
 7d50f1633555   kindest/node:v1.21.1   "/usr/local/bin/entr…"   About a minute ago   Up About a minute                             kind-capsule-worker
 ```
 
-## Folk & clone the repository
+## Fork & clone the repository
 
-The `folk-clone-contribute-pr` flow is common for contributing to OSS projects like Kubernetes, Capsule.
+The `fork-clone-contribute-pr` flow is common for contributing to OSS projects like Kubernetes, Capsule.
 
-Let's assume you've folked it into your GitHub namespace, say `myuser`, and then you can clone it with Git protocol.
+Let's assume you've forked it into your GitHub namespace, say `myuser`, and then you can clone it with Git protocol.
 Do remember to change the `myuser` to yours.
 
 ```sh
 $ git clone git@github.com:myuser/capsule.git && cd capsule
 ```
 
-It's a good practice to add the upsteam as the remote too so we can easily fetch and merge the upstream to our folk:
+It's a good practice to add the upsteam as the remote too so we can easily fetch and merge the upstream to our fork:
 
 ```sh
 $ git remote add upstream https://github.com/clastix/capsule.git
@@ -160,12 +160,12 @@ oil    Active                     0                                 14s
 
 ## Scaling down the deployed Pod
 
-As of now, a complete env has been set up in `kind` or `k3d` powred cluster, and the `capsule-controller-manager` is running as a deployment serving as:
+As of now, a complete Capsule env has been set up in `kind`- or `k3d`-powered cluster, and the `capsule-controller-manager` is running as a deployment serving as:
 
 - The reconcilers for CRDs and;
 - A series of webhooks 
 
-During development, we prefer the code is running within our IDE locally, so the `capsule-controller-manager` running in the Kubernetes will competing with us.
+During development, we prefer that the code is running within our IDE locally, so the `capsule-controller-manager` running in the Kubernetes will competing with us.
 
 To avoid that, we need to scale the existing replicas of `capsule-controller-manager` to 0:
 
@@ -192,30 +192,12 @@ openssl req -newkey rsa:4096 -days 3650 -nodes -x509 \
   -out /tmp/k8s-webhook-server/serving-certs/tls.crt
 ```
 
-Do note that there is an [known issue in controller-runtime, #900](https://github.com/kubernetes-sigs/controller-runtime/issues/900) when you now try to run the code locally:
-
-```sh
-$ go run .
-```
-
-As you will get errors:
-```log
-{"level":"error","ts":"2021-09-26T20:42:23.165+0800","logger":"setup","msg":"problem running manager","error":"[open /var/folders/d2/wlg1hjdj29z9vxc2lhndp8m80000gn/T/k8s-webhook-server/serving-certs/tls.crt: no such file or directory, failed waiting for all runnables to end within grace period of 30s: context deadline exceeded]","errorCauses":[{"error":"open /var/folders/d2/wlg1hjdj29z9vxc2lhndp8m80000gn/T/k8s-webhook-server/serving-certs/tls.crt: no such file or directory"},
-...
-exit status 1
-```
-
-And the workaround is to explicitly set `TMPDIR=/tmp/`:
-
-```sh
-$ TMPDIR=/tmp/ go run .
-```
-
 ## Patching the Webhooks
 
-And we need to _delegate_ the controllers' and wehbooks' services to the code running in our IDE.
+By default, the webhooks will be registered with the services inside the cluster.
 
-So we need to patch the `MutatingWebhookConfiguration` and `ValidatingWebhookConfiguration` objects with the right pointers.
+We need to _delegate_ the controllers' and wehbooks' services to the code running in our IDE.
+To achieve that, we need to patch the `MutatingWebhookConfiguration` and `ValidatingWebhookConfiguration`.
 
 ```sh
 # Export your laptop's IP with the 9443 port exposed by controllers/webhooks' services
@@ -256,14 +238,53 @@ $ kubectl get ValidatingWebhookConfiguration capsule-validating-webhook-configur
 
 ## Run Capsule
 
+Now we can run Capsule controllers with webhooks outside of Kubernetes cluster:
+
 ```sh
-$ export NAMESPACE=capsule-system
+$ export NAMESPACE=capsule-system && export TMPDIR=/tmp/
 $ make run
+```
+
+To verify that, we can open a new console and create a new Tenant:
+
+```sh
+$ kubectl apply -f - <<EOF
+apiVersion: capsule.clastix.io/v1beta1
+kind: Tenant
+metadata:
+  name: gas
+spec:
+  owners:
+  - name: alice
+    kind: User
+EOF
+```
+
+We should see output like:
+```log
+tenant.capsule.clastix.io/gas created
+```
+
+And could see logs in the `make run` console like:
+```log
+...
+{"level":"info","ts":"2021-09-28T21:10:30.520+0800","logger":"controllers.Tenant","msg":"Ensuring all Namespaces are collected","Request.Name":"gas"}
+{"level":"info","ts":"2021-09-28T21:10:30.527+0800","logger":"controllers.Tenant","msg":"Starting processing of Namespaces","Request.Name":"gas","items":0}
+{"level":"info","ts":"2021-09-28T21:10:30.527+0800","logger":"controllers.Tenant","msg":"Ensuring additional RoleBindings for owner","Request.Name":"gas"}
+{"level":"info","ts":"2021-09-28T21:10:30.527+0800","logger":"controllers.Tenant","msg":"Ensuring RoleBinding for owner","Request.Name":"gas"}
+{"level":"info","ts":"2021-09-28T21:10:30.527+0800","logger":"controllers.Tenant","msg":"Ensuring Namespace count","Request.Name":"gas"}
+{"level":"info","ts":"2021-09-28T21:10:30.533+0800","logger":"controllers.Tenant","msg":"Tenant reconciling completed","Request.Name":"gas"}
+{"level":"info","ts":"2021-09-28T21:10:30.540+0800","logger":"controllers.Tenant","msg":"Ensuring all Namespaces are collected","Request.Name":"gas"}
+{"level":"info","ts":"2021-09-28T21:10:30.547+0800","logger":"controllers.Tenant","msg":"Starting processing of Namespaces","Request.Name":"gas","items":0}
+{"level":"info","ts":"2021-09-28T21:10:30.547+0800","logger":"controllers.Tenant","msg":"Ensuring additional RoleBindings for owner","Request.Name":"gas"}
+{"level":"info","ts":"2021-09-28T21:10:30.547+0800","logger":"controllers.Tenant","msg":"Ensuring RoleBinding for owner","Request.Name":"gas"}
+{"level":"info","ts":"2021-09-28T21:10:30.547+0800","logger":"controllers.Tenant","msg":"Ensuring Namespace count","Request.Name":"gas"}
+{"level":"info","ts":"2021-09-28T21:10:30.554+0800","logger":"controllers.Tenant","msg":"Tenant reconciling completed","Request.Name":"gas"}
 ```
 
 ## Work in your prefered IDE
 
-Now it's time to work through our familiar inner development loop for code contribution.
+Now it's time to work through our familiar inner loop for development.
 
 For example, if you're using [Visual Studio Code](https://code.visualstudio.com), this `launch.json` file can be a good start.
 
@@ -290,3 +311,5 @@ For example, if you're using [Visual Studio Code](https://code.visualstudio.com)
     ]
 }
 ```
+
+Please refer to [contributing.md](contributing.md) for more details while contributing.
