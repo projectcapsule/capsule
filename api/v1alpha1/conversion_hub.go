@@ -545,9 +545,15 @@ func (t *Tenant) ConvertFrom(srcRaw conversion.Hub) error {
 	}
 
 	if src.Spec.ServiceOptions != nil && src.Spec.ServiceOptions.AllowedServices != nil {
-		t.Annotations[enableNodePortsAnnotation] = strconv.FormatBool(*src.Spec.ServiceOptions.AllowedServices.NodePort)
-		t.Annotations[enableExternalNameAnnotation] = strconv.FormatBool(*src.Spec.ServiceOptions.AllowedServices.ExternalName)
-		t.Annotations[enableLoadBalancerAnnotation] = strconv.FormatBool(*src.Spec.ServiceOptions.AllowedServices.LoadBalancer)
+		if src.Spec.ServiceOptions.AllowedServices.NodePort != nil {
+			t.Annotations[enableNodePortsAnnotation] = strconv.FormatBool(*src.Spec.ServiceOptions.AllowedServices.NodePort)
+		}
+		if src.Spec.ServiceOptions.AllowedServices.ExternalName != nil {
+			t.Annotations[enableExternalNameAnnotation] = strconv.FormatBool(*src.Spec.ServiceOptions.AllowedServices.ExternalName)
+		}
+		if src.Spec.ServiceOptions.AllowedServices.LoadBalancer != nil {
+			t.Annotations[enableLoadBalancerAnnotation] = strconv.FormatBool(*src.Spec.ServiceOptions.AllowedServices.LoadBalancer)
+		}
 	}
 
 	// Status

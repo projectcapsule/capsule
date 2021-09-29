@@ -12,8 +12,10 @@ import (
 	flag "github.com/spf13/pflag"
 	"go.uber.org/zap/zapcore"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/client-go/kubernetes"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -130,19 +132,28 @@ func main() {
 	_ = manager.AddReadyzCheck("ping", healthz.Ping)
 	_ = manager.AddHealthzCheck("ping", healthz.Ping)
 
-	if err = (&tenantcontroller.Manager{
-		Client:   manager.GetClient(),
-		Log:      ctrl.Log.WithName("controllers").WithName("Tenant"),
-		Scheme:   manager.GetScheme(),
-		Recorder: manager.GetEventRecorderFor("tenant-controller"),
+	ctx := ctrl.SetupSignalHandler()
+
+	if err = (&secretcontroller.CAReconciler{
+		Client:    manager.GetClient(),
+		Log:       ctrl.Log.WithName("controllers").WithName("CA"),
+		Scheme:    manager.GetScheme(),
+		Namespace: namespace,
 	}).SetupWithManager(manager); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "Tenant")
+		setupLog.Error(err, "unable to create controller", "controller", "Namespace")
 		os.Exit(1)
 	}
-	if err = (&capsulev1alpha1.Tenant{}).SetupWebhookWithManager(manager); err != nil {
-		setupLog.Error(err, "unable to create conversion webhook", "webhook", "Tenant")
+
+	if err = (&secretcontroller.TLSReconciler{
+		Client:    manager.GetClient(),
+		Log:       ctrl.Log.WithName("controllers").WithName("Tls"),
+		Scheme:    manager.GetScheme(),
+		Namespace: namespace,
+	}).SetupWithManager(manager); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "Namespace")
 		os.Exit(1)
 	}
+
 	// +kubebuilder:scaffold:builder
 
 	cfg := configuration.NewCapsuleConfiguration(manager.GetClient(), configurationName)
@@ -185,25 +196,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&secretcontroller.CAReconciler{
-		Client:    manager.GetClient(),
-		Log:       ctrl.Log.WithName("controllers").WithName("CA"),
-		Scheme:    manager.GetScheme(),
-		Namespace: namespace,
-	}).SetupWithManager(manager); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "Namespace")
-		os.Exit(1)
-	}
-	if err = (&secretcontroller.TLSReconciler{
-		Client:    manager.GetClient(),
-		Log:       ctrl.Log.WithName("controllers").WithName("Tls"),
-		Scheme:    manager.GetScheme(),
-		Namespace: namespace,
-	}).SetupWithManager(manager); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "Namespace")
-		os.Exit(1)
-	}
-
 	if err = (&servicelabelscontroller.ServicesLabelsReconciler{
 		Log: ctrl.Log.WithName("controllers").WithName("ServiceLabels"),
 	}).SetupWithManager(manager); err != nil {
@@ -231,11 +223,39 @@ func main() {
 		os.Exit(1)
 	}
 
-	ctx := ctrl.SetupSignalHandler()
-
-	if err = indexer.AddToManager(ctx, setupLog, manager); err != nil {
-		setupLog.Error(err, "unable to setup indexers")
+	clientset, err := kubernetes.NewForConfig(ctrl.GetConfigOrDie())
+	if err != nil {
+		setupLog.Error(err, "unable to create kubernetes clientset")
 		os.Exit(1)
+	}
+
+	ca, err := clientset.CoreV1().Secrets(namespace).Get(ctx, secretcontroller.CASecretName, metav1.GetOptions{})
+	if err != nil {
+		setupLog.Error(err, "unable to get Capsule CA secret")
+		os.Exit(1)
+	}
+
+	if len(ca.Data) > 0 {
+		if err = (&tenantcontroller.Manager{
+			Client:   manager.GetClient(),
+			Log:      ctrl.Log.WithName("controllers").WithName("Tenant"),
+			Scheme:   manager.GetScheme(),
+			Recorder: manager.GetEventRecorderFor("tenant-controller"),
+		}).SetupWithManager(manager); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "Tenant")
+			os.Exit(1)
+		}
+		if err = (&capsulev1alpha1.Tenant{}).SetupWebhookWithManager(manager); err != nil {
+			setupLog.Error(err, "unable to create conversion webhook", "webhook", "Tenant")
+			os.Exit(1)
+		}
+
+		if err = indexer.AddToManager(ctx, setupLog, manager); err != nil {
+			setupLog.Error(err, "unable to setup indexers")
+			os.Exit(1)
+		}
+	} else {
+		setupLog.Info("skip registering a tenant controller, missing CA secret")
 	}
 
 	setupLog.Info("starting manager")
