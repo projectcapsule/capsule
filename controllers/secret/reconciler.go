@@ -22,10 +22,10 @@ func getCertificateAuthority(client client.Client, namespace string) (ca cert.CA
 
 	err = client.Get(context.TODO(), types.NamespacedName{
 		Namespace: namespace,
-		Name:      caSecretName,
+		Name:      CASecretName,
 	}, instance)
 	if err != nil {
-		return nil, fmt.Errorf("missing secret %s, cannot reconcile", caSecretName)
+		return nil, fmt.Errorf("missing secret %s, cannot reconcile", CASecretName)
 	}
 
 	if instance.Data == nil {

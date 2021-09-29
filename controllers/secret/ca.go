@@ -35,7 +35,7 @@ type CAReconciler struct {
 
 func (r *CAReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&corev1.Secret{}, forOptionPerInstanceName(caSecretName)).
+		For(&corev1.Secret{}, forOptionPerInstanceName(CASecretName)).
 		Complete(r)
 }
 

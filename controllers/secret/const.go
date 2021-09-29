@@ -7,6 +7,6 @@ const (
 	certSecretKey       = "tls.crt"
 	privateKeySecretKey = "tls.key"
 
-	caSecretName  = "capsule-ca"
+	CASecretName  = "capsule-ca"
 	tlsSecretName = "capsule-tls"
 )
