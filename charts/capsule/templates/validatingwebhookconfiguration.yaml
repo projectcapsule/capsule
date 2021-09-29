@@ -23,7 +23,7 @@ webhooks:
   matchPolicy: Equivalent
   name: cordoning.tenant.capsule.clastix.io
   namespaceSelector:
-    {{- toYaml .Values.webhooks.cordoning.namespaceSelector | nindent 4}}
+  {{- toYaml .Values.webhooks.cordoning.namespaceSelector | nindent 4}}
   objectSelector: {}
   rules:
     - apiGroups:
@@ -53,10 +53,7 @@ webhooks:
   matchPolicy: Equivalent
   name: ingress.capsule.clastix.io
   namespaceSelector:
-    {{- toYaml .Values.webhooks.ingresses.namespaceSelector | nindent 4}}
-    matchExpressions:
-      - key: capsule.clastix.io/tenant
-        operator: Exists
+  {{- toYaml .Values.webhooks.ingresses.namespaceSelector | nindent 4}}
   objectSelector: {}
   rules:
     - apiGroups:
