@@ -6,7 +6,6 @@
 package e2e
 
 import (
-	"path/filepath"
 	"testing"
 
 	. "github.com/onsi/ginkgo"
@@ -48,7 +47,6 @@ var _ = BeforeSuite(func(done Done) {
 
 	By("bootstrapping test environment")
 	testEnv = &envtest.Environment{
-		CRDDirectoryPaths: []string{filepath.Join("..", "config", "crd", "bases")},
 		UseExistingCluster: func(v bool) *bool {
 			return &v
 		}(true),
