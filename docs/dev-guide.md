@@ -180,10 +180,15 @@ To achieve that, there are some necessary steps we need to walk through, which h
 So the TL;DR answer is:
 
 ```sh
-# To retrieve your laptop's IP and execute `make dev-setup`
+# If you haven't installed or run `make deploy` before, do it first
+# Note: please retry if you saw errors
+$ make deploy
+
+# To retrieve your laptop's IP and execute `make dev-setup` to setup dev env
 # For example: LAPTOP_HOST_IP=192.168.10.101 make dev-setup
-$ LAPTOP_HOST_IP=<YOUR_LAPTOP_IP> make dev-setup
+$ LAPTOP_HOST_IP="<YOUR_LAPTOP_IP>" make dev-setup
 ```
+
 
 This is a very common setup for typical Kubernetes Operator development so we'd better walk them through with more details here.
 
@@ -250,7 +255,9 @@ $ export CA_BUNDLE=`openssl base64 -in /tmp/k8s-webhook-server/serving-certs/tls
 
 # Patch the MutatingWebhookConfiguration webhook
 $ kubectl patch MutatingWebhookConfiguration capsule-mutating-webhook-configuration \
-    --type='json' -p="[{'op': 'replace', 'path': '/webhooks/0/clientConfig', 'value':{'url':\"${WEBHOOK_URL}/mutate-v1-namespace-owner-reference\",'caBundle':\"${CA_BUNDLE}\"}}]"
+    --type='json' -p="[\
+      {'op': 'replace', 'path': '/webhooks/0/clientConfig', 'value':{'url':\"${WEBHOOK_URL}/mutate-v1-namespace-owner-reference\",'caBundle':\"${CA_BUNDLE}\"}}\
+    ]"
 
 # Verify it if you want
 $ kubectl get MutatingWebhookConfiguration capsule-mutating-webhook-configuration -o yaml
@@ -258,21 +265,16 @@ $ kubectl get MutatingWebhookConfiguration capsule-mutating-webhook-configuratio
 # Patch the ValidatingWebhookConfiguration webhooks
 # Note: there is a list of validating webhook endpoints, not just one
 $ kubectl patch ValidatingWebhookConfiguration capsule-validating-webhook-configuration \
-    --type='json' -p="[{'op': 'replace', 'path': '/webhooks/0/clientConfig', 'value':{'url':\"${WEBHOOK_URL}/cordoning\",'caBundle':\"${CA_BUNDLE}\"}}]" && \
-  kubectl patch ValidatingWebhookConfiguration capsule-validating-webhook-configuration \
-    --type='json' -p="[{'op': 'replace', 'path': '/webhooks/1/clientConfig', 'value':{'url':\"${WEBHOOK_URL}/ingresses\",'caBundle':\"${CA_BUNDLE}\"}}]" && \
-  kubectl patch ValidatingWebhookConfiguration capsule-validating-webhook-configuration \
-    --type='json' -p="[{'op': 'replace', 'path': '/webhooks/2/clientConfig', 'value':{'url':\"${WEBHOOK_URL}/namespaces\",'caBundle':\"${CA_BUNDLE}\"}}]" && \
-  kubectl patch ValidatingWebhookConfiguration capsule-validating-webhook-configuration \
-    --type='json' -p="[{'op': 'replace', 'path': '/webhooks/3/clientConfig', 'value':{'url':\"${WEBHOOK_URL}/networkpolicies\",'caBundle':\"${CA_BUNDLE}\"}}]" && \
-  kubectl patch ValidatingWebhookConfiguration capsule-validating-webhook-configuration \
-    --type='json' -p="[{'op': 'replace', 'path': '/webhooks/4/clientConfig', 'value':{'url':\"${WEBHOOK_URL}/pods\",'caBundle':\"${CA_BUNDLE}\"}}]" && \
-  kubectl patch ValidatingWebhookConfiguration capsule-validating-webhook-configuration \
-    --type='json' -p="[{'op': 'replace', 'path': '/webhooks/5/clientConfig', 'value':{'url':\"${WEBHOOK_URL}/persistentvolumeclaims\",'caBundle':\"${CA_BUNDLE}\"}}]" && \
-  kubectl patch ValidatingWebhookConfiguration capsule-validating-webhook-configuration \
-    --type='json' -p="[{'op': 'replace', 'path': '/webhooks/6/clientConfig', 'value':{'url':\"${WEBHOOK_URL}/services\",'caBundle':\"${CA_BUNDLE}\"}}]" && \
-  kubectl patch ValidatingWebhookConfiguration capsule-validating-webhook-configuration \
-    --type='json' -p="[{'op': 'replace', 'path': '/webhooks/7/clientConfig', 'value':{'url':\"${WEBHOOK_URL}/tenants\",'caBundle':\"${CA_BUNDLE}\"}}]"
+    --type='json' -p="[\
+      {'op': 'replace', 'path': '/webhooks/0/clientConfig', 'value':{'url':\"${WEBHOOK_URL}/cordoning\",'caBundle':\"${CA_BUNDLE}\"}},\
+      {'op': 'replace', 'path': '/webhooks/1/clientConfig', 'value':{'url':\"${WEBHOOK_URL}/ingresses\",'caBundle':\"${CA_BUNDLE}\"}},\
+      {'op': 'replace', 'path': '/webhooks/2/clientConfig', 'value':{'url':\"${WEBHOOK_URL}/namespaces\",'caBundle':\"${CA_BUNDLE}\"}},\
+      {'op': 'replace', 'path': '/webhooks/3/clientConfig', 'value':{'url':\"${WEBHOOK_URL}/networkpolicies\",'caBundle':\"${CA_BUNDLE}\"}},\
+      {'op': 'replace', 'path': '/webhooks/4/clientConfig', 'value':{'url':\"${WEBHOOK_URL}/pods\",'caBundle':\"${CA_BUNDLE}\"}},\
+      {'op': 'replace', 'path': '/webhooks/5/clientConfig', 'value':{'url':\"${WEBHOOK_URL}/persistentvolumeclaims\",'caBundle':\"${CA_BUNDLE}\"}},\
+      {'op': 'replace', 'path': '/webhooks/6/clientConfig', 'value':{'url':\"${WEBHOOK_URL}/services\",'caBundle':\"${CA_BUNDLE}\"}},\
+      {'op': 'replace', 'path': '/webhooks/7/clientConfig', 'value':{'url':\"${WEBHOOK_URL}/tenants\",'caBundle':\"${CA_BUNDLE}\"}}\
+    ]"
 
 # Verify it if you want
 $ kubectl get ValidatingWebhookConfiguration capsule-validating-webhook-configuration -o yaml
