@@ -22,6 +22,7 @@ bin
 *.swp
 *.swo
 *~
+.vscode
 
 **/*.kubeconfig
 **/*.crt
