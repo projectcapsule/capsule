@@ -7,8 +7,8 @@
 Make sure you have these tools installed:
 
 - [Go 1.16+](https://golang.org/dl/)
-- [OperatorSDK 1.7.2+](https://github.com/operator-framework/operator-sdk), or [Kubebuilder](https://github.com/kubernetes-sigs/kubebuilder)
-- [KinD](https://github.com/kubernetes-sigs/kind), or [k3d](https://k3d.io/), with kubectl
+- [Operator SDK 1.7.2+](https://github.com/operator-framework/operator-sdk), or [Kubebuilder](https://github.com/kubernetes-sigs/kubebuilder)
+- [KinD](https://github.com/kubernetes-sigs/kind) or [k3d](https://k3d.io/), with `kubectl`
 - [ngrok](https://ngrok.com/) (if you want to run locally with remote Kubernetes)
 - [golangci-lint](https://github.com/golangci/golangci-lint)
 - OpenSSL
@@ -29,7 +29,7 @@ $ export LAPTOP_HOST_IP=192.168.10.101
 
 # Spin up a bare minimum cluster
 # Refer to here for more options: https://k3d.io/v4.4.8/usage/commands/k3d_cluster_create/
-$ k3d cluster create k3s-capsule --servers 1 --agents 1 --no-lb --k3s-server-arg --tls-san=${K8S_API_IP}
+$ k3d cluster create k3s-capsule --servers 1 --agents 1 --no-lb --k3s-server-arg --tls-san=${LAPTOP_HOST_IP}
 
 # This will create a cluster with 1 server and 1 worker node
 $ kubectl get nodes
@@ -47,6 +47,9 @@ CONTAINER ID   IMAGE                      COMMAND                  CREATED      
 #### By `kind`
 
 ```sh
+# # Install kind cli by brew in Mac, or your preferred way
+$ brew install kind
+
 # Prepare a kind config file with necessary customization
 $ cat > kind.yaml <<EOF
 kind: Cluster
@@ -158,62 +161,101 @@ NAME   STATE    NAMESPACE QUOTA   NAMESPACE COUNT   NODE SELECTOR   AGE
 oil    Active                     0                                 14s
 ```
 
-## Scaling down the deployed Pod
-
-As of now, a complete Capsule env has been set up in `kind`- or `k3d`-powered cluster, and the `capsule-controller-manager` is running as a deployment serving as:
+As of now, a complete Capsule environment has been set up in `kind`- or `k3d`-powered cluster, and the `capsule-controller-manager` is running as a deployment serving as:
 
 - The reconcilers for CRDs and;
-- A series of webhooks 
+- A series of webhooks
 
-During development, we prefer that the code is running within our IDE locally, so the `capsule-controller-manager` running in the Kubernetes will competing with us.
 
-To avoid that, we need to scale the existing replicas of `capsule-controller-manager` to 0:
+## Set up development env
+
+During development, we prefer that the code is running within our IDE locally, instead of running as the normal Pod(s) within the Kubernetes cluster.
+
+Such a setup can be illustrated as below diagram:
+
+![Development Env](assets/dev-env.png)
+
+To achieve that, there are some necessary steps we need to walk through, which have been made as a `make` target within our `Makefile`.
+
+So the TL;DR answer is:
+
+```sh
+# To retrieve your laptop's IP and execute `make dev-setup`
+# For example: LAPTOP_HOST_IP=192.168.10.101 make dev-setup
+$ LAPTOP_HOST_IP=<YOUR_LAPTOP_IP> make dev-setup
+```
+
+This is a very common setup for typical Kubernetes Operator development so we'd better walk them through with more details here.
+
+1. Scaling down the deployed Pod(s) to 0
+
+We need to scale the existing replicas of `capsule-controller-manager` to 0 to avoid reconciliation competition between the Pod(s) and the code running outside of the cluster, in our preferred IDE for example.
 
 ```sh
 $ kubectl -n capsule-system scale deployment capsule-controller-manager --replicas=0
 deployment.apps/capsule-controller-manager scaled
 ```
 
-## Preparing TLS certificate for webhooks
+2. Preparing TLS certificate for the webhooks
 
-Running webhooks requires TLS, so let's prepare the TLS key pair in our development env to handle HTTPS requests.
+Running webhooks requires TLS, we can prepare the TLS key pair in our development env to handle HTTPS requests.
 
 ```sh
-# Create this dir to mimic the Pod mount point
-mkdir -p /tmp/k8s-webhook-server/serving-certs
+# Prepare a simple OpenSSL config file
+# Do remember to export LAPTOP_HOST_IP before running this command
+$ cat > _tls.cnf <<EOF
+[ req ]
+default_bits       = 4096
+distinguished_name = req_distinguished_name
+req_extensions     = req_ext
+[ req_distinguished_name ]
+countryName                = SG
+stateOrProvinceName        = SG
+localityName               = SG
+organizationName           = CAPSULE
+commonName                 = CAPSULE
+[ req_ext ]
+subjectAltName = @alt_names
+[alt_names]
+IP.1   = ${LAPTOP_HOST_IP}
+EOF
 
-# Generate cert/key under /tmp/k8s-webhook-server/
-openssl req -newkey rsa:4096 -days 3650 -nodes -x509 \
+# Create this dir to mimic the Pod mount point
+$ mkdir -p /tmp/k8s-webhook-server/serving-certs
+
+# Generate the TLS cert/key under /tmp/k8s-webhook-server/serving-certs
+$ openssl req -newkey rsa:4096 -days 3650 -nodes -x509 \
   -subj "/C=SG/ST=SG/L=SG/O=CAPSULE/CN=CAPSULE" \
-  -extensions SAN \
-  -config <( cat $( [[ "Darwin" -eq "$(uname -s)" ]]  && echo /System/Library/OpenSSL/openssl.cnf || echo /etc/ssl/openssl.cnf  ) \
-    <(printf "[ SAN ]\nsubjectAltName = \"IP:${LAPTOP_HOST_IP}\"")) \
+  -extensions req_ext \
+  -config _tls.cnf \
   -keyout /tmp/k8s-webhook-server/serving-certs/tls.key \
   -out /tmp/k8s-webhook-server/serving-certs/tls.crt
+
+# Clean it up
+$ rm -f _tls.cnf
 ```
 
-## Patching the Webhooks
+3. Patching the Webhooks
 
-By default, the webhooks will be registered with the services inside the cluster.
+By default, the webhooks will be registered with the services, which will route to the Pods, inside the cluster.
 
-We need to _delegate_ the controllers' and wehbooks' services to the code running in our IDE.
-To achieve that, we need to patch the `MutatingWebhookConfiguration` and `ValidatingWebhookConfiguration`.
+We need to _delegate_ the controllers' and webbooks' services to the code running in our IDE by patching the `MutatingWebhookConfiguration` and `ValidatingWebhookConfiguration`.
 
 ```sh
 # Export your laptop's IP with the 9443 port exposed by controllers/webhooks' services
 $ export WEBHOOK_URL="https://${LAPTOP_HOST_IP}:9443"
 
-# Trust the cert we generated for webhook TLS
+# Export the cert we just generated as the CA bundle for webhook TLS
 $ export CA_BUNDLE=`openssl base64 -in /tmp/k8s-webhook-server/serving-certs/tls.crt | tr -d '\n'`
 
-# Patch the MutatingWebhookConfiguration
+# Patch the MutatingWebhookConfiguration webhook
 $ kubectl patch MutatingWebhookConfiguration capsule-mutating-webhook-configuration \
     --type='json' -p="[{'op': 'replace', 'path': '/webhooks/0/clientConfig', 'value':{'url':\"${WEBHOOK_URL}/mutate-v1-namespace-owner-reference\",'caBundle':\"${CA_BUNDLE}\"}}]"
 
-# We can verify it by command
+# Verify it if you want
 $ kubectl get MutatingWebhookConfiguration capsule-mutating-webhook-configuration -o yaml
 
-# Patch the ValidatingWebhookConfiguration
+# Patch the ValidatingWebhookConfiguration webhooks
 # Note: there is a list of validating webhook endpoints, not just one
 $ kubectl patch ValidatingWebhookConfiguration capsule-validating-webhook-configuration \
     --type='json' -p="[{'op': 'replace', 'path': '/webhooks/0/clientConfig', 'value':{'url':\"${WEBHOOK_URL}/cordoning\",'caBundle':\"${CA_BUNDLE}\"}}]" && \
@@ -232,17 +274,17 @@ $ kubectl patch ValidatingWebhookConfiguration capsule-validating-webhook-config
   kubectl patch ValidatingWebhookConfiguration capsule-validating-webhook-configuration \
     --type='json' -p="[{'op': 'replace', 'path': '/webhooks/7/clientConfig', 'value':{'url':\"${WEBHOOK_URL}/tenants\",'caBundle':\"${CA_BUNDLE}\"}}]"
 
-# We can verify it by command
+# Verify it if you want
 $ kubectl get ValidatingWebhookConfiguration capsule-validating-webhook-configuration -o yaml
 ```
 
-## Run Capsule
+## Run Capsule outside the cluster
 
-Now we can run Capsule controllers with webhooks outside of Kubernetes cluster:
+Now we can run Capsule controllers with webhooks outside of the Kubernetes cluster:
 
 ```sh
 $ export NAMESPACE=capsule-system && export TMPDIR=/tmp/
-$ make run
+$ go run .
 ```
 
 To verify that, we can open a new console and create a new Tenant:
@@ -282,9 +324,9 @@ And could see logs in the `make run` console like:
 {"level":"info","ts":"2021-09-28T21:10:30.554+0800","logger":"controllers.Tenant","msg":"Tenant reconciling completed","Request.Name":"gas"}
 ```
 
-## Work in your prefered IDE
+## Work in your preferred IDE
 
-Now it's time to work through our familiar inner loop for development.
+Now it's time to work through our familiar inner loop for development in our preferred IDE.
 
 For example, if you're using [Visual Studio Code](https://code.visualstudio.com), this `launch.json` file can be a good start.
 
