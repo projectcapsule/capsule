@@ -83,7 +83,7 @@ generate: controller-gen
 # 	LAPTOP_HOST_IP=<YOUR_LAPTOP_IP> make dev-setup
 # For example:
 #	LAPTOP_HOST_IP=192.168.10.101 make dev-setup
-define tls_cnf
+define TLS_CNF
 [ req ]
 default_bits       = 4096
 distinguished_name = req_distinguished_name
@@ -99,11 +99,11 @@ subjectAltName = @alt_names
 [alt_names]
 IP.1   = $(LAPTOP_HOST_IP)
 endef
-export tls_cnf
-dev-setup: 
+export TLS_CNF
+dev-setup:
 	kubectl -n capsule-system scale deployment capsule-controller-manager --replicas=0
 	mkdir -p /tmp/k8s-webhook-server/serving-certs
-	echo "$${tls_cnf}" > _tls.cnf
+	echo "$${TLS_CNF}" > _tls.cnf
 	openssl req -newkey rsa:4096 -days 3650 -nodes -x509 \
 		-subj "/C=SG/ST=SG/L=SG/O=CAPSULE/CN=CAPSULE" \
 		-extensions req_ext \
@@ -114,23 +114,20 @@ dev-setup:
 	export WEBHOOK_URL="https://$${LAPTOP_HOST_IP}:9443"; \
 	export CA_BUNDLE=`openssl base64 -in /tmp/k8s-webhook-server/serving-certs/tls.crt | tr -d '\n'`; \
 	kubectl patch MutatingWebhookConfiguration capsule-mutating-webhook-configuration \
-		--type='json' -p="[{'op': 'replace', 'path': '/webhooks/0/clientConfig', 'value':{'url':\"$${WEBHOOK_URL}/mutate-v1-namespace-owner-reference\",'caBundle':\"$${CA_BUNDLE}\"}}]" && \
+		--type='json' -p="[\
+			{'op': 'replace', 'path': '/webhooks/0/clientConfig', 'value':{'url':\"$${WEBHOOK_URL}/mutate-v1-namespace-owner-reference\",'caBundle':\"$${CA_BUNDLE}\"}}\
+		]" && \
 	kubectl patch ValidatingWebhookConfiguration capsule-validating-webhook-configuration \
-		--type='json' -p="[{'op': 'replace', 'path': '/webhooks/0/clientConfig', 'value':{'url':\"$${WEBHOOK_URL}/cordoning\",'caBundle':\"$${CA_BUNDLE}\"}}]" && \
-	kubectl patch ValidatingWebhookConfiguration capsule-validating-webhook-configuration \
-		--type='json' -p="[{'op': 'replace', 'path': '/webhooks/1/clientConfig', 'value':{'url':\"$${WEBHOOK_URL}/ingresses\",'caBundle':\"$${CA_BUNDLE}\"}}]" && \
-	kubectl patch ValidatingWebhookConfiguration capsule-validating-webhook-configuration \
-		--type='json' -p="[{'op': 'replace', 'path': '/webhooks/2/clientConfig', 'value':{'url':\"$${WEBHOOK_URL}/namespaces\",'caBundle':\"$${CA_BUNDLE}\"}}]" && \
-	kubectl patch ValidatingWebhookConfiguration capsule-validating-webhook-configuration \
-		--type='json' -p="[{'op': 'replace', 'path': '/webhooks/3/clientConfig', 'value':{'url':\"$${WEBHOOK_URL}/networkpolicies\",'caBundle':\"$${CA_BUNDLE}\"}}]" && \
-	kubectl patch ValidatingWebhookConfiguration capsule-validating-webhook-configuration \
-		--type='json' -p="[{'op': 'replace', 'path': '/webhooks/4/clientConfig', 'value':{'url':\"$${WEBHOOK_URL}/pods\",'caBundle':\"$${CA_BUNDLE}\"}}]" && \
-	kubectl patch ValidatingWebhookConfiguration capsule-validating-webhook-configuration \
-		--type='json' -p="[{'op': 'replace', 'path': '/webhooks/5/clientConfig', 'value':{'url':\"$${WEBHOOK_URL}/persistentvolumeclaims\",'caBundle':\"$${CA_BUNDLE}\"}}]" && \
-	kubectl patch ValidatingWebhookConfiguration capsule-validating-webhook-configuration \
-		--type='json' -p="[{'op': 'replace', 'path': '/webhooks/6/clientConfig', 'value':{'url':\"$${WEBHOOK_URL}/services\",'caBundle':\"$${CA_BUNDLE}\"}}]" && \
-	kubectl patch ValidatingWebhookConfiguration capsule-validating-webhook-configuration \
-		--type='json' -p="[{'op': 'replace', 'path': '/webhooks/7/clientConfig', 'value':{'url':\"$${WEBHOOK_URL}/tenants\",'caBundle':\"$${CA_BUNDLE}\"}}]";
+		--type='json' -p="[\
+			{'op': 'replace', 'path': '/webhooks/0/clientConfig', 'value':{'url':\"$${WEBHOOK_URL}/cordoning\",'caBundle':\"$${CA_BUNDLE}\"}},\
+			{'op': 'replace', 'path': '/webhooks/1/clientConfig', 'value':{'url':\"$${WEBHOOK_URL}/ingresses\",'caBundle':\"$${CA_BUNDLE}\"}},\
+			{'op': 'replace', 'path': '/webhooks/2/clientConfig', 'value':{'url':\"$${WEBHOOK_URL}/namespaces\",'caBundle':\"$${CA_BUNDLE}\"}},\
+			{'op': 'replace', 'path': '/webhooks/3/clientConfig', 'value':{'url':\"$${WEBHOOK_URL}/networkpolicies\",'caBundle':\"$${CA_BUNDLE}\"}},\
+			{'op': 'replace', 'path': '/webhooks/4/clientConfig', 'value':{'url':\"$${WEBHOOK_URL}/pods\",'caBundle':\"$${CA_BUNDLE}\"}},\
+			{'op': 'replace', 'path': '/webhooks/5/clientConfig', 'value':{'url':\"$${WEBHOOK_URL}/persistentvolumeclaims\",'caBundle':\"$${CA_BUNDLE}\"}},\
+			{'op': 'replace', 'path': '/webhooks/6/clientConfig', 'value':{'url':\"$${WEBHOOK_URL}/services\",'caBundle':\"$${CA_BUNDLE}\"}},\
+			{'op': 'replace', 'path': '/webhooks/7/clientConfig', 'value':{'url':\"$${WEBHOOK_URL}/tenants\",'caBundle':\"$${CA_BUNDLE}\"}}\
+		]";
 
 # Build the docker image
 docker-build: test
