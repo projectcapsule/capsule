@@ -150,9 +150,6 @@ Error from server (Forbidden): pods is forbidden:
 User "bob" cannot list resource "pods" in API group "" in the namespace "kube-system"
 ```
 
-# Documentation
-Please, check the project [documentation](./docs/index.md) for more cool things you can do with Capsule.
-
 # Removal
 Similar to `deploy`, you can get rid of Capsule using the `remove` target.
 
@@ -160,14 +157,20 @@ Similar to `deploy`, you can get rid of Capsule using the `remove` target.
 $ make remove
 ```
 
+# Documentation
+Please, check the project [documentation](./docs/index.md) for more cool things you can do with Capsule.
+
+# Contribution
+Capsule is Open Source with Apache 2 license and any contribution is welcome.
+
+Please refer to the corresponding docs:
+- [contributing.md](./docs/contributing.md) for the general guide; and
+- [dev-guide.md](./docs/dev-guide.md) for how to set up the development env to get started.
+
 # FAQ
 - Q. How to pronounce Capsule?
 
   A. It should be pronounced as `/ˈkæpsjuːl/`.
-
-- Q. Can I contribute?
-
-  A. Absolutely! Capsule is Open Source with Apache 2 license and any contribution is welcome. Please refer to the corresponding [section](./docs/operator/contributing.md) in the documentation.
 
 - Q. Is it production grade?
 
