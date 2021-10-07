@@ -163,7 +163,7 @@ webhooks:
     caBundle: Cg==
     service:
       name: {{ include "capsule.fullname" . }}-webhook-service
-      namespace: capsule-system
+      namespace: {{ .Release.Namespace }}
       path: /persistentvolumeclaims
   failurePolicy: {{ .Values.webhooks.persistentvolumeclaims.failurePolicy }}
   name: pvc.capsule.clastix.io
