@@ -20,7 +20,7 @@ To simplify the usage of Capsule in this scenario, we'll work with the following
 
 Use Capsule to address any of the following scenarios:
 
-* [Onboard Tenants](./onboarding.md)
+* [Assign Tenant Ownership](./tenant-ownership.md)
 * [Create Namespaces](./create-namespaces.md)
 * [Assign Permissions](./permissions.md)
 * [Enforce Resources Quotas and Limits](./resources-quota-limits.md)
