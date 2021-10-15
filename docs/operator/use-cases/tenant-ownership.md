@@ -1,4 +1,4 @@
-# Onboard a new tenant
+# Tenant ownership
 Bill, the cluster admin, receives a new request from Acme Corp.'s CTO asking for a new tenant to be onboarded and Alice user will be the tenant owner. Bill then assigns Alice's identity of `alice` in the Acme Corp. identity management system. Since Alice is a tenant owner, Bill needs to assign `alice` the Capsule group defined by `--capsule-user-group` option, which defaults to `capsule.clastix.io`.
 
 To keep things simple, we assume that Bill just creates a client certificate for authentication using X.509 Certificate Signing Request, so Alice's certificate has `"/CN=alice/O=capsule.clastix.io"`.
@@ -134,6 +134,27 @@ Bill can create a Service Account called `robot`, for example, in the `default` 
 ```
 kubectl --as system:serviceaccount:default:robot --as-group capsule.clastix.io auth can-i create namespaces
 yes
+```
+
+The service account has to be part of Capsule group, so Bill has to set in the `CapsuleConfiguration`
+
+```yaml
+apiVersion: capsule.clastix.io/v1alpha1
+kind: CapsuleConfiguration
+metadata:
+  name: default
+spec:
+  userGroups:
+  - capsule.clastix.io
+  - system:serviceaccounts:default
+```
+
+because, by default, each service account is a member of following groups:
+
+```
+system:serviceaccounts
+system:serviceaccounts:{service-account-namespace}
+system:authenticated
 ```
 
 # What’s next
