@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # This script uses Kubernetes CertificateSigningRequest (CSR) to generate a
 # certificate signed by the Kubernetes CA itself.
