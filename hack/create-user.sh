@@ -10,23 +10,18 @@
 # Exit immediately if a command exits with a non-zero status.
 set -e
 
-# Check if OpenSSL is installed
-if [[ ! -x "$(command -v openssl)" ]]; then
-    echo "Error: openssl not found"
-    exit 1
-fi
+function check_command() {
+    local command=$1
 
-# Check if kubectl is installed
-if [[ ! -x "$(command -v kubectl)" ]]; then
-    echo "Error: kubectl not found"
-    exit 1
-fi
+    if ! command -v $command &> /dev/null; then
+        echo "Error: ${command} not found"
+        exit 1
+    fi
+}
 
-# Check if jq is installed
-if [[ ! -x "$(command -v jq)" ]]; then
-    echo "Error: jq not found"
-    exit 1
-fi
+check_command openssl
+check_command kubectl
+check_command jq
 
 USER=$1
 TENANT=$2
