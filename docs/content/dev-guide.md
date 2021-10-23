@@ -31,6 +31,9 @@ $ export LAPTOP_HOST_IP=192.168.10.101
 # Refer to here for more options: https://k3d.io/v4.4.8/usage/commands/k3d_cluster_create/
 $ k3d cluster create k3s-capsule --servers 1 --agents 1 --no-lb --k3s-server-arg --tls-san=${LAPTOP_HOST_IP}
 
+# Get Kubeconfig 
+$ k3d kubeconfig get k3s-capsule > /tmp/k3s-capsule && export KUBECONFIG="/tmp/k3s-capsule"
+
 # This will create a cluster with 1 server and 1 worker node
 $ kubectl get nodes
 NAME                       STATUS   ROLES                  AGE     VERSION
@@ -153,6 +156,8 @@ spec:
   owners:
   - name: alice
     kind: User
+  - name: system:serviceaccount:capsule-system:default
+    kind: ServiceAccount
 EOF
 
 # There shouldn't be any errors and you should see the newly created tenant
@@ -161,11 +166,16 @@ NAME   STATE    NAMESPACE QUOTA   NAMESPACE COUNT   NODE SELECTOR   AGE
 oil    Active                     0                                 14s
 ```
 
+If you want to test namespace creation or such stuff, make sure to use impersonation:
+
+```sh
+$ kubectl ... --as system:serviceaccount:capsule-system:default --as-group capsule.clastix.io
+```
+
 As of now, a complete Capsule environment has been set up in `kind`- or `k3d`-powered cluster, and the `capsule-controller-manager` is running as a deployment serving as:
 
 - The reconcilers for CRDs and;
 - A series of webhooks
-
 
 ## Set up development env
 
