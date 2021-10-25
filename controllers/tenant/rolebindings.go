@@ -97,6 +97,9 @@ func (r *Manager) syncAdditionalRoleBinding(tenant *capsulev1beta1.Tenant, ns st
 			r.Log.Error(err, "Cannot sync Additional RoleBinding")
 		}
 		r.Log.Info(fmt.Sprintf("Additional RoleBindings sync result: %s", string(res)), "name", target.Name, "namespace", target.Namespace)
+		if err != nil {
+			return
+		}
 	}
 
 	return nil
