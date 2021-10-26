@@ -20,6 +20,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
+	"github.com/clastix/capsule/pkg/webhook/node"
+
 	capsulev1alpha1 "github.com/clastix/capsule/api/v1alpha1"
 	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
 	configcontroller "github.com/clastix/capsule/controllers/config"
@@ -157,6 +159,7 @@ func main() {
 		route.Tenant(tenant.NameHandler(), tenant.IngressClassRegexHandler(), tenant.StorageClassRegexHandler(), tenant.ContainerRegistryRegexHandler(), tenant.HostnameRegexHandler(), tenant.FreezedEmitter(), tenant.ServiceAccountNameHandler()),
 		route.OwnerReference(utils.InCapsuleGroups(cfg, ownerreference.Handler(cfg))),
 		route.Cordoning(tenant.CordoningHandler(cfg)),
+		route.Node(utils.InCapsuleGroups(cfg, node.UserMetadataHandler(cfg))),
 	)
 	if err = webhook.Register(manager, webhooksList...); err != nil {
 		setupLog.Error(err, "unable to setup webhooks")
