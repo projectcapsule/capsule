@@ -95,7 +95,12 @@ Create the proxy fully-qualified Docker image to use
 Create the jobs fully-qualified Docker image to use
 */}}
 {{- define "capsule.jobsFullyQualifiedDockerImage" -}}
+{{- if .Values.jobs.image.tag }}
 {{- printf "%s:%s" .Values.jobs.image.repository .Values.jobs.image.tag -}}
+{{- else }}
+{{- $kubeversion := print "v" .Capabilities.KubeVersion.Major "." .Capabilities.KubeVersion.Minor -}}
+{{- printf "%s:%s" .Values.jobs.image.repository $kubeversion -}}
+{{- end }}
 {{- end }}
 
 {{/*
