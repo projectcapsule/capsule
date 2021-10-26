@@ -1,4 +1,4 @@
-# Denying user-defined labels or annotations
+# Denying specific user-defined labels or annotations on Namespaces
 
 By default, capsule allows tenant owners to add and modify any label or annotation on their namespaces. 
 
@@ -13,9 +13,9 @@ kind: Tenant
 metadata:
   name: oil
   annotations:
-    capsule.clastix.io/forbidden-namespace-labels: foo.acme.net, bar.acme.net
+    capsule.clastix.io/forbidden-namespace-labels: foo.acme.net,bar.acme.net
     capsule.clastix.io/forbidden-namespace-labels-regexp: .*.acme.net
-    capsule.clastix.io/forbidden-namespace-annotations: foo.acme.net, bar.acme.net
+    capsule.clastix.io/forbidden-namespace-annotations: foo.acme.net,bar.acme.net
     capsule.clastix.io/forbidden-namespace-annotations-regexp: .*.acme.net
 spec:
   owners:
