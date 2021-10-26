@@ -240,3 +240,29 @@ webhooks:
       scope: '*'
   sideEffects: None
   timeoutSeconds: {{ .Values.validatingWebhooksTimeoutSeconds }}
+- admissionReviewVersions:
+    - v1
+    - v1beta1
+  clientConfig:
+    caBundle: Cg==
+    service:
+      name: {{ include "capsule.fullname" . }}-webhook-service
+      namespace: {{ .Release.Namespace }}
+      path: /nodes
+      port: 443
+  failurePolicy: {{ .Values.webhooks.nodes.failurePolicy }}
+  name: nodes.capsule.clastix.io
+  matchPolicy: Exact
+  namespaceSelector: {}
+  objectSelector: {}
+  rules:
+    - apiGroups:
+        - ""
+      apiVersions:
+        - v1
+      operations:
+        - UPDATE
+      resources:
+        - nodes
+  sideEffects: None
+  timeoutSeconds: {{ .Values.validatingWebhooksTimeoutSeconds }}

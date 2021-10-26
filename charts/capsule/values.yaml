@@ -123,5 +123,7 @@ webhooks:
       matchExpressions:
         - key: capsule.clastix.io/tenant
           operator: Exists
+  nodes:
+    failurePolicy: Fail
 mutatingWebhooksTimeoutSeconds: 30
 validatingWebhooksTimeoutSeconds: 30
