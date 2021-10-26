@@ -50,6 +50,14 @@ func TenantNamespaceList(t *capsulev1beta1.Tenant, timeout time.Duration) AsyncA
 	}, timeout, defaultPollInterval)
 }
 
+func ModifyNode(fn func(node *corev1.Node) error) error {
+	nodeList := &corev1.NodeList{}
+
+	Expect(k8sClient.List(context.Background(), nodeList)).ToNot(HaveOccurred())
+
+	return fn(&nodeList.Items[0])
+}
+
 func EventuallyCreation(f interface{}) AsyncAssertion {
 	return Eventually(f, defaultTimeoutInterval, defaultPollInterval)
 }
