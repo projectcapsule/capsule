@@ -1588,13 +1588,32 @@ webhooks:
     service:
       name: capsule-webhook-service
       namespace: capsule-system
-      path: /pods
+      path: /nodes
   failurePolicy: Fail
-  name: pods.capsule.clastix.io
+  name: nodes.capsule.clastix.io
   namespaceSelector:
     matchExpressions:
     - key: capsule.clastix.io/tenant
       operator: Exists
+  rules:
+  - apiGroups:
+    - ""
+    apiVersions:
+    - v1
+    operations:
+    - UPDATE
+    resources:
+    - nodes
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: capsule-webhook-service
+      namespace: capsule-system
+      path: /pods
+  failurePolicy: Fail
+  name: pods.capsule.clastix.io
   rules:
   - apiGroups:
     - ""
