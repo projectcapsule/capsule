@@ -41,7 +41,7 @@ jobs:
   image:
     repository: quay.io/clastix/kubectl
     pullPolicy: IfNotPresent
-    tag: "v1.20.7"
+    tag: ""
 imagePullSecrets: []
 serviceAccount:
   create: true
