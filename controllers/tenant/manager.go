@@ -68,28 +68,22 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 		return
 	}
 
-	if instance.Spec.NetworkPolicies != nil {
-		r.Log.Info("Starting processing of Network Policies", "items", len(instance.Spec.NetworkPolicies.Items))
-		if err = r.syncNetworkPolicies(instance); err != nil {
-			r.Log.Error(err, "Cannot sync NetworkPolicy items")
-			return
-		}
+	r.Log.Info("Starting processing of Network Policies")
+	if err = r.syncNetworkPolicies(instance); err != nil {
+		r.Log.Error(err, "Cannot sync NetworkPolicy items")
+		return
 	}
 
-	if instance.Spec.LimitRanges != nil {
-		r.Log.Info("Starting processing of Limit Ranges", "items", len(instance.Spec.LimitRanges.Items))
-		if err = r.syncLimitRanges(instance); err != nil {
-			r.Log.Error(err, "Cannot sync LimitRange items")
-			return
-		}
+	r.Log.Info("Starting processing of Limit Ranges", "items", len(instance.Spec.LimitRanges.Items))
+	if err = r.syncLimitRanges(instance); err != nil {
+		r.Log.Error(err, "Cannot sync LimitRange items")
+		return
 	}
 
-	if instance.Spec.ResourceQuota != nil {
-		r.Log.Info("Starting processing of Resource Quotas", "items", len(instance.Spec.ResourceQuota.Items))
-		if err = r.syncResourceQuotas(instance); err != nil {
-			r.Log.Error(err, "Cannot sync ResourceQuota items")
-			return
-		}
+	r.Log.Info("Starting processing of Resource Quotas", "items", len(instance.Spec.ResourceQuota.Items))
+	if err = r.syncResourceQuotas(instance); err != nil {
+		r.Log.Error(err, "Cannot sync ResourceQuota items")
+		return
 	}
 
 	r.Log.Info("Ensuring additional RoleBindings for owner")
