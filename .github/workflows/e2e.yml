@@ -5,8 +5,8 @@ on:
     branches: [ "*" ]
     paths:
       - '.github/workflows/e2e.yml'
-      - 'api/*'
-      - 'controllers/*'
+      - 'api/**'
+      - 'controllers/**'
       - 'e2e/*'
       - 'Dockerfile'
       - 'go.*'
@@ -16,8 +16,8 @@ on:
     branches: [ "*" ]
     paths:
       - '.github/workflows/e2e.yml'
-      - 'api/*'
-      - 'controllers/*'
+      - 'api/**'
+      - 'controllers/**'
       - 'e2e/*'
       - 'Dockerfile'
       - 'go.*'
