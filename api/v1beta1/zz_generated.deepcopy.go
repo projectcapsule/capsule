@@ -480,21 +480,9 @@ func (in *TenantSpec) DeepCopyInto(out *TenantSpec) {
 			(*out)[key] = val
 		}
 	}
-	if in.NetworkPolicies != nil {
-		in, out := &in.NetworkPolicies, &out.NetworkPolicies
-		*out = new(NetworkPolicySpec)
-		(*in).DeepCopyInto(*out)
-	}
-	if in.LimitRanges != nil {
-		in, out := &in.LimitRanges, &out.LimitRanges
-		*out = new(LimitRangesSpec)
-		(*in).DeepCopyInto(*out)
-	}
-	if in.ResourceQuota != nil {
-		in, out := &in.ResourceQuota, &out.ResourceQuota
-		*out = new(ResourceQuotaSpec)
-		(*in).DeepCopyInto(*out)
-	}
+	in.NetworkPolicies.DeepCopyInto(&out.NetworkPolicies)
+	in.LimitRanges.DeepCopyInto(&out.LimitRanges)
+	in.ResourceQuota.DeepCopyInto(&out.ResourceQuota)
 	if in.AdditionalRoleBindings != nil {
 		in, out := &in.AdditionalRoleBindings, &out.AdditionalRoleBindings
 		*out = make([]AdditionalRoleBindingsSpec, len(*in))
