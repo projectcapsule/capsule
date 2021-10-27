@@ -200,17 +200,17 @@ func (t *Tenant) ConvertTo(dstRaw conversion.Hub) error {
 		}
 	}
 	if len(t.Spec.NetworkPolicies) > 0 {
-		dst.Spec.NetworkPolicies = &capsulev1beta1.NetworkPolicySpec{
+		dst.Spec.NetworkPolicies = capsulev1beta1.NetworkPolicySpec{
 			Items: t.Spec.NetworkPolicies,
 		}
 	}
 	if len(t.Spec.LimitRanges) > 0 {
-		dst.Spec.LimitRanges = &capsulev1beta1.LimitRangesSpec{
+		dst.Spec.LimitRanges = capsulev1beta1.LimitRangesSpec{
 			Items: t.Spec.LimitRanges,
 		}
 	}
 	if len(t.Spec.ResourceQuota) > 0 {
-		dst.Spec.ResourceQuota = &capsulev1beta1.ResourceQuotaSpec{
+		dst.Spec.ResourceQuota = capsulev1beta1.ResourceQuotaSpec{
 			Scope: func() capsulev1beta1.ResourceQuotaScope {
 				if v, ok := t.GetAnnotations()[resourceQuotaScopeAnnotation]; ok {
 					switch v {
@@ -500,13 +500,13 @@ func (t *Tenant) ConvertFrom(srcRaw conversion.Hub) error {
 			Regex: src.Spec.ContainerRegistries.Regex,
 		}
 	}
-	if src.Spec.NetworkPolicies != nil {
+	if len(src.Spec.NetworkPolicies.Items) > 0 {
 		t.Spec.NetworkPolicies = src.Spec.NetworkPolicies.Items
 	}
-	if src.Spec.LimitRanges != nil {
+	if len(src.Spec.LimitRanges.Items) > 0 {
 		t.Spec.LimitRanges = src.Spec.LimitRanges.Items
 	}
-	if src.Spec.ResourceQuota != nil {
+	if len(src.Spec.ResourceQuota.Items) > 0 {
 		t.Annotations[resourceQuotaScopeAnnotation] = string(src.Spec.ResourceQuota.Scope)
 		t.Spec.ResourceQuota = src.Spec.ResourceQuota.Items
 	}

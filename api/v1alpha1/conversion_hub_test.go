@@ -240,13 +240,13 @@ func generateTenantsSpecs() (Tenant, capsulev1beta1.Tenant) {
 			},
 			ContainerRegistries: v1beta1AllowedListSpec,
 			NodeSelector:        nodeSelector,
-			NetworkPolicies: &capsulev1beta1.NetworkPolicySpec{
+			NetworkPolicies: capsulev1beta1.NetworkPolicySpec{
 				Items: networkPolicies,
 			},
-			LimitRanges: &capsulev1beta1.LimitRangesSpec{
+			LimitRanges: capsulev1beta1.LimitRangesSpec{
 				Items: limitRanges,
 			},
-			ResourceQuota: &capsulev1beta1.ResourceQuotaSpec{
+			ResourceQuota: capsulev1beta1.ResourceQuotaSpec{
 				Scope: capsulev1beta1.ResourceQuotaScopeNamespace,
 				Items: resourceQuotas,
 			},
