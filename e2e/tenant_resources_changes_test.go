@@ -33,7 +33,7 @@ var _ = Describe("changing Tenant managed Kubernetes resources", func() {
 					Kind: "User",
 				},
 			},
-			LimitRanges: &capsulev1beta1.LimitRangesSpec{Items: []corev1.LimitRangeSpec{
+			LimitRanges: capsulev1beta1.LimitRangesSpec{Items: []corev1.LimitRangeSpec{
 				{
 					Limits: []corev1.LimitRangeItem{
 						{
@@ -79,7 +79,7 @@ var _ = Describe("changing Tenant managed Kubernetes resources", func() {
 				},
 			},
 			},
-			NetworkPolicies: &capsulev1beta1.NetworkPolicySpec{Items: []networkingv1.NetworkPolicySpec{
+			NetworkPolicies: capsulev1beta1.NetworkPolicySpec{Items: []networkingv1.NetworkPolicySpec{
 				{
 					Ingress: []networkingv1.NetworkPolicyIngressRule{
 						{
@@ -127,7 +127,7 @@ var _ = Describe("changing Tenant managed Kubernetes resources", func() {
 			NodeSelector: map[string]string{
 				"kubernetes.io/os": "linux",
 			},
-			ResourceQuota: &capsulev1beta1.ResourceQuotaSpec{Items: []corev1.ResourceQuotaSpec{
+			ResourceQuota: capsulev1beta1.ResourceQuotaSpec{Items: []corev1.ResourceQuotaSpec{
 				{
 					Hard: map[corev1.ResourceName]resource.Quantity{
 						corev1.ResourceLimitsCPU:      resource.MustParse("8"),
