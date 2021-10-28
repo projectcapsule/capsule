@@ -21,12 +21,10 @@ spec:
     allowedRegex: 'internal.registry.\\w.tld'
 ```
 
-> In case of `non-FQDI` (non fully qualified Docker image) and official images hosted on Docker Hub,
-> Capsule is going to retrieve the registry even if it's not explicit: a `busybox:latest` Pod
-> running on a Tenant allowing `docker.io` will not be blocked, even if the image
-> field is not explicit as `docker.io/busybox:latest`.
+> In case of Pod running `non-FQCI` (non fully qualified container image) containers, the container registry enforcement will disallow the execution.
+> If you would like to run a `busybox:latest` container that is commonly hosted on Docker Hub, the Tenant Owner has to specify its name explicitly, like `docker.io/library/busybox:latest`.
 
-A Pod running `internal.registry.foo.tld` as registry will be allowed, as well `internal.registry.bar.tld` since these are matching the regular expression.
+A Pod running `internal.registry.foo.tld/capsule:latest` as registry will be allowed, as well `internal.registry.bar.tld` since these are matching the regular expression.
 
 > A catch-all regex entry as `.*` allows every kind of registry, which would be the same result of unsetting `containerRegistries` at all.
 
