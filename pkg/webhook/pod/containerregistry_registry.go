@@ -7,8 +7,6 @@ import (
 	"regexp"
 )
 
-const defaultRegistryName = "docker.io"
-
 type registry map[string]string
 
 func (r registry) Registry() string {
@@ -16,9 +14,7 @@ func (r registry) Registry() string {
 	if !ok {
 		return ""
 	}
-	if len(res) == 0 {
-		return defaultRegistryName
-	}
+
 	return res
 }
 
@@ -27,9 +23,7 @@ func (r registry) Repository() string {
 	if !ok {
 		return ""
 	}
-	if res == defaultRegistryName {
-		return ""
-	}
+
 	return res
 }
 
@@ -38,6 +32,7 @@ func (r registry) Image() string {
 	if !ok {
 		return ""
 	}
+
 	return res
 }
 
@@ -54,7 +49,7 @@ func (r registry) Tag() string {
 
 func NewRegistry(value string) Registry {
 	reg := make(registry)
-	r := regexp.MustCompile(`(((?P<registry>[a-zA-Z0-9-._]+)\/)?((?P<repository>[a-zA-Z0-9-._]+)\/))?(?P<image>[a-zA-Z0-9-._]+)(:(?P<tag>[a-zA-Z0-9-._]+))?`)
+	r := regexp.MustCompile(`((?P<registry>[a-zA-Z0-9-._]+(:\d+)?)\/)?(?P<repository>.*\/)?(?P<image>[a-zA-Z0-9-._]+:(?P<tag>[a-zA-Z0-9-._]+))?`)
 	match := r.FindStringSubmatch(value)
 	for i, name := range r.SubexpNames() {
 		if i > 0 && i <= len(match) {
