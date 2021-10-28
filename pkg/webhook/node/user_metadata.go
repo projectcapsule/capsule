@@ -8,6 +8,7 @@ import (
 	"reflect"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -20,11 +21,13 @@ import (
 
 type userMetadataHandler struct {
 	configuration configuration.Configuration
+	version       *version.Version
 }
 
-func UserMetadataHandler(configuration configuration.Configuration) capsulewebhook.Handler {
+func UserMetadataHandler(configuration configuration.Configuration, ver *version.Version) capsulewebhook.Handler {
 	return &userMetadataHandler{
 		configuration: configuration,
+		version:       ver,
 	}
 }
 
@@ -76,6 +79,12 @@ func (r *userMetadataHandler) getForbiddenNodeAnnotations(node *corev1.Node) map
 
 func (r *userMetadataHandler) OnUpdate(client client.Client, decoder *admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
+		nodeWebhookSupported, _ := utils.NodeWebhookSupported(r.version)
+
+		if !nodeWebhookSupported {
+			return nil
+		}
+
 		oldNode := &corev1.Node{}
 		if err := decoder.DecodeRaw(req.OldObject, oldNode); err != nil {
 			return utils.ErroredResponse(err)
