@@ -1,4 +1,5 @@
-//+build e2e
+//go:build e2e
+// +build e2e
 
 // Copyright 2020-2021 Clastix Labs
 // SPDX-License-Identifier: Apache-2.0
@@ -8,13 +9,13 @@ package e2e
 import (
 	"context"
 
-	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
 	capsulev1alpha1 "github.com/clastix/capsule/api/v1alpha1"
+	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	corev1 "k8s.io/api/core/v1"
 )
 
 var _ = Describe("modifying node labels and annotations", func() {
@@ -31,7 +32,7 @@ var _ = Describe("modifying node labels and annotations", func() {
 			},
 		},
 	}
-	
+
 	cr := &rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "node-modifier",
@@ -44,7 +45,7 @@ var _ = Describe("modifying node labels and annotations", func() {
 			},
 		},
 	}
-	
+
 	crb := &rbacv1.ClusterRoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "node-modifier",
@@ -56,9 +57,9 @@ var _ = Describe("modifying node labels and annotations", func() {
 		},
 		Subjects: []rbacv1.Subject{
 			{
-				Kind:      rbacv1.UserKind,
-				APIGroup:  "rbac.authorization.k8s.io",
-				Name:      "gatsby",
+				Kind:     rbacv1.UserKind,
+				APIGroup: "rbac.authorization.k8s.io",
+				Name:     "gatsby",
 			},
 		},
 	}
@@ -86,48 +87,56 @@ var _ = Describe("modifying node labels and annotations", func() {
 	It("should allow", func() {
 		ModifyCapsuleConfigurationOpts(func(configuration *capsulev1alpha1.CapsuleConfiguration) {
 			protected := map[string]string{
-				capsulev1alpha1.ForbiddenNodeLabelsAnnotation: "foo,bar",
-				capsulev1alpha1.ForbiddenNodeLabelsRegexpAnnotation: "^gatsby-.*$",
-				capsulev1alpha1.ForbiddenNodeAnnotationsAnnotation: "foo,bar",
+				capsulev1alpha1.ForbiddenNodeLabelsAnnotation:            "foo,bar",
+				capsulev1alpha1.ForbiddenNodeLabelsRegexpAnnotation:      "^gatsby-.*$",
+				capsulev1alpha1.ForbiddenNodeAnnotationsAnnotation:       "foo,bar",
 				capsulev1alpha1.ForbiddenNodeAnnotationsRegexpAnnotation: "^gatsby-.*$",
 			}
 			configuration.SetAnnotations(protected)
 		})
 		By("adding non-forbidden labels", func() {
-			Expect(ModifyNode(func(node *corev1.Node) error {
-				node.Labels["bim"] = "baz"
-				cs := ownerClient(tnt.Spec.Owners[0])
+			EventuallyCreation(func() error {
+				return ModifyNode(func(node *corev1.Node) error {
+					node.Labels["bim"] = "baz"
+					cs := ownerClient(tnt.Spec.Owners[0])
 
-				_, err := cs.CoreV1().Nodes().Update(context.Background(), node, metav1.UpdateOptions{})
-				return err
-			})).Should(Succeed())
+					_, err := cs.CoreV1().Nodes().Update(context.Background(), node, metav1.UpdateOptions{})
+					return err
+				})
+			}).Should(Succeed())
 		})
 		By("modifying non-forbidden labels", func() {
-			Expect(ModifyNode(func(node *corev1.Node) error {
-				node.Labels["bim"] = "bom"
-				cs := ownerClient(tnt.Spec.Owners[0])
+			EventuallyCreation(func() error {
+				return ModifyNode(func(node *corev1.Node) error {
+					node.Labels["bim"] = "bom"
+					cs := ownerClient(tnt.Spec.Owners[0])
 
-				_, err := cs.CoreV1().Nodes().Update(context.Background(), node, metav1.UpdateOptions{})
-				return err
-			})).Should(Succeed())
+					_, err := cs.CoreV1().Nodes().Update(context.Background(), node, metav1.UpdateOptions{})
+					return err
+				})
+			}).Should(Succeed())
 		})
 		By("adding non-forbidden annotations", func() {
-			Expect(ModifyNode(func(node *corev1.Node) error {
-				node.Annotations["bim"] = "baz"
-				cs := ownerClient(tnt.Spec.Owners[0])
+			EventuallyCreation(func() error {
+				return ModifyNode(func(node *corev1.Node) error {
+					node.Annotations["bim"] = "baz"
+					cs := ownerClient(tnt.Spec.Owners[0])
 
-				_, err := cs.CoreV1().Nodes().Update(context.Background(), node, metav1.UpdateOptions{})
-				return err
-			})).Should(Succeed())
+					_, err := cs.CoreV1().Nodes().Update(context.Background(), node, metav1.UpdateOptions{})
+					return err
+				})
+			}).Should(Succeed())
 		})
 		By("modifying non-forbidden annotations", func() {
-			Expect(ModifyNode(func(node *corev1.Node) error {
-				node.Annotations["bim"] = "bom"
-				cs := ownerClient(tnt.Spec.Owners[0])
+			EventuallyCreation(func() error {
+				return ModifyNode(func(node *corev1.Node) error {
+					node.Annotations["bim"] = "bom"
+					cs := ownerClient(tnt.Spec.Owners[0])
 
-				_, err := cs.CoreV1().Nodes().Update(context.Background(), node, metav1.UpdateOptions{})
-				return err
-			})).Should(Succeed())
+					_, err := cs.CoreV1().Nodes().Update(context.Background(), node, metav1.UpdateOptions{})
+					return err
+				})
+			}).Should(Succeed())
 		})
 	})
 	It("should fail", func() {
@@ -140,65 +149,70 @@ var _ = Describe("modifying node labels and annotations", func() {
 		})).Should(Succeed())
 
 		By("adding forbidden labels using exact match", func() {
-			Expect(ModifyNode(func(node *corev1.Node) error {
-				node.Labels["bar"] = "baz"
-				cs := ownerClient(tnt.Spec.Owners[0])
+			EventuallyCreation(func() error {
+				return ModifyNode(func(node *corev1.Node) error {
+					node.Labels["bar"] = "baz"
+					cs := ownerClient(tnt.Spec.Owners[0])
 
-				_, err := cs.CoreV1().Nodes().Update(context.Background(), node, metav1.UpdateOptions{})
-				return err
-			})).ShouldNot(Succeed())
+					_, err := cs.CoreV1().Nodes().Update(context.Background(), node, metav1.UpdateOptions{})
+					return err
+				})
+			}).ShouldNot(Succeed())
 		})
 		By("adding forbidden labels using regex match", func() {
-			Expect(ModifyNode(func(node *corev1.Node) error {
-				node.Labels["gatsby-foo"] = "baz"
-				cs := ownerClient(tnt.Spec.Owners[0])
+			EventuallyCreation(func() error {
+				return ModifyNode(func(node *corev1.Node) error {
+					node.Labels["gatsby-foo"] = "baz"
+					cs := ownerClient(tnt.Spec.Owners[0])
 
-				_, err := cs.CoreV1().Nodes().Update(context.Background(), node, metav1.UpdateOptions{})
-				return err
-			})).ShouldNot(Succeed())
+					_, err := cs.CoreV1().Nodes().Update(context.Background(), node, metav1.UpdateOptions{})
+					return err
+				})
+			}).ShouldNot(Succeed())
 		})
 		By("modifying forbidden labels", func() {
-			Expect(ModifyNode(func(node *corev1.Node) error {
-				node.Labels["foo"] = "baz"
-				cs := ownerClient(tnt.Spec.Owners[0])
+			EventuallyCreation(func() error {
+				return ModifyNode(func(node *corev1.Node) error {
+					node.Labels["foo"] = "baz"
+					cs := ownerClient(tnt.Spec.Owners[0])
 
-				_, err := cs.CoreV1().Nodes().Update(context.Background(), node, metav1.UpdateOptions{})
-				return err
-			})).ShouldNot(Succeed())
+					_, err := cs.CoreV1().Nodes().Update(context.Background(), node, metav1.UpdateOptions{})
+					return err
+				})
+			}).ShouldNot(Succeed())
 		})
 		By("adding forbidden annotations using exact match", func() {
-			Expect(ModifyNode(func(node *corev1.Node) error {
-				node.Annotations["bar"] = "baz"
-				cs := ownerClient(tnt.Spec.Owners[0])
+			EventuallyCreation(func() error {
+				return ModifyNode(func(node *corev1.Node) error {
+					node.Annotations["bar"] = "baz"
+					cs := ownerClient(tnt.Spec.Owners[0])
 
-				_, err := cs.CoreV1().Nodes().Update(context.Background(), node, metav1.UpdateOptions{})
-				return err
-			})).ShouldNot(Succeed())
+					_, err := cs.CoreV1().Nodes().Update(context.Background(), node, metav1.UpdateOptions{})
+					return err
+				})
+			}).ShouldNot(Succeed())
 		})
 		By("adding forbidden annotations using regex match", func() {
-			Expect(ModifyNode(func(node *corev1.Node) error {
-				node.Annotations["gatsby-foo"] = "baz"
-				cs := ownerClient(tnt.Spec.Owners[0])
+			EventuallyCreation(func() error {
+				return ModifyNode(func(node *corev1.Node) error {
+					node.Annotations["gatsby-foo"] = "baz"
+					cs := ownerClient(tnt.Spec.Owners[0])
 
-				_, err := cs.CoreV1().Nodes().Update(context.Background(), node, metav1.UpdateOptions{})
-				return err
-			})).ShouldNot(Succeed())
+					_, err := cs.CoreV1().Nodes().Update(context.Background(), node, metav1.UpdateOptions{})
+					return err
+				})
+			}).ShouldNot(Succeed())
 		})
 		By("modifying forbidden annotations", func() {
-			Expect(ModifyNode(func(node *corev1.Node) error {
-				node.Annotations["foo"] = "baz"
-				cs := ownerClient(tnt.Spec.Owners[0])
+			EventuallyCreation(func() error {
+				return ModifyNode(func(node *corev1.Node) error {
+					node.Annotations["foo"] = "baz"
+					cs := ownerClient(tnt.Spec.Owners[0])
 
-				_, err := cs.CoreV1().Nodes().Update(context.Background(), node, metav1.UpdateOptions{})
-				return err
-			})).ShouldNot(Succeed())
+					_, err := cs.CoreV1().Nodes().Update(context.Background(), node, metav1.UpdateOptions{})
+					return err
+				})
+			}).ShouldNot(Succeed())
 		})
-
-		ModifyCapsuleConfigurationOpts(func(configuration *capsulev1alpha1.CapsuleConfiguration) {
-			configuration.SetAnnotations(map[string]string{})
-		})
-
 	})
 })
-
-

@@ -70,7 +70,7 @@ func ModifyCapsuleConfigurationOpts(fn func(configuration *capsulev1alpha1.Capsu
 
 	Expect(k8sClient.Update(context.Background(), config)).ToNot(HaveOccurred())
 
-	time.Sleep(time.Second)
+	time.Sleep(1 * time.Second)
 }
 
 func KindInTenantRoleBindingAssertions(ns *corev1.Namespace, timeout time.Duration) (out []AsyncAssertion) {
