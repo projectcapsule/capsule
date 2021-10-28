@@ -184,8 +184,8 @@ var _ = Describe("when Tenant handles Ingress classes with extensions/v1beta1", 
 			}
 		}
 
-		if maj, min, v := GetKubernetesSemVer(); maj == 1 && min < 18 {
-			Skip("Running test on Kubernetes " + v + ", doesn't provide .spec.ingressClassName")
+		if version := GetKubernetesVersion(); version.Major() == 1 && version.Minor() < 18 {
+			Skip("Running test on Kubernetes " + version.String() + ", doesn't provide .spec.ingressClassName")
 		}
 
 		ns := NewNamespace("ingress-class-allowed-annotation-extensions-v1beta1")
@@ -265,8 +265,8 @@ var _ = Describe("when Tenant handles Ingress classes with extensions/v1beta1", 
 				}
 			}
 
-			if maj, min, v := GetKubernetesSemVer(); maj == 1 && min < 18 {
-				Skip("Running test on Kubernetes " + v + ", doesn't provide .spec.ingressClassName")
+			if version := GetKubernetesVersion(); version.Major() == 1 && version.Minor() < 18 {
+				Skip("Running test on Kubernetes " + version.String() + ", doesn't provide .spec.ingressClassName")
 			}
 
 			i := &extensionsv1beta1.Ingress{

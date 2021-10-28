@@ -7,7 +7,6 @@ package e2e
 
 import (
 	"context"
-	"strconv"
 	"time"
 
 	. "github.com/onsi/gomega"
@@ -15,6 +14,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	versionUtil "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/client-go/kubernetes"
 
@@ -90,21 +90,21 @@ func KindInTenantRoleBindingAssertions(ns *corev1.Namespace, timeout time.Durati
 	return
 }
 
-func GetKubernetesSemVer() (major, minor int, ver string) {
-	var v *version.Info
+func GetKubernetesVersion() *versionUtil.Version {
+	var serverVersion *version.Info
 	var err error
 	var cs kubernetes.Interface
+	var ver *versionUtil.Version
 
 	cs, err = kubernetes.NewForConfig(cfg)
 	Expect(err).ToNot(HaveOccurred())
 
-	v, err = cs.Discovery().ServerVersion()
+	serverVersion, err = cs.Discovery().ServerVersion()
 	Expect(err).ToNot(HaveOccurred())
-	major, err = strconv.Atoi(v.Major)
-	Expect(err).ToNot(HaveOccurred())
-	minor, err = strconv.Atoi(v.Minor)
-	Expect(err).ToNot(HaveOccurred())
-	ver = v.String()
 
-	return
+	ver, err = versionUtil.ParseGeneric(serverVersion.String())
+	Expect(err).ToNot(HaveOccurred())
+
+
+	return ver
 }

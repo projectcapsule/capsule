@@ -16,6 +16,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"github.com/clastix/capsule/pkg/webhook/utils"
+	"fmt"
 )
 
 var _ = Describe("modifying node labels and annotations", func() {
@@ -65,6 +67,13 @@ var _ = Describe("modifying node labels and annotations", func() {
 	}
 
 	JustBeforeEach(func() {
+		version := GetKubernetesVersion()
+		nodeWebhookSupported, _ := utils.NodeWebhookSupported(version)
+
+		if !nodeWebhookSupported {
+			Skip(fmt.Sprintf("Node webhook is disabled for current version %s", version.String()))
+		}
+
 		EventuallyCreation(func() error {
 			tnt.ResourceVersion = ""
 			return k8sClient.Create(context.TODO(), tnt)
