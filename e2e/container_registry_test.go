@@ -30,7 +30,7 @@ var _ = Describe("enforcing a Container Registry", func() {
 				},
 			},
 			ContainerRegistries: &capsulev1beta1.AllowedListSpec{
-				Exact: []string{"docker.io", "docker.tld"},
+				Exact: []string{"docker.io", "myregistry.azurecr.io"},
 				Regex: `quay\.\w+`,
 			},
 		},
@@ -51,7 +51,7 @@ var _ = Describe("enforcing a Container Registry", func() {
 		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 		Eventually(func() (ok bool) {
 			Expect(k8sClient.Get(context.Background(), types.NamespacedName{Name: ns.Name}, ns)).Should(Succeed())
-			ok, _ = HaveKeyWithValue("capsule.clastix.io/allowed-registries", "docker.io,docker.tld").Match(ns.Annotations)
+			ok, _ = HaveKeyWithValue("capsule.clastix.io/allowed-registries", "docker.io,myregistry.azurecr.io").Match(ns.Annotations)
 			if !ok {
 				return
 			}
@@ -85,6 +85,31 @@ var _ = Describe("enforcing a Container Registry", func() {
 		Expect(err).ShouldNot(Succeed())
 	})
 
+	It("should allow using a registry only match", func() {
+		ns := NewNamespace("registry-only")
+		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+
+		pod := &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "container",
+			},
+			Spec: corev1.PodSpec{
+				Containers: []corev1.Container{
+					{
+						Name:  "container",
+						Image: "myregistry.azurecr.io/myapp:latest",
+					},
+				},
+			},
+		}
+
+		cs := ownerClient(tnt.Spec.Owners[0])
+		EventuallyCreation(func() error {
+			_, err := cs.CoreV1().Pods(ns.Name).Create(context.Background(), pod, metav1.CreateOptions{})
+			return err
+		}).Should(Succeed())
+	})
+
 	It("should allow using an exact match", func() {
 		ns := NewNamespace("registry-list")
 		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
@@ -97,7 +122,7 @@ var _ = Describe("enforcing a Container Registry", func() {
 				Containers: []corev1.Container{
 					{
 						Name:  "container",
-						Image: "docker.io/nginx:alpine",
+						Image: "docker.io/library/nginx:alpine",
 					},
 				},
 			},
