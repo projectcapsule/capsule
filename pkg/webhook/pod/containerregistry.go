@@ -48,14 +48,22 @@ func (h *containerRegistryHandler) OnCreate(c client.Client, decoder *admission.
 			var valid, matched bool
 
 			for _, container := range pod.Spec.Containers {
-				registry := NewRegistry(container.Image)
+				reg := NewRegistry(container.Image)
 
-				valid = tnt.Spec.ContainerRegistries.ExactMatch(registry.Registry())
+				if len(reg.Registry()) == 0 {
+					recorder.Eventf(&tnt, corev1.EventTypeWarning, "MissingFQCI", "Pod %s/%s is not using using a fully qualified container image, cannot enforce registry the current Tenant", req.Namespace, req.Name, reg.Registry())
 
-				matched = tnt.Spec.ContainerRegistries.RegexMatch(registry.Registry())
+					response := admission.Denied(NewContainerRegistryForbidden(container.Image, *tnt.Spec.ContainerRegistries).Error())
+
+					return &response
+				}
+
+				valid = tnt.Spec.ContainerRegistries.ExactMatch(reg.Registry())
+
+				matched = tnt.Spec.ContainerRegistries.RegexMatch(reg.Registry())
 
 				if !valid && !matched {
-					recorder.Eventf(&tnt, corev1.EventTypeWarning, "ForbiddenContainerRegistry", "Pod %s/%s is using a forbidden registry %s is forbidden for the current Tenant", req.Namespace, req.Name, registry.Registry())
+					recorder.Eventf(&tnt, corev1.EventTypeWarning, "ForbiddenContainerRegistry", "Pod %s/%s is using a container hosted on registry %s that is forbidden for the current Tenant", req.Namespace, req.Name, reg.Registry())
 
 					response := admission.Denied(NewContainerRegistryForbidden(container.Image, *tnt.Spec.ContainerRegistries).Error())
 
