@@ -6,9 +6,6 @@ on:
     tags: [ "helm-v*" ]
   pull_request:
     branches: [ "*" ]
-  create:
-    branches: [ "*" ]
-    tags: [ "helm-v*" ]
 
 jobs:
   lint:
