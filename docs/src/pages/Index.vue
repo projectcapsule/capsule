@@ -146,12 +146,10 @@ export default {
           property: "twitter:description",
           content: this.$page.metadata.siteDescription,
         },
-        // {
-        //   property: "og:url",
-        //   content: window.location.href ,
-        // },
-        // TO CHANGE
-        { name: "robots", content: "noindex, nofollow" },
+        {
+          property: "og:url",
+          content: "https://capsule.clastix.io/",
+        },
       ],
     };
   },

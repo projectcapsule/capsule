@@ -63,12 +63,10 @@ export default {
           property: "twitter:description",
           content: this.$page.metadata.siteDescription,
         },
-        // {
-        //   property: "og:url",
-        //   content: "",
-        // },
-        // TO CHANGE
-        { name: "robots", content: "noindex, nofollow" },
+        {
+          property: "og:url",
+          content: `https://capsule.clastix.io${this.$page.markdownPage.path}`,
+        },
       ],
     };
   },
@@ -131,7 +129,7 @@ export default {
   blockquote {
     @apply border-l-4 pl-4 ml-4 my-4 border-solid border-primary;
   }
-  
+
   ol,
   ul {
     @apply pl-5;
