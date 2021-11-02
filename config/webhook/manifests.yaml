@@ -124,6 +124,25 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
+      path: /nodes
+  failurePolicy: Fail
+  name: nodes.capsule.clastix.io
+  rules:
+  - apiGroups:
+    - ""
+    apiVersions:
+    - v1
+    operations:
+    - UPDATE
+    resources:
+    - nodes
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
       path: /pods
   failurePolicy: Fail
   name: pods.capsule.clastix.io

@@ -26,7 +26,4 @@ EOF
 Doing this, Alice will not be able to use `oil.bigorg.com`, being the tenant-owner of `gas`.
 
 # What’s next
-
-This ends our tour in Capsule use cases. As we improve Capsule, more  use cases about multi-tenancy, policy admission control, and cluster  governance will be covered in the future.
-
-Stay tuned!
+See how Bill, the cluster admin can protect specific labels and annotations on Nodes from modifications by Tenant Owners. [Denying specific user-defined labels or annotations on Nodes](./node-labels-and-annotations.md).

@@ -20,6 +20,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
+	"github.com/clastix/capsule/pkg/webhook/node"
+
 	capsulev1alpha1 "github.com/clastix/capsule/api/v1alpha1"
 	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
 	configcontroller "github.com/clastix/capsule/controllers/config"
@@ -119,7 +121,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	majorVer, minorVer, _, err := utils.GetK8sVersion()
+	kubeVersion, err := utils.GetK8sVersion()
 	if err != nil {
 		setupLog.Error(err, "unable to get kubernetes version")
 		os.Exit(1)
@@ -157,7 +159,14 @@ func main() {
 		route.Tenant(tenant.NameHandler(), tenant.IngressClassRegexHandler(), tenant.StorageClassRegexHandler(), tenant.ContainerRegistryRegexHandler(), tenant.HostnameRegexHandler(), tenant.FreezedEmitter(), tenant.ServiceAccountNameHandler()),
 		route.OwnerReference(utils.InCapsuleGroups(cfg, ownerreference.Handler(cfg))),
 		route.Cordoning(tenant.CordoningHandler(cfg)),
+		route.Node(utils.InCapsuleGroups(cfg, node.UserMetadataHandler(cfg, kubeVersion))),
 	)
+
+	nodeWebhookSupported, _ := utils.NodeWebhookSupported(kubeVersion)
+	if !nodeWebhookSupported {
+		setupLog.Info("Disabling node labels verification webhook as current Kubernetes version doesn't have fix for CVE-2021-25735")
+	}
+
 	if err = webhook.Register(manager, webhooksList...); err != nil {
 		setupLog.Error(err, "unable to setup webhooks")
 		os.Exit(1)
@@ -209,8 +218,8 @@ func main() {
 	}
 	if err = (&servicelabelscontroller.EndpointSlicesLabelsReconciler{
 		Log:          ctrl.Log.WithName("controllers").WithName("EndpointSliceLabels"),
-		VersionMinor: minorVer,
-		VersionMajor: majorVer,
+		VersionMinor: kubeVersion.Minor(),
+		VersionMajor: kubeVersion.Major(),
 	}).SetupWithManager(manager); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "EndpointSliceLabels")
 	}

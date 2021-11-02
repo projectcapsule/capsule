@@ -25,4 +25,4 @@ EOF
 When Alice creates a service in a namespace, this will inherit the given label and/or annotation.
 
 # What’s next
-See how Bill, the cluster admin, can allow Alice to use specific labels or annotations. [Allow adding labels and annotations on namespaces](./namespace-labels-and-annotations.md).
+See how Bill, the cluster admin, can protect specific labels and annotations on Namespaces from modifications by Alice. [Denying specific user-defined labels or annotations on Namespaces](./namespace-labels-and-annotations.md).
