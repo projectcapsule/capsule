@@ -1,0 +1,28 @@
+{
+  "name": "doc-capsule",
+  "private": true,
+  "scripts": {
+    "develop": "gridsome develop",
+    "explore": "gridsome explore",
+    "build": "gridsome build"
+  },
+  "dependencies": {
+    "@gridsome/remark-prismjs": "^0.5.0",
+    "@gridsome/source-filesystem": "^0.6.2",
+    "@gridsome/transformer-remark": "^0.6.4",
+    "fuse.js": "^6.4.6",
+    "gridsome": "^0.7.0"
+  },
+  "devDependencies": {
+    "autoprefixer": "^9.8.8",
+    "gridsome-plugin-tailwindcss": "^4.1.1",
+    "postcss": "^7.0.39",
+    "postcss-import": "^14.0.2",
+    "postcss-preset-env": "^6.7.0",
+    "prism-themes": "^1.9.0",
+    "sass": "^1.42.1",
+    "sass-loader": "^10.1.1",
+    "tailwindcss": "npm:@tailwindcss/postcss7-compat@^2.2.17",
+    "vue-svg-loader": "^0.16.0"
+  }
+}
