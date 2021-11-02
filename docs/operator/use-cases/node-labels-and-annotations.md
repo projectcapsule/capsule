@@ -1,13 +1,5 @@
 # Denying specific user-defined labels or annotations on Nodes
 
-**Important note**
-
-Due to [CVE-2021-25735](https://github.com/kubernetes/kubernetes/issues/100096) this feature is only supported for Kubernetes version older than:
-* v1.18.18
-* v1.19.10
-* v1.20.6
-* v1.21.0
-
 When using `capsule` together with [capsule-proxy](https://github.com/clastix/capsule-proxy), Bill can allow Tenant Owners to [modify Nodes](../../proxy/overview.md).
 
 By default, it will allow tenant owners to add and modify any label or annotation on their nodes. 
@@ -33,6 +25,15 @@ spec:
     - system:serviceaccounts:default
 EOF
 ```
+
+> **Important note**
+>
+>Due to [CVE-2021-25735](https://github.com/kubernetes/kubernetes/issues/100096) this feature is only supported for Kubernetes version older than:
+>* v1.18.18
+>* v1.19.10
+>* v1.20.6
+>* v1.21.0
+
 # What’s next
 
 This ends our tour in Capsule use cases. As we improve Capsule, more  use cases about multi-tenancy, policy admission control, and cluster  governance will be covered in the future.
