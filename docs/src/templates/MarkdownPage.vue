@@ -128,6 +128,10 @@ export default {
     @apply list-decimal mb-2;
   }
 
+  blockquote {
+    @apply border-l-4 pl-4 ml-4 my-4 border-solid border-primary;
+  }
+  
   ol,
   ul {
     @apply pl-5;
