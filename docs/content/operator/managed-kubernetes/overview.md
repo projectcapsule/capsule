@@ -9,7 +9,7 @@ Capsule Operator can be easily installed on a Managed Kubernetes Service. Since 
     - MutatingAdmissionWebhook
     - ValidatingAdmissionWebhook
 
-* [AWS EKS](/docs/managed-kubernetes/aws-eks)
+* [AWS EKS](/docs/operator/managed-kubernetes/aws-eks)
 * CoAKS - Capsule over Azure Kubernetes Service
 * Google Cloud GKE
 * IBM Cloud

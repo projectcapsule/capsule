@@ -23,11 +23,7 @@ module.exports = function (api) {
             {
               label: 'Dev guide',
               path: '/docs/dev-guide'
-            },
-            {
-              label: 'Contributing',
-              path: '/docs/contributing'
-            },
+            }
           ]
         },
         {

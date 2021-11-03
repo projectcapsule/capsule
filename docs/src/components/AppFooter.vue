@@ -9,7 +9,7 @@
       "
     >
       <div class="space-y-2">
-        <h1 class="font-bold text-2xl inline-block">Capsule</h1>
+        <h1 class="font-bold text-2xl inline-block">Clastix</h1>
         <small class="block">
           ©{{ new Date().getFullYear() }} All rights reserved
         </small>

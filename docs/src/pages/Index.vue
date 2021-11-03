@@ -77,15 +77,6 @@
               Resources Control
             </h2>
             <p class="lg:text-lg">
-              Leverage Kubernetes Admission Controllers to enforce the industry
-              security best practices and meet legal requirements.
-            </p>
-          </div>
-          <div class="bg-gray-900 bg-opacity-20 p-5 rounded-md shadow-lg">
-            <h2 class="text-xl lg:text-3xl font-semibold mb-2.5">
-              Resources Control
-            </h2>
-            <p class="lg:text-lg">
               Take control of the resources consumed by users while preventing
               them to overtake.
             </p>
@@ -98,6 +89,14 @@
               Provide multi-tenancy with a native Kubernetes experience without
               introducing additional management layers, plugins, or customized
               binaries.
+            </p>
+          </div>
+          <div class="bg-gray-900 bg-opacity-20 p-5 rounded-md shadow-lg">
+            <h2 class="text-xl lg:text-3xl font-semibold mb-2.5">
+              GitOps ready
+            </h2>
+            <p class="lg:text-lg">
+              Capsule is completely declarative and GitOps ready.
             </p>
           </div>
         </div>
@@ -124,7 +123,8 @@ export default {
       meta: [
         {
           property: "og:title",
-          content: "Capsule Documentation | Capsule: Kubernetes Operator for multi-tenancy",
+          content:
+            "Capsule Documentation | Capsule: Kubernetes Operator for multi-tenancy",
         },
         {
           property: "og:description",
@@ -132,7 +132,8 @@ export default {
         },
         {
           property: "og:image",
-          content: 'https://quizzical-roentgen-574926.netlify.app/assets/share.png',
+          content:
+            "https://quizzical-roentgen-574926.netlify.app/assets/share.png",
         },
         {
           property: "twitter:card",
@@ -140,7 +141,8 @@ export default {
         },
         {
           property: "twitter:title",
-          content: "Capsule Documentation | Capsule: Kubernetes Operator for multi-tenancy",
+          content:
+            "Capsule Documentation | Capsule: Kubernetes Operator for multi-tenancy",
         },
         {
           property: "twitter:description",

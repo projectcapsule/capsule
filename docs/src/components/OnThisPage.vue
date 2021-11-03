@@ -1,7 +1,7 @@
 <template>
   <ul class="space-y-2">
     <template v-for="(heading, index) in headings">
-      <li v-if="heading.depth > 1" :key="index" class="hover:underline">
+      <li v-if="heading.depth === 2" :key="index" class="hover:underline">
         <g-link
           :to="`${pagePath}${heading.anchor}`"
           class="text-sm"
@@ -93,7 +93,7 @@ export default {
       });
 
       const elements = document.querySelectorAll(
-        ".content h2, .content h3, .content h4, .content h5, .content h6"
+        ".content h2"
       );
 
       for (let i = 0; i < elements.length; i++) {
