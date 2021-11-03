@@ -43,7 +43,7 @@ Use Capsule to address any of the following scenarios:
 * [Allow adding labels and annotations on namespaces](/docs/operator/use-cases/namespace-labels-and-annotations)
 * [Velero Backup Restoration](/docs/operator/use-cases/velero-backup-restoration)
 * [Deny Wildcard Hostnames](/docs/operator/use-cases/deny-wildcard-hostnames)
-* [Denying specific user-defined labels or annotations on Nodes](/docs/operator/use-cases/deny-specific-user-defined-labels-or-annotations-on-nodes)
+* [Denying specific user-defined labels or annotations on Nodes](/docs/operator/use-cases/node-labels-and-annotations)
 
 > NB: as we improve Capsule, more use cases about multi-tenancy and cluster governance will be covered.
 

@@ -13,7 +13,7 @@ Capsule operator uses a Custom Resources Definition (CRD) for _Tenants_. In Caps
 
 You can learn about tenant CRD by the `kubectl explain` command:
 
-```command
+```
 kubectl explain tenant
 
 KIND:     Tenant
@@ -44,7 +44,7 @@ FIELDS:
 
 For Tenant spec:
 
-```command
+```
 kubectl explain tenant.spec
 
 KIND:     Tenant
@@ -124,7 +124,7 @@ FIELDS:
 
 and Tenant status:
 
-```command
+```
 kubectl explain tenant.status
 KIND:     Tenant
 VERSION:  capsule.clastix.io/v1beta1
