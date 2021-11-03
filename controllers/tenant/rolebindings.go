@@ -121,7 +121,7 @@ func (r *Manager) ownerRoleBinding(tenant *capsulev1beta1.Tenant) error {
 	newLabels := map[string]string{tl: tenant.Name}
 
 	for _, owner := range tenant.Spec.Owners {
-		if owner.Kind == "ServiceAccount" {
+		if owner.Kind == rbacv1.ServiceAccountKind {
 			splitName := strings.Split(owner.Name, ":")
 			subjects = append(subjects, rbacv1.Subject{
 				Kind:      owner.Kind.String(),
