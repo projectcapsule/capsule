@@ -158,7 +158,7 @@ $ make remove
 ```
 
 # Documentation
-Please, check the project [documentation](./docs/index.md) for more cool things you can do with Capsule.
+Please, check the project [documentation](./docs/content/index.md) for more cool things you can do with Capsule.
 
 # Contribution
 Capsule is Open Source with Apache 2 license and any contribution is welcome.
