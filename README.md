@@ -53,7 +53,7 @@ Capsule is completely declarative and GitOps ready.
 Assign to tenants a dedicated set of compute, storage, and network resources and avoid the noisy neighbors' effect.
 
 # Common use cases for Capsule
-Please, refer to the corresponding [section](./docs/operator/use-cases/overview.md) in the project documentation for a detailed list of common use cases that Capsule can address.
+Please, refer to the corresponding [section](./docs/content/operator/use-cases/overview.md) in the project documentation for a detailed list of common use cases that Capsule can address.
 
 # Installation
 Make sure you have access to a Kubernetes cluster as administrator.
