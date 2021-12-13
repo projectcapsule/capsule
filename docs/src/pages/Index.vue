@@ -21,11 +21,8 @@
             <logo-capsule class="w-32 lg:w-48 mx-auto mb-4" />
             <h1 class="text-4xl lg:text-6xl font-bold mb-8">capsule</h1>
             <p class="text-lg lg:text-2xl mb-8">
-              Capsule helps to implement a multi-tenancy and policy-based
-              environment in your Kubernetes cluster. It is not intended to be
-              yet another PaaS, instead, it has been designed as a
-              micro-services-based ecosystem with the minimalist approach,
-              leveraging only on upstream Kubernetes.
+              A multi-tenancy and policy-based
+              framework for Kubernetes
             </p>
             <div>
               <app-button link="/docs">Get Started</app-button>
@@ -51,7 +48,7 @@
               Self-Service
             </h2>
             <p class="lg:text-lg">
-              Leave to developers the freedom to self-provision their cluster
+              Leave developers the freedom to self-provision their cluster
               resources according to the assigned boundaries.
             </p>
           </div>
@@ -69,7 +66,7 @@
             <h2 class="text-xl lg:text-3xl font-semibold mb-2.5">Governance</h2>
             <p class="lg:text-lg">
               Leverage Kubernetes Admission Controllers to enforce the industry
-              security best practices and meet legal requirements.
+              security best practices and meet policy requirements.
             </p>
           </div>
           <div class="bg-gray-900 bg-opacity-20 p-5 rounded-md shadow-lg">

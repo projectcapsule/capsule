@@ -72,11 +72,14 @@
           </g-link>
           <nav class="hidden lg:inline-block">
             <ul class="flex items-center font-medium space-x-5">
-              <li class="hidden lg:block">
-                <g-link to="/">About Capsule</g-link>
+              <li>
+                <g-link to="/docs/general">Documentation</g-link>
               </li>
               <li>
-                <g-link to="/docs">Documentation</g-link>
+                <g-link to="/docs/guides">Guides</g-link>
+              </li>
+              <li>
+                <g-link to="/docs/contributing">Contributing</g-link>
               </li>
               <!-- <li class="group relative">
                 main
@@ -205,7 +208,7 @@
               target="_blank"
               rel="noopener noreferrer"
             >
-              Github
+              GitHub
             </a>
           </li>
         </ul>
