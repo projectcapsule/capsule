@@ -9,25 +9,19 @@
       "
     >
       <div class="space-y-2">
-        <h1 class="font-bold text-2xl inline-block">Clastix</h1>
+        <h1 class="font-bold text-2xl inline-block">Clastix Labs</h1>
         <small class="block">
-          ©{{ new Date().getFullYear() }} All rights reserved
+          © {{ new Date().getFullYear() }} All rights reserved
         </small>
       </div>
       <ul class="lg:flex lg:items-center lg:space-x-5 space-y-2 lg:space-y-0">
-        <li class="block lg:hidden">
-          <g-link to="/">About Capsule</g-link>
-        </li>
-        <li class="block lg:hidden pb-4">
-          <g-link to="/docs">Documentation</g-link>
-        </li>
         <li>
           <a
             href="https://github.com/clastix/capsule"
             target="_blank"
             rel="noopener noreferrer"
             class="flex space-x-2 hover:text-blue-400"
-            ><icon-github class="w-5 h-5" /> <span> Github </span></a
+            ><icon-github class="w-5 h-5" /> <span> GitHub </span></a
           >
         </li>
         <li>
