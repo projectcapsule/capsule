@@ -1312,6 +1312,58 @@ With the above example, Capsule is leaving the tenant owner to create namespaced
 
 > Take Note: a tenant owner having the admin scope on its namespaces only, does not have the permission to create Custom Resources Definitions (CRDs) because this requires a cluster admin permission level. Only Bill, the cluster admin, can create CRDs. This is a known limitation of any multi-tenancy environment based on a single shared control plane.
 
+## Assign custom resources quota
+
+Kubernetes offers by default `ResourceQuota` resources, aimed to limit the number of basic primitives in a Namespace.
+
+Capsule already provides the sharing of these constraints across the Tenant Namespaces, however, limiting the amount of namespaced Custom Resources instances is not upstream-supported.
+
+Starting from Capsule **v0.1.1**, this can be done using a special annotation in the Tenant manifest.
+
+Imagine the case where a Custom Resource named `MySQL` in the API group `databases.acme.corp/v1` usage must be limited in the Tenant `oil`: this can be done as follows.
+
+```yaml
+apiVersion: capsule.clastix.io/v1beta1
+kind: Tenant
+metadata:
+  name: oil
+  annotations:
+    quota.resources.capsule.clastix.io/mysqls.databases.acme.corp_v1: "3"
+spec:
+  additionalRoleBindings:
+  - clusterRoleName: mysql-namespace-admin
+    subjects:
+      - kind: User
+        name: alice
+  owners:
+  - name: alice
+    kind: User
+```
+
+> The Additional Role Binding referring to the Cluster Role `mysql-namespace-admin` is required to let Alice manage their Custom Resource instances.
+
+> The pattern for the `quota.resources.capsule.clastix.io` annotation is the following:
+> `quota.resources.capsule.clastix.io/${PLURAL_NAME}.${API_GROUP}_${API_VERSION}`
+>
+> You can figure out the required fields using `kubectl api-resources`.
+
+When `alice` will create a `MySQL` instance in one of their Tenant Namespace, the Cluster Administrator can easily retrieve the overall usage.
+
+```yaml
+apiVersion: capsule.clastix.io/v1beta1
+kind: Tenant
+metadata:
+  name: oil
+  annotations:
+    quota.resources.capsule.clastix.io/mysqls.databases.acme.corp_v1: "3"
+    used.resources.capsule.clastix.io/mysqls.databases.acme.corp_v1: "1"
+spec:
+  owners:
+  - name: alice
+    kind: User
+```
+
+> This feature is still in an alpha stage and requires a high amount of computing resources due to the dynamic client requests.
 
 ## Taint namespaces
 With Capsule, Bill can _"taint"_ the namespaces created by Alice with additional labels and/or annotations. There is no specific semantic assigned to these labels and annotations: they just will be assigned to the namespaces in the tenant as they are created by Alice. This can help the cluster admin to implement specific use cases. As it can be used to implement backup as a service for namespaces in the tenant.
@@ -1564,4 +1616,8 @@ EOF
 >* v1.20.6
 >* v1.21.0
 
-This ends our tutorial on how to implement complex multi-tenancy and policy-driven scenarios with Capsule. As we improve it, more use cases about multi-tenancy, policy admission control, and cluster governance will be covered in the future. Stay tuned!
+---
+
+This ends our tutorial on how to implement complex multi-tenancy and policy-driven scenarios with Capsule. As we improve it, more use cases about multi-tenancy, policy admission control, and cluster governance will be covered in the future.
+
+Stay tuned!
