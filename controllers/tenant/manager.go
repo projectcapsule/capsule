@@ -9,6 +9,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -20,9 +21,10 @@ import (
 
 type Manager struct {
 	client.Client
-	Log      logr.Logger
-	Scheme   *runtime.Scheme
-	Recorder record.EventRecorder
+	Log        logr.Logger
+	Scheme     *runtime.Scheme
+	Recorder   record.EventRecorder
+	RESTConfig *rest.Config
 }
 
 func (r *Manager) SetupWithManager(mgr ctrl.Manager) error {
@@ -52,6 +54,12 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 	// Ensuring the Tenant Status
 	if err = r.updateTenantStatus(instance); err != nil {
 		r.Log.Error(err, "Cannot update Tenant status")
+		return
+	}
+
+	r.Log.Info("Ensuring limit resources count is updated")
+	if err = r.syncCustomResourceQuotaUsages(ctx, instance); err != nil {
+		r.Log.Error(err, "Cannot count limited resources")
 		return
 	}
 
