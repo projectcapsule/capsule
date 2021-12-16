@@ -167,10 +167,11 @@ func main() {
 
 	if len(ca.Data) > 0 && len(tls.Data) > 0 {
 		if err = (&tenantcontroller.Manager{
-			Client:   manager.GetClient(),
-			Log:      ctrl.Log.WithName("controllers").WithName("Tenant"),
-			Scheme:   manager.GetScheme(),
-			Recorder: manager.GetEventRecorderFor("tenant-controller"),
+			RESTConfig: manager.GetConfig(),
+			Client:     manager.GetClient(),
+			Log:        ctrl.Log.WithName("controllers").WithName("Tenant"),
+			Scheme:     manager.GetScheme(),
+			Recorder:   manager.GetEventRecorderFor("tenant-controller"),
 		}).SetupWithManager(manager); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "Tenant")
 			os.Exit(1)
@@ -206,7 +207,7 @@ func main() {
 			route.NetworkPolicy(utils.InCapsuleGroups(cfg, networkpolicy.Handler())),
 			route.Tenant(tenant.NameHandler(), tenant.RoleBindingRegexHandler(), tenant.IngressClassRegexHandler(), tenant.StorageClassRegexHandler(), tenant.ContainerRegistryRegexHandler(), tenant.HostnameRegexHandler(), tenant.FreezedEmitter(), tenant.ServiceAccountNameHandler()),
 			route.OwnerReference(utils.InCapsuleGroups(cfg, ownerreference.Handler(cfg))),
-			route.Cordoning(tenant.CordoningHandler(cfg)),
+			route.Cordoning(tenant.CordoningHandler(cfg), tenant.ResourceCounterHandler()),
 			route.Node(utils.InCapsuleGroups(cfg, node.UserMetadataHandler(cfg, kubeVersion))),
 		)
 
