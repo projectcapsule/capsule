@@ -15,14 +15,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	utilVersion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/client-go/kubernetes"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
-
-	"github.com/clastix/capsule/pkg/webhook/node"
 
 	capsulev1alpha1 "github.com/clastix/capsule/api/v1alpha1"
 	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
@@ -37,6 +36,7 @@ import (
 	"github.com/clastix/capsule/pkg/webhook/ingress"
 	namespacewebhook "github.com/clastix/capsule/pkg/webhook/namespace"
 	"github.com/clastix/capsule/pkg/webhook/networkpolicy"
+	"github.com/clastix/capsule/pkg/webhook/node"
 	"github.com/clastix/capsule/pkg/webhook/ownerreference"
 	"github.com/clastix/capsule/pkg/webhook/pod"
 	"github.com/clastix/capsule/pkg/webhook/pvc"
@@ -44,7 +44,6 @@ import (
 	"github.com/clastix/capsule/pkg/webhook/service"
 	"github.com/clastix/capsule/pkg/webhook/tenant"
 	"github.com/clastix/capsule/pkg/webhook/utils"
-	// +kubebuilder:scaffold:imports
 )
 
 var (
@@ -123,12 +122,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	kubeVersion, err := utils.GetK8sVersion()
-	if err != nil {
-		setupLog.Error(err, "unable to get kubernetes version")
-		os.Exit(1)
-	}
-
 	_ = manager.AddReadyzCheck("ping", healthz.Ping)
 	_ = manager.AddHealthzCheck("ping", healthz.Ping)
 
@@ -154,75 +147,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	// +kubebuilder:scaffold:builder
-
-	cfg := configuration.NewCapsuleConfiguration(manager.GetClient(), configurationName)
-
-	// webhooks: the order matters, don't change it and just append
-	webhooksList := append(
-		make([]webhook.Webhook, 0),
-		route.Pod(pod.ImagePullPolicy(), pod.ContainerRegistry(), pod.PriorityClass()),
-		route.Namespace(utils.InCapsuleGroups(cfg, namespacewebhook.QuotaHandler(), namespacewebhook.FreezeHandler(cfg), namespacewebhook.PrefixHandler(cfg), namespacewebhook.UserMetadataHandler())),
-		route.Ingress(ingress.Class(cfg), ingress.Hostnames(cfg), ingress.Collision(cfg), ingress.Wildcard()),
-		route.PVC(pvc.Handler()),
-		route.Service(service.Handler()),
-		route.NetworkPolicy(utils.InCapsuleGroups(cfg, networkpolicy.Handler())),
-		route.Tenant(tenant.NameHandler(), tenant.RoleBindingRegexHandler(), tenant.IngressClassRegexHandler(), tenant.StorageClassRegexHandler(), tenant.ContainerRegistryRegexHandler(), tenant.HostnameRegexHandler(), tenant.FreezedEmitter(), tenant.ServiceAccountNameHandler()),
-		route.OwnerReference(utils.InCapsuleGroups(cfg, ownerreference.Handler(cfg))),
-		route.Cordoning(tenant.CordoningHandler(cfg)),
-		route.Node(utils.InCapsuleGroups(cfg, node.UserMetadataHandler(cfg, kubeVersion))),
-	)
-
-	nodeWebhookSupported, _ := utils.NodeWebhookSupported(kubeVersion)
-	if !nodeWebhookSupported {
-		setupLog.Info("Disabling node labels verification webhook as current Kubernetes version doesn't have fix for CVE-2021-25735")
-	}
-
-	if err = webhook.Register(manager, webhooksList...); err != nil {
-		setupLog.Error(err, "unable to setup webhooks")
-		os.Exit(1)
-	}
-
-	rbacManager := &rbaccontroller.Manager{
-		Log:           ctrl.Log.WithName("controllers").WithName("Rbac"),
-		Configuration: cfg,
-	}
-	if err = manager.Add(rbacManager); err != nil {
-		setupLog.Error(err, "unable to create cluster roles")
-		os.Exit(1)
-	}
-	if err = rbacManager.SetupWithManager(manager, configurationName); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "Rbac")
-		os.Exit(1)
-	}
-
-	if err = (&servicelabelscontroller.ServicesLabelsReconciler{
-		Log: ctrl.Log.WithName("controllers").WithName("ServiceLabels"),
-	}).SetupWithManager(manager); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "ServiceLabels")
-		os.Exit(1)
-	}
-	if err = (&servicelabelscontroller.EndpointsLabelsReconciler{
-		Log: ctrl.Log.WithName("controllers").WithName("EndpointLabels"),
-	}).SetupWithManager(manager); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "EndpointLabels")
-		os.Exit(1)
-	}
-	if err = (&servicelabelscontroller.EndpointSlicesLabelsReconciler{
-		Log:          ctrl.Log.WithName("controllers").WithName("EndpointSliceLabels"),
-		VersionMinor: kubeVersion.Minor(),
-		VersionMajor: kubeVersion.Major(),
-	}).SetupWithManager(manager); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "EndpointSliceLabels")
-	}
-
-	if err = (&configcontroller.Manager{
-		Log: ctrl.Log.WithName("controllers").WithName("CapsuleConfiguration"),
-	}).SetupWithManager(manager, configurationName); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "CapsuleConfiguration")
-		os.Exit(1)
-	}
-
 	clientset, err := kubernetes.NewForConfig(ctrl.GetConfigOrDie())
 	if err != nil {
 		setupLog.Error(err, "unable to create kubernetes clientset")
@@ -235,7 +159,13 @@ func main() {
 		os.Exit(1)
 	}
 
-	if len(ca.Data) > 0 {
+	tls, err := clientset.CoreV1().Secrets(namespace).Get(ctx, secretcontroller.TLSSecretName, metav1.GetOptions{})
+	if err != nil {
+		setupLog.Error(err, "unable to get Capsule TLS secret")
+		os.Exit(1)
+	}
+
+	if len(ca.Data) > 0 && len(tls.Data) > 0 {
 		if err = (&tenantcontroller.Manager{
 			Client:   manager.GetClient(),
 			Log:      ctrl.Log.WithName("controllers").WithName("Tenant"),
@@ -245,6 +175,7 @@ func main() {
 			setupLog.Error(err, "unable to create controller", "controller", "Tenant")
 			os.Exit(1)
 		}
+
 		if err = (&capsulev1alpha1.Tenant{}).SetupWebhookWithManager(manager); err != nil {
 			setupLog.Error(err, "unable to create conversion webhook", "webhook", "Tenant")
 			os.Exit(1)
@@ -252,6 +183,84 @@ func main() {
 
 		if err = indexer.AddToManager(ctx, setupLog, manager); err != nil {
 			setupLog.Error(err, "unable to setup indexers")
+			os.Exit(1)
+		}
+
+		var kubeVersion *utilVersion.Version
+		kubeVersion, err = utils.GetK8sVersion()
+		if err != nil {
+			setupLog.Error(err, "unable to get kubernetes version")
+			os.Exit(1)
+		}
+
+		cfg := configuration.NewCapsuleConfiguration(manager.GetClient(), configurationName)
+
+		// webhooks: the order matters, don't change it and just append
+		webhooksList := append(
+			make([]webhook.Webhook, 0),
+			route.Pod(pod.ImagePullPolicy(), pod.ContainerRegistry(), pod.PriorityClass()),
+			route.Namespace(utils.InCapsuleGroups(cfg, namespacewebhook.QuotaHandler(), namespacewebhook.FreezeHandler(cfg), namespacewebhook.PrefixHandler(cfg), namespacewebhook.UserMetadataHandler())),
+			route.Ingress(ingress.Class(cfg), ingress.Hostnames(cfg), ingress.Collision(cfg), ingress.Wildcard()),
+			route.PVC(pvc.Handler()),
+			route.Service(service.Handler()),
+			route.NetworkPolicy(utils.InCapsuleGroups(cfg, networkpolicy.Handler())),
+			route.Tenant(tenant.NameHandler(), tenant.RoleBindingRegexHandler(), tenant.IngressClassRegexHandler(), tenant.StorageClassRegexHandler(), tenant.ContainerRegistryRegexHandler(), tenant.HostnameRegexHandler(), tenant.FreezedEmitter(), tenant.ServiceAccountNameHandler()),
+			route.OwnerReference(utils.InCapsuleGroups(cfg, ownerreference.Handler(cfg))),
+			route.Cordoning(tenant.CordoningHandler(cfg)),
+			route.Node(utils.InCapsuleGroups(cfg, node.UserMetadataHandler(cfg, kubeVersion))),
+		)
+
+		nodeWebhookSupported, _ := utils.NodeWebhookSupported(kubeVersion)
+		if !nodeWebhookSupported {
+			setupLog.Info("Disabling node labels verification webhook as current Kubernetes version doesn't have fix for CVE-2021-25735")
+		}
+
+		if err = webhook.Register(manager, webhooksList...); err != nil {
+			setupLog.Error(err, "unable to setup webhooks")
+			os.Exit(1)
+		}
+
+		rbacManager := &rbaccontroller.Manager{
+			Log:           ctrl.Log.WithName("controllers").WithName("Rbac"),
+			Configuration: cfg,
+		}
+
+		if err = manager.Add(rbacManager); err != nil {
+			setupLog.Error(err, "unable to create cluster roles")
+			os.Exit(1)
+		}
+
+		if err = rbacManager.SetupWithManager(manager, configurationName); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "Rbac")
+			os.Exit(1)
+		}
+
+		if err = (&servicelabelscontroller.ServicesLabelsReconciler{
+			Log: ctrl.Log.WithName("controllers").WithName("ServiceLabels"),
+		}).SetupWithManager(manager); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "ServiceLabels")
+			os.Exit(1)
+		}
+
+		if err = (&servicelabelscontroller.EndpointsLabelsReconciler{
+			Log: ctrl.Log.WithName("controllers").WithName("EndpointLabels"),
+		}).SetupWithManager(manager); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "EndpointLabels")
+			os.Exit(1)
+		}
+
+		if err = (&servicelabelscontroller.EndpointSlicesLabelsReconciler{
+			Log:          ctrl.Log.WithName("controllers").WithName("EndpointSliceLabels"),
+			VersionMinor: kubeVersion.Minor(),
+			VersionMajor: kubeVersion.Major(),
+		}).SetupWithManager(manager); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "EndpointSliceLabels")
+		}
+
+		if err = (&configcontroller.Manager{
+			Log: ctrl.Log.WithName("controllers").WithName("CapsuleConfiguration"),
+		}).SetupWithManager(manager, configurationName); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "CapsuleConfiguration")
 			os.Exit(1)
 		}
 	} else {

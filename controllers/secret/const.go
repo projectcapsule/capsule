@@ -8,5 +8,5 @@ const (
 	privateKeySecretKey = "tls.key"
 
 	CASecretName  = "capsule-ca"
-	tlsSecretName = "capsule-tls"
+	TLSSecretName = "capsule-tls"
 )
