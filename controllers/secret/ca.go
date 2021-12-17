@@ -189,7 +189,7 @@ func (r CAReconciler) Reconcile(ctx context.Context, request ctrl.Request) (ctrl
 		tls := &corev1.Secret{}
 		err = r.Get(ctx, types.NamespacedName{
 			Namespace: r.Namespace,
-			Name:      tlsSecretName,
+			Name:      TLSSecretName,
 		}, tls)
 		if err != nil {
 			r.Log.Error(err, "Capsule TLS Secret missing")

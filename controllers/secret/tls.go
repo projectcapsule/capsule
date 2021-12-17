@@ -33,7 +33,7 @@ type TLSReconciler struct {
 
 func (r *TLSReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&corev1.Secret{}, forOptionPerInstanceName(tlsSecretName)).
+		For(&corev1.Secret{}, forOptionPerInstanceName(TLSSecretName)).
 		Complete(r)
 }
 
@@ -112,7 +112,7 @@ func (r TLSReconciler) Reconcile(ctx context.Context, request ctrl.Request) (ctr
 		return reconcile.Result{}, err
 	}
 
-	if instance.Name == tlsSecretName && res == controllerutil.OperationResultUpdated {
+	if instance.Name == TLSSecretName && res == controllerutil.OperationResultUpdated {
 		r.Log.Info("Capsule TLS certificates has been updated, Controller pods must be restarted to load new certificate")
 
 		hostname, _ := os.Hostname()
