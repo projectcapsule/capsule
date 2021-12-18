@@ -1614,6 +1614,10 @@ webhooks:
       path: /pods
   failurePolicy: Fail
   name: pods.capsule.clastix.io
+  namespaceSelector:
+    matchExpressions:
+    - key: capsule.clastix.io/tenant
+      operator: Exists
   rules:
   - apiGroups:
     - ""
