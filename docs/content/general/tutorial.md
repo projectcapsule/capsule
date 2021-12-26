@@ -586,7 +586,7 @@ By setting enforcement at the namespace level, i.e. `spec.resourceQuotas.scope=N
 Bill, the cluster admin, can also set Limit Ranges for each namespace in Alice's tenant by defining limits for pods and containers in the tenant spec:
 
 ```yaml
-apiVersion: capsule.clastix.io/v1alpha1
+apiVersion: capsule.clastix.io/v1beta1
 kind: Tenant
 metadata:
   name: oil
