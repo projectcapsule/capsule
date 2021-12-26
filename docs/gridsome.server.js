@@ -67,6 +67,10 @@ module.exports = function (api) {
               path: '/docs/guides/velero'
             },
             {
+              label: 'Upgrading Tenant version',
+              path: '/docs/guides/upgrading'
+            },
+            {
               title: 'Managed Kubernetes',
               subItems: [
                 {
