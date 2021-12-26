@@ -38,6 +38,10 @@ module.exports = function (api) {
               path: '/docs/general/references'
             },
             {
+              label: 'Multi-Tenant Benchmark',
+              path: '/docs/general/mtb'
+            },
+            {
               label: 'Capsule Proxy',
               path: '/docs/general/proxy'
             },
