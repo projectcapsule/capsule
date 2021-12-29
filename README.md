@@ -59,7 +59,7 @@ Assign to tenants a dedicated set of compute, storage, and network resources and
 
 # Documentation
 
-Please, check the project [documentation](capsule.clastix.io) for the cool things you can do with Capsule.
+Please, check the project [documentation](https://capsule.clastix.io) for the cool things you can do with Capsule.
 
 # Contributions
 
