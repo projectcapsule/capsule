@@ -7,7 +7,17 @@ metadata:
   name: tenants.capsule.clastix.io
 spec:
   conversion:
-    strategy: None
+    strategy: Webhook
+    webhook:
+      clientConfig:
+        service:
+          name: capsule-webhook-service
+          namespace: capsule-system
+          path: /convert
+          port: 443
+      conversionReviewVersions:
+        - v1alpha1
+        - v1beta1
   group: capsule.clastix.io
   names:
     kind: Tenant
