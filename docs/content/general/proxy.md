@@ -2,7 +2,7 @@
 
 Capsule Proxy is an add-on for Capsule Operator addressing some RBAC issues when enabling multi-tenacy in Kubernetes since users cannot list the owned cluster-scoped resources.
 
-For example:
+Kubernetes RBAC cannot list only the owned cluster-scoped resources since there are no ACL-filtered APIs. For example:
 
 ```
 $ kubectl get namespaces
@@ -29,21 +29,26 @@ The `capsule-proxy` implements a simple reverse proxy that intercepts only speci
 
 Current implementation filters the following requests:
 
-* `api/v1/namespaces`
-* `api/v1/nodes`
-* `apis/storage.k8s.io/v1/storageclasses{/name}`
-* `apis/networking.k8s.io/{v1,v1beta1}/ingressclasses{/name}`
-* `api/scheduling.k8s.io/{v1}/priorityclasses{/name}`
+* `/api/scheduling.k8s.io/{v1}/priorityclasses{/name}`
+* `/api/v1/namespaces`
+* `/api/v1/nodes{/name}`
+* `/api/v1/pods?fieldSelector=spec.nodeName%3D{name}`
+* `/apis/coordination.k8s.io/v1/namespaces/kube-node-lease/leases/{name}`
+* `/apis/metrics.k8s.io/{v1beta1}/nodes{/name}`
+* `/apis/networking.k8s.io/{v1,v1beta1}/ingressclasses{/name}`
+* `/apis/storage.k8s.io/v1/storageclasses{/name}`
 
-All other requestes are proxied transparently to the APIs server, so no side-effects are expected. We're planning to add new APIs in the future, so PRs are welcome!
+All other requests are proxied transparently to the APIs server, so no side effects are expected. We're planning to add new APIs in the future, so [PRs are welcome](https://github.com/clastix/capsule-proxy)!
 
 ## Installation
 
-Capsule Proxy is an optional add-on of the main Capsule Operator, so make sure you have a working instance of Caspule before attempting to install it. Use the `capsule-proxy` only if you want Tenant Owners to list their own Cluster-Scope resources.
+Capsule Proxy is an optional add-on of the main Capsule Operator, so make sure you have a working instance of Caspule before attempting to install it.
+Use the `capsule-proxy` only if you want Tenant Owners to list their own Cluster-Scope resources.
 
-The `capsule-proxy` can be deployed in standalone mode, e.g. running as a pod bridging any Kubernetes client to the APIs server. Optionally, it can be deployed as a sidecar container in the backend of a dashboard.
+The `capsule-proxy` can be deployed in standalone mode, e.g. running as a pod bridging any Kubernetes client to the APIs server.
+Optionally, it can be deployed as a sidecar container in the backend of a dashboard.
 
-Running outside of a Kubernetes cluster is also viable, although a valid `KUBECONFIG` file must be provided, using the environment variable `KUBECONFIG` or the default file in `$HOME/.kube/config`.
+Running outside a Kubernetes cluster is also viable, although a valid `KUBECONFIG` file must be provided, using the environment variable `KUBECONFIG` or the default file in `$HOME/.kube/config`.
 
 A Helm Chart is available [here](https://github.com/clastix/capsule/blob/master/charts/capsule/README.md).
 
@@ -64,6 +69,18 @@ Here how it looks like when exposed through an Ingress Controller:
                 ingress-controller     capsule-proxy         kube-apiserver
 ``` 
 
+## CLI flags
+
+- `capsule-configuration-name`: name of the `CapsuleConfiguration` resource which is containing the [Capsule configurations](/docs/general/references/#capsule-configuration) (default: `default`)
+- `capsule-user-group` (deprecated): old way to specify the user groups which request must be intercepted by the proxy
+- `ignored-user-group`: names of the groups which requests must be ignored and proxy-passed to the upstream server
+- `listening-port`: HTTP port the proxy listens to (default: `9001`)
+- `oidc-username-claim`: the OIDC field name used to identify the user (default: `preferred_username`), the proper value can be extracted from the Kubernetes API Server flags
+- `enable-ssl`: enable the bind on HTTPS for secure communication, allowing client-based certificate, also knows as mutual TLS (default: `true`)
+- `ssl-cert-path`: path to the TLS certificate, then TLS mode is enabled (default: `/opt/capsule-proxy/tls.crt`)
+- `ssl-key-path`: path to the TLS certificate key, when TLS mode is enabled (default: `/opt/capsule-proxy/tls.key`)
+- `rolebindings-resync-period`: resync period for RoleBinding resources reflector, lower values can help if you're facing [flaky etcd connection](https://github.com/clastix/capsule-proxy/issues/174) (default: `10h`)
+
 ## User Authentication
 
 The `capsule-proxy` intercepts all the requests from the `kubectl` client directed to the APIs Server. Users using a TLS client based authentication with certificate and key are able to talks with APIs Server since it is able to forward client certificates to the Kubernetes APIs server.
@@ -71,6 +88,16 @@ The `capsule-proxy` intercepts all the requests from the `kubectl` client direct
 It is possible to protect the `capsule-proxy` using a certificate provided by Let's Encrypt. Keep in mind that, in this way, the TLS termination will be executed by the Ingress Controller, meaning that the authentication based on client certificate will be withdrawn and not reversed to the upstream.
 
 If your prerequisite is exposing `capsule-proxy` using an Ingress, you must rely on the token-based authentication, for example OIDC or Bearer tokens. Users providing tokens are always able to reach the APIs Server.
+
+## Kubernetes dashboards integration
+
+If you're using a client-only dashboard, for example [Lens](https://k8slens.dev/), the `capsule-proxy` can be used as with `kubectl` since this dashboard usually talks to the APIs server using just a `kubeconfig` file.
+
+![Lens dashboard](../assets/proxy-lens.png)
+
+For a web-based dashboard, like the [Kubernetes Dashboard](https://github.com/kubernetes/dashboard), the `capsule-proxy` can be deployed as a sidecar container in the backend, following the well-known cloud-native _Ambassador Pattern_.
+
+![Kubernetes dashboard](../assets/proxy-kubernetes-dashboard.png)
 
 ## Tenant Owner Authorization
 
@@ -107,6 +134,7 @@ Each Resource kind can be granted with several verbs, such as:
 ### Namespaces
 
 As tenant owner `alice`, you can use `kubectl` to create some namespaces:
+
 ```
 $ kubectl --context alice-oidc@mycluster create namespace oil-production
 $ kubectl --context alice-oidc@mycluster create namespace oil-development
@@ -122,6 +150,44 @@ gas-marketing       Active   2m
 oil-development     Active   2m
 oil-production      Active   2m
 ```
+
+### Nodes
+
+The Capsule Proxy gives the owners the ability to access the nodes matching the `.spec.nodeSelector` in the Tenant manifest:
+
+```yaml
+apiVersion: capsule.clastix.io/v1beta1
+kind: Tenant
+metadata:
+  name: oil
+spec:
+  owners:
+    - kind: User
+      name: alice
+      proxySettings:
+        - kind: Nodes
+          operations:
+            - List
+  nodeSelector:
+    kubernetes.io/hostname: capsule-gold-qwerty
+```
+
+```bash
+$ kubectl --context alice-oidc@mycluster get nodes
+NAME                    STATUS   ROLES    AGE   VERSION
+capsule-gold-qwerty     Ready    <none>   43h   v1.19.1
+```
+
+> Warning: when no `nodeSelector` is specified, the tenant owners has access to all the nodes, according to the permissions listed in the `proxySettings` specs.
+
+### Special routes for kubectl describe
+
+When issuing a `kubectl describe node`, some other endpoints are put in place:
+
+* `api/v1/pods?fieldSelector=spec.nodeName%3D{name}`
+* `/apis/coordination.k8s.io/v1/namespaces/kube-node-lease/leases/{name}`
+
+These are mandatory in order to retrieve the list of the running Pods on the required node, and providing info about the lease status of it.
 
 ### Nodes
 
@@ -346,3 +412,9 @@ $ curl -H "Authorization: Bearer $TOKEN" http://localhost:9001/api/v1/namespaces
 ```
 
 > NOTE: `kubectl` will not work against a `http` server.
+
+## Contributing
+
+`capsule-proxy` is an open-source software released with Apache2 [license](https://github.com/clastix/capsule-proxy/blob/master/LICENSE).
+
+Contributing guidelines are available [here](https://github.com/clastix/capsule-proxy/blob/master/CONTRIBUTING.md).
