@@ -1411,7 +1411,7 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.namespace
-        image: quay.io/clastix/capsule:v0.1.1-rc1
+        image: quay.io/clastix/capsule:v0.1.1
         imagePullPolicy: IfNotPresent
         name: manager
         ports:
