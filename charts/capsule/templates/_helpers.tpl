@@ -92,14 +92,24 @@ Create the proxy fully-qualified Docker image to use
 {{- end }}
 
 {{/*
+Determine the Kubernetes version to use for jobsFullyQualifiedDockerImage tag
+*/}}
+{{- define "capsule.jobsTagKubeVersion" -}}
+{{- if contains "-eks-" .Capabilities.KubeVersion.GitVersion }}
+{{- print "v" .Capabilities.KubeVersion.Major "." (.Capabilities.KubeVersion.Minor | replace "+" "") -}}
+{{- else }}
+{{- print "v" .Capabilities.KubeVersion.Major "." .Capabilities.KubeVersion.Minor -}}
+{{- end }}
+{{- end }}
+
+{{/*
 Create the jobs fully-qualified Docker image to use
 */}}
 {{- define "capsule.jobsFullyQualifiedDockerImage" -}}
 {{- if .Values.jobs.image.tag }}
 {{- printf "%s:%s" .Values.jobs.image.repository .Values.jobs.image.tag -}}
 {{- else }}
-{{- $kubeversion := print "v" .Capabilities.KubeVersion.Major "." .Capabilities.KubeVersion.Minor -}}
-{{- printf "%s:%s" .Values.jobs.image.repository $kubeversion -}}
+{{- printf "%s:%s" .Values.jobs.image.repository (include "capsule.jobsTagKubeVersion" .) -}}
 {{- end }}
 {{- end }}
 
