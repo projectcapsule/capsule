@@ -141,8 +141,6 @@ metadata:
   name: oil
 spec:
   owners:
-  - name: oil-users
-    kind: Group
   - name: system:serviceaccount:default:robot
     kind: ServiceAccount
 EOF
@@ -164,17 +162,17 @@ metadata:
   name: default
 spec:
   userGroups:
-  - capsule.clastix.io
   - system:serviceaccounts:default
 ```
 
-because, by default, each service account is a member of following groups:
+since each service account in a namespace is a member of following group:
 
 ```
-system:serviceaccounts
 system:serviceaccounts:{service-account-namespace}
-system:authenticated
 ```
+
+> Please, pay attention when setting a service account acting as tenant owner. Make sure you're not using the group `system:serviceaccounts` or the group `system:serviceaccounts:{capsule-namespace}` as Capsule group, otherwise you'll create a short-circuit in the Capsule controller, being Capsule itself controlled by a serviceaccount. 
+
 
 ## Create namespaces
 Alice, once logged with her credentials, can create a new namespace in her tenant, as simply issuing:
