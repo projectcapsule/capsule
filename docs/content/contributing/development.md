@@ -274,14 +274,14 @@ $ kubectl get MutatingWebhookConfiguration capsule-mutating-webhook-configuratio
 $ kubectl patch ValidatingWebhookConfiguration capsule-validating-webhook-configuration \
     --type='json' -p="[\
        {'op': 'replace', 'path': '/webhooks/0/clientConfig', 'value':{'url':\"${WEBHOOK_URL}/cordoning\",'caBundle':\"${CA_BUNDLE}\"}},\
-                {'op': 'replace', 'path': '/webhooks/1/clientConfig', 'value':{'url':\"${WEBHOOK_URL}/ingresses\",'caBundle':\"${CA_BUNDLE}\"}},\
-                {'op': 'replace', 'path': '/webhooks/2/clientConfig', 'value':{'url':\"${WEBHOOK_URL}/namespaces\",'caBundle':\"${CA_BUNDLE}\"}},\
-                {'op': 'replace', 'path': '/webhooks/3/clientConfig', 'value':{'url':\"${WEBHOOK_URL}/networkpolicies\",'caBundle':\"${CA_BUNDLE}\"}},\
-                {'op': 'replace', 'path': '/webhooks/4/clientConfig', 'value':{'url':\"${WEBHOOK_URL}/pods\",'caBundle':\"${CA_BUNDLE}\"}},\
-                {'op': 'replace', 'path': '/webhooks/5/clientConfig', 'value':{'url':\"${WEBHOOK_URL}/persistentvolumeclaims\",'caBundle':\"${CA_BUNDLE}\"}},\
-                {'op': 'replace', 'path': '/webhooks/6/clientConfig', 'value':{'url':\"${WEBHOOK_URL}/services\",'caBundle':\"${CA_BUNDLE}\"}},\
-                {'op': 'replace', 'path': '/webhooks/7/clientConfig', 'value':{'url':\"${WEBHOOK_URL}/tenants\",'caBundle':\"${CA_BUNDLE}\"}},\
-                {'op': 'replace', 'path': '/webhooks/8/clientConfig', 'value':{'url':\"${WEBHOOK_URL}/nodes\",'caBundle':\"${CA_BUNDLE}\"}}\
+       {'op': 'replace', 'path': '/webhooks/1/clientConfig', 'value':{'url':\"${WEBHOOK_URL}/ingresses\",'caBundle':\"${CA_BUNDLE}\"}},\
+       {'op': 'replace', 'path': '/webhooks/2/clientConfig', 'value':{'url':\"${WEBHOOK_URL}/namespaces\",'caBundle':\"${CA_BUNDLE}\"}},\
+       {'op': 'replace', 'path': '/webhooks/3/clientConfig', 'value':{'url':\"${WEBHOOK_URL}/networkpolicies\",'caBundle':\"${CA_BUNDLE}\"}},\
+       {'op': 'replace', 'path': '/webhooks/4/clientConfig', 'value':{'url':\"${WEBHOOK_URL}/pods\",'caBundle':\"${CA_BUNDLE}\"}},\
+       {'op': 'replace', 'path': '/webhooks/5/clientConfig', 'value':{'url':\"${WEBHOOK_URL}/persistentvolumeclaims\",'caBundle':\"${CA_BUNDLE}\"}},\
+       {'op': 'replace', 'path': '/webhooks/6/clientConfig', 'value':{'url':\"${WEBHOOK_URL}/services\",'caBundle':\"${CA_BUNDLE}\"}},\
+       {'op': 'replace', 'path': '/webhooks/7/clientConfig', 'value':{'url':\"${WEBHOOK_URL}/tenants\",'caBundle':\"${CA_BUNDLE}\"}},\
+       {'op': 'replace', 'path': '/webhooks/8/clientConfig', 'value':{'url':\"${WEBHOOK_URL}/nodes\",'caBundle':\"${CA_BUNDLE}\"}}\
     ]"
 
 # Verify it if you want
