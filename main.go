@@ -205,7 +205,7 @@ func main() {
 			route.PVC(pvc.Handler()),
 			route.Service(service.Handler()),
 			route.NetworkPolicy(utils.InCapsuleGroups(cfg, networkpolicy.Handler())),
-			route.Tenant(tenant.NameHandler(), tenant.RoleBindingRegexHandler(), tenant.IngressClassRegexHandler(), tenant.StorageClassRegexHandler(), tenant.ContainerRegistryRegexHandler(), tenant.HostnameRegexHandler(), tenant.FreezedEmitter(), tenant.ServiceAccountNameHandler()),
+			route.Tenant(tenant.NameHandler(), tenant.RoleBindingRegexHandler(), tenant.IngressClassRegexHandler(), tenant.StorageClassRegexHandler(), tenant.ContainerRegistryRegexHandler(), tenant.HostnameRegexHandler(), tenant.FreezedEmitter(), tenant.ServiceAccountNameHandler(), tenant.ForbiddenAnnotationsRegexHandler()),
 			route.OwnerReference(utils.InCapsuleGroups(cfg, ownerreference.Handler(cfg))),
 			route.Cordoning(tenant.CordoningHandler(cfg), tenant.ResourceCounterHandler()),
 			route.Node(utils.InCapsuleGroups(cfg, node.UserMetadataHandler(cfg, kubeVersion))),
