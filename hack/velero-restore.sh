@@ -7,7 +7,7 @@
 # let script exit if a command fails
 #set -o errexit
 
-# let script exit if an unsed variable is used
+# let script exit if an unused variable is used
 #set -o nounset
 
 KUBECFGFILE="$HOME/.kube/config"

@@ -104,7 +104,7 @@ Do remember to change the `myuser` to yours.
 $ git clone git@github.com:myuser/capsule.git && cd capsule
 ```
 
-It's a good practice to add the upsteam as the remote too so we can easily fetch and merge the upstream to our fork:
+It's a good practice to add the upstream as the remote too so we can easily fetch and merge the upstream to our fork:
 
 ```shell
 $ git remote add upstream https://github.com/clastix/capsule.git

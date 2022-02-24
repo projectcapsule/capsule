@@ -42,7 +42,7 @@ All other requests are proxied transparently to the APIs server, so no side effe
 
 ## Installation
 
-Capsule Proxy is an optional add-on of the main Capsule Operator, so make sure you have a working instance of Caspule before attempting to install it.
+Capsule Proxy is an optional add-on of the main Capsule Operator, so make sure you have a working instance of Capsule before attempting to install it.
 Use the `capsule-proxy` only if you want Tenant Owners to list their own Cluster-Scope resources.
 
 The `capsule-proxy` can be deployed in standalone mode, e.g. running as a pod bridging any Kubernetes client to the APIs server.
