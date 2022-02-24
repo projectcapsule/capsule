@@ -68,7 +68,7 @@ var _ = Describe("creating a tenant with various forbidden regexes", func() {
 	}
 	for _, annotation := range annotationsToCheck {
 		for _, annotationValue := range successRegexes {
-			It("should suceed using a valid regex on the annotation "+annotation, func() {
+			It("should succeed using a valid regex on the annotation "+annotation, func() {
 				EventuallyCreation(func() error {
 					tnt.ResourceVersion = ""
 					tnt.ObjectMeta.Annotations = make(map[string]string)
