@@ -20,6 +20,7 @@ import (
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
@@ -127,21 +128,25 @@ func main() {
 
 	ctx := ctrl.SetupSignalHandler()
 
+	cfg := configuration.NewCapsuleConfiguration(manager.GetClient(), configurationName)
+
 	if err = (&secretcontroller.CAReconciler{
-		Client:    manager.GetClient(),
-		Log:       ctrl.Log.WithName("controllers").WithName("CA"),
-		Scheme:    manager.GetScheme(),
-		Namespace: namespace,
+		Client:        manager.GetClient(),
+		Log:           ctrl.Log.WithName("controllers").WithName("CA"),
+		Scheme:        manager.GetScheme(),
+		Namespace:     namespace,
+		Configuration: cfg,
 	}).SetupWithManager(manager); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Namespace")
 		os.Exit(1)
 	}
 
 	if err = (&secretcontroller.TLSReconciler{
-		Client:    manager.GetClient(),
-		Log:       ctrl.Log.WithName("controllers").WithName("Tls"),
-		Scheme:    manager.GetScheme(),
-		Namespace: namespace,
+		Client:        manager.GetClient(),
+		Log:           ctrl.Log.WithName("controllers").WithName("Tls"),
+		Scheme:        manager.GetScheme(),
+		Namespace:     namespace,
+		Configuration: cfg,
 	}).SetupWithManager(manager); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Namespace")
 		os.Exit(1)
@@ -153,13 +158,23 @@ func main() {
 		os.Exit(1)
 	}
 
-	ca, err := clientset.CoreV1().Secrets(namespace).Get(ctx, secretcontroller.CASecretName, metav1.GetOptions{})
+	directClient, err := client.New(ctrl.GetConfigOrDie(), client.Options{
+		Scheme: manager.GetScheme(),
+		Mapper: manager.GetRESTMapper(),
+	})
+	if err != nil {
+		setupLog.Error(err, "unable to create the direct client")
+		os.Exit(1)
+	}
+	directCfg := configuration.NewCapsuleConfiguration(directClient, configurationName)
+
+	ca, err := clientset.CoreV1().Secrets(namespace).Get(ctx, directCfg.CASecretName(), metav1.GetOptions{})
 	if err != nil {
 		setupLog.Error(err, "unable to get Capsule CA secret")
 		os.Exit(1)
 	}
 
-	tls, err := clientset.CoreV1().Secrets(namespace).Get(ctx, secretcontroller.TLSSecretName, metav1.GetOptions{})
+	tls, err := clientset.CoreV1().Secrets(namespace).Get(ctx, directCfg.TLSSecretName(), metav1.GetOptions{})
 	if err != nil {
 		setupLog.Error(err, "unable to get Capsule TLS secret")
 		os.Exit(1)
@@ -193,8 +208,6 @@ func main() {
 			setupLog.Error(err, "unable to get kubernetes version")
 			os.Exit(1)
 		}
-
-		cfg := configuration.NewCapsuleConfiguration(manager.GetClient(), configurationName)
 
 		// webhooks: the order matters, don't change it and just append
 		webhooksList := append(

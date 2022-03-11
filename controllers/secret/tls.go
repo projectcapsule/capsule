@@ -22,23 +22,29 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"github.com/clastix/capsule/pkg/cert"
+	"github.com/clastix/capsule/pkg/configuration"
 )
 
 type TLSReconciler struct {
 	client.Client
-	Log       logr.Logger
-	Scheme    *runtime.Scheme
-	Namespace string
+	Log           logr.Logger
+	Scheme        *runtime.Scheme
+	Namespace     string
+	Configuration configuration.Configuration
 }
 
 func (r *TLSReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&corev1.Secret{}, forOptionPerInstanceName(TLSSecretName)).
+		For(&corev1.Secret{}).
 		Complete(r)
 }
 
 func (r TLSReconciler) Reconcile(ctx context.Context, request ctrl.Request) (ctrl.Result, error) {
 	var err error
+
+	if request.Name != r.Configuration.TLSSecretName() {
+		return ctrl.Result{}, nil
+	}
 
 	r.Log = r.Log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
 	r.Log.Info("Reconciling TLS Secret")
@@ -54,7 +60,7 @@ func (r TLSReconciler) Reconcile(ctx context.Context, request ctrl.Request) (ctr
 	var ca cert.CA
 	var rq time.Duration
 
-	ca, err = getCertificateAuthority(r.Client, r.Namespace)
+	ca, err = getCertificateAuthority(r.Client, r.Namespace, r.Configuration.CASecretName())
 	if err != nil {
 		return reconcile.Result{}, err
 	}
@@ -112,7 +118,7 @@ func (r TLSReconciler) Reconcile(ctx context.Context, request ctrl.Request) (ctr
 		return reconcile.Result{}, err
 	}
 
-	if instance.Name == TLSSecretName && res == controllerutil.OperationResultUpdated {
+	if instance.Name == r.Configuration.TLSSecretName() && res == controllerutil.OperationResultUpdated {
 		r.Log.Info("Capsule TLS certificates has been updated, Controller pods must be restarted to load new certificate")
 
 		hostname, _ := os.Hostname()
