@@ -24,18 +24,20 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"github.com/clastix/capsule/pkg/cert"
+	"github.com/clastix/capsule/pkg/configuration"
 )
 
 type CAReconciler struct {
 	client.Client
-	Log       logr.Logger
-	Scheme    *runtime.Scheme
-	Namespace string
+	Log           logr.Logger
+	Scheme        *runtime.Scheme
+	Namespace     string
+	Configuration configuration.Configuration
 }
 
 func (r *CAReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&corev1.Secret{}, forOptionPerInstanceName(CASecretName)).
+		For(&corev1.Secret{}).
 		Complete(r)
 }
 
@@ -115,6 +117,10 @@ func (r CAReconciler) UpdateMutatingWebhookConfiguration(caBundle []byte) error 
 func (r CAReconciler) Reconcile(ctx context.Context, request ctrl.Request) (ctrl.Result, error) {
 	var err error
 
+	if request.Name != r.Configuration.CASecretName() {
+		return ctrl.Result{}, nil
+	}
+
 	r.Log = r.Log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
 	r.Log.Info("Reconciling CA Secret")
 
@@ -128,7 +134,7 @@ func (r CAReconciler) Reconcile(ctx context.Context, request ctrl.Request) (ctrl
 
 	var ca cert.CA
 	var rq time.Duration
-	ca, err = getCertificateAuthority(r.Client, r.Namespace)
+	ca, err = getCertificateAuthority(r.Client, r.Namespace, r.Configuration.CASecretName())
 	if err != nil && errors.Is(err, MissingCaError{}) {
 		ca, err = cert.GenerateCertificateAuthority()
 		if err != nil {
@@ -189,7 +195,7 @@ func (r CAReconciler) Reconcile(ctx context.Context, request ctrl.Request) (ctrl
 		tls := &corev1.Secret{}
 		err = r.Get(ctx, types.NamespacedName{
 			Namespace: r.Namespace,
-			Name:      TLSSecretName,
+			Name:      r.Configuration.TLSSecretName(),
 		}, tls)
 		if err != nil {
 			r.Log.Error(err, "Capsule TLS Secret missing")

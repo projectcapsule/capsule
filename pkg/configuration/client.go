@@ -13,9 +13,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
-
 	capsulev1alpha1 "github.com/clastix/capsule/api/v1alpha1"
+	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
 )
 
 // capsuleConfiguration is the Capsule Configuration retrieval mode
@@ -60,6 +59,36 @@ func (c capsuleConfiguration) ProtectedNamespaceRegexp() (*regexp.Regexp, error)
 
 func (c capsuleConfiguration) ForceTenantPrefix() bool {
 	return c.retrievalFn().Spec.ForceTenantPrefix
+}
+
+func (c capsuleConfiguration) CASecretName() (name string) {
+	name = CASecretName
+
+	if c.retrievalFn().Annotations == nil {
+		return
+	}
+
+	v, ok := c.retrievalFn().Annotations[capsulev1alpha1.CASecretNameAnnotation]
+	if ok {
+		return v
+	}
+
+	return
+}
+
+func (c capsuleConfiguration) TLSSecretName() (name string) {
+	name = TLSSecretName
+
+	if c.retrievalFn().Annotations == nil {
+		return
+	}
+
+	v, ok := c.retrievalFn().Annotations[capsulev1alpha1.TLSSecretNameAnnotation]
+	if ok {
+		return v
+	}
+
+	return
 }
 
 func (c capsuleConfiguration) UserGroups() []string {

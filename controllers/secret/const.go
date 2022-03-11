@@ -6,7 +6,4 @@ package secret
 const (
 	certSecretKey       = "tls.crt"
 	privateKeySecretKey = "tls.key"
-
-	CASecretName  = "capsule-ca"
-	TLSSecretName = "capsule-tls"
 )

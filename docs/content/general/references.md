@@ -152,6 +152,9 @@ apiVersion: capsule.clastix.io/v1alpha1
 kind: CapsuleConfiguration
 metadata:
   name: default
+  annotations:
+    capsule.clastix.io/ca-secret-name: "capsule-ca"
+    capsule.clastix.io/tls-secret-name: "capsule-tls"
 spec:
   userGroups: ["capsule.clastix.io"]
   forceTenantPrefix: false
@@ -163,6 +166,8 @@ Option | Description | Default
 `.spec.forceTenantPrefix` | Force the tenant name as prefix for namespaces: `<tenant_name>-<namespace>`.  | `false`
 `.spec.userGroups` | Array of Capsule groups to which all tenant owners must belong. | `[capsule.clastix.io]`
 `.spec.protectedNamespaceRegex` | Disallows creation of namespaces matching the passed regexp. | `null`
+`.metadata.annotations.capsule.clastix.io/ca-secret-name` | Set the Capsule Certificate Authority secret name | `capsule-ca`
+`.metadata.annotations.capsule.clastic.io/tls-secret-name` | Set the Capsule TLS secret name | `capsule-tls`
 
 Upon installation using Kustomize or Helm, a `capsule-default` resource will be created.
 The reference to this configuration is managed by the CLI flag `--configuration-name`.  
