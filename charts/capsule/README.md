@@ -107,6 +107,7 @@ This Helm Chart creates the following Kubernetes resources in the release namesp
 * CA Secret
 * Certificate Secret
 * Tenant Custom Resource Definition
+* CapsuleConfiguration Custom Resource Definition
 * MutatingWebHookConfiguration
 * ValidatingWebHookConfiguration
 * RBAC Cluster Roles
