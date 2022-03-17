@@ -127,4 +127,4 @@ Capsule, as many other add-ons, defines its own set of Custom Resource Definitio
 
 ## More
 
-See Capsule [use cases](https://github.com/clastix/capsule/blob/master/use_cases.md) for more information about how to use Capsule.
+See Capsule [tutorial](https://github.com/clastix/capsule/blob/master/docs/content/general/tutorial.md) for more information about how to use Capsule.
