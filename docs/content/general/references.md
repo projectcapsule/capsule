@@ -73,9 +73,8 @@ FIELDS:
      IngressClass. Optional.
 
    limitRanges  <Object>
-     Specifies the NetworkPolicies assigned to the Tenant. The assigned
-     NetworkPolicies are inherited by any namespace created in the Tenant.
-     Optional.
+     Specifies the resource min/max usage restrictions to the Tenant. The assigned
+     values are inherited by any namespace created in the Tenant. Optional.
 
    namespaceOptions     <Object>
      Specifies options for the Namespaces, such as additional metadata or

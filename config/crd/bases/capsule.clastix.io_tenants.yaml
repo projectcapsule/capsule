@@ -697,7 +697,7 @@ spec:
                     type: string
                 type: object
               limitRanges:
-                description: Specifies the NetworkPolicies assigned to the Tenant. The assigned NetworkPolicies are inherited by any namespace created in the Tenant. Optional.
+                description: Specifies the resource min/max usage restrictions to the Tenant. The assigned values are inherited by any namespace created in the Tenant. Optional.
                 properties:
                   items:
                     items:
@@ -1055,7 +1055,7 @@ spec:
               nodeSelector:
                 additionalProperties:
                   type: string
-                description: Specifies the label to control the placement of pods on a given pool of worker nodes. All namesapces created within the Tenant will have the node selector annotation. This annotation tells the Kubernetes scheduler to place pods on the nodes having the selector label. Optional.
+                description: Specifies the label to control the placement of pods on a given pool of worker nodes. All namespaces created within the Tenant will have the node selector annotation. This annotation tells the Kubernetes scheduler to place pods on the nodes having the selector label. Optional.
                 type: object
               owners:
                 description: Specifies the owners of the Tenant. Mandatory.
