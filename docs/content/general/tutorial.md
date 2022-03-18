@@ -400,7 +400,7 @@ spec:
 EOF
 ```
 
-The two tenants remain isolated from each other in terms of resources assignments, e.g. _ResourceQuota_, _Nodes Pool_, _Storage Calsses_ and _Ingress Classes_, and in terms of governance, e.g. _NetworkPolicies_, _PodSecurityPolicies_, _Trusted Registries_, etc.
+The two tenants remain isolated from each other in terms of resources assignments, e.g. _ResourceQuota_, _Nodes Pool_, _Storage Classes_ and _Ingress Classes_, and in terms of governance, e.g. _NetworkPolicies_, _PodSecurityPolicies_, _Trusted Registries_, etc.
 
 
 When Alice logs in, she has access to all namespaces belonging to both the `oil` and `gas` tenants.

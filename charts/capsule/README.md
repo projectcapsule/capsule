@@ -24,23 +24,19 @@ The Capsule Operator Chart can be used to instantly deploy the Capsule Operator 
 
         $ helm repo add clastix https://clastix.github.io/charts
 
-2. Create the Namespace:
+2. Install the Chart:
 
-        $ kubectl create namespace capsule-system
+        $ helm install capsule clastix/capsule -n capsule-system --create-namespace
 
-3. Install the Chart:
-
-        $ helm install capsule clastix/capsule -n capsule-system
-
-4. Show the status:
+3. Show the status:
 
         $ helm status capsule -n capsule-system
 
-5. Upgrade the Chart
+4. Upgrade the Chart
 
         $ helm upgrade capsule clastix/capsule -n capsule-system
 
-6. Uninstall the Chart
+5. Uninstall the Chart
 
         $ helm uninstall capsule -n capsule-system
 
@@ -111,6 +107,7 @@ This Helm Chart creates the following Kubernetes resources in the release namesp
 * CA Secret
 * Certificate Secret
 * Tenant Custom Resource Definition
+* CapsuleConfiguration Custom Resource Definition
 * MutatingWebHookConfiguration
 * ValidatingWebHookConfiguration
 * RBAC Cluster Roles
@@ -130,4 +127,4 @@ Capsule, as many other add-ons, defines its own set of Custom Resource Definitio
 
 ## More
 
-See Capsule [use cases](https://github.com/clastix/capsule/blob/master/use_cases.md) for more information about how to use Capsule.
+See Capsule [tutorial](https://github.com/clastix/capsule/blob/master/docs/content/general/tutorial.md) for more information about how to use Capsule.
