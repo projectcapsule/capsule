@@ -91,6 +91,36 @@ func (c capsuleConfiguration) TLSSecretName() (name string) {
 	return
 }
 
+func (c capsuleConfiguration) MutatingWebhookConfigurationName() (name string) {
+	name = MutatingWebhookConfigurationName
+
+	if c.retrievalFn().Annotations == nil {
+		return
+	}
+
+	v, ok := c.retrievalFn().Annotations[capsulev1alpha1.MutatingWebhookConfigurationName]
+	if ok {
+		return v
+	}
+
+	return
+}
+
+func (c capsuleConfiguration) ValidatingWebhookConfigurationName() (name string) {
+	name = ValidatingWebhookConfigurationName
+
+	if c.retrievalFn().Annotations == nil {
+		return
+	}
+
+	v, ok := c.retrievalFn().Annotations[capsulev1alpha1.ValidatingWebhookConfigurationName]
+	if ok {
+		return v
+	}
+
+	return
+}
+
 func (c capsuleConfiguration) UserGroups() []string {
 	return c.retrievalFn().Spec.UserGroups
 }

@@ -80,7 +80,7 @@ func (r *CAReconciler) UpdateCustomResourceDefinition(caBundle []byte) error {
 func (r CAReconciler) UpdateValidatingWebhookConfiguration(caBundle []byte) error {
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
 		vw := &admissionregistrationv1.ValidatingWebhookConfiguration{}
-		err = r.Get(context.TODO(), types.NamespacedName{Name: "capsule-validating-webhook-configuration"}, vw)
+		err = r.Get(context.TODO(), types.NamespacedName{Name: r.Configuration.ValidatingWebhookConfigurationName()}, vw)
 		if err != nil {
 			r.Log.Error(err, "cannot retrieve ValidatingWebhookConfiguration")
 			return err
@@ -99,7 +99,7 @@ func (r CAReconciler) UpdateValidatingWebhookConfiguration(caBundle []byte) erro
 func (r CAReconciler) UpdateMutatingWebhookConfiguration(caBundle []byte) error {
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
 		mw := &admissionregistrationv1.MutatingWebhookConfiguration{}
-		err = r.Get(context.TODO(), types.NamespacedName{Name: "capsule-mutating-webhook-configuration"}, mw)
+		err = r.Get(context.TODO(), types.NamespacedName{Name: r.Configuration.MutatingWebhookConfigurationName()}, mw)
 		if err != nil {
 			r.Log.Error(err, "cannot retrieve MutatingWebhookConfiguration")
 			return err
