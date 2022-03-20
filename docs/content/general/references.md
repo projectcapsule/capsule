@@ -154,19 +154,23 @@ metadata:
   annotations:
     capsule.clastix.io/ca-secret-name: "capsule-ca"
     capsule.clastix.io/tls-secret-name: "capsule-tls"
+    capsule.clastix.io/mutating-webhook-configuration-name: "capsule-mutating-webhook-configuration"
+    capsule.clastix.io/validating-webhook-configuration-name: "capsule-validating-webhook-configuration"
 spec:
   userGroups: ["capsule.clastix.io"]
   forceTenantPrefix: false
   protectedNamespaceRegex: ""
 ```
 
-Option | Description | Default
---- | --- | ---
-`.spec.forceTenantPrefix` | Force the tenant name as prefix for namespaces: `<tenant_name>-<namespace>`.  | `false`
-`.spec.userGroups` | Array of Capsule groups to which all tenant owners must belong. | `[capsule.clastix.io]`
-`.spec.protectedNamespaceRegex` | Disallows creation of namespaces matching the passed regexp. | `null`
-`.metadata.annotations.capsule.clastix.io/ca-secret-name` | Set the Capsule Certificate Authority secret name | `capsule-ca`
-`.metadata.annotations.capsule.clastic.io/tls-secret-name` | Set the Capsule TLS secret name | `capsule-tls`
+Option | Description                                                                  | Default
+--- |------------------------------------------------------------------------------| ---
+`.spec.forceTenantPrefix` | Force the tenant name as prefix for namespaces: `<tenant_name>-<namespace>`. | `false`
+`.spec.userGroups` | Array of Capsule groups to which all tenant owners must belong.              | `[capsule.clastix.io]`
+`.spec.protectedNamespaceRegex` | Disallows creation of namespaces matching the passed regexp.                 | `null`
+`.metadata.annotations.capsule.clastix.io/ca-secret-name` | Set the Capsule Certificate Authority secret name                            | `capsule-ca`
+`.metadata.annotations.capsule.clastic.io/tls-secret-name` | Set the Capsule TLS secret name                                              | `capsule-tls`
+`.metadata.annotations.capsule.clastix.io/mutating-webhook-configuration-name` | Set the MutatingWebhookConfiguration name                                    | `mutating-webhook-configuration-name`
+`.metadata.annotations.capsule.clastix.io/validating-webhook-configuration-name` | Set the ValidatingWebhookConfiguration name                                  | `validating-webhook-configuration-name`
 
 Upon installation using Kustomize or Helm, a `capsule-default` resource will be created.
 The reference to this configuration is managed by the CLI flag `--configuration-name`.  
