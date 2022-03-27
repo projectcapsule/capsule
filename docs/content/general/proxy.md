@@ -50,7 +50,7 @@ Optionally, it can be deployed as a sidecar container in the backend of a dashbo
 
 Running outside a Kubernetes cluster is also viable, although a valid `KUBECONFIG` file must be provided, using the environment variable `KUBECONFIG` or the default file in `$HOME/.kube/config`.
 
-A Helm Chart is available [here](https://github.com/clastix/capsule/blob/master/charts/capsule/README.md).
+A Helm Chart is available [here](https://github.com/clastix/capsule-proxy/blob/master/charts/capsule-proxy/README.md).
 
 Depending on your environment, you can expose the `capsule-proxy` by:
 
