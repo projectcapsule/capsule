@@ -4,8 +4,12 @@ metadata:
   name: default
   labels:
   {{- include "capsule.labels" . | nindent 4 }}
-  {{- with .Values.customAnnotations }}
   annotations:
+    capsule.clastix.io/ca-secret-name: {{ include "capsule.secretCaName" . }}
+    capsule.clastix.io/mutating-webhook-configuration-name: {{ include "capsule.fullname" . }}-mutating-webhook-configuration
+    capsule.clastix.io/tls-secret-name: {{ include "capsule.secretTlsName" . }}
+    capsule.clastix.io/validating-webhook-configuration-name: {{ include "capsule.fullname" . }}-validating-webhook-configuration
+  {{- with .Values.customAnnotations }}
     {{- toYaml . | nindent 4 }}
   {{- end }}
 spec:

@@ -1,4 +1,4 @@
-{{- $cmd := "while [ -z $$(kubectl -n $NAMESPACE get secret capsule-tls -o jsonpath='{.data.tls\\\\.crt}') ];" -}}
+{{- $cmd := printf "while [ -z $$(kubectl -n $NAMESPACE get secret %s -o jsonpath='{.data.tls\\\\.crt}') ];" (include "capsule.secretCaName" .) -}}
 {{- $cmd = printf "%s do echo 'waiting Capsule to be up and running...' && sleep 5;" $cmd -}}
 {{- $cmd = printf "%s done" $cmd -}}
 apiVersion: batch/v1
