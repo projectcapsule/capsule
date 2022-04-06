@@ -89,6 +89,8 @@ It is possible to protect the `capsule-proxy` using a certificate provided by Le
 
 If your prerequisite is exposing `capsule-proxy` using an Ingress, you must rely on the token-based authentication, for example OIDC or Bearer tokens. Users providing tokens are always able to reach the APIs Server.
 
+Starting from v3.0.0 of Capsule Proxy, access to cluster-scoped resources used by a Tenant can be delegated using a Custom Resource Definition, named [`ProxySettings`](#delegating-cluster-scoped-resources-access-using-proxysetting). 
+
 ## Kubernetes dashboards integration
 
 If you're using a client-only dashboard, for example [Lens](https://k8slens.dev/), the `capsule-proxy` can be used as with `kubectl` since this dashboard usually talks to the APIs server using just a `kubeconfig` file.
@@ -398,6 +400,35 @@ value: 1000
 globalDefault: false
 description: "Priority class for Tenants"
 ```
+
+## Delegating cluster scoped resources access using ProxySetting
+
+Capsule Proxy introduced a Custom Resource Definition named `ProxySetting` allowing to specify additional permissions to non-owner users or groups to the Tenant resources.
+
+The `ProxySetting` resource is a Namespace-scoped resource that allows specifying additional proxy settings to a set of users, groups, or service accounts.
+
+These settings will be inflected to the Tenant to which the Namespace belongs.
+In combination with Capsule `additionalRoleBindings` feature, this allows Tenant Owners the ability to specify additional permissions to other users, without granting them the Tenant ownership.
+
+```yaml
+apiVersion: capsule.clastix.io/v1beta1
+kind: ProxySetting
+metadata:
+  name: sre-readers
+  namespace: solar-production
+spec:
+  subjects:
+  - name: sre
+    kind: Group
+    proxySettings:
+    - kind: Nodes
+      operations:
+      - List
+```
+
+If a `ProxySetting` resource will be deployed in a Namespace not owned by a Tenant, no side effects will be put in place.
+
+Resources that can be delegated to subjects are the ones enumareted in [Tenant Owner Authorization](#tenant-owner-authorization) section.
 
 ## HTTP support
 Capsule proxy supports `https` and `http`, although the latter is not recommended, we understand that it can be useful for some use cases (i.e. development, working behind a TLS-terminated reverse proxy and so on). As the default behaviour is to work with `https`, we need to use the flag `--enable-ssl=false` if we really want to work under `http`.
