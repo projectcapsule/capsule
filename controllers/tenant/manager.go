@@ -94,15 +94,9 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 		return
 	}
 
-	r.Log.Info("Ensuring additional RoleBindings for owner")
-	if err = r.syncAdditionalRoleBindings(instance); err != nil {
-		r.Log.Error(err, "Cannot sync additional RoleBindings items")
-		return
-	}
-
-	r.Log.Info("Ensuring RoleBinding for owner")
-	if err = r.ownerRoleBinding(instance); err != nil {
-		r.Log.Error(err, "Cannot sync owner RoleBinding")
+	r.Log.Info("Ensuring RoleBindings for Owners and Tenant")
+	if err = r.syncRoleBindings(instance); err != nil {
+		r.Log.Error(err, "Cannot sync RoleBindings items")
 		return
 	}
 
