@@ -1,4 +1,5 @@
-//+build e2e
+//go:build e2e
+// +build e2e
 
 // Copyright 2020-2021 Clastix Labs
 // SPDX-License-Identifier: Apache-2.0
@@ -7,6 +8,9 @@ package e2e
 
 import (
 	"context"
+	"fmt"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"strings"
 	"time"
 
 	. "github.com/onsi/gomega"
@@ -73,21 +77,54 @@ func ModifyCapsuleConfigurationOpts(fn func(configuration *capsulev1alpha1.Capsu
 	time.Sleep(1 * time.Second)
 }
 
-func KindInTenantRoleBindingAssertions(ns *corev1.Namespace, timeout time.Duration) (out []AsyncAssertion) {
-	for _, rbn := range tenantRoleBindingNames {
-		rb := &rbacv1.RoleBinding{}
-		out = append(out, Eventually(func() []string {
-			if err := k8sClient.Get(context.TODO(), types.NamespacedName{Name: rbn, Namespace: ns.GetName()}, rb); err != nil {
-				return nil
-			}
-			var subjects []string
-			for _, subject := range rb.Subjects {
-				subjects = append(subjects, subject.Kind)
-			}
-			return subjects
-		}, timeout, defaultPollInterval))
+func CheckForOwnerRoleBindings(ns *corev1.Namespace, owner capsulev1beta1.OwnerSpec, roles map[string]bool) func() error {
+	if roles == nil {
+		roles = map[string]bool{
+			"admin":                     false,
+			"capsule-namespace-deleter": false,
+		}
 	}
-	return
+
+	return func() (err error) {
+		roleBindings := &rbacv1.RoleBindingList{}
+
+		if err = k8sClient.List(context.Background(), roleBindings, client.InNamespace(ns.GetName())); err != nil {
+			return fmt.Errorf("cannot retrieve list of rolebindings: %w", err)
+		}
+
+		var ownerName string
+
+		if owner.Kind == capsulev1beta1.ServiceAccountOwner {
+			parts := strings.Split(owner.Name, ":")
+
+			ownerName = parts[3]
+		} else {
+			ownerName = owner.Name
+		}
+
+		for _, roleBinding := range roleBindings.Items {
+			_, ok := roles[roleBinding.RoleRef.Name]
+			if !ok {
+				continue
+			}
+
+			subject := roleBinding.Subjects[0]
+
+			if subject.Name != ownerName {
+				continue
+			}
+
+			roles[roleBinding.RoleRef.Name] = true
+		}
+
+		for role, found := range roles {
+			if !found {
+				return fmt.Errorf("role %s for %s.%s has not been reconciled", role, owner.Kind.String(), owner.Name)
+			}
+		}
+
+		return nil
+	}
 }
 
 func GetKubernetesVersion() *versionUtil.Version {
@@ -104,7 +141,6 @@ func GetKubernetesVersion() *versionUtil.Version {
 
 	ver, err = versionUtil.ParseGeneric(serverVersion.String())
 	Expect(err).ToNot(HaveOccurred())
-
 
 	return ver
 }

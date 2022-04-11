@@ -9,15 +9,15 @@ package e2e
 import (
 	"context"
 
+	"fmt"
 	capsulev1alpha1 "github.com/clastix/capsule/api/v1alpha1"
 	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
+	"github.com/clastix/capsule/pkg/webhook/utils"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"github.com/clastix/capsule/pkg/webhook/utils"
-	"fmt"
 )
 
 var _ = Describe("modifying node labels and annotations", func() {
@@ -55,12 +55,12 @@ var _ = Describe("modifying node labels and annotations", func() {
 		RoleRef: rbacv1.RoleRef{
 			Kind:     "ClusterRole",
 			Name:     "node-modifier",
-			APIGroup: "rbac.authorization.k8s.io",
+			APIGroup: rbacv1.GroupName,
 		},
 		Subjects: []rbacv1.Subject{
 			{
 				Kind:     rbacv1.UserKind,
-				APIGroup: "rbac.authorization.k8s.io",
+				APIGroup: rbacv1.GroupName,
 				Name:     "gatsby",
 			},
 		},

@@ -1,4 +1,5 @@
-//+build e2e
+//go:build e2e
+// +build e2e
 
 // Copyright 2020-2021 Clastix Labs
 // SPDX-License-Identifier: Apache-2.0
@@ -7,7 +8,6 @@ package e2e
 
 import (
 	"context"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -48,28 +48,31 @@ var _ = Describe("creating a Namespaces as different type of Tenant owners", fun
 		Expect(k8sClient.Delete(context.TODO(), tnt)).Should(Succeed())
 	})
 
-	It("should be available in Tenant namespaces list and rolebindigs should present when created as User", func() {
+	It("should be available in Tenant namespaces list and RoleBindings should be present when created", func() {
 		ns := NewNamespace("new-namespace-user")
 		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElements(ns.GetName()))
-		for _, a := range KindInTenantRoleBindingAssertions(ns, defaultTimeoutInterval) {
-			a.Should(ContainElements("User", "Group", "ServiceAccount"))
+
+		for _, owner := range tnt.Spec.Owners {
+			Eventually(CheckForOwnerRoleBindings(ns, owner, nil), defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		}
 	})
-	It("should be available in Tenant namespaces list and rolebindigs should present when created as Group", func() {
+	It("should be available in Tenant namespaces list and RoleBindings should present when created as Group", func() {
 		ns := NewNamespace("new-namespace-group")
 		NamespaceCreation(ns, tnt.Spec.Owners[1], defaultTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElements(ns.GetName()))
-		for _, a := range KindInTenantRoleBindingAssertions(ns, defaultTimeoutInterval) {
-			a.Should(ContainElements("User", "Group", "ServiceAccount"))
+
+		for _, owner := range tnt.Spec.Owners {
+			Eventually(CheckForOwnerRoleBindings(ns, owner, nil), defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		}
 	})
-	It("should be available in Tenant namespaces list and rolebindigs should present when created as ServiceAccount", func() {
+	It("should be available in Tenant namespaces list and RoleBindings should present when created as ServiceAccount", func() {
 		ns := NewNamespace("new-namespace-sa")
 		NamespaceCreation(ns, tnt.Spec.Owners[2], defaultTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElements(ns.GetName()))
-		for _, a := range KindInTenantRoleBindingAssertions(ns, defaultTimeoutInterval) {
-			a.Should(ContainElements("User", "Group", "ServiceAccount"))
+
+		for _, owner := range tnt.Spec.Owners {
+			Eventually(CheckForOwnerRoleBindings(ns, owner, nil), defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		}
 	})
 })
