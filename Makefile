@@ -40,8 +40,8 @@ test: generate manifests
 	go test ./... -coverprofile cover.out
 
 # Build manager binary
-manager: generate fmt vet
-	go build -o bin/manager main.go
+manager: generate golint
+	go build -o bin/manager
 
 # Run against the configured Kubernetes cluster in ~/.kube/config
 run: generate manifests
