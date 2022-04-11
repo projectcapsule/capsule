@@ -1,4 +1,5 @@
-//+build e2e
+//go:build e2e
+// +build e2e
 
 // Copyright 2020-2021 Clastix Labs
 // SPDX-License-Identifier: Apache-2.0
@@ -35,7 +36,7 @@ var _ = Describe("creating a Namespace with an additional Role Binding", func() 
 					Subjects: []rbacv1.Subject{
 						{
 							Kind:     "Group",
-							APIGroup: "rbac.authorization.k8s.io",
+							APIGroup: rbacv1.GroupName,
 							Name:     "system:authenticated",
 						},
 					},
@@ -64,7 +65,7 @@ var _ = Describe("creating a Namespace with an additional Role Binding", func() 
 
 			Eventually(func() (err error) {
 				cs := ownerClient(tnt.Spec.Owners[0])
-				rb, err = cs.RbacV1().RoleBindings(ns.Name).Get(context.Background(), fmt.Sprintf("capsule-%s-0-%s", tnt.Name, "crds-rolebinding"), metav1.GetOptions{})
+				rb, err = cs.RbacV1().RoleBindings(ns.Name).Get(context.Background(), fmt.Sprintf("capsule-%s-2-%s", tnt.Name, "crds-rolebinding"), metav1.GetOptions{})
 				return err
 			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 			Expect(rb.RoleRef.Name).Should(Equal(tnt.Spec.AdditionalRoleBindings[0].ClusterRoleName))
