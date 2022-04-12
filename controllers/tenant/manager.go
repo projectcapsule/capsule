@@ -17,6 +17,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
+	"github.com/clastix/capsule/pkg/stats"
 )
 
 type Manager struct {
@@ -119,8 +120,18 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 func (r *Manager) updateTenantStatus(tnt *capsulev1beta1.Tenant) error {
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
 		if tnt.IsCordoned() {
+			if tnt.Status.State != capsulev1beta1.TenantStateCordoned {
+				// Avoid counter skew by incrementing only when we are transitioning to
+				// cordoned state.
+				stats.RecordCordonedTenant()
+			}
 			tnt.Status.State = capsulev1beta1.TenantStateCordoned
 		} else {
+			if tnt.Status.State != capsulev1beta1.TenantStateActive {
+				// Avoid counter skew by incrementing only when we are transitioning to
+				// active state.
+				stats.RecordActiveTenant()
+			}
 			tnt.Status.State = capsulev1beta1.TenantStateActive
 		}
 
