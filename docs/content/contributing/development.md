@@ -4,7 +4,7 @@
 
 Make sure you have these tools installed:
 
-- [Go 1.16+](https://golang.org/dl/)
+- [Go 1.18+](https://golang.org/dl/)
 - [Operator SDK 1.7.2+](https://github.com/operator-framework/operator-sdk), or [Kubebuilder](https://github.com/kubernetes-sigs/kubebuilder)
 - [KinD](https://github.com/kubernetes-sigs/kind) or [k3d](https://k3d.io/), with `kubectl`
 - [ngrok](https://ngrok.com/) (if you want to run locally with remote Kubernetes)

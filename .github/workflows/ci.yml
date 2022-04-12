@@ -36,7 +36,7 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-go@v2
         with:
-          go-version: '1.16'
+          go-version: '1.18'
       - run: make installer
       - name: Checking if YAML installer file is not aligned
         run: if [[ $(git diff | wc -l) -gt 0 ]]; then echo ">>> Untracked generated files have not been committed" && git --no-pager diff && exit 1; fi
