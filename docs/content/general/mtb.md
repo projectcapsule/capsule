@@ -450,24 +450,24 @@ As tenant owner list RBAC permissions set by Capsule
 
 ```bash 
 kubectl --kubeconfig alice get rolebindings
-NAME                ROLE                                    AGE
-namespace-deleter   ClusterRole/capsule-namespace-deleter   11h
-namespace:admin     ClusterRole/admin                       11h
+NAME                                      ROLE                                    AGE
+capsule-oil-0-admin                       ClusterRole/admin                       11h
+capsule-oil-1-capsule-namespace-deleter   ClusterRole/capsule-namespace-deleter   11h
 ```
 
 As tenant owner, try to change/delete  the rolebinding to escalate permissions
 
 ```bash 
-kubectl --kubeconfig alice edit/delete rolebinding namespace:admin
+kubectl --kubeconfig alice edit/delete rolebinding capsule-oil-0-admin
 ```
 
 The rolebinding is immediately recreated by Capsule:
 
 ```
 kubectl --kubeconfig alice get rolebindings
-NAME                ROLE                                    AGE
-namespace-deleter   ClusterRole/capsule-namespace-deleter   11h
-namespace:admin     ClusterRole/admin                       2s
+NAME                                      ROLE                                    AGE
+capsule-oil-0-admin                       ClusterRole/admin                       2s
+capsule-oil-1-capsule-namespace-deleter   ClusterRole/capsule-namespace-deleter   11h
 ```
 
 However, the tenant owner can create and assign permissions inside the namespace she owns

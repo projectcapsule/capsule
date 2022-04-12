@@ -17,6 +17,53 @@ Capsule is a framework to implement multi-tenant and policy-driven scenarios in 
 
 ## Assign Tenant ownership
 
+### Roles assigned to Tenant Owners
+
+By default, all Tenant Owners will be granted with two ClusterRole resources using the RoleBinding API:
+
+1. the Kubernetes default one, `admin`, that grants most of the Namespace scoped resources management operations
+2. a custom one, named `capsule-namespace-deleter`, allowing to delete the created Namespace
+
+```
+$: kubectl get rolebindings.rbac.authorization.k8s.io
+NAME                                      ROLE                                    AGE
+capsule-oil-0-admin                       ClusterRole/admin                       6s
+capsule-oil-1-capsule-namespace-deleter   ClusterRole/capsule-namespace-deleter   5s
+capsule-oil-2-admin                       ClusterRole/admin                       5s
+capsule-oil-3-capsule-namespace-deleter   ClusterRole/capsule-namespace-deleter   5s
+```
+
+Capsule supports the dynamic management of the assigned ClusterRole resources for each Tenant Owner.
+
+```yaml
+apiVersion: capsule.clastix.io/v1beta1
+kind: Tenant
+metadata:
+  annotations:
+    clusterrolenames.capsule.clastix.io/user.alice: editor,manager
+    clusterrolenames.capsule.clastix.io/group.sre: readonly
+  name: oil
+spec:
+  owners:
+    - kind: User
+      name: alice
+    - kind: Group
+      name: sre
+```
+
+For the given configuration, the resulting RoleBinding resources are the following ones:
+
+```
+$: kubectl get rolebindings.rbac.authorization.k8s.io
+NAME                     ROLE                   AGE
+capsule-oil-0-editor     ClusterRole/editor     21s
+capsule-oil-1-manager    ClusterRole/manager    19s
+capsule-oil-2-readonly   ClusterRole/readonly   2s
+```
+
+> The pattern for the annotation is `clusterrolenames.capsule.clastix.io/${KIND}.${NAME}`.
+> The placeholders `${KIND}` and `${NAME}` are referring to the Tenant Owner specification fields, both lower-cased.
+
 ### User as tenant owner
 Bill, the cluster admin, receives a new request from Acme Corp.'s CTO asking for a new tenant to be onboarded and Alice user will be the tenant owner. Bill then assigns Alice's identity of `alice` in the Acme Corp. identity management system. Since Alice is a tenant owner, Bill needs to assign `alice` the Capsule group defined by `--capsule-user-group` option, which defaults to `capsule.clastix.io`.
 
@@ -192,7 +239,7 @@ When Alice creates the namespace, the Capsule controller listening for creation 
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: namespace:admin
+  name: capsule-oil-0-admin
   namespace: oil-production
 subjects:
 - kind: User
@@ -205,7 +252,7 @@ roleRef:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: namespace-deleter
+  name: capsule-oil-1-capsule-namespace-deleter
   namespace: oil-production
 subjects:
 - kind: User
@@ -220,9 +267,9 @@ So Alice is the admin of the namespaces:
 
 ```
 kubectl get rolebindings -n oil-development
-NAME                ROLE                                    AGE
-namespace:admin     ClusterRole/admin                       12s
-namespace-deleter   ClusterRole/capsule-namespace-deleter   12s
+NAME                                      ROLE                                    AGE
+capsule-oil-0-admin                       ClusterRole/admin                       5s
+capsule-oil-1-capsule-namespace-deleter   ClusterRole/capsule-namespace-deleter   4s
 ```
 
 The said Role Binding resources are automatically created by Capsule controller when the tenant owner Alice creates a namespace in the tenant.
