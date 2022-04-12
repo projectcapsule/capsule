@@ -1,4 +1,4 @@
-//+build e2e
+//go:build e2e
 
 // Copyright 2020-2021 Clastix Labs
 // SPDX-License-Identifier: Apache-2.0
@@ -19,9 +19,9 @@ var _ = Describe("creating a Namespace with user-specified labels and annotation
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "tenant-user-metadata-forbidden",
 			Annotations: map[string]string{
-				capsulev1beta1.ForbiddenNamespaceLabelsAnnotation: "foo,bar",
-				capsulev1beta1.ForbiddenNamespaceLabelsRegexpAnnotation: "^gatsby-.*$",
-				capsulev1beta1.ForbiddenNamespaceAnnotationsAnnotation: "foo,bar",
+				capsulev1beta1.ForbiddenNamespaceLabelsAnnotation:            "foo,bar",
+				capsulev1beta1.ForbiddenNamespaceLabelsRegexpAnnotation:      "^gatsby-.*$",
+				capsulev1beta1.ForbiddenNamespaceAnnotationsAnnotation:       "foo,bar",
 				capsulev1beta1.ForbiddenNamespaceAnnotationsRegexpAnnotation: "^gatsby-.*$",
 			},
 		},
@@ -57,7 +57,6 @@ var _ = Describe("creating a Namespace with user-specified labels and annotation
 			NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 		})
 	})
-
 
 	It("should fail", func() {
 		By("specifying forbidden labels using exact match", func() {

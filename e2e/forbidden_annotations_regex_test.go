@@ -1,4 +1,4 @@
-// +build e2e
+//go:build e2e
 
 // Copyright 2020-2021 Clastix Labs
 // SPDX-License-Identifier: Apache-2.0
