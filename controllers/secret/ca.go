@@ -19,9 +19,13 @@ import (
 	"k8s.io/client-go/util/retry"
 	"k8s.io/utils/pointer"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	"github.com/clastix/capsule/pkg/cert"
 	"github.com/clastix/capsule/pkg/configuration"
@@ -36,23 +40,40 @@ type CAReconciler struct {
 }
 
 func (r *CAReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	enqueueFn := handler.EnqueueRequestsFromMapFunc(func(client.Object) []reconcile.Request {
+		return []reconcile.Request{
+			{
+				NamespacedName: types.NamespacedName{
+					Namespace: r.Namespace,
+					Name:      r.Configuration.CASecretName(),
+				},
+			},
+		}
+	})
+
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&corev1.Secret{}).
+		Watches(source.NewKindWithCache(&admissionregistrationv1.ValidatingWebhookConfiguration{}, mgr.GetCache()), enqueueFn, builder.WithPredicates(predicate.NewPredicateFuncs(func(object client.Object) bool {
+			return r.Configuration.ValidatingWebhookConfigurationName() == object.GetName()
+		}))).
+		Watches(source.NewKindWithCache(&admissionregistrationv1.MutatingWebhookConfiguration{}, mgr.GetCache()), enqueueFn, builder.WithPredicates(predicate.NewPredicateFuncs(func(object client.Object) bool {
+			return r.Configuration.MutatingWebhookConfigurationName() == object.GetName()
+		}))).
 		Complete(r)
 }
 
 // By default helm doesn't allow to use templates in CRD (https://helm.sh/docs/chart_best_practices/custom_resource_definitions/#method-1-let-helm-do-it-for-you).
 // In order to overcome this, we are setting conversion strategy in helm chart to None, and then update it with CA and namespace information.
-func (r *CAReconciler) UpdateCustomResourceDefinition(caBundle []byte) error {
+func (r *CAReconciler) UpdateCustomResourceDefinition(ctx context.Context, caBundle []byte) error {
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
 		crd := &apiextensionsv1.CustomResourceDefinition{}
-		err = r.Get(context.TODO(), types.NamespacedName{Name: "tenants.capsule.clastix.io"}, crd)
+		err = r.Get(ctx, types.NamespacedName{Name: "tenants.capsule.clastix.io"}, crd)
 		if err != nil {
 			r.Log.Error(err, "cannot retrieve CustomResourceDefinition")
 			return err
 		}
 
-		_, err = controllerutil.CreateOrUpdate(context.TODO(), r.Client, crd, func() error {
+		_, err = controllerutil.CreateOrUpdate(ctx, r.Client, crd, func() error {
 			crd.Spec.Conversion = &apiextensionsv1.CustomResourceConversion{
 				Strategy: "Webhook",
 				Webhook: &apiextensionsv1.WebhookConversion{
@@ -77,10 +98,10 @@ func (r *CAReconciler) UpdateCustomResourceDefinition(caBundle []byte) error {
 }
 
 //nolint:dupl
-func (r CAReconciler) UpdateValidatingWebhookConfiguration(caBundle []byte) error {
+func (r CAReconciler) UpdateValidatingWebhookConfiguration(ctx context.Context, caBundle []byte) error {
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
 		vw := &admissionregistrationv1.ValidatingWebhookConfiguration{}
-		err = r.Get(context.TODO(), types.NamespacedName{Name: r.Configuration.ValidatingWebhookConfigurationName()}, vw)
+		err = r.Get(ctx, types.NamespacedName{Name: r.Configuration.ValidatingWebhookConfigurationName()}, vw)
 		if err != nil {
 			r.Log.Error(err, "cannot retrieve ValidatingWebhookConfiguration")
 			return err
@@ -91,15 +112,15 @@ func (r CAReconciler) UpdateValidatingWebhookConfiguration(caBundle []byte) erro
 				vw.Webhooks[i].ClientConfig.CABundle = caBundle
 			}
 		}
-		return r.Update(context.TODO(), vw, &client.UpdateOptions{})
+		return r.Update(ctx, vw, &client.UpdateOptions{})
 	})
 }
 
 //nolint:dupl
-func (r CAReconciler) UpdateMutatingWebhookConfiguration(caBundle []byte) error {
+func (r CAReconciler) UpdateMutatingWebhookConfiguration(ctx context.Context, caBundle []byte) error {
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
 		mw := &admissionregistrationv1.MutatingWebhookConfiguration{}
-		err = r.Get(context.TODO(), types.NamespacedName{Name: r.Configuration.MutatingWebhookConfigurationName()}, mw)
+		err = r.Get(ctx, types.NamespacedName{Name: r.Configuration.MutatingWebhookConfigurationName()}, mw)
 		if err != nil {
 			r.Log.Error(err, "cannot retrieve MutatingWebhookConfiguration")
 			return err
@@ -110,7 +131,7 @@ func (r CAReconciler) UpdateMutatingWebhookConfiguration(caBundle []byte) error 
 				mw.Webhooks[i].ClientConfig.CABundle = caBundle
 			}
 		}
-		return r.Update(context.TODO(), mw, &client.UpdateOptions{})
+		return r.Update(ctx, mw, &client.UpdateOptions{})
 	})
 }
 
@@ -126,7 +147,7 @@ func (r CAReconciler) Reconcile(ctx context.Context, request ctrl.Request) (ctrl
 
 	// Fetch the CA instance
 	instance := &corev1.Secret{}
-	err = r.Client.Get(context.TODO(), request.NamespacedName, instance)
+	err = r.Client.Get(ctx, request.NamespacedName, instance)
 	if err != nil {
 		// Error reading the object - requeue the request.
 		return reconcile.Result{}, err
@@ -165,13 +186,13 @@ func (r CAReconciler) Reconcile(ctx context.Context, request ctrl.Request) (ctrl
 
 		group := new(errgroup.Group)
 		group.Go(func() error {
-			return r.UpdateMutatingWebhookConfiguration(crt.Bytes())
+			return r.UpdateMutatingWebhookConfiguration(ctx, crt.Bytes())
 		})
 		group.Go(func() error {
-			return r.UpdateValidatingWebhookConfiguration(crt.Bytes())
+			return r.UpdateValidatingWebhookConfiguration(ctx, crt.Bytes())
 		})
 		group.Go(func() error {
-			return r.UpdateCustomResourceDefinition(crt.Bytes())
+			return r.UpdateCustomResourceDefinition(ctx, crt.Bytes())
 		})
 
 		if err = group.Wait(); err != nil {
@@ -181,7 +202,7 @@ func (r CAReconciler) Reconcile(ctx context.Context, request ctrl.Request) (ctrl
 
 	var res controllerutil.OperationResult
 	t := &corev1.Secret{ObjectMeta: instance.ObjectMeta}
-	res, err = controllerutil.CreateOrUpdate(context.TODO(), r.Client, t, func() error {
+	res, err = controllerutil.CreateOrUpdate(ctx, r.Client, t, func() error {
 		t.Data = instance.Data
 		return nil
 	})
