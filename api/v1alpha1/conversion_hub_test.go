@@ -256,7 +256,7 @@ func generateTenantsSpecs() (Tenant, capsulev1beta1.Tenant) {
 					Subjects: []rbacv1.Subject{
 						{
 							Kind:     "Group",
-							APIGroup: "rbac.authorization.k8s.io",
+							APIGroup: rbacv1.GroupName,
 							Name:     "system:authenticated",
 						},
 					},
@@ -327,7 +327,7 @@ func generateTenantsSpecs() (Tenant, capsulev1beta1.Tenant) {
 					Subjects: []rbacv1.Subject{
 						{
 							Kind:     "Group",
-							APIGroup: "rbac.authorization.k8s.io",
+							APIGroup: rbacv1.GroupName,
 							Name:     "system:authenticated",
 						},
 					},
