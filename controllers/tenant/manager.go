@@ -105,7 +105,14 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 		r.Log.Error(err, "Cannot sync Namespace count")
 		return
 	}
-
+	r.Log.Info("Ensuring additional resources")
+	if err = r.syncAdditionalResources(instance); err != nil {
+		r.Log.Error(err, "Cannot sync additional resources")
+		if instance.Spec.ResyncPeriod != nil {
+			return ctrl.Result{RequeueAfter: instance.Spec.ResyncPeriod.Duration}, nil
+		}
+		return
+	}
 	r.Log.Info("Tenant reconciling completed")
 	return ctrl.Result{}, err
 }

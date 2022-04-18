@@ -9,6 +9,13 @@ import (
 
 // TenantSpec defines the desired state of Tenant
 type TenantSpec struct {
+	// Duration for reconciliation loop to poll and ensure AdditionalResources are
+	// in correct state.
+	//+kubebuilder:default="60s"
+	ResyncPeriod *metav1.Duration `json:"resyncPeriod,omitempty"`
+	// AdditionalResources specifies additional resources that will be created with
+	// the tenant
+	AdditionalResources *AdditionalResources `json:"additionalResources,omitempty"`
 	// Specifies the owners of the Tenant. Mandatory.
 	Owners OwnerListSpec `json:"owners"`
 	// Specifies options for the Namespaces, such as additional metadata or maximum number of namespaces allowed for that Tenant. Once the namespace quota assigned to the Tenant has been reached, the Tenant owner cannot create further namespaces. Optional.

@@ -9,9 +9,10 @@ spec:
     webhook:
       clientConfig:
         service:
-          namespace: system
-          name: webhook-service
+          namespace: capsule-system
+          name: capsule-webhook-service
           path: /convert
+          port: 443
       conversionReviewVersions:
         - v1alpha1
         - v1beta1
