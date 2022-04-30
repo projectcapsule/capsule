@@ -54,10 +54,10 @@ func (r *CAReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&corev1.Secret{}).
 		Watches(source.NewKindWithCache(&admissionregistrationv1.ValidatingWebhookConfiguration{}, mgr.GetCache()), enqueueFn, builder.WithPredicates(predicate.NewPredicateFuncs(func(object client.Object) bool {
-			return r.Configuration.ValidatingWebhookConfigurationName() == object.GetName()
+			return object.GetName() == r.Configuration.ValidatingWebhookConfigurationName()
 		}))).
 		Watches(source.NewKindWithCache(&admissionregistrationv1.MutatingWebhookConfiguration{}, mgr.GetCache()), enqueueFn, builder.WithPredicates(predicate.NewPredicateFuncs(func(object client.Object) bool {
-			return r.Configuration.MutatingWebhookConfigurationName() == object.GetName()
+			return object.GetName() == r.Configuration.MutatingWebhookConfigurationName()
 		}))).
 		Complete(r)
 }

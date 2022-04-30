@@ -14,16 +14,15 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/workqueue"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
-	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	capsulev1alpha1 "github.com/clastix/capsule/api/v1alpha1"
+	"github.com/clastix/capsule/controllers/utils"
 	"github.com/clastix/capsule/pkg/configuration"
 )
 
@@ -39,46 +38,18 @@ func (r *Manager) InjectClient(c client.Client) error {
 	return nil
 }
 
-func (r *Manager) filterByNames(name string) bool {
-	return name == ProvisionerRoleName || name == DeleterRoleName
-}
-
 //nolint:dupl
 func (r *Manager) SetupWithManager(ctx context.Context, mgr ctrl.Manager, configurationName string) (err error) {
+	namesPredicate := utils.NamesMatchingPredicate(ProvisionerRoleName, DeleterRoleName)
+
 	crErr := ctrl.NewControllerManagedBy(mgr).
-		For(&rbacv1.ClusterRole{}, builder.WithPredicates(predicate.Funcs{
-			CreateFunc: func(event event.CreateEvent) bool {
-				return r.filterByNames(event.Object.GetName())
-			},
-			DeleteFunc: func(deleteEvent event.DeleteEvent) bool {
-				return r.filterByNames(deleteEvent.Object.GetName())
-			},
-			UpdateFunc: func(updateEvent event.UpdateEvent) bool {
-				return r.filterByNames(updateEvent.ObjectNew.GetName())
-			},
-			GenericFunc: func(genericEvent event.GenericEvent) bool {
-				return r.filterByNames(genericEvent.Object.GetName())
-			},
-		})).
+		For(&rbacv1.ClusterRole{}, namesPredicate).
 		Complete(r)
 	if crErr != nil {
 		err = multierror.Append(err, crErr)
 	}
 	crbErr := ctrl.NewControllerManagedBy(mgr).
-		For(&rbacv1.ClusterRoleBinding{}, builder.WithPredicates(predicate.Funcs{
-			CreateFunc: func(event event.CreateEvent) bool {
-				return r.filterByNames(event.Object.GetName())
-			},
-			DeleteFunc: func(deleteEvent event.DeleteEvent) bool {
-				return r.filterByNames(deleteEvent.Object.GetName())
-			},
-			UpdateFunc: func(updateEvent event.UpdateEvent) bool {
-				return r.filterByNames(updateEvent.ObjectNew.GetName())
-			},
-			GenericFunc: func(genericEvent event.GenericEvent) bool {
-				return r.filterByNames(genericEvent.Object.GetName())
-			},
-		})).
+		For(&rbacv1.ClusterRoleBinding{}, namesPredicate).
 		Watches(source.NewKindWithCache(&capsulev1alpha1.CapsuleConfiguration{}, mgr.GetCache()), handler.Funcs{
 			UpdateFunc: func(updateEvent event.UpdateEvent, limitingInterface workqueue.RateLimitingInterface) {
 				if updateEvent.ObjectNew.GetName() == configurationName {
