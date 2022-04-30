@@ -60,7 +60,7 @@ func (r TLSReconciler) Reconcile(ctx context.Context, request ctrl.Request) (ctr
 	var ca cert.CA
 	var rq time.Duration
 
-	ca, err = getCertificateAuthority(r.Client, r.Namespace, r.Configuration.CASecretName())
+	ca, err = getCertificateAuthority(ctx, r.Client, r.Namespace, r.Configuration.CASecretName())
 	if err != nil {
 		return reconcile.Result{}, err
 	}

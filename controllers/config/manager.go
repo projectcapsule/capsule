@@ -61,7 +61,7 @@ func (c *Manager) SetupWithManager(mgr ctrl.Manager, configurationName string) e
 func (c *Manager) Reconcile(ctx context.Context, request reconcile.Request) (res reconcile.Result, err error) {
 	c.Log.Info("CapsuleConfiguration reconciliation started", "request.name", request.Name)
 
-	cfg := configuration.NewCapsuleConfiguration(c.Client, request.Name)
+	cfg := configuration.NewCapsuleConfiguration(ctx, c.Client, request.Name)
 	// Validating the Capsule Configuration options
 	if _, err = cfg.ProtectedNamespaceRegexp(); err != nil {
 		panic(errors.Wrap(err, "Invalid configuration for protected Namespace regex"))

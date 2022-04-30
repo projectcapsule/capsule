@@ -14,7 +14,7 @@ import (
 )
 
 // Ensuring all the NetworkPolicies are applied to each Namespace handled by the Tenant.
-func (r *Manager) syncNetworkPolicies(tenant *capsulev1beta1.Tenant) error {
+func (r *Manager) syncNetworkPolicies(ctx context.Context, tenant *capsulev1beta1.Tenant) error {
 	// getting requested NetworkPolicy keys
 	keys := make([]string, 0, len(tenant.Spec.NetworkPolicies.Items))
 
@@ -28,15 +28,15 @@ func (r *Manager) syncNetworkPolicies(tenant *capsulev1beta1.Tenant) error {
 		namespace := ns
 
 		group.Go(func() error {
-			return r.syncNetworkPolicy(tenant, namespace, keys)
+			return r.syncNetworkPolicy(ctx, tenant, namespace, keys)
 		})
 	}
 
 	return group.Wait()
 }
 
-func (r *Manager) syncNetworkPolicy(tenant *capsulev1beta1.Tenant, namespace string, keys []string) (err error) {
-	if err = r.pruningResources(namespace, keys, &networkingv1.NetworkPolicy{}); err != nil {
+func (r *Manager) syncNetworkPolicy(ctx context.Context, tenant *capsulev1beta1.Tenant, namespace string, keys []string) (err error) {
+	if err = r.pruningResources(ctx, namespace, keys, &networkingv1.NetworkPolicy{}); err != nil {
 		return
 	}
 	// getting NetworkPolicy labels for the mutateFn
@@ -59,7 +59,7 @@ func (r *Manager) syncNetworkPolicy(tenant *capsulev1beta1.Tenant, namespace str
 		}
 
 		var res controllerutil.OperationResult
-		res, err = controllerutil.CreateOrUpdate(context.TODO(), r.Client, target, func() (err error) {
+		res, err = controllerutil.CreateOrUpdate(ctx, r.Client, target, func() (err error) {
 			target.SetLabels(map[string]string{
 				tenantLabel:        tenant.Name,
 				networkPolicyLabel: strconv.Itoa(i),

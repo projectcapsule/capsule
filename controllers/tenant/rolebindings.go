@@ -45,7 +45,7 @@ func (r *Manager) ownerClusterRoleBindings(owner capsulev1beta1.OwnerSpec, clust
 
 // Sync the dynamic Tenant Owner specific cluster-roles and additional Role Bindings, which can be used in many ways:
 // applying Pod Security Policies or giving access to CRDs or specific API groups.
-func (r *Manager) syncRoleBindings(tenant *capsulev1beta1.Tenant) (err error) {
+func (r *Manager) syncRoleBindings(ctx context.Context, tenant *capsulev1beta1.Tenant) (err error) {
 	// hashing the RoleBinding name due to DNS RFC-1123 applied to Kubernetes labels
 	hashFn := func(binding capsulev1beta1.AdditionalRoleBindingsSpec) string {
 		h := fnv.New64a()
@@ -79,14 +79,14 @@ func (r *Manager) syncRoleBindings(tenant *capsulev1beta1.Tenant) (err error) {
 		namespace := ns
 
 		group.Go(func() error {
-			return r.syncAdditionalRoleBinding(tenant, namespace, keys, hashFn)
+			return r.syncAdditionalRoleBinding(ctx, tenant, namespace, keys, hashFn)
 		})
 	}
 
 	return group.Wait()
 }
 
-func (r *Manager) syncAdditionalRoleBinding(tenant *capsulev1beta1.Tenant, ns string, keys []string, hashFn func(binding capsulev1beta1.AdditionalRoleBindingsSpec) string) (err error) {
+func (r *Manager) syncAdditionalRoleBinding(ctx context.Context, tenant *capsulev1beta1.Tenant, ns string, keys []string, hashFn func(binding capsulev1beta1.AdditionalRoleBindingsSpec) string) (err error) {
 	var tenantLabel, roleBindingLabel string
 
 	if tenantLabel, err = capsulev1beta1.GetTypeLabel(&capsulev1beta1.Tenant{}); err != nil {
@@ -97,7 +97,7 @@ func (r *Manager) syncAdditionalRoleBinding(tenant *capsulev1beta1.Tenant, ns st
 		return
 	}
 
-	if err = r.pruningResources(ns, keys, &rbacv1.RoleBinding{}); err != nil {
+	if err = r.pruningResources(ctx, ns, keys, &rbacv1.RoleBinding{}); err != nil {
 		return
 	}
 
@@ -122,7 +122,7 @@ func (r *Manager) syncAdditionalRoleBinding(tenant *capsulev1beta1.Tenant, ns st
 		}
 
 		var res controllerutil.OperationResult
-		res, err = controllerutil.CreateOrUpdate(context.TODO(), r.Client, target, func() error {
+		res, err = controllerutil.CreateOrUpdate(ctx, r.Client, target, func() error {
 			target.ObjectMeta.Labels = map[string]string{
 				tenantLabel:      tenant.Name,
 				roleBindingLabel: roleBindingHashLabel,

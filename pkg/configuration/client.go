@@ -23,11 +23,11 @@ type capsuleConfiguration struct {
 	retrievalFn func() *capsulev1alpha1.CapsuleConfiguration
 }
 
-func NewCapsuleConfiguration(client client.Client, name string) Configuration {
+func NewCapsuleConfiguration(ctx context.Context, client client.Client, name string) Configuration {
 	return &capsuleConfiguration{retrievalFn: func() *capsulev1alpha1.CapsuleConfiguration {
 		config := &capsulev1alpha1.CapsuleConfiguration{}
 
-		if err := client.Get(context.Background(), types.NamespacedName{Name: name}, config); err != nil {
+		if err := client.Get(ctx, types.NamespacedName{Name: name}, config); err != nil {
 			if machineryerr.IsNotFound(err) {
 				return &capsulev1alpha1.CapsuleConfiguration{
 					Spec: capsulev1alpha1.CapsuleConfigurationSpec{

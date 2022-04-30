@@ -14,7 +14,7 @@ import (
 )
 
 // Ensuring all the LimitRange are applied to each Namespace handled by the Tenant.
-func (r *Manager) syncLimitRanges(tenant *capsulev1beta1.Tenant) error {
+func (r *Manager) syncLimitRanges(ctx context.Context, tenant *capsulev1beta1.Tenant) error {
 	// getting requested LimitRange keys
 	keys := make([]string, 0, len(tenant.Spec.LimitRanges.Items))
 
@@ -28,14 +28,14 @@ func (r *Manager) syncLimitRanges(tenant *capsulev1beta1.Tenant) error {
 		namespace := ns
 
 		group.Go(func() error {
-			return r.syncLimitRange(tenant, namespace, keys)
+			return r.syncLimitRange(ctx, tenant, namespace, keys)
 		})
 	}
 
 	return group.Wait()
 }
 
-func (r *Manager) syncLimitRange(tenant *capsulev1beta1.Tenant, namespace string, keys []string) (err error) {
+func (r *Manager) syncLimitRange(ctx context.Context, tenant *capsulev1beta1.Tenant, namespace string, keys []string) (err error) {
 	// getting LimitRange labels for the mutateFn
 	var tenantLabel, limitRangeLabel string
 
@@ -46,7 +46,7 @@ func (r *Manager) syncLimitRange(tenant *capsulev1beta1.Tenant, namespace string
 		return
 	}
 
-	if err = r.pruningResources(namespace, keys, &corev1.LimitRange{}); err != nil {
+	if err = r.pruningResources(ctx, namespace, keys, &corev1.LimitRange{}); err != nil {
 		return
 	}
 
@@ -59,7 +59,7 @@ func (r *Manager) syncLimitRange(tenant *capsulev1beta1.Tenant, namespace string
 		}
 
 		var res controllerutil.OperationResult
-		res, err = controllerutil.CreateOrUpdate(context.TODO(), r.Client, target, func() (err error) {
+		res, err = controllerutil.CreateOrUpdate(ctx, r.Client, target, func() (err error) {
 			target.ObjectMeta.Labels = map[string]string{
 				tenantLabel:     tenant.Name,
 				limitRangeLabel: strconv.Itoa(i),

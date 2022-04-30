@@ -44,7 +44,7 @@ func (r *Manager) filterByNames(name string) bool {
 }
 
 //nolint:dupl
-func (r *Manager) SetupWithManager(mgr ctrl.Manager, configurationName string) (err error) {
+func (r *Manager) SetupWithManager(ctx context.Context, mgr ctrl.Manager, configurationName string) (err error) {
 	crErr := ctrl.NewControllerManagedBy(mgr).
 		For(&rbacv1.ClusterRole{}, builder.WithPredicates(predicate.Funcs{
 			CreateFunc: func(event event.CreateEvent) bool {
@@ -82,7 +82,7 @@ func (r *Manager) SetupWithManager(mgr ctrl.Manager, configurationName string) (
 		Watches(source.NewKindWithCache(&capsulev1alpha1.CapsuleConfiguration{}, mgr.GetCache()), handler.Funcs{
 			UpdateFunc: func(updateEvent event.UpdateEvent, limitingInterface workqueue.RateLimitingInterface) {
 				if updateEvent.ObjectNew.GetName() == configurationName {
-					if crbErr := r.EnsureClusterRoleBindings(); crbErr != nil {
+					if crbErr := r.EnsureClusterRoleBindings(ctx); crbErr != nil {
 						r.Log.Error(err, "cannot update ClusterRoleBinding upon CapsuleConfiguration update")
 					}
 				}
@@ -100,18 +100,18 @@ func (r *Manager) SetupWithManager(mgr ctrl.Manager, configurationName string) (
 func (r *Manager) Reconcile(ctx context.Context, request reconcile.Request) (res reconcile.Result, err error) {
 	switch request.Name {
 	case ProvisionerRoleName:
-		if err = r.EnsureClusterRole(ProvisionerRoleName); err != nil {
+		if err = r.EnsureClusterRole(ctx, ProvisionerRoleName); err != nil {
 			r.Log.Error(err, "Reconciliation for ClusterRole failed", "ClusterRole", ProvisionerRoleName)
 
 			break
 		}
-		if err = r.EnsureClusterRoleBindings(); err != nil {
+		if err = r.EnsureClusterRoleBindings(ctx); err != nil {
 			r.Log.Error(err, "Reconciliation for ClusterRoleBindings failed")
 
 			break
 		}
 	case DeleterRoleName:
-		if err = r.EnsureClusterRole(DeleterRoleName); err != nil {
+		if err = r.EnsureClusterRole(ctx, DeleterRoleName); err != nil {
 			r.Log.Error(err, "Reconciliation for ClusterRole failed", "ClusterRole", DeleterRoleName)
 		}
 	}
@@ -119,14 +119,14 @@ func (r *Manager) Reconcile(ctx context.Context, request reconcile.Request) (res
 	return
 }
 
-func (r *Manager) EnsureClusterRoleBindings() (err error) {
+func (r *Manager) EnsureClusterRoleBindings(ctx context.Context) (err error) {
 	crb := &rbacv1.ClusterRoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: ProvisionerRoleName,
 		},
 	}
 
-	_, err = controllerutil.CreateOrUpdate(context.TODO(), r.Client, crb, func() (err error) {
+	_, err = controllerutil.CreateOrUpdate(ctx, r.Client, crb, func() (err error) {
 		crb.RoleRef = provisionerClusterRoleBinding.RoleRef
 
 		crb.Subjects = []rbacv1.Subject{}
@@ -144,7 +144,7 @@ func (r *Manager) EnsureClusterRoleBindings() (err error) {
 	return
 }
 
-func (r *Manager) EnsureClusterRole(roleName string) (err error) {
+func (r *Manager) EnsureClusterRole(ctx context.Context, roleName string) (err error) {
 	role, ok := clusterRoles[roleName]
 	if !ok {
 		return fmt.Errorf("clusterRole %s is not mapped", roleName)
@@ -156,7 +156,7 @@ func (r *Manager) EnsureClusterRole(roleName string) (err error) {
 		},
 	}
 
-	_, err = controllerutil.CreateOrUpdate(context.TODO(), r.Client, clusterRole, func() error {
+	_, err = controllerutil.CreateOrUpdate(ctx, r.Client, clusterRole, func() error {
 		clusterRole.Rules = role.Rules
 		return nil
 	})
@@ -170,7 +170,7 @@ func (r *Manager) EnsureClusterRole(roleName string) (err error) {
 func (r *Manager) Start(ctx context.Context) error {
 	for roleName := range clusterRoles {
 		r.Log.Info("setting up ClusterRoles", "ClusterRole", roleName)
-		if err := r.EnsureClusterRole(roleName); err != nil {
+		if err := r.EnsureClusterRole(ctx, roleName); err != nil {
 			if errors.IsAlreadyExists(err) {
 				continue
 			}
@@ -180,7 +180,7 @@ func (r *Manager) Start(ctx context.Context) error {
 	}
 
 	r.Log.Info("setting up ClusterRoleBindings")
-	if err := r.EnsureClusterRoleBindings(); err != nil {
+	if err := r.EnsureClusterRoleBindings(ctx); err != nil {
 		if errors.IsAlreadyExists(err) {
 			return nil
 		}

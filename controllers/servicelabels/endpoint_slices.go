@@ -4,6 +4,8 @@
 package servicelabels
 
 import (
+	"context"
+
 	"github.com/go-logr/logr"
 	discoveryv1 "k8s.io/api/discovery/v1"
 	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
@@ -18,8 +20,7 @@ type EndpointSlicesLabelsReconciler struct {
 	VersionMajor uint
 }
 
-func (r *EndpointSlicesLabelsReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	r.scheme = mgr.GetScheme()
+func (r *EndpointSlicesLabelsReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager) error {
 	r.abstractServiceLabelsReconciler = abstractServiceLabelsReconciler{
 		scheme: mgr.GetScheme(),
 		log:    r.Log,
@@ -36,6 +37,6 @@ func (r *EndpointSlicesLabelsReconciler) SetupWithManager(mgr ctrl.Manager) erro
 	}
 
 	return ctrl.NewControllerManagedBy(mgr).
-		For(r.obj, r.abstractServiceLabelsReconciler.forOptionPerInstanceName()).
+		For(r.obj, r.abstractServiceLabelsReconciler.forOptionPerInstanceName(ctx)).
 		Complete(r)
 }

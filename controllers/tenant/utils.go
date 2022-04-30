@@ -16,7 +16,7 @@ import (
 
 // pruningResources is taking care of removing the no more requested sub-resources as LimitRange, ResourceQuota or
 // NetworkPolicy using the "exists" and "notin" LabelSelector to perform an outer-join removal.
-func (r *Manager) pruningResources(ns string, keys []string, obj client.Object) (err error) {
+func (r *Manager) pruningResources(ctx context.Context, ns string, keys []string, obj client.Object) (err error) {
 	var capsuleLabel string
 	if capsuleLabel, err = capsulev1beta1.GetTypeLabel(obj); err != nil {
 		return
@@ -42,7 +42,7 @@ func (r *Manager) pruningResources(ns string, keys []string, obj client.Object) 
 	r.Log.Info("Pruning objects with label selector " + selector.String())
 
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		return r.DeleteAllOf(context.TODO(), obj, &client.DeleteAllOfOptions{
+		return r.DeleteAllOf(ctx, obj, &client.DeleteAllOfOptions{
 			ListOptions: client.ListOptions{
 				LabelSelector: selector,
 				Namespace:     ns,
