@@ -155,7 +155,7 @@ func (r CAReconciler) Reconcile(ctx context.Context, request ctrl.Request) (ctrl
 
 	var ca cert.CA
 	var rq time.Duration
-	ca, err = getCertificateAuthority(r.Client, r.Namespace, r.Configuration.CASecretName())
+	ca, err = getCertificateAuthority(ctx, r.Client, r.Namespace, r.Configuration.CASecretName())
 	if err != nil && errors.Is(err, MissingCaError{}) {
 		ca, err = cert.GenerateCertificateAuthority()
 		if err != nil {

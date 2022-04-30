@@ -31,7 +31,7 @@ import (
 // the mutateFn along with the CreateOrUpdate to don't perform the update since resources are identical.
 //
 // In case of Namespace-scoped Resource Budget, we're just replicating the resources across all registered Namespaces.
-func (r *Manager) syncResourceQuotas(tenant *capsulev1beta1.Tenant) (err error) {
+func (r *Manager) syncResourceQuotas(ctx context.Context, tenant *capsulev1beta1.Tenant) (err error) {
 	// getting ResourceQuota labels for the mutateFn
 	var tenantLabel, typeLabel string
 
@@ -67,7 +67,7 @@ func (r *Manager) syncResourceQuotas(tenant *capsulev1beta1.Tenant) (err error) 
 				// These are required since Capsule is going to sum all the used quota to
 				// sum them and get the Tenant one.
 				list := &corev1.ResourceQuotaList{}
-				if scopeErr = r.List(context.TODO(), list, &client.ListOptions{LabelSelector: labels.NewSelector().Add(*tntRequirement).Add(*indexRequirement)}); scopeErr != nil {
+				if scopeErr = r.List(ctx, list, &client.ListOptions{LabelSelector: labels.NewSelector().Add(*tntRequirement).Add(*indexRequirement)}); scopeErr != nil {
 					r.Log.Error(scopeErr, "Cannot list ResourceQuota", "tenantFilter", tntRequirement.String(), "indexFilter", indexRequirement.String())
 					return
 				}
@@ -116,7 +116,7 @@ func (r *Manager) syncResourceQuotas(tenant *capsulev1beta1.Tenant) (err error) 
 							list.Items[item].Spec.Hard[name] = resourceQuota.Hard[name]
 						}
 					}
-					if scopeErr = r.resourceQuotasUpdate(name, quantity, resourceQuota.Hard[name], list.Items...); scopeErr != nil {
+					if scopeErr = r.resourceQuotasUpdate(ctx, name, quantity, resourceQuota.Hard[name], list.Items...); scopeErr != nil {
 						r.Log.Error(scopeErr, "cannot proceed with outer ResourceQuota")
 						return
 					}
@@ -142,14 +142,14 @@ func (r *Manager) syncResourceQuotas(tenant *capsulev1beta1.Tenant) (err error) 
 		namespace := ns
 
 		group.Go(func() error {
-			return r.syncResourceQuota(tenant, namespace, keys)
+			return r.syncResourceQuota(ctx, tenant, namespace, keys)
 		})
 	}
 
 	return group.Wait()
 }
 
-func (r *Manager) syncResourceQuota(tenant *capsulev1beta1.Tenant, namespace string, keys []string) (err error) {
+func (r *Manager) syncResourceQuota(ctx context.Context, tenant *capsulev1beta1.Tenant, namespace string, keys []string) (err error) {
 	// getting ResourceQuota labels for the mutateFn
 	var tenantLabel, typeLabel string
 
@@ -161,7 +161,7 @@ func (r *Manager) syncResourceQuota(tenant *capsulev1beta1.Tenant, namespace str
 		return err
 	}
 	// Pruning resource of non-requested resources
-	if err = r.pruningResources(namespace, keys, &corev1.ResourceQuota{}); err != nil {
+	if err = r.pruningResources(ctx, namespace, keys, &corev1.ResourceQuota{}); err != nil {
 		return err
 	}
 
@@ -175,7 +175,7 @@ func (r *Manager) syncResourceQuota(tenant *capsulev1beta1.Tenant, namespace str
 
 		var res controllerutil.OperationResult
 		err = retry.RetryOnConflict(retry.DefaultBackoff, func() (retryErr error) {
-			res, retryErr = controllerutil.CreateOrUpdate(context.TODO(), r.Client, target, func() (err error) {
+			res, retryErr = controllerutil.CreateOrUpdate(ctx, r.Client, target, func() (err error) {
 				target.SetLabels(map[string]string{
 					tenantLabel: tenant.Name,
 					typeLabel:   strconv.Itoa(index),
@@ -208,7 +208,7 @@ func (r *Manager) syncResourceQuota(tenant *capsulev1beta1.Tenant, namespace str
 // Serial ResourceQuota processing is expensive: using Go routines we can speed it up.
 // In case of multiple errors these are logged properly, returning a generic error since we have to repush back the
 // reconciliation loop.
-func (r *Manager) resourceQuotasUpdate(resourceName corev1.ResourceName, actual, limit resource.Quantity, list ...corev1.ResourceQuota) (err error) {
+func (r *Manager) resourceQuotasUpdate(ctx context.Context, resourceName corev1.ResourceName, actual, limit resource.Quantity, list ...corev1.ResourceQuota) (err error) {
 	group := new(errgroup.Group)
 
 	for _, item := range list {
@@ -216,12 +216,12 @@ func (r *Manager) resourceQuotasUpdate(resourceName corev1.ResourceName, actual,
 
 		group.Go(func() (err error) {
 			found := &corev1.ResourceQuota{}
-			if err = r.Get(context.TODO(), types.NamespacedName{Namespace: rq.Namespace, Name: rq.Name}, found); err != nil {
+			if err = r.Get(ctx, types.NamespacedName{Namespace: rq.Namespace, Name: rq.Name}, found); err != nil {
 				return
 			}
 
 			return retry.RetryOnConflict(retry.DefaultBackoff, func() (retryErr error) {
-				_, retryErr = controllerutil.CreateOrUpdate(context.TODO(), r.Client, found, func() error {
+				_, retryErr = controllerutil.CreateOrUpdate(ctx, r.Client, found, func() error {
 					// Ensuring annotation map is there to avoid uninitialized map error and
 					// assigning the overall usage
 					if found.Annotations == nil {

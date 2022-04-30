@@ -14,14 +14,10 @@ import (
 	"github.com/clastix/capsule/pkg/cert"
 )
 
-func getCertificateAuthority(client client.Client, namespace, name string) (ca cert.CA, err error) {
+func getCertificateAuthority(ctx context.Context, client client.Client, namespace, name string) (ca cert.CA, err error) {
 	instance := &corev1.Secret{}
 
-	err = client.Get(context.TODO(), types.NamespacedName{
-		Namespace: namespace,
-		Name:      name,
-	}, instance)
-	if err != nil {
+	if err = client.Get(ctx, types.NamespacedName{Namespace: namespace, Name: name}, instance); err != nil {
 		return nil, fmt.Errorf("missing secret %s, cannot reconcile", name)
 	}
 

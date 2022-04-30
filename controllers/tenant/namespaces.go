@@ -20,14 +20,14 @@ import (
 )
 
 // Ensuring all annotations are applied to each Namespace handled by the Tenant.
-func (r *Manager) syncNamespaces(tenant *capsulev1beta1.Tenant) (err error) {
+func (r *Manager) syncNamespaces(ctx context.Context, tenant *capsulev1beta1.Tenant) (err error) {
 	group := new(errgroup.Group)
 
 	for _, item := range tenant.Status.Namespaces {
 		namespace := item
 
 		group.Go(func() error {
-			return r.syncNamespaceMetadata(namespace, tenant)
+			return r.syncNamespaceMetadata(ctx, namespace, tenant)
 		})
 	}
 
@@ -39,18 +39,18 @@ func (r *Manager) syncNamespaces(tenant *capsulev1beta1.Tenant) (err error) {
 	return
 }
 
-func (r *Manager) syncNamespaceMetadata(namespace string, tnt *capsulev1beta1.Tenant) (err error) {
+func (r *Manager) syncNamespaceMetadata(ctx context.Context, namespace string, tnt *capsulev1beta1.Tenant) (err error) {
 	var res controllerutil.OperationResult
 
 	err = retry.RetryOnConflict(retry.DefaultBackoff, func() (conflictErr error) {
 		ns := &corev1.Namespace{}
-		if conflictErr = r.Client.Get(context.TODO(), types.NamespacedName{Name: namespace}, ns); err != nil {
+		if conflictErr = r.Client.Get(ctx, types.NamespacedName{Name: namespace}, ns); err != nil {
 			return
 		}
 
 		capsuleLabel, _ := capsulev1beta1.GetTypeLabel(&capsulev1beta1.Tenant{})
 
-		res, conflictErr = controllerutil.CreateOrUpdate(context.TODO(), r.Client, ns, func() error {
+		res, conflictErr = controllerutil.CreateOrUpdate(ctx, r.Client, ns, func() error {
 			annotations := make(map[string]string)
 			labels := map[string]string{
 				"name":       namespace,
@@ -147,25 +147,25 @@ func (r *Manager) syncNamespaceMetadata(namespace string, tnt *capsulev1beta1.Te
 	return
 }
 
-func (r *Manager) ensureNamespaceCount(tenant *capsulev1beta1.Tenant) error {
+func (r *Manager) ensureNamespaceCount(ctx context.Context, tenant *capsulev1beta1.Tenant) error {
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		tenant.Status.Size = uint(len(tenant.Status.Namespaces))
 
 		found := &capsulev1beta1.Tenant{}
-		if err := r.Client.Get(context.TODO(), types.NamespacedName{Name: tenant.GetName()}, found); err != nil {
+		if err := r.Client.Get(ctx, types.NamespacedName{Name: tenant.GetName()}, found); err != nil {
 			return err
 		}
 
 		found.Status.Size = tenant.Status.Size
 
-		return r.Client.Status().Update(context.TODO(), found, &client.UpdateOptions{})
+		return r.Client.Status().Update(ctx, found, &client.UpdateOptions{})
 	})
 }
 
-func (r *Manager) collectNamespaces(tenant *capsulev1beta1.Tenant) error {
+func (r *Manager) collectNamespaces(ctx context.Context, tenant *capsulev1beta1.Tenant) error {
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
 		list := &corev1.NamespaceList{}
-		err = r.Client.List(context.TODO(), list, client.MatchingFieldsSelector{
+		err = r.Client.List(ctx, list, client.MatchingFieldsSelector{
 			Selector: fields.OneTermEqualSelector(".metadata.ownerReferences[*].capsule", tenant.GetName()),
 		})
 
@@ -173,10 +173,10 @@ func (r *Manager) collectNamespaces(tenant *capsulev1beta1.Tenant) error {
 			return
 		}
 
-		_, err = controllerutil.CreateOrUpdate(context.TODO(), r.Client, tenant.DeepCopy(), func() error {
+		_, err = controllerutil.CreateOrUpdate(ctx, r.Client, tenant.DeepCopy(), func() error {
 			tenant.AssignNamespaces(list.Items)
 
-			return r.Client.Status().Update(context.TODO(), tenant, &client.UpdateOptions{})
+			return r.Client.Status().Update(ctx, tenant, &client.UpdateOptions{})
 		})
 		return
 	})

@@ -128,7 +128,7 @@ func main() {
 
 	ctx := ctrl.SetupSignalHandler()
 
-	cfg := configuration.NewCapsuleConfiguration(manager.GetClient(), configurationName)
+	cfg := configuration.NewCapsuleConfiguration(ctx, manager.GetClient(), configurationName)
 
 	if err = (&secretcontroller.CAReconciler{
 		Client:        manager.GetClient(),
@@ -166,7 +166,7 @@ func main() {
 		setupLog.Error(err, "unable to create the direct client")
 		os.Exit(1)
 	}
-	directCfg := configuration.NewCapsuleConfiguration(directClient, configurationName)
+	directCfg := configuration.NewCapsuleConfiguration(ctx, directClient, configurationName)
 
 	ca, err := clientset.CoreV1().Secrets(namespace).Get(ctx, directCfg.CASecretName(), metav1.GetOptions{})
 	if err != nil {
@@ -244,21 +244,21 @@ func main() {
 			os.Exit(1)
 		}
 
-		if err = rbacManager.SetupWithManager(manager, configurationName); err != nil {
+		if err = rbacManager.SetupWithManager(ctx, manager, configurationName); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "Rbac")
 			os.Exit(1)
 		}
 
 		if err = (&servicelabelscontroller.ServicesLabelsReconciler{
 			Log: ctrl.Log.WithName("controllers").WithName("ServiceLabels"),
-		}).SetupWithManager(manager); err != nil {
+		}).SetupWithManager(ctx, manager); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "ServiceLabels")
 			os.Exit(1)
 		}
 
 		if err = (&servicelabelscontroller.EndpointsLabelsReconciler{
 			Log: ctrl.Log.WithName("controllers").WithName("EndpointLabels"),
-		}).SetupWithManager(manager); err != nil {
+		}).SetupWithManager(ctx, manager); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "EndpointLabels")
 			os.Exit(1)
 		}
@@ -267,7 +267,7 @@ func main() {
 			Log:          ctrl.Log.WithName("controllers").WithName("EndpointSliceLabels"),
 			VersionMinor: kubeVersion.Minor(),
 			VersionMajor: kubeVersion.Major(),
-		}).SetupWithManager(manager); err != nil {
+		}).SetupWithManager(ctx, manager); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "EndpointSliceLabels")
 		}
 

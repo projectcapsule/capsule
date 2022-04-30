@@ -4,6 +4,8 @@
 package servicelabels
 
 import (
+	"context"
+
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -15,7 +17,7 @@ type EndpointsLabelsReconciler struct {
 	Log logr.Logger
 }
 
-func (r *EndpointsLabelsReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *EndpointsLabelsReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager) error {
 	r.abstractServiceLabelsReconciler = abstractServiceLabelsReconciler{
 		obj:    &corev1.Endpoints{},
 		scheme: mgr.GetScheme(),
@@ -23,6 +25,6 @@ func (r *EndpointsLabelsReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	}
 
 	return ctrl.NewControllerManagedBy(mgr).
-		For(r.abstractServiceLabelsReconciler.obj, r.abstractServiceLabelsReconciler.forOptionPerInstanceName()).
+		For(r.abstractServiceLabelsReconciler.obj, r.abstractServiceLabelsReconciler.forOptionPerInstanceName(ctx)).
 		Complete(r)
 }
