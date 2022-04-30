@@ -13,6 +13,7 @@ import (
 	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
 )
 
+// nolint:dupl
 // Ensuring all the NetworkPolicies are applied to each Namespace handled by the Tenant.
 func (r *Manager) syncNetworkPolicies(ctx context.Context, tenant *capsulev1beta1.Tenant) error {
 	// getting requested NetworkPolicy keys
