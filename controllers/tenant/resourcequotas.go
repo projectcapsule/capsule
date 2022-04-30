@@ -187,7 +187,7 @@ func (r *Manager) syncResourceQuota(ctx context.Context, tenant *capsulev1beta1.
 					target.Spec.Hard = resQuota.Hard
 				}
 
-				return controllerutil.SetControllerReference(tenant, target, r.Scheme)
+				return controllerutil.SetControllerReference(tenant, target, r.Client.Scheme())
 			})
 
 			return retryErr

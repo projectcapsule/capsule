@@ -133,7 +133,6 @@ func main() {
 	if err = (&secretcontroller.CAReconciler{
 		Client:        manager.GetClient(),
 		Log:           ctrl.Log.WithName("controllers").WithName("CA"),
-		Scheme:        manager.GetScheme(),
 		Namespace:     namespace,
 		Configuration: cfg,
 	}).SetupWithManager(manager); err != nil {
@@ -144,7 +143,6 @@ func main() {
 	if err = (&secretcontroller.TLSReconciler{
 		Client:        manager.GetClient(),
 		Log:           ctrl.Log.WithName("controllers").WithName("Tls"),
-		Scheme:        manager.GetScheme(),
 		Namespace:     namespace,
 		Configuration: cfg,
 	}).SetupWithManager(manager); err != nil {
@@ -185,7 +183,6 @@ func main() {
 			RESTConfig: manager.GetConfig(),
 			Client:     manager.GetClient(),
 			Log:        ctrl.Log.WithName("controllers").WithName("Tenant"),
-			Scheme:     manager.GetScheme(),
 			Recorder:   manager.GetEventRecorderFor("tenant-controller"),
 		}).SetupWithManager(manager); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "Tenant")

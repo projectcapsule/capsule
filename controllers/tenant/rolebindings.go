@@ -134,7 +134,7 @@ func (r *Manager) syncAdditionalRoleBinding(ctx context.Context, tenant *capsule
 			}
 			target.Subjects = roleBinding.Subjects
 
-			return controllerutil.SetControllerReference(tenant, target, r.Scheme)
+			return controllerutil.SetControllerReference(tenant, target, r.Client.Scheme())
 		})
 
 		r.emitEvent(tenant, target.GetNamespace(), res, fmt.Sprintf("Ensuring RoleBinding %s", target.GetName()), err)

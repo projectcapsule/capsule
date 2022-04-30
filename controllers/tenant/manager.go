@@ -8,7 +8,6 @@ import (
 	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/retry"
@@ -22,7 +21,6 @@ import (
 type Manager struct {
 	client.Client
 	Log        logr.Logger
-	Scheme     *runtime.Scheme
 	Recorder   record.EventRecorder
 	RESTConfig *rest.Config
 }
