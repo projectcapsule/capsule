@@ -17,7 +17,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
@@ -104,26 +103,15 @@ func (r *abstractServiceLabelsReconciler) sync(available map[string]string, tena
 	return available
 }
 
-func (r *abstractServiceLabelsReconciler) forOptionPerInstanceName() builder.ForOption {
-	return builder.WithPredicates(predicate.Funcs{
-		CreateFunc: func(event event.CreateEvent) bool {
-			return r.IsNamespaceInTenant(event.Object.GetNamespace())
-		},
-		DeleteFunc: func(deleteEvent event.DeleteEvent) bool {
-			return r.IsNamespaceInTenant(deleteEvent.Object.GetNamespace())
-		},
-		UpdateFunc: func(updateEvent event.UpdateEvent) bool {
-			return r.IsNamespaceInTenant(updateEvent.ObjectNew.GetNamespace())
-		},
-		GenericFunc: func(genericEvent event.GenericEvent) bool {
-			return r.IsNamespaceInTenant(genericEvent.Object.GetNamespace())
-		},
-	})
+func (r *abstractServiceLabelsReconciler) forOptionPerInstanceName(ctx context.Context) builder.ForOption {
+	return builder.WithPredicates(predicate.NewPredicateFuncs(func(object client.Object) bool {
+		return r.IsNamespaceInTenant(ctx, object.GetNamespace())
+	}))
 }
 
-func (r *abstractServiceLabelsReconciler) IsNamespaceInTenant(namespace string) bool {
+func (r *abstractServiceLabelsReconciler) IsNamespaceInTenant(ctx context.Context, namespace string) bool {
 	tl := &capsulev1beta1.TenantList{}
-	if err := r.client.List(context.Background(), tl, client.MatchingFieldsSelector{
+	if err := r.client.List(ctx, tl, client.MatchingFieldsSelector{
 		Selector: fields.OneTermEqualSelector(".status.namespaces", namespace),
 	}); err != nil {
 		return false
