@@ -25,7 +25,7 @@ func getCertificateAuthority(ctx context.Context, client client.Client, namespac
 		return nil, MissingCaError{}
 	}
 
-	ca, err = cert.NewCertificateAuthorityFromBytes(instance.Data[certSecretKey], instance.Data[privateKeySecretKey])
+	ca, err = cert.NewCertificateAuthorityFromBytes(instance.Data[corev1.TLSCertKey], instance.Data[corev1.TLSPrivateKeyKey])
 	if err != nil {
 		return
 	}

@@ -180,8 +180,8 @@ func (r CAReconciler) Reconcile(ctx context.Context, request ctrl.Request) (ctrl
 		key, _ = ca.CAPrivateKeyPem()
 
 		instance.Data = map[string][]byte{
-			certSecretKey:       crt.Bytes(),
-			privateKeySecretKey: key.Bytes(),
+			corev1.TLSCertKey:       crt.Bytes(),
+			corev1.TLSPrivateKeyKey: key.Bytes(),
 		}
 
 		group := new(errgroup.Group)

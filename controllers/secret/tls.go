@@ -66,7 +66,7 @@ func (r TLSReconciler) Reconcile(ctx context.Context, request ctrl.Request) (ctr
 	}
 
 	var shouldCreate bool
-	for _, key := range []string{certSecretKey, privateKeySecretKey} {
+	for _, key := range []string{corev1.TLSCertKey, corev1.TLSPrivateKeyKey} {
 		if _, ok := instance.Data[key]; !ok {
 			shouldCreate = true
 			break
@@ -85,13 +85,13 @@ func (r TLSReconciler) Reconcile(ctx context.Context, request ctrl.Request) (ctr
 			return reconcile.Result{}, err
 		}
 		instance.Data = map[string][]byte{
-			certSecretKey:       crt.Bytes(),
-			privateKeySecretKey: key.Bytes(),
+			corev1.TLSCertKey:       crt.Bytes(),
+			corev1.TLSPrivateKeyKey: key.Bytes(),
 		}
 	} else {
 		var c *x509.Certificate
 		var b *pem.Block
-		b, _ = pem.Decode(instance.Data[certSecretKey])
+		b, _ = pem.Decode(instance.Data[corev1.TLSCertKey])
 		c, err = x509.ParseCertificate(b.Bytes)
 		if err != nil {
 			r.Log.Error(err, "cannot parse Capsule TLS")
