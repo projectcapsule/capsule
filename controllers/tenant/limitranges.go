@@ -65,7 +65,7 @@ func (r *Manager) syncLimitRange(ctx context.Context, tenant *capsulev1beta1.Ten
 				limitRangeLabel: strconv.Itoa(i),
 			}
 			target.Spec = spec
-			return controllerutil.SetControllerReference(tenant, target, r.Scheme)
+			return controllerutil.SetControllerReference(tenant, target, r.Client.Scheme())
 		})
 
 		r.emitEvent(tenant, target.GetNamespace(), res, fmt.Sprintf("Ensuring LimitRange %s", target.GetName()), err)

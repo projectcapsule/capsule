@@ -19,9 +19,8 @@ type ServicesLabelsReconciler struct {
 
 func (r *ServicesLabelsReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager) error {
 	r.abstractServiceLabelsReconciler = abstractServiceLabelsReconciler{
-		obj:    &corev1.Service{},
-		scheme: mgr.GetScheme(),
-		log:    r.Log,
+		obj: &corev1.Service{},
+		log: r.Log,
 	}
 	return ctrl.NewControllerManagedBy(mgr).
 		For(r.abstractServiceLabelsReconciler.obj, r.abstractServiceLabelsReconciler.forOptionPerInstanceName(ctx)).
