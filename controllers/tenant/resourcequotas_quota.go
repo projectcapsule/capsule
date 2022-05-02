@@ -22,7 +22,7 @@ func (r *Manager) syncCustomResourceQuotaUsages(ctx context.Context, tenant *cap
 		group   string
 		version string
 	}
-
+	// nolint:prealloc
 	var resourceList []resource
 
 	for k := range tenant.GetAnnotations() {

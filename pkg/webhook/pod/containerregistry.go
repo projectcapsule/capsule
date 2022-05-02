@@ -17,8 +17,7 @@ import (
 	"github.com/clastix/capsule/pkg/webhook/utils"
 )
 
-type containerRegistryHandler struct {
-}
+type containerRegistryHandler struct{}
 
 func ContainerRegistry() capsulewebhook.Handler {
 	return &containerRegistryHandler{}

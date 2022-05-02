@@ -11,5 +11,6 @@ func (t *Tenant) IsWildcardDenied() bool {
 	if v, ok := t.Annotations[denyWildcard]; ok && v == "true" {
 		return true
 	}
+
 	return false
 }

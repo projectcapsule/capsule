@@ -9,7 +9,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// TenantSpec defines the desired state of Tenant
+// TenantSpec defines the desired state of Tenant.
 type TenantSpec struct {
 	Owner OwnerSpec `json:"owner"`
 
@@ -29,7 +29,7 @@ type TenantSpec struct {
 	ExternalServiceIPs     *ExternalServiceIPsSpec          `json:"externalServiceIPs,omitempty"`
 }
 
-// TenantStatus defines the observed state of Tenant
+// TenantStatus defines the observed state of Tenant.
 type TenantStatus struct {
 	Size       uint     `json:"size"`
 	Namespaces []string `json:"namespaces,omitempty"`
@@ -45,7 +45,7 @@ type TenantStatus struct {
 // +kubebuilder:printcolumn:name="Node selector",type="string",JSONPath=".spec.nodeSelector",description="Node Selector applied to Pods"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp",description="Age"
 
-// Tenant is the Schema for the tenants API
+// Tenant is the Schema for the tenants API.
 type Tenant struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -56,7 +56,7 @@ type Tenant struct {
 
 // +kubebuilder:object:root=true
 
-// TenantList contains a list of Tenant
+// TenantList contains a list of Tenant.
 type TenantList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`

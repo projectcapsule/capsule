@@ -22,7 +22,7 @@ type Manager struct {
 	Client client.Client
 }
 
-// InjectClient injects the Client interface, required by the Runnable interface
+// InjectClient injects the Client interface, required by the Runnable interface.
 func (c *Manager) InjectClient(client client.Client) error {
 	c.Client = client
 

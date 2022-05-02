@@ -70,6 +70,7 @@ func (r *CAReconciler) UpdateCustomResourceDefinition(ctx context.Context, caBun
 		err = r.Get(ctx, types.NamespacedName{Name: "tenants.capsule.clastix.io"}, crd)
 		if err != nil {
 			r.Log.Error(err, "cannot retrieve CustomResourceDefinition")
+
 			return err
 		}
 
@@ -104,6 +105,7 @@ func (r CAReconciler) UpdateValidatingWebhookConfiguration(ctx context.Context, 
 		err = r.Get(ctx, types.NamespacedName{Name: r.Configuration.ValidatingWebhookConfigurationName()}, vw)
 		if err != nil {
 			r.Log.Error(err, "cannot retrieve ValidatingWebhookConfiguration")
+
 			return err
 		}
 		for i, w := range vw.Webhooks {
@@ -112,6 +114,7 @@ func (r CAReconciler) UpdateValidatingWebhookConfiguration(ctx context.Context, 
 				vw.Webhooks[i].ClientConfig.CABundle = caBundle
 			}
 		}
+
 		return r.Update(ctx, vw, &client.UpdateOptions{})
 	})
 }
@@ -123,6 +126,7 @@ func (r CAReconciler) UpdateMutatingWebhookConfiguration(ctx context.Context, ca
 		err = r.Get(ctx, types.NamespacedName{Name: r.Configuration.MutatingWebhookConfigurationName()}, mw)
 		if err != nil {
 			r.Log.Error(err, "cannot retrieve MutatingWebhookConfiguration")
+
 			return err
 		}
 		for i, w := range mw.Webhooks {
@@ -131,6 +135,7 @@ func (r CAReconciler) UpdateMutatingWebhookConfiguration(ctx context.Context, ca
 				mw.Webhooks[i].ClientConfig.CABundle = caBundle
 			}
 		}
+
 		return r.Update(ctx, mw, &client.UpdateOptions{})
 	})
 }
@@ -147,14 +152,16 @@ func (r CAReconciler) Reconcile(ctx context.Context, request ctrl.Request) (ctrl
 
 	// Fetch the CA instance
 	instance := &corev1.Secret{}
-	err = r.Client.Get(ctx, request.NamespacedName, instance)
-	if err != nil {
+
+	if err = r.Client.Get(ctx, request.NamespacedName, instance); err != nil {
 		// Error reading the object - requeue the request.
 		return reconcile.Result{}, err
 	}
 
 	var ca cert.CA
+
 	var rq time.Duration
+
 	ca, err = getCertificateAuthority(ctx, r.Client, r.Namespace, r.Configuration.CASecretName())
 	if err != nil && errors.Is(err, MissingCaError{}) {
 		ca, err = cert.GenerateCertificateAuthority()
@@ -170,6 +177,7 @@ func (r CAReconciler) Reconcile(ctx context.Context, request ctrl.Request) (ctrl
 	rq, err = ca.ExpiresIn(time.Now())
 	if err != nil {
 		r.Log.Info("CA is expired, cleaning to obtain a new one")
+
 		instance.Data = map[string][]byte{}
 	} else {
 		r.Log.Info("Updating CA secret with new PEM and RSA")
@@ -201,39 +209,50 @@ func (r CAReconciler) Reconcile(ctx context.Context, request ctrl.Request) (ctrl
 	}
 
 	var res controllerutil.OperationResult
+
 	t := &corev1.Secret{ObjectMeta: instance.ObjectMeta}
+
 	res, err = controllerutil.CreateOrUpdate(ctx, r.Client, t, func() error {
 		t.Data = instance.Data
+
 		return nil
 	})
 	if err != nil {
 		r.Log.Error(err, "cannot update Capsule TLS")
+
 		return reconcile.Result{}, err
 	}
 
 	if res == controllerutil.OperationResultUpdated {
 		r.Log.Info("Capsule CA has been updated, we need to trigger TLS update too")
+
 		tls := &corev1.Secret{}
 		err = r.Get(ctx, types.NamespacedName{
 			Namespace: r.Namespace,
 			Name:      r.Configuration.TLSSecretName(),
 		}, tls)
+
 		if err != nil {
 			r.Log.Error(err, "Capsule TLS Secret missing")
 		}
+
 		err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 			_, err = controllerutil.CreateOrUpdate(ctx, r.Client, tls, func() error {
 				tls.Data = map[string][]byte{}
+
 				return nil
 			})
+
 			return err
 		})
 		if err != nil {
 			r.Log.Error(err, "Cannot clean Capsule TLS Secret due to CA update")
+
 			return reconcile.Result{}, err
 		}
 	}
 
 	r.Log.Info("Reconciliation completed, processing back in " + rq.String())
+
 	return reconcile.Result{Requeue: true, RequeueAfter: rq}, nil
 }

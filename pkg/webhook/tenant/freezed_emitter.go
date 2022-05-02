@@ -16,8 +16,7 @@ import (
 	"github.com/clastix/capsule/pkg/webhook/utils"
 )
 
-type freezedEmitterHandler struct {
-}
+type freezedEmitterHandler struct{}
 
 func FreezedEmitter() capsulewebhook.Handler {
 	return &freezedEmitterHandler{}

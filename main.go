@@ -58,7 +58,6 @@ func init() {
 	utilruntime.Must(capsulev1alpha1.AddToScheme(scheme))
 	utilruntime.Must(capsulev1beta1.AddToScheme(scheme))
 	utilruntime.Must(apiextensionsv1.AddToScheme(scheme))
-	// +kubebuilder:scaffold:scheme
 }
 
 func printVersion() {
@@ -69,11 +68,12 @@ func printVersion() {
 	setupLog.Info(fmt.Sprintf("Go OS/Arch: %s/%s", goRuntime.GOOS, goRuntime.GOARCH))
 }
 
+// nolint:maintidx
 func main() {
-	var metricsAddr string
-	var enableLeaderElection bool
-	var version bool
-	var namespace, configurationName string
+	var enableLeaderElection, version bool
+
+	var metricsAddr, namespace, configurationName string
+
 	var goFlagSet goflag.FlagSet
 
 	flag.StringVar(&metricsAddr, "metrics-addr", ":8080", "The address the metric endpoint binds to.")
@@ -96,6 +96,7 @@ func main() {
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
 	printVersion()
+
 	if version {
 		os.Exit(0)
 	}
@@ -164,6 +165,7 @@ func main() {
 		setupLog.Error(err, "unable to create the direct client")
 		os.Exit(1)
 	}
+
 	directCfg := configuration.NewCapsuleConfiguration(ctx, directClient, configurationName)
 
 	ca, err := clientset.CoreV1().Secrets(namespace).Get(ctx, directCfg.CASecretName(), metav1.GetOptions{})
@@ -177,7 +179,7 @@ func main() {
 		setupLog.Error(err, "unable to get Capsule TLS secret")
 		os.Exit(1)
 	}
-
+	// nolint:nestif
 	if len(ca.Data) > 0 && len(tls.Data) > 0 {
 		if err = (&tenantcontroller.Manager{
 			RESTConfig: manager.GetConfig(),
@@ -200,8 +202,8 @@ func main() {
 		}
 
 		var kubeVersion *utilVersion.Version
-		kubeVersion, err = utils.GetK8sVersion()
-		if err != nil {
+
+		if kubeVersion, err = utils.GetK8sVersion(); err != nil {
 			setupLog.Error(err, "unable to get kubernetes version")
 			os.Exit(1)
 		}
@@ -279,6 +281,7 @@ func main() {
 	}
 
 	setupLog.Info("starting manager")
+
 	if err = manager.Start(ctx); err != nil {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)

@@ -38,17 +38,17 @@ func (r *Manager) syncNetworkPolicies(ctx context.Context, tenant *capsulev1beta
 
 func (r *Manager) syncNetworkPolicy(ctx context.Context, tenant *capsulev1beta1.Tenant, namespace string, keys []string) (err error) {
 	if err = r.pruningResources(ctx, namespace, keys, &networkingv1.NetworkPolicy{}); err != nil {
-		return
+		return err
 	}
 	// getting NetworkPolicy labels for the mutateFn
 	var tenantLabel, networkPolicyLabel string
 
 	if tenantLabel, err = capsulev1beta1.GetTypeLabel(&capsulev1beta1.Tenant{}); err != nil {
-		return
+		return err
 	}
 
 	if networkPolicyLabel, err = capsulev1beta1.GetTypeLabel(&networkingv1.NetworkPolicy{}); err != nil {
-		return
+		return err
 	}
 
 	for i, spec := range tenant.Spec.NetworkPolicies.Items {
@@ -75,9 +75,9 @@ func (r *Manager) syncNetworkPolicy(ctx context.Context, tenant *capsulev1beta1.
 		r.Log.Info("Network Policy sync result: "+string(res), "name", target.Name, "namespace", target.Namespace)
 
 		if err != nil {
-			return
+			return err
 		}
 	}
 
-	return
+	return nil
 }

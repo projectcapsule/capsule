@@ -17,8 +17,7 @@ import (
 	"github.com/clastix/capsule/pkg/webhook/utils"
 )
 
-type saNameHandler struct {
-}
+type saNameHandler struct{}
 
 func ServiceAccountNameHandler() capsulewebhook.Handler {
 	return &saNameHandler{}

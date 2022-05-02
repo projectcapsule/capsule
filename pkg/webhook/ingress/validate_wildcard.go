@@ -16,8 +16,7 @@ import (
 	"github.com/clastix/capsule/pkg/webhook/utils"
 )
 
-type wildcard struct {
-}
+type wildcard struct{}
 
 func Wildcard() capsulewebhook.Handler {
 	return &wildcard{}

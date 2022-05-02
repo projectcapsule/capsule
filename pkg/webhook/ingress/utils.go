@@ -26,12 +26,13 @@ func tenantFromIngress(ctx context.Context, c client.Client, ingress Ingress) (*
 	}
 
 	if len(tenantList.Items) == 0 {
-		return nil, nil
+		return nil, nil // nolint:nilnil
 	}
 
 	return &tenantList.Items[0], nil
 }
 
+// nolint:nakedret
 func ingressFromRequest(req admission.Request, decoder *admission.Decoder) (ingress Ingress, err error) {
 	switch req.Kind.Group {
 	case "networking.k8s.io":
@@ -40,22 +41,28 @@ func ingressFromRequest(req admission.Request, decoder *admission.Decoder) (ingr
 			if err = decoder.Decode(req, ingressObj); err != nil {
 				return
 			}
+
 			ingress = NetworkingV1{Ingress: ingressObj}
+
 			break
 		}
+
 		ingressObj := &networkingv1beta1.Ingress{}
 		if err = decoder.Decode(req, ingressObj); err != nil {
 			return
 		}
+
 		ingress = NetworkingV1Beta1{Ingress: ingressObj}
 	case "extensions":
 		ingressObj := &extensionsv1beta1.Ingress{}
 		if err = decoder.Decode(req, ingressObj); err != nil {
 			return
 		}
+
 		ingress = Extension{Ingress: ingressObj}
 	default:
 		err = fmt.Errorf("cannot recognize type %s", req.Kind.Group)
 	}
+
 	return
 }

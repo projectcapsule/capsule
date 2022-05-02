@@ -19,11 +19,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	"github.com/clastix/capsule/pkg/webhook/utils"
-
 	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
 	"github.com/clastix/capsule/pkg/configuration"
 	capsulewebhook "github.com/clastix/capsule/pkg/webhook"
+	"github.com/clastix/capsule/pkg/webhook/utils"
 )
 
 type handler struct {
@@ -41,6 +40,7 @@ func (h *handler) OnCreate(client client.Client, decoder *admission.Decoder, rec
 		return h.setOwnerRef(ctx, req, client, decoder, recorder)
 	}
 }
+
 func (h *handler) OnDelete(client client.Client, decoder *admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		return nil
@@ -60,6 +60,7 @@ func (h *handler) setOwnerRef(ctx context.Context, req admission.Request, client
 
 		return &response
 	}
+
 	ln, err := capsulev1beta1.GetTypeLabel(&capsulev1beta1.Tenant{})
 	if err != nil {
 		response := admission.Errored(http.StatusBadRequest, err)
@@ -157,6 +158,7 @@ func (h *handler) setOwnerRef(ctx context.Context, req admission.Request, client
 				return &response
 			}
 		}
+
 		response := admission.Denied("The Namespace prefix used doesn't match any available Tenant")
 
 		return &response
@@ -172,8 +174,12 @@ func (h *handler) patchResponseForOwnerRef(tenant *capsulev1beta1.Tenant, ns *co
 	_ = capsulev1beta1.AddToScheme(scheme)
 	_ = corev1.AddToScheme(scheme)
 
-	o, _ := json.Marshal(ns.DeepCopy())
-	if err := controllerutil.SetControllerReference(tenant, ns, scheme); err != nil {
+	o, err := json.Marshal(ns.DeepCopy())
+	if err != nil {
+		return admission.Errored(http.StatusInternalServerError, err)
+	}
+
+	if err = controllerutil.SetControllerReference(tenant, ns, scheme); err != nil {
 		recorder.Eventf(tenant, corev1.EventTypeWarning, "Error", "Namespace %s cannot be assigned to the desired Tenant", ns.GetName())
 
 		return admission.Errored(http.StatusInternalServerError, err)
@@ -181,7 +187,11 @@ func (h *handler) patchResponseForOwnerRef(tenant *capsulev1beta1.Tenant, ns *co
 
 	recorder.Eventf(tenant, corev1.EventTypeNormal, "NamespaceCreationWebhook", "Namespace %s has been assigned to the desired Tenant", ns.GetName())
 
-	c, _ := json.Marshal(ns)
+	c, err := json.Marshal(ns)
+	if err != nil {
+		return admission.Errored(http.StatusInternalServerError, err)
+	}
+
 	return admission.PatchResponseFromRaw(o, c)
 }
 
@@ -191,6 +201,7 @@ func (h *handler) listTenantsForOwnerKind(ctx context.Context, ownerKind string,
 		".spec.owner.ownerkind": fmt.Sprintf("%s:%s", ownerKind, ownerName),
 	}
 	err := clt.List(ctx, tntList, fields)
+
 	return tntList, err
 }
 

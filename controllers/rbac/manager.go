@@ -10,7 +10,7 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/hashicorp/go-multierror"
 	rbacv1 "k8s.io/api/rbac/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/workqueue"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -32,9 +32,10 @@ type Manager struct {
 	Configuration configuration.Configuration
 }
 
-// InjectClient injects the Client interface, required by the Runnable interface
+// InjectClient injects the Client interface, required by the Runnable interface.
 func (r *Manager) InjectClient(c client.Client) error {
 	r.Client = c
+
 	return nil
 }
 
@@ -47,6 +48,7 @@ func (r *Manager) SetupWithManager(ctx context.Context, mgr ctrl.Manager, config
 	if crErr != nil {
 		err = multierror.Append(err, crErr)
 	}
+
 	crbErr := ctrl.NewControllerManagedBy(mgr).
 		For(&rbacv1.ClusterRoleBinding{}, namesPredicate).
 		Watches(source.NewKindWithCache(&capsulev1alpha1.CapsuleConfiguration{}, mgr.GetCache()), handler.Funcs{
@@ -59,9 +61,11 @@ func (r *Manager) SetupWithManager(ctx context.Context, mgr ctrl.Manager, config
 			},
 		}).
 		Complete(r)
+
 	if crbErr != nil {
 		err = multierror.Append(err, crbErr)
 	}
+
 	return
 }
 
@@ -75,6 +79,7 @@ func (r *Manager) Reconcile(ctx context.Context, request reconcile.Request) (res
 
 			break
 		}
+
 		if err = r.EnsureClusterRoleBindings(ctx); err != nil {
 			r.Log.Error(err, "Reconciliation for ClusterRoleBindings failed")
 
@@ -128,6 +133,7 @@ func (r *Manager) EnsureClusterRole(ctx context.Context, roleName string) (err e
 
 	_, err = controllerutil.CreateOrUpdate(ctx, r.Client, clusterRole, func() error {
 		clusterRole.Rules = role.Rules
+
 		return nil
 	})
 
@@ -140,8 +146,9 @@ func (r *Manager) EnsureClusterRole(ctx context.Context, roleName string) (err e
 func (r *Manager) Start(ctx context.Context) error {
 	for roleName := range clusterRoles {
 		r.Log.Info("setting up ClusterRoles", "ClusterRole", roleName)
+
 		if err := r.EnsureClusterRole(ctx, roleName); err != nil {
-			if errors.IsAlreadyExists(err) {
+			if apierrors.IsAlreadyExists(err) {
 				continue
 			}
 
@@ -150,8 +157,9 @@ func (r *Manager) Start(ctx context.Context) error {
 	}
 
 	r.Log.Info("setting up ClusterRoleBindings")
+
 	if err := r.EnsureClusterRoleBindings(ctx); err != nil {
-		if errors.IsAlreadyExists(err) {
+		if apierrors.IsAlreadyExists(err) {
 			return nil
 		}
 

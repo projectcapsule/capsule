@@ -7,7 +7,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// CapsuleConfigurationSpec defines the Capsule configuration
+// CapsuleConfigurationSpec defines the Capsule configuration.
 type CapsuleConfigurationSpec struct {
 	// Names of the groups for Capsule users.
 	// +kubebuilder:default={capsule.clastix.io}
@@ -23,7 +23,7 @@ type CapsuleConfigurationSpec struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:resource:scope=Cluster
 
-// CapsuleConfiguration is the Schema for the Capsule configuration API
+// CapsuleConfiguration is the Schema for the Capsule configuration API.
 type CapsuleConfiguration struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -33,7 +33,7 @@ type CapsuleConfiguration struct {
 
 // +kubebuilder:object:root=true
 
-// CapsuleConfigurationList contains a list of CapsuleConfiguration
+// CapsuleConfigurationList contains a list of CapsuleConfiguration.
 type CapsuleConfigurationList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`

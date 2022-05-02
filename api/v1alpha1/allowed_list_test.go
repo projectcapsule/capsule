@@ -15,6 +15,7 @@ func TestAllowedListSpec_ExactMatch(t *testing.T) {
 		True  []string
 		False []string
 	}
+
 	for _, tc := range []tc{
 		{
 			[]string{"foo", "bar", "bizz", "buzz"},
@@ -35,9 +36,11 @@ func TestAllowedListSpec_ExactMatch(t *testing.T) {
 		a := AllowedListSpec{
 			Exact: tc.In,
 		}
+
 		for _, ok := range tc.True {
 			assert.True(t, a.ExactMatch(ok))
 		}
+
 		for _, ko := range tc.False {
 			assert.False(t, a.ExactMatch(ko))
 		}
@@ -50,6 +53,7 @@ func TestAllowedListSpec_RegexMatch(t *testing.T) {
 		True  []string
 		False []string
 	}
+
 	for _, tc := range []tc{
 		{`first-\w+-pattern`, []string{"first-date-pattern", "first-year-pattern"}, []string{"broken", "first-year", "second-date-pattern"}},
 		{``, nil, []string{"any", "value"}},
@@ -57,9 +61,11 @@ func TestAllowedListSpec_RegexMatch(t *testing.T) {
 		a := AllowedListSpec{
 			Regex: tc.Regex,
 		}
+
 		for _, ok := range tc.True {
 			assert.True(t, a.RegexMatch(ok))
 		}
+
 		for _, ko := range tc.False {
 			assert.False(t, a.RegexMatch(ko))
 		}

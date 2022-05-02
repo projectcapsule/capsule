@@ -34,11 +34,13 @@ func (r *Manager) syncNamespaces(ctx context.Context, tenant *capsulev1beta1.Ten
 	if err = group.Wait(); err != nil {
 		r.Log.Error(err, "Cannot sync Namespaces")
 
-		err = fmt.Errorf("cannot sync Namespaces: %s", err.Error())
+		err = fmt.Errorf("cannot sync Namespaces: %w", err)
 	}
+
 	return
 }
 
+// nolint:gocognit
 func (r *Manager) syncNamespaceMetadata(ctx context.Context, namespace string, tnt *capsulev1beta1.Tenant) (err error) {
 	var res controllerutil.OperationResult
 
@@ -144,7 +146,7 @@ func (r *Manager) syncNamespaceMetadata(ctx context.Context, namespace string, t
 
 	r.emitEvent(tnt, namespace, res, "Ensuring Namespace metadata", err)
 
-	return
+	return err
 }
 
 func (r *Manager) ensureNamespaceCount(ctx context.Context, tenant *capsulev1beta1.Tenant) error {
@@ -178,6 +180,7 @@ func (r *Manager) collectNamespaces(ctx context.Context, tenant *capsulev1beta1.
 
 			return r.Client.Status().Update(ctx, tenant, &client.UpdateOptions{})
 		})
+
 		return
 	})
 }

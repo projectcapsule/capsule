@@ -19,9 +19,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
-	"github.com/clastix/capsule/pkg/indexer/ingress"
-
 	"github.com/clastix/capsule/pkg/configuration"
+	"github.com/clastix/capsule/pkg/indexer/ingress"
 	capsulewebhook "github.com/clastix/capsule/pkg/webhook"
 	"github.com/clastix/capsule/pkg/webhook/utils"
 )
@@ -57,7 +56,7 @@ func (r *collision) OnCreate(client client.Client, decoder *admission.Decoder, r
 			return nil
 		}
 
-		var collisionErr *ingressHostnameCollision
+		var collisionErr *ingressHostnameCollisionError
 
 		if errors.As(err, &collisionErr) {
 			recorder.Eventf(tenant, corev1.EventTypeWarning, "IngressHostnameCollision", "Ingress %s/%s hostname is colliding", ing.Namespace(), ing.Name())
@@ -92,7 +91,7 @@ func (r *collision) OnUpdate(client client.Client, decoder *admission.Decoder, r
 			return nil
 		}
 
-		var collisionErr *ingressHostnameCollision
+		var collisionErr *ingressHostnameCollisionError
 
 		if errors.As(err, &collisionErr) {
 			recorder.Eventf(tenant, corev1.EventTypeWarning, "IngressHostnameCollision", "Ingress %s/%s hostname is colliding", ing.Namespace(), ing.Name())
@@ -110,6 +109,7 @@ func (r *collision) OnDelete(client.Client, *admission.Decoder, record.EventReco
 	}
 }
 
+// nolint:gocognit,gocyclo,cyclop
 func (r *collision) validateCollision(ctx context.Context, clt client.Client, ing Ingress, scope capsulev1beta1.HostnameCollisionScope) error {
 	for hostname, paths := range ing.HostnamePathsPairs() {
 		for path := range paths {
@@ -125,7 +125,7 @@ func (r *collision) validateCollision(ctx context.Context, clt client.Client, in
 			}
 
 			namespaces := sets.NewString()
-
+			// nolint:exhaustive
 			switch scope {
 			case capsulev1beta1.HostnameCollisionScopeCluster:
 				tenantList := &capsulev1beta1.TenantList{}
@@ -174,6 +174,7 @@ func (r *collision) validateCollision(ctx context.Context, clt client.Client, in
 					if index := ingressList.List()[0]; list.Items[index].GetName() == ing.Name() && list.Items[index].GetNamespace() == ing.Namespace() {
 						break
 					}
+
 					fallthrough
 				default:
 					return NewIngressHostnameCollision(hostname)
@@ -192,6 +193,7 @@ func (r *collision) validateCollision(ctx context.Context, clt client.Client, in
 					if index := ingressList.List()[0]; list.Items[index].GetName() == ing.Name() && list.Items[index].GetNamespace() == ing.Namespace() {
 						break
 					}
+
 					fallthrough
 				default:
 					return NewIngressHostnameCollision(hostname)
@@ -210,6 +212,7 @@ func (r *collision) validateCollision(ctx context.Context, clt client.Client, in
 					if index := ingressList.List()[0]; list.Items[index].GetName() == ing.Name() && list.Items[index].GetNamespace() == ing.Namespace() {
 						break
 					}
+
 					fallthrough
 				default:
 					return NewIngressHostnameCollision(hostname)

@@ -11,7 +11,7 @@ const (
 	TenantStateCordoned tenantState = "Cordoned"
 )
 
-// Returns the observed state of the Tenant
+// Returns the observed state of the Tenant.
 type TenantStatus struct {
 	//+kubebuilder:default=Active
 	// The operational state of the Tenant. Possible values are "Active", "Cordoned".

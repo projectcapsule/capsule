@@ -18,12 +18,14 @@ import (
 	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
 )
 
+// nolint:maintidx
 func generateTenantsSpecs() (Tenant, capsulev1beta1.Tenant) {
 	var namespaceQuota int32 = 5
-	var nodeSelector = map[string]string{
+
+	nodeSelector := map[string]string{
 		"foo": "bar",
 	}
-	var v1alpha1AdditionalMetadataSpec = &AdditionalMetadataSpec{
+	v1alpha1AdditionalMetadataSpec := &AdditionalMetadataSpec{
 		AdditionalLabels: map[string]string{
 			"foo": "bar",
 		},
@@ -31,11 +33,11 @@ func generateTenantsSpecs() (Tenant, capsulev1beta1.Tenant) {
 			"foo": "bar",
 		},
 	}
-	var v1alpha1AllowedListSpec = &AllowedListSpec{
+	v1alpha1AllowedListSpec := &AllowedListSpec{
 		Exact: []string{"foo", "bar"},
 		Regex: "^foo*",
 	}
-	var v1beta1AdditionalMetadataSpec = &capsulev1beta1.AdditionalMetadataSpec{
+	v1beta1AdditionalMetadataSpec := &capsulev1beta1.AdditionalMetadataSpec{
 		Labels: map[string]string{
 			"foo": "bar",
 		},
@@ -43,11 +45,11 @@ func generateTenantsSpecs() (Tenant, capsulev1beta1.Tenant) {
 			"foo": "bar",
 		},
 	}
-	var v1beta1NamespaceOptions = &capsulev1beta1.NamespaceOptions{
+	v1beta1NamespaceOptions := &capsulev1beta1.NamespaceOptions{
 		Quota:              &namespaceQuota,
 		AdditionalMetadata: v1beta1AdditionalMetadataSpec,
 	}
-	var v1beta1ServiceOptions = &capsulev1beta1.ServiceOptions{
+	v1beta1ServiceOptions := &capsulev1beta1.ServiceOptions{
 		AdditionalMetadata: v1beta1AdditionalMetadataSpec,
 		AllowedServices: &capsulev1beta1.AllowedServices{
 			NodePort:     pointer.BoolPtr(false),
@@ -58,11 +60,11 @@ func generateTenantsSpecs() (Tenant, capsulev1beta1.Tenant) {
 			Allowed: []capsulev1beta1.AllowedIP{"192.168.0.1"},
 		},
 	}
-	var v1beta1AllowedListSpec = &capsulev1beta1.AllowedListSpec{
+	v1beta1AllowedListSpec := &capsulev1beta1.AllowedListSpec{
 		Exact: []string{"foo", "bar"},
 		Regex: "^foo*",
 	}
-	var networkPolicies = []networkingv1.NetworkPolicySpec{
+	networkPolicies := []networkingv1.NetworkPolicySpec{
 		{
 			Ingress: []networkingv1.NetworkPolicyIngressRule{
 				{
@@ -87,7 +89,7 @@ func generateTenantsSpecs() (Tenant, capsulev1beta1.Tenant) {
 			},
 		},
 	}
-	var limitRanges = []corev1.LimitRangeSpec{
+	limitRanges := []corev1.LimitRangeSpec{
 		{
 			Limits: []corev1.LimitRangeItem{
 				{
@@ -104,7 +106,7 @@ func generateTenantsSpecs() (Tenant, capsulev1beta1.Tenant) {
 			},
 		},
 	}
-	var resourceQuotas = []corev1.ResourceQuotaSpec{
+	resourceQuotas := []corev1.ResourceQuotaSpec{
 		{
 			Hard: map[corev1.ResourceName]resource.Quantity{
 				corev1.ResourceLimitsCPU:      resource.MustParse("8"),
@@ -118,7 +120,7 @@ func generateTenantsSpecs() (Tenant, capsulev1beta1.Tenant) {
 		},
 	}
 
-	var v1beta1Tnt = capsulev1beta1.Tenant{
+	v1beta1Tnt := capsulev1beta1.Tenant{
 		TypeMeta: metav1.TypeMeta{},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "alice",
@@ -274,7 +276,7 @@ func generateTenantsSpecs() (Tenant, capsulev1beta1.Tenant) {
 		},
 	}
 
-	var v1alpha1Tnt = Tenant{
+	v1alpha1Tnt := Tenant{
 		TypeMeta: metav1.TypeMeta{},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "alice",
@@ -347,10 +349,11 @@ func generateTenantsSpecs() (Tenant, capsulev1beta1.Tenant) {
 }
 
 func TestConversionHub_ConvertTo(t *testing.T) {
-	var v1beta1ConvertedTnt = capsulev1beta1.Tenant{}
+	v1beta1ConvertedTnt := capsulev1beta1.Tenant{}
 
 	v1alpha1Tnt, v1beta1tnt := generateTenantsSpecs()
 	err := v1alpha1Tnt.ConvertTo(&v1beta1ConvertedTnt)
+
 	if assert.NoError(t, err) {
 		sort.Slice(v1beta1tnt.Spec.Owners, func(i, j int) bool {
 			return v1beta1tnt.Spec.Owners[i].Name < v1beta1tnt.Spec.Owners[j].Name
@@ -364,17 +367,20 @@ func TestConversionHub_ConvertTo(t *testing.T) {
 				return owner.ProxyOperations[i].Kind < owner.ProxyOperations[j].Kind
 			})
 		}
+
 		for _, owner := range v1beta1ConvertedTnt.Spec.Owners {
 			sort.Slice(owner.ProxyOperations, func(i, j int) bool {
 				return owner.ProxyOperations[i].Kind < owner.ProxyOperations[j].Kind
 			})
 		}
+
 		assert.Equal(t, v1beta1tnt, v1beta1ConvertedTnt)
 	}
 }
 
 func TestConversionHub_ConvertFrom(t *testing.T) {
-	var v1alpha1ConvertedTnt = Tenant{}
+	v1alpha1ConvertedTnt := Tenant{}
+
 	v1alpha1Tnt, v1beta1tnt := generateTenantsSpecs()
 
 	err := v1alpha1ConvertedTnt.ConvertFrom(&v1beta1tnt)

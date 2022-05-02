@@ -9,8 +9,7 @@ import (
 	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
 )
 
-type NamespacesReference struct {
-}
+type NamespacesReference struct{}
 
 func (o NamespacesReference) Object() client.Object {
 	return &capsulev1beta1.Tenant{}
@@ -20,6 +19,7 @@ func (o NamespacesReference) Field() string {
 	return ".status.namespaces"
 }
 
+// nolint:forcetypeassert
 func (o NamespacesReference) Func() client.IndexerFunc {
 	return func(object client.Object) []string {
 		namespaces := object.(*capsulev1beta1.Tenant).DeepCopy().Status.Namespaces

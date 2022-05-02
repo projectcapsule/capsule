@@ -40,6 +40,7 @@ func (n NetworkingV1) IngressClass() (res *string) {
 			}
 		}
 	}
+
 	return
 }
 
@@ -91,6 +92,7 @@ func (n NetworkingV1Beta1) IngressClass() (res *string) {
 			}
 		}
 	}
+
 	return
 }
 
@@ -142,6 +144,7 @@ func (e Extension) IngressClass() (res *string) {
 			}
 		}
 	}
+
 	return
 }
 
@@ -194,5 +197,6 @@ func (h HostnamesList) IsStringInList(value string) (ok bool) {
 	sort.Sort(h)
 	i := sort.SearchStrings(h, value)
 	ok = i < h.Len() && h[i] == value
+
 	return
 }

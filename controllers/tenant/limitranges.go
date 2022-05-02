@@ -41,14 +41,15 @@ func (r *Manager) syncLimitRange(ctx context.Context, tenant *capsulev1beta1.Ten
 	var tenantLabel, limitRangeLabel string
 
 	if tenantLabel, err = capsulev1beta1.GetTypeLabel(&capsulev1beta1.Tenant{}); err != nil {
-		return
+		return err
 	}
+
 	if limitRangeLabel, err = capsulev1beta1.GetTypeLabel(&corev1.LimitRange{}); err != nil {
-		return
+		return err
 	}
 
 	if err = r.pruningResources(ctx, namespace, keys, &corev1.LimitRange{}); err != nil {
-		return
+		return err
 	}
 
 	for i, spec := range tenant.Spec.LimitRanges.Items {
@@ -66,16 +67,18 @@ func (r *Manager) syncLimitRange(ctx context.Context, tenant *capsulev1beta1.Ten
 				limitRangeLabel: strconv.Itoa(i),
 			}
 			target.Spec = spec
+
 			return controllerutil.SetControllerReference(tenant, target, r.Client.Scheme())
 		})
 
 		r.emitEvent(tenant, target.GetNamespace(), res, fmt.Sprintf("Ensuring LimitRange %s", target.GetName()), err)
 
 		r.Log.Info("LimitRange sync result: "+string(res), "name", target.Name, "namespace", target.Namespace)
+
 		if err != nil {
-			return
+			return err
 		}
 	}
 
-	return
+	return nil
 }

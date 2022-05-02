@@ -27,5 +27,6 @@ func GetTypeLabel(t runtime.Object) (label string, err error) {
 	default:
 		err = fmt.Errorf("type %T is not mapped as Capsule label recognized", v)
 	}
+
 	return
 }

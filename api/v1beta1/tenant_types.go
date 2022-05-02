@@ -7,7 +7,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// TenantSpec defines the desired state of Tenant
+// TenantSpec defines the desired state of Tenant.
 type TenantSpec struct {
 	// Specifies the owners of the Tenant. Mandatory.
 	Owners OwnerListSpec `json:"owners"`
@@ -47,7 +47,7 @@ type TenantSpec struct {
 // +kubebuilder:printcolumn:name="Node selector",type="string",JSONPath=".spec.nodeSelector",description="Node Selector applied to Pods"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp",description="Age"
 
-// Tenant is the Schema for the tenants API
+// Tenant is the Schema for the tenants API.
 type Tenant struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -60,7 +60,7 @@ func (t *Tenant) Hub() {}
 
 //+kubebuilder:object:root=true
 
-// TenantList contains a list of Tenant
+// TenantList contains a list of Tenant.
 type TenantList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
