@@ -55,7 +55,7 @@ func (r *hostnames) OnCreate(c client.Client, decoder *admission.Decoder, record
 			return nil
 		}
 
-		var hostnameNotValidErr *ingressHostnameNotValid
+		var hostnameNotValidErr *ingressHostnameNotValidError
 
 		if errors.As(err, &hostnameNotValidErr) {
 			recorder.Eventf(tenant, corev1.EventTypeWarning, "IngressHostnameNotValid", "Ingress %s/%s hostname is not valid", ingress.Namespace(), ingress.Name())
@@ -96,7 +96,7 @@ func (r *hostnames) OnUpdate(c client.Client, decoder *admission.Decoder, record
 			return nil
 		}
 
-		var hostnameNotValidErr *ingressHostnameNotValid
+		var hostnameNotValidErr *ingressHostnameNotValidError
 
 		if errors.As(err, &hostnameNotValidErr) {
 			recorder.Eventf(tenant, corev1.EventTypeWarning, "IngressHostnameNotValid", "Ingress %s/%s hostname is not valid", ingress.Namespace(), ingress.Name())
@@ -126,24 +126,27 @@ func (r *hostnames) validateHostnames(tenant capsulev1beta1.Tenant, hostnames se
 	tenantHostnameSet := sets.NewString(tenant.Spec.IngressOptions.AllowedHostnames.Exact...)
 
 	var invalidHostnames []string
+
 	if len(hostnames) > 0 {
 		if diff := hostnames.Difference(tenantHostnameSet); len(diff) > 0 {
 			invalidHostnames = append(invalidHostnames, diff.List()...)
 		}
+
 		if len(invalidHostnames) == 0 {
 			valid = true
 		}
 	}
 
 	var notMatchingHostnames []string
-	allowedRegex := tenant.Spec.IngressOptions.AllowedHostnames.Regex
-	if len(allowedRegex) > 0 {
+
+	if allowedRegex := tenant.Spec.IngressOptions.AllowedHostnames.Regex; len(allowedRegex) > 0 {
 		for currentHostname := range hostnames {
 			matched, _ = regexp.MatchString(allowedRegex, currentHostname)
 			if !matched {
 				notMatchingHostnames = append(notMatchingHostnames, currentHostname)
 			}
 		}
+
 		if len(notMatchingHostnames) == 0 {
 			matched = true
 		}

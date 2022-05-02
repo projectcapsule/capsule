@@ -10,6 +10,7 @@ import (
 	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
 )
 
+// nolint:predeclared
 func appendForbiddenError(spec *capsulev1beta1.ForbiddenListSpec) (append string) {
 	append += "Forbidden are "
 	if len(spec.Exact) > 0 {
@@ -18,9 +19,11 @@ func appendForbiddenError(spec *capsulev1beta1.ForbiddenListSpec) (append string
 			append += " or "
 		}
 	}
+
 	if len(spec.Regex) > 0 {
 		append += fmt.Sprintf("matching the regex %s", spec.Regex)
 	}
+
 	return
 }
 

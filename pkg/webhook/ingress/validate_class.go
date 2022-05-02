@@ -49,13 +49,13 @@ func (r *class) OnCreate(client client.Client, decoder *admission.Decoder, recor
 			return nil
 		}
 
-		var forbiddenErr *ingressClassForbidden
+		var forbiddenErr *ingressClassForbiddenError
 
 		if errors.As(err, &forbiddenErr) {
 			recorder.Eventf(tenant, corev1.EventTypeWarning, "IngressClassForbidden", "Ingress %s/%s class is forbidden", ingress.Namespace(), ingress.Name())
 		}
 
-		var invalidErr *ingressClassNotValid
+		var invalidErr *ingressClassNotValidError
 
 		if errors.As(err, &invalidErr) {
 			recorder.Eventf(tenant, corev1.EventTypeWarning, "IngressClassNotValid", "Ingress %s/%s class is invalid", ingress.Namespace(), ingress.Name())
@@ -90,13 +90,13 @@ func (r *class) OnUpdate(client client.Client, decoder *admission.Decoder, recor
 			return nil
 		}
 
-		var forbiddenErr *ingressClassForbidden
+		var forbiddenErr *ingressClassForbiddenError
 
 		if errors.As(err, &forbiddenErr) {
 			recorder.Eventf(tenant, corev1.EventTypeWarning, "IngressClassForbidden", "Ingress %s/%s class is forbidden", ingress.Namespace(), ingress.Name())
 		}
 
-		var invalidErr *ingressClassNotValid
+		var invalidErr *ingressClassNotValidError
 
 		if errors.As(err, &invalidErr) {
 			recorder.Eventf(tenant, corev1.EventTypeWarning, "IngressClassNotValid", "Ingress %s/%s class is invalid", ingress.Namespace(), ingress.Name())
@@ -128,6 +128,7 @@ func (r *class) validateClass(tenant capsulev1beta1.Tenant, ingressClass *string
 	if len(tenant.Spec.IngressOptions.AllowedClasses.Exact) > 0 {
 		valid = tenant.Spec.IngressOptions.AllowedClasses.ExactMatch(*ingressClass)
 	}
+
 	matched = tenant.Spec.IngressOptions.AllowedClasses.RegexMatch(*ingressClass)
 
 	if !valid && !matched {

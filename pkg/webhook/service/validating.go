@@ -84,6 +84,7 @@ func (r *handler) handleService(ctx context.Context, clt client.Client, decoder 
 				return true
 			}
 		}
+
 		return false
 	}
 

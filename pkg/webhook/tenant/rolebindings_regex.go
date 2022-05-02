@@ -19,8 +19,7 @@ import (
 	"github.com/clastix/capsule/pkg/webhook/utils"
 )
 
-type rbRegexHandler struct {
-}
+type rbRegexHandler struct{}
 
 func RoleBindingRegexHandler() capsulewebhook.Handler {
 	return &rbRegexHandler{}
@@ -39,14 +38,17 @@ func (h *rbRegexHandler) validate(req admission.Request, decoder *admission.Deco
 					err := validation.IsDNS1123Subdomain(subject.Name)
 					if len(err) > 0 {
 						response := admission.Denied(fmt.Sprintf("Subject Name '%v' for binding '%v' is invalid. %v", subject.Name, binding.ClusterRoleName, strings.Join(err, ", ")))
+
 						return &response
 					}
 				}
 			}
 		}
 	}
+
 	return nil
 }
+
 func (h *rbRegexHandler) OnCreate(_ client.Client, decoder *admission.Decoder, _ record.EventRecorder) capsulewebhook.Func {
 	return func(_ context.Context, req admission.Request) *admission.Response {
 		return h.validate(req, decoder)

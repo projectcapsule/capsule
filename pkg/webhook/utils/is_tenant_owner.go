@@ -9,11 +9,11 @@ import (
 func IsTenantOwner(owners capsulev1beta1.OwnerListSpec, userInfo authenticationv1.UserInfo) bool {
 	for _, owner := range owners {
 		switch owner.Kind {
-		case "User", "ServiceAccount":
+		case capsulev1beta1.UserOwner, capsulev1beta1.ServiceAccountOwner:
 			if userInfo.Username == owner.Name {
 				return true
 			}
-		case "Group":
+		case capsulev1beta1.GroupOwner:
 			for _, group := range userInfo.Groups {
 				if group == owner.Name {
 					return true

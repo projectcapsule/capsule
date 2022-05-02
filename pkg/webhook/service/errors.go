@@ -10,21 +10,23 @@ import (
 	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
 )
 
-type externalServiceIPForbidden struct {
+type externalServiceIPForbiddenError struct {
 	cidr []string
 }
 
 func NewExternalServiceIPForbidden(allowedIps []capsulev1beta1.AllowedIP) error {
-	var cidr []string
+	cidr := make([]string, 0, len(allowedIps))
+
 	for _, i := range allowedIps {
 		cidr = append(cidr, string(i))
 	}
-	return &externalServiceIPForbidden{
+
+	return &externalServiceIPForbiddenError{
 		cidr: cidr,
 	}
 }
 
-func (e externalServiceIPForbidden) Error() string {
+func (e externalServiceIPForbiddenError) Error() string {
 	if len(e.cidr) == 0 {
 		return "The current Tenant does not allow the use of Service with external IPs"
 	}
@@ -32,32 +34,32 @@ func (e externalServiceIPForbidden) Error() string {
 	return fmt.Sprintf("The selected external IPs for the current Service are violating the following enforced CIDRs: %s", strings.Join(e.cidr, ", "))
 }
 
-type nodePortDisabled struct{}
+type nodePortDisabledError struct{}
 
 func NewNodePortDisabledError() error {
-	return &nodePortDisabled{}
+	return &nodePortDisabledError{}
 }
 
-func (nodePortDisabled) Error() string {
+func (nodePortDisabledError) Error() string {
 	return "NodePort service types are forbidden for the tenant: please, reach out to the system administrators"
 }
 
-type externalNameDisabled struct{}
+type externalNameDisabledError struct{}
 
 func NewExternalNameDisabledError() error {
-	return &externalNameDisabled{}
+	return &externalNameDisabledError{}
 }
 
-func (externalNameDisabled) Error() string {
+func (externalNameDisabledError) Error() string {
 	return "ExternalName service types are forbidden for the tenant: please, reach out to the system administrators"
 }
 
-type loadBalancerDisabled struct{}
+type loadBalancerDisabledError struct{}
 
 func NewLoadBalancerDisabled() error {
-	return &loadBalancerDisabled{}
+	return &loadBalancerDisabledError{}
 }
 
-func (loadBalancerDisabled) Error() string {
+func (loadBalancerDisabledError) Error() string {
 	return "LoadBalancer service types are forbidden for the tenant: please, reach out to the system administrators"
 }

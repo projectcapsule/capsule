@@ -19,9 +19,12 @@ func (in *ForbiddenListSpec) ExactMatch(value string) (ok bool) {
 		sort.SliceStable(in.Exact, func(i, j int) bool {
 			return strings.ToLower(in.Exact[i]) < strings.ToLower(in.Exact[j])
 		})
+
 		i := sort.SearchStrings(in.Exact, value)
+
 		ok = i < len(in.Exact) && in.Exact[i] == value
 	}
+
 	return
 }
 
@@ -29,5 +32,6 @@ func (in ForbiddenListSpec) RegexMatch(value string) (ok bool) {
 	if len(in.Regex) > 0 {
 		ok = regexp.MustCompile(in.Regex).MatchString(value)
 	}
+
 	return
 }

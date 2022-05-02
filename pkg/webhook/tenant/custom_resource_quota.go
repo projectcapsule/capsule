@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/types"
@@ -89,7 +90,7 @@ func (r *resourceCounterHandler) OnCreate(clt client.Client, decoder *admission.
 			return clt.Update(ctx, tnt)
 		})
 		if err != nil {
-			if _, ok := err.(*customResourceQuotaError); ok {
+			if errors.As(err, &customResourceQuotaError{}) {
 				recorder.Eventf(tnt, corev1.EventTypeWarning, "ResourceQuota", "Resource %s/%s in API group %s cannot be created, limit usage of %d has been reached", req.Namespace, req.Name, kgv, limit)
 			}
 

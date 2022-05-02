@@ -20,6 +20,7 @@ func PVC(handler ...capsulewebhook.Handler) capsulewebhook.Webhook {
 func (w *pvc) GetHandlers() []capsulewebhook.Handler {
 	return w.handlers
 }
+
 func (w *pvc) GetPath() string {
 	return "/persistentvolumeclaims"
 }

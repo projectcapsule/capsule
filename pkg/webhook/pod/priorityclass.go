@@ -17,8 +17,7 @@ import (
 	"github.com/clastix/capsule/pkg/webhook/utils"
 )
 
-type priorityClass struct {
-}
+type priorityClass struct{}
 
 func PriorityClass() capsulewebhook.Handler {
 	return &priorityClass{}
@@ -26,12 +25,12 @@ func PriorityClass() capsulewebhook.Handler {
 
 func (h *priorityClass) OnCreate(c client.Client, decoder *admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		var pod = &corev1.Pod{}
+		pod := &corev1.Pod{}
 		if err := decoder.Decode(req, pod); err != nil {
 			return utils.ErroredResponse(err)
 		}
 
-		var tntList = &capsulev1beta1.TenantList{}
+		tntList := &capsulev1beta1.TenantList{}
 
 		if err := c.List(ctx, tntList, client.MatchingFieldsSelector{
 			Selector: fields.OneTermEqualSelector(".status.namespaces", pod.Namespace),
@@ -44,7 +43,8 @@ func (h *priorityClass) OnCreate(c client.Client, decoder *admission.Decoder, re
 		}
 
 		allowed := tntList.Items[0].Spec.PriorityClasses
-		var priorityClassName = pod.Spec.PriorityClassName
+
+		priorityClassName := pod.Spec.PriorityClassName
 
 		switch {
 		case allowed == nil:

@@ -17,8 +17,7 @@ import (
 	"github.com/clastix/capsule/pkg/webhook/utils"
 )
 
-type ingressClassRegexHandler struct {
-}
+type ingressClassRegexHandler struct{}
 
 func IngressClassRegexHandler() capsulewebhook.Handler {
 	return &ingressClassRegexHandler{}

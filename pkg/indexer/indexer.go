@@ -45,6 +45,7 @@ func AddToManager(ctx context.Context, log logr.Logger, mgr manager.Manager) err
 
 				continue
 			}
+
 			return err
 		}
 	}

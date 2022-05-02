@@ -8,8 +8,9 @@ import (
 	"fmt"
 
 	"github.com/go-logr/logr"
+	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierr "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -32,32 +33,35 @@ type abstractServiceLabelsReconciler struct {
 
 func (r *abstractServiceLabelsReconciler) InjectClient(c client.Client) error {
 	r.client = c
+
 	return nil
 }
 
 func (r *abstractServiceLabelsReconciler) Reconcile(ctx context.Context, request ctrl.Request) (ctrl.Result, error) {
 	tenant, err := r.getTenant(ctx, request.NamespacedName, r.client)
 	if err != nil {
-		switch err.(type) {
-		case *NonTenantObject, *NoServicesMetadata:
+		if errors.As(err, &NonTenantObjectError{}) || errors.As(err, &NoServicesMetadataError{}) {
 			return reconcile.Result{}, nil
-		default:
-			r.log.Error(err, fmt.Sprintf("Cannot sync %t labels", r.obj))
-			return reconcile.Result{}, err
 		}
+
+		r.log.Error(err, fmt.Sprintf("Cannot sync %t labels", r.obj))
+
+		return reconcile.Result{}, err
 	}
 
 	err = r.client.Get(ctx, request.NamespacedName, r.obj)
 	if err != nil {
-		if errors.IsNotFound(err) {
+		if apierr.IsNotFound(err) {
 			return reconcile.Result{}, nil
 		}
+
 		return reconcile.Result{}, err
 	}
 
 	_, err = controllerutil.CreateOrUpdate(ctx, r.client, r.obj, func() (err error) {
 		r.obj.SetLabels(r.sync(r.obj.GetLabels(), tenant.Spec.ServiceOptions.AdditionalMetadata.Labels))
 		r.obj.SetAnnotations(r.sync(r.obj.GetAnnotations(), tenant.Spec.ServiceOptions.AdditionalMetadata.Annotations))
+
 		return nil
 	})
 
@@ -100,6 +104,7 @@ func (r *abstractServiceLabelsReconciler) sync(available map[string]string, tena
 			}
 		}
 	}
+
 	return available
 }
 
@@ -116,5 +121,6 @@ func (r *abstractServiceLabelsReconciler) IsNamespaceInTenant(ctx context.Contex
 	}); err != nil {
 		return false
 	}
+
 	return len(tl.Items) > 0
 }

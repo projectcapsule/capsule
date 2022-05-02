@@ -1,51 +1,39 @@
 linters-settings:
   govet:
     check-shadowing: true
-  golint:
-    min-confidence: 0
-  maligned:
-    suggest-new: true
-  goimports:
-    local-prefixes: github.com/clastix/capsule
   dupl:
     threshold: 100
   goconst:
     min-len: 2
     min-occurrences: 2
+  cyclop:
+    max-complexity: 27
+  gocognit:
+    min-complexity: 50
+  gci:
+    sections:
+      - standard
+      - default
+      - prefix(github.com/clastix/capsule)
 linters:
-  disable-all: true
-  enable:
-    - bodyclose
-    - deadcode
-    - depguard
-    - dogsled
-    - dupl
-    - errcheck
-    - goconst
-    - gocritic
-    - gofmt
-    - goimports
-    - golint
-    - goprintffuncname
-    - gosec
-    - gosimple
-    - govet
-    - ineffassign
-    - interfacer
-    - misspell
-    - nolintlint
-    - rowserrcheck
-    - scopelint
-    - staticcheck
-    - structcheck
-    - stylecheck
-    - typecheck
-    - unconvert
-    - unparam
-    - unused
-    - varcheck
-    - whitespace
+  enable-all: true
+  disable:
+    - funlen
+    - gochecknoinits
+    - lll
+    - exhaustivestruct
     - maligned
+    - interfacer
+    - scopelint
+    - golint
+    - gochecknoglobals
+    - goerr113
+    - gomnd
+    - paralleltest
+    - ireturn
+    - testpackage
+    - varnamelen
+    - wrapcheck
 
 issues:
   exclude:

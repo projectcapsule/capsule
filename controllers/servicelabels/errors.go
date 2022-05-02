@@ -5,26 +5,26 @@ package servicelabels
 
 import "fmt"
 
-type NonTenantObject struct {
+type NonTenantObjectError struct {
 	objectName string
 }
 
 func NewNonTenantObject(objectName string) error {
-	return &NonTenantObject{objectName: objectName}
+	return &NonTenantObjectError{objectName: objectName}
 }
 
-func (n NonTenantObject) Error() string {
+func (n NonTenantObjectError) Error() string {
 	return fmt.Sprintf("Skipping labels sync for %s as it doesn't belong to tenant", n.objectName)
 }
 
-type NoServicesMetadata struct {
+type NoServicesMetadataError struct {
 	objectName string
 }
 
 func NewNoServicesMetadata(objectName string) error {
-	return &NoServicesMetadata{objectName: objectName}
+	return &NoServicesMetadataError{objectName: objectName}
 }
 
-func (n NoServicesMetadata) Error() string {
+func (n NoServicesMetadataError) Error() string {
 	return fmt.Sprintf("Skipping labels sync for %s because no AdditionalLabels or AdditionalAnnotations presents in Tenant spec", n.objectName)
 }

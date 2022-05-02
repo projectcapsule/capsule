@@ -34,6 +34,7 @@ func Register(manager controllerruntime.Manager, webhookList ...Webhook) error {
 			},
 		})
 	}
+
 	return nil
 }
 
@@ -65,6 +66,8 @@ func (r *handlerRouter) Handle(ctx context.Context, req admission.Request) admis
 				return *response
 			}
 		}
+	case admissionv1.Connect:
+		return admission.Allowed("")
 	}
 
 	return admission.Allowed("")

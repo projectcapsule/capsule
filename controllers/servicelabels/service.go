@@ -22,6 +22,7 @@ func (r *ServicesLabelsReconciler) SetupWithManager(ctx context.Context, mgr ctr
 		obj: &corev1.Service{},
 		log: r.Log,
 	}
+
 	return ctrl.NewControllerManagedBy(mgr).
 		For(r.abstractServiceLabelsReconciler.obj, r.abstractServiceLabelsReconciler.forOptionPerInstanceName(ctx)).
 		Complete(r)

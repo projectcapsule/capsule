@@ -25,12 +25,12 @@ func ImagePullPolicy() capsulewebhook.Handler {
 
 func (r *imagePullPolicy) OnCreate(c client.Client, decoder *admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		var pod = &corev1.Pod{}
+		pod := &corev1.Pod{}
 		if err := decoder.Decode(req, pod); err != nil {
 			return utils.ErroredResponse(err)
 		}
 
-		var tntList = &capsulev1beta1.TenantList{}
+		tntList := &capsulev1beta1.TenantList{}
 		if err := c.List(ctx, tntList, client.MatchingFieldsSelector{
 			Selector: fields.OneTermEqualSelector(".status.namespaces", pod.Namespace),
 		}); err != nil {

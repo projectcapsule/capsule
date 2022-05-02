@@ -18,6 +18,7 @@ import (
 // NetworkPolicy using the "exists" and "notin" LabelSelector to perform an outer-join removal.
 func (r *Manager) pruningResources(ctx context.Context, ns string, keys []string, obj client.Object) (err error) {
 	var capsuleLabel string
+
 	if capsuleLabel, err = capsulev1beta1.GetTypeLabel(obj); err != nil {
 		return
 	}
@@ -25,13 +26,16 @@ func (r *Manager) pruningResources(ctx context.Context, ns string, keys []string
 	selector := labels.NewSelector()
 
 	var exists *labels.Requirement
+
 	if exists, err = labels.NewRequirement(capsuleLabel, selection.Exists, []string{}); err != nil {
 		return
 	}
+
 	selector = selector.Add(*exists)
 
 	if len(keys) > 0 {
 		var notIn *labels.Requirement
+
 		if notIn, err = labels.NewRequirement(capsuleLabel, selection.NotIn, keys); err != nil {
 			return err
 		}
@@ -53,7 +57,8 @@ func (r *Manager) pruningResources(ctx context.Context, ns string, keys []string
 }
 
 func (r *Manager) emitEvent(object runtime.Object, namespace string, res controllerutil.OperationResult, msg string, err error) {
-	var eventType = corev1.EventTypeNormal
+	eventType := corev1.EventTypeNormal
+
 	if err != nil {
 		eventType = corev1.EventTypeWarning
 		res = "Error"

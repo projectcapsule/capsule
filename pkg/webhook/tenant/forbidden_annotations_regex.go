@@ -16,8 +16,7 @@ import (
 	"github.com/clastix/capsule/pkg/webhook/utils"
 )
 
-type forbiddenAnnotationsRegexHandler struct {
-}
+type forbiddenAnnotationsRegexHandler struct{}
 
 func ForbiddenAnnotationsRegexHandler() capsulewebhook.Handler {
 	return &forbiddenAnnotationsRegexHandler{}

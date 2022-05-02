@@ -14,13 +14,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
-
 	capsulewebhook "github.com/clastix/capsule/pkg/webhook"
 	"github.com/clastix/capsule/pkg/webhook/utils"
 )
 
-type userMetadataHandler struct {
-}
+type userMetadataHandler struct{}
 
 func UserMetadataHandler() capsulewebhook.Handler {
 	return &userMetadataHandler{}
@@ -29,6 +27,7 @@ func UserMetadataHandler() capsulewebhook.Handler {
 func (r *userMetadataHandler) validateUserMetadata(tnt *capsulev1beta1.Tenant, recorder record.EventRecorder, labels map[string]string, annotations map[string]string) *admission.Response {
 	if tnt.ForbiddenUserNamespaceLabels() != nil {
 		forbiddenLabels := tnt.ForbiddenUserNamespaceLabels()
+
 		for label := range labels {
 			var forbidden, matched bool
 			forbidden = forbiddenLabels.ExactMatch(label)
@@ -46,6 +45,7 @@ func (r *userMetadataHandler) validateUserMetadata(tnt *capsulev1beta1.Tenant, r
 
 	if tnt.ForbiddenUserNamespaceAnnotations() != nil {
 		forbiddenAnnotations := tnt.ForbiddenUserNamespaceLabels()
+
 		for annotation := range annotations {
 			var forbidden, matched bool
 			forbidden = forbiddenAnnotations.ExactMatch(annotation)
@@ -60,6 +60,7 @@ func (r *userMetadataHandler) validateUserMetadata(tnt *capsulev1beta1.Tenant, r
 			}
 		}
 	}
+
 	return nil
 }
 
@@ -73,7 +74,6 @@ func (r *userMetadataHandler) OnCreate(client client.Client, decoder *admission.
 		tnt := &capsulev1beta1.Tenant{}
 		for _, objectRef := range ns.ObjectMeta.OwnerReferences {
 			// retrieving the selected Tenant
-
 			if err := client.Get(ctx, types.NamespacedName{Name: objectRef.Name}, tnt); err != nil {
 				return utils.ErroredResponse(err)
 			}
@@ -107,7 +107,6 @@ func (r *userMetadataHandler) OnUpdate(client client.Client, decoder *admission.
 		tnt := &capsulev1beta1.Tenant{}
 		for _, objectRef := range newNs.ObjectMeta.OwnerReferences {
 			// retrieving the selected Tenant
-
 			if err := client.Get(ctx, types.NamespacedName{Name: objectRef.Name}, tnt); err != nil {
 				return utils.ErroredResponse(err)
 			}
@@ -120,6 +119,7 @@ func (r *userMetadataHandler) OnUpdate(client client.Client, decoder *admission.
 				if labels == nil {
 					labels = make(map[string]string)
 				}
+
 				labels[key] = value
 			}
 		}
@@ -129,6 +129,7 @@ func (r *userMetadataHandler) OnUpdate(client client.Client, decoder *admission.
 				if annotations == nil {
 					annotations = make(map[string]string)
 				}
+
 				annotations[key] = value
 			}
 		}

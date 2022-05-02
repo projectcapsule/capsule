@@ -31,6 +31,7 @@ import (
 // the mutateFn along with the CreateOrUpdate to don't perform the update since resources are identical.
 //
 // In case of Namespace-scoped Resource Budget, we're just replicating the resources across all registered Namespaces.
+// nolint:gocognit
 func (r *Manager) syncResourceQuotas(ctx context.Context, tenant *capsulev1beta1.Tenant) (err error) {
 	// getting ResourceQuota labels for the mutateFn
 	var tenantLabel, typeLabel string
@@ -42,7 +43,7 @@ func (r *Manager) syncResourceQuotas(ctx context.Context, tenant *capsulev1beta1
 	if typeLabel, err = capsulev1beta1.GetTypeLabel(&corev1.ResourceQuota{}); err != nil {
 		return err
 	}
-
+	// nolint:nestif
 	if tenant.Spec.ResourceQuota.Scope == capsulev1beta1.ResourceQuotaScopeTenant {
 		group := new(errgroup.Group)
 
@@ -69,6 +70,7 @@ func (r *Manager) syncResourceQuotas(ctx context.Context, tenant *capsulev1beta1
 				list := &corev1.ResourceQuotaList{}
 				if scopeErr = r.List(ctx, list, &client.ListOptions{LabelSelector: labels.NewSelector().Add(*tntRequirement).Add(*indexRequirement)}); scopeErr != nil {
 					r.Log.Error(scopeErr, "Cannot list ResourceQuota", "tenantFilter", tntRequirement.String(), "indexFilter", indexRequirement.String())
+
 					return
 				}
 				// Iterating over all the options declared for the ResourceQuota,
@@ -118,9 +120,11 @@ func (r *Manager) syncResourceQuotas(ctx context.Context, tenant *capsulev1beta1
 					}
 					if scopeErr = r.resourceQuotasUpdate(ctx, name, quantity, resourceQuota.Hard[name], list.Items...); scopeErr != nil {
 						r.Log.Error(scopeErr, "cannot proceed with outer ResourceQuota")
+
 						return
 					}
 				}
+
 				return
 			})
 		}
@@ -174,6 +178,7 @@ func (r *Manager) syncResourceQuota(ctx context.Context, tenant *capsulev1beta1.
 		}
 
 		var res controllerutil.OperationResult
+
 		err = retry.RetryOnConflict(retry.DefaultBackoff, func() (retryErr error) {
 			res, retryErr = controllerutil.CreateOrUpdate(ctx, r.Client, target, func() (err error) {
 				target.SetLabels(map[string]string{
@@ -232,6 +237,7 @@ func (r *Manager) resourceQuotasUpdate(ctx context.Context, resourceName corev1.
 					found.Annotations[capsulev1beta1.HardQuotaFor(resourceName)] = limit.String()
 					// Updating the Resource according to the actual.Cmp result
 					found.Spec.Hard = rq.Spec.Hard
+
 					return nil
 				})
 
@@ -244,7 +250,7 @@ func (r *Manager) resourceQuotasUpdate(ctx context.Context, resourceName corev1.
 		// We had an error and we mark the whole transaction as failed
 		// to process it another time according to the Tenant controller back-off factor.
 		r.Log.Error(err, "Cannot update outer ResourceQuotas", "resourceName", resourceName.String())
-		err = fmt.Errorf("update of outer ResourceQuota items has failed: %s", err.Error())
+		err = fmt.Errorf("update of outer ResourceQuota items has failed: %w", err)
 	}
 
 	return err

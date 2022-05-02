@@ -17,8 +17,7 @@ import (
 	"github.com/clastix/capsule/pkg/webhook/utils"
 )
 
-type handler struct {
-}
+type handler struct{}
 
 func Handler() capsulewebhook.Handler {
 	return &handler{}
@@ -59,9 +58,7 @@ func (h *handler) OnCreate(c client.Client, decoder *admission.Decoder, recorder
 		}
 
 		sc := *pvc.Spec.StorageClassName
-		valid = tnt.Spec.StorageClasses.ExactMatch(sc)
-		matched = tnt.Spec.StorageClasses.RegexMatch(sc)
-		if !valid && !matched {
+		if valid, matched = tnt.Spec.StorageClasses.ExactMatch(sc), tnt.Spec.StorageClasses.RegexMatch(sc); !valid && !matched {
 			recorder.Eventf(&tnt, corev1.EventTypeWarning, "ForbiddenStorageClass", "PersistentVolumeClaim %s/%s StorageClass %s is forbidden for the current Tenant", req.Namespace, req.Name, sc)
 
 			response := admission.Denied(NewStorageClassForbidden(*pvc.Spec.StorageClassName, *tnt.Spec.StorageClasses).Error())

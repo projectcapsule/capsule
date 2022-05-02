@@ -13,6 +13,7 @@ func (t *Tenant) IsCordoned() bool {
 	if v, ok := t.Labels["capsule.clastix.io/cordon"]; ok && v == "enabled" {
 		return true
 	}
+
 	return false
 }
 
@@ -21,16 +22,19 @@ func (t *Tenant) IsFull() bool {
 	if t.Spec.NamespaceQuota == nil {
 		return false
 	}
+
 	return len(t.Status.Namespaces) >= int(*t.Spec.NamespaceQuota)
 }
 
 func (t *Tenant) AssignNamespaces(namespaces []corev1.Namespace) {
 	var l []string
+
 	for _, ns := range namespaces {
 		if ns.Status.Phase == corev1.NamespaceActive {
 			l = append(l, ns.GetName())
 		}
 	}
+
 	sort.Strings(l)
 
 	t.Status.Namespaces = l

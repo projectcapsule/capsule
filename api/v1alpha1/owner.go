@@ -3,7 +3,7 @@
 
 package v1alpha1
 
-// OwnerSpec defines tenant owner name and kind
+// OwnerSpec defines tenant owner name and kind.
 type OwnerSpec struct {
 	Name string `json:"name"`
 	Kind Kind   `json:"kind"`

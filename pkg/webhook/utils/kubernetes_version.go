@@ -16,13 +16,14 @@ import (
 var versionsWithNodeFix = []string{"v1.18.18", "v1.19.10", "v1.20.6", "v1.21.0"}
 
 func NodeWebhookSupported(currentVersion *version.Version) (bool, error) {
-	var versions []*version.Version
+	versions := make([]*version.Version, 0, len(versionsWithNodeFix))
 
 	for _, v := range versionsWithNodeFix {
 		ver, err := version.ParseGeneric(v)
 		if err != nil {
 			return false, err
 		}
+
 		versions = append(versions, ver)
 	}
 
@@ -31,6 +32,7 @@ func NodeWebhookSupported(currentVersion *version.Version) (bool, error) {
 			if currentVersion.Minor() < v.Minor() {
 				return false, nil
 			}
+
 			if currentVersion.Minor() == v.Minor() && currentVersion.Patch() < v.Patch() {
 				return false, nil
 			}
@@ -46,9 +48,11 @@ func GetK8sVersion() (*version.Version, error) {
 		kubeconfig := filepath.Join(homedir.HomeDir(), ".kube", "config")
 		cfg, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
 	}
+
 	if err != nil {
 		return nil, err
 	}
+
 	client, err := kubernetes.NewForConfig(cfg)
 	if err != nil {
 		return nil, err

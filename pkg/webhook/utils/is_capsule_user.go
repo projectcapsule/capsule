@@ -14,10 +14,12 @@ func IsCapsuleUser(req admission.Request, userGroups []string) bool {
 	if groupList.Find("system:serviceaccounts:kube-system") {
 		return false
 	}
+
 	for _, group := range userGroups {
 		if groupList.Find(group) {
 			return true
 		}
 	}
+
 	return false
 }

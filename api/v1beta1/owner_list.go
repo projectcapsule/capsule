@@ -15,6 +15,7 @@ func (o OwnerListSpec) FindOwner(name string, kind OwnerKind) (owner OwnerSpec) 
 	if i < len(o) && o[i].Kind == kind && o[i].Name == name {
 		return o[i]
 	}
+
 	return
 }
 
@@ -23,12 +24,15 @@ type ByKindAndName OwnerListSpec
 func (b ByKindAndName) Len() int {
 	return len(b)
 }
+
 func (b ByKindAndName) Less(i, j int) bool {
 	if b[i].Kind.String() != b[j].Kind.String() {
 		return b[i].Kind.String() < b[j].Kind.String()
 	}
+
 	return b[i].Name < b[j].Name
 }
+
 func (b ByKindAndName) Swap(i, j int) {
 	b[i], b[j] = b[j], b[i]
 }

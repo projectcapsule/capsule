@@ -17,8 +17,7 @@ import (
 	"github.com/clastix/capsule/pkg/webhook/utils"
 )
 
-type quotaHandler struct {
-}
+type quotaHandler struct{}
 
 func QuotaHandler() capsulewebhook.Handler {
 	return &quotaHandler{}

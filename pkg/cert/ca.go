@@ -35,6 +35,7 @@ func (c CapsuleCA) ValidateCert(certificate *x509.Certificate) (err error) {
 		Roots:       pool,
 		CurrentTime: time.Time{},
 	})
+
 	return
 }
 
@@ -50,28 +51,34 @@ func (c CapsuleCA) ExpiresIn(now time.Time) (time.Duration, error) {
 	if !c.isExpired(now) {
 		return time.Nanosecond, CaExpiredError{}
 	}
+
 	if !c.isAlreadyValid(now) {
 		return time.Nanosecond, CaNotYetValidError{}
 	}
+
 	return time.Duration(c.certificate.NotAfter.Unix()-now.Unix()) * time.Second, nil
 }
 
 func (c CapsuleCA) CACertificatePem() (b *bytes.Buffer, err error) {
 	var crtBytes []byte
 	crtBytes, err = x509.CreateCertificate(rand.Reader, c.certificate, c.certificate, &c.key.PublicKey, c.key)
+
 	if err != nil {
 		return
 	}
+
 	b = new(bytes.Buffer)
 	err = pem.Encode(b, &pem.Block{
 		Type:  "CERTIFICATE",
 		Bytes: crtBytes,
 	})
+
 	return b, err
 }
 
 func (c CapsuleCA) CAPrivateKeyPem() (b *bytes.Buffer, err error) {
 	b = new(bytes.Buffer)
+
 	return b, pem.Encode(b, &pem.Block{
 		Type:  "RSA PRIVATE KEY",
 		Bytes: x509.MarshalPKCS1PrivateKey(c.key),
@@ -111,13 +118,17 @@ func NewCertificateAuthorityFromBytes(certBytes, keyBytes []byte) (s *CapsuleCA,
 	var b *pem.Block
 
 	b, _ = pem.Decode(certBytes)
+
 	var cert *x509.Certificate
+
 	if cert, err = x509.ParseCertificate(b.Bytes); err != nil {
 		return
 	}
 
 	b, _ = pem.Decode(keyBytes)
+
 	var key *rsa.PrivateKey
+
 	if key, err = x509.ParsePKCS1PrivateKey(b.Bytes); err != nil {
 		return
 	}
@@ -130,9 +141,11 @@ func NewCertificateAuthorityFromBytes(certBytes, keyBytes []byte) (s *CapsuleCA,
 	return
 }
 
+// nolint:nakedret
 func (c *CapsuleCA) GenerateCertificate(opts CertificateOptions) (certificatePem *bytes.Buffer, certificateKey *bytes.Buffer, err error) {
 	var certPrivKey *rsa.PrivateKey
 	certPrivKey, err = rsa.GenerateKey(rand.Reader, 4096)
+
 	if err != nil {
 		return nil, nil, err
 	}
@@ -157,6 +170,7 @@ func (c *CapsuleCA) GenerateCertificate(opts CertificateOptions) (certificatePem
 
 	var certBytes []byte
 	certBytes, err = x509.CreateCertificate(rand.Reader, cert, c.certificate, &certPrivKey.PublicKey, c.key)
+
 	if err != nil {
 		return nil, nil, err
 	}
@@ -166,11 +180,13 @@ func (c *CapsuleCA) GenerateCertificate(opts CertificateOptions) (certificatePem
 		Type:  "CERTIFICATE",
 		Bytes: certBytes,
 	})
+
 	if err != nil {
 		return
 	}
 
 	certificateKey = new(bytes.Buffer)
+
 	err = pem.Encode(certificateKey, &pem.Block{
 		Type:  "RSA PRIVATE KEY",
 		Bytes: x509.MarshalPKCS1PrivateKey(certPrivKey),

@@ -14,7 +14,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	"github.com/clastix/capsule/pkg/configuration"
-
 	capsulewebhook "github.com/clastix/capsule/pkg/webhook"
 	"github.com/clastix/capsule/pkg/webhook/utils"
 )
@@ -47,6 +46,7 @@ func (r *userMetadataHandler) getForbiddenNodeLabels(node *corev1.Node) map[stri
 	forbiddenNodeLabels := make(map[string]string)
 
 	forbiddenLabels := r.configuration.ForbiddenUserNodeLabels()
+
 	for label, value := range node.GetLabels() {
 		var forbidden, matched bool
 		forbidden = forbiddenLabels.ExactMatch(label)
@@ -64,6 +64,7 @@ func (r *userMetadataHandler) getForbiddenNodeAnnotations(node *corev1.Node) map
 	forbiddenNodeAnnotations := make(map[string]string)
 
 	forbiddenAnnotations := r.configuration.ForbiddenUserNodeAnnotations()
+
 	for annotation, value := range node.GetAnnotations() {
 		var forbidden, matched bool
 		forbidden = forbiddenAnnotations.ExactMatch(annotation)

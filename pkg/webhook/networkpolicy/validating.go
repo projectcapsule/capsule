@@ -18,8 +18,7 @@ import (
 	"github.com/clastix/capsule/pkg/webhook/utils"
 )
 
-type handler struct {
-}
+type handler struct{}
 
 func Handler() capsulewebhook.Handler {
 	return &handler{}
@@ -33,9 +32,9 @@ func (r *handler) OnCreate(client.Client, *admission.Decoder, record.EventRecord
 
 func (r *handler) generic(ctx context.Context, req admission.Request, client client.Client, _ *admission.Decoder) (*capsulev1beta1.Tenant, error) {
 	var err error
+
 	np := &networkingv1.NetworkPolicy{}
-	err = client.Get(ctx, types.NamespacedName{Namespace: req.AdmissionRequest.Namespace, Name: req.AdmissionRequest.Name}, np)
-	if err != nil {
+	if err = client.Get(ctx, types.NamespacedName{Namespace: req.AdmissionRequest.Namespace, Name: req.AdmissionRequest.Name}, np); err != nil {
 		return nil, err
 	}
 
@@ -50,7 +49,7 @@ func (r *handler) generic(ctx context.Context, req admission.Request, client cli
 		return tnt, nil
 	}
 
-	return nil, nil
+	return nil, nil // nolint:nilnil
 }
 
 //nolint:dupl
@@ -60,6 +59,7 @@ func (r *handler) OnDelete(client client.Client, decoder *admission.Decoder, rec
 		if err != nil {
 			return utils.ErroredResponse(err)
 		}
+
 		if tnt != nil {
 			recorder.Eventf(tnt, corev1.EventTypeWarning, "NetworkPolicyDeletion", "NetworkPolicy %s/%s cannot be deleted", req.Namespace, req.Name)
 

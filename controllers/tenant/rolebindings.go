@@ -59,7 +59,7 @@ func (r *Manager) syncRoleBindings(ctx context.Context, tenant *capsulev1beta1.T
 		return fmt.Sprintf("%x", h.Sum64())
 	}
 	// getting requested Role Binding keys
-	var keys []string
+	keys := make([]string, 0, len(tenant.Spec.Owners))
 	// Generating for dynamic tenant owners cluster roles
 	for _, owner := range tenant.Spec.Owners {
 		for _, clusterRoleName := range owner.GetRoles(*tenant) {
@@ -142,7 +142,9 @@ func (r *Manager) syncAdditionalRoleBinding(ctx context.Context, tenant *capsule
 		if err != nil {
 			r.Log.Error(err, "Cannot sync RoleBinding")
 		}
+
 		r.Log.Info(fmt.Sprintf("RoleBinding sync result: %s", string(res)), "name", target.Name, "namespace", target.Namespace)
+
 		if err != nil {
 			return
 		}

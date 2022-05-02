@@ -49,13 +49,13 @@ const (
 )
 
 func (t *Tenant) convertV1Alpha1OwnerToV1Beta1() capsulev1beta1.OwnerListSpec {
-	var serviceKindToAnnotationMap = map[capsulev1beta1.ProxyServiceKind][]string{
+	serviceKindToAnnotationMap := map[capsulev1beta1.ProxyServiceKind][]string{
 		capsulev1beta1.NodesProxy:           {enableNodeListingAnnotation, enableNodeUpdateAnnotation, enableNodeDeletionAnnotation},
 		capsulev1beta1.StorageClassesProxy:  {enableStorageClassListingAnnotation, enableStorageClassUpdateAnnotation, enableStorageClassDeletionAnnotation},
 		capsulev1beta1.IngressClassesProxy:  {enableIngressClassListingAnnotation, enableIngressClassUpdateAnnotation, enableIngressClassDeletionAnnotation},
 		capsulev1beta1.PriorityClassesProxy: {enablePriorityClassListingAnnotation, enablePriorityClassUpdateAnnotation, enablePriorityClassDeletionAnnotation},
 	}
-	var annotationToOperationMap = map[string]capsulev1beta1.ProxyOperation{
+	annotationToOperationMap := map[string]capsulev1beta1.ProxyOperation{
 		enableNodeListingAnnotation:           capsulev1beta1.ListOperation,
 		enableNodeUpdateAnnotation:            capsulev1beta1.UpdateOperation,
 		enableNodeDeletionAnnotation:          capsulev1beta1.DeleteOperation,
@@ -69,14 +69,15 @@ func (t *Tenant) convertV1Alpha1OwnerToV1Beta1() capsulev1beta1.OwnerListSpec {
 		enablePriorityClassUpdateAnnotation:   capsulev1beta1.UpdateOperation,
 		enablePriorityClassDeletionAnnotation: capsulev1beta1.DeleteOperation,
 	}
-	var annotationToOwnerKindMap = map[string]capsulev1beta1.OwnerKind{
+	annotationToOwnerKindMap := map[string]capsulev1beta1.OwnerKind{
 		ownerUsersAnnotation:          capsulev1beta1.UserOwner,
 		ownerGroupsAnnotation:         capsulev1beta1.GroupOwner,
 		ownerServiceAccountAnnotation: capsulev1beta1.ServiceAccountOwner,
 	}
+
 	annotations := t.GetAnnotations()
 
-	var operations = make(map[string]map[capsulev1beta1.ProxyServiceKind][]capsulev1beta1.ProxyOperation)
+	operations := make(map[string]map[capsulev1beta1.ProxyServiceKind][]capsulev1beta1.ProxyOperation)
 
 	for serviceKind, operationAnnotations := range serviceKindToAnnotationMap {
 		for _, operationAnnotation := range operationAnnotations {
@@ -86,6 +87,7 @@ func (t *Tenant) convertV1Alpha1OwnerToV1Beta1() capsulev1beta1.OwnerListSpec {
 					if _, exists := operations[owner]; !exists {
 						operations[owner] = make(map[capsulev1beta1.ProxyServiceKind][]capsulev1beta1.ProxyOperation)
 					}
+
 					operations[owner][serviceKind] = append(operations[owner][serviceKind], annotationToOperationMap[operationAnnotation])
 				}
 			}
@@ -94,7 +96,7 @@ func (t *Tenant) convertV1Alpha1OwnerToV1Beta1() capsulev1beta1.OwnerListSpec {
 
 	var owners capsulev1beta1.OwnerListSpec
 
-	var getProxySettingsForOwner = func(ownerName string) (settings []capsulev1beta1.ProxySettings) {
+	getProxySettingsForOwner := func(ownerName string) (settings []capsulev1beta1.ProxySettings) {
 		ownerOperations, ok := operations[ownerName]
 		if ok {
 			for k, v := range ownerOperations {
@@ -104,6 +106,7 @@ func (t *Tenant) convertV1Alpha1OwnerToV1Beta1() capsulev1beta1.OwnerListSpec {
 				})
 			}
 		}
+
 		return
 	}
 
@@ -129,8 +132,13 @@ func (t *Tenant) convertV1Alpha1OwnerToV1Beta1() capsulev1beta1.OwnerListSpec {
 	return owners
 }
 
+// nolint:gocognit,gocyclo,cyclop,maintidx
 func (t *Tenant) ConvertTo(dstRaw conversion.Hub) error {
-	dst := dstRaw.(*capsulev1beta1.Tenant)
+	dst, ok := dstRaw.(*capsulev1beta1.Tenant)
+	if !ok {
+		return fmt.Errorf("expected type *capsulev1beta1.Tenant, got %T", dst)
+	}
+
 	annotations := t.GetAnnotations()
 
 	// ObjectMeta
@@ -141,6 +149,7 @@ func (t *Tenant) ConvertTo(dstRaw conversion.Hub) error {
 		if dst.Spec.NamespaceOptions == nil {
 			dst.Spec.NamespaceOptions = &capsulev1beta1.NamespaceOptions{}
 		}
+
 		dst.Spec.NamespaceOptions.Quota = t.Spec.NamespaceQuota
 	}
 
@@ -152,11 +161,13 @@ func (t *Tenant) ConvertTo(dstRaw conversion.Hub) error {
 		if dst.Spec.NamespaceOptions == nil {
 			dst.Spec.NamespaceOptions = &capsulev1beta1.NamespaceOptions{}
 		}
+
 		dst.Spec.NamespaceOptions.AdditionalMetadata = &capsulev1beta1.AdditionalMetadataSpec{
 			Labels:      t.Spec.NamespacesMetadata.AdditionalLabels,
 			Annotations: t.Spec.NamespacesMetadata.AdditionalAnnotations,
 		}
 	}
+
 	if t.Spec.ServicesMetadata != nil {
 		if dst.Spec.ServiceOptions == nil {
 			dst.Spec.ServiceOptions = &capsulev1beta1.ServiceOptions{
@@ -167,13 +178,15 @@ func (t *Tenant) ConvertTo(dstRaw conversion.Hub) error {
 			}
 		}
 	}
+
 	if t.Spec.StorageClasses != nil {
 		dst.Spec.StorageClasses = &capsulev1beta1.AllowedListSpec{
 			Exact: t.Spec.StorageClasses.Exact,
 			Regex: t.Spec.StorageClasses.Regex,
 		}
 	}
-	if v, ok := t.Annotations[ingressHostnameCollisionScope]; ok {
+
+	if v, annotationOk := t.Annotations[ingressHostnameCollisionScope]; annotationOk {
 		switch v {
 		case string(capsulev1beta1.HostnameCollisionScopeCluster), string(capsulev1beta1.HostnameCollisionScopeTenant), string(capsulev1beta1.HostnameCollisionScopeNamespace):
 			dst.Spec.IngressOptions.HostnameCollisionScope = capsulev1beta1.HostnameCollisionScope(v)
@@ -181,38 +194,44 @@ func (t *Tenant) ConvertTo(dstRaw conversion.Hub) error {
 			dst.Spec.IngressOptions.HostnameCollisionScope = capsulev1beta1.HostnameCollisionScopeDisabled
 		}
 	}
+
 	if t.Spec.IngressClasses != nil {
 		dst.Spec.IngressOptions.AllowedClasses = &capsulev1beta1.AllowedListSpec{
 			Exact: t.Spec.IngressClasses.Exact,
 			Regex: t.Spec.IngressClasses.Regex,
 		}
 	}
+
 	if t.Spec.IngressHostnames != nil {
 		dst.Spec.IngressOptions.AllowedHostnames = &capsulev1beta1.AllowedListSpec{
 			Exact: t.Spec.IngressHostnames.Exact,
 			Regex: t.Spec.IngressHostnames.Regex,
 		}
 	}
+
 	if t.Spec.ContainerRegistries != nil {
 		dst.Spec.ContainerRegistries = &capsulev1beta1.AllowedListSpec{
 			Exact: t.Spec.ContainerRegistries.Exact,
 			Regex: t.Spec.ContainerRegistries.Regex,
 		}
 	}
+
 	if len(t.Spec.NetworkPolicies) > 0 {
 		dst.Spec.NetworkPolicies = capsulev1beta1.NetworkPolicySpec{
 			Items: t.Spec.NetworkPolicies,
 		}
 	}
+
 	if len(t.Spec.LimitRanges) > 0 {
 		dst.Spec.LimitRanges = capsulev1beta1.LimitRangesSpec{
 			Items: t.Spec.LimitRanges,
 		}
 	}
+
 	if len(t.Spec.ResourceQuota) > 0 {
 		dst.Spec.ResourceQuota = capsulev1beta1.ResourceQuotaSpec{
 			Scope: func() capsulev1beta1.ResourceQuotaScope {
-				if v, ok := t.GetAnnotations()[resourceQuotaScopeAnnotation]; ok {
+				if v, annotationOk := t.GetAnnotations()[resourceQuotaScopeAnnotation]; annotationOk {
 					switch v {
 					case string(capsulev1beta1.ResourceQuotaScopeNamespace):
 						return capsulev1beta1.ResourceQuotaScopeNamespace
@@ -220,11 +239,13 @@ func (t *Tenant) ConvertTo(dstRaw conversion.Hub) error {
 						return capsulev1beta1.ResourceQuotaScopeTenant
 					}
 				}
+
 				return capsulev1beta1.ResourceQuotaScopeTenant
 			}(),
 			Items: t.Spec.ResourceQuota,
 		}
 	}
+
 	if len(t.Spec.AdditionalRoleBindings) > 0 {
 		for _, rb := range t.Spec.AdditionalRoleBindings {
 			dst.Spec.AdditionalRoleBindings = append(dst.Spec.AdditionalRoleBindings, capsulev1beta1.AdditionalRoleBindingsSpec{
@@ -233,10 +254,12 @@ func (t *Tenant) ConvertTo(dstRaw conversion.Hub) error {
 			})
 		}
 	}
+
 	if t.Spec.ExternalServiceIPs != nil {
 		if dst.Spec.ServiceOptions == nil {
 			dst.Spec.ServiceOptions = &capsulev1beta1.ServiceOptions{}
 		}
+
 		dst.Spec.ServiceOptions.ExternalServiceIPs = &capsulev1beta1.ExternalServiceIPsSpec{
 			Allowed: make([]capsulev1beta1.AllowedIP, len(t.Spec.ExternalServiceIPs.Allowed)),
 		}
@@ -256,10 +279,13 @@ func (t *Tenant) ConvertTo(dstRaw conversion.Hub) error {
 	priorityClasses := capsulev1beta1.AllowedListSpec{}
 
 	priorityClassAllowed, ok := annotations[podPriorityAllowedAnnotation]
+
 	if ok {
 		priorityClasses.Exact = strings.Split(priorityClassAllowed, ",")
 	}
+
 	priorityClassesRegexp, ok := annotations[podPriorityAllowedRegexAnnotation]
+
 	if ok {
 		priorityClasses.Regex = priorityClassesRegexp
 	}
@@ -274,12 +300,15 @@ func (t *Tenant) ConvertTo(dstRaw conversion.Hub) error {
 		if err != nil {
 			return errors.Wrap(err, fmt.Sprintf("unable to parse %s annotation on tenant %s", enableNodePortsAnnotation, t.GetName()))
 		}
+
 		if dst.Spec.ServiceOptions == nil {
 			dst.Spec.ServiceOptions = &capsulev1beta1.ServiceOptions{}
 		}
+
 		if dst.Spec.ServiceOptions.AllowedServices == nil {
 			dst.Spec.ServiceOptions.AllowedServices = &capsulev1beta1.AllowedServices{}
 		}
+
 		dst.Spec.ServiceOptions.AllowedServices.NodePort = pointer.BoolPtr(val)
 	}
 
@@ -289,12 +318,15 @@ func (t *Tenant) ConvertTo(dstRaw conversion.Hub) error {
 		if err != nil {
 			return errors.Wrap(err, fmt.Sprintf("unable to parse %s annotation on tenant %s", enableExternalNameAnnotation, t.GetName()))
 		}
+
 		if dst.Spec.ServiceOptions == nil {
 			dst.Spec.ServiceOptions = &capsulev1beta1.ServiceOptions{}
 		}
+
 		if dst.Spec.ServiceOptions.AllowedServices == nil {
 			dst.Spec.ServiceOptions.AllowedServices = &capsulev1beta1.AllowedServices{}
 		}
+
 		dst.Spec.ServiceOptions.AllowedServices.ExternalName = pointer.BoolPtr(val)
 	}
 
@@ -304,21 +336,22 @@ func (t *Tenant) ConvertTo(dstRaw conversion.Hub) error {
 		if err != nil {
 			return errors.Wrap(err, fmt.Sprintf("unable to parse %s annotation on tenant %s", enableLoadBalancerAnnotation, t.GetName()))
 		}
+
 		if dst.Spec.ServiceOptions == nil {
 			dst.Spec.ServiceOptions = &capsulev1beta1.ServiceOptions{}
 		}
+
 		if dst.Spec.ServiceOptions.AllowedServices == nil {
 			dst.Spec.ServiceOptions.AllowedServices = &capsulev1beta1.AllowedServices{}
 		}
+
 		dst.Spec.ServiceOptions.AllowedServices.LoadBalancer = pointer.BoolPtr(val)
 	}
-
 	// Status
 	dst.Status = capsulev1beta1.TenantStatus{
 		Size:       t.Status.Size,
 		Namespaces: t.Status.Namespaces,
 	}
-
 	// Remove unneeded annotations
 	delete(dst.ObjectMeta.Annotations, podAllowedImagePullPolicyAnnotation)
 	delete(dst.ObjectMeta.Annotations, podPriorityAllowedAnnotation)
@@ -347,14 +380,15 @@ func (t *Tenant) ConvertTo(dstRaw conversion.Hub) error {
 	return nil
 }
 
+// nolint:gocognit,gocyclo,cyclop
 func (t *Tenant) convertV1Beta1OwnerToV1Alpha1(src *capsulev1beta1.Tenant) {
-	var ownersAnnotations = map[string][]string{
+	ownersAnnotations := map[string][]string{
 		ownerGroupsAnnotation:         nil,
 		ownerUsersAnnotation:          nil,
 		ownerServiceAccountAnnotation: nil,
 	}
 
-	var proxyAnnotations = map[string][]string{
+	proxyAnnotations := map[string][]string{
 		enableNodeListingAnnotation:          nil,
 		enableNodeUpdateAnnotation:           nil,
 		enableNodeDeletionAnnotation:         nil,
@@ -382,6 +416,7 @@ func (t *Tenant) convertV1Beta1OwnerToV1Alpha1(src *capsulev1beta1.Tenant) {
 				ownersAnnotations[ownerServiceAccountAnnotation] = append(ownersAnnotations[ownerServiceAccountAnnotation], owner.Name)
 			}
 		}
+
 		for _, setting := range owner.ProxyOperations {
 			switch setting.Kind {
 			case capsulev1beta1.NodesProxy:
@@ -437,6 +472,7 @@ func (t *Tenant) convertV1Beta1OwnerToV1Alpha1(src *capsulev1beta1.Tenant) {
 			t.Annotations[k] = strings.Join(v, ",")
 		}
 	}
+
 	for k, v := range proxyAnnotations {
 		if len(v) > 0 {
 			t.Annotations[k] = strings.Join(v, ",")
@@ -444,8 +480,12 @@ func (t *Tenant) convertV1Beta1OwnerToV1Alpha1(src *capsulev1beta1.Tenant) {
 	}
 }
 
+// nolint:gocyclo,cyclop
 func (t *Tenant) ConvertFrom(srcRaw conversion.Hub) error {
-	src := srcRaw.(*capsulev1beta1.Tenant)
+	src, ok := srcRaw.(*capsulev1beta1.Tenant)
+	if !ok {
+		return fmt.Errorf("expected *capsulev1beta1.Tenant, got %T", srcRaw)
+	}
 
 	// ObjectMeta
 	t.ObjectMeta = src.ObjectMeta
@@ -469,47 +509,57 @@ func (t *Tenant) ConvertFrom(srcRaw conversion.Hub) error {
 			AdditionalAnnotations: src.Spec.NamespaceOptions.AdditionalMetadata.Annotations,
 		}
 	}
+
 	if src.Spec.ServiceOptions != nil && src.Spec.ServiceOptions.AdditionalMetadata != nil {
 		t.Spec.ServicesMetadata = &AdditionalMetadataSpec{
 			AdditionalLabels:      src.Spec.ServiceOptions.AdditionalMetadata.Labels,
 			AdditionalAnnotations: src.Spec.ServiceOptions.AdditionalMetadata.Annotations,
 		}
 	}
+
 	if src.Spec.StorageClasses != nil {
 		t.Spec.StorageClasses = &AllowedListSpec{
 			Exact: src.Spec.StorageClasses.Exact,
 			Regex: src.Spec.StorageClasses.Regex,
 		}
 	}
+
 	t.Annotations[ingressHostnameCollisionScope] = string(src.Spec.IngressOptions.HostnameCollisionScope)
+
 	if src.Spec.IngressOptions.AllowedClasses != nil {
 		t.Spec.IngressClasses = &AllowedListSpec{
 			Exact: src.Spec.IngressOptions.AllowedClasses.Exact,
 			Regex: src.Spec.IngressOptions.AllowedClasses.Regex,
 		}
 	}
+
 	if src.Spec.IngressOptions.AllowedHostnames != nil {
 		t.Spec.IngressHostnames = &AllowedListSpec{
 			Exact: src.Spec.IngressOptions.AllowedHostnames.Exact,
 			Regex: src.Spec.IngressOptions.AllowedHostnames.Regex,
 		}
 	}
+
 	if src.Spec.ContainerRegistries != nil {
 		t.Spec.ContainerRegistries = &AllowedListSpec{
 			Exact: src.Spec.ContainerRegistries.Exact,
 			Regex: src.Spec.ContainerRegistries.Regex,
 		}
 	}
+
 	if len(src.Spec.NetworkPolicies.Items) > 0 {
 		t.Spec.NetworkPolicies = src.Spec.NetworkPolicies.Items
 	}
+
 	if len(src.Spec.LimitRanges.Items) > 0 {
 		t.Spec.LimitRanges = src.Spec.LimitRanges.Items
 	}
+
 	if len(src.Spec.ResourceQuota.Items) > 0 {
 		t.Annotations[resourceQuotaScopeAnnotation] = string(src.Spec.ResourceQuota.Scope)
 		t.Spec.ResourceQuota = src.Spec.ResourceQuota.Items
 	}
+
 	if len(src.Spec.AdditionalRoleBindings) > 0 {
 		for _, rb := range src.Spec.AdditionalRoleBindings {
 			t.Spec.AdditionalRoleBindings = append(t.Spec.AdditionalRoleBindings, AdditionalRoleBindingsSpec{
@@ -518,6 +568,7 @@ func (t *Tenant) ConvertFrom(srcRaw conversion.Hub) error {
 			})
 		}
 	}
+
 	if src.Spec.ServiceOptions != nil && src.Spec.ServiceOptions.ExternalServiceIPs != nil {
 		t.Spec.ExternalServiceIPs = &ExternalServiceIPsSpec{
 			Allowed: make([]AllowedIP, len(src.Spec.ServiceOptions.ExternalServiceIPs.Allowed)),
@@ -527,11 +578,14 @@ func (t *Tenant) ConvertFrom(srcRaw conversion.Hub) error {
 			t.Spec.ExternalServiceIPs.Allowed[i] = AllowedIP(IP)
 		}
 	}
+
 	if len(src.Spec.ImagePullPolicies) != 0 {
 		var pullPolicies []string
+
 		for _, policy := range src.Spec.ImagePullPolicies {
 			pullPolicies = append(pullPolicies, string(policy))
 		}
+
 		t.Annotations[podAllowedImagePullPolicyAnnotation] = strings.Join(pullPolicies, ",")
 	}
 
@@ -539,6 +593,7 @@ func (t *Tenant) ConvertFrom(srcRaw conversion.Hub) error {
 		if len(src.Spec.PriorityClasses.Exact) != 0 {
 			t.Annotations[podPriorityAllowedAnnotation] = strings.Join(src.Spec.PriorityClasses.Exact, ",")
 		}
+
 		if src.Spec.PriorityClasses.Regex != "" {
 			t.Annotations[podPriorityAllowedRegexAnnotation] = src.Spec.PriorityClasses.Regex
 		}
@@ -548,9 +603,11 @@ func (t *Tenant) ConvertFrom(srcRaw conversion.Hub) error {
 		if src.Spec.ServiceOptions.AllowedServices.NodePort != nil {
 			t.Annotations[enableNodePortsAnnotation] = strconv.FormatBool(*src.Spec.ServiceOptions.AllowedServices.NodePort)
 		}
+
 		if src.Spec.ServiceOptions.AllowedServices.ExternalName != nil {
 			t.Annotations[enableExternalNameAnnotation] = strconv.FormatBool(*src.Spec.ServiceOptions.AllowedServices.ExternalName)
 		}
+
 		if src.Spec.ServiceOptions.AllowedServices.LoadBalancer != nil {
 			t.Annotations[enableLoadBalancerAnnotation] = strconv.FormatBool(*src.Spec.ServiceOptions.AllowedServices.LoadBalancer)
 		}
