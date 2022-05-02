@@ -44,7 +44,7 @@ func (r *abstractServiceLabelsReconciler) Reconcile(ctx context.Context, request
 			return reconcile.Result{}, nil
 		}
 
-		r.log.Error(err, fmt.Sprintf("Cannot sync %t labels", r.obj))
+		r.log.Error(err, fmt.Sprintf("Cannot sync %T %s/%s labels", r.obj, r.obj.GetNamespace(), r.obj.GetName()))
 
 		return reconcile.Result{}, err
 	}
