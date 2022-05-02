@@ -17,7 +17,7 @@ spec:
     - name: v1alpha1
       schema:
         openAPIV3Schema:
-          description: CapsuleConfiguration is the Schema for the Capsule configuration API
+          description: CapsuleConfiguration is the Schema for the Capsule configuration API.
           properties:
             apiVersion:
               description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
@@ -28,7 +28,7 @@ spec:
             metadata:
               type: object
             spec:
-              description: CapsuleConfigurationSpec defines the Capsule configuration
+              description: CapsuleConfigurationSpec defines the Capsule configuration.
               properties:
                 forceTenantPrefix:
                   default: false

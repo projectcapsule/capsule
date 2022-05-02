@@ -56,7 +56,7 @@ spec:
       name: v1alpha1
       schema:
         openAPIV3Schema:
-          description: Tenant is the Schema for the tenants API
+          description: Tenant is the Schema for the tenants API.
           properties:
             apiVersion:
               description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
@@ -67,7 +67,7 @@ spec:
             metadata:
               type: object
             spec:
-              description: TenantSpec defines the desired state of Tenant
+              description: TenantSpec defines the desired state of Tenant.
               properties:
                 additionalRoleBindings:
                   items:
@@ -485,7 +485,7 @@ spec:
                     type: string
                   type: object
                 owner:
-                  description: OwnerSpec defines tenant owner name and kind
+                  description: OwnerSpec defines tenant owner name and kind.
                   properties:
                     kind:
                       enum:
@@ -568,7 +568,7 @@ spec:
                 - owner
               type: object
             status:
-              description: TenantStatus defines the observed state of Tenant
+              description: TenantStatus defines the observed state of Tenant.
               properties:
                 namespaces:
                   items:
@@ -608,7 +608,7 @@ spec:
       name: v1beta1
       schema:
         openAPIV3Schema:
-          description: Tenant is the Schema for the tenants API
+          description: Tenant is the Schema for the tenants API.
           properties:
             apiVersion:
               description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
@@ -619,7 +619,7 @@ spec:
             metadata:
               type: object
             spec:
-              description: TenantSpec defines the desired state of Tenant
+              description: TenantSpec defines the desired state of Tenant.
               properties:
                 additionalRoleBindings:
                   description: Specifies additional RoleBindings assigned to the Tenant. Capsule will ensure that all namespaces in the Tenant always contain the RoleBinding for the given ClusterRole. Optional.
@@ -707,7 +707,7 @@ spec:
                       type: string
                   type: object
                 limitRanges:
-                  description: Specifies the NetworkPolicies assigned to the Tenant. The assigned NetworkPolicies are inherited by any namespace created in the Tenant. Optional.
+                  description: Specifies the resource min/max usage restrictions to the Tenant. The assigned values are inherited by any namespace created in the Tenant. Optional.
                   properties:
                     items:
                       items:
@@ -1065,7 +1065,7 @@ spec:
                 nodeSelector:
                   additionalProperties:
                     type: string
-                  description: Specifies the label to control the placement of pods on a given pool of worker nodes. All namesapces created within the Tenant will have the node selector annotation. This annotation tells the Kubernetes scheduler to place pods on the nodes having the selector label. Optional.
+                  description: Specifies the label to control the placement of pods on a given pool of worker nodes. All namespaces created within the Tenant will have the node selector annotation. This annotation tells the Kubernetes scheduler to place pods on the nodes having the selector label. Optional.
                   type: object
                 owners:
                   description: Specifies the owners of the Tenant. Mandatory.
@@ -1234,7 +1234,7 @@ spec:
                 - owners
               type: object
             status:
-              description: Returns the observed state of the Tenant
+              description: Returns the observed state of the Tenant.
               properties:
                 namespaces:
                   description: List of namespaces assigned to the Tenant.
