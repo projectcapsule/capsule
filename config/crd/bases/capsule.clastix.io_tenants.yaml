@@ -46,7 +46,7 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: Tenant is the Schema for the tenants API
+        description: Tenant is the Schema for the tenants API.
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
@@ -57,7 +57,7 @@ spec:
           metadata:
             type: object
           spec:
-            description: TenantSpec defines the desired state of Tenant
+            description: TenantSpec defines the desired state of Tenant.
             properties:
               additionalRoleBindings:
                 items:
@@ -475,7 +475,7 @@ spec:
                   type: string
                 type: object
               owner:
-                description: OwnerSpec defines tenant owner name and kind
+                description: OwnerSpec defines tenant owner name and kind.
                 properties:
                   kind:
                     enum:
@@ -558,7 +558,7 @@ spec:
             - owner
             type: object
           status:
-            description: TenantStatus defines the observed state of Tenant
+            description: TenantStatus defines the observed state of Tenant.
             properties:
               namespaces:
                 items:
@@ -598,7 +598,7 @@ spec:
     name: v1beta1
     schema:
       openAPIV3Schema:
-        description: Tenant is the Schema for the tenants API
+        description: Tenant is the Schema for the tenants API.
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
@@ -609,7 +609,7 @@ spec:
           metadata:
             type: object
           spec:
-            description: TenantSpec defines the desired state of Tenant
+            description: TenantSpec defines the desired state of Tenant.
             properties:
               additionalRoleBindings:
                 description: Specifies additional RoleBindings assigned to the Tenant. Capsule will ensure that all namespaces in the Tenant always contain the RoleBinding for the given ClusterRole. Optional.
@@ -1224,7 +1224,7 @@ spec:
             - owners
             type: object
           status:
-            description: Returns the observed state of the Tenant
+            description: Returns the observed state of the Tenant.
             properties:
               namespaces:
                 description: List of namespaces assigned to the Tenant.
