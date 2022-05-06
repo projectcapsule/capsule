@@ -70,13 +70,15 @@ func printVersion() {
 
 // nolint:maintidx
 func main() {
-	var enableLeaderElection, version bool
+	var enableLeaderElection, enableSecretController, version bool
 
 	var metricsAddr, namespace, configurationName string
 
 	var goFlagSet goflag.FlagSet
 
 	flag.StringVar(&metricsAddr, "metrics-addr", ":8080", "The address the metric endpoint binds to.")
+	flag.BoolVar(&enableSecretController, "enable-secret-controller", true,
+		"Enable secret controller which reconciles TLS and CA secrets for capsule webhooks.")
 	flag.BoolVar(&enableLeaderElection, "enable-leader-election", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
@@ -131,24 +133,26 @@ func main() {
 
 	cfg := configuration.NewCapsuleConfiguration(ctx, manager.GetClient(), configurationName)
 
-	if err = (&secretcontroller.CAReconciler{
-		Client:        manager.GetClient(),
-		Log:           ctrl.Log.WithName("controllers").WithName("CA"),
-		Namespace:     namespace,
-		Configuration: cfg,
-	}).SetupWithManager(manager); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "Namespace")
-		os.Exit(1)
-	}
+	if enableSecretController {
+		if err = (&secretcontroller.CAReconciler{
+			Client:        manager.GetClient(),
+			Log:           ctrl.Log.WithName("controllers").WithName("CA"),
+			Namespace:     namespace,
+			Configuration: cfg,
+		}).SetupWithManager(manager); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "Namespace")
+			os.Exit(1)
+		}
 
-	if err = (&secretcontroller.TLSReconciler{
-		Client:        manager.GetClient(),
-		Log:           ctrl.Log.WithName("controllers").WithName("Tls"),
-		Namespace:     namespace,
-		Configuration: cfg,
-	}).SetupWithManager(manager); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "Namespace")
-		os.Exit(1)
+		if err = (&secretcontroller.TLSReconciler{
+			Client:        manager.GetClient(),
+			Log:           ctrl.Log.WithName("controllers").WithName("Tls"),
+			Namespace:     namespace,
+			Configuration: cfg,
+		}).SetupWithManager(manager); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "Namespace")
+			os.Exit(1)
+		}
 	}
 
 	clientset, err := kubernetes.NewForConfig(ctrl.GetConfigOrDie())
