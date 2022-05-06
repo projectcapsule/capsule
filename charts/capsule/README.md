@@ -58,45 +58,46 @@ If you only need to make minor customizations, you can specify them on the comma
 
 Here the values you can override:
 
-Parameter | Description | Default
---- | --- | ---
-`manager.hostNetwork` | Specifies if the container should be started in `hostNetwork` mode. | `false` 
-`manager.options.logLevel` | Set the log verbosity of the controller with a value from 1 to 10.| `4`
+Parameter | Description                                                                                                                             | Default
+--- |-----------------------------------------------------------------------------------------------------------------------------------------| ---
+`manager.hostNetwork` | Specifies if the container should be started in `hostNetwork` mode.                                                                     | `false` 
+`manager.options.logLevel` | Set the log verbosity of the controller with a value from 1 to 10.                                                                      | `4`
 `manager.options.forceTenantPrefix` | Boolean, enforces the Tenant owner, during Namespace creation, to name it using the selected Tenant name as prefix, separated by a dash | `false`
-`manager.options.capsuleUserGroups` | Override the Capsule user groups | `[capsule.clastix.io]`
-`manager.options.protectedNamespaceRegex` | If specified, disallows creation of namespaces matching the passed regexp | `null`
-`manager.image.repository` | Set the image repository of the controller. | `quay.io/clastix/capsule`
-`manager.image.tag` | Overrides the image tag whose default is the chart. `appVersion` | `null`
-`manager.image.pullPolicy` | Set the image pull policy. | `IfNotPresent`
-`manager.livenessProbe` | Configure the liveness probe using Deployment probe spec | `GET :10080/healthz`
-`manager.readinessProbe` | Configure the readiness probe using Deployment probe spec | `GET :10080/readyz`
-`manager.resources.requests/cpu` | Set the CPU requests assigned to the controller. | `200m`
-`manager.resources.requests/memory` | Set the memory requests assigned to the controller. | `128Mi`
-`manager.resources.limits/cpu` | Set the CPU limits assigned to the controller. | `200m`
-`manager.resources.limits/cpu` | Set the memory limits assigned to the controller. | `128Mi`
-`mutatingWebhooksTimeoutSeconds` | Timeout in seconds for mutating webhooks. | `30`
-`validatingWebhooksTimeoutSeconds` | Timeout in seconds for validating webhooks. | `30`
-`webhooks` | Additional configuration for capsule webhooks. |
-`imagePullSecrets` | Configuration for `imagePullSecrets` so that you can use a private images registry. | `[]`
-`serviceAccount.create` | Specifies whether a service account should be created. | `true`
-`serviceAccount.annotations` | Annotations to add to the service account. | `{}`
-`serviceAccount.name` | The name of the service account to use. If not set and `serviceAccount.create=true`, a name is generated using the fullname template | `capsule`
-`podAnnotations` | Annotations to add to the Capsule pod. | `{}`
-`priorityClassName` | Set the priority class name of the Capsule pod. | `null`
-`nodeSelector` | Set the node selector for the Capsule pod. | `{}`
-`tolerations` | Set list of tolerations for the Capsule pod. | `[]`
-`replicaCount` | Set the replica count for Capsule pod. | `1`
-`affinity` | Set affinity rules for the Capsule pod. | `{}`
-`podSecurityPolicy.enabled` | Specify if a Pod Security Policy must be created. | `false`
-`serviceMonitor.enabled` | Specifies if a service monitor must be created. | `false`
-`serviceMonitor.labels` | Additional labels which will be added to service monitor. | `{}`
-`serviceMonitor.annotations` | Additional annotations which will be added to service monitor. | `{}`
-`serviceMonitor.matchLabels` | Additional matchLabels which will be added to service monitor. | `{}`
-`serviceMonitor.serviceAccount.name` | Specifies service account name for metrics scrape. | `capsule`
-`serviceMonitor.serviceAccount.namespace` | Specifies service account namespace for metrics scrape. | `capsule-system`
-`customLabels` | Additional labels which will be added to all resources created by Capsule helm chart . | `{}`
-`customAnnotations` | Additional annotations which will be added to all resources created by Capsule helm chart . | `{}`
-
+`manager.options.capsuleUserGroups` | Override the Capsule user groups                                                                                                        | `[capsule.clastix.io]`
+`manager.options.protectedNamespaceRegex` | If specified, disallows creation of namespaces matching the passed regexp                                                               | `null`
+`manager.options.enableSecretController` | Boolean, enables apsule secret controller which reconciles TLS and CA secrets for capsule webhooks.                                     | `true`
+`manager.image.repository` | Set the image repository of the controller.                                                                                             | `quay.io/clastix/capsule`
+`manager.image.tag` | Overrides the image tag whose default is the chart. `appVersion`                                                                        | `null`
+`manager.image.pullPolicy` | Set the image pull policy.                                                                                                              | `IfNotPresent`
+`manager.livenessProbe` | Configure the liveness probe using Deployment probe spec                                                                                | `GET :10080/healthz`
+`manager.readinessProbe` | Configure the readiness probe using Deployment probe spec                                                                               | `GET :10080/readyz`
+`manager.resources.requests/cpu` | Set the CPU requests assigned to the controller.                                                                                        | `200m`
+`manager.resources.requests/memory` | Set the memory requests assigned to the controller.                                                                                     | `128Mi`
+`manager.resources.limits/cpu` | Set the CPU limits assigned to the controller.                                                                                          | `200m`
+`manager.resources.limits/cpu` | Set the memory limits assigned to the controller.                                                                                       | `128Mi`
+`mutatingWebhooksTimeoutSeconds` | Timeout in seconds for mutating webhooks.                                                                                               | `30`
+`validatingWebhooksTimeoutSeconds` | Timeout in seconds for validating webhooks.                                                                                             | `30`
+`webhooks` | Additional configuration for capsule webhooks.                                                                                          |
+`imagePullSecrets` | Configuration for `imagePullSecrets` so that you can use a private images registry.                                                     | `[]`
+`serviceAccount.create` | Specifies whether a service account should be created.                                                                                  | `true`
+`serviceAccount.annotations` | Annotations to add to the service account.                                                                                              | `{}`
+`serviceAccount.name` | The name of the service account to use. If not set and `serviceAccount.create=true`, a name is generated using the fullname template    | `capsule`
+`podAnnotations` | Annotations to add to the Capsule pod.                                                                                                  | `{}`
+`priorityClassName` | Set the priority class name of the Capsule pod.                                                                                         | `null`
+`nodeSelector` | Set the node selector for the Capsule pod.                                                                                              | `{}`
+`tolerations` | Set list of tolerations for the Capsule pod.                                                                                            | `[]`
+`replicaCount` | Set the replica count for Capsule pod.                                                                                                  | `1`
+`affinity` | Set affinity rules for the Capsule pod.                                                                                                 | `{}`
+`podSecurityPolicy.enabled` | Specify if a Pod Security Policy must be created.                                                                                       | `false`
+`serviceMonitor.enabled` | Specifies if a service monitor must be created.                                                                                         | `false`
+`serviceMonitor.labels` | Additional labels which will be added to service monitor.                                                                               | `{}`
+`serviceMonitor.annotations` | Additional annotations which will be added to service monitor.                                                                          | `{}`
+`serviceMonitor.matchLabels` | Additional matchLabels which will be added to service monitor.                                                                          | `{}`
+`serviceMonitor.serviceAccount.name` | Specifies service account name for metrics scrape.                                                                                      | `capsule`
+`serviceMonitor.serviceAccount.namespace` | Specifies service account namespace for metrics scrape.                                                                                 | `capsule-system`
+`customLabels` | Additional labels which will be added to all resources created by Capsule helm chart .                                                  | `{}`
+`customAnnotations` | Additional annotations which will be added to all resources created by Capsule helm chart .                                             | `{}`
+`certManager.generateCertificates` | Specifies whether capsule webhooks certificates should be generated using cert-manager.                                                 | `false`
 ## Created resources
 
 This Helm Chart creates the following Kubernetes resources in the release namespace:

@@ -67,6 +67,19 @@ ServiceAccount annotations
 
 
 {{/*
+Webhook annotations
+*/}}
+{{- define "capsule.webhookAnnotations" -}}
+{{- if .Values.certManager.generateCertificates -}}
+cert-manager.io/inject-ca-from: {{ .Release.Namespace }}/{{ include "capsule.fullname" . }}-webhook-cert
+{{- end }}
+{{- if .Values.customAnnotations }}
+{{ toYaml .Values.customAnnotations }}
+{{- end }}
+{{- end }}
+
+
+{{/*
 Create the name of the service account to use
 */}}
 {{- define "capsule.serviceAccountName" -}}
@@ -124,7 +137,11 @@ Create the Capsule Deployment name to use
 Create the Capsule CA Secret name to use
 */}}
 {{- define "capsule.secretCaName" -}}
+{{- if .Values.certManager.generateCertificates }}
+{{- printf "%s-tls" (include "capsule.fullname" .) -}}
+{{- else }}
 {{- printf "%s-ca" (include "capsule.fullname" .) -}}
+{{- end }}
 {{- end }}
 
 {{/*
