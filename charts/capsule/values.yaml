@@ -21,6 +21,7 @@ manager:
     forceTenantPrefix: false
     capsuleUserGroups: ["capsule.clastix.io"]
     protectedNamespaceRegex: ""
+    enableSecretController: true
   livenessProbe:
     httpGet:
       path: /healthz
@@ -60,6 +61,9 @@ replicaCount: 1
 affinity: {}
 podSecurityPolicy:
   enabled: false
+
+certManager:
+  generateCertificates: false
 
 serviceMonitor:
   enabled: false

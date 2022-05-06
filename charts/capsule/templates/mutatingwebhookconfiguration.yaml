@@ -4,16 +4,18 @@ metadata:
   name: {{ include "capsule.fullname" . }}-mutating-webhook-configuration
   labels:
     {{- include "capsule.labels" . | nindent 4 }}
-  {{- with .Values.customAnnotations }}
+  {{- if or (.Values.certManager.generateCertificates) (.Values.customAnnotations)  }}
   annotations:
-    {{- toYaml . | nindent 4 }}
+     {{- include "capsule.webhookAnnotations" . | nindent 4 }}
   {{- end }}
 webhooks:
 - admissionReviewVersions:
     - v1
     - v1beta1
   clientConfig:
+{{- if not .Values.certManager.generateCertificates }}
     caBundle: Cg==
+{{- end }}
     service:
       name: {{ include "capsule.fullname" . }}-webhook-service
       namespace: {{ .Release.Namespace }}

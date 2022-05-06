@@ -56,6 +56,7 @@ spec:
           - --enable-leader-election
           - --zap-log-level={{ default 4 .Values.manager.options.logLevel }}
           - --configuration-name=default
+          - --enable-secret-controller={{ .Values.manager.options.enableSecretController }}
           image: {{ include "capsule.managerFullyQualifiedDockerImage" . }}
           imagePullPolicy: {{ .Values.manager.image.pullPolicy }}
           env:
