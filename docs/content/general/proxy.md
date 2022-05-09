@@ -189,35 +189,6 @@ When issuing a `kubectl describe node`, some other endpoints are put in place:
 
 These are mandatory in order to retrieve the list of the running Pods on the required node, and providing info about the lease status of it.
 
-### Nodes
-
-The Capsule Proxy gives the owners the ability to access the nodes matching the `.spec.nodeSelector` in the Tenant manifest: 
-
-```yaml
-apiVersion: capsule.clastix.io/v1beta1
-kind: Tenant
-metadata:
-  name: oil
-spec:
-  owners:
-    - kind: User
-      name: alice
-      proxySettings:
-        - kind: Nodes
-          operations:
-            - List
-  nodeSelector:
-    kubernetes.io/hostname: capsule-gold-qwerty
-```
-
-```bash
-$ kubectl --context alice-oidc@mycluster get nodes
-NAME                    STATUS   ROLES    AGE   VERSION
-capsule-gold-qwerty     Ready    <none>   43h   v1.19.1
-```
-
-> Warning: when no `nodeSelector` is specified, the tenant owners has access to all the nodes, according to the permissions listed in the `proxySettings` specs.
-
 ### Storage Classes
 
 A Tenant may be limited to use a set of allowed Storage Class resources, as follows.
