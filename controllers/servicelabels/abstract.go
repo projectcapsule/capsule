@@ -12,7 +12,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierr "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
@@ -28,7 +27,6 @@ type abstractServiceLabelsReconciler struct {
 	obj    client.Object
 	client client.Client
 	log    logr.Logger
-	scheme *runtime.Scheme
 }
 
 func (r *abstractServiceLabelsReconciler) InjectClient(c client.Client) error {
