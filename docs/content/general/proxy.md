@@ -30,7 +30,7 @@ The `capsule-proxy` implements a simple reverse proxy that intercepts only speci
 Current implementation filters the following requests:
 
 * `/api/scheduling.k8s.io/{v1}/priorityclasses{/name}`
-* `/api/v1/namespaces`
+* `/api/v1/namespaces{/name}`
 * `/api/v1/nodes{/name}`
 * `/api/v1/pods?fieldSelector=spec.nodeName%3D{name}`
 * `/apis/coordination.k8s.io/v1/namespaces/kube-node-lease/leases/{name}`
@@ -149,6 +149,21 @@ NAME                STATUS   AGE
 gas-marketing       Active   2m
 oil-development     Active   2m
 oil-production      Active   2m
+```
+
+Capsule Proxy supports applying a Namespace configuration using the `apply` command, as follows.
+
+```
+$: cat <<EOF | kubectl apply -f -
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: solar-development
+EOF
+
+namespace/solar-development unchanged
+# or, in case of non existing Namespace:
+namespace/solar-development created
 ```
 
 ### Nodes
