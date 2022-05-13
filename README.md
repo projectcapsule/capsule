@@ -65,6 +65,14 @@ Please, check the project [documentation](https://capsule.clastix.io) for the co
 
 Capsule is Open Source with Apache 2 license and any contribution is welcome.
 
+## Community
+
+Join the community, share and learn from it. You can find all the resources to how to contribute code and docs, connect with people in the [community repository](https://github.com/clastix/capsule-community).
+
+# Governance
+
+You can find how the Capsule project is governed [here](https://capsule.clastix.io/docs/contributing/governance).
+
 # FAQ
 
 - Q. How to pronounce Capsule?
