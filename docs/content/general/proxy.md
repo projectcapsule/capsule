@@ -370,6 +370,59 @@ globalDefault: false
 description: "Priority class for Tenants"
 ```
 
+### ProxySetting Use Case
+Consider a scenario, where a cluster admin creates a tenant and assign ownership of the tenant to a user, so called tenant owner. Afterwards, tenant owner would in turn like to provide access to their cluster-scoped resources to a set of users (e.g. non-owners or tenant users), groups and service accounts, who doesn't require tenant owner level permissions.
+
+Tenant Owner can provide access to following cluster-scoped resources to their tenant users, groups and service account by creating `ProxySetting` resource
+- `Nodes`
+- `StorageClasses`
+- `IngressClasses`
+- `PriorityClasses`
+
+Each Resource kind can be granted with following verbs, such as:
+- `List`
+- `Update`
+- `Delete`
+
+These tenant users, groups and services accounts have less privileged access than tenant owners.
+
+As a Tenant Owner `alice`, you can create a `ProxySetting` resources to allow `bob` to list nodes, storage classes, ingress classes and priority classes
+```yaml
+apiVersion: capsule.clastix.io/v1beta1
+kind: ProxySetting
+metadata:
+  name: sre-readers
+  namespace: solar-production
+spec:
+  subjects:
+  - name: bob
+    kind: User
+    proxySettings:
+    - kind: Nodes
+      operations:
+      - List
+    - kind: StorageClasses
+      operations:
+      - List
+    - kind: IngressClasses
+      operations:
+      - List
+    - kind: PriorityClasses
+      operations:
+      - List
+```
+As a Tenant User `bob`, you can list nodes, storage classes, ingress classes and priority classes
+
+```bash
+$ kubectl auth can-i --context bob-oidc@mycluster get nodes
+yes
+$ kubectl auth can-i --context bob-oidc@mycluster get storageclasses
+yes
+$ kubectl auth can-i --context bob-oidc@mycluster get ingressclasses
+yes
+$ kubectl auth can-i --context bob-oidc@mycluster get priorityclasses
+yes
+```
 ## HTTP support
 Capsule proxy supports `https` and `http`, although the latter is not recommended, we understand that it can be useful for some use cases (i.e. development, working behind a TLS-terminated reverse proxy and so on). As the default behaviour is to work with `https`, we need to use the flag `--enable-ssl=false` if we really want to work under `http`.
 
