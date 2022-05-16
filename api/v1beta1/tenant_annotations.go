@@ -19,6 +19,7 @@ const (
 	ForbiddenNamespaceLabelsRegexpAnnotation      = "capsule.clastix.io/forbidden-namespace-labels-regexp"
 	ForbiddenNamespaceAnnotationsAnnotation       = "capsule.clastix.io/forbidden-namespace-annotations"
 	ForbiddenNamespaceAnnotationsRegexpAnnotation = "capsule.clastix.io/forbidden-namespace-annotations-regexp"
+	ProtectedTenantAnnotation                     = "capsule.clastix.io/protected"
 )
 
 func UsedQuotaFor(resource fmt.Stringer) string {
