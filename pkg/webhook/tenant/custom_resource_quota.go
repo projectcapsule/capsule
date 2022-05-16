@@ -77,7 +77,11 @@ func (r *resourceCounterHandler) OnCreate(clt client.Client, decoder *admission.
 			}
 
 			if limit, retryErr = capsulev1beta1.GetLimitResourceFromTenant(*tnt, kgv); retryErr != nil {
-				return nil
+				if errors.As(err, &capsulev1beta1.NonLimitedResourceError{}) {
+					return nil
+				}
+
+				return err
 			}
 			used, _ := capsulev1beta1.GetUsedResourceFromTenant(*tnt, kgv)
 

@@ -32,10 +32,22 @@ func GetUsedResourceFromTenant(tenant Tenant, kindGroup string) (int64, error) {
 	return used, nil
 }
 
+type NonLimitedResourceError struct {
+	kindGroup string
+}
+
+func NewNonLimitedResourceError(kindGroup string) *NonLimitedResourceError {
+	return &NonLimitedResourceError{kindGroup: kindGroup}
+}
+
+func (n NonLimitedResourceError) Error() string {
+	return fmt.Sprintf("resource %s is not limited for the current tenant", n.kindGroup)
+}
+
 func GetLimitResourceFromTenant(tenant Tenant, kindGroup string) (int64, error) {
 	limitStr, ok := tenant.GetAnnotations()[LimitAnnotationForResource(kindGroup)]
 	if !ok {
-		return 0, fmt.Errorf("resource %s is not limited for the current tenant", kindGroup)
+		return 0, NewNonLimitedResourceError(kindGroup)
 	}
 
 	limit, err := strconv.ParseInt(limitStr, 10, 10)
