@@ -1661,6 +1661,26 @@ EOF
 >* v1.20.6
 >* v1.21.0
 
+## Protecting tenants from deletion
+
+Sometimes it is important to protect business critical tenants from accidental deletion. 
+This can be achieved by adding `capsule.clastix.io/protected` annotation on the tenant:
+
+```yaml
+kubectl apply -f - << EOF
+apiVersion: capsule.clastix.io/v1beta1
+kind: Tenant
+metadata:
+  name: oil
+  annotations:
+    capsule.clastix.io/protected: ""
+spec:
+  owners:
+  - name: alice
+    kind: User
+EOF
+```
+
 ---
 
 This ends our tutorial on how to implement complex multi-tenancy and policy-driven scenarios with Capsule. As we improve it, more use cases about multi-tenancy, policy admission control, and cluster governance will be covered in the future.
