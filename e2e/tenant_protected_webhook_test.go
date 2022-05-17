@@ -18,7 +18,7 @@ import (
 var _ = Describe("Deleting a tenant with protected annotation", func() {
 	tnt := &capsulev1beta1.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "protected_tenant",
+			Name: "protected-tenant",
 			Annotations: map[string]string{
 				capsulev1beta1.ProtectedTenantAnnotation: "",
 			},
