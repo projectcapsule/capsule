@@ -5,6 +5,9 @@
   <a href="https://github.com/clastix/capsule/releases">
     <img src="https://img.shields.io/github/v/release/clastix/capsule"/>
   </a>
+  <a href="https://charmhub.io/capsule-k8s">
+    <img src="https://charmhub.io/capsule-k8s/badge.svg"/>
+  </a>
 </p>
 
 <p align="center">

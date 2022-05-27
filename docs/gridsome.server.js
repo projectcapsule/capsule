@@ -71,6 +71,10 @@ module.exports = function (api) {
               path: '/docs/guides/upgrading'
             },
             {
+              label: 'Install on Charmed Kubernetes',
+              path: '/docs/guides/charmed'
+            },
+            {
               title: 'Managed Kubernetes',
               subItems: [
                 {
