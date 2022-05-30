@@ -4,7 +4,7 @@
 
 manager:
   image:
-    repository: quay.io/clastix/capsule
+    repository: clastix/capsule
     pullPolicy: IfNotPresent
     tag: ''
 

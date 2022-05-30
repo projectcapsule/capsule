@@ -66,7 +66,7 @@ Parameter | Description                                                         
 `manager.options.capsuleUserGroups` | Override the Capsule user groups                                                                                                        | `[capsule.clastix.io]`
 `manager.options.protectedNamespaceRegex` | If specified, disallows creation of namespaces matching the passed regexp                                                               | `null`
 `manager.options.enableSecretController` | Boolean, enables apsule secret controller which reconciles TLS and CA secrets for capsule webhooks.                                     | `true`
-`manager.image.repository` | Set the image repository of the controller.                                                                                             | `quay.io/clastix/capsule`
+`manager.image.repository` | Set the image repository of the controller.                                                                                             | `clastix/capsule`
 `manager.image.tag` | Overrides the image tag whose default is the chart. `appVersion`                                                                        | `null`
 `manager.image.pullPolicy` | Set the image pull policy.                                                                                                              | `IfNotPresent`
 `manager.livenessProbe` | Configure the liveness probe using Deployment probe spec                                                                                | `GET :10080/healthz`
