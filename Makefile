@@ -2,7 +2,7 @@
 VERSION ?= $$(git describe --abbrev=0 --tags --match "v*")
 
 # Default bundle image tag
-BUNDLE_IMG ?= quay.io/clastix/capsule:$(VERSION)-bundle
+BUNDLE_IMG ?= clastix/capsule:$(VERSION)-bundle
 # Options for 'bundle-build'
 ifneq ($(origin CHANNELS), undefined)
 BUNDLE_CHANNELS := --channels=$(CHANNELS)
@@ -13,7 +13,7 @@ endif
 BUNDLE_METADATA_OPTS ?= $(BUNDLE_CHANNELS) $(BUNDLE_DEFAULT_CHANNEL)
 
 # Image URL to use all building/pushing image targets
-IMG ?= quay.io/clastix/capsule:$(VERSION)
+IMG ?= clastix/capsule:$(VERSION)
 # Produce CRDs that work back to Kubernetes 1.11 (no version conversion)
 CRD_OPTIONS ?= "crd:preserveUnknownFields=false"
 
