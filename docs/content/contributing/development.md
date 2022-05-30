@@ -125,12 +125,12 @@ $ go mod download
 $ make docker-build
 
 # Retrieve the built image version
-$ export CAPSULE_IMAGE_VESION=`docker images --format '{{.Tag}}' quay.io/clastix/capsule`
+$ export CAPSULE_IMAGE_VESION=`docker images --format '{{.Tag}}' clastix/capsule`
 
 # If k3s, load the image into cluster by
-$ k3d image import --cluster k3s-capsule capsule quay.io/clastix/capsule:${CAPSULE_IMAGE_VESION}
+$ k3d image import --cluster k3s-capsule capsule clastix/capsule:${CAPSULE_IMAGE_VESION}
 # If Kind, load the image into cluster by
-$ kind load docker-image --name kind-capsule quay.io/clastix/capsule:${CAPSULE_IMAGE_VESION}
+$ kind load docker-image --name kind-capsule clastix/capsule:${CAPSULE_IMAGE_VESION}
 
 # deploy all the required manifests
 # Note: 1) please retry if you saw errors; 2) if you want to clean it up first, run: make remove
