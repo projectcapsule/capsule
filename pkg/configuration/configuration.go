@@ -4,6 +4,7 @@
 package configuration
 
 import (
+	"k8s.io/apimachinery/pkg/util/sets"
 	"regexp"
 
 	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
@@ -24,6 +25,7 @@ type Configuration interface {
 	MutatingWebhookConfigurationName() string
 	ValidatingWebhookConfigurationName() string
 	UserGroups() []string
+	IgnoredUserGroupsAnnotations() sets.String
 	ForbiddenUserNodeLabels() *capsulev1beta1.ForbiddenListSpec
 	ForbiddenUserNodeAnnotations() *capsulev1beta1.ForbiddenListSpec
 }

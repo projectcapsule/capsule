@@ -5,7 +5,9 @@ package configuration
 
 import (
 	"context"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"regexp"
+	"sort"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -40,6 +42,9 @@ func NewCapsuleConfiguration(ctx context.Context, client client.Client, name str
 			panic(errors.Wrap(err, "Cannot retrieve Capsule configuration with name "+name))
 		}
 
+		if !isUserGroupsMutuallyExclusive(config.Annotations[capsulev1alpha1.IgnoredUserGroupsAnnotation], config.Spec.UserGroups) {
+			panic(errors.New("User Groups and Ignore User Groups are mutually exclusive, cannot bootstrap with current Capsule configuration"))
+		}
 		return config
 	}}
 }
@@ -170,4 +175,31 @@ func (c *capsuleConfiguration) ForbiddenUserNodeAnnotations() *capsulev1beta1.Fo
 		Exact: strings.Split(c.retrievalFn().Annotations[capsulev1alpha1.ForbiddenNodeAnnotationsAnnotation], ","),
 		Regex: c.retrievalFn().Annotations[capsulev1alpha1.ForbiddenNodeAnnotationsRegexpAnnotation],
 	}
+}
+
+func (c *capsuleConfiguration) IgnoredUserGroupsAnnotations() sets.String {
+	ignoredUserGroupSet := sets.NewString()
+	ignoredUserGroups, ok := c.retrievalFn().Annotations[capsulev1alpha1.IgnoredUserGroupsAnnotation]
+	if !ok {
+		return nil
+	}
+	return ignoredUserGroupSet.Insert(strings.Split(ignoredUserGroups, ",")...)
+}
+
+func isUserGroupsMutuallyExclusive(ignoredUserGroups string, userGroups []string) bool {
+	if len(ignoredUserGroups) > 0 {
+		sort.Strings(userGroups)
+		userGroupsLen := len(userGroups)
+
+		ignoredUserGrpSlice := strings.Split(ignoredUserGroups, ",")
+		sort.Strings(ignoredUserGrpSlice)
+
+		for _, ignoredGroup := range ignoredUserGrpSlice {
+			idx := sort.SearchStrings(userGroups, ignoredGroup)
+			if idx <= userGroupsLen && userGroups[idx] == ignoredGroup {
+				return false
+			}
+		}
+	}
+	return true
 }

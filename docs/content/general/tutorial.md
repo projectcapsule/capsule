@@ -220,6 +220,25 @@ system:serviceaccounts:{service-account-namespace}
 
 > Please, pay attention when setting a service account acting as tenant owner. Make sure you're not using the group `system:serviceaccounts` or the group `system:serviceaccounts:{capsule-namespace}` as Capsule group, otherwise you'll create a short-circuit in the Capsule controller, being Capsule itself controlled by a serviceaccount. 
 
+## Ignoring User Groups
+In capsule configuration, you can also prohibit certain user groups such that the users/service accounts belong to that user groups will be denied access to operate on the capsule managed resources.
+
+To do so, please add the list of user groups as comma (",") seperated string to the annotation `capsule.clastix.io/ignored-user-groups`. 
+
+For example, to deny any requests coming from `system:serviceaccounts:my-namespace-1` and `system:serviceaccounts:my-namespace-2`, the annotation should be set as follows.
+```yaml
+apiVersion: capsule.clastix.io/v1alpha1
+kind: CapsuleConfiguration
+metadata:
+  name: default
+  annotations:
+    capsule.clastix.io/ignored-user-groups: "system:serviceaccounts:my-namespace-1,system:serviceaccounts:my-namespace-2"
+spec:
+  userGroups:
+    - system:serviceaccounts:default
+```
+
+> Please note that the user groups in the spec and ignored user group in the annotations are mutually exclusive.    
 
 ## Create namespaces
 Alice, once logged with her credentials, can create a new namespace in her tenant, as simply issuing:

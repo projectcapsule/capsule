@@ -69,7 +69,7 @@ func (r *freezedHandler) OnDelete(c client.Client, _ *admission.Decoder, recorde
 
 		tnt := tntList.Items[0]
 
-		if tnt.IsCordoned() && utils.IsCapsuleUser(req, r.configuration.UserGroups()) {
+		if tnt.IsCordoned() && utils.IsCapsuleUser(req, r.configuration.UserGroups(), r.configuration.IgnoredUserGroupsAnnotations()) {
 			recorder.Eventf(&tnt, corev1.EventTypeWarning, "TenantFreezed", "Namespace %s cannot be deleted, the current Tenant is freezed", req.Name)
 
 			response := admission.Denied("the selected Tenant is freezed")
@@ -101,7 +101,7 @@ func (r *freezedHandler) OnUpdate(c client.Client, decoder *admission.Decoder, r
 
 		tnt := tntList.Items[0]
 
-		if tnt.IsCordoned() && utils.IsCapsuleUser(req, r.configuration.UserGroups()) {
+		if tnt.IsCordoned() && utils.IsCapsuleUser(req, r.configuration.UserGroups(), r.configuration.IgnoredUserGroupsAnnotations()) {
 			recorder.Eventf(&tnt, corev1.EventTypeWarning, "TenantFreezed", "Namespace %s cannot be updated, the current Tenant is freezed", ns.GetName())
 
 			response := admission.Denied("the selected Tenant is freezed")
