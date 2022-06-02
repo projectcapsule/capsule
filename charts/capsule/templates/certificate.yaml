@@ -29,5 +29,8 @@ spec:
   issuerRef:
     kind: Issuer
     name: {{ include "capsule.fullname" . }}-webhook-selfsigned
-  secretName: {{ include "capsule.fullname" . }}-tls
+  secretName: {{ include "capsule.secretTlsName" . }}
+  subject:
+    organizations:
+      - clastix.io
 {{- end }}

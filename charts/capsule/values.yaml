@@ -21,7 +21,7 @@ manager:
     forceTenantPrefix: false
     capsuleUserGroups: ["capsule.clastix.io"]
     protectedNamespaceRegex: ""
-    enableSecretController: true
+    generateCertificates: true
   livenessProbe:
     httpGet:
       path: /healthz
