@@ -4,9 +4,9 @@ metadata:
   name: {{ include "capsule.fullname" . }}-mutating-webhook-configuration
   labels:
     {{- include "capsule.labels" . | nindent 4 }}
-  {{- if or (.Values.certManager.generateCertificates) (.Values.customAnnotations)  }}
+  {{- with .Values.customAnnotations }}
   annotations:
-     {{- include "capsule.webhookAnnotations" . | nindent 4 }}
+    {{- toYaml . | nindent 4 }}
   {{- end }}
 webhooks:
 - admissionReviewVersions:
