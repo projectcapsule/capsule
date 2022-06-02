@@ -34,10 +34,9 @@ import (
 )
 
 const (
-	certificateExpirationThreshold     = 3 * 24 * time.Hour
-	certificateReconciliationThreshold = 4 * 24 * time.Hour
-	certificateValidity                = 6 * 30 * 24 * time.Hour
-	PodUpdateAnnotationName            = "capsule.clastix.io/updated"
+	certificateExpirationThreshold = 3 * 24 * time.Hour
+	certificateValidity            = 6 * 30 * 24 * time.Hour
+	PodUpdateAnnotationName        = "capsule.clastix.io/updated"
 )
 
 type Reconciler struct {
@@ -74,23 +73,13 @@ func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-func (r Reconciler) Reconcile(ctx context.Context, request ctrl.Request) (ctrl.Result, error) {
-	r.Log = r.Log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
-
-	// Fetch the CA instance
-	certSecret := &corev1.Secret{}
-
-	if err := r.Client.Get(ctx, request.NamespacedName, certSecret); err != nil {
-		// Error reading the object - requeue the request.
-		return reconcile.Result{}, err
-	}
-
+func (r Reconciler) ReconcileCertificates(ctx context.Context, certSecret *corev1.Secret) error {
 	if r.shouldUpdateCertificate(certSecret) {
 		r.Log.Info("Generating new TLS certificate")
 
 		ca, err := cert.GenerateCertificateAuthority()
 		if err != nil {
-			return reconcile.Result{}, err
+			return err
 		}
 
 		opts := cert.NewCertOpts(time.Now().Add(certificateValidity), fmt.Sprintf("capsule-webhook-service.%s.svc", r.Namespace))
@@ -99,7 +88,7 @@ func (r Reconciler) Reconcile(ctx context.Context, request ctrl.Request) (ctrl.R
 		if err != nil {
 			r.Log.Error(err, "Cannot generate new TLS certificate")
 
-			return reconcile.Result{}, err
+			return err
 		}
 
 		caCrt, _ := ca.CACertificatePem()
@@ -120,7 +109,7 @@ func (r Reconciler) Reconcile(ctx context.Context, request ctrl.Request) (ctrl.R
 		if err != nil {
 			r.Log.Error(err, "cannot update Capsule TLS")
 
-			return reconcile.Result{}, err
+			return err
 		}
 	}
 
@@ -129,12 +118,12 @@ func (r Reconciler) Reconcile(ctx context.Context, request ctrl.Request) (ctrl.R
 	var ok bool
 
 	if caBundle, ok = certSecret.Data[corev1.ServiceAccountRootCAKey]; !ok {
-		return reconcile.Result{}, fmt.Errorf("missing %s field in %s secret", corev1.ServiceAccountRootCAKey, r.Configuration.TLSSecretName())
+		return fmt.Errorf("missing %s field in %s secret", corev1.ServiceAccountRootCAKey, r.Configuration.TLSSecretName())
 	}
 
 	operatorPods, err := r.getOperatorPods(ctx)
 	if err != nil {
-		return reconcile.Result{}, err
+		return err
 	}
 
 	r.Log.Info("Updating caBundle in webhooks and crd")
@@ -161,6 +150,23 @@ func (r Reconciler) Reconcile(ctx context.Context, request ctrl.Request) (ctrl.R
 	}
 
 	if err := group.Wait(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (r Reconciler) Reconcile(ctx context.Context, request ctrl.Request) (ctrl.Result, error) {
+	r.Log = r.Log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
+
+	certSecret := &corev1.Secret{}
+
+	if err := r.Client.Get(ctx, request.NamespacedName, certSecret); err != nil {
+		// Error reading the object - requeue the request.
+		return reconcile.Result{}, err
+	}
+
+	if err := r.ReconcileCertificates(ctx, certSecret); err != nil {
 		return reconcile.Result{}, err
 	}
 
@@ -171,8 +177,8 @@ func (r Reconciler) Reconcile(ctx context.Context, request ctrl.Request) (ctrl.R
 		}
 
 		now := time.Now()
-
-		rq := (time.Duration(certificate.NotAfter.Unix()-now.Unix()) * time.Second) - certificateReconciliationThreshold
+		requeueTime := certificate.NotAfter.Add(-(certificateExpirationThreshold - 1*time.Second))
+		rq := requeueTime.Sub(now)
 
 		r.Log.Info("Reconciliation completed, processing back in " + rq.String())
 
