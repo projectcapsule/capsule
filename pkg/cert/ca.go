@@ -12,6 +12,8 @@ import (
 	"encoding/pem"
 	"math/big"
 	"time"
+
+	"github.com/pkg/errors"
 )
 
 type CA interface {
@@ -25,38 +27,6 @@ type CA interface {
 type CapsuleCA struct {
 	certificate *x509.Certificate
 	key         *rsa.PrivateKey
-}
-
-func (c CapsuleCA) ValidateCert(certificate *x509.Certificate) (err error) {
-	pool := x509.NewCertPool()
-	pool.AddCert(c.certificate)
-
-	_, err = certificate.Verify(x509.VerifyOptions{
-		Roots:       pool,
-		CurrentTime: time.Time{},
-	})
-
-	return
-}
-
-func (c CapsuleCA) isAlreadyValid(now time.Time) bool {
-	return now.After(c.certificate.NotBefore)
-}
-
-func (c CapsuleCA) isExpired(now time.Time) bool {
-	return now.Before(c.certificate.NotAfter)
-}
-
-func (c CapsuleCA) ExpiresIn(now time.Time) (time.Duration, error) {
-	if !c.isExpired(now) {
-		return time.Nanosecond, CaExpiredError{}
-	}
-
-	if !c.isAlreadyValid(now) {
-		return time.Nanosecond, CaNotYetValidError{}
-	}
-
-	return time.Duration(c.certificate.NotAfter.Unix()-now.Unix()) * time.Second, nil
 }
 
 func (c CapsuleCA) CACertificatePem() (b *bytes.Buffer, err error) {
@@ -83,6 +53,24 @@ func (c CapsuleCA) CAPrivateKeyPem() (b *bytes.Buffer, err error) {
 		Type:  "RSA PRIVATE KEY",
 		Bytes: x509.MarshalPKCS1PrivateKey(c.key),
 	})
+}
+
+func ValidateCertificate(cert *x509.Certificate, key *rsa.PrivateKey, expirationThreshold time.Duration) error {
+	if !key.PublicKey.Equal(cert.PublicKey) {
+		return errors.New("certificate signed by wrong public key")
+	}
+
+	now := time.Now()
+
+	if now.Before(cert.NotBefore) {
+		return errors.New("certificate is not valid yet")
+	}
+
+	if now.After(cert.NotAfter.Add(-expirationThreshold)) {
+		return errors.New("certificate expired or going to expire soon")
+	}
+
+	return nil
 }
 
 func GenerateCertificateAuthority() (s *CapsuleCA, err error) {
@@ -114,31 +102,46 @@ func GenerateCertificateAuthority() (s *CapsuleCA, err error) {
 	return
 }
 
-func NewCertificateAuthorityFromBytes(certBytes, keyBytes []byte) (s *CapsuleCA, err error) {
+func GetCertificateFromBytes(certBytes []byte) (*x509.Certificate, error) {
 	var b *pem.Block
 
 	b, _ = pem.Decode(certBytes)
 
-	var cert *x509.Certificate
+	return x509.ParseCertificate(b.Bytes)
+}
 
-	if cert, err = x509.ParseCertificate(b.Bytes); err != nil {
-		return
-	}
+func GetPrivateKeyFromBytes(keyBytes []byte) (*rsa.PrivateKey, error) {
+	var b *pem.Block
 
 	b, _ = pem.Decode(keyBytes)
 
-	var key *rsa.PrivateKey
+	return x509.ParsePKCS1PrivateKey(b.Bytes)
+}
 
-	if key, err = x509.ParsePKCS1PrivateKey(b.Bytes); err != nil {
-		return
+func GetCertificateWithPrivateKeyFromBytes(certBytes, keyBytes []byte) (*x509.Certificate, *rsa.PrivateKey, error) {
+	cert, err := GetCertificateFromBytes(certBytes)
+	if err != nil {
+		return nil, nil, err
 	}
 
-	s = &CapsuleCA{
+	key, err := GetPrivateKeyFromBytes(keyBytes)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return cert, key, nil
+}
+
+func NewCertificateAuthorityFromBytes(certBytes, keyBytes []byte) (*CapsuleCA, error) {
+	cert, key, err := GetCertificateWithPrivateKeyFromBytes(certBytes, keyBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	return &CapsuleCA{
 		certificate: cert,
 		key:         key,
-	}
-
-	return
+	}, nil
 }
 
 // nolint:nakedret

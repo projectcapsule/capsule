@@ -6,6 +6,7 @@ package configuration
 import (
 	"context"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -62,21 +63,6 @@ func (c capsuleConfiguration) ForceTenantPrefix() bool {
 	return c.retrievalFn().Spec.ForceTenantPrefix
 }
 
-func (c capsuleConfiguration) CASecretName() (name string) {
-	name = CASecretName
-
-	if c.retrievalFn().Annotations == nil {
-		return
-	}
-
-	v, ok := c.retrievalFn().Annotations[capsulev1alpha1.CASecretNameAnnotation]
-	if ok {
-		return v
-	}
-
-	return
-}
-
 func (c capsuleConfiguration) TLSSecretName() (name string) {
 	name = TLSSecretName
 
@@ -92,6 +78,21 @@ func (c capsuleConfiguration) TLSSecretName() (name string) {
 	return
 }
 
+func (c capsuleConfiguration) GenerateCertificates() bool {
+	annotationValue, ok := c.retrievalFn().Annotations[capsulev1alpha1.GenerateCertificatesAnnotationName]
+
+	if ok {
+		value, err := strconv.ParseBool(annotationValue)
+		if err != nil {
+			return false
+		}
+
+		return value
+	}
+
+	return false
+}
+
 func (c capsuleConfiguration) MutatingWebhookConfigurationName() (name string) {
 	name = MutatingWebhookConfigurationName
 
@@ -105,6 +106,10 @@ func (c capsuleConfiguration) MutatingWebhookConfigurationName() (name string) {
 	}
 
 	return
+}
+
+func (c capsuleConfiguration) TenantCRDName() string {
+	return TenantCRDName
 }
 
 func (c capsuleConfiguration) ValidatingWebhookConfigurationName() (name string) {

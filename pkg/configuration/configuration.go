@@ -10,19 +10,20 @@ import (
 )
 
 const (
-	CASecretName                       = "capsule-ca"
 	TLSSecretName                      = "capsule-tls"
 	MutatingWebhookConfigurationName   = "capsule-mutating-webhook-configuration"
 	ValidatingWebhookConfigurationName = "capsule-validating-webhook-configuration"
+	TenantCRDName                      = "tenants.capsule.clastix.io"
 )
 
 type Configuration interface {
 	ProtectedNamespaceRegexp() (*regexp.Regexp, error)
 	ForceTenantPrefix() bool
-	CASecretName() string
+	GenerateCertificates() bool
 	TLSSecretName() string
 	MutatingWebhookConfigurationName() string
 	ValidatingWebhookConfigurationName() string
+	TenantCRDName() string
 	UserGroups() []string
 	ForbiddenUserNodeLabels() *capsulev1beta1.ForbiddenListSpec
 	ForbiddenUserNodeAnnotations() *capsulev1beta1.ForbiddenListSpec

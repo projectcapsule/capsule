@@ -28,9 +28,9 @@ import (
 	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
 	configcontroller "github.com/clastix/capsule/controllers/config"
 	rbaccontroller "github.com/clastix/capsule/controllers/rbac"
-	secretcontroller "github.com/clastix/capsule/controllers/secret"
 	servicelabelscontroller "github.com/clastix/capsule/controllers/servicelabels"
 	tenantcontroller "github.com/clastix/capsule/controllers/tenant"
+	tlscontroller "github.com/clastix/capsule/controllers/tls"
 	"github.com/clastix/capsule/pkg/configuration"
 	"github.com/clastix/capsule/pkg/indexer"
 	"github.com/clastix/capsule/pkg/webhook"
@@ -70,15 +70,13 @@ func printVersion() {
 
 // nolint:maintidx
 func main() {
-	var enableLeaderElection, enableSecretController, version bool
+	var enableLeaderElection, version bool
 
 	var metricsAddr, namespace, configurationName string
 
 	var goFlagSet goflag.FlagSet
 
 	flag.StringVar(&metricsAddr, "metrics-addr", ":8080", "The address the metric endpoint binds to.")
-	flag.BoolVar(&enableSecretController, "enable-secret-controller", true,
-		"Enable secret controller which reconciles TLS and CA secrets for capsule webhooks.")
 	flag.BoolVar(&enableLeaderElection, "enable-leader-election", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
@@ -133,28 +131,6 @@ func main() {
 
 	cfg := configuration.NewCapsuleConfiguration(ctx, manager.GetClient(), configurationName)
 
-	if enableSecretController {
-		if err = (&secretcontroller.CAReconciler{
-			Client:        manager.GetClient(),
-			Log:           ctrl.Log.WithName("controllers").WithName("CA"),
-			Namespace:     namespace,
-			Configuration: cfg,
-		}).SetupWithManager(manager); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "Namespace")
-			os.Exit(1)
-		}
-
-		if err = (&secretcontroller.TLSReconciler{
-			Client:        manager.GetClient(),
-			Log:           ctrl.Log.WithName("controllers").WithName("Tls"),
-			Namespace:     namespace,
-			Configuration: cfg,
-		}).SetupWithManager(manager); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "Namespace")
-			os.Exit(1)
-		}
-	}
-
 	clientset, err := kubernetes.NewForConfig(ctrl.GetConfigOrDie())
 	if err != nil {
 		setupLog.Error(err, "unable to create kubernetes clientset")
@@ -172,9 +148,13 @@ func main() {
 
 	directCfg := configuration.NewCapsuleConfiguration(ctx, directClient, configurationName)
 
-	ca, err := clientset.CoreV1().Secrets(namespace).Get(ctx, directCfg.CASecretName(), metav1.GetOptions{})
-	if err != nil {
-		setupLog.Error(err, "unable to get Capsule CA secret")
+	if err = (&tlscontroller.Reconciler{
+		Client:        manager.GetClient(),
+		Log:           ctrl.Log.WithName("controllers").WithName("TLS"),
+		Namespace:     namespace,
+		Configuration: directCfg,
+	}).SetupWithManager(manager); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "Namespace")
 		os.Exit(1)
 	}
 
@@ -184,7 +164,7 @@ func main() {
 		os.Exit(1)
 	}
 	// nolint:nestif
-	if len(ca.Data) > 0 && len(tls.Data) > 0 {
+	if len(tls.Data) > 0 {
 		if err = (&tenantcontroller.Manager{
 			RESTConfig: manager.GetConfig(),
 			Client:     manager.GetClient(),
