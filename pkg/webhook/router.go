@@ -5,7 +5,6 @@ package webhook
 
 import (
 	"context"
-	"io/ioutil"
 
 	admissionv1 "k8s.io/api/admission/v1"
 	"k8s.io/client-go/tools/record"
@@ -16,12 +15,6 @@ import (
 )
 
 func Register(manager controllerruntime.Manager, webhookList ...Webhook) error {
-	// skipping webhook setup if certificate is missing
-	certData, _ := ioutil.ReadFile("/tmp/k8s-webhook-server/serving-certs/tls.crt")
-	if len(certData) == 0 {
-		return nil
-	}
-
 	recorder := manager.GetEventRecorderFor("tenant-webhook")
 
 	server := manager.GetWebhookServer()
