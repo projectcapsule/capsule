@@ -24,8 +24,11 @@ By default, all Tenant Owners will be granted with two ClusterRole resources usi
 1. the Kubernetes default one, `admin`, that grants most of the Namespace scoped resources management operations
 2. a custom one, named `capsule-namespace-deleter`, allowing to delete the created Namespace
 
+In the example below, assuming Alice create a namespace `oil-production` in Tenant `oil`,getting the tenant owner's Alice default 
+ClusterRoles command:
+
 ```
-$: kubectl get rolebindings.rbac.authorization.k8s.io
+$: kubectl get rolebindings.rbac.authorization.k8s.io -n oil-production
 NAME                                      ROLE                                    AGE
 capsule-oil-0-admin                       ClusterRole/admin                       6s
 capsule-oil-1-capsule-namespace-deleter   ClusterRole/capsule-namespace-deleter   5s
