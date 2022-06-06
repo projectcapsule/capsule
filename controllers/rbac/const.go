@@ -23,7 +23,7 @@ var (
 				{
 					APIGroups: []string{""},
 					Resources: []string{"namespaces"},
-					Verbs:     []string{"create"},
+					Verbs:     []string{"create", "patch"},
 				},
 			},
 		},
