@@ -11,6 +11,7 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 
 	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
 )
@@ -32,6 +33,13 @@ var _ = Describe("Deleting a tenant with protected annotation", func() {
 			},
 		},
 	}
+
+	JustAfterEach(func() {
+		Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: tnt.GetName()}, tnt)).Should(Succeed())
+		tnt.SetAnnotations(map[string]string{})
+		Expect(k8sClient.Update(context.TODO(), tnt)).Should(Succeed())
+		Expect(k8sClient.Delete(context.TODO(), tnt)).Should(Succeed())
+	})
 
 	It("should fail", func() {
 		Expect(k8sClient.Create(context.TODO(), tnt)).Should(Succeed())
