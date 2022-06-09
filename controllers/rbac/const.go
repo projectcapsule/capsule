@@ -35,7 +35,7 @@ var (
 				{
 					APIGroups: []string{""},
 					Resources: []string{"namespaces"},
-					Verbs:     []string{"delete", "patch"},
+					Verbs:     []string{"delete"},
 				},
 			},
 		},
