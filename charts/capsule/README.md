@@ -54,7 +54,7 @@ The values in your overrides file `myvalues.yaml` will override their counterpar
 
 If you only need to make minor customizations, you can specify them on the command line by using the `--set` option. For example:
 
-        $ helm install capsule capsule-helm-chart --set force_tenant_prefix=false -n capsule-system
+        $ helm install capsule capsule-helm-chart --set manager.options.forceTenantPrefix=false -n capsule-system
 
 Here the values you can override:
 
