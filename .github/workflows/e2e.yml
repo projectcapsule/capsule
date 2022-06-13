@@ -30,7 +30,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        k8s-version: ['v1.16.15', 'v1.17.11', 'v1.18.8', 'v1.19.4', 'v1.20.7', 'v1.21.2', 'v1.22.4', 'v1.23.0']
+        k8s-version: ['v1.16.15', 'v1.17.11', 'v1.18.8', 'v1.19.4', 'v1.20.7', 'v1.21.2', 'v1.22.4', 'v1.23.6', 'v1.24.1']
     runs-on: ubuntu-18.04
     steps:
       - uses: actions/checkout@v2
@@ -47,7 +47,7 @@ jobs:
       - uses: engineerd/setup-kind@v0.5.0
         with:
           skipClusterCreation: true
-          version: v0.11.1
+          version: v0.14.0
       - uses: azure/setup-helm@v1
         with:
           version: 3.3.4
