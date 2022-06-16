@@ -70,6 +70,16 @@ Please, check the project [documentation](https://capsule.clastix.io) for the co
 
 Capsule is Open Source with Apache 2 license and any contribution is welcome.
 
+## Chart Development
+
+The documentation for each chart is done with [helm-docs](https://github.com/norwoodj/helm-docs). This way we can ensure that values are consistent with the chart documentation.
+
+We have a script on the repository which will execute the helm-docs docker container, so that you don't have to worry about downloading the binary etc. Simply execute the script (Bash compatible):
+
+```
+bash scripts/helm-docs.sh
+```
+
 ## Community
 
 Join the community, share and learn from it. You can find all the resources to how to contribute code and docs, connect with people in the [community repository](https://github.com/clastix/capsule-community).
