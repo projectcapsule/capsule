@@ -66,6 +66,41 @@ capsule-oil-2-readonly   ClusterRole/readonly   2s
 
 > The pattern for the annotation is `clusterrolenames.capsule.clastix.io/${KIND}.${NAME}`.
 > The placeholders `${KIND}` and `${NAME}` are referring to the Tenant Owner specification fields, both lower-cased.
+> 
+> In the case of users that are identified using their email address, the symbol `@` wouldn't be supported by the RFC 1123.
+> For such cases, the `@` symbol can be replaced with the placeholder `__AT__`.
+> 
+> ```yaml
+> apiVersion: capsule.clastix.io/v1beta1
+> kind: Tenant
+> metadata:
+>   annotations:
+>     clusterrolenames.capsule.clastix.io/alice__AT__clastix.io: editor,manager
+> spec:
+>   owners:
+>     - kind: User
+>       name: alice@org.tld
+>     - kind: User
+>       name: alice@clastix.io
+> ```
+> 
+> Instead, with the resulting annotation key exceeding 63 characters length, the zero-based index of the owner can be specified as follows:
+> 
+> ```yaml
+> apiVersion: capsule.clastix.io/v1beta1
+> kind: Tenant
+> metadata:
+>   annotations:
+>     clusterrolenames.capsule.clastix.io/1: editor,manager
+> spec:
+>   owners:
+>     - kind: User
+>       name: alice@org.tld
+>     - kind: User
+>       name: very-long-user-name-that-breaks-rfc-1123@org.tld
+> ```
+> 
+> This latter example will assign the roles `editor` and `manager`, assigned to the user `very-long-user-name-that-breaks-rfc-1123@org.tld`.
 
 ### User as tenant owner
 Bill, the cluster admin, receives a new request from Acme Corp.'s CTO asking for a new tenant to be onboarded and Alice user will be the tenant owner. Bill then assigns Alice's identity of `alice` in the Acme Corp. identity management system. Since Alice is a tenant owner, Bill needs to assign `alice` the Capsule group defined by `--capsule-user-group` option, which defaults to `capsule.clastix.io`.
