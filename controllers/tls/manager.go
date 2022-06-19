@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
+	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -121,11 +122,6 @@ func (r Reconciler) ReconcileCertificates(ctx context.Context, certSecret *corev
 		return fmt.Errorf("missing %s field in %s secret", corev1.ServiceAccountRootCAKey, r.Configuration.TLSSecretName())
 	}
 
-	operatorPods, err := r.getOperatorPods(ctx)
-	if err != nil {
-		return err
-	}
-
 	r.Log.Info("Updating caBundle in webhooks and crd")
 
 	group := new(errgroup.Group)
@@ -138,6 +134,17 @@ func (r Reconciler) ReconcileCertificates(ctx context.Context, certSecret *corev
 	group.Go(func() error {
 		return r.updateCustomResourceDefinition(ctx, caBundle)
 	})
+
+	operatorPods, err := r.getOperatorPods(ctx)
+	if err != nil {
+		if errors.As(err, &RunningInOutOfClusterModeError{}) {
+			r.Log.Info("skipping annotation of Pods for cert-manager", "error", err.Error())
+
+			return nil
+		}
+
+		return err
+	}
 
 	r.Log.Info("Updating capsule operator pods")
 
@@ -326,9 +333,7 @@ func (r Reconciler) getOperatorPods(ctx context.Context) (*corev1.PodList, error
 	leaderPod := &corev1.Pod{}
 
 	if err := r.Client.Get(ctx, types.NamespacedName{Namespace: os.Getenv("NAMESPACE"), Name: hostname}, leaderPod); err != nil {
-		r.Log.Error(err, "cannot retrieve the leader Pod, probably running in out of the cluster mode")
-
-		return nil, err
+		return nil, RunningInOutOfClusterModeError{}
 	}
 
 	podList := &corev1.PodList{}
