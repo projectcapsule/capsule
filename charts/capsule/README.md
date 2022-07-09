@@ -90,6 +90,7 @@ Here the values you can override:
 | manager.image.repository | string | `"clastix/capsule"` | Set the image repository of the capsule. |
 | manager.image.tag | string | `""` | Overrides the image tag whose default is the chart appVersion. |
 | manager.imagePullSecrets | list | `[]` | Configuration for `imagePullSecrets` so that you can use a private images registry.   |
+| manager.kind | string | `"Deployment"` | Set the deployment mode as `Deployment` or `DaemonSet`.  |
 | manager.livenessProbe | object | `{"httpGet":{"path":"/healthz","port":10080}}` | Configure the liveness probe using Deployment probe spec    |
 | manager.options.capsuleUserGroups | list | `["capsule.clastix.io"]` | Override the Capsule user groups   |
 | manager.options.forceTenantPrefix | bool | `false` | Boolean, enforces the Tenant owner, during Namespace creation, to name it using the selected Tenant name as prefix, separated by a dash |

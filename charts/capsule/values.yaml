@@ -5,6 +5,9 @@
 # Manager Options
 manager:
 
+  # -- Set the deployment mode as `Deployment` or `DaemonSet`. 
+  kind: Deployment
+
   image:
     # -- Set the image repository of the capsule.
     repository: clastix/capsule
