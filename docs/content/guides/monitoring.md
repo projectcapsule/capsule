@@ -47,9 +47,13 @@ Verify that the service monitor is working correctly through the Prometheus "tar
 ![Prometheus Targets](./assets/prometheus_targets.png)
 
 ### Deploy dashboard
+A dashboard for Grafana is provided as [Config Map](https://github.com/clastix/capsule/blob/master/config/grafana/dashboard.yaml). Apply the manifest to namespace where Grafana is installed, making sure to select the correct Prometheus datasource:
 
-Simply upload [dashboard.json](https://github.com/clastix/capsule/blob/master/config/grafana/dashboard.json) file to Grafana through _Create_ -> _Import_,
-making sure to select the correct Prometheus data source:
+```
+kubectl apply -f config/grafana/dashboard.yaml
+```
+
+Alternatively, manual upload the dashboard in JSON format to Grafana through _Create -> Import_:
 
 ![Grafana Import](./assets/upload_json.png)
 
