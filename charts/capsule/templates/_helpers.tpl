@@ -113,9 +113,9 @@ Create the jobs fully-qualified Docker image to use
 {{- end }}
 
 {{/*
-Create the Capsule Deployment name to use
+Create the Capsule controller name to use
 */}}
-{{- define "capsule.deploymentName" -}}
+{{- define "capsule.controllerName" -}}
 {{- printf "%s-controller-manager" (include "capsule.fullname" .) -}}
 {{- end }}
 
