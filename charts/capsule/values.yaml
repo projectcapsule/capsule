@@ -5,7 +5,7 @@
 # Manager Options
 manager:
 
-  # -- Set the deployment mode as `Deployment` or `DaemonSet`. 
+  # -- Set the controller deployment mode as `Deployment` or `DaemonSet`. 
   kind: Deployment
 
   image:
