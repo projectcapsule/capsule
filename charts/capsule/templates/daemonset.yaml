@@ -1,6 +1,6 @@
-{{- if eq .Values.manager.kind "Deployment" }}
+{{- if eq .Values.manager.kind "DaemonSet" }}
 apiVersion: apps/v1
-kind: Deployment
+kind: DaemonSet
 metadata:
   name: {{ include "capsule.controllerName" . }}
   labels:
@@ -10,7 +10,8 @@ metadata:
     {{- toYaml . | nindent 4 }}
   {{- end }}
 spec:
-  replicas: {{ .Values.replicaCount }}
+  updateStrategy:
+    type: RollingUpdate
   selector:
     matchLabels:
       {{- include "capsule.selectorLabels" . | nindent 6 }}

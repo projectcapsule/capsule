@@ -1,4 +1,4 @@
-{{- $cmd := printf "kubectl scale deployment -n $NAMESPACE %s --replicas 0 &&" (include "capsule.deploymentName" .) -}}
+{{- $cmd := ""}}
 {{- if not .Values.certManager.generateCertificates }}
 {{- $cmd = printf "%s kubectl delete secret -n $NAMESPACE %s --ignore-not-found &&" $cmd (include "capsule.secretTlsName" .) -}}
 {{- end }}
