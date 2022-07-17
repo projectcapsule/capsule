@@ -1,0 +1,8 @@
+configMapGenerator:
+- name: capsule-grafana-dashboard
+  files:
+  - dashboard.json
+generatorOptions:
+  disableNameSuffixHash: true
+patchesStrategicMerge:
+- dashboard.yaml
