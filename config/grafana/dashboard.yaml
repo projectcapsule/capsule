@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  labels:
+    # label selector used by Grafana to load the dashboards from Config Maps
+    grafana_dashboard: "1"
+  name: capsule-grafana-dashboard

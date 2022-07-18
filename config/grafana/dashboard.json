@@ -1,2129 +1,2121 @@
 {
-  "__inputs": [
-    {
-      "name": "DS_PROMETHEUS",
-      "label": "Prometheus",
-      "description": "",
-      "type": "datasource",
-      "pluginId": "prometheus",
-      "pluginName": "Prometheus"
-    }
-  ],
-  "__requires": [
-    {
-      "type": "grafana",
-      "id": "grafana",
-      "name": "Grafana",
-      "version": "7.5.4"
-    },
-    {
-      "type": "panel",
-      "id": "heatmap",
-      "name": "Heatmap",
-      "version": ""
-    },
-    {
-      "type": "datasource",
-      "id": "prometheus",
-      "name": "Prometheus",
-      "version": "1.0.0"
-    },
-    {
-      "type": "panel",
-      "id": "stat",
-      "name": "Stat",
-      "version": ""
-    },
-    {
-      "type": "panel",
-      "id": "timeseries",
-      "name": "Time series",
-      "version": ""
-    }
-  ],
-  "annotations": {
-    "list": [
+    "__inputs": [
+    ],
+    "__requires": [
       {
-        "builtIn": 1,
-        "datasource": "-- Grafana --",
-        "enable": true,
-        "hide": true,
-        "iconColor": "rgba(0, 211, 255, 1)",
-        "name": "Annotations & Alerts",
-        "type": "dashboard"
+        "type": "grafana",
+        "id": "grafana",
+        "name": "Grafana",
+        "version": "7.5.4"
+      },
+      {
+        "type": "panel",
+        "id": "heatmap",
+        "name": "Heatmap",
+        "version": ""
+      },
+      {
+        "type": "datasource",
+        "id": "prometheus",
+        "name": "Prometheus",
+        "version": "1.0.0"
+      },
+      {
+        "type": "panel",
+        "id": "stat",
+        "name": "Stat",
+        "version": ""
+      },
+      {
+        "type": "panel",
+        "id": "timeseries",
+        "name": "Time series",
+        "version": ""
       }
-    ]
-  },
-  "editable": true,
-  "gnetId": null,
-  "graphTooltip": 0,
-  "id": null,
-  "iteration": 1629463154511,
-  "links": [],
-  "panels": [
-    {
-      "collapsed": false,
-      "datasource": null,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 0
-      },
-      "id": 28,
-      "panels": [],
-      "title": "Manager controllers",
-      "type": "row"
+    ],
+    "annotations": {
+      "list": [
+        {
+          "builtIn": 1,
+          "datasource": "-- Grafana --",
+          "enable": true,
+          "hide": true,
+          "iconColor": "rgba(0, 211, 255, 1)",
+          "name": "Annotations & Alerts",
+          "type": "dashboard"
+        }
+      ]
     },
-    {
-      "cards": {
-        "cardPadding": null,
-        "cardRound": null
-      },
-      "color": {
-        "cardColor": "#b4ff00",
-        "colorScale": "sqrt",
-        "colorScheme": "interpolateOranges",
-        "exponent": 0.5,
-        "mode": "spectrum"
-      },
-      "dataFormat": "timeseries",
-      "datasource": "${DS_PROMETHEUS}",
-      "description": "",
-      "fieldConfig": {
-        "defaults": {},
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 1
-      },
-      "heatmap": {},
-      "hideZeroBuckets": false,
-      "highlightCards": true,
-      "id": 21,
-      "legend": {
-        "show": false
-      },
-      "maxPerRow": 2,
-      "pluginVersion": "8.0.1",
-      "repeat": "controller_name",
-      "repeatDirection": "h",
-      "reverseYBuckets": false,
-      "targets": [
-        {
-          "exemplar": false,
-          "expr": "sum by (le) (increase(workqueue_work_duration_seconds_bucket{job=\"capsule\", name=\"$controller_name\"}[$__rate_interval]))",
-          "format": "heatmap",
-          "hide": false,
-          "interval": "",
-          "legendFormat": "",
-          "queryType": "randomWalk",
-          "refId": "A"
-        }
-      ],
-      "title": "$controller_name reconcile latency",
-      "tooltip": {
-        "show": true,
-        "showHistogram": false
-      },
-      "type": "heatmap",
-      "xAxis": {
-        "show": true
-      },
-      "xBucketNumber": null,
-      "xBucketSize": null,
-      "yAxis": {
-        "decimals": null,
-        "format": "ms",
-        "logBase": 1,
-        "max": null,
-        "min": "0",
-        "show": true,
-        "splitFactor": null
-      },
-      "yBucketBound": "auto",
-      "yBucketNumber": null,
-      "yBucketSize": null
-    },
-    {
-      "collapsed": false,
-      "datasource": null,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 33
-      },
-      "id": 58,
-      "panels": [],
-      "title": "Webhook error rate",
-      "type": "row"
-    },
-    {
-      "datasource": "${DS_PROMETHEUS}",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 10,
-            "gradientMode": "none",
-            "hideFrom": {
-              "graph": false,
-              "legend": false,
-              "tooltip": false
-            },
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "never",
-            "spanNulls": true
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          },
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 11,
-        "w": 6,
-        "x": 0,
-        "y": 34
-      },
-      "id": 59,
-      "options": {
-        "graph": {},
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom"
-        },
-        "tooltip": {
-          "mode": "single"
-        },
-        "tooltipOptions": {
-          "mode": "single"
-        }
-      },
-      "pluginVersion": "7.5.5",
-      "repeat": "webhook",
-      "targets": [
-        {
-          "exemplar": false,
-          "expr": "sum(irate(controller_runtime_webhook_requests_total{job=\"capsule\", webhook=\"$webhook\"}[$__rate_interval])) by (webhook, code)",
-          "format": "time_series",
-          "hide": false,
-          "interval": "",
-          "legendFormat": "{{ code }}",
-          "queryType": "randomWalk",
-          "refId": "A"
-        }
-      ],
-      "timeFrom": null,
-      "timeShift": null,
-      "title": "$webhook status code",
-      "type": "timeseries"
-    },
-    {
-      "collapsed": true,
-      "datasource": null,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 67
-      },
-      "id": 35,
-      "panels": [
-        {
-          "cards": {
-            "cardPadding": null,
-            "cardRound": null
-          },
-          "color": {
-            "cardColor": "#b4ff00",
-            "colorScale": "sqrt",
-            "colorScheme": "interpolateOranges",
-            "exponent": 0.5,
-            "mode": "spectrum"
-          },
-          "dataFormat": "timeseries",
-          "datasource": "${DS_PROMETHEUS}",
-          "description": "",
-          "fieldConfig": {
-            "defaults": {},
-            "overrides": []
-          },
-          "gridPos": {
-            "h": 8,
-            "w": 12,
-            "x": 0,
-            "y": 44
-          },
-          "heatmap": {},
-          "hideZeroBuckets": false,
-          "highlightCards": true,
-          "id": 37,
-          "legend": {
-            "show": false
-          },
-          "maxPerRow": 2,
-          "pluginVersion": "8.0.1",
-          "repeat": "webhook",
-          "repeatDirection": "h",
-          "reverseYBuckets": false,
-          "scopedVars": {
-            "webhook": {
-              "selected": false,
-              "text": "/cordoning",
-              "value": "/cordoning"
-            }
-          },
-          "targets": [
-            {
-              "exemplar": false,
-              "expr": "sum by (le) (increase(controller_runtime_webhook_latency_seconds_bucket{job=\"capsule\", webhook=\"$webhook\"}[$__rate_interval]))",
-              "format": "heatmap",
-              "hide": false,
-              "interval": "",
-              "legendFormat": "",
-              "queryType": "randomWalk",
-              "refId": "A"
-            }
-          ],
-          "title": "$webhook reconcile latency",
-          "tooltip": {
-            "show": true,
-            "showHistogram": false
-          },
-          "type": "heatmap",
-          "xAxis": {
-            "show": true
-          },
-          "xBucketNumber": null,
-          "xBucketSize": null,
-          "yAxis": {
-            "decimals": null,
-            "format": "ms",
-            "logBase": 1,
-            "max": null,
-            "min": "0",
-            "show": true,
-            "splitFactor": null
-          },
-          "yBucketBound": "auto",
-          "yBucketNumber": null,
-          "yBucketSize": null
-        },
-        {
-          "cards": {
-            "cardPadding": null,
-            "cardRound": null
-          },
-          "color": {
-            "cardColor": "#b4ff00",
-            "colorScale": "sqrt",
-            "colorScheme": "interpolateOranges",
-            "exponent": 0.5,
-            "mode": "spectrum"
-          },
-          "dataFormat": "timeseries",
-          "datasource": "${DS_PROMETHEUS}",
-          "description": "",
-          "fieldConfig": {
-            "defaults": {},
-            "overrides": []
-          },
-          "gridPos": {
-            "h": 8,
-            "w": 12,
-            "x": 12,
-            "y": 44
-          },
-          "heatmap": {},
-          "hideZeroBuckets": false,
-          "highlightCards": true,
-          "id": 79,
-          "legend": {
-            "show": false
-          },
-          "maxPerRow": 2,
-          "pluginVersion": "8.0.1",
-          "repeatDirection": "h",
-          "repeatIteration": 1627832445863,
-          "repeatPanelId": 37,
-          "reverseYBuckets": false,
-          "scopedVars": {
-            "webhook": {
-              "selected": false,
-              "text": "/ingresses",
-              "value": "/ingresses"
-            }
-          },
-          "targets": [
-            {
-              "exemplar": false,
-              "expr": "sum by (le) (increase(controller_runtime_webhook_latency_seconds_bucket{job=\"capsule\", webhook=\"$webhook\"}[$__rate_interval]))",
-              "format": "heatmap",
-              "hide": false,
-              "interval": "",
-              "legendFormat": "",
-              "queryType": "randomWalk",
-              "refId": "A"
-            }
-          ],
-          "title": "$webhook reconcile latency",
-          "tooltip": {
-            "show": true,
-            "showHistogram": false
-          },
-          "type": "heatmap",
-          "xAxis": {
-            "show": true
-          },
-          "xBucketNumber": null,
-          "xBucketSize": null,
-          "yAxis": {
-            "decimals": null,
-            "format": "ms",
-            "logBase": 1,
-            "max": null,
-            "min": "0",
-            "show": true,
-            "splitFactor": null
-          },
-          "yBucketBound": "auto",
-          "yBucketNumber": null,
-          "yBucketSize": null
-        },
-        {
-          "cards": {
-            "cardPadding": null,
-            "cardRound": null
-          },
-          "color": {
-            "cardColor": "#b4ff00",
-            "colorScale": "sqrt",
-            "colorScheme": "interpolateOranges",
-            "exponent": 0.5,
-            "mode": "spectrum"
-          },
-          "dataFormat": "timeseries",
-          "datasource": "${DS_PROMETHEUS}",
-          "description": "",
-          "fieldConfig": {
-            "defaults": {},
-            "overrides": []
-          },
-          "gridPos": {
-            "h": 8,
-            "w": 12,
-            "x": 0,
-            "y": 52
-          },
-          "heatmap": {},
-          "hideZeroBuckets": false,
-          "highlightCards": true,
-          "id": 80,
-          "legend": {
-            "show": false
-          },
-          "maxPerRow": 2,
-          "pluginVersion": "8.0.1",
-          "repeatDirection": "h",
-          "repeatIteration": 1627832445863,
-          "repeatPanelId": 37,
-          "reverseYBuckets": false,
-          "scopedVars": {
-            "webhook": {
-              "selected": false,
-              "text": "/namespace-owner-reference",
-              "value": "/namespace-owner-reference"
-            }
-          },
-          "targets": [
-            {
-              "exemplar": false,
-              "expr": "sum by (le) (increase(controller_runtime_webhook_latency_seconds_bucket{job=\"capsule\", webhook=\"$webhook\"}[$__rate_interval]))",
-              "format": "heatmap",
-              "hide": false,
-              "interval": "",
-              "legendFormat": "",
-              "queryType": "randomWalk",
-              "refId": "A"
-            }
-          ],
-          "title": "$webhook reconcile latency",
-          "tooltip": {
-            "show": true,
-            "showHistogram": false
-          },
-          "type": "heatmap",
-          "xAxis": {
-            "show": true
-          },
-          "xBucketNumber": null,
-          "xBucketSize": null,
-          "yAxis": {
-            "decimals": null,
-            "format": "ms",
-            "logBase": 1,
-            "max": null,
-            "min": "0",
-            "show": true,
-            "splitFactor": null
-          },
-          "yBucketBound": "auto",
-          "yBucketNumber": null,
-          "yBucketSize": null
-        },
-        {
-          "cards": {
-            "cardPadding": null,
-            "cardRound": null
-          },
-          "color": {
-            "cardColor": "#b4ff00",
-            "colorScale": "sqrt",
-            "colorScheme": "interpolateOranges",
-            "exponent": 0.5,
-            "mode": "spectrum"
-          },
-          "dataFormat": "timeseries",
-          "datasource": "${DS_PROMETHEUS}",
-          "description": "",
-          "fieldConfig": {
-            "defaults": {},
-            "overrides": []
-          },
-          "gridPos": {
-            "h": 8,
-            "w": 12,
-            "x": 12,
-            "y": 52
-          },
-          "heatmap": {},
-          "hideZeroBuckets": false,
-          "highlightCards": true,
-          "id": 81,
-          "legend": {
-            "show": false
-          },
-          "maxPerRow": 2,
-          "pluginVersion": "8.0.1",
-          "repeatDirection": "h",
-          "repeatIteration": 1627832445863,
-          "repeatPanelId": 37,
-          "reverseYBuckets": false,
-          "scopedVars": {
-            "webhook": {
-              "selected": false,
-              "text": "/namespaces",
-              "value": "/namespaces"
-            }
-          },
-          "targets": [
-            {
-              "exemplar": false,
-              "expr": "sum by (le) (increase(controller_runtime_webhook_latency_seconds_bucket{job=\"capsule\", webhook=\"$webhook\"}[$__rate_interval]))",
-              "format": "heatmap",
-              "hide": false,
-              "interval": "",
-              "legendFormat": "",
-              "queryType": "randomWalk",
-              "refId": "A"
-            }
-          ],
-          "title": "$webhook reconcile latency",
-          "tooltip": {
-            "show": true,
-            "showHistogram": false
-          },
-          "type": "heatmap",
-          "xAxis": {
-            "show": true
-          },
-          "xBucketNumber": null,
-          "xBucketSize": null,
-          "yAxis": {
-            "decimals": null,
-            "format": "ms",
-            "logBase": 1,
-            "max": null,
-            "min": "0",
-            "show": true,
-            "splitFactor": null
-          },
-          "yBucketBound": "auto",
-          "yBucketNumber": null,
-          "yBucketSize": null
-        },
-        {
-          "cards": {
-            "cardPadding": null,
-            "cardRound": null
-          },
-          "color": {
-            "cardColor": "#b4ff00",
-            "colorScale": "sqrt",
-            "colorScheme": "interpolateOranges",
-            "exponent": 0.5,
-            "mode": "spectrum"
-          },
-          "dataFormat": "timeseries",
-          "datasource": "${DS_PROMETHEUS}",
-          "description": "",
-          "fieldConfig": {
-            "defaults": {},
-            "overrides": []
-          },
-          "gridPos": {
-            "h": 8,
-            "w": 12,
-            "x": 0,
-            "y": 60
-          },
-          "heatmap": {},
-          "hideZeroBuckets": false,
-          "highlightCards": true,
-          "id": 82,
-          "legend": {
-            "show": false
-          },
-          "maxPerRow": 2,
-          "pluginVersion": "8.0.1",
-          "repeatDirection": "h",
-          "repeatIteration": 1627832445863,
-          "repeatPanelId": 37,
-          "reverseYBuckets": false,
-          "scopedVars": {
-            "webhook": {
-              "selected": false,
-              "text": "/networkpolicies",
-              "value": "/networkpolicies"
-            }
-          },
-          "targets": [
-            {
-              "exemplar": false,
-              "expr": "sum by (le) (increase(controller_runtime_webhook_latency_seconds_bucket{job=\"capsule\", webhook=\"$webhook\"}[$__rate_interval]))",
-              "format": "heatmap",
-              "hide": false,
-              "interval": "",
-              "legendFormat": "",
-              "queryType": "randomWalk",
-              "refId": "A"
-            }
-          ],
-          "title": "$webhook reconcile latency",
-          "tooltip": {
-            "show": true,
-            "showHistogram": false
-          },
-          "type": "heatmap",
-          "xAxis": {
-            "show": true
-          },
-          "xBucketNumber": null,
-          "xBucketSize": null,
-          "yAxis": {
-            "decimals": null,
-            "format": "ms",
-            "logBase": 1,
-            "max": null,
-            "min": "0",
-            "show": true,
-            "splitFactor": null
-          },
-          "yBucketBound": "auto",
-          "yBucketNumber": null,
-          "yBucketSize": null
-        },
-        {
-          "cards": {
-            "cardPadding": null,
-            "cardRound": null
-          },
-          "color": {
-            "cardColor": "#b4ff00",
-            "colorScale": "sqrt",
-            "colorScheme": "interpolateOranges",
-            "exponent": 0.5,
-            "mode": "spectrum"
-          },
-          "dataFormat": "timeseries",
-          "datasource": "${DS_PROMETHEUS}",
-          "description": "",
-          "fieldConfig": {
-            "defaults": {},
-            "overrides": []
-          },
-          "gridPos": {
-            "h": 8,
-            "w": 12,
-            "x": 12,
-            "y": 60
-          },
-          "heatmap": {},
-          "hideZeroBuckets": false,
-          "highlightCards": true,
-          "id": 83,
-          "legend": {
-            "show": false
-          },
-          "maxPerRow": 2,
-          "pluginVersion": "8.0.1",
-          "repeatDirection": "h",
-          "repeatIteration": 1627832445863,
-          "repeatPanelId": 37,
-          "reverseYBuckets": false,
-          "scopedVars": {
-            "webhook": {
-              "selected": false,
-              "text": "/persistentvolumeclaims",
-              "value": "/persistentvolumeclaims"
-            }
-          },
-          "targets": [
-            {
-              "exemplar": false,
-              "expr": "sum by (le) (increase(controller_runtime_webhook_latency_seconds_bucket{job=\"capsule\", webhook=\"$webhook\"}[$__rate_interval]))",
-              "format": "heatmap",
-              "hide": false,
-              "interval": "",
-              "legendFormat": "",
-              "queryType": "randomWalk",
-              "refId": "A"
-            }
-          ],
-          "title": "$webhook reconcile latency",
-          "tooltip": {
-            "show": true,
-            "showHistogram": false
-          },
-          "type": "heatmap",
-          "xAxis": {
-            "show": true
-          },
-          "xBucketNumber": null,
-          "xBucketSize": null,
-          "yAxis": {
-            "decimals": null,
-            "format": "ms",
-            "logBase": 1,
-            "max": null,
-            "min": "0",
-            "show": true,
-            "splitFactor": null
-          },
-          "yBucketBound": "auto",
-          "yBucketNumber": null,
-          "yBucketSize": null
-        },
-        {
-          "cards": {
-            "cardPadding": null,
-            "cardRound": null
-          },
-          "color": {
-            "cardColor": "#b4ff00",
-            "colorScale": "sqrt",
-            "colorScheme": "interpolateOranges",
-            "exponent": 0.5,
-            "mode": "spectrum"
-          },
-          "dataFormat": "timeseries",
-          "datasource": "${DS_PROMETHEUS}",
-          "description": "",
-          "fieldConfig": {
-            "defaults": {},
-            "overrides": []
-          },
-          "gridPos": {
-            "h": 8,
-            "w": 12,
-            "x": 0,
-            "y": 68
-          },
-          "heatmap": {},
-          "hideZeroBuckets": false,
-          "highlightCards": true,
-          "id": 84,
-          "legend": {
-            "show": false
-          },
-          "maxPerRow": 2,
-          "pluginVersion": "8.0.1",
-          "repeatDirection": "h",
-          "repeatIteration": 1627832445863,
-          "repeatPanelId": 37,
-          "reverseYBuckets": false,
-          "scopedVars": {
-            "webhook": {
-              "selected": false,
-              "text": "/pods",
-              "value": "/pods"
-            }
-          },
-          "targets": [
-            {
-              "exemplar": false,
-              "expr": "sum by (le) (increase(controller_runtime_webhook_latency_seconds_bucket{job=\"capsule\", webhook=\"$webhook\"}[$__rate_interval]))",
-              "format": "heatmap",
-              "hide": false,
-              "interval": "",
-              "legendFormat": "",
-              "queryType": "randomWalk",
-              "refId": "A"
-            }
-          ],
-          "title": "$webhook reconcile latency",
-          "tooltip": {
-            "show": true,
-            "showHistogram": false
-          },
-          "type": "heatmap",
-          "xAxis": {
-            "show": true
-          },
-          "xBucketNumber": null,
-          "xBucketSize": null,
-          "yAxis": {
-            "decimals": null,
-            "format": "ms",
-            "logBase": 1,
-            "max": null,
-            "min": "0",
-            "show": true,
-            "splitFactor": null
-          },
-          "yBucketBound": "auto",
-          "yBucketNumber": null,
-          "yBucketSize": null
-        },
-        {
-          "cards": {
-            "cardPadding": null,
-            "cardRound": null
-          },
-          "color": {
-            "cardColor": "#b4ff00",
-            "colorScale": "sqrt",
-            "colorScheme": "interpolateOranges",
-            "exponent": 0.5,
-            "mode": "spectrum"
-          },
-          "dataFormat": "timeseries",
-          "datasource": "${DS_PROMETHEUS}",
-          "description": "",
-          "fieldConfig": {
-            "defaults": {},
-            "overrides": []
-          },
-          "gridPos": {
-            "h": 8,
-            "w": 12,
-            "x": 12,
-            "y": 68
-          },
-          "heatmap": {},
-          "hideZeroBuckets": false,
-          "highlightCards": true,
-          "id": 85,
-          "legend": {
-            "show": false
-          },
-          "maxPerRow": 2,
-          "pluginVersion": "8.0.1",
-          "repeatDirection": "h",
-          "repeatIteration": 1627832445863,
-          "repeatPanelId": 37,
-          "reverseYBuckets": false,
-          "scopedVars": {
-            "webhook": {
-              "selected": false,
-              "text": "/services",
-              "value": "/services"
-            }
-          },
-          "targets": [
-            {
-              "exemplar": false,
-              "expr": "sum by (le) (increase(controller_runtime_webhook_latency_seconds_bucket{job=\"capsule\", webhook=\"$webhook\"}[$__rate_interval]))",
-              "format": "heatmap",
-              "hide": false,
-              "interval": "",
-              "legendFormat": "",
-              "queryType": "randomWalk",
-              "refId": "A"
-            }
-          ],
-          "title": "$webhook reconcile latency",
-          "tooltip": {
-            "show": true,
-            "showHistogram": false
-          },
-          "type": "heatmap",
-          "xAxis": {
-            "show": true
-          },
-          "xBucketNumber": null,
-          "xBucketSize": null,
-          "yAxis": {
-            "decimals": null,
-            "format": "ms",
-            "logBase": 1,
-            "max": null,
-            "min": "0",
-            "show": true,
-            "splitFactor": null
-          },
-          "yBucketBound": "auto",
-          "yBucketNumber": null,
-          "yBucketSize": null
-        },
-        {
-          "cards": {
-            "cardPadding": null,
-            "cardRound": null
-          },
-          "color": {
-            "cardColor": "#b4ff00",
-            "colorScale": "sqrt",
-            "colorScheme": "interpolateOranges",
-            "exponent": 0.5,
-            "mode": "spectrum"
-          },
-          "dataFormat": "timeseries",
-          "datasource": "${DS_PROMETHEUS}",
-          "description": "",
-          "fieldConfig": {
-            "defaults": {},
-            "overrides": []
-          },
-          "gridPos": {
-            "h": 8,
-            "w": 12,
-            "x": 0,
-            "y": 76
-          },
-          "heatmap": {},
-          "hideZeroBuckets": false,
-          "highlightCards": true,
-          "id": 86,
-          "legend": {
-            "show": false
-          },
-          "maxPerRow": 2,
-          "pluginVersion": "8.0.1",
-          "repeatDirection": "h",
-          "repeatIteration": 1627832445863,
-          "repeatPanelId": 37,
-          "reverseYBuckets": false,
-          "scopedVars": {
-            "webhook": {
-              "selected": false,
-              "text": "/tenants",
-              "value": "/tenants"
-            }
-          },
-          "targets": [
-            {
-              "exemplar": false,
-              "expr": "sum by (le) (increase(controller_runtime_webhook_latency_seconds_bucket{job=\"capsule\", webhook=\"$webhook\"}[$__rate_interval]))",
-              "format": "heatmap",
-              "hide": false,
-              "interval": "",
-              "legendFormat": "",
-              "queryType": "randomWalk",
-              "refId": "A"
-            }
-          ],
-          "title": "$webhook reconcile latency",
-          "tooltip": {
-            "show": true,
-            "showHistogram": false
-          },
-          "type": "heatmap",
-          "xAxis": {
-            "show": true
-          },
-          "xBucketNumber": null,
-          "xBucketSize": null,
-          "yAxis": {
-            "decimals": null,
-            "format": "ms",
-            "logBase": 1,
-            "max": null,
-            "min": "0",
-            "show": true,
-            "splitFactor": null
-          },
-          "yBucketBound": "auto",
-          "yBucketNumber": null,
-          "yBucketSize": null
-        }
-      ],
-      "title": "Webhooks latency",
-      "type": "row"
-    },
-    {
-      "collapsed": true,
-      "datasource": null,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 68
-      },
-      "id": 26,
-      "panels": [
-        {
-          "cards": {
-            "cardPadding": null,
-            "cardRound": null
-          },
-          "color": {
-            "cardColor": "#b4ff00",
-            "colorScale": "sqrt",
-            "colorScheme": "interpolateOranges",
-            "exponent": 0.5,
-            "mode": "spectrum"
-          },
-          "dataFormat": "timeseries",
-          "datasource": "${DS_PROMETHEUS}",
-          "fieldConfig": {
-            "defaults": {},
-            "overrides": []
-          },
-          "gridPos": {
-            "h": 7,
-            "w": 6,
-            "x": 0,
-            "y": 12
-          },
-          "heatmap": {},
-          "hideZeroBuckets": false,
-          "highlightCards": true,
-          "id": 20,
-          "legend": {
-            "show": false
-          },
-          "pluginVersion": "8.0.1",
-          "repeat": "rest_client_url",
-          "reverseYBuckets": false,
-          "scopedVars": {
-            "rest_client_url": {
-              "selected": true,
-              "text": "https://10.96.0.1:443/api/v1/namespaces/%7Bnamespace%7D/configmaps/%7Bname%7D",
-              "value": "https://10.96.0.1:443/api/v1/namespaces/%7Bnamespace%7D/configmaps/%7Bname%7D"
-            }
-          },
-          "targets": [
-            {
-              "exemplar": false,
-              "expr": "sum by (le) (increase(rest_client_request_latency_seconds_bucket{job=\"capsule\", url=\"${rest_client_url:raw}\", verb=\"$rest_client_verb\"}[$__rate_interval]))",
-              "format": "heatmap",
-              "hide": false,
-              "interval": "",
-              "legendFormat": "{{le}}",
-              "queryType": "randomWalk",
-              "refId": "A"
-            }
-          ],
-          "title": "Latency for ${rest_client_url:raw}",
-          "tooltip": {
-            "show": true,
-            "showHistogram": false
-          },
-          "type": "heatmap",
-          "xAxis": {
-            "show": true
-          },
-          "xBucketNumber": null,
-          "xBucketSize": null,
-          "yAxis": {
-            "decimals": null,
-            "format": "ms",
-            "logBase": 1,
-            "max": null,
-            "min": "0",
-            "show": true,
-            "splitFactor": null
-          },
-          "yBucketBound": "auto",
-          "yBucketNumber": null,
-          "yBucketSize": null
-        },
-        {
-          "cards": {
-            "cardPadding": null,
-            "cardRound": null
-          },
-          "color": {
-            "cardColor": "#b4ff00",
-            "colorScale": "sqrt",
-            "colorScheme": "interpolateOranges",
-            "exponent": 0.5,
-            "mode": "spectrum"
-          },
-          "dataFormat": "timeseries",
-          "datasource": "${DS_PROMETHEUS}",
-          "fieldConfig": {
-            "defaults": {},
-            "overrides": []
-          },
-          "gridPos": {
-            "h": 7,
-            "w": 6,
-            "x": 6,
-            "y": 12
-          },
-          "heatmap": {},
-          "hideZeroBuckets": false,
-          "highlightCards": true,
-          "id": 76,
-          "legend": {
-            "show": false
-          },
-          "pluginVersion": "8.0.1",
-          "repeatIteration": 1627832445863,
-          "repeatPanelId": 20,
-          "reverseYBuckets": false,
-          "scopedVars": {
-            "rest_client_url": {
-              "selected": true,
-              "text": "https://10.96.0.1:443/api/v1/namespaces/%7Bnamespace%7D/events",
-              "value": "https://10.96.0.1:443/api/v1/namespaces/%7Bnamespace%7D/events"
-            }
-          },
-          "targets": [
-            {
-              "exemplar": false,
-              "expr": "sum by (le) (increase(rest_client_request_latency_seconds_bucket{job=\"capsule\", url=\"${rest_client_url:raw}\", verb=\"$rest_client_verb\"}[$__rate_interval]))",
-              "format": "heatmap",
-              "hide": false,
-              "interval": "",
-              "legendFormat": "{{le}}",
-              "queryType": "randomWalk",
-              "refId": "A"
-            }
-          ],
-          "title": "Latency for ${rest_client_url:raw}",
-          "tooltip": {
-            "show": true,
-            "showHistogram": false
-          },
-          "type": "heatmap",
-          "xAxis": {
-            "show": true
-          },
-          "xBucketNumber": null,
-          "xBucketSize": null,
-          "yAxis": {
-            "decimals": null,
-            "format": "ms",
-            "logBase": 1,
-            "max": null,
-            "min": "0",
-            "show": true,
-            "splitFactor": null
-          },
-          "yBucketBound": "auto",
-          "yBucketNumber": null,
-          "yBucketSize": null
-        },
-        {
-          "cards": {
-            "cardPadding": null,
-            "cardRound": null
-          },
-          "color": {
-            "cardColor": "#b4ff00",
-            "colorScale": "sqrt",
-            "colorScheme": "interpolateOranges",
-            "exponent": 0.5,
-            "mode": "spectrum"
-          },
-          "dataFormat": "timeseries",
-          "datasource": "${DS_PROMETHEUS}",
-          "fieldConfig": {
-            "defaults": {},
-            "overrides": []
-          },
-          "gridPos": {
-            "h": 7,
-            "w": 6,
-            "x": 12,
-            "y": 12
-          },
-          "heatmap": {},
-          "hideZeroBuckets": false,
-          "highlightCards": true,
-          "id": 77,
-          "legend": {
-            "show": false
-          },
-          "pluginVersion": "8.0.1",
-          "repeatIteration": 1627832445863,
-          "repeatPanelId": 20,
-          "reverseYBuckets": false,
-          "scopedVars": {
-            "rest_client_url": {
-              "selected": true,
-              "text": "https://10.96.0.1:443/api/v1/namespaces?limit=%7Bvalue%7D&resourceVersion=%7Bvalue%7D",
-              "value": "https://10.96.0.1:443/api/v1/namespaces?limit=%7Bvalue%7D&resourceVersion=%7Bvalue%7D"
-            }
-          },
-          "targets": [
-            {
-              "exemplar": false,
-              "expr": "sum by (le) (increase(rest_client_request_latency_seconds_bucket{job=\"capsule\", url=\"${rest_client_url:raw}\", verb=\"$rest_client_verb\"}[$__rate_interval]))",
-              "format": "heatmap",
-              "hide": false,
-              "interval": "",
-              "legendFormat": "{{le}}",
-              "queryType": "randomWalk",
-              "refId": "A"
-            }
-          ],
-          "title": "Latency for ${rest_client_url:raw}",
-          "tooltip": {
-            "show": true,
-            "showHistogram": false
-          },
-          "type": "heatmap",
-          "xAxis": {
-            "show": true
-          },
-          "xBucketNumber": null,
-          "xBucketSize": null,
-          "yAxis": {
-            "decimals": null,
-            "format": "ms",
-            "logBase": 1,
-            "max": null,
-            "min": "0",
-            "show": true,
-            "splitFactor": null
-          },
-          "yBucketBound": "auto",
-          "yBucketNumber": null,
-          "yBucketSize": null
-        },
-        {
-          "cards": {
-            "cardPadding": null,
-            "cardRound": null
-          },
-          "color": {
-            "cardColor": "#b4ff00",
-            "colorScale": "sqrt",
-            "colorScheme": "interpolateOranges",
-            "exponent": 0.5,
-            "mode": "spectrum"
-          },
-          "dataFormat": "timeseries",
-          "datasource": "${DS_PROMETHEUS}",
-          "fieldConfig": {
-            "defaults": {},
-            "overrides": []
-          },
-          "gridPos": {
-            "h": 7,
-            "w": 6,
-            "x": 18,
-            "y": 12
-          },
-          "heatmap": {},
-          "hideZeroBuckets": false,
-          "highlightCards": true,
-          "id": 78,
-          "legend": {
-            "show": false
-          },
-          "pluginVersion": "8.0.1",
-          "repeatIteration": 1627832445863,
-          "repeatPanelId": 20,
-          "reverseYBuckets": false,
-          "scopedVars": {
-            "rest_client_url": {
-              "selected": true,
-              "text": "https://10.96.0.1:443/apis/coordination.k8s.io/v1/namespaces/%7Bnamespace%7D/leases/%7Bname%7D",
-              "value": "https://10.96.0.1:443/apis/coordination.k8s.io/v1/namespaces/%7Bnamespace%7D/leases/%7Bname%7D"
-            }
-          },
-          "targets": [
-            {
-              "exemplar": false,
-              "expr": "sum by (le) (increase(rest_client_request_latency_seconds_bucket{job=\"capsule\", url=\"${rest_client_url:raw}\", verb=\"$rest_client_verb\"}[$__rate_interval]))",
-              "format": "heatmap",
-              "hide": false,
-              "interval": "",
-              "legendFormat": "{{le}}",
-              "queryType": "randomWalk",
-              "refId": "A"
-            }
-          ],
-          "title": "Latency for ${rest_client_url:raw}",
-          "tooltip": {
-            "show": true,
-            "showHistogram": false
-          },
-          "type": "heatmap",
-          "xAxis": {
-            "show": true
-          },
-          "xBucketNumber": null,
-          "xBucketSize": null,
-          "yAxis": {
-            "decimals": null,
-            "format": "ms",
-            "logBase": 1,
-            "max": null,
-            "min": "0",
-            "show": true,
-            "splitFactor": null
-          },
-          "yBucketBound": "auto",
-          "yBucketNumber": null,
-          "yBucketSize": null
-        }
-      ],
-      "title": "REST client latency",
-      "type": "row"
-    },
-    {
-      "collapsed": false,
-      "datasource": null,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 69
-      },
-      "id": 17,
-      "panels": [],
-      "title": "REST client error rate",
-      "type": "row"
-    },
-    {
-      "datasource": "${DS_PROMETHEUS}",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "hideFrom": {
-              "graph": false,
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "auto",
-            "spanNulls": false
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 11,
-        "w": 12,
-        "x": 0,
-        "y": 70
-      },
-      "id": 22,
-      "options": {
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom"
-        },
-        "tooltip": {
-          "mode": "single"
-        },
-        "tooltipOptions": {
-          "mode": "single"
-        }
-      },
-      "pluginVersion": "8.0.1",
-      "targets": [
-        {
-          "exemplar": false,
-          "expr": "sum(irate(rest_client_requests_total{job=\"capsule\"}[$__rate_interval])) by (code)",
-          "format": "time_series",
-          "hide": false,
-          "interval": "",
-          "legendFormat": "{{ code }}",
-          "queryType": "randomWalk",
-          "refId": "A"
-        }
-      ],
-      "title": "REST Client status code",
-      "type": "timeseries"
-    },
-    {
-      "datasource": "${DS_PROMETHEUS}",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 11,
-        "w": 12,
-        "x": 12,
-        "y": 70
-      },
-      "id": 19,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "none",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "text": {},
-        "textMode": "auto"
-      },
-      "pluginVersion": "7.5.4",
-      "targets": [
-        {
-          "exemplar": false,
-          "expr": "sum(irate(rest_client_requests_total{job=\"capsule\"}[$__rate_interval])) by (code)",
-          "format": "time_series",
-          "hide": false,
-          "instant": false,
-          "interval": "",
-          "legendFormat": " {{ code }}",
-          "queryType": "randomWalk",
-          "refId": "A"
-        }
-      ],
-      "title": "Rate & Errors",
-      "type": "stat"
-    },
-    {
-      "collapsed": false,
-      "datasource": null,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 81
-      },
-      "id": 12,
-      "panels": [],
-      "title": "Saturation",
-      "type": "row"
-    },
-    {
-      "datasource": "${DS_PROMETHEUS}",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "hideFrom": {
-              "graph": false,
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "auto",
-            "spanNulls": false
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 7,
-        "x": 0,
-        "y": 82
-      },
-      "id": 2,
-      "options": {
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom"
-        },
-        "tooltip": {
-          "mode": "single"
-        },
-        "tooltipOptions": {
-          "mode": "single"
-        }
-      },
-      "targets": [
-        {
-          "exemplar": true,
-          "expr": "irate(process_cpu_seconds_total{job=\"capsule\"}[$__rate_interval])",
-          "interval": "",
-          "legendFormat": "{{ pod }}",
-          "queryType": "randomWalk",
-          "refId": "A"
-        }
-      ],
-      "title": "CPU Usage",
-      "type": "timeseries"
-    },
-    {
-      "datasource": "${DS_PROMETHEUS}",
-      "description": "",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 1,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "hideFrom": {
-              "graph": false,
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "lineInterpolation": "smooth",
-            "lineStyle": {
-              "fill": "solid"
-            },
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "auto",
-            "spanNulls": false
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          },
-          "unit": "decbytes"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 7,
-        "x": 7,
-        "y": 82
-      },
-      "id": 24,
-      "options": {
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom"
-        },
-        "tooltip": {
-          "mode": "single"
-        },
-        "tooltipOptions": {
-          "mode": "single"
-        }
-      },
-      "targets": [
-        {
-          "exemplar": false,
-          "expr": "process_resident_memory_bytes{job=\"capsule\"}",
-          "interval": "",
-          "legendFormat": "{{pod}}",
-          "queryType": "randomWalk",
-          "refId": "A"
-        }
-      ],
-      "title": "Memory Usage",
-      "type": "timeseries"
-    },
-    {
-      "datasource": "${DS_PROMETHEUS}",
-      "description": "",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 1,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "hideFrom": {
-              "graph": false,
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "lineInterpolation": "smooth",
-            "lineStyle": {
-              "fill": "solid"
-            },
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "auto",
-            "spanNulls": false
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          },
-          "unit": "none"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 7,
-        "x": 14,
-        "y": 82
-      },
-      "id": 33,
-      "options": {
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom"
-        },
-        "tooltip": {
-          "mode": "single"
-        },
-        "tooltipOptions": {
-          "mode": "single"
-        }
-      },
-      "targets": [
-        {
-          "exemplar": false,
-          "expr": "go_goroutines{job=\"capsule\"}",
-          "interval": "",
-          "legendFormat": "{{pod}}",
-          "queryType": "randomWalk",
-          "refId": "A"
-        }
-      ],
-      "title": "goroutines",
-      "type": "timeseries"
-    },
-    {
-      "datasource": "${DS_PROMETHEUS}",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 3,
-        "x": 21,
-        "y": 82
-      },
-      "id": 5,
-      "options": {
-        "colorMode": "background",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "text": {
-          "valueSize": 80
-        },
-        "textMode": "value_and_name"
-      },
-      "pluginVersion": "7.5.4",
-      "targets": [
-        {
-          "exemplar": true,
-          "expr": "sum(up{job=\"capsule\"})",
-          "interval": "",
-          "legendFormat": "Active Controllers",
-          "queryType": "randomWalk",
-          "refId": "A"
-        }
-      ],
-      "title": "Stats",
-      "transparent": true,
-      "type": "stat"
-    },
-    {
-      "collapsed": true,
-      "datasource": null,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 90
-      },
-      "id": 10,
-      "panels": [
-        {
-          "datasource": "${DS_PROMETHEUS}",
-          "description": "service time to complete needed actions",
-          "fieldConfig": {
-            "defaults": {
-              "color": {
-                "mode": "thresholds"
-              },
-              "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  {
-                    "color": "green",
-                    "value": null
-                  },
-                  {
-                    "color": "red",
-                    "value": 80
-                  }
-                ]
-              }
-            },
-            "overrides": []
-          },
-          "gridPos": {
-            "h": 8,
-            "w": 8,
-            "x": 0,
-            "y": 31
-          },
-          "id": 7,
-          "options": {
-            "colorMode": "value",
-            "graphMode": "area",
-            "justifyMode": "auto",
-            "orientation": "auto",
-            "reduceOptions": {
-              "calcs": [
-                "lastNotNull"
-              ],
-              "fields": "",
-              "values": false
-            },
-            "text": {},
-            "textMode": "auto"
-          },
-          "pluginVersion": "7.5.5",
-          "targets": [
-            {
-              "exemplar": true,
-              "expr": "histogram_quantile(0.99, sum(rate(workqueue_queue_duration_seconds_bucket{job=\"capsule\"}[$__rate_interval])) by (instance, name, le))",
-              "format": "time_series",
-              "hide": false,
-              "interval": "",
-              "legendFormat": "{{name}}",
-              "queryType": "randomWalk",
-              "refId": "A"
-            }
-          ],
-          "title": "Workqueue latency",
-          "type": "stat"
-        },
-        {
-          "datasource": "${DS_PROMETHEUS}",
-          "description": "number of actions per unit time",
-          "fieldConfig": {
-            "defaults": {
-              "color": {
-                "mode": "thresholds"
-              },
-              "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  {
-                    "color": "green",
-                    "value": null
-                  },
-                  {
-                    "color": "red",
-                    "value": 80
-                  }
-                ]
-              }
-            },
-            "overrides": []
-          },
-          "gridPos": {
-            "h": 8,
-            "w": 8,
-            "x": 8,
-            "y": 31
-          },
-          "id": 8,
-          "options": {
-            "colorMode": "value",
-            "graphMode": "area",
-            "justifyMode": "auto",
-            "orientation": "auto",
-            "reduceOptions": {
-              "calcs": [
-                "lastNotNull"
-              ],
-              "fields": "",
-              "values": false
-            },
-            "text": {},
-            "textMode": "auto"
-          },
-          "pluginVersion": "7.5.5",
-          "targets": [
-            {
-              "exemplar": true,
-              "expr": "sum(rate(workqueue_adds_total{job=\"capsule\"}[$__rate_interval])) by (instance, name)",
-              "format": "time_series",
-              "hide": false,
-              "interval": "",
-              "legendFormat": "{{name}}",
-              "queryType": "randomWalk",
-              "refId": "A"
-            }
-          ],
-          "title": "Workqueue rate",
-          "type": "stat"
-        },
-        {
-          "datasource": "${DS_PROMETHEUS}",
-          "description": "number of actions waiting in the queue to be performed",
-          "fieldConfig": {
-            "defaults": {
-              "color": {
-                "mode": "thresholds"
-              },
-              "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  {
-                    "color": "green",
-                    "value": null
-                  },
-                  {
-                    "color": "red",
-                    "value": 80
-                  }
-                ]
-              }
-            },
-            "overrides": []
-          },
-          "gridPos": {
-            "h": 8,
-            "w": 8,
-            "x": 16,
-            "y": 31
-          },
-          "id": 13,
-          "options": {
-            "colorMode": "value",
-            "graphMode": "area",
-            "justifyMode": "auto",
-            "orientation": "auto",
-            "reduceOptions": {
-              "calcs": [
-                "lastNotNull"
-              ],
-              "fields": "",
-              "values": false
-            },
-            "text": {},
-            "textMode": "auto"
-          },
-          "pluginVersion": "7.5.5",
-          "targets": [
-            {
-              "exemplar": false,
-              "expr": "sum(rate(workqueue_depth{job=\"capsule\"}[$__rate_interval])) by (instance, name)",
-              "format": "time_series",
-              "hide": false,
-              "interval": "",
-              "legendFormat": "{{name}}",
-              "queryType": "randomWalk",
-              "refId": "A"
-            }
-          ],
-          "title": "Workqueue depth",
-          "type": "stat"
-        }
-      ],
-      "title": "Workqueue",
-      "type": "row"
-    }
-  ],
-  "refresh": "30s",
-  "schemaVersion": 27,
-  "style": "dark",
-  "tags": [],
-  "templating": {
-    "list": [
+    "editable": true,
+    "gnetId": null,
+    "graphTooltip": 0,
+    "id": null,
+    "iteration": 1629463154511,
+    "links": [],
+    "panels": [
       {
-        "allValue": null,
-        "current": {},
-        "datasource": "${DS_PROMETHEUS}",
-        "definition": "label_values(controller_runtime_active_workers{job=\"capsule\"},controller)",
-        "description": "Select the underlying Controller to get metrics",
-        "error": null,
-        "hide": 0,
-        "includeAll": false,
-        "label": "Controller name",
-        "multi": true,
-        "name": "controller_name",
-        "options": [],
-        "query": {
-          "query": "label_values(controller_runtime_active_workers{job=\"capsule\"},controller)",
-          "refId": "StandardVariableQuery"
+        "collapsed": false,
+        "datasource": null,
+        "gridPos": {
+          "h": 1,
+          "w": 24,
+          "x": 0,
+          "y": 0
         },
-        "refresh": 1,
-        "regex": "",
-        "skipUrlSync": false,
-        "sort": 0,
-        "tagValuesQuery": "",
-        "tags": [],
-        "tagsQuery": "",
-        "type": "query",
-        "useTags": false
+        "id": 28,
+        "panels": [],
+        "title": "Manager controllers",
+        "type": "row"
       },
       {
-        "allValue": null,
-        "current": {},
-        "datasource": "${DS_PROMETHEUS}",
-        "definition": "label_values(rest_client_request_latency_seconds_sum{job=\"capsule\"},url)",
-        "description": "Kubernetes API endpoint the REST client is interacting with",
-        "error": null,
-        "hide": 0,
-        "includeAll": true,
-        "label": "REST client URL",
-        "multi": true,
-        "name": "rest_client_url",
-        "options": [],
-        "query": {
-          "query": "label_values(rest_client_request_latency_seconds_sum{job=\"capsule\"},url)",
-          "refId": "StandardVariableQuery"
+        "cards": {
+          "cardPadding": null,
+          "cardRound": null
         },
-        "refresh": 1,
-        "regex": "",
-        "skipUrlSync": false,
-        "sort": 0,
-        "tagValuesQuery": "",
-        "tags": [],
-        "tagsQuery": "",
-        "type": "query",
-        "useTags": false
+        "color": {
+          "cardColor": "#b4ff00",
+          "colorScale": "sqrt",
+          "colorScheme": "interpolateOranges",
+          "exponent": 0.5,
+          "mode": "spectrum"
+        },
+        "dataFormat": "timeseries",
+        "datasource": "prometheus",
+        "description": "",
+        "fieldConfig": {
+          "defaults": {},
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 1
+        },
+        "heatmap": {},
+        "hideZeroBuckets": false,
+        "highlightCards": true,
+        "id": 21,
+        "legend": {
+          "show": false
+        },
+        "maxPerRow": 2,
+        "pluginVersion": "8.0.1",
+        "repeat": "controller_name",
+        "repeatDirection": "h",
+        "reverseYBuckets": false,
+        "targets": [
+          {
+            "exemplar": false,
+            "expr": "sum by (le) (increase(workqueue_work_duration_seconds_bucket{job=\"capsule\", name=\"$controller_name\"}[$__rate_interval]))",
+            "format": "heatmap",
+            "hide": false,
+            "interval": "",
+            "legendFormat": "",
+            "queryType": "randomWalk",
+            "refId": "A"
+          }
+        ],
+        "title": "$controller_name reconcile latency",
+        "tooltip": {
+          "show": true,
+          "showHistogram": false
+        },
+        "type": "heatmap",
+        "xAxis": {
+          "show": true
+        },
+        "xBucketNumber": null,
+        "xBucketSize": null,
+        "yAxis": {
+          "decimals": null,
+          "format": "ms",
+          "logBase": 1,
+          "max": null,
+          "min": "0",
+          "show": true,
+          "splitFactor": null
+        },
+        "yBucketBound": "auto",
+        "yBucketNumber": null,
+        "yBucketSize": null
       },
       {
-        "allValue": null,
-        "current": {},
-        "datasource": "${DS_PROMETHEUS}",
-        "definition": "label_values(rest_client_request_latency_seconds_sum{job=\"capsule\"},verb)",
-        "description": "Kubernetes API HTTP verb the REST client is interacting with",
-        "error": null,
-        "hide": 0,
-        "includeAll": false,
-        "label": "REST client verb",
-        "multi": false,
-        "name": "rest_client_verb",
-        "options": [],
-        "query": {
-          "query": "label_values(rest_client_request_latency_seconds_sum{job=\"capsule\"},verb)",
-          "refId": "StandardVariableQuery"
+        "collapsed": false,
+        "datasource": null,
+        "gridPos": {
+          "h": 1,
+          "w": 24,
+          "x": 0,
+          "y": 33
         },
-        "refresh": 1,
-        "regex": "",
-        "skipUrlSync": false,
-        "sort": 0,
-        "tagValuesQuery": "",
-        "tags": [],
-        "tagsQuery": "",
-        "type": "query",
-        "useTags": false
+        "id": 58,
+        "panels": [],
+        "title": "Webhook error rate",
+        "type": "row"
       },
       {
-        "allValue": null,
-        "current": {},
-        "datasource": "${DS_PROMETHEUS}",
-        "definition": "label_values(controller_runtime_webhook_requests_in_flight{job=\"capsule\"}, webhook)",
-        "description": "Capsule webhook",
-        "error": null,
-        "hide": 0,
-        "includeAll": true,
-        "label": "Webhook",
-        "multi": true,
-        "name": "webhook",
-        "options": [],
-        "query": {
-          "query": "label_values(controller_runtime_webhook_requests_in_flight{job=\"capsule\"}, webhook)",
-          "refId": "StandardVariableQuery"
+        "datasource": "prometheus",
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "axisLabel": "",
+              "axisPlacement": "auto",
+              "barAlignment": 0,
+              "drawStyle": "line",
+              "fillOpacity": 10,
+              "gradientMode": "none",
+              "hideFrom": {
+                "graph": false,
+                "legend": false,
+                "tooltip": false
+              },
+              "lineInterpolation": "linear",
+              "lineWidth": 1,
+              "pointSize": 5,
+              "scaleDistribution": {
+                "type": "linear"
+              },
+              "showPoints": "never",
+              "spanNulls": true
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "red",
+                  "value": 80
+                }
+              ]
+            },
+            "unit": "short"
+          },
+          "overrides": []
         },
-        "refresh": 1,
-        "regex": "",
-        "skipUrlSync": false,
-        "sort": 0,
-        "tagValuesQuery": "",
-        "tags": [],
-        "tagsQuery": "",
-        "type": "query",
-        "useTags": false
+        "gridPos": {
+          "h": 11,
+          "w": 6,
+          "x": 0,
+          "y": 34
+        },
+        "id": 59,
+        "options": {
+          "graph": {},
+          "legend": {
+            "calcs": [],
+            "displayMode": "list",
+            "placement": "bottom"
+          },
+          "tooltip": {
+            "mode": "single"
+          },
+          "tooltipOptions": {
+            "mode": "single"
+          }
+        },
+        "pluginVersion": "7.5.5",
+        "repeat": "webhook",
+        "targets": [
+          {
+            "exemplar": false,
+            "expr": "sum(irate(controller_runtime_webhook_requests_total{job=\"capsule\", webhook=\"$webhook\"}[$__rate_interval])) by (webhook, code)",
+            "format": "time_series",
+            "hide": false,
+            "interval": "",
+            "legendFormat": "{{ code }}",
+            "queryType": "randomWalk",
+            "refId": "A"
+          }
+        ],
+        "timeFrom": null,
+        "timeShift": null,
+        "title": "$webhook status code",
+        "type": "timeseries"
+      },
+      {
+        "collapsed": true,
+        "datasource": null,
+        "gridPos": {
+          "h": 1,
+          "w": 24,
+          "x": 0,
+          "y": 67
+        },
+        "id": 35,
+        "panels": [
+          {
+            "cards": {
+              "cardPadding": null,
+              "cardRound": null
+            },
+            "color": {
+              "cardColor": "#b4ff00",
+              "colorScale": "sqrt",
+              "colorScheme": "interpolateOranges",
+              "exponent": 0.5,
+              "mode": "spectrum"
+            },
+            "dataFormat": "timeseries",
+            "datasource": "prometheus",
+            "description": "",
+            "fieldConfig": {
+              "defaults": {},
+              "overrides": []
+            },
+            "gridPos": {
+              "h": 8,
+              "w": 12,
+              "x": 0,
+              "y": 44
+            },
+            "heatmap": {},
+            "hideZeroBuckets": false,
+            "highlightCards": true,
+            "id": 37,
+            "legend": {
+              "show": false
+            },
+            "maxPerRow": 2,
+            "pluginVersion": "8.0.1",
+            "repeat": "webhook",
+            "repeatDirection": "h",
+            "reverseYBuckets": false,
+            "scopedVars": {
+              "webhook": {
+                "selected": false,
+                "text": "/cordoning",
+                "value": "/cordoning"
+              }
+            },
+            "targets": [
+              {
+                "exemplar": false,
+                "expr": "sum by (le) (increase(controller_runtime_webhook_latency_seconds_bucket{job=\"capsule\", webhook=\"$webhook\"}[$__rate_interval]))",
+                "format": "heatmap",
+                "hide": false,
+                "interval": "",
+                "legendFormat": "",
+                "queryType": "randomWalk",
+                "refId": "A"
+              }
+            ],
+            "title": "$webhook reconcile latency",
+            "tooltip": {
+              "show": true,
+              "showHistogram": false
+            },
+            "type": "heatmap",
+            "xAxis": {
+              "show": true
+            },
+            "xBucketNumber": null,
+            "xBucketSize": null,
+            "yAxis": {
+              "decimals": null,
+              "format": "ms",
+              "logBase": 1,
+              "max": null,
+              "min": "0",
+              "show": true,
+              "splitFactor": null
+            },
+            "yBucketBound": "auto",
+            "yBucketNumber": null,
+            "yBucketSize": null
+          },
+          {
+            "cards": {
+              "cardPadding": null,
+              "cardRound": null
+            },
+            "color": {
+              "cardColor": "#b4ff00",
+              "colorScale": "sqrt",
+              "colorScheme": "interpolateOranges",
+              "exponent": 0.5,
+              "mode": "spectrum"
+            },
+            "dataFormat": "timeseries",
+            "datasource": "prometheus",
+            "description": "",
+            "fieldConfig": {
+              "defaults": {},
+              "overrides": []
+            },
+            "gridPos": {
+              "h": 8,
+              "w": 12,
+              "x": 12,
+              "y": 44
+            },
+            "heatmap": {},
+            "hideZeroBuckets": false,
+            "highlightCards": true,
+            "id": 79,
+            "legend": {
+              "show": false
+            },
+            "maxPerRow": 2,
+            "pluginVersion": "8.0.1",
+            "repeatDirection": "h",
+            "repeatIteration": 1627832445863,
+            "repeatPanelId": 37,
+            "reverseYBuckets": false,
+            "scopedVars": {
+              "webhook": {
+                "selected": false,
+                "text": "/ingresses",
+                "value": "/ingresses"
+              }
+            },
+            "targets": [
+              {
+                "exemplar": false,
+                "expr": "sum by (le) (increase(controller_runtime_webhook_latency_seconds_bucket{job=\"capsule\", webhook=\"$webhook\"}[$__rate_interval]))",
+                "format": "heatmap",
+                "hide": false,
+                "interval": "",
+                "legendFormat": "",
+                "queryType": "randomWalk",
+                "refId": "A"
+              }
+            ],
+            "title": "$webhook reconcile latency",
+            "tooltip": {
+              "show": true,
+              "showHistogram": false
+            },
+            "type": "heatmap",
+            "xAxis": {
+              "show": true
+            },
+            "xBucketNumber": null,
+            "xBucketSize": null,
+            "yAxis": {
+              "decimals": null,
+              "format": "ms",
+              "logBase": 1,
+              "max": null,
+              "min": "0",
+              "show": true,
+              "splitFactor": null
+            },
+            "yBucketBound": "auto",
+            "yBucketNumber": null,
+            "yBucketSize": null
+          },
+          {
+            "cards": {
+              "cardPadding": null,
+              "cardRound": null
+            },
+            "color": {
+              "cardColor": "#b4ff00",
+              "colorScale": "sqrt",
+              "colorScheme": "interpolateOranges",
+              "exponent": 0.5,
+              "mode": "spectrum"
+            },
+            "dataFormat": "timeseries",
+            "datasource": "prometheus",
+            "description": "",
+            "fieldConfig": {
+              "defaults": {},
+              "overrides": []
+            },
+            "gridPos": {
+              "h": 8,
+              "w": 12,
+              "x": 0,
+              "y": 52
+            },
+            "heatmap": {},
+            "hideZeroBuckets": false,
+            "highlightCards": true,
+            "id": 80,
+            "legend": {
+              "show": false
+            },
+            "maxPerRow": 2,
+            "pluginVersion": "8.0.1",
+            "repeatDirection": "h",
+            "repeatIteration": 1627832445863,
+            "repeatPanelId": 37,
+            "reverseYBuckets": false,
+            "scopedVars": {
+              "webhook": {
+                "selected": false,
+                "text": "/namespace-owner-reference",
+                "value": "/namespace-owner-reference"
+              }
+            },
+            "targets": [
+              {
+                "exemplar": false,
+                "expr": "sum by (le) (increase(controller_runtime_webhook_latency_seconds_bucket{job=\"capsule\", webhook=\"$webhook\"}[$__rate_interval]))",
+                "format": "heatmap",
+                "hide": false,
+                "interval": "",
+                "legendFormat": "",
+                "queryType": "randomWalk",
+                "refId": "A"
+              }
+            ],
+            "title": "$webhook reconcile latency",
+            "tooltip": {
+              "show": true,
+              "showHistogram": false
+            },
+            "type": "heatmap",
+            "xAxis": {
+              "show": true
+            },
+            "xBucketNumber": null,
+            "xBucketSize": null,
+            "yAxis": {
+              "decimals": null,
+              "format": "ms",
+              "logBase": 1,
+              "max": null,
+              "min": "0",
+              "show": true,
+              "splitFactor": null
+            },
+            "yBucketBound": "auto",
+            "yBucketNumber": null,
+            "yBucketSize": null
+          },
+          {
+            "cards": {
+              "cardPadding": null,
+              "cardRound": null
+            },
+            "color": {
+              "cardColor": "#b4ff00",
+              "colorScale": "sqrt",
+              "colorScheme": "interpolateOranges",
+              "exponent": 0.5,
+              "mode": "spectrum"
+            },
+            "dataFormat": "timeseries",
+            "datasource": "prometheus",
+            "description": "",
+            "fieldConfig": {
+              "defaults": {},
+              "overrides": []
+            },
+            "gridPos": {
+              "h": 8,
+              "w": 12,
+              "x": 12,
+              "y": 52
+            },
+            "heatmap": {},
+            "hideZeroBuckets": false,
+            "highlightCards": true,
+            "id": 81,
+            "legend": {
+              "show": false
+            },
+            "maxPerRow": 2,
+            "pluginVersion": "8.0.1",
+            "repeatDirection": "h",
+            "repeatIteration": 1627832445863,
+            "repeatPanelId": 37,
+            "reverseYBuckets": false,
+            "scopedVars": {
+              "webhook": {
+                "selected": false,
+                "text": "/namespaces",
+                "value": "/namespaces"
+              }
+            },
+            "targets": [
+              {
+                "exemplar": false,
+                "expr": "sum by (le) (increase(controller_runtime_webhook_latency_seconds_bucket{job=\"capsule\", webhook=\"$webhook\"}[$__rate_interval]))",
+                "format": "heatmap",
+                "hide": false,
+                "interval": "",
+                "legendFormat": "",
+                "queryType": "randomWalk",
+                "refId": "A"
+              }
+            ],
+            "title": "$webhook reconcile latency",
+            "tooltip": {
+              "show": true,
+              "showHistogram": false
+            },
+            "type": "heatmap",
+            "xAxis": {
+              "show": true
+            },
+            "xBucketNumber": null,
+            "xBucketSize": null,
+            "yAxis": {
+              "decimals": null,
+              "format": "ms",
+              "logBase": 1,
+              "max": null,
+              "min": "0",
+              "show": true,
+              "splitFactor": null
+            },
+            "yBucketBound": "auto",
+            "yBucketNumber": null,
+            "yBucketSize": null
+          },
+          {
+            "cards": {
+              "cardPadding": null,
+              "cardRound": null
+            },
+            "color": {
+              "cardColor": "#b4ff00",
+              "colorScale": "sqrt",
+              "colorScheme": "interpolateOranges",
+              "exponent": 0.5,
+              "mode": "spectrum"
+            },
+            "dataFormat": "timeseries",
+            "datasource": "prometheus",
+            "description": "",
+            "fieldConfig": {
+              "defaults": {},
+              "overrides": []
+            },
+            "gridPos": {
+              "h": 8,
+              "w": 12,
+              "x": 0,
+              "y": 60
+            },
+            "heatmap": {},
+            "hideZeroBuckets": false,
+            "highlightCards": true,
+            "id": 82,
+            "legend": {
+              "show": false
+            },
+            "maxPerRow": 2,
+            "pluginVersion": "8.0.1",
+            "repeatDirection": "h",
+            "repeatIteration": 1627832445863,
+            "repeatPanelId": 37,
+            "reverseYBuckets": false,
+            "scopedVars": {
+              "webhook": {
+                "selected": false,
+                "text": "/networkpolicies",
+                "value": "/networkpolicies"
+              }
+            },
+            "targets": [
+              {
+                "exemplar": false,
+                "expr": "sum by (le) (increase(controller_runtime_webhook_latency_seconds_bucket{job=\"capsule\", webhook=\"$webhook\"}[$__rate_interval]))",
+                "format": "heatmap",
+                "hide": false,
+                "interval": "",
+                "legendFormat": "",
+                "queryType": "randomWalk",
+                "refId": "A"
+              }
+            ],
+            "title": "$webhook reconcile latency",
+            "tooltip": {
+              "show": true,
+              "showHistogram": false
+            },
+            "type": "heatmap",
+            "xAxis": {
+              "show": true
+            },
+            "xBucketNumber": null,
+            "xBucketSize": null,
+            "yAxis": {
+              "decimals": null,
+              "format": "ms",
+              "logBase": 1,
+              "max": null,
+              "min": "0",
+              "show": true,
+              "splitFactor": null
+            },
+            "yBucketBound": "auto",
+            "yBucketNumber": null,
+            "yBucketSize": null
+          },
+          {
+            "cards": {
+              "cardPadding": null,
+              "cardRound": null
+            },
+            "color": {
+              "cardColor": "#b4ff00",
+              "colorScale": "sqrt",
+              "colorScheme": "interpolateOranges",
+              "exponent": 0.5,
+              "mode": "spectrum"
+            },
+            "dataFormat": "timeseries",
+            "datasource": "prometheus",
+            "description": "",
+            "fieldConfig": {
+              "defaults": {},
+              "overrides": []
+            },
+            "gridPos": {
+              "h": 8,
+              "w": 12,
+              "x": 12,
+              "y": 60
+            },
+            "heatmap": {},
+            "hideZeroBuckets": false,
+            "highlightCards": true,
+            "id": 83,
+            "legend": {
+              "show": false
+            },
+            "maxPerRow": 2,
+            "pluginVersion": "8.0.1",
+            "repeatDirection": "h",
+            "repeatIteration": 1627832445863,
+            "repeatPanelId": 37,
+            "reverseYBuckets": false,
+            "scopedVars": {
+              "webhook": {
+                "selected": false,
+                "text": "/persistentvolumeclaims",
+                "value": "/persistentvolumeclaims"
+              }
+            },
+            "targets": [
+              {
+                "exemplar": false,
+                "expr": "sum by (le) (increase(controller_runtime_webhook_latency_seconds_bucket{job=\"capsule\", webhook=\"$webhook\"}[$__rate_interval]))",
+                "format": "heatmap",
+                "hide": false,
+                "interval": "",
+                "legendFormat": "",
+                "queryType": "randomWalk",
+                "refId": "A"
+              }
+            ],
+            "title": "$webhook reconcile latency",
+            "tooltip": {
+              "show": true,
+              "showHistogram": false
+            },
+            "type": "heatmap",
+            "xAxis": {
+              "show": true
+            },
+            "xBucketNumber": null,
+            "xBucketSize": null,
+            "yAxis": {
+              "decimals": null,
+              "format": "ms",
+              "logBase": 1,
+              "max": null,
+              "min": "0",
+              "show": true,
+              "splitFactor": null
+            },
+            "yBucketBound": "auto",
+            "yBucketNumber": null,
+            "yBucketSize": null
+          },
+          {
+            "cards": {
+              "cardPadding": null,
+              "cardRound": null
+            },
+            "color": {
+              "cardColor": "#b4ff00",
+              "colorScale": "sqrt",
+              "colorScheme": "interpolateOranges",
+              "exponent": 0.5,
+              "mode": "spectrum"
+            },
+            "dataFormat": "timeseries",
+            "datasource": "prometheus",
+            "description": "",
+            "fieldConfig": {
+              "defaults": {},
+              "overrides": []
+            },
+            "gridPos": {
+              "h": 8,
+              "w": 12,
+              "x": 0,
+              "y": 68
+            },
+            "heatmap": {},
+            "hideZeroBuckets": false,
+            "highlightCards": true,
+            "id": 84,
+            "legend": {
+              "show": false
+            },
+            "maxPerRow": 2,
+            "pluginVersion": "8.0.1",
+            "repeatDirection": "h",
+            "repeatIteration": 1627832445863,
+            "repeatPanelId": 37,
+            "reverseYBuckets": false,
+            "scopedVars": {
+              "webhook": {
+                "selected": false,
+                "text": "/pods",
+                "value": "/pods"
+              }
+            },
+            "targets": [
+              {
+                "exemplar": false,
+                "expr": "sum by (le) (increase(controller_runtime_webhook_latency_seconds_bucket{job=\"capsule\", webhook=\"$webhook\"}[$__rate_interval]))",
+                "format": "heatmap",
+                "hide": false,
+                "interval": "",
+                "legendFormat": "",
+                "queryType": "randomWalk",
+                "refId": "A"
+              }
+            ],
+            "title": "$webhook reconcile latency",
+            "tooltip": {
+              "show": true,
+              "showHistogram": false
+            },
+            "type": "heatmap",
+            "xAxis": {
+              "show": true
+            },
+            "xBucketNumber": null,
+            "xBucketSize": null,
+            "yAxis": {
+              "decimals": null,
+              "format": "ms",
+              "logBase": 1,
+              "max": null,
+              "min": "0",
+              "show": true,
+              "splitFactor": null
+            },
+            "yBucketBound": "auto",
+            "yBucketNumber": null,
+            "yBucketSize": null
+          },
+          {
+            "cards": {
+              "cardPadding": null,
+              "cardRound": null
+            },
+            "color": {
+              "cardColor": "#b4ff00",
+              "colorScale": "sqrt",
+              "colorScheme": "interpolateOranges",
+              "exponent": 0.5,
+              "mode": "spectrum"
+            },
+            "dataFormat": "timeseries",
+            "datasource": "prometheus",
+            "description": "",
+            "fieldConfig": {
+              "defaults": {},
+              "overrides": []
+            },
+            "gridPos": {
+              "h": 8,
+              "w": 12,
+              "x": 12,
+              "y": 68
+            },
+            "heatmap": {},
+            "hideZeroBuckets": false,
+            "highlightCards": true,
+            "id": 85,
+            "legend": {
+              "show": false
+            },
+            "maxPerRow": 2,
+            "pluginVersion": "8.0.1",
+            "repeatDirection": "h",
+            "repeatIteration": 1627832445863,
+            "repeatPanelId": 37,
+            "reverseYBuckets": false,
+            "scopedVars": {
+              "webhook": {
+                "selected": false,
+                "text": "/services",
+                "value": "/services"
+              }
+            },
+            "targets": [
+              {
+                "exemplar": false,
+                "expr": "sum by (le) (increase(controller_runtime_webhook_latency_seconds_bucket{job=\"capsule\", webhook=\"$webhook\"}[$__rate_interval]))",
+                "format": "heatmap",
+                "hide": false,
+                "interval": "",
+                "legendFormat": "",
+                "queryType": "randomWalk",
+                "refId": "A"
+              }
+            ],
+            "title": "$webhook reconcile latency",
+            "tooltip": {
+              "show": true,
+              "showHistogram": false
+            },
+            "type": "heatmap",
+            "xAxis": {
+              "show": true
+            },
+            "xBucketNumber": null,
+            "xBucketSize": null,
+            "yAxis": {
+              "decimals": null,
+              "format": "ms",
+              "logBase": 1,
+              "max": null,
+              "min": "0",
+              "show": true,
+              "splitFactor": null
+            },
+            "yBucketBound": "auto",
+            "yBucketNumber": null,
+            "yBucketSize": null
+          },
+          {
+            "cards": {
+              "cardPadding": null,
+              "cardRound": null
+            },
+            "color": {
+              "cardColor": "#b4ff00",
+              "colorScale": "sqrt",
+              "colorScheme": "interpolateOranges",
+              "exponent": 0.5,
+              "mode": "spectrum"
+            },
+            "dataFormat": "timeseries",
+            "datasource": "prometheus",
+            "description": "",
+            "fieldConfig": {
+              "defaults": {},
+              "overrides": []
+            },
+            "gridPos": {
+              "h": 8,
+              "w": 12,
+              "x": 0,
+              "y": 76
+            },
+            "heatmap": {},
+            "hideZeroBuckets": false,
+            "highlightCards": true,
+            "id": 86,
+            "legend": {
+              "show": false
+            },
+            "maxPerRow": 2,
+            "pluginVersion": "8.0.1",
+            "repeatDirection": "h",
+            "repeatIteration": 1627832445863,
+            "repeatPanelId": 37,
+            "reverseYBuckets": false,
+            "scopedVars": {
+              "webhook": {
+                "selected": false,
+                "text": "/tenants",
+                "value": "/tenants"
+              }
+            },
+            "targets": [
+              {
+                "exemplar": false,
+                "expr": "sum by (le) (increase(controller_runtime_webhook_latency_seconds_bucket{job=\"capsule\", webhook=\"$webhook\"}[$__rate_interval]))",
+                "format": "heatmap",
+                "hide": false,
+                "interval": "",
+                "legendFormat": "",
+                "queryType": "randomWalk",
+                "refId": "A"
+              }
+            ],
+            "title": "$webhook reconcile latency",
+            "tooltip": {
+              "show": true,
+              "showHistogram": false
+            },
+            "type": "heatmap",
+            "xAxis": {
+              "show": true
+            },
+            "xBucketNumber": null,
+            "xBucketSize": null,
+            "yAxis": {
+              "decimals": null,
+              "format": "ms",
+              "logBase": 1,
+              "max": null,
+              "min": "0",
+              "show": true,
+              "splitFactor": null
+            },
+            "yBucketBound": "auto",
+            "yBucketNumber": null,
+            "yBucketSize": null
+          }
+        ],
+        "title": "Webhooks latency",
+        "type": "row"
+      },
+      {
+        "collapsed": true,
+        "datasource": null,
+        "gridPos": {
+          "h": 1,
+          "w": 24,
+          "x": 0,
+          "y": 68
+        },
+        "id": 26,
+        "panels": [
+          {
+            "cards": {
+              "cardPadding": null,
+              "cardRound": null
+            },
+            "color": {
+              "cardColor": "#b4ff00",
+              "colorScale": "sqrt",
+              "colorScheme": "interpolateOranges",
+              "exponent": 0.5,
+              "mode": "spectrum"
+            },
+            "dataFormat": "timeseries",
+            "datasource": "prometheus",
+            "fieldConfig": {
+              "defaults": {},
+              "overrides": []
+            },
+            "gridPos": {
+              "h": 7,
+              "w": 6,
+              "x": 0,
+              "y": 12
+            },
+            "heatmap": {},
+            "hideZeroBuckets": false,
+            "highlightCards": true,
+            "id": 20,
+            "legend": {
+              "show": false
+            },
+            "pluginVersion": "8.0.1",
+            "repeat": "rest_client_url",
+            "reverseYBuckets": false,
+            "scopedVars": {
+              "rest_client_url": {
+                "selected": true,
+                "text": "https://10.96.0.1:443/api/v1/namespaces/%7Bnamespace%7D/configmaps/%7Bname%7D",
+                "value": "https://10.96.0.1:443/api/v1/namespaces/%7Bnamespace%7D/configmaps/%7Bname%7D"
+              }
+            },
+            "targets": [
+              {
+                "exemplar": false,
+                "expr": "sum by (le) (increase(rest_client_request_latency_seconds_bucket{job=\"capsule\", url=\"${rest_client_url:raw}\", verb=\"$rest_client_verb\"}[$__rate_interval]))",
+                "format": "heatmap",
+                "hide": false,
+                "interval": "",
+                "legendFormat": "{{le}}",
+                "queryType": "randomWalk",
+                "refId": "A"
+              }
+            ],
+            "title": "Latency for ${rest_client_url:raw}",
+            "tooltip": {
+              "show": true,
+              "showHistogram": false
+            },
+            "type": "heatmap",
+            "xAxis": {
+              "show": true
+            },
+            "xBucketNumber": null,
+            "xBucketSize": null,
+            "yAxis": {
+              "decimals": null,
+              "format": "ms",
+              "logBase": 1,
+              "max": null,
+              "min": "0",
+              "show": true,
+              "splitFactor": null
+            },
+            "yBucketBound": "auto",
+            "yBucketNumber": null,
+            "yBucketSize": null
+          },
+          {
+            "cards": {
+              "cardPadding": null,
+              "cardRound": null
+            },
+            "color": {
+              "cardColor": "#b4ff00",
+              "colorScale": "sqrt",
+              "colorScheme": "interpolateOranges",
+              "exponent": 0.5,
+              "mode": "spectrum"
+            },
+            "dataFormat": "timeseries",
+            "datasource": "prometheus",
+            "fieldConfig": {
+              "defaults": {},
+              "overrides": []
+            },
+            "gridPos": {
+              "h": 7,
+              "w": 6,
+              "x": 6,
+              "y": 12
+            },
+            "heatmap": {},
+            "hideZeroBuckets": false,
+            "highlightCards": true,
+            "id": 76,
+            "legend": {
+              "show": false
+            },
+            "pluginVersion": "8.0.1",
+            "repeatIteration": 1627832445863,
+            "repeatPanelId": 20,
+            "reverseYBuckets": false,
+            "scopedVars": {
+              "rest_client_url": {
+                "selected": true,
+                "text": "https://10.96.0.1:443/api/v1/namespaces/%7Bnamespace%7D/events",
+                "value": "https://10.96.0.1:443/api/v1/namespaces/%7Bnamespace%7D/events"
+              }
+            },
+            "targets": [
+              {
+                "exemplar": false,
+                "expr": "sum by (le) (increase(rest_client_request_latency_seconds_bucket{job=\"capsule\", url=\"${rest_client_url:raw}\", verb=\"$rest_client_verb\"}[$__rate_interval]))",
+                "format": "heatmap",
+                "hide": false,
+                "interval": "",
+                "legendFormat": "{{le}}",
+                "queryType": "randomWalk",
+                "refId": "A"
+              }
+            ],
+            "title": "Latency for ${rest_client_url:raw}",
+            "tooltip": {
+              "show": true,
+              "showHistogram": false
+            },
+            "type": "heatmap",
+            "xAxis": {
+              "show": true
+            },
+            "xBucketNumber": null,
+            "xBucketSize": null,
+            "yAxis": {
+              "decimals": null,
+              "format": "ms",
+              "logBase": 1,
+              "max": null,
+              "min": "0",
+              "show": true,
+              "splitFactor": null
+            },
+            "yBucketBound": "auto",
+            "yBucketNumber": null,
+            "yBucketSize": null
+          },
+          {
+            "cards": {
+              "cardPadding": null,
+              "cardRound": null
+            },
+            "color": {
+              "cardColor": "#b4ff00",
+              "colorScale": "sqrt",
+              "colorScheme": "interpolateOranges",
+              "exponent": 0.5,
+              "mode": "spectrum"
+            },
+            "dataFormat": "timeseries",
+            "datasource": "prometheus",
+            "fieldConfig": {
+              "defaults": {},
+              "overrides": []
+            },
+            "gridPos": {
+              "h": 7,
+              "w": 6,
+              "x": 12,
+              "y": 12
+            },
+            "heatmap": {},
+            "hideZeroBuckets": false,
+            "highlightCards": true,
+            "id": 77,
+            "legend": {
+              "show": false
+            },
+            "pluginVersion": "8.0.1",
+            "repeatIteration": 1627832445863,
+            "repeatPanelId": 20,
+            "reverseYBuckets": false,
+            "scopedVars": {
+              "rest_client_url": {
+                "selected": true,
+                "text": "https://10.96.0.1:443/api/v1/namespaces?limit=%7Bvalue%7D&resourceVersion=%7Bvalue%7D",
+                "value": "https://10.96.0.1:443/api/v1/namespaces?limit=%7Bvalue%7D&resourceVersion=%7Bvalue%7D"
+              }
+            },
+            "targets": [
+              {
+                "exemplar": false,
+                "expr": "sum by (le) (increase(rest_client_request_latency_seconds_bucket{job=\"capsule\", url=\"${rest_client_url:raw}\", verb=\"$rest_client_verb\"}[$__rate_interval]))",
+                "format": "heatmap",
+                "hide": false,
+                "interval": "",
+                "legendFormat": "{{le}}",
+                "queryType": "randomWalk",
+                "refId": "A"
+              }
+            ],
+            "title": "Latency for ${rest_client_url:raw}",
+            "tooltip": {
+              "show": true,
+              "showHistogram": false
+            },
+            "type": "heatmap",
+            "xAxis": {
+              "show": true
+            },
+            "xBucketNumber": null,
+            "xBucketSize": null,
+            "yAxis": {
+              "decimals": null,
+              "format": "ms",
+              "logBase": 1,
+              "max": null,
+              "min": "0",
+              "show": true,
+              "splitFactor": null
+            },
+            "yBucketBound": "auto",
+            "yBucketNumber": null,
+            "yBucketSize": null
+          },
+          {
+            "cards": {
+              "cardPadding": null,
+              "cardRound": null
+            },
+            "color": {
+              "cardColor": "#b4ff00",
+              "colorScale": "sqrt",
+              "colorScheme": "interpolateOranges",
+              "exponent": 0.5,
+              "mode": "spectrum"
+            },
+            "dataFormat": "timeseries",
+            "datasource": "prometheus",
+            "fieldConfig": {
+              "defaults": {},
+              "overrides": []
+            },
+            "gridPos": {
+              "h": 7,
+              "w": 6,
+              "x": 18,
+              "y": 12
+            },
+            "heatmap": {},
+            "hideZeroBuckets": false,
+            "highlightCards": true,
+            "id": 78,
+            "legend": {
+              "show": false
+            },
+            "pluginVersion": "8.0.1",
+            "repeatIteration": 1627832445863,
+            "repeatPanelId": 20,
+            "reverseYBuckets": false,
+            "scopedVars": {
+              "rest_client_url": {
+                "selected": true,
+                "text": "https://10.96.0.1:443/apis/coordination.k8s.io/v1/namespaces/%7Bnamespace%7D/leases/%7Bname%7D",
+                "value": "https://10.96.0.1:443/apis/coordination.k8s.io/v1/namespaces/%7Bnamespace%7D/leases/%7Bname%7D"
+              }
+            },
+            "targets": [
+              {
+                "exemplar": false,
+                "expr": "sum by (le) (increase(rest_client_request_latency_seconds_bucket{job=\"capsule\", url=\"${rest_client_url:raw}\", verb=\"$rest_client_verb\"}[$__rate_interval]))",
+                "format": "heatmap",
+                "hide": false,
+                "interval": "",
+                "legendFormat": "{{le}}",
+                "queryType": "randomWalk",
+                "refId": "A"
+              }
+            ],
+            "title": "Latency for ${rest_client_url:raw}",
+            "tooltip": {
+              "show": true,
+              "showHistogram": false
+            },
+            "type": "heatmap",
+            "xAxis": {
+              "show": true
+            },
+            "xBucketNumber": null,
+            "xBucketSize": null,
+            "yAxis": {
+              "decimals": null,
+              "format": "ms",
+              "logBase": 1,
+              "max": null,
+              "min": "0",
+              "show": true,
+              "splitFactor": null
+            },
+            "yBucketBound": "auto",
+            "yBucketNumber": null,
+            "yBucketSize": null
+          }
+        ],
+        "title": "REST client latency",
+        "type": "row"
+      },
+      {
+        "collapsed": false,
+        "datasource": null,
+        "gridPos": {
+          "h": 1,
+          "w": 24,
+          "x": 0,
+          "y": 69
+        },
+        "id": 17,
+        "panels": [],
+        "title": "REST client error rate",
+        "type": "row"
+      },
+      {
+        "datasource": "prometheus",
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "axisLabel": "",
+              "axisPlacement": "auto",
+              "barAlignment": 0,
+              "drawStyle": "line",
+              "fillOpacity": 0,
+              "gradientMode": "none",
+              "hideFrom": {
+                "graph": false,
+                "legend": false,
+                "tooltip": false,
+                "viz": false
+              },
+              "lineInterpolation": "linear",
+              "lineWidth": 1,
+              "pointSize": 5,
+              "scaleDistribution": {
+                "type": "linear"
+              },
+              "showPoints": "auto",
+              "spanNulls": false
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "red",
+                  "value": 80
+                }
+              ]
+            }
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 11,
+          "w": 12,
+          "x": 0,
+          "y": 70
+        },
+        "id": 22,
+        "options": {
+          "legend": {
+            "calcs": [],
+            "displayMode": "list",
+            "placement": "bottom"
+          },
+          "tooltip": {
+            "mode": "single"
+          },
+          "tooltipOptions": {
+            "mode": "single"
+          }
+        },
+        "pluginVersion": "8.0.1",
+        "targets": [
+          {
+            "exemplar": false,
+            "expr": "sum(irate(rest_client_requests_total{job=\"capsule\"}[$__rate_interval])) by (code)",
+            "format": "time_series",
+            "hide": false,
+            "interval": "",
+            "legendFormat": "{{ code }}",
+            "queryType": "randomWalk",
+            "refId": "A"
+          }
+        ],
+        "title": "REST Client status code",
+        "type": "timeseries"
+      },
+      {
+        "datasource": "prometheus",
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "red",
+                  "value": 80
+                }
+              ]
+            }
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 11,
+          "w": 12,
+          "x": 12,
+          "y": 70
+        },
+        "id": 19,
+        "options": {
+          "colorMode": "value",
+          "graphMode": "none",
+          "justifyMode": "auto",
+          "orientation": "auto",
+          "reduceOptions": {
+            "calcs": [
+              "lastNotNull"
+            ],
+            "fields": "",
+            "values": false
+          },
+          "text": {},
+          "textMode": "auto"
+        },
+        "pluginVersion": "7.5.4",
+        "targets": [
+          {
+            "exemplar": false,
+            "expr": "sum(irate(rest_client_requests_total{job=\"capsule\"}[$__rate_interval])) by (code)",
+            "format": "time_series",
+            "hide": false,
+            "instant": false,
+            "interval": "",
+            "legendFormat": " {{ code }}",
+            "queryType": "randomWalk",
+            "refId": "A"
+          }
+        ],
+        "title": "Rate & Errors",
+        "type": "stat"
+      },
+      {
+        "collapsed": false,
+        "datasource": null,
+        "gridPos": {
+          "h": 1,
+          "w": 24,
+          "x": 0,
+          "y": 81
+        },
+        "id": 12,
+        "panels": [],
+        "title": "Saturation",
+        "type": "row"
+      },
+      {
+        "datasource": "prometheus",
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "axisLabel": "",
+              "axisPlacement": "auto",
+              "barAlignment": 0,
+              "drawStyle": "line",
+              "fillOpacity": 0,
+              "gradientMode": "none",
+              "hideFrom": {
+                "graph": false,
+                "legend": false,
+                "tooltip": false,
+                "viz": false
+              },
+              "lineInterpolation": "linear",
+              "lineWidth": 1,
+              "pointSize": 5,
+              "scaleDistribution": {
+                "type": "linear"
+              },
+              "showPoints": "auto",
+              "spanNulls": false
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "red",
+                  "value": 80
+                }
+              ]
+            }
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 7,
+          "x": 0,
+          "y": 82
+        },
+        "id": 2,
+        "options": {
+          "legend": {
+            "calcs": [],
+            "displayMode": "list",
+            "placement": "bottom"
+          },
+          "tooltip": {
+            "mode": "single"
+          },
+          "tooltipOptions": {
+            "mode": "single"
+          }
+        },
+        "targets": [
+          {
+            "exemplar": true,
+            "expr": "irate(process_cpu_seconds_total{job=\"capsule\"}[$__rate_interval])",
+            "interval": "",
+            "legendFormat": "{{ pod }}",
+            "queryType": "randomWalk",
+            "refId": "A"
+          }
+        ],
+        "title": "CPU Usage",
+        "type": "timeseries"
+      },
+      {
+        "datasource": "prometheus",
+        "description": "",
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "axisLabel": "",
+              "axisPlacement": "auto",
+              "barAlignment": 1,
+              "drawStyle": "line",
+              "fillOpacity": 0,
+              "gradientMode": "none",
+              "hideFrom": {
+                "graph": false,
+                "legend": false,
+                "tooltip": false,
+                "viz": false
+              },
+              "lineInterpolation": "smooth",
+              "lineStyle": {
+                "fill": "solid"
+              },
+              "lineWidth": 1,
+              "pointSize": 5,
+              "scaleDistribution": {
+                "type": "linear"
+              },
+              "showPoints": "auto",
+              "spanNulls": false
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "red",
+                  "value": 80
+                }
+              ]
+            },
+            "unit": "decbytes"
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 7,
+          "x": 7,
+          "y": 82
+        },
+        "id": 24,
+        "options": {
+          "legend": {
+            "calcs": [],
+            "displayMode": "list",
+            "placement": "bottom"
+          },
+          "tooltip": {
+            "mode": "single"
+          },
+          "tooltipOptions": {
+            "mode": "single"
+          }
+        },
+        "targets": [
+          {
+            "exemplar": false,
+            "expr": "process_resident_memory_bytes{job=\"capsule\"}",
+            "interval": "",
+            "legendFormat": "{{pod}}",
+            "queryType": "randomWalk",
+            "refId": "A"
+          }
+        ],
+        "title": "Memory Usage",
+        "type": "timeseries"
+      },
+      {
+        "datasource": "prometheus",
+        "description": "",
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "axisLabel": "",
+              "axisPlacement": "auto",
+              "barAlignment": 1,
+              "drawStyle": "line",
+              "fillOpacity": 0,
+              "gradientMode": "none",
+              "hideFrom": {
+                "graph": false,
+                "legend": false,
+                "tooltip": false,
+                "viz": false
+              },
+              "lineInterpolation": "smooth",
+              "lineStyle": {
+                "fill": "solid"
+              },
+              "lineWidth": 1,
+              "pointSize": 5,
+              "scaleDistribution": {
+                "type": "linear"
+              },
+              "showPoints": "auto",
+              "spanNulls": false
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "red",
+                  "value": 80
+                }
+              ]
+            },
+            "unit": "none"
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 7,
+          "x": 14,
+          "y": 82
+        },
+        "id": 33,
+        "options": {
+          "legend": {
+            "calcs": [],
+            "displayMode": "list",
+            "placement": "bottom"
+          },
+          "tooltip": {
+            "mode": "single"
+          },
+          "tooltipOptions": {
+            "mode": "single"
+          }
+        },
+        "targets": [
+          {
+            "exemplar": false,
+            "expr": "go_goroutines{job=\"capsule\"}",
+            "interval": "",
+            "legendFormat": "{{pod}}",
+            "queryType": "randomWalk",
+            "refId": "A"
+          }
+        ],
+        "title": "goroutines",
+        "type": "timeseries"
+      },
+      {
+        "datasource": "prometheus",
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                }
+              ]
+            }
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 3,
+          "x": 21,
+          "y": 82
+        },
+        "id": 5,
+        "options": {
+          "colorMode": "background",
+          "graphMode": "area",
+          "justifyMode": "auto",
+          "orientation": "auto",
+          "reduceOptions": {
+            "calcs": [
+              "lastNotNull"
+            ],
+            "fields": "",
+            "values": false
+          },
+          "text": {
+            "valueSize": 80
+          },
+          "textMode": "value_and_name"
+        },
+        "pluginVersion": "7.5.4",
+        "targets": [
+          {
+            "exemplar": true,
+            "expr": "sum(up{job=\"capsule\"})",
+            "interval": "",
+            "legendFormat": "Active Controllers",
+            "queryType": "randomWalk",
+            "refId": "A"
+          }
+        ],
+        "title": "Stats",
+        "transparent": true,
+        "type": "stat"
+      },
+      {
+        "collapsed": true,
+        "datasource": null,
+        "gridPos": {
+          "h": 1,
+          "w": 24,
+          "x": 0,
+          "y": 90
+        },
+        "id": 10,
+        "panels": [
+          {
+            "datasource": "prometheus",
+            "description": "service time to complete needed actions",
+            "fieldConfig": {
+              "defaults": {
+                "color": {
+                  "mode": "thresholds"
+                },
+                "mappings": [],
+                "thresholds": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "red",
+                      "value": 80
+                    }
+                  ]
+                }
+              },
+              "overrides": []
+            },
+            "gridPos": {
+              "h": 8,
+              "w": 8,
+              "x": 0,
+              "y": 31
+            },
+            "id": 7,
+            "options": {
+              "colorMode": "value",
+              "graphMode": "area",
+              "justifyMode": "auto",
+              "orientation": "auto",
+              "reduceOptions": {
+                "calcs": [
+                  "lastNotNull"
+                ],
+                "fields": "",
+                "values": false
+              },
+              "text": {},
+              "textMode": "auto"
+            },
+            "pluginVersion": "7.5.5",
+            "targets": [
+              {
+                "exemplar": true,
+                "expr": "histogram_quantile(0.99, sum(rate(workqueue_queue_duration_seconds_bucket{job=\"capsule\"}[$__rate_interval])) by (instance, name, le))",
+                "format": "time_series",
+                "hide": false,
+                "interval": "",
+                "legendFormat": "{{name}}",
+                "queryType": "randomWalk",
+                "refId": "A"
+              }
+            ],
+            "title": "Workqueue latency",
+            "type": "stat"
+          },
+          {
+            "datasource": "prometheus",
+            "description": "number of actions per unit time",
+            "fieldConfig": {
+              "defaults": {
+                "color": {
+                  "mode": "thresholds"
+                },
+                "mappings": [],
+                "thresholds": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "red",
+                      "value": 80
+                    }
+                  ]
+                }
+              },
+              "overrides": []
+            },
+            "gridPos": {
+              "h": 8,
+              "w": 8,
+              "x": 8,
+              "y": 31
+            },
+            "id": 8,
+            "options": {
+              "colorMode": "value",
+              "graphMode": "area",
+              "justifyMode": "auto",
+              "orientation": "auto",
+              "reduceOptions": {
+                "calcs": [
+                  "lastNotNull"
+                ],
+                "fields": "",
+                "values": false
+              },
+              "text": {},
+              "textMode": "auto"
+            },
+            "pluginVersion": "7.5.5",
+            "targets": [
+              {
+                "exemplar": true,
+                "expr": "sum(rate(workqueue_adds_total{job=\"capsule\"}[$__rate_interval])) by (instance, name)",
+                "format": "time_series",
+                "hide": false,
+                "interval": "",
+                "legendFormat": "{{name}}",
+                "queryType": "randomWalk",
+                "refId": "A"
+              }
+            ],
+            "title": "Workqueue rate",
+            "type": "stat"
+          },
+          {
+            "datasource": "prometheus",
+            "description": "number of actions waiting in the queue to be performed",
+            "fieldConfig": {
+              "defaults": {
+                "color": {
+                  "mode": "thresholds"
+                },
+                "mappings": [],
+                "thresholds": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "red",
+                      "value": 80
+                    }
+                  ]
+                }
+              },
+              "overrides": []
+            },
+            "gridPos": {
+              "h": 8,
+              "w": 8,
+              "x": 16,
+              "y": 31
+            },
+            "id": 13,
+            "options": {
+              "colorMode": "value",
+              "graphMode": "area",
+              "justifyMode": "auto",
+              "orientation": "auto",
+              "reduceOptions": {
+                "calcs": [
+                  "lastNotNull"
+                ],
+                "fields": "",
+                "values": false
+              },
+              "text": {},
+              "textMode": "auto"
+            },
+            "pluginVersion": "7.5.5",
+            "targets": [
+              {
+                "exemplar": false,
+                "expr": "sum(rate(workqueue_depth{job=\"capsule\"}[$__rate_interval])) by (instance, name)",
+                "format": "time_series",
+                "hide": false,
+                "interval": "",
+                "legendFormat": "{{name}}",
+                "queryType": "randomWalk",
+                "refId": "A"
+              }
+            ],
+            "title": "Workqueue depth",
+            "type": "stat"
+          }
+        ],
+        "title": "Workqueue",
+        "type": "row"
       }
-    ]
-  },
-  "time": {
-    "from": "now-30m",
-    "to": "now"
-  },
-  "timepicker": {},
-  "timezone": "",
-  "title": "capsule",
-  "uid": "nEFvaoR7z",
-  "version": 2
+    ],
+    "refresh": "30s",
+    "schemaVersion": 27,
+    "style": "dark",
+    "tags": [],
+    "templating": {
+      "list": [
+        {
+          "allValue": null,
+          "current": {},
+          "datasource": "prometheus",
+          "definition": "label_values(controller_runtime_active_workers{job=\"capsule\"},controller)",
+          "description": "Select the underlying Controller to get metrics",
+          "error": null,
+          "hide": 0,
+          "includeAll": false,
+          "label": "Controller name",
+          "multi": true,
+          "name": "controller_name",
+          "options": [],
+          "query": {
+            "query": "label_values(controller_runtime_active_workers{job=\"capsule\"},controller)",
+            "refId": "StandardVariableQuery"
+          },
+          "refresh": 1,
+          "regex": "",
+          "skipUrlSync": false,
+          "sort": 0,
+          "tagValuesQuery": "",
+          "tags": [],
+          "tagsQuery": "",
+          "type": "query",
+          "useTags": false
+        },
+        {
+          "allValue": null,
+          "current": {},
+          "datasource": "prometheus",
+          "definition": "label_values(rest_client_request_latency_seconds_sum{job=\"capsule\"},url)",
+          "description": "Kubernetes API endpoint the REST client is interacting with",
+          "error": null,
+          "hide": 0,
+          "includeAll": true,
+          "label": "REST client URL",
+          "multi": true,
+          "name": "rest_client_url",
+          "options": [],
+          "query": {
+            "query": "label_values(rest_client_request_latency_seconds_sum{job=\"capsule\"},url)",
+            "refId": "StandardVariableQuery"
+          },
+          "refresh": 1,
+          "regex": "",
+          "skipUrlSync": false,
+          "sort": 0,
+          "tagValuesQuery": "",
+          "tags": [],
+          "tagsQuery": "",
+          "type": "query",
+          "useTags": false
+        },
+        {
+          "allValue": null,
+          "current": {},
+          "datasource": "prometheus",
+          "definition": "label_values(rest_client_request_latency_seconds_sum{job=\"capsule\"},verb)",
+          "description": "Kubernetes API HTTP verb the REST client is interacting with",
+          "error": null,
+          "hide": 0,
+          "includeAll": false,
+          "label": "REST client verb",
+          "multi": false,
+          "name": "rest_client_verb",
+          "options": [],
+          "query": {
+            "query": "label_values(rest_client_request_latency_seconds_sum{job=\"capsule\"},verb)",
+            "refId": "StandardVariableQuery"
+          },
+          "refresh": 1,
+          "regex": "",
+          "skipUrlSync": false,
+          "sort": 0,
+          "tagValuesQuery": "",
+          "tags": [],
+          "tagsQuery": "",
+          "type": "query",
+          "useTags": false
+        },
+        {
+          "allValue": null,
+          "current": {},
+          "datasource": "prometheus",
+          "definition": "label_values(controller_runtime_webhook_requests_in_flight{job=\"capsule\"}, webhook)",
+          "description": "Capsule webhook",
+          "error": null,
+          "hide": 0,
+          "includeAll": true,
+          "label": "Webhook",
+          "multi": true,
+          "name": "webhook",
+          "options": [],
+          "query": {
+            "query": "label_values(controller_runtime_webhook_requests_in_flight{job=\"capsule\"}, webhook)",
+            "refId": "StandardVariableQuery"
+          },
+          "refresh": 1,
+          "regex": "",
+          "skipUrlSync": false,
+          "sort": 0,
+          "tagValuesQuery": "",
+          "tags": [],
+          "tagsQuery": "",
+          "type": "query",
+          "useTags": false
+        }
+      ]
+    },
+    "time": {
+      "from": "now-30m",
+      "to": "now"
+    },
+    "timepicker": {},
+    "timezone": "",
+    "title": "capsule",
+    "uid": "nEFvaoR7z",
+    "version": 2
 }
