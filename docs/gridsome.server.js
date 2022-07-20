@@ -90,7 +90,11 @@ module.exports = function (api) {
                   path: '/docs/guides/managed-kubernetes/coaks'
                 },
               ]
-            }
+            },
+			{
+				label: 'Flux and Capsule for multi-tenant GitOps',
+				path: '/docs/guides/flux2-capsule'
+			}
           ]
         },
         {
