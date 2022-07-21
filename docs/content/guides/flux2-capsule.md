@@ -1,71 +1,6 @@
 # Multi-tenancy the GitOps way
 
-As GitOps finds its roots in DevOps culture and it's an evolution continuous delivery techniques. As it enables a common language, the barrier to share responsibilities has been lowered.
-
-This is the motivation that led to the importance of managing multi-tenant configurations the GitOps way, and furthermore, to provide tenants the ability to control and manage their space on their own.
-
-We'll see how to do it with Flux v2 and Capsule.
-
-## [Flux](https://fluxcd.io/)
-
-Flux is a set of solutions for GitOps continuous delivery, which are part of the GitOps Toolkit operators.
-
-It works with Git providers, all major container registries, and all CI workflow providers.
-
-It reconciles any Kubernetes object and supports resources management tools, like Kustomize and Helm. It also helps manage dependencies between them.
-
-Flux can push back to Git for you with automated container image updates to Git, by scanning OCI repositories and patching manifests on Git.
-
-It enforces RBAC and security with least-privilege via Kubernetes User impersonation. 
-Moreover, it supports reconcile remote clusters.
-For this reason is a good fit also for both soft and hard multi-tenancy scenarios.
-
-Moreover, it also operates on day 2-stages with alerting thanks to the notification controller.
-
-### Concepts
-
-Let's take just a rapid overview on core concepts of Flux, in order to understand the type of resources it provides.
-
-#### Sources
-
-A Source defines the origin of a repository containing the desired state of the system and the requirements to obtain it (e.g. credentials, version selectors). For example, the latest 1.x tag available from a Git repository over SSH.
-
-Sources produce an artifact that is consumed by other Flux components to perform actions, like applying the contents of the artifact on the cluster. A source may be shared by multiple consumers to deduplicate configuration and/or storage.
-
-The origin of the source is checked for changes on a defined interval, if there is a newer version available that matches the criteria, a new artifact is produced.
-
-All sources are specified as Custom Resources in a Kubernetes cluster, examples of sources are `GitRepository`, `HelmRepository` and `Bucket` resources.
-
-They can be respectively consumed by `Kustomization`, `HelmRelease`, `Bucket` Reconciliation resources.
-
-#### Reconciliation
-
-Reconciliation refers to ensuring that a given state matches a desired state declaratively defined somewhere (e.g. a Git repository). In Flux, desired states are expressed through reconciliation custom resources, that refer artifacts generated from Sources.
-
-There are various examples of reconciliations in Flux:
-
-- `HelmRelease` reconciliation: ensures the state of the Helm release matches what is defined in the resource, performs a release if this is not the case (including revision changes of a HelmChart resource).
-- `Bucket` reconciliation: downloads and archives the contents of the declared bucket on a given interval and stores this as an artifact, records the observed revision of the artifact and the artifact itself in the status of resource.
-- `Kustomization` reconciliation: ensures the state of the application deployed on a cluster matches the resources defined in a Git repository or S3 bucket.
-
-Let's just stick a bit more on the `Kustomization` resource.
-
-##### Kustomization
-
-The `Kustomization` resource is a Reconciliation resource that represents a local set of Kubernetes resources that Flux is supposed to periodically reconcile in the cluster.
-
-It supports both `kustomizations` folders and folders that contain bare manifests.
-> The latter case is supported as the controller will anyway initialize a `Kustomization` from that folder, with the manifest as its resources.
-
-A Kustomization can refer to other manifest that in turn can be Kustomizations, so that you can create a hierarchy of Kustomizations.
-
-As all Reconciliation resources enables you to specify the `ServiceAccount` with which they can be reconciled (through impersonation), you can specify unprivileged `ServiceAccount`s as the hierarchy reaches an unprivileged space (i.e. a tenant).
-
-![img](./kustomization-hierarchy.png)
-
-Practically, each space could match a specific Source (e.g. Git repo + Git ref). For example, a Tenant Git repository separated from a cluster admin Git repository. To ensure that each unprivilegd user can't neither access actual state nor desired state of other unprivileged or privileged users.
-
-Coming to the central topic, let's see how Flux increased the security for isolation in multi-tenant scenarios.
+This guide is intended to cover how to use Flux v2 with [multi-tenancy lockdown features](https://fluxcd.io/docs/installation/#multi-tenancy-lockdown) with Capsule and Capsule Proxy together, to enable a Namespace-as-a-Service the GitOps-way.
 
 ### Flux and multi-tenancy
 
@@ -79,7 +14,7 @@ These features enable you to:
 
 - disallow remote bases for Kustomizations. Actually, this is not stryctly required, but it decreases the risk of referencing Kustomizations which aren't part of the controlled GitOps pipelines. In a multi-tenant scenario this is important too. They can be disabled with `--no-remote-bases=true` option of the kustomize controller.
 
-In any case, to ensure privileged Reconciliation resources have the needed privileges to be reconciled, we can explicitely set a privileged `ServiceAccount`s.
+Where required, to ensure privileged Reconciliation resources have the needed privileges to be reconciled, we can explicitely set a privileged `ServiceAccount`s.
 
 In any case, is required that the `ServiceAccount` is in the same `Namespace` of the `Kustomization`, so unprivileged spaces should not have privileged `ServiceAccount`s available.
 
@@ -112,34 +47,6 @@ They would be responsible of tenants administration, and each change (e.g. new t
 ![no-naas](./flux-tenants-reconciliation.png)
 
 What if we would like to provide tenants the ability to manage also their own space the GitOps-way? Enter Capsule.
-
-## [Capsule](https://capsule.clastix.io/)
-
-This is the operator that enables us to make Kubernetes learn about the Tenant concept.
-
-It adds a layer of isolation on top of the flat layer of Namespaces.
-Capsule conceives Tenants as aggregation of Namespaces and automatically applies RBAC to Tenant Owners, which are Kuberneets identities.
-It enforces isolation between tenants and resource control inside each tenant. It does that with native Kubernetes primitives, like Limit Ranges, Resource Quotas, Network Policies and so on.
-
-Capsule also automates restriction on usage of cluster-level resources like Storage Classes or Ingress Classes to specific Tenants.
-This is achieved thanks to its admission webhooks that can validate requests from Tenants.
-
-It enables these features introducing only one CRD: the `Tenant`. The Tenant is then bound to Kubernetes identities to configure the owners.
-
-With Capsule we can enable Namespace-as-a-Service for tenants, so that they can manage their own unprivileged space.
-Then, cluster admins are only responsible to setup `Tenant` resources and provide their boundaries.
-
-![naas](./flux-tenants-capsule-reconciliation.png)
-
-But sometimes tenants need also to read (get, list) cluster-level resources, like Namespaces. For example a tenant would like to list his own Namespaces.
-
-### List cluster-level resources
-
-Obviously tenant owners cannot be granted privilege of listing such resources without them having filtered. In GitOps scenarios where reconciliation is automated through Kubernetes controllers this is frequent. 
-To help such use cases Capsule Proxy is a reverse proxy that proxies requests to the Kubernetes API server and filters response data based on the identity of the request.
-This way, e.g. a tenant is able to list Namespaces without coming to know the existence of other Tenants' Namespaces.
-
-With all of this in mind we can select the ingredients to make our GitOps multi-tenancy recipe!
 
 ## The ingredients of the recipe
 
@@ -550,12 +457,6 @@ He could try to use privileged `ServiceAccount` by changing ownership of a privi
 This is not permitted as he can't patch Namespaces which have not been created by him. Capsule request validation would not pass.
 
 For other protections against threats in this multi-tenancy scenario please see the Capsule [Multi-Tenancy Benchmark](/docs/general/mtb). 
-
-## Conclusion
-
-> TBD
-
-That's all folks!
 
 ## References
 - https://fluxcd.io/docs/installation/#multi-tenancy-lockdown
