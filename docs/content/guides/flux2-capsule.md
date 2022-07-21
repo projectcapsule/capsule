@@ -48,6 +48,8 @@ They would be responsible of tenants administration, and each change (e.g. new t
 
 What if we would like to provide tenants the ability to manage also their own space the GitOps-way? Enter Capsule.
 
+![naas](./flux-tenants-capsule-reconciliation.png)
+
 ## The ingredients of the recipe
 
 > Legenda:
