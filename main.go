@@ -13,6 +13,7 @@ import (
 	"go.uber.org/zap/zapcore"
 	corev1 "k8s.io/api/core/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -154,16 +155,21 @@ func main() {
 		os.Exit(1)
 	}
 
-	tlsCert := &corev1.Secret{}
-
-	if err = directClient.Get(ctx, types.NamespacedName{Namespace: namespace, Name: directCfg.TLSSecretName()}, tlsCert); err != nil {
-		setupLog.Error(err, "unable to get Capsule TLS secret")
-		os.Exit(1)
+	tlsCert := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      directCfg.TLSSecretName(),
+			Namespace: namespace,
+		},
 	}
 
 	// Reconcile TLS certificates before starting controllers and webhooks
 	if err = tlsReconciler.ReconcileCertificates(ctx, tlsCert); err != nil {
 		setupLog.Error(err, "unable to reconcile Capsule TLS secret")
+		os.Exit(1)
+	}
+
+	if err = directClient.Get(ctx, types.NamespacedName{Namespace: namespace, Name: directCfg.TLSSecretName()}, tlsCert); err != nil {
+		setupLog.Error(err, "unable to get Capsule TLS secret")
 		os.Exit(1)
 	}
 
