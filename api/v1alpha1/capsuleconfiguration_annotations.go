@@ -8,5 +8,5 @@ const (
 	TLSSecretNameAnnotation                  = "capsule.clastix.io/tls-secret-name"
 	MutatingWebhookConfigurationName         = "capsule.clastix.io/mutating-webhook-configuration-name"
 	ValidatingWebhookConfigurationName       = "capsule.clastix.io/validating-webhook-configuration-name"
-	GenerateCertificatesAnnotationName       = "capsule.clastix.io/generate-certificates"
+	EnableTLSConfigurationAnnotationName     = "capsule.clastix.io/enable-tls-configuration"
 )

@@ -78,8 +78,8 @@ func (c capsuleConfiguration) TLSSecretName() (name string) {
 	return
 }
 
-func (c capsuleConfiguration) GenerateCertificates() bool {
-	annotationValue, ok := c.retrievalFn().Annotations[capsulev1alpha1.GenerateCertificatesAnnotationName]
+func (c capsuleConfiguration) EnableTLSConfiguration() bool {
+	annotationValue, ok := c.retrievalFn().Annotations[capsulev1alpha1.EnableTLSConfigurationAnnotationName]
 
 	if ok {
 		value, err := strconv.ParseBool(annotationValue)

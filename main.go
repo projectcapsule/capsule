@@ -142,29 +142,30 @@ func main() {
 
 	directCfg := configuration.NewCapsuleConfiguration(ctx, directClient, configurationName)
 
-	tlsReconciler := &tlscontroller.Reconciler{
-		Client:        directClient,
-		Log:           ctrl.Log.WithName("controllers").WithName("TLS"),
-		Namespace:     namespace,
-		Configuration: directCfg,
-	}
+	if directCfg.EnableTLSConfiguration() {
+		tlsReconciler := &tlscontroller.Reconciler{
+			Client:        directClient,
+			Log:           ctrl.Log.WithName("controllers").WithName("TLS"),
+			Namespace:     namespace,
+			Configuration: directCfg,
+		}
 
-	if err = tlsReconciler.SetupWithManager(manager); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "Namespace")
-		os.Exit(1)
-	}
+		if err = tlsReconciler.SetupWithManager(manager); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "Namespace")
+			os.Exit(1)
+		}
 
-	tlsCert := &corev1.Secret{}
+		tlsCert := &corev1.Secret{}
 
-	if err = directClient.Get(ctx, types.NamespacedName{Namespace: namespace, Name: directCfg.TLSSecretName()}, tlsCert); err != nil {
-		setupLog.Error(err, "unable to get Capsule TLS secret")
-		os.Exit(1)
-	}
-
-	// Reconcile TLS certificates before starting controllers and webhooks
-	if err = tlsReconciler.ReconcileCertificates(ctx, tlsCert); err != nil {
-		setupLog.Error(err, "unable to reconcile Capsule TLS secret")
-		os.Exit(1)
+		if err = directClient.Get(ctx, types.NamespacedName{Namespace: namespace, Name: directCfg.TLSSecretName()}, tlsCert); err != nil {
+			setupLog.Error(err, "unable to get Capsule TLS secret")
+			os.Exit(1)
+		}
+		// Reconcile TLS certificates before starting controllers and webhooks
+		if err = tlsReconciler.ReconcileCertificates(ctx, tlsCert); err != nil {
+			setupLog.Error(err, "unable to reconcile Capsule TLS secret")
+			os.Exit(1)
+		}
 	}
 
 	if err = (&tenantcontroller.Manager{

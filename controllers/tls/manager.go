@@ -177,31 +177,21 @@ func (r Reconciler) Reconcile(ctx context.Context, request ctrl.Request) (ctrl.R
 		return reconcile.Result{}, err
 	}
 
-	if r.Configuration.GenerateCertificates() {
-		certificate, err := cert.GetCertificateFromBytes(certSecret.Data[corev1.TLSCertKey])
-		if err != nil {
-			return reconcile.Result{}, err
-		}
-
-		now := time.Now()
-		requeueTime := certificate.NotAfter.Add(-(certificateExpirationThreshold - 1*time.Second))
-		rq := requeueTime.Sub(now)
-
-		r.Log.Info("Reconciliation completed, processing back in " + rq.String())
-
-		return reconcile.Result{Requeue: true, RequeueAfter: rq}, nil
+	certificate, err := cert.GetCertificateFromBytes(certSecret.Data[corev1.TLSCertKey])
+	if err != nil {
+		return reconcile.Result{}, err
 	}
 
-	return reconcile.Result{}, nil
+	now := time.Now()
+	requeueTime := certificate.NotAfter.Add(-(certificateExpirationThreshold - 1*time.Second))
+	rq := requeueTime.Sub(now)
+
+	r.Log.Info("Reconciliation completed, processing back in " + rq.String())
+
+	return reconcile.Result{Requeue: true, RequeueAfter: rq}, nil
 }
 
 func (r Reconciler) shouldUpdateCertificate(secret *corev1.Secret) bool {
-	if !r.Configuration.GenerateCertificates() {
-		r.Log.Info("Skipping TLS certificate generation as it is disabled in CapsuleConfiguration")
-
-		return false
-	}
-
 	if _, ok := secret.Data[corev1.ServiceAccountRootCAKey]; !ok {
 		return true
 	}
