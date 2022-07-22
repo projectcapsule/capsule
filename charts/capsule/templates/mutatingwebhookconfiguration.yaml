@@ -4,8 +4,11 @@ metadata:
   name: {{ include "capsule.fullname" . }}-mutating-webhook-configuration
   labels:
     {{- include "capsule.labels" . | nindent 4 }}
-  {{- with .Values.customAnnotations }}
   annotations:
+  {{- if .Values.certManager.generateCertificates }}
+    cert-manager.io/inject-ca-from: {{ .Release.Namespace }}/{{ include "capsule.fullname" . }}-webhook-cert
+  {{-  end }}
+  {{- with .Values.customAnnotations }}
     {{- toYaml . | nindent 4 }}
   {{- end }}
 webhooks:

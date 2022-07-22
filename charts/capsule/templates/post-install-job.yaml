@@ -1,3 +1,4 @@
+{{- if .Values.tls.create }}
 {{- $cmd := printf "while [ -z $$(kubectl -n $NAMESPACE get secret %s -o jsonpath='{.data.tls\\\\.crt}') ];" (include "capsule.secretTlsName" .) -}}
 {{- $cmd = printf "%s do echo 'waiting Capsule to be up and running...' && sleep 5;" $cmd -}}
 {{- $cmd = printf "%s done" $cmd -}}
@@ -45,3 +46,4 @@ spec:
             fieldRef:
               fieldPath: metadata.namespace
       serviceAccountName: {{ include "capsule.serviceAccountName" . }}
+{{- end }}

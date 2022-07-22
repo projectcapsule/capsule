@@ -2,6 +2,15 @@
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
+# Secret Options
+tls:
+  # -- Start the Capsule controller that injects the CA into mutating and validating webhooks, and CRD as well.
+  enableController: true
+  # -- When cert-manager is disabled, Capsule will generate the TLS certificate for webhook and CRDs conversion.
+  create: true
+  # -- Override name of the Capsule TLS Secret name when externally managed.
+  name: ""
+
 # Manager Options
 manager:
 

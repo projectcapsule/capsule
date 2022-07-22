@@ -1,5 +1,5 @@
 {{- $cmd := ""}}
-{{- if not .Values.certManager.generateCertificates }}
+{{- if or (.Values.tls.create) (.Values.certManager.generateCertificates) }}
 {{- $cmd = printf "%s kubectl delete secret -n $NAMESPACE %s --ignore-not-found &&" $cmd (include "capsule.secretTlsName" .) -}}
 {{- end }}
 {{- $cmd = printf "%s kubectl delete clusterroles.rbac.authorization.k8s.io capsule-namespace-deleter capsule-namespace-provisioner --ignore-not-found &&" $cmd -}}
