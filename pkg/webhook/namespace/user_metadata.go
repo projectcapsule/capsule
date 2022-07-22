@@ -115,7 +115,7 @@ func (r *userMetadataHandler) OnUpdate(client client.Client, decoder *admission.
 		var labels, annotations map[string]string
 
 		for key, value := range newNs.GetLabels() {
-			if _, ok := oldNs.GetLabels()[key]; !ok {
+			if _, ok := oldNs.GetLabels()[key]; ok {
 				if labels == nil {
 					labels = make(map[string]string)
 				}
@@ -125,7 +125,7 @@ func (r *userMetadataHandler) OnUpdate(client client.Client, decoder *admission.
 		}
 
 		for key, value := range newNs.GetAnnotations() {
-			if _, ok := oldNs.GetAnnotations()[key]; !ok {
+			if _, ok := oldNs.GetAnnotations()[key]; ok {
 				if annotations == nil {
 					annotations = make(map[string]string)
 				}
