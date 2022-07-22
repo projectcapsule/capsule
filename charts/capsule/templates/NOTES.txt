@@ -5,7 +5,7 @@
 
 
    # Check the capsule logs
-   $ kubectl logs -f deployment/{{ template "capsule.fullname" . }}-controller-manager -c manager -n{{ .Release.Namespace }}
+   $ kubectl logs -f deployment/{{ template "capsule.fullname" . }}-controller-manager -c manager -n {{ .Release.Namespace }}
 
 - Manage this chart:
 
