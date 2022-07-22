@@ -1,3 +1,4 @@
+{{- if or (not .Values.certManager.generateCertificates) (.Values.tls.create) }}
 apiVersion: v1
 kind: Secret
 metadata:
@@ -8,3 +9,4 @@ metadata:
     {{- toYaml . | nindent 4 }}
   {{- end }}
   name: {{ include "capsule.secretTlsName" . }}
+{{- end }}

@@ -123,5 +123,5 @@ Create the Capsule controller name to use
 Create the Capsule TLS Secret name to use
 */}}
 {{- define "capsule.secretTlsName" -}}
-{{- printf "%s-tls" (include "capsule.fullname" .) -}}
+{{ default ( printf "%s-tls" ( include "capsule.fullname" . ) ) .Values.tls.name }}
 {{- end }}

@@ -78,6 +78,9 @@ Here the values you can override:
 | serviceAccount.annotations | object | `{}` | Annotations to add to the service account. |
 | serviceAccount.create | bool | `true` | Specifies whether a service account should be created. |
 | serviceAccount.name | string | `"capsule"` | The name of the service account to use. If not set and `serviceAccount.create=true`, a name is generated using the fullname template |
+| tls.create | bool | `true` | When cert-manager is disabled, Capsule will generate the TLS certificate for webhook and CRDs conversion. |
+| tls.enableController | bool | `true` | Start the Capsule controller that injects the CA into mutating and validating webhooks, and CRD as well. |
+| tls.name | string | `""` | Override name of the Capsule TLS Secret name when externally managed. |
 | tolerations | list | `[]` | Set list of tolerations for the Capsule pod |
 | validatingWebhooksTimeoutSeconds | int | `30` | Timeout in seconds for validating webhooks |
 
@@ -85,7 +88,7 @@ Here the values you can override:
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| manager.hostNetwork | bool | `false` | Specifies if the container should be started in hostNetwork mode.  Required for use in some managed kubernetes clusters (such as AWS EKS) with custom CNI (such as calico), because control-plane managed by AWS cannot communicate with pods' IP CIDR and admission webhooks are not working |
+| manager.hostNetwork | bool | `false` | Specifies if the container should be started in hostNetwork mode. Required for use in some managed kubernetes clusters (such as AWS EKS) with custom CNI (such as calico), because control-plane managed by AWS cannot communicate with pods' IP CIDR and admission webhooks are not working |
 | manager.image.pullPolicy | string | `"IfNotPresent"` | Set the image pull policy. |
 | manager.image.repository | string | `"clastix/capsule"` | Set the image repository of the capsule. |
 | manager.image.tag | string | `""` | Overrides the image tag whose default is the chart appVersion. |
@@ -174,6 +177,34 @@ And optionally, depending on the values set:
 ## Notes on installing Custom Resource Definitions with Helm3
 
 Capsule, as many other add-ons, defines its own set of Custom Resource Definitions (CRDs). Helm3 removed the old CRDs installation method for a more simple methodology. In the Helm Chart, there is now a special directory called `crds` to hold the CRDs. These CRDs are not templated, but will be installed by default when running a `helm install` for the chart. If the CRDs already exist (for example, you already executed `helm install`), it will be skipped with a warning. When you wish to skip the CRDs installation, and do not see the warning, you can pass the `--skip-crds` flag to the `helm install` command.
+
+## Cert-Manager integration
+
+You can enable the generation of certificates using `cert-manager` as follows.
+
+```
+helm upgrade --install capsule clastix/capsule --namespace capsule-system --create-namespace \
+  --set "certManager.generateCertificates=true" \
+  --set "tls.create=false" \
+  --set "tls.enableController=false"
+```
+
+With the usage of `tls.enableController=false` value, you're delegating the injection of the Validating and Mutating Webhooks' CA to `cert-manager`.
+Since Helm3 doesn't allow to template _CRDs_, you have to patch manually the Custom Resource Definition `tenants.capsule.clastix.io` adding the proper annotation (YMMV).
+
+```yaml
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.5.0
+    cert-manager.io/inject-ca-from: capsule-system/capsule-webhook-cert
+  creationTimestamp: "2022-07-22T08:32:51Z"
+  generation: 45
+  name: tenants.capsule.clastix.io
+  resourceVersion: "9832"
+  uid: 61e287df-319b-476d-88d5-bdb8dc14d4a6
+```
 
 ## More
 
