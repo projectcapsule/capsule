@@ -7,4 +7,4 @@ kind: Kustomization
 images:
 - name: controller
   newName: clastix/capsule
-  newTag: v0.1.2-rc1
+  newTag: v0.1.2
