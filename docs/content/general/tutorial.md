@@ -1237,88 +1237,6 @@ A Pod running `internal.registry.foo.tld/capsule:latest` as registry will be all
 
 Any attempt of Alice to use a not allowed `containerRegistries` value is denied by the Validation Webhook enforcing it.
 
-
-## Assign Pod Security Policies
-Bill, the cluster admin, can assign a dedicated Pod Security Policy (PSP) to Alice's tenant. This is likely to be a requirement in a multi-tenancy environment.
-
-The cluster admin creates a PSP:
-
-```yaml
-kubectl -n oil-production apply -f - << EOF
-apiVersion: policy/v1beta1
-kind: PodSecurityPolicy
-metadata:
-  name: psp:restricted
-spec:
-  privileged: false
-  # Required to prevent escalations to root.
-  allowPrivilegeEscalation: false
-  ...
-EOF
-```
-
-Then create a _ClusterRole_ using or granting the said item
-
-```yaml
-kubectl -n oil-production apply -f - << EOF
-kind: ClusterRole
-apiVersion: rbac.authorization.k8s.io/v1
-metadata:
-  name: psp:restricted
-rules:
-- apiGroups: ['policy']
-  resources: ['podsecuritypolicies']
-  resourceNames: ['psp:restricted']
-  verbs: ['use']
-EOF
-```
-
-Bill can assign this role to all namespaces in the Alice's tenant by setting it in the tenant manifest:
-
-```yaml
-kubectl -n oil-production apply -f - << EOF
-apiVersion: capsule.clastix.io/v1beta1
-kind: Tenant
-metadata:
-  name: oil
-spec:
-  owners:
-  - name: alice
-    kind: User
-  additionalRoleBindings:
-  - clusterRoleName: psp:privileged
-    subjects:
-    - kind: "Group"
-      apiGroup: "rbac.authorization.k8s.io"
-      name: "system:authenticated"
-EOF
-```
-
-With the given specification, Capsule will ensure that all Alice's namespaces will contain a _RoleBinding_ for the specified _Cluster Role_.
-
-For example, in the `oil-production` namespace, Alice will see:
-
-```yaml
-kind: RoleBinding
-apiVersion: rbac.authorization.k8s.io/v1
-metadata:
-  name: 'capsule-oil-psp:privileged'
-  namespace: oil-production
-  labels:
-    capsule.clastix.io/role-binding: a10c4c8c48474963
-    capsule.clastix.io/tenant: oil
-subjects:
-  - kind: Group
-    apiGroup: rbac.authorization.k8s.io
-    name: 'system:authenticated'
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: 'psp:privileged'
-```
-
-With the above example, Capsule is forbidding any authenticated user in `oil-production` namespace to run privileged pods and to perform privilege escalation as declared by the Cluster Role `psp:privileged`.
-
 ## Create Custom Resources
 Capsule grants admin permissions to the tenant owners but is only limited to their namespaces. To achieve that, it assigns the ClusterRole [admin](https://kubernetes.io/docs/reference/access-authn-authz/rbac/#user-facing-roles) to the tenant owner. This ClusterRole does not permit the installation of custom resources in the namespaces.
 
@@ -1448,10 +1366,10 @@ spec:
 
 > This feature is still in an alpha stage and requires a high amount of computing resources due to the dynamic client requests.
 
-## Taint namespaces
-With Capsule, Bill can _"taint"_ the namespaces created by Alice with additional labels and/or annotations. There is no specific semantic assigned to these labels and annotations: they just will be assigned to the namespaces in the tenant as they are created by Alice. This can help the cluster admin to implement specific use cases. As it can be used to implement backup as a service for namespaces in the tenant.
+## Assign Additional Metadata
+The cluster admin can _"taint"_ the namespaces created by tenant onwers with additional metadata as labels and annotations. There is no specific semantic assigned to these labels and annotations: they will be assigned to the namespaces in the tenant as they are created. This can help the cluster admin to implement specific use cases as, for example, leave only a given tenant to be backuped by a backup service.
 
-Bill assigns additional labels and annotations to all namespaces created in the `oil` tenant: 
+Assigns additional labels and annotations to all namespaces created in the `oil` tenant: 
 
 ```yaml
 kubectl apply -f - << EOF
@@ -1466,18 +1384,42 @@ spec:
   namespaceOptions:
     additionalMetadata:
       annotations:
-        capsule.clastix.io/backup: "true"
+        storagelocationtype: s3
       labels:
-        capsule.clastix.io/tenant: oil
+        capsule.clastix.io/backup: "true"
 EOF
 ```
 
-When Alice creates a namespace, this will inherit the given label and/or annotation.
+When the tenant owner creates a namespace, it inherits the given label and/or annotation:
 
-## Taint services
-With Capsule, Bill can _"taint"_ the services created by Alice with additional labels and/or annotations. There is no specific semantic assigned to these labels and annotations: they just will be assigned to the services in the tenant as they are created by Alice. This can help the cluster admin to implement specific use cases.
+```yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  annotations:
+    storagelocationtype: s3
+  labels:
+    capsule.clastix.io/tenant: oil
+    kubernetes.io/metadata.name: oil-production
+    name: oil-production
+    capsule.clastix.io/backup: "true"
+  name: oil-production
+  ownerReferences:
+  - apiVersion: capsule.clastix.io/v1beta1
+    blockOwnerDeletion: true
+    controller: true
+    kind: Tenant
+    name: oil
+spec:
+  finalizers:
+  - kubernetes
+status:
+  phase: Active
+```
 
-Bill assigns additional labels and annotations to all services created in the `oil` tenant: 
+Additionally, the cluster admin can _"taint"_ the services created by the tenant owners with additional metadata as labels and annotations.
+
+Assigns additional labels and annotations to all services created in the `oil` tenant: 
 
 ```yaml
 kubectl apply -f - << EOF
@@ -1491,14 +1433,30 @@ spec:
     kind: User
   serviceOptions:
     additionalMetadata:
-      annotations:
-        capsule.clastix.io/backup: "true"
       labels:
-        capsule.clastix.io/tenant: oil
+        capsule.clastix.io/backup: "true"
 EOF
 ```
 
-When Alice creates a service in a namespace, this will inherit the given label and/or annotation.
+When the tenant owner creates a service in a tenant namespace, it inherits the given label and/or annotation:
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx
+  namespace: oil-production
+  labels:
+    capsule.clastix.io/backup: "true"
+spec:
+  ports:
+  - protocol: TCP
+    port: 80 
+    targetPort: 8080 
+  selector:
+    run: nginx
+  type: ClusterIP 
+```
 
 ## Cordon a Tenant
 
