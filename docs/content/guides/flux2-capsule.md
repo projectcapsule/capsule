@@ -37,18 +37,18 @@ spec:
 In example, the cluster admin is supposed to apply this Kustomization, during the cluster bootstrap that i.e. will reconcile also Flux itself.
 All the remaining Reconciliation resources can be children of this Kustomization.
 
-![bootstrap](./kustomization-hierarchy-root-tenants.png)
+![bootstrap](./assets/kustomization-hierarchy-root-tenants.png)
 
 ### Namespace-as-a-Service
 
 Tenants could have his own set of Namespaces to operate on but it should be prepared by higher-level roles, like platform admins: the declarations would be part of the platform space.
 They would be responsible of tenants administration, and each change (e.g. new tenant Namespace) should be a request that would pass through approval.
 
-![no-naas](./flux-tenants-reconciliation.png)
+![no-naas](./assets/flux-tenants-reconciliation.png)
 
 What if we would like to provide tenants the ability to manage also their own space the GitOps-way? Enter Capsule.
 
-![naas](./flux-tenants-capsule-reconciliation.png)
+![naas](./assets/flux-tenants-capsule-reconciliation.png)
 
 ## The ingredients of the recipe
 

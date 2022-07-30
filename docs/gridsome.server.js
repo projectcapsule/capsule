@@ -71,6 +71,10 @@ module.exports = function (api) {
               path: '/docs/guides/upgrading'
             },
             {
+              label: 'Multi-tenant GitOps with Flux',
+              path: '/docs/guides/flux2-capsule'
+            },
+            {
               label: 'Install on Charmed Kubernetes',
               path: '/docs/guides/charmed'
             },
@@ -90,11 +94,7 @@ module.exports = function (api) {
                   path: '/docs/guides/managed-kubernetes/coaks'
                 },
               ]
-            },
-			{
-				label: 'Flux and Capsule for multi-tenant GitOps',
-				path: '/docs/guides/flux2-capsule'
-			}
+            }
           ]
         },
         {
