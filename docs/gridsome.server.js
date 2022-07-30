@@ -79,6 +79,10 @@ module.exports = function (api) {
               path: '/docs/guides/charmed'
             },
             {
+              label: 'Control Pod Security',
+              path: '/docs/guides/pod-security'
+            },
+            {
               title: 'Managed Kubernetes',
               subItems: [
                 {

@@ -1237,88 +1237,6 @@ A Pod running `internal.registry.foo.tld/capsule:latest` as registry will be all
 
 Any attempt of Alice to use a not allowed `containerRegistries` value is denied by the Validation Webhook enforcing it.
 
-
-## Assign Pod Security Policies
-Bill, the cluster admin, can assign a dedicated Pod Security Policy (PSP) to Alice's tenant. This is likely to be a requirement in a multi-tenancy environment.
-
-The cluster admin creates a PSP:
-
-```yaml
-kubectl -n oil-production apply -f - << EOF
-apiVersion: policy/v1beta1
-kind: PodSecurityPolicy
-metadata:
-  name: psp:restricted
-spec:
-  privileged: false
-  # Required to prevent escalations to root.
-  allowPrivilegeEscalation: false
-  ...
-EOF
-```
-
-Then create a _ClusterRole_ using or granting the said item
-
-```yaml
-kubectl -n oil-production apply -f - << EOF
-kind: ClusterRole
-apiVersion: rbac.authorization.k8s.io/v1
-metadata:
-  name: psp:restricted
-rules:
-- apiGroups: ['policy']
-  resources: ['podsecuritypolicies']
-  resourceNames: ['psp:restricted']
-  verbs: ['use']
-EOF
-```
-
-Bill can assign this role to all namespaces in the Alice's tenant by setting it in the tenant manifest:
-
-```yaml
-kubectl -n oil-production apply -f - << EOF
-apiVersion: capsule.clastix.io/v1beta1
-kind: Tenant
-metadata:
-  name: oil
-spec:
-  owners:
-  - name: alice
-    kind: User
-  additionalRoleBindings:
-  - clusterRoleName: psp:privileged
-    subjects:
-    - kind: "Group"
-      apiGroup: "rbac.authorization.k8s.io"
-      name: "system:authenticated"
-EOF
-```
-
-With the given specification, Capsule will ensure that all Alice's namespaces will contain a _RoleBinding_ for the specified _Cluster Role_.
-
-For example, in the `oil-production` namespace, Alice will see:
-
-```yaml
-kind: RoleBinding
-apiVersion: rbac.authorization.k8s.io/v1
-metadata:
-  name: 'capsule-oil-psp:privileged'
-  namespace: oil-production
-  labels:
-    capsule.clastix.io/role-binding: a10c4c8c48474963
-    capsule.clastix.io/tenant: oil
-subjects:
-  - kind: Group
-    apiGroup: rbac.authorization.k8s.io
-    name: 'system:authenticated'
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: 'psp:privileged'
-```
-
-With the above example, Capsule is forbidding any authenticated user in `oil-production` namespace to run privileged pods and to perform privilege escalation as declared by the Cluster Role `psp:privileged`.
-
 ## Create Custom Resources
 Capsule grants admin permissions to the tenant owners but is only limited to their namespaces. To achieve that, it assigns the ClusterRole [admin](https://kubernetes.io/docs/reference/access-authn-authz/rbac/#user-facing-roles) to the tenant owner. This ClusterRole does not permit the installation of custom resources in the namespaces.
 
@@ -1448,7 +1366,7 @@ spec:
 
 > This feature is still in an alpha stage and requires a high amount of computing resources due to the dynamic client requests.
 
-## Additional metadata
+## Assign Additional Metadata
 The cluster admin can _"taint"_ the namespaces created by tenant onwers with additional metadata as labels and annotations. There is no specific semantic assigned to these labels and annotations: they will be assigned to the namespaces in the tenant as they are created. This can help the cluster admin to implement specific use cases as, for example, leave only a given tenant to be backuped by a backup service.
 
 Assigns additional labels and annotations to all namespaces created in the `oil` tenant: 
