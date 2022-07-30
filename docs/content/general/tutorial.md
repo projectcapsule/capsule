@@ -2,23 +2,21 @@
 
 Capsule is a framework to implement multi-tenant and policy-driven scenarios in Kubernetes. In this tutorial, we'll focus on a hypothetical case covering the main features of the Capsule Operator.
 
-***Acme Corp***, our sample organization, is building a Container as a Service platform (CaaS) to serve multiple lines of business. Each line of business has its team of engineers that are responsible for the development, deployment, and operating of their digital products. We'll work with the following actors:
+***Acme Corp***, our sample organization, is building a Container as a Service platform (CaaS) to serve multiple lines of business, or departments, e.g. _Oil_, _Gas_, _Solar_, _Wind_, _Water_. Each department has its team of engineers that are responsible for the development, deployment, and operating of their digital products. We'll work with the following actors:
 
-* ***Bill***: the cluster administrator from the operations department of Acme Corp.
+* ***Bill***: the cluster administrator from the operations department of _Acme Corp_.
 
-* ***Alice***: the IT Project Leader in the Oil & Gas Business Units. She is responsible for a team made of different job responsibilities (developers, administrators, SRE engineers, etc.) working in separate multiple departments.
+* ***Alice***: the project leader in the _Oil_ & _Gas_ departments. She is responsible for a team made of different job responsibilities: e.g. developers, administrators, SRE engineers, etc.
   
-* ***Joe***:
-  He works at Acme Corp, as a lead developer of a distributed team in Alice's organization.
+* ***Joe***: works as a lead developer of a distributed team in Alice's organization.
 
-* ***Bob***:
-  He is the head of Engineering for the Water Business Unit, the main and historical line of business at Acme Corp.
+* ***Bob***: is the head of engineering for the _Water_ department, the main and historical line of business at _Acme Corp_.
 
 
 ## Assign Tenant ownership
 
 ### User as tenant owner
-Bill, the cluster admin, receives a new request from Acme Corp.'s CTO asking for a new tenant to be onboarded and Alice user will be the tenant owner. Bill then assigns Alice's identity of `alice` in the Acme Corp. identity management system. Since Alice is a tenant owner, Bill needs to assign `alice` the Capsule group defined by `--capsule-user-group` option, which defaults to `capsule.clastix.io`.
+Bill, the cluster admin, receives a new request from _Acme Corp_'s CTO asking for a new tenant to be onboarded and Alice user will be the tenant owner. Bill then assigns Alice's identity of `alice` in the _Acme Corp_. identity management system. Since Alice is a tenant owner, Bill needs to assign `alice` the Capsule group defined by `--capsule-user-group` option, which defaults to `capsule.clastix.io`.
 
 To keep things simple, we assume that Bill just creates a client certificate for authentication using X.509 Certificate Signing Request, so Alice's certificate has `"/CN=alice/O=capsule.clastix.io"`.
 
@@ -190,7 +188,7 @@ capsule-oil-0-admin                       ClusterRole/admin                     
 capsule-oil-1-capsule-namespace-deleter   ClusterRole/capsule-namespace-deleter   5s
 ```
 
-When Alice creates the namespaces, the Capsule controller assigns to Alice the following permissions:
+When Alice creates the namespaces, the Capsule controller assigns to Alice the following permissions, so that Alice can act as the admin of all the tenant namespaces.
 
 ```yaml
 ---
@@ -220,8 +218,6 @@ roleRef:
   name: capsule-namespace-deleter
   apiGroup: rbac.authorization.k8s.io
 ```
-
-so that Alice can act as the admin of all the tenant namespaces.
 
 In some cases, the cluster admin needs to narrow the range of permissions assigned to tenant owners by assigning a Cluster Role with less permissions than above. Capsule supports the dynamic assignment of any ClusterRole resources for each Tenant Owner.
 
