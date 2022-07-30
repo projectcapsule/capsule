@@ -1448,10 +1448,10 @@ spec:
 
 > This feature is still in an alpha stage and requires a high amount of computing resources due to the dynamic client requests.
 
-## Taint namespaces
-With Capsule, Bill can _"taint"_ the namespaces created by Alice with additional labels and/or annotations. There is no specific semantic assigned to these labels and annotations: they just will be assigned to the namespaces in the tenant as they are created by Alice. This can help the cluster admin to implement specific use cases. As it can be used to implement backup as a service for namespaces in the tenant.
+## Additional metadata
+The cluster admin can _"taint"_ the namespaces created by tenant onwers with additional metadata as labels and annotations. There is no specific semantic assigned to these labels and annotations: they will be assigned to the namespaces in the tenant as they are created. This can help the cluster admin to implement specific use cases as, for example, leave only a given tenant to be backuped by a backup service.
 
-Bill assigns additional labels and annotations to all namespaces created in the `oil` tenant: 
+Assigns additional labels and annotations to all namespaces created in the `oil` tenant: 
 
 ```yaml
 kubectl apply -f - << EOF
@@ -1466,18 +1466,42 @@ spec:
   namespaceOptions:
     additionalMetadata:
       annotations:
-        capsule.clastix.io/backup: "true"
+        storagelocationtype: s3
       labels:
-        capsule.clastix.io/tenant: oil
+        capsule.clastix.io/backup: "true"
 EOF
 ```
 
-When Alice creates a namespace, this will inherit the given label and/or annotation.
+When the tenant owner creates a namespace, it inherits the given label and/or annotation:
 
-## Taint services
-With Capsule, Bill can _"taint"_ the services created by Alice with additional labels and/or annotations. There is no specific semantic assigned to these labels and annotations: they just will be assigned to the services in the tenant as they are created by Alice. This can help the cluster admin to implement specific use cases.
+```yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  annotations:
+    storagelocationtype: s3
+  labels:
+    capsule.clastix.io/tenant: oil
+    kubernetes.io/metadata.name: oil-production
+    name: oil-production
+    capsule.clastix.io/backup: "true"
+  name: oil-production
+  ownerReferences:
+  - apiVersion: capsule.clastix.io/v1beta1
+    blockOwnerDeletion: true
+    controller: true
+    kind: Tenant
+    name: oil
+spec:
+  finalizers:
+  - kubernetes
+status:
+  phase: Active
+```
 
-Bill assigns additional labels and annotations to all services created in the `oil` tenant: 
+Additionally, the cluster admin can _"taint"_ the services created by the tenant owners with additional metadata as labels and annotations.
+
+Assigns additional labels and annotations to all services created in the `oil` tenant: 
 
 ```yaml
 kubectl apply -f - << EOF
@@ -1491,14 +1515,30 @@ spec:
     kind: User
   serviceOptions:
     additionalMetadata:
-      annotations:
-        capsule.clastix.io/backup: "true"
       labels:
-        capsule.clastix.io/tenant: oil
+        capsule.clastix.io/backup: "true"
 EOF
 ```
 
-When Alice creates a service in a namespace, this will inherit the given label and/or annotation.
+When the tenant owner creates a service in a tenant namespace, it inherits the given label and/or annotation:
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx
+  namespace: oil-production
+  labels:
+    capsule.clastix.io/backup: "true"
+spec:
+  ports:
+  - protocol: TCP
+    port: 80 
+    targetPort: 8080 
+  selector:
+    run: nginx
+  type: ClusterIP 
+```
 
 ## Cordon a Tenant
 
