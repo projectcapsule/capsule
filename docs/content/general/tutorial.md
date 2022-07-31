@@ -2,108 +2,21 @@
 
 Capsule is a framework to implement multi-tenant and policy-driven scenarios in Kubernetes. In this tutorial, we'll focus on a hypothetical case covering the main features of the Capsule Operator.
 
-***Acme Corp***, our sample organization, is building a Container as a Service platform (CaaS) to serve multiple lines of business. Each line of business has its team of engineers that are responsible for the development, deployment, and operating of their digital products. We'll work with the following actors:
+***Acme Corp***, our sample organization, is building a Container as a Service platform (CaaS) to serve multiple lines of business, or departments, e.g. _Oil_, _Gas_, _Solar_, _Wind_, _Water_. Each department has its team of engineers that are responsible for the development, deployment, and operating of their digital products. We'll work with the following actors:
 
-* ***Bill***: the cluster administrator from the operations department of Acme Corp.
+* ***Bill***: the cluster administrator from the operations department of _Acme Corp_.
 
-* ***Alice***: the IT Project Leader in the Oil & Gas Business Units. She is responsible for a team made of different job responsibilities (developers, administrators, SRE engineers, etc.) working in separate multiple departments.
+* ***Alice***: the project leader in the _Oil_ & _Gas_ departments. She is responsible for a team made of different job responsibilities: e.g. developers, administrators, SRE engineers, etc.
   
-* ***Joe***:
-  He works at Acme Corp, as a lead developer of a distributed team in Alice's organization.
+* ***Joe***: works as a lead developer of a distributed team in Alice's organization.
 
-* ***Bob***:
-  He is the head of Engineering for the Water Business Unit, the main and historical line of business at Acme Corp.
+* ***Bob***: is the head of engineering for the _Water_ department, the main and historical line of business at _Acme Corp_.
 
 
 ## Assign Tenant ownership
 
-### Roles assigned to Tenant Owners
-
-By default, all Tenant Owners will be granted with two ClusterRole resources using the RoleBinding API:
-
-1. the Kubernetes default one, `admin`, that grants most of the Namespace scoped resources management operations
-2. a custom one, named `capsule-namespace-deleter`, allowing to delete the created Namespace
-
-In the example below, assuming Alice create a namespace `oil-production` in Tenant `oil`,getting the tenant owner's Alice default 
-ClusterRoles command:
-
-```
-$: kubectl get rolebindings.rbac.authorization.k8s.io -n oil-production
-NAME                                      ROLE                                    AGE
-capsule-oil-0-admin                       ClusterRole/admin                       6s
-capsule-oil-1-capsule-namespace-deleter   ClusterRole/capsule-namespace-deleter   5s
-capsule-oil-2-admin                       ClusterRole/admin                       5s
-capsule-oil-3-capsule-namespace-deleter   ClusterRole/capsule-namespace-deleter   5s
-```
-
-Capsule supports the dynamic management of the assigned ClusterRole resources for each Tenant Owner.
-
-```yaml
-apiVersion: capsule.clastix.io/v1beta1
-kind: Tenant
-metadata:
-  annotations:
-    clusterrolenames.capsule.clastix.io/user.alice: editor,manager
-    clusterrolenames.capsule.clastix.io/group.sre: readonly
-  name: oil
-spec:
-  owners:
-    - kind: User
-      name: alice
-    - kind: Group
-      name: sre
-```
-
-For the given configuration, the resulting RoleBinding resources are the following ones:
-
-```
-$: kubectl get rolebindings.rbac.authorization.k8s.io
-NAME                     ROLE                   AGE
-capsule-oil-0-editor     ClusterRole/editor     21s
-capsule-oil-1-manager    ClusterRole/manager    19s
-capsule-oil-2-readonly   ClusterRole/readonly   2s
-```
-
-> The pattern for the annotation is `clusterrolenames.capsule.clastix.io/${KIND}.${NAME}`.
-> The placeholders `${KIND}` and `${NAME}` are referring to the Tenant Owner specification fields, both lower-cased.
-> 
-> In the case of users that are identified using their email address, the symbol `@` wouldn't be supported by the RFC 1123.
-> For such cases, the `@` symbol can be replaced with the placeholder `__AT__`.
-> 
-> ```yaml
-> apiVersion: capsule.clastix.io/v1beta1
-> kind: Tenant
-> metadata:
->   annotations:
->     clusterrolenames.capsule.clastix.io/alice__AT__clastix.io: editor,manager
-> spec:
->   owners:
->     - kind: User
->       name: alice@org.tld
->     - kind: User
->       name: alice@clastix.io
-> ```
-> 
-> Instead, with the resulting annotation key exceeding 63 characters length, the zero-based index of the owner can be specified as follows:
-> 
-> ```yaml
-> apiVersion: capsule.clastix.io/v1beta1
-> kind: Tenant
-> metadata:
->   annotations:
->     clusterrolenames.capsule.clastix.io/1: editor,manager
-> spec:
->   owners:
->     - kind: User
->       name: alice@org.tld
->     - kind: User
->       name: very-long-user-name-that-breaks-rfc-1123@org.tld
-> ```
-> 
-> This latter example will assign the roles `editor` and `manager`, assigned to the user `very-long-user-name-that-breaks-rfc-1123@org.tld`.
-
 ### User as tenant owner
-Bill, the cluster admin, receives a new request from Acme Corp.'s CTO asking for a new tenant to be onboarded and Alice user will be the tenant owner. Bill then assigns Alice's identity of `alice` in the Acme Corp. identity management system. Since Alice is a tenant owner, Bill needs to assign `alice` the Capsule group defined by `--capsule-user-group` option, which defaults to `capsule.clastix.io`.
+Bill, the cluster admin, receives a new request from _Acme Corp_'s CTO asking for a new tenant to be onboarded and Alice user will be the tenant owner. Bill then assigns Alice's identity of `alice` in the _Acme Corp_. identity management system. Since Alice is a tenant owner, Bill needs to assign `alice` the Capsule group defined by `--capsule-user-group` option, which defaults to `capsule.clastix.io`.
 
 To keep things simple, we assume that Bill just creates a client certificate for authentication using X.509 Certificate Signing Request, so Alice's certificate has `"/CN=alice/O=capsule.clastix.io"`.
 
@@ -258,19 +171,24 @@ system:serviceaccounts:{service-account-namespace}
 
 > Please, pay attention when setting a service account acting as tenant owner. Make sure you're not using the group `system:serviceaccounts` or the group `system:serviceaccounts:{capsule-namespace}` as Capsule group, otherwise you'll create a short-circuit in the Capsule controller, being Capsule itself controlled by a serviceaccount. 
 
+### Roles assigned to Tenant Owners
 
-## Create namespaces
-Alice, once logged with her credentials, can create a new namespace in her tenant, as simply issuing:
+By default, all Tenant Owners will be granted with two ClusterRole resources using the RoleBinding API:
+
+1. the Kubernetes default one, [`admin`](https://kubernetes.io/docs/reference/access-authn-authz/rbac/#user-facing-roles), that grants most of the namespace scoped resources
+
+2. a custom one, created by Capsule, named `capsule-namespace-deleter`, allowing to delete the created namespaces
+
+In the example below, assuming the tenant owner creates a namespace `oil-production` in Tenant `oil`, you'll see the Role Bindings giving the tenant owner full permissions on the tenant namespaces:
 
 ```
-kubectl create ns oil-production
+$: kubectl get rolebindings -n oil-production
+NAME                                      ROLE                                    AGE
+capsule-oil-0-admin                       ClusterRole/admin                       6s
+capsule-oil-1-capsule-namespace-deleter   ClusterRole/capsule-namespace-deleter   5s
 ```
 
-Alice started the name of the namespace prepended by the name of the tenant: this is not a strict requirement but it is highly suggested because it is likely that many different tenants would like to call their namespaces `production`, `test`, or `demo`, etc.
-
-The enforcement of this naming convention is optional and can be controlled by the cluster administrator with the `--force-tenant-prefix` option as an argument of the Capsule controller.
-
-When Alice creates the namespace, the Capsule controller listening for creation and deletion events assigns to Alice the following roles:
+When Alice creates the namespaces, the Capsule controller assigns to Alice the following permissions, so that Alice can act as the admin of all the tenant namespaces.
 
 ```yaml
 ---
@@ -301,28 +219,191 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
 ```
 
-So Alice is the admin of the namespaces:
+In some cases, the cluster admin needs to narrow the range of permissions assigned to tenant owners by assigning a Cluster Role with less permissions than above. Capsule supports the dynamic assignment of any ClusterRole resources for each Tenant Owner.
+
+For example, assign user `Joe` the tenant ownership with only [view](https://kubernetes.io/docs/reference/access-authn-authz/rbac/#user-facing-roles) permissions on tenant namespaces:
+
+```yaml
+kubectl apply -f - << EOF
+apiVersion: capsule.clastix.io/v1beta1
+kind: Tenant
+metadata:
+  name: oil
+  annotations:
+    clusterrolenames.capsule.clastix.io/user.joe: view
+spec:
+  owners:
+  - name: alice
+    kind: User
+  - name: joe
+    kind: User
+EOF
+```
+
+you'll see the new Role Bindings assigned to Joe:
 
 ```
-kubectl get rolebindings -n oil-development
+kubectl -n oil-production get rolebindings
 NAME                                      ROLE                                    AGE
-capsule-oil-0-admin                       ClusterRole/admin                       5s
-capsule-oil-1-capsule-namespace-deleter   ClusterRole/capsule-namespace-deleter   4s
+capsule-oil-0-admin                       ClusterRole/admin                       8d
+capsule-oil-1-capsule-namespace-deleter   ClusterRole/capsule-namespace-deleter   8d
+capsule-oil-2-view                        ClusterRole/edit                        5s
 ```
 
-The said Role Binding resources are automatically created by Capsule controller when the tenant owner Alice creates a namespace in the tenant.
+so that Joe can only view resources in the tenant namespaces:
 
-Alice can deploy any resource in the namespace, according to the predefined
-[`admin` cluster role](https://kubernetes.io/docs/reference/access-authn-authz/rbac/#user-facing-roles).
+```
+kubectl --as joe --as-group capsule.clastix.io auth can-i delete pods -n oil-marketing
+no
+```
+
+> Please, note that, despite created with more restricted permissions, a tenant owner can still create namespaces in the tenant because he belongs to the `capsule.clastix.io` group. If you want a user not acting as tenant owner, but still operating in the tenant, you can assign additional `RoleBindings` without assigning him the tenant ownership.
+
+Custom ClusterRoles are also supported. Assuming the cluster admin creates:
+
+```yaml
+kubectl apply -f - << EOF
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: prometheus-servicemonitors-viewer
+rules:
+- apiGroups: ["monitoring.coreos.com"]
+  resources: ["servicemonitors"]
+  verbs: ["get", "list", "watch"]
+EOF
+```
+
+These permissions can be granted to Joe
+
+```yaml
+kubectl apply -f - << EOF
+apiVersion: capsule.clastix.io/v1beta1
+kind: Tenant
+metadata:
+  name: oil
+  annotations:
+    clusterrolenames.capsule.clastix.io/user.joe: view,prometheus-servicemonitors-viewer
+spec:
+  owners:
+  - name: alice
+    kind: User
+  - name: joe
+    kind: User
+EOF
+```
+
+For the given configuration, the resulting RoleBinding resources are the following ones:
+
+```
+kubectl -n oil-production get rolebindings
+NAME                                              ROLE                                            AGE
+capsule-oil-0-admin                               ClusterRole/admin                               8d
+capsule-oil-1-capsule-namespace-deleter           ClusterRole/capsule-namespace-deleter           8d
+capsule-oil-2-view                                ClusterRole/view                                11m
+capsule-oil-3-prometheus-servicemonitors-viewer   ClusterRole/prometheus-servicemonitors-viewer   18s
+```
+
+> The pattern for the annotation is `clusterrolenames.capsule.clastix.io/${KIND}.${NAME}`.
+> The placeholders `${KIND}` and `${NAME}` are referring to the Tenant Owner specification fields, both lower-cased.
+> 
+> In the case of users that are identified using their email address, the symbol `@` wouldn't be supported by the RFC 1123.
+> For such cases, the `@` symbol can be replaced with the placeholder `__AT__`.
+> 
+> ```yaml
+> apiVersion: capsule.clastix.io/v1beta1
+> kind: Tenant
+> metadata:
+>   annotations:
+>     clusterrolenames.capsule.clastix.io/alice__AT__clastix.io: editor,manager
+> spec:
+>   owners:
+>     - kind: User
+>       name: alice@org.tld
+>     - kind: User
+>       name: alice@clastix.io
+> ```
+> 
+> Instead, with the resulting annotation key exceeding 63 characters length, the zero-based index of the owner can be specified as follows:
+> 
+> ```yaml
+> apiVersion: capsule.clastix.io/v1beta1
+> kind: Tenant
+> metadata:
+>   annotations:
+>     clusterrolenames.capsule.clastix.io/1: editor,manager
+> spec:
+>   owners:
+>     - kind: User
+>       name: alice@org.tld
+>     - kind: User
+>       name: very-long-user-name-that-breaks-rfc-1123@org.tld
+> ```
+> 
+> This latter example will assign the roles `editor` and `manager`, assigned to the user `very-long-user-name-that-breaks-rfc-1123@org.tld`.
+
+
+### Assign additional Role Bindings
+The tenant owner acts as admin of tenant namespaces. Other users can operate inside the tenant namespaces with different levels of permissions and authorizations. 
+
+Assuming the cluster admin creates:
+
+```yaml
+kubectl apply -f - << EOF
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: prometheus-servicemonitors-viewer
+rules:
+- apiGroups: ["monitoring.coreos.com"]
+  resources: ["servicemonitors"]
+  verbs: ["get", "list", "watch"]
+EOF
+```
+
+These permissions can be granted to a user without giving the role of tenant owner:
+
+```yaml
+kubectl apply -f - << EOF
+apiVersion: capsule.clastix.io/v1beta1
+kind: Tenant
+metadata:
+  name: oil
+spec:
+  owners:
+  - name: alice
+    kind: User
+  additionalRoleBindings:
+  - clusterRoleName: 'prometheus-servicemonitors-viewer'
+    subjects:
+    - apiGroup: rbac.authorization.k8s.io
+      kind: User
+      name: joe
+EOF
+```
+
+## Create namespaces
+Alice, once logged with her credentials, can create a new namespace in her tenant, as simply issuing:
+
+```
+kubectl create ns oil-production
+```
+
+Alice started the name of the namespace prepended by the name of the tenant: this is not a strict requirement but it is highly suggested because it is likely that many different tenants would like to call their namespaces `production`, `test`, or `demo`, etc.
+
+The enforcement of this naming convention is optional and can be controlled by the cluster administrator with the `--force-tenant-prefix` option as an argument of the Capsule controller.
+
+Alice can deploy any resource in any of the namespaces
 
 ```
 kubectl -n oil-development run nginx --image=docker.io/nginx 
 kubectl -n oil-development get pods
 ```
 
-Bill, the cluster admin, can control how many namespaces Alice, creates by setting a quota in the tenant manifest `spec.namespaceOptions.quota`
+The cluster admin, can control how many namespaces Alice, creates by setting a quota in the tenant manifest `spec.namespaceOptions.quota`
 
 ```yaml
+kubectl apply -f - << EOF
 apiVersion: capsule.clastix.io/v1beta1
 kind: Tenant
 metadata:
@@ -333,6 +414,7 @@ spec:
     kind: User
   namespaceOptions:
     quota: 3
+EOF
 ```
 
 Alice can create additional namespaces according to the quota:
@@ -367,58 +449,6 @@ Error from server (Cannot exceed Namespace quota: please, reach out to the syste
 admission webhook "namespace.capsule.clastix.io" denied the request.
 ```
 The enforcement on the maximum number of namespaces per Tenant is the responsibility of the Capsule controller via its Dynamic Admission Webhook capability.
-
-## Assign permissions
-Alice acts as the tenant admin. Other users can operate inside the tenant with different levels of permissions and authorizations. Alice is responsible for creating additional roles and assigning these roles to other users to work in the same tenant.
-
-One of the key design principles of the Capsule is self-provisioning management from the tenant owner's perspective. Alice, the tenant owner, does not need to interact with Bill, the cluster admin, to complete her day-by-day duties. On the other side, Bill does not have to deal with multiple requests coming from multiple tenant owners that probably will overwhelm him.
-
-Capsule leaves Alice, and the other tenant owners, the freedom to create RBAC roles at the namespace level, or using the pre-defined cluster roles already available in Kubernetes. Since roles and rolebindings are limited to a namespace scope, Alice can assign the roles to the other users accessing the same tenant only after the namespace is created. This gives Alice the power to administer the tenant without the intervention of the cluster admin.
-
-From the cluster admin perspective, the only required action for Bill is to provide the other identities, eg. `joe` in the Identity Management system. This task can be done once when onboarding the tenant and the number of users accessing the tenant can be part of the tenant business profile.
-
-Alice can create Roles and RoleBindings only in the namespaces she owns
-
-```
-kubectl auth can-i get roles -n oil-development
-yes
-
-kubectl auth can-i get rolebindings -n oil-development
-yes
-```
-
-so she can assign the role of namespace `oil-development` admin to Joe, another user accessing the tenant `oil`
-
-```yaml
-kubectl --as alice --as-group capsule.clastix.io apply -f - << EOF
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  labels:
-  name: oil-development:admin
-  namespace: oil-development
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: admin
-subjects:
-- apiGroup: rbac.authorization.k8s.io
-  kind: User
-  name: joe
-EOF
-```
-
-Joe now can operate on the namespace `oil-development` as admin but he has no access to the other namespaces `oil-production`, and `oil-test` that are part of the same tenant:
-
-```
-kubectl --as joe --as-group capsule.clastix.io auth can-i create pod -n oil-development
-yes
-
-kubectl --as joe --as-group capsule.clastix.io auth can-i create pod -n oil-production
-no
-```
-
-> Please, note the user `joe`, in the example above, is not acting as tenant owner. He can just operate in `oil-development` namespace as admin.
 
 ## Assign multiple tenants
 A single team is likely responsible for multiple lines of business. For example, in our sample organization Acme Corp., Alice is responsible for both the Oil and Gas lines of business. It's more likely that Alice requires two different tenants, for example, `oil` and `gas` to keep things isolated.
@@ -1085,7 +1115,7 @@ Also, Bill can make sure pods belonging to a tenant namespace cannot access othe
 Bill can set network policies in the tenant manifest, according to the requirements:
 
 ```yaml
-kubectl -n oil-production apply -f - << EOF
+kubectl apply -f - << EOF
 apiVersion: capsule.clastix.io/v1beta1
 kind: Tenant
 metadata:
@@ -1186,7 +1216,7 @@ Bob, an attacker, could try to schedule a Pod on the same node where Alice is ru
 To avoid this kind of attack, Bill, the cluster admin, can force Alice, the tenant owner, to start her Pods using only the allowed values for `ImagePullPolicy`, enforcing the `kubelet` to check the authorization first.
 
 ```yaml
-kubectl -n oil-production apply -f - << EOF
+kubectl apply -f - << EOF
 apiVersion: capsule.clastix.io/v1beta1
 kind: Tenant
 metadata:
@@ -1212,7 +1242,7 @@ The spec `containerRegistries` addresses this task and can provide a combination
 
 
 ```yaml
-kubectl -n oil-production apply -f - << EOF
+kubectl apply -f - << EOF
 apiVersion: capsule.clastix.io/v1beta1
 kind: Tenant
 metadata:
@@ -1243,7 +1273,7 @@ Capsule grants admin permissions to the tenant owners but is only limited to the
 In order to leave the tenant owner to create Custom Resources in their namespaces, the cluster admin defines a proper Cluster Role. For example:
 
 ```yaml
-kubectl -n oil-production apply -f - << EOF
+kubectl apply -f - << EOF
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
@@ -1268,7 +1298,7 @@ EOF
 Bill can assign this role to any namespace in the Alice's tenant by setting it in the tenant manifest:
 
 ```yaml
-kubectl -n oil-production apply -f - << EOF
+kubectl apply -f - << EOF
 apiVersion: capsule.clastix.io/v1beta1
 kind: Tenant
 metadata:
