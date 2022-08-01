@@ -84,6 +84,10 @@ bash scripts/helm-docs.sh
 
 Join the community, share and learn from it. You can find all the resources to how to contribute code and docs, connect with people in the [community repository](https://github.com/clastix/capsule-community).
 
+## Adopters
+
+See the [ADOPTERS.md](ADOPTERS.md) file for a list of companies that are using Capsule.
+
 # Governance
 
 You can find how the Capsule project is governed [here](https://capsule.clastix.io/docs/contributing/governance).
