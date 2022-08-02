@@ -88,6 +88,10 @@ Join the community, share and learn from it. You can find all the resources to h
 
 You can find how the Capsule project is governed [here](https://capsule.clastix.io/docs/contributing/governance).
 
+## Maintainers
+
+Please, refer to the maintainers file available [here](.github/maintainers.yaml).
+
 # FAQ
 
 - Q. How to pronounce Capsule?
