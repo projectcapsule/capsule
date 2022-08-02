@@ -92,6 +92,10 @@ See the [ADOPTERS.md](ADOPTERS.md) file for a list of companies that are using C
 
 You can find how the Capsule project is governed [here](https://capsule.clastix.io/docs/contributing/governance).
 
+## Maintainers
+
+Please, refer to the maintainers file available [here](.github/maintainers.yaml).
+
 # FAQ
 
 - Q. How to pronounce Capsule?

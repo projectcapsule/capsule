@@ -1,0 +1,18 @@
+- name: Adriano Pezzuto
+  github: https://github.com/bsctl
+  company: Clastix
+  projects:
+    - https://github.com/clastix/capsule
+    - https://github.com/clastix/capsule-proxy
+- name: Dario Tranchitella
+  github: https://github.com/prometherion
+  company: Clastix
+  projects:
+    - https://github.com/clastix/capsule
+    - https://github.com/clastix/capsule-proxy
+- name: Maksim Fedotov
+  github: https://github.com/MaxFedotov
+  company: wargaming.net
+  projects:
+    - https://github.com/clastix/capsule
+    - https://github.com/clastix/capsule-proxy
