@@ -1,0 +1,27 @@
+name: e2e
+
+on:
+  push:
+    branches: [ "*" ]
+    paths:
+      - 'charts/capsule/crds/**'
+  pull_request:
+    branches: [ "*" ]
+    paths:
+      - 'charts/capsule/crds/**'
+
+jobs:
+  kind:
+    name: Autogen API Docs
+    runs-on: ubuntu-18.04
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v2
+        with:
+          go-version: '1.18'
+      - name: "Install generator"
+        run: go install fybrik.io/crdoc@latest
+      - name: Autogen APIs
+        run: crdoc --resources config/crd/bases --output docs/api.md
