@@ -78,6 +78,9 @@ manifests: controller-gen
 generate: controller-gen
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
 
+apidoc: apidocs-gen
+	$(APIDOCS_GEN) crdoc --resources config/crd/bases --output docs/content/general/references.md
+
 # Setup development env
 # Usage: 
 # 	LAPTOP_HOST_IP=<YOUR_LAPTOP_IP> make dev-setup
@@ -146,6 +149,10 @@ docker-push:
 CONTROLLER_GEN = $(shell pwd)/bin/controller-gen
 controller-gen: ## Download controller-gen locally if necessary.
 	$(call go-install-tool,$(CONTROLLER_GEN),sigs.k8s.io/controller-tools/cmd/controller-gen@v0.5.0)
+
+APIDOCS_GEN = $(shell pwd)/bin/crdoc
+apidocs-gen: ## Download controller-gen locally if necessary.
+	$(call go-install-tool,$(APIDOCS_GEN),fybrik.io/crdoc@latest)
 
 GINKGO = $(shell pwd)/bin/ginkgo
 ginkgo: ## Download ginkgo locally if necessary.
