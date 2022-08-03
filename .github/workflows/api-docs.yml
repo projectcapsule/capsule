@@ -13,7 +13,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  kind:
+  autogen:
     runs-on: ubuntu-18.04
     steps:
       - uses: actions/checkout@v2
@@ -22,7 +22,12 @@ jobs:
       - uses: actions/setup-go@v2
         with:
           go-version: '1.18'
-      - name: "Install generator"
+      - name: "Install code generator (fybrik.io/crdoc@latest)"
         run: go install fybrik.io/crdoc@latest
       - name: Autogen APIs
-        run: crdoc --resources config/crd/bases --output docs/api.md
+        run: crdoc --resources config/crd/bases --output docs/content/general/references.md
+      - name: Copy To Branches Action
+        uses: planetoftheweb/copy-to-branches@v1.2
+        env:
+          key: main        
+          files: docs/content/general/references.md
