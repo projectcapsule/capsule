@@ -1,4 +1,4 @@
-name: api-docs
+name: Autogen API Docs
 
 on:
   push:
@@ -12,7 +12,6 @@ on:
 
 jobs:
   kind:
-    name: Autogen API Docs
     runs-on: ubuntu-18.04
     steps:
       - uses: actions/checkout@v2
