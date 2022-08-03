@@ -10,6 +10,8 @@ on:
     paths:
       - 'charts/capsule/crds/**'
 
+  workflow_dispatch:
+
 jobs:
   kind:
     runs-on: ubuntu-18.04
