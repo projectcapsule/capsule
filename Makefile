@@ -79,7 +79,7 @@ generate: controller-gen
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
 
 apidoc: apidocs-gen
-	$(APIDOCS_GEN) crdoc --resources config/crd/bases --output docs/content/general/references.md
+	$(APIDOCS_GEN) crdoc --resources config/crd/bases --output docs/content/general/tenantCRDMarkdown.md
 
 # Setup development env
 # Usage: 
@@ -151,7 +151,7 @@ controller-gen: ## Download controller-gen locally if necessary.
 	$(call go-install-tool,$(CONTROLLER_GEN),sigs.k8s.io/controller-tools/cmd/controller-gen@v0.5.0)
 
 APIDOCS_GEN = $(shell pwd)/bin/crdoc
-apidocs-gen: ## Download controller-gen locally if necessary.
+apidocs-gen: ## Download crdoc locally if necessary.
 	$(call go-install-tool,$(APIDOCS_GEN),fybrik.io/crdoc@latest)
 
 GINKGO = $(shell pwd)/bin/ginkgo
