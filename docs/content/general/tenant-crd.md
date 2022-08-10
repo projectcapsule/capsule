@@ -1,3 +1,19 @@
+<style>
+  table {
+    border: solid;
+    padding: 15px;
+    text-align: left;
+  }
+  th, td {
+    border-bottom: 1px solid #ddd;
+    border: solid;
+  }
+  tr:hover {background-color: coral;}
+  sup {
+    font-size: 15px;
+  }
+</style>
+
 # API Reference
 
 Packages:

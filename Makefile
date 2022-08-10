@@ -79,7 +79,7 @@ generate: controller-gen
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
 
 apidoc: apidocs-gen
-	$(APIDOCS_GEN) crdoc --resources config/crd/bases --output docs/content/general/tenant-crd.md
+	$(APIDOCS_GEN) crdoc --resources config/crd/bases --output docs/content/general/tenant-crd.md --template docs/template/reference-cr.tmpl
 
 # Setup development env
 # Usage: 
