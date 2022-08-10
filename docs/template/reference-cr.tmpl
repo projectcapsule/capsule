@@ -6,6 +6,7 @@
   }
   th, td {
     border-bottom: 1px solid #ddd;
+    padding: 10px;
     border: solid;
   }
   tr:hover {background-color: coral;}
