@@ -16,13 +16,13 @@ const (
 
 // Sync the Tenant Owner specific cluster-roles.
 // When the Tenant is configured GitOpsReady additional (Cluster)Roles are created, then bound.
-func (r *Manager) syncRoles(ctx context.Context, tenant *capsulev1beta1.Tenant) (err error) {
+func (r *Manager) syncClusterRoles(ctx context.Context, tenant *capsulev1beta1.Tenant) (err error) {
 
 	// If the Tenant will be reconciled the GitOps-way,
 	// Tenant Owners might be machine GitOps reconciler identities.
 	if tenant.Spec.GitOpsReady {
 		for _, owner := range tenant.Spec.Owners {
-			if err = r.ensureOwnerRole(ctx, tenant, &owner, ImpersonatorRoleName); err != nil {
+			if err = r.ensureOwnerClusterRole(ctx, tenant, &owner, ImpersonatorRoleName); err != nil {
 				r.Log.Error(err, "Reconciliation for ClusterRole failed", "ClusterRole", ImpersonatorRoleName)
 				return err
 			}
@@ -32,7 +32,7 @@ func (r *Manager) syncRoles(ctx context.Context, tenant *capsulev1beta1.Tenant) 
 	return
 }
 
-func (r *Manager) ensureOwnerRole(ctx context.Context, tenant *capsulev1beta1.Tenant, owner *capsulev1beta1.OwnerSpec, roleName string) (err error) {
+func (r *Manager) ensureOwnerClusterRole(ctx context.Context, tenant *capsulev1beta1.Tenant, owner *capsulev1beta1.OwnerSpec, roleName string) (err error) {
 	switch roleName {
 	case ImpersonatorRoleName:
 		clusterRole := &rbacv1.ClusterRole{
@@ -48,7 +48,7 @@ func (r *Manager) ensureOwnerRole(ctx context.Context, tenant *capsulev1beta1.Te
 
 		resourceName := owner.Name
 		if owner.Kind == capsulev1beta1.ServiceAccountOwner {
-			resourceName = "system:serviceaccount:" + tenant.Namespace + ":" + owner.Name
+			resourceName = owner.Name
 		}
 
 		_, err = controllerutil.CreateOrUpdate(ctx, r.Client, clusterRole, func() error {

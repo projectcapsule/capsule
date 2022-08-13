@@ -105,11 +105,11 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 
 		return
 	}
-	// Ensuring Roles resources
-	r.Log.Info("Ensuring Roles for Owners and Tenant")
+	// Ensuring ClusterRoles resources
+	r.Log.Info("Ensuring ClusterRoles for Owners and Tenant")
 
-	if err = r.syncRoles(ctx, instance); err != nil {
-		r.Log.Error(err, "Cannot sync Roles items")
+	if err = r.syncClusterRoles(ctx, instance); err != nil {
+		r.Log.Error(err, "Cannot sync ClusterRoles items")
 
 		return
 	}
