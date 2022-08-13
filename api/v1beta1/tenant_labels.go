@@ -24,6 +24,8 @@ func GetTypeLabel(t runtime.Object) (label string, err error) {
 		return "capsule.clastix.io/resource-quota", nil
 	case *rbacv1.RoleBinding:
 		return "capsule.clastix.io/role-binding", nil
+	case *rbacv1.ClusterRoleBinding:
+		return "capsule.clastix.io/cluster-role-binding", nil
 	default:
 		err = fmt.Errorf("type %T is not mapped as Capsule label recognized", v)
 	}

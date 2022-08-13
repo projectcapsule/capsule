@@ -113,6 +113,14 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 
 		return
 	}
+	// Ensuring ClusterRoleBindings resources
+	r.Log.Info("Ensuring ClusterRoleBindings for Owners and Tenant")
+
+	if err = r.syncClusterRoleBindings(ctx, instance); err != nil {
+		r.Log.Error(err, "Cannot sync ClusterRoleBindings items")
+
+		return
+	}
 	// Ensuring RoleBinding resources
 	r.Log.Info("Ensuring RoleBindings for Owners and Tenant")
 

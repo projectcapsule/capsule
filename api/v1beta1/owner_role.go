@@ -40,21 +40,30 @@ func (in OwnerSpec) GetRoles(tenant Tenant, index int) []string {
 
 	roles := []string{"admin", "capsule-namespace-deleter"}
 
+	if tenant.Spec.GitOpsReady {
+		roles = append(roles, in.getGitOpsRoles(tenant)...)
+	}
+
 	return roles
 }
 
 func (in OwnerSpec) GetClusterRoles(tenant Tenant) []string {
 	if tenant.Spec.GitOpsReady {
-		return in.getGitOpsRoles(tenant)
+		return in.getGitOpsClusterRoles(tenant)
 	}
 
 	return []string{}
 }
 
+func (in OwnerSpec) getGitOpsClusterRoles(tenant Tenant) []string {
+	return []string{
+		"capsule-tenant-impersonator-" + tenant.Name + "-" + in.Name,
+	}
+}
+
 func (in OwnerSpec) getGitOpsRoles(tenant Tenant) []string {
 	return []string{
 		"cluster-admin",
-		"capsule-tenant-impersonator-" + tenant.Name + "-" + in.Name,
 	}
 }
 

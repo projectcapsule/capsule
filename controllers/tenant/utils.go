@@ -14,6 +14,47 @@ import (
 	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
 )
 
+// pruningClusterResources is taking care of removing the no more requested sub-resources as LimitRange, ResourceQuota or
+// NetworkPolicy using the "exists" and "notin" LabelSelector to perform an outer-join removal.
+func (r *Manager) pruningClusterResources(ctx context.Context, keys []string, obj client.Object) (err error) {
+	var capsuleLabel string
+
+	if capsuleLabel, err = capsulev1beta1.GetTypeLabel(obj); err != nil {
+		return
+	}
+
+	selector := labels.NewSelector()
+
+	var exists *labels.Requirement
+
+	if exists, err = labels.NewRequirement(capsuleLabel, selection.Exists, []string{}); err != nil {
+		return
+	}
+
+	selector = selector.Add(*exists)
+
+	if len(keys) > 0 {
+		var notIn *labels.Requirement
+
+		if notIn, err = labels.NewRequirement(capsuleLabel, selection.NotIn, keys); err != nil {
+			return err
+		}
+
+		selector = selector.Add(*notIn)
+	}
+
+	r.Log.Info("Pruning objects with label selector " + selector.String())
+
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		return r.DeleteAllOf(ctx, obj, &client.DeleteAllOfOptions{
+			ListOptions: client.ListOptions{
+				LabelSelector: selector,
+			},
+			DeleteOptions: client.DeleteOptions{},
+		})
+	})
+}
+
 // pruningResources is taking care of removing the no more requested sub-resources as LimitRange, ResourceQuota or
 // NetworkPolicy using the "exists" and "notin" LabelSelector to perform an outer-join removal.
 func (r *Manager) pruningResources(ctx context.Context, ns string, keys []string, obj client.Object) (err error) {

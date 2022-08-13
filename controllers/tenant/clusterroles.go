@@ -47,9 +47,6 @@ func (r *Manager) ensureOwnerClusterRole(ctx context.Context, tenant *capsulev1b
 		}
 
 		resourceName := owner.Name
-		if owner.Kind == capsulev1beta1.ServiceAccountOwner {
-			resourceName = owner.Name
-		}
 
 		_, err = controllerutil.CreateOrUpdate(ctx, r.Client, clusterRole, func() error {
 			clusterRole.Rules = []rbacv1.PolicyRule{

@@ -654,6 +654,9 @@ spec:
                   allowedRegex:
                     type: string
                 type: object
+              gitOpsReady:
+                description: Configured RBAC for machine owners tailored for GitOps controllers.
+                type: boolean
               imagePullPolicies:
                 description: Specify the allowed values for the imagePullPolicies option in Pod resources. Capsule assures that all Pod resources created in the Tenant can use only one of the allowed policy. Optional.
                 items:
