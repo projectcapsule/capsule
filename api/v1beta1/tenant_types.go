@@ -35,6 +35,8 @@ type TenantSpec struct {
 	ImagePullPolicies []ImagePullPolicySpec `json:"imagePullPolicies,omitempty"`
 	// Specifies the allowed priorityClasses assigned to the Tenant. Capsule assures that all Pods resources created in the Tenant can use only one of the allowed PriorityClasses. Optional.
 	PriorityClasses *AllowedListSpec `json:"priorityClasses,omitempty"`
+	// Configured RBAC for machine owners tailored for GitOps controllers.
+	GitOpsReady bool `json:"gitOpsReady,omitempty"`
 }
 
 //+kubebuilder:object:root=true
