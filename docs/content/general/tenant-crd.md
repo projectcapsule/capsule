@@ -34,7 +34,6 @@ Resource Types:
 
 
 ## CapsuleConfiguration
-<sup><sup>[↩ Parent](#capsuleclastixiov1alpha1 )</sup></sup>
 
 
 
@@ -81,7 +80,6 @@ CapsuleConfiguration is the Schema for the Capsule configuration API.
 
 
 ### CapsuleConfiguration.spec
-<sup><sup>[↩ Parent](#capsuleconfiguration)</sup></sup>
 
 
 
@@ -125,7 +123,6 @@ CapsuleConfigurationSpec defines the Capsule configuration.
 </table>
 
 ## Tenant
-<sup><sup>[↩ Parent](#capsuleclastixiov1alpha1 )</sup></sup>
 
 
 
@@ -179,7 +176,6 @@ Tenant is the Schema for the tenants API.
 
 
 ### Tenant.spec
-<sup><sup>[↩ Parent](#tenant)</sup></sup>
 
 
 
@@ -300,7 +296,6 @@ TenantSpec defines the desired state of Tenant.
 
 
 ### Tenant.spec.owner
-<sup><sup>[↩ Parent](#tenantspec)</sup></sup>
 
 
 
@@ -336,7 +331,6 @@ OwnerSpec defines tenant owner name and kind.
 
 
 ### Tenant.spec.additionalRoleBindings[index]
-<sup><sup>[↩ Parent](#tenantspec)</sup></sup>
 
 
 
@@ -370,7 +364,6 @@ OwnerSpec defines tenant owner name and kind.
 
 
 ### Tenant.spec.additionalRoleBindings[index].subjects[index]
-<sup><sup>[↩ Parent](#tenantspecadditionalrolebindingsindex)</sup></sup>
 
 
 
@@ -418,7 +411,6 @@ Subject contains a reference to the object or user identities a role binding app
 
 
 ### Tenant.spec.containerRegistries
-<sup><sup>[↩ Parent](#tenantspec)</sup></sup>
 
 
 
@@ -452,7 +444,6 @@ Subject contains a reference to the object or user identities a role binding app
 
 
 ### Tenant.spec.externalServiceIPs
-<sup><sup>[↩ Parent](#tenantspec)</sup></sup>
 
 
 
@@ -479,7 +470,6 @@ Subject contains a reference to the object or user identities a role binding app
 
 
 ### Tenant.spec.ingressClasses
-<sup><sup>[↩ Parent](#tenantspec)</sup></sup>
 
 
 
@@ -513,7 +503,6 @@ Subject contains a reference to the object or user identities a role binding app
 
 
 ### Tenant.spec.ingressHostnames
-<sup><sup>[↩ Parent](#tenantspec)</sup></sup>
 
 
 
@@ -547,7 +536,6 @@ Subject contains a reference to the object or user identities a role binding app
 
 
 ### Tenant.spec.limitRanges[index]
-<sup><sup>[↩ Parent](#tenantspec)</sup></sup>
 
 
 
@@ -574,7 +562,6 @@ LimitRangeSpec defines a min/max usage limit for resources that match on kind.
 
 
 ### Tenant.spec.limitRanges[index].limits[index]
-<sup><sup>[↩ Parent](#tenantspeclimitrangesindex)</sup></sup>
 
 
 
@@ -636,7 +623,6 @@ LimitRangeItem defines a min/max usage limit for any resource that matches on ki
 
 
 ### Tenant.spec.namespacesMetadata
-<sup><sup>[↩ Parent](#tenantspec)</sup></sup>
 
 
 
@@ -670,7 +656,6 @@ LimitRangeItem defines a min/max usage limit for any resource that matches on ki
 
 
 ### Tenant.spec.networkPolicies[index]
-<sup><sup>[↩ Parent](#tenantspec)</sup></sup>
 
 
 
@@ -718,7 +703,6 @@ NetworkPolicySpec provides the specification of a NetworkPolicy
 
 
 ### Tenant.spec.networkPolicies[index].podSelector
-<sup><sup>[↩ Parent](#tenantspecnetworkpoliciesindex)</sup></sup>
 
 
 
@@ -752,7 +736,6 @@ Selects the pods to which this NetworkPolicy object applies. The array of ingres
 
 
 ### Tenant.spec.networkPolicies[index].podSelector.matchExpressions[index]
-<sup><sup>[↩ Parent](#tenantspecnetworkpoliciesindexpodselector)</sup></sup>
 
 
 
@@ -793,7 +776,6 @@ A label selector requirement is a selector that contains values, a key, and an o
 
 
 ### Tenant.spec.networkPolicies[index].egress[index]
-<sup><sup>[↩ Parent](#tenantspecnetworkpoliciesindex)</sup></sup>
 
 
 
@@ -827,7 +809,6 @@ NetworkPolicyEgressRule describes a particular set of traffic that is allowed ou
 
 
 ### Tenant.spec.networkPolicies[index].egress[index].ports[index]
-<sup><sup>[↩ Parent](#tenantspecnetworkpoliciesindexegressindex)</sup></sup>
 
 
 
@@ -872,7 +853,6 @@ NetworkPolicyPort describes a port to allow traffic on
 
 
 ### Tenant.spec.networkPolicies[index].egress[index].to[index]
-<sup><sup>[↩ Parent](#tenantspecnetworkpoliciesindexegressindex)</sup></sup>
 
 
 
@@ -915,7 +895,6 @@ NetworkPolicyPeer describes a peer to allow traffic to/from. Only certain combin
 
 
 ### Tenant.spec.networkPolicies[index].egress[index].to[index].ipBlock
-<sup><sup>[↩ Parent](#tenantspecnetworkpoliciesindexegressindextoindex)</sup></sup>
 
 
 
@@ -949,7 +928,6 @@ IPBlock defines policy on a particular IPBlock. If this field is set then neithe
 
 
 ### Tenant.spec.networkPolicies[index].egress[index].to[index].namespaceSelector
-<sup><sup>[↩ Parent](#tenantspecnetworkpoliciesindexegressindextoindex)</sup></sup>
 
 
 
@@ -984,7 +962,6 @@ Selects Namespaces using cluster-scoped labels. This field follows standard labe
 
 
 ### Tenant.spec.networkPolicies[index].egress[index].to[index].namespaceSelector.matchExpressions[index]
-<sup><sup>[↩ Parent](#tenantspecnetworkpoliciesindexegressindextoindexnamespaceselector)</sup></sup>
 
 
 
@@ -1025,7 +1002,6 @@ A label selector requirement is a selector that contains values, a key, and an o
 
 
 ### Tenant.spec.networkPolicies[index].egress[index].to[index].podSelector
-<sup><sup>[↩ Parent](#tenantspecnetworkpoliciesindexegressindextoindex)</sup></sup>
 
 
 
@@ -1060,7 +1036,6 @@ This is a label selector which selects Pods. This field follows standard label s
 
 
 ### Tenant.spec.networkPolicies[index].egress[index].to[index].podSelector.matchExpressions[index]
-<sup><sup>[↩ Parent](#tenantspecnetworkpoliciesindexegressindextoindexpodselector)</sup></sup>
 
 
 
@@ -1101,7 +1076,6 @@ A label selector requirement is a selector that contains values, a key, and an o
 
 
 ### Tenant.spec.networkPolicies[index].ingress[index]
-<sup><sup>[↩ Parent](#tenantspecnetworkpoliciesindex)</sup></sup>
 
 
 
@@ -1135,7 +1109,6 @@ NetworkPolicyIngressRule describes a particular set of traffic that is allowed t
 
 
 ### Tenant.spec.networkPolicies[index].ingress[index].from[index]
-<sup><sup>[↩ Parent](#tenantspecnetworkpoliciesindexingressindex)</sup></sup>
 
 
 
@@ -1178,7 +1151,6 @@ NetworkPolicyPeer describes a peer to allow traffic to/from. Only certain combin
 
 
 ### Tenant.spec.networkPolicies[index].ingress[index].from[index].ipBlock
-<sup><sup>[↩ Parent](#tenantspecnetworkpoliciesindexingressindexfromindex)</sup></sup>
 
 
 
@@ -1212,7 +1184,6 @@ IPBlock defines policy on a particular IPBlock. If this field is set then neithe
 
 
 ### Tenant.spec.networkPolicies[index].ingress[index].from[index].namespaceSelector
-<sup><sup>[↩ Parent](#tenantspecnetworkpoliciesindexingressindexfromindex)</sup></sup>
 
 
 
@@ -1247,7 +1218,6 @@ Selects Namespaces using cluster-scoped labels. This field follows standard labe
 
 
 ### Tenant.spec.networkPolicies[index].ingress[index].from[index].namespaceSelector.matchExpressions[index]
-<sup><sup>[↩ Parent](#tenantspecnetworkpoliciesindexingressindexfromindexnamespaceselector)</sup></sup>
 
 
 
@@ -1288,7 +1258,6 @@ A label selector requirement is a selector that contains values, a key, and an o
 
 
 ### Tenant.spec.networkPolicies[index].ingress[index].from[index].podSelector
-<sup><sup>[↩ Parent](#tenantspecnetworkpoliciesindexingressindexfromindex)</sup></sup>
 
 
 
@@ -1323,7 +1292,6 @@ This is a label selector which selects Pods. This field follows standard label s
 
 
 ### Tenant.spec.networkPolicies[index].ingress[index].from[index].podSelector.matchExpressions[index]
-<sup><sup>[↩ Parent](#tenantspecnetworkpoliciesindexingressindexfromindexpodselector)</sup></sup>
 
 
 
@@ -1364,7 +1332,6 @@ A label selector requirement is a selector that contains values, a key, and an o
 
 
 ### Tenant.spec.networkPolicies[index].ingress[index].ports[index]
-<sup><sup>[↩ Parent](#tenantspecnetworkpoliciesindexingressindex)</sup></sup>
 
 
 
@@ -1409,7 +1376,6 @@ NetworkPolicyPort describes a port to allow traffic on
 
 
 ### Tenant.spec.resourceQuotas[index]
-<sup><sup>[↩ Parent](#tenantspec)</sup></sup>
 
 
 
@@ -1450,7 +1416,6 @@ ResourceQuotaSpec defines the desired hard limits to enforce for Quota.
 
 
 ### Tenant.spec.resourceQuotas[index].scopeSelector
-<sup><sup>[↩ Parent](#tenantspecresourcequotasindex)</sup></sup>
 
 
 
@@ -1477,7 +1442,6 @@ scopeSelector is also a collection of filters like scopes that must match each o
 
 
 ### Tenant.spec.resourceQuotas[index].scopeSelector.matchExpressions[index]
-<sup><sup>[↩ Parent](#tenantspecresourcequotasindexscopeselector)</sup></sup>
 
 
 
@@ -1518,7 +1482,6 @@ A scoped-resource selector requirement is a selector that contains values, a sco
 
 
 ### Tenant.spec.servicesMetadata
-<sup><sup>[↩ Parent](#tenantspec)</sup></sup>
 
 
 
@@ -1552,7 +1515,6 @@ A scoped-resource selector requirement is a selector that contains values, a sco
 
 
 ### Tenant.spec.storageClasses
-<sup><sup>[↩ Parent](#tenantspec)</sup></sup>
 
 
 
@@ -1586,7 +1548,6 @@ A scoped-resource selector requirement is a selector that contains values, a sco
 
 
 ### Tenant.status
-<sup><sup>[↩ Parent](#tenant)</sup></sup>
 
 
 
@@ -1628,7 +1589,6 @@ Resource Types:
 
 
 ## Tenant
-<sup><sup>[↩ Parent](#capsuleclastixiov1beta1 )</sup></sup>
 
 
 
@@ -1682,7 +1642,6 @@ Tenant is the Schema for the tenants API.
 
 
 ### Tenant.spec
-<sup><sup>[↩ Parent](#tenant-1)</sup></sup>
 
 
 
@@ -1793,7 +1752,6 @@ TenantSpec defines the desired state of Tenant.
 
 
 ### Tenant.spec.owners[index]
-<sup><sup>[↩ Parent](#tenantspec-1)</sup></sup>
 
 
 
@@ -1836,7 +1794,6 @@ TenantSpec defines the desired state of Tenant.
 
 
 ### Tenant.spec.owners[index].proxySettings[index]
-<sup><sup>[↩ Parent](#tenantspecownersindex)</sup></sup>
 
 
 
@@ -1872,7 +1829,6 @@ TenantSpec defines the desired state of Tenant.
 
 
 ### Tenant.spec.additionalRoleBindings[index]
-<sup><sup>[↩ Parent](#tenantspec-1)</sup></sup>
 
 
 
@@ -1906,7 +1862,6 @@ TenantSpec defines the desired state of Tenant.
 
 
 ### Tenant.spec.additionalRoleBindings[index].subjects[index]
-<sup><sup>[↩ Parent](#tenantspecadditionalrolebindingsindex-1)</sup></sup>
 
 
 
@@ -1954,7 +1909,6 @@ Subject contains a reference to the object or user identities a role binding app
 
 
 ### Tenant.spec.containerRegistries
-<sup><sup>[↩ Parent](#tenantspec-1)</sup></sup>
 
 
 
@@ -1988,7 +1942,6 @@ Specifies the trusted Image Registries assigned to the Tenant. Capsule assures t
 
 
 ### Tenant.spec.ingressOptions
-<sup><sup>[↩ Parent](#tenantspec-1)</sup></sup>
 
 
 
@@ -2036,7 +1989,6 @@ Specifies options for the Ingress resources, such as allowed hostnames and Ingre
 
 
 ### Tenant.spec.ingressOptions.allowedClasses
-<sup><sup>[↩ Parent](#tenantspecingressoptions)</sup></sup>
 
 
 
@@ -2070,7 +2022,6 @@ Specifies the allowed IngressClasses assigned to the Tenant. Capsule assures tha
 
 
 ### Tenant.spec.ingressOptions.allowedHostnames
-<sup><sup>[↩ Parent](#tenantspecingressoptions)</sup></sup>
 
 
 
@@ -2104,7 +2055,6 @@ Specifies the allowed hostnames in Ingresses for the given Tenant. Capsule assur
 
 
 ### Tenant.spec.limitRanges
-<sup><sup>[↩ Parent](#tenantspec-1)</sup></sup>
 
 
 
@@ -2131,7 +2081,6 @@ Specifies the resource min/max usage restrictions to the Tenant. The assigned va
 
 
 ### Tenant.spec.limitRanges.items[index]
-<sup><sup>[↩ Parent](#tenantspeclimitranges)</sup></sup>
 
 
 
@@ -2158,7 +2107,6 @@ LimitRangeSpec defines a min/max usage limit for resources that match on kind.
 
 
 ### Tenant.spec.limitRanges.items[index].limits[index]
-<sup><sup>[↩ Parent](#tenantspeclimitrangesitemsindex)</sup></sup>
 
 
 
@@ -2220,7 +2168,6 @@ LimitRangeItem defines a min/max usage limit for any resource that matches on ki
 
 
 ### Tenant.spec.namespaceOptions
-<sup><sup>[↩ Parent](#tenantspec-1)</sup></sup>
 
 
 
@@ -2257,7 +2204,6 @@ Specifies options for the Namespaces, such as additional metadata or maximum num
 
 
 ### Tenant.spec.namespaceOptions.additionalMetadata
-<sup><sup>[↩ Parent](#tenantspecnamespaceoptions)</sup></sup>
 
 
 
@@ -2291,7 +2237,6 @@ Specifies additional labels and annotations the Capsule operator places on any N
 
 
 ### Tenant.spec.networkPolicies
-<sup><sup>[↩ Parent](#tenantspec-1)</sup></sup>
 
 
 
@@ -2318,7 +2263,6 @@ Specifies the NetworkPolicies assigned to the Tenant. The assigned NetworkPolici
 
 
 ### Tenant.spec.networkPolicies.items[index]
-<sup><sup>[↩ Parent](#tenantspecnetworkpolicies)</sup></sup>
 
 
 
@@ -2366,7 +2310,6 @@ NetworkPolicySpec provides the specification of a NetworkPolicy
 
 
 ### Tenant.spec.networkPolicies.items[index].podSelector
-<sup><sup>[↩ Parent](#tenantspecnetworkpoliciesitemsindex)</sup></sup>
 
 
 
@@ -2400,7 +2343,6 @@ Selects the pods to which this NetworkPolicy object applies. The array of ingres
 
 
 ### Tenant.spec.networkPolicies.items[index].podSelector.matchExpressions[index]
-<sup><sup>[↩ Parent](#tenantspecnetworkpoliciesitemsindexpodselector)</sup></sup>
 
 
 
@@ -2441,7 +2383,6 @@ A label selector requirement is a selector that contains values, a key, and an o
 
 
 ### Tenant.spec.networkPolicies.items[index].egress[index]
-<sup><sup>[↩ Parent](#tenantspecnetworkpoliciesitemsindex)</sup></sup>
 
 
 
@@ -2475,7 +2416,6 @@ NetworkPolicyEgressRule describes a particular set of traffic that is allowed ou
 
 
 ### Tenant.spec.networkPolicies.items[index].egress[index].ports[index]
-<sup><sup>[↩ Parent](#tenantspecnetworkpoliciesitemsindexegressindex)</sup></sup>
 
 
 
@@ -2520,7 +2460,6 @@ NetworkPolicyPort describes a port to allow traffic on
 
 
 ### Tenant.spec.networkPolicies.items[index].egress[index].to[index]
-<sup><sup>[↩ Parent](#tenantspecnetworkpoliciesitemsindexegressindex)</sup></sup>
 
 
 
@@ -2563,7 +2502,6 @@ NetworkPolicyPeer describes a peer to allow traffic to/from. Only certain combin
 
 
 ### Tenant.spec.networkPolicies.items[index].egress[index].to[index].ipBlock
-<sup><sup>[↩ Parent](#tenantspecnetworkpoliciesitemsindexegressindextoindex)</sup></sup>
 
 
 
@@ -2597,7 +2535,6 @@ IPBlock defines policy on a particular IPBlock. If this field is set then neithe
 
 
 ### Tenant.spec.networkPolicies.items[index].egress[index].to[index].namespaceSelector
-<sup><sup>[↩ Parent](#tenantspecnetworkpoliciesitemsindexegressindextoindex)</sup></sup>
 
 
 
@@ -2632,7 +2569,6 @@ Selects Namespaces using cluster-scoped labels. This field follows standard labe
 
 
 ### Tenant.spec.networkPolicies.items[index].egress[index].to[index].namespaceSelector.matchExpressions[index]
-<sup><sup>[↩ Parent](#tenantspecnetworkpoliciesitemsindexegressindextoindexnamespaceselector)</sup></sup>
 
 
 
@@ -2673,7 +2609,6 @@ A label selector requirement is a selector that contains values, a key, and an o
 
 
 ### Tenant.spec.networkPolicies.items[index].egress[index].to[index].podSelector
-<sup><sup>[↩ Parent](#tenantspecnetworkpoliciesitemsindexegressindextoindex)</sup></sup>
 
 
 
@@ -2708,7 +2643,6 @@ This is a label selector which selects Pods. This field follows standard label s
 
 
 ### Tenant.spec.networkPolicies.items[index].egress[index].to[index].podSelector.matchExpressions[index]
-<sup><sup>[↩ Parent](#tenantspecnetworkpoliciesitemsindexegressindextoindexpodselector)</sup></sup>
 
 
 
@@ -2749,7 +2683,6 @@ A label selector requirement is a selector that contains values, a key, and an o
 
 
 ### Tenant.spec.networkPolicies.items[index].ingress[index]
-<sup><sup>[↩ Parent](#tenantspecnetworkpoliciesitemsindex)</sup></sup>
 
 
 
@@ -2783,7 +2716,6 @@ NetworkPolicyIngressRule describes a particular set of traffic that is allowed t
 
 
 ### Tenant.spec.networkPolicies.items[index].ingress[index].from[index]
-<sup><sup>[↩ Parent](#tenantspecnetworkpoliciesitemsindexingressindex)</sup></sup>
 
 
 
@@ -2826,7 +2758,6 @@ NetworkPolicyPeer describes a peer to allow traffic to/from. Only certain combin
 
 
 ### Tenant.spec.networkPolicies.items[index].ingress[index].from[index].ipBlock
-<sup><sup>[↩ Parent](#tenantspecnetworkpoliciesitemsindexingressindexfromindex)</sup></sup>
 
 
 
@@ -2860,7 +2791,6 @@ IPBlock defines policy on a particular IPBlock. If this field is set then neithe
 
 
 ### Tenant.spec.networkPolicies.items[index].ingress[index].from[index].namespaceSelector
-<sup><sup>[↩ Parent](#tenantspecnetworkpoliciesitemsindexingressindexfromindex)</sup></sup>
 
 
 
@@ -2895,7 +2825,6 @@ Selects Namespaces using cluster-scoped labels. This field follows standard labe
 
 
 ### Tenant.spec.networkPolicies.items[index].ingress[index].from[index].namespaceSelector.matchExpressions[index]
-<sup><sup>[↩ Parent](#tenantspecnetworkpoliciesitemsindexingressindexfromindexnamespaceselector)</sup></sup>
 
 
 
@@ -2936,7 +2865,6 @@ A label selector requirement is a selector that contains values, a key, and an o
 
 
 ### Tenant.spec.networkPolicies.items[index].ingress[index].from[index].podSelector
-<sup><sup>[↩ Parent](#tenantspecnetworkpoliciesitemsindexingressindexfromindex)</sup></sup>
 
 
 
@@ -2971,7 +2899,6 @@ This is a label selector which selects Pods. This field follows standard label s
 
 
 ### Tenant.spec.networkPolicies.items[index].ingress[index].from[index].podSelector.matchExpressions[index]
-<sup><sup>[↩ Parent](#tenantspecnetworkpoliciesitemsindexingressindexfromindexpodselector)</sup></sup>
 
 
 
@@ -3012,7 +2939,6 @@ A label selector requirement is a selector that contains values, a key, and an o
 
 
 ### Tenant.spec.networkPolicies.items[index].ingress[index].ports[index]
-<sup><sup>[↩ Parent](#tenantspecnetworkpoliciesitemsindexingressindex)</sup></sup>
 
 
 
@@ -3057,7 +2983,6 @@ NetworkPolicyPort describes a port to allow traffic on
 
 
 ### Tenant.spec.priorityClasses
-<sup><sup>[↩ Parent](#tenantspec-1)</sup></sup>
 
 
 
@@ -3091,7 +3016,6 @@ Specifies the allowed priorityClasses assigned to the Tenant. Capsule assures th
 
 
 ### Tenant.spec.resourceQuotas
-<sup><sup>[↩ Parent](#tenantspec-1)</sup></sup>
 
 
 
@@ -3128,7 +3052,6 @@ Specifies a list of ResourceQuota resources assigned to the Tenant. The assigned
 
 
 ### Tenant.spec.resourceQuotas.items[index]
-<sup><sup>[↩ Parent](#tenantspecresourcequotas)</sup></sup>
 
 
 
@@ -3169,7 +3092,6 @@ ResourceQuotaSpec defines the desired hard limits to enforce for Quota.
 
 
 ### Tenant.spec.resourceQuotas.items[index].scopeSelector
-<sup><sup>[↩ Parent](#tenantspecresourcequotasitemsindex)</sup></sup>
 
 
 
@@ -3196,7 +3118,6 @@ scopeSelector is also a collection of filters like scopes that must match each o
 
 
 ### Tenant.spec.resourceQuotas.items[index].scopeSelector.matchExpressions[index]
-<sup><sup>[↩ Parent](#tenantspecresourcequotasitemsindexscopeselector)</sup></sup>
 
 
 
@@ -3237,7 +3158,6 @@ A scoped-resource selector requirement is a selector that contains values, a sco
 
 
 ### Tenant.spec.serviceOptions
-<sup><sup>[↩ Parent](#tenantspec-1)</sup></sup>
 
 
 
@@ -3278,7 +3198,6 @@ Specifies options for the Service, such as additional metadata or block of certa
 
 
 ### Tenant.spec.serviceOptions.additionalMetadata
-<sup><sup>[↩ Parent](#tenantspecserviceoptions)</sup></sup>
 
 
 
@@ -3312,7 +3231,6 @@ Specifies additional labels and annotations the Capsule operator places on any S
 
 
 ### Tenant.spec.serviceOptions.allowedServices
-<sup><sup>[↩ Parent](#tenantspecserviceoptions)</sup></sup>
 
 
 
@@ -3359,7 +3277,6 @@ Block or deny certain type of Services. Optional.
 
 
 ### Tenant.spec.serviceOptions.externalIPs
-<sup><sup>[↩ Parent](#tenantspecserviceoptions)</sup></sup>
 
 
 
@@ -3386,7 +3303,6 @@ Specifies the external IPs that can be used in Services with type ClusterIP. An 
 
 
 ### Tenant.spec.storageClasses
-<sup><sup>[↩ Parent](#tenantspec-1)</sup></sup>
 
 
 
@@ -3420,7 +3336,6 @@ Specifies the allowed StorageClasses assigned to the Tenant. Capsule assures tha
 
 
 ### Tenant.status
-<sup><sup>[↩ Parent](#tenant-1)</sup></sup>
 
 
 

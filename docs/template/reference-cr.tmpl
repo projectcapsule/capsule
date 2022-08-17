@@ -35,13 +35,11 @@ Resource Types:
 {{range .Kinds}}
 {{$kind := .}}
 ## {{.Name}}
-<sup><sup>[↩ Parent](#{{ anchorize (printf "%s/%s" $group.Group $group.Version) }} )</sup></sup>
 
 {{range .Types}}
 
 {{if not .IsTopLevel}}
 ### {{.Name}}
-{{if .ParentKey}}<sup><sup>[↩ Parent](#{{.ParentKey}})</sup></sup>{{end}}
 {{end}}
 
 
