@@ -38,6 +38,10 @@ module.exports = function (api) {
               path: '/docs/general/references'
             },
             {
+              label: 'CRDs APIs',
+              path: '/docs/general/tenant-crd'
+            },
+            {
               label: 'Multi-Tenant Benchmark',
               path: '/docs/general/mtb'
             },
