@@ -9,10 +9,7 @@ assignees: ''
 
 <!--
 Thanks for taking time reporting a Capsule bug!
-
-We do our best to keep it reliable and working, so don't hesitate adding
-as many information as you can and keep in mind you can reach us on our
-Clastix Slack workspace: https://clastix.slack.com, #capsule channel.   
+  
 -->
 
 # Bug description

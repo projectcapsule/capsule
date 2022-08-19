@@ -14,8 +14,6 @@ We're trying to build a community drive Open Source project, so don't
 hesitate proposing your enhancement ideas: keep in mind, since we would like
 to keep it as agnostic as possible, to motivate all your assumptions.
 
-If you need to reach the maintainers, please join the Clastix Slack workspace:
-https://clastix.slack.com, #capsule channel.   
 -->
 
 # Describe the feature
