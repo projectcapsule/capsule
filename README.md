@@ -72,12 +72,20 @@ Capsule is Open Source with Apache 2 license and any contribution is welcome.
 
 ## Chart Development
 
-The documentation for each chart is done with [helm-docs](https://github.com/norwoodj/helm-docs). This way we can ensure that values are consistent with the chart documentation.
+### Chart Linting
 
-We have a script on the repository which will execute the helm-docs docker container, so that you don't have to worry about downloading the binary etc. Simply execute the script (Bash compatible):
+The chart is linted with [ct](https://github.com/helm/chart-testing). You can run the linter locally with this command:
 
 ```
-bash scripts/helm-docs.sh
+make helm-lint
+```
+
+### Chart Documentation
+
+The documentation for each chart is done with [helm-docs](https://github.com/norwoodj/helm-docs). This way we can ensure that values are consistent with the chart documentation. Run this anytime you make changes to a `values.yaml` file:
+
+```
+make helm-docs
 ```
 
 ## Community
