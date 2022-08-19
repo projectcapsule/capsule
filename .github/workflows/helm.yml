@@ -31,6 +31,17 @@ jobs:
           fi
       - name: Run chart-testing (lint)
         run: ct lint --debug --config ./.github/configs/ct.yaml --lint-conf ./.github/configs/lintconf.yaml
+      - name: Run docs-testing (helm-docs)
+        id: helm-docs
+        run: |
+          make helm-docs
+          if [[ $(git diff --stat) != '' ]]; then
+            echo -e '\033[0;31mDocumentation outdated! (Run make helm-docs locally and commit)\033[0m ❌'
+            git diff --color
+            exit 1
+          else
+            echo -e '\033[0;32mDocumentation up to date\033[0m ✔'
+          fi
       # Create KIND Cluster
       - name: Create kind cluster
         uses: helm/kind-action@v1.2.0
