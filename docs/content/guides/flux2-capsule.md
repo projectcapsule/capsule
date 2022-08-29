@@ -279,35 +279,6 @@ this is the required set of resources to setup a Tenant:
     userGroups:
     - system:serviceaccounts:my-tenant
   ```
-- Additional `ClusterRole` with related `ClusterRoleBinding` that allows to `PATCH` requests on Namespaces, besides `CREATE`. Flux kustomize controller will `kubectl-apply` resources:
-
-  ```yaml
-  apiVersion: rbac.authorization.k8s.io/v1
-  kind: ClusterRole
-  metadata:
-    name: capsule-namespace-provisioner-gitops
-  rules:
-  - apiGroups:
-    - ""
-    resources:
-    - namespaces
-    verbs:
-    - patch
-  ---
-  apiVersion: rbac.authorization.k8s.io/v1
-  kind: ClusterRoleBinding
-  metadata:
-    name: capsule-namespace-provisioner-gitops-my-tenant
-  roleRef:
-    apiGroup: rbac.authorization.k8s.io
-    kind: ClusterRole
-    name: capsule-namespace-provisioner-gitops
-  subjects:
-  - apiGroup: rbac.authorization.k8s.io
-    kind: Group
-    name: system:serviceaccounts:my-tenant
-  ```
-
 - Additional `ClusterRole` with related `ClusterRoleBinding` that allows the Tenant GitOps Reconciler to impersonate his own `User` (e.g. `system:serviceaccount:my-tenant:gitops-reconciler`):
   ```yaml
   apiVersion: rbac.authorization.k8s.io/v1
