@@ -26,6 +26,7 @@ import (
 
 	capsulev1alpha1 "github.com/clastix/capsule/api/v1alpha1"
 	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
+	capsulev1beta2 "github.com/clastix/capsule/api/v1beta2"
 	configcontroller "github.com/clastix/capsule/controllers/config"
 	rbaccontroller "github.com/clastix/capsule/controllers/rbac"
 	servicelabelscontroller "github.com/clastix/capsule/controllers/servicelabels"
@@ -57,6 +58,7 @@ func init() {
 
 	utilruntime.Must(capsulev1alpha1.AddToScheme(scheme))
 	utilruntime.Must(capsulev1beta1.AddToScheme(scheme))
+	utilruntime.Must(capsulev1beta2.AddToScheme(scheme))
 	utilruntime.Must(apiextensionsv1.AddToScheme(scheme))
 }
 
