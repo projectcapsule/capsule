@@ -12,3 +12,4 @@ configurations:
 
 patchesStrategicMerge:
 - patches/webhook_in_tenants.yaml
+- patches/webhook_in_capsuleconfiguration.yaml
