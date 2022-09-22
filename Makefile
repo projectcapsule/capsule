@@ -213,10 +213,14 @@ bundle-build:
 goimports:
 	goimports -w -l -local "github.com/clastix/capsule" .
 
+GOLANGCI_LINT = $(shell pwd)/bin/golangci-lint
+golangci-lint: ## Download golangci-lint locally if necessary.
+	$(call go-install-tool,$(GOLANGCI_LINT),github.com/golangci/golangci-lint/cmd/golangci-lint@v1.45.2)
+
 # Linting code as PR is expecting
 .PHONY: golint
-golint:
-	golangci-lint run -c .golangci.yml
+golint: golangci-lint
+	$(GOLANGCI_LINT) run -c .golangci.yml
 
 # Running e2e tests in a KinD instance
 .PHONY: e2e

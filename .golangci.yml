@@ -40,7 +40,7 @@ issues:
     - Using the variable on range scope .* in function literal
 
 service:
-  golangci-lint-version: 1.33.x
+  golangci-lint-version: 1.45.2
 
 run:
   skip-files:
