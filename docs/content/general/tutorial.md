@@ -139,15 +139,15 @@ metadata:
   name: oil
 spec:
   owners:
-  - name: system:serviceaccount:default:robot
+  - name: system:serviceaccount:tenant-system:robot
     kind: ServiceAccount
 EOF
 ```
 
-Bill can create a Service Account called `robot`, for example, in the `default` namespace and leave it to act as Tenant Owner of the `oil` tenant
+Bill can create a Service Account called `robot`, for example, in the `tenant-system` namespace and leave it to act as Tenant Owner of the `oil` tenant
 
 ```
-kubectl --as system:serviceaccount:default:robot --as-group capsule.clastix.io auth can-i create namespaces
+kubectl --as system:serviceaccount:tenant-system:robot --as-group capsule.clastix.io auth can-i create namespaces
 yes
 ```
 
@@ -160,13 +160,30 @@ metadata:
   name: default
 spec:
   userGroups:
-  - system:serviceaccounts:default
+  - system:serviceaccounts:tenant-system
 ```
 
 since each service account in a namespace is a member of following group:
 
 ```
 system:serviceaccounts:{service-account-namespace}
+```
+
+You can change the CapsuleConfiguration at install time with a helm parameter:
+```
+helm upgrade -i  \
+  capsule \
+  clastix/capsule \
+  -n capsule-system \
+  --set manager.options.capsuleUserGroups=system:serviceaccounts:tenant-system \
+  --create-namespace
+```
+
+Or after installation:
+```
+kubectl patch capsuleconfigurations default \
+  --patch '{"spec":{"userGroups":["capsule.clastix.io","system:serviceaccounts:tenant-system"]}}' \
+  --type=merge
 ```
 
 > Please, pay attention when setting a service account acting as tenant owner. Make sure you're not using the group `system:serviceaccounts` or the group `system:serviceaccounts:{capsule-namespace}` as Capsule group, otherwise you'll create a short-circuit in the Capsule controller, being Capsule itself controlled by a serviceaccount. 
