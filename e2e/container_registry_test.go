@@ -15,6 +15,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
+	"github.com/clastix/capsule/pkg/api"
 )
 
 var _ = Describe("enforcing a Container Registry", func() {
@@ -29,7 +30,7 @@ var _ = Describe("enforcing a Container Registry", func() {
 					Kind: "User",
 				},
 			},
-			ContainerRegistries: &capsulev1beta1.AllowedListSpec{
+			ContainerRegistries: &api.AllowedListSpec{
 				Exact: []string{"docker.io", "myregistry.azurecr.io"},
 				Regex: `quay\.\w+`,
 			},

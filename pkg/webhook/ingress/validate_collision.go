@@ -19,6 +19,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
+	"github.com/clastix/capsule/pkg/api"
 	"github.com/clastix/capsule/pkg/configuration"
 	"github.com/clastix/capsule/pkg/indexer/ingress"
 	capsulewebhook "github.com/clastix/capsule/pkg/webhook"
@@ -48,7 +49,7 @@ func (r *collision) OnCreate(client client.Client, decoder *admission.Decoder, r
 			return utils.ErroredResponse(err)
 		}
 
-		if tenant == nil || tenant.Spec.IngressOptions.HostnameCollisionScope == capsulev1beta1.HostnameCollisionScopeDisabled {
+		if tenant == nil || tenant.Spec.IngressOptions.HostnameCollisionScope == api.HostnameCollisionScopeDisabled {
 			return nil
 		}
 
@@ -83,7 +84,7 @@ func (r *collision) OnUpdate(client client.Client, decoder *admission.Decoder, r
 			return utils.ErroredResponse(err)
 		}
 
-		if tenant == nil || tenant.Spec.IngressOptions.HostnameCollisionScope == capsulev1beta1.HostnameCollisionScopeDisabled {
+		if tenant == nil || tenant.Spec.IngressOptions.HostnameCollisionScope == api.HostnameCollisionScopeDisabled {
 			return nil
 		}
 
@@ -110,7 +111,7 @@ func (r *collision) OnDelete(client.Client, *admission.Decoder, record.EventReco
 }
 
 // nolint:gocognit,gocyclo,cyclop
-func (r *collision) validateCollision(ctx context.Context, clt client.Client, ing Ingress, scope capsulev1beta1.HostnameCollisionScope) error {
+func (r *collision) validateCollision(ctx context.Context, clt client.Client, ing Ingress, scope api.HostnameCollisionScope) error {
 	for hostname, paths := range ing.HostnamePathsPairs() {
 		for path := range paths {
 			var ingressObjList client.ObjectList
@@ -127,7 +128,7 @@ func (r *collision) validateCollision(ctx context.Context, clt client.Client, in
 			namespaces := sets.NewString()
 			// nolint:exhaustive
 			switch scope {
-			case capsulev1beta1.HostnameCollisionScopeCluster:
+			case api.HostnameCollisionScopeCluster:
 				tenantList := &capsulev1beta1.TenantList{}
 				if err := clt.List(ctx, tenantList); err != nil {
 					return err
@@ -136,7 +137,7 @@ func (r *collision) validateCollision(ctx context.Context, clt client.Client, in
 				for _, tenant := range tenantList.Items {
 					namespaces.Insert(tenant.Status.Namespaces...)
 				}
-			case capsulev1beta1.HostnameCollisionScopeTenant:
+			case api.HostnameCollisionScopeTenant:
 				selector := client.MatchingFieldsSelector{Selector: fields.OneTermEqualSelector(".status.namespaces", ing.Namespace())}
 
 				tenantList := &capsulev1beta1.TenantList{}
@@ -147,7 +148,7 @@ func (r *collision) validateCollision(ctx context.Context, clt client.Client, in
 				for _, tenant := range tenantList.Items {
 					namespaces.Insert(tenant.Status.Namespaces...)
 				}
-			case capsulev1beta1.HostnameCollisionScopeNamespace:
+			case api.HostnameCollisionScopeNamespace:
 				namespaces.Insert(ing.Namespace())
 			}
 

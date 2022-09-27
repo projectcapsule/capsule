@@ -3,7 +3,7 @@
 
 package v1alpha1
 
-type AdditionalMetadataSpec struct {
-	AdditionalLabels      map[string]string `json:"additionalLabels,omitempty"`
-	AdditionalAnnotations map[string]string `json:"additionalAnnotations,omitempty"`
+type AdditionalMetadata struct {
+	Labels      map[string]string `json:"additionalLabels,omitempty"`
+	Annotations map[string]string `json:"additionalAnnotations,omitempty"`
 }

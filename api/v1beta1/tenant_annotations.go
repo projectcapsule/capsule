@@ -9,12 +9,6 @@ import (
 )
 
 const (
-	AvailableIngressClassesAnnotation             = "capsule.clastix.io/ingress-classes"
-	AvailableIngressClassesRegexpAnnotation       = "capsule.clastix.io/ingress-classes-regexp"
-	AvailableStorageClassesAnnotation             = "capsule.clastix.io/storage-classes"
-	AvailableStorageClassesRegexpAnnotation       = "capsule.clastix.io/storage-classes-regexp"
-	AllowedRegistriesAnnotation                   = "capsule.clastix.io/allowed-registries"
-	AllowedRegistriesRegexpAnnotation             = "capsule.clastix.io/allowed-registries-regexp"
 	ForbiddenNamespaceLabelsAnnotation            = "capsule.clastix.io/forbidden-namespace-labels"
 	ForbiddenNamespaceLabelsRegexpAnnotation      = "capsule.clastix.io/forbidden-namespace-labels-regexp"
 	ForbiddenNamespaceAnnotationsAnnotation       = "capsule.clastix.io/forbidden-namespace-annotations"

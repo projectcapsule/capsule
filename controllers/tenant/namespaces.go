@@ -51,7 +51,7 @@ func (r *Manager) syncNamespaceMetadata(ctx context.Context, namespace string, t
 			return
 		}
 
-		capsuleLabel, _ := capsulev1beta1.GetTypeLabel(&capsulev1beta1.Tenant{})
+		capsuleLabel, _ := utils.GetTypeLabel(&capsulev1beta1.Tenant{})
 
 		res, conflictErr = controllerutil.CreateOrUpdate(ctx, r.Client, ns, func() error {
 			annotations := make(map[string]string)
@@ -78,28 +78,28 @@ func (r *Manager) syncNamespaceMetadata(ctx context.Context, namespace string, t
 
 			if tnt.Spec.IngressOptions.AllowedClasses != nil {
 				if len(tnt.Spec.IngressOptions.AllowedClasses.Exact) > 0 {
-					annotations[capsulev1beta1.AvailableIngressClassesAnnotation] = strings.Join(tnt.Spec.IngressOptions.AllowedClasses.Exact, ",")
+					annotations[AvailableIngressClassesAnnotation] = strings.Join(tnt.Spec.IngressOptions.AllowedClasses.Exact, ",")
 				}
 				if len(tnt.Spec.IngressOptions.AllowedClasses.Regex) > 0 {
-					annotations[capsulev1beta1.AvailableIngressClassesRegexpAnnotation] = tnt.Spec.IngressOptions.AllowedClasses.Regex
+					annotations[AvailableIngressClassesRegexpAnnotation] = tnt.Spec.IngressOptions.AllowedClasses.Regex
 				}
 			}
 
 			if tnt.Spec.StorageClasses != nil {
 				if len(tnt.Spec.StorageClasses.Exact) > 0 {
-					annotations[capsulev1beta1.AvailableStorageClassesAnnotation] = strings.Join(tnt.Spec.StorageClasses.Exact, ",")
+					annotations[AvailableStorageClassesAnnotation] = strings.Join(tnt.Spec.StorageClasses.Exact, ",")
 				}
 				if len(tnt.Spec.StorageClasses.Regex) > 0 {
-					annotations[capsulev1beta1.AvailableStorageClassesRegexpAnnotation] = tnt.Spec.StorageClasses.Regex
+					annotations[AvailableStorageClassesRegexpAnnotation] = tnt.Spec.StorageClasses.Regex
 				}
 			}
 
 			if tnt.Spec.ContainerRegistries != nil {
 				if len(tnt.Spec.ContainerRegistries.Exact) > 0 {
-					annotations[capsulev1beta1.AllowedRegistriesAnnotation] = strings.Join(tnt.Spec.ContainerRegistries.Exact, ",")
+					annotations[AllowedRegistriesAnnotation] = strings.Join(tnt.Spec.ContainerRegistries.Exact, ",")
 				}
 				if len(tnt.Spec.ContainerRegistries.Regex) > 0 {
-					annotations[capsulev1beta1.AllowedRegistriesRegexpAnnotation] = tnt.Spec.ContainerRegistries.Regex
+					annotations[AllowedRegistriesRegexpAnnotation] = tnt.Spec.ContainerRegistries.Regex
 				}
 			}
 

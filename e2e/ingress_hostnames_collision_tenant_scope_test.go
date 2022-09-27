@@ -19,6 +19,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
+	"github.com/clastix/capsule/pkg/api"
 )
 
 var _ = Describe("when handling Tenant scoped Ingress hostnames collision", func() {
@@ -34,7 +35,7 @@ var _ = Describe("when handling Tenant scoped Ingress hostnames collision", func
 				},
 			},
 			IngressOptions: capsulev1beta1.IngressOptions{
-				HostnameCollisionScope: capsulev1beta1.HostnameCollisionScopeTenant,
+				HostnameCollisionScope: api.HostnameCollisionScopeTenant,
 			},
 		},
 	}

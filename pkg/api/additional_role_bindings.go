@@ -1,9 +1,11 @@
 // Copyright 2020-2021 Clastix Labs
 // SPDX-License-Identifier: Apache-2.0
 
-package v1alpha1
+package api
 
 import rbacv1 "k8s.io/api/rbac/v1"
+
+// +kubebuilder:object:generate=true
 
 type AdditionalRoleBindingsSpec struct {
 	ClusterRoleName string `json:"clusterRoleName"`

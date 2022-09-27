@@ -30,10 +30,21 @@ func (in *CapsuleConfiguration) ConvertTo(raw conversion.Hub) error {
 	}
 
 	if in.Spec.NodeMetadata != nil {
-		annotations[capsulev1alpha1.ForbiddenNodeLabelsAnnotation] = strings.Join(in.Spec.NodeMetadata.ForbiddenLabels.Exact, ",")
-		annotations[capsulev1alpha1.ForbiddenNodeLabelsRegexpAnnotation] = in.Spec.NodeMetadata.ForbiddenLabels.Regex
-		annotations[capsulev1alpha1.ForbiddenNodeAnnotationsAnnotation] = strings.Join(in.Spec.NodeMetadata.ForbiddenAnnotations.Exact, ",")
-		annotations[capsulev1alpha1.ForbiddenNodeAnnotationsRegexpAnnotation] = in.Spec.NodeMetadata.ForbiddenAnnotations.Regex
+		if len(in.Spec.NodeMetadata.ForbiddenLabels.Exact) > 0 {
+			annotations[capsulev1alpha1.ForbiddenNodeLabelsAnnotation] = strings.Join(in.Spec.NodeMetadata.ForbiddenLabels.Exact, ",")
+		}
+
+		if len(in.Spec.NodeMetadata.ForbiddenLabels.Regex) > 0 {
+			annotations[capsulev1alpha1.ForbiddenNodeLabelsRegexpAnnotation] = in.Spec.NodeMetadata.ForbiddenLabels.Regex
+		}
+
+		if len(in.Spec.NodeMetadata.ForbiddenAnnotations.Exact) > 0 {
+			annotations[capsulev1alpha1.ForbiddenNodeAnnotationsAnnotation] = strings.Join(in.Spec.NodeMetadata.ForbiddenAnnotations.Exact, ",")
+		}
+
+		if len(in.Spec.NodeMetadata.ForbiddenAnnotations.Regex) > 0 {
+			annotations[capsulev1alpha1.ForbiddenNodeAnnotationsRegexpAnnotation] = in.Spec.NodeMetadata.ForbiddenAnnotations.Regex
+		}
 	}
 
 	annotations[capsulev1alpha1.EnableTLSConfigurationAnnotationName] = fmt.Sprintf("%t", in.Spec.EnableTLSReconciler)

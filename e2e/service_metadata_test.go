@@ -24,6 +24,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
+	"github.com/clastix/capsule/pkg/api"
 )
 
 var _ = Describe("adding metadata to Service objects", func() {
@@ -38,8 +39,8 @@ var _ = Describe("adding metadata to Service objects", func() {
 					Kind: "User",
 				},
 			},
-			ServiceOptions: &capsulev1beta1.ServiceOptions{
-				AdditionalMetadata: &capsulev1beta1.AdditionalMetadataSpec{
+			ServiceOptions: &api.ServiceOptions{
+				AdditionalMetadata: &api.AdditionalMetadataSpec{
 					Labels: map[string]string{
 						"k8s.io/custom-label":     "foo",
 						"clastix.io/custom-label": "bar",
