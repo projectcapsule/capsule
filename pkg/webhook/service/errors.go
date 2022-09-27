@@ -7,14 +7,14 @@ import (
 	"fmt"
 	"strings"
 
-	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
+	"github.com/clastix/capsule/pkg/api"
 )
 
 type externalServiceIPForbiddenError struct {
 	cidr []string
 }
 
-func NewExternalServiceIPForbidden(allowedIps []capsulev1beta1.AllowedIP) error {
+func NewExternalServiceIPForbidden(allowedIps []api.AllowedIP) error {
 	cidr := make([]string, 0, len(allowedIps))
 
 	for _, i := range allowedIps {

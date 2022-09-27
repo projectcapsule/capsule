@@ -21,6 +21,7 @@ import (
 
 	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
 	"github.com/clastix/capsule/pkg/configuration"
+	utils2 "github.com/clastix/capsule/pkg/utils"
 	capsulewebhook "github.com/clastix/capsule/pkg/webhook"
 	"github.com/clastix/capsule/pkg/webhook/utils"
 )
@@ -61,7 +62,7 @@ func (h *handler) setOwnerRef(ctx context.Context, req admission.Request, client
 		return &response
 	}
 
-	ln, err := capsulev1beta1.GetTypeLabel(&capsulev1beta1.Tenant{})
+	ln, err := utils2.GetTypeLabel(&capsulev1beta1.Tenant{})
 	if err != nil {
 		response := admission.Errored(http.StatusBadRequest, err)
 

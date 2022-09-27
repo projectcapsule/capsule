@@ -7,8 +7,8 @@ const (
 	DenyWildcard = "capsule.clastix.io/deny-wildcard"
 )
 
-func (t *Tenant) IsWildcardDenied() bool {
-	if v, ok := t.Annotations[DenyWildcard]; ok && v == "true" {
+func (in *Tenant) IsWildcardDenied() bool {
+	if v, ok := in.Annotations[DenyWildcard]; ok && v == "true" {
 		return true
 	}
 

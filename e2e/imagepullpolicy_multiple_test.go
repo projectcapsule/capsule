@@ -14,6 +14,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
+	"github.com/clastix/capsule/pkg/api"
 )
 
 var _ = Describe("enforcing some defined ImagePullPolicy", func() {
@@ -28,7 +29,7 @@ var _ = Describe("enforcing some defined ImagePullPolicy", func() {
 					Kind: "User",
 				},
 			},
-			ImagePullPolicies: []capsulev1beta1.ImagePullPolicySpec{"Always", "IfNotPresent"},
+			ImagePullPolicies: []api.ImagePullPolicySpec{"Always", "IfNotPresent"},
 		},
 	}
 

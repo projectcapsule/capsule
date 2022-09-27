@@ -8,6 +8,7 @@ package e2e
 import (
 	"context"
 	"fmt"
+	"github.com/clastix/capsule/pkg/api"
 	"strings"
 
 	. "github.com/onsi/ginkgo"
@@ -33,7 +34,7 @@ var _ = Describe("creating namespaces within a Tenant with resources", func() {
 					Kind: "User",
 				},
 			},
-			LimitRanges: capsulev1beta1.LimitRangesSpec{Items: []corev1.LimitRangeSpec{
+			LimitRanges: api.LimitRangesSpec{Items: []corev1.LimitRangeSpec{
 				{
 					Limits: []corev1.LimitRangeItem{
 						{
@@ -79,7 +80,7 @@ var _ = Describe("creating namespaces within a Tenant with resources", func() {
 				},
 			},
 			},
-			NetworkPolicies: capsulev1beta1.NetworkPolicySpec{Items: []networkingv1.NetworkPolicySpec{
+			NetworkPolicies: api.NetworkPolicySpec{Items: []networkingv1.NetworkPolicySpec{
 				{
 					Ingress: []networkingv1.NetworkPolicyIngressRule{
 						{
@@ -127,7 +128,7 @@ var _ = Describe("creating namespaces within a Tenant with resources", func() {
 			NodeSelector: map[string]string{
 				"kubernetes.io/os": "linux",
 			},
-			ResourceQuota: capsulev1beta1.ResourceQuotaSpec{Items: []corev1.ResourceQuotaSpec{
+			ResourceQuota: api.ResourceQuotaSpec{Items: []corev1.ResourceQuotaSpec{
 				{
 					Hard: map[corev1.ResourceName]resource.Quantity{
 						corev1.ResourceLimitsCPU:      resource.MustParse("8"),

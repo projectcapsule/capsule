@@ -19,7 +19,7 @@ const (
 // 2. the overall length of the annotation key that is exceeding 63 characters
 // For emails, the symbol @ can be replaced with the placeholder __AT__.
 // For the latter one, the index of the owner can be used to force the retrieval.
-func (in OwnerSpec) GetRoles(tenant Tenant, index int) []string {
+func (in *OwnerSpec) GetRoles(tenant Tenant, index int) []string {
 	for key, value := range tenant.GetAnnotations() {
 		if !strings.HasPrefix(key, fmt.Sprintf("%s/", ClusterRoleNamesAnnotation)) {
 			continue
@@ -41,7 +41,7 @@ func (in OwnerSpec) GetRoles(tenant Tenant, index int) []string {
 	return []string{"admin", "capsule-namespace-deleter"}
 }
 
-func (in OwnerSpec) convertMap() map[string]string {
+func (in *OwnerSpec) convertMap() map[string]string {
 	return map[string]string{
 		"__AT__": "@",
 	}

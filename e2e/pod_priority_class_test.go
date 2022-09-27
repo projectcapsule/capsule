@@ -15,6 +15,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
+	"github.com/clastix/capsule/pkg/api"
 )
 
 var _ = Describe("enforcing a Priority Class", func() {
@@ -29,7 +30,7 @@ var _ = Describe("enforcing a Priority Class", func() {
 					Kind: "User",
 				},
 			},
-			PriorityClasses: &capsulev1beta1.AllowedListSpec{
+			PriorityClasses: &api.AllowedListSpec{
 				Exact: []string{"gold"},
 				Regex: "pc\\-\\w+",
 			},

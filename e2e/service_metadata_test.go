@@ -10,7 +10,6 @@ import (
 	"errors"
 	"fmt"
 
-	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
@@ -21,6 +20,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/pointer"
+
+	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
+	"github.com/clastix/capsule/pkg/api"
 )
 
 var _ = Describe("adding metadata to Service objects", func() {
@@ -36,7 +38,7 @@ var _ = Describe("adding metadata to Service objects", func() {
 				},
 			},
 			ServiceOptions: &capsulev1beta1.ServiceOptions{
-				AdditionalMetadata: &capsulev1beta1.AdditionalMetadataSpec{
+				AdditionalMetadata: &api.AdditionalMetadataSpec{
 					Labels: map[string]string{
 						"k8s.io/custom-label":     "foo",
 						"clastix.io/custom-label": "bar",

@@ -19,6 +19,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
+	"github.com/clastix/capsule/pkg/api"
 )
 
 var _ = Describe("when handling Cluster scoped Ingress hostnames collision", func() {
@@ -34,7 +35,7 @@ var _ = Describe("when handling Cluster scoped Ingress hostnames collision", fun
 				},
 			},
 			IngressOptions: capsulev1beta1.IngressOptions{
-				HostnameCollisionScope: capsulev1beta1.HostnameCollisionScopeCluster,
+				HostnameCollisionScope: api.HostnameCollisionScopeCluster,
 			},
 		},
 	}
@@ -50,7 +51,7 @@ var _ = Describe("when handling Cluster scoped Ingress hostnames collision", fun
 				},
 			},
 			IngressOptions: capsulev1beta1.IngressOptions{
-				HostnameCollisionScope: capsulev1beta1.HostnameCollisionScopeCluster,
+				HostnameCollisionScope: api.HostnameCollisionScopeCluster,
 			},
 		},
 	}

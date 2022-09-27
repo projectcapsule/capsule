@@ -21,6 +21,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
+	"github.com/clastix/capsule/pkg/utils"
 )
 
 type abstractServiceLabelsReconciler struct {
@@ -77,7 +78,7 @@ func (r *abstractServiceLabelsReconciler) getTenant(ctx context.Context, namespa
 		return nil, err
 	}
 
-	capsuleLabel, _ := capsulev1beta1.GetTypeLabel(&capsulev1beta1.Tenant{})
+	capsuleLabel, _ := utils.GetTypeLabel(&capsulev1beta1.Tenant{})
 	if _, ok := ns.GetLabels()[capsuleLabel]; !ok {
 		return nil, NewNonTenantObject(namespacedName.Name)
 	}

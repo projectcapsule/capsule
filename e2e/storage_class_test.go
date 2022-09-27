@@ -16,6 +16,7 @@ import (
 	"k8s.io/utils/pointer"
 
 	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
+	"github.com/clastix/capsule/pkg/api"
 )
 
 var _ = Describe("when Tenant handles Storage classes", func() {
@@ -30,7 +31,7 @@ var _ = Describe("when Tenant handles Storage classes", func() {
 					Kind: "User",
 				},
 			},
-			StorageClasses: &capsulev1beta1.AllowedListSpec{
+			StorageClasses: &api.AllowedListSpec{
 				Exact: []string{
 					"cephfs",
 					"glusterfs",
