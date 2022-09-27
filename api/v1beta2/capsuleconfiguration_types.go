@@ -5,6 +5,8 @@ package v1beta2
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/clastix/capsule/pkg/api"
 )
 
 // CapsuleConfigurationSpec defines the Capsule configuration.
@@ -32,9 +34,9 @@ type CapsuleConfigurationSpec struct {
 
 type NodeMetadata struct {
 	// Define the labels that a Tenant Owner cannot set for their nodes.
-	ForbiddenLabels ForbiddenListSpec `json:"forbiddenLabels"`
+	ForbiddenLabels api.ForbiddenListSpec `json:"forbiddenLabels"`
 	// Define the annotations that a Tenant Owner cannot set for their nodes.
-	ForbiddenAnnotations ForbiddenListSpec `json:"forbiddenAnnotations"`
+	ForbiddenAnnotations api.ForbiddenListSpec `json:"forbiddenAnnotations"`
 }
 
 type CapsuleResources struct {

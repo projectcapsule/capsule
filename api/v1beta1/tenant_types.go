@@ -5,6 +5,8 @@ package v1beta1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/clastix/capsule/pkg/api"
 )
 
 // TenantSpec defines the desired state of Tenant.
@@ -16,11 +18,11 @@ type TenantSpec struct {
 	// Specifies options for the Service, such as additional metadata or block of certain type of Services. Optional.
 	ServiceOptions *ServiceOptions `json:"serviceOptions,omitempty"`
 	// Specifies the allowed StorageClasses assigned to the Tenant. Capsule assures that all PersistentVolumeClaim resources created in the Tenant can use only one of the allowed StorageClasses. Optional.
-	StorageClasses *AllowedListSpec `json:"storageClasses,omitempty"`
+	StorageClasses *api.AllowedListSpec `json:"storageClasses,omitempty"`
 	// Specifies options for the Ingress resources, such as allowed hostnames and IngressClass. Optional.
 	IngressOptions IngressOptions `json:"ingressOptions,omitempty"`
 	// Specifies the trusted Image Registries assigned to the Tenant. Capsule assures that all Pods resources created in the Tenant can use only one of the allowed trusted registries. Optional.
-	ContainerRegistries *AllowedListSpec `json:"containerRegistries,omitempty"`
+	ContainerRegistries *api.AllowedListSpec `json:"containerRegistries,omitempty"`
 	// Specifies the label to control the placement of pods on a given pool of worker nodes. All namespaces created within the Tenant will have the node selector annotation. This annotation tells the Kubernetes scheduler to place pods on the nodes having the selector label. Optional.
 	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
 	// Specifies the NetworkPolicies assigned to the Tenant. The assigned NetworkPolicies are inherited by any namespace created in the Tenant. Optional.
@@ -30,11 +32,11 @@ type TenantSpec struct {
 	// Specifies a list of ResourceQuota resources assigned to the Tenant. The assigned values are inherited by any namespace created in the Tenant. The Capsule operator aggregates ResourceQuota at Tenant level, so that the hard quota is never crossed for the given Tenant. This permits the Tenant owner to consume resources in the Tenant regardless of the namespace. Optional.
 	ResourceQuota ResourceQuotaSpec `json:"resourceQuotas,omitempty"`
 	// Specifies additional RoleBindings assigned to the Tenant. Capsule will ensure that all namespaces in the Tenant always contain the RoleBinding for the given ClusterRole. Optional.
-	AdditionalRoleBindings []AdditionalRoleBindingsSpec `json:"additionalRoleBindings,omitempty"`
+	AdditionalRoleBindings []api.AdditionalRoleBindingsSpec `json:"additionalRoleBindings,omitempty"`
 	// Specify the allowed values for the imagePullPolicies option in Pod resources. Capsule assures that all Pod resources created in the Tenant can use only one of the allowed policy. Optional.
-	ImagePullPolicies []ImagePullPolicySpec `json:"imagePullPolicies,omitempty"`
+	ImagePullPolicies []api.ImagePullPolicySpec `json:"imagePullPolicies,omitempty"`
 	// Specifies the allowed priorityClasses assigned to the Tenant. Capsule assures that all Pods resources created in the Tenant can use only one of the allowed PriorityClasses. Optional.
-	PriorityClasses *AllowedListSpec `json:"priorityClasses,omitempty"`
+	PriorityClasses *api.AllowedListSpec `json:"priorityClasses,omitempty"`
 }
 
 //+kubebuilder:object:root=true

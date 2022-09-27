@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"strings"
 
-	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
+	capsulev1beta1 "github.com/clastix/capsule/pkg/api"
 )
 
 // nolint:predeclared

@@ -12,6 +12,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/conversion"
 
 	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
+	"github.com/clastix/capsule/pkg/api"
 )
 
 //nolint:gocyclo
@@ -58,11 +59,8 @@ func (in *Tenant) ConvertFrom(raw conversion.Hub) error {
 
 		in.Spec.NamespaceOptions.Quota = src.Spec.NamespaceOptions.Quota
 
-		if nsOpts.AdditionalMetadata != nil {
-			in.Spec.NamespaceOptions.AdditionalMetadata = &AdditionalMetadataSpec{}
-
-			in.Spec.NamespaceOptions.AdditionalMetadata.Annotations = nsOpts.AdditionalMetadata.Annotations
-			in.Spec.NamespaceOptions.AdditionalMetadata.Labels = nsOpts.AdditionalMetadata.Labels
+		if metadata := nsOpts.AdditionalMetadata; metadata != nil {
+			in.Spec.NamespaceOptions.AdditionalMetadata = metadata
 		}
 
 		if value, found := annotations[capsulev1beta1.ForbiddenNamespaceLabelsAnnotation]; found {
@@ -91,45 +89,30 @@ func (in *Tenant) ConvertFrom(raw conversion.Hub) error {
 	}
 
 	if svcOpts := src.Spec.ServiceOptions; svcOpts != nil {
-		in.Spec.ServiceOptions = &ServiceOptions{}
+		in.Spec.ServiceOptions = &api.ServiceOptions{}
 
 		if metadata := svcOpts.AdditionalMetadata; metadata != nil {
-			in.Spec.ServiceOptions.AdditionalMetadata = &AdditionalMetadataSpec{
-				Labels:      metadata.Labels,
-				Annotations: metadata.Annotations,
-			}
+			in.Spec.ServiceOptions.AdditionalMetadata = metadata
 		}
 
-		if types := svcOpts.AllowedServices; types != nil {
-			in.Spec.ServiceOptions.AllowedServices = &AllowedServices{
-				NodePort:     types.NodePort,
-				ExternalName: types.ExternalName,
-				LoadBalancer: types.LoadBalancer,
-			}
+		if allowed := svcOpts.AllowedServices; allowed != nil {
+			in.Spec.ServiceOptions.AllowedServices = allowed
 		}
 
 		if externalIPs := svcOpts.ExternalServiceIPs; externalIPs != nil {
-			allowed := make([]AllowedIP, 0, len(externalIPs.Allowed))
-
-			for _, ip := range externalIPs.Allowed {
-				allowed = append(allowed, AllowedIP(ip))
-			}
-
-			in.Spec.ServiceOptions.ExternalServiceIPs = &ExternalServiceIPsSpec{
-				Allowed: allowed,
-			}
+			in.Spec.ServiceOptions.ExternalServiceIPs = externalIPs
 		}
 	}
 
 	if sc := src.Spec.StorageClasses; sc != nil {
-		in.Spec.StorageClasses = &AllowedListSpec{
+		in.Spec.StorageClasses = &api.AllowedListSpec{
 			Exact: sc.Exact,
 			Regex: sc.Regex,
 		}
 	}
 
 	if scope := src.Spec.IngressOptions.HostnameCollisionScope; len(scope) > 0 {
-		in.Spec.IngressOptions.HostnameCollisionScope = HostnameCollisionScope(scope)
+		in.Spec.IngressOptions.HostnameCollisionScope = scope
 	}
 
 	v, found := annotations[capsulev1beta1.DenyWildcard]
@@ -143,21 +126,21 @@ func (in *Tenant) ConvertFrom(raw conversion.Hub) error {
 	}
 
 	if ingressClass := src.Spec.IngressOptions.AllowedClasses; ingressClass != nil {
-		in.Spec.IngressOptions.AllowedClasses = &AllowedListSpec{
+		in.Spec.IngressOptions.AllowedClasses = &api.AllowedListSpec{
 			Exact: ingressClass.Exact,
 			Regex: ingressClass.Regex,
 		}
 	}
 
 	if hostnames := src.Spec.IngressOptions.AllowedHostnames; hostnames != nil {
-		in.Spec.IngressOptions.AllowedClasses = &AllowedListSpec{
+		in.Spec.IngressOptions.AllowedClasses = &api.AllowedListSpec{
 			Exact: hostnames.Exact,
 			Regex: hostnames.Regex,
 		}
 	}
 
 	if allowed := src.Spec.ContainerRegistries; allowed != nil {
-		in.Spec.ContainerRegistries = &AllowedListSpec{
+		in.Spec.ContainerRegistries = &api.AllowedListSpec{
 			Exact: allowed.Exact,
 			Regex: allowed.Regex,
 		}
@@ -189,13 +172,10 @@ func (in *Tenant) ConvertFrom(raw conversion.Hub) error {
 		})
 	}
 
-	in.Spec.ImagePullPolicies = make([]ImagePullPolicySpec, 0, len(src.Spec.ImagePullPolicies))
-	for _, policy := range src.Spec.ImagePullPolicies {
-		in.Spec.ImagePullPolicies = append(in.Spec.ImagePullPolicies, ImagePullPolicySpec(policy))
-	}
+	in.Spec.ImagePullPolicies = src.Spec.ImagePullPolicies
 
 	if allowed := src.Spec.PriorityClasses; allowed != nil {
-		in.Spec.PriorityClasses = &AllowedListSpec{
+		in.Spec.PriorityClasses = &api.AllowedListSpec{
 			Exact: allowed.Exact,
 			Regex: allowed.Regex,
 		}
@@ -274,10 +254,7 @@ func (in *Tenant) ConvertTo(raw conversion.Hub) error {
 		}
 
 		if metadata := nsOpts.AdditionalMetadata; metadata != nil {
-			dst.Spec.NamespaceOptions.AdditionalMetadata = &capsulev1beta1.AdditionalMetadataSpec{
-				Labels:      metadata.Labels,
-				Annotations: metadata.Annotations,
-			}
+			dst.Spec.NamespaceOptions.AdditionalMetadata = metadata
 		}
 
 		if exact := nsOpts.ForbiddenAnnotations.Exact; len(exact) > 0 {
@@ -301,63 +278,36 @@ func (in *Tenant) ConvertTo(raw conversion.Hub) error {
 		dst.Spec.ServiceOptions = &capsulev1beta1.ServiceOptions{}
 
 		if metadata := svcOpts.AdditionalMetadata; metadata != nil {
-			dst.Spec.ServiceOptions.AdditionalMetadata = &capsulev1beta1.AdditionalMetadataSpec{
-				Labels:      metadata.Labels,
-				Annotations: metadata.Annotations,
-			}
+			dst.Spec.ServiceOptions.AdditionalMetadata = metadata
 		}
 
 		if allowed := svcOpts.AllowedServices; allowed != nil {
-			dst.Spec.ServiceOptions.AllowedServices = &capsulev1beta1.AllowedServices{
-				NodePort:     allowed.NodePort,
-				ExternalName: allowed.ExternalName,
-				LoadBalancer: allowed.ExternalName,
-			}
+			dst.Spec.ServiceOptions.AllowedServices = allowed
 		}
 
 		if externalIPs := svcOpts.ExternalServiceIPs; externalIPs != nil {
-			allowed := make([]capsulev1beta1.AllowedIP, 0, len(externalIPs.Allowed))
-
-			for _, ip := range externalIPs.Allowed {
-				allowed = append(allowed, capsulev1beta1.AllowedIP(ip))
-			}
-
-			dst.Spec.ServiceOptions.ExternalServiceIPs = &capsulev1beta1.ExternalServiceIPsSpec{
-				Allowed: allowed,
-			}
+			dst.Spec.ServiceOptions.ExternalServiceIPs = svcOpts.ExternalServiceIPs
 		}
 	}
 
-	if storageClass := in.Spec.StorageClasses; storageClass != nil {
-		dst.Spec.StorageClasses = &capsulev1beta1.AllowedListSpec{
-			Exact: storageClass.Exact,
-			Regex: storageClass.Regex,
-		}
+	if allowed := in.Spec.StorageClasses; allowed != nil {
+		dst.Spec.StorageClasses = allowed
 	}
 
-	dst.Spec.IngressOptions.HostnameCollisionScope = capsulev1beta1.HostnameCollisionScope(in.Spec.IngressOptions.HostnameCollisionScope)
+	dst.Spec.IngressOptions.HostnameCollisionScope = in.Spec.IngressOptions.HostnameCollisionScope
 
 	if allowed := in.Spec.IngressOptions.AllowedClasses; allowed != nil {
-		dst.Spec.IngressOptions.AllowedClasses = &capsulev1beta1.AllowedListSpec{
-			Exact: allowed.Exact,
-			Regex: allowed.Regex,
-		}
+		dst.Spec.IngressOptions.AllowedClasses = allowed
 	}
 
 	if allowed := in.Spec.IngressOptions.AllowedHostnames; allowed != nil {
-		dst.Spec.IngressOptions.AllowedHostnames = &capsulev1beta1.AllowedListSpec{
-			Exact: allowed.Exact,
-			Regex: allowed.Regex,
-		}
+		dst.Spec.IngressOptions.AllowedHostnames = allowed
 	}
 
 	annotations[capsulev1beta1.DenyWildcard] = fmt.Sprintf("%t", in.Spec.IngressOptions.AllowWildcardHostnames)
 
 	if allowed := in.Spec.ContainerRegistries; allowed != nil {
-		dst.Spec.ContainerRegistries = &capsulev1beta1.AllowedListSpec{
-			Exact: allowed.Exact,
-			Regex: allowed.Regex,
-		}
+		dst.Spec.ContainerRegistries = allowed
 	}
 
 	dst.Spec.NodeSelector = in.Spec.NodeSelector
@@ -375,24 +325,21 @@ func (in *Tenant) ConvertTo(raw conversion.Hub) error {
 		Items: in.Spec.ResourceQuota.Items,
 	}
 
-	dst.Spec.AdditionalRoleBindings = make([]capsulev1beta1.AdditionalRoleBindingsSpec, 0, len(in.Spec.AdditionalRoleBindings))
+	dst.Spec.AdditionalRoleBindings = make([]api.AdditionalRoleBindingsSpec, 0, len(in.Spec.AdditionalRoleBindings))
 	for _, item := range in.Spec.AdditionalRoleBindings {
-		dst.Spec.AdditionalRoleBindings = append(dst.Spec.AdditionalRoleBindings, capsulev1beta1.AdditionalRoleBindingsSpec{
+		dst.Spec.AdditionalRoleBindings = append(dst.Spec.AdditionalRoleBindings, api.AdditionalRoleBindingsSpec{
 			ClusterRoleName: item.ClusterRoleName,
 			Subjects:        item.Subjects,
 		})
 	}
 
-	dst.Spec.ImagePullPolicies = make([]capsulev1beta1.ImagePullPolicySpec, 0, len(in.Spec.ImagePullPolicies))
+	dst.Spec.ImagePullPolicies = make([]api.ImagePullPolicySpec, 0, len(in.Spec.ImagePullPolicies))
 	for _, item := range in.Spec.ImagePullPolicies {
-		dst.Spec.ImagePullPolicies = append(dst.Spec.ImagePullPolicies, capsulev1beta1.ImagePullPolicySpec(item))
+		dst.Spec.ImagePullPolicies = append(dst.Spec.ImagePullPolicies, item)
 	}
 
 	if allowed := in.Spec.PriorityClasses; allowed != nil {
-		dst.Spec.PriorityClasses = &capsulev1beta1.AllowedListSpec{
-			Exact: allowed.Exact,
-			Regex: allowed.Regex,
-		}
+		dst.Spec.PriorityClasses = allowed
 	}
 
 	dst.SetAnnotations(annotations)

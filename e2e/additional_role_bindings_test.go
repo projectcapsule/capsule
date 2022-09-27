@@ -15,6 +15,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
+	"github.com/clastix/capsule/pkg/api"
 )
 
 var _ = Describe("creating a Namespace with an additional Role Binding", func() {
@@ -29,7 +30,7 @@ var _ = Describe("creating a Namespace with an additional Role Binding", func() 
 					Kind: "User",
 				},
 			},
-			AdditionalRoleBindings: []capsulev1beta1.AdditionalRoleBindingsSpec{
+			AdditionalRoleBindings: []api.AdditionalRoleBindingsSpec{
 				{
 					ClusterRoleName: "crds-rolebinding",
 					Subjects: []rbacv1.Subject{

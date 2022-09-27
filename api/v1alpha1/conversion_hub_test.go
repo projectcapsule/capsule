@@ -16,6 +16,7 @@ import (
 	"k8s.io/utils/pointer"
 
 	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
+	"github.com/clastix/capsule/pkg/api"
 )
 
 // nolint:maintidx
@@ -25,19 +26,19 @@ func generateTenantsSpecs() (Tenant, capsulev1beta1.Tenant) {
 	nodeSelector := map[string]string{
 		"foo": "bar",
 	}
-	v1alpha1AdditionalMetadataSpec := &AdditionalMetadataSpec{
-		AdditionalLabels: map[string]string{
+	v1alpha1AdditionalMetadataSpec := &api.AdditionalMetadataSpec{
+		Labels: map[string]string{
 			"foo": "bar",
 		},
-		AdditionalAnnotations: map[string]string{
+		Annotations: map[string]string{
 			"foo": "bar",
 		},
 	}
-	v1alpha1AllowedListSpec := &AllowedListSpec{
+	v1alpha1AllowedListSpec := &api.AllowedListSpec{
 		Exact: []string{"foo", "bar"},
 		Regex: "^foo*",
 	}
-	v1beta1AdditionalMetadataSpec := &capsulev1beta1.AdditionalMetadataSpec{
+	v1beta1AdditionalMetadataSpec := &api.AdditionalMetadataSpec{
 		Labels: map[string]string{
 			"foo": "bar",
 		},
@@ -51,16 +52,16 @@ func generateTenantsSpecs() (Tenant, capsulev1beta1.Tenant) {
 	}
 	v1beta1ServiceOptions := &capsulev1beta1.ServiceOptions{
 		AdditionalMetadata: v1beta1AdditionalMetadataSpec,
-		AllowedServices: &capsulev1beta1.AllowedServices{
+		AllowedServices: &api.AllowedServices{
 			NodePort:     pointer.BoolPtr(false),
 			ExternalName: pointer.BoolPtr(false),
 			LoadBalancer: pointer.BoolPtr(false),
 		},
-		ExternalServiceIPs: &capsulev1beta1.ExternalServiceIPsSpec{
-			Allowed: []capsulev1beta1.AllowedIP{"192.168.0.1"},
+		ExternalServiceIPs: &api.ExternalServiceIPsSpec{
+			Allowed: []api.AllowedIP{"192.168.0.1"},
 		},
 	}
-	v1beta1AllowedListSpec := &capsulev1beta1.AllowedListSpec{
+	v1beta1AllowedListSpec := &api.AllowedListSpec{
 		Exact: []string{"foo", "bar"},
 		Regex: "^foo*",
 	}
@@ -236,7 +237,7 @@ func generateTenantsSpecs() (Tenant, capsulev1beta1.Tenant) {
 			ServiceOptions:   v1beta1ServiceOptions,
 			StorageClasses:   v1beta1AllowedListSpec,
 			IngressOptions: capsulev1beta1.IngressOptions{
-				HostnameCollisionScope: capsulev1beta1.HostnameCollisionScopeDisabled,
+				HostnameCollisionScope: api.HostnameCollisionScopeDisabled,
 				AllowedClasses:         v1beta1AllowedListSpec,
 				AllowedHostnames:       v1beta1AllowedListSpec,
 			},
@@ -252,7 +253,7 @@ func generateTenantsSpecs() (Tenant, capsulev1beta1.Tenant) {
 				Scope: capsulev1beta1.ResourceQuotaScopeNamespace,
 				Items: resourceQuotas,
 			},
-			AdditionalRoleBindings: []capsulev1beta1.AdditionalRoleBindingsSpec{
+			AdditionalRoleBindings: []api.AdditionalRoleBindingsSpec{
 				{
 					ClusterRoleName: "crds-rolebinding",
 					Subjects: []rbacv1.Subject{
@@ -264,8 +265,8 @@ func generateTenantsSpecs() (Tenant, capsulev1beta1.Tenant) {
 					},
 				},
 			},
-			ImagePullPolicies: []capsulev1beta1.ImagePullPolicySpec{"Always", "IfNotPresent"},
-			PriorityClasses: &capsulev1beta1.AllowedListSpec{
+			ImagePullPolicies: []api.ImagePullPolicySpec{"Always", "IfNotPresent"},
+			PriorityClasses: &api.AllowedListSpec{
 				Exact: []string{"default"},
 				Regex: "^tier-.*$",
 			},
@@ -323,7 +324,7 @@ func generateTenantsSpecs() (Tenant, capsulev1beta1.Tenant) {
 			NetworkPolicies:     networkPolicies,
 			LimitRanges:         limitRanges,
 			ResourceQuota:       resourceQuotas,
-			AdditionalRoleBindings: []AdditionalRoleBindingsSpec{
+			AdditionalRoleBindings: []api.AdditionalRoleBindingsSpec{
 				{
 					ClusterRoleName: "crds-rolebinding",
 					Subjects: []rbacv1.Subject{
@@ -335,8 +336,8 @@ func generateTenantsSpecs() (Tenant, capsulev1beta1.Tenant) {
 					},
 				},
 			},
-			ExternalServiceIPs: &ExternalServiceIPsSpec{
-				Allowed: []AllowedIP{"192.168.0.1"},
+			ExternalServiceIPs: &api.ExternalServiceIPsSpec{
+				Allowed: []api.AllowedIP{"192.168.0.1"},
 			},
 		},
 		Status: TenantStatus{

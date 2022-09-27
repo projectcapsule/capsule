@@ -12,11 +12,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
+	"github.com/clastix/capsule/pkg/api"
 )
 
 // ownerClusterRoleBindings generates a Capsule AdditionalRoleBinding object for the Owner dynamic clusterrole in order
 // to take advantage of the additional role binding feature.
-func (r *Manager) ownerClusterRoleBindings(owner capsulev1beta1.OwnerSpec, clusterRole string) capsulev1beta1.AdditionalRoleBindingsSpec {
+func (r *Manager) ownerClusterRoleBindings(owner capsulev1beta1.OwnerSpec, clusterRole string) api.AdditionalRoleBindingsSpec {
 	var subject rbacv1.Subject
 
 	if owner.Kind == "ServiceAccount" {
@@ -35,7 +36,7 @@ func (r *Manager) ownerClusterRoleBindings(owner capsulev1beta1.OwnerSpec, clust
 		}
 	}
 
-	return capsulev1beta1.AdditionalRoleBindingsSpec{
+	return api.AdditionalRoleBindingsSpec{
 		ClusterRoleName: clusterRole,
 		Subjects: []rbacv1.Subject{
 			subject,
@@ -47,7 +48,7 @@ func (r *Manager) ownerClusterRoleBindings(owner capsulev1beta1.OwnerSpec, clust
 // applying Pod Security Policies or giving access to CRDs or specific API groups.
 func (r *Manager) syncRoleBindings(ctx context.Context, tenant *capsulev1beta1.Tenant) (err error) {
 	// hashing the RoleBinding name due to DNS RFC-1123 applied to Kubernetes labels
-	hashFn := func(binding capsulev1beta1.AdditionalRoleBindingsSpec) string {
+	hashFn := func(binding api.AdditionalRoleBindingsSpec) string {
 		h := fnv.New64a()
 
 		_, _ = h.Write([]byte(binding.ClusterRoleName))
@@ -86,7 +87,7 @@ func (r *Manager) syncRoleBindings(ctx context.Context, tenant *capsulev1beta1.T
 	return group.Wait()
 }
 
-func (r *Manager) syncAdditionalRoleBinding(ctx context.Context, tenant *capsulev1beta1.Tenant, ns string, keys []string, hashFn func(binding capsulev1beta1.AdditionalRoleBindingsSpec) string) (err error) {
+func (r *Manager) syncAdditionalRoleBinding(ctx context.Context, tenant *capsulev1beta1.Tenant, ns string, keys []string, hashFn func(binding api.AdditionalRoleBindingsSpec) string) (err error) {
 	var tenantLabel, roleBindingLabel string
 
 	if tenantLabel, err = capsulev1beta1.GetTypeLabel(&capsulev1beta1.Tenant{}); err != nil {
@@ -101,7 +102,7 @@ func (r *Manager) syncAdditionalRoleBinding(ctx context.Context, tenant *capsule
 		return
 	}
 
-	var roleBindings []capsulev1beta1.AdditionalRoleBindingsSpec
+	var roleBindings []api.AdditionalRoleBindingsSpec
 
 	for index, owner := range tenant.Spec.Owners {
 		for _, clusterRoleName := range owner.GetRoles(*tenant, index) {

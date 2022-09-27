@@ -19,6 +19,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
+	"github.com/clastix/capsule/pkg/api"
 )
 
 var _ = Describe("when Tenant handles Ingress hostnames", func() {
@@ -34,7 +35,7 @@ var _ = Describe("when Tenant handles Ingress hostnames", func() {
 				},
 			},
 			IngressOptions: capsulev1beta1.IngressOptions{
-				AllowedHostnames: &capsulev1beta1.AllowedListSpec{
+				AllowedHostnames: &api.AllowedListSpec{
 					Exact: []string{"sigs.k8s.io", "operator.sdk", "domain.tld"},
 					Regex: `.*\.clastix\.io`,
 				},

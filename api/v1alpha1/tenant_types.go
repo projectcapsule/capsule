@@ -7,6 +7,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/clastix/capsule/pkg/api"
 )
 
 // TenantSpec defines the desired state of Tenant.
@@ -15,18 +17,18 @@ type TenantSpec struct {
 
 	//+kubebuilder:validation:Minimum=1
 	NamespaceQuota         *int32                           `json:"namespaceQuota,omitempty"`
-	NamespacesMetadata     *AdditionalMetadataSpec          `json:"namespacesMetadata,omitempty"`
-	ServicesMetadata       *AdditionalMetadataSpec          `json:"servicesMetadata,omitempty"`
-	StorageClasses         *AllowedListSpec                 `json:"storageClasses,omitempty"`
-	IngressClasses         *AllowedListSpec                 `json:"ingressClasses,omitempty"`
-	IngressHostnames       *AllowedListSpec                 `json:"ingressHostnames,omitempty"`
-	ContainerRegistries    *AllowedListSpec                 `json:"containerRegistries,omitempty"`
+	NamespacesMetadata     *api.AdditionalMetadataSpec      `json:"namespacesMetadata,omitempty"`
+	ServicesMetadata       *api.AdditionalMetadataSpec      `json:"servicesMetadata,omitempty"`
+	StorageClasses         *api.AllowedListSpec             `json:"storageClasses,omitempty"`
+	IngressClasses         *api.AllowedListSpec             `json:"ingressClasses,omitempty"`
+	IngressHostnames       *api.AllowedListSpec             `json:"ingressHostnames,omitempty"`
+	ContainerRegistries    *api.AllowedListSpec             `json:"containerRegistries,omitempty"`
 	NodeSelector           map[string]string                `json:"nodeSelector,omitempty"`
 	NetworkPolicies        []networkingv1.NetworkPolicySpec `json:"networkPolicies,omitempty"`
 	LimitRanges            []corev1.LimitRangeSpec          `json:"limitRanges,omitempty"`
 	ResourceQuota          []corev1.ResourceQuotaSpec       `json:"resourceQuotas,omitempty"`
-	AdditionalRoleBindings []AdditionalRoleBindingsSpec     `json:"additionalRoleBindings,omitempty"`
-	ExternalServiceIPs     *ExternalServiceIPsSpec          `json:"externalServiceIPs,omitempty"`
+	AdditionalRoleBindings []api.AdditionalRoleBindingsSpec `json:"additionalRoleBindings,omitempty"`
+	ExternalServiceIPs     *api.ExternalServiceIPsSpec      `json:"externalServiceIPs,omitempty"`
 }
 
 // TenantStatus defines the observed state of Tenant.

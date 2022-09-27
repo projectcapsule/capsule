@@ -14,6 +14,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/conversion"
 
 	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
+	"github.com/clastix/capsule/pkg/api"
 )
 
 const (
@@ -162,55 +163,46 @@ func (t *Tenant) ConvertTo(dstRaw conversion.Hub) error {
 			dst.Spec.NamespaceOptions = &capsulev1beta1.NamespaceOptions{}
 		}
 
-		dst.Spec.NamespaceOptions.AdditionalMetadata = &capsulev1beta1.AdditionalMetadataSpec{
-			Labels:      t.Spec.NamespacesMetadata.AdditionalLabels,
-			Annotations: t.Spec.NamespacesMetadata.AdditionalAnnotations,
-		}
+		dst.Spec.NamespaceOptions.AdditionalMetadata = t.Spec.NamespacesMetadata
 	}
 
 	if t.Spec.ServicesMetadata != nil {
 		if dst.Spec.ServiceOptions == nil {
 			dst.Spec.ServiceOptions = &capsulev1beta1.ServiceOptions{
-				AdditionalMetadata: &capsulev1beta1.AdditionalMetadataSpec{
-					Labels:      t.Spec.ServicesMetadata.AdditionalLabels,
-					Annotations: t.Spec.ServicesMetadata.AdditionalAnnotations,
-				},
+				AdditionalMetadata: t.Spec.ServicesMetadata,
 			}
 		}
 	}
 
 	if t.Spec.StorageClasses != nil {
-		dst.Spec.StorageClasses = &capsulev1beta1.AllowedListSpec{
-			Exact: t.Spec.StorageClasses.Exact,
-			Regex: t.Spec.StorageClasses.Regex,
-		}
+		dst.Spec.StorageClasses = t.Spec.StorageClasses
 	}
 
 	if v, annotationOk := t.Annotations[ingressHostnameCollisionScope]; annotationOk {
 		switch v {
-		case string(capsulev1beta1.HostnameCollisionScopeCluster), string(capsulev1beta1.HostnameCollisionScopeTenant), string(capsulev1beta1.HostnameCollisionScopeNamespace):
-			dst.Spec.IngressOptions.HostnameCollisionScope = capsulev1beta1.HostnameCollisionScope(v)
+		case string(api.HostnameCollisionScopeCluster), string(api.HostnameCollisionScopeTenant), string(api.HostnameCollisionScopeNamespace):
+			dst.Spec.IngressOptions.HostnameCollisionScope = api.HostnameCollisionScope(v)
 		default:
-			dst.Spec.IngressOptions.HostnameCollisionScope = capsulev1beta1.HostnameCollisionScopeDisabled
+			dst.Spec.IngressOptions.HostnameCollisionScope = api.HostnameCollisionScopeDisabled
 		}
 	}
 
 	if t.Spec.IngressClasses != nil {
-		dst.Spec.IngressOptions.AllowedClasses = &capsulev1beta1.AllowedListSpec{
+		dst.Spec.IngressOptions.AllowedClasses = &api.AllowedListSpec{
 			Exact: t.Spec.IngressClasses.Exact,
 			Regex: t.Spec.IngressClasses.Regex,
 		}
 	}
 
 	if t.Spec.IngressHostnames != nil {
-		dst.Spec.IngressOptions.AllowedHostnames = &capsulev1beta1.AllowedListSpec{
+		dst.Spec.IngressOptions.AllowedHostnames = &api.AllowedListSpec{
 			Exact: t.Spec.IngressHostnames.Exact,
 			Regex: t.Spec.IngressHostnames.Regex,
 		}
 	}
 
 	if t.Spec.ContainerRegistries != nil {
-		dst.Spec.ContainerRegistries = &capsulev1beta1.AllowedListSpec{
+		dst.Spec.ContainerRegistries = &api.AllowedListSpec{
 			Exact: t.Spec.ContainerRegistries.Exact,
 			Regex: t.Spec.ContainerRegistries.Regex,
 		}
@@ -246,37 +238,24 @@ func (t *Tenant) ConvertTo(dstRaw conversion.Hub) error {
 		}
 	}
 
-	if len(t.Spec.AdditionalRoleBindings) > 0 {
-		for _, rb := range t.Spec.AdditionalRoleBindings {
-			dst.Spec.AdditionalRoleBindings = append(dst.Spec.AdditionalRoleBindings, capsulev1beta1.AdditionalRoleBindingsSpec{
-				ClusterRoleName: rb.ClusterRoleName,
-				Subjects:        rb.Subjects,
-			})
-		}
-	}
+	dst.Spec.AdditionalRoleBindings = t.Spec.AdditionalRoleBindings
 
 	if t.Spec.ExternalServiceIPs != nil {
 		if dst.Spec.ServiceOptions == nil {
 			dst.Spec.ServiceOptions = &capsulev1beta1.ServiceOptions{}
 		}
 
-		dst.Spec.ServiceOptions.ExternalServiceIPs = &capsulev1beta1.ExternalServiceIPsSpec{
-			Allowed: make([]capsulev1beta1.AllowedIP, len(t.Spec.ExternalServiceIPs.Allowed)),
-		}
-
-		for i, IP := range t.Spec.ExternalServiceIPs.Allowed {
-			dst.Spec.ServiceOptions.ExternalServiceIPs.Allowed[i] = capsulev1beta1.AllowedIP(IP)
-		}
+		dst.Spec.ServiceOptions.ExternalServiceIPs = t.Spec.ExternalServiceIPs
 	}
 
 	pullPolicies, ok := annotations[podAllowedImagePullPolicyAnnotation]
 	if ok {
 		for _, policy := range strings.Split(pullPolicies, ",") {
-			dst.Spec.ImagePullPolicies = append(dst.Spec.ImagePullPolicies, capsulev1beta1.ImagePullPolicySpec(policy))
+			dst.Spec.ImagePullPolicies = append(dst.Spec.ImagePullPolicies, api.ImagePullPolicySpec(policy))
 		}
 	}
 
-	priorityClasses := capsulev1beta1.AllowedListSpec{}
+	priorityClasses := api.AllowedListSpec{}
 
 	priorityClassAllowed, ok := annotations[podPriorityAllowedAnnotation]
 
@@ -306,7 +285,7 @@ func (t *Tenant) ConvertTo(dstRaw conversion.Hub) error {
 		}
 
 		if dst.Spec.ServiceOptions.AllowedServices == nil {
-			dst.Spec.ServiceOptions.AllowedServices = &capsulev1beta1.AllowedServices{}
+			dst.Spec.ServiceOptions.AllowedServices = &api.AllowedServices{}
 		}
 
 		dst.Spec.ServiceOptions.AllowedServices.NodePort = pointer.BoolPtr(val)
@@ -324,7 +303,7 @@ func (t *Tenant) ConvertTo(dstRaw conversion.Hub) error {
 		}
 
 		if dst.Spec.ServiceOptions.AllowedServices == nil {
-			dst.Spec.ServiceOptions.AllowedServices = &capsulev1beta1.AllowedServices{}
+			dst.Spec.ServiceOptions.AllowedServices = &api.AllowedServices{}
 		}
 
 		dst.Spec.ServiceOptions.AllowedServices.ExternalName = pointer.BoolPtr(val)
@@ -342,7 +321,7 @@ func (t *Tenant) ConvertTo(dstRaw conversion.Hub) error {
 		}
 
 		if dst.Spec.ServiceOptions.AllowedServices == nil {
-			dst.Spec.ServiceOptions.AllowedServices = &capsulev1beta1.AllowedServices{}
+			dst.Spec.ServiceOptions.AllowedServices = &api.AllowedServices{}
 		}
 
 		dst.Spec.ServiceOptions.AllowedServices.LoadBalancer = pointer.BoolPtr(val)
@@ -480,7 +459,7 @@ func (t *Tenant) convertV1Beta1OwnerToV1Alpha1(src *capsulev1beta1.Tenant) {
 	}
 }
 
-// nolint:gocyclo,cyclop
+//nolint:cyclop
 func (t *Tenant) ConvertFrom(srcRaw conversion.Hub) error {
 	src, ok := srcRaw.(*capsulev1beta1.Tenant)
 	if !ok {
@@ -504,47 +483,29 @@ func (t *Tenant) ConvertFrom(srcRaw conversion.Hub) error {
 	t.convertV1Beta1OwnerToV1Alpha1(src)
 
 	if src.Spec.NamespaceOptions != nil && src.Spec.NamespaceOptions.AdditionalMetadata != nil {
-		t.Spec.NamespacesMetadata = &AdditionalMetadataSpec{
-			AdditionalLabels:      src.Spec.NamespaceOptions.AdditionalMetadata.Labels,
-			AdditionalAnnotations: src.Spec.NamespaceOptions.AdditionalMetadata.Annotations,
-		}
+		t.Spec.NamespacesMetadata = src.Spec.NamespaceOptions.AdditionalMetadata
 	}
 
 	if src.Spec.ServiceOptions != nil && src.Spec.ServiceOptions.AdditionalMetadata != nil {
-		t.Spec.ServicesMetadata = &AdditionalMetadataSpec{
-			AdditionalLabels:      src.Spec.ServiceOptions.AdditionalMetadata.Labels,
-			AdditionalAnnotations: src.Spec.ServiceOptions.AdditionalMetadata.Annotations,
-		}
+		t.Spec.ServicesMetadata = src.Spec.ServiceOptions.AdditionalMetadata
 	}
 
 	if src.Spec.StorageClasses != nil {
-		t.Spec.StorageClasses = &AllowedListSpec{
-			Exact: src.Spec.StorageClasses.Exact,
-			Regex: src.Spec.StorageClasses.Regex,
-		}
+		t.Spec.StorageClasses = src.Spec.StorageClasses
 	}
 
 	t.Annotations[ingressHostnameCollisionScope] = string(src.Spec.IngressOptions.HostnameCollisionScope)
 
 	if src.Spec.IngressOptions.AllowedClasses != nil {
-		t.Spec.IngressClasses = &AllowedListSpec{
-			Exact: src.Spec.IngressOptions.AllowedClasses.Exact,
-			Regex: src.Spec.IngressOptions.AllowedClasses.Regex,
-		}
+		t.Spec.IngressClasses = src.Spec.IngressOptions.AllowedClasses
 	}
 
 	if src.Spec.IngressOptions.AllowedHostnames != nil {
-		t.Spec.IngressHostnames = &AllowedListSpec{
-			Exact: src.Spec.IngressOptions.AllowedHostnames.Exact,
-			Regex: src.Spec.IngressOptions.AllowedHostnames.Regex,
-		}
+		t.Spec.IngressHostnames = src.Spec.IngressOptions.AllowedHostnames
 	}
 
 	if src.Spec.ContainerRegistries != nil {
-		t.Spec.ContainerRegistries = &AllowedListSpec{
-			Exact: src.Spec.ContainerRegistries.Exact,
-			Regex: src.Spec.ContainerRegistries.Regex,
-		}
+		t.Spec.ContainerRegistries = src.Spec.ContainerRegistries
 	}
 
 	if len(src.Spec.NetworkPolicies.Items) > 0 {
@@ -560,23 +521,10 @@ func (t *Tenant) ConvertFrom(srcRaw conversion.Hub) error {
 		t.Spec.ResourceQuota = src.Spec.ResourceQuota.Items
 	}
 
-	if len(src.Spec.AdditionalRoleBindings) > 0 {
-		for _, rb := range src.Spec.AdditionalRoleBindings {
-			t.Spec.AdditionalRoleBindings = append(t.Spec.AdditionalRoleBindings, AdditionalRoleBindingsSpec{
-				ClusterRoleName: rb.ClusterRoleName,
-				Subjects:        rb.Subjects,
-			})
-		}
-	}
+	t.Spec.AdditionalRoleBindings = src.Spec.AdditionalRoleBindings
 
 	if src.Spec.ServiceOptions != nil && src.Spec.ServiceOptions.ExternalServiceIPs != nil {
-		t.Spec.ExternalServiceIPs = &ExternalServiceIPsSpec{
-			Allowed: make([]AllowedIP, len(src.Spec.ServiceOptions.ExternalServiceIPs.Allowed)),
-		}
-
-		for i, IP := range src.Spec.ServiceOptions.ExternalServiceIPs.Allowed {
-			t.Spec.ExternalServiceIPs.Allowed[i] = AllowedIP(IP)
-		}
+		t.Spec.ExternalServiceIPs = src.Spec.ServiceOptions.ExternalServiceIPs
 	}
 
 	if len(src.Spec.ImagePullPolicies) != 0 {

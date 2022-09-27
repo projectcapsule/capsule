@@ -18,6 +18,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
+	"github.com/clastix/capsule/pkg/api"
 )
 
 var _ = Describe("when Tenant owner interacts with the webhooks", func() {
@@ -32,7 +33,7 @@ var _ = Describe("when Tenant owner interacts with the webhooks", func() {
 					Kind: "User",
 				},
 			},
-			StorageClasses: &capsulev1beta1.AllowedListSpec{
+			StorageClasses: &api.AllowedListSpec{
 				Exact: []string{
 					"cephfs",
 					"glusterfs",

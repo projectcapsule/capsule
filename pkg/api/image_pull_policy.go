@@ -1,7 +1,7 @@
 // Copyright 2020-2021 Clastix Labs
 // SPDX-License-Identifier: Apache-2.0
 
-package v1beta1
+package api
 
 // +kubebuilder:validation:Enum=Always;Never;IfNotPresent
 type ImagePullPolicySpec string
