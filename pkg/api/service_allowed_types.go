@@ -1,7 +1,9 @@
 // Copyright 2020-2021 Clastix Labs
 // SPDX-License-Identifier: Apache-2.0
 
-package v1beta2
+package api
+
+// +kubebuilder:object:generate=true
 
 type AllowedServices struct {
 	//+kubebuilder:default=true

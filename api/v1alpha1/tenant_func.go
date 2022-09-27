@@ -9,24 +9,24 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-func (t *Tenant) IsCordoned() bool {
-	if v, ok := t.Labels["capsule.clastix.io/cordon"]; ok && v == "enabled" {
+func (in *Tenant) IsCordoned() bool {
+	if v, ok := in.Labels["capsule.clastix.io/cordon"]; ok && v == "enabled" {
 		return true
 	}
 
 	return false
 }
 
-func (t *Tenant) IsFull() bool {
+func (in *Tenant) IsFull() bool {
 	// we don't have limits on assigned Namespaces
-	if t.Spec.NamespaceQuota == nil {
+	if in.Spec.NamespaceQuota == nil {
 		return false
 	}
 
-	return len(t.Status.Namespaces) >= int(*t.Spec.NamespaceQuota)
+	return len(in.Status.Namespaces) >= int(*in.Spec.NamespaceQuota)
 }
 
-func (t *Tenant) AssignNamespaces(namespaces []corev1.Namespace) {
+func (in *Tenant) AssignNamespaces(namespaces []corev1.Namespace) {
 	var l []string
 
 	for _, ns := range namespaces {
@@ -37,6 +37,6 @@ func (t *Tenant) AssignNamespaces(namespaces []corev1.Namespace) {
 
 	sort.Strings(l)
 
-	t.Status.Namespaces = l
-	t.Status.Size = uint(len(l))
+	in.Status.Namespaces = l
+	in.Status.Size = uint(len(l))
 }

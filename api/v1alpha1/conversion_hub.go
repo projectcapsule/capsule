@@ -14,6 +14,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/conversion"
 
 	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
+	"github.com/clastix/capsule/pkg/api"
 )
 
 const (
@@ -48,7 +49,7 @@ const (
 	ingressHostnameCollisionScope = "ingress.capsule.clastix.io/hostname-collision-scope"
 )
 
-func (t *Tenant) convertV1Alpha1OwnerToV1Beta1() capsulev1beta1.OwnerListSpec {
+func (in *Tenant) convertV1Alpha1OwnerToV1Beta1() capsulev1beta1.OwnerListSpec {
 	serviceKindToAnnotationMap := map[capsulev1beta1.ProxyServiceKind][]string{
 		capsulev1beta1.NodesProxy:           {enableNodeListingAnnotation, enableNodeUpdateAnnotation, enableNodeDeletionAnnotation},
 		capsulev1beta1.StorageClassesProxy:  {enableStorageClassListingAnnotation, enableStorageClassUpdateAnnotation, enableStorageClassDeletionAnnotation},
@@ -75,7 +76,7 @@ func (t *Tenant) convertV1Alpha1OwnerToV1Beta1() capsulev1beta1.OwnerListSpec {
 		ownerServiceAccountAnnotation: capsulev1beta1.ServiceAccountOwner,
 	}
 
-	annotations := t.GetAnnotations()
+	annotations := in.GetAnnotations()
 
 	operations := make(map[string]map[capsulev1beta1.ProxyServiceKind][]capsulev1beta1.ProxyOperation)
 
@@ -111,9 +112,9 @@ func (t *Tenant) convertV1Alpha1OwnerToV1Beta1() capsulev1beta1.OwnerListSpec {
 	}
 
 	owners = append(owners, capsulev1beta1.OwnerSpec{
-		Kind:            capsulev1beta1.OwnerKind(t.Spec.Owner.Kind),
-		Name:            t.Spec.Owner.Name,
-		ProxyOperations: getProxySettingsForOwner(t.Spec.Owner.Name),
+		Kind:            capsulev1beta1.OwnerKind(in.Spec.Owner.Kind),
+		Name:            in.Spec.Owner.Name,
+		ProxyOperations: getProxySettingsForOwner(in.Spec.Owner.Name),
 	})
 
 	for ownerAnnotation, ownerKind := range annotationToOwnerKindMap {
@@ -133,150 +134,134 @@ func (t *Tenant) convertV1Alpha1OwnerToV1Beta1() capsulev1beta1.OwnerListSpec {
 }
 
 // nolint:gocognit,gocyclo,cyclop,maintidx
-func (t *Tenant) ConvertTo(dstRaw conversion.Hub) error {
+func (in *Tenant) ConvertTo(dstRaw conversion.Hub) error {
 	dst, ok := dstRaw.(*capsulev1beta1.Tenant)
 	if !ok {
 		return fmt.Errorf("expected type *capsulev1beta1.Tenant, got %T", dst)
 	}
 
-	annotations := t.GetAnnotations()
+	annotations := in.GetAnnotations()
 
 	// ObjectMeta
-	dst.ObjectMeta = t.ObjectMeta
+	dst.ObjectMeta = in.ObjectMeta
 
 	// Spec
-	if t.Spec.NamespaceQuota != nil {
+	if in.Spec.NamespaceQuota != nil {
 		if dst.Spec.NamespaceOptions == nil {
 			dst.Spec.NamespaceOptions = &capsulev1beta1.NamespaceOptions{}
 		}
 
-		dst.Spec.NamespaceOptions.Quota = t.Spec.NamespaceQuota
+		dst.Spec.NamespaceOptions.Quota = in.Spec.NamespaceQuota
 	}
 
-	dst.Spec.NodeSelector = t.Spec.NodeSelector
+	dst.Spec.NodeSelector = in.Spec.NodeSelector
 
-	dst.Spec.Owners = t.convertV1Alpha1OwnerToV1Beta1()
+	dst.Spec.Owners = in.convertV1Alpha1OwnerToV1Beta1()
 
-	if t.Spec.NamespacesMetadata != nil {
+	if in.Spec.NamespacesMetadata != nil {
 		if dst.Spec.NamespaceOptions == nil {
 			dst.Spec.NamespaceOptions = &capsulev1beta1.NamespaceOptions{}
 		}
 
-		dst.Spec.NamespaceOptions.AdditionalMetadata = &capsulev1beta1.AdditionalMetadataSpec{
-			Labels:      t.Spec.NamespacesMetadata.AdditionalLabels,
-			Annotations: t.Spec.NamespacesMetadata.AdditionalAnnotations,
+		dst.Spec.NamespaceOptions.AdditionalMetadata = &api.AdditionalMetadataSpec{
+			Labels:      in.Spec.NamespacesMetadata.Labels,
+			Annotations: in.Spec.NamespacesMetadata.Annotations,
 		}
 	}
 
-	if t.Spec.ServicesMetadata != nil {
+	if in.Spec.ServicesMetadata != nil {
 		if dst.Spec.ServiceOptions == nil {
-			dst.Spec.ServiceOptions = &capsulev1beta1.ServiceOptions{
-				AdditionalMetadata: &capsulev1beta1.AdditionalMetadataSpec{
-					Labels:      t.Spec.ServicesMetadata.AdditionalLabels,
-					Annotations: t.Spec.ServicesMetadata.AdditionalAnnotations,
-				},
-			}
+			dst.Spec.ServiceOptions = &api.ServiceOptions{}
+		}
+
+		dst.Spec.ServiceOptions.AdditionalMetadata = &api.AdditionalMetadataSpec{
+			Labels:      in.Spec.ServicesMetadata.Labels,
+			Annotations: in.Spec.ServicesMetadata.Annotations,
 		}
 	}
 
-	if t.Spec.StorageClasses != nil {
-		dst.Spec.StorageClasses = &capsulev1beta1.AllowedListSpec{
-			Exact: t.Spec.StorageClasses.Exact,
-			Regex: t.Spec.StorageClasses.Regex,
-		}
+	if in.Spec.StorageClasses != nil {
+		dst.Spec.StorageClasses = in.Spec.StorageClasses
 	}
 
-	if v, annotationOk := t.Annotations[ingressHostnameCollisionScope]; annotationOk {
+	if v, annotationOk := in.Annotations[ingressHostnameCollisionScope]; annotationOk {
 		switch v {
-		case string(capsulev1beta1.HostnameCollisionScopeCluster), string(capsulev1beta1.HostnameCollisionScopeTenant), string(capsulev1beta1.HostnameCollisionScopeNamespace):
-			dst.Spec.IngressOptions.HostnameCollisionScope = capsulev1beta1.HostnameCollisionScope(v)
+		case string(api.HostnameCollisionScopeCluster), string(api.HostnameCollisionScopeTenant), string(api.HostnameCollisionScopeNamespace):
+			dst.Spec.IngressOptions.HostnameCollisionScope = api.HostnameCollisionScope(v)
 		default:
-			dst.Spec.IngressOptions.HostnameCollisionScope = capsulev1beta1.HostnameCollisionScopeDisabled
+			dst.Spec.IngressOptions.HostnameCollisionScope = api.HostnameCollisionScopeDisabled
 		}
 	}
 
-	if t.Spec.IngressClasses != nil {
-		dst.Spec.IngressOptions.AllowedClasses = &capsulev1beta1.AllowedListSpec{
-			Exact: t.Spec.IngressClasses.Exact,
-			Regex: t.Spec.IngressClasses.Regex,
+	if in.Spec.IngressClasses != nil {
+		dst.Spec.IngressOptions.AllowedClasses = &api.AllowedListSpec{
+			Exact: in.Spec.IngressClasses.Exact,
+			Regex: in.Spec.IngressClasses.Regex,
 		}
 	}
 
-	if t.Spec.IngressHostnames != nil {
-		dst.Spec.IngressOptions.AllowedHostnames = &capsulev1beta1.AllowedListSpec{
-			Exact: t.Spec.IngressHostnames.Exact,
-			Regex: t.Spec.IngressHostnames.Regex,
+	if in.Spec.IngressHostnames != nil {
+		dst.Spec.IngressOptions.AllowedHostnames = &api.AllowedListSpec{
+			Exact: in.Spec.IngressHostnames.Exact,
+			Regex: in.Spec.IngressHostnames.Regex,
 		}
 	}
 
-	if t.Spec.ContainerRegistries != nil {
-		dst.Spec.ContainerRegistries = &capsulev1beta1.AllowedListSpec{
-			Exact: t.Spec.ContainerRegistries.Exact,
-			Regex: t.Spec.ContainerRegistries.Regex,
+	if in.Spec.ContainerRegistries != nil {
+		dst.Spec.ContainerRegistries = &api.AllowedListSpec{
+			Exact: in.Spec.ContainerRegistries.Exact,
+			Regex: in.Spec.ContainerRegistries.Regex,
 		}
 	}
 
-	if len(t.Spec.NetworkPolicies) > 0 {
-		dst.Spec.NetworkPolicies = capsulev1beta1.NetworkPolicySpec{
-			Items: t.Spec.NetworkPolicies,
+	if len(in.Spec.NetworkPolicies) > 0 {
+		dst.Spec.NetworkPolicies = api.NetworkPolicySpec{
+			Items: in.Spec.NetworkPolicies,
 		}
 	}
 
-	if len(t.Spec.LimitRanges) > 0 {
-		dst.Spec.LimitRanges = capsulev1beta1.LimitRangesSpec{
-			Items: t.Spec.LimitRanges,
+	if len(in.Spec.LimitRanges) > 0 {
+		dst.Spec.LimitRanges = api.LimitRangesSpec{
+			Items: in.Spec.LimitRanges,
 		}
 	}
 
-	if len(t.Spec.ResourceQuota) > 0 {
-		dst.Spec.ResourceQuota = capsulev1beta1.ResourceQuotaSpec{
-			Scope: func() capsulev1beta1.ResourceQuotaScope {
-				if v, annotationOk := t.GetAnnotations()[resourceQuotaScopeAnnotation]; annotationOk {
+	if len(in.Spec.ResourceQuota) > 0 {
+		dst.Spec.ResourceQuota = api.ResourceQuotaSpec{
+			Scope: func() api.ResourceQuotaScope {
+				if v, annotationOk := in.GetAnnotations()[resourceQuotaScopeAnnotation]; annotationOk {
 					switch v {
-					case string(capsulev1beta1.ResourceQuotaScopeNamespace):
-						return capsulev1beta1.ResourceQuotaScopeNamespace
-					case string(capsulev1beta1.ResourceQuotaScopeTenant):
-						return capsulev1beta1.ResourceQuotaScopeTenant
+					case string(api.ResourceQuotaScopeNamespace):
+						return api.ResourceQuotaScopeNamespace
+					case string(api.ResourceQuotaScopeTenant):
+						return api.ResourceQuotaScopeTenant
 					}
 				}
 
-				return capsulev1beta1.ResourceQuotaScopeTenant
+				return api.ResourceQuotaScopeTenant
 			}(),
-			Items: t.Spec.ResourceQuota,
+			Items: in.Spec.ResourceQuota,
 		}
 	}
 
-	if len(t.Spec.AdditionalRoleBindings) > 0 {
-		for _, rb := range t.Spec.AdditionalRoleBindings {
-			dst.Spec.AdditionalRoleBindings = append(dst.Spec.AdditionalRoleBindings, capsulev1beta1.AdditionalRoleBindingsSpec{
-				ClusterRoleName: rb.ClusterRoleName,
-				Subjects:        rb.Subjects,
-			})
-		}
-	}
+	dst.Spec.AdditionalRoleBindings = in.Spec.AdditionalRoleBindings
 
-	if t.Spec.ExternalServiceIPs != nil {
+	if in.Spec.ExternalServiceIPs != nil {
 		if dst.Spec.ServiceOptions == nil {
-			dst.Spec.ServiceOptions = &capsulev1beta1.ServiceOptions{}
+			dst.Spec.ServiceOptions = &api.ServiceOptions{}
 		}
 
-		dst.Spec.ServiceOptions.ExternalServiceIPs = &capsulev1beta1.ExternalServiceIPsSpec{
-			Allowed: make([]capsulev1beta1.AllowedIP, len(t.Spec.ExternalServiceIPs.Allowed)),
-		}
-
-		for i, IP := range t.Spec.ExternalServiceIPs.Allowed {
-			dst.Spec.ServiceOptions.ExternalServiceIPs.Allowed[i] = capsulev1beta1.AllowedIP(IP)
-		}
+		dst.Spec.ServiceOptions.ExternalServiceIPs = in.Spec.ExternalServiceIPs
 	}
 
 	pullPolicies, ok := annotations[podAllowedImagePullPolicyAnnotation]
 	if ok {
 		for _, policy := range strings.Split(pullPolicies, ",") {
-			dst.Spec.ImagePullPolicies = append(dst.Spec.ImagePullPolicies, capsulev1beta1.ImagePullPolicySpec(policy))
+			dst.Spec.ImagePullPolicies = append(dst.Spec.ImagePullPolicies, api.ImagePullPolicySpec(policy))
 		}
 	}
 
-	priorityClasses := capsulev1beta1.AllowedListSpec{}
+	priorityClasses := api.AllowedListSpec{}
 
 	priorityClassAllowed, ok := annotations[podPriorityAllowedAnnotation]
 
@@ -298,15 +283,15 @@ func (t *Tenant) ConvertTo(dstRaw conversion.Hub) error {
 	if ok {
 		val, err := strconv.ParseBool(enableNodePorts)
 		if err != nil {
-			return errors.Wrap(err, fmt.Sprintf("unable to parse %s annotation on tenant %s", enableNodePortsAnnotation, t.GetName()))
+			return errors.Wrap(err, fmt.Sprintf("unable to parse %s annotation on tenant %s", enableNodePortsAnnotation, in.GetName()))
 		}
 
 		if dst.Spec.ServiceOptions == nil {
-			dst.Spec.ServiceOptions = &capsulev1beta1.ServiceOptions{}
+			dst.Spec.ServiceOptions = &api.ServiceOptions{}
 		}
 
 		if dst.Spec.ServiceOptions.AllowedServices == nil {
-			dst.Spec.ServiceOptions.AllowedServices = &capsulev1beta1.AllowedServices{}
+			dst.Spec.ServiceOptions.AllowedServices = &api.AllowedServices{}
 		}
 
 		dst.Spec.ServiceOptions.AllowedServices.NodePort = pointer.BoolPtr(val)
@@ -316,15 +301,15 @@ func (t *Tenant) ConvertTo(dstRaw conversion.Hub) error {
 	if ok {
 		val, err := strconv.ParseBool(enableExternalName)
 		if err != nil {
-			return errors.Wrap(err, fmt.Sprintf("unable to parse %s annotation on tenant %s", enableExternalNameAnnotation, t.GetName()))
+			return errors.Wrap(err, fmt.Sprintf("unable to parse %s annotation on tenant %s", enableExternalNameAnnotation, in.GetName()))
 		}
 
 		if dst.Spec.ServiceOptions == nil {
-			dst.Spec.ServiceOptions = &capsulev1beta1.ServiceOptions{}
+			dst.Spec.ServiceOptions = &api.ServiceOptions{}
 		}
 
 		if dst.Spec.ServiceOptions.AllowedServices == nil {
-			dst.Spec.ServiceOptions.AllowedServices = &capsulev1beta1.AllowedServices{}
+			dst.Spec.ServiceOptions.AllowedServices = &api.AllowedServices{}
 		}
 
 		dst.Spec.ServiceOptions.AllowedServices.ExternalName = pointer.BoolPtr(val)
@@ -334,23 +319,23 @@ func (t *Tenant) ConvertTo(dstRaw conversion.Hub) error {
 	if ok {
 		val, err := strconv.ParseBool(loadBalancerService)
 		if err != nil {
-			return errors.Wrap(err, fmt.Sprintf("unable to parse %s annotation on tenant %s", enableLoadBalancerAnnotation, t.GetName()))
+			return errors.Wrap(err, fmt.Sprintf("unable to parse %s annotation on tenant %s", enableLoadBalancerAnnotation, in.GetName()))
 		}
 
 		if dst.Spec.ServiceOptions == nil {
-			dst.Spec.ServiceOptions = &capsulev1beta1.ServiceOptions{}
+			dst.Spec.ServiceOptions = &api.ServiceOptions{}
 		}
 
 		if dst.Spec.ServiceOptions.AllowedServices == nil {
-			dst.Spec.ServiceOptions.AllowedServices = &capsulev1beta1.AllowedServices{}
+			dst.Spec.ServiceOptions.AllowedServices = &api.AllowedServices{}
 		}
 
 		dst.Spec.ServiceOptions.AllowedServices.LoadBalancer = pointer.BoolPtr(val)
 	}
 	// Status
 	dst.Status = capsulev1beta1.TenantStatus{
-		Size:       t.Status.Size,
-		Namespaces: t.Status.Namespaces,
+		Size:       in.Status.Size,
+		Namespaces: in.Status.Namespaces,
 	}
 	// Remove unneeded annotations
 	delete(dst.ObjectMeta.Annotations, podAllowedImagePullPolicyAnnotation)
@@ -381,7 +366,7 @@ func (t *Tenant) ConvertTo(dstRaw conversion.Hub) error {
 }
 
 // nolint:gocognit,gocyclo,cyclop
-func (t *Tenant) convertV1Beta1OwnerToV1Alpha1(src *capsulev1beta1.Tenant) {
+func (in *Tenant) convertV1Beta1OwnerToV1Alpha1(src *capsulev1beta1.Tenant) {
 	ownersAnnotations := map[string][]string{
 		ownerGroupsAnnotation:         nil,
 		ownerUsersAnnotation:          nil,
@@ -402,7 +387,7 @@ func (t *Tenant) convertV1Beta1OwnerToV1Alpha1(src *capsulev1beta1.Tenant) {
 
 	for i, owner := range src.Spec.Owners {
 		if i == 0 {
-			t.Spec.Owner = OwnerSpec{
+			in.Spec.Owner = OwnerSpec{
 				Name: owner.Name,
 				Kind: Kind(owner.Kind),
 			}
@@ -469,114 +454,89 @@ func (t *Tenant) convertV1Beta1OwnerToV1Alpha1(src *capsulev1beta1.Tenant) {
 
 	for k, v := range ownersAnnotations {
 		if len(v) > 0 {
-			t.Annotations[k] = strings.Join(v, ",")
+			in.Annotations[k] = strings.Join(v, ",")
 		}
 	}
 
 	for k, v := range proxyAnnotations {
 		if len(v) > 0 {
-			t.Annotations[k] = strings.Join(v, ",")
+			in.Annotations[k] = strings.Join(v, ",")
 		}
 	}
 }
 
-// nolint:gocyclo,cyclop
-func (t *Tenant) ConvertFrom(srcRaw conversion.Hub) error {
+//nolint:cyclop
+func (in *Tenant) ConvertFrom(srcRaw conversion.Hub) error {
 	src, ok := srcRaw.(*capsulev1beta1.Tenant)
 	if !ok {
 		return fmt.Errorf("expected *capsulev1beta1.Tenant, got %T", srcRaw)
 	}
 
 	// ObjectMeta
-	t.ObjectMeta = src.ObjectMeta
+	in.ObjectMeta = src.ObjectMeta
 
 	// Spec
 	if src.Spec.NamespaceOptions != nil && src.Spec.NamespaceOptions.Quota != nil {
-		t.Spec.NamespaceQuota = src.Spec.NamespaceOptions.Quota
+		in.Spec.NamespaceQuota = src.Spec.NamespaceOptions.Quota
 	}
 
-	t.Spec.NodeSelector = src.Spec.NodeSelector
+	in.Spec.NodeSelector = src.Spec.NodeSelector
 
-	if t.Annotations == nil {
-		t.Annotations = make(map[string]string)
+	if in.Annotations == nil {
+		in.Annotations = make(map[string]string)
 	}
 
-	t.convertV1Beta1OwnerToV1Alpha1(src)
+	in.convertV1Beta1OwnerToV1Alpha1(src)
 
 	if src.Spec.NamespaceOptions != nil && src.Spec.NamespaceOptions.AdditionalMetadata != nil {
-		t.Spec.NamespacesMetadata = &AdditionalMetadataSpec{
-			AdditionalLabels:      src.Spec.NamespaceOptions.AdditionalMetadata.Labels,
-			AdditionalAnnotations: src.Spec.NamespaceOptions.AdditionalMetadata.Annotations,
+		in.Spec.NamespacesMetadata = &AdditionalMetadata{
+			Labels:      src.Spec.NamespaceOptions.AdditionalMetadata.Labels,
+			Annotations: src.Spec.NamespaceOptions.AdditionalMetadata.Annotations,
 		}
 	}
 
 	if src.Spec.ServiceOptions != nil && src.Spec.ServiceOptions.AdditionalMetadata != nil {
-		t.Spec.ServicesMetadata = &AdditionalMetadataSpec{
-			AdditionalLabels:      src.Spec.ServiceOptions.AdditionalMetadata.Labels,
-			AdditionalAnnotations: src.Spec.ServiceOptions.AdditionalMetadata.Annotations,
+		in.Spec.ServicesMetadata = &AdditionalMetadata{
+			Labels:      src.Spec.ServiceOptions.AdditionalMetadata.Labels,
+			Annotations: src.Spec.ServiceOptions.AdditionalMetadata.Annotations,
 		}
 	}
 
 	if src.Spec.StorageClasses != nil {
-		t.Spec.StorageClasses = &AllowedListSpec{
-			Exact: src.Spec.StorageClasses.Exact,
-			Regex: src.Spec.StorageClasses.Regex,
-		}
+		in.Spec.StorageClasses = src.Spec.StorageClasses
 	}
 
-	t.Annotations[ingressHostnameCollisionScope] = string(src.Spec.IngressOptions.HostnameCollisionScope)
+	in.Annotations[ingressHostnameCollisionScope] = string(src.Spec.IngressOptions.HostnameCollisionScope)
 
 	if src.Spec.IngressOptions.AllowedClasses != nil {
-		t.Spec.IngressClasses = &AllowedListSpec{
-			Exact: src.Spec.IngressOptions.AllowedClasses.Exact,
-			Regex: src.Spec.IngressOptions.AllowedClasses.Regex,
-		}
+		in.Spec.IngressClasses = src.Spec.IngressOptions.AllowedClasses
 	}
 
 	if src.Spec.IngressOptions.AllowedHostnames != nil {
-		t.Spec.IngressHostnames = &AllowedListSpec{
-			Exact: src.Spec.IngressOptions.AllowedHostnames.Exact,
-			Regex: src.Spec.IngressOptions.AllowedHostnames.Regex,
-		}
+		in.Spec.IngressHostnames = src.Spec.IngressOptions.AllowedHostnames
 	}
 
 	if src.Spec.ContainerRegistries != nil {
-		t.Spec.ContainerRegistries = &AllowedListSpec{
-			Exact: src.Spec.ContainerRegistries.Exact,
-			Regex: src.Spec.ContainerRegistries.Regex,
-		}
+		in.Spec.ContainerRegistries = src.Spec.ContainerRegistries
 	}
 
 	if len(src.Spec.NetworkPolicies.Items) > 0 {
-		t.Spec.NetworkPolicies = src.Spec.NetworkPolicies.Items
+		in.Spec.NetworkPolicies = src.Spec.NetworkPolicies.Items
 	}
 
 	if len(src.Spec.LimitRanges.Items) > 0 {
-		t.Spec.LimitRanges = src.Spec.LimitRanges.Items
+		in.Spec.LimitRanges = src.Spec.LimitRanges.Items
 	}
 
 	if len(src.Spec.ResourceQuota.Items) > 0 {
-		t.Annotations[resourceQuotaScopeAnnotation] = string(src.Spec.ResourceQuota.Scope)
-		t.Spec.ResourceQuota = src.Spec.ResourceQuota.Items
+		in.Annotations[resourceQuotaScopeAnnotation] = string(src.Spec.ResourceQuota.Scope)
+		in.Spec.ResourceQuota = src.Spec.ResourceQuota.Items
 	}
 
-	if len(src.Spec.AdditionalRoleBindings) > 0 {
-		for _, rb := range src.Spec.AdditionalRoleBindings {
-			t.Spec.AdditionalRoleBindings = append(t.Spec.AdditionalRoleBindings, AdditionalRoleBindingsSpec{
-				ClusterRoleName: rb.ClusterRoleName,
-				Subjects:        rb.Subjects,
-			})
-		}
-	}
+	in.Spec.AdditionalRoleBindings = src.Spec.AdditionalRoleBindings
 
 	if src.Spec.ServiceOptions != nil && src.Spec.ServiceOptions.ExternalServiceIPs != nil {
-		t.Spec.ExternalServiceIPs = &ExternalServiceIPsSpec{
-			Allowed: make([]AllowedIP, len(src.Spec.ServiceOptions.ExternalServiceIPs.Allowed)),
-		}
-
-		for i, IP := range src.Spec.ServiceOptions.ExternalServiceIPs.Allowed {
-			t.Spec.ExternalServiceIPs.Allowed[i] = AllowedIP(IP)
-		}
+		in.Spec.ExternalServiceIPs = src.Spec.ServiceOptions.ExternalServiceIPs
 	}
 
 	if len(src.Spec.ImagePullPolicies) != 0 {
@@ -586,35 +546,35 @@ func (t *Tenant) ConvertFrom(srcRaw conversion.Hub) error {
 			pullPolicies = append(pullPolicies, string(policy))
 		}
 
-		t.Annotations[podAllowedImagePullPolicyAnnotation] = strings.Join(pullPolicies, ",")
+		in.Annotations[podAllowedImagePullPolicyAnnotation] = strings.Join(pullPolicies, ",")
 	}
 
 	if src.Spec.PriorityClasses != nil {
 		if len(src.Spec.PriorityClasses.Exact) != 0 {
-			t.Annotations[podPriorityAllowedAnnotation] = strings.Join(src.Spec.PriorityClasses.Exact, ",")
+			in.Annotations[podPriorityAllowedAnnotation] = strings.Join(src.Spec.PriorityClasses.Exact, ",")
 		}
 
 		if src.Spec.PriorityClasses.Regex != "" {
-			t.Annotations[podPriorityAllowedRegexAnnotation] = src.Spec.PriorityClasses.Regex
+			in.Annotations[podPriorityAllowedRegexAnnotation] = src.Spec.PriorityClasses.Regex
 		}
 	}
 
 	if src.Spec.ServiceOptions != nil && src.Spec.ServiceOptions.AllowedServices != nil {
 		if src.Spec.ServiceOptions.AllowedServices.NodePort != nil {
-			t.Annotations[enableNodePortsAnnotation] = strconv.FormatBool(*src.Spec.ServiceOptions.AllowedServices.NodePort)
+			in.Annotations[enableNodePortsAnnotation] = strconv.FormatBool(*src.Spec.ServiceOptions.AllowedServices.NodePort)
 		}
 
 		if src.Spec.ServiceOptions.AllowedServices.ExternalName != nil {
-			t.Annotations[enableExternalNameAnnotation] = strconv.FormatBool(*src.Spec.ServiceOptions.AllowedServices.ExternalName)
+			in.Annotations[enableExternalNameAnnotation] = strconv.FormatBool(*src.Spec.ServiceOptions.AllowedServices.ExternalName)
 		}
 
 		if src.Spec.ServiceOptions.AllowedServices.LoadBalancer != nil {
-			t.Annotations[enableLoadBalancerAnnotation] = strconv.FormatBool(*src.Spec.ServiceOptions.AllowedServices.LoadBalancer)
+			in.Annotations[enableLoadBalancerAnnotation] = strconv.FormatBool(*src.Spec.ServiceOptions.AllowedServices.LoadBalancer)
 		}
 	}
 
 	// Status
-	t.Status = TenantStatus{
+	in.Status = TenantStatus{
 		Size:       src.Status.Size,
 		Namespaces: src.Status.Namespaces,
 	}

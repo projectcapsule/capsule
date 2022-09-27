@@ -16,6 +16,7 @@ import (
 	"k8s.io/utils/pointer"
 
 	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
+	"github.com/clastix/capsule/pkg/api"
 )
 
 var _ = Describe("creating a nodePort service when it is disabled for Tenant", func() {
@@ -30,8 +31,8 @@ var _ = Describe("creating a nodePort service when it is disabled for Tenant", f
 					Kind: "User",
 				},
 			},
-			ServiceOptions: &capsulev1beta1.ServiceOptions{
-				AllowedServices: &capsulev1beta1.AllowedServices{
+			ServiceOptions: &api.ServiceOptions{
+				AllowedServices: &api.AllowedServices{
 					NodePort: pointer.BoolPtr(false),
 				},
 			},

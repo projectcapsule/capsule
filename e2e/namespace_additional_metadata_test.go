@@ -14,6 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
+	"github.com/clastix/capsule/pkg/api"
 )
 
 var _ = Describe("creating a Namespace for a Tenant with additional metadata", func() {
@@ -29,7 +30,7 @@ var _ = Describe("creating a Namespace for a Tenant with additional metadata", f
 				},
 			},
 			NamespaceOptions: &capsulev1beta1.NamespaceOptions{
-				AdditionalMetadata: &capsulev1beta1.AdditionalMetadataSpec{
+				AdditionalMetadata: &api.AdditionalMetadataSpec{
 					Labels: map[string]string{
 						"k8s.io/custom-label":     "foo",
 						"clastix.io/custom-label": "bar",

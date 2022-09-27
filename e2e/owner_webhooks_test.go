@@ -18,6 +18,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
+	"github.com/clastix/capsule/pkg/api"
 )
 
 var _ = Describe("when Tenant owner interacts with the webhooks", func() {
@@ -32,13 +33,13 @@ var _ = Describe("when Tenant owner interacts with the webhooks", func() {
 					Kind: "User",
 				},
 			},
-			StorageClasses: &capsulev1beta1.AllowedListSpec{
+			StorageClasses: &api.AllowedListSpec{
 				Exact: []string{
 					"cephfs",
 					"glusterfs",
 				},
 			},
-			LimitRanges: capsulev1beta1.LimitRangesSpec{Items: []corev1.LimitRangeSpec{
+			LimitRanges: api.LimitRangesSpec{Items: []corev1.LimitRangeSpec{
 				{
 					Limits: []corev1.LimitRangeItem{
 						{
@@ -56,7 +57,7 @@ var _ = Describe("when Tenant owner interacts with the webhooks", func() {
 				},
 			},
 			},
-			NetworkPolicies: capsulev1beta1.NetworkPolicySpec{Items: []networkingv1.NetworkPolicySpec{
+			NetworkPolicies: api.NetworkPolicySpec{Items: []networkingv1.NetworkPolicySpec{
 				{
 					Egress: []networkingv1.NetworkPolicyEgressRule{
 						{
@@ -77,7 +78,7 @@ var _ = Describe("when Tenant owner interacts with the webhooks", func() {
 				},
 			},
 			},
-			ResourceQuota: capsulev1beta1.ResourceQuotaSpec{Items: []corev1.ResourceQuotaSpec{
+			ResourceQuota: api.ResourceQuotaSpec{Items: []corev1.ResourceQuotaSpec{
 				{
 					Hard: map[corev1.ResourceName]resource.Quantity{
 						corev1.ResourcePods: resource.MustParse("10"),

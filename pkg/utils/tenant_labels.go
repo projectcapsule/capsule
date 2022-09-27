@@ -1,7 +1,7 @@
 // Copyright 2020-2021 Clastix Labs
 // SPDX-License-Identifier: Apache-2.0
 
-package v1alpha1
+package utils
 
 import (
 	"fmt"
@@ -10,11 +10,15 @@ import (
 	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+
+	"github.com/clastix/capsule/api/v1alpha1"
+	"github.com/clastix/capsule/api/v1beta1"
+	"github.com/clastix/capsule/api/v1beta2"
 )
 
 func GetTypeLabel(t runtime.Object) (label string, err error) {
 	switch v := t.(type) {
-	case *Tenant:
+	case *v1alpha1.Tenant, *v1beta1.Tenant, *v1beta2.Tenant:
 		return "capsule.clastix.io/tenant", nil
 	case *corev1.LimitRange:
 		return "capsule.clastix.io/limit-range", nil

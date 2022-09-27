@@ -15,6 +15,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
+	"github.com/clastix/capsule/pkg/api"
 )
 
 var _ = Describe("enforcing an allowed set of Service external IPs", func() {
@@ -29,9 +30,9 @@ var _ = Describe("enforcing an allowed set of Service external IPs", func() {
 					Kind: "User",
 				},
 			},
-			ServiceOptions: &capsulev1beta1.ServiceOptions{
-				ExternalServiceIPs: &capsulev1beta1.ExternalServiceIPsSpec{
-					Allowed: []capsulev1beta1.AllowedIP{
+			ServiceOptions: &api.ServiceOptions{
+				ExternalServiceIPs: &api.ExternalServiceIPsSpec{
+					Allowed: []api.AllowedIP{
 						"10.20.0.0/16",
 						"192.168.1.2/32",
 					},

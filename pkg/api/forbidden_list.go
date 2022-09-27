@@ -1,7 +1,7 @@
 // Copyright 2020-2021 Clastix Labs
 // SPDX-License-Identifier: Apache-2.0
 
-package v1beta2
+package api
 
 import (
 	"regexp"
@@ -9,12 +9,14 @@ import (
 	"strings"
 )
 
+// +kubebuilder:object:generate=true
+
 type ForbiddenListSpec struct {
 	Exact []string `json:"denied,omitempty"`
 	Regex string   `json:"deniedRegex,omitempty"`
 }
 
-func (in *ForbiddenListSpec) ExactMatch(value string) (ok bool) {
+func (in ForbiddenListSpec) ExactMatch(value string) (ok bool) {
 	if len(in.Exact) > 0 {
 		sort.SliceStable(in.Exact, func(i, j int) bool {
 			return strings.ToLower(in.Exact[i]) < strings.ToLower(in.Exact[j])

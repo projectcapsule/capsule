@@ -11,6 +11,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
+	"github.com/clastix/capsule/pkg/utils"
 )
 
 // nolint:dupl
@@ -40,11 +41,11 @@ func (r *Manager) syncLimitRange(ctx context.Context, tenant *capsulev1beta1.Ten
 	// getting LimitRange labels for the mutateFn
 	var tenantLabel, limitRangeLabel string
 
-	if tenantLabel, err = capsulev1beta1.GetTypeLabel(&capsulev1beta1.Tenant{}); err != nil {
+	if tenantLabel, err = utils.GetTypeLabel(&capsulev1beta1.Tenant{}); err != nil {
 		return err
 	}
 
-	if limitRangeLabel, err = capsulev1beta1.GetTypeLabel(&corev1.LimitRange{}); err != nil {
+	if limitRangeLabel, err = utils.GetTypeLabel(&corev1.LimitRange{}); err != nil {
 		return err
 	}
 

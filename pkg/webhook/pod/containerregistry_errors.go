@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"strings"
 
-	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
+	"github.com/clastix/capsule/pkg/api"
 )
 
 type missingContainerRegistryError struct {
@@ -24,10 +24,10 @@ func NewMissingContainerRegistryError(image string) error {
 
 type registryClassForbiddenError struct {
 	fqci string
-	spec capsulev1beta1.AllowedListSpec
+	spec api.AllowedListSpec
 }
 
-func NewContainerRegistryForbidden(image string, spec capsulev1beta1.AllowedListSpec) error {
+func NewContainerRegistryForbidden(image string, spec api.AllowedListSpec) error {
 	return &registryClassForbiddenError{
 		fqci: image,
 		spec: spec,
