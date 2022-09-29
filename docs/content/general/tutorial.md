@@ -838,6 +838,42 @@ With the said Tenant specification, Alice can create a Pod resource if `spec.pri
 
 If a Pod is going to use a non-allowed _Priority Class_, it will be rejected by the Validation Webhook enforcing it.
 
+
+## Assign Pod Runtime Classes
+
+Pods can be assigned different runtime classes. With the assigned runtime you can control Container Runtime Interface (CRI) is used for each pod. See [Kubernetes documentation](https://kubernetes.io/docs/concepts/containers/runtime-class/). 
+
+To prevent misuses of Pod Runtime Classes, Bill, the cluster admin, can enforce the allowed Pod Runtime Class at tenant level:
+
+```yaml
+kubectl apply -f - << EOF
+apiVersion: capsule.clastix.io/v1beta2
+kind: Tenant
+metadata:
+  name: oil
+spec:
+  owners:
+  - name: alice
+    kind: User
+  RuntimeClasses:
+    allowed:
+    - legacy
+    allowedRegex: "^hardened-.*$"
+    selector:
+      matchLabels:
+        env: "production"
+EOF
+```
+
+With the said Tenant specification, Alice can create a Pod resource if `spec.RuntimeClasses` equals to:
+
+- `legacy`
+- `hardened-crio` or `hardened-containerd`, since these compile the allowed regex.
+- Any RuntimeClass which has the label `env` with the value `production`
+
+If a Pod is going to use a non-allowed _Runtime Class_, it will be rejected by the Validation Webhook enforcing it.
+
+
 ## Assign Nodes Pool
 Bill, the cluster admin, can dedicate a pool of worker nodes to the `oil` tenant, to isolate the tenant applications from other noisy neighbors.
 
