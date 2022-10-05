@@ -89,7 +89,7 @@ helm-docs: docker
 	@docker run -v "$(SRC_ROOT):/helm-docs" jnorwood/helm-docs:$(HELMDOCS_VERSION) --chart-search-root /helm-docs
 
 helm-lint: docker
-	@docker run -v "$(SRC_ROOT):/workdir" --entrypoint /bin/sh quay.io/helmpack/chart-testing:v3.3.1 -c cd /workdir && ct lint --config .github/configs/ct.yaml --lint-conf .github/configs/lintconf.yaml --all --debug
+	@docker run -v "$(SRC_ROOT):/workdir" --entrypoint /bin/sh quay.io/helmpack/chart-testing:v3.3.1 -c "cd /workdir && ct lint --config .github/configs/ct.yaml --lint-conf .github/configs/lintconf.yaml --all --debug"
 
 docker:
 	@hash docker 2>/dev/null || {\
@@ -134,7 +134,7 @@ dev-setup:
 	export CA_BUNDLE=`openssl base64 -in /tmp/k8s-webhook-server/serving-certs/tls.crt | tr -d '\n'`; \
 	kubectl patch MutatingWebhookConfiguration capsule-mutating-webhook-configuration \
 		--type='json' -p="[\
-			{'op': 'replace', 'path': '/webhooks/0/clientConfig', 'value':{'url':\"$${WEBHOOK_URL}/mutate-v1-namespace-owner-reference\",'caBundle':\"$${CA_BUNDLE}\"}}\
+			{'op': 'replace', 'path': '/webhooks/0/clientConfig', 'value':{'url':\"$${WEBHOOK_URL}/namespace-owner-reference\",'caBundle':\"$${CA_BUNDLE}\"}}\
 		]" && \
 	kubectl patch ValidatingWebhookConfiguration capsule-validating-webhook-configuration \
 		--type='json' -p="[\
@@ -142,11 +142,11 @@ dev-setup:
 			{'op': 'replace', 'path': '/webhooks/1/clientConfig', 'value':{'url':\"$${WEBHOOK_URL}/ingresses\",'caBundle':\"$${CA_BUNDLE}\"}},\
 			{'op': 'replace', 'path': '/webhooks/2/clientConfig', 'value':{'url':\"$${WEBHOOK_URL}/namespaces\",'caBundle':\"$${CA_BUNDLE}\"}},\
 			{'op': 'replace', 'path': '/webhooks/3/clientConfig', 'value':{'url':\"$${WEBHOOK_URL}/networkpolicies\",'caBundle':\"$${CA_BUNDLE}\"}},\
-			{'op': 'replace', 'path': '/webhooks/4/clientConfig', 'value':{'url':\"$${WEBHOOK_URL}/pods\",'caBundle':\"$${CA_BUNDLE}\"}},\
-			{'op': 'replace', 'path': '/webhooks/5/clientConfig', 'value':{'url':\"$${WEBHOOK_URL}/persistentvolumeclaims\",'caBundle':\"$${CA_BUNDLE}\"}},\
-			{'op': 'replace', 'path': '/webhooks/6/clientConfig', 'value':{'url':\"$${WEBHOOK_URL}/services\",'caBundle':\"$${CA_BUNDLE}\"}},\
-			{'op': 'replace', 'path': '/webhooks/7/clientConfig', 'value':{'url':\"$${WEBHOOK_URL}/tenants\",'caBundle':\"$${CA_BUNDLE}\"}},\
-			{'op': 'replace', 'path': '/webhooks/8/clientConfig', 'value':{'url':\"$${WEBHOOK_URL}/nodes\",'caBundle':\"$${CA_BUNDLE}\"}}\
+			{'op': 'replace', 'path': '/webhooks/4/clientConfig', 'value':{'url':\"$${WEBHOOK_URL}/nodes\",'caBundle':\"$${CA_BUNDLE}\"}},\
+			{'op': 'replace', 'path': '/webhooks/5/clientConfig', 'value':{'url':\"$${WEBHOOK_URL}/pods\",'caBundle':\"$${CA_BUNDLE}\"}},\
+			{'op': 'replace', 'path': '/webhooks/6/clientConfig', 'value':{'url':\"$${WEBHOOK_URL}/persistentvolumeclaims\",'caBundle':\"$${CA_BUNDLE}\"}},\
+			{'op': 'replace', 'path': '/webhooks/7/clientConfig', 'value':{'url':\"$${WEBHOOK_URL}/services\",'caBundle':\"$${CA_BUNDLE}\"}},\
+			{'op': 'replace', 'path': '/webhooks/8/clientConfig', 'value':{'url':\"$${WEBHOOK_URL}/tenants\",'caBundle':\"$${CA_BUNDLE}\"}}\
 		]";
 
 # Build the docker image
@@ -172,7 +172,7 @@ apidocs-gen: ## Download crdoc locally if necessary.
 
 GINKGO = $(shell pwd)/bin/ginkgo
 ginkgo: ## Download ginkgo locally if necessary.
-	$(call go-install-tool,$(KUSTOMIZE),github.com/onsi/ginkgo/ginkgo@v1.16.5)
+	$(call go-install-tool,$(GINKGO),github.com/onsi/ginkgo/ginkgo@v1.16.5)
 
 KUSTOMIZE = $(shell pwd)/bin/kustomize
 kustomize: ## Download kustomize locally if necessary.
@@ -221,6 +221,9 @@ golint:
 # Running e2e tests in a KinD instance
 .PHONY: e2e
 e2e/%: ginkgo
+	$(MAKE) e2e-build/$* && $(MAKE) e2e-exec || $(MAKE) e2e-destroy
+
+e2e-build/%:
 	kind create cluster --name capsule --image=kindest/node:$*
 	make docker-build
 	kind load docker-image --nodes capsule-control-plane --name capsule $(IMG)
@@ -236,5 +239,10 @@ e2e/%: ginkgo
 		--set 'manager.readinessProbe.failureThreshold=10' \
 		capsule \
 		./charts/capsule
+
+e2e-exec:
 	$(GINKGO) -v -tags e2e ./e2e
+
+e2e-destroy:
 	kind delete cluster --name capsule
+
