@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Package v1beta2 contains API Schema definitions for the capsule v1beta2 API group
-//+kubebuilder:object:generate=true
-//+groupName=capsule.clastix.io
+// +kubebuilder:object:generate=true
+// +groupName=capsule.clastix.io
 package v1beta2
 
 import (
