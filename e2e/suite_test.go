@@ -22,6 +22,7 @@ import (
 
 	capsulev1alpha1 "github.com/clastix/capsule/api/v1alpha1"
 	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
+	capsulev1beta2 "github.com/clastix/capsule/api/v1beta2"
 )
 
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to
@@ -57,11 +58,9 @@ var _ = BeforeSuite(func(done Done) {
 	Expect(err).ToNot(HaveOccurred())
 	Expect(cfg).ToNot(BeNil())
 
-	err = capsulev1beta1.AddToScheme(scheme.Scheme)
-	Expect(err).NotTo(HaveOccurred())
-
-	err = capsulev1alpha1.AddToScheme(scheme.Scheme)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(capsulev1alpha1.AddToScheme(scheme.Scheme)).NotTo(HaveOccurred())
+	Expect(capsulev1beta1.AddToScheme(scheme.Scheme)).NotTo(HaveOccurred())
+	Expect(capsulev1beta2.AddToScheme(scheme.Scheme)).NotTo(HaveOccurred())
 
 	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
 	Expect(err).ToNot(HaveOccurred())
