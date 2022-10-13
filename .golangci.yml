@@ -15,6 +15,11 @@ linters-settings:
       - standard
       - default
       - prefix(github.com/clastix/capsule)
+  goheader:
+    template: |-
+      Copyright 2020-2021 Clastix Labs
+      SPDX-License-Identifier: Apache-2.0
+
 linters:
   enable-all: true
   disable:
@@ -34,10 +39,6 @@ linters:
     - testpackage
     - varnamelen
     - wrapcheck
-
-issues:
-  exclude:
-    - Using the variable on range scope .* in function literal
 
 service:
   golangci-lint-version: 1.45.2
