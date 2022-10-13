@@ -115,6 +115,12 @@ upstream	https://github.com/clastix/capsule.git (fetch)
 upstream	https://github.com/clastix/capsule.git (push)
 ```
 
+Pull all tags
+
+```
+$ git fetch --all && git pull upstream
+```
+
 Build and deploy:
 
 ```shell
