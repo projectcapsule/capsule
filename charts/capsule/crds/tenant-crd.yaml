@@ -213,11 +213,11 @@ spec:
                   type: integer
                 namespacesMetadata:
                   properties:
-                    annotations:
+                    additionalAnnotations:
                       additionalProperties:
                         type: string
                       type: object
-                    labels:
+                    additionalLabels:
                       additionalProperties:
                         type: string
                       type: object
@@ -556,11 +556,11 @@ spec:
                   type: array
                 servicesMetadata:
                   properties:
-                    annotations:
+                    additionalAnnotations:
                       additionalProperties:
                         type: string
                       type: object
-                    labels:
+                    additionalLabels:
                       additionalProperties:
                         type: string
                       type: object
