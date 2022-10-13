@@ -72,3 +72,13 @@ type TenantList struct {
 func init() {
 	SchemeBuilder.Register(&Tenant{}, &TenantList{})
 }
+
+func (in *Tenant) GetNamespaces() (res []string) {
+	res = make([]string, 0, len(in.Status.Namespaces))
+
+	for _, ns := range in.Status.Namespaces {
+		res = append(res, ns)
+	}
+
+	return
+}
