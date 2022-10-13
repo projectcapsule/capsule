@@ -6,7 +6,7 @@ Reference document for Capsule Operator configuration
 
 Capsule operator uses a Custom Resources Definition (CRD) for _Tenants_. 
 Tenants are cluster wide resources, so you need cluster level permissions to work with tenants. 
-You can learn about tenant CRDs in the following [section](./tenant-crd)
+You can learn about tenant CRDs in the following [section](./crds-apis)
 
 ## Capsule Configuration
 

@@ -39,7 +39,7 @@ module.exports = function (api) {
             },
             {
               label: 'CRDs APIs',
-              path: '/docs/general/tenant-crd'
+              path: '/docs/general/crds-apis'
             },
             {
               label: 'Multi-Tenant Benchmark',

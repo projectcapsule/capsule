@@ -639,14 +639,14 @@ LimitRangeItem defines a min/max usage limit for any resource that matches on ki
         </tr>
     </thead>
     <tbody><tr>
-        <td><b>annotations</b></td>
+        <td><b>additionalAnnotations</b></td>
         <td>map[string]string</td>
         <td>
           <br/>
         </td>
         <td>false</td>
       </tr><tr>
-        <td><b>labels</b></td>
+        <td><b>additionalLabels</b></td>
         <td>map[string]string</td>
         <td>
           <br/>
@@ -1498,14 +1498,14 @@ A scoped-resource selector requirement is a selector that contains values, a sco
         </tr>
     </thead>
     <tbody><tr>
-        <td><b>annotations</b></td>
+        <td><b>additionalAnnotations</b></td>
         <td>map[string]string</td>
         <td>
           <br/>
         </td>
         <td>false</td>
       </tr><tr>
-        <td><b>labels</b></td>
+        <td><b>additionalLabels</b></td>
         <td>map[string]string</td>
         <td>
           <br/>
@@ -1585,6 +1585,10 @@ TenantStatus defines the observed state of Tenant.
 Resource Types:
 
 - [CapsuleConfiguration](#capsuleconfiguration)
+
+- [GlobalTenantResource](#globaltenantresource)
+
+- [TenantResource](#tenantresource)
 
 - [Tenant](#tenant)
 
@@ -1848,6 +1852,977 @@ Allows to set different name rather than the canonical one for the Capsule confi
       </tr></tbody>
 </table>
 
+## GlobalTenantResource
+
+
+
+
+
+
+GlobalTenantResource allows to propagate resource replications to a specific subset of Tenant resources.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+      <td><b>apiVersion</b></td>
+      <td>string</td>
+      <td>capsule.clastix.io/v1beta2</td>
+      <td>true</td>
+      </tr>
+      <tr>
+      <td><b>kind</b></td>
+      <td>string</td>
+      <td>GlobalTenantResource</td>
+      <td>true</td>
+      </tr>
+      <tr>
+      <td><b><a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.20/#objectmeta-v1-meta">metadata</a></b></td>
+      <td>object</td>
+      <td>Refer to the Kubernetes API documentation for the fields of the `metadata` field.</td>
+      <td>true</td>
+      </tr><tr>
+        <td><b><a href="#globaltenantresourcespec">spec</a></b></td>
+        <td>object</td>
+        <td>
+          GlobalTenantResourceSpec defines the desired state of GlobalTenantResource.<br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#globaltenantresourcestatus">status</a></b></td>
+        <td>object</td>
+        <td>
+          GlobalTenantResourceStatus defines the observed state of GlobalTenantResource.<br/>
+        </td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+### GlobalTenantResource.spec
+
+
+
+GlobalTenantResourceSpec defines the desired state of GlobalTenantResource.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b><a href="#globaltenantresourcespecresourcesindex">resources</a></b></td>
+        <td>[]object</td>
+        <td>
+          Defines the rules to select targeting Namespace, along with the objects that must be replicated.<br/>
+        </td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>resyncPeriod</b></td>
+        <td>string</td>
+        <td>
+          Define the period of time upon a second reconciliation must be invoked. Keep in mind that any change to the manifests will trigger a new reconciliation.<br/>
+          <br/>
+            <i>Default</i>: 60s<br/>
+        </td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>pruningOnDelete</b></td>
+        <td>boolean</td>
+        <td>
+          When the replicated resource manifest is deleted, all the objects replicated so far will be automatically deleted. Disable this to keep replicated resources although the deletion of the replication manifest.<br/>
+          <br/>
+            <i>Default</i>: true<br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#globaltenantresourcespectenantselector">tenantSelector</a></b></td>
+        <td>object</td>
+        <td>
+          Defines the Tenant selector used target the tenants on which resources must be propagated.<br/>
+        </td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+### GlobalTenantResource.spec.resources[index]
+
+
+
+
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b><a href="#globaltenantresourcespecresourcesindexadditionalmetadata">additionalMetadata</a></b></td>
+        <td>object</td>
+        <td>
+          Besides the Capsule metadata required by TenantResource controller, defines additional metadata that must be added to the replicated resources.<br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#globaltenantresourcespecresourcesindexnamespaceselector">namespaceSelector</a></b></td>
+        <td>object</td>
+        <td>
+          Defines the Namespace selector to select the Tenant Namespaces on which the resources must be propagated. In case of nil value, all the Tenant Namespaces are targeted.<br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#globaltenantresourcespecresourcesindexnamespaceditemsindex">namespacedItems</a></b></td>
+        <td>[]object</td>
+        <td>
+          List of the resources already existing in other Namespaces that must be replicated.<br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>rawItems</b></td>
+        <td>[]RawExtension</td>
+        <td>
+          List of raw resources that must be replicated.<br/>
+        </td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+### GlobalTenantResource.spec.resources[index].additionalMetadata
+
+
+
+Besides the Capsule metadata required by TenantResource controller, defines additional metadata that must be added to the replicated resources.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>annotations</b></td>
+        <td>map[string]string</td>
+        <td>
+          <br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>labels</b></td>
+        <td>map[string]string</td>
+        <td>
+          <br/>
+        </td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+### GlobalTenantResource.spec.resources[index].namespaceSelector
+
+
+
+Defines the Namespace selector to select the Tenant Namespaces on which the resources must be propagated. In case of nil value, all the Tenant Namespaces are targeted.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b><a href="#globaltenantresourcespecresourcesindexnamespaceselectormatchexpressionsindex">matchExpressions</a></b></td>
+        <td>[]object</td>
+        <td>
+          matchExpressions is a list of label selector requirements. The requirements are ANDed.<br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>matchLabels</b></td>
+        <td>map[string]string</td>
+        <td>
+          matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is "key", the operator is "In", and the values array contains only "value". The requirements are ANDed.<br/>
+        </td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+### GlobalTenantResource.spec.resources[index].namespaceSelector.matchExpressions[index]
+
+
+
+A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>key</b></td>
+        <td>string</td>
+        <td>
+          key is the label key that the selector applies to.<br/>
+        </td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>operator</b></td>
+        <td>string</td>
+        <td>
+          operator represents a key's relationship to a set of values. Valid operators are In, NotIn, Exists and DoesNotExist.<br/>
+        </td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>values</b></td>
+        <td>[]string</td>
+        <td>
+          values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.<br/>
+        </td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+### GlobalTenantResource.spec.resources[index].namespacedItems[index]
+
+
+
+
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>kind</b></td>
+        <td>string</td>
+        <td>
+          Kind of the referent. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds<br/>
+        </td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>namespace</b></td>
+        <td>string</td>
+        <td>
+          Namespace of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/<br/>
+        </td>
+        <td>true</td>
+      </tr><tr>
+        <td><b><a href="#globaltenantresourcespecresourcesindexnamespaceditemsindexselector">selector</a></b></td>
+        <td>object</td>
+        <td>
+          Label selector used to select the given resources in the given Namespace.<br/>
+        </td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>apiVersion</b></td>
+        <td>string</td>
+        <td>
+          API version of the referent.<br/>
+        </td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+### GlobalTenantResource.spec.resources[index].namespacedItems[index].selector
+
+
+
+Label selector used to select the given resources in the given Namespace.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b><a href="#globaltenantresourcespecresourcesindexnamespaceditemsindexselectormatchexpressionsindex">matchExpressions</a></b></td>
+        <td>[]object</td>
+        <td>
+          matchExpressions is a list of label selector requirements. The requirements are ANDed.<br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>matchLabels</b></td>
+        <td>map[string]string</td>
+        <td>
+          matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is "key", the operator is "In", and the values array contains only "value". The requirements are ANDed.<br/>
+        </td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+### GlobalTenantResource.spec.resources[index].namespacedItems[index].selector.matchExpressions[index]
+
+
+
+A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>key</b></td>
+        <td>string</td>
+        <td>
+          key is the label key that the selector applies to.<br/>
+        </td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>operator</b></td>
+        <td>string</td>
+        <td>
+          operator represents a key's relationship to a set of values. Valid operators are In, NotIn, Exists and DoesNotExist.<br/>
+        </td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>values</b></td>
+        <td>[]string</td>
+        <td>
+          values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.<br/>
+        </td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+### GlobalTenantResource.spec.tenantSelector
+
+
+
+Defines the Tenant selector used target the tenants on which resources must be propagated.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b><a href="#globaltenantresourcespectenantselectormatchexpressionsindex">matchExpressions</a></b></td>
+        <td>[]object</td>
+        <td>
+          matchExpressions is a list of label selector requirements. The requirements are ANDed.<br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>matchLabels</b></td>
+        <td>map[string]string</td>
+        <td>
+          matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is "key", the operator is "In", and the values array contains only "value". The requirements are ANDed.<br/>
+        </td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+### GlobalTenantResource.spec.tenantSelector.matchExpressions[index]
+
+
+
+A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>key</b></td>
+        <td>string</td>
+        <td>
+          key is the label key that the selector applies to.<br/>
+        </td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>operator</b></td>
+        <td>string</td>
+        <td>
+          operator represents a key's relationship to a set of values. Valid operators are In, NotIn, Exists and DoesNotExist.<br/>
+        </td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>values</b></td>
+        <td>[]string</td>
+        <td>
+          values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.<br/>
+        </td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+### GlobalTenantResource.status
+
+
+
+GlobalTenantResourceStatus defines the observed state of GlobalTenantResource.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b><a href="#globaltenantresourcestatusprocesseditemsindex">processedItems</a></b></td>
+        <td>[]object</td>
+        <td>
+          List of the replicated resources for the given TenantResource.<br/>
+        </td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>selectedTenants</b></td>
+        <td>[]string</td>
+        <td>
+          List of Tenants addressed by the GlobalTenantResource.<br/>
+        </td>
+        <td>true</td>
+      </tr></tbody>
+</table>
+
+
+### GlobalTenantResource.status.processedItems[index]
+
+
+
+
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>kind</b></td>
+        <td>string</td>
+        <td>
+          Kind of the referent. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds<br/>
+        </td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>name</b></td>
+        <td>string</td>
+        <td>
+          Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names<br/>
+        </td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>namespace</b></td>
+        <td>string</td>
+        <td>
+          Namespace of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/<br/>
+        </td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>apiVersion</b></td>
+        <td>string</td>
+        <td>
+          API version of the referent.<br/>
+        </td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+## TenantResource
+
+
+
+
+
+
+TenantResource allows a Tenant Owner, if enabled with proper RBAC, to propagate resources in its Namespace. The object must be deployed in a Tenant Namespace, and cannot reference object living in non-Tenant namespaces. For such cases, the GlobalTenantResource must be used.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+      <td><b>apiVersion</b></td>
+      <td>string</td>
+      <td>capsule.clastix.io/v1beta2</td>
+      <td>true</td>
+      </tr>
+      <tr>
+      <td><b>kind</b></td>
+      <td>string</td>
+      <td>TenantResource</td>
+      <td>true</td>
+      </tr>
+      <tr>
+      <td><b><a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.20/#objectmeta-v1-meta">metadata</a></b></td>
+      <td>object</td>
+      <td>Refer to the Kubernetes API documentation for the fields of the `metadata` field.</td>
+      <td>true</td>
+      </tr><tr>
+        <td><b><a href="#tenantresourcespec">spec</a></b></td>
+        <td>object</td>
+        <td>
+          TenantResourceSpec defines the desired state of TenantResource.<br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#tenantresourcestatus">status</a></b></td>
+        <td>object</td>
+        <td>
+          TenantResourceStatus defines the observed state of TenantResource.<br/>
+        </td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+### TenantResource.spec
+
+
+
+TenantResourceSpec defines the desired state of TenantResource.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b><a href="#tenantresourcespecresourcesindex">resources</a></b></td>
+        <td>[]object</td>
+        <td>
+          Defines the rules to select targeting Namespace, along with the objects that must be replicated.<br/>
+        </td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>resyncPeriod</b></td>
+        <td>string</td>
+        <td>
+          Define the period of time upon a second reconciliation must be invoked. Keep in mind that any change to the manifests will trigger a new reconciliation.<br/>
+          <br/>
+            <i>Default</i>: 60s<br/>
+        </td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>pruningOnDelete</b></td>
+        <td>boolean</td>
+        <td>
+          When the replicated resource manifest is deleted, all the objects replicated so far will be automatically deleted. Disable this to keep replicated resources although the deletion of the replication manifest.<br/>
+          <br/>
+            <i>Default</i>: true<br/>
+        </td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+### TenantResource.spec.resources[index]
+
+
+
+
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b><a href="#tenantresourcespecresourcesindexadditionalmetadata">additionalMetadata</a></b></td>
+        <td>object</td>
+        <td>
+          Besides the Capsule metadata required by TenantResource controller, defines additional metadata that must be added to the replicated resources.<br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#tenantresourcespecresourcesindexnamespaceselector">namespaceSelector</a></b></td>
+        <td>object</td>
+        <td>
+          Defines the Namespace selector to select the Tenant Namespaces on which the resources must be propagated. In case of nil value, all the Tenant Namespaces are targeted.<br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#tenantresourcespecresourcesindexnamespaceditemsindex">namespacedItems</a></b></td>
+        <td>[]object</td>
+        <td>
+          List of the resources already existing in other Namespaces that must be replicated.<br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>rawItems</b></td>
+        <td>[]RawExtension</td>
+        <td>
+          List of raw resources that must be replicated.<br/>
+        </td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+### TenantResource.spec.resources[index].additionalMetadata
+
+
+
+Besides the Capsule metadata required by TenantResource controller, defines additional metadata that must be added to the replicated resources.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>annotations</b></td>
+        <td>map[string]string</td>
+        <td>
+          <br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>labels</b></td>
+        <td>map[string]string</td>
+        <td>
+          <br/>
+        </td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+### TenantResource.spec.resources[index].namespaceSelector
+
+
+
+Defines the Namespace selector to select the Tenant Namespaces on which the resources must be propagated. In case of nil value, all the Tenant Namespaces are targeted.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b><a href="#tenantresourcespecresourcesindexnamespaceselectormatchexpressionsindex">matchExpressions</a></b></td>
+        <td>[]object</td>
+        <td>
+          matchExpressions is a list of label selector requirements. The requirements are ANDed.<br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>matchLabels</b></td>
+        <td>map[string]string</td>
+        <td>
+          matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is "key", the operator is "In", and the values array contains only "value". The requirements are ANDed.<br/>
+        </td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+### TenantResource.spec.resources[index].namespaceSelector.matchExpressions[index]
+
+
+
+A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>key</b></td>
+        <td>string</td>
+        <td>
+          key is the label key that the selector applies to.<br/>
+        </td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>operator</b></td>
+        <td>string</td>
+        <td>
+          operator represents a key's relationship to a set of values. Valid operators are In, NotIn, Exists and DoesNotExist.<br/>
+        </td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>values</b></td>
+        <td>[]string</td>
+        <td>
+          values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.<br/>
+        </td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+### TenantResource.spec.resources[index].namespacedItems[index]
+
+
+
+
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>kind</b></td>
+        <td>string</td>
+        <td>
+          Kind of the referent. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds<br/>
+        </td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>namespace</b></td>
+        <td>string</td>
+        <td>
+          Namespace of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/<br/>
+        </td>
+        <td>true</td>
+      </tr><tr>
+        <td><b><a href="#tenantresourcespecresourcesindexnamespaceditemsindexselector">selector</a></b></td>
+        <td>object</td>
+        <td>
+          Label selector used to select the given resources in the given Namespace.<br/>
+        </td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>apiVersion</b></td>
+        <td>string</td>
+        <td>
+          API version of the referent.<br/>
+        </td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+### TenantResource.spec.resources[index].namespacedItems[index].selector
+
+
+
+Label selector used to select the given resources in the given Namespace.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b><a href="#tenantresourcespecresourcesindexnamespaceditemsindexselectormatchexpressionsindex">matchExpressions</a></b></td>
+        <td>[]object</td>
+        <td>
+          matchExpressions is a list of label selector requirements. The requirements are ANDed.<br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>matchLabels</b></td>
+        <td>map[string]string</td>
+        <td>
+          matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is "key", the operator is "In", and the values array contains only "value". The requirements are ANDed.<br/>
+        </td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+### TenantResource.spec.resources[index].namespacedItems[index].selector.matchExpressions[index]
+
+
+
+A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>key</b></td>
+        <td>string</td>
+        <td>
+          key is the label key that the selector applies to.<br/>
+        </td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>operator</b></td>
+        <td>string</td>
+        <td>
+          operator represents a key's relationship to a set of values. Valid operators are In, NotIn, Exists and DoesNotExist.<br/>
+        </td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>values</b></td>
+        <td>[]string</td>
+        <td>
+          values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.<br/>
+        </td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+### TenantResource.status
+
+
+
+TenantResourceStatus defines the observed state of TenantResource.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b><a href="#tenantresourcestatusprocesseditemsindex">processedItems</a></b></td>
+        <td>[]object</td>
+        <td>
+          List of the replicated resources for the given TenantResource.<br/>
+        </td>
+        <td>true</td>
+      </tr></tbody>
+</table>
+
+
+### TenantResource.status.processedItems[index]
+
+
+
+
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>kind</b></td>
+        <td>string</td>
+        <td>
+          Kind of the referent. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds<br/>
+        </td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>name</b></td>
+        <td>string</td>
+        <td>
+          Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names<br/>
+        </td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>namespace</b></td>
+        <td>string</td>
+        <td>
+          Namespace of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/<br/>
+        </td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>apiVersion</b></td>
+        <td>string</td>
+        <td>
+          API version of the referent.<br/>
+        </td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
 ## Tenant
 
 
@@ -2041,13 +3016,6 @@ TenantSpec defines the desired state of Tenant.
         </tr>
     </thead>
     <tbody><tr>
-        <td><b>clusterRoles</b></td>
-        <td>[]string</td>
-        <td>
-          Defines additional cluster-roles for the specific Owner.<br/>
-        </td>
-        <td>true</td>
-      </tr><tr>
         <td><b>kind</b></td>
         <td>enum</td>
         <td>
@@ -2063,6 +3031,15 @@ TenantSpec defines the desired state of Tenant.
           Name of tenant owner.<br/>
         </td>
         <td>true</td>
+      </tr><tr>
+        <td><b>clusterRoles</b></td>
+        <td>[]string</td>
+        <td>
+          Defines additional cluster-roles for the specific Owner.<br/>
+          <br/>
+            <i>Default</i>: [admin capsule-namespace-deleter]<br/>
+        </td>
+        <td>false</td>
       </tr><tr>
         <td><b><a href="#tenantspecownersindexproxysettingsindex-1">proxySettings</a></b></td>
         <td>[]object</td>
