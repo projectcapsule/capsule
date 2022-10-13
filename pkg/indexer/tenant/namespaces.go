@@ -6,13 +6,15 @@ package tenant
 import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
+	"github.com/clastix/capsule/pkg/api"
 )
 
-type NamespacesReference struct{}
+type NamespacesReference struct {
+	Obj client.Object
+}
 
 func (o NamespacesReference) Object() client.Object {
-	return &capsulev1beta1.Tenant{}
+	return o.Obj
 }
 
 func (o NamespacesReference) Field() string {
@@ -22,12 +24,6 @@ func (o NamespacesReference) Field() string {
 // nolint:forcetypeassert
 func (o NamespacesReference) Func() client.IndexerFunc {
 	return func(object client.Object) []string {
-		namespaces := object.(*capsulev1beta1.Tenant).DeepCopy().Status.Namespaces
-
-		if namespaces == nil {
-			return []string{}
-		}
-
-		return namespaces
+		return object.(api.Tenant).GetNamespaces()
 	}
 }

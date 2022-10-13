@@ -16,6 +16,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
+	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
+	capsulev1beta2 "github.com/clastix/capsule/api/v1beta2"
 	"github.com/clastix/capsule/pkg/indexer/ingress"
 	"github.com/clastix/capsule/pkg/indexer/namespace"
 	"github.com/clastix/capsule/pkg/indexer/tenant"
@@ -29,7 +31,8 @@ type CustomIndexer interface {
 
 func AddToManager(ctx context.Context, log logr.Logger, mgr manager.Manager) error {
 	indexers := []CustomIndexer{
-		tenant.NamespacesReference{},
+		tenant.NamespacesReference{Obj: &capsulev1beta1.Tenant{}},
+		tenant.NamespacesReference{Obj: &capsulev1beta2.Tenant{}},
 		tenant.OwnerReference{},
 		namespace.OwnerReference{},
 		ingress.HostnamePath{Obj: &extensionsv1beta1.Ingress{}},

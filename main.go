@@ -29,6 +29,7 @@ import (
 	capsulev1beta2 "github.com/clastix/capsule/api/v1beta2"
 	configcontroller "github.com/clastix/capsule/controllers/config"
 	rbaccontroller "github.com/clastix/capsule/controllers/rbac"
+	"github.com/clastix/capsule/controllers/resources"
 	servicelabelscontroller "github.com/clastix/capsule/controllers/servicelabels"
 	tenantcontroller "github.com/clastix/capsule/controllers/tenant"
 	tlscontroller "github.com/clastix/capsule/controllers/tls"
@@ -263,6 +264,16 @@ func main() {
 		Log: ctrl.Log.WithName("controllers").WithName("CapsuleConfiguration"),
 	}).SetupWithManager(manager, configurationName); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "CapsuleConfiguration")
+		os.Exit(1)
+	}
+
+	if err = (&resources.Global{}).SetupWithManager(manager); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "resources.Global")
+		os.Exit(1)
+	}
+
+	if err = (&resources.Namespaced{}).SetupWithManager(manager); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "resources.Namespaced")
 		os.Exit(1)
 	}
 
