@@ -62,6 +62,16 @@ type Tenant struct {
 	Status TenantStatus `json:"status,omitempty"`
 }
 
+func (in *Tenant) GetNamespaces() (res []string) {
+	res = make([]string, 0, len(in.Status.Namespaces))
+
+	for _, ns := range in.Status.Namespaces {
+		res = append(res, ns)
+	}
+
+	return
+}
+
 //+kubebuilder:object:root=true
 
 // TenantList contains a list of Tenant.
