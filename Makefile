@@ -77,7 +77,7 @@ generate: controller-gen
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
 
 apidoc: apidocs-gen
-	$(APIDOCS_GEN) crdoc --resources config/crd/bases --output docs/content/general/tenant-crd.md --template docs/template/reference-cr.tmpl
+	$(APIDOCS_GEN) crdoc --resources config/crd/bases --output docs/content/general/crds-apis.md --template docs/template/reference-cr.tmpl
 
 # Helm
 SRC_ROOT = $(shell git rev-parse --show-toplevel)
