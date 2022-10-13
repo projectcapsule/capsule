@@ -6,6 +6,8 @@ package v1beta2
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+
+	"github.com/clastix/capsule/pkg/api"
 )
 
 // TenantResourceSpec defines the desired state of TenantResource.
@@ -32,7 +34,7 @@ type ResourceSpec struct {
 	RawItems []RawExtension `json:"rawItems,omitempty"`
 	// Besides the Capsule metadata required by TenantResource controller, defines additional metadata that must be
 	// added to the replicated resources.
-	AdditionalMetadata *AdditionalMetadataSpec `json:"additionalMetadata,omitempty"`
+	AdditionalMetadata *api.AdditionalMetadataSpec `json:"additionalMetadata,omitempty"`
 }
 
 // +kubebuilder:validation:XEmbeddedResource
