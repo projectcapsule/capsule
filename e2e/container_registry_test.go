@@ -131,13 +131,15 @@ var _ = Describe("enforcing a Container Registry", func() {
 		cs := ownerClient(tnt.Spec.Owners[0])
 		EventuallyCreation(func() error {
 			_, err := cs.CoreV1().Pods(ns.Name).Create(context.Background(), pod, metav1.CreateOptions{})
-			if err == nil {
-				c := pod.DeepCopy()
-				c.Spec.Containers[0].Image = "attacker/google-containers/pause-amd64:3.0"
-				_, err = cs.CoreV1().Pods(ns.Name).Update(context.Background(), c, metav1.UpdateOptions{})
-			}
+
 			return err
-		}).ShouldNot(Succeed())
+		}).Should(Succeed())
+
+		Expect(k8sClient.Get(context.Background(), types.NamespacedName{Name: pod.GetName(), Namespace: ns.GetName()}, pod)).ToNot(HaveOccurred())
+
+		pod.Spec.Containers[0].Image = "attacker/google-containers/pause-amd64:3.0"
+		Expect(k8sClient.Update(context.Background(), pod)).To(HaveOccurred()).ShouldNot(Succeed())
+
 	})
 
 	It("should allow patching a matching registry after applying with a matching", func() {
@@ -159,9 +161,16 @@ var _ = Describe("enforcing a Container Registry", func() {
 
 		cs := ownerClient(tnt.Spec.Owners[0])
 		EventuallyCreation(func() error {
-			_, err := cs.CoreV1().Pods(ns.Name).Update(context.Background(), pod, metav1.UpdateOptions{})
+			_, err := cs.CoreV1().Pods(ns.Name).Create(context.Background(), pod, metav1.CreateOptions{})
+
 			return err
 		}).Should(Succeed())
+
+		Expect(k8sClient.Get(context.Background(), types.NamespacedName{Name: pod.GetName(), Namespace: ns.GetName()}, pod)).ToNot(HaveOccurred())
+
+		pod.Spec.Containers[0].Image = "docker.io/google-containers/pause-amd64:3.1"
+		Expect(k8sClient.Update(context.Background(), pod)).To(HaveOccurred())
+
 	})
 
 	It("should allow using an exact match", func() {
