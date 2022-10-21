@@ -38,7 +38,10 @@ func (r *abstractServiceLabelsReconciler) InjectClient(c client.Client) error {
 func (r *abstractServiceLabelsReconciler) Reconcile(ctx context.Context, request ctrl.Request) (ctrl.Result, error) {
 	tenant, err := r.getTenant(ctx, request.NamespacedName, r.client)
 	if err != nil {
-		if errors.As(err, &NonTenantObjectError{}) || errors.As(err, &NoServicesMetadataError{}) {
+		noTenantObjError := &NonTenantObjectError{}
+		noSvcMetaError := &NoServicesMetadataError{}
+
+		if errors.As(err, &noTenantObjError) || errors.As(err, &noSvcMetaError) {
 			return reconcile.Result{}, nil
 		}
 
