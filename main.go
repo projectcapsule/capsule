@@ -9,21 +9,6 @@ import (
 	"os"
 	goRuntime "runtime"
 
-	flag "github.com/spf13/pflag"
-	"go.uber.org/zap/zapcore"
-	corev1 "k8s.io/api/core/v1"
-	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	utilVersion "k8s.io/apimachinery/pkg/util/version"
-	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
-	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
-	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/healthz"
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
-
 	capsulev1alpha1 "github.com/clastix/capsule/api/v1alpha1"
 	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
 	capsulev1beta2 "github.com/clastix/capsule/api/v1beta2"
@@ -47,6 +32,22 @@ import (
 	"github.com/clastix/capsule/pkg/webhook/service"
 	"github.com/clastix/capsule/pkg/webhook/tenant"
 	"github.com/clastix/capsule/pkg/webhook/utils"
+	flag "github.com/spf13/pflag"
+	"go.uber.org/zap/zapcore"
+	corev1 "k8s.io/api/core/v1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	utilVersion "k8s.io/apimachinery/pkg/util/version"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
+	"k8s.io/client-go/rest"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/healthz"
+	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 )
 
 var (
@@ -69,6 +70,27 @@ func printVersion() {
 	setupLog.Info(fmt.Sprintf("Build date: %s", BuildTime))
 	setupLog.Info(fmt.Sprintf("Go Version: %s", goRuntime.Version()))
 	setupLog.Info(fmt.Sprintf("Go OS/Arch: %s/%s", goRuntime.GOOS, goRuntime.GOARCH))
+}
+
+func newDelegatingClient(cache cache.Cache, config *rest.Config, options client.Options, uncachedObjects ...client.Object) (client.Client, error) {
+	cl, err := client.New(config, options)
+	if err != nil {
+		return nil, err
+	}
+
+	delegatingClient, err := client.NewDelegatingClient(
+		client.NewDelegatingClientInput{
+			Client:            cl,
+			CacheReader:       cache,
+			UncachedObjects:   uncachedObjects,
+			CacheUnstructured: true,
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return delegatingClient, nil
 }
 
 // nolint:maintidx
@@ -121,6 +143,7 @@ func main() {
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       "42c733ea.clastix.capsule.io",
 		HealthProbeBindAddress: ":10080",
+		NewClient:              newDelegatingClient,
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
