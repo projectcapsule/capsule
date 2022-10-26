@@ -17,7 +17,7 @@ type TenantResourceSpec struct {
 	// When the replicated resource manifest is deleted, all the objects replicated so far will be automatically deleted.
 	// Disable this to keep replicated resources although the deletion of the replication manifest.
 	// +kubebuilder:default=true
-	PruningOnDelete bool `json:"pruningOnDelete,omitempty"`
+	PruningOnDelete *bool `json:"pruningOnDelete,omitempty"`
 	// Defines the rules to select targeting Namespace, along with the objects that must be replicated.
 	Resources []ResourceSpec `json:"resources"`
 }

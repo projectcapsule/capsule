@@ -749,6 +749,11 @@ func (in *TenantResourceList) DeepCopyObject() runtime.Object {
 func (in *TenantResourceSpec) DeepCopyInto(out *TenantResourceSpec) {
 	*out = *in
 	out.ResyncPeriod = in.ResyncPeriod
+	if in.PruningOnDelete != nil {
+		in, out := &in.PruningOnDelete, &out.PruningOnDelete
+		*out = new(bool)
+		**out = **in
+	}
 	if in.Resources != nil {
 		in, out := &in.Resources, &out.Resources
 		*out = make([]ResourceSpec, len(*in))

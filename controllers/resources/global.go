@@ -96,7 +96,7 @@ func (r *Global) Reconcile(ctx context.Context, request reconcile.Request) (reco
 	}
 
 	defer func() {
-		if e := patchHelper.Patch(context.TODO(), tntResource); e != nil {
+		if e := patchHelper.Patch(ctx, tntResource); e != nil {
 			if err == nil {
 				err = errors.Wrap(e, "failed to patch GlobalTenantResource")
 			}
@@ -115,7 +115,7 @@ func (r *Global) Reconcile(ctx context.Context, request reconcile.Request) (reco
 func (r *Global) reconcileNormal(ctx context.Context, tntResource *capsulev1beta2.GlobalTenantResource) (reconcile.Result, error) {
 	log := ctrllog.FromContext(ctx)
 
-	if tntResource.Spec.PruningOnDelete {
+	if *tntResource.Spec.PruningOnDelete {
 		controllerutil.AddFinalizer(tntResource, finalizer)
 	}
 
@@ -194,7 +194,7 @@ func (r *Global) reconcileNormal(ctx context.Context, tntResource *capsulev1beta
 func (r *Global) reconcileDelete(ctx context.Context, tntResource *capsulev1beta2.GlobalTenantResource) (reconcile.Result, error) {
 	log := ctrllog.FromContext(ctx)
 
-	if tntResource.Spec.PruningOnDelete {
+	if *tntResource.Spec.PruningOnDelete {
 		r.processor.HandlePruning(ctx, tntResource.Status.ProcessedItems.AsSet(), nil)
 
 		controllerutil.RemoveFinalizer(tntResource, finalizer)
@@ -202,5 +202,5 @@ func (r *Global) reconcileDelete(ctx context.Context, tntResource *capsulev1beta
 
 	log.Info("processing completed")
 
-	return reconcile.Result{}, nil
+	return reconcile.Result{Requeue: true, RequeueAfter: tntResource.Spec.ResyncPeriod.Duration}, nil
 }

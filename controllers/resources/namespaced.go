@@ -59,7 +59,7 @@ func (r *Namespaced) Reconcile(ctx context.Context, request reconcile.Request) (
 	}
 
 	defer func() {
-		if e := patchHelper.Patch(context.TODO(), tntResource); e != nil {
+		if e := patchHelper.Patch(ctx, tntResource); e != nil {
 			if err == nil {
 				err = errors.Wrap(e, "failed to patch TenantResource")
 			}
@@ -78,7 +78,7 @@ func (r *Namespaced) Reconcile(ctx context.Context, request reconcile.Request) (
 func (r *Namespaced) reconcileNormal(ctx context.Context, tntResource *capsulev1beta2.TenantResource) (reconcile.Result, error) {
 	log := ctrllog.FromContext(ctx)
 
-	if tntResource.Spec.PruningOnDelete {
+	if *tntResource.Spec.PruningOnDelete {
 		controllerutil.AddFinalizer(tntResource, finalizer)
 	}
 
@@ -149,7 +149,7 @@ func (r *Namespaced) reconcileNormal(ctx context.Context, tntResource *capsulev1
 func (r *Namespaced) reconcileDelete(ctx context.Context, tntResource *capsulev1beta2.TenantResource) (reconcile.Result, error) {
 	log := ctrllog.FromContext(ctx)
 
-	if tntResource.Spec.PruningOnDelete {
+	if *tntResource.Spec.PruningOnDelete {
 		r.processor.HandlePruning(ctx, tntResource.Status.ProcessedItems.AsSet(), nil)
 
 		controllerutil.RemoveFinalizer(tntResource, finalizer)
@@ -157,5 +157,5 @@ func (r *Namespaced) reconcileDelete(ctx context.Context, tntResource *capsulev1
 
 	log.Info("processing completed")
 
-	return reconcile.Result{}, nil
+	return reconcile.Result{Requeue: true, RequeueAfter: tntResource.Spec.ResyncPeriod.Duration}, nil
 }

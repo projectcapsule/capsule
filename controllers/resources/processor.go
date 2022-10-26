@@ -7,7 +7,6 @@ import (
 	"context"
 	"fmt"
 
-	capsulev1beta2 "github.com/clastix/capsule/api/v1beta2"
 	"github.com/hashicorp/go-multierror"
 	corev1 "k8s.io/api/core/v1"
 	apierr "k8s.io/apimachinery/pkg/api/errors"
@@ -21,6 +20,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
+
+	capsulev1beta2 "github.com/clastix/capsule/api/v1beta2"
 )
 
 const (
