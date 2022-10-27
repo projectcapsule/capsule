@@ -5,6 +5,7 @@ package v1beta2
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 // GlobalTenantResourceSpec defines the desired state of GlobalTenantResource.
@@ -19,7 +20,18 @@ type GlobalTenantResourceStatus struct {
 	// List of Tenants addressed by the GlobalTenantResource.
 	SelectedTenants []string `json:"selectedTenants"`
 	// List of the replicated resources for the given TenantResource.
-	ProcessedItems []ObjectReferenceStatus `json:"processedItems"`
+	ProcessedItems ProcessedItems `json:"processedItems"`
+}
+
+type ProcessedItems []ObjectReferenceStatus
+
+func (p *ProcessedItems) AsSet() sets.String {
+	set := sets.NewString()
+	for _, i := range *p {
+		set.Insert(i.String())
+	}
+
+	return set
 }
 
 //+kubebuilder:object:root=true
