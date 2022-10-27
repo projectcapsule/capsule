@@ -46,7 +46,7 @@ type RawExtension struct {
 // TenantResourceStatus defines the observed state of TenantResource.
 type TenantResourceStatus struct {
 	// List of the replicated resources for the given TenantResource.
-	ProcessedItems []ObjectReferenceStatus `json:"processedItems"`
+	ProcessedItems ProcessedItems `json:"processedItems"`
 }
 
 //+kubebuilder:object:root=true
