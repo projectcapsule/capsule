@@ -15,7 +15,7 @@ import (
 type TenantSpec struct {
 	Owner OwnerSpec `json:"owner"`
 
-	//+kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Minimum=1
 	NamespaceQuota         *int32                           `json:"namespaceQuota,omitempty"`
 	NamespacesMetadata     *AdditionalMetadata              `json:"namespacesMetadata,omitempty"`
 	ServicesMetadata       *AdditionalMetadata              `json:"servicesMetadata,omitempty"`

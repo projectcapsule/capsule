@@ -39,9 +39,9 @@ type TenantSpec struct {
 	PriorityClasses *api.AllowedListSpec `json:"priorityClasses,omitempty"`
 }
 
-//+kubebuilder:object:root=true
-//+kubebuilder:subresource:status
-//+kubebuilder:storageversion
+// +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
+// +kubebuilder:storageversion
 // +kubebuilder:resource:scope=Cluster,shortName=tnt
 // +kubebuilder:printcolumn:name="State",type="string",JSONPath=".status.state",description="The actual state of the Tenant"
 // +kubebuilder:printcolumn:name="Namespace quota",type="integer",JSONPath=".spec.namespaceOptions.quota",description="The max amount of Namespaces can be created"
@@ -60,7 +60,7 @@ type Tenant struct {
 
 func (in *Tenant) Hub() {}
 
-//+kubebuilder:object:root=true
+// +kubebuilder:object:root=true
 
 // TenantList contains a list of Tenant.
 type TenantList struct {
