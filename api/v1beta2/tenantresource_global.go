@@ -34,8 +34,8 @@ func (p *ProcessedItems) AsSet() sets.String {
 	return set
 }
 
-//+kubebuilder:object:root=true
-//+kubebuilder:subresource:status
+// +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
 // +kubebuilder:resource:scope=Cluster
 
 // GlobalTenantResource allows to propagate resource replications to a specific subset of Tenant resources.
@@ -47,7 +47,7 @@ type GlobalTenantResource struct {
 	Status GlobalTenantResourceStatus `json:"status,omitempty"`
 }
 
-//+kubebuilder:object:root=true
+// +kubebuilder:object:root=true
 
 // GlobalTenantResourceList contains a list of GlobalTenantResource.
 type GlobalTenantResourceList struct {
