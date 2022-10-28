@@ -1,0 +1,24 @@
+# permissions for end users to edit globaltenantresources.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: globaltenantresource-editor-role
+rules:
+- apiGroups:
+  - capsule.clastix.io
+  resources:
+  - globaltenantresources
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - capsule.clastix.io
+  resources:
+  - globaltenantresources/status
+  verbs:
+  - get

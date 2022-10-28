@@ -1,0 +1,20 @@
+# permissions for end users to view globaltenantresources.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: globaltenantresource-viewer-role
+rules:
+- apiGroups:
+  - capsule.clastix.io
+  resources:
+  - globaltenantresources
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - capsule.clastix.io
+  resources:
+  - globaltenantresources/status
+  verbs:
+  - get
