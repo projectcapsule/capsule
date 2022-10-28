@@ -50,7 +50,7 @@ var _ = Describe("creating a nodePort service when it is disabled for Tenant", f
 	})
 
 	It("should fail creating a service with NodePort type", func() {
-		ns := NewNamespace("disable-node-ports")
+		ns := NewNamespace("")
 		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 
 		svc := &corev1.Service{

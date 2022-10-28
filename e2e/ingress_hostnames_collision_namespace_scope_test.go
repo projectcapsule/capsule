@@ -120,8 +120,8 @@ var _ = Describe("when handling Namespace scoped Ingress hostnames collision", f
 	})
 
 	It("should ensure Namespace scope for Ingress hostname and path collision", func() {
-		ns1 := NewNamespace("namespace-collision-one")
-		ns2 := NewNamespace("namespace-collision-two")
+		ns1 := NewNamespace("")
+		ns2 := NewNamespace("")
 		cs := ownerClient(tnt.Spec.Owners[0])
 		NamespaceCreation(ns1, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 		NamespaceCreation(ns2, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())

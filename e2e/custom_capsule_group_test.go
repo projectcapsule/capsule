@@ -47,7 +47,7 @@ var _ = Describe("creating a Namespace as Tenant owner with custom --capsule-gro
 			configuration.Spec.UserGroups = []string{"test"}
 		})
 
-		ns := NewNamespace("cg-namespace-fail")
+		ns := NewNamespace("")
 		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).ShouldNot(Succeed())
 	})
 
@@ -56,7 +56,7 @@ var _ = Describe("creating a Namespace as Tenant owner with custom --capsule-gro
 			configuration.Spec.UserGroups = []string{"test", "alice"}
 		})
 
-		ns := NewNamespace("cg-namespace-1")
+		ns := NewNamespace("")
 
 		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
@@ -67,7 +67,7 @@ var _ = Describe("creating a Namespace as Tenant owner with custom --capsule-gro
 			configuration.Spec.UserGroups = []string{"capsule.clastix.io"}
 		})
 
-		ns := NewNamespace("cg-namespace-2")
+		ns := NewNamespace("")
 
 		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))

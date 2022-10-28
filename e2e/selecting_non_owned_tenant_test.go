@@ -48,7 +48,7 @@ var _ = Describe("creating a Namespace trying to select a third Tenant", func() 
 			l, err := utils.GetTypeLabel(&capsulev1beta1.Tenant{})
 			Expect(err).ToNot(HaveOccurred())
 
-			ns := NewNamespace("tenant-non-owned-ns")
+			ns := NewNamespace("")
 			ns.SetLabels(map[string]string{
 				l: tnt.Name,
 			})

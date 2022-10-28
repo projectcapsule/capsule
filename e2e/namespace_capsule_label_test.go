@@ -44,9 +44,9 @@ var _ = Describe("creating several Namespaces for a Tenant", func() {
 
 	It("should contains the default Capsule label", func() {
 		namespaces := []*v1.Namespace{
-			NewNamespace("first-capsule-ns"),
-			NewNamespace("second-capsule-ns"),
-			NewNamespace("third-capsule-ns"),
+			NewNamespace(""),
+			NewNamespace(""),
+			NewNamespace(""),
 		}
 		for _, ns := range namespaces {
 			NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())

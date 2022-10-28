@@ -60,7 +60,7 @@ var _ = Describe("creating an Ingress with a wildcard when it is denied for the 
 			}
 		}
 
-		ns := NewNamespace("extensions-v1beta1")
+		ns := NewNamespace("")
 
 		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 
@@ -141,7 +141,7 @@ var _ = Describe("creating an Ingress with a wildcard when it is denied for the 
 			}
 		}
 
-		ns := NewNamespace("networking-v1beta1")
+		ns := NewNamespace("")
 
 		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 
@@ -222,7 +222,7 @@ var _ = Describe("creating an Ingress with a wildcard when it is denied for the 
 			}
 		}
 
-		ns := NewNamespace("networking-v1")
+		ns := NewNamespace("")
 
 		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 
