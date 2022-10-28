@@ -46,6 +46,7 @@ type TenantStatus struct {
 // +kubebuilder:printcolumn:name="Owner kind",type="string",JSONPath=".spec.owner.kind",description="The assigned Tenant owner kind"
 // +kubebuilder:printcolumn:name="Node selector",type="string",JSONPath=".spec.nodeSelector",description="Node Selector applied to Pods"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp",description="Age"
+// +kubebuilder:deprecatedversion:warning="This version is going to be dropped in the upcoming version of Capsule; please, migrate to v1beta2 version."
 
 // Tenant is the Schema for the tenants API.
 type Tenant struct {
