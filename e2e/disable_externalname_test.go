@@ -51,7 +51,7 @@ var _ = Describe("creating an ExternalName service when it is disabled for Tenan
 	})
 
 	It("should fail creating a service with ExternalService type", func() {
-		ns := NewNamespace("disable-external-service")
+		ns := NewNamespace("")
 		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 
 		EventuallyCreation(func() error {

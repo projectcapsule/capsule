@@ -121,7 +121,7 @@ var _ = Describe("when Tenant handles Ingress hostnames", func() {
 	})
 
 	It("should block a non allowed Hostname", func() {
-		ns := NewNamespace("disallowed-hostname-networking")
+		ns := NewNamespace("")
 		cs := ownerClient(tnt.Spec.Owners[0])
 
 		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
@@ -144,7 +144,7 @@ var _ = Describe("when Tenant handles Ingress hostnames", func() {
 	})
 
 	It("should block a non allowed Hostname", func() {
-		ns := NewNamespace("disallowed-hostname-extensions")
+		ns := NewNamespace("")
 		cs := ownerClient(tnt.Spec.Owners[0])
 
 		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
@@ -167,7 +167,7 @@ var _ = Describe("when Tenant handles Ingress hostnames", func() {
 	})
 
 	It("should allow Hostnames in list", func() {
-		ns := NewNamespace("allowed-hostname-list-networking")
+		ns := NewNamespace("")
 		cs := ownerClient(tnt.Spec.Owners[0])
 
 		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
@@ -192,7 +192,7 @@ var _ = Describe("when Tenant handles Ingress hostnames", func() {
 	})
 
 	It("should allow Hostnames in list", func() {
-		ns := NewNamespace("allowed-hostname-list-extensions")
+		ns := NewNamespace("")
 		cs := ownerClient(tnt.Spec.Owners[0])
 
 		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
@@ -217,7 +217,7 @@ var _ = Describe("when Tenant handles Ingress hostnames", func() {
 	})
 
 	It("should allow Hostnames in regex", func() {
-		ns := NewNamespace("allowed-hostname-regex-networking")
+		ns := NewNamespace("")
 		cs := ownerClient(tnt.Spec.Owners[0])
 
 		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
@@ -242,7 +242,7 @@ var _ = Describe("when Tenant handles Ingress hostnames", func() {
 	})
 
 	It("should allow Hostnames in regex", func() {
-		ns := NewNamespace("allowed-hostname-regex-extensions")
+		ns := NewNamespace("")
 		cs := ownerClient(tnt.Spec.Owners[0])
 
 		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())

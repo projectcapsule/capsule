@@ -65,7 +65,7 @@ var _ = Describe("adding metadata to Service objects", func() {
 	})
 
 	It("should apply them to Service", func() {
-		ns := NewNamespace("service-metadata")
+		ns := NewNamespace("")
 		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
@@ -142,7 +142,7 @@ var _ = Describe("adding metadata to Service objects", func() {
 	})
 
 	It("should apply them to Endpoints", func() {
-		ns := NewNamespace("endpoints-metadata")
+		ns := NewNamespace("")
 		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
@@ -226,7 +226,7 @@ var _ = Describe("adding metadata to Service objects", func() {
 			}
 		}
 
-		ns := NewNamespace("endpointslice-metadata")
+		ns := NewNamespace("")
 		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 

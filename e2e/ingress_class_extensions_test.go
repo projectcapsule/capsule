@@ -57,7 +57,7 @@ var _ = Describe("when Tenant handles Ingress classes with extensions/v1beta1", 
 	})
 
 	It("should block a non allowed class for extensions/v1beta1", func() {
-		ns := NewNamespace("ingress-class-disallowed-extensions-v1beta1")
+		ns := NewNamespace("")
 		cs := ownerClient(tnt.Spec.Owners[0])
 
 		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
@@ -142,7 +142,7 @@ var _ = Describe("when Tenant handles Ingress classes with extensions/v1beta1", 
 	})
 
 	It("should allow enabled class using the deprecated annotation", func() {
-		ns := NewNamespace("ingress-class-allowed-annotation-extensions-v1beta1")
+		ns := NewNamespace("")
 		cs := ownerClient(tnt.Spec.Owners[0])
 
 		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
@@ -189,7 +189,7 @@ var _ = Describe("when Tenant handles Ingress classes with extensions/v1beta1", 
 			Skip("Running test on Kubernetes " + version.String() + ", doesn't provide .spec.ingressClassName")
 		}
 
-		ns := NewNamespace("ingress-class-allowed-annotation-extensions-v1beta1")
+		ns := NewNamespace("")
 		cs := ownerClient(tnt.Spec.Owners[0])
 
 		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
@@ -216,7 +216,7 @@ var _ = Describe("when Tenant handles Ingress classes with extensions/v1beta1", 
 	})
 
 	It("should allow enabled Ingress by regex using the deprecated annotation", func() {
-		ns := NewNamespace("ingress-class-allowed-annotation-extensions-v1beta1")
+		ns := NewNamespace("")
 		cs := ownerClient(tnt.Spec.Owners[0])
 		ingressClass := "oil-ingress"
 
@@ -251,7 +251,7 @@ var _ = Describe("when Tenant handles Ingress classes with extensions/v1beta1", 
 	})
 
 	It("should allow enabled Ingress by regex using the ingressClassName field", func() {
-		ns := NewNamespace("ingress-class-allowed-annotation-extensions-v1beta1")
+		ns := NewNamespace("")
 		cs := ownerClient(tnt.Spec.Owners[0])
 		ingressClass := "oil-haproxy"
 

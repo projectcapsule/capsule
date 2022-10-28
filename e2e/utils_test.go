@@ -8,9 +8,11 @@ package e2e
 import (
 	"context"
 	"fmt"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"strings"
 	"time"
+
+	"k8s.io/apimachinery/pkg/util/rand"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
@@ -31,6 +33,10 @@ const (
 )
 
 func NewNamespace(name string) *corev1.Namespace {
+	if len(name) == 0 {
+		name = rand.String(10)
+	}
+
 	return &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,

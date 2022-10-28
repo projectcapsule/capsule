@@ -43,7 +43,7 @@ var _ = Describe("creating a nodePort service when it is enabled for Tenant", fu
 	})
 
 	It("should allow creating a service with NodePort type", func() {
-		ns := NewNamespace("enable-node-ports")
+		ns := NewNamespace("")
 		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 
 		svc := &corev1.Service{

@@ -50,7 +50,7 @@ var _ = Describe("creating a LoadBalancer service when it is enabled for Tenant"
 	})
 
 	It("should succeed creating a service with LoadBalancer type", func() {
-		ns := NewNamespace("enable-loadbalancer-service")
+		ns := NewNamespace("")
 
 		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 

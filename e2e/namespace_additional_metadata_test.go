@@ -54,7 +54,7 @@ var _ = Describe("creating a Namespace for a Tenant with additional metadata", f
 	})
 
 	It("should contain additional Namespace metadata", func() {
-		ns := NewNamespace("namespace-metadata")
+		ns := NewNamespace("")
 		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
