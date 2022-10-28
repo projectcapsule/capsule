@@ -49,8 +49,8 @@ type TenantResourceStatus struct {
 	ProcessedItems ProcessedItems `json:"processedItems"`
 }
 
-//+kubebuilder:object:root=true
-//+kubebuilder:subresource:status
+// +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
 
 // TenantResource allows a Tenant Owner, if enabled with proper RBAC, to propagate resources in its Namespace.
 // The object must be deployed in a Tenant Namespace, and cannot reference object living in non-Tenant namespaces.
@@ -63,7 +63,7 @@ type TenantResource struct {
 	Status TenantResourceStatus `json:"status,omitempty"`
 }
 
-//+kubebuilder:object:root=true
+// +kubebuilder:object:root=true
 
 // TenantResourceList contains a list of TenantResource.
 type TenantResourceList struct {
