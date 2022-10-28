@@ -615,6 +615,8 @@ spec:
       jsonPath: .metadata.creationTimestamp
       name: Age
       type: date
+    deprecated: true
+    deprecationWarning: This version is going to be dropped in the upcoming version of Capsule; please, migrate to v1beta2 version.
     name: v1alpha1
     schema:
       openAPIV3Schema:
