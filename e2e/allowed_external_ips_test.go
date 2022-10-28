@@ -52,7 +52,7 @@ var _ = Describe("enforcing an allowed set of Service external IPs", func() {
 	})
 
 	It("should fail creating an evil service", func() {
-		ns := NewNamespace("evil-service")
+		ns := NewNamespace("")
 		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 
 		svc := &corev1.Service{
@@ -85,7 +85,7 @@ var _ = Describe("enforcing an allowed set of Service external IPs", func() {
 	})
 
 	It("should allow the first CIDR block", func() {
-		ns := NewNamespace("allowed-service-cidr")
+		ns := NewNamespace("")
 		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 
 		svc := &corev1.Service{
@@ -118,7 +118,7 @@ var _ = Describe("enforcing an allowed set of Service external IPs", func() {
 	})
 
 	It("should allow the /32 CIDR block", func() {
-		ns := NewNamespace("allowed-service-strict")
+		ns := NewNamespace("")
 		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 
 		svc := &corev1.Service{

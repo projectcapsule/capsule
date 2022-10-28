@@ -58,7 +58,7 @@ var _ = Describe("creating a Namespace with Tenant selector when user owns multi
 	})
 
 	It("should be assigned to the selected Tenant", func() {
-		ns := NewNamespace("tenant-2-ns")
+		ns := NewNamespace("")
 		By("assigning to the Namespace the Capsule Tenant label", func() {
 			l, err := utils.GetTypeLabel(&capsulev1beta1.Tenant{})
 			Expect(err).ToNot(HaveOccurred())

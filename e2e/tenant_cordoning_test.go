@@ -46,7 +46,7 @@ var _ = Describe("cordoning a Tenant", func() {
 	It("should block or allow operations", func() {
 		cs := ownerClient(tnt.Spec.Owners[0])
 
-		ns := NewNamespace("cordoned-namespace")
+		ns := NewNamespace("")
 
 		pod := &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{

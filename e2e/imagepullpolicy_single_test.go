@@ -45,7 +45,7 @@ var _ = Describe("enforcing a defined ImagePullPolicy", func() {
 	})
 
 	It("should just allow the defined policy", func() {
-		ns := NewNamespace("allow-policies")
+		ns := NewNamespace("")
 		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 
 		cs := ownerClient(tnt.Spec.Owners[0])

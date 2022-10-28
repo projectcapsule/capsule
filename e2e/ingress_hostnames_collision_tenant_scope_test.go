@@ -120,9 +120,9 @@ var _ = Describe("when handling Tenant scoped Ingress hostnames collision", func
 
 	It("should ensure Tenant scope for Ingress hostname and path collision", func() {
 
-		ns1 := NewNamespace("cluster-collision-one")
+		ns1 := NewNamespace("")
 
-		ns2 := NewNamespace("cluster-collision-two")
+		ns2 := NewNamespace("")
 
 		cs := ownerClient(tnt.Spec.Owners[0])
 

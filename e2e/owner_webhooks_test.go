@@ -100,7 +100,7 @@ var _ = Describe("when Tenant owner interacts with the webhooks", func() {
 
 	It("should disallow deletions", func() {
 		By("blocking Capsule Limit ranges", func() {
-			ns := NewNamespace("limit-range-disallow")
+			ns := NewNamespace("")
 			NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 			TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
@@ -114,7 +114,7 @@ var _ = Describe("when Tenant owner interacts with the webhooks", func() {
 			Expect(cs.CoreV1().LimitRanges(ns.GetName()).Delete(context.TODO(), lr.Name, metav1.DeleteOptions{})).ShouldNot(Succeed())
 		})
 		By("blocking Capsule Network Policy", func() {
-			ns := NewNamespace("network-policy-disallow")
+			ns := NewNamespace("")
 			NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 			TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
@@ -128,7 +128,7 @@ var _ = Describe("when Tenant owner interacts with the webhooks", func() {
 			Expect(cs.NetworkingV1().NetworkPolicies(ns.GetName()).Delete(context.TODO(), np.Name, metav1.DeleteOptions{})).ShouldNot(Succeed())
 		})
 		By("blocking Capsule Resource Quota", func() {
-			ns := NewNamespace("resource-quota-disallow")
+			ns := NewNamespace("")
 			NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 			TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
@@ -145,7 +145,7 @@ var _ = Describe("when Tenant owner interacts with the webhooks", func() {
 
 	It("should allow", func() {
 		By("listing Limit Range", func() {
-			ns := NewNamespace("limit-range-list")
+			ns := NewNamespace("")
 			NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 			TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
@@ -156,7 +156,7 @@ var _ = Describe("when Tenant owner interacts with the webhooks", func() {
 			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		})
 		By("listing Network Policy", func() {
-			ns := NewNamespace("network-policy-list")
+			ns := NewNamespace("")
 			NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 			TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
@@ -167,7 +167,7 @@ var _ = Describe("when Tenant owner interacts with the webhooks", func() {
 			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		})
 		By("listing Resource Quota", func() {
-			ns := NewNamespace("resource-quota-list")
+			ns := NewNamespace("")
 			NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 			TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
@@ -180,7 +180,7 @@ var _ = Describe("when Tenant owner interacts with the webhooks", func() {
 	})
 
 	It("should allow all actions to Tenant owner Network Policy", func() {
-		ns := NewNamespace("network-policy-allow")
+		ns := NewNamespace("")
 		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
