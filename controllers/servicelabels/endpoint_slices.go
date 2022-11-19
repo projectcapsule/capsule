@@ -30,10 +30,10 @@ func (r *EndpointSlicesLabelsReconciler) SetupWithManager(ctx context.Context, m
 		r.Log.Info("Skipping controller setup, as EndpointSlices are not supported on current kubernetes version", "VersionMajor", r.VersionMajor, "VersionMinor", r.VersionMinor)
 
 		return nil
-	case r.VersionMajor == 1 && r.VersionMinor >= 21:
-		r.abstractServiceLabelsReconciler.obj = &discoveryv1.EndpointSlice{}
-	default:
+	case r.VersionMajor == 1 && r.VersionMinor < 25:
 		r.abstractServiceLabelsReconciler.obj = &discoveryv1beta1.EndpointSlice{}
+	default:
+		r.abstractServiceLabelsReconciler.obj = &discoveryv1.EndpointSlice{}
 	}
 
 	return ctrl.NewControllerManagedBy(mgr).
