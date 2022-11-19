@@ -226,7 +226,7 @@ e2e/%: ginkgo
 	$(MAKE) e2e-build/$* && $(MAKE) e2e-exec || $(MAKE) e2e-destroy
 
 e2e-build/%:
-	kind create cluster --name capsule --image=kindest/node:$*
+	kind create cluster --wait=60s --name capsule --image=kindest/node:$*
 	make docker-build
 	kind load docker-image --nodes capsule-control-plane --name capsule $(IMG)
 	helm upgrade \
@@ -247,4 +247,3 @@ e2e-exec:
 
 e2e-destroy:
 	kind delete cluster --name capsule
-
