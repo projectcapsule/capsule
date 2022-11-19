@@ -220,7 +220,7 @@ var _ = Describe("adding metadata to Service objects", func() {
 		})
 	})
 
-	It("should apply them to EndpointSlice", func() {
+	It("should apply them to EndpointSlice in v1", func() {
 		if err := k8sClient.List(context.Background(), &networkingv1.IngressList{}); err != nil {
 			missingAPIError := &meta.NoKindMatchError{}
 			if errors.As(err, &missingAPIError) {
@@ -231,10 +231,34 @@ var _ = Describe("adding metadata to Service objects", func() {
 		ns := NewNamespace("")
 		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
+		// Waiting for the reconciliation of required RBAC
+		EventuallyCreation(func() (err error) {
+			pod := &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "container",
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:  "container",
+							Image: "quay.io/google-containers/pause-amd64:3.0",
+						},
+					},
+				},
+			}
+			_, err = ownerClient(tnt.Spec.Owners[0]).CoreV1().Pods(ns.GetName()).Create(context.Background(), pod, metav1.CreateOptions{})
+
+			return
+		}).Should(Succeed())
 
 		var eps client.Object
 
-		if version := GetKubernetesVersion(); version.Major() == 1 && version.Minor() < 25 {
+		if err := k8sClient.List(context.Background(), &discoveryv1.EndpointSliceList{}); err != nil {
+			missingAPIError := &meta.NoKindMatchError{}
+			if errors.As(err, &missingAPIError) {
+				Skip(fmt.Sprintf("Running test due to unsupported API kind: %s", err.Error()))
+			}
+
 			eps = &discoveryv1beta1.EndpointSlice{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "endpointslice-metadata",
@@ -273,25 +297,6 @@ var _ = Describe("adding metadata to Service objects", func() {
 				},
 			}
 		}
-		// Waiting for the reconciliation of required RBAC
-		EventuallyCreation(func() (err error) {
-			pod := &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "container",
-				},
-				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{
-						{
-							Name:  "container",
-							Image: "quay.io/google-containers/pause-amd64:3.0",
-						},
-					},
-				},
-			}
-			_, err = ownerClient(tnt.Spec.Owners[0]).CoreV1().Pods(ns.GetName()).Create(context.Background(), pod, metav1.CreateOptions{})
-
-			return
-		}).Should(Succeed())
 
 		EventuallyCreation(func() (err error) {
 			return k8sClient.Create(context.TODO(), eps)
