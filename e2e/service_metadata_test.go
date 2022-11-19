@@ -9,11 +9,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	discoveryv1 "k8s.io/api/discovery/v1"
+	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
-	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
 	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -37,7 +39,7 @@ var _ = Describe("adding metadata to Service objects", func() {
 					Kind: "User",
 				},
 			},
-			ServiceOptions: &capsulev1beta1.ServiceOptions{
+			ServiceOptions: &api.ServiceOptions{
 				AdditionalMetadata: &api.AdditionalMetadataSpec{
 					Labels: map[string]string{
 						"k8s.io/custom-label":     "foo",
@@ -218,7 +220,7 @@ var _ = Describe("adding metadata to Service objects", func() {
 		})
 	})
 
-	It("should apply them to EndpointSlice", func() {
+	It("should apply them to EndpointSlice in v1", func() {
 		if err := k8sClient.List(context.Background(), &networkingv1.IngressList{}); err != nil {
 			missingAPIError := &meta.NoKindMatchError{}
 			if errors.As(err, &missingAPIError) {
@@ -230,24 +232,6 @@ var _ = Describe("adding metadata to Service objects", func() {
 		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
-		eps := &discoveryv1beta1.EndpointSlice{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "endpointslice-metadata",
-				Namespace: ns.GetName(),
-			},
-			AddressType: discoveryv1beta1.AddressTypeIPv4,
-			Endpoints: []discoveryv1beta1.Endpoint{
-				{
-					Addresses: []string{"10.10.1.1"},
-				},
-			},
-			Ports: []discoveryv1beta1.EndpointPort{
-				{
-					Name: pointer.StringPtr("foo"),
-					Port: pointer.Int32Ptr(9999),
-				},
-			},
-		}
 		// Waiting for the reconciliation of required RBAC
 		EventuallyCreation(func() (err error) {
 			pod := &corev1.Pod{
@@ -268,6 +252,53 @@ var _ = Describe("adding metadata to Service objects", func() {
 			return
 		}).Should(Succeed())
 
+		var eps client.Object
+
+		if err := k8sClient.List(context.Background(), &discoveryv1.EndpointSliceList{}); err != nil {
+			missingAPIError := &meta.NoKindMatchError{}
+			if errors.As(err, &missingAPIError) {
+				Skip(fmt.Sprintf("Running test due to unsupported API kind: %s", err.Error()))
+			}
+
+			eps = &discoveryv1beta1.EndpointSlice{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "endpointslice-metadata",
+					Namespace: ns.GetName(),
+				},
+				AddressType: discoveryv1beta1.AddressTypeIPv4,
+				Endpoints: []discoveryv1beta1.Endpoint{
+					{
+						Addresses: []string{"10.10.1.1"},
+					},
+				},
+				Ports: []discoveryv1beta1.EndpointPort{
+					{
+						Name: pointer.StringPtr("foo"),
+						Port: pointer.Int32Ptr(9999),
+					},
+				},
+			}
+		} else {
+			eps = &discoveryv1.EndpointSlice{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "endpointslice-metadata",
+					Namespace: ns.GetName(),
+				},
+				AddressType: discoveryv1.AddressTypeIPv4,
+				Endpoints: []discoveryv1.Endpoint{
+					{
+						Addresses: []string{"10.10.1.1"},
+					},
+				},
+				Ports: []discoveryv1.EndpointPort{
+					{
+						Name: pointer.StringPtr("foo"),
+						Port: pointer.Int32Ptr(9999),
+					},
+				},
+			}
+		}
+
 		EventuallyCreation(func() (err error) {
 			return k8sClient.Create(context.TODO(), eps)
 		}).Should(Succeed())
@@ -276,7 +307,7 @@ var _ = Describe("adding metadata to Service objects", func() {
 			Eventually(func() (ok bool) {
 				Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: eps.GetName(), Namespace: ns.GetName()}, eps)).Should(Succeed())
 				for k, v := range tnt.Spec.ServiceOptions.AdditionalMetadata.Annotations {
-					ok, _ = HaveKeyWithValue(k, v).Match(eps.Annotations)
+					ok, _ = HaveKeyWithValue(k, v).Match(eps.GetAnnotations())
 					if !ok {
 						return false
 					}
@@ -289,7 +320,7 @@ var _ = Describe("adding metadata to Service objects", func() {
 			Eventually(func() (ok bool) {
 				Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: eps.GetName(), Namespace: ns.GetName()}, eps)).Should(Succeed())
 				for k, v := range tnt.Spec.ServiceOptions.AdditionalMetadata.Labels {
-					ok, _ = HaveKeyWithValue(k, v).Match(eps.Labels)
+					ok, _ = HaveKeyWithValue(k, v).Match(eps.GetLabels())
 					if !ok {
 						return false
 					}
