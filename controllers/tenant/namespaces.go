@@ -17,6 +17,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
+	"github.com/clastix/capsule/pkg/utils"
 )
 
 // Ensuring all annotations are applied to each Namespace handled by the Tenant.
@@ -72,11 +73,7 @@ func (r *Manager) syncNamespaceMetadata(ctx context.Context, namespace string, t
 			}
 
 			if tnt.Spec.NodeSelector != nil {
-				var selector []string
-				for k, v := range tnt.Spec.NodeSelector {
-					selector = append(selector, fmt.Sprintf("%s=%s", k, v))
-				}
-				annotations["scheduler.alpha.kubernetes.io/node-selector"] = strings.Join(selector, ",")
+				annotations = utils.BuildNodeSelector(tnt, annotations)
 			}
 
 			if tnt.Spec.IngressOptions.AllowedClasses != nil {

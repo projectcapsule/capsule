@@ -28,7 +28,7 @@ type handler struct {
 
 func (h *handler) OnCreate(client client.Client, decoder *admission.Decoder, recorder record.EventRecorder) webhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		if !IsCapsuleUser(req, h.configuration.UserGroups()) {
+		if !IsCapsuleUser(ctx, req, client, h.configuration.UserGroups()) {
 			return nil
 		}
 
@@ -44,7 +44,7 @@ func (h *handler) OnCreate(client client.Client, decoder *admission.Decoder, rec
 
 func (h *handler) OnDelete(client client.Client, decoder *admission.Decoder, recorder record.EventRecorder) webhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		if !IsCapsuleUser(req, h.configuration.UserGroups()) {
+		if !IsCapsuleUser(ctx, req, client, h.configuration.UserGroups()) {
 			return nil
 		}
 
@@ -60,7 +60,7 @@ func (h *handler) OnDelete(client client.Client, decoder *admission.Decoder, rec
 
 func (h *handler) OnUpdate(client client.Client, decoder *admission.Decoder, recorder record.EventRecorder) webhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		if !IsCapsuleUser(req, h.configuration.UserGroups()) {
+		if !IsCapsuleUser(ctx, req, client, h.configuration.UserGroups()) {
 			return nil
 		}
 

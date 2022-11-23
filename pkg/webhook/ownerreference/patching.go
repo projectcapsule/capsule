@@ -49,7 +49,7 @@ func (h *handler) OnDelete(client client.Client, decoder *admission.Decoder, rec
 
 func (h *handler) OnUpdate(client client.Client, decoder *admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		return h.setOwnerRef(ctx, req, client, decoder, recorder)
+		return nil
 	}
 }
 
