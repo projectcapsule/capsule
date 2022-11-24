@@ -131,26 +131,36 @@ func (r *userMetadataHandler) OnUpdate(client client.Client, decoder *admission.
 			}
 		}
 
-		var labels, annotations map[string]string
+		labels, annotations := oldNs.GetLabels(), oldNs.GetAnnotations()
 
 		for key, value := range newNs.GetLabels() {
-			if _, ok := oldNs.GetLabels()[key]; ok {
-				if labels == nil {
-					labels = make(map[string]string)
-				}
-
+			v, ok := labels[key]
+			if !ok {
 				labels[key] = value
+
+				continue
 			}
+
+			if v != value {
+				continue
+			}
+
+			delete(labels, key)
 		}
 
 		for key, value := range newNs.GetAnnotations() {
-			if _, ok := oldNs.GetAnnotations()[key]; ok {
-				if annotations == nil {
-					annotations = make(map[string]string)
-				}
-
+			v, ok := annotations[key]
+			if !ok {
 				annotations[key] = value
+
+				continue
 			}
+
+			if v != value {
+				continue
+			}
+
+			delete(annotations, key)
 		}
 
 		return r.validateUserMetadata(tnt, recorder, labels, annotations)
