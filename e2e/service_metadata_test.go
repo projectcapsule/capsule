@@ -10,10 +10,10 @@ import (
 	"errors"
 	"fmt"
 
-	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
+	discoveryv1 "k8s.io/api/discovery/v1"
 	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
 	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -21,6 +21,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/pointer"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
 )
 
 var _ = Describe("adding metadata to Service objects", func() {
@@ -228,23 +231,46 @@ var _ = Describe("adding metadata to Service objects", func() {
 		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
-		eps := &discoveryv1beta1.EndpointSlice{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "endpointslice-metadata",
-				Namespace: ns.GetName(),
-			},
-			AddressType: discoveryv1beta1.AddressTypeIPv4,
-			Endpoints: []discoveryv1beta1.Endpoint{
-				{
-					Addresses: []string{"10.10.1.1"},
+		var eps client.Object
+
+		if version := GetKubernetesVersion(); version.Major() == 1 && version.Minor() < 25 {
+			eps = &discoveryv1beta1.EndpointSlice{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "endpointslice-metadata",
+					Namespace: ns.GetName(),
 				},
-			},
-			Ports: []discoveryv1beta1.EndpointPort{
-				{
-					Name: pointer.StringPtr("foo"),
-					Port: pointer.Int32Ptr(9999),
+				AddressType: discoveryv1beta1.AddressTypeIPv4,
+				Endpoints: []discoveryv1beta1.Endpoint{
+					{
+						Addresses: []string{"10.10.1.1"},
+					},
 				},
-			},
+				Ports: []discoveryv1beta1.EndpointPort{
+					{
+						Name: pointer.StringPtr("foo"),
+						Port: pointer.Int32Ptr(9999),
+					},
+				},
+			}
+		} else {
+			eps = &discoveryv1.EndpointSlice{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "endpointslice-metadata",
+					Namespace: ns.GetName(),
+				},
+				AddressType: discoveryv1.AddressTypeIPv4,
+				Endpoints: []discoveryv1.Endpoint{
+					{
+						Addresses: []string{"10.10.1.1"},
+					},
+				},
+				Ports: []discoveryv1.EndpointPort{
+					{
+						Name: pointer.StringPtr("foo"),
+						Port: pointer.Int32Ptr(9999),
+					},
+				},
+			}
 		}
 		// Waiting for the reconciliation of required RBAC
 		EventuallyCreation(func() (err error) {
@@ -274,7 +300,7 @@ var _ = Describe("adding metadata to Service objects", func() {
 			Eventually(func() (ok bool) {
 				Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: eps.GetName(), Namespace: ns.GetName()}, eps)).Should(Succeed())
 				for k, v := range tnt.Spec.ServiceOptions.AdditionalMetadata.Annotations {
-					ok, _ = HaveKeyWithValue(k, v).Match(eps.Annotations)
+					ok, _ = HaveKeyWithValue(k, v).Match(eps.GetAnnotations())
 					if !ok {
 						return false
 					}
@@ -287,7 +313,7 @@ var _ = Describe("adding metadata to Service objects", func() {
 			Eventually(func() (ok bool) {
 				Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: eps.GetName(), Namespace: ns.GetName()}, eps)).Should(Succeed())
 				for k, v := range tnt.Spec.ServiceOptions.AdditionalMetadata.Labels {
-					ok, _ = HaveKeyWithValue(k, v).Match(eps.Labels)
+					ok, _ = HaveKeyWithValue(k, v).Match(eps.GetLabels())
 					if !ok {
 						return false
 					}
