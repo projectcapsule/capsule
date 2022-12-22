@@ -20,7 +20,6 @@ type CapsuleConfigurationSpec struct {
 	ProtectedNamespaceRegexpString string `json:"protectedNamespaceRegex,omitempty"`
 }
 
-// +kubebuilder:storageversion
 // +kubebuilder:object:root=true
 // +kubebuilder:resource:scope=Cluster
 

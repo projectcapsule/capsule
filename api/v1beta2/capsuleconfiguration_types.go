@@ -54,6 +54,7 @@ type CapsuleResources struct {
 
 // +kubebuilder:object:root=true
 // +kubebuilder:resource:scope=Cluster
+// +kubebuilder:storageversion
 
 // CapsuleConfiguration is the Schema for the Capsule configuration API.
 type CapsuleConfiguration struct {
