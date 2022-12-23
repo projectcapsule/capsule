@@ -249,7 +249,7 @@ webhooks:
     - apiGroups:
         - capsule.clastix.io
       apiVersions:
-        - v1beta1
+        - v1beta2
       operations:
         - CREATE
         - UPDATE

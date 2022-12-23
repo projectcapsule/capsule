@@ -1,18 +1,19 @@
-apiVersion: capsule.clastix.io/v1alpha1
+apiVersion: capsule.clastix.io/v1beta2
 kind: CapsuleConfiguration
 metadata:
   name: default
   labels:
   {{- include "capsule.labels" . | nindent 4 }}
   annotations:
-    capsule.clastix.io/mutating-webhook-configuration-name: {{ include "capsule.fullname" . }}-mutating-webhook-configuration
-    capsule.clastix.io/tls-secret-name: {{ include "capsule.secretTlsName" . }}
-    capsule.clastix.io/validating-webhook-configuration-name: {{ include "capsule.fullname" . }}-validating-webhook-configuration
-    capsule.clastix.io/enable-tls-configuration: "{{ .Values.tls.enableController }}"
   {{- with .Values.customAnnotations }}
     {{- toYaml . | nindent 4 }}
   {{- end }}
 spec:
+  enableTLSReconciler: {{ .Values.tls.enableController }}
+  overrides:
+    mutatingWebhookConfigurationName: {{ include "capsule.fullname" . }}-mutating-webhook-configuration
+    TLSSecretName: {{ include "capsule.secretTlsName" . }}
+    validatingWebhookConfigurationName: {{ include "capsule.fullname" . }}-validating-webhook-configuration
   forceTenantPrefix: {{ .Values.manager.options.forceTenantPrefix }}
   userGroups:
 {{- range .Values.manager.options.capsuleUserGroups }}

@@ -113,6 +113,10 @@ spec:
                     - forbiddenLabels
                   type: object
                 overrides:
+                  default:
+                    TLSSecretName: capsule-tls
+                    mutatingWebhookConfigurationName: capsule-mutating-webhook-configuration
+                    validatingWebhookConfigurationName: capsule-validating-webhook-configuration
                   description: Allows to set different name rather than the canonical one for the Capsule configuration objects, such as webhook secret or configurations.
                   properties:
                     TLSSecretName:
@@ -144,8 +148,6 @@ spec:
                   type: array
               required:
                 - enableTLSReconciler
-                - nodeMetadata
-                - overrides
               type: object
           type: object
       served: true
