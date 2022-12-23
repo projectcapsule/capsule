@@ -12,10 +12,10 @@ import (
 
 type ingressClassForbiddenError struct {
 	className string
-	spec      api.AllowedListSpec
+	spec      api.SelectorAllowedListSpec
 }
 
-func NewIngressClassForbidden(className string, spec api.AllowedListSpec) error {
+func NewIngressClassForbidden(className string, spec api.SelectorAllowedListSpec) error {
 	return &ingressClassForbiddenError{
 		className: className,
 		spec:      spec,
@@ -54,10 +54,10 @@ func (i ingressHostnameNotValidError) Error() string {
 }
 
 type ingressClassNotValidError struct {
-	spec api.AllowedListSpec
+	spec api.SelectorAllowedListSpec
 }
 
-func NewIngressClassNotValid(spec api.AllowedListSpec) error {
+func NewIngressClassNotValid(spec api.SelectorAllowedListSpec) error {
 	return &ingressClassNotValidError{
 		spec: spec,
 	}
@@ -68,13 +68,17 @@ func (i ingressClassNotValidError) Error() string {
 }
 
 // nolint:predeclared
-func appendClassError(spec api.AllowedListSpec) (append string) {
+func appendClassError(spec api.SelectorAllowedListSpec) (append string) {
 	if len(spec.Exact) > 0 {
 		append += fmt.Sprintf(", one of the following (%s)", strings.Join(spec.Exact, ", "))
 	}
 
 	if len(spec.Regex) > 0 {
 		append += fmt.Sprintf(", or matching the regex %s", spec.Regex)
+	}
+
+	if len(spec.Selector.MatchLabels) > 0 || len(spec.Selector.MatchExpressions) > 0 {
+		append += fmt.Sprintf(", or matching the label selector defined in the Tenant")
 	}
 
 	return

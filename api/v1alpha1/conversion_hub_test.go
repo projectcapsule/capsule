@@ -61,9 +61,11 @@ func generateTenantsSpecs() (Tenant, capsulev1beta1.Tenant) {
 			Allowed: []api.AllowedIP{"192.168.0.1"},
 		},
 	}
-	v1beta1AllowedListSpec := &api.AllowedListSpec{
-		Exact: []string{"foo", "bar"},
-		Regex: "^foo*",
+	v1beta2AllowedListSpec := &api.SelectorAllowedListSpec{
+		AllowedListSpec: api.AllowedListSpec{
+			Exact: []string{"foo", "bar"},
+			Regex: "^foo*",
+		},
 	}
 	networkPolicies := []networkingv1.NetworkPolicySpec{
 		{
@@ -235,13 +237,13 @@ func generateTenantsSpecs() (Tenant, capsulev1beta1.Tenant) {
 			},
 			NamespaceOptions: v1beta1NamespaceOptions,
 			ServiceOptions:   v1beta1ServiceOptions,
-			StorageClasses:   v1beta1AllowedListSpec,
+			StorageClasses:   &v1beta2AllowedListSpec.AllowedListSpec,
 			IngressOptions: capsulev1beta1.IngressOptions{
 				HostnameCollisionScope: api.HostnameCollisionScopeDisabled,
-				AllowedClasses:         v1beta1AllowedListSpec,
-				AllowedHostnames:       v1beta1AllowedListSpec,
+				AllowedClasses:         &v1beta2AllowedListSpec.AllowedListSpec,
+				AllowedHostnames:       &v1beta2AllowedListSpec.AllowedListSpec,
 			},
-			ContainerRegistries: v1beta1AllowedListSpec,
+			ContainerRegistries: &v1beta2AllowedListSpec.AllowedListSpec,
 			NodeSelector:        nodeSelector,
 			NetworkPolicies: api.NetworkPolicySpec{
 				Items: networkPolicies,

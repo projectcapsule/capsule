@@ -11,23 +11,27 @@ import (
 )
 
 type storageClassNotValidError struct {
-	spec api.AllowedListSpec
+	spec api.SelectorAllowedListSpec
 }
 
-func NewStorageClassNotValid(storageClasses api.AllowedListSpec) error {
+func NewStorageClassNotValid(storageClasses api.SelectorAllowedListSpec) error {
 	return &storageClassNotValidError{
 		spec: storageClasses,
 	}
 }
 
 // nolint:predeclared
-func appendError(spec api.AllowedListSpec) (append string) {
+func appendError(spec api.SelectorAllowedListSpec) (append string) {
 	if len(spec.Exact) > 0 {
 		append += fmt.Sprintf(", one of the following (%s)", strings.Join(spec.Exact, ", "))
 	}
 
 	if len(spec.Regex) > 0 {
 		append += fmt.Sprintf(", or matching the regex %s", spec.Regex)
+	}
+
+	if len(spec.Selector.MatchLabels) > 0 || len(spec.Selector.MatchExpressions) > 0 {
+		append += ", or matching the label selector defined in the Tenant"
 	}
 
 	return
@@ -39,10 +43,10 @@ func (s storageClassNotValidError) Error() (err string) {
 
 type storageClassForbiddenError struct {
 	className string
-	spec      api.AllowedListSpec
+	spec      api.SelectorAllowedListSpec
 }
 
-func NewStorageClassForbidden(className string, storageClasses api.AllowedListSpec) error {
+func NewStorageClassForbidden(className string, storageClasses api.SelectorAllowedListSpec) error {
 	return &storageClassForbiddenError{
 		className: className,
 		spec:      storageClasses,

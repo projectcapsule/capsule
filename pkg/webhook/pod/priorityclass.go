@@ -5,9 +5,13 @@ package pod
 
 import (
 	"context"
+	"net/http"
 
 	corev1 "k8s.io/api/core/v1"
+	schedulingv1 "k8s.io/api/scheduling/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -21,6 +25,24 @@ type priorityClass struct{}
 
 func PriorityClass() capsulewebhook.Handler {
 	return &priorityClass{}
+}
+
+func (h *priorityClass) class(ctx context.Context, c client.Client, name string) (client.Object, error) {
+	if len(name) == 0 {
+		return nil, nil
+	}
+
+	obj := &schedulingv1.PriorityClass{}
+
+	if err := c.Get(ctx, types.NamespacedName{Name: name}, obj); err != nil {
+		if errors.IsNotFound(err) {
+			return nil, nil
+		}
+
+		return nil, err
+	}
+
+	return obj, nil
 }
 
 func (h *priorityClass) OnCreate(c client.Client, decoder *admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
@@ -46,6 +68,13 @@ func (h *priorityClass) OnCreate(c client.Client, decoder *admission.Decoder, re
 
 		priorityClassName := pod.Spec.PriorityClassName
 
+		class, err := h.class(ctx, c, priorityClassName)
+		if err != nil {
+			response := admission.Errored(http.StatusInternalServerError, err)
+
+			return &response
+		}
+
 		switch {
 		case allowed == nil:
 			// Enforcement is not in place, skipping it at all
@@ -53,7 +82,7 @@ func (h *priorityClass) OnCreate(c client.Client, decoder *admission.Decoder, re
 		case len(priorityClassName) == 0:
 			// We don't have to force Pod to specify a Priority Class
 			return nil
-		case !allowed.ExactMatch(priorityClassName) && !allowed.RegexMatch(priorityClassName):
+		case !allowed.ExactMatch(priorityClassName) && !allowed.RegexMatch(priorityClassName) && !allowed.SelectorMatch(class):
 			recorder.Eventf(&tntList.Items[0], corev1.EventTypeWarning, "ForbiddenPriorityClass", "Pod %s/%s is using Priority Class %s is forbidden for the current Tenant", pod.Namespace, pod.Name, priorityClassName)
 
 			response := admission.Denied(NewPodPriorityClassForbidden(priorityClassName, *allowed).Error())
