@@ -35,12 +35,14 @@ var _ = Describe("when Tenant handles Ingress classes with extensions/v1beta1", 
 				},
 			},
 			IngressOptions: capsulev1beta2.IngressOptions{
-				AllowedClasses: &api.AllowedListSpec{
-					Exact: []string{
-						"nginx",
-						"haproxy",
+				AllowedClasses: &api.SelectorAllowedListSpec{
+					AllowedListSpec: api.AllowedListSpec{
+						Exact: []string{
+							"nginx",
+							"haproxy",
+						},
+						Regex: "^oil-.*$",
 					},
-					Regex: "^oil-.*$",
 				},
 			},
 		},

@@ -33,10 +33,12 @@ var _ = Describe("when Tenant owner interacts with the webhooks", func() {
 					Kind: "User",
 				},
 			},
-			StorageClasses: &api.AllowedListSpec{
-				Exact: []string{
-					"cephfs",
-					"glusterfs",
+			StorageClasses: &api.SelectorAllowedListSpec{
+				AllowedListSpec: api.AllowedListSpec{
+					Exact: []string{
+						"cephfs",
+						"glusterfs",
+					},
 				},
 			},
 			LimitRanges: api.LimitRangesSpec{Items: []corev1.LimitRangeSpec{

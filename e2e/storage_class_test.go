@@ -31,12 +31,14 @@ var _ = Describe("when Tenant handles Storage classes", func() {
 					Kind: "User",
 				},
 			},
-			StorageClasses: &api.AllowedListSpec{
-				Exact: []string{
-					"cephfs",
-					"glusterfs",
+			StorageClasses: &api.SelectorAllowedListSpec{
+				AllowedListSpec: api.AllowedListSpec{
+					Exact: []string{
+						"cephfs",
+						"glusterfs",
+					},
+					Regex: "^oil-.*$",
 				},
-				Regex: "^oil-.*$",
 			},
 		},
 	}
