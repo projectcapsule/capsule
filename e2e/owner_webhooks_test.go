@@ -17,17 +17,17 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
-	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
+	capsulev1beta2 "github.com/clastix/capsule/api/v1beta2"
 	"github.com/clastix/capsule/pkg/api"
 )
 
 var _ = Describe("when Tenant owner interacts with the webhooks", func() {
-	tnt := &capsulev1beta1.Tenant{
+	tnt := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "tenant-owner",
 		},
-		Spec: capsulev1beta1.TenantSpec{
-			Owners: capsulev1beta1.OwnerListSpec{
+		Spec: capsulev1beta2.TenantSpec{
+			Owners: capsulev1beta2.OwnerListSpec{
 				{
 					Name: "ruby",
 					Kind: "User",

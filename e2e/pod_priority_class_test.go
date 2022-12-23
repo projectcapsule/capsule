@@ -14,17 +14,17 @@ import (
 	v1 "k8s.io/api/scheduling/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
+	capsulev1beta2 "github.com/clastix/capsule/api/v1beta2"
 	"github.com/clastix/capsule/pkg/api"
 )
 
 var _ = Describe("enforcing a Priority Class", func() {
-	tnt := &capsulev1beta1.Tenant{
+	tnt := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "priority-class",
 		},
-		Spec: capsulev1beta1.TenantSpec{
-			Owners: capsulev1beta1.OwnerListSpec{
+		Spec: capsulev1beta2.TenantSpec{
+			Owners: capsulev1beta2.OwnerListSpec{
 				{
 					Name: "george",
 					Kind: "User",

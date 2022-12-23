@@ -19,16 +19,16 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/pointer"
 
-	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
+	capsulev1beta2 "github.com/clastix/capsule/api/v1beta2"
 )
 
 var _ = Describe("exceeding a Tenant resource quota", func() {
-	tnt := &capsulev1beta1.Tenant{
+	tnt := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "tenant-resources-changes",
 		},
-		Spec: capsulev1beta1.TenantSpec{
-			Owners: capsulev1beta1.OwnerListSpec{
+		Spec: capsulev1beta2.TenantSpec{
+			Owners: capsulev1beta2.OwnerListSpec{
 				{
 					Name: "bobby",
 					Kind: "User",

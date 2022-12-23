@@ -13,19 +13,17 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
-	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
+	capsulev1beta2 "github.com/clastix/capsule/api/v1beta2"
 )
 
 var _ = Describe("Deleting a tenant with protected annotation", func() {
-	tnt := &capsulev1beta1.Tenant{
+	tnt := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "protected-tenant",
-			Annotations: map[string]string{
-				capsulev1beta1.ProtectedTenantAnnotation: "",
-			},
 		},
-		Spec: capsulev1beta1.TenantSpec{
-			Owners: capsulev1beta1.OwnerListSpec{
+		Spec: capsulev1beta2.TenantSpec{
+			PreventDeletion: true,
+			Owners: capsulev1beta2.OwnerListSpec{
 				{
 					Name: "john",
 					Kind: "User",
@@ -36,7 +34,7 @@ var _ = Describe("Deleting a tenant with protected annotation", func() {
 
 	JustAfterEach(func() {
 		Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: tnt.GetName()}, tnt)).Should(Succeed())
-		tnt.SetAnnotations(map[string]string{})
+		tnt.Spec.PreventDeletion = false
 		Expect(k8sClient.Update(context.TODO(), tnt)).Should(Succeed())
 		Expect(k8sClient.Delete(context.TODO(), tnt)).Should(Succeed())
 	})

@@ -12,18 +12,16 @@ import (
 	. "github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	capsulev1alpha1 "github.com/clastix/capsule/api/v1alpha1"
-
-	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
+	capsulev1beta2 "github.com/clastix/capsule/api/v1beta2"
 )
 
 var _ = Describe("creating a Namespace with Tenant name prefix enforcement", func() {
-	t1 := &capsulev1beta1.Tenant{
+	t1 := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "awesome",
 		},
-		Spec: capsulev1beta1.TenantSpec{
-			Owners: capsulev1beta1.OwnerListSpec{
+		Spec: capsulev1beta2.TenantSpec{
+			Owners: capsulev1beta2.OwnerListSpec{
 				{
 					Name: "john",
 					Kind: "User",
@@ -31,12 +29,12 @@ var _ = Describe("creating a Namespace with Tenant name prefix enforcement", fun
 			},
 		},
 	}
-	t2 := &capsulev1beta1.Tenant{
+	t2 := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "awesome-tenant",
 		},
-		Spec: capsulev1beta1.TenantSpec{
-			Owners: capsulev1beta1.OwnerListSpec{
+		Spec: capsulev1beta2.TenantSpec{
+			Owners: capsulev1beta2.OwnerListSpec{
 				{
 					Name: "john",
 					Kind: "User",
@@ -55,7 +53,7 @@ var _ = Describe("creating a Namespace with Tenant name prefix enforcement", fun
 			return k8sClient.Create(context.TODO(), t2)
 		}).Should(Succeed())
 
-		ModifyCapsuleConfigurationOpts(func(configuration *capsulev1alpha1.CapsuleConfiguration) {
+		ModifyCapsuleConfigurationOpts(func(configuration *capsulev1beta2.CapsuleConfiguration) {
 			configuration.Spec.ForceTenantPrefix = true
 		})
 	})
@@ -63,7 +61,7 @@ var _ = Describe("creating a Namespace with Tenant name prefix enforcement", fun
 		Expect(k8sClient.Delete(context.TODO(), t1)).Should(Succeed())
 		Expect(k8sClient.Delete(context.TODO(), t2)).Should(Succeed())
 
-		ModifyCapsuleConfigurationOpts(func(configuration *capsulev1alpha1.CapsuleConfiguration) {
+		ModifyCapsuleConfigurationOpts(func(configuration *capsulev1beta2.CapsuleConfiguration) {
 			configuration.Spec.ForceTenantPrefix = false
 		})
 	})
