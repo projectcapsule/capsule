@@ -85,7 +85,11 @@ func (in *Tenant) ConvertFrom(raw conversion.Hub) error {
 	}
 
 	in.Spec.ServiceOptions = src.Spec.ServiceOptions
-	in.Spec.StorageClasses = src.Spec.StorageClasses
+	if src.Spec.StorageClasses != nil {
+		in.Spec.StorageClasses = &api.SelectorAllowedListSpec{
+			AllowedListSpec: *src.Spec.StorageClasses,
+		}
+	}
 
 	if scope := src.Spec.IngressOptions.HostnameCollisionScope; len(scope) > 0 {
 		in.Spec.IngressOptions.HostnameCollisionScope = scope
@@ -102,7 +106,9 @@ func (in *Tenant) ConvertFrom(raw conversion.Hub) error {
 	}
 
 	if ingressClass := src.Spec.IngressOptions.AllowedClasses; ingressClass != nil {
-		in.Spec.IngressOptions.AllowedClasses = ingressClass
+		in.Spec.IngressOptions.AllowedClasses = &api.SelectorAllowedListSpec{
+			AllowedListSpec: *ingressClass,
+		}
 	}
 
 	if hostnames := src.Spec.IngressOptions.AllowedHostnames; hostnames != nil {
@@ -116,7 +122,12 @@ func (in *Tenant) ConvertFrom(raw conversion.Hub) error {
 	in.Spec.ResourceQuota = src.Spec.ResourceQuota
 	in.Spec.AdditionalRoleBindings = src.Spec.AdditionalRoleBindings
 	in.Spec.ImagePullPolicies = src.Spec.ImagePullPolicies
-	in.Spec.PriorityClasses = src.Spec.PriorityClasses
+
+	if src.Spec.PriorityClasses != nil {
+		in.Spec.PriorityClasses = &api.SelectorAllowedListSpec{
+			AllowedListSpec: *src.Spec.PriorityClasses,
+		}
+	}
 
 	if v, found := annotations["capsule.clastix.io/cordon"]; found {
 		value, err := strconv.ParseBool(v)
@@ -207,12 +218,14 @@ func (in *Tenant) ConvertTo(raw conversion.Hub) error {
 	}
 
 	dst.Spec.ServiceOptions = in.Spec.ServiceOptions
-	dst.Spec.StorageClasses = in.Spec.StorageClasses
+	if in.Spec.StorageClasses != nil {
+		dst.Spec.StorageClasses = &in.Spec.StorageClasses.AllowedListSpec
+	}
 
 	dst.Spec.IngressOptions.HostnameCollisionScope = in.Spec.IngressOptions.HostnameCollisionScope
 
 	if allowed := in.Spec.IngressOptions.AllowedClasses; allowed != nil {
-		dst.Spec.IngressOptions.AllowedClasses = allowed
+		dst.Spec.IngressOptions.AllowedClasses = &allowed.AllowedListSpec
 	}
 
 	if allowed := in.Spec.IngressOptions.AllowedHostnames; allowed != nil {
@@ -231,7 +244,10 @@ func (in *Tenant) ConvertTo(raw conversion.Hub) error {
 	dst.Spec.ResourceQuota = in.Spec.ResourceQuota
 	dst.Spec.AdditionalRoleBindings = in.Spec.AdditionalRoleBindings
 	dst.Spec.ImagePullPolicies = in.Spec.ImagePullPolicies
-	dst.Spec.PriorityClasses = in.Spec.PriorityClasses
+
+	if in.Spec.PriorityClasses != nil {
+		dst.Spec.PriorityClasses = &in.Spec.PriorityClasses.AllowedListSpec
+	}
 
 	if in.Spec.PreventDeletion {
 		annotations[api.ProtectedTenantAnnotation] = "true" //nolint:goconst

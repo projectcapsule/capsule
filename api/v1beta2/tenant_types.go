@@ -18,7 +18,7 @@ type TenantSpec struct {
 	// Specifies options for the Service, such as additional metadata or block of certain type of Services. Optional.
 	ServiceOptions *api.ServiceOptions `json:"serviceOptions,omitempty"`
 	// Specifies the allowed StorageClasses assigned to the Tenant. Capsule assures that all PersistentVolumeClaim resources created in the Tenant can use only one of the allowed StorageClasses. Optional.
-	StorageClasses *api.AllowedListSpec `json:"storageClasses,omitempty"`
+	StorageClasses *api.SelectorAllowedListSpec `json:"storageClasses,omitempty"`
 	// Specifies options for the Ingress resources, such as allowed hostnames and IngressClass. Optional.
 	IngressOptions IngressOptions `json:"ingressOptions,omitempty"`
 	// Specifies the trusted Image Registries assigned to the Tenant. Capsule assures that all Pods resources created in the Tenant can use only one of the allowed trusted registries. Optional.
@@ -36,7 +36,7 @@ type TenantSpec struct {
 	// Specify the allowed values for the imagePullPolicies option in Pod resources. Capsule assures that all Pod resources created in the Tenant can use only one of the allowed policy. Optional.
 	ImagePullPolicies []api.ImagePullPolicySpec `json:"imagePullPolicies,omitempty"`
 	// Specifies the allowed priorityClasses assigned to the Tenant. Capsule assures that all Pods resources created in the Tenant can use only one of the allowed PriorityClasses. Optional.
-	PriorityClasses *api.AllowedListSpec `json:"priorityClasses,omitempty"`
+	PriorityClasses *api.SelectorAllowedListSpec `json:"priorityClasses,omitempty"`
 	// Toggling the Tenant resources cordoning, when enable resources cannot be deleted.
 	Cordoned bool `json:"cordoned,omitempty"`
 	// Prevent accidental deletion of the Tenant.

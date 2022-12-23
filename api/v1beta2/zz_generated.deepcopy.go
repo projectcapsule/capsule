@@ -261,7 +261,7 @@ func (in *IngressOptions) DeepCopyInto(out *IngressOptions) {
 	*out = *in
 	if in.AllowedClasses != nil {
 		in, out := &in.AllowedClasses, &out.AllowedClasses
-		*out = new(api.AllowedListSpec)
+		*out = new(api.SelectorAllowedListSpec)
 		(*in).DeepCopyInto(*out)
 	}
 	if in.AllowedHostnames != nil {
@@ -718,7 +718,7 @@ func (in *TenantSpec) DeepCopyInto(out *TenantSpec) {
 	}
 	if in.StorageClasses != nil {
 		in, out := &in.StorageClasses, &out.StorageClasses
-		*out = new(api.AllowedListSpec)
+		*out = new(api.SelectorAllowedListSpec)
 		(*in).DeepCopyInto(*out)
 	}
 	in.IngressOptions.DeepCopyInto(&out.IngressOptions)
@@ -751,7 +751,7 @@ func (in *TenantSpec) DeepCopyInto(out *TenantSpec) {
 	}
 	if in.PriorityClasses != nil {
 		in, out := &in.PriorityClasses, &out.PriorityClasses
-		*out = new(api.AllowedListSpec)
+		*out = new(api.SelectorAllowedListSpec)
 		(*in).DeepCopyInto(*out)
 	}
 }

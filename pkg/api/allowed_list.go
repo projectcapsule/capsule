@@ -7,7 +7,28 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
+
+// +kubebuilder:object:generate=true
+
+type SelectorAllowedListSpec struct {
+	AllowedListSpec `json:",inline"`
+
+	Selector metav1.LabelSelector `json:",inline"`
+}
+
+func (in *SelectorAllowedListSpec) SelectorMatch(obj client.Object) bool {
+	selector, err := metav1.LabelSelectorAsSelector(&in.Selector)
+	if err != nil {
+		return false
+	}
+
+	return selector.Matches(labels.Set(obj.GetLabels()))
+}
 
 // +kubebuilder:object:generate=true
 
