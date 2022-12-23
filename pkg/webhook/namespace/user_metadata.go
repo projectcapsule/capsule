@@ -135,6 +135,14 @@ func (r *userMetadataHandler) OnUpdate(client client.Client, decoder *admission.
 
 		labels, annotations := oldNs.GetLabels(), oldNs.GetAnnotations()
 
+		if labels == nil {
+			labels = make(map[string]string)
+		}
+
+		if annotations == nil {
+			annotations = make(map[string]string)
+		}
+
 		for key, value := range newNs.GetLabels() {
 			v, ok := labels[key]
 			if !ok {
