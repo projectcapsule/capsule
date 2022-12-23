@@ -6,14 +6,11 @@ package configuration
 import (
 	"regexp"
 
-	capsulev1beta1 "github.com/clastix/capsule/pkg/api"
+	capsuleapi "github.com/clastix/capsule/pkg/api"
 )
 
 const (
-	TLSSecretName                      = "capsule-tls"
-	MutatingWebhookConfigurationName   = "capsule-mutating-webhook-configuration"
-	ValidatingWebhookConfigurationName = "capsule-validating-webhook-configuration"
-	TenantCRDName                      = "tenants.capsule.clastix.io"
+	TenantCRDName = "tenants.capsule.clastix.io"
 )
 
 type Configuration interface {
@@ -27,6 +24,6 @@ type Configuration interface {
 	ValidatingWebhookConfigurationName() string
 	TenantCRDName() string
 	UserGroups() []string
-	ForbiddenUserNodeLabels() *capsulev1beta1.ForbiddenListSpec
-	ForbiddenUserNodeAnnotations() *capsulev1beta1.ForbiddenListSpec
+	ForbiddenUserNodeLabels() *capsuleapi.ForbiddenListSpec
+	ForbiddenUserNodeAnnotations() *capsuleapi.ForbiddenListSpec
 }

@@ -18,11 +18,11 @@ type NamespaceOptions struct {
 }
 
 func (in *Tenant) hasForbiddenNamespaceLabelsAnnotations() bool {
-	if _, ok := in.Annotations[ForbiddenNamespaceLabelsAnnotation]; ok {
+	if _, ok := in.Annotations[api.ForbiddenNamespaceLabelsAnnotation]; ok {
 		return true
 	}
 
-	if _, ok := in.Annotations[ForbiddenNamespaceLabelsRegexpAnnotation]; ok {
+	if _, ok := in.Annotations[api.ForbiddenNamespaceLabelsRegexpAnnotation]; ok {
 		return true
 	}
 
@@ -30,11 +30,11 @@ func (in *Tenant) hasForbiddenNamespaceLabelsAnnotations() bool {
 }
 
 func (in *Tenant) hasForbiddenNamespaceAnnotationsAnnotations() bool {
-	if _, ok := in.Annotations[ForbiddenNamespaceAnnotationsAnnotation]; ok {
+	if _, ok := in.Annotations[api.ForbiddenNamespaceAnnotationsAnnotation]; ok {
 		return true
 	}
 
-	if _, ok := in.Annotations[ForbiddenNamespaceAnnotationsRegexpAnnotation]; ok {
+	if _, ok := in.Annotations[api.ForbiddenNamespaceAnnotationsRegexpAnnotation]; ok {
 		return true
 	}
 
@@ -47,8 +47,8 @@ func (in *Tenant) ForbiddenUserNamespaceLabels() *api.ForbiddenListSpec {
 	}
 
 	return &api.ForbiddenListSpec{
-		Exact: strings.Split(in.Annotations[ForbiddenNamespaceLabelsAnnotation], ","),
-		Regex: in.Annotations[ForbiddenNamespaceLabelsRegexpAnnotation],
+		Exact: strings.Split(in.Annotations[api.ForbiddenNamespaceLabelsAnnotation], ","),
+		Regex: in.Annotations[api.ForbiddenNamespaceLabelsRegexpAnnotation],
 	}
 }
 
@@ -58,7 +58,7 @@ func (in *Tenant) ForbiddenUserNamespaceAnnotations() *api.ForbiddenListSpec {
 	}
 
 	return &api.ForbiddenListSpec{
-		Exact: strings.Split(in.Annotations[ForbiddenNamespaceAnnotationsAnnotation], ","),
-		Regex: in.Annotations[ForbiddenNamespaceAnnotationsRegexpAnnotation],
+		Exact: strings.Split(in.Annotations[api.ForbiddenNamespaceAnnotationsAnnotation], ","),
+		Regex: in.Annotations[api.ForbiddenNamespaceAnnotationsRegexpAnnotation],
 	}
 }

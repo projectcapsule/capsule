@@ -18,7 +18,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
+	capsulev1beta2 "github.com/clastix/capsule/api/v1beta2"
 )
 
 type Manager struct {
@@ -30,7 +30,7 @@ type Manager struct {
 
 func (r *Manager) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&capsulev1beta1.Tenant{}).
+		For(&capsulev1beta2.Tenant{}).
 		Owns(&corev1.Namespace{}).
 		Owns(&networkingv1.NetworkPolicy{}).
 		Owns(&corev1.LimitRange{}).
@@ -42,7 +42,7 @@ func (r *Manager) SetupWithManager(mgr ctrl.Manager) error {
 func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ctrl.Result, err error) {
 	r.Log = r.Log.WithValues("Request.Name", request.Name)
 	// Fetch the Tenant instance
-	instance := &capsulev1beta1.Tenant{}
+	instance := &capsulev1beta2.Tenant{}
 	if err = r.Get(ctx, request.NamespacedName, instance); err != nil {
 		if apierrors.IsNotFound(err) {
 			r.Log.Info("Request object not found, could have been deleted after reconcile request")
@@ -130,12 +130,12 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 	return ctrl.Result{}, err
 }
 
-func (r *Manager) updateTenantStatus(ctx context.Context, tnt *capsulev1beta1.Tenant) error {
+func (r *Manager) updateTenantStatus(ctx context.Context, tnt *capsulev1beta2.Tenant) error {
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
-		if tnt.IsCordoned() {
-			tnt.Status.State = capsulev1beta1.TenantStateCordoned
+		if tnt.Spec.Cordoned {
+			tnt.Status.State = capsulev1beta2.TenantStateCordoned
 		} else {
-			tnt.Status.State = capsulev1beta1.TenantStateActive
+			tnt.Status.State = capsulev1beta2.TenantStateActive
 		}
 
 		return r.Client.Status().Update(ctx, tnt)

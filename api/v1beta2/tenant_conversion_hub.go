@@ -11,6 +11,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/conversion"
 
 	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
+	"github.com/clastix/capsule/pkg/api"
 )
 
 func (in *Tenant) ConvertFrom(raw conversion.Hub) error {
@@ -58,28 +59,28 @@ func (in *Tenant) ConvertFrom(raw conversion.Hub) error {
 
 		in.Spec.NamespaceOptions.AdditionalMetadata = nsOpts.AdditionalMetadata
 
-		if value, found := annotations[capsulev1beta1.ForbiddenNamespaceLabelsAnnotation]; found {
+		if value, found := annotations[api.ForbiddenNamespaceLabelsAnnotation]; found {
 			in.Spec.NamespaceOptions.ForbiddenLabels.Exact = strings.Split(value, ",")
 
-			delete(annotations, capsulev1beta1.ForbiddenNamespaceLabelsAnnotation)
+			delete(annotations, api.ForbiddenNamespaceLabelsAnnotation)
 		}
 
-		if value, found := annotations[capsulev1beta1.ForbiddenNamespaceLabelsRegexpAnnotation]; found {
+		if value, found := annotations[api.ForbiddenNamespaceLabelsRegexpAnnotation]; found {
 			in.Spec.NamespaceOptions.ForbiddenLabels.Regex = value
 
-			delete(annotations, capsulev1beta1.ForbiddenNamespaceLabelsRegexpAnnotation)
+			delete(annotations, api.ForbiddenNamespaceLabelsRegexpAnnotation)
 		}
 
-		if value, found := annotations[capsulev1beta1.ForbiddenNamespaceAnnotationsAnnotation]; found {
+		if value, found := annotations[api.ForbiddenNamespaceAnnotationsAnnotation]; found {
 			in.Spec.NamespaceOptions.ForbiddenAnnotations.Exact = strings.Split(value, ",")
 
-			delete(annotations, capsulev1beta1.ForbiddenNamespaceAnnotationsAnnotation)
+			delete(annotations, api.ForbiddenNamespaceAnnotationsAnnotation)
 		}
 
-		if value, found := annotations[capsulev1beta1.ForbiddenNamespaceAnnotationsRegexpAnnotation]; found {
+		if value, found := annotations[api.ForbiddenNamespaceAnnotationsRegexpAnnotation]; found {
 			in.Spec.NamespaceOptions.ForbiddenAnnotations.Regex = value
 
-			delete(annotations, capsulev1beta1.ForbiddenNamespaceAnnotationsRegexpAnnotation)
+			delete(annotations, api.ForbiddenNamespaceAnnotationsRegexpAnnotation)
 		}
 	}
 
@@ -126,10 +127,10 @@ func (in *Tenant) ConvertFrom(raw conversion.Hub) error {
 		in.Spec.Cordoned = value
 	}
 
-	if _, found := annotations[capsulev1beta1.ProtectedTenantAnnotation]; found {
+	if _, found := annotations[api.ProtectedTenantAnnotation]; found {
 		in.Spec.PreventDeletion = true
 
-		delete(annotations, capsulev1beta1.ProtectedTenantAnnotation)
+		delete(annotations, api.ProtectedTenantAnnotation)
 	}
 
 	in.SetAnnotations(annotations)
@@ -189,19 +190,19 @@ func (in *Tenant) ConvertTo(raw conversion.Hub) error {
 		dst.Spec.NamespaceOptions.AdditionalMetadata = nsOpts.AdditionalMetadata
 
 		if exact := nsOpts.ForbiddenAnnotations.Exact; len(exact) > 0 {
-			annotations[capsulev1beta1.ForbiddenNamespaceAnnotationsAnnotation] = strings.Join(exact, ",")
+			annotations[api.ForbiddenNamespaceAnnotationsAnnotation] = strings.Join(exact, ",")
 		}
 
 		if regex := nsOpts.ForbiddenAnnotations.Regex; len(regex) > 0 {
-			annotations[capsulev1beta1.ForbiddenNamespaceAnnotationsRegexpAnnotation] = regex
+			annotations[api.ForbiddenNamespaceAnnotationsRegexpAnnotation] = regex
 		}
 
 		if exact := nsOpts.ForbiddenLabels.Exact; len(exact) > 0 {
-			annotations[capsulev1beta1.ForbiddenNamespaceLabelsAnnotation] = strings.Join(exact, ",")
+			annotations[api.ForbiddenNamespaceLabelsAnnotation] = strings.Join(exact, ",")
 		}
 
 		if regex := nsOpts.ForbiddenLabels.Regex; len(regex) > 0 {
-			annotations[capsulev1beta1.ForbiddenNamespaceLabelsRegexpAnnotation] = regex
+			annotations[api.ForbiddenNamespaceLabelsRegexpAnnotation] = regex
 		}
 	}
 
@@ -233,7 +234,7 @@ func (in *Tenant) ConvertTo(raw conversion.Hub) error {
 	dst.Spec.PriorityClasses = in.Spec.PriorityClasses
 
 	if in.Spec.PreventDeletion {
-		annotations[capsulev1beta1.ProtectedTenantAnnotation] = "true" //nolint:goconst
+		annotations[api.ProtectedTenantAnnotation] = "true" //nolint:goconst
 	}
 
 	if in.Spec.Cordoned {

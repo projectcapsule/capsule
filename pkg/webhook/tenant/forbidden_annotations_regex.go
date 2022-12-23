@@ -5,13 +5,14 @@ package tenant
 
 import (
 	"context"
+	"fmt"
 	"regexp"
 
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
+	capsulev1beta2 "github.com/clastix/capsule/api/v1beta2"
 	capsulewebhook "github.com/clastix/capsule/pkg/webhook"
 	"github.com/clastix/capsule/pkg/webhook/utils"
 )
@@ -23,23 +24,23 @@ func ForbiddenAnnotationsRegexHandler() capsulewebhook.Handler {
 }
 
 func (h *forbiddenAnnotationsRegexHandler) validate(decoder *admission.Decoder, req admission.Request) *admission.Response {
-	tenant := &capsulev1beta1.Tenant{}
+	tenant := &capsulev1beta2.Tenant{}
 	if err := decoder.Decode(req, tenant); err != nil {
 		return utils.ErroredResponse(err)
 	}
 
-	if tenant.Annotations == nil {
+	if tenant.Spec.NamespaceOptions == nil {
 		return nil
 	}
 
-	annotationsToCheck := []string{
-		capsulev1beta1.ForbiddenNamespaceAnnotationsRegexpAnnotation,
-		capsulev1beta1.ForbiddenNamespaceLabelsRegexpAnnotation,
+	annotationsToCheck := map[string]string{
+		"labels":      tenant.Spec.NamespaceOptions.ForbiddenLabels.Regex,
+		"annotations": tenant.Spec.NamespaceOptions.ForbiddenAnnotations.Regex,
 	}
 
-	for _, annotation := range annotationsToCheck {
-		if _, err := regexp.Compile(tenant.Annotations[annotation]); err != nil {
-			response := admission.Denied("unable to compile " + annotation + " regex annotation")
+	for scope, annotation := range annotationsToCheck {
+		if _, err := regexp.Compile(tenant.Spec.NamespaceOptions.ForbiddenLabels.Regex); err != nil {
+			response := admission.Denied(fmt.Sprintf("unable to compile %s regex for forbidden %s", annotation, scope))
 
 			return &response
 		}

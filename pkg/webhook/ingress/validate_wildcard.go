@@ -14,7 +14,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
+	capsulev1beta2 "github.com/clastix/capsule/api/v1beta2"
 	capsulewebhook "github.com/clastix/capsule/pkg/webhook"
 	"github.com/clastix/capsule/pkg/webhook/utils"
 )
@@ -44,7 +44,7 @@ func (h *wildcard) OnUpdate(client client.Client, decoder *admission.Decoder, re
 }
 
 func (h *wildcard) wildcardHandler(ctx context.Context, clt client.Client, req admission.Request, recorder record.EventRecorder, decoder *admission.Decoder) *admission.Response {
-	tntList := &capsulev1beta1.TenantList{}
+	tntList := &capsulev1beta2.TenantList{}
 
 	if err := clt.List(ctx, tntList, client.MatchingFieldsSelector{
 		Selector: fields.OneTermEqualSelector(".status.namespaces", req.Namespace),
@@ -59,8 +59,7 @@ func (h *wildcard) wildcardHandler(ctx context.Context, clt client.Client, req a
 
 	tnt := tntList.Items[0]
 
-	// Check if Annotation in manifest has value "capsule.clastix.io/deny-wildcard" set to "true".
-	if tnt.IsWildcardDenied() {
+	if !tnt.Spec.IngressOptions.AllowWildcardHostnames {
 		// Retrieve ingress resource from request.
 		ingress, err := ingressFromRequest(req, decoder)
 		if err != nil {

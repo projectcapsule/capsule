@@ -5,14 +5,13 @@ package tenant
 
 import (
 	"context"
-	"fmt"
 
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
+	capsulev1beta2 "github.com/clastix/capsule/api/v1beta2"
 	capsulewebhook "github.com/clastix/capsule/pkg/webhook"
 	"github.com/clastix/capsule/pkg/webhook/utils"
 )
@@ -31,14 +30,14 @@ func (h *protectedHandler) OnCreate(client.Client, *admission.Decoder, record.Ev
 
 func (h *protectedHandler) OnDelete(clt client.Client, decoder *admission.Decoder, _ record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		tenant := &capsulev1beta1.Tenant{}
+		tenant := &capsulev1beta2.Tenant{}
 
 		if err := clt.Get(ctx, types.NamespacedName{Name: req.AdmissionRequest.Name}, tenant); err != nil {
 			return utils.ErroredResponse(err)
 		}
 
-		if _, protected := tenant.Annotations[capsulev1beta1.ProtectedTenantAnnotation]; protected {
-			response := admission.Denied(fmt.Sprintf("tenant is protected and cannot be deleted, remove %s annotation before proceeding", capsulev1beta1.ProtectedTenantAnnotation))
+		if tenant.Spec.PreventDeletion {
+			response := admission.Denied("tenant is protected and cannot be deleted")
 
 			return &response
 		}

@@ -14,7 +14,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
+	capsulev1beta2 "github.com/clastix/capsule/api/v1beta2"
 	"github.com/clastix/capsule/pkg/configuration"
 	capsulewebhook "github.com/clastix/capsule/pkg/webhook"
 	"github.com/clastix/capsule/pkg/webhook/utils"
@@ -31,7 +31,7 @@ func CordoningHandler(configuration configuration.Configuration) capsulewebhook.
 }
 
 func (h *cordoningHandler) cordonHandler(ctx context.Context, clt client.Client, req admission.Request, recorder record.EventRecorder) *admission.Response {
-	tntList := &capsulev1beta1.TenantList{}
+	tntList := &capsulev1beta2.TenantList{}
 
 	if err := clt.List(ctx, tntList, client.MatchingFieldsSelector{
 		Selector: fields.OneTermEqualSelector(".status.namespaces", req.Namespace),
@@ -44,7 +44,7 @@ func (h *cordoningHandler) cordonHandler(ctx context.Context, clt client.Client,
 	}
 
 	tnt := tntList.Items[0]
-	if tnt.IsCordoned() && utils.IsCapsuleUser(ctx, req, clt, h.configuration.UserGroups()) {
+	if tnt.Spec.Cordoned && utils.IsCapsuleUser(ctx, req, clt, h.configuration.UserGroups()) {
 		recorder.Eventf(&tnt, corev1.EventTypeWarning, "TenantFreezed", "%s %s/%s cannot be %sd, current Tenant is freezed", req.Kind.String(), req.Namespace, req.Name, strings.ToLower(string(req.Operation)))
 
 		response := admission.Denied(fmt.Sprintf("tenant %s is freezed: please, reach out to the system administrator", tnt.GetName()))

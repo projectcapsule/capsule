@@ -12,7 +12,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
+	capsulev1beta2 "github.com/clastix/capsule/api/v1beta2"
 	"github.com/clastix/capsule/pkg/utils"
 )
 
@@ -31,7 +31,7 @@ func IsCapsuleUser(ctx context.Context, req admission.Request, clt client.Client
 		targetNamespace := parts[2]
 
 		if len(targetNamespace) > 0 {
-			tl := &capsulev1beta1.TenantList{}
+			tl := &capsulev1beta2.TenantList{}
 			if err := clt.List(ctx, tl, client.MatchingFieldsSelector{Selector: fields.OneTermEqualSelector(".status.namespaces", targetNamespace)}); err != nil {
 				return false
 			}

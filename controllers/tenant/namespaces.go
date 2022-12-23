@@ -16,12 +16,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
-	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
+	capsulev1beta2 "github.com/clastix/capsule/api/v1beta2"
+	"github.com/clastix/capsule/pkg/api"
 	"github.com/clastix/capsule/pkg/utils"
 )
 
 // Ensuring all annotations are applied to each Namespace handled by the Tenant.
-func (r *Manager) syncNamespaces(ctx context.Context, tenant *capsulev1beta1.Tenant) (err error) {
+func (r *Manager) syncNamespaces(ctx context.Context, tenant *capsulev1beta2.Tenant) (err error) {
 	group := new(errgroup.Group)
 
 	for _, item := range tenant.Status.Namespaces {
@@ -42,7 +43,7 @@ func (r *Manager) syncNamespaces(ctx context.Context, tenant *capsulev1beta1.Ten
 }
 
 // nolint:gocognit
-func (r *Manager) syncNamespaceMetadata(ctx context.Context, namespace string, tnt *capsulev1beta1.Tenant) (err error) {
+func (r *Manager) syncNamespaceMetadata(ctx context.Context, namespace string, tnt *capsulev1beta2.Tenant) (err error) {
 	var res controllerutil.OperationResult
 
 	err = retry.RetryOnConflict(retry.DefaultBackoff, func() (conflictErr error) {
@@ -51,7 +52,7 @@ func (r *Manager) syncNamespaceMetadata(ctx context.Context, namespace string, t
 			return
 		}
 
-		capsuleLabel, _ := utils.GetTypeLabel(&capsulev1beta1.Tenant{})
+		capsuleLabel, _ := utils.GetTypeLabel(&capsulev1beta2.Tenant{})
 
 		res, conflictErr = controllerutil.CreateOrUpdate(ctx, r.Client, ns, func() error {
 			annotations := make(map[string]string)
@@ -103,20 +104,20 @@ func (r *Manager) syncNamespaceMetadata(ctx context.Context, namespace string, t
 				}
 			}
 
-			if value, ok := tnt.Annotations[capsulev1beta1.ForbiddenNamespaceLabelsAnnotation]; ok {
-				annotations[capsulev1beta1.ForbiddenNamespaceLabelsAnnotation] = value
+			if value, ok := tnt.Annotations[api.ForbiddenNamespaceLabelsAnnotation]; ok {
+				annotations[api.ForbiddenNamespaceLabelsAnnotation] = value
 			}
 
-			if value, ok := tnt.Annotations[capsulev1beta1.ForbiddenNamespaceLabelsRegexpAnnotation]; ok {
-				annotations[capsulev1beta1.ForbiddenNamespaceLabelsRegexpAnnotation] = value
+			if value, ok := tnt.Annotations[api.ForbiddenNamespaceLabelsRegexpAnnotation]; ok {
+				annotations[api.ForbiddenNamespaceLabelsRegexpAnnotation] = value
 			}
 
-			if value, ok := tnt.Annotations[capsulev1beta1.ForbiddenNamespaceAnnotationsAnnotation]; ok {
-				annotations[capsulev1beta1.ForbiddenNamespaceAnnotationsAnnotation] = value
+			if value, ok := tnt.Annotations[api.ForbiddenNamespaceAnnotationsAnnotation]; ok {
+				annotations[api.ForbiddenNamespaceAnnotationsAnnotation] = value
 			}
 
-			if value, ok := tnt.Annotations[capsulev1beta1.ForbiddenNamespaceAnnotationsRegexpAnnotation]; ok {
-				annotations[capsulev1beta1.ForbiddenNamespaceAnnotationsRegexpAnnotation] = value
+			if value, ok := tnt.Annotations[api.ForbiddenNamespaceAnnotationsRegexpAnnotation]; ok {
+				annotations[api.ForbiddenNamespaceAnnotationsRegexpAnnotation] = value
 			}
 
 			if ns.Annotations == nil {
@@ -146,11 +147,11 @@ func (r *Manager) syncNamespaceMetadata(ctx context.Context, namespace string, t
 	return err
 }
 
-func (r *Manager) ensureNamespaceCount(ctx context.Context, tenant *capsulev1beta1.Tenant) error {
+func (r *Manager) ensureNamespaceCount(ctx context.Context, tenant *capsulev1beta2.Tenant) error {
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		tenant.Status.Size = uint(len(tenant.Status.Namespaces))
 
-		found := &capsulev1beta1.Tenant{}
+		found := &capsulev1beta2.Tenant{}
 		if err := r.Client.Get(ctx, types.NamespacedName{Name: tenant.GetName()}, found); err != nil {
 			return err
 		}
@@ -161,7 +162,7 @@ func (r *Manager) ensureNamespaceCount(ctx context.Context, tenant *capsulev1bet
 	})
 }
 
-func (r *Manager) collectNamespaces(ctx context.Context, tenant *capsulev1beta1.Tenant) error {
+func (r *Manager) collectNamespaces(ctx context.Context, tenant *capsulev1beta2.Tenant) error {
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
 		list := &corev1.NamespaceList{}
 		err = r.Client.List(ctx, list, client.MatchingFieldsSelector{

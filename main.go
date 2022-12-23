@@ -206,7 +206,17 @@ func main() {
 	}
 
 	if err = (&capsulev1alpha1.Tenant{}).SetupWebhookWithManager(manager); err != nil {
-		setupLog.Error(err, "unable to create conversion webhook", "webhook", "Tenant")
+		setupLog.Error(err, "unable to create conversion webhook", "webhook", "capsulev1alpha1.Tenant")
+		os.Exit(1)
+	}
+
+	if err = (&capsulev1alpha1.CapsuleConfiguration{}).SetupWebhookWithManager(manager); err != nil {
+		setupLog.Error(err, "unable to create conversion webhook", "webhook", "capsulev1alpha1.CapsuleConfiguration")
+		os.Exit(1)
+	}
+
+	if err = (&capsulev1beta1.Tenant{}).SetupWebhookWithManager(manager); err != nil {
+		setupLog.Error(err, "unable to create conversion webhook", "webhook", "capsulev1beta1.Tenant")
 		os.Exit(1)
 	}
 

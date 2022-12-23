@@ -18,7 +18,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
+	capsulev1beta2 "github.com/clastix/capsule/api/v1beta2"
 	"github.com/clastix/capsule/pkg/api"
 	"github.com/clastix/capsule/pkg/configuration"
 	"github.com/clastix/capsule/pkg/indexer/ingress"
@@ -42,7 +42,7 @@ func (r *collision) OnCreate(client client.Client, decoder *admission.Decoder, r
 			return utils.ErroredResponse(err)
 		}
 
-		var tenant *capsulev1beta1.Tenant
+		var tenant *capsulev1beta2.Tenant
 
 		tenant, err = tenantFromIngress(ctx, client, ing)
 		if err != nil {
@@ -77,7 +77,7 @@ func (r *collision) OnUpdate(client client.Client, decoder *admission.Decoder, r
 			return utils.ErroredResponse(err)
 		}
 
-		var tenant *capsulev1beta1.Tenant
+		var tenant *capsulev1beta2.Tenant
 
 		tenant, err = tenantFromIngress(ctx, client, ing)
 		if err != nil {
@@ -129,7 +129,7 @@ func (r *collision) validateCollision(ctx context.Context, clt client.Client, in
 			// nolint:exhaustive
 			switch scope {
 			case api.HostnameCollisionScopeCluster:
-				tenantList := &capsulev1beta1.TenantList{}
+				tenantList := &capsulev1beta2.TenantList{}
 				if err := clt.List(ctx, tenantList); err != nil {
 					return err
 				}
@@ -140,7 +140,7 @@ func (r *collision) validateCollision(ctx context.Context, clt client.Client, in
 			case api.HostnameCollisionScopeTenant:
 				selector := client.MatchingFieldsSelector{Selector: fields.OneTermEqualSelector(".status.namespaces", ing.Namespace())}
 
-				tenantList := &capsulev1beta1.TenantList{}
+				tenantList := &capsulev1beta2.TenantList{}
 				if err := clt.List(ctx, tenantList, selector); err != nil {
 					return err
 				}
