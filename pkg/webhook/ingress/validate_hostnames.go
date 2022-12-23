@@ -14,7 +14,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
+	capsulev1beta2 "github.com/clastix/capsule/api/v1beta2"
 	"github.com/clastix/capsule/pkg/configuration"
 	capsulewebhook "github.com/clastix/capsule/pkg/webhook"
 	"github.com/clastix/capsule/pkg/webhook/utils"
@@ -35,7 +35,7 @@ func (r *hostnames) OnCreate(c client.Client, decoder *admission.Decoder, record
 			return utils.ErroredResponse(err)
 		}
 
-		var tenant *capsulev1beta1.Tenant
+		var tenant *capsulev1beta2.Tenant
 
 		tenant, err = tenantFromIngress(ctx, c, ingress)
 		if err != nil {
@@ -76,7 +76,7 @@ func (r *hostnames) OnUpdate(c client.Client, decoder *admission.Decoder, record
 			return utils.ErroredResponse(err)
 		}
 
-		var tenant *capsulev1beta1.Tenant
+		var tenant *capsulev1beta2.Tenant
 
 		tenant, err = tenantFromIngress(ctx, c, ingress)
 		if err != nil {
@@ -116,7 +116,7 @@ func (r *hostnames) OnDelete(client.Client, *admission.Decoder, record.EventReco
 	}
 }
 
-func (r *hostnames) validateHostnames(tenant capsulev1beta1.Tenant, hostnames sets.String) error {
+func (r *hostnames) validateHostnames(tenant capsulev1beta2.Tenant, hostnames sets.String) error {
 	if tenant.Spec.IngressOptions.AllowedHostnames == nil {
 		return nil
 	}

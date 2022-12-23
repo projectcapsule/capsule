@@ -22,10 +22,11 @@ type CapsuleConfigurationSpec struct {
 	ProtectedNamespaceRegexpString string `json:"protectedNamespaceRegex,omitempty"`
 	// Allows to set different name rather than the canonical one for the Capsule configuration objects,
 	// such as webhook secret or configurations.
-	CapsuleResources CapsuleResources `json:"overrides"`
+	// +kubebuilder:default={TLSSecretName:"capsule-tls",mutatingWebhookConfigurationName:"capsule-mutating-webhook-configuration",validatingWebhookConfigurationName:"capsule-validating-webhook-configuration"}
+	CapsuleResources CapsuleResources `json:"overrides,omitempty"`
 	// Allows to set the forbidden metadata for the worker nodes that could be patched by a Tenant.
 	// This applies only if the Tenant has an active NodeSelector, and the Owner have right to patch their nodes.
-	NodeMetadata *NodeMetadata `json:"nodeMetadata"`
+	NodeMetadata *NodeMetadata `json:"nodeMetadata,omitempty"`
 	// Toggles the TLS reconciler, the controller that is able to generate CA and certificates for the webhooks
 	// when not using an already provided CA and certificate, or when these are managed externally with Vault, or cert-manager.
 	// +kubebuilder:default=true

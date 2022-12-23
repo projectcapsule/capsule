@@ -14,7 +14,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
+	capsulev1beta2 "github.com/clastix/capsule/api/v1beta2"
 	capsulewebhook "github.com/clastix/capsule/pkg/webhook"
 	"github.com/clastix/capsule/pkg/webhook/utils"
 )
@@ -26,7 +26,7 @@ func RoleBindingRegexHandler() capsulewebhook.Handler {
 }
 
 func (h *rbRegexHandler) validate(req admission.Request, decoder *admission.Decoder) *admission.Response {
-	tenant := &capsulev1beta1.Tenant{}
+	tenant := &capsulev1beta2.Tenant{}
 	if err := decoder.Decode(req, tenant); err != nil {
 		return utils.ErroredResponse(err)
 	}

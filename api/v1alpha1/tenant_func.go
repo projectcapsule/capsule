@@ -9,14 +9,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-func (in *Tenant) IsCordoned() bool {
-	if v, ok := in.Labels["capsule.clastix.io/cordon"]; ok && v == "enabled" {
-		return true
-	}
-
-	return false
-}
-
 func (in *Tenant) IsFull() bool {
 	// we don't have limits on assigned Namespaces
 	if in.Spec.NamespaceQuota == nil {

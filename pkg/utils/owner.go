@@ -6,10 +6,10 @@ package utils
 import (
 	"fmt"
 
-	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
+	capsulev1beta2 "github.com/clastix/capsule/api/v1beta2"
 )
 
-func GetOwnersWithKinds(tenant *capsulev1beta1.Tenant) (owners []string) {
+func GetOwnersWithKinds(tenant *capsulev1beta2.Tenant) (owners []string) {
 	for _, owner := range tenant.Spec.Owners {
 		owners = append(owners, fmt.Sprintf("%s:%s", owner.Kind.String(), owner.Name))
 	}

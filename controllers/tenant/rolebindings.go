@@ -14,14 +14,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
-	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
+	capsulev1beta2 "github.com/clastix/capsule/api/v1beta2"
 	"github.com/clastix/capsule/pkg/api"
 	"github.com/clastix/capsule/pkg/utils"
 )
 
 // ownerClusterRoleBindings generates a Capsule AdditionalRoleBinding object for the Owner dynamic clusterrole in order
 // to take advantage of the additional role binding feature.
-func (r *Manager) ownerClusterRoleBindings(owner capsulev1beta1.OwnerSpec, clusterRole string) api.AdditionalRoleBindingsSpec {
+func (r *Manager) ownerClusterRoleBindings(owner capsulev1beta2.OwnerSpec, clusterRole string) api.AdditionalRoleBindingsSpec {
 	var subject rbacv1.Subject
 
 	if owner.Kind == "ServiceAccount" {
@@ -50,7 +50,7 @@ func (r *Manager) ownerClusterRoleBindings(owner capsulev1beta1.OwnerSpec, clust
 
 // Sync the dynamic Tenant Owner specific cluster-roles and additional Role Bindings, which can be used in many ways:
 // applying Pod Security Policies or giving access to CRDs or specific API groups.
-func (r *Manager) syncRoleBindings(ctx context.Context, tenant *capsulev1beta1.Tenant) (err error) {
+func (r *Manager) syncRoleBindings(ctx context.Context, tenant *capsulev1beta2.Tenant) (err error) {
 	// hashing the RoleBinding name due to DNS RFC-1123 applied to Kubernetes labels
 	hashFn := func(binding api.AdditionalRoleBindingsSpec) string {
 		h := fnv.New64a()
@@ -66,8 +66,8 @@ func (r *Manager) syncRoleBindings(ctx context.Context, tenant *capsulev1beta1.T
 	// getting requested Role Binding keys
 	keys := make([]string, 0, len(tenant.Spec.Owners))
 	// Generating for dynamic tenant owners cluster roles
-	for index, owner := range tenant.Spec.Owners {
-		for _, clusterRoleName := range owner.GetRoles(*tenant, index) {
+	for _, owner := range tenant.Spec.Owners {
+		for _, clusterRoleName := range owner.ClusterRoles {
 			cr := r.ownerClusterRoleBindings(owner, clusterRoleName)
 
 			keys = append(keys, hashFn(cr))
@@ -91,10 +91,10 @@ func (r *Manager) syncRoleBindings(ctx context.Context, tenant *capsulev1beta1.T
 	return group.Wait()
 }
 
-func (r *Manager) syncAdditionalRoleBinding(ctx context.Context, tenant *capsulev1beta1.Tenant, ns string, keys []string, hashFn func(binding api.AdditionalRoleBindingsSpec) string) (err error) {
+func (r *Manager) syncAdditionalRoleBinding(ctx context.Context, tenant *capsulev1beta2.Tenant, ns string, keys []string, hashFn func(binding api.AdditionalRoleBindingsSpec) string) (err error) {
 	var tenantLabel, roleBindingLabel string
 
-	if tenantLabel, err = utils.GetTypeLabel(&capsulev1beta1.Tenant{}); err != nil {
+	if tenantLabel, err = utils.GetTypeLabel(&capsulev1beta2.Tenant{}); err != nil {
 		return
 	}
 
@@ -108,8 +108,8 @@ func (r *Manager) syncAdditionalRoleBinding(ctx context.Context, tenant *capsule
 
 	var roleBindings []api.AdditionalRoleBindingsSpec
 
-	for index, owner := range tenant.Spec.Owners {
-		for _, clusterRoleName := range owner.GetRoles(*tenant, index) {
+	for _, owner := range tenant.Spec.Owners {
+		for _, clusterRoleName := range owner.ClusterRoles {
 			roleBindings = append(roleBindings, r.ownerClusterRoleBindings(owner, clusterRoleName))
 		}
 	}

@@ -12,7 +12,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
+	capsulev1beta2 "github.com/clastix/capsule/api/v1beta2"
 	"github.com/clastix/capsule/pkg/configuration"
 	capsulewebhook "github.com/clastix/capsule/pkg/webhook"
 	"github.com/clastix/capsule/pkg/webhook/utils"
@@ -34,7 +34,7 @@ func (r *class) OnCreate(client client.Client, decoder *admission.Decoder, recor
 			return utils.ErroredResponse(err)
 		}
 
-		var tenant *capsulev1beta1.Tenant
+		var tenant *capsulev1beta2.Tenant
 
 		tenant, err = tenantFromIngress(ctx, client, ingress)
 		if err != nil {
@@ -75,7 +75,7 @@ func (r *class) OnUpdate(client client.Client, decoder *admission.Decoder, recor
 			return utils.ErroredResponse(err)
 		}
 
-		var tenant *capsulev1beta1.Tenant
+		var tenant *capsulev1beta2.Tenant
 
 		tenant, err = tenantFromIngress(ctx, client, ingress)
 		if err != nil {
@@ -114,7 +114,7 @@ func (r *class) OnDelete(client.Client, *admission.Decoder, record.EventRecorder
 	}
 }
 
-func (r *class) validateClass(tenant capsulev1beta1.Tenant, ingressClass *string) error {
+func (r *class) validateClass(tenant capsulev1beta2.Tenant, ingressClass *string) error {
 	if tenant.Spec.IngressOptions.AllowedClasses == nil {
 		return nil
 	}

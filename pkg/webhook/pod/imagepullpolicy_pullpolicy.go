@@ -6,7 +6,7 @@ package pod
 import (
 	"strings"
 
-	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
+	capsulev1beta2 "github.com/clastix/capsule/api/v1beta2"
 )
 
 type PullPolicy interface {
@@ -32,7 +32,7 @@ func (i imagePullPolicyValidator) AllowedPullPolicies() []string {
 	return i.allowedPolicies
 }
 
-func NewPullPolicy(tenant *capsulev1beta1.Tenant) PullPolicy {
+func NewPullPolicy(tenant *capsulev1beta2.Tenant) PullPolicy {
 	// the Tenant doesn't enforce the allowed image pull policy, returning nil
 	if len(tenant.Spec.ImagePullPolicies) == 0 {
 		return nil

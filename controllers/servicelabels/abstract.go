@@ -20,7 +20,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
+	capsulev1beta2 "github.com/clastix/capsule/api/v1beta2"
 	"github.com/clastix/capsule/pkg/utils"
 )
 
@@ -70,15 +70,15 @@ func (r *abstractServiceLabelsReconciler) Reconcile(ctx context.Context, request
 	return reconcile.Result{}, err
 }
 
-func (r *abstractServiceLabelsReconciler) getTenant(ctx context.Context, namespacedName types.NamespacedName, client client.Client) (*capsulev1beta1.Tenant, error) {
+func (r *abstractServiceLabelsReconciler) getTenant(ctx context.Context, namespacedName types.NamespacedName, client client.Client) (*capsulev1beta2.Tenant, error) {
 	ns := &corev1.Namespace{}
-	tenant := &capsulev1beta1.Tenant{}
+	tenant := &capsulev1beta2.Tenant{}
 
 	if err := client.Get(ctx, types.NamespacedName{Name: namespacedName.Namespace}, ns); err != nil {
 		return nil, err
 	}
 
-	capsuleLabel, _ := utils.GetTypeLabel(&capsulev1beta1.Tenant{})
+	capsuleLabel, _ := utils.GetTypeLabel(&capsulev1beta2.Tenant{})
 	if _, ok := ns.GetLabels()[capsuleLabel]; !ok {
 		return nil, NewNonTenantObject(namespacedName.Name)
 	}
@@ -117,7 +117,7 @@ func (r *abstractServiceLabelsReconciler) forOptionPerInstanceName(ctx context.C
 }
 
 func (r *abstractServiceLabelsReconciler) IsNamespaceInTenant(ctx context.Context, namespace string) bool {
-	tl := &capsulev1beta1.TenantList{}
+	tl := &capsulev1beta2.TenantList{}
 	if err := r.client.List(ctx, tl, client.MatchingFieldsSelector{
 		Selector: fields.OneTermEqualSelector(".status.namespaces", namespace),
 	}); err != nil {

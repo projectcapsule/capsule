@@ -7,11 +7,11 @@ import (
 	"fmt"
 	"strings"
 
-	capsulev1beta1 "github.com/clastix/capsule/pkg/api"
+	capsuleapi "github.com/clastix/capsule/pkg/api"
 )
 
 // nolint:predeclared
-func appendForbiddenError(spec *capsulev1beta1.ForbiddenListSpec) (append string) {
+func appendForbiddenError(spec *capsuleapi.ForbiddenListSpec) (append string) {
 	append += "Forbidden are "
 	if len(spec.Exact) > 0 {
 		append += fmt.Sprintf("one of the following (%s)", strings.Join(spec.Exact, ", "))
@@ -39,10 +39,10 @@ func (namespaceQuotaExceededError) Error() string {
 
 type namespaceLabelForbiddenError struct {
 	label string
-	spec  *capsulev1beta1.ForbiddenListSpec
+	spec  *capsuleapi.ForbiddenListSpec
 }
 
-func NewNamespaceLabelForbiddenError(label string, forbiddenSpec *capsulev1beta1.ForbiddenListSpec) error {
+func NewNamespaceLabelForbiddenError(label string, forbiddenSpec *capsuleapi.ForbiddenListSpec) error {
 	return &namespaceLabelForbiddenError{
 		label: label,
 		spec:  forbiddenSpec,
@@ -55,10 +55,10 @@ func (f namespaceLabelForbiddenError) Error() string {
 
 type namespaceAnnotationForbiddenError struct {
 	annotation string
-	spec       *capsulev1beta1.ForbiddenListSpec
+	spec       *capsuleapi.ForbiddenListSpec
 }
 
-func NewNamespaceAnnotationForbiddenError(annotation string, forbiddenSpec *capsulev1beta1.ForbiddenListSpec) error {
+func NewNamespaceAnnotationForbiddenError(annotation string, forbiddenSpec *capsuleapi.ForbiddenListSpec) error {
 	return &namespaceAnnotationForbiddenError{
 		annotation: annotation,
 		spec:       forbiddenSpec,

@@ -16,10 +16,10 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/util/retry"
 
-	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
+	capsulev1beta2 "github.com/clastix/capsule/api/v1beta2"
 )
 
-func (r *Manager) syncCustomResourceQuotaUsages(ctx context.Context, tenant *capsulev1beta1.Tenant) error {
+func (r *Manager) syncCustomResourceQuotaUsages(ctx context.Context, tenant *capsulev1beta2.Tenant) error {
 	type resource struct {
 		kind    string
 		group   string
@@ -29,7 +29,7 @@ func (r *Manager) syncCustomResourceQuotaUsages(ctx context.Context, tenant *cap
 	var resourceList []resource
 
 	for k := range tenant.GetAnnotations() {
-		if !strings.HasPrefix(k, capsulev1beta1.ResourceQuotaAnnotationPrefix) {
+		if !strings.HasPrefix(k, capsulev1beta2.ResourceQuotaAnnotationPrefix) {
 			continue
 		}
 
@@ -69,7 +69,7 @@ func (r *Manager) syncCustomResourceQuotaUsages(ctx context.Context, tenant *cap
 	defer func() {
 		for gvk, used := range usedMap {
 			err := retry.RetryOnConflict(retry.DefaultBackoff, func() (retryErr error) {
-				tnt := &capsulev1beta1.Tenant{}
+				tnt := &capsulev1beta2.Tenant{}
 				if retryErr = r.Client.Get(ctx, types.NamespacedName{Name: tenant.GetName()}, tnt); retryErr != nil {
 					return
 				}
@@ -78,7 +78,7 @@ func (r *Manager) syncCustomResourceQuotaUsages(ctx context.Context, tenant *cap
 					tnt.Annotations = make(map[string]string)
 				}
 
-				tnt.Annotations[capsulev1beta1.UsedAnnotationForResource(gvk)] = fmt.Sprintf("%d", used)
+				tnt.Annotations[capsulev1beta2.UsedAnnotationForResource(gvk)] = fmt.Sprintf("%d", used)
 
 				return r.Client.Update(ctx, tnt)
 			})

@@ -7,11 +7,11 @@ import (
 	"fmt"
 	"strings"
 
-	capsulev1beta1 "github.com/clastix/capsule/pkg/api"
+	capsulev1beta2 "github.com/clastix/capsule/pkg/api"
 )
 
 // nolint:predeclared
-func appendForbiddenError(spec *capsulev1beta1.ForbiddenListSpec) (append string) {
+func appendForbiddenError(spec *capsulev1beta2.ForbiddenListSpec) (append string) {
 	append += "Forbidden are "
 	if len(spec.Exact) > 0 {
 		append += fmt.Sprintf("one of the following (%s)", strings.Join(spec.Exact, ", "))
@@ -28,10 +28,10 @@ func appendForbiddenError(spec *capsulev1beta1.ForbiddenListSpec) (append string
 }
 
 type nodeLabelForbiddenError struct {
-	spec *capsulev1beta1.ForbiddenListSpec
+	spec *capsulev1beta2.ForbiddenListSpec
 }
 
-func NewNodeLabelForbiddenError(forbiddenSpec *capsulev1beta1.ForbiddenListSpec) error {
+func NewNodeLabelForbiddenError(forbiddenSpec *capsulev1beta2.ForbiddenListSpec) error {
 	return &nodeLabelForbiddenError{
 		spec: forbiddenSpec,
 	}
@@ -42,10 +42,10 @@ func (f nodeLabelForbiddenError) Error() string {
 }
 
 type nodeAnnotationForbiddenError struct {
-	spec *capsulev1beta1.ForbiddenListSpec
+	spec *capsulev1beta2.ForbiddenListSpec
 }
 
-func NewNodeAnnotationForbiddenError(forbiddenSpec *capsulev1beta1.ForbiddenListSpec) error {
+func NewNodeAnnotationForbiddenError(forbiddenSpec *capsulev1beta2.ForbiddenListSpec) error {
 	return &nodeAnnotationForbiddenError{
 		spec: forbiddenSpec,
 	}

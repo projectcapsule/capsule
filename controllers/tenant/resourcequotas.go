@@ -19,7 +19,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
-	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
+	capsulev1beta2 "github.com/clastix/capsule/api/v1beta2"
 	"github.com/clastix/capsule/pkg/api"
 	"github.com/clastix/capsule/pkg/utils"
 )
@@ -37,11 +37,11 @@ import (
 //
 // In case of Namespace-scoped Resource Budget, we're just replicating the resources across all registered Namespaces.
 // nolint:gocognit
-func (r *Manager) syncResourceQuotas(ctx context.Context, tenant *capsulev1beta1.Tenant) (err error) {
+func (r *Manager) syncResourceQuotas(ctx context.Context, tenant *capsulev1beta2.Tenant) (err error) {
 	// getting ResourceQuota labels for the mutateFn
 	var tenantLabel, typeLabel string
 
-	if tenantLabel, err = utils.GetTypeLabel(&capsulev1beta1.Tenant{}); err != nil {
+	if tenantLabel, err = utils.GetTypeLabel(&capsulev1beta2.Tenant{}); err != nil {
 		return err
 	}
 
@@ -158,11 +158,11 @@ func (r *Manager) syncResourceQuotas(ctx context.Context, tenant *capsulev1beta1
 	return group.Wait()
 }
 
-func (r *Manager) syncResourceQuota(ctx context.Context, tenant *capsulev1beta1.Tenant, namespace string, keys []string) (err error) {
+func (r *Manager) syncResourceQuota(ctx context.Context, tenant *capsulev1beta2.Tenant, namespace string, keys []string) (err error) {
 	// getting ResourceQuota labels for the mutateFn
 	var tenantLabel, typeLabel string
 
-	if tenantLabel, err = utils.GetTypeLabel(&capsulev1beta1.Tenant{}); err != nil {
+	if tenantLabel, err = utils.GetTypeLabel(&capsulev1beta2.Tenant{}); err != nil {
 		return err
 	}
 
@@ -238,8 +238,8 @@ func (r *Manager) resourceQuotasUpdate(ctx context.Context, resourceName corev1.
 						found.Annotations = make(map[string]string)
 					}
 					found.Labels = rq.Labels
-					found.Annotations[capsulev1beta1.UsedQuotaFor(resourceName)] = actual.String()
-					found.Annotations[capsulev1beta1.HardQuotaFor(resourceName)] = limit.String()
+					found.Annotations[capsulev1beta2.UsedQuotaFor(resourceName)] = actual.String()
+					found.Annotations[capsulev1beta2.HardQuotaFor(resourceName)] = limit.String()
 					// Updating the Resource according to the actual.Cmp result
 					found.Spec.Hard = rq.Spec.Hard
 

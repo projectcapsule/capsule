@@ -8,14 +8,14 @@ import (
 	"sort"
 	"strings"
 
-	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
+	capsulev1beta2 "github.com/clastix/capsule/api/v1beta2"
 )
 
 const (
 	NodeSelectorAnnotation = "scheduler.alpha.kubernetes.io/node-selector"
 )
 
-func BuildNodeSelector(tnt *capsulev1beta1.Tenant, nsAnnotations map[string]string) map[string]string {
+func BuildNodeSelector(tnt *capsulev1beta2.Tenant, nsAnnotations map[string]string) map[string]string {
 	if nsAnnotations == nil {
 		nsAnnotations = make(map[string]string)
 	}
