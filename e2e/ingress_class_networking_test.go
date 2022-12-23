@@ -34,12 +34,14 @@ var _ = Describe("when Tenant handles Ingress classes with networking.k8s.io/v1"
 				},
 			},
 			IngressOptions: capsulev1beta2.IngressOptions{
-				AllowedClasses: &api.AllowedListSpec{
-					Exact: []string{
-						"nginx",
-						"haproxy",
+				AllowedClasses: &api.SelectorAllowedListSpec{
+					AllowedListSpec: api.AllowedListSpec{
+						Exact: []string{
+							"nginx",
+							"haproxy",
+						},
+						Regex: "^oil-.*$",
 					},
-					Regex: "^oil-.*$",
 				},
 			},
 		},

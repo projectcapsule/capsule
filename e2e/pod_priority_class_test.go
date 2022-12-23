@@ -30,9 +30,11 @@ var _ = Describe("enforcing a Priority Class", func() {
 					Kind: "User",
 				},
 			},
-			PriorityClasses: &api.AllowedListSpec{
-				Exact: []string{"gold"},
-				Regex: "pc\\-\\w+",
+			PriorityClasses: &api.SelectorAllowedListSpec{
+				AllowedListSpec: api.AllowedListSpec{
+					Exact: []string{"gold"},
+					Regex: "pc\\-\\w+",
+				},
 			},
 		},
 	}
