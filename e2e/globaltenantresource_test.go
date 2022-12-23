@@ -21,21 +21,20 @@ import (
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
 	capsulev1beta2 "github.com/clastix/capsule/api/v1beta2"
 	"github.com/clastix/capsule/pkg/api"
 )
 
 var _ = Describe("Creating a GlobalTenantResource object", func() {
-	solar := &capsulev1beta1.Tenant{
+	solar := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "energy-solar",
 			Labels: map[string]string{
 				"replicate": "true",
 			},
 		},
-		Spec: capsulev1beta1.TenantSpec{
-			Owners: capsulev1beta1.OwnerListSpec{
+		Spec: capsulev1beta2.TenantSpec{
+			Owners: capsulev1beta2.OwnerListSpec{
 				{
 					Name: "solar-user",
 					Kind: "User",
@@ -44,15 +43,15 @@ var _ = Describe("Creating a GlobalTenantResource object", func() {
 		},
 	}
 
-	wind := &capsulev1beta1.Tenant{
+	wind := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "energy-wind",
 			Labels: map[string]string{
 				"replicate": "true",
 			},
 		},
-		Spec: capsulev1beta1.TenantSpec{
-			Owners: capsulev1beta1.OwnerListSpec{
+		Spec: capsulev1beta2.TenantSpec{
+			Owners: capsulev1beta2.OwnerListSpec{
 				{
 					Name: "wind-user",
 					Kind: "User",

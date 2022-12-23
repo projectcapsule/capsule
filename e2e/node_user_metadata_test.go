@@ -7,25 +7,26 @@ package e2e
 
 import (
 	"context"
-
 	"fmt"
-	capsulev1alpha1 "github.com/clastix/capsule/api/v1alpha1"
-	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
-	"github.com/clastix/capsule/pkg/webhook/utils"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	capsulev1beta2 "github.com/clastix/capsule/api/v1beta2"
+	"github.com/clastix/capsule/pkg/api"
+	"github.com/clastix/capsule/pkg/webhook/utils"
 )
 
 var _ = Describe("modifying node labels and annotations", func() {
-	tnt := &capsulev1beta1.Tenant{
+	tnt := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "tenant-node-user-metadata-forbidden",
 		},
-		Spec: capsulev1beta1.TenantSpec{
-			Owners: capsulev1beta1.OwnerListSpec{
+		Spec: capsulev1beta2.TenantSpec{
+			Owners: capsulev1beta2.OwnerListSpec{
 				{
 					Name: "gatsby",
 					Kind: "User",
@@ -90,17 +91,41 @@ var _ = Describe("modifying node labels and annotations", func() {
 		Expect(k8sClient.Delete(context.TODO(), tnt)).Should(Succeed())
 		Expect(k8sClient.Delete(context.TODO(), crb)).Should(Succeed())
 		Expect(k8sClient.Delete(context.TODO(), cr)).Should(Succeed())
+		EventuallyCreation(func() error {
+			return ModifyNode(func(node *corev1.Node) error {
+				annotations := node.GetAnnotations()
+
+				delete(annotations, "bim")
+				delete(annotations, "foo")
+				delete(annotations, "gatsby-foo")
+
+				node.SetAnnotations(annotations)
+
+				labels := node.GetLabels()
+
+				delete(labels, "bim")
+				delete(labels, "foo")
+				delete(labels, "gatsby-foo")
+
+				node.SetLabels(labels)
+
+				return k8sClient.Update(context.Background(), node)
+			})
+		}).Should(Succeed())
 	})
 
 	It("should allow", func() {
-		ModifyCapsuleConfigurationOpts(func(configuration *capsulev1alpha1.CapsuleConfiguration) {
-			protected := map[string]string{
-				capsulev1alpha1.ForbiddenNodeLabelsAnnotation:            "foo,bar",
-				capsulev1alpha1.ForbiddenNodeLabelsRegexpAnnotation:      "^gatsby-.*$",
-				capsulev1alpha1.ForbiddenNodeAnnotationsAnnotation:       "foo,bar",
-				capsulev1alpha1.ForbiddenNodeAnnotationsRegexpAnnotation: "^gatsby-.*$",
+		ModifyCapsuleConfigurationOpts(func(configuration *capsulev1beta2.CapsuleConfiguration) {
+			configuration.Spec.NodeMetadata = &capsulev1beta2.NodeMetadata{
+				ForbiddenLabels: api.ForbiddenListSpec{
+					Exact: []string{"foo", "bar"},
+					Regex: "^gatsby-.*$",
+				},
+				ForbiddenAnnotations: api.ForbiddenListSpec{
+					Exact: []string{"foo", "bar"},
+					Regex: "^gatsby-.*$",
+				},
 			}
-			configuration.SetAnnotations(protected)
 		})
 		By("adding non-forbidden labels", func() {
 			EventuallyCreation(func() error {

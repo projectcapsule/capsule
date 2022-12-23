@@ -20,8 +20,6 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	capsulev1alpha1 "github.com/clastix/capsule/api/v1alpha1"
-	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
 	capsulev1beta2 "github.com/clastix/capsule/api/v1beta2"
 )
 
@@ -58,8 +56,6 @@ var _ = BeforeSuite(func(done Done) {
 	Expect(err).ToNot(HaveOccurred())
 	Expect(cfg).ToNot(BeNil())
 
-	Expect(capsulev1alpha1.AddToScheme(scheme.Scheme)).NotTo(HaveOccurred())
-	Expect(capsulev1beta1.AddToScheme(scheme.Scheme)).NotTo(HaveOccurred())
 	Expect(capsulev1beta2.AddToScheme(scheme.Scheme)).NotTo(HaveOccurred())
 
 	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
@@ -74,10 +70,10 @@ var _ = AfterSuite(func() {
 	Expect(testEnv.Stop()).ToNot(HaveOccurred())
 })
 
-func ownerClient(owner capsulev1beta1.OwnerSpec) (cs kubernetes.Interface) {
+func ownerClient(owner capsulev1beta2.OwnerSpec) (cs kubernetes.Interface) {
 	c, err := config.GetConfig()
 	Expect(err).ToNot(HaveOccurred())
-	c.Impersonate.Groups = []string{capsulev1beta1.GroupVersion.Group, owner.Name}
+	c.Impersonate.Groups = []string{capsulev1beta2.GroupVersion.Group, owner.Name}
 	c.Impersonate.UserName = owner.Name
 	cs, err = kubernetes.NewForConfig(c)
 	Expect(err).ToNot(HaveOccurred())

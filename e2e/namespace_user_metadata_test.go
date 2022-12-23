@@ -15,22 +15,27 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
-	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
+	capsulev1beta2 "github.com/clastix/capsule/api/v1beta2"
+	"github.com/clastix/capsule/pkg/api"
 )
 
 var _ = Describe("creating a Namespace with user-specified labels and annotations", func() {
-	tnt := &capsulev1beta1.Tenant{
+	tnt := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "tenant-user-metadata-forbidden",
-			Annotations: map[string]string{
-				capsulev1beta1.ForbiddenNamespaceLabelsAnnotation:            "foo,bar",
-				capsulev1beta1.ForbiddenNamespaceLabelsRegexpAnnotation:      "^gatsby-.*$",
-				capsulev1beta1.ForbiddenNamespaceAnnotationsAnnotation:       "foo,bar",
-				capsulev1beta1.ForbiddenNamespaceAnnotationsRegexpAnnotation: "^gatsby-.*$",
-			},
 		},
-		Spec: capsulev1beta1.TenantSpec{
-			Owners: capsulev1beta1.OwnerListSpec{
+		Spec: capsulev1beta2.TenantSpec{
+			NamespaceOptions: &capsulev1beta2.NamespaceOptions{
+				ForbiddenLabels: api.ForbiddenListSpec{
+					Exact: []string{"foo", "bar"},
+					Regex: "^gatsby-.*$",
+				},
+				ForbiddenAnnotations: api.ForbiddenListSpec{
+					Exact: []string{"foo", "bar"},
+					Regex: "^gatsby-.*$",
+				},
+			},
+			Owners: capsulev1beta2.OwnerListSpec{
 				{
 					Name: "gatsby",
 					Kind: "User",

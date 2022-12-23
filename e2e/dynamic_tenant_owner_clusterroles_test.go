@@ -13,27 +13,25 @@ import (
 	. "github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
+	capsulev1beta2 "github.com/clastix/capsule/api/v1beta2"
 )
 
 var _ = Describe("defining dynamic Tenant Owner Cluster Roles", func() {
-	tnt := &capsulev1beta1.Tenant{
+	tnt := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "dynamic-tenant-owner-clusterroles",
-			Annotations: map[string]string{
-				"clusterrolenames.capsule.clastix.io/user.michonne": "editor,manager",
-				"clusterrolenames.capsule.clastix.io/group.kingdom": "readonly",
-			},
 		},
-		Spec: capsulev1beta1.TenantSpec{
-			Owners: capsulev1beta1.OwnerListSpec{
+		Spec: capsulev1beta2.TenantSpec{
+			Owners: capsulev1beta2.OwnerListSpec{
 				{
-					Name: "michonne",
-					Kind: "User",
+					Kind:         "User",
+					Name:         "michonne",
+					ClusterRoles: []string{"editor", "manager"},
 				},
 				{
-					Name: "kingdom",
-					Kind: "Group",
+					Name:         "kingdom",
+					Kind:         "Group",
+					ClusterRoles: []string{"readonly"},
 				},
 			},
 		},

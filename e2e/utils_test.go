@@ -23,8 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/client-go/kubernetes"
 
-	capsulev1alpha1 "github.com/clastix/capsule/api/v1alpha1"
-	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
+	capsulev1beta2 "github.com/clastix/capsule/api/v1beta2"
 )
 
 const (
@@ -44,7 +43,7 @@ func NewNamespace(name string) *corev1.Namespace {
 	}
 }
 
-func NamespaceCreation(ns *corev1.Namespace, owner capsulev1beta1.OwnerSpec, timeout time.Duration) AsyncAssertion {
+func NamespaceCreation(ns *corev1.Namespace, owner capsulev1beta2.OwnerSpec, timeout time.Duration) AsyncAssertion {
 	cs := ownerClient(owner)
 	return Eventually(func() (err error) {
 		_, err = cs.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
@@ -52,7 +51,7 @@ func NamespaceCreation(ns *corev1.Namespace, owner capsulev1beta1.OwnerSpec, tim
 	}, timeout, defaultPollInterval)
 }
 
-func TenantNamespaceList(t *capsulev1beta1.Tenant, timeout time.Duration) AsyncAssertion {
+func TenantNamespaceList(t *capsulev1beta2.Tenant, timeout time.Duration) AsyncAssertion {
 	return Eventually(func() []string {
 		Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: t.GetName()}, t)).Should(Succeed())
 		return t.Status.Namespaces
@@ -71,8 +70,8 @@ func EventuallyCreation(f interface{}) AsyncAssertion {
 	return Eventually(f, defaultTimeoutInterval, defaultPollInterval)
 }
 
-func ModifyCapsuleConfigurationOpts(fn func(configuration *capsulev1alpha1.CapsuleConfiguration)) {
-	config := &capsulev1alpha1.CapsuleConfiguration{}
+func ModifyCapsuleConfigurationOpts(fn func(configuration *capsulev1beta2.CapsuleConfiguration)) {
+	config := &capsulev1beta2.CapsuleConfiguration{}
 	Expect(k8sClient.Get(context.Background(), types.NamespacedName{Name: "default"}, config)).ToNot(HaveOccurred())
 
 	fn(config)
@@ -82,7 +81,7 @@ func ModifyCapsuleConfigurationOpts(fn func(configuration *capsulev1alpha1.Capsu
 	time.Sleep(1 * time.Second)
 }
 
-func CheckForOwnerRoleBindings(ns *corev1.Namespace, owner capsulev1beta1.OwnerSpec, roles map[string]bool) func() error {
+func CheckForOwnerRoleBindings(ns *corev1.Namespace, owner capsulev1beta2.OwnerSpec, roles map[string]bool) func() error {
 	if roles == nil {
 		roles = map[string]bool{
 			"admin":                     false,
@@ -99,7 +98,7 @@ func CheckForOwnerRoleBindings(ns *corev1.Namespace, owner capsulev1beta1.OwnerS
 
 		var ownerName string
 
-		if owner.Kind == capsulev1beta1.ServiceAccountOwner {
+		if owner.Kind == capsulev1beta2.ServiceAccountOwner {
 			parts := strings.Split(owner.Name, ":")
 
 			ownerName = parts[3]
