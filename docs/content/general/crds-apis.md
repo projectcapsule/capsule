@@ -1666,26 +1666,28 @@ CapsuleConfigurationSpec defines the Capsule configuration.
         </td>
         <td>true</td>
       </tr><tr>
-        <td><b><a href="#capsuleconfigurationspecnodemetadata">nodeMetadata</a></b></td>
-        <td>object</td>
-        <td>
-          Allows to set the forbidden metadata for the worker nodes that could be patched by a Tenant. This applies only if the Tenant has an active NodeSelector, and the Owner have right to patch their nodes.<br/>
-        </td>
-        <td>true</td>
-      </tr><tr>
-        <td><b><a href="#capsuleconfigurationspecoverrides">overrides</a></b></td>
-        <td>object</td>
-        <td>
-          Allows to set different name rather than the canonical one for the Capsule configuration objects, such as webhook secret or configurations.<br/>
-        </td>
-        <td>true</td>
-      </tr><tr>
         <td><b>forceTenantPrefix</b></td>
         <td>boolean</td>
         <td>
           Enforces the Tenant owner, during Namespace creation, to name it using the selected Tenant name as prefix, separated by a dash. This is useful to avoid Namespace name collision in a public CaaS environment.<br/>
           <br/>
             <i>Default</i>: false<br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#capsuleconfigurationspecnodemetadata">nodeMetadata</a></b></td>
+        <td>object</td>
+        <td>
+          Allows to set the forbidden metadata for the worker nodes that could be patched by a Tenant. This applies only if the Tenant has an active NodeSelector, and the Owner have right to patch their nodes.<br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#capsuleconfigurationspecoverrides">overrides</a></b></td>
+        <td>object</td>
+        <td>
+          Allows to set different name rather than the canonical one for the Capsule configuration objects, such as webhook secret or configurations.<br/>
+          <br/>
+            <i>Default</i>: map[TLSSecretName:capsule-tls mutatingWebhookConfigurationName:capsule-mutating-webhook-configuration validatingWebhookConfigurationName:capsule-validating-webhook-configuration]<br/>
         </td>
         <td>false</td>
       </tr><tr>
