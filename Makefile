@@ -86,8 +86,15 @@ helm-docs: HELMDOCS_VERSION := v1.11.0
 helm-docs: docker
 	@docker run -v "$(SRC_ROOT):/helm-docs" jnorwood/helm-docs:$(HELMDOCS_VERSION) --chart-search-root /helm-docs
 
-helm-lint: docker
-	@docker run -v "$(SRC_ROOT):/workdir" --entrypoint /bin/sh quay.io/helmpack/chart-testing:v3.3.1 -c "cd /workdir && ct lint --config .github/configs/ct.yaml --lint-conf .github/configs/lintconf.yaml --all --debug"
+helm-lint: ct
+	@ct lint --config $(SRC_ROOT)/.github/configs/ct.yaml --lint-conf $(SRC_ROOT)/.github/configs/lintconf.yaml --all --debug
+
+helm-test: kind ct docker-build
+	@kind create cluster --wait=60s --name capsule-charts
+	@kind load docker-image --name capsule-charts ${IMG}
+	@kubectl create ns capsule-system
+	@ct install --config $(SRC_ROOT)/.github/configs/ct.yaml --namespace=capsule-system --all --debug
+	@kind delete cluster --name capsule-charts
 
 docker:
 	@hash docker 2>/dev/null || {\
@@ -171,6 +178,14 @@ apidocs-gen: ## Download crdoc locally if necessary.
 GINKGO = $(shell pwd)/bin/ginkgo
 ginkgo: ## Download ginkgo locally if necessary.
 	$(call go-install-tool,$(GINKGO),github.com/onsi/ginkgo/ginkgo@v1.16.5)
+
+CT = $(shell pwd)/bin/ct
+ct: ## Download ct locally if necessary.
+	$(call go-install-tool,$(CT),github.com/helm/chart-testing/v3/ct@v3.7.1)
+
+KIND = $(shell pwd)/bin/kind
+kind: ## Download kind locally if necessary.
+	$(call go-install-tool,$(KIND),sigs.k8s.io/kind/cmd/kind@v0.17.0)
 
 KUSTOMIZE = $(shell pwd)/bin/kustomize
 kustomize: ## Download kustomize locally if necessary.
