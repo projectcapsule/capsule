@@ -42,23 +42,31 @@ jobs:
           else
             echo -e '\033[0;32mDocumentation up to date\033[0m ✔'
           fi
-      # Create KIND Cluster
-      - name: Create kind cluster
-        uses: helm/kind-action@v1.2.0
-        if: steps.list-changed.outputs.changed == 'true'
-      # Install Required Operators/CRDs
-      - name: Prepare Cluster Operators/CRDs
-        run: |
-          # Cert-Manager CRDs
-          kubectl create -f https://github.com/cert-manager/cert-manager/releases/download/v1.9.1/cert-manager.crds.yaml
-          
-          # Prometheus CRDs
-          kubectl create -f https://github.com/prometheus-operator/prometheus-operator/releases/download/v0.58.0/bundle.yaml
-        if: steps.list-changed.outputs.changed == 'true'
-      # Install Charts
+
+      # ATTENTION: This is a workaround for the upcoming ApiVersion Conversions for the capsule CRDs
+      # With this workflow the current docker image is build and loaded into kind, otherwise the install fails
+      # In the future this must be removed and the chart-testing-action must be used
       - name: Run chart-testing (install)
-        run: ct install --debug --config ./.github/configs/ct.yaml
+        run: make helm-test
         if: steps.list-changed.outputs.changed == 'true'
+
+      ## Create KIND Cluster
+      #- name: Create kind cluster
+      #  uses: helm/kind-action@v1.2.0
+      #  if: steps.list-changed.outputs.changed == 'true'
+      ## Install Required Operators/CRDs
+      #- name: Prepare Cluster Operators/CRDs
+      #  run: |
+      #    # Cert-Manager CRDs
+      #    kubectl create -f https://github.com/cert-manager/cert-manager/releases/download/v1.9.1/cert-manager.crds.yaml
+      #    
+      #    # Prometheus CRDs
+      #    kubectl create -f https://github.com/prometheus-operator/prometheus-operator/releases/download/v0.58.0/bundle.yaml
+      #  if: steps.list-changed.outputs.changed == 'true'
+      ## Install Charts
+      #- name: Run chart-testing (install)
+      #  run: ct install --debug --config ./.github/configs/ct.yaml
+      #  if: steps.list-changed.outputs.changed == 'true'
   release:
     if: startsWith(github.ref, 'refs/tags/helm-v')
     runs-on: ubuntu-latest
