@@ -15,6 +15,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
+	"github.com/clastix/capsule/pkg/api"
 )
 
 var _ = Describe("enforcing a Container Registry", func() {
@@ -29,7 +30,7 @@ var _ = Describe("enforcing a Container Registry", func() {
 					Kind: "User",
 				},
 			},
-			ContainerRegistries: &capsulev1beta1.AllowedListSpec{
+			ContainerRegistries: &api.AllowedListSpec{
 				Exact: []string{"docker.io", "myregistry.azurecr.io"},
 				Regex: `quay\.\w+`,
 			},
@@ -47,7 +48,7 @@ var _ = Describe("enforcing a Container Registry", func() {
 	})
 
 	It("should add labels to Namespace", func() {
-		ns := NewNamespace("registry-labels")
+		ns := NewNamespace("")
 		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 		Eventually(func() (ok bool) {
 			Expect(k8sClient.Get(context.Background(), types.NamespacedName{Name: ns.Name}, ns)).Should(Succeed())
@@ -64,7 +65,7 @@ var _ = Describe("enforcing a Container Registry", func() {
 	})
 
 	It("should deny running a gcr.io container", func() {
-		ns := NewNamespace("registry-deny")
+		ns := NewNamespace("")
 		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 
 		pod := &corev1.Pod{
@@ -86,7 +87,7 @@ var _ = Describe("enforcing a Container Registry", func() {
 	})
 
 	It("should allow using a registry only match", func() {
-		ns := NewNamespace("registry-only")
+		ns := NewNamespace("")
 		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 
 		pod := &corev1.Pod{
@@ -174,7 +175,7 @@ var _ = Describe("enforcing a Container Registry", func() {
 	})
 
 	It("should allow using an exact match", func() {
-		ns := NewNamespace("registry-list")
+		ns := NewNamespace("")
 		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 
 		pod := &corev1.Pod{
@@ -199,7 +200,7 @@ var _ = Describe("enforcing a Container Registry", func() {
 	})
 
 	It("should allow using a regex match", func() {
-		ns := NewNamespace("registry-regex")
+		ns := NewNamespace("")
 		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 
 		pod := &corev1.Pod{

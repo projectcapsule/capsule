@@ -14,8 +14,6 @@ BUNDLE_METADATA_OPTS ?= $(BUNDLE_CHANNELS) $(BUNDLE_DEFAULT_CHANNEL)
 
 # Image URL to use all building/pushing image targets
 IMG ?= clastix/capsule:$(VERSION)
-# Produce CRDs that work back to Kubernetes 1.11 (no version conversion)
-CRD_OPTIONS ?= "crd:preserveUnknownFields=false"
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
@@ -72,14 +70,14 @@ remove: installer
 
 # Generate manifests e.g. CRD, RBAC etc.
 manifests: controller-gen
-	$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=manager-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases
+	$(CONTROLLER_GEN) rbac:roleName=manager-role crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases
 
 # Generate code
 generate: controller-gen
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
 
 apidoc: apidocs-gen
-	$(APIDOCS_GEN) crdoc --resources config/crd/bases --output docs/content/general/tenant-crd.md --template docs/template/reference-cr.tmpl
+	$(APIDOCS_GEN) crdoc --resources config/crd/bases --output docs/content/general/crds-apis.md --template docs/template/reference-cr.tmpl
 
 # Helm
 SRC_ROOT = $(shell git rev-parse --show-toplevel)
@@ -164,7 +162,7 @@ docker-push:
 
 CONTROLLER_GEN = $(shell pwd)/bin/controller-gen
 controller-gen: ## Download controller-gen locally if necessary.
-	$(call go-install-tool,$(CONTROLLER_GEN),sigs.k8s.io/controller-tools/cmd/controller-gen@v0.5.0)
+	$(call go-install-tool,$(CONTROLLER_GEN),sigs.k8s.io/controller-tools/cmd/controller-gen@v0.10.0)
 
 APIDOCS_GEN = $(shell pwd)/bin/crdoc
 apidocs-gen: ## Download crdoc locally if necessary.
@@ -213,10 +211,14 @@ bundle-build:
 goimports:
 	goimports -w -l -local "github.com/clastix/capsule" .
 
+GOLANGCI_LINT = $(shell pwd)/bin/golangci-lint
+golangci-lint: ## Download golangci-lint locally if necessary.
+	$(call go-install-tool,$(GOLANGCI_LINT),github.com/golangci/golangci-lint/cmd/golangci-lint@v1.45.2)
+
 # Linting code as PR is expecting
 .PHONY: golint
-golint:
-	golangci-lint run -c .golangci.yml
+golint: golangci-lint
+	$(GOLANGCI_LINT) run -c .golangci.yml
 
 # Running e2e tests in a KinD instance
 .PHONY: e2e
@@ -224,7 +226,7 @@ e2e/%: ginkgo
 	$(MAKE) e2e-build/$* && $(MAKE) e2e-exec || $(MAKE) e2e-destroy
 
 e2e-build/%:
-	kind create cluster --name capsule --image=kindest/node:$*
+	kind create cluster --wait=60s --name capsule --image=kindest/node:$*
 	make docker-build
 	kind load docker-image --nodes capsule-control-plane --name capsule $(IMG)
 	helm upgrade \
@@ -245,4 +247,3 @@ e2e-exec:
 
 e2e-destroy:
 	kind delete cluster --name capsule
-

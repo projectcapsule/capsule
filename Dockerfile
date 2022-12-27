@@ -1,14 +1,6 @@
 # Build the manager binary
 FROM golang:1.18 as builder
 
-ARG TARGETARCH
-ARG GIT_HEAD_COMMIT
-ARG GIT_TAG_COMMIT
-ARG GIT_LAST_TAG
-ARG GIT_MODIFIED
-ARG GIT_REPO
-ARG BUILD_DATE
-
 WORKDIR /workspace
 # Copy the Go Modules manifests
 COPY go.mod go.mod
@@ -16,6 +8,14 @@ COPY go.sum go.sum
 # cache deps before building and copying source so that we don't need to re-download as much
 # and so that source changes don't invalidate our downloaded layer
 RUN go mod download
+
+ARG TARGETARCH
+ARG GIT_HEAD_COMMIT
+ARG GIT_TAG_COMMIT
+ARG GIT_LAST_TAG
+ARG GIT_MODIFIED
+ARG GIT_REPO
+ARG BUILD_DATE
 
 # Copy the go source
 COPY main.go main.go

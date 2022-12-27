@@ -1,3 +1,6 @@
+// Copyright 2020-2021 Clastix Labs
+// SPDX-License-Identifier: Apache-2.0
+
 package v1beta1
 
 import (
@@ -6,14 +9,14 @@ import (
 
 type OwnerListSpec []OwnerSpec
 
-func (o OwnerListSpec) FindOwner(name string, kind OwnerKind) (owner OwnerSpec) {
-	sort.Sort(ByKindAndName(o))
-	i := sort.Search(len(o), func(i int) bool {
-		return o[i].Kind >= kind && o[i].Name >= name
+func (in OwnerListSpec) FindOwner(name string, kind OwnerKind) (owner OwnerSpec) {
+	sort.Sort(ByKindAndName(in))
+	i := sort.Search(len(in), func(i int) bool {
+		return in[i].Kind >= kind && in[i].Name >= name
 	})
 
-	if i < len(o) && o[i].Kind == kind && o[i].Name == name {
-		return o[i]
+	if i < len(in) && in[i].Kind == kind && in[i].Name == name {
+		return in[i]
 	}
 
 	return
@@ -21,18 +24,18 @@ func (o OwnerListSpec) FindOwner(name string, kind OwnerKind) (owner OwnerSpec) 
 
 type ByKindAndName OwnerListSpec
 
-func (b ByKindAndName) Len() int {
-	return len(b)
+func (in ByKindAndName) Len() int {
+	return len(in)
 }
 
-func (b ByKindAndName) Less(i, j int) bool {
-	if b[i].Kind.String() != b[j].Kind.String() {
-		return b[i].Kind.String() < b[j].Kind.String()
+func (in ByKindAndName) Less(i, j int) bool {
+	if in[i].Kind.String() != in[j].Kind.String() {
+		return in[i].Kind.String() < in[j].Kind.String()
 	}
 
-	return b[i].Name < b[j].Name
+	return in[i].Name < in[j].Name
 }
 
-func (b ByKindAndName) Swap(i, j int) {
-	b[i], b[j] = b[j], b[i]
+func (in ByKindAndName) Swap(i, j int) {
+	in[i], in[j] = in[j], in[i]
 }

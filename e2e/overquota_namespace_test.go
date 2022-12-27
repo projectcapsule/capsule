@@ -52,7 +52,7 @@ var _ = Describe("creating a Namespace in over-quota of three", func() {
 			}
 		})
 
-		ns := NewNamespace("bob-fail")
+		ns := NewNamespace("")
 		cs := ownerClient(tnt.Spec.Owners[0])
 		_, err := cs.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
 		Expect(err).ShouldNot(Succeed())

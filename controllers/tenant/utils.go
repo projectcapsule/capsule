@@ -1,3 +1,6 @@
+// Copyright 2020-2021 Clastix Labs
+// SPDX-License-Identifier: Apache-2.0
+
 package tenant
 
 import (
@@ -11,7 +14,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
-	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
+	capsulev1beta1 "github.com/clastix/capsule/pkg/utils"
 )
 
 // pruningResources is taking care of removing the no more requested sub-resources as LimitRange, ResourceQuota or

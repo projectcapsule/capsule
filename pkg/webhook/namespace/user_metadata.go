@@ -112,26 +112,55 @@ func (r *userMetadataHandler) OnUpdate(client client.Client, decoder *admission.
 			}
 		}
 
-		var labels, annotations map[string]string
+		if len(tnt.Spec.NodeSelector) > 0 {
+			v, ok := newNs.GetAnnotations()["scheduler.alpha.kubernetes.io/node-selector"]
+			if !ok {
+				response := admission.Denied("the node-selector annotation is enforced, cannot be removed")
 
-		for key, value := range newNs.GetLabels() {
-			if _, ok := oldNs.GetLabels()[key]; ok {
-				if labels == nil {
-					labels = make(map[string]string)
-				}
+				recorder.Eventf(tnt, corev1.EventTypeWarning, "ForbiddenNodeSelectorDeletion", string(response.Result.Reason))
 
-				labels[key] = value
+				return &response
+			}
+
+			if v != oldNs.GetAnnotations()["scheduler.alpha.kubernetes.io/node-selector"] {
+				response := admission.Denied("the the node-selector annotation is enforced, cannot be updated")
+
+				recorder.Eventf(tnt, corev1.EventTypeWarning, "ForbiddenNodeSelectorUpdate", string(response.Result.Reason))
+
+				return &response
 			}
 		}
 
-		for key, value := range newNs.GetAnnotations() {
-			if _, ok := oldNs.GetAnnotations()[key]; ok {
-				if annotations == nil {
-					annotations = make(map[string]string)
-				}
+		labels, annotations := oldNs.GetLabels(), oldNs.GetAnnotations()
 
-				annotations[key] = value
+		for key, value := range newNs.GetLabels() {
+			v, ok := labels[key]
+			if !ok {
+				labels[key] = value
+
+				continue
 			}
+
+			if v != value {
+				continue
+			}
+
+			delete(labels, key)
+		}
+
+		for key, value := range newNs.GetAnnotations() {
+			v, ok := annotations[key]
+			if !ok {
+				annotations[key] = value
+
+				continue
+			}
+
+			if v != value {
+				continue
+			}
+
+			delete(annotations, key)
 		}
 
 		return r.validateUserMetadata(tnt, recorder, labels, annotations)

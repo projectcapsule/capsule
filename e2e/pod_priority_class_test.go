@@ -15,6 +15,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
+	"github.com/clastix/capsule/pkg/api"
 )
 
 var _ = Describe("enforcing a Priority Class", func() {
@@ -29,7 +30,7 @@ var _ = Describe("enforcing a Priority Class", func() {
 					Kind: "User",
 				},
 			},
-			PriorityClasses: &capsulev1beta1.AllowedListSpec{
+			PriorityClasses: &api.AllowedListSpec{
 				Exact: []string{"gold"},
 				Regex: "pc\\-\\w+",
 			},
@@ -47,7 +48,7 @@ var _ = Describe("enforcing a Priority Class", func() {
 	})
 
 	It("should block non allowed Priority Class", func() {
-		ns := NewNamespace("system-node-critical")
+		ns := NewNamespace("")
 		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 
 		pod := &corev1.Pod{
@@ -86,7 +87,7 @@ var _ = Describe("enforcing a Priority Class", func() {
 			Expect(k8sClient.Delete(context.TODO(), pc)).Should(Succeed())
 		}()
 
-		ns := NewNamespace("pc-exact-match")
+		ns := NewNamespace("")
 		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 
 		pod := &corev1.Pod{
@@ -112,7 +113,7 @@ var _ = Describe("enforcing a Priority Class", func() {
 	})
 
 	It("should allow regex match", func() {
-		ns := NewNamespace("pc-regex-match")
+		ns := NewNamespace("")
 
 		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 

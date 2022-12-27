@@ -68,7 +68,7 @@ velero create backup oil-namespaces \
     --include-namespaces oil-production,oil-development,oil-marketing
 ```
 
-resulting ti the following Velero object:
+resulting to the following Velero object:
 
 ```yaml
 apiVersion: velero.io/v1

@@ -4,6 +4,8 @@
 resources:
 - bases/capsule.clastix.io_tenants.yaml
 - bases/capsule.clastix.io_capsuleconfigurations.yaml
+- bases/capsule.clastix.io_tenantresources.yaml
+- bases/capsule.clastix.io_globaltenantresources.yaml
 # +kubebuilder:scaffold:crdkustomizeresource
 
 # the following config is for teaching kustomize how to do kustomization for CRDs.
@@ -12,3 +14,4 @@ configurations:
 
 patchesStrategicMerge:
 - patches/webhook_in_tenants.yaml
+- patches/webhook_in_capsuleconfiguration.yaml

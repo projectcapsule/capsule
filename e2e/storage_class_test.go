@@ -16,6 +16,7 @@ import (
 	"k8s.io/utils/pointer"
 
 	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
+	"github.com/clastix/capsule/pkg/api"
 )
 
 var _ = Describe("when Tenant handles Storage classes", func() {
@@ -30,7 +31,7 @@ var _ = Describe("when Tenant handles Storage classes", func() {
 					Kind: "User",
 				},
 			},
-			StorageClasses: &capsulev1beta1.AllowedListSpec{
+			StorageClasses: &api.AllowedListSpec{
 				Exact: []string{
 					"cephfs",
 					"glusterfs",
@@ -51,7 +52,7 @@ var _ = Describe("when Tenant handles Storage classes", func() {
 	})
 
 	It("should fails", func() {
-		ns := NewNamespace("storage-class-disallowed")
+		ns := NewNamespace("")
 		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
@@ -98,7 +99,7 @@ var _ = Describe("when Tenant handles Storage classes", func() {
 	})
 
 	It("should allow", func() {
-		ns := NewNamespace("storage-class-allowed")
+		ns := NewNamespace("")
 		cs := ownerClient(tnt.Spec.Owners[0])
 
 		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())

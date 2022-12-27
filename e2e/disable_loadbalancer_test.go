@@ -16,6 +16,7 @@ import (
 	"k8s.io/utils/pointer"
 
 	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
+	"github.com/clastix/capsule/pkg/api"
 )
 
 var _ = Describe("creating a LoadBalancer service when it is disabled for Tenant", func() {
@@ -30,8 +31,8 @@ var _ = Describe("creating a LoadBalancer service when it is disabled for Tenant
 					Kind: "User",
 				},
 			},
-			ServiceOptions: &capsulev1beta1.ServiceOptions{
-				AllowedServices: &capsulev1beta1.AllowedServices{
+			ServiceOptions: &api.ServiceOptions{
+				AllowedServices: &api.AllowedServices{
 					LoadBalancer: pointer.BoolPtr(false),
 				},
 			},
@@ -49,7 +50,7 @@ var _ = Describe("creating a LoadBalancer service when it is disabled for Tenant
 	})
 
 	It("should fail creating a service with LoadBalancer type", func() {
-		ns := NewNamespace("disable-loadbalancer-service")
+		ns := NewNamespace("")
 
 		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 

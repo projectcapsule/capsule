@@ -19,6 +19,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
+	"github.com/clastix/capsule/pkg/api"
 )
 
 var _ = Describe("when handling Namespace scoped Ingress hostnames collision", func() {
@@ -34,7 +35,7 @@ var _ = Describe("when handling Namespace scoped Ingress hostnames collision", f
 				},
 			},
 			IngressOptions: capsulev1beta1.IngressOptions{
-				HostnameCollisionScope: capsulev1beta1.HostnameCollisionScopeNamespace,
+				HostnameCollisionScope: api.HostnameCollisionScopeNamespace,
 			},
 		},
 	}
@@ -119,8 +120,8 @@ var _ = Describe("when handling Namespace scoped Ingress hostnames collision", f
 	})
 
 	It("should ensure Namespace scope for Ingress hostname and path collision", func() {
-		ns1 := NewNamespace("namespace-collision-one")
-		ns2 := NewNamespace("namespace-collision-two")
+		ns1 := NewNamespace("")
+		ns2 := NewNamespace("")
 		cs := ownerClient(tnt.Spec.Owners[0])
 		NamespaceCreation(ns1, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 		NamespaceCreation(ns2, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())

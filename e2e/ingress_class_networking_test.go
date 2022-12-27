@@ -18,6 +18,7 @@ import (
 	"k8s.io/utils/pointer"
 
 	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
+	"github.com/clastix/capsule/pkg/api"
 )
 
 var _ = Describe("when Tenant handles Ingress classes with networking.k8s.io/v1", func() {
@@ -33,7 +34,7 @@ var _ = Describe("when Tenant handles Ingress classes with networking.k8s.io/v1"
 				},
 			},
 			IngressOptions: capsulev1beta1.IngressOptions{
-				AllowedClasses: &capsulev1beta1.AllowedListSpec{
+				AllowedClasses: &api.AllowedListSpec{
 					Exact: []string{
 						"nginx",
 						"haproxy",
@@ -62,7 +63,7 @@ var _ = Describe("when Tenant handles Ingress classes with networking.k8s.io/v1"
 			}
 		}
 
-		ns := NewNamespace("ingress-class-disallowed-networking-v1")
+		ns := NewNamespace("")
 		cs := ownerClient(tnt.Spec.Owners[0])
 
 		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
@@ -145,7 +146,7 @@ var _ = Describe("when Tenant handles Ingress classes with networking.k8s.io/v1"
 			}
 		}
 
-		ns := NewNamespace("ingress-class-allowed-annotation-networking-v1")
+		ns := NewNamespace("")
 		cs := ownerClient(tnt.Spec.Owners[0])
 
 		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
@@ -185,7 +186,7 @@ var _ = Describe("when Tenant handles Ingress classes with networking.k8s.io/v1"
 			}
 		}
 
-		ns := NewNamespace("ingress-class-allowed-annotation-networking-v1")
+		ns := NewNamespace("")
 		cs := ownerClient(tnt.Spec.Owners[0])
 
 		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
@@ -223,7 +224,7 @@ var _ = Describe("when Tenant handles Ingress classes with networking.k8s.io/v1"
 			}
 		}
 
-		ns := NewNamespace("ingress-class-allowed-annotation-networking-v1")
+		ns := NewNamespace("")
 		cs := ownerClient(tnt.Spec.Owners[0])
 		ingressClass := "oil-ingress"
 
@@ -262,7 +263,7 @@ var _ = Describe("when Tenant handles Ingress classes with networking.k8s.io/v1"
 			}
 		}
 
-		ns := NewNamespace("ingress-class-allowed-annotation-networking-v1")
+		ns := NewNamespace("")
 		cs := ownerClient(tnt.Spec.Owners[0])
 		ingressClass := "oil-haproxy"
 

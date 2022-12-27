@@ -70,7 +70,7 @@ var _ = Describe("creating a Namespace without a Tenant selector when user owns 
 	}
 
 	It("should fail", func() {
-		ns := NewNamespace("fail-ns")
+		ns := NewNamespace("")
 		By("user owns 2 tenants", func() {
 			EventuallyCreation(func() error { return k8sClient.Create(context.TODO(), t1) }).Should(Succeed())
 			EventuallyCreation(func() error { return k8sClient.Create(context.TODO(), t2) }).Should(Succeed())

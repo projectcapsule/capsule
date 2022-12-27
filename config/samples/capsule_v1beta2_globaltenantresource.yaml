@@ -1,0 +1,39 @@
+apiVersion: capsule.clastix.io/v1beta2
+kind: GlobalTenantResource
+metadata:
+  name: green-production
+spec:
+  tenantSelector:
+    matchLabels:
+      energy: green
+  resyncPeriod: 60s
+  pruningOnDelete: true
+  resources:
+    - namespaceSelector:
+        matchLabels:
+          environment: production
+      additionalMetadata:
+        labels:
+          labels.energy.io: green
+        annotations:
+          annotations.energy.io: green
+      namespacedItems:
+        - apiVersion: v1
+          kind: Secret
+          namespace: default
+          selector:
+            matchLabels:
+              replicate: green
+      rawItems:
+        - apiVersion: v1
+          kind: Secret
+          metadata:
+            name: raw-secret-1
+        - apiVersion: v1
+          kind: Secret
+          metadata:
+            name: raw-secret-2
+        - apiVersion: v1
+          kind: Secret
+          metadata:
+            name: raw-secret-3

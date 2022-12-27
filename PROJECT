@@ -9,7 +9,6 @@ repo: github.com/clastix/capsule
 resources:
 - api:
     crdVersion: v1
-    namespaced: false
   controller: true
   domain: clastix.io
   group: capsule
@@ -21,7 +20,6 @@ resources:
     webhookVersion: v1
 - api:
     crdVersion: v1
-    namespaced: false
   controller: true
   domain: clastix.io
   group: capsule
@@ -30,10 +28,39 @@ resources:
   version: v1alpha1
 - api:
     crdVersion: v1
-    namespaced: false
   domain: clastix.io
   group: capsule
   kind: Tenant
   path: github.com/clastix/capsule/api/v1beta1
   version: v1beta1
+- api:
+    crdVersion: v1
+  domain: clastix.io
+  group: capsule
+  kind: Tenant
+  path: github.com/clastix/capsule/api/v1beta2
+  version: v1beta2
+- api:
+    crdVersion: v1
+  controller: true
+  domain: clastix.io
+  group: capsule
+  kind: CapsuleConfiguration
+  path: github.com/clastix/capsule/api/v1beta2
+  version: v1beta2
+- api:
+    crdVersion: v1
+    namespaced: true
+  domain: clastix.io
+  group: capsule
+  kind: TenantResource
+  path: github.com/clastix/capsule/api/v1beta2
+  version: v1beta2
+- api:
+    crdVersion: v1
+  domain: clastix.io
+  group: capsule
+  kind: GlobalTenantResource
+  path: github.com/clastix/capsule/api/v1beta2
+  version: v1beta2
 version: "3"

@@ -7,6 +7,7 @@ package e2e
 
 import (
 	"context"
+	"github.com/clastix/capsule/pkg/utils"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -57,9 +58,9 @@ var _ = Describe("creating a Namespace with Tenant selector when user owns multi
 	})
 
 	It("should be assigned to the selected Tenant", func() {
-		ns := NewNamespace("tenant-2-ns")
+		ns := NewNamespace("")
 		By("assigning to the Namespace the Capsule Tenant label", func() {
-			l, err := capsulev1beta1.GetTypeLabel(&capsulev1beta1.Tenant{})
+			l, err := utils.GetTypeLabel(&capsulev1beta1.Tenant{})
 			Expect(err).ToNot(HaveOccurred())
 			ns.Labels = map[string]string{
 				l: t2.Name,

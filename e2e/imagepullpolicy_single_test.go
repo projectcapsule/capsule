@@ -14,6 +14,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
+	"github.com/clastix/capsule/pkg/api"
 )
 
 var _ = Describe("enforcing a defined ImagePullPolicy", func() {
@@ -28,7 +29,7 @@ var _ = Describe("enforcing a defined ImagePullPolicy", func() {
 					Kind: "User",
 				},
 			},
-			ImagePullPolicies: []capsulev1beta1.ImagePullPolicySpec{"Always"},
+			ImagePullPolicies: []api.ImagePullPolicySpec{"Always"},
 		},
 	}
 
@@ -44,7 +45,7 @@ var _ = Describe("enforcing a defined ImagePullPolicy", func() {
 	})
 
 	It("should just allow the defined policy", func() {
-		ns := NewNamespace("allow-policies")
+		ns := NewNamespace("")
 		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 
 		cs := ownerClient(tnt.Spec.Owners[0])

@@ -19,15 +19,19 @@ import (
 	utilVersion "k8s.io/apimachinery/pkg/util/version"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
+	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	capsulev1alpha1 "github.com/clastix/capsule/api/v1alpha1"
 	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
+	capsulev1beta2 "github.com/clastix/capsule/api/v1beta2"
 	configcontroller "github.com/clastix/capsule/controllers/config"
 	rbaccontroller "github.com/clastix/capsule/controllers/rbac"
+	"github.com/clastix/capsule/controllers/resources"
 	servicelabelscontroller "github.com/clastix/capsule/controllers/servicelabels"
 	tenantcontroller "github.com/clastix/capsule/controllers/tenant"
 	tlscontroller "github.com/clastix/capsule/controllers/tls"
@@ -57,6 +61,7 @@ func init() {
 
 	utilruntime.Must(capsulev1alpha1.AddToScheme(scheme))
 	utilruntime.Must(capsulev1beta1.AddToScheme(scheme))
+	utilruntime.Must(capsulev1beta2.AddToScheme(scheme))
 	utilruntime.Must(apiextensionsv1.AddToScheme(scheme))
 }
 
@@ -66,6 +71,27 @@ func printVersion() {
 	setupLog.Info(fmt.Sprintf("Build date: %s", BuildTime))
 	setupLog.Info(fmt.Sprintf("Go Version: %s", goRuntime.Version()))
 	setupLog.Info(fmt.Sprintf("Go OS/Arch: %s/%s", goRuntime.GOOS, goRuntime.GOARCH))
+}
+
+func newDelegatingClient(cache cache.Cache, config *rest.Config, options client.Options, uncachedObjects ...client.Object) (client.Client, error) {
+	cl, err := client.New(config, options)
+	if err != nil {
+		return nil, err
+	}
+
+	delegatingClient, err := client.NewDelegatingClient(
+		client.NewDelegatingClientInput{
+			Client:            cl,
+			CacheReader:       cache,
+			UncachedObjects:   uncachedObjects,
+			CacheUnstructured: true,
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return delegatingClient, nil
 }
 
 // nolint:maintidx
@@ -118,6 +144,7 @@ func main() {
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       "42c733ea.clastix.capsule.io",
 		HealthProbeBindAddress: ":10080",
+		NewClient:              newDelegatingClient,
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
@@ -205,7 +232,7 @@ func main() {
 		route.Service(service.Handler()),
 		route.NetworkPolicy(utils.InCapsuleGroups(cfg, networkpolicy.Handler())),
 		route.Tenant(tenant.NameHandler(), tenant.RoleBindingRegexHandler(), tenant.IngressClassRegexHandler(), tenant.StorageClassRegexHandler(), tenant.ContainerRegistryRegexHandler(), tenant.HostnameRegexHandler(), tenant.FreezedEmitter(), tenant.ServiceAccountNameHandler(), tenant.ForbiddenAnnotationsRegexHandler(), tenant.ProtectedHandler()),
-		route.OwnerReference(utils.InCapsuleGroups(cfg, ownerreference.Handler(cfg))),
+		route.OwnerReference(utils.InCapsuleGroups(cfg, namespacewebhook.OwnerReferenceHandler(), ownerreference.Handler(cfg))),
 		route.Cordoning(tenant.CordoningHandler(cfg), tenant.ResourceCounterHandler()),
 		route.Node(utils.InCapsuleGroups(cfg, node.UserMetadataHandler(cfg, kubeVersion))),
 	)
@@ -261,6 +288,16 @@ func main() {
 		Log: ctrl.Log.WithName("controllers").WithName("CapsuleConfiguration"),
 	}).SetupWithManager(manager, configurationName); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "CapsuleConfiguration")
+		os.Exit(1)
+	}
+
+	if err = (&resources.Global{}).SetupWithManager(manager); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "resources.Global")
+		os.Exit(1)
+	}
+
+	if err = (&resources.Namespaced{}).SetupWithManager(manager); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "resources.Namespaced")
 		os.Exit(1)
 	}
 

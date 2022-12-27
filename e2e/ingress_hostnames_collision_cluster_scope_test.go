@@ -19,6 +19,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
+	"github.com/clastix/capsule/pkg/api"
 )
 
 var _ = Describe("when handling Cluster scoped Ingress hostnames collision", func() {
@@ -34,7 +35,7 @@ var _ = Describe("when handling Cluster scoped Ingress hostnames collision", fun
 				},
 			},
 			IngressOptions: capsulev1beta1.IngressOptions{
-				HostnameCollisionScope: capsulev1beta1.HostnameCollisionScopeCluster,
+				HostnameCollisionScope: api.HostnameCollisionScopeCluster,
 			},
 		},
 	}
@@ -50,7 +51,7 @@ var _ = Describe("when handling Cluster scoped Ingress hostnames collision", fun
 				},
 			},
 			IngressOptions: capsulev1beta1.IngressOptions{
-				HostnameCollisionScope: capsulev1beta1.HostnameCollisionScopeCluster,
+				HostnameCollisionScope: api.HostnameCollisionScopeCluster,
 			},
 		},
 	}
@@ -143,12 +144,12 @@ var _ = Describe("when handling Cluster scoped Ingress hostnames collision", fun
 	})
 
 	It("should ensure Cluster scope for Ingress hostname and path collision", func() {
-		ns1 := NewNamespace("tenant-one-ns")
+		ns1 := NewNamespace("")
 		cs1 := ownerClient(tnt1.Spec.Owners[0])
 		NamespaceCreation(ns1, tnt1.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(tnt1, defaultTimeoutInterval).Should(ContainElement(ns1.GetName()))
 
-		ns2 := NewNamespace("tenant-two-ns")
+		ns2 := NewNamespace("")
 		cs2 := ownerClient(tnt2.Spec.Owners[0])
 		NamespaceCreation(ns2, tnt2.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(tnt2, defaultTimeoutInterval).Should(ContainElement(ns2.GetName()))

@@ -19,6 +19,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
+	"github.com/clastix/capsule/pkg/api"
 )
 
 var _ = Describe("when Tenant handles Ingress hostnames", func() {
@@ -34,7 +35,7 @@ var _ = Describe("when Tenant handles Ingress hostnames", func() {
 				},
 			},
 			IngressOptions: capsulev1beta1.IngressOptions{
-				AllowedHostnames: &capsulev1beta1.AllowedListSpec{
+				AllowedHostnames: &api.AllowedListSpec{
 					Exact: []string{"sigs.k8s.io", "operator.sdk", "domain.tld"},
 					Regex: `.*\.clastix\.io`,
 				},
@@ -120,7 +121,7 @@ var _ = Describe("when Tenant handles Ingress hostnames", func() {
 	})
 
 	It("should block a non allowed Hostname", func() {
-		ns := NewNamespace("disallowed-hostname-networking")
+		ns := NewNamespace("")
 		cs := ownerClient(tnt.Spec.Owners[0])
 
 		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
@@ -143,7 +144,7 @@ var _ = Describe("when Tenant handles Ingress hostnames", func() {
 	})
 
 	It("should block a non allowed Hostname", func() {
-		ns := NewNamespace("disallowed-hostname-extensions")
+		ns := NewNamespace("")
 		cs := ownerClient(tnt.Spec.Owners[0])
 
 		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
@@ -166,7 +167,7 @@ var _ = Describe("when Tenant handles Ingress hostnames", func() {
 	})
 
 	It("should allow Hostnames in list", func() {
-		ns := NewNamespace("allowed-hostname-list-networking")
+		ns := NewNamespace("")
 		cs := ownerClient(tnt.Spec.Owners[0])
 
 		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
@@ -191,7 +192,7 @@ var _ = Describe("when Tenant handles Ingress hostnames", func() {
 	})
 
 	It("should allow Hostnames in list", func() {
-		ns := NewNamespace("allowed-hostname-list-extensions")
+		ns := NewNamespace("")
 		cs := ownerClient(tnt.Spec.Owners[0])
 
 		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
@@ -216,7 +217,7 @@ var _ = Describe("when Tenant handles Ingress hostnames", func() {
 	})
 
 	It("should allow Hostnames in regex", func() {
-		ns := NewNamespace("allowed-hostname-regex-networking")
+		ns := NewNamespace("")
 		cs := ownerClient(tnt.Spec.Owners[0])
 
 		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
@@ -241,7 +242,7 @@ var _ = Describe("when Tenant handles Ingress hostnames", func() {
 	})
 
 	It("should allow Hostnames in regex", func() {
-		ns := NewNamespace("allowed-hostname-regex-extensions")
+		ns := NewNamespace("")
 		cs := ownerClient(tnt.Spec.Owners[0])
 
 		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())

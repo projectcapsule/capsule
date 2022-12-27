@@ -7,6 +7,7 @@ package e2e
 
 import (
 	"context"
+	"github.com/clastix/capsule/pkg/utils"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -44,10 +45,10 @@ var _ = Describe("creating a Namespace trying to select a third Tenant", func() 
 		var ns *corev1.Namespace
 
 		By("assigning to the Namespace the Capsule Tenant label", func() {
-			l, err := capsulev1beta1.GetTypeLabel(&capsulev1beta1.Tenant{})
+			l, err := utils.GetTypeLabel(&capsulev1beta1.Tenant{})
 			Expect(err).ToNot(HaveOccurred())
 
-			ns := NewNamespace("tenant-non-owned-ns")
+			ns := NewNamespace("")
 			ns.SetLabels(map[string]string{
 				l: tnt.Name,
 			})

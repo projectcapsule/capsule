@@ -132,7 +132,10 @@ func (r Reconciler) ReconcileCertificates(ctx context.Context, certSecret *corev
 		return r.updateValidatingWebhookConfiguration(ctx, caBundle)
 	})
 	group.Go(func() error {
-		return r.updateCustomResourceDefinition(ctx, caBundle)
+		return r.updateTenantCustomResourceDefinition(ctx, "tenants.capsule.clastix.io", caBundle)
+	})
+	group.Go(func() error {
+		return r.updateTenantCustomResourceDefinition(ctx, "capsuleconfigurations.capsule.clastix.io", caBundle)
 	})
 
 	operatorPods, err := r.getOperatorPods(ctx)
@@ -214,10 +217,10 @@ func (r Reconciler) shouldUpdateCertificate(secret *corev1.Secret) bool {
 
 // By default helm doesn't allow to use templates in CRD (https://helm.sh/docs/chart_best_practices/custom_resource_definitions/#method-1-let-helm-do-it-for-you).
 // In order to overcome this, we are setting conversion strategy in helm chart to None, and then update it with CA and namespace information.
-func (r *Reconciler) updateCustomResourceDefinition(ctx context.Context, caBundle []byte) error {
+func (r *Reconciler) updateTenantCustomResourceDefinition(ctx context.Context, name string, caBundle []byte) error {
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
 		crd := &apiextensionsv1.CustomResourceDefinition{}
-		err = r.Get(ctx, types.NamespacedName{Name: "tenants.capsule.clastix.io"}, crd)
+		err = r.Get(ctx, types.NamespacedName{Name: name}, crd)
 		if err != nil {
 			r.Log.Error(err, "cannot retrieve CustomResourceDefinition")
 

@@ -1,3 +1,6 @@
+// Copyright 2020-2021 Clastix Labs
+// SPDX-License-Identifier: Apache-2.0
+
 package tenant
 
 import (
@@ -11,6 +14,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
+	"github.com/clastix/capsule/pkg/utils"
 )
 
 // nolint:dupl
@@ -43,11 +47,11 @@ func (r *Manager) syncNetworkPolicy(ctx context.Context, tenant *capsulev1beta1.
 	// getting NetworkPolicy labels for the mutateFn
 	var tenantLabel, networkPolicyLabel string
 
-	if tenantLabel, err = capsulev1beta1.GetTypeLabel(&capsulev1beta1.Tenant{}); err != nil {
+	if tenantLabel, err = utils.GetTypeLabel(&capsulev1beta1.Tenant{}); err != nil {
 		return err
 	}
 
-	if networkPolicyLabel, err = capsulev1beta1.GetTypeLabel(&networkingv1.NetworkPolicy{}); err != nil {
+	if networkPolicyLabel, err = utils.GetTypeLabel(&networkingv1.NetworkPolicy{}); err != nil {
 		return err
 	}
 

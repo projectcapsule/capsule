@@ -27,7 +27,7 @@ var _ = Describe("creating a Namespace creation with no Tenant assigned", func()
 				},
 			},
 		}
-		ns := NewNamespace("no-namespace")
+		ns := NewNamespace("")
 		cs := ownerClient(tnt.Spec.Owners[0])
 		_, err := cs.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
 		Expect(err).ShouldNot(Succeed())
