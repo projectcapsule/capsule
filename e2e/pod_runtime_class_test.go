@@ -7,22 +7,22 @@ package e2e
 
 import (
 	"context"
-
-	capsulev1beta2 "github.com/clastix/capsule/api/v1beta2"
 	"github.com/clastix/capsule/pkg/api"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/scheduling/v1"
+	nodev1 "k8s.io/api/node/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"strconv"
 	"strings"
+
+	capsulev1beta2 "github.com/clastix/capsule/api/v1beta2"
 )
 
-var _ = Describe("enforcing a Priority Class", func() {
+var _ = Describe("enforcing a Runtime Class", func() {
 	tnt := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "priority-class",
+			Name: "runtime-class",
 		},
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: capsulev1beta2.OwnerListSpec{
@@ -31,10 +31,10 @@ var _ = Describe("enforcing a Priority Class", func() {
 					Kind: "User",
 				},
 			},
-			PriorityClasses: &api.SelectorAllowedListSpec{
+			RuntimeClasses: &api.SelectorAllowedListSpec{
 				AllowedListSpec: api.AllowedListSpec{
-					Exact: []string{"gold"},
-					Regex: "pc\\-\\w+",
+					Exact: []string{"legacy"},
+					Regex: "^hardened-.*$",
 				},
 				Selector: metav1.LabelSelector{
 					MatchLabels: map[string]string{
@@ -55,10 +55,22 @@ var _ = Describe("enforcing a Priority Class", func() {
 		Expect(k8sClient.Delete(context.TODO(), tnt)).Should(Succeed())
 	})
 
-	It("should block non allowed Priority Class", func() {
-		ns := NewNamespace("")
-		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+	It("should block non allowed Runtime Class", func() {
+		runtime := &nodev1.RuntimeClass{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "disallowed",
+			},
+			Handler: "custom-handler",
+		}
+		Expect(k8sClient.Create(context.TODO(), runtime)).Should(Succeed())
 
+		defer func() {
+			Expect(k8sClient.Delete(context.TODO(), runtime)).Should(Succeed())
+		}()
+
+		ns := NewNamespace("rt-disallow")
+		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+		runtimeName := "disallowed"
 		pod := &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "container",
@@ -70,7 +82,7 @@ var _ = Describe("enforcing a Priority Class", func() {
 						Image: "quay.io/google-containers/pause-amd64:3.0",
 					},
 				},
-				PriorityClassName: "system-node-critical",
+				RuntimeClassName: &runtimeName,
 			},
 		}
 
@@ -82,22 +94,21 @@ var _ = Describe("enforcing a Priority Class", func() {
 	})
 
 	It("should allow exact match", func() {
-		pc := &v1.PriorityClass{
+		runtime := &nodev1.RuntimeClass{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: "gold",
+				Name: "legacy",
 			},
-			Description: "fake PriorityClass for e2e",
-			Value:       10000,
+			Handler: "custom-handler",
 		}
-		Expect(k8sClient.Create(context.TODO(), pc)).Should(Succeed())
+		Expect(k8sClient.Create(context.TODO(), runtime)).Should(Succeed())
 
 		defer func() {
-			Expect(k8sClient.Delete(context.TODO(), pc)).Should(Succeed())
+			Expect(k8sClient.Delete(context.TODO(), runtime)).Should(Succeed())
 		}()
 
-		ns := NewNamespace("")
+		ns := NewNamespace("rt-exact-match")
 		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
-
+		runtimeName := "legacy"
 		pod := &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "container",
@@ -109,7 +120,7 @@ var _ = Describe("enforcing a Priority Class", func() {
 						Image: "quay.io/google-containers/pause-amd64:3.0",
 					},
 				},
-				PriorityClassName: "gold",
+				RuntimeClassName: &runtimeName,
 			},
 		}
 
@@ -121,24 +132,24 @@ var _ = Describe("enforcing a Priority Class", func() {
 	})
 
 	It("should allow regex match", func() {
-		ns := NewNamespace("")
+		ns := NewNamespace("rc-regex-match")
 
 		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 
-		for i, pc := range []string{"pc-bronze", "pc-silver", "pc-gold"} {
-			class := &v1.PriorityClass{
+		for i, rt := range []string{"hardened-crio", "hardened-containerd", "hardened-dockerd"} {
+			runtimeName := strings.Join([]string{rt, "-", strconv.Itoa(i)}, "")
+			runtime := &nodev1.RuntimeClass{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: pc,
+					Name: runtimeName,
 				},
-				Description: "fake PriorityClass for e2e",
-				Value:       int32(10000 * (i + 2)),
+				Handler: "custom-handler",
 			}
 
-			Expect(k8sClient.Create(context.TODO(), class)).Should(Succeed())
+			Expect(k8sClient.Create(context.TODO(), runtime)).Should(Succeed())
 
 			pod := &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: pc,
+					Name: rt,
 				},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
@@ -147,7 +158,7 @@ var _ = Describe("enforcing a Priority Class", func() {
 							Image: "quay.io/google-containers/pause-amd64:3.0",
 						},
 					},
-					PriorityClassName: class.GetName(),
+					RuntimeClassName: &runtimeName,
 				},
 			}
 
@@ -158,33 +169,33 @@ var _ = Describe("enforcing a Priority Class", func() {
 				return err
 			}).Should(Succeed())
 
-			Expect(k8sClient.Delete(context.TODO(), class)).Should(Succeed())
+			Expect(k8sClient.Delete(context.TODO(), runtime)).Should(Succeed())
 		}
 	})
 
 	It("should allow selector match", func() {
-		ns := NewNamespace("priority-selector-match")
+		ns := NewNamespace("rc-selector-match")
 
 		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 
-		for i, pc := range []string{"customer-bronze", "customer-silver", "customer-gold"} {
-			priorityName := strings.Join([]string{pc, "-", strconv.Itoa(i)}, "")
-			class := &v1.PriorityClass{
+		for i, rt := range []string{"customer-containerd", "customer-crio", "customer-dockerd"} {
+			runtimeName := strings.Join([]string{rt, "-", strconv.Itoa(i)}, "")
+			runtime := &nodev1.RuntimeClass{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: pc,
+					Name: runtimeName,
 					Labels: map[string]string{
-						"name": priorityName,
+						"name": runtimeName,
 						"env":  "customers",
 					},
 				},
-				Description: "fake PriorityClass for e2e",
-				Value:       int32(10000 * (i + 2)),
+				Handler: "custom-handler",
 			}
-			Expect(k8sClient.Create(context.TODO(), class)).Should(Succeed())
+
+			Expect(k8sClient.Create(context.TODO(), runtime)).Should(Succeed())
 
 			pod := &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: pc,
+					Name: rt,
 				},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
@@ -193,7 +204,7 @@ var _ = Describe("enforcing a Priority Class", func() {
 							Image: "quay.io/google-containers/pause-amd64:3.0",
 						},
 					},
-					PriorityClassName: class.GetName(),
+					RuntimeClassName: &runtimeName,
 				},
 			}
 
@@ -204,7 +215,7 @@ var _ = Describe("enforcing a Priority Class", func() {
 				return err
 			}).Should(Succeed())
 
-			Expect(k8sClient.Delete(context.TODO(), class)).Should(Succeed())
+			Expect(k8sClient.Delete(context.TODO(), runtime)).Should(Succeed())
 		}
 	})
 

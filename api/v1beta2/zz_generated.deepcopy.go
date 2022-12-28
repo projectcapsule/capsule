@@ -749,6 +749,11 @@ func (in *TenantSpec) DeepCopyInto(out *TenantSpec) {
 		*out = make([]api.ImagePullPolicySpec, len(*in))
 		copy(*out, *in)
 	}
+	if in.RuntimeClasses != nil {
+		in, out := &in.RuntimeClasses, &out.RuntimeClasses
+		*out = new(api.SelectorAllowedListSpec)
+		(*in).DeepCopyInto(*out)
+	}
 	if in.PriorityClasses != nil {
 		in, out := &in.PriorityClasses, &out.PriorityClasses
 		*out = new(api.SelectorAllowedListSpec)

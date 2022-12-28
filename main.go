@@ -235,7 +235,7 @@ func main() {
 	// webhooks: the order matters, don't change it and just append
 	webhooksList := append(
 		make([]webhook.Webhook, 0),
-		route.Pod(pod.ImagePullPolicy(), pod.ContainerRegistry(), pod.PriorityClass()),
+		route.Pod(pod.ImagePullPolicy(), pod.ContainerRegistry(), pod.PriorityClass(), pod.RuntimeClass()),
 		route.Namespace(utils.InCapsuleGroups(cfg, namespacewebhook.PatchHandler(), namespacewebhook.QuotaHandler(), namespacewebhook.FreezeHandler(cfg), namespacewebhook.PrefixHandler(cfg), namespacewebhook.UserMetadataHandler())),
 		route.Ingress(ingress.Class(cfg), ingress.Hostnames(cfg), ingress.Collision(cfg), ingress.Wildcard()),
 		route.PVC(pvc.Handler()),

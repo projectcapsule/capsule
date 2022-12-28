@@ -257,7 +257,7 @@ e2e-build/%:
 		capsule \
 		./charts/capsule
 
-e2e-exec:
+e2e-exec: ginkgo
 	$(GINKGO) -v -tags e2e ./e2e
 
 e2e-destroy:
