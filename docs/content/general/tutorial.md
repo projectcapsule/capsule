@@ -855,7 +855,7 @@ spec:
   owners:
   - name: alice
     kind: User
-  RuntimeClasses:
+  runtimeClasses:
     allowed:
     - legacy
     allowedRegex: "^hardened-.*$"

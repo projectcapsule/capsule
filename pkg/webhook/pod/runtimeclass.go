@@ -94,7 +94,7 @@ func (h *runtimeClass) validate(ctx context.Context, c client.Client, decoder *a
 		// Enforcement is not in place, skipping it at all
 		return nil
 	case len(runtimeClassName) == 0:
-		// We don't have to force Pod to specify a Priority Class
+		// We don't have to force Pod to specify a RuntimeClass
 		return nil
 	case !allowed.ExactMatch(runtimeClassName) && !allowed.RegexMatch(runtimeClassName) && !allowed.SelectorMatch(class):
 		recorder.Eventf(&tntList.Items[0], corev1.EventTypeWarning, "ForbiddenRuntimeClass", "Pod %s/%s is using Runtime Class %s is forbidden for the current Tenant", pod.Namespace, pod.Name, runtimeClassName)
