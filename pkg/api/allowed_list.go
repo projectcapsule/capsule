@@ -16,13 +16,12 @@ import (
 // +kubebuilder:object:generate=true
 
 type SelectorAllowedListSpec struct {
-	AllowedListSpec `json:",inline"`
-
-	Selector metav1.LabelSelector `json:",inline"`
+	AllowedListSpec      `json:",inline"`
+	metav1.LabelSelector `json:",inline"`
 }
 
 func (in *SelectorAllowedListSpec) SelectorMatch(obj client.Object) bool {
-	selector, err := metav1.LabelSelectorAsSelector(&in.Selector)
+	selector, err := metav1.LabelSelectorAsSelector(&in.LabelSelector)
 	if err != nil {
 		return false
 	}

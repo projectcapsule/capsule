@@ -7,16 +7,17 @@ package e2e
 
 import (
 	"context"
+	"strconv"
+	"strings"
 
-	capsulev1beta2 "github.com/clastix/capsule/api/v1beta2"
-	"github.com/clastix/capsule/pkg/api"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/scheduling/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"strconv"
-	"strings"
+
+	capsulev1beta2 "github.com/clastix/capsule/api/v1beta2"
+	"github.com/clastix/capsule/pkg/api"
 )
 
 var _ = Describe("enforcing a Priority Class", func() {
@@ -36,7 +37,7 @@ var _ = Describe("enforcing a Priority Class", func() {
 					Exact: []string{"gold"},
 					Regex: "pc\\-\\w+",
 				},
-				Selector: metav1.LabelSelector{
+				LabelSelector: metav1.LabelSelector{
 					MatchLabels: map[string]string{
 						"env": "customers",
 					},

@@ -7,14 +7,16 @@ package e2e
 
 import (
 	"context"
-	"github.com/clastix/capsule/pkg/api"
+	"strconv"
+	"strings"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	nodev1 "k8s.io/api/node/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"strconv"
-	"strings"
+
+	"github.com/clastix/capsule/pkg/api"
 
 	capsulev1beta2 "github.com/clastix/capsule/api/v1beta2"
 )
@@ -36,7 +38,7 @@ var _ = Describe("enforcing a Runtime Class", func() {
 					Exact: []string{"legacy"},
 					Regex: "^hardened-.*$",
 				},
-				Selector: metav1.LabelSelector{
+				LabelSelector: metav1.LabelSelector{
 					MatchLabels: map[string]string{
 						"env": "customers",
 					},
