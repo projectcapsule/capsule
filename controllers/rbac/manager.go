@@ -21,7 +21,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
-	capsulev1alpha1 "github.com/clastix/capsule/api/v1alpha1"
+	capsulev1beta2 "github.com/clastix/capsule/api/v1beta2"
 	"github.com/clastix/capsule/controllers/utils"
 	"github.com/clastix/capsule/pkg/configuration"
 )
@@ -51,7 +51,7 @@ func (r *Manager) SetupWithManager(ctx context.Context, mgr ctrl.Manager, config
 
 	crbErr := ctrl.NewControllerManagedBy(mgr).
 		For(&rbacv1.ClusterRoleBinding{}, namesPredicate).
-		Watches(source.NewKindWithCache(&capsulev1alpha1.CapsuleConfiguration{}, mgr.GetCache()), handler.Funcs{
+		Watches(source.NewKindWithCache(&capsulev1beta2.CapsuleConfiguration{}, mgr.GetCache()), handler.Funcs{
 			UpdateFunc: func(updateEvent event.UpdateEvent, limitingInterface workqueue.RateLimitingInterface) {
 				if updateEvent.ObjectNew.GetName() == configurationName {
 					if crbErr := r.EnsureClusterRoleBindings(ctx); crbErr != nil {
