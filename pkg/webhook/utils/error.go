@@ -29,7 +29,7 @@ func AllowedValuesErrorMessage(allowed api.SelectorAllowedListSpec, err string) 
 		extra = append(extra, fmt.Sprintf(" use one matching the following regex (%s)", allowed.Regex))
 	}
 
-	if len(allowed.Selector.MatchLabels) > 0 || len(allowed.Selector.MatchExpressions) > 0 {
+	if len(allowed.MatchLabels) > 0 || len(allowed.MatchExpressions) > 0 {
 		extra = append(extra, ", or matching the label selector defined in the Tenant")
 	}
 

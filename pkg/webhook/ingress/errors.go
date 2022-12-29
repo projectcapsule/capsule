@@ -77,7 +77,7 @@ func appendClassError(spec api.SelectorAllowedListSpec) (append string) {
 		append += fmt.Sprintf(", or matching the regex %s", spec.Regex)
 	}
 
-	if len(spec.Selector.MatchLabels) > 0 || len(spec.Selector.MatchExpressions) > 0 {
+	if len(spec.MatchLabels) > 0 || len(spec.MatchExpressions) > 0 {
 		append += fmt.Sprintf(", or matching the label selector defined in the Tenant")
 	}
 
