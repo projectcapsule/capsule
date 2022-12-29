@@ -1,3 +1,4 @@
+---
 apiVersion: capsule.clastix.io/v1beta2
 kind: CapsuleConfiguration
 metadata:
@@ -7,3 +8,4 @@ spec:
   forceTenantPrefix: false
   protectedNamespaceRegex: ""
   enableTLSReconciler: true
+

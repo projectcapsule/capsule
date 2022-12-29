@@ -2794,12 +2794,13 @@ spec:
           defaultMode: 420
           secretName: capsule-tls
 ---
-apiVersion: capsule.clastix.io/v1alpha1
+apiVersion: capsule.clastix.io/v1beta2
 kind: CapsuleConfiguration
 metadata:
   name: capsule-default
   namespace: capsule-system
 spec:
+  enableTLSReconciler: true
   forceTenantPrefix: false
   protectedNamespaceRegex: ""
   userGroups:
@@ -2980,6 +2981,7 @@ webhooks:
     - v1
     operations:
     - CREATE
+    - UPDATE
     resources:
     - pods
     scope: Namespaced
