@@ -12,7 +12,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	capsulev1alpha1 "github.com/clastix/capsule/api/v1alpha1"
+	capsulev1beta2 "github.com/clastix/capsule/api/v1beta2"
 	"github.com/clastix/capsule/controllers/utils"
 	"github.com/clastix/capsule/pkg/configuration"
 )
@@ -31,7 +31,7 @@ func (c *Manager) InjectClient(client client.Client) error {
 
 func (c *Manager) SetupWithManager(mgr ctrl.Manager, configurationName string) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&capsulev1alpha1.CapsuleConfiguration{}, utils.NamesMatchingPredicate(configurationName)).
+		For(&capsulev1beta2.CapsuleConfiguration{}, utils.NamesMatchingPredicate(configurationName)).
 		Complete(c)
 }
 
