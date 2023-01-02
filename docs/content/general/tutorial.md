@@ -724,31 +724,34 @@ spec:
 ...
   limitRanges:
     items:
-    - type: Pod
-      min:
-        cpu: "50m"
-        memory: "5Mi"
-      max:
-        cpu: "1"
-        memory: "1Gi"
-    - type: Container
-      defaultRequest:
-        cpu: "100m"
-        memory: "10Mi"
-      default:
-        cpu: "200m"
-        memory: "100Mi"
-      min:
-        cpu: "50m"
-        memory: "5Mi"
-      max:
-        cpu: "1"
-        memory: "1Gi"
-    - type: PersistentVolumeClaim
-      min:
-        storage: "1Gi"
-      max:
-        storage: "10Gi"
+      - limits:
+          - type: Pod
+            min:
+              cpu: "50m"
+              memory: "5Mi"
+            max:
+              cpu: "1"
+              memory: "1Gi"
+      - limits:
+          - type: Container
+            defaultRequest:
+              cpu: "100m"
+              memory: "10Mi"
+            default:
+              cpu: "200m"
+              memory: "100Mi"
+            min:
+              cpu: "50m"
+              memory: "5Mi"
+            max:
+              cpu: "1"
+              memory: "1Gi"
+      - limits:
+          - type: PersistentVolumeClaim
+            min:
+              storage: "1Gi"
+            max:
+              storage: "10Gi"
 ```
 
 Limits will be inherited by all the namespaces created by Alice. In our case, when Alice creates the namespace `oil-production`, Capsule creates the following:
