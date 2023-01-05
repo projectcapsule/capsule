@@ -7,6 +7,7 @@ package e2e
 
 import (
 	"context"
+	"encoding/json"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -17,6 +18,12 @@ import (
 	capsulev1beta2 "github.com/clastix/capsule/api/v1beta2"
 	"github.com/clastix/capsule/pkg/api"
 )
+
+type Patch struct {
+	Op    string `json:"op"`
+	Path  string `json:"path"`
+	Value string `json:"value"`
+}
 
 var _ = Describe("enforcing a Container Registry", func() {
 	tnt := &capsulev1beta2.Tenant{
@@ -112,8 +119,7 @@ var _ = Describe("enforcing a Container Registry", func() {
 	})
 
 	It("should deny patching a not matching registry after applying with a matching (Container)", func() {
-		ns := NewNamespace("reg-deny-container-patch")
-		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+		ns := NewNamespace("")
 
 		pod := &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
@@ -130,23 +136,33 @@ var _ = Describe("enforcing a Container Registry", func() {
 		}
 
 		cs := ownerClient(tnt.Spec.Owners[0])
+
+		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
+
 		EventuallyCreation(func() error {
 			_, err := cs.CoreV1().Pods(ns.Name).Create(context.Background(), pod, metav1.CreateOptions{})
 
 			return err
 		}).Should(Succeed())
 
-		Expect(k8sClient.Get(context.Background(), types.NamespacedName{Name: pod.GetName(), Namespace: ns.GetName()}, pod)).ToNot(HaveOccurred())
-
-		pod.Spec.Containers[0].Image = "attacker/google-containers/pause-amd64:3.0"
-		Expect(k8sClient.Update(context.Background(), pod)).To(HaveOccurred())
-
-		Expect(k8sClient.Delete(context.TODO(), ns)).Should(Succeed())
+		Eventually(func() error {
+			payload := []Patch{{
+				Op:    "replace",
+				Path:  "/spec/containers/0/image",
+				Value: "attacker/google-containers/pause-amd64:3.0",
+			}}
+			payloadBytes, _ := json.Marshal(payload)
+			_, err := cs.CoreV1().Pods(ns.GetName()).Patch(context.TODO(), pod.GetName(), types.JSONPatchType, payloadBytes, metav1.PatchOptions{})
+			if err != nil {
+				return err
+			}
+			return nil
+		}).ShouldNot(Succeed())
 	})
 
 	It("should deny patching a not matching registry after applying with a matching (initContainer)", func() {
-		ns := NewNamespace("reg-deny-init-patch")
-		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+		ns := NewNamespace("")
 
 		pod := &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
@@ -169,23 +185,33 @@ var _ = Describe("enforcing a Container Registry", func() {
 		}
 
 		cs := ownerClient(tnt.Spec.Owners[0])
+
+		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
+
 		EventuallyCreation(func() error {
 			_, err := cs.CoreV1().Pods(ns.Name).Create(context.Background(), pod, metav1.CreateOptions{})
 
 			return err
 		}).Should(Succeed())
 
-		Expect(k8sClient.Get(context.Background(), types.NamespacedName{Name: pod.GetName(), Namespace: ns.GetName()}, pod)).ToNot(HaveOccurred())
-
-		pod.Spec.InitContainers[0].Image = "attacker/google-containers/pause-amd64:3.0"
-		Expect(k8sClient.Update(context.Background(), pod)).To(HaveOccurred())
-
-		Expect(k8sClient.Delete(context.TODO(), ns)).Should(Succeed())
+		Eventually(func() error {
+			payload := []Patch{{
+				Op:    "replace",
+				Path:  "/spec/initContainers/0/image",
+				Value: "attacker/google-containers/pause-amd64:3.0",
+			}}
+			payloadBytes, _ := json.Marshal(payload)
+			_, err := cs.CoreV1().Pods(ns.GetName()).Patch(context.TODO(), pod.GetName(), types.JSONPatchType, payloadBytes, metav1.PatchOptions{})
+			if err != nil {
+				return err
+			}
+			return nil
+		}).ShouldNot(Succeed())
 	})
 
 	It("should allow patching a matching registry after applying with a matching (Container)", func() {
-		ns := NewNamespace("reg-allow-container-patch")
-		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+		ns := NewNamespace("")
 
 		pod := &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
@@ -202,23 +228,33 @@ var _ = Describe("enforcing a Container Registry", func() {
 		}
 
 		cs := ownerClient(tnt.Spec.Owners[0])
+
+		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
+
 		EventuallyCreation(func() error {
 			_, err := cs.CoreV1().Pods(ns.Name).Create(context.Background(), pod, metav1.CreateOptions{})
 
 			return err
 		}).Should(Succeed())
 
-		Expect(k8sClient.Get(context.Background(), types.NamespacedName{Name: pod.GetName(), Namespace: ns.GetName()}, pod)).ToNot(HaveOccurred())
-
-		pod.Spec.Containers[0].Image = "myregistry.azurecr.io/google-containers/pause-amd64:3.1"
-		Expect(k8sClient.Update(context.Background(), pod)).To(HaveOccurred())
-
-		Expect(k8sClient.Delete(context.TODO(), ns)).Should(Succeed())
+		Eventually(func() error {
+			payload := []Patch{{
+				Op:    "replace",
+				Path:  "/spec/containers/0/image",
+				Value: "myregistry.azurecr.io/google-containers/pause-amd64:3.1",
+			}}
+			payloadBytes, _ := json.Marshal(payload)
+			_, err := cs.CoreV1().Pods(ns.GetName()).Patch(context.TODO(), pod.GetName(), types.JSONPatchType, payloadBytes, metav1.PatchOptions{})
+			if err != nil {
+				return err
+			}
+			return nil
+		}).Should(Succeed())
 	})
 
 	It("should allow patching a matching registry after applying with a matching (initContainer)", func() {
-		ns := NewNamespace("reg-allow-container-patch")
-		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+		ns := NewNamespace("")
 
 		pod := &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
@@ -241,18 +277,29 @@ var _ = Describe("enforcing a Container Registry", func() {
 		}
 
 		cs := ownerClient(tnt.Spec.Owners[0])
+
+		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
+
 		EventuallyCreation(func() error {
 			_, err := cs.CoreV1().Pods(ns.Name).Create(context.Background(), pod, metav1.CreateOptions{})
 
 			return err
 		}).Should(Succeed())
 
-		Expect(k8sClient.Get(context.Background(), types.NamespacedName{Name: pod.GetName(), Namespace: ns.GetName()}, pod)).ToNot(HaveOccurred())
-
-		pod.Spec.InitContainers[0].Image = "myregistry.azurecr.io/google-containers/pause-amd64:3.1"
-		Expect(k8sClient.Update(context.Background(), pod)).To(HaveOccurred())
-
-		Expect(k8sClient.Delete(context.TODO(), ns)).Should(Succeed())
+		Eventually(func() error {
+			payload := []Patch{{
+				Op:    "replace",
+				Path:  "/spec/initContainers/0/image",
+				Value: "myregistry.azurecr.io/google-containers/pause-amd64:3.1",
+			}}
+			payloadBytes, _ := json.Marshal(payload)
+			_, err := cs.CoreV1().Pods(ns.GetName()).Patch(context.TODO(), pod.GetName(), types.JSONPatchType, payloadBytes, metav1.PatchOptions{})
+			if err != nil {
+				return err
+			}
+			return nil
+		}).Should(Succeed())
 	})
 
 	It("should allow using an exact match", func() {
