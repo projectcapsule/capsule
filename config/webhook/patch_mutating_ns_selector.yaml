@@ -1,0 +1,27 @@
+- op: add
+  path: /webhooks/0/namespaceSelector
+  value:
+    matchExpressions:
+      - key: capsule.clastix.io/tenant
+        operator: Exists
+- op: add
+  path: /webhooks/1/namespaceSelector
+  value:
+    matchExpressions:
+      - key: capsule.clastix.io/tenant
+        operator: Exists
+- op: add
+  path: /webhooks/2/namespaceSelector
+  value:
+    matchExpressions:
+      - key: capsule.clastix.io/tenant
+        operator: Exists
+- op: add
+  path: /webhooks/0/rules/0/scope
+  value: Namespaced
+- op: add
+  path: /webhooks/1/rules/0/scope
+  value: Namespaced
+- op: add
+  path: /webhooks/2/rules/0/scope
+  value: Namespaced

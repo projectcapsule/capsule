@@ -8,7 +8,14 @@ patchesJson6902:
     kind: ValidatingWebhookConfiguration
     name: validating-webhook-configuration
     version: v1
-  path: patch_ns_selector.yaml
+  path: patch_validating_ns_selector.yaml
+- target:
+    group: admissionregistration.k8s.io
+    kind: MutatingWebhookConfiguration
+    name: mutating-webhook-configuration
+    version: v1
+  path: patch_mutating_ns_selector.yaml
+
 
 configurations:
 - kustomizeconfig.yaml
