@@ -11,6 +11,65 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
+      path: /defaults
+  failurePolicy: Fail
+  name: pod.defaults.capsule.clastix.io
+  rules:
+  - apiGroups:
+    - ""
+    apiVersions:
+    - v1
+    operations:
+    - CREATE
+    resources:
+    - pods
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /defaults
+  failurePolicy: Fail
+  name: storage.defaults.capsule.clastix.io
+  rules:
+  - apiGroups:
+    - ""
+    apiVersions:
+    - v1
+    operations:
+    - CREATE
+    resources:
+    - persistentvolumeclaims
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /defaults
+  failurePolicy: Fail
+  name: ingress.defaults.capsule.clastix.io
+  rules:
+  - apiGroups:
+    - networking.k8s.io
+    apiVersions:
+    - v1beta1
+    - v1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - ingresses
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
       path: /namespace-owner-reference
   failurePolicy: Fail
   name: owner.namespace.capsule.clastix.io

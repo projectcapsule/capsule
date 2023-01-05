@@ -1940,13 +1940,15 @@ spec:
                     description: Toggles the ability for Ingress resources created in a Tenant to have a hostname wildcard.
                     type: boolean
                   allowedClasses:
-                    description: Specifies the allowed IngressClasses assigned to the Tenant. Capsule assures that all Ingress resources created in the Tenant can use only one of the allowed IngressClasses. Optional.
+                    description: Specifies the allowed IngressClasses assigned to the Tenant. Capsule assures that all Ingress resources created in the Tenant can use only one of the allowed IngressClasses. A default value can be specified, and all the Ingress resources created will inherit the declared class. Optional.
                     properties:
                       allowed:
                         items:
                           type: string
                         type: array
                       allowedRegex:
+                        type: string
+                      default:
                         type: string
                       matchExpressions:
                         description: matchExpressions is a list of label selector requirements. The requirements are ANDed.
@@ -2442,13 +2444,15 @@ spec:
                 description: Prevent accidental deletion of the Tenant. When enabled, the deletion request will be declined.
                 type: boolean
               priorityClasses:
-                description: Specifies the allowed priorityClasses assigned to the Tenant. Capsule assures that all Pods resources created in the Tenant can use only one of the allowed PriorityClasses. Optional.
+                description: Specifies the allowed priorityClasses assigned to the Tenant. Capsule assures that all Pods resources created in the Tenant can use only one of the allowed PriorityClasses. A default value can be specified, and all the Pod resources created will inherit the declared class. Optional.
                 properties:
                   allowed:
                     items:
                       type: string
                     type: array
                   allowedRegex:
+                    type: string
+                  default:
                     type: string
                   matchExpressions:
                     description: matchExpressions is a list of label selector requirements. The requirements are ANDed.
@@ -2617,13 +2621,15 @@ spec:
                     type: object
                 type: object
               storageClasses:
-                description: Specifies the allowed StorageClasses assigned to the Tenant. Capsule assures that all PersistentVolumeClaim resources created in the Tenant can use only one of the allowed StorageClasses. Optional.
+                description: Specifies the allowed StorageClasses assigned to the Tenant. Capsule assures that all PersistentVolumeClaim resources created in the Tenant can use only one of the allowed StorageClasses. A default value can be specified, and all the PersistentVolumeClaim resources created will inherit the declared class. Optional.
                 properties:
                   allowed:
                     items:
                       type: string
                     type: array
                   allowedRegex:
+                    type: string
+                  default:
                     type: string
                   matchExpressions:
                     description: matchExpressions is a list of label selector requirements. The requirements are ANDed.
@@ -2812,6 +2818,80 @@ metadata:
   creationTimestamp: null
   name: capsule-mutating-webhook-configuration
 webhooks:
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: capsule-webhook-service
+      namespace: capsule-system
+      path: /defaults
+  failurePolicy: Fail
+  name: pod.defaults.capsule.clastix.io
+  namespaceSelector:
+    matchExpressions:
+    - key: capsule.clastix.io/tenant
+      operator: Exists
+  rules:
+  - apiGroups:
+    - ""
+    apiVersions:
+    - v1
+    operations:
+    - CREATE
+    resources:
+    - pods
+    scope: Namespaced
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: capsule-webhook-service
+      namespace: capsule-system
+      path: /defaults
+  failurePolicy: Fail
+  name: storage.defaults.capsule.clastix.io
+  namespaceSelector:
+    matchExpressions:
+    - key: capsule.clastix.io/tenant
+      operator: Exists
+  rules:
+  - apiGroups:
+    - ""
+    apiVersions:
+    - v1
+    operations:
+    - CREATE
+    resources:
+    - persistentvolumeclaims
+    scope: Namespaced
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: capsule-webhook-service
+      namespace: capsule-system
+      path: /defaults
+  failurePolicy: Fail
+  name: ingress.defaults.capsule.clastix.io
+  namespaceSelector:
+    matchExpressions:
+    - key: capsule.clastix.io/tenant
+      operator: Exists
+  rules:
+  - apiGroups:
+    - networking.k8s.io
+    apiVersions:
+    - v1beta1
+    - v1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - ingresses
+    scope: Namespaced
+  sideEffects: None
 - admissionReviewVersions:
   - v1
   clientConfig:
