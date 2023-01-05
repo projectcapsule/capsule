@@ -27,7 +27,7 @@ func Wildcard() capsulewebhook.Handler {
 
 func (h *wildcard) OnCreate(client client.Client, decoder *admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		return h.wildcardHandler(ctx, client, req, recorder, decoder)
+		return h.validate(ctx, client, req, recorder, decoder)
 	}
 }
 
@@ -39,11 +39,11 @@ func (h *wildcard) OnDelete(client client.Client, decoder *admission.Decoder, re
 
 func (h *wildcard) OnUpdate(client client.Client, decoder *admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		return h.wildcardHandler(ctx, client, req, recorder, decoder)
+		return h.validate(ctx, client, req, recorder, decoder)
 	}
 }
 
-func (h *wildcard) wildcardHandler(ctx context.Context, clt client.Client, req admission.Request, recorder record.EventRecorder, decoder *admission.Decoder) *admission.Response {
+func (h *wildcard) validate(ctx context.Context, clt client.Client, req admission.Request, recorder record.EventRecorder, decoder *admission.Decoder) *admission.Response {
 	tntList := &capsulev1beta2.TenantList{}
 
 	if err := clt.List(ctx, tntList, client.MatchingFieldsSelector{
@@ -61,7 +61,7 @@ func (h *wildcard) wildcardHandler(ctx context.Context, clt client.Client, req a
 
 	if !tnt.Spec.IngressOptions.AllowWildcardHostnames {
 		// Retrieve ingress resource from request.
-		ingress, err := ingressFromRequest(req, decoder)
+		ingress, err := FromRequest(req, decoder)
 		if err != nil {
 			return utils.ErroredResponse(err)
 		}

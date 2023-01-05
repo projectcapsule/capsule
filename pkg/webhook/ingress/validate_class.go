@@ -7,12 +7,8 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
-	networkingv1 "k8s.io/api/networking/v1"
-	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -29,135 +25,22 @@ type class struct {
 	version       *version.Version
 }
 
-func Class(configuration configuration.Configuration) capsulewebhook.Handler {
-	version, _ := utils.GetK8sVersion()
-
+func Class(configuration configuration.Configuration, version *version.Version) capsulewebhook.Handler {
 	return &class{
 		configuration: configuration,
 		version:       version,
 	}
 }
 
-func (r *class) retrieveIngressClass(ctx context.Context, ctrlClient client.Client, ingressClassName *string) (client.Object, error) {
-	if r.version == nil || ingressClassName == nil {
-		return nil, nil
-	}
-
-	var obj client.Object
-
-	switch {
-	case r.version.Minor() < 18:
-		return nil, nil
-	case r.version.Minor() < 19:
-		obj = &networkingv1beta1.IngressClass{}
-	default:
-		obj = &networkingv1.IngressClass{}
-	}
-
-	if err := ctrlClient.Get(ctx, types.NamespacedName{Name: *ingressClassName}, obj); err != nil {
-		if k8serrors.IsNotFound(err) {
-			return nil, nil
-		}
-
-		return nil, err
-	}
-
-	return obj, nil
-}
-
-// nolint:dupl
 func (r *class) OnCreate(client client.Client, decoder *admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		ingress, err := ingressFromRequest(req, decoder)
-		if err != nil {
-			return utils.ErroredResponse(err)
-		}
-
-		var tenant *capsulev1beta2.Tenant
-
-		tenant, err = tenantFromIngress(ctx, client, ingress)
-		if err != nil {
-			return utils.ErroredResponse(err)
-		}
-
-		if tenant == nil {
-			return nil
-		}
-
-		ic, err := r.retrieveIngressClass(ctx, client, ingress.IngressClass())
-		if err != nil {
-			response := admission.Errored(http.StatusInternalServerError, err)
-
-			return &response
-		}
-
-		if err = r.validateClass(*tenant, ingress.IngressClass(), ic); err == nil {
-			return nil
-		}
-
-		var forbiddenErr *ingressClassForbiddenError
-
-		if errors.As(err, &forbiddenErr) {
-			recorder.Eventf(tenant, corev1.EventTypeWarning, "IngressClassForbidden", "Ingress %s/%s class is forbidden", ingress.Namespace(), ingress.Name())
-		}
-
-		var invalidErr *ingressClassNotValidError
-
-		if errors.As(err, &invalidErr) {
-			recorder.Eventf(tenant, corev1.EventTypeWarning, "IngressClassNotValid", "Ingress %s/%s class is invalid", ingress.Namespace(), ingress.Name())
-		}
-
-		response := admission.Denied(err.Error())
-
-		return &response
+		return r.validate(ctx, r.version, client, req, decoder, recorder)
 	}
 }
 
-// nolint:dupl
 func (r *class) OnUpdate(client client.Client, decoder *admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		ingress, err := ingressFromRequest(req, decoder)
-		if err != nil {
-			return utils.ErroredResponse(err)
-		}
-
-		var tenant *capsulev1beta2.Tenant
-
-		tenant, err = tenantFromIngress(ctx, client, ingress)
-		if err != nil {
-			return utils.ErroredResponse(err)
-		}
-
-		if tenant == nil {
-			return nil
-		}
-
-		ic, err := r.retrieveIngressClass(ctx, client, ingress.IngressClass())
-		if err != nil {
-			response := admission.Errored(http.StatusInternalServerError, err)
-
-			return &response
-		}
-
-		if err = r.validateClass(*tenant, ingress.IngressClass(), ic); err == nil {
-			return nil
-		}
-
-		var forbiddenErr *ingressClassForbiddenError
-
-		if errors.As(err, &forbiddenErr) {
-			recorder.Eventf(tenant, corev1.EventTypeWarning, "IngressClassForbidden", "Ingress %s/%s class is forbidden", ingress.Namespace(), ingress.Name())
-		}
-
-		var invalidErr *ingressClassNotValidError
-
-		if errors.As(err, &invalidErr) {
-			recorder.Eventf(tenant, corev1.EventTypeWarning, "IngressClassNotValid", "Ingress %s/%s class is invalid", ingress.Namespace(), ingress.Name())
-		}
-
-		response := admission.Denied(err.Error())
-
-		return &response
+		return r.validate(ctx, r.version, client, req, decoder, recorder)
 	}
 }
 
@@ -167,32 +50,66 @@ func (r *class) OnDelete(client.Client, *admission.Decoder, record.EventRecorder
 	}
 }
 
-func (r *class) validateClass(tenant capsulev1beta2.Tenant, ingressClass *string, ingressClassObj client.Object) error {
-	if tenant.Spec.IngressOptions.AllowedClasses == nil {
+func (r *class) validate(ctx context.Context, version *version.Version, client client.Client, req admission.Request, decoder *admission.Decoder, recorder record.EventRecorder) *admission.Response {
+	ingress, err := FromRequest(req, decoder)
+	if err != nil {
+		return utils.ErroredResponse(err)
+	}
+
+	var tnt *capsulev1beta2.Tenant
+
+	tnt, err = TenantFromIngress(ctx, client, ingress)
+	if err != nil {
+		return utils.ErroredResponse(err)
+	}
+
+	if tnt == nil {
 		return nil
 	}
 
+	allowed := tnt.Spec.IngressOptions.AllowedClasses
+
+	if allowed == nil {
+		return nil
+	}
+
+	ingressClass := ingress.IngressClass()
+
 	if ingressClass == nil {
-		return NewIngressClassNotValid(*tenant.Spec.IngressOptions.AllowedClasses)
+		recorder.Eventf(tnt, corev1.EventTypeWarning, "MissingIngressClass", "Ingress %s/%s is missing IngressClass", req.Namespace, req.Name)
+
+		response := admission.Denied(NewIngressClassUndefined(*allowed).Error())
+
+		return &response
 	}
 
-	var valid, regex, match bool
+	selector := false
 
-	if len(tenant.Spec.IngressOptions.AllowedClasses.Exact) > 0 {
-		valid = tenant.Spec.IngressOptions.AllowedClasses.ExactMatch(*ingressClass)
+	// Verify if the IngressClass exists and matches the label selector/expression
+	if len(allowed.MatchExpressions) > 0 || len(allowed.MatchLabels) > 0 {
+		ingressClassObj, err := utils.GetIngressClassByName(ctx, version, client, ingressClass)
+		if err != nil && !k8serrors.IsNotFound(err) {
+			response := admission.Errored(http.StatusInternalServerError, err)
+
+			return &response
+		}
+
+		// Ingress Class is present, check if it matches the selector
+		if ingressClassObj != nil {
+			selector = allowed.SelectorMatch(ingressClassObj)
+		}
 	}
 
-	regex = tenant.Spec.IngressOptions.AllowedClasses.RegexMatch(*ingressClass)
+	switch {
+	case allowed.MatchDefault(*ingressClass):
+		return nil
+	case allowed.Match(*ingressClass) || selector:
+		return nil
+	default:
+		recorder.Eventf(tnt, corev1.EventTypeWarning, "ForbiddenIngressClass", "Ingress %s/%s IngressClass %s is forbidden for the current Tenant", req.Namespace, req.Name, &ingressClass)
 
-	if ingressClassObj != nil {
-		match = tenant.Spec.IngressOptions.AllowedClasses.SelectorMatch(ingressClassObj)
-	} else {
-		match = true
+		response := admission.Denied(NewIngressClassForbidden(*ingressClass, *allowed).Error())
+
+		return &response
 	}
-
-	if !valid && !regex && !match {
-		return NewIngressClassForbidden(*ingressClass, *tenant.Spec.IngressOptions.AllowedClasses)
-	}
-
-	return nil
 }

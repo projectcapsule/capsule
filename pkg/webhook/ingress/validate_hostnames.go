@@ -30,83 +30,13 @@ func Hostnames(configuration configuration.Configuration) capsulewebhook.Handler
 
 func (r *hostnames) OnCreate(c client.Client, decoder *admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		ingress, err := ingressFromRequest(req, decoder)
-		if err != nil {
-			return utils.ErroredResponse(err)
-		}
-
-		var tenant *capsulev1beta2.Tenant
-
-		tenant, err = tenantFromIngress(ctx, c, ingress)
-		if err != nil {
-			return utils.ErroredResponse(err)
-		}
-
-		if tenant == nil || tenant.Spec.IngressOptions.AllowedHostnames == nil {
-			return nil
-		}
-
-		hostnameList := sets.NewString()
-		for hostname := range ingress.HostnamePathsPairs() {
-			hostnameList.Insert(hostname)
-		}
-
-		if err = r.validateHostnames(*tenant, hostnameList); err == nil {
-			return nil
-		}
-
-		var hostnameNotValidErr *ingressHostnameNotValidError
-
-		if errors.As(err, &hostnameNotValidErr) {
-			recorder.Eventf(tenant, corev1.EventTypeWarning, "IngressHostnameNotValid", "Ingress %s/%s hostname is not valid", ingress.Namespace(), ingress.Name())
-
-			response := admission.Denied(err.Error())
-
-			return &response
-		}
-
-		return utils.ErroredResponse(err)
+		return r.validate(ctx, c, req, decoder, recorder)
 	}
 }
 
 func (r *hostnames) OnUpdate(c client.Client, decoder *admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		ingress, err := ingressFromRequest(req, decoder)
-		if err != nil {
-			return utils.ErroredResponse(err)
-		}
-
-		var tenant *capsulev1beta2.Tenant
-
-		tenant, err = tenantFromIngress(ctx, c, ingress)
-		if err != nil {
-			return utils.ErroredResponse(err)
-		}
-
-		if tenant == nil {
-			return nil
-		}
-
-		hostnameSet := sets.NewString()
-		for hostname := range ingress.HostnamePathsPairs() {
-			hostnameSet.Insert(hostname)
-		}
-
-		if err = r.validateHostnames(*tenant, hostnameSet); err == nil {
-			return nil
-		}
-
-		var hostnameNotValidErr *ingressHostnameNotValidError
-
-		if errors.As(err, &hostnameNotValidErr) {
-			recorder.Eventf(tenant, corev1.EventTypeWarning, "IngressHostnameNotValid", "Ingress %s/%s hostname is not valid", ingress.Namespace(), ingress.Name())
-
-			response := admission.Denied(err.Error())
-
-			return &response
-		}
-
-		return utils.ErroredResponse(err)
+		return r.validate(ctx, c, req, decoder, recorder)
 	}
 }
 
@@ -114,6 +44,45 @@ func (r *hostnames) OnDelete(client.Client, *admission.Decoder, record.EventReco
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		return nil
 	}
+}
+
+func (r *hostnames) validate(ctx context.Context, client client.Client, req admission.Request, decoder *admission.Decoder, recorder record.EventRecorder) *admission.Response {
+	ingress, err := FromRequest(req, decoder)
+	if err != nil {
+		return utils.ErroredResponse(err)
+	}
+
+	var tenant *capsulev1beta2.Tenant
+
+	tenant, err = TenantFromIngress(ctx, client, ingress)
+	if err != nil {
+		return utils.ErroredResponse(err)
+	}
+
+	if tenant == nil || tenant.Spec.IngressOptions.AllowedHostnames == nil {
+		return nil
+	}
+
+	hostnameList := sets.NewString()
+	for hostname := range ingress.HostnamePathsPairs() {
+		hostnameList.Insert(hostname)
+	}
+
+	if err = r.validateHostnames(*tenant, hostnameList); err == nil {
+		return nil
+	}
+
+	var hostnameNotValidErr *ingressHostnameNotValidError
+
+	if errors.As(err, &hostnameNotValidErr) {
+		recorder.Eventf(tenant, corev1.EventTypeWarning, "IngressHostnameNotValid", "Ingress %s/%s hostname is not valid", ingress.Namespace(), ingress.Name())
+
+		response := admission.Denied(err.Error())
+
+		return &response
+	}
+
+	return utils.ErroredResponse(err)
 }
 
 func (r *hostnames) validateHostnames(tenant capsulev1beta2.Tenant, hostnames sets.String) error {

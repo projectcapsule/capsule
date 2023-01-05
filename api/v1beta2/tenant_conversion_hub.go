@@ -86,8 +86,10 @@ func (in *Tenant) ConvertFrom(raw conversion.Hub) error {
 
 	in.Spec.ServiceOptions = src.Spec.ServiceOptions
 	if src.Spec.StorageClasses != nil {
-		in.Spec.StorageClasses = &api.SelectorAllowedListSpec{
-			AllowedListSpec: *src.Spec.StorageClasses,
+		in.Spec.StorageClasses = &api.DefaultAllowedListSpec{
+			SelectorAllowedListSpec: api.SelectorAllowedListSpec{
+				AllowedListSpec: *src.Spec.StorageClasses,
+			},
 		}
 	}
 
@@ -106,8 +108,10 @@ func (in *Tenant) ConvertFrom(raw conversion.Hub) error {
 	}
 
 	if ingressClass := src.Spec.IngressOptions.AllowedClasses; ingressClass != nil {
-		in.Spec.IngressOptions.AllowedClasses = &api.SelectorAllowedListSpec{
-			AllowedListSpec: *ingressClass,
+		in.Spec.IngressOptions.AllowedClasses = &api.DefaultAllowedListSpec{
+			SelectorAllowedListSpec: api.SelectorAllowedListSpec{
+				AllowedListSpec: *ingressClass,
+			},
 		}
 	}
 
@@ -124,8 +128,10 @@ func (in *Tenant) ConvertFrom(raw conversion.Hub) error {
 	in.Spec.ImagePullPolicies = src.Spec.ImagePullPolicies
 
 	if src.Spec.PriorityClasses != nil {
-		in.Spec.PriorityClasses = &api.SelectorAllowedListSpec{
-			AllowedListSpec: *src.Spec.PriorityClasses,
+		in.Spec.PriorityClasses = &api.DefaultAllowedListSpec{
+			SelectorAllowedListSpec: api.SelectorAllowedListSpec{
+				AllowedListSpec: *src.Spec.PriorityClasses,
+			},
 		}
 	}
 

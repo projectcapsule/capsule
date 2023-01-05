@@ -15,18 +15,41 @@ import (
 
 // +kubebuilder:object:generate=true
 
+type DefaultAllowedListSpec struct {
+	SelectorAllowedListSpec `json:",inline"`
+	Default                 string `json:"default,omitempty"`
+}
+
+func (in *DefaultAllowedListSpec) MatchDefault(value string) bool {
+	return in.Default == value
+}
+
+// +kubebuilder:object:generate=true
+
 type SelectorAllowedListSpec struct {
 	AllowedListSpec      `json:",inline"`
 	metav1.LabelSelector `json:",inline"`
 }
 
-func (in *SelectorAllowedListSpec) SelectorMatch(obj client.Object) bool {
-	selector, err := metav1.LabelSelectorAsSelector(&in.LabelSelector)
-	if err != nil {
-		return false
+func (in *SelectorAllowedListSpec) MatchSelectByName(obj client.Object) bool {
+	if obj != nil {
+		return in.AllowedListSpec.Match(obj.GetName()) || in.SelectorMatch(obj)
 	}
 
-	return selector.Matches(labels.Set(obj.GetLabels()))
+	return false
+}
+
+func (in *SelectorAllowedListSpec) SelectorMatch(obj client.Object) bool {
+	if obj != nil {
+		selector, err := metav1.LabelSelectorAsSelector(&in.LabelSelector)
+		if err != nil {
+			return false
+		}
+
+		return selector.Matches(labels.Set(obj.GetLabels()))
+	}
+
+	return false
 }
 
 // +kubebuilder:object:generate=true
@@ -34,6 +57,14 @@ func (in *SelectorAllowedListSpec) SelectorMatch(obj client.Object) bool {
 type AllowedListSpec struct {
 	Exact []string `json:"allowed,omitempty"`
 	Regex string   `json:"allowedRegex,omitempty"`
+}
+
+func (in *AllowedListSpec) Match(value string) (ok bool) {
+	if in.ExactMatch(value) || in.RegexMatch(value) {
+		return true
+	}
+
+	return false
 }
 
 func (in *AllowedListSpec) ExactMatch(value string) (ok bool) {

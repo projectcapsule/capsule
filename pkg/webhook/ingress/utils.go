@@ -17,7 +17,7 @@ import (
 	capsulev1beta2 "github.com/clastix/capsule/api/v1beta2"
 )
 
-func tenantFromIngress(ctx context.Context, c client.Client, ingress Ingress) (*capsulev1beta2.Tenant, error) {
+func TenantFromIngress(ctx context.Context, c client.Client, ingress Ingress) (*capsulev1beta2.Tenant, error) {
 	tenantList := &capsulev1beta2.TenantList{}
 	if err := c.List(ctx, tenantList, client.MatchingFieldsSelector{
 		Selector: fields.OneTermEqualSelector(".status.namespaces", ingress.Namespace()),
@@ -33,7 +33,7 @@ func tenantFromIngress(ctx context.Context, c client.Client, ingress Ingress) (*
 }
 
 // nolint:nakedret
-func ingressFromRequest(req admission.Request, decoder *admission.Decoder) (ingress Ingress, err error) {
+func FromRequest(req admission.Request, decoder *admission.Decoder) (ingress Ingress, err error) {
 	switch req.Kind.Group {
 	case "networking.k8s.io":
 		if req.Kind.Version == "v1" {
