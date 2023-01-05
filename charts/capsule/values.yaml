@@ -172,6 +172,26 @@ webhooks:
           operator: Exists
   nodes:
     failurePolicy: Fail
+  defaults:
+    ingress:
+      failurePolicy: Fail
+      namespaceSelector:
+        matchExpressions:
+          - key: capsule.clastix.io/tenant
+            operator: Exists
+    pvc:
+      failurePolicy: Fail
+      namespaceSelector:
+        matchExpressions:
+          - key: capsule.clastix.io/tenant
+            operator: Exists
+    pods:
+      failurePolicy: Fail
+      namespaceSelector:
+        matchExpressions:
+          - key: capsule.clastix.io/tenant
+            operator: Exists
+
 
 # -- Timeout in seconds for mutating webhooks
 mutatingWebhooksTimeoutSeconds: 30
