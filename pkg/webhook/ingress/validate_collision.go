@@ -34,73 +34,15 @@ func Collision(configuration configuration.Configuration) capsulewebhook.Handler
 	return &collision{configuration: configuration}
 }
 
-// nolint:dupl
 func (r *collision) OnCreate(client client.Client, decoder *admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		ing, err := ingressFromRequest(req, decoder)
-		if err != nil {
-			return utils.ErroredResponse(err)
-		}
-
-		var tenant *capsulev1beta2.Tenant
-
-		tenant, err = tenantFromIngress(ctx, client, ing)
-		if err != nil {
-			return utils.ErroredResponse(err)
-		}
-
-		if tenant == nil || tenant.Spec.IngressOptions.HostnameCollisionScope == api.HostnameCollisionScopeDisabled {
-			return nil
-		}
-
-		if err = r.validateCollision(ctx, client, ing, tenant.Spec.IngressOptions.HostnameCollisionScope); err == nil {
-			return nil
-		}
-
-		var collisionErr *ingressHostnameCollisionError
-
-		if errors.As(err, &collisionErr) {
-			recorder.Eventf(tenant, corev1.EventTypeWarning, "IngressHostnameCollision", "Ingress %s/%s hostname is colliding", ing.Namespace(), ing.Name())
-		}
-
-		response := admission.Denied(err.Error())
-
-		return &response
+		return r.validate(ctx, client, req, decoder, recorder)
 	}
 }
 
-// nolint:dupl
 func (r *collision) OnUpdate(client client.Client, decoder *admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		ing, err := ingressFromRequest(req, decoder)
-		if err != nil {
-			return utils.ErroredResponse(err)
-		}
-
-		var tenant *capsulev1beta2.Tenant
-
-		tenant, err = tenantFromIngress(ctx, client, ing)
-		if err != nil {
-			return utils.ErroredResponse(err)
-		}
-
-		if tenant == nil || tenant.Spec.IngressOptions.HostnameCollisionScope == api.HostnameCollisionScopeDisabled {
-			return nil
-		}
-
-		if err = r.validateCollision(ctx, client, ing, tenant.Spec.IngressOptions.HostnameCollisionScope); err == nil {
-			return nil
-		}
-
-		var collisionErr *ingressHostnameCollisionError
-
-		if errors.As(err, &collisionErr) {
-			recorder.Eventf(tenant, corev1.EventTypeWarning, "IngressHostnameCollision", "Ingress %s/%s hostname is colliding", ing.Namespace(), ing.Name())
-		}
-
-		response := admission.Denied(err.Error())
-
-		return &response
+		return r.validate(ctx, client, req, decoder, recorder)
 	}
 }
 
@@ -108,6 +50,38 @@ func (r *collision) OnDelete(client.Client, *admission.Decoder, record.EventReco
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		return nil
 	}
+}
+
+func (r *collision) validate(ctx context.Context, client client.Client, req admission.Request, decoder *admission.Decoder, recorder record.EventRecorder) *admission.Response {
+	ing, err := FromRequest(req, decoder)
+	if err != nil {
+		return utils.ErroredResponse(err)
+	}
+
+	var tenant *capsulev1beta2.Tenant
+
+	tenant, err = TenantFromIngress(ctx, client, ing)
+	if err != nil {
+		return utils.ErroredResponse(err)
+	}
+
+	if tenant == nil || tenant.Spec.IngressOptions.HostnameCollisionScope == api.HostnameCollisionScopeDisabled {
+		return nil
+	}
+
+	if err = r.validateCollision(ctx, client, ing, tenant.Spec.IngressOptions.HostnameCollisionScope); err == nil {
+		return nil
+	}
+
+	var collisionErr *ingressHostnameCollisionError
+
+	if errors.As(err, &collisionErr) {
+		recorder.Eventf(tenant, corev1.EventTypeWarning, "IngressHostnameCollision", "Ingress %s/%s hostname is colliding", ing.Namespace(), ing.Name())
+	}
+
+	response := admission.Denied(err.Error())
+
+	return &response
 }
 
 // nolint:gocognit,gocyclo,cyclop

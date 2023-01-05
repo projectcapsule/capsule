@@ -8,8 +8,11 @@ import (
 )
 
 type IngressOptions struct {
-	// Specifies the allowed IngressClasses assigned to the Tenant. Capsule assures that all Ingress resources created in the Tenant can use only one of the allowed IngressClasses. Optional.
-	AllowedClasses *api.SelectorAllowedListSpec `json:"allowedClasses,omitempty"`
+	// Specifies the allowed IngressClasses assigned to the Tenant.
+	// Capsule assures that all Ingress resources created in the Tenant can use only one of the allowed IngressClasses.
+	// A default value can be specified, and all the Ingress resources created will inherit the declared class.
+	// Optional.
+	AllowedClasses *api.DefaultAllowedListSpec `json:"allowedClasses,omitempty"`
 	// Defines the scope of hostname collision check performed when Tenant Owners create Ingress with allowed hostnames.
 	//
 	//

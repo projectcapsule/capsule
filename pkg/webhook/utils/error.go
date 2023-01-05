@@ -19,6 +19,10 @@ func ErroredResponse(err error) *admission.Response {
 	return &response
 }
 
+func DefaultAllowedValuesErrorMessage(allowed api.DefaultAllowedListSpec, err string) string {
+	return AllowedValuesErrorMessage(allowed.SelectorAllowedListSpec, err)
+}
+
 func AllowedValuesErrorMessage(allowed api.SelectorAllowedListSpec, err string) string {
 	var extra []string
 	if len(allowed.Exact) > 0 {
@@ -26,11 +30,11 @@ func AllowedValuesErrorMessage(allowed api.SelectorAllowedListSpec, err string) 
 	}
 
 	if len(allowed.Regex) > 0 {
-		extra = append(extra, fmt.Sprintf(" use one matching the following regex (%s)", allowed.Regex))
+		extra = append(extra, fmt.Sprintf("use one matching the following regex (%s)", allowed.Regex))
 	}
 
 	if len(allowed.MatchLabels) > 0 || len(allowed.MatchExpressions) > 0 {
-		extra = append(extra, ", or matching the label selector defined in the Tenant")
+		extra = append(extra, "matching the label selector defined in the Tenant")
 	}
 
 	err += strings.Join(extra, " or ")

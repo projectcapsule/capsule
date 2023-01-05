@@ -12,10 +12,10 @@ import (
 
 type podPriorityClassForbiddenError struct {
 	priorityClassName string
-	spec              api.SelectorAllowedListSpec
+	spec              api.DefaultAllowedListSpec
 }
 
-func NewPodPriorityClassForbidden(priorityClassName string, spec api.SelectorAllowedListSpec) error {
+func NewPodPriorityClassForbidden(priorityClassName string, spec api.DefaultAllowedListSpec) error {
 	return &podPriorityClassForbiddenError{
 		priorityClassName: priorityClassName,
 		spec:              spec,
@@ -23,7 +23,7 @@ func NewPodPriorityClassForbidden(priorityClassName string, spec api.SelectorAll
 }
 
 func (f podPriorityClassForbiddenError) Error() (err string) {
-	err = fmt.Sprintf("Pod Priorioty Class %s is forbidden for the current Tenant: ", f.priorityClassName)
+	msg := fmt.Sprintf("Pod Priority Class %s is forbidden for the current Tenant: ", f.priorityClassName)
 
-	return utils.AllowedValuesErrorMessage(f.spec, err)
+	return utils.DefaultAllowedValuesErrorMessage(f.spec, msg)
 }

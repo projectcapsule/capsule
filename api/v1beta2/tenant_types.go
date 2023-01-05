@@ -17,8 +17,11 @@ type TenantSpec struct {
 	NamespaceOptions *NamespaceOptions `json:"namespaceOptions,omitempty"`
 	// Specifies options for the Service, such as additional metadata or block of certain type of Services. Optional.
 	ServiceOptions *api.ServiceOptions `json:"serviceOptions,omitempty"`
-	// Specifies the allowed StorageClasses assigned to the Tenant. Capsule assures that all PersistentVolumeClaim resources created in the Tenant can use only one of the allowed StorageClasses. Optional.
-	StorageClasses *api.SelectorAllowedListSpec `json:"storageClasses,omitempty"`
+	// Specifies the allowed StorageClasses assigned to the Tenant.
+	// Capsule assures that all PersistentVolumeClaim resources created in the Tenant can use only one of the allowed StorageClasses.
+	// A default value can be specified, and all the PersistentVolumeClaim resources created will inherit the declared class.
+	// Optional.
+	StorageClasses *api.DefaultAllowedListSpec `json:"storageClasses,omitempty"`
 	// Specifies options for the Ingress resources, such as allowed hostnames and IngressClass. Optional.
 	IngressOptions IngressOptions `json:"ingressOptions,omitempty"`
 	// Specifies the trusted Image Registries assigned to the Tenant. Capsule assures that all Pods resources created in the Tenant can use only one of the allowed trusted registries. Optional.
@@ -35,10 +38,15 @@ type TenantSpec struct {
 	AdditionalRoleBindings []api.AdditionalRoleBindingsSpec `json:"additionalRoleBindings,omitempty"`
 	// Specify the allowed values for the imagePullPolicies option in Pod resources. Capsule assures that all Pod resources created in the Tenant can use only one of the allowed policy. Optional.
 	ImagePullPolicies []api.ImagePullPolicySpec `json:"imagePullPolicies,omitempty"`
-	// Specifies the allowed RuntimeClasses assigned to the Tenant. Capsule assures that all Pods resources created in the Tenant can use only one of the allowed RuntimeClasses. Optional.
+	// Specifies the allowed RuntimeClasses assigned to the Tenant.
+	// Capsule assures that all Pods resources created in the Tenant can use only one of the allowed RuntimeClasses.
+	// Optional.
 	RuntimeClasses *api.SelectorAllowedListSpec `json:"runtimeClasses,omitempty"`
-	// Specifies the allowed priorityClasses assigned to the Tenant. Capsule assures that all Pods resources created in the Tenant can use only one of the allowed PriorityClasses. Optional.
-	PriorityClasses *api.SelectorAllowedListSpec `json:"priorityClasses,omitempty"`
+	// Specifies the allowed priorityClasses assigned to the Tenant.
+	// Capsule assures that all Pods resources created in the Tenant can use only one of the allowed PriorityClasses.
+	// A default value can be specified, and all the Pod resources created will inherit the declared class.
+	// Optional.
+	PriorityClasses *api.DefaultAllowedListSpec `json:"priorityClasses,omitempty"`
 	// Toggling the Tenant resources cordoning, when enable resources cannot be deleted.
 	Cordoned bool `json:"cordoned,omitempty"`
 	// Prevent accidental deletion of the Tenant.

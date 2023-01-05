@@ -5,48 +5,33 @@ package pvc
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/clastix/capsule/pkg/api"
+	"github.com/clastix/capsule/pkg/webhook/utils"
 )
 
 type storageClassNotValidError struct {
-	spec api.SelectorAllowedListSpec
+	spec api.DefaultAllowedListSpec
 }
 
-func NewStorageClassNotValid(storageClasses api.SelectorAllowedListSpec) error {
+func NewStorageClassNotValid(storageClasses api.DefaultAllowedListSpec) error {
 	return &storageClassNotValidError{
 		spec: storageClasses,
 	}
 }
 
-// nolint:predeclared
-func appendError(spec api.SelectorAllowedListSpec) (append string) {
-	if len(spec.Exact) > 0 {
-		append += fmt.Sprintf(", one of the following (%s)", strings.Join(spec.Exact, ", "))
-	}
-
-	if len(spec.Regex) > 0 {
-		append += fmt.Sprintf(", or matching the regex %s", spec.Regex)
-	}
-
-	if len(spec.MatchLabels) > 0 || len(spec.MatchExpressions) > 0 {
-		append += ", or matching the label selector defined in the Tenant"
-	}
-
-	return
-}
-
 func (s storageClassNotValidError) Error() (err string) {
-	return "A valid Storage Class must be used" + appendError(s.spec)
+	msg := "A valid Storage Class must be used: "
+
+	return utils.DefaultAllowedValuesErrorMessage(s.spec, msg)
 }
 
 type storageClassForbiddenError struct {
 	className string
-	spec      api.SelectorAllowedListSpec
+	spec      api.DefaultAllowedListSpec
 }
 
-func NewStorageClassForbidden(className string, storageClasses api.SelectorAllowedListSpec) error {
+func NewStorageClassForbidden(className string, storageClasses api.DefaultAllowedListSpec) error {
 	return &storageClassForbiddenError{
 		className: className,
 		spec:      storageClasses,
@@ -54,5 +39,7 @@ func NewStorageClassForbidden(className string, storageClasses api.SelectorAllow
 }
 
 func (f storageClassForbiddenError) Error() string {
-	return fmt.Sprintf("Storage Class %s is forbidden for the current Tenant%s", f.className, appendError(f.spec))
+	msg := fmt.Sprintf("Storage Class %s is forbidden for the current Tenant ", f.className)
+
+	return utils.DefaultAllowedValuesErrorMessage(f.spec, msg)
 }
