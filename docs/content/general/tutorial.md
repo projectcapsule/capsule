@@ -819,7 +819,7 @@ To prevent misuses of Pod Priority Class, Bill, the cluster admin, can enforce t
 
 ```yaml
 kubectl apply -f - << EOF
-apiVersion: capsule.clastix.io/v1beta1
+apiVersion: capsule.clastix.io/v1beta2
 kind: Tenant
 metadata:
   name: oil
@@ -829,22 +829,73 @@ spec:
     kind: User
   priorityClasses:
     allowed:
-    - default
+    - custom
     allowedRegex: "^tier-.*$"
+    selector:
+      matchLabels:
+        env: "production"
 EOF
 ```
 
 With the said Tenant specification, Alice can create a Pod resource if `spec.priorityClassName` equals to:
 
-- `default`
+- `custom`
 - `tier-gold`, `tier-silver`, or `tier-bronze`, since these compile the allowed regex. 
+- Any PriorityClass which has the label `env` with the value `production`
 
 If a Pod is going to use a non-allowed _Priority Class_, it will be rejected by the Validation Webhook enforcing it.
 
 
+### Assign Pod Priority Class as tenant default
+
+It's possible to assign each tenant a PriorityClass which will be used, if no PriorityClass is set on pod basis:
+
+```yaml
+kubectl apply -f - << EOF
+apiVersion: capsule.clastix.io/v1beta2
+kind: Tenant
+metadata:
+  name: oil
+spec:
+  owners:
+  - name: alice
+    kind: User
+  priorityClasses:
+    allowed:
+    - custom
+    default: "tenant-default"
+    allowedRegex: "^tier-.*$"
+    selector:
+      matchLabels:
+        env: "production"
+EOF
+```
+
+Here's how the new PriorityClass could look like
+
+```yaml
+kubectl apply -f - << EOF
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: tenant-default
+value: 1313
+preemptionPolicy: Never
+globalDefault: false
+description: "This is the default PriorityClass for the oil-tenant"
+EOF
+```
+
+If a Pod has no value for `spec.priorityClassName`, the default value for PriorityClass (`tenant-default`) will be used.
+
+> This feature allows specifying a custom default value on a Tenant basis, bypassing the global cluster default (`globalDefault=true`) that acts only at the cluster level.
+
+**Note**: This feature supports type `PriorityClass` only on API version `scheduling.k8s.io/v1`
+
 ## Assign Pod Runtime Classes
 
-Pods can be assigned different runtime classes. With the assigned runtime you can control Container Runtime Interface (CRI) is used for each pod. See [Kubernetes documentation](https://kubernetes.io/docs/concepts/containers/runtime-class/). 
+Pods can be assigned different runtime classes. With the assigned runtime you can control Container Runtime Interface (CRI) is used for each pod.
+See [Kubernetes documentation](https://kubernetes.io/docs/concepts/containers/runtime-class/) for more information. 
 
 To prevent misuses of Pod Runtime Classes, Bill, the cluster admin, can enforce the allowed Pod Runtime Class at tenant level:
 
@@ -868,14 +919,13 @@ spec:
 EOF
 ```
 
-With the said Tenant specification, Alice can create a Pod resource if `spec.RuntimeClasses` equals to:
+With the said Tenant specification, Alice can create a Pod resource if `spec.runtimeClassName` equals to:
 
 - `legacy`
-- `hardened-crio` or `hardened-containerd`, since these compile the allowed regex.
-- Any RuntimeClass which has the label `env` with the value `production`
+- e.g.: `hardened-crio` or `hardened-containerd`, since these compile the allowed regex (`^hardened-.*$"`).
+- any RuntimeClass which has the label `env` with the value `production`
 
 If a Pod is going to use a non-allowed _Runtime Class_, it will be rejected by the Validation Webhook enforcing it.
-
 
 ## Assign Nodes Pool
 Bill, the cluster admin, can dedicate a pool of worker nodes to the `oil` tenant, to isolate the tenant applications from other noisy neighbors.
@@ -946,7 +996,7 @@ Bill can assign a set of dedicated Ingress Classes to the `oil` tenant to force 
 
 ```yaml
 kubectl apply -f - << EOF
-apiVersion: capsule.clastix.io/v1beta1
+apiVersion: capsule.clastix.io/v1beta2
 kind: Tenant
 metadata:
   name: oil
@@ -957,12 +1007,21 @@ spec:
   ingressOptions:
     allowedClasses:
       allowed:
-      - default
+      - legacy
       allowedRegex: ^\w+-lb$
+      selector:
+        matchLabels:
+          env: "production"
 EOF
 ```
 
-Capsule assures that all Ingresses created in the tenant can use only one of the valid Ingress Classes.
+With the said Tenant specification, Alice can create a Ingress resource if `spec.ingressClassName` or `metadata.annotations."kubernetes.io/ingress.class"` equals to:
+
+- `legacy`
+- eg. `haproxy-lb` or `nginx-lb`, since these compile the allowed regex (`^\w+-lb$`).
+- Any IngressClass which has the label `env` with the value `production`
+
+If an Ingress is going to use a non-allowed _IngressClass_, it will be rejected by the Validation Webhook enforcing it.
 
 Alice can create an Ingress using only an allowed Ingress Class:
 
@@ -974,7 +1033,7 @@ metadata:
   name: nginx
   namespace: oil-production
   annotations:
-    kubernetes.io/ingress.class: default
+    kubernetes.io/ingress.class: legacy
 spec:
   rules:
   - host: oil.acmecorp.com
@@ -988,6 +1047,58 @@ EOF
 ```
 
 Any attempt of Alice to use a non-valid Ingress Class, or missing it, is denied by the Validation Webhook enforcing it.
+
+### Assign Ingress Class as tenant default
+
+It's possible to assign each tenant an Ingress Class which will be used, if a class is not set on ingress basis:
+
+```yaml
+kubectl apply -f - << EOF
+apiVersion: capsule.clastix.io/v1beta2
+kind: Tenant
+metadata:
+  name: oil
+spec:
+  owners:
+  - name: alice
+    kind: User
+  ingressOptions:
+    allowedClasses:
+      allowed:
+      - legacy
+      default: "tenant-default"
+      allowedRegex: ^\w+-lb$
+      selector:
+        matchLabels:
+          env: "production"
+EOF
+```
+
+Here's how the Tenant default IngressClass could look like:
+
+```yaml
+kubectl apply -f - << EOF
+apiVersion: networking.k8s.io/v1
+kind: IngressClass
+metadata:
+  labels:
+    app.kubernetes.io/component: controller
+  name: tenant-default
+  annotations:
+    ingressclass.kubernetes.io/is-default-class: "false"
+spec:
+  controller: k8s.io/customer-nginx
+EOF
+```
+
+If an Ingress has no value for `spec.ingressClassName` or `metadata.annotations."kubernetes.io/ingress.class"`, the `tenant-default` IngressClass is automatically applied to the Ingress resource.
+
+> This feature allows specifying a custom default value on a Tenant basis, bypassing the global cluster default (with the annotation `metadata.annotations.ingressclass.kubernetes.io/is-default-class=true`) that acts only at the cluster level.
+> 
+> More information: [Default IngressClass](https://kubernetes.io/docs/concepts/services-networking/ingress/#default-ingress-class)
+
+**Note**: This feature is offered only by API type `IngressClass` in group `networking.k8s.io` version `v1`.
+However, resource `Ingress` is supported in `networking.k8s.io/v1` and `networking.k8s.io/v1beta1`
 
 ## Assign Ingress Hostnames
 Bill can control ingress hostnames in the `oil` tenant to force the applications to be published only using the given hostname or set of hostnames: 
@@ -1124,7 +1235,7 @@ Persistent storage infrastructure is provided to tenants. Different types of sto
 
 ```yaml
 kubectl apply -f - << EOF
-apiVersion: capsule.clastix.io/v1beta1
+apiVersion: capsule.clastix.io/v1beta2
 kind: Tenant
 metadata:
   name: oil
@@ -1137,8 +1248,17 @@ spec:
     - ceph-rbd
     - ceph-nfs
     allowedRegex: "^ceph-.*$"
+    selector:
+      matchLabels:
+        env: "production"
 EOF
 ```
+
+With the said Tenant specification, Alice can create a Persistent Volume Claims if `spec.storageClassName` equals to:
+
+- `ceph-rbd` or `ceph-nfs`
+- eg. `ceph-hdd` or `ceph-ssd`, since these compile the allowed regex (`^ceph-.*$`).
+- Any IngressClass which has the label `env` with the value `production`
 
 Capsule assures that all Persistent Volume Claims created by Alice will use only one of the valid storage classes:
 
@@ -1159,7 +1279,56 @@ spec:
 EOF
 ```
 
-Any attempt of Alice to use a non-valid Storage Class, or missing it, is denied by the Validation Webhook enforcing it.
+If a Persistent Volume Claim is going to use a non-allowed _Storage Class_, it will be rejected by the Validation Webhook enforcing it.
+
+### Assign Storage Class as tenant default
+
+It's possible to assign each tenant a StorageClass which will be used, if no value is set on Persistent Volume Claim basis:
+
+```yaml
+kubectl apply -f - << EOF
+apiVersion: capsule.clastix.io/v1beta2
+kind: Tenant
+metadata:
+  name: oil
+spec:
+  owners:
+  - name: alice
+    kind: User
+  storageClasses:
+    default: "tenant-default"
+    allowed:
+    - ceph-rbd
+    - ceph-nfs
+    allowedRegex: "^ceph-.*$"
+    selector:
+      matchLabels:
+        env: "production"
+EOF
+```
+
+Here's how the new Storage Class could look like
+
+```yaml
+kubectl apply -f - << EOF
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: tenant-default
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "false"
+provisioner: kubernetes.io/no-provisioner
+volumeBindingMode: WaitForFirstConsumer
+EOF
+```
+
+If a Persistent Volume Claim has no value for `spec.storageClassName` the `tenant-default` value will be used on new Persistent Volume Claim resources.
+
+> This feature allows specifying a custom default value on a Tenant basis, bypassing the global cluster default (`.metadata.annotations.storageclass.kubernetes.io/is-default-class=true`) that acts only at the cluster level.
+>
+> See the [Default Storage Class](https://kubernetes.io/docs/tasks/administer-cluster/change-default-storage-class/) section on Kubernetes documentation.
+
+**Note**: This feature supports type `StorageClass` only on API version `storage.k8s.io/v1`
 
 ## Assign Network Policies
 Kubernetes network policies control network traffic between namespaces and between pods in the same namespace. Bill, the cluster admin, can enforce network traffic isolation between different tenants while leaving to Alice, the tenant owner, the freedom to set isolation between namespaces in the same tenant or even between pods in the same namespace.

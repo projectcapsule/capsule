@@ -2974,7 +2974,7 @@ TenantSpec defines the desired state of Tenant.
         <td><b><a href="#tenantspecpriorityclasses-1">priorityClasses</a></b></td>
         <td>object</td>
         <td>
-          Specifies the allowed priorityClasses assigned to the Tenant. Capsule assures that all Pods resources created in the Tenant can use only one of the allowed PriorityClasses. Optional.<br/>
+          Specifies the allowed priorityClasses assigned to the Tenant. Capsule assures that all Pods resources created in the Tenant can use only one of the allowed PriorityClasses. A default value can be specified, and all the Pod resources created will inherit the declared class. Optional.<br/>
         </td>
         <td>false</td>
       </tr><tr>
@@ -3002,7 +3002,7 @@ TenantSpec defines the desired state of Tenant.
         <td><b><a href="#tenantspecstorageclasses-1">storageClasses</a></b></td>
         <td>object</td>
         <td>
-          Specifies the allowed StorageClasses assigned to the Tenant. Capsule assures that all PersistentVolumeClaim resources created in the Tenant can use only one of the allowed StorageClasses. Optional.<br/>
+          Specifies the allowed StorageClasses assigned to the Tenant. Capsule assures that all PersistentVolumeClaim resources created in the Tenant can use only one of the allowed StorageClasses. A default value can be specified, and all the PersistentVolumeClaim resources created will inherit the declared class. Optional.<br/>
         </td>
         <td>false</td>
       </tr></tbody>
@@ -3234,7 +3234,7 @@ Specifies options for the Ingress resources, such as allowed hostnames and Ingre
         <td><b><a href="#tenantspecingressoptionsallowedclasses-1">allowedClasses</a></b></td>
         <td>object</td>
         <td>
-          Specifies the allowed IngressClasses assigned to the Tenant. Capsule assures that all Ingress resources created in the Tenant can use only one of the allowed IngressClasses. Optional.<br/>
+          Specifies the allowed IngressClasses assigned to the Tenant. Capsule assures that all Ingress resources created in the Tenant can use only one of the allowed IngressClasses. A default value can be specified, and all the Ingress resources created will inherit the declared class. Optional.<br/>
         </td>
         <td>false</td>
       </tr><tr>
@@ -3266,7 +3266,7 @@ Specifies options for the Ingress resources, such as allowed hostnames and Ingre
 
 
 
-Specifies the allowed IngressClasses assigned to the Tenant. Capsule assures that all Ingress resources created in the Tenant can use only one of the allowed IngressClasses. Optional.
+Specifies the allowed IngressClasses assigned to the Tenant. Capsule assures that all Ingress resources created in the Tenant can use only one of the allowed IngressClasses. A default value can be specified, and all the Ingress resources created will inherit the declared class. Optional.
 
 <table>
     <thead>
@@ -3286,6 +3286,13 @@ Specifies the allowed IngressClasses assigned to the Tenant. Capsule assures tha
         <td>false</td>
       </tr><tr>
         <td><b>allowedRegex</b></td>
+        <td>string</td>
+        <td>
+          <br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>default</b></td>
         <td>string</td>
         <td>
           <br/>
@@ -4394,7 +4401,7 @@ NetworkPolicyPort describes a port to allow traffic on
 
 
 
-Specifies the allowed priorityClasses assigned to the Tenant. Capsule assures that all Pods resources created in the Tenant can use only one of the allowed PriorityClasses. Optional.
+Specifies the allowed priorityClasses assigned to the Tenant. Capsule assures that all Pods resources created in the Tenant can use only one of the allowed PriorityClasses. A default value can be specified, and all the Pod resources created will inherit the declared class. Optional.
 
 <table>
     <thead>
@@ -4414,6 +4421,13 @@ Specifies the allowed priorityClasses assigned to the Tenant. Capsule assures th
         <td>false</td>
       </tr><tr>
         <td><b>allowedRegex</b></td>
+        <td>string</td>
+        <td>
+          <br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>default</b></td>
         <td>string</td>
         <td>
           <br/>
@@ -4855,7 +4869,7 @@ Specifies the external IPs that can be used in Services with type ClusterIP. An 
 
 
 
-Specifies the allowed StorageClasses assigned to the Tenant. Capsule assures that all PersistentVolumeClaim resources created in the Tenant can use only one of the allowed StorageClasses. Optional.
+Specifies the allowed StorageClasses assigned to the Tenant. Capsule assures that all PersistentVolumeClaim resources created in the Tenant can use only one of the allowed StorageClasses. A default value can be specified, and all the PersistentVolumeClaim resources created will inherit the declared class. Optional.
 
 <table>
     <thead>
@@ -4875,6 +4889,13 @@ Specifies the allowed StorageClasses assigned to the Tenant. Capsule assures tha
         <td>false</td>
       </tr><tr>
         <td><b>allowedRegex</b></td>
+        <td>string</td>
+        <td>
+          <br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>default</b></td>
         <td>string</td>
         <td>
           <br/>
