@@ -12,6 +12,86 @@ metadata:
     {{- toYaml . | nindent 4 }}
   {{- end }}
 webhooks:
+{{- with .Values.webhooks.defaults.pods }}
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+  {{- if not $.Values.certManager.generateCertificates }}
+    caBundle: Cg==
+  {{- end }}
+    service:
+      name: {{ include "capsule.fullname" $ }}-webhook-service
+      namespace: {{ $.Release.Namespace }}
+      path: /defaults
+  failurePolicy: {{ .failurePolicy }}
+  name: pod.defaults.capsule.clastix.io
+  rules:
+  - apiGroups:
+    - ""
+    apiVersions:
+    - v1
+    operations:
+    - CREATE
+    resources:
+    - pods
+  namespaceSelector:
+  {{- toYaml .namespaceSelector | nindent 4}} 
+  sideEffects: None
+{{- end }}
+{{- with .Values.webhooks.defaults.pvc }}
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+  {{- if not $.Values.certManager.generateCertificates }}
+    caBundle: Cg==
+  {{- end }}
+    service:
+      name: {{ include "capsule.fullname" $ }}-webhook-service
+      namespace: {{ $.Release.Namespace }}
+      path: /defaults
+  failurePolicy: {{ .failurePolicy }}
+  name: storage.defaults.capsule.clastix.io
+  rules:
+  - apiGroups:
+    - ""
+    apiVersions:
+    - v1
+    operations:
+    - CREATE
+    resources:
+    - persistentvolumeclaims
+  namespaceSelector:
+  {{- toYaml .namespaceSelector | nindent 4}}  
+  sideEffects: None
+{{- end }}
+{{- with .Values.webhooks.defaults.ingress }}  
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+  {{- if not $.Values.certManager.generateCertificates }}
+    caBundle: Cg==
+  {{- end }}
+    service:
+      name: {{ include "capsule.fullname" $ }}-webhook-service
+      namespace: {{ $.Release.Namespace }}
+      path: /defaults
+  failurePolicy: {{ .failurePolicy }}
+  name: ingress.defaults.capsule.clastix.io
+  rules:
+  - apiGroups:
+    - networking.k8s.io
+    apiVersions:
+    - v1beta1
+    - v1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - ingresses
+  namespaceSelector:
+  {{- toYaml .namespaceSelector | nindent 4}}
+  sideEffects: None
+{{- end }}  
 - admissionReviewVersions:
     - v1
     - v1beta1
