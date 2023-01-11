@@ -6,3 +6,6 @@ This is a list of companies that have adopted Capsule, feel free to open a Pull-
 
 ### [Bedag Informatik AG](https://www.bedag.ch/)
 ![Bedag](https://www.bedag.ch/wGlobal/wGlobal/layout/images/logo.svg)
+
+### [Wargaming.net](https://www.wargaming.net/)
+![Wargaming.net](https://static-cspbe-eu.wargaming.net/images/logo@2x.png)
