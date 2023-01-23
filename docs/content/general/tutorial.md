@@ -2058,6 +2058,77 @@ Eventually, using the key `namespacedItem`, it is possible to reference existing
 
 As with `GlobalTenantResource`, the full reference of the API is available in the [CRDs API section](/docs/general/crds-apis).
 
+## Preventing PersistentVolume cross mounting across Tenants
+
+Any Tenant owner is able to create a `PersistentVolumeClaim` that, backed by a given _StorageClass_, will provide volumes for their applications.
+
+In most cases, once a `PersistentVolumeClaim` is deleted, the bounded `PersistentVolume` will be recycled due.
+
+However, in some scenarios, the `StorageClass` or the provisioned `PersistentVolume` itself could change the retention policy of the volume, keeping it available for recycling and being consumable for another Pod.
+
+In such a scenario, Capsule enforces the Volume mount only to the Namespaces belonging to the Tenant on which it's been consumed, by adding a label to the Volume as follows.
+
+```yaml
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  annotations:
+    pv.kubernetes.io/provisioned-by: rancher.io/local-path
+  creationTimestamp: "2022-12-22T09:54:46Z"
+  finalizers:
+  - kubernetes.io/pv-protection
+  labels:
+    capsule.clastix.io/tenant: atreides
+  name: pvc-1b3aa814-3b0c-4912-9bd9-112820da38fe
+  resourceVersion: "2743059"
+  uid: 9836ae3e-4adb-41d2-a416-0c45c2da41ff
+spec:
+  accessModes:
+  - ReadWriteOnce
+  capacity:
+    storage: 10Gi
+  claimRef:
+    apiVersion: v1
+    kind: PersistentVolumeClaim
+    name: melange
+    namespace: caladan
+    resourceVersion: "2743014"
+    uid: 1b3aa814-3b0c-4912-9bd9-112820da38fe
+```
+
+Once the `PeristentVolume` become available again, it can be referenced by any `PersistentVolumeClaim` in the `atreides` Tenant Namespace resources.
+
+If another Tenant, like `harkonnen`, tries to use it, it will get an error:
+
+```
+$: k describe pv pvc-9788f5e4-1114-419b-a830-74e7f9a33f5d
+Name:              pvc-9788f5e4-1114-419b-a830-74e7f9a33f5d
+Labels:            capsule.clastix.io/tenant=atreides
+Annotations:       pv.kubernetes.io/provisioned-by: rancher.io/local-path
+Finalizers:        [kubernetes.io/pv-protection]
+StorageClass:      standard
+Status:            Available
+...
+
+$: cat /tmp/pvc.yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: melange
+  namespace: harkonnen
+spec:
+  storageClassName: standard
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 3Gi
+  volumeName: pvc-9788f5e4-1114-419b-a830-74e7f9a33f5d
+
+$: k apply -f /tmp/pvc.yaml
+Error from server: error when creating "/tmp/pvc.yaml": admission webhook "pvc.capsule.clastix.io" denied the request: PeristentVolume pvc-9788f5e4-1114-419b-a830-74e7f9a33f5d cannot be used by the following Tenant, preventing a cross-tenant mount
+```
+
 ---
 
 This ends our tutorial on how to implement complex multi-tenancy and policy-driven scenarios with Capsule. As we improve it, more use cases about multi-tenancy, policy admission control, and cluster governance will be covered in the future.
