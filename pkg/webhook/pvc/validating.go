@@ -17,13 +17,13 @@ import (
 	"github.com/clastix/capsule/pkg/webhook/utils"
 )
 
-type handler struct{}
+type validating struct{}
 
-func Handler() capsulewebhook.Handler {
-	return &handler{}
+func Validating() capsulewebhook.Handler {
+	return &validating{}
 }
 
-func (h *handler) OnCreate(c client.Client, decoder *admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
+func (h *validating) OnCreate(c client.Client, decoder *admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		pvc := &corev1.PersistentVolumeClaim{}
 		if err := decoder.Decode(req, pvc); err != nil {
@@ -87,13 +87,13 @@ func (h *handler) OnCreate(c client.Client, decoder *admission.Decoder, recorder
 	}
 }
 
-func (h *handler) OnDelete(client.Client, *admission.Decoder, record.EventRecorder) capsulewebhook.Func {
+func (h *validating) OnDelete(client.Client, *admission.Decoder, record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (h *handler) OnUpdate(client.Client, *admission.Decoder, record.EventRecorder) capsulewebhook.Func {
+func (h *validating) OnUpdate(client.Client, *admission.Decoder, record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		return nil
 	}

@@ -30,6 +30,7 @@ import (
 	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
 	capsulev1beta2 "github.com/clastix/capsule/api/v1beta2"
 	configcontroller "github.com/clastix/capsule/controllers/config"
+	"github.com/clastix/capsule/controllers/pv"
 	rbaccontroller "github.com/clastix/capsule/controllers/rbac"
 	"github.com/clastix/capsule/controllers/resources"
 	servicelabelscontroller "github.com/clastix/capsule/controllers/servicelabels"
@@ -95,7 +96,7 @@ func newDelegatingClient(cache cache.Cache, config *rest.Config, options client.
 	return delegatingClient, nil
 }
 
-// nolint:maintidx
+// nolint:maintidx,cyclop
 func main() {
 	var enableLeaderElection, version bool
 
@@ -239,7 +240,7 @@ func main() {
 		route.Pod(pod.ImagePullPolicy(), pod.ContainerRegistry(), pod.PriorityClass(), pod.RuntimeClass()),
 		route.Namespace(utils.InCapsuleGroups(cfg, namespacewebhook.PatchHandler(), namespacewebhook.QuotaHandler(), namespacewebhook.FreezeHandler(cfg), namespacewebhook.PrefixHandler(cfg), namespacewebhook.UserMetadataHandler())),
 		route.Ingress(ingress.Class(cfg, kubeVersion), ingress.Hostnames(cfg), ingress.Collision(cfg), ingress.Wildcard()),
-		route.PVC(pvc.Handler()),
+		route.PVC(pvc.Validating(), pvc.PersistentVolumeReuse()),
 		route.Service(service.Handler()),
 		route.NetworkPolicy(utils.InCapsuleGroups(cfg, networkpolicy.Handler())),
 		route.Tenant(tenant.NameHandler(), tenant.RoleBindingRegexHandler(), tenant.IngressClassRegexHandler(), tenant.StorageClassRegexHandler(), tenant.ContainerRegistryRegexHandler(), tenant.HostnameRegexHandler(), tenant.FreezedEmitter(), tenant.ServiceAccountNameHandler(), tenant.ForbiddenAnnotationsRegexHandler(), tenant.ProtectedHandler()),
@@ -294,6 +295,11 @@ func main() {
 		VersionMajor: kubeVersion.Major(),
 	}).SetupWithManager(ctx, manager); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "EndpointSliceLabels")
+	}
+
+	if err = (&pv.Controller{}).SetupWithManager(manager); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "PersistentVolume")
+		os.Exit(1)
 	}
 
 	if err = (&configcontroller.Manager{

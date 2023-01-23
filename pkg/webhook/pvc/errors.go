@@ -43,3 +43,51 @@ func (f storageClassForbiddenError) Error() string {
 
 	return utils.DefaultAllowedValuesErrorMessage(f.spec, msg)
 }
+
+type missingPVLabelsError struct {
+	name string
+}
+
+func NewMissingPVLabelsError(name string) error {
+	return &missingPVLabelsError{name: name}
+}
+
+func (m missingPVLabelsError) Error() string {
+	return fmt.Sprintf("PeristentVolume %s is missing any label, please, ask the Cluster Administrator to label it", m.name)
+}
+
+type missingPVTenantLabelsError struct {
+	name string
+}
+
+func NewMissingTenantPVLabelsError(name string) error {
+	return &missingPVTenantLabelsError{name: name}
+}
+
+func (m missingPVTenantLabelsError) Error() string {
+	return fmt.Sprintf("PeristentVolume %s is missing the Capsule Tenant label, preventing a potential cross-tenant mount", m.name)
+}
+
+type crossTenantPVMountError struct {
+	name string
+}
+
+func NewCrossTenantPVMountError(name string) error {
+	return &crossTenantPVMountError{
+		name: name,
+	}
+}
+
+func (m crossTenantPVMountError) Error() string {
+	return fmt.Sprintf("PeristentVolume %s cannot be used by the following Tenant, preventing a cross-tenant mount", m.name)
+}
+
+type pvSelectorError struct{}
+
+func NewPVSelectorError() error {
+	return &pvSelectorError{}
+}
+
+func (m pvSelectorError) Error() string {
+	return "PersistentVolume selectors are not allowed since unable to prevent cross-tenant mount"
+}
