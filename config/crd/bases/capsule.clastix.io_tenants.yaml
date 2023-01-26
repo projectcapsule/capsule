@@ -2131,8 +2131,6 @@ spec:
                     - Namespace
                     - Disabled
                     type: string
-                required:
-                - allowWildcardHostnames
                 type: object
               limitRanges:
                 description: Specifies the resource min/max usage restrictions to
@@ -2267,9 +2265,6 @@ spec:
                     format: int32
                     minimum: 1
                     type: integer
-                required:
-                - forbiddenAnnotations
-                - forbiddenLabels
                 type: object
               networkPolicies:
                 description: Specifies the NetworkPolicies assigned to the Tenant.

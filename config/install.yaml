@@ -1997,8 +1997,6 @@ spec:
                     - Namespace
                     - Disabled
                     type: string
-                required:
-                - allowWildcardHostnames
                 type: object
               limitRanges:
                 description: Specifies the resource min/max usage restrictions to the Tenant. The assigned values are inherited by any namespace created in the Tenant. Optional.
@@ -2109,9 +2107,6 @@ spec:
                     format: int32
                     minimum: 1
                     type: integer
-                required:
-                - forbiddenAnnotations
-                - forbiddenLabels
                 type: object
               networkPolicies:
                 description: Specifies the NetworkPolicies assigned to the Tenant. The assigned NetworkPolicies are inherited by any namespace created in the Tenant. Optional.
