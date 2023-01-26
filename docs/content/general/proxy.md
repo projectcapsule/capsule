@@ -104,7 +104,7 @@ For a web-based dashboard, like the [Kubernetes Dashboard](https://github.com/ku
 Each Tenant owner can have their capabilities managed pretty similar to a standard Kubernetes RBAC.
 
 ```yaml
-apiVersion: capsule.clastix.io/v1beta1
+apiVersion: capsule.clastix.io/v1beta2
 kind: Tenant
 metadata:
   name: my-tenant
@@ -171,7 +171,7 @@ namespace/solar-development created
 The Capsule Proxy gives the owners the ability to access the nodes matching the `.spec.nodeSelector` in the Tenant manifest:
 
 ```yaml
-apiVersion: capsule.clastix.io/v1beta1
+apiVersion: capsule.clastix.io/v1beta2
 kind: Tenant
 metadata:
   name: oil
@@ -209,7 +209,7 @@ These are mandatory in order to retrieve the list of the running Pods on the req
 A Tenant may be limited to use a set of allowed Storage Class resources, as follows.
 
 ```yaml
-apiVersion: capsule.clastix.io/v1beta1
+apiVersion: capsule.clastix.io/v1beta2
 kind: Tenant
 metadata:
   name: oil
@@ -267,7 +267,7 @@ provisioner: cephfs
 As for Storage Class, also Ingress Class can be enforced.
 
 ```yaml
-apiVersion: capsule.clastix.io/v1beta1
+apiVersion: capsule.clastix.io/v1beta2
 kind: Tenant
 metadata:
   name: oil
@@ -330,7 +330,7 @@ spec:
 Allowed PriorityClasses assigned to a Tenant Owner can be enforced as follows:
 
 ```yaml
-apiVersion: capsule.clastix.io/v1beta1
+apiVersion: capsule.clastix.io/v1beta2
 kind: Tenant
 metadata:
   name: oil
@@ -403,7 +403,7 @@ These tenant users, groups and services accounts have less privileged access tha
 
 As a Tenant Owner `alice`, you can create a `ProxySetting` resources to allow `bob` to list nodes, storage classes, ingress classes and priority classes
 ```yaml
-apiVersion: capsule.clastix.io/v1beta1
+apiVersion: capsule.clastix.io/v1beta2
 kind: ProxySetting
 metadata:
   name: sre-readers

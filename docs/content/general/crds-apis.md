@@ -3229,7 +3229,7 @@ Specifies options for the Ingress resources, such as allowed hostnames and Ingre
         <td>
           Toggles the ability for Ingress resources created in a Tenant to have a hostname wildcard.<br/>
         </td>
-        <td>true</td>
+        <td>false</td>
       </tr><tr>
         <td><b><a href="#tenantspecingressoptionsallowedclasses-1">allowedClasses</a></b></td>
         <td>object</td>
@@ -3518,24 +3518,24 @@ Specifies options for the Namespaces, such as additional metadata or maximum num
         </tr>
     </thead>
     <tbody><tr>
+        <td><b><a href="#tenantspecnamespaceoptionsadditionalmetadata-1">additionalMetadata</a></b></td>
+        <td>object</td>
+        <td>
+          Specifies additional labels and annotations the Capsule operator places on any Namespace resource in the Tenant. Optional.<br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
         <td><b><a href="#tenantspecnamespaceoptionsforbiddenannotations">forbiddenAnnotations</a></b></td>
         <td>object</td>
         <td>
           Define the annotations that a Tenant Owner cannot set for their Namespace resources.<br/>
         </td>
-        <td>true</td>
+        <td>false</td>
       </tr><tr>
         <td><b><a href="#tenantspecnamespaceoptionsforbiddenlabels">forbiddenLabels</a></b></td>
         <td>object</td>
         <td>
           Define the labels that a Tenant Owner cannot set for their Namespace resources.<br/>
-        </td>
-        <td>true</td>
-      </tr><tr>
-        <td><b><a href="#tenantspecnamespaceoptionsadditionalmetadata-1">additionalMetadata</a></b></td>
-        <td>object</td>
-        <td>
-          Specifies additional labels and annotations the Capsule operator places on any Namespace resource in the Tenant. Optional.<br/>
         </td>
         <td>false</td>
       </tr><tr>
@@ -3546,6 +3546,39 @@ Specifies options for the Namespaces, such as additional metadata or maximum num
           <br/>
             <i>Format</i>: int32<br/>
             <i>Minimum</i>: 1<br/>
+        </td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+### Tenant.spec.namespaceOptions.additionalMetadata
+
+
+
+Specifies additional labels and annotations the Capsule operator places on any Namespace resource in the Tenant. Optional.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>annotations</b></td>
+        <td>map[string]string</td>
+        <td>
+          <br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>labels</b></td>
+        <td>map[string]string</td>
+        <td>
+          <br/>
         </td>
         <td>false</td>
       </tr></tbody>
@@ -3610,39 +3643,6 @@ Define the labels that a Tenant Owner cannot set for their Namespace resources.
       </tr><tr>
         <td><b>deniedRegex</b></td>
         <td>string</td>
-        <td>
-          <br/>
-        </td>
-        <td>false</td>
-      </tr></tbody>
-</table>
-
-
-### Tenant.spec.namespaceOptions.additionalMetadata
-
-
-
-Specifies additional labels and annotations the Capsule operator places on any Namespace resource in the Tenant. Optional.
-
-<table>
-    <thead>
-        <tr>
-            <th>Name</th>
-            <th>Type</th>
-            <th>Description</th>
-            <th>Required</th>
-        </tr>
-    </thead>
-    <tbody><tr>
-        <td><b>annotations</b></td>
-        <td>map[string]string</td>
-        <td>
-          <br/>
-        </td>
-        <td>false</td>
-      </tr><tr>
-        <td><b>labels</b></td>
-        <td>map[string]string</td>
         <td>
           <br/>
         </td>

@@ -47,7 +47,7 @@ He can assign this role to all namespaces in a tenant by setting the tenant mani
 
 ```yaml
 kubectl apply -f - << EOF
-apiVersion: capsule.clastix.io/v1beta1
+apiVersion: capsule.clastix.io/v1beta2
 kind: Tenant
 metadata:
   name: oil
@@ -171,7 +171,7 @@ As cluster admin, create a tenant with additional labels:
 
 ```yaml
 kubectl apply -f - << EOF
-apiVersion: capsule.clastix.io/v1beta1
+apiVersion: capsule.clastix.io/v1beta2
 kind: Tenant
 metadata:
   name: oil
@@ -203,7 +203,7 @@ metadata:
     pod-security.kubernetes.io/audit: restricted
   name: oil-development
   ownerReferences:
-  - apiVersion: capsule.clastix.io/v1beta1
+  - apiVersion: capsule.clastix.io/v1beta2
     blockOwnerDeletion: true
     controller: true
     kind: Tenant

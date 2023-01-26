@@ -35,7 +35,7 @@ Create the tenant as cluster admin:
 
 ```yaml
 kubectl create -f - << EOF
-apiVersion: capsule.clastix.io/v1beta1
+apiVersion: capsule.clastix.io/v1beta2
 kind: Tenant
 metadata:
   name: oil

@@ -152,7 +152,7 @@ $ kubectl -n capsule-system logs --all-containers -l control-plane=controller-ma
 
 # You may have a try to deploy a Tenant too to make sure it works end to end
 $ kubectl apply -f - <<EOF
-apiVersion: capsule.clastix.io/v1beta1
+apiVersion: capsule.clastix.io/v1beta2
 kind: Tenant
 metadata:
   name: oil
@@ -307,7 +307,7 @@ To verify that, we can open a new console and create a new Tenant:
 
 ```shell
 $ kubectl apply -f - <<EOF
-apiVersion: capsule.clastix.io/v1beta1
+apiVersion: capsule.clastix.io/v1beta2
 kind: Tenant
 metadata:
   name: gas

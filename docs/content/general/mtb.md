@@ -51,7 +51,7 @@ As cluster admin, create a tenant
 
 ```yaml
 kubectl create -f - <<EOF
-apiVersion: capsule.clastix.io/v1beta1
+apiVersion: capsule.clastix.io/v1beta2
 kind: Tenant
 metadata:
   name: oil
@@ -129,7 +129,7 @@ As cluster admin, create a tenant
 
 ```yaml
 kubectl create -f - <<EOF
-apiVersion: capsule.clastix.io/v1beta1
+apiVersion: capsule.clastix.io/v1beta2
 kind: Tenant
 metadata:
   name: oil
@@ -188,7 +188,7 @@ As cluster admin, create a tenant
 
 ```yaml
 kubectl create -f - <<EOF
-apiVersion: capsule.clastix.io/v1beta1
+apiVersion: capsule.clastix.io/v1beta2
 kind: Tenant
 metadata:
   name: oil
@@ -247,7 +247,7 @@ As cluster admin, create a tenant
 
 ```yaml
 kubectl create -f - <<EOF
-apiVersion: capsule.clastix.io/v1beta1
+apiVersion: capsule.clastix.io/v1beta2
 kind: Tenant
 metadata:
   name: oil
@@ -361,7 +361,7 @@ As cluster admin, create a tenant
 
 ```yaml
 kubectl create -f - <<EOF
-apiVersion: capsule.clastix.io/v1beta1
+apiVersion: capsule.clastix.io/v1beta2
 kind: Tenant
 metadata:
   name: oil
@@ -517,7 +517,7 @@ As cluster admin, create a couple of tenants
 
 ```yaml
 kubectl create -f - <<EOF
-apiVersion: capsule.clastix.io/v1beta1
+apiVersion: capsule.clastix.io/v1beta2
 kind: Tenant
 metadata:
   name: oil
@@ -535,7 +535,7 @@ and
 
 ```yaml
 kubectl create -f - <<EOF
-apiVersion: capsule.clastix.io/v1beta1
+apiVersion: capsule.clastix.io/v1beta2
 kind: Tenant
 metadata:
   name: gas
@@ -659,7 +659,7 @@ And assign it to the tenant
 
 ```yaml
 kubectl apply -f - << EOF
-apiVersion: capsule.clastix.io/v1beta1
+apiVersion: capsule.clastix.io/v1beta2
 kind: Tenant
 metadata:
   name: oil
@@ -737,7 +737,7 @@ As cluster admin, create a tenant
 
 ```yaml
 kubectl create -f - <<EOF
-apiVersion: capsule.clastix.io/v1beta1
+apiVersion: capsule.clastix.io/v1beta2
 kind: Tenant
 metadata:
   name: oil
@@ -807,7 +807,7 @@ As cluster admin, create a couple of tenants
 
 ```yaml
 kubectl create -f - <<EOF
-apiVersion: capsule.clastix.io/v1beta1
+apiVersion: capsule.clastix.io/v1beta2
 kind: Tenant
 metadata:
   name: oil
@@ -834,7 +834,7 @@ and
 
 ```yaml
 kubectl create -f - <<EOF
-apiVersion: capsule.clastix.io/v1beta1
+apiVersion: capsule.clastix.io/v1beta2
 kind: Tenant
 metadata:
   name: gas
@@ -956,7 +956,7 @@ And assign it to the tenant
 
 ```yaml
 kubectl apply -f - << EOF
-apiVersion: capsule.clastix.io/v1beta1
+apiVersion: capsule.clastix.io/v1beta2
 kind: Tenant
 metadata:
   name: oil
@@ -1072,7 +1072,7 @@ And assign it to the tenant
 
 ```yaml
 kubectl apply -f - << EOF
-apiVersion: capsule.clastix.io/v1beta1
+apiVersion: capsule.clastix.io/v1beta2
 kind: Tenant
 metadata:
   name: oil
@@ -1148,7 +1148,7 @@ As cluster admin, create a tenant
 
 ```yaml
 kubectl create -f - << EOF
-apiVersion: capsule.clastix.io/v1beta1
+apiVersion: capsule.clastix.io/v1beta2
 kind: Tenant
 metadata:
   name: oil
@@ -1231,7 +1231,7 @@ And assign it to the tenant
 
 ```yaml
 kubectl apply -f - << EOF
-apiVersion: capsule.clastix.io/v1beta1
+apiVersion: capsule.clastix.io/v1beta2
 kind: Tenant
 metadata:
   name: oil
@@ -1348,7 +1348,7 @@ And assign it to the tenant
 
 ```yaml
 kubectl apply -f - << EOF
-apiVersion: capsule.clastix.io/v1beta1
+apiVersion: capsule.clastix.io/v1beta2
 kind: Tenant
 metadata:
   name: oil
@@ -1489,7 +1489,7 @@ And assign it to the tenant
 
 ```yaml
 kubectl apply -f - << EOF
-apiVersion: capsule.clastix.io/v1beta1
+apiVersion: capsule.clastix.io/v1beta2
 kind: Tenant
 metadata:
   name: oil
@@ -1613,7 +1613,7 @@ And assign it to the tenant
 
 ```yaml
 kubectl apply -f - << EOF
-apiVersion: capsule.clastix.io/v1beta1
+apiVersion: capsule.clastix.io/v1beta2
 kind: Tenant
 metadata:
   name: oil
@@ -1687,12 +1687,14 @@ As cluster admin, create a tenant
 
 ```yaml
 kubectl create -f - << EOF
-apiVersion: capsule.clastix.io/v1beta1
+apiVersion: capsule.clastix.io/v1beta2
 kind: Tenant
 metadata:
   name: oil
 spec:
-  enableNodePorts: false
+  serviceOptions:
+    allowedServices:
+      nodePort: false
   owners:
   - kind: User
     name: alice
@@ -1763,7 +1765,7 @@ As cluster admin, create a tenant
 
 ```yaml
 kubectl create -f - <<EOF
-apiVersion: capsule.clastix.io/v1beta1
+apiVersion: capsule.clastix.io/v1beta2
 kind: Tenant
 metadata:
   name: oil
@@ -1830,7 +1832,7 @@ As cluster admin, create a tenant
 
 ```yaml
 kubectl create -f - <<EOF
-apiVersion: capsule.clastix.io/v1beta1
+apiVersion: capsule.clastix.io/v1beta2
 kind: Tenant
 metadata:
   name: oil
@@ -1896,7 +1898,7 @@ As cluster admin, create a tenant
 
 ```yaml
 kubectl create -f - << EOF
-apiVersion: capsule.clastix.io/v1beta1
+apiVersion: capsule.clastix.io/v1beta2
 kind: Tenant
 metadata:
   name: oil
@@ -2011,7 +2013,7 @@ And assign it to the tenant
 
 ```yaml
 kubectl apply -f - << EOF
-apiVersion: capsule.clastix.io/v1beta1
+apiVersion: capsule.clastix.io/v1beta2
 kind: Tenant
 metadata:
   name: oil
@@ -2106,7 +2108,7 @@ As cluster admin, create a tenant and assign the above Storage Class
 
 ```yaml
 kubectl create -f - << EOF
-apiVersion: capsule.clastix.io/v1beta1
+apiVersion: capsule.clastix.io/v1beta2
 kind: Tenant
 metadata:
   name: oil
@@ -2229,7 +2231,7 @@ And assign it to the tenant
 
 ```yaml
 kubectl apply -f - << EOF
-apiVersion: capsule.clastix.io/v1beta1
+apiVersion: capsule.clastix.io/v1beta2
 kind: Tenant
 metadata:
   name: oil
