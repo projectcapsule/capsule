@@ -24,7 +24,7 @@ Bill creates a new tenant `oil` in the CaaS management portal according to the t
 
 ```yaml
 kubectl create -f - << EOF
-apiVersion: capsule.clastix.io/v1beta1
+apiVersion: capsule.clastix.io/v1beta2
 kind: Tenant
 metadata:
   name: oil
@@ -88,7 +88,7 @@ In the example above, Bill assigned the ownership of `oil` tenant to `alice` use
 
 ```yaml
 kubectl apply -f - << EOF
-apiVersion: capsule.clastix.io/v1beta1
+apiVersion: capsule.clastix.io/v1beta2
 kind: Tenant
 metadata:
   name: oil
@@ -107,7 +107,7 @@ The tenant manifest is modified as in the following:
 
 ```yaml
 kubectl apply -f - << EOF
-apiVersion: capsule.clastix.io/v1beta1
+apiVersion: capsule.clastix.io/v1beta2
 kind: Tenant
 metadata:
   name: oil
@@ -133,7 +133,7 @@ The tenant manifest is modified as in the following:
 
 ```yaml
 kubectl apply -f - << EOF
-apiVersion: capsule.clastix.io/v1beta1
+apiVersion: capsule.clastix.io/v1beta2
 kind: Tenant
 metadata:
   name: oil
@@ -154,7 +154,7 @@ yes
 The service account has to be part of Capsule group, so Bill has to set in the `CapsuleConfiguration`
 
 ```yaml
-apiVersion: capsule.clastix.io/v1alpha1
+apiVersion: capsule.clastix.io/v1beta2
 kind: CapsuleConfiguration
 metadata:
   name: default
@@ -242,18 +242,18 @@ For example, assign user `Joe` the tenant ownership with only [view](https://kub
 
 ```yaml
 kubectl apply -f - << EOF
-apiVersion: capsule.clastix.io/v1beta1
+apiVersion: capsule.clastix.io/v1beta2
 kind: Tenant
 metadata:
   name: oil
-  annotations:
-    clusterrolenames.capsule.clastix.io/user.joe: view
 spec:
   owners:
   - name: alice
     kind: User
   - name: joe
     kind: User
+    clusterRoles:
+      - view
 EOF
 ```
 
@@ -262,9 +262,9 @@ you'll see the new Role Bindings assigned to Joe:
 ```
 kubectl -n oil-production get rolebindings
 NAME                                      ROLE                                    AGE
-capsule-oil-0-admin                       ClusterRole/admin                       8d
-capsule-oil-1-capsule-namespace-deleter   ClusterRole/capsule-namespace-deleter   8d
-capsule-oil-2-view                        ClusterRole/edit                        5s
+capsule-oil-0-admin                       ClusterRole/admin                       3s
+capsule-oil-1-capsule-namespace-deleter   ClusterRole/capsule-namespace-deleter   3s
+capsule-oil-2-view                        ClusterRole/view                        3s
 ```
 
 so that Joe can only view resources in the tenant namespaces:
@@ -274,7 +274,8 @@ kubectl --as joe --as-group capsule.clastix.io auth can-i delete pods -n oil-mar
 no
 ```
 
-> Please, note that, despite created with more restricted permissions, a tenant owner can still create namespaces in the tenant because he belongs to the `capsule.clastix.io` group. If you want a user not acting as tenant owner, but still operating in the tenant, you can assign additional `RoleBindings` without assigning him the tenant ownership.
+> Please, note that, despite created with more restricted permissions, a tenant owner can still create namespaces in the tenant because he belongs to the `capsule.clastix.io` group.
+> If you want a user not acting as tenant owner, but still operating in the tenant, you can assign additional `RoleBindings` without assigning him the tenant ownership.
 
 Custom ClusterRoles are also supported. Assuming the cluster admin creates:
 
@@ -295,18 +296,19 @@ These permissions can be granted to Joe
 
 ```yaml
 kubectl apply -f - << EOF
-apiVersion: capsule.clastix.io/v1beta1
+apiVersion: capsule.clastix.io/v1beta2
 kind: Tenant
 metadata:
   name: oil
-  annotations:
-    clusterrolenames.capsule.clastix.io/user.joe: view,prometheus-servicemonitors-viewer
 spec:
   owners:
   - name: alice
     kind: User
   - name: joe
     kind: User
+    clusterRoles:
+      - view
+      - prometheus-servicemonitors-viewer
 EOF
 ```
 
@@ -315,50 +317,11 @@ For the given configuration, the resulting RoleBinding resources are the followi
 ```
 kubectl -n oil-production get rolebindings
 NAME                                              ROLE                                            AGE
-capsule-oil-0-admin                               ClusterRole/admin                               8d
-capsule-oil-1-capsule-namespace-deleter           ClusterRole/capsule-namespace-deleter           8d
-capsule-oil-2-view                                ClusterRole/view                                11m
-capsule-oil-3-prometheus-servicemonitors-viewer   ClusterRole/prometheus-servicemonitors-viewer   18s
+capsule-oil-0-admin                               ClusterRole/admin                               90s
+capsule-oil-1-capsule-namespace-deleter           ClusterRole/capsule-namespace-deleter           90s
+capsule-oil-2-view                                ClusterRole/view                                90s
+capsule-oil-3-prometheus-servicemonitors-viewer   ClusterRole/prometheus-servicemonitors-viewer   25s
 ```
-
-> The pattern for the annotation is `clusterrolenames.capsule.clastix.io/${KIND}.${NAME}`.
-> The placeholders `${KIND}` and `${NAME}` are referring to the Tenant Owner specification fields, both lower-cased.
-> 
-> In the case of users that are identified using their email address, the symbol `@` wouldn't be supported by the RFC 1123.
-> For such cases, the `@` symbol can be replaced with the placeholder `__AT__`.
-> 
-> ```yaml
-> apiVersion: capsule.clastix.io/v1beta1
-> kind: Tenant
-> metadata:
->   annotations:
->     clusterrolenames.capsule.clastix.io/alice__AT__clastix.io: editor,manager
-> spec:
->   owners:
->     - kind: User
->       name: alice@org.tld
->     - kind: User
->       name: alice@clastix.io
-> ```
-> 
-> Instead, with the resulting annotation key exceeding 63 characters length, the zero-based index of the owner can be specified as follows:
-> 
-> ```yaml
-> apiVersion: capsule.clastix.io/v1beta1
-> kind: Tenant
-> metadata:
->   annotations:
->     clusterrolenames.capsule.clastix.io/1: editor,manager
-> spec:
->   owners:
->     - kind: User
->       name: alice@org.tld
->     - kind: User
->       name: very-long-user-name-that-breaks-rfc-1123@org.tld
-> ```
-> 
-> This latter example will assign the roles `editor` and `manager`, assigned to the user `very-long-user-name-that-breaks-rfc-1123@org.tld`.
-
 
 ### Assign additional Role Bindings
 The tenant owner acts as admin of tenant namespaces. Other users can operate inside the tenant namespaces with different levels of permissions and authorizations. 
@@ -382,7 +345,7 @@ These permissions can be granted to a user without giving the role of tenant own
 
 ```yaml
 kubectl apply -f - << EOF
-apiVersion: capsule.clastix.io/v1beta1
+apiVersion: capsule.clastix.io/v1beta2
 kind: Tenant
 metadata:
   name: oil
@@ -421,7 +384,7 @@ The cluster admin, can control how many namespaces Alice, creates by setting a q
 
 ```yaml
 kubectl apply -f - << EOF
-apiVersion: capsule.clastix.io/v1beta1
+apiVersion: capsule.clastix.io/v1beta2
 kind: Tenant
 metadata:
   name: oil
@@ -454,7 +417,8 @@ status:
     oil-development
     oil-production
     oil-test
-  size:  3 # current namespace count
+  Size:   3 # current namespace count
+  State:  Active
 ...
 ```
 
@@ -476,7 +440,7 @@ Bill, the cluster admin, creates multiple tenants having `alice` as owner:
 
 ```yaml
 kubectl apply -f - << EOF
-apiVersion: capsule.clastix.io/v1beta1
+apiVersion: capsule.clastix.io/v1beta2
 kind: Tenant
 metadata:
   name: oil
@@ -491,7 +455,7 @@ and
 
 ```yaml
 kubectl apply -f - << EOF
-apiVersion: capsule.clastix.io/v1beta1
+apiVersion: capsule.clastix.io/v1beta2
 kind: Tenant
 metadata:
   name: gas
@@ -506,7 +470,7 @@ Alternatively, the ownership can be assigned to a group called `oil-and-gas`:
 
 ```yaml
 kubectl apply -f - << EOF
-apiVersion: capsule.clastix.io/v1beta1
+apiVersion: capsule.clastix.io/v1beta2
 kind: Tenant
 metadata:
   name: oil
@@ -521,7 +485,7 @@ and
 
 ```yaml
 kubectl apply -f - << EOF
-apiVersion: capsule.clastix.io/v1beta1
+apiVersion: capsule.clastix.io/v1beta2
 kind: Tenant
 metadata:
   name: gas
@@ -564,7 +528,7 @@ Set resources quota for each namespace in the Alice's tenant by defining them in
 
 ```yaml
 kubectl apply -f - << EOF
-apiVersion: capsule.clastix.io/v1beta1
+apiVersion: capsule.clastix.io/v1beta2
 kind: Tenant
 metadata:
   name: oil
@@ -716,7 +680,7 @@ By setting enforcement at the namespace level, i.e. `spec.resourceQuotas.scope=N
 Bill, the cluster admin, can also set Limit Ranges for each namespace in Alice's tenant by defining limits for pods and containers in the tenant spec:
 
 ```yaml
-apiVersion: capsule.clastix.io/v1beta1
+apiVersion: capsule.clastix.io/v1beta2
 kind: Tenant
 metadata:
   name: oil
@@ -757,40 +721,54 @@ spec:
 Limits will be inherited by all the namespaces created by Alice. In our case, when Alice creates the namespace `oil-production`, Capsule creates the following:
  
 ```yaml
-kind: LimitRange
 apiVersion: v1
+kind: LimitRange
 metadata:
-  name: limits
+  name: capsule-oil-0
   namespace: oil-production
-  labels:
-    tenant: oil
 spec:
   limits:
-  - type: Pod
-    min:
-      cpu: "50m"
-      memory: "5Mi"
-    max:
-      cpu: "1"
-      memory: "1Gi"
-  - type: Container
-    defaultRequest:
-      cpu: "100m"
-      memory: "10Mi"
-    default:
-      cpu: "200m"
-      memory: "100Mi"
-    min:
-      cpu: "50m"
-      memory: "5Mi"
-    max:
-      cpu: "1"
-      memory: "1Gi"
-  - type: PersistentVolumeClaim
-    min:
-      storage: "1Gi"
-    max:
-      storage: "10Gi"
+    - max:
+        cpu: "1"
+        memory: 1Gi
+      min:
+        cpu: 50m
+        memory: 5Mi
+      type: Pod
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: capsule-oil-1
+  namespace: oil-production
+spec:
+  limits:
+    - default:
+        cpu: 200m
+        memory: 100Mi
+      defaultRequest:
+        cpu: 100m
+        memory: 10Mi
+      max:
+        cpu: "1"
+        memory: 1Gi
+      min:
+        cpu: 50m
+        memory: 5Mi
+      type: Container
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: capsule-oil-2
+  namespace: oil-production
+spec:
+  limits:
+    - max:
+        storage: 10Gi
+      min:
+        storage: 1Gi
+      type: PersistentVolumeClaim
 ```
 
 > Note: being the limit range specific of single resources, there is no aggregate to count.
@@ -831,9 +809,8 @@ spec:
     allowed:
     - custom
     allowedRegex: "^tier-.*$"
-    selector:
-      matchLabels:
-        env: "production"
+    matchLabels:
+      env: "production"
 EOF
 ```
 
@@ -844,7 +821,6 @@ With the said Tenant specification, Alice can create a Pod resource if `spec.pri
 - Any PriorityClass which has the label `env` with the value `production`
 
 If a Pod is going to use a non-allowed _Priority Class_, it will be rejected by the Validation Webhook enforcing it.
-
 
 ### Assign Pod Priority Class as tenant default
 
@@ -865,9 +841,8 @@ spec:
     - custom
     default: "tenant-default"
     allowedRegex: "^tier-.*$"
-    selector:
-      matchLabels:
-        env: "production"
+    matchLabels:
+      env: "production"
 EOF
 ```
 
@@ -913,9 +888,8 @@ spec:
     allowed:
     - legacy
     allowedRegex: "^hardened-.*$"
-    selector:
-      matchLabels:
-        env: "production"
+    matchLabels:
+      env: "production"
 EOF
 ```
 
@@ -946,7 +920,7 @@ The label `pool=oil` is defined as node selector in the tenant manifest:
 
 ```yaml
 kubectl apply -f - << EOF
-apiVersion: capsule.clastix.io/v1beta1
+apiVersion: capsule.clastix.io/v1beta2
 kind: Tenant
 metadata:
   name: oil
@@ -965,7 +939,7 @@ The Capsule controller makes sure that any namespace created in the tenant has t
 Multiple node selector labels can be defined as in the following snippet:
 
 ```yaml
-apiVersion: capsule.clastix.io/v1beta1
+apiVersion: capsule.clastix.io/v1beta2
 kind: Tenant
 metadata:
   name: oil
@@ -1009,9 +983,8 @@ spec:
       allowed:
       - legacy
       allowedRegex: ^\w+-lb$
-      selector:
-        matchLabels:
-          env: "production"
+      matchLabels:
+        env: "production"
 EOF
 ```
 
@@ -1040,9 +1013,12 @@ spec:
     http:
       paths:
       - backend:
-          serviceName: nginx
-          servicePort: 80
+          service:
+            name: nginx
+            port:
+              number: 80
         path: /
+        pathType: ImplementationSpecific
 EOF
 ```
 
@@ -1068,9 +1044,8 @@ spec:
       - legacy
       default: "tenant-default"
       allowedRegex: ^\w+-lb$
-      selector:
-        matchLabels:
-          env: "production"
+      matchLabels:
+        env: "production"
 EOF
 ```
 
@@ -1105,7 +1080,7 @@ Bill can control ingress hostnames in the `oil` tenant to force the applications
 
 ```yaml
 kubectl apply -f - << EOF
-apiVersion: capsule.clastix.io/v1beta1
+apiVersion: capsule.clastix.io/v1beta2
 kind: Tenant
 metadata:
   name: oil
@@ -1161,7 +1136,7 @@ In a multi-tenant environment, as more and more ingresses are defined, there is 
 
 ```yaml
 kubectl apply -f - << EOF
-apiVersion: capsule.clastix.io/v1beta1
+apiVersion: capsule.clastix.io/v1beta2
 kind: Tenant
 metadata:
   name: oil
@@ -1248,9 +1223,8 @@ spec:
     - ceph-rbd
     - ceph-nfs
     allowedRegex: "^ceph-.*$"
-    selector:
-      matchLabels:
-        env: "production"
+    matchLabels:
+      env: "production"
 EOF
 ```
 
@@ -1301,9 +1275,8 @@ spec:
     - ceph-rbd
     - ceph-nfs
     allowedRegex: "^ceph-.*$"
-    selector:
-      matchLabels:
-        env: "production"
+    matchLabels:
+      env: "production"
 EOF
 ```
 
@@ -1341,7 +1314,7 @@ Bill can set network policies in the tenant manifest, according to the requireme
 
 ```yaml
 kubectl apply -f - << EOF
-apiVersion: capsule.clastix.io/v1beta1
+apiVersion: capsule.clastix.io/v1beta2
 kind: Tenant
 metadata:
   name: oil
@@ -1442,7 +1415,7 @@ To avoid this kind of attack, Bill, the cluster admin, can force Alice, the tena
 
 ```yaml
 kubectl apply -f - << EOF
-apiVersion: capsule.clastix.io/v1beta1
+apiVersion: capsule.clastix.io/v1beta2
 kind: Tenant
 metadata:
   name: oil
@@ -1468,7 +1441,7 @@ The spec `containerRegistries` addresses this task and can provide a combination
 
 ```yaml
 kubectl apply -f - << EOF
-apiVersion: capsule.clastix.io/v1beta1
+apiVersion: capsule.clastix.io/v1beta2
 kind: Tenant
 metadata:
   name: oil
@@ -1524,7 +1497,7 @@ Bill can assign this role to any namespace in the Alice's tenant by setting it i
 
 ```yaml
 kubectl apply -f - << EOF
-apiVersion: capsule.clastix.io/v1beta1
+apiVersion: capsule.clastix.io/v1beta2
 kind: Tenant
 metadata:
   name: oil
@@ -1579,7 +1552,7 @@ Starting from Capsule **v0.1.1**, this can be done using a special annotation in
 Imagine the case where a Custom Resource named `MySQL` in the API group `databases.acme.corp/v1` usage must be limited in the Tenant `oil`: this can be done as follows.
 
 ```yaml
-apiVersion: capsule.clastix.io/v1beta1
+apiVersion: capsule.clastix.io/v1beta2
 kind: Tenant
 metadata:
   name: oil
@@ -1606,7 +1579,7 @@ spec:
 When `alice` will create a `MySQL` instance in one of their Tenant Namespace, the Cluster Administrator can easily retrieve the overall usage.
 
 ```yaml
-apiVersion: capsule.clastix.io/v1beta1
+apiVersion: capsule.clastix.io/v1beta2
 kind: Tenant
 metadata:
   name: oil
@@ -1628,7 +1601,7 @@ Assigns additional labels and annotations to all namespaces created in the `oil`
 
 ```yaml
 kubectl apply -f - << EOF
-apiVersion: capsule.clastix.io/v1beta1
+apiVersion: capsule.clastix.io/v1beta2
 kind: Tenant
 metadata:
   name: oil
@@ -1660,7 +1633,7 @@ metadata:
     capsule.clastix.io/backup: "true"
   name: oil-production
   ownerReferences:
-  - apiVersion: capsule.clastix.io/v1beta1
+  - apiVersion: capsule.clastix.io/v1beta2
     blockOwnerDeletion: true
     controller: true
     kind: Tenant
@@ -1678,7 +1651,7 @@ Assigns additional labels and annotations to all services created in the `oil` t
 
 ```yaml
 kubectl apply -f - << EOF
-apiVersion: capsule.clastix.io/v1beta1
+apiVersion: capsule.clastix.io/v1beta2
 kind: Tenant
 metadata:
   name: oil
@@ -1724,20 +1697,36 @@ Bill needs to cordon a Tenant and its Namespaces for several reasons:
 
 With this said, the Tenant Owner and the related Service Account living into managed Namespaces, cannot proceed to any update, create or delete action.
 
-This is possible just labeling the Tenant as follows:
+This is possible by just toggling the specific Tenant specification:
 
 ```shell
-kubectl label tenant oil capsule.clastix.io/cordon=enabled
-tenant oil labeled
+apiVersion: capsule.clastix.io/v1beta2
+kind: Tenant
+metadata:
+  name: oil
+spec:
+  cordoned: true
+  owners:
+  - kind: User
+    name: alice
 ```
 
 Any operation performed by Alice, the Tenant Owner, will be rejected by the Admission controller.
 
-Uncordoning can be done by removing the said label:
+Uncordoning can be done by removing the said specification key:
 
 ```shell
-$ kubectl label tenant oil capsule.clastix.io/cordon-
-tenant.capsule.clastix.io/oil labeled
+$ cat <<EOF | kubectl apply -f -
+apiVersion: capsule.clastix.io/v1beta2
+kind: Tenant
+metadata:
+  name: oil
+spec:
+  cordoned: false
+  owners:
+  - kind: User
+    name: alice
+EOF
 
 $ kubectl --as alice --as-group capsule.clastix.io -n oil-dev create deployment nginx --image nginx
 deployment.apps/nginx created
@@ -1765,7 +1754,7 @@ Bill, the cluster admin, can block the creation of services with `NodePort` serv
 
 ```yaml
 kubectl apply -f - << EOF
-apiVersion: capsule.clastix.io/v1beta1
+apiVersion: capsule.clastix.io/v1beta2
 kind: Tenant
 metadata:
   name: oil
@@ -1786,7 +1775,7 @@ Service with the type of `ExternalName` has been found subject to many security 
 
 ```yaml
 kubectl apply -f - << EOF
-apiVersion: capsule.clastix.io/v1beta1
+apiVersion: capsule.clastix.io/v1beta2
 kind: Tenant
 metadata:
   name: oil
@@ -1808,7 +1797,7 @@ Same as previously, the Service of type of `LoadBalancer` could be blocked for v
 
 ```yaml
 kubectl apply -f - << EOF
-apiVersion: capsule.clastix.io/v1beta1
+apiVersion: capsule.clastix.io/v1beta2
 kind: Tenant
 metadata:
   name: oil
@@ -1835,16 +1824,16 @@ To avoid this kind of problems, Bill can deny the use of wildcard hostnames in t
 
 ```yaml
 kubectl apply -f - << EOF
-apiVersion: capsule.clastix.io/v1beta1
+apiVersion: capsule.clastix.io/v1beta2
 kind: Tenant
 metadata:
   name: oil
-  annotations:
-    capsule.clastix.io/deny-wildcard: true
 spec:
   owners:
-  - name: alice
-    kind: User
+    - name: alice
+      kind: User
+  ingressOptions:
+    allowWildcardHostnames: false
 EOF
 ```
 
@@ -1860,16 +1849,22 @@ Bill, the cluster admin, can deny Alice to add specific labels and annotations o
 
 ```yaml
 kubectl apply -f - << EOF
-apiVersion: capsule.clastix.io/v1beta1
+apiVersion: capsule.clastix.io/v1beta2
 kind: Tenant
 metadata:
   name: oil
-  annotations:
-    capsule.clastix.io/forbidden-namespace-labels: foo.acme.net,bar.acme.net
-    capsule.clastix.io/forbidden-namespace-labels-regexp: .*.acme.net
-    capsule.clastix.io/forbidden-namespace-annotations: foo.acme.net,bar.acme.net
-    capsule.clastix.io/forbidden-namespace-annotations-regexp: .*.acme.net
 spec:
+  namespaceOptions:
+    forbiddenAnnotations:
+      denied:
+          - foo.acme.net
+          - bar.acme.net
+      deniedRegex: .*.acme.net 
+    forbiddenLabels:
+      denied:
+          - foo.acme.net
+          - bar.acme.net
+      deniedRegex: .*.acme.net
   owners:
   - name: alice
     kind: User
@@ -1888,16 +1883,22 @@ Bill, the cluster admin, can deny Tenant Owners to add or modify specific labels
 
 ```yaml
 kubectl apply -f - << EOF
-apiVersion: capsule.clastix.io/v1alpha1
+apiVersion: capsule.clastix.io/v1beta2
 kind: CapsuleConfiguration
 metadata:
-  name: default
-  annotations:
-    capsule.clastix.io/forbidden-node-labels: foo.acme.net,bar.acme.net
-    capsule.clastix.io/forbidden-node-labels-regexp: .*.acme.net
-    capsule.clastix.io/forbidden-node-annotations: foo.acme.net,bar.acme.net
-    capsule.clastix.io/forbidden-node-annotations-regexp: .*.acme.net
+  name: default 
 spec:
+  nodeMetadata:
+    forbiddenAnnotations:
+      denied:
+        - foo.acme.net
+        - bar.acme.net
+      deniedRegex: .*.acme.net
+    forbiddenLabels:
+      denied:
+        - foo.acme.net
+        - bar.acme.net
+      deniedRegex: .*.acme.net
   userGroups:
     - capsule.clastix.io
     - system:serviceaccounts:default
@@ -1915,20 +1916,19 @@ EOF
 ## Protecting tenants from deletion
 
 Sometimes it is important to protect business critical tenants from accidental deletion. 
-This can be achieved by adding `capsule.clastix.io/protected` annotation on the tenant:
+This can be achieved by toggling `preventDeletion` specification key on the tenant:
 
 ```yaml
 kubectl apply -f - << EOF
-apiVersion: capsule.clastix.io/v1beta1
+apiVersion: capsule.clastix.io/v1beta2
 kind: Tenant
 metadata:
   name: oil
-  annotations:
-    capsule.clastix.io/protected: ""
 spec:
   owners:
   - name: alice
     kind: User
+  preventDeletion: true
 EOF
 ```
 

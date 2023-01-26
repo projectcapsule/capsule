@@ -77,7 +77,7 @@ metadata:
   name: gitops-reconciler
   namespace: my-tenant
 ---
-apiVersion: capsule.clastix.io/v1beta1
+apiVersion: capsule.clastix.io/v1beta2
 kind: Tenant
 metadata:
   name: my-tenant
@@ -93,7 +93,7 @@ From now on, we'll refer to it as the **Tenant GitOps Reconciler**.
 We also need to state that Capsule should enforce tenant access control for requests coming from tenants, and we can do that by specifying one of the `Group`s bound by default by Kubernetes to the Tenant GitOps Reconciler `ServiceAccount` in the `CapsuleConfiguration`:
 
 ```yaml
-apiVersion: capsule.clastix.io/v1alpha1
+apiVersion: capsule.clastix.io/v1beta2
 kind: CapsuleConfiguration
 metadata:
   name: default
@@ -238,7 +238,7 @@ this is the required set of resources to setup a Tenant:
 - Additional binding to *cluster-admin* `ClusterRole` for the Tenant's `Namespace`s and `Namespace` of the Tenant GitOps Reconciler' `ServiceAccount`.
   By default Capsule binds only `admin` ClusterRole, which has no privileges over Custom Resources, but *cluster-admin* has. This is needed to operate on Flux CRs:
   ```yaml
-  apiVersion: capsule.clastix.io/v1beta1
+  apiVersion: capsule.clastix.io/v1beta2
   kind: Tenant
   metadata:
     name: my-tenant
