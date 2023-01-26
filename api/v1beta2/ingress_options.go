@@ -29,5 +29,5 @@ type IngressOptions struct {
 	// Specifies the allowed hostnames in Ingresses for the given Tenant. Capsule assures that all Ingress resources created in the Tenant can use only one of the allowed hostnames. Optional.
 	AllowedHostnames *api.AllowedListSpec `json:"allowedHostnames,omitempty"`
 	// Toggles the ability for Ingress resources created in a Tenant to have a hostname wildcard.
-	AllowWildcardHostnames bool `json:"allowWildcardHostnames"`
+	AllowWildcardHostnames bool `json:"allowWildcardHostnames,omitempty"`
 }
