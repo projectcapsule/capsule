@@ -71,7 +71,7 @@ module.exports = function (api) {
               path: '/docs/guides/velero'
             },
             {
-              label: 'Upgrading Tenant version',
+              label: 'Upgrading Capsule',
               path: '/docs/guides/upgrading'
             },
             {
