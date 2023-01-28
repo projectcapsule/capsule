@@ -67,7 +67,7 @@ Here the values you can override:
 | customAnnotations | object | `{}` | Additional annotations which will be added to all resources created by Capsule helm chart |
 | customLabels | object | `{}` | Additional labels which will be added to all resources created by Capsule helm chart |
 | jobs.image.pullPolicy | string | `"IfNotPresent"` | Set the image pull policy of the helm chart job |
-| jobs.image.repository | string | `"quay.io/clastix/kubectl"` | Set the image repository of the helm chart job |
+| jobs.image.repository | string | `"clastix/kubectl"` | Set the image repository of the helm chart job |
 | jobs.image.tag | string | `""` | Set the image tag of the helm chart job |
 | mutatingWebhooksTimeoutSeconds | int | `30` | Timeout in seconds for mutating webhooks |
 | nodeSelector | object | `{}` | Set the node selector for the Capsule pod |
