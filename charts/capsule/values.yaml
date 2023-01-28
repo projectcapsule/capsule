@@ -101,7 +101,7 @@ podSecurityPolicy:
 jobs:
   image:
     # -- Set the image repository of the helm chart job
-    repository: quay.io/clastix/kubectl
+    repository: clastix/kubectl
     # -- Set the image pull policy of the helm chart job
     pullPolicy: IfNotPresent
     # -- Set the image tag of the helm chart job
