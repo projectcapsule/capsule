@@ -154,7 +154,15 @@ func (in *Tenant) ConvertFrom(raw conversion.Hub) error {
 
 	in.Status.Namespaces = src.Status.Namespaces
 	in.Status.Size = src.Status.Size
-	in.Status.State = tenantState(src.Status.State)
+
+	switch src.Status.State {
+	case capsulev1beta1.TenantStateActive:
+		in.Status.State = TenantStateActive
+	case capsulev1beta1.TenantStateCordoned:
+		in.Status.State = TenantStateCordoned
+	default:
+		in.Status.State = TenantStateActive
+	}
 
 	return nil
 }
@@ -264,6 +272,18 @@ func (in *Tenant) ConvertTo(raw conversion.Hub) error {
 	}
 
 	dst.SetAnnotations(annotations)
+
+	dst.Status.Size = in.Status.Size
+	dst.Status.Namespaces = in.Status.Namespaces
+
+	switch in.Status.State {
+	case TenantStateActive:
+		dst.Status.State = capsulev1beta1.TenantStateActive
+	case TenantStateCordoned:
+		dst.Status.State = capsulev1beta1.TenantStateCordoned
+	default:
+		dst.Status.State = capsulev1beta1.TenantStateActive
+	}
 
 	return nil
 }
