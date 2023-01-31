@@ -252,12 +252,13 @@ func (r *Processor) createOrUpdate(ctx context.Context, obj *unstructured.Unstru
 
 			_, err = controllerutil.CreateOrUpdate(ctx, r.client, actual, func() error {
 				UID := actual.GetUID()
+				rv := actual.GetResourceVersion()
 
 				actual.SetUnstructuredContent(desired.Object)
 				actual.SetNamespace(ns)
 				actual.SetLabels(labels)
 				actual.SetAnnotations(annotations)
-				actual.SetResourceVersion("")
+				actual.SetResourceVersion(rv)
 				actual.SetUID(UID)
 
 				return nil
