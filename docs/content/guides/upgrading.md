@@ -14,7 +14,7 @@ As an installation method, Helm is given for granted, YMMV using the `kustomize`
 We strongly suggest performing a full backup of your Kubernetes cluster, such as storage and etcd.
 Use your favourite tool according to your needs.
 
-# Upgrading from v0.1.3 to v0.2.0
+# Upgrading from v0.1.3 to v0.2.x
 
 ## Scale down the Capsule controller
 
@@ -28,19 +28,19 @@ helm upgrade -n capsule-system capsule --set "replicaCount=0"
 
 ## Migrate manually the `CapsuleConfiguration` to the latest API version
 
-With the v0.2.0 release of Capsule and the new features introduced, the resource `CapsuleConfiguration` is offering a new API version, bumped to `v1beta1` from `v1alpha1`.
+With the v0.2.x release of Capsule and the new features introduced, the resource `CapsuleConfiguration` is offering a new API version, bumped to `v1beta1` from `v1alpha1`.
 
 Essentially, the `CapsuleConfiguration` is storing configuration flags that allow Capsule to be configured on the fly without requiring the operator to reload.
 This resource is read at the operator init-time when the conversion webhook offered by Capsule is not yet ready to serve any request.
 
-Migrating from v0.1.3 to v0.2.0 requires a manual conversion of your `CapsuleConfiguration` according to the latest version (currently, `v1beta2`).
+Migrating from v0.1.3 to v0.2.x requires a manual conversion of your `CapsuleConfiguration` according to the latest version (currently, `v1beta2`).
 You can find further information about it at the section `CRDs APIs`.
 
 The deletion of the `CapsuleConfiguration` resource is required, along with the update of the related CRD.
 
 ```
 kubectl delete capsuleconfiguration default
-kubectl apply -f https://raw.githubusercontent.com/clastix/capsule/v0.2.0/config/crd/bases/capsuleconfiguration-crd.yaml
+kubectl apply -f https://raw.githubusercontent.com/clastix/capsule/v0.2.1/config/crd/bases/capsuleconfiguration-crd.yaml
 ```
 
 During the Helm upgrade, a new `CapsuleConfiguration` will be created: please, refer to the Helm Chart values to pick up your desired settings.
@@ -52,9 +52,9 @@ Unfortunately, Helm doesn't manage the lifecycle of Custom Resource Definitions,
 This process must be executed manually as follows:
 
 ```
-kubectl apply -f https://raw.githubusercontent.com/clastix/capsule/v0.2.0/config/crd/bases/globaltenantresources-crd.yaml
-kubectl apply -f https://raw.githubusercontent.com/clastix/capsule/v0.2.0/config/crd/bases/tenant-crd.yaml
-kubectl apply -f https://raw.githubusercontent.com/clastix/capsule/v0.2.0/config/crd/bases/tenantresources-crd.yaml
+kubectl apply -f https://raw.githubusercontent.com/clastix/capsule/v0.2.1/config/crd/bases/globaltenantresources-crd.yaml
+kubectl apply -f https://raw.githubusercontent.com/clastix/capsule/v0.2.1/config/crd/bases/tenant-crd.yaml
+kubectl apply -f https://raw.githubusercontent.com/clastix/capsule/v0.2.1/config/crd/bases/tenantresources-crd.yaml
 ```
 
 > We're giving for granted that Capsule is installed in the `capsule-system` Namespace.
@@ -76,7 +76,7 @@ Ensure to update the Capsule repository to fetch the latest changes.
 helm repo update
 ```
 
-The latest Chart must be used, at the current time, 0.3.0 is expected for Capsule v0.2.0, you can fetch the full list of available charts with the following command.
+The latest Chart must be used, at the current time, >0.3.0 is expected for Capsule >v0.2.0, you can fetch the full list of available charts with the following command.
 
 ```
 helm search repo -l clastix/capsule
