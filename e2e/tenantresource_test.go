@@ -104,6 +104,10 @@ var _ = Describe("Creating a TenantResource object", func() {
 										Name: "raw-secret-1",
 									},
 									Type: corev1.SecretTypeOpaque,
+									Data: map[string][]byte{
+										"{{ tenant.name }}": []byte("Cg=="),
+										"{{ namespace }}":   []byte("Cg=="),
+									},
 								},
 							},
 						},
@@ -118,6 +122,10 @@ var _ = Describe("Creating a TenantResource object", func() {
 										Name: "raw-secret-2",
 									},
 									Type: corev1.SecretTypeOpaque,
+									Data: map[string][]byte{
+										"{{ tenant.name }}": []byte("Cg=="),
+										"{{ namespace }}":   []byte("Cg=="),
+									},
 								},
 							},
 						},
@@ -132,6 +140,10 @@ var _ = Describe("Creating a TenantResource object", func() {
 										Name: "raw-secret-3",
 									},
 									Type: corev1.SecretTypeOpaque,
+									Data: map[string][]byte{
+										"{{ tenant.name }}": []byte("Cg=="),
+										"{{ namespace }}":   []byte("Cg=="),
+									},
 								},
 							},
 						},
@@ -219,6 +231,16 @@ var _ = Describe("Creating a TenantResource object", func() {
 
 					return secrets.Items
 				}, defaultTimeoutInterval, defaultPollInterval).Should(HaveLen(4))
+			})
+
+			By(fmt.Sprintf("ensuring raw items are templated in %s Namespace", ns), func() {
+				for _, name := range []string{"raw-secret-1", "raw-secret-2", "raw-secret-3"} {
+					secret := corev1.Secret{}
+					Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: name, Namespace: ns}, &secret)).ToNot(HaveOccurred())
+
+					Expect(secret.Data).To(HaveKey(solar.Name))
+					Expect(secret.Data).To(HaveKey(ns))
+				}
 			})
 		}
 
