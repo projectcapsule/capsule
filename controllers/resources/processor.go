@@ -225,7 +225,12 @@ func (r *Processor) createOrUpdate(ctx context.Context, obj *unstructured.Unstru
 		ns := item.GetName()
 
 		errGroup.Go(func() (err error) {
-			actual, desired := obj.DeepCopy(), obj.DeepCopy()
+			actual, desired := &unstructured.Unstructured{}, obj.DeepCopy()
+
+			actual.SetAPIVersion(desired.GetAPIVersion())
+			actual.SetKind(desired.GetKind())
+			actual.SetNamespace(desired.GetNamespace())
+			actual.SetName(desired.GetName())
 			// Using a deferred function to properly log the results, and adding the item to the processed set.
 			defer func() {
 				keysAndValues := []interface{}{"resource", fmt.Sprintf("%s/%s", ns, desired.GetName())}
