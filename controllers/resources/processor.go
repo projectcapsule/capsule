@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	"github.com/hashicorp/go-multierror"
+	"github.com/valyala/fasttemplate"
 	corev1 "k8s.io/api/core/v1"
 	apierr "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -201,9 +202,18 @@ func (r *Processor) HandleSection(ctx context.Context, tnt capsulev1beta2.Tenant
 		}
 
 		for rawIndex, item := range spec.RawItems {
+			template := string(item.Raw)
+
+			t := fasttemplate.New(template, "{{ ", " }}")
+
+			tmplString := t.ExecuteString(map[string]interface{}{
+				"tenant.name": tnt.Name,
+				"namespace":   ns.Name,
+			})
+
 			obj, keysAndValues := unstructured.Unstructured{}, []interface{}{"index", rawIndex}
 
-			if _, _, decodeErr := codecFactory.UniversalDeserializer().Decode(item.Raw, nil, &obj); decodeErr != nil {
+			if _, _, decodeErr := codecFactory.UniversalDeserializer().Decode([]byte(tmplString), nil, &obj); decodeErr != nil {
 				log.Error(decodeErr, "unable to deserialize rawItem", keysAndValues...)
 
 				syncErr = multierror.Append(syncErr, decodeErr)
