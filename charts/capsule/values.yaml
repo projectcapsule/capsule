@@ -77,6 +77,9 @@ podAnnotations: {}
 # -- Set the priority class name of the Capsule pod
 priorityClassName: '' # system-cluster-critical
 
+# -- Set the securityContext for the Capsule pod
+securityContext: {}
+
 # -- Set the node selector for the Capsule pod
 nodeSelector: {}
 #  node-role.kubernetes.io/master: ""
