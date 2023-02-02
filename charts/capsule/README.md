@@ -75,6 +75,7 @@ Here the values you can override:
 | podSecurityPolicy.enabled | bool | `false` | Specify if a Pod Security Policy must be created |
 | priorityClassName | string | `""` | Set the priority class name of the Capsule pod |
 | replicaCount | int | `1` | Set the replica count for capsule pod |
+| securityContext | object | `{}` | Set the securityContext for the Capsule pod |
 | serviceAccount.annotations | object | `{}` | Annotations to add to the service account. |
 | serviceAccount.create | bool | `true` | Specifies whether a service account should be created. |
 | serviceAccount.name | string | `"capsule"` | The name of the service account to use. If not set and `serviceAccount.create=true`, a name is generated using the fullname template |
