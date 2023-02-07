@@ -119,8 +119,6 @@ Here the values you can override:
 | serviceMonitor.labels | object | `{}` | Assign additional labels according to Prometheus' serviceMonitorSelector matching labels |
 | serviceMonitor.matchLabels | object | `{}` | Change matching labels |
 | serviceMonitor.namespace | string | `""` | Install the ServiceMonitor into a different Namespace, as the monitoring stack one (default: the release one) |
-| serviceMonitor.serviceAccount.name | string | `"capsule"` | ServiceAccount for Metrics RBAC |
-| serviceMonitor.serviceAccount.namespace | string | `"capsule-system"` | ServiceAccount Namespace for Metrics RBAC |
 | serviceMonitor.targetLabels | list | `[]` | Set targetLabels for the serviceMonitor |
 
 ### Webhook Parameters
