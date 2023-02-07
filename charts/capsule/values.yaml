@@ -212,11 +212,6 @@ serviceMonitor:
   matchLabels: {}
   # -- Set targetLabels for the serviceMonitor
   targetLabels: []
-  serviceAccount:
-    # -- ServiceAccount for Metrics RBAC
-    name: capsule
-    # -- ServiceAccount Namespace for Metrics RBAC
-    namespace: capsule-system
   endpoint:
     # -- Set the scrape interval for the endpoint of the serviceMonitor
     interval: "15s"
