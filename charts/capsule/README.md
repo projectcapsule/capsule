@@ -72,9 +72,11 @@ Here the values you can override:
 | mutatingWebhooksTimeoutSeconds | int | `30` | Timeout in seconds for mutating webhooks |
 | nodeSelector | object | `{}` | Set the node selector for the Capsule pod |
 | podAnnotations | object | `{}` | Annotations to add to the capsule pod. |
+| podSecurityContext | object | `{"runAsGroup":1002,"runAsNonRoot":true,"runAsUser":1002,"seccompProfile":{"type":"RuntimeDefault"}}` | Set the securityContext for the Capsule pod |
 | podSecurityPolicy.enabled | bool | `false` | Specify if a Pod Security Policy must be created |
 | priorityClassName | string | `""` | Set the priority class name of the Capsule pod |
 | replicaCount | int | `1` | Set the replica count for capsule pod |
+| securityContext | object | `{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]},"readOnlyRootFilesystem":true}` | Set the securityContext for the Capsule container |
 | serviceAccount.annotations | object | `{}` | Annotations to add to the service account. |
 | serviceAccount.create | bool | `true` | Specifies whether a service account should be created. |
 | serviceAccount.name | string | `"capsule"` | The name of the service account to use. If not set and `serviceAccount.create=true`, a name is generated using the fullname template |
