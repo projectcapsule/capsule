@@ -77,6 +77,21 @@ podAnnotations: {}
 # -- Set the priority class name of the Capsule pod
 priorityClassName: '' # system-cluster-critical
 
+# -- Set the securityContext for the Capsule pod
+podSecurityContext:
+  runAsGroup: 1002
+  runAsNonRoot: true
+  runAsUser: 1002
+
+
+# -- Set the securityContext for the Capsule container
+securityContext:
+  capabilities:
+    drop:
+    - ALL
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+
 # -- Set the node selector for the Capsule pod
 nodeSelector: {}
 #  node-role.kubernetes.io/master: ""
