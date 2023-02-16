@@ -66,6 +66,7 @@ Here the values you can override:
 | certManager.generateCertificates | bool | `false` | Specifies whether capsule webhooks certificates should be generated using cert-manager |
 | customAnnotations | object | `{}` | Additional annotations which will be added to all resources created by Capsule helm chart |
 | customLabels | object | `{}` | Additional labels which will be added to all resources created by Capsule helm chart |
+| imagePullSecrets | list | `[]` | Configuration for `imagePullSecrets` so that you can use a private images registry. |
 | jobs.image.pullPolicy | string | `"IfNotPresent"` | Set the image pull policy of the helm chart job |
 | jobs.image.repository | string | `"clastix/kubectl"` | Set the image repository of the helm chart job |
 | jobs.image.tag | string | `""` | Set the image tag of the helm chart job |
@@ -94,7 +95,6 @@ Here the values you can override:
 | manager.image.pullPolicy | string | `"IfNotPresent"` | Set the image pull policy. |
 | manager.image.repository | string | `"clastix/capsule"` | Set the image repository of the capsule. |
 | manager.image.tag | string | `""` | Overrides the image tag whose default is the chart appVersion. |
-| manager.imagePullSecrets | list | `[]` | Configuration for `imagePullSecrets` so that you can use a private images registry. |
 | manager.kind | string | `"Deployment"` | Set the controller deployment mode as `Deployment` or `DaemonSet`. |
 | manager.livenessProbe | object | `{"httpGet":{"path":"/healthz","port":10080}}` | Configure the liveness probe using Deployment probe spec |
 | manager.options.capsuleUserGroups | list | `["capsule.clastix.io"]` | Override the Capsule user groups |
