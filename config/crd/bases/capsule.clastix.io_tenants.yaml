@@ -2840,6 +2840,8 @@ spec:
                             - StorageClasses
                             - IngressClasses
                             - PriorityClasses
+                            - RuntimeClasses
+                            - PersistentVolumes
                             type: string
                           operations:
                             items:
