@@ -3081,7 +3081,7 @@ TenantSpec defines the desired state of Tenant.
         <td>
           <br/>
           <br/>
-            <i>Enum</i>: Nodes, StorageClasses, IngressClasses, PriorityClasses<br/>
+            <i>Enum</i>: Nodes, StorageClasses, IngressClasses, PriorityClasses, RuntimeClasses, PersistentVolumes<br/>
         </td>
         <td>true</td>
       </tr><tr>
