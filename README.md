@@ -1,5 +1,6 @@
 
 <p align="left">
+  <img src="https://github.com/clastix/capsule/actions/workflows/ci.yml/badge.svg"/>
   <img src="https://img.shields.io/github/license/clastix/capsule"/>
   <img src="https://img.shields.io/github/go-mod/go-version/clastix/capsule"/>
   <a href="https://github.com/clastix/capsule/releases">
