@@ -60,6 +60,7 @@ spec:
           command:
           - /manager
           args:
+          - --webhook-port={{ .Values.manager.webhookPort }}
           - --enable-leader-election
           - --zap-log-level={{ default 4 .Values.manager.options.logLevel }}
           - --configuration-name=default
@@ -72,7 +73,7 @@ spec:
                 fieldPath: metadata.namespace
           ports:
             - name: webhook-server
-              containerPort: 9443
+              containerPort: {{ .Values.manager.webhookPort }}
               protocol: TCP
             - name: metrics
               containerPort: 8080

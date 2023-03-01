@@ -107,6 +107,7 @@ Here the values you can override:
 | manager.resources.limits.memory | string | `"128Mi"` |  |
 | manager.resources.requests.cpu | string | `"200m"` |  |
 | manager.resources.requests.memory | string | `"128Mi"` |  |
+| manager.webhookPort | int | `9443` | Set an alternative to the default container port.  Useful for use in some kubernetes clusters (such as GKE Private) with aggregator routing turned on, because pod ports have to be opened manually on the firewall side |
 
 ### ServiceMonitor Parameters
 
