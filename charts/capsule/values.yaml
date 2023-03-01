@@ -32,6 +32,13 @@ manager:
   # with pods' IP CIDR and admission webhooks are not working
   hostNetwork: false
 
+  # -- Set an alternative to the default container port.
+  #
+  # Useful for use in some kubernetes clusters (such as GKE Private) with
+  # aggregator routing turned on, because pod ports have to be opened manually
+  # on the firewall side
+  webhookPort: 9443
+
   # Additional Capsule Controller Options
   options:
     # -- Set the log verbosity of the capsule with a value from 1 to 10
