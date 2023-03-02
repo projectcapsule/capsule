@@ -63,7 +63,7 @@ func (n NetworkingV1) Namespace() string {
 	return n.GetNamespace()
 }
 
-// nolint:dupl
+//nolint:dupl
 func (n NetworkingV1) HostnamePathsPairs() (pairs map[string]sets.String) {
 	pairs = make(map[string]sets.String)
 
@@ -129,7 +129,7 @@ func (n NetworkingV1Beta1) Namespace() string {
 	return n.GetNamespace()
 }
 
-// nolint:dupl
+//nolint:dupl
 func (n NetworkingV1Beta1) HostnamePathsPairs() (pairs map[string]sets.String) {
 	pairs = make(map[string]sets.String)
 
@@ -193,7 +193,7 @@ func (e Extension) Namespace() string {
 	return e.GetNamespace()
 }
 
-// nolint:dupl
+//nolint:dupl
 func (e Extension) HostnamePathsPairs() (pairs map[string]sets.String) {
 	pairs = make(map[string]sets.String)
 

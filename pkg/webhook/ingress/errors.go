@@ -88,7 +88,7 @@ func (i ingressClassNotValidError) Error() string {
 	return utils.DefaultAllowedValuesErrorMessage(i.spec, err)
 }
 
-// nolint:predeclared
+//nolint:predeclared
 func appendHostnameError(spec api.AllowedListSpec) (append string) {
 	if len(spec.Exact) > 0 {
 		append = fmt.Sprintf(", specify one of the following (%s)", strings.Join(spec.Exact, ", "))

@@ -133,7 +133,7 @@ func (in *Tenant) convertV1Alpha1OwnerToV1Beta1() capsulev1beta1.OwnerListSpec {
 	return owners
 }
 
-// nolint:gocognit,gocyclo,cyclop,maintidx
+//nolint:gocognit,gocyclo,cyclop,maintidx
 func (in *Tenant) ConvertTo(dstRaw conversion.Hub) error {
 	dst, ok := dstRaw.(*capsulev1beta1.Tenant)
 	if !ok {
@@ -365,7 +365,7 @@ func (in *Tenant) ConvertTo(dstRaw conversion.Hub) error {
 	return nil
 }
 
-// nolint:gocognit,gocyclo,cyclop
+//nolint:gocognit,gocyclo,cyclop
 func (in *Tenant) convertV1Beta1OwnerToV1Alpha1(src *capsulev1beta1.Tenant) {
 	ownersAnnotations := map[string][]string{
 		ownerGroupsAnnotation:         nil,

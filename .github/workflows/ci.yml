@@ -24,9 +24,9 @@ jobs:
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v2.3.0
         with:
-          version: v1.45.2
+          version: v1.51.2
           only-new-issues: false
-          args: --timeout 2m --config .golangci.yml
+          args: --timeout 5m --config .golangci.yml
   diff:
     name: diff
     runs-on: ubuntu-18.04

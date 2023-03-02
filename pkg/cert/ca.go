@@ -144,7 +144,7 @@ func NewCertificateAuthorityFromBytes(certBytes, keyBytes []byte) (*CapsuleCA, e
 	}, nil
 }
 
-// nolint:nakedret
+//nolint:nakedret
 func (c *CapsuleCA) GenerateCertificate(opts CertificateOptions) (certificatePem *bytes.Buffer, certificateKey *bytes.Buffer, err error) {
 	var certPrivKey *rsa.PrivateKey
 	certPrivKey, err = rsa.GenerateKey(rand.Reader, 4096)

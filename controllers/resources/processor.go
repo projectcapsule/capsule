@@ -135,7 +135,7 @@ func (r *Processor) HandleSection(ctx context.Context, tnt capsulev1beta2.Tenant
 
 	for _, ns := range namespaces.Items {
 		for nsIndex, item := range spec.NamespacedItems {
-			keysAndValues := []interface{}{"index", nsIndex, "namespace", item.Namespace}
+			keysAndValues := []any{"index", nsIndex, "namespace", item.Namespace}
 			// A TenantResource is created by a TenantOwner, and potentially, they could point to a resource in a non-owned
 			// Namespace: this must be blocked by checking it this is the case.
 			if !allowCrossNamespaceSelection && !tntNamespaces.Has(item.Namespace) {
@@ -174,7 +174,7 @@ func (r *Processor) HandleSection(ctx context.Context, tnt capsulev1beta2.Tenant
 
 				multiErr.Go(func() error {
 					kv := keysAndValues
-					kv = append(kv, []interface{}{"resource", fmt.Sprintf("%s/%s", obj.GetNamespace(), obj.GetNamespace())})
+					kv = append(kv, "resource", fmt.Sprintf("%s/%s", obj.GetNamespace(), obj.GetNamespace()))
 
 					if opErr := r.createOrUpdate(ctx, &obj, objLabels, objAnnotations); opErr != nil {
 						log.Error(opErr, "unable to sync namespacedItems", kv...)

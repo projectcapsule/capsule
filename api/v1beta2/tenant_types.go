@@ -76,9 +76,7 @@ type Tenant struct {
 func (in *Tenant) GetNamespaces() (res []string) {
 	res = make([]string, 0, len(in.Status.Namespaces))
 
-	for _, ns := range in.Status.Namespaces {
-		res = append(res, ns)
-	}
+	res = append(res, in.Status.Namespaces...)
 
 	return
 }

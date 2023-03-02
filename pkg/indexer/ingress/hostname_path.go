@@ -22,7 +22,7 @@ type HostnamePath struct {
 	Obj metav1.Object
 }
 
-// nolint:forcetypeassert
+//nolint:forcetypeassert
 func (s HostnamePath) Object() client.Object {
 	return s.Obj.(client.Object)
 }

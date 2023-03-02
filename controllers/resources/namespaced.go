@@ -85,7 +85,7 @@ func (r *Namespaced) reconcileNormal(ctx context.Context, tntResource *capsulev1
 
 	// Adding the default value for the status
 	if tntResource.Status.ProcessedItems == nil {
-		tntResource.Status.ProcessedItems = make([]capsulev1beta2.ObjectReferenceStatus, 0, 0)
+		tntResource.Status.ProcessedItems = make([]capsulev1beta2.ObjectReferenceStatus, 0)
 	}
 
 	// Retrieving the parent of the Tenant Resource:

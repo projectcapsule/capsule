@@ -17,9 +17,8 @@ import (
 	"github.com/clastix/capsule/pkg/utils"
 )
 
-// nolint:dupl
 // Ensuring all the LimitRange are applied to each Namespace handled by the Tenant.
-func (r *Manager) syncLimitRanges(ctx context.Context, tenant *capsulev1beta2.Tenant) error {
+func (r *Manager) syncLimitRanges(ctx context.Context, tenant *capsulev1beta2.Tenant) error { //nolint:dupl
 	// getting requested LimitRange keys
 	keys := make([]string, 0, len(tenant.Spec.LimitRanges.Items))
 
