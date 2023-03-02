@@ -28,9 +28,9 @@ func IsCapsuleUser(ctx context.Context, req admission.Request, clt client.Client
 	if sets.NewString(req.UserInfo.Groups...).Has("system:serviceaccounts") {
 		parts := strings.Split(req.UserInfo.Username, ":")
 
-		targetNamespace := parts[2]
+		if len(parts) == 4 {
+			targetNamespace := parts[2]
 
-		if len(targetNamespace) > 0 {
 			tl := &capsulev1beta2.TenantList{}
 			if err := clt.List(ctx, tl, client.MatchingFieldsSelector{Selector: fields.OneTermEqualSelector(".status.namespaces", targetNamespace)}); err != nil {
 				return false
