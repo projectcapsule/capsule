@@ -121,7 +121,7 @@ func (r *Global) reconcileNormal(ctx context.Context, tntResource *capsulev1beta
 	}
 
 	if tntResource.Status.ProcessedItems == nil {
-		tntResource.Status.ProcessedItems = make([]capsulev1beta2.ObjectReferenceStatus, 0, 0)
+		tntResource.Status.ProcessedItems = make([]capsulev1beta2.ObjectReferenceStatus, 0)
 	}
 
 	// Retrieving the list of the Tenants up to the selector provided by the GlobalTenantResource resource.

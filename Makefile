@@ -240,7 +240,7 @@ goimports:
 
 GOLANGCI_LINT = $(shell pwd)/bin/golangci-lint
 golangci-lint: ## Download golangci-lint locally if necessary.
-	$(call go-install-tool,$(GOLANGCI_LINT),github.com/golangci/golangci-lint/cmd/golangci-lint@v1.45.2)
+	$(call go-install-tool,$(GOLANGCI_LINT),github.com/golangci/golangci-lint/cmd/golangci-lint@v1.51.2)
 
 # Linting code as PR is expecting
 .PHONY: golint
@@ -250,7 +250,7 @@ golint: golangci-lint
 # Running e2e tests in a KinD instance
 .PHONY: e2e
 e2e/%: ginkgo
-	$(MAKE) e2e-build/$* && $(MAKE) e2e-exec || $(MAKE) e2e-destroy
+	$(MAKE) e2e-build/$* && $(MAKE) e2e-exec && $(MAKE) e2e-destroy
 
 e2e-build/%:
 	kind create cluster --wait=60s --name capsule --image=kindest/node:$*

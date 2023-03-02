@@ -19,7 +19,7 @@ import (
 	"github.com/clastix/capsule/pkg/api"
 )
 
-// nolint:maintidx
+//nolint:maintidx
 func generateTenantsSpecs() (Tenant, capsulev1beta1.Tenant) {
 	var namespaceQuota int32 = 5
 

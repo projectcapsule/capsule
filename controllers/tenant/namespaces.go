@@ -42,7 +42,7 @@ func (r *Manager) syncNamespaces(ctx context.Context, tenant *capsulev1beta2.Ten
 	return
 }
 
-// nolint:gocognit
+//nolint:gocognit
 func (r *Manager) syncNamespaceMetadata(ctx context.Context, namespace string, tnt *capsulev1beta2.Tenant) (err error) {
 	var res controllerutil.OperationResult
 

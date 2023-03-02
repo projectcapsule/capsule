@@ -50,7 +50,7 @@ func (r *handler) generic(ctx context.Context, req admission.Request, client cli
 		return tnt, nil
 	}
 
-	return nil, nil // nolint:nilnil
+	return nil, nil //nolint:nilnil
 }
 
 //nolint:dupl

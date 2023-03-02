@@ -8,9 +8,6 @@ import (
 	"net/http"
 
 	corev1 "k8s.io/api/core/v1"
-	schedulingv1 "k8s.io/api/scheduling/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -23,24 +20,6 @@ type priorityClass struct{}
 
 func PriorityClass() capsulewebhook.Handler {
 	return &priorityClass{}
-}
-
-func (h *priorityClass) class(ctx context.Context, c client.Client, name string) (client.Object, error) {
-	if len(name) == 0 {
-		return nil, nil
-	}
-
-	obj := &schedulingv1.PriorityClass{}
-
-	if err := c.Get(ctx, types.NamespacedName{Name: name}, obj); err != nil {
-		if errors.IsNotFound(err) {
-			return nil, nil
-		}
-
-		return nil, err
-	}
-
-	return obj, nil
 }
 
 func (h *priorityClass) OnCreate(c client.Client, decoder *admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {

@@ -125,7 +125,7 @@ func (r *userMetadataHandler) OnUpdate(client client.Client, decoder *admission.
 			}
 
 			if v != oldNs.GetAnnotations()["scheduler.alpha.kubernetes.io/node-selector"] {
-				response := admission.Denied("the the node-selector annotation is enforced, cannot be updated")
+				response := admission.Denied("the node-selector annotation is enforced, cannot be updated")
 
 				recorder.Eventf(tnt, corev1.EventTypeWarning, "ForbiddenNodeSelectorUpdate", string(response.Result.Reason))
 

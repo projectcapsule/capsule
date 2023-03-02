@@ -46,7 +46,7 @@ func NewCapsuleConfiguration(ctx context.Context, client client.Client, name str
 func (c *capsuleConfiguration) ProtectedNamespaceRegexp() (*regexp.Regexp, error) {
 	expr := c.retrievalFn().Spec.ProtectedNamespaceRegexpString
 	if len(expr) == 0 {
-		return nil, nil // nolint:nilnil
+		return nil, nil //nolint:nilnil
 	}
 
 	r, err := regexp.Compile(expr)

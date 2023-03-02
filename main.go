@@ -96,7 +96,7 @@ func newDelegatingClient(cache cache.Cache, config *rest.Config, options client.
 	return delegatingClient, nil
 }
 
-// nolint:maintidx,cyclop
+//nolint:maintidx,cyclop
 func main() {
 	var enableLeaderElection, version bool
 

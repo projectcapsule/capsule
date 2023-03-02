@@ -24,7 +24,7 @@ func IsCapsuleUser(ctx context.Context, req admission.Request, clt client.Client
 	if groupList.Find("system:serviceaccounts:kube-system") {
 		return false
 	}
-	// nolint:nestif
+	//nolint:nestif
 	if sets.NewString(req.UserInfo.Groups...).Has("system:serviceaccounts") {
 		parts := strings.Split(req.UserInfo.Username, ":")
 

@@ -86,7 +86,7 @@ func (h *containerRegistryHandler) VerifyContainerRegistry(recorder record.Event
 	reg := NewRegistry(container.Image)
 
 	if len(reg.Registry()) == 0 {
-		recorder.Eventf(&tnt, corev1.EventTypeWarning, "MissingFQCI", "Pod %s/%s is not using using a fully qualified container image, cannot enforce registry the current Tenant", req.Namespace, req.Name, reg.Registry())
+		recorder.Eventf(&tnt, corev1.EventTypeWarning, "MissingFQCI", "Pod %s/%s is not using a fully qualified container image, cannot enforce registry the current Tenant", req.Namespace, req.Name, reg.Registry())
 
 		response := admission.Denied(NewContainerRegistryForbidden(container.Image, *tnt.Spec.ContainerRegistries).Error())
 

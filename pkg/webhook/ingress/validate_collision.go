@@ -84,7 +84,7 @@ func (r *collision) validate(ctx context.Context, client client.Client, req admi
 	return &response
 }
 
-// nolint:gocognit,gocyclo,cyclop
+//nolint:gocognit,gocyclo,cyclop
 func (r *collision) validateCollision(ctx context.Context, clt client.Client, ing Ingress, scope api.HostnameCollisionScope) error {
 	for hostname, paths := range ing.HostnamePathsPairs() {
 		for path := range paths {
@@ -100,7 +100,7 @@ func (r *collision) validateCollision(ctx context.Context, clt client.Client, in
 			}
 
 			namespaces := sets.NewString()
-			// nolint:exhaustive
+			//nolint:exhaustive
 			switch scope {
 			case api.HostnameCollisionScopeCluster:
 				tenantList := &capsulev1beta2.TenantList{}

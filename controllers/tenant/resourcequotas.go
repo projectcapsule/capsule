@@ -36,8 +36,7 @@ import (
 // the mutateFn along with the CreateOrUpdate to don't perform the update since resources are identical.
 //
 // In case of Namespace-scoped Resource Budget, we're just replicating the resources across all registered Namespaces.
-// nolint:gocognit
-func (r *Manager) syncResourceQuotas(ctx context.Context, tenant *capsulev1beta2.Tenant) (err error) {
+func (r *Manager) syncResourceQuotas(ctx context.Context, tenant *capsulev1beta2.Tenant) (err error) { //nolint:gocognit
 	// getting ResourceQuota labels for the mutateFn
 	var tenantLabel, typeLabel string
 
@@ -48,7 +47,7 @@ func (r *Manager) syncResourceQuotas(ctx context.Context, tenant *capsulev1beta2
 	if typeLabel, err = utils.GetTypeLabel(&corev1.ResourceQuota{}); err != nil {
 		return err
 	}
-	// nolint:nestif
+	//nolint:nestif
 	if tenant.Spec.ResourceQuota.Scope == api.ResourceQuotaScopeTenant {
 		group := new(errgroup.Group)
 
