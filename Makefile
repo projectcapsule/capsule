@@ -266,6 +266,7 @@ e2e-build/%:
 		--set "manager.image.tag=$(VERSION)" \
 		--set 'manager.livenessProbe.failureThreshold=10' \
 		--set 'manager.readinessProbe.failureThreshold=10' \
+		--set 'podSecurityContext.seccompProfile=null' \
 		capsule \
 		./charts/capsule
 
