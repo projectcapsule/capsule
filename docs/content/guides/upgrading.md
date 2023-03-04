@@ -3,7 +3,8 @@
 List of Tenant API changes:
 
 - [Capsule v0.1.0](https://github.com/clastix/capsule/releases/tag/v0.1.0) bump to `v1beta1` from `v1alpha1`.
-- [Capsule v0.2.0](https://github.com/clastix/capsule/releases/tag/v0.1.0) bump to `v1beta2` from `v1beta1`, deprecating `v1alpha1`.
+- [Capsule v0.2.0](https://github.com/clastix/capsule/releases/tag/v0.2.0) bump to `v1beta2` from `v1beta1`, deprecating `v1alpha1`.
+- [Capsule v0.3.0](https://github.com/clastix/capsule/releases/tag/v0.3.0) missing enums required by [Capsule Proxy](https://github.com/clastix/capsule-proxy).
 
 This document aims to provide support and a guide on how to perform a clean upgrade to the latest API version in order to avoid service disruption and data loss.
 
@@ -13,6 +14,55 @@ As an installation method, Helm is given for granted, YMMV using the `kustomize`
 
 We strongly suggest performing a full backup of your Kubernetes cluster, such as storage and etcd.
 Use your favourite tool according to your needs.
+
+# Upgrading from v0.2.x to v0.3.x
+
+A minor bump has been requested due to some missing enums in the Tenant resource.
+
+## Scale down the Capsule controller
+
+Using the `kubectl` or Helm, scale down the Capsule controller manager: this is required to avoid the old Capsule version from processing objects that aren't yet installed as a CRD.
+
+```
+helm upgrade -n capsule-system capsule --set "replicaCount=0" 
+```
+
+## Patch the Tenant custom resource definition
+
+Unfortunately, Helm doesn't manage the lifecycle of Custom Resource Definitions, additional details can be found [here](https://github.com/helm/community/blob/f9e06c16d89ccea1bea77c01a6a96ae3b309f823/architecture/crds.md).
+
+This process must be executed manually as follows:
+
+```
+kubectl apply -f https://raw.githubusercontent.com/clastix/capsule/v0.3.0/config/crd/bases/tenant-crd.yaml
+```
+
+## Update your Capsule Helm chart
+
+Ensure to update the Capsule repository to fetch the latest changes.
+
+```
+helm repo update
+```
+
+The latest Chart must be used, at the current time, >=0.4.0 is expected for Capsule >=v0.3.0, you can fetch the full list of available charts with the following command.
+
+```
+helm search repo -l clastix/capsule
+```
+
+Since the Tenant custom resource definition has been patched with new fields, we can install back Capsule using the provided Helm chart.
+
+```
+helm upgrade --install capsule clastix/capsule -n capsule-system --create-namespace --version 0.4.0
+```
+
+This will start the Operator with the latest changes, and perform the required sync operations like:
+
+1. Ensuring the CA is still valid
+2. Ensuring a TLS certificate is valid for the local webhook server
+3. If not using the cert-manager integration, patching the Validating and Mutating Webhook Configuration resources with the Capsule CA
+4. If not using the cert-manager integration, patching the Capsule's Custom Resource Definitions conversion webhook fields with the Capsule CA
 
 # Upgrading from v0.1.3 to v0.2.x
 
