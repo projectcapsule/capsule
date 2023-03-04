@@ -2769,7 +2769,7 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.namespace
-        image: clastix/capsule:v0.2.1
+        image: clastix/capsule:v0.3.0
         imagePullPolicy: IfNotPresent
         name: manager
         ports:
