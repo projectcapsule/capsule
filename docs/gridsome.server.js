@@ -67,6 +67,10 @@ module.exports = function (api) {
               path: '/docs/guides/monitoring'
             },
             {
+              label: 'Kubernetes Dashboard',
+              path: '/docs/guides/kubernetes-dashboard'
+            },
+            {
               label: 'Backup & Restore with Velero',
               path: '/docs/guides/velero'
             },
