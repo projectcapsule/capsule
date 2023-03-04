@@ -10,7 +10,7 @@ Error from server (Forbidden): namespaces is forbidden:
 User "alice" cannot list resource "namespaces" in API group "" at the cluster scope
 ```
 
-However, the user can have permissions on some namespaces
+However, the user can have permission on some namespaces
 
 ```
 $ kubectl auth can-i [get|list|watch|delete] ns oil-production
@@ -21,13 +21,13 @@ The reason, as the error message reported, is that the RBAC _list_ action is ava
 
 To overcome this problem, many Kubernetes distributions introduced mirrored custom resources supported by a custom set of ACL-filtered APIs. However, this leads to radically change the user's experience of Kubernetes by introducing hard customizations that make it painful to move from one distribution to another.
 
-With **Capsule**, we took a different approach. As one of the key goals, we want to keep the same user's experience on all the distributions of Kubernetes. We want people to use the standard tools they already know and love and it should just work.
+With **Capsule**, we took a different approach. As one of the key goals, we want to keep the same user experience on all the distributions of Kubernetes. We want people to use the standard tools they already know and love and it should just work.
 
 ## How it works
 
 The `capsule-proxy` implements a simple reverse proxy that intercepts only specific requests to the APIs server and Capsule does all the magic behind the scenes.
 
-Current implementation filters the following requests:
+The current implementation filters the following requests:
 
 * `/api/scheduling.k8s.io/{v1}/priorityclasses{/name}`
 * `/api/v1/namespaces{/name}`
@@ -37,13 +37,16 @@ Current implementation filters the following requests:
 * `/apis/metrics.k8s.io/{v1beta1}/nodes{/name}`
 * `/apis/networking.k8s.io/{v1,v1beta1}/ingressclasses{/name}`
 * `/apis/storage.k8s.io/v1/storageclasses{/name}`
+* `/apis/node.k8s.io/v1/runtimeclasses{/name}`
+* `/api/v1/persistentvolumes{/name}`
 
-All other requests are proxied transparently to the APIs server, so no side effects are expected. We're planning to add new APIs in the future, so [PRs are welcome](https://github.com/clastix/capsule-proxy)!
+All other requests are proxy-passed transparently to the API server, so no side effects are expected.
+We're planning to add new APIs in the future, so [PRs are welcome](https://github.com/clastix/capsule-proxy)!
 
 ## Installation
 
 Capsule Proxy is an optional add-on of the main Capsule Operator, so make sure you have a working instance of Capsule before attempting to install it.
-Use the `capsule-proxy` only if you want Tenant Owners to list their own Cluster-Scope resources.
+Use the `capsule-proxy` only if you want Tenant Owners to list their Cluster-Scope resources.
 
 The `capsule-proxy` can be deployed in standalone mode, e.g. running as a pod bridging any Kubernetes client to the APIs server.
 Optionally, it can be deployed as a sidecar container in the backend of a dashboard.
@@ -72,22 +75,22 @@ Here how it looks like when exposed through an Ingress Controller:
 ## CLI flags
 
 - `capsule-configuration-name`: name of the `CapsuleConfiguration` resource which is containing the [Capsule configurations](/docs/general/references/#capsule-configuration) (default: `default`)
-- `capsule-user-group` (deprecated): old way to specify the user groups which request must be intercepted by the proxy
-- `ignored-user-group`: names of the groups which requests must be ignored and proxy-passed to the upstream server
+- `capsule-user-group` (deprecated): the old way to specify the user groups whose request must be intercepted by the proxy
+- `ignored-user-group`: names of the groups whose requests must be ignored and proxy-passed to the upstream server
 - `listening-port`: HTTP port the proxy listens to (default: `9001`)
 - `oidc-username-claim`: the OIDC field name used to identify the user (default: `preferred_username`), the proper value can be extracted from the Kubernetes API Server flags
-- `enable-ssl`: enable the bind on HTTPS for secure communication, allowing client-based certificate, also knows as mutual TLS (default: `true`)
+- `enable-ssl`: enable the bind on HTTPS for secure communication, allowing client-based certificate, also known as mutual TLS (default: `true`)
 - `ssl-cert-path`: path to the TLS certificate, then TLS mode is enabled (default: `/opt/capsule-proxy/tls.crt`)
 - `ssl-key-path`: path to the TLS certificate key, when TLS mode is enabled (default: `/opt/capsule-proxy/tls.key`)
 - `rolebindings-resync-period`: resync period for RoleBinding resources reflector, lower values can help if you're facing [flaky etcd connection](https://github.com/clastix/capsule-proxy/issues/174) (default: `10h`)
 
 ## User Authentication
 
-The `capsule-proxy` intercepts all the requests from the `kubectl` client directed to the APIs Server. Users using a TLS client based authentication with certificate and key are able to talks with APIs Server since it is able to forward client certificates to the Kubernetes APIs server.
+The `capsule-proxy` intercepts all the requests from the `kubectl` client directed to the APIs Server. Users using a TLS client-based authentication with a certificate and key can talk with the API Server since it can forward client certificates to the Kubernetes APIs server.
 
-It is possible to protect the `capsule-proxy` using a certificate provided by Let's Encrypt. Keep in mind that, in this way, the TLS termination will be executed by the Ingress Controller, meaning that the authentication based on client certificate will be withdrawn and not reversed to the upstream.
+It is possible to protect the `capsule-proxy` using a certificate provided by Let's Encrypt. Keep in mind that, in this way, the TLS termination will be executed by the Ingress Controller, meaning that the authentication based on the client certificate will be withdrawn and not reversed to the upstream.
 
-If your prerequisite is exposing `capsule-proxy` using an Ingress, you must rely on the token-based authentication, for example OIDC or Bearer tokens. Users providing tokens are always able to reach the APIs Server.
+If your prerequisite is exposing `capsule-proxy` using an Ingress, you must rely on the token-based authentication, for example, OIDC or Bearer tokens. Users providing tokens are always able to reach the APIs Server.
 
 ## Kubernetes dashboards integration
 
@@ -124,12 +127,22 @@ The proxy setting `kind` is an __enum__ accepting the supported resources:
 - `StorageClasses`
 - `IngressClasses`
 - `PriorityClasses`
+- `RuntimeClasses`
+- `PersistentVolumes`
 
 Each Resource kind can be granted with several verbs, such as:
 
 - `List`
 - `Update`
 - `Delete`
+
+## Cluster-scoped resources selection strategy precedence
+
+Starting from [Capsule v0.2.0](https://github.com/clastix/capsule/releases/tag/v0.2.0), selection of cluster-scoped resources based on labels has been introduced.
+
+Due to the limitations of Kubernetes API Server which not support `OR` label selector, the Capsule core team decided to give precedence to the label selector over the exact and regex match.
+
+Capsule is going to deprecate in the upcoming feature the selection based on exact names and regex in order to approach entirely to the matching labels approach of Kubernetes itself.
 
 ### Namespaces
 
@@ -162,7 +175,7 @@ metadata:
 EOF
 
 namespace/solar-development unchanged
-# or, in case of non existing Namespace:
+# or, in case of non-existing Namespace:
 namespace/solar-development created
 ```
 
@@ -202,7 +215,7 @@ When issuing a `kubectl describe node`, some other endpoints are put in place:
 * `api/v1/pods?fieldSelector=spec.nodeName%3D{name}`
 * `/apis/coordination.k8s.io/v1/namespaces/kube-node-lease/leases/{name}`
 
-These are mandatory in order to retrieve the list of the running Pods on the required node, and providing info about the lease status of it.
+These are mandatory to retrieve the list of the running Pods on the required node and provide info about its lease status.
 
 ### Storage Classes
 
@@ -239,7 +252,7 @@ glusterfs            rook.io/glusterfs        Delete          WaitForFirstConsum
 zol                  zfs-on-linux/zfs         Delete          WaitForFirstConsumer   false                  54m
 ```
 
-The expected output using `capsule-proxy` is the retrieval of the `custom` Storage Class as well the other ones matching the regex `\w+fs`.
+The expected output using `capsule-proxy` is the retrieval of the `custom` Storage Class as well as the other ones matching the regex `\w+fs`.
 
 ```bash
 $ kubectl --context alice-oidc@mycluster get storageclasses
@@ -259,7 +272,6 @@ metadata:
     name: cephfs
   name: cephfs
 provisioner: cephfs
-
 ```
 
 ### Ingress Classes
@@ -286,7 +298,7 @@ spec:
         allowedRegex: "\\w+-lb"
 ```
 
-In the Kubernetes cluster we could have more Ingress Class resources, some of them forbidden and non-usable by the Tenant owner.
+In the Kubernetes cluster, we could have more Ingress Class resources, some of them forbidden and non-usable by the Tenant owner.
 
 ```bash
 $ kubectl --context admin@mycluster get ingressclasses
@@ -385,23 +397,141 @@ globalDefault: false
 description: "Priority class for Tenants"
 ```
 
-### ProxySetting Use Case
-Consider a scenario, where a cluster admin creates a tenant and assign ownership of the tenant to a user, so called tenant owner. Afterwards, tenant owner would in turn like to provide access to their cluster-scoped resources to a set of users (e.g. non-owners or tenant users), groups and service accounts, who doesn't require tenant owner level permissions.
+### Runtime Classes
 
-Tenant Owner can provide access to following cluster-scoped resources to their tenant users, groups and service account by creating `ProxySetting` resource
+Allowed RuntimeClasses assigned to a Tenant Owner can be enforced as follows:
+
+```yaml
+apiVersion: capsule.clastix.io/v1beta2
+kind: Tenant
+metadata:
+  name: oil
+spec:
+  owners:
+  - kind: User
+    name: alice
+    proxySettings:
+    - kind: PriorityClasses
+      operations:
+      - List
+  runtimeClasses:
+    matchExpressions:
+      - key: capsule.clastix.io/qos
+        operator: Exists
+        values:
+          - bronze
+          - silver 
+```
+
+In the Kubernetes cluster we could have more RuntimeClasses resources, some of them forbidden and non-usable by the Tenant owner.
+
+```bash
+$ kubectl --context admin@mycluster get runtimeclasses.node.k8s.io --show-labels
+NAME      HANDLER           AGE   LABELS
+bronze    bronze            21h   capsule.clastix.io/qos=bronze
+default   myconfiguration   21h   <none>
+gold      gold              21h   capsule.clastix.io/qos=gold
+silver    silver            21h   capsule.clastix.io/qos=silver
+```
+
+The expected output using `capsule-proxy` is the retrieval of the `bronze` and `silver` ones.
+
+```bash
+$ kubectl --context alice-oidc@mycluster get runtimeclasses.node.k8s.io
+NAME     HANDLER   AGE
+bronze   bronze    21h
+silver   silver    21h
+```
+
+> `RuntimeClass` is one of the latest implementations in Capsule Proxy and is adhering to the new selection strategy based on labels selector, rather than exact match and regex ones.
+>
+> The latter ones are going to be deprecated in the upcoming releases of Capsule.
+
+### Persistent Volumes
+
+A Tenant can request persistent volumes through the `PersistentVolumeClaim` API, and get a volume from it.
+
+Starting from release v0.2.0, all the `PersistentVolumes` are labelled with the Capsule label that is used by the Capsule Proxy to allow the retrieval.
+
+```yaml
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  annotations:
+  finalizers:
+    - kubernetes.io/pv-protection
+  labels:
+    capsule.clastix.io/tenant: oil
+  name: data-01
+spec:
+  accessModes:
+    - ReadWriteOnce
+  capacity:
+    storage: 10Gi
+  hostPath:
+    path: /mnt/data
+    type: ""
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: manual
+  volumeMode: Filesystem
+```
+
+> Please, notice the label `capsule.clastix.io/tenant` matching the Tenant name.
+
+With that said, a multi-tenant cluster can be made of several volumes, each one for different tenants.
+
+```bash
+$ kubectl --context admin@mycluster get persistentvolumes --show-labels
+NAME      CAPACITY   ACCESS MODES   RECLAIM POLICY   STATUS      CLAIM   STORAGECLASS   REASON   AGE   LABELS
+data-01   10Gi       RWO            Retain           Available           manual                  17h   capsule.clastix.io/tenant=oil
+data-02   10Gi       RWO            Retain           Available           manual                  17h   capsule.clastix.io/tenant=gas
+
+```
+
+For the `oil` Tenant, Alice has the required permission to list Volumes.
+
+```yaml
+apiVersion: capsule.clastix.io/v1beta2
+kind: Tenant
+metadata:
+  name: oil
+spec:
+  owners:
+    - kind: User
+      name: alice
+      proxySettings:
+        - kind: PersistentVolumes
+          operations:
+            - List
+```
+
+The expected output using `capsule-proxy` is the retrieval of the PVs used currently, or in the past, by the PVCs in their Tenants.
+
+```bash
+$ kubectl --context alice-oidc@mycluster get persistentvolumes
+NAME      CAPACITY   ACCESS MODES   RECLAIM POLICY   STATUS      CLAIM   STORAGECLASS   REASON   AGE
+data-01   10Gi       RWO            Retain           Available           manual                  17h
+```
+
+### ProxySetting Use Case
+Consider a scenario, where a cluster admin creates a tenant and assigns ownership of the tenant to a user, the so-called tenant owner. Afterwards, tenant owner would in turn like to provide access to their cluster-scoped resources to a set of users (e.g. non-owners or tenant users), groups and service accounts, who doesn't require tenant-owner-level permissions.
+
+Tenant Owner can provide access to the following cluster-scoped resources to their tenant users, groups and service account by creating `ProxySetting` resource
 - `Nodes`
 - `StorageClasses`
 - `IngressClasses`
 - `PriorityClasses`
+- `RuntimeClasses`
+- `PersistentVolumes`
 
-Each Resource kind can be granted with following verbs, such as:
+Each Resource kind can be granted with the following verbs, such as:
 - `List`
 - `Update`
 - `Delete`
 
 These tenant users, groups and services accounts have less privileged access than tenant owners.
 
-As a Tenant Owner `alice`, you can create a `ProxySetting` resources to allow `bob` to list nodes, storage classes, ingress classes and priority classes
+As a Tenant Owner `alice`, you can create a `ProxySetting` resource to allow `bob` to list nodes, storage classes, ingress classes and priority classes
 ```yaml
 apiVersion: capsule.clastix.io/v1beta2
 kind: ProxySetting
@@ -439,7 +569,7 @@ $ kubectl auth can-i --context bob-oidc@mycluster get priorityclasses
 yes
 ```
 ## HTTP support
-Capsule proxy supports `https` and `http`, although the latter is not recommended, we understand that it can be useful for some use cases (i.e. development, working behind a TLS-terminated reverse proxy and so on). As the default behaviour is to work with `https`, we need to use the flag `--enable-ssl=false` if we really want to work under `http`.
+Capsule proxy supports `https` and `http`, although the latter is not recommended, we understand that it can be useful for some use cases (i.e. development, working behind a TLS-terminated reverse proxy and so on). As the default behaviour is to work with `https`, we need to use the flag `--enable-ssl=false` if we want to work under `http`.
 
 After having the `capsule-proxy` working under `http`, requests must provide authentication using an allowed Bearer Token.
 
@@ -456,16 +586,16 @@ $ curl -H "Authorization: Bearer $TOKEN" http://localhost:9001/api/v1/namespaces
 
 Starting from the v0.3.0 release, Capsule Proxy exposes Prometheus metrics available at `http://0.0.0.0:8080/metrics`.
 
-The offered metrics are related to the internal `controller-manager` code base, such as work-queue and REST client requests, and the Go runtime ones.
+The offered metrics are related to the internal `controller-manager` code base, such as work queue and REST client requests, and the Go runtime ones.
 
 Along with these, metrics `capsule_proxy_response_time_seconds` and `capsule_proxy_requests_total` have been introduced and are specific to the Capsule Proxy code-base and functionalities.
 
 `capsule_proxy_response_time_seconds` offers a bucket representation of the HTTP request duration.
-The available variables for this metrics are the following ones:
-- `path`: the HTTP path of each single request that Capsule Proxy passes to the upstream
+The available variables for these metrics are the following ones:
+- `path`: the HTTP path of every single request that Capsule Proxy passes to the upstream
 
 `capsule_proxy_requests_total` counts the global requests that Capsule Proxy is passing to the upstream with the following labels.
-- `path`: the HTTP path of each single request that Capsule Proxy passes to the upstream
+- `path`: the HTTP path of every single request that Capsule Proxy passes to the upstream
 - `status`: the HTTP status code of the request
 
 > Example output of the metrics:
@@ -493,6 +623,6 @@ The available variables for this metrics are the following ones:
 
 ## Contributing
 
-`capsule-proxy` is an open-source software released with Apache2 [license](https://github.com/clastix/capsule-proxy/blob/master/LICENSE).
+`capsule-proxy` is open-source software released with Apache2 [license](https://github.com/clastix/capsule-proxy/blob/master/LICENSE).
 
 Contributing guidelines are available [here](https://github.com/clastix/capsule-proxy/blob/master/CONTRIBUTING.md).
