@@ -111,7 +111,7 @@ extraVolumes:
               - key: ca.crt
                 path: ca.crt
 extraVolumeMounts:
-  - mountPath: /var/run/secrets/kubernetes.io/serviceaccount/
+  - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
     name: token-ca
 
 ingress:
@@ -119,6 +119,10 @@ ingress:
   annotations:
     nginx.ingress.kubernetes.io/auth-signin: https://${DASHBOARD_URL}/oauth2/start?rd=$escaped_request_uri
     nginx.ingress.kubernetes.io/auth-url: https://${DASHBOARD_URL}/oauth2/auth
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      auth_request_set $token $upstream_http_authorization;
+      proxy_set_header Authorization $token;
   hosts:
     - ${DASHBOARD_URL}
   tls:
