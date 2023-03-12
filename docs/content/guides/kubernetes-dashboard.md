@@ -119,10 +119,7 @@ ingress:
   annotations:
     nginx.ingress.kubernetes.io/auth-signin: https://${DASHBOARD_URL}/oauth2/start?rd=$escaped_request_uri
     nginx.ingress.kubernetes.io/auth-url: https://${DASHBOARD_URL}/oauth2/auth
-    nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
-    nginx.ingress.kubernetes.io/configuration-snippet: |
-      auth_request_set $token $upstream_http_authorization;
-      proxy_set_header Authorization $token;
+    nginx.ingress.kubernetes.io/auth-response-headers: "authorization"
   hosts:
     - ${DASHBOARD_URL}
   tls:
