@@ -34,7 +34,7 @@ Unfortunately, Helm doesn't manage the lifecycle of Custom Resource Definitions,
 This process must be executed manually as follows:
 
 ```
-kubectl apply -f https://raw.githubusercontent.com/clastix/capsule/v0.3.0/config/crd/bases/tenant-crd.yaml
+kubectl apply -f https://raw.githubusercontent.com/clastix/capsule/v0.3.0/charts/capsule/crds/tenant-crd.yaml
 ```
 
 ## Update your Capsule Helm chart
@@ -90,7 +90,7 @@ The deletion of the `CapsuleConfiguration` resource is required, along with the 
 
 ```
 kubectl delete capsuleconfiguration default
-kubectl apply -f https://raw.githubusercontent.com/clastix/capsule/v0.2.1/config/crd/bases/capsuleconfiguration-crd.yaml
+kubectl apply -f https://raw.githubusercontent.com/clastix/capsule/v0.2.1/charts/capsule/crds/capsuleconfiguration-crd.yaml
 ```
 
 During the Helm upgrade, a new `CapsuleConfiguration` will be created: please, refer to the Helm Chart values to pick up your desired settings.
@@ -102,9 +102,9 @@ Unfortunately, Helm doesn't manage the lifecycle of Custom Resource Definitions,
 This process must be executed manually as follows:
 
 ```
-kubectl apply -f https://raw.githubusercontent.com/clastix/capsule/v0.2.1/config/crd/bases/globaltenantresources-crd.yaml
-kubectl apply -f https://raw.githubusercontent.com/clastix/capsule/v0.2.1/config/crd/bases/tenant-crd.yaml
-kubectl apply -f https://raw.githubusercontent.com/clastix/capsule/v0.2.1/config/crd/bases/tenantresources-crd.yaml
+kubectl apply -f https://raw.githubusercontent.com/clastix/capsule/v0.2.1/charts/capsule/crds/globaltenantresources-crd.yaml
+kubectl apply -f https://raw.githubusercontent.com/clastix/capsule/v0.2.1/charts/capsule/crds/tenant-crd.yaml
+kubectl apply -f https://raw.githubusercontent.com/clastix/capsule/v0.2.1/charts/capsule/crds/tenantresources-crd.yaml
 ```
 
 > We're giving for granted that Capsule is installed in the `capsule-system` Namespace.
@@ -192,7 +192,7 @@ Unfortunately, Helm doesn't manage the lifecycle of Custom Resource Definitions,
 This process must be executed manually as follows:
 
 ```
-kubectl apply -f https://raw.githubusercontent.com/clastix/capsule/v0.1.0/config/crd/bases/capsule.clastix.io_tenants.yaml
+kubectl apply -f https://raw.githubusercontent.com/clastix/capsule/v0.1.0/charts/capsule/crds/tenant-crd.yaml
 ```
 
 > Please note the Capsule version in the said URL, your mileage may vary according to the desired upgrading version.
