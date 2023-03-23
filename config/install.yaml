@@ -3118,6 +3118,35 @@ webhooks:
     service:
       name: capsule-webhook-service
       namespace: capsule-system
+      path: /tenantresource-objects
+  failurePolicy: Fail
+  name: resource-objects.tenant.capsule.clastix.io
+  namespaceSelector:
+    matchExpressions:
+    - key: capsule.clastix.io/tenant
+      operator: Exists
+  objectSelector:
+    matchExpressions:
+    - key: capsule.clastix.io/resources
+      operator: Exists
+  rules:
+  - apiGroups:
+    - '*'
+    apiVersions:
+    - '*'
+    operations:
+    - UPDATE
+    - DELETE
+    resources:
+    - '*'
+    scope: Namespaced
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: capsule-webhook-service
+      namespace: capsule-system
       path: /tenants
   failurePolicy: Fail
   name: tenants.capsule.clastix.io
