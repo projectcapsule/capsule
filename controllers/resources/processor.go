@@ -26,6 +26,7 @@ import (
 )
 
 const (
+	Label     = "capsule.clastix.io/resources"
 	finalizer = "capsule.clastix.io/resources"
 )
 
@@ -121,7 +122,7 @@ func (r *Processor) HandleSection(ctx context.Context, tnt capsulev1beta2.Tenant
 
 	objAnnotations[tenantLabel] = tnt.GetName()
 
-	objLabels["capsule.clastix.io/resources"] = fmt.Sprintf("%d", resourceIndex)
+	objLabels[Label] = fmt.Sprintf("%d", resourceIndex)
 	objLabels[tenantLabel] = tnt.GetName()
 	// processed will contain the sets of resources replicated, both for the raw and the Namespaced ones:
 	// these are required to perform a final pruning once the replication has been occurred.
