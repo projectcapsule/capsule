@@ -259,6 +259,26 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
+      path: /tenantresource-objects
+  failurePolicy: Fail
+  name: resource-objects.tenant.capsule.clastix.io
+  rules:
+  - apiGroups:
+    - '*'
+    apiVersions:
+    - '*'
+    operations:
+    - UPDATE
+    - DELETE
+    resources:
+    - '*'
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
       path: /tenants
   failurePolicy: Fail
   name: tenants.capsule.clastix.io
