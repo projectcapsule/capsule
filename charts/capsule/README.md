@@ -158,6 +158,7 @@ Here the values you can override:
 | webhooks.services.failurePolicy | string | `"Fail"` |  |
 | webhooks.services.namespaceSelector.matchExpressions[0].key | string | `"capsule.clastix.io/tenant"` |  |
 | webhooks.services.namespaceSelector.matchExpressions[0].operator | string | `"Exists"` |  |
+| webhooks.tenantResourceObjects.failurePolicy | string | `"Fail"` |  |
 | webhooks.tenants.failurePolicy | string | `"Fail"` |  |
 
 ## Created resources

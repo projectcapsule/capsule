@@ -259,6 +259,38 @@ webhooks:
   timeoutSeconds: {{ .Values.validatingWebhooksTimeoutSeconds }}
 - admissionReviewVersions:
     - v1
+  clientConfig:
+{{- if not .Values.certManager.generateCertificates }}
+    caBundle: Cg==
+{{- end }}
+    service:
+      name: capsule-webhook-service
+      namespace: capsule-system
+      path: /tenantresource-objects
+  failurePolicy:  {{ .Values.webhooks.tenantResourceObjects.failurePolicy }}
+  name: resource-objects.tenant.capsule.clastix.io
+  namespaceSelector:
+    matchExpressions:
+      - key: capsule.clastix.io/tenant
+        operator: Exists
+  objectSelector:
+    matchExpressions:
+      - key: capsule.clastix.io/resources
+        operator: Exists
+  rules:
+    - apiGroups:
+        - '*'
+      apiVersions:
+        - '*'
+      operations:
+        - UPDATE
+        - DELETE
+      resources:
+        - '*'
+      scope: Namespaced
+  sideEffects: None
+- admissionReviewVersions:
+    - v1
     - v1beta1
   clientConfig:
 {{- if not .Values.certManager.generateCertificates }}

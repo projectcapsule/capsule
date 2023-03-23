@@ -188,6 +188,8 @@ webhooks:
           operator: Exists
   tenants:
     failurePolicy: Fail
+  tenantResourceObjects:
+    failurePolicy: Fail
   services:
     failurePolicy: Fail
     namespaceSelector:
