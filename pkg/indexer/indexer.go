@@ -20,6 +20,7 @@ import (
 	"github.com/clastix/capsule/pkg/indexer/ingress"
 	"github.com/clastix/capsule/pkg/indexer/namespace"
 	"github.com/clastix/capsule/pkg/indexer/tenant"
+	"github.com/clastix/capsule/pkg/indexer/tenantresource"
 )
 
 type CustomIndexer interface {
@@ -36,6 +37,8 @@ func AddToManager(ctx context.Context, log logr.Logger, mgr manager.Manager) err
 		ingress.HostnamePath{Obj: &extensionsv1beta1.Ingress{}},
 		ingress.HostnamePath{Obj: &networkingv1beta1.Ingress{}},
 		ingress.HostnamePath{Obj: &networkingv1.Ingress{}},
+		tenantresource.GlobalProcessedItems{},
+		tenantresource.LocalProcessedItems{},
 	}
 
 	for _, f := range indexers {
