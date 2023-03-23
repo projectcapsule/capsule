@@ -42,6 +42,10 @@ func (r *ownerReferenceHandler) OnUpdate(_ client.Client, decoder *admission.Dec
 			return utils.ErroredResponse(err)
 		}
 
+		if len(oldNs.OwnerReferences) == 0 {
+			return nil
+		}
+
 		newNs := &corev1.Namespace{}
 		if err := decoder.Decode(req, newNs); err != nil {
 			return utils.ErroredResponse(err)

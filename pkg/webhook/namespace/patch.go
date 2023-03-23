@@ -72,11 +72,6 @@ func (r *patchHandler) OnUpdate(c client.Client, decoder *admission.Decoder, rec
 
 				return &response
 			}
-		} else {
-			recorder.Eventf(ns, corev1.EventTypeWarning, "NamespacePatch", e)
-			response := admission.Denied(e)
-
-			return &response
 		}
 
 		return nil
