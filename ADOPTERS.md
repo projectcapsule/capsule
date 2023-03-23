@@ -11,7 +11,7 @@ This is a list of companies that have adopted Capsule, feel free to open a Pull-
 ![Fastweb](https://www.fastweb.it/grandi-aziende/gfx/common/logo-fastweb-header.svg)
 
 ### [Velocity](https://velocity.tech/)
-![Velocity](https://raw.githubusercontent.com/yarelm/velocity-logo/main/Light.jpg)
+![Velocity](https://raw.githubusercontent.com/yarelm/velocity-logo/main/velocity.png)
 
 ### [Wargaming.net](https://www.wargaming.net/)
 ![Wargaming.net](https://static-cspbe-eu.wargaming.net/images/logo@2x.png)
