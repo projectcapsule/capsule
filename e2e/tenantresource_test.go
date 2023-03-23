@@ -296,6 +296,36 @@ var _ = Describe("Creating a TenantResource object", func() {
 			}
 		})
 
+		By("checking replicated object cannot be deleted by a Tenant Owner", func() {
+			for _, name := range []string{"dummy-secret", "raw-secret-1", "raw-secret-2", "raw-secret-3"} {
+				cs := ownerClient(solar.Spec.Owners[0])
+
+				Consistently(func() error {
+					return cs.CoreV1().Secrets("solar-three").Delete(context.TODO(), name, metav1.DeleteOptions{})
+				}, 10*time.Second, time.Second).Should(HaveOccurred())
+			}
+		})
+
+		By("checking replicated object cannot be update by a Tenant Owner", func() {
+			for _, name := range []string{"dummy-secret", "raw-secret-1", "raw-secret-2", "raw-secret-3"} {
+				cs := ownerClient(solar.Spec.Owners[0])
+
+				Consistently(func() error {
+					secret, err := cs.CoreV1().Secrets("solar-three").Get(context.TODO(), name, metav1.GetOptions{})
+					if err != nil {
+						return err
+					}
+
+					secret.SetLabels(nil)
+					secret.SetAnnotations(nil)
+
+					_, err = cs.CoreV1().Secrets("solar-three").Update(context.TODO(), secret, metav1.UpdateOptions{})
+
+					return err
+				}, 10*time.Second, time.Second).Should(HaveOccurred())
+			}
+		})
+
 		By("checking that cross-namespace objects are not replicated", func() {
 			Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: tr.GetName(), Namespace: "solar-system"}, tr)).ToNot(HaveOccurred())
 			tr.Spec.Resources[0].NamespacedItems = append(tr.Spec.Resources[0].NamespacedItems, capsulev1beta2.ObjectReference{
