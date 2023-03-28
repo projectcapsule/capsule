@@ -18,13 +18,15 @@ import (
 	"github.com/clastix/capsule/pkg/webhook/utils"
 )
 
-func mutatePodDefaults(ctx context.Context, req admission.Request, c client.Client, decoder *admission.Decoder, recorder record.EventRecorder) *admission.Response {
+func mutatePodDefaults(ctx context.Context, req admission.Request, c client.Client, decoder *admission.Decoder, recorder record.EventRecorder, namespace string) *admission.Response {
 	var err error
 
 	pod := &corev1.Pod{}
 	if err = decoder.Decode(req, pod); err != nil {
 		return utils.ErroredResponse(err)
 	}
+
+	pod.SetNamespace(namespace)
 
 	var tnt *capsulev1beta2.Tenant
 
