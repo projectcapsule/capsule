@@ -22,6 +22,7 @@ type Ingress interface {
 	Name() string
 	HostnamePathsPairs() map[string]sets.String
 	SetIngressClass(string)
+	SetNamespace(string)
 }
 
 type NetworkingV1 struct {
@@ -61,6 +62,10 @@ func (n NetworkingV1) SetIngressClass(ingressClassName string) {
 
 func (n NetworkingV1) Namespace() string {
 	return n.GetNamespace()
+}
+
+func (n NetworkingV1) SetNamespace(ns string) {
+	n.Ingress.SetNamespace(ns)
 }
 
 //nolint:dupl
@@ -129,6 +134,10 @@ func (n NetworkingV1Beta1) Namespace() string {
 	return n.GetNamespace()
 }
 
+func (n NetworkingV1Beta1) SetNamespace(ns string) {
+	n.Ingress.SetNamespace(ns)
+}
+
 //nolint:dupl
 func (n NetworkingV1Beta1) HostnamePathsPairs() (pairs map[string]sets.String) {
 	pairs = make(map[string]sets.String)
@@ -162,6 +171,10 @@ type Extension struct {
 
 func (e Extension) Name() string {
 	return e.GetName()
+}
+
+func (e Extension) SetNamespace(ns string) {
+	e.Ingress.SetNamespace(ns)
 }
 
 func (e Extension) IngressClass() (res *string) {

@@ -18,13 +18,15 @@ import (
 	"github.com/clastix/capsule/pkg/webhook/utils"
 )
 
-func mutatePVCDefaults(ctx context.Context, req admission.Request, c client.Client, decoder *admission.Decoder, recorder record.EventRecorder) *admission.Response {
+func mutatePVCDefaults(ctx context.Context, req admission.Request, c client.Client, decoder *admission.Decoder, recorder record.EventRecorder, namespace string) *admission.Response {
 	var err error
 
 	pvc := &corev1.PersistentVolumeClaim{}
 	if err = decoder.Decode(req, pvc); err != nil {
 		return utils.ErroredResponse(err)
 	}
+
+	pvc.SetNamespace(namespace)
 
 	var tnt *capsulev1beta2.Tenant
 

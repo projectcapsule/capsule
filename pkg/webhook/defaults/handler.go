@@ -51,11 +51,11 @@ func (h *handler) mutate(ctx context.Context, req admission.Request, c client.Cl
 
 	switch {
 	case req.Resource == (metav1.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}):
-		response = mutatePodDefaults(ctx, req, c, decoder, recorder)
+		response = mutatePodDefaults(ctx, req, c, decoder, recorder, req.Namespace)
 	case req.Resource == (metav1.GroupVersionResource{Group: "", Version: "v1", Resource: "persistentvolumeclaims"}):
-		response = mutatePVCDefaults(ctx, req, c, decoder, recorder)
+		response = mutatePVCDefaults(ctx, req, c, decoder, recorder, req.Namespace)
 	case req.Resource == (metav1.GroupVersionResource{Group: "networking.k8s.io", Version: "v1", Resource: "ingresses"}) || req.Resource == (metav1.GroupVersionResource{Group: "networking.k8s.io", Version: "v1beta1", Resource: "ingresses"}):
-		response = mutateIngressDefaults(ctx, req, h.version, c, decoder, recorder)
+		response = mutateIngressDefaults(ctx, req, h.version, c, decoder, recorder, req.Namespace)
 	}
 
 	if response == nil {
