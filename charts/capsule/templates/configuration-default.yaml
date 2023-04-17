@@ -20,3 +20,7 @@ spec:
     - {{ . }}
 {{- end}}
   protectedNamespaceRegex: {{ .Values.manager.options.protectedNamespaceRegex | quote }}
+  {{- with .Values.manager.options.nodeMetadata }}
+  nodeMetadata:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
