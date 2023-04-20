@@ -240,7 +240,7 @@ func (r *Reconciler) updateTenantCustomResourceDefinition(ctx context.Context, n
 						},
 						CABundle: caBundle,
 					},
-					ConversionReviewVersions: []string{"v1alpha1", "v1beta1"},
+					ConversionReviewVersions: []string{"v1alpha1", "v1beta1", "v1beta2"},
 				},
 			}
 
