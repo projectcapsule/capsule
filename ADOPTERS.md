@@ -24,3 +24,6 @@ This is a list of companies that have adopted Capsule, feel free to open a Pull-
 
 ### [Wargaming.net](https://www.wargaming.net/)
 ![Wargaming.net](https://static-cspbe-eu.wargaming.net/images/logo@2x.png)
+
+### [Klarrio](https://klarrio.com/)
+![Klarrio](https://klarrio.com/wp-content/uploads/klarrio.png)
