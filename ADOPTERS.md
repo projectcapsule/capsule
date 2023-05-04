@@ -13,6 +13,9 @@ This is a list of companies that have adopted Capsule, feel free to open a Pull-
 ### [Klarrio](https://klarrio.com/)
 ![Klarrio](https://klarrio.com/wp-content/uploads/klarrio.png)
 
+### [PITS Global Data Recovery Services](https://www.pitsdatarecovery.net)
+![PITS Global Data Recovery Services](https://www.pitsdatarecovery.net/wp-content/uploads/2020/09/pits-logo.svg)
+
 ### [Politecnico di Torino](https://www.polito.it/)
 ![Politecnico di Torino](https://www.polito.it/themes/custom/polito/logo.svg)
 
