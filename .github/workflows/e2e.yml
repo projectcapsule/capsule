@@ -32,7 +32,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        k8s-version: ['v1.20.7', 'v1.21.2', 'v1.22.4', 'v1.23.6', 'v1.24.7', 'v1.25.3', 'v1.26.3']
+        k8s-version: ['v1.20.7', 'v1.21.2', 'v1.22.4', 'v1.23.6', 'v1.24.7', 'v1.25.3', 'v1.26.3', 'v1.27.2']
     runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v2
