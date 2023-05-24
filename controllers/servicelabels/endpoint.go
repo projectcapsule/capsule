@@ -19,8 +19,9 @@ type EndpointsLabelsReconciler struct {
 
 func (r *EndpointsLabelsReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager) error {
 	r.abstractServiceLabelsReconciler = abstractServiceLabelsReconciler{
-		obj: &corev1.Endpoints{},
-		log: r.Log,
+		obj:    &corev1.Endpoints{},
+		client: mgr.GetClient(),
+		log:    r.Log,
 	}
 
 	return ctrl.NewControllerManagedBy(mgr).

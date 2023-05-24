@@ -21,10 +21,10 @@ import (
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	ctrlwebhook "sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	capsulev1alpha1 "github.com/clastix/capsule/api/v1alpha1"
 	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
@@ -76,27 +76,6 @@ func printVersion() {
 	setupLog.Info(fmt.Sprintf("Go OS/Arch: %s/%s", goRuntime.GOOS, goRuntime.GOARCH))
 }
 
-func newDelegatingClient(cache cache.Cache, config *rest.Config, options client.Options, uncachedObjects ...client.Object) (client.Client, error) {
-	cl, err := client.New(config, options)
-	if err != nil {
-		return nil, err
-	}
-
-	delegatingClient, err := client.NewDelegatingClient(
-		client.NewDelegatingClientInput{
-			Client:            cl,
-			CacheReader:       cache,
-			UncachedObjects:   uncachedObjects,
-			CacheUnstructured: true,
-		},
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	return delegatingClient, nil
-}
-
 //nolint:maintidx,cyclop
 func main() {
 	var enableLeaderElection, version bool
@@ -144,13 +123,19 @@ func main() {
 	}
 
 	manager, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-		Scheme:                 scheme,
-		MetricsBindAddress:     metricsAddr,
-		Port:                   webhookPort,
+		Scheme:             scheme,
+		MetricsBindAddress: metricsAddr,
+		WebhookServer: ctrlwebhook.NewServer(ctrlwebhook.Options{
+			Port: webhookPort,
+		}),
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       "42c733ea.clastix.capsule.io",
 		HealthProbeBindAddress: ":10080",
-		NewClient:              newDelegatingClient,
+		NewClient: func(config *rest.Config, options client.Options) (client.Client, error) {
+			options.Cache.Unstructured = true
+
+			return client.New(config, options)
+		},
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
@@ -250,7 +235,7 @@ func main() {
 		route.NetworkPolicy(utils.InCapsuleGroups(cfg, networkpolicy.Handler())),
 		route.Tenant(tenant.NameHandler(), tenant.RoleBindingRegexHandler(), tenant.IngressClassRegexHandler(), tenant.StorageClassRegexHandler(), tenant.ContainerRegistryRegexHandler(), tenant.HostnameRegexHandler(), tenant.FreezedEmitter(), tenant.ServiceAccountNameHandler(), tenant.ForbiddenAnnotationsRegexHandler(), tenant.ProtectedHandler()),
 		route.OwnerReference(utils.InCapsuleGroups(cfg, namespacewebhook.OwnerReferenceHandler(), ownerreference.Handler(cfg))),
-		route.Cordoning(tenant.CordoningHandler(cfg), tenant.ResourceCounterHandler()),
+		route.Cordoning(tenant.CordoningHandler(cfg), tenant.ResourceCounterHandler(manager.GetClient())),
 		route.Node(utils.InCapsuleGroups(cfg, node.UserMetadataHandler(cfg, kubeVersion))),
 		route.Defaults(defaults.Handler(cfg, kubeVersion)),
 	)
@@ -267,6 +252,7 @@ func main() {
 
 	rbacManager := &rbaccontroller.Manager{
 		Log:           ctrl.Log.WithName("controllers").WithName("Rbac"),
+		Client:        manager.GetClient(),
 		Configuration: cfg,
 	}
 

@@ -20,7 +20,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	capsulev1beta2 "github.com/clastix/capsule/api/v1beta2"
 )
@@ -30,11 +29,11 @@ type Global struct {
 	processor Processor
 }
 
-func (r *Global) enqueueRequestFromTenant(object client.Object) (reqs []reconcile.Request) {
+func (r *Global) enqueueRequestFromTenant(ctx context.Context, object client.Object) (reqs []reconcile.Request) {
 	tnt := object.(*capsulev1beta2.Tenant) //nolint:forcetypeassert
 
 	resList := capsulev1beta2.GlobalTenantResourceList{}
-	if err := r.client.List(context.Background(), &resList); err != nil {
+	if err := r.client.List(ctx, &resList); err != nil {
 		return nil
 	}
 
@@ -70,7 +69,7 @@ func (r *Global) SetupWithManager(mgr ctrl.Manager) error {
 
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&capsulev1beta2.GlobalTenantResource{}).
-		Watches(&source.Kind{Type: &capsulev1beta2.Tenant{}}, handler.EnqueueRequestsFromMapFunc(r.enqueueRequestFromTenant)).
+		Watches(&capsulev1beta2.Tenant{}, handler.EnqueueRequestsFromMapFunc(r.enqueueRequestFromTenant)).
 		Complete(r)
 }
 

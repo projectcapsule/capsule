@@ -22,6 +22,8 @@ func Register(manager controllerruntime.Manager, webhookList ...Webhook) error {
 	for _, wh := range webhookList {
 		server.Register(wh.GetPath(), &webhook.Admission{
 			Handler: &handlerRouter{
+				client:   manager.GetClient(),
+				decoder:  admission.NewDecoder(manager.GetScheme()),
 				recorder: recorder,
 				handlers: wh.GetHandlers(),
 			},
@@ -64,16 +66,4 @@ func (r *handlerRouter) Handle(ctx context.Context, req admission.Request) admis
 	}
 
 	return admission.Allowed("")
-}
-
-func (r *handlerRouter) InjectClient(c client.Client) error {
-	r.client = c
-
-	return nil
-}
-
-func (r *handlerRouter) InjectDecoder(d *admission.Decoder) error {
-	r.decoder = d
-
-	return nil
 }
