@@ -22,7 +22,8 @@ type EndpointSlicesLabelsReconciler struct {
 
 func (r *EndpointSlicesLabelsReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager) error {
 	r.abstractServiceLabelsReconciler = abstractServiceLabelsReconciler{
-		log: r.Log,
+		client: mgr.GetClient(),
+		log:    r.Log,
 	}
 
 	switch {

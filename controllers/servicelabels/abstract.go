@@ -30,12 +30,6 @@ type abstractServiceLabelsReconciler struct {
 	log    logr.Logger
 }
 
-func (r *abstractServiceLabelsReconciler) InjectClient(c client.Client) error {
-	r.client = c
-
-	return nil
-}
-
 func (r *abstractServiceLabelsReconciler) Reconcile(ctx context.Context, request ctrl.Request) (ctrl.Result, error) {
 	tenant, err := r.getTenant(ctx, request.NamespacedName, r.client)
 	if err != nil {

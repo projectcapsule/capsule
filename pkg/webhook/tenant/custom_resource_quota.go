@@ -25,14 +25,10 @@ type resourceCounterHandler struct {
 	client client.Client
 }
 
-func (r *resourceCounterHandler) InjectClient(c client.Client) error {
-	r.client = c
-
-	return nil
-}
-
-func ResourceCounterHandler() capsulewebhook.Handler {
-	return &resourceCounterHandler{}
+func ResourceCounterHandler(client client.Client) capsulewebhook.Handler {
+	return &resourceCounterHandler{
+		client: client,
+	}
 }
 
 func (r *resourceCounterHandler) getTenantName(ctx context.Context, clt client.Client, req admission.Request) (string, error) {

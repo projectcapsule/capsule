@@ -158,7 +158,7 @@ func (r *Manager) ensureNamespaceCount(ctx context.Context, tenant *capsulev1bet
 
 		found.Status.Size = tenant.Status.Size
 
-		return r.Client.Status().Update(ctx, found, &client.UpdateOptions{})
+		return r.Client.Status().Update(ctx, found, &client.SubResourceUpdateOptions{})
 	})
 }
 
@@ -176,7 +176,7 @@ func (r *Manager) collectNamespaces(ctx context.Context, tenant *capsulev1beta2.
 		_, err = controllerutil.CreateOrUpdate(ctx, r.Client, tenant.DeepCopy(), func() error {
 			tenant.AssignNamespaces(list.Items)
 
-			return r.Client.Status().Update(ctx, tenant, &client.UpdateOptions{})
+			return r.Client.Status().Update(ctx, tenant, &client.SubResourceUpdateOptions{})
 		})
 
 		return
