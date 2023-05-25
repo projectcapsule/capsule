@@ -33,7 +33,7 @@ var _ = Describe("creating an ExternalName service when it is disabled for Tenan
 			},
 			ServiceOptions: &api.ServiceOptions{
 				AllowedServices: &api.AllowedServices{
-					ExternalName: pointer.BoolPtr(false),
+					ExternalName: pointer.Bool(false),
 				},
 			},
 		},

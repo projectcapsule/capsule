@@ -53,9 +53,9 @@ func generateTenantsSpecs() (Tenant, capsulev1beta1.Tenant) {
 	v1beta1ServiceOptions := &api.ServiceOptions{
 		AdditionalMetadata: v1beta1AdditionalMetadataSpec,
 		AllowedServices: &api.AllowedServices{
-			NodePort:     pointer.BoolPtr(false),
-			ExternalName: pointer.BoolPtr(false),
-			LoadBalancer: pointer.BoolPtr(false),
+			NodePort:     pointer.Bool(false),
+			ExternalName: pointer.Bool(false),
+			LoadBalancer: pointer.Bool(false),
 		},
 		ExternalServiceIPs: &api.ExternalServiceIPsSpec{
 			Allowed: []api.AllowedIP{"192.168.0.1"},

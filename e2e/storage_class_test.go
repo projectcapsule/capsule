@@ -236,7 +236,7 @@ var _ = Describe("when Tenant handles Storage classes", func() {
 							Name: c,
 						},
 						Spec: corev1.PersistentVolumeClaimSpec{
-							StorageClassName: pointer.StringPtr(c),
+							StorageClassName: pointer.String(c),
 							AccessModes:      []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
 							Resources: corev1.ResourceRequirements{
 								Requests: map[corev1.ResourceName]resource.Quantity{

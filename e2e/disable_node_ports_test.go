@@ -33,7 +33,7 @@ var _ = Describe("creating a nodePort service when it is disabled for Tenant", f
 			},
 			ServiceOptions: &api.ServiceOptions{
 				AllowedServices: &api.AllowedServices{
-					NodePort: pointer.BoolPtr(false),
+					NodePort: pointer.Bool(false),
 				},
 			},
 		},

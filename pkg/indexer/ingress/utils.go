@@ -10,8 +10,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
-func hostPathMapForExtensionsV1Beta1(ing *extensionsv1beta1.Ingress) map[string]sets.String {
-	hostPathMap := make(map[string]sets.String)
+func hostPathMapForExtensionsV1Beta1(ing *extensionsv1beta1.Ingress) map[string]sets.Set[string] {
+	hostPathMap := make(map[string]sets.Set[string])
 
 	for _, r := range ing.Spec.Rules {
 		if r.HTTP == nil {
@@ -19,7 +19,7 @@ func hostPathMapForExtensionsV1Beta1(ing *extensionsv1beta1.Ingress) map[string]
 		}
 
 		if _, ok := hostPathMap[r.Host]; !ok {
-			hostPathMap[r.Host] = sets.NewString()
+			hostPathMap[r.Host] = sets.New[string]()
 		}
 
 		for _, path := range r.HTTP.Paths {
@@ -30,8 +30,8 @@ func hostPathMapForExtensionsV1Beta1(ing *extensionsv1beta1.Ingress) map[string]
 	return hostPathMap
 }
 
-func hostPathMapForNetworkingV1Beta1(ing *networkingv1beta1.Ingress) map[string]sets.String {
-	hostPathMap := make(map[string]sets.String)
+func hostPathMapForNetworkingV1Beta1(ing *networkingv1beta1.Ingress) map[string]sets.Set[string] {
+	hostPathMap := make(map[string]sets.Set[string])
 
 	for _, r := range ing.Spec.Rules {
 		if r.HTTP == nil {
@@ -39,7 +39,7 @@ func hostPathMapForNetworkingV1Beta1(ing *networkingv1beta1.Ingress) map[string]
 		}
 
 		if _, ok := hostPathMap[r.Host]; !ok {
-			hostPathMap[r.Host] = sets.NewString()
+			hostPathMap[r.Host] = sets.New[string]()
 		}
 
 		for _, path := range r.HTTP.Paths {
@@ -50,8 +50,8 @@ func hostPathMapForNetworkingV1Beta1(ing *networkingv1beta1.Ingress) map[string]
 	return hostPathMap
 }
 
-func hostPathMapForNetworkingV1(ing *networkingv1.Ingress) map[string]sets.String {
-	hostPathMap := make(map[string]sets.String)
+func hostPathMapForNetworkingV1(ing *networkingv1.Ingress) map[string]sets.Set[string] {
+	hostPathMap := make(map[string]sets.Set[string])
 
 	for _, r := range ing.Spec.Rules {
 		if r.HTTP == nil {
@@ -59,7 +59,7 @@ func hostPathMapForNetworkingV1(ing *networkingv1.Ingress) map[string]sets.Strin
 		}
 
 		if _, ok := hostPathMap[r.Host]; !ok {
-			hostPathMap[r.Host] = sets.NewString()
+			hostPathMap[r.Host] = sets.New[string]()
 		}
 
 		for _, path := range r.HTTP.Paths {

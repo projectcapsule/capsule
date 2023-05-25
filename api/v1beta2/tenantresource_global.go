@@ -25,8 +25,9 @@ type GlobalTenantResourceStatus struct {
 
 type ProcessedItems []ObjectReferenceStatus
 
-func (p *ProcessedItems) AsSet() sets.String {
-	set := sets.NewString()
+func (p *ProcessedItems) AsSet() sets.Set[string] {
+	set := sets.New[string]()
+
 	for _, i := range *p {
 		set.Insert(i.String())
 	}

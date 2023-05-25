@@ -33,7 +33,7 @@ func (s HostnamePath) Field() string {
 
 func (s HostnamePath) Func() client.IndexerFunc {
 	return func(object client.Object) (entries []string) {
-		hostPathMap := make(map[string]sets.String)
+		hostPathMap := make(map[string]sets.Set[string])
 
 		switch ing := object.(type) {
 		case *networkingv1.Ingress:

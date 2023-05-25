@@ -135,7 +135,7 @@ var _ = Describe("when Tenant handles Ingress classes with extensions/v1beta1", 
 						Name: "denied-ingress",
 					},
 					Spec: extensionsv1beta1.IngressSpec{
-						IngressClassName: pointer.StringPtr("the-worst-ingress-available"),
+						IngressClassName: pointer.String("the-worst-ingress-available"),
 						Backend: &extensionsv1beta1.IngressBackend{
 							ServiceName: "foo",
 							ServicePort: intstr.FromInt(8080),

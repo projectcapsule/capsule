@@ -272,8 +272,8 @@ var _ = Describe("adding metadata to Service objects", func() {
 				},
 				Ports: []discoveryv1beta1.EndpointPort{
 					{
-						Name: pointer.StringPtr("foo"),
-						Port: pointer.Int32Ptr(9999),
+						Name: pointer.String("foo"),
+						Port: pointer.Int32(9999),
 					},
 				},
 			}
@@ -291,8 +291,8 @@ var _ = Describe("adding metadata to Service objects", func() {
 				},
 				Ports: []discoveryv1.EndpointPort{
 					{
-						Name: pointer.StringPtr("foo"),
-						Port: pointer.Int32Ptr(9999),
+						Name: pointer.String("foo"),
+						Port: pointer.Int32(9999),
 					},
 				},
 			}

@@ -63,7 +63,7 @@ func (r *hostnames) validate(ctx context.Context, client client.Client, req admi
 		return nil
 	}
 
-	hostnameList := sets.NewString()
+	hostnameList := sets.New[string]()
 	for hostname := range ingress.HostnamePathsPairs() {
 		hostnameList.Insert(hostname)
 	}
@@ -85,20 +85,20 @@ func (r *hostnames) validate(ctx context.Context, client client.Client, req admi
 	return utils.ErroredResponse(err)
 }
 
-func (r *hostnames) validateHostnames(tenant capsulev1beta2.Tenant, hostnames sets.String) error {
+func (r *hostnames) validateHostnames(tenant capsulev1beta2.Tenant, hostnames sets.Set[string]) error {
 	if tenant.Spec.IngressOptions.AllowedHostnames == nil {
 		return nil
 	}
 
 	var valid, matched bool
 
-	tenantHostnameSet := sets.NewString(tenant.Spec.IngressOptions.AllowedHostnames.Exact...)
+	tenantHostnameSet := sets.New[string](tenant.Spec.IngressOptions.AllowedHostnames.Exact...)
 
 	var invalidHostnames []string
 
 	if len(hostnames) > 0 {
 		if diff := hostnames.Difference(tenantHostnameSet); len(diff) > 0 {
-			invalidHostnames = append(invalidHostnames, diff.List()...)
+			invalidHostnames = append(invalidHostnames, diff.UnsortedList()...)
 		}
 
 		if len(invalidHostnames) == 0 {

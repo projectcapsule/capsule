@@ -33,7 +33,7 @@ var _ = Describe("creating a LoadBalancer service when it is enabled for Tenant"
 			},
 			ServiceOptions: &api.ServiceOptions{
 				AllowedServices: &api.AllowedServices{
-					LoadBalancer: pointer.BoolPtr(true),
+					LoadBalancer: pointer.Bool(true),
 				},
 			},
 		},

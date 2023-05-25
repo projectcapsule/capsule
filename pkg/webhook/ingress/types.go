@@ -20,7 +20,7 @@ type Ingress interface {
 	IngressClass() *string
 	Namespace() string
 	Name() string
-	HostnamePathsPairs() map[string]sets.String
+	HostnamePathsPairs() map[string]sets.Set[string]
 	SetIngressClass(string)
 	SetNamespace(string)
 }
@@ -69,14 +69,14 @@ func (n NetworkingV1) SetNamespace(ns string) {
 }
 
 //nolint:dupl
-func (n NetworkingV1) HostnamePathsPairs() (pairs map[string]sets.String) {
-	pairs = make(map[string]sets.String)
+func (n NetworkingV1) HostnamePathsPairs() (pairs map[string]sets.Set[string]) {
+	pairs = make(map[string]sets.Set[string])
 
 	for _, rule := range n.Spec.Rules {
 		host := rule.Host
 
 		if _, ok := pairs[host]; !ok {
-			pairs[host] = sets.NewString()
+			pairs[host] = sets.New[string]()
 		}
 
 		if http := rule.IngressRuleValue.HTTP; http != nil {
@@ -139,14 +139,14 @@ func (n NetworkingV1Beta1) SetNamespace(ns string) {
 }
 
 //nolint:dupl
-func (n NetworkingV1Beta1) HostnamePathsPairs() (pairs map[string]sets.String) {
-	pairs = make(map[string]sets.String)
+func (n NetworkingV1Beta1) HostnamePathsPairs() (pairs map[string]sets.Set[string]) {
+	pairs = make(map[string]sets.Set[string])
 
 	for _, rule := range n.Spec.Rules {
 		host := rule.Host
 
 		if _, ok := pairs[host]; !ok {
-			pairs[host] = sets.NewString()
+			pairs[host] = sets.New[string]()
 		}
 
 		if http := rule.IngressRuleValue.HTTP; http != nil {
@@ -207,14 +207,14 @@ func (e Extension) Namespace() string {
 }
 
 //nolint:dupl
-func (e Extension) HostnamePathsPairs() (pairs map[string]sets.String) {
-	pairs = make(map[string]sets.String)
+func (e Extension) HostnamePathsPairs() (pairs map[string]sets.Set[string]) {
+	pairs = make(map[string]sets.Set[string])
 
 	for _, rule := range e.Spec.Rules {
 		host := rule.Host
 
 		if _, ok := pairs[host]; !ok {
-			pairs[host] = sets.NewString()
+			pairs[host] = sets.New[string]()
 		}
 
 		if http := rule.IngressRuleValue.HTTP; http != nil {
