@@ -7,7 +7,6 @@ package e2e
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	. "github.com/onsi/ginkgo"
@@ -16,7 +15,6 @@ import (
 	discoveryv1 "k8s.io/api/discovery/v1"
 	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
 	networkingv1 "k8s.io/api/networking/v1"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -25,6 +23,7 @@ import (
 
 	capsulev1beta2 "github.com/clastix/capsule/api/v1beta2"
 	"github.com/clastix/capsule/pkg/api"
+	"github.com/clastix/capsule/pkg/utils"
 )
 
 var _ = Describe("adding metadata to Service objects", func() {
@@ -222,8 +221,7 @@ var _ = Describe("adding metadata to Service objects", func() {
 
 	It("should apply them to EndpointSlice in v1", func() {
 		if err := k8sClient.List(context.Background(), &networkingv1.IngressList{}); err != nil {
-			missingAPIError := &meta.NoKindMatchError{}
-			if errors.As(err, &missingAPIError) {
+			if utils.IsUnsupportedAPI(err) {
 				Skip(fmt.Sprintf("Running test due to unsupported API kind: %s", err.Error()))
 			}
 		}
@@ -254,8 +252,7 @@ var _ = Describe("adding metadata to Service objects", func() {
 		var eps client.Object
 
 		if err := k8sClient.List(context.Background(), &discoveryv1.EndpointSliceList{}); err != nil {
-			missingAPIError := &meta.NoKindMatchError{}
-			if errors.As(err, &missingAPIError) {
+			if utils.IsUnsupportedAPI(err) {
 				Skip(fmt.Sprintf("Running test due to unsupported API kind: %s", err.Error()))
 			}
 

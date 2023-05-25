@@ -7,7 +7,6 @@ package e2e
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	. "github.com/onsi/ginkgo"
@@ -15,11 +14,11 @@ import (
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	networkingv1 "k8s.io/api/networking/v1"
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	capsulev1beta2 "github.com/clastix/capsule/api/v1beta2"
+	"github.com/clastix/capsule/pkg/utils"
 )
 
 var _ = Describe("creating an Ingress with a wildcard when it is denied for the Tenant", func() {
@@ -54,8 +53,7 @@ var _ = Describe("creating an Ingress with a wildcard when it is denied for the 
 
 	It("should fail creating an extensions/v1beta1 Ingress with a wildcard hostname", func() {
 		if err := k8sClient.List(context.Background(), &extensionsv1beta1.IngressList{}); err != nil {
-			missingAPIError := &meta.NoKindMatchError{}
-			if errors.As(err, &missingAPIError) {
+			if utils.IsUnsupportedAPI(err) {
 				Skip(fmt.Sprintf("Running test due to unsupported API kind: %s", err.Error()))
 			}
 		}
@@ -135,8 +133,7 @@ var _ = Describe("creating an Ingress with a wildcard when it is denied for the 
 
 	It("should fail creating an networking.k8s.io/v1beta1 Ingress with a wildcard hostname", func() {
 		if err := k8sClient.List(context.Background(), &networkingv1beta1.IngressList{}); err != nil {
-			missingAPIError := &meta.NoKindMatchError{}
-			if errors.As(err, &missingAPIError) {
+			if utils.IsUnsupportedAPI(err) {
 				Skip(fmt.Sprintf("Running test due to unsupported API kind: %s", err.Error()))
 			}
 		}
@@ -216,8 +213,7 @@ var _ = Describe("creating an Ingress with a wildcard when it is denied for the 
 
 	It("should fail creating an networking.k8s.io/v1 Ingress with a wildcard hostname", func() {
 		if err := k8sClient.List(context.Background(), &networkingv1.IngressList{}); err != nil {
-			missingAPIError := &meta.NoKindMatchError{}
-			if errors.As(err, &missingAPIError) {
+			if utils.IsUnsupportedAPI(err) {
 				Skip(fmt.Sprintf("Running test due to unsupported API kind: %s", err.Error()))
 			}
 		}
