@@ -7,19 +7,18 @@ package e2e
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/pointer"
 
 	capsulev1beta2 "github.com/clastix/capsule/api/v1beta2"
 	"github.com/clastix/capsule/pkg/api"
+	"github.com/clastix/capsule/pkg/utils"
 )
 
 var _ = Describe("when Tenant handles Ingress classes with extensions/v1beta1", func() {
@@ -72,8 +71,7 @@ var _ = Describe("when Tenant handles Ingress classes with extensions/v1beta1", 
 
 		By("non-specifying at all", func() {
 			if err := k8sClient.List(context.Background(), &extensionsv1beta1.IngressList{}); err != nil {
-				missingAPIError := &meta.NoKindMatchError{}
-				if errors.As(err, &missingAPIError) {
+				if utils.IsUnsupportedAPI(err) {
 					Skip(fmt.Sprintf("Running test due to unsupported API kind: %s", err.Error()))
 				}
 			}
@@ -96,8 +94,7 @@ var _ = Describe("when Tenant handles Ingress classes with extensions/v1beta1", 
 		})
 		By("defining as deprecated annotation", func() {
 			if err := k8sClient.List(context.Background(), &extensionsv1beta1.IngressList{}); err != nil {
-				missingAPIError := &meta.NoKindMatchError{}
-				if errors.As(err, &missingAPIError) {
+				if utils.IsUnsupportedAPI(err) {
 					Skip(fmt.Sprintf("Running test due to unsupported API kind: %s", err.Error()))
 				}
 			}
@@ -123,8 +120,7 @@ var _ = Describe("when Tenant handles Ingress classes with extensions/v1beta1", 
 		})
 		By("using the ingressClassName", func() {
 			if err := k8sClient.List(context.Background(), &extensionsv1beta1.IngressList{}); err != nil {
-				missingAPIError := &meta.NoKindMatchError{}
-				if errors.As(err, &missingAPIError) {
+				if utils.IsUnsupportedAPI(err) {
 					Skip(fmt.Sprintf("Running test due to unsupported API kind: %s", err.Error()))
 				}
 			}
@@ -158,8 +154,7 @@ var _ = Describe("when Tenant handles Ingress classes with extensions/v1beta1", 
 		for _, c := range tnt.Spec.IngressOptions.AllowedClasses.Exact {
 			Eventually(func() (err error) {
 				if err := k8sClient.List(context.Background(), &extensionsv1beta1.IngressList{}); err != nil {
-					missingAPIError := &meta.NoKindMatchError{}
-					if errors.As(err, &missingAPIError) {
+					if utils.IsUnsupportedAPI(err) {
 						Skip(fmt.Sprintf("Running test due to unsupported API kind: %s", err.Error()))
 					}
 				}
@@ -186,8 +181,7 @@ var _ = Describe("when Tenant handles Ingress classes with extensions/v1beta1", 
 
 	It("should allow enabled class using the ingressClassName field", func() {
 		if err := k8sClient.List(context.Background(), &extensionsv1beta1.IngressList{}); err != nil {
-			missingAPIError := &meta.NoKindMatchError{}
-			if errors.As(err, &missingAPIError) {
+			if utils.IsUnsupportedAPI(err) {
 				Skip(fmt.Sprintf("Running test due to unsupported API kind: %s", err.Error()))
 			}
 		}
@@ -232,8 +226,7 @@ var _ = Describe("when Tenant handles Ingress classes with extensions/v1beta1", 
 
 		Eventually(func() (err error) {
 			if err := k8sClient.List(context.Background(), &extensionsv1beta1.IngressList{}); err != nil {
-				missingAPIError := &meta.NoKindMatchError{}
-				if errors.As(err, &missingAPIError) {
+				if utils.IsUnsupportedAPI(err) {
 					Skip(fmt.Sprintf("Running test due to unsupported API kind: %s", err.Error()))
 				}
 			}
@@ -267,8 +260,7 @@ var _ = Describe("when Tenant handles Ingress classes with extensions/v1beta1", 
 
 		Eventually(func() (err error) {
 			if err := k8sClient.List(context.Background(), &extensionsv1beta1.IngressList{}); err != nil {
-				missingAPIError := &meta.NoKindMatchError{}
-				if errors.As(err, &missingAPIError) {
+				if utils.IsUnsupportedAPI(err) {
 					Skip(fmt.Sprintf("Running test due to unsupported API kind: %s", err.Error()))
 				}
 			}

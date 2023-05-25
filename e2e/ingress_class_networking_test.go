@@ -7,7 +7,6 @@ package e2e
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -15,7 +14,6 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	networkingv1 "k8s.io/api/networking/v1"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
@@ -25,6 +23,7 @@ import (
 
 	capsulev1beta2 "github.com/clastix/capsule/api/v1beta2"
 	"github.com/clastix/capsule/pkg/api"
+	"github.com/clastix/capsule/pkg/utils"
 )
 
 var _ = Describe("when Tenant handles Ingress classes with networking.k8s.io/v1", func() {
@@ -158,8 +157,7 @@ var _ = Describe("when Tenant handles Ingress classes with networking.k8s.io/v1"
 
 	It("should block a non allowed class", func() {
 		if err := k8sClient.List(context.Background(), &networkingv1.IngressList{}); err != nil {
-			missingAPIError := &meta.NoKindMatchError{}
-			if errors.As(err, &missingAPIError) {
+			if utils.IsUnsupportedAPI(err) {
 				Skip(fmt.Sprintf("Running test due to unsupported API kind: %s", err.Error()))
 			}
 		}
@@ -241,8 +239,7 @@ var _ = Describe("when Tenant handles Ingress classes with networking.k8s.io/v1"
 
 	It("should allow enabled class using the deprecated annotation for networking.k8s.io/v1", func() {
 		if err := k8sClient.List(context.Background(), &networkingv1.IngressList{}); err != nil {
-			missingAPIError := &meta.NoKindMatchError{}
-			if errors.As(err, &missingAPIError) {
+			if utils.IsUnsupportedAPI(err) {
 				Skip(fmt.Sprintf("Running test due to unsupported API kind: %s", err.Error()))
 			}
 		}
@@ -281,8 +278,7 @@ var _ = Describe("when Tenant handles Ingress classes with networking.k8s.io/v1"
 
 	It("should allow enabled class using the ingressClassName field", func() {
 		if err := k8sClient.List(context.Background(), &networkingv1.IngressList{}); err != nil {
-			missingAPIError := &meta.NoKindMatchError{}
-			if errors.As(err, &missingAPIError) {
+			if utils.IsUnsupportedAPI(err) {
 				Skip(fmt.Sprintf("Running test due to unsupported API kind: %s", err.Error()))
 			}
 		}
@@ -319,8 +315,7 @@ var _ = Describe("when Tenant handles Ingress classes with networking.k8s.io/v1"
 
 	It("should allow enabled Ingress by regex using the deprecated annotation", func() {
 		if err := k8sClient.List(context.Background(), &networkingv1.IngressList{}); err != nil {
-			missingAPIError := &meta.NoKindMatchError{}
-			if errors.As(err, &missingAPIError) {
+			if utils.IsUnsupportedAPI(err) {
 				Skip(fmt.Sprintf("Running test due to unsupported API kind: %s", err.Error()))
 			}
 		}
@@ -358,8 +353,7 @@ var _ = Describe("when Tenant handles Ingress classes with networking.k8s.io/v1"
 
 	It("should allow enabled Ingress by regex using the ingressClassName field", func() {
 		if err := k8sClient.List(context.Background(), &networkingv1.IngressList{}); err != nil {
-			missingAPIError := &meta.NoKindMatchError{}
-			if errors.As(err, &missingAPIError) {
+			if utils.IsUnsupportedAPI(err) {
 				Skip(fmt.Sprintf("Running test due to unsupported API kind: %s", err.Error()))
 			}
 		}
@@ -395,8 +389,7 @@ var _ = Describe("when Tenant handles Ingress classes with networking.k8s.io/v1"
 
 	It("should allow enabled Ingress by selector using the deprecated annotation", func() {
 		if err := k8sClient.List(context.Background(), &networkingv1.IngressList{}); err != nil {
-			missingAPIError := &meta.NoKindMatchError{}
-			if errors.As(err, &missingAPIError) {
+			if utils.IsUnsupportedAPI(err) {
 				Skip(fmt.Sprintf("Running test due to unsupported API kind: %s", err.Error()))
 			}
 		}
@@ -451,8 +444,7 @@ var _ = Describe("when Tenant handles Ingress classes with networking.k8s.io/v1"
 
 	It("should allow enabled Ingress by selector using the ingressClassName field", func() {
 		if err := k8sClient.List(context.Background(), &networkingv1.IngressList{}); err != nil {
-			missingAPIError := &meta.NoKindMatchError{}
-			if errors.As(err, &missingAPIError) {
+			if utils.IsUnsupportedAPI(err) {
 				Skip(fmt.Sprintf("Running test due to unsupported API kind: %s", err.Error()))
 			}
 		}
@@ -535,8 +527,7 @@ var _ = Describe("when Tenant handles Ingress classes with networking.k8s.io/v1"
 
 	It("should mutate to default tenant IngressClass (class exists)", func() {
 		if err := k8sClient.List(context.Background(), &networkingv1.IngressList{}); err != nil {
-			missingAPIError := &meta.NoKindMatchError{}
-			if errors.As(err, &missingAPIError) {
+			if utils.IsUnsupportedAPI(err) {
 				Skip(fmt.Sprintf("Running test due to unsupported API kind: %s", err.Error()))
 			}
 		}
@@ -575,8 +566,7 @@ var _ = Describe("when Tenant handles Ingress classes with networking.k8s.io/v1"
 
 	It("shoult mutate to default tenant IngressClass although the cluster global one is not allowed", func() {
 		if err := k8sClient.List(context.Background(), &networkingv1.IngressList{}); err != nil {
-			missingAPIError := &meta.NoKindMatchError{}
-			if errors.As(err, &missingAPIError) {
+			if utils.IsUnsupportedAPI(err) {
 				Skip(fmt.Sprintf("Running test due to unsupported API kind: %s", err.Error()))
 			}
 		}
@@ -622,8 +612,7 @@ var _ = Describe("when Tenant handles Ingress classes with networking.k8s.io/v1"
 
 	It("should mutate to default tenant IngressClass although the cluster global one is allowed", func() {
 		if err := k8sClient.List(context.Background(), &networkingv1.IngressList{}); err != nil {
-			missingAPIError := &meta.NoKindMatchError{}
-			if errors.As(err, &missingAPIError) {
+			if utils.IsUnsupportedAPI(err) {
 				Skip(fmt.Sprintf("Running test due to unsupported API kind: %s", err.Error()))
 			}
 		}
