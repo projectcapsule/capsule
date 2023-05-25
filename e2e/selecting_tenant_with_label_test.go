@@ -7,9 +7,10 @@ package e2e
 
 import (
 	"context"
+
 	"github.com/clastix/capsule/pkg/utils"
 
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
