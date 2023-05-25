@@ -8,10 +8,11 @@ package e2e
 import (
 	"context"
 	"fmt"
-	"github.com/clastix/capsule/pkg/api"
 	"strings"
 
-	. "github.com/onsi/ginkgo"
+	"github.com/clastix/capsule/pkg/api"
+
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"

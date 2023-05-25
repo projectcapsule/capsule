@@ -189,7 +189,7 @@ apidocs-gen: ## Download crdoc locally if necessary.
 
 GINKGO = $(shell pwd)/bin/ginkgo
 ginkgo: ## Download ginkgo locally if necessary.
-	$(call go-install-tool,$(GINKGO),github.com/onsi/ginkgo/ginkgo@v1.16.5)
+	$(call go-install-tool,$(GINKGO),github.com/onsi/ginkgo/v2/ginkgo@v2.9.5)
 
 CT = $(shell pwd)/bin/ct
 ct: ## Download ct locally if necessary.

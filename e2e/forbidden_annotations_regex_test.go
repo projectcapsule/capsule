@@ -8,7 +8,7 @@ package e2e
 import (
 	"context"
 
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -91,7 +91,7 @@ var _ = Describe("creating a tenant with various forbidden regexes", func() {
 
 			EventuallyCreation(func() error {
 				tnt.SetResourceVersion("")
-				
+
 				tnt.Spec.NamespaceOptions = &capsulev1beta2.NamespaceOptions{
 					ForbiddenAnnotations: api.ForbiddenListSpec{
 						Regex: annotationValue,
