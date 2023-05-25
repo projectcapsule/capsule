@@ -234,8 +234,8 @@ func (r *Reconciler) updateTenantCustomResourceDefinition(ctx context.Context, n
 						Service: &apiextensionsv1.ServiceReference{
 							Namespace: r.Namespace,
 							Name:      "capsule-webhook-service",
-							Path:      pointer.StringPtr("/convert"),
-							Port:      pointer.Int32Ptr(443),
+							Path:      pointer.String("/convert"),
+							Port:      pointer.Int32(443),
 						},
 						CABundle: caBundle,
 					},

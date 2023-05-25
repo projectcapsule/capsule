@@ -174,7 +174,7 @@ func (r *Global) reconcileNormal(ctx context.Context, tntResource *capsulev1beta
 		return reconcile.Result{}, err
 	}
 
-	if r.processor.HandlePruning(ctx, tntResource.Status.ProcessedItems.AsSet(), processedItems) {
+	if r.processor.HandlePruning(ctx, tntResource.Status.ProcessedItems.AsSet(), sets.Set[string](processedItems)) {
 		tntResource.Status.ProcessedItems = make([]capsulev1beta2.ObjectReferenceStatus, 0, len(processedItems))
 
 		for _, item := range processedItems.List() {

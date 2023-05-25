@@ -8,6 +8,7 @@ package e2e
 import (
 	"context"
 	"fmt"
+
 	"github.com/clastix/capsule/pkg/api"
 
 	. "github.com/onsi/ginkgo"
@@ -134,7 +135,7 @@ var _ = Describe("exceeding a Tenant resource quota", func() {
 						Name: "my-pause",
 					},
 					Spec: appsv1.DeploymentSpec{
-						Replicas: pointer.Int32Ptr(5),
+						Replicas: pointer.Int32(5),
 						Selector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
 								"app": "pause",

@@ -34,7 +34,7 @@ type Processor struct {
 	client client.Client
 }
 
-func (r *Processor) HandlePruning(ctx context.Context, current, desired sets.String) (updateStatus bool) {
+func (r *Processor) HandlePruning(ctx context.Context, current, desired sets.Set[string]) (updateStatus bool) {
 	log := ctrllog.FromContext(ctx)
 
 	diff := current.Difference(desired)

@@ -222,7 +222,7 @@ var _ = Describe("when Tenant handles Ingress classes with networking.k8s.io/v1"
 						Name: "denied-ingress",
 					},
 					Spec: networkingv1.IngressSpec{
-						IngressClassName: pointer.StringPtr("the-worst-ingress-available"),
+						IngressClassName: pointer.String("the-worst-ingress-available"),
 						DefaultBackend: &networkingv1.IngressBackend{
 							Service: &networkingv1.IngressServiceBackend{
 								Name: "foo",

@@ -294,7 +294,7 @@ func (in *Tenant) ConvertTo(dstRaw conversion.Hub) error {
 			dst.Spec.ServiceOptions.AllowedServices = &api.AllowedServices{}
 		}
 
-		dst.Spec.ServiceOptions.AllowedServices.NodePort = pointer.BoolPtr(val)
+		dst.Spec.ServiceOptions.AllowedServices.NodePort = pointer.Bool(val)
 	}
 
 	enableExternalName, ok := annotations[enableExternalNameAnnotation]
@@ -312,7 +312,7 @@ func (in *Tenant) ConvertTo(dstRaw conversion.Hub) error {
 			dst.Spec.ServiceOptions.AllowedServices = &api.AllowedServices{}
 		}
 
-		dst.Spec.ServiceOptions.AllowedServices.ExternalName = pointer.BoolPtr(val)
+		dst.Spec.ServiceOptions.AllowedServices.ExternalName = pointer.Bool(val)
 	}
 
 	loadBalancerService, ok := annotations[enableLoadBalancerAnnotation]
@@ -330,7 +330,7 @@ func (in *Tenant) ConvertTo(dstRaw conversion.Hub) error {
 			dst.Spec.ServiceOptions.AllowedServices = &api.AllowedServices{}
 		}
 
-		dst.Spec.ServiceOptions.AllowedServices.LoadBalancer = pointer.BoolPtr(val)
+		dst.Spec.ServiceOptions.AllowedServices.LoadBalancer = pointer.Bool(val)
 	}
 	// Status
 	dst.Status = capsulev1beta1.TenantStatus{
