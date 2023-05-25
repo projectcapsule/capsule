@@ -675,28 +675,28 @@ NetworkPolicySpec provides the specification of a NetworkPolicy
         <td><b><a href="#tenantspecnetworkpoliciesindexpodselector">podSelector</a></b></td>
         <td>object</td>
         <td>
-          Selects the pods to which this NetworkPolicy object applies. The array of ingress rules is applied to any pods selected by this field. Multiple network policies can select the same set of pods. In this case, the ingress rules for each are combined additively. This field is NOT optional and follows standard label selector semantics. An empty podSelector matches all pods in this namespace.<br/>
+          podSelector selects the pods to which this NetworkPolicy object applies. The array of ingress rules is applied to any pods selected by this field. Multiple network policies can select the same set of pods. In this case, the ingress rules for each are combined additively. This field is NOT optional and follows standard label selector semantics. An empty podSelector matches all pods in this namespace.<br/>
         </td>
         <td>true</td>
       </tr><tr>
         <td><b><a href="#tenantspecnetworkpoliciesindexegressindex">egress</a></b></td>
         <td>[]object</td>
         <td>
-          List of egress rules to be applied to the selected pods. Outgoing traffic is allowed if there are no NetworkPolicies selecting the pod (and cluster policy otherwise allows the traffic), OR if the traffic matches at least one egress rule across all of the NetworkPolicy objects whose podSelector matches the pod. If this field is empty then this NetworkPolicy limits all outgoing traffic (and serves solely to ensure that the pods it selects are isolated by default). This field is beta-level in 1.8<br/>
+          egress is a list of egress rules to be applied to the selected pods. Outgoing traffic is allowed if there are no NetworkPolicies selecting the pod (and cluster policy otherwise allows the traffic), OR if the traffic matches at least one egress rule across all of the NetworkPolicy objects whose podSelector matches the pod. If this field is empty then this NetworkPolicy limits all outgoing traffic (and serves solely to ensure that the pods it selects are isolated by default). This field is beta-level in 1.8<br/>
         </td>
         <td>false</td>
       </tr><tr>
         <td><b><a href="#tenantspecnetworkpoliciesindexingressindex">ingress</a></b></td>
         <td>[]object</td>
         <td>
-          List of ingress rules to be applied to the selected pods. Traffic is allowed to a pod if there are no NetworkPolicies selecting the pod (and cluster policy otherwise allows the traffic), OR if the traffic source is the pod's local node, OR if the traffic matches at least one ingress rule across all of the NetworkPolicy objects whose podSelector matches the pod. If this field is empty then this NetworkPolicy does not allow any traffic (and serves solely to ensure that the pods it selects are isolated by default)<br/>
+          ingress is a list of ingress rules to be applied to the selected pods. Traffic is allowed to a pod if there are no NetworkPolicies selecting the pod (and cluster policy otherwise allows the traffic), OR if the traffic source is the pod's local node, OR if the traffic matches at least one ingress rule across all of the NetworkPolicy objects whose podSelector matches the pod. If this field is empty then this NetworkPolicy does not allow any traffic (and serves solely to ensure that the pods it selects are isolated by default)<br/>
         </td>
         <td>false</td>
       </tr><tr>
         <td><b>policyTypes</b></td>
         <td>[]string</td>
         <td>
-          List of rule types that the NetworkPolicy relates to. Valid options are ["Ingress"], ["Egress"], or ["Ingress", "Egress"]. If this field is not specified, it will default based on the existence of Ingress or Egress rules; policies that contain an Egress section are assumed to affect Egress, and all policies (whether or not they contain an Ingress section) are assumed to affect Ingress. If you want to write an egress-only policy, you must explicitly specify policyTypes [ "Egress" ]. Likewise, if you want to write a policy that specifies that no egress is allowed, you must specify a policyTypes value that include "Egress" (since such a policy would not include an Egress section and would otherwise default to just [ "Ingress" ]). This field is beta-level in 1.8<br/>
+          policyTypes is a list of rule types that the NetworkPolicy relates to. Valid options are ["Ingress"], ["Egress"], or ["Ingress", "Egress"]. If this field is not specified, it will default based on the existence of ingress or egress rules; policies that contain an egress section are assumed to affect egress, and all policies (whether or not they contain an ingress section) are assumed to affect ingress. If you want to write an egress-only policy, you must explicitly specify policyTypes [ "Egress" ]. Likewise, if you want to write a policy that specifies that no egress is allowed, you must specify a policyTypes value that include "Egress" (since such a policy would not include an egress section and would otherwise default to just [ "Ingress" ]). This field is beta-level in 1.8<br/>
         </td>
         <td>false</td>
       </tr></tbody>
@@ -707,7 +707,7 @@ NetworkPolicySpec provides the specification of a NetworkPolicy
 
 
 
-Selects the pods to which this NetworkPolicy object applies. The array of ingress rules is applied to any pods selected by this field. Multiple network policies can select the same set of pods. In this case, the ingress rules for each are combined additively. This field is NOT optional and follows standard label selector semantics. An empty podSelector matches all pods in this namespace.
+podSelector selects the pods to which this NetworkPolicy object applies. The array of ingress rules is applied to any pods selected by this field. Multiple network policies can select the same set of pods. In this case, the ingress rules for each are combined additively. This field is NOT optional and follows standard label selector semantics. An empty podSelector matches all pods in this namespace.
 
 <table>
     <thead>
@@ -795,14 +795,14 @@ NetworkPolicyEgressRule describes a particular set of traffic that is allowed ou
         <td><b><a href="#tenantspecnetworkpoliciesindexegressindexportsindex">ports</a></b></td>
         <td>[]object</td>
         <td>
-          List of destination ports for outgoing traffic. Each item in this list is combined using a logical OR. If this field is empty or missing, this rule matches all ports (traffic not restricted by port). If this field is present and contains at least one item, then this rule allows traffic only if the traffic matches at least one port in the list.<br/>
+          ports is a list of destination ports for outgoing traffic. Each item in this list is combined using a logical OR. If this field is empty or missing, this rule matches all ports (traffic not restricted by port). If this field is present and contains at least one item, then this rule allows traffic only if the traffic matches at least one port in the list.<br/>
         </td>
         <td>false</td>
       </tr><tr>
         <td><b><a href="#tenantspecnetworkpoliciesindexegressindextoindex">to</a></b></td>
         <td>[]object</td>
         <td>
-          List of destinations for outgoing traffic of pods selected for this rule. Items in this list are combined using a logical OR operation. If this field is empty or missing, this rule matches all destinations (traffic not restricted by destination). If this field is present and contains at least one item, this rule allows traffic only if the traffic matches at least one item in the to list.<br/>
+          to is a list of destinations for outgoing traffic of pods selected for this rule. Items in this list are combined using a logical OR operation. If this field is empty or missing, this rule matches all destinations (traffic not restricted by destination). If this field is present and contains at least one item, this rule allows traffic only if the traffic matches at least one item in the to list.<br/>
         </td>
         <td>false</td>
       </tr></tbody>
@@ -828,7 +828,7 @@ NetworkPolicyPort describes a port to allow traffic on
         <td><b>endPort</b></td>
         <td>integer</td>
         <td>
-          If set, indicates that the range of ports from port to endPort, inclusive, should be allowed by the policy. This field cannot be defined if the port field is not defined or if the port field is defined as a named (string) port. The endPort must be equal or greater than port. This feature is in Beta state and is enabled by default. It can be disabled using the Feature Gate "NetworkPolicyEndPort".<br/>
+          endPort indicates that the range of ports from port to endPort if set, inclusive, should be allowed by the policy. This field cannot be defined if the port field is not defined or if the port field is defined as a named (string) port. The endPort must be equal or greater than port.<br/>
           <br/>
             <i>Format</i>: int32<br/>
         </td>
@@ -837,14 +837,14 @@ NetworkPolicyPort describes a port to allow traffic on
         <td><b>port</b></td>
         <td>int or string</td>
         <td>
-          The port on the given protocol. This can either be a numerical or named port on a pod. If this field is not provided, this matches all port names and numbers. If present, only traffic on the specified protocol AND port will be matched.<br/>
+          port represents the port on the given protocol. This can either be a numerical or named port on a pod. If this field is not provided, this matches all port names and numbers. If present, only traffic on the specified protocol AND port will be matched.<br/>
         </td>
         <td>false</td>
       </tr><tr>
         <td><b>protocol</b></td>
         <td>string</td>
         <td>
-          The protocol (TCP, UDP, or SCTP) which traffic must match. If not specified, this field defaults to TCP.<br/>
+          protocol represents the protocol (TCP, UDP, or SCTP) which traffic must match. If not specified, this field defaults to TCP.<br/>
           <br/>
             <i>Default</i>: TCP<br/>
         </td>
@@ -872,23 +872,23 @@ NetworkPolicyPeer describes a peer to allow traffic to/from. Only certain combin
         <td><b><a href="#tenantspecnetworkpoliciesindexegressindextoindexipblock">ipBlock</a></b></td>
         <td>object</td>
         <td>
-          IPBlock defines policy on a particular IPBlock. If this field is set then neither of the other fields can be.<br/>
+          ipBlock defines policy on a particular IPBlock. If this field is set then neither of the other fields can be.<br/>
         </td>
         <td>false</td>
       </tr><tr>
         <td><b><a href="#tenantspecnetworkpoliciesindexegressindextoindexnamespaceselector">namespaceSelector</a></b></td>
         <td>object</td>
         <td>
-          Selects Namespaces using cluster-scoped labels. This field follows standard label selector semantics; if present but empty, it selects all namespaces. 
- If PodSelector is also set, then the NetworkPolicyPeer as a whole selects the Pods matching PodSelector in the Namespaces selected by NamespaceSelector. Otherwise it selects all Pods in the Namespaces selected by NamespaceSelector.<br/>
+          namespaceSelector selects namespaces using cluster-scoped labels. This field follows standard label selector semantics; if present but empty, it selects all namespaces. 
+ If podSelector is also set, then the NetworkPolicyPeer as a whole selects the pods matching podSelector in the namespaces selected by namespaceSelector. Otherwise it selects all pods in the namespaces selected by namespaceSelector.<br/>
         </td>
         <td>false</td>
       </tr><tr>
         <td><b><a href="#tenantspecnetworkpoliciesindexegressindextoindexpodselector">podSelector</a></b></td>
         <td>object</td>
         <td>
-          This is a label selector which selects Pods. This field follows standard label selector semantics; if present but empty, it selects all pods. 
- If NamespaceSelector is also set, then the NetworkPolicyPeer as a whole selects the Pods matching PodSelector in the Namespaces selected by NamespaceSelector. Otherwise it selects the Pods matching PodSelector in the policy's own Namespace.<br/>
+          podSelector is a label selector which selects pods. This field follows standard label selector semantics; if present but empty, it selects all pods. 
+ If namespaceSelector is also set, then the NetworkPolicyPeer as a whole selects the pods matching podSelector in the Namespaces selected by NamespaceSelector. Otherwise it selects the pods matching podSelector in the policy's own namespace.<br/>
         </td>
         <td>false</td>
       </tr></tbody>
@@ -899,7 +899,7 @@ NetworkPolicyPeer describes a peer to allow traffic to/from. Only certain combin
 
 
 
-IPBlock defines policy on a particular IPBlock. If this field is set then neither of the other fields can be.
+ipBlock defines policy on a particular IPBlock. If this field is set then neither of the other fields can be.
 
 <table>
     <thead>
@@ -914,14 +914,14 @@ IPBlock defines policy on a particular IPBlock. If this field is set then neithe
         <td><b>cidr</b></td>
         <td>string</td>
         <td>
-          CIDR is a string representing the IP Block Valid examples are "192.168.1.1/24" or "2001:db9::/64"<br/>
+          cidr is a string representing the IPBlock Valid examples are "192.168.1.0/24" or "2001:db8::/64"<br/>
         </td>
         <td>true</td>
       </tr><tr>
         <td><b>except</b></td>
         <td>[]string</td>
         <td>
-          Except is a slice of CIDRs that should not be included within an IP Block Valid examples are "192.168.1.1/24" or "2001:db9::/64" Except values will be rejected if they are outside the CIDR range<br/>
+          except is a slice of CIDRs that should not be included within an IPBlock Valid examples are "192.168.1.0/24" or "2001:db8::/64" Except values will be rejected if they are outside the cidr range<br/>
         </td>
         <td>false</td>
       </tr></tbody>
@@ -932,8 +932,8 @@ IPBlock defines policy on a particular IPBlock. If this field is set then neithe
 
 
 
-Selects Namespaces using cluster-scoped labels. This field follows standard label selector semantics; if present but empty, it selects all namespaces. 
- If PodSelector is also set, then the NetworkPolicyPeer as a whole selects the Pods matching PodSelector in the Namespaces selected by NamespaceSelector. Otherwise it selects all Pods in the Namespaces selected by NamespaceSelector.
+namespaceSelector selects namespaces using cluster-scoped labels. This field follows standard label selector semantics; if present but empty, it selects all namespaces. 
+ If podSelector is also set, then the NetworkPolicyPeer as a whole selects the pods matching podSelector in the namespaces selected by namespaceSelector. Otherwise it selects all pods in the namespaces selected by namespaceSelector.
 
 <table>
     <thead>
@@ -1006,8 +1006,8 @@ A label selector requirement is a selector that contains values, a key, and an o
 
 
 
-This is a label selector which selects Pods. This field follows standard label selector semantics; if present but empty, it selects all pods. 
- If NamespaceSelector is also set, then the NetworkPolicyPeer as a whole selects the Pods matching PodSelector in the Namespaces selected by NamespaceSelector. Otherwise it selects the Pods matching PodSelector in the policy's own Namespace.
+podSelector is a label selector which selects pods. This field follows standard label selector semantics; if present but empty, it selects all pods. 
+ If namespaceSelector is also set, then the NetworkPolicyPeer as a whole selects the pods matching podSelector in the Namespaces selected by NamespaceSelector. Otherwise it selects the pods matching podSelector in the policy's own namespace.
 
 <table>
     <thead>
@@ -1095,14 +1095,14 @@ NetworkPolicyIngressRule describes a particular set of traffic that is allowed t
         <td><b><a href="#tenantspecnetworkpoliciesindexingressindexfromindex">from</a></b></td>
         <td>[]object</td>
         <td>
-          List of sources which should be able to access the pods selected for this rule. Items in this list are combined using a logical OR operation. If this field is empty or missing, this rule matches all sources (traffic not restricted by source). If this field is present and contains at least one item, this rule allows traffic only if the traffic matches at least one item in the from list.<br/>
+          from is a list of sources which should be able to access the pods selected for this rule. Items in this list are combined using a logical OR operation. If this field is empty or missing, this rule matches all sources (traffic not restricted by source). If this field is present and contains at least one item, this rule allows traffic only if the traffic matches at least one item in the from list.<br/>
         </td>
         <td>false</td>
       </tr><tr>
         <td><b><a href="#tenantspecnetworkpoliciesindexingressindexportsindex">ports</a></b></td>
         <td>[]object</td>
         <td>
-          List of ports which should be made accessible on the pods selected for this rule. Each item in this list is combined using a logical OR. If this field is empty or missing, this rule matches all ports (traffic not restricted by port). If this field is present and contains at least one item, then this rule allows traffic only if the traffic matches at least one port in the list.<br/>
+          ports is a list of ports which should be made accessible on the pods selected for this rule. Each item in this list is combined using a logical OR. If this field is empty or missing, this rule matches all ports (traffic not restricted by port). If this field is present and contains at least one item, then this rule allows traffic only if the traffic matches at least one port in the list.<br/>
         </td>
         <td>false</td>
       </tr></tbody>
@@ -1128,23 +1128,23 @@ NetworkPolicyPeer describes a peer to allow traffic to/from. Only certain combin
         <td><b><a href="#tenantspecnetworkpoliciesindexingressindexfromindexipblock">ipBlock</a></b></td>
         <td>object</td>
         <td>
-          IPBlock defines policy on a particular IPBlock. If this field is set then neither of the other fields can be.<br/>
+          ipBlock defines policy on a particular IPBlock. If this field is set then neither of the other fields can be.<br/>
         </td>
         <td>false</td>
       </tr><tr>
         <td><b><a href="#tenantspecnetworkpoliciesindexingressindexfromindexnamespaceselector">namespaceSelector</a></b></td>
         <td>object</td>
         <td>
-          Selects Namespaces using cluster-scoped labels. This field follows standard label selector semantics; if present but empty, it selects all namespaces. 
- If PodSelector is also set, then the NetworkPolicyPeer as a whole selects the Pods matching PodSelector in the Namespaces selected by NamespaceSelector. Otherwise it selects all Pods in the Namespaces selected by NamespaceSelector.<br/>
+          namespaceSelector selects namespaces using cluster-scoped labels. This field follows standard label selector semantics; if present but empty, it selects all namespaces. 
+ If podSelector is also set, then the NetworkPolicyPeer as a whole selects the pods matching podSelector in the namespaces selected by namespaceSelector. Otherwise it selects all pods in the namespaces selected by namespaceSelector.<br/>
         </td>
         <td>false</td>
       </tr><tr>
         <td><b><a href="#tenantspecnetworkpoliciesindexingressindexfromindexpodselector">podSelector</a></b></td>
         <td>object</td>
         <td>
-          This is a label selector which selects Pods. This field follows standard label selector semantics; if present but empty, it selects all pods. 
- If NamespaceSelector is also set, then the NetworkPolicyPeer as a whole selects the Pods matching PodSelector in the Namespaces selected by NamespaceSelector. Otherwise it selects the Pods matching PodSelector in the policy's own Namespace.<br/>
+          podSelector is a label selector which selects pods. This field follows standard label selector semantics; if present but empty, it selects all pods. 
+ If namespaceSelector is also set, then the NetworkPolicyPeer as a whole selects the pods matching podSelector in the Namespaces selected by NamespaceSelector. Otherwise it selects the pods matching podSelector in the policy's own namespace.<br/>
         </td>
         <td>false</td>
       </tr></tbody>
@@ -1155,7 +1155,7 @@ NetworkPolicyPeer describes a peer to allow traffic to/from. Only certain combin
 
 
 
-IPBlock defines policy on a particular IPBlock. If this field is set then neither of the other fields can be.
+ipBlock defines policy on a particular IPBlock. If this field is set then neither of the other fields can be.
 
 <table>
     <thead>
@@ -1170,14 +1170,14 @@ IPBlock defines policy on a particular IPBlock. If this field is set then neithe
         <td><b>cidr</b></td>
         <td>string</td>
         <td>
-          CIDR is a string representing the IP Block Valid examples are "192.168.1.1/24" or "2001:db9::/64"<br/>
+          cidr is a string representing the IPBlock Valid examples are "192.168.1.0/24" or "2001:db8::/64"<br/>
         </td>
         <td>true</td>
       </tr><tr>
         <td><b>except</b></td>
         <td>[]string</td>
         <td>
-          Except is a slice of CIDRs that should not be included within an IP Block Valid examples are "192.168.1.1/24" or "2001:db9::/64" Except values will be rejected if they are outside the CIDR range<br/>
+          except is a slice of CIDRs that should not be included within an IPBlock Valid examples are "192.168.1.0/24" or "2001:db8::/64" Except values will be rejected if they are outside the cidr range<br/>
         </td>
         <td>false</td>
       </tr></tbody>
@@ -1188,8 +1188,8 @@ IPBlock defines policy on a particular IPBlock. If this field is set then neithe
 
 
 
-Selects Namespaces using cluster-scoped labels. This field follows standard label selector semantics; if present but empty, it selects all namespaces. 
- If PodSelector is also set, then the NetworkPolicyPeer as a whole selects the Pods matching PodSelector in the Namespaces selected by NamespaceSelector. Otherwise it selects all Pods in the Namespaces selected by NamespaceSelector.
+namespaceSelector selects namespaces using cluster-scoped labels. This field follows standard label selector semantics; if present but empty, it selects all namespaces. 
+ If podSelector is also set, then the NetworkPolicyPeer as a whole selects the pods matching podSelector in the namespaces selected by namespaceSelector. Otherwise it selects all pods in the namespaces selected by namespaceSelector.
 
 <table>
     <thead>
@@ -1262,8 +1262,8 @@ A label selector requirement is a selector that contains values, a key, and an o
 
 
 
-This is a label selector which selects Pods. This field follows standard label selector semantics; if present but empty, it selects all pods. 
- If NamespaceSelector is also set, then the NetworkPolicyPeer as a whole selects the Pods matching PodSelector in the Namespaces selected by NamespaceSelector. Otherwise it selects the Pods matching PodSelector in the policy's own Namespace.
+podSelector is a label selector which selects pods. This field follows standard label selector semantics; if present but empty, it selects all pods. 
+ If namespaceSelector is also set, then the NetworkPolicyPeer as a whole selects the pods matching podSelector in the Namespaces selected by NamespaceSelector. Otherwise it selects the pods matching podSelector in the policy's own namespace.
 
 <table>
     <thead>
@@ -1351,7 +1351,7 @@ NetworkPolicyPort describes a port to allow traffic on
         <td><b>endPort</b></td>
         <td>integer</td>
         <td>
-          If set, indicates that the range of ports from port to endPort, inclusive, should be allowed by the policy. This field cannot be defined if the port field is not defined or if the port field is defined as a named (string) port. The endPort must be equal or greater than port. This feature is in Beta state and is enabled by default. It can be disabled using the Feature Gate "NetworkPolicyEndPort".<br/>
+          endPort indicates that the range of ports from port to endPort if set, inclusive, should be allowed by the policy. This field cannot be defined if the port field is not defined or if the port field is defined as a named (string) port. The endPort must be equal or greater than port.<br/>
           <br/>
             <i>Format</i>: int32<br/>
         </td>
@@ -1360,14 +1360,14 @@ NetworkPolicyPort describes a port to allow traffic on
         <td><b>port</b></td>
         <td>int or string</td>
         <td>
-          The port on the given protocol. This can either be a numerical or named port on a pod. If this field is not provided, this matches all port names and numbers. If present, only traffic on the specified protocol AND port will be matched.<br/>
+          port represents the port on the given protocol. This can either be a numerical or named port on a pod. If this field is not provided, this matches all port names and numbers. If present, only traffic on the specified protocol AND port will be matched.<br/>
         </td>
         <td>false</td>
       </tr><tr>
         <td><b>protocol</b></td>
         <td>string</td>
         <td>
-          The protocol (TCP, UDP, or SCTP) which traffic must match. If not specified, this field defaults to TCP.<br/>
+          protocol represents the protocol (TCP, UDP, or SCTP) which traffic must match. If not specified, this field defaults to TCP.<br/>
           <br/>
             <i>Default</i>: TCP<br/>
         </td>
@@ -3696,28 +3696,28 @@ NetworkPolicySpec provides the specification of a NetworkPolicy
         <td><b><a href="#tenantspecnetworkpoliciesitemsindexpodselector-1">podSelector</a></b></td>
         <td>object</td>
         <td>
-          Selects the pods to which this NetworkPolicy object applies. The array of ingress rules is applied to any pods selected by this field. Multiple network policies can select the same set of pods. In this case, the ingress rules for each are combined additively. This field is NOT optional and follows standard label selector semantics. An empty podSelector matches all pods in this namespace.<br/>
+          podSelector selects the pods to which this NetworkPolicy object applies. The array of ingress rules is applied to any pods selected by this field. Multiple network policies can select the same set of pods. In this case, the ingress rules for each are combined additively. This field is NOT optional and follows standard label selector semantics. An empty podSelector matches all pods in this namespace.<br/>
         </td>
         <td>true</td>
       </tr><tr>
         <td><b><a href="#tenantspecnetworkpoliciesitemsindexegressindex-1">egress</a></b></td>
         <td>[]object</td>
         <td>
-          List of egress rules to be applied to the selected pods. Outgoing traffic is allowed if there are no NetworkPolicies selecting the pod (and cluster policy otherwise allows the traffic), OR if the traffic matches at least one egress rule across all of the NetworkPolicy objects whose podSelector matches the pod. If this field is empty then this NetworkPolicy limits all outgoing traffic (and serves solely to ensure that the pods it selects are isolated by default). This field is beta-level in 1.8<br/>
+          egress is a list of egress rules to be applied to the selected pods. Outgoing traffic is allowed if there are no NetworkPolicies selecting the pod (and cluster policy otherwise allows the traffic), OR if the traffic matches at least one egress rule across all of the NetworkPolicy objects whose podSelector matches the pod. If this field is empty then this NetworkPolicy limits all outgoing traffic (and serves solely to ensure that the pods it selects are isolated by default). This field is beta-level in 1.8<br/>
         </td>
         <td>false</td>
       </tr><tr>
         <td><b><a href="#tenantspecnetworkpoliciesitemsindexingressindex-1">ingress</a></b></td>
         <td>[]object</td>
         <td>
-          List of ingress rules to be applied to the selected pods. Traffic is allowed to a pod if there are no NetworkPolicies selecting the pod (and cluster policy otherwise allows the traffic), OR if the traffic source is the pod's local node, OR if the traffic matches at least one ingress rule across all of the NetworkPolicy objects whose podSelector matches the pod. If this field is empty then this NetworkPolicy does not allow any traffic (and serves solely to ensure that the pods it selects are isolated by default)<br/>
+          ingress is a list of ingress rules to be applied to the selected pods. Traffic is allowed to a pod if there are no NetworkPolicies selecting the pod (and cluster policy otherwise allows the traffic), OR if the traffic source is the pod's local node, OR if the traffic matches at least one ingress rule across all of the NetworkPolicy objects whose podSelector matches the pod. If this field is empty then this NetworkPolicy does not allow any traffic (and serves solely to ensure that the pods it selects are isolated by default)<br/>
         </td>
         <td>false</td>
       </tr><tr>
         <td><b>policyTypes</b></td>
         <td>[]string</td>
         <td>
-          List of rule types that the NetworkPolicy relates to. Valid options are ["Ingress"], ["Egress"], or ["Ingress", "Egress"]. If this field is not specified, it will default based on the existence of Ingress or Egress rules; policies that contain an Egress section are assumed to affect Egress, and all policies (whether or not they contain an Ingress section) are assumed to affect Ingress. If you want to write an egress-only policy, you must explicitly specify policyTypes [ "Egress" ]. Likewise, if you want to write a policy that specifies that no egress is allowed, you must specify a policyTypes value that include "Egress" (since such a policy would not include an Egress section and would otherwise default to just [ "Ingress" ]). This field is beta-level in 1.8<br/>
+          policyTypes is a list of rule types that the NetworkPolicy relates to. Valid options are ["Ingress"], ["Egress"], or ["Ingress", "Egress"]. If this field is not specified, it will default based on the existence of ingress or egress rules; policies that contain an egress section are assumed to affect egress, and all policies (whether or not they contain an ingress section) are assumed to affect ingress. If you want to write an egress-only policy, you must explicitly specify policyTypes [ "Egress" ]. Likewise, if you want to write a policy that specifies that no egress is allowed, you must specify a policyTypes value that include "Egress" (since such a policy would not include an egress section and would otherwise default to just [ "Ingress" ]). This field is beta-level in 1.8<br/>
         </td>
         <td>false</td>
       </tr></tbody>
@@ -3728,7 +3728,7 @@ NetworkPolicySpec provides the specification of a NetworkPolicy
 
 
 
-Selects the pods to which this NetworkPolicy object applies. The array of ingress rules is applied to any pods selected by this field. Multiple network policies can select the same set of pods. In this case, the ingress rules for each are combined additively. This field is NOT optional and follows standard label selector semantics. An empty podSelector matches all pods in this namespace.
+podSelector selects the pods to which this NetworkPolicy object applies. The array of ingress rules is applied to any pods selected by this field. Multiple network policies can select the same set of pods. In this case, the ingress rules for each are combined additively. This field is NOT optional and follows standard label selector semantics. An empty podSelector matches all pods in this namespace.
 
 <table>
     <thead>
@@ -3816,14 +3816,14 @@ NetworkPolicyEgressRule describes a particular set of traffic that is allowed ou
         <td><b><a href="#tenantspecnetworkpoliciesitemsindexegressindexportsindex-1">ports</a></b></td>
         <td>[]object</td>
         <td>
-          List of destination ports for outgoing traffic. Each item in this list is combined using a logical OR. If this field is empty or missing, this rule matches all ports (traffic not restricted by port). If this field is present and contains at least one item, then this rule allows traffic only if the traffic matches at least one port in the list.<br/>
+          ports is a list of destination ports for outgoing traffic. Each item in this list is combined using a logical OR. If this field is empty or missing, this rule matches all ports (traffic not restricted by port). If this field is present and contains at least one item, then this rule allows traffic only if the traffic matches at least one port in the list.<br/>
         </td>
         <td>false</td>
       </tr><tr>
         <td><b><a href="#tenantspecnetworkpoliciesitemsindexegressindextoindex-1">to</a></b></td>
         <td>[]object</td>
         <td>
-          List of destinations for outgoing traffic of pods selected for this rule. Items in this list are combined using a logical OR operation. If this field is empty or missing, this rule matches all destinations (traffic not restricted by destination). If this field is present and contains at least one item, this rule allows traffic only if the traffic matches at least one item in the to list.<br/>
+          to is a list of destinations for outgoing traffic of pods selected for this rule. Items in this list are combined using a logical OR operation. If this field is empty or missing, this rule matches all destinations (traffic not restricted by destination). If this field is present and contains at least one item, this rule allows traffic only if the traffic matches at least one item in the to list.<br/>
         </td>
         <td>false</td>
       </tr></tbody>
@@ -3849,7 +3849,7 @@ NetworkPolicyPort describes a port to allow traffic on
         <td><b>endPort</b></td>
         <td>integer</td>
         <td>
-          If set, indicates that the range of ports from port to endPort, inclusive, should be allowed by the policy. This field cannot be defined if the port field is not defined or if the port field is defined as a named (string) port. The endPort must be equal or greater than port. This feature is in Beta state and is enabled by default. It can be disabled using the Feature Gate "NetworkPolicyEndPort".<br/>
+          endPort indicates that the range of ports from port to endPort if set, inclusive, should be allowed by the policy. This field cannot be defined if the port field is not defined or if the port field is defined as a named (string) port. The endPort must be equal or greater than port.<br/>
           <br/>
             <i>Format</i>: int32<br/>
         </td>
@@ -3858,14 +3858,14 @@ NetworkPolicyPort describes a port to allow traffic on
         <td><b>port</b></td>
         <td>int or string</td>
         <td>
-          The port on the given protocol. This can either be a numerical or named port on a pod. If this field is not provided, this matches all port names and numbers. If present, only traffic on the specified protocol AND port will be matched.<br/>
+          port represents the port on the given protocol. This can either be a numerical or named port on a pod. If this field is not provided, this matches all port names and numbers. If present, only traffic on the specified protocol AND port will be matched.<br/>
         </td>
         <td>false</td>
       </tr><tr>
         <td><b>protocol</b></td>
         <td>string</td>
         <td>
-          The protocol (TCP, UDP, or SCTP) which traffic must match. If not specified, this field defaults to TCP.<br/>
+          protocol represents the protocol (TCP, UDP, or SCTP) which traffic must match. If not specified, this field defaults to TCP.<br/>
           <br/>
             <i>Default</i>: TCP<br/>
         </td>
@@ -3893,23 +3893,23 @@ NetworkPolicyPeer describes a peer to allow traffic to/from. Only certain combin
         <td><b><a href="#tenantspecnetworkpoliciesitemsindexegressindextoindexipblock-1">ipBlock</a></b></td>
         <td>object</td>
         <td>
-          IPBlock defines policy on a particular IPBlock. If this field is set then neither of the other fields can be.<br/>
+          ipBlock defines policy on a particular IPBlock. If this field is set then neither of the other fields can be.<br/>
         </td>
         <td>false</td>
       </tr><tr>
         <td><b><a href="#tenantspecnetworkpoliciesitemsindexegressindextoindexnamespaceselector-1">namespaceSelector</a></b></td>
         <td>object</td>
         <td>
-          Selects Namespaces using cluster-scoped labels. This field follows standard label selector semantics; if present but empty, it selects all namespaces. 
- If PodSelector is also set, then the NetworkPolicyPeer as a whole selects the Pods matching PodSelector in the Namespaces selected by NamespaceSelector. Otherwise it selects all Pods in the Namespaces selected by NamespaceSelector.<br/>
+          namespaceSelector selects namespaces using cluster-scoped labels. This field follows standard label selector semantics; if present but empty, it selects all namespaces. 
+ If podSelector is also set, then the NetworkPolicyPeer as a whole selects the pods matching podSelector in the namespaces selected by namespaceSelector. Otherwise it selects all pods in the namespaces selected by namespaceSelector.<br/>
         </td>
         <td>false</td>
       </tr><tr>
         <td><b><a href="#tenantspecnetworkpoliciesitemsindexegressindextoindexpodselector-1">podSelector</a></b></td>
         <td>object</td>
         <td>
-          This is a label selector which selects Pods. This field follows standard label selector semantics; if present but empty, it selects all pods. 
- If NamespaceSelector is also set, then the NetworkPolicyPeer as a whole selects the Pods matching PodSelector in the Namespaces selected by NamespaceSelector. Otherwise it selects the Pods matching PodSelector in the policy's own Namespace.<br/>
+          podSelector is a label selector which selects pods. This field follows standard label selector semantics; if present but empty, it selects all pods. 
+ If namespaceSelector is also set, then the NetworkPolicyPeer as a whole selects the pods matching podSelector in the Namespaces selected by NamespaceSelector. Otherwise it selects the pods matching podSelector in the policy's own namespace.<br/>
         </td>
         <td>false</td>
       </tr></tbody>
@@ -3920,7 +3920,7 @@ NetworkPolicyPeer describes a peer to allow traffic to/from. Only certain combin
 
 
 
-IPBlock defines policy on a particular IPBlock. If this field is set then neither of the other fields can be.
+ipBlock defines policy on a particular IPBlock. If this field is set then neither of the other fields can be.
 
 <table>
     <thead>
@@ -3935,14 +3935,14 @@ IPBlock defines policy on a particular IPBlock. If this field is set then neithe
         <td><b>cidr</b></td>
         <td>string</td>
         <td>
-          CIDR is a string representing the IP Block Valid examples are "192.168.1.1/24" or "2001:db9::/64"<br/>
+          cidr is a string representing the IPBlock Valid examples are "192.168.1.0/24" or "2001:db8::/64"<br/>
         </td>
         <td>true</td>
       </tr><tr>
         <td><b>except</b></td>
         <td>[]string</td>
         <td>
-          Except is a slice of CIDRs that should not be included within an IP Block Valid examples are "192.168.1.1/24" or "2001:db9::/64" Except values will be rejected if they are outside the CIDR range<br/>
+          except is a slice of CIDRs that should not be included within an IPBlock Valid examples are "192.168.1.0/24" or "2001:db8::/64" Except values will be rejected if they are outside the cidr range<br/>
         </td>
         <td>false</td>
       </tr></tbody>
@@ -3953,8 +3953,8 @@ IPBlock defines policy on a particular IPBlock. If this field is set then neithe
 
 
 
-Selects Namespaces using cluster-scoped labels. This field follows standard label selector semantics; if present but empty, it selects all namespaces. 
- If PodSelector is also set, then the NetworkPolicyPeer as a whole selects the Pods matching PodSelector in the Namespaces selected by NamespaceSelector. Otherwise it selects all Pods in the Namespaces selected by NamespaceSelector.
+namespaceSelector selects namespaces using cluster-scoped labels. This field follows standard label selector semantics; if present but empty, it selects all namespaces. 
+ If podSelector is also set, then the NetworkPolicyPeer as a whole selects the pods matching podSelector in the namespaces selected by namespaceSelector. Otherwise it selects all pods in the namespaces selected by namespaceSelector.
 
 <table>
     <thead>
@@ -4027,8 +4027,8 @@ A label selector requirement is a selector that contains values, a key, and an o
 
 
 
-This is a label selector which selects Pods. This field follows standard label selector semantics; if present but empty, it selects all pods. 
- If NamespaceSelector is also set, then the NetworkPolicyPeer as a whole selects the Pods matching PodSelector in the Namespaces selected by NamespaceSelector. Otherwise it selects the Pods matching PodSelector in the policy's own Namespace.
+podSelector is a label selector which selects pods. This field follows standard label selector semantics; if present but empty, it selects all pods. 
+ If namespaceSelector is also set, then the NetworkPolicyPeer as a whole selects the pods matching podSelector in the Namespaces selected by NamespaceSelector. Otherwise it selects the pods matching podSelector in the policy's own namespace.
 
 <table>
     <thead>
@@ -4116,14 +4116,14 @@ NetworkPolicyIngressRule describes a particular set of traffic that is allowed t
         <td><b><a href="#tenantspecnetworkpoliciesitemsindexingressindexfromindex-1">from</a></b></td>
         <td>[]object</td>
         <td>
-          List of sources which should be able to access the pods selected for this rule. Items in this list are combined using a logical OR operation. If this field is empty or missing, this rule matches all sources (traffic not restricted by source). If this field is present and contains at least one item, this rule allows traffic only if the traffic matches at least one item in the from list.<br/>
+          from is a list of sources which should be able to access the pods selected for this rule. Items in this list are combined using a logical OR operation. If this field is empty or missing, this rule matches all sources (traffic not restricted by source). If this field is present and contains at least one item, this rule allows traffic only if the traffic matches at least one item in the from list.<br/>
         </td>
         <td>false</td>
       </tr><tr>
         <td><b><a href="#tenantspecnetworkpoliciesitemsindexingressindexportsindex-1">ports</a></b></td>
         <td>[]object</td>
         <td>
-          List of ports which should be made accessible on the pods selected for this rule. Each item in this list is combined using a logical OR. If this field is empty or missing, this rule matches all ports (traffic not restricted by port). If this field is present and contains at least one item, then this rule allows traffic only if the traffic matches at least one port in the list.<br/>
+          ports is a list of ports which should be made accessible on the pods selected for this rule. Each item in this list is combined using a logical OR. If this field is empty or missing, this rule matches all ports (traffic not restricted by port). If this field is present and contains at least one item, then this rule allows traffic only if the traffic matches at least one port in the list.<br/>
         </td>
         <td>false</td>
       </tr></tbody>
@@ -4149,23 +4149,23 @@ NetworkPolicyPeer describes a peer to allow traffic to/from. Only certain combin
         <td><b><a href="#tenantspecnetworkpoliciesitemsindexingressindexfromindexipblock-1">ipBlock</a></b></td>
         <td>object</td>
         <td>
-          IPBlock defines policy on a particular IPBlock. If this field is set then neither of the other fields can be.<br/>
+          ipBlock defines policy on a particular IPBlock. If this field is set then neither of the other fields can be.<br/>
         </td>
         <td>false</td>
       </tr><tr>
         <td><b><a href="#tenantspecnetworkpoliciesitemsindexingressindexfromindexnamespaceselector-1">namespaceSelector</a></b></td>
         <td>object</td>
         <td>
-          Selects Namespaces using cluster-scoped labels. This field follows standard label selector semantics; if present but empty, it selects all namespaces. 
- If PodSelector is also set, then the NetworkPolicyPeer as a whole selects the Pods matching PodSelector in the Namespaces selected by NamespaceSelector. Otherwise it selects all Pods in the Namespaces selected by NamespaceSelector.<br/>
+          namespaceSelector selects namespaces using cluster-scoped labels. This field follows standard label selector semantics; if present but empty, it selects all namespaces. 
+ If podSelector is also set, then the NetworkPolicyPeer as a whole selects the pods matching podSelector in the namespaces selected by namespaceSelector. Otherwise it selects all pods in the namespaces selected by namespaceSelector.<br/>
         </td>
         <td>false</td>
       </tr><tr>
         <td><b><a href="#tenantspecnetworkpoliciesitemsindexingressindexfromindexpodselector-1">podSelector</a></b></td>
         <td>object</td>
         <td>
-          This is a label selector which selects Pods. This field follows standard label selector semantics; if present but empty, it selects all pods. 
- If NamespaceSelector is also set, then the NetworkPolicyPeer as a whole selects the Pods matching PodSelector in the Namespaces selected by NamespaceSelector. Otherwise it selects the Pods matching PodSelector in the policy's own Namespace.<br/>
+          podSelector is a label selector which selects pods. This field follows standard label selector semantics; if present but empty, it selects all pods. 
+ If namespaceSelector is also set, then the NetworkPolicyPeer as a whole selects the pods matching podSelector in the Namespaces selected by NamespaceSelector. Otherwise it selects the pods matching podSelector in the policy's own namespace.<br/>
         </td>
         <td>false</td>
       </tr></tbody>
@@ -4176,7 +4176,7 @@ NetworkPolicyPeer describes a peer to allow traffic to/from. Only certain combin
 
 
 
-IPBlock defines policy on a particular IPBlock. If this field is set then neither of the other fields can be.
+ipBlock defines policy on a particular IPBlock. If this field is set then neither of the other fields can be.
 
 <table>
     <thead>
@@ -4191,14 +4191,14 @@ IPBlock defines policy on a particular IPBlock. If this field is set then neithe
         <td><b>cidr</b></td>
         <td>string</td>
         <td>
-          CIDR is a string representing the IP Block Valid examples are "192.168.1.1/24" or "2001:db9::/64"<br/>
+          cidr is a string representing the IPBlock Valid examples are "192.168.1.0/24" or "2001:db8::/64"<br/>
         </td>
         <td>true</td>
       </tr><tr>
         <td><b>except</b></td>
         <td>[]string</td>
         <td>
-          Except is a slice of CIDRs that should not be included within an IP Block Valid examples are "192.168.1.1/24" or "2001:db9::/64" Except values will be rejected if they are outside the CIDR range<br/>
+          except is a slice of CIDRs that should not be included within an IPBlock Valid examples are "192.168.1.0/24" or "2001:db8::/64" Except values will be rejected if they are outside the cidr range<br/>
         </td>
         <td>false</td>
       </tr></tbody>
@@ -4209,8 +4209,8 @@ IPBlock defines policy on a particular IPBlock. If this field is set then neithe
 
 
 
-Selects Namespaces using cluster-scoped labels. This field follows standard label selector semantics; if present but empty, it selects all namespaces. 
- If PodSelector is also set, then the NetworkPolicyPeer as a whole selects the Pods matching PodSelector in the Namespaces selected by NamespaceSelector. Otherwise it selects all Pods in the Namespaces selected by NamespaceSelector.
+namespaceSelector selects namespaces using cluster-scoped labels. This field follows standard label selector semantics; if present but empty, it selects all namespaces. 
+ If podSelector is also set, then the NetworkPolicyPeer as a whole selects the pods matching podSelector in the namespaces selected by namespaceSelector. Otherwise it selects all pods in the namespaces selected by namespaceSelector.
 
 <table>
     <thead>
@@ -4283,8 +4283,8 @@ A label selector requirement is a selector that contains values, a key, and an o
 
 
 
-This is a label selector which selects Pods. This field follows standard label selector semantics; if present but empty, it selects all pods. 
- If NamespaceSelector is also set, then the NetworkPolicyPeer as a whole selects the Pods matching PodSelector in the Namespaces selected by NamespaceSelector. Otherwise it selects the Pods matching PodSelector in the policy's own Namespace.
+podSelector is a label selector which selects pods. This field follows standard label selector semantics; if present but empty, it selects all pods. 
+ If namespaceSelector is also set, then the NetworkPolicyPeer as a whole selects the pods matching podSelector in the Namespaces selected by NamespaceSelector. Otherwise it selects the pods matching podSelector in the policy's own namespace.
 
 <table>
     <thead>
@@ -4372,7 +4372,7 @@ NetworkPolicyPort describes a port to allow traffic on
         <td><b>endPort</b></td>
         <td>integer</td>
         <td>
-          If set, indicates that the range of ports from port to endPort, inclusive, should be allowed by the policy. This field cannot be defined if the port field is not defined or if the port field is defined as a named (string) port. The endPort must be equal or greater than port. This feature is in Beta state and is enabled by default. It can be disabled using the Feature Gate "NetworkPolicyEndPort".<br/>
+          endPort indicates that the range of ports from port to endPort if set, inclusive, should be allowed by the policy. This field cannot be defined if the port field is not defined or if the port field is defined as a named (string) port. The endPort must be equal or greater than port.<br/>
           <br/>
             <i>Format</i>: int32<br/>
         </td>
@@ -4381,14 +4381,14 @@ NetworkPolicyPort describes a port to allow traffic on
         <td><b>port</b></td>
         <td>int or string</td>
         <td>
-          The port on the given protocol. This can either be a numerical or named port on a pod. If this field is not provided, this matches all port names and numbers. If present, only traffic on the specified protocol AND port will be matched.<br/>
+          port represents the port on the given protocol. This can either be a numerical or named port on a pod. If this field is not provided, this matches all port names and numbers. If present, only traffic on the specified protocol AND port will be matched.<br/>
         </td>
         <td>false</td>
       </tr><tr>
         <td><b>protocol</b></td>
         <td>string</td>
         <td>
-          The protocol (TCP, UDP, or SCTP) which traffic must match. If not specified, this field defaults to TCP.<br/>
+          protocol represents the protocol (TCP, UDP, or SCTP) which traffic must match. If not specified, this field defaults to TCP.<br/>
           <br/>
             <i>Default</i>: TCP<br/>
         </td>
@@ -5703,28 +5703,28 @@ NetworkPolicySpec provides the specification of a NetworkPolicy
         <td><b><a href="#tenantspecnetworkpoliciesitemsindexpodselector">podSelector</a></b></td>
         <td>object</td>
         <td>
-          Selects the pods to which this NetworkPolicy object applies. The array of ingress rules is applied to any pods selected by this field. Multiple network policies can select the same set of pods. In this case, the ingress rules for each are combined additively. This field is NOT optional and follows standard label selector semantics. An empty podSelector matches all pods in this namespace.<br/>
+          podSelector selects the pods to which this NetworkPolicy object applies. The array of ingress rules is applied to any pods selected by this field. Multiple network policies can select the same set of pods. In this case, the ingress rules for each are combined additively. This field is NOT optional and follows standard label selector semantics. An empty podSelector matches all pods in this namespace.<br/>
         </td>
         <td>true</td>
       </tr><tr>
         <td><b><a href="#tenantspecnetworkpoliciesitemsindexegressindex">egress</a></b></td>
         <td>[]object</td>
         <td>
-          List of egress rules to be applied to the selected pods. Outgoing traffic is allowed if there are no NetworkPolicies selecting the pod (and cluster policy otherwise allows the traffic), OR if the traffic matches at least one egress rule across all of the NetworkPolicy objects whose podSelector matches the pod. If this field is empty then this NetworkPolicy limits all outgoing traffic (and serves solely to ensure that the pods it selects are isolated by default). This field is beta-level in 1.8<br/>
+          egress is a list of egress rules to be applied to the selected pods. Outgoing traffic is allowed if there are no NetworkPolicies selecting the pod (and cluster policy otherwise allows the traffic), OR if the traffic matches at least one egress rule across all of the NetworkPolicy objects whose podSelector matches the pod. If this field is empty then this NetworkPolicy limits all outgoing traffic (and serves solely to ensure that the pods it selects are isolated by default). This field is beta-level in 1.8<br/>
         </td>
         <td>false</td>
       </tr><tr>
         <td><b><a href="#tenantspecnetworkpoliciesitemsindexingressindex">ingress</a></b></td>
         <td>[]object</td>
         <td>
-          List of ingress rules to be applied to the selected pods. Traffic is allowed to a pod if there are no NetworkPolicies selecting the pod (and cluster policy otherwise allows the traffic), OR if the traffic source is the pod's local node, OR if the traffic matches at least one ingress rule across all of the NetworkPolicy objects whose podSelector matches the pod. If this field is empty then this NetworkPolicy does not allow any traffic (and serves solely to ensure that the pods it selects are isolated by default)<br/>
+          ingress is a list of ingress rules to be applied to the selected pods. Traffic is allowed to a pod if there are no NetworkPolicies selecting the pod (and cluster policy otherwise allows the traffic), OR if the traffic source is the pod's local node, OR if the traffic matches at least one ingress rule across all of the NetworkPolicy objects whose podSelector matches the pod. If this field is empty then this NetworkPolicy does not allow any traffic (and serves solely to ensure that the pods it selects are isolated by default)<br/>
         </td>
         <td>false</td>
       </tr><tr>
         <td><b>policyTypes</b></td>
         <td>[]string</td>
         <td>
-          List of rule types that the NetworkPolicy relates to. Valid options are ["Ingress"], ["Egress"], or ["Ingress", "Egress"]. If this field is not specified, it will default based on the existence of Ingress or Egress rules; policies that contain an Egress section are assumed to affect Egress, and all policies (whether or not they contain an Ingress section) are assumed to affect Ingress. If you want to write an egress-only policy, you must explicitly specify policyTypes [ "Egress" ]. Likewise, if you want to write a policy that specifies that no egress is allowed, you must specify a policyTypes value that include "Egress" (since such a policy would not include an Egress section and would otherwise default to just [ "Ingress" ]). This field is beta-level in 1.8<br/>
+          policyTypes is a list of rule types that the NetworkPolicy relates to. Valid options are ["Ingress"], ["Egress"], or ["Ingress", "Egress"]. If this field is not specified, it will default based on the existence of ingress or egress rules; policies that contain an egress section are assumed to affect egress, and all policies (whether or not they contain an ingress section) are assumed to affect ingress. If you want to write an egress-only policy, you must explicitly specify policyTypes [ "Egress" ]. Likewise, if you want to write a policy that specifies that no egress is allowed, you must specify a policyTypes value that include "Egress" (since such a policy would not include an egress section and would otherwise default to just [ "Ingress" ]). This field is beta-level in 1.8<br/>
         </td>
         <td>false</td>
       </tr></tbody>
@@ -5735,7 +5735,7 @@ NetworkPolicySpec provides the specification of a NetworkPolicy
 
 
 
-Selects the pods to which this NetworkPolicy object applies. The array of ingress rules is applied to any pods selected by this field. Multiple network policies can select the same set of pods. In this case, the ingress rules for each are combined additively. This field is NOT optional and follows standard label selector semantics. An empty podSelector matches all pods in this namespace.
+podSelector selects the pods to which this NetworkPolicy object applies. The array of ingress rules is applied to any pods selected by this field. Multiple network policies can select the same set of pods. In this case, the ingress rules for each are combined additively. This field is NOT optional and follows standard label selector semantics. An empty podSelector matches all pods in this namespace.
 
 <table>
     <thead>
@@ -5823,14 +5823,14 @@ NetworkPolicyEgressRule describes a particular set of traffic that is allowed ou
         <td><b><a href="#tenantspecnetworkpoliciesitemsindexegressindexportsindex">ports</a></b></td>
         <td>[]object</td>
         <td>
-          List of destination ports for outgoing traffic. Each item in this list is combined using a logical OR. If this field is empty or missing, this rule matches all ports (traffic not restricted by port). If this field is present and contains at least one item, then this rule allows traffic only if the traffic matches at least one port in the list.<br/>
+          ports is a list of destination ports for outgoing traffic. Each item in this list is combined using a logical OR. If this field is empty or missing, this rule matches all ports (traffic not restricted by port). If this field is present and contains at least one item, then this rule allows traffic only if the traffic matches at least one port in the list.<br/>
         </td>
         <td>false</td>
       </tr><tr>
         <td><b><a href="#tenantspecnetworkpoliciesitemsindexegressindextoindex">to</a></b></td>
         <td>[]object</td>
         <td>
-          List of destinations for outgoing traffic of pods selected for this rule. Items in this list are combined using a logical OR operation. If this field is empty or missing, this rule matches all destinations (traffic not restricted by destination). If this field is present and contains at least one item, this rule allows traffic only if the traffic matches at least one item in the to list.<br/>
+          to is a list of destinations for outgoing traffic of pods selected for this rule. Items in this list are combined using a logical OR operation. If this field is empty or missing, this rule matches all destinations (traffic not restricted by destination). If this field is present and contains at least one item, this rule allows traffic only if the traffic matches at least one item in the to list.<br/>
         </td>
         <td>false</td>
       </tr></tbody>
@@ -5856,7 +5856,7 @@ NetworkPolicyPort describes a port to allow traffic on
         <td><b>endPort</b></td>
         <td>integer</td>
         <td>
-          If set, indicates that the range of ports from port to endPort, inclusive, should be allowed by the policy. This field cannot be defined if the port field is not defined or if the port field is defined as a named (string) port. The endPort must be equal or greater than port. This feature is in Beta state and is enabled by default. It can be disabled using the Feature Gate "NetworkPolicyEndPort".<br/>
+          endPort indicates that the range of ports from port to endPort if set, inclusive, should be allowed by the policy. This field cannot be defined if the port field is not defined or if the port field is defined as a named (string) port. The endPort must be equal or greater than port.<br/>
           <br/>
             <i>Format</i>: int32<br/>
         </td>
@@ -5865,14 +5865,14 @@ NetworkPolicyPort describes a port to allow traffic on
         <td><b>port</b></td>
         <td>int or string</td>
         <td>
-          The port on the given protocol. This can either be a numerical or named port on a pod. If this field is not provided, this matches all port names and numbers. If present, only traffic on the specified protocol AND port will be matched.<br/>
+          port represents the port on the given protocol. This can either be a numerical or named port on a pod. If this field is not provided, this matches all port names and numbers. If present, only traffic on the specified protocol AND port will be matched.<br/>
         </td>
         <td>false</td>
       </tr><tr>
         <td><b>protocol</b></td>
         <td>string</td>
         <td>
-          The protocol (TCP, UDP, or SCTP) which traffic must match. If not specified, this field defaults to TCP.<br/>
+          protocol represents the protocol (TCP, UDP, or SCTP) which traffic must match. If not specified, this field defaults to TCP.<br/>
           <br/>
             <i>Default</i>: TCP<br/>
         </td>
@@ -5900,23 +5900,23 @@ NetworkPolicyPeer describes a peer to allow traffic to/from. Only certain combin
         <td><b><a href="#tenantspecnetworkpoliciesitemsindexegressindextoindexipblock">ipBlock</a></b></td>
         <td>object</td>
         <td>
-          IPBlock defines policy on a particular IPBlock. If this field is set then neither of the other fields can be.<br/>
+          ipBlock defines policy on a particular IPBlock. If this field is set then neither of the other fields can be.<br/>
         </td>
         <td>false</td>
       </tr><tr>
         <td><b><a href="#tenantspecnetworkpoliciesitemsindexegressindextoindexnamespaceselector">namespaceSelector</a></b></td>
         <td>object</td>
         <td>
-          Selects Namespaces using cluster-scoped labels. This field follows standard label selector semantics; if present but empty, it selects all namespaces. 
- If PodSelector is also set, then the NetworkPolicyPeer as a whole selects the Pods matching PodSelector in the Namespaces selected by NamespaceSelector. Otherwise it selects all Pods in the Namespaces selected by NamespaceSelector.<br/>
+          namespaceSelector selects namespaces using cluster-scoped labels. This field follows standard label selector semantics; if present but empty, it selects all namespaces. 
+ If podSelector is also set, then the NetworkPolicyPeer as a whole selects the pods matching podSelector in the namespaces selected by namespaceSelector. Otherwise it selects all pods in the namespaces selected by namespaceSelector.<br/>
         </td>
         <td>false</td>
       </tr><tr>
         <td><b><a href="#tenantspecnetworkpoliciesitemsindexegressindextoindexpodselector">podSelector</a></b></td>
         <td>object</td>
         <td>
-          This is a label selector which selects Pods. This field follows standard label selector semantics; if present but empty, it selects all pods. 
- If NamespaceSelector is also set, then the NetworkPolicyPeer as a whole selects the Pods matching PodSelector in the Namespaces selected by NamespaceSelector. Otherwise it selects the Pods matching PodSelector in the policy's own Namespace.<br/>
+          podSelector is a label selector which selects pods. This field follows standard label selector semantics; if present but empty, it selects all pods. 
+ If namespaceSelector is also set, then the NetworkPolicyPeer as a whole selects the pods matching podSelector in the Namespaces selected by NamespaceSelector. Otherwise it selects the pods matching podSelector in the policy's own namespace.<br/>
         </td>
         <td>false</td>
       </tr></tbody>
@@ -5927,7 +5927,7 @@ NetworkPolicyPeer describes a peer to allow traffic to/from. Only certain combin
 
 
 
-IPBlock defines policy on a particular IPBlock. If this field is set then neither of the other fields can be.
+ipBlock defines policy on a particular IPBlock. If this field is set then neither of the other fields can be.
 
 <table>
     <thead>
@@ -5942,14 +5942,14 @@ IPBlock defines policy on a particular IPBlock. If this field is set then neithe
         <td><b>cidr</b></td>
         <td>string</td>
         <td>
-          CIDR is a string representing the IP Block Valid examples are "192.168.1.1/24" or "2001:db9::/64"<br/>
+          cidr is a string representing the IPBlock Valid examples are "192.168.1.0/24" or "2001:db8::/64"<br/>
         </td>
         <td>true</td>
       </tr><tr>
         <td><b>except</b></td>
         <td>[]string</td>
         <td>
-          Except is a slice of CIDRs that should not be included within an IP Block Valid examples are "192.168.1.1/24" or "2001:db9::/64" Except values will be rejected if they are outside the CIDR range<br/>
+          except is a slice of CIDRs that should not be included within an IPBlock Valid examples are "192.168.1.0/24" or "2001:db8::/64" Except values will be rejected if they are outside the cidr range<br/>
         </td>
         <td>false</td>
       </tr></tbody>
@@ -5960,8 +5960,8 @@ IPBlock defines policy on a particular IPBlock. If this field is set then neithe
 
 
 
-Selects Namespaces using cluster-scoped labels. This field follows standard label selector semantics; if present but empty, it selects all namespaces. 
- If PodSelector is also set, then the NetworkPolicyPeer as a whole selects the Pods matching PodSelector in the Namespaces selected by NamespaceSelector. Otherwise it selects all Pods in the Namespaces selected by NamespaceSelector.
+namespaceSelector selects namespaces using cluster-scoped labels. This field follows standard label selector semantics; if present but empty, it selects all namespaces. 
+ If podSelector is also set, then the NetworkPolicyPeer as a whole selects the pods matching podSelector in the namespaces selected by namespaceSelector. Otherwise it selects all pods in the namespaces selected by namespaceSelector.
 
 <table>
     <thead>
@@ -6034,8 +6034,8 @@ A label selector requirement is a selector that contains values, a key, and an o
 
 
 
-This is a label selector which selects Pods. This field follows standard label selector semantics; if present but empty, it selects all pods. 
- If NamespaceSelector is also set, then the NetworkPolicyPeer as a whole selects the Pods matching PodSelector in the Namespaces selected by NamespaceSelector. Otherwise it selects the Pods matching PodSelector in the policy's own Namespace.
+podSelector is a label selector which selects pods. This field follows standard label selector semantics; if present but empty, it selects all pods. 
+ If namespaceSelector is also set, then the NetworkPolicyPeer as a whole selects the pods matching podSelector in the Namespaces selected by NamespaceSelector. Otherwise it selects the pods matching podSelector in the policy's own namespace.
 
 <table>
     <thead>
@@ -6123,14 +6123,14 @@ NetworkPolicyIngressRule describes a particular set of traffic that is allowed t
         <td><b><a href="#tenantspecnetworkpoliciesitemsindexingressindexfromindex">from</a></b></td>
         <td>[]object</td>
         <td>
-          List of sources which should be able to access the pods selected for this rule. Items in this list are combined using a logical OR operation. If this field is empty or missing, this rule matches all sources (traffic not restricted by source). If this field is present and contains at least one item, this rule allows traffic only if the traffic matches at least one item in the from list.<br/>
+          from is a list of sources which should be able to access the pods selected for this rule. Items in this list are combined using a logical OR operation. If this field is empty or missing, this rule matches all sources (traffic not restricted by source). If this field is present and contains at least one item, this rule allows traffic only if the traffic matches at least one item in the from list.<br/>
         </td>
         <td>false</td>
       </tr><tr>
         <td><b><a href="#tenantspecnetworkpoliciesitemsindexingressindexportsindex">ports</a></b></td>
         <td>[]object</td>
         <td>
-          List of ports which should be made accessible on the pods selected for this rule. Each item in this list is combined using a logical OR. If this field is empty or missing, this rule matches all ports (traffic not restricted by port). If this field is present and contains at least one item, then this rule allows traffic only if the traffic matches at least one port in the list.<br/>
+          ports is a list of ports which should be made accessible on the pods selected for this rule. Each item in this list is combined using a logical OR. If this field is empty or missing, this rule matches all ports (traffic not restricted by port). If this field is present and contains at least one item, then this rule allows traffic only if the traffic matches at least one port in the list.<br/>
         </td>
         <td>false</td>
       </tr></tbody>
@@ -6156,23 +6156,23 @@ NetworkPolicyPeer describes a peer to allow traffic to/from. Only certain combin
         <td><b><a href="#tenantspecnetworkpoliciesitemsindexingressindexfromindexipblock">ipBlock</a></b></td>
         <td>object</td>
         <td>
-          IPBlock defines policy on a particular IPBlock. If this field is set then neither of the other fields can be.<br/>
+          ipBlock defines policy on a particular IPBlock. If this field is set then neither of the other fields can be.<br/>
         </td>
         <td>false</td>
       </tr><tr>
         <td><b><a href="#tenantspecnetworkpoliciesitemsindexingressindexfromindexnamespaceselector">namespaceSelector</a></b></td>
         <td>object</td>
         <td>
-          Selects Namespaces using cluster-scoped labels. This field follows standard label selector semantics; if present but empty, it selects all namespaces. 
- If PodSelector is also set, then the NetworkPolicyPeer as a whole selects the Pods matching PodSelector in the Namespaces selected by NamespaceSelector. Otherwise it selects all Pods in the Namespaces selected by NamespaceSelector.<br/>
+          namespaceSelector selects namespaces using cluster-scoped labels. This field follows standard label selector semantics; if present but empty, it selects all namespaces. 
+ If podSelector is also set, then the NetworkPolicyPeer as a whole selects the pods matching podSelector in the namespaces selected by namespaceSelector. Otherwise it selects all pods in the namespaces selected by namespaceSelector.<br/>
         </td>
         <td>false</td>
       </tr><tr>
         <td><b><a href="#tenantspecnetworkpoliciesitemsindexingressindexfromindexpodselector">podSelector</a></b></td>
         <td>object</td>
         <td>
-          This is a label selector which selects Pods. This field follows standard label selector semantics; if present but empty, it selects all pods. 
- If NamespaceSelector is also set, then the NetworkPolicyPeer as a whole selects the Pods matching PodSelector in the Namespaces selected by NamespaceSelector. Otherwise it selects the Pods matching PodSelector in the policy's own Namespace.<br/>
+          podSelector is a label selector which selects pods. This field follows standard label selector semantics; if present but empty, it selects all pods. 
+ If namespaceSelector is also set, then the NetworkPolicyPeer as a whole selects the pods matching podSelector in the Namespaces selected by NamespaceSelector. Otherwise it selects the pods matching podSelector in the policy's own namespace.<br/>
         </td>
         <td>false</td>
       </tr></tbody>
@@ -6183,7 +6183,7 @@ NetworkPolicyPeer describes a peer to allow traffic to/from. Only certain combin
 
 
 
-IPBlock defines policy on a particular IPBlock. If this field is set then neither of the other fields can be.
+ipBlock defines policy on a particular IPBlock. If this field is set then neither of the other fields can be.
 
 <table>
     <thead>
@@ -6198,14 +6198,14 @@ IPBlock defines policy on a particular IPBlock. If this field is set then neithe
         <td><b>cidr</b></td>
         <td>string</td>
         <td>
-          CIDR is a string representing the IP Block Valid examples are "192.168.1.1/24" or "2001:db9::/64"<br/>
+          cidr is a string representing the IPBlock Valid examples are "192.168.1.0/24" or "2001:db8::/64"<br/>
         </td>
         <td>true</td>
       </tr><tr>
         <td><b>except</b></td>
         <td>[]string</td>
         <td>
-          Except is a slice of CIDRs that should not be included within an IP Block Valid examples are "192.168.1.1/24" or "2001:db9::/64" Except values will be rejected if they are outside the CIDR range<br/>
+          except is a slice of CIDRs that should not be included within an IPBlock Valid examples are "192.168.1.0/24" or "2001:db8::/64" Except values will be rejected if they are outside the cidr range<br/>
         </td>
         <td>false</td>
       </tr></tbody>
@@ -6216,8 +6216,8 @@ IPBlock defines policy on a particular IPBlock. If this field is set then neithe
 
 
 
-Selects Namespaces using cluster-scoped labels. This field follows standard label selector semantics; if present but empty, it selects all namespaces. 
- If PodSelector is also set, then the NetworkPolicyPeer as a whole selects the Pods matching PodSelector in the Namespaces selected by NamespaceSelector. Otherwise it selects all Pods in the Namespaces selected by NamespaceSelector.
+namespaceSelector selects namespaces using cluster-scoped labels. This field follows standard label selector semantics; if present but empty, it selects all namespaces. 
+ If podSelector is also set, then the NetworkPolicyPeer as a whole selects the pods matching podSelector in the namespaces selected by namespaceSelector. Otherwise it selects all pods in the namespaces selected by namespaceSelector.
 
 <table>
     <thead>
@@ -6290,8 +6290,8 @@ A label selector requirement is a selector that contains values, a key, and an o
 
 
 
-This is a label selector which selects Pods. This field follows standard label selector semantics; if present but empty, it selects all pods. 
- If NamespaceSelector is also set, then the NetworkPolicyPeer as a whole selects the Pods matching PodSelector in the Namespaces selected by NamespaceSelector. Otherwise it selects the Pods matching PodSelector in the policy's own Namespace.
+podSelector is a label selector which selects pods. This field follows standard label selector semantics; if present but empty, it selects all pods. 
+ If namespaceSelector is also set, then the NetworkPolicyPeer as a whole selects the pods matching podSelector in the Namespaces selected by NamespaceSelector. Otherwise it selects the pods matching podSelector in the policy's own namespace.
 
 <table>
     <thead>
@@ -6379,7 +6379,7 @@ NetworkPolicyPort describes a port to allow traffic on
         <td><b>endPort</b></td>
         <td>integer</td>
         <td>
-          If set, indicates that the range of ports from port to endPort, inclusive, should be allowed by the policy. This field cannot be defined if the port field is not defined or if the port field is defined as a named (string) port. The endPort must be equal or greater than port. This feature is in Beta state and is enabled by default. It can be disabled using the Feature Gate "NetworkPolicyEndPort".<br/>
+          endPort indicates that the range of ports from port to endPort if set, inclusive, should be allowed by the policy. This field cannot be defined if the port field is not defined or if the port field is defined as a named (string) port. The endPort must be equal or greater than port.<br/>
           <br/>
             <i>Format</i>: int32<br/>
         </td>
@@ -6388,14 +6388,14 @@ NetworkPolicyPort describes a port to allow traffic on
         <td><b>port</b></td>
         <td>int or string</td>
         <td>
-          The port on the given protocol. This can either be a numerical or named port on a pod. If this field is not provided, this matches all port names and numbers. If present, only traffic on the specified protocol AND port will be matched.<br/>
+          port represents the port on the given protocol. This can either be a numerical or named port on a pod. If this field is not provided, this matches all port names and numbers. If present, only traffic on the specified protocol AND port will be matched.<br/>
         </td>
         <td>false</td>
       </tr><tr>
         <td><b>protocol</b></td>
         <td>string</td>
         <td>
-          The protocol (TCP, UDP, or SCTP) which traffic must match. If not specified, this field defaults to TCP.<br/>
+          protocol represents the protocol (TCP, UDP, or SCTP) which traffic must match. If not specified, this field defaults to TCP.<br/>
           <br/>
             <i>Default</i>: TCP<br/>
         </td>
