@@ -25,6 +25,11 @@ var (
 					Resources: []string{"namespaces"},
 					Verbs:     []string{"create", "patch"},
 				},
+				{
+					APIGroups: []string{"capsule.clastix.io"},
+					Resources: []string{"tenants/finalizers"},
+					Verbs:     []string{"update"},
+				},
 			},
 		},
 		DeleterRoleName: {
