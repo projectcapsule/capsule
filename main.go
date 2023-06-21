@@ -266,6 +266,11 @@ func main() {
 		os.Exit(1)
 	}
 
+	if err = (rbaccontroller.OwnerReferencesPermissionEnforcement{Client: manager.GetClient()}).SetupWithManager(manager); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "OwnerReferencesPermissionEnforcement")
+		os.Exit(1)
+	}
+
 	if err = (&servicelabelscontroller.ServicesLabelsReconciler{
 		Log: ctrl.Log.WithName("controllers").WithName("ServiceLabels"),
 	}).SetupWithManager(ctx, manager); err != nil {
