@@ -265,7 +265,7 @@ webhooks:
 {{- end }}
     service:
       name: capsule-webhook-service
-      namespace: capsule-system
+      namespace: {{ .Release.Namespace }}
       path: /tenantresource-objects
   failurePolicy:  {{ .Values.webhooks.tenantResourceObjects.failurePolicy }}
   name: resource-objects.tenant.capsule.clastix.io
