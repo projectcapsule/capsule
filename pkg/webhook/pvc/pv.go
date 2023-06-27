@@ -77,7 +77,7 @@ func (p PV) OnCreate(client client.Client, decoder *admission.Decoder, recorder 
 			return utils.ErroredResponse(NewMissingTenantPVLabelsError(pv.GetName()))
 		}
 
-		if value != p.capsuleLabel {
+		if value != tnt.Name {
 			return utils.ErroredResponse(NewCrossTenantPVMountError(pv.GetName()))
 		}
 
