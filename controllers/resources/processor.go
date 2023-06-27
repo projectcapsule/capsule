@@ -172,6 +172,7 @@ func (r *Processor) HandleSection(ctx context.Context, tnt capsulev1beta2.Tenant
 			for _, o := range objs.Items {
 				obj := o
 				obj.SetNamespace(ns.Name)
+				obj.SetOwnerReferences(nil)
 
 				multiErr.Go(func() error {
 					kv := keysAndValues
