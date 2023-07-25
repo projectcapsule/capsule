@@ -137,7 +137,7 @@ For example, if the `NetworkPolicy` is configured to allow all ingress traffic f
 
 Then, a `NetworkPolicy` can be applied at `Tenant`-level with Capsule `GlobalTenantResource`s. For example it can be applied a minimal policy for the *oil* `Tenant`:
 
-```
+```yaml
 apiVersion: capsule.clastix.io/v1beta2
 kind: GlobalTenantResource
 metadata:
