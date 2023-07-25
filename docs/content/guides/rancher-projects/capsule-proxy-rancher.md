@@ -14,7 +14,7 @@ The [capsule-rancher-addon](https://github.com/clastix/capsule-addon-rancher/tre
 
 Add the Clastix Helm repository `https://clastix.github.io/charts`.
 
-By updating the cache with the Clastix's Helm repository an Helm chart named *capsule-rancher-addon* is availble.
+By updating the cache with Clastix's Helm repository a Helm chart named `capsule-rancher-addon` is available.
 
 Install keeping attention to the following Helm values:
 
