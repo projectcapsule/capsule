@@ -43,27 +43,27 @@ When onboarding tenants, the administrator needs to create the following, in ord
 
 - In Rancher, create a `Project`.
 - In the target Kubernetes cluster, create a `Tenant`, with the following specification:
-    ```yaml
-    kind: Tenant
-    ...
-    spec:
-      namespaceOptions:
-        additionalMetadata:
-          annotations:
-            field.cattle.io/projectId: ${CLUSTER_ID}:${PROJECT_ID}
-          labels:
-            field.cattle.io/projectId: ${PROJECT_ID}
-    ```
-    where `$CLUSTER_ID` and `$PROEJCT_ID` can be retrieved, assuming a valid `$CLUSTER_NAME`, as:
+  ```yaml
+  kind: Tenant
+  ...
+  spec:
+    namespaceOptions:
+      additionalMetadata:
+        annotations:
+          field.cattle.io/projectId: ${CLUSTER_ID}:${PROJECT_ID}
+        labels:
+          field.cattle.io/projectId: ${PROJECT_ID}
+  ```
+  where `$CLUSTER_ID` and `$PROEJCT_ID` can be retrieved, assuming a valid `$CLUSTER_NAME`, as:
 
-    ```shell
-    CLUSTER_NAME=foo
-    CLUSTER_ID=$(kubectl get cluster -n fleet-default ${CLUSTER_NAME} -o jsonpath='{.status.clusterName}')
-    PROJECT_IDS=$(kubectl get projects -n $CLUSTER_ID -o jsonpath="{.items[*].metadata.name}")
-    for project_id in $PROJECT_IDS; do echo "${project_id}"; done
-    ```
+  ```shell
+  CLUSTER_NAME=foo
+  CLUSTER_ID=$(kubectl get cluster -n fleet-default ${CLUSTER_NAME} -o jsonpath='{.status.clusterName}')
+  PROJECT_IDS=$(kubectl get projects -n $CLUSTER_ID -o jsonpath="{.items[*].metadata.name}")
+  for project_id in $PROJECT_IDS; do echo "${project_id}"; done
+  ```
 
-    More on declarative `Project`s [here](https://github.com/rancher/rancher/issues/35631).
+  More on declarative `Project`s [here](https://github.com/rancher/rancher/issues/35631).
 - In the identity provider, create a user with [correct OIDC claim](https://capsule.clastix.io/docs/guides/oidc-auth) of the Tenant.
 - In Rancher, add the new user to the `Project` with the *Read-only* `Role`.
 - In Rancher, add the new user to the `Cluster` with the *Tenant Member* `Cluster Role`.
