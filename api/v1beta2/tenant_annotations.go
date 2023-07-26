@@ -4,7 +4,7 @@
 package v1beta2
 
 import (
-	"crypto/md5"
+	"crypto/md5" //#nosec
 	"encoding/hex"
 	"fmt"
 )
@@ -17,7 +17,7 @@ const (
 func createAnnotation(format string, resource fmt.Stringer) (string, error) {
 	suffix := resource.String()
 
-	hash := md5.Sum([]byte(resource.String()))
+	hash := md5.Sum([]byte(resource.String())) //#nosec
 
 	hashed := hex.EncodeToString(hash[:])
 	capsuleHashed := format + hashed
