@@ -237,8 +237,12 @@ func (r *Manager) resourceQuotasUpdate(ctx context.Context, resourceName corev1.
 						found.Annotations = make(map[string]string)
 					}
 					found.Labels = rq.Labels
-					found.Annotations[capsulev1beta2.UsedQuotaFor(resourceName)] = actual.String()
-					found.Annotations[capsulev1beta2.HardQuotaFor(resourceName)] = limit.String()
+					if actualKey, keyErr := capsulev1beta2.UsedQuotaFor(resourceName); keyErr == nil {
+						found.Annotations[actualKey] = actual.String()
+					}
+					if limitKey, keyErr := capsulev1beta2.HardQuotaFor(resourceName); keyErr == nil {
+						found.Annotations[limitKey] = limit.String()
+					}
 					// Updating the Resource according to the actual.Cmp result
 					found.Spec.Hard = rq.Spec.Hard
 
