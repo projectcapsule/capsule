@@ -1306,7 +1306,7 @@ If a Persistent Volume Claim has no value for `spec.storageClassName` the `tenan
 ## Assign Network Policies
 Kubernetes network policies control network traffic between namespaces and between pods in the same namespace. Bill, the cluster admin, can enforce network traffic isolation between different tenants while leaving to Alice, the tenant owner, the freedom to set isolation between namespaces in the same tenant or even between pods in the same namespace.
 
-To meet this requirement, Bill needs to define network policies that deny pods belonging to Alice's namespaces to access pods in namespaces belonging to other tenants, e.g. Bob's tenant `water`, or in system namespaces, e.g. `kube-system`.
+To meet this requirement, Bill needs to define network policies that deny pods belonging to Alice's namespaces to access pods in namespaces belonging to other tenants, e.g. Bob's tenant `water`, or in system namespaces, e.g. `kube-system`. ( keep in mind, that because how the NetworkPolicies API works, the user can still add a policy which contradicts what the tenant admin has set, resulting in users being able to circunvent the initial limitation set by the tenant admin. i.e. The tenant admin configures a tenant to not be able to reach CIDR: 192.168.0.0/16 , where the local LDAP servers are, but then a tenant owner goes and creates a network policy which allows LDAP traffic, it will result in LDAP server being reachable )
 
 Also, Bill can make sure pods belonging to a tenant namespace cannot access other network infrastructures like cluster nodes, load balancers, and virtual machines running other services.  
 
