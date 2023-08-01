@@ -1308,6 +1308,12 @@ Kubernetes network policies control network traffic between namespaces and betwe
 
 To meet this requirement, Bill needs to define network policies that deny pods belonging to Alice's namespaces to access pods in namespaces belonging to other tenants, e.g. Bob's tenant `water`, or in system namespaces, e.g. `kube-system`.
 
+> Keep in mind, that because of how the NetworkPolicies API works, the users can still add a policy which contradicts what the Tenant has set, resulting in users being able to circumvent the initial limitation set by the tenant admin.
+>
+> Two options can be put in place to mitigate this potential privilege escalation:
+> 1. providing a restricted role rather than the default `admin` one
+> 2. using Calico's `GlobalNetworkPolicy`, or Cilium's `CiliumClusterwideNetworkPolicy` which are defined at the cluster-level, thus creating an order of packet filtering.
+
 Also, Bill can make sure pods belonging to a tenant namespace cannot access other network infrastructures like cluster nodes, load balancers, and virtual machines running other services.  
 
 Bill can set network policies in the tenant manifest, according to the requirements:
