@@ -371,7 +371,9 @@ kubectl create ns oil-production
 
 Alice started the name of the namespace prepended by the name of the tenant: this is not a strict requirement but it is highly suggested because it is likely that many different tenants would like to call their namespaces `production`, `test`, or `demo`, etc.
 
-The enforcement of this naming convention is optional and can be controlled by the cluster administrator with the `--force-tenant-prefix` option as an argument of the Capsule controller.
+The enforcement of this naming convention is optional and can be controlled by the cluster administrator with the `spec.forceTenantPrefix` option for the loaded `CapsuleConfiguration`.
+
+> For more information, please, refer to the [`CapsuleConfiguration` API CRD](https://capsule.clastix.io/docs/general/crds-apis/#capsuleconfigurationspec-1).
 
 Alice can deploy any resource in any of the namespaces
 
@@ -506,7 +508,7 @@ kubectl create ns oil-production
 kubectl create ns gas-production
 ```
 
-When the enforcement of the naming convention with the `--force-tenant-prefix` option, is enabled, the namespaces are automatically assigned to the right tenant by Capsule because the operator does a lookup on the tenant names. If the `--force-tenant-prefix` option, is not set,   Alice needs to specify the tenant name as a label `capsule.clastix.io/tenant=<desired_tenant>` in the namespace manifest:
+When the enforcement of the naming convention with the `forceTenantPrefix` option is enabled, the namespaces are automatically assigned to the right tenant by Capsule because the operator does a lookup on the tenant names. If the `forceTenantPrefix` option, is not set,  Alice needs to specify the tenant name as a label `capsule.clastix.io/tenant=<desired_tenant>` in the namespace manifest:
 
 ```yaml
 kubectl apply -f - << EOF
