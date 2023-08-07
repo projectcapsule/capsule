@@ -225,7 +225,13 @@ webhooks:
         matchExpressions:
           - key: capsule.clastix.io/tenant
             operator: Exists
-
+    managed:
+      enabled: true
+      failurePolicy: Fail
+      namespaceSelector:
+        matchExpressions:
+          - key: capsule.clastix.io/tenant
+            operator: Exists
 
 # -- Timeout in seconds for mutating webhooks
 mutatingWebhooksTimeoutSeconds: 30

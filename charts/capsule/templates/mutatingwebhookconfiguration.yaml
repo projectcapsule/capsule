@@ -91,7 +91,37 @@ webhooks:
   namespaceSelector:
   {{- toYaml .namespaceSelector | nindent 4}}
   sideEffects: None
-{{- end }}  
+{{- end }}
+{{- if .Values.webhooks.managed.enabled }}
+- admissionReviewVersions:
+    - v1
+    - v1beta1
+  clientConfig:
+{{- if not .Values.certManager.generateCertificates }}
+    caBundle: Cg==
+{{- end }}
+    service:
+      name: {{ include "capsule.fullname" . }}-webhook-service
+      namespace: {{ .Release.Namespace }}
+      path: /managed
+      port: 443
+  name: managed.capsule.clastix.io
+  rules:
+  - apiGroups:
+    - '*'
+    apiVersions:
+    - '*'
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - '*'
+  failurePolicy: {{ .Values.webhooks.managed.failurePolicy }}
+  matchPolicy: Equivalent
+  namespaceSelector:
+  {{- toYaml .Values.webhooks.managed.namespaceSelector | nindent 4}}
+  sideEffects: None
+{{- end }}
 - admissionReviewVersions:
     - v1
     - v1beta1
