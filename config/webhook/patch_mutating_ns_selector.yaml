@@ -17,6 +17,18 @@
       - key: capsule.clastix.io/tenant
         operator: Exists
 - op: add
+  path: /webhooks/3/namespaceSelector
+  value:
+    matchExpressions:
+      - key: capsule.clastix.io/tenant
+        operator: Exists
+- op: add
+  path: /webhooks/4/namespaceSelector
+  value:
+    matchExpressions:
+      - key: capsule.clastix.io/tenant
+        operator: Exists
+- op: add
   path: /webhooks/0/rules/0/scope
   value: Namespaced
 - op: add
@@ -24,4 +36,10 @@
   value: Namespaced
 - op: add
   path: /webhooks/2/rules/0/scope
+  value: Namespaced
+- op: add
+  path: /webhooks/3/rules/0/scope
+  value: Namespaced
+- op: add
+  path: /webhooks/4/rules/0/scope
   value: Namespaced

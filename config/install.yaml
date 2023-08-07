@@ -2769,7 +2769,7 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.namespace
-        image: clastix/capsule:v0.3.3
+        image: clastix/capsule:v0.2.1
         imagePullPolicy: IfNotPresent
         name: manager
         ports:
@@ -2887,6 +2887,31 @@ webhooks:
     - UPDATE
     resources:
     - ingresses
+    scope: Namespaced
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: capsule-webhook-service
+      namespace: capsule-system
+      path: /managed
+  failurePolicy: Fail
+  name: managed.capsule.clastix.io
+  namespaceSelector:
+    matchExpressions:
+    - key: capsule.clastix.io/tenant
+      operator: Exists
+  rules:
+  - apiGroups:
+    - '*'
+    apiVersions:
+    - '*'
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - '*'
     scope: Namespaced
   sideEffects: None
 - admissionReviewVersions:
