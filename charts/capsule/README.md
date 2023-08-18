@@ -85,6 +85,7 @@ Here the values you can override:
 | tls.enableController | bool | `true` | Start the Capsule controller that injects the CA into mutating and validating webhooks, and CRD as well. |
 | tls.name | string | `""` | Override name of the Capsule TLS Secret name when externally managed. |
 | tolerations | list | `[]` | Set list of tolerations for the Capsule pod |
+| topologySpreadConstraints | list | `[]` | Set topology spread constraints for the Capsule pod |
 | validatingWebhooksTimeoutSeconds | int | `30` | Timeout in seconds for validating webhooks |
 
 ### Manager Parameters

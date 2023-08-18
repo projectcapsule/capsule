@@ -126,6 +126,9 @@ replicaCount: 1
 # -- Set affinity rules for the Capsule pod
 affinity: {}
 
+# -- Set topology spread constraints for the Capsule pod
+topologySpreadConstraints: []
+
 podSecurityPolicy:
   # -- Specify if a Pod Security Policy must be created
   enabled: false
