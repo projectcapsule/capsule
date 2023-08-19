@@ -146,7 +146,9 @@ func (r *Processor) HandleSection(ctx context.Context, tnt capsulev1beta2.Tenant
 			}
 			// Namespaced Items are relying on selecting resources, rather than specifying a specific name:
 			// creating it to get used by the client List action.
-			itemSelector, selectorErr := metav1.LabelSelectorAsSelector(&item.Selector)
+			objSelector := item.Selector
+
+			itemSelector, selectorErr := metav1.LabelSelectorAsSelector(&objSelector)
 			if selectorErr != nil {
 				log.Error(selectorErr, "cannot create Selector for namespacedItem", keysAndValues...)
 
