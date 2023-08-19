@@ -40,7 +40,9 @@ func (r *Global) enqueueRequestFromTenant(ctx context.Context, object client.Obj
 	set := sets.NewString()
 
 	for _, res := range resList.Items {
-		selector, err := metav1.LabelSelectorAsSelector(&res.Spec.TenantSelector)
+		tntSelector := res.Spec.TenantSelector
+
+		selector, err := metav1.LabelSelectorAsSelector(&tntSelector)
 		if err != nil {
 			continue
 		}
