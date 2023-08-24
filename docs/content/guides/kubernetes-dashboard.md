@@ -41,7 +41,7 @@ EOF
 > Values used for the config:
 > 
 > - **OIDC_CLIENT_ID**: the keycloak client ID (name) which user in Kubernetes API Server for authorization
-> - **OIDC_CLIENT_SECRET**: secret for the client (`OIDC_CLIENT_ID`). You can see it from the Keycloack UI -> Clients -> `OIDC_CLIENT_ID` -> Credentials
+> - **OIDC_CLIENT_SECRET**: secret for the client (`OIDC_CLIENT_ID`). You can see it from the Keycloak UI -> Clients -> `OIDC_CLIENT_ID` -> Credentials
 > - **DASHBOARD_URL**: the Kubernetes Dashboard URL
 > - **KEYCLOAK_URL**: the Keycloak URL
 

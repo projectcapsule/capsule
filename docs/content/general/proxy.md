@@ -1,6 +1,6 @@
 # Capsule Proxy
 
-Capsule Proxy is an add-on for Capsule Operator addressing some RBAC issues when enabling multi-tenacy in Kubernetes since users cannot list the owned cluster-scoped resources.
+Capsule Proxy is an add-on for Capsule Operator addressing some RBAC issues when enabling multi-tenancy in Kubernetes since users cannot list the owned cluster-scoped resources.
 
 Kubernetes RBAC cannot list only the owned cluster-scoped resources since there are no ACL-filtered APIs. For example:
 

@@ -4,17 +4,17 @@ This guide is intended to cover how to use Flux v2 with [multi-tenancy lockdown 
 
 ### Flux and multi-tenancy
 
-Flux v2 released a [set of features](https://fluxcd.io/blog/2022/05/may-2022-security-announcement/#whats-next-for-flux) that further increasesed security for multi-tenancy scenarios.
+Flux v2 released a [set of features](https://fluxcd.io/blog/2022/05/may-2022-security-announcement/#whats-next-for-flux) that further increased security for multi-tenancy scenarios.
 
 These features enable you to:
 - disable cross-Namespace reference of Source CRs from Reconciliation CRs and Notification CRs. This way, especially for tenants, they can't access resources outside their space. This can be achieved with `--no-cross-namespace-refs=true` option of kustomize, helm, notification, image-reflector, image-automation controllers.
-- set a default `ServiceAccount` impersonation for Reconciliation CRs. This is supposed to be an unprivileged SA that reconciles just the tenant's desired state. This will be enforced when is not otherwise specified explicitely in Reconciliation CR spec. This can be enforced with the `--default-service-account=<name>` option of helm and kustomize controllers.
+- set a default `ServiceAccount` impersonation for Reconciliation CRs. This is supposed to be an unprivileged SA that reconciles just the tenant's desired state. This will be enforced when is not otherwise specified explicitly in Reconciliation CR spec. This can be enforced with the `--default-service-account=<name>` option of helm and kustomize controllers.
 
   > For this responsibility we identify a Tenant GitOps Reconciler identity, which is a ServiceAccount and it's also the tenant owner (more on tenants and owners later on, with Capsule).
 
-- disallow remote bases for Kustomizations. Actually, this is not stryctly required, but it decreases the risk of referencing Kustomizations which aren't part of the controlled GitOps pipelines. In a multi-tenant scenario this is important too. They can be disabled with `--no-remote-bases=true` option of the kustomize controller.
+- disallow remote bases for Kustomizations. Actually, this is not strictly required, but it decreases the risk of referencing Kustomizations which aren't part of the controlled GitOps pipelines. In a multi-tenant scenario this is important too. They can be disabled with `--no-remote-bases=true` option of the kustomize controller.
 
-Where required, to ensure privileged Reconciliation resources have the needed privileges to be reconciled, we can explicitely set a privileged `ServiceAccount`s.
+Where required, to ensure privileged Reconciliation resources have the needed privileges to be reconciled, we can explicitly set a privileged `ServiceAccount`s.
 
 In any case, is required that the `ServiceAccount` is in the same `Namespace` of the `Kustomization`, so unprivileged spaces should not have privileged `ServiceAccount`s available.
 
@@ -385,7 +385,7 @@ The reconciliation requests will pass through Capsule Proxy as Tenant GitOps Rec
 
 ## Full setup
 
-To have a glimp on a full setup you can follow the [flux2-capsule-multi-tenancy](https://github.com/clastix/flux2-capsule-multi-tenancy.git) repository.
+To have a glimpse on a full setup you can follow the [flux2-capsule-multi-tenancy](https://github.com/clastix/flux2-capsule-multi-tenancy.git) repository.
 For simplicity, the system and tenants declarations are on the same repository but on dedicated git branches.
 
 It's a fork of [flux2-multi-tenancy](https://github.com/fluxcd/flux2-multi-tenancy.git) but with the integration we saw with Capsule.

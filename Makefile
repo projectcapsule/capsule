@@ -275,3 +275,7 @@ e2e-exec: ginkgo
 
 e2e-destroy:
 	kind delete cluster --name capsule
+
+docs-lint:
+	cd docs/content && spellchecker *.md */*.md -d dictionary.txt
+

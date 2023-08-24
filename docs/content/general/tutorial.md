@@ -1603,7 +1603,7 @@ spec:
 > This feature is still in an alpha stage and requires a high amount of computing resources due to the dynamic client requests.
 
 ## Assign Additional Metadata
-The cluster admin can _"taint"_ the namespaces created by tenant onwers with additional metadata as labels and annotations. There is no specific semantic assigned to these labels and annotations: they will be assigned to the namespaces in the tenant as they are created. This can help the cluster admin to implement specific use cases as, for example, leave only a given tenant to be backuped by a backup service.
+The cluster admin can _"taint"_ the namespaces created by tenant owners with additional metadata as labels and annotations. There is no specific semantic assigned to these labels and annotations: they will be assigned to the namespaces in the tenant as they are created. This can help the cluster admin to implement specific use cases as, for example, leave only a given tenant to be backed up by a backup service.
 
 Assigns additional labels and annotations to all namespaces created in the `oil` tenant: 
 
