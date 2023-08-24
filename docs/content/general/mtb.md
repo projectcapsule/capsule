@@ -2131,7 +2131,7 @@ kubectl --kubeconfig alice create ns oil-production
 kubectl --kubeconfig alice config set-context --current --namespace oil-production
 ```
 
-As tenant owner, creates a Persistent Volum Claim in the tenant namespace missing the Storage Class or using any other Storage Class:
+As tenant owner, creates a Persistent Volume Claim in the tenant namespace missing the Storage Class or using any other Storage Class:
 
 ```yaml
 kubectl --kubeconfig alice apply -f - << EOF

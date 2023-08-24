@@ -1,0 +1,27 @@
+name: docs-lint
+
+on:
+  push:
+    branches: [ "*" ]
+    paths:
+      - '.github/workflows/docs-lint.yml'
+      - 'docs/content/**'
+  pull_request:
+    branches: [ "*" ]
+    paths:
+      - '.github/workflows/docs-lint.yml'
+      - 'docs/content/**'
+
+jobs:
+  spelling:
+    name: Spell Check
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18
+      - run: npm install --global spellchecker-cli
+      - run: make docs-lint

@@ -257,7 +257,7 @@ $ rm -f _tls.cnf
 
 By default, the webhooks will be registered with the services, which will route to the Pods, inside the cluster.
 
-We need to _delegate_ the controllers' and webbooks' services to the code running in our IDE by patching the `MutatingWebhookConfiguration` and `ValidatingWebhookConfiguration`.
+We need to _delegate_ the controllers' and webhooks' services to the code running in our IDE by patching the `MutatingWebhookConfiguration` and `ValidatingWebhookConfiguration`.
 
 ```shell
 # Export your laptop's IP with the 9443 port exposed by controllers/webhooks' services
