@@ -123,13 +123,16 @@ module.exports = function (api) {
             {
               label: 'Governance',
               path: '/docs/contributing/governance'
-            }            
+            },
+            {
+              label: 'Release process',
+              path: '/docs/contributing/release'
+            }
           ]
         }
       ]
     })
   })
-
 
   api.createPages(({ createPage }) => {
     // Use the Pages API here: https://gridsome.org/docs/pages-api/
