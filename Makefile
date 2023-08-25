@@ -276,6 +276,7 @@ e2e-exec: ginkgo
 e2e-destroy:
 	kind delete cluster --name capsule
 
+SPELL_CHECKER = npx spellchecker-cli
 docs-lint:
-	cd docs/content && spellchecker *.md */*.md -d dictionary.txt
+	cd docs/content && $(SPELL_CHECKER) -f "*.md" "*/*.md" -d dictionary.txt
 

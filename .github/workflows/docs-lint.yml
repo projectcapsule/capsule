@@ -23,5 +23,4 @@ jobs:
       - uses: actions/setup-node@v3
         with:
           node-version: 18
-      - run: npm install --global spellchecker-cli
       - run: make docs-lint
