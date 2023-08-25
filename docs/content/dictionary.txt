@@ -3,11 +3,13 @@ APIs
 Apache2
 Authenticator
 BYOD
+CLASTIX
 CLI
 CRD
 CRDs
 CRs
 CTO
+CVE
 CVE-2021-25735
 CaaS
 CapsuleConfiguration
@@ -106,6 +108,7 @@ RoleBinding
 RuntimeClass
 RuntimeClasses
 SDK
+SHA
 SRE
 SSD
 ScopeSelectorOperator
