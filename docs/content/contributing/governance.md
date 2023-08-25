@@ -17,7 +17,7 @@ In the context of Capsule project, we consider the following roles:
 
 The release process will be governed by Maintainers.
 
-Please, refer to the [maintainers file](https://github.com/clastix/capsule/blob/master/.github/blob/master/maintainers.yaml) available in the source code.
+Please, refer to the [maintainers file](https://github.com/clastix/capsule/blob/master/.github/maintainers.yaml) available in the source code.
 
 ## Roadmap Planning
 
