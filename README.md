@@ -105,6 +105,10 @@ You can find how the Capsule project is governed [here](https://capsule.clastix.
 
 Please, refer to the maintainers file available [here](.github/maintainers.yaml).
 
+## Release process
+
+Please, refer to the [documentation page](https://capsule.clastix.io/docs/contributing/release).
+
 # FAQ
 
 - Q. How to pronounce Capsule?
