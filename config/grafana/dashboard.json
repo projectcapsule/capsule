@@ -80,7 +80,7 @@
           "mode": "spectrum"
         },
         "dataFormat": "timeseries",
-        "datasource": "prometheus",
+        "datasource": "$DS_PROMETHEUS",
         "description": "",
         "fieldConfig": {
           "defaults": {},
@@ -155,7 +155,7 @@
         "type": "row"
       },
       {
-        "datasource": "prometheus",
+        "datasource": "$DS_PROMETHEUS",
         "fieldConfig": {
           "defaults": {
             "color": {
@@ -264,7 +264,7 @@
               "mode": "spectrum"
             },
             "dataFormat": "timeseries",
-            "datasource": "prometheus",
+            "datasource": "$DS_PROMETHEUS",
             "description": "",
             "fieldConfig": {
               "defaults": {},
@@ -344,7 +344,7 @@
               "mode": "spectrum"
             },
             "dataFormat": "timeseries",
-            "datasource": "prometheus",
+            "datasource": "$DS_PROMETHEUS",
             "description": "",
             "fieldConfig": {
               "defaults": {},
@@ -425,7 +425,7 @@
               "mode": "spectrum"
             },
             "dataFormat": "timeseries",
-            "datasource": "prometheus",
+            "datasource": "$DS_PROMETHEUS",
             "description": "",
             "fieldConfig": {
               "defaults": {},
@@ -506,7 +506,7 @@
               "mode": "spectrum"
             },
             "dataFormat": "timeseries",
-            "datasource": "prometheus",
+            "datasource": "$DS_PROMETHEUS",
             "description": "",
             "fieldConfig": {
               "defaults": {},
@@ -587,7 +587,7 @@
               "mode": "spectrum"
             },
             "dataFormat": "timeseries",
-            "datasource": "prometheus",
+            "datasource": "$DS_PROMETHEUS",
             "description": "",
             "fieldConfig": {
               "defaults": {},
@@ -668,7 +668,7 @@
               "mode": "spectrum"
             },
             "dataFormat": "timeseries",
-            "datasource": "prometheus",
+            "datasource": "$DS_PROMETHEUS",
             "description": "",
             "fieldConfig": {
               "defaults": {},
@@ -749,7 +749,7 @@
               "mode": "spectrum"
             },
             "dataFormat": "timeseries",
-            "datasource": "prometheus",
+            "datasource": "$DS_PROMETHEUS",
             "description": "",
             "fieldConfig": {
               "defaults": {},
@@ -830,7 +830,7 @@
               "mode": "spectrum"
             },
             "dataFormat": "timeseries",
-            "datasource": "prometheus",
+            "datasource": "$DS_PROMETHEUS",
             "description": "",
             "fieldConfig": {
               "defaults": {},
@@ -911,7 +911,7 @@
               "mode": "spectrum"
             },
             "dataFormat": "timeseries",
-            "datasource": "prometheus",
+            "datasource": "$DS_PROMETHEUS",
             "description": "",
             "fieldConfig": {
               "defaults": {},
@@ -1007,7 +1007,7 @@
               "mode": "spectrum"
             },
             "dataFormat": "timeseries",
-            "datasource": "prometheus",
+            "datasource": "$DS_PROMETHEUS",
             "fieldConfig": {
               "defaults": {},
               "overrides": []
@@ -1084,7 +1084,7 @@
               "mode": "spectrum"
             },
             "dataFormat": "timeseries",
-            "datasource": "prometheus",
+            "datasource": "$DS_PROMETHEUS",
             "fieldConfig": {
               "defaults": {},
               "overrides": []
@@ -1162,7 +1162,7 @@
               "mode": "spectrum"
             },
             "dataFormat": "timeseries",
-            "datasource": "prometheus",
+            "datasource": "$DS_PROMETHEUS",
             "fieldConfig": {
               "defaults": {},
               "overrides": []
@@ -1240,7 +1240,7 @@
               "mode": "spectrum"
             },
             "dataFormat": "timeseries",
-            "datasource": "prometheus",
+            "datasource": "$DS_PROMETHEUS",
             "fieldConfig": {
               "defaults": {},
               "overrides": []
@@ -1324,7 +1324,7 @@
         "type": "row"
       },
       {
-        "datasource": "prometheus",
+        "datasource": "$DS_PROMETHEUS",
         "fieldConfig": {
           "defaults": {
             "color": {
@@ -1406,7 +1406,7 @@
         "type": "timeseries"
       },
       {
-        "datasource": "prometheus",
+        "datasource": "$DS_PROMETHEUS",
         "fieldConfig": {
           "defaults": {
             "color": {
@@ -1483,7 +1483,7 @@
         "type": "row"
       },
       {
-        "datasource": "prometheus",
+        "datasource": "$DS_PROMETHEUS",
         "fieldConfig": {
           "defaults": {
             "color": {
@@ -1562,7 +1562,7 @@
         "type": "timeseries"
       },
       {
-        "datasource": "prometheus",
+        "datasource": "$DS_PROMETHEUS",
         "description": "",
         "fieldConfig": {
           "defaults": {
@@ -1646,7 +1646,7 @@
         "type": "timeseries"
       },
       {
-        "datasource": "prometheus",
+        "datasource": "$DS_PROMETHEUS",
         "description": "",
         "fieldConfig": {
           "defaults": {
@@ -1730,7 +1730,7 @@
         "type": "timeseries"
       },
       {
-        "datasource": "prometheus",
+        "datasource": "$DS_PROMETHEUS",
         "fieldConfig": {
           "defaults": {
             "color": {
@@ -1800,7 +1800,7 @@
         "id": 10,
         "panels": [
           {
-            "datasource": "prometheus",
+            "datasource": "$DS_PROMETHEUS",
             "description": "service time to complete needed actions",
             "fieldConfig": {
               "defaults": {
@@ -1863,7 +1863,7 @@
             "type": "stat"
           },
           {
-            "datasource": "prometheus",
+            "datasource": "$DS_PROMETHEUS",
             "description": "number of actions per unit time",
             "fieldConfig": {
               "defaults": {
@@ -1926,7 +1926,7 @@
             "type": "stat"
           },
           {
-            "datasource": "prometheus",
+            "datasource": "$DS_PROMETHEUS",
             "description": "number of actions waiting in the queue to be performed",
             "fieldConfig": {
               "defaults": {
@@ -1999,10 +1999,27 @@
     "tags": [],
     "templating": {
       "list": [
+      {
+          "current": {
+            "selected": false,
+            "text": "Prometheus",
+            "value": "Prometheus"
+          },
+          "hide": 0,
+          "includeAll": false,
+          "multi": false,
+          "name": "DS_PROMETHEUS",
+          "options": [],
+          "query": "prometheus",
+          "refresh": 1,
+          "regex": "",
+          "skipUrlSync": false,
+          "type": "datasource"
+        },
         {
           "allValue": null,
           "current": {},
-          "datasource": "prometheus",
+          "datasource": "$DS_PROMETHEUS",
           "definition": "label_values(controller_runtime_active_workers{job=\"capsule\"},controller)",
           "description": "Select the underlying Controller to get metrics",
           "error": null,
@@ -2029,7 +2046,7 @@
         {
           "allValue": null,
           "current": {},
-          "datasource": "prometheus",
+          "datasource": "$DS_PROMETHEUS",
           "definition": "label_values(rest_client_request_latency_seconds_sum{job=\"capsule\"},url)",
           "description": "Kubernetes API endpoint the REST client is interacting with",
           "error": null,
@@ -2056,7 +2073,7 @@
         {
           "allValue": null,
           "current": {},
-          "datasource": "prometheus",
+          "datasource": "$DS_PROMETHEUS",
           "definition": "label_values(rest_client_request_latency_seconds_sum{job=\"capsule\"},verb)",
           "description": "Kubernetes API HTTP verb the REST client is interacting with",
           "error": null,
@@ -2083,7 +2100,7 @@
         {
           "allValue": null,
           "current": {},
-          "datasource": "prometheus",
+          "datasource": "$DS_PROMETHEUS",
           "definition": "label_values(controller_runtime_webhook_requests_in_flight{job=\"capsule\"}, webhook)",
           "description": "Capsule webhook",
           "error": null,
