@@ -64,7 +64,14 @@ func (r *hostnames) validate(ctx context.Context, client client.Client, req admi
 	}
 
 	hostnameList := sets.New[string]()
+
 	for hostname := range ingress.HostnamePathsPairs() {
+		if len(hostname) == 0 {
+			recorder.Eventf(tenant, corev1.EventTypeWarning, "IngressHostnameEmpty", "Ingress %s/%s hostname is empty", ingress.Namespace(), ingress.Name())
+
+			return utils.ErroredResponse(NewEmptyIngressHostname(*tenant.Spec.IngressOptions.AllowedHostnames))
+		}
+
 		hostnameList.Insert(hostname)
 	}
 
