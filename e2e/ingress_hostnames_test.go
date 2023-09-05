@@ -43,37 +43,40 @@ var _ = Describe("when Tenant handles Ingress hostnames", func() {
 	}
 
 	// scaffold a basic networking.k8s.io Ingress with name and host
-	networkingIngress := func(name, hostname string) *networkingv1.Ingress {
-		return &networkingv1.Ingress{
+	networkingIngress := func(name string, hostnames ...string) *networkingv1.Ingress {
+		ing := &networkingv1.Ingress{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: name,
 			},
 			Spec: networkingv1.IngressSpec{
-				Rules: []networkingv1.IngressRule{
-					{
-						Host: hostname,
-						IngressRuleValue: networkingv1.IngressRuleValue{
-							HTTP: &networkingv1.HTTPIngressRuleValue{
-								Paths: []networkingv1.HTTPIngressPath{
-									{
-										Path: "/",
-										PathType: func(v networkingv1.PathType) *networkingv1.PathType {
-											return &v
-										}(networkingv1.PathTypeExact),
-										Backend: networkingv1.IngressBackend{
-											Service: &networkingv1.IngressServiceBackend{
-												Name: "foo",
-												Port: networkingv1.ServiceBackendPort{Name: "http"},
-											},
-										},
+				Rules: []networkingv1.IngressRule{},
+			},
+		}
+
+		for _, hostname := range hostnames {
+			ing.Spec.Rules = append(ing.Spec.Rules, networkingv1.IngressRule{
+				Host: hostname,
+				IngressRuleValue: networkingv1.IngressRuleValue{
+					HTTP: &networkingv1.HTTPIngressRuleValue{
+						Paths: []networkingv1.HTTPIngressPath{
+							{
+								Path: "/",
+								PathType: func(v networkingv1.PathType) *networkingv1.PathType {
+									return &v
+								}(networkingv1.PathTypeExact),
+								Backend: networkingv1.IngressBackend{
+									Service: &networkingv1.IngressServiceBackend{
+										Name: "foo",
+										Port: networkingv1.ServiceBackendPort{Name: "http"},
 									},
 								},
 							},
 						},
 					},
 				},
-			},
+			})
 		}
+		return ing
 	}
 	// scaffold a basic extensions Ingress with name and host
 	extensionsIngress := func(name, hostname string) *extensionsv1beta1.Ingress {
@@ -117,6 +120,28 @@ var _ = Describe("when Tenant handles Ingress hostnames", func() {
 
 	JustAfterEach(func() {
 		Expect(k8sClient.Delete(context.TODO(), tnt)).Should(Succeed())
+	})
+
+	It("should block an empty hostname", func() {
+		ns := NewNamespace("")
+		cs := ownerClient(tnt.Spec.Owners[0])
+
+		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
+
+		By("testing networking.k8s.io", func() {
+			if err := k8sClient.List(context.Background(), &networkingv1.IngressList{}); err != nil {
+				if utils.IsUnsupportedAPI(err) {
+					Skip(fmt.Sprintf("Running test due to unsupported API kind: %s", err.Error()))
+				}
+			}
+
+			Eventually(func() (err error) {
+				obj := networkingIngress("no-empty-hostname", "", "kubernetes.io")
+				_, err = cs.NetworkingV1().Ingresses(ns.GetName()).Create(context.TODO(), obj, metav1.CreateOptions{})
+				return
+			}, defaultTimeoutInterval, defaultPollInterval).ShouldNot(Succeed())
+		})
 	})
 
 	It("should block a non allowed Hostname", func() {
