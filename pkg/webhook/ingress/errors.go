@@ -47,6 +47,20 @@ func NewIngressHostnameCollision(hostname string) error {
 	return &ingressHostnameCollisionError{hostname: hostname}
 }
 
+func NewEmptyIngressHostname(spec api.AllowedListSpec) error {
+	return &emptyIngressHostnameError{
+		spec: spec,
+	}
+}
+
+type emptyIngressHostnameError struct {
+	spec api.AllowedListSpec
+}
+
+func (e emptyIngressHostnameError) Error() string {
+	return fmt.Sprintf("empty hostname is not allowed for the current Tenant%s", appendHostnameError(e.spec))
+}
+
 func NewIngressHostnamesNotValid(invalidHostnames []string, notMatchingHostnames []string, spec api.AllowedListSpec) error {
 	return &ingressHostnameNotValidError{invalidHostnames: invalidHostnames, notMatchingHostnames: notMatchingHostnames, spec: spec}
 }
