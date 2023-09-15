@@ -50,7 +50,39 @@ func (h *handler) OnDelete(client client.Client, decoder *admission.Decoder, rec
 
 func (h *handler) OnUpdate(client client.Client, decoder *admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		return nil
+		oldNs := &corev1.Namespace{}
+		if err := decoder.DecodeRaw(req.OldObject, oldNs); err != nil {
+			return utils.ErroredResponse(err)
+		}
+
+		if len(oldNs.OwnerReferences) == 0 {
+			return nil
+		}
+
+		newNs := &corev1.Namespace{}
+		if err := decoder.Decode(req, newNs); err != nil {
+			return utils.ErroredResponse(err)
+		}
+
+		o, err := json.Marshal(newNs.DeepCopy())
+		if err != nil {
+			response := admission.Errored(http.StatusInternalServerError, err)
+
+			return &response
+		}
+
+		newNs.OwnerReferences = oldNs.OwnerReferences
+
+		c, err := json.Marshal(newNs)
+		if err != nil {
+			response := admission.Errored(http.StatusInternalServerError, err)
+
+			return &response
+		}
+
+		response := admission.PatchResponseFromRaw(o, c)
+
+		return &response
 	}
 }
 

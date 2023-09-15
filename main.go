@@ -237,7 +237,7 @@ func main() {
 		route.TenantResourceObjects(utils.InCapsuleGroups(cfg, tntresource.WriteOpsHandler())),
 		route.NetworkPolicy(utils.InCapsuleGroups(cfg, networkpolicy.Handler())),
 		route.Tenant(tenant.NameHandler(), tenant.RoleBindingRegexHandler(), tenant.IngressClassRegexHandler(), tenant.StorageClassRegexHandler(), tenant.ContainerRegistryRegexHandler(), tenant.HostnameRegexHandler(), tenant.FreezedEmitter(), tenant.ServiceAccountNameHandler(), tenant.ForbiddenAnnotationsRegexHandler(), tenant.ProtectedHandler()),
-		route.OwnerReference(utils.InCapsuleGroups(cfg, namespacewebhook.OwnerReferenceHandler(), ownerreference.Handler(cfg))),
+		route.OwnerReference(utils.InCapsuleGroups(cfg, ownerreference.Handler(cfg))),
 		route.Cordoning(tenant.CordoningHandler(cfg), tenant.ResourceCounterHandler(manager.GetClient())),
 		route.Node(utils.InCapsuleGroups(cfg, node.UserMetadataHandler(cfg, kubeVersion))),
 		route.Defaults(defaults.Handler(cfg, kubeVersion)),
