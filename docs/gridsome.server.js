@@ -91,6 +91,27 @@ module.exports = function (api) {
               path: '/docs/guides/pod-security'
             },
             {
+              title: 'Tenants and Rancher Projects',
+              subItems: [
+                {
+                  label: 'Overview',
+                  path: '/docs/guides/rancher-projects/introduction'
+                },
+                {
+                  label: 'Tenants and Projects',
+                  path: '/docs/guides/rancher-projects/capsule-rancher'
+                },
+                {
+                  label: 'Rancher Shell and cluster-wide resources',
+                  path: '/docs/guides/rancher-projects/capsule-proxy-rancher'
+                },
+                {
+                  label: 'OIDC authentication with Capsule, Rancher and Keycloak',
+                  path: '/docs/guides/rancher-projects/oidc-keycloak'
+                },
+	      ]
+            },
+            {
               title: 'Managed Kubernetes',
               subItems: [
                 {
