@@ -1,0 +1,27 @@
+name: FOSSA
+
+on:
+  push:
+    branches: [ "*" ]
+  pull_request:
+    branches: [ "*" ]
+
+jobs:
+  fossa-scan:
+    runs-on: ubuntu-20.04
+    steps:
+      - name: "Checkout Code"
+        uses: actions/checkout@v3
+
+      - name: "Run FOSSA Scan"
+        uses: fossas/fossa-action@v1.3.1
+        with:
+          api-key: ${{ secrets.FOSSA_API_KEY }}
+          container: ubuntu:20.04
+
+      - name: "Run FOSSA Test"
+        uses: fossas/fossa-action@v1.3.1
+        with:
+          api-key: ${{ secrets.FOSSA_API_KEY }}
+          container: ubuntu:20.04
+          run-tests: true
