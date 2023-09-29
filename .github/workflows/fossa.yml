@@ -17,11 +17,9 @@ jobs:
         uses: fossas/fossa-action@v1.3.1
         with:
           api-key: ${{ secrets.FOSSA_API_KEY }}
-          container: ubuntu:20.04
 
       - name: "Run FOSSA Test"
         uses: fossas/fossa-action@v1.3.1
         with:
           api-key: ${{ secrets.FOSSA_API_KEY }}
-          container: ubuntu:20.04
           run-tests: true
