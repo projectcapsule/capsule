@@ -9,6 +9,9 @@
   <a href="https://charmhub.io/capsule-k8s">
     <img src="https://charmhub.io/capsule-k8s/badge.svg"/>
   </a>
+  <a href="https://www.bestpractices.dev/projects/5601">
+    <img src="https://www.bestpractices.dev/projects/5601/badge"/>
+  </a>
 </p>
 
 <p align="center">
