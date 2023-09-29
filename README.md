@@ -96,6 +96,8 @@ make helm-docs
 
 Join the community, share and learn from it. You can find all the resources to how to contribute code and docs, connect with people in the [community repository](https://github.com/clastix/capsule-community).
 
+Please read the [code of conduct](CODE_OF_CONDUCT.md).
+
 ## Adopters
 
 See the [ADOPTERS.md](ADOPTERS.md) file for a list of companies that are using Capsule.
