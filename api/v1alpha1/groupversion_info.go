@@ -1,4 +1,4 @@
-// Copyright 2020-2021 Clastix Labs
+// Copyright 2020-2023 Project Capsule Authors.
 // SPDX-License-Identifier: Apache-2.0
 
 // Package v1alpha1 contains API Schema definitions for the capsule.clastix.io v1alpha1 API group
