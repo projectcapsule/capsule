@@ -4,7 +4,7 @@
 package route
 
 import (
-	capsulewebhook "github.com/clastix/capsule/pkg/webhook"
+	capsulewebhook "github.com/projectcapsule/capsule/pkg/webhook"
 )
 
 // +kubebuilder:webhook:path=/namespaces,mutating=false,sideEffects=None,admissionReviewVersions=v1,failurePolicy=fail,groups="",resources=namespaces,verbs=create;update;delete,versions=v1,name=namespaces.capsule.clastix.io

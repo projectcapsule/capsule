@@ -6,7 +6,7 @@ package configuration
 import (
 	"regexp"
 
-	capsuleapi "github.com/clastix/capsule/pkg/api"
+	capsuleapi "github.com/projectcapsule/capsule/pkg/api"
 )
 
 const (

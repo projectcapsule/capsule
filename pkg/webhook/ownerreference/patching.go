@@ -19,11 +19,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	capsulev1beta2 "github.com/clastix/capsule/api/v1beta2"
-	"github.com/clastix/capsule/pkg/configuration"
-	capsuleutils "github.com/clastix/capsule/pkg/utils"
-	capsulewebhook "github.com/clastix/capsule/pkg/webhook"
-	"github.com/clastix/capsule/pkg/webhook/utils"
+	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/configuration"
+	capsuleutils "github.com/projectcapsule/capsule/pkg/utils"
+	capsulewebhook "github.com/projectcapsule/capsule/pkg/webhook"
+	"github.com/projectcapsule/capsule/pkg/webhook/utils"
 )
 
 type handler struct {

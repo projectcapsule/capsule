@@ -14,7 +14,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
-	capsulev1beta2 "github.com/clastix/capsule/pkg/utils"
+	capsulev1beta2 "github.com/projectcapsule/capsule/pkg/utils"
 )
 
 // pruningResources is taking care of removing the no more requested sub-resources as LimitRange, ResourceQuota or

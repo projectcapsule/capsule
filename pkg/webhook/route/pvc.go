@@ -4,7 +4,7 @@
 package route
 
 import (
-	capsulewebhook "github.com/clastix/capsule/pkg/webhook"
+	capsulewebhook "github.com/projectcapsule/capsule/pkg/webhook"
 )
 
 // +kubebuilder:webhook:path=/persistentvolumeclaims,mutating=false,sideEffects=None,admissionReviewVersions=v1,failurePolicy=fail,groups="",resources=persistentvolumeclaims,verbs=create,versions=v1,name=pvc.capsule.clastix.io

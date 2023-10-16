@@ -4,7 +4,7 @@
 package route
 
 import (
-	capsulewebhook "github.com/clastix/capsule/pkg/webhook"
+	capsulewebhook "github.com/projectcapsule/capsule/pkg/webhook"
 )
 
 // +kubebuilder:webhook:path=/tenantresource-objects,mutating=false,sideEffects=None,admissionReviewVersions=v1,failurePolicy=fail,groups="*",resources="*",verbs=update;delete,versions="*",name=resource-objects.tenant.capsule.clastix.io

@@ -6,7 +6,7 @@ package utils
 import (
 	"fmt"
 
-	capsulev1beta2 "github.com/clastix/capsule/api/v1beta2"
+	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 )
 
 func GetOwnersWithKinds(tenant *capsulev1beta2.Tenant) (owners []string) {

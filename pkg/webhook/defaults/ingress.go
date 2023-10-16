@@ -15,9 +15,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	capsulev1beta2 "github.com/clastix/capsule/api/v1beta2"
-	capsuleingress "github.com/clastix/capsule/pkg/webhook/ingress"
-	"github.com/clastix/capsule/pkg/webhook/utils"
+	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	capsuleingress "github.com/projectcapsule/capsule/pkg/webhook/ingress"
+	"github.com/projectcapsule/capsule/pkg/webhook/utils"
 )
 
 func mutateIngressDefaults(ctx context.Context, req admission.Request, version *version.Version, c client.Client, decoder *admission.Decoder, recorder record.EventRecorder, namespace string) *admission.Response {

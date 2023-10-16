@@ -14,12 +14,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
-	capsulev1beta2 "github.com/clastix/capsule/api/v1beta2"
-	"github.com/clastix/capsule/pkg/indexer/ingress"
-	"github.com/clastix/capsule/pkg/indexer/namespace"
-	"github.com/clastix/capsule/pkg/indexer/tenant"
-	"github.com/clastix/capsule/pkg/indexer/tenantresource"
-	"github.com/clastix/capsule/pkg/utils"
+	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/indexer/ingress"
+	"github.com/projectcapsule/capsule/pkg/indexer/namespace"
+	"github.com/projectcapsule/capsule/pkg/indexer/tenant"
+	"github.com/projectcapsule/capsule/pkg/indexer/tenantresource"
+	"github.com/projectcapsule/capsule/pkg/utils"
 )
 
 type CustomIndexer interface {

@@ -13,10 +13,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	capsulev1beta2 "github.com/clastix/capsule/api/v1beta2"
-	"github.com/clastix/capsule/pkg/configuration"
-	capsulewebhook "github.com/clastix/capsule/pkg/webhook"
-	"github.com/clastix/capsule/pkg/webhook/utils"
+	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/configuration"
+	capsulewebhook "github.com/projectcapsule/capsule/pkg/webhook"
+	"github.com/projectcapsule/capsule/pkg/webhook/utils"
 )
 
 type freezedHandler struct {

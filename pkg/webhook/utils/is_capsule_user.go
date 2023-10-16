@@ -12,15 +12,15 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	capsulev1beta2 "github.com/clastix/capsule/api/v1beta2"
-	"github.com/clastix/capsule/pkg/utils"
+	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/utils"
 )
 
 func IsCapsuleUser(ctx context.Context, req admission.Request, clt client.Client, userGroups []string) bool {
 	groupList := utils.NewUserGroupList(req.UserInfo.Groups)
 	// if the user is a ServiceAccount belonging to the kube-system namespace, definitely, it's not a Capsule user
 	// and we can skip the check in case of Capsule user group assigned to system:authenticated
-	// (ref: https://github.com/clastix/capsule/issues/234)
+	// (ref: https://github.com/projectcapsule/capsule/issues/234)
 	if groupList.Find("system:serviceaccounts:kube-system") {
 		return false
 	}

@@ -10,7 +10,7 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/conversion"
 
-	capsulev1alpha1 "github.com/clastix/capsule/api/v1alpha1"
+	capsulev1alpha1 "github.com/projectcapsule/capsule/api/v1alpha1"
 )
 
 func (in *CapsuleConfiguration) ConvertTo(raw conversion.Hub) error {

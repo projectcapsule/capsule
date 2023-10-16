@@ -4,7 +4,7 @@
 package route
 
 import (
-	capsulewebhook "github.com/clastix/capsule/pkg/webhook"
+	capsulewebhook "github.com/projectcapsule/capsule/pkg/webhook"
 )
 
 // +kubebuilder:webhook:path=/networkpolicies,mutating=false,sideEffects=None,admissionReviewVersions=v1,failurePolicy=fail,groups="networking.k8s.io",resources=networkpolicies,verbs=update;delete,versions=v1,name=networkpolicies.capsule.clastix.io

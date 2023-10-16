@@ -6,8 +6,8 @@ package pod
 import (
 	"fmt"
 
-	"github.com/clastix/capsule/pkg/api"
-	"github.com/clastix/capsule/pkg/webhook/utils"
+	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/webhook/utils"
 )
 
 type podRuntimeClassForbiddenError struct {

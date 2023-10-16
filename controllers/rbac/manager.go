@@ -20,9 +20,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	capsulev1beta2 "github.com/clastix/capsule/api/v1beta2"
-	"github.com/clastix/capsule/controllers/utils"
-	"github.com/clastix/capsule/pkg/configuration"
+	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/controllers/utils"
+	"github.com/projectcapsule/capsule/pkg/configuration"
 )
 
 type Manager struct {

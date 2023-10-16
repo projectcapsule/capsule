@@ -15,8 +15,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/pointer"
 
-	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
-	"github.com/clastix/capsule/pkg/api"
+	capsulev1beta1 "github.com/projectcapsule/capsule/api/v1beta1"
+	"github.com/projectcapsule/capsule/pkg/api"
 )
 
 //nolint:maintidx

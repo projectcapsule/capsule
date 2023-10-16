@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/clastix/capsule/pkg/api"
-	"github.com/clastix/capsule/pkg/webhook/utils"
+	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/webhook/utils"
 )
 
 type ingressClassForbiddenError struct {

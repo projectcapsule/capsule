@@ -4,7 +4,7 @@
 package v1beta1
 
 import (
-	"github.com/clastix/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api"
 )
 
 type IngressOptions struct {

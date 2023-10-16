@@ -13,8 +13,8 @@ import (
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/conversion"
 
-	capsulev1beta1 "github.com/clastix/capsule/api/v1beta1"
-	"github.com/clastix/capsule/pkg/api"
+	capsulev1beta1 "github.com/projectcapsule/capsule/api/v1beta1"
+	"github.com/projectcapsule/capsule/pkg/api"
 )
 
 const (
