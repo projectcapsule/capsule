@@ -16,7 +16,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/util/retry"
 
-	capsulev1beta2 "github.com/clastix/capsule/api/v1beta2"
+	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 )
 
 func (r *Manager) syncCustomResourceQuotaUsages(ctx context.Context, tenant *capsulev1beta2.Tenant) error {

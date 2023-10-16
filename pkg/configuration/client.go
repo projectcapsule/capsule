@@ -12,8 +12,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	capsulev1beta2 "github.com/clastix/capsule/api/v1beta2"
-	capsuleapi "github.com/clastix/capsule/pkg/api"
+	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	capsuleapi "github.com/projectcapsule/capsule/pkg/api"
 )
 
 // capsuleConfiguration is the Capsule Configuration retrieval mode

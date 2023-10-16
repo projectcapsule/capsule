@@ -6,7 +6,7 @@ package tenant
 import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/clastix/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api"
 )
 
 type NamespacesReference struct {

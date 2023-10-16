@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"strings"
 
-	capsuleapi "github.com/clastix/capsule/pkg/api"
+	capsuleapi "github.com/projectcapsule/capsule/pkg/api"
 )
 
 //nolint:predeclared

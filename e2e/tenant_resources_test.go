@@ -10,7 +10,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/clastix/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -20,7 +20,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
-	capsulev1beta2 "github.com/clastix/capsule/api/v1beta2"
+	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 )
 
 var _ = Describe("creating namespaces within a Tenant with resources", func() {

@@ -16,9 +16,9 @@ import (
 	nodev1 "k8s.io/api/node/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/clastix/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api"
 
-	capsulev1beta2 "github.com/clastix/capsule/api/v1beta2"
+	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 )
 
 var _ = Describe("enforcing a Runtime Class", func() {

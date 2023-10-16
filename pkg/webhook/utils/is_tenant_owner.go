@@ -6,7 +6,7 @@ package utils
 import (
 	authenticationv1 "k8s.io/api/authentication/v1"
 
-	capsulev1beta2 "github.com/clastix/capsule/api/v1beta2"
+	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 )
 
 func IsTenantOwner(owners capsulev1beta2.OwnerListSpec, userInfo authenticationv1.UserInfo) bool {

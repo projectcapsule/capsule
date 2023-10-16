@@ -13,8 +13,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	capsulev1beta2 "github.com/clastix/capsule/api/v1beta2"
-	"github.com/clastix/capsule/pkg/api"
+	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/api"
 )
 
 var _ = Describe("enforcing a defined ImagePullPolicy", func() {

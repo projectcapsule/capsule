@@ -9,7 +9,7 @@
 package v1alpha1
 
 import (
-	"github.com/clastix/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/api/networking/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"

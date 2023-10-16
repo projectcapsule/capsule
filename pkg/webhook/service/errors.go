@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/clastix/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api"
 )
 
 type externalServiceIPForbiddenError struct {

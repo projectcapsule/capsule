@@ -16,9 +16,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	capsulev1beta2 "github.com/clastix/capsule/api/v1beta2"
-	capsuleutils "github.com/clastix/capsule/pkg/utils"
-	webhookutils "github.com/clastix/capsule/pkg/webhook/utils"
+	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	capsuleutils "github.com/projectcapsule/capsule/pkg/utils"
+	webhookutils "github.com/projectcapsule/capsule/pkg/webhook/utils"
 )
 
 type Controller struct {

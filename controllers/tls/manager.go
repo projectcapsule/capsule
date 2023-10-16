@@ -28,9 +28,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	"github.com/clastix/capsule/controllers/utils"
-	"github.com/clastix/capsule/pkg/cert"
-	"github.com/clastix/capsule/pkg/configuration"
+	"github.com/projectcapsule/capsule/controllers/utils"
+	"github.com/projectcapsule/capsule/pkg/cert"
+	"github.com/projectcapsule/capsule/pkg/configuration"
 )
 
 const (

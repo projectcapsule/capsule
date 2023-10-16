@@ -1,4 +1,4 @@
-module github.com/clastix/capsule
+module github.com/projectcapsule/capsule
 
 go 1.19
 

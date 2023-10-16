@@ -16,9 +16,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
-	capsulev1beta2 "github.com/clastix/capsule/api/v1beta2"
-	"github.com/clastix/capsule/pkg/api"
-	"github.com/clastix/capsule/pkg/utils"
+	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/utils"
 )
 
 // Ensuring all annotations are applied to each Namespace handled by the Tenant.

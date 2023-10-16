@@ -15,8 +15,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/utils/pointer"
 
-	capsulev1beta2 "github.com/clastix/capsule/api/v1beta2"
-	"github.com/clastix/capsule/pkg/api"
+	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/api"
 )
 
 var _ = Describe("creating a LoadBalancer service when it is enabled for Tenant", func() {

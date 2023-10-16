@@ -11,9 +11,9 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 
-	"github.com/clastix/capsule/api/v1alpha1"
-	"github.com/clastix/capsule/api/v1beta1"
-	"github.com/clastix/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/api/v1alpha1"
+	"github.com/projectcapsule/capsule/api/v1beta1"
+	"github.com/projectcapsule/capsule/api/v1beta2"
 )
 
 func GetTypeLabel(t runtime.Object) (label string, err error) {
