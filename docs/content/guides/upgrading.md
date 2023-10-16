@@ -2,9 +2,9 @@
 
 List of Tenant API changes:
 
-- [Capsule v0.1.0](https://github.com/clastix/capsule/releases/tag/v0.1.0) bump to `v1beta1` from `v1alpha1`.
-- [Capsule v0.2.0](https://github.com/clastix/capsule/releases/tag/v0.2.0) bump to `v1beta2` from `v1beta1`, deprecating `v1alpha1`.
-- [Capsule v0.3.0](https://github.com/clastix/capsule/releases/tag/v0.3.0) missing enums required by [Capsule Proxy](https://github.com/clastix/capsule-proxy).
+- [Capsule v0.1.0](https://github.com/projectcapsule/capsule/releases/tag/v0.1.0) bump to `v1beta1` from `v1alpha1`.
+- [Capsule v0.2.0](https://github.com/projectcapsule/capsule/releases/tag/v0.2.0) bump to `v1beta2` from `v1beta1`, deprecating `v1alpha1`.
+- [Capsule v0.3.0](https://github.com/projectcapsule/capsule/releases/tag/v0.3.0) missing enums required by [Capsule Proxy](https://github.com/clastix/capsule-proxy).
 
 This document aims to provide support and a guide on how to perform a clean upgrade to the latest API version in order to avoid service disruption and data loss.
 

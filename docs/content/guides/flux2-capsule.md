@@ -180,7 +180,7 @@ To deepen on this please go to [#Insights](#insights).
 
 ### How to setup Tenants GitOps-ready
 
-Given that [Capsule](github.com/clastix/capsule) and [Capsule Proxy](github.com/clastix/capsule-proxy) are installed, and [Flux v2](https://github.com/fluxcd/flux2) configured with [multi-tenancy lockdown](https://fluxcd.io/docs/installation/#multi-tenancy-lockdown) features, of which the patch below:
+Given that [Capsule](github.com/projectcapsule/capsule) and [Capsule Proxy](github.com/clastix/capsule-proxy) are installed, and [Flux v2](https://github.com/fluxcd/flux2) configured with [multi-tenancy lockdown](https://fluxcd.io/docs/installation/#multi-tenancy-lockdown) features, of which the patch below:
 
 ```yaml
 apiVersion: kustomize.config.k8s.io/v1beta1
@@ -435,7 +435,7 @@ For other protections against threats in this multi-tenancy scenario please see 
 - https://fluxcd.io/docs/installation/#multi-tenancy-lockdown
 - https://fluxcd.io/blog/2022/05/may-2022-security-announcement/
 - https://github.com/clastix/capsule-proxy/issues/218
-- https://github.com/clastix/capsule/issues/528 
+- https://github.com/projectcapsule/capsule/issues/528 
 - https://github.com/clastix/flux2-capsule-multi-tenancy
 - https://github.com/fluxcd/flux2-multi-tenancy
 - https://fluxcd.io/docs/guides/repository-structure/

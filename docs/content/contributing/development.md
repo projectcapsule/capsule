@@ -107,12 +107,12 @@ $ git clone git@github.com:myuser/capsule.git && cd capsule
 It's a good practice to add the upstream as the remote too so we can easily fetch and merge the upstream to our fork:
 
 ```shell
-$ git remote add upstream https://github.com/clastix/capsule.git
+$ git remote add upstream https://github.com/projectcapsule/capsule.git
 $ git remote -vv
 origin	git@github.com:myuser/capsule.git (fetch)
 origin	git@github.com:myuser/capsule.git (push)
-upstream	https://github.com/clastix/capsule.git (fetch)
-upstream	https://github.com/clastix/capsule.git (push)
+upstream	https://github.com/projectcapsule/capsule.git (fetch)
+upstream	https://github.com/projectcapsule/capsule.git (push)
 ```
 
 Pull all tags

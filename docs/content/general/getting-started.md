@@ -9,7 +9,7 @@ Make sure you have access to a Kubernetes cluster as administrator.
 There are two ways to install Capsule:
 
 * Use the [single YAML file installer](https://raw.githubusercontent.com/clastix/capsule/master/config/install.yaml)
-* Use the [Capsule Helm Chart](https://github.com/clastix/capsule/blob/master/charts/capsule/README.md)
+* Use the [Capsule Helm Chart](https://github.com/projectcapsule/capsule/blob/master/charts/capsule/README.md)
 
 ### Install with the single YAML file installer
 
@@ -23,7 +23,7 @@ It will install the Capsule controller in a dedicated namespace `capsule-system`
 
 ### Install with Helm Chart
 
-Please, refer to the instructions reported in the Capsule Helm Chart [README](https://github.com/clastix/capsule/blob/master/charts/capsule/README.md). 
+Please, refer to the instructions reported in the Capsule Helm Chart [README](https://github.com/projectcapsule/capsule/blob/master/charts/capsule/README.md). 
 
 ## Create your first Tenant
 
@@ -74,7 +74,7 @@ Users authenticated through an _OIDC token_ must have in their token:
 ]
 ```
 
-The [hack/create-user.sh](https://github.com/clastix/capsule/blob/master/hack/create-user.sh) can help you set up a dummy `kubeconfig` for the `alice` user acting as owner of a tenant called `oil`
+The [hack/create-user.sh](https://github.com/projectcapsule/capsule/blob/master/hack/create-user.sh) can help you set up a dummy `kubeconfig` for the `alice` user acting as owner of a tenant called `oil`
 
 ```bash
 ./hack/create-user.sh alice oil

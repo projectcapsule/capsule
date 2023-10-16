@@ -138,7 +138,7 @@ Each Resource kind can be granted with several verbs, such as:
 
 ## Cluster-scoped resources selection strategy precedence
 
-Starting from [Capsule v0.2.0](https://github.com/clastix/capsule/releases/tag/v0.2.0), selection of cluster-scoped resources based on labels has been introduced.
+Starting from [Capsule v0.2.0](https://github.com/projectcapsule/capsule/releases/tag/v0.2.0), selection of cluster-scoped resources based on labels has been introduced.
 
 Due to the limitations of Kubernetes API Server which not support `OR` label selector, the Capsule core team decided to give precedence to the label selector over the exact and regex match.
 

@@ -28,7 +28,7 @@ This will trigger a _GitHub Action_ which builds a multi-arch container image, t
 
 ## Helm Chart hosting
 
-The suggested installation tool is [Helm](https://helm.sh), and the Capsule chart is hosted in the [GitHub repository](https://github.com/clastix/capsule/tree/master/charts/capsule).
+The suggested installation tool is [Helm](https://helm.sh), and the Capsule chart is hosted in the [GitHub repository](https://github.com/projectcapsule/capsule/tree/master/charts/capsule).
 For each Helm Chart release, a tit tag with the prefix `helm-v` will be issued to help developers to address the corresponding commit.
 
 The built Helm Charts are then automatically pushed upon tag release to the [CLASTIX Helm repository](https://clastix.github.io/charts).

@@ -18,7 +18,7 @@ To fastly deploy this monitoring stack, consider installing the [Prometheus Oper
 
 ## Quick Start
 
-The Capsule Helm [charts](https://github.com/clastix/capsule/tree/master/charts/capsule) allow you to automatically create Kubernetes minimum resources needed for the proper functioning of the dashboard:
+The Capsule Helm [charts](https://github.com/projectcapsule/capsule/tree/master/charts/capsule) allow you to automatically create Kubernetes minimum resources needed for the proper functioning of the dashboard:
 
 * ServiceMonitor
 * Role
@@ -38,7 +38,7 @@ serviceMonitor:
     name: <prometheus-sa>
     namespace: <prometheus-sa-namespace>
 ```
-Take a look at the Helm charts [README.md](https://github.com/clastix/capsule/blob/master/charts/capsule/README.md#customize-the-installation) file for further customization.
+Take a look at the Helm charts [README.md](https://github.com/projectcapsule/capsule/blob/master/charts/capsule/README.md#customize-the-installation) file for further customization.
 
 ### Check Service Monitor
 
@@ -47,7 +47,7 @@ Verify that the service monitor is working correctly through the Prometheus "tar
 ![Prometheus Targets](./assets/prometheus_targets.png)
 
 ### Deploy dashboard
-A dashboard for Grafana is provided as [dashboard.json](https://github.com/clastix/capsule/blob/master/config/grafana/dashboard.json).
+A dashboard for Grafana is provided as [dashboard.json](https://github.com/projectcapsule/capsule/blob/master/config/grafana/dashboard.json).
 
 Render with `kustomize` the dashboard as a ConfigMap and apply in the namespace where Grafana is installed, making sure to select the correct Prometheus datasource:
 
