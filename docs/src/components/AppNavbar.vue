@@ -204,7 +204,7 @@
         >
           <li>
             <a
-              href="https://github.com/clastix/capsule"
+              href="https://github.com/projectcapsule/capsule"
               target="_blank"
               rel="noopener noreferrer"
             >

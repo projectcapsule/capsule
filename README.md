@@ -1,9 +1,9 @@
 
 <p align="left">
-  <img src="https://github.com/clastix/capsule/actions/workflows/ci.yml/badge.svg"/>
+  <img src="https://github.com/projectcapsule/capsule/actions/workflows/ci.yml/badge.svg"/>
   <img src="https://img.shields.io/github/license/clastix/capsule"/>
   <img src="https://img.shields.io/github/go-mod/go-version/clastix/capsule"/>
-  <a href="https://github.com/clastix/capsule/releases">
+  <a href="https://github.com/projectcapsule/capsule/releases">
     <img src="https://img.shields.io/github/v/release/clastix/capsule"/>
   </a>
   <a href="https://charmhub.io/capsule-k8s">
@@ -94,7 +94,7 @@ make helm-docs
 
 ## Community
 
-Join the community, share and learn from it. You can find all the resources to how to contribute code and docs, connect with people in the [community repository](https://github.com/clastix/capsule-community).
+Join the community, share and learn from it. You can find all the resources to how to contribute code and docs, connect with people in the [community repository](https://github.com/projectcapsule/capsule-community).
 
 Please read the [code of conduct](CODE_OF_CONDUCT.md).
 
@@ -122,7 +122,7 @@ Please, refer to the [documentation page](https://capsule.clastix.io/docs/contri
 
 - Q. Is it production grade?
 
-  A. Although under frequent development and improvements, Capsule is ready to be used in production environments as currently, people are using it in public and private deployments. Check out the [release](https://github.com/clastix/capsule/releases) page for a detailed list of available versions.
+  A. Although under frequent development and improvements, Capsule is ready to be used in production environments as currently, people are using it in public and private deployments. Check out the [release](https://github.com/projectcapsule/capsule/releases) page for a detailed list of available versions.
 
 - Q. Does it work with my Kubernetes XYZ distribution?
 

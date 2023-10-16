@@ -17,7 +17,7 @@
       <ul class="lg:flex lg:items-center lg:space-x-5 space-y-2 lg:space-y-0">
         <li>
           <a
-            href="https://github.com/clastix/capsule"
+            href="https://github.com/projectcapsule/capsule"
             target="_blank"
             rel="noopener noreferrer"
             class="flex space-x-2 hover:text-blue-400"

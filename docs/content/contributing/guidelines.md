@@ -59,7 +59,7 @@ You can easily check them issuing the _Make_ recipe `golint`.
 golangci-lint run -c .golangci.yml
 ```
 
-> Enabled linters and related options are defined in the [.golanci.yml file](https://github.com/clastix/capsule/blob/master/.golangci.yml)
+> Enabled linters and related options are defined in the [.golanci.yml file](https://github.com/projectcapsule/capsule/blob/master/.golangci.yml)
 
 ### goimports
 
@@ -77,7 +77,7 @@ To help you out you can use the _Make_ recipe `goimports`
 
 ```
 # make goimports
-goimports -w -l -local "github.com/clastix/capsule" .
+goimports -w -l -local "github.com/projectcapsule/capsule" .
 ```
 
 ## Finding contributions to work on
@@ -108,4 +108,4 @@ Please, add a new single line at end of any file as the current coding style.
 
 ## Licensing
 
-See the [LICENSE](https://github.com/clastix/capsule/blob/master/LICENSE) file for our project's licensing. We can ask you to confirm the licensing of your contribution.
+See the [LICENSE](https://github.com/projectcapsule/capsule/blob/master/LICENSE) file for our project's licensing. We can ask you to confirm the licensing of your contribution.
