@@ -14,7 +14,7 @@ linters-settings:
     sections:
       - standard
       - default
-      - prefix(github.com/clastix/capsule)
+      - prefix(github.com/projectcapsule/capsule)
   goheader:
     template: |-
       Copyright 2020-2021 Clastix Labs

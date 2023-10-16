@@ -236,7 +236,7 @@ bundle-build:
 # Sorting imports
 .PHONY: goimports
 goimports:
-	goimports -w -l -local "github.com/clastix/capsule" .
+	goimports -w -l -local "github.com/projectcapsule/capsule" .
 
 GOLANGCI_LINT = $(shell pwd)/bin/golangci-lint
 golangci-lint: ## Download golangci-lint locally if necessary.
