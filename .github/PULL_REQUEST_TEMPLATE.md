@@ -15,6 +15,4 @@ following ourselves these points:
 - explain what and why in the body, if more than a trivial change, wrapping at
   72 characters
 
-If you have any issue or question, reach out us!
-https://clastix.slack.com >>> #capsule channel 
 -->

@@ -1,5 +1,5 @@
 remote: origin
-target-branch: master
+target-branch: main
 chart-dirs:
   - charts
 helm-extra-args: "--timeout 600s"  
