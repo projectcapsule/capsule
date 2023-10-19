@@ -23,9 +23,7 @@ spec:
         control-plane: controller-manager
     spec:
       containers:
-      - command:
-        - /manager
-        args:
+      - args:
         - --enable-leader-election
         - --zap-encoder=console
         - --zap-log-level=debug
