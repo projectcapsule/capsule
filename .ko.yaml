@@ -1,0 +1,8 @@
+defaultPlatforms:
+- linux/arm64
+- linux/amd64
+builds:
+- id: capsule
+  main: ./
+  ldflags:
+  - '{{ if index .Env "LD_FLAGS" }}{{ .Env.LD_FLAGS }}{{ end }}'
