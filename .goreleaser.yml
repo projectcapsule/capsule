@@ -1,0 +1,83 @@
+project_name: capsule
+env:
+  - COSIGN_EXPERIMENTAL=true
+  - GO111MODULE=on
+before:
+  hooks:
+    - go mod download
+gomod:
+  proxy: false
+builds:
+  - main: .
+    binary: "{{ .ProjectName }}-{{ .Os }}-{{ .Arch }}"
+    env:
+      - CGO_ENABLED=0
+    goarch:
+      - amd64
+      - arm64
+    goos:
+      - linux
+    flags:
+      - -trimpath
+    mod_timestamp: '{{ .CommitTimestamp }}'
+    ldflags:
+      - >-
+          -X main.Version={{ .Tag }}
+          -X main.GitCommit={{ .Commit }}
+          -X main.GitTag={{ .Tag }}
+          -X main.GitTreeState={{ .Date }}
+          -X main.BuildDate={{ .Date }}
+          -X main.GitRepo={{ .ProjectName }}
+release:
+  prerelease: auto
+  footer: |
+    Thanks to all the contributors!
+
+    **Full Changelog**: https://github.com/projectcapsule/{{ .ProjectName }}/compare/{{ .PreviousTag }}...{{ .Tag }}
+    
+    **Docker Images**
+    - `ghcr.io/projectcapsule/{{ .ProjectName }}:{{ .Tag }}`
+    - `ghcr.io/projectcapsule/{{ .ProjectName }}:latest`
+checksum:
+  name_template: 'checksums.txt'
+changelog:
+  sort: asc
+  use: github
+  filters:
+    exclude:
+    - '^test:'
+    - '^chore'
+    - '^rebase:'
+    - 'merge conflict'
+    - Merge pull request
+    - Merge remote-tracking branch
+    - Merge branch
+  groups:
+    # https://github.com/conventional-changelog/commitlint/tree/master/%40commitlint/config-conventional
+    - title: '🛠 Dependency updates'
+      regexp: '^.*?(feat|fix)\(deps\)!?:.+$'
+      order: 300
+    - title: '✨ New Features'
+      regexp: '^.*?feat(\([[:word:]]+\))??!?:.+$'
+      order: 100
+    - title: '🐛 Bug fixes'
+      regexp: '^.*?fix(\([[:word:]]+\))??!?:.+$'
+      order: 200
+    - title: '📖 Documentation updates'
+      regexp: ^.*?docs(\([[:word:]]+\))??!?:.+$
+      order: 400
+    - title: '🚀 Build process updates'
+      regexp: ^.*?(build|ci)(\([[:word:]]+\))??!?:.+$
+      order: 400
+    - title: '📦 Other work'
+      order: 9999
+sboms:
+  - artifacts: archive
+signs:
+- cmd: cosign
+  args:
+  - "sign-blob"
+  - "--output-signature=${signature}"
+  - "${artifact}"
+  - "--yes"
+  artifacts: all

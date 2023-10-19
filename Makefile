@@ -1,8 +1,23 @@
-# Current Operator version
-VERSION ?= $$(git describe --abbrev=0 --tags --match "v*")
+# Version
+GIT_HEAD_COMMIT ?= $(shell git rev-parse --short HEAD)
+VERSION          ?= $(shell git describe --abbrev=0 --tags --match "v*")
+ifndef VERSION
+VERSION          = $(GIT_HEAD_COMMIT)
+endif
 
-# Default bundle image tag
-BUNDLE_IMG ?= clastix/capsule:$(VERSION)-bundle
+# Defaults
+REGISTRY        ?= ghcr.io
+REPOSITORY      ?= projectcapsule/capsule
+GIT_TAG_COMMIT  ?= $(shell git rev-parse --short $(VERSION))
+GIT_MODIFIED_1  ?= $(shell git diff $(GIT_HEAD_COMMIT) $(GIT_TAG_COMMIT) --quiet && echo "" || echo ".dev")
+GIT_MODIFIED_2  ?= $(shell git diff --quiet && echo "" || echo ".dirty")
+GIT_MODIFIED    ?= $(shell echo "$(GIT_MODIFIED_1)$(GIT_MODIFIED_2)")
+GIT_REPO        ?= $(shell git config --get remote.origin.url)
+BUILD_DATE      ?= $(shell git log -1 --format="%at" | xargs -I{} sh -c 'if [ "$(shell uname)" = "Darwin" ]; then date -r {} +%Y-%m-%dT%H:%M:%S; else date -d @{} +%Y-%m-%dT%H:%M:%S; fi')
+IMG_BASE        ?= $(REPOSITORY)
+IMG             ?= $(IMG_BASE):$(VERSION)
+CAPSULE_IMG     ?= $(REGISTRY)/$(IMG_BASE)
+
 # Options for 'bundle-build'
 ifneq ($(origin CHANNELS), undefined)
 BUNDLE_CHANNELS := --channels=$(CHANNELS)
@@ -12,9 +27,6 @@ BUNDLE_DEFAULT_CHANNEL := --default-channel=$(DEFAULT_CHANNEL)
 endif
 BUNDLE_METADATA_OPTS ?= $(BUNDLE_CHANNELS) $(BUNDLE_DEFAULT_CHANNEL)
 
-# Image URL to use all building/pushing image targets
-IMG ?= clastix/capsule:$(VERSION)
-
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
 GOBIN=$(shell go env GOPATH)/bin
@@ -22,20 +34,16 @@ else
 GOBIN=$(shell go env GOBIN)
 endif
 
-# Get information about git current status
-GIT_HEAD_COMMIT ?= $$(git rev-parse --short HEAD)
-GIT_TAG_COMMIT  ?= $$(git rev-parse --short $(VERSION))
-GIT_MODIFIED_1  ?= $$(git diff $(GIT_HEAD_COMMIT) $(GIT_TAG_COMMIT) --quiet && echo "" || echo ".dev")
-GIT_MODIFIED_2  ?= $$(git diff --quiet && echo "" || echo ".dirty")
-GIT_MODIFIED    ?= $$(echo "$(GIT_MODIFIED_1)$(GIT_MODIFIED_2)")
-GIT_REPO        ?= $$(git config --get remote.origin.url)
-BUILD_DATE      ?= $$(git log -1 --format="%at" | xargs -I{} date -d @{} +%Y-%m-%dT%H:%M:%S)
-
 all: manager
 
 # Run tests
-test: generate manifests
-	go test ./... -coverprofile cover.out
+.PHONY: test
+test: test-clean generate manifests test-clean
+	@GO111MODULE=on go test -v ./... -coverprofile coverage.out
+
+.PHONY: test-clean
+test-clean: ## Clean tests cache
+	@go clean -testcache
 
 # Build manager binary
 manager: generate golint
@@ -47,7 +55,7 @@ run: generate manifests
 
 # Creates the single file to install Capsule without any external dependency
 installer: manifests kustomize
-	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
+	cd config/manager && $(KUSTOMIZE) edit set image controller=${CAPSULE_IMG}
 	$(KUSTOMIZE) build config/default > config/install.yaml
 
 # Install CRDs into a cluster
@@ -86,12 +94,13 @@ helm-docs: HELMDOCS_VERSION := v1.11.0
 helm-docs: docker
 	@docker run -v "$(SRC_ROOT):/helm-docs" jnorwood/helm-docs:$(HELMDOCS_VERSION) --chart-search-root /helm-docs
 
-helm-lint: ct
-	@ct lint --config $(SRC_ROOT)/.github/configs/ct.yaml --lint-conf $(SRC_ROOT)/.github/configs/lintconf.yaml --all --debug
+helm-lint: CT_VERSION := v3.3.1
+helm-lint: docker
+	@docker run -v "$(SRC_ROOT):/workdir" --entrypoint /bin/sh quay.io/helmpack/chart-testing:$(CT_VERSION) -c "cd /workdir; ct lint --config .github/configs/ct.yaml  --lint-conf .github/configs/lintconf.yaml  --all --debug"
 
-helm-test: kind ct docker-build
+helm-test: kind ct ko-build-all
 	@kind create cluster --wait=60s --name capsule-charts
-	@kind load docker-image --name capsule-charts ${IMG}
+	@kind load docker-image --name capsule-charts $(LOCAL_CAPSULE_IMG)
 	@kubectl create ns capsule-system
 	@ct install --config $(SRC_ROOT)/.github/configs/ct.yaml --namespace=capsule-system --all --debug
 	@kind delete cluster --name capsule-charts
@@ -166,42 +175,101 @@ dev-setup:
 		]";
 
 
-# Build the docker image
-docker-build: test
-	docker build . -t ${IMG} --build-arg GIT_HEAD_COMMIT=$(GIT_HEAD_COMMIT) \
- 							 --build-arg GIT_TAG_COMMIT=$(GIT_TAG_COMMIT) \
- 							 --build-arg GIT_MODIFIED=$(GIT_MODIFIED) \
- 							 --build-arg GIT_REPO=$(GIT_REPO) \
- 							 --build-arg GIT_LAST_TAG=$(VERSION) \
- 							 --build-arg BUILD_DATE=$(BUILD_DATE)
+####################
+# -- Docker
+####################
 
-# Push the docker image
-docker-push:
-	docker push ${IMG}
+KOCACHE         ?= /tmp/ko-cache
+KO_REGISTRY     := ko.local
+KO_TAGS         ?= "latest"
+ifdef VERSION
+KO_TAGS         := $(KO_TAGS),$(VERSION)
+endif
 
-CONTROLLER_GEN = $(shell pwd)/bin/controller-gen
+LD_FLAGS        := "-X main.Version=$(VERSION) \
+					-X main.GitCommit=$(GIT_HEAD_COMMIT) \
+					-X main.GitTag=$(VERSION) \
+					-X main.GitTreeState=$(GIT_MODIFIED) \
+					-X main.BuildDate=$(BUILD_DATE) \
+					-X main.GitRepo=$(GIT_REPO)"
+
+# Docker Image Build
+# ------------------
+
+.PHONY: ko-build-capsule
+LOCAL_CAPSULE_IMG_BASE := github.com/$(REPOSITORY)
+LOCAL_CAPSULE_IMG := $(KO_REGISTRY)/$(LOCAL_CAPSULE_IMG_BASE)
+ko-build-capsule: ko
+	@echo Building Capsule $(KO_TAGS) >&2
+	@LD_FLAGS=$(LD_FLAGS) KOCACHE=$(KOCACHE) KO_DOCKER_REPO=$(KO_REGISTRY) \
+		$(KO) build ./ --preserve-import-paths --tags=$(KO_TAGS)  --push=false
+
+.PHONY: ko-build-all
+ko-build-all: ko-build-capsule
+
+# Docker Image Publish
+# ------------------
+
+REGISTRY_PASSWORD   ?= dummy
+REGISTRY_USERNAME   ?= dummy
+
+.PHONY: ko-login
+ko-login: ko
+	@$(KO) login $(REGISTRY) --username $(REGISTRY_USERNAME) --password $(REGISTRY_PASSWORD)
+
+.PHONY: ko-publish-capsule
+ko-publish-capsule: ko-login ## Build and publish kyvernopre image (with ko)
+	@LD_FLAGS=$(LD_FLAGS) KOCACHE=$(KOCACHE) KO_DOCKER_REPO=$(CAPSULE_IMG) \
+		$(KO) build ./ --bare --tags=$(KO_TAGS)
+
+.PHONY: ko-publish-all
+ko-publish-all: ko-publish-capsule
+
+####################
+# -- Binaries
+####################
+
+CONTROLLER_GEN         := $(shell pwd)/bin/controller-gen
+CONTROLLER_GEN_VERSION := v0.10.0
 controller-gen: ## Download controller-gen locally if necessary.
-	$(call go-install-tool,$(CONTROLLER_GEN),sigs.k8s.io/controller-tools/cmd/controller-gen@v0.10.0)
+	$(call go-install-tool,$(CONTROLLER_GEN),sigs.k8s.io/controller-tools/cmd/controller-gen@$(CONTROLLER_GEN_VERSION))
 
-APIDOCS_GEN = $(shell pwd)/bin/crdoc
+APIDOCS_GEN         := $(shell pwd)/bin/crdoc
+APIDOCS_GEN_VERSION := latest
 apidocs-gen: ## Download crdoc locally if necessary.
-	$(call go-install-tool,$(APIDOCS_GEN),fybrik.io/crdoc@latest)
+	$(call go-install-tool,$(APIDOCS_GEN),fybrik.io/crdoc@$(APIDOCS_GEN_VERSION))
 
-GINKGO = $(shell pwd)/bin/ginkgo
+GINKGO         := $(shell pwd)/bin/ginkgo
+GINGKO_VERSION := v2.9.5
 ginkgo: ## Download ginkgo locally if necessary.
-	$(call go-install-tool,$(GINKGO),github.com/onsi/ginkgo/v2/ginkgo@v2.9.5)
+	$(call go-install-tool,$(GINKGO),github.com/onsi/ginkgo/v2/ginkgo@$(GINGKO_VERSION))
 
-CT = $(shell pwd)/bin/ct
+CT         := $(shell pwd)/bin/ct
+CT_VERSION := v3.7.1
 ct: ## Download ct locally if necessary.
-	$(call go-install-tool,$(CT),github.com/helm/chart-testing/v3/ct@v3.7.1)
+	$(call go-install-tool,$(CT),github.com/helm/chart-testing/v3/ct@$(CT_VERSION))
 
-KIND = $(shell pwd)/bin/kind
+KIND         := $(shell pwd)/bin/kind
+KIND_VERSION := v0.17.0
 kind: ## Download kind locally if necessary.
-	$(call go-install-tool,$(KIND),sigs.k8s.io/kind/cmd/kind@v0.17.0)
+	$(call go-install-tool,$(KIND),sigs.k8s.io/kind/cmd/kind@$(KIND_VERSION))
 
-KUSTOMIZE = $(shell pwd)/bin/kustomize
+KUSTOMIZE         := $(shell pwd)/bin/kustomize
+KUSTOMIZE_VERSION := 3.8.7
 kustomize: ## Download kustomize locally if necessary.
-	$(call install-kustomize,$(KUSTOMIZE),3.8.7)
+	$(call install-kustomize,$(KUSTOMIZE),$(KUSTOMIZE_VERSION))
+
+KO = $(shell pwd)/bin/ko
+KO_VERSION = v0.14.1
+ko:
+	$(call go-install-tool,$(KO),github.com/google/ko@v0.14.1)
+
+####################
+# -- Helpers
+####################
+pull-upstream:
+	git remote add upstream https://github.com/capsuleproject/capsule.git
+	git fetch --all && git pull upstream
 
 define install-kustomize
 @[ -f $(1) ] || { \
@@ -218,7 +286,6 @@ PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
 define go-install-tool
 @[ -f $(1) ] || { \
 set -e ;\
-echo "Installing $(2)" ;\
 GOBIN=$(PROJECT_DIR)/bin go install $(2) ;\
 }
 endef
@@ -228,10 +295,6 @@ bundle: manifests
 	operator-sdk generate kustomize manifests -q
 	kustomize build config/manifests | operator-sdk generate bundle -q --overwrite --version $(VERSION) $(BUNDLE_METADATA_OPTS)
 	operator-sdk bundle validate ./bundle
-
-# Build the bundle image.
-bundle-build:
-	docker build -f bundle.Dockerfile -t $(BUNDLE_IMG) .
 
 # Sorting imports
 .PHONY: goimports
@@ -254,8 +317,11 @@ e2e/%: ginkgo
 
 e2e-build/%:
 	kind create cluster --wait=60s --name capsule --image=kindest/node:$*
-	make docker-build
-	kind load docker-image --nodes capsule-control-plane --name capsule $(IMG)
+	make e2e-load-image
+	make e2e-install
+
+.PHONY: e2e-install
+e2e-install:
 	helm upgrade \
 		--debug \
 		--install \
@@ -264,15 +330,23 @@ e2e-build/%:
 		--set 'manager.image.pullPolicy=Never' \
 		--set 'manager.resources=null'\
 		--set "manager.image.tag=$(VERSION)" \
+		--set 'manager.image.registry=$(KO_REGISTRY)' \
+		--set 'manager.image.repository=$(LOCAL_CAPSULE_IMG_BASE)' \
 		--set 'manager.livenessProbe.failureThreshold=10' \
 		--set 'manager.readinessProbe.failureThreshold=10' \
 		--set 'podSecurityContext.seccompProfile=null' \
 		capsule \
 		./charts/capsule
 
+.PHONY: e2e-load-image
+e2e-load-image: ko-build-all
+	kind load docker-image --nodes capsule-control-plane --name capsule $(LOCAL_CAPSULE_IMG):$(VERSION)
+
+.PHONY: e2e-exec
 e2e-exec: ginkgo
 	$(GINKGO) -v -tags e2e ./e2e
 
+.PHONY: e2e-destroy
 e2e-destroy:
 	kind delete cluster --name capsule
 
