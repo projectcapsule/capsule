@@ -1,4 +1,5 @@
 name: FOSSA
+permissions: {}
 
 on:
   push:
@@ -6,20 +7,29 @@ on:
   pull_request:
     branches: [ "*" ]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true    
+
 jobs:
   fossa-scan:
     runs-on: ubuntu-20.04
     steps:
       - name: "Checkout Code"
-        uses: actions/checkout@v3
-
+        uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608 # v4.1.0
+      - name: Check secret
+        id: checksecret
+        uses: ./.github/actions/exists
+        with:
+          value: ${{ secrets.FOSSA_API_KEY }}
       - name: "Run FOSSA Scan"
-        uses: fossas/fossa-action@v1.3.1
+        if: steps.checksecret.outputs.result == 'true'
+        uses: fossas/fossa-action@f61a4c0c263690f2ddb54b9822a719c25a7b608f # v1.3.1
         with:
           api-key: ${{ secrets.FOSSA_API_KEY }}
-
       - name: "Run FOSSA Test"
-        uses: fossas/fossa-action@v1.3.1
+        if: steps.checksecret.outputs.result == 'true'
+        uses: fossas/fossa-action@f61a4c0c263690f2ddb54b9822a719c25a7b608f # v1.3.1
         with:
           api-key: ${{ secrets.FOSSA_API_KEY }}
           run-tests: true
