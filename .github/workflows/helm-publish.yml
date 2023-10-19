@@ -1,0 +1,64 @@
+name: Publish charts
+permissions: read-all
+on:
+  push:
+    tags: [ "helm-v*" ]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  publish-helm:
+    # Skip this Release on forks
+    if: github.repository_owner == 'capsuleproject'
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608 # v4.1.0
+      - name: Publish Helm chart
+        uses: stefanprodan/helm-gh-pages@0ad2bb377311d61ac04ad9eb6f252fb68e207260 # v1.7.0
+        with:
+          token: "${{ secrets.GITHUB_TOKEN }}"
+          linting: off
+          charts_dir: charts
+          charts_url: https://${{ github.repository_owner }}.github.io/charts
+          owner: ${{ github.repository_owner }}
+          repository: charts
+          branch: gh-pages
+          commit_username: ${{ github.actor }}
+  publish-helm-oci:
+    runs-on: ubuntu-20.04
+    permissions:
+      contents: write
+      id-token: write
+      packages: write
+    outputs:
+      chart-digest: ${{ steps.helm_publish.outputs.digest }}
+    steps:
+      - uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608 # v4.1.0
+      - uses: sigstore/cosign-installer@11086d25041f77fe8fe7b9ea4e48e3b9192b8f19 # v3.1.2
+      - name: Helm | Publish
+        id: helm_publish
+        uses: oliverbaehler/github-actions/helm-oci-chart@8dfd42735c85f6c58d5d4d6f3232cd0e39d1fe73 # v0.1.0
+        with:
+          registry: ghcr.io
+          repository: ${{ github.repository_owner }}/charts
+          name: "capsule"
+          registry-username: ${{ github.actor }}
+          registry-password: ${{ secrets.GITHUB_TOKEN }}
+          update-dependencies: 'true' # Defaults to false
+          sign-image: 'true'
+          signature-repository: ghcr.io/${{ github.repository_owner }}/signatures
+  helm-provenance:
+    needs: publish-helm-oci
+    permissions:
+      id-token: write   # To sign the provenance.
+      packages: write   # To upload assets to release.
+      actions: read     # To read the workflow path.
+    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@v1.9.0
+    with:
+      image: ghcr.io/${{ github.repository_owner }}/charts/capsule
+      digest: "${{ needs.publish-helm-oci.outputs.chart-digest }}"
+      registry-username: ${{ github.actor }}
+    secrets:
+      registry-password: ${{ secrets.GITHUB_TOKEN }}

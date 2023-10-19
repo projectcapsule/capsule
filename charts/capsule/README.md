@@ -22,11 +22,15 @@ The Capsule Operator Chart can be used to instantly deploy the Capsule Operator 
 
 1. Add this repository:
 
-        $ helm repo add clastix https://clastix.github.io/charts
+        $ helm repo add projectcapsule https://projectcapsule.github.io/charts
 
 2. Install the Chart:
 
-        $ helm install capsule clastix/capsule -n capsule-system --create-namespace
+        $ helm install capsule projectcapsule/capsule -n capsule-system --create-namespace
+
+        or
+
+        $ helm install capsule oci://ghcr.io/projectcapsule/charts/capsule --version 0.4.6  -n capsule-system --create-namespace
 
 3. Show the status:
 
@@ -34,7 +38,11 @@ The Capsule Operator Chart can be used to instantly deploy the Capsule Operator 
 
 4. Upgrade the Chart
 
-        $ helm upgrade capsule clastix/capsule -n capsule-system
+        $ helm upgrade capsule projectcapsule/capsule -n capsule-system
+
+        or
+
+        $ helm upgrade capsule oci://ghcr.io/projectcapsule/charts/capsule --version 0.4.7
 
 5. Uninstall the Chart
 
@@ -68,6 +76,7 @@ Here the values you can override:
 | customLabels | object | `{}` | Additional labels which will be added to all resources created by Capsule helm chart |
 | imagePullSecrets | list | `[]` | Configuration for `imagePullSecrets` so that you can use a private images registry. |
 | jobs.image.pullPolicy | string | `"IfNotPresent"` | Set the image pull policy of the helm chart job |
+| jobs.image.registry | string | `"docker.io"` | Set the image repository of the helm chart job |
 | jobs.image.repository | string | `"clastix/kubectl"` | Set the image repository of the helm chart job |
 | jobs.image.tag | string | `""` | Set the image tag of the helm chart job |
 | mutatingWebhooksTimeoutSeconds | int | `30` | Timeout in seconds for mutating webhooks |
@@ -94,7 +103,8 @@ Here the values you can override:
 |-----|------|---------|-------------|
 | manager.hostNetwork | bool | `false` | Specifies if the container should be started in hostNetwork mode.  Required for use in some managed kubernetes clusters (such as AWS EKS) with custom CNI (such as calico), because control-plane managed by AWS cannot communicate with pods' IP CIDR and admission webhooks are not working |
 | manager.image.pullPolicy | string | `"IfNotPresent"` | Set the image pull policy. |
-| manager.image.repository | string | `"clastix/capsule"` | Set the image repository of the capsule. |
+| manager.image.registry | string | `"ghcr.io"` | Set the image registry of capsule. |
+| manager.image.repository | string | `"projectcapsule/capsule"` | Set the image repository of capsule. |
 | manager.image.tag | string | `""` | Overrides the image tag whose default is the chart appVersion. |
 | manager.kind | string | `"Deployment"` | Set the controller deployment mode as `Deployment` or `DaemonSet`. |
 | manager.livenessProbe | object | `{"httpGet":{"path":"/healthz","port":10080}}` | Configure the liveness probe using Deployment probe spec |
@@ -196,7 +206,7 @@ Capsule, as many other add-ons, defines its own set of Custom Resource Definitio
 You can enable the generation of certificates using `cert-manager` as follows.
 
 ```
-helm upgrade --install capsule clastix/capsule --namespace capsule-system --create-namespace \
+helm upgrade --install capsule projectcapsule/capsule --namespace capsule-system --create-namespace \
   --set "certManager.generateCertificates=true" \
   --set "tls.create=false" \
   --set "tls.enableController=false"

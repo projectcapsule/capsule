@@ -80,7 +80,7 @@ Create the name of the service account to use
 Create the manager fully-qualified Docker image to use
 */}}
 {{- define "capsule.managerFullyQualifiedDockerImage" -}}
-{{- printf "%s:%s" .Values.manager.image.repository ( .Values.manager.image.tag | default (printf "v%s" .Chart.AppVersion) ) -}}
+{{- printf "%s/%s:%s" .Values.manager.image.registry  .Values.manager.image.repository ( .Values.manager.image.tag | default (printf "v%s" .Chart.AppVersion) ) -}}
 {{- end }}
 
 {{/*
@@ -106,9 +106,9 @@ Create the jobs fully-qualified Docker image to use
 */}}
 {{- define "capsule.jobsFullyQualifiedDockerImage" -}}
 {{- if .Values.jobs.image.tag }}
-{{- printf "%s:%s" .Values.jobs.image.repository .Values.jobs.image.tag -}}
+{{- printf "%s/%s:%s" .Values.jobs.image.registry .Values.jobs.image.repository .Values.jobs.image.tag -}}
 {{- else }}
-{{- printf "%s:%s" .Values.jobs.image.repository (include "capsule.jobsTagKubeVersion" .) -}}
+{{- printf "%s/%s:%s" .Values.jobs.image.registry .Values.jobs.image.repository (include "capsule.jobsTagKubeVersion" .) -}}
 {{- end }}
 {{- end }}
 
