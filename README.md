@@ -12,6 +12,9 @@
   <a href="https://www.bestpractices.dev/projects/5601">
     <img src="https://www.bestpractices.dev/projects/5601/badge"/>
   </a>
+  <a href="https://api.securityscorecards.dev/projects/github.com/projectcapsule/capsule/badge">
+    <img src="https://api.securityscorecards.dev/projects/github.com/projectcapsule/capsule/badge"/>
+  </a>
 </p>
 
 <p align="center">
