@@ -1,0 +1,20 @@
+name: Setup caches
+
+description: Setup caches for go modules and build cache.
+
+inputs:
+  build-cache-key:
+    description: build cache prefix
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/cache@4723a57e26efda3a62cbde1812113b730952852d # v3.2.2
+      with:
+        path: ~/go/pkg/mod
+        key: ${{ runner.os }}-go-pkg-mod-${{ hashFiles('**/go.sum') }}-${{ hashFiles('Makefile') }}
+    - uses: actions/cache@4723a57e26efda3a62cbde1812113b730952852d # v3.2.2
+      if: ${{ inputs.build-cache-key }}
+      with:
+        path: ~/.cache/go-build
+        key: ${{ runner.os }}-build-cache-${{ inputs.build-cache-key }}-${{ hashFiles('**/go.sum') }}-${{ hashFiles('Makefile') }}
