@@ -1,31 +1,23 @@
-name: docs-lint
+name: Check Commit
 permissions: {}
 
 on:
   push:
     branches: [ "*" ]
-    paths:
-      - '.github/workflows/docs-lint.yml'
-      - 'docs/content/**'
   pull_request:
     branches: [ "*" ]
-    paths:
-      - '.github/workflows/docs-lint.yml'
-      - 'docs/content/**'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  spelling:
-    name: Spell Check
+  commit_lint:
     runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608 # v4.1.0
         with:
           fetch-depth: 0
-      - uses: actions/setup-node@5e21ff4d9bc1a8cf6de233a3057d20ec6b3fb69d # v3.8.1
+      - uses: wagoid/commitlint-github-action@6319f54d83768b60acd6fd60e61007ccc583e62f #v5.4.3
         with:
-          node-version: 18
-      - run: make docs-lint
+          firstParent: true
