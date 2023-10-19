@@ -22,11 +22,15 @@ The Capsule Operator Chart can be used to instantly deploy the Capsule Operator 
 
 1. Add this repository:
 
-        $ helm repo add clastix https://clastix.github.io/charts
+        $ helm repo add projectcapsule https://projectcapsule.github.io/charts
 
 2. Install the Chart:
 
-        $ helm install capsule clastix/capsule -n capsule-system --create-namespace
+        $ helm install capsule projectcapsule/capsule -n capsule-system --create-namespace
+
+        or
+
+        $ helm install capsule oci://ghcr.io/projectcapsule/charts/capsule --version 0.4.6  -n capsule-system --create-namespace
 
 3. Show the status:
 
@@ -34,7 +38,11 @@ The Capsule Operator Chart can be used to instantly deploy the Capsule Operator 
 
 4. Upgrade the Chart
 
-        $ helm upgrade capsule clastix/capsule -n capsule-system
+        $ helm upgrade capsule projectcapsule/capsule -n capsule-system
+
+        or
+
+        $ helm upgrade capsule oci://ghcr.io/projectcapsule/charts/capsule --version 0.4.7
 
 5. Uninstall the Chart
 
@@ -132,7 +140,7 @@ Capsule, as many other add-ons, defines its own set of Custom Resource Definitio
 You can enable the generation of certificates using `cert-manager` as follows.
 
 ```
-helm upgrade --install capsule clastix/capsule --namespace capsule-system --create-namespace \
+helm upgrade --install capsule projectcapsule/capsule --namespace capsule-system --create-namespace \
   --set "certManager.generateCertificates=true" \
   --set "tls.create=false" \
   --set "tls.enableController=false"

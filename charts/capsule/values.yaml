@@ -18,8 +18,10 @@ manager:
   kind: Deployment
 
   image:
-    # -- Set the image repository of the capsule.
-    repository: clastix/capsule
+     # -- Set the image registry of capsule.
+    registry: ghcr.io
+    # -- Set the image repository of capsule.
+    repository: projectcapsule/capsule
     # -- Set the image pull policy.
     pullPolicy: IfNotPresent
     # -- Overrides the image tag whose default is the chart appVersion.
@@ -135,6 +137,8 @@ podSecurityPolicy:
 
 jobs:
   image:
+    # -- Set the image repository of the helm chart job
+    registry: docker.io
     # -- Set the image repository of the helm chart job
     repository: clastix/kubectl
     # -- Set the image pull policy of the helm chart job
