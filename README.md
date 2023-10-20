@@ -98,7 +98,7 @@ The documentation for each chart is done with [helm-docs](https://github.com/nor
 make helm-docs
 ```
 
-## Community
+## Community meeting
 
 Join the community, share and learn from it. You can find all the resources to how to contribute code and docs, connect with people in the [community repository](https://github.com/projectcapsule/capsule-community).
 
