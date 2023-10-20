@@ -15,11 +15,18 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      - name: "Extract Version"
+        id: extract_version
+        run: |
+          GIT_TAG=${GITHUB_REF##*/}
+          VERSION=${GIT_TAG##*v}
+          echo "version=$(echo $VERSION)" >> $GITHUB_OUTPUT
       - name: Publish Helm chart
         uses: stefanprodan/helm-gh-pages@0ad2bb377311d61ac04ad9eb6f252fb68e207260 # v1.7.0
         with:
           token: "${{ secrets.HELM_CHARTS_PUSH_TOKEN }}"
           linting: off
+          chart_version: ${{ steps.extract_version.outputs.version }}
           charts_dir: charts
           charts_url: https://${{ github.repository_owner }}.github.io/charts
           owner: ${{ github.repository_owner }}
@@ -37,6 +44,12 @@ jobs:
     steps:
       - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
       - uses: sigstore/cosign-installer@11086d25041f77fe8fe7b9ea4e48e3b9192b8f19 # v3.1.2
+      - name: "Extract Version"
+        id: extract_version
+        run: |
+          GIT_TAG=${GITHUB_REF##*/}
+          VERSION=${GIT_TAG##*v}
+          echo "version=$(echo $VERSION)" >> $GITHUB_OUTPUT
       - name: Helm | Publish
         id: helm_publish
         uses: oliverbaehler/github-actions/helm-oci-chart@8dfd42735c85f6c58d5d4d6f3232cd0e39d1fe73 # v0.1.0
@@ -44,6 +57,7 @@ jobs:
           registry: ghcr.io
           repository: ${{ github.repository_owner }}/charts
           name: "capsule"
+          version: ${{ steps.extract_version.outputs.version }}
           registry-username: ${{ github.actor }}
           registry-password: ${{ secrets.GITHUB_TOKEN }}
           update-dependencies: 'true' # Defaults to false
