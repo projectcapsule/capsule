@@ -11,7 +11,7 @@ concurrency:
 jobs:
   publish-helm:
     # Skip this Release on forks
-    if: github.repository_owner == 'capsuleproject'
+    if: github.repository_owner == 'projectcapsule'
     runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
