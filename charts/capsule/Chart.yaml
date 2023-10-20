@@ -19,10 +19,9 @@ name: capsule
 sources:
 - https://github.com/projectcapsule/capsule
 
-# This is the chart version. This version number should be incremented each time you make changes
-# to the chart and its templates, including the app version.
+# The version is overwritten by the release workflow.
 version: 0.4.6
 
 # This is the version number of the application being deployed.
 # This version number should be incremented each time you make changes to the application.
-appVersion: 0.3.3
+appVersion: 0.4.0-rc.1
