@@ -14,7 +14,7 @@
   <a href="https://api.securityscorecards.dev/projects/github.com/projectcapsule/capsule/badge">
     <img src="https://api.securityscorecards.dev/projects/github.com/projectcapsule/capsule/badge"/>
   </a>
-  <a href="https://img.shields.io/endpoint?url=https://artifacthub.io/badge/repository/projectcapsule">
+  <a href="https://artifacthub.io/packages/search?repo=projectcapsule">
     <img src="https://img.shields.io/endpoint?url=https://artifacthub.io/badge/repository/projectcapsule"/>
   </a>
 </p>
