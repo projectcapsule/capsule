@@ -6,6 +6,17 @@ All contributions are welcome! If you find a bug or have a feature request, plea
 ## Guidelines
 
 
+## Supported Versions
+Versions follow [Semantic Versioning](https://semver.org/) terminology and are expressed as `x.y.z`:
+
+- where x is the major version
+- y is the minor version
+- and z is the patch version
+
+Security fixes, may be backported to the three most recent minor releases, depending on severity and feasibility.
+
+Prereleases are marked as `-rc.x` (release candidate) and may refere to any type of version bump.
+
 ## Pull Requests
 
 
