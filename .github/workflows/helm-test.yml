@@ -43,6 +43,10 @@ jobs:
             echo -e '\033[0;32mDocumentation up to date\033[0m ✔'
           fi
 
+      - name: Run chart-testing (install)
+        run: make helm-test
+        if: steps.list-changed.outputs.changed == 'true'
+
       # ATTENTION: This is a workaround for the upcoming ApiVersion Conversions for the capsule CRDs
       # With this workflow the current docker image is build and loaded into kind, otherwise the install fails
       # In the future this must be removed and the chart-testing-action must be used

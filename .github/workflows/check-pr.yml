@@ -1,0 +1,48 @@
+name: "Check Pull Request"
+
+on:
+  pull_request_target:
+    types:
+      - opened
+      - edited
+      - synchronize
+
+permissions:
+  pull-requests: read
+
+jobs:
+  main:
+    name: Validate PR title
+    runs-on: ubuntu-latest
+    steps:
+      - uses: amannn/action-semantic-pull-request@47b15d52c5c30e94a17ec87eb8dd51ff5221fed9
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          types: |
+            chore
+            ci
+            docs
+            feat
+            fix
+            test
+            sec
+          requireScope: false  
+          scopes: |
+            all
+            chart
+            operator
+            manifest
+            website
+            e2e
+            release
+            repo
+            deps
+            make
+          wip: true
+          # If the PR only contains a single commit, the action will validate that
+          # it matches the configured pattern.
+          validateSingleCommit: true
+          # Related to `validateSingleCommit` you can opt-in to validate that the PR
+          # title matches a single commit to avoid confusion.
+          validateSingleCommitMatchesPrTitle: true
