@@ -7,10 +7,11 @@ import (
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/client-go/discovery"
+	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 )
 
 func IsUnsupportedAPI(err error) bool {
-	missingAPIError, discoveryError := &meta.NoKindMatchError{}, &discovery.ErrGroupDiscoveryFailed{}
+	missingAPIError, discoveryGropuError, discoveryResourceError := &meta.NoKindMatchError{}, &discovery.ErrGroupDiscoveryFailed{}, &apiutil.ErrResourceDiscoveryFailed{}
 
-	return errors.As(err, &missingAPIError) || errors.As(err, &discoveryError)
+	return errors.As(err, &missingAPIError) || errors.As(err, &discoveryGropuError) || errors.As(err, &discoveryResourceError)
 }
