@@ -9,9 +9,13 @@
       "
     >
       <div class="space-y-2">
-        <h1 class="font-bold text-2xl inline-block">Clastix Labs</h1>
+        <icon-cncf class="h-50" />
         <small class="block">
-          © {{ new Date().getFullYear() }} All rights reserved
+          © {{ new Date().getFullYear() }} All rights reserved<br />
+          <a href="https://www.linuxfoundation.org/legal/trademark-usage" target="_blank" rel="noopener noreferrer">
+            Cloud Native Computing Foundation is part of the Linux Foundation.<br />
+            The Linux Foundation has registered trademarks and uses trademarks.
+          </a>
         </small>
       </div>
       <ul class="lg:flex lg:items-center lg:space-x-5 space-y-2 lg:space-y-0">
@@ -48,12 +52,14 @@
 </template>
 
 <script>
+import IconCncf from "~/assets/icon/cncf.svg?inline";
 import IconGithub from "~/assets/icon/github.svg?inline";
 import IconTwitter from "~/assets/icon/twitter.svg?inline";
 import IconLinkedin from "~/assets/icon/linkedin.svg?inline";
 
 export default {
   components: {
+    IconCncf,
     IconGithub,
     IconLinkedin,
     IconTwitter,
