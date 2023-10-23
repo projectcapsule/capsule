@@ -119,6 +119,10 @@ Please, refer to the maintainers file available [here](.github/maintainers.yaml)
 
 Please, refer to the [documentation page](https://capsule.clastix.io/docs/contributing/release).
 
+### Changelog
+
+Read how we log changes [here](CHANGELOG.md)
+
 ### Software Bill of Materials
 
 All OCI release artifacts include a Software Bill of Materials (SBOM) in CycloneDX JSON format. More information on this is available [here](SECURITY.md#software-bill-of-materials-sbom)
