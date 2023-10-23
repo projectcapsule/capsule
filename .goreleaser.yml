@@ -66,9 +66,12 @@ changelog:
     - title: '📖 Documentation updates'
       regexp: ^.*?docs(\([[:word:]]+\))??!?:.+$
       order: 400
+    - title: '🛡️ Security updates'
+      regexp: ^.*?(sec)(\([[:word:]]+\))??!?:.+$
+      order: 500
     - title: '🚀 Build process updates'
       regexp: ^.*?(build|ci)(\([[:word:]]+\))??!?:.+$
-      order: 400
+      order: 600
     - title: '📦 Other work'
       order: 9999
 sboms:
