@@ -13,15 +13,30 @@ keywords:
 - multitenant
 - namespace
 maintainers:
-- email: hello@clastix.io
-  name: Clastix Labs Team
+  - name: capsule-maintainers
+    email: cncf-capsule-maintainers@lists.cncf.io
 name: capsule
 sources:
 - https://github.com/projectcapsule/capsule
-
 # The version is overwritten by the release workflow.
 version: 0.4.6
-
 # This is the version number of the application being deployed.
 # This version number should be incremented each time you make changes to the application.
 appVersion: 0.4.0-rc.1
+annotations:
+  artifacthub.io/operator: "true"
+  artifacthub.io/prerelease: "false"
+  artifacthub.io/category: security
+  artifacthub.io/license: Apache-2.0
+  artifacthub.io/maintainers: |
+    - name: capsule-maintainers
+      email: cncf-capsule-maintainers@lists.cncf.io
+  artifacthub.io/links: |
+    - name: Documentation
+      url: https://capsule.clastix.io/
+  artifacthub.io/changes: |
+    - kind: added
+      description: artifacthub annotations
+    - kind: changed
+      description: maintainers contact
+
