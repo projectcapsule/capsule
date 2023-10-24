@@ -17,6 +17,9 @@
   <a href="https://artifacthub.io/packages/search?repo=projectcapsule">
     <img src="https://img.shields.io/endpoint?url=https://artifacthub.io/badge/repository/projectcapsule"/>
   </a>
+  <a href="https://app.fossa.com/projects/git%2Bgithub.com%2Fprojectcapsule%2Fcapsule?ref=badge_shield&issueType=license" alt="FOSSA Status">
+    <img src="https://app.fossa.com/api/projects/git%2Bgithub.com%2Fprojectcapsule%2Fcapsule.svg?type=shield&issueType=license"/>
+  </a>
 </p>
 
 <p align="center">
