@@ -39,7 +39,7 @@ jobs:
             repo
             deps
             make
-          wip: true
+          wip: false
           # If the PR only contains a single commit, the action will validate that
           # it matches the configured pattern.
           validateSingleCommit: true
