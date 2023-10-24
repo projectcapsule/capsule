@@ -30,18 +30,16 @@ reported by the tool _actually exists_ in capsule.
 
 ## Reporting a Vulnerability
 
+To report a security issue or vulnerability, [submit a private vulnerability report via GitHub](https://github.com/projectcapsule/capsule/security/advisories/new) to the repository maintainers with a description of the issue, the steps you took to create the issue, affected versions, and, if known, mitigations for the issue.
 
-  1. Describe the issue in English, ideally with some example configuration or code which allows the issue to be reproduced. Explain why you believe this to be a security issue in capsule, if that's not obvious. Emails should contain:
-   
+Describe the issue in English, ideally with some example configuration or code which allows the issue to be reproduced. Explain why you believe this to be a security issue in capsule, if that's not obvious. should contain the following:
+
      * description of the problem
      * precise and detailed steps (include screenshots) 
      * the affected version(s). This may also include environment relevant versions.
      * any possible mitigations
-  
 
-
-   2. Send the email to [`projectcapsule-security@googlegroups.com`](mailto:projectcapsule-security@googlegroups.com)
-   3. You may be contacted by a project maintainer to further discuss the reported item. Please bear with us as we seek to understand the breadth and scope of the reported problem, recreate it, and confirm if there is a vulnerability present.
+If the issue is confirmed as a vulnerability, we will open a Security Advisory and acknowledge your contributions as part of it.
 
 ## Reponse
 
@@ -53,8 +51,7 @@ Response times could be affected by weekends, holidays, breaks or time zone diff
 
 # Release Artifacts
 
-All packages are published in the package registry of the repository.
-
+[See all the available artifacts](https://github.com/orgs/projectcapsule/packages?repo_name=capsule)
 
 ## Verifing
 
