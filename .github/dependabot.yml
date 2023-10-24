@@ -13,4 +13,4 @@ updates:
       interval: daily
     rebase-strategy: disabled
     commit-message:
-      prefix: "ci"
+      prefix: "ci(deps)"
