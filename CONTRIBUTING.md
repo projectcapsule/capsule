@@ -173,7 +173,7 @@ The semantics should indicate the change and it's impact. The general format for
     |    |_______ Scope
     |____________ Type
 
- The commits are checked on pull-request. If the commit message does not follow the format, the workflow will fail. See the [Types](#types) and [Scopes](#scopes) sections for more information.
+ The commits are checked on pull-request. If the commit message does not follow the format, the workflow will fail. See the [Types](#types) for the supported types. The scope is not required but helps to provide more context for your changes. Try to use a scope if possible.
 
 ### Types
 
@@ -187,17 +187,3 @@ The following types are allowed for commits and pull requests:
   * `test`: test related changes
   * `sec`: security related changes
 
-### Scopes
-
-The following types are allowed for commits and pull requests:
-
-  * `all`: changes that affect all components
-  * `chart`: changes to the Helm chart
-  * `operator`: changes to the operator
-  * `manifest`: changes to the manifest installer
-  * `website`: changes to the website
-  * `e2e`: changes to the e2e testing process
-  * `release`: changes to the release process
-  * `repo`: changes to general repository files
-  * `deps`: dependency updates
-  * `make`: changes to Makefile

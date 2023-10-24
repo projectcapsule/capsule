@@ -2,8 +2,8 @@ const Configuration = {
     extends: ['@commitlint/config-conventional'],
     plugins: ['commitlint-plugin-function-rules'],
     rules: {
-      'scope-enum': [2, 'always', ['all', 'chart', 'operator', 'manifest', 'deps', 'release', 'website', 'repo', 'e2e', 'make']],
       'type-enum': [2, 'always', ['chore', 'ci', 'docs', 'feat', 'test', 'fix', 'sec']],
+      'body-max-line-length': [1, 'always', 500],
     },
     /*
      * Whether commitlint uses the default ignore rules, see the description above.
