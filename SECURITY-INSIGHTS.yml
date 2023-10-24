@@ -1,0 +1,38 @@
+# Reference https://github.com/ossf/security-insights-spec/blob/v1.0.0/specification.md
+header:
+  schema-version: 1.0.0
+  expiration-date: '2024-10-24T01:00:00.000Z'
+  last-updated: '2023-10-24'
+  last-reviewed: '2023-10-24'
+  project-url: https://github.com/projectcapsule/capsule
+  changelog: https://github.com/projectcapsule/capsule/blob/main/CHANGELOG.md
+  license: https://github.com/projectcapsule/capsule/blob/main/LICENSE
+project-lifecycle:
+  status: active
+  bug-fixes-only: false
+  core-maintainers:
+  - github:prometherion
+  - github:oliverbaehler
+  - github:bsctl
+  - github:MaxFedotov
+contribution-policy:
+  accepts-pull-requests: true
+  accepts-automated-pull-requests: true
+  contributing-policy: https://github.com/projectcapsule/capsule/blob/main/CONTRIBUTING.md
+  code-of-conduct: https://github.com/projectcapsule/capsule/blob/main/CODE_OF_CONDUCT.md
+vulnerability-reporting:
+  accepts-vulnerability-reports: true
+  security-policy: https://github.com/projectcapsule/capsule/blob/main/SECURITY.md
+  email-contact: cncf-capsule-maintainers@lists.cncf.io
+  comment: |
+    Report a vulnerability by using private security issues in GitHub.
+security-testing:
+- tool-type: sca
+  tool-name: Dependabot
+  tool-version: latest
+  integration:
+    ad-hoc: false
+    ci: true
+    before-release: true
+  comment: |
+    Dependabot is enabled for this repo.
