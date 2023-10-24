@@ -27,18 +27,7 @@ jobs:
             fix
             test
             sec
-          requireScope: false  
-          scopes: |
-            all
-            chart
-            operator
-            manifest
-            website
-            e2e
-            release
-            repo
-            deps
-            make
+          requireScope: false
           wip: false
           # If the PR only contains a single commit, the action will validate that
           # it matches the configured pattern.
