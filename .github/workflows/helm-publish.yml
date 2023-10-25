@@ -52,7 +52,7 @@ jobs:
           echo "version=$(echo $VERSION)" >> $GITHUB_OUTPUT
       - name: Helm | Publish
         id: helm_publish
-        uses: oliverbaehler/github-actions/helm-oci-chart@8dfd42735c85f6c58d5d4d6f3232cd0e39d1fe73 # v0.1.0
+        uses: oliverbaehler/github-actions/helm-oci-chart@979018716f7d0cbe8d2711f572b350afad4ef211 # v0.1.1
         with:
           registry: ghcr.io
           repository: ${{ github.repository_owner }}/charts
