@@ -13,6 +13,14 @@ module.exports = {
   },
   plugins: [
     {
+      use: 'gridsome-plugin-gtag',
+      options: {
+        config: {
+          id: 'G-ZL1M3TWPY2',
+        },
+      },
+    },
+    {
       use: "gridsome-plugin-tailwindcss",
 
       options: {
