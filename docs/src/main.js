@@ -9,4 +9,9 @@ export default function (Vue, { router, head, isClient }) {
   // Set default layout as a global component
   Vue.component('LayoutDefault', DefaultLayout)
   Vue.component('LayoutMarkdown', MarkdownLayout)
+
+  head.script.push({
+    src: 'https://www.googletagmanager.com/gtag/js?id=G-ZL1M3TWPY2',
+    async: true
+  })
 }
