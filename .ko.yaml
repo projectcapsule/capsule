@@ -1,6 +1,7 @@
 defaultPlatforms:
 - linux/arm64
 - linux/amd64
+- linux/arm
 builds:
 - id: capsule
   main: ./
