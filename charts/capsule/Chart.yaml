@@ -22,7 +22,7 @@ sources:
 version: 0.4.6
 # This is the version number of the application being deployed.
 # This version number should be incremented each time you make changes to the application.
-appVersion: 0.4.0-rc.1
+appVersion: 0.4.0-rc.3
 annotations:
   artifacthub.io/operator: "true"
   artifacthub.io/prerelease: "false"
