@@ -1,9 +1,6 @@
 # Version
 GIT_HEAD_COMMIT ?= $(shell git rev-parse --short HEAD)
-VERSION          ?= $(shell git describe --abbrev=0 --tags --match "v*")
-ifndef VERSION
-VERSION          = $(GIT_HEAD_COMMIT)
-endif
+VERSION         ?= $(or $(shell git describe --abbrev=0 --tags --match "v*" 2>/dev/null),$(GIT_HEAD_COMMIT))
 
 # Defaults
 REGISTRY        ?= ghcr.io
@@ -90,6 +87,10 @@ apidoc: apidocs-gen
 # Helm
 SRC_ROOT = $(shell git rev-parse --show-toplevel)
 
+helm-controller-version:
+	$(eval VERSION := $(shell grep 'appVersion:' charts/capsule/Chart.yaml | awk '{print "v"$$2}'))
+	$(eval KO_TAGS := $(shell grep 'appVersion:' charts/capsule/Chart.yaml | awk '{print "v"$$2}'))
+
 helm-docs: HELMDOCS_VERSION := v1.11.0
 helm-docs: docker
 	@docker run -v "$(SRC_ROOT):/helm-docs" jnorwood/helm-docs:$(HELMDOCS_VERSION) --chart-search-root /helm-docs
@@ -98,10 +99,12 @@ helm-lint: CT_VERSION := v3.3.1
 helm-lint: docker
 	@docker run -v "$(SRC_ROOT):/workdir" --entrypoint /bin/sh quay.io/helmpack/chart-testing:$(CT_VERSION) -c "cd /workdir; ct lint --config .github/configs/ct.yaml  --lint-conf .github/configs/lintconf.yaml  --all --debug"
 
-helm-test: kind ct ko-build-all
+helm-test: helm-controller-version kind ct ko-build-all
 	@kind create cluster --wait=60s --name capsule-charts
-	@kind load docker-image --name capsule-charts $(LOCAL_CAPSULE_IMG)
+	@kind load docker-image --name capsule-charts $(CAPSULE_IMG):$(VERSION)
 	@kubectl create ns capsule-system
+	@kubectl create -f https://github.com/cert-manager/cert-manager/releases/download/v1.9.1/cert-manager.crds.yaml
+	@kubectl create -f https://github.com/prometheus-operator/prometheus-operator/releases/download/v0.58.0/bundle.yaml
 	@ct install --config $(SRC_ROOT)/.github/configs/ct.yaml --namespace=capsule-system --all --debug
 	@kind delete cluster --name capsule-charts
 
@@ -197,12 +200,10 @@ LD_FLAGS        := "-X main.Version=$(VERSION) \
 # ------------------
 
 .PHONY: ko-build-capsule
-LOCAL_CAPSULE_IMG_BASE := github.com/$(REPOSITORY)
-LOCAL_CAPSULE_IMG := $(KO_REGISTRY)/$(LOCAL_CAPSULE_IMG_BASE)
 ko-build-capsule: ko
 	@echo Building Capsule $(KO_TAGS) >&2
-	@LD_FLAGS=$(LD_FLAGS) KOCACHE=$(KOCACHE) KO_DOCKER_REPO=$(KO_REGISTRY) \
-		$(KO) build ./ --preserve-import-paths --tags=$(KO_TAGS)  --push=false
+	@LD_FLAGS=$(LD_FLAGS) KOCACHE=$(KOCACHE) KO_DOCKER_REPO=$(CAPSULE_IMG) \
+		$(KO) build ./ --bare --tags=$(KO_TAGS) --push=false --local
 
 .PHONY: ko-build-all
 ko-build-all: ko-build-capsule
@@ -262,7 +263,7 @@ kustomize: ## Download kustomize locally if necessary.
 KO = $(shell pwd)/bin/ko
 KO_VERSION = v0.14.1
 ko:
-	$(call go-install-tool,$(KO),github.com/google/ko@v0.14.1)
+	$(call go-install-tool,$(KO),github.com/google/ko@$(KO_VERSION))
 
 ####################
 # -- Helpers
@@ -330,8 +331,6 @@ e2e-install:
 		--set 'manager.image.pullPolicy=Never' \
 		--set 'manager.resources=null'\
 		--set "manager.image.tag=$(VERSION)" \
-		--set 'manager.image.registry=$(KO_REGISTRY)' \
-		--set 'manager.image.repository=$(LOCAL_CAPSULE_IMG_BASE)' \
 		--set 'manager.livenessProbe.failureThreshold=10' \
 		--set 'manager.readinessProbe.failureThreshold=10' \
 		--set 'podSecurityContext.seccompProfile=null' \
@@ -340,7 +339,7 @@ e2e-install:
 
 .PHONY: e2e-load-image
 e2e-load-image: ko-build-all
-	kind load docker-image --nodes capsule-control-plane --name capsule $(LOCAL_CAPSULE_IMG):$(VERSION)
+	kind load docker-image --nodes capsule-control-plane --name capsule $(CAPSULE_IMG):$(VERSION)
 
 .PHONY: e2e-exec
 e2e-exec: ginkgo
