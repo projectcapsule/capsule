@@ -50,7 +50,9 @@ dependencies:
     sbom-url: https://github.com/projectcapsule/capsule/blob/main/SECURITY.md#software-bill-of-materials-sbom
 security-artifacts:
   self-assessment:
-    self-assessment-created: false
+    self-assessment-created: true
+    evidence-url:
+    - https://github.com/projectcapsule/capsule/blob/main/SELF_ASSESSMENT.md
 security-contacts:
 - type: email
   value: cncf-capsule-maintainers@lists.cncf.io
