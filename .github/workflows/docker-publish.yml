@@ -39,7 +39,7 @@ jobs:
         uses: sigstore/cosign-installer@11086d25041f77fe8fe7b9ea4e48e3b9192b8f19 # v3.1.2
       - name: Publish Capsule
         id: publish-capsule
-        uses: oliverbaehler/github-actions/ko-publish-image@979018716f7d0cbe8d2711f572b350afad4ef211 # v0.1.1
+        uses: peak-scale/github-actions/make-ko-publish@38322faabccd75abfa581c435e367d446b6d2c3b # v0.1.0
         with:
           makefile-target: ko-publish-capsule
           registry: ghcr.io
