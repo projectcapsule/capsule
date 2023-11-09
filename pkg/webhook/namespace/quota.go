@@ -38,6 +38,14 @@ func (r *quotaHandler) OnCreate(client client.Client, decoder *admission.Decoder
 			}
 
 			if tnt.IsFull() {
+				// Checking if the Namespace already exists.
+				// If this is the case, no need to return the quota exceeded error:
+				// the Kubernetes API Server will return an AlreadyExists error,
+				// adhering more to the native Kubernetes experience.
+				if err := client.Get(ctx, types.NamespacedName{Name: ns.Name}, &corev1.Namespace{}); err == nil {
+					return nil
+				}
+
 				recorder.Eventf(tnt, corev1.EventTypeWarning, "NamespaceQuotaExceded", "Namespace %s cannot be attached, quota exceeded for the current Tenant", ns.GetName())
 
 				response := admission.Denied(NewNamespaceQuotaExceededError().Error())
