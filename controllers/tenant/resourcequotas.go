@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"strings"
 
 	"golang.org/x/sync/errgroup"
 	corev1 "k8s.io/api/core/v1"
@@ -15,6 +16,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -52,9 +54,12 @@ func (r *Manager) syncResourceQuotas(ctx context.Context, tenant *capsulev1beta2
 		group := new(errgroup.Group)
 
 		for i, q := range tenant.Spec.ResourceQuota.Items {
-			index := i
+			index, resourceQuota := i, q
 
-			resourceQuota := q
+			toKeep := sets.New[corev1.ResourceName]()
+			for k := range resourceQuota.Hard {
+				toKeep.Insert(k)
+			}
 
 			group.Go(func() (scopeErr error) {
 				// Calculating the Resource Budget at Tenant scope just if this is put in place.
@@ -120,9 +125,15 @@ func (r *Manager) syncResourceQuotas(ctx context.Context, tenant *capsulev1beta2
 								list.Items[item].Spec.Hard = map[corev1.ResourceName]resource.Quantity{}
 							}
 							list.Items[item].Spec.Hard[name] = resourceQuota.Hard[name]
+
+							for k := range list.Items[item].Spec.Hard {
+								if !toKeep.Has(k) {
+									delete(list.Items[item].Spec.Hard, k)
+								}
+							}
 						}
 					}
-					if scopeErr = r.resourceQuotasUpdate(ctx, name, quantity, resourceQuota.Hard[name], list.Items...); scopeErr != nil {
+					if scopeErr = r.resourceQuotasUpdate(ctx, name, quantity, toKeep, resourceQuota.Hard[name], list.Items...); scopeErr != nil {
 						r.Log.Error(scopeErr, "cannot proceed with outer ResourceQuota")
 
 						return
@@ -217,8 +228,20 @@ func (r *Manager) syncResourceQuota(ctx context.Context, tenant *capsulev1beta2.
 // Serial ResourceQuota processing is expensive: using Go routines we can speed it up.
 // In case of multiple errors these are logged properly, returning a generic error since we have to repush back the
 // reconciliation loop.
-func (r *Manager) resourceQuotasUpdate(ctx context.Context, resourceName corev1.ResourceName, actual, limit resource.Quantity, list ...corev1.ResourceQuota) (err error) {
+func (r *Manager) resourceQuotasUpdate(ctx context.Context, resourceName corev1.ResourceName, actual resource.Quantity, toKeep sets.Set[corev1.ResourceName], limit resource.Quantity, list ...corev1.ResourceQuota) (err error) {
 	group := new(errgroup.Group)
+
+	annotationsToKeep := sets.New[string]()
+
+	for _, item := range toKeep.UnsortedList() {
+		if v, vErr := capsulev1beta2.UsedQuotaFor(item); vErr == nil {
+			annotationsToKeep.Insert(v)
+		}
+
+		if v, vErr := capsulev1beta2.HardQuotaFor(item); vErr == nil {
+			annotationsToKeep.Insert(v)
+		}
+	}
 
 	for _, item := range list {
 		rq := item
@@ -236,6 +259,16 @@ func (r *Manager) resourceQuotasUpdate(ctx context.Context, resourceName corev1.
 					if found.Annotations == nil {
 						found.Annotations = make(map[string]string)
 					}
+					// Pruning the Capsule quota annotations:
+					// if the ResourceQuota is updated by removing some objects,
+					// we could still have left-overs which could be misleading.
+					// This will not lead to a reconciliation loop since the whole code is idempotent.
+					for k := range found.Annotations {
+						if (strings.HasPrefix(k, capsulev1beta2.HardCapsuleQuotaAnnotation) || strings.HasPrefix(k, capsulev1beta2.UsedCapsuleQuotaAnnotation)) && !annotationsToKeep.Has(k) {
+							delete(found.Annotations, k)
+						}
+					}
+
 					found.Labels = rq.Labels
 					if actualKey, keyErr := capsulev1beta2.UsedQuotaFor(resourceName); keyErr == nil {
 						found.Annotations[actualKey] = actual.String()
