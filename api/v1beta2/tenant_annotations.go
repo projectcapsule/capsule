@@ -12,6 +12,9 @@ import (
 const (
 	// Annotation name part must be no more than 63 characters.
 	maxAnnotationLength = 63
+
+	HardCapsuleQuotaAnnotation = "quota.capsule.clastix.io/hard-"
+	UsedCapsuleQuotaAnnotation = "quota.capsule.clastix.io/used-"
 )
 
 func createAnnotation(format string, resource fmt.Stringer) (string, error) {
@@ -36,9 +39,9 @@ func createAnnotation(format string, resource fmt.Stringer) (string, error) {
 }
 
 func UsedQuotaFor(resource fmt.Stringer) (string, error) {
-	return createAnnotation("quota.capsule.clastix.io/used-", resource)
+	return createAnnotation(UsedCapsuleQuotaAnnotation, resource)
 }
 
 func HardQuotaFor(resource fmt.Stringer) (string, error) {
-	return createAnnotation("quota.capsule.clastix.io/hard-", resource)
+	return createAnnotation(HardCapsuleQuotaAnnotation, resource)
 }
