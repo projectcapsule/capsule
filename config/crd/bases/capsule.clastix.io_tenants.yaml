@@ -1873,6 +1873,28 @@ spec:
                     required:
                     - allowed
                     type: object
+                  forbiddenAnnotations:
+                    description: Define the annotations that a Tenant Owner cannot
+                      set for their Service resources.
+                    properties:
+                      denied:
+                        items:
+                          type: string
+                        type: array
+                      deniedRegex:
+                        type: string
+                    type: object
+                  forbiddenLabels:
+                    description: Define the labels that a Tenant Owner cannot set
+                      for their Service resources.
+                    properties:
+                      denied:
+                        items:
+                          type: string
+                        type: array
+                      deniedRegex:
+                        type: string
+                    type: object
                 type: object
               storageClasses:
                 description: Specifies the allowed StorageClasses assigned to the
@@ -3124,6 +3146,28 @@ spec:
                         type: array
                     required:
                     - allowed
+                    type: object
+                  forbiddenAnnotations:
+                    description: Define the annotations that a Tenant Owner cannot
+                      set for their Service resources.
+                    properties:
+                      denied:
+                        items:
+                          type: string
+                        type: array
+                      deniedRegex:
+                        type: string
+                    type: object
+                  forbiddenLabels:
+                    description: Define the labels that a Tenant Owner cannot set
+                      for their Service resources.
+                    properties:
+                      denied:
+                        items:
+                          type: string
+                        type: array
+                      deniedRegex:
+                        type: string
                     type: object
                 type: object
               storageClasses:

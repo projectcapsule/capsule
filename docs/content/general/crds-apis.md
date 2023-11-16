@@ -4822,6 +4822,20 @@ Specifies options for the Service, such as additional metadata or block of certa
           Specifies the external IPs that can be used in Services with type ClusterIP. An empty list means no IPs are allowed. Optional.<br/>
         </td>
         <td>false</td>
+      </tr><tr>
+        <td><b><a href="#tenantspecserviceoptionsforbiddenannotations-1">forbiddenAnnotations</a></b></td>
+        <td>object</td>
+        <td>
+          Define the annotations that a Tenant Owner cannot set for their Service resources.<br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#tenantspecserviceoptionsforbiddenlabels-1">forbiddenLabels</a></b></td>
+        <td>object</td>
+        <td>
+          Define the labels that a Tenant Owner cannot set for their Service resources.<br/>
+        </td>
+        <td>false</td>
       </tr></tbody>
 </table>
 
@@ -4927,6 +4941,72 @@ Specifies the external IPs that can be used in Services with type ClusterIP. An 
           <br/>
         </td>
         <td>true</td>
+      </tr></tbody>
+</table>
+
+
+### Tenant.spec.serviceOptions.forbiddenAnnotations
+
+
+
+Define the annotations that a Tenant Owner cannot set for their Service resources.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>denied</b></td>
+        <td>[]string</td>
+        <td>
+          <br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>deniedRegex</b></td>
+        <td>string</td>
+        <td>
+          <br/>
+        </td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+### Tenant.spec.serviceOptions.forbiddenLabels
+
+
+
+Define the labels that a Tenant Owner cannot set for their Service resources.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>denied</b></td>
+        <td>[]string</td>
+        <td>
+          <br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>deniedRegex</b></td>
+        <td>string</td>
+        <td>
+          <br/>
+        </td>
+        <td>false</td>
       </tr></tbody>
 </table>
 
@@ -6681,6 +6761,20 @@ Specifies options for the Service, such as additional metadata or block of certa
           Specifies the external IPs that can be used in Services with type ClusterIP. An empty list means no IPs are allowed. Optional.<br/>
         </td>
         <td>false</td>
+      </tr><tr>
+        <td><b><a href="#tenantspecserviceoptionsforbiddenannotations">forbiddenAnnotations</a></b></td>
+        <td>object</td>
+        <td>
+          Define the annotations that a Tenant Owner cannot set for their Service resources.<br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
+        <td><b><a href="#tenantspecserviceoptionsforbiddenlabels">forbiddenLabels</a></b></td>
+        <td>object</td>
+        <td>
+          Define the labels that a Tenant Owner cannot set for their Service resources.<br/>
+        </td>
+        <td>false</td>
       </tr></tbody>
 </table>
 
@@ -6786,6 +6880,72 @@ Specifies the external IPs that can be used in Services with type ClusterIP. An 
           <br/>
         </td>
         <td>true</td>
+      </tr></tbody>
+</table>
+
+
+### Tenant.spec.serviceOptions.forbiddenAnnotations
+
+
+
+Define the annotations that a Tenant Owner cannot set for their Service resources.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>denied</b></td>
+        <td>[]string</td>
+        <td>
+          <br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>deniedRegex</b></td>
+        <td>string</td>
+        <td>
+          <br/>
+        </td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+### Tenant.spec.serviceOptions.forbiddenLabels
+
+
+
+Define the labels that a Tenant Owner cannot set for their Service resources.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>denied</b></td>
+        <td>[]string</td>
+        <td>
+          <br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>deniedRegex</b></td>
+        <td>string</td>
+        <td>
+          <br/>
+        </td>
+        <td>false</td>
       </tr></tbody>
 </table>
 

@@ -8,6 +8,7 @@ import (
 	"net"
 	"strings"
 
+	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/client-go/tools/record"
@@ -15,6 +16,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/api"
 	capsulewebhook "github.com/projectcapsule/capsule/pkg/webhook"
 	"github.com/projectcapsule/capsule/pkg/webhook/utils"
 )
@@ -66,6 +68,26 @@ func (r *handler) handleService(ctx context.Context, clt client.Client, decoder 
 		response := admission.Denied(NewLoadBalancerDisabled().Error())
 
 		return &response
+	}
+
+	if tnt.Spec.ServiceOptions != nil {
+		err := api.ValidateForbidden(svc.Annotations, tnt.Spec.ServiceOptions.ForbiddenAnnotations)
+		if err != nil {
+			err = errors.Wrap(err, "service annotations validation failed")
+			recorder.Eventf(&tnt, corev1.EventTypeWarning, api.ForbiddenAnnotationReason, err.Error())
+			response := admission.Denied(err.Error())
+
+			return &response
+		}
+
+		err = api.ValidateForbidden(svc.Labels, tnt.Spec.ServiceOptions.ForbiddenLabels)
+		if err != nil {
+			err = errors.Wrap(err, "service labels validation failed")
+			recorder.Eventf(&tnt, corev1.EventTypeWarning, api.ForbiddenLabelReason, err.Error())
+			response := admission.Denied(err.Error())
+
+			return &response
+		}
 	}
 
 	if svc.Spec.ExternalIPs == nil || (tnt.Spec.ServiceOptions == nil || tnt.Spec.ServiceOptions.ExternalServiceIPs == nil) {
