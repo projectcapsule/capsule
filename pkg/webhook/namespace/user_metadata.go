@@ -5,8 +5,8 @@ package namespace
 
 import (
 	"context"
-	"fmt"
 
+	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
@@ -14,6 +14,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/api"
 	capsulewebhook "github.com/projectcapsule/capsule/pkg/webhook"
 	"github.com/projectcapsule/capsule/pkg/webhook/utils"
 )
@@ -22,48 +23,6 @@ type userMetadataHandler struct{}
 
 func UserMetadataHandler() capsulewebhook.Handler {
 	return &userMetadataHandler{}
-}
-
-func (r *userMetadataHandler) validateUserMetadata(tnt *capsulev1beta2.Tenant, recorder record.EventRecorder, labels map[string]string, annotations map[string]string) *admission.Response {
-	if tnt.Spec.NamespaceOptions != nil {
-		forbiddenLabels := tnt.Spec.NamespaceOptions.ForbiddenLabels
-
-		for label := range labels {
-			var forbidden, matched bool
-			forbidden = forbiddenLabels.ExactMatch(label)
-			matched = forbiddenLabels.RegexMatch(label)
-
-			if forbidden || matched {
-				recorder.Eventf(tnt, corev1.EventTypeWarning, "ForbiddenNamespaceLabel", fmt.Sprintf("Label %s is forbidden for a namespaces of the current Tenant ", label))
-
-				response := admission.Denied(NewNamespaceLabelForbiddenError(label, &forbiddenLabels).Error())
-
-				return &response
-			}
-		}
-	}
-
-	if tnt.Spec.NamespaceOptions == nil {
-		return nil
-	}
-
-	forbiddenAnnotations := tnt.Spec.NamespaceOptions.ForbiddenLabels
-
-	for annotation := range annotations {
-		var forbidden, matched bool
-		forbidden = forbiddenAnnotations.ExactMatch(annotation)
-		matched = forbiddenAnnotations.RegexMatch(annotation)
-
-		if forbidden || matched {
-			recorder.Eventf(tnt, corev1.EventTypeWarning, "ForbiddenNamespaceAnnotation", fmt.Sprintf("Annotation %s is forbidden for a namespaces of the current Tenant ", annotation))
-
-			response := admission.Denied(NewNamespaceAnnotationForbiddenError(annotation, &forbiddenAnnotations).Error())
-
-			return &response
-		}
-	}
-
-	return nil
 }
 
 func (r *userMetadataHandler) OnCreate(client client.Client, decoder *admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
@@ -81,10 +40,27 @@ func (r *userMetadataHandler) OnCreate(client client.Client, decoder *admission.
 			}
 		}
 
-		labels := ns.GetLabels()
-		annotations := ns.GetAnnotations()
+		if tnt.Spec.NamespaceOptions != nil {
+			err := api.ValidateForbidden(ns.ObjectMeta.Annotations, tnt.Spec.NamespaceOptions.ForbiddenAnnotations)
+			if err != nil {
+				err = errors.Wrap(err, "namespace annotations validation failed")
+				recorder.Eventf(tnt, corev1.EventTypeWarning, api.ForbiddenAnnotationReason, err.Error())
+				response := admission.Denied(err.Error())
 
-		return r.validateUserMetadata(tnt, recorder, labels, annotations)
+				return &response
+			}
+
+			err = api.ValidateForbidden(ns.ObjectMeta.Labels, tnt.Spec.NamespaceOptions.ForbiddenLabels)
+			if err != nil {
+				err = errors.Wrap(err, "namespace labels validation failed")
+				recorder.Eventf(tnt, corev1.EventTypeWarning, api.ForbiddenLabelReason, err.Error())
+				response := admission.Denied(err.Error())
+
+				return &response
+			}
+		}
+
+		return nil
 	}
 }
 
@@ -173,6 +149,26 @@ func (r *userMetadataHandler) OnUpdate(client client.Client, decoder *admission.
 			delete(annotations, key)
 		}
 
-		return r.validateUserMetadata(tnt, recorder, labels, annotations)
+		if tnt.Spec.NamespaceOptions != nil {
+			err := api.ValidateForbidden(annotations, tnt.Spec.NamespaceOptions.ForbiddenAnnotations)
+			if err != nil {
+				err = errors.Wrap(err, "namespace annotations validation failed")
+				recorder.Eventf(tnt, corev1.EventTypeWarning, api.ForbiddenAnnotationReason, err.Error())
+				response := admission.Denied(err.Error())
+
+				return &response
+			}
+
+			err = api.ValidateForbidden(labels, tnt.Spec.NamespaceOptions.ForbiddenLabels)
+			if err != nil {
+				err = errors.Wrap(err, "namespace labels validation failed")
+				recorder.Eventf(tnt, corev1.EventTypeWarning, api.ForbiddenLabelReason, err.Error())
+				response := admission.Denied(err.Error())
+
+				return &response
+			}
+		}
+
+		return nil
 	}
 }

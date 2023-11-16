@@ -3133,6 +3133,28 @@ spec:
                             type: string
                           type: object
                       type: object
+                    forbiddenAnnotations:
+                      description: Define the annotations that a Tenant Owner cannot
+                        set for their Service resources.
+                      properties:
+                        denied:
+                          items:
+                            type: string
+                          type: array
+                        deniedRegex:
+                          type: string
+                      type: object
+                    forbiddenLabels:
+                      description: Define the labels that a Tenant Owner cannot set
+                        for their Service resources.
+                      properties:
+                        denied:
+                          items:
+                            type: string
+                          type: array
+                        deniedRegex:
+                          type: string
+                      type: object
                     allowedServices:
                       description: Block or deny certain type of Services. Optional.
                       properties:

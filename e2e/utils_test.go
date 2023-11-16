@@ -31,6 +31,28 @@ const (
 	defaultPollInterval    = time.Second
 )
 
+func NewService(svc types.NamespacedName) *corev1.Service {
+	return &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      svc.Name,
+			Namespace: svc.Namespace,
+		},
+		Spec: corev1.ServiceSpec{
+			Ports: []corev1.ServicePort{
+				{Port: int32(80)},
+			},
+		},
+	}
+}
+
+func ServiceCreation(svc *corev1.Service, owner capsulev1beta2.OwnerSpec, timeout time.Duration) AsyncAssertion {
+	cs := ownerClient(owner)
+	return Eventually(func() (err error) {
+		_, err = cs.CoreV1().Services(svc.Namespace).Create(context.TODO(), svc, metav1.CreateOptions{})
+		return
+	}, timeout, defaultPollInterval)
+}
+
 func NewNamespace(name string) *corev1.Namespace {
 	if len(name) == 0 {
 		name = rand.String(10)

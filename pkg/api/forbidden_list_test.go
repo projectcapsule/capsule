@@ -72,3 +72,50 @@ func TestForbiddenListSpec_RegexMatch(t *testing.T) {
 		}
 	}
 }
+
+func TestValidateForbidden(t *testing.T) {
+	type tc struct {
+		Keys          map[string]string
+		ForbiddenSpec ForbiddenListSpec
+		HasError      bool
+	}
+
+	for _, tc := range []tc{
+		{
+			Keys: map[string]string{"foobar": "", "thesecondkey": "", "anotherkey": ""},
+			ForbiddenSpec: ForbiddenListSpec{
+				Exact: []string{"foobar", "somelabelkey1"},
+			},
+			HasError: true,
+		},
+		{
+			Keys: map[string]string{"foobar": ""},
+			ForbiddenSpec: ForbiddenListSpec{
+				Exact: []string{"foobar.io", "somelabelkey1", "test-exact"},
+			},
+			HasError: false,
+		},
+		{
+			Keys: map[string]string{"foobar": "", "barbaz": ""},
+			ForbiddenSpec: ForbiddenListSpec{
+				Regex: "foo.*",
+			},
+			HasError: true,
+		},
+		{
+			Keys: map[string]string{"foobar": "", "another-annotation-key": ""},
+			ForbiddenSpec: ForbiddenListSpec{
+				Regex: "foo1111",
+			},
+			HasError: false,
+		},
+	} {
+		if tc.HasError {
+			assert.Error(t, ValidateForbidden(tc.Keys, tc.ForbiddenSpec))
+		}
+
+		if !tc.HasError {
+			assert.NoError(t, ValidateForbidden(tc.Keys, tc.ForbiddenSpec))
+		}
+	}
+}
