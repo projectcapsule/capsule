@@ -110,7 +110,17 @@ func (r *Manager) syncCustomResourceQuotaUsages(ctx context.Context, tenant *cap
 					usedMap[key] = 0
 				}
 
-				usedMap[key] += len(list.Items)
+				var used int
+
+				for _, k := range list.Items {
+					if k.GetDeletionTimestamp() != nil {
+						continue
+					}
+
+					used++
+				}
+
+				usedMap[key] += used
 			}
 
 			return
