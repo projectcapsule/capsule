@@ -53,9 +53,11 @@ var _ = BeforeSuite(func() {
 
 	Expect(capsulev1beta2.AddToScheme(scheme.Scheme)).NotTo(HaveOccurred())
 
-	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
+	ctrlClient, err := client.New(cfg, client.Options{Scheme: scheme.Scheme})
 	Expect(err).ToNot(HaveOccurred())
-	Expect(k8sClient).ToNot(BeNil())
+	Expect(ctrlClient).ToNot(BeNil())
+
+	k8sClient = &e2eClient{Client: ctrlClient}
 })
 
 var _ = AfterSuite(func() {
@@ -70,5 +72,6 @@ func ownerClient(owner capsulev1beta2.OwnerSpec) (cs kubernetes.Interface) {
 	c.Impersonate.UserName = owner.Name
 	cs, err = kubernetes.NewForConfig(c)
 	Expect(err).ToNot(HaveOccurred())
-	return
+
+	return cs
 }
