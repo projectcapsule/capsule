@@ -77,8 +77,6 @@ func ModifyCapsuleConfigurationOpts(fn func(configuration *capsulev1beta2.Capsul
 	fn(config)
 
 	Expect(k8sClient.Update(context.Background(), config)).ToNot(HaveOccurred())
-
-	time.Sleep(1 * time.Second)
 }
 
 func CheckForOwnerRoleBindings(ns *corev1.Namespace, owner capsulev1beta2.OwnerSpec, roles map[string]bool) func() error {
