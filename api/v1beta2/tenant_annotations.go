@@ -7,6 +7,7 @@ import (
 	"crypto/md5" //#nosec
 	"encoding/hex"
 	"fmt"
+	"strings"
 )
 
 const (
@@ -18,13 +19,13 @@ const (
 )
 
 func createAnnotation(format string, resource fmt.Stringer) (string, error) {
-	suffix := resource.String()
+	resourceStr := strings.ReplaceAll(resource.String(), "/", "_")
 
-	hash := md5.Sum([]byte(resource.String())) //#nosec
+	hash := md5.Sum([]byte(resourceStr)) //#nosec
 
 	hashed := hex.EncodeToString(hash[:])
 	capsuleHashed := format + hashed
-	capsuleAnnotation := format + suffix
+	capsuleAnnotation := format + resourceStr
 
 	switch {
 	case len(capsuleAnnotation) <= maxAnnotationLength:
