@@ -2859,6 +2859,24 @@ spec:
                   - name
                   type: object
                 type: array
+              podOptions:
+                description: Specifies options for the Pods deployed in the Tenant
+                  namespaces, such as additional metadata.
+                properties:
+                  additionalMetadata:
+                    description: Specifies additional labels and annotations the Capsule
+                      operator places on any Pod resource in the Tenant. Optional.
+                    properties:
+                      annotations:
+                        additionalProperties:
+                          type: string
+                        type: object
+                      labels:
+                        additionalProperties:
+                          type: string
+                        type: object
+                    type: object
+                type: object
               preventDeletion:
                 description: Prevent accidental deletion of the Tenant. When enabled,
                   the deletion request will be declined.
