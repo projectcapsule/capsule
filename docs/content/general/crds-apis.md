@@ -2964,6 +2964,13 @@ TenantSpec defines the desired state of Tenant.
         </td>
         <td>false</td>
       </tr><tr>
+        <td><b><a href="#tenantspecpodoptions">podOptions</a></b></td>
+        <td>object</td>
+        <td>
+          Specifies options for the Pods deployed in the Tenant namespaces, such as additional metadata.<br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
         <td><b>preventDeletion</b></td>
         <td>boolean</td>
         <td>
@@ -4391,6 +4398,65 @@ NetworkPolicyPort describes a port to allow traffic on
           protocol represents the protocol (TCP, UDP, or SCTP) which traffic must match. If not specified, this field defaults to TCP.<br/>
           <br/>
             <i>Default</i>: TCP<br/>
+        </td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+### Tenant.spec.podOptions
+
+
+
+Specifies options for the Pods deployed in the Tenant namespaces, such as additional metadata.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b><a href="#tenantspecpodoptionsadditionalmetadata">additionalMetadata</a></b></td>
+        <td>object</td>
+        <td>
+          Specifies additional labels and annotations the Capsule operator places on any Pod resource in the Tenant. Optional.<br/>
+        </td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+### Tenant.spec.podOptions.additionalMetadata
+
+
+
+Specifies additional labels and annotations the Capsule operator places on any Pod resource in the Tenant. Optional.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>annotations</b></td>
+        <td>map[string]string</td>
+        <td>
+          <br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>labels</b></td>
+        <td>map[string]string</td>
+        <td>
+          <br/>
         </td>
         <td>false</td>
       </tr></tbody>
