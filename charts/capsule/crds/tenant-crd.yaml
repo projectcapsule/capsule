@@ -632,6 +632,22 @@ spec:
                       - name
                     type: object
                   type: array
+                podOptions:
+                  description: Specifies options for the Pod, such as additional metadata. Optional.
+                  properties:
+                    additionalMetadata:
+                      description: Specifies additional labels and annotations the Capsule operator places on any Service resource in the Tenant. Optional.
+                      properties:
+                        annotations:
+                          additionalProperties:
+                            type: string
+                          type: object
+                        labels:
+                          additionalProperties:
+                            type: string
+                          type: object
+                      type: object
+                  type: object
                 preventDeletion:
                   description: Prevent accidental deletion of the Tenant. When enabled, the deletion request will be declined.
                   type: boolean
@@ -1737,6 +1753,22 @@ spec:
                       - name
                     type: object
                   type: array
+                podOptions:
+                  description: Specifies options for the Pod, such as additional metadata. Optional.
+                  properties:
+                    additionalMetadata:
+                      description: Specifies additional labels and annotations the Capsule operator places on any Service resource in the Tenant. Optional.
+                      properties:
+                        annotations:
+                          additionalProperties:
+                            type: string
+                          type: object
+                        labels:
+                          additionalProperties:
+                            type: string
+                          type: object
+                      type: object
+                  type: object
                 priorityClasses:
                   description: Specifies the allowed priorityClasses assigned to the
                     Tenant. Capsule assures that all Pods resources created in the Tenant
@@ -2869,6 +2901,22 @@ spec:
                       - name
                     type: object
                   type: array
+                podOptions:
+                  description: Specifies options for the Pod, such as additional metadata. Optional.
+                  properties:
+                    additionalMetadata:
+                      description: Specifies additional labels and annotations the Capsule operator places on any Service resource in the Tenant. Optional.
+                      properties:
+                        annotations:
+                          additionalProperties:
+                            type: string
+                          type: object
+                        labels:
+                          additionalProperties:
+                            type: string
+                          type: object
+                      type: object
+                  type: object
                 preventDeletion:
                   description: Prevent accidental deletion of the Tenant. When enabled,
                     the deletion request will be declined.
