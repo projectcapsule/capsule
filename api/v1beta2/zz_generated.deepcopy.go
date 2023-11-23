@@ -716,6 +716,11 @@ func (in *TenantSpec) DeepCopyInto(out *TenantSpec) {
 		*out = new(api.ServiceOptions)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.PodOptions != nil {
+		in, out := &in.PodOptions, &out.PodOptions
+		*out = new(api.PodOptions)
+		(*in).DeepCopyInto(*out)
+	}
 	if in.StorageClasses != nil {
 		in, out := &in.StorageClasses, &out.StorageClasses
 		*out = new(api.DefaultAllowedListSpec)
