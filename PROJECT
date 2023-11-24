@@ -9,25 +9,6 @@ repo: github.com/projectcapsule/capsule
 resources:
 - api:
     crdVersion: v1
-  controller: true
-  domain: clastix.io
-  group: capsule
-  kind: Tenant
-  path: github.com/projectcapsule/capsule/api/v1alpha1
-  version: v1alpha1
-  webhooks:
-    conversion: true
-    webhookVersion: v1
-- api:
-    crdVersion: v1
-  controller: true
-  domain: clastix.io
-  group: capsule
-  kind: CapsuleConfiguration
-  path: github.com/projectcapsule/capsule/api/v1alpha1
-  version: v1alpha1
-- api:
-    crdVersion: v1
   domain: clastix.io
   group: capsule
   kind: Tenant

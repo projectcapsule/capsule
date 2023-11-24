@@ -27,7 +27,6 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	ctrlwebhook "sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	capsulev1alpha1 "github.com/projectcapsule/capsule/api/v1alpha1"
 	capsulev1beta1 "github.com/projectcapsule/capsule/api/v1beta1"
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	configcontroller "github.com/projectcapsule/capsule/controllers/config"
@@ -64,7 +63,6 @@ var (
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
-	utilruntime.Must(capsulev1alpha1.AddToScheme(scheme))
 	utilruntime.Must(capsulev1beta1.AddToScheme(scheme))
 	utilruntime.Must(capsulev1beta2.AddToScheme(scheme))
 	utilruntime.Must(apiextensionsv1.AddToScheme(scheme))
@@ -78,7 +76,7 @@ func printVersion() {
 	setupLog.Info(fmt.Sprintf("Go OS/Arch: %s/%s", goRuntime.GOOS, goRuntime.GOARCH))
 }
 
-//nolint:maintidx,cyclop
+//nolint:maintidx
 func main() {
 	var enableLeaderElection, version bool
 
@@ -197,16 +195,6 @@ func main() {
 		Recorder:   manager.GetEventRecorderFor("tenant-controller"),
 	}).SetupWithManager(manager); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Tenant")
-		os.Exit(1)
-	}
-
-	if err = (&capsulev1alpha1.Tenant{}).SetupWebhookWithManager(manager); err != nil {
-		setupLog.Error(err, "unable to create conversion webhook", "webhook", "capsulev1alpha1.Tenant")
-		os.Exit(1)
-	}
-
-	if err = (&capsulev1alpha1.CapsuleConfiguration{}).SetupWebhookWithManager(manager); err != nil {
-		setupLog.Error(err, "unable to create conversion webhook", "webhook", "capsulev1alpha1.CapsuleConfiguration")
 		os.Exit(1)
 	}
 
