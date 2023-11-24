@@ -11,14 +11,13 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 
-	"github.com/projectcapsule/capsule/api/v1alpha1"
 	"github.com/projectcapsule/capsule/api/v1beta1"
 	"github.com/projectcapsule/capsule/api/v1beta2"
 )
 
 func GetTypeLabel(t runtime.Object) (label string, err error) {
 	switch v := t.(type) {
-	case *v1alpha1.Tenant, *v1beta1.Tenant, *v1beta2.Tenant:
+	case *v1beta1.Tenant, *v1beta2.Tenant:
 		return "capsule.clastix.io/tenant", nil
 	case *corev1.LimitRange:
 		return "capsule.clastix.io/limit-range", nil
