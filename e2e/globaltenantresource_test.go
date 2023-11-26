@@ -249,7 +249,7 @@ var _ = Describe("Creating a GlobalTenantResource object", func() {
 
 			gtr.Spec.Resources[0].NamespaceSelector = &metav1.LabelSelector{
 				MatchLabels: map[string]string{
-					"name": "solar-three",
+					"kubernetes.io/metadata.name": "solar-three",
 				},
 			}
 
