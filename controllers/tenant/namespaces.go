@@ -57,8 +57,8 @@ func (r *Manager) syncNamespaceMetadata(ctx context.Context, namespace string, t
 		res, conflictErr = controllerutil.CreateOrUpdate(ctx, r.Client, ns, func() error {
 			annotations := make(map[string]string)
 			labels := map[string]string{
-				"name":       namespace,
-				capsuleLabel: tnt.GetName(),
+				"kubernetes.io/metadata.name": namespace,
+				capsuleLabel:                  tnt.GetName(),
 			}
 
 			if tnt.Spec.NamespaceOptions != nil && tnt.Spec.NamespaceOptions.AdditionalMetadata != nil {
