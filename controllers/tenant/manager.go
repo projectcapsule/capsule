@@ -60,6 +60,13 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 
 		return
 	}
+	// Ensuring Metadata
+	if err = r.ensureMetadata(ctx, instance); err != nil {
+		r.Log.Error(err, "Cannot ensure metadata")
+
+		return
+	}
+
 	// Ensuring ResourceQuota
 	r.Log.Info("Ensuring limit resources count is updated")
 

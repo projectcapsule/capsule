@@ -48,6 +48,7 @@ const (
 	PriorityClassesProxy   ProxyServiceKind = "PriorityClasses"
 	RuntimeClassesProxy    ProxyServiceKind = "RuntimeClasses"
 	PersistentVolumesProxy ProxyServiceKind = "PersistentVolumes"
+	TenantProxy            ProxyServiceKind = "Tenant"
 
 	ListOperation   ProxyOperation = "List"
 	UpdateOperation ProxyOperation = "Update"
