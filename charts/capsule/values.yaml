@@ -14,6 +14,17 @@ tls:
 # Manager Options
 manager:
 
+  # Manager RBAC
+  rbac:
+    # -- Specifies whether RBAC resources should be created.
+    create: true
+    # -- Specifies further cluster roles to be added to the Capsule manager service account.
+    existingClusterRoles: []
+    # - cluster-admin
+    # -- Specifies further cluster roles to be added to the Capsule manager service account.
+    existingRoles: []
+    # - namespace-admin
+
   # -- Set the controller deployment mode as `Deployment` or `DaemonSet`.
   kind: Deployment
 

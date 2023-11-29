@@ -1,61 +1,4 @@
-kind: ClusterRole
-apiVersion: rbac.authorization.k8s.io/v1
-metadata:
-  name: {{ include "capsule.fullname" . }}-proxy-role
-  labels:
-    {{- include "capsule.labels" . | nindent 4 }}
-  {{- with .Values.customAnnotations }}
-  annotations:
-    {{- toYaml . | nindent 4 }}
-  {{- end }}
-rules:
-- apiGroups:
-  - authentication.k8s.io
-  resources:
-  - tokenreviews
-  verbs:
-  - create
-- apiGroups:
-  - authorization.k8s.io
-  resources:
-  - subjectaccessreviews
-  verbs:
-  - create
----
-kind: ClusterRole
-apiVersion: rbac.authorization.k8s.io/v1
-metadata:
-  name: {{ include "capsule.fullname" . }}-metrics-reader
-  labels:
-    {{- include "capsule.labels" . | nindent 4 }}
-  {{- with .Values.customAnnotations }}
-  annotations:
-    {{- toYaml . | nindent 4 }}
-  {{- end }}
-rules:
-- nonResourceURLs:
-  - /metrics
-  verbs:
-  - get
----
-kind: ClusterRoleBinding
-apiVersion: rbac.authorization.k8s.io/v1
-metadata:
-  name: {{ include "capsule.fullname" . }}-proxy-rolebinding
-  labels:
-    {{- include "capsule.labels" . | nindent 4 }}
-  {{- with .Values.customAnnotations }}
-  annotations:
-    {{- toYaml . | nindent 4 }}
-  {{- end }}
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: {{ include "capsule.fullname" . }}-proxy-role
-subjects:
-- kind: ServiceAccount
-  name: {{ include "capsule.serviceAccountName" . }}
-  namespace: {{ .Release.Namespace }}
+{{- if $.Values.manager.rbac.create }}
 ---
 kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
@@ -75,3 +18,46 @@ subjects:
 - kind: ServiceAccount
   name: {{ include "capsule.serviceAccountName" . }}
   namespace: {{ .Release.Namespace }}
+{{- end }}
+{{- range $_, $cr := $.Values.manager.rbac.existingClusterRoles }}
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: {{ include "capsule.fullname" $ }}-{{ $cr }}
+  labels:
+    {{- include "capsule.labels" $ | nindent 4 }}
+  {{- with $.Values.customAnnotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ $cr }}
+subjects:
+- kind: ServiceAccount
+  name: {{ include "capsule.serviceAccountName" $ }}
+  namespace: {{ $.Release.Namespace }}
+{{- end }}
+{{- range $_, $nr := $.Values.manager.rbac.existingRoles }}
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: {{ include "capsule.fullname" $ }}-{{ $nr }}
+  labels:
+    {{- include "capsule.labels" $ | nindent 4 }}
+  {{- with $.Values.customAnnotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ $nr }}
+subjects:
+- kind: ServiceAccount
+  name: {{ include "capsule.serviceAccountName" $ }}
+  namespace: {{ $.Release.Namespace }}
+{{- end }}
