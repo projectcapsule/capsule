@@ -114,6 +114,9 @@ Here the values you can override:
 | manager.options.logLevel | string | `"4"` | Set the log verbosity of the capsule with a value from 1 to 10 |
 | manager.options.nodeMetadata | object | `{"forbiddenAnnotations":{"denied":[],"deniedRegex":""},"forbiddenLabels":{"denied":[],"deniedRegex":""}}` | Allows to set the forbidden metadata for the worker nodes that could be patched by a Tenant |
 | manager.options.protectedNamespaceRegex | string | `""` | If specified, disallows creation of namespaces matching the passed regexp |
+| manager.rbac.create | bool | `true` | Specifies whether RBAC resources should be created. |
+| manager.rbac.existingClusterRoles | list | `[]` | Specifies further cluster roles to be added to the Capsule manager service account. |
+| manager.rbac.existingRoles | list | `[]` | Specifies further cluster roles to be added to the Capsule manager service account. |
 | manager.readinessProbe | object | `{"httpGet":{"path":"/readyz","port":10080}}` | Configure the readiness probe using Deployment probe spec |
 | manager.resources.limits.cpu | string | `"200m"` |  |
 | manager.resources.limits.memory | string | `"128Mi"` |  |
