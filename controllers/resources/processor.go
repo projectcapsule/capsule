@@ -124,6 +124,7 @@ func (r *Processor) HandleSection(ctx context.Context, tnt capsulev1beta2.Tenant
 
 	objLabels[Label] = fmt.Sprintf("%d", resourceIndex)
 	objLabels[tenantLabel] = tnt.GetName()
+
 	// processed will contain the sets of resources replicated, both for the raw and the Namespaced ones:
 	// these are required to perform a final pruning once the replication has been occurred.
 	processed := sets.NewString()
@@ -265,8 +266,22 @@ func (r *Processor) createOrUpdate(ctx context.Context, obj *unstructured.Unstru
 		rv := actual.GetResourceVersion()
 
 		actual.SetUnstructuredContent(desired.Object)
-		actual.SetLabels(labels)
-		actual.SetAnnotations(annotations)
+		combinedLabels := obj.GetLabels()
+		if combinedLabels == nil {
+			combinedLabels = make(map[string]string)
+		}
+		for key, value := range labels {
+			combinedLabels[key] = value
+		}
+		actual.SetLabels(combinedLabels)
+		combinedAnnotations := obj.GetAnnotations()
+		if combinedAnnotations == nil {
+			combinedAnnotations = make(map[string]string)
+		}
+		for key, value := range annotations {
+			combinedAnnotations[key] = value
+		}
+		actual.SetAnnotations(combinedAnnotations)
 		actual.SetResourceVersion(rv)
 		actual.SetUID(UID)
 

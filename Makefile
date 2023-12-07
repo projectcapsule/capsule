@@ -166,7 +166,7 @@ dev-setup:
 			{'op': 'replace', 'path': '/webhooks/5/clientConfig', 'value':{'url':\"$${WEBHOOK_URL}/pods\",'caBundle':\"$${CA_BUNDLE}\"}},\
 			{'op': 'replace', 'path': '/webhooks/6/clientConfig', 'value':{'url':\"$${WEBHOOK_URL}/persistentvolumeclaims\",'caBundle':\"$${CA_BUNDLE}\"}},\
 			{'op': 'replace', 'path': '/webhooks/7/clientConfig', 'value':{'url':\"$${WEBHOOK_URL}/services\",'caBundle':\"$${CA_BUNDLE}\"}},\
-			{'op': 'replace', 'path': '/webhooks/8/clientConfig', 'value':{'url':\"$${WEBHOOK_URL}/tenants\",'caBundle':\"$${CA_BUNDLE}\"}},\
+			{'op': 'replace', 'path': '/webhooks/8/clientConfig', 'value':{'url':\"$${WEBHOOK_URL}/tenantresource-objects\",'caBundle':\"$${CA_BUNDLE}\"}},\
 			{'op': 'replace', 'path': '/webhooks/9/clientConfig', 'value':{'url':\"$${WEBHOOK_URL}/tenants\",'caBundle':\"$${CA_BUNDLE}\"}}\
 		]" && \
 	kubectl patch crd tenants.capsule.clastix.io \
@@ -242,7 +242,7 @@ apidocs-gen: ## Download crdoc locally if necessary.
 	$(call go-install-tool,$(APIDOCS_GEN),fybrik.io/crdoc@$(APIDOCS_GEN_VERSION))
 
 GINKGO         := $(shell pwd)/bin/ginkgo
-GINGKO_VERSION := v2.13.1
+GINGKO_VERSION := v2.13.2
 ginkgo: ## Download ginkgo locally if necessary.
 	$(call go-install-tool,$(GINKGO),github.com/onsi/ginkgo/v2/ginkgo@$(GINGKO_VERSION))
 
