@@ -63,6 +63,13 @@ var _ = Describe("Creating a TenantResource object", func() {
 		Type: corev1.SecretTypeOpaque,
 	}
 
+	testLabels := map[string]string{
+		"labels.energy.io": "namespaced",
+	}
+	testAnnotations := map[string]string{
+		"annotations.energy.io": "namespaced",
+	}
+
 	tr := &capsulev1beta2.TenantResource{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "replicate-energies",
@@ -101,7 +108,9 @@ var _ = Describe("Creating a TenantResource object", func() {
 										APIVersion: "v1",
 									},
 									ObjectMeta: metav1.ObjectMeta{
-										Name: "raw-secret-1",
+										Name:        "raw-secret-1",
+										Labels:      testLabels,
+										Annotations: testAnnotations,
 									},
 									Type: corev1.SecretTypeOpaque,
 									Data: map[string][]byte{
@@ -119,7 +128,9 @@ var _ = Describe("Creating a TenantResource object", func() {
 										APIVersion: "v1",
 									},
 									ObjectMeta: metav1.ObjectMeta{
-										Name: "raw-secret-2",
+										Name:        "raw-secret-2",
+										Labels:      testLabels,
+										Annotations: testAnnotations,
 									},
 									Type: corev1.SecretTypeOpaque,
 									Data: map[string][]byte{
@@ -137,7 +148,9 @@ var _ = Describe("Creating a TenantResource object", func() {
 										APIVersion: "v1",
 									},
 									ObjectMeta: metav1.ObjectMeta{
-										Name: "raw-secret-3",
+										Name:        "raw-secret-3",
+										Labels:      testLabels,
+										Annotations: testAnnotations,
 									},
 									Type: corev1.SecretTypeOpaque,
 									Data: map[string][]byte{
@@ -288,8 +301,15 @@ var _ = Describe("Creating a TenantResource object", func() {
 					_, err := HaveKeyWithValue(k, v).Match(secret.GetLabels())
 					Expect(err).ToNot(HaveOccurred())
 				}
-
+				for k, v := range testLabels {
+					_, err := HaveKeyWithValue(k, v).Match(secret.GetLabels())
+					Expect(err).ToNot(HaveOccurred())
+				}
 				for k, v := range tr.Spec.Resources[0].AdditionalMetadata.Annotations {
+					_, err := HaveKeyWithValue(k, v).Match(secret.GetAnnotations())
+					Expect(err).ToNot(HaveOccurred())
+				}
+				for k, v := range testAnnotations {
 					_, err := HaveKeyWithValue(k, v).Match(secret.GetAnnotations())
 					Expect(err).ToNot(HaveOccurred())
 				}
