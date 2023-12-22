@@ -8,4 +8,4 @@ Capsule extension for Lens provides these capabilities:
 - See tenant details and change through the embedded Lens editor
 - Check Resources Quota and Budget at both the tenant and namespace level
 
-Please, see the [README](https://github.com/projectcapsule/capsule-lens-extension) for details about the installation of the Capsule Lens Extension.
+Please, see the [README](https://github.com/clastix/capsule-lens-extension) for details about the installation of the Capsule Lens Extension.
