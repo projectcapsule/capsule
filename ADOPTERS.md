@@ -7,6 +7,9 @@ This is a list of companies that have adopted Capsule, feel free to open a Pull-
 ### [Bedag Informatik AG](https://www.bedag.ch/)
 ![Bedag](https://www.bedag.ch/wGlobal/wGlobal/layout/images/logo.svg)
 
+### [EPAM Delivery Platform](https://epam.github.io/edp-install/)
+![EPAM Delivery Platform](https://raw.githubusercontent.com/epam/edp-install/master/docs/assets/edp-logo-150x150-black.png)
+
 ### [Fastweb](https://www.fastweb.it/)
 ![Fastweb](https://www.fastweb.it/grandi-aziende/gfx/common/logo-fastweb-header.svg)
 
