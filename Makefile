@@ -193,8 +193,8 @@ endif
 LD_FLAGS        := "-X main.Version=$(VERSION) \
 					-X main.GitCommit=$(GIT_HEAD_COMMIT) \
 					-X main.GitTag=$(VERSION) \
-					-X main.GitTreeState=$(GIT_MODIFIED) \
-					-X main.BuildDate=$(BUILD_DATE) \
+					-X main.GitDirty=$(GIT_MODIFIED) \
+					-X main.BuildTime=$(BUILD_DATE) \
 					-X main.GitRepo=$(GIT_REPO)"
 
 # Docker Image Build
