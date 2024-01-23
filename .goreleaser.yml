@@ -25,8 +25,8 @@ builds:
           -X main.Version={{ .Tag }}
           -X main.GitCommit={{ .Commit }}
           -X main.GitTag={{ .Tag }}
-          -X main.GitTreeState={{ .Date }}
-          -X main.BuildDate={{ .Date }}
+          -X main.GitDirty={{ .Date }}
+          -X main.BuildTime={{ .Date }}
           -X main.GitRepo={{ .ProjectName }}
 release:
   prerelease: auto
