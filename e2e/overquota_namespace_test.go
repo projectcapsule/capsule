@@ -11,7 +11,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 )
@@ -29,7 +29,7 @@ var _ = Describe("creating a Namespace in over-quota of three", func() {
 				},
 			},
 			NamespaceOptions: &capsulev1beta2.NamespaceOptions{
-				Quota: pointer.Int32(3),
+				Quota: ptr.To(int32(3)),
 			},
 		},
 	}

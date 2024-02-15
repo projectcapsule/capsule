@@ -18,7 +18,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
@@ -269,8 +269,8 @@ var _ = Describe("adding metadata to Service objects", func() {
 				},
 				Ports: []discoveryv1beta1.EndpointPort{
 					{
-						Name: pointer.String("foo"),
-						Port: pointer.Int32(9999),
+						Name: ptr.To("foo"),
+						Port: ptr.To(int32(9999)),
 					},
 				},
 			}
@@ -288,8 +288,8 @@ var _ = Describe("adding metadata to Service objects", func() {
 				},
 				Ports: []discoveryv1.EndpointPort{
 					{
-						Name: pointer.String("foo"),
-						Port: pointer.Int32(9999),
+						Name: ptr.To("foo"),
+						Port: ptr.To(int32(9999)),
 					},
 				},
 			}

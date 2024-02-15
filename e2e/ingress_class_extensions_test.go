@@ -14,7 +14,7 @@ import (
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api"
@@ -131,7 +131,7 @@ var _ = Describe("when Tenant handles Ingress classes with extensions/v1beta1", 
 						Name: "denied-ingress",
 					},
 					Spec: extensionsv1beta1.IngressSpec{
-						IngressClassName: pointer.String("the-worst-ingress-available"),
+						IngressClassName: ptr.To("the-worst-ingress-available"),
 						Backend: &extensionsv1beta1.IngressBackend{
 							ServiceName: "foo",
 							ServicePort: intstr.FromInt(8080),

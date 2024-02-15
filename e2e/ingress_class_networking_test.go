@@ -18,7 +18,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
@@ -220,7 +220,7 @@ var _ = Describe("when Tenant handles Ingress classes with networking.k8s.io/v1"
 						Name: "denied-ingress",
 					},
 					Spec: networkingv1.IngressSpec{
-						IngressClassName: pointer.String("the-worst-ingress-available"),
+						IngressClassName: ptr.To("the-worst-ingress-available"),
 						DefaultBackend: &networkingv1.IngressBackend{
 							Service: &networkingv1.IngressServiceBackend{
 								Name: "foo",
