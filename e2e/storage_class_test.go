@@ -21,7 +21,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
@@ -230,13 +230,14 @@ var _ = Describe("when Tenant handles Storage classes", func() {
 		TenantNamespaceList(tntNoDefaults, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 		By("using exact matches", func() {
 			for _, c := range tntNoDefaults.Spec.StorageClasses.Exact {
+
 				Eventually(func() (err error) {
 					p := &corev1.PersistentVolumeClaim{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: c,
 						},
 						Spec: corev1.PersistentVolumeClaimSpec{
-							StorageClassName: pointer.String(c),
+							StorageClassName: ptr.To(c),
 							AccessModes:      []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
 							Resources: corev1.ResourceRequirements{
 								Requests: map[corev1.ResourceName]resource.Quantity{
