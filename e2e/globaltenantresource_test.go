@@ -18,7 +18,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
@@ -83,7 +83,7 @@ var _ = Describe("Creating a GlobalTenantResource object", func() {
 			},
 			TenantResourceSpec: capsulev1beta2.TenantResourceSpec{
 				ResyncPeriod:    metav1.Duration{Duration: time.Minute},
-				PruningOnDelete: pointer.Bool(true),
+				PruningOnDelete: ptr.To(true),
 				Resources: []capsulev1beta2.ResourceSpec{
 					{
 						NamespacedItems: []capsulev1beta2.ObjectReference{
