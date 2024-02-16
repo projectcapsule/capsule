@@ -1,6 +1,8 @@
 module github.com/projectcapsule/capsule
 
-go 1.20
+go 1.21
+
+toolchain go1.21.4
 
 require (
 	github.com/go-logr/logr v1.4.1
@@ -18,7 +20,7 @@ require (
 	k8s.io/apiextensions-apiserver v0.29.2
 	k8s.io/apimachinery v0.29.2
 	k8s.io/client-go v0.29.2
-    k8s.io/utils v0.0.0-20240102154912-e7106e64919e
+	k8s.io/utils v0.0.0-20240102154912-e7106e64919e
 	sigs.k8s.io/cluster-api v1.6.1
 	sigs.k8s.io/controller-runtime v0.16.3
 )
@@ -76,11 +78,7 @@ require (
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-<<<<<<< HEAD
 	k8s.io/component-base v0.29.2 // indirect
-=======
-	k8s.io/component-base v0.28.4 // indirect
->>>>>>> 1db7a46e34194bcc9e91261ac0d48f31ddaeb673
 	k8s.io/klog/v2 v2.110.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20231010175941-2dd684a91f00 // indirect
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
