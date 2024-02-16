@@ -151,7 +151,7 @@ var _ = Describe("when Tenant handles Storage classes", func() {
 					},
 					Spec: corev1.PersistentVolumeClaimSpec{
 						AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
-						Resources: corev1.ResourceRequirements{
+						Resources: corev1.VolumeResourceRequirements{
 							Requests: map[corev1.ResourceName]resource.Quantity{
 								corev1.ResourceStorage: resource.MustParse("3Gi"),
 							},
@@ -171,7 +171,7 @@ var _ = Describe("when Tenant handles Storage classes", func() {
 					},
 					Spec: corev1.PersistentVolumeClaimSpec{
 						AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
-						Resources: corev1.ResourceRequirements{
+						Resources: corev1.VolumeResourceRequirements{
 							Requests: map[corev1.ResourceName]resource.Quantity{
 								corev1.ResourceStorage: resource.MustParse("3Gi"),
 							},
@@ -203,7 +203,7 @@ var _ = Describe("when Tenant handles Storage classes", func() {
 					Spec: corev1.PersistentVolumeClaimSpec{
 						StorageClassName: &storageName,
 						AccessModes:      []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
-						Resources: corev1.ResourceRequirements{
+						Resources: corev1.VolumeResourceRequirements{
 							Requests: map[corev1.ResourceName]resource.Quantity{
 								corev1.ResourceStorage: resource.MustParse("3Gi"),
 							},
@@ -238,7 +238,7 @@ var _ = Describe("when Tenant handles Storage classes", func() {
 						Spec: corev1.PersistentVolumeClaimSpec{
 							StorageClassName: pointer.String(c),
 							AccessModes:      []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
-							Resources: corev1.ResourceRequirements{
+							Resources: corev1.VolumeResourceRequirements{
 								Requests: map[corev1.ResourceName]resource.Quantity{
 									corev1.ResourceStorage: resource.MustParse("3Gi"),
 								},
@@ -260,7 +260,7 @@ var _ = Describe("when Tenant handles Storage classes", func() {
 					Spec: corev1.PersistentVolumeClaimSpec{
 						StorageClassName: &allowedClass,
 						AccessModes:      []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
-						Resources: corev1.ResourceRequirements{
+						Resources: corev1.VolumeResourceRequirements{
 							Requests: map[corev1.ResourceName]resource.Quantity{
 								corev1.ResourceStorage: resource.MustParse("3Gi"),
 							},
@@ -294,7 +294,7 @@ var _ = Describe("when Tenant handles Storage classes", func() {
 						Spec: corev1.PersistentVolumeClaimSpec{
 							StorageClassName: &storageName,
 							AccessModes:      []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
-							Resources: corev1.ResourceRequirements{
+							Resources: corev1.VolumeResourceRequirements{
 								Requests: map[corev1.ResourceName]resource.Quantity{
 									corev1.ResourceStorage: resource.MustParse("3Gi"),
 								},
@@ -320,7 +320,7 @@ var _ = Describe("when Tenant handles Storage classes", func() {
 			},
 			Spec: corev1.PersistentVolumeClaimSpec{
 				AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
-				Resources: corev1.ResourceRequirements{
+				Resources: corev1.VolumeResourceRequirements{
 					Requests: map[corev1.ResourceName]resource.Quantity{
 						corev1.ResourceStorage: resource.MustParse("3Gi"),
 					},
@@ -348,7 +348,7 @@ var _ = Describe("when Tenant handles Storage classes", func() {
 			},
 			Spec: corev1.PersistentVolumeClaimSpec{
 				AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
-				Resources: corev1.ResourceRequirements{
+				Resources: corev1.VolumeResourceRequirements{
 					Requests: map[corev1.ResourceName]resource.Quantity{
 						corev1.ResourceStorage: resource.MustParse("3Gi"),
 					},
@@ -380,7 +380,7 @@ var _ = Describe("when Tenant handles Storage classes", func() {
 			},
 			Spec: corev1.PersistentVolumeClaimSpec{
 				AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
-				Resources: corev1.ResourceRequirements{
+				Resources: corev1.VolumeResourceRequirements{
 					Requests: map[corev1.ResourceName]resource.Quantity{
 						corev1.ResourceStorage: resource.MustParse("3Gi"),
 					},
@@ -411,7 +411,7 @@ var _ = Describe("when Tenant handles Storage classes", func() {
 			},
 			Spec: corev1.PersistentVolumeClaimSpec{
 				AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
-				Resources: corev1.ResourceRequirements{
+				Resources: corev1.VolumeResourceRequirements{
 					Requests: map[corev1.ResourceName]resource.Quantity{
 						corev1.ResourceStorage: resource.MustParse("3Gi"),
 					},
