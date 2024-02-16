@@ -14,7 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
@@ -84,7 +84,7 @@ var _ = Describe("preventing PersistentVolume cross-tenant mount", func() {
 						corev1.ResourceStorage: resource.MustParse("1Gi"),
 					},
 				},
-				StorageClassName: pointer.String("standard"),
+				StorageClassName: ptr.To("standard"),
 			},
 		}
 
@@ -167,7 +167,7 @@ var _ = Describe("preventing PersistentVolume cross-tenant mount", func() {
 			return k8sClient.Update(context.Background(), &pv)
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 
-		Expect(k8sClient.Delete(context.Background(), &pod, &client.DeleteOptions{GracePeriodSeconds: pointer.Int64(0)})).ToNot(HaveOccurred())
+		Expect(k8sClient.Delete(context.Background(), &pod, &client.DeleteOptions{GracePeriodSeconds: ptr.To(int64(0))})).ToNot(HaveOccurred())
 
 		ns2 := NewNamespace("")
 		NamespaceCreation(ns2, tnt2.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
@@ -188,7 +188,7 @@ var _ = Describe("preventing PersistentVolume cross-tenant mount", func() {
 							corev1.ResourceStorage: resource.MustParse("1Gi"),
 						},
 					},
-					StorageClassName: pointer.String("standard"),
+					StorageClassName: ptr.To("standard"),
 					VolumeName:       pv.Name,
 				},
 			}
