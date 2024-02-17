@@ -15,18 +15,19 @@ import (
 )
 
 func TestNewCertificateAuthorityFromBytes(t *testing.T) {
-	var ca *CapsuleCA
-
-	var err error
+	var (
+		ca  *CapsuleCA
+		crt *bytes.Buffer
+		key *bytes.Buffer
+		err error
+	)
 
 	ca, err = GenerateCertificateAuthority()
 	assert.Nil(t, err)
 
-	var crt *bytes.Buffer
 	crt, err = ca.CACertificatePem()
 	assert.Nil(t, err)
 
-	var key *bytes.Buffer
 	key, err = ca.CAPrivateKeyPem()
 	assert.Nil(t, err)
 
@@ -44,26 +45,28 @@ func TestCapsuleCa_GenerateCertificate(t *testing.T) {
 		"SAN":     {[]string{"capsule-webhook-service.capsule-system.svc", "capsule-webhook-service.capsule-system.default.cluster"}},
 	} {
 		t.Run(name, func(t *testing.T) {
-			var ca *CapsuleCA
-			var err error
+			var (
+				ca   *CapsuleCA
+				crt  *bytes.Buffer
+				key  *bytes.Buffer
+				b    *pem.Block
+				cert *x509.Certificate
+				err  error
+			)
 
 			e := time.Now().AddDate(1, 0, 0)
 
 			ca, err = GenerateCertificateAuthority()
 			assert.Nil(t, err)
 
-			var crt *bytes.Buffer
-			var key *bytes.Buffer
 			crt, key, err = ca.GenerateCertificate(NewCertOpts(e, c.dnsNames...))
 			assert.Nil(t, err)
 
-			var b *pem.Block
-			var c *x509.Certificate
 			b, _ = pem.Decode(crt.Bytes())
-			c, err = x509.ParseCertificate(b.Bytes)
+			cert, err = x509.ParseCertificate(b.Bytes)
 			assert.Nil(t, err)
 
-			assert.Equal(t, e.Unix(), c.NotAfter.Unix())
+			assert.Equal(t, e.Unix(), cert.NotAfter.Unix())
 
 			for _, i := range c.DNSNames {
 				assert.Contains(t, c.DNSNames, i)
