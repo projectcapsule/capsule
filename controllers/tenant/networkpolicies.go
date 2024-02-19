@@ -54,7 +54,7 @@ func (r *Manager) syncNetworkPolicy(ctx context.Context, tenant *capsulev1beta2.
 		return err
 	}
 
-	for i, spec := range tenant.Spec.NetworkPolicies.Items {
+	for i, spec := range tenant.Spec.NetworkPolicies.Items { //nolint:dupl
 		target := &networkingv1.NetworkPolicy{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      fmt.Sprintf("capsule-%s-%d", tenant.Name, i),
@@ -64,10 +64,15 @@ func (r *Manager) syncNetworkPolicy(ctx context.Context, tenant *capsulev1beta2.
 
 		var res controllerutil.OperationResult
 		res, err = controllerutil.CreateOrUpdate(ctx, r.Client, target, func() (err error) {
-			target.SetLabels(map[string]string{
-				tenantLabel:        tenant.Name,
-				networkPolicyLabel: strconv.Itoa(i),
-			})
+			labels := target.GetLabels()
+			if labels == nil {
+				labels = map[string]string{}
+			}
+
+			labels[tenantLabel] = tenant.Name
+			labels[networkPolicyLabel] = strconv.Itoa(i)
+
+			target.SetLabels(labels)
 			target.Spec = spec
 
 			return controllerutil.SetControllerReference(tenant, target, r.Client.Scheme())

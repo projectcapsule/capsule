@@ -196,10 +196,15 @@ func (r *Manager) syncResourceQuota(ctx context.Context, tenant *capsulev1beta2.
 
 		err = retry.RetryOnConflict(retry.DefaultBackoff, func() (retryErr error) {
 			res, retryErr = controllerutil.CreateOrUpdate(ctx, r.Client, target, func() (err error) {
-				target.SetLabels(map[string]string{
-					tenantLabel: tenant.Name,
-					typeLabel:   strconv.Itoa(index),
-				})
+				targetLabels := target.GetLabels()
+				if targetLabels == nil {
+					targetLabels = map[string]string{}
+				}
+
+				targetLabels[tenantLabel] = tenant.Name
+				targetLabels[typeLabel] = strconv.Itoa(index)
+
+				target.SetLabels(targetLabels)
 				target.Spec.Scopes = resQuota.Scopes
 				target.Spec.ScopeSelector = resQuota.ScopeSelector
 				// In case of Namespace scope for the ResourceQuota we can easily apply the bare specification
