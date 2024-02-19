@@ -256,6 +256,7 @@ func (r Reconciler) updateValidatingWebhookConfiguration(ctx context.Context, ca
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
 		vw := &admissionregistrationv1.ValidatingWebhookConfiguration{}
 		err = r.Get(ctx, types.NamespacedName{Name: r.Configuration.ValidatingWebhookConfigurationName()}, vw)
+
 		if err != nil {
 			r.Log.Error(err, "cannot retrieve ValidatingWebhookConfiguration")
 
@@ -277,6 +278,7 @@ func (r Reconciler) updateValidatingWebhookConfiguration(ctx context.Context, ca
 func (r Reconciler) updateMutatingWebhookConfiguration(ctx context.Context, caBundle []byte) error {
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
 		mw := &admissionregistrationv1.MutatingWebhookConfiguration{}
+
 		err = r.Get(ctx, types.NamespacedName{Name: r.Configuration.MutatingWebhookConfigurationName()}, mw)
 		if err != nil {
 			r.Log.Error(err, "cannot retrieve MutatingWebhookConfiguration")

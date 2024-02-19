@@ -44,6 +44,7 @@ func (r *Manager) SetupWithManager(_ context.Context, mgr ctrl.Manager, configur
 	crbErr := ctrl.NewControllerManagedBy(mgr).
 		For(&rbacv1.ClusterRoleBinding{}, namesPredicate).
 		Watches(&capsulev1beta2.CapsuleConfiguration{}, handler.Funcs{
+			//nolint:revive
 			UpdateFunc: func(ctx context.Context, updateEvent event.UpdateEvent, limitingInterface workqueue.RateLimitingInterface) {
 				if updateEvent.ObjectNew.GetName() == configurationName {
 					if crbErr := r.EnsureClusterRoleBindings(ctx); crbErr != nil {
