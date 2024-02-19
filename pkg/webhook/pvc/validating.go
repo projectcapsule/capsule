@@ -88,7 +88,7 @@ func (h *validating) OnCreate(c client.Client, decoder *admission.Decoder, recor
 }
 
 func (h *validating) OnDelete(client.Client, *admission.Decoder, record.EventRecorder) capsulewebhook.Func {
-	return func(ctx context.Context, req admission.Request) *admission.Response {
+	return func(_ context.Context, req admission.Request) *admission.Response {
 		return nil
 	}
 }

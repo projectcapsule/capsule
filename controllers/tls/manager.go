@@ -220,6 +220,7 @@ func (r *Reconciler) updateTenantCustomResourceDefinition(ctx context.Context, n
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
 		crd := &apiextensionsv1.CustomResourceDefinition{}
 		err = r.Get(ctx, types.NamespacedName{Name: name}, crd)
+
 		if err != nil {
 			r.Log.Error(err, "cannot retrieve CustomResourceDefinition")
 
@@ -255,11 +256,13 @@ func (r Reconciler) updateValidatingWebhookConfiguration(ctx context.Context, ca
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
 		vw := &admissionregistrationv1.ValidatingWebhookConfiguration{}
 		err = r.Get(ctx, types.NamespacedName{Name: r.Configuration.ValidatingWebhookConfigurationName()}, vw)
+
 		if err != nil {
 			r.Log.Error(err, "cannot retrieve ValidatingWebhookConfiguration")
 
 			return err
 		}
+
 		for i, w := range vw.Webhooks {
 			// Updating CABundle only in case of an internal service reference
 			if w.ClientConfig.Service != nil {
@@ -276,11 +279,13 @@ func (r Reconciler) updateMutatingWebhookConfiguration(ctx context.Context, caBu
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
 		mw := &admissionregistrationv1.MutatingWebhookConfiguration{}
 		err = r.Get(ctx, types.NamespacedName{Name: r.Configuration.MutatingWebhookConfigurationName()}, mw)
+
 		if err != nil {
 			r.Log.Error(err, "cannot retrieve MutatingWebhookConfiguration")
 
 			return err
 		}
+
 		for i, w := range mw.Webhooks {
 			// Updating CABundle only in case of an internal service reference
 			if w.ClientConfig.Service != nil {

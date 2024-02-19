@@ -62,7 +62,7 @@ func (p PV) OnCreate(client client.Client, decoder *admission.Decoder, recorder 
 		pv := corev1.PersistentVolume{}
 		if err = client.Get(ctx, types.NamespacedName{Name: pvc.Spec.VolumeName}, &pv); err != nil {
 			if errors.IsNotFound(err) {
-				err = fmt.Errorf("cannot create a PVC referring to a not yet existing PV")
+				err = errors.New("cannot create a PVC referring to a not yet existing PV")
 			}
 
 			return utils.ErroredResponse(err)
