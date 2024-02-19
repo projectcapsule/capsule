@@ -77,6 +77,7 @@ func printVersion() {
 	setupLog.Info(fmt.Sprintf("Go OS/Arch: %s/%s", goRuntime.GOOS, goRuntime.GOARCH))
 }
 
+//gofumpt:diagnose version: v0.5.0 (go1.20.7) flags: -lang=v1.21 -modpath=github.com/projectcapsule/capsule
 //nolint:maintidx
 func main() {
 	var enableLeaderElection, version bool

@@ -1,6 +1,4 @@
 linters-settings:
-  gofmt:
-    simplify: true
   govet:
     check-shadowing: true
   dupl:
@@ -17,6 +15,9 @@ linters-settings:
       - standard
       - default
       - prefix(github.com/projectcapsule/capsule)
+  gofumpt:
+    module-path: github.com/projectcapsule/capsule
+    extra-rules: false
   goheader:
     template: |-
       Copyright 2020-2023 Project Capsule Authors.
@@ -57,8 +58,10 @@ linters:
     - ifshort
     - nonamedreturns
 
+
 run:
   timeout: 3m
+  go: '1.21'
   skip-files:
     - "zz_.*\\.go$"
     - ".+\\.generated.go"
