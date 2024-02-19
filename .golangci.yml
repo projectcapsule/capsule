@@ -19,13 +19,22 @@ linters-settings:
     template: |-
       Copyright 2020-2023 Project Capsule Authors.
       SPDX-License-Identifier: Apache-2.0
+  inamedparam:
+    # Skips check for interface methods with only a single parameter.
+    # Default: false
+    skip-single-param: true
+  nakedret:
+    # Make an issue if func has more lines of code than this setting, and it has naked returns.
+    max-func-lines: 50
 
 linters:
   enable-all: true
   disable:
+    - perfsprint
     - funlen
     - gochecknoinits
     - lll
+    - depguard
     - exhaustivestruct
     - maligned
     - interfacer
@@ -47,9 +56,11 @@ linters:
     - ifshort
     - nonamedreturns
 
-service:
-  golangci-lint-version: 1.51.2
-
 run:
+  timeout: 3m
   skip-files:
     - "zz_.*\\.go$"
+    - ".+\\.generated.go"
+    - ".+_test.go"
+    - ".+_test_.+.go"
+

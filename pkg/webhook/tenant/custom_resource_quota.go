@@ -6,6 +6,7 @@ package tenant
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
@@ -47,7 +48,7 @@ func (r *resourceCounterHandler) getTenantName(ctx context.Context, clt client.C
 	return tntList.Items[0].GetName(), nil
 }
 
-func (r *resourceCounterHandler) OnCreate(clt client.Client, decoder *admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
+func (r *resourceCounterHandler) OnCreate(clt client.Client, _ *admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		var tntName string
 
@@ -79,13 +80,14 @@ func (r *resourceCounterHandler) OnCreate(clt client.Client, decoder *admission.
 
 				return err
 			}
+
 			used, _ := capsulev1beta2.GetUsedResourceFromTenant(*tnt, kgv)
 
 			if used >= limit {
 				return NewCustomResourceQuotaError(kgv, limit)
 			}
 
-			tnt.Annotations[capsulev1beta2.UsedAnnotationForResource(kgv)] = fmt.Sprintf("%d", used+1)
+			tnt.Annotations[capsulev1beta2.UsedAnnotationForResource(kgv)] = strconv.FormatInt(used+1, 16)
 
 			return clt.Update(ctx, tnt)
 		})
@@ -101,7 +103,7 @@ func (r *resourceCounterHandler) OnCreate(clt client.Client, decoder *admission.
 	}
 }
 
-func (r *resourceCounterHandler) OnDelete(clt client.Client, decoder *admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
+func (r *resourceCounterHandler) OnDelete(clt client.Client, _ *admission.Decoder, _ record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		var tntName string
 
@@ -133,7 +135,7 @@ func (r *resourceCounterHandler) OnDelete(clt client.Client, decoder *admission.
 
 			used, _ := capsulev1beta2.GetUsedResourceFromTenant(*tnt, kgv)
 
-			tnt.Annotations[capsulev1beta2.UsedAnnotationForResource(kgv)] = fmt.Sprintf("%d", used-1)
+			tnt.Annotations[capsulev1beta2.UsedAnnotationForResource(kgv)] = strconv.FormatInt(used-1, 16)
 
 			return clt.Update(ctx, tnt)
 		})
@@ -145,8 +147,8 @@ func (r *resourceCounterHandler) OnDelete(clt client.Client, decoder *admission.
 	}
 }
 
-func (r *resourceCounterHandler) OnUpdate(client client.Client, decoder *admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
-	return func(ctx context.Context, req admission.Request) *admission.Response {
+func (r *resourceCounterHandler) OnUpdate(client.Client, *admission.Decoder, record.EventRecorder) capsulewebhook.Func {
+	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }

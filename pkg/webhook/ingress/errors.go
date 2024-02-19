@@ -58,7 +58,7 @@ type emptyIngressHostnameError struct {
 }
 
 func (e emptyIngressHostnameError) Error() string {
-	return fmt.Sprintf("empty hostname is not allowed for the current Tenant%s", appendHostnameError(e.spec))
+	return ("empty hostname is not allowed for the current Tenant" + appendHostnameError(e.spec))
 }
 
 func NewIngressHostnamesNotValid(invalidHostnames []string, notMatchingHostnames []string, spec api.AllowedListSpec) error {
@@ -102,14 +102,13 @@ func (i ingressClassNotValidError) Error() string {
 	return utils.DefaultAllowedValuesErrorMessage(i.spec, err)
 }
 
-//nolint:predeclared
-func appendHostnameError(spec api.AllowedListSpec) (append string) {
+func appendHostnameError(spec api.AllowedListSpec) (err string) {
 	if len(spec.Exact) > 0 {
-		append = fmt.Sprintf(", specify one of the following (%s)", strings.Join(spec.Exact, ", "))
+		err = fmt.Sprintf(", specify one of the following (%s)", strings.Join(spec.Exact, ", "))
 	}
 
 	if len(spec.Regex) > 0 {
-		append += fmt.Sprintf(", or matching the regex %s", spec.Regex)
+		err += ", or matching the regex " + spec.Regex
 	}
 
 	return

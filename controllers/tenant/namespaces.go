@@ -48,8 +48,8 @@ func (r *Manager) syncNamespaceMetadata(ctx context.Context, namespace string, t
 
 	err = retry.RetryOnConflict(retry.DefaultBackoff, func() (conflictErr error) {
 		ns := &corev1.Namespace{}
-		if conflictErr = r.Client.Get(ctx, types.NamespacedName{Name: namespace}, ns); err != nil {
-			return
+		if conflictErr = r.Client.Get(ctx, types.NamespacedName{Name: namespace}, ns); conflictErr != nil {
+			return conflictErr
 		}
 
 		capsuleLabel, _ := utils.GetTypeLabel(&capsulev1beta2.Tenant{})
@@ -81,6 +81,7 @@ func (r *Manager) syncNamespaceMetadata(ctx context.Context, namespace string, t
 				if len(tnt.Spec.IngressOptions.AllowedClasses.Exact) > 0 {
 					annotations[AvailableIngressClassesAnnotation] = strings.Join(tnt.Spec.IngressOptions.AllowedClasses.Exact, ",")
 				}
+
 				if len(tnt.Spec.IngressOptions.AllowedClasses.Regex) > 0 {
 					annotations[AvailableIngressClassesRegexpAnnotation] = tnt.Spec.IngressOptions.AllowedClasses.Regex
 				}
@@ -90,6 +91,7 @@ func (r *Manager) syncNamespaceMetadata(ctx context.Context, namespace string, t
 				if len(tnt.Spec.StorageClasses.Exact) > 0 {
 					annotations[AvailableStorageClassesAnnotation] = strings.Join(tnt.Spec.StorageClasses.Exact, ",")
 				}
+
 				if len(tnt.Spec.StorageClasses.Regex) > 0 {
 					annotations[AvailableStorageClassesRegexpAnnotation] = tnt.Spec.StorageClasses.Regex
 				}
@@ -99,6 +101,7 @@ func (r *Manager) syncNamespaceMetadata(ctx context.Context, namespace string, t
 				if len(tnt.Spec.ContainerRegistries.Exact) > 0 {
 					annotations[AllowedRegistriesAnnotation] = strings.Join(tnt.Spec.ContainerRegistries.Exact, ",")
 				}
+
 				if len(tnt.Spec.ContainerRegistries.Regex) > 0 {
 					annotations[AllowedRegistriesRegexpAnnotation] = tnt.Spec.ContainerRegistries.Regex
 				}
@@ -139,7 +142,7 @@ func (r *Manager) syncNamespaceMetadata(ctx context.Context, namespace string, t
 			return nil
 		})
 
-		return
+		return conflictErr
 	})
 
 	r.emitEvent(tnt, namespace, res, "Ensuring Namespace metadata", err)
@@ -168,9 +171,8 @@ func (r *Manager) collectNamespaces(ctx context.Context, tenant *capsulev1beta2.
 		err = r.Client.List(ctx, list, client.MatchingFieldsSelector{
 			Selector: fields.OneTermEqualSelector(".metadata.ownerReferences[*].capsule", tenant.GetName()),
 		})
-
 		if err != nil {
-			return
+			return err
 		}
 
 		_, err = controllerutil.CreateOrUpdate(ctx, r.Client, tenant.DeepCopy(), func() error {

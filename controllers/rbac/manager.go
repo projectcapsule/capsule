@@ -31,7 +31,7 @@ type Manager struct {
 	Configuration configuration.Configuration
 }
 
-func (r *Manager) SetupWithManager(ctx context.Context, mgr ctrl.Manager, configurationName string) (err error) {
+func (r *Manager) SetupWithManager(_ context.Context, mgr ctrl.Manager, configurationName string) (err error) {
 	namesPredicate := utils.NamesMatchingPredicate(ProvisionerRoleName, DeleterRoleName)
 
 	crErr := ctrl.NewControllerManagedBy(mgr).

@@ -6,6 +6,7 @@ package resources
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/valyala/fasttemplate"
@@ -122,7 +123,7 @@ func (r *Processor) HandleSection(ctx context.Context, tnt capsulev1beta2.Tenant
 
 	objAnnotations[tenantLabel] = tnt.GetName()
 
-	objLabels[Label] = fmt.Sprintf("%d", resourceIndex)
+	objLabels[Label] = strconv.Itoa(resourceIndex)
 	objLabels[tenantLabel] = tnt.GetName()
 
 	// processed will contain the sets of resources replicated, both for the raw and the Namespaced ones:
@@ -159,7 +160,7 @@ func (r *Processor) HandleSection(ctx context.Context, tnt capsulev1beta2.Tenant
 			}
 
 			objs := unstructured.UnstructuredList{}
-			objs.SetGroupVersionKind(schema.FromAPIVersionAndKind(item.APIVersion, fmt.Sprintf("%sList", item.Kind)))
+			objs.SetGroupVersionKind(schema.FromAPIVersionAndKind(item.APIVersion, (item.Kind + "List")))
 
 			if clientErr := r.client.List(ctx, &objs, client.InNamespace(item.Namespace), client.MatchingLabelsSelector{Selector: itemSelector}); clientErr != nil {
 				log.Error(clientErr, "cannot retrieve object for namespacedItem", keysAndValues...)
@@ -266,21 +267,27 @@ func (r *Processor) createOrUpdate(ctx context.Context, obj *unstructured.Unstru
 		rv := actual.GetResourceVersion()
 
 		actual.SetUnstructuredContent(desired.Object)
+
 		combinedLabels := obj.GetLabels()
 		if combinedLabels == nil {
 			combinedLabels = make(map[string]string)
 		}
+
 		for key, value := range labels {
 			combinedLabels[key] = value
 		}
+
 		actual.SetLabels(combinedLabels)
+
 		combinedAnnotations := obj.GetAnnotations()
 		if combinedAnnotations == nil {
 			combinedAnnotations = make(map[string]string)
 		}
+
 		for key, value := range annotations {
 			combinedAnnotations[key] = value
 		}
+
 		actual.SetAnnotations(combinedAnnotations)
 		actual.SetResourceVersion(rv)
 		actual.SetUID(UID)

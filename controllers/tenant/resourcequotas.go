@@ -65,11 +65,13 @@ func (r *Manager) syncResourceQuotas(ctx context.Context, tenant *capsulev1beta2
 				// Calculating the Resource Budget at Tenant scope just if this is put in place.
 				// Requirement to list ResourceQuota of the current Tenant
 				var tntRequirement *labels.Requirement
+
 				if tntRequirement, scopeErr = labels.NewRequirement(tenantLabel, selection.Equals, []string{tenant.Name}); scopeErr != nil {
 					r.Log.Error(scopeErr, "Cannot build ResourceQuota Tenant requirement")
 				}
 				// Requirement to list ResourceQuota for the current index
 				var indexRequirement *labels.Requirement
+
 				if indexRequirement, scopeErr = labels.NewRequirement(typeLabel, selection.Equals, []string{strconv.Itoa(index)}); scopeErr != nil {
 					r.Log.Error(scopeErr, "Cannot build ResourceQuota index requirement")
 				}
@@ -80,7 +82,7 @@ func (r *Manager) syncResourceQuotas(ctx context.Context, tenant *capsulev1beta2
 				if scopeErr = r.List(ctx, list, &client.ListOptions{LabelSelector: labels.NewSelector().Add(*tntRequirement).Add(*indexRequirement)}); scopeErr != nil {
 					r.Log.Error(scopeErr, "Cannot list ResourceQuota", "tenantFilter", tntRequirement.String(), "indexFilter", indexRequirement.String())
 
-					return
+					return scopeErr
 				}
 				// Iterating over all the options declared for the ResourceQuota,
 				// summing all the used quota across different Namespaces to determinate
@@ -95,6 +97,7 @@ func (r *Manager) syncResourceQuotas(ctx context.Context, tenant *capsulev1beta2
 					for _, item := range list.Items {
 						quantity.Add(item.Status.Used[name])
 					}
+
 					r.Log.Info("Computed " + name.String() + " quota for the whole Tenant is " + quantity.String())
 
 					switch quantity.Cmp(resourceQuota.Hard[name]) {
@@ -124,6 +127,7 @@ func (r *Manager) syncResourceQuotas(ctx context.Context, tenant *capsulev1beta2
 							if list.Items[item].Spec.Hard == nil {
 								list.Items[item].Spec.Hard = map[corev1.ResourceName]resource.Quantity{}
 							}
+
 							list.Items[item].Spec.Hard[name] = resourceQuota.Hard[name]
 
 							for k := range list.Items[item].Spec.Hard {
@@ -133,19 +137,20 @@ func (r *Manager) syncResourceQuotas(ctx context.Context, tenant *capsulev1beta2
 							}
 						}
 					}
+
 					if scopeErr = r.resourceQuotasUpdate(ctx, name, quantity, toKeep, resourceQuota.Hard[name], list.Items...); scopeErr != nil {
 						r.Log.Error(scopeErr, "cannot proceed with outer ResourceQuota")
 
-						return
+						return scopeErr
 					}
 				}
 
-				return
+				return scopeErr
 			})
 		}
 		// Waiting the update of all ResourceQuotas
 		if err = group.Wait(); err != nil {
-			return
+			return err
 		}
 	}
 	// getting requested ResourceQuota keys
@@ -218,12 +223,12 @@ func (r *Manager) syncResourceQuota(ctx context.Context, tenant *capsulev1beta2.
 			return retryErr
 		})
 
-		r.emitEvent(tenant, target.GetNamespace(), res, fmt.Sprintf("Ensuring ResourceQuota %s", target.GetName()), err)
+		r.emitEvent(tenant, target.GetNamespace(), res, ("Ensuring ResourceQuota %s" + target.GetName()), err)
 
 		r.Log.Info("Resource Quota sync result: "+string(res), "name", target.Name, "namespace", target.Namespace)
 
 		if err != nil {
-			return
+			return err
 		}
 	}
 
@@ -254,7 +259,7 @@ func (r *Manager) resourceQuotasUpdate(ctx context.Context, resourceName corev1.
 		group.Go(func() (err error) {
 			found := &corev1.ResourceQuota{}
 			if err = r.Get(ctx, types.NamespacedName{Namespace: rq.Namespace, Name: rq.Name}, found); err != nil {
-				return
+				return err
 			}
 
 			return retry.RetryOnConflict(retry.DefaultBackoff, func() (retryErr error) {
@@ -278,9 +283,11 @@ func (r *Manager) resourceQuotasUpdate(ctx context.Context, resourceName corev1.
 					if actualKey, keyErr := capsulev1beta2.UsedQuotaFor(resourceName); keyErr == nil {
 						found.Annotations[actualKey] = actual.String()
 					}
+
 					if limitKey, keyErr := capsulev1beta2.HardQuotaFor(resourceName); keyErr == nil {
 						found.Annotations[limitKey] = limit.String()
 					}
+
 					// Updating the Resource according to the actual.Cmp result
 					found.Spec.Hard = rq.Spec.Hard
 

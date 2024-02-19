@@ -246,7 +246,7 @@ func (in *Tenant) ConvertTo(raw conversion.Hub) error {
 		dst.Spec.IngressOptions.AllowedHostnames = allowed
 	}
 
-	annotations[capsulev1beta1.DenyWildcard] = fmt.Sprintf("%t", !in.Spec.IngressOptions.AllowWildcardHostnames)
+	annotations[capsulev1beta1.DenyWildcard] = strconv.FormatBool(!in.Spec.IngressOptions.AllowWildcardHostnames)
 
 	if allowed := in.Spec.ContainerRegistries; allowed != nil {
 		dst.Spec.ContainerRegistries = allowed

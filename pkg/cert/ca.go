@@ -32,7 +32,6 @@ type CapsuleCA struct {
 func (c CapsuleCA) CACertificatePem() (b *bytes.Buffer, err error) {
 	var crtBytes []byte
 	crtBytes, err = x509.CreateCertificate(rand.Reader, c.certificate, c.certificate, &c.key.PublicKey, c.key)
-
 	if err != nil {
 		return
 	}
@@ -148,7 +147,6 @@ func NewCertificateAuthorityFromBytes(certBytes, keyBytes []byte) (*CapsuleCA, e
 func (c *CapsuleCA) GenerateCertificate(opts CertificateOptions) (certificatePem *bytes.Buffer, certificateKey *bytes.Buffer, err error) {
 	var certPrivKey *rsa.PrivateKey
 	certPrivKey, err = rsa.GenerateKey(rand.Reader, 4096)
-
 	if err != nil {
 		return nil, nil, err
 	}
@@ -173,7 +171,6 @@ func (c *CapsuleCA) GenerateCertificate(opts CertificateOptions) (certificatePem
 
 	var certBytes []byte
 	certBytes, err = x509.CreateCertificate(rand.Reader, cert, c.certificate, &certPrivKey.PublicKey, c.key)
-
 	if err != nil {
 		return nil, nil, err
 	}
@@ -183,7 +180,6 @@ func (c *CapsuleCA) GenerateCertificate(opts CertificateOptions) (certificatePem
 		Type:  "CERTIFICATE",
 		Bytes: certBytes,
 	})
-
 	if err != nil {
 		return
 	}

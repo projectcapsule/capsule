@@ -311,7 +311,7 @@ golangci-lint: ## Download golangci-lint locally if necessary.
 # Linting code as PR is expecting
 .PHONY: golint
 golint: golangci-lint
-	$(GOLANGCI_LINT) run -c .golangci.yml
+	$(GOLANGCI_LINT) run --fix -c .golangci.yml
 
 # Running e2e tests in a KinD instance
 .PHONY: e2e

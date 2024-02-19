@@ -30,14 +30,14 @@ func UserMetadataHandler(configuration configuration.Configuration, ver *version
 	}
 }
 
-func (r *userMetadataHandler) OnCreate(client client.Client, decoder *admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
-	return func(ctx context.Context, req admission.Request) *admission.Response {
+func (r *userMetadataHandler) OnCreate(client.Client, *admission.Decoder, record.EventRecorder) capsulewebhook.Func {
+	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (r *userMetadataHandler) OnDelete(client client.Client, decoder *admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
-	return func(ctx context.Context, req admission.Request) *admission.Response {
+func (r *userMetadataHandler) OnDelete(client.Client, *admission.Decoder, record.EventRecorder) capsulewebhook.Func {
+	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
@@ -78,8 +78,8 @@ func (r *userMetadataHandler) getForbiddenNodeAnnotations(node *corev1.Node) map
 	return forbiddenNodeAnnotations
 }
 
-func (r *userMetadataHandler) OnUpdate(client client.Client, decoder *admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
-	return func(ctx context.Context, req admission.Request) *admission.Response {
+func (r *userMetadataHandler) OnUpdate(_ client.Client, decoder *admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
+	return func(_ context.Context, req admission.Request) *admission.Response {
 		nodeWebhookSupported, _ := utils.NodeWebhookSupported(r.version)
 
 		if !nodeWebhookSupported {

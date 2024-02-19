@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"hash/fnv"
+	"strconv"
 	"strings"
 
 	"golang.org/x/sync/errgroup"
@@ -61,7 +62,7 @@ func (r *Manager) syncRoleBindings(ctx context.Context, tenant *capsulev1beta2.T
 			_, _ = h.Write([]byte(sub.Kind + sub.Name))
 		}
 
-		return fmt.Sprintf("%x", h.Sum64())
+		return strconv.FormatUint(h.Sum64(), 16)
 	}
 	// getting requested Role Binding keys
 	keys := make([]string, 0, len(tenant.Spec.Owners))
@@ -95,15 +96,15 @@ func (r *Manager) syncAdditionalRoleBinding(ctx context.Context, tenant *capsule
 	var tenantLabel, roleBindingLabel string
 
 	if tenantLabel, err = utils.GetTypeLabel(&capsulev1beta2.Tenant{}); err != nil {
-		return
+		return err
 	}
 
 	if roleBindingLabel, err = utils.GetTypeLabel(&rbacv1.RoleBinding{}); err != nil {
-		return
+		return err
 	}
 
 	if err = r.pruningResources(ctx, ns, keys, &rbacv1.RoleBinding{}); err != nil {
-		return
+		return err
 	}
 
 	var roleBindings []api.AdditionalRoleBindingsSpec
@@ -144,16 +145,16 @@ func (r *Manager) syncAdditionalRoleBinding(ctx context.Context, tenant *capsule
 			return controllerutil.SetControllerReference(tenant, target, r.Client.Scheme())
 		})
 
-		r.emitEvent(tenant, target.GetNamespace(), res, fmt.Sprintf("Ensuring RoleBinding %s", target.GetName()), err)
+		r.emitEvent(tenant, target.GetNamespace(), res, ("Ensuring RoleBinding " + target.GetName()), err)
 
 		if err != nil {
 			r.Log.Error(err, "Cannot sync RoleBinding")
 		}
 
-		r.Log.Info(fmt.Sprintf("RoleBinding sync result: %s", string(res)), "name", target.Name, "namespace", target.Namespace)
+		r.Log.Info(("RoleBinding sync result: " + string(res)), "name", target.Name, "namespace", target.Namespace)
 
 		if err != nil {
-			return
+			return err
 		}
 	}
 

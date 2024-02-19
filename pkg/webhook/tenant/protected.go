@@ -6,7 +6,6 @@ package tenant
 import (
 	"context"
 
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -28,11 +27,10 @@ func (h *protectedHandler) OnCreate(client.Client, *admission.Decoder, record.Ev
 	}
 }
 
-func (h *protectedHandler) OnDelete(clt client.Client, decoder *admission.Decoder, _ record.EventRecorder) capsulewebhook.Func {
-	return func(ctx context.Context, req admission.Request) *admission.Response {
+func (h *protectedHandler) OnDelete(_ client.Client, decoder *admission.Decoder, _ record.EventRecorder) capsulewebhook.Func {
+	return func(_ context.Context, req admission.Request) *admission.Response {
 		tenant := &capsulev1beta2.Tenant{}
-
-		if err := clt.Get(ctx, types.NamespacedName{Name: req.AdmissionRequest.Name}, tenant); err != nil {
+		if err := decoder.Decode(req, tenant); err != nil {
 			return utils.ErroredResponse(err)
 		}
 

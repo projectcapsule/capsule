@@ -69,6 +69,7 @@ func (r *Manager) syncLimitRange(ctx context.Context, tenant *capsulev1beta2.Ten
 			if labels == nil {
 				labels = map[string]string{}
 			}
+
 			labels[tenantLabel] = tenant.Name
 			labels[limitRangeLabel] = strconv.Itoa(i)
 
@@ -78,7 +79,7 @@ func (r *Manager) syncLimitRange(ctx context.Context, tenant *capsulev1beta2.Ten
 			return controllerutil.SetControllerReference(tenant, target, r.Client.Scheme())
 		})
 
-		r.emitEvent(tenant, target.GetNamespace(), res, fmt.Sprintf("Ensuring LimitRange %s", target.GetName()), err)
+		r.emitEvent(tenant, target.GetNamespace(), res, ("Ensuring LimitRange " + target.GetName()), err)
 
 		r.Log.Info("LimitRange sync result: "+string(res), "name", target.Name, "namespace", target.Namespace)
 

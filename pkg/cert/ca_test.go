@@ -68,8 +68,8 @@ func TestCapsuleCa_GenerateCertificate(t *testing.T) {
 
 			assert.Equal(t, e.Unix(), cert.NotAfter.Unix())
 
-			for _, i := range c.DNSNames {
-				assert.Contains(t, c.DNSNames, i)
+			for _, i := range cert.DNSNames {
+				assert.Contains(t, cert.DNSNames, i)
 			}
 
 			_, err = tls.X509KeyPair(crt.Bytes(), key.Bytes())

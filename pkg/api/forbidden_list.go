@@ -58,18 +58,17 @@ func NewForbiddenError(key string, forbiddenSpec ForbiddenListSpec) error {
 	}
 }
 
-//nolint:predeclared
-func (f *ForbiddenError) appendForbiddenError() (append string) {
-	append += "Forbidden are "
+func (f *ForbiddenError) appendForbiddenError() (forbidden string) {
+	forbidden += "Forbidden are "
 	if len(f.spec.Exact) > 0 {
-		append += fmt.Sprintf("one of the following (%s)", strings.Join(f.spec.Exact, ", "))
+		forbidden += fmt.Sprintf("one of the following (%s)", strings.Join(f.spec.Exact, ", "))
 		if len(f.spec.Regex) > 0 {
-			append += " or "
+			forbidden += " or "
 		}
 	}
 
 	if len(f.spec.Regex) > 0 {
-		append += fmt.Sprintf("matching the regex %s", f.spec.Regex)
+		forbidden += fmt.Sprintf("matching the regex %s", f.spec.Regex)
 	}
 
 	return

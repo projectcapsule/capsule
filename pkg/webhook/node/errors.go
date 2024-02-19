@@ -10,18 +10,17 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/pkg/api"
 )
 
-//nolint:predeclared
-func appendForbiddenError(spec *capsulev1beta2.ForbiddenListSpec) (append string) {
-	append += "Forbidden are "
+func appendForbiddenError(spec *capsulev1beta2.ForbiddenListSpec) (forbidden string) {
+	forbidden += "Forbidden are "
 	if len(spec.Exact) > 0 {
-		append += fmt.Sprintf("one of the following (%s)", strings.Join(spec.Exact, ", "))
+		forbidden += fmt.Sprintf("one of the following (%s)", strings.Join(spec.Exact, ", "))
 		if len(spec.Regex) > 0 {
-			append += " or "
+			forbidden += " or "
 		}
 	}
 
 	if len(spec.Regex) > 0 {
-		append += fmt.Sprintf("matching the regex %s", spec.Regex)
+		forbidden += fmt.Sprintf("matching the regex %s", spec.Regex)
 	}
 
 	return

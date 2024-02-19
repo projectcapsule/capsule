@@ -23,7 +23,7 @@ func (r *Manager) pruningResources(ctx context.Context, ns string, keys []string
 	var capsuleLabel string
 
 	if capsuleLabel, err = capsulev1beta2.GetTypeLabel(obj); err != nil {
-		return
+		return err
 	}
 
 	selector := labels.NewSelector()
@@ -31,7 +31,7 @@ func (r *Manager) pruningResources(ctx context.Context, ns string, keys []string
 	var exists *labels.Requirement
 
 	if exists, err = labels.NewRequirement(capsuleLabel, selection.Exists, []string{}); err != nil {
-		return
+		return err
 	}
 
 	selector = selector.Add(*exists)

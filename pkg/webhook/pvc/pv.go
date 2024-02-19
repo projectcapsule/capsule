@@ -34,7 +34,7 @@ func PersistentVolumeReuse() capsulewebhook.Handler {
 	}
 }
 
-func (p PV) OnCreate(client client.Client, decoder *admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
+func (p PV) OnCreate(client client.Client, decoder *admission.Decoder, _ record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		pvc := corev1.PersistentVolumeClaim{}
 		if err := decoder.Decode(req, &pvc); err != nil {
@@ -62,7 +62,7 @@ func (p PV) OnCreate(client client.Client, decoder *admission.Decoder, recorder 
 		pv := corev1.PersistentVolume{}
 		if err = client.Get(ctx, types.NamespacedName{Name: pvc.Spec.VolumeName}, &pv); err != nil {
 			if errors.IsNotFound(err) {
-				err = errors.New("cannot create a PVC referring to a not yet existing PV")
+				err = fmt.Errorf("cannot create a PVC referring to a not yet existing PV")
 			}
 
 			return utils.ErroredResponse(err)

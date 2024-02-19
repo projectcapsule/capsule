@@ -6,6 +6,7 @@ package tenant
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"golang.org/x/sync/errgroup"
@@ -78,7 +79,7 @@ func (r *Manager) syncCustomResourceQuotaUsages(ctx context.Context, tenant *cap
 					tnt.Annotations = make(map[string]string)
 				}
 
-				tnt.Annotations[capsulev1beta2.UsedAnnotationForResource(gvk)] = fmt.Sprintf("%d", used)
+				tnt.Annotations[capsulev1beta2.UsedAnnotationForResource(gvk)] = strconv.Itoa(used)
 
 				return r.Client.Update(ctx, tnt)
 			})
@@ -98,7 +99,7 @@ func (r *Manager) syncCustomResourceQuotaUsages(ctx context.Context, tenant *cap
 				var list *unstructured.UnstructuredList
 
 				list, scopeErr = dynamicClient.Resource(schema.GroupVersionResource{Group: res.group, Version: res.version, Resource: res.kind}).List(ctx, metav1.ListOptions{
-					FieldSelector: fmt.Sprintf("metadata.namespace==%s", ns),
+					FieldSelector: ("metadata.namespace==" + ns),
 				})
 				if scopeErr != nil {
 					return scopeErr
