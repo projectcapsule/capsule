@@ -71,7 +71,7 @@ func (h *cordoningHandler) handler(ctx context.Context, clt client.Client, req a
 }
 
 func (h *cordoningHandler) OnCreate(client.Client, *admission.Decoder, record.EventRecorder) capsulewebhook.Func {
-	return func(ctx context.Context, req admission.Request) *admission.Response {
+	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }

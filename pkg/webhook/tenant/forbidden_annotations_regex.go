@@ -50,7 +50,7 @@ func (h *forbiddenAnnotationsRegexHandler) validate(decoder *admission.Decoder, 
 }
 
 func (h *forbiddenAnnotationsRegexHandler) OnCreate(_ client.Client, decoder *admission.Decoder, _ record.EventRecorder) capsulewebhook.Func {
-	return func(ctx context.Context, req admission.Request) *admission.Response {
+	return func(_ context.Context, req admission.Request) *admission.Response {
 		if err := h.validate(decoder, req); err != nil {
 			return err
 		}
@@ -65,8 +65,8 @@ func (h *forbiddenAnnotationsRegexHandler) OnDelete(client.Client, *admission.De
 	}
 }
 
-func (h *forbiddenAnnotationsRegexHandler) OnUpdate(client client.Client, decoder *admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
-	return func(ctx context.Context, req admission.Request) *admission.Response {
+func (h *forbiddenAnnotationsRegexHandler) OnUpdate(_ client.Client, decoder *admission.Decoder, _ record.EventRecorder) capsulewebhook.Func {
+	return func(_ context.Context, req admission.Request) *admission.Response {
 		if response := h.validate(decoder, req); response != nil {
 			return response
 		}

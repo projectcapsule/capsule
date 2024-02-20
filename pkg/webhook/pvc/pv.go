@@ -34,7 +34,7 @@ func PersistentVolumeReuse() capsulewebhook.Handler {
 	}
 }
 
-func (p PV) OnCreate(client client.Client, decoder *admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
+func (p PV) OnCreate(client client.Client, decoder *admission.Decoder, _ record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		pvc := corev1.PersistentVolumeClaim{}
 		if err := decoder.Decode(req, &pvc); err != nil {

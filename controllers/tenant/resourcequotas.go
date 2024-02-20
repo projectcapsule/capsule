@@ -38,6 +38,8 @@ import (
 // the mutateFn along with the CreateOrUpdate to don't perform the update since resources are identical.
 //
 // In case of Namespace-scoped Resource Budget, we're just replicating the resources across all registered Namespaces.
+
+//nolint:nakedret
 func (r *Manager) syncResourceQuotas(ctx context.Context, tenant *capsulev1beta2.Tenant) (err error) { //nolint:gocognit
 	// getting ResourceQuota labels for the mutateFn
 	var tenantLabel, typeLabel string
@@ -65,11 +67,13 @@ func (r *Manager) syncResourceQuotas(ctx context.Context, tenant *capsulev1beta2
 				// Calculating the Resource Budget at Tenant scope just if this is put in place.
 				// Requirement to list ResourceQuota of the current Tenant
 				var tntRequirement *labels.Requirement
+
 				if tntRequirement, scopeErr = labels.NewRequirement(tenantLabel, selection.Equals, []string{tenant.Name}); scopeErr != nil {
 					r.Log.Error(scopeErr, "Cannot build ResourceQuota Tenant requirement")
 				}
 				// Requirement to list ResourceQuota for the current index
 				var indexRequirement *labels.Requirement
+
 				if indexRequirement, scopeErr = labels.NewRequirement(typeLabel, selection.Equals, []string{strconv.Itoa(index)}); scopeErr != nil {
 					r.Log.Error(scopeErr, "Cannot build ResourceQuota index requirement")
 				}
@@ -80,7 +84,7 @@ func (r *Manager) syncResourceQuotas(ctx context.Context, tenant *capsulev1beta2
 				if scopeErr = r.List(ctx, list, &client.ListOptions{LabelSelector: labels.NewSelector().Add(*tntRequirement).Add(*indexRequirement)}); scopeErr != nil {
 					r.Log.Error(scopeErr, "Cannot list ResourceQuota", "tenantFilter", tntRequirement.String(), "indexFilter", indexRequirement.String())
 
-					return
+					return scopeErr
 				}
 				// Iterating over all the options declared for the ResourceQuota,
 				// summing all the used quota across different Namespaces to determinate
@@ -95,6 +99,7 @@ func (r *Manager) syncResourceQuotas(ctx context.Context, tenant *capsulev1beta2
 					for _, item := range list.Items {
 						quantity.Add(item.Status.Used[name])
 					}
+
 					r.Log.Info("Computed " + name.String() + " quota for the whole Tenant is " + quantity.String())
 
 					switch quantity.Cmp(resourceQuota.Hard[name]) {
@@ -124,6 +129,7 @@ func (r *Manager) syncResourceQuotas(ctx context.Context, tenant *capsulev1beta2
 							if list.Items[item].Spec.Hard == nil {
 								list.Items[item].Spec.Hard = map[corev1.ResourceName]resource.Quantity{}
 							}
+
 							list.Items[item].Spec.Hard[name] = resourceQuota.Hard[name]
 
 							for k := range list.Items[item].Spec.Hard {
@@ -133,6 +139,7 @@ func (r *Manager) syncResourceQuotas(ctx context.Context, tenant *capsulev1beta2
 							}
 						}
 					}
+
 					if scopeErr = r.resourceQuotasUpdate(ctx, name, quantity, toKeep, resourceQuota.Hard[name], list.Items...); scopeErr != nil {
 						r.Log.Error(scopeErr, "cannot proceed with outer ResourceQuota")
 
@@ -168,6 +175,7 @@ func (r *Manager) syncResourceQuotas(ctx context.Context, tenant *capsulev1beta2
 	return group.Wait()
 }
 
+//nolint:nakedret
 func (r *Manager) syncResourceQuota(ctx context.Context, tenant *capsulev1beta2.Tenant, namespace string, keys []string) (err error) {
 	// getting ResourceQuota labels for the mutateFn
 	var tenantLabel, typeLabel string
@@ -207,6 +215,7 @@ func (r *Manager) syncResourceQuota(ctx context.Context, tenant *capsulev1beta2.
 				target.SetLabels(targetLabels)
 				target.Spec.Scopes = resQuota.Scopes
 				target.Spec.ScopeSelector = resQuota.ScopeSelector
+
 				// In case of Namespace scope for the ResourceQuota we can easily apply the bare specification
 				if tenant.Spec.ResourceQuota.Scope == api.ResourceQuotaScopeNamespace {
 					target.Spec.Hard = resQuota.Hard
@@ -278,6 +287,7 @@ func (r *Manager) resourceQuotasUpdate(ctx context.Context, resourceName corev1.
 					if actualKey, keyErr := capsulev1beta2.UsedQuotaFor(resourceName); keyErr == nil {
 						found.Annotations[actualKey] = actual.String()
 					}
+
 					if limitKey, keyErr := capsulev1beta2.HardQuotaFor(resourceName); keyErr == nil {
 						found.Annotations[limitKey] = limit.String()
 					}
