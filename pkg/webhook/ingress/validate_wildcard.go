@@ -31,8 +31,8 @@ func (h *wildcard) OnCreate(client client.Client, decoder *admission.Decoder, re
 	}
 }
 
-func (h *wildcard) OnDelete(client client.Client, decoder *admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
-	return func(ctx context.Context, req admission.Request) *admission.Response {
+func (h *wildcard) OnDelete(client.Client, *admission.Decoder, record.EventRecorder) capsulewebhook.Func {
+	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }

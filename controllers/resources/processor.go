@@ -264,23 +264,28 @@ func (r *Processor) createOrUpdate(ctx context.Context, obj *unstructured.Unstru
 	_, err = controllerutil.CreateOrUpdate(ctx, r.client, actual, func() error {
 		UID := actual.GetUID()
 		rv := actual.GetResourceVersion()
-
 		actual.SetUnstructuredContent(desired.Object)
+
 		combinedLabels := obj.GetLabels()
 		if combinedLabels == nil {
 			combinedLabels = make(map[string]string)
 		}
+
 		for key, value := range labels {
 			combinedLabels[key] = value
 		}
+
 		actual.SetLabels(combinedLabels)
+
 		combinedAnnotations := obj.GetAnnotations()
 		if combinedAnnotations == nil {
 			combinedAnnotations = make(map[string]string)
 		}
+
 		for key, value := range annotations {
 			combinedAnnotations[key] = value
 		}
+
 		actual.SetAnnotations(combinedAnnotations)
 		actual.SetResourceVersion(rv)
 		actual.SetUID(UID)

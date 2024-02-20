@@ -41,7 +41,7 @@ func (h *ingressClassRegexHandler) validate(decoder *admission.Decoder, req admi
 }
 
 func (h *ingressClassRegexHandler) OnCreate(_ client.Client, decoder *admission.Decoder, _ record.EventRecorder) capsulewebhook.Func {
-	return func(ctx context.Context, req admission.Request) *admission.Response {
+	return func(_ context.Context, req admission.Request) *admission.Response {
 		if response := h.validate(decoder, req); response != nil {
 			return response
 		}
@@ -57,7 +57,7 @@ func (h *ingressClassRegexHandler) OnDelete(client.Client, *admission.Decoder, r
 }
 
 func (h *ingressClassRegexHandler) OnUpdate(_ client.Client, decoder *admission.Decoder, _ record.EventRecorder) capsulewebhook.Func {
-	return func(ctx context.Context, req admission.Request) *admission.Response {
+	return func(_ context.Context, req admission.Request) *admission.Response {
 		if err := h.validate(decoder, req); err != nil {
 			return err
 		}

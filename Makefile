@@ -242,7 +242,7 @@ apidocs-gen: ## Download crdoc locally if necessary.
 	$(call go-install-tool,$(APIDOCS_GEN),fybrik.io/crdoc@$(APIDOCS_GEN_VERSION))
 
 GINKGO         := $(shell pwd)/bin/ginkgo
-GINGKO_VERSION := v2.13.2
+GINGKO_VERSION := v2.15.0
 ginkgo: ## Download ginkgo locally if necessary.
 	$(call go-install-tool,$(GINKGO),github.com/onsi/ginkgo/v2/ginkgo@$(GINGKO_VERSION))
 
@@ -304,8 +304,9 @@ goimports:
 	goimports -w -l -local "github.com/projectcapsule/capsule" .
 
 GOLANGCI_LINT = $(shell pwd)/bin/golangci-lint
+GOLANGCI_LINT_VERSION = v1.56.2
 golangci-lint: ## Download golangci-lint locally if necessary.
-	$(call go-install-tool,$(GOLANGCI_LINT),github.com/golangci/golangci-lint/cmd/golangci-lint@v1.51.2)
+	$(call go-install-tool,$(GOLANGCI_LINT),github.com/golangci/golangci-lint/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION))
 
 # Linting code as PR is expecting
 .PHONY: golint

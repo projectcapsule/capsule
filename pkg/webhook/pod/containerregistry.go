@@ -30,7 +30,7 @@ func (h *containerRegistryHandler) OnCreate(c client.Client, decoder *admission.
 }
 
 func (h *containerRegistryHandler) OnDelete(client.Client, *admission.Decoder, record.EventRecorder) capsulewebhook.Func {
-	return func(ctx context.Context, req admission.Request) *admission.Response {
+	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }

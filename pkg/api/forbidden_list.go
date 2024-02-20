@@ -58,7 +58,7 @@ func NewForbiddenError(key string, forbiddenSpec ForbiddenListSpec) error {
 	}
 }
 
-//nolint:predeclared
+//nolint:predeclared,revive
 func (f *ForbiddenError) appendForbiddenError() (append string) {
 	append += "Forbidden are "
 	if len(f.spec.Exact) > 0 {

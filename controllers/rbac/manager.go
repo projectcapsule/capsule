@@ -31,6 +31,7 @@ type Manager struct {
 	Configuration configuration.Configuration
 }
 
+//nolint:revive
 func (r *Manager) SetupWithManager(ctx context.Context, mgr ctrl.Manager, configurationName string) (err error) {
 	namesPredicate := utils.NamesMatchingPredicate(ProvisionerRoleName, DeleterRoleName)
 

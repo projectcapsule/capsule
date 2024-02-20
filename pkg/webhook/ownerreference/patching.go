@@ -42,14 +42,14 @@ func (h *handler) OnCreate(client client.Client, decoder *admission.Decoder, rec
 	}
 }
 
-func (h *handler) OnDelete(client client.Client, decoder *admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
-	return func(ctx context.Context, req admission.Request) *admission.Response {
+func (h *handler) OnDelete(client.Client, *admission.Decoder, record.EventRecorder) capsulewebhook.Func {
+	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (h *handler) OnUpdate(client client.Client, decoder *admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
-	return func(ctx context.Context, req admission.Request) *admission.Response {
+func (h *handler) OnUpdate(_ client.Client, decoder *admission.Decoder, _ record.EventRecorder) capsulewebhook.Func {
+	return func(_ context.Context, req admission.Request) *admission.Response {
 		oldNs := &corev1.Namespace{}
 		if err := decoder.DecodeRaw(req.OldObject, oldNs); err != nil {
 			return utils.ErroredResponse(err)

@@ -85,13 +85,13 @@ func (h *priorityClass) OnCreate(c client.Client, decoder *admission.Decoder, re
 }
 
 func (h *priorityClass) OnDelete(client.Client, *admission.Decoder, record.EventRecorder) capsulewebhook.Func {
-	return func(ctx context.Context, req admission.Request) *admission.Response {
+	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
 func (h *priorityClass) OnUpdate(client.Client, *admission.Decoder, record.EventRecorder) capsulewebhook.Func {
-	return func(ctx context.Context, req admission.Request) *admission.Response {
+	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }

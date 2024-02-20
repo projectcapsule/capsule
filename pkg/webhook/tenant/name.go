@@ -23,7 +23,7 @@ func NameHandler() capsulewebhook.Handler {
 }
 
 func (h *nameHandler) OnCreate(_ client.Client, decoder *admission.Decoder, _ record.EventRecorder) capsulewebhook.Func {
-	return func(ctx context.Context, req admission.Request) *admission.Response {
+	return func(_ context.Context, req admission.Request) *admission.Response {
 		tenant := &capsulev1beta2.Tenant{}
 		if err := decoder.Decode(req, tenant); err != nil {
 			return utils.ErroredResponse(err)
@@ -47,7 +47,7 @@ func (h *nameHandler) OnDelete(client.Client, *admission.Decoder, record.EventRe
 }
 
 func (h *nameHandler) OnUpdate(client.Client, *admission.Decoder, record.EventRecorder) capsulewebhook.Func {
-	return func(ctx context.Context, req admission.Request) *admission.Response {
+	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }

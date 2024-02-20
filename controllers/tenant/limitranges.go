@@ -69,6 +69,7 @@ func (r *Manager) syncLimitRange(ctx context.Context, tenant *capsulev1beta2.Ten
 			if labels == nil {
 				labels = map[string]string{}
 			}
+
 			labels[tenantLabel] = tenant.Name
 			labels[limitRangeLabel] = strconv.Itoa(i)
 

@@ -41,7 +41,7 @@ func (h *hostnameRegexHandler) validate(decoder *admission.Decoder, req admissio
 }
 
 func (h *hostnameRegexHandler) OnCreate(_ client.Client, decoder *admission.Decoder, _ record.EventRecorder) capsulewebhook.Func {
-	return func(ctx context.Context, req admission.Request) *admission.Response {
+	return func(_ context.Context, req admission.Request) *admission.Response {
 		if response := h.validate(decoder, req); response != nil {
 			return response
 		}
@@ -57,7 +57,7 @@ func (h *hostnameRegexHandler) OnDelete(client.Client, *admission.Decoder, recor
 }
 
 func (h *hostnameRegexHandler) OnUpdate(_ client.Client, decoder *admission.Decoder, _ record.EventRecorder) capsulewebhook.Func {
-	return func(ctx context.Context, req admission.Request) *admission.Response {
+	return func(_ context.Context, req admission.Request) *admission.Response {
 		if err := h.validate(decoder, req); err != nil {
 			return err
 		}
