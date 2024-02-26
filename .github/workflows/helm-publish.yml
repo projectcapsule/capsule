@@ -2,7 +2,8 @@ name: Publish charts
 permissions: read-all
 on:
   push:
-    tags: [ "helm-v*" ]
+    tags:
+      - 'v*'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -27,6 +28,7 @@ jobs:
           token: "${{ secrets.HELM_CHARTS_PUSH_TOKEN }}"
           linting: off
           chart_version: ${{ steps.extract_version.outputs.version }}
+          app_version: ${{ steps.extract_version.outputs.version }}
           charts_dir: charts
           charts_url: https://${{ github.repository_owner }}.github.io/charts
           owner: ${{ github.repository_owner }}
@@ -58,6 +60,7 @@ jobs:
           repository: ${{ github.repository_owner }}/charts
           name: "capsule"
           version: ${{ steps.extract_version.outputs.version }}
+          app-version: ${{ steps.extract_version.outputs.version }}
           registry-username: ${{ github.actor }}
           registry-password: ${{ secrets.GITHUB_TOKEN }}
           update-dependencies: 'true' # Defaults to false
