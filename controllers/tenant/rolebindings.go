@@ -91,6 +91,7 @@ func (r *Manager) syncRoleBindings(ctx context.Context, tenant *capsulev1beta2.T
 	return group.Wait()
 }
 
+//nolint:nakedret
 func (r *Manager) syncAdditionalRoleBinding(ctx context.Context, tenant *capsulev1beta2.Tenant, ns string, keys []string, hashFn func(binding api.AdditionalRoleBindingsSpec) string) (err error) {
 	var tenantLabel, roleBindingLabel string
 
@@ -128,10 +129,12 @@ func (r *Manager) syncAdditionalRoleBinding(ctx context.Context, tenant *capsule
 
 		var res controllerutil.OperationResult
 		res, err = controllerutil.CreateOrUpdate(ctx, r.Client, target, func() error {
-			target.ObjectMeta.Labels = map[string]string{
-				tenantLabel:      tenant.Name,
-				roleBindingLabel: roleBindingHashLabel,
+			if target.ObjectMeta.Labels == nil {
+				target.ObjectMeta.Labels = map[string]string{}
 			}
+
+			target.ObjectMeta.Labels[tenantLabel] = tenant.Name
+			target.ObjectMeta.Labels[roleBindingLabel] = roleBindingHashLabel
 			target.RoleRef = rbacv1.RoleRef{
 				APIGroup: rbacv1.GroupName,
 				Kind:     "ClusterRole",

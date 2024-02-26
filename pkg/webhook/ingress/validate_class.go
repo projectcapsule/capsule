@@ -45,7 +45,7 @@ func (r *class) OnUpdate(client client.Client, decoder *admission.Decoder, recor
 }
 
 func (r *class) OnDelete(client.Client, *admission.Decoder, record.EventRecorder) capsulewebhook.Func {
-	return func(ctx context.Context, req admission.Request) *admission.Response {
+	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }

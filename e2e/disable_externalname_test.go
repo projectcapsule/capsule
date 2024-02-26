@@ -13,7 +13,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api"
@@ -33,7 +33,7 @@ var _ = Describe("creating an ExternalName service when it is disabled for Tenan
 			},
 			ServiceOptions: &api.ServiceOptions{
 				AllowedServices: &api.AllowedServices{
-					ExternalName: pointer.Bool(false),
+					ExternalName: ptr.To(false),
 				},
 			},
 		},

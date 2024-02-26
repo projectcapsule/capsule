@@ -28,7 +28,7 @@ func (h *protectedHandler) OnCreate(client.Client, *admission.Decoder, record.Ev
 	}
 }
 
-func (h *protectedHandler) OnDelete(clt client.Client, decoder *admission.Decoder, _ record.EventRecorder) capsulewebhook.Func {
+func (h *protectedHandler) OnDelete(clt client.Client, _ *admission.Decoder, _ record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		tenant := &capsulev1beta2.Tenant{}
 

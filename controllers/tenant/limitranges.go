@@ -55,7 +55,7 @@ func (r *Manager) syncLimitRange(ctx context.Context, tenant *capsulev1beta2.Ten
 		return err
 	}
 
-	for i, spec := range tenant.Spec.LimitRanges.Items {
+	for i, spec := range tenant.Spec.LimitRanges.Items { //nolint:dupl
 		target := &corev1.LimitRange{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      fmt.Sprintf("capsule-%s-%d", tenant.Name, i),
@@ -65,10 +65,15 @@ func (r *Manager) syncLimitRange(ctx context.Context, tenant *capsulev1beta2.Ten
 
 		var res controllerutil.OperationResult
 		res, err = controllerutil.CreateOrUpdate(ctx, r.Client, target, func() (err error) {
-			target.ObjectMeta.Labels = map[string]string{
-				tenantLabel:     tenant.Name,
-				limitRangeLabel: strconv.Itoa(i),
+			labels := target.GetLabels()
+			if labels == nil {
+				labels = map[string]string{}
 			}
+
+			labels[tenantLabel] = tenant.Name
+			labels[limitRangeLabel] = strconv.Itoa(i)
+
+			target.SetLabels(labels)
 			target.Spec = spec
 
 			return controllerutil.SetControllerReference(tenant, target, r.Client.Scheme())

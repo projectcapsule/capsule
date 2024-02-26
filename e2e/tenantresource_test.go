@@ -19,7 +19,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
@@ -77,7 +77,7 @@ var _ = Describe("Creating a TenantResource object", func() {
 		},
 		Spec: capsulev1beta2.TenantResourceSpec{
 			ResyncPeriod:    metav1.Duration{Duration: time.Minute},
-			PruningOnDelete: pointer.Bool(true),
+			PruningOnDelete: ptr.To(true),
 			Resources: []capsulev1beta2.ResourceSpec{
 				{
 					NamespaceSelector: &metav1.LabelSelector{
@@ -371,7 +371,7 @@ var _ = Describe("Creating a TenantResource object", func() {
 			Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: tr.GetName(), Namespace: "solar-system"}, tr)).ToNot(HaveOccurred())
 			Expect(*tr.Spec.PruningOnDelete).Should(BeTrue())
 
-			tr.Spec.PruningOnDelete = pointer.Bool(false)
+			tr.Spec.PruningOnDelete = ptr.To(false)
 
 			Expect(k8sClient.Update(context.TODO(), tr)).ToNot(HaveOccurred())
 

@@ -10,7 +10,7 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/pkg/api"
 )
 
-//nolint:predeclared
+//nolint:predeclared,revive
 func appendForbiddenError(spec *capsulev1beta2.ForbiddenListSpec) (append string) {
 	append += "Forbidden are "
 	if len(spec.Exact) > 0 {
