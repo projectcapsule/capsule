@@ -50,6 +50,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/webhook/pod"
 	"github.com/projectcapsule/capsule/pkg/webhook/pvc"
 	"github.com/projectcapsule/capsule/pkg/webhook/route"
+	"github.com/projectcapsule/capsule/pkg/webhook/scheduling"
 	"github.com/projectcapsule/capsule/pkg/webhook/service"
 	"github.com/projectcapsule/capsule/pkg/webhook/tenant"
 	tntresource "github.com/projectcapsule/capsule/pkg/webhook/tenantresource"
@@ -231,7 +232,7 @@ func main() {
 		route.Cordoning(tenant.CordoningHandler(cfg), tenant.ResourceCounterHandler(manager.GetClient())),
 		route.Node(utils.InCapsuleGroups(cfg, node.UserMetadataHandler(cfg, kubeVersion))),
 		route.Defaults(defaults.Handler(cfg, kubeVersion)),
-		route.Scheduling(defaults.Handler(cfg, kubeVersion)),
+		route.Scheduling(scheduling.Handler(cfg, kubeVersion)),
 	)
 
 	nodeWebhookSupported, _ := utils.NodeWebhookSupported(kubeVersion)

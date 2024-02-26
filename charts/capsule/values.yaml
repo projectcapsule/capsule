@@ -224,6 +224,12 @@ webhooks:
           operator: Exists
   nodes:
     failurePolicy: Fail
+  scheduling:
+    failurePolicy: Fail
+    namespaceSelector:
+      matchExpressions:
+        - key: capsule.clastix.io/tenant
+          operator: Exists
   defaults:
     ingress:
       failurePolicy: Fail

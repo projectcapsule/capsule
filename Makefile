@@ -154,7 +154,8 @@ dev-setup:
 		    {'op': 'replace', 'path': '/webhooks/0/clientConfig', 'value':{'url':\"$${WEBHOOK_URL}/defaults\",'caBundle':\"$${CA_BUNDLE}\"}},\
 			{'op': 'replace', 'path': '/webhooks/1/clientConfig', 'value':{'url':\"$${WEBHOOK_URL}/defaults\",'caBundle':\"$${CA_BUNDLE}\"}},\
 			{'op': 'replace', 'path': '/webhooks/2/clientConfig', 'value':{'url':\"$${WEBHOOK_URL}/defaults\",'caBundle':\"$${CA_BUNDLE}\"}},\
-			{'op': 'replace', 'path': '/webhooks/3/clientConfig', 'value':{'url':\"$${WEBHOOK_URL}/namespace-owner-reference\",'caBundle':\"$${CA_BUNDLE}\"}}\
+			{'op': 'replace', 'path': '/webhooks/3/clientConfig', 'value':{'url':\"$${WEBHOOK_URL}/namespace-owner-reference\",'caBundle':\"$${CA_BUNDLE}\"}},\
+			{'op': 'replace', 'path': '/webhooks/4/clientConfig', 'value':{'url':\"$${WEBHOOK_URL}/scheduling\",'caBundle':\"$${CA_BUNDLE}\"}}\
 		]" && \
 	kubectl patch ValidatingWebhookConfiguration capsule-validating-webhook-configuration \
 		--type='json' -p="[\
@@ -320,11 +321,10 @@ e2e/%: ginkgo
 
 e2e-build/%:
 	kind create cluster --wait=60s --name capsule --image=kindest/node:$*
-	make e2e-load-image
 	make e2e-install
 
 .PHONY: e2e-install
-e2e-install:
+e2e-install: e2e-load-image
 	helm upgrade \
 		--debug \
 		--install \

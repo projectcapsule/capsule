@@ -7,7 +7,7 @@ import (
 	capsulewebhook "github.com/projectcapsule/capsule/pkg/webhook"
 )
 
-// +kubebuilder:webhook:path=/scheduling,mutating=true,sideEffects=None,admissionReviewVersions=v1,failurePolicy=fail,groups="",resources=pods,verbs=create,versions=v1,name=scheduling.projectcapsule.dev
+// +kubebuilder:webhook:path=/scheduling,mutating=true,sideEffects=None,admissionReviewVersions=v1,failurePolicy=fail,groups="",resources=pods,verbs=create;update,versions=v1,name=scheduling.projectcapsule.dev
 
 type scheduling struct {
 	handlers []capsulewebhook.Handler

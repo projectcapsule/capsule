@@ -1,0 +1,23 @@
+apiVersion: capsule.clastix.io/v1beta2
+kind: Tenant
+metadata:
+  name: solar
+spec:
+  owners:
+  - name: alice
+    kind: User
+  podOptions:
+    scheduling:
+      - action: "overwrite"
+        nodeSelector:
+          solar: "helpp"
+      - action: "aggregate"
+        nodeSelector:
+          label: "additional"
+        topologySpreadConstraints:
+          - maxSkew: 1
+            topologyKey: "kubernetes.io/hostname"
+            whenUnsatisfiable: "DoNotSchedule"
+            labelSelector:
+              matchLabels:
+                solar: "helpp"

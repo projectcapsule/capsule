@@ -123,3 +123,32 @@ webhooks:
       scope: '*'
   sideEffects: NoneOnDryRun
   timeoutSeconds: {{ .Values.mutatingWebhooksTimeoutSeconds }}
+{{- with .Values.webhooks.scheduling }}  
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+  {{- if not $.Values.certManager.generateCertificates }}
+    caBundle: Cg==
+  {{- end }}
+    service:
+      name: {{ include "capsule.fullname" $ }}-webhook-service
+      namespace: {{ $.Release.Namespace }}
+      path: /scheduling
+  failurePolicy: {{ .failurePolicy }}
+  name: scheduling.projectcapsule.dev
+  rules:
+  - apiGroups:
+    - ""
+    apiVersions:
+    - v1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - pods
+  namespaceSelector:
+  {{- toYaml .namespaceSelector | nindent 4}}
+  sideEffects: None
+{{- end }} 
+
+
