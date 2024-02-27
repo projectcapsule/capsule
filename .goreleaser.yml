@@ -38,6 +38,9 @@ release:
     **Docker Images**
     - `ghcr.io/projectcapsule/{{ .ProjectName }}:{{ .Tag }}`
     - `ghcr.io/projectcapsule/{{ .ProjectName }}:latest`
+
+    **Helm Chart**
+    View this release on [Artifact Hub](https://artifacthub.io/packages/helm/projectcapsule/capsule/{{ .Tag | trimSuffix "v" }})
 checksum:
   name_template: 'checksums.txt'
 changelog:
