@@ -7,7 +7,7 @@ spec:
   - name: alice
     kind: User
   podOptions:
-    scheduling:
+    specExpressions:
       - action: "overwrite"
         nodeSelector:
           solar: "helpp"
@@ -21,3 +21,5 @@ spec:
             labelSelector:
               matchLabels:
                 solar: "helpp"
+      validations: 
+        
