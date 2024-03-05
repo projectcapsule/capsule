@@ -11,6 +11,11 @@ tls:
   # -- Override name of the Capsule TLS Secret name when externally managed.
   name: ""
 
+# Capsule Proxy
+proxy:
+  # -- Enable Installation of Capsule Proxy
+  enabled: false
+
 # Manager Options
 manager:
 
@@ -85,13 +90,8 @@ manager:
       path: /readyz
       port: 10080
 
-  resources:
-    limits:
-      cpu: 200m
-      memory: 128Mi
-    requests:
-      cpu: 200m
-      memory: 128Mi
+  # -- Set the resource requests/limits for the Capsule manager container
+  resources: {}
 
 # -- Configuration for `imagePullSecrets` so that you can use a private images registry.
 imagePullSecrets: []

@@ -57,6 +57,6 @@ jobs:
           version: v0.14.0
       - uses: azure/setup-helm@5119fcb9089d432beecbf79bb2c7915207344b78 # v3
         with:
-          version: 3.3.4
+          version: v3.14.2
       - name: e2e testing
         run: make e2e/${{ matrix.k8s-version }}
