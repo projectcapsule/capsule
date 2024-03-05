@@ -85,6 +85,7 @@ Here the values you can override:
 | podSecurityContext | object | `{"runAsGroup":1002,"runAsNonRoot":true,"runAsUser":1002,"seccompProfile":{"type":"RuntimeDefault"}}` | Set the securityContext for the Capsule pod |
 | podSecurityPolicy.enabled | bool | `false` | Specify if a Pod Security Policy must be created |
 | priorityClassName | string | `""` | Set the priority class name of the Capsule pod |
+| proxy.enabled | bool | `false` | Enable Installation of Capsule Proxy |
 | replicaCount | int | `1` | Set the replica count for capsule pod |
 | securityContext | object | `{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]},"readOnlyRootFilesystem":true}` | Set the securityContext for the Capsule container |
 | serviceAccount.annotations | object | `{}` | Annotations to add to the service account. |
@@ -118,10 +119,7 @@ Here the values you can override:
 | manager.rbac.existingClusterRoles | list | `[]` | Specifies further cluster roles to be added to the Capsule manager service account. |
 | manager.rbac.existingRoles | list | `[]` | Specifies further cluster roles to be added to the Capsule manager service account. |
 | manager.readinessProbe | object | `{"httpGet":{"path":"/readyz","port":10080}}` | Configure the readiness probe using Deployment probe spec |
-| manager.resources.limits.cpu | string | `"200m"` |  |
-| manager.resources.limits.memory | string | `"128Mi"` |  |
-| manager.resources.requests.cpu | string | `"200m"` |  |
-| manager.resources.requests.memory | string | `"128Mi"` |  |
+| manager.resources | object | `{}` | Set the resource requests/limits for the Capsule manager container |
 | manager.webhookPort | int | `9443` | Set an alternative to the default container port.  Useful for use in some kubernetes clusters (such as GKE Private) with aggregator routing turned on, because pod ports have to be opened manually on the firewall side |
 
 ### ServiceMonitor Parameters

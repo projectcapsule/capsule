@@ -4,6 +4,12 @@ description: A Helm chart to deploy the Capsule Operator for easily implementing
   managing, and maintaining mutitenancy and access control in Kubernetes.
 home: https://github.com/projectcapsule/capsule
 icon: https://github.com/projectcapsule/capsule/raw/main/assets/logo/capsule_small.png
+dependencies:
+  - name: capsule-proxy
+    version: 0.6.0
+    repository: "oci://ghcr.io/projectcapsule/charts"
+    condition: proxy.enabled
+    alias: proxy
 keywords:
 - kubernetes
 - operator
@@ -18,10 +24,9 @@ maintainers:
 name: capsule
 sources:
 - https://github.com/projectcapsule/capsule
-# The version is overwritten by the release workflow.
+# Note: The version is overwritten by the release workflow.
 version: 0.6.0
-# This is the version number of the application being deployed.
-# This version number should be incremented each time you make changes to the application.
+# Note: The version is overwritten by the release workflow.
 appVersion: 0.5.0
 annotations:
   artifacthub.io/operator: "true"
