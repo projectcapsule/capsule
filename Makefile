@@ -87,26 +87,24 @@ apidoc: apidocs-gen
 # Helm
 SRC_ROOT = $(shell git rev-parse --show-toplevel)
 
-helm-controller-version:
-	$(eval VERSION := $(shell grep 'appVersion:' charts/capsule/Chart.yaml | awk '{print "v"$$2}'))
-	$(eval KO_TAGS := $(shell grep 'appVersion:' charts/capsule/Chart.yaml | awk '{print "v"$$2}'))
-
 helm-docs: HELMDOCS_VERSION := v1.11.0
 helm-docs: docker
 	@docker run -v "$(SRC_ROOT):/helm-docs" jnorwood/helm-docs:$(HELMDOCS_VERSION) --chart-search-root /helm-docs
 
-helm-lint: CT_VERSION := v3.3.1
 helm-lint: docker
 	@docker run -v "$(SRC_ROOT):/workdir" --entrypoint /bin/sh quay.io/helmpack/chart-testing:$(CT_VERSION) -c "cd /workdir; ct lint --config .github/configs/ct.yaml  --lint-conf .github/configs/lintconf.yaml  --all --debug"
 
-helm-test: helm-controller-version kind ct ko-build-all
+helm-test: kind ct ko-build-all
 	@kind create cluster --wait=60s --name capsule-charts
-	@kind load docker-image --name capsule-charts $(CAPSULE_IMG):$(VERSION)
-	@kubectl create ns capsule-system
-	@kubectl create -f https://github.com/cert-manager/cert-manager/releases/download/v1.9.1/cert-manager.crds.yaml
-	@kubectl create -f https://github.com/prometheus-operator/prometheus-operator/releases/download/v0.58.0/bundle.yaml
-	@ct install --config $(SRC_ROOT)/.github/configs/ct.yaml --namespace=capsule-system --all --debug
+	@make helm-test-exec
 	@kind delete cluster --name capsule-charts
+
+helm-test-exec:
+	@kind load docker-image --name capsule-charts $(CAPSULE_IMG):$(VERSION)
+	@kubectl create ns capsule-system || true
+	@kubectl apply --server-side=true -f https://github.com/cert-manager/cert-manager/releases/download/v1.9.1/cert-manager.crds.yaml
+	@kubectl apply --server-side=true -f https://github.com/prometheus-operator/prometheus-operator/releases/download/v0.58.0/bundle.yaml
+	@ct install --config $(SRC_ROOT)/.github/configs/ct.yaml --namespace=capsule-system --all --debug
 
 docker:
 	@hash docker 2>/dev/null || {\
@@ -247,7 +245,7 @@ ginkgo: ## Download ginkgo locally if necessary.
 	$(call go-install-tool,$(GINKGO),github.com/onsi/ginkgo/v2/ginkgo@$(GINGKO_VERSION))
 
 CT         := $(shell pwd)/bin/ct
-CT_VERSION := v3.7.1
+CT_VERSION := v3.10.1
 ct: ## Download ct locally if necessary.
 	$(call go-install-tool,$(CT),github.com/helm/chart-testing/v3/ct@$(CT_VERSION))
 
@@ -326,6 +324,7 @@ e2e-build/%:
 .PHONY: e2e-install
 e2e-install:
 	helm upgrade \
+	    --dependency-update \
 		--debug \
 		--install \
 		--namespace capsule-system \

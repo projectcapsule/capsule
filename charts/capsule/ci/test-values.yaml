@@ -1,16 +1,12 @@
 fullnameOverride: capsule
 manager:
-    # Manager RBAC
+  resources:
+    requests:
+      cpu: 200m
+      memory: 128Mi
   rbac:
     create: true
     existingClusterRoles:
     - "view"
     existingRoles:
     - "some-role"
-  resources:
-    limits:
-      cpu: 500m
-      memory: 512Mi
-    requests:
-      cpu: 200m
-      memory: 128Mi

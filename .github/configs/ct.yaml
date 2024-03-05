@@ -2,6 +2,8 @@ remote: origin
 target-branch: main
 chart-dirs:
   - charts
+chart-repos:
+  - capsule=https://projectcapsule.github.io/charts/
 helm-extra-args: "--timeout 600s"  
 validate-chart-schema: false
 validate-maintainers: false
