@@ -3,6 +3,8 @@
 
 package v1beta2
 
+import "github.com/projectcapsule/capsule/pkg/api"
+
 type OwnerSpec struct {
 	// Kind of tenant owner. Possible values are "User", "Group", and "ServiceAccount"
 	Kind OwnerKind `json:"kind"`
@@ -11,6 +13,8 @@ type OwnerSpec struct {
 	// Defines additional cluster-roles for the specific Owner.
 	// +kubebuilder:default={admin,capsule-namespace-deleter}
 	ClusterRoles []string `json:"clusterRoles,omitempty"`
+	// Defines additional cluster-resources for the specific Owner.
+	ClusterResources []api.ClusterResource `json:"clusterResources,omitempty"`
 	// Proxy settings for tenant owner.
 	ProxyOperations []ProxySettings `json:"proxySettings,omitempty"`
 }
