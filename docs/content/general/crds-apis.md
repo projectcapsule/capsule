@@ -1490,6 +1490,13 @@ TenantSpec defines the desired state of Tenant.
         </td>
         <td>true</td>
       </tr><tr>
+        <td><b><a href="#tenantspecownersindexclusterresourcesindex">clusterResources</a></b></td>
+        <td>[]object</td>
+        <td>
+          Defines additional cluster-resources for the specific Owner.<br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
         <td><b>clusterRoles</b></td>
         <td>[]string</td>
         <td>
@@ -1503,6 +1510,128 @@ TenantSpec defines the desired state of Tenant.
         <td>[]object</td>
         <td>
           Proxy settings for tenant owner.<br/>
+        </td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+### Tenant.spec.owners[index].clusterResources[index]
+
+
+
+
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>apiGroups</b></td>
+        <td>[]string</td>
+        <td>
+          APIGroups is the name of the APIGroup that contains the resources. If multiple API groups are specified, any action requested against any resource listed will be allowed. '*' represents all resources. Empty string represents v1 api resources.<br/>
+        </td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>operations</b></td>
+        <td>[]enum</td>
+        <td>
+          Operations which can be executed on the selected resources.<br/>
+          <br/>
+            <i>Default</i>: [List]<br/>
+        </td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>resources</b></td>
+        <td>[]string</td>
+        <td>
+          Resources is a list of resources this rule applies to. '*' represents all resources.<br/>
+        </td>
+        <td>true</td>
+      </tr><tr>
+        <td><b><a href="#tenantspecownersindexclusterresourcesindexselector">selector</a></b></td>
+        <td>object</td>
+        <td>
+          Select all cluster scoped resources with the given label selector.<br/>
+        </td>
+        <td>true</td>
+      </tr></tbody>
+</table>
+
+
+### Tenant.spec.owners[index].clusterResources[index].selector
+
+
+
+Select all cluster scoped resources with the given label selector.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b><a href="#tenantspecownersindexclusterresourcesindexselectormatchexpressionsindex">matchExpressions</a></b></td>
+        <td>[]object</td>
+        <td>
+          matchExpressions is a list of label selector requirements. The requirements are ANDed.<br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>matchLabels</b></td>
+        <td>map[string]string</td>
+        <td>
+          matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is "key", the operator is "In", and the values array contains only "value". The requirements are ANDed.<br/>
+        </td>
+        <td>false</td>
+      </tr></tbody>
+</table>
+
+
+### Tenant.spec.owners[index].clusterResources[index].selector.matchExpressions[index]
+
+
+
+A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.
+
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Required</th>
+        </tr>
+    </thead>
+    <tbody><tr>
+        <td><b>key</b></td>
+        <td>string</td>
+        <td>
+          key is the label key that the selector applies to.<br/>
+        </td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>operator</b></td>
+        <td>string</td>
+        <td>
+          operator represents a key's relationship to a set of values. Valid operators are In, NotIn, Exists and DoesNotExist.<br/>
+        </td>
+        <td>true</td>
+      </tr><tr>
+        <td><b>values</b></td>
+        <td>[]string</td>
+        <td>
+          values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.<br/>
         </td>
         <td>false</td>
       </tr></tbody>
