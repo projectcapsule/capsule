@@ -189,7 +189,6 @@ func (c *CapsuleCA) GenerateCertificate(opts CertificateOptions) (certificatePem
 	}
 
 	certificateKey = new(bytes.Buffer)
-
 	err = pem.Encode(certificateKey, &pem.Block{
 		Type:  "RSA PRIVATE KEY",
 		Bytes: x509.MarshalPKCS1PrivateKey(certPrivKey),
