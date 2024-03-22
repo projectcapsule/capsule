@@ -5,8 +5,13 @@ package tenant
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"strings"
+	"time"
 
 	"github.com/go-logr/logr"
+	"github.com/juju/mutex/v2"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -14,8 +19,10 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/retry"
+	"k8s.io/utils/clock"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
@@ -23,12 +30,16 @@ import (
 
 type Manager struct {
 	client.Client
-	Log        logr.Logger
-	Recorder   record.EventRecorder
-	RESTConfig *rest.Config
+	Log                     logr.Logger
+	Recorder                record.EventRecorder
+	RESTConfig              *rest.Config
+	MaxConcurrentReconciles int
+	clock                   mutex.Clock
 }
 
 func (r *Manager) SetupWithManager(mgr ctrl.Manager) error {
+	r.clock = clock.RealClock{}
+
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&capsulev1beta2.Tenant{}).
 		Owns(&corev1.Namespace{}).
@@ -36,6 +47,7 @@ func (r *Manager) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&corev1.LimitRange{}).
 		Owns(&corev1.ResourceQuota{}).
 		Owns(&rbacv1.RoleBinding{}).
+		WithOptions(controller.Options{MaxConcurrentReconciles: r.MaxConcurrentReconciles}).
 		Complete(r)
 }
 
@@ -55,6 +67,26 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 
 		return
 	}
+
+	releaser, err := mutex.Acquire(r.mutexSpec(instance))
+	if err != nil {
+		switch {
+		case errors.As(err, &mutex.ErrTimeout):
+			r.Log.Info("acquire timed out, current process is blocked by another reconciliation")
+
+			return ctrl.Result{Requeue: true}, nil
+		case errors.As(err, &mutex.ErrCancelled):
+			r.Log.Info("acquire cancelled")
+
+			return ctrl.Result{Requeue: true}, nil
+		default:
+			r.Log.Error(err, "acquire failed")
+
+			return ctrl.Result{}, err
+		}
+	}
+	defer releaser.Release()
+
 	// Ensuring the Tenant Status
 	if err = r.updateTenantStatus(ctx, instance); err != nil {
 		r.Log.Error(err, "Cannot update Tenant status")
@@ -136,6 +168,16 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 	r.Log.Info("Tenant reconciling completed")
 
 	return ctrl.Result{}, err
+}
+
+func (r *Manager) mutexSpec(obj client.Object) mutex.Spec {
+	return mutex.Spec{
+		Name:    strings.ReplaceAll(fmt.Sprintf("capsule%s", obj.GetUID()), "-", ""),
+		Clock:   r.clock,
+		Delay:   2 * time.Millisecond,
+		Timeout: time.Second,
+		Cancel:  nil,
+	}
 }
 
 func (r *Manager) updateTenantStatus(ctx context.Context, tnt *capsulev1beta2.Tenant) error {

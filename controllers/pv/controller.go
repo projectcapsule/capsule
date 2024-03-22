@@ -12,6 +12,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 	log2 "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -88,7 +89,7 @@ func (c *Controller) Reconcile(ctx context.Context, request reconcile.Request) (
 	return reconcile.Result{}, nil
 }
 
-func (c *Controller) SetupWithManager(mgr ctrl.Manager) error {
+func (c *Controller) SetupWithManager(mgr ctrl.Manager, workerCount int) error {
 	label, err := capsuleutils.GetTypeLabel(&capsulev1beta2.Tenant{})
 	if err != nil {
 		return err
@@ -113,5 +114,6 @@ func (c *Controller) SetupWithManager(mgr ctrl.Manager) error {
 
 			return !ok
 		}))).
+		WithOptions(controller.Options{MaxConcurrentReconciles: workerCount}).
 		Complete(c)
 }

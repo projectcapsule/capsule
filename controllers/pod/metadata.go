@@ -15,6 +15,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
@@ -123,8 +124,9 @@ func (m *MetadataReconciler) isNamespaceInTenant(ctx context.Context, namespace 
 	return len(tl.Items) > 0
 }
 
-func (m *MetadataReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager) error {
+func (m *MetadataReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, workerCount int) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&corev1.Pod{}, m.forOptionPerInstanceName(ctx)).
+		WithOptions(controller.Options{MaxConcurrentReconciles: workerCount}).
 		Complete(m)
 }

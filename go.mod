@@ -5,6 +5,7 @@ go 1.21
 require (
 	github.com/go-logr/logr v1.4.1
 	github.com/hashicorp/go-multierror v1.1.1
+	github.com/juju/mutex/v2 v2.0.0
 	github.com/onsi/ginkgo/v2 v2.17.1
 	github.com/onsi/gomega v1.32.0
 	github.com/pkg/errors v0.9.1
@@ -49,6 +50,7 @@ require (
 	github.com/imdario/mergo v0.3.13 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
+	github.com/juju/errors v0.0.0-20220203013757-bd733f3c86b9 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/matttproud/golang_protobuf_extensions/v2 v2.0.0 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect

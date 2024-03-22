@@ -14,6 +14,7 @@ import (
 	"sigs.k8s.io/cluster-api/util/patch"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -26,7 +27,7 @@ type Namespaced struct {
 	processor Processor
 }
 
-func (r *Namespaced) SetupWithManager(mgr ctrl.Manager) error {
+func (r *Namespaced) SetupWithManager(mgr ctrl.Manager, workerCount int) error {
 	r.client = mgr.GetClient()
 	r.processor = Processor{
 		client: mgr.GetClient(),
@@ -34,6 +35,7 @@ func (r *Namespaced) SetupWithManager(mgr ctrl.Manager) error {
 
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&capsulev1beta2.TenantResource{}).
+		WithOptions(controller.Options{MaxConcurrentReconciles: workerCount}).
 		Complete(r)
 }
 

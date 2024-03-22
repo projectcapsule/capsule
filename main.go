@@ -83,7 +83,7 @@ func main() {
 
 	var metricsAddr, namespace, configurationName string
 
-	var webhookPort int
+	var webhookPort, workerCount int
 
 	var goFlagSet goflag.FlagSet
 
@@ -94,6 +94,7 @@ func main() {
 			"Enabling this will ensure there is only one active controller manager.")
 	flag.BoolVar(&version, "version", false, "Print the Capsule version and exit")
 	flag.StringVar(&configurationName, "configuration-name", "default", "The CapsuleConfiguration resource name to use")
+	flag.IntVar(&workerCount, "workers", 1, "Defines the number of concurrent reconciles the controller can handle")
 
 	opts := zap.Options{
 		EncoderConfigOptions: append([]zap.EncoderConfigOption{}, func(config *zapcore.EncoderConfig) {
@@ -190,10 +191,11 @@ func main() {
 	}
 
 	if err = (&tenantcontroller.Manager{
-		RESTConfig: manager.GetConfig(),
-		Client:     manager.GetClient(),
-		Log:        ctrl.Log.WithName("controllers").WithName("Tenant"),
-		Recorder:   manager.GetEventRecorderFor("tenant-controller"),
+		RESTConfig:              manager.GetConfig(),
+		Client:                  manager.GetClient(),
+		Log:                     ctrl.Log.WithName("controllers").WithName("Tenant"),
+		Recorder:                manager.GetEventRecorderFor("tenant-controller"),
+		MaxConcurrentReconciles: workerCount,
 	}).SetupWithManager(manager); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Tenant")
 		os.Exit(1)
@@ -254,21 +256,21 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = rbacManager.SetupWithManager(ctx, manager, configurationName); err != nil {
+	if err = rbacManager.SetupWithManager(ctx, manager, configurationName, workerCount); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Rbac")
 		os.Exit(1)
 	}
 
 	if err = (&servicelabelscontroller.ServicesLabelsReconciler{
 		Log: ctrl.Log.WithName("controllers").WithName("ServiceLabels"),
-	}).SetupWithManager(ctx, manager); err != nil {
+	}).SetupWithManager(ctx, manager, workerCount); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ServiceLabels")
 		os.Exit(1)
 	}
 
 	if err = (&servicelabelscontroller.EndpointsLabelsReconciler{
 		Log: ctrl.Log.WithName("controllers").WithName("EndpointLabels"),
-	}).SetupWithManager(ctx, manager); err != nil {
+	}).SetupWithManager(ctx, manager, workerCount); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "EndpointLabels")
 		os.Exit(1)
 	}
@@ -281,12 +283,12 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "EndpointSliceLabels")
 	}
 
-	if err = (&podlabelscontroller.MetadataReconciler{Client: manager.GetClient()}).SetupWithManager(ctx, manager); err != nil {
+	if err = (&podlabelscontroller.MetadataReconciler{Client: manager.GetClient()}).SetupWithManager(ctx, manager, workerCount); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "PodLabels")
 		os.Exit(1)
 	}
 
-	if err = (&pv.Controller{}).SetupWithManager(manager); err != nil {
+	if err = (&pv.Controller{}).SetupWithManager(manager, workerCount); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "PersistentVolume")
 		os.Exit(1)
 	}
@@ -298,12 +300,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&resources.Global{}).SetupWithManager(manager); err != nil {
+	if err = (&resources.Global{}).SetupWithManager(manager, workerCount); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "resources.Global")
 		os.Exit(1)
 	}
 
-	if err = (&resources.Namespaced{}).SetupWithManager(manager); err != nil {
+	if err = (&resources.Namespaced{}).SetupWithManager(manager, workerCount); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "resources.Namespaced")
 		os.Exit(1)
 	}
