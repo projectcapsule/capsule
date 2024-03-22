@@ -1,12 +1,13 @@
 The current Maintainers Group for the [TODO: Projectname] Project consists of:
 
-| Name                      | Employer    | Responsibilities |
-| ------------------------- | ----------- | ---------------- |
-|  Adriano Pezzuto          | Clastix     |  Maintainer      |
-|  Dario Tranchitella       | Clastix     |  Maintainer      |
-|  Maksim Fedotov           | Wargaming   |  Maintainer      |
-|  Oliver Bähler            | Peak Scale  |  Maintainer      |
-|  Massimiliano Giovagnoli  | Proximus    |  Maintainer      |
+| Name                      | Employer    | Responsibilities           |
+| ------------------------- | ----------- | -------------------------- |
+|  Adriano Pezzuto          | Clastix     |  Maintainer                |
+|  Dario Tranchitella       | Clastix     |  Maintainer                |
+|  Maksim Fedotov           | Wargaming   |  Maintainer                |
+|  Oliver Bähler            | Peak Scale  |  Maintainer/Community      |
+|  Massimiliano Giovagnoli  | Proximus    |  Maintainer                |
+|  Luca Kündig              | Swisscom    |  Maintainer                |
 
 This list must be kept in sync with the [CNCF Project Maintainers list](https://github.com/cncf/foundation/blob/master/project-maintainers.csv).
 
