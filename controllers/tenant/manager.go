@@ -16,6 +16,7 @@ import (
 	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
@@ -28,7 +29,7 @@ type Manager struct {
 	RESTConfig *rest.Config
 }
 
-func (r *Manager) SetupWithManager(mgr ctrl.Manager) error {
+func (r *Manager) SetupWithManager(mgr ctrl.Manager, workerCount int) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&capsulev1beta2.Tenant{}).
 		Owns(&corev1.Namespace{}).
@@ -36,6 +37,7 @@ func (r *Manager) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&corev1.LimitRange{}).
 		Owns(&corev1.ResourceQuota{}).
 		Owns(&rbacv1.RoleBinding{}).
+		WithOptions(controller.Options{MaxConcurrentReconciles: workerCount}).
 		Complete(r)
 }
 
