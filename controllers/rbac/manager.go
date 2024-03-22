@@ -15,6 +15,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -32,11 +33,12 @@ type Manager struct {
 }
 
 //nolint:revive
-func (r *Manager) SetupWithManager(ctx context.Context, mgr ctrl.Manager, configurationName string) (err error) {
+func (r *Manager) SetupWithManager(ctx context.Context, mgr ctrl.Manager, configurationName string, workerCount int) (err error) {
 	namesPredicate := utils.NamesMatchingPredicate(ProvisionerRoleName, DeleterRoleName)
 
 	crErr := ctrl.NewControllerManagedBy(mgr).
 		For(&rbacv1.ClusterRole{}, namesPredicate).
+		WithOptions(controller.Options{MaxConcurrentReconciles: workerCount}).
 		Complete(r)
 	if crErr != nil {
 		err = multierror.Append(err, crErr)

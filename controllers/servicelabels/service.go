@@ -9,6 +9,7 @@ import (
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 )
 
 type ServicesLabelsReconciler struct {
@@ -17,7 +18,7 @@ type ServicesLabelsReconciler struct {
 	Log logr.Logger
 }
 
-func (r *ServicesLabelsReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager) error {
+func (r *ServicesLabelsReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager, workerCount int) error {
 	r.abstractServiceLabelsReconciler = abstractServiceLabelsReconciler{
 		obj:    &corev1.Service{},
 		client: mgr.GetClient(),
@@ -26,5 +27,6 @@ func (r *ServicesLabelsReconciler) SetupWithManager(ctx context.Context, mgr ctr
 
 	return ctrl.NewControllerManagedBy(mgr).
 		For(r.abstractServiceLabelsReconciler.obj, r.abstractServiceLabelsReconciler.forOptionPerInstanceName(ctx)).
+		WithOptions(controller.Options{MaxConcurrentReconciles: workerCount}).
 		Complete(r)
 }
