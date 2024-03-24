@@ -417,6 +417,13 @@ func (in *OwnerSpec) DeepCopyInto(out *OwnerSpec) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.ClusterResources != nil {
+		in, out := &in.ClusterResources, &out.ClusterResources
+		*out = make([]api.ClusterResource, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
 	if in.ProxyOperations != nil {
 		in, out := &in.ProxyOperations, &out.ProxyOperations
 		*out = make([]ProxySettings, len(*in))
