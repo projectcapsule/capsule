@@ -15,7 +15,11 @@ require (
 	go.uber.org/zap v1.27.0
 	golang.org/x/sync v0.6.0
 	k8s.io/api v0.29.3
+<<<<<<< HEAD
+	k8s.io/apiextensions-apiserver v0.28.4
+=======
 	k8s.io/apiextensions-apiserver v0.29.3
+>>>>>>> 9c1b9487d98585b04741da658d5e97b94ea439cd
 	k8s.io/apimachinery v0.29.3
 	k8s.io/client-go v0.29.3
 	k8s.io/utils v0.0.0-20240102154912-e7106e64919e
