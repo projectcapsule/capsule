@@ -50,9 +50,11 @@ type TenantSpec struct {
 	// Optional.
 	PriorityClasses *api.DefaultAllowedListSpec `json:"priorityClasses,omitempty"`
 	// Toggling the Tenant resources cordoning, when enable resources cannot be deleted.
+	//+kubebuilder:default:=false
 	Cordoned bool `json:"cordoned,omitempty"`
 	// Prevent accidental deletion of the Tenant.
 	// When enabled, the deletion request will be declined.
+	//+kubebuilder:default:=false
 	PreventDeletion bool `json:"preventDeletion,omitempty"`
 }
 
