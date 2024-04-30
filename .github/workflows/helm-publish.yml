@@ -15,7 +15,7 @@ jobs:
     if: github.repository_owner == 'projectcapsule'
     runs-on: ubuntu-20.04
     steps:
-      - uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
+      - uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b # v4.1.4
       - name: "Extract Version"
         id: extract_version
         run: |
@@ -44,7 +44,7 @@ jobs:
     outputs:
       chart-digest: ${{ steps.helm_publish.outputs.digest }}
     steps:
-      - uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633 # v4.1.2
+      - uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b # v4.1.4
       - uses: sigstore/cosign-installer@59acb6260d9c0ba8f4a2f9d9b48431a222b68e20 # v3.5.0
       - name: "Extract Version"
         id: extract_version
@@ -72,7 +72,7 @@ jobs:
       id-token: write   # To sign the provenance.
       packages: write   # To upload assets to release.
       actions: read     # To read the workflow path.
-    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@v1.10.0
+    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@v2.0.0
     with:
       image: ghcr.io/${{ github.repository_owner }}/charts/capsule
       digest: "${{ needs.publish-helm-oci.outputs.chart-digest }}"
