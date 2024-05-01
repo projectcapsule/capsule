@@ -1341,6 +1341,7 @@ spec:
                     type: string
                 type: object
               cordoned:
+                default: false
                 description: Toggling the Tenant resources cordoning, when enable resources cannot be deleted.
                 type: boolean
               imagePullPolicies:
@@ -1873,6 +1874,7 @@ spec:
                     type: object
                 type: object
               preventDeletion:
+                default: false
                 description: Prevent accidental deletion of the Tenant. When enabled, the deletion request will be declined.
                 type: boolean
               priorityClasses:

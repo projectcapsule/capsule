@@ -1361,6 +1361,8 @@ TenantSpec defines the desired state of Tenant.
         <td>boolean</td>
         <td>
           Toggling the Tenant resources cordoning, when enable resources cannot be deleted.<br/>
+          <br/>
+            <i>Default</i>: false<br/>
         </td>
         <td>false</td>
       </tr><tr>
@@ -1417,6 +1419,8 @@ TenantSpec defines the desired state of Tenant.
         <td>boolean</td>
         <td>
           Prevent accidental deletion of the Tenant. When enabled, the deletion request will be declined.<br/>
+          <br/>
+            <i>Default</i>: false<br/>
         </td>
         <td>false</td>
       </tr><tr>
