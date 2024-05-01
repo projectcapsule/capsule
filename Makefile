@@ -230,7 +230,7 @@ ko-publish-all: ko-publish-capsule
 ####################
 
 CONTROLLER_GEN         := $(shell pwd)/bin/controller-gen
-CONTROLLER_GEN_VERSION := v0.10.0
+CONTROLLER_GEN_VERSION := v0.15.0
 controller-gen: ## Download controller-gen locally if necessary.
 	$(call go-install-tool,$(CONTROLLER_GEN),sigs.k8s.io/controller-tools/cmd/controller-gen@$(CONTROLLER_GEN_VERSION))
 
@@ -240,7 +240,7 @@ apidocs-gen: ## Download crdoc locally if necessary.
 	$(call go-install-tool,$(APIDOCS_GEN),fybrik.io/crdoc@$(APIDOCS_GEN_VERSION))
 
 GINKGO         := $(shell pwd)/bin/ginkgo
-GINGKO_VERSION := v2.15.0
+GINGKO_VERSION := v2.17.2
 ginkgo: ## Download ginkgo locally if necessary.
 	$(call go-install-tool,$(GINKGO),github.com/onsi/ginkgo/v2/ginkgo@$(GINGKO_VERSION))
 
@@ -260,7 +260,7 @@ kustomize: ## Download kustomize locally if necessary.
 	$(call install-kustomize,$(KUSTOMIZE),$(KUSTOMIZE_VERSION))
 
 KO = $(shell pwd)/bin/ko
-KO_VERSION = v0.14.1
+KO_VERSION = v0.15.2
 ko:
 	$(call go-install-tool,$(KO),github.com/google/ko@$(KO_VERSION))
 
