@@ -21,6 +21,14 @@ var _ = Describe("creating a Namespace for a Tenant with additional metadata", f
 	tnt := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "tenant-metadata",
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: "cap",
+					Kind:       "dummy",
+					Name:       "tenant-metadata",
+					UID:        "tenant-metadata",
+				},
+			},
 		},
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: capsulev1beta2.OwnerListSpec{

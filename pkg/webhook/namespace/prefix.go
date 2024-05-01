@@ -49,6 +49,10 @@ func (r *prefixHandler) OnCreate(clt client.Client, decoder *admission.Decoder, 
 			tnt := &capsulev1beta2.Tenant{}
 
 			for _, or := range ns.ObjectMeta.OwnerReferences {
+				if !isTenantOwnerReference(or) {
+					continue
+				}
+
 				// retrieving the selected Tenant
 				if err := clt.Get(ctx, types.NamespacedName{Name: or.Name}, tnt); err != nil {
 					return utils.ErroredResponse(err)
