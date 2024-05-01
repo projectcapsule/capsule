@@ -17,8 +17,6 @@ jobs:
         with:
           fetch-depth: 0
       - uses: azure/setup-helm@fe7b79cd5ee1e45176fcad797de68ecaf3ca4814 # v3
-        with:
-          version: v3.14.2
       - name: Linting Chart
         run: helm lint ./charts/capsule
       - name: Setup Chart Linting
