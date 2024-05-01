@@ -22,13 +22,13 @@ func ProtectedHandler() capsulewebhook.Handler {
 	return &protectedHandler{}
 }
 
-func (h *protectedHandler) OnCreate(client.Client, *admission.Decoder, record.EventRecorder) capsulewebhook.Func {
+func (h *protectedHandler) OnCreate(client.Client, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (h *protectedHandler) OnDelete(clt client.Client, _ *admission.Decoder, _ record.EventRecorder) capsulewebhook.Func {
+func (h *protectedHandler) OnDelete(clt client.Client, _ admission.Decoder, _ record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		tenant := &capsulev1beta2.Tenant{}
 
@@ -46,7 +46,7 @@ func (h *protectedHandler) OnDelete(clt client.Client, _ *admission.Decoder, _ r
 	}
 }
 
-func (h *protectedHandler) OnUpdate(client.Client, *admission.Decoder, record.EventRecorder) capsulewebhook.Func {
+func (h *protectedHandler) OnUpdate(client.Client, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}

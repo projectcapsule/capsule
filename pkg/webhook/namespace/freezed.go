@@ -27,7 +27,7 @@ func FreezeHandler(configuration configuration.Configuration) capsulewebhook.Han
 	return &freezedHandler{configuration: configuration}
 }
 
-func (r *freezedHandler) OnCreate(client client.Client, decoder *admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
+func (r *freezedHandler) OnCreate(client client.Client, decoder admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		ns := &corev1.Namespace{}
 		if err := decoder.Decode(req, ns); err != nil {
@@ -54,7 +54,7 @@ func (r *freezedHandler) OnCreate(client client.Client, decoder *admission.Decod
 	}
 }
 
-func (r *freezedHandler) OnDelete(c client.Client, _ *admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
+func (r *freezedHandler) OnDelete(c client.Client, _ admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		tntList := &capsulev1beta2.TenantList{}
 		if err := c.List(ctx, tntList, client.MatchingFieldsSelector{
@@ -81,7 +81,7 @@ func (r *freezedHandler) OnDelete(c client.Client, _ *admission.Decoder, recorde
 	}
 }
 
-func (r *freezedHandler) OnUpdate(c client.Client, decoder *admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
+func (r *freezedHandler) OnUpdate(c client.Client, decoder admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		ns := &corev1.Namespace{}
 		if err := decoder.Decode(req, ns); err != nil {

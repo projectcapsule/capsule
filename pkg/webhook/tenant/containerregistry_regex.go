@@ -23,7 +23,7 @@ func ContainerRegistryRegexHandler() capsulewebhook.Handler {
 	return &containerRegistryRegexHandler{}
 }
 
-func (h *containerRegistryRegexHandler) validate(decoder *admission.Decoder, req admission.Request) *admission.Response {
+func (h *containerRegistryRegexHandler) validate(decoder admission.Decoder, req admission.Request) *admission.Response {
 	tenant := &capsulev1beta2.Tenant{}
 	if err := decoder.Decode(req, tenant); err != nil {
 		return utils.ErroredResponse(err)
@@ -40,7 +40,7 @@ func (h *containerRegistryRegexHandler) validate(decoder *admission.Decoder, req
 	return nil
 }
 
-func (h *containerRegistryRegexHandler) OnCreate(_ client.Client, decoder *admission.Decoder, _ record.EventRecorder) capsulewebhook.Func {
+func (h *containerRegistryRegexHandler) OnCreate(_ client.Client, decoder admission.Decoder, _ record.EventRecorder) capsulewebhook.Func {
 	return func(_ context.Context, req admission.Request) *admission.Response {
 		if err := h.validate(decoder, req); err != nil {
 			return err
@@ -50,13 +50,13 @@ func (h *containerRegistryRegexHandler) OnCreate(_ client.Client, decoder *admis
 	}
 }
 
-func (h *containerRegistryRegexHandler) OnDelete(client.Client, *admission.Decoder, record.EventRecorder) capsulewebhook.Func {
+func (h *containerRegistryRegexHandler) OnDelete(client.Client, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (h *containerRegistryRegexHandler) OnUpdate(_ client.Client, decoder *admission.Decoder, _ record.EventRecorder) capsulewebhook.Func {
+func (h *containerRegistryRegexHandler) OnUpdate(_ client.Client, decoder admission.Decoder, _ record.EventRecorder) capsulewebhook.Func {
 	return func(_ context.Context, req admission.Request) *admission.Response {
 		if response := h.validate(decoder, req); response != nil {
 			return response

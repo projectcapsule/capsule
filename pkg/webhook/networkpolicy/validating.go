@@ -25,13 +25,13 @@ func Handler() capsulewebhook.Handler {
 	return &handler{}
 }
 
-func (r *handler) OnCreate(client.Client, *admission.Decoder, record.EventRecorder) capsulewebhook.Func {
+func (r *handler) OnCreate(client.Client, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (r *handler) generic(ctx context.Context, req admission.Request, client client.Client, _ *admission.Decoder) (*capsulev1beta2.Tenant, error) {
+func (r *handler) generic(ctx context.Context, req admission.Request, client client.Client, _ admission.Decoder) (*capsulev1beta2.Tenant, error) {
 	var err error
 
 	np := &networkingv1.NetworkPolicy{}
@@ -54,7 +54,7 @@ func (r *handler) generic(ctx context.Context, req admission.Request, client cli
 }
 
 //nolint:dupl
-func (r *handler) OnDelete(client client.Client, decoder *admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
+func (r *handler) OnDelete(client client.Client, decoder admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		tnt, err := r.generic(ctx, req, client, decoder)
 		if err != nil {
@@ -74,7 +74,7 @@ func (r *handler) OnDelete(client client.Client, decoder *admission.Decoder, rec
 }
 
 //nolint:dupl
-func (r *handler) OnUpdate(client client.Client, decoder *admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
+func (r *handler) OnUpdate(client client.Client, decoder admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		tnt, err := r.generic(ctx, req, client, decoder)
 		if err != nil {

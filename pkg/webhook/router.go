@@ -35,7 +35,7 @@ func Register(manager controllerruntime.Manager, webhookList ...Webhook) error {
 
 type handlerRouter struct {
 	client   client.Client
-	decoder  *admission.Decoder
+	decoder  admission.Decoder
 	recorder record.EventRecorder
 
 	handlers []Handler

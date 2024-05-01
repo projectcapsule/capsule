@@ -36,19 +36,19 @@ func Handler(cfg configuration.Configuration) capsulewebhook.Handler {
 	}
 }
 
-func (h *handler) OnCreate(client client.Client, decoder *admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
+func (h *handler) OnCreate(client client.Client, decoder admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		return h.setOwnerRef(ctx, req, client, decoder, recorder)
 	}
 }
 
-func (h *handler) OnDelete(client.Client, *admission.Decoder, record.EventRecorder) capsulewebhook.Func {
+func (h *handler) OnDelete(client.Client, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (h *handler) OnUpdate(_ client.Client, decoder *admission.Decoder, _ record.EventRecorder) capsulewebhook.Func {
+func (h *handler) OnUpdate(_ client.Client, decoder admission.Decoder, _ record.EventRecorder) capsulewebhook.Func {
 	return func(_ context.Context, req admission.Request) *admission.Response {
 		oldNs := &corev1.Namespace{}
 		if err := decoder.DecodeRaw(req.OldObject, oldNs); err != nil {
@@ -86,7 +86,7 @@ func (h *handler) OnUpdate(_ client.Client, decoder *admission.Decoder, _ record
 	}
 }
 
-func (h *handler) setOwnerRef(ctx context.Context, req admission.Request, client client.Client, decoder *admission.Decoder, recorder record.EventRecorder) *admission.Response {
+func (h *handler) setOwnerRef(ctx context.Context, req admission.Request, client client.Client, decoder admission.Decoder, recorder record.EventRecorder) *admission.Response {
 	ns := &corev1.Namespace{}
 	if err := decoder.Decode(req, ns); err != nil {
 		response := admission.Errored(http.StatusBadRequest, err)
