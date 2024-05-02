@@ -5,9 +5,9 @@ package resources
 
 import (
 	"context"
+	"errors"
 
-	"github.com/hashicorp/go-multierror"
-	"github.com/pkg/errors"
+	gherrors "github.com/pkg/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -75,14 +75,15 @@ func (r *Global) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-//nolint:dupl
 func (r *Global) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
+	var err error
+
 	log := ctrllog.FromContext(ctx)
 
 	log.Info("start processing")
 	// Retrieving the GlobalTenantResource
 	tntResource := &capsulev1beta2.GlobalTenantResource{}
-	if err := r.client.Get(ctx, request.NamespacedName, tntResource); err != nil {
+	if err = r.client.Get(ctx, request.NamespacedName, tntResource); err != nil {
 		if apierrors.IsNotFound(err) {
 			log.Info("Request object not found, could have been deleted after reconcile request")
 
@@ -94,13 +95,13 @@ func (r *Global) Reconcile(ctx context.Context, request reconcile.Request) (reco
 
 	patchHelper, err := patch.NewHelper(tntResource, r.client)
 	if err != nil {
-		return reconcile.Result{}, errors.Wrap(err, "failed to init patch helper")
+		return reconcile.Result{}, gherrors.Wrap(err, "failed to init patch helper")
 	}
 
 	defer func() {
 		if e := patchHelper.Patch(ctx, tntResource); e != nil {
 			if err == nil {
-				err = errors.Wrap(e, "failed to patch GlobalTenantResource")
+				err = gherrors.Wrap(e, "failed to patch GlobalTenantResource")
 			}
 		}
 	}()
@@ -143,7 +144,6 @@ func (r *Global) reconcileNormal(ctx context.Context, tntResource *capsulev1beta
 	// upon replication and pruning, this will be updated in the status of the resource.
 	tntSet := sets.NewString()
 
-	err = new(multierror.Error)
 	// A TenantResource is made of several Resource sections, each one with specific options:
 	// the Status can be updated only in case of no errors across all of them to guarantee a valid and coherent status.
 	processedItems := sets.NewString()
@@ -163,14 +163,14 @@ func (r *Global) reconcileNormal(ctx context.Context, tntResource *capsulev1beta
 			if sectionErr != nil {
 				// Upon a process error storing the last error occurred and continuing to iterate,
 				// avoid to block the whole processing.
-				err = multierror.Append(err, sectionErr)
+				err = errors.Join(err, sectionErr)
 			} else {
 				processedItems.Insert(items...)
 			}
 		}
 	}
 
-	if err.(*multierror.Error).ErrorOrNil() != nil { //nolint:errorlint,forcetypeassert
+	if err != nil {
 		log.Error(err, "unable to replicate the requested resources")
 
 		return reconcile.Result{}, err
