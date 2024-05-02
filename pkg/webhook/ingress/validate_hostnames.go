@@ -28,25 +28,25 @@ func Hostnames(configuration configuration.Configuration) capsulewebhook.Handler
 	return &hostnames{configuration: configuration}
 }
 
-func (r *hostnames) OnCreate(c client.Client, decoder *admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
+func (r *hostnames) OnCreate(c client.Client, decoder admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		return r.validate(ctx, c, req, decoder, recorder)
 	}
 }
 
-func (r *hostnames) OnUpdate(c client.Client, decoder *admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
+func (r *hostnames) OnUpdate(c client.Client, decoder admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		return r.validate(ctx, c, req, decoder, recorder)
 	}
 }
 
-func (r *hostnames) OnDelete(client.Client, *admission.Decoder, record.EventRecorder) capsulewebhook.Func {
+func (r *hostnames) OnDelete(client.Client, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (r *hostnames) validate(ctx context.Context, client client.Client, req admission.Request, decoder *admission.Decoder, recorder record.EventRecorder) *admission.Response {
+func (r *hostnames) validate(ctx context.Context, client client.Client, req admission.Request, decoder admission.Decoder, recorder record.EventRecorder) *admission.Response {
 	ingress, err := FromRequest(req, decoder)
 	if err != nil {
 		return utils.ErroredResponse(err)

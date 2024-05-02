@@ -27,7 +27,7 @@ func Handler() capsulewebhook.Handler {
 	return &handler{}
 }
 
-func (r *handler) handleService(ctx context.Context, clt client.Client, decoder *admission.Decoder, req admission.Request, recorder record.EventRecorder) *admission.Response {
+func (r *handler) handleService(ctx context.Context, clt client.Client, decoder admission.Decoder, req admission.Request, recorder record.EventRecorder) *admission.Response {
 	svc := &corev1.Service{}
 	if err := decoder.Decode(req, svc); err != nil {
 		return utils.ErroredResponse(err)
@@ -125,19 +125,19 @@ func (r *handler) handleService(ctx context.Context, clt client.Client, decoder 
 	return nil
 }
 
-func (r *handler) OnCreate(client client.Client, decoder *admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
+func (r *handler) OnCreate(client client.Client, decoder admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		return r.handleService(ctx, client, decoder, req, recorder)
 	}
 }
 
-func (r *handler) OnUpdate(client client.Client, decoder *admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
+func (r *handler) OnUpdate(client client.Client, decoder admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		return r.handleService(ctx, client, decoder, req, recorder)
 	}
 }
 
-func (r *handler) OnDelete(client.Client, *admission.Decoder, record.EventRecorder) capsulewebhook.Func {
+func (r *handler) OnDelete(client.Client, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
