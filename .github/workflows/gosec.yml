@@ -18,7 +18,15 @@ jobs:
     steps:
       - name: Checkout Source
         uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b # v4.1.4
+      - uses: actions/setup-go@0c52d547c9bc32b1aa3301fd7a9cb496313a4491 # v5.0.0
+        with:
+          go-version: '1.22'
       - name: Run Gosec Security Scanner
         uses: securego/gosec@26e57d6b340778c2983cd61775bc7e8bb41d002a # v2.19.0
         with:
-          args: ./...
+          args:  '-no-fail -fmt sarif -out gosec.sarif ./...'
+      - name: Upload SARIF file
+        uses: github/codeql-action/upload-sarif@c4fb451437765abf5018c6fbf22cce1a7da1e5cc
+        with:
+          sarif_file: gosec.sarif
+
