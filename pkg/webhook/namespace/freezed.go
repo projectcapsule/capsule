@@ -35,6 +35,10 @@ func (r *freezedHandler) OnCreate(client client.Client, decoder *admission.Decod
 		}
 
 		for _, objectRef := range ns.ObjectMeta.OwnerReferences {
+			if !isTenantOwnerReference(objectRef) {
+				continue
+			}
+
 			// retrieving the selected Tenant
 			tnt := &capsulev1beta2.Tenant{}
 			if err := client.Get(ctx, types.NamespacedName{Name: objectRef.Name}, tnt); err != nil {

@@ -33,7 +33,12 @@ func (r *userMetadataHandler) OnCreate(client client.Client, decoder *admission.
 		}
 
 		tnt := &capsulev1beta2.Tenant{}
+
 		for _, objectRef := range ns.ObjectMeta.OwnerReferences {
+			if !isTenantOwnerReference(objectRef) {
+				continue
+			}
+
 			// retrieving the selected Tenant
 			if err := client.Get(ctx, types.NamespacedName{Name: objectRef.Name}, tnt); err != nil {
 				return utils.ErroredResponse(err)
@@ -83,7 +88,12 @@ func (r *userMetadataHandler) OnUpdate(client client.Client, decoder *admission.
 		}
 
 		tnt := &capsulev1beta2.Tenant{}
+
 		for _, objectRef := range newNs.ObjectMeta.OwnerReferences {
+			if !isTenantOwnerReference(objectRef) {
+				continue
+			}
+
 			// retrieving the selected Tenant
 			if err := client.Get(ctx, types.NamespacedName{Name: objectRef.Name}, tnt); err != nil {
 				return utils.ErroredResponse(err)
