@@ -1,6 +1,8 @@
 # Version
 GIT_HEAD_COMMIT ?= $(shell git rev-parse --short HEAD)
 VERSION         ?= $(or $(shell git describe --abbrev=0 --tags --match "v*" 2>/dev/null),$(GIT_HEAD_COMMIT))
+GOOS                 ?= $(shell go env GOOS)
+GOARCH               ?= $(shell go env GOARCH)
 
 # Defaults
 REGISTRY        ?= ghcr.io
@@ -181,6 +183,7 @@ dev-setup:
 # -- Docker
 ####################
 
+KO_PLATFORM     ?= linux/$(GOARCH)
 KOCACHE         ?= /tmp/ko-cache
 KO_REGISTRY     := ko.local
 KO_TAGS         ?= "latest"
@@ -200,9 +203,9 @@ LD_FLAGS        := "-X main.Version=$(VERSION) \
 
 .PHONY: ko-build-capsule
 ko-build-capsule: ko
-	@echo Building Capsule $(KO_TAGS) >&2
+	@echo Building Capsule $(KO_TAGS) for $(KO_PLATFORM) >&2
 	@LD_FLAGS=$(LD_FLAGS) KOCACHE=$(KOCACHE) KO_DOCKER_REPO=$(CAPSULE_IMG) \
-		$(KO) build ./ --bare --tags=$(KO_TAGS) --push=false --local
+		$(KO) build ./ --bare --tags=$(KO_TAGS) --push=false --local --platform=$(KO_PLATFORM)
 
 .PHONY: ko-build-all
 ko-build-all: ko-build-capsule
@@ -230,7 +233,7 @@ ko-publish-all: ko-publish-capsule
 ####################
 
 CONTROLLER_GEN         := $(shell pwd)/bin/controller-gen
-CONTROLLER_GEN_VERSION := v0.10.0
+CONTROLLER_GEN_VERSION := v0.15.0
 controller-gen: ## Download controller-gen locally if necessary.
 	$(call go-install-tool,$(CONTROLLER_GEN),sigs.k8s.io/controller-tools/cmd/controller-gen@$(CONTROLLER_GEN_VERSION))
 
@@ -240,7 +243,7 @@ apidocs-gen: ## Download crdoc locally if necessary.
 	$(call go-install-tool,$(APIDOCS_GEN),fybrik.io/crdoc@$(APIDOCS_GEN_VERSION))
 
 GINKGO         := $(shell pwd)/bin/ginkgo
-GINGKO_VERSION := v2.15.0
+GINGKO_VERSION := v2.17.2
 ginkgo: ## Download ginkgo locally if necessary.
 	$(call go-install-tool,$(GINKGO),github.com/onsi/ginkgo/v2/ginkgo@$(GINGKO_VERSION))
 
@@ -352,5 +355,5 @@ e2e-destroy:
 
 SPELL_CHECKER = npx spellchecker-cli
 docs-lint:
-	cd docs/content && $(SPELL_CHECKER) -f "*.md" "*/*.md" -d dictionary.txt
+	cd docs/content && $(SPELL_CHECKER) -f "*.md" "*/*.md" "!general/crds-apis.md" -d dictionary.txt
 

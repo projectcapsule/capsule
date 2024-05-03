@@ -25,25 +25,25 @@ func Wildcard() capsulewebhook.Handler {
 	return &wildcard{}
 }
 
-func (h *wildcard) OnCreate(client client.Client, decoder *admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
+func (h *wildcard) OnCreate(client client.Client, decoder admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		return h.validate(ctx, client, req, recorder, decoder)
 	}
 }
 
-func (h *wildcard) OnDelete(client.Client, *admission.Decoder, record.EventRecorder) capsulewebhook.Func {
+func (h *wildcard) OnDelete(client.Client, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (h *wildcard) OnUpdate(client client.Client, decoder *admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
+func (h *wildcard) OnUpdate(client client.Client, decoder admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		return h.validate(ctx, client, req, recorder, decoder)
 	}
 }
 
-func (h *wildcard) validate(ctx context.Context, clt client.Client, req admission.Request, recorder record.EventRecorder, decoder *admission.Decoder) *admission.Response {
+func (h *wildcard) validate(ctx context.Context, clt client.Client, req admission.Request, recorder record.EventRecorder, decoder admission.Decoder) *admission.Response {
 	tntList := &capsulev1beta2.TenantList{}
 
 	if err := clt.List(ctx, tntList, client.MatchingFieldsSelector{

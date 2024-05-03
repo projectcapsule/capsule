@@ -32,25 +32,25 @@ func Class(configuration configuration.Configuration, version *version.Version) 
 	}
 }
 
-func (r *class) OnCreate(client client.Client, decoder *admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
+func (r *class) OnCreate(client client.Client, decoder admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		return r.validate(ctx, r.version, client, req, decoder, recorder)
 	}
 }
 
-func (r *class) OnUpdate(client client.Client, decoder *admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
+func (r *class) OnUpdate(client client.Client, decoder admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		return r.validate(ctx, r.version, client, req, decoder, recorder)
 	}
 }
 
-func (r *class) OnDelete(client.Client, *admission.Decoder, record.EventRecorder) capsulewebhook.Func {
+func (r *class) OnDelete(client.Client, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (r *class) validate(ctx context.Context, version *version.Version, client client.Client, req admission.Request, decoder *admission.Decoder, recorder record.EventRecorder) *admission.Response {
+func (r *class) validate(ctx context.Context, version *version.Version, client client.Client, req admission.Request, decoder admission.Decoder, recorder record.EventRecorder) *admission.Response {
 	ingress, err := FromRequest(req, decoder)
 	if err != nil {
 		return utils.ErroredResponse(err)

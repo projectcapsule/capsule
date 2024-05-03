@@ -23,7 +23,7 @@ func ImagePullPolicy() capsulewebhook.Handler {
 	return &imagePullPolicy{}
 }
 
-func (r *imagePullPolicy) OnCreate(c client.Client, decoder *admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
+func (r *imagePullPolicy) OnCreate(c client.Client, decoder admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		pod := &corev1.Pod{}
 		if err := decoder.Decode(req, pod); err != nil {
@@ -65,13 +65,13 @@ func (r *imagePullPolicy) OnCreate(c client.Client, decoder *admission.Decoder, 
 	}
 }
 
-func (r *imagePullPolicy) OnUpdate(client.Client, *admission.Decoder, record.EventRecorder) capsulewebhook.Func {
+func (r *imagePullPolicy) OnUpdate(client.Client, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (r *imagePullPolicy) OnDelete(client.Client, *admission.Decoder, record.EventRecorder) capsulewebhook.Func {
+func (r *imagePullPolicy) OnDelete(client.Client, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}

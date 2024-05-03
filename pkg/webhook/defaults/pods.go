@@ -18,7 +18,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/webhook/utils"
 )
 
-func mutatePodDefaults(ctx context.Context, req admission.Request, c client.Client, decoder *admission.Decoder, recorder record.EventRecorder, namespace string) *admission.Response {
+func mutatePodDefaults(ctx context.Context, req admission.Request, c client.Client, decoder admission.Decoder, recorder record.EventRecorder, namespace string) *admission.Response {
 	var err error
 
 	pod := &corev1.Pod{}

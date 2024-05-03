@@ -102,7 +102,8 @@ CapsuleConfigurationSpec defines the Capsule configuration.
         <td><b>enableTLSReconciler</b></td>
         <td>boolean</td>
         <td>
-          Toggles the TLS reconciler, the controller that is able to generate CA and certificates for the webhooks when not using an already provided CA and certificate, or when these are managed externally with Vault, or cert-manager.<br/>
+          Toggles the TLS reconciler, the controller that is able to generate CA and certificates for the webhooks
+when not using an already provided CA and certificate, or when these are managed externally with Vault, or cert-manager.<br/>
           <br/>
             <i>Default</i>: true<br/>
         </td>
@@ -111,7 +112,8 @@ CapsuleConfigurationSpec defines the Capsule configuration.
         <td><b>forceTenantPrefix</b></td>
         <td>boolean</td>
         <td>
-          Enforces the Tenant owner, during Namespace creation, to name it using the selected Tenant name as prefix, separated by a dash. This is useful to avoid Namespace name collision in a public CaaS environment.<br/>
+          Enforces the Tenant owner, during Namespace creation, to name it using the selected Tenant name as prefix,
+separated by a dash. This is useful to avoid Namespace name collision in a public CaaS environment.<br/>
           <br/>
             <i>Default</i>: false<br/>
         </td>
@@ -120,14 +122,16 @@ CapsuleConfigurationSpec defines the Capsule configuration.
         <td><b><a href="#capsuleconfigurationspecnodemetadata">nodeMetadata</a></b></td>
         <td>object</td>
         <td>
-          Allows to set the forbidden metadata for the worker nodes that could be patched by a Tenant. This applies only if the Tenant has an active NodeSelector, and the Owner have right to patch their nodes.<br/>
+          Allows to set the forbidden metadata for the worker nodes that could be patched by a Tenant.
+This applies only if the Tenant has an active NodeSelector, and the Owner have right to patch their nodes.<br/>
         </td>
         <td>false</td>
       </tr><tr>
         <td><b><a href="#capsuleconfigurationspecoverrides">overrides</a></b></td>
         <td>object</td>
         <td>
-          Allows to set different name rather than the canonical one for the Capsule configuration objects, such as webhook secret or configurations.<br/>
+          Allows to set different name rather than the canonical one for the Capsule configuration objects,
+such as webhook secret or configurations.<br/>
           <br/>
             <i>Default</i>: map[TLSSecretName:capsule-tls mutatingWebhookConfigurationName:capsule-mutating-webhook-configuration validatingWebhookConfigurationName:capsule-validating-webhook-configuration]<br/>
         </td>
@@ -156,7 +160,8 @@ CapsuleConfigurationSpec defines the Capsule configuration.
 
 
 
-Allows to set the forbidden metadata for the worker nodes that could be patched by a Tenant. This applies only if the Tenant has an active NodeSelector, and the Owner have right to patch their nodes.
+Allows to set the forbidden metadata for the worker nodes that could be patched by a Tenant.
+This applies only if the Tenant has an active NodeSelector, and the Owner have right to patch their nodes.
 
 <table>
     <thead>
@@ -255,7 +260,8 @@ Define the labels that a Tenant Owner cannot set for their nodes.
 
 
 
-Allows to set different name rather than the canonical one for the Capsule configuration objects, such as webhook secret or configurations.
+Allows to set different name rather than the canonical one for the Capsule configuration objects,
+such as webhook secret or configurations.
 
 <table>
     <thead>
@@ -270,7 +276,8 @@ Allows to set different name rather than the canonical one for the Capsule confi
         <td><b>TLSSecretName</b></td>
         <td>string</td>
         <td>
-          Defines the Secret name used for the webhook server. Must be in the same Namespace where the Capsule Deployment is deployed.<br/>
+          Defines the Secret name used for the webhook server.
+Must be in the same Namespace where the Capsule Deployment is deployed.<br/>
           <br/>
             <i>Default</i>: capsule-tls<br/>
         </td>
@@ -375,7 +382,8 @@ GlobalTenantResourceSpec defines the desired state of GlobalTenantResource.
         <td><b>resyncPeriod</b></td>
         <td>string</td>
         <td>
-          Define the period of time upon a second reconciliation must be invoked. Keep in mind that any change to the manifests will trigger a new reconciliation.<br/>
+          Define the period of time upon a second reconciliation must be invoked.
+Keep in mind that any change to the manifests will trigger a new reconciliation.<br/>
           <br/>
             <i>Default</i>: 60s<br/>
         </td>
@@ -384,7 +392,8 @@ GlobalTenantResourceSpec defines the desired state of GlobalTenantResource.
         <td><b>pruningOnDelete</b></td>
         <td>boolean</td>
         <td>
-          When the replicated resource manifest is deleted, all the objects replicated so far will be automatically deleted. Disable this to keep replicated resources although the deletion of the replication manifest.<br/>
+          When the replicated resource manifest is deleted, all the objects replicated so far will be automatically deleted.
+Disable this to keep replicated resources although the deletion of the replication manifest.<br/>
           <br/>
             <i>Default</i>: true<br/>
         </td>
@@ -419,14 +428,16 @@ GlobalTenantResourceSpec defines the desired state of GlobalTenantResource.
         <td><b><a href="#globaltenantresourcespecresourcesindexadditionalmetadata">additionalMetadata</a></b></td>
         <td>object</td>
         <td>
-          Besides the Capsule metadata required by TenantResource controller, defines additional metadata that must be added to the replicated resources.<br/>
+          Besides the Capsule metadata required by TenantResource controller, defines additional metadata that must be
+added to the replicated resources.<br/>
         </td>
         <td>false</td>
       </tr><tr>
         <td><b><a href="#globaltenantresourcespecresourcesindexnamespaceselector">namespaceSelector</a></b></td>
         <td>object</td>
         <td>
-          Defines the Namespace selector to select the Tenant Namespaces on which the resources must be propagated. In case of nil value, all the Tenant Namespaces are targeted.<br/>
+          Defines the Namespace selector to select the Tenant Namespaces on which the resources must be propagated.
+In case of nil value, all the Tenant Namespaces are targeted.<br/>
         </td>
         <td>false</td>
       </tr><tr>
@@ -451,7 +462,8 @@ GlobalTenantResourceSpec defines the desired state of GlobalTenantResource.
 
 
 
-Besides the Capsule metadata required by TenantResource controller, defines additional metadata that must be added to the replicated resources.
+Besides the Capsule metadata required by TenantResource controller, defines additional metadata that must be
+added to the replicated resources.
 
 <table>
     <thead>
@@ -484,7 +496,8 @@ Besides the Capsule metadata required by TenantResource controller, defines addi
 
 
 
-Defines the Namespace selector to select the Tenant Namespaces on which the resources must be propagated. In case of nil value, all the Tenant Namespaces are targeted.
+Defines the Namespace selector to select the Tenant Namespaces on which the resources must be propagated.
+In case of nil value, all the Tenant Namespaces are targeted.
 
 <table>
     <thead>
@@ -506,7 +519,9 @@ Defines the Namespace selector to select the Tenant Namespaces on which the reso
         <td><b>matchLabels</b></td>
         <td>map[string]string</td>
         <td>
-          matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is "key", the operator is "In", and the values array contains only "value". The requirements are ANDed.<br/>
+          matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+map is equivalent to an element of matchExpressions, whose key field is "key", the
+operator is "In", and the values array contains only "value". The requirements are ANDed.<br/>
         </td>
         <td>false</td>
       </tr></tbody>
@@ -517,7 +532,8 @@ Defines the Namespace selector to select the Tenant Namespaces on which the reso
 
 
 
-A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.
+A label selector requirement is a selector that contains values, a key, and an operator that
+relates the key and values.
 
 <table>
     <thead>
@@ -539,14 +555,18 @@ A label selector requirement is a selector that contains values, a key, and an o
         <td><b>operator</b></td>
         <td>string</td>
         <td>
-          operator represents a key's relationship to a set of values. Valid operators are In, NotIn, Exists and DoesNotExist.<br/>
+          operator represents a key's relationship to a set of values.
+Valid operators are In, NotIn, Exists and DoesNotExist.<br/>
         </td>
         <td>true</td>
       </tr><tr>
         <td><b>values</b></td>
         <td>[]string</td>
         <td>
-          values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.<br/>
+          values is an array of string values. If the operator is In or NotIn,
+the values array must be non-empty. If the operator is Exists or DoesNotExist,
+the values array must be empty. This array is replaced during a strategic
+merge patch.<br/>
         </td>
         <td>false</td>
       </tr></tbody>
@@ -572,14 +592,16 @@ A label selector requirement is a selector that contains values, a key, and an o
         <td><b>kind</b></td>
         <td>string</td>
         <td>
-          Kind of the referent. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds<br/>
+          Kind of the referent.
+More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds<br/>
         </td>
         <td>true</td>
       </tr><tr>
         <td><b>namespace</b></td>
         <td>string</td>
         <td>
-          Namespace of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/<br/>
+          Namespace of the referent.
+More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/<br/>
         </td>
         <td>true</td>
       </tr><tr>
@@ -626,7 +648,9 @@ Label selector used to select the given resources in the given Namespace.
         <td><b>matchLabels</b></td>
         <td>map[string]string</td>
         <td>
-          matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is "key", the operator is "In", and the values array contains only "value". The requirements are ANDed.<br/>
+          matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+map is equivalent to an element of matchExpressions, whose key field is "key", the
+operator is "In", and the values array contains only "value". The requirements are ANDed.<br/>
         </td>
         <td>false</td>
       </tr></tbody>
@@ -637,7 +661,8 @@ Label selector used to select the given resources in the given Namespace.
 
 
 
-A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.
+A label selector requirement is a selector that contains values, a key, and an operator that
+relates the key and values.
 
 <table>
     <thead>
@@ -659,14 +684,18 @@ A label selector requirement is a selector that contains values, a key, and an o
         <td><b>operator</b></td>
         <td>string</td>
         <td>
-          operator represents a key's relationship to a set of values. Valid operators are In, NotIn, Exists and DoesNotExist.<br/>
+          operator represents a key's relationship to a set of values.
+Valid operators are In, NotIn, Exists and DoesNotExist.<br/>
         </td>
         <td>true</td>
       </tr><tr>
         <td><b>values</b></td>
         <td>[]string</td>
         <td>
-          values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.<br/>
+          values is an array of string values. If the operator is In or NotIn,
+the values array must be non-empty. If the operator is Exists or DoesNotExist,
+the values array must be empty. This array is replaced during a strategic
+merge patch.<br/>
         </td>
         <td>false</td>
       </tr></tbody>
@@ -699,7 +728,9 @@ Defines the Tenant selector used target the tenants on which resources must be p
         <td><b>matchLabels</b></td>
         <td>map[string]string</td>
         <td>
-          matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is "key", the operator is "In", and the values array contains only "value". The requirements are ANDed.<br/>
+          matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+map is equivalent to an element of matchExpressions, whose key field is "key", the
+operator is "In", and the values array contains only "value". The requirements are ANDed.<br/>
         </td>
         <td>false</td>
       </tr></tbody>
@@ -710,7 +741,8 @@ Defines the Tenant selector used target the tenants on which resources must be p
 
 
 
-A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.
+A label selector requirement is a selector that contains values, a key, and an operator that
+relates the key and values.
 
 <table>
     <thead>
@@ -732,14 +764,18 @@ A label selector requirement is a selector that contains values, a key, and an o
         <td><b>operator</b></td>
         <td>string</td>
         <td>
-          operator represents a key's relationship to a set of values. Valid operators are In, NotIn, Exists and DoesNotExist.<br/>
+          operator represents a key's relationship to a set of values.
+Valid operators are In, NotIn, Exists and DoesNotExist.<br/>
         </td>
         <td>true</td>
       </tr><tr>
         <td><b>values</b></td>
         <td>[]string</td>
         <td>
-          values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.<br/>
+          values is an array of string values. If the operator is In or NotIn,
+the values array must be non-empty. If the operator is Exists or DoesNotExist,
+the values array must be empty. This array is replaced during a strategic
+merge patch.<br/>
         </td>
         <td>false</td>
       </tr></tbody>
@@ -798,21 +834,24 @@ GlobalTenantResourceStatus defines the observed state of GlobalTenantResource.
         <td><b>kind</b></td>
         <td>string</td>
         <td>
-          Kind of the referent. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds<br/>
+          Kind of the referent.
+More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds<br/>
         </td>
         <td>true</td>
       </tr><tr>
         <td><b>name</b></td>
         <td>string</td>
         <td>
-          Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names<br/>
+          Name of the referent.
+More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names<br/>
         </td>
         <td>true</td>
       </tr><tr>
         <td><b>namespace</b></td>
         <td>string</td>
         <td>
-          Namespace of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/<br/>
+          Namespace of the referent.
+More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/<br/>
         </td>
         <td>true</td>
       </tr><tr>
@@ -832,7 +871,9 @@ GlobalTenantResourceStatus defines the observed state of GlobalTenantResource.
 
 
 
-TenantResource allows a Tenant Owner, if enabled with proper RBAC, to propagate resources in its Namespace. The object must be deployed in a Tenant Namespace, and cannot reference object living in non-Tenant namespaces. For such cases, the GlobalTenantResource must be used.
+TenantResource allows a Tenant Owner, if enabled with proper RBAC, to propagate resources in its Namespace.
+The object must be deployed in a Tenant Namespace, and cannot reference object living in non-Tenant namespaces.
+For such cases, the GlobalTenantResource must be used.
 
 <table>
     <thead>
@@ -904,7 +945,8 @@ TenantResourceSpec defines the desired state of TenantResource.
         <td><b>resyncPeriod</b></td>
         <td>string</td>
         <td>
-          Define the period of time upon a second reconciliation must be invoked. Keep in mind that any change to the manifests will trigger a new reconciliation.<br/>
+          Define the period of time upon a second reconciliation must be invoked.
+Keep in mind that any change to the manifests will trigger a new reconciliation.<br/>
           <br/>
             <i>Default</i>: 60s<br/>
         </td>
@@ -913,7 +955,8 @@ TenantResourceSpec defines the desired state of TenantResource.
         <td><b>pruningOnDelete</b></td>
         <td>boolean</td>
         <td>
-          When the replicated resource manifest is deleted, all the objects replicated so far will be automatically deleted. Disable this to keep replicated resources although the deletion of the replication manifest.<br/>
+          When the replicated resource manifest is deleted, all the objects replicated so far will be automatically deleted.
+Disable this to keep replicated resources although the deletion of the replication manifest.<br/>
           <br/>
             <i>Default</i>: true<br/>
         </td>
@@ -941,14 +984,16 @@ TenantResourceSpec defines the desired state of TenantResource.
         <td><b><a href="#tenantresourcespecresourcesindexadditionalmetadata">additionalMetadata</a></b></td>
         <td>object</td>
         <td>
-          Besides the Capsule metadata required by TenantResource controller, defines additional metadata that must be added to the replicated resources.<br/>
+          Besides the Capsule metadata required by TenantResource controller, defines additional metadata that must be
+added to the replicated resources.<br/>
         </td>
         <td>false</td>
       </tr><tr>
         <td><b><a href="#tenantresourcespecresourcesindexnamespaceselector">namespaceSelector</a></b></td>
         <td>object</td>
         <td>
-          Defines the Namespace selector to select the Tenant Namespaces on which the resources must be propagated. In case of nil value, all the Tenant Namespaces are targeted.<br/>
+          Defines the Namespace selector to select the Tenant Namespaces on which the resources must be propagated.
+In case of nil value, all the Tenant Namespaces are targeted.<br/>
         </td>
         <td>false</td>
       </tr><tr>
@@ -973,7 +1018,8 @@ TenantResourceSpec defines the desired state of TenantResource.
 
 
 
-Besides the Capsule metadata required by TenantResource controller, defines additional metadata that must be added to the replicated resources.
+Besides the Capsule metadata required by TenantResource controller, defines additional metadata that must be
+added to the replicated resources.
 
 <table>
     <thead>
@@ -1006,7 +1052,8 @@ Besides the Capsule metadata required by TenantResource controller, defines addi
 
 
 
-Defines the Namespace selector to select the Tenant Namespaces on which the resources must be propagated. In case of nil value, all the Tenant Namespaces are targeted.
+Defines the Namespace selector to select the Tenant Namespaces on which the resources must be propagated.
+In case of nil value, all the Tenant Namespaces are targeted.
 
 <table>
     <thead>
@@ -1028,7 +1075,9 @@ Defines the Namespace selector to select the Tenant Namespaces on which the reso
         <td><b>matchLabels</b></td>
         <td>map[string]string</td>
         <td>
-          matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is "key", the operator is "In", and the values array contains only "value". The requirements are ANDed.<br/>
+          matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+map is equivalent to an element of matchExpressions, whose key field is "key", the
+operator is "In", and the values array contains only "value". The requirements are ANDed.<br/>
         </td>
         <td>false</td>
       </tr></tbody>
@@ -1039,7 +1088,8 @@ Defines the Namespace selector to select the Tenant Namespaces on which the reso
 
 
 
-A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.
+A label selector requirement is a selector that contains values, a key, and an operator that
+relates the key and values.
 
 <table>
     <thead>
@@ -1061,14 +1111,18 @@ A label selector requirement is a selector that contains values, a key, and an o
         <td><b>operator</b></td>
         <td>string</td>
         <td>
-          operator represents a key's relationship to a set of values. Valid operators are In, NotIn, Exists and DoesNotExist.<br/>
+          operator represents a key's relationship to a set of values.
+Valid operators are In, NotIn, Exists and DoesNotExist.<br/>
         </td>
         <td>true</td>
       </tr><tr>
         <td><b>values</b></td>
         <td>[]string</td>
         <td>
-          values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.<br/>
+          values is an array of string values. If the operator is In or NotIn,
+the values array must be non-empty. If the operator is Exists or DoesNotExist,
+the values array must be empty. This array is replaced during a strategic
+merge patch.<br/>
         </td>
         <td>false</td>
       </tr></tbody>
@@ -1094,14 +1148,16 @@ A label selector requirement is a selector that contains values, a key, and an o
         <td><b>kind</b></td>
         <td>string</td>
         <td>
-          Kind of the referent. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds<br/>
+          Kind of the referent.
+More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds<br/>
         </td>
         <td>true</td>
       </tr><tr>
         <td><b>namespace</b></td>
         <td>string</td>
         <td>
-          Namespace of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/<br/>
+          Namespace of the referent.
+More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/<br/>
         </td>
         <td>true</td>
       </tr><tr>
@@ -1148,7 +1204,9 @@ Label selector used to select the given resources in the given Namespace.
         <td><b>matchLabels</b></td>
         <td>map[string]string</td>
         <td>
-          matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is "key", the operator is "In", and the values array contains only "value". The requirements are ANDed.<br/>
+          matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+map is equivalent to an element of matchExpressions, whose key field is "key", the
+operator is "In", and the values array contains only "value". The requirements are ANDed.<br/>
         </td>
         <td>false</td>
       </tr></tbody>
@@ -1159,7 +1217,8 @@ Label selector used to select the given resources in the given Namespace.
 
 
 
-A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.
+A label selector requirement is a selector that contains values, a key, and an operator that
+relates the key and values.
 
 <table>
     <thead>
@@ -1181,14 +1240,18 @@ A label selector requirement is a selector that contains values, a key, and an o
         <td><b>operator</b></td>
         <td>string</td>
         <td>
-          operator represents a key's relationship to a set of values. Valid operators are In, NotIn, Exists and DoesNotExist.<br/>
+          operator represents a key's relationship to a set of values.
+Valid operators are In, NotIn, Exists and DoesNotExist.<br/>
         </td>
         <td>true</td>
       </tr><tr>
         <td><b>values</b></td>
         <td>[]string</td>
         <td>
-          values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.<br/>
+          values is an array of string values. If the operator is In or NotIn,
+the values array must be non-empty. If the operator is Exists or DoesNotExist,
+the values array must be empty. This array is replaced during a strategic
+merge patch.<br/>
         </td>
         <td>false</td>
       </tr></tbody>
@@ -1240,21 +1303,24 @@ TenantResourceStatus defines the observed state of TenantResource.
         <td><b>kind</b></td>
         <td>string</td>
         <td>
-          Kind of the referent. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds<br/>
+          Kind of the referent.
+More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds<br/>
         </td>
         <td>true</td>
       </tr><tr>
         <td><b>name</b></td>
         <td>string</td>
         <td>
-          Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names<br/>
+          Name of the referent.
+More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names<br/>
         </td>
         <td>true</td>
       </tr><tr>
         <td><b>namespace</b></td>
         <td>string</td>
         <td>
-          Namespace of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/<br/>
+          Namespace of the referent.
+More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/<br/>
         </td>
         <td>true</td>
       </tr><tr>
@@ -1418,7 +1484,8 @@ TenantSpec defines the desired state of Tenant.
         <td><b>preventDeletion</b></td>
         <td>boolean</td>
         <td>
-          Prevent accidental deletion of the Tenant. When enabled, the deletion request will be declined.<br/>
+          Prevent accidental deletion of the Tenant.
+When enabled, the deletion request will be declined.<br/>
           <br/>
             <i>Default</i>: false<br/>
         </td>
@@ -1427,7 +1494,10 @@ TenantSpec defines the desired state of Tenant.
         <td><b><a href="#tenantspecpriorityclasses-1">priorityClasses</a></b></td>
         <td>object</td>
         <td>
-          Specifies the allowed priorityClasses assigned to the Tenant. Capsule assures that all Pods resources created in the Tenant can use only one of the allowed PriorityClasses. A default value can be specified, and all the Pod resources created will inherit the declared class. Optional.<br/>
+          Specifies the allowed priorityClasses assigned to the Tenant.
+Capsule assures that all Pods resources created in the Tenant can use only one of the allowed PriorityClasses.
+A default value can be specified, and all the Pod resources created will inherit the declared class.
+Optional.<br/>
         </td>
         <td>false</td>
       </tr><tr>
@@ -1441,7 +1511,9 @@ TenantSpec defines the desired state of Tenant.
         <td><b><a href="#tenantspecruntimeclasses">runtimeClasses</a></b></td>
         <td>object</td>
         <td>
-          Specifies the allowed RuntimeClasses assigned to the Tenant. Capsule assures that all Pods resources created in the Tenant can use only one of the allowed RuntimeClasses. Optional.<br/>
+          Specifies the allowed RuntimeClasses assigned to the Tenant.
+Capsule assures that all Pods resources created in the Tenant can use only one of the allowed RuntimeClasses.
+Optional.<br/>
         </td>
         <td>false</td>
       </tr><tr>
@@ -1455,7 +1527,10 @@ TenantSpec defines the desired state of Tenant.
         <td><b><a href="#tenantspecstorageclasses-1">storageClasses</a></b></td>
         <td>object</td>
         <td>
-          Specifies the allowed StorageClasses assigned to the Tenant. Capsule assures that all PersistentVolumeClaim resources created in the Tenant can use only one of the allowed StorageClasses. A default value can be specified, and all the PersistentVolumeClaim resources created will inherit the declared class. Optional.<br/>
+          Specifies the allowed StorageClasses assigned to the Tenant.
+Capsule assures that all PersistentVolumeClaim resources created in the Tenant can use only one of the allowed StorageClasses.
+A default value can be specified, and all the PersistentVolumeClaim resources created will inherit the declared class.
+Optional.<br/>
         </td>
         <td>false</td>
       </tr></tbody>
@@ -1585,7 +1660,8 @@ TenantSpec defines the desired state of Tenant.
 
 
 
-Subject contains a reference to the object or user identities a role binding applies to.  This can either hold a direct API object reference, or a value for non-objects such as user and group names.
+Subject contains a reference to the object or user identities a role binding applies to.  This can either hold a direct API object reference,
+or a value for non-objects such as user and group names.
 
 <table>
     <thead>
@@ -1600,7 +1676,8 @@ Subject contains a reference to the object or user identities a role binding app
         <td><b>kind</b></td>
         <td>string</td>
         <td>
-          Kind of object being referenced. Values defined by this API group are "User", "Group", and "ServiceAccount". If the Authorizer does not recognized the kind value, the Authorizer should report an error.<br/>
+          Kind of object being referenced. Values defined by this API group are "User", "Group", and "ServiceAccount".
+If the Authorizer does not recognized the kind value, the Authorizer should report an error.<br/>
         </td>
         <td>true</td>
       </tr><tr>
@@ -1614,14 +1691,17 @@ Subject contains a reference to the object or user identities a role binding app
         <td><b>apiGroup</b></td>
         <td>string</td>
         <td>
-          APIGroup holds the API group of the referenced subject. Defaults to "" for ServiceAccount subjects. Defaults to "rbac.authorization.k8s.io" for User and Group subjects.<br/>
+          APIGroup holds the API group of the referenced subject.
+Defaults to "" for ServiceAccount subjects.
+Defaults to "rbac.authorization.k8s.io" for User and Group subjects.<br/>
         </td>
         <td>false</td>
       </tr><tr>
         <td><b>namespace</b></td>
         <td>string</td>
         <td>
-          Namespace of the referenced object.  If the object kind is non-namespace, such as "User" or "Group", and this value is not empty the Authorizer should report an error.<br/>
+          Namespace of the referenced object.  If the object kind is non-namespace, such as "User" or "Group", and this value is not empty
+the Authorizer should report an error.<br/>
         </td>
         <td>false</td>
       </tr></tbody>
@@ -1687,7 +1767,10 @@ Specifies options for the Ingress resources, such as allowed hostnames and Ingre
         <td><b><a href="#tenantspecingressoptionsallowedclasses-1">allowedClasses</a></b></td>
         <td>object</td>
         <td>
-          Specifies the allowed IngressClasses assigned to the Tenant. Capsule assures that all Ingress resources created in the Tenant can use only one of the allowed IngressClasses. A default value can be specified, and all the Ingress resources created will inherit the declared class. Optional.<br/>
+          Specifies the allowed IngressClasses assigned to the Tenant.
+Capsule assures that all Ingress resources created in the Tenant can use only one of the allowed IngressClasses.
+A default value can be specified, and all the Ingress resources created will inherit the declared class.
+Optional.<br/>
         </td>
         <td>false</td>
       </tr><tr>
@@ -1701,11 +1784,19 @@ Specifies options for the Ingress resources, such as allowed hostnames and Ingre
         <td><b>hostnameCollisionScope</b></td>
         <td>enum</td>
         <td>
-          Defines the scope of hostname collision check performed when Tenant Owners create Ingress with allowed hostnames. 
- - Cluster: disallow the creation of an Ingress if the pair hostname and path is already used across the Namespaces managed by Capsule. 
- - Tenant: disallow the creation of an Ingress if the pair hostname and path is already used across the Namespaces of the Tenant. 
- - Namespace: disallow the creation of an Ingress if the pair hostname and path is already used in the Ingress Namespace. 
- Optional.<br/>
+          Defines the scope of hostname collision check performed when Tenant Owners create Ingress with allowed hostnames.
+
+
+- Cluster: disallow the creation of an Ingress if the pair hostname and path is already used across the Namespaces managed by Capsule.
+
+
+- Tenant: disallow the creation of an Ingress if the pair hostname and path is already used across the Namespaces of the Tenant.
+
+
+- Namespace: disallow the creation of an Ingress if the pair hostname and path is already used in the Ingress Namespace.
+
+
+Optional.<br/>
           <br/>
             <i>Enum</i>: Cluster, Tenant, Namespace, Disabled<br/>
             <i>Default</i>: Disabled<br/>
@@ -1719,7 +1810,10 @@ Specifies options for the Ingress resources, such as allowed hostnames and Ingre
 
 
 
-Specifies the allowed IngressClasses assigned to the Tenant. Capsule assures that all Ingress resources created in the Tenant can use only one of the allowed IngressClasses. A default value can be specified, and all the Ingress resources created will inherit the declared class. Optional.
+Specifies the allowed IngressClasses assigned to the Tenant.
+Capsule assures that all Ingress resources created in the Tenant can use only one of the allowed IngressClasses.
+A default value can be specified, and all the Ingress resources created will inherit the declared class.
+Optional.
 
 <table>
     <thead>
@@ -1762,7 +1856,9 @@ Specifies the allowed IngressClasses assigned to the Tenant. Capsule assures tha
         <td><b>matchLabels</b></td>
         <td>map[string]string</td>
         <td>
-          matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is "key", the operator is "In", and the values array contains only "value". The requirements are ANDed.<br/>
+          matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+map is equivalent to an element of matchExpressions, whose key field is "key", the
+operator is "In", and the values array contains only "value". The requirements are ANDed.<br/>
         </td>
         <td>false</td>
       </tr></tbody>
@@ -1773,7 +1869,8 @@ Specifies the allowed IngressClasses assigned to the Tenant. Capsule assures tha
 
 
 
-A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.
+A label selector requirement is a selector that contains values, a key, and an operator that
+relates the key and values.
 
 <table>
     <thead>
@@ -1795,14 +1892,18 @@ A label selector requirement is a selector that contains values, a key, and an o
         <td><b>operator</b></td>
         <td>string</td>
         <td>
-          operator represents a key's relationship to a set of values. Valid operators are In, NotIn, Exists and DoesNotExist.<br/>
+          operator represents a key's relationship to a set of values.
+Valid operators are In, NotIn, Exists and DoesNotExist.<br/>
         </td>
         <td>true</td>
       </tr><tr>
         <td><b>values</b></td>
         <td>[]string</td>
         <td>
-          values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.<br/>
+          values is an array of string values. If the operator is In or NotIn,
+the values array must be non-empty. If the operator is Exists or DoesNotExist,
+the values array must be empty. This array is replaced during a strategic
+merge patch.<br/>
         </td>
         <td>false</td>
       </tr></tbody>
@@ -2149,28 +2250,54 @@ NetworkPolicySpec provides the specification of a NetworkPolicy
         <td><b><a href="#tenantspecnetworkpoliciesitemsindexpodselector-1">podSelector</a></b></td>
         <td>object</td>
         <td>
-          podSelector selects the pods to which this NetworkPolicy object applies. The array of ingress rules is applied to any pods selected by this field. Multiple network policies can select the same set of pods. In this case, the ingress rules for each are combined additively. This field is NOT optional and follows standard label selector semantics. An empty podSelector matches all pods in this namespace.<br/>
+          podSelector selects the pods to which this NetworkPolicy object applies.
+The array of ingress rules is applied to any pods selected by this field.
+Multiple network policies can select the same set of pods. In this case,
+the ingress rules for each are combined additively.
+This field is NOT optional and follows standard label selector semantics.
+An empty podSelector matches all pods in this namespace.<br/>
         </td>
         <td>true</td>
       </tr><tr>
         <td><b><a href="#tenantspecnetworkpoliciesitemsindexegressindex-1">egress</a></b></td>
         <td>[]object</td>
         <td>
-          egress is a list of egress rules to be applied to the selected pods. Outgoing traffic is allowed if there are no NetworkPolicies selecting the pod (and cluster policy otherwise allows the traffic), OR if the traffic matches at least one egress rule across all of the NetworkPolicy objects whose podSelector matches the pod. If this field is empty then this NetworkPolicy limits all outgoing traffic (and serves solely to ensure that the pods it selects are isolated by default). This field is beta-level in 1.8<br/>
+          egress is a list of egress rules to be applied to the selected pods. Outgoing traffic
+is allowed if there are no NetworkPolicies selecting the pod (and cluster policy
+otherwise allows the traffic), OR if the traffic matches at least one egress rule
+across all of the NetworkPolicy objects whose podSelector matches the pod. If
+this field is empty then this NetworkPolicy limits all outgoing traffic (and serves
+solely to ensure that the pods it selects are isolated by default).
+This field is beta-level in 1.8<br/>
         </td>
         <td>false</td>
       </tr><tr>
         <td><b><a href="#tenantspecnetworkpoliciesitemsindexingressindex-1">ingress</a></b></td>
         <td>[]object</td>
         <td>
-          ingress is a list of ingress rules to be applied to the selected pods. Traffic is allowed to a pod if there are no NetworkPolicies selecting the pod (and cluster policy otherwise allows the traffic), OR if the traffic source is the pod's local node, OR if the traffic matches at least one ingress rule across all of the NetworkPolicy objects whose podSelector matches the pod. If this field is empty then this NetworkPolicy does not allow any traffic (and serves solely to ensure that the pods it selects are isolated by default)<br/>
+          ingress is a list of ingress rules to be applied to the selected pods.
+Traffic is allowed to a pod if there are no NetworkPolicies selecting the pod
+(and cluster policy otherwise allows the traffic), OR if the traffic source is
+the pod's local node, OR if the traffic matches at least one ingress rule
+across all of the NetworkPolicy objects whose podSelector matches the pod. If
+this field is empty then this NetworkPolicy does not allow any traffic (and serves
+solely to ensure that the pods it selects are isolated by default)<br/>
         </td>
         <td>false</td>
       </tr><tr>
         <td><b>policyTypes</b></td>
         <td>[]string</td>
         <td>
-          policyTypes is a list of rule types that the NetworkPolicy relates to. Valid options are ["Ingress"], ["Egress"], or ["Ingress", "Egress"]. If this field is not specified, it will default based on the existence of ingress or egress rules; policies that contain an egress section are assumed to affect egress, and all policies (whether or not they contain an ingress section) are assumed to affect ingress. If you want to write an egress-only policy, you must explicitly specify policyTypes [ "Egress" ]. Likewise, if you want to write a policy that specifies that no egress is allowed, you must specify a policyTypes value that include "Egress" (since such a policy would not include an egress section and would otherwise default to just [ "Ingress" ]). This field is beta-level in 1.8<br/>
+          policyTypes is a list of rule types that the NetworkPolicy relates to.
+Valid options are ["Ingress"], ["Egress"], or ["Ingress", "Egress"].
+If this field is not specified, it will default based on the existence of ingress or egress rules;
+policies that contain an egress section are assumed to affect egress, and all policies
+(whether or not they contain an ingress section) are assumed to affect ingress.
+If you want to write an egress-only policy, you must explicitly specify policyTypes [ "Egress" ].
+Likewise, if you want to write a policy that specifies that no egress is allowed,
+you must specify a policyTypes value that include "Egress" (since such a policy would not include
+an egress section and would otherwise default to just [ "Ingress" ]).
+This field is beta-level in 1.8<br/>
         </td>
         <td>false</td>
       </tr></tbody>
@@ -2181,7 +2308,12 @@ NetworkPolicySpec provides the specification of a NetworkPolicy
 
 
 
-podSelector selects the pods to which this NetworkPolicy object applies. The array of ingress rules is applied to any pods selected by this field. Multiple network policies can select the same set of pods. In this case, the ingress rules for each are combined additively. This field is NOT optional and follows standard label selector semantics. An empty podSelector matches all pods in this namespace.
+podSelector selects the pods to which this NetworkPolicy object applies.
+The array of ingress rules is applied to any pods selected by this field.
+Multiple network policies can select the same set of pods. In this case,
+the ingress rules for each are combined additively.
+This field is NOT optional and follows standard label selector semantics.
+An empty podSelector matches all pods in this namespace.
 
 <table>
     <thead>
@@ -2203,7 +2335,9 @@ podSelector selects the pods to which this NetworkPolicy object applies. The arr
         <td><b>matchLabels</b></td>
         <td>map[string]string</td>
         <td>
-          matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is "key", the operator is "In", and the values array contains only "value". The requirements are ANDed.<br/>
+          matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+map is equivalent to an element of matchExpressions, whose key field is "key", the
+operator is "In", and the values array contains only "value". The requirements are ANDed.<br/>
         </td>
         <td>false</td>
       </tr></tbody>
@@ -2214,7 +2348,8 @@ podSelector selects the pods to which this NetworkPolicy object applies. The arr
 
 
 
-A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.
+A label selector requirement is a selector that contains values, a key, and an operator that
+relates the key and values.
 
 <table>
     <thead>
@@ -2236,14 +2371,18 @@ A label selector requirement is a selector that contains values, a key, and an o
         <td><b>operator</b></td>
         <td>string</td>
         <td>
-          operator represents a key's relationship to a set of values. Valid operators are In, NotIn, Exists and DoesNotExist.<br/>
+          operator represents a key's relationship to a set of values.
+Valid operators are In, NotIn, Exists and DoesNotExist.<br/>
         </td>
         <td>true</td>
       </tr><tr>
         <td><b>values</b></td>
         <td>[]string</td>
         <td>
-          values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.<br/>
+          values is an array of string values. If the operator is In or NotIn,
+the values array must be non-empty. If the operator is Exists or DoesNotExist,
+the values array must be empty. This array is replaced during a strategic
+merge patch.<br/>
         </td>
         <td>false</td>
       </tr></tbody>
@@ -2254,7 +2393,9 @@ A label selector requirement is a selector that contains values, a key, and an o
 
 
 
-NetworkPolicyEgressRule describes a particular set of traffic that is allowed out of pods matched by a NetworkPolicySpec's podSelector. The traffic must match both ports and to. This type is beta-level in 1.8
+NetworkPolicyEgressRule describes a particular set of traffic that is allowed out of pods
+matched by a NetworkPolicySpec's podSelector. The traffic must match both ports and to.
+This type is beta-level in 1.8
 
 <table>
     <thead>
@@ -2269,14 +2410,22 @@ NetworkPolicyEgressRule describes a particular set of traffic that is allowed ou
         <td><b><a href="#tenantspecnetworkpoliciesitemsindexegressindexportsindex-1">ports</a></b></td>
         <td>[]object</td>
         <td>
-          ports is a list of destination ports for outgoing traffic. Each item in this list is combined using a logical OR. If this field is empty or missing, this rule matches all ports (traffic not restricted by port). If this field is present and contains at least one item, then this rule allows traffic only if the traffic matches at least one port in the list.<br/>
+          ports is a list of destination ports for outgoing traffic.
+Each item in this list is combined using a logical OR. If this field is
+empty or missing, this rule matches all ports (traffic not restricted by port).
+If this field is present and contains at least one item, then this rule allows
+traffic only if the traffic matches at least one port in the list.<br/>
         </td>
         <td>false</td>
       </tr><tr>
         <td><b><a href="#tenantspecnetworkpoliciesitemsindexegressindextoindex-1">to</a></b></td>
         <td>[]object</td>
         <td>
-          to is a list of destinations for outgoing traffic of pods selected for this rule. Items in this list are combined using a logical OR operation. If this field is empty or missing, this rule matches all destinations (traffic not restricted by destination). If this field is present and contains at least one item, this rule allows traffic only if the traffic matches at least one item in the to list.<br/>
+          to is a list of destinations for outgoing traffic of pods selected for this rule.
+Items in this list are combined using a logical OR operation. If this field is
+empty or missing, this rule matches all destinations (traffic not restricted by
+destination). If this field is present and contains at least one item, this rule
+allows traffic only if the traffic matches at least one item in the to list.<br/>
         </td>
         <td>false</td>
       </tr></tbody>
@@ -2302,7 +2451,10 @@ NetworkPolicyPort describes a port to allow traffic on
         <td><b>endPort</b></td>
         <td>integer</td>
         <td>
-          endPort indicates that the range of ports from port to endPort if set, inclusive, should be allowed by the policy. This field cannot be defined if the port field is not defined or if the port field is defined as a named (string) port. The endPort must be equal or greater than port.<br/>
+          endPort indicates that the range of ports from port to endPort if set, inclusive,
+should be allowed by the policy. This field cannot be defined if the port field
+is not defined or if the port field is defined as a named (string) port.
+The endPort must be equal or greater than port.<br/>
           <br/>
             <i>Format</i>: int32<br/>
         </td>
@@ -2311,14 +2463,18 @@ NetworkPolicyPort describes a port to allow traffic on
         <td><b>port</b></td>
         <td>int or string</td>
         <td>
-          port represents the port on the given protocol. This can either be a numerical or named port on a pod. If this field is not provided, this matches all port names and numbers. If present, only traffic on the specified protocol AND port will be matched.<br/>
+          port represents the port on the given protocol. This can either be a numerical or named
+port on a pod. If this field is not provided, this matches all port names and
+numbers.
+If present, only traffic on the specified protocol AND port will be matched.<br/>
         </td>
         <td>false</td>
       </tr><tr>
         <td><b>protocol</b></td>
         <td>string</td>
         <td>
-          protocol represents the protocol (TCP, UDP, or SCTP) which traffic must match. If not specified, this field defaults to TCP.<br/>
+          protocol represents the protocol (TCP, UDP, or SCTP) which traffic must match.
+If not specified, this field defaults to TCP.<br/>
           <br/>
             <i>Default</i>: TCP<br/>
         </td>
@@ -2331,7 +2487,8 @@ NetworkPolicyPort describes a port to allow traffic on
 
 
 
-NetworkPolicyPeer describes a peer to allow traffic to/from. Only certain combinations of fields are allowed
+NetworkPolicyPeer describes a peer to allow traffic to/from. Only certain combinations of
+fields are allowed
 
 <table>
     <thead>
@@ -2346,23 +2503,34 @@ NetworkPolicyPeer describes a peer to allow traffic to/from. Only certain combin
         <td><b><a href="#tenantspecnetworkpoliciesitemsindexegressindextoindexipblock-1">ipBlock</a></b></td>
         <td>object</td>
         <td>
-          ipBlock defines policy on a particular IPBlock. If this field is set then neither of the other fields can be.<br/>
+          ipBlock defines policy on a particular IPBlock. If this field is set then
+neither of the other fields can be.<br/>
         </td>
         <td>false</td>
       </tr><tr>
         <td><b><a href="#tenantspecnetworkpoliciesitemsindexegressindextoindexnamespaceselector-1">namespaceSelector</a></b></td>
         <td>object</td>
         <td>
-          namespaceSelector selects namespaces using cluster-scoped labels. This field follows standard label selector semantics; if present but empty, it selects all namespaces. 
- If podSelector is also set, then the NetworkPolicyPeer as a whole selects the pods matching podSelector in the namespaces selected by namespaceSelector. Otherwise it selects all pods in the namespaces selected by namespaceSelector.<br/>
+          namespaceSelector selects namespaces using cluster-scoped labels. This field follows
+standard label selector semantics; if present but empty, it selects all namespaces.
+
+
+If podSelector is also set, then the NetworkPolicyPeer as a whole selects
+the pods matching podSelector in the namespaces selected by namespaceSelector.
+Otherwise it selects all pods in the namespaces selected by namespaceSelector.<br/>
         </td>
         <td>false</td>
       </tr><tr>
         <td><b><a href="#tenantspecnetworkpoliciesitemsindexegressindextoindexpodselector-1">podSelector</a></b></td>
         <td>object</td>
         <td>
-          podSelector is a label selector which selects pods. This field follows standard label selector semantics; if present but empty, it selects all pods. 
- If namespaceSelector is also set, then the NetworkPolicyPeer as a whole selects the pods matching podSelector in the Namespaces selected by NamespaceSelector. Otherwise it selects the pods matching podSelector in the policy's own namespace.<br/>
+          podSelector is a label selector which selects pods. This field follows standard label
+selector semantics; if present but empty, it selects all pods.
+
+
+If namespaceSelector is also set, then the NetworkPolicyPeer as a whole selects
+the pods matching podSelector in the Namespaces selected by NamespaceSelector.
+Otherwise it selects the pods matching podSelector in the policy's own namespace.<br/>
         </td>
         <td>false</td>
       </tr></tbody>
@@ -2373,7 +2541,8 @@ NetworkPolicyPeer describes a peer to allow traffic to/from. Only certain combin
 
 
 
-ipBlock defines policy on a particular IPBlock. If this field is set then neither of the other fields can be.
+ipBlock defines policy on a particular IPBlock. If this field is set then
+neither of the other fields can be.
 
 <table>
     <thead>
@@ -2388,14 +2557,17 @@ ipBlock defines policy on a particular IPBlock. If this field is set then neithe
         <td><b>cidr</b></td>
         <td>string</td>
         <td>
-          cidr is a string representing the IPBlock Valid examples are "192.168.1.0/24" or "2001:db8::/64"<br/>
+          cidr is a string representing the IPBlock
+Valid examples are "192.168.1.0/24" or "2001:db8::/64"<br/>
         </td>
         <td>true</td>
       </tr><tr>
         <td><b>except</b></td>
         <td>[]string</td>
         <td>
-          except is a slice of CIDRs that should not be included within an IPBlock Valid examples are "192.168.1.0/24" or "2001:db8::/64" Except values will be rejected if they are outside the cidr range<br/>
+          except is a slice of CIDRs that should not be included within an IPBlock
+Valid examples are "192.168.1.0/24" or "2001:db8::/64"
+Except values will be rejected if they are outside the cidr range<br/>
         </td>
         <td>false</td>
       </tr></tbody>
@@ -2406,8 +2578,13 @@ ipBlock defines policy on a particular IPBlock. If this field is set then neithe
 
 
 
-namespaceSelector selects namespaces using cluster-scoped labels. This field follows standard label selector semantics; if present but empty, it selects all namespaces. 
- If podSelector is also set, then the NetworkPolicyPeer as a whole selects the pods matching podSelector in the namespaces selected by namespaceSelector. Otherwise it selects all pods in the namespaces selected by namespaceSelector.
+namespaceSelector selects namespaces using cluster-scoped labels. This field follows
+standard label selector semantics; if present but empty, it selects all namespaces.
+
+
+If podSelector is also set, then the NetworkPolicyPeer as a whole selects
+the pods matching podSelector in the namespaces selected by namespaceSelector.
+Otherwise it selects all pods in the namespaces selected by namespaceSelector.
 
 <table>
     <thead>
@@ -2429,7 +2606,9 @@ namespaceSelector selects namespaces using cluster-scoped labels. This field fol
         <td><b>matchLabels</b></td>
         <td>map[string]string</td>
         <td>
-          matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is "key", the operator is "In", and the values array contains only "value". The requirements are ANDed.<br/>
+          matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+map is equivalent to an element of matchExpressions, whose key field is "key", the
+operator is "In", and the values array contains only "value". The requirements are ANDed.<br/>
         </td>
         <td>false</td>
       </tr></tbody>
@@ -2440,7 +2619,8 @@ namespaceSelector selects namespaces using cluster-scoped labels. This field fol
 
 
 
-A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.
+A label selector requirement is a selector that contains values, a key, and an operator that
+relates the key and values.
 
 <table>
     <thead>
@@ -2462,14 +2642,18 @@ A label selector requirement is a selector that contains values, a key, and an o
         <td><b>operator</b></td>
         <td>string</td>
         <td>
-          operator represents a key's relationship to a set of values. Valid operators are In, NotIn, Exists and DoesNotExist.<br/>
+          operator represents a key's relationship to a set of values.
+Valid operators are In, NotIn, Exists and DoesNotExist.<br/>
         </td>
         <td>true</td>
       </tr><tr>
         <td><b>values</b></td>
         <td>[]string</td>
         <td>
-          values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.<br/>
+          values is an array of string values. If the operator is In or NotIn,
+the values array must be non-empty. If the operator is Exists or DoesNotExist,
+the values array must be empty. This array is replaced during a strategic
+merge patch.<br/>
         </td>
         <td>false</td>
       </tr></tbody>
@@ -2480,8 +2664,13 @@ A label selector requirement is a selector that contains values, a key, and an o
 
 
 
-podSelector is a label selector which selects pods. This field follows standard label selector semantics; if present but empty, it selects all pods. 
- If namespaceSelector is also set, then the NetworkPolicyPeer as a whole selects the pods matching podSelector in the Namespaces selected by NamespaceSelector. Otherwise it selects the pods matching podSelector in the policy's own namespace.
+podSelector is a label selector which selects pods. This field follows standard label
+selector semantics; if present but empty, it selects all pods.
+
+
+If namespaceSelector is also set, then the NetworkPolicyPeer as a whole selects
+the pods matching podSelector in the Namespaces selected by NamespaceSelector.
+Otherwise it selects the pods matching podSelector in the policy's own namespace.
 
 <table>
     <thead>
@@ -2503,7 +2692,9 @@ podSelector is a label selector which selects pods. This field follows standard 
         <td><b>matchLabels</b></td>
         <td>map[string]string</td>
         <td>
-          matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is "key", the operator is "In", and the values array contains only "value". The requirements are ANDed.<br/>
+          matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+map is equivalent to an element of matchExpressions, whose key field is "key", the
+operator is "In", and the values array contains only "value". The requirements are ANDed.<br/>
         </td>
         <td>false</td>
       </tr></tbody>
@@ -2514,7 +2705,8 @@ podSelector is a label selector which selects pods. This field follows standard 
 
 
 
-A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.
+A label selector requirement is a selector that contains values, a key, and an operator that
+relates the key and values.
 
 <table>
     <thead>
@@ -2536,14 +2728,18 @@ A label selector requirement is a selector that contains values, a key, and an o
         <td><b>operator</b></td>
         <td>string</td>
         <td>
-          operator represents a key's relationship to a set of values. Valid operators are In, NotIn, Exists and DoesNotExist.<br/>
+          operator represents a key's relationship to a set of values.
+Valid operators are In, NotIn, Exists and DoesNotExist.<br/>
         </td>
         <td>true</td>
       </tr><tr>
         <td><b>values</b></td>
         <td>[]string</td>
         <td>
-          values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.<br/>
+          values is an array of string values. If the operator is In or NotIn,
+the values array must be non-empty. If the operator is Exists or DoesNotExist,
+the values array must be empty. This array is replaced during a strategic
+merge patch.<br/>
         </td>
         <td>false</td>
       </tr></tbody>
@@ -2554,7 +2750,8 @@ A label selector requirement is a selector that contains values, a key, and an o
 
 
 
-NetworkPolicyIngressRule describes a particular set of traffic that is allowed to the pods matched by a NetworkPolicySpec's podSelector. The traffic must match both ports and from.
+NetworkPolicyIngressRule describes a particular set of traffic that is allowed to the pods
+matched by a NetworkPolicySpec's podSelector. The traffic must match both ports and from.
 
 <table>
     <thead>
@@ -2569,14 +2766,22 @@ NetworkPolicyIngressRule describes a particular set of traffic that is allowed t
         <td><b><a href="#tenantspecnetworkpoliciesitemsindexingressindexfromindex-1">from</a></b></td>
         <td>[]object</td>
         <td>
-          from is a list of sources which should be able to access the pods selected for this rule. Items in this list are combined using a logical OR operation. If this field is empty or missing, this rule matches all sources (traffic not restricted by source). If this field is present and contains at least one item, this rule allows traffic only if the traffic matches at least one item in the from list.<br/>
+          from is a list of sources which should be able to access the pods selected for this rule.
+Items in this list are combined using a logical OR operation. If this field is
+empty or missing, this rule matches all sources (traffic not restricted by
+source). If this field is present and contains at least one item, this rule
+allows traffic only if the traffic matches at least one item in the from list.<br/>
         </td>
         <td>false</td>
       </tr><tr>
         <td><b><a href="#tenantspecnetworkpoliciesitemsindexingressindexportsindex-1">ports</a></b></td>
         <td>[]object</td>
         <td>
-          ports is a list of ports which should be made accessible on the pods selected for this rule. Each item in this list is combined using a logical OR. If this field is empty or missing, this rule matches all ports (traffic not restricted by port). If this field is present and contains at least one item, then this rule allows traffic only if the traffic matches at least one port in the list.<br/>
+          ports is a list of ports which should be made accessible on the pods selected for
+this rule. Each item in this list is combined using a logical OR. If this field is
+empty or missing, this rule matches all ports (traffic not restricted by port).
+If this field is present and contains at least one item, then this rule allows
+traffic only if the traffic matches at least one port in the list.<br/>
         </td>
         <td>false</td>
       </tr></tbody>
@@ -2587,7 +2792,8 @@ NetworkPolicyIngressRule describes a particular set of traffic that is allowed t
 
 
 
-NetworkPolicyPeer describes a peer to allow traffic to/from. Only certain combinations of fields are allowed
+NetworkPolicyPeer describes a peer to allow traffic to/from. Only certain combinations of
+fields are allowed
 
 <table>
     <thead>
@@ -2602,23 +2808,34 @@ NetworkPolicyPeer describes a peer to allow traffic to/from. Only certain combin
         <td><b><a href="#tenantspecnetworkpoliciesitemsindexingressindexfromindexipblock-1">ipBlock</a></b></td>
         <td>object</td>
         <td>
-          ipBlock defines policy on a particular IPBlock. If this field is set then neither of the other fields can be.<br/>
+          ipBlock defines policy on a particular IPBlock. If this field is set then
+neither of the other fields can be.<br/>
         </td>
         <td>false</td>
       </tr><tr>
         <td><b><a href="#tenantspecnetworkpoliciesitemsindexingressindexfromindexnamespaceselector-1">namespaceSelector</a></b></td>
         <td>object</td>
         <td>
-          namespaceSelector selects namespaces using cluster-scoped labels. This field follows standard label selector semantics; if present but empty, it selects all namespaces. 
- If podSelector is also set, then the NetworkPolicyPeer as a whole selects the pods matching podSelector in the namespaces selected by namespaceSelector. Otherwise it selects all pods in the namespaces selected by namespaceSelector.<br/>
+          namespaceSelector selects namespaces using cluster-scoped labels. This field follows
+standard label selector semantics; if present but empty, it selects all namespaces.
+
+
+If podSelector is also set, then the NetworkPolicyPeer as a whole selects
+the pods matching podSelector in the namespaces selected by namespaceSelector.
+Otherwise it selects all pods in the namespaces selected by namespaceSelector.<br/>
         </td>
         <td>false</td>
       </tr><tr>
         <td><b><a href="#tenantspecnetworkpoliciesitemsindexingressindexfromindexpodselector-1">podSelector</a></b></td>
         <td>object</td>
         <td>
-          podSelector is a label selector which selects pods. This field follows standard label selector semantics; if present but empty, it selects all pods. 
- If namespaceSelector is also set, then the NetworkPolicyPeer as a whole selects the pods matching podSelector in the Namespaces selected by NamespaceSelector. Otherwise it selects the pods matching podSelector in the policy's own namespace.<br/>
+          podSelector is a label selector which selects pods. This field follows standard label
+selector semantics; if present but empty, it selects all pods.
+
+
+If namespaceSelector is also set, then the NetworkPolicyPeer as a whole selects
+the pods matching podSelector in the Namespaces selected by NamespaceSelector.
+Otherwise it selects the pods matching podSelector in the policy's own namespace.<br/>
         </td>
         <td>false</td>
       </tr></tbody>
@@ -2629,7 +2846,8 @@ NetworkPolicyPeer describes a peer to allow traffic to/from. Only certain combin
 
 
 
-ipBlock defines policy on a particular IPBlock. If this field is set then neither of the other fields can be.
+ipBlock defines policy on a particular IPBlock. If this field is set then
+neither of the other fields can be.
 
 <table>
     <thead>
@@ -2644,14 +2862,17 @@ ipBlock defines policy on a particular IPBlock. If this field is set then neithe
         <td><b>cidr</b></td>
         <td>string</td>
         <td>
-          cidr is a string representing the IPBlock Valid examples are "192.168.1.0/24" or "2001:db8::/64"<br/>
+          cidr is a string representing the IPBlock
+Valid examples are "192.168.1.0/24" or "2001:db8::/64"<br/>
         </td>
         <td>true</td>
       </tr><tr>
         <td><b>except</b></td>
         <td>[]string</td>
         <td>
-          except is a slice of CIDRs that should not be included within an IPBlock Valid examples are "192.168.1.0/24" or "2001:db8::/64" Except values will be rejected if they are outside the cidr range<br/>
+          except is a slice of CIDRs that should not be included within an IPBlock
+Valid examples are "192.168.1.0/24" or "2001:db8::/64"
+Except values will be rejected if they are outside the cidr range<br/>
         </td>
         <td>false</td>
       </tr></tbody>
@@ -2662,8 +2883,13 @@ ipBlock defines policy on a particular IPBlock. If this field is set then neithe
 
 
 
-namespaceSelector selects namespaces using cluster-scoped labels. This field follows standard label selector semantics; if present but empty, it selects all namespaces. 
- If podSelector is also set, then the NetworkPolicyPeer as a whole selects the pods matching podSelector in the namespaces selected by namespaceSelector. Otherwise it selects all pods in the namespaces selected by namespaceSelector.
+namespaceSelector selects namespaces using cluster-scoped labels. This field follows
+standard label selector semantics; if present but empty, it selects all namespaces.
+
+
+If podSelector is also set, then the NetworkPolicyPeer as a whole selects
+the pods matching podSelector in the namespaces selected by namespaceSelector.
+Otherwise it selects all pods in the namespaces selected by namespaceSelector.
 
 <table>
     <thead>
@@ -2685,7 +2911,9 @@ namespaceSelector selects namespaces using cluster-scoped labels. This field fol
         <td><b>matchLabels</b></td>
         <td>map[string]string</td>
         <td>
-          matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is "key", the operator is "In", and the values array contains only "value". The requirements are ANDed.<br/>
+          matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+map is equivalent to an element of matchExpressions, whose key field is "key", the
+operator is "In", and the values array contains only "value". The requirements are ANDed.<br/>
         </td>
         <td>false</td>
       </tr></tbody>
@@ -2696,7 +2924,8 @@ namespaceSelector selects namespaces using cluster-scoped labels. This field fol
 
 
 
-A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.
+A label selector requirement is a selector that contains values, a key, and an operator that
+relates the key and values.
 
 <table>
     <thead>
@@ -2718,14 +2947,18 @@ A label selector requirement is a selector that contains values, a key, and an o
         <td><b>operator</b></td>
         <td>string</td>
         <td>
-          operator represents a key's relationship to a set of values. Valid operators are In, NotIn, Exists and DoesNotExist.<br/>
+          operator represents a key's relationship to a set of values.
+Valid operators are In, NotIn, Exists and DoesNotExist.<br/>
         </td>
         <td>true</td>
       </tr><tr>
         <td><b>values</b></td>
         <td>[]string</td>
         <td>
-          values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.<br/>
+          values is an array of string values. If the operator is In or NotIn,
+the values array must be non-empty. If the operator is Exists or DoesNotExist,
+the values array must be empty. This array is replaced during a strategic
+merge patch.<br/>
         </td>
         <td>false</td>
       </tr></tbody>
@@ -2736,8 +2969,13 @@ A label selector requirement is a selector that contains values, a key, and an o
 
 
 
-podSelector is a label selector which selects pods. This field follows standard label selector semantics; if present but empty, it selects all pods. 
- If namespaceSelector is also set, then the NetworkPolicyPeer as a whole selects the pods matching podSelector in the Namespaces selected by NamespaceSelector. Otherwise it selects the pods matching podSelector in the policy's own namespace.
+podSelector is a label selector which selects pods. This field follows standard label
+selector semantics; if present but empty, it selects all pods.
+
+
+If namespaceSelector is also set, then the NetworkPolicyPeer as a whole selects
+the pods matching podSelector in the Namespaces selected by NamespaceSelector.
+Otherwise it selects the pods matching podSelector in the policy's own namespace.
 
 <table>
     <thead>
@@ -2759,7 +2997,9 @@ podSelector is a label selector which selects pods. This field follows standard 
         <td><b>matchLabels</b></td>
         <td>map[string]string</td>
         <td>
-          matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is "key", the operator is "In", and the values array contains only "value". The requirements are ANDed.<br/>
+          matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+map is equivalent to an element of matchExpressions, whose key field is "key", the
+operator is "In", and the values array contains only "value". The requirements are ANDed.<br/>
         </td>
         <td>false</td>
       </tr></tbody>
@@ -2770,7 +3010,8 @@ podSelector is a label selector which selects pods. This field follows standard 
 
 
 
-A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.
+A label selector requirement is a selector that contains values, a key, and an operator that
+relates the key and values.
 
 <table>
     <thead>
@@ -2792,14 +3033,18 @@ A label selector requirement is a selector that contains values, a key, and an o
         <td><b>operator</b></td>
         <td>string</td>
         <td>
-          operator represents a key's relationship to a set of values. Valid operators are In, NotIn, Exists and DoesNotExist.<br/>
+          operator represents a key's relationship to a set of values.
+Valid operators are In, NotIn, Exists and DoesNotExist.<br/>
         </td>
         <td>true</td>
       </tr><tr>
         <td><b>values</b></td>
         <td>[]string</td>
         <td>
-          values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.<br/>
+          values is an array of string values. If the operator is In or NotIn,
+the values array must be non-empty. If the operator is Exists or DoesNotExist,
+the values array must be empty. This array is replaced during a strategic
+merge patch.<br/>
         </td>
         <td>false</td>
       </tr></tbody>
@@ -2825,7 +3070,10 @@ NetworkPolicyPort describes a port to allow traffic on
         <td><b>endPort</b></td>
         <td>integer</td>
         <td>
-          endPort indicates that the range of ports from port to endPort if set, inclusive, should be allowed by the policy. This field cannot be defined if the port field is not defined or if the port field is defined as a named (string) port. The endPort must be equal or greater than port.<br/>
+          endPort indicates that the range of ports from port to endPort if set, inclusive,
+should be allowed by the policy. This field cannot be defined if the port field
+is not defined or if the port field is defined as a named (string) port.
+The endPort must be equal or greater than port.<br/>
           <br/>
             <i>Format</i>: int32<br/>
         </td>
@@ -2834,14 +3082,18 @@ NetworkPolicyPort describes a port to allow traffic on
         <td><b>port</b></td>
         <td>int or string</td>
         <td>
-          port represents the port on the given protocol. This can either be a numerical or named port on a pod. If this field is not provided, this matches all port names and numbers. If present, only traffic on the specified protocol AND port will be matched.<br/>
+          port represents the port on the given protocol. This can either be a numerical or named
+port on a pod. If this field is not provided, this matches all port names and
+numbers.
+If present, only traffic on the specified protocol AND port will be matched.<br/>
         </td>
         <td>false</td>
       </tr><tr>
         <td><b>protocol</b></td>
         <td>string</td>
         <td>
-          protocol represents the protocol (TCP, UDP, or SCTP) which traffic must match. If not specified, this field defaults to TCP.<br/>
+          protocol represents the protocol (TCP, UDP, or SCTP) which traffic must match.
+If not specified, this field defaults to TCP.<br/>
           <br/>
             <i>Default</i>: TCP<br/>
         </td>
@@ -2913,7 +3165,10 @@ Specifies additional labels and annotations the Capsule operator places on any P
 
 
 
-Specifies the allowed priorityClasses assigned to the Tenant. Capsule assures that all Pods resources created in the Tenant can use only one of the allowed PriorityClasses. A default value can be specified, and all the Pod resources created will inherit the declared class. Optional.
+Specifies the allowed priorityClasses assigned to the Tenant.
+Capsule assures that all Pods resources created in the Tenant can use only one of the allowed PriorityClasses.
+A default value can be specified, and all the Pod resources created will inherit the declared class.
+Optional.
 
 <table>
     <thead>
@@ -2956,7 +3211,9 @@ Specifies the allowed priorityClasses assigned to the Tenant. Capsule assures th
         <td><b>matchLabels</b></td>
         <td>map[string]string</td>
         <td>
-          matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is "key", the operator is "In", and the values array contains only "value". The requirements are ANDed.<br/>
+          matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+map is equivalent to an element of matchExpressions, whose key field is "key", the
+operator is "In", and the values array contains only "value". The requirements are ANDed.<br/>
         </td>
         <td>false</td>
       </tr></tbody>
@@ -2967,7 +3224,8 @@ Specifies the allowed priorityClasses assigned to the Tenant. Capsule assures th
 
 
 
-A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.
+A label selector requirement is a selector that contains values, a key, and an operator that
+relates the key and values.
 
 <table>
     <thead>
@@ -2989,14 +3247,18 @@ A label selector requirement is a selector that contains values, a key, and an o
         <td><b>operator</b></td>
         <td>string</td>
         <td>
-          operator represents a key's relationship to a set of values. Valid operators are In, NotIn, Exists and DoesNotExist.<br/>
+          operator represents a key's relationship to a set of values.
+Valid operators are In, NotIn, Exists and DoesNotExist.<br/>
         </td>
         <td>true</td>
       </tr><tr>
         <td><b>values</b></td>
         <td>[]string</td>
         <td>
-          values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.<br/>
+          values is an array of string values. If the operator is In or NotIn,
+the values array must be non-empty. If the operator is Exists or DoesNotExist,
+the values array must be empty. This array is replaced during a strategic
+merge patch.<br/>
         </td>
         <td>false</td>
       </tr></tbody>
@@ -3058,21 +3320,25 @@ ResourceQuotaSpec defines the desired hard limits to enforce for Quota.
         <td><b>hard</b></td>
         <td>map[string]int or string</td>
         <td>
-          hard is the set of desired hard limits for each named resource. More info: https://kubernetes.io/docs/concepts/policy/resource-quotas/<br/>
+          hard is the set of desired hard limits for each named resource.
+More info: https://kubernetes.io/docs/concepts/policy/resource-quotas/<br/>
         </td>
         <td>false</td>
       </tr><tr>
         <td><b><a href="#tenantspecresourcequotasitemsindexscopeselector-1">scopeSelector</a></b></td>
         <td>object</td>
         <td>
-          scopeSelector is also a collection of filters like scopes that must match each object tracked by a quota but expressed using ScopeSelectorOperator in combination with possible values. For a resource to match, both scopes AND scopeSelector (if specified in spec), must be matched.<br/>
+          scopeSelector is also a collection of filters like scopes that must match each object tracked by a quota
+but expressed using ScopeSelectorOperator in combination with possible values.
+For a resource to match, both scopes AND scopeSelector (if specified in spec), must be matched.<br/>
         </td>
         <td>false</td>
       </tr><tr>
         <td><b>scopes</b></td>
         <td>[]string</td>
         <td>
-          A collection of filters that must match each object tracked by a quota. If not specified, the quota matches all objects.<br/>
+          A collection of filters that must match each object tracked by a quota.
+If not specified, the quota matches all objects.<br/>
         </td>
         <td>false</td>
       </tr></tbody>
@@ -3083,7 +3349,9 @@ ResourceQuotaSpec defines the desired hard limits to enforce for Quota.
 
 
 
-scopeSelector is also a collection of filters like scopes that must match each object tracked by a quota but expressed using ScopeSelectorOperator in combination with possible values. For a resource to match, both scopes AND scopeSelector (if specified in spec), must be matched.
+scopeSelector is also a collection of filters like scopes that must match each object tracked by a quota
+but expressed using ScopeSelectorOperator in combination with possible values.
+For a resource to match, both scopes AND scopeSelector (if specified in spec), must be matched.
 
 <table>
     <thead>
@@ -3109,7 +3377,8 @@ scopeSelector is also a collection of filters like scopes that must match each o
 
 
 
-A scoped-resource selector requirement is a selector that contains values, a scope name, and an operator that relates the scope name and values.
+A scoped-resource selector requirement is a selector that contains values, a scope name, and an operator
+that relates the scope name and values.
 
 <table>
     <thead>
@@ -3124,7 +3393,8 @@ A scoped-resource selector requirement is a selector that contains values, a sco
         <td><b>operator</b></td>
         <td>string</td>
         <td>
-          Represents a scope's relationship to a set of values. Valid operators are In, NotIn, Exists, DoesNotExist.<br/>
+          Represents a scope's relationship to a set of values.
+Valid operators are In, NotIn, Exists, DoesNotExist.<br/>
         </td>
         <td>true</td>
       </tr><tr>
@@ -3138,7 +3408,10 @@ A scoped-resource selector requirement is a selector that contains values, a sco
         <td><b>values</b></td>
         <td>[]string</td>
         <td>
-          An array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.<br/>
+          An array of string values. If the operator is In or NotIn,
+the values array must be non-empty. If the operator is Exists or DoesNotExist,
+the values array must be empty.
+This array is replaced during a strategic merge patch.<br/>
         </td>
         <td>false</td>
       </tr></tbody>
@@ -3149,7 +3422,9 @@ A scoped-resource selector requirement is a selector that contains values, a sco
 
 
 
-Specifies the allowed RuntimeClasses assigned to the Tenant. Capsule assures that all Pods resources created in the Tenant can use only one of the allowed RuntimeClasses. Optional.
+Specifies the allowed RuntimeClasses assigned to the Tenant.
+Capsule assures that all Pods resources created in the Tenant can use only one of the allowed RuntimeClasses.
+Optional.
 
 <table>
     <thead>
@@ -3185,7 +3460,9 @@ Specifies the allowed RuntimeClasses assigned to the Tenant. Capsule assures tha
         <td><b>matchLabels</b></td>
         <td>map[string]string</td>
         <td>
-          matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is "key", the operator is "In", and the values array contains only "value". The requirements are ANDed.<br/>
+          matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+map is equivalent to an element of matchExpressions, whose key field is "key", the
+operator is "In", and the values array contains only "value". The requirements are ANDed.<br/>
         </td>
         <td>false</td>
       </tr></tbody>
@@ -3196,7 +3473,8 @@ Specifies the allowed RuntimeClasses assigned to the Tenant. Capsule assures tha
 
 
 
-A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.
+A label selector requirement is a selector that contains values, a key, and an operator that
+relates the key and values.
 
 <table>
     <thead>
@@ -3218,14 +3496,18 @@ A label selector requirement is a selector that contains values, a key, and an o
         <td><b>operator</b></td>
         <td>string</td>
         <td>
-          operator represents a key's relationship to a set of values. Valid operators are In, NotIn, Exists and DoesNotExist.<br/>
+          operator represents a key's relationship to a set of values.
+Valid operators are In, NotIn, Exists and DoesNotExist.<br/>
         </td>
         <td>true</td>
       </tr><tr>
         <td><b>values</b></td>
         <td>[]string</td>
         <td>
-          values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.<br/>
+          values is an array of string values. If the operator is In or NotIn,
+the values array must be non-empty. If the operator is Exists or DoesNotExist,
+the values array must be empty. This array is replaced during a strategic
+merge patch.<br/>
         </td>
         <td>false</td>
       </tr></tbody>
@@ -3461,7 +3743,10 @@ Define the labels that a Tenant Owner cannot set for their Service resources.
 
 
 
-Specifies the allowed StorageClasses assigned to the Tenant. Capsule assures that all PersistentVolumeClaim resources created in the Tenant can use only one of the allowed StorageClasses. A default value can be specified, and all the PersistentVolumeClaim resources created will inherit the declared class. Optional.
+Specifies the allowed StorageClasses assigned to the Tenant.
+Capsule assures that all PersistentVolumeClaim resources created in the Tenant can use only one of the allowed StorageClasses.
+A default value can be specified, and all the PersistentVolumeClaim resources created will inherit the declared class.
+Optional.
 
 <table>
     <thead>
@@ -3504,7 +3789,9 @@ Specifies the allowed StorageClasses assigned to the Tenant. Capsule assures tha
         <td><b>matchLabels</b></td>
         <td>map[string]string</td>
         <td>
-          matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is "key", the operator is "In", and the values array contains only "value". The requirements are ANDed.<br/>
+          matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+map is equivalent to an element of matchExpressions, whose key field is "key", the
+operator is "In", and the values array contains only "value". The requirements are ANDed.<br/>
         </td>
         <td>false</td>
       </tr></tbody>
@@ -3515,7 +3802,8 @@ Specifies the allowed StorageClasses assigned to the Tenant. Capsule assures tha
 
 
 
-A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.
+A label selector requirement is a selector that contains values, a key, and an operator that
+relates the key and values.
 
 <table>
     <thead>
@@ -3537,14 +3825,18 @@ A label selector requirement is a selector that contains values, a key, and an o
         <td><b>operator</b></td>
         <td>string</td>
         <td>
-          operator represents a key's relationship to a set of values. Valid operators are In, NotIn, Exists and DoesNotExist.<br/>
+          operator represents a key's relationship to a set of values.
+Valid operators are In, NotIn, Exists and DoesNotExist.<br/>
         </td>
         <td>true</td>
       </tr><tr>
         <td><b>values</b></td>
         <td>[]string</td>
         <td>
-          values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.<br/>
+          values is an array of string values. If the operator is In or NotIn,
+the values array must be non-empty. If the operator is Exists or DoesNotExist,
+the values array must be empty. This array is replaced during a strategic
+merge patch.<br/>
         </td>
         <td>false</td>
       </tr></tbody>
@@ -3879,7 +4171,8 @@ TenantSpec defines the desired state of Tenant.
 
 
 
-Subject contains a reference to the object or user identities a role binding applies to.  This can either hold a direct API object reference, or a value for non-objects such as user and group names.
+Subject contains a reference to the object or user identities a role binding applies to.  This can either hold a direct API object reference,
+or a value for non-objects such as user and group names.
 
 <table>
     <thead>
@@ -3894,7 +4187,8 @@ Subject contains a reference to the object or user identities a role binding app
         <td><b>kind</b></td>
         <td>string</td>
         <td>
-          Kind of object being referenced. Values defined by this API group are "User", "Group", and "ServiceAccount". If the Authorizer does not recognized the kind value, the Authorizer should report an error.<br/>
+          Kind of object being referenced. Values defined by this API group are "User", "Group", and "ServiceAccount".
+If the Authorizer does not recognized the kind value, the Authorizer should report an error.<br/>
         </td>
         <td>true</td>
       </tr><tr>
@@ -3908,14 +4202,17 @@ Subject contains a reference to the object or user identities a role binding app
         <td><b>apiGroup</b></td>
         <td>string</td>
         <td>
-          APIGroup holds the API group of the referenced subject. Defaults to "" for ServiceAccount subjects. Defaults to "rbac.authorization.k8s.io" for User and Group subjects.<br/>
+          APIGroup holds the API group of the referenced subject.
+Defaults to "" for ServiceAccount subjects.
+Defaults to "rbac.authorization.k8s.io" for User and Group subjects.<br/>
         </td>
         <td>false</td>
       </tr><tr>
         <td><b>namespace</b></td>
         <td>string</td>
         <td>
-          Namespace of the referenced object.  If the object kind is non-namespace, such as "User" or "Group", and this value is not empty the Authorizer should report an error.<br/>
+          Namespace of the referenced object.  If the object kind is non-namespace, such as "User" or "Group", and this value is not empty
+the Authorizer should report an error.<br/>
         </td>
         <td>false</td>
       </tr></tbody>
@@ -3988,11 +4285,19 @@ Specifies options for the Ingress resources, such as allowed hostnames and Ingre
         <td><b>hostnameCollisionScope</b></td>
         <td>enum</td>
         <td>
-          Defines the scope of hostname collision check performed when Tenant Owners create Ingress with allowed hostnames. 
- - Cluster: disallow the creation of an Ingress if the pair hostname and path is already used across the Namespaces managed by Capsule. 
- - Tenant: disallow the creation of an Ingress if the pair hostname and path is already used across the Namespaces of the Tenant. 
- - Namespace: disallow the creation of an Ingress if the pair hostname and path is already used in the Ingress Namespace. 
- Optional.<br/>
+          Defines the scope of hostname collision check performed when Tenant Owners create Ingress with allowed hostnames.
+
+
+- Cluster: disallow the creation of an Ingress if the pair hostname and path is already used across the Namespaces managed by Capsule.
+
+
+- Tenant: disallow the creation of an Ingress if the pair hostname and path is already used across the Namespaces of the Tenant.
+
+
+- Namespace: disallow the creation of an Ingress if the pair hostname and path is already used in the Ingress Namespace.
+
+
+Optional.<br/>
           <br/>
             <i>Enum</i>: Cluster, Tenant, Namespace, Disabled<br/>
             <i>Default</i>: Disabled<br/>
@@ -4295,28 +4600,54 @@ NetworkPolicySpec provides the specification of a NetworkPolicy
         <td><b><a href="#tenantspecnetworkpoliciesitemsindexpodselector">podSelector</a></b></td>
         <td>object</td>
         <td>
-          podSelector selects the pods to which this NetworkPolicy object applies. The array of ingress rules is applied to any pods selected by this field. Multiple network policies can select the same set of pods. In this case, the ingress rules for each are combined additively. This field is NOT optional and follows standard label selector semantics. An empty podSelector matches all pods in this namespace.<br/>
+          podSelector selects the pods to which this NetworkPolicy object applies.
+The array of ingress rules is applied to any pods selected by this field.
+Multiple network policies can select the same set of pods. In this case,
+the ingress rules for each are combined additively.
+This field is NOT optional and follows standard label selector semantics.
+An empty podSelector matches all pods in this namespace.<br/>
         </td>
         <td>true</td>
       </tr><tr>
         <td><b><a href="#tenantspecnetworkpoliciesitemsindexegressindex">egress</a></b></td>
         <td>[]object</td>
         <td>
-          egress is a list of egress rules to be applied to the selected pods. Outgoing traffic is allowed if there are no NetworkPolicies selecting the pod (and cluster policy otherwise allows the traffic), OR if the traffic matches at least one egress rule across all of the NetworkPolicy objects whose podSelector matches the pod. If this field is empty then this NetworkPolicy limits all outgoing traffic (and serves solely to ensure that the pods it selects are isolated by default). This field is beta-level in 1.8<br/>
+          egress is a list of egress rules to be applied to the selected pods. Outgoing traffic
+is allowed if there are no NetworkPolicies selecting the pod (and cluster policy
+otherwise allows the traffic), OR if the traffic matches at least one egress rule
+across all of the NetworkPolicy objects whose podSelector matches the pod. If
+this field is empty then this NetworkPolicy limits all outgoing traffic (and serves
+solely to ensure that the pods it selects are isolated by default).
+This field is beta-level in 1.8<br/>
         </td>
         <td>false</td>
       </tr><tr>
         <td><b><a href="#tenantspecnetworkpoliciesitemsindexingressindex">ingress</a></b></td>
         <td>[]object</td>
         <td>
-          ingress is a list of ingress rules to be applied to the selected pods. Traffic is allowed to a pod if there are no NetworkPolicies selecting the pod (and cluster policy otherwise allows the traffic), OR if the traffic source is the pod's local node, OR if the traffic matches at least one ingress rule across all of the NetworkPolicy objects whose podSelector matches the pod. If this field is empty then this NetworkPolicy does not allow any traffic (and serves solely to ensure that the pods it selects are isolated by default)<br/>
+          ingress is a list of ingress rules to be applied to the selected pods.
+Traffic is allowed to a pod if there are no NetworkPolicies selecting the pod
+(and cluster policy otherwise allows the traffic), OR if the traffic source is
+the pod's local node, OR if the traffic matches at least one ingress rule
+across all of the NetworkPolicy objects whose podSelector matches the pod. If
+this field is empty then this NetworkPolicy does not allow any traffic (and serves
+solely to ensure that the pods it selects are isolated by default)<br/>
         </td>
         <td>false</td>
       </tr><tr>
         <td><b>policyTypes</b></td>
         <td>[]string</td>
         <td>
-          policyTypes is a list of rule types that the NetworkPolicy relates to. Valid options are ["Ingress"], ["Egress"], or ["Ingress", "Egress"]. If this field is not specified, it will default based on the existence of ingress or egress rules; policies that contain an egress section are assumed to affect egress, and all policies (whether or not they contain an ingress section) are assumed to affect ingress. If you want to write an egress-only policy, you must explicitly specify policyTypes [ "Egress" ]. Likewise, if you want to write a policy that specifies that no egress is allowed, you must specify a policyTypes value that include "Egress" (since such a policy would not include an egress section and would otherwise default to just [ "Ingress" ]). This field is beta-level in 1.8<br/>
+          policyTypes is a list of rule types that the NetworkPolicy relates to.
+Valid options are ["Ingress"], ["Egress"], or ["Ingress", "Egress"].
+If this field is not specified, it will default based on the existence of ingress or egress rules;
+policies that contain an egress section are assumed to affect egress, and all policies
+(whether or not they contain an ingress section) are assumed to affect ingress.
+If you want to write an egress-only policy, you must explicitly specify policyTypes [ "Egress" ].
+Likewise, if you want to write a policy that specifies that no egress is allowed,
+you must specify a policyTypes value that include "Egress" (since such a policy would not include
+an egress section and would otherwise default to just [ "Ingress" ]).
+This field is beta-level in 1.8<br/>
         </td>
         <td>false</td>
       </tr></tbody>
@@ -4327,7 +4658,12 @@ NetworkPolicySpec provides the specification of a NetworkPolicy
 
 
 
-podSelector selects the pods to which this NetworkPolicy object applies. The array of ingress rules is applied to any pods selected by this field. Multiple network policies can select the same set of pods. In this case, the ingress rules for each are combined additively. This field is NOT optional and follows standard label selector semantics. An empty podSelector matches all pods in this namespace.
+podSelector selects the pods to which this NetworkPolicy object applies.
+The array of ingress rules is applied to any pods selected by this field.
+Multiple network policies can select the same set of pods. In this case,
+the ingress rules for each are combined additively.
+This field is NOT optional and follows standard label selector semantics.
+An empty podSelector matches all pods in this namespace.
 
 <table>
     <thead>
@@ -4349,7 +4685,9 @@ podSelector selects the pods to which this NetworkPolicy object applies. The arr
         <td><b>matchLabels</b></td>
         <td>map[string]string</td>
         <td>
-          matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is "key", the operator is "In", and the values array contains only "value". The requirements are ANDed.<br/>
+          matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+map is equivalent to an element of matchExpressions, whose key field is "key", the
+operator is "In", and the values array contains only "value". The requirements are ANDed.<br/>
         </td>
         <td>false</td>
       </tr></tbody>
@@ -4360,7 +4698,8 @@ podSelector selects the pods to which this NetworkPolicy object applies. The arr
 
 
 
-A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.
+A label selector requirement is a selector that contains values, a key, and an operator that
+relates the key and values.
 
 <table>
     <thead>
@@ -4382,14 +4721,18 @@ A label selector requirement is a selector that contains values, a key, and an o
         <td><b>operator</b></td>
         <td>string</td>
         <td>
-          operator represents a key's relationship to a set of values. Valid operators are In, NotIn, Exists and DoesNotExist.<br/>
+          operator represents a key's relationship to a set of values.
+Valid operators are In, NotIn, Exists and DoesNotExist.<br/>
         </td>
         <td>true</td>
       </tr><tr>
         <td><b>values</b></td>
         <td>[]string</td>
         <td>
-          values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.<br/>
+          values is an array of string values. If the operator is In or NotIn,
+the values array must be non-empty. If the operator is Exists or DoesNotExist,
+the values array must be empty. This array is replaced during a strategic
+merge patch.<br/>
         </td>
         <td>false</td>
       </tr></tbody>
@@ -4400,7 +4743,9 @@ A label selector requirement is a selector that contains values, a key, and an o
 
 
 
-NetworkPolicyEgressRule describes a particular set of traffic that is allowed out of pods matched by a NetworkPolicySpec's podSelector. The traffic must match both ports and to. This type is beta-level in 1.8
+NetworkPolicyEgressRule describes a particular set of traffic that is allowed out of pods
+matched by a NetworkPolicySpec's podSelector. The traffic must match both ports and to.
+This type is beta-level in 1.8
 
 <table>
     <thead>
@@ -4415,14 +4760,22 @@ NetworkPolicyEgressRule describes a particular set of traffic that is allowed ou
         <td><b><a href="#tenantspecnetworkpoliciesitemsindexegressindexportsindex">ports</a></b></td>
         <td>[]object</td>
         <td>
-          ports is a list of destination ports for outgoing traffic. Each item in this list is combined using a logical OR. If this field is empty or missing, this rule matches all ports (traffic not restricted by port). If this field is present and contains at least one item, then this rule allows traffic only if the traffic matches at least one port in the list.<br/>
+          ports is a list of destination ports for outgoing traffic.
+Each item in this list is combined using a logical OR. If this field is
+empty or missing, this rule matches all ports (traffic not restricted by port).
+If this field is present and contains at least one item, then this rule allows
+traffic only if the traffic matches at least one port in the list.<br/>
         </td>
         <td>false</td>
       </tr><tr>
         <td><b><a href="#tenantspecnetworkpoliciesitemsindexegressindextoindex">to</a></b></td>
         <td>[]object</td>
         <td>
-          to is a list of destinations for outgoing traffic of pods selected for this rule. Items in this list are combined using a logical OR operation. If this field is empty or missing, this rule matches all destinations (traffic not restricted by destination). If this field is present and contains at least one item, this rule allows traffic only if the traffic matches at least one item in the to list.<br/>
+          to is a list of destinations for outgoing traffic of pods selected for this rule.
+Items in this list are combined using a logical OR operation. If this field is
+empty or missing, this rule matches all destinations (traffic not restricted by
+destination). If this field is present and contains at least one item, this rule
+allows traffic only if the traffic matches at least one item in the to list.<br/>
         </td>
         <td>false</td>
       </tr></tbody>
@@ -4448,7 +4801,10 @@ NetworkPolicyPort describes a port to allow traffic on
         <td><b>endPort</b></td>
         <td>integer</td>
         <td>
-          endPort indicates that the range of ports from port to endPort if set, inclusive, should be allowed by the policy. This field cannot be defined if the port field is not defined or if the port field is defined as a named (string) port. The endPort must be equal or greater than port.<br/>
+          endPort indicates that the range of ports from port to endPort if set, inclusive,
+should be allowed by the policy. This field cannot be defined if the port field
+is not defined or if the port field is defined as a named (string) port.
+The endPort must be equal or greater than port.<br/>
           <br/>
             <i>Format</i>: int32<br/>
         </td>
@@ -4457,14 +4813,18 @@ NetworkPolicyPort describes a port to allow traffic on
         <td><b>port</b></td>
         <td>int or string</td>
         <td>
-          port represents the port on the given protocol. This can either be a numerical or named port on a pod. If this field is not provided, this matches all port names and numbers. If present, only traffic on the specified protocol AND port will be matched.<br/>
+          port represents the port on the given protocol. This can either be a numerical or named
+port on a pod. If this field is not provided, this matches all port names and
+numbers.
+If present, only traffic on the specified protocol AND port will be matched.<br/>
         </td>
         <td>false</td>
       </tr><tr>
         <td><b>protocol</b></td>
         <td>string</td>
         <td>
-          protocol represents the protocol (TCP, UDP, or SCTP) which traffic must match. If not specified, this field defaults to TCP.<br/>
+          protocol represents the protocol (TCP, UDP, or SCTP) which traffic must match.
+If not specified, this field defaults to TCP.<br/>
           <br/>
             <i>Default</i>: TCP<br/>
         </td>
@@ -4477,7 +4837,8 @@ NetworkPolicyPort describes a port to allow traffic on
 
 
 
-NetworkPolicyPeer describes a peer to allow traffic to/from. Only certain combinations of fields are allowed
+NetworkPolicyPeer describes a peer to allow traffic to/from. Only certain combinations of
+fields are allowed
 
 <table>
     <thead>
@@ -4492,23 +4853,34 @@ NetworkPolicyPeer describes a peer to allow traffic to/from. Only certain combin
         <td><b><a href="#tenantspecnetworkpoliciesitemsindexegressindextoindexipblock">ipBlock</a></b></td>
         <td>object</td>
         <td>
-          ipBlock defines policy on a particular IPBlock. If this field is set then neither of the other fields can be.<br/>
+          ipBlock defines policy on a particular IPBlock. If this field is set then
+neither of the other fields can be.<br/>
         </td>
         <td>false</td>
       </tr><tr>
         <td><b><a href="#tenantspecnetworkpoliciesitemsindexegressindextoindexnamespaceselector">namespaceSelector</a></b></td>
         <td>object</td>
         <td>
-          namespaceSelector selects namespaces using cluster-scoped labels. This field follows standard label selector semantics; if present but empty, it selects all namespaces. 
- If podSelector is also set, then the NetworkPolicyPeer as a whole selects the pods matching podSelector in the namespaces selected by namespaceSelector. Otherwise it selects all pods in the namespaces selected by namespaceSelector.<br/>
+          namespaceSelector selects namespaces using cluster-scoped labels. This field follows
+standard label selector semantics; if present but empty, it selects all namespaces.
+
+
+If podSelector is also set, then the NetworkPolicyPeer as a whole selects
+the pods matching podSelector in the namespaces selected by namespaceSelector.
+Otherwise it selects all pods in the namespaces selected by namespaceSelector.<br/>
         </td>
         <td>false</td>
       </tr><tr>
         <td><b><a href="#tenantspecnetworkpoliciesitemsindexegressindextoindexpodselector">podSelector</a></b></td>
         <td>object</td>
         <td>
-          podSelector is a label selector which selects pods. This field follows standard label selector semantics; if present but empty, it selects all pods. 
- If namespaceSelector is also set, then the NetworkPolicyPeer as a whole selects the pods matching podSelector in the Namespaces selected by NamespaceSelector. Otherwise it selects the pods matching podSelector in the policy's own namespace.<br/>
+          podSelector is a label selector which selects pods. This field follows standard label
+selector semantics; if present but empty, it selects all pods.
+
+
+If namespaceSelector is also set, then the NetworkPolicyPeer as a whole selects
+the pods matching podSelector in the Namespaces selected by NamespaceSelector.
+Otherwise it selects the pods matching podSelector in the policy's own namespace.<br/>
         </td>
         <td>false</td>
       </tr></tbody>
@@ -4519,7 +4891,8 @@ NetworkPolicyPeer describes a peer to allow traffic to/from. Only certain combin
 
 
 
-ipBlock defines policy on a particular IPBlock. If this field is set then neither of the other fields can be.
+ipBlock defines policy on a particular IPBlock. If this field is set then
+neither of the other fields can be.
 
 <table>
     <thead>
@@ -4534,14 +4907,17 @@ ipBlock defines policy on a particular IPBlock. If this field is set then neithe
         <td><b>cidr</b></td>
         <td>string</td>
         <td>
-          cidr is a string representing the IPBlock Valid examples are "192.168.1.0/24" or "2001:db8::/64"<br/>
+          cidr is a string representing the IPBlock
+Valid examples are "192.168.1.0/24" or "2001:db8::/64"<br/>
         </td>
         <td>true</td>
       </tr><tr>
         <td><b>except</b></td>
         <td>[]string</td>
         <td>
-          except is a slice of CIDRs that should not be included within an IPBlock Valid examples are "192.168.1.0/24" or "2001:db8::/64" Except values will be rejected if they are outside the cidr range<br/>
+          except is a slice of CIDRs that should not be included within an IPBlock
+Valid examples are "192.168.1.0/24" or "2001:db8::/64"
+Except values will be rejected if they are outside the cidr range<br/>
         </td>
         <td>false</td>
       </tr></tbody>
@@ -4552,8 +4928,13 @@ ipBlock defines policy on a particular IPBlock. If this field is set then neithe
 
 
 
-namespaceSelector selects namespaces using cluster-scoped labels. This field follows standard label selector semantics; if present but empty, it selects all namespaces. 
- If podSelector is also set, then the NetworkPolicyPeer as a whole selects the pods matching podSelector in the namespaces selected by namespaceSelector. Otherwise it selects all pods in the namespaces selected by namespaceSelector.
+namespaceSelector selects namespaces using cluster-scoped labels. This field follows
+standard label selector semantics; if present but empty, it selects all namespaces.
+
+
+If podSelector is also set, then the NetworkPolicyPeer as a whole selects
+the pods matching podSelector in the namespaces selected by namespaceSelector.
+Otherwise it selects all pods in the namespaces selected by namespaceSelector.
 
 <table>
     <thead>
@@ -4575,7 +4956,9 @@ namespaceSelector selects namespaces using cluster-scoped labels. This field fol
         <td><b>matchLabels</b></td>
         <td>map[string]string</td>
         <td>
-          matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is "key", the operator is "In", and the values array contains only "value". The requirements are ANDed.<br/>
+          matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+map is equivalent to an element of matchExpressions, whose key field is "key", the
+operator is "In", and the values array contains only "value". The requirements are ANDed.<br/>
         </td>
         <td>false</td>
       </tr></tbody>
@@ -4586,7 +4969,8 @@ namespaceSelector selects namespaces using cluster-scoped labels. This field fol
 
 
 
-A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.
+A label selector requirement is a selector that contains values, a key, and an operator that
+relates the key and values.
 
 <table>
     <thead>
@@ -4608,14 +4992,18 @@ A label selector requirement is a selector that contains values, a key, and an o
         <td><b>operator</b></td>
         <td>string</td>
         <td>
-          operator represents a key's relationship to a set of values. Valid operators are In, NotIn, Exists and DoesNotExist.<br/>
+          operator represents a key's relationship to a set of values.
+Valid operators are In, NotIn, Exists and DoesNotExist.<br/>
         </td>
         <td>true</td>
       </tr><tr>
         <td><b>values</b></td>
         <td>[]string</td>
         <td>
-          values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.<br/>
+          values is an array of string values. If the operator is In or NotIn,
+the values array must be non-empty. If the operator is Exists or DoesNotExist,
+the values array must be empty. This array is replaced during a strategic
+merge patch.<br/>
         </td>
         <td>false</td>
       </tr></tbody>
@@ -4626,8 +5014,13 @@ A label selector requirement is a selector that contains values, a key, and an o
 
 
 
-podSelector is a label selector which selects pods. This field follows standard label selector semantics; if present but empty, it selects all pods. 
- If namespaceSelector is also set, then the NetworkPolicyPeer as a whole selects the pods matching podSelector in the Namespaces selected by NamespaceSelector. Otherwise it selects the pods matching podSelector in the policy's own namespace.
+podSelector is a label selector which selects pods. This field follows standard label
+selector semantics; if present but empty, it selects all pods.
+
+
+If namespaceSelector is also set, then the NetworkPolicyPeer as a whole selects
+the pods matching podSelector in the Namespaces selected by NamespaceSelector.
+Otherwise it selects the pods matching podSelector in the policy's own namespace.
 
 <table>
     <thead>
@@ -4649,7 +5042,9 @@ podSelector is a label selector which selects pods. This field follows standard 
         <td><b>matchLabels</b></td>
         <td>map[string]string</td>
         <td>
-          matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is "key", the operator is "In", and the values array contains only "value". The requirements are ANDed.<br/>
+          matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+map is equivalent to an element of matchExpressions, whose key field is "key", the
+operator is "In", and the values array contains only "value". The requirements are ANDed.<br/>
         </td>
         <td>false</td>
       </tr></tbody>
@@ -4660,7 +5055,8 @@ podSelector is a label selector which selects pods. This field follows standard 
 
 
 
-A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.
+A label selector requirement is a selector that contains values, a key, and an operator that
+relates the key and values.
 
 <table>
     <thead>
@@ -4682,14 +5078,18 @@ A label selector requirement is a selector that contains values, a key, and an o
         <td><b>operator</b></td>
         <td>string</td>
         <td>
-          operator represents a key's relationship to a set of values. Valid operators are In, NotIn, Exists and DoesNotExist.<br/>
+          operator represents a key's relationship to a set of values.
+Valid operators are In, NotIn, Exists and DoesNotExist.<br/>
         </td>
         <td>true</td>
       </tr><tr>
         <td><b>values</b></td>
         <td>[]string</td>
         <td>
-          values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.<br/>
+          values is an array of string values. If the operator is In or NotIn,
+the values array must be non-empty. If the operator is Exists or DoesNotExist,
+the values array must be empty. This array is replaced during a strategic
+merge patch.<br/>
         </td>
         <td>false</td>
       </tr></tbody>
@@ -4700,7 +5100,8 @@ A label selector requirement is a selector that contains values, a key, and an o
 
 
 
-NetworkPolicyIngressRule describes a particular set of traffic that is allowed to the pods matched by a NetworkPolicySpec's podSelector. The traffic must match both ports and from.
+NetworkPolicyIngressRule describes a particular set of traffic that is allowed to the pods
+matched by a NetworkPolicySpec's podSelector. The traffic must match both ports and from.
 
 <table>
     <thead>
@@ -4715,14 +5116,22 @@ NetworkPolicyIngressRule describes a particular set of traffic that is allowed t
         <td><b><a href="#tenantspecnetworkpoliciesitemsindexingressindexfromindex">from</a></b></td>
         <td>[]object</td>
         <td>
-          from is a list of sources which should be able to access the pods selected for this rule. Items in this list are combined using a logical OR operation. If this field is empty or missing, this rule matches all sources (traffic not restricted by source). If this field is present and contains at least one item, this rule allows traffic only if the traffic matches at least one item in the from list.<br/>
+          from is a list of sources which should be able to access the pods selected for this rule.
+Items in this list are combined using a logical OR operation. If this field is
+empty or missing, this rule matches all sources (traffic not restricted by
+source). If this field is present and contains at least one item, this rule
+allows traffic only if the traffic matches at least one item in the from list.<br/>
         </td>
         <td>false</td>
       </tr><tr>
         <td><b><a href="#tenantspecnetworkpoliciesitemsindexingressindexportsindex">ports</a></b></td>
         <td>[]object</td>
         <td>
-          ports is a list of ports which should be made accessible on the pods selected for this rule. Each item in this list is combined using a logical OR. If this field is empty or missing, this rule matches all ports (traffic not restricted by port). If this field is present and contains at least one item, then this rule allows traffic only if the traffic matches at least one port in the list.<br/>
+          ports is a list of ports which should be made accessible on the pods selected for
+this rule. Each item in this list is combined using a logical OR. If this field is
+empty or missing, this rule matches all ports (traffic not restricted by port).
+If this field is present and contains at least one item, then this rule allows
+traffic only if the traffic matches at least one port in the list.<br/>
         </td>
         <td>false</td>
       </tr></tbody>
@@ -4733,7 +5142,8 @@ NetworkPolicyIngressRule describes a particular set of traffic that is allowed t
 
 
 
-NetworkPolicyPeer describes a peer to allow traffic to/from. Only certain combinations of fields are allowed
+NetworkPolicyPeer describes a peer to allow traffic to/from. Only certain combinations of
+fields are allowed
 
 <table>
     <thead>
@@ -4748,23 +5158,34 @@ NetworkPolicyPeer describes a peer to allow traffic to/from. Only certain combin
         <td><b><a href="#tenantspecnetworkpoliciesitemsindexingressindexfromindexipblock">ipBlock</a></b></td>
         <td>object</td>
         <td>
-          ipBlock defines policy on a particular IPBlock. If this field is set then neither of the other fields can be.<br/>
+          ipBlock defines policy on a particular IPBlock. If this field is set then
+neither of the other fields can be.<br/>
         </td>
         <td>false</td>
       </tr><tr>
         <td><b><a href="#tenantspecnetworkpoliciesitemsindexingressindexfromindexnamespaceselector">namespaceSelector</a></b></td>
         <td>object</td>
         <td>
-          namespaceSelector selects namespaces using cluster-scoped labels. This field follows standard label selector semantics; if present but empty, it selects all namespaces. 
- If podSelector is also set, then the NetworkPolicyPeer as a whole selects the pods matching podSelector in the namespaces selected by namespaceSelector. Otherwise it selects all pods in the namespaces selected by namespaceSelector.<br/>
+          namespaceSelector selects namespaces using cluster-scoped labels. This field follows
+standard label selector semantics; if present but empty, it selects all namespaces.
+
+
+If podSelector is also set, then the NetworkPolicyPeer as a whole selects
+the pods matching podSelector in the namespaces selected by namespaceSelector.
+Otherwise it selects all pods in the namespaces selected by namespaceSelector.<br/>
         </td>
         <td>false</td>
       </tr><tr>
         <td><b><a href="#tenantspecnetworkpoliciesitemsindexingressindexfromindexpodselector">podSelector</a></b></td>
         <td>object</td>
         <td>
-          podSelector is a label selector which selects pods. This field follows standard label selector semantics; if present but empty, it selects all pods. 
- If namespaceSelector is also set, then the NetworkPolicyPeer as a whole selects the pods matching podSelector in the Namespaces selected by NamespaceSelector. Otherwise it selects the pods matching podSelector in the policy's own namespace.<br/>
+          podSelector is a label selector which selects pods. This field follows standard label
+selector semantics; if present but empty, it selects all pods.
+
+
+If namespaceSelector is also set, then the NetworkPolicyPeer as a whole selects
+the pods matching podSelector in the Namespaces selected by NamespaceSelector.
+Otherwise it selects the pods matching podSelector in the policy's own namespace.<br/>
         </td>
         <td>false</td>
       </tr></tbody>
@@ -4775,7 +5196,8 @@ NetworkPolicyPeer describes a peer to allow traffic to/from. Only certain combin
 
 
 
-ipBlock defines policy on a particular IPBlock. If this field is set then neither of the other fields can be.
+ipBlock defines policy on a particular IPBlock. If this field is set then
+neither of the other fields can be.
 
 <table>
     <thead>
@@ -4790,14 +5212,17 @@ ipBlock defines policy on a particular IPBlock. If this field is set then neithe
         <td><b>cidr</b></td>
         <td>string</td>
         <td>
-          cidr is a string representing the IPBlock Valid examples are "192.168.1.0/24" or "2001:db8::/64"<br/>
+          cidr is a string representing the IPBlock
+Valid examples are "192.168.1.0/24" or "2001:db8::/64"<br/>
         </td>
         <td>true</td>
       </tr><tr>
         <td><b>except</b></td>
         <td>[]string</td>
         <td>
-          except is a slice of CIDRs that should not be included within an IPBlock Valid examples are "192.168.1.0/24" or "2001:db8::/64" Except values will be rejected if they are outside the cidr range<br/>
+          except is a slice of CIDRs that should not be included within an IPBlock
+Valid examples are "192.168.1.0/24" or "2001:db8::/64"
+Except values will be rejected if they are outside the cidr range<br/>
         </td>
         <td>false</td>
       </tr></tbody>
@@ -4808,8 +5233,13 @@ ipBlock defines policy on a particular IPBlock. If this field is set then neithe
 
 
 
-namespaceSelector selects namespaces using cluster-scoped labels. This field follows standard label selector semantics; if present but empty, it selects all namespaces. 
- If podSelector is also set, then the NetworkPolicyPeer as a whole selects the pods matching podSelector in the namespaces selected by namespaceSelector. Otherwise it selects all pods in the namespaces selected by namespaceSelector.
+namespaceSelector selects namespaces using cluster-scoped labels. This field follows
+standard label selector semantics; if present but empty, it selects all namespaces.
+
+
+If podSelector is also set, then the NetworkPolicyPeer as a whole selects
+the pods matching podSelector in the namespaces selected by namespaceSelector.
+Otherwise it selects all pods in the namespaces selected by namespaceSelector.
 
 <table>
     <thead>
@@ -4831,7 +5261,9 @@ namespaceSelector selects namespaces using cluster-scoped labels. This field fol
         <td><b>matchLabels</b></td>
         <td>map[string]string</td>
         <td>
-          matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is "key", the operator is "In", and the values array contains only "value". The requirements are ANDed.<br/>
+          matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+map is equivalent to an element of matchExpressions, whose key field is "key", the
+operator is "In", and the values array contains only "value". The requirements are ANDed.<br/>
         </td>
         <td>false</td>
       </tr></tbody>
@@ -4842,7 +5274,8 @@ namespaceSelector selects namespaces using cluster-scoped labels. This field fol
 
 
 
-A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.
+A label selector requirement is a selector that contains values, a key, and an operator that
+relates the key and values.
 
 <table>
     <thead>
@@ -4864,14 +5297,18 @@ A label selector requirement is a selector that contains values, a key, and an o
         <td><b>operator</b></td>
         <td>string</td>
         <td>
-          operator represents a key's relationship to a set of values. Valid operators are In, NotIn, Exists and DoesNotExist.<br/>
+          operator represents a key's relationship to a set of values.
+Valid operators are In, NotIn, Exists and DoesNotExist.<br/>
         </td>
         <td>true</td>
       </tr><tr>
         <td><b>values</b></td>
         <td>[]string</td>
         <td>
-          values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.<br/>
+          values is an array of string values. If the operator is In or NotIn,
+the values array must be non-empty. If the operator is Exists or DoesNotExist,
+the values array must be empty. This array is replaced during a strategic
+merge patch.<br/>
         </td>
         <td>false</td>
       </tr></tbody>
@@ -4882,8 +5319,13 @@ A label selector requirement is a selector that contains values, a key, and an o
 
 
 
-podSelector is a label selector which selects pods. This field follows standard label selector semantics; if present but empty, it selects all pods. 
- If namespaceSelector is also set, then the NetworkPolicyPeer as a whole selects the pods matching podSelector in the Namespaces selected by NamespaceSelector. Otherwise it selects the pods matching podSelector in the policy's own namespace.
+podSelector is a label selector which selects pods. This field follows standard label
+selector semantics; if present but empty, it selects all pods.
+
+
+If namespaceSelector is also set, then the NetworkPolicyPeer as a whole selects
+the pods matching podSelector in the Namespaces selected by NamespaceSelector.
+Otherwise it selects the pods matching podSelector in the policy's own namespace.
 
 <table>
     <thead>
@@ -4905,7 +5347,9 @@ podSelector is a label selector which selects pods. This field follows standard 
         <td><b>matchLabels</b></td>
         <td>map[string]string</td>
         <td>
-          matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is "key", the operator is "In", and the values array contains only "value". The requirements are ANDed.<br/>
+          matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+map is equivalent to an element of matchExpressions, whose key field is "key", the
+operator is "In", and the values array contains only "value". The requirements are ANDed.<br/>
         </td>
         <td>false</td>
       </tr></tbody>
@@ -4916,7 +5360,8 @@ podSelector is a label selector which selects pods. This field follows standard 
 
 
 
-A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.
+A label selector requirement is a selector that contains values, a key, and an operator that
+relates the key and values.
 
 <table>
     <thead>
@@ -4938,14 +5383,18 @@ A label selector requirement is a selector that contains values, a key, and an o
         <td><b>operator</b></td>
         <td>string</td>
         <td>
-          operator represents a key's relationship to a set of values. Valid operators are In, NotIn, Exists and DoesNotExist.<br/>
+          operator represents a key's relationship to a set of values.
+Valid operators are In, NotIn, Exists and DoesNotExist.<br/>
         </td>
         <td>true</td>
       </tr><tr>
         <td><b>values</b></td>
         <td>[]string</td>
         <td>
-          values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.<br/>
+          values is an array of string values. If the operator is In or NotIn,
+the values array must be non-empty. If the operator is Exists or DoesNotExist,
+the values array must be empty. This array is replaced during a strategic
+merge patch.<br/>
         </td>
         <td>false</td>
       </tr></tbody>
@@ -4971,7 +5420,10 @@ NetworkPolicyPort describes a port to allow traffic on
         <td><b>endPort</b></td>
         <td>integer</td>
         <td>
-          endPort indicates that the range of ports from port to endPort if set, inclusive, should be allowed by the policy. This field cannot be defined if the port field is not defined or if the port field is defined as a named (string) port. The endPort must be equal or greater than port.<br/>
+          endPort indicates that the range of ports from port to endPort if set, inclusive,
+should be allowed by the policy. This field cannot be defined if the port field
+is not defined or if the port field is defined as a named (string) port.
+The endPort must be equal or greater than port.<br/>
           <br/>
             <i>Format</i>: int32<br/>
         </td>
@@ -4980,14 +5432,18 @@ NetworkPolicyPort describes a port to allow traffic on
         <td><b>port</b></td>
         <td>int or string</td>
         <td>
-          port represents the port on the given protocol. This can either be a numerical or named port on a pod. If this field is not provided, this matches all port names and numbers. If present, only traffic on the specified protocol AND port will be matched.<br/>
+          port represents the port on the given protocol. This can either be a numerical or named
+port on a pod. If this field is not provided, this matches all port names and
+numbers.
+If present, only traffic on the specified protocol AND port will be matched.<br/>
         </td>
         <td>false</td>
       </tr><tr>
         <td><b>protocol</b></td>
         <td>string</td>
         <td>
-          protocol represents the protocol (TCP, UDP, or SCTP) which traffic must match. If not specified, this field defaults to TCP.<br/>
+          protocol represents the protocol (TCP, UDP, or SCTP) which traffic must match.
+If not specified, this field defaults to TCP.<br/>
           <br/>
             <i>Default</i>: TCP<br/>
         </td>
@@ -5084,21 +5540,25 @@ ResourceQuotaSpec defines the desired hard limits to enforce for Quota.
         <td><b>hard</b></td>
         <td>map[string]int or string</td>
         <td>
-          hard is the set of desired hard limits for each named resource. More info: https://kubernetes.io/docs/concepts/policy/resource-quotas/<br/>
+          hard is the set of desired hard limits for each named resource.
+More info: https://kubernetes.io/docs/concepts/policy/resource-quotas/<br/>
         </td>
         <td>false</td>
       </tr><tr>
         <td><b><a href="#tenantspecresourcequotasitemsindexscopeselector">scopeSelector</a></b></td>
         <td>object</td>
         <td>
-          scopeSelector is also a collection of filters like scopes that must match each object tracked by a quota but expressed using ScopeSelectorOperator in combination with possible values. For a resource to match, both scopes AND scopeSelector (if specified in spec), must be matched.<br/>
+          scopeSelector is also a collection of filters like scopes that must match each object tracked by a quota
+but expressed using ScopeSelectorOperator in combination with possible values.
+For a resource to match, both scopes AND scopeSelector (if specified in spec), must be matched.<br/>
         </td>
         <td>false</td>
       </tr><tr>
         <td><b>scopes</b></td>
         <td>[]string</td>
         <td>
-          A collection of filters that must match each object tracked by a quota. If not specified, the quota matches all objects.<br/>
+          A collection of filters that must match each object tracked by a quota.
+If not specified, the quota matches all objects.<br/>
         </td>
         <td>false</td>
       </tr></tbody>
@@ -5109,7 +5569,9 @@ ResourceQuotaSpec defines the desired hard limits to enforce for Quota.
 
 
 
-scopeSelector is also a collection of filters like scopes that must match each object tracked by a quota but expressed using ScopeSelectorOperator in combination with possible values. For a resource to match, both scopes AND scopeSelector (if specified in spec), must be matched.
+scopeSelector is also a collection of filters like scopes that must match each object tracked by a quota
+but expressed using ScopeSelectorOperator in combination with possible values.
+For a resource to match, both scopes AND scopeSelector (if specified in spec), must be matched.
 
 <table>
     <thead>
@@ -5135,7 +5597,8 @@ scopeSelector is also a collection of filters like scopes that must match each o
 
 
 
-A scoped-resource selector requirement is a selector that contains values, a scope name, and an operator that relates the scope name and values.
+A scoped-resource selector requirement is a selector that contains values, a scope name, and an operator
+that relates the scope name and values.
 
 <table>
     <thead>
@@ -5150,7 +5613,8 @@ A scoped-resource selector requirement is a selector that contains values, a sco
         <td><b>operator</b></td>
         <td>string</td>
         <td>
-          Represents a scope's relationship to a set of values. Valid operators are In, NotIn, Exists, DoesNotExist.<br/>
+          Represents a scope's relationship to a set of values.
+Valid operators are In, NotIn, Exists, DoesNotExist.<br/>
         </td>
         <td>true</td>
       </tr><tr>
@@ -5164,7 +5628,10 @@ A scoped-resource selector requirement is a selector that contains values, a sco
         <td><b>values</b></td>
         <td>[]string</td>
         <td>
-          An array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.<br/>
+          An array of string values. If the operator is In or NotIn,
+the values array must be non-empty. If the operator is Exists or DoesNotExist,
+the values array must be empty.
+This array is replaced during a strategic merge patch.<br/>
         </td>
         <td>false</td>
       </tr></tbody>

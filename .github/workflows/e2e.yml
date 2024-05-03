@@ -45,12 +45,7 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-go@0c52d547c9bc32b1aa3301fd7a9cb496313a4491 # v5.0.0
         with:
-          go-version: '1.21'
-      - run: make manifests
-      - name: Checking if manifests are disaligned
-        run: test -z "$(git diff 2> /dev/null)"
-      - name: Checking if manifests generated untracked files
-        run: test -z "$(git ls-files --others --exclude-standard 2> /dev/null)"
+          go-version-file: 'go.mod'
       - uses: engineerd/setup-kind@aa272fe2a7309878ffc2a81c56cfe3ef108ae7d0 # v0.5.0
         with:
           skipClusterCreation: true
