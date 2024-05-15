@@ -47,7 +47,7 @@ func (r *resourceCounterHandler) getTenantName(ctx context.Context, clt client.C
 	return tntList.Items[0].GetName(), nil
 }
 
-func (r *resourceCounterHandler) OnCreate(clt client.Client, _ *admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
+func (r *resourceCounterHandler) OnCreate(clt client.Client, _ admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		var tntName string
 
@@ -101,7 +101,7 @@ func (r *resourceCounterHandler) OnCreate(clt client.Client, _ *admission.Decode
 	}
 }
 
-func (r *resourceCounterHandler) OnDelete(clt client.Client, _ *admission.Decoder, _ record.EventRecorder) capsulewebhook.Func {
+func (r *resourceCounterHandler) OnDelete(clt client.Client, _ admission.Decoder, _ record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		var tntName string
 
@@ -145,7 +145,7 @@ func (r *resourceCounterHandler) OnDelete(clt client.Client, _ *admission.Decode
 	}
 }
 
-func (r *resourceCounterHandler) OnUpdate(client.Client, *admission.Decoder, record.EventRecorder) capsulewebhook.Func {
+func (r *resourceCounterHandler) OnUpdate(client.Client, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}

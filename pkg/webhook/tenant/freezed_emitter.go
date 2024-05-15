@@ -22,19 +22,19 @@ func FreezedEmitter() capsulewebhook.Handler {
 	return &freezedEmitterHandler{}
 }
 
-func (h *freezedEmitterHandler) OnCreate(client.Client, *admission.Decoder, record.EventRecorder) capsulewebhook.Func {
+func (h *freezedEmitterHandler) OnCreate(client.Client, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (h *freezedEmitterHandler) OnDelete(client.Client, *admission.Decoder, record.EventRecorder) capsulewebhook.Func {
+func (h *freezedEmitterHandler) OnDelete(client.Client, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (h *freezedEmitterHandler) OnUpdate(_ client.Client, decoder *admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
+func (h *freezedEmitterHandler) OnUpdate(_ client.Client, decoder admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
 	return func(_ context.Context, req admission.Request) *admission.Response {
 		oldTnt := &capsulev1beta2.Tenant{}
 		if err := decoder.DecodeRaw(req.OldObject, oldTnt); err != nil {

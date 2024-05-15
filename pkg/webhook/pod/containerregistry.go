@@ -23,26 +23,26 @@ func ContainerRegistry() capsulewebhook.Handler {
 	return &containerRegistryHandler{}
 }
 
-func (h *containerRegistryHandler) OnCreate(c client.Client, decoder *admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
+func (h *containerRegistryHandler) OnCreate(c client.Client, decoder admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		return h.validate(ctx, c, decoder, recorder, req)
 	}
 }
 
-func (h *containerRegistryHandler) OnDelete(client.Client, *admission.Decoder, record.EventRecorder) capsulewebhook.Func {
+func (h *containerRegistryHandler) OnDelete(client.Client, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
 // ust be validate on update events since updates to pods on spec.containers[*].image and spec.initContainers[*].image are allowed.
-func (h *containerRegistryHandler) OnUpdate(c client.Client, decoder *admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
+func (h *containerRegistryHandler) OnUpdate(c client.Client, decoder admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		return h.validate(ctx, c, decoder, recorder, req)
 	}
 }
 
-func (h *containerRegistryHandler) validate(ctx context.Context, c client.Client, decoder *admission.Decoder, recorder record.EventRecorder, req admission.Request) *admission.Response {
+func (h *containerRegistryHandler) validate(ctx context.Context, c client.Client, decoder admission.Decoder, recorder record.EventRecorder, req admission.Request) *admission.Response {
 	pod := &corev1.Pod{}
 	if err := decoder.Decode(req, pod); err != nil {
 		return utils.ErroredResponse(err)

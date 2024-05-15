@@ -20,7 +20,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/webhook/utils"
 )
 
-func mutateIngressDefaults(ctx context.Context, req admission.Request, version *version.Version, c client.Client, decoder *admission.Decoder, recorder record.EventRecorder, namespace string) *admission.Response {
+func mutateIngressDefaults(ctx context.Context, req admission.Request, version *version.Version, c client.Client, decoder admission.Decoder, recorder record.EventRecorder, namespace string) *admission.Response {
 	ingress, err := capsuleingress.FromRequest(req, decoder)
 	if err != nil {
 		return utils.ErroredResponse(err)

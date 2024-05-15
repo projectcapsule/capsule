@@ -5,9 +5,9 @@ package resources
 
 import (
 	"context"
+	"errors"
 
-	"github.com/hashicorp/go-multierror"
-	"github.com/pkg/errors"
+	gherrors "github.com/pkg/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -37,7 +37,6 @@ func (r *Namespaced) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-//nolint:dupl
 func (r *Namespaced) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	log := ctrllog.FromContext(ctx)
 
@@ -56,13 +55,13 @@ func (r *Namespaced) Reconcile(ctx context.Context, request reconcile.Request) (
 
 	patchHelper, err := patch.NewHelper(tntResource, r.client)
 	if err != nil {
-		return reconcile.Result{}, errors.Wrap(err, "failed to init patch helper")
+		return reconcile.Result{}, gherrors.Wrap(err, "failed to init patch helper")
 	}
 
 	defer func() {
 		if e := patchHelper.Patch(ctx, tntResource); e != nil {
 			if err == nil {
-				err = errors.Wrap(e, "failed to patch TenantResource")
+				err = gherrors.Wrap(e, "failed to patch TenantResource")
 			}
 		}
 	}()
@@ -103,7 +102,6 @@ func (r *Namespaced) reconcileNormal(ctx context.Context, tntResource *capsulev1
 		return reconcile.Result{}, nil
 	}
 
-	err := new(multierror.Error)
 	// A TenantResource is made of several Resource sections, each one with specific options:
 	// the Status can be updated only in case of no errors across all of them to guarantee a valid and coherent status.
 	processedItems := sets.NewString()
@@ -115,18 +113,21 @@ func (r *Namespaced) reconcileNormal(ctx context.Context, tntResource *capsulev1
 		return reconcile.Result{}, labelErr
 	}
 
+	// new empty error
+	var err error
+
 	for index, resource := range tntResource.Spec.Resources {
 		items, sectionErr := r.processor.HandleSection(ctx, tl.Items[0], false, tenantLabel, index, resource)
 		if sectionErr != nil {
 			// Upon a process error storing the last error occurred and continuing to iterate,
 			// avoid to block the whole processing.
-			err = multierror.Append(err, sectionErr)
+			err = errors.Join(err, sectionErr)
 		} else {
 			processedItems.Insert(items...)
 		}
 	}
 
-	if err.ErrorOrNil() != nil {
+	if err != nil {
 		log.Error(err, "unable to replicate the requested resources")
 
 		return reconcile.Result{}, err

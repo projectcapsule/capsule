@@ -23,7 +23,7 @@ func Validating() capsulewebhook.Handler {
 	return &validating{}
 }
 
-func (h *validating) OnCreate(c client.Client, decoder *admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
+func (h *validating) OnCreate(c client.Client, decoder admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		pvc := &corev1.PersistentVolumeClaim{}
 		if err := decoder.Decode(req, pvc); err != nil {
@@ -87,13 +87,13 @@ func (h *validating) OnCreate(c client.Client, decoder *admission.Decoder, recor
 	}
 }
 
-func (h *validating) OnDelete(client.Client, *admission.Decoder, record.EventRecorder) capsulewebhook.Func {
+func (h *validating) OnDelete(client.Client, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (h *validating) OnUpdate(client.Client, *admission.Decoder, record.EventRecorder) capsulewebhook.Func {
+func (h *validating) OnUpdate(client.Client, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}

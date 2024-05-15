@@ -23,7 +23,7 @@ func StorageClassRegexHandler() capsulewebhook.Handler {
 	return &storageClassRegexHandler{}
 }
 
-func (h *storageClassRegexHandler) validate(decoder *admission.Decoder, req admission.Request) *admission.Response {
+func (h *storageClassRegexHandler) validate(decoder admission.Decoder, req admission.Request) *admission.Response {
 	tenant := &capsulev1beta2.Tenant{}
 	if err := decoder.Decode(req, tenant); err != nil {
 		return utils.ErroredResponse(err)
@@ -40,7 +40,7 @@ func (h *storageClassRegexHandler) validate(decoder *admission.Decoder, req admi
 	return nil
 }
 
-func (h *storageClassRegexHandler) OnCreate(_ client.Client, decoder *admission.Decoder, _ record.EventRecorder) capsulewebhook.Func {
+func (h *storageClassRegexHandler) OnCreate(_ client.Client, decoder admission.Decoder, _ record.EventRecorder) capsulewebhook.Func {
 	return func(_ context.Context, req admission.Request) *admission.Response {
 		if err := h.validate(decoder, req); err != nil {
 			return err
@@ -50,13 +50,13 @@ func (h *storageClassRegexHandler) OnCreate(_ client.Client, decoder *admission.
 	}
 }
 
-func (h *storageClassRegexHandler) OnDelete(client.Client, *admission.Decoder, record.EventRecorder) capsulewebhook.Func {
+func (h *storageClassRegexHandler) OnDelete(client.Client, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (h *storageClassRegexHandler) OnUpdate(_ client.Client, decoder *admission.Decoder, _ record.EventRecorder) capsulewebhook.Func {
+func (h *storageClassRegexHandler) OnUpdate(_ client.Client, decoder admission.Decoder, _ record.EventRecorder) capsulewebhook.Func {
 	return func(_ context.Context, req admission.Request) *admission.Response {
 		if err := h.validate(decoder, req); err != nil {
 			return err

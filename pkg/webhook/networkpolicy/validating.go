@@ -23,13 +23,13 @@ func Handler() capsulewebhook.Handler {
 	return &handler{}
 }
 
-func (r *handler) OnCreate(client.Client, *admission.Decoder, record.EventRecorder) capsulewebhook.Func {
+func (r *handler) OnCreate(client.Client, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (r *handler) OnDelete(client client.Client, decoder *admission.Decoder, _ record.EventRecorder) capsulewebhook.Func {
+func (r *handler) OnDelete(client client.Client, decoder admission.Decoder, _ record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		allowed, err := r.handle(ctx, req, client, decoder)
 		if err != nil {
@@ -46,7 +46,7 @@ func (r *handler) OnDelete(client client.Client, decoder *admission.Decoder, _ r
 	}
 }
 
-func (r *handler) OnUpdate(client client.Client, decoder *admission.Decoder, _ record.EventRecorder) capsulewebhook.Func {
+func (r *handler) OnUpdate(client client.Client, decoder admission.Decoder, _ record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		allowed, err := r.handle(ctx, req, client, decoder)
 		if err != nil {
@@ -63,7 +63,7 @@ func (r *handler) OnUpdate(client client.Client, decoder *admission.Decoder, _ r
 	}
 }
 
-func (r *handler) handle(ctx context.Context, req admission.Request, client client.Client, _ *admission.Decoder) (allowed bool, err error) {
+func (r *handler) handle(ctx context.Context, req admission.Request, client client.Client, _ admission.Decoder) (allowed bool, err error) {
 	allowed = true
 
 	np := &networkingv1.NetworkPolicy{}

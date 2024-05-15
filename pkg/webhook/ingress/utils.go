@@ -32,7 +32,7 @@ func TenantFromIngress(ctx context.Context, c client.Client, ingress Ingress) (*
 	return &tenantList.Items[0], nil
 }
 
-func FromRequest(req admission.Request, decoder *admission.Decoder) (ingress Ingress, err error) {
+func FromRequest(req admission.Request, decoder admission.Decoder) (ingress Ingress, err error) {
 	switch req.Kind.Group {
 	case "networking.k8s.io":
 		if req.Kind.Version == "v1" {
