@@ -31,7 +31,7 @@ jobs:
         run: make test
       - name: Upload Report to Codecov
         if: steps.checksecret.outputs.result == 'true'
-        uses: codecov/codecov-action@6d798873df2b1b8e5846dba6fb86631229fbcb17 # v4.4.0
+        uses: codecov/codecov-action@125fc84a9a348dbcf27191600683ec096ec9021c # v4.4.1
         with:
           file: ./coverage.out
           fail_ci_if_error: true
