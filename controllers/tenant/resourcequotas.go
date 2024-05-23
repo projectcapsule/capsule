@@ -130,7 +130,15 @@ func (r *Manager) syncResourceQuotas(ctx context.Context, tenant *capsulev1beta2
 								list.Items[item].Spec.Hard = map[corev1.ResourceName]resource.Quantity{}
 							}
 
-							list.Items[item].Spec.Hard[name] = resourceQuota.Hard[name]
+							// Effectively this subtracts the usage from all other namespaces in the tenant from the desired tenant hard quota.
+							// Thus we can determine, how much is left in this resourcequota (item) for the current resource (name).
+							// We use this remaining quota at the tenant level, to update the hard quota for the current namespace.
+
+							newHard := hardQuota                            // start off with desired tenant wide hard quota
+							newHard.Sub(quantity)                           // subtract tenant wide usage
+							newHard.Add(list.Items[item].Status.Used[name]) // add back usage in current ns
+
+							list.Items[item].Spec.Hard[name] = newHard
 
 							for k := range list.Items[item].Spec.Hard {
 								if !toKeep.Has(k) {
