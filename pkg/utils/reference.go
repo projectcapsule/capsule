@@ -1,7 +1,7 @@
 // Copyright 2020-2023 Project Capsule Authors.
 // SPDX-License-Identifier: Apache-2.0
 
-package namespace
+package utils
 
 import (
 	"strings"
@@ -15,7 +15,7 @@ const (
 	ObjectReferenceTenantKind = "Tenant"
 )
 
-func isTenantOwnerReference(or metav1.OwnerReference) bool {
+func IsTenantOwnerReference(or metav1.OwnerReference) bool {
 	parts := strings.Split(or.APIVersion, "/")
 	if len(parts) != 2 {
 		return false

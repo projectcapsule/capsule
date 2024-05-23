@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
@@ -71,7 +72,21 @@ func (h *handler) OnUpdate(_ client.Client, decoder admission.Decoder, _ record.
 			return &response
 		}
 
-		newNs.OwnerReferences = oldNs.OwnerReferences
+		var refs []metav1.OwnerReference
+
+		for _, ref := range oldNs.OwnerReferences {
+			if capsuleutils.IsTenantOwnerReference(ref) {
+				refs = append(refs, ref)
+			}
+		}
+
+		for _, ref := range newNs.OwnerReferences {
+			if !capsuleutils.IsTenantOwnerReference(ref) {
+				refs = append(refs, ref)
+			}
+		}
+
+		newNs.OwnerReferences = refs
 
 		c, err := json.Marshal(newNs)
 		if err != nil {
@@ -212,7 +227,7 @@ func (h *handler) patchResponseForOwnerRef(tenant *capsulev1beta2.Tenant, ns *co
 		return admission.Errored(http.StatusInternalServerError, err)
 	}
 
-	if err = controllerutil.SetControllerReference(tenant, ns, scheme); err != nil {
+	if err = controllerutil.SetOwnerReference(tenant, ns, scheme); err != nil {
 		recorder.Eventf(tenant, corev1.EventTypeWarning, "Error", "Namespace %s cannot be assigned to the desired Tenant", ns.GetName())
 
 		return admission.Errored(http.StatusInternalServerError, err)
