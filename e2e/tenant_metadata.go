@@ -58,7 +58,7 @@ var _ = Describe("adding metadata to a Tenant", func() {
 			Expect(currentlabels["kubernetes.io/metadata.name"]).To(Equal("tenant-metadata"))
 			Expect(currentlabels["custom-label"]).To(Equal("test"))
 		})
-		By("Disallow name overwritte", func() {
+		By("Disallow name overwrite", func() {
 			tnt.Labels["kubernetes.io/metadata.name"] = "evil"
 			Expect(k8sClient.Update(context.TODO(), tnt)).ShouldNot(Succeed())
 		})
