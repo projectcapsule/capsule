@@ -19,6 +19,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/metrics"
 )
 
 type Manager struct {
@@ -47,6 +48,10 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 	if err = r.Get(ctx, request.NamespacedName, instance); err != nil {
 		if apierrors.IsNotFound(err) {
 			r.Log.Info("Request object not found, could have been deleted after reconcile request")
+
+			// If tenant was deleted or cannot be found, clean up metrics
+			metrics.TenantResourceUsage.DeletePartialMatch(map[string]string{"tenant": request.Name})
+			metrics.TenantResourceLimit.DeletePartialMatch(map[string]string{"tenant": request.Name})
 
 			return reconcile.Result{}, nil
 		}
