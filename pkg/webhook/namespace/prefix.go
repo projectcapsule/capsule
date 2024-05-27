@@ -16,6 +16,7 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/configuration"
+	capsuleutils "github.com/projectcapsule/capsule/pkg/utils"
 	capsulewebhook "github.com/projectcapsule/capsule/pkg/webhook"
 	"github.com/projectcapsule/capsule/pkg/webhook/utils"
 )
@@ -49,7 +50,7 @@ func (r *prefixHandler) OnCreate(clt client.Client, decoder admission.Decoder, r
 			tnt := &capsulev1beta2.Tenant{}
 
 			for _, or := range ns.ObjectMeta.OwnerReferences {
-				if !isTenantOwnerReference(or) {
+				if !capsuleutils.IsTenantOwnerReference(or) {
 					continue
 				}
 

@@ -16,6 +16,7 @@ import (
 	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
@@ -31,11 +32,11 @@ type Manager struct {
 func (r *Manager) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&capsulev1beta2.Tenant{}).
-		Owns(&corev1.Namespace{}).
 		Owns(&networkingv1.NetworkPolicy{}).
 		Owns(&corev1.LimitRange{}).
 		Owns(&corev1.ResourceQuota{}).
 		Owns(&rbacv1.RoleBinding{}).
+		Watches(&corev1.Namespace{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &capsulev1beta2.Tenant{})).
 		Complete(r)
 }
 

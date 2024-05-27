@@ -15,6 +15,7 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api"
+	capsuleutils "github.com/projectcapsule/capsule/pkg/utils"
 	capsulewebhook "github.com/projectcapsule/capsule/pkg/webhook"
 	"github.com/projectcapsule/capsule/pkg/webhook/utils"
 )
@@ -35,7 +36,7 @@ func (r *userMetadataHandler) OnCreate(client client.Client, decoder admission.D
 		tnt := &capsulev1beta2.Tenant{}
 
 		for _, objectRef := range ns.ObjectMeta.OwnerReferences {
-			if !isTenantOwnerReference(objectRef) {
+			if !capsuleutils.IsTenantOwnerReference(objectRef) {
 				continue
 			}
 
@@ -90,7 +91,7 @@ func (r *userMetadataHandler) OnUpdate(client client.Client, decoder admission.D
 		tnt := &capsulev1beta2.Tenant{}
 
 		for _, objectRef := range newNs.ObjectMeta.OwnerReferences {
-			if !isTenantOwnerReference(objectRef) {
+			if !capsuleutils.IsTenantOwnerReference(objectRef) {
 				continue
 			}
 
