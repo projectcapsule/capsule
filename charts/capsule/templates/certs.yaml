@@ -1,12 +1,14 @@
-{{- if or (not .Values.certManager.generateCertificates) (.Values.tls.create) }}
+{{- if not $.Values.crds.exclusive }}
+  {{- if or (not .Values.certManager.generateCertificates) (.Values.tls.create) }}
 apiVersion: v1
 kind: Secret
 metadata:
   labels:
     {{- include "capsule.labels" . | nindent 4 }}
-  {{- with .Values.customAnnotations }}
+    {{- with .Values.customAnnotations }}
   annotations:
-    {{- toYaml . | nindent 4 }}
-  {{- end }}
+      {{- toYaml . | nindent 4 }}
+    {{- end }}
   name: {{ include "capsule.secretTlsName" . }}
+  {{- end }}
 {{- end }}

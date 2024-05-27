@@ -1,0 +1,44 @@
+{{- if .Values.tls.create }}
+  {{- if not $.Values.crds.exclusive }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "capsule.post-install.name" . }}
+  namespace: {{ .Release.Namespace | quote }}
+  annotations:
+    # create hook dependencies in the right order
+    "helm.sh/hook-weight": "-3"
+    {{- include "capsule.post-install.annotations" . | nindent 4 }}
+  labels:
+    app.kubernetes.io/component: {{ include "capsule.post-install.component" . | quote }}
+    {{- include "capsule.labels" . | nindent 4 }}
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "capsule.post-install.name" . }}
+  namespace: {{ .Release.Namespace | quote }}
+  annotations:
+    # create hook dependencies in the right order
+    "helm.sh/hook-weight": "-2"
+    {{- include "capsule.post-install.annotations" . | nindent 4 }}
+  labels:
+    app.kubernetes.io/component: {{ include "capsule.post-install.component" . | quote }}
+    {{- include "capsule.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "capsule.post-install.name" . }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "capsule.post-install.name" . }}
+    namespace: {{ .Release.Namespace | quote }}
+  {{- end }}
+{{- end }}

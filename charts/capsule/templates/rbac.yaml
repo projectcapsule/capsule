@@ -1,4 +1,5 @@
-{{- if $.Values.manager.rbac.create }}
+{{- if not $.Values.crds.exclusive }}
+  {{- if $.Values.manager.rbac.create }}
 ---
 kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
@@ -18,8 +19,8 @@ subjects:
 - kind: ServiceAccount
   name: {{ include "capsule.serviceAccountName" . }}
   namespace: {{ .Release.Namespace }}
-{{- end }}
-{{- range $_, $cr := $.Values.manager.rbac.existingClusterRoles }}
+  {{- end }}
+  {{- range $_, $cr := $.Values.manager.rbac.existingClusterRoles }}
 ---
 kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
@@ -60,4 +61,5 @@ subjects:
 - kind: ServiceAccount
   name: {{ include "capsule.serviceAccountName" $ }}
   namespace: {{ $.Release.Namespace }}
+  {{- end }}
 {{- end }}

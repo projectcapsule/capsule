@@ -1,4 +1,5 @@
-{{- if eq .Values.manager.kind "DaemonSet" }}
+{{- if not $.Values.crds.exclusive }}
+  {{- if eq .Values.manager.kind "DaemonSet" }}
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
@@ -90,4 +91,5 @@ spec:
             {{- toYaml .Values.manager.resources | nindent 12 }}
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
+  {{- end }}
 {{- end }}

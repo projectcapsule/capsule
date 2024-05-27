@@ -1,4 +1,5 @@
-{{- if .Values.certManager.generateCertificates }}
+{{- if not $.Values.crds.exclusive }}
+  {{- if .Values.certManager.generateCertificates }}
 apiVersion: cert-manager.io/v1
 kind: Issuer
 metadata:
@@ -33,4 +34,5 @@ spec:
   subject:
     organizations:
       - clastix.io
+  {{- end }}
 {{- end }}

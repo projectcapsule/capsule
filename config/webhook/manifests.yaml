@@ -12,7 +12,7 @@ webhooks:
       namespace: system
       path: /defaults
   failurePolicy: Fail
-  name: ingress.defaults.capsule.clastix.io
+  name: ingress.defaults.projectcapsule.dev
   rules:
   - apiGroups:
     - networking.k8s.io
@@ -33,7 +33,7 @@ webhooks:
       namespace: system
       path: /namespace-owner-reference
   failurePolicy: Fail
-  name: owner.namespace.capsule.clastix.io
+  name: owner.namespace.projectcapsule.dev
   rules:
   - apiGroups:
     - ""
@@ -53,7 +53,7 @@ webhooks:
       namespace: system
       path: /defaults
   failurePolicy: Fail
-  name: pod.defaults.capsule.clastix.io
+  name: pod.defaults.projectcapsule.dev
   rules:
   - apiGroups:
     - ""
@@ -72,7 +72,7 @@ webhooks:
       namespace: system
       path: /defaults
   failurePolicy: Fail
-  name: storage.defaults.capsule.clastix.io
+  name: storage.defaults.projectcapsule.dev
   rules:
   - apiGroups:
     - ""
@@ -97,7 +97,7 @@ webhooks:
       namespace: system
       path: /cordoning
   failurePolicy: Fail
-  name: cordoning.tenant.capsule.clastix.io
+  name: cordoning.tenant.projectcapsule.dev
   rules:
   - apiGroups:
     - '*'
@@ -118,7 +118,7 @@ webhooks:
       namespace: system
       path: /ingresses
   failurePolicy: Fail
-  name: ingress.capsule.clastix.io
+  name: ingress.projectcapsule.dev
   rules:
   - apiGroups:
     - networking.k8s.io
@@ -140,7 +140,7 @@ webhooks:
       namespace: system
       path: /namespaces
   failurePolicy: Fail
-  name: namespaces.capsule.clastix.io
+  name: namespaces.projectcapsule.dev
   rules:
   - apiGroups:
     - ""
@@ -161,7 +161,7 @@ webhooks:
       namespace: system
       path: /networkpolicies
   failurePolicy: Fail
-  name: networkpolicies.capsule.clastix.io
+  name: networkpolicies.projectcapsule.dev
   rules:
   - apiGroups:
     - networking.k8s.io
@@ -181,7 +181,7 @@ webhooks:
       namespace: system
       path: /nodes
   failurePolicy: Fail
-  name: nodes.capsule.clastix.io
+  name: nodes.projectcapsule.dev
   rules:
   - apiGroups:
     - ""
@@ -200,7 +200,7 @@ webhooks:
       namespace: system
       path: /pods
   failurePolicy: Fail
-  name: pods.capsule.clastix.io
+  name: pods.projectcapsule.dev
   rules:
   - apiGroups:
     - ""
@@ -220,7 +220,7 @@ webhooks:
       namespace: system
       path: /persistentvolumeclaims
   failurePolicy: Fail
-  name: pvc.capsule.clastix.io
+  name: pvc.projectcapsule.dev
   rules:
   - apiGroups:
     - ""
@@ -239,7 +239,7 @@ webhooks:
       namespace: system
       path: /tenantresource-objects
   failurePolicy: Fail
-  name: resource-objects.tenant.capsule.clastix.io
+  name: resource-objects.tenant.projectcapsule.dev
   rules:
   - apiGroups:
     - '*'
@@ -259,7 +259,7 @@ webhooks:
       namespace: system
       path: /services
   failurePolicy: Fail
-  name: services.capsule.clastix.io
+  name: services.projectcapsule.dev
   rules:
   - apiGroups:
     - ""
@@ -279,7 +279,7 @@ webhooks:
       namespace: system
       path: /tenants
   failurePolicy: Fail
-  name: tenants.capsule.clastix.io
+  name: tenants.projectcapsule.dev
   rules:
   - apiGroups:
     - capsule.clastix.io

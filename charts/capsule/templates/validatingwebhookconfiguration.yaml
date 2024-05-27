@@ -1,3 +1,4 @@
+{{- if or (not $.Values.crds.exclusive) ($.Values.webhooks.exclusive) }}
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
 metadata:
@@ -12,23 +13,17 @@ metadata:
     {{- toYaml . | nindent 4 }}
   {{- end }}
 webhooks:
+{{- with .Values.webhooks.hooks.cordoning }}
 - admissionReviewVersions:
     - v1
     - v1beta1
   clientConfig:
-{{- if not .Values.certManager.generateCertificates }}
-    caBundle: Cg==
-{{- end }}
-    service:
-      name: {{ include "capsule.fullname" . }}-webhook-service
-      namespace: {{ .Release.Namespace }}
-      path: /cordoning
-      port: 443
-  failurePolicy: {{ .Values.webhooks.cordoning.failurePolicy }}
+    {{- include "capsule.webhooks.service" (dict "path" "/cordoning" "ctx" $) | nindent 4 }}
+  failurePolicy: {{ .failurePolicy }}
   matchPolicy: Equivalent
-  name: cordoning.tenant.capsule.clastix.io
+  name: cordoning.tenant.projectcapsule.dev
   namespaceSelector:
-  {{- toYaml .Values.webhooks.cordoning.namespaceSelector | nindent 4}}
+  {{- toYaml .namespaceSelector | nindent 4}}
   objectSelector: {}
   rules:
     - apiGroups:
@@ -43,24 +38,19 @@ webhooks:
         - '*'
       scope: Namespaced
   sideEffects: None
-  timeoutSeconds: {{ .Values.validatingWebhooksTimeoutSeconds }}
+  timeoutSeconds: {{ $.Values.webhooks.validatingWebhooksTimeoutSeconds }}
+{{- end }}
+{{- with .Values.webhooks.hooks.ingresses }}
 - admissionReviewVersions:
     - v1
     - v1beta1
   clientConfig:
-{{- if not .Values.certManager.generateCertificates }}
-    caBundle: Cg==
-{{- end }}
-    service:
-      name: {{ include "capsule.fullname" . }}-webhook-service
-      namespace: {{ .Release.Namespace }}
-      path: /ingresses
-      port: 443
-  failurePolicy: {{ .Values.webhooks.ingresses.failurePolicy }}
+    {{- include "capsule.webhooks.service" (dict "path" "/ingresses" "ctx" $) | nindent 4 }}
+  failurePolicy: {{ .failurePolicy }}
   matchPolicy: Equivalent
-  name: ingress.capsule.clastix.io
+  name: ingress.projectcapsule.dev
   namespaceSelector:
-  {{- toYaml .Values.webhooks.ingresses.namespaceSelector | nindent 4}}
+  {{- toYaml .namespaceSelector | nindent 4}}
   objectSelector: {}
   rules:
     - apiGroups:
@@ -76,22 +66,17 @@ webhooks:
         - ingresses
       scope: Namespaced
   sideEffects: None
-  timeoutSeconds: {{ .Values.validatingWebhooksTimeoutSeconds }}
+  timeoutSeconds: {{ $.Values.webhooks.validatingWebhooksTimeoutSeconds }}
+{{- end }}
+{{ with .Values.webhooks.hooks.namespaces }}
 - admissionReviewVersions:
     - v1
     - v1beta1
   clientConfig:
-{{- if not .Values.certManager.generateCertificates }}
-    caBundle: Cg==
-{{- end }}
-    service:
-      name: {{ include "capsule.fullname" . }}-webhook-service
-      namespace: {{ .Release.Namespace }}
-      path: /namespaces
-      port: 443
-  failurePolicy: {{ .Values.webhooks.namespaces.failurePolicy }}
+    {{- include "capsule.webhooks.service" (dict "path" "/namespaces" "ctx" $) | nindent 4 }}
+  failurePolicy: {{ .failurePolicy }}
   matchPolicy: Equivalent
-  name: namespaces.capsule.clastix.io
+  name: namespaces.projectcapsule.dev
   namespaceSelector: {}
   objectSelector: {}
   rules:
@@ -107,24 +92,19 @@ webhooks:
         - namespaces
       scope: '*'
   sideEffects: None
-  timeoutSeconds: {{ .Values.validatingWebhooksTimeoutSeconds }}
+  timeoutSeconds: {{ $.Values.webhooks.validatingWebhooksTimeoutSeconds }}
+{{- end }}
+{{- with .Values.webhooks.hooks.networkpolicies }}
 - admissionReviewVersions:
     - v1
     - v1beta1
   clientConfig:
-{{- if not .Values.certManager.generateCertificates }}
-    caBundle: Cg==
-{{- end }}
-    service:
-      name: {{ include "capsule.fullname" . }}-webhook-service
-      namespace: {{ .Release.Namespace }}
-      path: /networkpolicies
-      port: 443
-  failurePolicy: {{ .Values.webhooks.networkpolicies.failurePolicy }}
+    {{- include "capsule.webhooks.service" (dict "path" "/networkpolicies" "ctx" $) | nindent 4 }}
+  failurePolicy: {{ .failurePolicy }}
   matchPolicy: Equivalent
-  name: networkpolicies.capsule.clastix.io
+  name: networkpolicies.projectcapsule.dev
   namespaceSelector:
-  {{- toYaml .Values.webhooks.networkpolicies.namespaceSelector | nindent 4}}
+  {{- toYaml .namespaceSelector | nindent 4}}
   objectSelector: {}
   rules:
     - apiGroups:
@@ -138,21 +118,16 @@ webhooks:
         - networkpolicies
       scope: Namespaced
   sideEffects: None
-  timeoutSeconds: {{ .Values.validatingWebhooksTimeoutSeconds }}
+  timeoutSeconds: {{ $.Values.webhooks.validatingWebhooksTimeoutSeconds }}
+{{- end }}
+{{- with .Values.webhooks.hooks.nodes }}
 - admissionReviewVersions:
     - v1
     - v1beta1
   clientConfig:
-{{- if not .Values.certManager.generateCertificates }}
-    caBundle: Cg==
-{{- end }}
-    service:
-      name: {{ include "capsule.fullname" . }}-webhook-service
-      namespace: {{ .Release.Namespace }}
-      path: /nodes
-      port: 443
-  failurePolicy: {{ .Values.webhooks.nodes.failurePolicy }}
-  name: nodes.capsule.clastix.io
+    {{- include "capsule.webhooks.service" (dict "path" "/nodes" "ctx" $) | nindent 4 }}
+  failurePolicy: {{ .failurePolicy }}
+  name: nodes.projectcapsule.dev
   matchPolicy: Exact
   namespaceSelector: {}
   objectSelector: {}
@@ -166,24 +141,19 @@ webhooks:
       resources:
         - nodes
   sideEffects: None
-  timeoutSeconds: {{ .Values.validatingWebhooksTimeoutSeconds }}
+  timeoutSeconds: {{ $.Values.webhooks.validatingWebhooksTimeoutSeconds }}
+{{- end }}
+{{- with .Values.webhooks.hooks.pods }}
 - admissionReviewVersions:
     - v1
     - v1beta1
   clientConfig:
-{{- if not .Values.certManager.generateCertificates }}
-    caBundle: Cg==
-{{- end }}
-    service:
-      name: {{ include "capsule.fullname" . }}-webhook-service
-      namespace: {{ .Release.Namespace }}
-      path: /pods
-      port: 443
-  failurePolicy: {{ .Values.webhooks.pods.failurePolicy }}
+    {{- include "capsule.webhooks.service" (dict "path" "/pods" "ctx" $) | nindent 4 }}
+  failurePolicy: {{ .failurePolicy }}
   matchPolicy: Exact
-  name: pods.capsule.clastix.io
+  name: pods.projectcapsule.dev
   namespaceSelector:
-  {{- toYaml .Values.webhooks.pods.namespaceSelector | nindent 4}}
+  {{- toYaml .namespaceSelector | nindent 4}}
   objectSelector: {}
   rules:
     - apiGroups:
@@ -197,22 +167,18 @@ webhooks:
         - pods
       scope: Namespaced
   sideEffects: None
-  timeoutSeconds: {{ .Values.validatingWebhooksTimeoutSeconds }}
+  timeoutSeconds: {{ $.Values.webhooks.validatingWebhooksTimeoutSeconds }}
+{{- end }}
+{{- with .Values.webhooks.hooks.persistentvolumeclaims }}
 - admissionReviewVersions:
     - v1
     - v1beta1
   clientConfig:
-{{- if not .Values.certManager.generateCertificates }}
-    caBundle: Cg==
-{{- end }}
-    service:
-      name: {{ include "capsule.fullname" . }}-webhook-service
-      namespace: {{ .Release.Namespace }}
-      path: /persistentvolumeclaims
-  failurePolicy: {{ .Values.webhooks.persistentvolumeclaims.failurePolicy }}
-  name: pvc.capsule.clastix.io
+    {{- include "capsule.webhooks.service" (dict "path" "/persistentvolumeclaims" "ctx" $) | nindent 4 }}
+  failurePolicy: {{ .failurePolicy }}
+  name: pvc.projectcapsule.dev
   namespaceSelector:
-  {{- toYaml .Values.webhooks.persistentvolumeclaims.namespaceSelector | nindent 4}}
+  {{- toYaml .namespaceSelector | nindent 4}}
   objectSelector: {}
   rules:
     - apiGroups:
@@ -225,24 +191,19 @@ webhooks:
         - persistentvolumeclaims
       scope: Namespaced
   sideEffects: None
-  timeoutSeconds: {{ .Values.validatingWebhooksTimeoutSeconds }}
+  timeoutSeconds: {{ $.Values.webhooks.validatingWebhooksTimeoutSeconds }}
+{{- end }}
+{{- with .Values.webhooks.hooks.services }}
 - admissionReviewVersions:
     - v1
     - v1beta1
   clientConfig:
-{{- if not .Values.certManager.generateCertificates }}
-    caBundle: Cg==
-{{- end }}
-    service:
-      name: {{ include "capsule.fullname" . }}-webhook-service
-      namespace: {{ .Release.Namespace }}
-      path: /services
-      port: 443
-  failurePolicy: {{ .Values.webhooks.services.failurePolicy }}
+    {{- include "capsule.webhooks.service" (dict "path" "/services" "ctx" $) | nindent 4 }}
+  failurePolicy: {{ .failurePolicy }}
   matchPolicy: Exact
-  name: services.capsule.clastix.io
+  name: services.projectcapsule.dev
   namespaceSelector:
-  {{- toYaml .Values.webhooks.services.namespaceSelector | nindent 4}}
+  {{- toYaml .namespaceSelector | nindent 4}}
   objectSelector: {}
   rules:
     - apiGroups:
@@ -256,19 +217,15 @@ webhooks:
         - services
       scope: Namespaced
   sideEffects: None
-  timeoutSeconds: {{ .Values.validatingWebhooksTimeoutSeconds }}
+  timeoutSeconds: {{ $.Values.webhooks.validatingWebhooksTimeoutSeconds }}
+{{- end }}
+{{- with .Values.webhooks.hooks.tenantResourceObjects }}
 - admissionReviewVersions:
     - v1
   clientConfig:
-{{- if not .Values.certManager.generateCertificates }}
-    caBundle: Cg==
-{{- end }}
-    service:
-      name: capsule-webhook-service
-      namespace: {{ .Release.Namespace }}
-      path: /tenantresource-objects
-  failurePolicy:  {{ .Values.webhooks.tenantResourceObjects.failurePolicy }}
-  name: resource-objects.tenant.capsule.clastix.io
+    {{- include "capsule.webhooks.service" (dict "path" "/tenantresource-objects" "ctx" $) | nindent 4 }}
+  failurePolicy:  {{ .failurePolicy }}
+  name: resource-objects.tenant.projectcapsule.dev
   namespaceSelector:
     matchExpressions:
       - key: capsule.clastix.io/tenant
@@ -289,21 +246,17 @@ webhooks:
         - '*'
       scope: Namespaced
   sideEffects: None
+  timeoutSeconds: {{ $.Values.webhooks.validatingWebhooksTimeoutSeconds }}
+{{- end }}
+{{- with .Values.webhooks.hooks.tenants }}
 - admissionReviewVersions:
     - v1
     - v1beta1
   clientConfig:
-{{- if not .Values.certManager.generateCertificates }}
-    caBundle: Cg==
-{{- end }}
-    service:
-      name: {{ include "capsule.fullname" . }}-webhook-service
-      namespace: {{ .Release.Namespace }}
-      path: /tenants
-      port: 443
-  failurePolicy:  {{ .Values.webhooks.tenants.failurePolicy }}
+    {{- include "capsule.webhooks.service" (dict "path" "/tenants" "ctx" $) | nindent 4 }}
+  failurePolicy:  {{ .failurePolicy }}
   matchPolicy: Exact
-  name: tenants.capsule.clastix.io
+  name: tenants.projectcapsule.dev
   namespaceSelector: {}
   objectSelector: {}
   rules:
@@ -319,4 +272,6 @@ webhooks:
         - tenants
       scope: '*'
   sideEffects: None
-  timeoutSeconds: {{ .Values.validatingWebhooksTimeoutSeconds }}
+  timeoutSeconds: {{ $.Values.webhooks.validatingWebhooksTimeoutSeconds }}
+{{- end }}
+{{- end }}
