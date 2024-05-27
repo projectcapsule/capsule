@@ -44,6 +44,7 @@ release:
 
     - `ghcr.io/projectcapsule/charts/{{ .ProjectName }}:{{ .Version }}`
 
+    [Review the Major Changes section first before upgrading to a new version](https://artifacthub.io/packages/helm/projectcapsule/capsule/{{ .Version }}#major-changes)
 checksum:
   name_template: 'checksums.txt'
 changelog:

@@ -22,12 +22,9 @@ jobs:
       - uses: actions/setup-go@cdcb36043654635271a94b9a6d1392de5bb323a7 # v5.0.1
         with:
           go-version-file: 'go.mod'
-      - run: make installer
+      - run: make manifests
       - name: Checking if YAML installer file is not aligned
         run: if [[ $(git diff | wc -l) -gt 0 ]]; then echo ">>> Untracked generated files have not been committed" && git --no-pager diff && exit 1; fi
-      - run: make apidoc
-      - name: Checking if the CRDs documentation is not aligned
-        run: if [[ $(git diff | wc -l) -gt 0 ]]; then echo ">>> CRDs generated documentation have not been committed" && git --no-pager diff && exit 1; fi
       - name: Checking if YAML installer generated untracked files
         run: test -z "$(git ls-files --others --exclude-standard 2> /dev/null)"
       - name: Checking if source code is not formatted
