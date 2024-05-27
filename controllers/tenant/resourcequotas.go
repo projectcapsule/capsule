@@ -23,6 +23,7 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/metrics"
 	"github.com/projectcapsule/capsule/pkg/utils"
 )
 
@@ -51,6 +52,18 @@ func (r *Manager) syncResourceQuotas(ctx context.Context, tenant *capsulev1beta2
 	if typeLabel, err = utils.GetTypeLabel(&corev1.ResourceQuota{}); err != nil {
 		return err
 	}
+
+	// Remove prior metrics, to avoid cleaning up for metrics of deleted ResourceQuotas
+	metrics.TenantResourceUsage.DeletePartialMatch(map[string]string{"tenant": tenant.Name})
+	metrics.TenantResourceLimit.DeletePartialMatch(map[string]string{"tenant": tenant.Name})
+
+	// Expose the namespace quota and usage as metrics for the tenant
+	metrics.TenantResourceUsage.WithLabelValues(tenant.Name, "namespaces", "").Set(float64(tenant.Status.Size))
+
+	if tenant.Spec.NamespaceOptions != nil && tenant.Spec.NamespaceOptions.Quota != nil {
+		metrics.TenantResourceLimit.WithLabelValues(tenant.Name, "namespaces", "").Set(float64(*tenant.Spec.NamespaceOptions.Quota))
+	}
+
 	//nolint:nestif
 	if tenant.Spec.ResourceQuota.Scope == api.ResourceQuotaScopeTenant {
 		group := new(errgroup.Group)
@@ -101,6 +114,19 @@ func (r *Manager) syncResourceQuotas(ctx context.Context, tenant *capsulev1beta2
 					}
 
 					r.Log.Info("Computed " + name.String() + " quota for the whole Tenant is " + quantity.String())
+
+					// Expose usage and limit metrics for the resource (name) of the ResourceQuota (index)
+					metrics.TenantResourceUsage.WithLabelValues(
+						tenant.Name,
+						name.String(),
+						strconv.Itoa(index),
+					).Set(float64(quantity.MilliValue()) / 1000)
+
+					metrics.TenantResourceLimit.WithLabelValues(
+						tenant.Name,
+						name.String(),
+						strconv.Itoa(index),
+					).Set(float64(hardQuota.MilliValue()) / 1000)
 
 					switch quantity.Cmp(resourceQuota.Hard[name]) {
 					case 0:
