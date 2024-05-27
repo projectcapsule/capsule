@@ -7,7 +7,7 @@ import (
 	capsulewebhook "github.com/projectcapsule/capsule/pkg/webhook"
 )
 
-// +kubebuilder:webhook:path=/cordoning,mutating=false,sideEffects=None,admissionReviewVersions=v1,failurePolicy=fail,groups="*",resources="*",verbs=create;update;delete,versions="*",name=cordoning.tenant.capsule.clastix.io
+// +kubebuilder:webhook:path=/cordoning,mutating=false,sideEffects=None,admissionReviewVersions=v1,failurePolicy=fail,groups="*",resources="*",verbs=create;update;delete,versions="*",name=cordoning.tenant.projectcapsule.dev
 
 type cordoning struct {
 	handlers []capsulewebhook.Handler

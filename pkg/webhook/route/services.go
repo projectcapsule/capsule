@@ -7,7 +7,7 @@ import (
 	capsulewebhook "github.com/projectcapsule/capsule/pkg/webhook"
 )
 
-// +kubebuilder:webhook:path=/services,mutating=false,sideEffects=None,admissionReviewVersions=v1,failurePolicy=fail,groups="",resources=services,verbs=create;update,versions=v1,name=services.capsule.clastix.io
+// +kubebuilder:webhook:path=/services,mutating=false,sideEffects=None,admissionReviewVersions=v1,failurePolicy=fail,groups="",resources=services,verbs=create;update,versions=v1,name=services.projectcapsule.dev
 
 type service struct {
 	handlers []capsulewebhook.Handler

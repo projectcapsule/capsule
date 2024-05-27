@@ -7,7 +7,7 @@ import (
 	capsulewebhook "github.com/projectcapsule/capsule/pkg/webhook"
 )
 
-// +kubebuilder:webhook:path=/ingresses,mutating=false,sideEffects=None,admissionReviewVersions=v1,failurePolicy=fail,groups=networking.k8s.io;extensions,resources=ingresses,verbs=create;update,versions=v1beta1;v1,name=ingress.capsule.clastix.io
+// +kubebuilder:webhook:path=/ingresses,mutating=false,sideEffects=None,admissionReviewVersions=v1,failurePolicy=fail,groups=networking.k8s.io;extensions,resources=ingresses,verbs=create;update,versions=v1beta1;v1,name=ingress.projectcapsule.dev
 
 type ingress struct {
 	handlers []capsulewebhook.Handler
