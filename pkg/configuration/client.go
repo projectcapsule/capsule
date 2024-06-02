@@ -30,7 +30,7 @@ func NewCapsuleConfiguration(ctx context.Context, client client.Client, name str
 			if apierrors.IsNotFound(err) {
 				return &capsulev1beta2.CapsuleConfiguration{
 					Spec: capsulev1beta2.CapsuleConfigurationSpec{
-						UserGroups:                     []string{"capsule.clastix.io"},
+						UserGroups:                     []string{"projectcapsule.dev"},
 						ForceTenantPrefix:              false,
 						ProtectedNamespaceRegexpString: "",
 					},
