@@ -1,5 +1,6 @@
 name: CI gosec
-permissions: {}
+permissions:
+  actions: read
 on:
   push:
     branches: [ "*" ]
