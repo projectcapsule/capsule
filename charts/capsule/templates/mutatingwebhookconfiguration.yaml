@@ -1,3 +1,4 @@
+{{- if or (not $.Values.crds.exclusive) ($.Values.webhooks.exclusive) }}
 apiVersion: admissionregistration.k8s.io/v1
 kind: MutatingWebhookConfiguration
 metadata:
@@ -12,19 +13,13 @@ metadata:
     {{- toYaml . | nindent 4 }}
   {{- end }}
 webhooks:
-{{- with .Values.webhooks.defaults.pods }}
+{{- with .Values.webhooks.hooks.defaults.pods }}
 - admissionReviewVersions:
   - v1
   clientConfig:
-  {{- if not $.Values.certManager.generateCertificates }}
-    caBundle: Cg==
-  {{- end }}
-    service:
-      name: {{ include "capsule.fullname" $ }}-webhook-service
-      namespace: {{ $.Release.Namespace }}
-      path: /defaults
+    {{- include "capsule.webhooks.service" (dict "path" "/defaults" "ctx" $) | nindent 4 }}
   failurePolicy: {{ .failurePolicy }}
-  name: pod.defaults.capsule.clastix.io
+  name: pod.defaults.projectcapsule.dev
   rules:
   - apiGroups:
     - ""
@@ -37,20 +32,15 @@ webhooks:
   namespaceSelector:
   {{- toYaml .namespaceSelector | nindent 4}} 
   sideEffects: None
+  timeoutSeconds: {{ $.Values.webhooks.mutatingWebhooksTimeoutSeconds }}
 {{- end }}
-{{- with .Values.webhooks.defaults.pvc }}
+{{- with .Values.webhooks.hooks.defaults.pvc }}
 - admissionReviewVersions:
   - v1
   clientConfig:
-  {{- if not $.Values.certManager.generateCertificates }}
-    caBundle: Cg==
-  {{- end }}
-    service:
-      name: {{ include "capsule.fullname" $ }}-webhook-service
-      namespace: {{ $.Release.Namespace }}
-      path: /defaults
+    {{- include "capsule.webhooks.service" (dict "path" "/defaults" "ctx" $) | nindent 4 }}
   failurePolicy: {{ .failurePolicy }}
-  name: storage.defaults.capsule.clastix.io
+  name: storage.defaults.projectcapsule.dev
   rules:
   - apiGroups:
     - ""
@@ -63,20 +53,15 @@ webhooks:
   namespaceSelector:
   {{- toYaml .namespaceSelector | nindent 4}}  
   sideEffects: None
+  timeoutSeconds: {{ $.Values.webhooks.mutatingWebhooksTimeoutSeconds }}
 {{- end }}
-{{- with .Values.webhooks.defaults.ingress }}  
+{{- with .Values.webhooks.hooks.defaults.ingress }}  
 - admissionReviewVersions:
   - v1
   clientConfig:
-  {{- if not $.Values.certManager.generateCertificates }}
-    caBundle: Cg==
-  {{- end }}
-    service:
-      name: {{ include "capsule.fullname" $ }}-webhook-service
-      namespace: {{ $.Release.Namespace }}
-      path: /defaults
+    {{- include "capsule.webhooks.service" (dict "path" "/defaults" "ctx" $) | nindent 4 }}
   failurePolicy: {{ .failurePolicy }}
-  name: ingress.defaults.capsule.clastix.io
+  name: ingress.defaults.projectcapsule.dev
   rules:
   - apiGroups:
     - networking.k8s.io
@@ -91,22 +76,17 @@ webhooks:
   namespaceSelector:
   {{- toYaml .namespaceSelector | nindent 4}}
   sideEffects: None
-{{- end }}  
+  timeoutSeconds: {{ $.Values.webhooks.mutatingWebhooksTimeoutSeconds }}
+{{- end }}
+{{- with .Values.webhooks.hooks.namespaceOwnerReference }} 
 - admissionReviewVersions:
     - v1
     - v1beta1
   clientConfig:
-{{- if not .Values.certManager.generateCertificates }}
-    caBundle: Cg==
-{{- end }}
-    service:
-      name: {{ include "capsule.fullname" . }}-webhook-service
-      namespace: {{ .Release.Namespace }}
-      path: /namespace-owner-reference
-      port: 443
-  failurePolicy: {{ .Values.webhooks.namespaceOwnerReference.failurePolicy }}
+    {{- include "capsule.webhooks.service" (dict "path" "/namespace-owner-reference" "ctx" $) | nindent 4 }}
+  failurePolicy: {{ .failurePolicy }}
   matchPolicy: Equivalent
-  name: owner.namespace.capsule.clastix.io
+  name: owner.namespace.projectcapsule.dev
   namespaceSelector: {}
   objectSelector: {}
   reinvocationPolicy: Never
@@ -122,4 +102,6 @@ webhooks:
       - namespaces
       scope: '*'
   sideEffects: NoneOnDryRun
-  timeoutSeconds: {{ .Values.mutatingWebhooksTimeoutSeconds }}
+  timeoutSeconds: {{ $.Values.webhooks.mutatingWebhooksTimeoutSeconds }}
+{{- end }}
+{{- end }}

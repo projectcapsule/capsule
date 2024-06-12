@@ -62,7 +62,7 @@ var _ = Describe("creating a Namespace as Tenant owner with custom --capsule-gro
 
 	It("should succeed and be available in Tenant namespaces list with default single group", func() {
 		ModifyCapsuleConfigurationOpts(func(configuration *capsulev1beta2.CapsuleConfiguration) {
-			configuration.Spec.UserGroups = []string{"capsule.clastix.io"}
+			configuration.Spec.UserGroups = []string{"projectcapsule.dev"}
 		})
 
 		ns := NewNamespace("")

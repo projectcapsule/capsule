@@ -38,9 +38,9 @@ annotations:
       email: cncf-capsule-maintainers@lists.cncf.io
   artifacthub.io/links: |
     - name: Documentation
-      url: https://capsule.clastix.io/
-# artifacthub.io/changes: |
-#   - kind: added
-#     description: artifacthub annotations
-#   - kind: changed
-#     description: maintainers contact
+      url: https://projectcapsule.dev/
+  artifacthub.io/changes: |
+    - kind: added
+      description: bundled crd lifecycle
+    - kind: changed
+      description: removed PodSecurityPolicy support

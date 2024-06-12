@@ -52,39 +52,13 @@ manager: generate golint
 run: generate manifests
 	go run .
 
-# Creates the single file to install Capsule without any external dependency
-installer: manifests kustomize
-	cd config/manager && $(KUSTOMIZE) edit set image controller=${CAPSULE_IMG}
-	$(KUSTOMIZE) build config/default > config/install.yaml
-
-# Install CRDs into a cluster
-install: installer
-	$(KUSTOMIZE) build config/crd | kubectl apply -f -
-
-# Uninstall CRDs from a cluster
-uninstall: installer
-	$(KUSTOMIZE) build config/crd | kubectl delete -f -
-
-# Deploy controller in the configured Kubernetes cluster in ~/.kube/config
-deploy: installer
-	kubectl apply -f config/install.yaml
-
-# Remove controller in the configured Kubernetes cluster in ~/.kube/config
-remove: installer
-	kubectl delete -f config/install.yaml
-	kubectl delete clusterroles.rbac.authorization.k8s.io capsule-namespace-deleter capsule-namespace-provisioner --ignore-not-found
-	kubectl delete clusterrolebindings.rbac.authorization.k8s.io capsule-namespace-deleter capsule-namespace-provisioner --ignore-not-found
-
 # Generate manifests e.g. CRD, RBAC etc.
 manifests: controller-gen
-	$(CONTROLLER_GEN) rbac:roleName=manager-role crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases
+	$(CONTROLLER_GEN) rbac:roleName=manager-role crd webhook paths="./..." output:crd:artifacts:config=charts/capsule/crds
 
 # Generate code
 generate: controller-gen
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
-
-apidoc: apidocs-gen
-	$(APIDOCS_GEN) crdoc --resources config/crd/bases --output docs/content/general/crds-apis.md --template docs/template/reference-cr.tmpl
 
 # Helm
 SRC_ROOT = $(shell git rev-parse --show-toplevel)
@@ -137,7 +111,7 @@ IP.1   = $(LAPTOP_HOST_IP)
 endef
 export TLS_CNF
 dev-setup:
-	kubectl -n capsule-system scale deployment capsule-controller-manager --replicas=0
+	kubectl -n capsule-system scale deployment capsule-controller-manager --replicas=0 || true
 	mkdir -p /tmp/k8s-webhook-server/serving-certs
 	echo "$${TLS_CNF}" > _tls.cnf
 	openssl req -newkey rsa:4096 -days 3650 -nodes -x509 \
@@ -149,35 +123,19 @@ dev-setup:
 	rm -f _tls.cnf 
 	export WEBHOOK_URL="https://$${LAPTOP_HOST_IP}:9443"; \
 	export CA_BUNDLE=`openssl base64 -in /tmp/k8s-webhook-server/serving-certs/tls.crt | tr -d '\n'`; \
-	kubectl patch MutatingWebhookConfiguration capsule-mutating-webhook-configuration \
-		--type='json' -p="[\
-		    {'op': 'replace', 'path': '/webhooks/0/clientConfig', 'value':{'url':\"$${WEBHOOK_URL}/defaults\",'caBundle':\"$${CA_BUNDLE}\"}},\
-			{'op': 'replace', 'path': '/webhooks/1/clientConfig', 'value':{'url':\"$${WEBHOOK_URL}/defaults\",'caBundle':\"$${CA_BUNDLE}\"}},\
-			{'op': 'replace', 'path': '/webhooks/2/clientConfig', 'value':{'url':\"$${WEBHOOK_URL}/defaults\",'caBundle':\"$${CA_BUNDLE}\"}},\
-			{'op': 'replace', 'path': '/webhooks/3/clientConfig', 'value':{'url':\"$${WEBHOOK_URL}/namespace-owner-reference\",'caBundle':\"$${CA_BUNDLE}\"}}\
-		]" && \
-	kubectl patch ValidatingWebhookConfiguration capsule-validating-webhook-configuration \
-		--type='json' -p="[\
-			{'op': 'replace', 'path': '/webhooks/0/clientConfig', 'value':{'url':\"$${WEBHOOK_URL}/cordoning\",'caBundle':\"$${CA_BUNDLE}\"}},\
-			{'op': 'replace', 'path': '/webhooks/1/clientConfig', 'value':{'url':\"$${WEBHOOK_URL}/ingresses\",'caBundle':\"$${CA_BUNDLE}\"}},\
-			{'op': 'replace', 'path': '/webhooks/2/clientConfig', 'value':{'url':\"$${WEBHOOK_URL}/namespaces\",'caBundle':\"$${CA_BUNDLE}\"}},\
-			{'op': 'replace', 'path': '/webhooks/3/clientConfig', 'value':{'url':\"$${WEBHOOK_URL}/networkpolicies\",'caBundle':\"$${CA_BUNDLE}\"}},\
-			{'op': 'replace', 'path': '/webhooks/4/clientConfig', 'value':{'url':\"$${WEBHOOK_URL}/nodes\",'caBundle':\"$${CA_BUNDLE}\"}},\
-			{'op': 'replace', 'path': '/webhooks/5/clientConfig', 'value':{'url':\"$${WEBHOOK_URL}/pods\",'caBundle':\"$${CA_BUNDLE}\"}},\
-			{'op': 'replace', 'path': '/webhooks/6/clientConfig', 'value':{'url':\"$${WEBHOOK_URL}/persistentvolumeclaims\",'caBundle':\"$${CA_BUNDLE}\"}},\
-			{'op': 'replace', 'path': '/webhooks/7/clientConfig', 'value':{'url':\"$${WEBHOOK_URL}/services\",'caBundle':\"$${CA_BUNDLE}\"}},\
-			{'op': 'replace', 'path': '/webhooks/8/clientConfig', 'value':{'url':\"$${WEBHOOK_URL}/tenantresource-objects\",'caBundle':\"$${CA_BUNDLE}\"}},\
-			{'op': 'replace', 'path': '/webhooks/9/clientConfig', 'value':{'url':\"$${WEBHOOK_URL}/tenants\",'caBundle':\"$${CA_BUNDLE}\"}}\
-		]" && \
-	kubectl patch crd tenants.capsule.clastix.io \
-		--type='json' -p="[\
-			{'op': 'replace', 'path': '/spec/conversion/webhook/clientConfig', 'value':{'url': \"$${WEBHOOK_URL}\", 'caBundle': \"$${CA_BUNDLE}\"}}\
-		]" && \
-	kubectl patch crd capsuleconfigurations.capsule.clastix.io \
-		--type='json' -p="[\
-			{'op': 'replace', 'path': '/spec/conversion/webhook/clientConfig', 'value':{'url': \"$${WEBHOOK_URL}\", 'caBundle': \"$${CA_BUNDLE}\"}}\
-		]";
-
+	helm upgrade \
+	    --dependency-update \
+		--debug \
+		--install \
+		--namespace capsule-system \
+		--create-namespace \
+		--set 'crds.install=true' \
+		--set 'crds.exclusive=true'\
+		--set "webhooks.exclusive=true"\
+		--set "webhooks.service.url=$${WEBHOOK_URL}" \
+		--set "webhooks.service.caBundle=$${CA_BUNDLE}" \
+		capsule \
+		./charts/capsule
 
 ####################
 # -- Docker
@@ -236,11 +194,6 @@ CONTROLLER_GEN         := $(shell pwd)/bin/controller-gen
 CONTROLLER_GEN_VERSION := v0.15.0
 controller-gen: ## Download controller-gen locally if necessary.
 	$(call go-install-tool,$(CONTROLLER_GEN),sigs.k8s.io/controller-tools/cmd/controller-gen@$(CONTROLLER_GEN_VERSION))
-
-APIDOCS_GEN         := $(shell pwd)/bin/crdoc
-APIDOCS_GEN_VERSION := latest
-apidocs-gen: ## Download crdoc locally if necessary.
-	$(call go-install-tool,$(APIDOCS_GEN),fybrik.io/crdoc@$(APIDOCS_GEN_VERSION))
 
 GINKGO         := $(shell pwd)/bin/ginkgo
 GINGKO_VERSION := v2.17.2
@@ -321,11 +274,10 @@ e2e/%: ginkgo
 
 e2e-build/%:
 	kind create cluster --wait=60s --name capsule --image=kindest/node:$*
-	make e2e-load-image
 	make e2e-install
 
 .PHONY: e2e-install
-e2e-install:
+e2e-install: e2e-load-image
 	helm upgrade \
 	    --dependency-update \
 		--debug \
@@ -337,7 +289,6 @@ e2e-install:
 		--set "manager.image.tag=$(VERSION)" \
 		--set 'manager.livenessProbe.failureThreshold=10' \
 		--set 'manager.readinessProbe.failureThreshold=10' \
-		--set 'podSecurityContext.seccompProfile=null' \
 		capsule \
 		./charts/capsule
 

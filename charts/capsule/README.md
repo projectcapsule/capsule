@@ -16,21 +16,39 @@ Use the Capsule Operator for easily implementing, managing, and maintaining mult
 
 * A [`kubeconfig`](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/) file accessing the Kubernetes cluster with cluster admin permissions.
 
-## Quick Start
+## Major Changes
 
+In the following sections you see actions which are required when you are upgrading to a specific version.
+
+### Upgrading to 0.7.x
+
+Introduces a new methode to manage all capsule CRDs and their lifecycle. We are no longer relying on the [native CRD hook with the Helm Chart](https://helm.sh/docs/chart_best_practices/custom_resource_definitions/#some-caveats-and-explanations). The hook only allows to manage CRDs on install and uninstall but we can't deliver updates to the CRDs.
+When you newly install the chart we recommend to set  `crds.install` to `true`. This will manage the CRDs with the Helm Chart. This behavior is the new default.
+
+#### Changed Values
+
+The following Values have changed key or Value:
+
+  * All values from previous releases under `webhooks` have moved to `webhooks.hooks`.
+  * `mutatingWebhooksTimeoutSeconds` has moved to `webhooks.mutatingWebhooksTimeoutSeconds`
+  * `validatingWebhooksTimeoutSeconds` has moved to `webhooks.validatingWebhooksTimeoutSeconds`
+
+## Installation
+
+The Capsule Operator requires it's CRDs to be installed before the operator itself. Since the Helm CRD lifecycle has limitations, we recommend to install the CRDs separately. Our chart supports the installation of crds via a dedicated Release.
 The Capsule Operator Chart can be used to instantly deploy the Capsule Operator on your Kubernetes cluster.
 
 1. Add this repository:
 
         $ helm repo add projectcapsule https://projectcapsule.github.io/charts
 
-2. Install the Chart:
+2. Install Capsule:
 
-        $ helm install capsule projectcapsule/capsule -n capsule-system --create-namespace
+        $ helm install capsule projectcapsule/capsule --version 0.7.0 -n capsule-system --create-namespace
 
         or
 
-        $ helm install capsule oci://ghcr.io/projectcapsule/charts/capsule --version 0.4.6  -n capsule-system --create-namespace
+        $ helm install capsule oci://ghcr.io/projectcapsule/charts/capsule --version 0.7.0  -n capsule-system --create-namespace
 
 3. Show the status:
 
@@ -58,13 +76,22 @@ Specify your overrides file when you install the chart:
 
         $ helm install capsule capsule-helm-chart --values myvalues.yaml -n capsule-system
 
-The values in your overrides file `myvalues.yaml` will override their counterparts in the chart’s values.yaml file. Any values in `values.yaml` that weren’t overridden will keep their defaults.
+The values in your overrides file `myvalues.yaml` will override their counterparts in the chart's values.yaml file. Any values in `values.yaml` that weren’t overridden will keep their defaults.
 
 If you only need to make minor customizations, you can specify them on the command line by using the `--set` option. For example:
 
         $ helm install capsule capsule-helm-chart --set manager.options.forceTenantPrefix=false -n capsule-system
 
 Here the values you can override:
+
+### CustomResourceDefinition Lifecycle
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| crds.annnotations | object | `{}` | Extra Annotations for CRDs |
+| crds.exclusive | bool | `false` | Only install the CRDs, no other primitives |
+| crds.install | bool | `true` | Install the CustomResourceDefinitions (This also manages the lifecycle of the CRDs for update operations) |
+| crds.labels | object | `{}` | Extra Labels for CRDs |
 
 ### General Parameters
 
@@ -75,28 +102,36 @@ Here the values you can override:
 | customAnnotations | object | `{}` | Additional annotations which will be added to all resources created by Capsule helm chart |
 | customLabels | object | `{}` | Additional labels which will be added to all resources created by Capsule helm chart |
 | imagePullSecrets | list | `[]` | Configuration for `imagePullSecrets` so that you can use a private images registry. |
+| jobs.affinity | object | `{}` | Set affinity rules |
+| jobs.annotations | object | `{"helm.sh/hook-delete-policy":"before-hook-creation,hook-succeeded"}` | Annotations to add to the certgen job. |
 | jobs.image.pullPolicy | string | `"IfNotPresent"` | Set the image pull policy of the helm chart job |
 | jobs.image.registry | string | `"docker.io"` | Set the image repository of the helm chart job |
 | jobs.image.repository | string | `"clastix/kubectl"` | Set the image repository of the helm chart job |
 | jobs.image.tag | string | `""` | Set the image tag of the helm chart job |
-| mutatingWebhooksTimeoutSeconds | int | `30` | Timeout in seconds for mutating webhooks |
+| jobs.nodeSelector | object | `{}` | Set the node selector |
+| jobs.podSecurityContext | object | `{"seccompProfile":{"type":"RuntimeDefault"}}` | Security context for the job pods. |
+| jobs.priorityClassName | string | `""` | Set a pod priorityClassName |
+| jobs.resources | object | `{}` | Job resources |
+| jobs.restartPolicy | string | `"Never"` | Set the restartPolicy |
+| jobs.securityContext | object | `{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]},"readOnlyRootFilesystem":true,"runAsGroup":1002,"runAsNonRoot":true,"runAsUser":1002}` | Security context for the job containers. |
+| jobs.tolerations | list | `[]` | Set list of tolerations |
+| jobs.topologySpreadConstraints | list | `[]` | Set Topology Spread Constraints |
+| jobs.ttlSecondsAfterFinished | int | `60` | Sets the ttl in seconds after a finished certgen job is deleted. Set to -1 to never delete. |
 | nodeSelector | object | `{}` | Set the node selector for the Capsule pod |
 | podAnnotations | object | `{}` | Annotations to add to the capsule pod. |
 | podSecurityContext | object | `{"runAsGroup":1002,"runAsNonRoot":true,"runAsUser":1002,"seccompProfile":{"type":"RuntimeDefault"}}` | Set the securityContext for the Capsule pod |
-| podSecurityPolicy.enabled | bool | `false` | Specify if a Pod Security Policy must be created |
 | priorityClassName | string | `""` | Set the priority class name of the Capsule pod |
 | proxy.enabled | bool | `false` | Enable Installation of Capsule Proxy |
 | replicaCount | int | `1` | Set the replica count for capsule pod |
 | securityContext | object | `{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]},"readOnlyRootFilesystem":true}` | Set the securityContext for the Capsule container |
 | serviceAccount.annotations | object | `{}` | Annotations to add to the service account. |
 | serviceAccount.create | bool | `true` | Specifies whether a service account should be created. |
-| serviceAccount.name | string | `"capsule"` | The name of the service account to use. If not set and `serviceAccount.create=true`, a name is generated using the fullname template |
+| serviceAccount.name | string | `""` | The name of the service account to use. If not set and `serviceAccount.create=true`, a name is generated using the fullname template |
 | tls.create | bool | `true` | When cert-manager is disabled, Capsule will generate the TLS certificate for webhook and CRDs conversion. |
 | tls.enableController | bool | `true` | Start the Capsule controller that injects the CA into mutating and validating webhooks, and CRD as well. |
 | tls.name | string | `""` | Override name of the Capsule TLS Secret name when externally managed. |
 | tolerations | list | `[]` | Set list of tolerations for the Capsule pod |
 | topologySpreadConstraints | list | `[]` | Set topology spread constraints for the Capsule pod |
-| validatingWebhooksTimeoutSeconds | int | `30` | Timeout in seconds for validating webhooks |
 
 ### Manager Parameters
 
@@ -109,7 +144,7 @@ Here the values you can override:
 | manager.image.tag | string | `""` | Overrides the image tag whose default is the chart appVersion. |
 | manager.kind | string | `"Deployment"` | Set the controller deployment mode as `Deployment` or `DaemonSet`. |
 | manager.livenessProbe | object | `{"httpGet":{"path":"/healthz","port":10080}}` | Configure the liveness probe using Deployment probe spec |
-| manager.options.capsuleUserGroups | list | `["capsule.clastix.io"]` | Override the Capsule user groups |
+| manager.options.capsuleUserGroups | list | `["projectcapsule.dev"]` | Override the Capsule user groups |
 | manager.options.forceTenantPrefix | bool | `false` | Boolean, enforces the Tenant owner, during Namespace creation, to name it using the selected Tenant name as prefix, separated by a dash |
 | manager.options.generateCertificates | bool | `true` | Specifies whether capsule webhooks certificates should be generated by capsule operator |
 | manager.options.logLevel | string | `"4"` | Set the log verbosity of the capsule with a value from 1 to 10 |
@@ -137,42 +172,50 @@ Here the values you can override:
 | serviceMonitor.namespace | string | `""` | Install the ServiceMonitor into a different Namespace, as the monitoring stack one (default: the release one) |
 | serviceMonitor.targetLabels | list | `[]` | Set targetLabels for the serviceMonitor |
 
-### Webhook Parameters
+### Webhooks Parameters
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| webhooks.cordoning.failurePolicy | string | `"Fail"` |  |
-| webhooks.cordoning.namespaceSelector.matchExpressions[0].key | string | `"capsule.clastix.io/tenant"` |  |
-| webhooks.cordoning.namespaceSelector.matchExpressions[0].operator | string | `"Exists"` |  |
-| webhooks.defaults.ingress.failurePolicy | string | `"Fail"` |  |
-| webhooks.defaults.ingress.namespaceSelector.matchExpressions[0].key | string | `"capsule.clastix.io/tenant"` |  |
-| webhooks.defaults.ingress.namespaceSelector.matchExpressions[0].operator | string | `"Exists"` |  |
-| webhooks.defaults.pods.failurePolicy | string | `"Fail"` |  |
-| webhooks.defaults.pods.namespaceSelector.matchExpressions[0].key | string | `"capsule.clastix.io/tenant"` |  |
-| webhooks.defaults.pods.namespaceSelector.matchExpressions[0].operator | string | `"Exists"` |  |
-| webhooks.defaults.pvc.failurePolicy | string | `"Fail"` |  |
-| webhooks.defaults.pvc.namespaceSelector.matchExpressions[0].key | string | `"capsule.clastix.io/tenant"` |  |
-| webhooks.defaults.pvc.namespaceSelector.matchExpressions[0].operator | string | `"Exists"` |  |
-| webhooks.ingresses.failurePolicy | string | `"Fail"` |  |
-| webhooks.ingresses.namespaceSelector.matchExpressions[0].key | string | `"capsule.clastix.io/tenant"` |  |
-| webhooks.ingresses.namespaceSelector.matchExpressions[0].operator | string | `"Exists"` |  |
-| webhooks.namespaceOwnerReference.failurePolicy | string | `"Fail"` |  |
-| webhooks.namespaces.failurePolicy | string | `"Fail"` |  |
-| webhooks.networkpolicies.failurePolicy | string | `"Fail"` |  |
-| webhooks.networkpolicies.namespaceSelector.matchExpressions[0].key | string | `"capsule.clastix.io/tenant"` |  |
-| webhooks.networkpolicies.namespaceSelector.matchExpressions[0].operator | string | `"Exists"` |  |
-| webhooks.nodes.failurePolicy | string | `"Fail"` |  |
-| webhooks.persistentvolumeclaims.failurePolicy | string | `"Fail"` |  |
-| webhooks.persistentvolumeclaims.namespaceSelector.matchExpressions[0].key | string | `"capsule.clastix.io/tenant"` |  |
-| webhooks.persistentvolumeclaims.namespaceSelector.matchExpressions[0].operator | string | `"Exists"` |  |
-| webhooks.pods.failurePolicy | string | `"Fail"` |  |
-| webhooks.pods.namespaceSelector.matchExpressions[0].key | string | `"capsule.clastix.io/tenant"` |  |
-| webhooks.pods.namespaceSelector.matchExpressions[0].operator | string | `"Exists"` |  |
-| webhooks.services.failurePolicy | string | `"Fail"` |  |
-| webhooks.services.namespaceSelector.matchExpressions[0].key | string | `"capsule.clastix.io/tenant"` |  |
-| webhooks.services.namespaceSelector.matchExpressions[0].operator | string | `"Exists"` |  |
-| webhooks.tenantResourceObjects.failurePolicy | string | `"Fail"` |  |
-| webhooks.tenants.failurePolicy | string | `"Fail"` |  |
+| webhooks.exclusive | bool | `false` | When `crds.exclusive` is `true` the webhooks will be installed |
+| webhooks.hooks.cordoning.failurePolicy | string | `"Fail"` |  |
+| webhooks.hooks.cordoning.namespaceSelector.matchExpressions[0].key | string | `"capsule.clastix.io/tenant"` |  |
+| webhooks.hooks.cordoning.namespaceSelector.matchExpressions[0].operator | string | `"Exists"` |  |
+| webhooks.hooks.defaults.ingress.failurePolicy | string | `"Fail"` |  |
+| webhooks.hooks.defaults.ingress.namespaceSelector.matchExpressions[0].key | string | `"capsule.clastix.io/tenant"` |  |
+| webhooks.hooks.defaults.ingress.namespaceSelector.matchExpressions[0].operator | string | `"Exists"` |  |
+| webhooks.hooks.defaults.pods.failurePolicy | string | `"Fail"` |  |
+| webhooks.hooks.defaults.pods.namespaceSelector.matchExpressions[0].key | string | `"capsule.clastix.io/tenant"` |  |
+| webhooks.hooks.defaults.pods.namespaceSelector.matchExpressions[0].operator | string | `"Exists"` |  |
+| webhooks.hooks.defaults.pvc.failurePolicy | string | `"Fail"` |  |
+| webhooks.hooks.defaults.pvc.namespaceSelector.matchExpressions[0].key | string | `"capsule.clastix.io/tenant"` |  |
+| webhooks.hooks.defaults.pvc.namespaceSelector.matchExpressions[0].operator | string | `"Exists"` |  |
+| webhooks.hooks.ingresses.failurePolicy | string | `"Fail"` |  |
+| webhooks.hooks.ingresses.namespaceSelector.matchExpressions[0].key | string | `"capsule.clastix.io/tenant"` |  |
+| webhooks.hooks.ingresses.namespaceSelector.matchExpressions[0].operator | string | `"Exists"` |  |
+| webhooks.hooks.namespaceOwnerReference.failurePolicy | string | `"Fail"` |  |
+| webhooks.hooks.namespaces.failurePolicy | string | `"Fail"` |  |
+| webhooks.hooks.networkpolicies.failurePolicy | string | `"Fail"` |  |
+| webhooks.hooks.networkpolicies.namespaceSelector.matchExpressions[0].key | string | `"capsule.clastix.io/tenant"` |  |
+| webhooks.hooks.networkpolicies.namespaceSelector.matchExpressions[0].operator | string | `"Exists"` |  |
+| webhooks.hooks.nodes.failurePolicy | string | `"Fail"` |  |
+| webhooks.hooks.persistentvolumeclaims.failurePolicy | string | `"Fail"` |  |
+| webhooks.hooks.persistentvolumeclaims.namespaceSelector.matchExpressions[0].key | string | `"capsule.clastix.io/tenant"` |  |
+| webhooks.hooks.persistentvolumeclaims.namespaceSelector.matchExpressions[0].operator | string | `"Exists"` |  |
+| webhooks.hooks.pods.failurePolicy | string | `"Fail"` |  |
+| webhooks.hooks.pods.namespaceSelector.matchExpressions[0].key | string | `"capsule.clastix.io/tenant"` |  |
+| webhooks.hooks.pods.namespaceSelector.matchExpressions[0].operator | string | `"Exists"` |  |
+| webhooks.hooks.services.failurePolicy | string | `"Fail"` |  |
+| webhooks.hooks.services.namespaceSelector.matchExpressions[0].key | string | `"capsule.clastix.io/tenant"` |  |
+| webhooks.hooks.services.namespaceSelector.matchExpressions[0].operator | string | `"Exists"` |  |
+| webhooks.hooks.tenantResourceObjects.failurePolicy | string | `"Fail"` |  |
+| webhooks.hooks.tenants.failurePolicy | string | `"Fail"` |  |
+| webhooks.mutatingWebhooksTimeoutSeconds | int | `30` | Timeout in seconds for mutating webhooks |
+| webhooks.service.caBundle | string | `""` | CABundle for the webhook service |
+| webhooks.service.name | string | `""` | Custom service name for the webhook service |
+| webhooks.service.namespace | string | `""` | Custom service namespace for the webhook service |
+| webhooks.service.port | string | `nil` | Custom service port for the webhook service |
+| webhooks.service.url | string | `""` | The URL where the capsule webhook services are running (Overwrites cluster scoped service definition) |
+| webhooks.validatingWebhooksTimeoutSeconds | int | `30` | Timeout in seconds for validating webhooks |
 
 ## Created resources
 

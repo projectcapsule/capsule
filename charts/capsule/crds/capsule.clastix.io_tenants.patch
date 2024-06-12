@@ -1,0 +1,14 @@
+metadata:
+  annotations:
+  {{- if $.Values.certManager.generateCertificates }}
+    cert-manager.io/inject-ca-from: {{ .Release.Namespace }}/{{ include "capsule.fullname" . }}-webhook-cert
+  {{-  end }}
+spec:
+  conversion:
+    strategy: Webhook
+    webhook:
+      clientConfig:
+        {{- include "capsule.webhooks.service" (dict "path" "/convert" "ctx" $) | nindent 8 }}
+      conversionReviewVersions:
+        - v1beta1
+        - v1beta2
