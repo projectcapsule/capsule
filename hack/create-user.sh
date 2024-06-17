@@ -38,7 +38,7 @@ if [[ -z ${TENANT} ]]; then
 fi
 
 if [[ -z ${GROUP} ]]; then
-    GROUP=capsule.clastix.io
+    GROUP=projectcapsule.dev
 fi
 
 

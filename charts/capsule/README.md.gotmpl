@@ -16,21 +16,40 @@ Use the Capsule Operator for easily implementing, managing, and maintaining mult
 
 * A [`kubeconfig`](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/) file accessing the Kubernetes cluster with cluster admin permissions.
 
-## Quick Start
+## Major Changes 
 
+In the following sections you see actions which are required when you are upgrading to a specific version.
+
+### Upgrading to 0.7.x
+
+Introduces a new methode to manage all capsule CRDs and their lifecycle. We are no longer relying on the [native CRD hook with the Helm Chart](https://helm.sh/docs/chart_best_practices/custom_resource_definitions/#some-caveats-and-explanations). The hook only allows to manage CRDs on install and uninstall but we can't deliver updates to the CRDs.
+When you newly install the chart we recommend to set  `crds.install` to `true`. This will manage the CRDs with the Helm Chart. This behavior is the new default.
+
+#### Changed Values 
+
+The following Values have changed key or Value:
+
+  * All values from previous releases under `webhooks` have moved to `webhooks.hooks`.
+  * `mutatingWebhooksTimeoutSeconds` has moved to `webhooks.mutatingWebhooksTimeoutSeconds`
+  * `validatingWebhooksTimeoutSeconds` has moved to `webhooks.validatingWebhooksTimeoutSeconds`
+
+
+## Installation
+
+The Capsule Operator requires it's CRDs to be installed before the operator itself. Since the Helm CRD lifecycle has limitations, we recommend to install the CRDs separately. Our chart supports the installation of crds via a dedicated Release.
 The Capsule Operator Chart can be used to instantly deploy the Capsule Operator on your Kubernetes cluster.
 
 1. Add this repository:
 
         $ helm repo add projectcapsule https://projectcapsule.github.io/charts
 
-2. Install the Chart:
+2. Install Capsule:
 
-        $ helm install capsule projectcapsule/capsule -n capsule-system --create-namespace
+        $ helm install capsule projectcapsule/capsule --version 0.7.0 -n capsule-system --create-namespace
 
         or
 
-        $ helm install capsule oci://ghcr.io/projectcapsule/charts/capsule --version 0.4.6  -n capsule-system --create-namespace
+        $ helm install capsule oci://ghcr.io/projectcapsule/charts/capsule --version 0.7.0  -n capsule-system --create-namespace
 
 3. Show the status:
 
@@ -58,7 +77,7 @@ Specify your overrides file when you install the chart:
 
         $ helm install capsule capsule-helm-chart --values myvalues.yaml -n capsule-system
 
-The values in your overrides file `myvalues.yaml` will override their counterparts in the chart’s values.yaml file. Any values in `values.yaml` that weren’t overridden will keep their defaults.
+The values in your overrides file `myvalues.yaml` will override their counterparts in the chart's values.yaml file. Any values in `values.yaml` that weren’t overridden will keep their defaults.
 
 If you only need to make minor customizations, you can specify them on the command line by using the `--set` option. For example:
 
@@ -66,13 +85,23 @@ If you only need to make minor customizations, you can specify them on the comma
 
 Here the values you can override:
 
+### CustomResourceDefinition Lifecycle
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+{{- range .Values }}
+  {{- if (hasPrefix "crds" .Key)  }}
+| {{ .Key }} | {{ .Type }} | {{ if .Default }}{{ .Default }}{{ else }}{{ .AutoDefault }}{{ end }} | {{ if .Description }}{{ .Description }}{{ else }}{{ .AutoDescription }}{{ end }} |
+  {{- end }}
+{{- end }}
+
 
 ### General Parameters
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 {{- range .Values }}
-  {{- if not (or (hasPrefix "manager" .Key) (hasPrefix "serviceMonitor" .Key) (hasPrefix "webhook" .Key) (hasPrefix "capsule-proxy" .Key) )  }}
+  {{- if not (or (hasPrefix "manager" .Key) (hasPrefix "crds" .Key) (hasPrefix "serviceMonitor" .Key) (hasPrefix "webhook" .Key) (hasPrefix "capsule-proxy" .Key) )  }}
 | {{ .Key }} | {{ .Type }} | {{ if .Default }}{{ .Default }}{{ else }}{{ .AutoDefault }}{{ end }} | {{ if .Description }}{{ .Description }}{{ else }}{{ .AutoDescription }}{{ end }} |
   {{- end }}
 {{- end }}
@@ -97,7 +126,7 @@ Here the values you can override:
   {{- end }}
 {{- end }}
 
-### Webhook Parameters
+### Webhooks Parameters
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|

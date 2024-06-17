@@ -68,7 +68,7 @@ var _ = AfterSuite(func() {
 func ownerClient(owner capsulev1beta2.OwnerSpec) (cs kubernetes.Interface) {
 	c, err := config.GetConfig()
 	Expect(err).ToNot(HaveOccurred())
-	c.Impersonate.Groups = []string{capsulev1beta2.GroupVersion.Group, owner.Name}
+	c.Impersonate.Groups = []string{"projectcapsule.dev", owner.Name}
 	c.Impersonate.UserName = owner.Name
 	cs, err = kubernetes.NewForConfig(c)
 	Expect(err).ToNot(HaveOccurred())

@@ -1,0 +1,90 @@
+{{- if not $.Values.crds.exclusive }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "capsule.pre-delete.name" . }}
+  namespace: {{ .Release.Namespace | quote }}
+  annotations:
+    # create hook dependencies in the right order
+    "helm.sh/hook-weight": "-3"
+    {{- include "capsule.pre-delete.annotations" . | nindent 4 }}
+  labels:
+    app.kubernetes.io/component: {{ include "capsule.pre-delete.component" . | quote }}
+    {{- include "capsule.labels" . | nindent 4 }}
+rules:
+- apiGroups:
+  - rbac.authorization.k8s.io
+  resourceNames:
+  - capsule-namespace-deleter
+  - capsule-namespace-provisioner
+  resources:
+  - clusterroles
+  - clusterrolebindings
+  verbs:
+  - delete
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "capsule.pre-delete.name" . }}
+  namespace: {{ .Release.Namespace | quote }}
+  annotations:
+    # create hook dependencies in the right order
+    "helm.sh/hook-weight": "-3"
+    {{- include "capsule.pre-delete.annotations" . | nindent 4 }}
+  labels:
+    app.kubernetes.io/component: {{ include "capsule.pre-delete.component" . | quote }}
+    {{- include "capsule.labels" . | nindent 4 }}
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - delete
+  resourceNames:
+  - {{ include "capsule.secretTlsName" $ }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "capsule.pre-delete.name" . }}
+  namespace: {{ .Release.Namespace | quote }}
+  annotations:
+    # create hook dependencies in the right order
+    "helm.sh/hook-weight": "-2"
+    {{- include "capsule.pre-delete.annotations" . | nindent 4 }}
+  labels:
+    app.kubernetes.io/component: {{ include "capsule.pre-delete.component" . | quote }}
+    {{- include "capsule.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "capsule.pre-delete.name" . }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "capsule.pre-delete.name" . }}
+    namespace: {{ .Release.Namespace | quote }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "capsule.pre-delete.name" . }}
+  namespace: {{ .Release.Namespace | quote }}
+  annotations:
+    # create hook dependencies in the right order
+    "helm.sh/hook-weight": "-2"
+    {{- include "capsule.pre-delete.annotations" . | nindent 4 }}
+  labels:
+    app.kubernetes.io/component: {{ include "capsule.pre-delete.component" . | quote }}
+    {{- include "capsule.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "capsule.pre-delete.name" . }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "capsule.pre-delete.name" . }}
+    namespace: {{ .Release.Namespace | quote }}
+{{- end }}

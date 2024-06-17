@@ -1,3 +1,4 @@
+{{- if not $.Values.crds.exclusive }}
 apiVersion: capsule.clastix.io/v1beta2
 kind: CapsuleConfiguration
 metadata:
@@ -24,3 +25,4 @@ spec:
   nodeMetadata:
     {{- toYaml . | nindent 4 }}
   {{- end }}
+{{- end }}
