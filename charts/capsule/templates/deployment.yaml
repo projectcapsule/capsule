@@ -65,7 +65,7 @@ spec:
           - --webhook-port={{ .Values.manager.webhookPort }}
           - --enable-leader-election
           - --zap-log-level={{ default 4 .Values.manager.options.logLevel }}
-          - --configuration-name=default
+          - --configuration-name={{ .Values.manager.options.capsuleConfiguration }}
           image: {{ include "capsule.managerFullyQualifiedDockerImage" . }}
           imagePullPolicy: {{ .Values.manager.image.pullPolicy }}
           env:

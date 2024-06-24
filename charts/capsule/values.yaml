@@ -70,6 +70,8 @@ manager:
 
   # Additional Capsule Controller Options
   options:
+    # -- Change the default name of the capsule configuration name
+    capsuleConfiguration: default
     # -- Set the log verbosity of the capsule with a value from 1 to 10
     logLevel: '4'
     # -- Boolean, enforces the Tenant owner, during Namespace creation, to name it using the selected Tenant name as prefix, separated by a dash
