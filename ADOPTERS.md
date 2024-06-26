@@ -7,6 +7,9 @@ This is a list of companies that have adopted Capsule, feel free to open a Pull-
 ### [Bedag Informatik AG](https://www.bedag.ch/)
 ![Bedag](https://www.bedag.ch/wGlobal/wGlobal/layout/images/logo.svg)
 
+### [Department of Defense](https://www.defense.gov/)
+![United States Department of Defense](https://www.access-board.gov/images/dod-seal.png)
+
 ### [EPAM Delivery Platform](https://epam.github.io/edp-install/)
 ![EPAM Delivery Platform](https://raw.githubusercontent.com/epam/edp-install/master/docs/assets/edp-logo-150x150-black.png)
 
