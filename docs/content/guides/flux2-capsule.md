@@ -1,6 +1,135 @@
 # Multi-tenancy the GitOps way
 
-This guide is intended to cover how to use Flux v2 with [multi-tenancy lockdown features](https://fluxcd.io/docs/installation/#multi-tenancy-lockdown) with Capsule and Capsule Proxy together, to enable a Namespace-as-a-Service the GitOps-way.
+This document will guide you to manage Tenant resources the GitOps way with Flux configured with the [multi-tenancy lockdown](https://fluxcd.io/docs/installation/#multi-tenancy-lockdown).
+
+The proposed approach consists on making Flux to reconcile Tenant resources as Tenant Owners, while still providing Namespace as a Service to Tenants.
+
+This means that Tenants can operate and declare multiple Namespaces in their own Git repositories while not escaping the policies enforced by Capsule.
+
+## Quickstart
+
+### Install
+
+In order to make it work you can install the FluxCD addon via Helm:
+
+```shell
+helm install -n capsule-system capsule-addon-fluxcd \
+  oci://ghcr.io/projectcapsule/charts/capsule-addon-fluxcd
+```
+
+### Configure Tenants
+
+> The audience for this part is the **platform administrator** user persona.
+
+In order to make Flux controllers reconcile Tenant resources impersonating a Tenant Owner, a Tenant Owner as Service Account is required.
+
+To be recognized by the addon that will automate the required configurations, the `ServiceAccount` needs the `capsule.addon.fluxcd/enabled=true` annotation.
+
+Assuming a configured *oil* `Tenant`, the following Tenant Owner `ServiceAccount` must be declared:
+
+```yml
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: oil-system
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: gitops-reconciler
+  namespace: oil-system
+  annotations:
+    capsule.addon.fluxcd/enabled: "true"
+```
+
+set it as a valid *oil* `Tenant` owner, and made Capsule recognize its `Group`:
+
+```yml
+---
+apiVersion: capsule.clastix.io/v1beta2
+kind: Tenant
+metadata:
+  name: oil
+spec:
+  additionalRoleBindings:
+  - clusterRoleName: cluster-admin
+    subjects:
+    - name: gitops-reconciler
+      kind: ServiceAccount
+      namespace: oil-system
+  owners:
+  - name: system:serviceaccount:oil-system:gitops-reconciler
+    kind: ServiceAccount
+---
+apiVersion: capsule.clastix.io/v1beta2
+kind: CapsuleConfiguration
+metadata:
+  name: default
+spec:
+  userGroups:
+  - capsule.clastix.io
+  - system:serviceaccounts:oil-system
+```
+
+The addon will automate:
+* RBAC configuration for the `Tenant` owner `ServiceAccount`
+* `Tenant` owner `ServiceAccount` token generation
+* `Tenant` owner `kubeconfig` needed to send Flux reconciliation requests through the Capsule proxy
+* `Tenant` `kubeconfig` distribution across all Tenant `Namespace`s.
+
+The last automation is needed so that the `kubeconfig` can be set on `Kustomization`s/`HelmRelease`s across all `Tenant`'s `Namespace`s.
+
+More details on this are available in the deep-dive section.
+
+### How to use
+
+> The audience for this part is the **platform administrator** user persona.
+
+Consider a `Tenant` named *oil* that has a dedicated Git repository that contains oil's configurations.
+
+You as a platform administrator want to provide to the *oil* `Tenant` a Namespace-as-a-Service with a GitOps experience, allowing the tenant to version the configurations in a Git repository.
+
+You, as Tenant owner, can configure Flux [reconciliation](https://fluxcd.io/flux/concepts/#reconciliation) resources to be applied as Tenant owner:
+
+```yml
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1beta2
+kind: Kustomization
+metadata:
+  name: oil-apps
+  namespace: oil-system
+spec:
+  serviceAccountName: gitops-reconciler
+  kubeConfig:
+    secretRef:
+      name: gitops-reconciler-kubeconfig
+      key: kubeconfig
+  sourceRef:
+    kind: GitRepository
+    name: oil
+---
+apiVersion: source.toolkit.fluxcd.io/v1beta2
+kind: GitRepository
+metadata:
+  name: oil
+  namespace: oil-system
+spec:
+  url: https://github.com/oil/oil-apps
+```
+
+Let's analyze the setup field by field:
+- the `GitRepository` and the `Kustomization` are in a Tenant system `Namespace`
+- the `Kustomization` refers to a `ServiceAccount` to be impersonated when reconciling the resources the `Kustomization` refers to: this ServiceAccount is an *oil* **Tenant owner**
+- the `Kustomization` refers also to a `kubeConfig` to be used when reconciling the resources the `Kustomization` refers to: this is needed to make requests through the **Capsule proxy** in order to operate on cluster-wide resources as a Tenant
+
+The *oil* tenant can also declare new `Namespace`s thanks to the segregation provided by Capsule.
+
+> Note: it can be avoided to explicitly set the service account name when it's set as default Service Account name at Flux's [kustomize-controller level](https://fluxcd.io/flux/installation/configuration/multitenancy/#how-to-configure-flux-multi-tenancy) via the `default-service-account` flag.
+
+More information are available in the [addon repository](https://github.com/projectcapsule/capsule-addon-fluxcd).
+
+## Deep dive
 
 ### Flux and multi-tenancy
 
@@ -50,7 +179,7 @@ What if we would like to provide tenants the ability to manage also their own sp
 
 ![naas](./assets/flux-tenants-capsule-reconciliation.png)
 
-## The ingredients of the recipe
+## Manual setup
 
 > Legenda:
 > - Privileged space: group of Namespaces which are not part of any Tenant.
