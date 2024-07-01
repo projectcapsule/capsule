@@ -6,20 +6,7 @@ Thanks for giving Capsule a try.
 
 Make sure you have access to a Kubernetes cluster as administrator.
 
-There are two ways to install Capsule:
-
-* Use the [single YAML file installer](https://raw.githubusercontent.com/clastix/capsule/master/config/install.yaml)
-* Use the [Capsule Helm Chart](https://github.com/projectcapsule/capsule/blob/master/charts/capsule/README.md)
-
-### Install with the single YAML file installer
-
-Ensure you have `kubectl` installed in your `PATH`. Clone this repository and move to the repo folder:
-
-```
-$ kubectl apply -f https://raw.githubusercontent.com/clastix/capsule/master/config/install.yaml
-```
-
-It will install the Capsule controller in a dedicated namespace `capsule-system`.
+You can use the [Capsule Helm Chart](https://github.com/projectcapsule/capsule/blob/master/charts/capsule/README.md) to install Capsule.
 
 ### Install with Helm Chart
 
