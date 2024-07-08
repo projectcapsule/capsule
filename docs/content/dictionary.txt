@@ -218,3 +218,7 @@ v2
 webhook
 webhooks
 wontfix
+Quickstart
+FluxCD
+addon
+kustomize-controller
