@@ -120,6 +120,9 @@ dev-setup:
 		-config _tls.cnf \
 		-keyout /tmp/k8s-webhook-server/serving-certs/tls.key \
 		-out /tmp/k8s-webhook-server/serving-certs/tls.crt
+	kubectl create secret tls capsule-tls -n capsule-system \
+		--cert=/tmp/k8s-webhook-server/serving-certs/tls.crt\
+		--key=/tmp/k8s-webhook-server/serving-certs/tls.key || true
 	rm -f _tls.cnf 
 	export WEBHOOK_URL="https://$${LAPTOP_HOST_IP}:9443"; \
 	export CA_BUNDLE=`openssl base64 -in /tmp/k8s-webhook-server/serving-certs/tls.crt | tr -d '\n'`; \
