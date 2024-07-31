@@ -564,7 +564,7 @@ var _ = Describe("when Tenant handles Ingress classes with networking.k8s.io/v1"
 		Expect(*i.Spec.IngressClassName).To(Equal(class.GetName()))
 	})
 
-	It("shoult mutate to default tenant IngressClass although the cluster global one is not allowed", func() {
+	It("should mutate to default tenant IngressClass although the cluster global one is not allowed", func() {
 		if err := k8sClient.List(context.Background(), &networkingv1.IngressList{}); err != nil {
 			if utils.IsUnsupportedAPI(err) {
 				Skip(fmt.Sprintf("Running test due to unsupported API kind: %s", err.Error()))
