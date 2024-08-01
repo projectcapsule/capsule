@@ -70,7 +70,7 @@ git clone https://hostname/YOUR-USERNAME/YOUR-REPOSITORY
 
 2. **Create a branch:**
 
-Create a new brach and navigate to the branch using this command.
+Create a new branch and navigate to it using this command.
 
 ```sh
 git checkout -b <new-branch>
@@ -180,7 +180,7 @@ The semantics should indicate the change and it's impact. The general format for
 The following types are allowed for commits and pull requests:
 
   * `chore`: housekeeping changes, no production code change
-  * `ci`: changes to buillding process/workflows
+  * `ci`: changes to building process/workflows
   * `docs`: changes to documentation
   * `feat`: new features
   * `fix`: bug fixes

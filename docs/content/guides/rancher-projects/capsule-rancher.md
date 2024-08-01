@@ -70,7 +70,7 @@ When onboarding tenants, the administrator needs to create the following, in ord
 
 #### Create the Tenant Member Project Role
 
-A custom `Project Role` is needed to allow Tenant users, with minimun set of privileges and create and delete `Namespace`s.
+A custom `Project Role` is needed to allow Tenant users, with minimum set of privileges and create and delete `Namespace`s.
 
 Create a Project Role named *Tenant Member* that inherits the privileges from the following Roles:
 - *read-only*
