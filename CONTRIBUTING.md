@@ -70,7 +70,7 @@ git clone https://hostname/YOUR-USERNAME/YOUR-REPOSITORY
 
 2. **Create a branch:**
 
-Create a new breach and navigate to the branch using this command.
+Create a new branch and navigate to it using this command.
 
 ```sh
 git checkout -b <new-branch>
