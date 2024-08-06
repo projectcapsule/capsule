@@ -91,6 +91,5 @@ spec:
             path: {{ $path | base }}
 {{- end }}
 {{- end }}
-      restartPolicy: Never
   backoffLimit: 4
 {{- end }}
