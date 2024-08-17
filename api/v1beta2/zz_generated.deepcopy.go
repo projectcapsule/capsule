@@ -755,7 +755,7 @@ func (in *TenantSpec) DeepCopyInto(out *TenantSpec) {
 	}
 	if in.RuntimeClasses != nil {
 		in, out := &in.RuntimeClasses, &out.RuntimeClasses
-		*out = new(api.SelectorAllowedListSpec)
+		*out = new(api.DefaultAllowedListSpec)
 		(*in).DeepCopyInto(*out)
 	}
 	if in.PriorityClasses != nil {

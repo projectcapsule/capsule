@@ -20,10 +20,6 @@ func ErroredResponse(err error) *admission.Response {
 }
 
 func DefaultAllowedValuesErrorMessage(allowed api.DefaultAllowedListSpec, err string) string {
-	return AllowedValuesErrorMessage(allowed.SelectorAllowedListSpec, err)
-}
-
-func AllowedValuesErrorMessage(allowed api.SelectorAllowedListSpec, err string) string {
 	var extra []string
 	if len(allowed.Exact) > 0 {
 		extra = append(extra, fmt.Sprintf("use one from the following list (%s)", strings.Join(allowed.Exact, ", ")))

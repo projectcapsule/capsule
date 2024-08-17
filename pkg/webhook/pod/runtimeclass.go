@@ -88,8 +88,8 @@ func (h *runtimeClass) validate(ctx context.Context, c client.Client, decoder ad
 	case allowed == nil:
 		// Enforcement is not in place, skipping it at all
 		return nil
-	case len(runtimeClassName) == 0:
-		// We don't have to force Pod to specify a RuntimeClass
+	case len(runtimeClassName) == 0 || runtimeClassName == allowed.Default:
+		// Delegating mutating webhook to specify a default RuntimeClass
 		return nil
 	case !allowed.MatchSelectByName(class):
 		recorder.Eventf(tnt, corev1.EventTypeWarning, "ForbiddenRuntimeClass", "Pod %s/%s is using Runtime Class %s is forbidden for the current Tenant", pod.Namespace, pod.Name, runtimeClassName)

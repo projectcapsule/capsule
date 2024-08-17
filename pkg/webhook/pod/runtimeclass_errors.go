@@ -12,10 +12,10 @@ import (
 
 type podRuntimeClassForbiddenError struct {
 	runtimeClassName string
-	spec             api.SelectorAllowedListSpec
+	spec             api.DefaultAllowedListSpec
 }
 
-func NewPodRuntimeClassForbidden(runtimeClassName string, spec api.SelectorAllowedListSpec) error {
+func NewPodRuntimeClassForbidden(runtimeClassName string, spec api.DefaultAllowedListSpec) error {
 	return &podRuntimeClassForbiddenError{
 		runtimeClassName: runtimeClassName,
 		spec:             spec,
@@ -25,5 +25,5 @@ func NewPodRuntimeClassForbidden(runtimeClassName string, spec api.SelectorAllow
 func (f podRuntimeClassForbiddenError) Error() (err string) {
 	err = fmt.Sprintf("Pod Runtime Class %s is forbidden for the current Tenant: ", f.runtimeClassName)
 
-	return utils.AllowedValuesErrorMessage(f.spec, err)
+	return utils.DefaultAllowedValuesErrorMessage(f.spec, err)
 }
