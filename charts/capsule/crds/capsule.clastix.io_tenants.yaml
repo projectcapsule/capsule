@@ -2139,6 +2139,8 @@ spec:
                     type: array
                   allowedRegex:
                     type: string
+                  default:
+                    type: string
                   matchExpressions:
                     description: matchExpressions is a list of label selector requirements.
                       The requirements are ANDed.
