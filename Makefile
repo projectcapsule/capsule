@@ -276,7 +276,7 @@ e2e/%: ginkgo
 
 e2e-build/%:
 	kind create cluster --wait=60s --name capsule --image=kindest/node:$*
-	make e2e-install
+	$(MAKE) e2e-install
 
 .PHONY: e2e-install
 e2e-install: e2e-load-image
