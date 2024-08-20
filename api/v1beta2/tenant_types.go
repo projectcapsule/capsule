@@ -43,7 +43,7 @@ type TenantSpec struct {
 	// Specifies the allowed RuntimeClasses assigned to the Tenant.
 	// Capsule assures that all Pods resources created in the Tenant can use only one of the allowed RuntimeClasses.
 	// Optional.
-	RuntimeClasses *api.SelectorAllowedListSpec `json:"runtimeClasses,omitempty"`
+	RuntimeClasses *api.DefaultAllowedListSpec `json:"runtimeClasses,omitempty"`
 	// Specifies the allowed priorityClasses assigned to the Tenant.
 	// Capsule assures that all Pods resources created in the Tenant can use only one of the allowed PriorityClasses.
 	// A default value can be specified, and all the Pod resources created will inherit the declared class.

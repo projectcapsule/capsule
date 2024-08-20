@@ -33,14 +33,17 @@ var _ = Describe("enforcing a Runtime Class", func() {
 					Kind: "User",
 				},
 			},
-			RuntimeClasses: &api.SelectorAllowedListSpec{
-				AllowedListSpec: api.AllowedListSpec{
-					Exact: []string{"legacy"},
-					Regex: "^hardened-.*$",
-				},
-				LabelSelector: metav1.LabelSelector{
-					MatchLabels: map[string]string{
-						"env": "customers",
+			RuntimeClasses: &api.DefaultAllowedListSpec{
+				Default: "default-runtime",
+				SelectorAllowedListSpec: api.SelectorAllowedListSpec{
+					AllowedListSpec: api.AllowedListSpec{
+						Exact: []string{"legacy"},
+						Regex: "^hardened-.*$",
+					},
+					LabelSelector: metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"env": "customers",
+						},
 					},
 				},
 			},
@@ -221,4 +224,49 @@ var _ = Describe("enforcing a Runtime Class", func() {
 		}
 	})
 
+	It("should auto assign the default", func() {
+		ns := NewNamespace("rc-default")
+
+		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+
+		runtime := &nodev1.RuntimeClass{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "default-runtime",
+			},
+			Handler: "custom-handler",
+		}
+		Expect(k8sClient.Create(context.TODO(), runtime)).Should(Succeed())
+		defer func() {
+			Expect(k8sClient.Delete(context.TODO(), runtime)).Should(Succeed())
+		}()
+
+		pod := corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "rc-default",
+				Namespace: ns.Name,
+			},
+			Spec: corev1.PodSpec{
+				Containers: []corev1.Container{
+					{
+						Name:  "container",
+						Image: "quay.io/google-containers/pause-amd64:3.0",
+					},
+				},
+			},
+		}
+
+		cs := ownerClient(tnt.Spec.Owners[0])
+
+		var createdPod *corev1.Pod
+
+		EventuallyCreation(func() (err error) {
+			createdPod, err = cs.CoreV1().Pods(ns.GetName()).Create(context.Background(), &pod, metav1.CreateOptions{})
+
+			return err
+		}).Should(Succeed())
+
+		Expect(createdPod.Spec.RuntimeClassName).NotTo(BeNil())
+		_, err := Equal(createdPod.Spec.RuntimeClassName).Match(tnt.Spec.RuntimeClasses.Default)
+		Expect(err).NotTo(HaveOccurred())
+	})
 })
