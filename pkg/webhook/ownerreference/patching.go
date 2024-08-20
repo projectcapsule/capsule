@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"k8s.io/apimachinery/pkg/fields"
 	"net/http"
 	"sort"
 	"strings"
@@ -49,15 +50,26 @@ func (h *handler) OnDelete(client.Client, admission.Decoder, record.EventRecorde
 	}
 }
 
-func (h *handler) OnUpdate(_ client.Client, decoder admission.Decoder, _ record.EventRecorder) capsulewebhook.Func {
-	return func(_ context.Context, req admission.Request) *admission.Response {
+func (h *handler) OnUpdate(c client.Client, decoder admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
+	return func(ctx context.Context, req admission.Request) *admission.Response {
 		oldNs := &corev1.Namespace{}
 		if err := decoder.DecodeRaw(req.OldObject, oldNs); err != nil {
 			return utils.ErroredResponse(err)
 		}
 
-		if len(oldNs.OwnerReferences) == 0 {
-			return nil
+		tntList := &capsulev1beta2.TenantList{}
+		if err := c.List(ctx, tntList, client.MatchingFieldsSelector{
+			Selector: fields.OneTermEqualSelector(".status.namespaces", oldNs.Name),
+		}); err != nil {
+			return utils.ErroredResponse(err)
+		}
+
+		if !h.namespaceIsOwned(oldNs, tntList, req) {
+			recorder.Eventf(oldNs, corev1.EventTypeWarning, "OfflimitNamespace", "Namespace %s can not be patched", oldNs.GetName())
+
+			response := admission.Denied("Denied patch request for this namespace")
+
+			return &response
 		}
 
 		newNs := &corev1.Namespace{}
@@ -99,6 +111,21 @@ func (h *handler) OnUpdate(_ client.Client, decoder admission.Decoder, _ record.
 
 		return &response
 	}
+}
+
+func (h *handler) namespaceIsOwned(ns *corev1.Namespace, tenantList *capsulev1beta2.TenantList, req admission.Request) bool {
+	for _, tenant := range tenantList.Items {
+		for _, ownerRef := range ns.OwnerReferences {
+			if !capsuleutils.IsTenantOwnerReference(ownerRef) {
+				continue
+			}
+			if ownerRef.UID == tenant.UID && utils.IsTenantOwner(tenant.Spec.Owners, req.UserInfo) {
+				return true
+			}
+		}
+	}
+
+	return false
 }
 
 func (h *handler) setOwnerRef(ctx context.Context, req admission.Request, client client.Client, decoder admission.Decoder, recorder record.EventRecorder) *admission.Response {
