@@ -18,6 +18,6 @@ jobs:
       - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
         with:
           fetch-depth: 0
-      - uses: wagoid/commitlint-github-action@baa1b236f990293a1b2d94c19e41c2313a85e749 #v6.0.2
+      - uses: wagoid/commitlint-github-action@a2bc521d745b1ba127ee2f8b02d6afaa4eed035c #v6.1.1
         with:
           firstParent: true
