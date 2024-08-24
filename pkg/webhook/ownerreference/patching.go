@@ -7,13 +7,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"k8s.io/apimachinery/pkg/fields"
 	"net/http"
 	"sort"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
@@ -119,6 +119,7 @@ func (h *handler) namespaceIsOwned(ns *corev1.Namespace, tenantList *capsulev1be
 			if !capsuleutils.IsTenantOwnerReference(ownerRef) {
 				continue
 			}
+
 			if ownerRef.UID == tenant.UID && utils.IsTenantOwner(tenant.Spec.Owners, req.UserInfo) {
 				return true
 			}
