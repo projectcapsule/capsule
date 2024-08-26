@@ -51,7 +51,7 @@ func (r registry) Tag() string {
 
 func NewRegistry(value string) Registry {
 	reg := make(registry)
-	r := regexp.MustCompile(`((?P<registry>[a-zA-Z0-9-._]+(:\d+)?)\/)?(?P<repository>.*\/)?(?P<image>[a-zA-Z0-9-._]+:(?P<tag>[a-zA-Z0-9-._]+))?`)
+	r := regexp.MustCompile(`((?P<registry>[a-zA-Z0-9][a-zA-Z0-9-._]+(:\d+)?)\/)?(?P<repository>.*\/)?(?P<image>[a-zA-Z0-9-._]+:(?P<tag>[a-zA-Z0-9-._]+))?`)
 	match := r.FindStringSubmatch(value)
 
 	for i, name := range r.SubexpNames() {
