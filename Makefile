@@ -194,7 +194,7 @@ ko-publish-all: ko-publish-capsule
 ####################
 
 CONTROLLER_GEN         := $(shell pwd)/bin/controller-gen
-CONTROLLER_GEN_VERSION := v0.15.0
+CONTROLLER_GEN_VERSION := v0.16.1
 controller-gen: ## Download controller-gen locally if necessary.
 	$(call go-install-tool,$(CONTROLLER_GEN),sigs.k8s.io/controller-tools/cmd/controller-gen@$(CONTROLLER_GEN_VERSION))
 
