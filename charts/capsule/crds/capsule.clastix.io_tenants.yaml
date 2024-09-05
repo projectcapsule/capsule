@@ -3,7 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.15.0
+    controller-gen.kubebuilder.io/version: v0.16.1
   name: tenants.capsule.clastix.io
 spec:
   group: capsule.clastix.io
@@ -165,15 +165,11 @@ spec:
                     description: |-
                       Defines the scope of hostname collision check performed when Tenant Owners create Ingress with allowed hostnames.
 
-
                       - Cluster: disallow the creation of an Ingress if the pair hostname and path is already used across the Namespaces managed by Capsule.
-
 
                       - Tenant: disallow the creation of an Ingress if the pair hostname and path is already used across the Namespaces of the Tenant.
 
-
                       - Namespace: disallow the creation of an Ingress if the pair hostname and path is already used in the Ingress Namespace.
-
 
                       Optional.
                     enum:
@@ -351,7 +347,6 @@ spec:
                                         If present, only traffic on the specified protocol AND port will be matched.
                                       x-kubernetes-int-or-string: true
                                     protocol:
-                                      default: TCP
                                       description: |-
                                         protocol represents the protocol (TCP, UDP, or SCTP) which traffic must match.
                                         If not specified, this field defaults to TCP.
@@ -397,7 +392,6 @@ spec:
                                       description: |-
                                         namespaceSelector selects namespaces using cluster-scoped labels. This field follows
                                         standard label selector semantics; if present but empty, it selects all namespaces.
-
 
                                         If podSelector is also set, then the NetworkPolicyPeer as a whole selects
                                         the pods matching podSelector in the namespaces selected by namespaceSelector.
@@ -451,7 +445,6 @@ spec:
                                       description: |-
                                         podSelector is a label selector which selects pods. This field follows standard label
                                         selector semantics; if present but empty, it selects all pods.
-
 
                                         If namespaceSelector is also set, then the NetworkPolicyPeer as a whole selects
                                         the pods matching podSelector in the Namespaces selected by NamespaceSelector.
@@ -560,7 +553,6 @@ spec:
                                         namespaceSelector selects namespaces using cluster-scoped labels. This field follows
                                         standard label selector semantics; if present but empty, it selects all namespaces.
 
-
                                         If podSelector is also set, then the NetworkPolicyPeer as a whole selects
                                         the pods matching podSelector in the namespaces selected by namespaceSelector.
                                         Otherwise it selects all pods in the namespaces selected by namespaceSelector.
@@ -613,7 +605,6 @@ spec:
                                       description: |-
                                         podSelector is a label selector which selects pods. This field follows standard label
                                         selector semantics; if present but empty, it selects all pods.
-
 
                                         If namespaceSelector is also set, then the NetworkPolicyPeer as a whole selects
                                         the pods matching podSelector in the Namespaces selected by NamespaceSelector.
@@ -696,7 +687,6 @@ spec:
                                         If present, only traffic on the specified protocol AND port will be matched.
                                       x-kubernetes-int-or-string: true
                                     protocol:
-                                      default: TCP
                                       description: |-
                                         protocol represents the protocol (TCP, UDP, or SCTP) which traffic must match.
                                         If not specified, this field defaults to TCP.
@@ -1254,15 +1244,11 @@ spec:
                     description: |-
                       Defines the scope of hostname collision check performed when Tenant Owners create Ingress with allowed hostnames.
 
-
                       - Cluster: disallow the creation of an Ingress if the pair hostname and path is already used across the Namespaces managed by Capsule.
-
 
                       - Tenant: disallow the creation of an Ingress if the pair hostname and path is already used across the Namespaces of the Tenant.
 
-
                       - Namespace: disallow the creation of an Ingress if the pair hostname and path is already used in the Ingress Namespace.
-
 
                       Optional.
                     enum:
@@ -1462,7 +1448,6 @@ spec:
                                         If present, only traffic on the specified protocol AND port will be matched.
                                       x-kubernetes-int-or-string: true
                                     protocol:
-                                      default: TCP
                                       description: |-
                                         protocol represents the protocol (TCP, UDP, or SCTP) which traffic must match.
                                         If not specified, this field defaults to TCP.
@@ -1508,7 +1493,6 @@ spec:
                                       description: |-
                                         namespaceSelector selects namespaces using cluster-scoped labels. This field follows
                                         standard label selector semantics; if present but empty, it selects all namespaces.
-
 
                                         If podSelector is also set, then the NetworkPolicyPeer as a whole selects
                                         the pods matching podSelector in the namespaces selected by namespaceSelector.
@@ -1562,7 +1546,6 @@ spec:
                                       description: |-
                                         podSelector is a label selector which selects pods. This field follows standard label
                                         selector semantics; if present but empty, it selects all pods.
-
 
                                         If namespaceSelector is also set, then the NetworkPolicyPeer as a whole selects
                                         the pods matching podSelector in the Namespaces selected by NamespaceSelector.
@@ -1671,7 +1654,6 @@ spec:
                                         namespaceSelector selects namespaces using cluster-scoped labels. This field follows
                                         standard label selector semantics; if present but empty, it selects all namespaces.
 
-
                                         If podSelector is also set, then the NetworkPolicyPeer as a whole selects
                                         the pods matching podSelector in the namespaces selected by namespaceSelector.
                                         Otherwise it selects all pods in the namespaces selected by namespaceSelector.
@@ -1724,7 +1706,6 @@ spec:
                                       description: |-
                                         podSelector is a label selector which selects pods. This field follows standard label
                                         selector semantics; if present but empty, it selects all pods.
-
 
                                         If namespaceSelector is also set, then the NetworkPolicyPeer as a whole selects
                                         the pods matching podSelector in the Namespaces selected by NamespaceSelector.
@@ -1807,7 +1788,6 @@ spec:
                                         If present, only traffic on the specified protocol AND port will be matched.
                                       x-kubernetes-int-or-string: true
                                     protocol:
-                                      default: TCP
                                       description: |-
                                         protocol represents the protocol (TCP, UDP, or SCTP) which traffic must match.
                                         If not specified, this field defaults to TCP.
