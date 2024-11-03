@@ -144,6 +144,7 @@ func (h *handler) setOwnerRef(ctx context.Context, req admission.Request, client
 		return &response
 	}
 	// If we already had TenantName label on NS -> assign to it
+
 	if label, ok := ns.ObjectMeta.Labels[ln]; ok {
 		// retrieving the selected Tenant
 		tnt := &capsulev1beta2.Tenant{}
@@ -159,6 +160,10 @@ func (h *handler) setOwnerRef(ctx context.Context, req admission.Request, client
 			response := admission.Denied("Cannot assign the desired namespace to a non-owned Tenant")
 
 			return &response
+		}
+		// Check if namespace needs Tenant name prefix
+		if errResponse := h.validateNamespacePrefix(ns, tnt); errResponse != nil {
+			return errResponse
 		}
 		// Patching the response
 		response := h.patchResponseForOwnerRef(tnt, ns, recorder)
@@ -221,6 +226,11 @@ func (h *handler) setOwnerRef(ctx context.Context, req admission.Request, client
 	}
 
 	if len(tenants) == 1 {
+		// Check if namespace needs Tenant name prefix
+		if errResponse := h.validateNamespacePrefix(ns, &tenants[0]); errResponse != nil {
+			return errResponse
+		}
+
 		response := h.patchResponseForOwnerRef(&tenants[0], ns, recorder)
 
 		return &response
@@ -279,6 +289,19 @@ func (h *handler) listTenantsForOwnerKind(ctx context.Context, ownerKind string,
 	err := clt.List(ctx, tntList, fields)
 
 	return tntList, err
+}
+
+func (h *handler) validateNamespacePrefix(ns *corev1.Namespace, tenant *capsulev1beta2.Tenant) *admission.Response {
+	// Check if ForceTenantPrefix is true
+	if tenant.Spec.ForceTenantPrefix != nil && *tenant.Spec.ForceTenantPrefix {
+		if !strings.HasPrefix(ns.GetName(), fmt.Sprintf("%s-", tenant.GetName())) {
+			response := admission.Denied(fmt.Sprintf("The Namespace name must start with '%s-' when ForceTenantPrefix is enabled in the Tenant.", tenant.GetName()))
+
+			return &response
+		}
+	}
+
+	return nil
 }
 
 type sortedTenants []capsulev1beta2.Tenant

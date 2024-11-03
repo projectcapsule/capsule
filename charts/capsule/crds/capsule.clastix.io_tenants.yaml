@@ -1149,6 +1149,17 @@ spec:
                 description: Toggling the Tenant resources cordoning, when enable
                   resources cannot be deleted.
                 type: boolean
+              forceTenantPrefix:
+                description: |-
+                  Use this if you want to disable/enable the Tenant name prefix to specific Tenants, overriding global forceTenantPrefix in CapsuleConfiguration.
+                  When set to 'true', it enforces Namespaces created for this Tenant to be named with the Tenant name prefix,
+                  separated by a dash (i.e. for Tenant 'foo', namespace names must be prefixed with 'foo-'),
+                  this is useful to avoid Namespace name collision.
+                  When set to 'false', it allows Namespaces created for this Tenant to be named anything.
+                  Overrides CapsuleConfiguration global forceTenantPrefix for the Tenant only.
+                  If unset, Tenant uses CapsuleConfiguration's forceTenantPrefix
+                  Optional
+                type: boolean
               imagePullPolicies:
                 description: Specify the allowed values for the imagePullPolicies
                   option in Pod resources. Capsule assures that all Pod resources
