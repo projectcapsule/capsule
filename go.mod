@@ -16,7 +16,7 @@ require (
 	golang.org/x/sync v0.8.0
 	k8s.io/api v0.31.1
 	k8s.io/apiextensions-apiserver v0.31.0
-	k8s.io/apimachinery v0.31.1
+	k8s.io/apimachinery v0.31.3
 	k8s.io/client-go v0.31.1
 	k8s.io/utils v0.0.0-20240821151609-f90d01438635
 	sigs.k8s.io/cluster-api v1.8.4
