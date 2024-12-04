@@ -18,7 +18,7 @@
     "autoprefixer": "^9.8.8",
     "gridsome-plugin-tailwindcss": "^4.1.1",
     "postcss": "^8.4.31",
-    "postcss-import": "^14.0.2",
+    "postcss-import": "^16.0.0",
     "postcss-preset-env": "^6.7.0",
     "prism-themes": "^1.9.0",
     "sass": "^1.42.1",
