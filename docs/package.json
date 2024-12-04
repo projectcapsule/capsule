@@ -15,7 +15,7 @@
     "gridsome-plugin-gtag": "^0.1.10"
   },
   "devDependencies": {
-    "autoprefixer": "^9.8.8",
+    "autoprefixer": "^10.0.0",
     "gridsome-plugin-tailwindcss": "^4.1.1",
     "postcss": "^8.4.31",
     "postcss-import": "^14.0.2",
