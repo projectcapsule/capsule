@@ -10,7 +10,7 @@
     "@gridsome/remark-prismjs": "^0.5.0",
     "@gridsome/source-filesystem": "^0.6.2",
     "@gridsome/transformer-remark": "^0.6.4",
-    "fuse.js": "^6.4.6",
+    "fuse.js": "^7.0.0",
     "gridsome": "^0.7.0",
     "gridsome-plugin-gtag": "^0.1.10"
   },
