@@ -56,6 +56,15 @@ type TenantSpec struct {
 	// When enabled, the deletion request will be declined.
 	//+kubebuilder:default:=false
 	PreventDeletion bool `json:"preventDeletion,omitempty"`
+	// Use this if you want to disable/enable the Tenant name prefix to specific Tenants, overriding global forceTenantPrefix in CapsuleConfiguration.
+	// When set to 'true', it enforces Namespaces created for this Tenant to be named with the Tenant name prefix,
+	// separated by a dash (i.e. for Tenant 'foo', namespace names must be prefixed with 'foo-'),
+	// this is useful to avoid Namespace name collision.
+	// When set to 'false', it allows Namespaces created for this Tenant to be named anything.
+	// Overrides CapsuleConfiguration global forceTenantPrefix for the Tenant only.
+	// If unset, Tenant uses CapsuleConfiguration's forceTenantPrefix
+	// Optional
+	ForceTenantPrefix *bool `json:"forceTenantPrefix,omitempty"`
 }
 
 // +kubebuilder:object:root=true

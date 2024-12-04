@@ -59,6 +59,11 @@ func (r *prefixHandler) OnCreate(clt client.Client, decoder admission.Decoder, r
 					return utils.ErroredResponse(err)
 				}
 
+				// Check for Tenant-level ForceTenantPrefix override
+				if tnt.Spec.ForceTenantPrefix != nil && !*tnt.Spec.ForceTenantPrefix {
+					return nil
+				}
+
 				if e := fmt.Sprintf("%s-%s", tnt.GetName(), ns.GetName()); !strings.HasPrefix(ns.GetName(), fmt.Sprintf("%s-", tnt.GetName())) {
 					recorder.Eventf(tnt, corev1.EventTypeWarning, "InvalidTenantPrefix", "Namespace %s does not match the expected prefix for the current Tenant", ns.GetName())
 

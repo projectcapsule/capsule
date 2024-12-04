@@ -53,14 +53,20 @@ func ServiceCreation(svc *corev1.Service, owner capsulev1beta2.OwnerSpec, timeou
 	}, timeout, defaultPollInterval)
 }
 
-func NewNamespace(name string) *corev1.Namespace {
+func NewNamespace(name string, labels ...map[string]string) *corev1.Namespace {
 	if len(name) == 0 {
 		name = rand.String(10)
 	}
 
+	var namespaceLabels map[string]string
+	if len(labels) > 0 {
+		namespaceLabels = labels[0]
+	}
+
 	return &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
+			Name:   name,
+			Labels: namespaceLabels,
 		},
 	}
 }
