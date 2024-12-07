@@ -9,6 +9,9 @@
   "commitMessageLowerCase": "auto",
   "semanticCommits": "enabled",
   "semanticCommitType": "feat",
+  "ignorePaths": [
+      "docs"
+  ],
   "flux": {
     "fileMatch": ["^.*flux\\.yaml$"]
   },
