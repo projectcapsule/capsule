@@ -212,7 +212,8 @@ serviceAccount:
 certManager:
   # -- Specifies whether capsule webhooks certificates should be generated using cert-manager
   generateCertificates: false
-
+  # -- Specify additional SANS to add to the certificate
+  additionalSANS: []
 # -- Additional labels which will be added to all resources created by Capsule helm chart
 customLabels: {}
 
