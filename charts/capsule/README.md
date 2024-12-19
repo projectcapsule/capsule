@@ -98,6 +98,7 @@ Here the values you can override:
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | affinity | object | `{}` | Set affinity rules for the Capsule pod |
+| certManager.additionalSANS | list | `[]` | Specify additional SANS to add to the certificate |
 | certManager.generateCertificates | bool | `false` | Specifies whether capsule webhooks certificates should be generated using cert-manager |
 | customAnnotations | object | `{}` | Additional annotations which will be added to all resources created by Capsule helm chart |
 | customLabels | object | `{}` | Additional labels which will be added to all resources created by Capsule helm chart |
