@@ -27,6 +27,9 @@ spec:
   dnsNames:
   - {{ include "capsule.fullname" . }}-webhook-service.{{ .Release.Namespace }}.svc
   - {{ include "capsule.fullname" . }}-webhook-service.{{ .Release.Namespace }}.svc.cluster.local
+  {{- range  .Values.certManager.additionalSANS }}
+  - {{ toYaml . }} 
+  {{- end }}
   issuerRef:
     kind: Issuer
     name: {{ include "capsule.fullname" . }}-webhook-selfsigned
