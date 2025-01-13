@@ -140,6 +140,7 @@ webhooks:
         - UPDATE
       resources:
         - nodes
+      scope: "*"
   sideEffects: None
   timeoutSeconds: {{ $.Values.webhooks.validatingWebhooksTimeoutSeconds }}
 {{- end }}
