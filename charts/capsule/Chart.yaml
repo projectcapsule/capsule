@@ -40,7 +40,7 @@ annotations:
     - name: Documentation
       url: https://projectcapsule.dev/
   artifacthub.io/changes: |
-    - kind: added
-      description: bundled crd lifecycle
+    - kind: fixed
+      description: added scope for mutating webhook configurations
     - kind: changed
-      description: removed PodSecurityPolicy support
+      description: moved job configuration from jobs to global.jobs.kubectl

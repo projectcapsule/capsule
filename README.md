@@ -40,9 +40,9 @@ Kubernetes introduces the _Namespace_ object type to create logical partitions o
 
 # Entering Capsule
 
-Capsule takes a different approach. In a single cluster, the Capsule Controller aggregates multiple namespaces in a lightweight abstraction called _Tenant_, basically a grouping of Kubernetes Namespaces. Within each tenant, users are free to create their namespaces and share all the assigned resources. 
+Capsule takes a different approach. In a single cluster, the Capsule Controller aggregates multiple namespaces in a lightweight abstraction called _Tenant_, basically a grouping of Kubernetes Namespaces. Within each tenant, users are free to create their namespaces and share all the assigned resources.
 
-On the other side, the Capsule Policy Engine keeps the different tenants isolated from each other. _Network and Security Policies_, _Resource Quota_, _Limit Ranges_, _RBAC_, and other policies defined at the tenant level are automatically inherited by all the namespaces in the tenant. Then users are free to operate their tenants in autonomy, without the intervention of the cluster administrator. 
+On the other side, the Capsule Policy Engine keeps the different tenants isolated from each other. _Network and Security Policies_, _Resource Quota_, _Limit Ranges_, _RBAC_, and other policies defined at the tenant level are automatically inherited by all the namespaces in the tenant. Then users are free to operate their tenants in autonomy, without the intervention of the cluster administrator.
 
 # Features
 
@@ -76,7 +76,7 @@ Assign to tenants a dedicated set of compute, storage, and network resources and
 
 # Documentation
 
-Please, check the project [documentation](https://capsule.clastix.io) for the cool things you can do with Capsule.
+Please, check the project [documentation](https://projectcapsule.dev) for the cool things you can do with Capsule.
 
 # Contributions
 
@@ -110,17 +110,13 @@ Please read the [code of conduct](CODE_OF_CONDUCT.md).
 
 See the [ADOPTERS.md](ADOPTERS.md) file for a list of companies that are using Capsule.
 
-# Governance
+# Project Governance
 
-You can find how the Capsule project is governed [here](https://capsule.clastix.io/docs/contributing/governance).
+You can find how the Capsule project is governed [here](https://projectcapsule.dev/project/governance/).
 
 ## Maintainers
 
 Please, refer to the maintainers file available [here](.github/maintainers.yaml).
-
-## Release process
-
-Please, refer to the [documentation page](https://capsule.clastix.io/docs/contributing/release).
 
 ### Changelog
 

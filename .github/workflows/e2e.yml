@@ -46,12 +46,8 @@ jobs:
       - uses: actions/setup-go@3041bf56c941b39c61721a86cd11f3bb1338122a # v5.2.0
         with:
           go-version-file: 'go.mod'
-      - uses: engineerd/setup-kind@aa272fe2a7309878ffc2a81c56cfe3ef108ae7d0 # v0.5.0
-        with:
-          skipClusterCreation: true
-          version: v0.14.0
       - uses: azure/setup-helm@fe7b79cd5ee1e45176fcad797de68ecaf3ca4814 # v4
         with:
           version: v3.14.2
       - name: e2e testing
-        run: make e2e/${{ matrix.k8s-version }}
+        run: KIND_K8S_VERSION=${{ matrix.k8s-version }} make e2e

@@ -105,10 +105,12 @@ Determine the Kubernetes version to use for jobsFullyQualifiedDockerImage tag
 Create the jobs fully-qualified Docker image to use
 */}}
 {{- define "capsule.jobsFullyQualifiedDockerImage" -}}
-{{- if .Values.jobs.image.tag }}
-{{- printf "%s/%s:%s" .Values.jobs.image.registry .Values.jobs.image.repository .Values.jobs.image.tag -}}
+{{- $Values := mergeOverwrite $.Values.global.jobs.kubectl $.Values.jobs -}}
+
+{{- if $Values.image.tag }}
+{{- printf "%s/%s:%s" $Values.image.registry $Values.image.repository $Values.image.tag -}}
 {{- else }}
-{{- printf "%s/%s:%s" .Values.jobs.image.registry .Values.jobs.image.repository (include "capsule.jobsTagKubeVersion" .) -}}
+{{- printf "%s/%s:%s" $Values.image.registry $Values.image.repository (include "capsule.jobsTagKubeVersion" .) -}}
 {{- end }}
 {{- end }}
 

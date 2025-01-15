@@ -93,6 +93,28 @@ Here the values you can override:
 | crds.install | bool | `true` | Install the CustomResourceDefinitions (This also manages the lifecycle of the CRDs for update operations) |
 | crds.labels | object | `{}` | Extra Labels for CRDs |
 
+### Global Parameters
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| global.jobs.kubectl.affinity | object | `{}` | Set affinity rules |
+| global.jobs.kubectl.annotations | object | `{}` | Annotations to add to the certgen job. |
+| global.jobs.kubectl.backoffLimit | int | `4` | Backofflimit for jobs |
+| global.jobs.kubectl.image.pullPolicy | string | `"IfNotPresent"` | Set the image pull policy of the helm chart job |
+| global.jobs.kubectl.image.registry | string | `"docker.io"` | Set the image repository of the helm chart job |
+| global.jobs.kubectl.image.repository | string | `"clastix/kubectl"` | Set the image repository of the helm chart job |
+| global.jobs.kubectl.image.tag | string | `""` | Set the image tag of the helm chart job |
+| global.jobs.kubectl.imagePullSecrets | list | `[]` | ImagePullSecrets |
+| global.jobs.kubectl.nodeSelector | object | `{}` | Set the node selector |
+| global.jobs.kubectl.podSecurityContext | object | `{"seccompProfile":{"type":"RuntimeDefault"}}` | Security context for the job pods. |
+| global.jobs.kubectl.priorityClassName | string | `""` | Set a pod priorityClassName |
+| global.jobs.kubectl.resources | object | `{}` | Job resources |
+| global.jobs.kubectl.restartPolicy | string | `"Never"` | Set the restartPolicy |
+| global.jobs.kubectl.securityContext | object | `{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]},"readOnlyRootFilesystem":true,"runAsGroup":1002,"runAsNonRoot":true,"runAsUser":1002}` | Security context for the job containers. |
+| global.jobs.kubectl.tolerations | list | `[]` | Set list of tolerations |
+| global.jobs.kubectl.topologySpreadConstraints | list | `[]` | Set Topology Spread Constraints |
+| global.jobs.kubectl.ttlSecondsAfterFinished | int | `60` | Sets the ttl in seconds after a finished certgen job is deleted. Set to -1 to never delete. |
+
 ### General Parameters
 
 | Key | Type | Default | Description |
@@ -103,21 +125,7 @@ Here the values you can override:
 | customAnnotations | object | `{}` | Additional annotations which will be added to all resources created by Capsule helm chart |
 | customLabels | object | `{}` | Additional labels which will be added to all resources created by Capsule helm chart |
 | imagePullSecrets | list | `[]` | Configuration for `imagePullSecrets` so that you can use a private images registry. |
-| jobs.affinity | object | `{}` | Set affinity rules |
-| jobs.annotations | object | `{"helm.sh/hook-delete-policy":"before-hook-creation,hook-succeeded"}` | Annotations to add to the certgen job. |
-| jobs.image.pullPolicy | string | `"IfNotPresent"` | Set the image pull policy of the helm chart job |
-| jobs.image.registry | string | `"docker.io"` | Set the image repository of the helm chart job |
-| jobs.image.repository | string | `"clastix/kubectl"` | Set the image repository of the helm chart job |
-| jobs.image.tag | string | `""` | Set the image tag of the helm chart job |
-| jobs.nodeSelector | object | `{}` | Set the node selector |
-| jobs.podSecurityContext | object | `{"seccompProfile":{"type":"RuntimeDefault"}}` | Security context for the job pods. |
-| jobs.priorityClassName | string | `""` | Set a pod priorityClassName |
-| jobs.resources | object | `{}` | Job resources |
-| jobs.restartPolicy | string | `"Never"` | Set the restartPolicy |
-| jobs.securityContext | object | `{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]},"readOnlyRootFilesystem":true,"runAsGroup":1002,"runAsNonRoot":true,"runAsUser":1002}` | Security context for the job containers. |
-| jobs.tolerations | list | `[]` | Set list of tolerations |
-| jobs.topologySpreadConstraints | list | `[]` | Set Topology Spread Constraints |
-| jobs.ttlSecondsAfterFinished | int | `60` | Sets the ttl in seconds after a finished certgen job is deleted. Set to -1 to never delete. |
+| jobs | object | `{}` | Deprecated, use .global.jobs.kubectl instead |
 | nodeSelector | object | `{}` | Set the node selector for the Capsule pod |
 | podAnnotations | object | `{}` | Annotations to add to the capsule pod. |
 | podSecurityContext | object | `{"runAsGroup":1002,"runAsNonRoot":true,"runAsUser":1002,"seccompProfile":{"type":"RuntimeDefault"}}` | Set the securityContext for the Capsule pod |

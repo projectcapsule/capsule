@@ -1,3 +1,6 @@
+{{/* Backwards compatibility */}}
+{{- $Values := mergeOverwrite $.Values.global.jobs.kubectl $.Values.jobs -}}
+
 {{- if .Values.crds.install }}
 apiVersion: batch/v1
 kind: Job
@@ -8,12 +11,16 @@ metadata:
     # create hook dependencies in the right order
     "helm.sh/hook-weight": "-1"
     {{- include "capsule.crds.annotations" . | nindent 4 }}
+    {{- with $Values.annotations }}
+      {{- . | toYaml | nindent 4 }}
+    {{- end }}
   labels:
     app.kubernetes.io/component: {{ include "capsule.crds.component" . | quote }}
     {{- include "capsule.labels" . | nindent 4 }}
 spec:
-  {{- if ge .Values.jobs.ttlSecondsAfterFinished 0.0 }}
-  ttlSecondsAfterFinished: {{ .Values.jobs.ttlSecondsAfterFinished }}
+  backoffLimit: {{ $Values.backoffLimit }}
+  {{- if ge $Values.ttlSecondsAfterFinished 0.0 }}
+  ttlSecondsAfterFinished: {{ $Values.ttlSecondsAfterFinished }}
   {{- end }}
   template:
     metadata:
@@ -22,31 +29,31 @@ spec:
         app.kubernetes.io/component: {{ include "capsule.crds.component" . | quote }}
         {{- include "capsule.selectorLabels" . | nindent 8 }}
     spec:
-      restartPolicy: {{ $.Values.jobs.restartPolicy }}
-      {{- with $.Values.jobs.podSecurityContext }}
+      restartPolicy: {{ $Values.restartPolicy }}
+      {{- with $Values.podSecurityContext }}
       securityContext:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .Values.jobs.nodeSelector }}
+      {{- with $Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .Values.jobs.affinity }}
+      {{- with $Values.affinity }}
       affinity:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .Values.jobs.tolerations }}
+      {{- with $Values.tolerations }}
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .Values.jobs.topologySpreadConstraints }}
+      {{- with $Values.topologySpreadConstraints }}
       topologySpreadConstraints: 
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .Values.jobs.priorityClassName }}
+      {{- with $Values.priorityClassName }}
       priorityClassName: {{ . }}
       {{- end }}
-      {{- with .Values.imagePullSecrets }}
+      {{- with $Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}  
@@ -54,8 +61,8 @@ spec:
       containers:
       - name: crds-hook
         image: {{ include "capsule.jobsFullyQualifiedDockerImage" . }}
-        imagePullPolicy: {{ .Values.jobs.image.pullPolicy }}
-        {{- with $.Values.jobs.securityContext }}
+        imagePullPolicy: {{ $Values.image.pullPolicy }}
+        {{- with $Values.securityContext }}
         securityContext:
           {{- toYaml . | nindent 10 }}
         {{- end }}
@@ -75,7 +82,7 @@ spec:
           mountPath: /data/{{ $path | base }}
           subPath: {{ $path | base }}
 {{- end }}
-        {{- with .Values.jobs.resources }}
+        {{- with $Values.resources }}
         resources:
           {{- toYaml . | nindent 10 }}
         {{- end }}
@@ -91,5 +98,4 @@ spec:
             path: {{ $path | base }}
 {{- end }}
 {{- end }}
-  backoffLimit: 4
 {{- end }}

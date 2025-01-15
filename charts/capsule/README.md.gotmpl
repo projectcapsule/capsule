@@ -95,13 +95,22 @@ Here the values you can override:
   {{- end }}
 {{- end }}
 
+### Global Parameters
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+{{- range .Values }}
+  {{- if (hasPrefix "global" .Key)  }}
+| {{ .Key }} | {{ .Type }} | {{ if .Default }}{{ .Default }}{{ else }}{{ .AutoDefault }}{{ end }} | {{ if .Description }}{{ .Description }}{{ else }}{{ .AutoDescription }}{{ end }} |
+  {{- end }}
+{{- end }}
 
 ### General Parameters
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 {{- range .Values }}
-  {{- if not (or (hasPrefix "manager" .Key) (hasPrefix "crds" .Key) (hasPrefix "serviceMonitor" .Key) (hasPrefix "webhook" .Key) (hasPrefix "capsule-proxy" .Key) )  }}
+  {{- if not (or (hasPrefix "global" .Key) (hasPrefix "manager" .Key) (hasPrefix "crds" .Key) (hasPrefix "serviceMonitor" .Key) (hasPrefix "webhook" .Key) (hasPrefix "capsule-proxy" .Key) )  }}
 | {{ .Key }} | {{ .Type }} | {{ if .Default }}{{ .Default }}{{ else }}{{ .AutoDefault }}{{ end }} | {{ if .Description }}{{ .Description }}{{ else }}{{ .AutoDescription }}{{ end }} |
   {{- end }}
 {{- end }}

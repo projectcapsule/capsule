@@ -29,6 +29,7 @@ webhooks:
     - CREATE
     resources:
     - pods
+    scope: "Namespaced"
   namespaceSelector:
   {{- toYaml .namespaceSelector | nindent 4}} 
   sideEffects: None
@@ -50,6 +51,7 @@ webhooks:
     - CREATE
     resources:
     - persistentvolumeclaims
+    scope: "Namespaced"
   namespaceSelector:
   {{- toYaml .namespaceSelector | nindent 4}}  
   sideEffects: None
@@ -73,6 +75,7 @@ webhooks:
     - UPDATE
     resources:
     - ingresses
+    scope: "Namespaced"
   namespaceSelector:
   {{- toYaml .namespaceSelector | nindent 4}}
   sideEffects: None

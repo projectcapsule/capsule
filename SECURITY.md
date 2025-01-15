@@ -6,7 +6,6 @@ The Capsule community has adopted this security disclosures and response policy 
 
 For information regarding the security of this project please join our [slack channel](https://kubernetes.slack.com/archives/C03GETTJQRL).
 
-
 ## Covered Repositories and Issues
 
 When we say "a security vulnerability in capsule" we mean a security issue
