@@ -4,9 +4,6 @@
 
 {{- define "capsule.crds.annotations" -}}
 "helm.sh/hook": "pre-install,pre-upgrade"
-  {{- with $.Values.jobs.annotations }}
-    {{- . | toYaml | nindent 0 }}
-  {{- end }}
 {{- end }}
 
 {{- define "capsule.crds.component" -}}

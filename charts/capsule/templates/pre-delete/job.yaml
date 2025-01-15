@@ -1,3 +1,5 @@
+{{- $Values := mergeOverwrite $.Values.global.jobs.kubectl $.Values.jobs -}}
+
 {{- if not $.Values.crds.exclusive }}
 ---
 apiVersion: batch/v1
@@ -10,12 +12,13 @@ metadata:
   annotations:
     "helm.sh/hook-weight": "-1"
     {{- include "capsule.pre-delete.annotations" . | nindent 4 }}
-    {{- with .Values.customAnnotations }}
-      {{- toYaml . | nindent 4 }}
+    {{- with $Values.annotations }}
+      {{- . | toYaml | nindent 4 }}
     {{- end }}
 spec:
-  {{- if ge .Values.jobs.ttlSecondsAfterFinished 0.0 }}
-  ttlSecondsAfterFinished: {{ .Values.jobs.ttlSecondsAfterFinished }}
+  backoffLimit: {{ $Values.backoffLimit }}
+  {{- if ge $Values.ttlSecondsAfterFinished 0.0 }}
+  ttlSecondsAfterFinished: {{ $Values.ttlSecondsAfterFinished }}
   {{- end }}
   template:
     metadata:
@@ -23,31 +26,31 @@ spec:
         app.kubernetes.io/component: {{ include "capsule.pre-delete.component" . | quote }}
         {{- include "capsule.selectorLabels" . | nindent 8 }}
     spec:
-      restartPolicy: {{ $.Values.jobs.restartPolicy }}
-      {{- with $.Values.jobs.podSecurityContext }}
+      restartPolicy: {{ $Values.restartPolicy }}
+      {{- with $Values.podSecurityContext }}
       securityContext:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .Values.jobs.nodeSelector }}
+      {{- with $Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .Values.jobs.affinity }}
+      {{- with $Values.affinity }}
       affinity:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .Values.jobs.tolerations }}
+      {{- with $Values.tolerations }}
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .Values.jobs.topologySpreadConstraints }}
+      {{- with $Values.topologySpreadConstraints }}
       topologySpreadConstraints: 
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .Values.jobs.priorityClassName }}
+      {{- with $Values.priorityClassName }}
       priorityClassName: {{ . }}
       {{- end }}
-      {{- with .Values.imagePullSecrets }}
+      {{- with $Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
@@ -55,7 +58,7 @@ spec:
       containers:
         - name: pre-delete-job
           image: {{ include "capsule.jobsFullyQualifiedDockerImage" . }}
-          imagePullPolicy: {{ .Values.jobs.image.pullPolicy }}
+          imagePullPolicy: {{ $Values.image.pullPolicy }}
           command:
           - "/bin/sh"
           - "-c"
@@ -71,11 +74,11 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
-          {{- with $.Values.jobs.securityContext }}
+          {{- with $Values.securityContext }}
           securityContext:
             {{- toYaml . | nindent 12 }}
           {{- end }}
-          {{- with .Values.jobs.resources }}
+          {{- with $Values.resources }}
           resources:
             {{- toYaml . | nindent 12 }}
           {{- end }}

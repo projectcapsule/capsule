@@ -2,6 +2,55 @@
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
+global:
+  jobs:
+    kubectl:
+      image:
+        # -- Set the image repository of the helm chart job
+        registry: docker.io
+        # -- Set the image repository of the helm chart job
+        repository: clastix/kubectl
+        # -- Set the image pull policy of the helm chart job
+        pullPolicy: IfNotPresent
+        # -- Set the image tag of the helm chart job
+        tag: ""
+      # -- ImagePullSecrets
+      imagePullSecrets: []
+      # -- Annotations to add to the certgen job.
+      annotations: {}
+      # -- Set the restartPolicy
+      restartPolicy: Never
+      # -- Sets the ttl in seconds after a finished certgen job is deleted. Set to -1 to never delete.
+      ttlSecondsAfterFinished: 60
+      # -- Security context for the job pods.
+      podSecurityContext:
+        seccompProfile:
+          type: "RuntimeDefault"
+      # -- Security context for the job containers.
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+          - ALL
+        readOnlyRootFilesystem: true
+        runAsGroup: 1002
+        runAsNonRoot: true
+        runAsUser: 1002
+      # -- Job resources
+      resources: {}
+      # -- Set the node selector
+      nodeSelector: {}
+      # -- Set list of tolerations
+      tolerations: []
+      # -- Set affinity rules
+      affinity: {}
+      # -- Set Topology Spread Constraints
+      topologySpreadConstraints: []
+      # -- Set a pod priorityClassName
+      priorityClassName: ""
+      # -- Backofflimit for jobs
+      backoffLimit: 4
+
 # Manage CRD Lifecycle
 crds:
   # -- Install the CustomResourceDefinitions (This also manages the lifecycle of the CRDs for update operations)
@@ -155,50 +204,8 @@ affinity: {}
 # -- Set topology spread constraints for the Capsule pod
 topologySpreadConstraints: []
 
-jobs:
-  image:
-    # -- Set the image repository of the helm chart job
-    registry: docker.io
-    # -- Set the image repository of the helm chart job
-    repository: clastix/kubectl
-    # -- Set the image pull policy of the helm chart job
-    pullPolicy: IfNotPresent
-    # -- Set the image tag of the helm chart job
-    tag: ""
-  # -- Annotations to add to the certgen job.
-  annotations:
-    "helm.sh/hook-delete-policy": "before-hook-creation,hook-succeeded"
-  # -- Set the restartPolicy
-  restartPolicy: Never
-  # -- Sets the ttl in seconds after a finished certgen job is deleted. Set to -1 to never delete.
-  ttlSecondsAfterFinished: 60
-  # -- Security context for the job pods.
-  podSecurityContext:
-    seccompProfile:
-      type: "RuntimeDefault"
-  # -- Security context for the job containers.
-  securityContext:
-    allowPrivilegeEscalation: false
-    capabilities:
-      drop:
-      - ALL
-    readOnlyRootFilesystem: true
-    runAsGroup: 1002
-    runAsNonRoot: true
-    runAsUser: 1002
-  # -- Job resources
-  resources: {}
-  # -- Set the node selector
-  nodeSelector: {}
-  # -- Set list of tolerations
-  tolerations: []
-  # -- Set affinity rules
-  affinity: {}
-  # -- Set Topology Spread Constraints
-  topologySpreadConstraints: []
-  # -- Set a pod priorityClassName
-  priorityClassName: ""
-
+# -- Deprecated, use .global.jobs.kubectl instead
+jobs: {}
 
 # ServiceAccount
 serviceAccount:

@@ -42,3 +42,5 @@ annotations:
   artifacthub.io/changes: |
     - kind: fixed
       description: added scope for mutating webhook configurations
+    - kind: changed
+      description: moved job configuration from jobs to global.jobs.kubectl
