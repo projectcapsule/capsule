@@ -37,6 +37,11 @@ spec:
       hostNetwork: true
       dnsPolicy: ClusterFirstWithHostNet
       {{- end }}
+      {{- if .Values.manager.hostPID }}
+      hostPID: {{ .Values.manager.hostPID }}
+      {{- else }}
+      hostPID: false
+      {{- end }}
       priorityClassName: {{ .Values.priorityClassName }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
@@ -59,13 +64,16 @@ spec:
           secret:
             defaultMode: 420
             secretName: {{ include "capsule.secretTlsName" . }}
+        {{- if .Values.manager.volumes }}
+        {{- toYaml .Values.manager.volumes | nindent 8 }}
+        {{- end }}
       containers:
         - name: manager
           args:
-          - --webhook-port={{ .Values.manager.webhookPort }}
-          - --enable-leader-election
-          - --zap-log-level={{ default 4 .Values.manager.options.logLevel }}
-          - --configuration-name={{ .Values.manager.options.capsuleConfiguration }}
+            - --webhook-port={{ .Values.manager.webhookPort }}
+            - --enable-leader-election
+            - --zap-log-level={{ default 4 .Values.manager.options.logLevel }}
+            - --configuration-name={{ .Values.manager.options.capsuleConfiguration }}
           image: {{ include "capsule.managerFullyQualifiedDockerImage" . }}
           imagePullPolicy: {{ .Values.manager.image.pullPolicy }}
           env:
@@ -74,23 +82,35 @@ spec:
               fieldRef:
                 fieldPath: metadata.namespace
           ports:
+            {{- if not (.Values.manager.hostNetwork) }}
             - name: webhook-server
               containerPort: {{ .Values.manager.webhookPort }}
               protocol: TCP
             - name: metrics
               containerPort: 8080
               protocol: TCP
+            {{- end }}
+            {{- with .Values.manager.ports }}
+              {{- . | nindent 12 }}
+            {{- end }}
           livenessProbe:
             {{- toYaml .Values.manager.livenessProbe | nindent 12}}
           readinessProbe:
             {{- toYaml .Values.manager.readinessProbe | nindent 12}}
           volumeMounts:
-          - mountPath: /tmp/k8s-webhook-server/serving-certs
-            name: cert
-            readOnly: true
+            - mountPath: /tmp/k8s-webhook-server/serving-certs
+              name: cert
+              readOnly: true
+          {{- if .Values.manager.volumeMounts }}
+          {{- toYaml .Values.manager.volumeMounts | nindent 12 }}
+          {{- end }}
           resources:
             {{- toYaml .Values.manager.resources | nindent 12 }}
           securityContext:
+            {{- if .Values.manager.securityContext }}
+            {{- toYaml .Values.manager.securityContext | nindent 12 }}
+            {{- else }}
             {{- toYaml .Values.securityContext | nindent 12 }}
+            {{- end }}
   {{- end }}
 {{- end }}

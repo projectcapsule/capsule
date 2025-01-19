@@ -16,6 +16,7 @@ BUILD_DATE      ?= $(shell git log -1 --format="%at" | xargs -I{} sh -c 'if [ "$
 IMG_BASE        ?= $(REPOSITORY)
 IMG             ?= $(IMG_BASE):$(VERSION)
 CAPSULE_IMG     ?= $(REGISTRY)/$(IMG_BASE)
+CLUSTER_NAME    ?= capsule
 
 ## Tool Binaries
 KUBECTL ?= kubectl
@@ -77,17 +78,21 @@ helm-lint: docker
 helm-schema: helm-plugin-schema
 	cd charts/capsule && $(HELM) schema
 
+helm-test: HELM_KIND_CONFIG ?= ""
 helm-test: kind ct ko-build-all
-	@$(KIND) create cluster --wait=60s --name capsule-charts --image kindest/node:$${KIND_K8S_VERSION:-v1.27.0}
+	@mkdir -p /tmp/results || true
+	@$(KIND) create cluster --wait=60s --name capsule-charts --image kindest/node:$${KIND_K8S_VERSION:-v1.27.0} --config $(HELM_KIND_CONFIG)
 	@make helm-test-exec
 	@$(KIND) delete cluster --name capsule-charts
 
 helm-test-exec: kind
-	@$(KIND) load docker-image --name capsule-charts $(CAPSULE_IMG):$(VERSION)
+	$(MAKE) docker-build-capsule-trace
+	$(MAKE) e2e-load-image CLUSTER_NAME=capsule-charts IMAGE=$(CAPSULE_IMG) VERSION=latest
+	$(MAKE) e2e-load-image CLUSTER_NAME=capsule-charts IMAGE=$(CAPSULE_IMG) VERSION=tracing
 	@kubectl create ns capsule-system || true
 	@kubectl apply --server-side=true -f https://github.com/cert-manager/cert-manager/releases/download/v1.9.1/cert-manager.crds.yaml
 	@kubectl apply --server-side=true -f https://github.com/prometheus-operator/prometheus-operator/releases/download/v0.58.0/bundle.yaml
-	@ct install --config $(SRC_ROOT)/.github/configs/ct.yaml --namespace=capsule-system --all --debug
+	@$(CT) install --config $(SRC_ROOT)/.github/configs/ct.yaml --namespace=capsule-system --all --debug
 
 docker:
 	@hash docker 2>/dev/null || {\
@@ -178,6 +183,14 @@ ko-build-capsule: ko
 .PHONY: ko-build-all
 ko-build-all: ko-build-capsule
 
+.PHONY: docker-build-capsule-trace
+docker-build-capsule-trace: ko-build-capsule
+	@docker build \
+		--no-cache \
+		--build-arg TARGET_IMAGE=$(CAPSULE_IMG):$(VERSION) \
+		-t $(CAPSULE_IMG):tracing \
+		-f Dockerfile.tracing .
+
 # Docker Image Publish
 # ------------------
 
@@ -238,6 +251,13 @@ KO_VERSION = v0.14.1
 ko:
 	$(call go-install-tool,$(KO),github.com/google/ko@$(KO_VERSION))
 
+HARPOON         := $(shell pwd)/bin/harpoon
+HARPOON_VERSION := v0.9.4
+harpoon: ## Download harpoon locally if necessary.
+	@mkdir $(shell pwd)/bin
+	@curl -s https://raw.githubusercontent.com/alegrey91/harpoon/main/install | \
+		sudo bash -s -- --install-version $(HARPOON_VERSION) --install-dir $(shell pwd)/bin
+
 ####################
 # -- Helpers
 ####################
@@ -264,12 +284,6 @@ GOBIN=$(PROJECT_DIR)/bin go install $(2) ;\
 }
 endef
 
-# Generate bundle manifests and metadata, then validate generated files.
-bundle: manifests
-	operator-sdk generate kustomize manifests -q
-	kustomize build config/manifests | operator-sdk generate bundle -q --overwrite --version $(VERSION) $(BUNDLE_METADATA_OPTS)
-	operator-sdk bundle validate ./bundle
-
 # Sorting imports
 .PHONY: goimports
 goimports:
@@ -291,11 +305,12 @@ e2e: ginkgo
 	$(MAKE) e2e-build && $(MAKE) e2e-exec && $(MAKE) e2e-destroy
 
 e2e-build: kind
-	$(KIND) create cluster --wait=60s --name capsule --image kindest/node:$${KIND_K8S_VERSION:-v1.27.0}
+	$(KIND) create cluster --wait=60s --name $(CLUSTER_NAME) --image kindest/node:$${KIND_K8S_VERSION:-v1.27.0}
+	$(MAKE) e2e-load-image CLUSTER_NAME=$(CLUSTER_NAME) IMAGE=$(CAPSULE_IMG) VERSION=$(VERSION)
 	$(MAKE) e2e-install
 
 .PHONY: e2e-install
-e2e-install: e2e-load-image
+e2e-install:
 	helm upgrade \
 	    --dependency-update \
 		--debug \
@@ -310,9 +325,43 @@ e2e-install: e2e-load-image
 		capsule \
 		./charts/capsule
 
+.PHONY: trace-install
+trace-install: 
+	helm upgrade \
+	    --dependency-update \
+		--debug \
+		--install \
+		--namespace capsule-system \
+		--create-namespace \
+		--set 'manager.resources=null'\
+		--set 'manager.livenessProbe.failureThreshold=10' \
+		--set 'manager.readinessProbe.failureThreshold=10' \
+		--values charts/capsule/ci/tracing-values.yaml \
+		capsule \
+		./charts/capsule
+
+.PHONY: trace-e2e
+trace-e2e: kind
+	$(MAKE) docker-build-capsule-trace
+	$(KIND) create cluster --wait=60s --image kindest/node:$${KIND_K8S_VERSION:-v1.27.0} --config hack/kind-cluster.yml
+	$(MAKE) e2e-load-image CLUSTER_NAME=capsule-tracing IMAGE=$(CAPSULE_IMG) VERSION=tracing
+	$(MAKE) trace-install
+	$(MAKE) e2e-exec
+	$(KIND) delete cluster --name capsule-tracing
+
+.PHONY: trace-unit 
+trace-unit: harpoon
+	$(HARPOON) analyze -e .git/ -e assets/ -e charts/ -e config/ -e docs/ -e e2e/ -e hack/ --directory /tmp/artifacts/ --save
+	$(HARPOON) hunt -D /tmp/results -F harpoon-report.yml --include-cmd-stdout --save
+
+.PHONY: seccomp
+seccomp:
+	$(HARPOON) build --add-syscall-sets=dynamic,docker -D /tmp/results --name capsule-seccomp.json --save
+
 .PHONY: e2e-load-image
+e2e-load-image: LOAD_IMAGE ?= $(IMAGE):$(VERSION)
 e2e-load-image: kind ko-build-all
-	$(KIND) load docker-image --nodes capsule-control-plane --name capsule $(CAPSULE_IMG):$(VERSION)
+	$(KIND) load docker-image $(IMAGE):$(VERSION) --name $(CLUSTER_NAME)
 
 .PHONY: e2e-exec
 e2e-exec: ginkgo

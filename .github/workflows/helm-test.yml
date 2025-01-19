@@ -31,6 +31,7 @@ jobs:
           fi
       - name: Run chart-testing (lint)
         run: ct lint --debug --config ./.github/configs/ct.yaml --lint-conf ./.github/configs/lintconf.yaml
+        
       - name: Run docs-testing (helm-docs)
         id: helm-docs
         run: |
@@ -44,5 +45,5 @@ jobs:
           fi
 
       - name: Run chart-testing (install)
-        run: make helm-test
+        run: HELM_KIND_CONFIG="./hack/kind-cluster.yml" make helm-test
         if: steps.list-changed.outputs.changed == 'true'
