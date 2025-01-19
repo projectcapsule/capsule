@@ -411,7 +411,7 @@ spec:
   - kind: User
     name: alice
     proxySettings:
-    - kind: PriorityClasses
+    - kind: RuntimeClasses
       operations:
       - List
   runtimeClasses:
