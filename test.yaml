@@ -1,0 +1,20 @@
+apiVersion: capsule.clastix.io/v1beta2
+kind: Tenant
+metadata:
+  name: solar
+spec:
+  owners:
+  - name: alice
+    kind: User
+  namespaceOptions:
+    quota: 3
+  resourceQuotas:
+    scope: Tenant
+    items:
+    - hard:
+        limits.cpu: "2"
+        limits.memory: 2Gi
+        requests.cpu: "2"
+        requests.memory: 2Gi
+    - hard:
+        pods: "3"
