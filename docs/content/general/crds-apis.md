@@ -1652,6 +1652,11 @@ Optional.<br/>
           kubebuilder:validation:Minimum=1<br/>
         </td>
         <td>true</td>
+      </tr><tr>
+        <td><b>actAsOwner</b></td>
+        <td>bool</td>
+        <td>If subject is treated as owner for namespace creation by admission webhook. Subject still requires permission from RBAC</td>
+        <td>false<td>
       </tr></tbody>
 </table>
 
