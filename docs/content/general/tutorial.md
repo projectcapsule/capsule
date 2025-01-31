@@ -1694,6 +1694,50 @@ spec:
   type: ClusterIP 
 ```
 
+## Conditional Metadata Assignment with additionalMetadataList
+If the cluster admin wants to apply different labels and annotations based on namespace conditions, additionalMetadataList can be used. This supports multiple sets of metadata, allowing the selection of namespaces based on a namespaceSelector.
+
+Example: Assigning Conditional Metadata to Namespaces in the `oil` Tenant:
+
+```yaml
+kubectl apply -f - << EOF
+apiVersion: capsule.clastix.io/v1beta2
+kind: Tenant
+metadata:
+  name: oil
+spec:
+  owners:
+  - name: alice
+    kind: User
+  namespaceOptions:
+    additionalMetadataList:
+      - labels:
+          capsule.clastix.io/backup: "true"
+      - namespaceSelector:
+          matchExpressions:
+            - key: capsule.clastix.io/low_security_profile
+              operator: NotIn
+              values: ["true"]
+        labels:
+          pod-security.kubernetes.io/enforce: baseline
+      - namespaceSelector:
+          matchExpressions:
+            - key: capsule.clastix.io/low_security_profile
+              operator: In
+              values: ["true"]
+        labels:
+          pod-security.kubernetes.io/enforce: privileged
+EOF
+```
+
+With this configuration:
+
+All namespaces receive the label capsule.clastix.io/backup: "true".
+Namespaces without capsule.clastix.io/low_security_profile=true get the label pod-security.kubernetes.io/enforce: baseline.
+Namespaces with capsule.clastix.io/low_security_profile=true get the label pod-security.kubernetes.io/enforce: privileged.
+
+Note of attention: If the same label or annotation is defined in both additionalMetadata and additionalMetadataList, the value from additionalMetadataList takes precedence over additionalMetadata. 
+
 ## Cordon a Tenant
 
 Bill needs to cordon a Tenant and its Namespaces for several reasons:
