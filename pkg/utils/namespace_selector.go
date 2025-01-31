@@ -8,7 +8,7 @@ import (
 
 func IsNamespaceSelectedBySelector(ns *corev1.Namespace, selector *metav1.LabelSelector) (bool, error) {
 	if selector == nil {
-		return true, nil // If the selector is nil, all namespaces match
+		return true, nil // If selector is nil, all namespaces match
 	}
 
 	labelSelector, err := metav1.LabelSelectorAsSelector(selector)
