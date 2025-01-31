@@ -4502,10 +4502,19 @@ Specifies options for the Namespaces, such as additional metadata or maximum num
         </tr>
     </thead>
     <tbody><tr>
+        <td><b>additionalMetadata</b></td>
         <td><b><a href="#tenantspecnamespaceoptionsadditionalmetadata">additionalMetadata</a></b></td>
-        <td>object</td>
         <td>
-          Specifies additional labels and annotations the Capsule operator places on any Namespace resource in the Tenant. Optional.<br/>
+          Specifies additional labels and annotations the Capsule operator places on any Namespace resource in the Tenant. 
+                This supports a single object and does not support a namespaceSelector. <br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>additionalMetadataList</b></td>
+        <td><b><a href="#tenantspecnamespaceoptionsadditionalmetadata">[]additionalMetadata</a></b></td>
+        <td>
+          Specifies additional labels and annotations the Capsule operator places on any Namespace resource in the Tenant. 
+                This supports a list and includes support for a namespaceSelector. .<br/>
         </td>
         <td>false</td>
       </tr><tr>
@@ -4547,6 +4556,13 @@ Specifies additional labels and annotations the Capsule operator places on any N
       </tr><tr>
         <td><b>labels</b></td>
         <td>map[string]string</td>
+        <td>
+          <br/>
+        </td>
+        <td>false</td>
+      </tr><tr>
+        <td><b>NamespaceSelector</b></td>
+        <td><b><a href="#tenantspecnetworkpoliciesitemsindexegressindextoindexnamespaceselector">namespaceSelector</a></b></td>
         <td>
           <br/>
         </td>
