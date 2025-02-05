@@ -2104,7 +2104,7 @@ spec:
     uid: 1b3aa814-3b0c-4912-9bd9-112820da38fe
 ```
 
-Once the `PeristentVolume` become available again, it can be referenced by any `PersistentVolumeClaim` in the `atreides` Tenant Namespace resources.
+Once the `PersistentVolume` become available again, it can be referenced by any `PersistentVolumeClaim` in the `atreides` Tenant Namespace resources.
 
 If another Tenant, like `harkonnen`, tries to use it, it will get an error:
 
