@@ -17,6 +17,10 @@ IMG_BASE        ?= $(REPOSITORY)
 IMG             ?= $(IMG_BASE):$(VERSION)
 CAPSULE_IMG     ?= $(REGISTRY)/$(IMG_BASE)
 
+## Tool Binaries
+KUBECTL ?= kubectl
+HELM ?= helm
+
 # Options for 'bundle-build'
 ifneq ($(origin CHANNELS), undefined)
 BUNDLE_CHANNELS := --channels=$(CHANNELS)
@@ -70,6 +74,9 @@ helm-docs: docker
 helm-lint: docker
 	@docker run -v "$(SRC_ROOT):/workdir" --entrypoint /bin/sh quay.io/helmpack/chart-testing:$(CT_VERSION) -c "cd /workdir; ct lint --config .github/configs/ct.yaml  --lint-conf .github/configs/lintconf.yaml  --all --debug"
 
+helm-schema: helm-plugin-schema
+	cd charts/capsule && $(HELM) schema
+
 helm-test: kind ct ko-build-all
 	@$(KIND) create cluster --wait=60s --name capsule-charts --image kindest/node:$${KIND_K8S_VERSION:-v1.27.0}
 	@make helm-test-exec
@@ -89,7 +96,7 @@ docker:
 	}
 
 # Setup development env
-# Usage: 
+# Usage:
 # 	LAPTOP_HOST_IP=<YOUR_LAPTOP_IP> make dev-setup
 # For example:
 #	LAPTOP_HOST_IP=192.168.10.101 make dev-setup
@@ -123,7 +130,7 @@ dev-setup:
 	kubectl create secret tls capsule-tls -n capsule-system \
 		--cert=/tmp/k8s-webhook-server/serving-certs/tls.crt\
 		--key=/tmp/k8s-webhook-server/serving-certs/tls.key || true
-	rm -f _tls.cnf 
+	rm -f _tls.cnf
 	export WEBHOOK_URL="https://$${LAPTOP_HOST_IP}:9443"; \
 	export CA_BUNDLE=`openssl base64 -in /tmp/k8s-webhook-server/serving-certs/tls.crt | tr -d '\n'`; \
 	helm upgrade \
@@ -188,6 +195,15 @@ ko-publish-capsule: ko-login ## Build and publish kyvernopre image (with ko)
 
 .PHONY: ko-publish-all
 ko-publish-all: ko-publish-capsule
+
+
+####################
+# -- Helm Plugins
+####################
+
+HELM_SCHEMA_VERSION   := ""
+helm-plugin-schema:
+	$(HELM) plugin install https://github.com/losisin/helm-values-schema-json.git --version $(HELM_SCHEMA_VERSION) || true
 
 ####################
 # -- Binaries
@@ -273,7 +289,7 @@ golint: golangci-lint
 .PHONY: e2e
 e2e: ginkgo
 	$(MAKE) e2e-build && $(MAKE) e2e-exec && $(MAKE) e2e-destroy
-    
+
 e2e-build: kind
 	$(KIND) create cluster --wait=60s --name capsule --image kindest/node:$${KIND_K8S_VERSION:-v1.27.0}
 	$(MAKE) e2e-install
@@ -309,4 +325,3 @@ e2e-destroy: kind
 SPELL_CHECKER = npx spellchecker-cli
 docs-lint:
 	cd docs/content && $(SPELL_CHECKER) -f "*.md" "*/*.md" "!general/crds-apis.md" -d dictionary.txt
-
