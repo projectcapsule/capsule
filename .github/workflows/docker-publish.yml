@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       packages: write
-      id-token: write 
+      id-token: write
     outputs:
       capsule-digest: ${{ steps.publish-capsule.outputs.digest }}
     steps:
@@ -49,8 +49,8 @@ jobs:
           version: ${{ github.ref_name }}
           sign-image: true
           sbom-name: capsule
-          sbom-repository: ghcr.io/${{ github.repository_owner }}/sbom
-          signature-repository: ghcr.io/${{ github.repository_owner }}/signatures
+          sbom-repository: ghcr.io/${{ github.repository_owner }}/capsule
+          signature-repository: ghcr.io/${{ github.repository_owner }}/capsule
           main-path: ./
         env:
           REPOSITORY: ${{ github.repository }}

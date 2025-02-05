@@ -65,7 +65,7 @@ jobs:
           registry-password: ${{ secrets.GITHUB_TOKEN }}
           update-dependencies: 'true' # Defaults to false
           sign-image: 'true'
-          signature-repository: ghcr.io/${{ github.repository_owner }}/signatures
+          signature-repository: ghcr.io/${{ github.repository_owner }}/charts/capsule
   helm-provenance:
     needs: publish-helm-oci
     permissions:
