@@ -2,18 +2,6 @@ name: e2e
 permissions: {}
 
 on:
-  push:
-    branches: [ "*" ]
-    paths:
-      - '.github/workflows/e2e.yml'
-      - 'api/**'
-      - 'controllers/**'
-      - 'pkg/**'
-      - 'e2e/*'
-      - 'Dockerfile'
-      - 'go.*'
-      - 'main.go'
-      - 'Makefile'
   pull_request:
     branches: [ "*" ]
     paths:

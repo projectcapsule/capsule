@@ -110,6 +110,9 @@ manager:
   # with pods' IP CIDR and admission webhooks are not working
   hostNetwork: false
 
+  # -- Specifies if the container should be started in hostPID mode.
+  hostPID: false
+
   # -- Set an alternative to the default container port.
   #
   # Useful for use in some kubernetes clusters (such as GKE Private) with
@@ -155,6 +158,15 @@ manager:
   # -- Set the resource requests/limits for the Capsule manager container
   resources: {}
 
+  # -- Set the additional volumes needed for the Capsule manager container
+  volumes: []
+
+  # -- Set the additional volumeMounts needed for the Capsule manager container
+  volumeMounts: []
+
+  # -- Set the securityContext for the Capsule container
+  securityContext: {}
+
 # -- Configuration for `imagePullSecrets` so that you can use a private images registry.
 imagePullSecrets: []
 
@@ -174,7 +186,6 @@ podSecurityContext:
   runAsGroup: 1002
   runAsNonRoot: true
   runAsUser: 1002
-
 
 # -- Set the securityContext for the Capsule container
 securityContext:
@@ -197,6 +208,9 @@ tolerations: []
 
 # -- Set the replica count for capsule pod
 replicaCount: 1
+
+# -- Set additional ports for the deployment
+ports: []
 
 # -- Set affinity rules for the Capsule pod
 affinity: {}

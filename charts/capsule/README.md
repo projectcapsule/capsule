@@ -129,6 +129,7 @@ Here the values you can override:
 | nodeSelector | object | `{}` | Set the node selector for the Capsule pod |
 | podAnnotations | object | `{}` | Annotations to add to the capsule pod. |
 | podSecurityContext | object | `{"runAsGroup":1002,"runAsNonRoot":true,"runAsUser":1002,"seccompProfile":{"type":"RuntimeDefault"}}` | Set the securityContext for the Capsule pod |
+| ports | list | `[]` | Set additional ports for the deployment |
 | priorityClassName | string | `""` | Set the priority class name of the Capsule pod |
 | proxy.enabled | bool | `false` | Enable Installation of Capsule Proxy |
 | replicaCount | int | `1` | Set the replica count for capsule pod |
@@ -147,6 +148,7 @@ Here the values you can override:
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | manager.hostNetwork | bool | `false` | Specifies if the container should be started in hostNetwork mode.  Required for use in some managed kubernetes clusters (such as AWS EKS) with custom CNI (such as calico), because control-plane managed by AWS cannot communicate with pods' IP CIDR and admission webhooks are not working |
+| manager.hostPID | bool | `false` | Specifies if the container should be started in hostPID mode. |
 | manager.image.pullPolicy | string | `"IfNotPresent"` | Set the image pull policy. |
 | manager.image.registry | string | `"ghcr.io"` | Set the image registry of capsule. |
 | manager.image.repository | string | `"projectcapsule/capsule"` | Set the image repository of capsule. |
@@ -165,6 +167,9 @@ Here the values you can override:
 | manager.rbac.existingRoles | list | `[]` | Specifies further cluster roles to be added to the Capsule manager service account. |
 | manager.readinessProbe | object | `{"httpGet":{"path":"/readyz","port":10080}}` | Configure the readiness probe using Deployment probe spec |
 | manager.resources | object | `{}` | Set the resource requests/limits for the Capsule manager container |
+| manager.securityContext | object | `{}` | Set the securityContext for the Capsule container |
+| manager.volumeMounts | list | `[]` | Set the additional volumeMounts needed for the Capsule manager container |
+| manager.volumes | list | `[]` | Set the additional volumes needed for the Capsule manager container |
 | manager.webhookPort | int | `9443` | Set an alternative to the default container port.  Useful for use in some kubernetes clusters (such as GKE Private) with aggregator routing turned on, because pod ports have to be opened manually on the firewall side |
 
 ### ServiceMonitor Parameters
