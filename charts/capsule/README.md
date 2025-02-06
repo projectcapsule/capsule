@@ -35,6 +35,8 @@ The following Values have changed key or Value:
 
 ## Installation
 
+**When using OCI we recommend our dedicated [OCI Repository](https://artifacthub.io/packages/helm/capsule/capsule) for this chart**
+
 The Capsule Operator requires it's CRDs to be installed before the operator itself. Since the Helm CRD lifecycle has limitations, we recommend to install the CRDs separately. Our chart supports the installation of crds via a dedicated Release.
 The Capsule Operator Chart can be used to instantly deploy the Capsule Operator on your Kubernetes cluster.
 

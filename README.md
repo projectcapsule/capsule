@@ -82,24 +82,6 @@ Please, check the project [documentation](https://projectcapsule.dev) for the co
 
 Capsule is Open Source with Apache 2 license and any contribution is welcome.
 
-## Chart Development
-
-### Chart Linting
-
-The chart is linted with [ct](https://github.com/helm/chart-testing). You can run the linter locally with this command:
-
-```
-make helm-lint
-```
-
-### Chart Documentation
-
-The documentation for each chart is done with [helm-docs](https://github.com/norwoodj/helm-docs). This way we can ensure that values are consistent with the chart documentation. Run this anytime you make changes to a `values.yaml` file:
-
-```
-make helm-docs
-```
-
 ## Community meeting
 
 Join the community, share and learn from it. You can find all the resources to how to contribute code and docs, connect with people in the [community repository](https://github.com/projectcapsule/capsule-community).
@@ -117,6 +99,12 @@ You can find how the Capsule project is governed [here](https://projectcapsule.d
 ## Maintainers
 
 Please, refer to the maintainers file available [here](.github/maintainers.yaml).
+
+## CLOMonitor
+
+CLOMonitor is a tool that periodically checks open source projects repositories to verify they meet certain project health best practices.
+
+[![CloMonitor report summary](https://clomonitor.io/api/projects/cncf/capsule/report-summary?theme=light)](https://clomonitor.io/projects/cncf/capsule)
 
 ### Changelog
 
@@ -142,4 +130,4 @@ All OCI release artifacts include a Software Bill of Materials (SBOM) in Cyclone
 
 - Q. Do you provide commercial support?
 
-  A. Yes, we're available to help and provide commercial support. [Clastix](https://clastix.io) is the company behind Capsule. Please, contact us for a quote. 
+  A. Yes, we're available to help and provide commercial support. [Clastix](https://clastix.io) is the company behind Capsule. Please, contact us for a quote.

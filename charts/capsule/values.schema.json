@@ -171,6 +171,9 @@
                 "hostNetwork": {
                     "type": "boolean"
                 },
+                "hostPID": {
+                    "type": "boolean"
+                },
                 "image": {
                     "properties": {
                         "pullPolicy": {
@@ -312,6 +315,16 @@
                     },
                     "type": "object"
                 },
+                "securityContext": {
+                    "properties": {},
+                    "type": "object"
+                },
+                "volumeMounts": {
+                    "type": "array"
+                },
+                "volumes": {
+                    "type": "array"
+                },
                 "webhookPort": {
                     "type": "integer"
                 }
@@ -347,6 +360,9 @@
                 }
             },
             "type": "object"
+        },
+        "ports": {
+            "type": "array"
         },
         "priorityClassName": {
             "type": "string"

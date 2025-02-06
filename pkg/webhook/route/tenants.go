@@ -7,8 +7,6 @@ import (
 	capsulewebhook "github.com/projectcapsule/capsule/pkg/webhook"
 )
 
-// +kubebuilder:webhook:path=/tenants,mutating=false,sideEffects=None,admissionReviewVersions=v1,failurePolicy=fail,groups="capsule.clastix.io",resources=tenants,verbs=create;update;delete,versions=v1beta2,name=tenants.projectcapsule.dev
-
 type tenant struct {
 	handlers []capsulewebhook.Handler
 }
