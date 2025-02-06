@@ -225,11 +225,11 @@ e2e: ginkgo
 
 e2e-build: kind
 	$(KIND) create cluster --wait=60s --name $(CLUSTER_NAME) --image kindest/node:$${KIND_K8S_VERSION:-v1.27.0}
-	$(MAKE) e2e-load-image CLUSTER_NAME=$(CLUSTER_NAME) IMAGE=$(CAPSULE_IMG) VERSION=$(VERSION)
 	$(MAKE) e2e-install
 
 .PHONY: e2e-install
-e2e-install: e2e-load-image
+e2e-install:
+	$(MAKE) e2e-load-image CLUSTER_NAME=$(CLUSTER_NAME) IMAGE=$(CAPSULE_IMG) VERSION=$(VERSION)
 	$(HELM) upgrade \
 	    --dependency-update \
 		--debug \
@@ -324,7 +324,7 @@ helm-doc:
 # -- Tools
 ####################
 CONTROLLER_GEN         := $(LOCALBIN)/controller-gen
-CONTROLLER_GEN_VERSION := v0.16.3
+CONTROLLER_GEN_VERSION ?= v0.16.3
 CONTROLLER_GEN_LOOKUP  := kubernetes-sigs/controller-tools
 controller-gen:
 	@test -s $(CONTROLLER_GEN) && $(CONTROLLER_GEN) --version | grep -q $(CONTROLLER_GEN_VERSION) || \

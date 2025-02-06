@@ -1,5 +1,6 @@
 name: Publish charts
 permissions: read-all
+
 on:
   push:
     tags:
