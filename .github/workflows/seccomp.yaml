@@ -3,14 +3,16 @@ permissions: {}
 
 on:
   pull_request:
-    branches: [ "*" ]
+    branches:
+      - "*"
     paths:
       - '.github/workflows/e2e.yml'
       - 'api/**'
       - 'controllers/**'
       - 'pkg/**'
       - 'e2e/*'
-      - 'Dockerfile'
+      - '.ko.yaml'
+      - 'Dockerfile.tracing'
       - 'go.*'
       - 'main.go'
       - 'Makefile'
@@ -25,10 +27,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # differently from the e2e workflow
-        # we don't need all the versions of kubernetes
-        # to generate the seccomp profile.
-        k8s-version: [ 'v1.30.0' ]
+        k8s-version:
+          - "v1.30.0"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -51,4 +51,3 @@ jobs:
         with:
           name: capsule-seccomp
           path: capsule-seccomp.json
-

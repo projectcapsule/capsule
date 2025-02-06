@@ -1,6 +1,8 @@
-
 ---
 rules:
+  truthy:
+    level: warning
+    check-keys: false
   braces:
     min-spaces-inside: 0
     max-spaces-inside: 0
@@ -39,5 +41,3 @@ rules:
   new-lines:
     type: unix
   trailing-spaces: enable
-  truthy:
-    level: warning
