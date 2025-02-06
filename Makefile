@@ -370,7 +370,7 @@ apidocs-gen: ## Download crdoc locally if necessary.
 	$(call go-install-tool,$(APIDOCS_GEN),fybrik.io/crdoc@$(APIDOCS_GEN_VERSION))
 
 HARPOON         := $(LOCALBIN)/harpoon
-HARPOON_VERSION := v0.9.4
+HARPOON_VERSION := v0.9.5
 HARPOON_LOOKUP  := alegrey91/harpoon
 harpoon:
 	@mkdir $(LOCALBIN)
