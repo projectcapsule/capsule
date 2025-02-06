@@ -1,0 +1,102 @@
+name: Coverage
+on:
+  push:
+    branches:
+      - "main"
+  pull_request:
+    types: [opened, reopened, synchronize]
+    branches:
+      - "main"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  compliance:
+    name: "License Compliance"
+    runs-on: ubuntu-24.04
+    steps:
+      - name: "Checkout Code"
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Check secret
+        id: checksecret
+        uses: ./.github/actions/exists
+        with:
+          value: ${{ secrets.FOSSA_API_KEY }}
+      - name: "Run FOSSA Scan"
+        if: steps.checksecret.outputs.result == 'true'
+        uses: fossas/fossa-action@93a52ecf7c3ac7eb40f5de77fd69b1a19524de94 # v1.5.0
+        with:
+          api-key: ${{ secrets.FOSSA_API_KEY }}
+      - name: "Run FOSSA Test"
+        if: steps.checksecret.outputs.result == 'true'
+        uses: fossas/fossa-action@93a52ecf7c3ac7eb40f5de77fd69b1a19524de94 # v1.5.0
+        with:
+          api-key: ${{ secrets.FOSSA_API_KEY }}
+          run-tests: true
+  sast:
+    name: "SAST"
+    runs-on: ubuntu-24.04
+    env:
+      GO111MODULE: on
+    permissions:
+      security-events: write
+      actions: read
+      contents: read
+    steps:
+      - name: Checkout Source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-go@f111f3307d8850f501ac008e886eec1fd1932a34 # v5.3.0
+        with:
+          go-version-file: 'go.mod'
+      - name: Run Gosec Security Scanner
+        uses: securego/gosec@e0cca6fe95306b7e7790d6f1bf6a7bec6d622459 # v2.22.0
+        with:
+          args: '-no-fail -fmt sarif -out gosec.sarif ./...'
+      - name: Upload SARIF file
+        uses: github/codeql-action/upload-sarif@08bc0cf022445eacafaa248bf48da20f26b8fd40
+        with:
+          sarif_file: gosec.sarif
+  unit_tests:
+    name: "Unit tests"
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-go@f111f3307d8850f501ac008e886eec1fd1932a34 # v5.3.0
+        with:
+          go-version-file: 'go.mod'
+      - name: Unit Test
+        run: make test
+      - name: Upload Coverage Results
+        uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08
+        with:
+          name: code-coverage
+          path: coverage.out
+      - name: Check secret
+        id: checksecret
+        uses: ./.github/actions/exists
+        with:
+          value: ${{ secrets.CODECOV_TOKEN }}
+      - name: Upload Report to Codecov
+        if: steps.checksecret.outputs.result == 'true'
+        uses: codecov/codecov-action@13ce06bfc6bbe3ecf90edbbf1bc32fe5978ca1d3 # v5.3.1
+        with:
+          file: ./coverage.out
+          fail_ci_if_error: true
+          verbose: true
+  coverage_upload:
+    name: "Code coverage report"
+    if: github.event_name == 'pull_request' # Do not run when workflow is triggered by push to main branch
+    runs-on: ubuntu-24.04
+    needs: unit_tests # Depends on the artifact uploaded by the "unit_tests" job
+    permissions:
+      contents: read
+      actions: read  # to download code coverage results from "test" job
+      pull-requests: write # write permission needed to comment on PR
+    steps:
+      - uses: fgrosse/go-coverage-report@8c1d1a09864211d258937b1b1a5b849f7e4f2682 # Consider using a Git revision for maximum security
+        with:
+          coverage-artifact-name: "code-coverage" # can be omitted if you used this default value
+          coverage-file-name: "coverage.txt" #

@@ -58,8 +58,8 @@ run: generate manifests
 	go run .
 
 # Generate manifests e.g. CRD, RBAC etc.
-manifests: controller-gen
-	$(CONTROLLER_GEN) rbac:roleName=manager-role crd webhook paths="./..." output:crd:artifacts:config=charts/capsule/crds
+manifests: generate
+	$(CONTROLLER_GEN) crd paths="./..." output:crd:artifacts:config=charts/capsule/crds
 
 # Generate code
 generate: controller-gen
@@ -216,7 +216,7 @@ goimports:
 # Linting code as PR is expecting
 .PHONY: golint
 golint: golangci-lint
-	$(GOLANGCI_LINT) run -c .golangci.yml
+	$(GOLANGCI_LINT) run -c .golangci.yml --verbose --fix
 
 # Running e2e tests in a KinD instance
 .PHONY: e2e

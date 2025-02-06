@@ -7,8 +7,6 @@ import (
 	capsulewebhook "github.com/projectcapsule/capsule/pkg/webhook"
 )
 
-// +kubebuilder:webhook:path=/namespaces,mutating=false,sideEffects=None,admissionReviewVersions=v1,failurePolicy=fail,groups="",resources=namespaces,verbs=create;update;delete,versions=v1,name=namespaces.projectcapsule.dev
-
 type namespace struct {
 	handlers []capsulewebhook.Handler
 }

@@ -57,11 +57,10 @@ linters:
     - deadcode
     - ifshort
     - nonamedreturns
-service:
-  golangci-lint-version: 1.56.x
 run:
   timeout: 3m
-  go: '1.21'
+  allow-parallel-runners: true
+  tests: false
   skip-files:
     - "zz_.*\\.go$"
     - ".+\\.generated.go"

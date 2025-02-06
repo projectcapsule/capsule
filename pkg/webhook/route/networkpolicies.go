@@ -7,8 +7,6 @@ import (
 	capsulewebhook "github.com/projectcapsule/capsule/pkg/webhook"
 )
 
-// +kubebuilder:webhook:path=/networkpolicies,mutating=false,sideEffects=None,admissionReviewVersions=v1,failurePolicy=fail,groups="networking.k8s.io",resources=networkpolicies,verbs=update;delete,versions=v1,name=networkpolicies.projectcapsule.dev
-
 type networkPolicy struct {
 	handlers []capsulewebhook.Handler
 }
