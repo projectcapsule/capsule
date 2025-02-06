@@ -1,6 +1,5 @@
 name: Linting
 permissions: {}
-
 on:
   push:
     branches:
@@ -8,20 +7,39 @@ on:
   pull_request:
     branches:
       - "*"
-
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
-
 jobs:
+  manifests:
+    name: diff
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@f111f3307d8850f501ac008e886eec1fd1932a34 # v5.3.0
+        with:
+          go-version-file: 'go.mod'
+      - name: Generate manifests
+        run: |
+          make manifests
+          if [[ $(git diff --stat) != '' ]]; then
+            echo -e '\033[0;31mManifests outdated! (Run make manifests locally and commit)\033[0m ❌'
+            git diff --color --no-pager
+            exit 1
+          else
+            echo -e '\033[0;32mDocumentation up to date\033[0m ✔'
+          fi
   yamllint:
-    runs-on: ubuntu-latest
+    name: yamllint
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - name: Install yamllint
         run: pip install yamllint
       - name: Lint YAML files
-        run: yamllint --strict -c=.github/configs/lintconf.yaml
+        run: yamllint -s -c=.github/configs/lintconf.yaml .
   golangci:
     name: lint
     runs-on: ubuntu-24.04
