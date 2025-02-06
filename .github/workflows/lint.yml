@@ -39,7 +39,7 @@ jobs:
       - name: Install yamllint
         run: pip install yamllint
       - name: Lint YAML files
-        run: yamllint -s -c=.github/configs/lintconf.yaml .
+        run: yamllint -c=.github/configs/lintconf.yaml .
   golangci:
     name: lint
     runs-on: ubuntu-24.04

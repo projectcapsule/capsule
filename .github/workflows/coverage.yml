@@ -81,7 +81,7 @@ jobs:
         with:
           value: ${{ secrets.CODECOV_TOKEN }}
       - name: Upload Report to Codecov
-        if: steps.checksecret.outputs.result == 'true'
+        if: ${{ steps.checksecret.outputs.result == 'true' }}
         uses: codecov/codecov-action@13ce06bfc6bbe3ecf90edbbf1bc32fe5978ca1d3 # v5.3.1
         with:
           file: ./coverage.out
@@ -89,15 +89,15 @@ jobs:
           verbose: true
   coverage_upload:
     name: "Code coverage report"
-    if: github.event_name == 'pull_request' # Do not run when workflow is triggered by push to main branch
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-24.04
-    needs: unit_tests # Depends on the artifact uploaded by the "unit_tests" job
+    needs: unit_tests
     permissions:
       contents: read
-      actions: read  # to download code coverage results from "test" job
-      pull-requests: write # write permission needed to comment on PR
+      actions: read
+      pull-requests: write
     steps:
-      - uses: fgrosse/go-coverage-report@8c1d1a09864211d258937b1b1a5b849f7e4f2682 # Consider using a Git revision for maximum security
+      - uses: fgrosse/go-coverage-report@8c1d1a09864211d258937b1b1a5b849f7e4f2682
         with:
-          coverage-artifact-name: "code-coverage" # can be omitted if you used this default value
-          coverage-file-name: "coverage.txt" #
+          coverage-artifact-name: "code-coverage"
+          coverage-file-name: "coverage.out" #
