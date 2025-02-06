@@ -1,8 +1,0 @@
-resources:
-- role_binding.yaml
-# Uncomment the following 3 lines if you are running Capsule
-# in a cluster where [Pod Security Policies](https://kubernetes.io/docs/concepts/policy/pod-security-policy/)
-# are enabled.
-# - psp_policy.yaml
-# - psp_role.yaml
-# - psp_role_binding.yaml

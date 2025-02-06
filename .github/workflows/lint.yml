@@ -26,7 +26,7 @@ jobs:
           make manifests
           if [[ $(git diff --stat) != '' ]]; then
             echo -e '\033[0;31mManifests outdated! (Run make manifests locally and commit)\033[0m ❌'
-            git diff --color --no-pager
+            git diff --color
             exit 1
           else
             echo -e '\033[0;32mDocumentation up to date\033[0m ✔'

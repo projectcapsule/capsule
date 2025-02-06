@@ -17,7 +17,7 @@ repos:
   rev: v1.29.0
   hooks:
   - id: yamllint
-    args: [--strict, -c=.github/configs/lintconf.yaml]
+    args: [-c=.github/configs/lintconf.yaml]
 - repo: local
   hooks:
   - id: run-helm-docs

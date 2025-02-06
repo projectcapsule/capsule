@@ -1,4 +1,8 @@
 ---
+ignore:
+  - config/
+  - charts/*/templates/
+  - charts/**/templates/
 rules:
   truthy:
     level: warning

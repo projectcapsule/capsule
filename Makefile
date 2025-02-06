@@ -373,6 +373,7 @@ HARPOON         := $(LOCALBIN)/harpoon
 HARPOON_VERSION := v0.9.4
 HARPOON_LOOKUP  := alegrey91/harpoon
 harpoon:
+	@mkdir $(LOCALBIN)
 	@curl -s https://raw.githubusercontent.com/alegrey91/harpoon/main/install | \
 		sudo bash -s -- --install-version $(HARPOON_VERSION) --install-dir $(LOCALBIN)
 

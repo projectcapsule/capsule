@@ -34,7 +34,7 @@ release:
     Thanks to all the contributors!
 
     **Full Changelog**: https://github.com/projectcapsule/{{ .ProjectName }}/compare/{{ .PreviousTag }}...{{ .Tag }}
-    
+
     **Docker Images**
     - `ghcr.io/projectcapsule/{{ .ProjectName }}:{{ .Version }}`
     - `ghcr.io/projectcapsule/{{ .ProjectName }}:latest`

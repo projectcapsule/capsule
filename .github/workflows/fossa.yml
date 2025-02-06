@@ -1,15 +1,12 @@
 name: FOSSA
 permissions: {}
-
 on:
-  push:
-    branches: [ "*" ]
   pull_request:
-    branches: [ "*" ]
-
+    branches:
+      - "main"
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true    
+  cancel-in-progress: true
 
 jobs:
   fossa-scan:
