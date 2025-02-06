@@ -349,7 +349,7 @@ kind:
 	$(call go-install-tool,$(KIND),sigs.k8s.io/kind/cmd/kind@$(KIND_VERSION))
 
 KO           := $(LOCALBIN)/ko
-KO_VERSION   := v0.14.1
+KO_VERSION   := v0.17.1
 KO_LOOKUP    := google/ko
 ko:
 	@test -s $(KO) && $(KO) -h | grep -q $(KO_VERSION) || \
