@@ -21,21 +21,9 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  kind:
-    name: Kubernetes
-    strategy:
-      fail-fast: false
-      matrix:
-        k8s-version:
-          - "v1.24.7"
-          - "v1.25.3"
-          - "v1.26.3"
-          - "v1.27.2"
-          - "v1.28.0"
-          - "v1.29.0"
-          - "v1.30.0"
-          - "v1.31.0"
-    runs-on: ubuntu-24.04
+  e2e:
+    name: E2E Testing
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
@@ -46,5 +34,14 @@ jobs:
       - uses: azure/setup-helm@fe7b79cd5ee1e45176fcad797de68ecaf3ca4814 # v4
         with:
           version: v3.14.2
-      - name: e2e testing
-        run: KIND_K8S_VERSION=${{ matrix.k8s-version }} make e2e
+      - name: unit tracing
+        run: sudo make trace-unit
+      - name: e2e tracing
+        run: sudo make trace-e2e
+      - name: build seccomp profile
+        run: make seccomp
+      - name: upload artifact
+        uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08 # v4.6.0
+        with:
+          name: capsule-seccomp
+          path: capsule-seccomp.json

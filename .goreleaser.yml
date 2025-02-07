@@ -31,8 +31,6 @@ builds:
 release:
   prerelease: auto
   footer: |
-    Thanks to all the contributors!
-
     **Full Changelog**: https://github.com/projectcapsule/{{ .ProjectName }}/compare/{{ .PreviousTag }}...{{ .Tag }}
 
     **Docker Images**
@@ -45,6 +43,19 @@ release:
     - `ghcr.io/projectcapsule/charts/{{ .ProjectName }}:{{ .Version }}`
 
     [Review the Major Changes section first before upgrading to a new version](https://artifacthub.io/packages/helm/projectcapsule/capsule/{{ .Version }}#major-changes)
+
+    **Kubernetes compatibility**
+
+    [!IMPORTANT]
+    Note that the Capsule project offers support only for the latest minor version of Kubernetes.
+    Backwards compatibility with older versions of Kubernetes and OpenShift is [offered by vendors](https://projectcapsule.dev/support/).
+
+    | Kubernetes version | Minimum required |
+    |--------------------|------------------|
+    | `v1.31`            | `>= 1.31.0`      |
+
+
+    Thanks to all the contributors! 🚀 🦄
   extra_files:
     - glob: ./capsule-seccomp.json
 checksum:

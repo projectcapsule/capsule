@@ -1,6 +1,4 @@
 linters-settings:
-  govet:
-    check-shadowing: true
   dupl:
     threshold: 100
   goconst:
@@ -32,37 +30,31 @@ linters-settings:
 linters:
   enable-all: true
   disable:
+    - err113
     - depguard
     - perfsprint
     - funlen
     - gochecknoinits
     - lll
-    - exhaustivestruct
-    - maligned
-    - interfacer
-    - scopelint
-    - golint
     - gochecknoglobals
-    - goerr113
-    - gomnd
+    - mnd
+    - nilnil
+    - recvcheck
+    - unparam
     - paralleltest
     - ireturn
     - testpackage
     - varnamelen
     - wrapcheck
     - exhaustruct
-    - varcheck
-    - structcheck
-    - nosnakecase
-    - deadcode
-    - ifshort
     - nonamedreturns
-run:
-  timeout: 3m
-  allow-parallel-runners: true
-  tests: false
-  skip-files:
+issues:
+  exclude-files:
     - "zz_.*\\.go$"
     - ".+\\.generated.go"
     - ".+_test.go"
     - ".+_test_.+.go"
+run:
+  timeout: 3m
+  allow-parallel-runners: true
+  tests: false

@@ -5,6 +5,11 @@ on:
   pull_request:
     branches:
       - "main"
+    paths:
+      - '.github/configs/**'
+      - '.github/workflows/helm-*.yml'
+      - 'charts/**'
+      - 'Makefile'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -31,18 +36,9 @@ jobs:
       - uses: azure/setup-helm@fe7b79cd5ee1e45176fcad797de68ecaf3ca4814 # v4
       - name: Linting Chart
         run: helm lint ./charts/capsule
-      - name: Setup Chart Linting
-        id: lint
-        uses: helm/chart-testing-action@0d28d3144d3a25ea2cc349d6e59901c4ff469b3b # v2.7.0
-      - name: Run chart-testing (list-changed)
-        id: list-changed
-        run: |
-          changed=$(ct list-changed --config ./.github/configs/ct.yaml)
-          if [[ -n "$changed" ]]; then
-            echo "::set-output name=changed::true"
-          fi
+
       - name: Run chart-testing (lint)
-        run: ct lint --debug --config ./.github/configs/ct.yaml --lint-conf ./.github/configs/lintconf.yaml
+        run: make helm-lint
 
       - name: Run docs-testing (helm-docs)
         id: helm-docs
@@ -68,4 +64,3 @@ jobs:
           fi
       - name: Run chart-testing (install)
         run: HELM_KIND_CONFIG="./hack/kind-cluster.yml" make helm-test
-        if: steps.list-changed.outputs.changed == 'true'

@@ -79,6 +79,6 @@ jobs:
         if: ${{ steps.checksecret.outputs.result == 'true' }}
         uses: codecov/codecov-action@13ce06bfc6bbe3ecf90edbbf1bc32fe5978ca1d3 # v5.3.1
         with:
-          file: ./coverage.out
+          files: ./coverage.out
           fail_ci_if_error: true
           verbose: true
