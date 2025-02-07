@@ -71,6 +71,10 @@ generate: controller-gen
 # Helm
 SRC_ROOT = $(shell git rev-parse --show-toplevel)
 
+helm-controller-version:
+	$(eval VERSION := $(shell grep 'appVersion:' charts/capsule/Chart.yaml | awk '{print "v"$$2}'))
+	$(eval KO_TAGS := $(shell grep 'appVersion:' charts/capsule/Chart.yaml | awk '{print "v"$$2}'))
+
 helm-docs: helm-doc
 	$(HELM_DOCS) --chart-search-root ./charts
 
@@ -81,26 +85,20 @@ helm-schema: helm-plugin-schema
 	cd charts/capsule && $(HELM) schema -output values.schema.json
 
 helm-test: HELM_KIND_CONFIG ?= ""
-helm-test: kind ct ko-build-all
+helm-test: kind
 	@mkdir -p /tmp/results || true
 	@$(KIND) create cluster --wait=60s --name capsule-charts --image kindest/node:$(KUBERNETES_SUPPORTED_VERSION) --config $(HELM_KIND_CONFIG)
 	@make helm-test-exec
 	@$(KIND) delete cluster --name capsule-charts
 
-helm-test-exec: kind
+helm-test-exec: ct helm-controller-version ko-build-all
 	$(MAKE) docker-build-capsule-trace
-	$(MAKE) e2e-load-image CLUSTER_NAME=capsule-charts IMAGE=$(CAPSULE_IMG) VERSION=latest
+	$(MAKE) e2e-load-image CLUSTER_NAME=capsule-charts IMAGE=$(CAPSULE_IMG) VERSION=v0.0.0
 	$(MAKE) e2e-load-image CLUSTER_NAME=capsule-charts IMAGE=$(CAPSULE_IMG) VERSION=tracing
 	@$(KUBECTL) create ns capsule-system || true
-	@$(KUBECTL) apply --server-side=true -f https://github.com/cert-manager/cert-manager/releases/download/v1.9.1/cert-manager.crds.yaml
-	@$(KUBECTL) apply --server-side=true -f https://github.com/prometheus-operator/prometheus-operator/releases/download/v0.58.0/bundle.yaml
+	@$(KUBECTL) apply --force-conflicts --server-side=true -f https://github.com/cert-manager/cert-manager/releases/download/v1.9.1/cert-manager.crds.yaml
+	@$(KUBECTL) apply --force-conflicts --server-side=true -f https://github.com/prometheus-operator/prometheus-operator/releases/download/v0.58.0/bundle.yaml
 	@$(CT) install --config $(SRC_ROOT)/.github/configs/ct.yaml --namespace=capsule-system --all --debug
-
-docker:
-	@hash docker 2>/dev/null || {\
-		echo "You need docker" &&\
-		exit 1;\
-	}
 
 # Setup development env
 # Usage:
@@ -231,7 +229,7 @@ e2e-build: kind
 	$(MAKE) e2e-install
 
 .PHONY: e2e-install
-e2e-install:
+e2e-install: ko-build-all
 	$(MAKE) e2e-load-image CLUSTER_NAME=$(CLUSTER_NAME) IMAGE=$(CAPSULE_IMG) VERSION=$(VERSION)
 	$(HELM) upgrade \
 	    --dependency-update \
@@ -281,7 +279,7 @@ seccomp:
 	$(HARPOON) build --add-syscall-sets=dynamic,docker -D /tmp/results --name capsule-seccomp.json --save
 
 .PHONY: e2e-load-image
-e2e-load-image: kind ko-build-all
+e2e-load-image: kind
 	$(KIND) load docker-image $(IMAGE):$(VERSION) --name $(CLUSTER_NAME)
 
 .PHONY: e2e-exec

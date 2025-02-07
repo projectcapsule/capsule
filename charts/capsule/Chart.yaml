@@ -25,9 +25,9 @@ name: capsule
 sources:
 - https://github.com/projectcapsule/capsule
 # Note: The version is overwritten by the release workflow.
-version: 0.6.0
+version: 0.0.0
 # Note: The version is overwritten by the release workflow.
-appVersion: 0.5.0
+appVersion: 0.0.0
 annotations:
   artifacthub.io/operator: "true"
   artifacthub.io/prerelease: "false"
