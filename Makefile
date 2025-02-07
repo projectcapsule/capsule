@@ -18,6 +18,9 @@ IMG             ?= $(IMG_BASE):$(VERSION)
 CAPSULE_IMG     ?= $(REGISTRY)/$(IMG_BASE)
 CLUSTER_NAME    ?= capsule
 
+## Kubernetes Version Support
+KUBERNETES_SUPPORTED_VERSION ?= "v1.31.0"
+
 ## Tool Binaries
 KUBECTL ?= kubectl
 HELM ?= helm
@@ -80,7 +83,7 @@ helm-schema: helm-plugin-schema
 helm-test: HELM_KIND_CONFIG ?= ""
 helm-test: kind ct ko-build-all
 	@mkdir -p /tmp/results || true
-	@$(KIND) create cluster --wait=60s --name capsule-charts --image kindest/node:$${KIND_K8S_VERSION:-v1.27.0} --config $(HELM_KIND_CONFIG)
+	@$(KIND) create cluster --wait=60s --name capsule-charts --image kindest/node:$(KUBERNETES_SUPPORTED_VERSION) --config $(HELM_KIND_CONFIG)
 	@make helm-test-exec
 	@$(KIND) delete cluster --name capsule-charts
 
@@ -224,7 +227,7 @@ e2e: ginkgo
 	$(MAKE) e2e-build && $(MAKE) e2e-exec && $(MAKE) e2e-destroy
 
 e2e-build: kind
-	$(KIND) create cluster --wait=60s --name $(CLUSTER_NAME) --image kindest/node:$${KIND_K8S_VERSION:-v1.27.0}
+	$(KIND) create cluster --wait=60s --name $(CLUSTER_NAME) --image kindest/node:$(KUBERNETES_SUPPORTED_VERSION)
 	$(MAKE) e2e-install
 
 .PHONY: e2e-install
@@ -262,7 +265,7 @@ trace-install:
 .PHONY: trace-e2e
 trace-e2e: kind
 	$(MAKE) docker-build-capsule-trace
-	$(KIND) create cluster --wait=60s --image kindest/node:$${KIND_K8S_VERSION:-v1.27.0} --config hack/kind-cluster.yml
+	$(KIND) create cluster --wait=60s --image kindest/node:$(KUBERNETES_SUPPORTED_VERSION) --config hack/kind-cluster.yml
 	$(MAKE) e2e-load-image CLUSTER_NAME=capsule-tracing IMAGE=$(CAPSULE_IMG) VERSION=tracing
 	$(MAKE) trace-install
 	$(MAKE) e2e-exec
