@@ -6,7 +6,7 @@ home: https://github.com/projectcapsule/capsule
 icon: https://github.com/projectcapsule/capsule/raw/main/assets/logo/capsule_small.png
 dependencies:
   - name: capsule-proxy
-    version: 0.9.0
+    version: 0.9.1
     repository: "oci://ghcr.io/projectcapsule/charts"
     condition: proxy.enabled
     alias: proxy
