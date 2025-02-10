@@ -3,7 +3,7 @@ ARG TARGET_IMAGE
 FROM ${TARGET_IMAGE} AS target
 
 # Inject Harpoon Image
-FROM alegrey91/harpoon:v0.9.4
+FROM ghcr.io/alegrey91/harpoon:latest
 WORKDIR /
 COPY --from=target /ko-app/capsule ./manager
 
