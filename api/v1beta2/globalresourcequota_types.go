@@ -12,6 +12,10 @@ import (
 
 // GlobalResourceQuotaSpec defines the desired state of GlobalResourceQuota
 type GlobalResourceQuotaSpec struct {
+	// Ensure no overprovisiong is possible for this quota
+	// +kubebuilder:default=false
+	Guarantee bool `json:"guarantee,omitempty"`
+
 	// When a quota is active it's checking for the resources in the cluster
 	// If not active the resourcequotas are removed and the webhook no longer blocks updates
 	// +kubebuilder:default=true

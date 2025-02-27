@@ -61,6 +61,10 @@ spec:
                   When a quota is active it's checking for the resources in the cluster
                   If not active the resourcequotas are removed and the webhook no longer blocks updates
                 type: boolean
+              guarantee:
+                default: false
+                description: Ensure no overprovisiong is possible for this quota
+                type: boolean
               quotas:
                 additionalProperties:
                   description: ResourceQuotaSpec defines the desired hard limits to

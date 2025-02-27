@@ -32,6 +32,7 @@ func StatusHandler(log logr.Logger) capsulewebhook.Handler {
 
 func (h *statusHandler) OnCreate(c client.Client, decoder admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
+		h.log.V(3).Info("loggign request", "REQUEST", req)
 		return nil
 	}
 }
