@@ -146,12 +146,20 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 
 func (r *Manager) updateTenantStatus(ctx context.Context, tnt *capsulev1beta2.Tenant) error {
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
-		if tnt.Spec.Cordoned {
-			tnt.Status.State = capsulev1beta2.TenantStateCordoned
-		} else {
-			tnt.Status.State = capsulev1beta2.TenantStateActive
+		// Re-fetch the tenant to get the latest state (avoid conflicts by quota webhook)
+		latestTenant := &capsulev1beta2.Tenant{}
+		if err := r.Client.Get(ctx, client.ObjectKey{Name: tnt.Name, Namespace: tnt.Namespace}, latestTenant); err != nil {
+			r.Log.Error(err, "Failed to fetch the latest Tenant object during retry")
+			return err
 		}
 
-		return r.Client.Status().Update(ctx, tnt)
+		// Update the state based on the latest spec
+		if latestTenant.Spec.Cordoned {
+			latestTenant.Status.State = capsulev1beta2.TenantStateCordoned
+		} else {
+			latestTenant.Status.State = capsulev1beta2.TenantStateActive
+		}
+
+		return r.Client.Status().Update(ctx, latestTenant)
 	})
 }

@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: compute-resources
+spec:
+  hard:
+     pods: "0"

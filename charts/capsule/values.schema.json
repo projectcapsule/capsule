@@ -730,6 +730,33 @@
                             },
                             "type": "object"
                         },
+                        "quotas": {
+                            "properties": {
+                                "failurePolicy": {
+                                    "type": "string"
+                                },
+                                "namespaceSelector": {
+                                    "properties": {
+                                        "matchExpressions": {
+                                            "items": {
+                                                "properties": {
+                                                    "key": {
+                                                        "type": "string"
+                                                    },
+                                                    "operator": {
+                                                        "type": "string"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            },
+                                            "type": "array"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            },
+                            "type": "object"
+                        },
                         "services": {
                             "properties": {
                                 "failurePolicy": {
