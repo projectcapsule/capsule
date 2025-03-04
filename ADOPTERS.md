@@ -39,3 +39,6 @@ This is a list of companies that have adopted Capsule, feel free to open a Pull-
 
 ### [Wargaming.net](https://www.wargaming.net/)
 ![Wargaming.net](https://static-cspbe-eu.wargaming.net/images/logo@2x.png)
+
+### [Enreach](https://www.enreach.com/)
+![Enreach](https://campaigns.enreach.com/hubfs/Global/logos/Enreach-logo-vertical-indigo.svg)
