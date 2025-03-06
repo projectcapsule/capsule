@@ -625,7 +625,7 @@
                             },
                             "type": "object"
                         },
-                        "namespaceOwnerReference": {
+                        "namespacesPatch": {
                             "properties": {
                                 "failurePolicy": {
                                     "type": "string"
@@ -633,7 +633,7 @@
                             },
                             "type": "object"
                         },
-                        "namespaces": {
+                        "namespacesValidation": {
                             "properties": {
                                 "failurePolicy": {
                                     "type": "string"

@@ -68,12 +68,12 @@ webhooks:
   sideEffects: None
   timeoutSeconds: {{ $.Values.webhooks.validatingWebhooksTimeoutSeconds }}
 {{- end }}
-{{ with .Values.webhooks.hooks.namespaces }}
+{{ with .Values.webhooks.hooks.namespacesValidation }}
 - admissionReviewVersions:
     - v1
     - v1beta1
   clientConfig:
-    {{- include "capsule.webhooks.service" (dict "path" "/namespaces" "ctx" $) | nindent 4 }}
+    {{- include "capsule.webhooks.service" (dict "path" "/namespace-validate" "ctx" $) | nindent 4 }}
   failurePolicy: {{ .failurePolicy }}
   matchPolicy: Equivalent
   name: namespaces.projectcapsule.dev

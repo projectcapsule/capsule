@@ -265,8 +265,6 @@ webhooks:
 
   # Hook Configuration
   hooks:
-    namespaceOwnerReference:
-      failurePolicy: Fail
     cordoning:
       failurePolicy: Fail
       namespaceSelector:
@@ -279,7 +277,9 @@ webhooks:
         matchExpressions:
           - key: capsule.clastix.io/tenant
             operator: Exists
-    namespaces:
+    namespacesPatch:
+      failurePolicy: Fail
+    namespacesValidation:
       failurePolicy: Fail
     networkpolicies:
       failurePolicy: Fail
