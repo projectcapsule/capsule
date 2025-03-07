@@ -52,7 +52,7 @@ jobs:
         with:
           go-version-file: 'go.mod'
       - name: Run Gosec Security Scanner
-        uses: securego/gosec@43fee884f668c23601e0bec7a8c095fba226f889 # v2.22.1
+        uses: securego/gosec@136f6c00402b11775d4f4a45d5a21e2f6dd99db2 # v2.22.2
         with:
           args: '-no-fail -fmt sarif -out gosec.sarif ./...'
       - name: Upload SARIF file
