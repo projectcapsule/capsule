@@ -10,5 +10,6 @@ import rbacv1 "k8s.io/api/rbac/v1"
 type AdditionalRoleBindingsSpec struct {
 	ClusterRoleName string `json:"clusterRoleName"`
 	// kubebuilder:validation:Minimum=1
-	Subjects []rbacv1.Subject `json:"subjects"`
+	Subjects   []rbacv1.Subject `json:"subjects"`
+	ActAsOwner bool             `json:"actAsOwner"`
 }
