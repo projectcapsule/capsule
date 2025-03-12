@@ -72,8 +72,8 @@ generate: controller-gen
 SRC_ROOT = $(shell git rev-parse --show-toplevel)
 
 helm-controller-version:
-	$(eval VERSION := $(shell grep 'appVersion:' charts/capsule/Chart.yaml | awk '{print "v"$$2}'))
-	$(eval KO_TAGS := $(shell grep 'appVersion:' charts/capsule/Chart.yaml | awk '{print "v"$$2}'))
+	$(eval VERSION := $(shell grep 'appVersion:' charts/capsule/Chart.yaml | awk '{print $$2}'))
+	$(eval KO_TAGS := $(shell grep 'appVersion:' charts/capsule/Chart.yaml | awk '{print $$2}'))
 
 helm-docs: helm-doc
 	$(HELM_DOCS) --chart-search-root ./charts

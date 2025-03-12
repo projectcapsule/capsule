@@ -19,6 +19,8 @@ func GetTypeLabel(t runtime.Object) (label string, err error) {
 	switch v := t.(type) {
 	case *v1beta1.Tenant, *v1beta2.Tenant:
 		return "capsule.clastix.io/tenant", nil
+	case *v1beta2.GlobalResourceQuota:
+		return "capsule.clastix.io/global-quota", nil
 	case *corev1.LimitRange:
 		return "capsule.clastix.io/limit-range", nil
 	case *networkingv1.NetworkPolicy:
@@ -32,4 +34,8 @@ func GetTypeLabel(t runtime.Object) (label string, err error) {
 	}
 
 	return
+}
+
+func GetGlobalResourceQuotaTypeLabel() (label string) {
+	return "capsule.clastix.io/global-quota-item"
 }
