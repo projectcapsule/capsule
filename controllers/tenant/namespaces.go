@@ -42,7 +42,6 @@ func (r *Manager) syncNamespaces(ctx context.Context, tenant *capsulev1beta2.Ten
 	return
 }
 
-//nolint:gocognit,nakedret
 func (r *Manager) syncNamespaceMetadata(ctx context.Context, namespace string, tnt *capsulev1beta2.Tenant) (err error) {
 	var res controllerutil.OperationResult
 
@@ -52,92 +51,8 @@ func (r *Manager) syncNamespaceMetadata(ctx context.Context, namespace string, t
 			return
 		}
 
-		capsuleLabel, _ := utils.GetTypeLabel(&capsulev1beta2.Tenant{})
-
 		res, conflictErr = controllerutil.CreateOrUpdate(ctx, r.Client, ns, func() error {
-			annotations := make(map[string]string)
-			labels := map[string]string{
-				"kubernetes.io/metadata.name": namespace,
-				capsuleLabel:                  tnt.GetName(),
-			}
-
-			if tnt.Spec.NamespaceOptions != nil && tnt.Spec.NamespaceOptions.AdditionalMetadata != nil {
-				for k, v := range tnt.Spec.NamespaceOptions.AdditionalMetadata.Annotations {
-					annotations[k] = v
-				}
-			}
-
-			if tnt.Spec.NamespaceOptions != nil && tnt.Spec.NamespaceOptions.AdditionalMetadata != nil {
-				for k, v := range tnt.Spec.NamespaceOptions.AdditionalMetadata.Labels {
-					labels[k] = v
-				}
-			}
-
-			if tnt.Spec.NodeSelector != nil {
-				annotations = utils.BuildNodeSelector(tnt, annotations)
-			}
-
-			if tnt.Spec.IngressOptions.AllowedClasses != nil {
-				if len(tnt.Spec.IngressOptions.AllowedClasses.Exact) > 0 {
-					annotations[AvailableIngressClassesAnnotation] = strings.Join(tnt.Spec.IngressOptions.AllowedClasses.Exact, ",")
-				}
-
-				if len(tnt.Spec.IngressOptions.AllowedClasses.Regex) > 0 {
-					annotations[AvailableIngressClassesRegexpAnnotation] = tnt.Spec.IngressOptions.AllowedClasses.Regex
-				}
-			}
-
-			if tnt.Spec.StorageClasses != nil {
-				if len(tnt.Spec.StorageClasses.Exact) > 0 {
-					annotations[AvailableStorageClassesAnnotation] = strings.Join(tnt.Spec.StorageClasses.Exact, ",")
-				}
-
-				if len(tnt.Spec.StorageClasses.Regex) > 0 {
-					annotations[AvailableStorageClassesRegexpAnnotation] = tnt.Spec.StorageClasses.Regex
-				}
-			}
-
-			if tnt.Spec.ContainerRegistries != nil {
-				if len(tnt.Spec.ContainerRegistries.Exact) > 0 {
-					annotations[AllowedRegistriesAnnotation] = strings.Join(tnt.Spec.ContainerRegistries.Exact, ",")
-				}
-
-				if len(tnt.Spec.ContainerRegistries.Regex) > 0 {
-					annotations[AllowedRegistriesRegexpAnnotation] = tnt.Spec.ContainerRegistries.Regex
-				}
-			}
-
-			if value, ok := tnt.Annotations[api.ForbiddenNamespaceLabelsAnnotation]; ok {
-				annotations[api.ForbiddenNamespaceLabelsAnnotation] = value
-			}
-
-			if value, ok := tnt.Annotations[api.ForbiddenNamespaceLabelsRegexpAnnotation]; ok {
-				annotations[api.ForbiddenNamespaceLabelsRegexpAnnotation] = value
-			}
-
-			if value, ok := tnt.Annotations[api.ForbiddenNamespaceAnnotationsAnnotation]; ok {
-				annotations[api.ForbiddenNamespaceAnnotationsAnnotation] = value
-			}
-
-			if value, ok := tnt.Annotations[api.ForbiddenNamespaceAnnotationsRegexpAnnotation]; ok {
-				annotations[api.ForbiddenNamespaceAnnotationsRegexpAnnotation] = value
-			}
-
-			if ns.Annotations == nil {
-				ns.SetAnnotations(annotations)
-			} else {
-				for k, v := range annotations {
-					ns.Annotations[k] = v
-				}
-			}
-
-			if ns.Labels == nil {
-				ns.SetLabels(labels)
-			} else {
-				for k, v := range labels {
-					ns.Labels[k] = v
-				}
-			}
+			SyncNamespaceMetadata(tnt, ns)
 
 			return nil
 		})
@@ -184,4 +99,93 @@ func (r *Manager) collectNamespaces(ctx context.Context, tenant *capsulev1beta2.
 
 		return
 	})
+}
+
+// SyncNamespaceMetadata sync namespace metadata according to tenant spec.
+func SyncNamespaceMetadata(tnt *capsulev1beta2.Tenant, ns *corev1.Namespace) {
+	capsuleLabel, _ := utils.GetTypeLabel(&capsulev1beta2.Tenant{})
+
+	annotations := make(map[string]string)
+	labels := map[string]string{
+		"kubernetes.io/metadata.name": ns.GetName(),
+		capsuleLabel:                  tnt.GetName(),
+	}
+
+	if tnt.Spec.NamespaceOptions != nil && tnt.Spec.NamespaceOptions.AdditionalMetadata != nil {
+		for k, v := range tnt.Spec.NamespaceOptions.AdditionalMetadata.Annotations {
+			annotations[k] = v
+		}
+	}
+
+	if tnt.Spec.NamespaceOptions != nil && tnt.Spec.NamespaceOptions.AdditionalMetadata != nil {
+		for k, v := range tnt.Spec.NamespaceOptions.AdditionalMetadata.Labels {
+			labels[k] = v
+		}
+	}
+
+	if tnt.Spec.NodeSelector != nil {
+		annotations = utils.BuildNodeSelector(tnt, annotations)
+	}
+
+	if tnt.Spec.IngressOptions.AllowedClasses != nil {
+		if len(tnt.Spec.IngressOptions.AllowedClasses.Exact) > 0 {
+			annotations[AvailableIngressClassesAnnotation] = strings.Join(tnt.Spec.IngressOptions.AllowedClasses.Exact, ",")
+		}
+
+		if len(tnt.Spec.IngressOptions.AllowedClasses.Regex) > 0 {
+			annotations[AvailableIngressClassesRegexpAnnotation] = tnt.Spec.IngressOptions.AllowedClasses.Regex
+		}
+	}
+
+	if tnt.Spec.StorageClasses != nil {
+		if len(tnt.Spec.StorageClasses.Exact) > 0 {
+			annotations[AvailableStorageClassesAnnotation] = strings.Join(tnt.Spec.StorageClasses.Exact, ",")
+		}
+
+		if len(tnt.Spec.StorageClasses.Regex) > 0 {
+			annotations[AvailableStorageClassesRegexpAnnotation] = tnt.Spec.StorageClasses.Regex
+		}
+	}
+
+	if tnt.Spec.ContainerRegistries != nil {
+		if len(tnt.Spec.ContainerRegistries.Exact) > 0 {
+			annotations[AllowedRegistriesAnnotation] = strings.Join(tnt.Spec.ContainerRegistries.Exact, ",")
+		}
+
+		if len(tnt.Spec.ContainerRegistries.Regex) > 0 {
+			annotations[AllowedRegistriesRegexpAnnotation] = tnt.Spec.ContainerRegistries.Regex
+		}
+	}
+
+	if value, ok := tnt.Annotations[api.ForbiddenNamespaceLabelsAnnotation]; ok {
+		annotations[api.ForbiddenNamespaceLabelsAnnotation] = value
+	}
+
+	if value, ok := tnt.Annotations[api.ForbiddenNamespaceLabelsRegexpAnnotation]; ok {
+		annotations[api.ForbiddenNamespaceLabelsRegexpAnnotation] = value
+	}
+
+	if value, ok := tnt.Annotations[api.ForbiddenNamespaceAnnotationsAnnotation]; ok {
+		annotations[api.ForbiddenNamespaceAnnotationsAnnotation] = value
+	}
+
+	if value, ok := tnt.Annotations[api.ForbiddenNamespaceAnnotationsRegexpAnnotation]; ok {
+		annotations[api.ForbiddenNamespaceAnnotationsRegexpAnnotation] = value
+	}
+
+	if ns.Annotations == nil {
+		ns.SetAnnotations(annotations)
+	} else {
+		for k, v := range annotations {
+			ns.Annotations[k] = v
+		}
+	}
+
+	if ns.Labels == nil {
+		ns.SetLabels(labels)
+	} else {
+		for k, v := range labels {
+			ns.Labels[k] = v
+		}
+	}
 }

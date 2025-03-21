@@ -37,6 +37,9 @@ var _ = Describe("creating a Namespace for a Tenant with additional metadata", f
 					Kind: "User",
 				},
 			},
+			NodeSelector: map[string]string{
+				"node": "foobar",
+			},
 			NamespaceOptions: &capsulev1beta2.NamespaceOptions{
 				AdditionalMetadata: &api.AdditionalMetadataSpec{
 					Labels: map[string]string{
@@ -67,26 +70,25 @@ var _ = Describe("creating a Namespace for a Tenant with additional metadata", f
 		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 		By("checking additional labels", func() {
-			Eventually(func() (ok bool) {
 				Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: ns.GetName()}, ns)).Should(Succeed())
+
 				for k, v := range tnt.Spec.NamespaceOptions.AdditionalMetadata.Labels {
-					if ok, _ = HaveKeyWithValue(k, v).Match(ns.Labels); !ok {
-						return
-					}
+					Expect(ns.Labels).To(HaveKeyWithValue(k, v))
 				}
 				return
-			}, defaultTimeoutInterval, defaultPollInterval).Should(BeTrue())
 		})
 		By("checking additional annotations", func() {
-			Eventually(func() (ok bool) {
-				Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: ns.GetName()}, ns)).Should(Succeed())
-				for k, v := range tnt.Spec.NamespaceOptions.AdditionalMetadata.Annotations {
-					if ok, _ = HaveKeyWithValue(k, v).Match(ns.Annotations); !ok {
-						return
-					}
-				}
-				return
-			}, defaultTimeoutInterval, defaultPollInterval).Should(BeTrue())
+			Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: ns.GetName()}, ns)).Should(Succeed())
+
+			for k, v := range tnt.Spec.NamespaceOptions.AdditionalMetadata.Annotations {
+				Expect(ns.Annotations).To(HaveKeyWithValue(k, v))
+			}
+			return
+		})
+		By("checking namespace node-selector annotation", func() {
+			Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: ns.GetName()}, ns)).Should(Succeed())
+			Expect(ns.Annotations).Should(HaveKeyWithValue("scheduler.alpha.kubernetes.io/node-selector", "node=foobar"))
+			return
 		})
 	})
 })
