@@ -39,7 +39,7 @@ jobs:
       - name: build seccomp profile
         run: make seccomp
       - name: upload artifact
-        uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08 # v4.6.0
+        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4.6.1
         with:
           name: capsule-seccomp
           path: capsule-seccomp.json
@@ -66,9 +66,9 @@ jobs:
       - uses: creekorful/goreportcard-action@1f35ced8cdac2cba28c9a2f2288a16aacfd507f9 # v1.0
       - uses: anchore/sbom-action/download-syft@79202aee38a39bd2039be442e58d731b63baf740
       - name: Install Cosign
-        uses: sigstore/cosign-installer@c56c2d3e59e4281cc41dea2217323ba5694b171e # v3.8.0
+        uses: sigstore/cosign-installer@d7d6bc7722e3daa8354c50bcb52f4837da5e9b6a # v3.8.1
       - name: download artifact
-        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
+        uses: actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806 # v4.1.9
         with:
           name: capsule-seccomp
           path: ./capsule-seccomp.json

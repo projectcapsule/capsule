@@ -36,7 +36,7 @@ jobs:
           output: 'trivy-results.sarif'
           severity: 'CRITICAL,HIGH'
       - name: Install Cosign
-        uses: sigstore/cosign-installer@c56c2d3e59e4281cc41dea2217323ba5694b171e # v3.8.0
+        uses: sigstore/cosign-installer@d7d6bc7722e3daa8354c50bcb52f4837da5e9b6a # v3.8.1
       - name: Publish Capsule
         id: publish-capsule
         uses: peak-scale/github-actions/make-ko-publish@a441cca016861c546ab7e065277e40ce41a3eb84 # v0.2.0
@@ -60,7 +60,7 @@ jobs:
       id-token: write   # To sign the provenance.
       packages: write   # To upload assets to release.
       actions: read     # To read the workflow path.
-    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@v2.0.0
+    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@v2.1.0
     with:
       image: ghcr.io/${{ github.repository_owner }}/capsule
       digest: "${{ needs.publish-images.outputs.capsule-digest }}"

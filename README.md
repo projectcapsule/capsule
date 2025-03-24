@@ -23,7 +23,7 @@
 </p>
 
 <p align="center">
-  <img src="assets/logo/capsule_medium.png" />
+  <img src="assets/logo/capsule.svg" height=560 />
 </p>
 
 ---
