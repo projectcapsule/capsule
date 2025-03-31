@@ -248,7 +248,7 @@ webhooks:
   sideEffects: None
   timeoutSeconds: {{ $.Values.webhooks.validatingWebhooksTimeoutSeconds }}
 {{- end }}
-{{- with .Values.webhooks.hooks.tenants }}
+  {{- with .Values.webhooks.hooks.tenants }}
 - admissionReviewVersions:
     - v1
     - v1beta1
@@ -273,5 +273,32 @@ webhooks:
       scope: '*'
   sideEffects: None
   timeoutSeconds: {{ $.Values.webhooks.validatingWebhooksTimeoutSeconds }}
-{{- end }}
+  {{- end }}
+  {{- with .Values.webhooks.hooks.quotas }}
+- admissionReviewVersions:
+    - v1
+    - v1beta1
+  clientConfig:
+    {{- include "capsule.webhooks.service" (dict "path" "/globalquota/validation" "ctx" $) | nindent 4 }}
+  failurePolicy: {{ .failurePolicy }}
+  matchPolicy: Equivalent
+  name: quotas.projectcapsule.dev
+  reinvocationPolicy: Never
+  rules:
+    - apiGroups:
+      - ""
+      apiVersions:
+      - v1
+      operations:
+      - UPDATE
+      - DELETE
+      resources:
+      - resourcequotas
+      - resourcequotas/status
+      scope: 'Namespaced'
+  sideEffects: None
+  namespaceSelector:
+    {{- toYaml .namespaceSelector | nindent 4}}
+  timeoutSeconds: {{ $.Values.webhooks.mutatingWebhooksTimeoutSeconds }}
+  {{- end }}
 {{- end }}

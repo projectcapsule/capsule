@@ -1,0 +1,94 @@
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: grafana
+  namespace: flux-system
+spec:
+  interval: 15m
+  timeout: 10m
+  targetNamespace: observability-system
+  releaseName: "grafana"
+  chart:
+    spec:
+      chart: grafana
+      version: "8.3.4"
+      sourceRef:
+        kind: HelmRepository
+        name: grafana
+      interval: 24h
+  install:
+    remediation:
+      retries: -1
+  upgrade:
+    remediation:
+      remediateLastFailure: true
+      retries: -1
+  driftDetection:
+    mode: enabled
+  values:
+    global:
+      dnsService: "kube-dns"
+      dnsNamespace: "kube-system"
+    assertNoLeakedSecrets: false
+    deploymentStrategy:
+      type: Recreate
+    persistence:
+      enabled: true
+    initChownData:
+      enabled: false
+    plugins:
+      - grafana-pyroscope-app
+    env:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: "Admin"
+      GF_DIAGNOSTICS_PROFILING_ENABLED: "true"
+      GF_DIAGNOSTICS_PROFILING_ADDR: "0.0.0.0"
+      GF_DIAGNOSTICS_PROFILING_PORT: "6060"
+    sidecar:
+      securityContext:
+        runAsUser: 472
+        runAsGroup: 472
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        capabilities:
+          drop:
+            - ALL
+      enableUniqueFilenames: true
+      datasources:
+        enabled: false
+      dashboards:
+        enabled: false
+    # https://grafana.com/docs/grafana/latest/setup-grafana/configure-grafana/
+    grafana.ini:
+      analytics:
+        reporting_enabled: false
+        check_for_updates: false
+        check_for_plugin_updates: false
+      security:
+        disable_gravatar: true
+        cookie_secure: true
+        cookie_samesite: lax
+        strict_transport_security: true
+        strict_transport_security_preload: true
+        strict_transport_security_subdomains: true
+        content_security_policy: true
+      auth:
+        disable_login_form: false
+      users:
+        allow_sign_up: true
+        auto_assign_org: true
+    ingress:
+      enabled: false
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: grafana
+  namespace: flux-system
+spec:
+  interval: 24h0m0s
+  url: https://grafana.github.io/helm-charts
