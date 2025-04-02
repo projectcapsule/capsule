@@ -46,7 +46,6 @@ import (
 	namespacewebhook "github.com/projectcapsule/capsule/pkg/webhook/namespace"
 	"github.com/projectcapsule/capsule/pkg/webhook/networkpolicy"
 	"github.com/projectcapsule/capsule/pkg/webhook/node"
-	"github.com/projectcapsule/capsule/pkg/webhook/ownerreference"
 	"github.com/projectcapsule/capsule/pkg/webhook/pod"
 	"github.com/projectcapsule/capsule/pkg/webhook/pvc"
 	"github.com/projectcapsule/capsule/pkg/webhook/route"
@@ -220,14 +219,14 @@ func main() {
 	webhooksList := append(
 		make([]webhook.Webhook, 0),
 		route.Pod(pod.ImagePullPolicy(), pod.ContainerRegistry(), pod.PriorityClass(), pod.RuntimeClass()),
-		route.Namespace(utils.InCapsuleGroups(cfg, namespacewebhook.PatchHandler(), namespacewebhook.QuotaHandler(), namespacewebhook.FreezeHandler(cfg), namespacewebhook.PrefixHandler(cfg), namespacewebhook.UserMetadataHandler())),
+		route.NamespaceValidate(utils.InCapsuleGroups(cfg, namespacewebhook.QuotaHandler(), namespacewebhook.FreezeHandler(cfg), namespacewebhook.PrefixHandler(cfg), namespacewebhook.UserMetadataHandler())),
+		route.NamespacePatch(utils.InCapsuleGroups(cfg, namespacewebhook.PatchHandler(cfg))),
 		route.Ingress(ingress.Class(cfg, kubeVersion), ingress.Hostnames(cfg), ingress.Collision(cfg), ingress.Wildcard()),
 		route.PVC(pvc.Validating(), pvc.PersistentVolumeReuse()),
 		route.Service(service.Handler()),
 		route.TenantResourceObjects(utils.InCapsuleGroups(cfg, tntresource.WriteOpsHandler())),
 		route.NetworkPolicy(utils.InCapsuleGroups(cfg, networkpolicy.Handler())),
 		route.Tenant(tenant.NameHandler(), tenant.RoleBindingRegexHandler(), tenant.IngressClassRegexHandler(), tenant.StorageClassRegexHandler(), tenant.ContainerRegistryRegexHandler(), tenant.HostnameRegexHandler(), tenant.FreezedEmitter(), tenant.ServiceAccountNameHandler(), tenant.ForbiddenAnnotationsRegexHandler(), tenant.ProtectedHandler(), tenant.MetaHandler()),
-		route.OwnerReference(utils.InCapsuleGroups(cfg, ownerreference.Handler(cfg))),
 		route.Cordoning(tenant.CordoningHandler(cfg), tenant.ResourceCounterHandler(manager.GetClient())),
 		route.Node(utils.InCapsuleGroups(cfg, node.UserMetadataHandler(cfg, kubeVersion))),
 		route.Defaults(defaults.Handler(cfg, kubeVersion)),
