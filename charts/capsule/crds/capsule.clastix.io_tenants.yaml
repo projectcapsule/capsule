@@ -68,6 +68,8 @@ spec:
                   the RoleBinding for the given ClusterRole. Optional.
                 items:
                   properties:
+                    actAsOwner:
+                      type: boolean
                     clusterRoleName:
                       type: string
                     subjects:
@@ -103,6 +105,7 @@ spec:
                         x-kubernetes-map-type: atomic
                       type: array
                   required:
+                  - actAsOwner
                   - clusterRoleName
                   - subjects
                   type: object
@@ -1093,6 +1096,8 @@ spec:
                   the RoleBinding for the given ClusterRole. Optional.
                 items:
                   properties:
+                    actAsOwner:
+                      type: boolean
                     clusterRoleName:
                       type: string
                     subjects:
@@ -1128,6 +1133,7 @@ spec:
                         x-kubernetes-map-type: atomic
                       type: array
                   required:
+                  - actAsOwner
                   - clusterRoleName
                   - subjects
                   type: object
