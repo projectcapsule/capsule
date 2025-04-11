@@ -7,6 +7,9 @@ This is a list of companies that have adopted Capsule, feel free to open a Pull-
 ### [Bedag Informatik AG](https://www.bedag.ch/)
 ![Bedag](https://www.bedag.ch/wGlobal/wGlobal/layout/images/logo.svg)
 
+### [Begasoft AG](https://www.begasoft.ch)
+![Begasoft](./assets/adopters/begasoft.png)
+
 ### [Department of Defense](https://www.defense.gov/)
 ![United States Department of Defense](https://www.access-board.gov/images/dod-seal.png)
 
