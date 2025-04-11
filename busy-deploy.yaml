@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: busybox-deployment
+  labels:
+    app: busybox
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: busybox
+  template:
+    metadata:
+      labels:
+        app: busybox
+    spec:
+      containers:
+      - name: busybox
+        image: alpine:latest
+        resources:
+          limits:
+            cpu: 0.3
+            memory: 128Mi
+          requests:
+            cpu: 0.25
+            memory: 128Mi
+        command:
+        - sh
+        - -c
+        - |
+          apk add busybox-extras && sleep infinity

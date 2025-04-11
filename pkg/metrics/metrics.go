@@ -20,6 +20,16 @@ var (
 		Name: metricsPrefix + "tenant_resource_limit",
 		Help: "Current resource limit for a given resource in a tenant",
 	}, []string{"tenant", "resource", "resourcequotaindex"})
+
+	GlobalResourceUsage = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Name: metricsPrefix + "global_resource_usage",
+		Help: "Current resource usage for a given resource in a global resource quota",
+	}, []string{"quota", "resource", "resourcequotaindex"})
+
+	GlobalResourceLimit = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Name: metricsPrefix + "global_resource_limit",
+		Help: "Current resource limit for a given resource in a global resource quota",
+	}, []string{"quota", "resource", "resourcequotaindex"})
 )
 
 func init() {

@@ -1,0 +1,20 @@
+apiVersion: capsule.clastix.io/v1beta2
+kind: GlobalResourceQuota
+metadata:
+  name: sampler
+spec:
+  selectors:
+  - matchLabels:
+      capsule.clastix.io/tenant: solar
+  - matchLabels:
+      capsule.clastix.io/tenant: solar
+  quotas:
+    scheduling:
+      hard:
+        limits.cpu: "2"
+        limits.memory: 2Gi
+        requests.cpu: "2"
+        requests.memory: 2Gi
+    pods:
+      hard:
+        pods: "3"

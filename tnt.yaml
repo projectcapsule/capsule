@@ -1,0 +1,26 @@
+apiVersion: capsule.clastix.io/v1beta2
+kind: Tenant
+metadata:
+  creationTimestamp: "2025-02-18T17:38:52Z"
+  generation: 1
+  labels:
+    customer-resource-pool: dev
+    kubernetes.io/metadata.name: solar-quota
+  name: solar-quota
+  resourceVersion: "28140"
+  uid: 81c4ca40-550c-4dca-97f7-6f0ca98ad88a
+spec:
+  cordoned: false
+  ingressOptions:
+    hostnameCollisionScope: Disabled
+  limitRanges: {}
+  networkPolicies: {}
+  owners:
+  - clusterRoles:
+    - admin
+    - capsule-namespace-deleter
+    kind: User
+    name: solar-user
+  preventDeletion: false
+  resourceQuotas:
+    scope: Tenant
