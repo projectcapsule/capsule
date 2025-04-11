@@ -7,18 +7,34 @@ import (
 	capsulewebhook "github.com/projectcapsule/capsule/pkg/webhook"
 )
 
-type namespace struct {
+type namespaceValidate struct {
 	handlers []capsulewebhook.Handler
 }
 
-func Namespace(handler ...capsulewebhook.Handler) capsulewebhook.Webhook {
-	return &namespace{handlers: handler}
+type namespacePatch struct {
+	handlers []capsulewebhook.Handler
 }
 
-func (w *namespace) GetHandlers() []capsulewebhook.Handler {
+func NamespaceValidate(handler ...capsulewebhook.Handler) capsulewebhook.Webhook {
+	return &namespaceValidate{handlers: handler}
+}
+
+func (w *namespaceValidate) GetHandlers() []capsulewebhook.Handler {
 	return w.handlers
 }
 
-func (w *namespace) GetPath() string {
-	return "/namespaces"
+func (w *namespaceValidate) GetPath() string {
+	return "/namespace-validate"
+}
+
+func NamespacePatch(handler ...capsulewebhook.Handler) capsulewebhook.Webhook {
+	return &namespacePatch{handlers: handler}
+}
+
+func (w *namespacePatch) GetHandlers() []capsulewebhook.Handler {
+	return w.handlers
+}
+
+func (w *namespacePatch) GetPath() string {
+	return "/namespace-patch"
 }

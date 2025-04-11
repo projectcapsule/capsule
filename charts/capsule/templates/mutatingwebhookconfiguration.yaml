@@ -81,12 +81,12 @@ webhooks:
   sideEffects: None
   timeoutSeconds: {{ $.Values.webhooks.mutatingWebhooksTimeoutSeconds }}
 {{- end }}
-{{- with .Values.webhooks.hooks.namespaceOwnerReference }} 
+{{- with .Values.webhooks.hooks.namespacesPatch }}
 - admissionReviewVersions:
     - v1
     - v1beta1
   clientConfig:
-    {{- include "capsule.webhooks.service" (dict "path" "/namespace-owner-reference" "ctx" $) | nindent 4 }}
+    {{- include "capsule.webhooks.service" (dict "path" "/namespace-patch" "ctx" $) | nindent 4 }}
   failurePolicy: {{ .failurePolicy }}
   matchPolicy: Equivalent
   name: owner.namespace.projectcapsule.dev
