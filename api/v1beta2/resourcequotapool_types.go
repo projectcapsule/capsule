@@ -11,24 +11,22 @@ import (
 )
 
 // GlobalResourceQuotaSpec defines the desired state of GlobalResourceQuota
-type GlobalResourceQuotaSpec struct {
-	// Ensure no overprovisiong is possible for this quota
-	// +kubebuilder:default=false
-	Guarantee bool `json:"guarantee,omitempty"`
-
-	// When a quota is active it's checking for the resources in the cluster
-	// If not active the resourcequotas are removed and the webhook no longer blocks updates
-	// +kubebuilder:default=true
-	Active bool `json:"active,omitempty"`
-
+type ResourceQuotaPoolSpec struct {
 	// Selector to match the namespaces that should be managed by the GlobalResourceQuota
-	Selectors []GlobalResourceQuotaSelector `json:"selectors,omitempty"`
+	Selectors []ResourceQuotaPoolSelector `json:"selectors,omitempty"`
 
 	// Define resourcequotas for the namespaces
-	Items map[api.Name]corev1.ResourceQuotaSpec `json:"quotas,omitempty"`
+	Quota corev1.ResourceQuotaSpec `json:"quota,omitempty"`
+
+	// The maxmum amount of resources that can be claimed from a resourcequota in a namespace
+	MaximumAllocation corev1.ResourceList `json:"namespaceMaximum,omitempty"`
+
+	// The Defaults given for each namespace, the default is not counted towards the total allocation
+	// When you use claims it's recommended to provision Defaults as the prevent the scheduling of any resources
+	Defaults corev1.ResourceList `json:"namespaceDefaults,omitempty"`
 }
 
-type GlobalResourceQuotaSelector struct {
+type ResourceQuotaPoolSelector struct {
 	// Only considers namespaces which are part of a tenant, other namespaces which might match
 	// the label, but do not have a tenant, are ignored.
 	// +kubebuilder:default=true
@@ -46,23 +44,23 @@ type GlobalResourceQuotaSelector struct {
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp",description="Age"
 
 // GlobalResourceQuota is the Schema for the globalresourcequotas API
-type GlobalResourceQuota struct {
+type ResourceQuotaPool struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   GlobalResourceQuotaSpec   `json:"spec,omitempty"`
-	Status GlobalResourceQuotaStatus `json:"status,omitempty"`
+	Spec   ResourceQuotaPoolSpec   `json:"spec,omitempty"`
+	Status ResourceQuotaPoolStatus `json:"status,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 
 // GlobalResourceQuotaList contains a list of GlobalResourceQuota
-type GlobalResourceQuotaList struct {
+type ResourceQuotaPoolList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []GlobalResourceQuota `json:"items"`
+	Items           []ResourceQuotaPool `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&GlobalResourceQuota{}, &GlobalResourceQuotaList{})
+	SchemeBuilder.Register(&ResourceQuotaPool{}, &ResourceQuotaPoolList{})
 }

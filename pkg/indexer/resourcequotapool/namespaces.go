@@ -22,7 +22,7 @@ func (o NamespacesReference) Field() string {
 //nolint:forcetypeassert
 func (o NamespacesReference) Func() client.IndexerFunc {
 	return func(object client.Object) []string {
-		grq, ok := object.(*capsulev1beta2.GlobalResourceQuota)
+		grq, ok := object.(*capsulev1beta2.ResourceQuotaPool)
 		if !ok {
 			return nil
 		}

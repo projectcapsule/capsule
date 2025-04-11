@@ -1,4 +1,11 @@
+// Copyright 2020-2023 Project Capsule Authors.
+// SPDX-License-Identifier: Apache-2.0
+
 package api
+
+import (
+	k8stypes "k8s.io/apimachinery/pkg/types"
+)
 
 // Name must be unique within a namespace. Is required when creating resources, although
 // some resources may allow a client to request the generation of an appropriate name
@@ -13,4 +20,13 @@ type Name string
 
 func (n Name) String() string {
 	return string(n)
+}
+
+type StatusNameUID struct {
+	// Name
+	Name Name `json:"name"`
+	// Namespace
+	Namespace Name `json:"namespace,omitempty"`
+	// UID of the tracked Tenant to pin point tracking
+	k8stypes.UID `json:"uid,omitempty" protobuf:"bytes,5,opt,name=uid"`
 }

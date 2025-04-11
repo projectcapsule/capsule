@@ -290,11 +290,10 @@ webhooks:
       apiVersions:
       - v1
       operations:
-      - CREATE
       - UPDATE
-      - DELETE
       resources:
-      - events
+      - resourcequota
+      - resourcequotas/status
       scope: 'Namespaced'
   sideEffects: None
   timeoutSeconds: {{ $.Values.webhooks.mutatingWebhooksTimeoutSeconds }}
