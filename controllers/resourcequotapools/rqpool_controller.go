@@ -1,20 +1,19 @@
 // Copyright 2020-2023 Project Capsule Authors.
 // SPDX-License-Identifier: Apache-2.0
 
-package globalquota
+package resourcequotapools
 
 import (
 	"context"
 	"fmt"
+	"sort"
 
 	"github.com/go-logr/logr"
 	"golang.org/x/sync/errgroup"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
@@ -26,20 +25,19 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/metrics"
 	"github.com/projectcapsule/capsule/pkg/utils"
 	capsuleutils "github.com/projectcapsule/capsule/pkg/utils"
 )
 
-type ResourcePoolController struct {
+type resourcePoolController struct {
 	client.Client
 	Log        logr.Logger
 	Recorder   record.EventRecorder
 	RESTConfig *rest.Config
 }
 
-func (r *ResourcePoolController) SetupWithManager(mgr ctrl.Manager) error {
+func (r *resourcePoolController) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&capsulev1beta2.ResourceQuotaPool{}).
 		Owns(&corev1.ResourceQuota{}).
@@ -68,7 +66,7 @@ func (r *ResourcePoolController) SetupWithManager(mgr ctrl.Manager) error {
 }
 
 //nolint:nakedret
-func (r ResourcePoolController) Reconcile(ctx context.Context, request ctrl.Request) (result ctrl.Result, err error) {
+func (r resourcePoolController) Reconcile(ctx context.Context, request ctrl.Request) (result ctrl.Result, err error) {
 	r.Log = r.Log.WithValues("Request.Name", request.Name)
 	// Fetch the Tenant instance
 	instance := &capsulev1beta2.ResourceQuotaPool{}
@@ -84,13 +82,6 @@ func (r ResourcePoolController) Reconcile(ctx context.Context, request ctrl.Requ
 		}
 
 		r.Log.Error(err, "Error reading the object")
-
-		return
-	}
-
-	// Ensuring the Quota Status
-	if err = r.reconcile(ctx, instance); err != nil {
-		r.Log.Error(err, "Cannot update Tenant status")
 
 		return
 	}
@@ -156,105 +147,14 @@ func (r ResourcePoolController) Reconcile(ctx context.Context, request ctrl.Requ
 }
 
 //nolint:nakedret, gocognit
-func (r *ResourcePoolController) reconcile(
+func (r *resourcePoolController) reconcile(
 	ctx context.Context,
 	quota *capsulev1beta2.ResourceQuotaPool,
 	matchingNamespaces []string,
 ) (err error) {
-	// getting ResourceQuota labels for the mutateFn
-	var quotaLabel, typeLabel string
-
-	if quotaLabel, err = utils.GetTypeLabel(&capsulev1beta2.ResourceQuotaPool{}); err != nil {
-		return err
-	}
-
-	typeLabel = utils.GetGlobalResourceQuotaTypeLabel()
-
-	// Keep original status to verify if we need to change anything
-	originalStatus := quota.Status.DeepCopy()
-
-	// Process each item (quota index)
-	for index, resourceQuota := range quota.Spec.Items {
-		// Fetch the latest tenant quota status
-		itemUsage, exists := quota.Status.Quota[index]
-		if !exists {
-			// Initialize Object
-			quota.Status.Quota[index] = &corev1.ResourceQuotaStatus{
-				Used: corev1.ResourceList{},
-				Hard: corev1.ResourceList{},
-			}
-
-			itemUsage = &corev1.ResourceQuotaStatus{
-				Used: corev1.ResourceList{},
-				Hard: resourceQuota.Hard,
-			}
-		}
-
-		// ✅ Update the Used state in the global quota
-		quota.Status.Quota[index] = itemUsage
-	}
-
-	// Update the tenant's status with the computed quota information
-	// We only want to update the status if we really have to, resulting in less
-	// conflicts because the usage status is updated by the webhook
-	if !equality.Semantic.DeepEqual(quota.Status, *originalStatus) {
-		if err := r.Status().Update(ctx, quota); err != nil {
-			r.Log.Info("updating status", "quota", quota.Status)
-
-			r.Log.Error(err, "Failed to update tenant status")
-
-			return err
-		}
-	}
-
 	// Remove prior metrics, to avoid cleaning up for metrics of deleted ResourceQuotas
 	metrics.TenantResourceUsage.DeletePartialMatch(map[string]string{"quota": quota.Name})
 	metrics.TenantResourceLimit.DeletePartialMatch(map[string]string{"quota": quota.Name})
-
-	// Remove Quotas which are no longer mentioned in spec
-	for existingIndex := range quota.Status.Quota {
-		if _, exists := quota.Spec.Items[api.Name(existingIndex)]; !exists {
-
-			r.Log.V(7).Info("Orphaned quota index detected", "quotaIndex", existingIndex)
-
-			for _, ns := range append(matchingNamespaces, quota.Status.Namespaces...) {
-				selector := labels.SelectorFromSet(map[string]string{
-					quotaLabel: quota.Name,
-					typeLabel:  existingIndex.String(),
-				})
-
-				r.Log.V(7).Info("Searching for ResourceQuotas to delete", "namespace", ns, "selector", selector.String())
-
-				// Query and delete all ResourceQuotas with matching labels in the namespace
-				rqList := &corev1.ResourceQuotaList{}
-				if err := r.Client.List(ctx, rqList, &client.ListOptions{
-					Namespace:     ns,
-					LabelSelector: selector,
-				}); err != nil {
-					r.Log.Error(err, "Failed to list ResourceQuotas", "namespace", ns, "quotaName", quota.Name, "index", existingIndex)
-					return err
-				}
-
-				r.Log.V(7).Info("Found ResourceQuotas for deletion", "count", len(rqList.Items), "namespace", ns, "quotaIndex", existingIndex)
-
-				for _, rq := range rqList.Items {
-					if err := r.Client.Delete(ctx, &rq); err != nil {
-						r.Log.Error(err, "Failed to delete ResourceQuota", "name", rq.Name, "namespace", ns)
-						return err
-					}
-
-					r.Log.V(7).Info("Deleted orphaned ResourceQuota", "name", rq.Name, "namespace", ns)
-				}
-			}
-
-			// Only Remove from status if the ResourceQuota has been deleted
-			// Remove the orphaned quota from status
-			delete(quota.Status.Quota, existingIndex)
-			r.Log.Info("Removed orphaned quota from status", "quotaIndex", existingIndex)
-		} else {
-			r.Log.V(7).Info("no lifecycle", "quotaIndex", existingIndex)
-		}
-	}
 
 	// Convert matchingNamespaces to a map for quick lookup
 	matchingNamespaceSet := make(map[string]struct{}, len(matchingNamespaces))
@@ -272,11 +172,79 @@ func (r *ResourcePoolController) reconcile(
 		}
 	}
 
-	return SyncResourceQuotas(ctx, r.Client, quota, matchingNamespaces)
+	return r.syncResourceQuotas(ctx, r.Client, quota, matchingNamespaces)
+}
+
+// Handles All the Claims for the ResourcePool
+func (r *resourcePoolController) reconcileResourceClaims(
+	ctx context.Context,
+	log logr.Logger,
+	quota *capsulev1beta2.ResourceQuotaPool,
+	namespaces []string,
+) (err error) {
+	var allClaims []capsulev1beta2.ResourceQuotaClaim
+
+	for _, ns := range namespaces {
+		var claimList capsulev1beta2.ResourceQuotaClaimList
+		if err := r.List(ctx, &claimList, &client.ListOptions{
+			Namespace: ns,
+		}); err != nil {
+			log.Error(err, "failed to list ResourceQuotaClaims", "namespace", ns)
+			return err
+		}
+		allClaims = append(allClaims, claimList.Items...)
+	}
+
+	// Sort by creation timestamp (oldest first)
+	sort.Slice(allClaims, func(i, j int) bool {
+		return allClaims[i].CreationTimestamp.Before(&allClaims[j].CreationTimestamp)
+	})
+
+	log.Info("Sorted ResourceQuotaClaims", "count", len(allClaims))
+
+	// You can now iterate over `allClaims` in order
+	for _, claim := range allClaims {
+		log.Info("Found claim", "name", claim.Name, "namespace", claim.Namespace, "created", claim.CreationTimestamp)
+
+		r.reconcileResourceClaim(ctx, log.WithValues("Claim", claim.Name), quota, claim)
+	}
+
+}
+
+// Reconciles a single ResourceClaim
+func (r *resourcePoolController) reconcileResourceClaim(
+	ctx context.Context,
+	log logr.Logger,
+	quota *capsulev1beta2.ResourceQuotaPool,
+	claim capsulev1beta2.ResourceQuotaClaim,
+) (err error) {
+	// Handles Claims which are already in status
+
+	var claimList capsulev1beta2.ResourceQuotaClaimList
+	if err := r.List(ctx, &claimList, &client.ListOptions{}); err != nil {
+		r.Log.Error(err, "failed to gather claims")
+		return nil
+	}
+
+}
+
+func (r *resourcePoolController) handlePoolClaimExhaustion(
+	ctx context.Context,
+	log logr.Logger,
+	c client.Client,
+	quota *capsulev1beta2.ResourceQuotaPool,
+	claim capsulev1beta2.ResourceQuotaClaim,
+) (err error) {
+	var claimList capsulev1beta2.ResourceQuotaClaimList
+	if err := r.List(ctx, &claimList, &client.ListOptions{}); err != nil {
+		r.Log.Error(err, "failed to gather claims")
+		return nil
+	}
+
 }
 
 // Synchronize resources quotas in all the given namespaces (routines)
-func (r *ResourcePoolController) syncResourceQuotas(
+func (r *resourcePoolController) syncResourceQuotas(
 	ctx context.Context,
 	c client.Client,
 	quota *capsulev1beta2.ResourceQuotaPool,
@@ -289,7 +257,7 @@ func (r *ResourcePoolController) syncResourceQuotas(
 		namespace := ns
 
 		group.Go(func() error {
-			return SyncResourceQuota(ctx, c, quota, namespace)
+			return r.syncResourceQuota(ctx, c, quota, namespace)
 		})
 	}
 
@@ -297,7 +265,7 @@ func (r *ResourcePoolController) syncResourceQuotas(
 }
 
 // Synchronize a single resourcequota
-func (r *ResourcePoolController) syncResourceQuota(
+func (r *resourcePoolController) syncResourceQuota(
 	ctx context.Context,
 	c client.Client,
 	pool *capsulev1beta2.ResourceQuotaPool,
@@ -351,7 +319,7 @@ func (r *ResourcePoolController) syncResourceQuota(
 }
 
 // Attempts to garbage collect a ResourceQuota resource.
-func (r *ResourcePoolController) garbageCollectNamespace(
+func (r *resourcePoolController) garbageCollectNamespace(
 	ctx context.Context,
 	pool *capsulev1beta2.ResourceQuotaPool,
 	namespace string,
@@ -391,7 +359,7 @@ func (r *ResourcePoolController) garbageCollectNamespace(
 }
 
 // Update tracking namespaces
-func (r *ResourcePoolController) statusNamespaces(
+func (r *resourcePoolController) statusNamespaces(
 	ctx context.Context,
 	quota *capsulev1beta2.ResourceQuotaPool,
 	ns []corev1.Namespace,

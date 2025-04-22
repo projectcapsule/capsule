@@ -1,4 +1,7 @@
-package globalquota
+// Copyright 2020-2023 Project Capsule Authors.
+// SPDX-License-Identifier: Apache-2.0
+
+package resourcequotapools
 
 import (
 	"context"
@@ -12,12 +15,12 @@ import (
 )
 
 // Get all matching namespaces (just names)
-func GetMatchingGlobalQuotaNamespacesByName(
+func getMatchingGlobalQuotaNamespacesByName(
 	ctx context.Context,
 	c client.Client,
-	quota *capsulev1beta2.GlobalResourceQuota,
+	quota *capsulev1beta2.ResourceQuotaPool,
 ) (nsNames []string, err error) {
-	namespaces, err := GetMatchingGlobalQuotaNamespaces(ctx, c, quota)
+	namespaces, err := getMatchingGlobalQuotaNamespaces(ctx, c, quota)
 	if err != nil {
 		return
 	}
@@ -31,10 +34,10 @@ func GetMatchingGlobalQuotaNamespacesByName(
 }
 
 // Get all matching namespaces
-func GetMatchingGlobalQuotaNamespaces(
+func getMatchingGlobalQuotaNamespaces(
 	ctx context.Context,
 	c client.Client,
-	quota *capsulev1beta2.GlobalResourceQuota,
+	quota *capsulev1beta2.ResourceQuotaPool,
 ) (namespaces []corev1.Namespace, err error) {
 	// Collect Namespaces (Matching)
 	namespaces = make([]corev1.Namespace, 0)

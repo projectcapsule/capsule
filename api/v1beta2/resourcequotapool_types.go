@@ -24,6 +24,9 @@ type ResourceQuotaPoolSpec struct {
 	// The Defaults given for each namespace, the default is not counted towards the total allocation
 	// When you use claims it's recommended to provision Defaults as the prevent the scheduling of any resources
 	Defaults corev1.ResourceList `json:"namespaceDefaults,omitempty"`
+
+	// If force is enabled, resources can be removed, even when they are claimed. The claims will be updated accordingly
+	Force bool `json:"force,omitempty"`
 }
 
 type ResourceQuotaPoolSelector struct {

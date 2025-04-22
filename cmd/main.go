@@ -31,10 +31,10 @@ import (
 	capsulev1beta1 "github.com/projectcapsule/capsule/api/v1beta1"
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	configcontroller "github.com/projectcapsule/capsule/controllers/config"
-	"github.com/projectcapsule/capsule/controllers/globalquota"
 	podlabelscontroller "github.com/projectcapsule/capsule/controllers/pod"
 	"github.com/projectcapsule/capsule/controllers/pv"
 	rbaccontroller "github.com/projectcapsule/capsule/controllers/rbac"
+	"github.com/projectcapsule/capsule/controllers/resourcequotapools"
 	"github.com/projectcapsule/capsule/controllers/resources"
 	servicelabelscontroller "github.com/projectcapsule/capsule/controllers/servicelabels"
 	tenantcontroller "github.com/projectcapsule/capsule/controllers/tenant"
@@ -43,7 +43,6 @@ import (
 	"github.com/projectcapsule/capsule/pkg/indexer"
 	"github.com/projectcapsule/capsule/pkg/webhook"
 	"github.com/projectcapsule/capsule/pkg/webhook/defaults"
-	globalquotahook "github.com/projectcapsule/capsule/pkg/webhook/globalquota"
 	"github.com/projectcapsule/capsule/pkg/webhook/ingress"
 	namespacewebhook "github.com/projectcapsule/capsule/pkg/webhook/namespace"
 	"github.com/projectcapsule/capsule/pkg/webhook/networkpolicy"
@@ -233,7 +232,6 @@ func main() {
 		route.Cordoning(tenant.CordoningHandler(cfg), tenant.ResourceCounterHandler(manager.GetClient())),
 		route.Node(utils.InCapsuleGroups(cfg, node.UserMetadataHandler(cfg, kubeVersion))),
 		route.Defaults(defaults.Handler(cfg, kubeVersion)),
-		route.QuotaValidation(globalquotahook.StatusHandler(ctrl.Log.WithName("controllers").WithName("Webhook")), utils.InCapsuleGroups(cfg, globalquotahook.ValidationHandler()), globalquotahook.DeletionHandler(ctrl.Log.WithName("controllers").WithName("Webhook"))),
 	)
 
 	nodeWebhookSupported, _ := utils.NodeWebhookSupported(kubeVersion)
@@ -311,12 +309,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&globalquota.Manager{
-		Log:      ctrl.Log.WithName("controllers").WithName("GlobalResourceQuotas"),
-		Client:   manager.GetClient(),
-		Recorder: manager.GetEventRecorderFor("global-quota-ctrl"),
-	}).SetupWithManager(manager); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "globalquota")
+	if err := resourcequotapools.Add(
+		ctrl.Log.WithName("controllers").WithName("ResourceQuotaPools"),
+		manager,
+		manager.GetEventRecorderFor("pools-ctrl"),
+	); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "resourcequotapools")
 		os.Exit(1)
 	}
 

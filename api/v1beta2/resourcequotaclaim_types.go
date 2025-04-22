@@ -16,7 +16,7 @@ type ResourceQuotaClaimSpec struct {
 	// You must be specific about which one you want to claim resources from
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="Value is immutable"
-	Quota string `json:"quota,omitempty"`
+	Pool string `json:"pool,omitempty"`
 	// Amount which should be claimed for the resourcequota
 	ResourceClaims corev1.ResourceList `json:"claim"`
 }

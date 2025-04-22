@@ -15,9 +15,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	"github.com/projectcapsule/capsule/pkg/indexer/globalquota"
 	"github.com/projectcapsule/capsule/pkg/indexer/ingress"
 	"github.com/projectcapsule/capsule/pkg/indexer/namespace"
+	"github.com/projectcapsule/capsule/pkg/indexer/resourcequotapool"
 	"github.com/projectcapsule/capsule/pkg/indexer/tenant"
 	"github.com/projectcapsule/capsule/pkg/indexer/tenantresource"
 	"github.com/projectcapsule/capsule/pkg/utils"
@@ -32,7 +32,7 @@ type CustomIndexer interface {
 func AddToManager(ctx context.Context, log logr.Logger, mgr manager.Manager) error {
 	indexers := []CustomIndexer{
 		tenant.NamespacesReference{Obj: &capsulev1beta2.Tenant{}},
-		globalquota.NamespacesReference{Obj: &capsulev1beta2.GlobalResourceQuota{}},
+		resourcequotapool.NamespacesReference{Obj: &capsulev1beta2.ResourceQuotaPool{}},
 		tenant.OwnerReference{},
 		namespace.OwnerReference{},
 		ingress.HostnamePath{Obj: &extensionsv1beta1.Ingress{}},

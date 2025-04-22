@@ -33,7 +33,7 @@ func (g *ResourceQuotaPool) GetResourceDefaults() corev1.ResourceList {
 // As we would need to verify if a new namespace with it's defaults still has place in the Pool. Same with attempting to join exisitng namespaces
 func (g *ResourceQuotaPool) GetResourceQuotaHardResources(namespace string) corev1.ResourceList {
 	// Read Resources which are claimed
-	claimed := g.GetNamespaceClaims(namespace)
+	_, claimed := g.GetNamespaceClaims(namespace)
 
 	for resourceName, amount := range g.GetResourceDefaults() {
 		usedValue, usedExists := claimed[resourceName]
@@ -53,12 +53,12 @@ func (g *ResourceQuotaPool) GetResourceQuotaHardResources(namespace string) core
 }
 
 // Gets the total amount of claimed resources for a namespace
-func (g *ResourceQuotaPool) GetNamespaceClaims(namespace string) corev1.ResourceList {
-	claimedResources := corev1.ResourceList{}
+func (g *ResourceQuotaPool) GetNamespaceClaims(namespace string) (claims map[string]*ResourceQuotaPoolClaimsItem, claimedResources corev1.ResourceList) {
+	claimedResources = corev1.ResourceList{}
 
 	// First, check if quota exists in the status
 	for _, claim := range g.Status.Claims {
-		if claim.Namespace == namespace {
+		if claim.Namespace.String() == namespace {
 			for resourceName, claimed := range claim.Claims {
 				usedValue, usedExists := claimedResources[resourceName]
 				if !usedExists {
@@ -70,11 +70,13 @@ func (g *ResourceQuotaPool) GetNamespaceClaims(namespace string) corev1.Resource
 
 				claimedResources[resourceName] = usedValue
 			}
+
+			claims[string(claim.UID)] = claim
 		}
 
 	}
 
-	return claimedResources
+	return
 }
 
 func (g *ResourceQuotaPool) AssignNamespaces(namespaces []corev1.Namespace) {
