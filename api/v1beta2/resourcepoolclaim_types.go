@@ -10,50 +10,51 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api"
 )
 
-// ResourceQuotaClaimSpec defines the desired state of ResourceQuotaClaim.
-type ResourceQuotaClaimSpec struct {
+type ResourcePoolClaimSpec struct {
 	// If there's the possability to claim from multiple global Quotas
 	// You must be specific about which one you want to claim resources from
+	// Once bound to a ResourcePool, this field is immutable
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="Value is immutable"
 	Pool string `json:"pool,omitempty"`
 	// Amount which should be claimed for the resourcequota
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="Resources are immutable"
 	ResourceClaims corev1.ResourceList `json:"claim"`
 }
 
 // ResourceQuotaClaimStatus defines the observed state of ResourceQuotaClaim.
-type ResourceQuotaClaimStatus struct {
+type ResourcePoolClaimStatus struct {
 	// Reference to the GlobalQuota being claimed from
-	GlobalQuota api.StatusNameUID `json:"globalQuota,omitempty"`
+	Pool api.StatusNameUID `json:"pool,omitempty"`
 	// Condtion for this resource claim
 	Condition metav1.Condition `json:"condition,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp",description=""
-// +kubebuilder:printcolumn:name="Quota",type="string",JSONPath=".status.globalQuota.name",description="The Global ResourceQuota being consumed"
+// +kubebuilder:printcolumn:name="Pool",type="string",JSONPath=".status.pool.name",description="The ResourcePool being claimed from"
 // +kubebuilder:printcolumn:name="Status",type="string",JSONPath=".status.condition.reason",description="Condition"
 // +kubebuilder:printcolumn:name="Message",type="string",JSONPath=".status.condition.message",description="Condition Message"
+// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp",description=""
 
-// ResourceQuotaClaim is the Schema for the resourcequotaclaims API.
-type ResourceQuotaClaim struct {
+// ResourcePoolClaim is the Schema for the resourcepoolclaims API.
+type ResourcePoolClaim struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   ResourceQuotaClaimSpec   `json:"spec,omitempty"`
-	Status ResourceQuotaClaimStatus `json:"status,omitempty"`
+	Spec   ResourcePoolClaimSpec   `json:"spec,omitempty"`
+	Status ResourcePoolClaimStatus `json:"status,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 
 // ResourceQuotaClaimList contains a list of ResourceQuotaClaim.
-type ResourceQuotaClaimList struct {
+type ResourcePoolClaimList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []ResourceQuotaClaim `json:"items"`
+	Items           []ResourcePoolClaim `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&ResourceQuotaClaim{}, &ResourceQuotaClaimList{})
+	SchemeBuilder.Register(&ResourcePoolClaim{}, &ResourcePoolClaimList{})
 }

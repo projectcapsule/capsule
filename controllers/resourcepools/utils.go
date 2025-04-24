@@ -1,7 +1,7 @@
 // Copyright 2020-2023 Project Capsule Authors.
 // SPDX-License-Identifier: Apache-2.0
 
-package resourcequotapools
+package resourcepools
 
 import (
 	"context"
@@ -18,7 +18,7 @@ import (
 func getMatchingGlobalQuotaNamespacesByName(
 	ctx context.Context,
 	c client.Client,
-	quota *capsulev1beta2.ResourceQuotaPool,
+	quota *capsulev1beta2.ResourcePool,
 ) (nsNames []string, err error) {
 	namespaces, err := getMatchingGlobalQuotaNamespaces(ctx, c, quota)
 	if err != nil {
@@ -37,7 +37,7 @@ func getMatchingGlobalQuotaNamespacesByName(
 func getMatchingGlobalQuotaNamespaces(
 	ctx context.Context,
 	c client.Client,
-	quota *capsulev1beta2.ResourceQuotaPool,
+	quota *capsulev1beta2.ResourcePool,
 ) (namespaces []corev1.Namespace, err error) {
 	// Collect Namespaces (Matching)
 	namespaces = make([]corev1.Namespace, 0)
@@ -80,7 +80,7 @@ func getMatchingGlobalQuotaNamespaces(
 }
 
 // Returns for an item it's name as Kubernetes object
-func resourceQuotaItemName(quota *capsulev1beta2.ResourceQuotaPool) string {
+func resourceQuotaItemName(quota *capsulev1beta2.ResourcePool) string {
 	// Generate a name using the tenant name and item name
 	return fmt.Sprintf("capsule-pool-%s", quota.Name)
 }

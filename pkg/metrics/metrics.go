@@ -21,15 +21,20 @@ var (
 		Help: "Current resource limit for a given resource in a tenant",
 	}, []string{"tenant", "resource", "resourcequotaindex"})
 
-	GlobalResourceUsage = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Name: metricsPrefix + "global_resource_usage",
-		Help: "Current resource usage for a given resource in a global resource quota",
-	}, []string{"quota", "resource", "resourcequotaindex"})
+	ResourcePoolUsage = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Name: metricsPrefix + "pool_resource_usage",
+		Help: "Current resource usage for a given resource in a resource pool",
+	}, []string{"pool", "resource"})
 
-	GlobalResourceLimit = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Name: metricsPrefix + "global_resource_limit",
-		Help: "Current resource limit for a given resource in a global resource quota",
-	}, []string{"quota", "resource", "resourcequotaindex"})
+	ResourcePoolLimit = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Name: metricsPrefix + "pool_resource_limit",
+		Help: "Current resource limit for a given resource in a resource pool",
+	}, []string{"pool", "resource"})
+
+	ResourcePoolQueueSize = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Name: metricsPrefix + "pool_queue_size",
+		Help: "Amount of items waiting in queue for a resource pool",
+	}, []string{"pool", "resource"})
 )
 
 func init() {

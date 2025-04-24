@@ -1,5 +1,20 @@
+---
 apiVersion: capsule.clastix.io/v1beta2
-kind: GlobalResourceQuota
+kind: ResourcePool
+metadata:
+  name: sampler-2
+spec:
+  selectors:
+  - matchLabels:
+      capsule.clastix.io/tenant: solar
+  - matchLabels:
+      capsule.clastix.io/tenant: wind
+  quota:
+    hard:
+      count/pods: "10"
+---
+apiVersion: capsule.clastix.io/v1beta2
+kind: ResourcePool
 metadata:
   name: sampler
 spec:
@@ -7,14 +22,45 @@ spec:
   - matchLabels:
       capsule.clastix.io/tenant: solar
   - matchLabels:
-      capsule.clastix.io/tenant: solar
-  quotas:
-    scheduling:
-      hard:
-        limits.cpu: "2"
-        limits.memory: 2Gi
-        requests.cpu: "2"
-        requests.memory: 2Gi
-    pods:
-      hard:
-        pods: "3"
+      capsule.clastix.io/tenant: wind
+  defaults:
+    enabled: false
+  quota:
+    hard:
+      limits.cpu: "2"
+      limits.memory: 2Gi
+      requests.cpu: "2"
+      requests.memory: 2Gi
+#---
+#apiVersion: capsule.clastix.io/v1beta2
+#kind: ResourcePoolClaim
+#metadata:
+#  name: get-me-cpu
+#  namespace: solar-test
+#spec:
+#  claim:
+#    limits.cpu: "1"
+#    limits.memory: 1Gi
+#    requests.cpu: "1"
+#    requests.memory: 1Gi
+#status:
+#  pool: (sampler UID)
+#  condition:
+#  - type: Allocated
+#    status: "True"
+#    lastTransitionTime: "2025-02-18T17:38:52Z"
+#    reason: Allocated
+#    message: ResourcePoolClaim allocated to ResourcePool
+#
+#  - type: Bound
+#    status: "True"
+#    lastTransitionTime: "2025-02-18T17:38:52Z"
+#    reason: Allocated
+#    message: ResourcePoolClaim allocated to ResourcePool
+#
+#
+#  - type: Queued
+#    status: "True"
+#    lastTransitionTime: "2025-02-18T17:38:52Z"
+#    reason: Allocated
+#    message: ResourcePoolClaim allocated to ResourcePool

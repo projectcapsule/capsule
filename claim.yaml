@@ -1,0 +1,49 @@
+---
+apiVersion: capsule.clastix.io/v1beta2
+kind: ResourcePoolClaim
+metadata:
+  name: get-me-cpu
+  namespace: solar-prod
+spec:
+  pool: sampler
+  claim:
+    limits.cpu: "2"
+    limits.memory: 1Gi
+    requests.cpu: "1"
+    requests.memory: 1Gi
+---
+apiVersion: capsule.clastix.io/v1beta2
+kind: ResourcePoolClaim
+metadata:
+  name: get-me-cpu-2
+  namespace: solar-prod
+spec:
+  pool: sampler
+  claim:
+    limits.cpu: "2"
+    limits.memory: 1Gi
+    requests.cpu: "1"
+    requests.memory: 1Gi
+---
+apiVersion: capsule.clastix.io/v1beta2
+kind: ResourcePoolClaim
+metadata:
+  name: get-me-cpu-3
+  namespace: solar-prod
+spec:
+  pool: sampler
+  claim:
+    limits.memory: 128Mi
+    requests.cpu: "0.1"
+    requests.memory: 256Mi
+#---
+#apiVersion: capsule.clastix.io/v1beta2
+#kind: ResourcePoolClaim
+#metadata:
+#  name: get-me-pods
+#  namespace: solar-prod
+#spec:
+#  pool: sampler
+#  claim:
+#    pods: "1000"
+#

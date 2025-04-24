@@ -52,7 +52,7 @@ resources:
     crdVersion: v1
   domain: clastix.io
   group: capsule
-  kind: GlobalResourceQuota
+  kind: ResourcePool
   path: github.com/projectcapsule/capsule/api/v1beta2
   version: v1beta2
 - api:
@@ -61,7 +61,7 @@ resources:
   controller: true
   domain: clastix.io
   group: capsule
-  kind: ResourceQuotaClaim
+  kind: ResourcePoolClaim
   path: github.com/projectcapsule/capsule/api/v1beta2
   version: v1beta2
 version: "3"

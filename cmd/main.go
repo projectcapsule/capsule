@@ -34,7 +34,7 @@ import (
 	podlabelscontroller "github.com/projectcapsule/capsule/controllers/pod"
 	"github.com/projectcapsule/capsule/controllers/pv"
 	rbaccontroller "github.com/projectcapsule/capsule/controllers/rbac"
-	"github.com/projectcapsule/capsule/controllers/resourcequotapools"
+	"github.com/projectcapsule/capsule/controllers/resourcepools"
 	"github.com/projectcapsule/capsule/controllers/resources"
 	servicelabelscontroller "github.com/projectcapsule/capsule/controllers/servicelabels"
 	tenantcontroller "github.com/projectcapsule/capsule/controllers/tenant"
@@ -50,6 +50,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/webhook/ownerreference"
 	"github.com/projectcapsule/capsule/pkg/webhook/pod"
 	"github.com/projectcapsule/capsule/pkg/webhook/pvc"
+	"github.com/projectcapsule/capsule/pkg/webhook/resourcepool"
 	"github.com/projectcapsule/capsule/pkg/webhook/route"
 	"github.com/projectcapsule/capsule/pkg/webhook/service"
 	"github.com/projectcapsule/capsule/pkg/webhook/tenant"
@@ -232,6 +233,8 @@ func main() {
 		route.Cordoning(tenant.CordoningHandler(cfg), tenant.ResourceCounterHandler(manager.GetClient())),
 		route.Node(utils.InCapsuleGroups(cfg, node.UserMetadataHandler(cfg, kubeVersion))),
 		route.Defaults(defaults.Handler(cfg, kubeVersion)),
+		route.ResourcePoolMutation((resourcepool.PoolMutationHandler(ctrl.Log.WithName("webhooks").WithName("resourcepool")))),
+		route.ResourcePoolValidation((resourcepool.PoolValidationHandler(ctrl.Log.WithName("webhooks").WithName("resourcepool")))),
 	)
 
 	nodeWebhookSupported, _ := utils.NodeWebhookSupported(kubeVersion)
@@ -309,12 +312,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := resourcequotapools.Add(
-		ctrl.Log.WithName("controllers").WithName("ResourceQuotaPools"),
+	if err := resourcepools.Add(
+		ctrl.Log.WithName("controllers").WithName("ResourcePools"),
 		manager,
 		manager.GetEventRecorderFor("pools-ctrl"),
 	); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "resourcequotapools")
+		setupLog.Error(err, "unable to create controller", "controller", "resourcepools")
 		os.Exit(1)
 	}
 

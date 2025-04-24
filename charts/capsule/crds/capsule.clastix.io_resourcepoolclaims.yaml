@@ -4,23 +4,20 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.17.2
-  name: resourcequotaclaims.capsule.clastix.io
+  name: resourcepoolclaims.capsule.clastix.io
 spec:
   group: capsule.clastix.io
   names:
-    kind: ResourceQuotaClaim
-    listKind: ResourceQuotaClaimList
-    plural: resourcequotaclaims
-    singular: resourcequotaclaim
+    kind: ResourcePoolClaim
+    listKind: ResourcePoolClaimList
+    plural: resourcepoolclaims
+    singular: resourcepoolclaim
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
-    - jsonPath: .metadata.creationTimestamp
-      name: Age
-      type: date
-    - description: The Global ResourceQuota being consumed
-      jsonPath: .status.globalQuota.name
-      name: Quota
+    - description: The ResourcePool being claimed from
+      jsonPath: .status.pool.name
+      name: Pool
       type: string
     - description: Condition
       jsonPath: .status.condition.reason
@@ -30,11 +27,13 @@ spec:
       jsonPath: .status.condition.message
       name: Message
       type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
     name: v1beta2
     schema:
       openAPIV3Schema:
-        description: ResourceQuotaClaim is the Schema for the resourcequotaclaims
-          API.
+        description: ResourcePoolClaim is the Schema for the resourcepoolclaims API.
         properties:
           apiVersion:
             description: |-
@@ -54,7 +53,6 @@ spec:
           metadata:
             type: object
           spec:
-            description: ResourceQuotaClaimSpec defines the desired state of ResourceQuotaClaim.
             properties:
               claim:
                 additionalProperties:
@@ -65,10 +63,14 @@ spec:
                   x-kubernetes-int-or-string: true
                 description: Amount which should be claimed for the resourcequota
                 type: object
-              quota:
+                x-kubernetes-validations:
+                - message: Resources are immutable
+                  rule: self == oldSelf
+              pool:
                 description: |-
                   If there's the possability to claim from multiple global Quotas
                   You must be specific about which one you want to claim resources from
+                  Once bound to a ResourcePool, this field is immutable
                 type: string
                 x-kubernetes-validations:
                 - message: Value is immutable
@@ -132,7 +134,7 @@ spec:
                 - status
                 - type
                 type: object
-              globalQuota:
+              pool:
                 description: Reference to the GlobalQuota being claimed from
                 properties:
                   name:
@@ -148,8 +150,6 @@ spec:
                   uid:
                     description: UID of the tracked Tenant to pin point tracking
                     type: string
-                required:
-                - name
                 type: object
             type: object
         type: object

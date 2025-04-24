@@ -757,6 +757,28 @@
                             },
                             "type": "object"
                         },
+                        "resourcePools": {
+                            "properties": {
+                                "failurePolicy": {
+                                    "type": "string"
+                                },
+                                "matchPolicy": {
+                                    "type": "string"
+                                },
+                                "namespaceSelector": {
+                                    "properties": {},
+                                    "type": "object"
+                                },
+                                "objectSelector": {
+                                    "properties": {},
+                                    "type": "object"
+                                },
+                                "reinvocationPolicy": {
+                                    "type": "string"
+                                }
+                            },
+                            "type": "object"
+                        },
                         "services": {
                             "properties": {
                                 "failurePolicy": {

@@ -24,7 +24,7 @@ func (n Name) String() string {
 
 type StatusNameUID struct {
 	// Name
-	Name Name `json:"name"`
+	Name Name `json:"name,omitempty"`
 	// Namespace
 	Namespace Name `json:"namespace,omitempty"`
 	// UID of the tracked Tenant to pin point tracking

@@ -11,29 +11,42 @@ import (
 )
 
 // GlobalResourceQuotaSpec defines the desired state of GlobalResourceQuota
-type ResourceQuotaPoolSpec struct {
+type ResourcePoolSpec struct {
 	// Selector to match the namespaces that should be managed by the GlobalResourceQuota
-	Selectors []ResourceQuotaPoolSelector `json:"selectors,omitempty"`
-
+	Selectors []ResourcePoolSelector `json:"selectors,omitempty"`
 	// Define resourcequotas for the namespaces
-	Quota corev1.ResourceQuotaSpec `json:"quota,omitempty"`
-
+	Quota corev1.ResourceQuotaSpec `json:"quota"`
 	// The maxmum amount of resources that can be claimed from a resourcequota in a namespace
 	MaximumAllocation corev1.ResourceList `json:"namespaceMaximum,omitempty"`
-
 	// The Defaults given for each namespace, the default is not counted towards the total allocation
 	// When you use claims it's recommended to provision Defaults as the prevent the scheduling of any resources
-	Defaults corev1.ResourceList `json:"namespaceDefaults,omitempty"`
-
+	Defaults *ResourcePoolDefaults `json:"defaults,omitempty"`
+	// Claims are queued whenever they are allocated to a pool. A pool tries to allocate claims in order based on their
+	// creation date.
+	// Disabling this option will cause the resource pool to allocate claims which still fit in the remaining available resources.
+	// This disregards any ordering of the claims.
+	// +kubebuilder:default=false
+	OrderedQueue bool `json:"orderedQueue,omitempty"`
 	// If force is enabled, resources can be removed, even when they are claimed. The claims will be updated accordingly
 	Force bool `json:"force,omitempty"`
 }
 
-type ResourceQuotaPoolSelector struct {
+type ResourcePoolDefaults struct {
+	// Enable Distribution of Defaults for each namespace
+	// This allocates the default resources to each resourcequota responsible for a namespace.
+	// The Defaults serve as a base for the resource allocation, and are not counted towards the total allocation
+	// +kubebuilder:default=true
+	Enabled bool `json:"enabled,omitempty"`
+	// The Defaults given for each namespace, the default is not counted towards the total allocation
+	// When you use claims it's recommended to provision Defaults as the prevent the scheduling of any resources
+	Resources corev1.ResourceList `json:"defaults,omitempty"`
+}
+
+type ResourcePoolSelector struct {
 	// Only considers namespaces which are part of a tenant, other namespaces which might match
 	// the label, but do not have a tenant, are ignored.
-	// +kubebuilder:default=true
-	MustTenantNamespace bool `json:"tenant,omitempty"`
+	// +kubebuilder:default=false
+	MustTenantNamespace bool `json:"tenantNamespace,omitempty"`
 
 	// Selector to match the namespaces that should be managed by the GlobalResourceQuota
 	api.NamespaceSelector `json:",inline"`
@@ -41,29 +54,27 @@ type ResourceQuotaPoolSelector struct {
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:scope=Cluster,shortName=globalquota
-// +kubebuilder:printcolumn:name="Active",type="boolean",JSONPath=".status.active",description="Active status of the GlobalResourceQuota"
+// +kubebuilder:resource:scope=Cluster,shortName=quotapool
 // +kubebuilder:printcolumn:name="Namespaces",type="integer",JSONPath=".status.size",description="The total amount of Namespaces spanned across"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp",description="Age"
 
-// GlobalResourceQuota is the Schema for the globalresourcequotas API
-type ResourceQuotaPool struct {
+type ResourcePool struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   ResourceQuotaPoolSpec   `json:"spec,omitempty"`
-	Status ResourceQuotaPoolStatus `json:"status,omitempty"`
+	Spec   ResourcePoolSpec   `json:"spec,omitempty"`
+	Status ResourcePoolStatus `json:"status,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 
 // GlobalResourceQuotaList contains a list of GlobalResourceQuota
-type ResourceQuotaPoolList struct {
+type ResourcePoolList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []ResourceQuotaPool `json:"items"`
+	Items           []ResourcePool `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&ResourceQuotaPool{}, &ResourceQuotaPoolList{})
+	SchemeBuilder.Register(&ResourcePool{}, &ResourcePoolList{})
 }

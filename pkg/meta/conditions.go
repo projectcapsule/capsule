@@ -13,11 +13,12 @@ const (
 	ReadyCondition    string = "Ready"
 	NotReadyCondition string = "NotReady"
 
-	// SucceededReason indicates a condition or event observed a success (Claim successful)
-	SucceededReason string = "Claimed"
+	// BoundReason indicates a condition or event observed a success (Claim successful)
+	BoundReason string = "Bound"
 
 	// FailedReason indicates a condition or event observed a failure (Claim Rejected).
 	FailedReason string = "Rejected"
+	QueuedReason string = "Queued"
 
 	// ProgressingReason indicates a condition or event observed progression, for example when the reconciliation of a
 	// resource or an action has started.
@@ -31,8 +32,6 @@ func NewReadyCondition(obj client.Object) metav1.Condition {
 		Type:               ReadyCondition,
 		Status:             metav1.ConditionTrue,
 		ObservedGeneration: obj.GetGeneration(),
-		Reason:             SucceededReason,
-		Message:            "Claimed Resources",
 		LastTransitionTime: metav1.Now(),
 	}
 }
@@ -44,6 +43,28 @@ func NewNotReadyCondition(obj client.Object, msg string) metav1.Condition {
 		ObservedGeneration: obj.GetGeneration(),
 		Reason:             FailedReason,
 		Message:            msg,
+		LastTransitionTime: metav1.Now(),
+	}
+}
+
+func NewQueuedReasonCondition(obj client.Object) metav1.Condition {
+	return metav1.Condition{
+		Type:               NotReadyCondition,
+		Status:             metav1.ConditionTrue,
+		Reason:             QueuedReason,
+		Message:            "Queued for allocation",
+		ObservedGeneration: obj.GetGeneration(),
+		LastTransitionTime: metav1.Now(),
+	}
+}
+
+func NewReconcilingReasonCondition(obj client.Object) metav1.Condition {
+	return metav1.Condition{
+		Type:               NotReadyCondition,
+		Status:             metav1.ConditionUnknown,
+		Reason:             ProgressingReason,
+		Message:            "Reconciling",
+		ObservedGeneration: obj.GetGeneration(),
 		LastTransitionTime: metav1.Now(),
 	}
 }

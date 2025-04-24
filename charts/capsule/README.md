@@ -224,6 +224,11 @@ Here the values you can override:
 | webhooks.hooks.quotas.failurePolicy | string | `"Fail"` |  |
 | webhooks.hooks.quotas.namespaceSelector.matchExpressions[0].key | string | `"capsule.clastix.io/tenant"` |  |
 | webhooks.hooks.quotas.namespaceSelector.matchExpressions[0].operator | string | `"Exists"` |  |
+| webhooks.hooks.resourcePools.failurePolicy | string | `"Fail"` |  |
+| webhooks.hooks.resourcePools.matchPolicy | string | `"Equivalent"` |  |
+| webhooks.hooks.resourcePools.namespaceSelector | object | `{}` |  |
+| webhooks.hooks.resourcePools.objectSelector | object | `{}` |  |
+| webhooks.hooks.resourcePools.reinvocationPolicy | string | `"Never"` |  |
 | webhooks.hooks.services.failurePolicy | string | `"Fail"` |  |
 | webhooks.hooks.services.namespaceSelector.matchExpressions[0].key | string | `"capsule.clastix.io/tenant"` |  |
 | webhooks.hooks.services.namespaceSelector.matchExpressions[0].operator | string | `"Exists"` |  |

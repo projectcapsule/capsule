@@ -1,4 +1,4 @@
-package resourcequotapool
+package resourcepool
 
 import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -22,10 +22,16 @@ func (o NamespacesReference) Field() string {
 //nolint:forcetypeassert
 func (o NamespacesReference) Func() client.IndexerFunc {
 	return func(object client.Object) []string {
-		grq, ok := object.(*capsulev1beta2.ResourceQuotaPool)
+		grq, ok := object.(*capsulev1beta2.ResourcePool)
 		if !ok {
 			return nil
 		}
-		return grq.Status.Namespaces
+
+		namespaces := make([]string, 0, len(grq.Status.Claims))
+		for ns := range grq.Status.Claims {
+			namespaces = append(namespaces, ns)
+		}
+
+		return namespaces
 	}
 }
