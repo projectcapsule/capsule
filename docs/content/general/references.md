@@ -4,8 +4,8 @@ Reference document for Capsule Operator configuration
 
 ## Custom Resource Definition
 
-Capsule operator uses a Custom Resources Definition (CRD) for _Tenants_. 
-Tenants are cluster wide resources, so you need cluster level permissions to work with tenants. 
+Capsule operator uses a Custom Resources Definition (CRD) for _Tenants_.
+Tenants are cluster wide resources, so you need cluster level permissions to work with tenants.
 You can learn about tenant CRDs in the following [section](./crds-apis)
 
 ## Capsule Configuration
@@ -39,7 +39,7 @@ Option | Description                                                            
 `.metadata.annotations.capsule.clastix.io/validating-webhook-configuration-name` | Set the ValidatingWebhookConfiguration name                                  | `validating-webhook-configuration-name`
 
 Upon installation using Kustomize or Helm, a `capsule-default` resource will be created.
-The reference to this configuration is managed by the CLI flag `--configuration-name`.  
+The reference to this configuration is managed by the CLI flag `--configuration-name`.
 
 ## Capsule Permissions
 

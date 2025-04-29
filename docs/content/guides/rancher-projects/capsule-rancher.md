@@ -203,5 +203,3 @@ spec:
 ## Cluster-wide resources and Rancher Shell interface
 
 For using the Rancher Shell and cluster-wide resources as tenant user, please follow [this guide](./capsule-proxy-rancher.md).
-
-

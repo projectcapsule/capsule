@@ -24,7 +24,7 @@ A minor bump has been requested due to some missing enums in the Tenant resource
 Using the `kubectl` or Helm, scale down the Capsule controller manager: this is required to avoid the old Capsule version from processing objects that aren't yet installed as a CRD.
 
 ```
-helm upgrade -n capsule-system capsule --set "replicaCount=0" 
+helm upgrade -n capsule-system capsule --set "replicaCount=0"
 ```
 
 ## Patch the Tenant custom resource definition
@@ -71,7 +71,7 @@ This will start the Operator with the latest changes, and perform the required s
 Using the `kubectl` or Helm, scale down the Capsule controller manager: this is required to avoid the old Capsule version from processing objects that aren't yet installed as a CRD.
 
 ```
-helm upgrade -n capsule-system capsule --set "replicaCount=0" 
+helm upgrade -n capsule-system capsule --set "replicaCount=0"
 ```
 
 > Ensure that all the Pods have been removed correctly.
@@ -112,7 +112,7 @@ kubectl apply -f https://raw.githubusercontent.com/clastix/capsule/v0.2.1/charts
 >
 > ```bash
 > CUSTOM_NS="tenancy-operations"
-> 
+>
 > for CR in capsuleconfigurations.capsule.clastix.io globaltenantresources.capsule.clastix.io tenantresources.capsule.clastix.io tenants.capsule.clastix.io; do
 >   kubectl patch crd capsuleconfigurations.capsule.clastix.io --type='json' -p=" [{'op': 'replace', 'path': '/spec/conversion/webhook/clientConfig/service/namespace', 'value': "${CUSTOM_NS}"}]"
 > done
@@ -162,7 +162,7 @@ oil    3                 0                 alice        User         {"kubernete
 You should see all the previous Tenant resources converted in the new format and structure.
 
 ```
-$: kubectl get tenants.v1beta2.capsule.clastix.io 
+$: kubectl get tenants.v1beta2.capsule.clastix.io
 NAME   STATE    NAMESPACE QUOTA   NAMESPACE COUNT   NODE SELECTOR                  AGE
 oil    Active   3                 0                 {"kubernetes.io/os":"linux"}   3m38s
 ```
@@ -180,7 +180,7 @@ oil    Active   3                 0                 {"kubernetes.io/os":"linux"}
 If you're using Helm as package manager, all the Operator resources such as Deployment, Service, Role Binding, etc. must be deleted.
 
 ```
-helm uninstall -n capsule-system capsule 
+helm uninstall -n capsule-system capsule
 ```
 
 Ensure that everything has been removed correctly, especially the Secret resources.
@@ -233,7 +233,7 @@ oil    3                 0                 alice        User         {"kubernete
 You should see all the previous Tenant resources converted into the new format and structure.
 
 ```
-$: kubectl get tenants.v1beta1.capsule.clastix.io 
+$: kubectl get tenants.v1beta1.capsule.clastix.io
 NAME   STATE    NAMESPACE QUOTA   NAMESPACE COUNT   NODE SELECTOR                  AGE
 oil    Active   3                 0                 {"kubernetes.io/os":"linux"}   3m38s
 ```

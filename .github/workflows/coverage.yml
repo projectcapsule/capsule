@@ -34,7 +34,7 @@ jobs:
         with:
           args: '-no-fail -fmt sarif -out gosec.sarif ./...'
       - name: Upload SARIF file
-        uses: github/codeql-action/upload-sarif@d26c46acea4065b13fc57703621e0a7c8b9e836b
+        uses: github/codeql-action/upload-sarif@ed51cb5abd90d0e898e492d5e3f24423da71c2fb
         with:
           sarif_file: gosec.sarif
   unit_tests:
@@ -55,7 +55,7 @@ jobs:
           value: ${{ secrets.CODECOV_TOKEN }}
       - name: Upload Report to Codecov
         if: ${{ steps.checksecret.outputs.result == 'true' }}
-        uses: codecov/codecov-action@0565863a31f2c772f9f0395002a31e3f06189574 # v5.4.0
+        uses: codecov/codecov-action@ad3126e916f78f00edff4ed0317cf185271ccc2d # v5.4.2
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           slug: projectcapsule/capsule

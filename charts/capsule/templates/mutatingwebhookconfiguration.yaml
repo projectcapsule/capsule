@@ -31,7 +31,7 @@ webhooks:
     - pods
     scope: "Namespaced"
   namespaceSelector:
-  {{- toYaml .namespaceSelector | nindent 4}} 
+  {{- toYaml .namespaceSelector | nindent 4}}
   sideEffects: None
   timeoutSeconds: {{ $.Values.webhooks.mutatingWebhooksTimeoutSeconds }}
 {{- end }}
@@ -53,11 +53,11 @@ webhooks:
     - persistentvolumeclaims
     scope: "Namespaced"
   namespaceSelector:
-  {{- toYaml .namespaceSelector | nindent 4}}  
+  {{- toYaml .namespaceSelector | nindent 4}}
   sideEffects: None
   timeoutSeconds: {{ $.Values.webhooks.mutatingWebhooksTimeoutSeconds }}
 {{- end }}
-{{- with .Values.webhooks.hooks.defaults.ingress }}  
+{{- with .Values.webhooks.hooks.defaults.ingress }}
 - admissionReviewVersions:
   - v1
   clientConfig:
@@ -81,7 +81,7 @@ webhooks:
   sideEffects: None
   timeoutSeconds: {{ $.Values.webhooks.mutatingWebhooksTimeoutSeconds }}
 {{- end }}
-{{- with .Values.webhooks.hooks.namespaceOwnerReference }} 
+{{- with .Values.webhooks.hooks.namespaceOwnerReference }}
 - admissionReviewVersions:
     - v1
     - v1beta1

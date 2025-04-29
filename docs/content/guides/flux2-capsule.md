@@ -258,7 +258,7 @@ patches:
       name: "(kustomize-controller|helm-controller)"
 ```
 
-This way tenants can't make Flux apply their Reconciliation resources with Flux's privileged Service Accounts, by not specifying a `spec.ServiceAccountName` on them. 
+This way tenants can't make Flux apply their Reconciliation resources with Flux's privileged Service Accounts, by not specifying a `spec.ServiceAccountName` on them.
 
 At the same time at resource-level in privileged space we still can specify a privileged ServiceAccount, and its reconciliation requests won't pass through Capsule validation:
 
@@ -279,7 +279,7 @@ spec:
 #### Kubeconfig
 
 We also need to specify on Tenant's Reconciliation resources, the `Secret` with **`kubeconfig`** configured to use the **Capsule Proxy** as the API server in order to provide the Tenant GitOps Reconciler the ability to list cluster-level resources.
-The `kubeconfig` would specify also as the token the Tenant GitOps Reconciler SA token, 
+The `kubeconfig` would specify also as the token the Tenant GitOps Reconciler SA token,
 
 For example:
 
@@ -293,7 +293,7 @@ spec:
   kubeConfig:
     secretRef:
       name: gitops-reconciler-kubeconfig
-      key: kubeconfig 
+      key: kubeconfig
   sourceRef:
     kind: GitRepository
     name: my-tenant
@@ -320,14 +320,14 @@ patches:
   - patch: |
       - op: add
         path: /spec/template/spec/containers/0/args/0
-        value: --no-cross-namespace-refs=true      
+        value: --no-cross-namespace-refs=true
     target:
       kind: Deployment
       name: "(kustomize-controller|helm-controller|notification-controller|image-reflector-controller|image-automation-controller)"
   - patch: |
       - op: add
         path: /spec/template/spec/containers/0/args/-
-        value: --no-remote-bases=true      
+        value: --no-remote-bases=true
     target:
       kind: Deployment
       name: "kustomize-controller"
@@ -341,7 +341,7 @@ patches:
   - patch: |
       - op: add
         path: /spec/serviceAccountName
-        value: kustomize-controller      
+        value: kustomize-controller
     target:
       kind: Kustomization
       name: "flux-system"
@@ -435,7 +435,7 @@ this is the required set of resources to setup a Tenant:
   ```
 - `Secret` with `kubeconfig` for the Tenant GitOps Reconciler with Capsule Proxy as `kubeconfig.server` and the SA token as `kubeconfig.token`.
   > This is supported only with Service Account static tokens.
-- Flux Source and Reconciliation resources that refer to Tenant desired state. This typically points to a specific path inside a dedicated Git repository, where tenant's root configuration reside: 
+- Flux Source and Reconciliation resources that refer to Tenant desired state. This typically points to a specific path inside a dedicated Git repository, where tenant's root configuration reside:
   ```yaml
   apiVersion: source.toolkit.fluxcd.io/v1beta2
   kind: GitRepository
@@ -497,7 +497,7 @@ spec:
   kubeConfig:
     secretRef:
       name: gitops-reconciler-kubeconfig
-      key: kubeconfig 
+      key: kubeconfig
   sourceRef:
     kind: GitRepository
     name: my-tenant
@@ -539,7 +539,7 @@ Furthermore, let's see if there are other vulnerabilities we are able to protect
 
 ##### Impersonate privileged SA
 
-Then, what if a tenant tries to escalate by using one of the Flux controllers privileged `ServiceAccount`s? 
+Then, what if a tenant tries to escalate by using one of the Flux controllers privileged `ServiceAccount`s?
 
 As `spec.ServiceAccountName` for Reconciliation resource cannot cross-namespace reference Service Accounts, tenants are able to let Flux apply his own resources only with ServiceAccounts that reside in his own Namespaces. Which is, Namespace of the ServiceAccount and Namespace of the Reconciliation resource must match.
 
@@ -558,13 +558,13 @@ Now let's go on with the practical part.
 He could try to use privileged `ServiceAccount` by changing ownership of a privileged Namespace so that he could create Reconciliation resource there and using the privileged SA.
 This is not permitted as he can't patch Namespaces which have not been created by him. Capsule request validation would not pass.
 
-For other protections against threats in this multi-tenancy scenario please see the Capsule [Multi-Tenancy Benchmark](/docs/general/mtb). 
+For other protections against threats in this multi-tenancy scenario please see the Capsule [Multi-Tenancy Benchmark](/docs/general/mtb).
 
 ## References
 - https://fluxcd.io/docs/installation/#multi-tenancy-lockdown
 - https://fluxcd.io/blog/2022/05/may-2022-security-announcement/
 - https://github.com/clastix/capsule-proxy/issues/218
-- https://github.com/projectcapsule/capsule/issues/528 
+- https://github.com/projectcapsule/capsule/issues/528
 - https://github.com/clastix/flux2-capsule-multi-tenancy
 - https://github.com/fluxcd/flux2-multi-tenancy
 - https://fluxcd.io/docs/guides/repository-structure/

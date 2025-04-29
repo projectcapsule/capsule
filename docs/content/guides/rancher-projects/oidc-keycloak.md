@@ -37,4 +37,3 @@ Configure an OIDC authentication provider, with Client with issuer, return URLs 
 1. In Rancher as an administrator, set the user  custom role with `get` of Cluster.
 1. In Rancher as an administrator, add the Rancher user ID of the just-logged in user as Owner of a `Tenant`.
 1. (optional) configure `proxySettings` for the `Tenant` to enable tenant users to access cluster-wide resources.
-

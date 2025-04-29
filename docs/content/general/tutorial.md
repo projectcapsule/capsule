@@ -7,7 +7,7 @@ Capsule is a framework to implement multi-tenant and policy-driven scenarios in 
 * ***Bill***: the cluster administrator from the operations department of _Acme Corp_.
 
 * ***Alice***: the project leader in the _Oil_ & _Gas_ departments. She is responsible for a team made of different job responsibilities: e.g. developers, administrators, SRE engineers, etc.
-  
+
 * ***Joe***: works as a lead developer of a distributed team in Alice's organization.
 
 * ***Bob***: is the head of engineering for the _Water_ department, the main and historical line of business at _Acme Corp_.
@@ -54,7 +54,7 @@ Alice can log in using her credentials and check if she can create a namespace
 ```
 kubectl auth can-i create namespaces
 yes
-``` 
+```
 
 or even delete the namespace
 
@@ -186,7 +186,7 @@ kubectl patch capsuleconfigurations default \
   --type=merge
 ```
 
-> Please, pay attention when setting a service account acting as tenant owner. Make sure you're not using the group `system:serviceaccounts` or the group `system:serviceaccounts:{capsule-namespace}` as Capsule group, otherwise you'll create a short-circuit in the Capsule controller, being Capsule itself controlled by a serviceaccount. 
+> Please, pay attention when setting a service account acting as tenant owner. Make sure you're not using the group `system:serviceaccounts` or the group `system:serviceaccounts:{capsule-namespace}` as Capsule group, otherwise you'll create a short-circuit in the Capsule controller, being Capsule itself controlled by a serviceaccount.
 
 ### Roles assigned to Tenant Owners
 
@@ -324,7 +324,7 @@ capsule-oil-3-prometheus-servicemonitors-viewer   ClusterRole/prometheus-service
 ```
 
 ### Assign additional Role Bindings
-The tenant owner acts as admin of tenant namespaces. Other users can operate inside the tenant namespaces with different levels of permissions and authorizations. 
+The tenant owner acts as admin of tenant namespaces. Other users can operate inside the tenant namespaces with different levels of permissions and authorizations.
 
 Assuming the cluster admin creates:
 
@@ -378,7 +378,7 @@ The enforcement of this naming convention is optional and can be controlled by t
 Alice can deploy any resource in any of the namespaces
 
 ```
-kubectl -n oil-development run nginx --image=docker.io/nginx 
+kubectl -n oil-development run nginx --image=docker.io/nginx
 kubectl -n oil-development get pods
 ```
 
@@ -643,7 +643,7 @@ metadata:
 ...
 ```
 
-When the aggregate usage for all namespaces crosses the hard quota, then the native `ResourceQuota` Admission Controller in Kubernetes denies Alice's request to create resources exceeding the quota: 
+When the aggregate usage for all namespaces crosses the hard quota, then the native `ResourceQuota` Admission Controller in Kubernetes denies Alice's request to create resources exceeding the quota:
 
 ```
 kubectl -n oil-development create deployment nginx --image nginx:latest --replicas 10
@@ -662,7 +662,7 @@ nginx-55649fd747-mlhlq   1/1     Running   0          12s
 nginx-55649fd747-t48s5   1/1     Running   0          7s
 ```
 
-and 
+and
 
 ```
 kubectl -n oil-production get pods
@@ -721,7 +721,7 @@ spec:
 ```
 
 Limits will be inherited by all the namespaces created by Alice. In our case, when Alice creates the namespace `oil-production`, Capsule creates the following:
- 
+
 ```yaml
 apiVersion: v1
 kind: LimitRange
@@ -791,7 +791,7 @@ no
 
 ## Assign Pod Priority Classes
 
-Pods can have priority. Priority indicates the importance of a Pod relative to other Pods. If a Pod cannot be scheduled, the scheduler tries to preempt (evict) lower priority Pods to make scheduling of the pending Pod possible. See [Kubernetes documentation](https://kubernetes.io/docs/concepts/scheduling-eviction/pod-priority-preemption/). 
+Pods can have priority. Priority indicates the importance of a Pod relative to other Pods. If a Pod cannot be scheduled, the scheduler tries to preempt (evict) lower priority Pods to make scheduling of the pending Pod possible. See [Kubernetes documentation](https://kubernetes.io/docs/concepts/scheduling-eviction/pod-priority-preemption/).
 
 In a multi-tenant cluster, not all users can be trusted, as a tenant owner could create Pods at the highest possible priorities, causing other Pods to be evicted/not get scheduled.
 
@@ -819,7 +819,7 @@ EOF
 With the said Tenant specification, Alice can create a Pod resource if `spec.priorityClassName` equals to:
 
 - `custom`
-- `tier-gold`, `tier-silver`, or `tier-bronze`, since these compile the allowed regex. 
+- `tier-gold`, `tier-silver`, or `tier-bronze`, since these compile the allowed regex.
 - Any PriorityClass which has the label `env` with the value `production`
 
 If a Pod is going to use a non-allowed _Priority Class_, it will be rejected by the Validation Webhook enforcing it.
@@ -872,7 +872,7 @@ If a Pod has no value for `spec.priorityClassName`, the default value for Priori
 ## Assign Pod Runtime Classes
 
 Pods can be assigned different runtime classes. With the assigned runtime you can control Container Runtime Interface (CRI) is used for each pod.
-See [Kubernetes documentation](https://kubernetes.io/docs/concepts/containers/runtime-class/) for more information. 
+See [Kubernetes documentation](https://kubernetes.io/docs/concepts/containers/runtime-class/) for more information.
 
 To prevent misuses of Pod Runtime Classes, Bill, the cluster admin, can enforce the allowed Pod Runtime Class at tenant level:
 
@@ -968,7 +968,7 @@ no
 ## Assign Ingress Classes
 An Ingress Controller is used in Kubernetes to publish services and applications outside of the cluster. An Ingress Controller can be provisioned to accept only Ingresses with a given Ingress Class.
 
-Bill can assign a set of dedicated Ingress Classes to the `oil` tenant to force the applications in the `oil` tenant to be published only by the assigned Ingress Controller: 
+Bill can assign a set of dedicated Ingress Classes to the `oil` tenant to force the applications in the `oil` tenant to be published only by the assigned Ingress Controller:
 
 ```yaml
 kubectl apply -f - << EOF
@@ -1071,14 +1071,14 @@ EOF
 If an Ingress has no value for `spec.ingressClassName` or `metadata.annotations."kubernetes.io/ingress.class"`, the `tenant-default` IngressClass is automatically applied to the Ingress resource.
 
 > This feature allows specifying a custom default value on a Tenant basis, bypassing the global cluster default (with the annotation `metadata.annotations.ingressclass.kubernetes.io/is-default-class=true`) that acts only at the cluster level.
-> 
+>
 > More information: [Default IngressClass](https://kubernetes.io/docs/concepts/services-networking/ingress/#default-ingress-class)
 
 **Note**: This feature is offered only by API type `IngressClass` in group `networking.k8s.io` version `v1`.
 However, resource `Ingress` is supported in `networking.k8s.io/v1` and `networking.k8s.io/v1beta1`
 
 ## Assign Ingress Hostnames
-Bill can control ingress hostnames in the `oil` tenant to force the applications to be published only using the given hostname or set of hostnames: 
+Bill can control ingress hostnames in the `oil` tenant to force the applications to be published only using the given hostname or set of hostnames:
 
 ```yaml
 kubectl apply -f - << EOF
@@ -1316,7 +1316,7 @@ To meet this requirement, Bill needs to define network policies that deny pods b
 > 1. providing a restricted role rather than the default `admin` one
 > 2. using Calico's `GlobalNetworkPolicy`, or Cilium's `CiliumClusterwideNetworkPolicy` which are defined at the cluster-level, thus creating an order of packet filtering.
 
-Also, Bill can make sure pods belonging to a tenant namespace cannot access other network infrastructures like cluster nodes, load balancers, and virtual machines running other services.  
+Also, Bill can make sure pods belonging to a tenant namespace cannot access other network infrastructures like cluster nodes, load balancers, and virtual machines running other services.
 
 Bill can set network policies in the tenant manifest, according to the requirements:
 
@@ -1340,7 +1340,7 @@ spec:
         - ipBlock:
             cidr: 0.0.0.0/0
             except:
-              - 192.168.0.0/16 
+              - 192.168.0.0/16
       ingress:
       - from:
         - namespaceSelector:
@@ -1417,7 +1417,7 @@ Bill is a cluster admin providing a Container as a Service platform using shared
 
 Alice, a Tenant Owner, can start container images using private images: according to the Kubernetes architecture, the `kubelet` will download the layers on its cache.
 
-Bob, an attacker, could try to schedule a Pod on the same node where Alice is running her Pods backed by private images: they could start new Pods using `ImagePullPolicy=IfNotPresent` and be able to start them, even without required authentication since the image is cached on the node. 
+Bob, an attacker, could try to schedule a Pod on the same node where Alice is running her Pods backed by private images: they could start new Pods using `ImagePullPolicy=IfNotPresent` and be able to start them, even without required authentication since the image is cached on the node.
 
 To avoid this kind of attack, Bill, the cluster admin, can force Alice, the tenant owner, to start her Pods using only the allowed values for `ImagePullPolicy`, enforcing the `kubelet` to check the authorization first.
 
@@ -1605,7 +1605,7 @@ spec:
 ## Assign Additional Metadata
 The cluster admin can _"taint"_ the namespaces created by tenant owners with additional metadata as labels and annotations. There is no specific semantic assigned to these labels and annotations: they will be assigned to the namespaces in the tenant as they are created. This can help the cluster admin to implement specific use cases as, for example, leave only a given tenant to be backed up by a backup service.
 
-Assigns additional labels and annotations to all namespaces created in the `oil` tenant: 
+Assigns additional labels and annotations to all namespaces created in the `oil` tenant:
 
 ```yaml
 kubectl apply -f - << EOF
@@ -1655,7 +1655,7 @@ status:
 
 Additionally, the cluster admin can _"taint"_ the services created by the tenant owners with additional metadata as labels and annotations.
 
-Assigns additional labels and annotations to all services created in the `oil` tenant: 
+Assigns additional labels and annotations to all services created in the `oil` tenant:
 
 ```yaml
 kubectl apply -f - << EOF
@@ -1687,11 +1687,11 @@ metadata:
 spec:
   ports:
   - protocol: TCP
-    port: 80 
-    targetPort: 8080 
+    port: 80
+    targetPort: 8080
   selector:
     run: nginx
-  type: ClusterIP 
+  type: ClusterIP
 ```
 
 ## Cordon a Tenant
@@ -1849,7 +1849,7 @@ Doing this, Alice will not be able to use `water.acme.com`, being the tenant own
 
 ## Deny labels and annotations on Namespaces
 
-By default, capsule allows tenant owners to add and modify any label or annotation on their namespaces. 
+By default, capsule allows tenant owners to add and modify any label or annotation on their namespaces.
 
 But there are some scenarios, when tenant owners should not have an ability to add or modify specific labels or annotations (for example, this can be labels used in [Kubernetes network policies](https://kubernetes.io/docs/concepts/services-networking/network-policies/) which are added by cluster administrator).
 
@@ -1867,7 +1867,7 @@ spec:
       denied:
           - foo.acme.net
           - bar.acme.net
-      deniedRegex: .*.acme.net 
+      deniedRegex: .*.acme.net
     forbiddenLabels:
       denied:
           - foo.acme.net
@@ -1883,7 +1883,7 @@ EOF
 
 When using `capsule` together with [capsule-proxy](https://github.com/clastix/capsule-proxy), Bill can allow Tenant Owners to [modify Nodes](/docs/proxy/overview).
 
-By default, it will allow tenant owners to add and modify any label or annotation on their nodes. 
+By default, it will allow tenant owners to add and modify any label or annotation on their nodes.
 
 But there are some scenarios, when tenant owners should not have an ability to add or modify specific labels or annotations (there are some types of labels or annotations, which must be protected from modifications - for example, which are set by `cloud-providers` or `autoscalers`).
 
@@ -1894,7 +1894,7 @@ kubectl apply -f - << EOF
 apiVersion: capsule.clastix.io/v1beta2
 kind: CapsuleConfiguration
 metadata:
-  name: default 
+  name: default
 spec:
   nodeMetadata:
     forbiddenAnnotations:
@@ -1923,7 +1923,7 @@ EOF
 
 ## Protecting tenants from deletion
 
-Sometimes it is important to protect business critical tenants from accidental deletion. 
+Sometimes it is important to protect business critical tenants from accidental deletion.
 This can be achieved by toggling `preventDeletion` specification key on the tenant:
 
 ```yaml

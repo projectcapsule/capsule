@@ -10,7 +10,7 @@ You can use the [Capsule Helm Chart](https://github.com/projectcapsule/capsule/b
 
 ### Install with Helm Chart
 
-Please, refer to the instructions reported in the Capsule Helm Chart [README](https://github.com/projectcapsule/capsule/blob/master/charts/capsule/README.md). 
+Please, refer to the instructions reported in the Capsule Helm Chart [README](https://github.com/projectcapsule/capsule/blob/master/charts/capsule/README.md).
 
 ## Create your first Tenant
 
@@ -90,7 +90,7 @@ $ kubectl create namespace oil-development
 And operate with fully admin permissions:
 
 ```
-$ kubectl -n oil-development run nginx --image=docker.io/nginx 
+$ kubectl -n oil-development run nginx --image=docker.io/nginx
 $ kubectl -n oil-development get pods
 ```
 

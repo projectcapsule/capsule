@@ -46,13 +46,13 @@ echo `date`": INFO: Wait then Kind cluster be ready. Wait only 30 seconds"
 counter=0
 while true
 do
-    if [ $counter == 30 ]; then 
+    if [ $counter == 30 ]; then
         echo `date`": ERROR: Kind cluster not ready for too long"
         error_action
     fi
 
     kubectl get nodes | grep " Ready " &>/dev/null
-    if [ $? == 0 ]; then 
+    if [ $? == 0 ]; then
         break
     fi
 
@@ -75,13 +75,13 @@ echo `date`": INFO: Wait then capsule POD be ready. Wait only 30 seconds"
 counter=0
 while true
 do
-    if [ $counter == 30 ]; then 
+    if [ $counter == 30 ]; then
         echo `date`": ERROR: Kind cluster not ready for too long"
         error_action
     fi
 
     kubectl get pod -n capsule-system | grep " Running " &>/dev/null
-    if [ $? == 0 ]; then 
+    if [ $? == 0 ]; then
         break
     fi
 

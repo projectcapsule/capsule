@@ -32,7 +32,7 @@ $ curl -k -s https://${OIDC_ISSUER}/protocol/openid-connect/token \
 The result will include an `ACCESS_TOKEN`, a `REFRESH_TOKEN`, and an `ID_TOKEN`. The access-token can generally be disregarded for Kubernetes. It would be used if the identity provider was managing roles and permissions for the users but that is done in Kubernetes itself with RBAC. The id-token is short lived while the refresh-token has longer expiration. The refresh-token is used to fetch a new id-token when the id-token expires.
 
 ```json
-{  
+{
    "access_token":"ACCESS_TOKEN",
    "refresh_token":"REFRESH_TOKEN",
    "id_token": "ID_TOKEN",

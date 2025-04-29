@@ -21,4 +21,4 @@ Please, refer to the [maintainers file](https://github.com/projectcapsule/capsul
 
 ## Roadmap Planning
 
-Maintainers will share roadmap and release versions as milestones in GitHub. 
+Maintainers will share roadmap and release versions as milestones in GitHub.

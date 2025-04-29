@@ -24,4 +24,3 @@ With Capsule Proxy users can also access cluster-wide resources, as configured b
 You can read in detail how the integration works and how to configure it, in the following guides.
 - [How to integrate Rancher Projects with Capsule Tenants](./capsule-proxy-rancher.md)
 - [How to enable cluster-wide resources and Rancher shell access](./capsule-proxy-rancher.md).
-

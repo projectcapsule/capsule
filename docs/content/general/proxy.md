@@ -70,7 +70,7 @@ Here how it looks like when exposed through an Ingress Controller:
  kubectl ------>|:443       |--------->|:9001      |-------->|:6443      |
                 +-----------+          +-----------+         +-----------+
                 ingress-controller     capsule-proxy         kube-apiserver
-``` 
+```
 
 ## CLI flags
 
@@ -420,7 +420,7 @@ spec:
         operator: Exists
         values:
           - bronze
-          - silver 
+          - silver
 ```
 
 In the Kubernetes cluster we could have more RuntimeClasses resources, some of them forbidden and non-usable by the Tenant owner.

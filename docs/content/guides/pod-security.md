@@ -188,7 +188,7 @@ spec:
 EOF
 ```
 
-All namespaces created by the tenant owner, will inherit the Pod Security labels: 
+All namespaces created by the tenant owner, will inherit the Pod Security labels:
 
 ```yaml
 apiVersion: v1
