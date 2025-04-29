@@ -107,4 +107,31 @@ webhooks:
   sideEffects: NoneOnDryRun
   timeoutSeconds: {{ $.Values.webhooks.mutatingWebhooksTimeoutSeconds }}
 {{- end }}
+{{- with .Values.webhooks.hooks.namespaceCordoning }}
+- admissionReviewVersions:
+    - v1
+    - v1beta1
+  clientConfig:
+    {{- include "capsule.webhooks.service" (dict "path" "/namespace-cordoning" "ctx" $) | nindent 4 }}
+  failurePolicy: {{ .failurePolicy }}
+  matchPolicy: Equivalent
+  name: cordoning.namespace.projectcapsule.dev
+  namespaceSelector:
+  {{- toYaml .namespaceSelector | nindent 4}}
+  objectSelector: { }
+  reinvocationPolicy: Never
+  rules:
+    - apiGroups:
+        - ""
+      apiVersions:
+        - v1
+      operations:
+        - CREATE
+        - UPDATE
+      resources:
+        - namespaces
+      scope: '*'
+  sideEffects: NoneOnDryRun
+  timeoutSeconds: {{ $.Values.webhooks.mutatingWebhooksTimeoutSeconds }}
+{{- end }}
 {{- end }}

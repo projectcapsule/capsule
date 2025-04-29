@@ -2,6 +2,7 @@ package namespace
 
 import (
 	"context"
+	"fmt"
 	"github.com/projectcapsule/capsule/pkg/configuration"
 	capsulewebhook "github.com/projectcapsule/capsule/pkg/webhook"
 	"k8s.io/client-go/tools/record"
@@ -20,7 +21,8 @@ func CordoningHandler(cfg configuration.Configuration) capsulewebhook.Handler {
 }
 
 func (h *cordoningHandler) OnCreate(client.Client, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
-	return func(context.Context, admission.Request) *admission.Response {
+	fmt.Printf("Cordoning handler in action")
+	return func(ctx context.Context, r admission.Request) *admission.Response {
 		return nil
 	}
 }

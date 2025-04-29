@@ -267,11 +267,19 @@ webhooks:
   hooks:
     namespaceOwnerReference:
       failurePolicy: Fail
+    namespaceCordoning:
+      failurePolicy: Fail
+      namespaceSelector:
+        matchExpressions:
+          - key: capsule.clastix.io/tenant
+            operator: Exists
     cordoning:
       failurePolicy: Fail
       namespaceSelector:
         matchExpressions:
           - key: capsule.clastix.io/tenant
+            operator: Exists
+          - key: projectcapsule.dev/cordoned
             operator: Exists
     ingresses:
       failurePolicy: Fail
