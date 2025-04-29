@@ -75,7 +75,7 @@ func (r *Manager) syncNetworkPolicy(ctx context.Context, tenant *capsulev1beta2.
 			target.SetLabels(labels)
 			target.Spec = spec
 
-			return controllerutil.SetControllerReference(tenant, target, r.Client.Scheme())
+			return controllerutil.SetControllerReference(tenant, target, r.Scheme())
 		})
 
 		r.emitEvent(tenant, target.GetNamespace(), res, fmt.Sprintf("Ensuring NetworkPolicy %s", target.GetName()), err)
