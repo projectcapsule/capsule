@@ -267,6 +267,12 @@ webhooks:
   hooks:
     namespaceOwnerReference:
       failurePolicy: Fail
+    customresources:
+      failurePolicy: Fail
+      namespaceSelector:
+        matchExpressions:
+          - key: capsule.clastix.io/tenant
+            operator: Exists
     namespaceCordoning:
       failurePolicy: Fail
       namespaceSelector:

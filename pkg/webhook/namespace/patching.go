@@ -10,30 +10,30 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
-type cordoningHandler struct {
+type patchingHandler struct {
 	cfg configuration.Configuration
 }
 
-func CordoningHandler(cfg configuration.Configuration) capsulewebhook.Handler {
-	return &cordoningHandler{
+func PatchingHandler(cfg configuration.Configuration) capsulewebhook.Handler {
+	return &patchingHandler{
 		cfg: cfg,
 	}
 }
 
-func (h *cordoningHandler) OnCreate(client.Client, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
+func (h *patchingHandler) OnCreate(client.Client, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
 	fmt.Printf("Cordoning handler in action")
 	return func(ctx context.Context, r admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (h *cordoningHandler) OnUpdate(client.Client, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
+func (h *patchingHandler) OnUpdate(client.Client, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (h *cordoningHandler) OnDelete(client.Client, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
+func (h *patchingHandler) OnDelete(client.Client, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
