@@ -34,6 +34,7 @@ import (
 	podlabelscontroller "github.com/projectcapsule/capsule/controllers/pod"
 	"github.com/projectcapsule/capsule/controllers/pv"
 	rbaccontroller "github.com/projectcapsule/capsule/controllers/rbac"
+	"github.com/projectcapsule/capsule/controllers/resourcequotapools"
 	"github.com/projectcapsule/capsule/controllers/resources"
 	servicelabelscontroller "github.com/projectcapsule/capsule/controllers/servicelabels"
 	tenantcontroller "github.com/projectcapsule/capsule/controllers/tenant"
@@ -305,6 +306,15 @@ func main() {
 
 	if err = (&resources.Namespaced{}).SetupWithManager(manager); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "resources.Namespaced")
+		os.Exit(1)
+	}
+
+	if err := resourcequotapools.Add(
+		ctrl.Log.WithName("controllers").WithName("ResourceQuotaPools"),
+		manager,
+		manager.GetEventRecorderFor("pools-ctrl"),
+	); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "resourcequotapools")
 		os.Exit(1)
 	}
 

@@ -1,0 +1,21 @@
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: busbox
+spec:
+  containers:
+  - name: busybox
+    image: alpine:latest
+    resources:
+      limits:
+        cpu: 0.5
+        memory: 128Mi
+      requests:
+        cpu: 0.25
+        memory: 128Mi
+    command:
+    - sh
+    - -c
+    - |
+      apk add busybox-extras && sleep infinity

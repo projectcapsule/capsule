@@ -221,6 +221,9 @@ Here the values you can override:
 | webhooks.hooks.pods.failurePolicy | string | `"Fail"` |  |
 | webhooks.hooks.pods.namespaceSelector.matchExpressions[0].key | string | `"capsule.clastix.io/tenant"` |  |
 | webhooks.hooks.pods.namespaceSelector.matchExpressions[0].operator | string | `"Exists"` |  |
+| webhooks.hooks.quotas.failurePolicy | string | `"Fail"` |  |
+| webhooks.hooks.quotas.namespaceSelector.matchExpressions[0].key | string | `"capsule.clastix.io/tenant"` |  |
+| webhooks.hooks.quotas.namespaceSelector.matchExpressions[0].operator | string | `"Exists"` |  |
 | webhooks.hooks.services.failurePolicy | string | `"Fail"` |  |
 | webhooks.hooks.services.namespaceSelector.matchExpressions[0].key | string | `"capsule.clastix.io/tenant"` |  |
 | webhooks.hooks.services.namespaceSelector.matchExpressions[0].operator | string | `"Exists"` |  |
