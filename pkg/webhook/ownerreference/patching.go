@@ -153,8 +153,8 @@ func (h *handler) setOwnerRef(ctx context.Context, req admission.Request, client
 
 			return &response
 		}
-		// Tenant owner must adhere to user that asked for NS creation
-		if !utils.IsTenantOwner(tnt.Spec.Owners, req.UserInfo) {
+		// Tenant owner must adhere to user that asked for NS creation or a subject in the Tenant's AdditionalRoleBindings with ActAsTenantOwner
+		if !utils.IsTenantOwner(tnt.Spec.Owners, req.UserInfo) && !utils.IsActAsTenantOwner(tnt.Spec.AdditionalRoleBindings, req.UserInfo) {
 			recorder.Eventf(tnt, corev1.EventTypeWarning, "NonOwnedTenant", "Namespace %s cannot be assigned to the current Tenant", ns.GetName())
 
 			response := admission.Denied("Cannot assign the desired namespace to a non-owned Tenant")
