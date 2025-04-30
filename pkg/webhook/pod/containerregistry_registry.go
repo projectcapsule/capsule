@@ -49,6 +49,13 @@ func (r registry) Tag() string {
 	return res
 }
 
+type Registry interface {
+	Registry() string
+	Repository() string
+	Image() string
+	Tag() string
+}
+
 func NewRegistry(value string) Registry {
 	reg := make(registry)
 	r := regexp.MustCompile(`((?P<registry>[a-zA-Z0-9-._]+(:\d+)?)\/)?(?P<repository>.*\/)?(?P<image>[a-zA-Z0-9-._]+:(?P<tag>[a-zA-Z0-9-._]+))?`)
@@ -61,11 +68,4 @@ func NewRegistry(value string) Registry {
 	}
 
 	return reg
-}
-
-type Registry interface {
-	Registry() string
-	Repository() string
-	Image() string
-	Tag() string
 }

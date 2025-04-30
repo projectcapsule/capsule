@@ -32,9 +32,9 @@ func (r *EndpointSlicesLabelsReconciler) SetupWithManager(ctx context.Context, m
 
 		return nil
 	case r.VersionMajor == 1 && r.VersionMinor < 25:
-		r.abstractServiceLabelsReconciler.obj = &discoveryv1beta1.EndpointSlice{}
+		r.obj = &discoveryv1beta1.EndpointSlice{}
 	default:
-		r.abstractServiceLabelsReconciler.obj = &discoveryv1.EndpointSlice{}
+		r.obj = &discoveryv1.EndpointSlice{}
 	}
 
 	return ctrl.NewControllerManagedBy(mgr).

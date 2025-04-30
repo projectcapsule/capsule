@@ -57,7 +57,7 @@ func (r *patchHandler) OnUpdate(c client.Client, decoder admission.Decoder, reco
 		// Extract Tenant from namespace
 		e := fmt.Sprintf("namespace/%s can not be patched", ns.Name)
 
-		if label, ok := ns.ObjectMeta.Labels[ln]; ok {
+		if label, ok := ns.Labels[ln]; ok {
 			// retrieving the selected Tenant
 			tnt := &capsulev1beta2.Tenant{}
 			if err = c.Get(ctx, types.NamespacedName{Name: label}, tnt); err != nil {

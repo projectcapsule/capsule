@@ -29,6 +29,18 @@ type CapsuleCA struct {
 	key         *rsa.PrivateKey
 }
 
+func NewCertificateAuthorityFromBytes(certBytes, keyBytes []byte) (*CapsuleCA, error) {
+	cert, key, err := GetCertificateWithPrivateKeyFromBytes(certBytes, keyBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	return &CapsuleCA{
+		certificate: cert,
+		key:         key,
+	}, nil
+}
+
 func (c CapsuleCA) CACertificatePem() (b *bytes.Buffer, err error) {
 	var crtBytes []byte
 
@@ -130,18 +142,6 @@ func GetCertificateWithPrivateKeyFromBytes(certBytes, keyBytes []byte) (*x509.Ce
 	}
 
 	return cert, key, nil
-}
-
-func NewCertificateAuthorityFromBytes(certBytes, keyBytes []byte) (*CapsuleCA, error) {
-	cert, key, err := GetCertificateWithPrivateKeyFromBytes(certBytes, keyBytes)
-	if err != nil {
-		return nil, err
-	}
-
-	return &CapsuleCA{
-		certificate: cert,
-		key:         key,
-	}, nil
 }
 
 //nolint:nakedret
