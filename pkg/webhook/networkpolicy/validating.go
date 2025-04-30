@@ -67,7 +67,7 @@ func (r *handler) handle(ctx context.Context, req admission.Request, client clie
 	allowed = true
 
 	np := &networkingv1.NetworkPolicy{}
-	if err = client.Get(ctx, types.NamespacedName{Namespace: req.AdmissionRequest.Namespace, Name: req.AdmissionRequest.Name}, np); err != nil {
+	if err = client.Get(ctx, types.NamespacedName{Namespace: req.Namespace, Name: req.Name}, np); err != nil {
 		return false, err
 	}
 
