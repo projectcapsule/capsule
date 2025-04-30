@@ -145,7 +145,7 @@ func (h *handler) setOwnerRef(ctx context.Context, req admission.Request, client
 	}
 	// If we already had TenantName label on NS -> assign to it
 
-	if label, ok := ns.ObjectMeta.Labels[ln]; ok {
+	if label, ok := ns.Labels[ln]; ok {
 		// retrieving the selected Tenant
 		tnt := &capsulev1beta2.Tenant{}
 		if err = client.Get(ctx, types.NamespacedName{Name: label}, tnt); err != nil {
