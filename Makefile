@@ -46,7 +46,7 @@ all: manager
 # Run tests
 .PHONY: test
 test: test-clean generate manifests test-clean
-	@GO111MODULE=on go test -v ./... -coverprofile coverage.out
+	@GO111MODULE=on go test -v $(shell go list ./... | grep -v "e2e") -coverprofile coverage.out
 
 .PHONY: test-clean
 test-clean: ## Clean tests cache
