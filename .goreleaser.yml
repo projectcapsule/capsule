@@ -28,6 +28,25 @@ builds:
           -X main.GitDirty={{ .Date }}
           -X main.BuildTime={{ .Date }}
           -X main.GitRepo={{ .ProjectName }}
+  - main: .
+    binary: "{{ .ProjectName }}.wasm"
+    env:
+      - CGO_ENABLED=0
+    goos:
+    - js
+    goarch:
+    - wasm
+    flags:
+      - -trimpath
+    mod_timestamp: '{{ .CommitTimestamp }}'
+    ldflags:
+      - >-
+          -X main.Version={{ .Tag }}
+          -X main.GitCommit={{ .Commit }}
+          -X main.GitTag={{ .Tag }}
+          -X main.GitDirty={{ .Date }}
+          -X main.BuildTime={{ .Date }}
+          -X main.GitRepo={{ .ProjectName }}
 release:
   prerelease: auto
   footer: |
