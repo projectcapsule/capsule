@@ -1,6 +1,6 @@
 repos:
 - repo: https://github.com/alessandrojcm/commitlint-pre-commit-hook
-  rev: v9.20.0
+  rev: v9.22.0
   hooks:
   - id: commitlint
     stages: [commit-msg]
@@ -13,7 +13,7 @@ repos:
   - id: end-of-file-fixer
   - id: trailing-whitespace
 - repo: https://github.com/adrienverge/yamllint
-  rev: v1.35.1
+  rev: v1.37.0
   hooks:
   - id: yamllint
     args: [-c=.github/configs/lintconf.yaml]

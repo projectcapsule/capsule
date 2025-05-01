@@ -31,22 +31,6 @@ func ResourceCounterHandler(client client.Client) capsulewebhook.Handler {
 	}
 }
 
-func (r *resourceCounterHandler) getTenantName(ctx context.Context, clt client.Client, req admission.Request) (string, error) {
-	tntList := &capsulev1beta2.TenantList{}
-
-	if err := clt.List(ctx, tntList, client.MatchingFieldsSelector{
-		Selector: fields.OneTermEqualSelector(".status.namespaces", req.Namespace),
-	}); err != nil {
-		return "", err
-	}
-
-	if len(tntList.Items) == 0 {
-		return "", nil
-	}
-
-	return tntList.Items[0].GetName(), nil
-}
-
 func (r *resourceCounterHandler) OnCreate(clt client.Client, _ admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		var tntName string
@@ -149,4 +133,20 @@ func (r *resourceCounterHandler) OnUpdate(client.Client, admission.Decoder, reco
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
+}
+
+func (r *resourceCounterHandler) getTenantName(ctx context.Context, clt client.Client, req admission.Request) (string, error) {
+	tntList := &capsulev1beta2.TenantList{}
+
+	if err := clt.List(ctx, tntList, client.MatchingFieldsSelector{
+		Selector: fields.OneTermEqualSelector(".status.namespaces", req.Namespace),
+	}); err != nil {
+		return "", err
+	}
+
+	if len(tntList.Items) == 0 {
+		return "", nil
+	}
+
+	return tntList.Items[0].GetName(), nil
 }

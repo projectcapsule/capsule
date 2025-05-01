@@ -35,7 +35,7 @@ func (r *freezedHandler) OnCreate(client client.Client, decoder admission.Decode
 			return utils.ErroredResponse(err)
 		}
 
-		for _, objectRef := range ns.ObjectMeta.OwnerReferences {
+		for _, objectRef := range ns.OwnerReferences {
 			if !capsuleutils.IsTenantOwnerReference(objectRef) {
 				continue
 			}

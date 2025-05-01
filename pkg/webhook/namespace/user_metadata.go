@@ -35,7 +35,7 @@ func (r *userMetadataHandler) OnCreate(client client.Client, decoder admission.D
 
 		tnt := &capsulev1beta2.Tenant{}
 
-		for _, objectRef := range ns.ObjectMeta.OwnerReferences {
+		for _, objectRef := range ns.OwnerReferences {
 			if !capsuleutils.IsTenantOwnerReference(objectRef) {
 				continue
 			}
@@ -47,7 +47,7 @@ func (r *userMetadataHandler) OnCreate(client client.Client, decoder admission.D
 		}
 
 		if tnt.Spec.NamespaceOptions != nil {
-			err := api.ValidateForbidden(ns.ObjectMeta.Annotations, tnt.Spec.NamespaceOptions.ForbiddenAnnotations)
+			err := api.ValidateForbidden(ns.Annotations, tnt.Spec.NamespaceOptions.ForbiddenAnnotations)
 			if err != nil {
 				err = errors.Wrap(err, "namespace annotations validation failed")
 				recorder.Eventf(tnt, corev1.EventTypeWarning, api.ForbiddenAnnotationReason, err.Error())
@@ -56,7 +56,7 @@ func (r *userMetadataHandler) OnCreate(client client.Client, decoder admission.D
 				return &response
 			}
 
-			err = api.ValidateForbidden(ns.ObjectMeta.Labels, tnt.Spec.NamespaceOptions.ForbiddenLabels)
+			err = api.ValidateForbidden(ns.Labels, tnt.Spec.NamespaceOptions.ForbiddenLabels)
 			if err != nil {
 				err = errors.Wrap(err, "namespace labels validation failed")
 				recorder.Eventf(tnt, corev1.EventTypeWarning, api.ForbiddenLabelReason, err.Error())
@@ -90,7 +90,7 @@ func (r *userMetadataHandler) OnUpdate(client client.Client, decoder admission.D
 
 		tnt := &capsulev1beta2.Tenant{}
 
-		for _, objectRef := range newNs.ObjectMeta.OwnerReferences {
+		for _, objectRef := range newNs.OwnerReferences {
 			if !capsuleutils.IsTenantOwnerReference(objectRef) {
 				continue
 			}

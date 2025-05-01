@@ -19,7 +19,7 @@ CAPSULE_IMG     ?= $(REGISTRY)/$(IMG_BASE)
 CLUSTER_NAME    ?= capsule
 
 ## Kubernetes Version Support
-KUBERNETES_SUPPORTED_VERSION ?= "v1.31.0"
+KUBERNETES_SUPPORTED_VERSION ?= "v1.33.0"
 
 ## Tool Binaries
 KUBECTL ?= kubectl
@@ -217,7 +217,7 @@ goimports:
 # Linting code as PR is expecting
 .PHONY: golint
 golint: golangci-lint
-	$(GOLANGCI_LINT) run -c .golangci.yml --verbose --fix
+	$(GOLANGCI_LINT) run -c .golangci.yaml --verbose --fix
 
 # Running e2e tests in a KinD instance
 .PHONY: e2e
@@ -325,7 +325,7 @@ helm-doc:
 # -- Tools
 ####################
 CONTROLLER_GEN         := $(LOCALBIN)/controller-gen
-CONTROLLER_GEN_VERSION ?= v0.17.1
+CONTROLLER_GEN_VERSION ?= v0.17.3
 CONTROLLER_GEN_LOOKUP  := kubernetes-sigs/controller-tools
 controller-gen:
 	@test -s $(CONTROLLER_GEN) && $(CONTROLLER_GEN) --version | grep -q $(CONTROLLER_GEN_VERSION) || \
@@ -343,7 +343,7 @@ ct:
 	$(call go-install-tool,$(CT),github.com/$(CT_LOOKUP)/v3/ct@$(CT_VERSION))
 
 KIND         := $(LOCALBIN)/kind
-KIND_VERSION := v0.26.0
+KIND_VERSION := v0.27.0
 KIND_LOOKUP  := kubernetes-sigs/kind
 kind:
 	@test -s $(KIND) && $(KIND) --version | grep -q $(KIND_VERSION) || \
@@ -357,11 +357,11 @@ ko:
 	$(call go-install-tool,$(KO),github.com/$(KO_LOOKUP)@$(KO_VERSION))
 
 GOLANGCI_LINT          := $(LOCALBIN)/golangci-lint
-GOLANGCI_LINT_VERSION  := v1.63.4
+GOLANGCI_LINT_VERSION  := v2.1.5
 GOLANGCI_LINT_LOOKUP   := golangci/golangci-lint
 golangci-lint: ## Download golangci-lint locally if necessary.
 	@test -s $(GOLANGCI_LINT) && $(GOLANGCI_LINT) -h | grep -q $(GOLANGCI_LINT_VERSION) || \
-	$(call go-install-tool,$(GOLANGCI_LINT),github.com/$(GOLANGCI_LINT_LOOKUP)/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION))
+	$(call go-install-tool,$(GOLANGCI_LINT),github.com/$(GOLANGCI_LINT_LOOKUP)/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION))
 
 APIDOCS_GEN         := $(LOCALBIN)/crdoc
 APIDOCS_GEN_VERSION := v0.6.4
@@ -371,7 +371,7 @@ apidocs-gen: ## Download crdoc locally if necessary.
 	$(call go-install-tool,$(APIDOCS_GEN),fybrik.io/crdoc@$(APIDOCS_GEN_VERSION))
 
 HARPOON         := $(LOCALBIN)/harpoon
-HARPOON_VERSION := v0.9.5
+HARPOON_VERSION := v0.9.6
 HARPOON_LOOKUP  := alegrey91/harpoon
 harpoon:
 	@mkdir $(LOCALBIN)

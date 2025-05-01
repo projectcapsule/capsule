@@ -23,7 +23,7 @@
 </p>
 
 <p align="center">
-  <img src="assets/logo/capsule_medium.png" />
+  <img src="assets/logo/capsule.svg" height=560 />
 </p>
 
 ---
@@ -76,7 +76,7 @@ Assign to tenants a dedicated set of compute, storage, and network resources and
 
 # Documentation
 
-Please, check the project [documentation](https://projectcapsule.dev) for the cool things you can do with Capsule.
+Please check the project [documentation](https://projectcapsule.dev) for the cool things you can do with Capsule.
 
 # Contributions
 
@@ -98,11 +98,11 @@ You can find how the Capsule project is governed [here](https://projectcapsule.d
 
 ## Maintainers
 
-Please, refer to the maintainers file available [here](.github/maintainers.yaml).
+Please refer to the maintainers file available [here](.github/maintainers.yaml).
 
 ## CLOMonitor
 
-CLOMonitor is a tool that periodically checks open source projects repositories to verify they meet certain project health best practices.
+CLOMonitor is a tool that periodically checks open source project repositories to verify they meet certain project health best practices.
 
 [![CloMonitor report summary](https://clomonitor.io/api/projects/cncf/capsule/report-summary?theme=light)](https://clomonitor.io/projects/cncf/capsule)
 
@@ -112,21 +112,21 @@ Read how we log changes [here](CHANGELOG.md)
 
 ### Software Bill of Materials
 
-All OCI release artifacts include a Software Bill of Materials (SBOM) in CycloneDX JSON format. More information on this is available [here](SECURITY.md#software-bill-of-materials-sbom)
+All OCI release artifacts include a Software Bill of Materials (SBOM) in CycloneDX JSON format. More information about this is available [here](SECURITY.md#software-bill-of-materials-sbom)
 
 # FAQ
 
-- Q. How to pronounce Capsule?
+- Q. How do you pronounce Capsule?
 
   A. It should be pronounced as `/ˈkæpsjuːl/`.
 
 - Q. Is it production grade?
 
-  A. Although under frequent development and improvements, Capsule is ready to be used in production environments as currently, people are using it in public and private deployments. Check out the [release](https://github.com/projectcapsule/capsule/releases) page for a detailed list of available versions.
+  A. Although under frequent development and improvement, Capsule is ready to be used in production environments as currently, people are using it in public and private deployments. Check out the [release](https://github.com/projectcapsule/capsule/releases) page for a detailed list of available versions.
 
 - Q. Does it work with my Kubernetes XYZ distribution?
 
-  A. We tested Capsule with vanilla Kubernetes 1.16+ on private environments and public clouds. We expect it to work smoothly on any other Kubernetes distribution. Please, let us know if you find it doesn't.
+  A. We tested Capsule with vanilla Kubernetes 1.16+ on private environments and public clouds. We expect it to work smoothly on any other Kubernetes distribution. Please let us know if you find it doesn't.
 
 - Q. Do you provide commercial support?
 

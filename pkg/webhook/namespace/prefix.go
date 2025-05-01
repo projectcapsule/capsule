@@ -49,7 +49,7 @@ func (r *prefixHandler) OnCreate(clt client.Client, decoder admission.Decoder, r
 		if r.configuration.ForceTenantPrefix() {
 			tnt := &capsulev1beta2.Tenant{}
 
-			for _, or := range ns.ObjectMeta.OwnerReferences {
+			for _, or := range ns.OwnerReferences {
 				if !capsuleutils.IsTenantOwnerReference(or) {
 					continue
 				}

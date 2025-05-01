@@ -129,12 +129,12 @@ func (r *Manager) syncAdditionalRoleBinding(ctx context.Context, tenant *capsule
 
 		var res controllerutil.OperationResult
 		res, err = controllerutil.CreateOrUpdate(ctx, r.Client, target, func() error {
-			if target.ObjectMeta.Labels == nil {
-				target.ObjectMeta.Labels = map[string]string{}
+			if target.Labels == nil {
+				target.Labels = map[string]string{}
 			}
 
-			target.ObjectMeta.Labels[tenantLabel] = tenant.Name
-			target.ObjectMeta.Labels[roleBindingLabel] = roleBindingHashLabel
+			target.Labels[tenantLabel] = tenant.Name
+			target.Labels[roleBindingLabel] = roleBindingHashLabel
 			target.RoleRef = rbacv1.RoleRef{
 				APIGroup: rbacv1.GroupName,
 				Kind:     "ClusterRole",
@@ -142,7 +142,7 @@ func (r *Manager) syncAdditionalRoleBinding(ctx context.Context, tenant *capsule
 			}
 			target.Subjects = roleBinding.Subjects
 
-			return controllerutil.SetControllerReference(tenant, target, r.Client.Scheme())
+			return controllerutil.SetControllerReference(tenant, target, r.Scheme())
 		})
 
 		r.emitEvent(tenant, target.GetNamespace(), res, fmt.Sprintf("Ensuring RoleBinding %s", target.GetName()), err)

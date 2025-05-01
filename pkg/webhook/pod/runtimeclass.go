@@ -24,19 +24,6 @@ func RuntimeClass() capsulewebhook.Handler {
 	return &runtimeClass{}
 }
 
-func (h *runtimeClass) class(ctx context.Context, c client.Client, name string) (client.Object, error) {
-	if len(name) == 0 {
-		return nil, nil
-	}
-
-	obj := &nodev1.RuntimeClass{}
-	if err := c.Get(ctx, types.NamespacedName{Name: name}, obj); err != nil {
-		return nil, err
-	}
-
-	return obj, nil
-}
-
 func (h *runtimeClass) OnCreate(c client.Client, decoder admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		return h.validate(ctx, c, decoder, recorder, req)
@@ -53,6 +40,19 @@ func (h *runtimeClass) OnUpdate(client.Client, admission.Decoder, record.EventRe
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
+}
+
+func (h *runtimeClass) class(ctx context.Context, c client.Client, name string) (client.Object, error) {
+	if len(name) == 0 {
+		return nil, nil
+	}
+
+	obj := &nodev1.RuntimeClass{}
+	if err := c.Get(ctx, types.NamespacedName{Name: name}, obj); err != nil {
+		return nil, err
+	}
+
+	return obj, nil
 }
 
 func (h *runtimeClass) validate(ctx context.Context, c client.Client, decoder admission.Decoder, recorder record.EventRecorder, req admission.Request) *admission.Response {
