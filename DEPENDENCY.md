@@ -23,10 +23,10 @@ Capsule maintainers must follow these guidelines when consuming third-party pack
 
 When adding a new third-party package to Capsule, maintainers must follow these steps:
 
-1. Evaluate the need for the package. Is it necessary for the functionality of Capsule? 
-2. Research the package. Is it well-maintained? Does it have a good reputation? 
-3. Choose a version of the package. Use the latest version whenever possible. 
-4. Pin the package to the specific version in the Capsule codebase. 
+1. Evaluate the need for the package. Is it necessary for the functionality of Capsule?
+2. Research the package. Is it well-maintained? Does it have a good reputation?
+3. Choose a version of the package. Use the latest version whenever possible.
+4. Pin the package to the specific version in the Capsule codebase.
 5. Update the Capsule documentation to reflect the new dependency.
 
 ## Archive/Deprecation

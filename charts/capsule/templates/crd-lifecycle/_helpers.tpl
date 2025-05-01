@@ -13,5 +13,3 @@ crd-install-hook
 {{- define "capsule.crds.regexReplace" -}}
 {{- printf "%s" ($ | base | trimSuffix ".yaml" | regexReplaceAll "[_.]" "-") -}}
 {{- end }}
-
-

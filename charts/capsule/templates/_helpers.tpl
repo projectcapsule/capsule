@@ -154,5 +154,3 @@ Capsule Webhook endpoint CA Bundle
 caBundle: {{ $.Values.webhooks.service.caBundle -}}
   {{- end -}}
 {{- end -}}
-
-
