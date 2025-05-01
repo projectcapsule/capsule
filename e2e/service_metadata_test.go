@@ -11,7 +11,6 @@ import (
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
-	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -140,83 +139,6 @@ var _ = Describe("adding metadata to Service objects", func() {
 		})
 	})
 
-	It("should apply them to Endpoints", func() {
-		ns := NewNamespace("")
-		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
-		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
-
-		ep := &corev1.Endpoints{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "endpoints-metadata",
-				Namespace: ns.GetName(),
-			},
-			Subsets: []corev1.EndpointSubset{
-				{
-					Addresses: []corev1.EndpointAddress{
-						{
-							IP: "10.10.1.1",
-						},
-					},
-					Ports: []corev1.EndpointPort{
-						{
-							Name: "foo",
-							Port: 9999,
-						},
-					},
-				},
-			},
-		}
-		// Waiting for the reconciliation of required RBAC
-		EventuallyCreation(func() (err error) {
-			pod := &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "container",
-				},
-				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{
-						{
-							Name:  "container",
-							Image: "quay.io/google-containers/pause-amd64:3.0",
-						},
-					},
-				},
-			}
-			_, err = ownerClient(tnt.Spec.Owners[0]).CoreV1().Pods(ns.GetName()).Create(context.Background(), pod, metav1.CreateOptions{})
-
-			return
-		}).Should(Succeed())
-
-		EventuallyCreation(func() (err error) {
-			return k8sClient.Create(context.TODO(), ep)
-		}).Should(Succeed())
-
-		By("checking additional labels", func() {
-			Eventually(func() (ok bool) {
-				Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: ep.GetName(), Namespace: ns.GetName()}, ep)).Should(Succeed())
-				for k, v := range tnt.Spec.ServiceOptions.AdditionalMetadata.Labels {
-					ok, _ = HaveKeyWithValue(k, v).Match(ep.Labels)
-					if !ok {
-						return false
-					}
-				}
-				return true
-			}, defaultTimeoutInterval, defaultPollInterval).Should(BeTrue())
-		})
-
-		By("checking additional annotations", func() {
-			Eventually(func() (ok bool) {
-				Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: ep.GetName(), Namespace: ns.GetName()}, ep)).Should(Succeed())
-				for k, v := range tnt.Spec.ServiceOptions.AdditionalMetadata.Annotations {
-					ok, _ = HaveKeyWithValue(k, v).Match(ep.Annotations)
-					if !ok {
-						return false
-					}
-				}
-				return true
-			}, defaultTimeoutInterval, defaultPollInterval).Should(BeTrue())
-		})
-	})
-
 	It("should apply them to EndpointSlice in v1", func() {
 		if err := k8sClient.List(context.Background(), &networkingv1.IngressList{}); err != nil {
 			if utils.IsUnsupportedAPI(err) {
@@ -249,48 +171,23 @@ var _ = Describe("adding metadata to Service objects", func() {
 
 		var eps client.Object
 
-		if err := k8sClient.List(context.Background(), &discoveryv1.EndpointSliceList{}); err != nil {
-			if utils.IsUnsupportedAPI(err) {
-				Skip(fmt.Sprintf("Running test due to unsupported API kind: %s", err.Error()))
-			}
-
-			eps = &discoveryv1beta1.EndpointSlice{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "endpointslice-metadata",
-					Namespace: ns.GetName(),
+		eps = &discoveryv1.EndpointSlice{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "endpointslice-metadata",
+				Namespace: ns.GetName(),
+			},
+			AddressType: discoveryv1.AddressTypeIPv4,
+			Endpoints: []discoveryv1.Endpoint{
+				{
+					Addresses: []string{"10.10.1.1"},
 				},
-				AddressType: discoveryv1beta1.AddressTypeIPv4,
-				Endpoints: []discoveryv1beta1.Endpoint{
-					{
-						Addresses: []string{"10.10.1.1"},
-					},
+			},
+			Ports: []discoveryv1.EndpointPort{
+				{
+					Name: ptr.To("foo"),
+					Port: ptr.To(int32(9999)),
 				},
-				Ports: []discoveryv1beta1.EndpointPort{
-					{
-						Name: ptr.To("foo"),
-						Port: ptr.To(int32(9999)),
-					},
-				},
-			}
-		} else {
-			eps = &discoveryv1.EndpointSlice{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "endpointslice-metadata",
-					Namespace: ns.GetName(),
-				},
-				AddressType: discoveryv1.AddressTypeIPv4,
-				Endpoints: []discoveryv1.Endpoint{
-					{
-						Addresses: []string{"10.10.1.1"},
-					},
-				},
-				Ports: []discoveryv1.EndpointPort{
-					{
-						Name: ptr.To("foo"),
-						Port: ptr.To(int32(9999)),
-					},
-				},
-			}
+			},
 		}
 
 		EventuallyCreation(func() (err error) {
