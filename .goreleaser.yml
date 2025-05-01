@@ -30,6 +30,7 @@ builds:
           -X main.GitRepo={{ .ProjectName }}
   - main: .
     binary: "{{ .ProjectName }}.wasm"
+    id: {{ .ProjectName }}-wasm
     env:
       - CGO_ENABLED=0
     goos:
