@@ -63,9 +63,9 @@ release:
 
     [Review the Major Changes section first before upgrading to a new version](https://artifacthub.io/packages/helm/projectcapsule/capsule/{{ .Version }}#major-changes)
 
-    **Kubernetes compatibility**
-
     > [!IMPORTANT]
+    > **Kubernetes compatibility**
+    >
     > Note that the Capsule project offers support only for the latest minor version of Kubernetes.
     > Backwards compatibility with older versions of Kubernetes and OpenShift is [offered by vendors](https://projectcapsule.dev/support/).
     >
@@ -93,26 +93,27 @@ changelog:
     - Merge branch
   groups:
     # https://github.com/conventional-changelog/commitlint/tree/master/%40commitlint/config-conventional
-    - title: '🛠 Dependency updates'
-      regexp: '^.*?(feat|fix)\(deps\)!?:.+$'
-      order: 300
-    - title: '✨ New Features'
-      regexp: '^.*?feat(\([[:word:]]+\))??!?:.+$'
-      order: 100
-    - title: '🐛 Bug fixes'
-      regexp: '^.*?fix(\([[:word:]]+\))??!?:.+$'
-      order: 200
-    - title: '📖 Documentation updates'
-      regexp: ^.*?docs(\([[:word:]]+\))??!?:.+$
-      order: 400
-    - title: '🛡️ Security updates'
-      regexp: ^.*?(sec)(\([[:word:]]+\))??!?:.+$
-      order: 500
-    - title: '🚀 Build process updates'
-      regexp: ^.*?(build|ci)(\([[:word:]]+\))??!?:.+$
-      order: 600
-    - title: '📦 Other work'
-      order: 9999
+  - title: '🛠 Dependency updates'
+    regexp: '^fix\(deps\):|^feat\(deps\):'
+    order: 300
+  - title: '✨ New Features'
+    regexp: '^feat(\([^)]*\))?:'
+    order: 100
+  - title: '🐛 Bug fixes'
+    regexp: '^fix(\([^)]*\))?:'
+    order: 200
+  - title: '📖 Documentation updates'
+    regexp: '^docs(\([^)]*\))?:'
+    order: 400
+  - title: '🛡️ Security updates'
+    regexp: '^sec(\([^)]*\))?:'
+    order: 500
+  - title: '🚀 Build process updates'
+    regexp: '^(build|ci)(\([^)]*\))?:'
+    order: 600
+  - title: '📦 Other work'
+    regexp: '^chore(\([^)]*\))?:|^chore:'
+    order: 9999
 sboms:
   - artifacts: archive
 signs:
