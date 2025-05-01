@@ -19,10 +19,12 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/meta"
+	"github.com/projectcapsule/capsule/pkg/metrics"
 )
 
 type resourceClaimController struct {
 	client.Client
+	Metrics    *metrics.ClaimRecorder
 	Log        logr.Logger
 	Recorder   record.EventRecorder
 	RESTConfig *rest.Config
@@ -34,28 +36,32 @@ func (r *resourceClaimController) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-//nolint:nakedret
 func (r resourceClaimController) Reconcile(ctx context.Context, request ctrl.Request) (result ctrl.Result, err error) {
-	r.Log = r.Log.WithValues("Request.Name", request.Name)
-	// Fetch the Tenant instance
+	log := r.Log.WithValues("Request.Name", request.Name)
+
 	instance := &capsulev1beta2.ResourcePoolClaim{}
 	if err = r.Get(ctx, request.NamespacedName, instance); err != nil {
 		if apierrors.IsNotFound(err) {
-			r.Log.Info("Request object not found, could have been deleted after reconcile request")
+			log.Info("Request object not found, could have been deleted after reconcile request")
 
-			// Claim Status as Metrics
+			r.Metrics.DeleteClaimMetric(request.Name)
 
 			return reconcile.Result{}, nil
 		}
 
-		r.Log.Error(err, "Error reading the object")
+		log.Error(err, "Error reading the object")
 
 		return
 	}
 
 	// Ensuring the Quota Status
-	if err = r.reconcile(ctx, instance); err != nil {
-		r.Log.Error(err, "Cannot update Tenant status")
+	err = r.reconcile(ctx, instance)
+
+	// Emit a Metric in any case
+	r.Metrics.RecordClaimCondition(instance)
+
+	if err != nil {
+		log.Error(err, "Cannot update Tenant status")
 
 		return
 	}
@@ -63,7 +69,7 @@ func (r resourceClaimController) Reconcile(ctx context.Context, request ctrl.Req
 	return ctrl.Result{}, err
 }
 
-// This Controller is responsible for assigning Claims to ResourcePools
+// This Controller is responsible for assigning Claims to ResourcePools.
 // Everything else will be handeled by the ResourcePool Controller
 func (r resourceClaimController) reconcile(
 	ctx context.Context,
@@ -145,8 +151,6 @@ func (r resourceClaimController) allocateResourcePool(
 	}); err != nil {
 		return err
 	}
-
-	r.Log.V(3).Info("STATUS", "claim", claim.Status)
 
 	// Update status in a separate call
 	if err := r.Client.Status().Update(ctx, claim); err != nil {

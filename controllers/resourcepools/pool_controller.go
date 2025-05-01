@@ -14,6 +14,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/types"
@@ -31,11 +32,11 @@ import (
 	"github.com/projectcapsule/capsule/pkg/meta"
 	"github.com/projectcapsule/capsule/pkg/metrics"
 	"github.com/projectcapsule/capsule/pkg/utils"
-	capsuleutils "github.com/projectcapsule/capsule/pkg/utils"
 )
 
 type resourcePoolController struct {
 	client.Client
+	Metrics    *metrics.ResourcePoolRecorder
 	Log        logr.Logger
 	Recorder   record.EventRecorder
 	RESTConfig *rest.Config
@@ -45,6 +46,7 @@ func (r *resourcePoolController) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&capsulev1beta2.ResourcePool{}).
 		Owns(&corev1.ResourceQuota{}).
+		Owns(&capsulev1beta2.ResourcePoolClaim{}).
 		Watches(&corev1.Namespace{},
 			handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
 				// Fetch all GlobalResourceQuota objects
@@ -66,28 +68,9 @@ func (r *resourcePoolController) SetupWithManager(mgr ctrl.Manager) error {
 				return requests
 			}),
 		).
-		Watches(&capsulev1beta2.ResourcePoolClaim{},
-			handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
-				var requests []reconcile.Request
-
-				claim, ok := obj.(*capsulev1beta2.ResourcePoolClaim)
-				if !ok {
-					return nil
-				}
-
-				requests = append(requests, reconcile.Request{
-					NamespacedName: types.NamespacedName{
-						Name: claim.Spec.Pool,
-					},
-				})
-
-				return requests
-			}),
-		).
 		Complete(r)
 }
 
-//nolint:nakedret
 func (r resourcePoolController) Reconcile(ctx context.Context, request ctrl.Request) (result ctrl.Result, err error) {
 	log := r.Log.WithValues("Request.Name", request.Name)
 	// Fetch the Tenant instance
@@ -96,10 +79,7 @@ func (r resourcePoolController) Reconcile(ctx context.Context, request ctrl.Requ
 		if apierrors.IsNotFound(err) {
 			log.Info("Request object not found, could have been deleted after reconcile request")
 
-			// If tenant was deleted or cannot be found, clean up metrics
-			metrics.ResourcePoolQueueSize.DeletePartialMatch(map[string]string{"pool": request.Name})
-			metrics.ResourcePoolLimit.DeletePartialMatch(map[string]string{"pool": request.Name})
-			metrics.ResourcePoolLimit.DeletePartialMatch(map[string]string{"pool": request.Name})
+			r.Metrics.DeleteResourcePoolMetric(request.Name)
 
 			return reconcile.Result{}, nil
 		}
@@ -124,6 +104,8 @@ func (r resourcePoolController) Reconcile(ctx context.Context, request ctrl.Requ
 	// ResourceQuota Reconcilation
 	err = r.reconcile(ctx, log, instance, nsNames)
 
+	r.Metrics.ResourceUsageMetrics(instance)
+
 	r.Client.Status().Update(ctx, instance)
 
 	if err != nil {
@@ -133,7 +115,6 @@ func (r resourcePoolController) Reconcile(ctx context.Context, request ctrl.Requ
 	return ctrl.Result{}, err
 }
 
-//nolint:nakedret, gocognit
 func (r *resourcePoolController) reconcile(
 	ctx context.Context,
 	log logr.Logger,
@@ -146,7 +127,7 @@ func (r *resourcePoolController) reconcile(
 	if err != nil {
 		log.Error(err, "Cannot get matching namespaces")
 
-		return
+		return err
 	}
 
 	var allClaims []capsulev1beta2.ResourcePoolClaim
@@ -170,10 +151,12 @@ func (r *resourcePoolController) reconcile(
 		allClaims = append(allClaims, claimList.Items...)
 	}
 
-	// Garbage collect orphaned ResourceQuotas
-	r.garbageCollection(ctx, log, pool, allClaims, namespaces)
+	if err := r.garbageCollection(ctx, log, pool, allClaims, namespaces); err != nil {
+		log.Error(err, "Failed to garbage collect ResourceQuotas")
 
-	// After Garbage Collection we can update the new namespaces
+		return err
+	}
+
 	pool.AssignNamespaces(namespaces)
 
 	// Sort by creation timestamp (oldest first)
@@ -183,11 +166,13 @@ func (r *resourcePoolController) reconcile(
 
 	log.Info("Sorted ResourceQuotaClaims", "count", len(allClaims))
 
+	exhaustionPipeline := &PoolExhaustion{}
+
 	// You can now iterate over `allClaims` in order
 	for _, claim := range allClaims {
 		log.Info("Found claim", "name", claim.Name, "namespace", claim.Namespace, "created", claim.CreationTimestamp)
 
-		err = r.reconcileResourceClaim(ctx, log.WithValues("Claim", claim.Name), pool, &claim)
+		err = r.reconcileResourceClaim(ctx, log.WithValues("Claim", claim.Name), pool, &claim, exhaustionPipeline)
 		if err != nil {
 			log.Error(err, "Failed to reconcile ResourceQuotaClaim", "claim", claim.Name)
 		}
@@ -195,21 +180,140 @@ func (r *resourcePoolController) reconcile(
 		log.V(5).Info("Status resources", "pool", pool.Status)
 	}
 
+	pool.CalculateUsage()
+
 	return r.syncResourceQuotas(ctx, r.Client, pool, matchingNamespaces)
 }
 
-// Handles All the Claims for the ResourcePool
+// Reconciles a single ResourceClaim.
+func (r *resourcePoolController) reconcileResourceClaim(
+	ctx context.Context,
+	log logr.Logger,
+	pool *capsulev1beta2.ResourcePool,
+	claim *capsulev1beta2.ResourcePoolClaim,
+	exhaustion *PoolExhaustion,
+) (err error) {
+	t := pool.GetClaimFromStatus(claim)
+	log.V(5).Info("Reconcile ResourceClaim", "claim", claim.GetUID(), "status", t)
+
+	// Handle claims which are already considered
+	if t != nil {
+		log.V(5).Info("Claim already exists in pool status", "claim", claim.Name)
+
+		return r.bindClaimToPool(ctx, log, pool, claim)
+	}
+
+	// Check if Resources can be Assigned (Enough Resources to claim)
+	exhaustions := r.canClaimWithinNamespace(log, pool, claim)
+	if len(exhaustions) != 0 {
+		var lines []string
+		for resourceName, exhaustion := range exhaustions {
+			line := fmt.Sprintf(
+				"%s: %s/%s",
+				resourceName,
+				exhaustion.Requesting.String(),
+				exhaustion.Available.String(),
+			)
+			lines = append(lines, line)
+		}
+
+		// Join all lines nicely
+		combined := fmt.Sprintf("cannot claim resources:\n%s", strings.Join(lines, "\n"))
+
+		cond := meta.NewQueuedReasonCondition(claim)
+		cond.Message = combined
+		claim.Status.Condition = cond
+	}
+
+	// When we are Ordering the claims it's important to
+	// verify that the resource would have not been exhausted already
+	//if pool.Spec.OrderedQueue {
+	//
+	//}
+	//
+	return r.bindClaimToPool(ctx, log, pool, claim)
+}
+
+func (r *resourcePoolController) canClaimWithinNamespace(
+	log logr.Logger,
+	pool *capsulev1beta2.ResourcePool,
+	claim *capsulev1beta2.ResourcePoolClaim,
+) (res map[string]PoolExhaustionResource) {
+	claimable := pool.GetAvailableClaimableResources()
+	log.V(5).Info("claimable resources", "claimable", claimable)
+
+	_, namespaceClaimed := pool.GetNamespaceClaims(claim.Namespace)
+	log.V(5).Info("namespace claimed resources", "claimed", namespaceClaimed)
+
+	for resourceName, req := range claim.Spec.ResourceClaims {
+
+		// Verify if total Quota is available
+		available, exists := claimable[resourceName]
+		if !exists || available.IsZero() || available.Cmp(req) < 0 {
+			log.V(5).Info("not enough resources available", "available", available, "requesting", req)
+
+			res[resourceName.String()] = PoolExhaustionResource{
+				Available:  available,
+				Requesting: req,
+				Namespace:  false,
+			}
+
+			continue
+		}
+
+		// Verify that this resource can still be claimed within the namespace
+		// Only Necessary when there is a limit
+		maxNamespaceAllocation, maxExist := pool.Spec.MaximumAllocation[resourceName]
+		if !maxExist {
+			continue
+		}
+
+		claimed, exists := namespaceClaimed[resourceName]
+		if !exists {
+			claimed = resource.MustParse("0")
+		}
+
+		claimed.Add(req)
+
+		if maxNamespaceAllocation.Cmp(claimed) < 0 {
+			log.V(5).Info("maxium for namespace claimed", "max", maxNamespaceAllocation, "claiming", claimed)
+
+			res[resourceName.String()] = PoolExhaustionResource{
+				Available:  available,
+				Requesting: req,
+				Namespace:  true,
+			}
+
+			continue
+		}
+	}
+
+	return
+}
+
+func (r *resourcePoolController) bindClaimToPool(
+	ctx context.Context,
+	log logr.Logger,
+	pool *capsulev1beta2.ResourcePool,
+	claim *capsulev1beta2.ResourcePoolClaim,
+) (err error) {
+	cond := meta.NewReadyCondition(claim)
+	cond.Reason = meta.BoundReason
+	cond.Message = "Claimed resources"
+
+	pool.AddClaimToStatus(claim)
+
+	claim.UpdateCondition(cond)
+
+	return r.Client.Status().Update(ctx, claim)
+}
+
+// Handles All the Claims for the ResourcePool.
 func (r *resourcePoolController) gatherMatchingNamespaces(
 	ctx context.Context,
 	log logr.Logger,
 	pool *capsulev1beta2.ResourcePool,
 ) (namespaces []corev1.Namespace, err error) {
-	// Get Item within Resource Quota
-	objectLabel, err := capsuleutils.GetTypeLabel(&capsulev1beta2.Tenant{})
-	if err != nil {
-		return
-	}
-
 	// Collect Namespaces (Matching)
 	namespaces = make([]corev1.Namespace, 0)
 	seenNamespaces := make(map[string]struct{})
@@ -232,13 +336,8 @@ func (r *resourcePoolController) gatherMatchingNamespaces(
 				continue // Skip duplicates
 			}
 
-			if selector.MustTenantNamespace {
-				if _, ok := ns.Labels[objectLabel]; !ok {
-					continue
-				}
-			}
-
 			seenNamespaces[ns.Name] = struct{}{}
+
 			namespaces = append(namespaces, ns)
 		}
 	}
@@ -246,63 +345,7 @@ func (r *resourcePoolController) gatherMatchingNamespaces(
 	return
 }
 
-// Reconciles a single ResourceClaim
-func (r *resourcePoolController) reconcileResourceClaim(
-	ctx context.Context,
-	log logr.Logger,
-	pool *capsulev1beta2.ResourcePool,
-	claim *capsulev1beta2.ResourcePoolClaim,
-) (err error) {
-	t := pool.GetClaimFromStatus(claim)
-	log.V(5).Info("Reconcile ResourceClaim", "claim", claim.GetUID(), "status", t)
-
-	// Handle claims which are already considered
-	if t != nil {
-		log.V(5).Info("Claim already exists in pool status", "claim", claim.Name)
-
-		return r.bindClaimToPool(ctx, log, pool, claim)
-	}
-
-	// Check if Resources can be Assigned (Enough Resources to claim)
-	errs := pool.CanClaimWithinNamespace(log, claim)
-	if len(errs) > 0 {
-		lines := make([]string, 0, len(errs))
-		for _, err := range errs {
-			lines = append(lines, fmt.Sprintf(" - %s", err.Error()))
-		}
-
-		// Join with newline
-		combined := fmt.Sprintf("cannot claim resources:\n%s", strings.Join(lines, "\n"))
-
-		cond := meta.NewQueuedReasonCondition(claim)
-		cond.Message = combined
-
-		claim.Status.Condition = cond
-
-		return r.Status().Update(ctx, claim)
-	}
-
-	return r.bindClaimToPool(ctx, log, pool, claim)
-}
-
-func (r *resourcePoolController) bindClaimToPool(
-	ctx context.Context,
-	log logr.Logger,
-	pool *capsulev1beta2.ResourcePool,
-	claim *capsulev1beta2.ResourcePoolClaim,
-) (err error) {
-	cond := meta.NewReadyCondition(claim)
-	cond.Reason = meta.BoundReason
-	cond.Message = fmt.Sprintf("Claimed resources")
-
-	pool.AddClaimToStatus(claim)
-
-	claim.UpdateCondition(cond)
-
-	return r.Client.Status().Update(ctx, claim)
-}
-
-// Synchronize resources quotas in all the given namespaces (routines)
+// Synchronize resources quotas in all the given namespaces (routines).
 func (r *resourcePoolController) syncResourceQuotas(
 	ctx context.Context,
 	c client.Client,
@@ -311,7 +354,6 @@ func (r *resourcePoolController) syncResourceQuotas(
 ) (err error) {
 	group := new(errgroup.Group)
 
-	// Sync resource quotas for matching namespaces
 	for _, ns := range namespaces {
 		namespace := ns
 
@@ -323,7 +365,7 @@ func (r *resourcePoolController) syncResourceQuotas(
 	return group.Wait()
 }
 
-// Synchronize a single resourcequota
+// Synchronize a single resourcequota.
 func (r *resourcePoolController) syncResourceQuota(
 	ctx context.Context,
 	c client.Client,
@@ -401,20 +443,19 @@ func (r *resourcePoolController) garbageCollection(
 		if !namespaceOk {
 			if err := r.garbageCollectNamespace(ctx, pool, ns); err != nil {
 				r.Log.Error(err, "Failed to garbage collect resource quota", "namespace", ns)
+
 				return err
 			}
 		}
 
 		for _, cl := range clms {
 			_, ok := claimSet[string(cl.UID)]
-
-			log.V(5).Info("GARBAGE COLLECT", "claims", claimSet, "uid", cl.UID)
-
 			if !namespaceOk || !ok {
 				log.V(5).Info("Disassociating claim", "namespace", ns, "uid", cl.UID)
 
 				if err := r.disassociateClaimItem(ctx, pool, cl); err != nil {
 					r.Log.Error(err, "Failed to disassociate claim", "namespace", ns, "uid", cl.UID)
+
 					return err
 				}
 			}
@@ -425,6 +466,10 @@ func (r *resourcePoolController) garbageCollection(
 		}
 	}
 
+	// We can recalculate the usage in the end
+	// Since it's only going to decrease
+	pool.CalculateUsage()
+
 	return nil
 }
 
@@ -434,13 +479,17 @@ func (r *resourcePoolController) garbageCollectNamespace(
 	pool *capsulev1beta2.ResourcePool,
 	namespace string,
 ) error {
+	r.Metrics.DeleteResourcePoolNamespaceMetric(pool.Name, namespace)
+
 	// Check if the namespace still exists
 	ns := &corev1.Namespace{}
 	if err := r.Client.Get(ctx, types.NamespacedName{Name: namespace}, ns); err != nil {
 		if errors.IsNotFound(err) {
 			r.Log.V(5).Info("Namespace does not exist, skipping garbage collection", "namespace", namespace)
+
 			return nil
 		}
+
 		return fmt.Errorf("failed to check namespace existence: %w", err)
 	}
 
@@ -451,11 +500,13 @@ func (r *resourcePoolController) garbageCollectNamespace(
 			Namespace: namespace,
 		},
 	}
+
 	err := r.Client.Get(ctx, types.NamespacedName{Namespace: namespace, Name: target.GetName()}, target)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			r.Log.V(5).Info("ResourceQuota already deleted", "namespace", namespace, "name", resourceQuotaItemName(pool))
 		}
+
 		return err
 	}
 
@@ -465,6 +516,50 @@ func (r *resourcePoolController) garbageCollectNamespace(
 	}
 
 	r.Log.Info("Deleted ResourceQuota", "namespace", namespace)
+
+	return nil
+}
+
+// Attempts to garbage collect a ResourceQuota resource.
+func (r *resourcePoolController) moveClaimItemToQueue(
+	ctx context.Context,
+	pool *capsulev1beta2.ResourcePool,
+	claim *capsulev1beta2.ResourcePoolClaimsItem,
+) error {
+	claimObj := &capsulev1beta2.ResourcePoolClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      claim.Name.String(),
+			Namespace: claim.Namespace.String(),
+			UID:       claim.UID,
+		},
+	}
+
+	err := r.Client.Get(ctx, types.NamespacedName{
+		Name:      claim.Name.String(),
+		Namespace: claim.Namespace.String(),
+	}, claimObj)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			pool.RemoveClaimFromStatus(claimObj)
+
+			return nil
+		}
+
+		return err
+	}
+
+	// Remove Pool Reference
+	claimObj.Status = capsulev1beta2.ResourcePoolClaimStatus{
+		Pool:      api.StatusNameUID{},
+		Condition: meta.NewNotReadyCondition(claimObj, "Claim is being disassociated"),
+	}
+
+	if err := r.Client.Status().Update(ctx, claimObj); err != nil {
+		return err
+	}
+
+	pool.RemoveClaimFromStatus(claimObj)
+
 	return nil
 }
 

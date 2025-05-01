@@ -9,6 +9,8 @@ import (
 	"github.com/go-logr/logr"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+
+	"github.com/projectcapsule/capsule/pkg/metrics"
 )
 
 func Add(
@@ -20,6 +22,7 @@ func Add(
 		Client:   mgr.GetClient(),
 		Log:      log.WithName("Pools"),
 		Recorder: Recorder,
+		Metrics:  metrics.MustMakeResourcePoolRecorder(),
 	}).SetupWithManager(mgr); err != nil {
 		return fmt.Errorf("unable to create pool controller: %w", err)
 	}
@@ -28,6 +31,7 @@ func Add(
 		Client:   mgr.GetClient(),
 		Log:      log.WithName("Claims"),
 		Recorder: Recorder,
+		Metrics:  metrics.MustMakeClaimRecorder(),
 	}).SetupWithManager(mgr); err != nil {
 		return fmt.Errorf("unable to create claim controller: %w", err)
 	}

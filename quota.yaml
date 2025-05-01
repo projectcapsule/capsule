@@ -23,14 +23,13 @@ spec:
       capsule.clastix.io/tenant: solar
   - matchLabels:
       capsule.clastix.io/tenant: wind
-  defaults:
-    enabled: false
   quota:
     hard:
       limits.cpu: "2"
       limits.memory: 2Gi
       requests.cpu: "2"
       requests.memory: 2Gi
+      requests.storage: "5Gi"
 #---
 #apiVersion: capsule.clastix.io/v1beta2
 #kind: ResourcePoolClaim

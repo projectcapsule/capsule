@@ -54,7 +54,14 @@ spec:
                   The Defaults given for each namespace, the default is not counted towards the total allocation
                   When you use claims it's recommended to provision Defaults as the prevent the scheduling of any resources
                 properties:
-                  defaults:
+                  enabled:
+                    default: true
+                    description: |-
+                      Enable Distribution of Defaults for each namespace
+                      This allocates the default resources to each resourcequota responsible for a namespace.
+                      The Defaults serve as a base for the resource allocation, and are not counted towards the total allocation
+                    type: boolean
+                  resources:
                     additionalProperties:
                       anyOf:
                       - type: integer
@@ -65,18 +72,7 @@ spec:
                       The Defaults given for each namespace, the default is not counted towards the total allocation
                       When you use claims it's recommended to provision Defaults as the prevent the scheduling of any resources
                     type: object
-                  enabled:
-                    default: true
-                    description: |-
-                      Enable Distribution of Defaults for each namespace
-                      This allocates the default resources to each resourcequota responsible for a namespace.
-                      The Defaults serve as a base for the resource allocation, and are not counted towards the total allocation
-                    type: boolean
                 type: object
-              force:
-                description: If force is enabled, resources can be removed, even when
-                  they are claimed. The claims will be updated accordingly
-                type: boolean
               namespaceMaximum:
                 additionalProperties:
                   anyOf:
@@ -165,6 +161,8 @@ spec:
                 description: Selector to match the namespaces that should be managed
                   by the GlobalResourceQuota
                 items:
+                  description: Selector for resources and their labels or selecting
+                    origin namespaces
                   properties:
                     matchExpressions:
                       description: matchExpressions is a list of label selector requirements.
@@ -207,12 +205,6 @@ spec:
                         map is equivalent to an element of matchExpressions, whose key field is "key", the
                         operator is "In", and the values array contains only "value". The requirements are ANDed.
                       type: object
-                    tenantNamespace:
-                      default: false
-                      description: |-
-                        Only considers namespaces which are part of a tenant, other namespaces which might match
-                        the label, but do not have a tenant, are ignored.
-                      type: boolean
                   type: object
                   x-kubernetes-map-type: atomic
                 type: array

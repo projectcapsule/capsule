@@ -13,7 +13,7 @@ import (
 // GlobalResourceQuotaSpec defines the desired state of GlobalResourceQuota
 type ResourcePoolSpec struct {
 	// Selector to match the namespaces that should be managed by the GlobalResourceQuota
-	Selectors []ResourcePoolSelector `json:"selectors,omitempty"`
+	Selectors []api.NamespaceSelector `json:"selectors,omitempty"`
 	// Define resourcequotas for the namespaces
 	Quota corev1.ResourceQuotaSpec `json:"quota"`
 	// The maxmum amount of resources that can be claimed from a resourcequota in a namespace
@@ -27,8 +27,6 @@ type ResourcePoolSpec struct {
 	// This disregards any ordering of the claims.
 	// +kubebuilder:default=false
 	OrderedQueue bool `json:"orderedQueue,omitempty"`
-	// If force is enabled, resources can be removed, even when they are claimed. The claims will be updated accordingly
-	Force bool `json:"force,omitempty"`
 }
 
 type ResourcePoolDefaults struct {
@@ -39,17 +37,7 @@ type ResourcePoolDefaults struct {
 	Enabled bool `json:"enabled,omitempty"`
 	// The Defaults given for each namespace, the default is not counted towards the total allocation
 	// When you use claims it's recommended to provision Defaults as the prevent the scheduling of any resources
-	Resources corev1.ResourceList `json:"defaults,omitempty"`
-}
-
-type ResourcePoolSelector struct {
-	// Only considers namespaces which are part of a tenant, other namespaces which might match
-	// the label, but do not have a tenant, are ignored.
-	// +kubebuilder:default=false
-	MustTenantNamespace bool `json:"tenantNamespace,omitempty"`
-
-	// Selector to match the namespaces that should be managed by the GlobalResourceQuota
-	api.NamespaceSelector `json:",inline"`
+	Resources corev1.ResourceList `json:"resources,omitempty"`
 }
 
 // +kubebuilder:object:root=true

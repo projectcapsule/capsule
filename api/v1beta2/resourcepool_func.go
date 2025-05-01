@@ -7,7 +7,6 @@ import (
 	"errors"
 	"sort"
 
-	"github.com/go-logr/logr"
 	"github.com/projectcapsule/capsule/pkg/api"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -86,7 +85,7 @@ func (r *ResourcePool) AddClaimToStatus(claim *ResourcePoolClaim) {
 
 	r.Status.Claims[ns] = claims
 
-	r.calculateUsage()
+	r.CalculateUsage()
 }
 
 func (r *ResourcePool) RemoveClaimFromStatus(claim *ResourcePoolClaim) {
@@ -107,78 +106,34 @@ func (r *ResourcePool) RemoveClaimFromStatus(claim *ResourcePoolClaim) {
 	if len(newClaims) == 0 {
 		delete(r.Status.Claims, claim.Namespace)
 	}
-
-	r.calculateUsage()
 }
 
-func (r *ResourcePool) calculateUsage() {
+func (r *ResourcePool) CalculateUsage() {
 	usage := corev1.ResourceList{}
 
-	for _, claims := range r.Status.Claims {
-		for _, claim := range claims {
-			for resourceName, qt := range claim.Claims {
-				amount, exists := usage[resourceName]
-				if !exists {
-					amount = resource.MustParse("0")
-				}
+	if len(r.Status.Claims) == 0 {
+		for r, _ := range r.Status.Allocation.Hard {
+			usage[r] = resource.MustParse("0")
+		}
 
-				amount.Add(qt)
-				usage[resourceName] = amount
+		return
+	} else {
+		for _, claims := range r.Status.Claims {
+			for _, claim := range claims {
+				for resourceName, qt := range claim.Claims {
+					amount, exists := usage[resourceName]
+					if !exists {
+						amount = resource.MustParse("0")
+					}
+
+					amount.Add(qt)
+					usage[resourceName] = amount
+				}
 			}
 		}
 	}
 
 	r.Status.Allocation.Claimed = usage
-}
-
-func (g *ResourcePool) CanClaimWithinNamespace(
-	log logr.Logger,
-	claim *ResourcePoolClaim,
-) []error {
-	claimable := g.GetAvailableClaimableResources()
-	log.V(1).Info("claimable resources", "claimable", claimable)
-
-	_, namespaceClaimed := g.GetNamespaceClaims(claim.Namespace)
-	log.V(1).Info("namespace claimed resources", "claimed", namespaceClaimed)
-
-	errs := []error{}
-
-	for resourceName, req := range claim.Spec.ResourceClaims {
-
-		// Verify if total Quota is available
-		available, exists := claimable[resourceName]
-		if !exists || available.IsZero() || available.Cmp(req) < 0 {
-			log.V(1).Info("not enough resources available", "available", available, "requesting", req)
-
-			errs = append(errs, errors.New("resource not available"+string(resourceName)))
-
-			continue
-		}
-
-		// Verify that this resource can still be claimed within the namespace
-		// Only Necessary when there is a limit
-		maxNamespaceAllocation, maxExist := g.Spec.MaximumAllocation[resourceName]
-		if !maxExist {
-			continue
-		}
-
-		claimed, exists := namespaceClaimed[resourceName]
-		if !exists {
-			claimed = resource.MustParse("0")
-		}
-
-		claimed.Add(req)
-
-		if maxNamespaceAllocation.Cmp(claimed) < 0 {
-			log.V(1).Info("maxium for namespace claimed", "max", maxNamespaceAllocation, "claiming", claimed)
-
-			errs = append(errs, errors.New("claimed namespace maximum"+string(resourceName)+"available"))
-
-			continue
-		}
-	}
-
-	return errs
 }
 
 func (g *ResourcePool) CanClaimFromPool(claim corev1.ResourceList) []error {
@@ -282,6 +237,31 @@ func (g *ResourcePool) GetNamespaceClaims(namespace string) (claims map[string]*
 			claims[string(claim.UID)] = claim
 		}
 
+	}
+
+	return
+}
+
+// Calculate usage for each namespace
+func (g *ResourcePool) GetClaimedByNamespaceClaims() (claims map[string]corev1.ResourceList) {
+	claims = map[string]corev1.ResourceList{}
+
+	// First, check if quota exists in the status
+	for ns, cl := range g.Status.Claims {
+		claims[ns] = corev1.ResourceList{}
+		nsScope := claims[ns]
+
+		for _, claim := range cl {
+			for resourceName, claimed := range claim.Claims {
+				usedValue, usedExists := nsScope[resourceName]
+				if !usedExists {
+					usedValue = resource.MustParse("0")
+				}
+
+				usedValue.Add(claimed)
+				nsScope[resourceName] = usedValue
+			}
+		}
 	}
 
 	return

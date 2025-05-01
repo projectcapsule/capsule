@@ -68,6 +68,9 @@ manifests: generate
 generate: controller-gen
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
 
+apply-hack/%:
+	$(KUBECTL) kustomize hack/$* | envsubst | $(KUBECTL) apply -f -
+
 # Helm
 SRC_ROOT = $(shell git rev-parse --show-toplevel)
 
