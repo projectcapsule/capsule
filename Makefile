@@ -46,7 +46,7 @@ all: manager
 # Run tests
 .PHONY: test
 test: test-clean generate manifests test-clean
-	@GO111MODULE=on go test -v ./... -coverprofile coverage.out
+	@GO111MODULE=on go test -v $(shell go list ./... | grep -v "e2e") -coverprofile coverage.out
 
 .PHONY: test-clean
 test-clean: ## Clean tests cache
@@ -284,7 +284,7 @@ e2e-load-image: kind
 
 .PHONY: e2e-exec
 e2e-exec: ginkgo
-	$(GINKGO) -v -p -tags e2e ./e2e
+	$(GINKGO) -v -tags e2e ./e2e
 
 .PHONY: e2e-destroy
 e2e-destroy: kind
