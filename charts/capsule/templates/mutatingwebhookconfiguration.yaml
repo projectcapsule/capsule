@@ -122,15 +122,14 @@ webhooks:
   reinvocationPolicy: Never
   rules:
     - apiGroups:
-        - capsule.clastix.io
+        - ""
       apiVersions:
-        - v1beta2
-        - v1beta1
+        - v1
       operations:
         - CREATE
         - UPDATE
       resources:
-        - tenants
+        - namespaces
       scope: '*'
   sideEffects: NoneOnDryRun
   timeoutSeconds: {{ $.Values.webhooks.mutatingWebhooksTimeoutSeconds }}

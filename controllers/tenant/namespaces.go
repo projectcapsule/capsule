@@ -73,6 +73,10 @@ func (r *Manager) syncNamespaceMetadata(ctx context.Context, namespace string, t
 				}
 			}
 
+			if tnt.Spec.Cordoned {
+				labels["projectcapsule.dev/cordoned"] = "true"
+			}
+
 			if tnt.Spec.NodeSelector != nil {
 				annotations = utils.BuildNodeSelector(tnt, annotations)
 			}
