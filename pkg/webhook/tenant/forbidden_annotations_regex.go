@@ -63,7 +63,6 @@ func (h *forbiddenAnnotationsRegexHandler) validate(decoder admission.Decoder, r
 		"labels":      tenant.Spec.NamespaceOptions.ForbiddenLabels.Regex,
 		"annotations": tenant.Spec.NamespaceOptions.ForbiddenAnnotations.Regex,
 	}
-
 	for scope, annotation := range annotationsToCheck {
 		if _, err := regexp.Compile(tenant.Spec.NamespaceOptions.ForbiddenLabels.Regex); err != nil {
 			response := admission.Denied(fmt.Sprintf("unable to compile %s regex for forbidden %s", annotation, scope))
