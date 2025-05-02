@@ -28,7 +28,7 @@ spec:
   - {{ include "capsule.fullname" . }}-webhook-service.{{ .Release.Namespace }}.svc
   - {{ include "capsule.fullname" . }}-webhook-service.{{ .Release.Namespace }}.svc.cluster.local
   {{- range  .Values.certManager.additionalSANS }}
-  - {{ toYaml . }} 
+  - {{ toYaml . }}
   {{- end }}
   issuerRef:
     kind: Issuer

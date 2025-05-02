@@ -19,7 +19,7 @@ CAPSULE_IMG     ?= $(REGISTRY)/$(IMG_BASE)
 CLUSTER_NAME    ?= capsule
 
 ## Kubernetes Version Support
-KUBERNETES_SUPPORTED_VERSION ?= "v1.31.0"
+KUBERNETES_SUPPORTED_VERSION ?= "v1.33.0"
 
 ## Tool Binaries
 KUBECTL ?= kubectl
@@ -46,7 +46,7 @@ all: manager
 # Run tests
 .PHONY: test
 test: test-clean generate manifests test-clean
-	@GO111MODULE=on go test -v ./... -coverprofile coverage.out
+	@GO111MODULE=on go test -v $(shell go list ./... | grep -v "e2e") -coverprofile coverage.out
 
 .PHONY: test-clean
 test-clean: ## Clean tests cache
@@ -217,7 +217,7 @@ goimports:
 # Linting code as PR is expecting
 .PHONY: golint
 golint: golangci-lint
-	$(GOLANGCI_LINT) run -c .golangci.yml --verbose --fix
+	$(GOLANGCI_LINT) run -c .golangci.yaml --verbose --fix
 
 # Running e2e tests in a KinD instance
 .PHONY: e2e
@@ -357,11 +357,11 @@ ko:
 	$(call go-install-tool,$(KO),github.com/$(KO_LOOKUP)@$(KO_VERSION))
 
 GOLANGCI_LINT          := $(LOCALBIN)/golangci-lint
-GOLANGCI_LINT_VERSION  := v1.64.5
+GOLANGCI_LINT_VERSION  := v2.1.5
 GOLANGCI_LINT_LOOKUP   := golangci/golangci-lint
 golangci-lint: ## Download golangci-lint locally if necessary.
 	@test -s $(GOLANGCI_LINT) && $(GOLANGCI_LINT) -h | grep -q $(GOLANGCI_LINT_VERSION) || \
-	$(call go-install-tool,$(GOLANGCI_LINT),github.com/$(GOLANGCI_LINT_LOOKUP)/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION))
+	$(call go-install-tool,$(GOLANGCI_LINT),github.com/$(GOLANGCI_LINT_LOOKUP)/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION))
 
 APIDOCS_GEN         := $(LOCALBIN)/crdoc
 APIDOCS_GEN_VERSION := v0.6.4

@@ -268,17 +268,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&servicelabelscontroller.EndpointsLabelsReconciler{
-		Log: ctrl.Log.WithName("controllers").WithName("EndpointLabels"),
-	}).SetupWithManager(ctx, manager); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "EndpointLabels")
-		os.Exit(1)
-	}
-
 	if err = (&servicelabelscontroller.EndpointSlicesLabelsReconciler{
-		Log:          ctrl.Log.WithName("controllers").WithName("EndpointSliceLabels"),
-		VersionMinor: kubeVersion.Minor(),
-		VersionMajor: kubeVersion.Major(),
+		Log: ctrl.Log.WithName("controllers").WithName("EndpointSliceLabels"),
 	}).SetupWithManager(ctx, manager); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "EndpointSliceLabels")
 	}

@@ -1,0 +1,83 @@
+version: "2"
+run:
+  tests: false
+  allow-parallel-runners: true
+linters:
+  default: all
+  disable:
+    - depguard
+    - err113
+    - exhaustruct
+    - funlen
+    - gochecknoglobals
+    - gochecknoinits
+    - ireturn
+    - lll
+    - mnd
+    - nilnil
+    - nonamedreturns
+    - paralleltest
+    - perfsprint
+    - recvcheck
+    - testpackage
+    - unparam
+    - varnamelen
+    - wrapcheck
+  settings:
+    cyclop:
+      max-complexity: 27
+    dupl:
+      threshold: 100
+    gocognit:
+      min-complexity: 50
+    goconst:
+      min-len: 2
+      min-occurrences: 2
+    goheader:
+      template: |-
+        Copyright 2020-2023 Project Capsule Authors.
+        SPDX-License-Identifier: Apache-2.0
+    inamedparam:
+      skip-single-param: true
+    nakedret:
+      max-func-lines: 50
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    paths:
+      - zz_.*\.go$
+      - .+\.generated.go
+      - .+_test.go
+      - .+_test_.+.go
+      - third_party$
+      - builtin$
+      - examples$
+formatters:
+  enable:
+    - gci
+    - gofmt
+    - gofumpt
+    - goimports
+  settings:
+    gci:
+      sections:
+        - standard
+        - default
+        - prefix(github.com/projectcapsule/capsule)
+    gofumpt:
+      module-path: github.com/projectcapsule/capsule
+      extra-rules: false
+  exclusions:
+    generated: lax
+    paths:
+      - zz_.*\.go$
+      - .+\.generated.go
+      - .+_test.go
+      - .+_test_.+.go
+      - third_party$
+      - builtin$
+      - examples$

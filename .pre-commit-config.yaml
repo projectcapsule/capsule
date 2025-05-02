@@ -9,7 +9,6 @@ repos:
   rev: v5.0.0
   hooks:
   - id: check-executables-have-shebangs
-  - id: check-yaml
   - id: double-quote-string-fixer
   - id: end-of-file-fixer
   - id: trailing-whitespace
@@ -35,24 +34,8 @@ repos:
     entry: make helm-lint
     language: system
     files: ^charts/
-  # Currently too slow smw
-  # - id: golangci-lint
-  #   name: Execute golangci-lint
-  #   entry: make golint
-  #   language: system
-  #   files: \.go$
-# - repo: https://github.com/tekwizely/pre-commit-golang
-#  rev: v1.0.0-rc.1
-#  hooks:
-#  - id: go-vet
-#  - id: go-vet-mod
-#  - id: go-vet-pkg
-#  - id: go-vet-repo-mod
-#  - id: go-vet-repo-pkg
-#  - id: go-revive
-#  - id: go-revive-mod
-#  - id: go-revive-repo-mod
-#  - id: go-sec-mod
-#  - id: go-sec-pkg
-#  - id: go-sec-repo-mod
-#  - id: go-sec-repo-pkg
+  - id: golangci-lint
+    name: Execute golangci-lint
+    entry: make golint
+    language: system
+    files: \.go$

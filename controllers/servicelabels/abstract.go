@@ -64,6 +64,17 @@ func (r *abstractServiceLabelsReconciler) Reconcile(ctx context.Context, request
 	return reconcile.Result{}, err
 }
 
+func (r *abstractServiceLabelsReconciler) IsNamespaceInTenant(ctx context.Context, namespace string) bool {
+	tl := &capsulev1beta2.TenantList{}
+	if err := r.client.List(ctx, tl, client.MatchingFieldsSelector{
+		Selector: fields.OneTermEqualSelector(".status.namespaces", namespace),
+	}); err != nil {
+		return false
+	}
+
+	return len(tl.Items) > 0
+}
+
 func (r *abstractServiceLabelsReconciler) getTenant(ctx context.Context, namespacedName types.NamespacedName, client client.Client) (*capsulev1beta2.Tenant, error) {
 	ns := &corev1.Namespace{}
 	tenant := &capsulev1beta2.Tenant{}
@@ -108,15 +119,4 @@ func (r *abstractServiceLabelsReconciler) forOptionPerInstanceName(ctx context.C
 	return builder.WithPredicates(predicate.NewPredicateFuncs(func(object client.Object) bool {
 		return r.IsNamespaceInTenant(ctx, object.GetNamespace())
 	}))
-}
-
-func (r *abstractServiceLabelsReconciler) IsNamespaceInTenant(ctx context.Context, namespace string) bool {
-	tl := &capsulev1beta2.TenantList{}
-	if err := r.client.List(ctx, tl, client.MatchingFieldsSelector{
-		Selector: fields.OneTermEqualSelector(".status.namespaces", namespace),
-	}); err != nil {
-		return false
-	}
-
-	return len(tl.Items) > 0
 }
