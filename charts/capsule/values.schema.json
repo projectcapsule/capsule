@@ -507,33 +507,33 @@
                                             "type": "array"
                                         }
                                     },
-                                  "type": "object"
+                                    "type": "object"
                                 }
                             },
-                          "type": "object"
+                            "type": "object"
                         },
-                      "customresources": {
-                        "properties": {
-                          "failurePolicy": {
-                            "type": "string"
-                          },
-                          "namespaceSelector": {
+                        "customresources": {
                             "properties": {
-                              "matchExpressions": {
-                                "items": {
-                                  "properties": {
-                                    "key": {
-                                      "type": "string"
-                                    },
-                                    "operator": {
-                                      "type": "string"
-                                    }
-                                  },
-                                  "type": "object"
+                                "failurePolicy": {
+                                    "type": "string"
                                 },
-                                "type": "array"
-                              }
-                            },
+                                "namespaceSelector": {
+                                    "properties": {
+                                        "matchExpressions": {
+                                            "items": {
+                                                "properties": {
+                                                    "key": {
+                                                        "type": "string"
+                                                    },
+                                                    "operator": {
+                                                        "type": "string"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            },
+                                            "type": "array"
+                                        }
+                                    },
                                     "type": "object"
                                 }
                             },
@@ -650,14 +650,14 @@
                                     "type": "object"
                                 }
                             },
-                          "type": "object"
+                            "type": "object"
                         },
-                      "namespaceCordoning": {
-                        "properties": {
-                          "failurePolicy": {
-                            "type": "string"
-                          }
-                        },
+                        "namespaceCordoning": {
+                            "properties": {
+                                "failurePolicy": {
+                                    "type": "string"
+                                }
+                            },
                             "type": "object"
                         },
                         "namespaceOwnerReference": {
