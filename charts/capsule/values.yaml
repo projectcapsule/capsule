@@ -275,10 +275,6 @@ webhooks:
             operator: Exists
     namespaceCordoning:
       failurePolicy: Fail
-      namespaceSelector:
-        matchExpressions:
-          - key: capsule.clastix.io/tenant
-            operator: Exists
     cordoning:
       failurePolicy: Fail
       namespaceSelector:

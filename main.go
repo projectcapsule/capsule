@@ -230,7 +230,7 @@ func main() {
 		route.OwnerReference(utils.InCapsuleGroups(cfg, ownerreference.Handler(cfg))),
 		route.Cordoning(tenant.CordoningHandler(cfg)),
 		route.Node(utils.InCapsuleGroups(cfg, node.UserMetadataHandler(cfg, kubeVersion))),
-		route.NamespacePatching(namespacewebhook.PatchingHandler(cfg)),
+		route.NamespaceCordoning(tenant.NamespaceCordoningHandler(cfg)),
 		route.CustomResources(tenant.ResourceCounterHandler(manager.GetClient())),
 		route.Defaults(defaults.Handler(cfg, kubeVersion)),
 	)
