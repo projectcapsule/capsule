@@ -52,7 +52,6 @@ func (h *patchingHandler) OnDelete(client.Client, admission.Decoder, record.Even
 
 func (h *patchingHandler) OnUpdate(c client.Client, decoder admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-
 		oldNs := &corev1.Namespace{}
 		if err := decoder.DecodeRaw(req.OldObject, oldNs); err != nil {
 			return utils.ErroredResponse(err)
@@ -77,6 +76,7 @@ func (h *patchingHandler) OnUpdate(c client.Client, decoder admission.Decoder, r
 		if err := decoder.Decode(req, newNs); err != nil {
 			return utils.ErroredResponse(err)
 		}
+
 		o, err := json.Marshal(newNs.DeepCopy())
 		if err != nil {
 			response := admission.Errored(http.StatusInternalServerError, err)
@@ -309,16 +309,22 @@ func (h *patchingHandler) validateNamespacePrefix(ns *corev1.Namespace, tenant *
 
 func (h *patchingHandler) adjustCordonedLabel(ctx context.Context, c client.Client, ns corev1.Namespace) error {
 	tnt := &capsulev1beta2.Tenant{}
+
 	ln, err := capsuleutils.GetTypeLabel(tnt)
+	if err != nil {
+		return err
+	}
+
 	if label, ok := ns.Labels[ln]; ok {
 		if err = c.Get(ctx, types.NamespacedName{Name: label}, tnt); err != nil {
 			admission.Errored(http.StatusInternalServerError, err)
 		}
 	}
+
 	if !tnt.Spec.Cordoned {
-		fmt.Printf("Tenant is no longer cordoned\n")
 		delete(ns.Labels, "projectcapsule.dev/cordoned")
 	}
+
 	return nil
 }
 
