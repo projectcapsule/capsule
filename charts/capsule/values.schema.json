@@ -652,7 +652,7 @@
                             },
                             "type": "object"
                         },
-                        "namespaceCordoning": {
+                      "namespaceOwnerReference": {
                             "properties": {
                                 "failurePolicy": {
                                     "type": "string"
@@ -660,7 +660,7 @@
                             },
                             "type": "object"
                         },
-                        "namespaceOwnerReference": {
+                      "namespacePatching": {
                             "properties": {
                                 "failurePolicy": {
                                     "type": "string"

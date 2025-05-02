@@ -81,7 +81,7 @@ webhooks:
   sideEffects: None
   timeoutSeconds: {{ $.Values.webhooks.mutatingWebhooksTimeoutSeconds }}
 {{- end }}
-{{- with .Values.webhooks.hooks.namespaceCordoning }}
+{{- with .Values.webhooks.hooks.namespacePatching }}
 - admissionReviewVersions:
     - v1
     - v1beta1

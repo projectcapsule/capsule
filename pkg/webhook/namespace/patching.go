@@ -99,7 +99,7 @@ func (h *patchingHandler) OnUpdate(c client.Client, decoder admission.Decoder, r
 		}
 
 		newNs.OwnerReferences = refs
-		if err := h.adjustCordonedLabel(ctx, c, *newNs); err != nil {
+		if err := h.syncNamespaceCordonLabel(ctx, c, *newNs); err != nil {
 			return utils.ErroredResponse(err)
 		}
 
@@ -307,7 +307,7 @@ func (h *patchingHandler) validateNamespacePrefix(ns *corev1.Namespace, tenant *
 	return nil
 }
 
-func (h *patchingHandler) adjustCordonedLabel(ctx context.Context, c client.Client, ns corev1.Namespace) error {
+func (h *patchingHandler) syncNamespaceCordonLabel(ctx context.Context, c client.Client, ns corev1.Namespace) error {
 	tnt := &capsulev1beta2.Tenant{}
 
 	ln, err := capsuleutils.GetTypeLabel(tnt)
@@ -323,6 +323,8 @@ func (h *patchingHandler) adjustCordonedLabel(ctx context.Context, c client.Clie
 
 	if !tnt.Spec.Cordoned {
 		delete(ns.Labels, "projectcapsule.dev/cordoned")
+	} else {
+		ns.Labels["projectcapsule.dev/cordoned"] = "true"
 	}
 
 	return nil
