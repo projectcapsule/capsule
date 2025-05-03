@@ -6,6 +6,7 @@ package main
 import (
 	goflag "flag"
 	"fmt"
+	"github.com/projectcapsule/capsule/pkg/webhook/ownerreference"
 	"os"
 	goRuntime "runtime"
 
@@ -228,7 +229,7 @@ func main() {
 		route.Tenant(tenant.NameHandler(), tenant.RoleBindingRegexHandler(), tenant.IngressClassRegexHandler(), tenant.StorageClassRegexHandler(), tenant.ContainerRegistryRegexHandler(), tenant.HostnameRegexHandler(), tenant.FreezedEmitter(), tenant.ServiceAccountNameHandler(), tenant.ForbiddenAnnotationsRegexHandler(), tenant.ProtectedHandler(), tenant.MetaHandler()),
 		route.Cordoning(tenant.CordoningHandler(cfg)),
 		route.Node(utils.InCapsuleGroups(cfg, node.UserMetadataHandler(cfg, kubeVersion))),
-		route.NamespacePatch(utils.InCapsuleGroups(cfg, namespacewebhook.PatchingHandler(cfg))),
+		route.NamespacePatch(utils.InCapsuleGroups(cfg, namespacewebhook.PatchingHandler(cfg), ownerreference.Handler(cfg))),
 		route.CustomResources(tenant.ResourceCounterHandler(manager.GetClient())),
 		route.Defaults(defaults.Handler(cfg, kubeVersion)),
 	)
