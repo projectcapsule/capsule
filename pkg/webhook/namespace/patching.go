@@ -29,7 +29,7 @@ func PatchingHandler(cfg configuration.Configuration) capsulewebhook.Handler {
 	}
 }
 
-func (h *patchingHandler) OnCreate(client client.Client, decoder admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
+func (h *patchingHandler) OnCreate(client.Client, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		return nil
 	}
@@ -41,10 +41,10 @@ func (h *patchingHandler) OnDelete(client.Client, admission.Decoder, record.Even
 	}
 }
 
-func (h *patchingHandler) OnUpdate(c client.Client, decoder admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
+func (h *patchingHandler) OnUpdate(c client.Client, decoder admission.Decoder, _ record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		ns := &corev1.Namespace{}
-		if err := decoder.DecodeRaw(req.OldObject, ns); err != nil {
+		if err := decoder.Decode(req, ns); err != nil {
 			return utils.ErroredResponse(err)
 		}
 		err := h.syncNamespaceCordonLabel(ctx, c, *ns)
