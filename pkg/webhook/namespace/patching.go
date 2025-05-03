@@ -30,7 +30,7 @@ func PatchingHandler(cfg configuration.Configuration) capsulewebhook.Handler {
 }
 
 func (h *patchingHandler) OnCreate(client.Client, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
-	return func(ctx context.Context, req admission.Request) *admission.Response {
+	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
