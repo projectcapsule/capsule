@@ -9,6 +9,8 @@ spec:
       capsule.clastix.io/tenant: solar
   - matchLabels:
       capsule.clastix.io/tenant: wind
+  - matchLabels:
+      test: "ns"
   quota:
     hard:
       count/pods: "10"
@@ -18,6 +20,9 @@ kind: ResourcePool
 metadata:
   name: sampler
 spec:
+  config:
+    defaultsZero: false
+    orderedQueue: true
   selectors:
   - matchLabels:
       capsule.clastix.io/tenant: solar

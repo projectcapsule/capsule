@@ -1,4 +1,4 @@
-// Copyright 2024 Peak Scale
+// Copyright 2020-2023 Project Capsule Authors.
 // SPDX-License-Identifier: Apache-2.0
 
 package meta
@@ -17,7 +17,7 @@ const (
 	BoundReason string = "Bound"
 
 	// FailedReason indicates a condition or event observed a failure (Claim Rejected).
-	FailedReason string = "Rejected"
+	FailedReason string = "Unassigned"
 	QueuedReason string = "Queued"
 
 	// ProgressingReason indicates a condition or event observed progression, for example when the reconciliation of a

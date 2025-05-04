@@ -6,14 +6,16 @@ package resourcepools
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/go-logr/logr"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
@@ -55,32 +57,42 @@ func (r resourceClaimController) Reconcile(ctx context.Context, request ctrl.Req
 	}
 
 	// Ensuring the Quota Status
-	err = r.reconcile(ctx, instance)
+	err = r.reconcile(ctx, log, instance)
 
 	// Emit a Metric in any case
 	r.Metrics.RecordClaimCondition(instance)
 
 	if err != nil {
-		log.Error(err, "Cannot update Tenant status")
-
-		return
+		return ctrl.Result{
+			RequeueAfter: time.Minute,
+		}, err
 	}
 
 	return ctrl.Result{}, err
 }
 
 // This Controller is responsible for assigning Claims to ResourcePools.
-// Everything else will be handeled by the ResourcePool Controller
+// Everything else will be handeled by the ResourcePool Controller.
 func (r resourceClaimController) reconcile(
 	ctx context.Context,
+	log logr.Logger,
 	claim *capsulev1beta2.ResourcePoolClaim,
 ) (err error) {
 	pool, err := r.evaluateResourcePool(ctx, claim)
 	if err != nil {
-		claim.Status.Condition = meta.NewNotReadyCondition(claim, err.Error())
+		claim.Status.Pool = api.StatusNameUID{}
+
+		updateStatusAndEmitEvent(
+			ctx,
+			r.Recorder,
+			claim,
+			meta.NewNotReadyCondition(claim, err.Error()),
+		)
+
+		return r.Client.Status().Update(ctx, claim)
 	}
 
-	return r.allocateResourcePool(ctx, claim, pool)
+	return r.allocateResourcePool(ctx, log, claim, pool)
 }
 
 // Verify a Pool can be allocated.
@@ -101,12 +113,10 @@ func (r resourceClaimController) evaluateResourcePool(
 	}
 
 	pool = &capsulev1beta2.ResourcePool{}
-	err = r.Get(ctx, client.ObjectKey{
+	if err := r.Get(ctx, client.ObjectKey{
 		Name: poolName,
-	}, pool)
-
-	if err != nil {
-		return
+	}, pool); err != nil {
+		return nil, err
 	}
 
 	// Validates if Resources can be allocated in the first place
@@ -114,7 +124,7 @@ func (r resourceClaimController) evaluateResourcePool(
 		_, exists := pool.Status.Allocation.Hard[resourceName]
 		if !exists {
 			return nil, fmt.Errorf(
-				"Resource %s is not available in pool %s",
+				"resource %s is not available in pool %s",
 				resourceName,
 				pool.Name,
 			)
@@ -126,7 +136,8 @@ func (r resourceClaimController) evaluateResourcePool(
 
 func (r resourceClaimController) allocateResourcePool(
 	ctx context.Context,
-	claim *capsulev1beta2.ResourcePoolClaim,
+	log logr.Logger,
+	cl *capsulev1beta2.ResourcePoolClaim,
 	pool *capsulev1beta2.ResourcePool,
 ) (err error) {
 	allocate := api.StatusNameUID{
@@ -134,28 +145,65 @@ func (r resourceClaimController) allocateResourcePool(
 		UID:  pool.GetUID(),
 	}
 
-	if claim.Status.Pool.Name == allocate.Name &&
-		claim.Status.Pool.UID == allocate.UID {
+	if !meta.HasLooseOwnerReference(cl, pool) {
+		log.V(5).Info("adding ownerreference for", "pool", pool.Name)
+
+		patch := client.MergeFrom(cl.DeepCopy())
+
+		if err := meta.SetLooseOwnerReference(cl, pool, r.Scheme()); err != nil {
+			return err
+		}
+
+		if err := r.Client.Patch(ctx, cl, patch); err != nil {
+			return err
+		}
+	}
+
+	if cl.Status.Pool.Name == allocate.Name &&
+		cl.Status.Pool.UID == allocate.UID {
 		return nil
 	}
 
 	// Set claim pool in status and condition
-	claim.Status = capsulev1beta2.ResourcePoolClaimStatus{
+	cl.Status = capsulev1beta2.ResourcePoolClaimStatus{
 		Pool:      allocate,
-		Condition: meta.NewQueuedReasonCondition(claim),
-	}
-
-	// Set metadata (owner ref)
-	if _, err := controllerutil.CreateOrUpdate(ctx, r.Client, claim.DeepCopy(), func() error {
-		return controllerutil.SetOwnerReference(pool, claim, r.Scheme())
-	}); err != nil {
-		return err
+		Condition: meta.NewQueuedReasonCondition(cl),
 	}
 
 	// Update status in a separate call
-	if err := r.Client.Status().Update(ctx, claim); err != nil {
+	if err := r.Client.Status().Update(ctx, cl); err != nil {
 		return err
 	}
 
 	return nil
+}
+
+// Update the Status of a claim and emit an event if Status changed.
+func updateStatusAndEmitEvent(
+	ctx context.Context,
+	recorder record.EventRecorder,
+	claim *capsulev1beta2.ResourcePoolClaim,
+	condition metav1.Condition,
+) {
+	if condition.Reason == claim.Status.Condition.Reason && condition.Message == claim.Status.Condition.Message {
+		return
+	}
+
+	claim.Status.Condition = condition
+	eventType := corev1.EventTypeNormal
+
+	if claim.Status.Condition.Status == metav1.ConditionFalse {
+		eventType = corev1.EventTypeWarning
+	}
+
+	recorder.AnnotatedEventf(
+		claim,
+		map[string]string{
+			"Status": string(claim.Status.Condition.Status),
+			"Type":   claim.Status.Condition.Type,
+		},
+		eventType,
+		claim.Status.Condition.Reason,
+		claim.Status.Condition.Message,
+	)
 }

@@ -17,27 +17,28 @@ type ResourcePoolSpec struct {
 	// Define resourcequotas for the namespaces
 	Quota corev1.ResourceQuotaSpec `json:"quota"`
 	// The maxmum amount of resources that can be claimed from a resourcequota in a namespace
-	MaximumAllocation corev1.ResourceList `json:"namespaceMaximum,omitempty"`
+	MaximumNamespaceAllocation corev1.ResourceList `json:"namespaceMaximum,omitempty"`
 	// The Defaults given for each namespace, the default is not counted towards the total allocation
 	// When you use claims it's recommended to provision Defaults as the prevent the scheduling of any resources
-	Defaults *ResourcePoolDefaults `json:"defaults,omitempty"`
+	Defaults corev1.ResourceList `json:"defaults,omitempty"`
+	// Additional Configuration
+	//+kubebuilder:default:={}
+	Config ResourcePoolSpecConfiguration `json:"config,omitempty"`
+}
+
+type ResourcePoolSpecConfiguration struct {
+	// Enable Distribution of Defaults for each namespace
+	// This allocates the default resources to each resourcequota responsible for a namespace.
+	// The Defaults serve as a base for the resource allocation, and are not counted towards the total allocation
+	// +kubebuilder:default=true
+	DefaultsAssignZero *bool `json:"defaultsZero,omitempty"`
+
 	// Claims are queued whenever they are allocated to a pool. A pool tries to allocate claims in order based on their
 	// creation date.
 	// Disabling this option will cause the resource pool to allocate claims which still fit in the remaining available resources.
 	// This disregards any ordering of the claims.
 	// +kubebuilder:default=false
-	OrderedQueue bool `json:"orderedQueue,omitempty"`
-}
-
-type ResourcePoolDefaults struct {
-	// Enable Distribution of Defaults for each namespace
-	// This allocates the default resources to each resourcequota responsible for a namespace.
-	// The Defaults serve as a base for the resource allocation, and are not counted towards the total allocation
-	// +kubebuilder:default=true
-	Enabled bool `json:"enabled,omitempty"`
-	// The Defaults given for each namespace, the default is not counted towards the total allocation
-	// When you use claims it's recommended to provision Defaults as the prevent the scheduling of any resources
-	Resources corev1.ResourceList `json:"resources,omitempty"`
+	OrderedQueue *bool `json:"orderedQueue,omitempty"`
 }
 
 // +kubebuilder:object:root=true

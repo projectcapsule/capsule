@@ -7,6 +7,7 @@ import (
 	"errors"
 	"sort"
 
+	"github.com/go-logr/logr"
 	"github.com/projectcapsule/capsule/pkg/api"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -27,11 +28,14 @@ func (r *ResourcePool) AssignNamespaces(namespaces []corev1.Namespace) {
 	r.Status.Namespaces = l
 }
 
-func (r *ResourcePool) GetClaimFromStatus(cl *ResourcePoolClaim) *ResourcePoolClaimsItem {
+func (r *ResourcePool) GetClaimFromStatus(log logr.Logger, cl *ResourcePoolClaim) *ResourcePoolClaimsItem {
 	ns := cl.Namespace
+
+	log.V(5).Info("LOOKUP NAMESAPCE", "NS", ns)
 
 	claims := r.Status.Claims[ns]
 	if claims == nil {
+		log.V(5).Info("EMPTY CLAIMS")
 		return nil
 	}
 
@@ -40,6 +44,8 @@ func (r *ResourcePool) GetClaimFromStatus(cl *ResourcePoolClaim) *ResourcePoolCl
 			return claim
 		}
 	}
+
+	log.V(5).Info("NOT FOUND")
 
 	return nil
 }
@@ -61,9 +67,8 @@ func (r *ResourcePool) AddClaimToStatus(claim *ResourcePoolClaim) {
 
 	scl := &ResourcePoolClaimsItem{
 		StatusNameUID: api.StatusNameUID{
-			UID:       claim.UID,
-			Name:      api.Name(claim.Name),
-			Namespace: api.Name(ns),
+			UID:  claim.UID,
+			Name: api.Name(claim.Name),
 		},
 		Claims: claim.Spec.ResourceClaims,
 	}
@@ -115,8 +120,6 @@ func (r *ResourcePool) CalculateUsage() {
 		for r, _ := range r.Status.Allocation.Hard {
 			usage[r] = resource.MustParse("0")
 		}
-
-		return
 	} else {
 		for _, claims := range r.Status.Claims {
 			for _, claim := range claims {
@@ -151,11 +154,11 @@ func (g *ResourcePool) CanClaimFromPool(claim corev1.ResourceList) []error {
 	return errs
 }
 
-func (g *ResourcePool) GetAvailableClaimableResources() corev1.ResourceList {
-	hard := g.Status.Allocation.Hard.DeepCopy()
+func (r *ResourcePool) GetAvailableClaimableResources() corev1.ResourceList {
+	hard := r.Status.Allocation.Hard.DeepCopy()
 
 	for resourceName, qt := range hard {
-		claimed, exists := g.Status.Allocation.Claimed[resourceName]
+		claimed, exists := r.Status.Allocation.Claimed[resourceName]
 		if !exists {
 			claimed = resource.MustParse("0")
 		}
@@ -170,12 +173,12 @@ func (g *ResourcePool) GetAvailableClaimableResources() corev1.ResourceList {
 
 // Retrieves Default-Values, Only Resources which are mentioned in the Quota Hard Spec are given with a default
 // If nothing is set, the value will be set to zero
-func (g *ResourcePool) GetResourceDefaults() corev1.ResourceList {
+func (r *ResourcePool) GetResourceDefaults() corev1.ResourceList {
 	defaults := corev1.ResourceList{}
 
-	for resourceName := range g.Spec.Quota.Hard {
-		amount, exists := g.Spec.Defaults.Resources[resourceName]
-		if !exists {
+	for resourceName := range r.Spec.Quota.Hard {
+		amount, exists := r.Spec.Defaults[resourceName]
+		if !exists && *r.Spec.Config.DefaultsAssignZero {
 			amount = resource.MustParse("0")
 		}
 
@@ -189,35 +192,33 @@ func (g *ResourcePool) GetResourceDefaults() corev1.ResourceList {
 // This takes into account the default resources being used. However they don't count towards the claim usage
 // This can be changed in the future, the default is not calculated as usage because this might interrupt the namespace management
 // As we would need to verify if a new namespace with it's defaults still has place in the Pool. Same with attempting to join exisitng namespaces
-func (g *ResourcePool) GetResourceQuotaHardResources(namespace string) corev1.ResourceList {
+func (r *ResourcePool) GetResourceQuotaHardResources(namespace string) corev1.ResourceList {
 	// Read Resources which are claimed
-	_, claimed := g.GetNamespaceClaims(namespace)
+	_, claimed := r.GetNamespaceClaims(namespace)
 
 	// Only Consider Default, when enabled
-	if g.Spec.Defaults.Enabled {
-		for resourceName, amount := range g.GetResourceDefaults() {
-			usedValue, usedExists := claimed[resourceName]
-			if !usedExists {
-				usedValue = resource.MustParse("0")
-			}
-
-			// Combine with claim
-			usedValue.Add(amount)
-
-			claimed[resourceName] = usedValue
+	for resourceName, amount := range r.GetResourceDefaults() {
+		usedValue, usedExists := claimed[resourceName]
+		if !usedExists {
+			usedValue = resource.MustParse("0")
 		}
+
+		// Combine with claim
+		usedValue.Add(amount)
+
+		claimed[resourceName] = usedValue
 	}
 
 	return claimed
 }
 
 // Gets the total amount of claimed resources for a namespace
-func (g *ResourcePool) GetNamespaceClaims(namespace string) (claims map[string]*ResourcePoolClaimsItem, claimedResources corev1.ResourceList) {
+func (r *ResourcePool) GetNamespaceClaims(namespace string) (claims map[string]*ResourcePoolClaimsItem, claimedResources corev1.ResourceList) {
 	claimedResources = corev1.ResourceList{}
 	claims = map[string]*ResourcePoolClaimsItem{}
 
 	// First, check if quota exists in the status
-	for ns, cl := range g.Status.Claims {
+	for ns, cl := range r.Status.Claims {
 		if ns != namespace {
 			continue
 		}
@@ -243,11 +244,11 @@ func (g *ResourcePool) GetNamespaceClaims(namespace string) (claims map[string]*
 }
 
 // Calculate usage for each namespace
-func (g *ResourcePool) GetClaimedByNamespaceClaims() (claims map[string]corev1.ResourceList) {
+func (r *ResourcePool) GetClaimedByNamespaceClaims() (claims map[string]corev1.ResourceList) {
 	claims = map[string]corev1.ResourceList{}
 
 	// First, check if quota exists in the status
-	for ns, cl := range g.Status.Claims {
+	for ns, cl := range r.Status.Claims {
 		claims[ns] = corev1.ResourceList{}
 		nsScope := claims[ns]
 

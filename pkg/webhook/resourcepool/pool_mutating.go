@@ -89,24 +89,18 @@ func (h *poolMutationHandler) OnUpdate(c client.Client, decoder admission.Decode
 func (h *poolMutationHandler) handleDefaults(
 	pool *capsulev1beta2.ResourcePool,
 ) {
-	h.log.V(1).Info("Handling defaults", "state", pool.Spec.Defaults, "pool", pool.Name)
-
-	if pool.Spec.Defaults == nil {
-		pool.Spec.Defaults = &capsulev1beta2.ResourcePoolDefaults{Enabled: true}
-	}
-
-	if !pool.Spec.Defaults.Enabled {
+	if !*pool.Spec.Config.DefaultsAssignZero {
 		return
 	}
 
 	defaults := corev1.ResourceList{}
 
-	if pool.Spec.Defaults.Resources == nil {
-		pool.Spec.Defaults.Resources = corev1.ResourceList{}
+	if pool.Spec.Defaults == nil {
+		pool.Spec.Defaults = corev1.ResourceList{}
 	}
 
 	for resourceName := range pool.Spec.Quota.Hard {
-		amount, exists := pool.Spec.Defaults.Resources[resourceName]
+		amount, exists := pool.Spec.Defaults[resourceName]
 		if !exists {
 			amount = resource.MustParse("0")
 		}
@@ -114,5 +108,5 @@ func (h *poolMutationHandler) handleDefaults(
 		defaults[resourceName] = amount
 	}
 
-	pool.Spec.Defaults.Resources = defaults
+	pool.Spec.Defaults = defaults
 }
