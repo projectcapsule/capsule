@@ -81,28 +81,34 @@ webhooks:
   sideEffects: None
   timeoutSeconds: {{ $.Values.webhooks.mutatingWebhooksTimeoutSeconds }}
 {{- end }}
-{{- with .Values.webhooks.hooks.namespaceOwnerReference }}
+{{- with (mergeOverwrite .Values.webhooks.hooks.namespace.mutation .Values.webhooks.hooks.namespaceOwnerReference) }}
 - admissionReviewVersions:
     - v1
     - v1beta1
   clientConfig:
-    {{- include "capsule.webhooks.service" (dict "path" "/namespace-owner-reference" "ctx" $) | nindent 4 }}
+    {{- include "capsule.webhooks.service" (dict "path" "/namespace-patch" "ctx" $) | nindent 4 }}
   failurePolicy: {{ .failurePolicy }}
   matchPolicy: Equivalent
-  name: owner.namespace.projectcapsule.dev
-  namespaceSelector: {}
-  objectSelector: {}
+  name: namespace-patching.tenants.projectcapsule.dev
+  {{- with .namespaceSelector }}
+  namespaceSelector:
+    {{- toYaml . |  nindent 4 }}
+  {{- end }}
+  {{- with .objectSelector }}
+  objectSelector:
+    {{- toYaml . |  nindent 4 }}
+  {{- end }}
   reinvocationPolicy: Never
   rules:
     - apiGroups:
-      - ""
+        - ""
       apiVersions:
-      - v1
+        - v1
       operations:
-      - CREATE
-      - UPDATE
+        - CREATE
+        - UPDATE
       resources:
-      - namespaces
+        - namespaces
       scope: '*'
   sideEffects: NoneOnDryRun
   timeoutSeconds: {{ $.Values.webhooks.mutatingWebhooksTimeoutSeconds }}

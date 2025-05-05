@@ -1,7 +1,7 @@
 // Copyright 2020-2023 Project Capsule Authors.
 // SPDX-License-Identifier: Apache-2.0
 
-package ownerreference
+package mutation
 
 import (
 	"context"
@@ -28,29 +28,29 @@ import (
 	"github.com/projectcapsule/capsule/pkg/webhook/utils"
 )
 
-type handler struct {
+type ownerReferenceHandler struct {
 	cfg configuration.Configuration
 }
 
-func Handler(cfg configuration.Configuration) capsulewebhook.Handler {
-	return &handler{
+func OwnerReferenceHandler(cfg configuration.Configuration) capsulewebhook.Handler {
+	return &ownerReferenceHandler{
 		cfg: cfg,
 	}
 }
 
-func (h *handler) OnCreate(client client.Client, decoder admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
+func (h *ownerReferenceHandler) OnCreate(client client.Client, decoder admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		return h.setOwnerRef(ctx, req, client, decoder, recorder)
 	}
 }
 
-func (h *handler) OnDelete(client.Client, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
+func (h *ownerReferenceHandler) OnDelete(client.Client, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (h *handler) OnUpdate(c client.Client, decoder admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
+func (h *ownerReferenceHandler) OnUpdate(c client.Client, decoder admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		oldNs := &corev1.Namespace{}
 		if err := decoder.DecodeRaw(req.OldObject, oldNs); err != nil {
@@ -113,7 +113,7 @@ func (h *handler) OnUpdate(c client.Client, decoder admission.Decoder, recorder 
 	}
 }
 
-func (h *handler) namespaceIsOwned(ns *corev1.Namespace, tenantList *capsulev1beta2.TenantList, req admission.Request) bool {
+func (h *ownerReferenceHandler) namespaceIsOwned(ns *corev1.Namespace, tenantList *capsulev1beta2.TenantList, req admission.Request) bool {
 	for _, tenant := range tenantList.Items {
 		for _, ownerRef := range ns.OwnerReferences {
 			if !capsuleutils.IsTenantOwnerReference(ownerRef) {
@@ -129,7 +129,7 @@ func (h *handler) namespaceIsOwned(ns *corev1.Namespace, tenantList *capsulev1be
 	return false
 }
 
-func (h *handler) setOwnerRef(ctx context.Context, req admission.Request, client client.Client, decoder admission.Decoder, recorder record.EventRecorder) *admission.Response {
+func (h *ownerReferenceHandler) setOwnerRef(ctx context.Context, req admission.Request, client client.Client, decoder admission.Decoder, recorder record.EventRecorder) *admission.Response {
 	ns := &corev1.Namespace{}
 	if err := decoder.Decode(req, ns); err != nil {
 		response := admission.Errored(http.StatusBadRequest, err)
@@ -255,7 +255,7 @@ func (h *handler) setOwnerRef(ctx context.Context, req admission.Request, client
 	return &response
 }
 
-func (h *handler) patchResponseForOwnerRef(tenant *capsulev1beta2.Tenant, ns *corev1.Namespace, recorder record.EventRecorder) admission.Response {
+func (h *ownerReferenceHandler) patchResponseForOwnerRef(tenant *capsulev1beta2.Tenant, ns *corev1.Namespace, recorder record.EventRecorder) admission.Response {
 	scheme := runtime.NewScheme()
 	_ = capsulev1beta2.AddToScheme(scheme)
 	_ = corev1.AddToScheme(scheme)
@@ -281,7 +281,7 @@ func (h *handler) patchResponseForOwnerRef(tenant *capsulev1beta2.Tenant, ns *co
 	return admission.PatchResponseFromRaw(o, c)
 }
 
-func (h *handler) listTenantsForOwnerKind(ctx context.Context, ownerKind string, ownerName string, clt client.Client) (*capsulev1beta2.TenantList, error) {
+func (h *ownerReferenceHandler) listTenantsForOwnerKind(ctx context.Context, ownerKind string, ownerName string, clt client.Client) (*capsulev1beta2.TenantList, error) {
 	tntList := &capsulev1beta2.TenantList{}
 	fields := client.MatchingFields{
 		".spec.owner.ownerkind": fmt.Sprintf("%s:%s", ownerKind, ownerName),
@@ -291,7 +291,7 @@ func (h *handler) listTenantsForOwnerKind(ctx context.Context, ownerKind string,
 	return tntList, err
 }
 
-func (h *handler) validateNamespacePrefix(ns *corev1.Namespace, tenant *capsulev1beta2.Tenant) *admission.Response {
+func (h *ownerReferenceHandler) validateNamespacePrefix(ns *corev1.Namespace, tenant *capsulev1beta2.Tenant) *admission.Response {
 	// Check if ForceTenantPrefix is true
 	if tenant.Spec.ForceTenantPrefix != nil && *tenant.Spec.ForceTenantPrefix {
 		if !strings.HasPrefix(ns.GetName(), fmt.Sprintf("%s-", tenant.GetName())) {

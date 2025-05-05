@@ -512,6 +512,37 @@
                             },
                             "type": "object"
                         },
+                        "customresources": {
+                            "properties": {
+                                "failurePolicy": {
+                                    "type": "string"
+                                },
+                                "namespaceSelector": {
+                                    "properties": {
+                                        "matchExpressions": {
+                                            "items": {
+                                                "properties": {
+                                                    "key": {
+                                                        "type": "string"
+                                                    },
+                                                    "operator": {
+                                                        "type": "string"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            },
+                                            "type": "array"
+                                        }
+                                    },
+                                    "type": "object"
+                                },
+                                "objectSelector": {
+                                    "properties": {},
+                                    "type": "object"
+                                }
+                            },
+                            "type": "object"
+                        },
                         "defaults": {
                             "properties": {
                                 "ingress": {
@@ -618,6 +649,35 @@
                                                 "type": "object"
                                             },
                                             "type": "array"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            },
+                            "type": "object"
+                        },
+                        "namespace": {
+                            "properties": {
+                                "mutation": {
+                                    "properties": {
+                                        "failurePolicy": {
+                                            "type": "string"
+                                        },
+                                        "namespaceSelector": {
+                                            "properties": {},
+                                            "type": "object"
+                                        },
+                                        "objectSelector": {
+                                            "properties": {},
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                },
+                                "validation": {
+                                    "properties": {
+                                        "failurePolicy": {
+                                            "type": "string"
                                         }
                                     },
                                     "type": "object"

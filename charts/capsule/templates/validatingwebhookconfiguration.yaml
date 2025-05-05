@@ -274,4 +274,36 @@ webhooks:
   sideEffects: None
   timeoutSeconds: {{ $.Values.webhooks.validatingWebhooksTimeoutSeconds }}
 {{- end }}
+{{- with .Values.webhooks.hooks.customresources }}
+- admissionReviewVersions:
+    - v1
+    - v1beta1
+  clientConfig:
+    {{- include "capsule.webhooks.service" (dict "path" "/customresources" "ctx" $) | nindent 4 }}
+  failurePolicy: {{ .failurePolicy }}
+  matchPolicy: Equivalent
+  name: customresources.tenant.projectcapsule.dev
+  {{- with .namespaceSelector }}
+  namespaceSelector:
+    {{- toYaml . |  nindent 4 }}
+  {{- end }}
+  {{- with .objectSelector }}
+  objectSelector:
+    {{- toYaml . |  nindent 4 }}
+  {{- end }}
+  rules:
+    - apiGroups:
+        - '*'
+      apiVersions:
+        - '*'
+      operations:
+        - CREATE
+        - UPDATE
+        - DELETE
+      resources:
+        - '*'
+      scope: Namespaced
+  sideEffects: None
+  timeoutSeconds: {{ $.Values.webhooks.validatingWebhooksTimeoutSeconds }}
+{{- end }}
 {{- end }}
