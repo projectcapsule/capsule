@@ -69,7 +69,7 @@ var _ = Describe("cordoning a Tenant", func() {
 			}).Should(Succeed())
 		})
 
-		By("should contains the cordoned Capsule label", func() {
+		By("should contain the cordoned Capsule label", func() {
 			Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: tnt.Name}, tnt)).Should(Succeed())
 
 			tnt.Spec.Cordoned = true
@@ -106,7 +106,7 @@ var _ = Describe("cordoning a Tenant", func() {
 			Expect(cs.CoreV1().Pods(ns.Name).Delete(context.Background(), pod.Name, metav1.DeleteOptions{})).Should(Succeed())
 		})
 
-		By("should not contains the cordoned Capsule label", func() {
+		By("should not contain the cordoned Capsule label", func() {
 			Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: tnt.Name}, tnt)).Should(Succeed())
 
 			tnt.Spec.Cordoned = false
