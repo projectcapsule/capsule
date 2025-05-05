@@ -276,7 +276,7 @@ webhooks:
       objectSelector: {}
     namespace:
       validation:
-         failurePolicy: Fail
+        failurePolicy: Fail
       mutation:
         failurePolicy: Fail
         namespaceSelector: {}

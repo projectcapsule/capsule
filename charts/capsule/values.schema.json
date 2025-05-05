@@ -656,39 +656,39 @@
                             },
                             "type": "object"
                         },
-                      "namespace": {
+                        "namespace": {
                             "properties": {
-                              "mutation": {
-                                "properties": {
-                                  "failurePolicy": {
-                                    "type": "string"
-                                  },
-                                  "namespaceSelector": {
-                                    "properties": {},
+                                "mutation": {
+                                    "properties": {
+                                        "failurePolicy": {
+                                            "type": "string"
+                                        },
+                                        "namespaceSelector": {
+                                            "properties": {},
+                                            "type": "object"
+                                        },
+                                        "objectSelector": {
+                                            "properties": {},
+                                            "type": "object"
+                                        }
+                                    },
                                     "type": "object"
-                                  },
-                                  "objectSelector": {
-                                    "properties": {},
+                                },
+                                "validation": {
+                                    "properties": {
+                                        "failurePolicy": {
+                                            "type": "string"
+                                        }
+                                    },
                                     "type": "object"
-                                  }
-                                },
-                                "type": "object"
-                              },
-                              "validation": {
-                                "properties": {
-                                  "failurePolicy": {
-                                    "type": "string"
-                                  }
-                                },
-                                "type": "object"
-                              }
+                                }
                             },
-                        "type": "object"
-                      },
-                      "namespaceOwnerReference": {
-                        "properties": {
-                          "failurePolicy": {
-                            "type": "string"
+                            "type": "object"
+                        },
+                        "namespaceOwnerReference": {
+                            "properties": {
+                                "failurePolicy": {
+                                    "type": "string"
                                 }
                             },
                             "type": "object"
