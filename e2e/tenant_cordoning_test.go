@@ -5,6 +5,7 @@ package e2e
 
 import (
 	"context"
+	"github.com/projectcapsule/capsule/pkg/utils"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -40,7 +41,6 @@ var _ = Describe("cordoning a Tenant", func() {
 	JustAfterEach(func() {
 		Expect(k8sClient.Delete(context.TODO(), tnt)).Should(Succeed())
 	})
-
 	It("should block or allow operations", func() {
 		cs := ownerClient(tnt.Spec.Owners[0])
 
@@ -59,7 +59,6 @@ var _ = Describe("cordoning a Tenant", func() {
 				},
 			},
 		}
-
 		By("creating a Namespace", func() {
 			NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 
@@ -68,6 +67,19 @@ var _ = Describe("cordoning a Tenant", func() {
 
 				return err
 			}).Should(Succeed())
+		})
+
+		By("should contains the cordoned Capsule label", func() {
+			Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: tnt.Name}, tnt)).Should(Succeed())
+
+			tnt.Spec.Cordoned = true
+
+			Expect(k8sClient.Update(context.TODO(), tnt)).Should(Succeed())
+
+			Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: ns.GetName()}, ns)).Should(Succeed())
+
+			Expect(ns.Labels).To(HaveKey(utils.CordonedLabel))
+
 		})
 
 		By("cordoning the Tenant deletion must be blocked", func() {
@@ -92,6 +104,19 @@ var _ = Describe("cordoning a Tenant", func() {
 			time.Sleep(2 * time.Second)
 
 			Expect(cs.CoreV1().Pods(ns.Name).Delete(context.Background(), pod.Name, metav1.DeleteOptions{})).Should(Succeed())
+		})
+
+		By("should not contains the cordoned Capsule label", func() {
+			Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: tnt.Name}, tnt)).Should(Succeed())
+
+			tnt.Spec.Cordoned = false
+
+			Expect(k8sClient.Update(context.TODO(), tnt)).Should(Succeed())
+
+			Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: ns.GetName()}, ns)).Should(Succeed())
+
+			Expect(ns.Labels).ToNot(HaveKey(utils.CordonedLabel))
+
 		})
 	})
 })

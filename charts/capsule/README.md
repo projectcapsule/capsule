@@ -202,6 +202,7 @@ Here the values you can override:
 | webhooks.hooks.customresources.failurePolicy | string | `"Fail"` |  |
 | webhooks.hooks.customresources.namespaceSelector.matchExpressions[0].key | string | `"capsule.clastix.io/tenant"` |  |
 | webhooks.hooks.customresources.namespaceSelector.matchExpressions[0].operator | string | `"Exists"` |  |
+| webhooks.hooks.customresources.objectSelector | object | `{}` |  |
 | webhooks.hooks.defaults.ingress.failurePolicy | string | `"Fail"` |  |
 | webhooks.hooks.defaults.ingress.namespaceSelector.matchExpressions[0].key | string | `"capsule.clastix.io/tenant"` |  |
 | webhooks.hooks.defaults.ingress.namespaceSelector.matchExpressions[0].operator | string | `"Exists"` |  |
@@ -216,6 +217,8 @@ Here the values you can override:
 | webhooks.hooks.ingresses.namespaceSelector.matchExpressions[0].operator | string | `"Exists"` |  |
 | webhooks.hooks.namespaceOwnerReference.failurePolicy | string | `"Fail"` |  |
 | webhooks.hooks.namespacePatching.failurePolicy | string | `"Fail"` |  |
+| webhooks.hooks.namespacePatching.namespaceSelector | object | `{}` |  |
+| webhooks.hooks.namespacePatching.objectSelector | object | `{}` |  |
 | webhooks.hooks.namespaces.failurePolicy | string | `"Fail"` |  |
 | webhooks.hooks.networkpolicies.failurePolicy | string | `"Fail"` |  |
 | webhooks.hooks.networkpolicies.namespaceSelector.matchExpressions[0].key | string | `"capsule.clastix.io/tenant"` |  |
