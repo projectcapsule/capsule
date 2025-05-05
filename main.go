@@ -47,7 +47,6 @@ import (
 	namespacevalidation "github.com/projectcapsule/capsule/pkg/webhook/namespace/validation"
 	"github.com/projectcapsule/capsule/pkg/webhook/networkpolicy"
 	"github.com/projectcapsule/capsule/pkg/webhook/node"
-	ownerreferencemutation "github.com/projectcapsule/capsule/pkg/webhook/ownerreference/mutation"
 	"github.com/projectcapsule/capsule/pkg/webhook/pod"
 	"github.com/projectcapsule/capsule/pkg/webhook/pvc"
 	"github.com/projectcapsule/capsule/pkg/webhook/route"
@@ -230,7 +229,7 @@ func main() {
 		route.Tenant(tenant.NameHandler(), tenant.RoleBindingRegexHandler(), tenant.IngressClassRegexHandler(), tenant.StorageClassRegexHandler(), tenant.ContainerRegistryRegexHandler(), tenant.HostnameRegexHandler(), tenant.FreezedEmitter(), tenant.ServiceAccountNameHandler(), tenant.ForbiddenAnnotationsRegexHandler(), tenant.ProtectedHandler(), tenant.MetaHandler()),
 		route.Cordoning(tenant.CordoningHandler(cfg)),
 		route.Node(utils.InCapsuleGroups(cfg, node.UserMetadataHandler(cfg, kubeVersion))),
-		route.NamespacePatch(utils.InCapsuleGroups(cfg, namespacemutation.PatchingHandler(cfg), ownerreferencemutation.Handler(cfg))),
+		route.NamespacePatch(utils.InCapsuleGroups(cfg, namespacemutation.CordoningLabelHandler(cfg), namespacemutation.OwnerReferenceHandler(cfg))),
 		route.CustomResources(tenant.ResourceCounterHandler(manager.GetClient())),
 		route.Defaults(defaults.Handler(cfg, kubeVersion)),
 	)

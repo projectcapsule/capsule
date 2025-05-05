@@ -19,29 +19,29 @@ import (
 	"github.com/projectcapsule/capsule/pkg/webhook/utils"
 )
 
-type patchingHandler struct {
+type cordoningLabelHandler struct {
 	cfg configuration.Configuration
 }
 
-func PatchingHandler(cfg configuration.Configuration) capsulewebhook.Handler {
-	return &patchingHandler{
+func CordoningLabelHandler(cfg configuration.Configuration) capsulewebhook.Handler {
+	return &cordoningLabelHandler{
 		cfg: cfg,
 	}
 }
 
-func (h *patchingHandler) OnCreate(client.Client, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
+func (h *cordoningLabelHandler) OnCreate(client.Client, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (h *patchingHandler) OnDelete(client.Client, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
+func (h *cordoningLabelHandler) OnDelete(client.Client, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (h *patchingHandler) OnUpdate(c client.Client, decoder admission.Decoder, _ record.EventRecorder) capsulewebhook.Func {
+func (h *cordoningLabelHandler) OnUpdate(c client.Client, decoder admission.Decoder, _ record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		ns := &corev1.Namespace{}
 		if err := decoder.Decode(req, ns); err != nil {
@@ -55,7 +55,7 @@ func (h *patchingHandler) OnUpdate(c client.Client, decoder admission.Decoder, _
 	}
 }
 
-func (h *patchingHandler) syncNamespaceCordonLabel(ctx context.Context, c client.Client, ns corev1.Namespace) error {
+func (h *cordoningLabelHandler) syncNamespaceCordonLabel(ctx context.Context, c client.Client, ns corev1.Namespace) error {
 	tnt := &capsulev1beta2.Tenant{}
 
 	ln, err := capsuleutils.GetTypeLabel(tnt)

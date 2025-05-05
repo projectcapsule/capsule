@@ -215,10 +215,11 @@ Here the values you can override:
 | webhooks.hooks.ingresses.failurePolicy | string | `"Fail"` |  |
 | webhooks.hooks.ingresses.namespaceSelector.matchExpressions[0].key | string | `"capsule.clastix.io/tenant"` |  |
 | webhooks.hooks.ingresses.namespaceSelector.matchExpressions[0].operator | string | `"Exists"` |  |
+| webhooks.hooks.namespace.mutation.failurePolicy | string | `"Fail"` |  |
+| webhooks.hooks.namespace.mutation.namespaceSelector | object | `{}` |  |
+| webhooks.hooks.namespace.mutation.objectSelector | object | `{}` |  |
+| webhooks.hooks.namespace.validation.failurePolicy | string | `"Fail"` |  |
 | webhooks.hooks.namespaceOwnerReference.failurePolicy | string | `"Fail"` |  |
-| webhooks.hooks.namespacePatching.failurePolicy | string | `"Fail"` |  |
-| webhooks.hooks.namespacePatching.namespaceSelector | object | `{}` |  |
-| webhooks.hooks.namespacePatching.objectSelector | object | `{}` |  |
 | webhooks.hooks.namespaces.failurePolicy | string | `"Fail"` |  |
 | webhooks.hooks.networkpolicies.failurePolicy | string | `"Fail"` |  |
 | webhooks.hooks.networkpolicies.namespaceSelector.matchExpressions[0].key | string | `"capsule.clastix.io/tenant"` |  |

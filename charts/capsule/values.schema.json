@@ -656,26 +656,39 @@
                             },
                             "type": "object"
                         },
-                        "namespaceOwnerReference": {
+                      "namespace": {
                             "properties": {
-                                "failurePolicy": {
+                              "mutation": {
+                                "properties": {
+                                  "failurePolicy": {
                                     "type": "string"
-                                }
+                                  },
+                                  "namespaceSelector": {
+                                    "properties": {},
+                                    "type": "object"
+                                  },
+                                  "objectSelector": {
+                                    "properties": {},
+                                    "type": "object"
+                                  }
+                                },
+                                "type": "object"
+                              },
+                              "validation": {
+                                "properties": {
+                                  "failurePolicy": {
+                                    "type": "string"
+                                  }
+                                },
+                                "type": "object"
+                              }
                             },
-                            "type": "object"
-                        },
-                        "namespacePatching": {
-                            "properties": {
-                                "failurePolicy": {
-                                    "type": "string"
-                                },
-                                "namespaceSelector": {
-                                    "properties": {},
-                                    "type": "object"
-                                },
-                                "objectSelector": {
-                                    "properties": {},
-                                    "type": "object"
+                        "type": "object"
+                      },
+                      "namespaceOwnerReference": {
+                        "properties": {
+                          "failurePolicy": {
+                            "type": "string"
                                 }
                             },
                             "type": "object"
