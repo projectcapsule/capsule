@@ -69,26 +69,25 @@ func (h *cordoningLabelHandler) syncNamespaceCordonLabel(ctx context.Context, c 
 	}
 
 	if !tnt.Spec.Cordoned {
-		response := admission.Allowed("")
-
-		return &response
+		return nil
 	}
 
 	labels := ns.GetLabels()
 	if _, ok := labels[capsuleutils.CordonedLabel]; !ok {
-		response := admission.Allowed("")
-
-		return &response
+		return nil
 
 	}
 
-	b, err := json.Marshal(ns)
+	ns.Labels[capsuleutils.CordonedLabel] = "true"
+
+	marshaled, err := json.Marshal(ns)
 	if err != nil {
 		response := admission.Errored(http.StatusInternalServerError, err)
 
 		return &response
 	}
-	response := admission.PatchResponseFromRaw(req.Object.Raw, b)
+
+	response := admission.PatchResponseFromRaw(req.Object.Raw, marshaled)
 
 	return &response
 }
