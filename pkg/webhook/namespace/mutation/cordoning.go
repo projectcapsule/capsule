@@ -55,10 +55,10 @@ func (h *cordoningLabelHandler) OnUpdate(c client.Client, decoder admission.Deco
 
 func (h *cordoningLabelHandler) syncNamespaceCordonLabel(ctx context.Context, c client.Client, req admission.Request, ns *corev1.Namespace) *admission.Response {
 	tnt := &capsulev1beta2.Tenant{}
-
 	ln, err := capsuleutils.GetTypeLabel(tnt)
 	if err != nil {
 		response := admission.Errored(http.StatusInternalServerError, err)
+
 		return &response
 	}
 
@@ -69,12 +69,17 @@ func (h *cordoningLabelHandler) syncNamespaceCordonLabel(ctx context.Context, c 
 	}
 
 	if !tnt.Spec.Cordoned {
-		return nil
+		response := admission.Allowed("")
+
+		return &response
 	}
 
 	labels := ns.GetLabels()
 	if _, ok := labels[capsuleutils.CordonedLabel]; !ok {
-		return nil
+		response := admission.Allowed("")
+
+		return &response
+
 	}
 
 	b, err := json.Marshal(ns)
