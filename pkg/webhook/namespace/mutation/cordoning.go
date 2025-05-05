@@ -75,7 +75,6 @@ func (h *cordoningLabelHandler) syncNamespaceCordonLabel(ctx context.Context, c 
 	labels := ns.GetLabels()
 	if _, ok := labels[capsuleutils.CordonedLabel]; !ok {
 		return nil
-
 	}
 
 	ns.Labels[capsuleutils.CordonedLabel] = "true"
