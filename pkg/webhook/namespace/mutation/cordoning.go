@@ -5,6 +5,7 @@ package mutation
 
 import (
 	"context"
+	"encoding/json"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
@@ -47,20 +48,18 @@ func (h *cordoningLabelHandler) OnUpdate(c client.Client, decoder admission.Deco
 		if err := decoder.Decode(req, ns); err != nil {
 			return utils.ErroredResponse(err)
 		}
-		err := h.syncNamespaceCordonLabel(ctx, c, *ns)
-		if err != nil {
-			return utils.ErroredResponse(err)
-		}
-		return nil
+		response := h.syncNamespaceCordonLabel(ctx, c, req, ns)
+		return response
 	}
 }
 
-func (h *cordoningLabelHandler) syncNamespaceCordonLabel(ctx context.Context, c client.Client, ns corev1.Namespace) error {
+func (h *cordoningLabelHandler) syncNamespaceCordonLabel(ctx context.Context, c client.Client, req admission.Request, ns *corev1.Namespace) *admission.Response {
 	tnt := &capsulev1beta2.Tenant{}
 
 	ln, err := capsuleutils.GetTypeLabel(tnt)
 	if err != nil {
-		return err
+		response := admission.Errored(http.StatusInternalServerError, err)
+		return &response
 	}
 
 	if label, ok := ns.Labels[ln]; ok {
@@ -69,9 +68,22 @@ func (h *cordoningLabelHandler) syncNamespaceCordonLabel(ctx context.Context, c 
 		}
 	}
 
-	if tnt.Spec.Cordoned {
-		ns.Labels[capsuleutils.CordonedLabel] = "true"
+	if !tnt.Spec.Cordoned {
+		return nil
 	}
 
-	return nil
+	labels := ns.GetLabels()
+	if _, ok := labels[capsuleutils.CordonedLabel]; !ok {
+		return nil
+	}
+
+	b, err := json.Marshal(ns)
+	if err != nil {
+		response := admission.Errored(http.StatusInternalServerError, err)
+
+		return &response
+	}
+	response := admission.PatchResponseFromRaw(req.Object.Raw, b)
+
+	return &response
 }
