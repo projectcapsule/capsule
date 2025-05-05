@@ -535,6 +535,10 @@
                                         }
                                     },
                                     "type": "object"
+                                },
+                              "objectSelector": {
+                                "properties": {},
+                                "type": "object"
                                 }
                             },
                             "type": "object"
@@ -664,6 +668,14 @@
                             "properties": {
                                 "failurePolicy": {
                                     "type": "string"
+                                },
+                              "namespaceSelector": {
+                                "properties": {},
+                                "type": "object"
+                              },
+                              "objectSelector": {
+                                "properties": {},
+                                "type": "object"
                                 }
                             },
                             "type": "object"
