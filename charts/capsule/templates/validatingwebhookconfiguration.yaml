@@ -283,9 +283,14 @@ webhooks:
   failurePolicy: {{ .failurePolicy }}
   matchPolicy: Equivalent
   name: customresources.tenant.projectcapsule.dev
+  {{- with .namespaceSelector }}
   namespaceSelector:
-  {{- toYaml .namespaceSelector | nindent 4}}
-  objectSelector: { }
+    {{- toYaml . |  nindent 4 }}
+  {{- end }}
+  {{- with .objectSelector }}
+  objectSelector:
+    {{- toYaml . |  nindent 4 }}
+  {{- end }}
   rules:
     - apiGroups:
         - '*'

@@ -6,7 +6,6 @@ package main
 import (
 	goflag "flag"
 	"fmt"
-	"github.com/projectcapsule/capsule/pkg/webhook/ownerreference"
 	"os"
 	goRuntime "runtime"
 
@@ -44,9 +43,11 @@ import (
 	"github.com/projectcapsule/capsule/pkg/webhook"
 	"github.com/projectcapsule/capsule/pkg/webhook/defaults"
 	"github.com/projectcapsule/capsule/pkg/webhook/ingress"
-	namespacewebhook "github.com/projectcapsule/capsule/pkg/webhook/namespace"
+	namespacemutation "github.com/projectcapsule/capsule/pkg/webhook/namespace/mutation"
+	namespacevalidation "github.com/projectcapsule/capsule/pkg/webhook/namespace/validation"
 	"github.com/projectcapsule/capsule/pkg/webhook/networkpolicy"
 	"github.com/projectcapsule/capsule/pkg/webhook/node"
+	ownerreferencemutation "github.com/projectcapsule/capsule/pkg/webhook/ownerreference/mutation"
 	"github.com/projectcapsule/capsule/pkg/webhook/pod"
 	"github.com/projectcapsule/capsule/pkg/webhook/pvc"
 	"github.com/projectcapsule/capsule/pkg/webhook/route"
@@ -220,7 +221,7 @@ func main() {
 	webhooksList := append(
 		make([]webhook.Webhook, 0),
 		route.Pod(pod.ImagePullPolicy(), pod.ContainerRegistry(), pod.PriorityClass(), pod.RuntimeClass()),
-		route.Namespace(utils.InCapsuleGroups(cfg, namespacewebhook.PatchHandler(), namespacewebhook.QuotaHandler(), namespacewebhook.FreezeHandler(cfg), namespacewebhook.PrefixHandler(cfg), namespacewebhook.UserMetadataHandler())),
+		route.Namespace(utils.InCapsuleGroups(cfg, namespacevalidation.PatchHandler(), namespacevalidation.QuotaHandler(), namespacevalidation.FreezeHandler(cfg), namespacevalidation.PrefixHandler(cfg), namespacevalidation.UserMetadataHandler())),
 		route.Ingress(ingress.Class(cfg, kubeVersion), ingress.Hostnames(cfg), ingress.Collision(cfg), ingress.Wildcard()),
 		route.PVC(pvc.Validating(), pvc.PersistentVolumeReuse()),
 		route.Service(service.Handler()),
@@ -229,7 +230,7 @@ func main() {
 		route.Tenant(tenant.NameHandler(), tenant.RoleBindingRegexHandler(), tenant.IngressClassRegexHandler(), tenant.StorageClassRegexHandler(), tenant.ContainerRegistryRegexHandler(), tenant.HostnameRegexHandler(), tenant.FreezedEmitter(), tenant.ServiceAccountNameHandler(), tenant.ForbiddenAnnotationsRegexHandler(), tenant.ProtectedHandler(), tenant.MetaHandler()),
 		route.Cordoning(tenant.CordoningHandler(cfg)),
 		route.Node(utils.InCapsuleGroups(cfg, node.UserMetadataHandler(cfg, kubeVersion))),
-		route.NamespacePatch(utils.InCapsuleGroups(cfg, namespacewebhook.PatchingHandler(cfg), ownerreference.Handler(cfg))),
+		route.NamespacePatch(utils.InCapsuleGroups(cfg, namespacemutation.PatchingHandler(cfg), ownerreferencemutation.Handler(cfg))),
 		route.CustomResources(tenant.ResourceCounterHandler(manager.GetClient())),
 		route.Defaults(defaults.Handler(cfg, kubeVersion)),
 	)

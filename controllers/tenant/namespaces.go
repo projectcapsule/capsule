@@ -74,9 +74,9 @@ func (r *Manager) syncNamespaceMetadata(ctx context.Context, namespace string, t
 			}
 
 			if tnt.Spec.Cordoned {
-				ns.Labels["projectcapsule.dev/cordoned"] = "true"
+				ns.Labels[utils.CordonedLabel] = "true"
 			} else {
-				delete(ns.Labels, "projectcapsule.dev/cordoned")
+				delete(ns.Labels, utils.CordonedLabel)
 			}
 
 			if tnt.Spec.NodeSelector != nil {

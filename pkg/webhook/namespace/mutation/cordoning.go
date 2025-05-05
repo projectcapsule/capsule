@@ -1,7 +1,7 @@
 // Copyright 2020-2023 Project Capsule Authors.
 // SPDX-License-Identifier: Apache-2.0
 
-package namespace
+package mutation
 
 import (
 	"context"
@@ -70,7 +70,7 @@ func (h *patchingHandler) syncNamespaceCordonLabel(ctx context.Context, c client
 	}
 
 	if tnt.Spec.Cordoned {
-		ns.Labels["projectcapsule.dev/cordoned"] = "true"
+		ns.Labels[capsuleutils.CordonedLabel] = "true"
 	}
 
 	return nil
