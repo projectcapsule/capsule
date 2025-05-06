@@ -67,25 +67,6 @@ func (r *Manager) syncNamespaceMetadata(ctx context.Context, namespace string, t
 				}
 			}
 
-			if tnt.Spec.NamespaceOptions != nil && len(tnt.Spec.NamespaceOptions.AdditionalMetadataList) > 0 {
-				for _, additionalMetadata := range tnt.Spec.NamespaceOptions.AdditionalMetadataList {
-					var namespaceSelectedBySelector bool
-
-					namespaceSelectedBySelector, err = utils.IsNamespaceSelectedBySelector(ns, additionalMetadata.NamespaceSelector)
-					if err != nil {
-						return err
-					}
-
-					if !namespaceSelectedBySelector {
-						continue
-					}
-
-					for k, v := range additionalMetadata.Annotations {
-						annotations[k] = v
-					}
-				}
-			}
-
 			if tnt.Spec.NamespaceOptions != nil && tnt.Spec.NamespaceOptions.AdditionalMetadata != nil {
 				for k, v := range tnt.Spec.NamespaceOptions.AdditionalMetadata.Labels {
 					labels[k] = v
