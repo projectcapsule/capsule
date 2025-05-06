@@ -295,7 +295,7 @@ func (in *NamespaceOptions) DeepCopyInto(out *NamespaceOptions) {
 	}
 	if in.AdditionalMetadataList != nil {
 		in, out := &in.AdditionalMetadataList, &out.AdditionalMetadataList
-		*out = make([]api.AdditionalMetadataSpec, len(*in))
+		*out = make([]api.AdditionalMetadataSelectorSpec, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}

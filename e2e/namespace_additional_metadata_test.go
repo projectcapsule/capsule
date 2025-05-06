@@ -38,8 +38,10 @@ var _ = Describe("creating a Namespace for a Tenant with additional metadata", f
 			NamespaceOptions: &capsulev1beta2.NamespaceOptions{
 				AdditionalMetadata: &api.AdditionalMetadataSpec{
 					Labels: map[string]string{
-						"k8s.io/custom-label":     "foo",
-						"clastix.io/custom-label": "bar",
+						"k8s.io/custom-label":         "foo",
+						"clastix.io/custom-label":     "bar",
+						"capsule.clastix.io/tenant":   "tenan-override",
+						"kubernetes.io/metadata.name": "namespace-override",
 					},
 					Annotations: map[string]string{
 						"k8s.io/custom-annotation":     "bizz",
@@ -68,9 +70,24 @@ var _ = Describe("creating a Namespace for a Tenant with additional metadata", f
 			Eventually(func() (ok bool) {
 				Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: ns.GetName()}, ns)).Should(Succeed())
 				for k, v := range tnt.Spec.NamespaceOptions.AdditionalMetadata.Labels {
+					if k == "capsule.clastix.io/tenant" || k == "kubernetes.io/metadata.name" {
+						continue // this label is managed and shouldn't be set by the user
+					}
 					if ok, _ = HaveKeyWithValue(k, v).Match(ns.Labels); !ok {
 						return
 					}
+				}
+				return
+			}, defaultTimeoutInterval, defaultPollInterval).Should(BeTrue())
+		})
+		By("checking managed labels", func() {
+			Eventually(func() (ok bool) {
+				Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: ns.GetName()}, ns)).Should(Succeed())
+				if ok, _ = HaveKeyWithValue("capsule.clastix.io/tenant", tnt.GetName()).Match(ns.Labels); !ok {
+					return
+				}
+				if ok, _ = HaveKeyWithValue("kubernetes.io/metadata.name", ns.GetName()).Match(ns.Labels); !ok {
+					return
 				}
 				return
 			}, defaultTimeoutInterval, defaultPollInterval).Should(BeTrue())
@@ -110,7 +127,7 @@ var _ = Describe("creating a Namespace for a Tenant with additional metadata lis
 				},
 			},
 			NamespaceOptions: &capsulev1beta2.NamespaceOptions{
-				AdditionalMetadataList: []api.AdditionalMetadataSpec{
+				AdditionalMetadataList: []api.AdditionalMetadataSelectorSpec{
 					{
 						Labels: map[string]string{
 							"k8s.io/custom-label":     "foo",
