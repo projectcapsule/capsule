@@ -52,50 +52,8 @@ func (r *Manager) syncNamespaceMetadata(ctx context.Context, namespace string, t
 			return conflictErr
 		}
 
-		capsuleLabel, _ := utils.GetTypeLabel(&capsulev1beta2.Tenant{})
-
 		res, conflictErr = controllerutil.CreateOrUpdate(ctx, r.Client, ns, func() error {
-			annotations := buildNamespaceAnnotationsForTenant(tnt)
-			labels := buildNamespaceLabelsForTenant(tnt)
-
-			if opts := tnt.Spec.NamespaceOptions; opts != nil && len(opts.AdditionalMetadataList) > 0 {
-				for _, md := range opts.AdditionalMetadataList {
-					ok, err := utils.IsNamespaceSelectedBySelector(ns, md.NamespaceSelector)
-					if err != nil {
-						return err
-					}
-
-					if !ok {
-						continue
-					}
-
-					maps.Copy(labels, md.Labels)
-					maps.Copy(annotations, md.Annotations)
-				}
-			}
-
-			labels["kubernetes.io/metadata.name"] = namespace
-			labels[capsuleLabel] = tnt.GetName()
-
-			if tnt.Spec.Cordoned {
-				ns.Labels[utils.CordonedLabel] = "true"
-			} else {
-				delete(ns.Labels, utils.CordonedLabel)
-			}
-
-			if ns.Annotations == nil {
-				ns.SetAnnotations(annotations)
-			} else {
-				maps.Copy(ns.Annotations, annotations)
-			}
-
-			if ns.Labels == nil {
-				ns.SetLabels(labels)
-			} else {
-				maps.Copy(ns.Labels, labels)
-			}
-
-			return nil
+			return SyncNamespaceMetadata(tnt, ns)
 		})
 
 		return conflictErr
@@ -205,4 +163,51 @@ func (r *Manager) collectNamespaces(ctx context.Context, tenant *capsulev1beta2.
 
 		return
 	})
+}
+
+// SyncNamespaceMetadata sync namespace metadata according to tenant spec.
+func SyncNamespaceMetadata(tnt *capsulev1beta2.Tenant, ns *corev1.Namespace) error {
+	capsuleLabel, _ := utils.GetTypeLabel(&capsulev1beta2.Tenant{})
+
+	annotations := buildNamespaceAnnotationsForTenant(tnt)
+	labels := buildNamespaceLabelsForTenant(tnt)
+
+	if opts := tnt.Spec.NamespaceOptions; opts != nil && len(opts.AdditionalMetadataList) > 0 {
+		for _, md := range opts.AdditionalMetadataList {
+			ok, err := utils.IsNamespaceSelectedBySelector(ns, md.NamespaceSelector)
+			if err != nil {
+				return err
+			}
+
+			if !ok {
+				continue
+			}
+
+			maps.Copy(labels, md.Labels)
+			maps.Copy(annotations, md.Annotations)
+		}
+	}
+
+	labels["kubernetes.io/metadata.name"] = ns.GetName()
+	labels[capsuleLabel] = tnt.GetName()
+
+	if tnt.Spec.Cordoned {
+		ns.Labels[utils.CordonedLabel] = "true"
+	} else {
+		delete(ns.Labels, utils.CordonedLabel)
+	}
+
+	if ns.Annotations == nil {
+		ns.SetAnnotations(annotations)
+	} else {
+		maps.Copy(ns.Annotations, annotations)
+	}
+
+	if ns.Labels == nil {
+		ns.SetLabels(labels)
+	} else {
+		maps.Copy(ns.Labels, labels)
+	}
+
+	return nil
 }
