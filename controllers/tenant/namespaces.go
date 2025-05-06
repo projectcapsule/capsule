@@ -109,6 +109,8 @@ func (r *Manager) syncNamespaceMetadata(ctx context.Context, namespace string, t
 						labels[k] = v
 					}
 				}
+			}
+
 			if tnt.Spec.Cordoned {
 				ns.Labels[utils.CordonedLabel] = "true"
 			} else {
