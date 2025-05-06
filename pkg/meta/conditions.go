@@ -17,8 +17,9 @@ const (
 	BoundReason string = "Bound"
 
 	// FailedReason indicates a condition or event observed a failure (Claim Rejected).
-	FailedReason string = "Unassigned"
-	QueuedReason string = "Queued"
+	FailedReason   string = "Unassigned"
+	QueuedReason   string = "Queued"
+	AssignedReason string = "Assigned"
 
 	// ProgressingReason indicates a condition or event observed progression, for example when the reconciliation of a
 	// resource or an action has started.
@@ -47,12 +48,23 @@ func NewNotReadyCondition(obj client.Object, msg string) metav1.Condition {
 	}
 }
 
-func NewQueuedReasonCondition(obj client.Object) metav1.Condition {
+func NewQueuedReasonCondition(obj client.Object, msg string) metav1.Condition {
 	return metav1.Condition{
 		Type:               NotReadyCondition,
-		Status:             metav1.ConditionTrue,
+		Status:             metav1.ConditionFalse,
 		Reason:             QueuedReason,
-		Message:            "Queued for allocation",
+		Message:            msg,
+		ObservedGeneration: obj.GetGeneration(),
+		LastTransitionTime: metav1.Now(),
+	}
+}
+
+func NewAssignedReasonCondition(obj client.Object) metav1.Condition {
+	return metav1.Condition{
+		Type:               NotReadyCondition,
+		Status:             metav1.ConditionFalse,
+		Reason:             AssignedReason,
+		Message:            "Assigned to Pool",
 		ObservedGeneration: obj.GetGeneration(),
 		LastTransitionTime: metav1.Now(),
 	}

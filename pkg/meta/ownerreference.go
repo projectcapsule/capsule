@@ -66,7 +66,7 @@ func HasLooseOwnerReference(
 	owner client.Object,
 ) bool {
 	for _, ownerRef := range obj.GetOwnerReferences() {
-		if ownerRef.UID == obj.GetUID() {
+		if ownerRef.UID == owner.GetUID() {
 			return true
 		}
 	}

@@ -33,7 +33,9 @@ type ResourcePoolClaimStatus struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="Pool",type="string",JSONPath=".status.pool.name",description="The ResourcePool being claimed from"
-// +kubebuilder:printcolumn:name="Status",type="string",JSONPath=".status.condition.reason",description="Condition"
+// +kubebuilder:printcolumn:name="Reasion",type="string",JSONPath=".status.condition.reason",description="Reason for status"
+
+// +kubebuilder:printcolumn:name="Reasion",type="string",JSONPath=".status.condition.reason",description="Reason for status"
 // +kubebuilder:printcolumn:name="Message",type="string",JSONPath=".status.condition.message",description="Condition Message"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp",description=""
 

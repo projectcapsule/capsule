@@ -7,7 +7,6 @@ import (
 	"errors"
 	"sort"
 
-	"github.com/go-logr/logr"
 	"github.com/projectcapsule/capsule/pkg/api"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -28,14 +27,11 @@ func (r *ResourcePool) AssignNamespaces(namespaces []corev1.Namespace) {
 	r.Status.Namespaces = l
 }
 
-func (r *ResourcePool) GetClaimFromStatus(log logr.Logger, cl *ResourcePoolClaim) *ResourcePoolClaimsItem {
+func (r *ResourcePool) GetClaimFromStatus(cl *ResourcePoolClaim) *ResourcePoolClaimsItem {
 	ns := cl.Namespace
-
-	log.V(5).Info("LOOKUP NAMESAPCE", "NS", ns)
 
 	claims := r.Status.Claims[ns]
 	if claims == nil {
-		log.V(5).Info("EMPTY CLAIMS")
 		return nil
 	}
 
@@ -44,8 +40,6 @@ func (r *ResourcePool) GetClaimFromStatus(log logr.Logger, cl *ResourcePoolClaim
 			return claim
 		}
 	}
-
-	log.V(5).Info("NOT FOUND")
 
 	return nil
 }

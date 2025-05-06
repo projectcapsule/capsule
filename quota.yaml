@@ -28,6 +28,9 @@ spec:
       capsule.clastix.io/tenant: solar
   - matchLabels:
       capsule.clastix.io/tenant: wind
+  namespaceMaximum:
+    limits.cpu: "1"
+    limits.memory: 1Gi
   quota:
     hard:
       limits.cpu: "2"
@@ -35,6 +38,10 @@ spec:
       requests.cpu: "2"
       requests.memory: 2Gi
       requests.storage: "5Gi"
+
+
+
+
 #---
 #apiVersion: capsule.clastix.io/v1beta2
 #kind: ResourcePoolClaim

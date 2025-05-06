@@ -11,10 +11,12 @@ import (
 )
 
 type ResourcePoolRecorder struct {
-	poolResource           *prometheus.GaugeVec
-	poolResourceLimit      *prometheus.GaugeVec
-	poolResourceUsage      *prometheus.GaugeVec
-	namespaceResourceClaim *prometheus.GaugeVec
+	poolResource               *prometheus.GaugeVec
+	poolResourceLimit          *prometheus.GaugeVec
+	poolResourceUsage          *prometheus.GaugeVec
+	poolResourceExhaustion     *prometheus.GaugeVec
+	poolNamespaceResourceUsage *prometheus.GaugeVec
+	poolNamespaceResourceLimit *prometheus.GaugeVec
 }
 
 func MustMakeResourcePoolRecorder() *ResourcePoolRecorder {
@@ -26,6 +28,14 @@ func MustMakeResourcePoolRecorder() *ResourcePoolRecorder {
 
 func NewResourcePoolRecorder() *ResourcePoolRecorder {
 	return &ResourcePoolRecorder{
+		poolResourceExhaustion: prometheus.NewGaugeVec(
+			prometheus.GaugeOpts{
+				Namespace: metricsPrefix,
+				Name:      "pool_exhaustion",
+				Help:      "Resources become exhausted, when there's not enough available for all claims and the claims get queued",
+			},
+			[]string{"pool", "resource"},
+		),
 		poolResource: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
 				Namespace: metricsPrefix,
@@ -50,11 +60,19 @@ func NewResourcePoolRecorder() *ResourcePoolRecorder {
 			},
 			[]string{"pool", "resource"},
 		),
-		namespaceResourceClaim: prometheus.NewGaugeVec(
+		poolNamespaceResourceUsage: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
 				Namespace: metricsPrefix,
-				Name:      "pool_namespace_claimed",
+				Name:      "pool_namespace_usage",
 				Help:      "Current resources claimed on namespace basis for a given resource in a resource pool for a specific namespace",
+			},
+			[]string{"pool", "namespace", "resource"},
+		),
+		poolNamespaceResourceLimit: prometheus.NewGaugeVec(
+			prometheus.GaugeOpts{
+				Namespace: metricsPrefix,
+				Name:      "pool_namespace_limit",
+				Help:      "Current limit on namespace basis for a given resource in a resource pool for a specific namespace",
 			},
 			[]string{"pool", "namespace", "resource"},
 		),
@@ -107,7 +125,7 @@ func (r *ResourcePoolRecorder) resourceUsageMetricsByNamespace(pool *capsulev1be
 
 	for namespace, claims := range resources {
 		for resourceName, quantity := range claims {
-			r.namespaceResourceClaim.WithLabelValues(
+			r.poolNamespaceResourceUsage.WithLabelValues(
 				pool.Name,
 				namespace,
 				resourceName.String(),
@@ -118,13 +136,24 @@ func (r *ResourcePoolRecorder) resourceUsageMetricsByNamespace(pool *capsulev1be
 
 // Delete all metrics for a namespace in a resource pool.
 func (r *ResourcePoolRecorder) DeleteResourcePoolNamespaceMetric(pool string, namespace string) {
-	r.namespaceResourceClaim.DeletePartialMatch(map[string]string{"pool": pool, "namespace": namespace})
+	r.poolNamespaceResourceUsage.DeletePartialMatch(map[string]string{"pool": pool, "namespace": namespace})
+	r.poolNamespaceResourceLimit.DeletePartialMatch(map[string]string{"pool": pool, "namespace": namespace})
 }
 
 // Delete all metrics for a resource pool.
 func (r *ResourcePoolRecorder) DeleteResourcePoolMetric(pool string) {
-	r.poolResourceLimit.DeletePartialMatch(map[string]string{"pool": pool})
-	r.poolResourceUsage.DeletePartialMatch(map[string]string{"pool": pool})
-	r.namespaceResourceClaim.DeletePartialMatch(map[string]string{"pool": pool})
-	r.poolResource.DeletePartialMatch(map[string]string{"pool": pool})
+	r.cleanupAllMetricForLabels(map[string]string{"pool": pool})
+}
+
+func (r *ResourcePoolRecorder) DeleteResourcePoolSingleResourceMetric(pool string, resourceName string) {
+	r.cleanupAllMetricForLabels(map[string]string{"pool": pool, "resource": resourceName})
+}
+
+func (r *ResourcePoolRecorder) cleanupAllMetricForLabels(labels map[string]string) {
+	r.poolResourceLimit.DeletePartialMatch(labels)
+	r.poolResourceUsage.DeletePartialMatch(labels)
+	r.poolNamespaceResourceUsage.DeletePartialMatch(labels)
+	r.poolNamespaceResourceLimit.DeletePartialMatch(labels)
+	r.poolResource.DeletePartialMatch(labels)
+	r.poolResourceExhaustion.DeletePartialMatch(labels)
 }

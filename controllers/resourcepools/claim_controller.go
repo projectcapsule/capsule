@@ -12,10 +12,14 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
@@ -35,7 +39,45 @@ type resourceClaimController struct {
 func (r *resourceClaimController) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&capsulev1beta2.ResourcePoolClaim{}).
+		Watches(
+			&capsulev1beta2.ResourcePool{},
+			handler.EnqueueRequestsFromMapFunc(r.claimsWithoutPoolFromNamespaces),
+			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
+		).
 		Complete(r)
+}
+
+// Trigger claims from a namespace, which are not yet allocated.
+// when a resourcepool updates it's status.
+func (r *resourceClaimController) claimsWithoutPoolFromNamespaces(ctx context.Context, obj client.Object) []reconcile.Request {
+	pool, ok := obj.(*capsulev1beta2.ResourcePool)
+	if !ok {
+		return nil
+	}
+
+	var requests []reconcile.Request
+
+	for _, ns := range pool.Status.Namespaces {
+		claimList := &capsulev1beta2.ResourcePoolClaimList{}
+		if err := r.Client.List(context.TODO(), claimList, client.InNamespace(ns)); err != nil {
+			r.Log.Error(err, "Failed to list claims in namespace", "namespace", ns)
+
+			continue
+		}
+
+		for _, claim := range claimList.Items {
+			if claim.Status.Pool.UID == "" {
+				requests = append(requests, reconcile.Request{
+					NamespacedName: types.NamespacedName{
+						Namespace: claim.Namespace,
+						Name:      claim.Name,
+					},
+				})
+			}
+		}
+	}
+
+	return requests
 }
 
 func (r resourceClaimController) Reconcile(ctx context.Context, request ctrl.Request) (result ctrl.Result, err error) {
@@ -167,7 +209,7 @@ func (r resourceClaimController) allocateResourcePool(
 	// Set claim pool in status and condition
 	cl.Status = capsulev1beta2.ResourcePoolClaimStatus{
 		Pool:      allocate,
-		Condition: meta.NewQueuedReasonCondition(cl),
+		Condition: meta.NewAssignedReasonCondition(cl),
 	}
 
 	// Update status in a separate call
