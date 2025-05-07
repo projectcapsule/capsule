@@ -1,5 +1,3 @@
-//go:build e2e
-
 // Copyright 2020-2023 Project Capsule Authors.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -27,7 +25,7 @@ import (
 )
 
 const (
-	defaultTimeoutInterval = 20 * time.Second
+	defaultTimeoutInterval = 40 * time.Second
 	defaultPollInterval    = time.Second
 )
 

@@ -48,7 +48,7 @@ func (r *Manager) syncNamespaceMetadata(ctx context.Context, namespace string, t
 
 	err = retry.RetryOnConflict(retry.DefaultBackoff, func() (conflictErr error) {
 		ns := &corev1.Namespace{}
-		if conflictErr = r.Client.Get(ctx, types.NamespacedName{Name: namespace}, ns); err != nil {
+		if conflictErr = r.Get(ctx, types.NamespacedName{Name: namespace}, ns); err != nil {
 			return
 		}
 
@@ -109,6 +109,10 @@ func (r *Manager) syncNamespaceMetadata(ctx context.Context, namespace string, t
 						labels[k] = v
 					}
 				}
+			if tnt.Spec.Cordoned {
+				ns.Labels[utils.CordonedLabel] = "true"
+			} else {
+				delete(ns.Labels, utils.CordonedLabel)
 			}
 
 			if tnt.Spec.NodeSelector != nil {
@@ -193,7 +197,7 @@ func (r *Manager) ensureNamespaceCount(ctx context.Context, tenant *capsulev1bet
 		tenant.Status.Size = uint(len(tenant.Status.Namespaces))
 
 		found := &capsulev1beta2.Tenant{}
-		if err := r.Client.Get(ctx, types.NamespacedName{Name: tenant.GetName()}, found); err != nil {
+		if err := r.Get(ctx, types.NamespacedName{Name: tenant.GetName()}, found); err != nil {
 			return err
 		}
 
@@ -207,7 +211,7 @@ func (r *Manager) collectNamespaces(ctx context.Context, tenant *capsulev1beta2.
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
 		list := &corev1.NamespaceList{}
 
-		err = r.Client.List(ctx, list, client.MatchingFieldsSelector{
+		err = r.List(ctx, list, client.MatchingFieldsSelector{
 			Selector: fields.OneTermEqualSelector(".metadata.ownerReferences[*].capsule", tenant.GetName()),
 		})
 		if err != nil {

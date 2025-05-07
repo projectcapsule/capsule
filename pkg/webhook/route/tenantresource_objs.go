@@ -7,8 +7,6 @@ import (
 	capsulewebhook "github.com/projectcapsule/capsule/pkg/webhook"
 )
 
-// +kubebuilder:webhook:path=/tenantresource-objects,mutating=false,sideEffects=None,admissionReviewVersions=v1,failurePolicy=fail,groups="*",resources="*",verbs=update;delete,versions="*",name=resource-objects.tenant.projectcapsule.dev
-
 type tntResourceObjs struct {
 	handlers []capsulewebhook.Handler
 }

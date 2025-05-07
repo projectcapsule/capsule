@@ -53,7 +53,7 @@ func NewMissingPVLabelsError(name string) error {
 }
 
 func (m missingPVLabelsError) Error() string {
-	return fmt.Sprintf("PeristentVolume %s is missing any label, please, ask the Cluster Administrator to label it", m.name)
+	return fmt.Sprintf("PersistentVolume %s is missing any label, please, ask the Cluster Administrator to label it", m.name)
 }
 
 type missingPVTenantLabelsError struct {
@@ -65,7 +65,7 @@ func NewMissingTenantPVLabelsError(name string) error {
 }
 
 func (m missingPVTenantLabelsError) Error() string {
-	return fmt.Sprintf("PeristentVolume %s is missing the Capsule Tenant label, preventing a potential cross-tenant mount", m.name)
+	return fmt.Sprintf("PersistentVolume %s is missing the Capsule Tenant label, preventing a potential cross-tenant mount", m.name)
 }
 
 type crossTenantPVMountError struct {
@@ -79,7 +79,7 @@ func NewCrossTenantPVMountError(name string) error {
 }
 
 func (m crossTenantPVMountError) Error() string {
-	return fmt.Sprintf("PeristentVolume %s cannot be used by the following Tenant, preventing a cross-tenant mount", m.name)
+	return fmt.Sprintf("PersistentVolume %s cannot be used by the following Tenant, preventing a cross-tenant mount", m.name)
 }
 
 type pvSelectorError struct{}

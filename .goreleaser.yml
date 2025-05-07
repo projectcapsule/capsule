@@ -8,7 +8,8 @@ before:
 gomod:
   proxy: false
 builds:
-  - main: .
+  - id: "{{ .ProjectName }}"
+    main: .
     binary: "{{ .ProjectName }}-{{ .Os }}-{{ .Arch }}"
     env:
       - CGO_ENABLED=0
@@ -28,13 +29,31 @@ builds:
           -X main.GitDirty={{ .Date }}
           -X main.BuildTime={{ .Date }}
           -X main.GitRepo={{ .ProjectName }}
+  - id: "{{ .ProjectName }}-wasm"
+    main: .
+    binary: "{{ .ProjectName }}.wasm"
+    env:
+      - CGO_ENABLED=0
+    goos:
+    - js
+    goarch:
+    - wasm
+    flags:
+      - -trimpath
+    mod_timestamp: '{{ .CommitTimestamp }}'
+    ldflags:
+      - >-
+          -X main.Version={{ .Tag }}
+          -X main.GitCommit={{ .Commit }}
+          -X main.GitTag={{ .Tag }}
+          -X main.GitDirty={{ .Date }}
+          -X main.BuildTime={{ .Date }}
+          -X main.GitRepo={{ .ProjectName }}
 release:
   prerelease: auto
   footer: |
-    Thanks to all the contributors!
-
     **Full Changelog**: https://github.com/projectcapsule/{{ .ProjectName }}/compare/{{ .PreviousTag }}...{{ .Tag }}
-    
+
     **Docker Images**
     - `ghcr.io/projectcapsule/{{ .ProjectName }}:{{ .Version }}`
     - `ghcr.io/projectcapsule/{{ .ProjectName }}:latest`
@@ -45,6 +64,21 @@ release:
     - `ghcr.io/projectcapsule/charts/{{ .ProjectName }}:{{ .Version }}`
 
     [Review the Major Changes section first before upgrading to a new version](https://artifacthub.io/packages/helm/projectcapsule/capsule/{{ .Version }}#major-changes)
+
+    > [!IMPORTANT]
+    > **Kubernetes compatibility**
+    >
+    > Note that the Capsule project offers support only for the latest minor version of Kubernetes.
+    > Backwards compatibility with older versions of Kubernetes and OpenShift is [offered by vendors](https://projectcapsule.dev/support/).
+    >
+    > | Kubernetes version | Minimum required |
+    > |--------------------|------------------|
+    > | `v1.33`            | `>= 1.33.0`      |
+
+
+    Thanks to all the contributors! 🚀 🦄
+  extra_files:
+    - glob: ./capsule-seccomp.json
 checksum:
   name_template: 'checksums.txt'
 changelog:
@@ -61,26 +95,27 @@ changelog:
     - Merge branch
   groups:
     # https://github.com/conventional-changelog/commitlint/tree/master/%40commitlint/config-conventional
-    - title: '🛠 Dependency updates'
-      regexp: '^.*?(feat|fix)\(deps\)!?:.+$'
-      order: 300
-    - title: '✨ New Features'
-      regexp: '^.*?feat(\([[:word:]]+\))??!?:.+$'
-      order: 100
-    - title: '🐛 Bug fixes'
-      regexp: '^.*?fix(\([[:word:]]+\))??!?:.+$'
-      order: 200
-    - title: '📖 Documentation updates'
-      regexp: ^.*?docs(\([[:word:]]+\))??!?:.+$
-      order: 400
-    - title: '🛡️ Security updates'
-      regexp: ^.*?(sec)(\([[:word:]]+\))??!?:.+$
-      order: 500
-    - title: '🚀 Build process updates'
-      regexp: ^.*?(build|ci)(\([[:word:]]+\))??!?:.+$
-      order: 600
-    - title: '📦 Other work'
-      order: 9999
+  - title: '🛠 Dependency updates'
+    regexp: '^fix\(deps\):|^feat\(deps\):'
+    order: 300
+  - title: '✨ New Features'
+    regexp: '^feat(\([^)]*\))?:'
+    order: 100
+  - title: '🐛 Bug fixes'
+    regexp: '^fix(\([^)]*\))?:'
+    order: 200
+  - title: '📖 Documentation updates'
+    regexp: '^docs(\([^)]*\))?:'
+    order: 400
+  - title: '🛡️ Security updates'
+    regexp: '^sec(\([^)]*\))?:'
+    order: 500
+  - title: '🚀 Build process updates'
+    regexp: '^(build|ci)(\([^)]*\))?:'
+    order: 600
+  - title: '📦 Other work'
+    regexp: '^chore(\([^)]*\))?:|^chore:'
+    order: 9999
 sboms:
   - artifacts: archive
 signs:

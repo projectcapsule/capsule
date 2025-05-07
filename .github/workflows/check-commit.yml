@@ -3,14 +3,15 @@ permissions: {}
 
 on:
   push:
-    branches: [ "*" ]
+    branches:
+      - "*"
   pull_request:
-    branches: [ "*" ]
+    branches:
+      - "*"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
-
 jobs:
   commit_lint:
     runs-on: ubuntu-24.04
@@ -19,5 +20,3 @@ jobs:
         with:
           fetch-depth: 0
       - uses: wagoid/commitlint-github-action@b948419dd99f3fd78a6548d48f94e3df7f6bf3ed # v6.2.1
-        with:
-          firstParent: true

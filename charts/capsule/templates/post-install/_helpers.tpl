@@ -9,4 +9,3 @@
 {{- define "capsule.post-install.component" -}}
 post-install-hook
 {{- end }}
-

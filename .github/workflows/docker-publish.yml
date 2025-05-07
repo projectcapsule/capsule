@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       packages: write
-      id-token: write 
+      id-token: write
     outputs:
       capsule-digest: ${{ steps.publish-capsule.outputs.digest }}
     steps:
@@ -28,7 +28,7 @@ jobs:
         with:
           build-cache-key: publish-images
       - name: Run Trivy vulnerability (Repo)
-        uses: aquasecurity/trivy-action@18f2510ee396bbf400402947b394f2dd8c87dbb0 # v0.29.0
+        uses: aquasecurity/trivy-action@6c175e9c4083a92bbca2f9724c8a5e33bc2d97a5 # 0.30.0
         with:
           scan-type: 'fs'
           ignore-unfixed: true
@@ -36,10 +36,10 @@ jobs:
           output: 'trivy-results.sarif'
           severity: 'CRITICAL,HIGH'
       - name: Install Cosign
-        uses: sigstore/cosign-installer@dc72c7d5c4d10cd6bcb8cf6e3fd625a9e5e537da # v3.7.0
+        uses: sigstore/cosign-installer@3454372f43399081ed03b604cb2d021dabca52bb # v3.8.2
       - name: Publish Capsule
         id: publish-capsule
-        uses: peak-scale/github-actions/make-ko-publish@38322faabccd75abfa581c435e367d446b6d2c3b # v0.1.0
+        uses: peak-scale/github-actions/make-ko-publish@a441cca016861c546ab7e065277e40ce41a3eb84 # v0.2.0
         with:
           makefile-target: ko-publish-capsule
           registry: ghcr.io
@@ -49,8 +49,8 @@ jobs:
           version: ${{ github.ref_name }}
           sign-image: true
           sbom-name: capsule
-          sbom-repository: ghcr.io/${{ github.repository_owner }}/sbom
-          signature-repository: ghcr.io/${{ github.repository_owner }}/signatures
+          sbom-repository: ghcr.io/${{ github.repository_owner }}/capsule
+          signature-repository: ghcr.io/${{ github.repository_owner }}/capsule
           main-path: ./
         env:
           REPOSITORY: ${{ github.repository }}
@@ -60,7 +60,7 @@ jobs:
       id-token: write   # To sign the provenance.
       packages: write   # To upload assets to release.
       actions: read     # To read the workflow path.
-    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@v2.0.0
+    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_container_slsa3.yml@v2.1.0
     with:
       image: ghcr.io/${{ github.repository_owner }}/capsule
       digest: "${{ needs.publish-images.outputs.capsule-digest }}"

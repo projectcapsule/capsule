@@ -79,7 +79,7 @@ func (n NetworkingV1) HostnamePathsPairs() (pairs map[string]sets.Set[string]) {
 			pairs[host] = sets.New[string]()
 		}
 
-		if http := rule.IngressRuleValue.HTTP; http != nil {
+		if http := rule.HTTP; http != nil {
 			for _, path := range http.Paths {
 				pairs[host].Insert(path.Path)
 			}
@@ -149,7 +149,7 @@ func (n NetworkingV1Beta1) HostnamePathsPairs() (pairs map[string]sets.Set[strin
 			pairs[host] = sets.New[string]()
 		}
 
-		if http := rule.IngressRuleValue.HTTP; http != nil {
+		if http := rule.HTTP; http != nil {
 			for _, path := range http.Paths {
 				pairs[host].Insert(path.Path)
 			}
@@ -217,7 +217,7 @@ func (e Extension) HostnamePathsPairs() (pairs map[string]sets.Set[string]) {
 			pairs[host] = sets.New[string]()
 		}
 
-		if http := rule.IngressRuleValue.HTTP; http != nil {
+		if http := rule.HTTP; http != nil {
 			for _, path := range http.Paths {
 				pairs[host].Insert(path.Path)
 			}

@@ -16,7 +16,7 @@ Use the Capsule Operator for easily implementing, managing, and maintaining mult
 
 * A [`kubeconfig`](https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/) file accessing the Kubernetes cluster with cluster admin permissions.
 
-## Major Changes 
+## Major Changes
 
 In the following sections you see actions which are required when you are upgrading to a specific version.
 
@@ -25,7 +25,7 @@ In the following sections you see actions which are required when you are upgrad
 Introduces a new methode to manage all capsule CRDs and their lifecycle. We are no longer relying on the [native CRD hook with the Helm Chart](https://helm.sh/docs/chart_best_practices/custom_resource_definitions/#some-caveats-and-explanations). The hook only allows to manage CRDs on install and uninstall but we can't deliver updates to the CRDs.
 When you newly install the chart we recommend to set  `crds.install` to `true`. This will manage the CRDs with the Helm Chart. This behavior is the new default.
 
-#### Changed Values 
+#### Changed Values
 
 The following Values have changed key or Value:
 
@@ -35,6 +35,8 @@ The following Values have changed key or Value:
 
 
 ## Installation
+
+**When using OCI we recommend our dedicated [OCI Repository](https://artifacthub.io/packages/helm/capsule/capsule) for this chart**
 
 The Capsule Operator requires it's CRDs to be installed before the operator itself. Since the Helm CRD lifecycle has limitations, we recommend to install the CRDs separately. Our chart supports the installation of crds via a dedicated Release.
 The Capsule Operator Chart can be used to instantly deploy the Capsule Operator on your Kubernetes cluster.

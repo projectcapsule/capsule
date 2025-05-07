@@ -1,0 +1,38 @@
+# Custome values for capsule tracing.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+manager:
+  image:
+    registry: ghcr.io
+    repository: projectcapsule/capsule
+    pullPolicy: Never
+    tag: tracing
+  hostNetwork: true
+  hostPID: true
+  volumes:
+    - name: debugfs
+      hostPath:
+        path: /sys/kernel/debug
+        type: Directory
+    - name: data
+      hostPath:
+        path: /tmp/results
+        type: Directory
+  volumeMounts:
+    - name: debugfs
+      mountPath: /sys/kernel/debug
+    - mountPath: /tmp/results
+      name: data
+  securityContext:
+    capabilities:
+      add:
+      - SYS_ADMIN
+      - NET_ADMIN
+      - PERFOM
+    privileged: true
+podSecurityContext:
+  seccompProfile:
+    type: "Unconfined"
+  runAsGroup: 0
+  runAsNonRoot: false
+  runAsUser: 0

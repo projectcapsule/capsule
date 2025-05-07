@@ -3,12 +3,14 @@ permissions: {}
 
 on:
   push:
-    branches: [ "*" ]
+    branches:
+      - "*"
     paths:
       - '.github/workflows/docs-lint.yml'
       - 'docs/content/**'
   pull_request:
-    branches: [ "*" ]
+    branches:
+      - "*"
     paths:
       - '.github/workflows/docs-lint.yml'
       - 'docs/content/**'

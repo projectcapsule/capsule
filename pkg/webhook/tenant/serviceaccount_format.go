@@ -23,6 +23,24 @@ func ServiceAccountNameHandler() capsulewebhook.Handler {
 	return &saNameHandler{}
 }
 
+func (h *saNameHandler) OnCreate(_ client.Client, decoder admission.Decoder, _ record.EventRecorder) capsulewebhook.Func {
+	return func(_ context.Context, req admission.Request) *admission.Response {
+		return h.validateServiceAccountName(req, decoder)
+	}
+}
+
+func (h *saNameHandler) OnDelete(client.Client, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
+	return func(context.Context, admission.Request) *admission.Response {
+		return nil
+	}
+}
+
+func (h *saNameHandler) OnUpdate(_ client.Client, decoder admission.Decoder, _ record.EventRecorder) capsulewebhook.Func {
+	return func(_ context.Context, req admission.Request) *admission.Response {
+		return h.validateServiceAccountName(req, decoder)
+	}
+}
+
 func (h *saNameHandler) validateServiceAccountName(req admission.Request, decoder admission.Decoder) *admission.Response {
 	tenant := &capsulev1beta2.Tenant{}
 	if err := decoder.Decode(req, tenant); err != nil {
@@ -44,22 +62,4 @@ func (h *saNameHandler) validateServiceAccountName(req admission.Request, decode
 	}
 
 	return nil
-}
-
-func (h *saNameHandler) OnCreate(_ client.Client, decoder admission.Decoder, _ record.EventRecorder) capsulewebhook.Func {
-	return func(_ context.Context, req admission.Request) *admission.Response {
-		return h.validateServiceAccountName(req, decoder)
-	}
-}
-
-func (h *saNameHandler) OnDelete(client.Client, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
-	return func(context.Context, admission.Request) *admission.Response {
-		return nil
-	}
-}
-
-func (h *saNameHandler) OnUpdate(_ client.Client, decoder admission.Decoder, _ record.EventRecorder) capsulewebhook.Func {
-	return func(_ context.Context, req admission.Request) *admission.Response {
-		return h.validateServiceAccountName(req, decoder)
-	}
 }

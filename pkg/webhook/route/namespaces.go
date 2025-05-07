@@ -7,8 +7,6 @@ import (
 	capsulewebhook "github.com/projectcapsule/capsule/pkg/webhook"
 )
 
-// +kubebuilder:webhook:path=/namespaces,mutating=false,sideEffects=None,admissionReviewVersions=v1,failurePolicy=fail,groups="",resources=namespaces,verbs=create;update;delete,versions=v1,name=namespaces.projectcapsule.dev
-
 type namespace struct {
 	handlers []capsulewebhook.Handler
 }
@@ -23,4 +21,20 @@ func (w *namespace) GetHandlers() []capsulewebhook.Handler {
 
 func (w *namespace) GetPath() string {
 	return "/namespaces"
+}
+
+type namespacePatch struct {
+	handlers []capsulewebhook.Handler
+}
+
+func NamespacePatch(handlers ...capsulewebhook.Handler) capsulewebhook.Webhook {
+	return &namespacePatch{handlers: handlers}
+}
+
+func (w *namespacePatch) GetHandlers() []capsulewebhook.Handler {
+	return w.handlers
+}
+
+func (w *namespacePatch) GetPath() string {
+	return "/namespace-patch"
 }
