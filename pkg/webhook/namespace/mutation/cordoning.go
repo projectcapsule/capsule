@@ -68,7 +68,9 @@ func (h *cordoningLabelHandler) syncNamespaceCordonLabel(ctx context.Context, c 
 
 	if label, ok := ns.Labels[ln]; ok {
 		if err = c.Get(ctx, types.NamespacedName{Name: label}, tnt); err != nil {
-			admission.Errored(http.StatusInternalServerError, err)
+			response := admission.Errored(http.StatusInternalServerError, err)
+
+			return &response
 		}
 	}
 
