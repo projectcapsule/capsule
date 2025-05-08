@@ -6,6 +6,7 @@ package tenant
 import (
 	"context"
 	"fmt"
+	"maps"
 	"strings"
 
 	"golang.org/x/sync/errgroup"
@@ -42,36 +43,39 @@ func (r *Manager) syncNamespaces(ctx context.Context, tenant *capsulev1beta2.Ten
 	return
 }
 
-//nolint:gocognit,nakedret
 func (r *Manager) syncNamespaceMetadata(ctx context.Context, namespace string, tnt *capsulev1beta2.Tenant) (err error) {
 	var res controllerutil.OperationResult
 
 	err = retry.RetryOnConflict(retry.DefaultBackoff, func() (conflictErr error) {
 		ns := &corev1.Namespace{}
 		if conflictErr = r.Get(ctx, types.NamespacedName{Name: namespace}, ns); err != nil {
-			return
+			return conflictErr
 		}
 
 		capsuleLabel, _ := utils.GetTypeLabel(&capsulev1beta2.Tenant{})
 
 		res, conflictErr = controllerutil.CreateOrUpdate(ctx, r.Client, ns, func() error {
-			annotations := make(map[string]string)
-			labels := map[string]string{
-				"kubernetes.io/metadata.name": namespace,
-				capsuleLabel:                  tnt.GetName(),
-			}
+			annotations := buildNamespaceAnnotationsForTenant(tnt)
+			labels := buildNamespaceLabelsForTenant(tnt)
 
-			if tnt.Spec.NamespaceOptions != nil && tnt.Spec.NamespaceOptions.AdditionalMetadata != nil {
-				for k, v := range tnt.Spec.NamespaceOptions.AdditionalMetadata.Annotations {
-					annotations[k] = v
+			if opts := tnt.Spec.NamespaceOptions; opts != nil && len(opts.AdditionalMetadataList) > 0 {
+				for _, md := range opts.AdditionalMetadataList {
+					ok, err := utils.IsNamespaceSelectedBySelector(ns, md.NamespaceSelector)
+					if err != nil {
+						return err
+					}
+
+					if !ok {
+						continue
+					}
+
+					maps.Copy(labels, md.Labels)
+					maps.Copy(annotations, md.Annotations)
 				}
 			}
 
-			if tnt.Spec.NamespaceOptions != nil && tnt.Spec.NamespaceOptions.AdditionalMetadata != nil {
-				for k, v := range tnt.Spec.NamespaceOptions.AdditionalMetadata.Labels {
-					labels[k] = v
-				}
-			}
+			labels["kubernetes.io/metadata.name"] = namespace
+			labels[capsuleLabel] = tnt.GetName()
 
 			if tnt.Spec.Cordoned {
 				ns.Labels[utils.CordonedLabel] = "true"
@@ -79,81 +83,92 @@ func (r *Manager) syncNamespaceMetadata(ctx context.Context, namespace string, t
 				delete(ns.Labels, utils.CordonedLabel)
 			}
 
-			if tnt.Spec.NodeSelector != nil {
-				annotations = utils.BuildNodeSelector(tnt, annotations)
-			}
-
-			if tnt.Spec.IngressOptions.AllowedClasses != nil {
-				if len(tnt.Spec.IngressOptions.AllowedClasses.Exact) > 0 {
-					annotations[AvailableIngressClassesAnnotation] = strings.Join(tnt.Spec.IngressOptions.AllowedClasses.Exact, ",")
-				}
-
-				if len(tnt.Spec.IngressOptions.AllowedClasses.Regex) > 0 {
-					annotations[AvailableIngressClassesRegexpAnnotation] = tnt.Spec.IngressOptions.AllowedClasses.Regex
-				}
-			}
-
-			if tnt.Spec.StorageClasses != nil {
-				if len(tnt.Spec.StorageClasses.Exact) > 0 {
-					annotations[AvailableStorageClassesAnnotation] = strings.Join(tnt.Spec.StorageClasses.Exact, ",")
-				}
-
-				if len(tnt.Spec.StorageClasses.Regex) > 0 {
-					annotations[AvailableStorageClassesRegexpAnnotation] = tnt.Spec.StorageClasses.Regex
-				}
-			}
-
-			if tnt.Spec.ContainerRegistries != nil {
-				if len(tnt.Spec.ContainerRegistries.Exact) > 0 {
-					annotations[AllowedRegistriesAnnotation] = strings.Join(tnt.Spec.ContainerRegistries.Exact, ",")
-				}
-
-				if len(tnt.Spec.ContainerRegistries.Regex) > 0 {
-					annotations[AllowedRegistriesRegexpAnnotation] = tnt.Spec.ContainerRegistries.Regex
-				}
-			}
-
-			if value, ok := tnt.Annotations[api.ForbiddenNamespaceLabelsAnnotation]; ok {
-				annotations[api.ForbiddenNamespaceLabelsAnnotation] = value
-			}
-
-			if value, ok := tnt.Annotations[api.ForbiddenNamespaceLabelsRegexpAnnotation]; ok {
-				annotations[api.ForbiddenNamespaceLabelsRegexpAnnotation] = value
-			}
-
-			if value, ok := tnt.Annotations[api.ForbiddenNamespaceAnnotationsAnnotation]; ok {
-				annotations[api.ForbiddenNamespaceAnnotationsAnnotation] = value
-			}
-
-			if value, ok := tnt.Annotations[api.ForbiddenNamespaceAnnotationsRegexpAnnotation]; ok {
-				annotations[api.ForbiddenNamespaceAnnotationsRegexpAnnotation] = value
-			}
-
 			if ns.Annotations == nil {
 				ns.SetAnnotations(annotations)
 			} else {
-				for k, v := range annotations {
-					ns.Annotations[k] = v
-				}
+				maps.Copy(ns.Annotations, annotations)
 			}
 
 			if ns.Labels == nil {
 				ns.SetLabels(labels)
 			} else {
-				for k, v := range labels {
-					ns.Labels[k] = v
-				}
+				maps.Copy(ns.Labels, labels)
 			}
 
 			return nil
 		})
 
-		return
+		return conflictErr
 	})
 
 	r.emitEvent(tnt, namespace, res, "Ensuring Namespace metadata", err)
 
 	return err
+}
+
+func buildNamespaceAnnotationsForTenant(tnt *capsulev1beta2.Tenant) map[string]string {
+	annotations := make(map[string]string)
+
+	if md := tnt.Spec.NamespaceOptions; md != nil && md.AdditionalMetadata != nil {
+		maps.Copy(annotations, md.AdditionalMetadata.Annotations)
+	}
+
+	if tnt.Spec.NodeSelector != nil {
+		annotations = utils.BuildNodeSelector(tnt, annotations)
+	}
+
+	if ic := tnt.Spec.IngressOptions.AllowedClasses; ic != nil {
+		if len(ic.Exact) > 0 {
+			annotations[AvailableIngressClassesAnnotation] = strings.Join(ic.Exact, ",")
+		}
+
+		if len(ic.Regex) > 0 {
+			annotations[AvailableIngressClassesRegexpAnnotation] = ic.Regex
+		}
+	}
+
+	if sc := tnt.Spec.StorageClasses; sc != nil {
+		if len(sc.Exact) > 0 {
+			annotations[AvailableStorageClassesAnnotation] = strings.Join(sc.Exact, ",")
+		}
+
+		if len(sc.Regex) > 0 {
+			annotations[AvailableStorageClassesRegexpAnnotation] = sc.Regex
+		}
+	}
+
+	if cr := tnt.Spec.ContainerRegistries; cr != nil {
+		if len(cr.Exact) > 0 {
+			annotations[AllowedRegistriesAnnotation] = strings.Join(cr.Exact, ",")
+		}
+
+		if len(cr.Regex) > 0 {
+			annotations[AllowedRegistriesRegexpAnnotation] = cr.Regex
+		}
+	}
+
+	for _, key := range []string{
+		api.ForbiddenNamespaceLabelsAnnotation,
+		api.ForbiddenNamespaceLabelsRegexpAnnotation,
+		api.ForbiddenNamespaceAnnotationsAnnotation,
+		api.ForbiddenNamespaceAnnotationsRegexpAnnotation,
+	} {
+		if value, ok := tnt.Annotations[key]; ok {
+			annotations[key] = value
+		}
+	}
+
+	return annotations
+}
+
+func buildNamespaceLabelsForTenant(tnt *capsulev1beta2.Tenant) map[string]string {
+	labels := make(map[string]string)
+
+	if md := tnt.Spec.NamespaceOptions; md != nil && md.AdditionalMetadata != nil {
+		maps.Copy(labels, md.AdditionalMetadata.Labels)
+	}
+
+	return labels
 }
 
 func (r *Manager) ensureNamespaceCount(ctx context.Context, tenant *capsulev1beta2.Tenant) error {
