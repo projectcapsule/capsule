@@ -6,16 +6,12 @@ package mutation
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
-	"sort"
-	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -143,114 +139,19 @@ func (h *ownerReferenceHandler) setOwnerRef(ctx context.Context, req admission.R
 
 		return &response
 	}
-	// If we already had TenantName label on NS -> assign to it
 
-	if label, ok := ns.Labels[ln]; ok {
-		// retrieving the selected Tenant
-		tnt := &capsulev1beta2.Tenant{}
-		if err = client.Get(ctx, types.NamespacedName{Name: label}, tnt); err != nil {
-			response := admission.Errored(http.StatusBadRequest, err)
+	tnt, errResponse := getNamespaceTenant(ctx, client, ns, req, h.cfg, recorder)
+	if errResponse != nil {
+		return errResponse
+	}
 
-			return &response
-		}
-		// Tenant owner must adhere to user that asked for NS creation
-		if !utils.IsTenantOwner(tnt.Spec.Owners, req.UserInfo) {
-			recorder.Eventf(tnt, corev1.EventTypeWarning, "NonOwnedTenant", "Namespace %s cannot be assigned to the current Tenant", ns.GetName())
-
-			response := admission.Denied("Cannot assign the desired namespace to a non-owned Tenant")
-
-			return &response
-		}
-		// Check if namespace needs Tenant name prefix
-		if errResponse := h.validateNamespacePrefix(ns, tnt); errResponse != nil {
-			return errResponse
-		}
-		// Patching the response
-		response := h.patchResponseForOwnerRef(tnt, ns, recorder)
+	if tnt == nil {
+		response := admission.Denied("Unable to assign namespace to tenant. Please use " + ln + " label when creating a namespace")
 
 		return &response
 	}
 
-	// If we forceTenantPrefix -> find Tenant from NS name
-	var tenants sortedTenants
-
-	// Find tenants belonging to user (it can be regular user or ServiceAccount)
-	if strings.HasPrefix(req.UserInfo.Username, "system:serviceaccount:") {
-		var tntList *capsulev1beta2.TenantList
-
-		if tntList, err = h.listTenantsForOwnerKind(ctx, "ServiceAccount", req.UserInfo.Username, client); err != nil {
-			response := admission.Errored(http.StatusBadRequest, err)
-
-			return &response
-		}
-
-		for _, tnt := range tntList.Items {
-			tenants = append(tenants, tnt)
-		}
-	} else {
-		var tntList *capsulev1beta2.TenantList
-
-		if tntList, err = h.listTenantsForOwnerKind(ctx, "User", req.UserInfo.Username, client); err != nil {
-			response := admission.Errored(http.StatusBadRequest, err)
-
-			return &response
-		}
-
-		for _, tnt := range tntList.Items {
-			tenants = append(tenants, tnt)
-		}
-	}
-
-	// Find tenants belonging to user groups
-	{
-		for _, group := range req.UserInfo.Groups {
-			tntList, err := h.listTenantsForOwnerKind(ctx, "Group", group, client)
-			if err != nil {
-				response := admission.Errored(http.StatusBadRequest, err)
-
-				return &response
-			}
-
-			for _, tnt := range tntList.Items {
-				tenants = append(tenants, tnt)
-			}
-		}
-	}
-
-	sort.Sort(sort.Reverse(tenants))
-
-	if len(tenants) == 0 {
-		response := admission.Denied("You do not have any Tenant assigned: please, reach out to the system administrators")
-
-		return &response
-	}
-
-	if len(tenants) == 1 {
-		// Check if namespace needs Tenant name prefix
-		if errResponse := h.validateNamespacePrefix(ns, &tenants[0]); errResponse != nil {
-			return errResponse
-		}
-
-		response := h.patchResponseForOwnerRef(&tenants[0], ns, recorder)
-
-		return &response
-	}
-
-	if h.cfg.ForceTenantPrefix() {
-		for _, tnt := range tenants {
-			if strings.HasPrefix(ns.GetName(), fmt.Sprintf("%s-", tnt.GetName())) {
-				response := h.patchResponseForOwnerRef(tnt.DeepCopy(), ns, recorder)
-
-				return &response
-			}
-		}
-
-		response := admission.Denied("The Namespace prefix used doesn't match any available Tenant")
-
-		return &response
-	}
-
-	response := admission.Denied("Unable to assign namespace to tenant. Please use " + ln + " label when creating a namespace")
+	response := h.patchResponseForOwnerRef(tnt.DeepCopy(), ns, recorder)
 
 	return &response
 }
@@ -279,41 +180,4 @@ func (h *ownerReferenceHandler) patchResponseForOwnerRef(tenant *capsulev1beta2.
 	}
 
 	return admission.PatchResponseFromRaw(o, c)
-}
-
-func (h *ownerReferenceHandler) listTenantsForOwnerKind(ctx context.Context, ownerKind string, ownerName string, clt client.Client) (*capsulev1beta2.TenantList, error) {
-	tntList := &capsulev1beta2.TenantList{}
-	fields := client.MatchingFields{
-		".spec.owner.ownerkind": fmt.Sprintf("%s:%s", ownerKind, ownerName),
-	}
-	err := clt.List(ctx, tntList, fields)
-
-	return tntList, err
-}
-
-func (h *ownerReferenceHandler) validateNamespacePrefix(ns *corev1.Namespace, tenant *capsulev1beta2.Tenant) *admission.Response {
-	// Check if ForceTenantPrefix is true
-	if tenant.Spec.ForceTenantPrefix != nil && *tenant.Spec.ForceTenantPrefix {
-		if !strings.HasPrefix(ns.GetName(), fmt.Sprintf("%s-", tenant.GetName())) {
-			response := admission.Denied(fmt.Sprintf("The Namespace name must start with '%s-' when ForceTenantPrefix is enabled in the Tenant.", tenant.GetName()))
-
-			return &response
-		}
-	}
-
-	return nil
-}
-
-type sortedTenants []capsulev1beta2.Tenant
-
-func (s sortedTenants) Len() int {
-	return len(s)
-}
-
-func (s sortedTenants) Less(i, j int) bool {
-	return len(s[i].GetName()) < len(s[j].GetName())
-}
-
-func (s sortedTenants) Swap(i, j int) {
-	s[i], s[j] = s[j], s[i]
 }
