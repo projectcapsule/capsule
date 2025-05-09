@@ -6,10 +6,11 @@ package mutation
 import (
 	"context"
 	"encoding/json"
+	"net/http"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
-	"net/http"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
@@ -48,13 +49,16 @@ func (h *cordoningLabelHandler) OnUpdate(c client.Client, decoder admission.Deco
 		if err := decoder.Decode(req, ns); err != nil {
 			return utils.ErroredResponse(err)
 		}
+
 		response := h.syncNamespaceCordonLabel(ctx, c, req, ns)
+
 		return response
 	}
 }
 
 func (h *cordoningLabelHandler) syncNamespaceCordonLabel(ctx context.Context, c client.Client, req admission.Request, ns *corev1.Namespace) *admission.Response {
 	tnt := &capsulev1beta2.Tenant{}
+
 	ln, err := capsuleutils.GetTypeLabel(tnt)
 	if err != nil {
 		response := admission.Errored(http.StatusInternalServerError, err)
@@ -64,7 +68,9 @@ func (h *cordoningLabelHandler) syncNamespaceCordonLabel(ctx context.Context, c 
 
 	if label, ok := ns.Labels[ln]; ok {
 		if err = c.Get(ctx, types.NamespacedName{Name: label}, tnt); err != nil {
-			admission.Errored(http.StatusInternalServerError, err)
+			response := admission.Errored(http.StatusInternalServerError, err)
+
+			return &response
 		}
 	}
 
