@@ -65,6 +65,10 @@ type TenantSpec struct {
 	// If unset, Tenant uses CapsuleConfiguration's forceTenantPrefix
 	// Optional
 	ForceTenantPrefix *bool `json:"forceTenantPrefix,omitempty"`
+	// Specifies RBAC permissions for the Tenant. Capsule will ensure that all namespaces in the Tenant always contain the RoleBinding for the given ClusterRole.
+	// Capsule will add the subjects to the ClusterRoleBinding, and the RoleBinding will be created in each namespace, or each namespace specified in the namespace selector.
+	// Optional.
+	Permissions []PermissionSpec `json:"permissions,omitempty"`
 }
 
 // +kubebuilder:object:root=true
