@@ -23,8 +23,20 @@ func (r *ResourcePool) AssignNamespaces(namespaces []corev1.Namespace) {
 
 	sort.Strings(l)
 
-	r.Status.Size = uint(len(l))
+	r.Status.NamespaceSize = uint(len(l))
 	r.Status.Namespaces = l
+}
+
+func (r *ResourcePool) AssignClaims() {
+	var size uint
+
+	for _, claims := range r.Status.Claims {
+		for _ = range claims {
+			size++
+		}
+	}
+
+	r.Status.ClaimSize = size
 }
 
 func (r *ResourcePool) GetClaimFromStatus(cl *ResourcePoolClaim) *ResourcePoolClaimsItem {
@@ -192,10 +204,7 @@ func (r *ResourcePool) GetResourceQuotaHardResources(namespace string) corev1.Re
 
 	// Only Consider Default, when enabled
 	for resourceName, amount := range r.GetResourceDefaults() {
-		usedValue, usedExists := claimed[resourceName]
-		if !usedExists {
-			usedValue = resource.MustParse("0")
-		}
+		usedValue, _ := claimed[resourceName]
 
 		// Combine with claim
 		usedValue.Add(amount)

@@ -13,7 +13,11 @@ import (
 // GlobalResourceQuotaStatus defines the observed state of GlobalResourceQuota
 type ResourcePoolStatus struct {
 	// How many namespaces are considered
-	Size uint `json:"size, omitempty"`
+	// +kubebuilder:default=0
+	NamespaceSize uint `json:"namespaceCount,omitempty"`
+	// Amount of claims
+	// +kubebuilder:default=0
+	ClaimSize uint `json:"claimCount,omitempty"`
 	// Namespaces which are considered for claims
 	Namespaces []string `json:"namespaces,omitempty"`
 	// Tracks the quotas for the Resource.

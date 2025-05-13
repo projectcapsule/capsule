@@ -124,11 +124,15 @@ func (r resourceClaimController) reconcile(
 	if err != nil {
 		claim.Status.Pool = api.StatusNameUID{}
 
+		cond := meta.NewAssignedReasonCondition(claim)
+		cond.Status = metav1.ConditionFalse
+		cond.Type = meta.NotReadyCondition
+
 		updateStatusAndEmitEvent(
 			ctx,
 			r.Recorder,
 			claim,
-			meta.NewNotReadyCondition(claim, err.Error()),
+			cond,
 		)
 
 		return r.Client.Status().Update(ctx, claim)
@@ -159,6 +163,22 @@ func (r resourceClaimController) evaluateResourcePool(
 		Name: poolName,
 	}, pool); err != nil {
 		return nil, err
+	}
+
+	allowed := false
+
+	for _, ns := range pool.Status.Namespaces {
+		if ns == claim.GetNamespace() {
+			allowed = true
+
+			continue
+		}
+	}
+
+	if !allowed {
+		return nil, fmt.Errorf(
+			"resourcepool not available",
+		)
 	}
 
 	// Validates if Resources can be allocated in the first place
@@ -206,10 +226,14 @@ func (r resourceClaimController) allocateResourcePool(
 		return nil
 	}
 
+	cond := meta.NewAssignedReasonCondition(cl)
+	cond.Status = metav1.ConditionTrue
+	cond.Type = meta.ReadyCondition
+
 	// Set claim pool in status and condition
 	cl.Status = capsulev1beta2.ResourcePoolClaimStatus{
 		Pool:      allocate,
-		Condition: meta.NewAssignedReasonCondition(cl),
+		Condition: cond,
 	}
 
 	// Update status in a separate call

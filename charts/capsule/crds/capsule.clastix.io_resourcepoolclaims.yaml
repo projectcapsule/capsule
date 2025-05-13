@@ -19,9 +19,13 @@ spec:
       jsonPath: .status.pool.name
       name: Pool
       type: string
-    - description: Condition
-      jsonPath: .status.condition.reason
+    - description: Status for claim
+      jsonPath: .status.condition.status
       name: Status
+      type: string
+    - description: Reason for status
+      jsonPath: .status.condition.reason
+      name: Reason
       type: string
     - description: Condition Message
       jsonPath: .status.condition.message

@@ -64,12 +64,4 @@ resources:
   kind: ResourcePoolClaim
   path: github.com/projectcapsule/capsule/api/v1beta2
   version: v1beta2
-- api:
-    crdVersion: v1
-    namespaced: true
-  domain: clastix.io
-  group: capsule
-  kind: ResourcePoolUsage
-  path: github.com/projectcapsule/capsule/api/v1beta2
-  version: v1beta2
 version: "3"

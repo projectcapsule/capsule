@@ -212,7 +212,7 @@ var _ = Describe("ResourcePool Tests", func() {
 			ok, msg := DeepCompare(namespaces, pool.Status.Namespaces)
 			Expect(ok).To(BeTrue(), "Mismatch for expected namespaces: %s", msg)
 
-			Expect(pool.Status.Size).To(Equal(uint(3)))
+			Expect(pool.Status.NamespaceSize).To(Equal(uint(3)))
 		})
 
 		By("Verify ResourceQuotas for namespaces", func() {
@@ -322,7 +322,7 @@ var _ = Describe("ResourcePool Tests", func() {
 			ok, msg := DeepCompare(expected, pool.Status.Namespaces)
 			Expect(ok).To(BeTrue(), "Mismatch for expected namespaces: %s", msg)
 
-			Expect(pool.Status.Size).To(Equal(uint(2)))
+			Expect(pool.Status.NamespaceSize).To(Equal(uint(2)))
 		})
 
 		By("Verify ResourceQuota was cleaned up", func() {
@@ -357,7 +357,7 @@ var _ = Describe("ResourcePool Tests", func() {
 			ok, msg := DeepCompare(expected, pool.Status.Namespaces)
 			Expect(ok).To(BeTrue(), "Mismatch for expected namespaces: %s", msg)
 
-			Expect(pool.Status.Size).To(Equal(uint(1)))
+			Expect(pool.Status.NamespaceSize).To(Equal(uint(1)))
 		})
 
 		By("Delete Resourcepool", func() {
@@ -484,7 +484,7 @@ var _ = Describe("ResourcePool Tests", func() {
 			ok, msg := DeepCompare(namespaces, pool.Status.Namespaces)
 			Expect(ok).To(BeTrue(), "Mismatch for expected namespaces: %s", msg)
 
-			Expect(pool.Status.Size).To(Equal(uint(2)))
+			Expect(pool.Status.NamespaceSize).To(Equal(uint(2)))
 		})
 
 		By("Verify ResourceQuotas for namespaces", func() {

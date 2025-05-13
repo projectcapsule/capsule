@@ -97,13 +97,51 @@ func (r resourcePoolController) Reconcile(ctx context.Context, request ctrl.Requ
 
 	r.Metrics.ResourceUsageMetrics(instance)
 
-	r.Client.Status().Update(ctx, instance)
-
+	err = r.Client.Status().Update(ctx, instance)
 	if err != nil {
-		log.Error(err, "Cannot sync ResourceQuotas")
+		log.Error(err, "Failed to Update ResourcePool Status")
 	}
 
+	err = r.finalize(ctx, log, instance)
+
 	return ctrl.Result{}, err
+}
+
+func (r *resourcePoolController) finalize(
+	ctx context.Context,
+	log logr.Logger,
+	pool *capsulev1beta2.ResourcePool,
+) (err error) {
+	if pool.Status.ClaimSize == 0 {
+		// Skip if finalizer no longer present
+		if !controllerutil.ContainsFinalizer(pool, meta.ControllerFinalizer) {
+			return
+		}
+
+		if _, err = controllerutil.CreateOrUpdate(ctx, r.Client, pool, func() error {
+			controllerutil.RemoveFinalizer(pool, meta.ControllerFinalizer)
+
+			return nil
+		}); err != nil {
+			return err
+		}
+
+		return nil
+	}
+
+	if controllerutil.ContainsFinalizer(pool, meta.ControllerFinalizer) {
+		return
+	}
+
+	if _, err = controllerutil.CreateOrUpdate(ctx, r.Client, pool, func() error {
+		controllerutil.AddFinalizer(pool, meta.ControllerFinalizer)
+
+		return nil
+	}); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (r *resourcePoolController) reconcile(
@@ -154,11 +192,10 @@ func (r *resourcePoolController) reconcile(
 		if err != nil {
 			log.Error(err, "Failed to reconcile ResourceQuotaClaim", "claim", claim.Name)
 		}
-
-		log.V(5).Info("Status resources", "pool", pool.Status)
 	}
 
 	pool.CalculateUsage()
+	pool.AssignClaims()
 
 	return r.syncResourceQuotas(ctx, r.Client, pool, namespaces)
 }
@@ -189,8 +226,14 @@ func (r *resourcePoolController) reconcileResourceClaim(
 			exhaustion,
 		)
 
-		if err != nil || queued {
+		if err != nil {
 			return err
+		}
+
+		if queued {
+			log.V(5).Info("Claim is queued", "claim", claim.Name)
+
+			return nil
 		}
 	}
 
@@ -251,13 +294,15 @@ func (r *resourcePoolController) canClaimWithinNamespace(
 			claimed = resource.MustParse("0")
 		}
 
-		claimed.Add(req)
+		combinedClaim := claimed.DeepCopy()
+		combinedClaim.Add(req)
 
-		if maxNamespaceAllocation.Cmp(claimed) < 0 {
+		if maxNamespaceAllocation.Cmp(combinedClaim) < 0 {
 			log.V(5).Info("maxium for namespace claimed", "max", maxNamespaceAllocation, "claiming", claimed)
 
+			maxNamespaceAllocation.Sub(claimed)
 			res[resourceName.String()] = PoolExhaustionResource{
-				Available:  available,
+				Available:  maxNamespaceAllocation,
 				Requesting: req,
 				Namespace:  true,
 			}
@@ -338,6 +383,7 @@ func (r *resourcePoolController) handleClaimResourceExhaustion(
 			resourceName,
 			ex.Available.String(),
 		)
+
 		status = append(status, line)
 	}
 
@@ -385,6 +431,7 @@ func (r *resourcePoolController) handleClaimToPoolBinding(
 // Attempts to garbage collect a ResourceQuota resource.
 func (r *resourcePoolController) handleClaimDisassociation(
 	ctx context.Context,
+	log logr.Logger,
 	pool *capsulev1beta2.ResourcePool,
 	claim *capsulev1beta2.ResourcePoolClaimsItem,
 ) error {
@@ -396,6 +443,8 @@ func (r *resourcePoolController) handleClaimDisassociation(
 		},
 	}
 
+	log.V(5).Info("OBJECT", "CLAIM", claimObj, "FUll", claim)
+
 	err := r.Client.Get(ctx, types.NamespacedName{
 		Name:      claim.Name.String(),
 		Namespace: claim.Namespace.String(),
@@ -403,6 +452,8 @@ func (r *resourcePoolController) handleClaimDisassociation(
 	if err != nil {
 		if errors.IsNotFound(err) {
 			pool.RemoveClaimFromStatus(claimObj)
+
+			log.V(5).Info("HERERERER")
 
 			return nil
 		}
@@ -526,6 +577,10 @@ func (r *resourcePoolController) gatherMatchingNamespaces(
 	namespaces = make([]corev1.Namespace, 0)
 	seenNamespaces := make(map[string]struct{})
 
+	if !pool.DeletionTimestamp.IsZero() {
+		return
+	}
+
 	for _, selector := range pool.Spec.Selectors {
 		selected, serr := selector.GetMatchingNamespaces(ctx, r.Client)
 		if serr != nil {
@@ -560,6 +615,11 @@ func (r *resourcePoolController) gatherMatchingClaims(
 	pool *capsulev1beta2.ResourcePool,
 ) (claims []capsulev1beta2.ResourcePoolClaim, err error) {
 	claimList := &capsulev1beta2.ResourcePoolClaimList{}
+
+	if !pool.DeletionTimestamp.IsZero() {
+		return
+	}
+
 	if err := r.List(ctx, claimList, client.MatchingFieldsSelector{
 		Selector: fields.OneTermEqualSelector(".status.pool.uid", string(pool.GetUID())),
 	}); err != nil {
@@ -622,7 +682,8 @@ func (r *resourcePoolController) garbageCollection(
 			if nsMarked || !claimActive {
 				log.V(5).Info("Disassociating claim", "claim", cl.Name, "namespace", ns, "uid", cl.UID, "nsGC", nsMarked, "claimGC", claimActive)
 
-				if err := r.handleClaimDisassociation(ctx, pool, cl); err != nil {
+				cl.Namespace = api.Name(ns)
+				if err := r.handleClaimDisassociation(ctx, log, pool, cl); err != nil {
 					r.Log.Error(err, "Failed to disassociate claim", "namespace", ns, "uid", cl.UID)
 
 					return err
@@ -630,7 +691,7 @@ func (r *resourcePoolController) garbageCollection(
 			}
 		}
 
-		if nsMarked {
+		if nsMarked || len(pool.Status.Claims[ns]) == 0 {
 			delete(pool.Status.Claims, ns)
 		}
 	}

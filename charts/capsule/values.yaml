@@ -265,12 +265,19 @@ webhooks:
 
   # Hook Configuration
   hooks:
-    resourcePools:
-      namespaceSelector: {}
-      objectSelector: {}
-      reinvocationPolicy: Never
-      matchPolicy: Equivalent
-      failurePolicy: Fail
+    resource:
+      pools:
+        namespaceSelector: {}
+        objectSelector: {}
+        reinvocationPolicy: Never
+        matchPolicy: Equivalent
+        failurePolicy: Fail
+      claims:
+        namespaceSelector: {}
+        objectSelector: {}
+        reinvocationPolicy: Never
+        matchPolicy: Equivalent
+        failurePolicy: Fail
     namespaceOwnerReference:
       failurePolicy: Fail
     cordoning:

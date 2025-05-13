@@ -17,7 +17,7 @@ const (
 	BoundReason string = "Bound"
 
 	// FailedReason indicates a condition or event observed a failure (Claim Rejected).
-	FailedReason   string = "Unassigned"
+	FailedReason   string = "Failed"
 	QueuedReason   string = "Queued"
 	AssignedReason string = "Assigned"
 
@@ -61,7 +61,6 @@ func NewQueuedReasonCondition(obj client.Object, msg string) metav1.Condition {
 
 func NewAssignedReasonCondition(obj client.Object) metav1.Condition {
 	return metav1.Condition{
-		Type:               NotReadyCondition,
 		Status:             metav1.ConditionFalse,
 		Reason:             AssignedReason,
 		Message:            "Assigned to Pool",

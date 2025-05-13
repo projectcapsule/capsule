@@ -44,7 +44,8 @@ type ResourcePoolSpecConfiguration struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:scope=Cluster,shortName=quotapool
-// +kubebuilder:printcolumn:name="Namespaces",type="integer",JSONPath=".status.size",description="The total amount of Namespaces spanned across"
+// +kubebuilder:printcolumn:name="Claims",type="integer",JSONPath=".status.claimCount",description="The total amount of Claims bound"
+// +kubebuilder:printcolumn:name="Namespaces",type="integer",JSONPath=".status.namespaceCount",description="The total amount of Namespaces considered"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp",description="Age"
 
 type ResourcePool struct {

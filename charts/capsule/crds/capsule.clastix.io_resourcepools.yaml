@@ -17,8 +17,12 @@ spec:
   scope: Cluster
   versions:
   - additionalPrinterColumns:
-    - description: The total amount of Namespaces spanned across
-      jsonPath: .status.size
+    - description: The total amount of Claims bound
+      jsonPath: .status.claimCount
+      name: Claims
+      type: integer
+    - description: The total amount of Namespaces considered
+      jsonPath: .status.namespaceCount
       name: Namespaces
       type: integer
     - description: Age
@@ -239,6 +243,10 @@ spec:
                       in the namespace.
                     type: object
                 type: object
+              claimCount:
+                default: 0
+                description: Amount of claims
+                type: integer
               claims:
                 additionalProperties:
                   items:
@@ -271,16 +279,15 @@ spec:
                   type: array
                 description: Tracks the quotas for the Resource.
                 type: object
+              namespaceCount:
+                default: 0
+                description: How many namespaces are considered
+                type: integer
               namespaces:
                 description: Namespaces which are considered for claims
                 items:
                   type: string
                 type: array
-              size:
-                description: How many namespaces are considered
-                type: integer
-            required:
-            - size
             type: object
         type: object
     served: true
