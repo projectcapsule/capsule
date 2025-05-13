@@ -14,11 +14,8 @@ type ResourcePoolClaimSpec struct {
 	// If there's the possability to claim from multiple global Quotas
 	// You must be specific about which one you want to claim resources from
 	// Once bound to a ResourcePool, this field is immutable
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="Value is immutable"
-	Pool string `json:"pool,omitempty"`
+	Pool string `json:"pool"`
 	// Amount which should be claimed for the resourcequota
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="Resources are immutable"
 	ResourceClaims corev1.ResourceList `json:"claim"`
 }
 

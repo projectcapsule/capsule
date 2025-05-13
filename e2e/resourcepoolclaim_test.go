@@ -123,6 +123,38 @@ var _ = Describe("ResourcePool Tests", func() {
 			},
 		}
 
+		claim1 := &capsulev1beta2.ResourcePoolClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "assign-pool-claim-1",
+				Namespace: "ns-1-pool-assign",
+			},
+			Spec: capsulev1beta2.ResourcePoolClaimSpec{
+				Pool: "test-binding-claims",
+				ResourceClaims: corev1.ResourceList{
+					corev1.ResourceLimitsCPU:      resource.MustParse("0"),
+					corev1.ResourceLimitsMemory:   resource.MustParse("0"),
+					corev1.ResourceRequestsCPU:    resource.MustParse("0"),
+					corev1.ResourceRequestsMemory: resource.MustParse("0"),
+				},
+			},
+		}
+
+		claim2 := &capsulev1beta2.ResourcePoolClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "assign-pool-claim-2",
+				Namespace: "ns-2-pool-assign",
+			},
+			Spec: capsulev1beta2.ResourcePoolClaimSpec{
+				Pool: "test-binding-claims",
+				ResourceClaims: corev1.ResourceList{
+					corev1.ResourceLimitsCPU:      resource.MustParse("0"),
+					corev1.ResourceLimitsMemory:   resource.MustParse("0"),
+					corev1.ResourceRequestsCPU:    resource.MustParse("0"),
+					corev1.ResourceRequestsMemory: resource.MustParse("0"),
+				},
+			},
+		}
+
 		By("Create the ResourcePool", func() {
 			err := k8sClient.Create(context.TODO(), pool1)
 			Expect(err).Should(Succeed(), "Failed to create ResourcePool %s", pool1)
@@ -187,74 +219,43 @@ var _ = Describe("ResourcePool Tests", func() {
 		})
 
 		By("Create a first claim and verify binding", func() {
-			claim := &capsulev1beta2.ResourcePoolClaim{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "assign-pool-claim-1",
-					Namespace: "ns-1-pool-assign",
-				},
-				Spec: capsulev1beta2.ResourcePoolClaimSpec{
-					Pool: "test-binding-claims",
-					ResourceClaims: corev1.ResourceList{
-						corev1.ResourceLimitsCPU:      resource.MustParse("0"),
-						corev1.ResourceLimitsMemory:   resource.MustParse("0"),
-						corev1.ResourceRequestsCPU:    resource.MustParse("0"),
-						corev1.ResourceRequestsMemory: resource.MustParse("0"),
-					},
-				},
-			}
 
-			err := k8sClient.Create(context.TODO(), claim)
-			Expect(err).Should(Succeed(), "Failed to create Claim %s", claim)
+			err := k8sClient.Create(context.TODO(), claim1)
+			Expect(err).Should(Succeed(), "Failed to create Claim %s", claim1)
 
-			err = k8sClient.Get(context.TODO(), client.ObjectKey{Name: claim.Name, Namespace: claim.Namespace}, claim)
+			err = k8sClient.Get(context.TODO(), client.ObjectKey{Name: claim1.Name, Namespace: claim1.Namespace}, claim1)
 			Expect(err).Should(Succeed())
 
 			expectedPool := api.StatusNameUID{
 				Name: api.Name(pool1.Name),
 				UID:  pool1.GetUID(),
 			}
-			Expect(claim.Status.Pool).To(Equal(expectedPool), "expected pool name to match")
+			Expect(claim1.Status.Pool).To(Equal(expectedPool), "expected pool name to match")
 
-			Expect(claim.Status.Condition.Status).To(Equal(metav1.ConditionTrue), "failed to verify condition status")
-			Expect(claim.Status.Condition.Type).To(Equal(meta.ReadyCondition), "failed to verify condition type")
-			Expect(claim.Status.Condition.Reason).To(Equal(meta.BoundReason), "failed to verify condition reason")
+			Expect(claim1.Status.Condition.Status).To(Equal(metav1.ConditionTrue), "failed to verify condition status")
+			Expect(claim1.Status.Condition.Type).To(Equal(meta.ReadyCondition), "failed to verify condition type")
+			Expect(claim1.Status.Condition.Reason).To(Equal(meta.BoundReason), "failed to verify condition reason")
 		})
 
 		By("Create a second claim and verify binding", func() {
-			claim := &capsulev1beta2.ResourcePoolClaim{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "assign-pool-claim-2",
-					Namespace: "ns-2-pool-assign",
-				},
-				Spec: capsulev1beta2.ResourcePoolClaimSpec{
-					Pool: "test-binding-claims",
-					ResourceClaims: corev1.ResourceList{
-						corev1.ResourceLimitsCPU:      resource.MustParse("0"),
-						corev1.ResourceLimitsMemory:   resource.MustParse("0"),
-						corev1.ResourceRequestsCPU:    resource.MustParse("0"),
-						corev1.ResourceRequestsMemory: resource.MustParse("0"),
-					},
-				},
-			}
+			err := k8sClient.Create(context.TODO(), claim2)
+			Expect(err).Should(Succeed(), "Failed to create Claim %s", claim2)
 
-			err := k8sClient.Create(context.TODO(), claim)
-			Expect(err).Should(Succeed(), "Failed to create Claim %s", claim)
-
-			err = k8sClient.Get(context.TODO(), client.ObjectKey{Name: claim.Name, Namespace: claim.Namespace}, claim)
+			err = k8sClient.Get(context.TODO(), client.ObjectKey{Name: claim2.Name, Namespace: claim2.Namespace}, claim2)
 			Expect(err).Should(Succeed())
 
 			expectedPool := api.StatusNameUID{
 				Name: api.Name(pool1.Name),
 				UID:  pool1.GetUID(),
 			}
-			Expect(claim.Status.Pool).To(Equal(expectedPool), "expected pool name to match")
+			Expect(claim2.Status.Pool).To(Equal(expectedPool), "expected pool name to match")
 
-			Expect(claim.Status.Condition.Status).To(Equal(metav1.ConditionTrue), "failed to verify condition status")
-			Expect(claim.Status.Condition.Type).To(Equal(meta.ReadyCondition), "failed to verify condition type")
-			Expect(claim.Status.Condition.Reason).To(Equal(meta.BoundReason), "failed to verify condition reason")
+			Expect(claim2.Status.Condition.Status).To(Equal(metav1.ConditionTrue), "failed to verify condition status")
+			Expect(claim2.Status.Condition.Type).To(Equal(meta.ReadyCondition), "failed to verify condition type")
+			Expect(claim2.Status.Condition.Reason).To(Equal(meta.BoundReason), "failed to verify condition reason")
 		})
 
-		By("Create a second claim and verify error", func() {
+		By("Create a third claim and verify error", func() {
 			claim := &capsulev1beta2.ResourcePoolClaim{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "assign-pool-claim-3",
@@ -284,5 +285,233 @@ var _ = Describe("ResourcePool Tests", func() {
 			Expect(claim.Status.Condition.Type).To(Equal(meta.NotReadyCondition), "failed to verify condition type")
 			Expect(claim.Status.Condition.Reason).To(Equal(meta.AssignedReason), "failed to verify condition reason")
 		})
+
+		By("Verify ResourcePool status", func() {
+			err := k8sClient.Get(context.TODO(), client.ObjectKey{Name: pool1.Name}, pool1)
+			Expect(err).Should(Succeed())
+
+			//expectedClaims := map[string]capsulev1beta2.ResourcePoolClaimsList{}
+			expectedClaims := map[string]capsulev1beta2.ResourcePoolClaimsList{
+				claim1.GetNamespace(): {
+					&capsulev1beta2.ResourcePoolClaimsItem{
+						StatusNameUID: api.StatusNameUID{
+							Name: api.Name(claim1.GetName()),
+							UID:  claim1.GetUID(),
+						},
+						Claims: claim1.Spec.ResourceClaims,
+					},
+				},
+				claim2.GetNamespace(): {
+					&capsulev1beta2.ResourcePoolClaimsItem{
+						StatusNameUID: api.StatusNameUID{
+							Name: api.Name(claim2.GetName()),
+							UID:  claim2.GetUID(),
+						},
+						Claims: claim2.Spec.ResourceClaims,
+					},
+				},
+			}
+
+			ok, msg := DeepCompare(expectedClaims, pool1.Status.Claims)
+			Expect(ok).To(BeTrue(), "Mismatch for expected claims: %s", msg)
+		})
 	})
+
+	It("Admission (Validation)", func() {
+		pool := &capsulev1beta2.ResourcePool{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test-admission-claims",
+				Labels: map[string]string{
+					"e2e-resourcepoolclaims": "test",
+				},
+			},
+			Spec: capsulev1beta2.ResourcePoolSpec{
+				Selectors: []api.NamespaceSelector{
+					{
+						LabelSelector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{
+								"capsule.clastix.io/tenant": "admission-guards",
+							},
+						},
+					},
+				},
+				Quota: corev1.ResourceQuotaSpec{
+					Hard: corev1.ResourceList{
+						corev1.ResourceLimitsCPU:      resource.MustParse("2"),
+						corev1.ResourceLimitsMemory:   resource.MustParse("2Gi"),
+						corev1.ResourceRequestsCPU:    resource.MustParse("2"),
+						corev1.ResourceRequestsMemory: resource.MustParse("2Gi"),
+					},
+				},
+			},
+		}
+
+		claim := &capsulev1beta2.ResourcePoolClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "admission-pool-claim-1",
+				Namespace: "ns-1-pool-admission",
+			},
+			Spec: capsulev1beta2.ResourcePoolClaimSpec{
+				Pool: pool.GetName(),
+				ResourceClaims: corev1.ResourceList{
+					corev1.ResourceLimitsCPU:      resource.MustParse("1"),
+					corev1.ResourceLimitsMemory:   resource.MustParse("1Gi"),
+					corev1.ResourceRequestsCPU:    resource.MustParse("1"),
+					corev1.ResourceRequestsMemory: resource.MustParse("1Gi"),
+				},
+			},
+		}
+
+		By("Create the Claim", func() {
+			ns := &corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: claim.Namespace,
+					Labels: map[string]string{
+						"e2e-resourcepoolclaims":    "test",
+						"capsule.clastix.io/tenant": "admission-guards",
+					},
+				},
+			}
+
+			err := k8sClient.Create(context.TODO(), ns)
+			Expect(err).Should(Succeed())
+
+			err = k8sClient.Create(context.TODO(), claim)
+			Expect(err).Should(Succeed(), "Failed to create Claim %s", claim)
+		})
+
+		By("Create the ResourcePool", func() {
+			err := k8sClient.Create(context.TODO(), pool)
+			Expect(err).Should(Succeed(), "Failed to create ResourcePool %s", pool)
+		})
+
+		By("Get Applied revision", func() {
+			err := k8sClient.Get(context.TODO(), client.ObjectKey{Name: pool.Name}, pool)
+			Expect(err).Should(Succeed())
+		})
+
+		By("Bind a claim", func() {
+			err := k8sClient.Get(context.TODO(), client.ObjectKey{Name: claim.Name, Namespace: claim.Namespace}, claim)
+			Expect(err).Should(Succeed())
+
+			expectedPool := api.StatusNameUID{
+				Name: api.Name(pool.Name),
+				UID:  pool.GetUID(),
+			}
+
+			isBoundCondition(claim)
+			Expect(claim.Status.Pool).To(Equal(expectedPool), "expected pool name to match")
+		})
+
+		By("Error on patching resources for claim (Increase)", func() {
+			err := k8sClient.Get(context.TODO(), client.ObjectKey{Name: claim.Name, Namespace: claim.Namespace}, claim)
+			Expect(err).Should(Succeed())
+
+			claim.Spec.ResourceClaims = corev1.ResourceList{
+				corev1.ResourceLimitsCPU:      resource.MustParse("2"),
+				corev1.ResourceLimitsMemory:   resource.MustParse("2Gi"),
+				corev1.ResourceRequestsCPU:    resource.MustParse("2"),
+				corev1.ResourceRequestsMemory: resource.MustParse("2Gi"),
+			}
+
+			err = k8sClient.Update(context.TODO(), claim)
+			Expect(err).To(HaveOccurred(), "Expected error when updating resources in bound state %s", claim)
+		})
+
+		By("Error on patching resources for claim (Decrease)", func() {
+			err := k8sClient.Get(context.TODO(), client.ObjectKey{Name: claim.Name, Namespace: claim.Namespace}, claim)
+			Expect(err).Should(Succeed())
+
+			claim.Spec.ResourceClaims = corev1.ResourceList{
+				corev1.ResourceLimitsCPU:      resource.MustParse("0"),
+				corev1.ResourceLimitsMemory:   resource.MustParse("0Gi"),
+				corev1.ResourceRequestsCPU:    resource.MustParse("0"),
+				corev1.ResourceRequestsMemory: resource.MustParse("0Gi"),
+			}
+
+			err = k8sClient.Update(context.TODO(), claim)
+			Expect(err).To(HaveOccurred(), "Expected error when updating resources in bound state %s", claim)
+		})
+
+		By("Error on patching pool name", func() {
+			err := k8sClient.Get(context.TODO(), client.ObjectKey{Name: claim.Name, Namespace: claim.Namespace}, claim)
+			Expect(err).Should(Succeed())
+
+			claim.Spec.Pool = "some-random-pool"
+
+			err = k8sClient.Update(context.TODO(), claim)
+			Expect(err).To(HaveOccurred(), "Expected error when updating resources in bound state %s", claim)
+		})
+
+		By("Delete Pool", func() {
+			err := k8sClient.Delete(context.TODO(), pool)
+			Expect(err).Should(Succeed())
+		})
+
+		By("Verify claim is no longer bound", func() {
+			isUnassignedCondition(claim)
+		})
+
+		By("Allow patching resources for claim (Increase)", func() {
+			err := k8sClient.Get(context.TODO(), client.ObjectKey{Name: claim.Name, Namespace: claim.Namespace}, claim)
+			Expect(err).Should(Succeed())
+
+			claim.Spec.ResourceClaims = corev1.ResourceList{
+				corev1.ResourceLimitsCPU:      resource.MustParse("2"),
+				corev1.ResourceLimitsMemory:   resource.MustParse("2Gi"),
+				corev1.ResourceRequestsCPU:    resource.MustParse("2"),
+				corev1.ResourceRequestsMemory: resource.MustParse("2Gi"),
+			}
+
+			err = k8sClient.Update(context.TODO(), claim)
+			Expect(err).To(HaveOccurred(), "Expected error when updating resources in bound state %s", claim)
+		})
+
+		By("Allow patching resources for claim (Decrease)", func() {
+			err := k8sClient.Get(context.TODO(), client.ObjectKey{Name: claim.Name, Namespace: claim.Namespace}, claim)
+			Expect(err).Should(Succeed())
+
+			claim.Spec.ResourceClaims = corev1.ResourceList{
+				corev1.ResourceLimitsCPU:      resource.MustParse("0"),
+				corev1.ResourceLimitsMemory:   resource.MustParse("0Gi"),
+				corev1.ResourceRequestsCPU:    resource.MustParse("0"),
+				corev1.ResourceRequestsMemory: resource.MustParse("0Gi"),
+			}
+
+			err = k8sClient.Update(context.TODO(), claim)
+			Expect(err).To(HaveOccurred(), "Expected error when updating resources in bound state %s", claim)
+		})
+
+		By("Allow patching pool name", func() {
+			err := k8sClient.Get(context.TODO(), client.ObjectKey{Name: claim.Name, Namespace: claim.Namespace}, claim)
+			Expect(err).Should(Succeed())
+
+			claim.Spec.Pool = "some-random-pool"
+
+			err = k8sClient.Update(context.TODO(), claim)
+			Expect(err).To(HaveOccurred(), "Expected error when updating resources in bound state %s", claim)
+		})
+
+	})
+
 })
+
+func isUnassignedCondition(claim *capsulev1beta2.ResourcePoolClaim) {
+	cl := &capsulev1beta2.ResourcePoolClaim{}
+	err := k8sClient.Get(context.TODO(), client.ObjectKey{Name: claim.Name, Namespace: claim.Namespace}, cl)
+	Expect(err).Should(Succeed())
+
+	Expect(cl.Status.Condition.Status).To(Equal(metav1.ConditionFalse), "failed to verify condition status")
+	Expect(cl.Status.Condition.Type).To(Equal(meta.NotReadyCondition), "failed to verify condition type")
+	Expect(cl.Status.Condition.Reason).To(Equal(meta.AssignedReason), "failed to verify condition reason")
+}
+
+func isBoundCondition(claim *capsulev1beta2.ResourcePoolClaim) {
+	cl := &capsulev1beta2.ResourcePoolClaim{}
+	err := k8sClient.Get(context.TODO(), client.ObjectKey{Name: claim.Name, Namespace: claim.Namespace}, cl)
+	Expect(err).Should(Succeed())
+
+	Expect(cl.Status.Condition.Status).To(Equal(metav1.ConditionTrue), "failed to verify condition status")
+	Expect(cl.Status.Condition.Type).To(Equal(meta.ReadyCondition), "failed to verify condition type")
+	Expect(cl.Status.Condition.Reason).To(Equal(meta.BoundReason), "failed to verify condition reason")
+}

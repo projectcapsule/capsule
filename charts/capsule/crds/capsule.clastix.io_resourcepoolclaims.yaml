@@ -67,20 +67,15 @@ spec:
                   x-kubernetes-int-or-string: true
                 description: Amount which should be claimed for the resourcequota
                 type: object
-                x-kubernetes-validations:
-                - message: Resources are immutable
-                  rule: self == oldSelf
               pool:
                 description: |-
                   If there's the possability to claim from multiple global Quotas
                   You must be specific about which one you want to claim resources from
                   Once bound to a ResourcePool, this field is immutable
                 type: string
-                x-kubernetes-validations:
-                - message: Value is immutable
-                  rule: self == oldSelf
             required:
             - claim
+            - pool
             type: object
           status:
             description: ResourceQuotaClaimStatus defines the observed state of ResourceQuotaClaim.
@@ -143,12 +138,12 @@ spec:
                 properties:
                   name:
                     description: Name
-                    maxLength: 20
+                    maxLength: 253
                     pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
                     type: string
                   namespace:
                     description: Namespace
-                    maxLength: 20
+                    maxLength: 253
                     pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
                     type: string
                   uid:

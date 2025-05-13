@@ -93,13 +93,23 @@ func (r resourcePoolController) Reconcile(ctx context.Context, request ctrl.Requ
 	}
 
 	// ResourceQuota Reconcilation
-	err = r.reconcile(ctx, log, instance)
+	reconcileErr := r.reconcile(ctx, log, instance)
 
 	r.Metrics.ResourceUsageMetrics(instance)
 
 	err = r.Client.Status().Update(ctx, instance)
 	if err != nil {
 		log.Error(err, "Failed to Update ResourcePool Status")
+		return ctrl.Result{
+			Requeue: true,
+		}, err
+	}
+
+	if reconcileErr != nil {
+		log.Error(err, "Failed to reconcile ResourcePool")
+		return ctrl.Result{
+			Requeue: true,
+		}, reconcileErr
 	}
 
 	err = r.finalize(ctx, log, instance)
@@ -208,8 +218,6 @@ func (r *resourcePoolController) reconcileResourceClaim(
 	claim *capsulev1beta2.ResourcePoolClaim,
 	exhaustion map[string]resource.Quantity,
 ) (err error) {
-	log.V(5).Info("RECONCILING CLAIM", "CLAIM", claim.Name)
-
 	t := pool.GetClaimFromStatus(claim)
 	if t != nil {
 		// TBD: Future Implementation for Claim Resizing here
@@ -443,8 +451,6 @@ func (r *resourcePoolController) handleClaimDisassociation(
 		},
 	}
 
-	log.V(5).Info("OBJECT", "CLAIM", claimObj, "FUll", claim)
-
 	err := r.Client.Get(ctx, types.NamespacedName{
 		Name:      claim.Name.String(),
 		Namespace: claim.Namespace.String(),
@@ -475,6 +481,18 @@ func (r *resourcePoolController) handleClaimDisassociation(
 	}
 
 	pool.RemoveClaimFromStatus(claimObj)
+
+	if err = r.Client.Get(ctx, types.NamespacedName{
+		Name:      claim.Name.String(),
+		Namespace: claim.Namespace.String(),
+	}, claimObj); err != nil {
+		return err
+	}
+
+	patch := client.MergeFrom(claimObj.DeepCopy())
+	if updated := meta.RemoveLooseOwnerReference(claimObj, pool); updated {
+		return r.Client.Patch(ctx, claimObj, patch)
+	}
 
 	return nil
 }

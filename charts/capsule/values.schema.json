@@ -757,24 +757,51 @@
                             },
                             "type": "object"
                         },
-                        "resourcePools": {
+                        "resource": {
                             "properties": {
-                                "failurePolicy": {
-                                    "type": "string"
-                                },
-                                "matchPolicy": {
-                                    "type": "string"
-                                },
-                                "namespaceSelector": {
-                                    "properties": {},
+                                "claims": {
+                                    "properties": {
+                                        "failurePolicy": {
+                                            "type": "string"
+                                        },
+                                        "matchPolicy": {
+                                            "type": "string"
+                                        },
+                                        "namespaceSelector": {
+                                            "properties": {},
+                                            "type": "object"
+                                        },
+                                        "objectSelector": {
+                                            "properties": {},
+                                            "type": "object"
+                                        },
+                                        "reinvocationPolicy": {
+                                            "type": "string"
+                                        }
+                                    },
                                     "type": "object"
                                 },
-                                "objectSelector": {
-                                    "properties": {},
+                                "pools": {
+                                    "properties": {
+                                        "failurePolicy": {
+                                            "type": "string"
+                                        },
+                                        "matchPolicy": {
+                                            "type": "string"
+                                        },
+                                        "namespaceSelector": {
+                                            "properties": {},
+                                            "type": "object"
+                                        },
+                                        "objectSelector": {
+                                            "properties": {},
+                                            "type": "object"
+                                        },
+                                        "reinvocationPolicy": {
+                                            "type": "string"
+                                        }
+                                    },
                                     "type": "object"
-                                },
-                                "reinvocationPolicy": {
-                                    "type": "string"
                                 }
                             },
                             "type": "object"

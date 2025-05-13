@@ -8,13 +8,11 @@ import (
 	"reflect"
 
 	"github.com/go-logr/logr"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	"github.com/projectcapsule/capsule/pkg/meta"
 	capsulewebhook "github.com/projectcapsule/capsule/pkg/webhook"
 	"github.com/projectcapsule/capsule/pkg/webhook/utils"
 )
@@ -53,8 +51,16 @@ func (h *claimValidationHandler) OnUpdate(c client.Client, decoder admission.Dec
 		}
 
 		if !reflect.DeepEqual(oldClaim.Spec.ResourceClaims, newClaim.Spec.ResourceClaims) {
-			if oldClaim.Status.Condition.Reason == meta.BoundReason && oldClaim.Status.Condition.Status == metav1.ConditionTrue {
-				response := admission.Denied(fmt.Sprintf("cannot change the requested resources while claim is bound to resourcepool %s", oldClaim.Status.Pool.Name))
+			if oldClaim.IsBoundToResourcePool() {
+				response := admission.Denied(fmt.Sprintf("cannot change the requested resources while claim is bound to a resourcepool %s", oldClaim.Status.Pool.Name))
+
+				return &response
+			}
+		}
+
+		if !reflect.DeepEqual(oldClaim.Spec.Pool, newClaim.Spec.Pool) {
+			if oldClaim.IsBoundToResourcePool() {
+				response := admission.Denied(fmt.Sprintf("cannot change the pool while claim is bound to a resourcepool %s", oldClaim.Status.Pool.Name))
 
 				return &response
 			}

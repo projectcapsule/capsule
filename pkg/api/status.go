@@ -14,7 +14,7 @@ import (
 // Cannot be updated.
 // More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names#names
 // +kubebuilder:validation:Pattern=`^[a-z0-9]([-a-z0-9]*[a-z0-9])?$`
-// +kubebuilder:validation:MaxLength=20
+// +kubebuilder:validation:MaxLength=253
 // +kubebuilder:object:generate=true
 type Name string
 

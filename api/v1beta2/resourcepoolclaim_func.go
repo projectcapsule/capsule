@@ -4,6 +4,7 @@
 package v1beta2
 
 import (
+	"github.com/projectcapsule/capsule/pkg/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -15,4 +16,14 @@ func (r *ResourcePoolClaim) UpdateCondition(condition metav1.Condition) {
 	}
 
 	r.Status.Condition = condition
+}
+
+// Indicate the claim is bound to a resource pool
+func (r *ResourcePoolClaim) IsBoundToResourcePool() bool {
+	if r.Status.Condition.Reason == meta.BoundReason &&
+		r.Status.Condition.Status == metav1.ConditionTrue {
+		return true
+	}
+
+	return false
 }
