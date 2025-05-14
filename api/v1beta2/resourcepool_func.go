@@ -96,11 +96,12 @@ func (r *ResourcePool) AddClaimToStatus(claim *ResourcePoolClaim) {
 
 	r.Status.Claims[ns] = claims
 
-	r.CalculateUsage()
+	r.CalculateClaimedResources()
 }
 
 func (r *ResourcePool) RemoveClaimFromStatus(claim *ResourcePoolClaim) {
 	newClaims := ResourcePoolClaimsList{}
+
 	claims, ok := r.Status.Claims[claim.Namespace]
 	if !ok {
 		return
@@ -119,30 +120,45 @@ func (r *ResourcePool) RemoveClaimFromStatus(claim *ResourcePoolClaim) {
 	}
 }
 
-func (r *ResourcePool) CalculateUsage() {
+func (r *ResourcePool) CalculateClaimedResources() {
 	usage := corev1.ResourceList{}
 
-	if len(r.Status.Claims) == 0 {
-		for r, _ := range r.Status.Allocation.Hard {
-			usage[r] = resource.MustParse("0")
-		}
-	} else {
-		for _, claims := range r.Status.Claims {
-			for _, claim := range claims {
-				for resourceName, qt := range claim.Claims {
-					amount, exists := usage[resourceName]
-					if !exists {
-						amount = resource.MustParse("0")
-					}
+	for res, _ := range r.Status.Allocation.Hard {
+		usage[res] = resource.MustParse("0")
+	}
 
-					amount.Add(qt)
-					usage[resourceName] = amount
+	for _, claims := range r.Status.Claims {
+		for _, claim := range claims {
+			for resourceName, qt := range claim.Claims {
+				amount, exists := usage[resourceName]
+				if !exists {
+					amount = resource.MustParse("0")
 				}
+
+				amount.Add(qt)
+				usage[resourceName] = amount
 			}
 		}
 	}
 
 	r.Status.Allocation.Claimed = usage
+
+	r.CalculateAvailableResources()
+}
+
+func (r *ResourcePool) CalculateAvailableResources() {
+	available := corev1.ResourceList{}
+
+	for res, qt := range r.Status.Allocation.Hard {
+		amount, exists := r.Status.Allocation.Claimed[res]
+		if exists {
+			qt.Sub(amount)
+		}
+
+		available[res] = qt
+	}
+
+	r.Status.Allocation.Available = available
 }
 
 func (g *ResourcePool) CanClaimFromPool(claim corev1.ResourceList) []error {

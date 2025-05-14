@@ -36,6 +36,9 @@ type ResourcePoolQuotaStatus struct {
 	// Used is the current observed total usage of the resource in the namespace.
 	// +optional
 	Claimed corev1.ResourceList `json:"used,omitempty" protobuf:"bytes,2,rep,name=used,casttype=ResourceList,castkey=ResourceName"`
+	// Used to track the usage of the resource in the pool (diff hard - claimed). May be used for further automation
+	// +optional
+	Available corev1.ResourceList `json:"available,omitempty" protobuf:"bytes,2,rep,name=available,casttype=ResourceList,castkey=ResourceName"`
 }
 
 type ResourcePoolClaimsList []*ResourcePoolClaimsItem

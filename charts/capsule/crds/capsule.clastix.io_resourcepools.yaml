@@ -227,6 +227,16 @@ spec:
                 description: Tracks the Usage from Claimed against what has been granted
                   from the pool
                 properties:
+                  available:
+                    additionalProperties:
+                      anyOf:
+                      - type: integer
+                      - type: string
+                      pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                      x-kubernetes-int-or-string: true
+                    description: Used to track the usage of the resource in the pool
+                      (diff hard - claimed). May be used for further automation
+                    type: object
                   hard:
                     additionalProperties:
                       anyOf:

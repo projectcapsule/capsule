@@ -148,10 +148,6 @@ func (r resourceClaimController) evaluateResourcePool(
 ) (pool *capsulev1beta2.ResourcePool, err error) {
 	poolName := claim.Spec.Pool
 
-	if claim.Status.Pool.Name != "" {
-		poolName = claim.Status.Pool.Name.String()
-	}
-
 	if poolName == "" {
 		err = fmt.Errorf("no pool reference was defined")
 

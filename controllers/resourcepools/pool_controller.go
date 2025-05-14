@@ -204,7 +204,7 @@ func (r *resourcePoolController) reconcile(
 		}
 	}
 
-	pool.CalculateUsage()
+	pool.CalculateClaimedResources()
 	pool.AssignClaims()
 
 	return r.syncResourceQuotas(ctx, r.Client, pool, namespaces)
@@ -729,7 +729,7 @@ func (r *resourcePoolController) garbageCollection(
 
 	// We can recalculate the usage in the end
 	// Since it's only going to decrease
-	pool.CalculateUsage()
+	pool.CalculateClaimedResources()
 
 	return nil
 }
