@@ -467,20 +467,27 @@ func (r *resourcePoolController) handleClaimDisassociation(
 		return err
 	}
 
-	updateStatusAndEmitEvent(
-		ctx,
-		r.Recorder,
-		claimObj,
-		meta.NewNotReadyCondition(claimObj, "Claim is being disassociated"),
-	)
+	if !*pool.Spec.Config.DeleteBoundResources {
+		patch := client.MergeFrom(claimObj.DeepCopy())
+		meta.RemoveLooseOwnerReference(claimObj, pool)
 
-	claimObj.Status.Pool = api.StatusNameUID{}
+		if err := r.Client.Patch(ctx, claimObj, patch); err != nil {
+			log.Info("Removing owner reference", "claim", claimObj, "pool", pool.Name)
 
-	if err := r.Client.Status().Update(ctx, claimObj); err != nil {
-		return err
+			return err
+		}
+
+		r.Recorder.AnnotatedEventf(
+			claimObj,
+			map[string]string{
+				"Status": string(metav1.ConditionFalse),
+				"Type":   meta.NotReadyCondition,
+			},
+			corev1.EventTypeNormal,
+			"Disassociated",
+			"Claim is disassociated from the pool",
+		)
 	}
-
-	pool.RemoveClaimFromStatus(claimObj)
 
 	if err = r.Client.Get(ctx, types.NamespacedName{
 		Name:      claim.Name.String(),
@@ -489,9 +496,15 @@ func (r *resourcePoolController) handleClaimDisassociation(
 		return err
 	}
 
-	patch := client.MergeFrom(claimObj.DeepCopy())
-	if updated := meta.RemoveLooseOwnerReference(claimObj, pool); updated {
-		return r.Client.Patch(ctx, claimObj, patch)
+	claimObj.Status.Pool = api.StatusNameUID{}
+	if err := r.Client.Status().Update(ctx, claimObj); err != nil {
+		return err
+	}
+
+	pool.RemoveClaimFromStatus(claimObj)
+
+	if *pool.Spec.Config.DeleteBoundResources {
+		return nil
 	}
 
 	return nil

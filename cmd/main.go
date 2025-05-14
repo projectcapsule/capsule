@@ -235,7 +235,7 @@ func main() {
 		route.Defaults(defaults.Handler(cfg, kubeVersion)),
 		route.ResourcePoolMutation((resourcepool.PoolMutationHandler(ctrl.Log.WithName("webhooks").WithName("resourcepool")))),
 		route.ResourcePoolValidation((resourcepool.PoolValidationHandler(ctrl.Log.WithName("webhooks").WithName("resourcepool")))),
-		route.ResourcePoolClaimMutation((resourcepool.ClaimMutationHandler(ctrl.Log.WithName("webhooks").WithName("resourcepool")))),
+		route.ResourcePoolClaimMutation((resourcepool.ClaimMutationHandler(ctrl.Log.WithName("webhooks").WithName("resourcepoolclaims")))),
 		route.ResourcePoolClaimValidation((resourcepool.ClaimValidationHandler(ctrl.Log.WithName("webhooks").WithName("resourcepoolclaims")))),
 	)
 

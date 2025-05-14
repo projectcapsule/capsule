@@ -4,6 +4,7 @@
 package meta
 
 import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -39,25 +40,18 @@ func SetLooseOwnerReference(
 func RemoveLooseOwnerReference(
 	obj client.Object,
 	owner client.Object,
-) (updated bool) {
-	ownerRefs := obj.GetOwnerReferences()
-	updated = false
+) {
+	refs := []metav1.OwnerReference{}
 
-	for i, ownerRef := range ownerRefs {
+	for _, ownerRef := range obj.GetOwnerReferences() {
 		if ownerRef.UID == owner.GetUID() {
-			ownerRefs = append(ownerRefs[:i], ownerRefs[i+1:]...)
-
-			updated = true
-
-			break
+			continue
 		}
+
+		refs = append(refs, ownerRef)
 	}
 
-	if updated {
-		obj.SetOwnerReferences(ownerRefs)
-	}
-
-	return
+	obj.SetOwnerReferences(refs)
 }
 
 // If not returns false.

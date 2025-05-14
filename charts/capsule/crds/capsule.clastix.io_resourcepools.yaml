@@ -64,6 +64,12 @@ spec:
                       This allocates the default resources to each resourcequota responsible for a namespace.
                       The Defaults serve as a base for the resource allocation, and are not counted towards the total allocation
                     type: boolean
+                  deleteBoundResources:
+                    default: false
+                    description: |-
+                      When a resourcepool is deleted, the resourceclaims bound to it are disassociated from the resourcepool but not deleted.
+                      By Enabling this option, the resourceclaims will be deleted when the resourcepool is deleted, if they are in bound state.
+                    type: boolean
                   orderedQueue:
                     default: false
                     description: |-

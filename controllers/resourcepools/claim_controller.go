@@ -165,6 +165,12 @@ func (r resourceClaimController) evaluateResourcePool(
 		return nil, err
 	}
 
+	if !pool.ObjectMeta.DeletionTimestamp.IsZero() {
+		return nil, fmt.Errorf(
+			"resourcepool not available",
+		)
+	}
+
 	allowed := false
 
 	for _, ns := range pool.Status.Namespaces {

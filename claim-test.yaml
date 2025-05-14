@@ -3,9 +3,7 @@ apiVersion: capsule.clastix.io/v1beta2
 kind: ResourcePoolClaim
 metadata:
   name: get-me-cpu
-  namespace: solar-prod
 spec:
-  pool: sampler
   claim:
     limits.cpu: "2"
     limits.memory: 1Gi

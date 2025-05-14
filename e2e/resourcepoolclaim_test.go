@@ -11,6 +11,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
@@ -317,7 +318,7 @@ var _ = Describe("ResourcePool Tests", func() {
 		})
 	})
 
-	It("Admission (Validation)", func() {
+	It("Admission (Validation) - Patch Guard", func() {
 		pool := &capsulev1beta2.ResourcePool{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "test-admission-claims",
@@ -326,6 +327,9 @@ var _ = Describe("ResourcePool Tests", func() {
 				},
 			},
 			Spec: capsulev1beta2.ResourcePoolSpec{
+				Config: capsulev1beta2.ResourcePoolSpecConfiguration{
+					DeleteBoundResources: ptr.To(false),
+				},
 				Selectors: []api.NamespaceSelector{
 					{
 						LabelSelector: &metav1.LabelSelector{
@@ -464,7 +468,7 @@ var _ = Describe("ResourcePool Tests", func() {
 			}
 
 			err = k8sClient.Update(context.TODO(), claim)
-			Expect(err).To(HaveOccurred(), "Expected error when updating resources in bound state %s", claim)
+			Expect(err).Should(Succeed(), "Expected error when updating resources in bound state %s", claim)
 		})
 
 		By("Allow patching resources for claim (Decrease)", func() {
@@ -479,7 +483,7 @@ var _ = Describe("ResourcePool Tests", func() {
 			}
 
 			err = k8sClient.Update(context.TODO(), claim)
-			Expect(err).To(HaveOccurred(), "Expected error when updating resources in bound state %s", claim)
+			Expect(err).Should(Succeed(), "Expected error when updating resources in bound state %s", claim)
 		})
 
 		By("Allow patching pool name", func() {
@@ -489,7 +493,183 @@ var _ = Describe("ResourcePool Tests", func() {
 			claim.Spec.Pool = "some-random-pool"
 
 			err = k8sClient.Update(context.TODO(), claim)
-			Expect(err).To(HaveOccurred(), "Expected error when updating resources in bound state %s", claim)
+			Expect(err).Should(Succeed(), "Expected no error when updating resources in bound state %s", claim)
+		})
+
+	})
+
+	It("Admission (Mutation) - Auto Pool Assign", func() {
+		pool1 := &capsulev1beta2.ResourcePool{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test-auto-assign-1",
+				Labels: map[string]string{
+					"e2e-resourcepoolclaims": "test",
+				},
+			},
+			Spec: capsulev1beta2.ResourcePoolSpec{
+				Config: capsulev1beta2.ResourcePoolSpecConfiguration{
+					DeleteBoundResources: ptr.To(false),
+				},
+				Selectors: []api.NamespaceSelector{
+					{
+						LabelSelector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{
+								"capsule.clastix.io/tenant": "admission-auto-assign",
+							},
+						},
+					},
+				},
+				Quota: corev1.ResourceQuotaSpec{
+					Hard: corev1.ResourceList{
+						corev1.ResourceLimitsCPU:   resource.MustParse("2"),
+						corev1.ResourceRequestsCPU: resource.MustParse("2"),
+					},
+				},
+			},
+		}
+
+		pool2 := &capsulev1beta2.ResourcePool{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test-auto-assign-2",
+				Labels: map[string]string{
+					"e2e-resourcepoolclaims": "test",
+				},
+			},
+			Spec: capsulev1beta2.ResourcePoolSpec{
+				Config: capsulev1beta2.ResourcePoolSpecConfiguration{
+					DeleteBoundResources: ptr.To(false),
+				},
+				Selectors: []api.NamespaceSelector{
+					{
+						LabelSelector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{
+								"capsule.clastix.io/tenant": "admission-auto-assign",
+							},
+						},
+					},
+				},
+				Quota: corev1.ResourceQuotaSpec{
+					Hard: corev1.ResourceList{
+						corev1.ResourceLimitsMemory:   resource.MustParse("2"),
+						corev1.ResourceRequestsMemory: resource.MustParse("2"),
+					},
+				},
+			},
+		}
+
+		By("Create the ResourcePools", func() {
+			err := k8sClient.Create(context.TODO(), pool1)
+			Expect(err).Should(Succeed(), "Failed to create ResourcePool %s", pool1)
+
+			err = k8sClient.Create(context.TODO(), pool2)
+			Expect(err).Should(Succeed(), "Failed to create ResourcePool %s", pool2)
+		})
+
+		By("Auto Assign Claim (CPU)", func() {
+			claim := &capsulev1beta2.ResourcePoolClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "auto-assign-1",
+					Namespace: "ns-1-pool-assign",
+				},
+				Spec: capsulev1beta2.ResourcePoolClaimSpec{
+					ResourceClaims: corev1.ResourceList{
+						corev1.ResourceLimitsCPU:   resource.MustParse("1"),
+						corev1.ResourceRequestsCPU: resource.MustParse("1"),
+					},
+				},
+			}
+
+			ns := &corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: claim.Namespace,
+					Labels: map[string]string{
+						"e2e-resourcepoolclaims":    "test",
+						"capsule.clastix.io/tenant": "admission-auto-assign",
+					},
+				},
+			}
+
+			err := k8sClient.Create(context.TODO(), ns)
+			Expect(err).Should(Succeed())
+
+			err = k8sClient.Create(context.TODO(), claim)
+			Expect(err).Should(Succeed(), "Failed to create Claim %s", claim)
+
+			err = k8sClient.Get(context.TODO(), client.ObjectKey{Name: claim.Name, Namespace: claim.Namespace}, claim)
+			Expect(err).Should(Succeed())
+
+			Expect(claim.Spec.Pool).To(Equal(pool1.Name), "expected pool name to match")
+		})
+
+		By("Auto Assign Claim (Memory)", func() {
+			claim := &capsulev1beta2.ResourcePoolClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "auto-assign-1",
+					Namespace: "ns-2-pool-assign",
+				},
+				Spec: capsulev1beta2.ResourcePoolClaimSpec{
+					ResourceClaims: corev1.ResourceList{
+						corev1.ResourceLimitsMemory:   resource.MustParse("1"),
+						corev1.ResourceRequestsMemory: resource.MustParse("1"),
+					},
+				},
+			}
+
+			ns := &corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: claim.Namespace,
+					Labels: map[string]string{
+						"e2e-resourcepoolclaims":    "test",
+						"capsule.clastix.io/tenant": "admission-auto-assign",
+					},
+				},
+			}
+
+			err := k8sClient.Create(context.TODO(), ns)
+			Expect(err).Should(Succeed())
+
+			err = k8sClient.Create(context.TODO(), claim)
+			Expect(err).Should(Succeed(), "Failed to create Claim %s", claim)
+
+			err = k8sClient.Get(context.TODO(), client.ObjectKey{Name: claim.Name, Namespace: claim.Namespace}, claim)
+			Expect(err).Should(Succeed())
+
+			Expect(claim.Spec.Pool).To(Equal(pool2.Name), "expected pool name to match")
+		})
+
+		By("No Default available (Storage)", func() {
+			claim := &capsulev1beta2.ResourcePoolClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "auto-assign-3",
+					Namespace: "ns-3-pool-assign",
+				},
+				Spec: capsulev1beta2.ResourcePoolClaimSpec{
+					ResourceClaims: corev1.ResourceList{
+						corev1.ResourceRequestsStorage: resource.MustParse("1"),
+					},
+				},
+			}
+
+			ns := &corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: claim.Namespace,
+					Labels: map[string]string{
+						"e2e-resourcepoolclaims":    "test",
+						"capsule.clastix.io/tenant": "admission-auto-assign",
+					},
+				},
+			}
+
+			err := k8sClient.Create(context.TODO(), ns)
+			Expect(err).Should(Succeed())
+
+			err = k8sClient.Create(context.TODO(), claim)
+			Expect(err).Should(Succeed(), "Failed to create Claim %s", claim)
+
+			err = k8sClient.Get(context.TODO(), client.ObjectKey{Name: claim.Name, Namespace: claim.Namespace}, claim)
+			Expect(err).Should(Succeed())
+
+			Expect(claim.Spec.Pool).To(Equal(""), "expected pool name to match")
 		})
 
 	})

@@ -39,6 +39,11 @@ type ResourcePoolSpecConfiguration struct {
 	// This disregards any ordering of the claims.
 	// +kubebuilder:default=false
 	OrderedQueue *bool `json:"orderedQueue,omitempty"`
+
+	// When a resourcepool is deleted, the resourceclaims bound to it are disassociated from the resourcepool but not deleted.
+	// By Enabling this option, the resourceclaims will be deleted when the resourcepool is deleted, if they are in bound state.
+	// +kubebuilder:default=false
+	DeleteBoundResources *bool `json:"deleteBoundResources,omitempty"`
 }
 
 // +kubebuilder:object:root=true
