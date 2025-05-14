@@ -200,7 +200,9 @@ func (r *ResourcePool) GetResourceDefaults() corev1.ResourceList {
 
 	for resourceName := range r.Spec.Quota.Hard {
 		amount, exists := r.Spec.Defaults[resourceName]
-		if !exists && *r.Spec.Config.DefaultsAssignZero {
+		if !exists && !*r.Spec.Config.DefaultsAssignZero {
+			continue
+		} else {
 			amount = resource.MustParse("0")
 		}
 
@@ -215,12 +217,17 @@ func (r *ResourcePool) GetResourceDefaults() corev1.ResourceList {
 // This can be changed in the future, the default is not calculated as usage because this might interrupt the namespace management
 // As we would need to verify if a new namespace with it's defaults still has place in the Pool. Same with attempting to join exisitng namespaces
 func (r *ResourcePool) GetResourceQuotaHardResources(namespace string) corev1.ResourceList {
-	// Read Resources which are claimed
 	_, claimed := r.GetNamespaceClaims(namespace)
+
+	for resourceName, amount := range claimed {
+		if amount.IsZero() {
+			delete(claimed, resourceName)
+		}
+	}
 
 	// Only Consider Default, when enabled
 	for resourceName, amount := range r.GetResourceDefaults() {
-		usedValue, _ := claimed[resourceName]
+		usedValue := claimed[resourceName]
 
 		// Combine with claim
 		usedValue.Add(amount)

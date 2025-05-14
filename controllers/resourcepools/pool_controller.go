@@ -682,7 +682,11 @@ func (r *resourcePoolController) gatherMatchingClaims(
 
 		// Tiebreaker: use name as a stable secondary sort - If CreationTimestamp is equal
 		// (e.g., when two claims are created at the same time in Gitops environments or CI/CD pipelines)
-		return a.Name < b.Name
+		if a.Name != b.Name {
+			return a.Name < b.Name
+		}
+
+		return a.Namespace < b.Namespace
 	})
 
 	return claimList.Items, nil
