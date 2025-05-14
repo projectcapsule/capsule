@@ -45,7 +45,6 @@ metadata:
 spec:
   pool: sampler
   claim:
-    limits.memory: 128Mi
     requests.cpu: "0.1"
     requests.memory: 256Mi
 

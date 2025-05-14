@@ -25,20 +25,20 @@ func PoolValidationHandler(log logr.Logger) capsulewebhook.Handler {
 	return &poolValidationHandler{log: log}
 }
 
-func (h *poolValidationHandler) OnCreate(c client.Client, decoder admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
-	return func(ctx context.Context, req admission.Request) *admission.Response {
+func (h *poolValidationHandler) OnCreate(client.Client, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
+	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (h *poolValidationHandler) OnDelete(c client.Client, decoder admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
-	return func(ctx context.Context, req admission.Request) *admission.Response {
+func (h *poolValidationHandler) OnDelete(client.Client, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
+	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (h *poolValidationHandler) OnUpdate(c client.Client, decoder admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
-	return func(ctx context.Context, req admission.Request) *admission.Response {
+func (h *poolValidationHandler) OnUpdate(c client.Client, decoder admission.Decoder, _ record.EventRecorder) capsulewebhook.Func {
+	return func(_ context.Context, req admission.Request) *admission.Response {
 		oldPool := &capsulev1beta2.ResourcePool{}
 		if err := decoder.DecodeRaw(req.OldObject, oldPool); err != nil {
 			return utils.ErroredResponse(err)
@@ -54,13 +54,21 @@ func (h *poolValidationHandler) OnUpdate(c client.Client, decoder admission.Deco
 			for resourceName, qt := range oldPool.Status.Allocation.Claimed {
 				allocation, exists := pool.Spec.Quota.Hard[resourceName]
 				if !exists {
-					response := admission.Denied(fmt.Sprintf("can not remove resource %s as it is still being allocated %s. Remove corresponding claims or keep the resources in the pool", resourceName, allocation))
+					response := admission.Denied(fmt.Sprintf(
+						"can not remove resource %s as it is still being allocated. Remove corresponding claims or keep the resources in the pool",
+						resourceName,
+					))
 
 					return &response
 				}
 
 				if qt.Cmp(allocation) < 0 {
-					response := admission.Denied(fmt.Sprintf("can not remove resource %s as it is still being allocated %s. Remove corresponding claims or keep the resources in the pool", resourceName, allocation))
+					response := admission.Denied(
+						fmt.Sprintf(
+							"can not reduce %s usage because quantity %s is claimed . Remove corresponding claims or keep the resources in the pool",
+							resourceName,
+							qt.String(),
+						))
 
 					return &response
 				}
@@ -68,5 +76,18 @@ func (h *poolValidationHandler) OnUpdate(c client.Client, decoder admission.Deco
 		}
 
 		return nil
+	}
+}
+
+// Prevents selector from being changed, when it loses namespaces which are still
+// allocated.
+func (h *poolValidationHandler) handleSelectorChange(
+	ctx context.Context,
+	c client.Client,
+	old *capsulev1beta2.ResourcePool,
+	new *capsulev1beta2.ResourcePool,
+) {
+	if !equality.Semantic.DeepEqual(new.Spec.Quota.Hard, old.Spec.Quota.Hard) {
+
 	}
 }

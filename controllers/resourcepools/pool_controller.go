@@ -331,13 +331,15 @@ func (r *resourcePoolController) handleClaimOrderedExhaustion(
 	var status []string
 
 	for resourceName, qt := range claim.Spec.ResourceClaims {
-		_, ok := exhaustion[resourceName.String()]
+		req, ok := exhaustion[resourceName.String()]
 		if !ok {
 			continue
 		}
 
 		line := fmt.Sprintf(
-			"queued: %s=%s",
+			"requested: %s=%s, queued: %s=%s",
+			resourceName,
+			req.String(),
 			resourceName,
 			qt.String(),
 		)
@@ -347,14 +349,16 @@ func (r *resourcePoolController) handleClaimOrderedExhaustion(
 	if len(status) != 0 {
 		queued = true
 
+		cond := meta.NewBoundCondition(claim)
+		cond.Status = metav1.ConditionFalse
+		cond.Reason = meta.QueueExhaustedReason
+		cond.Message = strings.Join(status, "; ")
+
 		updateStatusAndEmitEvent(
 			ctx,
 			r.Recorder,
 			claim,
-			meta.NewQueuedReasonCondition(
-				claim,
-				fmt.Sprintf("exhausted queue: %s", strings.Join(status, "; ")),
-			),
+			cond,
 		)
 
 		err = r.Client.Status().Update(ctx, claim)
@@ -395,11 +399,16 @@ func (r *resourcePoolController) handleClaimResourceExhaustion(
 		status = append(status, line)
 	}
 
+	cond := meta.NewBoundCondition(claim)
+	cond.Status = metav1.ConditionFalse
+	cond.Reason = meta.PoolExhaustedReason
+	cond.Message = strings.Join(status, "; ")
+
 	updateStatusAndEmitEvent(
 		ctx,
 		r.Recorder,
 		claim,
-		meta.NewQueuedReasonCondition(claim, fmt.Sprintf("exhausted resourcepool: %s", strings.Join(status, "; "))),
+		cond,
 	)
 
 	return r.Client.Status().Update(ctx, claim)
@@ -417,9 +426,11 @@ func (r *resourcePoolController) handleClaimToPoolBinding(
 		return err
 	}
 
-	cond := meta.NewReadyCondition(freshClaim)
-	cond.Reason = meta.BoundReason
+	cond := meta.NewBoundCondition(freshClaim)
+	cond.Status = metav1.ConditionTrue
+	cond.Reason = meta.SucceededReason
 	cond.Message = "Claimed resources"
+
 	updateStatusAndEmitEvent(
 		ctx,
 		r.Recorder,
@@ -658,6 +669,21 @@ func (r *resourcePoolController) gatherMatchingClaims(
 
 		return claims, err
 	}
+
+	// Sort by creation timestamp (oldest first)
+	sort.Slice(claimList.Items, func(i, j int) bool {
+		a := claimList.Items[i]
+		b := claimList.Items[j]
+
+		// First, sort by CreationTimestamp
+		if !a.CreationTimestamp.Equal(&b.CreationTimestamp) {
+			return a.CreationTimestamp.Before(&b.CreationTimestamp)
+		}
+
+		// Tiebreaker: use name as a stable secondary sort - If CreationTimestamp is equal
+		// (e.g., when two claims are created at the same time in Gitops environments or CI/CD pipelines)
+		return a.Name < b.Name
+	})
 
 	return claimList.Items, nil
 }

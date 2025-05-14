@@ -29,28 +29,7 @@ func ClaimMutationHandler(log logr.Logger) capsulewebhook.Handler {
 
 func (h *claimMutationHandler) OnUpdate(c client.Client, decoder admission.Decoder, _ record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		claim := &capsulev1beta2.ResourcePoolClaim{}
-
-		if err := decoder.Decode(req, claim); err != nil {
-			return utils.ErroredResponse(fmt.Errorf("failed to decode new object: %w", err))
-		}
-
-		if err := h.autoAssignPools(ctx, c, claim); err != nil {
-			response := admission.Errored(http.StatusInternalServerError, err)
-
-			return &response
-		}
-
-		marshaled, err := json.Marshal(claim)
-		if err != nil {
-			response := admission.Errored(http.StatusInternalServerError, err)
-
-			return &response
-		}
-
-		response := admission.PatchResponseFromRaw(req.Object.Raw, marshaled)
-
-		return &response
+		return h.handle(ctx, req, decoder, c)
 	}
 }
 
@@ -62,32 +41,40 @@ func (h *claimMutationHandler) OnDelete(client.Client, admission.Decoder, record
 
 func (h *claimMutationHandler) OnCreate(c client.Client, decoder admission.Decoder, _ record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		claim := &capsulev1beta2.ResourcePoolClaim{}
-
-		if err := decoder.Decode(req, claim); err != nil {
-			return utils.ErroredResponse(fmt.Errorf("failed to decode new object: %w", err))
-		}
-
-		if err := h.autoAssignPools(ctx, c, claim); err != nil {
-			response := admission.Errored(http.StatusInternalServerError, err)
-
-			return &response
-		}
-
-		marshaled, err := json.Marshal(claim)
-		if err != nil {
-			response := admission.Errored(http.StatusInternalServerError, err)
-
-			return &response
-		}
-
-		response := admission.PatchResponseFromRaw(req.Object.Raw, marshaled)
-
-		return &response
+		return h.handle(ctx, req, decoder, c)
 	}
 }
 
-// Assign a pool when empty
+func (h *claimMutationHandler) handle(
+	ctx context.Context,
+	req admission.Request,
+	decoder admission.Decoder,
+	c client.Client,
+) *admission.Response {
+	claim := &capsulev1beta2.ResourcePoolClaim{}
+
+	if err := decoder.Decode(req, claim); err != nil {
+		return utils.ErroredResponse(fmt.Errorf("failed to decode new object: %w", err))
+	}
+
+	if err := h.autoAssignPools(ctx, c, claim); err != nil {
+		response := admission.Errored(http.StatusInternalServerError, err)
+
+		return &response
+	}
+
+	marshaled, err := json.Marshal(claim)
+	if err != nil {
+		response := admission.Errored(http.StatusInternalServerError, err)
+
+		return &response
+	}
+
+	response := admission.PatchResponseFromRaw(req.Object.Raw, marshaled)
+
+	return &response
+}
+
 func (h *claimMutationHandler) autoAssignPools(
 	ctx context.Context,
 	c client.Client,

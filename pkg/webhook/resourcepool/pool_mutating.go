@@ -28,60 +28,49 @@ func PoolMutationHandler(log logr.Logger) capsulewebhook.Handler {
 	return &poolMutationHandler{log: log}
 }
 
-func (h *poolMutationHandler) OnCreate(c client.Client, decoder admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
+func (h *poolMutationHandler) OnCreate(c client.Client, decoder admission.Decoder, _ record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		// Decode the incoming object
-		pool := &capsulev1beta2.ResourcePool{}
-		if err := decoder.Decode(req, pool); err != nil {
-			return utils.ErroredResponse(fmt.Errorf("failed to decode object: %w", err))
-		}
-
-		// Correctly set the defaults
-		h.handleDefaults(pool)
-
-		// Marshal Manifest
-		marshaled, err := json.Marshal(pool)
-		if err != nil {
-			response := admission.Errored(http.StatusInternalServerError, err)
-
-			return &response
-		}
-
-		response := admission.PatchResponseFromRaw(req.Object.Raw, marshaled)
-
-		return &response
+		return h.handle(ctx, req, decoder, c)
 	}
 }
 
-func (h *poolMutationHandler) OnDelete(c client.Client, decoder admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
-	return func(ctx context.Context, req admission.Request) *admission.Response {
+func (h *poolMutationHandler) OnDelete(client.Client, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
+	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (h *poolMutationHandler) OnUpdate(c client.Client, decoder admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
+func (h *poolMutationHandler) OnUpdate(c client.Client, decoder admission.Decoder, _ record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		// Decode the incoming object
-		pool := &capsulev1beta2.ResourcePool{}
-		if err := decoder.Decode(req, pool); err != nil {
-			return utils.ErroredResponse(fmt.Errorf("failed to decode object: %w", err))
-		}
+		return h.handle(ctx, req, decoder, c)
+	}
+}
 
-		// Correctly set the defaults
-		h.handleDefaults(pool)
+func (h *poolMutationHandler) handle(
+	ctx context.Context,
+	req admission.Request,
+	decoder admission.Decoder,
+	c client.Client,
+) *admission.Response {
+	pool := &capsulev1beta2.ResourcePool{}
+	if err := decoder.Decode(req, pool); err != nil {
+		return utils.ErroredResponse(fmt.Errorf("failed to decode object: %w", err))
+	}
 
-		// Marshal Manifest
-		marshaled, err := json.Marshal(pool)
-		if err != nil {
-			response := admission.Errored(http.StatusInternalServerError, err)
+	// Correctly set the defaults
+	h.handleDefaults(pool)
 
-			return &response
-		}
-
-		response := admission.PatchResponseFromRaw(req.Object.Raw, marshaled)
+	// Marshal Manifest
+	marshaled, err := json.Marshal(pool)
+	if err != nil {
+		response := admission.Errored(http.StatusInternalServerError, err)
 
 		return &response
 	}
+
+	response := admission.PatchResponseFromRaw(req.Object.Raw, marshaled)
+
+	return &response
 }
 
 // Handles the Default Property. This is done at admission, to prevent and reconcile loops

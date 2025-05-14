@@ -13,68 +13,28 @@ const (
 	ReadyCondition    string = "Ready"
 	NotReadyCondition string = "NotReady"
 
-	// BoundReason indicates a condition or event observed a success (Claim successful)
-	BoundReason string = "Bound"
+	AssignedCondition string = "Assigned"
+	BoundCondition    string = "Bound"
 
 	// FailedReason indicates a condition or event observed a failure (Claim Rejected).
-	FailedReason   string = "Failed"
-	QueuedReason   string = "Queued"
-	AssignedReason string = "Assigned"
-
-	// ProgressingReason indicates a condition or event observed progression, for example when the reconciliation of a
-	// resource or an action has started.
-	ProgressingReason string = "Progressing"
+	SucceededReason          string = "Succeeded"
+	FailedReason             string = "Failed"
+	PoolExhaustedReason      string = "PoolExhausted"
+	QueueExhaustedReason     string = "QueueExhausted"
+	NamespaceExhaustedReason string = "NamespaceExhausted"
 )
 
-// Can be used when tenant was successfully translated
-// Should be used on translator level.
-func NewReadyCondition(obj client.Object) metav1.Condition {
+func NewBoundCondition(obj client.Object) metav1.Condition {
 	return metav1.Condition{
-		Type:               ReadyCondition,
-		Status:             metav1.ConditionTrue,
+		Type:               BoundCondition,
 		ObservedGeneration: obj.GetGeneration(),
 		LastTransitionTime: metav1.Now(),
 	}
 }
 
-func NewNotReadyCondition(obj client.Object, msg string) metav1.Condition {
+func NewAssignedCondition(obj client.Object) metav1.Condition {
 	return metav1.Condition{
-		Type:               NotReadyCondition,
-		Status:             metav1.ConditionFalse,
-		ObservedGeneration: obj.GetGeneration(),
-		Reason:             FailedReason,
-		Message:            msg,
-		LastTransitionTime: metav1.Now(),
-	}
-}
-
-func NewQueuedReasonCondition(obj client.Object, msg string) metav1.Condition {
-	return metav1.Condition{
-		Type:               NotReadyCondition,
-		Status:             metav1.ConditionFalse,
-		Reason:             QueuedReason,
-		Message:            msg,
-		ObservedGeneration: obj.GetGeneration(),
-		LastTransitionTime: metav1.Now(),
-	}
-}
-
-func NewAssignedReasonCondition(obj client.Object) metav1.Condition {
-	return metav1.Condition{
-		Status:             metav1.ConditionFalse,
-		Reason:             AssignedReason,
-		Message:            "Assigned to Pool",
-		ObservedGeneration: obj.GetGeneration(),
-		LastTransitionTime: metav1.Now(),
-	}
-}
-
-func NewReconcilingReasonCondition(obj client.Object) metav1.Condition {
-	return metav1.Condition{
-		Type:               NotReadyCondition,
-		Status:             metav1.ConditionUnknown,
-		Reason:             ProgressingReason,
-		Message:            "Reconciling",
+		Type:               AssignedCondition,
 		ObservedGeneration: obj.GetGeneration(),
 		LastTransitionTime: metav1.Now(),
 	}

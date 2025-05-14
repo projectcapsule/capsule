@@ -22,7 +22,7 @@ metadata:
 spec:
   config:
     defaultsZero: false
-    orderedQueue: true
+    orderedQueue: false
   selectors:
   - matchLabels:
       capsule.clastix.io/tenant: solar

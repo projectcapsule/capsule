@@ -124,9 +124,10 @@ func (r resourceClaimController) reconcile(
 	if err != nil {
 		claim.Status.Pool = api.StatusNameUID{}
 
-		cond := meta.NewAssignedReasonCondition(claim)
+		cond := meta.NewAssignedCondition(claim)
 		cond.Status = metav1.ConditionFalse
-		cond.Type = meta.NotReadyCondition
+		cond.Reason = meta.FailedReason
+		cond.Message = err.Error()
 
 		updateStatusAndEmitEvent(
 			ctx,
@@ -228,9 +229,9 @@ func (r resourceClaimController) allocateResourcePool(
 		return nil
 	}
 
-	cond := meta.NewAssignedReasonCondition(cl)
+	cond := meta.NewAssignedCondition(cl)
 	cond.Status = metav1.ConditionTrue
-	cond.Type = meta.ReadyCondition
+	cond.Reason = meta.SucceededReason
 
 	// Set claim pool in status and condition
 	cl.Status = capsulev1beta2.ResourcePoolClaimStatus{
@@ -253,7 +254,10 @@ func updateStatusAndEmitEvent(
 	claim *capsulev1beta2.ResourcePoolClaim,
 	condition metav1.Condition,
 ) {
-	if condition.Reason == claim.Status.Condition.Reason && condition.Message == claim.Status.Condition.Message {
+	if claim.Status.Condition.Type == condition.Type &&
+		claim.Status.Condition.Status == condition.Status &&
+		claim.Status.Condition.Reason == condition.Reason &&
+		claim.Status.Condition.Message == condition.Message {
 		return
 	}
 
