@@ -6,7 +6,7 @@ FROM ${TARGET_IMAGE} AS target
 FROM ghcr.io/alegrey91/harpoon:latest
 WORKDIR /
 COPY --from=target /ko-app/capsule ./manager
-
+RUN chmod +x ./harpoon
 ENTRYPOINT ["/harpoon", \
 		"capture", \
 		"-f", "main.main", \

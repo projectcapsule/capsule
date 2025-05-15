@@ -58,6 +58,10 @@ func NewForbiddenError(key string, forbiddenSpec ForbiddenListSpec) error {
 	}
 }
 
+func (f ForbiddenError) Error() string {
+	return fmt.Sprintf("%s is forbidden for the current Tenant. %s", f.key, f.appendForbiddenError())
+}
+
 //nolint:predeclared,revive
 func (f *ForbiddenError) appendForbiddenError() (append string) {
 	append += "Forbidden are "
@@ -73,10 +77,6 @@ func (f *ForbiddenError) appendForbiddenError() (append string) {
 	}
 
 	return
-}
-
-func (f ForbiddenError) Error() string {
-	return fmt.Sprintf("%s is forbidden for the current Tenant. %s", f.key, f.appendForbiddenError())
 }
 
 func ValidateForbidden(metadata map[string]string, forbiddenList ForbiddenListSpec) error {

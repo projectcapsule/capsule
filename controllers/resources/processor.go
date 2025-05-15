@@ -35,6 +35,14 @@ type Processor struct {
 	client client.Client
 }
 
+func prepareAdditionalMetadata(m map[string]string) map[string]string {
+	if m == nil {
+		return make(map[string]string)
+	}
+
+	return m
+}
+
 func (r *Processor) HandlePruning(ctx context.Context, current, desired sets.Set[string]) (updateStatus bool) {
 	log := ctrllog.FromContext(ctx)
 
@@ -118,8 +126,8 @@ func (r *Processor) HandleSection(ctx context.Context, tnt capsulev1beta2.Tenant
 	objAnnotations, objLabels := map[string]string{}, map[string]string{}
 
 	if spec.AdditionalMetadata != nil {
-		objAnnotations = spec.AdditionalMetadata.Annotations
-		objLabels = spec.AdditionalMetadata.Labels
+		objAnnotations = prepareAdditionalMetadata(spec.AdditionalMetadata.Annotations)
+		objLabels = prepareAdditionalMetadata(spec.AdditionalMetadata.Labels)
 	}
 
 	objAnnotations[tenantLabel] = tnt.GetName()

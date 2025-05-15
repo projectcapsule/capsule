@@ -19,5 +19,5 @@ func (r *Manager) ensureMetadata(ctx context.Context, tnt *capsulev1beta2.Tenant
 
 	tnt.Labels[capsuleapi.TenantNameLabel] = tnt.Name
 
-	return r.Client.Update(ctx, tnt)
+	return r.Update(ctx, tnt)
 }

@@ -23,23 +23,6 @@ func StorageClassRegexHandler() capsulewebhook.Handler {
 	return &storageClassRegexHandler{}
 }
 
-func (h *storageClassRegexHandler) validate(decoder admission.Decoder, req admission.Request) *admission.Response {
-	tenant := &capsulev1beta2.Tenant{}
-	if err := decoder.Decode(req, tenant); err != nil {
-		return utils.ErroredResponse(err)
-	}
-
-	if tenant.Spec.StorageClasses != nil && len(tenant.Spec.StorageClasses.Regex) > 0 {
-		if _, err := regexp.Compile(tenant.Spec.StorageClasses.Regex); err != nil {
-			response := admission.Denied("unable to compile storageClasses allowedRegex")
-
-			return &response
-		}
-	}
-
-	return nil
-}
-
 func (h *storageClassRegexHandler) OnCreate(_ client.Client, decoder admission.Decoder, _ record.EventRecorder) capsulewebhook.Func {
 	return func(_ context.Context, req admission.Request) *admission.Response {
 		if err := h.validate(decoder, req); err != nil {
@@ -64,4 +47,21 @@ func (h *storageClassRegexHandler) OnUpdate(_ client.Client, decoder admission.D
 
 		return nil
 	}
+}
+
+func (h *storageClassRegexHandler) validate(decoder admission.Decoder, req admission.Request) *admission.Response {
+	tenant := &capsulev1beta2.Tenant{}
+	if err := decoder.Decode(req, tenant); err != nil {
+		return utils.ErroredResponse(err)
+	}
+
+	if tenant.Spec.StorageClasses != nil && len(tenant.Spec.StorageClasses.Regex) > 0 {
+		if _, err := regexp.Compile(tenant.Spec.StorageClasses.Regex); err != nil {
+			response := admission.Denied("unable to compile storageClasses allowedRegex")
+
+			return &response
+		}
+	}
+
+	return nil
 }

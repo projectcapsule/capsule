@@ -42,42 +42,6 @@ func (r *userMetadataHandler) OnDelete(client.Client, admission.Decoder, record.
 	}
 }
 
-func (r *userMetadataHandler) getForbiddenNodeLabels(node *corev1.Node) map[string]string {
-	forbiddenNodeLabels := make(map[string]string)
-
-	forbiddenLabels := r.configuration.ForbiddenUserNodeLabels()
-
-	for label, value := range node.GetLabels() {
-		var forbidden, matched bool
-		forbidden = forbiddenLabels.ExactMatch(label)
-		matched = forbiddenLabels.RegexMatch(label)
-
-		if forbidden || matched {
-			forbiddenNodeLabels[label] = value
-		}
-	}
-
-	return forbiddenNodeLabels
-}
-
-func (r *userMetadataHandler) getForbiddenNodeAnnotations(node *corev1.Node) map[string]string {
-	forbiddenNodeAnnotations := make(map[string]string)
-
-	forbiddenAnnotations := r.configuration.ForbiddenUserNodeAnnotations()
-
-	for annotation, value := range node.GetAnnotations() {
-		var forbidden, matched bool
-		forbidden = forbiddenAnnotations.ExactMatch(annotation)
-		matched = forbiddenAnnotations.RegexMatch(annotation)
-
-		if forbidden || matched {
-			forbiddenNodeAnnotations[annotation] = value
-		}
-	}
-
-	return forbiddenNodeAnnotations
-}
-
 func (r *userMetadataHandler) OnUpdate(_ client.Client, decoder admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
 	return func(_ context.Context, req admission.Request) *admission.Response {
 		nodeWebhookSupported, _ := utils.NodeWebhookSupported(r.version)
@@ -124,4 +88,40 @@ func (r *userMetadataHandler) OnUpdate(_ client.Client, decoder admission.Decode
 
 		return nil
 	}
+}
+
+func (r *userMetadataHandler) getForbiddenNodeLabels(node *corev1.Node) map[string]string {
+	forbiddenNodeLabels := make(map[string]string)
+
+	forbiddenLabels := r.configuration.ForbiddenUserNodeLabels()
+
+	for label, value := range node.GetLabels() {
+		var forbidden, matched bool
+		forbidden = forbiddenLabels.ExactMatch(label)
+		matched = forbiddenLabels.RegexMatch(label)
+
+		if forbidden || matched {
+			forbiddenNodeLabels[label] = value
+		}
+	}
+
+	return forbiddenNodeLabels
+}
+
+func (r *userMetadataHandler) getForbiddenNodeAnnotations(node *corev1.Node) map[string]string {
+	forbiddenNodeAnnotations := make(map[string]string)
+
+	forbiddenAnnotations := r.configuration.ForbiddenUserNodeAnnotations()
+
+	for annotation, value := range node.GetAnnotations() {
+		var forbidden, matched bool
+		forbidden = forbiddenAnnotations.ExactMatch(annotation)
+		matched = forbiddenAnnotations.RegexMatch(annotation)
+
+		if forbidden || matched {
+			forbiddenNodeAnnotations[annotation] = value
+		}
+	}
+
+	return forbiddenNodeAnnotations
 }

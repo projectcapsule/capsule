@@ -12,4 +12,3 @@
 {{- define "capsule.pre-delete.component" -}}
 pre-delete-hook
 {{- end }}
-

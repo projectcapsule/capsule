@@ -2,6 +2,8 @@
 
 This is a list of companies that have adopted Capsule, feel free to open a Pull-Request to get yours listed.
 
+[See all on the website](https://projectcapsule.dev/adopters/)
+
 ## Adopters list (alphabetically)
 
 ### [Bedag Informatik AG](https://www.bedag.ch/)
@@ -39,3 +41,6 @@ This is a list of companies that have adopted Capsule, feel free to open a Pull-
 
 ### [Wargaming.net](https://www.wargaming.net/)
 ![Wargaming.net](https://static-cspbe-eu.wargaming.net/images/logo@2x.png)
+
+### [Enreach](https://www.enreach.com/)
+![Enreach](https://campaigns.enreach.com/hubfs/Global/logos/Enreach-logo-vertical-indigo.svg)

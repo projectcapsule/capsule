@@ -70,7 +70,7 @@ func (r *Manager) syncCustomResourceQuotaUsages(ctx context.Context, tenant *cap
 		for gvk, used := range usedMap {
 			err := retry.RetryOnConflict(retry.DefaultBackoff, func() (retryErr error) {
 				tnt := &capsulev1beta2.Tenant{}
-				if retryErr = r.Client.Get(ctx, types.NamespacedName{Name: tenant.GetName()}, tnt); retryErr != nil {
+				if retryErr = r.Get(ctx, types.NamespacedName{Name: tenant.GetName()}, tnt); retryErr != nil {
 					return
 				}
 
@@ -80,7 +80,7 @@ func (r *Manager) syncCustomResourceQuotaUsages(ctx context.Context, tenant *cap
 
 				tnt.Annotations[capsulev1beta2.UsedAnnotationForResource(gvk)] = fmt.Sprintf("%d", used)
 
-				return r.Client.Update(ctx, tnt)
+				return r.Update(ctx, tnt)
 			})
 			if err != nil {
 				r.Log.Error(err, "cannot update custom Resource Quota", "GVK", gvk)

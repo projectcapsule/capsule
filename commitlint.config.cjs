@@ -16,5 +16,5 @@ const Configuration = {
     helpUrl:
       'https://github.com/projectcapsule/capsule/blob/main/CONTRIBUTING.md#commits',
   };
-  
+
   module.exports = Configuration;

@@ -64,14 +64,14 @@ func (h *containerRegistryHandler) validate(ctx context.Context, c client.Client
 	if tnt.Spec.ContainerRegistries != nil {
 		// Evaluate init containers
 		for _, container := range pod.Spec.InitContainers {
-			if response := h.VerifyContainerRegistry(recorder, req, container, tnt); response != nil {
+			if response := h.verifyContainerRegistry(recorder, req, container, tnt); response != nil {
 				return response
 			}
 		}
 
 		// Evaluate containers
 		for _, container := range pod.Spec.Containers {
-			if response := h.VerifyContainerRegistry(recorder, req, container, tnt); response != nil {
+			if response := h.verifyContainerRegistry(recorder, req, container, tnt); response != nil {
 				return response
 			}
 		}
@@ -80,7 +80,7 @@ func (h *containerRegistryHandler) validate(ctx context.Context, c client.Client
 	return nil
 }
 
-func (h *containerRegistryHandler) VerifyContainerRegistry(recorder record.EventRecorder, req admission.Request, container corev1.Container, tnt capsulev1beta2.Tenant) *admission.Response {
+func (h *containerRegistryHandler) verifyContainerRegistry(recorder record.EventRecorder, req admission.Request, container corev1.Container, tnt capsulev1beta2.Tenant) *admission.Response {
 	var valid, matched bool
 
 	reg := NewRegistry(container.Image)

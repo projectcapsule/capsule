@@ -19,7 +19,7 @@ CAPSULE_IMG     ?= $(REGISTRY)/$(IMG_BASE)
 CLUSTER_NAME    ?= capsule
 
 ## Kubernetes Version Support
-KUBERNETES_SUPPORTED_VERSION ?= "v1.31.0"
+KUBERNETES_SUPPORTED_VERSION ?= "v1.33.0"
 
 ## Tool Binaries
 KUBECTL ?= kubectl
@@ -46,7 +46,7 @@ all: manager
 # Run tests
 .PHONY: test
 test: test-clean generate manifests test-clean
-	@GO111MODULE=on go test -v ./... -coverprofile coverage.out
+	@GO111MODULE=on go test -v $(shell go list ./... | grep -v "e2e") -coverprofile coverage.out
 
 .PHONY: test-clean
 test-clean: ## Clean tests cache
@@ -220,7 +220,7 @@ goimports:
 # Linting code as PR is expecting
 .PHONY: golint
 golint: golangci-lint
-	$(GOLANGCI_LINT) run -c .golangci.yml --verbose --fix
+	$(GOLANGCI_LINT) run -c .golangci.yaml --verbose --fix
 
 # Running e2e tests in a KinD instance
 .PHONY: e2e
@@ -328,7 +328,7 @@ helm-doc:
 # -- Tools
 ####################
 CONTROLLER_GEN         := $(LOCALBIN)/controller-gen
-CONTROLLER_GEN_VERSION ?= v0.17.2
+CONTROLLER_GEN_VERSION ?= v0.18.0
 CONTROLLER_GEN_LOOKUP  := kubernetes-sigs/controller-tools
 controller-gen:
 	@test -s $(CONTROLLER_GEN) && $(CONTROLLER_GEN) --version | grep -q $(CONTROLLER_GEN_VERSION) || \
@@ -353,18 +353,18 @@ kind:
 	$(call go-install-tool,$(KIND),sigs.k8s.io/kind/cmd/kind@$(KIND_VERSION))
 
 KO           := $(LOCALBIN)/ko
-KO_VERSION   := v0.17.1
+KO_VERSION   := v0.18.0
 KO_LOOKUP    := google/ko
 ko:
 	@test -s $(KO) && $(KO) -h | grep -q $(KO_VERSION) || \
 	$(call go-install-tool,$(KO),github.com/$(KO_LOOKUP)@$(KO_VERSION))
 
 GOLANGCI_LINT          := $(LOCALBIN)/golangci-lint
-GOLANGCI_LINT_VERSION  := v1.64.5
+GOLANGCI_LINT_VERSION  := v2.1.6
 GOLANGCI_LINT_LOOKUP   := golangci/golangci-lint
 golangci-lint: ## Download golangci-lint locally if necessary.
 	@test -s $(GOLANGCI_LINT) && $(GOLANGCI_LINT) -h | grep -q $(GOLANGCI_LINT_VERSION) || \
-	$(call go-install-tool,$(GOLANGCI_LINT),github.com/$(GOLANGCI_LINT_LOOKUP)/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION))
+	$(call go-install-tool,$(GOLANGCI_LINT),github.com/$(GOLANGCI_LINT_LOOKUP)/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION))
 
 APIDOCS_GEN         := $(LOCALBIN)/crdoc
 APIDOCS_GEN_VERSION := v0.6.4
@@ -374,7 +374,7 @@ apidocs-gen: ## Download crdoc locally if necessary.
 	$(call go-install-tool,$(APIDOCS_GEN),fybrik.io/crdoc@$(APIDOCS_GEN_VERSION))
 
 HARPOON         := $(LOCALBIN)/harpoon
-HARPOON_VERSION := v0.9.6
+HARPOON_VERSION := v0.10.1
 HARPOON_LOOKUP  := alegrey91/harpoon
 harpoon:
 	@mkdir $(LOCALBIN)

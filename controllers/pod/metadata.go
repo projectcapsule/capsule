@@ -28,6 +28,12 @@ type MetadataReconciler struct {
 	Client client.Client
 }
 
+func (m *MetadataReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager) error {
+	return ctrl.NewControllerManagedBy(mgr).
+		For(&corev1.Pod{}, m.forOptionPerInstanceName(ctx)).
+		Complete(m)
+}
+
 func (m *MetadataReconciler) Reconcile(ctx context.Context, request ctrl.Request) (ctrl.Result, error) {
 	var pod corev1.Pod
 
@@ -121,10 +127,4 @@ func (m *MetadataReconciler) isNamespaceInTenant(ctx context.Context, namespace 
 	}
 
 	return len(tl.Items) > 0
-}
-
-func (m *MetadataReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
-		For(&corev1.Pod{}, m.forOptionPerInstanceName(ctx)).
-		Complete(m)
 }

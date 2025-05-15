@@ -81,7 +81,7 @@ Capsule was accepted as a CNCF sandbox project in December 2022.
 It's the Operator which provides all the multi-tenant capabilities offered by Capsule.
 It's made of two internal components, such as the webhooks server (known as _policy engine_), and the _tenant controller_.
 
-**Capsule Tenant Controller** 
+**Capsule Tenant Controller**
 
 The controller is responsible for managing the tenants by reconciling the required objects at the Namespace level, such as _Network Policy_, _LimitRange_, _ResourceQuota_, _Role Binding_, as well as labelling the Namespace objects belonging to a Tenant according to their desired metadata.
 It is responsible for binding Namespaces to the selected Tenant, and managing their lifecycle.
@@ -90,10 +90,10 @@ Furthermore, the manager can replicate objects thanks to the **Tenant Resource**
 
 The replicated resources are dynamically created, and replicated by Capsule itself, as well as preserving the deletion of these objects by the Tenant owner.
 
-**Capsule Tenant Controller (Policy Engine)** 
+**Capsule Tenant Controller (Policy Engine)**
 
 Policies are defined on a Tenant basis: therefore the policy engine is enforcing these policies on the tenants's Namespaces and their children's resources.
-The Policy Engine is currently not a dedicated component, but a part of the Capsule Tenant Controller. 
+The Policy Engine is currently not a dedicated component, but a part of the Capsule Tenant Controller.
 
 The webhook server, also known as the policy engine, interpolates the Tenant rules and takes full advantage of the dynamic admission controllers offered by Kubernetes itself (such as `ValidatingWebhookConfiguration` and `MutatingWebhookConfiguration`).
 Thanks to the _policy engine_ the cluster administrators can enforce specific rules such as preventing _Pod_ objects from untrusted registries to run or preventing the creation of _PersistentVolumeClaim_ resources using a non-allowed _StorageClass_, etc.
@@ -152,7 +152,7 @@ This is a further abstraction from having cluster defaults (eg. default `Storage
 
 **General**
 
-* **Control Plane**: Capsule can't mimic for each tenant a feeling of a dedicated control plane. 
+* **Control Plane**: Capsule can't mimic for each tenant a feeling of a dedicated control plane.
 
 * **Custom Resource Definitions**: Capsule doesn't want to provide virtual cluster capabilities and it's sticking to the native Kubernetes user experience and design; rather, its focus is to provide a governance solution by focusing on resource optimization and security lockdown.
 

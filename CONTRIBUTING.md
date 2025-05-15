@@ -45,7 +45,7 @@ Prereleases are marked as `-rc.x` (release candidate) and may refere to any type
 
 The pull request title is checked according to the described [semantics](#semantics) (pull requests don't require a scope). However pull requests are currently not used to generate the changelog. Check if your pull requests body meets the following criteria:
 
-- reference a previously opened issue: https://docs.github.com/en/github/writing-on-github/autolinked-references-and-urls#issues-and-pull-requests 
+- reference a previously opened issue: https://docs.github.com/en/github/writing-on-github/autolinked-references-and-urls#issues-and-pull-requests
 - splitting changes into several and documented small commits
 - limit the git subject to 50 characters and write as the continuation of the
   sentence "If applied, this commit will ..."
@@ -104,7 +104,7 @@ To reorganise your commits, do the following (or use your way of doing it):
 
 
 1. Pull upstream changes
-   
+
 ```bash
 git remote add upstream git@github.com:projectcapsule/capsule.git
 git pull upstream main
@@ -186,4 +186,3 @@ The following types are allowed for commits and pull requests:
   * `fix`: bug fixes
   * `test`: test related changes
   * `sec`: security related changes
-

@@ -170,7 +170,7 @@ func (r Reconciler) Reconcile(ctx context.Context, request ctrl.Request) (ctrl.R
 
 	certSecret := &corev1.Secret{}
 
-	if err := r.Client.Get(ctx, request.NamespacedName, certSecret); err != nil {
+	if err := r.Get(ctx, request.NamespacedName, certSecret); err != nil {
 		// Error reading the object - requeue the request.
 		return reconcile.Result{}, err
 	}
@@ -302,7 +302,7 @@ func (r Reconciler) updateOperatorPod(ctx context.Context, pod corev1.Pod) error
 		// Need to get latest version of pod
 		p := &corev1.Pod{}
 
-		if err := r.Client.Get(ctx, types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}, p); err != nil && !apierrors.IsNotFound(err) {
+		if err := r.Get(ctx, types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}, p); err != nil && !apierrors.IsNotFound(err) {
 			r.Log.Error(err, "cannot get pod", "name", pod.Name, "namespace", pod.Namespace)
 
 			return err
@@ -314,7 +314,7 @@ func (r Reconciler) updateOperatorPod(ctx context.Context, pod corev1.Pod) error
 
 		p.Annotations[PodUpdateAnnotationName] = time.Now().Format(time.RFC3339Nano)
 
-		if err := r.Client.Update(ctx, p, &client.UpdateOptions{}); err != nil {
+		if err := r.Update(ctx, p, &client.UpdateOptions{}); err != nil {
 			r.Log.Error(err, "cannot update pod", "name", pod.Name, "namespace", pod.Namespace)
 
 			return err
@@ -329,12 +329,12 @@ func (r Reconciler) getOperatorPods(ctx context.Context) (*corev1.PodList, error
 
 	leaderPod := &corev1.Pod{}
 
-	if err := r.Client.Get(ctx, types.NamespacedName{Namespace: os.Getenv("NAMESPACE"), Name: hostname}, leaderPod); err != nil {
+	if err := r.Get(ctx, types.NamespacedName{Namespace: os.Getenv("NAMESPACE"), Name: hostname}, leaderPod); err != nil {
 		return nil, RunningInOutOfClusterModeError{}
 	}
 
 	podList := &corev1.PodList{}
-	if err := r.Client.List(ctx, podList, client.MatchingLabels(leaderPod.ObjectMeta.Labels)); err != nil {
+	if err := r.List(ctx, podList, client.MatchingLabels(leaderPod.Labels)); err != nil {
 		r.Log.Error(err, "cannot retrieve list of Capsule pods")
 
 		return nil, err

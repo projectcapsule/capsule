@@ -22,3 +22,19 @@ func (w *namespace) GetHandlers() []capsulewebhook.Handler {
 func (w *namespace) GetPath() string {
 	return "/namespaces"
 }
+
+type namespacePatch struct {
+	handlers []capsulewebhook.Handler
+}
+
+func NamespacePatch(handlers ...capsulewebhook.Handler) capsulewebhook.Webhook {
+	return &namespacePatch{handlers: handlers}
+}
+
+func (w *namespacePatch) GetHandlers() []capsulewebhook.Handler {
+	return w.handlers
+}
+
+func (w *namespacePatch) GetPath() string {
+	return "/namespace-patch"
+}

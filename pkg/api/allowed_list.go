@@ -33,7 +33,7 @@ type SelectorAllowedListSpec struct {
 
 func (in *SelectorAllowedListSpec) MatchSelectByName(obj client.Object) bool {
 	if obj != nil {
-		return in.AllowedListSpec.Match(obj.GetName()) || in.SelectorMatch(obj)
+		return in.Match(obj.GetName()) || in.SelectorMatch(obj)
 	}
 
 	return false

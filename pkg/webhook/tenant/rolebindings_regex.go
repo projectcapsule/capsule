@@ -25,6 +25,24 @@ func RoleBindingRegexHandler() capsulewebhook.Handler {
 	return &rbRegexHandler{}
 }
 
+func (h *rbRegexHandler) OnCreate(_ client.Client, decoder admission.Decoder, _ record.EventRecorder) capsulewebhook.Func {
+	return func(_ context.Context, req admission.Request) *admission.Response {
+		return h.validate(req, decoder)
+	}
+}
+
+func (h *rbRegexHandler) OnDelete(client.Client, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
+	return func(context.Context, admission.Request) *admission.Response {
+		return nil
+	}
+}
+
+func (h *rbRegexHandler) OnUpdate(_ client.Client, decoder admission.Decoder, _ record.EventRecorder) capsulewebhook.Func {
+	return func(_ context.Context, req admission.Request) *admission.Response {
+		return h.validate(req, decoder)
+	}
+}
+
 func (h *rbRegexHandler) validate(req admission.Request, decoder admission.Decoder) *admission.Response {
 	tenant := &capsulev1beta2.Tenant{}
 	if err := decoder.Decode(req, tenant); err != nil {
@@ -47,22 +65,4 @@ func (h *rbRegexHandler) validate(req admission.Request, decoder admission.Decod
 	}
 
 	return nil
-}
-
-func (h *rbRegexHandler) OnCreate(_ client.Client, decoder admission.Decoder, _ record.EventRecorder) capsulewebhook.Func {
-	return func(_ context.Context, req admission.Request) *admission.Response {
-		return h.validate(req, decoder)
-	}
-}
-
-func (h *rbRegexHandler) OnDelete(client.Client, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
-	return func(context.Context, admission.Request) *admission.Response {
-		return nil
-	}
-}
-
-func (h *rbRegexHandler) OnUpdate(_ client.Client, decoder admission.Decoder, _ record.EventRecorder) capsulewebhook.Func {
-	return func(_ context.Context, req admission.Request) *admission.Response {
-		return h.validate(req, decoder)
-	}
 }

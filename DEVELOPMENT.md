@@ -60,7 +60,7 @@ To achieve that, there are some necessary steps we need to walk through, which h
 
 So the TL;DR answer is:
 
-**Make sure a *KinD* cluster is running on your laptop, and then run `make dev-setup` to setup the dev environment.**. This is not done in the `make dev-setup` setup. 
+**Make sure a *KinD* cluster is running on your laptop, and then run `make dev-setup` to setup the dev environment.**. This is not done in the `make dev-setup` setup.
 
 ```bash
 # If you haven't installed or run `make deploy` before, do it first
@@ -222,9 +222,9 @@ time="2023-10-23T13:45:08Z" level=info msg="Found Chart directories [charts/caps
 time="2023-10-23T13:45:08Z" level=info msg="Generating README Documentation for chart /helm-docs/charts/capsule"
 ```
 
-This will update the documentation for the chart in the `README.md` file. 
+This will update the documentation for the chart in the `README.md` file.
 
-### Helm Changelog 
+### Helm Changelog
 
 The `version` of the chart does not require a bump, since it's driven by our release process. The `appVersion` of the chart is the version of the Capsule project. This is the version that should be bumped when a new Capsule version is released. This will be done by the maintainers.
 

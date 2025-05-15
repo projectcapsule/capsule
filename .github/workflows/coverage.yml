@@ -27,12 +27,12 @@ jobs:
           value: ${{ secrets.FOSSA_API_KEY }}
       - name: "Run FOSSA Scan"
         if: steps.checksecret.outputs.result == 'true'
-        uses: fossas/fossa-action@93a52ecf7c3ac7eb40f5de77fd69b1a19524de94 # v1.5.0
+        uses: fossas/fossa-action@3ebcea1862c6ffbd5cf1b4d0bd6b3fe7bd6f2cac # v1.7.0
         with:
           api-key: ${{ secrets.FOSSA_API_KEY }}
       - name: "Run FOSSA Test"
         if: steps.checksecret.outputs.result == 'true'
-        uses: fossas/fossa-action@93a52ecf7c3ac7eb40f5de77fd69b1a19524de94 # v1.5.0
+        uses: fossas/fossa-action@3ebcea1862c6ffbd5cf1b4d0bd6b3fe7bd6f2cac # v1.7.0
         with:
           api-key: ${{ secrets.FOSSA_API_KEY }}
           run-tests: true
@@ -48,15 +48,15 @@ jobs:
     steps:
       - name: Checkout Source
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      - uses: actions/setup-go@f111f3307d8850f501ac008e886eec1fd1932a34 # v5.3.0
+      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
         with:
           go-version-file: 'go.mod'
       - name: Run Gosec Security Scanner
-        uses: securego/gosec@43fee884f668c23601e0bec7a8c095fba226f889 # v2.22.1
+        uses: securego/gosec@6decf96c3d272d5a8bbdcf9fddb5789d0be16a8d # v2.22.4
         with:
           args: '-no-fail -fmt sarif -out gosec.sarif ./...'
       - name: Upload SARIF file
-        uses: github/codeql-action/upload-sarif@80f993039571a6de66594ecaa432875a6942e8e0
+        uses: github/codeql-action/upload-sarif@510dfa3460b15b34a807ab5609b4691aed5ebbee
         with:
           sarif_file: gosec.sarif
   unit_tests:
@@ -65,7 +65,7 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      - uses: actions/setup-go@f111f3307d8850f501ac008e886eec1fd1932a34 # v5.3.0
+      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
         with:
           go-version-file: 'go.mod'
       - name: Unit Test
@@ -77,7 +77,7 @@ jobs:
           value: ${{ secrets.CODECOV_TOKEN }}
       - name: Upload Report to Codecov
         if: ${{ steps.checksecret.outputs.result == 'true' }}
-        uses: codecov/codecov-action@0565863a31f2c772f9f0395002a31e3f06189574 # v5.4.0
+        uses: codecov/codecov-action@ad3126e916f78f00edff4ed0317cf185271ccc2d # v5.4.2
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           slug: projectcapsule/capsule

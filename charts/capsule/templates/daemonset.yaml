@@ -58,8 +58,6 @@ spec:
             secretName: {{ include "capsule.secretTlsName" . }}
       containers:
         - name: manager
-          command:
-          - /manager
           args:
           - --webhook-port={{ .Values.manager.webhookPort }}
           - --enable-leader-election

@@ -51,7 +51,7 @@ spec:
           metadata:
             type: object
           spec:
-            description: GlobalResourceQuotaSpec defines the desired state of GlobalResourceQuota
+            description: ResourcePoolSpec
             properties:
               config:
                 default: {}

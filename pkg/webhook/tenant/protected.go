@@ -32,7 +32,7 @@ func (h *protectedHandler) OnDelete(clt client.Client, _ admission.Decoder, _ re
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		tenant := &capsulev1beta2.Tenant{}
 
-		if err := clt.Get(ctx, types.NamespacedName{Name: req.AdmissionRequest.Name}, tenant); err != nil {
+		if err := clt.Get(ctx, types.NamespacedName{Name: req.Name}, tenant); err != nil {
 			return utils.ErroredResponse(err)
 		}
 

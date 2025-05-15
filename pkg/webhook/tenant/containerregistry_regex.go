@@ -23,23 +23,6 @@ func ContainerRegistryRegexHandler() capsulewebhook.Handler {
 	return &containerRegistryRegexHandler{}
 }
 
-func (h *containerRegistryRegexHandler) validate(decoder admission.Decoder, req admission.Request) *admission.Response {
-	tenant := &capsulev1beta2.Tenant{}
-	if err := decoder.Decode(req, tenant); err != nil {
-		return utils.ErroredResponse(err)
-	}
-
-	if tenant.Spec.ContainerRegistries != nil && len(tenant.Spec.ContainerRegistries.Regex) > 0 {
-		if _, err := regexp.Compile(tenant.Spec.ContainerRegistries.Regex); err != nil {
-			response := admission.Denied("unable to compile containerRegistries allowedRegex")
-
-			return &response
-		}
-	}
-
-	return nil
-}
-
 func (h *containerRegistryRegexHandler) OnCreate(_ client.Client, decoder admission.Decoder, _ record.EventRecorder) capsulewebhook.Func {
 	return func(_ context.Context, req admission.Request) *admission.Response {
 		if err := h.validate(decoder, req); err != nil {
@@ -64,4 +47,21 @@ func (h *containerRegistryRegexHandler) OnUpdate(_ client.Client, decoder admiss
 
 		return nil
 	}
+}
+
+func (h *containerRegistryRegexHandler) validate(decoder admission.Decoder, req admission.Request) *admission.Response {
+	tenant := &capsulev1beta2.Tenant{}
+	if err := decoder.Decode(req, tenant); err != nil {
+		return utils.ErroredResponse(err)
+	}
+
+	if tenant.Spec.ContainerRegistries != nil && len(tenant.Spec.ContainerRegistries.Regex) > 0 {
+		if _, err := regexp.Compile(tenant.Spec.ContainerRegistries.Regex); err != nil {
+			response := admission.Denied("unable to compile containerRegistries allowedRegex")
+
+			return &response
+		}
+	}
+
+	return nil
 }

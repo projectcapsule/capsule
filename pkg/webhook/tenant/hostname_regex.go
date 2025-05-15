@@ -23,23 +23,6 @@ func HostnameRegexHandler() capsulewebhook.Handler {
 	return &hostnameRegexHandler{}
 }
 
-func (h *hostnameRegexHandler) validate(decoder admission.Decoder, req admission.Request) *admission.Response {
-	tenant := &capsulev1beta2.Tenant{}
-	if err := decoder.Decode(req, tenant); err != nil {
-		return utils.ErroredResponse(err)
-	}
-
-	if tenant.Spec.IngressOptions.AllowedHostnames != nil && len(tenant.Spec.IngressOptions.AllowedHostnames.Regex) > 0 {
-		if _, err := regexp.Compile(tenant.Spec.IngressOptions.AllowedHostnames.Regex); err != nil {
-			response := admission.Denied("unable to compile allowedHostnames allowedRegex")
-
-			return &response
-		}
-	}
-
-	return nil
-}
-
 func (h *hostnameRegexHandler) OnCreate(_ client.Client, decoder admission.Decoder, _ record.EventRecorder) capsulewebhook.Func {
 	return func(_ context.Context, req admission.Request) *admission.Response {
 		if response := h.validate(decoder, req); response != nil {
@@ -64,4 +47,21 @@ func (h *hostnameRegexHandler) OnUpdate(_ client.Client, decoder admission.Decod
 
 		return nil
 	}
+}
+
+func (h *hostnameRegexHandler) validate(decoder admission.Decoder, req admission.Request) *admission.Response {
+	tenant := &capsulev1beta2.Tenant{}
+	if err := decoder.Decode(req, tenant); err != nil {
+		return utils.ErroredResponse(err)
+	}
+
+	if tenant.Spec.IngressOptions.AllowedHostnames != nil && len(tenant.Spec.IngressOptions.AllowedHostnames.Regex) > 0 {
+		if _, err := regexp.Compile(tenant.Spec.IngressOptions.AllowedHostnames.Regex); err != nil {
+			response := admission.Denied("unable to compile allowedHostnames allowedRegex")
+
+			return &response
+		}
+	}
+
+	return nil
 }

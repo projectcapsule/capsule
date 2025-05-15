@@ -294,6 +294,13 @@ func (in *NamespaceOptions) DeepCopyInto(out *NamespaceOptions) {
 		*out = new(api.AdditionalMetadataSpec)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.AdditionalMetadataList != nil {
+		in, out := &in.AdditionalMetadataList, &out.AdditionalMetadataList
+		*out = make([]api.AdditionalMetadataSelectorSpec, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
 	in.ForbiddenLabels.DeepCopyInto(&out.ForbiddenLabels)
 	in.ForbiddenAnnotations.DeepCopyInto(&out.ForbiddenAnnotations)
 }

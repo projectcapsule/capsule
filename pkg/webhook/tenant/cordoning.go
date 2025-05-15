@@ -30,6 +30,24 @@ func CordoningHandler(configuration configuration.Configuration) capsulewebhook.
 	}
 }
 
+func (h *cordoningHandler) OnCreate(client client.Client, _ admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
+	return func(ctx context.Context, req admission.Request) *admission.Response {
+		return h.cordonHandler(ctx, client, req, recorder)
+	}
+}
+
+func (h *cordoningHandler) OnDelete(client client.Client, _ admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
+	return func(ctx context.Context, req admission.Request) *admission.Response {
+		return h.cordonHandler(ctx, client, req, recorder)
+	}
+}
+
+func (h *cordoningHandler) OnUpdate(client client.Client, _ admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
+	return func(ctx context.Context, req admission.Request) *admission.Response {
+		return h.cordonHandler(ctx, client, req, recorder)
+	}
+}
+
 func (h *cordoningHandler) cordonHandler(ctx context.Context, clt client.Client, req admission.Request, recorder record.EventRecorder) *admission.Response {
 	tntList := &capsulev1beta2.TenantList{}
 
@@ -53,22 +71,4 @@ func (h *cordoningHandler) cordonHandler(ctx context.Context, clt client.Client,
 	}
 
 	return nil
-}
-
-func (h *cordoningHandler) OnCreate(client client.Client, _ admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
-	return func(ctx context.Context, req admission.Request) *admission.Response {
-		return h.cordonHandler(ctx, client, req, recorder)
-	}
-}
-
-func (h *cordoningHandler) OnDelete(client client.Client, _ admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
-	return func(ctx context.Context, req admission.Request) *admission.Response {
-		return h.cordonHandler(ctx, client, req, recorder)
-	}
-}
-
-func (h *cordoningHandler) OnUpdate(client client.Client, _ admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
-	return func(ctx context.Context, req admission.Request) *admission.Response {
-		return h.cordonHandler(ctx, client, req, recorder)
-	}
 }

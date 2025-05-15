@@ -9,7 +9,7 @@ assignees: ''
 
 <!--
 Thanks for taking time reporting a Capsule bug!
-  
+
 -->
 
 # Bug description
