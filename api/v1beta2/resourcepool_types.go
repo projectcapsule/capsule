@@ -10,14 +10,12 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api"
 )
 
-// GlobalResourceQuotaSpec defines the desired state of GlobalResourceQuota
+// ResourcePoolSpec
 type ResourcePoolSpec struct {
 	// Selector to match the namespaces that should be managed by the GlobalResourceQuota
 	Selectors []api.NamespaceSelector `json:"selectors,omitempty"`
-	// Define resourcequotas for the namespaces
+	// Define the resourcequota served by this resourcepool.
 	Quota corev1.ResourceQuotaSpec `json:"quota"`
-	// The maxmum amount of resources that can be claimed from a resourcequota in a namespace
-	MaximumNamespaceAllocation corev1.ResourceList `json:"namespaceMaximum,omitempty"`
 	// The Defaults given for each namespace, the default is not counted towards the total allocation
 	// When you use claims it's recommended to provision Defaults as the prevent the scheduling of any resources
 	Defaults corev1.ResourceList `json:"defaults,omitempty"`
@@ -27,23 +25,26 @@ type ResourcePoolSpec struct {
 }
 
 type ResourcePoolSpecConfiguration struct {
-	// Enable Distribution of Defaults for each namespace
-	// This allocates the default resources to each resourcequota responsible for a namespace.
-	// The Defaults serve as a base for the resource allocation, and are not counted towards the total allocation
+	// With this option all resources which can be allocated are set to 0 for the resourcequota defaults.
 	// +kubebuilder:default=true
 	DefaultsAssignZero *bool `json:"defaultsZero,omitempty"`
-
 	// Claims are queued whenever they are allocated to a pool. A pool tries to allocate claims in order based on their
-	// creation date.
-	// Disabling this option will cause the resource pool to allocate claims which still fit in the remaining available resources.
-	// This disregards any ordering of the claims.
+	// creation date. But no matter their creation time, if a claim is requesting too much resources it's put into the queue
+	// but if a lower priority claim still has enough space in the available resources, it will be able to claim them. Eventough
+	// it's priority was lower
+	// Enabling this option respects to Order. Meaning the Creationtimestamp matters and if a resource is put into the queue, no
+	// other claim can claim the same resources with lower priority.
 	// +kubebuilder:default=false
 	OrderedQueue *bool `json:"orderedQueue,omitempty"`
-
 	// When a resourcepool is deleted, the resourceclaims bound to it are disassociated from the resourcepool but not deleted.
 	// By Enabling this option, the resourceclaims will be deleted when the resourcepool is deleted, if they are in bound state.
 	// +kubebuilder:default=false
 	DeleteBoundResources *bool `json:"deleteBoundResources,omitempty"`
+	// You can limit the amount of resources which can be claimed from the ResourcePool on namespace basis.
+	// This can apply to all resources or only a subset. Without per namespace limits all eligible namespaces can
+	// claim what's available from the resourcepool. If you define limits, they will be capped based on the
+	// total claims from one namespace to the given resources.
+	NamespaceLimits corev1.ResourceList `json:"namespaceLimits,omitempty"`
 }
 
 // +kubebuilder:object:root=true

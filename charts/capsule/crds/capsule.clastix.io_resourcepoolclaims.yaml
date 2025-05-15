@@ -20,7 +20,7 @@ spec:
       name: Pool
       type: string
     - description: Status for claim
-      jsonPath: .status.condition.status
+      jsonPath: .status.condition.type
       name: Status
       type: string
     - description: Reason for status

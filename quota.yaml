@@ -20,17 +20,10 @@ kind: ResourcePool
 metadata:
   name: sampler
 spec:
+  defaults:
+    "count/persistentvolumeclaims": 3
   config:
-    defaultsZero: false
-    orderedQueue: false
-  selectors:
-  - matchLabels:
-      capsule.clastix.io/tenant: solar
-  - matchLabels:
-      capsule.clastix.io/tenant: wind
-  namespaceMaximum:
-    limits.cpu: "1"
-    limits.memory: 1Gi
+    defaultsZero: true
   quota:
     hard:
       limits.cpu: "2"
@@ -38,6 +31,11 @@ spec:
       requests.cpu: "2"
       requests.memory: 2Gi
       requests.storage: "5Gi"
+  selectors:
+  - matchLabels:
+      capsule.clastix.io/tenant: solar
+  - matchLabels:
+      capsule.clastix.io/tenant: wind
 
 
 

@@ -324,6 +324,22 @@ webhooks:
   sideEffects: None
   timeoutSeconds: {{ $.Values.webhooks.validatingWebhooksTimeoutSeconds }}
   {{- end }}
-
-
+  {{- with .Values.webhooks.hooks.generic.freeze.enabled }}
+    {{- with .Values.webhooks.hooks.generic.freeze }}
+- admissionReviewVersions:
+    - v1
+    - v1beta1
+  clientConfig:
+    {{- include "capsule.webhooks.service" (dict "path" "/generic/freeze" "ctx" $) | nindent 4 }}
+  failurePolicy: {{ .failurePolicy }}
+  matchPolicy: {{ .matchPolicy }}
+  name: freeze.generic.projectcapsule.dev
+  namespaceSelector: {{ toYaml .namespaceSelector | nindent 4 }}
+  objectSelector: {{ toYaml .objectSelector | nindent 4 }}
+  rules:
+    {{- toYaml .rules | nindent 4 }}
+  sideEffects: None
+  timeoutSeconds: {{ $.Values.webhooks.validatingWebhooksTimeoutSeconds }}
+    {{- end }}
+  {{- end }}
 {{- end }}

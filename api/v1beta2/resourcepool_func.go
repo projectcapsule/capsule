@@ -193,25 +193,6 @@ func (r *ResourcePool) GetAvailableClaimableResources() corev1.ResourceList {
 	return hard
 }
 
-// Retrieves Default-Values, Only Resources which are mentioned in the Quota Hard Spec are given with a default
-// If nothing is set, the value will be set to zero
-func (r *ResourcePool) GetResourceDefaults() corev1.ResourceList {
-	defaults := corev1.ResourceList{}
-
-	for resourceName := range r.Spec.Quota.Hard {
-		amount, exists := r.Spec.Defaults[resourceName]
-		if !exists && !*r.Spec.Config.DefaultsAssignZero {
-			continue
-		} else {
-			amount = resource.MustParse("0")
-		}
-
-		defaults[resourceName] = amount
-	}
-
-	return defaults
-}
-
 // Gets the Hard specification for the resourcequotas
 // This takes into account the default resources being used. However they don't count towards the claim usage
 // This can be changed in the future, the default is not calculated as usage because this might interrupt the namespace management
@@ -226,10 +207,8 @@ func (r *ResourcePool) GetResourceQuotaHardResources(namespace string) corev1.Re
 	}
 
 	// Only Consider Default, when enabled
-	for resourceName, amount := range r.GetResourceDefaults() {
+	for resourceName, amount := range r.Spec.Defaults {
 		usedValue := claimed[resourceName]
-
-		// Combine with claim
 		usedValue.Add(amount)
 
 		claimed[resourceName] = usedValue

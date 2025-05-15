@@ -779,13 +779,6 @@ func (in *ResourcePoolSpec) DeepCopyInto(out *ResourcePoolSpec) {
 		}
 	}
 	in.Quota.DeepCopyInto(&out.Quota)
-	if in.MaximumNamespaceAllocation != nil {
-		in, out := &in.MaximumNamespaceAllocation, &out.MaximumNamespaceAllocation
-		*out = make(corev1.ResourceList, len(*in))
-		for key, val := range *in {
-			(*out)[key] = val.DeepCopy()
-		}
-	}
 	if in.Defaults != nil {
 		in, out := &in.Defaults, &out.Defaults
 		*out = make(corev1.ResourceList, len(*in))
@@ -823,6 +816,13 @@ func (in *ResourcePoolSpecConfiguration) DeepCopyInto(out *ResourcePoolSpecConfi
 		in, out := &in.DeleteBoundResources, &out.DeleteBoundResources
 		*out = new(bool)
 		**out = **in
+	}
+	if in.NamespaceLimits != nil {
+		in, out := &in.NamespaceLimits, &out.NamespaceLimits
+		*out = make(corev1.ResourceList, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val.DeepCopy()
+		}
 	}
 }
 

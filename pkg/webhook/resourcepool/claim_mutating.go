@@ -15,6 +15,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/meta"
 	capsulewebhook "github.com/projectcapsule/capsule/pkg/webhook"
 	"github.com/projectcapsule/capsule/pkg/webhook/utils"
 )
@@ -63,6 +64,8 @@ func (h *claimMutationHandler) handle(
 		return &response
 	}
 
+	h.handleReleaseAnnotation(claim)
+
 	marshaled, err := json.Marshal(claim)
 	if err != nil {
 		response := admission.Errored(http.StatusInternalServerError, err)
@@ -73,6 +76,21 @@ func (h *claimMutationHandler) handle(
 	response := admission.PatchResponseFromRaw(req.Object.Raw, marshaled)
 
 	return &response
+}
+
+// Only Adds release label when necessary.
+func (h *claimMutationHandler) handleReleaseAnnotation(
+	claim *capsulev1beta2.ResourcePoolClaim,
+) {
+	if !meta.ReleaseAnnotationTriggers(claim) {
+		return
+	}
+
+	if !claim.IsBoundToResourcePool() {
+		return
+	}
+
+	meta.ReleaseAnnotationRemove(claim)
 }
 
 func (h *claimMutationHandler) autoAssignPools(
@@ -95,31 +113,45 @@ func (h *claimMutationHandler) autoAssignPools(
 		return nil
 	}
 
-	var electedPool *capsulev1beta2.ResourcePool
+	var candidates []*capsulev1beta2.ResourcePool
 
 	for _, pool := range poolList.Items {
 		assignable := true
+		allocatable := true
 
-		for resource := range claim.Spec.ResourceClaims {
+		for resource, requested := range claim.Spec.ResourceClaims {
 			if _, ok := pool.Status.Allocation.Hard[resource]; !ok {
 				assignable = false
 
 				break
 			}
+
+			available, ok := pool.Status.Allocation.Available[resource]
+			if !ok || available.Cmp(requested) < 0 {
+				allocatable = false
+
+				break
+			}
 		}
 
-		if assignable {
-			electedPool = &pool
-
-			break
+		if !assignable {
+			continue
 		}
+
+		if allocatable {
+			candidates = append([]*capsulev1beta2.ResourcePool{&pool}, candidates...)
+
+			continue
+		}
+
+		candidates = append(candidates, &pool)
 	}
 
-	if electedPool == nil {
-		return nil
+	if len(candidates) == 0 {
+		return nil // no eligible pools
 	}
 
-	claim.Spec.Pool = electedPool.Name
+	claim.Spec.Pool = candidates[0].Name
 
 	return nil
 }

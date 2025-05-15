@@ -35,7 +35,3 @@ func GetTypeLabel(t runtime.Object) (label string, err error) {
 
 	return
 }
-
-func GetGlobalResourceQuotaTypeLabel() (label string) {
-	return "capsule.clastix.io/global-quota-item"
-}

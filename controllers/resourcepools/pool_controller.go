@@ -292,7 +292,7 @@ func (r *resourcePoolController) canClaimWithinNamespace(
 
 		// Verify that this resource can still be claimed within the namespace
 		// Only Necessary when there is a limit
-		maxNamespaceAllocation, maxExist := pool.Spec.MaximumNamespaceAllocation[resourceName]
+		maxNamespaceAllocation, maxExist := pool.Spec.Config.NamespaceLimits[resourceName]
 		if !maxExist {
 			continue
 		}
@@ -376,7 +376,16 @@ func (r *resourcePoolController) handleClaimResourceExhaustion(
 ) (err error) {
 	var status []string
 
-	for resourceName, ex := range exhaustions {
+	var resourceNames []string
+	for resourceName := range exhaustions {
+		resourceNames = append(resourceNames, resourceName)
+	}
+
+	sort.Strings(resourceNames)
+
+	for _, resourceName := range resourceNames {
+		ex := exhaustions[resourceName]
+
 		if *pool.Spec.Config.OrderedQueue {
 			ext, ok := exhaustion[resourceName]
 			if !ok {
@@ -470,17 +479,16 @@ func (r *resourcePoolController) handleClaimDisassociation(
 		if errors.IsNotFound(err) {
 			pool.RemoveClaimFromStatus(claimObj)
 
-			log.V(5).Info("HERERERER")
-
 			return nil
 		}
 
 		return err
 	}
 
-	if !*pool.Spec.Config.DeleteBoundResources {
+	if !*pool.Spec.Config.DeleteBoundResources || meta.ReleaseAnnotationTriggers(claimObj) {
 		patch := client.MergeFrom(claimObj.DeepCopy())
 		meta.RemoveLooseOwnerReference(claimObj, pool)
+		meta.ReleaseAnnotationRemove(claimObj)
 
 		if err := r.Client.Patch(ctx, claimObj, patch); err != nil {
 			log.Info("Removing owner reference", "claim", claimObj, "pool", pool.Name)
@@ -656,12 +664,11 @@ func (r *resourcePoolController) gatherMatchingClaims(
 	log logr.Logger,
 	pool *capsulev1beta2.ResourcePool,
 ) (claims []capsulev1beta2.ResourcePoolClaim, err error) {
-	claimList := &capsulev1beta2.ResourcePoolClaimList{}
-
 	if !pool.DeletionTimestamp.IsZero() {
 		return
 	}
 
+	claimList := &capsulev1beta2.ResourcePoolClaimList{}
 	if err := r.List(ctx, claimList, client.MatchingFieldsSelector{
 		Selector: fields.OneTermEqualSelector(".status.pool.uid", string(pool.GetUID())),
 	}); err != nil {
@@ -670,10 +677,19 @@ func (r *resourcePoolController) gatherMatchingClaims(
 		return claims, err
 	}
 
+	var filteredClaims []capsulev1beta2.ResourcePoolClaim
+	for _, claim := range claimList.Items {
+		if meta.ReleaseAnnotationTriggers(&claim) {
+			continue
+		}
+
+		filteredClaims = append(filteredClaims, claim)
+	}
+
 	// Sort by creation timestamp (oldest first)
-	sort.Slice(claimList.Items, func(i, j int) bool {
-		a := claimList.Items[i]
-		b := claimList.Items[j]
+	sort.Slice(filteredClaims, func(i, j int) bool {
+		a := filteredClaims[i]
+		b := filteredClaims[j]
 
 		// First, sort by CreationTimestamp
 		if !a.CreationTimestamp.Equal(&b.CreationTimestamp) {
@@ -689,7 +705,7 @@ func (r *resourcePoolController) gatherMatchingClaims(
 		return a.Namespace < b.Namespace
 	})
 
-	return claimList.Items, nil
+	return filteredClaims, nil
 }
 
 // Attempts to garbage collect a ResourceQuota resource.

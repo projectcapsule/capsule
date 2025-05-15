@@ -82,11 +82,11 @@ func (h *poolMutationHandler) handleDefaults(
 		return
 	}
 
-	defaults := corev1.ResourceList{}
-
 	if pool.Spec.Defaults == nil {
 		pool.Spec.Defaults = corev1.ResourceList{}
 	}
+
+	defaults := pool.Spec.Defaults
 
 	for resourceName := range pool.Spec.Quota.Hard {
 		amount, exists := pool.Spec.Defaults[resourceName]

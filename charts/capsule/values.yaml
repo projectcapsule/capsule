@@ -265,6 +265,28 @@ webhooks:
 
   # Hook Configuration
   hooks:
+    generic:
+      freeze:
+        enabled: true
+        namespaceSelector: {}
+        objectSelector:
+          matchLabels:
+            "projectcapsule.dev/freeze": "true"
+        reinvocationPolicy: Never
+        matchPolicy: Equivalent
+        failurePolicy: Fail
+        rules:
+          - apiGroups:
+            - "*"
+            apiVersions:
+            - "*"
+            operations:
+            - CREATE
+            - UPDATE
+            - DELETE
+            resources:
+            - "*"
+            scope: 'Namespaced'
     resource:
       pools:
         namespaceSelector: {}

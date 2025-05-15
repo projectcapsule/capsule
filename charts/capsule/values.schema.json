@@ -598,6 +598,80 @@
                             },
                             "type": "object"
                         },
+                        "generic": {
+                            "properties": {
+                                "freeze": {
+                                    "properties": {
+                                        "enabled": {
+                                            "type": "boolean"
+                                        },
+                                        "failurePolicy": {
+                                            "type": "string"
+                                        },
+                                        "matchPolicy": {
+                                            "type": "string"
+                                        },
+                                        "namespaceSelector": {
+                                            "properties": {},
+                                            "type": "object"
+                                        },
+                                        "objectSelector": {
+                                            "properties": {
+                                                "matchLabels": {
+                                                    "properties": {
+                                                        "projectcapsule.dev/freeze": {
+                                                            "type": "string"
+                                                        }
+                                                    },
+                                                    "type": "object"
+                                                }
+                                            },
+                                            "type": "object"
+                                        },
+                                        "reinvocationPolicy": {
+                                            "type": "string"
+                                        },
+                                        "rules": {
+                                            "items": {
+                                                "properties": {
+                                                    "apiGroups": {
+                                                        "items": {
+                                                            "type": "string"
+                                                        },
+                                                        "type": "array"
+                                                    },
+                                                    "apiVersions": {
+                                                        "items": {
+                                                            "type": "string"
+                                                        },
+                                                        "type": "array"
+                                                    },
+                                                    "operations": {
+                                                        "items": {
+                                                            "type": "string"
+                                                        },
+                                                        "type": "array"
+                                                    },
+                                                    "resources": {
+                                                        "items": {
+                                                            "type": "string"
+                                                        },
+                                                        "type": "array"
+                                                    },
+                                                    "scope": {
+                                                        "type": "string"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            },
+                                            "type": "array"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            },
+                            "type": "object"
+                        },
                         "ingresses": {
                             "properties": {
                                 "failurePolicy": {
