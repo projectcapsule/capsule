@@ -56,6 +56,8 @@ func (h *handler) mutate(ctx context.Context, req admission.Request, c client.Cl
 		response = mutatePVCDefaults(ctx, req, c, decoder, recorder, req.Namespace)
 	case metav1.GroupVersionResource{Group: "networking.k8s.io", Version: "v1", Resource: "ingresses"}, metav1.GroupVersionResource{Group: "networking.k8s.io", Version: "v1beta1", Resource: "ingresses"}:
 		response = mutateIngressDefaults(ctx, req, h.version, c, decoder, recorder, req.Namespace)
+	case metav1.GroupVersionResource{Group: "gateway.networking.k8s.io", Version: "v1", Resource: "GatewayClass"}:
+		response = mutateGatewayDefaults(ctx, req, h.version, c, decoder, recorder, req.Namespace)
 	}
 
 	if response == nil {
