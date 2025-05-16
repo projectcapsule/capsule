@@ -1,0 +1,19 @@
+apiVersion: capsule.clastix.io/v1beta2
+kind: Tenant
+metadata:
+  name: solar
+spec:
+  owners:
+  - clusterRoles:
+    - admin
+    - capsule-namespace-deleter
+    kind: User
+    name: alice
+  - clusterRoles:
+    - admin
+    - capsule-namespace-deleter
+    kind: User
+    name: solar-user
+  preventDeletion: false
+  resourceQuotas:
+    scope: Tenant

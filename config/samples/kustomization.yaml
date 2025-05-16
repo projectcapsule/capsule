@@ -1,0 +1,5 @@
+## Append samples of your project ##
+resources:
+- capsule_v1beta2_resourcequotaclaim.yaml
+- capsule_v1beta2_resourcepoolusage.yaml
+# +kubebuilder:scaffold:manifestskustomizesamples

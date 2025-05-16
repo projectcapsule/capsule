@@ -34,6 +34,7 @@ import (
 	podlabelscontroller "github.com/projectcapsule/capsule/controllers/pod"
 	"github.com/projectcapsule/capsule/controllers/pv"
 	rbaccontroller "github.com/projectcapsule/capsule/controllers/rbac"
+	"github.com/projectcapsule/capsule/controllers/resourcepools"
 	"github.com/projectcapsule/capsule/controllers/resources"
 	servicelabelscontroller "github.com/projectcapsule/capsule/controllers/servicelabels"
 	tenantcontroller "github.com/projectcapsule/capsule/controllers/tenant"
@@ -49,6 +50,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/webhook/node"
 	"github.com/projectcapsule/capsule/pkg/webhook/pod"
 	"github.com/projectcapsule/capsule/pkg/webhook/pvc"
+	"github.com/projectcapsule/capsule/pkg/webhook/resourcepool"
 	"github.com/projectcapsule/capsule/pkg/webhook/route"
 	"github.com/projectcapsule/capsule/pkg/webhook/service"
 	"github.com/projectcapsule/capsule/pkg/webhook/tenant"
@@ -232,6 +234,10 @@ func main() {
 		route.NamespacePatch(utils.InCapsuleGroups(cfg, namespacemutation.CordoningLabelHandler(cfg), namespacemutation.OwnerReferenceHandler(cfg), namespacemutation.MetadataHandler(cfg))),
 		route.CustomResources(tenant.ResourceCounterHandler(manager.GetClient())),
 		route.Defaults(defaults.Handler(cfg, kubeVersion)),
+		route.ResourcePoolMutation((resourcepool.PoolMutationHandler(ctrl.Log.WithName("webhooks").WithName("resourcepool")))),
+		route.ResourcePoolValidation((resourcepool.PoolValidationHandler(ctrl.Log.WithName("webhooks").WithName("resourcepool")))),
+		route.ResourcePoolClaimMutation((resourcepool.ClaimMutationHandler(ctrl.Log.WithName("webhooks").WithName("resourcepoolclaims")))),
+		route.ResourcePoolClaimValidation((resourcepool.ClaimValidationHandler(ctrl.Log.WithName("webhooks").WithName("resourcepoolclaims")))),
 	)
 
 	nodeWebhookSupported, _ := utils.NodeWebhookSupported(kubeVersion)
@@ -297,6 +303,15 @@ func main() {
 
 	if err = (&resources.Namespaced{}).SetupWithManager(manager); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "resources.Namespaced")
+		os.Exit(1)
+	}
+
+	if err := resourcepools.Add(
+		ctrl.Log.WithName("controllers").WithName("ResourcePools"),
+		manager,
+		manager.GetEventRecorderFor("pools-ctrl"),
+	); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "resourcepools")
 		os.Exit(1)
 	}
 

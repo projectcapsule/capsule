@@ -1,0 +1,11 @@
+---
+apiVersion: capsule.clastix.io/v1beta2
+kind: ResourcePoolClaim
+metadata:
+  name: get-me-cpu
+spec:
+  claim:
+    limits.cpu: "0.1"
+    limits.memory: 1Gi
+    requests.cpu: "1"
+    requests.memory: 1Gi

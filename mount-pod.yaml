@@ -1,0 +1,21 @@
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: mount-pod
+spec:
+  containers:
+  - name: my-container
+    image: alpine
+    command:
+    - sh
+    - -c 
+    - |
+        sleep infinity
+    volumeMounts:
+    - mountPath: /data
+      name: my-volume
+  volumes:
+  - name: my-volume
+    persistentVolumeClaim:
+      claimName: k41-minio

@@ -99,6 +99,7 @@ func (r *Manager) syncResourceQuotas(ctx context.Context, tenant *capsulev1beta2
 
 					return scopeErr
 				}
+
 				// Iterating over all the options declared for the ResourceQuota,
 				// summing all the used quota across different Namespaces to determinate
 				// if we're hitting a Hard quota at Tenant level.
@@ -111,6 +112,7 @@ func (r *Manager) syncResourceQuotas(ctx context.Context, tenant *capsulev1beta2
 					var quantity resource.Quantity
 					for _, item := range list.Items {
 						quantity.Add(item.Status.Used[name])
+						//tenantQuotaStatus[strconv.Itoa(index)].Quotas[item.Namespace] = item.Status
 					}
 
 					r.Log.Info("Computed " + name.String() + " quota for the whole Tenant is " + quantity.String())
@@ -188,6 +190,7 @@ func (r *Manager) syncResourceQuotas(ctx context.Context, tenant *capsulev1beta2
 		if err = group.Wait(); err != nil {
 			return
 		}
+
 	}
 	// getting requested ResourceQuota keys
 	keys := make([]string, 0, len(tenant.Spec.ResourceQuota.Items))
