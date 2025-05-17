@@ -130,13 +130,6 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 
 		return
 	}
-	// Ensuring Permissions
-	r.Log.Info("Ensuring Permissions for Owners and Tenant")
-
-	if err = r.syncPermissions(ctx, instance); err != nil {
-		r.Log.Error(err, "Cannot sync Permissions items")
-		return
-	}
 	// Ensuring Namespace count
 	r.Log.Info("Ensuring Namespace count")
 
