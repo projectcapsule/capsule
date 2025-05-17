@@ -6,6 +6,7 @@ package main
 import (
 	goflag "flag"
 	"fmt"
+	"github.com/projectcapsule/capsule/pkg/webhook/gateway"
 	"os"
 	goRuntime "runtime"
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
@@ -233,6 +234,7 @@ func main() {
 		route.Node(utils.InCapsuleGroups(cfg, node.UserMetadataHandler(cfg, kubeVersion))),
 		route.NamespacePatch(utils.InCapsuleGroups(cfg, namespacemutation.CordoningLabelHandler(cfg), namespacemutation.OwnerReferenceHandler(cfg), namespacemutation.MetadataHandler(cfg))),
 		route.CustomResources(tenant.ResourceCounterHandler(manager.GetClient())),
+		route.Gateway(gateway.Class(cfg)),
 		route.Defaults(defaults.Handler(cfg, kubeVersion)),
 	)
 

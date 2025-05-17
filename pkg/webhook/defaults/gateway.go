@@ -14,7 +14,6 @@ import (
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	gatewayutils "github.com/projectcapsule/capsule/pkg/webhook/gateway"
 	"github.com/projectcapsule/capsule/pkg/webhook/utils"
 )
 
@@ -42,10 +41,12 @@ func mutateGatewayDefaults(ctx context.Context, req admission.Request, version *
 	if allowed == nil || allowed.Default == "" {
 		return nil
 	}
-	if gatewayClass, err := gatewayutils.GetGatewayClassClassByName(ctx, c, gatewayObj.Spec.GatewayClassName); err != nil && !k8serrors.IsNotFound(err) {
-		response := admission.Denied(err.Error())
 
+	gatewayClass, err := utils.GetGatewayClassClassByObjectName(ctx, c, gatewayObj.Spec.GatewayClassName)
+	if err != nil && !k8serrors.IsNotFound(err) {
+		response := admission.Denied(NewGatewayClassError(gatewayClass.Name, err).Error())
 		return &response
 	}
+
 	return nil
 }

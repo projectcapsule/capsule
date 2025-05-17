@@ -1,21 +1,21 @@
+// Copyright 2020-2023 Project Capsule Authors.
+// SPDX-License-Identifier: Apache-2.0
+
 package gateway
 
 import (
 	"context"
+	v1 "sigs.k8s.io/gateway-api/apis/v1"
+
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/types"
-	"reflect"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
-	v1 "sigs.k8s.io/gateway-api/apis/v1"
 )
 
-func TenantFromIngress(ctx context.Context, c client.Client, gateway v1.ObjectName) (*capsulev1beta2.Tenant, error) {
+func TenantFromGateway(ctx context.Context, c client.Client, gateway *v1.Gateway) (*capsulev1beta2.Tenant, error) {
 	tenantList := &capsulev1beta2.TenantList{}
-	objName := reflect.ValueOf(gateway).String()
 	if err := c.List(ctx, tenantList, client.MatchingFieldsSelector{
-		Selector: fields.OneTermEqualSelector(".status.namespaces", objName),
+		Selector: fields.OneTermEqualSelector(".status.namespaces", gateway.Namespace),
 	}); err != nil {
 		return nil, err
 	}
@@ -25,14 +25,4 @@ func TenantFromIngress(ctx context.Context, c client.Client, gateway v1.ObjectNa
 	}
 
 	return &tenantList.Items[0], nil
-}
-
-func GetGatewayClassClassByName(ctx context.Context, c client.Client, gatewayClassName v1.ObjectName) (*gatewayv1.GatewayClass, error) {
-	objName := reflect.ValueOf(gatewayClassName).String()
-	gatewayClass := &gatewayv1.GatewayClass{}
-
-	if err := c.Get(ctx, types.NamespacedName{Name: objName}, gatewayClass); err != nil {
-		return nil, err
-	}
-	return gatewayClass, nil
 }

@@ -39,6 +39,22 @@ func (e IngressClassError) Error() string {
 	return fmt.Sprintf("Failed to resolve Ingress Class %s: %s", e.ingressClass, e.msg)
 }
 
+type GatewayClassError struct {
+	gatewayClass string
+	msg          error
+}
+
+func NewGatewayClassError(class string, msg error) error {
+	return &GatewayClassError{
+		gatewayClass: class,
+		msg:          msg,
+	}
+}
+
+func (e GatewayClassError) Error() string {
+	return fmt.Sprintf("Failed to resolve Gateway Class %s: %s", e.gatewayClass, e.msg)
+}
+
 type PriorityClassError struct {
 	priorityClass string
 	msg           error
