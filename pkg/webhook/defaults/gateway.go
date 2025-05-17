@@ -5,7 +5,7 @@ package defaults
 
 import (
 	"context"
-
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/client-go/tools/record"
@@ -14,17 +14,11 @@ import (
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	gatewayutils "github.com/projectcapsule/capsule/pkg/webhook/gateway"
 	"github.com/projectcapsule/capsule/pkg/webhook/utils"
 )
 
 func mutateGatewayDefaults(ctx context.Context, req admission.Request, version *version.Version, c client.Client, decoder admission.Decoder, recorder record.EventRecorder, namespace string) *admission.Response {
-	const (
-		annotationName = "kubernetes.io/gateway.class"
-	)
-	var (
-	//gatewayClass client.Object
-	//mutate bool
-	)
 	tntList := &capsulev1beta2.TenantList{}
 	gatewayObj := &gatewayv1.Gateway{}
 	tnt := &capsulev1beta2.Tenant{}
@@ -48,9 +42,10 @@ func mutateGatewayDefaults(ctx context.Context, req admission.Request, version *
 	if allowed == nil || allowed.Default == "" {
 		return nil
 	}
-	gatewayClassName := &gatewayObj.Spec.GatewayClassName
-	if gatewayClassName != nil && *gatewayClassName != gatewayv1.ObjectName(allowed.Default) {
-		return nil
+	if gatewayClass, err := gatewayutils.GetGatewayClassClassByName(ctx, c, gatewayObj.Spec.GatewayClassName); err != nil && !k8serrors.IsNotFound(err) {
+		response := admission.Denied(err.Error())
+
+		return &response
 	}
 	return nil
 }

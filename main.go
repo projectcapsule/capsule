@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	goRuntime "runtime"
+	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	flag "github.com/spf13/pflag"
 	_ "go.uber.org/automaxprocs"
@@ -67,6 +68,7 @@ func init() {
 	utilruntime.Must(capsulev1beta1.AddToScheme(scheme))
 	utilruntime.Must(capsulev1beta2.AddToScheme(scheme))
 	utilruntime.Must(apiextensionsv1.AddToScheme(scheme))
+	utilruntime.Must(gatewayv1.AddToScheme(scheme))
 }
 
 func printVersion() {
