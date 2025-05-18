@@ -40,14 +40,6 @@ func DefaultAllowedValuesErrorMessage(allowed api.DefaultAllowedListSpec, err st
 
 func SelectionListWithDefaultErrorMessage(allowed api.SelectionListWithDefaultSpec, err string) string {
 	var extra []string
-	if len(allowed.Exact) > 0 {
-		extra = append(extra, fmt.Sprintf("use one from the following list (%s)", strings.Join(allowed.Exact, ", ")))
-	}
-
-	if len(allowed.Regex) > 0 {
-		extra = append(extra, fmt.Sprintf("use one matching the following regex (%s)", allowed.Regex))
-	}
-
 	if len(allowed.MatchLabels) > 0 || len(allowed.MatchExpressions) > 0 {
 		extra = append(extra, "matching the label selector defined in the Tenant")
 	}

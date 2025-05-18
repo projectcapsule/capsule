@@ -6,10 +6,8 @@ package main
 import (
 	goflag "flag"
 	"fmt"
-	"github.com/projectcapsule/capsule/pkg/webhook/gateway"
 	"os"
 	goRuntime "runtime"
-	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	flag "github.com/spf13/pflag"
 	_ "go.uber.org/automaxprocs"
@@ -29,6 +27,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	ctrlwebhook "sigs.k8s.io/controller-runtime/pkg/webhook"
+	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	capsulev1beta1 "github.com/projectcapsule/capsule/api/v1beta1"
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
@@ -44,6 +43,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/indexer"
 	"github.com/projectcapsule/capsule/pkg/webhook"
 	"github.com/projectcapsule/capsule/pkg/webhook/defaults"
+	"github.com/projectcapsule/capsule/pkg/webhook/gateway"
 	"github.com/projectcapsule/capsule/pkg/webhook/ingress"
 	namespacemutation "github.com/projectcapsule/capsule/pkg/webhook/namespace/mutation"
 	namespacevalidation "github.com/projectcapsule/capsule/pkg/webhook/namespace/validation"

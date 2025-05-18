@@ -1165,12 +1165,6 @@ spec:
                 properties:
                   allowedClasses:
                     properties:
-                      allowed:
-                        items:
-                          type: string
-                        type: array
-                      allowedRegex:
-                        type: string
                       default:
                         type: string
                       matchExpressions:
