@@ -45,7 +45,6 @@ func mutateGatewayDefaults(ctx context.Context, req admission.Request, c client.
 	var mutate bool
 
 	gatewayClass, err := utils.GetGatewayClassClassByObjectName(ctx, c, gatewayObj.Spec.GatewayClassName)
-
 	if gatewayClass != nil && gatewayClass.Name != allowed.Default {
 		if err != nil && !k8serrors.IsNotFound(err) {
 			response := admission.Denied(NewGatewayClassError(gatewayClass.Name, err).Error())
@@ -55,8 +54,7 @@ func mutateGatewayDefaults(ctx context.Context, req admission.Request, c client.
 	} else {
 		mutate = true
 	}
-
-	if mutate = mutate || gatewayClass.Name != allowed.Default; !mutate {
+	if mutate = mutate || (gatewayClass.Name == allowed.Default); !mutate {
 		return nil
 	}
 
