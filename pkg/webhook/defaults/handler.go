@@ -5,7 +5,6 @@ package defaults
 
 import (
 	"context"
-	"fmt"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/version"
@@ -49,7 +48,6 @@ func (h *handler) OnUpdate(client client.Client, decoder admission.Decoder, reco
 
 func (h *handler) mutate(ctx context.Context, req admission.Request, c client.Client, decoder admission.Decoder, recorder record.EventRecorder) *admission.Response {
 	var response *admission.Response
-	fmt.Printf("Mutating resource %s/%s/%s\n", req.Namespace, req.Name, req.Resource.Resource)
 	switch req.Resource {
 	case metav1.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}:
 		response = mutatePodDefaults(ctx, req, c, decoder, recorder, req.Namespace)
@@ -58,7 +56,7 @@ func (h *handler) mutate(ctx context.Context, req admission.Request, c client.Cl
 	case metav1.GroupVersionResource{Group: "networking.k8s.io", Version: "v1", Resource: "ingresses"}, metav1.GroupVersionResource{Group: "networking.k8s.io", Version: "v1beta1", Resource: "ingresses"}:
 		response = mutateIngressDefaults(ctx, req, h.version, c, decoder, recorder, req.Namespace)
 	case metav1.GroupVersionResource{Group: "gateway.networking.k8s.io", Version: "v1", Resource: "gateways"}:
-		response = mutateGatewayDefaults(ctx, req, h.version, c, decoder, recorder, req.Namespace)
+		response = mutateGatewayDefaults(ctx, req, c, decoder, recorder, req.Namespace)
 	}
 
 	if response == nil {

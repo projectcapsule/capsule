@@ -5,11 +5,12 @@ package gateway
 
 import (
 	"context"
+
+	"k8s.io/apimachinery/pkg/fields"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	v1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	"k8s.io/apimachinery/pkg/fields"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 func TenantFromGateway(ctx context.Context, c client.Client, gateway *v1.Gateway) (*capsulev1beta2.Tenant, error) {
