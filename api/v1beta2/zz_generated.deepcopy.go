@@ -159,7 +159,7 @@ func (in *GatewayOptions) DeepCopyInto(out *GatewayOptions) {
 	*out = *in
 	if in.AllowedClasses != nil {
 		in, out := &in.AllowedClasses, &out.AllowedClasses
-		*out = new(api.DefaultAllowedListSpec)
+		*out = new(api.SelectionListWithDefaultSpec)
 		(*in).DeepCopyInto(*out)
 	}
 }
