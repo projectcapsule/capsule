@@ -5,16 +5,16 @@ package utils
 
 import (
 	"context"
+	"reflect"
+
 	networkingv1 "k8s.io/api/networking/v1"
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	schedulev1 "k8s.io/api/scheduling/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/version"
-	"reflect"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
-	v1 "sigs.k8s.io/gateway-api/apis/v1"
 )
 
 const TRUE string = "true"
@@ -66,14 +66,14 @@ func GetIngressClassByName(ctx context.Context, version *version.Version, c clie
 }
 
 // Get GatewayClassClass by name (Does not return error if not found).
-func GetGatewayClassClassByObjectName(ctx context.Context, c client.Client, gatewayClassName v1.ObjectName) (*gatewayv1.GatewayClass, error) {
+func GetGatewayClassClassByObjectName(ctx context.Context, c client.Client, gatewayClassName gatewayv1.ObjectName) (*gatewayv1.GatewayClass, error) {
 	objName := reflect.ValueOf(gatewayClassName).String()
 	gatewayClass := &gatewayv1.GatewayClass{}
 
 	if err := c.Get(ctx, types.NamespacedName{Name: objName}, gatewayClass); err != nil {
 		return nil, err
-
 	}
+
 	return gatewayClass, nil
 }
 

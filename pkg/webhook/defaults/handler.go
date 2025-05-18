@@ -48,6 +48,7 @@ func (h *handler) OnUpdate(client client.Client, decoder admission.Decoder, reco
 
 func (h *handler) mutate(ctx context.Context, req admission.Request, c client.Client, decoder admission.Decoder, recorder record.EventRecorder) *admission.Response {
 	var response *admission.Response
+
 	switch req.Resource {
 	case metav1.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}:
 		response = mutatePodDefaults(ctx, req, c, decoder, recorder, req.Namespace)

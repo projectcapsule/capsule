@@ -72,6 +72,9 @@ func (r *class) validate(ctx context.Context, client client.Client, req admissio
 	}
 
 	gatewayClass, err := utils.GetGatewayClassClassByObjectName(ctx, client, gatewayObj.Spec.GatewayClassName)
+	if err != nil {
+		return utils.ErroredResponse(err)
+	}
 
 	if gatewayClass == nil {
 		recorder.Eventf(tnt, corev1.EventTypeWarning, "MissingGatewayClass", "Gateway %s/%s is missing GatewayClass", req.Namespace, req.Name)

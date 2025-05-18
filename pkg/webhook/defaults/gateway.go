@@ -13,10 +13,10 @@ import (
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	capsulegateway "github.com/projectcapsule/capsule/pkg/webhook/gateway"
 	"github.com/projectcapsule/capsule/pkg/webhook/utils"
-	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
 
 func mutateGatewayDefaults(ctx context.Context, req admission.Request, c client.Client, decoder admission.Decoder, recorder record.EventRecorder, namespce string) *admission.Response {
@@ -49,6 +49,7 @@ func mutateGatewayDefaults(ctx context.Context, req admission.Request, c client.
 	if gatewayClass != nil && gatewayClass.Name != allowed.Default {
 		if err != nil && !k8serrors.IsNotFound(err) {
 			response := admission.Denied(NewGatewayClassError(gatewayClass.Name, err).Error())
+
 			return &response
 		}
 	} else {
@@ -62,7 +63,6 @@ func mutateGatewayDefaults(ctx context.Context, req admission.Request, c client.
 	gatewayObj.Spec.GatewayClassName = gatewayv1.ObjectName(allowed.Default)
 
 	marshaled, err := json.Marshal(gatewayObj)
-
 	if err != nil {
 		response := admission.Errored(http.StatusInternalServerError, err)
 

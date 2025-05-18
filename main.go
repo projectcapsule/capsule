@@ -69,7 +69,7 @@ func init() {
 	utilruntime.Must(capsulev1beta1.AddToScheme(scheme))
 	utilruntime.Must(capsulev1beta2.AddToScheme(scheme))
 	utilruntime.Must(apiextensionsv1.AddToScheme(scheme))
-	utilruntime.Must(gatewayv1.AddToScheme(scheme))
+	utilruntime.Must(gatewayv1.Install(scheme))
 }
 
 func printVersion() {
