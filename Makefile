@@ -224,8 +224,12 @@ golint: golangci-lint
 e2e: ginkgo
 	$(MAKE) e2e-build && $(MAKE) e2e-exec && $(MAKE) e2e-destroy
 
+e2e-install-deps:
+	@$(KUBECTL) apply --force-conflicts --server-side=true -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.3.0/standard-install.yaml
+
 e2e-build: kind
 	$(KIND) create cluster --wait=60s --name $(CLUSTER_NAME) --image kindest/node:$(KUBERNETES_SUPPORTED_VERSION)
+	$(MAKE) e2e-install-deps
 	$(MAKE) e2e-install
 
 .PHONY: e2e-install
