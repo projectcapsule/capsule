@@ -131,8 +131,8 @@ webhooks:
       apiVersions:
       - "*"
       operations:
-      - CREATE
-      - UPDATE
+        - CREATE
+        - UPDATE
       resources:
       - resourcepools
       scope: '*'
