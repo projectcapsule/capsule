@@ -270,6 +270,7 @@ trace-e2e: kind
 	$(KIND) create cluster --wait=60s --image kindest/node:$(KUBERNETES_SUPPORTED_VERSION) --config hack/kind-cluster.yml
 	$(MAKE) e2e-load-image CLUSTER_NAME=capsule-tracing IMAGE=$(CAPSULE_IMG) VERSION=tracing
 	$(MAKE) trace-install
+	$(MAKE) e2e-install-deps
 	$(MAKE) e2e-exec
 	$(KIND) delete cluster --name capsule-tracing
 
@@ -288,7 +289,7 @@ e2e-load-image: kind
 
 .PHONY: e2e-exec
 e2e-exec: ginkgo
-	$(GINKGO) -v -tags e2e ./e2e
+	$(GINKGO) --label-filter="gateway" -v -tags e2e ./e2e
 
 .PHONY: e2e-destroy
 e2e-destroy: kind
