@@ -112,7 +112,6 @@ func (r *Manager) syncResourceQuotas(ctx context.Context, tenant *capsulev1beta2
 					var quantity resource.Quantity
 					for _, item := range list.Items {
 						quantity.Add(item.Status.Used[name])
-						// tenantQuotaStatus[strconv.Itoa(index)].Quotas[item.Namespace] = item.Status
 					}
 
 					r.Log.Info("Computed " + name.String() + " quota for the whole Tenant is " + quantity.String())

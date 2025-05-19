@@ -49,6 +49,11 @@ type ResourcePoolSpecConfiguration struct {
 // +kubebuilder:printcolumn:name="Namespaces",type="integer",JSONPath=".status.namespaceCount",description="The total amount of Namespaces considered"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp",description="Age"
 
+// Resourcepools allows you to define a set of resources as known from ResoureQuotas. The Resourcepools are defined at cluster-scope an should
+// be administrated by cluster-administrators. However they create an interface, where cluster-administrators can define
+// from which namespaces resources from a Resourcepool can be claimed. The claiming is done via a namespaced CRD called ResourcePoolClaim. Then
+// it's up the group of users within these namespaces, to manage the resources they consume per namespace. Each Resourcepool provisions a ResourceQuotainto all the selected namespaces. Then essentially the ResourcePoolClaims, when they can be assigned to the ResourcePool stack resources on top of that
+// ResourceQuota based on the namspace, where the ResourcePoolClaim was made from.
 type ResourcePool struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -59,7 +64,7 @@ type ResourcePool struct {
 
 // +kubebuilder:object:root=true
 
-// GlobalResourceQuotaList contains a list of GlobalResourceQuota.
+// ResourcePoolList contains a list of ResourcePool.
 type ResourcePoolList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`

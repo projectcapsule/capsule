@@ -14,6 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api"
@@ -119,6 +120,10 @@ var _ = Describe("ResourcePool Tests", func() {
 		By("Get Applied revision", func() {
 			err := k8sClient.Get(context.TODO(), client.ObjectKey{Name: pool.Name}, pool)
 			Expect(err).Should(Succeed())
+		})
+
+		By("Has no Finalizer", func() {
+			Expect(controllerutil.ContainsFinalizer(pool, meta.ControllerFinalizer)).To(BeFalse())
 		})
 
 		By("Verify Defaults were set", func() {
@@ -295,6 +300,10 @@ var _ = Describe("ResourcePool Tests", func() {
 
 			ok, msg := DeepCompare(*expected, pool.Status.Allocation)
 			Expect(ok).To(BeTrue(), "Mismatch for expected status allocation: %s", msg)
+		})
+
+		By("Pool Has Finalizer", func() {
+			Expect(controllerutil.ContainsFinalizer(pool, meta.ControllerFinalizer)).To(BeTrue())
 		})
 
 		By("Verify ResourceQuotas for namespaces", func() {

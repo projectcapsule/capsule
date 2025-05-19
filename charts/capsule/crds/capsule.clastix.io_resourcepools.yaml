@@ -32,6 +32,12 @@ spec:
     name: v1beta2
     schema:
       openAPIV3Schema:
+        description: |-
+          Resourcepools allows you to define a set of resources as known from ResoureQuotas. The Resourcepools are defined at cluster-scope an should
+          be administrated by cluster-administrators. However they create an interface, where cluster-administrators can define
+          from which namespaces resources from a Resourcepool can be claimed. The claiming is done via a namespaced CRD called ResourcePoolClaim. Then
+          it's up the group of users within these namespaces, to manage the resources they consume per namespace. Each Resourcepool provisions a ResourceQuotainto all the selected namespaces. Then essentially the ResourcePoolClaims, when they can be assigned to the ResourcePool stack resources on top of that
+          ResourceQuota based on the namspace, where the ResourcePoolClaim was made from.
         properties:
           apiVersion:
             description: |-
