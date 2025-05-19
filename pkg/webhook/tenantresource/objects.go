@@ -26,6 +26,24 @@ func WriteOpsHandler() capsulewebhook.Handler {
 	return &cordoningHandler{}
 }
 
+func (h *cordoningHandler) OnCreate(client.Client, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
+	return func(context.Context, admission.Request) *admission.Response {
+		return nil
+	}
+}
+
+func (h *cordoningHandler) OnDelete(client client.Client, _ admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
+	return func(ctx context.Context, req admission.Request) *admission.Response {
+		return h.handler(ctx, client, req, recorder)
+	}
+}
+
+func (h *cordoningHandler) OnUpdate(client client.Client, _ admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
+	return func(ctx context.Context, req admission.Request) *admission.Response {
+		return h.handler(ctx, client, req, recorder)
+	}
+}
+
 func (h *cordoningHandler) handler(ctx context.Context, clt client.Client, req admission.Request, recorder record.EventRecorder) *admission.Response {
 	tntList := &capsulev1beta2.TenantList{}
 
@@ -68,22 +86,4 @@ func (h *cordoningHandler) handler(ctx context.Context, clt client.Client, req a
 	}
 
 	return nil
-}
-
-func (h *cordoningHandler) OnCreate(client.Client, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
-	return func(context.Context, admission.Request) *admission.Response {
-		return nil
-	}
-}
-
-func (h *cordoningHandler) OnDelete(client client.Client, _ admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
-	return func(ctx context.Context, req admission.Request) *admission.Response {
-		return h.handler(ctx, client, req, recorder)
-	}
-}
-
-func (h *cordoningHandler) OnUpdate(client client.Client, _ admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
-	return func(ctx context.Context, req admission.Request) *admission.Response {
-		return h.handler(ctx, client, req, recorder)
-	}
 }

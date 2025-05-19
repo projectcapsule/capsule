@@ -1,0 +1,17 @@
+# Target Binary
+ARG TARGET_IMAGE
+FROM ${TARGET_IMAGE} AS target
+
+# Inject Harpoon Image
+FROM ghcr.io/alegrey91/harpoon:latest
+WORKDIR /
+COPY --from=target /ko-app/capsule ./manager
+RUN chmod +x ./harpoon
+ENTRYPOINT ["/harpoon", \
+		"capture", \
+		"-f", "main.main", \
+		"-E", "NAMESPACE=capsule-system", \
+		"-i", "2", \
+		"-c", "-e", \
+		"-S", "-D", "/tmp/results/", \
+		"--", "/manager"]

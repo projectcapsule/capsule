@@ -9,16 +9,16 @@ import (
 )
 
 var (
-	metricsPrefix = "capsule_"
-
 	TenantResourceUsage = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Name: metricsPrefix + "tenant_resource_usage",
-		Help: "Current resource usage for a given resource in a tenant",
+		Namespace: metricsPrefix,
+		Name:      "tenant_resource_usage",
+		Help:      "Current resource usage for a given resource in a tenant",
 	}, []string{"tenant", "resource", "resourcequotaindex"})
 
 	TenantResourceLimit = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Name: metricsPrefix + "tenant_resource_limit",
-		Help: "Current resource limit for a given resource in a tenant",
+		Namespace: metricsPrefix,
+		Name:      "tenant_resource_limit",
+		Help:      "Current resource limit for a given resource in a tenant",
 	}, []string{"tenant", "resource", "resourcequotaindex"})
 )
 

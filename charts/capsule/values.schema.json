@@ -1,0 +1,983 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+        "affinity": {
+            "properties": {},
+            "type": "object"
+        },
+        "certManager": {
+            "properties": {
+                "additionalSANS": {
+                    "type": "array"
+                },
+                "generateCertificates": {
+                    "type": "boolean"
+                }
+            },
+            "type": "object"
+        },
+        "crds": {
+            "properties": {
+                "annnotations": {
+                    "properties": {},
+                    "type": "object"
+                },
+                "exclusive": {
+                    "type": "boolean"
+                },
+                "install": {
+                    "type": "boolean"
+                },
+                "labels": {
+                    "properties": {},
+                    "type": "object"
+                }
+            },
+            "type": "object"
+        },
+        "customAnnotations": {
+            "properties": {},
+            "type": "object"
+        },
+        "customLabels": {
+            "properties": {},
+            "type": "object"
+        },
+        "fullnameOverride": {
+            "type": "string"
+        },
+        "global": {
+            "properties": {
+                "jobs": {
+                    "properties": {
+                        "kubectl": {
+                            "properties": {
+                                "affinity": {
+                                    "properties": {},
+                                    "type": "object"
+                                },
+                                "annotations": {
+                                    "properties": {},
+                                    "type": "object"
+                                },
+                                "backoffLimit": {
+                                    "type": "integer"
+                                },
+                                "image": {
+                                    "properties": {
+                                        "pullPolicy": {
+                                            "type": "string"
+                                        },
+                                        "registry": {
+                                            "type": "string"
+                                        },
+                                        "repository": {
+                                            "type": "string"
+                                        },
+                                        "tag": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                },
+                                "imagePullSecrets": {
+                                    "type": "array"
+                                },
+                                "nodeSelector": {
+                                    "properties": {},
+                                    "type": "object"
+                                },
+                                "podSecurityContext": {
+                                    "properties": {
+                                        "seccompProfile": {
+                                            "properties": {
+                                                "type": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                },
+                                "priorityClassName": {
+                                    "type": "string"
+                                },
+                                "resources": {
+                                    "properties": {},
+                                    "type": "object"
+                                },
+                                "restartPolicy": {
+                                    "type": "string"
+                                },
+                                "securityContext": {
+                                    "properties": {
+                                        "allowPrivilegeEscalation": {
+                                            "type": "boolean"
+                                        },
+                                        "capabilities": {
+                                            "properties": {
+                                                "drop": {
+                                                    "items": {
+                                                        "type": "string"
+                                                    },
+                                                    "type": "array"
+                                                }
+                                            },
+                                            "type": "object"
+                                        },
+                                        "readOnlyRootFilesystem": {
+                                            "type": "boolean"
+                                        },
+                                        "runAsGroup": {
+                                            "type": "integer"
+                                        },
+                                        "runAsNonRoot": {
+                                            "type": "boolean"
+                                        },
+                                        "runAsUser": {
+                                            "type": "integer"
+                                        }
+                                    },
+                                    "type": "object"
+                                },
+                                "tolerations": {
+                                    "type": "array"
+                                },
+                                "topologySpreadConstraints": {
+                                    "type": "array"
+                                },
+                                "ttlSecondsAfterFinished": {
+                                    "type": "integer"
+                                }
+                            },
+                            "type": "object"
+                        }
+                    },
+                    "type": "object"
+                }
+            },
+            "type": "object"
+        },
+        "imagePullSecrets": {
+            "type": "array"
+        },
+        "jobs": {
+            "properties": {},
+            "type": "object"
+        },
+        "manager": {
+            "properties": {
+                "hostNetwork": {
+                    "type": "boolean"
+                },
+                "hostPID": {
+                    "type": "boolean"
+                },
+                "image": {
+                    "properties": {
+                        "pullPolicy": {
+                            "type": "string"
+                        },
+                        "registry": {
+                            "type": "string"
+                        },
+                        "repository": {
+                            "type": "string"
+                        },
+                        "tag": {
+                            "type": "string"
+                        }
+                    },
+                    "type": "object"
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "livenessProbe": {
+                    "properties": {
+                        "httpGet": {
+                            "properties": {
+                                "path": {
+                                    "type": "string"
+                                },
+                                "port": {
+                                    "type": "integer"
+                                }
+                            },
+                            "type": "object"
+                        }
+                    },
+                    "type": "object"
+                },
+                "options": {
+                    "properties": {
+                        "capsuleConfiguration": {
+                            "type": "string"
+                        },
+                        "capsuleUserGroups": {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        "forceTenantPrefix": {
+                            "type": "boolean"
+                        },
+                        "generateCertificates": {
+                            "type": "boolean"
+                        },
+                        "logLevel": {
+                            "type": "string"
+                        },
+                        "nodeMetadata": {
+                            "properties": {
+                                "forbiddenAnnotations": {
+                                    "properties": {
+                                        "denied": {
+                                            "type": "array"
+                                        },
+                                        "deniedRegex": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                },
+                                "forbiddenLabels": {
+                                    "properties": {
+                                        "denied": {
+                                            "type": "array"
+                                        },
+                                        "deniedRegex": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            },
+                            "type": "object"
+                        },
+                        "protectedNamespaceRegex": {
+                            "type": "string"
+                        }
+                    },
+                    "type": "object"
+                },
+                "rbac": {
+                    "properties": {
+                        "create": {
+                            "type": "boolean"
+                        },
+                        "existingClusterRoles": {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        "existingRoles": {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        }
+                    },
+                    "type": "object"
+                },
+                "readinessProbe": {
+                    "properties": {
+                        "httpGet": {
+                            "properties": {
+                                "path": {
+                                    "type": "string"
+                                },
+                                "port": {
+                                    "type": "integer"
+                                }
+                            },
+                            "type": "object"
+                        }
+                    },
+                    "type": "object"
+                },
+                "resources": {
+                    "properties": {
+                        "requests": {
+                            "properties": {
+                                "cpu": {
+                                    "type": "string"
+                                },
+                                "memory": {
+                                    "type": "string"
+                                }
+                            },
+                            "type": "object"
+                        }
+                    },
+                    "type": "object"
+                },
+                "securityContext": {
+                    "properties": {},
+                    "type": "object"
+                },
+                "volumeMounts": {
+                    "type": "array"
+                },
+                "volumes": {
+                    "type": "array"
+                },
+                "webhookPort": {
+                    "type": "integer"
+                }
+            },
+            "type": "object"
+        },
+        "nodeSelector": {
+            "properties": {},
+            "type": "object"
+        },
+        "podAnnotations": {
+            "properties": {},
+            "type": "object"
+        },
+        "podSecurityContext": {
+            "properties": {
+                "runAsGroup": {
+                    "type": "integer"
+                },
+                "runAsNonRoot": {
+                    "type": "boolean"
+                },
+                "runAsUser": {
+                    "type": "integer"
+                },
+                "seccompProfile": {
+                    "properties": {
+                        "type": {
+                            "type": "string"
+                        }
+                    },
+                    "type": "object"
+                }
+            },
+            "type": "object"
+        },
+        "ports": {
+            "type": "array"
+        },
+        "priorityClassName": {
+            "type": "string"
+        },
+        "proxy": {
+            "properties": {
+                "enabled": {
+                    "type": "boolean"
+                }
+            },
+            "type": "object"
+        },
+        "rbac": {
+            "properties": {
+                "resourcepoolclaims": {
+                    "properties": {
+                        "create": {
+                            "type": "boolean"
+                        },
+                        "labels": {
+                            "properties": {
+                                "rbac.authorization.k8s.io/aggregate-to-admin": {
+                                    "type": "string"
+                                }
+                            },
+                            "type": "object"
+                        }
+                    },
+                    "type": "object"
+                },
+                "resources": {
+                    "properties": {
+                        "create": {
+                            "type": "boolean"
+                        },
+                        "labels": {
+                            "properties": {
+                                "rbac.authorization.k8s.io/aggregate-to-admin": {
+                                    "type": "string"
+                                }
+                            },
+                            "type": "object"
+                        }
+                    },
+                    "type": "object"
+                }
+            },
+            "type": "object"
+        },
+        "replicaCount": {
+            "type": "integer"
+        },
+        "securityContext": {
+            "properties": {
+                "allowPrivilegeEscalation": {
+                    "type": "boolean"
+                },
+                "capabilities": {
+                    "properties": {
+                        "drop": {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        }
+                    },
+                    "type": "object"
+                },
+                "readOnlyRootFilesystem": {
+                    "type": "boolean"
+                }
+            },
+            "type": "object"
+        },
+        "serviceAccount": {
+            "properties": {
+                "annotations": {
+                    "properties": {},
+                    "type": "object"
+                },
+                "create": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
+                }
+            },
+            "type": "object"
+        },
+        "serviceMonitor": {
+            "properties": {
+                "annotations": {
+                    "properties": {},
+                    "type": "object"
+                },
+                "enabled": {
+                    "type": "boolean"
+                },
+                "endpoint": {
+                    "properties": {
+                        "interval": {
+                            "type": "string"
+                        },
+                        "metricRelabelings": {
+                            "type": "array"
+                        },
+                        "relabelings": {
+                            "type": "array"
+                        },
+                        "scrapeTimeout": {
+                            "type": "string"
+                        }
+                    },
+                    "type": "object"
+                },
+                "labels": {
+                    "properties": {},
+                    "type": "object"
+                },
+                "matchLabels": {
+                    "properties": {},
+                    "type": "object"
+                },
+                "namespace": {
+                    "type": "string"
+                },
+                "targetLabels": {
+                    "type": "array"
+                }
+            },
+            "type": "object"
+        },
+        "tls": {
+            "properties": {
+                "create": {
+                    "type": "boolean"
+                },
+                "enableController": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
+                }
+            },
+            "type": "object"
+        },
+        "tolerations": {
+            "type": "array"
+        },
+        "topologySpreadConstraints": {
+            "type": "array"
+        },
+        "webhooks": {
+            "properties": {
+                "exclusive": {
+                    "type": "boolean"
+                },
+                "hooks": {
+                    "properties": {
+                        "cordoning": {
+                            "properties": {
+                                "failurePolicy": {
+                                    "type": "string"
+                                },
+                                "namespaceSelector": {
+                                    "properties": {
+                                        "matchExpressions": {
+                                            "items": {
+                                                "properties": {
+                                                    "key": {
+                                                        "type": "string"
+                                                    },
+                                                    "operator": {
+                                                        "type": "string"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            },
+                                            "type": "array"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            },
+                            "type": "object"
+                        },
+                        "customresources": {
+                            "properties": {
+                                "failurePolicy": {
+                                    "type": "string"
+                                },
+                                "namespaceSelector": {
+                                    "properties": {
+                                        "matchExpressions": {
+                                            "items": {
+                                                "properties": {
+                                                    "key": {
+                                                        "type": "string"
+                                                    },
+                                                    "operator": {
+                                                        "type": "string"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            },
+                                            "type": "array"
+                                        }
+                                    },
+                                    "type": "object"
+                                },
+                                "objectSelector": {
+                                    "properties": {},
+                                    "type": "object"
+                                }
+                            },
+                            "type": "object"
+                        },
+                        "defaults": {
+                            "properties": {
+                                "ingress": {
+                                    "properties": {
+                                        "failurePolicy": {
+                                            "type": "string"
+                                        },
+                                        "namespaceSelector": {
+                                            "properties": {
+                                                "matchExpressions": {
+                                                    "items": {
+                                                        "properties": {
+                                                            "key": {
+                                                                "type": "string"
+                                                            },
+                                                            "operator": {
+                                                                "type": "string"
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    },
+                                                    "type": "array"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                },
+                                "pods": {
+                                    "properties": {
+                                        "failurePolicy": {
+                                            "type": "string"
+                                        },
+                                        "namespaceSelector": {
+                                            "properties": {
+                                                "matchExpressions": {
+                                                    "items": {
+                                                        "properties": {
+                                                            "key": {
+                                                                "type": "string"
+                                                            },
+                                                            "operator": {
+                                                                "type": "string"
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    },
+                                                    "type": "array"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                },
+                                "pvc": {
+                                    "properties": {
+                                        "failurePolicy": {
+                                            "type": "string"
+                                        },
+                                        "namespaceSelector": {
+                                            "properties": {
+                                                "matchExpressions": {
+                                                    "items": {
+                                                        "properties": {
+                                                            "key": {
+                                                                "type": "string"
+                                                            },
+                                                            "operator": {
+                                                                "type": "string"
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    },
+                                                    "type": "array"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            },
+                            "type": "object"
+                        },
+                        "ingresses": {
+                            "properties": {
+                                "failurePolicy": {
+                                    "type": "string"
+                                },
+                                "namespaceSelector": {
+                                    "properties": {
+                                        "matchExpressions": {
+                                            "items": {
+                                                "properties": {
+                                                    "key": {
+                                                        "type": "string"
+                                                    },
+                                                    "operator": {
+                                                        "type": "string"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            },
+                                            "type": "array"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            },
+                            "type": "object"
+                        },
+                        "namespace": {
+                            "properties": {
+                                "mutation": {
+                                    "properties": {
+                                        "failurePolicy": {
+                                            "type": "string"
+                                        },
+                                        "namespaceSelector": {
+                                            "properties": {},
+                                            "type": "object"
+                                        },
+                                        "objectSelector": {
+                                            "properties": {},
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                },
+                                "validation": {
+                                    "properties": {
+                                        "failurePolicy": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            },
+                            "type": "object"
+                        },
+                        "namespaceOwnerReference": {
+                            "properties": {
+                                "failurePolicy": {
+                                    "type": "string"
+                                }
+                            },
+                            "type": "object"
+                        },
+                        "namespaces": {
+                            "properties": {
+                                "failurePolicy": {
+                                    "type": "string"
+                                }
+                            },
+                            "type": "object"
+                        },
+                        "networkpolicies": {
+                            "properties": {
+                                "failurePolicy": {
+                                    "type": "string"
+                                },
+                                "namespaceSelector": {
+                                    "properties": {
+                                        "matchExpressions": {
+                                            "items": {
+                                                "properties": {
+                                                    "key": {
+                                                        "type": "string"
+                                                    },
+                                                    "operator": {
+                                                        "type": "string"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            },
+                                            "type": "array"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            },
+                            "type": "object"
+                        },
+                        "nodes": {
+                            "properties": {
+                                "failurePolicy": {
+                                    "type": "string"
+                                }
+                            },
+                            "type": "object"
+                        },
+                        "persistentvolumeclaims": {
+                            "properties": {
+                                "failurePolicy": {
+                                    "type": "string"
+                                },
+                                "namespaceSelector": {
+                                    "properties": {
+                                        "matchExpressions": {
+                                            "items": {
+                                                "properties": {
+                                                    "key": {
+                                                        "type": "string"
+                                                    },
+                                                    "operator": {
+                                                        "type": "string"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            },
+                                            "type": "array"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            },
+                            "type": "object"
+                        },
+                        "pods": {
+                            "properties": {
+                                "failurePolicy": {
+                                    "type": "string"
+                                },
+                                "namespaceSelector": {
+                                    "properties": {
+                                        "matchExpressions": {
+                                            "items": {
+                                                "properties": {
+                                                    "key": {
+                                                        "type": "string"
+                                                    },
+                                                    "operator": {
+                                                        "type": "string"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            },
+                                            "type": "array"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            },
+                            "type": "object"
+                        },
+                        "quotas": {
+                            "properties": {
+                                "failurePolicy": {
+                                    "type": "string"
+                                },
+                                "namespaceSelector": {
+                                    "properties": {
+                                        "matchExpressions": {
+                                            "items": {
+                                                "properties": {
+                                                    "key": {
+                                                        "type": "string"
+                                                    },
+                                                    "operator": {
+                                                        "type": "string"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            },
+                                            "type": "array"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            },
+                            "type": "object"
+                        },
+                        "resourcepools": {
+                            "properties": {
+                                "claims": {
+                                    "properties": {
+                                        "failurePolicy": {
+                                            "type": "string"
+                                        },
+                                        "matchPolicy": {
+                                            "type": "string"
+                                        },
+                                        "namespaceSelector": {
+                                            "properties": {},
+                                            "type": "object"
+                                        },
+                                        "objectSelector": {
+                                            "properties": {},
+                                            "type": "object"
+                                        },
+                                        "reinvocationPolicy": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                },
+                                "pools": {
+                                    "properties": {
+                                        "failurePolicy": {
+                                            "type": "string"
+                                        },
+                                        "matchPolicy": {
+                                            "type": "string"
+                                        },
+                                        "namespaceSelector": {
+                                            "properties": {},
+                                            "type": "object"
+                                        },
+                                        "objectSelector": {
+                                            "properties": {},
+                                            "type": "object"
+                                        },
+                                        "reinvocationPolicy": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            },
+                            "type": "object"
+                        },
+                        "services": {
+                            "properties": {
+                                "failurePolicy": {
+                                    "type": "string"
+                                },
+                                "namespaceSelector": {
+                                    "properties": {
+                                        "matchExpressions": {
+                                            "items": {
+                                                "properties": {
+                                                    "key": {
+                                                        "type": "string"
+                                                    },
+                                                    "operator": {
+                                                        "type": "string"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            },
+                                            "type": "array"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            },
+                            "type": "object"
+                        },
+                        "tenantResourceObjects": {
+                            "properties": {
+                                "failurePolicy": {
+                                    "type": "string"
+                                }
+                            },
+                            "type": "object"
+                        },
+                        "tenants": {
+                            "properties": {
+                                "failurePolicy": {
+                                    "type": "string"
+                                }
+                            },
+                            "type": "object"
+                        }
+                    },
+                    "type": "object"
+                },
+                "mutatingWebhooksTimeoutSeconds": {
+                    "type": "integer"
+                },
+                "service": {
+                    "properties": {
+                        "caBundle": {
+                            "type": "string"
+                        },
+                        "name": {
+                            "type": "string"
+                        },
+                        "namespace": {
+                            "type": "string"
+                        },
+                        "port": {
+                            "type": "null"
+                        },
+                        "url": {
+                            "type": "string"
+                        }
+                    },
+                    "type": "object"
+                },
+                "validatingWebhooksTimeoutSeconds": {
+                    "type": "integer"
+                }
+            },
+            "type": "object"
+        }
+    },
+    "type": "object"
+}

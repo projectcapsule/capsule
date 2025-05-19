@@ -7,6 +7,7 @@
 *.dylib
 bin
 dist/
+config/
 
 # Test binary, build with `go test -c`
 *.test
@@ -31,3 +32,4 @@ dist/
 .DS_Store
 *.tgz
 kind.yaml
+capsule-seccomp.json

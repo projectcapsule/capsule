@@ -57,4 +57,3 @@ security-contacts:
 - type: email
   value: cncf-capsule-maintainers@lists.cncf.io
   primary: true
-

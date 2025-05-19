@@ -23,32 +23,6 @@ func ForbiddenAnnotationsRegexHandler() capsulewebhook.Handler {
 	return &forbiddenAnnotationsRegexHandler{}
 }
 
-func (h *forbiddenAnnotationsRegexHandler) validate(decoder admission.Decoder, req admission.Request) *admission.Response {
-	tenant := &capsulev1beta2.Tenant{}
-	if err := decoder.Decode(req, tenant); err != nil {
-		return utils.ErroredResponse(err)
-	}
-
-	if tenant.Spec.NamespaceOptions == nil {
-		return nil
-	}
-
-	annotationsToCheck := map[string]string{
-		"labels":      tenant.Spec.NamespaceOptions.ForbiddenLabels.Regex,
-		"annotations": tenant.Spec.NamespaceOptions.ForbiddenAnnotations.Regex,
-	}
-
-	for scope, annotation := range annotationsToCheck {
-		if _, err := regexp.Compile(tenant.Spec.NamespaceOptions.ForbiddenLabels.Regex); err != nil {
-			response := admission.Denied(fmt.Sprintf("unable to compile %s regex for forbidden %s", annotation, scope))
-
-			return &response
-		}
-	}
-
-	return nil
-}
-
 func (h *forbiddenAnnotationsRegexHandler) OnCreate(_ client.Client, decoder admission.Decoder, _ record.EventRecorder) capsulewebhook.Func {
 	return func(_ context.Context, req admission.Request) *admission.Response {
 		if err := h.validate(decoder, req); err != nil {
@@ -73,4 +47,30 @@ func (h *forbiddenAnnotationsRegexHandler) OnUpdate(_ client.Client, decoder adm
 
 		return nil
 	}
+}
+
+func (h *forbiddenAnnotationsRegexHandler) validate(decoder admission.Decoder, req admission.Request) *admission.Response {
+	tenant := &capsulev1beta2.Tenant{}
+	if err := decoder.Decode(req, tenant); err != nil {
+		return utils.ErroredResponse(err)
+	}
+
+	if tenant.Spec.NamespaceOptions == nil {
+		return nil
+	}
+
+	annotationsToCheck := map[string]string{
+		"labels":      tenant.Spec.NamespaceOptions.ForbiddenLabels.Regex,
+		"annotations": tenant.Spec.NamespaceOptions.ForbiddenAnnotations.Regex,
+	}
+
+	for scope, annotation := range annotationsToCheck {
+		if _, err := regexp.Compile(tenant.Spec.NamespaceOptions.ForbiddenLabels.Regex); err != nil {
+			response := admission.Denied(fmt.Sprintf("unable to compile %s regex for forbidden %s", annotation, scope))
+
+			return &response
+		}
+	}
+
+	return nil
 }

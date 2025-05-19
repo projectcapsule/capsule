@@ -3,10 +3,6 @@
 
 package v1beta2
 
-import (
-	corev1 "k8s.io/api/core/v1"
-)
-
 // +kubebuilder:validation:Enum=Cordoned;Active
 type tenantState string
 
@@ -24,6 +20,4 @@ type TenantStatus struct {
 	Size uint `json:"size"`
 	// List of namespaces assigned to the Tenant.
 	Namespaces []string `json:"namespaces,omitempty"`
-	// Quota Usages (Tenant Scope)
-	QuotaUsage map[string]corev1.ResourceQuotaStatus
 }

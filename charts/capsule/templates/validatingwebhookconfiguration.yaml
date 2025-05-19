@@ -248,7 +248,7 @@ webhooks:
   sideEffects: None
   timeoutSeconds: {{ $.Values.webhooks.validatingWebhooksTimeoutSeconds }}
 {{- end }}
-{{- with .Values.webhooks.hooks.tenants }}
+  {{- with .Values.webhooks.hooks.tenants }}
 - admissionReviewVersions:
     - v1
     - v1beta1
@@ -271,6 +271,88 @@ webhooks:
       resources:
         - tenants
       scope: '*'
+  sideEffects: None
+  timeoutSeconds: {{ $.Values.webhooks.validatingWebhooksTimeoutSeconds }}
+  {{- end }}
+  {{- with .Values.webhooks.hooks.resourcepools.pools }}
+- admissionReviewVersions:
+    - v1
+    - v1beta1
+  clientConfig:
+    {{- include "capsule.webhooks.service" (dict "path" "/resourcepool/validating" "ctx" $) | nindent 4 }}
+  failurePolicy: {{ .failurePolicy }}
+  matchPolicy: {{ .matchPolicy }}
+  name: resourcepools.projectcapsule.dev
+  namespaceSelector: {{ toYaml .namespaceSelector | nindent 4 }}
+  objectSelector: {{ toYaml .objectSelector | nindent 4 }}
+  rules:
+    - apiGroups:
+      - "capsule.clastix.io"
+      apiVersions:
+      - "*"
+      operations:
+      - CREATE
+      - UPDATE
+      resources:
+      - resourcepools
+      scope: '*'
+  sideEffects: None
+  timeoutSeconds: {{ $.Values.webhooks.validatingWebhooksTimeoutSeconds }}
+  {{- end }}
+  {{- with .Values.webhooks.hooks.resourcepools.pools }}
+- admissionReviewVersions:
+    - v1
+    - v1beta1
+  clientConfig:
+    {{- include "capsule.webhooks.service" (dict "path" "/resourcepool/claim/validating" "ctx" $) | nindent 4 }}
+  failurePolicy: {{ .failurePolicy }}
+  matchPolicy: {{ .matchPolicy }}
+  name: resourcepoolclaims.projectcapsule.dev
+  namespaceSelector: {{ toYaml .namespaceSelector | nindent 4 }}
+  objectSelector: {{ toYaml .objectSelector | nindent 4 }}
+  rules:
+    - apiGroups:
+      - "capsule.clastix.io"
+      apiVersions:
+      - "*"
+      operations:
+      - CREATE
+      - UPDATE
+      resources:
+      - resourcepoolclaims
+      scope: '*'
+  sideEffects: None
+  timeoutSeconds: {{ $.Values.webhooks.validatingWebhooksTimeoutSeconds }}
+  {{- end }}
+{{- with .Values.webhooks.hooks.customresources }}
+- admissionReviewVersions:
+    - v1
+    - v1beta1
+  clientConfig:
+    {{- include "capsule.webhooks.service" (dict "path" "/customresources" "ctx" $) | nindent 4 }}
+  failurePolicy: {{ .failurePolicy }}
+  matchPolicy: Equivalent
+  name: customresources.tenant.projectcapsule.dev
+  {{- with .namespaceSelector }}
+  namespaceSelector:
+    {{- toYaml . |  nindent 4 }}
+  {{- end }}
+  {{- with .objectSelector }}
+  objectSelector:
+    {{- toYaml . |  nindent 4 }}
+  {{- end }}
+  rules:
+    - apiGroups:
+        - '*'
+      apiVersions:
+        - '*'
+      operations:
+        - CREATE
+        - UPDATE
+        - DELETE
+      resources:
+        - '*'
+      scope: Namespaced
   sideEffects: None
   timeoutSeconds: {{ $.Values.webhooks.validatingWebhooksTimeoutSeconds }}
 {{- end }}

@@ -11,7 +11,41 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  seccomp-generation:
+    name: Seccomp Generation
+    strategy:
+      fail-fast: false
+      matrix:
+        # differently from the e2e workflow
+        # we don't need all the versions of kubernetes
+        # to generate the seccomp profile.
+        k8s-version:
+          - "v1.30.0"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
+        with:
+          go-version-file: 'go.mod'
+      - uses: azure/setup-helm@b9e51907a09c216f16ebe8536097933489208112 # v4
+        with:
+          version: v3.14.2
+      - name: unit tracing
+        run: sudo make trace-unit
+      - name: e2e tracing
+        run: sudo KIND_K8S_VERSION=${{ matrix.k8s-version }} make trace-e2e
+      - name: build seccomp profile
+        run: make seccomp
+      - name: upload artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: capsule-seccomp
+          path: capsule-seccomp.json
+
   create-release:
+    needs: seccomp-generation
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -22,7 +56,7 @@ jobs:
         with:
           fetch-depth: 0
       - name: Install Go
-        uses: actions/setup-go@f111f3307d8850f501ac008e886eec1fd1932a34 # v5.3.0
+        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
         with:
           go-version-file: 'go.mod'
       - name: Setup caches
@@ -30,11 +64,16 @@ jobs:
         timeout-minutes: 5
         continue-on-error: true
       - uses: creekorful/goreportcard-action@1f35ced8cdac2cba28c9a2f2288a16aacfd507f9 # v1.0
-      - uses: anchore/sbom-action/download-syft@df80a981bc6edbc4e220a492d3cbe9f5547a6e75
+      - uses: anchore/sbom-action/download-syft@e11c554f704a0b820cbf8c51673f6945e0731532
       - name: Install Cosign
-        uses: sigstore/cosign-installer@dc72c7d5c4d10cd6bcb8cf6e3fd625a9e5e537da # v3.7.0
+        uses: sigstore/cosign-installer@3454372f43399081ed03b604cb2d021dabca52bb # v3.8.2
+      - name: download artifact
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: capsule-seccomp
+          path: ./capsule-seccomp.json
       - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@9ed2f89a662bf1735a48bc8557fd212fa902bebf # v6.1.0
+        uses: goreleaser/goreleaser-action@9c156ee8a17a598857849441385a2041ef570552 # v6.3.0
         with:
           version: latest
           args: release --clean --timeout 90m

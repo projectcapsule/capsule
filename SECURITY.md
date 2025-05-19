@@ -34,7 +34,7 @@ To report a security issue or vulnerability, [submit a private vulnerability rep
 Describe the issue in English, ideally with some example configuration or code which allows the issue to be reproduced. Explain why you believe this to be a security issue in capsule, if that's not obvious. should contain the following:
 
      * description of the problem
-     * precise and detailed steps (include screenshots) 
+     * precise and detailed steps (include screenshots)
      * the affected version(s). This may also include environment relevant versions.
      * any possible mitigations
 
@@ -54,19 +54,23 @@ Response times could be affected by weekends, holidays, breaks or time zone diff
 
 ## Verifing
 
-To verify artifacts you need to have [cosign installed](https://github.com/sigstore/cosign#installation). This guide assumes you are using v2.x of cosign. All of the signatures are created using [keyless signing](https://docs.sigstore.dev/verifying/verify/#keyless-verification-using-openid-connect). We have a seperate repository for all the signatures for all the artifacts released under the projectcapsule - `ghcr.io/projectcapsule/signatures`. You can set the environment variable `COSIGN_REPOSITORY` to point to this repository. For example:
+To verify artifacts you need to have [cosign installed](https://github.com/sigstore/cosign#installation). This guide assumes you are using v2.x of cosign. All of the signatures are created using [keyless signing](https://docs.sigstore.dev/verifying/verify/#keyless-verification-using-openid-connect). You can set the environment variable `COSIGN_REPOSITORY` to point to this repository. For example:
 
-    export COSIGN_REPOSITORY=ghcr.io/projectcapsule/signatures
+    # Docker Image
+    export COSIGN_REPOSITORY=ghcr.io/projectcapsule/capsule
+
+    # Helm Chart
+    export COSIGN_REPOSITORY=ghcr.io/projectcapsule/charts/capsule
 
 To verify the signature of the docker image, run the following command. Replace `<release_tag>` with an [available release tag](https://github.com/projectcapsule/capsule/pkgs/container/capsule):
 
-    COSIGN_REPOSITORY=ghcr.io/projectcapsule/signatures cosign verify ghcr.io/projectcapsule/capsule:<release_tag> \
+    COSIGN_REPOSITORY=ghcr.io/projectcapsule/charts/capsule cosign verify ghcr.io/projectcapsule/capsule:<release_tag> \
       --certificate-identity-regexp="https://github.com/projectcapsule/capsule/.github/workflows/docker-publish.yml@refs/tags/*" \
       --certificate-oidc-issuer="https://token.actions.githubusercontent.com" | jq
 
 To verify the signature of the helm image, run the following command. Replace `<release_tag>` with an [available release tag](https://github.com/projectcapsule/capsule/pkgs/container/charts%2Fcapsule):
 
-    COSIGN_REPOSITORY=ghcr.io/projectcapsule/signatures cosign verify ghcr.io/projectcapsule/charts/capsule:<release_tag> \
+    COSIGN_REPOSITORY=ghcr.io/projectcapsule/charts/capsule cosign verify ghcr.io/projectcapsule/charts/capsule:<release_tag> \
       --certificate-identity-regexp="https://github.com/projectcapsule/capsule/.github/workflows/helm-publish.yml@refs/tags/*" \
       --certificate-oidc-issuer="https://token.actions.githubusercontent.com" | jq
 
@@ -95,19 +99,23 @@ cosign verify-attestation --type slsaprovenance \
 
 ## Software Bill of Materials (SBOM)
 
-An SBOM (Software Bill of Materials) in CycloneDX JSON format is published for each Kyverno release, including pre-releases. Like signatures, SBOMs are stored in a separate repository at `ghcr.io/projectcapsule/sbom`. You can set the environment variable `COSIGN_REPOSITORY` to point to this repository. For example:
+An SBOM (Software Bill of Materials) in CycloneDX JSON format is published for each release, including pre-releases. You can set the environment variable `COSIGN_REPOSITORY` to point to this repository. For example:
 
-    export COSIGN_REPOSITORY=ghcr.io/projectcapsule/sbom
+    # Docker Image
+    export COSIGN_REPOSITORY=ghcr.io/projectcapsule/capsule
+
+    # Helm Chart
+    export COSIGN_REPOSITORY=ghcr.io/projectcapsule/charts/capsule
+
 
 To inspect the SBOM of the docker image, run the following command. Replace `<release_tag>` with an [available release tag](https://github.com/projectcapsule/capsule/pkgs/container/capsule):
 
 
-    COSIGN_REPOSITORY=ghcr.io/projectcapsule/sbom cosign download sbom ghcr.io/projectcapsule/capsule:<release_tag>
-    
+    COSIGN_REPOSITORY=ghcr.io/projectcapsule/capsule cosign download sbom ghcr.io/projectcapsule/capsule:<release_tag>
+
 To inspect the SBOM of the helm image, run the following command. Replace `<release_tag>` with an [available release tag](https://github.com/projectcapsule/capsule/pkgs/container/charts%2Fcapsule):
 
-    COSIGN_REPOSITORY=ghcr.io/projectcapsule/sbom cosign download sbom ghcr.io/projectcapsule/charts/capsule:<release_tag>
-
+    COSIGN_REPOSITORY=ghcr.io/projectcapsule/charts/capsule cosign download sbom ghcr.io/projectcapsule/charts/capsule:<release_tag>
 
 # Credits
 

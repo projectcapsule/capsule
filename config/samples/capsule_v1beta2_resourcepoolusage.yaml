@@ -1,0 +1,9 @@
+apiVersion: capsule.clastix.io/v1beta2
+kind: ResourcePoolUsage
+metadata:
+  labels:
+    app.kubernetes.io/name: capsule
+    app.kubernetes.io/managed-by: kustomize
+  name: resourcepoolusage-sample
+spec:
+  # TODO(user): Add fields here

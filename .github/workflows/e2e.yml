@@ -2,20 +2,9 @@ name: e2e
 permissions: {}
 
 on:
-  push:
-    branches: [ "*" ]
-    paths:
-      - '.github/workflows/e2e.yml'
-      - 'api/**'
-      - 'controllers/**'
-      - 'pkg/**'
-      - 'e2e/*'
-      - 'Dockerfile'
-      - 'go.*'
-      - 'main.go'
-      - 'Makefile'
   pull_request:
-    branches: [ "*" ]
+    branches:
+      - "*"
     paths:
       - '.github/workflows/e2e.yml'
       - 'api/**'
@@ -32,22 +21,28 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  kind:
-    name: Kubernetes
-    strategy:
-      fail-fast: false
-      matrix:
-        k8s-version: [ 'v1.24.7', 'v1.25.3', 'v1.26.3', 'v1.27.2', 'v1.28.0', 'v1.29.0', 'v1.30.0', 'v1.31.0' ]
-    runs-on: ubuntu-24.04
+  e2e:
+    name: E2E Testing
+    runs-on:
+      labels: ubuntu-latest-8-cores
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 0
-      - uses: actions/setup-go@f111f3307d8850f501ac008e886eec1fd1932a34 # v5.3.0
+      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
         with:
           go-version-file: 'go.mod'
-      - uses: azure/setup-helm@fe7b79cd5ee1e45176fcad797de68ecaf3ca4814 # v4
+      - uses: azure/setup-helm@b9e51907a09c216f16ebe8536097933489208112 # v4
         with:
           version: v3.14.2
-      - name: e2e testing
-        run: KIND_K8S_VERSION=${{ matrix.k8s-version }} make e2e
+      - name: unit tracing
+        run: sudo make trace-unit
+      - name: e2e tracing
+        run: sudo make trace-e2e
+      - name: build seccomp profile
+        run: make seccomp
+      - name: upload artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: capsule-seccomp
+          path: capsule-seccomp.json

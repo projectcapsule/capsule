@@ -1,0 +1,86 @@
+name: Coverage
+
+on:
+  push:
+    branches:
+      - "main"
+  pull_request:
+    types: [opened, reopened, synchronize]
+    branches:
+      - "main"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  compliance:
+    name: "License Compliance"
+    runs-on: ubuntu-24.04
+    steps:
+      - name: "Checkout Code"
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Check secret
+        id: checksecret
+        uses: ./.github/actions/exists
+        with:
+          value: ${{ secrets.FOSSA_API_KEY }}
+      - name: "Run FOSSA Scan"
+        if: steps.checksecret.outputs.result == 'true'
+        uses: fossas/fossa-action@3ebcea1862c6ffbd5cf1b4d0bd6b3fe7bd6f2cac # v1.7.0
+        with:
+          api-key: ${{ secrets.FOSSA_API_KEY }}
+      - name: "Run FOSSA Test"
+        if: steps.checksecret.outputs.result == 'true'
+        uses: fossas/fossa-action@3ebcea1862c6ffbd5cf1b4d0bd6b3fe7bd6f2cac # v1.7.0
+        with:
+          api-key: ${{ secrets.FOSSA_API_KEY }}
+          run-tests: true
+  sast:
+    name: "SAST"
+    runs-on: ubuntu-24.04
+    env:
+      GO111MODULE: on
+    permissions:
+      security-events: write
+      actions: read
+      contents: read
+    steps:
+      - name: Checkout Source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
+        with:
+          go-version-file: 'go.mod'
+      - name: Run Gosec Security Scanner
+        uses: securego/gosec@6decf96c3d272d5a8bbdcf9fddb5789d0be16a8d # v2.22.4
+        with:
+          args: '-no-fail -fmt sarif -out gosec.sarif ./...'
+      - name: Upload SARIF file
+        uses: github/codeql-action/upload-sarif@57eebf61a2246ab60a0c2f5a85766db783ad3553
+        with:
+          sarif_file: gosec.sarif
+  unit_tests:
+    name: "Unit tests"
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
+        with:
+          go-version-file: 'go.mod'
+      - name: Unit Test
+        run: make test
+      - name: Check secret
+        id: checksecret
+        uses: ./.github/actions/exists
+        with:
+          value: ${{ secrets.CODECOV_TOKEN }}
+      - name: Upload Report to Codecov
+        if: ${{ steps.checksecret.outputs.result == 'true' }}
+        uses: codecov/codecov-action@18283e04ce6e62d37312384ff67231eb8fd56d24 # v5.4.3
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          slug: projectcapsule/capsule
+          files: ./coverage.out
+          fail_ci_if_error: true
+          verbose: true

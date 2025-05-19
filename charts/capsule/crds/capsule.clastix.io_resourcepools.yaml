@@ -1,0 +1,302 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.18.0
+  name: resourcepools.capsule.clastix.io
+spec:
+  group: capsule.clastix.io
+  names:
+    kind: ResourcePool
+    listKind: ResourcePoolList
+    plural: resourcepools
+    shortNames:
+    - quotapool
+    singular: resourcepool
+  scope: Cluster
+  versions:
+  - additionalPrinterColumns:
+    - description: The total amount of Claims bound
+      jsonPath: .status.claimCount
+      name: Claims
+      type: integer
+    - description: The total amount of Namespaces considered
+      jsonPath: .status.namespaceCount
+      name: Namespaces
+      type: integer
+    - description: Age
+      jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1beta2
+    schema:
+      openAPIV3Schema:
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: ResourcePoolSpec.
+            properties:
+              config:
+                default: {}
+                description: Additional Configuration
+                properties:
+                  defaultsZero:
+                    default: false
+                    description: With this option all resources which can be allocated
+                      are set to 0 for the resourcequota defaults.
+                    type: boolean
+                  deleteBoundResources:
+                    default: false
+                    description: |-
+                      When a resourcepool is deleted, the resourceclaims bound to it are disassociated from the resourcepool but not deleted.
+                      By Enabling this option, the resourceclaims will be deleted when the resourcepool is deleted, if they are in bound state.
+                    type: boolean
+                  orderedQueue:
+                    default: false
+                    description: |-
+                      Claims are queued whenever they are allocated to a pool. A pool tries to allocate claims in order based on their
+                      creation date. But no matter their creation time, if a claim is requesting too much resources it's put into the queue
+                      but if a lower priority claim still has enough space in the available resources, it will be able to claim them. Eventough
+                      it's priority was lower
+                      Enabling this option respects to Order. Meaning the Creationtimestamp matters and if a resource is put into the queue, no
+                      other claim can claim the same resources with lower priority.
+                    type: boolean
+                type: object
+              defaults:
+                additionalProperties:
+                  anyOf:
+                  - type: integer
+                  - type: string
+                  pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                  x-kubernetes-int-or-string: true
+                description: |-
+                  The Defaults given for each namespace, the default is not counted towards the total allocation
+                  When you use claims it's recommended to provision Defaults as the prevent the scheduling of any resources
+                type: object
+              quota:
+                description: Define the resourcequota served by this resourcepool.
+                properties:
+                  hard:
+                    additionalProperties:
+                      anyOf:
+                      - type: integer
+                      - type: string
+                      pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                      x-kubernetes-int-or-string: true
+                    description: |-
+                      hard is the set of desired hard limits for each named resource.
+                      More info: https://kubernetes.io/docs/concepts/policy/resource-quotas/
+                    type: object
+                  scopeSelector:
+                    description: |-
+                      scopeSelector is also a collection of filters like scopes that must match each object tracked by a quota
+                      but expressed using ScopeSelectorOperator in combination with possible values.
+                      For a resource to match, both scopes AND scopeSelector (if specified in spec), must be matched.
+                    properties:
+                      matchExpressions:
+                        description: A list of scope selector requirements by scope
+                          of the resources.
+                        items:
+                          description: |-
+                            A scoped-resource selector requirement is a selector that contains values, a scope name, and an operator
+                            that relates the scope name and values.
+                          properties:
+                            operator:
+                              description: |-
+                                Represents a scope's relationship to a set of values.
+                                Valid operators are In, NotIn, Exists, DoesNotExist.
+                              type: string
+                            scopeName:
+                              description: The name of the scope that the selector
+                                applies to.
+                              type: string
+                            values:
+                              description: |-
+                                An array of string values. If the operator is In or NotIn,
+                                the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                                the values array must be empty.
+                                This array is replaced during a strategic merge patch.
+                              items:
+                                type: string
+                              type: array
+                              x-kubernetes-list-type: atomic
+                          required:
+                          - operator
+                          - scopeName
+                          type: object
+                        type: array
+                        x-kubernetes-list-type: atomic
+                    type: object
+                    x-kubernetes-map-type: atomic
+                  scopes:
+                    description: |-
+                      A collection of filters that must match each object tracked by a quota.
+                      If not specified, the quota matches all objects.
+                    items:
+                      description: A ResourceQuotaScope defines a filter that must
+                        match each object tracked by a quota
+                      type: string
+                    type: array
+                    x-kubernetes-list-type: atomic
+                type: object
+              selectors:
+                description: Selector to match the namespaces that should be managed
+                  by the GlobalResourceQuota
+                items:
+                  description: Selector for resources and their labels or selecting
+                    origin namespaces
+                  properties:
+                    matchExpressions:
+                      description: matchExpressions is a list of label selector requirements.
+                        The requirements are ANDed.
+                      items:
+                        description: |-
+                          A label selector requirement is a selector that contains values, a key, and an operator that
+                          relates the key and values.
+                        properties:
+                          key:
+                            description: key is the label key that the selector applies
+                              to.
+                            type: string
+                          operator:
+                            description: |-
+                              operator represents a key's relationship to a set of values.
+                              Valid operators are In, NotIn, Exists and DoesNotExist.
+                            type: string
+                          values:
+                            description: |-
+                              values is an array of string values. If the operator is In or NotIn,
+                              the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                              the values array must be empty. This array is replaced during a strategic
+                              merge patch.
+                            items:
+                              type: string
+                            type: array
+                            x-kubernetes-list-type: atomic
+                        required:
+                        - key
+                        - operator
+                        type: object
+                      type: array
+                      x-kubernetes-list-type: atomic
+                    matchLabels:
+                      additionalProperties:
+                        type: string
+                      description: |-
+                        matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+                        map is equivalent to an element of matchExpressions, whose key field is "key", the
+                        operator is "In", and the values array contains only "value". The requirements are ANDed.
+                      type: object
+                  type: object
+                  x-kubernetes-map-type: atomic
+                type: array
+            required:
+            - quota
+            type: object
+          status:
+            description: GlobalResourceQuotaStatus defines the observed state of GlobalResourceQuota.
+            properties:
+              allocation:
+                description: Tracks the Usage from Claimed against what has been granted
+                  from the pool
+                properties:
+                  available:
+                    additionalProperties:
+                      anyOf:
+                      - type: integer
+                      - type: string
+                      pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                      x-kubernetes-int-or-string: true
+                    description: Used to track the usage of the resource in the pool
+                      (diff hard - claimed). May be used for further automation
+                    type: object
+                  hard:
+                    additionalProperties:
+                      anyOf:
+                      - type: integer
+                      - type: string
+                      pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                      x-kubernetes-int-or-string: true
+                    description: |-
+                      Hard is the set of enforced hard limits for each named resource.
+                      More info: https://kubernetes.io/docs/concepts/policy/resource-quotas/
+                    type: object
+                  used:
+                    additionalProperties:
+                      anyOf:
+                      - type: integer
+                      - type: string
+                      pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                      x-kubernetes-int-or-string: true
+                    description: Used is the current observed total usage of the resource
+                      in the namespace.
+                    type: object
+                type: object
+              claimCount:
+                default: 0
+                description: Amount of claims
+                type: integer
+              claims:
+                additionalProperties:
+                  items:
+                    description: ResourceQuotaClaimStatus defines the observed state
+                      of ResourceQuotaClaim.
+                    properties:
+                      claims:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: Claimed resources
+                        type: object
+                      name:
+                        description: Name
+                        maxLength: 253
+                        pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+                        type: string
+                      namespace:
+                        description: Namespace
+                        maxLength: 253
+                        pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+                        type: string
+                      uid:
+                        description: UID of the tracked Tenant to pin point tracking
+                        type: string
+                    type: object
+                  type: array
+                description: Tracks the quotas for the Resource.
+                type: object
+              namespaceCount:
+                default: 0
+                description: How many namespaces are considered
+                type: integer
+              namespaces:
+                description: Namespaces which are considered for claims
+                items:
+                  type: string
+                type: array
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

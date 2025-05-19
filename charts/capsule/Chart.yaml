@@ -6,7 +6,7 @@ home: https://github.com/projectcapsule/capsule
 icon: https://github.com/projectcapsule/capsule/raw/main/assets/logo/capsule_small.png
 dependencies:
   - name: capsule-proxy
-    version: 0.8.1
+    version: 0.9.3
     repository: "oci://ghcr.io/projectcapsule/charts"
     condition: proxy.enabled
     alias: proxy
@@ -25,9 +25,9 @@ name: capsule
 sources:
 - https://github.com/projectcapsule/capsule
 # Note: The version is overwritten by the release workflow.
-version: 0.6.0
+version: 0.0.0
 # Note: The version is overwritten by the release workflow.
-appVersion: 0.5.0
+appVersion: 0.0.0
 annotations:
   artifacthub.io/operator: "true"
   artifacthub.io/prerelease: "false"
@@ -40,7 +40,5 @@ annotations:
     - name: Documentation
       url: https://projectcapsule.dev/
   artifacthub.io/changes: |
-    - kind: fixed
-      description: added scope for mutating webhook configurations
-    - kind: changed
-      description: moved job configuration from jobs to global.jobs.kubectl
+    - kind: added
+      description: oci chart reference

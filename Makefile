@@ -16,6 +16,14 @@ BUILD_DATE      ?= $(shell git log -1 --format="%at" | xargs -I{} sh -c 'if [ "$
 IMG_BASE        ?= $(REPOSITORY)
 IMG             ?= $(IMG_BASE):$(VERSION)
 CAPSULE_IMG     ?= $(REGISTRY)/$(IMG_BASE)
+CLUSTER_NAME    ?= capsule
+
+## Kubernetes Version Support
+KUBERNETES_SUPPORTED_VERSION ?= "v1.33.0"
+
+## Tool Binaries
+KUBECTL ?= kubectl
+HELM ?= helm
 
 # Options for 'bundle-build'
 ifneq ($(origin CHANNELS), undefined)
@@ -38,7 +46,7 @@ all: manager
 # Run tests
 .PHONY: test
 test: test-clean generate manifests test-clean
-	@GO111MODULE=on go test -v ./... -coverprofile coverage.out
+	@GO111MODULE=on go test -v $(shell go list ./... | grep -v "e2e") -coverprofile coverage.out
 
 .PHONY: test-clean
 test-clean: ## Clean tests cache
@@ -53,8 +61,8 @@ run: generate manifests
 	go run .
 
 # Generate manifests e.g. CRD, RBAC etc.
-manifests: controller-gen
-	$(CONTROLLER_GEN) rbac:roleName=manager-role crd webhook paths="./..." output:crd:artifacts:config=charts/capsule/crds
+manifests: generate
+	$(CONTROLLER_GEN) crd paths="./..." output:crd:artifacts:config=charts/capsule/crds
 
 # Generate code
 generate: controller-gen
@@ -63,33 +71,37 @@ generate: controller-gen
 # Helm
 SRC_ROOT = $(shell git rev-parse --show-toplevel)
 
-helm-docs: HELMDOCS_VERSION := v1.11.0
-helm-docs: docker
-	@docker run -v "$(SRC_ROOT):/helm-docs" jnorwood/helm-docs:$(HELMDOCS_VERSION) --chart-search-root /helm-docs
+helm-controller-version:
+	$(eval VERSION := $(shell grep 'appVersion:' charts/capsule/Chart.yaml | awk '{print $$2}'))
+	$(eval KO_TAGS := $(shell grep 'appVersion:' charts/capsule/Chart.yaml | awk '{print $$2}'))
 
-helm-lint: docker
-	@docker run -v "$(SRC_ROOT):/workdir" --entrypoint /bin/sh quay.io/helmpack/chart-testing:$(CT_VERSION) -c "cd /workdir; ct lint --config .github/configs/ct.yaml  --lint-conf .github/configs/lintconf.yaml  --all --debug"
+helm-docs: helm-doc
+	$(HELM_DOCS) --chart-search-root ./charts
 
-helm-test: kind ct ko-build-all
-	@$(KIND) create cluster --wait=60s --name capsule-charts --image kindest/node:$${KIND_K8S_VERSION:-v1.27.0}
+helm-lint: ct
+	@$(CT) lint --config .github/configs/ct.yaml --validate-yaml=false --all --debug
+
+helm-schema: helm-plugin-schema
+	cd charts/capsule && $(HELM) schema -output values.schema.json
+
+helm-test: HELM_KIND_CONFIG ?= ""
+helm-test: kind
+	@mkdir -p /tmp/results || true
+	@$(KIND) create cluster --wait=60s --name capsule-charts --image kindest/node:$(KUBERNETES_SUPPORTED_VERSION) --config $(HELM_KIND_CONFIG)
 	@make helm-test-exec
 	@$(KIND) delete cluster --name capsule-charts
 
-helm-test-exec: kind
-	@$(KIND) load docker-image --name capsule-charts $(CAPSULE_IMG):$(VERSION)
-	@kubectl create ns capsule-system || true
-	@kubectl apply --server-side=true -f https://github.com/cert-manager/cert-manager/releases/download/v1.9.1/cert-manager.crds.yaml
-	@kubectl apply --server-side=true -f https://github.com/prometheus-operator/prometheus-operator/releases/download/v0.58.0/bundle.yaml
-	@ct install --config $(SRC_ROOT)/.github/configs/ct.yaml --namespace=capsule-system --all --debug
-
-docker:
-	@hash docker 2>/dev/null || {\
-		echo "You need docker" &&\
-		exit 1;\
-	}
+helm-test-exec: ct helm-controller-version ko-build-all
+	$(MAKE) docker-build-capsule-trace
+	$(MAKE) e2e-load-image CLUSTER_NAME=capsule-charts IMAGE=$(CAPSULE_IMG) VERSION=v0.0.0
+	$(MAKE) e2e-load-image CLUSTER_NAME=capsule-charts IMAGE=$(CAPSULE_IMG) VERSION=tracing
+	@$(KUBECTL) create ns capsule-system || true
+	@$(KUBECTL) apply --force-conflicts --server-side=true -f https://github.com/cert-manager/cert-manager/releases/download/v1.9.1/cert-manager.crds.yaml
+	@$(KUBECTL) apply --force-conflicts --server-side=true -f https://github.com/prometheus-operator/prometheus-operator/releases/download/v0.58.0/bundle.yaml
+	@$(CT) install --config $(SRC_ROOT)/.github/configs/ct.yaml --namespace=capsule-system --all --debug
 
 # Setup development env
-# Usage: 
+# Usage:
 # 	LAPTOP_HOST_IP=<YOUR_LAPTOP_IP> make dev-setup
 # For example:
 #	LAPTOP_HOST_IP=192.168.10.101 make dev-setup
@@ -111,7 +123,6 @@ IP.1   = $(LAPTOP_HOST_IP)
 endef
 export TLS_CNF
 dev-setup:
-	kubectl -n capsule-system scale deployment capsule-controller-manager --replicas=0 || true
 	mkdir -p /tmp/k8s-webhook-server/serving-certs
 	echo "$${TLS_CNF}" > _tls.cnf
 	openssl req -newkey rsa:4096 -days 3650 -nodes -x509 \
@@ -120,13 +131,13 @@ dev-setup:
 		-config _tls.cnf \
 		-keyout /tmp/k8s-webhook-server/serving-certs/tls.key \
 		-out /tmp/k8s-webhook-server/serving-certs/tls.crt
-	kubectl create secret tls capsule-tls -n capsule-system \
+	$(KUBECTL) create secret tls capsule-tls -n capsule-system \
 		--cert=/tmp/k8s-webhook-server/serving-certs/tls.crt\
 		--key=/tmp/k8s-webhook-server/serving-certs/tls.key || true
-	rm -f _tls.cnf 
+	rm -f _tls.cnf
 	export WEBHOOK_URL="https://$${LAPTOP_HOST_IP}:9443"; \
 	export CA_BUNDLE=`openssl base64 -in /tmp/k8s-webhook-server/serving-certs/tls.crt | tr -d '\n'`; \
-	helm upgrade \
+	$(HELM) upgrade \
 	    --dependency-update \
 		--debug \
 		--install \
@@ -139,6 +150,7 @@ dev-setup:
 		--set "webhooks.service.caBundle=$${CA_BUNDLE}" \
 		capsule \
 		./charts/capsule
+	$(KUBECTL) -n capsule-system scale deployment capsule-controller-manager --replicas=0 || true
 
 ####################
 # -- Docker
@@ -166,10 +178,18 @@ LD_FLAGS        := "-X main.Version=$(VERSION) \
 ko-build-capsule: ko
 	@echo Building Capsule $(KO_TAGS) for $(KO_PLATFORM) >&2
 	@LD_FLAGS=$(LD_FLAGS) KOCACHE=$(KOCACHE) KO_DOCKER_REPO=$(CAPSULE_IMG) \
-		$(KO) build ./ --bare --tags=$(KO_TAGS) --push=false --local --platform=$(KO_PLATFORM)
+		$(KO) build ./cmd/ --bare --tags=$(KO_TAGS) --push=false --local --platform=$(KO_PLATFORM)
 
 .PHONY: ko-build-all
 ko-build-all: ko-build-capsule
+
+.PHONY: docker-build-capsule-trace
+docker-build-capsule-trace: ko-build-capsule
+	@docker build \
+		--no-cache \
+		--build-arg TARGET_IMAGE=$(CAPSULE_IMG):$(VERSION) \
+		-t $(CAPSULE_IMG):tracing \
+		-f Dockerfile.tracing .
 
 # Docker Image Publish
 # ------------------
@@ -184,103 +204,34 @@ ko-login: ko
 .PHONY: ko-publish-capsule
 ko-publish-capsule: ko-login ## Build and publish kyvernopre image (with ko)
 	@LD_FLAGS=$(LD_FLAGS) KOCACHE=$(KOCACHE) KO_DOCKER_REPO=$(CAPSULE_IMG) \
-		$(KO) build ./ --bare --tags=$(KO_TAGS)
+		$(KO) build ./cmd/ --bare --tags=$(KO_TAGS)
 
 .PHONY: ko-publish-all
 ko-publish-all: ko-publish-capsule
-
-####################
-# -- Binaries
-####################
-
-CONTROLLER_GEN         := $(shell pwd)/bin/controller-gen
-CONTROLLER_GEN_VERSION := v0.16.1
-controller-gen: ## Download controller-gen locally if necessary.
-	$(call go-install-tool,$(CONTROLLER_GEN),sigs.k8s.io/controller-tools/cmd/controller-gen@$(CONTROLLER_GEN_VERSION))
-
-GINKGO         := $(shell pwd)/bin/ginkgo
-ginkgo: ## Download ginkgo locally if necessary.
-	$(call go-install-tool,$(GINKGO),github.com/onsi/ginkgo/v2/ginkgo)
-
-CT         := $(shell pwd)/bin/ct
-CT_VERSION := v3.10.1
-ct: ## Download ct locally if necessary.
-	$(call go-install-tool,$(CT),github.com/helm/chart-testing/v3/ct@$(CT_VERSION))
-
-KIND         := $(shell pwd)/bin/kind
-KIND_VERSION := v0.17.0
-kind: ## Download kind locally if necessary.
-	$(call go-install-tool,$(KIND),sigs.k8s.io/kind/cmd/kind@$(KIND_VERSION))
-
-KUSTOMIZE         := $(shell pwd)/bin/kustomize
-KUSTOMIZE_VERSION := 3.8.7
-kustomize: ## Download kustomize locally if necessary.
-	$(call install-kustomize,$(KUSTOMIZE),$(KUSTOMIZE_VERSION))
-
-KO = $(shell pwd)/bin/ko
-KO_VERSION = v0.14.1
-ko:
-	$(call go-install-tool,$(KO),github.com/google/ko@$(KO_VERSION))
-
-####################
-# -- Helpers
-####################
-pull-upstream:
-	git remote add upstream https://github.com/capsuleproject/capsule.git
-	git fetch --all && git pull upstream
-
-define install-kustomize
-@[ -f $(1) ] || { \
-set -e ;\
-echo "Installing v$(2)" ;\
-cd bin ;\
-wget "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" ;\
-bash ./install_kustomize.sh $(2) ;\
-}
-endef
-
-# go-install-tool will 'go install' any package $2 and install it to $1.
-PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
-define go-install-tool
-@[ -f $(1) ] || { \
-set -e ;\
-GOBIN=$(PROJECT_DIR)/bin go install $(2) ;\
-}
-endef
-
-# Generate bundle manifests and metadata, then validate generated files.
-bundle: manifests
-	operator-sdk generate kustomize manifests -q
-	kustomize build config/manifests | operator-sdk generate bundle -q --overwrite --version $(VERSION) $(BUNDLE_METADATA_OPTS)
-	operator-sdk bundle validate ./bundle
 
 # Sorting imports
 .PHONY: goimports
 goimports:
 	goimports -w -l -local "github.com/projectcapsule/capsule" .
 
-GOLANGCI_LINT = $(shell pwd)/bin/golangci-lint
-GOLANGCI_LINT_VERSION = v1.56.2
-golangci-lint: ## Download golangci-lint locally if necessary.
-	$(call go-install-tool,$(GOLANGCI_LINT),github.com/golangci/golangci-lint/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION))
-
 # Linting code as PR is expecting
 .PHONY: golint
 golint: golangci-lint
-	$(GOLANGCI_LINT) run -c .golangci.yml
+	$(GOLANGCI_LINT) run -c .golangci.yaml --verbose --fix
 
 # Running e2e tests in a KinD instance
 .PHONY: e2e
 e2e: ginkgo
 	$(MAKE) e2e-build && $(MAKE) e2e-exec && $(MAKE) e2e-destroy
-    
+
 e2e-build: kind
-	$(KIND) create cluster --wait=60s --name capsule --image kindest/node:$${KIND_K8S_VERSION:-v1.27.0}
+	$(KIND) create cluster --wait=60s --name $(CLUSTER_NAME) --image kindest/node:$(KUBERNETES_SUPPORTED_VERSION)
 	$(MAKE) e2e-install
 
 .PHONY: e2e-install
-e2e-install: e2e-load-image
-	helm upgrade \
+e2e-install: ko-build-all
+	$(MAKE) e2e-load-image CLUSTER_NAME=$(CLUSTER_NAME) IMAGE=$(CAPSULE_IMG) VERSION=$(VERSION)
+	$(HELM) upgrade \
 	    --dependency-update \
 		--debug \
 		--install \
@@ -294,9 +245,42 @@ e2e-install: e2e-load-image
 		capsule \
 		./charts/capsule
 
+.PHONY: trace-install
+trace-install:
+	helm upgrade \
+	    --dependency-update \
+		--debug \
+		--install \
+		--namespace capsule-system \
+		--create-namespace \
+		--set 'manager.resources=null'\
+		--set 'manager.livenessProbe.failureThreshold=10' \
+		--set 'manager.readinessProbe.failureThreshold=10' \
+		--values charts/capsule/ci/tracing-values.yaml \
+		capsule \
+		./charts/capsule
+
+.PHONY: trace-e2e
+trace-e2e: kind
+	$(MAKE) docker-build-capsule-trace
+	$(KIND) create cluster --wait=60s --image kindest/node:$(KUBERNETES_SUPPORTED_VERSION) --config hack/kind-cluster.yml
+	$(MAKE) e2e-load-image CLUSTER_NAME=capsule-tracing IMAGE=$(CAPSULE_IMG) VERSION=tracing
+	$(MAKE) trace-install
+	$(MAKE) e2e-exec
+	$(KIND) delete cluster --name capsule-tracing
+
+.PHONY: trace-unit
+trace-unit: harpoon
+	$(HARPOON) analyze -e .git/ -e assets/ -e charts/ -e config/ -e docs/ -e e2e/ -e hack/ --directory /tmp/artifacts/ --save
+	$(HARPOON) hunt -D /tmp/results -F harpoon-report.yml --include-cmd-stdout --save
+
+.PHONY: seccomp
+seccomp:
+	$(HARPOON) build --add-syscall-sets=dynamic,docker -D /tmp/results --name capsule-seccomp.json --save
+
 .PHONY: e2e-load-image
-e2e-load-image: kind ko-build-all
-	$(KIND) load docker-image --nodes capsule-control-plane --name capsule $(CAPSULE_IMG):$(VERSION)
+e2e-load-image: kind
+	$(KIND) load docker-image $(IMAGE):$(VERSION) --name $(CLUSTER_NAME)
 
 .PHONY: e2e-exec
 e2e-exec: ginkgo
@@ -310,3 +294,95 @@ SPELL_CHECKER = npx spellchecker-cli
 docs-lint:
 	cd docs/content && $(SPELL_CHECKER) -f "*.md" "*/*.md" "!general/crds-apis.md" -d dictionary.txt
 
+####################
+# -- Helpers
+####################
+pull-upstream:
+	git remote add upstream https://github.com/capsuleproject/capsule.git
+	git fetch --all && git pull upstream
+
+## Location to install dependencies to
+LOCALBIN ?= $(shell pwd)/bin
+$(LOCALBIN):
+	mkdir -p $(LOCALBIN)
+
+####################
+# -- Helm Plugins
+####################
+
+HELM_SCHEMA_VERSION   := ""
+helm-plugin-schema:
+	@$(HELM) plugin install https://github.com/losisin/helm-values-schema-json.git --version $(HELM_SCHEMA_VERSION) || true
+
+HELM_DOCS         := $(LOCALBIN)/helm-docs
+HELM_DOCS_VERSION := v1.14.1
+HELM_DOCS_LOOKUP  := norwoodj/helm-docs
+helm-doc:
+	@test -s $(HELM_DOCS) || \
+	$(call go-install-tool,$(HELM_DOCS),github.com/$(HELM_DOCS_LOOKUP)/cmd/helm-docs@$(HELM_DOCS_VERSION))
+
+####################
+# -- Tools
+####################
+CONTROLLER_GEN         := $(LOCALBIN)/controller-gen
+CONTROLLER_GEN_VERSION ?= v0.18.0
+CONTROLLER_GEN_LOOKUP  := kubernetes-sigs/controller-tools
+controller-gen:
+	@test -s $(CONTROLLER_GEN) && $(CONTROLLER_GEN) --version | grep -q $(CONTROLLER_GEN_VERSION) || \
+	$(call go-install-tool,$(CONTROLLER_GEN),sigs.k8s.io/controller-tools/cmd/controller-gen@$(CONTROLLER_GEN_VERSION))
+
+GINKGO := $(LOCALBIN)/ginkgo
+ginkgo:
+	$(call go-install-tool,$(GINKGO),github.com/onsi/ginkgo/v2/ginkgo)
+
+CT         := $(LOCALBIN)/ct
+CT_VERSION := v3.12.0
+CT_LOOKUP  := helm/chart-testing
+ct:
+	@test -s $(CT) && $(CT) version | grep -q $(CT_VERSION) || \
+	$(call go-install-tool,$(CT),github.com/$(CT_LOOKUP)/v3/ct@$(CT_VERSION))
+
+KIND         := $(LOCALBIN)/kind
+KIND_VERSION := v0.28.0
+KIND_LOOKUP  := kubernetes-sigs/kind
+kind:
+	@test -s $(KIND) && $(KIND) --version | grep -q $(KIND_VERSION) || \
+	$(call go-install-tool,$(KIND),sigs.k8s.io/kind/cmd/kind@$(KIND_VERSION))
+
+KO           := $(LOCALBIN)/ko
+KO_VERSION   := v0.18.0
+KO_LOOKUP    := google/ko
+ko:
+	@test -s $(KO) && $(KO) -h | grep -q $(KO_VERSION) || \
+	$(call go-install-tool,$(KO),github.com/$(KO_LOOKUP)@$(KO_VERSION))
+
+GOLANGCI_LINT          := $(LOCALBIN)/golangci-lint
+GOLANGCI_LINT_VERSION  := v2.1.6
+GOLANGCI_LINT_LOOKUP   := golangci/golangci-lint
+golangci-lint: ## Download golangci-lint locally if necessary.
+	@test -s $(GOLANGCI_LINT) && $(GOLANGCI_LINT) -h | grep -q $(GOLANGCI_LINT_VERSION) || \
+	$(call go-install-tool,$(GOLANGCI_LINT),github.com/$(GOLANGCI_LINT_LOOKUP)/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION))
+
+APIDOCS_GEN         := $(LOCALBIN)/crdoc
+APIDOCS_GEN_VERSION := v0.6.4
+APIDOCS_GEN_LOOKUP  := fybrik/crdoc
+apidocs-gen: ## Download crdoc locally if necessary.
+	@test -s $(APIDOCS_GEN) && $(APIDOCS_GEN) --version | grep -q $(APIDOCS_GEN_VERSION) || \
+	$(call go-install-tool,$(APIDOCS_GEN),fybrik.io/crdoc@$(APIDOCS_GEN_VERSION))
+
+HARPOON         := $(LOCALBIN)/harpoon
+HARPOON_VERSION := v0.10.1
+HARPOON_LOOKUP  := alegrey91/harpoon
+harpoon:
+	@mkdir $(LOCALBIN)
+	@curl -s https://raw.githubusercontent.com/alegrey91/harpoon/main/install | \
+		sudo bash -s -- --install-version $(HARPOON_VERSION) --install-dir $(LOCALBIN)
+
+# go-install-tool will 'go install' any package $2 and install it to $1.
+PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
+define go-install-tool
+[ -f $(1) ] || { \
+    set -e ;\
+    GOBIN=$(LOCALBIN) go install $(2) ;\
+}
+endef

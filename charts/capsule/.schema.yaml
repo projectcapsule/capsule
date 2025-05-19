@@ -1,0 +1,4 @@
+input:
+  - values.yaml
+  - ci/test-values.yaml
+  - ci/proxy-values.yaml

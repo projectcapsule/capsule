@@ -15,10 +15,16 @@ import (
 	"github.com/projectcapsule/capsule/api/v1beta2"
 )
 
+const (
+	CordonedLabel = "projectcapsule.dev/cordoned"
+)
+
 func GetTypeLabel(t runtime.Object) (label string, err error) {
 	switch v := t.(type) {
 	case *v1beta1.Tenant, *v1beta2.Tenant:
 		return "capsule.clastix.io/tenant", nil
+	case *v1beta2.ResourcePool:
+		return "projectcapsule.dev/pool", nil
 	case *corev1.LimitRange:
 		return "capsule.clastix.io/limit-range", nil
 	case *networkingv1.NetworkPolicy:

@@ -1,0 +1,46 @@
+repos:
+- repo: https://github.com/alessandrojcm/commitlint-pre-commit-hook
+  rev: v9.22.0
+  hooks:
+  - id: commitlint
+    stages: [commit-msg]
+    additional_dependencies: ['@commitlint/config-conventional', 'commitlint-plugin-function-rules']
+- repo: https://github.com/pre-commit/pre-commit-hooks
+  rev: v5.0.0
+  hooks:
+  - id: check-executables-have-shebangs
+  - id: double-quote-string-fixer
+  - id: end-of-file-fixer
+  - id: trailing-whitespace
+- repo: https://github.com/adrienverge/yamllint
+  rev: v1.37.1
+  hooks:
+  - id: yamllint
+    args: [-c=.github/configs/lintconf.yaml]
+- repo: local
+  hooks:
+  - id: run-helm-docs
+    name: Execute helm-docs
+    entry: make helm-docs
+    language: system
+    files: ^charts/
+  - id: run-helm-schema
+    name: Execute helm-schema
+    entry: make helm-schema
+    language: system
+    files: ^charts/
+  - id: run-helm-lint
+    name: Execute helm-lint
+    entry: make helm-lint
+    language: system
+    files: ^charts/
+  - id: golangci-lint
+    name: Execute golangci-lint
+    entry: make golint
+    language: system
+    files: \.go$
+  - id: go-test
+    name: Execute go test
+    entry: make test
+    language: system
+    files: \.go$
