@@ -13,10 +13,10 @@ import (
 type ResourcePoolRecorder struct {
 	poolResource               *prometheus.GaugeVec
 	poolResourceLimit          *prometheus.GaugeVec
+	poolResourceAvailable      *prometheus.GaugeVec
 	poolResourceUsage          *prometheus.GaugeVec
 	poolResourceExhaustion     *prometheus.GaugeVec
 	poolNamespaceResourceUsage *prometheus.GaugeVec
-	poolNamespaceResourceLimit *prometheus.GaugeVec
 }
 
 func MustMakeResourcePoolRecorder() *ResourcePoolRecorder {
@@ -60,21 +60,22 @@ func NewResourcePoolRecorder() *ResourcePoolRecorder {
 			},
 			[]string{"pool", "resource"},
 		),
+
+		poolResourceAvailable: prometheus.NewGaugeVec(
+			prometheus.GaugeOpts{
+				Namespace: metricsPrefix,
+				Name:      "pool_available",
+				Help:      "Current resource availability for a given resource in a resource pool",
+			},
+			[]string{"pool", "resource"},
+		),
 		poolNamespaceResourceUsage: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
 				Namespace: metricsPrefix,
 				Name:      "pool_namespace_usage",
 				Help:      "Current resources claimed on namespace basis for a given resource in a resource pool for a specific namespace",
 			},
-			[]string{"pool", "namespace", "resource"},
-		),
-		poolNamespaceResourceLimit: prometheus.NewGaugeVec(
-			prometheus.GaugeOpts{
-				Namespace: metricsPrefix,
-				Name:      "pool_namespace_limit",
-				Help:      "Current limit on namespace basis for a given resource in a resource pool for a specific namespace",
-			},
-			[]string{"pool", "namespace", "resource"},
+			[]string{"pool", "target_namespace", "resource"},
 		),
 	}
 }
@@ -84,6 +85,9 @@ func (r *ResourcePoolRecorder) Collectors() []prometheus.Collector {
 		r.poolResource,
 		r.poolResourceLimit,
 		r.poolResourceUsage,
+		r.poolResourceAvailable,
+		r.poolResourceExhaustion,
+		r.poolNamespaceResourceUsage,
 	}
 }
 
@@ -114,6 +118,12 @@ func (r *ResourcePoolRecorder) ResourceUsageMetrics(pool *capsulev1beta2.Resourc
 			pool.Name,
 			resourceName.String(),
 		).Set(float64(claimed.MilliValue()) / 1000)
+
+		available := pool.Status.Allocation.Available[resourceName]
+		r.poolResourceAvailable.WithLabelValues(
+			pool.Name,
+			resourceName.String(),
+		).Set(float64(available.MilliValue()) / 1000)
 	}
 
 	r.resourceUsageMetricsByNamespace(pool)
@@ -122,7 +132,6 @@ func (r *ResourcePoolRecorder) ResourceUsageMetrics(pool *capsulev1beta2.Resourc
 // Delete all metrics for a namespace in a resource pool.
 func (r *ResourcePoolRecorder) DeleteResourcePoolNamespaceMetric(pool string, namespace string) {
 	r.poolNamespaceResourceUsage.DeletePartialMatch(map[string]string{"pool": pool, "namespace": namespace})
-	r.poolNamespaceResourceLimit.DeletePartialMatch(map[string]string{"pool": pool, "namespace": namespace})
 }
 
 // Delete all metrics for a resource pool.
@@ -136,9 +145,9 @@ func (r *ResourcePoolRecorder) DeleteResourcePoolSingleResourceMetric(pool strin
 
 func (r *ResourcePoolRecorder) cleanupAllMetricForLabels(labels map[string]string) {
 	r.poolResourceLimit.DeletePartialMatch(labels)
+	r.poolResourceAvailable.DeletePartialMatch(labels)
 	r.poolResourceUsage.DeletePartialMatch(labels)
 	r.poolNamespaceResourceUsage.DeletePartialMatch(labels)
-	r.poolNamespaceResourceLimit.DeletePartialMatch(labels)
 	r.poolResource.DeletePartialMatch(labels)
 	r.poolResourceExhaustion.DeletePartialMatch(labels)
 }

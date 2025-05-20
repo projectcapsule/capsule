@@ -42,6 +42,7 @@ import (
 	tlscontroller "github.com/projectcapsule/capsule/controllers/tls"
 	"github.com/projectcapsule/capsule/pkg/configuration"
 	"github.com/projectcapsule/capsule/pkg/indexer"
+	"github.com/projectcapsule/capsule/pkg/metrics"
 	"github.com/projectcapsule/capsule/pkg/webhook"
 	"github.com/projectcapsule/capsule/pkg/webhook/defaults"
 	"github.com/projectcapsule/capsule/pkg/webhook/gateway"
@@ -195,9 +196,11 @@ func main() {
 	}
 
 	if err = (&tenantcontroller.Manager{
-		Client:   manager.GetClient(),
-		Log:      ctrl.Log.WithName("controllers").WithName("Tenant"),
-		Recorder: manager.GetEventRecorderFor("tenant-controller"),
+		RESTConfig: manager.GetConfig(),
+		Client:     manager.GetClient(),
+		Metrics:    metrics.MustMakeTenantRecorder(),
+		Log:        ctrl.Log.WithName("controllers").WithName("Tenant"),
+		Recorder:   manager.GetEventRecorderFor("tenant-controller"),
 	}).SetupWithManager(manager); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Tenant")
 		os.Exit(1)

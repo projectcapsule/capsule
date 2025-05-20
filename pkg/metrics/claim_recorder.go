@@ -13,6 +13,7 @@ import (
 
 type ClaimRecorder struct {
 	claimConditionGauge *prometheus.GaugeVec
+	claimResourcesGauge *prometheus.GaugeVec
 }
 
 func MustMakeClaimRecorder() *ClaimRecorder {
@@ -30,7 +31,15 @@ func NewClaimRecorder() *ClaimRecorder {
 				Name:      "claim_condition",
 				Help:      "The current condition status of a claim.",
 			},
-			[]string{"name", "condition", "pool"},
+			[]string{"name", "target_namespace", "condition", "status", "reason", "pool"},
+		),
+		claimResourcesGauge: prometheus.NewGaugeVec(
+			prometheus.GaugeOpts{
+				Namespace: metricsPrefix,
+				Name:      "claim_resource",
+				Help:      "The given amount of resources from the claim",
+			},
+			[]string{"name", "target_namespace", "resource"},
 		),
 	}
 }
@@ -45,15 +54,26 @@ func (r *ClaimRecorder) Collectors() []prometheus.Collector {
 func (r *ClaimRecorder) RecordClaimCondition(claim *capsulev1beta2.ResourcePoolClaim) {
 	for _, status := range []string{meta.AssignedCondition, meta.BoundCondition} {
 		var value float64
-		if status == string(claim.Status.Condition.Status) {
+		if status == claim.Status.Condition.Type {
 			value = 1
 		}
 
 		r.claimConditionGauge.WithLabelValues(
 			claim.Name,
+			claim.Namespace,
 			status,
+			string(claim.Status.Condition.Status),
+			claim.Status.Condition.Reason,
 			claim.Status.Pool.Name.String(),
 		).Set(value)
+	}
+
+	for resourceName, qt := range claim.Spec.ResourceClaims {
+		r.claimResourcesGauge.WithLabelValues(
+			claim.Name,
+			claim.Namespace,
+			resourceName.String(),
+		).Set(float64(qt.MilliValue()) / 1000)
 	}
 }
 
