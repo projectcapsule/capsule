@@ -212,6 +212,9 @@ Here the values you can override:
 | webhooks.hooks.defaults.pvc.failurePolicy | string | `"Fail"` |  |
 | webhooks.hooks.defaults.pvc.namespaceSelector.matchExpressions[0].key | string | `"capsule.clastix.io/tenant"` |  |
 | webhooks.hooks.defaults.pvc.namespaceSelector.matchExpressions[0].operator | string | `"Exists"` |  |
+| webhooks.hooks.gateways.failurePolicy | string | `"Fail"` |  |
+| webhooks.hooks.gateways.namespaceSelector.matchExpressions[0].key | string | `"capsule.clastix.io/tenant"` |  |
+| webhooks.hooks.gateways.namespaceSelector.matchExpressions[0].operator | string | `"Exists"` |  |
 | webhooks.hooks.ingresses.failurePolicy | string | `"Fail"` |  |
 | webhooks.hooks.ingresses.namespaceSelector.matchExpressions[0].key | string | `"capsule.clastix.io/tenant"` |  |
 | webhooks.hooks.ingresses.namespaceSelector.matchExpressions[0].operator | string | `"Exists"` |  |
