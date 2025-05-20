@@ -19,9 +19,7 @@ metadata:
     {{- include "capsule.labels" . | nindent 4 }}
 spec:
   backoffLimit: {{ $Values.backoffLimit }}
-  {{- if ge $Values.ttlSecondsAfterFinished 0.0 }}
   ttlSecondsAfterFinished: {{ $Values.ttlSecondsAfterFinished }}
-  {{- end }}
   template:
     metadata:
       name: "{{ include "capsule.crds.name" . }}"
