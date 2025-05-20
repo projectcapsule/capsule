@@ -292,7 +292,7 @@ e2e-load-image: kind
 
 .PHONY: e2e-exec
 e2e-exec: ginkgo
-	$(GINKGO) --label-filter="gateway" -v -tags e2e ./e2e
+	$(GINKGO) -v -tags e2e ./e2e
 
 .PHONY: e2e-destroy
 e2e-destroy: kind

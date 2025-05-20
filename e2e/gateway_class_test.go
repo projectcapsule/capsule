@@ -5,9 +5,10 @@ package e2e
 
 import (
 	"context"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/projectcapsule/capsule/pkg/api"
+
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -16,6 +17,7 @@ import (
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/api"
 )
 
 var _ = Describe("when Tenant handles Gateway classes", Label("gateway"), func() {
@@ -112,32 +114,32 @@ var _ = Describe("when Tenant handles Gateway classes", Label("gateway"), func()
 			},
 		},
 	}
-
 	JustBeforeEach(func() {
 		utilruntime.Must(gatewayv1.Install(scheme.Scheme))
 		for _, tnt := range []*capsulev1beta2.Tenant{tntWithDefault, tntWithoutLabel, tntWithLabel} {
+			tnt.ResourceVersion = ""
 			EventuallyCreation(func() error {
 				return k8sClient.Create(context.TODO(), tnt)
 			}).Should(Succeed())
 		}
-		EventuallyCreation(func() error {
-			return k8sClient.Create(context.TODO(), authorized)
-		}).Should(Succeed())
-		EventuallyCreation(func() error {
-			return k8sClient.Create(context.TODO(), unauthorized)
-		}).Should(Succeed())
-	})
-
-	JustAfterEach(func() {
-		Expect(k8sClient.Delete(context.TODO(), authorized)).Should(Succeed())
-		Expect(k8sClient.Delete(context.TODO(), unauthorized)).Should(Succeed())
-		for _, tnt := range []*capsulev1beta2.Tenant{tntWithDefault, tntWithoutLabel, tntWithLabel} {
+		for _, crd := range []*gatewayv1.GatewayClass{authorized, unauthorized} {
 			Eventually(func() error {
-				return k8sClient.Delete(context.TODO(), tnt)
+				crd.ResourceVersion = ""
+				return k8sClient.Create(context.TODO(), crd)
 			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		}
 	})
-
+	JustAfterEach(func() {
+		utilruntime.Must(gatewayv1.Install(scheme.Scheme))
+		for _, tnt := range []*capsulev1beta2.Tenant{tntWithDefault, tntWithoutLabel, tntWithLabel} {
+			EventuallyCreation(func() error {
+				return k8sClient.Delete(context.TODO(), tnt)
+			}).Should(Succeed())
+		}
+		for _, crd := range []*gatewayv1.GatewayClass{authorized, unauthorized} {
+			Expect(k8sClient.Delete(context.TODO(), crd)).Should(Succeed())
+		}
+	})
 	It("should block or mutate Gateway", func() {
 		ns := NewNamespace("")
 		NamespaceCreation(ns, tntWithDefault.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
@@ -190,9 +192,53 @@ var _ = Describe("when Tenant handles Gateway classes", Label("gateway"), func()
 			return
 		})
 	})
-	It("should allow enabled Gateway", func() {
+	It("providing allowed gatewayClassName", func() {
 		ns := NewNamespace("")
 		NamespaceCreation(ns, tntWithDefault.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(tntWithDefault, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
+		By("providing authorized class", func() {
+			Eventually(func() (err error) {
+				g := &gatewayv1.Gateway{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "authorized-gateway",
+						Namespace: ns.GetName(),
+					},
+					Spec: gatewayv1.GatewaySpec{
+						Listeners: []gatewayv1.Listener{
+							{
+								Name:     "http",
+								Protocol: gatewayv1.HTTPProtocolType,
+								Port:     80,
+							},
+						},
+						GatewayClassName: gatewayv1.ObjectName("customer-class"),
+					},
+				}
+				err = k8sClient.Create(context.TODO(), g)
+				return
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		})
+		By("providing no gatewayClassName", func() {
+			g := &gatewayv1.Gateway{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "mutated-gateway",
+					Namespace: ns.GetName(),
+				},
+				Spec: gatewayv1.GatewaySpec{
+					Listeners: []gatewayv1.Listener{
+						{
+							Name:     "http",
+							Protocol: gatewayv1.HTTPProtocolType,
+							Port:     80,
+						},
+					},
+				},
+			}
+			Expect(k8sClient.Create(context.TODO(), g)).Should(Succeed())
+			gw := &gatewayv1.Gateway{}
+			Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: g.GetName(), Namespace: g.Namespace}, gw)).Should(Succeed())
+			Expect(gw.Spec.GatewayClassName).Should(Equal(gatewayv1.ObjectName("customer-class")))
+			return
+		})
 	})
 })
