@@ -79,11 +79,11 @@ proxy:
 # These are ClusterRoles which grant permissions for Capsule CRDs to Tenant Owners
 rbac:
   resources:
-    create: true
+    create: false
     labels:
       rbac.authorization.k8s.io/aggregate-to-admin: "true"
   resourcepoolclaims:
-    create: true
+    create: false
     labels:
       rbac.authorization.k8s.io/aggregate-to-admin: "true"
 

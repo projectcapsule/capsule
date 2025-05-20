@@ -134,9 +134,9 @@ Here the values you can override:
 | ports | list | `[]` | Set additional ports for the deployment |
 | priorityClassName | string | `""` | Set the priority class name of the Capsule pod |
 | proxy.enabled | bool | `false` | Enable Installation of Capsule Proxy |
-| rbac.resourcepoolclaims.create | bool | `true` |  |
+| rbac.resourcepoolclaims.create | bool | `false` |  |
 | rbac.resourcepoolclaims.labels."rbac.authorization.k8s.io/aggregate-to-admin" | string | `"true"` |  |
-| rbac.resources.create | bool | `true` |  |
+| rbac.resources.create | bool | `false` |  |
 | rbac.resources.labels."rbac.authorization.k8s.io/aggregate-to-admin" | string | `"true"` |  |
 | replicaCount | int | `1` | Set the replica count for capsule pod |
 | securityContext | object | `{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]},"readOnlyRootFilesystem":true}` | Set the securityContext for the Capsule container |
