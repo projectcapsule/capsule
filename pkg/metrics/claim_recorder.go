@@ -30,7 +30,7 @@ func NewClaimRecorder() *ClaimRecorder {
 				Name:      "claim_condition",
 				Help:      "The current condition status of a claim.",
 			},
-			[]string{"name", "reason", "status", "pool"},
+			[]string{"name", "condition", "pool"},
 		),
 	}
 }
@@ -43,7 +43,7 @@ func (r *ClaimRecorder) Collectors() []prometheus.Collector {
 
 // RecordCondition records the condition as given for the ref.
 func (r *ClaimRecorder) RecordClaimCondition(claim *capsulev1beta2.ResourcePoolClaim) {
-	for _, status := range []string{meta.ReadyCondition, meta.NotReadyCondition} {
+	for _, status := range []string{meta.AssignedCondition, meta.BoundCondition} {
 		var value float64
 		if status == string(claim.Status.Condition.Status) {
 			value = 1
@@ -51,7 +51,6 @@ func (r *ClaimRecorder) RecordClaimCondition(claim *capsulev1beta2.ResourcePoolC
 
 		r.claimConditionGauge.WithLabelValues(
 			claim.Name,
-			claim.Status.Condition.Reason,
 			status,
 			claim.Status.Pool.Name.String(),
 		).Set(value)
