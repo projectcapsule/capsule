@@ -44,25 +44,6 @@ var _ = Describe("when Tenant handles Gateway classes", Label("gateway"), func()
 		},
 	}
 
-	tntWithoutLabel := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "tnt-with-default-gateway-class-only",
-		},
-		Spec: capsulev1beta2.TenantSpec{
-			Owners: []capsulev1beta2.OwnerSpec{
-				{
-					Name: "gateway-without-label-selector",
-					Kind: "User",
-				},
-			},
-			GatewayOptions: capsulev1beta2.GatewayOptions{
-				AllowedClasses: &api.SelectionListWithDefaultSpec{
-					Default: "customer-class",
-				},
-			},
-		},
-	}
-
 	tntWithDefault := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "tnt-with-default-gateway-class-and-label-selector",
@@ -115,7 +96,7 @@ var _ = Describe("when Tenant handles Gateway classes", Label("gateway"), func()
 	}
 	JustBeforeEach(func() {
 		utilruntime.Must(gatewayv1.Install(scheme.Scheme))
-		for _, tnt := range []*capsulev1beta2.Tenant{tntWithDefault, tntWithoutLabel, tntWithoutDefault} {
+		for _, tnt := range []*capsulev1beta2.Tenant{tntWithDefault, tntWithoutDefault} {
 			tnt.ResourceVersion = ""
 			EventuallyCreation(func() error {
 				return k8sClient.Create(context.TODO(), tnt)
@@ -130,7 +111,7 @@ var _ = Describe("when Tenant handles Gateway classes", Label("gateway"), func()
 	})
 	JustAfterEach(func() {
 		utilruntime.Must(gatewayv1.Install(scheme.Scheme))
-		for _, tnt := range []*capsulev1beta2.Tenant{tntWithDefault, tntWithoutLabel, tntWithoutDefault} {
+		for _, tnt := range []*capsulev1beta2.Tenant{tntWithDefault, tntWithoutDefault} {
 			EventuallyCreation(func() error {
 				return k8sClient.Delete(context.TODO(), tnt)
 			}).Should(Succeed())
