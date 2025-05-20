@@ -119,36 +119,40 @@ func (r resourcePoolController) Reconcile(ctx context.Context, request ctrl.Requ
 func (r *resourcePoolController) finalize(
 	ctx context.Context,
 	pool *capsulev1beta2.ResourcePool,
-) (err error) {
-	if pool.Status.ClaimSize == 0 {
-		if !controllerutil.ContainsFinalizer(pool, meta.ControllerFinalizer) {
-			return
-		}
+) error {
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		// Re-fetch latest version of the object
+		latest := &capsulev1beta2.ResourcePool{}
+		if err := r.Get(ctx, client.ObjectKeyFromObject(pool), latest); err != nil {
+			if apierrors.IsNotFound(err) {
+				return nil
+			}
 
-		if _, err = controllerutil.CreateOrUpdate(ctx, r.Client, pool, func() error {
-			controllerutil.RemoveFinalizer(pool, meta.ControllerFinalizer)
-
-			return nil
-		}); err != nil {
 			return err
 		}
 
+		changed := false
+
+		// Case: all claims are gone, remove finalizer
+		if latest.Status.ClaimSize == 0 && controllerutil.ContainsFinalizer(latest, meta.ControllerFinalizer) {
+			controllerutil.RemoveFinalizer(latest, meta.ControllerFinalizer)
+
+			changed = true
+		}
+
+		// Case: claims still exist, add finalizer if not already present
+		if latest.Status.ClaimSize > 0 && !controllerutil.ContainsFinalizer(latest, meta.ControllerFinalizer) {
+			controllerutil.AddFinalizer(latest, meta.ControllerFinalizer)
+
+			changed = true
+		}
+
+		if changed {
+			return r.Update(ctx, latest)
+		}
+
 		return nil
-	}
-
-	if controllerutil.ContainsFinalizer(pool, meta.ControllerFinalizer) {
-		return
-	}
-
-	if _, err = controllerutil.CreateOrUpdate(ctx, r.Client, pool, func() error {
-		controllerutil.AddFinalizer(pool, meta.ControllerFinalizer)
-
-		return nil
-	}); err != nil {
-		return err
-	}
-
-	return nil
+	})
 }
 
 func (r *resourcePoolController) reconcile(
@@ -415,55 +419,48 @@ func (r *resourcePoolController) handleClaimDisassociation(
 		},
 	}
 
-	err := r.Get(ctx, types.NamespacedName{
-		Name:      claim.Name.String(),
-		Namespace: claim.Namespace.String(),
-	}, claimObj)
-	if err != nil {
-		if apierrors.IsNotFound(err) {
-			pool.RemoveClaimFromStatus(claimObj)
-
-			return nil
-		}
-
-		return err
-	}
-
-	if !*pool.Spec.Config.DeleteBoundResources || meta.ReleaseAnnotationTriggers(claimObj) {
-		patch := client.MergeFrom(claimObj.DeepCopy())
-		meta.RemoveLooseOwnerReference(claimObj, pool)
-		meta.ReleaseAnnotationRemove(claimObj)
-
-		if err := r.Patch(ctx, claimObj, patch); err != nil {
-			log.Info("Removing owner reference", "claim", claimObj, "pool", pool.Name)
-
-			return err
-		}
-
-		r.recorder.AnnotatedEventf(
-			claimObj,
-			map[string]string{
-				"Status": string(metav1.ConditionFalse),
-				"Type":   meta.NotReadyCondition,
-			},
-			corev1.EventTypeNormal,
-			"Disassociated",
-			"Claim is disassociated from the pool",
-		)
-	}
-
-	if err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		current := &capsulev1beta2.ResourcePoolClaim{}
-		if err := r.Get(ctx, client.ObjectKeyFromObject(claimObj), current); err != nil {
-			return fmt.Errorf("failed to refetch instance before update: %w", err)
+		if err := r.Get(ctx, types.NamespacedName{
+			Name:      claim.Name.String(),
+			Namespace: claim.Namespace.String(),
+		}, current); err != nil {
+			return fmt.Errorf("failed to refetch claim before patch: %w", err)
+		}
+
+		if !*pool.Spec.Config.DeleteBoundResources || meta.ReleaseAnnotationTriggers(claimObj) {
+			patch := client.MergeFrom(claimObj.DeepCopy())
+			meta.RemoveLooseOwnerReference(claimObj, pool)
+			meta.ReleaseAnnotationRemove(claimObj)
+
+			if err := r.Patch(ctx, current, patch); err != nil {
+				return fmt.Errorf("failed to patch claim: %w", err)
+			}
 		}
 
 		current.Status.Pool = api.StatusNameUID{}
+		if err := r.Client.Status().Update(ctx, current); err != nil {
+			return fmt.Errorf("failed to update claim status: %w", err)
+		}
 
-		return r.Client.Status().Update(ctx, current)
-	}); err != nil {
+		return nil
+	})
+	if err != nil {
+		log.Info("Removing owner reference failed", "claim", claimObj.Name, "pool", pool.Name, "error", err)
+
 		return err
 	}
+
+	r.recorder.AnnotatedEventf(
+		claimObj,
+		map[string]string{
+			"Status": string(metav1.ConditionFalse),
+			"Type":   meta.NotReadyCondition,
+		},
+		corev1.EventTypeNormal,
+		"Disassociated",
+		"Claim is disassociated from the pool",
+	)
 
 	pool.RemoveClaimFromStatus(claimObj)
 
@@ -580,13 +577,12 @@ func (r *resourcePoolController) gatherMatchingNamespaces(
 		}
 
 		for _, ns := range selected {
-			// Skip if namespace is being deleted
 			if !ns.DeletionTimestamp.IsZero() {
 				continue
 			}
 
 			if _, exists := seenNamespaces[ns.Name]; exists {
-				continue // Skip duplicates
+				continue
 			}
 
 			seenNamespaces[ns.Name] = struct{}{}
