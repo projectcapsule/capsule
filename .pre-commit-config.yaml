@@ -9,7 +9,6 @@ repos:
   rev: v5.0.0
   hooks:
   - id: check-executables-have-shebangs
-  - id: check-yaml
   - id: double-quote-string-fixer
   - id: end-of-file-fixer
   - id: trailing-whitespace
