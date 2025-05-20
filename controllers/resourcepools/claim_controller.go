@@ -6,7 +6,6 @@ package resourcepools
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
@@ -71,9 +70,7 @@ func (r resourceClaimController) Reconcile(ctx context.Context, request ctrl.Req
 	r.metrics.RecordClaimCondition(instance)
 
 	if err != nil {
-		return ctrl.Result{
-			RequeueAfter: time.Minute,
-		}, err
+		return ctrl.Result{}, err
 	}
 
 	return ctrl.Result{}, err

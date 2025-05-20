@@ -324,7 +324,7 @@ webhooks:
   sideEffects: None
   timeoutSeconds: {{ $.Values.webhooks.validatingWebhooksTimeoutSeconds }}
   {{- end }}
-  {{- with .Values.webhooks.hooks.customresources }}
+{{- with .Values.webhooks.hooks.customresources }}
 - admissionReviewVersions:
     - v1
     - v1beta1
@@ -355,5 +355,5 @@ webhooks:
       scope: Namespaced
   sideEffects: None
   timeoutSeconds: {{ $.Values.webhooks.validatingWebhooksTimeoutSeconds }}
-  {{- end }}
+{{- end }}
 {{- end }}

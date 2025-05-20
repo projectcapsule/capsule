@@ -351,13 +351,6 @@ webhooks:
             operator: Exists
     nodes:
       failurePolicy: Fail
-
-    quotas:
-      failurePolicy: Fail
-      namespaceSelector:
-        matchExpressions:
-          - key: capsule.clastix.io/tenant
-            operator: Exists
     defaults:
       ingress:
         failurePolicy: Fail

@@ -169,7 +169,12 @@ func (r *resourcePoolController) reconcile(
 		return err
 	}
 
-	claims, err := r.gatherMatchingClaims(ctx, log, pool)
+	currentNamespaces := make(map[string]struct{}, len(namespaces))
+	for _, ns := range namespaces {
+		currentNamespaces[ns.Name] = struct{}{}
+	}
+
+	claims, err := r.gatherMatchingClaims(ctx, log, pool, currentNamespaces)
 	if err != nil {
 		log.Error(err, "Can not get matching namespaces")
 
@@ -178,7 +183,7 @@ func (r *resourcePoolController) reconcile(
 
 	log.V(5).Info("Collected assigned claims", "count", len(claims))
 
-	if err := r.garbageCollection(ctx, log, pool, claims, namespaces); err != nil {
+	if err := r.garbageCollection(ctx, log, pool, claims, currentNamespaces); err != nil {
 		log.Error(err, "Failed to garbage collect ResourceQuotas")
 
 		return err
@@ -411,7 +416,7 @@ func (r *resourcePoolController) handleClaimDisassociation(
 	pool *capsulev1beta2.ResourcePool,
 	claim *capsulev1beta2.ResourcePoolClaimsItem,
 ) error {
-	claimObj := &capsulev1beta2.ResourcePoolClaim{
+	current := &capsulev1beta2.ResourcePoolClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      claim.Name.String(),
 			Namespace: claim.Namespace.String(),
@@ -420,18 +425,21 @@ func (r *resourcePoolController) handleClaimDisassociation(
 	}
 
 	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		current := &capsulev1beta2.ResourcePoolClaim{}
 		if err := r.Get(ctx, types.NamespacedName{
 			Name:      claim.Name.String(),
 			Namespace: claim.Namespace.String(),
 		}, current); err != nil {
+			if apierrors.IsNotFound(err) {
+				return nil
+			}
+
 			return fmt.Errorf("failed to refetch claim before patch: %w", err)
 		}
 
-		if !*pool.Spec.Config.DeleteBoundResources || meta.ReleaseAnnotationTriggers(claimObj) {
-			patch := client.MergeFrom(claimObj.DeepCopy())
-			meta.RemoveLooseOwnerReference(claimObj, pool)
-			meta.ReleaseAnnotationRemove(claimObj)
+		if !*pool.Spec.Config.DeleteBoundResources || meta.ReleaseAnnotationTriggers(current) {
+			patch := client.MergeFrom(current.DeepCopy())
+			meta.RemoveLooseOwnerReference(current, pool)
+			meta.ReleaseAnnotationRemove(current)
 
 			if err := r.Patch(ctx, current, patch); err != nil {
 				return fmt.Errorf("failed to patch claim: %w", err)
@@ -443,26 +451,26 @@ func (r *resourcePoolController) handleClaimDisassociation(
 			return fmt.Errorf("failed to update claim status: %w", err)
 		}
 
+		r.recorder.AnnotatedEventf(
+			current,
+			map[string]string{
+				"Status": string(metav1.ConditionFalse),
+				"Type":   meta.NotReadyCondition,
+			},
+			corev1.EventTypeNormal,
+			"Disassociated",
+			"Claim is disassociated from the pool",
+		)
+
 		return nil
 	})
 	if err != nil {
-		log.Info("Removing owner reference failed", "claim", claimObj.Name, "pool", pool.Name, "error", err)
+		log.Info("Removing owner reference failed", "claim", current.Name, "pool", pool.Name, "error", err)
 
 		return err
 	}
 
-	r.recorder.AnnotatedEventf(
-		claimObj,
-		map[string]string{
-			"Status": string(metav1.ConditionFalse),
-			"Type":   meta.NotReadyCondition,
-		},
-		corev1.EventTypeNormal,
-		"Disassociated",
-		"Claim is disassociated from the pool",
-	)
-
-	pool.RemoveClaimFromStatus(claimObj)
+	pool.RemoveClaimFromStatus(current)
 
 	return nil
 }
@@ -599,9 +607,10 @@ func (r *resourcePoolController) gatherMatchingClaims(
 	ctx context.Context,
 	log logr.Logger,
 	pool *capsulev1beta2.ResourcePool,
+	namespaces map[string]struct{},
 ) (claims []capsulev1beta2.ResourcePoolClaim, err error) {
 	if !pool.DeletionTimestamp.IsZero() {
-		return
+		return claims, err
 	}
 
 	claimList := &capsulev1beta2.ResourcePoolClaimList{}
@@ -617,6 +626,10 @@ func (r *resourcePoolController) gatherMatchingClaims(
 
 	for _, claim := range claimList.Items {
 		if meta.ReleaseAnnotationTriggers(&claim) {
+			continue
+		}
+
+		if _, ok := namespaces[claim.Namespace]; !ok {
 			continue
 		}
 
@@ -651,24 +664,19 @@ func (r *resourcePoolController) garbageCollection(
 	log logr.Logger,
 	pool *capsulev1beta2.ResourcePool,
 	claims []capsulev1beta2.ResourcePoolClaim,
-	namespaces []corev1.Namespace,
+	namespaces map[string]struct{},
 ) error {
-	currentNamespaces := make(map[string]struct{}, len(namespaces))
-	for _, ns := range namespaces {
-		currentNamespaces[ns.Name] = struct{}{}
-	}
-
 	activeClaims := make(map[string]struct{}, len(claims))
 	for _, claim := range claims {
 		activeClaims[string(claim.UID)] = struct{}{}
 	}
 
-	log.V(5).Info("available items", "namespaces", currentNamespaces, "claims", activeClaims)
+	log.V(5).Info("available items", "namespaces", namespaces, "claims", activeClaims)
 
 	namespaceMarkedForGC := make(map[string]bool, len(pool.Status.Namespaces))
 
 	for _, ns := range pool.Status.Namespaces {
-		_, exists := currentNamespaces[ns]
+		_, exists := namespaces[ns]
 		if !exists {
 			log.V(5).Info("garbage collecting namespace", "namespace", ns)
 
