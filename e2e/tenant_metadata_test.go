@@ -23,7 +23,7 @@ func getLabels(tnt capsulev1beta2.Tenant) (map[string]string, error) {
 	return current.GetLabels(), nil
 }
 
-var _ = Describe("adding metadata to a Tenant", func() {
+var _ = Describe("adding metadata to a Tenant", Label("tenant"), func() {
 	tnt := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "tenant-metadata",

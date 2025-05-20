@@ -22,7 +22,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/utils"
 )
 
-var _ = Describe("ResourcePool Tests", func() {
+var _ = Describe("ResourcePool Tests", Label("resourcepool"), func() {
 	JustAfterEach(func() {
 		Eventually(func() error {
 			poolList := &capsulev1beta2.TenantList{}
@@ -430,6 +430,7 @@ var _ = Describe("ResourcePool Tests", func() {
 			Expect(ok).To(BeTrue(), "Mismatch for expected namespaces: %s", msg)
 
 			Expect(pool.Status.NamespaceSize).To(Equal(uint(2)))
+			Expect(pool.Status.ClaimSize).To(Equal(uint(1)))
 		})
 
 		By("Verify ResourceQuota was cleaned up", func() {

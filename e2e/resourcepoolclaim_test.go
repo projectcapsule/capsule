@@ -19,7 +19,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/meta"
 )
 
-var _ = Describe("ResourcePoolClaim Tests", func() {
+var _ = Describe("ResourcePoolClaim Tests", Label("resourcepool"), func() {
 	_ = &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-claims-1",

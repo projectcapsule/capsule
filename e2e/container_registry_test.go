@@ -23,7 +23,7 @@ type Patch struct {
 	Value string `json:"value"`
 }
 
-var _ = Describe("enforcing a Container Registry", func() {
+var _ = Describe("enforcing a Container Registry", Label("tenant"), func() {
 	tnt := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "container-registry",

@@ -19,7 +19,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/utils"
 )
 
-var _ = Describe("when handling Namespace scoped Ingress hostnames collision", func() {
+var _ = Describe("when handling Namespace scoped Ingress hostnames collision", Label("ingress"), func() {
 	tnt := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "hostnames-collision-namespace",

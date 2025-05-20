@@ -18,7 +18,7 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 )
 
-var _ = Describe("preventing PersistentVolume cross-tenant mount", func() {
+var _ = Describe("preventing PersistentVolume cross-tenant mount", Label("tenant", "storage"), func() {
 	tnt1 := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "pv-one",

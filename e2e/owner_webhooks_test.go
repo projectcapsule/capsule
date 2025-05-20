@@ -19,7 +19,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api"
 )
 
-var _ = Describe("when Tenant owner interacts with the webhooks", func() {
+var _ = Describe("when Tenant owner interacts with the webhooks", Label("tenant"), func() {
 	tnt := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "tenant-owner",

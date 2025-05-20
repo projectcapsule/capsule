@@ -24,7 +24,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/utils"
 )
 
-var _ = Describe("when Tenant handles Ingress classes with networking.k8s.io/v1", func() {
+var _ = Describe("when Tenant handles Ingress classes with networking.k8s.io/v1", Label("ingress"), func() {
 	tntNoDefault := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "ic-selector-networking-v1",

@@ -26,7 +26,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api"
 )
 
-var _ = Describe("when Tenant handles Storage classes", func() {
+var _ = Describe("when Tenant handles Storage classes", Label("tenant", "storage"), func() {
 	tntNoDefaults := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "storage-class-selector",
