@@ -152,29 +152,7 @@ var _ = Describe("when Tenant handles Gateway classes", Label("gateway"), func()
 			Eventually(func() (err error) {
 				g := &gatewayv1.Gateway{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "mutated-gateway",
-						Namespace: ns.GetName(),
-					},
-					Spec: gatewayv1.GatewaySpec{
-						Listeners: []gatewayv1.Listener{
-							{
-								Name:     "http",
-								Protocol: gatewayv1.HTTPProtocolType,
-								Port:     80,
-							},
-						},
-						GatewayClassName: gatewayv1.ObjectName("very-unauthorized-and-nonexistent-class"),
-					},
-				}
-				err = k8sClient.Create(context.TODO(), g)
-				return
-			}, defaultTimeoutInterval, defaultPollInterval).ShouldNot(Succeed())
-		})
-		By("providing no tenant default or gatewayClassName", func() {
-			Eventually(func() (err error) {
-				g := &gatewayv1.Gateway{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "mutated-gateway",
+						Name:      "nonexistent-gateway",
 						Namespace: ns.GetName(),
 					},
 					Spec: gatewayv1.GatewaySpec{
