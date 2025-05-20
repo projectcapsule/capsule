@@ -224,8 +224,15 @@ golint: golangci-lint
 e2e: ginkgo
 	$(MAKE) e2e-build && $(MAKE) e2e-exec && $(MAKE) e2e-destroy
 
+API_GW         := none
+API_GW_VERSION := v1.3.0
+API_GW_LOOKUP  := kubernetes-sigs/gateway-api/
+e2e-install-deps:
+	@$(KUBECTL) apply --force-conflicts --server-side=true -f https://github.com/$(API_GW_LOOKUP)/releases/download/$(API_GW_VERSION)/standard-install.yaml
+
 e2e-build: kind
 	$(KIND) create cluster --wait=60s --name $(CLUSTER_NAME) --image kindest/node:$(KUBERNETES_SUPPORTED_VERSION)
+	$(MAKE) e2e-install-deps
 	$(MAKE) e2e-install
 
 .PHONY: e2e-install
@@ -266,6 +273,7 @@ trace-e2e: kind
 	$(KIND) create cluster --wait=60s --image kindest/node:$(KUBERNETES_SUPPORTED_VERSION) --config hack/kind-cluster.yml
 	$(MAKE) e2e-load-image CLUSTER_NAME=capsule-tracing IMAGE=$(CAPSULE_IMG) VERSION=tracing
 	$(MAKE) trace-install
+	$(MAKE) e2e-install-deps
 	$(MAKE) e2e-exec
 	$(KIND) delete cluster --name capsule-tracing
 

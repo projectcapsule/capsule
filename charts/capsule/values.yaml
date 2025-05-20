@@ -313,6 +313,12 @@ webhooks:
             operator: Exists
           - key: projectcapsule.dev/cordoned
             operator: Exists
+    gateways:
+      failurePolicy: Fail
+      namespaceSelector:
+        matchExpressions:
+          - key: capsule.clastix.io/tenant
+            operator: Exists
     ingresses:
       failurePolicy: Fail
       namespaceSelector:
