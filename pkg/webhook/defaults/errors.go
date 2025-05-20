@@ -5,6 +5,8 @@ package defaults
 
 import (
 	"fmt"
+	"reflect"
+	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
 
 type StorageClassError struct {
@@ -53,6 +55,23 @@ func NewGatewayClassError(class string, msg error) error {
 
 func (e GatewayClassError) Error() string {
 	return fmt.Sprintf("Failed to resolve Gateway Class %s: %s", e.gatewayClass, e.msg)
+}
+
+type GatewayError struct {
+	gateway string
+	msg     error
+}
+
+func NewGatewayError(gateway gatewayv1.ObjectName, msg error) error {
+
+	return &GatewayError{
+		gateway: reflect.ValueOf(gateway).String(),
+		msg:     msg,
+	}
+}
+
+func (e GatewayError) Error() string {
+	return fmt.Sprintf("Failed to resolve Gateway %s: %s", e.gateway, e.msg)
 }
 
 type PriorityClassError struct {

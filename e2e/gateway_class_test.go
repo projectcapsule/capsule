@@ -5,7 +5,6 @@ package e2e
 
 import (
 	"context"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -90,7 +89,7 @@ var _ = Describe("when Tenant handles Gateway classes", Label("gateway"), func()
 		},
 	}
 
-	tntWithLabel := &capsulev1beta2.Tenant{
+	tntWithoutDefault := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "tnt-with-label-selector-only",
 		},
@@ -116,7 +115,7 @@ var _ = Describe("when Tenant handles Gateway classes", Label("gateway"), func()
 	}
 	JustBeforeEach(func() {
 		utilruntime.Must(gatewayv1.Install(scheme.Scheme))
-		for _, tnt := range []*capsulev1beta2.Tenant{tntWithDefault, tntWithoutLabel, tntWithLabel} {
+		for _, tnt := range []*capsulev1beta2.Tenant{tntWithDefault, tntWithoutLabel, tntWithoutDefault} {
 			tnt.ResourceVersion = ""
 			EventuallyCreation(func() error {
 				return k8sClient.Create(context.TODO(), tnt)
@@ -131,7 +130,7 @@ var _ = Describe("when Tenant handles Gateway classes", Label("gateway"), func()
 	})
 	JustAfterEach(func() {
 		utilruntime.Must(gatewayv1.Install(scheme.Scheme))
-		for _, tnt := range []*capsulev1beta2.Tenant{tntWithDefault, tntWithoutLabel, tntWithLabel} {
+		for _, tnt := range []*capsulev1beta2.Tenant{tntWithDefault, tntWithoutLabel, tntWithoutDefault} {
 			EventuallyCreation(func() error {
 				return k8sClient.Delete(context.TODO(), tnt)
 			}).Should(Succeed())
@@ -140,12 +139,12 @@ var _ = Describe("when Tenant handles Gateway classes", Label("gateway"), func()
 			Expect(k8sClient.Delete(context.TODO(), crd)).Should(Succeed())
 		}
 	})
-	It("should block or mutate Gateway", func() {
+	It("should block Gateway", func() {
 		ns := NewNamespace("")
 		NamespaceCreation(ns, tntWithDefault.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(tntWithDefault, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
-		By("providing unauthorized class (block)", func() {
+		By("providing unauthorized gatewayClassName", func() {
 			Eventually(func() (err error) {
 				g := &gatewayv1.Gateway{
 					ObjectMeta: metav1.ObjectMeta{
@@ -168,31 +167,52 @@ var _ = Describe("when Tenant handles Gateway classes", Label("gateway"), func()
 			}, defaultTimeoutInterval, defaultPollInterval).ShouldNot(Succeed())
 		})
 
-		By("providing nonexistent gatewayClassName (mutate)", func() {
-			g := &gatewayv1.Gateway{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "mutated-gateway",
-					Namespace: ns.GetName(),
-				},
-				Spec: gatewayv1.GatewaySpec{
-					Listeners: []gatewayv1.Listener{
-						{
-							Name:     "http",
-							Protocol: gatewayv1.HTTPProtocolType,
-							Port:     80,
-						},
+		By("providing nonexistent gatewayClassName", func() {
+			Eventually(func() (err error) {
+				g := &gatewayv1.Gateway{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "mutated-gateway",
+						Namespace: ns.GetName(),
 					},
-					GatewayClassName: gatewayv1.ObjectName("very-unauthorized-and-nonexistent-class"),
-				},
-			}
-			Expect(k8sClient.Create(context.TODO(), g)).Should(Succeed())
-			gw := &gatewayv1.Gateway{}
-			Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: g.GetName(), Namespace: g.Namespace}, gw)).Should(Succeed())
-			Expect(gw.Spec.GatewayClassName).Should(Equal(gatewayv1.ObjectName("customer-class")))
-			return
+					Spec: gatewayv1.GatewaySpec{
+						Listeners: []gatewayv1.Listener{
+							{
+								Name:     "http",
+								Protocol: gatewayv1.HTTPProtocolType,
+								Port:     80,
+							},
+						},
+						GatewayClassName: gatewayv1.ObjectName("very-unauthorized-and-nonexistent-class"),
+					},
+				}
+				err = k8sClient.Create(context.TODO(), g)
+				return
+			}, defaultTimeoutInterval, defaultPollInterval).ShouldNot(Succeed())
+		})
+		By("providing no tenant default or gatewayClassName", func() {
+			Eventually(func() (err error) {
+				g := &gatewayv1.Gateway{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "mutated-gateway",
+						Namespace: ns.GetName(),
+					},
+					Spec: gatewayv1.GatewaySpec{
+						Listeners: []gatewayv1.Listener{
+							{
+								Name:     "http",
+								Protocol: gatewayv1.HTTPProtocolType,
+								Port:     80,
+							},
+						},
+						GatewayClassName: gatewayv1.ObjectName("very-unauthorized-and-nonexistent-class"),
+					},
+				}
+				err = k8sClient.Create(context.TODO(), g)
+				return
+			}, defaultTimeoutInterval, defaultPollInterval).ShouldNot(Succeed())
 		})
 	})
-	It("providing allowed gatewayClassName", func() {
+	It("should allow Gateway", func() {
 		ns := NewNamespace("")
 		NamespaceCreation(ns, tntWithDefault.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(tntWithDefault, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
@@ -239,6 +259,32 @@ var _ = Describe("when Tenant handles Gateway classes", Label("gateway"), func()
 			Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: g.GetName(), Namespace: g.Namespace}, gw)).Should(Succeed())
 			Expect(gw.Spec.GatewayClassName).Should(Equal(gatewayv1.ObjectName("customer-class")))
 			return
+		})
+	})
+	It("should fail on invalid configuration", func() {
+		ns := NewNamespace("")
+		NamespaceCreation(ns, tntWithoutDefault.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+		TenantNamespaceList(tntWithoutDefault, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
+		By("providing empty GatewayClassName", func() {
+			Eventually(func() (err error) {
+				g := &gatewayv1.Gateway{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "empty-gateway",
+						Namespace: ns.GetName(),
+					},
+					Spec: gatewayv1.GatewaySpec{
+						Listeners: []gatewayv1.Listener{
+							{
+								Name:     "http",
+								Protocol: gatewayv1.HTTPProtocolType,
+								Port:     80,
+							},
+						},
+					},
+				}
+				err = k8sClient.Create(context.TODO(), g)
+				return
+			}, defaultTimeoutInterval, defaultPollInterval).ShouldNot(Succeed())
 		})
 	})
 })
