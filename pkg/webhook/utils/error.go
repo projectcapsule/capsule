@@ -37,3 +37,14 @@ func DefaultAllowedValuesErrorMessage(allowed api.DefaultAllowedListSpec, err st
 
 	return err
 }
+
+func SelectionListWithDefaultErrorMessage(allowed api.SelectionListWithDefaultSpec, err string) string {
+	var extra []string
+	if len(allowed.MatchLabels) > 0 || len(allowed.MatchExpressions) > 0 {
+		extra = append(extra, "matching the label selector defined in the Tenant")
+	}
+
+	err += strings.Join(extra, " or ")
+
+	return err
+}

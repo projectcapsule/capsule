@@ -19,7 +19,7 @@ CAPSULE_IMG     ?= $(REGISTRY)/$(IMG_BASE)
 CLUSTER_NAME    ?= capsule
 
 ## Kubernetes Version Support
-KUBERNETES_SUPPORTED_VERSION ?= "v1.31.0"
+KUBERNETES_SUPPORTED_VERSION ?= "v1.33.0"
 
 ## Tool Binaries
 KUBECTL ?= kubectl
@@ -46,7 +46,7 @@ all: manager
 # Run tests
 .PHONY: test
 test: test-clean generate manifests test-clean
-	@GO111MODULE=on go test -v ./... -coverprofile coverage.out
+	@GO111MODULE=on go test -v $(shell go list ./... | grep -v "e2e") -coverprofile coverage.out
 
 .PHONY: test-clean
 test-clean: ## Clean tests cache
@@ -217,15 +217,22 @@ goimports:
 # Linting code as PR is expecting
 .PHONY: golint
 golint: golangci-lint
-	$(GOLANGCI_LINT) run -c .golangci.yml --verbose --fix
+	$(GOLANGCI_LINT) run -c .golangci.yaml --verbose --fix
 
 # Running e2e tests in a KinD instance
 .PHONY: e2e
 e2e: ginkgo
 	$(MAKE) e2e-build && $(MAKE) e2e-exec && $(MAKE) e2e-destroy
 
+API_GW         := none
+API_GW_VERSION := v1.3.0
+API_GW_LOOKUP  := kubernetes-sigs/gateway-api/
+e2e-install-deps:
+	@$(KUBECTL) apply --force-conflicts --server-side=true -f https://github.com/$(API_GW_LOOKUP)/releases/download/$(API_GW_VERSION)/standard-install.yaml
+
 e2e-build: kind
 	$(KIND) create cluster --wait=60s --name $(CLUSTER_NAME) --image kindest/node:$(KUBERNETES_SUPPORTED_VERSION)
+	$(MAKE) e2e-install-deps
 	$(MAKE) e2e-install
 
 .PHONY: e2e-install
@@ -266,6 +273,7 @@ trace-e2e: kind
 	$(KIND) create cluster --wait=60s --image kindest/node:$(KUBERNETES_SUPPORTED_VERSION) --config hack/kind-cluster.yml
 	$(MAKE) e2e-load-image CLUSTER_NAME=capsule-tracing IMAGE=$(CAPSULE_IMG) VERSION=tracing
 	$(MAKE) trace-install
+	$(MAKE) e2e-install-deps
 	$(MAKE) e2e-exec
 	$(KIND) delete cluster --name capsule-tracing
 
@@ -325,7 +333,7 @@ helm-doc:
 # -- Tools
 ####################
 CONTROLLER_GEN         := $(LOCALBIN)/controller-gen
-CONTROLLER_GEN_VERSION ?= v0.17.1
+CONTROLLER_GEN_VERSION ?= v0.18.0
 CONTROLLER_GEN_LOOKUP  := kubernetes-sigs/controller-tools
 controller-gen:
 	@test -s $(CONTROLLER_GEN) && $(CONTROLLER_GEN) --version | grep -q $(CONTROLLER_GEN_VERSION) || \
@@ -343,25 +351,25 @@ ct:
 	$(call go-install-tool,$(CT),github.com/$(CT_LOOKUP)/v3/ct@$(CT_VERSION))
 
 KIND         := $(LOCALBIN)/kind
-KIND_VERSION := v0.26.0
+KIND_VERSION := v0.29.0
 KIND_LOOKUP  := kubernetes-sigs/kind
 kind:
 	@test -s $(KIND) && $(KIND) --version | grep -q $(KIND_VERSION) || \
 	$(call go-install-tool,$(KIND),sigs.k8s.io/kind/cmd/kind@$(KIND_VERSION))
 
 KO           := $(LOCALBIN)/ko
-KO_VERSION   := v0.17.1
+KO_VERSION   := v0.18.0
 KO_LOOKUP    := google/ko
 ko:
 	@test -s $(KO) && $(KO) -h | grep -q $(KO_VERSION) || \
 	$(call go-install-tool,$(KO),github.com/$(KO_LOOKUP)@$(KO_VERSION))
 
 GOLANGCI_LINT          := $(LOCALBIN)/golangci-lint
-GOLANGCI_LINT_VERSION  := v1.63.4
+GOLANGCI_LINT_VERSION  := v2.1.6
 GOLANGCI_LINT_LOOKUP   := golangci/golangci-lint
 golangci-lint: ## Download golangci-lint locally if necessary.
 	@test -s $(GOLANGCI_LINT) && $(GOLANGCI_LINT) -h | grep -q $(GOLANGCI_LINT_VERSION) || \
-	$(call go-install-tool,$(GOLANGCI_LINT),github.com/$(GOLANGCI_LINT_LOOKUP)/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION))
+	$(call go-install-tool,$(GOLANGCI_LINT),github.com/$(GOLANGCI_LINT_LOOKUP)/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION))
 
 APIDOCS_GEN         := $(LOCALBIN)/crdoc
 APIDOCS_GEN_VERSION := v0.6.4
@@ -371,7 +379,7 @@ apidocs-gen: ## Download crdoc locally if necessary.
 	$(call go-install-tool,$(APIDOCS_GEN),fybrik.io/crdoc@$(APIDOCS_GEN_VERSION))
 
 HARPOON         := $(LOCALBIN)/harpoon
-HARPOON_VERSION := v0.9.5
+HARPOON_VERSION := v0.10.1
 HARPOON_LOOKUP  := alegrey91/harpoon
 harpoon:
 	@mkdir $(LOCALBIN)

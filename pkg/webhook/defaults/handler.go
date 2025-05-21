@@ -49,13 +49,15 @@ func (h *handler) OnUpdate(client client.Client, decoder admission.Decoder, reco
 func (h *handler) mutate(ctx context.Context, req admission.Request, c client.Client, decoder admission.Decoder, recorder record.EventRecorder) *admission.Response {
 	var response *admission.Response
 
-	switch {
-	case req.Resource == (metav1.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}):
+	switch req.Resource {
+	case metav1.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}:
 		response = mutatePodDefaults(ctx, req, c, decoder, recorder, req.Namespace)
-	case req.Resource == (metav1.GroupVersionResource{Group: "", Version: "v1", Resource: "persistentvolumeclaims"}):
+	case metav1.GroupVersionResource{Group: "", Version: "v1", Resource: "persistentvolumeclaims"}:
 		response = mutatePVCDefaults(ctx, req, c, decoder, recorder, req.Namespace)
-	case req.Resource == (metav1.GroupVersionResource{Group: "networking.k8s.io", Version: "v1", Resource: "ingresses"}) || req.Resource == (metav1.GroupVersionResource{Group: "networking.k8s.io", Version: "v1beta1", Resource: "ingresses"}):
+	case metav1.GroupVersionResource{Group: "networking.k8s.io", Version: "v1", Resource: "ingresses"}, metav1.GroupVersionResource{Group: "networking.k8s.io", Version: "v1beta1", Resource: "ingresses"}:
 		response = mutateIngressDefaults(ctx, req, h.version, c, decoder, recorder, req.Namespace)
+	case metav1.GroupVersionResource{Group: "gateway.networking.k8s.io", Version: "v1", Resource: "gateways"}:
+		response = mutateGatewayDefaults(ctx, req, c, decoder, recorder, req.Namespace)
 	}
 
 	if response == nil {

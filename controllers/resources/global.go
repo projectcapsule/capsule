@@ -43,40 +43,6 @@ func (r *Global) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-func (r *Global) enqueueRequestFromTenant(ctx context.Context, object client.Object) (reqs []reconcile.Request) {
-	tnt := object.(*capsulev1beta2.Tenant) //nolint:forcetypeassert
-
-	resList := capsulev1beta2.GlobalTenantResourceList{}
-	if err := r.client.List(ctx, &resList); err != nil {
-		return nil
-	}
-
-	set := sets.NewString()
-
-	for _, res := range resList.Items {
-		tntSelector := res.Spec.TenantSelector
-
-		selector, err := metav1.LabelSelectorAsSelector(&tntSelector)
-		if err != nil {
-			continue
-		}
-
-		if selector.Matches(labels.Set(tnt.GetLabels())) {
-			set.Insert(res.GetName())
-		}
-	}
-	// No need of ordered value here
-	for res := range set {
-		reqs = append(reqs, reconcile.Request{
-			NamespacedName: types.NamespacedName{
-				Name: res,
-			},
-		})
-	}
-
-	return reqs
-}
-
 func (r *Global) SetupWithManager(mgr ctrl.Manager) error {
 	r.client = mgr.GetClient()
 	r.processor = Processor{
@@ -127,6 +93,40 @@ func (r *Global) Reconcile(ctx context.Context, request reconcile.Request) (reco
 
 	// Handle non-deleted GlobalTenantResource
 	return r.reconcileNormal(ctx, tntResource)
+}
+
+func (r *Global) enqueueRequestFromTenant(ctx context.Context, object client.Object) (reqs []reconcile.Request) {
+	tnt := object.(*capsulev1beta2.Tenant) //nolint:forcetypeassert
+
+	resList := capsulev1beta2.GlobalTenantResourceList{}
+	if err := r.client.List(ctx, &resList); err != nil {
+		return nil
+	}
+
+	set := sets.NewString()
+
+	for _, res := range resList.Items {
+		tntSelector := res.Spec.TenantSelector
+
+		selector, err := metav1.LabelSelectorAsSelector(&tntSelector)
+		if err != nil {
+			continue
+		}
+
+		if selector.Matches(labels.Set(tnt.GetLabels())) {
+			set.Insert(res.GetName())
+		}
+	}
+	// No need of ordered value here
+	for res := range set {
+		reqs = append(reqs, reconcile.Request{
+			NamespacedName: types.NamespacedName{
+				Name: res,
+			},
+		})
+	}
+
+	return reqs
 }
 
 func (r *Global) reconcileNormal(ctx context.Context, tntResource *capsulev1beta2.GlobalTenantResource) (reconcile.Result, error) {

@@ -27,6 +27,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	ctrlwebhook "sigs.k8s.io/controller-runtime/pkg/webhook"
+	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	capsulev1beta1 "github.com/projectcapsule/capsule/api/v1beta1"
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
@@ -42,11 +43,12 @@ import (
 	"github.com/projectcapsule/capsule/pkg/indexer"
 	"github.com/projectcapsule/capsule/pkg/webhook"
 	"github.com/projectcapsule/capsule/pkg/webhook/defaults"
+	"github.com/projectcapsule/capsule/pkg/webhook/gateway"
 	"github.com/projectcapsule/capsule/pkg/webhook/ingress"
-	namespacewebhook "github.com/projectcapsule/capsule/pkg/webhook/namespace"
+	namespacemutation "github.com/projectcapsule/capsule/pkg/webhook/namespace/mutation"
+	namespacevalidation "github.com/projectcapsule/capsule/pkg/webhook/namespace/validation"
 	"github.com/projectcapsule/capsule/pkg/webhook/networkpolicy"
 	"github.com/projectcapsule/capsule/pkg/webhook/node"
-	"github.com/projectcapsule/capsule/pkg/webhook/ownerreference"
 	"github.com/projectcapsule/capsule/pkg/webhook/pod"
 	"github.com/projectcapsule/capsule/pkg/webhook/pvc"
 	"github.com/projectcapsule/capsule/pkg/webhook/route"
@@ -67,6 +69,7 @@ func init() {
 	utilruntime.Must(capsulev1beta1.AddToScheme(scheme))
 	utilruntime.Must(capsulev1beta2.AddToScheme(scheme))
 	utilruntime.Must(apiextensionsv1.AddToScheme(scheme))
+	utilruntime.Must(gatewayv1.Install(scheme))
 }
 
 func printVersion() {
@@ -220,16 +223,18 @@ func main() {
 	webhooksList := append(
 		make([]webhook.Webhook, 0),
 		route.Pod(pod.ImagePullPolicy(), pod.ContainerRegistry(), pod.PriorityClass(), pod.RuntimeClass()),
-		route.Namespace(utils.InCapsuleGroups(cfg, namespacewebhook.PatchHandler(), namespacewebhook.QuotaHandler(), namespacewebhook.FreezeHandler(cfg), namespacewebhook.PrefixHandler(cfg), namespacewebhook.UserMetadataHandler())),
+		route.Namespace(utils.InCapsuleGroups(cfg, namespacevalidation.PatchHandler(), namespacevalidation.QuotaHandler(), namespacevalidation.FreezeHandler(cfg), namespacevalidation.PrefixHandler(cfg), namespacevalidation.UserMetadataHandler())),
 		route.Ingress(ingress.Class(cfg, kubeVersion), ingress.Hostnames(cfg), ingress.Collision(cfg), ingress.Wildcard()),
 		route.PVC(pvc.Validating(), pvc.PersistentVolumeReuse()),
 		route.Service(service.Handler()),
 		route.TenantResourceObjects(utils.InCapsuleGroups(cfg, tntresource.WriteOpsHandler())),
 		route.NetworkPolicy(utils.InCapsuleGroups(cfg, networkpolicy.Handler())),
 		route.Tenant(tenant.NameHandler(), tenant.RoleBindingRegexHandler(), tenant.IngressClassRegexHandler(), tenant.StorageClassRegexHandler(), tenant.ContainerRegistryRegexHandler(), tenant.HostnameRegexHandler(), tenant.FreezedEmitter(), tenant.ServiceAccountNameHandler(), tenant.ForbiddenAnnotationsRegexHandler(), tenant.ProtectedHandler(), tenant.MetaHandler()),
-		route.OwnerReference(utils.InCapsuleGroups(cfg, ownerreference.Handler(cfg))),
-		route.Cordoning(tenant.CordoningHandler(cfg), tenant.ResourceCounterHandler(manager.GetClient())),
+		route.Cordoning(tenant.CordoningHandler(cfg)),
 		route.Node(utils.InCapsuleGroups(cfg, node.UserMetadataHandler(cfg, kubeVersion))),
+		route.NamespacePatch(utils.InCapsuleGroups(cfg, namespacemutation.CordoningLabelHandler(cfg), namespacemutation.OwnerReferenceHandler(cfg), namespacemutation.MetadataHandler(cfg))),
+		route.CustomResources(tenant.ResourceCounterHandler(manager.GetClient())),
+		route.Gateway(gateway.Class(cfg)),
 		route.Defaults(defaults.Handler(cfg, kubeVersion)),
 	)
 
@@ -266,17 +271,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&servicelabelscontroller.EndpointsLabelsReconciler{
-		Log: ctrl.Log.WithName("controllers").WithName("EndpointLabels"),
-	}).SetupWithManager(ctx, manager); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "EndpointLabels")
-		os.Exit(1)
-	}
-
 	if err = (&servicelabelscontroller.EndpointSlicesLabelsReconciler{
-		Log:          ctrl.Log.WithName("controllers").WithName("EndpointSliceLabels"),
-		VersionMinor: kubeVersion.Minor(),
-		VersionMajor: kubeVersion.Major(),
+		Log: ctrl.Log.WithName("controllers").WithName("EndpointSliceLabels"),
 	}).SetupWithManager(ctx, manager); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "EndpointSliceLabels")
 	}

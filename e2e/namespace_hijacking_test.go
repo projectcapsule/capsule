@@ -1,5 +1,3 @@
-//go:build e2e
-
 // Copyright 2020-2023 Project Capsule Authors.
 // SPDX-License-Identifier: Apache-2.0
 
@@ -8,8 +6,9 @@ package e2e
 import (
 	"context"
 	"fmt"
-	corev1 "k8s.io/api/core/v1"
 	"math/rand"
+
+	corev1 "k8s.io/api/core/v1"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
