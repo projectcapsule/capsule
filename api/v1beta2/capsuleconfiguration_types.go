@@ -31,6 +31,8 @@ type CapsuleConfigurationSpec struct {
 	// when not using an already provided CA and certificate, or when these are managed externally with Vault, or cert-manager.
 	// +kubebuilder:default=true
 	EnableTLSReconciler bool `json:"enableTLSReconciler"` //nolint:tagliatelle
+	// Define Kubernetes-Client Configurations
+	ServiceAccountClient *api.ServiceAccountClient `json:"serviceAccountClient,omitempty"`
 }
 
 type NodeMetadata struct {

@@ -1,0 +1,24 @@
+apiVersion: capsule.clastix.io/v1beta2
+kind: Tenant
+metadata:
+  labels:
+    kubernetes.io/metadata.name: migration
+  name: migration
+spec:
+  owners:
+  - clusterRoles:
+    - admin
+    - capsule-namespace-deleter
+    kind: User
+    name: alice
+  preventDeletion: false
+  resourceQuotas:
+    items:
+    - hard:
+        limits.cpu: "2"
+        limits.memory: 2Gi
+        requests.cpu: "2"
+        requests.memory: 2Gi
+    - hard:
+        pods: "7"
+    scope: Tenant

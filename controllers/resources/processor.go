@@ -80,7 +80,15 @@ func (r *Processor) HandlePruning(ctx context.Context, current, desired sets.Set
 }
 
 //nolint:gocognit
-func (r *Processor) HandleSection(ctx context.Context, tnt capsulev1beta2.Tenant, allowCrossNamespaceSelection bool, tenantLabel string, resourceIndex int, spec capsulev1beta2.ResourceSpec) ([]string, error) {
+func (r *Processor) HandleSection(
+	ctx context.Context,
+	c client.Client,
+	tnt capsulev1beta2.Tenant,
+	allowCrossNamespaceSelection bool,
+	tenantLabel string,
+	resourceIndex int,
+	spec capsulev1beta2.ResourceSpec,
+) ([]string, error) {
 	log := ctrllog.FromContext(ctx)
 
 	var err error

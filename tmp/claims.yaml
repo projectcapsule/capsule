@@ -1,0 +1,25 @@
+---
+apiVersion: capsule.clastix.io/v1beta2
+kind: ResourcePoolClaim
+metadata:
+  name: compute
+  namespace: migration-dev
+spec:
+  pool: "migration-compute"
+  claim:
+    requests.cpu: 375m
+    requests.memory: 384Mi
+    limits.cpu: 375m
+    limits.memory: 384Mi
+---
+apiVersion: capsule.clastix.io/v1beta2
+kind: ResourcePoolClaim
+metadata:
+  name: pods
+  namespace: migration-dev
+spec:
+  pool: "migration-size"
+  claim:
+    pods: "3"
+
+

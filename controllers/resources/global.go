@@ -22,11 +22,25 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/configuration"
 )
 
-type Global struct {
-	client    client.Client
-	processor Processor
+type globalResourceController struct {
+	client        client.Client
+	processor     Processor
+	Configuration configuration.Configuration
+}
+
+func (r *Global) SetupWithManager(mgr ctrl.Manager) error {
+	r.client = mgr.GetClient()
+	r.processor = Processor{
+		client: mgr.GetClient(),
+	}
+
+	return ctrl.NewControllerManagedBy(mgr).
+		For(&capsulev1beta2.GlobalTenantResource{}).
+		Watches(&capsulev1beta2.Tenant{}, handler.EnqueueRequestsFromMapFunc(r.enqueueRequestFromTenant)).
+		Complete(r)
 }
 
 func (r *Global) enqueueRequestFromTenant(ctx context.Context, object client.Object) (reqs []reconcile.Request) {

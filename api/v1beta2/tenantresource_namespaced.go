@@ -22,6 +22,9 @@ type TenantResourceSpec struct {
 	PruningOnDelete *bool `json:"pruningOnDelete,omitempty"`
 	// Defines the rules to select targeting Namespace, along with the objects that must be replicated.
 	Resources []ResourceSpec `json:"resources"`
+	// Local ServiceAccount which will perform all the actions defined in the TenantResource
+	// You must provide permissions accordingly to that ServiceAccount
+	ServiceAccountName string `json:"serivceAccountName,omitempty"`
 }
 
 type ResourceSpec struct {

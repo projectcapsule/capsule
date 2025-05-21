@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
+	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -18,13 +19,15 @@ import (
 )
 
 type Manager struct {
-	client client.Client
+	client     client.Client
+	restClient *rest.Config
 
 	Log logr.Logger
 }
 
 func (c *Manager) SetupWithManager(mgr ctrl.Manager, configurationName string) error {
 	c.client = mgr.GetClient()
+	c.restClient = mgr.GetConfig()
 
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&capsulev1beta2.CapsuleConfiguration{}, utils.NamesMatchingPredicate(configurationName)).
@@ -34,7 +37,7 @@ func (c *Manager) SetupWithManager(mgr ctrl.Manager, configurationName string) e
 func (c *Manager) Reconcile(ctx context.Context, request reconcile.Request) (res reconcile.Result, err error) {
 	c.Log.Info("CapsuleConfiguration reconciliation started", "request.name", request.Name)
 
-	cfg := configuration.NewCapsuleConfiguration(ctx, c.client, request.Name)
+	cfg := configuration.NewCapsuleConfiguration(ctx, c.client, c.restClient, request.Name)
 	// Validating the Capsule Configuration options
 	if _, err = cfg.ProtectedNamespaceRegexp(); err != nil {
 		panic(errors.Wrap(err, "Invalid configuration for protected Namespace regex"))

@@ -1,0 +1,34 @@
+---
+apiVersion: capsule.clastix.io/v1beta2
+kind: ResourcePool
+metadata:
+  name: migration-compute
+spec:
+  config:
+    defaultsZero: true
+    orderedQueue: false
+  selectors:
+  - matchLabels:
+      capsule.clastix.io/tenant: migration
+  quota:
+    hard:
+      limits.cpu: "2"
+      limits.memory: 2Gi
+      requests.cpu: "2"
+      requests.memory: 2Gi
+---
+apiVersion: capsule.clastix.io/v1beta2
+kind: ResourcePool
+metadata:
+  name: migration-size
+spec:
+  config:
+    defaultsZero: true
+  selectors:
+  - matchLabels:
+      capsule.clastix.io/tenant: migration
+  quota:
+    hard:
+      pods: "7"
+
+
