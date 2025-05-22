@@ -24,7 +24,7 @@ jobs:
   e2e:
     name: E2E Testing
     runs-on:
-      labels: ubuntu-latest-8-cores
+      labels: ubuntu-latest-16-cores
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
