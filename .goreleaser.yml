@@ -9,7 +9,7 @@ gomod:
   proxy: false
 builds:
   - id: "{{ .ProjectName }}"
-    main: .
+    main: ./cmd/
     binary: "{{ .ProjectName }}-{{ .Os }}-{{ .Arch }}"
     env:
       - CGO_ENABLED=0
@@ -30,7 +30,7 @@ builds:
           -X main.BuildTime={{ .Date }}
           -X main.GitRepo={{ .ProjectName }}
   # - id: "{{ .ProjectName }}-wasm"
-  #   main: .
+  #   main: ./cmd/
   #   binary: "{{ .ProjectName }}.wasm"
   #   env:
   #     - CGO_ENABLED=0
