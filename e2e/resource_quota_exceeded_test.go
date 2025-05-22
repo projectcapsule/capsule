@@ -21,7 +21,7 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 )
 
-var _ = Describe("exceeding a Tenant resource quota", func() {
+var _ = Describe("exceeding a Tenant resource quota", Label("resourcequota"), func() {
 	tnt := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "tenant-resources-changes",

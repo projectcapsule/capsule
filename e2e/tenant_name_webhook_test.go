@@ -13,7 +13,7 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 )
 
-var _ = Describe("creating a Tenant with wrong name", func() {
+var _ = Describe("creating a Tenant with wrong name", Label("tenant"), func() {
 	tnt := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "non_rfc_dns_1123",

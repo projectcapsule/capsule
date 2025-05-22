@@ -18,7 +18,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/webhook/utils"
 )
 
-var _ = Describe("modifying node labels and annotations", func() {
+var _ = Describe("modifying node labels and annotations", Label("config", "nodes"), func() {
 	tnt := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "tenant-node-user-metadata-forbidden",

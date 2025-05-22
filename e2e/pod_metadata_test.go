@@ -16,7 +16,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
-var _ = Describe("adding metadata to Pod objects", func() {
+var _ = Describe("adding metadata to Pod objects", Label("pod"), func() {
 	tnt := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "pod-metadata",

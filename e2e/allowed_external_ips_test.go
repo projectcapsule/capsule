@@ -16,7 +16,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api"
 )
 
-var _ = Describe("enforcing an allowed set of Service external IPs", func() {
+var _ = Describe("enforcing an allowed set of Service external IPs", Label("tenant"), func() {
 	tnt := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "allowed-external-ip",

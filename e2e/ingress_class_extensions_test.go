@@ -19,7 +19,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/utils"
 )
 
-var _ = Describe("when Tenant handles Ingress classes with extensions/v1beta1", func() {
+var _ = Describe("when Tenant handles Ingress classes with extensions/v1beta1", Label("ingress"), func() {
 	tnt := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "ingress-class-extensions-v1beta1",

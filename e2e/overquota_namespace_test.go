@@ -14,7 +14,7 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 )
 
-var _ = Describe("creating a Namespace in over-quota of three", func() {
+var _ = Describe("creating a Namespace in over-quota of three", Label("namespace"), func() {
 	tnt := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "over-quota-tenant",

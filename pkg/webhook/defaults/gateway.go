@@ -6,10 +6,11 @@ package defaults
 import (
 	"context"
 	"encoding/json"
+	"net/http"
+
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/tools/record"
-	"net/http"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
@@ -42,6 +43,7 @@ func mutateGatewayDefaults(ctx context.Context, req admission.Request, c client.
 	}
 
 	var mutate bool
+
 	gatewayClass, err := utils.GetGatewayClassClassByObjectName(ctx, c, gatewayObj.Spec.GatewayClassName)
 
 	if gatewayClass == nil {
@@ -63,6 +65,7 @@ func mutateGatewayDefaults(ctx context.Context, req admission.Request, c client.
 	} else {
 		mutate = true
 	}
+
 	if mutate = mutate || (gatewayClass.Name == allowed.Default); !mutate {
 		return nil
 	}

@@ -19,7 +19,7 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 )
 
-var _ = Describe("enforcing a Runtime Class", func() {
+var _ = Describe("enforcing a Runtime Class", Label("pod"), func() {
 	tnt := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "runtime-class",

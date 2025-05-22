@@ -1,0 +1,24 @@
+{{- if $.Values.rbac.resourcepoolclaims.create }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "capsule.fullname" $ }}-resourcepoolclaims
+  labels:
+    {{- toYaml $.Values.rbac.resourcepoolclaims.labels | nindent 4 }}
+rules:
+- apiGroups: ["capsule.clastix.io"]
+  resources: ["resourcepoolclaims"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+{{- end }}
+{{- if $.Values.rbac.resources.create }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "capsule.fullname" $ }}-resources
+  labels:
+    {{- toYaml $.Values.rbac.resources.labels | nindent 4 }}
+rules:
+- apiGroups: ["capsule.clastix.io"]
+  resources: ["tenantresources"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+{{- end }}

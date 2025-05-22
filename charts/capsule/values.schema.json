@@ -375,6 +375,43 @@
             },
             "type": "object"
         },
+        "rbac": {
+            "properties": {
+                "resourcepoolclaims": {
+                    "properties": {
+                        "create": {
+                            "type": "boolean"
+                        },
+                        "labels": {
+                            "properties": {
+                                "rbac.authorization.k8s.io/aggregate-to-admin": {
+                                    "type": "string"
+                                }
+                            },
+                            "type": "object"
+                        }
+                    },
+                    "type": "object"
+                },
+                "resources": {
+                    "properties": {
+                        "create": {
+                            "type": "boolean"
+                        },
+                        "labels": {
+                            "properties": {
+                                "rbac.authorization.k8s.io/aggregate-to-admin": {
+                                    "type": "string"
+                                }
+                            },
+                            "type": "object"
+                        }
+                    },
+                    "type": "object"
+                }
+            },
+            "type": "object"
+        },
         "replicaCount": {
             "type": "integer"
         },
@@ -810,6 +847,55 @@
                                                 "type": "object"
                                             },
                                             "type": "array"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            },
+                            "type": "object"
+                        },
+                        "resourcepools": {
+                            "properties": {
+                                "claims": {
+                                    "properties": {
+                                        "failurePolicy": {
+                                            "type": "string"
+                                        },
+                                        "matchPolicy": {
+                                            "type": "string"
+                                        },
+                                        "namespaceSelector": {
+                                            "properties": {},
+                                            "type": "object"
+                                        },
+                                        "objectSelector": {
+                                            "properties": {},
+                                            "type": "object"
+                                        },
+                                        "reinvocationPolicy": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                },
+                                "pools": {
+                                    "properties": {
+                                        "failurePolicy": {
+                                            "type": "string"
+                                        },
+                                        "matchPolicy": {
+                                            "type": "string"
+                                        },
+                                        "namespaceSelector": {
+                                            "properties": {},
+                                            "type": "object"
+                                        },
+                                        "objectSelector": {
+                                            "properties": {},
+                                            "type": "object"
+                                        },
+                                        "reinvocationPolicy": {
+                                            "type": "string"
                                         }
                                     },
                                     "type": "object"
