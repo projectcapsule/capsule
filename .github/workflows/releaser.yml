@@ -46,7 +46,7 @@ jobs:
 
   create-release:
     needs: seccomp-generation
-    runs-on: ubuntu-latest-cores
+    runs-on: ubuntu-latest
     permissions:
       contents: write
       id-token: write
