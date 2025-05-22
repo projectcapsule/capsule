@@ -26,4 +26,4 @@ spec:
           limits:
             cpu: 0.125
             memory: 128Mi
-      
+

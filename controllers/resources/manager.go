@@ -7,33 +7,28 @@ import (
 	"fmt"
 
 	"github.com/go-logr/logr"
-	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
-	"github.com/projectcapsule/capsule/pkg/metrics"
+	"github.com/projectcapsule/capsule/pkg/configuration"
 )
 
 func Add(
 	log logr.Logger,
 	mgr manager.Manager,
-	recorder record.EventRecorder,
+	configuration configuration.Configuration,
 ) (err error) {
 	if err = (&globalResourceController{
-		Client:   mgr.GetClient(),
-		log:      log.WithName("Pools"),
-		recorder: recorder,
-		metrics:  metrics.MustMakeResourcePoolRecorder(),
+		log:           log.WithName("Global"),
+		configuration: configuration,
 	}).SetupWithManager(mgr); err != nil {
-		return fmt.Errorf("unable to create pool controller: %w", err)
+		return fmt.Errorf("unable to create global controller: %w", err)
 	}
 
-	if err = (&resourceClaimController{
-		Client:   mgr.GetClient(),
-		log:      log.WithName("Claims"),
-		recorder: recorder,
-		metrics:  metrics.MustMakeClaimRecorder(),
+	if err = (&namespacedResourceController{
+		log:           log.WithName("Namespaced"),
+		configuration: configuration,
 	}).SetupWithManager(mgr); err != nil {
-		return fmt.Errorf("unable to create claim controller: %w", err)
+		return fmt.Errorf("unable to create namespaced controller: %w", err)
 	}
 
 	return nil

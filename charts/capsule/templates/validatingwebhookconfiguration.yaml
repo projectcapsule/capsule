@@ -245,21 +245,22 @@ webhooks:
   sideEffects: None
   timeoutSeconds: {{ $.Values.webhooks.validatingWebhooksTimeoutSeconds }}
 {{- end }}
-{{- with .Values.webhooks.hooks.tenantResourceObjects }}
+
+{{- with (mergeOverwrite .Values.webhooks.hooks.tenantResources.namespaced.mutation .Values.webhooks.hooks.tenantResourceObjects) }}
 - admissionReviewVersions:
     - v1
   clientConfig:
-    {{- include "capsule.webhooks.service" (dict "path" "/tenantresource-objects" "ctx" $) | nindent 4 }}
+    {{- include "capsule.webhooks.service" (dict "path" "/tenantresource/objects/validating" "ctx" $) | nindent 4 }}
   failurePolicy:  {{ .failurePolicy }}
   name: resource-objects.tenant.projectcapsule.dev
+  {{- with .namespaceSelector }}
   namespaceSelector:
-    matchExpressions:
-      - key: capsule.clastix.io/tenant
-        operator: Exists
+    {{- toYaml . |  nindent 4 }}
+  {{- end }}
+  {{- with .objectSelector }}
   objectSelector:
-    matchExpressions:
-      - key: capsule.clastix.io/resources
-        operator: Exists
+    {{- toYaml . |  nindent 4 }}
+  {{- end }}
   rules:
     - apiGroups:
         - '*'

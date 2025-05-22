@@ -1,7 +1,7 @@
 // Copyright 2020-2023 Project Capsule Authors.
 // SPDX-License-Identifier: Apache-2.0
 
-package tenant
+package tenantresource
 
 import (
 	"context"
@@ -20,31 +20,31 @@ import (
 	"github.com/projectcapsule/capsule/pkg/webhook/utils"
 )
 
-type cordoningHandler struct{}
+type objectsValidatingHandler struct{}
 
-func WriteOpsHandler() capsulewebhook.Handler {
-	return &cordoningHandler{}
+func ObjectsValidatingHandler() capsulewebhook.Handler {
+	return &objectsValidatingHandler{}
 }
 
-func (h *cordoningHandler) OnCreate(client.Client, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
+func (h *objectsValidatingHandler) OnCreate(client.Client, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (h *cordoningHandler) OnDelete(client client.Client, _ admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
+func (h *objectsValidatingHandler) OnDelete(client client.Client, _ admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		return h.handler(ctx, client, req, recorder)
 	}
 }
 
-func (h *cordoningHandler) OnUpdate(client client.Client, _ admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
+func (h *objectsValidatingHandler) OnUpdate(client client.Client, _ admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		return h.handler(ctx, client, req, recorder)
 	}
 }
 
-func (h *cordoningHandler) handler(ctx context.Context, clt client.Client, req admission.Request, recorder record.EventRecorder) *admission.Response {
+func (h *objectsValidatingHandler) handler(ctx context.Context, clt client.Client, req admission.Request, recorder record.EventRecorder) *admission.Response {
 	tntList := &capsulev1beta2.TenantList{}
 
 	if err := clt.List(ctx, tntList, client.MatchingFieldsSelector{Selector: fields.OneTermEqualSelector(".status.namespaces", req.Namespace)}); err != nil {

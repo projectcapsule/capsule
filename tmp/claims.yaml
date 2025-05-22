@@ -21,5 +21,3 @@ spec:
   pool: "migration-size"
   claim:
     pods: "3"
-
-

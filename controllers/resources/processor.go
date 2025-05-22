@@ -43,7 +43,12 @@ func prepareAdditionalMetadata(m map[string]string) map[string]string {
 	return m
 }
 
-func (r *Processor) HandlePruning(ctx context.Context, current, desired sets.Set[string]) (updateStatus bool) {
+func (r *Processor) HandlePruning(
+	ctx context.Context,
+	c client.Client,
+	current,
+	desired sets.Set[string],
+) (updateStatus bool) {
 	log := ctrllog.FromContext(ctx)
 
 	diff := current.Difference(desired)
@@ -70,7 +75,7 @@ func (r *Processor) HandlePruning(ctx context.Context, current, desired sets.Set
 		obj.SetName(or.Name)
 		obj.SetGroupVersionKind(schema.FromAPIVersionAndKind(or.APIVersion, or.Kind))
 
-		if err := r.client.Delete(ctx, &obj); err != nil {
+		if err := c.Delete(ctx, &obj); err != nil {
 			if apierr.IsNotFound(err) {
 				// Object may have been already deleted, we can ignore this error
 				continue
@@ -90,7 +95,7 @@ func (r *Processor) HandlePruning(ctx context.Context, current, desired sets.Set
 //nolint:gocognit
 func (r *Processor) HandleSection(
 	ctx context.Context,
-	c client.Client,
+	serviceAccountClient client.Client,
 	tnt capsulev1beta2.Tenant,
 	allowCrossNamespaceSelection bool,
 	tenantLabel string,
@@ -178,7 +183,7 @@ func (r *Processor) HandleSection(
 			objs := unstructured.UnstructuredList{}
 			objs.SetGroupVersionKind(schema.FromAPIVersionAndKind(item.APIVersion, fmt.Sprintf("%sList", item.Kind)))
 
-			if clientErr := r.client.List(ctx, &objs, client.InNamespace(item.Namespace), client.MatchingLabelsSelector{Selector: itemSelector}); clientErr != nil {
+			if clientErr := serviceAccountClient.List(ctx, &objs, client.InNamespace(item.Namespace), client.MatchingLabelsSelector{Selector: itemSelector}); clientErr != nil {
 				log.Error(clientErr, "cannot retrieve object for namespacedItem", keysAndValues...)
 
 				syncErr = errors.Join(syncErr, clientErr)
@@ -208,7 +213,7 @@ func (r *Processor) HandleSection(
 					kv := keysAndValues
 					kv = append(kv, "resource", fmt.Sprintf("%s/%s", obj.GetNamespace(), obj.GetNamespace()))
 
-					if opErr := r.createOrUpdate(ctx, &obj, objLabels, objAnnotations); opErr != nil {
+					if opErr := r.createOrUpdate(ctx, serviceAccountClient, &obj, objLabels, objAnnotations); opErr != nil {
 						log.Error(opErr, "unable to sync namespacedItems", kv...)
 						errorsChan <- opErr
 
@@ -267,7 +272,7 @@ func (r *Processor) HandleSection(
 
 			obj.SetNamespace(ns.Name)
 
-			if rawErr := r.createOrUpdate(ctx, &obj, objLabels, objAnnotations); rawErr != nil {
+			if rawErr := r.createOrUpdate(ctx, serviceAccountClient, &obj, objLabels, objAnnotations); rawErr != nil {
 				log.Info("unable to sync rawItem", keysAndValues...)
 				// In case of error processing an item in one of any selected Namespaces, storing it to report it lately
 				// to the upper call to ensure a partial sync that will be fixed by a subsequent reconciliation.
@@ -292,7 +297,13 @@ func (r *Processor) HandleSection(
 // createOrUpdate replicates the provided unstructured object to all the provided Namespaces:
 // this function mimics the CreateOrUpdate, by retrieving the object to understand if it must be created or updated,
 // along adding the additional metadata, if required.
-func (r *Processor) createOrUpdate(ctx context.Context, obj *unstructured.Unstructured, labels map[string]string, annotations map[string]string) (err error) {
+func (r *Processor) createOrUpdate(
+	ctx context.Context,
+	c client.Client,
+	obj *unstructured.Unstructured,
+	labels map[string]string,
+	annotations map[string]string,
+) (err error) {
 	actual, desired := &unstructured.Unstructured{}, obj.DeepCopy()
 
 	actual.SetAPIVersion(desired.GetAPIVersion())

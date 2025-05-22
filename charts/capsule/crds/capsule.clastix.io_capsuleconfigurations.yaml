@@ -117,6 +117,35 @@ spec:
                 description: Disallow creation of namespaces, whose name matches this
                   regexp
                 type: string
+              serviceAccountClient:
+                description: Define Kubernetes-Client Configurations
+                properties:
+                  caSecretKey:
+                    default: ca.crt
+                    description: Key in the secret that holds the CA certificate (e.g.,
+                      "ca.crt")
+                    type: string
+                  caSecretName:
+                    description: Name of the secret containing the CA certificate
+                    type: string
+                  caSecretNamespace:
+                    description: Namespace where the CA certificate secret is located
+                    type: string
+                  defaultServiceAccount:
+                    description: |-
+                      Default ServiceAccount for namespaced resources (TenantResource)
+                      When defined, users are required to use this ServiceAccount within the namespace
+                      where they deploy the resource, unless they explicitly provide their own.
+                    type: string
+                  endpoint:
+                    description: Kubernetes API Endpoint to use for impersonation
+                    type: string
+                  skipTlsVerify:
+                    default: false
+                    description: If true, TLS certificate verification is skipped
+                      (not recommended for production)
+                    type: boolean
+                type: object
               userGroups:
                 default:
                 - capsule.clastix.io

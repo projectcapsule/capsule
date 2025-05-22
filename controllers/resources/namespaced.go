@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/go-logr/logr"
 	gherrors "github.com/pkg/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/fields"
@@ -19,14 +20,18 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/configuration"
+	"github.com/projectcapsule/capsule/pkg/utils"
 )
 
-type Namespaced struct {
-	client    client.Client
-	processor Processor
+type namespacedResourceController struct {
+	client        client.Client
+	log           logr.Logger
+	processor     Processor
+	configuration configuration.Configuration
 }
 
-func (r *Namespaced) SetupWithManager(mgr ctrl.Manager) error {
+func (r *namespacedResourceController) SetupWithManager(mgr ctrl.Manager) error {
 	r.client = mgr.GetClient()
 	r.processor = Processor{
 		client: mgr.GetClient(),
@@ -37,7 +42,7 @@ func (r *Namespaced) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-func (r *Namespaced) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
+func (r *namespacedResourceController) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	log := ctrllog.FromContext(ctx)
 
 	log.Info("start processing")
@@ -66,6 +71,16 @@ func (r *Namespaced) Reconcile(ctx context.Context, request reconcile.Request) (
 		}
 	}()
 
+	// Load Client
+	c, err := r.loadClient(ctx, log, tntResource)
+	if err != nil {
+		return reconcile.Result{}, gherrors.Wrap(err, "failed to load serviceaccount client")
+	}
+	if c == nil {
+		log.V(3).Info("received empty client for serviceaccount")
+		return reconcile.Result{}, nil
+	}
+
 	// Handle deleted TenantResource
 	if !tntResource.DeletionTimestamp.IsZero() {
 		return r.reconcileDelete(ctx, tntResource)
@@ -75,11 +90,25 @@ func (r *Namespaced) Reconcile(ctx context.Context, request reconcile.Request) (
 	return r.reconcileNormal(ctx, tntResource)
 }
 
-func (r *Namespaced) reconcileNormal(ctx context.Context, tntResource *capsulev1beta2.TenantResource) (reconcile.Result, error) {
+func (r *namespacedResourceController) reconcileNormal(ctx context.Context, tntResource *capsulev1beta2.TenantResource) (reconcile.Result, error) {
 	log := ctrllog.FromContext(ctx)
 
 	if *tntResource.Spec.PruningOnDelete {
 		controllerutil.AddFinalizer(tntResource, finalizer)
+	}
+
+	// Add ServiceAccount if required, Retriggers reconcile
+	// This is done in the background, Everything else should be handeled at admission
+	cfg := r.configuration.ServiceAccountClientProperties()
+	if cfg != nil {
+		if cfg.TenantDefaultServiceAccount != "" && tntResource.Spec.ServiceAccountName != "" {
+			tntResource.Spec.ServiceAccountName = utils.NamespacedServiceAccountName(cfg.TenantDefaultServiceAccount, tntResource.Namespace)
+
+			log.V(5).Info("adding default serviceAccount '%s'", cfg.TenantDefaultServiceAccount)
+
+			// Trigger new reconcile with ServiceAccount
+			return reconcile.Result{}, nil
+		}
 	}
 
 	// Adding the default value for the status
@@ -102,6 +131,30 @@ func (r *Namespaced) reconcileNormal(ctx context.Context, tntResource *capsulev1
 		return reconcile.Result{}, nil
 	}
 
+	// Load impersonation client
+	saClient := r.client
+	if tntResource.Spec.ServiceAccountName != "" {
+		re, err := r.configuration.ServiceAccountClient(ctx)
+		if err != nil {
+			log.Error(err, "failed to load impersonated rest client")
+
+			return reconcile.Result{}, err
+		}
+
+		//utils.NamespacedServiceAccountName()
+		//
+		saClient, err = utils.ImpersonatedKubernetesClientForServiceAccount(
+			re,
+			r.client.Scheme(),
+			utils.NamespacedServiceAccountName(tntResource.Spec.ServiceAccountName, tntResource.Namespace),
+		)
+		if err != nil {
+			log.Error(err, "failed to create impersonated client")
+
+			return reconcile.Result{}, err
+		}
+	}
+
 	// A TenantResource is made of several Resource sections, each one with specific options:
 	// the Status can be updated only in case of no errors across all of them to guarantee a valid and coherent status.
 	processedItems := sets.NewString()
@@ -117,7 +170,7 @@ func (r *Namespaced) reconcileNormal(ctx context.Context, tntResource *capsulev1
 	var err error
 
 	for index, resource := range tntResource.Spec.Resources {
-		items, sectionErr := r.processor.HandleSection(ctx, tl.Items[0], false, tenantLabel, index, resource)
+		items, sectionErr := r.processor.HandleSection(ctx, saClient, tl.Items[0], false, tenantLabel, index, resource)
 		if sectionErr != nil {
 			// Upon a process error storing the last error occurred and continuing to iterate,
 			// avoid to block the whole processing.
@@ -133,7 +186,7 @@ func (r *Namespaced) reconcileNormal(ctx context.Context, tntResource *capsulev1
 		return reconcile.Result{}, err
 	}
 
-	if r.processor.HandlePruning(ctx, tntResource.Status.ProcessedItems.AsSet(), sets.Set[string](processedItems)) {
+	if r.processor.HandlePruning(ctx, saClient, tntResource.Status.ProcessedItems.AsSet(), sets.Set[string](processedItems)) {
 		tntResource.Status.ProcessedItems = make([]capsulev1beta2.ObjectReferenceStatus, 0, len(processedItems))
 
 		for _, item := range processedItems.List() {
@@ -148,11 +201,11 @@ func (r *Namespaced) reconcileNormal(ctx context.Context, tntResource *capsulev1
 	return reconcile.Result{Requeue: true, RequeueAfter: tntResource.Spec.ResyncPeriod.Duration}, nil
 }
 
-func (r *Namespaced) reconcileDelete(ctx context.Context, tntResource *capsulev1beta2.TenantResource) (reconcile.Result, error) {
+func (r *namespacedResourceController) reconcileDelete(ctx context.Context, tntResource *capsulev1beta2.TenantResource) (reconcile.Result, error) {
 	log := ctrllog.FromContext(ctx)
 
 	if *tntResource.Spec.PruningOnDelete {
-		r.processor.HandlePruning(ctx, tntResource.Status.ProcessedItems.AsSet(), nil)
+		r.processor.HandlePruning(ctx, r.client, tntResource.Status.ProcessedItems.AsSet(), nil)
 	}
 
 	controllerutil.RemoveFinalizer(tntResource, finalizer)
@@ -160,4 +213,50 @@ func (r *Namespaced) reconcileDelete(ctx context.Context, tntResource *capsulev1
 	log.Info("processing completed")
 
 	return reconcile.Result{Requeue: true, RequeueAfter: tntResource.Spec.ResyncPeriod.Duration}, nil
+}
+
+func (r *namespacedResourceController) loadClient(
+	ctx context.Context,
+	log logr.Logger,
+	tntResource *capsulev1beta2.TenantResource,
+) (*client.Client, error) {
+	// Add ServiceAccount if required, Retriggers reconcile
+	// This is done in the background, Everything else should be handeled at admission
+	cfg := r.configuration.ServiceAccountClientProperties()
+	if cfg != nil {
+		if cfg.TenantDefaultServiceAccount != "" && tntResource.Spec.ServiceAccountName != "" {
+			tntResource.Spec.ServiceAccountName = utils.NamespacedServiceAccountName(cfg.TenantDefaultServiceAccount, tntResource.Namespace)
+
+			log.V(5).Info("adding default serviceAccount '%s'", cfg.TenantDefaultServiceAccount)
+
+			// Trigger new reconcile with ServiceAccount
+			return nil, nil
+		}
+	}
+
+	// Load impersonation client
+	saClient := r.client
+	if tntResource.Spec.ServiceAccountName != "" {
+		re, err := r.configuration.ServiceAccountClient(ctx)
+		if err != nil {
+			log.Error(err, "failed to load impersonated rest client")
+
+			return nil, err
+		}
+
+		//utils.NamespacedServiceAccountName()
+		//
+		saClient, err = utils.ImpersonatedKubernetesClientForServiceAccount(
+			re,
+			r.client.Scheme(),
+			utils.NamespacedServiceAccountName(tntResource.Spec.ServiceAccountName, tntResource.Namespace),
+		)
+		if err != nil {
+			log.Error(err, "failed to create impersonated client")
+
+			return nil, err
+		}
+	}
+
+	return &saClient, nil
 }

@@ -323,6 +323,33 @@ webhooks:
             operator: Exists
     tenants:
       failurePolicy: Fail
+    tenantResources:
+      objects:
+        validation:
+          namespaceSelector:
+            matchExpressions:
+              - key: capsule.clastix.io/tenant
+                operator: Exists
+          objectSelector:
+            matchExpressions:
+              - key: capsule.clastix.io/resources
+                operator: Exists
+          failurePolicy: Fail
+      namespaced:
+        mutation:
+          namespaceSelector:
+            matchExpressions:
+            - key: capsule.clastix.io/tenant
+              operator: Exists
+          objectSelector: {}
+          failurePolicy: Fail
+          reinvocationPolicy: Never
+
+
+
+
+
+
     tenantResourceObjects:
       failurePolicy: Fail
     services:

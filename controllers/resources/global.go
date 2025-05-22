@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/go-logr/logr"
 	gherrors "github.com/pkg/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -27,11 +28,12 @@ import (
 
 type globalResourceController struct {
 	client        client.Client
+	log           logr.Logger
 	processor     Processor
-	Configuration configuration.Configuration
+	configuration configuration.Configuration
 }
 
-func (r *Global) SetupWithManager(mgr ctrl.Manager) error {
+func (r *globalResourceController) SetupWithManager(mgr ctrl.Manager) error {
 	r.client = mgr.GetClient()
 	r.processor = Processor{
 		client: mgr.GetClient(),
@@ -43,19 +45,7 @@ func (r *Global) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-func (r *Global) SetupWithManager(mgr ctrl.Manager) error {
-	r.client = mgr.GetClient()
-	r.processor = Processor{
-		client: mgr.GetClient(),
-	}
-
-	return ctrl.NewControllerManagedBy(mgr).
-		For(&capsulev1beta2.GlobalTenantResource{}).
-		Watches(&capsulev1beta2.Tenant{}, handler.EnqueueRequestsFromMapFunc(r.enqueueRequestFromTenant)).
-		Complete(r)
-}
-
-func (r *Global) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
+func (r *globalResourceController) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	var err error
 
 	log := ctrllog.FromContext(ctx)
@@ -95,7 +85,7 @@ func (r *Global) Reconcile(ctx context.Context, request reconcile.Request) (reco
 	return r.reconcileNormal(ctx, tntResource)
 }
 
-func (r *Global) enqueueRequestFromTenant(ctx context.Context, object client.Object) (reqs []reconcile.Request) {
+func (r *globalResourceController) enqueueRequestFromTenant(ctx context.Context, object client.Object) (reqs []reconcile.Request) {
 	tnt := object.(*capsulev1beta2.Tenant) //nolint:forcetypeassert
 
 	resList := capsulev1beta2.GlobalTenantResourceList{}
@@ -129,7 +119,7 @@ func (r *Global) enqueueRequestFromTenant(ctx context.Context, object client.Obj
 	return reqs
 }
 
-func (r *Global) reconcileNormal(ctx context.Context, tntResource *capsulev1beta2.GlobalTenantResource) (reconcile.Result, error) {
+func (r *globalResourceController) reconcileNormal(ctx context.Context, tntResource *capsulev1beta2.GlobalTenantResource) (reconcile.Result, error) {
 	log := ctrllog.FromContext(ctx)
 
 	if *tntResource.Spec.PruningOnDelete {
@@ -148,6 +138,7 @@ func (r *Global) reconcileNormal(ctx context.Context, tntResource *capsulev1beta
 		return reconcile.Result{}, err
 	}
 
+	// Use Controller Client.
 	tntList := capsulev1beta2.TenantList{}
 	if err = r.client.List(ctx, &tntList, &client.MatchingLabelsSelector{Selector: tntSelector}); err != nil {
 		log.Error(err, "cannot list Tenants matching the provided selector")
@@ -161,6 +152,21 @@ func (r *Global) reconcileNormal(ctx context.Context, tntResource *capsulev1beta
 	// A TenantResource is made of several Resource sections, each one with specific options:
 	// the Status can be updated only in case of no errors across all of them to guarantee a valid and coherent status.
 	processedItems := sets.NewString()
+
+	saClient := r.client
+	if tntResource.Spec.ServiceAccountName != "" {
+		re, err := r.configuration.ServiceAccountClient(ctx)
+		if err != nil {
+			log.Error(err, "failed to load impersonated rest client")
+
+			return reconcile.Result{}, err
+		}
+
+		utils.Ser
+
+	}
+
+	r.configuration.ServiceAccountClient(ctx)
 
 	for index, resource := range tntResource.Spec.Resources {
 		tenantLabel, labelErr := capsulev1beta2.GetTypeLabel(&capsulev1beta2.Tenant{})
@@ -207,7 +213,7 @@ func (r *Global) reconcileNormal(ctx context.Context, tntResource *capsulev1beta
 	return reconcile.Result{Requeue: true, RequeueAfter: tntResource.Spec.ResyncPeriod.Duration}, nil
 }
 
-func (r *Global) reconcileDelete(ctx context.Context, tntResource *capsulev1beta2.GlobalTenantResource) (reconcile.Result, error) {
+func (r *globalResourceController) reconcileDelete(ctx context.Context, tntResource *capsulev1beta2.GlobalTenantResource) (reconcile.Result, error) {
 	log := ctrllog.FromContext(ctx)
 
 	if *tntResource.Spec.PruningOnDelete {

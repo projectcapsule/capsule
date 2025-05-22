@@ -153,7 +153,7 @@ func main() {
 
 	ctx := ctrl.SetupSignalHandler()
 
-	cfg := configuration.NewCapsuleConfiguration(ctx, manager.GetClient(), configurationName)
+	cfg := configuration.NewCapsuleConfiguration(ctx, manager.GetClient(), manager.GetConfig(), configurationName)
 
 	directClient, err := client.New(ctrl.GetConfigOrDie(), client.Options{
 		Scheme: manager.GetScheme(),
@@ -164,7 +164,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	directCfg := configuration.NewCapsuleConfiguration(ctx, directClient, configurationName)
+	directCfg := configuration.NewCapsuleConfiguration(ctx, directClient, manager.GetConfig(), configurationName)
 
 	if directCfg.EnableTLSConfiguration() {
 		tlsReconciler := &tlscontroller.Reconciler{
@@ -227,7 +227,8 @@ func main() {
 		route.Ingress(ingress.Class(cfg, kubeVersion), ingress.Hostnames(cfg), ingress.Collision(cfg), ingress.Wildcard()),
 		route.PVC(pvc.Validating(), pvc.PersistentVolumeReuse()),
 		route.Service(service.Handler()),
-		route.TenantResourceObjects(utils.InCapsuleGroups(cfg, tntresource.WriteOpsHandler())),
+		route.TenantResourceNamespacedMutation(tntresource.NamespacedMutatingHandler(cfg)),
+		route.TenantResourceObjectsValidation(utils.InCapsuleGroups(cfg, tntresource.ObjectsValidatingHandler())),
 		route.NetworkPolicy(utils.InCapsuleGroups(cfg, networkpolicy.Handler())),
 		route.Tenant(tenant.NameHandler(), tenant.RoleBindingRegexHandler(), tenant.IngressClassRegexHandler(), tenant.StorageClassRegexHandler(), tenant.ContainerRegistryRegexHandler(), tenant.HostnameRegexHandler(), tenant.FreezedEmitter(), tenant.ServiceAccountNameHandler(), tenant.ForbiddenAnnotationsRegexHandler(), tenant.ProtectedHandler(), tenant.MetaHandler()),
 		route.Cordoning(tenant.CordoningHandler(cfg)),
@@ -294,13 +295,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&resources.Global{}).SetupWithManager(manager); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "resources.Global")
-		os.Exit(1)
-	}
-
-	if err = (&resources.Namespaced{}).SetupWithManager(manager); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "resources.Namespaced")
+	if err := resources.Add(
+		ctrl.Log.WithName("controllers").WithName("TenantResources"),
+		manager,
+		cfg,
+	); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "tenantresources")
 		os.Exit(1)
 	}
 
