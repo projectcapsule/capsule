@@ -16,7 +16,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api"
 )
 
-var _ = Describe("creating a Namespace with an additional Role Binding", func() {
+var _ = Describe("creating a Namespace with an additional Role Binding", Label("tenant"), func() {
 	tnt := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "additional-role-binding",

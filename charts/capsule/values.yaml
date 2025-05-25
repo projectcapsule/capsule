@@ -76,6 +76,17 @@ proxy:
   # -- Enable Installation of Capsule Proxy
   enabled: false
 
+# These are ClusterRoles which grant permissions for Capsule CRDs to Tenant Owners
+rbac:
+  resources:
+    create: false
+    labels:
+      rbac.authorization.k8s.io/aggregate-to-admin: "true"
+  resourcepoolclaims:
+    create: false
+    labels:
+      rbac.authorization.k8s.io/aggregate-to-admin: "true"
+
 # Manager Options
 manager:
 
@@ -265,6 +276,19 @@ webhooks:
 
   # Hook Configuration
   hooks:
+    resourcepools:
+      pools:
+        namespaceSelector: {}
+        objectSelector: {}
+        reinvocationPolicy: Never
+        matchPolicy: Equivalent
+        failurePolicy: Fail
+      claims:
+        namespaceSelector: {}
+        objectSelector: {}
+        reinvocationPolicy: Never
+        matchPolicy: Equivalent
+        failurePolicy: Fail
     namespaceOwnerReference:
       failurePolicy: Fail
     customresources:
@@ -288,6 +312,12 @@ webhooks:
           - key: capsule.clastix.io/tenant
             operator: Exists
           - key: projectcapsule.dev/cordoned
+            operator: Exists
+    gateways:
+      failurePolicy: Fail
+      namespaceSelector:
+        matchExpressions:
+          - key: capsule.clastix.io/tenant
             operator: Exists
     ingresses:
       failurePolicy: Fail
@@ -346,6 +376,7 @@ webhooks:
           matchExpressions:
             - key: capsule.clastix.io/tenant
               operator: Exists
+
 
 # ServiceMonitor
 serviceMonitor:

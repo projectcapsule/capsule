@@ -88,3 +88,32 @@ func (in *AllowedListSpec) RegexMatch(value string) (ok bool) {
 
 	return
 }
+
+// +kubebuilder:object:generate=true
+type SelectionListWithDefaultSpec struct {
+	SelectionListWithSpec `json:",inline"`
+	Default               string `json:"default,omitempty"`
+}
+
+func (in *SelectionListWithDefaultSpec) MatchDefault(value string) bool {
+	return in.Default == value
+}
+
+// +kubebuilder:object:generate=true
+
+type SelectionListWithSpec struct {
+	metav1.LabelSelector `json:",inline"`
+}
+
+func (in *SelectionListWithSpec) SelectorMatch(obj client.Object) bool {
+	if obj != nil {
+		selector, err := metav1.LabelSelectorAsSelector(&in.LabelSelector)
+		if err != nil {
+			return false
+		}
+
+		return selector.Matches(labels.Set(obj.GetLabels()))
+	}
+
+	return false
+}

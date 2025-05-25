@@ -25,6 +25,7 @@ import (
 
 type Manager struct {
 	client.Client
+	Metrics    *metrics.TenantRecorder
 	Log        logr.Logger
 	Recorder   record.EventRecorder
 	RESTConfig *rest.Config
@@ -51,8 +52,7 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 			r.Log.Info("Request object not found, could have been deleted after reconcile request")
 
 			// If tenant was deleted or cannot be found, clean up metrics
-			metrics.TenantResourceUsage.DeletePartialMatch(map[string]string{"tenant": request.Name})
-			metrics.TenantResourceLimit.DeletePartialMatch(map[string]string{"tenant": request.Name})
+			r.Metrics.DeleteTenantMetric(request.Name)
 
 			return reconcile.Result{}, nil
 		}

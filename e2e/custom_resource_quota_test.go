@@ -21,7 +21,7 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 )
 
-var _ = Describe("when Tenant limits custom Resource Quota", func() {
+var _ = Describe("when Tenant limits custom Resource Quota", Label("resourcequota"), func() {
 	tnt := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "limiting-resources",
@@ -100,7 +100,7 @@ var _ = Describe("when Tenant limits custom Resource Quota", func() {
 		dynamicClient := dynamic.NewForConfigOrDie(cfg)
 
 		for _, i := range []int{1, 2, 3} {
-			ns := NewNamespace(fmt.Sprintf("resource-ns-%d", i))
+			ns := NewNamespace(fmt.Sprintf("limiting-resources-ns-%d", i))
 
 			NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 			TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
@@ -122,7 +122,7 @@ var _ = Describe("when Tenant limits custom Resource Quota", func() {
 		}
 
 		for _, i := range []int{1, 2, 3} {
-			ns := NewNamespace(fmt.Sprintf("resource-ns-%d", i))
+			ns := NewNamespace(fmt.Sprintf("limiting-resources-ns-%d", i))
 
 			obj := &unstructured.Unstructured{
 				Object: map[string]interface{}{

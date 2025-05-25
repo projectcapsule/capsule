@@ -13,7 +13,7 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 )
 
-var _ = Describe("creating a Namespace with Tenant name prefix enforcement at Tenant scope", func() {
+var _ = Describe("creating a Namespace with Tenant name prefix enforcement at Tenant scope", Label("tenant", "config"), func() {
 	t1 := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "awesome",

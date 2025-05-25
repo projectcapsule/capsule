@@ -13,7 +13,7 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 )
 
-var _ = Describe("creating a Namespaces as different type of Tenant owners", func() {
+var _ = Describe("creating a Namespaces as different type of Tenant owners", Label("namespace"), func() {
 	tnt := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "tenant-assigned",

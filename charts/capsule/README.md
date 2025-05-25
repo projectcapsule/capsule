@@ -134,6 +134,10 @@ Here the values you can override:
 | ports | list | `[]` | Set additional ports for the deployment |
 | priorityClassName | string | `""` | Set the priority class name of the Capsule pod |
 | proxy.enabled | bool | `false` | Enable Installation of Capsule Proxy |
+| rbac.resourcepoolclaims.create | bool | `false` |  |
+| rbac.resourcepoolclaims.labels."rbac.authorization.k8s.io/aggregate-to-admin" | string | `"true"` |  |
+| rbac.resources.create | bool | `false` |  |
+| rbac.resources.labels."rbac.authorization.k8s.io/aggregate-to-admin" | string | `"true"` |  |
 | replicaCount | int | `1` | Set the replica count for capsule pod |
 | securityContext | object | `{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]},"readOnlyRootFilesystem":true}` | Set the securityContext for the Capsule container |
 | serviceAccount.annotations | object | `{}` | Annotations to add to the service account. |
@@ -212,6 +216,9 @@ Here the values you can override:
 | webhooks.hooks.defaults.pvc.failurePolicy | string | `"Fail"` |  |
 | webhooks.hooks.defaults.pvc.namespaceSelector.matchExpressions[0].key | string | `"capsule.clastix.io/tenant"` |  |
 | webhooks.hooks.defaults.pvc.namespaceSelector.matchExpressions[0].operator | string | `"Exists"` |  |
+| webhooks.hooks.gateways.failurePolicy | string | `"Fail"` |  |
+| webhooks.hooks.gateways.namespaceSelector.matchExpressions[0].key | string | `"capsule.clastix.io/tenant"` |  |
+| webhooks.hooks.gateways.namespaceSelector.matchExpressions[0].operator | string | `"Exists"` |  |
 | webhooks.hooks.ingresses.failurePolicy | string | `"Fail"` |  |
 | webhooks.hooks.ingresses.namespaceSelector.matchExpressions[0].key | string | `"capsule.clastix.io/tenant"` |  |
 | webhooks.hooks.ingresses.namespaceSelector.matchExpressions[0].operator | string | `"Exists"` |  |
@@ -231,6 +238,16 @@ Here the values you can override:
 | webhooks.hooks.pods.failurePolicy | string | `"Fail"` |  |
 | webhooks.hooks.pods.namespaceSelector.matchExpressions[0].key | string | `"capsule.clastix.io/tenant"` |  |
 | webhooks.hooks.pods.namespaceSelector.matchExpressions[0].operator | string | `"Exists"` |  |
+| webhooks.hooks.resourcepools.claims.failurePolicy | string | `"Fail"` |  |
+| webhooks.hooks.resourcepools.claims.matchPolicy | string | `"Equivalent"` |  |
+| webhooks.hooks.resourcepools.claims.namespaceSelector | object | `{}` |  |
+| webhooks.hooks.resourcepools.claims.objectSelector | object | `{}` |  |
+| webhooks.hooks.resourcepools.claims.reinvocationPolicy | string | `"Never"` |  |
+| webhooks.hooks.resourcepools.pools.failurePolicy | string | `"Fail"` |  |
+| webhooks.hooks.resourcepools.pools.matchPolicy | string | `"Equivalent"` |  |
+| webhooks.hooks.resourcepools.pools.namespaceSelector | object | `{}` |  |
+| webhooks.hooks.resourcepools.pools.objectSelector | object | `{}` |  |
+| webhooks.hooks.resourcepools.pools.reinvocationPolicy | string | `"Never"` |  |
 | webhooks.hooks.services.failurePolicy | string | `"Fail"` |  |
 | webhooks.hooks.services.namespaceSelector.matchExpressions[0].key | string | `"capsule.clastix.io/tenant"` |  |
 | webhooks.hooks.services.namespaceSelector.matchExpressions[0].operator | string | `"Exists"` |  |

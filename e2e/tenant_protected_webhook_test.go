@@ -14,7 +14,7 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 )
 
-var _ = Describe("Deleting a tenant with protected annotation", func() {
+var _ = Describe("Deleting a tenant with protected annotation", Label("tenant"), func() {
 	tnt := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "protected-tenant",

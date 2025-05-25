@@ -23,7 +23,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/utils"
 )
 
-var _ = Describe("adding metadata to Service objects", func() {
+var _ = Describe("adding metadata to Service objects", Label("tenant", "service"), func() {
 	tnt := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "service-metadata",

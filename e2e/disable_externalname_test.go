@@ -17,7 +17,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api"
 )
 
-var _ = Describe("creating an ExternalName service when it is disabled for Tenant", func() {
+var _ = Describe("creating an ExternalName service when it is disabled for Tenant", Label("tenant"), func() {
 	tnt := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "disable-external-service",

@@ -13,7 +13,7 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 )
 
-var _ = Describe("defining dynamic Tenant Owner Cluster Roles", func() {
+var _ = Describe("defining dynamic Tenant Owner Cluster Roles", Label("tenant"), func() {
 	tnt := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "dynamic-tenant-owner-clusterroles",

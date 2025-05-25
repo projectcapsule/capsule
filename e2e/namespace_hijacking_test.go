@@ -17,7 +17,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
-var _ = Describe("creating several Namespaces for a Tenant", func() {
+var _ = Describe("creating several Namespaces for a Tenant", Label("namespace"), func() {
 	tnt := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "capsule-ns-attack-1",

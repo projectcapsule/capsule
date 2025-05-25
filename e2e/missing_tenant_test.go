@@ -13,7 +13,7 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 )
 
-var _ = Describe("creating a Namespace creation with no Tenant assigned", func() {
+var _ = Describe("creating a Namespace creation with no Tenant assigned", Label("tenant"), func() {
 	It("should fail", func() {
 		tnt := &capsulev1beta2.Tenant{
 			Spec: capsulev1beta2.TenantSpec{

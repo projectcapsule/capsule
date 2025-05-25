@@ -13,7 +13,7 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 )
 
-var _ = Describe("creating a Namespace as Tenant owner with custom --capsule-group", func() {
+var _ = Describe("creating a Namespace as Tenant owner with custom --capsule-group", Label("config"), func() {
 	tnt := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "tenant-assigned-custom-group",

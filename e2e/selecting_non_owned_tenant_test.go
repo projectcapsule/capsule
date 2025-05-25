@@ -16,7 +16,7 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 )
 
-var _ = Describe("creating a Namespace trying to select a third Tenant", func() {
+var _ = Describe("creating a Namespace trying to select a third Tenant", Label("tenant"), func() {
 	tnt := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "tenant-non-owned",

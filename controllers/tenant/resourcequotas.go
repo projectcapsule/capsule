@@ -23,7 +23,6 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api"
-	"github.com/projectcapsule/capsule/pkg/metrics"
 	"github.com/projectcapsule/capsule/pkg/utils"
 )
 
@@ -54,14 +53,13 @@ func (r *Manager) syncResourceQuotas(ctx context.Context, tenant *capsulev1beta2
 	}
 
 	// Remove prior metrics, to avoid cleaning up for metrics of deleted ResourceQuotas
-	metrics.TenantResourceUsage.DeletePartialMatch(map[string]string{"tenant": tenant.Name})
-	metrics.TenantResourceLimit.DeletePartialMatch(map[string]string{"tenant": tenant.Name})
+	r.Metrics.DeleteTenantMetric(tenant.Name)
 
 	// Expose the namespace quota and usage as metrics for the tenant
-	metrics.TenantResourceUsage.WithLabelValues(tenant.Name, "namespaces", "").Set(float64(tenant.Status.Size))
+	r.Metrics.TenantResourceUsageGauge.WithLabelValues(tenant.Name, "namespaces", "").Set(float64(tenant.Status.Size))
 
 	if tenant.Spec.NamespaceOptions != nil && tenant.Spec.NamespaceOptions.Quota != nil {
-		metrics.TenantResourceLimit.WithLabelValues(tenant.Name, "namespaces", "").Set(float64(*tenant.Spec.NamespaceOptions.Quota))
+		r.Metrics.TenantResourceLimitGauge.WithLabelValues(tenant.Name, "namespaces", "").Set(float64(*tenant.Spec.NamespaceOptions.Quota))
 	}
 
 	//nolint:nestif
@@ -99,6 +97,7 @@ func (r *Manager) syncResourceQuotas(ctx context.Context, tenant *capsulev1beta2
 
 					return scopeErr
 				}
+
 				// Iterating over all the options declared for the ResourceQuota,
 				// summing all the used quota across different Namespaces to determinate
 				// if we're hitting a Hard quota at Tenant level.
@@ -116,13 +115,13 @@ func (r *Manager) syncResourceQuotas(ctx context.Context, tenant *capsulev1beta2
 					r.Log.Info("Computed " + name.String() + " quota for the whole Tenant is " + quantity.String())
 
 					// Expose usage and limit metrics for the resource (name) of the ResourceQuota (index)
-					metrics.TenantResourceUsage.WithLabelValues(
+					r.Metrics.TenantResourceUsageGauge.WithLabelValues(
 						tenant.Name,
 						name.String(),
 						strconv.Itoa(index),
 					).Set(float64(quantity.MilliValue()) / 1000)
 
-					metrics.TenantResourceLimit.WithLabelValues(
+					r.Metrics.TenantResourceLimitGauge.WithLabelValues(
 						tenant.Name,
 						name.String(),
 						strconv.Itoa(index),

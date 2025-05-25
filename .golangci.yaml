@@ -56,6 +56,10 @@ linters:
       - third_party$
       - builtin$
       - examples$
+    rules:
+    - path: pkg/meta/
+      linters:
+      - dupl
 formatters:
   enable:
     - gci
