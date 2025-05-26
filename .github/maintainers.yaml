@@ -1,3 +1,4 @@
+maintainers:
 - name: Adriano Pezzuto
   github: https://github.com/bsctl
   company: Clastix
@@ -21,7 +22,7 @@
   company: Peak Scale
   projects:
     - https://github.com/projectcapsule/capsule
-    - https://github.com/projectcapsule/capsule-proxy    
+    - https://github.com/projectcapsule/capsule-proxy
 - name: Massimiliano Giovagnoli
   github: https://github.com/maxgio92
   company: Proximus
