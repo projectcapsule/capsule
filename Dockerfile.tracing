@@ -5,7 +5,7 @@ FROM ${TARGET_IMAGE} AS target
 # Inject Harpoon Image
 FROM ghcr.io/alegrey91/harpoon:latest
 WORKDIR /
-COPY --from=target /ko-app/capsule ./manager
+COPY --from=target /ko-app/cmd ./manager
 RUN chmod +x ./harpoon
 ENTRYPOINT ["/harpoon", \
 		"capture", \

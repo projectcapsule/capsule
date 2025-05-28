@@ -15,7 +15,7 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 )
 
-var _ = Describe("creating several Namespaces for a Tenant", func() {
+var _ = Describe("creating several Namespaces for a Tenant", Label("namespace"), func() {
 	tnt := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "capsule-labels",

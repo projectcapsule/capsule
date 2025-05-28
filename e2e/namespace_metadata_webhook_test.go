@@ -17,7 +17,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api"
 )
 
-var _ = Describe("creating a Namespace for a Tenant with additional metadata", func() {
+var _ = Describe("creating a Namespace for a Tenant with additional metadata", Label("namespace"), func() {
 	tnt := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "tenant-metadata",
@@ -70,12 +70,12 @@ var _ = Describe("creating a Namespace for a Tenant with additional metadata", f
 		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 		By("checking additional labels", func() {
-				Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: ns.GetName()}, ns)).Should(Succeed())
+			Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: ns.GetName()}, ns)).Should(Succeed())
 
-				for k, v := range tnt.Spec.NamespaceOptions.AdditionalMetadata.Labels {
-					Expect(ns.Labels).To(HaveKeyWithValue(k, v))
-				}
-				return
+			for k, v := range tnt.Spec.NamespaceOptions.AdditionalMetadata.Labels {
+				Expect(ns.Labels).To(HaveKeyWithValue(k, v))
+			}
+			return
 		})
 		By("checking additional annotations", func() {
 			Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: ns.GetName()}, ns)).Should(Succeed())

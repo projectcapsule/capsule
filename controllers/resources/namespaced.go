@@ -21,6 +21,7 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/configuration"
+	"github.com/projectcapsule/capsule/pkg/metrics"
 	"github.com/projectcapsule/capsule/pkg/utils"
 )
 
@@ -29,6 +30,7 @@ type namespacedResourceController struct {
 	log           logr.Logger
 	processor     Processor
 	configuration configuration.Configuration
+	metrics       *metrics.TenantResourceRecorder
 }
 
 func (r *namespacedResourceController) SetupWithManager(mgr ctrl.Manager) error {
@@ -42,15 +44,17 @@ func (r *namespacedResourceController) SetupWithManager(mgr ctrl.Manager) error 
 		Complete(r)
 }
 
-func (r *namespacedResourceController) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
+func (r *namespacedResourceController) Reconcile(ctx context.Context, request reconcile.Request) (res reconcile.Result, err error) {
 	log := ctrllog.FromContext(ctx)
 
-	log.Info("start processing")
+	log.V(5).Info("start processing")
 	// Retrieving the TenantResource
 	tntResource := &capsulev1beta2.TenantResource{}
 	if err := r.client.Get(ctx, request.NamespacedName, tntResource); err != nil {
 		if apierrors.IsNotFound(err) {
-			log.Info("Request object not found, could have been deleted after reconcile request")
+			log.V(3).Info("Request object not found, could have been deleted after reconcile request")
+
+			r.metrics.DeleteMetric(request.Name)
 
 			return reconcile.Result{}, nil
 		}
@@ -64,6 +68,9 @@ func (r *namespacedResourceController) Reconcile(ctx context.Context, request re
 	}
 
 	defer func() {
+		r.metrics.RecordCondition(tntResource)
+
+		tntResource.SetCondition()
 		if e := patchHelper.Patch(ctx, tntResource); e != nil {
 			if err == nil {
 				err = gherrors.Wrap(e, "failed to patch TenantResource")
@@ -71,7 +78,6 @@ func (r *namespacedResourceController) Reconcile(ctx context.Context, request re
 		}
 	}()
 
-	// Load Client
 	c, err := r.loadClient(ctx, log, tntResource)
 	if err != nil {
 		return reconcile.Result{}, gherrors.Wrap(err, "failed to load serviceaccount client")
@@ -83,32 +89,22 @@ func (r *namespacedResourceController) Reconcile(ctx context.Context, request re
 
 	// Handle deleted TenantResource
 	if !tntResource.DeletionTimestamp.IsZero() {
-		return r.reconcileDelete(ctx, tntResource)
+		return r.reconcileDelete(ctx, c, tntResource)
 	}
 
 	// Handle non-deleted TenantResource
-	return r.reconcileNormal(ctx, tntResource)
+	return r.reconcileNormal(ctx, c, tntResource)
 }
 
-func (r *namespacedResourceController) reconcileNormal(ctx context.Context, tntResource *capsulev1beta2.TenantResource) (reconcile.Result, error) {
+func (r *namespacedResourceController) reconcileNormal(
+	ctx context.Context,
+	c client.Client,
+	tntResource *capsulev1beta2.TenantResource,
+) (reconcile.Result, error) {
 	log := ctrllog.FromContext(ctx)
 
 	if *tntResource.Spec.PruningOnDelete {
 		controllerutil.AddFinalizer(tntResource, finalizer)
-	}
-
-	// Add ServiceAccount if required, Retriggers reconcile
-	// This is done in the background, Everything else should be handeled at admission
-	cfg := r.configuration.ServiceAccountClientProperties()
-	if cfg != nil {
-		if cfg.TenantDefaultServiceAccount != "" && tntResource.Spec.ServiceAccountName != "" {
-			tntResource.Spec.ServiceAccountName = utils.NamespacedServiceAccountName(cfg.TenantDefaultServiceAccount, tntResource.Namespace)
-
-			log.V(5).Info("adding default serviceAccount '%s'", cfg.TenantDefaultServiceAccount)
-
-			// Trigger new reconcile with ServiceAccount
-			return reconcile.Result{}, nil
-		}
 	}
 
 	// Adding the default value for the status
@@ -131,30 +127,6 @@ func (r *namespacedResourceController) reconcileNormal(ctx context.Context, tntR
 		return reconcile.Result{}, nil
 	}
 
-	// Load impersonation client
-	saClient := r.client
-	if tntResource.Spec.ServiceAccountName != "" {
-		re, err := r.configuration.ServiceAccountClient(ctx)
-		if err != nil {
-			log.Error(err, "failed to load impersonated rest client")
-
-			return reconcile.Result{}, err
-		}
-
-		//utils.NamespacedServiceAccountName()
-		//
-		saClient, err = utils.ImpersonatedKubernetesClientForServiceAccount(
-			re,
-			r.client.Scheme(),
-			utils.NamespacedServiceAccountName(tntResource.Spec.ServiceAccountName, tntResource.Namespace),
-		)
-		if err != nil {
-			log.Error(err, "failed to create impersonated client")
-
-			return reconcile.Result{}, err
-		}
-	}
-
 	// A TenantResource is made of several Resource sections, each one with specific options:
 	// the Status can be updated only in case of no errors across all of them to guarantee a valid and coherent status.
 	processedItems := sets.NewString()
@@ -166,18 +138,32 @@ func (r *namespacedResourceController) reconcileNormal(ctx context.Context, tntR
 		return reconcile.Result{}, labelErr
 	}
 
+	// Always post the processed items, as they allow users to track errors
+	defer func() {
+		tntResource.Status.ProcessedItems = make([]capsulev1beta2.ObjectReferenceStatus, 0, len(processedItems))
+
+		for _, item := range processedItems.List() {
+			or := capsulev1beta2.ObjectReferenceStatus{}
+			if err := or.ParseFromString(item); err == nil {
+				tntResource.Status.ProcessedItems = append(tntResource.Status.ProcessedItems, or)
+			} else {
+				log.Error(err, "failed to parse processed item", "item", item)
+			}
+		}
+	}()
+
 	// new empty error
 	var err error
 
 	for index, resource := range tntResource.Spec.Resources {
-		items, sectionErr := r.processor.HandleSection(ctx, saClient, tl.Items[0], false, tenantLabel, index, resource)
+		items, sectionErr := r.processor.HandleSection(ctx, c, tl.Items[0], false, tenantLabel, index, resource)
 		if sectionErr != nil {
 			// Upon a process error storing the last error occurred and continuing to iterate,
 			// avoid to block the whole processing.
 			err = errors.Join(err, sectionErr)
-		} else {
-			processedItems.Insert(items...)
 		}
+
+		processedItems.Insert(items...)
 	}
 
 	if err != nil {
@@ -186,14 +172,23 @@ func (r *namespacedResourceController) reconcileNormal(ctx context.Context, tntR
 		return reconcile.Result{}, err
 	}
 
-	if r.processor.HandlePruning(ctx, saClient, tntResource.Status.ProcessedItems.AsSet(), sets.Set[string](processedItems)) {
-		tntResource.Status.ProcessedItems = make([]capsulev1beta2.ObjectReferenceStatus, 0, len(processedItems))
+	failedItems, err := r.processor.HandlePruning(
+		ctx,
+		c,
+		tntResource.Status.ProcessedItems.AsSet(),
+		sets.Set[string](processedItems))
+	if len(failedItems) > 0 {
+		tntResource.Status.ProcessedItems = make([]capsulev1beta2.ObjectReferenceStatus, 0, len(failedItems))
 
-		for _, item := range processedItems.List() {
+		for _, item := range failedItems {
 			if or := (capsulev1beta2.ObjectReferenceStatus{}); or.ParseFromString(item) == nil {
 				tntResource.Status.ProcessedItems = append(tntResource.Status.ProcessedItems, or)
 			}
 		}
+	}
+
+	if err != nil {
+		return reconcile.Result{}, gherrors.Wrap(err, "failed to prune resources")
 	}
 
 	log.Info("processing completed")
@@ -201,11 +196,29 @@ func (r *namespacedResourceController) reconcileNormal(ctx context.Context, tntR
 	return reconcile.Result{Requeue: true, RequeueAfter: tntResource.Spec.ResyncPeriod.Duration}, nil
 }
 
-func (r *namespacedResourceController) reconcileDelete(ctx context.Context, tntResource *capsulev1beta2.TenantResource) (reconcile.Result, error) {
+func (r *namespacedResourceController) reconcileDelete(
+	ctx context.Context,
+	c client.Client,
+	tntResource *capsulev1beta2.TenantResource,
+) (reconcile.Result, error) {
 	log := ctrllog.FromContext(ctx)
 
 	if *tntResource.Spec.PruningOnDelete {
-		r.processor.HandlePruning(ctx, r.client, tntResource.Status.ProcessedItems.AsSet(), nil)
+		failedItems, err := r.processor.HandlePruning(ctx, c, tntResource.Status.ProcessedItems.AsSet(), nil)
+		if len(failedItems) > 0 {
+			tntResource.Status.ProcessedItems = make([]capsulev1beta2.ObjectReferenceStatus, 0, len(failedItems))
+
+			for _, item := range failedItems {
+				if or := (capsulev1beta2.ObjectReferenceStatus{}); or.ParseFromString(item) == nil {
+					tntResource.Status.ProcessedItems = append(tntResource.Status.ProcessedItems, or)
+				}
+			}
+		}
+
+		if len(failedItems) > 0 || err != nil {
+			return reconcile.Result{}, gherrors.Wrap(err, "failed to prune resources on delete")
+		}
+
 	}
 
 	controllerutil.RemoveFinalizer(tntResource, finalizer)
@@ -219,24 +232,18 @@ func (r *namespacedResourceController) loadClient(
 	ctx context.Context,
 	log logr.Logger,
 	tntResource *capsulev1beta2.TenantResource,
-) (*client.Client, error) {
+) (client.Client, error) {
 	// Add ServiceAccount if required, Retriggers reconcile
 	// This is done in the background, Everything else should be handeled at admission
-	cfg := r.configuration.ServiceAccountClientProperties()
-	if cfg != nil {
-		if cfg.TenantDefaultServiceAccount != "" && tntResource.Spec.ServiceAccountName != "" {
-			tntResource.Spec.ServiceAccountName = utils.NamespacedServiceAccountName(cfg.TenantDefaultServiceAccount, tntResource.Namespace)
+	if changed := SetTenantResourceServiceAccount(r.configuration, tntResource); changed {
+		log.V(5).Info("adding default serviceAccount '%s'", tntResource.Spec.ServiceAccount.GetFullName())
 
-			log.V(5).Info("adding default serviceAccount '%s'", cfg.TenantDefaultServiceAccount)
-
-			// Trigger new reconcile with ServiceAccount
-			return nil, nil
-		}
+		return nil, nil
 	}
 
 	// Load impersonation client
 	saClient := r.client
-	if tntResource.Spec.ServiceAccountName != "" {
+	if tntResource.Spec.ServiceAccount != nil {
 		re, err := r.configuration.ServiceAccountClient(ctx)
 		if err != nil {
 			log.Error(err, "failed to load impersonated rest client")
@@ -249,7 +256,7 @@ func (r *namespacedResourceController) loadClient(
 		saClient, err = utils.ImpersonatedKubernetesClientForServiceAccount(
 			re,
 			r.client.Scheme(),
-			utils.NamespacedServiceAccountName(tntResource.Spec.ServiceAccountName, tntResource.Namespace),
+			tntResource.Spec.ServiceAccount,
 		)
 		if err != nil {
 			log.Error(err, "failed to create impersonated client")
@@ -258,5 +265,5 @@ func (r *namespacedResourceController) loadClient(
 		}
 	}
 
-	return &saClient, nil
+	return saClient, nil
 }

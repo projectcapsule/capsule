@@ -4,6 +4,6 @@ defaultPlatforms:
 - linux/arm
 builds:
 - id: capsule
-  main: ./
+  main: ./cmd/
   ldflags:
   - '{{ if index .Env "LD_FLAGS" }}{{ .Env.LD_FLAGS }}{{ end }}'

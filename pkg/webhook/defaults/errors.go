@@ -6,6 +6,7 @@ package defaults
 import (
 	"fmt"
 	"reflect"
+
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
 
@@ -63,7 +64,6 @@ type GatewayError struct {
 }
 
 func NewGatewayError(gateway gatewayv1.ObjectName, msg error) error {
-
 	return &GatewayError{
 		gateway: reflect.ValueOf(gateway).String(),
 		msg:     msg,

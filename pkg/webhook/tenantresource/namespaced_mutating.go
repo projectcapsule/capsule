@@ -13,18 +13,20 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/controllers/resources"
 	"github.com/projectcapsule/capsule/pkg/configuration"
-	caputils "github.com/projectcapsule/capsule/pkg/utils"
 	capsulewebhook "github.com/projectcapsule/capsule/pkg/webhook"
 	"github.com/projectcapsule/capsule/pkg/webhook/utils"
 )
 
 type namespacedMutatingHandler struct {
-	cfg configuration.Configuration
+	configuration configuration.Configuration
 }
 
-func NamespacedMutatingHandler(cfg configuration.Configuration) capsulewebhook.Handler {
-	return &namespacedMutatingHandler{}
+func NamespacedMutatingHandler(configuration configuration.Configuration) capsulewebhook.Handler {
+	return &namespacedMutatingHandler{
+		configuration: configuration,
+	}
 }
 
 func (h *namespacedMutatingHandler) OnDelete(client.Client, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
@@ -51,7 +53,7 @@ func (h *namespacedMutatingHandler) handler(ctx context.Context, clt client.Clie
 		return utils.ErroredResponse(err)
 	}
 
-	changed := h.handleServiceAccount(resource)
+	changed := resources.SetTenantResourceServiceAccount(h.configuration, resource)
 	if !changed {
 		return nil
 	}
@@ -66,23 +68,4 @@ func (h *namespacedMutatingHandler) handler(ctx context.Context, clt client.Clie
 	response := admission.PatchResponseFromRaw(req.Object.Raw, marshaled)
 
 	return &response
-}
-
-func (h *namespacedMutatingHandler) handleServiceAccount(resource *capsulev1beta2.TenantResource) (changed bool) {
-	changed = false
-
-	if resource.Spec.ServiceAccountName != "" {
-		return
-	}
-
-	cfg := h.cfg.ServiceAccountClientProperties()
-	if cfg == nil || cfg.TenantDefaultServiceAccount != "" {
-		return
-	}
-
-	changed = true
-
-	resource.Spec.ServiceAccountName = caputils.NamespacedServiceAccountName(cfg.TenantDefaultServiceAccount, resource.Namespace)
-
-	return
 }

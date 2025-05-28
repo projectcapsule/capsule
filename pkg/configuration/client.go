@@ -11,6 +11,7 @@ import (
 
 	"github.com/pkg/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -36,13 +37,21 @@ func NewCapsuleConfiguration(ctx context.Context, client client.Client, rest *re
 
 			if err := client.Get(ctx, types.NamespacedName{Name: name}, config); err != nil {
 				if apierrors.IsNotFound(err) {
-					return &capsulev1beta2.CapsuleConfiguration{
+					config = &capsulev1beta2.CapsuleConfiguration{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: name,
+						},
 						Spec: capsulev1beta2.CapsuleConfigurationSpec{
 							UserGroups:                     []string{"projectcapsule.dev"},
 							ForceTenantPrefix:              false,
 							ProtectedNamespaceRegexpString: "",
 						},
 					}
+
+					_ = client.Create(ctx, config)
+
+					return config
+
 				}
 				panic(errors.Wrap(err, "Cannot retrieve Capsule configuration with name "+name))
 			}

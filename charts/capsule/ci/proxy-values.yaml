@@ -1,6 +1,10 @@
 proxy:
   enabled: true
 manager:
+  options:
+    useProxyForServiceAccountClient: true
+    serviceAccountClient:
+      skipTlsVerify: true
   resources:
     requests:
       cpu: 200m

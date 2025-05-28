@@ -16,6 +16,15 @@ spec:
     TLSSecretName: {{ include "capsule.secretTlsName" . }}
     validatingWebhookConfigurationName: {{ include "capsule.fullname" . }}-validating-webhook-configuration
   forceTenantPrefix: {{ .Values.manager.options.forceTenantPrefix }}
+  {{- $saClientValues := .Values.manager.options.serviceAccountClient -}}
+  {{- if and .Values.manager.options.useProxyForServiceAccountClient .Values.proxy.enabled }}
+    {{- $dlt_cfg := (fromYaml (include "proxy.defaults" $)) -}}
+    {{- $saClientValues = mergeOverwrite (default dict $dlt_cfg) (default dict .Values.manager.options.serviceAccountClient) -}}
+  {{- end }}
+  {{- with $saClientValues }}
+  serviceAccountClient:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
   userGroups:
 {{- range .Values.manager.options.capsuleUserGroups }}
     - {{ . }}
@@ -26,3 +35,11 @@ spec:
     {{- toYaml . | nindent 4 }}
   {{- end }}
 {{- end }}
+
+{{- define "proxy.defaults" -}}
+serviceAccountClient:
+  endpoint: https://{{ include "capsule.fullname" . }}-proxy.{{ .Release.Namespace }}.svc:9001
+  caSecretNamespace: {{ .Release.Namespace }}
+  caSecretName: {{ .Release.Name }}-capsule-proxy
+{{- end -}}
+

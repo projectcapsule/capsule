@@ -15,7 +15,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api"
 )
 
-var _ = Describe("creating a Namespace for a Tenant with additional metadata", func() {
+var _ = Describe("creating a Namespace for a Tenant with additional metadata", Label("namespace"), func() {
 	tnt := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "tenant-metadata",

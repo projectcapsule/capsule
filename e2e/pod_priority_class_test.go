@@ -21,7 +21,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api"
 )
 
-var _ = Describe("enforcing a Priority Class", func() {
+var _ = Describe("enforcing a Priority Class", Label("pod"), func() {
 	tntWithDefaults := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "priority-class-defaults",

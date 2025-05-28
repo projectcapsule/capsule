@@ -17,7 +17,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api"
 )
 
-var _ = Describe("creating a LoadBalancer service when it is enabled for Tenant", func() {
+var _ = Describe("creating a LoadBalancer service when it is enabled for Tenant", Label("tenant"), func() {
 	tnt := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "enable-loadbalancer-service",

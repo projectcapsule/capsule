@@ -15,7 +15,7 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 )
 
-var _ = Describe("creating a nodePort service when it is enabled for Tenant", func() {
+var _ = Describe("creating a nodePort service when it is enabled for Tenant", Label("tenant"), func() {
 	tnt := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "enable-node-ports",

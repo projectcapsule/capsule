@@ -39,3 +39,8 @@ repos:
     entry: make golint
     language: system
     files: \.go$
+  - id: go-test
+    name: Execute go test
+    entry: make test
+    language: system
+    files: \.go$

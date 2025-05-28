@@ -2,8 +2,8 @@ apiVersion: capsule.clastix.io/v1beta2
 kind: Tenant
 metadata:
   labels:
-    kubernetes.io/metadata.name: migration
-  name: migration
+    kubernetes.io/metadata.name: solar
+  name: solar
 spec:
   owners:
   - clusterRoles:

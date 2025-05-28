@@ -131,20 +131,26 @@ spec:
                   caSecretNamespace:
                     description: Namespace where the CA certificate secret is located
                     type: string
-                  defaultServiceAccount:
-                    description: |-
-                      Default ServiceAccount for namespaced resources (TenantResource)
-                      When defined, users are required to use this ServiceAccount within the namespace
-                      where they deploy the resource, unless they explicitly provide their own.
-                    type: string
                   endpoint:
                     description: Kubernetes API Endpoint to use for impersonation
+                    type: string
+                  globalDefaultServiceAccount:
+                    description: |-
+                      Default ServiceAccount for namespaced resources (GlobalTenantResource)
+                      When defined, users are required to use this ServiceAccount anywhere in the cluster
+                      unless they explicitly provide their own.
                     type: string
                   skipTlsVerify:
                     default: false
                     description: If true, TLS certificate verification is skipped
                       (not recommended for production)
                     type: boolean
+                  tenantDefaultServiceAccount:
+                    description: |-
+                      Default ServiceAccount for namespaced resources (TenantResource)
+                      When defined, users are required to use this ServiceAccount within the namespace
+                      where they deploy the resource, unless they explicitly provide their own.
+                    type: string
                 type: object
               userGroups:
                 default:

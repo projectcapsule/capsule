@@ -15,7 +15,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api"
 )
 
-var _ = Describe("enforcing a defined ImagePullPolicy", func() {
+var _ = Describe("enforcing a defined ImagePullPolicy", Label("pod"), func() {
 	tnt := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "image-pull-policy",

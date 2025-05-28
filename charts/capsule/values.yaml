@@ -76,6 +76,17 @@ proxy:
   # -- Enable Installation of Capsule Proxy
   enabled: false
 
+# These are ClusterRoles which grant permissions for Capsule CRDs to Tenant Owners
+rbac:
+  resources:
+    create: false
+    labels:
+      rbac.authorization.k8s.io/aggregate-to-admin: "true"
+  resourcepoolclaims:
+    create: false
+    labels:
+      rbac.authorization.k8s.io/aggregate-to-admin: "true"
+
 # Manager Options
 manager:
 
@@ -142,6 +153,10 @@ manager:
       forbiddenAnnotations:
         denied: []
         deniedRegex: ""
+    # -- If `proxy.enabled` is `true`, this option sets the `options.serviceAccountClient` according to the standard installation. Properties from `options.serviceAccountClient` are merged over the default values.
+    useProxyForServiceAccountClient: false
+    # -- Define custom service account client options for the Capsule manager container.
+    serviceAccountClient: {}
 
   # -- Configure the liveness probe using Deployment probe spec
   livenessProbe:
@@ -265,6 +280,19 @@ webhooks:
 
   # Hook Configuration
   hooks:
+    resourcepools:
+      pools:
+        namespaceSelector: {}
+        objectSelector: {}
+        reinvocationPolicy: Never
+        matchPolicy: Equivalent
+        failurePolicy: Fail
+      claims:
+        namespaceSelector: {}
+        objectSelector: {}
+        reinvocationPolicy: Never
+        matchPolicy: Equivalent
+        failurePolicy: Fail
     namespaceOwnerReference:
       failurePolicy: Fail
     customresources:
@@ -379,6 +407,7 @@ webhooks:
           matchExpressions:
             - key: capsule.clastix.io/tenant
               operator: Exists
+
 
 # ServiceMonitor
 serviceMonitor:

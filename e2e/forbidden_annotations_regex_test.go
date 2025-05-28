@@ -14,7 +14,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api"
 )
 
-var _ = Describe("creating a tenant with various forbidden regexes", func() {
+var _ = Describe("creating a tenant with various forbidden regexes", Label("tenant"), func() {
 	//errorRegexes := []string{
 	//	"(.*gitops|.*nsm).[k8s.io/((?!(resource)).*|trusted)](http://k8s.io/((?!(resource)).*%7Ctrusted))",
 	//}

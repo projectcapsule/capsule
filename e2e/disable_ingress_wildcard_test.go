@@ -19,7 +19,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/utils"
 )
 
-var _ = Describe("creating an Ingress with a wildcard when it is denied for the Tenant", func() {
+var _ = Describe("creating an Ingress with a wildcard when it is denied for the Tenant", Label("tenant"), func() {
 	tnt := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "denied-ingress-wildcard",

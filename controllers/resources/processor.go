@@ -24,10 +24,10 @@ import (
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/meta"
 )
 
 const (
-	Label     = "capsule.clastix.io/resources"
 	finalizer = "capsule.clastix.io/resources"
 )
 
@@ -48,24 +48,28 @@ func (r *Processor) HandlePruning(
 	c client.Client,
 	current,
 	desired sets.Set[string],
-) (updateStatus bool) {
+) (failedProcess []string, err error) {
 	log := ctrllog.FromContext(ctx)
 
 	diff := current.Difference(desired)
 	// We don't want to trigger a reconciliation of the Status every time,
 	// rather, only in case of a difference between the processed and the actual status.
 	// This can happen upon the first reconciliation, or a removal, or a change, of a resource.
-	updateStatus = diff.Len() > 0 || current.Len() != desired.Len()
+	reconcile := diff.Len() > 0 || current.Len() != desired.Len()
 
-	if diff.Len() > 0 {
-		log.Info("starting processing pruning", "length", diff.Len())
+	if !reconcile {
+		return
 	}
+
+	processed := sets.NewString()
+
+	log.Info("starting processing pruning", "length", diff.Len())
 
 	// The outer resources must be removed, iterating over these to clean-up
 	for item := range diff {
 		or := capsulev1beta2.ObjectReferenceStatus{}
-		if err := or.ParseFromString(item); err != nil {
-			log.Error(err, "unable to parse resource to prune", "resource", item)
+		if sectionErr := or.ParseFromString(item); sectionErr != nil {
+			log.Error(sectionErr, "unable to parse resource to prune", "resource", item)
 
 			continue
 		}
@@ -75,27 +79,33 @@ func (r *Processor) HandlePruning(
 		obj.SetName(or.Name)
 		obj.SetGroupVersionKind(schema.FromAPIVersionAndKind(or.APIVersion, or.Kind))
 
-		if err := c.Delete(ctx, &obj); err != nil {
-			if apierr.IsNotFound(err) {
+		if sectionErr := c.Delete(ctx, &obj); err != sectionErr {
+			if apierr.IsNotFound(sectionErr) {
 				// Object may have been already deleted, we can ignore this error
 				continue
 			}
 
+			or.Status = metav1.ConditionFalse
+			or.Message = sectionErr.Error()
+			or.Type = meta.PruningCondition
+
 			log.Error(err, "unable to prune resource", "resource", item)
 
-			continue
+			err = errors.Join(sectionErr)
 		}
+
+		processed.Insert(or.String())
 
 		log.Info("resource has been pruned", "resource", item)
 	}
 
-	return updateStatus
+	return processed.List(), nil
 }
 
 //nolint:gocognit
 func (r *Processor) HandleSection(
 	ctx context.Context,
-	serviceAccountClient client.Client,
+	c client.Client,
 	tnt capsulev1beta2.Tenant,
 	allowCrossNamespaceSelection bool,
 	tenantLabel string,
@@ -145,7 +155,7 @@ func (r *Processor) HandleSection(
 
 	objAnnotations[tenantLabel] = tnt.GetName()
 
-	objLabels[Label] = fmt.Sprintf("%d", resourceIndex)
+	objLabels[meta.ResourcesLabel] = fmt.Sprintf("%d", resourceIndex)
 	objLabels[tenantLabel] = tnt.GetName()
 	// processed will contain the sets of resources replicated, both for the raw and the Namespaced ones:
 	// these are required to perform a final pruning once the replication has been occurred.
@@ -183,7 +193,7 @@ func (r *Processor) HandleSection(
 			objs := unstructured.UnstructuredList{}
 			objs.SetGroupVersionKind(schema.FromAPIVersionAndKind(item.APIVersion, fmt.Sprintf("%sList", item.Kind)))
 
-			if clientErr := serviceAccountClient.List(ctx, &objs, client.InNamespace(item.Namespace), client.MatchingLabelsSelector{Selector: itemSelector}); clientErr != nil {
+			if clientErr := c.List(ctx, &objs, client.InNamespace(item.Namespace), client.MatchingLabelsSelector{Selector: itemSelector}); clientErr != nil {
 				log.Error(clientErr, "cannot retrieve object for namespacedItem", keysAndValues...)
 
 				syncErr = errors.Join(syncErr, clientErr)
@@ -213,22 +223,28 @@ func (r *Processor) HandleSection(
 					kv := keysAndValues
 					kv = append(kv, "resource", fmt.Sprintf("%s/%s", obj.GetNamespace(), obj.GetNamespace()))
 
-					if opErr := r.createOrUpdate(ctx, serviceAccountClient, &obj, objLabels, objAnnotations); opErr != nil {
-						log.Error(opErr, "unable to sync namespacedItems", kv...)
-						errorsChan <- opErr
-
-						return
-					}
-
-					log.Info("resource has been replicated", kv...)
-
 					replicatedItem := &capsulev1beta2.ObjectReferenceStatus{}
 					replicatedItem.Name = obj.GetName()
 					replicatedItem.Kind = obj.GetKind()
 					replicatedItem.Namespace = ns.Name
 					replicatedItem.APIVersion = obj.GetAPIVersion()
+					replicatedItem.Type = meta.ReplicationCondition
+
+					if opErr := r.createOrUpdate(ctx, c, &obj, objLabels, objAnnotations); opErr != nil {
+						log.Error(opErr, "unable to sync namespacedItems", kv...)
+						errorsChan <- opErr
+
+						replicatedItem.Status = metav1.ConditionFalse
+						replicatedItem.Message = opErr.Error()
+					} else {
+						replicatedItem.Status = metav1.ConditionTrue
+					}
+
+					log.Info("resource has been replicated", kv...)
 
 					processedRaw[index] = replicatedItem.String()
+
+					return
 				}(i, obj)
 			}
 
@@ -272,22 +288,29 @@ func (r *Processor) HandleSection(
 
 			obj.SetNamespace(ns.Name)
 
-			if rawErr := r.createOrUpdate(ctx, serviceAccountClient, &obj, objLabels, objAnnotations); rawErr != nil {
+			replicatedItem := &capsulev1beta2.ObjectReferenceStatus{}
+			replicatedItem.Name = obj.GetName()
+			replicatedItem.Kind = obj.GetKind()
+			replicatedItem.Namespace = ns.Name
+			replicatedItem.APIVersion = obj.GetAPIVersion()
+			replicatedItem.Type = meta.ReplicationCondition
+
+			if rawErr := r.createOrUpdate(ctx, c, &obj, objLabels, objAnnotations); rawErr != nil {
 				log.Info("unable to sync rawItem", keysAndValues...)
+
+				replicatedItem.Status = metav1.ConditionFalse
+				replicatedItem.Message = rawErr.Error()
+
 				// In case of error processing an item in one of any selected Namespaces, storing it to report it lately
 				// to the upper call to ensure a partial sync that will be fixed by a subsequent reconciliation.
 				syncErr = errors.Join(syncErr, rawErr)
 			} else {
 				log.Info("resource has been replicated", keysAndValues...)
 
-				replicatedItem := &capsulev1beta2.ObjectReferenceStatus{}
-				replicatedItem.Name = obj.GetName()
-				replicatedItem.Kind = obj.GetKind()
-				replicatedItem.Namespace = ns.Name
-				replicatedItem.APIVersion = obj.GetAPIVersion()
-
-				processed.Insert(replicatedItem.String())
+				replicatedItem.Status = metav1.ConditionTrue
 			}
+
+			processed.Insert(replicatedItem.String())
 		}
 	}
 
@@ -311,7 +334,7 @@ func (r *Processor) createOrUpdate(
 	actual.SetNamespace(desired.GetNamespace())
 	actual.SetName(desired.GetName())
 
-	_, err = controllerutil.CreateOrUpdate(ctx, r.client, actual, func() error {
+	_, err = controllerutil.CreateOrUpdate(ctx, c, actual, func() error {
 		UID := actual.GetUID()
 		rv := actual.GetResourceVersion()
 		actual.SetUnstructuredContent(desired.Object)

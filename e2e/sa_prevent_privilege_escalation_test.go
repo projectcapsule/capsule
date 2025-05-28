@@ -20,7 +20,7 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 )
 
-var _ = Describe("trying to escalate from a Tenant Namespace ServiceAccount", func() {
+var _ = Describe("trying to escalate from a Tenant Namespace ServiceAccount", Label("tenant"), func() {
 	tnt := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "sa-privilege-escalation",

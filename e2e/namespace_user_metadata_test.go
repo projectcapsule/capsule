@@ -17,7 +17,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api"
 )
 
-var _ = Describe("creating a Namespace with user-specified labels and annotations", func() {
+var _ = Describe("creating a Namespace with user-specified labels and annotations", Label("namespace"), func() {
 	tnt := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "tenant-user-metadata-forbidden",
