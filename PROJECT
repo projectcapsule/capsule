@@ -5,6 +5,7 @@
 domain: clastix.io
 layout:
 - go.kubebuilder.io/v4
+multigroup: true
 plugins:
   manifests.sdk.operatorframework.io/v2: {}
   scorecard.sdk.operatorframework.io/v2: {}
@@ -64,4 +65,13 @@ resources:
   kind: ResourcePoolClaim
   path: github.com/projectcapsule/capsule/api/v1beta2
   version: v1beta2
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: clastix.io
+  group: capsule
+  kind: TenantPermission
+  path: github.com/projectcapsule/capsule/api/capsule/v1aplha2
+  version: v1aplha2
 version: "3"
