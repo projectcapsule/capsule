@@ -7,11 +7,12 @@ import (
 	"context"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	capsulev1aplha2 "github.com/projectcapsule/capsule/api/capsule/v1aplha2"
+	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 )
 
 // TenantPermissionReconciler reconciles a TenantPermission object
@@ -20,30 +21,31 @@ type TenantPermissionReconciler struct {
 	Scheme *runtime.Scheme
 }
 
+// SetupWithManager sets up the controller with the Manager.
+func (r *TenantPermissionReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	return ctrl.NewControllerManagedBy(mgr).
+		For(&capsulev1beta2.TenantPermission{}).
+		Complete(r)
+}
+
 // +kubebuilder:rbac:groups=capsule.clastix.io,resources=tenantpermissions,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=capsule.clastix.io,resources=tenantpermissions/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=capsule.clastix.io,resources=tenantpermissions/finalizers,verbs=update
-
-// Reconcile is part of the main kubernetes reconciliation loop which aims to
-// move the current state of the cluster closer to the desired state.
-// TODO(user): Modify the Reconcile function to compare the state specified by
-// the TenantPermission object against the actual cluster state, and then
-// perform operations to make the cluster state reflect the state specified by
-// the user.
-//
-// For more details, check Reconcile and its Result here:
-// - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.19.0/pkg/reconcile
-func (r *TenantPermissionReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *TenantPermissionReconciler) Reconcile(ctx context.Context, req ctrl.Request) (result ctrl.Result, err error) {
 	_ = log.FromContext(ctx)
 
 	// TODO(user): your logic here
 
-	return ctrl.Result{}, nil
-}
+	tntPermission := &capsulev1beta2.TenantPermission{}
+	if err := r.client.Get(ctx, req.NamespacedName, tntPermission); err != nil {
+		if apierrors.IsNotFound(err) != nil {
+			log.Info("Request object not found, could have been deleted after reconcile request")
 
-// SetupWithManager sets up the controller with the Manager.
-func (r *TenantPermissionReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
-		For(&capsulev1aplha2.TenantPermission{}).
-		Complete(r)
+			return ctrl.Result{}, err
+		}
+		
+		return reconcile.Result{}, err
+	}
+
+	return ctrl.Result{}, nil
 }
