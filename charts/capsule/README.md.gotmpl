@@ -112,7 +112,7 @@ Here the values you can override:
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 {{- range .Values }}
-  {{- if not (or (hasPrefix "global" .Key) (hasPrefix "manager" .Key) (hasPrefix "crds" .Key) (hasPrefix "serviceMonitor" .Key) (hasPrefix "webhook" .Key) (hasPrefix "capsule-proxy" .Key) )  }}
+  {{- if not (or (hasPrefix "global" .Key) (hasPrefix "manager" .Key) (hasPrefix "crds" .Key) (hasPrefix "monitoring" .Key) (hasPrefix "webhook" .Key) (hasPrefix "capsule-proxy" .Key) )  }}
 | {{ .Key }} | {{ .Type }} | {{ if .Default }}{{ .Default }}{{ else }}{{ .AutoDefault }}{{ end }} | {{ if .Description }}{{ .Description }}{{ else }}{{ .AutoDescription }}{{ end }} |
   {{- end }}
 {{- end }}
@@ -127,12 +127,12 @@ Here the values you can override:
   {{- end }}
 {{- end }}
 
-### ServiceMonitor Parameters
+### Monitoring Parameters
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 {{- range .Values }}
-  {{- if hasPrefix "serviceMonitor" .Key }}
+  {{- if hasPrefix "monitoring" .Key }}
 | {{ .Key }} | {{ .Type }} | {{ if .Default }}{{ .Default }}{{ else }}{{ .AutoDefault }}{{ end }} | {{ if .Description }}{{ .Description }}{{ else }}{{ .AutoDescription }}{{ end }} |
   {{- end }}
 {{- end }}

@@ -377,27 +377,52 @@ webhooks:
             - key: capsule.clastix.io/tenant
               operator: Exists
 
+# Monitoring Settings
+monitoring:
 
-# ServiceMonitor
-serviceMonitor:
-  # -- Enable ServiceMonitor
-  enabled: false
-  # -- Install the ServiceMonitor into a different Namespace, as the monitoring stack one (default: the release one)
-  namespace: ''
-  # -- Assign additional labels according to Prometheus' serviceMonitorSelector matching labels
-  labels: {}
-  # -- Assign additional Annotations
-  annotations: {}
-  # -- Change matching labels
-  matchLabels: {}
-  # -- Set targetLabels for the serviceMonitor
-  targetLabels: []
-  endpoint:
-    # -- Set the scrape interval for the endpoint of the serviceMonitor
-    interval: "15s"
-    # -- Set the scrape timeout for the endpoint of the serviceMonitor
-    scrapeTimeout: ""
-    # -- Set metricRelabelings for the endpoint of the serviceMonitor
-    metricRelabelings: []
-    # -- Set relabelings for the endpoint of the serviceMonitor
-    relabelings: []
+  dashboards:
+    # -- Enable Dashboards to be deployed
+    enabled: false
+    # -- Annotations for dashboard configmaps
+    annotations: {}
+    # -- Labels for dashboard configmaps
+    labels: {}
+    # grafana_dashboard: "1"
+    # -- Custom namespace for dashboard configmaps
+    namespace: ""
+    # Grafana Operator
+    operator:
+      # -- Enable Operator Resources (GrafanaDashboard)
+      enabled: true
+      # -- Allow the Operator to match this resource with Grafanas outside the current namespace
+      allowCrossNamespaceImport: true
+      # -- How often the resource is synced, defaults to 10m0s if not set
+      resyncPeriod: "10m"
+      # -- Selects Grafana instances for import
+      instanceSelector: {}
+      # -- folder assignment for dashboard
+      folder: ""
+
+  # ServiceMonitor
+  serviceMonitor:
+    # -- Enable ServiceMonitor
+    enabled: false
+    # -- Install the ServiceMonitor into a different Namespace, as the monitoring stack one (default: the release one)
+    namespace: ''
+    # -- Assign additional labels according to Prometheus' serviceMonitorSelector matching labels
+    labels: {}
+    # -- Assign additional Annotations
+    annotations: {}
+    # -- Change matching labels
+    matchLabels: {}
+    # -- Set targetLabels for the serviceMonitor
+    targetLabels: []
+    endpoint:
+      # -- Set the scrape interval for the endpoint of the serviceMonitor
+      interval: "15s"
+      # -- Set the scrape timeout for the endpoint of the serviceMonitor
+      scrapeTimeout: ""
+      # -- Set metricRelabelings for the endpoint of the serviceMonitor
+      metricRelabelings: []
+      # -- Set relabelings for the endpoint of the serviceMonitor
+      relabelings: []

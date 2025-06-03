@@ -291,6 +291,26 @@ spec:
                   type: array
                 description: Tracks the quotas for the Resource.
                 type: object
+              exhaustions:
+                additionalProperties:
+                  properties:
+                    available:
+                      anyOf:
+                      - type: integer
+                      - type: string
+                      description: Available Resources to be claimed
+                      pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                      x-kubernetes-int-or-string: true
+                    requesting:
+                      anyOf:
+                      - type: integer
+                      - type: string
+                      description: Requesting Resources
+                      pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                      x-kubernetes-int-or-string: true
+                  type: object
+                description: Exhaustions from claims associated with the pool
+                type: object
               namespaceCount:
                 default: 0
                 description: How many namespaces are considered
