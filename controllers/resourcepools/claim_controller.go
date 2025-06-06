@@ -51,9 +51,9 @@ func (r resourceClaimController) Reconcile(ctx context.Context, request ctrl.Req
 	instance := &capsulev1beta2.ResourcePoolClaim{}
 	if err = r.Get(ctx, request.NamespacedName, instance); err != nil {
 		if apierrors.IsNotFound(err) {
-			log.V(3).Info("Request object not found, could have been deleted after reconcile request")
+			log.V(5).Info("Request object not found, could have been deleted after reconcile request")
 
-			r.metrics.DeleteClaimMetric(request.Name)
+			r.metrics.DeleteClaimMetric(request.Name, request.Namespace)
 
 			return reconcile.Result{}, nil
 		}

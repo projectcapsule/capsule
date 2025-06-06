@@ -8,15 +8,19 @@ import (
 	crtlmetrics "sigs.k8s.io/controller-runtime/pkg/metrics"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/api"
 )
 
 type ResourcePoolRecorder struct {
-	poolResource               *prometheus.GaugeVec
-	poolResourceLimit          *prometheus.GaugeVec
-	poolResourceAvailable      *prometheus.GaugeVec
-	poolResourceUsage          *prometheus.GaugeVec
-	poolResourceExhaustion     *prometheus.GaugeVec
-	poolNamespaceResourceUsage *prometheus.GaugeVec
+	poolResource                         *prometheus.GaugeVec
+	poolResourceLimit                    *prometheus.GaugeVec
+	poolResourceAvailable                *prometheus.GaugeVec
+	poolResourceUsage                    *prometheus.GaugeVec
+	poolResourceUsagePercentage          *prometheus.GaugeVec
+	poolResourceExhaustion               *prometheus.GaugeVec
+	poolResourceExhaustionPercentage     *prometheus.GaugeVec
+	poolNamespaceResourceUsage           *prometheus.GaugeVec
+	poolNamespaceResourceUsagePercentage *prometheus.GaugeVec
 }
 
 func MustMakeResourcePoolRecorder() *ResourcePoolRecorder {
@@ -33,6 +37,14 @@ func NewResourcePoolRecorder() *ResourcePoolRecorder {
 				Namespace: metricsPrefix,
 				Name:      "pool_exhaustion",
 				Help:      "Resources become exhausted, when there's not enough available for all claims and the claims get queued",
+			},
+			[]string{"pool", "resource"},
+		),
+		poolResourceExhaustionPercentage: prometheus.NewGaugeVec(
+			prometheus.GaugeOpts{
+				Namespace: metricsPrefix,
+				Name:      "pool_exhaustion_percentage",
+				Help:      "Resources become exhausted, when there's not enough available for all claims and the claims get queued (Percentage)",
 			},
 			[]string{"pool", "resource"},
 		),
@@ -60,7 +72,14 @@ func NewResourcePoolRecorder() *ResourcePoolRecorder {
 			},
 			[]string{"pool", "resource"},
 		),
-
+		poolResourceUsagePercentage: prometheus.NewGaugeVec(
+			prometheus.GaugeOpts{
+				Namespace: metricsPrefix,
+				Name:      "pool_usage_percentage",
+				Help:      "Current resource usage for a given resource in a resource pool (percentage)",
+			},
+			[]string{"pool", "resource"},
+		),
 		poolResourceAvailable: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
 				Namespace: metricsPrefix,
@@ -77,6 +96,14 @@ func NewResourcePoolRecorder() *ResourcePoolRecorder {
 			},
 			[]string{"pool", "target_namespace", "resource"},
 		),
+		poolNamespaceResourceUsagePercentage: prometheus.NewGaugeVec(
+			prometheus.GaugeOpts{
+				Namespace: metricsPrefix,
+				Name:      "pool_namespace_usage_percentage",
+				Help:      "Current resources claimed on namespace basis for a given resource in a resource pool for a specific namespace (percentage)",
+			},
+			[]string{"pool", "target_namespace", "resource"},
+		),
 	}
 }
 
@@ -85,9 +112,12 @@ func (r *ResourcePoolRecorder) Collectors() []prometheus.Collector {
 		r.poolResource,
 		r.poolResourceLimit,
 		r.poolResourceUsage,
+		r.poolResourceUsagePercentage,
 		r.poolResourceAvailable,
 		r.poolResourceExhaustion,
+		r.poolResourceExhaustionPercentage,
 		r.poolNamespaceResourceUsage,
+		r.poolNamespaceResourceUsagePercentage,
 	}
 }
 
@@ -124,9 +154,55 @@ func (r *ResourcePoolRecorder) ResourceUsageMetrics(pool *capsulev1beta2.Resourc
 			pool.Name,
 			resourceName.String(),
 		).Set(float64(available.MilliValue()) / 1000)
+
+		usagePercentage := float64(0)
+		if quantity.MilliValue() > 0 {
+			usagePercentage = (float64(claimed.MilliValue()) / float64(quantity.MilliValue())) * 100
+		}
+
+		r.poolResourceUsagePercentage.WithLabelValues(
+			pool.Name,
+			resourceName.String(),
+		).Set(usagePercentage)
 	}
 
 	r.resourceUsageMetricsByNamespace(pool)
+}
+
+// Emit exhaustion metrics
+func (r *ResourcePoolRecorder) CalculateExhaustions(
+	pool *capsulev1beta2.ResourcePool,
+	current map[string]api.PoolExhaustionResource,
+) {
+	for resource := range pool.Status.Exhaustions {
+		if _, ok := current[resource]; ok {
+			continue
+		}
+
+		r.poolResourceExhaustion.DeleteLabelValues(pool.Name, resource)
+		r.poolResourceExhaustionPercentage.DeleteLabelValues(pool.Name, resource)
+	}
+
+	for resource, ex := range current {
+		available := float64(ex.Available.MilliValue()) / 1000
+		requesting := float64(ex.Requesting.MilliValue()) / 1000
+
+		r.poolResourceExhaustion.WithLabelValues(
+			pool.Name,
+			resource,
+		).Set(float64(ex.Requesting.MilliValue()) / 1000)
+
+		// Calculate and expose overprovisioning percentage
+		if available > 0 && requesting > available {
+			percent := ((requesting - available) / available) * 100
+			r.poolResourceExhaustionPercentage.WithLabelValues(
+				pool.Name,
+				resource,
+			).Set(percent)
+		} else {
+			r.poolResourceExhaustionPercentage.DeleteLabelValues(pool.Name, resource)
+		}
+	}
 }
 
 // Delete all metrics for a namespace in a resource pool.
@@ -147,7 +223,9 @@ func (r *ResourcePoolRecorder) cleanupAllMetricForLabels(labels map[string]strin
 	r.poolResourceLimit.DeletePartialMatch(labels)
 	r.poolResourceAvailable.DeletePartialMatch(labels)
 	r.poolResourceUsage.DeletePartialMatch(labels)
+	r.poolResourceUsagePercentage.DeletePartialMatch(labels)
 	r.poolNamespaceResourceUsage.DeletePartialMatch(labels)
+	r.poolNamespaceResourceUsagePercentage.DeletePartialMatch(labels)
 	r.poolResource.DeletePartialMatch(labels)
 	r.poolResourceExhaustion.DeletePartialMatch(labels)
 }
@@ -163,6 +241,17 @@ func (r *ResourcePoolRecorder) resourceUsageMetricsByNamespace(pool *capsulev1be
 				namespace,
 				resourceName.String(),
 			).Set(float64(quantity.MilliValue()) / 1000)
+
+			availble, ok := pool.Status.Allocation.Hard[resourceName]
+			if !ok {
+				continue
+			}
+
+			r.poolNamespaceResourceUsagePercentage.WithLabelValues(
+				pool.Name,
+				namespace,
+				resourceName.String(),
+			).Set((float64(quantity.MilliValue()) / float64(availble.MilliValue())) * 100)
 		}
 	}
 }

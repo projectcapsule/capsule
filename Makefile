@@ -96,6 +96,7 @@ helm-test-exec: ct helm-controller-version ko-build-all
 	$(MAKE) e2e-load-image CLUSTER_NAME=capsule-charts IMAGE=$(CAPSULE_IMG) VERSION=v0.0.0
 	$(MAKE) e2e-load-image CLUSTER_NAME=capsule-charts IMAGE=$(CAPSULE_IMG) VERSION=tracing
 	@$(KUBECTL) create ns capsule-system || true
+	@$(KUBECTL) apply --force-conflicts --server-side=true -f https://github.com/grafana/grafana-operator/releases/download/v5.18.0/crds.yaml
 	@$(KUBECTL) apply --force-conflicts --server-side=true -f https://github.com/cert-manager/cert-manager/releases/download/v1.9.1/cert-manager.crds.yaml
 	@$(KUBECTL) apply --force-conflicts --server-side=true -f https://github.com/prometheus-operator/prometheus-operator/releases/download/v0.58.0/bundle.yaml
 	@$(CT) install --config $(SRC_ROOT)/.github/configs/ct.yaml --namespace=capsule-system --all --debug
@@ -344,7 +345,7 @@ ginkgo:
 	$(call go-install-tool,$(GINKGO),github.com/onsi/ginkgo/v2/ginkgo)
 
 CT         := $(LOCALBIN)/ct
-CT_VERSION := v3.12.0
+CT_VERSION := v3.13.0
 CT_LOOKUP  := helm/chart-testing
 ct:
 	@test -s $(CT) && $(CT) version | grep -q $(CT_VERSION) || \

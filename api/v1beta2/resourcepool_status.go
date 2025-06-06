@@ -24,6 +24,8 @@ type ResourcePoolStatus struct {
 	Claims ResourcePoolNamespaceClaimsStatus `json:"claims,omitempty"`
 	// Tracks the Usage from Claimed against what has been granted from the pool
 	Allocation ResourcePoolQuotaStatus `json:"allocation,omitempty"`
+	// Exhaustions from claims associated with the pool
+	Exhaustions map[string]api.PoolExhaustionResource `json:"exhaustions,omitempty"`
 }
 
 type ResourcePoolNamespaceClaimsStatus map[string]ResourcePoolClaimsList

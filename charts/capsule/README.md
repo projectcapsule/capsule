@@ -178,20 +178,29 @@ Here the values you can override:
 | manager.volumes | list | `[]` | Set the additional volumes needed for the Capsule manager container |
 | manager.webhookPort | int | `9443` | Set an alternative to the default container port.  Useful for use in some kubernetes clusters (such as GKE Private) with aggregator routing turned on, because pod ports have to be opened manually on the firewall side |
 
-### ServiceMonitor Parameters
+### Monitoring Parameters
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| serviceMonitor.annotations | object | `{}` | Assign additional Annotations |
-| serviceMonitor.enabled | bool | `false` | Enable ServiceMonitor |
-| serviceMonitor.endpoint.interval | string | `"15s"` | Set the scrape interval for the endpoint of the serviceMonitor |
-| serviceMonitor.endpoint.metricRelabelings | list | `[]` | Set metricRelabelings for the endpoint of the serviceMonitor |
-| serviceMonitor.endpoint.relabelings | list | `[]` | Set relabelings for the endpoint of the serviceMonitor |
-| serviceMonitor.endpoint.scrapeTimeout | string | `""` | Set the scrape timeout for the endpoint of the serviceMonitor |
-| serviceMonitor.labels | object | `{}` | Assign additional labels according to Prometheus' serviceMonitorSelector matching labels |
-| serviceMonitor.matchLabels | object | `{}` | Change matching labels |
-| serviceMonitor.namespace | string | `""` | Install the ServiceMonitor into a different Namespace, as the monitoring stack one (default: the release one) |
-| serviceMonitor.targetLabels | list | `[]` | Set targetLabels for the serviceMonitor |
+| monitoring.dashboards.annotations | object | `{}` | Annotations for dashboard configmaps |
+| monitoring.dashboards.enabled | bool | `false` | Enable Dashboards to be deployed |
+| monitoring.dashboards.labels | object | `{}` | Labels for dashboard configmaps |
+| monitoring.dashboards.namespace | string | `""` | Custom namespace for dashboard configmaps |
+| monitoring.dashboards.operator.allowCrossNamespaceImport | bool | `true` | Allow the Operator to match this resource with Grafanas outside the current namespace |
+| monitoring.dashboards.operator.enabled | bool | `true` | Enable Operator Resources (GrafanaDashboard) |
+| monitoring.dashboards.operator.folder | string | `""` | folder assignment for dashboard |
+| monitoring.dashboards.operator.instanceSelector | object | `{}` | Selects Grafana instances for import |
+| monitoring.dashboards.operator.resyncPeriod | string | `"10m"` | How often the resource is synced, defaults to 10m0s if not set |
+| monitoring.serviceMonitor.annotations | object | `{}` | Assign additional Annotations |
+| monitoring.serviceMonitor.enabled | bool | `false` | Enable ServiceMonitor |
+| monitoring.serviceMonitor.endpoint.interval | string | `"15s"` | Set the scrape interval for the endpoint of the serviceMonitor |
+| monitoring.serviceMonitor.endpoint.metricRelabelings | list | `[]` | Set metricRelabelings for the endpoint of the serviceMonitor |
+| monitoring.serviceMonitor.endpoint.relabelings | list | `[]` | Set relabelings for the endpoint of the serviceMonitor |
+| monitoring.serviceMonitor.endpoint.scrapeTimeout | string | `""` | Set the scrape timeout for the endpoint of the serviceMonitor |
+| monitoring.serviceMonitor.labels | object | `{}` | Assign additional labels according to Prometheus' serviceMonitorSelector matching labels |
+| monitoring.serviceMonitor.matchLabels | object | `{}` | Change matching labels |
+| monitoring.serviceMonitor.namespace | string | `""` | Install the ServiceMonitor into a different Namespace, as the monitoring stack one (default: the release one) |
+| monitoring.serviceMonitor.targetLabels | list | `[]` | Set targetLabels for the serviceMonitor |
 
 ### Webhooks Parameters
 

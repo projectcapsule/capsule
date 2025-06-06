@@ -1,22 +1,23 @@
 {{- if not $.Values.crds.exclusive }}
-  {{- if .Values.serviceMonitor.enabled }}
+  {{- with (mergeOverwrite .Values.monitoring.serviceMonitor (default dict .Values.serviceMonitor)) -}}
+    {{- if .enabled }}
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
-  name: {{ include "capsule.fullname" . }}-monitor
-  namespace: {{ .Values.serviceMonitor.namespace | default .Release.Namespace }}
+  name: {{ include "capsule.fullname" $ }}
+  namespace: {{ .namespace | default $.Release.Namespace }}
   labels:
     {{- include "capsule.labels" . | nindent 4 }}
-    {{- with .Values.serviceMonitor.labels }}
+    {{- with .labels }}
     {{- toYaml . | nindent 4 }}
     {{- end }}
-  {{- with .Values.serviceMonitor.annotations }}
+  {{- with .annotations }}
   annotations:
     {{- toYaml . | nindent 4 }}
   {{- end }}
 spec:
   endpoints:
-  {{- with .Values.serviceMonitor.endpoint }}
+  {{- with .endpoint }}
   - interval: {{ .interval }}
     port: metrics
     path: /metrics
@@ -31,18 +32,19 @@ spec:
     {{- end }}
   {{- end }}
   jobLabel: app.kubernetes.io/name
-  {{- with .Values.serviceMonitor.targetLabels }}
+  {{- with .targetLabels }}
   targetLabels: {{- toYaml . | nindent 4 }}
   {{- end }}
   selector:
     matchLabels:
-    {{- if .Values.serviceMonitor.matchLabels }}
-      {{- toYaml .Values.serviceMonitor.matchLabels | nindent 6 }}
+    {{- if .matchLabels }}
+      {{- toYaml .matchLabels | nindent 6 }}
     {{- else }}
-      {{- include "capsule.labels" . | nindent 6 }}
+      {{- include "capsule.selectorLabels" $ | nindent 6 }}
     {{- end }}
   namespaceSelector:
     matchNames:
-      - {{ .Release.Namespace }}
+      - {{ $.Release.Namespace }}
+    {{- end }}
   {{- end }}
 {{- end }}

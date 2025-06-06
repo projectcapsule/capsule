@@ -331,6 +331,94 @@
             },
             "type": "object"
         },
+        "monitoring": {
+            "properties": {
+                "dashboards": {
+                    "properties": {
+                        "annotations": {
+                            "properties": {},
+                            "type": "object"
+                        },
+                        "enabled": {
+                            "type": "boolean"
+                        },
+                        "labels": {
+                            "properties": {},
+                            "type": "object"
+                        },
+                        "namespace": {
+                            "type": "string"
+                        },
+                        "operator": {
+                            "properties": {
+                                "allowCrossNamespaceImport": {
+                                    "type": "boolean"
+                                },
+                                "enabled": {
+                                    "type": "boolean"
+                                },
+                                "folder": {
+                                    "type": "string"
+                                },
+                                "instanceSelector": {
+                                    "properties": {},
+                                    "type": "object"
+                                },
+                                "resyncPeriod": {
+                                    "type": "string"
+                                }
+                            },
+                            "type": "object"
+                        }
+                    },
+                    "type": "object"
+                },
+                "serviceMonitor": {
+                    "properties": {
+                        "annotations": {
+                            "properties": {},
+                            "type": "object"
+                        },
+                        "enabled": {
+                            "type": "boolean"
+                        },
+                        "endpoint": {
+                            "properties": {
+                                "interval": {
+                                    "type": "string"
+                                },
+                                "metricRelabelings": {
+                                    "type": "array"
+                                },
+                                "relabelings": {
+                                    "type": "array"
+                                },
+                                "scrapeTimeout": {
+                                    "type": "string"
+                                }
+                            },
+                            "type": "object"
+                        },
+                        "labels": {
+                            "properties": {},
+                            "type": "object"
+                        },
+                        "matchLabels": {
+                            "properties": {},
+                            "type": "object"
+                        },
+                        "namespace": {
+                            "type": "string"
+                        },
+                        "targetLabels": {
+                            "type": "array"
+                        }
+                    },
+                    "type": "object"
+                }
+            },
+            "type": "object"
+        },
         "nodeSelector": {
             "properties": {},
             "type": "object"
@@ -448,49 +536,6 @@
                 },
                 "name": {
                     "type": "string"
-                }
-            },
-            "type": "object"
-        },
-        "serviceMonitor": {
-            "properties": {
-                "annotations": {
-                    "properties": {},
-                    "type": "object"
-                },
-                "enabled": {
-                    "type": "boolean"
-                },
-                "endpoint": {
-                    "properties": {
-                        "interval": {
-                            "type": "string"
-                        },
-                        "metricRelabelings": {
-                            "type": "array"
-                        },
-                        "relabelings": {
-                            "type": "array"
-                        },
-                        "scrapeTimeout": {
-                            "type": "string"
-                        }
-                    },
-                    "type": "object"
-                },
-                "labels": {
-                    "properties": {},
-                    "type": "object"
-                },
-                "matchLabels": {
-                    "properties": {},
-                    "type": "object"
-                },
-                "namespace": {
-                    "type": "string"
-                },
-                "targetLabels": {
-                    "type": "array"
                 }
             },
             "type": "object"

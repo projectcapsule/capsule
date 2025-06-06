@@ -13,7 +13,6 @@ import (
 	"golang.org/x/sync/errgroup"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/types"
@@ -76,7 +75,7 @@ func (r resourcePoolController) Reconcile(ctx context.Context, request ctrl.Requ
 	instance := &capsulev1beta2.ResourcePool{}
 	if err = r.Get(ctx, request.NamespacedName, instance); err != nil {
 		if apierrors.IsNotFound(err) {
-			log.V(3).Info("Request object not found, could have been deleted after reconcile request")
+			log.V(5).Info("Request object not found, could have been deleted after reconcile request")
 
 			r.metrics.DeleteResourcePoolMetric(request.Name)
 
@@ -198,17 +197,22 @@ func (r *resourcePoolController) reconcile(
 
 	// Keeps track of resources which are exhausted by previous resource
 	// This is only required when Ordered is active
-	queuedResourcesMap := make(map[string]resource.Quantity)
+	exhaustions := make(map[string]api.PoolExhaustionResource)
 
 	// You can now iterate over `allClaims` in order
 	for _, claim := range claims {
 		log.V(5).Info("Found claim", "name", claim.Name, "namespace", claim.Namespace, "created", claim.CreationTimestamp)
 
-		err = r.reconcileResourceClaim(ctx, log.WithValues("Claim", claim.Name), pool, &claim, queuedResourcesMap)
+		err = r.reconcileResourceClaim(ctx, log.WithValues("Claim", claim.Name), pool, &claim, exhaustions)
 		if err != nil {
 			log.Error(err, "Failed to reconcile ResourceQuotaClaim", "claim", claim.Name)
 		}
 	}
+
+	log.V(7).Info("finalized reconciling claims", "exhaustions", exhaustions)
+
+	r.metrics.CalculateExhaustions(pool, exhaustions)
+	pool.Status.Exhaustions = exhaustions
 
 	pool.CalculateClaimedResources()
 	pool.AssignClaims()
@@ -222,7 +226,7 @@ func (r *resourcePoolController) reconcileResourceClaim(
 	log logr.Logger,
 	pool *capsulev1beta2.ResourcePool,
 	claim *capsulev1beta2.ResourcePoolClaim,
-	exhaustion map[string]resource.Quantity,
+	exhaustion map[string]api.PoolExhaustionResource,
 ) (err error) {
 	t := pool.GetClaimFromStatus(claim)
 	if t != nil {
@@ -257,7 +261,6 @@ func (r *resourcePoolController) reconcileResourceClaim(
 
 		return r.handleClaimResourceExhaustion(
 			ctx,
-			pool,
 			claim,
 			exhaustions,
 			exhaustion,
@@ -271,14 +274,14 @@ func (r *resourcePoolController) canClaimWithinNamespace(
 	log logr.Logger,
 	pool *capsulev1beta2.ResourcePool,
 	claim *capsulev1beta2.ResourcePoolClaim,
-) (res map[string]PoolExhaustionResource) {
+) (res map[string]api.PoolExhaustionResource) {
 	claimable := pool.GetAvailableClaimableResources()
 	log.V(5).Info("claimable resources", "claimable", claimable)
 
 	_, namespaceClaimed := pool.GetNamespaceClaims(claim.Namespace)
 	log.V(5).Info("namespace claimed resources", "claimed", namespaceClaimed)
 
-	res = make(map[string]PoolExhaustionResource)
+	res = make(map[string]api.PoolExhaustionResource)
 
 	for resourceName, req := range claim.Spec.ResourceClaims {
 		// Verify if total Quota is available
@@ -286,10 +289,9 @@ func (r *resourcePoolController) canClaimWithinNamespace(
 		if !exists || available.IsZero() || available.Cmp(req) < 0 {
 			log.V(5).Info("not enough resources available", "available", available, "requesting", req)
 
-			res[resourceName.String()] = PoolExhaustionResource{
+			res[resourceName.String()] = api.PoolExhaustionResource{
 				Available:  available,
 				Requesting: req,
-				Namespace:  false,
 			}
 
 			continue
@@ -303,12 +305,12 @@ func (r *resourcePoolController) canClaimWithinNamespace(
 func (r *resourcePoolController) handleClaimOrderedExhaustion(
 	ctx context.Context,
 	claim *capsulev1beta2.ResourcePoolClaim,
-	exhaustion map[string]resource.Quantity,
+	exhaustions map[string]api.PoolExhaustionResource,
 ) (queued bool, err error) {
 	status := make([]string, 0)
 
 	for resourceName, qt := range claim.Spec.ResourceClaims {
-		req, ok := exhaustion[resourceName.String()]
+		req, ok := exhaustions[resourceName.String()]
 		if !ok {
 			continue
 		}
@@ -318,7 +320,7 @@ func (r *resourcePoolController) handleClaimOrderedExhaustion(
 			resourceName,
 			qt.String(),
 			resourceName,
-			req.String(),
+			req.Requesting.String(),
 		)
 		status = append(status, line)
 	}
@@ -339,32 +341,28 @@ func (r *resourcePoolController) handleClaimOrderedExhaustion(
 
 func (r *resourcePoolController) handleClaimResourceExhaustion(
 	ctx context.Context,
-	pool *capsulev1beta2.ResourcePool,
 	claim *capsulev1beta2.ResourcePoolClaim,
-	exhaustions map[string]PoolExhaustionResource,
-	exhaustion map[string]resource.Quantity,
+	currentExhaustions map[string]api.PoolExhaustionResource,
+	exhaustions map[string]api.PoolExhaustionResource,
 ) (err error) {
 	status := make([]string, 0)
 
 	resourceNames := make([]string, 0)
-	for resourceName := range exhaustions {
+	for resourceName := range currentExhaustions {
 		resourceNames = append(resourceNames, resourceName)
 	}
 
 	sort.Strings(resourceNames)
 
 	for _, resourceName := range resourceNames {
-		ex := exhaustions[resourceName]
+		ex := currentExhaustions[resourceName]
 
-		if *pool.Spec.Config.OrderedQueue {
-			ext, ok := exhaustion[resourceName]
-			if ok {
-				ext.Add(ex.Requesting)
-			} else {
-				ext = ex.Requesting
-			}
-
-			exhaustion[resourceName] = ext
+		ext, ok := exhaustions[resourceName]
+		if ok {
+			ext.Requesting.Add(ex.Requesting)
+			exhaustions[resourceName] = ext
+		} else {
+			exhaustions[resourceName] = ex
 		}
 
 		line := fmt.Sprintf(
