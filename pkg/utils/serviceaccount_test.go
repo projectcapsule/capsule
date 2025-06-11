@@ -35,7 +35,7 @@ func TestSanitizeServiceAccountProp(t *testing.T) {
 }
 
 func TestImpersonatedKubernetesClientForServiceAccount(t *testing.T) {
-	reference := api.ServiceAccountReference{
+	reference := &api.ServiceAccountReference{
 		Name:      "account",
 		Namespace: "namespace",
 	}

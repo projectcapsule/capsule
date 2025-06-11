@@ -22,6 +22,7 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/meta"
 )
 
 var _ = Describe("Using Impersonation on TenantResources", Label("tenantresource"), func() {
@@ -277,6 +278,41 @@ var _ = Describe("Using Impersonation on TenantResources", Label("tenantresource
 			Expect(err).Should(Succeed())
 			Expect(t.Spec.ServiceAccount.Name.String()).To(Equal("replication-account"))
 			Expect(t.Spec.ServiceAccount.Namespace.String()).To(Equal(t.Namespace))
+		})
+
+		By("verify status (Verify ServiceAccount Names)", func() {
+			err := k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(tr), tr)
+			Expect(err).Should(Succeed())
+
+			Expect(tr.Status.Condition.Status).To(Equal(metav1.ConditionFalse))
+			Expect(tr.Status.Condition.Type).To(Equal(meta.ReadyCondition))
+			Expect(tr.Status.Condition.Reason).To(Equal(meta.FailedReason))
+
+			found := true
+			for _, ns := range solarNs {
+				for _, name := range []string{"raw-secret-1", "raw-secret-2", "raw-secret-3"} {
+					foundInner := false
+					for _, status := range tr.Status.ProcessedItems {
+						if status.Kind == "Secret" &&
+							status.Name == name &&
+							status.Namespace == ns &&
+							status.Type == meta.ReplicationCondition &&
+							status.Status == metav1.ConditionFalse {
+							foundInner = true
+							break
+						}
+					}
+					if !foundInner {
+						found = false
+						break
+					}
+				}
+				if !found {
+					break
+				}
+			}
+
+			Expect(found).To(BeTrue())
 		})
 
 		for _, ns := range solarNs {

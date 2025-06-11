@@ -6,6 +6,7 @@ package resources
 import (
 	"context"
 	"errors"
+	"reflect"
 
 	"github.com/go-logr/logr"
 	gherrors "github.com/pkg/errors"
@@ -16,10 +17,13 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/cluster-api/util/patch"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
@@ -45,6 +49,46 @@ func (r *globalResourceController) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&capsulev1beta2.GlobalTenantResource{}).
 		Watches(&capsulev1beta2.Tenant{}, handler.EnqueueRequestsFromMapFunc(r.enqueueRequestFromTenant)).
+		Watches(
+			&capsulev1beta2.CapsuleConfiguration{},
+			handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, _ client.Object) []reconcile.Request {
+				var list capsulev1beta2.GlobalTenantResourceList
+				if err := r.client.List(ctx, &list); err != nil {
+					r.log.Error(err, "unable to list GlobalTenantResources")
+
+					return nil
+				}
+
+				var requests []reconcile.Request
+				for _, s := range list.Items {
+					requests = append(requests, reconcile.Request{
+						NamespacedName: types.NamespacedName{
+							Name:      s.Name,
+							Namespace: s.Namespace,
+						},
+					})
+				}
+
+				return requests
+			}),
+			builder.WithPredicates(predicate.Funcs{
+				CreateFunc: func(event.CreateEvent) bool {
+					return false
+				},
+				UpdateFunc: func(e event.UpdateEvent) bool {
+					oldObj, okOld := e.ObjectOld.(*capsulev1beta2.CapsuleConfiguration)
+					newObj, okNew := e.ObjectNew.(*capsulev1beta2.CapsuleConfiguration)
+					if !okOld || !okNew {
+						return false
+					}
+
+					return !reflect.DeepEqual(oldObj.Spec.ServiceAccountClient, newObj.Spec.ServiceAccountClient)
+				},
+				DeleteFunc: func(event.DeleteEvent) bool {
+					return false
+				},
+			}),
+		).
 		Complete(r)
 }
 
