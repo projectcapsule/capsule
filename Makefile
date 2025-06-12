@@ -87,7 +87,7 @@ helm-lint: ct
 	@$(CT) lint --config .github/configs/ct.yaml --validate-yaml=false --all --debug
 
 helm-schema: helm-plugin-schema
-	cd charts/capsule && $(HELM) schema -output values.schema.json
+	cd charts/capsule && $(HELM) schema --use-helm-docs
 
 helm-test: HELM_KIND_CONFIG ?= ""
 helm-test: kind
@@ -223,7 +223,12 @@ goimports:
 # Linting code as PR is expecting
 .PHONY: golint
 golint: golangci-lint
+	$(GOLANGCI_LINT) run -c .golangci.yaml --verbose
+
+.PHONY: golint-fix
+golint-fix: golangci-lint
 	$(GOLANGCI_LINT) run -c .golangci.yaml --verbose --fix
+
 
 # Running e2e tests in a KinD instance
 .PHONY: e2e
