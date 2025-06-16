@@ -25,7 +25,10 @@ import (
 	"github.com/projectcapsule/capsule/pkg/meta"
 )
 
-var _ = Describe("Using Impersonation on TenantResources", Label("tenantresource"), func() {
+var _ = Describe("Using Impersonation on TenantResources", Label("tenantresource", "config"), func() {
+	originConfig := &capsulev1beta2.CapsuleConfiguration{}
+	testConfig := &capsulev1beta2.CapsuleConfiguration{}
+
 	solar := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "tenantresource-imp-config",
@@ -174,6 +177,10 @@ var _ = Describe("Using Impersonation on TenantResources", Label("tenantresource
 	}
 
 	JustBeforeEach(func() {
+		// Save the current state of the argoaddon configuration
+		Expect(k8sClient.Get(context.Background(), client.ObjectKey{Name: defaultConfigurationName}, originConfig)).To(Succeed())
+		testConfig = originConfig.DeepCopy()
+
 		EventuallyCreation(func() error {
 			return k8sClient.Create(context.TODO(), solar)
 		}).Should(Succeed())
@@ -186,6 +193,18 @@ var _ = Describe("Using Impersonation on TenantResources", Label("tenantresource
 	JustAfterEach(func() {
 		Expect(k8sClient.Delete(context.TODO(), crossNamespaceItem)).Should(Succeed())
 		_ = k8sClient.Delete(context.TODO(), solar)
+
+		// Restore Configuration
+		Eventually(func() error {
+			if err := k8sClient.Get(context.Background(), client.ObjectKey{Name: originConfig.Name}, testConfig); err != nil {
+				return err
+			}
+
+			// Apply the initial configuration from originConfig to testConfig
+			testConfig.Spec = originConfig.Spec
+			return k8sClient.Update(context.Background(), testConfig)
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+
 	})
 
 	It("should replicate resources to all Tenant Namespaces", func() {
@@ -245,7 +264,9 @@ var _ = Describe("Using Impersonation on TenantResources", Label("tenantresource
 
 			EventuallyCreation(func() error {
 				return k8sClient.Update(context.TODO(), t)
-			}).ShouldNot(Succeed())
+			}).Should(Succeed())
+			Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(t), t)).Should(Succeed())
+			Expect(t.Spec.ServiceAccount).To(BeNil())
 
 			t.Spec.ServiceAccount = &api.ServiceAccountReference{
 				Name:      "",
@@ -255,11 +276,8 @@ var _ = Describe("Using Impersonation on TenantResources", Label("tenantresource
 				return k8sClient.Update(context.TODO(), t)
 			}).Should(Succeed())
 
-			err = k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(t), t)
-			Expect(err).Should(Succeed())
+			Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(t), t)).Should(Succeed())
 			Expect(t.Spec.ServiceAccount).To(BeNil())
-
-			t.SetResourceVersion("")
 			t.Spec.ServiceAccount = &api.ServiceAccountReference{
 				Name: "system:serviceaccount:kube-system:replication-account",
 			}
@@ -274,15 +292,13 @@ var _ = Describe("Using Impersonation on TenantResources", Label("tenantresource
 				return k8sClient.Update(context.TODO(), t)
 			}).Should(Succeed())
 
-			err = k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(t), t)
-			Expect(err).Should(Succeed())
+			Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(t), t)).Should(Succeed())
 			Expect(t.Spec.ServiceAccount.Name.String()).To(Equal("replication-account"))
 			Expect(t.Spec.ServiceAccount.Namespace.String()).To(Equal(t.Namespace))
 		})
 
 		By("verify status (Verify ServiceAccount Names)", func() {
-			err := k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(tr), tr)
-			Expect(err).Should(Succeed())
+			Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(tr), tr)).Should(Succeed())
 
 			Expect(tr.Status.Condition.Status).To(Equal(metav1.ConditionFalse))
 			Expect(tr.Status.Condition.Type).To(Equal(meta.ReadyCondition))

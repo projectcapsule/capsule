@@ -232,6 +232,7 @@ func main() {
 		route.PVC(pvc.Validating(), pvc.PersistentVolumeReuse()),
 		route.Service(service.Handler()),
 		route.TenantResourceNamespacedMutation(tntresource.NamespacedMutatingHandler(cfg)),
+		route.TenantResourceGlobalMutation(tntresource.GlobalMutatingHandler(cfg)),
 		route.TenantResourceObjectsValidation(utils.InCapsuleGroups(cfg, tntresource.ObjectsValidatingHandler())),
 		route.NetworkPolicy(utils.InCapsuleGroups(cfg, networkpolicy.Handler())),
 		route.Tenant(tenant.NameHandler(), tenant.RoleBindingRegexHandler(), tenant.IngressClassRegexHandler(), tenant.StorageClassRegexHandler(), tenant.ContainerRegistryRegexHandler(), tenant.HostnameRegexHandler(), tenant.FreezedEmitter(), tenant.ServiceAccountNameHandler(), tenant.ForbiddenAnnotationsRegexHandler(), tenant.ProtectedHandler(), tenant.MetaHandler()),

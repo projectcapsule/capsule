@@ -2,7 +2,7 @@
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
 metadata:
-  name: {{ include "capsule.fullname" . }}-validating-webhook-configuration
+  name: {{ include "capsule.fullname" . }}-webhook
   labels:
     {{- include "capsule.labels" . | nindent 4 }}
   annotations:
@@ -246,7 +246,7 @@ webhooks:
   timeoutSeconds: {{ $.Values.webhooks.validatingWebhooksTimeoutSeconds }}
 {{- end }}
 
-{{- with (mergeOverwrite .Values.webhooks.hooks.tenantResources.namespaced.mutation .Values.webhooks.hooks.tenantResourceObjects) }}
+{{- with (mergeOverwrite (default dict .Values.webhooks.hooks.tenantResources.namespaced.mutation) (default dict .Values.webhooks.hooks.tenantResourceObjects)) }}
 - admissionReviewVersions:
     - v1
   clientConfig:

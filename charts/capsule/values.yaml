@@ -372,14 +372,11 @@ webhooks:
           objectSelector: {}
           failurePolicy: Fail
           reinvocationPolicy: Never
-
-
-
-
-
-
-    tenantResourceObjects:
-      failurePolicy: Fail
+      global:
+        mutation:
+          objectSelector: {}
+          failurePolicy: Fail
+          reinvocationPolicy: Never
     services:
       failurePolicy: Fail
       namespaceSelector:

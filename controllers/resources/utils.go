@@ -57,28 +57,29 @@ func SetTenantResourceServiceAccount(
 ) (changed bool) {
 	changed = false
 
+	// If name is empty, remove the whole reference
 	if resource.Spec.ServiceAccount == nil || resource.Spec.ServiceAccount.Name == "" {
-		if !setTenantDefaultResourceServiceAccount(config, resource) {
+		// If a default is configured, apply it
+		if setTenantDefaultResourceServiceAccount(config, resource) {
+			changed = true
+		} else {
+			// Remove invalid ServiceAccount reference
+			if resource.Spec.ServiceAccount != nil {
+				resource.Spec.ServiceAccount = nil
+				changed = true
+			}
 			return
 		}
-
-		changed = true
 	}
 
-	// Always sanitize the Name field (strip any colons, etc.)
+	// Sanitize the Name
 	sanitizedName := caputils.SanitizeServiceAccountProp(resource.Spec.ServiceAccount.Name.String())
 	if resource.Spec.ServiceAccount.Name.String() != sanitizedName {
 		resource.Spec.ServiceAccount.Name = api.Name(sanitizedName)
 		changed = true
 	}
 
-	if resource.Spec.ServiceAccount.Name == "" && resource.Spec.ServiceAccount.Namespace != "" {
-		resource.Spec.ServiceAccount = nil
-		changed = true
-
-		return
-	}
-
+	// Always set the namespace to match the resource
 	sanitizedNS := caputils.SanitizeServiceAccountProp(resource.Namespace)
 	if resource.Spec.ServiceAccount.Namespace.String() != sanitizedNS {
 		resource.Spec.ServiceAccount.Namespace = api.Name(sanitizedNS)

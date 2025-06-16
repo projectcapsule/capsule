@@ -38,3 +38,19 @@ func (t tntResourcenamespaceMutation) GetPath() string {
 func (t tntResourcenamespaceMutation) GetHandlers() []capsulewebhook.Handler {
 	return t.handlers
 }
+
+type tntResourceglobalMutation struct {
+	handlers []capsulewebhook.Handler
+}
+
+func TenantResourceGlobalMutation(handlers ...capsulewebhook.Handler) capsulewebhook.Webhook {
+	return &tntResourceglobalMutation{handlers: handlers}
+}
+
+func (t tntResourceglobalMutation) GetPath() string {
+	return "/tenantresource/global/mutating"
+}
+
+func (t tntResourceglobalMutation) GetHandlers() []capsulewebhook.Handler {
+	return t.handlers
+}

@@ -69,6 +69,8 @@ func (r *Processor) HandlePruning(
 	for item := range diff {
 		or := capsulev1beta2.ObjectReferenceStatus{}
 		if sectionErr := or.ParseFromString(item); sectionErr != nil {
+			processed.Insert(or.String())
+
 			log.Error(sectionErr, "unable to parse resource to prune", "resource", item)
 
 			continue
@@ -79,6 +81,8 @@ func (r *Processor) HandlePruning(
 		obj.SetName(or.Name)
 		obj.SetGroupVersionKind(schema.FromAPIVersionAndKind(or.APIVersion, or.Kind))
 
+		log.V(5).Info("pruning", "resource", obj.GroupVersionKind(), "name", obj.GetName(), "namespace", obj.GetNamespace())
+
 		if sectionErr := c.Delete(ctx, &obj); err != sectionErr {
 			if apierr.IsNotFound(sectionErr) {
 				// Object may have been already deleted, we can ignore this error
@@ -88,15 +92,14 @@ func (r *Processor) HandlePruning(
 			or.Status = metav1.ConditionFalse
 			or.Message = sectionErr.Error()
 			or.Type = meta.PruningCondition
-
-			log.Error(err, "unable to prune resource", "resource", item)
+			processed.Insert(or.String())
 
 			err = errors.Join(sectionErr)
+
+			continue
 		}
 
-		processed.Insert(or.String())
-
-		log.Info("resource has been pruned", "resource", item)
+		log.V(5).Info("resource has been pruned", "resource", item)
 	}
 
 	return processed.List(), nil

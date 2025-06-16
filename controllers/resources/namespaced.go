@@ -199,30 +199,29 @@ func (r *namespacedResourceController) reconcileNormal(
 	}()
 
 	// new empty error
-	var err error
+	var itemErrors error
 
 	for index, resource := range tntResource.Spec.Resources {
 		items, sectionErr := r.processor.HandleSection(ctx, c, tl.Items[0], false, tenantLabel, index, resource)
 		if sectionErr != nil {
 			// Upon a process error storing the last error occurred and continuing to iterate,
 			// avoid to block the whole processing.
-			err = errors.Join(err, sectionErr)
+			itemErrors = errors.Join(itemErrors, sectionErr)
 		}
 
 		processedItems.Insert(items...)
 	}
 
-	if err != nil {
-		log.Error(err, "unable to replicate the requested resources")
-
-		return reconcile.Result{}, err
+	if itemErrors != nil {
+		return reconcile.Result{}, nil
 	}
 
 	failedItems, err := r.processor.HandlePruning(
 		ctx,
 		c,
 		tntResource.Status.ProcessedItems.AsSet(),
-		sets.Set[string](processedItems))
+		sets.Set[string](processedItems),
+	)
 	if len(failedItems) > 0 {
 		tntResource.Status.ProcessedItems = make([]capsulev1beta2.ObjectReferenceStatus, 0, len(failedItems))
 
@@ -252,6 +251,8 @@ func (r *namespacedResourceController) reconcileDelete(
 	if *tntResource.Spec.PruningOnDelete {
 		failedItems, err := r.processor.HandlePruning(ctx, c, tntResource.Status.ProcessedItems.AsSet(), nil)
 		if len(failedItems) > 0 {
+			log.V(5).Info("failed items", "amount", len(failedItems), "items", failedItems)
+
 			tntResource.Status.ProcessedItems = make([]capsulev1beta2.ObjectReferenceStatus, 0, len(failedItems))
 
 			for _, item := range failedItems {
@@ -259,6 +260,9 @@ func (r *namespacedResourceController) reconcileDelete(
 					tntResource.Status.ProcessedItems = append(tntResource.Status.ProcessedItems, or)
 				}
 			}
+
+			log.V(5).Info("new status", "status", tntResource.Status.ProcessedItems)
+
 		}
 
 		if len(failedItems) > 0 || err != nil {
