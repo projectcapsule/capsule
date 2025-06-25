@@ -9,6 +9,8 @@ import (
 )
 
 type TenantRecorder struct {
+	TenantCordonedStatus     *prometheus.GaugeVec
+	TenantNamespaceCounter   *prometheus.GaugeVec
 	TenantResourceUsageGauge *prometheus.GaugeVec
 	TenantResourceLimitGauge *prometheus.GaugeVec
 }
@@ -22,6 +24,20 @@ func MustMakeTenantRecorder() *TenantRecorder {
 
 func NewTenantRecorder() *TenantRecorder {
 	return &TenantRecorder{
+		TenantCordonedStatus: prometheus.NewGaugeVec(
+			prometheus.GaugeOpts{
+				Namespace: metricsPrefix,
+				Name:      "tenant_cordon_status",
+				Help:      "Current cordon status of tenant",
+			}, []string{"tenant"},
+		),
+		TenantNamespaceCounter: prometheus.NewGaugeVec(
+			prometheus.GaugeOpts{
+				Namespace: metricsPrefix,
+				Name:      "tenant_namespace_count",
+				Help:      "Current count of tenant namespaces",
+			}, []string{"tenant", "resource"},
+		),
 		TenantResourceUsageGauge: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
 				Namespace: metricsPrefix,
@@ -41,6 +57,8 @@ func NewTenantRecorder() *TenantRecorder {
 
 func (r *TenantRecorder) Collectors() []prometheus.Collector {
 	return []prometheus.Collector{
+		r.TenantCordonedStatus,
+		r.TenantNamespaceCounter,
 		r.TenantResourceUsageGauge,
 		r.TenantResourceLimitGauge,
 	}
@@ -48,6 +66,12 @@ func (r *TenantRecorder) Collectors() []prometheus.Collector {
 
 // DeleteCondition deletes the condition metrics for the ref.
 func (r *TenantRecorder) DeleteTenantMetric(tenant string) {
+	r.TenantNamespaceCounter.DeletePartialMatch(map[string]string{
+		"tenant": tenant,
+	})
+	r.TenantCordonedStatus.DeletePartialMatch(map[string]string{
+		"tenant": tenant,
+	})
 	r.TenantResourceUsageGauge.DeletePartialMatch(map[string]string{
 		"tenant": tenant,
 	})
