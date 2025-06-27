@@ -53,7 +53,7 @@ func (r *Manager) syncResourceQuotas(ctx context.Context, tenant *capsulev1beta2
 	}
 
 	// Remove prior metrics, to avoid cleaning up for metrics of deleted ResourceQuotas
-	r.Metrics.DeleteTenantMetric(tenant.Name)
+	r.Metrics.DeleteTenantResourceMetrics(tenant.Name)
 	// Expose the namespace quota and usage as metrics for the tenant
 	r.Metrics.TenantResourceUsageGauge.WithLabelValues(tenant.Name, "namespaces", "").Set(float64(tenant.Status.Size))
 	if tenant.Spec.NamespaceOptions != nil && tenant.Spec.NamespaceOptions.Quota != nil {

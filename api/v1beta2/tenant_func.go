@@ -4,6 +4,7 @@
 package v1beta2
 
 import (
+	"github.com/prometheus/client_golang/prometheus"
 	"slices"
 	"sort"
 
@@ -22,11 +23,12 @@ func (in *Tenant) IsFull() bool {
 	return len(in.Status.Namespaces) >= int(*in.Spec.NamespaceOptions.Quota)
 }
 
-func (in *Tenant) AssignNamespaces(namespaces []corev1.Namespace) {
+func (in *Tenant) AssignNamespaces(namespaces []corev1.Namespace, vec *prometheus.GaugeVec) {
 	var l []string
 
 	for _, ns := range namespaces {
 		if ns.Status.Phase == corev1.NamespaceActive {
+			vec.WithLabelValues(in.GetName(), ns.GetName()).Set(1)
 			l = append(l, ns.GetName())
 		}
 	}

@@ -9,10 +9,11 @@ import (
 )
 
 type TenantRecorder struct {
-	TenantCordonedStatus     *prometheus.GaugeVec
-	TenantNamespaceCounter   *prometheus.GaugeVec
-	TenantResourceUsageGauge *prometheus.GaugeVec
-	TenantResourceLimitGauge *prometheus.GaugeVec
+	TenantNamespaceRelationshipGauge *prometheus.GaugeVec
+	TenantCordonedStatusGauge        *prometheus.GaugeVec
+	TenantNamespaceCounterGauge      *prometheus.GaugeVec
+	TenantResourceUsageGauge         *prometheus.GaugeVec
+	TenantResourceLimitGauge         *prometheus.GaugeVec
 }
 
 func MustMakeTenantRecorder() *TenantRecorder {
@@ -24,14 +25,21 @@ func MustMakeTenantRecorder() *TenantRecorder {
 
 func NewTenantRecorder() *TenantRecorder {
 	return &TenantRecorder{
-		TenantCordonedStatus: prometheus.NewGaugeVec(
+		TenantNamespaceRelationshipGauge: prometheus.NewGaugeVec(
+			prometheus.GaugeOpts{
+				Namespace: metricsPrefix,
+				Name:      "tenant_namespace_relationship",
+				Help:      "Current cordon status of tenant",
+			}, []string{"tenant", "namespace"},
+		),
+		TenantCordonedStatusGauge: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
 				Namespace: metricsPrefix,
 				Name:      "tenant_cordon_status",
 				Help:      "Current cordon status of tenant",
 			}, []string{"tenant"},
 		),
-		TenantNamespaceCounter: prometheus.NewGaugeVec(
+		TenantNamespaceCounterGauge: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
 				Namespace: metricsPrefix,
 				Name:      "tenant_namespace_count",
@@ -57,19 +65,27 @@ func NewTenantRecorder() *TenantRecorder {
 
 func (r *TenantRecorder) Collectors() []prometheus.Collector {
 	return []prometheus.Collector{
-		r.TenantCordonedStatus,
-		r.TenantNamespaceCounter,
+		r.TenantNamespaceRelationshipGauge,
+		r.TenantCordonedStatusGauge,
+		r.TenantNamespaceCounterGauge,
 		r.TenantResourceUsageGauge,
 		r.TenantResourceLimitGauge,
 	}
 }
 
 // DeleteCondition deletes the condition metrics for the ref.
-func (r *TenantRecorder) DeleteTenantMetric(tenant string) {
-	r.TenantNamespaceCounter.DeletePartialMatch(map[string]string{
+func (r *TenantRecorder) DeleteTenantResourceMetrics(tenant string) {
+	r.TenantResourceUsageGauge.DeletePartialMatch(map[string]string{
 		"tenant": tenant,
 	})
-	r.TenantCordonedStatus.DeletePartialMatch(map[string]string{
+	r.TenantResourceLimitGauge.DeletePartialMatch(map[string]string{
+		"tenant": tenant,
+	})
+}
+
+// DeleteCondition deletes the condition metrics for the ref.
+func (r *TenantRecorder) DeleteTenantStatusMetrics(tenant string) {
+	r.TenantNamespaceRelationshipGauge.DeletePartialMatch(map[string]string{
 		"tenant": tenant,
 	})
 	r.TenantResourceUsageGauge.DeletePartialMatch(map[string]string{
@@ -78,4 +94,9 @@ func (r *TenantRecorder) DeleteTenantMetric(tenant string) {
 	r.TenantResourceLimitGauge.DeletePartialMatch(map[string]string{
 		"tenant": tenant,
 	})
+}
+
+func (r *TenantRecorder) DeleteAllMetrics(tenant string) {
+	r.DeleteTenantResourceMetrics(tenant)
+	r.DeleteTenantStatusMetrics(tenant)
 }
