@@ -42,8 +42,8 @@ func (m *MetadataReconciler) Reconcile(ctx context.Context, request ctrl.Request
 	tenant, err := m.getTenant(ctx, request.NamespacedName, m.Client)
 	if err != nil {
 		noTenantObjError := &NonTenantObjectError{}
-		noPodMetaError := &NoPodMetadataError{}
 
+		noPodMetaError := &NoPodMetadataError{}
 		if errors.As(err, &noTenantObjError) || errors.As(err, &noPodMetaError) {
 			return reconcile.Result{}, nil
 		}

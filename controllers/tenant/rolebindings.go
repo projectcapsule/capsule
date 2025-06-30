@@ -128,6 +128,7 @@ func (r *Manager) syncAdditionalRoleBinding(ctx context.Context, tenant *capsule
 		}
 
 		var res controllerutil.OperationResult
+
 		res, err = controllerutil.CreateOrUpdate(ctx, r.Client, target, func() error {
 			if target.Labels == nil {
 				target.Labels = map[string]string{}

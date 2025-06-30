@@ -33,6 +33,7 @@ import (
 
 type resourcePoolController struct {
 	client.Client
+
 	metrics  *metrics.ResourcePoolRecorder
 	log      logr.Logger
 	recorder record.EventRecorder
@@ -103,7 +104,6 @@ func (r resourcePoolController) Reconcile(ctx context.Context, request ctrl.Requ
 
 		return r.Client.Status().Update(ctx, current)
 	})
-
 	if reconcileErr != nil || err != nil {
 		log.V(3).Info("Failed to reconcile ResourcePool", "error", err)
 

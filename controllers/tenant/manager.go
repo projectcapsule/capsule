@@ -25,6 +25,7 @@ import (
 
 type Manager struct {
 	client.Client
+
 	Metrics    *metrics.TenantRecorder
 	Log        logr.Logger
 	Recorder   record.EventRecorder

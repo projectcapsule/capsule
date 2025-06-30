@@ -23,6 +23,8 @@ linters:
     - unparam
     - varnamelen
     - wrapcheck
+    - noinlineerr
+    - revive
   settings:
     cyclop:
       max-complexity: 27

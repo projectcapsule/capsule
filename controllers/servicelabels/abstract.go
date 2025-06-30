@@ -34,8 +34,8 @@ func (r *abstractServiceLabelsReconciler) Reconcile(ctx context.Context, request
 	tenant, err := r.getTenant(ctx, request.NamespacedName, r.client)
 	if err != nil {
 		noTenantObjError := &NonTenantObjectError{}
-		noSvcMetaError := &NoServicesMetadataError{}
 
+		noSvcMetaError := &NoServicesMetadataError{}
 		if errors.As(err, &noTenantObjError) || errors.As(err, &noSvcMetaError) {
 			return reconcile.Result{}, nil
 		}

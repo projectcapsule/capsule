@@ -102,7 +102,8 @@ func (in *Tenant) GetNamespaces() (res []string) {
 type TenantList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []Tenant `json:"items"`
+
+	Items []Tenant `json:"items"`
 }
 
 func init() {

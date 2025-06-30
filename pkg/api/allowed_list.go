@@ -17,7 +17,8 @@ import (
 
 type DefaultAllowedListSpec struct {
 	SelectorAllowedListSpec `json:",inline"`
-	Default                 string `json:"default,omitempty"`
+
+	Default string `json:"default,omitempty"`
 }
 
 func (in *DefaultAllowedListSpec) MatchDefault(value string) bool {
@@ -92,7 +93,8 @@ func (in *AllowedListSpec) RegexMatch(value string) (ok bool) {
 // +kubebuilder:object:generate=true
 type SelectionListWithDefaultSpec struct {
 	SelectionListWithSpec `json:",inline"`
-	Default               string `json:"default,omitempty"`
+
+	Default string `json:"default,omitempty"`
 }
 
 func (in *SelectionListWithDefaultSpec) MatchDefault(value string) bool {

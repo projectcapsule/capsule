@@ -97,6 +97,7 @@ func (r *userMetadataHandler) getForbiddenNodeLabels(node *corev1.Node) map[stri
 
 	for label, value := range node.GetLabels() {
 		var forbidden, matched bool
+
 		forbidden = forbiddenLabels.ExactMatch(label)
 		matched = forbiddenLabels.RegexMatch(label)
 
@@ -115,6 +116,7 @@ func (r *userMetadataHandler) getForbiddenNodeAnnotations(node *corev1.Node) map
 
 	for annotation, value := range node.GetAnnotations() {
 		var forbidden, matched bool
+
 		forbidden = forbiddenAnnotations.ExactMatch(annotation)
 		matched = forbiddenAnnotations.RegexMatch(annotation)
 

@@ -53,7 +53,6 @@ func (r *Manager) SetupWithManager(ctx context.Context, mgr ctrl.Manager, config
 				}
 			},
 		}).Complete(r)
-
 	if crbErr != nil {
 		err = errors.Join(err, crbErr)
 	}

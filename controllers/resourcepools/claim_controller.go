@@ -29,6 +29,7 @@ import (
 
 type resourceClaimController struct {
 	client.Client
+
 	metrics  *metrics.ClaimRecorder
 	log      logr.Logger
 	recorder record.EventRecorder
