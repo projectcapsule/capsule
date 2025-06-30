@@ -86,6 +86,7 @@ func ValidateForbidden(metadata map[string]string, forbiddenList ForbiddenListSp
 
 	for key := range metadata {
 		var forbidden, matched bool
+
 		forbidden = forbiddenList.ExactMatch(key)
 		matched = forbiddenList.RegexMatch(key)
 

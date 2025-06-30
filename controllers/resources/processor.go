@@ -202,6 +202,7 @@ func (r *Processor) HandleSection(ctx context.Context, tnt capsulev1beta2.Tenant
 
 					if opErr := r.createOrUpdate(ctx, &obj, objLabels, objAnnotations); opErr != nil {
 						log.Error(opErr, "unable to sync namespacedItems", kv...)
+
 						errorsChan <- opErr
 
 						return

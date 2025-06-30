@@ -68,7 +68,8 @@ type ResourcePool struct {
 type ResourcePoolList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []ResourcePool `json:"items"`
+
+	Items []ResourcePool `json:"items"`
 }
 
 func init() {
