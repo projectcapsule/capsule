@@ -10,9 +10,10 @@ import (
 
 // GlobalTenantResourceSpec defines the desired state of GlobalTenantResource.
 type GlobalTenantResourceSpec struct {
-	// Defines the Tenant selector used target the tenants on which resources must be propagated.
-	TenantSelector     metav1.LabelSelector `json:"tenantSelector,omitempty"`
 	TenantResourceSpec `json:",inline"`
+
+	// Defines the Tenant selector used target the tenants on which resources must be propagated.
+	TenantSelector metav1.LabelSelector `json:"tenantSelector,omitempty"`
 }
 
 // GlobalTenantResourceStatus defines the observed state of GlobalTenantResource.
@@ -54,7 +55,8 @@ type GlobalTenantResource struct {
 type GlobalTenantResourceList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []GlobalTenantResource `json:"items"`
+
+	Items []GlobalTenantResource `json:"items"`
 }
 
 func init() {

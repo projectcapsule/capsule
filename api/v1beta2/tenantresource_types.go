@@ -23,6 +23,7 @@ type ObjectReferenceAbstract struct {
 
 type ObjectReferenceStatus struct {
 	ObjectReferenceAbstract `json:",inline"`
+
 	// Name of the referent.
 	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
 	Name string `json:"name"`
@@ -30,6 +31,7 @@ type ObjectReferenceStatus struct {
 
 type ObjectReference struct {
 	ObjectReferenceAbstract `json:",inline"`
+
 	// Label selector used to select the given resources in the given Namespace.
 	Selector metav1.LabelSelector `json:"selector"`
 }

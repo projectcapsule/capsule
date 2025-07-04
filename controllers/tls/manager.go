@@ -41,6 +41,7 @@ const (
 
 type Reconciler struct {
 	client.Client
+
 	Log           logr.Logger
 	Scheme        *runtime.Scheme
 	Namespace     string

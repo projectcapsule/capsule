@@ -50,7 +50,8 @@ type ResourcePoolClaim struct {
 type ResourcePoolClaimList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []ResourcePoolClaim `json:"items"`
+
+	Items []ResourcePoolClaim `json:"items"`
 }
 
 func init() {
