@@ -4,10 +4,10 @@
 package v1beta2
 
 import (
-	"github.com/prometheus/client_golang/prometheus"
 	"slices"
 	"sort"
 
+	"github.com/prometheus/client_golang/prometheus"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 
@@ -37,7 +37,6 @@ func (in *Tenant) AssignNamespaces(namespaces []corev1.Namespace, vec *prometheu
 
 	in.Status.Namespaces = l
 	in.Status.Size = uint(len(l))
-
 }
 
 func (in *Tenant) GetOwnerProxySettings(name string, kind OwnerKind) []ProxySettings {
