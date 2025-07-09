@@ -91,6 +91,10 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 
 		return
 	}
+	// Ensuring Status metrics are exposed
+	r.Log.Info("Ensuring all status metrics are exposed")
+	r.syncStatusMetrics(instance)
+
 	// Ensuring Namespace metadata
 	r.Log.Info("Starting processing of Namespaces", "items", len(instance.Status.Namespaces))
 

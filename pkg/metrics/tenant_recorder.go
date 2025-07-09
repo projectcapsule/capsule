@@ -35,7 +35,7 @@ func NewTenantRecorder() *TenantRecorder {
 		TenantCordonedStatusGauge: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
 				Namespace: metricsPrefix,
-				Name:      "tenant_cordon_status",
+				Name:      "tenant_status",
 				Help:      "Current cordon status of tenant",
 			}, []string{"tenant"},
 		),
