@@ -89,6 +89,9 @@ spec:
             - name: metrics
               containerPort: 8080
               protocol: TCP
+            - name: health-api
+              containerPort: 10080
+              protocol: TCP
             {{- end }}
             {{- with .Values.manager.ports }}
               {{- . | nindent 12 }}
