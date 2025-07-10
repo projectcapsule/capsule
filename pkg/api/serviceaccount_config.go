@@ -17,12 +17,16 @@ type ServiceAccountClient struct {
 	// If true, TLS certificate verification is skipped (not recommended for production)
 	// +kubebuilder:default=false
 	SkipTLSVerify bool `json:"skipTlsVerify,omitempty"`
-	// Default ServiceAccount for namespaced resources (GlobalTenantResource)
+	// Default ServiceAccount for global resources (GlobalTenantResource)
 	// When defined, users are required to use this ServiceAccount anywhere in the cluster
 	// unless they explicitly provide their own.
-	GlobalDefaultServiceAccount string `json:"globalDefaultServiceAccount,omitempty"`
+	GlobalDefaultServiceAccount Name `json:"globalDefaultServiceAccount,omitempty"`
+	// Default ServiceAccount for global resources (GlobalTenantResource)
+	// When defined, users are required to use this ServiceAccount anywhere in the cluster
+	// unless they explicitly provide their own.
+	GlobalDefaultServiceAccountNamespace Name `json:"globalDefaultServiceAccountNamespace,omitempty"`
 	// Default ServiceAccount for namespaced resources (TenantResource)
 	// When defined, users are required to use this ServiceAccount within the namespace
 	// where they deploy the resource, unless they explicitly provide their own.
-	TenantDefaultServiceAccount string `json:"tenantDefaultServiceAccount,omitempty"`
+	TenantDefaultServiceAccount Name `json:"tenantDefaultServiceAccount,omitempty"`
 }

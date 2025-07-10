@@ -100,7 +100,7 @@ func (r *namespacedResourceController) Reconcile(ctx context.Context, request re
 		if apierrors.IsNotFound(err) {
 			log.V(3).Info("Request object not found, could have been deleted after reconcile request")
 
-			r.metrics.DeleteMetric(request.Name)
+			r.metrics.DeleteMetrics(request.Name, request.Namespace)
 
 			return reconcile.Result{}, nil
 		}
@@ -208,6 +208,8 @@ func (r *namespacedResourceController) reconcileNormal(
 			// avoid to block the whole processing.
 			itemErrors = errors.Join(itemErrors, sectionErr)
 		}
+
+		log.Info("replicate items", "amount", len(items))
 
 		processedItems.Insert(items...)
 	}

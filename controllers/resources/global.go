@@ -104,7 +104,7 @@ func (r *globalResourceController) Reconcile(ctx context.Context, request reconc
 		if apierrors.IsNotFound(err) {
 			log.V(3).Info("Request object not found, could have been deleted after reconcile request")
 
-			r.metrics.DeleteMetric(request.Name)
+			r.metrics.DeleteMetrics(request.Name)
 
 			return reconcile.Result{}, nil
 		}

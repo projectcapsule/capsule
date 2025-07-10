@@ -12,6 +12,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -25,13 +26,17 @@ import (
 	"github.com/projectcapsule/capsule/pkg/meta"
 )
 
+var (
+	suiteLabelValue = "e2e-tenantresource-impersonation"
+)
+
 var _ = Describe("Using Impersonation on TenantResources", Label("tenantresource", "config"), func() {
 	originConfig := &capsulev1beta2.CapsuleConfiguration{}
 	testConfig := &capsulev1beta2.CapsuleConfiguration{}
 
 	solar := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "tenantresource-imp-config",
+			Name: "tenantresource-imp",
 		},
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: capsulev1beta2.OwnerListSpec{
@@ -84,7 +89,7 @@ var _ = Describe("Using Impersonation on TenantResources", Label("tenantresource
 				{
 					NamespaceSelector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{
-							"replicate": "true",
+							"replicate": "tenantresource-imp",
 						},
 					},
 					NamespacedItems: []capsulev1beta2.ObjectReference{
@@ -96,7 +101,7 @@ var _ = Describe("Using Impersonation on TenantResources", Label("tenantresource
 							},
 							Selector: metav1.LabelSelector{
 								MatchLabels: map[string]string{
-									"replicate": "tenantresource-imp",
+									"replicate": "true",
 								},
 							},
 						},
@@ -176,16 +181,19 @@ var _ = Describe("Using Impersonation on TenantResources", Label("tenantresource
 		},
 	}
 
+	solarNs := []string{"tenantresource-imp-one", "tenantresource-imp-two", "tenantresource-imp-three"}
+
 	JustBeforeEach(func() {
-		// Save the current state of the argoaddon configuration
 		Expect(k8sClient.Get(context.Background(), client.ObjectKey{Name: defaultConfigurationName}, originConfig)).To(Succeed())
 		testConfig = originConfig.DeepCopy()
 
 		EventuallyCreation(func() error {
+			solar.ResourceVersion = ""
 			return k8sClient.Create(context.TODO(), solar)
 		}).Should(Succeed())
 
 		EventuallyCreation(func() error {
+			crossNamespaceItem.ResourceVersion = ""
 			return k8sClient.Create(context.TODO(), crossNamespaceItem)
 		}).Should(Succeed())
 	})
@@ -205,22 +213,178 @@ var _ = Describe("Using Impersonation on TenantResources", Label("tenantresource
 			return k8sClient.Update(context.Background(), testConfig)
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 
+		Eventually(func() error {
+			poolList := &rbacv1.RoleBindingList{}
+			labelSelector := client.MatchingLabels{"e2e-test": suiteLabelValue}
+			if err := k8sClient.List(context.TODO(), poolList, labelSelector); err != nil {
+				return err
+			}
+
+			for _, pool := range poolList.Items {
+				if err := k8sClient.Delete(context.TODO(), &pool); err != nil {
+					return err
+				}
+			}
+
+			return nil
+		}, "30s", "5s").Should(Succeed())
+
+		Eventually(func() error {
+			poolList := &corev1.ServiceAccountList{}
+			labelSelector := client.MatchingLabels{"e2e-test": suiteLabelValue}
+			if err := k8sClient.List(context.TODO(), poolList, labelSelector); err != nil {
+				return err
+			}
+
+			for _, pool := range poolList.Items {
+				if err := k8sClient.Delete(context.TODO(), &pool); err != nil {
+					return err
+				}
+			}
+
+			return nil
+		}, "30s", "5s").Should(Succeed())
+
+	})
+
+	It("Impersonation from ServiceAccount (From Config)", func() {
+		By("Verifying CapsuleConfiguration Influence", func() {
+
+			NamespaceCreation(&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "tenantresource-imp-config"}}, solar.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+
+			t := tr.DeepCopy()
+			t.Namespace = "tenantresource-imp-config"
+
+			Expect(k8sClient.Create(context.TODO(), t)).Should(Succeed())
+			Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(t), t)).Should(Succeed())
+
+			Expect(t.Spec.ServiceAccount).To(BeNil())
+			EventuallyCreation(func() error {
+				k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(t), t)
+				t.Spec.ServiceAccount = &api.ServiceAccountReference{
+					Name: "system:serviceaccount:kube-system:replication-account",
+				}
+				return k8sClient.Update(context.TODO(), t)
+			}).Should(Succeed())
+			Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(t), t)).Should(Succeed())
+			Expect(t.Spec.ServiceAccount.Name.String()).To(Equal("replication-account"))
+			Expect(t.Spec.ServiceAccount.Namespace.String()).To(Equal(t.Namespace))
+
+			EventuallyCreation(func() error {
+				k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(t), t)
+				t.Spec.ServiceAccount = nil
+				return k8sClient.Update(context.TODO(), t)
+			}).Should(Succeed())
+			Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(t), t)).Should(Succeed())
+			Expect(t.Spec.ServiceAccount).To(BeNil())
+
+			testConfig.Spec.ServiceAccountClient = &api.ServiceAccountClient{
+				TenantDefaultServiceAccount: "default-gitops",
+			}
+			Expect(k8sClient.Update(context.TODO(), testConfig)).Should(Succeed())
+
+			Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(t), t)).Should(Succeed())
+			Expect(t.Spec.ServiceAccount.Name.String()).To(Equal("default-gitops"))
+			Expect(t.Spec.ServiceAccount.Namespace.String()).To(Equal(t.Namespace))
+
+			EventuallyCreation(func() error {
+				k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(testConfig), testConfig)
+				testConfig.Spec.ServiceAccountClient = &api.ServiceAccountClient{
+					TenantDefaultServiceAccount: "illegal:name",
+				}
+				return k8sClient.Update(context.TODO(), testConfig)
+			}).ShouldNot(Succeed())
+
+			EventuallyCreation(func() error {
+				k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(t), t)
+				t.Spec.ServiceAccount = &api.ServiceAccountReference{
+					Name:      "system:serviceaccount:kube-system:custom-account",
+					Namespace: "kube-system",
+				}
+				return k8sClient.Update(context.TODO(), t)
+			}).Should(Succeed())
+			Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(t), t)).Should(Succeed())
+			Expect(t.Spec.ServiceAccount.Name.String()).To(Equal("custom-account"))
+			Expect(t.Spec.ServiceAccount.Namespace.String()).To(Equal(t.Namespace))
+
+			EventuallyCreation(func() error {
+				k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(t), t)
+				t.Spec.ServiceAccount = nil
+				return k8sClient.Update(context.TODO(), t)
+			}).Should(Succeed())
+			Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(t), t)).Should(Succeed())
+			Expect(t.Spec.ServiceAccount.Name.String()).To(Equal("default-gitops"))
+			Expect(t.Spec.ServiceAccount.Namespace.String()).To(Equal(t.Namespace))
+
+			EventuallyCreation(func() error {
+				k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(testConfig), testConfig)
+				testConfig.Spec.ServiceAccountClient = &api.ServiceAccountClient{
+					TenantDefaultServiceAccount: "",
+				}
+				return k8sClient.Update(context.TODO(), testConfig)
+			}).Should(Succeed())
+
+			// It's still going to be the default, as we are not tracking the relation between default from the config
+			// and the TenantResource.
+			Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(t), t)).Should(Succeed())
+			Expect(t.Spec.ServiceAccount.Name.String()).To(Equal("default-gitops"))
+			Expect(t.Spec.ServiceAccount.Namespace.String()).To(Equal(t.Namespace))
+
+			EventuallyCreation(func() error {
+				k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(t), t)
+				t.Spec.ServiceAccount = nil
+				return k8sClient.Update(context.TODO(), t)
+			}).Should(Succeed())
+
+		})
 	})
 
 	It("should replicate resources to all Tenant Namespaces", func() {
-		solarNs := []string{"tenantresource-imp-one", "tenantresource-imp-two", "tenantresource-imp-three"}
-
 		By("creating solar Namespaces", func() {
 			for _, ns := range append(solarNs, "tenantresource-imp-system") {
 				NamespaceCreation(&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: ns}}, solar.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 			}
-		})
 
-		By("labelling Namespaces", func() {
-			for _, name := range solarNs {
+			// Create the ServiceAccount in tenantresource-imp-system
+			adminSA := &corev1.ServiceAccount{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "default-gitops",
+					Namespace: tr.GetNamespace(),
+					Labels: map[string]string{
+						"e2e-test": suiteLabelValue,
+					},
+				},
+			}
+			Expect(k8sClient.Create(context.TODO(), adminSA)).To(Succeed())
+
+			for _, name := range append(solarNs, tr.GetNamespace()) {
+				role := &rbacv1.RoleBinding{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "tenantresource-imp-binding",
+						Labels: map[string]string{
+							"e2e-test": suiteLabelValue,
+						},
+						Namespace: name,
+					},
+					Subjects: []rbacv1.Subject{
+						{
+							Kind:      "ServiceAccount",
+							Name:      "default-gitops",
+							Namespace: tr.GetNamespace(),
+						},
+					},
+					RoleRef: rbacv1.RoleRef{
+						Kind:     "ClusterRole",
+						Name:     "admin",
+						APIGroup: "rbac.authorization.k8s.io",
+					},
+				}
+
 				EventuallyWithOffset(1, func() error {
 					ns := corev1.Namespace{}
 					Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: name}, &ns)).Should(Succeed())
+
+					Expect(k8sClient.Create(context.TODO(), role)).To(Succeed())
 
 					labels := ns.GetLabels()
 					if labels == nil {
@@ -240,80 +404,136 @@ var _ = Describe("Using Impersonation on TenantResources", Label("tenantresource
 			}).Should(Succeed())
 		})
 
-		By("creating the TenantResource (Verify ServiceAccount Names)", func() {
+		By("verifying ServiceAccount Names", func() {
 			t := tr.DeepCopy()
 
-			t.Spec.ServiceAccount = &api.ServiceAccountReference{
-				Name:      "privileged-account",
-				Namespace: "kube-system",
-			}
-
 			EventuallyCreation(func() error {
+				t.Spec.ServiceAccount = &api.ServiceAccountReference{
+					Name:      "",
+					Namespace: "kube-system:",
+				}
 				return k8sClient.Create(context.TODO(), t)
 			}).Should(Succeed())
+			Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(t), t)).Should(Succeed())
+			Expect(t.Spec.ServiceAccount).To(BeNil())
 
-			err := k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(t), t)
-			Expect(err).Should(Succeed())
+			EventuallyCreation(func() error {
+				k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(t), t)
+				t.Spec.ServiceAccount = &api.ServiceAccountReference{
+					Name:      "",
+					Namespace: "kube-system",
+				}
+				return k8sClient.Update(context.TODO(), t)
+			}).Should(Succeed())
+			k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(t), t)
+			Expect(t.Spec.ServiceAccount).To(BeNil())
+
+			EventuallyCreation(func() error {
+				k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(t), t)
+				t.Spec.ServiceAccount = &api.ServiceAccountReference{
+					Name:      "privileged-account",
+					Namespace: "kube-system",
+				}
+				return k8sClient.Update(context.TODO(), t)
+			}).Should(Succeed())
+
+			Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(t), t)).Should(Succeed())
 			Expect(t.Spec.ServiceAccount.Name.String()).To(Equal("privileged-account"))
 			Expect(t.Spec.ServiceAccount.Namespace.String()).To(Equal(t.Namespace))
 
-			t.Spec.ServiceAccount = &api.ServiceAccountReference{
-				Name:      "",
-				Namespace: "kube-system:",
-			}
-
 			EventuallyCreation(func() error {
+				k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(t), t)
+				t.Spec.ServiceAccount = &api.ServiceAccountReference{
+					Name: "system:serviceaccount:kube-system:replication-3-account",
+				}
 				return k8sClient.Update(context.TODO(), t)
 			}).Should(Succeed())
 			Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(t), t)).Should(Succeed())
-			Expect(t.Spec.ServiceAccount).To(BeNil())
+			Expect(t.Spec.ServiceAccount.Name.String()).To(Equal("replication-3-account"))
+			Expect(t.Spec.ServiceAccount.Namespace.String()).To(Equal(t.Namespace))
 
-			t.Spec.ServiceAccount = &api.ServiceAccountReference{
-				Name:      "",
-				Namespace: "kube-system",
-			}
 			EventuallyCreation(func() error {
+				k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(t), t)
+				t.Spec.ServiceAccount = &api.ServiceAccountReference{
+					Name: "replication-account",
+				}
 				return k8sClient.Update(context.TODO(), t)
 			}).Should(Succeed())
-
-			Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(t), t)).Should(Succeed())
-			Expect(t.Spec.ServiceAccount).To(BeNil())
-			t.Spec.ServiceAccount = &api.ServiceAccountReference{
-				Name: "system:serviceaccount:kube-system:replication-account",
-			}
-			EventuallyCreation(func() error {
-				return k8sClient.Update(context.TODO(), t)
-			}).ShouldNot(Succeed())
-
-			t.Spec.ServiceAccount = &api.ServiceAccountReference{
-				Name: "replication-account",
-			}
-			EventuallyCreation(func() error {
-				return k8sClient.Update(context.TODO(), t)
-			}).Should(Succeed())
-
 			Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(t), t)).Should(Succeed())
 			Expect(t.Spec.ServiceAccount.Name.String()).To(Equal("replication-account"))
 			Expect(t.Spec.ServiceAccount.Namespace.String()).To(Equal(t.Namespace))
+
+			By("verify status (Verify ServiceAccount Names)", func() {
+				t := tr.DeepCopy()
+				Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(t), t)).Should(Succeed())
+
+				Expect(t.Status.Condition.Status).To(Equal(metav1.ConditionFalse))
+				Expect(t.Status.Condition.Type).To(Equal(meta.ReadyCondition))
+				Expect(t.Status.Condition.Reason).To(Equal(meta.FailedReason))
+
+				found := true
+				for _, ns := range solarNs {
+					for _, name := range []string{"raw-secret-1", "raw-secret-2", "raw-secret-3"} {
+						foundInner := false
+						for _, status := range t.Status.ProcessedItems {
+							if status.Kind == "Secret" &&
+								status.Name == name &&
+								status.Namespace == ns &&
+								status.Type == meta.ReplicationCondition &&
+								status.Status == metav1.ConditionFalse {
+								foundInner = true
+								break
+							}
+						}
+						if !foundInner {
+							found = false
+							break
+						}
+					}
+					if !found {
+						break
+					}
+				}
+
+				Expect(found).To(BeTrue())
+			})
+
+			EventuallyCreation(func() error {
+				k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(t), t)
+				t.Spec.ServiceAccount = nil
+				return k8sClient.Update(context.TODO(), t)
+			}).Should(Succeed())
+
+			Expect(k8sClient.Delete(context.TODO(), t)).Should(Succeed())
 		})
 
-		By("verify status (Verify ServiceAccount Names)", func() {
-			Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(tr), tr)).Should(Succeed())
+		By("Recreating Object", func() {
+			t := tr.DeepCopy()
 
-			Expect(tr.Status.Condition.Status).To(Equal(metav1.ConditionFalse))
-			Expect(tr.Status.Condition.Type).To(Equal(meta.ReadyCondition))
-			Expect(tr.Status.Condition.Reason).To(Equal(meta.FailedReason))
+			EventuallyCreation(func() error {
+				t.Spec.ServiceAccount = &api.ServiceAccountReference{
+					Name: "default-gitops",
+				}
+
+				return k8sClient.Create(context.TODO(), t)
+			}).Should(Succeed())
+
+			Expect(k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(t), t)).Should(Succeed())
+
+			Expect(t.Status.Condition.Status).To(Equal(metav1.ConditionTrue))
+			Expect(t.Status.Condition.Type).To(Equal(meta.ReadyCondition))
+			Expect(t.Status.Condition.Reason).To(Equal(meta.SucceededReason))
 
 			found := true
 			for _, ns := range solarNs {
 				for _, name := range []string{"raw-secret-1", "raw-secret-2", "raw-secret-3"} {
 					foundInner := false
-					for _, status := range tr.Status.ProcessedItems {
+					for _, status := range t.Status.ProcessedItems {
 						if status.Kind == "Secret" &&
 							status.Name == name &&
 							status.Namespace == ns &&
 							status.Type == meta.ReplicationCondition &&
-							status.Status == metav1.ConditionFalse {
+							status.Status == metav1.ConditionTrue {
 							foundInner = true
 							break
 						}
@@ -329,47 +549,61 @@ var _ = Describe("Using Impersonation on TenantResources", Label("tenantresource
 			}
 
 			Expect(found).To(BeTrue())
+
+			for _, ns := range solarNs {
+				By(fmt.Sprintf("waiting for replicated resources in %s Namespace", ns), func() {
+					Eventually(func() []corev1.Secret {
+						r, err := labels.NewRequirement("labels.energy.io", selection.DoubleEquals, []string{"replicate"})
+						if err != nil {
+							return nil
+						}
+
+						secrets := corev1.SecretList{}
+						err = k8sClient.List(context.TODO(), &secrets, &client.ListOptions{LabelSelector: labels.NewSelector().Add(*r), Namespace: ns})
+						if err != nil {
+							return nil
+						}
+
+						return secrets.Items
+					}, defaultTimeoutInterval, defaultPollInterval).Should(HaveLen(4))
+				})
+
+				By(fmt.Sprintf("ensuring raw items are templated in %s Namespace", ns), func() {
+					for _, name := range []string{"raw-secret-1", "raw-secret-2", "raw-secret-3"} {
+						secret := corev1.Secret{}
+						Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: name, Namespace: ns}, &secret)).ToNot(HaveOccurred())
+
+						Expect(secret.Data).To(HaveKey(solar.Name))
+						Expect(secret.Data).To(HaveKey(ns))
+					}
+				})
+			}
+
+			Expect(k8sClient.Delete(context.TODO(), tr)).Should(Succeed())
+
 		})
 
-		for _, ns := range solarNs {
-			By(fmt.Sprintf("waiting for replicated resources in %s Namespace", ns), func() {
-				Eventually(func() []corev1.Secret {
-					r, err := labels.NewRequirement("labels.energy.io", selection.DoubleEquals, []string{"replicate"})
-					if err != nil {
-						return nil
-					}
+		By("using a Namespace selector ()", func() {
+			t := tr.DeepCopy()
 
-					secrets := corev1.SecretList{}
-					err = k8sClient.List(context.TODO(), &secrets, &client.ListOptions{LabelSelector: labels.NewSelector().Add(*r), Namespace: ns})
-					if err != nil {
-						return nil
-					}
-
-					return secrets.Items
-				}, defaultTimeoutInterval, defaultPollInterval).Should(HaveLen(4))
-			})
-
-			By(fmt.Sprintf("ensuring raw items are templated in %s Namespace", ns), func() {
-				for _, name := range []string{"raw-secret-1", "raw-secret-2", "raw-secret-3"} {
-					secret := corev1.Secret{}
-					Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: name, Namespace: ns}, &secret)).ToNot(HaveOccurred())
-
-					Expect(secret.Data).To(HaveKey(solar.Name))
-					Expect(secret.Data).To(HaveKey(ns))
-				}
-			})
-		}
-
-		By("using a Namespace selector", func() {
-			Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: tr.GetName(), Namespace: "solar-system"}, tr)).ToNot(HaveOccurred())
-
-			tr.Spec.Resources[0].NamespaceSelector = &metav1.LabelSelector{
+			t.Spec.Resources[0].NamespaceSelector = &metav1.LabelSelector{
 				MatchLabels: map[string]string{
-					"kubernetes.io/metadata.name": "solar-three",
+					"kubernetes.io/metadata.name": "tenantresource-imp-three",
 				},
 			}
 
-			Expect(k8sClient.Update(context.TODO(), tr)).ToNot(HaveOccurred())
+			t.Spec.ServiceAccount = &api.ServiceAccountReference{
+				Name: "replication-account",
+			}
+
+			EventuallyCreation(func() error {
+				t.Spec.ServiceAccount = &api.ServiceAccountReference{
+					Name: "default-gitops",
+				}
+
+				return k8sClient.Create(context.TODO(), t)
+
+			}).Should(Succeed())
 
 			checkFn := func(ns string) func() []corev1.Secret {
 				return func() []corev1.Secret {
@@ -388,17 +622,15 @@ var _ = Describe("Using Impersonation on TenantResources", Label("tenantresource
 				}
 			}
 
-			for _, ns := range []string{"solar-one", "solar-two"} {
+			for _, ns := range []string{"tenantresource-imp-one", "tenantresource-imp-two", "tenantresource-imp-three"} {
 				Eventually(checkFn(ns), defaultTimeoutInterval, defaultPollInterval).Should(HaveLen(0))
 			}
-
-			Eventually(checkFn("solar-three"), defaultTimeoutInterval, defaultPollInterval).Should(HaveLen(4))
 		})
 
 		By("checking if replicated object have annotations and labels", func() {
 			for _, name := range []string{"dummy-secret", "raw-secret-1", "raw-secret-2", "raw-secret-3"} {
 				secret := corev1.Secret{}
-				Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: name, Namespace: "solar-three"}, &secret)).ToNot(HaveOccurred())
+				Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: name, Namespace: "tenantresource-imp-three"}, &secret)).ToNot(HaveOccurred())
 
 				for k, v := range tr.Spec.Resources[0].AdditionalMetadata.Labels {
 					_, err := HaveKeyWithValue(k, v).Match(secret.GetLabels())
@@ -424,7 +656,7 @@ var _ = Describe("Using Impersonation on TenantResources", Label("tenantresource
 				cs := ownerClient(solar.Spec.Owners[0])
 
 				Consistently(func() error {
-					return cs.CoreV1().Secrets("solar-three").Delete(context.TODO(), name, metav1.DeleteOptions{})
+					return cs.CoreV1().Secrets("tenantresource-imp-three").Delete(context.TODO(), name, metav1.DeleteOptions{})
 				}, 10*time.Second, time.Second).Should(HaveOccurred())
 			}
 		})
@@ -434,7 +666,7 @@ var _ = Describe("Using Impersonation on TenantResources", Label("tenantresource
 				cs := ownerClient(solar.Spec.Owners[0])
 
 				Consistently(func() error {
-					secret, err := cs.CoreV1().Secrets("solar-three").Get(context.TODO(), name, metav1.GetOptions{})
+					secret, err := cs.CoreV1().Secrets("tenantresource-imp-three").Get(context.TODO(), name, metav1.GetOptions{})
 					if err != nil {
 						return err
 					}
@@ -442,7 +674,7 @@ var _ = Describe("Using Impersonation on TenantResources", Label("tenantresource
 					secret.SetLabels(nil)
 					secret.SetAnnotations(nil)
 
-					_, err = cs.CoreV1().Secrets("solar-three").Update(context.TODO(), secret, metav1.UpdateOptions{})
+					_, err = cs.CoreV1().Secrets("tenantresource-imp-three").Update(context.TODO(), secret, metav1.UpdateOptions{})
 
 					return err
 				}, 10*time.Second, time.Second).Should(HaveOccurred())
@@ -450,7 +682,7 @@ var _ = Describe("Using Impersonation on TenantResources", Label("tenantresource
 		})
 
 		By("checking that cross-namespace objects are not replicated", func() {
-			Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: tr.GetName(), Namespace: "solar-system"}, tr)).ToNot(HaveOccurred())
+			Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: tr.GetName(), Namespace: "tenantresource-imp-system"}, tr)).ToNot(HaveOccurred())
 			tr.Spec.Resources[0].NamespacedItems = append(tr.Spec.Resources[0].NamespacedItems, capsulev1beta2.ObjectReference{
 				ObjectReferenceAbstract: capsulev1beta2.ObjectReferenceAbstract{
 					Kind:       crossNamespaceItem.Kind,
@@ -471,7 +703,7 @@ var _ = Describe("Using Impersonation on TenantResources", Label("tenantresource
 		})
 
 		By("checking pruning is deleted", func() {
-			Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: tr.GetName(), Namespace: "solar-system"}, tr)).ToNot(HaveOccurred())
+			Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: tr.GetName(), Namespace: "tenantresource-imp-system"}, tr)).ToNot(HaveOccurred())
 			Expect(*tr.Spec.PruningOnDelete).Should(BeTrue())
 
 			tr.Spec.PruningOnDelete = ptr.To(false)
@@ -489,7 +721,7 @@ var _ = Describe("Using Impersonation on TenantResources", Label("tenantresource
 				Consistently(func() []corev1.Secret {
 					secrets := corev1.SecretList{}
 
-					err = k8sClient.List(context.TODO(), &secrets, &client.ListOptions{LabelSelector: labels.NewSelector().Add(*r), Namespace: "solar-three"})
+					err = k8sClient.List(context.TODO(), &secrets, &client.ListOptions{LabelSelector: labels.NewSelector().Add(*r), Namespace: "tenantresource-imp-three"})
 					Expect(err).ToNot(HaveOccurred())
 
 					return secrets.Items

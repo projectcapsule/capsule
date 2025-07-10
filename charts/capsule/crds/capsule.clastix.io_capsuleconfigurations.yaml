@@ -136,9 +136,19 @@ spec:
                     type: string
                   globalDefaultServiceAccount:
                     description: |-
-                      Default ServiceAccount for namespaced resources (GlobalTenantResource)
+                      Default ServiceAccount for global resources (GlobalTenantResource)
                       When defined, users are required to use this ServiceAccount anywhere in the cluster
                       unless they explicitly provide their own.
+                    maxLength: 253
+                    pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+                    type: string
+                  globalDefaultServiceAccountNamespace:
+                    description: |-
+                      Default ServiceAccount for global resources (GlobalTenantResource)
+                      When defined, users are required to use this ServiceAccount anywhere in the cluster
+                      unless they explicitly provide their own.
+                    maxLength: 253
+                    pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
                     type: string
                   skipTlsVerify:
                     default: false
@@ -150,6 +160,8 @@ spec:
                       Default ServiceAccount for namespaced resources (TenantResource)
                       When defined, users are required to use this ServiceAccount within the namespace
                       where they deploy the resource, unless they explicitly provide their own.
+                    maxLength: 253
+                    pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
                     type: string
                 type: object
               userGroups:

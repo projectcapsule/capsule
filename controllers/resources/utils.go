@@ -30,7 +30,7 @@ func SetGlobalTenantResourceServiceAccount(
 			return
 		}
 
-		resource.Spec.ServiceAccount.Name = api.Name(caputils.SanitizeServiceAccountProp(cfg.TenantDefaultServiceAccount))
+		resource.Spec.ServiceAccount.Name = api.Name(caputils.SanitizeServiceAccountProp(cfg.TenantDefaultServiceAccount.String()))
 		changed = true
 	}
 
@@ -107,8 +107,40 @@ func setTenantDefaultResourceServiceAccount(
 	}
 
 	resource.Spec.ServiceAccount.Name = api.Name(
-		caputils.SanitizeServiceAccountProp(cfg.TenantDefaultServiceAccount),
+		caputils.SanitizeServiceAccountProp(cfg.TenantDefaultServiceAccount.String()),
 	)
+
+	return true
+}
+
+func setGlobalTenantDefaultResourceServiceAccount(
+	config configuration.Configuration,
+	resource *capsulev1beta2.GlobalTenantResource,
+) (changed bool) {
+	cfg := config.ServiceAccountClientProperties()
+	if cfg == nil {
+		return false
+	}
+
+	if cfg.GlobalDefaultServiceAccount == "" && cfg.GlobalDefaultServiceAccountNamespace == "" {
+		return false
+	}
+
+	if resource.Spec.ServiceAccount == nil {
+		resource.Spec.ServiceAccount = &api.ServiceAccountReference{}
+	}
+
+	if cfg.GlobalDefaultServiceAccount == "" {
+		resource.Spec.ServiceAccount.Name = api.Name(
+			caputils.SanitizeServiceAccountProp(cfg.GlobalDefaultServiceAccount.String()),
+		)
+	}
+
+	if cfg.GlobalDefaultServiceAccountNamespace == "" {
+		resource.Spec.ServiceAccount.Namespace = api.Name(
+			caputils.SanitizeServiceAccountProp(cfg.GlobalDefaultServiceAccountNamespace.String()),
+		)
+	}
 
 	return true
 }
