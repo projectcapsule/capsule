@@ -41,4 +41,4 @@ annotations:
       url: https://projectcapsule.dev/
   artifacthub.io/changes: |
     - kind: added
-      description: oci chart reference
+      description: added toggles for podSecurityContexts and securityContexts
