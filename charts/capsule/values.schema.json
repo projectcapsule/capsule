@@ -102,6 +102,9 @@
                                     "description": "Security context for the job pods.",
                                     "type": "object",
                                     "properties": {
+                                        "enabled": {
+                                            "type": "boolean"
+                                        },
                                         "seccompProfile": {
                                             "type": "object",
                                             "properties": {
@@ -141,6 +144,9 @@
                                                     }
                                                 }
                                             }
+                                        },
+                                        "enabled": {
+                                            "type": "boolean"
                                         },
                                         "readOnlyRootFilesystem": {
                                             "type": "boolean"
@@ -464,6 +470,9 @@
             "description": "Set the securityContext for the Capsule pod",
             "type": "object",
             "properties": {
+                "enabled": {
+                    "type": "boolean"
+                },
                 "runAsGroup": {
                     "type": "integer"
                 },
@@ -558,6 +567,9 @@
                             }
                         }
                     }
+                },
+                "enabled": {
+                    "type": "boolean"
                 },
                 "readOnlyRootFilesystem": {
                     "type": "boolean"

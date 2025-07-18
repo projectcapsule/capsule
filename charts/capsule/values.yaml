@@ -24,10 +24,12 @@ global:
       ttlSecondsAfterFinished: 60
       # -- Security context for the job pods.
       podSecurityContext:
+        enabled: true
         seccompProfile:
           type: "RuntimeDefault"
       # -- Security context for the job containers.
       securityContext:
+        enabled: true
         allowPrivilegeEscalation: false
         capabilities:
           drop:
@@ -192,6 +194,7 @@ priorityClassName: '' # system-cluster-critical
 
 # -- Set the securityContext for the Capsule pod
 podSecurityContext:
+  enabled: true
   seccompProfile:
     type: "RuntimeDefault"
   runAsGroup: 1002
@@ -200,6 +203,7 @@ podSecurityContext:
 
 # -- Set the securityContext for the Capsule container
 securityContext:
+  enabled: true
   capabilities:
     drop:
     - ALL

@@ -108,11 +108,11 @@ Here the values you can override:
 | global.jobs.kubectl.image.tag | string | `""` | Set the image tag of the helm chart job |
 | global.jobs.kubectl.imagePullSecrets | list | `[]` | ImagePullSecrets |
 | global.jobs.kubectl.nodeSelector | object | `{}` | Set the node selector |
-| global.jobs.kubectl.podSecurityContext | object | `{"seccompProfile":{"type":"RuntimeDefault"}}` | Security context for the job pods. |
+| global.jobs.kubectl.podSecurityContext | object | `{"enabled":true,"seccompProfile":{"type":"RuntimeDefault"}}` | Security context for the job pods. |
 | global.jobs.kubectl.priorityClassName | string | `""` | Set a pod priorityClassName |
 | global.jobs.kubectl.resources | object | `{}` | Job resources |
 | global.jobs.kubectl.restartPolicy | string | `"Never"` | Set the restartPolicy |
-| global.jobs.kubectl.securityContext | object | `{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]},"readOnlyRootFilesystem":true,"runAsGroup":1002,"runAsNonRoot":true,"runAsUser":1002}` | Security context for the job containers. |
+| global.jobs.kubectl.securityContext | object | `{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]},"enabled":true,"readOnlyRootFilesystem":true,"runAsGroup":1002,"runAsNonRoot":true,"runAsUser":1002}` | Security context for the job containers. |
 | global.jobs.kubectl.tolerations | list | `[]` | Set list of tolerations |
 | global.jobs.kubectl.topologySpreadConstraints | list | `[]` | Set Topology Spread Constraints |
 | global.jobs.kubectl.ttlSecondsAfterFinished | int | `60` | Sets the ttl in seconds after a finished certgen job is deleted. Set to -1 to never delete. |
@@ -130,7 +130,7 @@ Here the values you can override:
 | jobs | object | `{}` | Deprecated, use .global.jobs.kubectl instead |
 | nodeSelector | object | `{}` | Set the node selector for the Capsule pod |
 | podAnnotations | object | `{}` | Annotations to add to the capsule pod. |
-| podSecurityContext | object | `{"runAsGroup":1002,"runAsNonRoot":true,"runAsUser":1002,"seccompProfile":{"type":"RuntimeDefault"}}` | Set the securityContext for the Capsule pod |
+| podSecurityContext | object | `{"enabled":true,"runAsGroup":1002,"runAsNonRoot":true,"runAsUser":1002,"seccompProfile":{"type":"RuntimeDefault"}}` | Set the securityContext for the Capsule pod |
 | ports | list | `[]` | Set additional ports for the deployment |
 | priorityClassName | string | `""` | Set the priority class name of the Capsule pod |
 | proxy.enabled | bool | `false` | Enable Installation of Capsule Proxy |
@@ -139,7 +139,7 @@ Here the values you can override:
 | rbac.resources.create | bool | `false` |  |
 | rbac.resources.labels."rbac.authorization.k8s.io/aggregate-to-admin" | string | `"true"` |  |
 | replicaCount | int | `1` | Set the replica count for capsule pod |
-| securityContext | object | `{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]},"readOnlyRootFilesystem":true}` | Set the securityContext for the Capsule container |
+| securityContext | object | `{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]},"enabled":true,"readOnlyRootFilesystem":true}` | Set the securityContext for the Capsule container |
 | serviceAccount.annotations | object | `{}` | Annotations to add to the service account. |
 | serviceAccount.create | bool | `true` | Specifies whether a service account should be created. |
 | serviceAccount.name | string | `""` | The name of the service account to use. If not set and `serviceAccount.create=true`, a name is generated using the fullname template |

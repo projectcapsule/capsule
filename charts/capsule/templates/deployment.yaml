@@ -29,9 +29,8 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       serviceAccountName: {{ include "capsule.serviceAccountName" . }}
-      {{- with .Values.podSecurityContext }}
-      securityContext:
-        {{- toYaml . | nindent 8 }}
+      {{- if .Values.podSecurityContext.enabled }}
+      securityContext: {{- omit .Values.podSecurityContext "enabled" | toYaml | nindent 8 }}
       {{- end }}
       {{- if .Values.manager.hostNetwork }}
       hostNetwork: true
@@ -109,11 +108,10 @@ spec:
           {{- end }}
           resources:
             {{- toYaml .Values.manager.resources | nindent 12 }}
-          securityContext:
-            {{- if .Values.manager.securityContext }}
-            {{- toYaml .Values.manager.securityContext | nindent 12 }}
-            {{- else }}
-            {{- toYaml .Values.securityContext | nindent 12 }}
-            {{- end }}
+          {{- if .Values.manager.securityContext }}
+          securityContext: {{- omit .Values.manager.securityContext "enabled" | toYaml | nindent 12 }}
+          {{- else if .Values.securityContext.enabled }}
+          securityContext: {{- omit .Values.securityContext "enabled" | toYaml | nindent 12 }}
+          {{- end }}
   {{- end }}
 {{- end }}
