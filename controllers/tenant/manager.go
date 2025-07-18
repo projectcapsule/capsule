@@ -53,7 +53,7 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 			r.Log.Info("Request object not found, could have been deleted after reconcile request")
 
 			// If tenant was deleted or cannot be found, clean up metrics
-			r.Metrics.DeleteTenantMetric(request.Name)
+			r.Metrics.DeleteAllMetrics(request.Name)
 
 			return reconcile.Result{}, nil
 		}
@@ -91,6 +91,10 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 
 		return
 	}
+	// Ensuring Status metrics are exposed
+	r.Log.Info("Ensuring all status metrics are exposed")
+	r.syncStatusMetrics(instance)
+
 	// Ensuring Namespace metadata
 	r.Log.Info("Starting processing of Namespaces", "items", len(instance.Status.Namespaces))
 
