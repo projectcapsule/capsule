@@ -3,8 +3,9 @@
 package tenant
 
 import (
-	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"slices"
+
+	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 )
 
 // Exposing Status Metrics for tenant.
@@ -13,9 +14,6 @@ func (r *Manager) syncStatusMetrics(tenant *capsulev1beta2.Tenant, preRecStatus 
 
 	// Expose namespace-tenant relationship
 	for _, ns := range tenant.Status.Namespaces {
-		if slices.Contains(preRecStatus.Namespaces, ns) {
-			continue
-		}
 		r.Metrics.TenantNamespaceRelationshipGauge.WithLabelValues(tenant.GetName(), ns).Set(1)
 	}
 
@@ -25,6 +23,7 @@ func (r *Manager) syncStatusMetrics(tenant *capsulev1beta2.Tenant, preRecStatus 
 			r.Metrics.DeleteNamespaceRelationshipMetrics(ns)
 		}
 	}
+
 	if tenant.Spec.Cordoned {
 		cordoned = 1
 	}
