@@ -29,21 +29,21 @@ func NewTenantRecorder() *TenantRecorder {
 			prometheus.GaugeOpts{
 				Namespace: metricsPrefix,
 				Name:      "tenant_namespace_relationship",
-				Help:      "Current cordon status of tenant",
+				Help:      "Mapping metric showing namespace to tenant relationships",
 			}, []string{"tenant", "namespace"},
 		),
 		TenantCordonedStatusGauge: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
 				Namespace: metricsPrefix,
 				Name:      "tenant_status",
-				Help:      "Current cordon status of tenant",
+				Help:      "Tenant cordon state indicating if tenant operations are restricted (1) or allowed (0) for resource creation and modification",
 			}, []string{"tenant"},
 		),
 		TenantNamespaceCounterGauge: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
 				Namespace: metricsPrefix,
 				Name:      "tenant_namespace_count",
-				Help:      "Current count of tenant namespaces",
+				Help:      "Total number of namespaces currently owned by the tenant",
 			}, []string{"tenant", "resource"},
 		),
 		TenantResourceUsageGauge: prometheus.NewGaugeVec(
@@ -93,6 +93,13 @@ func (r *TenantRecorder) DeleteTenantStatusMetrics(tenant string) {
 	})
 	r.TenantResourceLimitGauge.DeletePartialMatch(map[string]string{
 		"tenant": tenant,
+	})
+}
+
+// DeleteCondition deletes the condition metrics for the ref.
+func (r *TenantRecorder) DeleteNamespaceRelationshipMetrics(namespace string) {
+	r.TenantNamespaceRelationshipGauge.DeletePartialMatch(map[string]string{
+		"namespace": namespace,
 	})
 }
 

@@ -2,18 +2,29 @@
 // SPDX-License-Identifier: Apache-2.0
 package tenant
 
-import capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+import (
+	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"slices"
+)
 
 // Exposing Status Metrics for tenant.
-func (r *Manager) syncStatusMetrics(tenant *capsulev1beta2.Tenant) {
+func (r *Manager) syncStatusMetrics(tenant *capsulev1beta2.Tenant, preRecStatus capsulev1beta2.TenantStatus) {
 	var cordoned float64 = 0
-	// Reset all metrics
-	r.Metrics.DeleteTenantStatusMetrics(tenant.GetName())
+
 	// Expose namespace-tenant relationship
 	for _, ns := range tenant.Status.Namespaces {
+		if slices.Contains(preRecStatus.Namespaces, ns) {
+			continue
+		}
 		r.Metrics.TenantNamespaceRelationshipGauge.WithLabelValues(tenant.GetName(), ns).Set(1)
 	}
 
+	// Cleanup deleted namespaces
+	for _, ns := range preRecStatus.Namespaces {
+		if !slices.Contains(tenant.Status.Namespaces, ns) {
+			r.Metrics.DeleteNamespaceRelationshipMetrics(ns)
+		}
+	}
 	if tenant.Spec.Cordoned {
 		cordoned = 1
 	}

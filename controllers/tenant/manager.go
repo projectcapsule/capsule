@@ -62,6 +62,9 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 
 		return
 	}
+
+	preRecStatus := instance.Status
+
 	// Ensuring the Tenant Status
 	if err = r.updateTenantStatus(ctx, instance); err != nil {
 		r.Log.Error(err, "Cannot update Tenant status")
@@ -93,7 +96,7 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 	}
 	// Ensuring Status metrics are exposed
 	r.Log.Info("Ensuring all status metrics are exposed")
-	r.syncStatusMetrics(instance)
+	r.syncStatusMetrics(instance, preRecStatus)
 
 	// Ensuring Namespace metadata
 	r.Log.Info("Starting processing of Namespaces", "items", len(instance.Status.Namespaces))
