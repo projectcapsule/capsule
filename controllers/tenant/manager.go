@@ -63,7 +63,7 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 		return
 	}
 
-	preRecStatus := instance.Status
+	preRecStatus := instance.Status.DeepCopy()
 
 	// Ensuring the Tenant Status
 	if err = r.updateTenantStatus(ctx, instance); err != nil {
@@ -96,7 +96,7 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 	}
 	// Ensuring Status metrics are exposed
 	r.Log.Info("Ensuring all status metrics are exposed")
-	r.syncStatusMetrics(instance, preRecStatus)
+	r.syncStatusMetrics(instance, *preRecStatus)
 
 	// Ensuring Namespace metadata
 	r.Log.Info("Starting processing of Namespaces", "items", len(instance.Status.Namespaces))
