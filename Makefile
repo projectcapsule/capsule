@@ -376,7 +376,7 @@ ko:
 	$(call go-install-tool,$(KO),github.com/$(KO_LOOKUP)@$(KO_VERSION))
 
 NWA           := $(LOCALBIN)/nwa
-NWA_VERSION   := v0.7.4
+NWA_VERSION   := v0.7.5
 NWA_LOOKUP    := B1NARY-GR0UP/nwa
 nwa:
 	@test -s $(NWA) && $(NWA) -h | grep -q $(NWA_VERSION) || \
