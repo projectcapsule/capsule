@@ -9,7 +9,7 @@ import (
 )
 
 // Exposing Status Metrics for tenant.
-func (r *Manager) syncStatusMetrics(tenant *capsulev1beta2.Tenant, preRecStatus capsulev1beta2.TenantStatus) {
+func (r *Manager) syncStatusMetrics(tenant *capsulev1beta2.Tenant, preRecNamespaces []string) {
 	var cordoned float64 = 0
 
 	// Expose namespace-tenant relationship
@@ -18,7 +18,7 @@ func (r *Manager) syncStatusMetrics(tenant *capsulev1beta2.Tenant, preRecStatus 
 	}
 
 	// Cleanup deleted namespaces
-	for _, ns := range preRecStatus.Namespaces {
+	for _, ns := range preRecNamespaces {
 		if !slices.Contains(tenant.Status.Namespaces, ns) {
 			r.Metrics.DeleteNamespaceRelationshipMetrics(ns)
 		}

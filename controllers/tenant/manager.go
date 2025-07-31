@@ -63,7 +63,7 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 		return
 	}
 
-	preRecStatus := instance.Status
+	preRecStatus := instance.Status.Namespaces
 
 	// Ensuring the Tenant Status
 	if err = r.updateTenantStatus(ctx, instance); err != nil {

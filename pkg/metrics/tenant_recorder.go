@@ -44,7 +44,7 @@ func NewTenantRecorder() *TenantRecorder {
 				Namespace: metricsPrefix,
 				Name:      "tenant_namespace_count",
 				Help:      "Total number of namespaces currently owned by the tenant",
-			}, []string{"tenant", "resource"},
+			}, []string{"tenant"},
 		),
 		TenantResourceUsageGauge: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
