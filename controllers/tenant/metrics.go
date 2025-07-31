@@ -28,7 +28,7 @@ func (r *Manager) syncStatusMetrics(tenant *capsulev1beta2.Tenant, preRecNamespa
 		cordoned = 1
 	}
 	// Expose cordoned status
-	r.Metrics.TenantNamespaceCounterGauge.WithLabelValues(tenant.Name, "namespaces").Set(float64(tenant.Status.Size))
+	r.Metrics.TenantNamespaceCounterGauge.WithLabelValues(tenant.Name).Set(float64(tenant.Status.Size))
 	// Expose the namespace counter
 	r.Metrics.TenantCordonedStatusGauge.WithLabelValues(tenant.Name).Set(cordoned)
 }
