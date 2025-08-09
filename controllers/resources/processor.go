@@ -45,6 +45,7 @@ func prepareAdditionalMetadata(m map[string]string) map[string]string {
 	for k, v := range m {
 		copied[k] = v
 	}
+
 	return copied
 }
 

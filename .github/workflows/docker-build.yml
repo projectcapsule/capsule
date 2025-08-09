@@ -40,6 +40,6 @@ jobs:
           # See: https://github.com/aquasecurity/trivy-action/issues/389#issuecomment-2385416577
           TRIVY_DB_REPOSITORY: 'public.ecr.aws/aquasecurity/trivy-db:2'
       - name: Upload Trivy scan results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@bbfff2f20a2d2b1bb30040286e0de8e59432af64
+        uses: github/codeql-action/upload-sarif@4474150eef8c855ab74a7f19f3ae525e469d2de6
         with:
           sarif_file: 'trivy-results.sarif'
