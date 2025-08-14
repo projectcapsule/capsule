@@ -57,6 +57,8 @@ crds:
   install: true
   # -- Only install the CRDs, no other primitives
   exclusive: false
+  # -- Create additionally CapsuleConfiguration even if CRDs are exclusive
+  createConfig: false 
   # -- Extra Labels for CRDs
   labels: {}
   # -- Extra Annotations for CRDs
