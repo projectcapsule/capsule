@@ -52,6 +52,13 @@ spec:
                   Enforces the Tenant owner, during Namespace creation, to name it using the selected Tenant name as prefix,
                   separated by a dash. This is useful to avoid Namespace name collision in a public CaaS environment.
                 type: boolean
+              ignoreUserWithGroups:
+                description: |-
+                  Define groups which when found in the request of a user will be ignored by the Capsule
+                  this might be useful if you have one group where all the users are in, but you want to separate administrators from normal users with additional groups.
+                items:
+                  type: string
+                type: array
               nodeMetadata:
                 description: |-
                   Allows to set the forbidden metadata for the worker nodes that could be patched by a Tenant.

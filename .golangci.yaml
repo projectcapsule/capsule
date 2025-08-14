@@ -23,6 +23,7 @@ linters:
     - unparam
     - varnamelen
     - wrapcheck
+    - interfacebloat
     - noinlineerr
     - revive
   settings:
