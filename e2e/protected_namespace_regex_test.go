@@ -15,8 +15,7 @@ import (
 )
 
 var _ = Describe("creating a Namespace with a protected Namespace regex enabled", Label("namespace"), func() {
-	originalConfig := &capsulev1beta2.CapsuleConfiguration{}
-	testingConfig := &capsulev1beta2.CapsuleConfiguration{}
+	originConfig := &capsulev1beta2.CapsuleConfiguration{}
 
 	tnt := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
@@ -33,8 +32,7 @@ var _ = Describe("creating a Namespace with a protected Namespace regex enabled"
 	}
 
 	JustBeforeEach(func() {
-		Expect(k8sClient.Get(context.Background(), client.ObjectKey{Name: defaultConfigurationName}, originalConfig)).To(Succeed())
-		testingConfig = originalConfig.DeepCopy()
+		Expect(k8sClient.Get(context.Background(), client.ObjectKey{Name: defaultConfigurationName}, originConfig)).To(Succeed())
 
 		EventuallyCreation(func() error {
 			tnt.ResourceVersion = ""
@@ -44,13 +42,15 @@ var _ = Describe("creating a Namespace with a protected Namespace regex enabled"
 	JustAfterEach(func() {
 		Expect(k8sClient.Delete(context.TODO(), tnt)).Should(Succeed())
 
+		// Restore Configuration
 		Eventually(func() error {
-			if err := k8sClient.Get(context.Background(), client.ObjectKey{Name: originalConfig.Name}, originalConfig); err != nil {
+			c := &capsulev1beta2.CapsuleConfiguration{}
+			if err := k8sClient.Get(context.Background(), client.ObjectKey{Name: originConfig.Name}, c); err != nil {
 				return err
 			}
-
-			testingConfig.Spec = originalConfig.Spec
-			return k8sClient.Update(context.Background(), testingConfig)
+			// Apply the initial configuration from originConfig to c
+			c.Spec = originConfig.Spec
+			return k8sClient.Update(context.Background(), c)
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 	})
 

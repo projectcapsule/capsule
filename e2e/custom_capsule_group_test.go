@@ -16,7 +16,6 @@ import (
 
 var _ = Describe("creating a Namespace as Tenant owner with custom --capsule-group", Label("config"), func() {
 	originConfig := &capsulev1beta2.CapsuleConfiguration{}
-	testConfig := &capsulev1beta2.CapsuleConfiguration{}
 
 	tnt := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
@@ -34,7 +33,6 @@ var _ = Describe("creating a Namespace as Tenant owner with custom --capsule-gro
 
 	JustBeforeEach(func() {
 		Expect(k8sClient.Get(context.Background(), client.ObjectKey{Name: defaultConfigurationName}, originConfig)).To(Succeed())
-		testConfig = originConfig.DeepCopy()
 
 		EventuallyCreation(func() error {
 			tnt.ResourceVersion = ""
@@ -46,15 +44,14 @@ var _ = Describe("creating a Namespace as Tenant owner with custom --capsule-gro
 
 		// Restore Configuration
 		Eventually(func() error {
-			if err := k8sClient.Get(context.Background(), client.ObjectKey{Name: originConfig.Name}, testConfig); err != nil {
+			c := &capsulev1beta2.CapsuleConfiguration{}
+			if err := k8sClient.Get(context.Background(), client.ObjectKey{Name: originConfig.Name}, c); err != nil {
 				return err
 			}
-
-			// Apply the initial configuration from originConfig to testConfig
-			testConfig.Spec = originConfig.Spec
-			return k8sClient.Update(context.Background(), testConfig)
+			// Apply the initial configuration from originConfig to c
+			c.Spec = originConfig.Spec
+			return k8sClient.Update(context.Background(), c)
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
-
 	})
 
 	It("should fail using a User non matching the capsule-user-group flag", func() {
