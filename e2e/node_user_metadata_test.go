@@ -12,6 +12,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api"
@@ -19,6 +20,9 @@ import (
 )
 
 var _ = Describe("modifying node labels and annotations", Label("config", "nodes"), func() {
+	originalConfig := &capsulev1beta2.CapsuleConfiguration{}
+	testingConfig := &capsulev1beta2.CapsuleConfiguration{}
+
 	tnt := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "tenant-node-user-metadata-forbidden",
@@ -72,6 +76,9 @@ var _ = Describe("modifying node labels and annotations", Label("config", "nodes
 			Skip(fmt.Sprintf("Node webhook is disabled for current version %s", version.String()))
 		}
 
+		Expect(k8sClient.Get(context.Background(), client.ObjectKey{Name: defaultConfigurationName}, originalConfig)).To(Succeed())
+		testingConfig = originalConfig.DeepCopy()
+
 		EventuallyCreation(func() error {
 			tnt.ResourceVersion = ""
 			return k8sClient.Create(context.TODO(), tnt)
@@ -110,6 +117,15 @@ var _ = Describe("modifying node labels and annotations", Label("config", "nodes
 				return k8sClient.Update(context.Background(), node)
 			})
 		}).Should(Succeed())
+
+		Eventually(func() error {
+			if err := k8sClient.Get(context.Background(), client.ObjectKey{Name: originalConfig.Name}, originalConfig); err != nil {
+				return err
+			}
+
+			testingConfig.Spec = originalConfig.Spec
+			return k8sClient.Update(context.Background(), testingConfig)
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 	})
 
 	It("should allow", func() {

@@ -9,11 +9,15 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 )
 
 var _ = Describe("creating a Namespace with a protected Namespace regex enabled", Label("namespace"), func() {
+	originalConfig := &capsulev1beta2.CapsuleConfiguration{}
+	testingConfig := &capsulev1beta2.CapsuleConfiguration{}
+
 	tnt := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "tenant-protected-namespace",
@@ -29,6 +33,9 @@ var _ = Describe("creating a Namespace with a protected Namespace regex enabled"
 	}
 
 	JustBeforeEach(func() {
+		Expect(k8sClient.Get(context.Background(), client.ObjectKey{Name: defaultConfigurationName}, originalConfig)).To(Succeed())
+		testingConfig = originalConfig.DeepCopy()
+
 		EventuallyCreation(func() error {
 			tnt.ResourceVersion = ""
 			return k8sClient.Create(context.TODO(), tnt)
@@ -36,6 +43,15 @@ var _ = Describe("creating a Namespace with a protected Namespace regex enabled"
 	})
 	JustAfterEach(func() {
 		Expect(k8sClient.Delete(context.TODO(), tnt)).Should(Succeed())
+
+		Eventually(func() error {
+			if err := k8sClient.Get(context.Background(), client.ObjectKey{Name: originalConfig.Name}, originalConfig); err != nil {
+				return err
+			}
+
+			testingConfig.Spec = originalConfig.Spec
+			return k8sClient.Update(context.Background(), testingConfig)
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 	})
 
 	It("should succeed and be available in Tenant namespaces list", func() {

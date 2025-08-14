@@ -27,8 +27,9 @@ import (
 )
 
 const (
-	defaultTimeoutInterval = 40 * time.Second
-	defaultPollInterval    = time.Second
+	defaultTimeoutInterval   = 40 * time.Second
+	defaultPollInterval      = time.Second
+	defaultConfigurationName = "default"
 )
 
 func NewService(svc types.NamespacedName) *corev1.Service {
@@ -100,7 +101,7 @@ func EventuallyCreation(f interface{}) AsyncAssertion {
 
 func ModifyCapsuleConfigurationOpts(fn func(configuration *capsulev1beta2.CapsuleConfiguration)) {
 	config := &capsulev1beta2.CapsuleConfiguration{}
-	Expect(k8sClient.Get(context.Background(), types.NamespacedName{Name: "default"}, config)).ToNot(HaveOccurred())
+	Expect(k8sClient.Get(context.Background(), types.NamespacedName{Name: defaultConfigurationName}, config)).ToNot(HaveOccurred())
 
 	fn(config)
 
