@@ -187,6 +187,19 @@ var _ = Describe("modifying node labels and annotations", Label("config", "nodes
 		})
 	})
 	It("should fail", func() {
+		ModifyCapsuleConfigurationOpts(func(configuration *capsulev1beta2.CapsuleConfiguration) {
+			configuration.Spec.NodeMetadata = &capsulev1beta2.NodeMetadata{
+				ForbiddenLabels: api.ForbiddenListSpec{
+					Exact: []string{"foo", "bar"},
+					Regex: "^gatsby-.*$",
+				},
+				ForbiddenAnnotations: api.ForbiddenListSpec{
+					Exact: []string{"foo", "bar"},
+					Regex: "^gatsby-.*$",
+				},
+			}
+		})
+
 		Expect(ModifyNode(func(node *corev1.Node) error {
 			node.Labels["foo"] = "bar"
 			node.Labels["gatsby-foo"] = "bar"
