@@ -1,4 +1,4 @@
-{{- if and (not $.Values.crds.exclusive) (not $.Values.crds.createConfig) }}
+{{- if or (not $.Values.crds.exclusive) ($.Values.crds.createConfig) }}
 apiVersion: capsule.clastix.io/v1beta2
 kind: CapsuleConfiguration
 metadata:

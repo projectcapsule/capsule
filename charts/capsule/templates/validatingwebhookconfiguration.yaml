@@ -2,7 +2,7 @@
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
 metadata:
-  name: {{ include "capsule.fullname" . }}-webhook
+  name: {{ include "capsule.fullname" . }}-validating-webhook-configuration
   labels:
     {{- include "capsule.labels" . | nindent 4 }}
   annotations:
