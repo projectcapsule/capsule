@@ -66,14 +66,14 @@ func (r *patchHandler) OnUpdate(c client.Client, decoder admission.Decoder, reco
 				return &response
 			}
 
-			if !utils.IsTenantOwner(tnt.Spec.Owners, req.UserInfo) {
-				recorder.Eventf(tnt, corev1.EventTypeWarning, "NamespacePatch", e)
-				response := admission.Denied(e)
-
-				return &response
+			if utils.IsTenantOwner(tnt.Spec.Owners, req.UserInfo) {
+				return nil
 			}
 		}
 
-		return nil
+		recorder.Eventf(ns, corev1.EventTypeWarning, "NamespacePatch", e)
+		response := admission.Denied(e)
+
+		return &response
 	}
 }
