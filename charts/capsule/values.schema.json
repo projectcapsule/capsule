@@ -1,130 +1,152 @@
 {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
     "properties": {
         "affinity": {
-            "properties": {},
+            "description": "Set affinity rules for the Capsule pod",
             "type": "object"
         },
         "certManager": {
+            "type": "object",
             "properties": {
                 "additionalSANS": {
+                    "description": "Specify additional SANS to add to the certificate",
                     "type": "array"
                 },
                 "generateCertificates": {
+                    "description": "Specifies whether capsule webhooks certificates should be generated using cert-manager",
                     "type": "boolean"
                 }
-            },
-            "type": "object"
+            }
         },
         "crds": {
+            "type": "object",
             "properties": {
                 "annnotations": {
-                    "properties": {},
+                    "description": "Extra Annotations for CRDs",
                     "type": "object"
                 },
                 "exclusive": {
+                    "description": "Only install the CRDs, no other primitives",
                     "type": "boolean"
                 },
                 "install": {
+                    "description": "Install the CustomResourceDefinitions (This also manages the lifecycle of the CRDs for update operations)",
                     "type": "boolean"
                 },
                 "labels": {
-                    "properties": {},
+                    "description": "Extra Labels for CRDs",
                     "type": "object"
                 }
-            },
-            "type": "object"
+            }
         },
         "customAnnotations": {
-            "properties": {},
+            "description": "Additional annotations which will be added to all resources created by Capsule helm chart",
             "type": "object"
         },
         "customLabels": {
-            "properties": {},
+            "description": "Additional labels which will be added to all resources created by Capsule helm chart",
             "type": "object"
         },
-        "fullnameOverride": {
-            "type": "string"
-        },
         "global": {
+            "type": "object",
             "properties": {
                 "jobs": {
+                    "type": "object",
                     "properties": {
                         "kubectl": {
+                            "type": "object",
                             "properties": {
                                 "affinity": {
-                                    "properties": {},
+                                    "description": "Set affinity rules",
                                     "type": "object"
                                 },
                                 "annotations": {
-                                    "properties": {},
+                                    "description": "Annotations to add to the certgen job.",
                                     "type": "object"
                                 },
                                 "backoffLimit": {
+                                    "description": "Backofflimit for jobs",
                                     "type": "integer"
                                 },
                                 "image": {
+                                    "type": "object",
                                     "properties": {
                                         "pullPolicy": {
+                                            "description": "Set the image pull policy of the helm chart job",
                                             "type": "string"
                                         },
                                         "registry": {
+                                            "description": "Set the image repository of the helm chart job",
                                             "type": "string"
                                         },
                                         "repository": {
+                                            "description": "Set the image repository of the helm chart job",
                                             "type": "string"
                                         },
                                         "tag": {
+                                            "description": "Set the image tag of the helm chart job",
                                             "type": "string"
                                         }
-                                    },
-                                    "type": "object"
+                                    }
                                 },
                                 "imagePullSecrets": {
+                                    "description": "ImagePullSecrets",
                                     "type": "array"
                                 },
                                 "nodeSelector": {
-                                    "properties": {},
+                                    "description": "Set the node selector",
                                     "type": "object"
                                 },
                                 "podSecurityContext": {
+                                    "description": "Security context for the job pods.",
+                                    "type": "object",
                                     "properties": {
+                                        "enabled": {
+                                            "type": "boolean"
+                                        },
                                         "seccompProfile": {
+                                            "type": "object",
                                             "properties": {
                                                 "type": {
                                                     "type": "string"
                                                 }
-                                            },
-                                            "type": "object"
+                                            }
                                         }
-                                    },
-                                    "type": "object"
+                                    }
                                 },
                                 "priorityClassName": {
+                                    "description": "Set a pod priorityClassName",
                                     "type": "string"
                                 },
                                 "resources": {
-                                    "properties": {},
+                                    "description": "Job resources",
                                     "type": "object"
                                 },
                                 "restartPolicy": {
+                                    "description": "Set the restartPolicy",
                                     "type": "string"
                                 },
                                 "securityContext": {
+                                    "description": "Security context for the job containers.",
+                                    "type": "object",
                                     "properties": {
                                         "allowPrivilegeEscalation": {
                                             "type": "boolean"
                                         },
                                         "capabilities": {
+                                            "type": "object",
                                             "properties": {
                                                 "drop": {
+                                                    "type": "array",
                                                     "items": {
                                                         "type": "string"
-                                                    },
-                                                    "type": "array"
+                                                    }
                                                 }
-                                            },
-                                            "type": "object"
+                                            }
+                                        },
+                                        "enabled": {
+                                            "type": "boolean"
                                         },
                                         "readOnlyRootFilesystem": {
                                             "type": "boolean"
@@ -138,65 +160,76 @@
                                         "runAsUser": {
                                             "type": "integer"
                                         }
-                                    },
-                                    "type": "object"
+                                    }
                                 },
                                 "tolerations": {
+                                    "description": "Set list of tolerations",
                                     "type": "array"
                                 },
                                 "topologySpreadConstraints": {
+                                    "description": "Set Topology Spread Constraints",
                                     "type": "array"
                                 },
                                 "ttlSecondsAfterFinished": {
+                                    "description": "Sets the ttl in seconds after a finished certgen job is deleted. Set to -1 to never delete.",
                                     "type": "integer"
                                 }
-                            },
-                            "type": "object"
+                            }
                         }
-                    },
-                    "type": "object"
+                    }
                 }
-            },
-            "type": "object"
+            }
         },
         "imagePullSecrets": {
+            "description": "Configuration for `imagePullSecrets` so that you can use a private images registry.",
             "type": "array"
         },
         "jobs": {
-            "properties": {},
+            "description": "Deprecated, use .global.jobs.kubectl instead",
             "type": "object"
         },
         "manager": {
+            "type": "object",
             "properties": {
                 "hostNetwork": {
+                    "description": "Specifies if the container should be started in hostNetwork mode.  Required for use in some managed kubernetes clusters (such as AWS EKS) with custom CNI (such as calico), because control-plane managed by AWS cannot communicate with pods' IP CIDR and admission webhooks are not working",
                     "type": "boolean"
                 },
                 "hostPID": {
+                    "description": "Specifies if the container should be started in hostPID mode.",
                     "type": "boolean"
                 },
                 "image": {
+                    "type": "object",
                     "properties": {
                         "pullPolicy": {
+                            "description": "Set the image pull policy.",
                             "type": "string"
                         },
                         "registry": {
+                            "description": "Set the image registry of capsule.",
                             "type": "string"
                         },
                         "repository": {
+                            "description": "Set the image repository of capsule.",
                             "type": "string"
                         },
                         "tag": {
+                            "description": "Overrides the image tag whose default is the chart appVersion.",
                             "type": "string"
                         }
-                    },
-                    "type": "object"
+                    }
                 },
                 "kind": {
+                    "description": "Set the controller deployment mode as `Deployment` or `DaemonSet`.",
                     "type": "string"
                 },
                 "livenessProbe": {
+                    "description": "Configure the liveness probe using Deployment probe spec",
+                    "type": "object",
                     "properties": {
                         "httpGet": {
+                            "type": "object",
                             "properties": {
                                 "path": {
                                     "type": "string"
@@ -204,35 +237,42 @@
                                 "port": {
                                     "type": "integer"
                                 }
-                            },
-                            "type": "object"
+                            }
                         }
-                    },
-                    "type": "object"
+                    }
                 },
                 "options": {
+                    "type": "object",
                     "properties": {
                         "capsuleConfiguration": {
+                            "description": "Change the default name of the capsule configuration name",
                             "type": "string"
                         },
                         "capsuleUserGroups": {
+                            "description": "Override the Capsule user groups",
+                            "type": "array",
                             "items": {
                                 "type": "string"
-                            },
-                            "type": "array"
+                            }
                         },
                         "forceTenantPrefix": {
+                            "description": "Boolean, enforces the Tenant owner, during Namespace creation, to name it using the selected Tenant name as prefix, separated by a dash",
                             "type": "boolean"
                         },
                         "generateCertificates": {
+                            "description": "Specifies whether capsule webhooks certificates should be generated by capsule operator",
                             "type": "boolean"
                         },
                         "logLevel": {
+                            "description": "Set the log verbosity of the capsule with a value from 1 to 10",
                             "type": "string"
                         },
                         "nodeMetadata": {
+                            "description": "Allows to set the forbidden metadata for the worker nodes that could be patched by a Tenant",
+                            "type": "object",
                             "properties": {
                                 "forbiddenAnnotations": {
+                                    "type": "object",
                                     "properties": {
                                         "denied": {
                                             "type": "array"
@@ -240,10 +280,10 @@
                                         "deniedRegex": {
                                             "type": "string"
                                         }
-                                    },
-                                    "type": "object"
+                                    }
                                 },
                                 "forbiddenLabels": {
+                                    "type": "object",
                                     "properties": {
                                         "denied": {
                                             "type": "array"
@@ -251,41 +291,39 @@
                                         "deniedRegex": {
                                             "type": "string"
                                         }
-                                    },
-                                    "type": "object"
+                                    }
                                 }
-                            },
-                            "type": "object"
+                            }
                         },
                         "protectedNamespaceRegex": {
+                            "description": "If specified, disallows creation of namespaces matching the passed regexp",
                             "type": "string"
                         }
-                    },
-                    "type": "object"
+                    }
                 },
                 "rbac": {
+                    "type": "object",
                     "properties": {
                         "create": {
+                            "description": "Specifies whether RBAC resources should be created.",
                             "type": "boolean"
                         },
                         "existingClusterRoles": {
-                            "items": {
-                                "type": "string"
-                            },
+                            "description": "Specifies further cluster roles to be added to the Capsule manager service account.",
                             "type": "array"
                         },
                         "existingRoles": {
-                            "items": {
-                                "type": "string"
-                            },
+                            "description": "Specifies further cluster roles to be added to the Capsule manager service account.",
                             "type": "array"
                         }
-                    },
-                    "type": "object"
+                    }
                 },
                 "readinessProbe": {
+                    "description": "Configure the readiness probe using Deployment probe spec",
+                    "type": "object",
                     "properties": {
                         "httpGet": {
+                            "type": "object",
                             "properties": {
                                 "path": {
                                     "type": "string"
@@ -293,142 +331,148 @@
                                 "port": {
                                     "type": "integer"
                                 }
-                            },
-                            "type": "object"
+                            }
                         }
-                    },
-                    "type": "object"
+                    }
                 },
                 "resources": {
-                    "properties": {
-                        "requests": {
-                            "properties": {
-                                "cpu": {
-                                    "type": "string"
-                                },
-                                "memory": {
-                                    "type": "string"
-                                }
-                            },
-                            "type": "object"
-                        }
-                    },
+                    "description": "Set the resource requests/limits for the Capsule manager container",
                     "type": "object"
                 },
                 "securityContext": {
-                    "properties": {},
+                    "description": "Set the securityContext for the Capsule container",
                     "type": "object"
                 },
                 "volumeMounts": {
+                    "description": "Set the additional volumeMounts needed for the Capsule manager container",
                     "type": "array"
                 },
                 "volumes": {
+                    "description": "Set the additional volumes needed for the Capsule manager container",
                     "type": "array"
                 },
                 "webhookPort": {
+                    "description": "Set an alternative to the default container port.  Useful for use in some kubernetes clusters (such as GKE Private) with aggregator routing turned on, because pod ports have to be opened manually on the firewall side",
                     "type": "integer"
                 }
-            },
-            "type": "object"
+            }
         },
         "monitoring": {
+            "type": "object",
             "properties": {
                 "dashboards": {
+                    "type": "object",
                     "properties": {
                         "annotations": {
-                            "properties": {},
+                            "description": "Annotations for dashboard configmaps",
                             "type": "object"
                         },
                         "enabled": {
+                            "description": "Enable Dashboards to be deployed",
                             "type": "boolean"
                         },
                         "labels": {
-                            "properties": {},
+                            "description": "Labels for dashboard configmaps",
                             "type": "object"
                         },
                         "namespace": {
+                            "description": "Custom namespace for dashboard configmaps",
                             "type": "string"
                         },
                         "operator": {
+                            "type": "object",
                             "properties": {
                                 "allowCrossNamespaceImport": {
+                                    "description": "Allow the Operator to match this resource with Grafanas outside the current namespace",
                                     "type": "boolean"
                                 },
                                 "enabled": {
+                                    "description": "Enable Operator Resources (GrafanaDashboard)",
                                     "type": "boolean"
                                 },
                                 "folder": {
+                                    "description": "folder assignment for dashboard",
                                     "type": "string"
                                 },
                                 "instanceSelector": {
-                                    "properties": {},
+                                    "description": "Selects Grafana instances for import",
                                     "type": "object"
                                 },
                                 "resyncPeriod": {
+                                    "description": "How often the resource is synced, defaults to 10m0s if not set",
                                     "type": "string"
                                 }
-                            },
-                            "type": "object"
+                            }
                         }
-                    },
-                    "type": "object"
+                    }
                 },
                 "serviceMonitor": {
+                    "type": "object",
                     "properties": {
                         "annotations": {
-                            "properties": {},
+                            "description": "Assign additional Annotations",
                             "type": "object"
                         },
                         "enabled": {
+                            "description": "Enable ServiceMonitor",
                             "type": "boolean"
                         },
                         "endpoint": {
+                            "type": "object",
                             "properties": {
                                 "interval": {
+                                    "description": "Set the scrape interval for the endpoint of the serviceMonitor",
                                     "type": "string"
                                 },
                                 "metricRelabelings": {
+                                    "description": "Set metricRelabelings for the endpoint of the serviceMonitor",
                                     "type": "array"
                                 },
                                 "relabelings": {
+                                    "description": "Set relabelings for the endpoint of the serviceMonitor",
                                     "type": "array"
                                 },
                                 "scrapeTimeout": {
+                                    "description": "Set the scrape timeout for the endpoint of the serviceMonitor",
                                     "type": "string"
                                 }
-                            },
-                            "type": "object"
+                            }
                         },
                         "labels": {
-                            "properties": {},
+                            "description": "Assign additional labels according to Prometheus' serviceMonitorSelector matching labels",
                             "type": "object"
                         },
                         "matchLabels": {
-                            "properties": {},
+                            "description": "Change matching labels",
                             "type": "object"
                         },
                         "namespace": {
+                            "description": "Install the ServiceMonitor into a different Namespace, as the monitoring stack one (default: the release one)",
                             "type": "string"
                         },
                         "targetLabels": {
+                            "description": "Set targetLabels for the serviceMonitor",
                             "type": "array"
                         }
-                    },
-                    "type": "object"
+                    }
                 }
-            },
-            "type": "object"
+            }
         },
         "nodeSelector": {
-            "properties": {},
+            "description": "Set the node selector for the Capsule pod",
             "type": "object"
         },
         "podAnnotations": {
-            "properties": {},
+            "description": "Annotations to add to the capsule pod.",
             "type": "object"
         },
         "podSecurityContext": {
+            "description": "Set the securityContext for the Capsule pod",
+            "type": "object",
             "properties": {
+                "enabled": {
+                    "type": "boolean"
+                },
                 "runAsGroup": {
                     "type": "integer"
                 },
@@ -439,143 +483,164 @@
                     "type": "integer"
                 },
                 "seccompProfile": {
+                    "type": "object",
                     "properties": {
                         "type": {
                             "type": "string"
                         }
-                    },
-                    "type": "object"
+                    }
                 }
-            },
-            "type": "object"
+            }
         },
         "ports": {
+            "description": "Set additional ports for the deployment",
             "type": "array"
         },
         "priorityClassName": {
+            "description": "Set the priority class name of the Capsule pod",
             "type": "string"
         },
         "proxy": {
+            "type": "object",
             "properties": {
                 "enabled": {
+                    "description": "Enable Installation of Capsule Proxy",
                     "type": "boolean"
                 }
-            },
-            "type": "object"
+            }
         },
         "rbac": {
+            "type": "object",
             "properties": {
                 "resourcepoolclaims": {
+                    "type": "object",
                     "properties": {
                         "create": {
                             "type": "boolean"
                         },
                         "labels": {
+                            "type": "object",
                             "properties": {
                                 "rbac.authorization.k8s.io/aggregate-to-admin": {
                                     "type": "string"
                                 }
-                            },
-                            "type": "object"
+                            }
                         }
-                    },
-                    "type": "object"
+                    }
                 },
                 "resources": {
+                    "type": "object",
                     "properties": {
                         "create": {
                             "type": "boolean"
                         },
                         "labels": {
+                            "type": "object",
                             "properties": {
                                 "rbac.authorization.k8s.io/aggregate-to-admin": {
                                     "type": "string"
                                 }
-                            },
-                            "type": "object"
+                            }
                         }
-                    },
-                    "type": "object"
+                    }
                 }
-            },
-            "type": "object"
+            }
         },
         "replicaCount": {
+            "description": "Set the replica count for capsule pod",
             "type": "integer"
         },
         "securityContext": {
+            "description": "Set the securityContext for the Capsule container",
+            "type": "object",
             "properties": {
                 "allowPrivilegeEscalation": {
                     "type": "boolean"
                 },
                 "capabilities": {
+                    "type": "object",
                     "properties": {
                         "drop": {
+                            "type": "array",
                             "items": {
                                 "type": "string"
-                            },
-                            "type": "array"
+                            }
                         }
-                    },
-                    "type": "object"
+                    }
+                },
+                "enabled": {
+                    "type": "boolean"
                 },
                 "readOnlyRootFilesystem": {
                     "type": "boolean"
                 }
-            },
-            "type": "object"
+            }
         },
         "serviceAccount": {
+            "type": "object",
             "properties": {
                 "annotations": {
-                    "properties": {},
+                    "description": "Annotations to add to the service account.",
                     "type": "object"
                 },
                 "create": {
+                    "description": "Specifies whether a service account should be created.",
                     "type": "boolean"
                 },
                 "name": {
+                    "description": "The name of the service account to use. If not set and `serviceAccount.create=true`, a name is generated using the fullname template",
                     "type": "string"
                 }
-            },
-            "type": "object"
+            }
         },
         "tls": {
+            "type": "object",
             "properties": {
                 "create": {
+                    "description": "When cert-manager is disabled, Capsule will generate the TLS certificate for webhook and CRDs conversion.",
                     "type": "boolean"
                 },
                 "enableController": {
+                    "description": "Start the Capsule controller that injects the CA into mutating and validating webhooks, and CRD as well.",
                     "type": "boolean"
                 },
                 "name": {
+                    "description": "Override name of the Capsule TLS Secret name when externally managed.",
                     "type": "string"
                 }
-            },
-            "type": "object"
+            }
         },
         "tolerations": {
+            "description": "Set list of tolerations for the Capsule pod",
             "type": "array"
         },
         "topologySpreadConstraints": {
+            "description": "Set topology spread constraints for the Capsule pod",
             "type": "array"
         },
         "webhooks": {
+            "type": "object",
             "properties": {
                 "exclusive": {
+                    "description": "When `crds.exclusive` is `true` the webhooks will be installed",
                     "type": "boolean"
                 },
                 "hooks": {
+                    "type": "object",
                     "properties": {
                         "cordoning": {
+                            "type": "object",
                             "properties": {
                                 "failurePolicy": {
                                     "type": "string"
                                 },
                                 "namespaceSelector": {
+                                    "type": "object",
                                     "properties": {
                                         "matchExpressions": {
+                                            "type": "array",
                                             "items": {
+                                                "type": "object",
                                                 "properties": {
                                                     "key": {
                                                         "type": "string"
@@ -583,26 +648,26 @@
                                                     "operator": {
                                                         "type": "string"
                                                     }
-                                                },
-                                                "type": "object"
-                                            },
-                                            "type": "array"
+                                                }
+                                            }
                                         }
-                                    },
-                                    "type": "object"
+                                    }
                                 }
-                            },
-                            "type": "object"
+                            }
                         },
                         "customresources": {
+                            "type": "object",
                             "properties": {
                                 "failurePolicy": {
                                     "type": "string"
                                 },
                                 "namespaceSelector": {
+                                    "type": "object",
                                     "properties": {
                                         "matchExpressions": {
+                                            "type": "array",
                                             "items": {
+                                                "type": "object",
                                                 "properties": {
                                                     "key": {
                                                         "type": "string"
@@ -610,32 +675,32 @@
                                                     "operator": {
                                                         "type": "string"
                                                     }
-                                                },
-                                                "type": "object"
-                                            },
-                                            "type": "array"
+                                                }
+                                            }
                                         }
-                                    },
-                                    "type": "object"
+                                    }
                                 },
                                 "objectSelector": {
-                                    "properties": {},
                                     "type": "object"
                                 }
-                            },
-                            "type": "object"
+                            }
                         },
                         "defaults": {
+                            "type": "object",
                             "properties": {
                                 "ingress": {
+                                    "type": "object",
                                     "properties": {
                                         "failurePolicy": {
                                             "type": "string"
                                         },
                                         "namespaceSelector": {
+                                            "type": "object",
                                             "properties": {
                                                 "matchExpressions": {
+                                                    "type": "array",
                                                     "items": {
+                                                        "type": "object",
                                                         "properties": {
                                                             "key": {
                                                                 "type": "string"
@@ -643,26 +708,26 @@
                                                             "operator": {
                                                                 "type": "string"
                                                             }
-                                                        },
-                                                        "type": "object"
-                                                    },
-                                                    "type": "array"
+                                                        }
+                                                    }
                                                 }
-                                            },
-                                            "type": "object"
+                                            }
                                         }
-                                    },
-                                    "type": "object"
+                                    }
                                 },
                                 "pods": {
+                                    "type": "object",
                                     "properties": {
                                         "failurePolicy": {
                                             "type": "string"
                                         },
                                         "namespaceSelector": {
+                                            "type": "object",
                                             "properties": {
                                                 "matchExpressions": {
+                                                    "type": "array",
                                                     "items": {
+                                                        "type": "object",
                                                         "properties": {
                                                             "key": {
                                                                 "type": "string"
@@ -670,26 +735,26 @@
                                                             "operator": {
                                                                 "type": "string"
                                                             }
-                                                        },
-                                                        "type": "object"
-                                                    },
-                                                    "type": "array"
+                                                        }
+                                                    }
                                                 }
-                                            },
-                                            "type": "object"
+                                            }
                                         }
-                                    },
-                                    "type": "object"
+                                    }
                                 },
                                 "pvc": {
+                                    "type": "object",
                                     "properties": {
                                         "failurePolicy": {
                                             "type": "string"
                                         },
                                         "namespaceSelector": {
+                                            "type": "object",
                                             "properties": {
                                                 "matchExpressions": {
+                                                    "type": "array",
                                                     "items": {
+                                                        "type": "object",
                                                         "properties": {
                                                             "key": {
                                                                 "type": "string"
@@ -697,29 +762,28 @@
                                                             "operator": {
                                                                 "type": "string"
                                                             }
-                                                        },
-                                                        "type": "object"
-                                                    },
-                                                    "type": "array"
+                                                        }
+                                                    }
                                                 }
-                                            },
-                                            "type": "object"
+                                            }
                                         }
-                                    },
-                                    "type": "object"
+                                    }
                                 }
-                            },
-                            "type": "object"
+                            }
                         },
                         "gateways": {
+                            "type": "object",
                             "properties": {
                                 "failurePolicy": {
                                     "type": "string"
                                 },
                                 "namespaceSelector": {
+                                    "type": "object",
                                     "properties": {
                                         "matchExpressions": {
+                                            "type": "array",
                                             "items": {
+                                                "type": "object",
                                                 "properties": {
                                                     "key": {
                                                         "type": "string"
@@ -727,26 +791,26 @@
                                                     "operator": {
                                                         "type": "string"
                                                     }
-                                                },
-                                                "type": "object"
-                                            },
-                                            "type": "array"
+                                                }
+                                            }
                                         }
-                                    },
-                                    "type": "object"
+                                    }
                                 }
-                            },
-                            "type": "object"
+                            }
                         },
                         "ingresses": {
+                            "type": "object",
                             "properties": {
                                 "failurePolicy": {
                                     "type": "string"
                                 },
                                 "namespaceSelector": {
+                                    "type": "object",
                                     "properties": {
                                         "matchExpressions": {
+                                            "type": "array",
                                             "items": {
+                                                "type": "object",
                                                 "properties": {
                                                     "key": {
                                                         "type": "string"
@@ -754,71 +818,69 @@
                                                     "operator": {
                                                         "type": "string"
                                                     }
-                                                },
-                                                "type": "object"
-                                            },
-                                            "type": "array"
+                                                }
+                                            }
                                         }
-                                    },
-                                    "type": "object"
+                                    }
                                 }
-                            },
-                            "type": "object"
+                            }
                         },
                         "namespace": {
+                            "type": "object",
                             "properties": {
                                 "mutation": {
+                                    "type": "object",
                                     "properties": {
                                         "failurePolicy": {
                                             "type": "string"
                                         },
                                         "namespaceSelector": {
-                                            "properties": {},
                                             "type": "object"
                                         },
                                         "objectSelector": {
-                                            "properties": {},
                                             "type": "object"
                                         }
-                                    },
-                                    "type": "object"
+                                    }
                                 },
                                 "validation": {
+                                    "type": "object",
                                     "properties": {
                                         "failurePolicy": {
                                             "type": "string"
                                         }
-                                    },
-                                    "type": "object"
+                                    }
                                 }
-                            },
-                            "type": "object"
+                            }
                         },
                         "namespaceOwnerReference": {
+                            "type": "object",
                             "properties": {
                                 "failurePolicy": {
                                     "type": "string"
                                 }
-                            },
-                            "type": "object"
+                            }
                         },
                         "namespaces": {
+                            "type": "object",
                             "properties": {
                                 "failurePolicy": {
                                     "type": "string"
                                 }
-                            },
-                            "type": "object"
+                            }
                         },
                         "networkpolicies": {
+                            "type": "object",
                             "properties": {
                                 "failurePolicy": {
                                     "type": "string"
                                 },
                                 "namespaceSelector": {
+                                    "type": "object",
                                     "properties": {
                                         "matchExpressions": {
+                                            "type": "array",
                                             "items": {
+                                                "type": "object",
                                                 "properties": {
                                                     "key": {
                                                         "type": "string"
@@ -826,34 +888,34 @@
                                                     "operator": {
                                                         "type": "string"
                                                     }
-                                                },
-                                                "type": "object"
-                                            },
-                                            "type": "array"
+                                                }
+                                            }
                                         }
-                                    },
-                                    "type": "object"
+                                    }
                                 }
-                            },
-                            "type": "object"
+                            }
                         },
                         "nodes": {
+                            "type": "object",
                             "properties": {
                                 "failurePolicy": {
                                     "type": "string"
                                 }
-                            },
-                            "type": "object"
+                            }
                         },
                         "persistentvolumeclaims": {
+                            "type": "object",
                             "properties": {
                                 "failurePolicy": {
                                     "type": "string"
                                 },
                                 "namespaceSelector": {
+                                    "type": "object",
                                     "properties": {
                                         "matchExpressions": {
+                                            "type": "array",
                                             "items": {
+                                                "type": "object",
                                                 "properties": {
                                                     "key": {
                                                         "type": "string"
@@ -861,26 +923,26 @@
                                                     "operator": {
                                                         "type": "string"
                                                     }
-                                                },
-                                                "type": "object"
-                                            },
-                                            "type": "array"
+                                                }
+                                            }
                                         }
-                                    },
-                                    "type": "object"
+                                    }
                                 }
-                            },
-                            "type": "object"
+                            }
                         },
                         "pods": {
+                            "type": "object",
                             "properties": {
                                 "failurePolicy": {
                                     "type": "string"
                                 },
                                 "namespaceSelector": {
+                                    "type": "object",
                                     "properties": {
                                         "matchExpressions": {
+                                            "type": "array",
                                             "items": {
+                                                "type": "object",
                                                 "properties": {
                                                     "key": {
                                                         "type": "string"
@@ -888,20 +950,18 @@
                                                     "operator": {
                                                         "type": "string"
                                                     }
-                                                },
-                                                "type": "object"
-                                            },
-                                            "type": "array"
+                                                }
+                                            }
                                         }
-                                    },
-                                    "type": "object"
+                                    }
                                 }
-                            },
-                            "type": "object"
+                            }
                         },
                         "resourcepools": {
+                            "type": "object",
                             "properties": {
                                 "claims": {
+                                    "type": "object",
                                     "properties": {
                                         "failurePolicy": {
                                             "type": "string"
@@ -910,20 +970,18 @@
                                             "type": "string"
                                         },
                                         "namespaceSelector": {
-                                            "properties": {},
                                             "type": "object"
                                         },
                                         "objectSelector": {
-                                            "properties": {},
                                             "type": "object"
                                         },
                                         "reinvocationPolicy": {
                                             "type": "string"
                                         }
-                                    },
-                                    "type": "object"
+                                    }
                                 },
                                 "pools": {
+                                    "type": "object",
                                     "properties": {
                                         "failurePolicy": {
                                             "type": "string"
@@ -932,31 +990,31 @@
                                             "type": "string"
                                         },
                                         "namespaceSelector": {
-                                            "properties": {},
                                             "type": "object"
                                         },
                                         "objectSelector": {
-                                            "properties": {},
                                             "type": "object"
                                         },
                                         "reinvocationPolicy": {
                                             "type": "string"
                                         }
-                                    },
-                                    "type": "object"
+                                    }
                                 }
-                            },
-                            "type": "object"
+                            }
                         },
                         "services": {
+                            "type": "object",
                             "properties": {
                                 "failurePolicy": {
                                     "type": "string"
                                 },
                                 "namespaceSelector": {
+                                    "type": "object",
                                     "properties": {
                                         "matchExpressions": {
+                                            "type": "array",
                                             "items": {
+                                                "type": "object",
                                                 "properties": {
                                                     "key": {
                                                         "type": "string"
@@ -964,65 +1022,65 @@
                                                     "operator": {
                                                         "type": "string"
                                                     }
-                                                },
-                                                "type": "object"
-                                            },
-                                            "type": "array"
+                                                }
+                                            }
                                         }
-                                    },
-                                    "type": "object"
+                                    }
                                 }
-                            },
-                            "type": "object"
+                            }
                         },
                         "tenantResourceObjects": {
+                            "type": "object",
                             "properties": {
                                 "failurePolicy": {
                                     "type": "string"
                                 }
-                            },
-                            "type": "object"
+                            }
                         },
                         "tenants": {
+                            "type": "object",
                             "properties": {
                                 "failurePolicy": {
                                     "type": "string"
                                 }
-                            },
-                            "type": "object"
+                            }
                         }
-                    },
-                    "type": "object"
+                    }
                 },
                 "mutatingWebhooksTimeoutSeconds": {
+                    "description": "Timeout in seconds for mutating webhooks",
                     "type": "integer"
                 },
                 "service": {
+                    "type": "object",
                     "properties": {
                         "caBundle": {
+                            "description": "CABundle for the webhook service",
                             "type": "string"
                         },
                         "name": {
+                            "description": "Custom service name for the webhook service",
                             "type": "string"
                         },
                         "namespace": {
+                            "description": "Custom service namespace for the webhook service",
                             "type": "string"
                         },
                         "port": {
+                            "description": "Custom service port for the webhook service",
                             "type": "null"
                         },
                         "url": {
+                            "description": "The URL where the capsule webhook services are running (Overwrites cluster scoped service definition)",
                             "type": "string"
                         }
-                    },
-                    "type": "object"
+                    }
                 },
                 "validatingWebhooksTimeoutSeconds": {
+                    "description": "Timeout in seconds for validating webhooks",
                     "type": "integer"
                 }
-            },
-            "type": "object"
+            }
         }
-    },
-    "type": "object"
+    }
 }

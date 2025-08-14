@@ -23,7 +23,12 @@ linters:
     - unparam
     - varnamelen
     - wrapcheck
+<<<<<<< HEAD
     - interfacebloat
+=======
+    - noinlineerr
+    - revive
+>>>>>>> e1f47feade6e1695b2204407607d07c3b3994f6e
   settings:
     cyclop:
       max-complexity: 27
@@ -36,7 +41,7 @@ linters:
       min-occurrences: 2
     goheader:
       template: |-
-        Copyright 2020-2023 Project Capsule Authors.
+        Copyright 2020-2025 Project Capsule Authors
         SPDX-License-Identifier: Apache-2.0
     inamedparam:
       skip-single-param: true

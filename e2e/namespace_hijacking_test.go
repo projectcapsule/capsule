@@ -54,7 +54,7 @@ var _ = Describe("creating several Namespaces for a Tenant", Label("namespace"),
 
 	})
 
-	It("Can't hijack offlimits namespace", func() {
+	It("Can't hijack offlimits namespace (Ownerreferences)", func() {
 		tenant := &capsulev1beta2.Tenant{}
 		Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: tnt.Name}, tenant)).Should(Succeed())
 
@@ -69,6 +69,40 @@ var _ = Describe("creating several Namespaces for a Tenant", Label("namespace"),
 			_, err := cs.CoreV1().Namespaces().Patch(context.TODO(), kubeSystem.Name, types.StrategicMergePatchType, patch, metav1.PatchOptions{})
 			Expect(err).To(HaveOccurred())
 
+		}
+	})
+
+	It("Can't hijack offlimits namespace (Labels)", func() {
+		tenant := &capsulev1beta2.Tenant{}
+		Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: tnt.Name}, tenant)).Should(Succeed())
+
+		// Get the namespace
+		Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: kubeSystem.GetName()}, kubeSystem)).Should(Succeed())
+
+		for _, owner := range tnt.Spec.Owners {
+			cs := ownerClient(owner)
+
+			patch := []byte(fmt.Sprintf(`{"metadata":{"labels":{"%s":"%s"}}}`, "capsule.clastix.io/tenant", tenant.GetName()))
+
+			_, err := cs.CoreV1().Namespaces().Patch(context.TODO(), kubeSystem.Name, types.StrategicMergePatchType, patch, metav1.PatchOptions{})
+			Expect(err).To(HaveOccurred())
+		}
+	})
+
+	It("Can't hijack offlimits namespace (Annotations)", func() {
+		tenant := &capsulev1beta2.Tenant{}
+		Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: tnt.Name}, tenant)).Should(Succeed())
+
+		// Get the namespace
+		Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: kubeSystem.GetName()}, kubeSystem)).Should(Succeed())
+
+		for _, owner := range tnt.Spec.Owners {
+			cs := ownerClient(owner)
+
+			patch := []byte(fmt.Sprintf(`{"metadata":{"annotations":{"%s":"%s"}}}`, "capsule.clastix.io/tenant", tenant.GetName()))
+
+			_, err := cs.CoreV1().Namespaces().Patch(context.TODO(), kubeSystem.Name, types.StrategicMergePatchType, patch, metav1.PatchOptions{})
+			Expect(err).To(HaveOccurred())
 		}
 	})
 

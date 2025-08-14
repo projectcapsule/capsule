@@ -6,7 +6,7 @@ home: https://github.com/projectcapsule/capsule
 icon: https://github.com/projectcapsule/capsule/raw/main/assets/logo/capsule_small.png
 dependencies:
   - name: capsule-proxy
-    version: 0.9.5
+    version: 0.9.9
     repository: "oci://ghcr.io/projectcapsule/charts"
     condition: proxy.enabled
     alias: proxy
@@ -41,4 +41,4 @@ annotations:
       url: https://projectcapsule.dev/
   artifacthub.io/changes: |
     - kind: added
-      description: oci chart reference
+      description: added toggles for podSecurityContexts and securityContexts

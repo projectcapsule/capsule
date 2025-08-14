@@ -1,4 +1,4 @@
-// Copyright 2020-2023 Project Capsule Authors.
+// Copyright 2020-2025 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package tenant
@@ -36,7 +36,6 @@ func (r *resourceCounterHandler) OnCreate(clt client.Client, _ admission.Decoder
 		var tntName string
 
 		var err error
-
 		if tntName, err = r.getTenantName(ctx, clt, req); err != nil {
 			return utils.ErroredResponse(err)
 		}
@@ -90,7 +89,6 @@ func (r *resourceCounterHandler) OnDelete(clt client.Client, _ admission.Decoder
 		var tntName string
 
 		var err error
-
 		if tntName, err = r.getTenantName(ctx, clt, req); err != nil {
 			return utils.ErroredResponse(err)
 		}

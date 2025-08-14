@@ -15,6 +15,10 @@ spec:
     name: metrics
     protocol: TCP
     targetPort: 8080
+  - port: 10080
+    name: health-api
+    protocol: TCP
+    targetPort: 10080
   selector:
     {{- include "capsule.selectorLabels" . | nindent 4 }}
   sessionAffinity: None

@@ -28,9 +28,8 @@ spec:
         {{- include "capsule.selectorLabels" . | nindent 8 }}
     spec:
       restartPolicy: {{ $Values.restartPolicy }}
-      {{- with $Values.podSecurityContext }}
-      securityContext:
-        {{- toYaml . | nindent 8 }}
+      {{- if $Values.podSecurityContext.enabled }}
+      securityContext: {{- omit $Values.podSecurityContext "enabled" | toYaml | nindent 8 }}
       {{- end }}
       {{- with $Values.nodeSelector }}
       nodeSelector:
@@ -60,9 +59,8 @@ spec:
       - name: crds-hook
         image: {{ include "capsule.jobsFullyQualifiedDockerImage" . }}
         imagePullPolicy: {{ $Values.image.pullPolicy }}
-        {{- with $Values.securityContext }}
-        securityContext:
-          {{- toYaml . | nindent 10 }}
+        {{- if $Values.securityContext.enabled }}
+        securityContext: {{- omit $Values.securityContext "enabled" | toYaml | nindent 10 }}
         {{- end }}
         command:
         - sh

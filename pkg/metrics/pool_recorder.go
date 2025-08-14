@@ -1,4 +1,4 @@
-// Copyright 2020-2023 Project Capsule Authors.
+// Copyright 2020-2025 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package metrics
@@ -169,7 +169,7 @@ func (r *ResourcePoolRecorder) ResourceUsageMetrics(pool *capsulev1beta2.Resourc
 	r.resourceUsageMetricsByNamespace(pool)
 }
 
-// Emit exhaustion metrics..
+// Emit exhaustion metrics.
 func (r *ResourcePoolRecorder) CalculateExhaustions(
 	pool *capsulev1beta2.ResourcePool,
 	current map[string]api.PoolExhaustionResource,

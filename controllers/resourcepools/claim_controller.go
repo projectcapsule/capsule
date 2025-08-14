@@ -1,4 +1,4 @@
-// Copyright 2020-2023 Project Capsule Authors.
+// Copyright 2020-2025 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package resourcepools
@@ -29,6 +29,7 @@ import (
 
 type resourceClaimController struct {
 	client.Client
+
 	metrics  *metrics.ClaimRecorder
 	log      logr.Logger
 	recorder record.EventRecorder

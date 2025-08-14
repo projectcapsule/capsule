@@ -1,4 +1,4 @@
-// Copyright 2020-2023 Project Capsule Authors.
+// Copyright 2020-2025 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package tls
@@ -41,6 +41,7 @@ const (
 
 type Reconciler struct {
 	client.Client
+
 	Log           logr.Logger
 	Scheme        *runtime.Scheme
 	Namespace     string

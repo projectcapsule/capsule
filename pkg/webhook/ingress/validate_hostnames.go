@@ -1,4 +1,4 @@
-// Copyright 2020-2023 Project Capsule Authors.
+// Copyright 2020-2025 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package ingress
@@ -80,7 +80,6 @@ func (r *hostnames) validate(ctx context.Context, client client.Client, req admi
 	}
 
 	var hostnameNotValidErr *ingressHostnameNotValidError
-
 	if errors.As(err, &hostnameNotValidErr) {
 		recorder.Eventf(tenant, corev1.EventTypeWarning, "IngressHostnameNotValid", "Ingress %s/%s hostname is not valid", ingress.Namespace(), ingress.Name())
 
