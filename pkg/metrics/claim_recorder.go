@@ -63,6 +63,7 @@ func (r *ClaimRecorder) RecordClaimCondition(claim *capsulev1beta2.ResourcePoolC
 	if claim.Status.Condition.Status == metav1.ConditionTrue {
 		value = 1
 	}
+
 	r.claimConditionGauge.WithLabelValues(
 		claim.Name,
 		claim.Namespace,

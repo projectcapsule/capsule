@@ -28,48 +28,32 @@ type handler struct {
 
 func (h *handler) OnCreate(client client.Client, decoder admission.Decoder, recorder record.EventRecorder) webhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		if !IsCapsuleUser(ctx, req, client, h.configuration.UserGroups()) {
-			return nil
-		}
-
-		for _, hndl := range h.handlers {
-			if response := hndl.OnCreate(client, decoder, recorder)(ctx, req); response != nil {
-				return response
-			}
-		}
-
-		return nil
+		return h.handle(ctx, req, client, decoder, recorder)
 	}
 }
 
 func (h *handler) OnDelete(client client.Client, decoder admission.Decoder, recorder record.EventRecorder) webhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		if !IsCapsuleUser(ctx, req, client, h.configuration.UserGroups()) {
-			return nil
-		}
-
-		for _, hndl := range h.handlers {
-			if response := hndl.OnDelete(client, decoder, recorder)(ctx, req); response != nil {
-				return response
-			}
-		}
-
-		return nil
+		return h.handle(ctx, req, client, decoder, recorder)
 	}
 }
 
 func (h *handler) OnUpdate(client client.Client, decoder admission.Decoder, recorder record.EventRecorder) webhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		if !IsCapsuleUser(ctx, req, client, h.configuration.UserGroups()) {
-			return nil
-		}
+		return h.handle(ctx, req, client, decoder, recorder)
+	}
+}
 
-		for _, hndl := range h.handlers {
-			if response := hndl.OnUpdate(client, decoder, recorder)(ctx, req); response != nil {
-				return response
-			}
-		}
-
+func (h *handler) handle(ctx context.Context, req admission.Request, client client.Client, decoder admission.Decoder, recorder record.EventRecorder) *admission.Response {
+	if !IsCapsuleUser(ctx, req, client, h.configuration.UserGroups(), h.configuration.IgnoreUserWithGroups()) {
 		return nil
 	}
+
+	for _, hndl := range h.handlers {
+		if response := hndl.OnUpdate(client, decoder, recorder)(ctx, req); response != nil {
+			return response
+		}
+	}
+
+	return nil
 }

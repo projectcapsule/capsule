@@ -68,4 +68,16 @@ var _ = Describe("creating a Namespace as Tenant owner with custom --capsule-gro
 		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 	})
+
+	It("should fail when group is ignored", func() {
+		ModifyCapsuleConfigurationOpts(func(configuration *capsulev1beta2.CapsuleConfiguration) {
+			configuration.Spec.UserGroups = []string{"projectcapsule.dev"}
+			configuration.Spec.IgnoreUserWithGroups = []string{"projectcapsule.dev"}
+		})
+
+		ns := NewNamespace("")
+
+		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).ShouldNot(Succeed())
+	})
+
 })

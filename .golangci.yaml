@@ -23,6 +23,7 @@ linters:
     - unparam
     - varnamelen
     - wrapcheck
+    - interfacebloat
   settings:
     cyclop:
       max-complexity: 27

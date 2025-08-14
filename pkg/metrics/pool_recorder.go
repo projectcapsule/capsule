@@ -169,7 +169,7 @@ func (r *ResourcePoolRecorder) ResourceUsageMetrics(pool *capsulev1beta2.Resourc
 	r.resourceUsageMetricsByNamespace(pool)
 }
 
-// Emit exhaustion metrics
+// Emit exhaustion metrics..
 func (r *ResourcePoolRecorder) CalculateExhaustions(
 	pool *capsulev1beta2.ResourcePool,
 	current map[string]api.PoolExhaustionResource,
@@ -242,7 +242,7 @@ func (r *ResourcePoolRecorder) resourceUsageMetricsByNamespace(pool *capsulev1be
 				resourceName.String(),
 			).Set(float64(quantity.MilliValue()) / 1000)
 
-			availble, ok := pool.Status.Allocation.Hard[resourceName]
+			available, ok := pool.Status.Allocation.Hard[resourceName]
 			if !ok {
 				continue
 			}
@@ -251,7 +251,7 @@ func (r *ResourcePoolRecorder) resourceUsageMetricsByNamespace(pool *capsulev1be
 				pool.Name,
 				namespace,
 				resourceName.String(),
-			).Set((float64(quantity.MilliValue()) / float64(availble.MilliValue())) * 100)
+			).Set((float64(quantity.MilliValue()) / float64(available.MilliValue())) * 100)
 		}
 	}
 }
