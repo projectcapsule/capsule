@@ -40,7 +40,13 @@ func prepareAdditionalMetadata(m map[string]string) map[string]string {
 		return make(map[string]string)
 	}
 
-	return m
+	// we need to create a new map to avoid modifying the original one
+	copied := make(map[string]string, len(m))
+	for k, v := range m {
+		copied[k] = v
+	}
+
+	return copied
 }
 
 func (r *Processor) HandlePruning(ctx context.Context, current, desired sets.Set[string]) (updateStatus bool) {
