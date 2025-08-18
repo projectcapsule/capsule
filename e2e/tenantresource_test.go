@@ -226,6 +226,13 @@ var _ = Describe("Creating a TenantResource object", Label("tenantresource2"), f
 			}).Should(Succeed())
 		})
 
+		By("verify labels/annotations are not redirect to TenantResource", func() {
+			trVerify := &capsulev1beta2.TenantResource{}
+			Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: tr.GetName(), Namespace: tr.GetNamespace()}, trVerify)).ToNot(HaveOccurred())
+
+			Expect(trVerify.Spec.Resources[0].AdditionalMetadata).To(Equal(tr.Spec.Resources[0].AdditionalMetadata))
+		})
+
 		for _, ns := range solarNs {
 			By(fmt.Sprintf("waiting for replicated resources in %s Namespace", ns), func() {
 				Eventually(func() []corev1.Secret {

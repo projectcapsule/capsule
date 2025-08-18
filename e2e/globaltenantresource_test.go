@@ -197,6 +197,13 @@ var _ = Describe("Creating a GlobalTenantResource object", func() {
 			}
 		})
 
+		By("verify labels/annotations are not redirect to TenantResource", func() {
+			trVerify := &capsulev1beta2.GlobalTenantResource{}
+			Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: gtr.GetName(), Namespace: gtr.GetNamespace()}, trVerify)).ToNot(HaveOccurred())
+
+			Expect(trVerify.Spec.Resources[0].AdditionalMetadata).To(Equal(gtr.Spec.Resources[0].AdditionalMetadata))
+		})
+
 		for _, ns := range append(solarNs, windNs...) {
 			By(fmt.Sprintf("waiting for replicated resources in %s Namespace", ns), func() {
 				Eventually(func() []corev1.Secret {
