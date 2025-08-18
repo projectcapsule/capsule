@@ -16,7 +16,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/utils"
 )
 
-func IsCapsuleUser(ctx context.Context, req admission.Request, clt client.Client, userGroups []string) bool {
+func IsCapsuleUser(ctx context.Context, req admission.Request, clt client.Client, userGroups []string, ignoreGroups []string) bool {
 	groupList := utils.NewUserGroupList(req.UserInfo.Groups)
 	// if the user is a ServiceAccount belonging to the kube-system namespace, definitely, it's not a Capsule user
 	// and we can skip the check in case of Capsule user group assigned to system:authenticated
@@ -44,6 +44,14 @@ func IsCapsuleUser(ctx context.Context, req admission.Request, clt client.Client
 
 	for _, group := range userGroups {
 		if groupList.Find(group) {
+			if len(ignoreGroups) > 0 {
+				for _, ignoreGroup := range ignoreGroups {
+					if groupList.Find(ignoreGroup) {
+						return false
+					}
+				}
+			}
+
 			return true
 		}
 	}
