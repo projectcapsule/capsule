@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/rs/zerolog/log"
 	"github.com/valyala/fasttemplate"
 	corev1 "k8s.io/api/core/v1"
 	apierr "k8s.io/apimachinery/pkg/api/errors"
@@ -103,6 +104,51 @@ func (r *Processor) HandlePruning(
 	}
 
 	return processed.List(), nil
+}
+
+//nolint:gocognit
+func (r *Processor) HandleNamespaceSection(
+	ctx context.Context,
+	c client.Client,
+	tnt capsulev1beta2.Tenant,
+	allowCrossNamespaceSelection bool,
+	tenantLabel string,
+	resourceIndex int,
+	spec capsulev1beta2.ResourceSpec,
+) ([]string, error) {
+
+	var err error
+	// Creating Namespace selector
+	var selector labels.Selector
+
+	if spec.NamespaceSelector != nil {
+		selector, err = metav1.LabelSelectorAsSelector(spec.NamespaceSelector)
+		if err != nil {
+			log.Error(err, "cannot create Namespace selector for Namespace filtering and resource replication", "index", resourceIndex)
+
+			return nil, err
+		}
+	} else {
+		selector = labels.NewSelector()
+	}
+	// Resources can be replicated only on Namespaces belonging to the same Global:
+	// preventing a boundary cross by enforcing the selection.
+	tntRequirement, err := labels.NewRequirement(tenantLabel, selection.Equals, []string{tnt.GetName()})
+	if err != nil {
+		log.Error(err, "unable to create requirement for Namespace filtering and resource replication", "index", resourceIndex)
+
+		return nil, err
+	}
+
+	selector = selector.Add(*tntRequirement)
+	// Selecting the targeted Namespace according to the TenantResource specification.
+	namespaces := corev1.NamespaceList{}
+	if err = r.client.List(ctx, &namespaces, client.MatchingLabelsSelector{Selector: selector}); err != nil {
+		log.Error(err, "cannot retrieve Namespaces for resource", "index", resourceIndex)
+
+		return nil, err
+	}
+
 }
 
 //nolint:gocognit
