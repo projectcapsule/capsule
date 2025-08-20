@@ -17,9 +17,13 @@ spec:
     validatingWebhookConfigurationName: {{ include "capsule.fullname" . }}-validating-webhook-configuration
   forceTenantPrefix: {{ .Values.manager.options.forceTenantPrefix }}
   userGroups:
-{{- range .Values.manager.options.capsuleUserGroups }}
+  {{- range .Values.manager.options.capsuleUserGroups }}
     - {{ . }}
-{{- end}}
+  {{- end }}
+  ignoreUserWithGroups:
+  {{- range .Values.manager.options.ignoreUserWithGroups }}
+    - {{ . }}
+  {{- end }}
   protectedNamespaceRegex: {{ .Values.manager.options.protectedNamespaceRegex | quote }}
   {{- with .Values.manager.options.nodeMetadata }}
   nodeMetadata:
