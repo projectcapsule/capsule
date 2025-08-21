@@ -137,7 +137,7 @@ Here the values you can override:
   {{- end }}
 {{- end }}
 
-### Webhooks Parameters
+### Admission Webhook Parameters
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
@@ -146,30 +146,6 @@ Here the values you can override:
 | {{ .Key }} | {{ .Type }} | {{ if .Default }}{{ .Default }}{{ else }}{{ .AutoDefault }}{{ end }} | {{ if .Description }}{{ .Description }}{{ else }}{{ .AutoDescription }}{{ end }} |
   {{- end }}
 {{- end }}
-
-## Created resources
-
-This Helm Chart creates the following Kubernetes resources in the release namespace:
-
-* Capsule Namespace
-* Capsule Operator Deployment
-* Capsule Service
-* CA Secret
-* Certificate Secret
-* Tenant Custom Resource Definition
-* CapsuleConfiguration Custom Resource Definition
-* MutatingWebHookConfiguration
-* ValidatingWebHookConfiguration
-* RBAC Cluster Roles
-* Metrics Service
-
-And optionally, depending on the values set:
-
-* Capsule ServiceAccount
-* Capsule Service Monitor
-* PodSecurityPolicy
-* RBAC ClusterRole and RoleBinding for pod security policy
-* RBAC Role and Rolebinding for metrics scrape
 
 ## Notes on installing Custom Resource Definitions with Helm3
 
