@@ -23,6 +23,7 @@ type Configuration interface {
 	MutatingWebhookConfigurationName() string
 	ValidatingWebhookConfigurationName() string
 	TenantCRDName() string
+	UserNames() []string
 	UserGroups() []string
 	IgnoreUserWithGroups() []string
 	ForbiddenUserNodeLabels() *capsuleapi.ForbiddenListSpec

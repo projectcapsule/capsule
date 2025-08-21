@@ -96,4 +96,28 @@ var _ = Describe("creating a Namespace as Tenant owner with custom --capsule-gro
 		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).ShouldNot(Succeed())
 	})
 
+	It("should succeed and be available in Tenant namespaces list with default single user", func() {
+		ModifyCapsuleConfigurationOpts(func(configuration *capsulev1beta2.CapsuleConfiguration) {
+			configuration.Spec.UserGroups = []string{}
+			configuration.Spec.IgnoreUserWithGroups = []string{}
+			configuration.Spec.UserNames = []string{tnt.Spec.Owners[0].Name}
+		})
+
+		ns := NewNamespace("")
+
+		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).ShouldNot(Succeed())
+	})
+
+	It("should fail when group is ignored", func() {
+		ModifyCapsuleConfigurationOpts(func(configuration *capsulev1beta2.CapsuleConfiguration) {
+			configuration.Spec.UserGroups = []string{}
+			configuration.Spec.UserNames = []string{tnt.Spec.Owners[0].Name}
+			configuration.Spec.IgnoreUserWithGroups = []string{"projectcapsule.dev"}
+		})
+
+		ns := NewNamespace("")
+
+		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).ShouldNot(Succeed())
+	})
+
 })

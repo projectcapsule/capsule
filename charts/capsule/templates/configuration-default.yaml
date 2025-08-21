@@ -20,6 +20,10 @@ spec:
   {{- range .Values.manager.options.capsuleUserGroups }}
     - {{ . }}
   {{- end }}
+  userNames:
+  {{- range .Values.manager.options.userNames }}
+    - {{ . }}
+  {{- end }}
   ignoreUserWithGroups:
   {{- range .Values.manager.options.ignoreUserWithGroups }}
     - {{ . }}
