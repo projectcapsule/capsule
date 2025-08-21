@@ -203,66 +203,104 @@ Here the values you can override:
 | monitoring.serviceMonitor.namespace | string | `""` | Install the ServiceMonitor into a different Namespace, as the monitoring stack one (default: the release one) |
 | monitoring.serviceMonitor.targetLabels | list | `[]` | Set targetLabels for the serviceMonitor |
 
-### Webhooks Parameters
+### Admission Webhook Parameters
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | webhooks.exclusive | bool | `false` | When `crds.exclusive` is `true` the webhooks will be installed |
-| webhooks.hooks.cordoning.failurePolicy | string | `"Fail"` |  |
-| webhooks.hooks.cordoning.namespaceSelector.matchExpressions[0].key | string | `"capsule.clastix.io/tenant"` |  |
-| webhooks.hooks.cordoning.namespaceSelector.matchExpressions[0].operator | string | `"Exists"` |  |
-| webhooks.hooks.cordoning.namespaceSelector.matchExpressions[1].key | string | `"projectcapsule.dev/cordoned"` |  |
-| webhooks.hooks.cordoning.namespaceSelector.matchExpressions[1].operator | string | `"Exists"` |  |
-| webhooks.hooks.customresources.failurePolicy | string | `"Fail"` |  |
-| webhooks.hooks.customresources.namespaceSelector.matchExpressions[0].key | string | `"capsule.clastix.io/tenant"` |  |
-| webhooks.hooks.customresources.namespaceSelector.matchExpressions[0].operator | string | `"Exists"` |  |
-| webhooks.hooks.customresources.objectSelector | object | `{}` |  |
-| webhooks.hooks.defaults.ingress.failurePolicy | string | `"Fail"` |  |
-| webhooks.hooks.defaults.ingress.namespaceSelector.matchExpressions[0].key | string | `"capsule.clastix.io/tenant"` |  |
-| webhooks.hooks.defaults.ingress.namespaceSelector.matchExpressions[0].operator | string | `"Exists"` |  |
-| webhooks.hooks.defaults.pods.failurePolicy | string | `"Fail"` |  |
-| webhooks.hooks.defaults.pods.namespaceSelector.matchExpressions[0].key | string | `"capsule.clastix.io/tenant"` |  |
-| webhooks.hooks.defaults.pods.namespaceSelector.matchExpressions[0].operator | string | `"Exists"` |  |
-| webhooks.hooks.defaults.pvc.failurePolicy | string | `"Fail"` |  |
-| webhooks.hooks.defaults.pvc.namespaceSelector.matchExpressions[0].key | string | `"capsule.clastix.io/tenant"` |  |
-| webhooks.hooks.defaults.pvc.namespaceSelector.matchExpressions[0].operator | string | `"Exists"` |  |
-| webhooks.hooks.gateways.failurePolicy | string | `"Fail"` |  |
-| webhooks.hooks.gateways.namespaceSelector.matchExpressions[0].key | string | `"capsule.clastix.io/tenant"` |  |
-| webhooks.hooks.gateways.namespaceSelector.matchExpressions[0].operator | string | `"Exists"` |  |
-| webhooks.hooks.ingresses.failurePolicy | string | `"Fail"` |  |
-| webhooks.hooks.ingresses.namespaceSelector.matchExpressions[0].key | string | `"capsule.clastix.io/tenant"` |  |
-| webhooks.hooks.ingresses.namespaceSelector.matchExpressions[0].operator | string | `"Exists"` |  |
-| webhooks.hooks.namespace.mutation.failurePolicy | string | `"Fail"` |  |
-| webhooks.hooks.namespace.mutation.namespaceSelector | object | `{}` |  |
-| webhooks.hooks.namespace.mutation.objectSelector | object | `{}` |  |
-| webhooks.hooks.namespace.validation.failurePolicy | string | `"Fail"` |  |
-| webhooks.hooks.namespaceOwnerReference.failurePolicy | string | `"Fail"` |  |
-| webhooks.hooks.namespaces.failurePolicy | string | `"Fail"` |  |
-| webhooks.hooks.networkpolicies.failurePolicy | string | `"Fail"` |  |
-| webhooks.hooks.networkpolicies.namespaceSelector.matchExpressions[0].key | string | `"capsule.clastix.io/tenant"` |  |
-| webhooks.hooks.networkpolicies.namespaceSelector.matchExpressions[0].operator | string | `"Exists"` |  |
-| webhooks.hooks.nodes.failurePolicy | string | `"Fail"` |  |
-| webhooks.hooks.persistentvolumeclaims.failurePolicy | string | `"Fail"` |  |
-| webhooks.hooks.persistentvolumeclaims.namespaceSelector.matchExpressions[0].key | string | `"capsule.clastix.io/tenant"` |  |
-| webhooks.hooks.persistentvolumeclaims.namespaceSelector.matchExpressions[0].operator | string | `"Exists"` |  |
-| webhooks.hooks.pods.failurePolicy | string | `"Fail"` |  |
-| webhooks.hooks.pods.namespaceSelector.matchExpressions[0].key | string | `"capsule.clastix.io/tenant"` |  |
-| webhooks.hooks.pods.namespaceSelector.matchExpressions[0].operator | string | `"Exists"` |  |
-| webhooks.hooks.resourcepools.claims.failurePolicy | string | `"Fail"` |  |
-| webhooks.hooks.resourcepools.claims.matchPolicy | string | `"Equivalent"` |  |
-| webhooks.hooks.resourcepools.claims.namespaceSelector | object | `{}` |  |
-| webhooks.hooks.resourcepools.claims.objectSelector | object | `{}` |  |
-| webhooks.hooks.resourcepools.claims.reinvocationPolicy | string | `"Never"` |  |
-| webhooks.hooks.resourcepools.pools.failurePolicy | string | `"Fail"` |  |
-| webhooks.hooks.resourcepools.pools.matchPolicy | string | `"Equivalent"` |  |
-| webhooks.hooks.resourcepools.pools.namespaceSelector | object | `{}` |  |
-| webhooks.hooks.resourcepools.pools.objectSelector | object | `{}` |  |
-| webhooks.hooks.resourcepools.pools.reinvocationPolicy | string | `"Never"` |  |
-| webhooks.hooks.services.failurePolicy | string | `"Fail"` |  |
-| webhooks.hooks.services.namespaceSelector.matchExpressions[0].key | string | `"capsule.clastix.io/tenant"` |  |
-| webhooks.hooks.services.namespaceSelector.matchExpressions[0].operator | string | `"Exists"` |  |
-| webhooks.hooks.tenantResourceObjects.failurePolicy | string | `"Fail"` |  |
-| webhooks.hooks.tenants.failurePolicy | string | `"Fail"` |  |
+| webhooks.hooks.cordoning.enabled | bool | `true` | Enable the Hook |
+| webhooks.hooks.cordoning.failurePolicy | string | `"Fail"` | [FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy) |
+| webhooks.hooks.cordoning.matchConditions | list | `[]` | [MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy) |
+| webhooks.hooks.cordoning.matchPolicy | string | `"Equivalent"` | [MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy) |
+| webhooks.hooks.cordoning.namespaceSelector | object | `{"matchExpressions":[{"key":"capsule.clastix.io/tenant","operator":"Exists"},{"key":"projectcapsule.dev/cordoned","operator":"Exists"}]}` | [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector) |
+| webhooks.hooks.cordoning.objectSelector | object | `{}` | [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector) |
+| webhooks.hooks.cordoning.rules | list | `[{"apiGroups":["*"],"apiVersions":["*"],"operations":["CREATE","UPDATE","DELETE"],"resources":["*"],"scope":"Namespaced"}]` | [Rules](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-rules) |
+| webhooks.hooks.customresources.enabled | bool | `true` | Enable the Hook |
+| webhooks.hooks.customresources.failurePolicy | string | `"Fail"` | [FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy) |
+| webhooks.hooks.customresources.matchConditions | list | `[]` | [MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy) |
+| webhooks.hooks.customresources.matchPolicy | string | `"Equivalent"` | [MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy) |
+| webhooks.hooks.customresources.namespaceSelector | object | `{"matchExpressions":[{"key":"capsule.clastix.io/tenant","operator":"Exists"}]}` | [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector) |
+| webhooks.hooks.customresources.objectSelector | object | `{}` | [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector) |
+| webhooks.hooks.defaults.ingress | object | `{}` | Deprecated, use webhooks.hooks.ingresses instead |
+| webhooks.hooks.defaults.pods | object | `{}` | Deprecated, use webhooks.hooks.pods instead |
+| webhooks.hooks.defaults.pvc | object | `{}` | Deprecated, use webhooks.hooks.persistentvolumeclaims instead |
+| webhooks.hooks.gateways.enabled | bool | `true` | Enable the Hook |
+| webhooks.hooks.gateways.failurePolicy | string | `"Fail"` | [FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy) |
+| webhooks.hooks.gateways.matchConditions | list | `[]` | [MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy) |
+| webhooks.hooks.gateways.matchPolicy | string | `"Equivalent"` | [MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy) |
+| webhooks.hooks.gateways.namespaceSelector | object | `{"matchExpressions":[{"key":"capsule.clastix.io/tenant","operator":"Exists"}]}` | [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector) |
+| webhooks.hooks.gateways.objectSelector | object | `{}` | [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector) |
+| webhooks.hooks.ingresses.enabled | bool | `true` | Enable the Hook |
+| webhooks.hooks.ingresses.failurePolicy | string | `"Fail"` | [FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy) |
+| webhooks.hooks.ingresses.matchConditions | list | `[]` | [MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy) |
+| webhooks.hooks.ingresses.matchPolicy | string | `"Equivalent"` | [MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy) |
+| webhooks.hooks.ingresses.namespaceSelector | object | `{"matchExpressions":[{"key":"capsule.clastix.io/tenant","operator":"Exists"}]}` | [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector) |
+| webhooks.hooks.ingresses.objectSelector | object | `{}` | [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector) |
+| webhooks.hooks.ingresses.reinvocationPolicy | string | `"Never"` | [ReinvocationPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#reinvocation-policy) |
+| webhooks.hooks.namespaceOwnerReference | object | `{}` | Deprecated, use webhooks.hooks.namespaces instead |
+| webhooks.hooks.namespaces.enabled | bool | `true` | Enable the Hook |
+| webhooks.hooks.namespaces.failurePolicy | string | `"Fail"` | [FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy) |
+| webhooks.hooks.namespaces.matchConditions | list | `[]` | [MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy) |
+| webhooks.hooks.namespaces.matchPolicy | string | `"Equivalent"` | [MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy) |
+| webhooks.hooks.namespaces.namespaceSelector | object | `{}` | [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector) |
+| webhooks.hooks.namespaces.objectSelector | object | `{}` | [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector) |
+| webhooks.hooks.namespaces.reinvocationPolicy | string | `"Never"` | [ReinvocationPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#reinvocation-policy) |
+| webhooks.hooks.networkpolicies.enabled | bool | `true` | Enable the Hook |
+| webhooks.hooks.networkpolicies.failurePolicy | string | `"Fail"` | [FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy) |
+| webhooks.hooks.networkpolicies.matchConditions | list | `[]` | [MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy) |
+| webhooks.hooks.networkpolicies.matchPolicy | string | `"Equivalent"` | [MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy) |
+| webhooks.hooks.networkpolicies.namespaceSelector | object | `{"matchExpressions":[{"key":"capsule.clastix.io/tenant","operator":"Exists"}]}` | [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector) |
+| webhooks.hooks.networkpolicies.objectSelector | object | `{}` | [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector) |
+| webhooks.hooks.nodes.enabled | bool | `true` | Enable the Hook |
+| webhooks.hooks.nodes.failurePolicy | string | `"Fail"` | [FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy) |
+| webhooks.hooks.nodes.matchConditions | list | `[]` | [MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy) |
+| webhooks.hooks.nodes.matchPolicy | string | `"Exact"` | [MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy) |
+| webhooks.hooks.nodes.namespaceSelector | object | `{}` | [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector) |
+| webhooks.hooks.nodes.objectSelector | object | `{}` | [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector) |
+| webhooks.hooks.persistentvolumeclaims.enabled | bool | `true` | Enable the Hook |
+| webhooks.hooks.persistentvolumeclaims.failurePolicy | string | `"Fail"` | [FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy) |
+| webhooks.hooks.persistentvolumeclaims.matchConditions | list | `[]` | [MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy) |
+| webhooks.hooks.persistentvolumeclaims.matchPolicy | string | `"Equivalent"` | [MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy) |
+| webhooks.hooks.persistentvolumeclaims.namespaceSelector | object | `{"matchExpressions":[{"key":"capsule.clastix.io/tenant","operator":"Exists"}]}` | [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector) |
+| webhooks.hooks.persistentvolumeclaims.objectSelector | object | `{}` | [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector) |
+| webhooks.hooks.persistentvolumeclaims.reinvocationPolicy | string | `"Never"` | [ReinvocationPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#reinvocation-policy) |
+| webhooks.hooks.pods.enabled | bool | `true` | Enable the Hook |
+| webhooks.hooks.pods.failurePolicy | string | `"Fail"` | [FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy) |
+| webhooks.hooks.pods.matchConditions | list | `[]` | [MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy) |
+| webhooks.hooks.pods.matchPolicy | string | `"Exact"` | [MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy) |
+| webhooks.hooks.pods.namespaceSelector | object | `{"matchExpressions":[{"key":"capsule.clastix.io/tenant","operator":"Exists"}]}` | [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector) |
+| webhooks.hooks.pods.objectSelector | object | `{}` | [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector) |
+| webhooks.hooks.pods.reinvocationPolicy | string | `"Never"` | [ReinvocationPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#reinvocation-policy) |
+| webhooks.hooks.resourcepools.claims.enabled | bool | `true` | Enable the Hook |
+| webhooks.hooks.resourcepools.claims.failurePolicy | string | `"Fail"` | [FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy) |
+| webhooks.hooks.resourcepools.claims.matchConditions | list | `[]` | [MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy) |
+| webhooks.hooks.resourcepools.claims.matchPolicy | string | `"Equivalent"` | [MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy) |
+| webhooks.hooks.resourcepools.claims.namespaceSelector | object | `{}` | [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector) |
+| webhooks.hooks.resourcepools.claims.objectSelector | object | `{}` | [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector) |
+| webhooks.hooks.resourcepools.pools.enabled | bool | `true` | Enable the Hook |
+| webhooks.hooks.resourcepools.pools.failurePolicy | string | `"Fail"` | [FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy) |
+| webhooks.hooks.resourcepools.pools.matchConditions | list | `[]` | [MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy) |
+| webhooks.hooks.resourcepools.pools.matchPolicy | string | `"Equivalent"` | [MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy) |
+| webhooks.hooks.resourcepools.pools.namespaceSelector | object | `{}` | [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector) |
+| webhooks.hooks.resourcepools.pools.objectSelector | object | `{}` | [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector) |
+| webhooks.hooks.services.enabled | bool | `true` | Enable the Hook |
+| webhooks.hooks.services.failurePolicy | string | `"Fail"` | [FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy) |
+| webhooks.hooks.services.matchConditions | list | `[]` | [MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy) |
+| webhooks.hooks.services.matchPolicy | string | `"Exact"` | [MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy) |
+| webhooks.hooks.services.namespaceSelector | object | `{"matchExpressions":[{"key":"capsule.clastix.io/tenant","operator":"Exists"}]}` | [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector) |
+| webhooks.hooks.services.objectSelector | object | `{}` | [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector) |
+| webhooks.hooks.tenantResourceObjects.enabled | bool | `true` | Enable the Hook |
+| webhooks.hooks.tenantResourceObjects.failurePolicy | string | `"Fail"` | [FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy) |
+| webhooks.hooks.tenantResourceObjects.matchConditions | list | `[]` | [MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy) |
+| webhooks.hooks.tenantResourceObjects.matchPolicy | string | `"Exact"` | [MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy) |
+| webhooks.hooks.tenantResourceObjects.namespaceSelector | object | `{"matchExpressions":[{"key":"capsule.clastix.io/tenant","operator":"Exists"}]}` | [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector) |
+| webhooks.hooks.tenantResourceObjects.objectSelector | object | `{"matchExpressions":[{"key":"capsule.clastix.io/tenant","operator":"Exists"}]}` | [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector) |
+| webhooks.hooks.tenants.enabled | bool | `true` | Enable the Hook |
+| webhooks.hooks.tenants.failurePolicy | string | `"Fail"` | [FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy) |
+| webhooks.hooks.tenants.matchConditions | list | `[]` | [MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy) |
+| webhooks.hooks.tenants.matchPolicy | string | `"Exact"` | [MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy) |
+| webhooks.hooks.tenants.namespaceSelector | object | `{}` | [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector) |
+| webhooks.hooks.tenants.objectSelector | object | `{}` | [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector) |
 | webhooks.mutatingWebhooksTimeoutSeconds | int | `30` | Timeout in seconds for mutating webhooks |
 | webhooks.service.caBundle | string | `""` | CABundle for the webhook service |
 | webhooks.service.name | string | `""` | Custom service name for the webhook service |
@@ -270,30 +308,6 @@ Here the values you can override:
 | webhooks.service.port | string | `nil` | Custom service port for the webhook service |
 | webhooks.service.url | string | `""` | The URL where the capsule webhook services are running (Overwrites cluster scoped service definition) |
 | webhooks.validatingWebhooksTimeoutSeconds | int | `30` | Timeout in seconds for validating webhooks |
-
-## Created resources
-
-This Helm Chart creates the following Kubernetes resources in the release namespace:
-
-* Capsule Namespace
-* Capsule Operator Deployment
-* Capsule Service
-* CA Secret
-* Certificate Secret
-* Tenant Custom Resource Definition
-* CapsuleConfiguration Custom Resource Definition
-* MutatingWebHookConfiguration
-* ValidatingWebHookConfiguration
-* RBAC Cluster Roles
-* Metrics Service
-
-And optionally, depending on the values set:
-
-* Capsule ServiceAccount
-* Capsule Service Monitor
-* PodSecurityPolicy
-* RBAC ClusterRole and RoleBinding for pod security policy
-* RBAC Role and Rolebinding for metrics scrape
 
 ## Notes on installing Custom Resource Definitions with Helm3
 
