@@ -15,7 +15,7 @@ jobs:
     name: Validate PR title
     runs-on: ubuntu-latest
     steps:
-      - uses: amannn/action-semantic-pull-request@677b89571e961351de6fcbd96c8b2503787962e2
+      - uses: amannn/action-semantic-pull-request@e7d011b07ef37e089bea6539210f6a0d360d8af9
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
