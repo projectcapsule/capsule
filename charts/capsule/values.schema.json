@@ -249,7 +249,7 @@
                             "type": "string"
                         },
                         "capsuleUserGroups": {
-                            "description": "Override the Capsule user groups",
+                            "description": "Names of the groups considered as Capsule users.",
                             "type": "array",
                             "items": {
                                 "type": "string"
@@ -302,6 +302,10 @@
                         "protectedNamespaceRegex": {
                             "description": "If specified, disallows creation of namespaces matching the passed regexp",
                             "type": "string"
+                        },
+                        "userNames": {
+                            "description": "Names of the users considered as Capsule users.",
+                            "type": "array"
                         }
                     }
                 },

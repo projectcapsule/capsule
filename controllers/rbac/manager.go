@@ -104,6 +104,13 @@ func (r *Manager) EnsureClusterRoleBindings(ctx context.Context) (err error) {
 			})
 		}
 
+		for _, user := range r.Configuration.UserNames() {
+			crb.Subjects = append(crb.Subjects, rbacv1.Subject{
+				Kind: "User",
+				Name: user,
+			})
+		}
+
 		return
 	})
 

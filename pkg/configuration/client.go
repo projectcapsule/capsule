@@ -85,6 +85,10 @@ func (c *capsuleConfiguration) UserGroups() []string {
 	return c.retrievalFn().Spec.UserGroups
 }
 
+func (c *capsuleConfiguration) UserNames() []string {
+	return c.retrievalFn().Spec.UserNames
+}
+
 func (c *capsuleConfiguration) IgnoreUserWithGroups() []string {
 	return c.retrievalFn().Spec.IgnoreUserWithGroups
 }
