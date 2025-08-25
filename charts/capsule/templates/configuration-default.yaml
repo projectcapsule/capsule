@@ -20,13 +20,21 @@ spec:
   {{- range .Values.manager.options.capsuleUserGroups }}
     - {{ . }}
   {{- end }}
+  {{- if .Values.manager.options.userNames }}
   userNames:
   {{- range .Values.manager.options.userNames }}
     - {{ . }}
   {{- end }}
+  {{- else }}
+  userNames: []
+  {{- end }}
+  {{- if .Values.manager.options.ignoreUserWithGroups }}
   ignoreUserWithGroups:
   {{- range .Values.manager.options.ignoreUserWithGroups }}
     - {{ . }}
+  {{- end }}
+  {{- else }}
+  ignoreUserWithGroups: []
   {{- end }}
   protectedNamespaceRegex: {{ .Values.manager.options.protectedNamespaceRegex | quote }}
   {{- with .Values.manager.options.nodeMetadata }}
