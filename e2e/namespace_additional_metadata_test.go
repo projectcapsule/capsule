@@ -131,16 +131,12 @@ var _ = Describe("creating a Namespace for a Tenant with additional metadata lis
 				AdditionalMetadataList: []api.AdditionalMetadataSelectorSpec{
 					{
 						Labels: map[string]string{
-							"projectcapsule.dev/templated-tenant-label":    "{{ tenant.name }}",
-							"projectcapsule.dev/templated-namespace-label": "{{ namespace }}",
-							"k8s.io/custom-label":                          "foo",
-							"clastix.io/custom-label":                      "bar",
+							"k8s.io/custom-label":     "foo",
+							"clastix.io/custom-label": "bar",
 						},
 						Annotations: map[string]string{
-							"projectcapsule.dev/templated-tenant-annotation":    "{{ tenant.name }}",
-							"projectcapsule.dev/templated-namespace-annotation": "{{ namespace }}",
-							"k8s.io/custom-annotation":                          "bizz",
-							"clastix.io/custom-annotation":                      "buzz",
+							"k8s.io/custom-annotation":     "bizz",
+							"clastix.io/custom-annotation": "buzz",
 						},
 					},
 					{
