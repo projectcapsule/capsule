@@ -92,6 +92,7 @@ var _ = Describe("creating a Namespace for a Tenant with additional metadata", L
 				return
 			}, defaultTimeoutInterval, defaultPollInterval).Should(BeTrue())
 		})
+
 		By("checking additional annotations", func() {
 			Eventually(func() (ok bool) {
 				Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: ns.GetName()}, ns)).Should(Succeed())
@@ -130,12 +131,16 @@ var _ = Describe("creating a Namespace for a Tenant with additional metadata lis
 				AdditionalMetadataList: []api.AdditionalMetadataSelectorSpec{
 					{
 						Labels: map[string]string{
-							"k8s.io/custom-label":     "foo",
-							"clastix.io/custom-label": "bar",
+							"projectcapsule.dev/templated-tenant-label":    "{{ tenant.name }}",
+							"projectcapsule.dev/templated-namespace-label": "{{ namespace }}",
+							"k8s.io/custom-label":                          "foo",
+							"clastix.io/custom-label":                      "bar",
 						},
 						Annotations: map[string]string{
-							"k8s.io/custom-annotation":     "bizz",
-							"clastix.io/custom-annotation": "buzz",
+							"projectcapsule.dev/templated-tenant-annotation":    "{{ tenant.name }}",
+							"projectcapsule.dev/templated-namespace-annotation": "{{ namespace }}",
+							"k8s.io/custom-annotation":                          "bizz",
+							"clastix.io/custom-annotation":                      "buzz",
 						},
 					},
 					{
@@ -194,6 +199,30 @@ var _ = Describe("creating a Namespace for a Tenant with additional metadata lis
 		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
+		By("checking templated annotations", func() {
+			Eventually(func() (ok bool) {
+				Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: ns.GetName()}, ns)).Should(Succeed())
+				if ok, _ = HaveKeyWithValue("projectcapsule.dev/templated-tenant-annotation", tnt.Name).Match(ns.Annotations); !ok {
+					return
+				}
+				if ok, _ = HaveKeyWithValue("projectcapsule.dev/templated-namespace-annotation", ns.Name).Match(ns.Annotations); !ok {
+					return
+				}
+				return
+			}, defaultTimeoutInterval, defaultPollInterval).Should(BeTrue())
+		})
+		By("checking templated labels", func() {
+			Eventually(func() (ok bool) {
+				Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: ns.GetName()}, ns)).Should(Succeed())
+				if ok, _ = HaveKeyWithValue("projectcapsule.dev/templated-tenant-label", tnt.Name).Match(ns.Labels); !ok {
+					return
+				}
+				if ok, _ = HaveKeyWithValue("projectcapsule.dev/templated-namespace-label", ns.Name).Match(ns.Labels); !ok {
+					return
+				}
+				return
+			}, defaultTimeoutInterval, defaultPollInterval).Should(BeTrue())
+		})
 		By("checking additional labels from entry without node selector", func() {
 			Eventually(func() (ok bool) {
 				Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: ns.GetName()}, ns)).Should(Succeed())
