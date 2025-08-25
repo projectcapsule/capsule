@@ -54,7 +54,6 @@ func RemoveLooseOwnerReference(
 	obj.SetOwnerReferences(refs)
 }
 
-// If not returns false.
 func HasLooseOwnerReference(
 	obj client.Object,
 	owner client.Object,
