@@ -275,14 +275,20 @@ spec:
                         description: Claimed resources
                         type: object
                       name:
-                        description: Name
+                        description: Name of The Resource
                         maxLength: 253
                         pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
                         type: string
                       namespace:
-                        description: Namespace
+                        description: Namespace of The Resource
                         maxLength: 253
                         pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+                        type: string
+                      scope:
+                        description: Scope of The Resource
+                        enum:
+                        - Namespace
+                        - Tenant
                         type: string
                       uid:
                         description: UID of the tracked Tenant to pin point tracking

@@ -211,6 +211,17 @@ spec:
                   Define the period of time upon a second reconciliation must be invoked.
                   Keep in mind that any change to the manifests will trigger a new reconciliation.
                 type: string
+              scope:
+                default: Namespace
+                description: |-
+                  Resource Scope, Can either be
+                  - Cluster: Just once per cluster
+                  - Tenant: Create Resources for each tenant  in selected Tenants
+                  - Namespace: Create Resources for each namespace in selected Tenants
+                enum:
+                - Namespace
+                - Tenant
+                type: string
               serviceAccount:
                 description: |-
                   Local ServiceAccount which will perform all the actions defined in the TenantResource
@@ -277,6 +288,7 @@ spec:
             required:
             - resources
             - resyncPeriod
+            - scope
             type: object
           status:
             description: GlobalTenantResourceStatus defines the observed state of
@@ -362,6 +374,12 @@ spec:
                       description: |-
                         Namespace of the referent.
                         More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
+                      type: string
+                    scope:
+                      description: Resource Scope
+                      enum:
+                      - Namespace
+                      - Tenant
                       type: string
                     status:
                       description: status of the condition, one of True, False, Unknown.
