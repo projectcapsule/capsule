@@ -9,6 +9,7 @@ import (
 	"maps"
 	"strings"
 
+	"github.com/valyala/fasttemplate"
 	"golang.org/x/sync/errgroup"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -119,6 +120,23 @@ func buildNamespaceAnnotationsForTenant(tnt *capsulev1beta2.Tenant) map[string]s
 	return annotations
 }
 
+// applyTemplateMap applies templating to all values in the provided map in place.
+func applyTemplateMap(m map[string]string, tnt *capsulev1beta2.Tenant, ns *corev1.Namespace) {
+	for k, v := range m {
+		if !strings.Contains(v, "{{ ") && !strings.Contains(v, " }}") {
+			continue
+		}
+
+		t := fasttemplate.New(v, "{{ ", " }}")
+		tmplString := t.ExecuteString(map[string]interface{}{
+			"tenant.name": tnt.Name,
+			"namespace":   ns.Name,
+		})
+
+		m[k] = tmplString
+	}
+}
+
 func buildNamespaceLabelsForTenant(tnt *capsulev1beta2.Tenant) map[string]string {
 	labels := make(map[string]string)
 
@@ -182,6 +200,9 @@ func SyncNamespaceMetadata(tnt *capsulev1beta2.Tenant, ns *corev1.Namespace) err
 			if !ok {
 				continue
 			}
+
+			applyTemplateMap(md.Labels, tnt, ns)
+			applyTemplateMap(md.Annotations, tnt, ns)
 
 			maps.Copy(labels, md.Labels)
 			maps.Copy(annotations, md.Annotations)
