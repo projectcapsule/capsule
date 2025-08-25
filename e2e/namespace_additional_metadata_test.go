@@ -177,6 +177,16 @@ var _ = Describe("creating a Namespace for a Tenant with additional metadata lis
 							"k8s.io/custom-annotation_3": "bizz",
 						},
 					},
+					{
+						Labels: map[string]string{
+							"projectcapsule.dev/templated-tenant-label":    "{{ tenant.name }}",
+							"projectcapsule.dev/templated-namespace-label": "{{ namespace }}",
+						},
+						Annotations: map[string]string{
+							"projectcapsule.dev/templated-tenant-annotation":    "{{ tenant.name }}",
+							"projectcapsule.dev/templated-namespace-annotation": "{{ namespace }}",
+						},
+					},
 				},
 			},
 		},
