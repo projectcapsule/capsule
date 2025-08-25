@@ -1,4 +1,4 @@
-// Copyright 2020-2023 Project Capsule Authors.
+// Copyright 2020-2025 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package v1beta2
@@ -102,7 +102,8 @@ func (in *Tenant) GetNamespaces() (res []string) {
 type TenantList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []Tenant `json:"items"`
+
+	Items []Tenant `json:"items"`
 }
 
 func init() {

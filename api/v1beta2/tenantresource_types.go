@@ -1,4 +1,4 @@
-// Copyright 2020-2023 Project Capsule Authors.
+// Copyright 2020-2025 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package v1beta2
@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/projectcapsule/capsule/pkg/api"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -23,6 +24,7 @@ type ObjectReferenceAbstract struct {
 
 type ObjectReferenceStatus struct {
 	ObjectReferenceAbstract `json:",inline"`
+
 	// Name of the referent.
 	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
 	Name string `json:"name"`
@@ -48,10 +50,13 @@ type ObjectReferenceStatus struct {
 	// +kubebuilder:validation:Pattern=`^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$`
 	// +kubebuilder:validation:MaxLength=316
 	Type string `json:"type" protobuf:"bytes,1,opt,name=type"`
+	// Resource Scope
+	Scope api.ResourceScope `json:"scope,omitempty"`
 }
 
 type ObjectReference struct {
 	ObjectReferenceAbstract `json:",inline"`
+
 	// Label selector used to select the given resources in the given Namespace.
 	Selector metav1.LabelSelector `json:"selector"`
 }
@@ -100,6 +105,9 @@ func (in *ObjectReferenceStatus) ParseFromString(value string) error {
 			in.Message = v
 		case "Type":
 			in.Type = v
+		case "Scope":
+			in.Scope = api.ResourceScope(v)
+
 		default:
 			return fmt.Errorf("unrecognized marker: %s", k)
 		}

@@ -30,9 +30,8 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       serviceAccountName: {{ include "capsule.serviceAccountName" . }}
-      {{- with .Values.podSecurityContext }}
-      securityContext:
-        {{- toYaml . | nindent 8 }}
+      {{- if .Values.podSecurityContext.enabled }}
+      securityContext: {{- omit .Values.podSecurityContext "enabled" | toYaml | nindent 8 }}
       {{- end }}
       {{- if .Values.manager.hostNetwork }}
       hostNetwork: true
@@ -87,7 +86,8 @@ spec:
             readOnly: true
           resources:
             {{- toYaml .Values.manager.resources | nindent 12 }}
-          securityContext:
-            {{- toYaml .Values.securityContext | nindent 12 }}
+          {{- if .Values.securityContext.enabled }}
+          securityContext: {{- omit .Values.securityContext "enabled" | toYaml | nindent 12 }}
+          {{- end }}
   {{- end }}
 {{- end }}

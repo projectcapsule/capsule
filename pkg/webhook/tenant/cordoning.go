@@ -1,4 +1,4 @@
-// Copyright 2020-2023 Project Capsule Authors.
+// Copyright 2020-2025 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package tenant
@@ -62,7 +62,7 @@ func (h *cordoningHandler) cordonHandler(ctx context.Context, clt client.Client,
 	}
 
 	tnt := tntList.Items[0]
-	if tnt.Spec.Cordoned && utils.IsCapsuleUser(ctx, req, clt, h.configuration.UserGroups()) {
+	if tnt.Spec.Cordoned && utils.IsCapsuleUser(ctx, req, clt, h.configuration.UserNames(), h.configuration.UserGroups(), h.configuration.IgnoreUserWithGroups()) {
 		recorder.Eventf(&tnt, corev1.EventTypeWarning, "TenantFreezed", "%s %s/%s cannot be %sd, current Tenant is freezed", req.Kind.String(), req.Namespace, req.Name, strings.ToLower(string(req.Operation)))
 
 		response := admission.Denied(fmt.Sprintf("tenant %s is freezed: please, reach out to the system administrator", tnt.GetName()))

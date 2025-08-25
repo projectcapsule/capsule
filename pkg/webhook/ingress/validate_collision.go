@@ -1,4 +1,4 @@
-// Copyright 2020-2023 Project Capsule Authors.
+// Copyright 2020-2025 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package ingress
@@ -74,7 +74,6 @@ func (r *collision) validate(ctx context.Context, client client.Client, req admi
 	}
 
 	var collisionErr *ingressHostnameCollisionError
-
 	if errors.As(err, &collisionErr) {
 		recorder.Eventf(tenant, corev1.EventTypeWarning, "IngressHostnameCollision", "Ingress %s/%s hostname is colliding", ing.Namespace(), ing.Name())
 	}

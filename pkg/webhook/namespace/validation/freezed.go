@@ -1,4 +1,4 @@
-// Copyright 2020-2023 Project Capsule Authors.
+// Copyright 2020-2025 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package validation
@@ -74,7 +74,7 @@ func (r *freezedHandler) OnDelete(c client.Client, _ admission.Decoder, recorder
 
 		tnt := tntList.Items[0]
 
-		if tnt.Spec.Cordoned && utils.IsCapsuleUser(ctx, req, c, r.configuration.UserGroups()) {
+		if tnt.Spec.Cordoned && utils.IsCapsuleUser(ctx, req, c, r.configuration.UserNames(), r.configuration.UserGroups(), r.configuration.IgnoreUserWithGroups()) {
 			recorder.Eventf(&tnt, corev1.EventTypeWarning, "TenantFreezed", "Namespace %s cannot be deleted, the current Tenant is freezed", req.Name)
 
 			response := admission.Denied("the selected Tenant is freezed")
@@ -106,7 +106,7 @@ func (r *freezedHandler) OnUpdate(c client.Client, decoder admission.Decoder, re
 
 		tnt := tntList.Items[0]
 
-		if tnt.Spec.Cordoned && utils.IsCapsuleUser(ctx, req, c, r.configuration.UserGroups()) {
+		if tnt.Spec.Cordoned && utils.IsCapsuleUser(ctx, req, c, r.configuration.UserNames(), r.configuration.UserGroups(), r.configuration.IgnoreUserWithGroups()) {
 			recorder.Eventf(&tnt, corev1.EventTypeWarning, "TenantFreezed", "Namespace %s cannot be updated, the current Tenant is freezed", ns.GetName())
 
 			response := admission.Denied("the selected Tenant is freezed")

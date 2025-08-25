@@ -1,4 +1,4 @@
-// Copyright 2020-2023 Project Capsule Authors.
+// Copyright 2020-2025 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package utils
@@ -16,7 +16,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/utils"
 )
 
-func IsCapsuleUser(ctx context.Context, req admission.Request, clt client.Client, userGroups []string) bool {
+func IsCapsuleUser(ctx context.Context, req admission.Request, clt client.Client, users []string, userGroups []string, ignoreGroups []string) bool {
 	groupList := utils.NewUserGroupList(req.UserInfo.Groups)
 	// if the user is a ServiceAccount belonging to the kube-system namespace, definitely, it's not a Capsule user
 	// and we can skip the check in case of Capsule user group assigned to system:authenticated
@@ -24,6 +24,7 @@ func IsCapsuleUser(ctx context.Context, req admission.Request, clt client.Client
 	if groupList.Find("system:serviceaccounts:kube-system") {
 		return false
 	}
+
 	//nolint:nestif
 	if sets.NewString(req.UserInfo.Groups...).Has("system:serviceaccounts") {
 		parts := strings.Split(req.UserInfo.Username, ":")
@@ -44,8 +45,20 @@ func IsCapsuleUser(ctx context.Context, req admission.Request, clt client.Client
 
 	for _, group := range userGroups {
 		if groupList.Find(group) {
+			if len(ignoreGroups) > 0 {
+				for _, ignoreGroup := range ignoreGroups {
+					if groupList.Find(ignoreGroup) {
+						return false
+					}
+				}
+			}
+
 			return true
 		}
+	}
+
+	if len(users) > 0 && sets.New[string](users...).Has(req.UserInfo.Username) {
+		return true
 	}
 
 	return false

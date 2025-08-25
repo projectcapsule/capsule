@@ -1,4 +1,4 @@
-// Copyright 2020-2023 Project Capsule Authors.
+// Copyright 2020-2025 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package configuration
@@ -100,6 +100,14 @@ func (c *capsuleConfiguration) ValidatingWebhookConfigurationName() (name string
 
 func (c *capsuleConfiguration) UserGroups() []string {
 	return c.retrievalFn().Spec.UserGroups
+}
+
+func (c *capsuleConfiguration) UserNames() []string {
+	return c.retrievalFn().Spec.UserNames
+}
+
+func (c *capsuleConfiguration) IgnoreUserWithGroups() []string {
+	return c.retrievalFn().Spec.IgnoreUserWithGroups
 }
 
 func (c *capsuleConfiguration) ForbiddenUserNodeLabels() *capsuleapi.ForbiddenListSpec {

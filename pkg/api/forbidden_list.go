@@ -1,4 +1,4 @@
-// Copyright 2020-2023 Project Capsule Authors.
+// Copyright 2020-2025 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package api
@@ -86,6 +86,7 @@ func ValidateForbidden(metadata map[string]string, forbiddenList ForbiddenListSp
 
 	for key := range metadata {
 		var forbidden, matched bool
+
 		forbidden = forbiddenList.ExactMatch(key)
 		matched = forbiddenList.RegexMatch(key)
 

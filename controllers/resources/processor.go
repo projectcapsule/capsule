@@ -1,4 +1,4 @@
-// Copyright 2020-2023 Project Capsule Authors.
+// Copyright 2020-2025 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package resources
@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/rs/zerolog/log"
 	"github.com/valyala/fasttemplate"
 	corev1 "k8s.io/api/core/v1"
 	apierr "k8s.io/apimachinery/pkg/api/errors"
@@ -25,6 +24,7 @@ import (
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/meta"
 )
 
@@ -41,7 +41,13 @@ func prepareAdditionalMetadata(m map[string]string) map[string]string {
 		return make(map[string]string)
 	}
 
-	return m
+	// we need to create a new map to avoid modifying the original one
+	copied := make(map[string]string, len(m))
+	for k, v := range m {
+		copied[k] = v
+	}
+
+	return copied
 }
 
 func (r *Processor) HandlePruning(
@@ -107,7 +113,7 @@ func (r *Processor) HandlePruning(
 }
 
 //nolint:gocognit
-func (r *Processor) HandleNamespaceSection(
+func (r *Processor) HandleSectionPreflight(
 	ctx context.Context,
 	c client.Client,
 	tnt capsulev1beta2.Tenant,
@@ -115,57 +121,79 @@ func (r *Processor) HandleNamespaceSection(
 	tenantLabel string,
 	resourceIndex int,
 	spec capsulev1beta2.ResourceSpec,
-) ([]string, error) {
+	scope api.ResourceScope,
+) (processed []string, err error) {
+	log := ctrllog.FromContext(ctx)
 
-	var err error
-	// Creating Namespace selector
-	var selector labels.Selector
+	switch scope {
+	case api.ResourceScopeTenant:
+		return r.handleSection(
+			ctx,
+			c,
+			tnt,
+			allowCrossNamespaceSelection,
+			tenantLabel,
+			resourceIndex,
+			spec,
+			api.ResourceScopeTenant,
+			nil)
+	default:
 
-	if spec.NamespaceSelector != nil {
-		selector, err = metav1.LabelSelectorAsSelector(spec.NamespaceSelector)
+		// Creating Namespace selector
+		var selector labels.Selector
+
+		if spec.NamespaceSelector != nil {
+			selector, err = metav1.LabelSelectorAsSelector(spec.NamespaceSelector)
+			if err != nil {
+				log.Error(err, "cannot create Namespace selector for Namespace filtering and resource replication", "index", resourceIndex)
+
+				return nil, err
+			}
+		} else {
+			selector = labels.NewSelector()
+		}
+		// Resources can be replicated only on Namespaces belonging to the same Global:
+		// preventing a boundary cross by enforcing the selection.
+		tntRequirement, err := labels.NewRequirement(tenantLabel, selection.Equals, []string{tnt.GetName()})
 		if err != nil {
-			log.Error(err, "cannot create Namespace selector for Namespace filtering and resource replication", "index", resourceIndex)
+			log.Error(err, "unable to create requirement for Namespace filtering and resource replication", "index", resourceIndex)
 
 			return nil, err
 		}
-	} else {
-		selector = labels.NewSelector()
-	}
-	// Resources can be replicated only on Namespaces belonging to the same Global:
-	// preventing a boundary cross by enforcing the selection.
-	tntRequirement, err := labels.NewRequirement(tenantLabel, selection.Equals, []string{tnt.GetName()})
-	if err != nil {
-		log.Error(err, "unable to create requirement for Namespace filtering and resource replication", "index", resourceIndex)
 
-		return nil, err
-	}
+		selector = selector.Add(*tntRequirement)
+		// Selecting the targeted Namespace according to the TenantResource specification.
+		namespaces := corev1.NamespaceList{}
+		if err = r.client.List(ctx, &namespaces, client.MatchingLabelsSelector{Selector: selector}); err != nil {
+			log.Error(err, "cannot retrieve Namespaces for resource", "index", resourceIndex)
 
-	selector = selector.Add(*tntRequirement)
-	// Selecting the targeted Namespace according to the TenantResource specification.
-	namespaces := corev1.NamespaceList{}
-	if err = r.client.List(ctx, &namespaces, client.MatchingLabelsSelector{Selector: selector}); err != nil {
-		log.Error(err, "cannot retrieve Namespaces for resource", "index", resourceIndex)
+			return nil, err
+		}
 
-		return nil, err
-	}
+		for _, ns := range namespaces.Items {
+			p, perr := r.handleSection(
+				ctx,
+				c,
+				tnt,
+				allowCrossNamespaceSelection,
+				tenantLabel,
+				resourceIndex,
+				spec,
+				api.ResourceScopeNamespace,
+				&ns)
+			if perr != nil {
+				err = errors.Join(err, perr)
+			}
 
-	for _, ns := range namespaces.Items {
-       r.HandleSection(
-		ctx,
-		c,
-		tnt,
-		allowCrossNamespaceSelection,
-		tenantLabel,
-		resourceIndex,
-		spec,
-		ns
-	   )
+			processed = append(processed, p...)
+		}
 	}
 
+	return
 }
 
 //nolint:gocognit
-func (r *Processor) HandleSection(
+func (r *Processor) handleSection(
 	ctx context.Context,
 	c client.Client,
 	tnt capsulev1beta2.Tenant,
@@ -173,7 +201,8 @@ func (r *Processor) HandleSection(
 	tenantLabel string,
 	resourceIndex int,
 	spec capsulev1beta2.ResourceSpec,
-	ns *corev1.Namespace
+	scope api.ResourceScope,
+	ns *corev1.Namespace,
 ) ([]string, error) {
 	log := ctrllog.FromContext(ctx)
 
@@ -199,151 +228,164 @@ func (r *Processor) HandleSection(
 
 	codecFactory := serializer.NewCodecFactory(r.client.Scheme())
 
-	for _, ns := range namespaces.Items {
-		for nsIndex, item := range spec.NamespacedItems {
-			keysAndValues := []any{"index", nsIndex, "namespace", item.Namespace}
-			// A TenantResource is created by a TenantOwner, and potentially, they could point to a resource in a non-owned
-			// Namespace: this must be blocked by checking it this is the case.
-			if !allowCrossNamespaceSelection && !tntNamespaces.Has(item.Namespace) {
-				log.Info("skipping processing of namespacedItem, referring a Namespace that is not part of the given Tenant", keysAndValues...)
+	for nsIndex, item := range spec.NamespacedItems {
+		keysAndValues := []any{"index", nsIndex, "namespace", item.Namespace}
+		// A TenantResource is created by a TenantOwner, and potentially, they could point to a resource in a non-owned
+		// Namespace: this must be blocked by checking it this is the case.
+		if !allowCrossNamespaceSelection && !tntNamespaces.Has(item.Namespace) {
+			log.Info("skipping processing of namespacedItem, referring a Namespace that is not part of the given Tenant", keysAndValues...)
 
-				continue
-			}
-			// Namespaced Items are relying on selecting resources, rather than specifying a specific name:
-			// creating it to get used by the client List action.
-			objSelector := item.Selector
+			continue
+		}
+		// Namespaced Items are relying on selecting resources, rather than specifying a specific name:
+		// creating it to get used by the client List action.
+		objSelector := item.Selector
 
-			itemSelector, selectorErr := metav1.LabelSelectorAsSelector(&objSelector)
-			if selectorErr != nil {
-				log.Error(selectorErr, "cannot create Selector for namespacedItem", keysAndValues...)
+		itemSelector, selectorErr := metav1.LabelSelectorAsSelector(&objSelector)
+		if selectorErr != nil {
+			log.Error(selectorErr, "cannot create Selector for namespacedItem", keysAndValues...)
 
-				syncErr = errors.Join(syncErr, selectorErr)
+			syncErr = errors.Join(syncErr, selectorErr)
 
-				continue
-			}
-
-			objs := unstructured.UnstructuredList{}
-			objs.SetGroupVersionKind(schema.FromAPIVersionAndKind(item.APIVersion, fmt.Sprintf("%sList", item.Kind)))
-
-			if clientErr := c.List(ctx, &objs, client.InNamespace(item.Namespace), client.MatchingLabelsSelector{Selector: itemSelector}); clientErr != nil {
-				log.Error(clientErr, "cannot retrieve object for namespacedItem", keysAndValues...)
-
-				syncErr = errors.Join(syncErr, clientErr)
-
-				continue
-			}
-
-			var wg sync.WaitGroup
-
-			errorsChan := make(chan error, len(objs.Items))
-			// processedRaw is used to avoid concurrent map writes during iteration of namespaced items:
-			// the objects will be then added to processed variable if the resulting string is not empty,
-			// meaning it has been processed correctly.
-			processedRaw := make([]string, len(objs.Items))
-			// Iterating over all the retrieved objects from the resource spec to get replicated in all the selected Namespaces:
-			// in case of error during the create or update function, this will be appended to the list of errors.
-			for i, o := range objs.Items {
-				obj := o
-				obj.SetNamespace(ns.Name)
-				obj.SetOwnerReferences(nil)
-
-				wg.Add(1)
-
-				go func(index int, obj unstructured.Unstructured) {
-					defer wg.Done()
-
-					kv := keysAndValues
-					kv = append(kv, "resource", fmt.Sprintf("%s/%s", obj.GetNamespace(), obj.GetNamespace()))
-
-					replicatedItem := &capsulev1beta2.ObjectReferenceStatus{}
-					replicatedItem.Name = obj.GetName()
-					replicatedItem.Kind = obj.GetKind()
-					replicatedItem.Namespace = ns.Name
-					replicatedItem.APIVersion = obj.GetAPIVersion()
-					replicatedItem.Type = meta.ReplicationCondition
-
-					if opErr := r.createOrUpdate(ctx, c, &obj, objLabels, objAnnotations); opErr != nil {
-						log.Error(opErr, "unable to sync namespacedItems", kv...)
-						errorsChan <- opErr
-
-						replicatedItem.Status = metav1.ConditionFalse
-						replicatedItem.Message = opErr.Error()
-					} else {
-						replicatedItem.Status = metav1.ConditionTrue
-					}
-
-					log.Info("resource has been replicated", kv...)
-
-					processedRaw[index] = replicatedItem.String()
-
-					return
-				}(i, obj)
-			}
-
-			wg.Wait()
-			close(errorsChan)
-
-			for err := range errorsChan {
-				if err != nil {
-					syncErr = errors.Join(syncErr, err)
-				}
-			}
-
-			for _, p := range processedRaw {
-				if p == "" {
-					continue
-				}
-
-				processed.Insert(p)
-			}
+			continue
 		}
 
-		for rawIndex, item := range spec.RawItems {
-			template := string(item.Raw)
+		objs := unstructured.UnstructuredList{}
+		objs.SetGroupVersionKind(schema.FromAPIVersionAndKind(item.APIVersion, fmt.Sprintf("%sList", item.Kind)))
 
-			t := fasttemplate.New(template, "{{ ", " }}")
+		if clientErr := c.List(ctx, &objs, client.InNamespace(item.Namespace), client.MatchingLabelsSelector{Selector: itemSelector}); clientErr != nil {
+			log.Error(clientErr, "cannot retrieve object for namespacedItem", keysAndValues...)
 
-			tmplString := t.ExecuteString(map[string]interface{}{
-				"tenant.name": tnt.Name,
-				"namespace":   ns.Name,
-			})
+			syncErr = errors.Join(syncErr, clientErr)
 
-			obj, keysAndValues := unstructured.Unstructured{}, []interface{}{"index", rawIndex}
+			continue
+		}
 
-			if _, _, decodeErr := codecFactory.UniversalDeserializer().Decode([]byte(tmplString), nil, &obj); decodeErr != nil {
-				log.Error(decodeErr, "unable to deserialize rawItem", keysAndValues...)
+		var wg sync.WaitGroup
 
-				syncErr = errors.Join(syncErr, decodeErr)
-
-				continue
-			}
-
+		errorsChan := make(chan error, len(objs.Items))
+		// processedRaw is used to avoid concurrent map writes during iteration of namespaced items:
+		// the objects will be then added to processed variable if the resulting string is not empty,
+		// meaning it has been processed correctly.
+		processedRaw := make([]string, len(objs.Items))
+		// Iterating over all the retrieved objects from the resource spec to get replicated in all the selected Namespaces:
+		// in case of error during the create or update function, this will be appended to the list of errors.
+		for i, o := range objs.Items {
+			obj := o
 			obj.SetNamespace(ns.Name)
+			obj.SetOwnerReferences(nil)
 
-			replicatedItem := &capsulev1beta2.ObjectReferenceStatus{}
-			replicatedItem.Name = obj.GetName()
-			replicatedItem.Kind = obj.GetKind()
-			replicatedItem.Namespace = ns.Name
-			replicatedItem.APIVersion = obj.GetAPIVersion()
-			replicatedItem.Type = meta.ReplicationCondition
+			wg.Add(1)
 
-			if rawErr := r.createOrUpdate(ctx, c, &obj, objLabels, objAnnotations); rawErr != nil {
-				log.Info("unable to sync rawItem", keysAndValues...)
+			go func(index int, obj unstructured.Unstructured) {
+				defer wg.Done()
 
-				replicatedItem.Status = metav1.ConditionFalse
-				replicatedItem.Message = rawErr.Error()
+				kv := keysAndValues
+				kv = append(kv, "resource", fmt.Sprintf("%s/%s", obj.GetNamespace(), obj.GetNamespace()))
 
-				// In case of error processing an item in one of any selected Namespaces, storing it to report it lately
-				// to the upper call to ensure a partial sync that will be fixed by a subsequent reconciliation.
-				syncErr = errors.Join(syncErr, rawErr)
-			} else {
-				log.Info("resource has been replicated", keysAndValues...)
+				replicatedItem := &capsulev1beta2.ObjectReferenceStatus{}
+				replicatedItem.Name = obj.GetName()
+				replicatedItem.Kind = obj.GetKind()
+				replicatedItem.APIVersion = obj.GetAPIVersion()
+				replicatedItem.Type = meta.ReplicationCondition
+				replicatedItem.Scope = scope
 
-				replicatedItem.Status = metav1.ConditionTrue
+				if ns != nil {
+					replicatedItem.Namespace = ns.Name
+				}
+
+				if opErr := r.createOrUpdate(ctx, c, &obj, objLabels, objAnnotations); opErr != nil {
+					log.Error(opErr, "unable to sync namespacedItems", kv...)
+					errorsChan <- opErr
+
+					replicatedItem.Status = metav1.ConditionFalse
+					replicatedItem.Message = opErr.Error()
+				} else {
+					replicatedItem.Status = metav1.ConditionTrue
+				}
+
+				log.Info("resource has been replicated", kv...)
+
+				processedRaw[index] = replicatedItem.String()
+
+				return
+			}(i, obj)
+		}
+
+		wg.Wait()
+		close(errorsChan)
+
+		for err := range errorsChan {
+			if err != nil {
+				syncErr = errors.Join(syncErr, err)
+			}
+		}
+
+		for _, p := range processedRaw {
+			if p == "" {
+				continue
 			}
 
-			processed.Insert(replicatedItem.String())
+			processed.Insert(p)
 		}
+	}
+
+	for rawIndex, item := range spec.RawItems {
+		template := string(item.Raw)
+
+		t := fasttemplate.New(template, "{{ ", " }}")
+
+		tContext := map[string]interface{}{
+			"tenant.name": tnt.Name,
+		}
+		if ns != nil {
+			tContext["namespace"] = ns.Name
+		}
+
+		tmplString := t.ExecuteString(tContext)
+
+		obj, keysAndValues := unstructured.Unstructured{}, []interface{}{"index", rawIndex}
+
+		if _, _, decodeErr := codecFactory.UniversalDeserializer().Decode([]byte(tmplString), nil, &obj); decodeErr != nil {
+			log.Error(decodeErr, "unable to deserialize rawItem", keysAndValues...)
+
+			syncErr = errors.Join(syncErr, decodeErr)
+
+			continue
+		}
+
+		if ns != nil {
+			obj.SetNamespace(ns.Name)
+		}
+
+		replicatedItem := &capsulev1beta2.ObjectReferenceStatus{}
+		replicatedItem.Name = obj.GetName()
+		replicatedItem.Kind = obj.GetKind()
+		replicatedItem.Namespace = ns.Name
+		replicatedItem.APIVersion = obj.GetAPIVersion()
+		replicatedItem.Type = meta.ReplicationCondition
+		replicatedItem.Scope = scope
+
+		if ns != nil {
+			replicatedItem.Namespace = ns.Name
+		}
+
+		if rawErr := r.createOrUpdate(ctx, c, &obj, objLabels, objAnnotations); rawErr != nil {
+			log.Info("unable to sync rawItem", keysAndValues...)
+
+			replicatedItem.Status = metav1.ConditionFalse
+			replicatedItem.Message = rawErr.Error()
+
+			// In case of error processing an item in one of any selected Namespaces, storing it to report it lately
+			// to the upper call to ensure a partial sync that will be fixed by a subsequent reconciliation.
+			syncErr = errors.Join(syncErr, rawErr)
+		} else {
+			log.Info("resource has been replicated", keysAndValues...)
+
+			replicatedItem.Status = metav1.ConditionTrue
+		}
+
+		processed.Insert(replicatedItem.String())
 	}
 
 	return processed.List(), syncErr

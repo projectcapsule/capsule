@@ -1,4 +1,4 @@
-// Copyright 2020-2023 Project Capsule Authors.
+// Copyright 2020-2025 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package configuration
@@ -25,7 +25,9 @@ type Configuration interface {
 	MutatingWebhookConfigurationName() string
 	ValidatingWebhookConfigurationName() string
 	TenantCRDName() string
+	UserNames() []string
 	UserGroups() []string
+	IgnoreUserWithGroups() []string
 	ForbiddenUserNodeLabels() *capsuleapi.ForbiddenListSpec
 	ForbiddenUserNodeAnnotations() *capsuleapi.ForbiddenListSpec
 	ServiceAccountClientProperties() *capsuleapi.ServiceAccountClient

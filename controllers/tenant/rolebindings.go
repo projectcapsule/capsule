@@ -1,4 +1,4 @@
-// Copyright 2020-2023 Project Capsule Authors.
+// Copyright 2020-2025 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package tenant
@@ -128,6 +128,7 @@ func (r *Manager) syncAdditionalRoleBinding(ctx context.Context, tenant *capsule
 		}
 
 		var res controllerutil.OperationResult
+
 		res, err = controllerutil.CreateOrUpdate(ctx, r.Client, target, func() error {
 			if target.Labels == nil {
 				target.Labels = map[string]string{}

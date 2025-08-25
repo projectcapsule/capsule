@@ -12,6 +12,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api"
@@ -19,6 +20,8 @@ import (
 )
 
 var _ = Describe("modifying node labels and annotations", Label("config", "nodes"), func() {
+	originConfig := &capsulev1beta2.CapsuleConfiguration{}
+
 	tnt := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "tenant-node-user-metadata-forbidden",
@@ -72,6 +75,8 @@ var _ = Describe("modifying node labels and annotations", Label("config", "nodes
 			Skip(fmt.Sprintf("Node webhook is disabled for current version %s", version.String()))
 		}
 
+		Expect(k8sClient.Get(context.Background(), client.ObjectKey{Name: defaultConfigurationName}, originConfig)).To(Succeed())
+
 		EventuallyCreation(func() error {
 			tnt.ResourceVersion = ""
 			return k8sClient.Create(context.TODO(), tnt)
@@ -110,6 +115,17 @@ var _ = Describe("modifying node labels and annotations", Label("config", "nodes
 				return k8sClient.Update(context.Background(), node)
 			})
 		}).Should(Succeed())
+
+		// Restore Configuration
+		Eventually(func() error {
+			c := &capsulev1beta2.CapsuleConfiguration{}
+			if err := k8sClient.Get(context.Background(), client.ObjectKey{Name: originConfig.Name}, c); err != nil {
+				return err
+			}
+			// Apply the initial configuration from originConfig to c
+			c.Spec = originConfig.Spec
+			return k8sClient.Update(context.Background(), c)
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 	})
 
 	It("should allow", func() {
@@ -171,6 +187,19 @@ var _ = Describe("modifying node labels and annotations", Label("config", "nodes
 		})
 	})
 	It("should fail", func() {
+		ModifyCapsuleConfigurationOpts(func(configuration *capsulev1beta2.CapsuleConfiguration) {
+			configuration.Spec.NodeMetadata = &capsulev1beta2.NodeMetadata{
+				ForbiddenLabels: api.ForbiddenListSpec{
+					Exact: []string{"foo", "bar"},
+					Regex: "^gatsby-.*$",
+				},
+				ForbiddenAnnotations: api.ForbiddenListSpec{
+					Exact: []string{"foo", "bar"},
+					Regex: "^gatsby-.*$",
+				},
+			}
+		})
+
 		Expect(ModifyNode(func(node *corev1.Node) error {
 			node.Labels["foo"] = "bar"
 			node.Labels["gatsby-foo"] = "bar"

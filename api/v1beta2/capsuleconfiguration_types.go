@@ -1,4 +1,4 @@
-// Copyright 2020-2023 Project Capsule Authors.
+// Copyright 2020-2025 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package v1beta2
@@ -11,9 +11,14 @@ import (
 
 // CapsuleConfigurationSpec defines the Capsule configuration.
 type CapsuleConfigurationSpec struct {
-	// Names of the groups for Capsule users.
+	// Names of the users considered as Capsule users.
+	UserNames []string `json:"userNames,omitempty"`
+	// Names of the groups considered as Capsule users.
 	// +kubebuilder:default={capsule.clastix.io}
 	UserGroups []string `json:"userGroups,omitempty"`
+	// Define groups which when found in the request of a user will be ignored by the Capsule
+	// this might be useful if you have one group where all the users are in, but you want to separate administrators from normal users with additional groups.
+	IgnoreUserWithGroups []string `json:"ignoreUserWithGroups,omitempty"`
 	// Enforces the Tenant owner, during Namespace creation, to name it using the selected Tenant name as prefix,
 	// separated by a dash. This is useful to avoid Namespace name collision in a public CaaS environment.
 	// +kubebuilder:default=false
@@ -73,7 +78,8 @@ type CapsuleConfiguration struct {
 type CapsuleConfigurationList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []CapsuleConfiguration `json:"items"`
+
+	Items []CapsuleConfiguration `json:"items"`
 }
 
 func init() {

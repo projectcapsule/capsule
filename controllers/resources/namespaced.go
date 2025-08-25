@@ -1,4 +1,4 @@
-// Copyright 2020-2023 Project Capsule Authors.
+// Copyright 2020-2025 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package resources
@@ -26,6 +26,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/configuration"
 	"github.com/projectcapsule/capsule/pkg/metrics"
 	"github.com/projectcapsule/capsule/pkg/utils"
@@ -202,7 +203,7 @@ func (r *namespacedResourceController) reconcileNormal(
 	var itemErrors error
 
 	for index, resource := range tntResource.Spec.Resources {
-		items, sectionErr := r.processor.HandleSection(ctx, c, tl.Items[0], false, tenantLabel, index, resource)
+		items, sectionErr := r.processor.HandleSectionPreflight(ctx, c, tl.Items[0], false, tenantLabel, index, resource, api.ResourceScopeNamespace)
 		if sectionErr != nil {
 			// Upon a process error storing the last error occurred and continuing to iterate,
 			// avoid to block the whole processing.

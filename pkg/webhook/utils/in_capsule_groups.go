@@ -1,4 +1,4 @@
-// Copyright 2020-2023 Project Capsule Authors.
+// Copyright 2020-2025 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package utils
@@ -26,9 +26,10 @@ type handler struct {
 	handlers      []webhook.Handler
 }
 
+//nolint:dupl
 func (h *handler) OnCreate(client client.Client, decoder admission.Decoder, recorder record.EventRecorder) webhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		if !IsCapsuleUser(ctx, req, client, h.configuration.UserGroups()) {
+		if !IsCapsuleUser(ctx, req, client, h.configuration.UserNames(), h.configuration.UserGroups(), h.configuration.IgnoreUserWithGroups()) {
 			return nil
 		}
 
@@ -42,9 +43,10 @@ func (h *handler) OnCreate(client client.Client, decoder admission.Decoder, reco
 	}
 }
 
+//nolint:dupl
 func (h *handler) OnDelete(client client.Client, decoder admission.Decoder, recorder record.EventRecorder) webhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		if !IsCapsuleUser(ctx, req, client, h.configuration.UserGroups()) {
+		if !IsCapsuleUser(ctx, req, client, h.configuration.UserNames(), h.configuration.UserGroups(), h.configuration.IgnoreUserWithGroups()) {
 			return nil
 		}
 
@@ -58,9 +60,10 @@ func (h *handler) OnDelete(client client.Client, decoder admission.Decoder, reco
 	}
 }
 
+//nolint:dupl
 func (h *handler) OnUpdate(client client.Client, decoder admission.Decoder, recorder record.EventRecorder) webhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		if !IsCapsuleUser(ctx, req, client, h.configuration.UserGroups()) {
+		if !IsCapsuleUser(ctx, req, client, h.configuration.UserNames(), h.configuration.UserGroups(), h.configuration.IgnoreUserWithGroups()) {
 			return nil
 		}
 

@@ -13,13 +13,28 @@ metadata:
     {{- toYaml . | nindent 4 }}
   {{- end }}
 webhooks:
-{{- with .Values.webhooks.hooks.defaults.pods }}
-- admissionReviewVersions:
+{{- with (mergeOverwrite .Values.webhooks.hooks.pods .Values.webhooks.hooks.defaults.pods) }}
+  {{- if .enabled }}
+- name: pod.defaults.projectcapsule.dev
+  admissionReviewVersions:
   - v1
   clientConfig:
     {{- include "capsule.webhooks.service" (dict "path" "/defaults" "ctx" $) | nindent 4 }}
   failurePolicy: {{ .failurePolicy }}
-  name: pod.defaults.projectcapsule.dev
+  matchPolicy: {{ .matchPolicy }}
+  reinvocationPolicy: {{ .reinvocationPolicy }}
+  {{- with .namespaceSelector }}
+  namespaceSelector:
+    {{- toYaml . |  nindent 4 }}
+  {{- end }}
+  {{- with .objectSelector }}
+  objectSelector:
+    {{- toYaml . |  nindent 4 }}
+  {{- end }}
+  {{- with .matchConditions }}
+  matchConditions:
+    {{- toYaml . |  nindent 4 }}
+  {{- end }}
   rules:
   - apiGroups:
     - ""
@@ -30,18 +45,32 @@ webhooks:
     resources:
     - pods
     scope: "Namespaced"
-  namespaceSelector:
-  {{- toYaml .namespaceSelector | nindent 4}}
   sideEffects: None
   timeoutSeconds: {{ $.Values.webhooks.mutatingWebhooksTimeoutSeconds }}
+  {{- end }}
 {{- end }}
-{{- with .Values.webhooks.hooks.defaults.pvc }}
-- admissionReviewVersions:
+{{- with (mergeOverwrite .Values.webhooks.hooks.persistentvolumeclaims .Values.webhooks.hooks.defaults.pvc) }}
+  {{- if .enabled }}
+- name: storage.defaults.projectcapsule.dev
+  admissionReviewVersions:
   - v1
   clientConfig:
     {{- include "capsule.webhooks.service" (dict "path" "/defaults" "ctx" $) | nindent 4 }}
   failurePolicy: {{ .failurePolicy }}
-  name: storage.defaults.projectcapsule.dev
+  matchPolicy: {{ .matchPolicy }}
+  reinvocationPolicy: {{ .reinvocationPolicy }}
+  {{- with .namespaceSelector }}
+  namespaceSelector:
+    {{- toYaml . |  nindent 4 }}
+  {{- end }}
+  {{- with .objectSelector }}
+  objectSelector:
+    {{- toYaml . |  nindent 4 }}
+  {{- end }}
+  {{- with .matchConditions }}
+  matchConditions:
+    {{- toYaml . |  nindent 4 }}
+  {{- end }}
   rules:
   - apiGroups:
     - ""
@@ -52,18 +81,32 @@ webhooks:
     resources:
     - persistentvolumeclaims
     scope: "Namespaced"
-  namespaceSelector:
-  {{- toYaml .namespaceSelector | nindent 4}}
   sideEffects: None
   timeoutSeconds: {{ $.Values.webhooks.mutatingWebhooksTimeoutSeconds }}
+  {{- end }}
 {{- end }}
-{{- with .Values.webhooks.hooks.defaults.ingress }}
-- admissionReviewVersions:
+{{- with (mergeOverwrite .Values.webhooks.hooks.ingresses .Values.webhooks.hooks.defaults.ingress) }}
+  {{- if .enabled }}
+- name: ingress.defaults.projectcapsule.dev
+  admissionReviewVersions:
   - v1
   clientConfig:
     {{- include "capsule.webhooks.service" (dict "path" "/defaults" "ctx" $) | nindent 4 }}
   failurePolicy: {{ .failurePolicy }}
-  name: ingress.defaults.projectcapsule.dev
+  matchPolicy: {{ .matchPolicy }}
+  reinvocationPolicy: {{ .reinvocationPolicy }}
+  {{- with .namespaceSelector }}
+  namespaceSelector:
+    {{- toYaml . |  nindent 4 }}
+  {{- end }}
+  {{- with .objectSelector }}
+  objectSelector:
+    {{- toYaml . |  nindent 4 }}
+  {{- end }}
+  {{- with .matchConditions }}
+  matchConditions:
+    {{- toYaml . |  nindent 4 }}
+  {{- end }}
   rules:
   - apiGroups:
     - networking.k8s.io
@@ -76,18 +119,32 @@ webhooks:
     resources:
     - ingresses
     scope: "Namespaced"
-  namespaceSelector:
-  {{- toYaml .namespaceSelector | nindent 4}}
   sideEffects: None
   timeoutSeconds: {{ $.Values.webhooks.mutatingWebhooksTimeoutSeconds }}
+  {{- end }}
 {{- end }}
 {{- with .Values.webhooks.hooks.gateways }}
-- admissionReviewVersions:
+  {{- if .enabled }}
+- name: gateway.defaults.projectcapsule.dev
+  admissionReviewVersions:
   - v1
   clientConfig:
     {{- include "capsule.webhooks.service" (dict "path" "/defaults" "ctx" $) | nindent 4 }}
   failurePolicy: {{ .failurePolicy }}
-  name: gateway.defaults.projectcapsule.dev
+  matchPolicy: {{ .matchPolicy }}
+  reinvocationPolicy: {{ .reinvocationPolicy }}
+  {{- with .namespaceSelector }}
+  namespaceSelector:
+    {{- toYaml . |  nindent 4 }}
+  {{- end }}
+  {{- with .objectSelector }}
+  objectSelector:
+    {{- toYaml . |  nindent 4 }}
+  {{- end }}
+  {{- with .matchConditions }}
+  matchConditions:
+    {{- toYaml . |  nindent 4 }}
+  {{- end }}
   rules:
   - apiGroups:
     - gateway.networking.k8s.io
@@ -99,20 +156,21 @@ webhooks:
     resources:
     - gateways
     scope: "Namespaced"
-  namespaceSelector:
-  {{- toYaml .namespaceSelector | nindent 4}}
   sideEffects: None
   timeoutSeconds: {{ $.Values.webhooks.mutatingWebhooksTimeoutSeconds }}
+  {{- end }}
 {{- end }}
-{{- with (mergeOverwrite .Values.webhooks.hooks.namespace.mutation .Values.webhooks.hooks.namespaceOwnerReference) }}
-- admissionReviewVersions:
+{{- with (mergeOverwrite .Values.webhooks.hooks.namespaces .Values.webhooks.hooks.namespaceOwnerReference) }}
+  {{- if .enabled }}
+- name: namespaces.tenants.projectcapsule.dev
+  admissionReviewVersions:
     - v1
     - v1beta1
   clientConfig:
     {{- include "capsule.webhooks.service" (dict "path" "/namespace-patch" "ctx" $) | nindent 4 }}
   failurePolicy: {{ .failurePolicy }}
-  matchPolicy: Equivalent
-  name: namespace-patching.tenants.projectcapsule.dev
+  matchPolicy: {{ .matchPolicy }}
+  reinvocationPolicy: {{ .reinvocationPolicy }}
   {{- with .namespaceSelector }}
   namespaceSelector:
     {{- toYaml . |  nindent 4 }}
@@ -121,7 +179,10 @@ webhooks:
   objectSelector:
     {{- toYaml . |  nindent 4 }}
   {{- end }}
-  reinvocationPolicy: Never
+  {{- with .matchConditions }}
+  matchConditions:
+    {{- toYaml . |  nindent 4 }}
+  {{- end }}
   rules:
     - apiGroups:
         - ""
@@ -192,18 +253,30 @@ webhooks:
   sideEffects: None
   timeoutSeconds: {{ $.Values.webhooks.mutatingWebhooksTimeoutSeconds }}
   {{- end }}
-  {{- with .Values.webhooks.hooks.resourcepools.pools }}
-- admissionReviewVersions:
+{{- end }}
+{{- with .Values.webhooks.hooks.resourcepools.pools }}
+  {{- if .enabled }}
+- name: resourcepools.projectcapsule.dev
+  admissionReviewVersions:
     - v1
     - v1beta1
   clientConfig:
     {{- include "capsule.webhooks.service" (dict "path" "/resourcepool/mutating" "ctx" $) | nindent 4 }}
   failurePolicy: {{ .failurePolicy }}
   matchPolicy: {{ .matchPolicy }}
-  name: resourcepools.projectcapsule.dev
-  namespaceSelector: {{ toYaml .namespaceSelector | nindent 4 }}
-  objectSelector: {{ toYaml .objectSelector | nindent 4 }}
   reinvocationPolicy: {{ .reinvocationPolicy }}
+  {{- with .namespaceSelector }}
+  namespaceSelector:
+    {{- toYaml . |  nindent 4 }}
+  {{- end }}
+  {{- with .objectSelector }}
+  objectSelector:
+    {{- toYaml . |  nindent 4 }}
+  {{- end }}
+  {{- with .matchConditions }}
+  matchConditions:
+    {{- toYaml . |  nindent 4 }}
+  {{- end }}
   rules:
     - apiGroups:
       - "capsule.clastix.io"
@@ -218,18 +291,30 @@ webhooks:
   sideEffects: None
   timeoutSeconds: {{ $.Values.webhooks.mutatingWebhooksTimeoutSeconds }}
   {{- end }}
-  {{- with .Values.webhooks.hooks.resourcepools.claims }}
-- admissionReviewVersions:
+{{- end }}
+{{- with .Values.webhooks.hooks.resourcepools.claims }}
+  {{- if .enabled }}
+- name: resourcepoolclaims.projectcapsule.dev
+  admissionReviewVersions:
     - v1
     - v1beta1
   clientConfig:
     {{- include "capsule.webhooks.service" (dict "path" "/resourcepool/claim/mutating" "ctx" $) | nindent 4 }}
   failurePolicy: {{ .failurePolicy }}
   matchPolicy: {{ .matchPolicy }}
-  name: resourcepoolclaims.projectcapsule.dev
-  namespaceSelector: {{ toYaml .namespaceSelector | nindent 4 }}
-  objectSelector: {{ toYaml .objectSelector | nindent 4 }}
   reinvocationPolicy: {{ .reinvocationPolicy }}
+  {{- with .namespaceSelector }}
+  namespaceSelector:
+    {{- toYaml . |  nindent 4 }}
+  {{- end }}
+  {{- with .objectSelector }}
+  objectSelector:
+    {{- toYaml . |  nindent 4 }}
+  {{- end }}
+  {{- with .matchConditions }}
+  matchConditions:
+    {{- toYaml . |  nindent 4 }}
+  {{- end }}
   rules:
     - apiGroups:
       - "capsule.clastix.io"
@@ -244,4 +329,5 @@ webhooks:
   sideEffects: None
   timeoutSeconds: {{ $.Values.webhooks.mutatingWebhooksTimeoutSeconds }}
   {{- end }}
+{{- end }}
 {{- end }}

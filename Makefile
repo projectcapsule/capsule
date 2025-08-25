@@ -68,6 +68,11 @@ manifests: generate
 generate: controller-gen
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
 
+
+# Generate License Header
+license-headers: nwa
+	$(NWA) config
+
 # Helm
 SRC_ROOT = $(shell git rev-parse --show-toplevel)
 
@@ -82,7 +87,7 @@ helm-lint: ct
 	@$(CT) lint --config .github/configs/ct.yaml --validate-yaml=false --all --debug
 
 helm-schema: helm-plugin-schema
-	cd charts/capsule && $(HELM) schema -output values.schema.json
+	cd charts/capsule && $(HELM) schema --use-helm-docs
 
 helm-test: HELM_KIND_CONFIG ?= ""
 helm-test: kind
@@ -219,7 +224,12 @@ goimports:
 # Linting code as PR is expecting
 .PHONY: golint
 golint: golangci-lint
+	$(GOLANGCI_LINT) run -c .golangci.yaml --verbose
+
+.PHONY: golint-fix
+golint-fix: golangci-lint
 	$(GOLANGCI_LINT) run -c .golangci.yaml --verbose --fix
+
 
 # Running e2e tests in a KinD instance
 .PHONY: e2e
@@ -366,8 +376,15 @@ ko:
 	@test -s $(KO) && $(KO) -h | grep -q $(KO_VERSION) || \
 	$(call go-install-tool,$(KO),github.com/$(KO_LOOKUP)@$(KO_VERSION))
 
+NWA           := $(LOCALBIN)/nwa
+NWA_VERSION   := v0.7.5
+NWA_LOOKUP    := B1NARY-GR0UP/nwa
+nwa:
+	@test -s $(NWA) && $(NWA) -h | grep -q $(NWA_VERSION) || \
+	$(call go-install-tool,$(NWA),github.com/$(NWA_LOOKUP)@$(NWA_VERSION))
+
 GOLANGCI_LINT          := $(LOCALBIN)/golangci-lint
-GOLANGCI_LINT_VERSION  := v2.1.6
+GOLANGCI_LINT_VERSION  := v2.4.0
 GOLANGCI_LINT_LOOKUP   := golangci/golangci-lint
 golangci-lint: ## Download golangci-lint locally if necessary.
 	@test -s $(GOLANGCI_LINT) && $(GOLANGCI_LINT) -h | grep -q $(GOLANGCI_LINT_VERSION) || \
@@ -381,7 +398,7 @@ apidocs-gen: ## Download crdoc locally if necessary.
 	$(call go-install-tool,$(APIDOCS_GEN),fybrik.io/crdoc@$(APIDOCS_GEN_VERSION))
 
 HARPOON         := $(LOCALBIN)/harpoon
-HARPOON_VERSION := v0.10.1
+HARPOON_VERSION := v0.10.2
 HARPOON_LOOKUP  := alegrey91/harpoon
 harpoon:
 	@mkdir $(LOCALBIN)

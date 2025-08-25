@@ -1,4 +1,4 @@
-// Copyright 2020-2023 Project Capsule Authors.
+// Copyright 2020-2025 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package v1beta2
@@ -59,6 +59,7 @@ func (r *ResourcePoolClaimsList) GetClaimByUID(uid types.UID) *ResourcePoolClaim
 type ResourcePoolClaimsItem struct {
 	// Reference to the GlobalQuota being claimed from
 	api.StatusNameUID `json:",inline"`
+
 	// Claimed resources
 	Claims corev1.ResourceList `json:"claims,omitempty"`
 }

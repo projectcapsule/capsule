@@ -26,9 +26,11 @@ spec:
     {{- toYaml . | nindent 4 }}
   {{- end }}
   userGroups:
-{{- range .Values.manager.options.capsuleUserGroups }}
-    - {{ . }}
-{{- end}}
+    {{- toYaml .Values.manager.options.capsuleUserGroups  | nindent 4 }}
+  userNames:
+    {{- toYaml .Values.manager.options.userNames | nindent 4 }}
+  ignoreUserWithGroups:
+    {{- toYaml .Values.manager.options.ignoreUserWithGroups | nindent 4 }}
   protectedNamespaceRegex: {{ .Values.manager.options.protectedNamespaceRegex | quote }}
   {{- with .Values.manager.options.nodeMetadata }}
   nodeMetadata:

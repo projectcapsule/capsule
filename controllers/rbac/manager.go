@@ -1,4 +1,4 @@
-// Copyright 2020-2023 Project Capsule Authors.
+// Copyright 2020-2025 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package rbac
@@ -53,7 +53,6 @@ func (r *Manager) SetupWithManager(ctx context.Context, mgr ctrl.Manager, config
 				}
 			},
 		}).Complete(r)
-
 	if crbErr != nil {
 		err = errors.Join(err, crbErr)
 	}
@@ -102,6 +101,13 @@ func (r *Manager) EnsureClusterRoleBindings(ctx context.Context) (err error) {
 			crb.Subjects = append(crb.Subjects, rbacv1.Subject{
 				Kind: "Group",
 				Name: group,
+			})
+		}
+
+		for _, user := range r.Configuration.UserNames() {
+			crb.Subjects = append(crb.Subjects, rbacv1.Subject{
+				Kind: "User",
+				Name: user,
 			})
 		}
 

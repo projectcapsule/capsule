@@ -1,4 +1,4 @@
-// Copyright 2020-2023 Project Capsule Authors.
+// Copyright 2020-2025 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package v1beta2
@@ -50,7 +50,8 @@ type ResourcePoolClaim struct {
 type ResourcePoolClaimList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []ResourcePoolClaim `json:"items"`
+
+	Items []ResourcePoolClaim `json:"items"`
 }
 
 func init() {
