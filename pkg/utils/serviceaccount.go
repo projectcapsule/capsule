@@ -36,10 +36,8 @@ func ImpersonatedKubernetesClientForServiceAccount(
 	}
 
 	impersonated := rest.CopyConfig(base)
-	impersonated.Impersonate = rest.ImpersonationConfig{
-		UserName: reference.GetFullName(),
-		Groups:   groups,
-	}
+	impersonated.Impersonate.UserName = reference.GetFullName()
+	impersonated.Impersonate.Groups = groups
 
 	k8sClient, err := client.New(impersonated, client.Options{Scheme: scheme})
 	if err != nil {
