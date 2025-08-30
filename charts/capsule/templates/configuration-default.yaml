@@ -1,4 +1,4 @@
-{{- if not $.Values.crds.exclusive }}
+{{- if or (not $.Values.crds.exclusive) ($.Values.crds.createConfig) }}
 apiVersion: capsule.clastix.io/v1beta2
 kind: CapsuleConfiguration
 metadata:
@@ -16,6 +16,15 @@ spec:
     TLSSecretName: {{ include "capsule.secretTlsName" . }}
     validatingWebhookConfigurationName: {{ include "capsule.fullname" . }}-validating-webhook-configuration
   forceTenantPrefix: {{ .Values.manager.options.forceTenantPrefix }}
+  {{- $saClientValues := .Values.manager.options.serviceAccountClient -}}
+  {{- if and .Values.manager.options.useProxyForServiceAccountClient .Values.proxy.enabled }}
+    {{- $dlt_cfg := (fromYaml (include "proxy.defaults" $)) -}}
+    {{- $saClientValues = mergeOverwrite (default dict $dlt_cfg) (default dict .Values.manager.options.serviceAccountClient) -}}
+  {{- end }}
+  {{- with $saClientValues }}
+  serviceAccountClient:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
   userGroups:
     {{- toYaml .Values.manager.options.capsuleUserGroups  | nindent 4 }}
   userNames:
@@ -28,3 +37,11 @@ spec:
     {{- toYaml . | nindent 4 }}
   {{- end }}
 {{- end }}
+
+{{- define "proxy.defaults" -}}
+serviceAccountClient:
+  endpoint: https://{{ include "capsule.fullname" . }}-proxy.{{ .Release.Namespace }}.svc:9001
+  caSecretNamespace: {{ .Release.Namespace }}
+  caSecretName: {{ .Release.Name }}-capsule-proxy
+{{- end -}}
+
