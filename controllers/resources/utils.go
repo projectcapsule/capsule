@@ -4,8 +4,6 @@
 package resources
 
 import (
-	"os"
-
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/configuration"
@@ -16,36 +14,34 @@ func SetGlobalTenantResourceServiceAccount(
 	config configuration.Configuration,
 	resource *capsulev1beta2.GlobalTenantResource,
 ) (changed bool) {
-	changed = false
 
-	name := caputils.SanitizeServiceAccountProp(resource.Spec.ServiceAccount.Name.String())
-	if resource.Spec.ServiceAccount.Name != "" && resource.Spec.ServiceAccount.Name.String() != name {
-		resource.Spec.ServiceAccount.Name = api.Name(name)
-		changed = true
-	}
+	// If name is empty, remove the whole reference
+	if resource.Spec.ServiceAccount == nil || resource.Spec.ServiceAccount.Name == "" {
+		// If a default is configured, apply it
+		if setGlobalTenantDefaultResourceServiceAccount(config, resource) {
+			changed = true
+		} else {
+			if resource.Spec.ServiceAccount != nil {
+				resource.Spec.ServiceAccount = nil
+				changed = true
+			}
 
-	if resource.Spec.ServiceAccount.Name.String() == "" {
-		cfg := config.ServiceAccountClientProperties()
-		if cfg == nil || cfg.TenantDefaultServiceAccount != "" {
 			return
 		}
+	}
 
-		resource.Spec.ServiceAccount.Name = api.Name(caputils.SanitizeServiceAccountProp(cfg.TenantDefaultServiceAccount.String()))
+	// Sanitize the Name
+	sanitizedName := caputils.SanitizeServiceAccountProp(resource.Spec.ServiceAccount.Name.String())
+	if resource.Spec.ServiceAccount.Name.String() != sanitizedName {
+		resource.Spec.ServiceAccount.Name = api.Name(sanitizedName)
 		changed = true
 	}
 
-	if resource.Spec.ServiceAccount.Namespace == "" {
-		dflt := caputils.SanitizeServiceAccountProp(os.Getenv("NAMESPACE"))
-		if resource.Spec.ServiceAccount.Namespace.String() != dflt {
-			resource.Spec.ServiceAccount.Namespace = api.Name(dflt)
-			changed = true
-		}
-	} else {
-		ns := caputils.SanitizeServiceAccountProp(resource.Spec.ServiceAccount.Namespace.String())
-		if resource.Spec.ServiceAccount.Namespace.String() != ns {
-			resource.Spec.ServiceAccount.Namespace = api.Name(ns)
-			changed = true
-		}
+	// Always set the namespace to match the resource
+	sanitizedNS := caputils.SanitizeServiceAccountProp(resource.Namespace)
+	if resource.Spec.ServiceAccount.Namespace.String() != sanitizedNS {
+		resource.Spec.ServiceAccount.Namespace = api.Name(sanitizedNS)
+		changed = true
 	}
 
 	return
@@ -68,6 +64,7 @@ func SetTenantResourceServiceAccount(
 				resource.Spec.ServiceAccount = nil
 				changed = true
 			}
+
 			return
 		}
 	}

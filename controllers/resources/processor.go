@@ -229,7 +229,7 @@ func (r *Processor) handleSection(
 	codecFactory := serializer.NewCodecFactory(r.client.Scheme())
 
 	for nsIndex, item := range spec.NamespacedItems {
-		keysAndValues := []any{"index", nsIndex, "namespace", item.Namespace}
+		keysAndValues := []any{"index", nsIndex, "namespace", item.Namespace, "tenant", tnt.GetName()}
 		// A TenantResource is created by a TenantOwner, and potentially, they could point to a resource in a non-owned
 		// Namespace: this must be blocked by checking it this is the case.
 		if !allowCrossNamespaceSelection && !tntNamespaces.Has(item.Namespace) {
@@ -289,6 +289,7 @@ func (r *Processor) handleSection(
 				replicatedItem.APIVersion = obj.GetAPIVersion()
 				replicatedItem.Type = meta.ReplicationCondition
 				replicatedItem.Scope = scope
+				replicatedItem.Tenant = tnt.GetName()
 
 				if ns != nil {
 					replicatedItem.Namespace = ns.Name
@@ -361,10 +362,10 @@ func (r *Processor) handleSection(
 		replicatedItem := &capsulev1beta2.ObjectReferenceStatus{}
 		replicatedItem.Name = obj.GetName()
 		replicatedItem.Kind = obj.GetKind()
-		replicatedItem.Namespace = ns.Name
 		replicatedItem.APIVersion = obj.GetAPIVersion()
 		replicatedItem.Type = meta.ReplicationCondition
 		replicatedItem.Scope = scope
+		replicatedItem.Tenant = tnt.GetName()
 
 		if ns != nil {
 			replicatedItem.Namespace = ns.Name

@@ -29,7 +29,6 @@ type ObjectReferenceStatus struct {
 	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
 	Name string `json:"name"`
 	// Tenant of the referent.
-	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
 	Tenant string `json:"tenant,omitempty"`
 	// status of the condition, one of True, False, Unknown.
 	// +required

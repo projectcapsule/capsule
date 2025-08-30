@@ -132,8 +132,10 @@ func (r *globalResourceController) Reconcile(ctx context.Context, request reconc
 	if err != nil {
 		return reconcile.Result{}, gherrors.Wrap(err, "failed to load serviceaccount client")
 	}
+
 	if c == nil {
-		log.V(3).Info("received empty client for serviceaccount")
+		log.V(5).Info("received empty client for serviceaccount")
+
 		return reconcile.Result{}, nil
 	}
 
@@ -218,6 +220,22 @@ func (r *globalResourceController) reconcileNormal(
 	// the Status can be updated only in case of no errors across all of them to guarantee a valid and coherent status.
 	processedItems := sets.NewString()
 
+	// Always post the processed items, as they allow users to track errors
+	defer func() {
+		tntResource.Status.ProcessedItems = make([]capsulev1beta2.ObjectReferenceStatus, 0, len(processedItems))
+
+		for _, item := range processedItems.List() {
+			or := capsulev1beta2.ObjectReferenceStatus{}
+			if err := or.ParseFromString(item); err == nil {
+				tntResource.Status.ProcessedItems = append(tntResource.Status.ProcessedItems, or)
+			} else {
+				log.Error(err, "failed to parse processed item", "item", item)
+			}
+		}
+	}()
+
+	var itemErrors error
+
 	for index, resource := range tntResource.Spec.Resources {
 		tenantLabel, labelErr := capsulev1beta2.GetTypeLabel(&capsulev1beta2.Tenant{})
 		if labelErr != nil {
@@ -233,10 +251,12 @@ func (r *globalResourceController) reconcileNormal(
 			if sectionErr != nil {
 				// Upon a process error storing the last error occurred and continuing to iterate,
 				// avoid to block the whole processing.
-				err = errors.Join(err, sectionErr)
-			} else {
-				processedItems.Insert(items...)
+				itemErrors = errors.Join(itemErrors, sectionErr)
 			}
+
+			log.Info("replicate items", "amount", len(items))
+
+			processedItems.Insert(items...)
 		}
 	}
 

@@ -339,26 +339,15 @@ webhooks:
   timeoutSeconds: {{ $.Values.webhooks.validatingWebhooksTimeoutSeconds }}
   {{- end }}
 {{- end }}
-<<<<<<< HEAD
-
-{{- with (mergeOverwrite (default dict .Values.webhooks.hooks.tenantResources.namespaced.mutation) (default dict .Values.webhooks.hooks.tenantResourceObjects)) }}
-- admissionReviewVersions:
-    - v1
-  clientConfig:
-    {{- include "capsule.webhooks.service" (dict "path" "/tenantresource/objects/validating" "ctx" $) | nindent 4 }}
-  failurePolicy:  {{ .failurePolicy }}
-  name: resource-objects.tenant.projectcapsule.dev
-=======
 {{- with .Values.webhooks.hooks.tenantResourceObjects }}
   {{- if .enabled }}
 - name: resource-objects.tenant.projectcapsule.dev
   admissionReviewVersions:
     - v1
   clientConfig:
-    {{- include "capsule.webhooks.service" (dict "path" "/tenantresource-objects" "ctx" $) | nindent 4 }}
+    {{- include "capsule.webhooks.service" (dict "path" "/tenantresource/objects/validating" "ctx" $) | nindent 4 }}
   failurePolicy: {{ .failurePolicy }}
   matchPolicy: {{ .matchPolicy }}
->>>>>>> 6bee346d43f6439fe78f01c11ba002ed38dd4a41
   {{- with .namespaceSelector }}
   namespaceSelector:
     {{- toYaml . |  nindent 4 }}
@@ -367,13 +356,10 @@ webhooks:
   objectSelector:
     {{- toYaml . |  nindent 4 }}
   {{- end }}
-<<<<<<< HEAD
-=======
   {{- with .matchConditions }}
   matchConditions:
     {{- toYaml . |  nindent 4 }}
   {{- end }}
->>>>>>> 6bee346d43f6439fe78f01c11ba002ed38dd4a41
   rules:
     - apiGroups:
         - '*'

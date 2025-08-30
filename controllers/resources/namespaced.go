@@ -289,7 +289,7 @@ func (r *namespacedResourceController) loadClient(
 	// Add ServiceAccount if required, Retriggers reconcile
 	// This is done in the background, Everything else should be handeled at admission
 	if changed := SetTenantResourceServiceAccount(r.configuration, tntResource); changed {
-		log.V(5).Info("adding default serviceAccount '%s'", tntResource.Spec.ServiceAccount.GetFullName())
+		log.V(5).Info("adding default serviceAccount", "serviceaccount", tntResource.Spec.ServiceAccount.GetFullName())
 
 		return nil, nil
 	}

@@ -196,62 +196,6 @@ webhooks:
       scope: '*'
   sideEffects: NoneOnDryRun
   timeoutSeconds: {{ $.Values.webhooks.mutatingWebhooksTimeoutSeconds }}
-{{- end }}
-  {{- with .Values.webhooks.hooks.tenantResources.namespaced.mutation }}
-- admissionReviewVersions:
-    - v1
-  clientConfig:
-    {{- include "capsule.webhooks.service" (dict "path" "/tenantresource/namespaced/mutating" "ctx" $) | nindent 4 }}
-  failurePolicy:  {{ .failurePolicy }}
-  name: namespaced.resource-objects.tenant.projectcapsule.dev
-  {{- with .namespaceSelector }}
-  namespaceSelector:
-    {{- toYaml . |  nindent 4 }}
-  {{- end }}
-  {{- with .objectSelector }}
-  objectSelector:
-    {{- toYaml . |  nindent 4 }}
-  {{- end }}
-  reinvocationPolicy: {{ .reinvocationPolicy }}
-  rules:
-    - apiGroups:
-        - capsule.clastix.io
-      apiVersions:
-        - v1beta2
-      operations:
-        - UPDATE
-        - CREATE
-      resources:
-        - 'tenantresources'
-      scope: Namespaced
-  sideEffects: None
-  timeoutSeconds: {{ $.Values.webhooks.mutatingWebhooksTimeoutSeconds }}
-  {{- end }}
-  {{- with .Values.webhooks.hooks.tenantResources.global.mutation }}
-- admissionReviewVersions:
-    - v1
-  clientConfig:
-    {{- include "capsule.webhooks.service" (dict "path" "/tenantresource/global/mutating" "ctx" $) | nindent 4 }}
-  failurePolicy:  {{ .failurePolicy }}
-  name: global.resource-objects.tenant.projectcapsule.dev
-  {{- with .objectSelector }}
-  objectSelector:
-    {{- toYaml . |  nindent 4 }}
-  {{- end }}
-  reinvocationPolicy: {{ .reinvocationPolicy }}
-  rules:
-    - apiGroups:
-        - capsule.clastix.io
-      apiVersions:
-        - v1beta2
-      operations:
-        - UPDATE
-        - CREATE
-      resources:
-        - 'globaltenantresources'
-      scope: '*'
-  sideEffects: None
-  timeoutSeconds: {{ $.Values.webhooks.mutatingWebhooksTimeoutSeconds }}
   {{- end }}
 {{- end }}
 {{- with .Values.webhooks.hooks.resourcepools.pools }}
