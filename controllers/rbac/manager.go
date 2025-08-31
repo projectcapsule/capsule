@@ -9,9 +9,11 @@ import (
 	"fmt"
 
 	"github.com/go-logr/logr"
+	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/client-go/util/workqueue"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -23,6 +25,7 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/controllers/utils"
 	"github.com/projectcapsule/capsule/pkg/configuration"
+	"github.com/projectcapsule/capsule/pkg/meta"
 )
 
 type Manager struct {
@@ -47,12 +50,26 @@ func (r *Manager) SetupWithManager(ctx context.Context, mgr ctrl.Manager, config
 		Watches(&capsulev1beta2.CapsuleConfiguration{}, handler.Funcs{
 			UpdateFunc: func(ctx context.Context, updateEvent event.TypedUpdateEvent[client.Object], limitingInterface workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 				if updateEvent.ObjectNew.GetName() == configurationName {
-					if crbErr := r.EnsureClusterRoleBindings(ctx); crbErr != nil {
+					if crbErr := r.EnsureClusterRoleBindingsProvisioner(ctx); crbErr != nil {
 						r.Log.Error(err, "cannot update ClusterRoleBinding upon CapsuleConfiguration update")
 					}
 				}
 			},
-		}).Complete(r)
+		}).
+		Watches(&corev1.ServiceAccount{}, handler.Funcs{
+			CreateFunc: func(ctx context.Context, e event.TypedCreateEvent[client.Object], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+				r.handleSAChange(ctx, e.Object)
+			},
+			UpdateFunc: func(ctx context.Context, e event.TypedUpdateEvent[client.Object], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+				if promotionLabelsChanged(e.ObjectOld.GetLabels(), e.ObjectNew.GetLabels()) {
+					r.handleSAChange(ctx, e.ObjectNew)
+				}
+			},
+			DeleteFunc: func(ctx context.Context, e event.TypedDeleteEvent[client.Object], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+				r.handleSAChange(ctx, e.Object)
+			},
+		}).
+		Complete(r)
 	if crbErr != nil {
 		err = errors.Join(err, crbErr)
 	}
@@ -71,8 +88,8 @@ func (r *Manager) Reconcile(ctx context.Context, request reconcile.Request) (res
 			break
 		}
 
-		if err = r.EnsureClusterRoleBindings(ctx); err != nil {
-			r.Log.Error(err, "Reconciliation for ClusterRoleBindings failed")
+		if err = r.EnsureClusterRoleBindingsProvisioner(ctx); err != nil {
+			r.Log.Error(err, "Reconciliation for ClusterRoleBindings (Provisioner) failed")
 
 			break
 		}
@@ -85,36 +102,52 @@ func (r *Manager) Reconcile(ctx context.Context, request reconcile.Request) (res
 	return
 }
 
-func (r *Manager) EnsureClusterRoleBindings(ctx context.Context) (err error) {
+func (r *Manager) EnsureClusterRoleBindingsProvisioner(ctx context.Context) error {
 	crb := &rbacv1.ClusterRoleBinding{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: ProvisionerRoleName,
-		},
+		ObjectMeta: metav1.ObjectMeta{Name: ProvisionerRoleName},
 	}
 
-	_, err = controllerutil.CreateOrUpdate(ctx, r.Client, crb, func() (err error) {
-		crb.RoleRef = provisionerClusterRoleBinding.RoleRef
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		_, err := controllerutil.CreateOrUpdate(ctx, r.Client, crb, func() error {
+			crb.RoleRef = provisionerClusterRoleBinding.RoleRef
+			crb.Subjects = nil
 
-		crb.Subjects = []rbacv1.Subject{}
+			for _, group := range r.Configuration.UserGroups() {
+				crb.Subjects = append(crb.Subjects, rbacv1.Subject{
+					Kind: rbacv1.GroupKind,
+					Name: group,
+				})
+			}
 
-		for _, group := range r.Configuration.UserGroups() {
-			crb.Subjects = append(crb.Subjects, rbacv1.Subject{
-				Kind: "Group",
-				Name: group,
-			})
-		}
+			for _, user := range r.Configuration.UserNames() {
+				crb.Subjects = append(crb.Subjects, rbacv1.Subject{
+					Kind: rbacv1.UserKind,
+					Name: user,
+				})
+			}
 
-		for _, user := range r.Configuration.UserNames() {
-			crb.Subjects = append(crb.Subjects, rbacv1.Subject{
-				Kind: "User",
-				Name: user,
-			})
-		}
+			if r.Configuration.AllowServiceAccountPromotion() {
+				saList := &corev1.ServiceAccountList{}
+				if err := r.Client.List(ctx, saList, client.MatchingLabels{
+					meta.OwnerPromotionLabel: meta.OwnerPromotionLabelTrigger,
+				}); err != nil {
+					return err
+				}
 
-		return
+				for _, sa := range saList.Items {
+					crb.Subjects = append(crb.Subjects, rbacv1.Subject{
+						Kind:      rbacv1.ServiceAccountKind,
+						Name:      sa.Name,
+						Namespace: sa.Namespace,
+					})
+				}
+			}
+
+			return nil
+		})
+
+		return err
 	})
-
-	return
 }
 
 func (r *Manager) EnsureClusterRole(ctx context.Context, roleName string) (err error) {
@@ -156,7 +189,7 @@ func (r *Manager) Start(ctx context.Context) error {
 
 	r.Log.Info("setting up ClusterRoleBindings")
 
-	if err := r.EnsureClusterRoleBindings(ctx); err != nil {
+	if err := r.EnsureClusterRoleBindingsProvisioner(ctx); err != nil {
 		if apierrors.IsAlreadyExists(err) {
 			return nil
 		}
@@ -165,4 +198,31 @@ func (r *Manager) Start(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func (r *Manager) handleSAChange(ctx context.Context, obj client.Object) {
+	if !r.Configuration.AllowServiceAccountPromotion() {
+		return
+	}
+
+	if err := r.EnsureClusterRoleBindingsProvisioner(ctx); err != nil {
+		r.Log.Error(err, "cannot update ClusterRoleBinding upon ServiceAccount event")
+	}
+}
+
+func promotionLabelsChanged(oldLabels, newLabels map[string]string) bool {
+	keys := []string{
+		meta.OwnerPromotionLabel,
+	}
+
+	for _, key := range keys {
+		oldVal, oldOK := oldLabels[key]
+		newVal, newOK := newLabels[key]
+
+		if oldOK != newOK || oldVal != newVal {
+			return true
+		}
+	}
+
+	return false
 }

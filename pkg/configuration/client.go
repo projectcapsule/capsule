@@ -69,6 +69,10 @@ func (c *capsuleConfiguration) EnableTLSConfiguration() bool {
 	return c.retrievalFn().Spec.EnableTLSReconciler
 }
 
+func (c *capsuleConfiguration) AllowServiceAccountPromotion() bool {
+	return c.retrievalFn().Spec.AllowServiceAccountPromotion
+}
+
 func (c *capsuleConfiguration) MutatingWebhookConfigurationName() (name string) {
 	return c.retrievalFn().Spec.CapsuleResources.MutatingWebhookConfigurationName
 }

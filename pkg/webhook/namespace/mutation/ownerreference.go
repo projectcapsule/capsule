@@ -60,7 +60,12 @@ func (h *ownerReferenceHandler) OnUpdate(c client.Client, decoder admission.Deco
 			return utils.ErroredResponse(err)
 		}
 
-		if !h.namespaceIsOwned(oldNs, tntList, req) {
+		ok, err := h.namespaceIsOwned(ctx, c, oldNs, tntList, req)
+		if err != nil {
+			return utils.ErroredResponse(err)
+		}
+
+		if !ok {
 			recorder.Eventf(oldNs, corev1.EventTypeWarning, "OfflimitNamespace", "Namespace %s can not be patched", oldNs.GetName())
 
 			response := admission.Denied("Denied patch request for this namespace")
@@ -109,20 +114,25 @@ func (h *ownerReferenceHandler) OnUpdate(c client.Client, decoder admission.Deco
 	}
 }
 
-func (h *ownerReferenceHandler) namespaceIsOwned(ns *corev1.Namespace, tenantList *capsulev1beta2.TenantList, req admission.Request) bool {
+func (h *ownerReferenceHandler) namespaceIsOwned(ctx context.Context, c client.Client, ns *corev1.Namespace, tenantList *capsulev1beta2.TenantList, req admission.Request) (bool, error) {
 	for _, tenant := range tenantList.Items {
 		for _, ownerRef := range ns.OwnerReferences {
 			if !capsuleutils.IsTenantOwnerReference(ownerRef) {
 				continue
 			}
 
-			if ownerRef.UID == tenant.UID && utils.IsTenantOwner(tenant.Spec.Owners, req.UserInfo) {
-				return true
+			ok, err := utils.IsTenantOwner(ctx, c, &tenant, req.UserInfo, h.cfg.AllowServiceAccountPromotion())
+			if err != nil {
+				return false, err
+			}
+
+			if ownerRef.UID == tenant.UID && ok {
+				return true, nil
 			}
 		}
 	}
 
-	return false
+	return false, nil
 }
 
 func (h *ownerReferenceHandler) setOwnerRef(ctx context.Context, req admission.Request, client client.Client, decoder admission.Decoder, recorder record.EventRecorder) *admission.Response {

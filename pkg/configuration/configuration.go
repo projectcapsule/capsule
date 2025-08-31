@@ -19,6 +19,7 @@ type Configuration interface {
 	// EnableTLSConfiguration enabled the TLS reconciler, responsible for creating CA and TLS certificate required
 	// for the CRD conversion and webhooks.
 	EnableTLSConfiguration() bool
+	AllowServiceAccountPromotion() bool
 	TLSSecretName() string
 	MutatingWebhookConfigurationName() string
 	ValidatingWebhookConfigurationName() string
