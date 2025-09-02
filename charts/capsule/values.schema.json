@@ -62,7 +62,7 @@
                                     "type": "object"
                                 },
                                 "annotations": {
-                                    "description": "Annotations to add to the certgen job.",
+                                    "description": "Annotations to add to the job.",
                                     "type": "object"
                                 },
                                 "backoffLimit": {
@@ -94,8 +94,20 @@
                                     "description": "ImagePullSecrets",
                                     "type": "array"
                                 },
+                                "labels": {
+                                    "description": "Labels to add to the job.",
+                                    "type": "object"
+                                },
                                 "nodeSelector": {
                                     "description": "Set the node selector",
+                                    "type": "object"
+                                },
+                                "podAnnotations": {
+                                    "description": "Annotations to add to the job pod",
+                                    "type": "object"
+                                },
+                                "podLabels": {
+                                    "description": "Labels to add to the job pod",
                                     "type": "object"
                                 },
                                 "podSecurityContext": {
@@ -191,6 +203,17 @@
         "manager": {
             "type": "object",
             "properties": {
+                "env": {
+                    "description": "Additional Environment Variables",
+                    "type": "array"
+                },
+                "extraArgs": {
+                    "description": "A list of extra arguments for the capsule controller",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
                 "hostNetwork": {
                     "description": "Specifies if the container should be started in hostNetwork mode.  Required for use in some managed kubernetes clusters (such as AWS EKS) with custom CNI (such as calico), because control-plane managed by AWS cannot communicate with pods' IP CIDR and admission webhooks are not working",
                     "type": "boolean"
@@ -468,6 +491,10 @@
         },
         "podAnnotations": {
             "description": "Annotations to add to the capsule pod.",
+            "type": "object"
+        },
+        "podLabels": {
+            "description": "Labels to add to the capsule pod.",
             "type": "object"
         },
         "podSecurityContext": {

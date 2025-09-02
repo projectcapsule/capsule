@@ -17,15 +17,25 @@ metadata:
   labels:
     app.kubernetes.io/component: {{ include "capsule.crds.component" . | quote }}
     {{- include "capsule.labels" . | nindent 4 }}
+    {{- with $Values.labels }}
+      {{- . | toYaml | nindent 4 }}
+    {{- end }}
 spec:
   backoffLimit: {{ $Values.backoffLimit }}
   ttlSecondsAfterFinished: {{ $Values.ttlSecondsAfterFinished }}
   template:
     metadata:
       name: "{{ include "capsule.crds.name" . }}"
+      {{- with $Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       labels:
         app.kubernetes.io/component: {{ include "capsule.crds.component" . | quote }}
         {{- include "capsule.selectorLabels" . | nindent 8 }}
+        {{- with $Values.podLabels }}
+          {{- toYaml . | nindent 8 }}
+        {{- end }}
     spec:
       restartPolicy: {{ $Values.restartPolicy }}
       {{- if $Values.podSecurityContext.enabled }}

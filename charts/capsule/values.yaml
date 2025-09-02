@@ -16,7 +16,13 @@ global:
         tag: ""
       # -- ImagePullSecrets
       imagePullSecrets: []
-      # -- Annotations to add to the certgen job.
+      # -- Labels to add to the job pod
+      podLabels: {}
+      # -- Annotations to add to the job pod
+      podAnnotations: {}
+      # -- Labels to add to the job.
+      labels: {}
+      # -- Annotations to add to the job.
       annotations: {}
       # -- Set the restartPolicy
       restartPolicy: Never
@@ -159,6 +165,13 @@ manager:
         denied: []
         deniedRegex: ""
 
+  # -- A list of extra arguments for the capsule controller
+  extraArgs:
+  - "--enable-leader-election=true"
+
+  # -- Additional Environment Variables
+  env: []
+
   # -- Configure the liveness probe using Deployment probe spec
   livenessProbe:
     httpGet:
@@ -185,6 +198,12 @@ manager:
 
 # -- Configuration for `imagePullSecrets` so that you can use a private images registry.
 imagePullSecrets: []
+
+# -- Labels to add to the capsule pod.
+podLabels: {}
+#  The following annotations guarantee scheduling for critical add-on pods
+#  podAnnotations:
+#    scheduler.alpha.kubernetes.io/critical-pod: ''
 
 # -- Annotations to add to the capsule pod.
 podAnnotations: {}
