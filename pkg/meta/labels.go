@@ -12,6 +12,9 @@ import (
 const (
 	FreezeLabel        = "projectcapsule.dev/freeze"
 	FreezeLabelTrigger = "true"
+
+	OwnerPromotionLabel        = "owner.projectcapsule.dev/promote"
+	OwnerPromotionLabelTrigger = "true"
 )
 
 func FreezeLabelTriggers(obj client.Object) bool {
@@ -20,6 +23,14 @@ func FreezeLabelTriggers(obj client.Object) bool {
 
 func FreezeLabelRemove(obj client.Object) {
 	labelRemove(obj, FreezeLabel)
+}
+
+func OwnerPromotionLabelTriggers(obj client.Object) bool {
+	return labelTriggers(obj, OwnerPromotionLabel, OwnerPromotionLabelTrigger)
+}
+
+func OwnerPromotionLabelRemove(obj client.Object) {
+	labelRemove(obj, OwnerPromotionLabel)
 }
 
 func labelRemove(obj client.Object, anno string) {

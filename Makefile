@@ -151,6 +151,7 @@ dev-setup:
 		--create-namespace \
 		--set 'crds.install=true' \
 		--set 'crds.exclusive=true'\
+        --set 'crds.createConfig=true'\
 		--set "webhooks.exclusive=true"\
 		--set "webhooks.service.url=$${WEBHOOK_URL}" \
 		--set "webhooks.service.caBundle=$${CA_BUNDLE}" \

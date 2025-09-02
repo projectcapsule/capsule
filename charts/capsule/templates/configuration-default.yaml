@@ -1,4 +1,4 @@
-{{- if not $.Values.crds.exclusive }}
+{{- if or (not $.Values.crds.exclusive) ($.Values.crds.createConfig) }}
 apiVersion: capsule.clastix.io/v1beta2
 kind: CapsuleConfiguration
 metadata:
@@ -16,6 +16,7 @@ spec:
     TLSSecretName: {{ include "capsule.secretTlsName" . }}
     validatingWebhookConfigurationName: {{ include "capsule.fullname" . }}-validating-webhook-configuration
   forceTenantPrefix: {{ .Values.manager.options.forceTenantPrefix }}
+  allowServiceAccountPromotion: {{ .Values.manager.options.allowServiceAccountPromotion }}
   userGroups:
     {{- toYaml .Values.manager.options.capsuleUserGroups  | nindent 4 }}
   userNames:

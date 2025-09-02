@@ -8,6 +8,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
@@ -72,4 +73,20 @@ func ownerClient(owner capsulev1beta2.OwnerSpec) (cs kubernetes.Interface) {
 	Expect(err).ToNot(HaveOccurred())
 
 	return cs
+}
+
+func impersonationClient(user string, groups []string, scheme *runtime.Scheme) client.Client {
+	c, err := config.GetConfig()
+	Expect(err).ToNot(HaveOccurred())
+	c.Impersonate = rest.ImpersonationConfig{
+		UserName: user,
+		Groups:   groups,
+	}
+	cl, err := client.New(c, client.Options{Scheme: scheme})
+	Expect(err).ToNot(HaveOccurred())
+	return cl
+}
+
+func withDefaultGroups(groups []string) []string {
+	return append([]string{"projectcapsule.dev"}, groups...)
 }
