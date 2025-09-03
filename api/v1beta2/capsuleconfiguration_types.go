@@ -11,7 +11,9 @@ import (
 
 // CapsuleConfigurationSpec defines the Capsule configuration.
 type CapsuleConfigurationSpec struct {
-	// Names of the groups for Capsule users.
+	// Names of the users considered as Capsule users.
+	UserNames []string `json:"userNames,omitempty"`
+	// Names of the groups considered as Capsule users.
 	// +kubebuilder:default={capsule.clastix.io}
 	UserGroups []string `json:"userGroups,omitempty"`
 	// Define groups which when found in the request of a user will be ignored by the Capsule
