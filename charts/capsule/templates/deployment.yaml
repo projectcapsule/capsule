@@ -11,116 +11,15 @@ metadata:
     {{- toYaml . | nindent 4 }}
   {{- end }}
 spec:
+  {{- with .Values.manager.deploymentStrategy }}
+  strategy:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
   replicas: {{ .Values.replicaCount }}
   selector:
     matchLabels:
       {{- include "capsule.selectorLabels" . | nindent 6 }}
   template:
-    metadata:
-      {{- with .Values.podAnnotations }}
-      annotations:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      labels:
-        {{- include "capsule.labels" . | nindent 8 }}
-        {{- with .Values.podLabels }}
-          {{- toYaml . | nindent 8 }}
-        {{- end }}
-    spec:
-      {{- with .Values.imagePullSecrets }}
-      imagePullSecrets:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      serviceAccountName: {{ include "capsule.serviceAccountName" . }}
-      {{- if .Values.podSecurityContext.enabled }}
-      securityContext: {{- omit .Values.podSecurityContext "enabled" | toYaml | nindent 8 }}
-      {{- end }}
-      hostUsers: {{ .Values.manager.hostUsers }}
-      {{- if .Values.manager.hostNetwork }}
-      hostNetwork: true
-      dnsPolicy: ClusterFirstWithHostNet
-      {{- end }}
-      {{- if .Values.manager.hostPID }}
-      hostPID: {{ .Values.manager.hostPID }}
-      {{- else }}
-      hostPID: false
-      {{- end }}
-      priorityClassName: {{ .Values.priorityClassName }}
-      {{- with .Values.nodeSelector }}
-      nodeSelector:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      {{- with .Values.tolerations }}
-      tolerations:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      {{- with .Values.affinity }}
-      affinity:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      {{- with .Values.topologySpreadConstraints }}
-      topologySpreadConstraints:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      volumes:
-        - name: cert
-          secret:
-            defaultMode: 420
-            secretName: {{ include "capsule.secretTlsName" . }}
-        {{- if .Values.manager.volumes }}
-        {{- toYaml .Values.manager.volumes | nindent 8 }}
-        {{- end }}
-      containers:
-        - name: manager
-          args:
-            - --webhook-port={{ .Values.manager.webhookPort }}
-            - --zap-log-level={{ default 4 .Values.manager.options.logLevel }}
-            - --configuration-name={{ .Values.manager.options.capsuleConfiguration }}
-            {{- with .Values.extraArgs }}
-              {{- toYaml . | nindent 12 }}
-            {{- end }}
-          image: {{ include "capsule.managerFullyQualifiedDockerImage" . }}
-          imagePullPolicy: {{ .Values.manager.image.pullPolicy }}
-          env:
-          - name: NAMESPACE
-            valueFrom:
-              fieldRef:
-                fieldPath: metadata.namespace
-          {{- with .Values.env }}
-            {{- toYaml . | nindent 10 }}
-          {{- end }}
-          ports:
-            {{- if not (.Values.manager.hostNetwork) }}
-            - name: webhook-server
-              containerPort: {{ .Values.manager.webhookPort }}
-              protocol: TCP
-            - name: metrics
-              containerPort: 8080
-              protocol: TCP
-            - name: health-api
-              containerPort: 10080
-              protocol: TCP
-            {{- end }}
-            {{- with .Values.manager.ports }}
-              {{- . | nindent 12 }}
-            {{- end }}
-          livenessProbe:
-            {{- toYaml .Values.manager.livenessProbe | nindent 12}}
-          readinessProbe:
-            {{- toYaml .Values.manager.readinessProbe | nindent 12}}
-          volumeMounts:
-            - mountPath: /tmp/k8s-webhook-server/serving-certs
-              name: cert
-              readOnly: true
-          {{- if .Values.manager.volumeMounts }}
-          {{- toYaml .Values.manager.volumeMounts | nindent 12 }}
-          {{- end }}
-          resources:
-            {{- toYaml .Values.manager.resources | nindent 12 }}
-          {{- if .Values.manager.securityContext }}
-          securityContext: {{- omit .Values.manager.securityContext "enabled" | toYaml | nindent 12 }}
-          {{- else if .Values.securityContext.enabled }}
-          securityContext: {{- omit .Values.securityContext "enabled" | toYaml | nindent 12 }}
-          {{- end }}
+    {{- include "capsule.pod" $ | nindent 4 }}
   {{- end }}
 {{- end }}

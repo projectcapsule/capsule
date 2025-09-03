@@ -92,6 +92,8 @@ The following Values have changed key or Value:
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
+| manager.daemonsetStrategy | object | `{"type":"RollingUpdate"}` | [Daemonset Strategy](https://kubernetes.io/docs/tasks/manage-daemon/update-daemon-set/#creating-a-daemonset-with-rollingupdate-update-strategy) |
+| manager.deploymentStrategy | object | `{"type":"RollingUpdate"}` | [Deployment Strategy](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#strategy) |
 | manager.env | list | `[]` | Additional Environment Variables |
 | manager.extraArgs | list | `["--enable-leader-election=true"]` | A list of extra arguments for the capsule controller |
 | manager.hostNetwork | bool | `false` | Specifies if the container should be started in hostNetwork mode.  Required for use in some managed kubernetes clusters (such as AWS EKS) with custom CNI (such as calico), because control-plane managed by AWS cannot communicate with pods' IP CIDR and admission webhooks are not working |

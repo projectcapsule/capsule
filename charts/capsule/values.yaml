@@ -112,6 +112,18 @@ manager:
   # -- Set the controller deployment mode as `Deployment` or `DaemonSet`.
   kind: Deployment
 
+  # -- [Deployment Strategy](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#strategy)
+  deploymentStrategy:
+    type: "RollingUpdate"
+    # rollingUpdate:
+    #   maxUnavailable: 1
+
+  # -- [Daemonset Strategy](https://kubernetes.io/docs/tasks/manage-daemon/update-daemon-set/#creating-a-daemonset-with-rollingupdate-update-strategy)
+  daemonsetStrategy:
+    type: "RollingUpdate"
+    # rollingUpdate:
+    #   maxUnavailable: 1
+
   image:
      # -- Set the image registry of capsule.
     registry: ghcr.io

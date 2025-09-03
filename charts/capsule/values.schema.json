@@ -203,6 +203,24 @@
         "manager": {
             "type": "object",
             "properties": {
+                "daemonsetStrategy": {
+                    "description": "[Daemonset Strategy](https://kubernetes.io/docs/tasks/manage-daemon/update-daemon-set/#creating-a-daemonset-with-rollingupdate-update-strategy)",
+                    "type": "object",
+                    "properties": {
+                        "type": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "deploymentStrategy": {
+                    "description": "[Deployment Strategy](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#strategy)",
+                    "type": "object",
+                    "properties": {
+                        "type": {
+                            "type": "string"
+                        }
+                    }
+                },
                 "env": {
                     "description": "Additional Environment Variables",
                     "type": "array"
