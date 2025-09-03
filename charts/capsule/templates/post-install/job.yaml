@@ -23,14 +23,20 @@ spec:
   ttlSecondsAfterFinished: {{ $Values.ttlSecondsAfterFinished }}
   template:
     metadata:
-      {{- with $Values.podAnnotations }}
       annotations:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
+        {{- with $Values.podAnnotations }}
+          {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- with $.Values.podAnnotations }}
+          {{- toYaml . | nindent 8 }}
+        {{- end }}
       labels:
         app.kubernetes.io/component: {{ include "capsule.post-install.component" . | quote }}
         {{- include "capsule.selectorLabels" . | nindent 8 }}
         {{- with $Values.podLabels }}
+          {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- with $.Values.podLabels }}
           {{- toYaml . | nindent 8 }}
         {{- end }}
     spec:

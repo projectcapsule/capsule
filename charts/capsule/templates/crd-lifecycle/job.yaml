@@ -26,14 +26,20 @@ spec:
   template:
     metadata:
       name: "{{ include "capsule.crds.name" . }}"
-      {{- with $Values.podAnnotations }}
       annotations:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
+        {{- with $Values.podAnnotations }}
+          {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- with $.Values.podAnnotations }}
+          {{- toYaml . | nindent 8 }}
+        {{- end }}
       labels:
         app.kubernetes.io/component: {{ include "capsule.crds.component" . | quote }}
         {{- include "capsule.selectorLabels" . | nindent 8 }}
         {{- with $Values.podLabels }}
+          {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- with $.Values.podLabels }}
           {{- toYaml . | nindent 8 }}
         {{- end }}
     spec:
