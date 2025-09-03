@@ -222,6 +222,10 @@
                     "description": "Specifies if the container should be started in hostPID mode.",
                     "type": "boolean"
                 },
+                "hostUsers": {
+                    "description": "Don't use Host Users (User Namespaces)",
+                    "type": "boolean"
+                },
                 "image": {
                     "type": "object",
                     "properties": {

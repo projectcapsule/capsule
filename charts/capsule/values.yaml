@@ -132,6 +132,9 @@ manager:
   # -- Specifies if the container should be started in hostPID mode.
   hostPID: false
 
+  # -- Don't use Host Users (User Namespaces)
+  hostUsers: true
+
   # -- Set an alternative to the default container port.
   #
   # Useful for use in some kubernetes clusters (such as GKE Private) with

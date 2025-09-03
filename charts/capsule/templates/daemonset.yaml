@@ -36,6 +36,7 @@ spec:
       {{- if .Values.podSecurityContext.enabled }}
       securityContext: {{- omit .Values.podSecurityContext "enabled" | toYaml | nindent 8 }}
       {{- end }}
+      hostUsers: {{ .Values.manager.hostUsers }}
       {{- if .Values.manager.hostNetwork }}
       hostNetwork: true
       dnsPolicy: ClusterFirstWithHostNet
@@ -62,9 +63,11 @@ spec:
         - name: manager
           args:
           - --webhook-port={{ .Values.manager.webhookPort }}
-          - --enable-leader-election
           - --zap-log-level={{ default 4 .Values.manager.options.logLevel }}
           - --configuration-name={{ .Values.manager.options.capsuleConfiguration }}
+          {{- with .Values.extraArgs }}
+            {{- toYaml . | nindent 10 }}
+          {{- end }}
           image: {{ include "capsule.managerFullyQualifiedDockerImage" . }}
           imagePullPolicy: {{ .Values.manager.image.pullPolicy }}
           env:
@@ -72,6 +75,9 @@ spec:
             valueFrom:
               fieldRef:
                 fieldPath: metadata.namespace
+          {{- with .Values.env }}
+            {{- toYaml . | nindent 10 }}
+          {{- end }}
           ports:
             - name: webhook-server
               containerPort: {{ .Values.manager.webhookPort }}

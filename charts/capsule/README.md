@@ -96,6 +96,7 @@ The following Values have changed key or Value:
 | manager.extraArgs | list | `["--enable-leader-election=true"]` | A list of extra arguments for the capsule controller |
 | manager.hostNetwork | bool | `false` | Specifies if the container should be started in hostNetwork mode.  Required for use in some managed kubernetes clusters (such as AWS EKS) with custom CNI (such as calico), because control-plane managed by AWS cannot communicate with pods' IP CIDR and admission webhooks are not working |
 | manager.hostPID | bool | `false` | Specifies if the container should be started in hostPID mode. |
+| manager.hostUsers | bool | `true` | Don't use Host Users (User Namespaces) |
 | manager.image.pullPolicy | string | `"IfNotPresent"` | Set the image pull policy. |
 | manager.image.registry | string | `"ghcr.io"` | Set the image registry of capsule. |
 | manager.image.repository | string | `"projectcapsule/capsule"` | Set the image repository of capsule. |
