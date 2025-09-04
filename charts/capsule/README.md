@@ -35,14 +35,17 @@ The following Values have changed key or Value:
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | global.jobs.kubectl.affinity | object | `{}` | Set affinity rules |
-| global.jobs.kubectl.annotations | object | `{}` | Annotations to add to the certgen job. |
+| global.jobs.kubectl.annotations | object | `{}` | Annotations to add to the job. |
 | global.jobs.kubectl.backoffLimit | int | `4` | Backofflimit for jobs |
 | global.jobs.kubectl.image.pullPolicy | string | `"IfNotPresent"` | Set the image pull policy of the helm chart job |
 | global.jobs.kubectl.image.registry | string | `"docker.io"` | Set the image repository of the helm chart job |
 | global.jobs.kubectl.image.repository | string | `"clastix/kubectl"` | Set the image repository of the helm chart job |
 | global.jobs.kubectl.image.tag | string | `""` | Set the image tag of the helm chart job |
 | global.jobs.kubectl.imagePullSecrets | list | `[]` | ImagePullSecrets |
+| global.jobs.kubectl.labels | object | `{}` | Labels to add to the job. |
 | global.jobs.kubectl.nodeSelector | object | `{}` | Set the node selector |
+| global.jobs.kubectl.podAnnotations | object | `{}` | Annotations to add to the job pod |
+| global.jobs.kubectl.podLabels | object | `{}` | Labels to add to the job pod |
 | global.jobs.kubectl.podSecurityContext | object | `{"enabled":true,"seccompProfile":{"type":"RuntimeDefault"}}` | Security context for the job pods. |
 | global.jobs.kubectl.priorityClassName | string | `""` | Set a pod priorityClassName |
 | global.jobs.kubectl.resources | object | `{}` | Job resources |
@@ -65,6 +68,7 @@ The following Values have changed key or Value:
 | jobs | object | `{}` | Deprecated, use .global.jobs.kubectl instead |
 | nodeSelector | object | `{}` | Set the node selector for the Capsule pod |
 | podAnnotations | object | `{}` | Annotations to add to the capsule pod. |
+| podLabels | object | `{}` | Labels to add to the capsule pod. |
 | podSecurityContext | object | `{"enabled":true,"runAsGroup":1002,"runAsNonRoot":true,"runAsUser":1002,"seccompProfile":{"type":"RuntimeDefault"}}` | Set the securityContext for the Capsule pod |
 | ports | list | `[]` | Set additional ports for the deployment |
 | priorityClassName | string | `""` | Set the priority class name of the Capsule pod |
@@ -88,8 +92,13 @@ The following Values have changed key or Value:
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
+| manager.daemonsetStrategy | object | `{"type":"RollingUpdate"}` | [Daemonset Strategy](https://kubernetes.io/docs/tasks/manage-daemon/update-daemon-set/#creating-a-daemonset-with-rollingupdate-update-strategy) |
+| manager.deploymentStrategy | object | `{"type":"RollingUpdate"}` | [Deployment Strategy](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#strategy) |
+| manager.env | list | `[]` | Additional Environment Variables |
+| manager.extraArgs | list | `["--enable-leader-election=true"]` | A list of extra arguments for the capsule controller |
 | manager.hostNetwork | bool | `false` | Specifies if the container should be started in hostNetwork mode.  Required for use in some managed kubernetes clusters (such as AWS EKS) with custom CNI (such as calico), because control-plane managed by AWS cannot communicate with pods' IP CIDR and admission webhooks are not working |
 | manager.hostPID | bool | `false` | Specifies if the container should be started in hostPID mode. |
+| manager.hostUsers | bool | `true` | Don't use Host Users (User Namespaces) |
 | manager.image.pullPolicy | string | `"IfNotPresent"` | Set the image pull policy. |
 | manager.image.registry | string | `"ghcr.io"` | Set the image registry of capsule. |
 | manager.image.repository | string | `"projectcapsule/capsule"` | Set the image repository of capsule. |

@@ -16,7 +16,13 @@ global:
         tag: ""
       # -- ImagePullSecrets
       imagePullSecrets: []
-      # -- Annotations to add to the certgen job.
+      # -- Labels to add to the job pod
+      podLabels: {}
+      # -- Annotations to add to the job pod
+      podAnnotations: {}
+      # -- Labels to add to the job.
+      labels: {}
+      # -- Annotations to add to the job.
       annotations: {}
       # -- Set the restartPolicy
       restartPolicy: Never
@@ -106,6 +112,18 @@ manager:
   # -- Set the controller deployment mode as `Deployment` or `DaemonSet`.
   kind: Deployment
 
+  # -- [Deployment Strategy](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#strategy)
+  deploymentStrategy:
+    type: "RollingUpdate"
+    # rollingUpdate:
+    #   maxUnavailable: 1
+
+  # -- [Daemonset Strategy](https://kubernetes.io/docs/tasks/manage-daemon/update-daemon-set/#creating-a-daemonset-with-rollingupdate-update-strategy)
+  daemonsetStrategy:
+    type: "RollingUpdate"
+    # rollingUpdate:
+    #   maxUnavailable: 1
+
   image:
      # -- Set the image registry of capsule.
     registry: ghcr.io
@@ -125,6 +143,9 @@ manager:
 
   # -- Specifies if the container should be started in hostPID mode.
   hostPID: false
+
+  # -- Don't use Host Users (User Namespaces)
+  hostUsers: true
 
   # -- Set an alternative to the default container port.
   #
@@ -161,6 +182,13 @@ manager:
         denied: []
         deniedRegex: ""
 
+  # -- A list of extra arguments for the capsule controller
+  extraArgs:
+  - "--enable-leader-election=true"
+
+  # -- Additional Environment Variables
+  env: []
+
   # -- Configure the liveness probe using Deployment probe spec
   livenessProbe:
     httpGet:
@@ -187,6 +215,12 @@ manager:
 
 # -- Configuration for `imagePullSecrets` so that you can use a private images registry.
 imagePullSecrets: []
+
+# -- Labels to add to the capsule pod.
+podLabels: {}
+#  The following annotations guarantee scheduling for critical add-on pods
+#  podAnnotations:
+#    scheduler.alpha.kubernetes.io/critical-pod: ''
 
 # -- Annotations to add to the capsule pod.
 podAnnotations: {}

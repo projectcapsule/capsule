@@ -11,41 +11,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  seccomp-generation:
-    name: Seccomp Generation
-    strategy:
-      fail-fast: false
-      matrix:
-        # differently from the e2e workflow
-        # we don't need all the versions of kubernetes
-        # to generate the seccomp profile.
-        k8s-version:
-          - "v1.30.0"
-    runs-on: ubuntu-latest-8-cores
-    steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
-        with:
-          fetch-depth: 0
-      - uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
-        with:
-          go-version-file: 'go.mod'
-      - uses: azure/setup-helm@b9e51907a09c216f16ebe8536097933489208112 # v4
-        with:
-          version: v3.14.2
-      - name: unit tracing
-        run: sudo make trace-unit
-      - name: e2e tracing
-        run: sudo KIND_K8S_VERSION=${{ matrix.k8s-version }} make trace-e2e
-      - name: build seccomp profile
-        run: make seccomp
-      - name: upload artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: capsule-seccomp
-          path: capsule-seccomp.json
-
   create-release:
-    needs: seccomp-generation
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -67,11 +33,6 @@ jobs:
       - uses: anchore/sbom-action/download-syft@da167eac915b4e86f08b264dbdbc867b61be6f0c
       - name: Install Cosign
         uses: sigstore/cosign-installer@d58896d6a1865668819e1d91763c7751a165e159 # v3.9.2
-      - name: download artifact
-        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
-        with:
-          name: capsule-seccomp
-          path: ./capsule-seccomp.json
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@e435ccd777264be153ace6237001ef4d979d3a7a # v6.4.0
         with:

@@ -73,12 +73,10 @@ release:
     >
     > | Kubernetes version | Minimum required |
     > |--------------------|------------------|
-    > | `v1.33`            | `>= 1.33.0`      |
+    > | `v1.34`            | `>= 1.34.0`      |
 
 
     Thanks to all the contributors! 🚀 🦄
-  extra_files:
-    - glob: ./capsule-seccomp.json
 checksum:
   name_template: 'checksums.txt'
 changelog:
