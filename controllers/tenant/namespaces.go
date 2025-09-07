@@ -9,6 +9,9 @@ import (
 	"maps"
 	"strings"
 
+	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/utils"
 	"github.com/valyala/fasttemplate"
 	"golang.org/x/sync/errgroup"
 	corev1 "k8s.io/api/core/v1"
@@ -17,10 +20,6 @@ import (
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-
-	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	"github.com/projectcapsule/capsule/pkg/api"
-	"github.com/projectcapsule/capsule/pkg/utils"
 )
 
 // Ensuring all annotations are applied to each Namespace handled by the Tenant.
@@ -182,6 +181,28 @@ func (r *Manager) collectNamespaces(ctx context.Context, tenant *capsulev1beta2.
 		return
 	})
 }
+func RemoveObsoleteMetadata(ctx context.Context, client client.Client, tnt *capsulev1beta2.Tenant, deletedAnnotations []string, deletedLabels []string) (err error) {
+	err = retry.RetryOnConflict(retry.DefaultBackoff, func() (conflictErr error) {
+		for _, item := range tnt.Status.Namespaces {
+			ns := &corev1.Namespace{}
+			if err = client.Get(ctx, types.NamespacedName{Name: item}, ns); err != nil {
+				return err
+			}
+
+			_, conflictErr = controllerutil.CreateOrUpdate(ctx, client, ns.DeepCopy(), func() (err error) {
+				for _, annotation := range deletedAnnotations {
+					delete(ns.Annotations, annotation)
+				}
+				for _, label := range deletedLabels {
+					delete(ns.Annotations, label)
+				}
+				return client.Update(ctx, ns)
+			})
+		}
+		return
+	})
+	return
+}
 
 // SyncNamespaceMetadata sync namespace metadata according to tenant spec.
 func SyncNamespaceMetadata(tnt *capsulev1beta2.Tenant, ns *corev1.Namespace) error {
@@ -189,6 +210,17 @@ func SyncNamespaceMetadata(tnt *capsulev1beta2.Tenant, ns *corev1.Namespace) err
 
 	annotations := buildNamespaceAnnotationsForTenant(tnt)
 	labels := buildNamespaceLabelsForTenant(tnt)
+	// Remove obsolete metadata
+	if tnt.Status.ObsoleteMetadata.Annotations != nil {
+		for _, annotation := range tnt.Status.ObsoleteMetadata.Annotations {
+			delete(ns.Annotations, annotation)
+		}
+	}
+	if tnt.Status.ObsoleteMetadata.Labels != nil {
+		for _, label := range tnt.Status.ObsoleteMetadata.Labels {
+			delete(ns.Labels, label)
+		}
+	}
 
 	if opts := tnt.Spec.NamespaceOptions; opts != nil && len(opts.AdditionalMetadataList) > 0 {
 		for _, md := range opts.AdditionalMetadataList {
@@ -229,6 +261,5 @@ func SyncNamespaceMetadata(tnt *capsulev1beta2.Tenant, ns *corev1.Namespace) err
 	} else {
 		maps.Copy(ns.Labels, labels)
 	}
-
 	return nil
 }

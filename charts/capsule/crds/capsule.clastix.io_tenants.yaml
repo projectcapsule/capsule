@@ -2428,6 +2428,18 @@ spec:
                 items:
                   type: string
                 type: array
+              obsoleteMetadata:
+                description: List of namespaces assigned to the Tenant.
+                properties:
+                  Annotations:
+                    items:
+                      type: string
+                    type: array
+                  Labels:
+                    items:
+                      type: string
+                    type: array
+                type: object
               size:
                 description: How many namespaces are assigned to the Tenant.
                 type: integer

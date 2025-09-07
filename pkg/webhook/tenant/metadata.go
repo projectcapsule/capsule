@@ -35,8 +35,13 @@ func (h *metaHandler) OnDelete(client.Client, admission.Decoder, record.EventRec
 	}
 }
 
-func (h *metaHandler) OnUpdate(_ client.Client, decoder admission.Decoder, _ record.EventRecorder) capsulewebhook.Func {
-	return func(_ context.Context, req admission.Request) *admission.Response {
+func (h *metaHandler) OnUpdate(client client.Client, decoder admission.Decoder, _ record.EventRecorder) capsulewebhook.Func {
+	return func(ctx context.Context, req admission.Request) *admission.Response {
+		oldTenant := &capsulev1beta2.Tenant{}
+		if err := decoder.DecodeRaw(req.OldObject, oldTenant); err != nil {
+			return utils.ErroredResponse(err)
+		}
+
 		tenant := &capsulev1beta2.Tenant{}
 		if err := decoder.Decode(req, tenant); err != nil {
 			return utils.ErroredResponse(err)
@@ -52,6 +57,13 @@ func (h *metaHandler) OnUpdate(_ client.Client, decoder admission.Decoder, _ rec
 			}
 		}
 
+		deletedAnnotations, deletedLabels := utils.FindDeletedMetadataKeys(oldTenant, tenant)
+		tenant.Status.ObsoleteMetadata.Annotations = deletedAnnotations
+		tenant.Status.ObsoleteMetadata.Labels = deletedLabels
+		err := client.Status().Update(ctx, tenant)
+		if err != nil {
+			return utils.ErroredResponse(err)
+		}
 		return nil
 	}
 }

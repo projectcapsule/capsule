@@ -5,6 +5,10 @@ package v1beta2
 
 // +kubebuilder:validation:Enum=Cordoned;Active
 type tenantState string
+type ObsoleteMetadata struct {
+	Labels      []string `json:"Labels,omitempty"`
+	Annotations []string `json:"Annotations,omitempty"`
+}
 
 const (
 	TenantStateActive   tenantState = "Active"
@@ -20,4 +24,6 @@ type TenantStatus struct {
 	Size uint `json:"size"`
 	// List of namespaces assigned to the Tenant.
 	Namespaces []string `json:"namespaces,omitempty"`
+	// List of namespaces assigned to the Tenant.
+	ObsoleteMetadata ObsoleteMetadata `json:"obsoleteMetadata,omitempty"`
 }
