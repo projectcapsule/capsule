@@ -227,7 +227,10 @@ func SyncNamespaceMetadata(tnt *capsulev1beta2.Tenant, ns *corev1.Namespace) err
 	} else {
 		delete(ns.Labels, utils.CordonedLabel)
 	}
-
+	if ic := tnt.Spec.IngressOptions.AllowedClasses; ic == nil {
+		delete(annotations, AvailableIngressClassesAnnotation)
+		delete(annotations, AvailableIngressClassesRegexpAnnotation)
+	}
 	if ns.Annotations == nil {
 		ns.SetAnnotations(annotations)
 	} else {
