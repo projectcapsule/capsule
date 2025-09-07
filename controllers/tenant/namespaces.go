@@ -181,28 +181,6 @@ func (r *Manager) collectNamespaces(ctx context.Context, tenant *capsulev1beta2.
 		return
 	})
 }
-func RemoveObsoleteMetadata(ctx context.Context, client client.Client, tnt *capsulev1beta2.Tenant, deletedAnnotations []string, deletedLabels []string) (err error) {
-	err = retry.RetryOnConflict(retry.DefaultBackoff, func() (conflictErr error) {
-		for _, item := range tnt.Status.Namespaces {
-			ns := &corev1.Namespace{}
-			if err = client.Get(ctx, types.NamespacedName{Name: item}, ns); err != nil {
-				return err
-			}
-
-			_, conflictErr = controllerutil.CreateOrUpdate(ctx, client, ns.DeepCopy(), func() (err error) {
-				for _, annotation := range deletedAnnotations {
-					delete(ns.Annotations, annotation)
-				}
-				for _, label := range deletedLabels {
-					delete(ns.Annotations, label)
-				}
-				return client.Update(ctx, ns)
-			})
-		}
-		return
-	})
-	return
-}
 
 // SyncNamespaceMetadata sync namespace metadata according to tenant spec.
 func SyncNamespaceMetadata(tnt *capsulev1beta2.Tenant, ns *corev1.Namespace) error {
