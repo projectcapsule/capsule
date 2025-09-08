@@ -15,12 +15,12 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api"
 )
 
-type deletedMetadataKeys struct {
+type DeletedMetadataKeys struct {
 	annotations []string
 	labels      []string
 }
 
-func findDeletedStaticMetadataKeys(deletedMetadataKey *deletedMetadataKeys, oldTenant *capsulev1beta2.Tenant, newTenant *capsulev1beta2.Tenant) {
+func findDeletedStaticMetadataKeys(deletedMetadataKey *DeletedMetadataKeys, oldTenant *capsulev1beta2.Tenant, newTenant *capsulev1beta2.Tenant) {
 	if oldIc := oldTenant.Spec.IngressOptions.AllowedClasses; oldIc != nil {
 		if ic := newTenant.Spec.IngressOptions.AllowedClasses; ic == nil || len(ic.Exact) == 0 {
 			deletedMetadataKey.annotations = append(deletedMetadataKey.annotations, capsule.AvailableIngressClassesAnnotation)
@@ -67,7 +67,7 @@ func findDeletedStaticMetadataKeys(deletedMetadataKey *deletedMetadataKeys, oldT
 	}
 }
 
-func findDeletedMetadataListKeys(deletedMetadataKey *deletedMetadataKeys, oldTenant *capsulev1beta2.Tenant, newTenant *capsulev1beta2.Tenant) {
+func findDeletedMetadataListKeys(deletedMetadataKey *DeletedMetadataKeys, oldTenant *capsulev1beta2.Tenant, newTenant *capsulev1beta2.Tenant) {
 	allOldAnnotations := map[string]string{}
 	allOldLabels := map[string]string{}
 	allNewAnnotations := map[string]string{}
@@ -103,24 +103,24 @@ func findDeletedMetadataListKeys(deletedMetadataKey *deletedMetadataKeys, oldTen
 }
 
 // FindDeletedMetadataKeys returns the deleted metadata keys.
-func FindDeletedMetadataKeys(oldTenant *capsulev1beta2.Tenant, newTenant *capsulev1beta2.Tenant) (deletedAnnotations []string, deletedLabels []string) {
-	deletedMetadata := deletedMetadataKeys{}
-	findDeletedStaticMetadataKeys(&deletedMetadata, oldTenant, newTenant)
-	findDeletedMetadataListKeys(&deletedMetadata, oldTenant, newTenant)
+func FindDeletedMetadataKeys(oldTenant *capsulev1beta2.Tenant, newTenant *capsulev1beta2.Tenant) (deletedMetadata *DeletedMetadataKeys) {
+	deletedMetadata = &DeletedMetadataKeys{}
+	findDeletedStaticMetadataKeys(deletedMetadata, oldTenant, newTenant)
+	findDeletedMetadataListKeys(deletedMetadata, oldTenant, newTenant)
 
-	return deletedAnnotations, deletedLabels
+	return deletedMetadata
 }
 
 // StoreObsoleteMetadata Saves the deleted metadata in the Tenant status.
 func StoreObsoleteMetadata(client client.Client, ctx context.Context, oldTenant *capsulev1beta2.Tenant, newTenant *capsulev1beta2.Tenant) (err error) {
 	err = retry.RetryOnConflict(retry.DefaultBackoff, func() (conflictErr error) {
-		deletedAnnotations, deletedLabels := FindDeletedMetadataKeys(oldTenant, newTenant)
-		if deletedAnnotations == nil && deletedLabels == nil {
+		deletedMetadataKeys := FindDeletedMetadataKeys(oldTenant, newTenant)
+		if deletedMetadataKeys.annotations == nil && deletedMetadataKeys.labels == nil {
 			return nil
 		}
 
-		newTenant.Status.ObsoleteMetadata.Annotations = deletedAnnotations
-		newTenant.Status.ObsoleteMetadata.Labels = deletedLabels
+		newTenant.Status.ObsoleteMetadata.Annotations = deletedMetadataKeys.annotations
+		newTenant.Status.ObsoleteMetadata.Labels = deletedMetadataKeys.labels
 
 		return client.Status().Update(ctx, newTenant)
 	})

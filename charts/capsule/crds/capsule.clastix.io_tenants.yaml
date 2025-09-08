@@ -2431,11 +2431,11 @@ spec:
               obsoleteMetadata:
                 description: List of namespaces assigned to the Tenant.
                 properties:
-                  Annotations:
+                  annotations:
                     items:
                       type: string
                     type: array
-                  Labels:
+                  labels:
                     items:
                       type: string
                     type: array
