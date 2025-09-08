@@ -9,9 +9,6 @@ import (
 	"maps"
 	"strings"
 
-	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	"github.com/projectcapsule/capsule/pkg/api"
-	"github.com/projectcapsule/capsule/pkg/utils"
 	"github.com/valyala/fasttemplate"
 	"golang.org/x/sync/errgroup"
 	corev1 "k8s.io/api/core/v1"
@@ -20,6 +17,10 @@ import (
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+
+	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/utils"
 )
 
 // Ensuring all annotations are applied to each Namespace handled by the Tenant.
@@ -165,9 +166,11 @@ func (r *Manager) collectNamespaces(ctx context.Context, tenant *capsulev1beta2.
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
 		list := &corev1.NamespaceList{}
 		tnt := &capsulev1beta2.Tenant{}
+
 		if err = r.Get(ctx, types.NamespacedName{Name: tenant.GetName()}, tnt); err != nil {
 			return
 		}
+
 		err = r.List(ctx, list, client.MatchingFieldsSelector{
 			Selector: fields.OneTermEqualSelector(".metadata.ownerReferences[*].capsule", tenant.GetName()),
 		})
@@ -175,7 +178,7 @@ func (r *Manager) collectNamespaces(ctx context.Context, tenant *capsulev1beta2.
 			return
 		}
 
-		_, err = controllerutil.CreateOrUpdate(ctx, r.Client, tenant.DeepCopy(), func() error {
+		_, err = controllerutil.CreateOrUpdate(ctx, r.Client, tnt.DeepCopy(), func() error {
 			tnt.AssignNamespaces(list.Items)
 
 			return r.Client.Status().Update(ctx, tnt, &client.SubResourceUpdateOptions{})
@@ -197,6 +200,7 @@ func SyncNamespaceMetadata(tnt *capsulev1beta2.Tenant, ns *corev1.Namespace) err
 			delete(ns.Annotations, annotation)
 		}
 	}
+
 	if tnt.Status.ObsoleteMetadata.Labels != nil {
 		for _, label := range tnt.Status.ObsoleteMetadata.Labels {
 			delete(ns.Labels, label)
@@ -230,10 +234,12 @@ func SyncNamespaceMetadata(tnt *capsulev1beta2.Tenant, ns *corev1.Namespace) err
 	} else {
 		delete(ns.Labels, utils.CordonedLabel)
 	}
+
 	if ic := tnt.Spec.IngressOptions.AllowedClasses; ic == nil {
 		delete(annotations, AvailableIngressClassesAnnotation)
 		delete(annotations, AvailableIngressClassesRegexpAnnotation)
 	}
+
 	if ns.Annotations == nil {
 		ns.SetAnnotations(annotations)
 	} else {
@@ -245,5 +251,6 @@ func SyncNamespaceMetadata(tnt *capsulev1beta2.Tenant, ns *corev1.Namespace) err
 	} else {
 		maps.Copy(ns.Labels, labels)
 	}
+
 	return nil
 }

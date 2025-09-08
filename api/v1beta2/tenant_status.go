@@ -5,9 +5,10 @@ package v1beta2
 
 // +kubebuilder:validation:Enum=Cordoned;Active
 type tenantState string
+
 type ObsoleteMetadata struct {
-	Labels      []string `json:"Labels,omitempty"`
-	Annotations []string `json:"Annotations,omitempty"`
+	Labels      []string `json:"labels,omitempty"`
+	Annotations []string `json:"annotations,omitempty"`
 }
 
 const (

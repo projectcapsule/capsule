@@ -60,6 +60,7 @@ func (h *metaHandler) OnUpdate(client client.Client, decoder admission.Decoder, 
 		if err := utils.StoreObsoleteMetadata(client, ctx, oldTenant, tenant); err != nil {
 			return utils.ErroredResponse(err)
 		}
+
 		return nil
 	}
 }
