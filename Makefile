@@ -303,7 +303,7 @@ e2e-load-image: kind
 
 .PHONY: e2e-exec
 e2e-exec: ginkgo
-	$(GINKGO) -v -tags e2e ./e2e
+	$(GINKGO) --label-filter=globalresource -v -tags e2e ./e2e
 
 .PHONY: e2e-destroy
 e2e-destroy: kind

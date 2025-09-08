@@ -164,7 +164,10 @@ func (r *Manager) ensureNamespaceCount(ctx context.Context, tenant *capsulev1bet
 func (r *Manager) collectNamespaces(ctx context.Context, tenant *capsulev1beta2.Tenant) error {
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
 		list := &corev1.NamespaceList{}
-
+		tnt := &capsulev1beta2.Tenant{}
+		if err = r.Get(ctx, types.NamespacedName{Name: tenant.GetName()}, tnt); err != nil {
+			return
+		}
 		err = r.List(ctx, list, client.MatchingFieldsSelector{
 			Selector: fields.OneTermEqualSelector(".metadata.ownerReferences[*].capsule", tenant.GetName()),
 		})
@@ -173,9 +176,9 @@ func (r *Manager) collectNamespaces(ctx context.Context, tenant *capsulev1beta2.
 		}
 
 		_, err = controllerutil.CreateOrUpdate(ctx, r.Client, tenant.DeepCopy(), func() error {
-			tenant.AssignNamespaces(list.Items)
+			tnt.AssignNamespaces(list.Items)
 
-			return r.Client.Status().Update(ctx, tenant, &client.SubResourceUpdateOptions{})
+			return r.Client.Status().Update(ctx, tnt, &client.SubResourceUpdateOptions{})
 		})
 
 		return

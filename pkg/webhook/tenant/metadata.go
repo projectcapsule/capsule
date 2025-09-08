@@ -57,11 +57,7 @@ func (h *metaHandler) OnUpdate(client client.Client, decoder admission.Decoder, 
 			}
 		}
 
-		deletedAnnotations, deletedLabels := utils.FindDeletedMetadataKeys(oldTenant, tenant)
-		tenant.Status.ObsoleteMetadata.Annotations = deletedAnnotations
-		tenant.Status.ObsoleteMetadata.Labels = deletedLabels
-		err := client.Status().Update(ctx, tenant)
-		if err != nil {
+		if err := utils.StoreObsoleteMetadata(client, ctx, oldTenant, tenant); err != nil {
 			return utils.ErroredResponse(err)
 		}
 		return nil
