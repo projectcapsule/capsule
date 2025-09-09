@@ -17,23 +17,35 @@ metadata:
   {{- end }}
 spec:
   endpoints:
-  {{- with .endpoint }}
-  - interval: {{ .interval }}
-    port: metrics
-    path: /metrics
-    {{- with .scrapeTimeout }}
-    scrapeTimeout: {{ . }}
+  {{- range .endpoints }}
+  - {{- if .port }}
+    port: {{ .port }}
+    {{- end }}
+    {{- if .interval }}
+    interval: {{ .interval }}
+    {{- end }}
+    {{- if .path }}
+    path: {{ .path }}
+    {{- end }}
+    {{- if .scheme }}
+    scheme: {{ .scheme }}
+    {{- end }}
+    {{- if .scrapeTimeout }}
+    scrapeTimeout: {{ .scrapeTimeout }}
+    {{- end }}
+    {{- with .params }}
+    params: {{ toYaml . | nindent 6 }}
     {{- end }}
     {{- with .metricRelabelings }}
-    metricRelabelings: {{- toYaml . | nindent 6 }}
+    metricRelabelings: {{ toYaml . | nindent 6 }}
     {{- end }}
     {{- with .relabelings }}
-    relabelings: {{- toYaml . | nindent 6 }}
+    relabelings: {{ toYaml . | nindent 6 }}
     {{- end }}
   {{- end }}
   jobLabel: app.kubernetes.io/name
   {{- with .targetLabels }}
-  targetLabels: {{- toYaml . | nindent 4 }}
+  targetLabels: {{ toYaml . | nindent 4 }}
   {{- end }}
   selector:
     matchLabels:

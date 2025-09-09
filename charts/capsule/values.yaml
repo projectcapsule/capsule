@@ -322,28 +322,50 @@ monitoring:
       folder: ""
 
   # ServiceMonitor
-  serviceMonitor:
-    # -- Enable ServiceMonitor
-    enabled: false
-    # -- Install the ServiceMonitor into a different Namespace, as the monitoring stack one (default: the release one)
-    namespace: ''
-    # -- Assign additional labels according to Prometheus' serviceMonitorSelector matching labels
-    labels: {}
-    # -- Assign additional Annotations
-    annotations: {}
-    # -- Change matching labels
-    matchLabels: {}
-    # -- Set targetLabels for the serviceMonitor
-    targetLabels: []
-    endpoint:
-      # -- Set the scrape interval for the endpoint of the serviceMonitor
-      interval: "15s"
-      # -- Set the scrape timeout for the endpoint of the serviceMonitor
+# ServiceMonitor
+serviceMonitor:
+  # -- Enable ServiceMonitor
+  enabled: true
+
+  # -- Install the ServiceMonitor into a different Namespace, as the monitoring stack one (default: the release one)
+  namespace: ''
+
+  # -- Assign additional labels according to Prometheus' serviceMonitorSelector matching labels
+  labels: {}
+
+  # -- Assign additional Annotations
+  annotations: {}
+
+  # -- Change matching labels
+  matchLabels: {}
+
+  # -- Set targetLabels for the serviceMonitor
+  targetLabels: []
+
+  # -- Define multiple scrape endpoints
+  endpoints:
+    # Default metrics scrape
+    - interval: "15s"
       scrapeTimeout: ""
-      # -- Set metricRelabelings for the endpoint of the serviceMonitor
       metricRelabelings: []
-      # -- Set relabelings for the endpoint of the serviceMonitor
-      relabelings: []
+      relabelings:
+        - targetLabel: instance_name
+          replacement: "demo"
+
+    # # Endpoint-a
+    # - port: http
+    #   interval: 10s
+    #   scrapeTimeout: 5s
+    #   path: /probe
+    #   scheme: http
+
+    # # Endpoint-b
+    # - port: http
+    #   interval: 10s
+    #   scrapeTimeout: 5s
+    #   path: /probe
+    #   scheme: http
+
 
 
 # Webhooks configurations
