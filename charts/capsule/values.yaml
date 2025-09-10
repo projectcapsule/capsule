@@ -326,22 +326,16 @@ monitoring:
 serviceMonitor:
   # -- Enable ServiceMonitor
   enabled: true
-
   # -- Install the ServiceMonitor into a different Namespace, as the monitoring stack one (default: the release one)
   namespace: ''
-
   # -- Assign additional labels according to Prometheus' serviceMonitorSelector matching labels
   labels: {}
-
   # -- Assign additional Annotations
   annotations: {}
-
   # -- Change matching labels
   matchLabels: {}
-
   # -- Set targetLabels for the serviceMonitor
   targetLabels: []
-
   # -- Define multiple scrape endpoints
   endpoints:
     # Default metrics scrape
@@ -351,7 +345,6 @@ serviceMonitor:
       relabelings:
         - targetLabel: instance_name
           replacement: "demo"
-
     # # Endpoint-a
     # - port: http
     #   interval: 10s
@@ -365,9 +358,6 @@ serviceMonitor:
     #   scrapeTimeout: 5s
     #   path: /probe
     #   scheme: http
-
-
-
 # Webhooks configurations
 webhooks:
   # -- When `crds.exclusive` is `true` the webhooks will be installed
@@ -392,7 +382,6 @@ webhooks:
 
   # Admission Webhook Configuration
   hooks:
-
     resourcepools:
       pools:
         # -- Enable the Hook
