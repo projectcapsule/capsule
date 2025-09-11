@@ -1,0 +1,10 @@
+# -- Array of additional resources to be created alongside Capsule helm chart
+extraManifests:
+  - apiVersion: capsule.clastix.io/v1beta2
+    kind: Tenant
+    metadata:
+      name: oil
+    spec:
+      owners:
+      - name: alice
+        kind: User
