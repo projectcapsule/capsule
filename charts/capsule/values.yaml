@@ -298,6 +298,15 @@ customLabels: {}
 # -- Additional annotations which will be added to all resources created by Capsule helm chart
 customAnnotations: {}
 
+# -- Array of additional resources to be created alongside Capsule helm chart
+extraManifests: []
+  # - apiVersion: v1
+  #   kind: ConfigMap
+  #   metadata:
+  #     name: extra-configmap
+  #   data:
+  #     key: value
+
 # Monitoring Settings
 monitoring:
 

@@ -1,0 +1,8 @@
+# -- Array of additional resources to be created alongside Capsule helm chart
+extraManifests:
+  - apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: random-config
+    data:
+      random-value: "{{ randAlphaNum 16 }}"

@@ -65,6 +65,7 @@ The following Values have changed key or Value:
 | certManager.generateCertificates | bool | `false` | Specifies whether capsule webhooks certificates should be generated using cert-manager |
 | customAnnotations | object | `{}` | Additional annotations which will be added to all resources created by Capsule helm chart |
 | customLabels | object | `{}` | Additional labels which will be added to all resources created by Capsule helm chart |
+| extraManifests | list | `[]` | Array of additional resources to be created alongside Capsule helm chart |
 | imagePullSecrets | list | `[]` | Configuration for `imagePullSecrets` so that you can use a private images registry. |
 | jobs | object | `{}` | Deprecated, use .global.jobs.kubectl instead |
 | nodeSelector | object | `{}` | Set the node selector for the Capsule pod |
