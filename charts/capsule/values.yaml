@@ -295,6 +295,24 @@ customLabels: {}
 # -- Additional annotations which will be added to all resources created by Capsule helm chart
 customAnnotations: {}
 
+# -- Array of additional resources to be created alongside Capsule helm chart
+extraManifests: []
+  # - apiVersion: v1
+  #   kind: ConfigMap
+  #   metadata:
+  #     name: extra-configmap
+  #   data:
+  #     key: value
+  #
+  # - apiVersion: capsule.clastix.io/v1beta2
+  #   kind: Tenant
+  #   metadata:
+  #     name: oil
+  #   spec:
+  #     owners:
+  #     - name: alice
+  #       kind: User
+
 # Monitoring Settings
 monitoring:
 
