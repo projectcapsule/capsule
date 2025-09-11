@@ -16,7 +16,13 @@ global:
         tag: ""
       # -- ImagePullSecrets
       imagePullSecrets: []
-      # -- Annotations to add to the certgen job.
+      # -- Labels to add to the job pod
+      podLabels: {}
+      # -- Annotations to add to the job pod
+      podAnnotations: {}
+      # -- Labels to add to the job.
+      labels: {}
+      # -- Annotations to add to the job.
       annotations: {}
       # -- Set the restartPolicy
       restartPolicy: Never
@@ -108,6 +114,18 @@ manager:
   # -- Set the controller deployment mode as `Deployment` or `DaemonSet`.
   kind: Deployment
 
+  # -- [Deployment Strategy](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#strategy)
+  deploymentStrategy:
+    type: "RollingUpdate"
+    # rollingUpdate:
+    #   maxUnavailable: 1
+
+  # -- [Daemonset Strategy](https://kubernetes.io/docs/tasks/manage-daemon/update-daemon-set/#creating-a-daemonset-with-rollingupdate-update-strategy)
+  daemonsetStrategy:
+    type: "RollingUpdate"
+    # rollingUpdate:
+    #   maxUnavailable: 1
+
   image:
      # -- Set the image registry of capsule.
     registry: ghcr.io
@@ -127,6 +145,9 @@ manager:
 
   # -- Specifies if the container should be started in hostPID mode.
   hostPID: false
+
+  # -- Don't use Host Users (User Namespaces)
+  hostUsers: true
 
   # -- Set an alternative to the default container port.
   #
@@ -149,7 +170,8 @@ manager:
     # this might be useful if you have one group where all the users are in, but you want to separate administrators from normal users with additional groups.
     ignoreUserWithGroups: []
     # -- ServiceAccounts within tenant namespaces can be promoted to owners of the given tenant
-    # this can be achieved by labeling the serviceaccount and then they are considered owners. This can only be done by non capsule users.
+    # this can be achieved by labeling the serviceaccount and then they are considered owners. This can only be done by other owners of the tenant.
+    # However ServiceAccounts which have been promoted to owner can not promote further serviceAccounts.
     allowServiceAccountPromotion: false
     # -- Boolean, enforces the Tenant owner, during Namespace creation, to name it using the selected Tenant name as prefix, separated by a dash
     forceTenantPrefix: false
@@ -165,6 +187,13 @@ manager:
       forbiddenAnnotations:
         denied: []
         deniedRegex: ""
+
+  # -- A list of extra arguments for the capsule controller
+  extraArgs:
+  - "--enable-leader-election=true"
+
+  # -- Additional Environment Variables
+  env: []
 
   # -- Configure the liveness probe using Deployment probe spec
   livenessProbe:

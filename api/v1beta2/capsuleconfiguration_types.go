@@ -20,7 +20,8 @@ type CapsuleConfigurationSpec struct {
 	// this might be useful if you have one group where all the users are in, but you want to separate administrators from normal users with additional groups.
 	IgnoreUserWithGroups []string `json:"ignoreUserWithGroups,omitempty"`
 	// ServiceAccounts within tenant namespaces can be promoted to owners of the given tenant
-	// this can be achieved by labeling the serviceaccount and then they are considered owners. This can only be done by non capsule users.
+	// this can be achieved by labeling the serviceaccount and then they are considered owners. This can only be done by other owners of the tenant.
+	// However ServiceAccounts which have been promoted to owner can not promote further serviceAccounts.
 	// +kubebuilder:default=false
 	AllowServiceAccountPromotion bool `json:"allowServiceAccountPromotion,omitempty"`
 	// Enforces the Tenant owner, during Namespace creation, to name it using the selected Tenant name as prefix,
