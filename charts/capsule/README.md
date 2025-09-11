@@ -26,6 +26,7 @@ The following Values have changed key or Value:
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | crds.annnotations | object | `{}` | Extra Annotations for CRDs |
+| crds.createConfig | bool | `false` | Create additionally CapsuleConfiguration even if CRDs are exclusive |
 | crds.exclusive | bool | `false` | Only install the CRDs, no other primitives |
 | crds.install | bool | `true` | Install the CustomResourceDefinitions (This also manages the lifecycle of the CRDs for update operations) |
 | crds.labels | object | `{}` | Extra Labels for CRDs |
@@ -105,6 +106,7 @@ The following Values have changed key or Value:
 | manager.image.tag | string | `""` | Overrides the image tag whose default is the chart appVersion. |
 | manager.kind | string | `"Deployment"` | Set the controller deployment mode as `Deployment` or `DaemonSet`. |
 | manager.livenessProbe | object | `{"httpGet":{"path":"/healthz","port":10080}}` | Configure the liveness probe using Deployment probe spec |
+| manager.options.allowServiceAccountPromotion | bool | `false` | ServiceAccounts within tenant namespaces can be promoted to owners of the given tenant this can be achieved by labeling the serviceaccount and then they are considered owners. This can only be done by other owners of the tenant. However ServiceAccounts which have been promoted to owner can not promote further serviceAccounts. |
 | manager.options.capsuleConfiguration | string | `"default"` | Change the default name of the capsule configuration name |
 | manager.options.capsuleUserGroups | list | `["projectcapsule.dev"]` | Names of the groups considered as Capsule users. |
 | manager.options.forceTenantPrefix | bool | `false` | Boolean, enforces the Tenant owner, during Namespace creation, to name it using the selected Tenant name as prefix, separated by a dash |
@@ -228,6 +230,12 @@ The following Values have changed key or Value:
 | webhooks.hooks.resourcepools.pools.matchPolicy | string | `"Equivalent"` | [MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy) |
 | webhooks.hooks.resourcepools.pools.namespaceSelector | object | `{}` | [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector) |
 | webhooks.hooks.resourcepools.pools.objectSelector | object | `{}` | [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector) |
+| webhooks.hooks.serviceaccounts.enabled | bool | `true` | Enable the Hook |
+| webhooks.hooks.serviceaccounts.failurePolicy | string | `"Fail"` | [FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy) |
+| webhooks.hooks.serviceaccounts.matchConditions | list | `[]` | [MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy) |
+| webhooks.hooks.serviceaccounts.matchPolicy | string | `"Exact"` | [MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy) |
+| webhooks.hooks.serviceaccounts.namespaceSelector | object | `{"matchExpressions":[{"key":"capsule.clastix.io/tenant","operator":"Exists"}]}` | [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector) |
+| webhooks.hooks.serviceaccounts.objectSelector | object | `{}` | [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector) |
 | webhooks.hooks.services.enabled | bool | `true` | Enable the Hook |
 | webhooks.hooks.services.failurePolicy | string | `"Fail"` | [FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy) |
 | webhooks.hooks.services.matchConditions | list | `[]` | [MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy) |

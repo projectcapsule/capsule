@@ -15,15 +15,18 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/configuration"
 	capsuleutils "github.com/projectcapsule/capsule/pkg/utils"
 	capsulewebhook "github.com/projectcapsule/capsule/pkg/webhook"
 	"github.com/projectcapsule/capsule/pkg/webhook/utils"
 )
 
-type patchHandler struct{}
+type patchHandler struct {
+	configuration configuration.Configuration
+}
 
-func PatchHandler() capsulewebhook.Handler {
-	return &patchHandler{}
+func PatchHandler(configuration configuration.Configuration) capsulewebhook.Handler {
+	return &patchHandler{configuration: configuration}
 }
 
 func (r *patchHandler) OnCreate(client.Client, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
@@ -66,7 +69,14 @@ func (r *patchHandler) OnUpdate(c client.Client, decoder admission.Decoder, reco
 				return &response
 			}
 
-			if utils.IsTenantOwner(tnt.Spec.Owners, req.UserInfo) {
+			ok, err := utils.IsTenantOwner(ctx, c, tnt, req.UserInfo, r.configuration.AllowServiceAccountPromotion())
+			if err != nil {
+				response := admission.Errored(http.StatusBadRequest, err)
+
+				return &response
+			}
+
+			if ok {
 				return nil
 			}
 		}
