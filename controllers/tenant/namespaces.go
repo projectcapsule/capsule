@@ -184,17 +184,19 @@ func (r *Manager) collectNamespaces(ctx context.Context, tenant *capsulev1beta2.
 }
 
 // SyncNamespaceMetadata sync namespace metadata according to tenant spec.
-func SyncNamespaceMetadata(tnt *capsulev1beta2.Tenant, ns *corev1.Namespace) error {
+func SyncNamespaceMetadata(tnt *capsulev1beta2.Tenant, ns *corev1.Namespace) (labels map[string]string, annotations map[string]string, err error) {
 	capsuleLabel, _ := utils.GetTypeLabel(&capsulev1beta2.Tenant{})
 
-	annotations := buildNamespaceAnnotationsForTenant(tnt)
-	labels := buildNamespaceLabelsForTenant(tnt)
+	annotations = buildNamespaceAnnotationsForTenant(tnt)
+	labels = buildNamespaceLabelsForTenant(tnt)
 
 	if opts := tnt.Spec.NamespaceOptions; opts != nil && len(opts.AdditionalMetadataList) > 0 {
 		for _, md := range opts.AdditionalMetadataList {
-			ok, err := utils.IsNamespaceSelectedBySelector(ns, md.NamespaceSelector)
+			var ok bool
+
+			ok, err = utils.IsNamespaceSelectedBySelector(ns, md.NamespaceSelector)
 			if err != nil {
-				return err
+				return
 			}
 
 			if !ok {
