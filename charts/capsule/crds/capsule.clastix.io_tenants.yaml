@@ -2007,7 +2007,9 @@ spec:
                   label. Optional.
                 type: object
               owners:
-                description: Specifies the owners of the Tenant. Mandatory.
+                description: |-
+                  Specifies the owners of the Tenant.
+                  Optional
                 items:
                   properties:
                     clusterRoles:
@@ -2417,8 +2419,6 @@ spec:
                     type: object
                 type: object
                 x-kubernetes-map-type: atomic
-            required:
-            - owners
             type: object
           status:
             description: Returns the observed state of the Tenant.
