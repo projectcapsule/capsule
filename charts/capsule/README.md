@@ -26,6 +26,7 @@ The following Values have changed key or Value:
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | crds.annnotations | object | `{}` | Extra Annotations for CRDs |
+| crds.createConfig | bool | `false` | Create additionally CapsuleConfiguration even if CRDs are exclusive |
 | crds.exclusive | bool | `false` | Only install the CRDs, no other primitives |
 | crds.install | bool | `true` | Install the CustomResourceDefinitions (This also manages the lifecycle of the CRDs for update operations) |
 | crds.labels | object | `{}` | Extra Labels for CRDs |
@@ -35,14 +36,17 @@ The following Values have changed key or Value:
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | global.jobs.kubectl.affinity | object | `{}` | Set affinity rules |
-| global.jobs.kubectl.annotations | object | `{}` | Annotations to add to the certgen job. |
+| global.jobs.kubectl.annotations | object | `{}` | Annotations to add to the job. |
 | global.jobs.kubectl.backoffLimit | int | `4` | Backofflimit for jobs |
 | global.jobs.kubectl.image.pullPolicy | string | `"IfNotPresent"` | Set the image pull policy of the helm chart job |
 | global.jobs.kubectl.image.registry | string | `"docker.io"` | Set the image repository of the helm chart job |
 | global.jobs.kubectl.image.repository | string | `"clastix/kubectl"` | Set the image repository of the helm chart job |
 | global.jobs.kubectl.image.tag | string | `""` | Set the image tag of the helm chart job |
 | global.jobs.kubectl.imagePullSecrets | list | `[]` | ImagePullSecrets |
+| global.jobs.kubectl.labels | object | `{}` | Labels to add to the job. |
 | global.jobs.kubectl.nodeSelector | object | `{}` | Set the node selector |
+| global.jobs.kubectl.podAnnotations | object | `{}` | Annotations to add to the job pod |
+| global.jobs.kubectl.podLabels | object | `{}` | Labels to add to the job pod |
 | global.jobs.kubectl.podSecurityContext | object | `{"enabled":true,"seccompProfile":{"type":"RuntimeDefault"}}` | Security context for the job pods. |
 | global.jobs.kubectl.priorityClassName | string | `""` | Set a pod priorityClassName |
 | global.jobs.kubectl.resources | object | `{}` | Job resources |
@@ -65,6 +69,7 @@ The following Values have changed key or Value:
 | jobs | object | `{}` | Deprecated, use .global.jobs.kubectl instead |
 | nodeSelector | object | `{}` | Set the node selector for the Capsule pod |
 | podAnnotations | object | `{}` | Annotations to add to the capsule pod. |
+| podLabels | object | `{}` | Labels to add to the capsule pod. |
 | podSecurityContext | object | `{"enabled":true,"runAsGroup":1002,"runAsNonRoot":true,"runAsUser":1002,"seccompProfile":{"type":"RuntimeDefault"}}` | Set the securityContext for the Capsule pod |
 | ports | list | `[]` | Set additional ports for the deployment |
 | priorityClassName | string | `""` | Set the priority class name of the Capsule pod |
@@ -88,14 +93,20 @@ The following Values have changed key or Value:
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
+| manager.daemonsetStrategy | object | `{"type":"RollingUpdate"}` | [Daemonset Strategy](https://kubernetes.io/docs/tasks/manage-daemon/update-daemon-set/#creating-a-daemonset-with-rollingupdate-update-strategy) |
+| manager.deploymentStrategy | object | `{"type":"RollingUpdate"}` | [Deployment Strategy](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#strategy) |
+| manager.env | list | `[]` | Additional Environment Variables |
+| manager.extraArgs | list | `["--enable-leader-election=true"]` | A list of extra arguments for the capsule controller |
 | manager.hostNetwork | bool | `false` | Specifies if the container should be started in hostNetwork mode.  Required for use in some managed kubernetes clusters (such as AWS EKS) with custom CNI (such as calico), because control-plane managed by AWS cannot communicate with pods' IP CIDR and admission webhooks are not working |
 | manager.hostPID | bool | `false` | Specifies if the container should be started in hostPID mode. |
+| manager.hostUsers | bool | `true` | Don't use Host Users (User Namespaces) |
 | manager.image.pullPolicy | string | `"IfNotPresent"` | Set the image pull policy. |
 | manager.image.registry | string | `"ghcr.io"` | Set the image registry of capsule. |
 | manager.image.repository | string | `"projectcapsule/capsule"` | Set the image repository of capsule. |
 | manager.image.tag | string | `""` | Overrides the image tag whose default is the chart appVersion. |
 | manager.kind | string | `"Deployment"` | Set the controller deployment mode as `Deployment` or `DaemonSet`. |
 | manager.livenessProbe | object | `{"httpGet":{"path":"/healthz","port":10080}}` | Configure the liveness probe using Deployment probe spec |
+| manager.options.allowServiceAccountPromotion | bool | `false` | ServiceAccounts within tenant namespaces can be promoted to owners of the given tenant this can be achieved by labeling the serviceaccount and then they are considered owners. This can only be done by other owners of the tenant. However ServiceAccounts which have been promoted to owner can not promote further serviceAccounts. |
 | manager.options.capsuleConfiguration | string | `"default"` | Change the default name of the capsule configuration name |
 | manager.options.capsuleUserGroups | list | `["projectcapsule.dev"]` | Names of the groups considered as Capsule users. |
 | manager.options.forceTenantPrefix | bool | `false` | Boolean, enforces the Tenant owner, during Namespace creation, to name it using the selected Tenant name as prefix, separated by a dash |
@@ -219,6 +230,12 @@ The following Values have changed key or Value:
 | webhooks.hooks.resourcepools.pools.matchPolicy | string | `"Equivalent"` | [MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy) |
 | webhooks.hooks.resourcepools.pools.namespaceSelector | object | `{}` | [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector) |
 | webhooks.hooks.resourcepools.pools.objectSelector | object | `{}` | [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector) |
+| webhooks.hooks.serviceaccounts.enabled | bool | `true` | Enable the Hook |
+| webhooks.hooks.serviceaccounts.failurePolicy | string | `"Fail"` | [FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy) |
+| webhooks.hooks.serviceaccounts.matchConditions | list | `[]` | [MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy) |
+| webhooks.hooks.serviceaccounts.matchPolicy | string | `"Exact"` | [MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy) |
+| webhooks.hooks.serviceaccounts.namespaceSelector | object | `{"matchExpressions":[{"key":"capsule.clastix.io/tenant","operator":"Exists"}]}` | [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector) |
+| webhooks.hooks.serviceaccounts.objectSelector | object | `{}` | [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector) |
 | webhooks.hooks.services.enabled | bool | `true` | Enable the Hook |
 | webhooks.hooks.services.failurePolicy | string | `"Fail"` | [FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy) |
 | webhooks.hooks.services.matchConditions | list | `[]` | [MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy) |

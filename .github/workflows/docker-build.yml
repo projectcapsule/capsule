@@ -28,7 +28,7 @@ jobs:
       - name: ko build
         run: VERSION=${{ github.sha }} make ko-build-all
       - name: Trivy Scan Image
-        uses: aquasecurity/trivy-action@dc5a429b52fcf669ce959baa2c2dd26090d2a6c4 # 0.32.0
+        uses: aquasecurity/trivy-action@b6643a29fecd7f34b3597bc6acb0a98b03d33ff8 # 0.33.1
         with:
           scan-type: 'fs'
           ignore-unfixed: true
@@ -40,6 +40,6 @@ jobs:
           # See: https://github.com/aquasecurity/trivy-action/issues/389#issuecomment-2385416577
           TRIVY_DB_REPOSITORY: 'public.ecr.aws/aquasecurity/trivy-db:2'
       - name: Upload Trivy scan results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@5b49155c7f37b5ec074ffd26b428e6b64b1bf412
+        uses: github/codeql-action/upload-sarif@aa90e97ad2ed17cde6a43e89f70138299e64f837
         with:
           sarif_file: 'trivy-results.sarif'

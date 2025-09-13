@@ -25,6 +25,7 @@ spec:
   serviceAccountClient:
     {{- toYaml . | nindent 4 }}
   {{- end }}
+  allowServiceAccountPromotion: {{ .Values.manager.options.allowServiceAccountPromotion }}
   userGroups:
     {{- toYaml .Values.manager.options.capsuleUserGroups  | nindent 4 }}
   userNames:
