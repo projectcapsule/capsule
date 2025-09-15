@@ -345,7 +345,7 @@ webhooks:
   admissionReviewVersions:
     - v1
   clientConfig:
-    {{- include "capsule.webhooks.service" (dict "path" "/tenantresource-objects" "ctx" $) | nindent 4 }}
+    {{- include "capsule.webhooks.service" (dict "path" "/tenantresource/objects/validating" "ctx" $) | nindent 4 }}
   failurePolicy: {{ .failurePolicy }}
   matchPolicy: {{ .matchPolicy }}
   {{- with .namespaceSelector }}

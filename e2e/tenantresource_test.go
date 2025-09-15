@@ -24,7 +24,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api"
 )
 
-var _ = Describe("Creating a TenantResource object", Label("tenantresource"), func() {
+var _ = Describe("Creating a TenantResource object", Label("tenantresource2"), func() {
 	solar := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "energy-solar",
@@ -224,6 +224,13 @@ var _ = Describe("Creating a TenantResource object", Label("tenantresource"), fu
 			EventuallyCreation(func() error {
 				return k8sClient.Create(context.TODO(), tr)
 			}).Should(Succeed())
+		})
+
+		By("verify labels/annotations are not redirect to TenantResource", func() {
+			trVerify := &capsulev1beta2.TenantResource{}
+			Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: tr.GetName(), Namespace: tr.GetNamespace()}, trVerify)).ToNot(HaveOccurred())
+
+			Expect(trVerify.Spec.Resources[0].AdditionalMetadata).To(Equal(tr.Spec.Resources[0].AdditionalMetadata))
 		})
 
 		for _, ns := range solarNs {
