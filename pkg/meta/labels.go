@@ -10,6 +10,8 @@ import (
 )
 
 const (
+	ResourcesLabel = "capsule.clastix.io/resources"
+
 	FreezeLabel        = "projectcapsule.dev/freeze"
 	FreezeLabelTrigger = "true"
 

@@ -1,0 +1,20 @@
+apiVersion: capsule.clastix.io/v1beta2
+kind: TenantResource
+metadata:
+  name: solar-db
+  namespace: solar-system
+spec:
+  resyncPeriod: 60s
+  resources:
+    - additionalMetadata:
+        labels:
+          "replicated-by": "capsule"
+      rawItems:
+        - apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: game-demo
+          data:
+            # property-like keys; each key maps to a simple value
+            player_initial_lives: "3"
+            ui_properties_file_name: "user-interface.properties"

@@ -66,7 +66,7 @@ crds:
   # -- Only install the CRDs, no other primitives
   exclusive: false
   # -- Create additionally CapsuleConfiguration even if CRDs are exclusive
-  createConfig: false
+  createConfig: false 
   # -- Extra Labels for CRDs
   labels: {}
   # -- Extra Annotations for CRDs
@@ -187,6 +187,10 @@ manager:
       forbiddenAnnotations:
         denied: []
         deniedRegex: ""
+    # -- If `proxy.enabled` is `true`, this option sets the `options.serviceAccountClient` according to the standard installation. Properties from `options.serviceAccountClient` are merged over the default values.
+    useProxyForServiceAccountClient: false
+    # -- Define custom service account client options for the Capsule manager container.
+    serviceAccountClient: {}
 
   # -- A list of extra arguments for the capsule controller
   extraArgs:

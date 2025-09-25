@@ -13,6 +13,9 @@ const (
 	ReadyCondition    string = "Ready"
 	NotReadyCondition string = "NotReady"
 
+	PruningCondition     string = "Pruning"
+	ReplicationCondition string = "Replication"
+
 	AssignedCondition string = "Assigned"
 	BoundCondition    string = "Bound"
 
@@ -23,6 +26,14 @@ const (
 	QueueExhaustedReason     string = "QueueExhausted"
 	NamespaceExhaustedReason string = "NamespaceExhausted"
 )
+
+func NewReadyCondition(obj client.Object) metav1.Condition {
+	return metav1.Condition{
+		Type:               ReadyCondition,
+		ObservedGeneration: obj.GetGeneration(),
+		LastTransitionTime: metav1.Now(),
+	}
+}
 
 func NewBoundCondition(obj client.Object) metav1.Condition {
 	return metav1.Condition{

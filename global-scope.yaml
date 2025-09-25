@@ -1,0 +1,20 @@
+apiVersion: capsule.clastix.io/v1beta2
+kind: GlobalTenantResource
+metadata:
+  name: global-scope
+spec:
+  tenantSelector:
+    matchLabels:
+       energy: renewable
+  scope: Tenant
+  resyncPeriod: 5s
+  resources:
+    - rawItems:
+      - apiVersion: v1
+        kind: Secret
+        metadata:
+          name: "some-secret-bruv"
+          namespace: "solar-test"
+        stringData:
+          username: "some-username"
+
