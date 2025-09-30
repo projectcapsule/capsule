@@ -79,7 +79,7 @@ func (in *AllowedListSpec) ExactMatch(value string) (ok bool) {
 		ok = i < len(in.Exact) && in.Exact[i] == value
 	}
 
-	return
+	return ok
 }
 
 func (in *AllowedListSpec) RegexMatch(value string) (ok bool) {
@@ -87,7 +87,7 @@ func (in *AllowedListSpec) RegexMatch(value string) (ok bool) {
 		ok = regexp.MustCompile(in.Regex).MatchString(value)
 	}
 
-	return
+	return ok
 }
 
 // +kubebuilder:object:generate=true

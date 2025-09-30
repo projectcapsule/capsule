@@ -14,5 +14,5 @@ func GetOwnersWithKinds(tenant *capsulev1beta2.Tenant) (owners []string) {
 		owners = append(owners, fmt.Sprintf("%s:%s", owner.Kind.String(), owner.Name))
 	}
 
-	return
+	return owners
 }

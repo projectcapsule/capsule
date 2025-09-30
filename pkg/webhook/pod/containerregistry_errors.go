@@ -49,5 +49,5 @@ func (f registryClassForbiddenError) Error() (err string) {
 
 	err += strings.Join(extra, " or ")
 
-	return
+	return err
 }

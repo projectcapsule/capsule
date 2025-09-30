@@ -94,7 +94,7 @@ func (in *Tenant) GetNamespaces() (res []string) {
 
 	res = append(res, in.Status.Namespaces...)
 
-	return
+	return res
 }
 
 // +kubebuilder:object:root=true

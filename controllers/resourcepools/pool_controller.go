@@ -85,7 +85,7 @@ func (r resourcePoolController) Reconcile(ctx context.Context, request ctrl.Requ
 
 		log.Error(err, "Error reading the object")
 
-		return
+		return result, err
 	}
 
 	// ResourceQuota Reconciliation
@@ -298,7 +298,7 @@ func (r *resourcePoolController) canClaimWithinNamespace(
 		}
 	}
 
-	return
+	return res
 }
 
 // Handles exhaustions when a exhaustion was already declared in the given map.
@@ -336,7 +336,7 @@ func (r *resourcePoolController) handleClaimOrderedExhaustion(
 		return queued, updateStatusAndEmitEvent(ctx, r.Client, r.recorder, claim, cond)
 	}
 
-	return
+	return queued, err
 }
 
 func (r *resourcePoolController) handleClaimResourceExhaustion(
@@ -399,12 +399,12 @@ func (r *resourcePoolController) handleClaimToPoolBinding(
 	cond.Message = "Claimed resources"
 
 	if err = updateStatusAndEmitEvent(ctx, r.Client, r.recorder, claim, cond); err != nil {
-		return
+		return err
 	}
 
 	pool.AddClaimToStatus(claim)
 
-	return
+	return err
 }
 
 // Attempts to garbage collect a ResourceQuota resource.
@@ -571,7 +571,7 @@ func (r *resourcePoolController) gatherMatchingNamespaces(
 	seenNamespaces := make(map[string]struct{})
 
 	if !pool.DeletionTimestamp.IsZero() {
-		return
+		return namespaces, err
 	}
 
 	for _, selector := range pool.Spec.Selectors {
@@ -597,7 +597,7 @@ func (r *resourcePoolController) gatherMatchingNamespaces(
 		}
 	}
 
-	return
+	return namespaces, err
 }
 
 // Get Currently selected claims for the resourcepool.

@@ -30,5 +30,5 @@ func (u userGroupList) Find(needle string) (found bool) {
 
 	found = i < len(u) && u[i] == needle
 
-	return
+	return found
 }

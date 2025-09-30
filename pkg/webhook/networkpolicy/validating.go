@@ -73,7 +73,7 @@ func (r *handler) handle(ctx context.Context, req admission.Request, client clie
 
 	objectLabel, err := capsuleutils.GetTypeLabel(&networkingv1.NetworkPolicy{})
 	if err != nil {
-		return
+		return allowed, err
 	}
 
 	labels := np.GetLabels()
@@ -81,5 +81,5 @@ func (r *handler) handle(ctx context.Context, req admission.Request, client clie
 		allowed = false
 	}
 
-	return
+	return allowed, err
 }

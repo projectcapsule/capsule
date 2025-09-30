@@ -96,15 +96,15 @@ func (r *Manager) syncAdditionalRoleBinding(ctx context.Context, tenant *capsule
 	var tenantLabel, roleBindingLabel string
 
 	if tenantLabel, err = utils.GetTypeLabel(&capsulev1beta2.Tenant{}); err != nil {
-		return
+		return err
 	}
 
 	if roleBindingLabel, err = utils.GetTypeLabel(&rbacv1.RoleBinding{}); err != nil {
-		return
+		return err
 	}
 
 	if err = r.pruningResources(ctx, ns, keys, &rbacv1.RoleBinding{}); err != nil {
-		return
+		return err
 	}
 
 	var roleBindings []api.AdditionalRoleBindingsSpec
@@ -155,7 +155,7 @@ func (r *Manager) syncAdditionalRoleBinding(ctx context.Context, tenant *capsule
 		r.Log.Info(fmt.Sprintf("RoleBinding sync result: %s", string(res)), "name", target.Name, "namespace", target.Namespace)
 
 		if err != nil {
-			return
+			return err
 		}
 	}
 

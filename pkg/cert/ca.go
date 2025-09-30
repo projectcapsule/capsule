@@ -46,7 +46,7 @@ func (c CapsuleCA) CACertificatePem() (b *bytes.Buffer, err error) {
 
 	crtBytes, err = x509.CreateCertificate(rand.Reader, c.certificate, c.certificate, &c.key.PublicKey, c.key)
 	if err != nil {
-		return
+		return b, err
 	}
 
 	b = new(bytes.Buffer)
@@ -111,7 +111,7 @@ func GenerateCertificateAuthority() (s *CapsuleCA, err error) {
 		return nil, err
 	}
 
-	return
+	return s, err
 }
 
 func GetCertificateFromBytes(certBytes []byte) (*x509.Certificate, error) {
@@ -185,7 +185,7 @@ func (c *CapsuleCA) GenerateCertificate(opts CertificateOptions) (certificatePem
 		Bytes: certBytes,
 	})
 	if err != nil {
-		return
+		return certificatePem, certificateKey, err
 	}
 
 	certificateKey = new(bytes.Buffer)
@@ -195,8 +195,8 @@ func (c *CapsuleCA) GenerateCertificate(opts CertificateOptions) (certificatePem
 		Bytes: x509.MarshalPKCS1PrivateKey(certPrivKey),
 	})
 	if err != nil {
-		return
+		return certificatePem, certificateKey, err
 	}
 
-	return
+	return certificatePem, certificateKey, err
 }

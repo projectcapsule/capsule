@@ -175,16 +175,16 @@ func (r *Manager) syncResourceQuotas(ctx context.Context, tenant *capsulev1beta2
 					if scopeErr = r.resourceQuotasUpdate(ctx, name, quantity, toKeep, resourceQuota.Hard[name], list.Items...); scopeErr != nil {
 						r.Log.Error(scopeErr, "cannot proceed with outer ResourceQuota")
 
-						return
+						return scopeErr
 					}
 				}
 
-				return
+				return scopeErr
 			})
 		}
 		// Waiting the update of all ResourceQuotas
 		if err = group.Wait(); err != nil {
-			return
+			return err
 		}
 	}
 	// getting requested ResourceQuota keys
@@ -264,7 +264,7 @@ func (r *Manager) syncResourceQuota(ctx context.Context, tenant *capsulev1beta2.
 		r.Log.Info("Resource Quota sync result: "+string(res), "name", target.Name, "namespace", target.Namespace)
 
 		if err != nil {
-			return
+			return err
 		}
 	}
 
@@ -295,7 +295,7 @@ func (r *Manager) resourceQuotasUpdate(ctx context.Context, resourceName corev1.
 		group.Go(func() (err error) {
 			found := &corev1.ResourceQuota{}
 			if err = r.Get(ctx, types.NamespacedName{Namespace: rq.Namespace, Name: rq.Name}, found); err != nil {
-				return
+				return err
 			}
 
 			return retry.RetryOnConflict(retry.DefaultBackoff, func() (retryErr error) {

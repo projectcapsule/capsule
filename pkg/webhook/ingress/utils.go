@@ -38,7 +38,7 @@ func FromRequest(req admission.Request, decoder admission.Decoder) (ingress Ingr
 		if req.Kind.Version == "v1" {
 			ingressObj := &networkingv1.Ingress{}
 			if err = decoder.Decode(req, ingressObj); err != nil {
-				return
+				return ingress, err
 			}
 
 			ingress = NetworkingV1{Ingress: ingressObj}
@@ -48,14 +48,14 @@ func FromRequest(req admission.Request, decoder admission.Decoder) (ingress Ingr
 
 		ingressObj := &networkingv1beta1.Ingress{}
 		if err = decoder.Decode(req, ingressObj); err != nil {
-			return
+			return ingress, err
 		}
 
 		ingress = NetworkingV1Beta1{Ingress: ingressObj}
 	case "extensions":
 		ingressObj := &extensionsv1beta1.Ingress{}
 		if err = decoder.Decode(req, ingressObj); err != nil {
-			return
+			return ingress, err
 		}
 
 		ingress = Extension{Ingress: ingressObj}
@@ -63,5 +63,5 @@ func FromRequest(req admission.Request, decoder admission.Decoder) (ingress Ingr
 		err = fmt.Errorf("cannot recognize type %s", req.Kind.Group)
 	}
 
-	return
+	return ingress, err
 }

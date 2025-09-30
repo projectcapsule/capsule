@@ -247,7 +247,7 @@ func (r *ResourcePool) GetNamespaceClaims(namespace string) (claims map[string]*
 		}
 	}
 
-	return
+	return claims, claimedResources
 }
 
 // Calculate usage for each namespace.
@@ -272,5 +272,5 @@ func (r *ResourcePool) GetClaimedByNamespaceClaims() (claims map[string]corev1.R
 		}
 	}
 
-	return
+	return claims
 }
