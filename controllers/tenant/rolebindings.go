@@ -91,7 +91,6 @@ func (r *Manager) syncRoleBindings(ctx context.Context, tenant *capsulev1beta2.T
 	return group.Wait()
 }
 
-//nolint:nakedret
 func (r *Manager) syncAdditionalRoleBinding(ctx context.Context, tenant *capsulev1beta2.Tenant, ns string, keys []string, hashFn func(binding api.AdditionalRoleBindingsSpec) string) (err error) {
 	var tenantLabel, roleBindingLabel string
 

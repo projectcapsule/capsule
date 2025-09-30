@@ -39,7 +39,6 @@ import (
 //
 // In case of Namespace-scoped Resource Budget, we're just replicating the resources across all registered Namespaces.
 
-//nolint:nakedret
 func (r *Manager) syncResourceQuotas(ctx context.Context, tenant *capsulev1beta2.Tenant) (err error) { //nolint:gocognit
 	// getting ResourceQuota labels for the mutateFn
 	var tenantLabel, typeLabel string
@@ -207,7 +206,6 @@ func (r *Manager) syncResourceQuotas(ctx context.Context, tenant *capsulev1beta2
 	return group.Wait()
 }
 
-//nolint:nakedret
 func (r *Manager) syncResourceQuota(ctx context.Context, tenant *capsulev1beta2.Tenant, namespace string, keys []string) (err error) {
 	// getting ResourceQuota labels for the mutateFn
 	var tenantLabel, typeLabel string

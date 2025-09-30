@@ -144,7 +144,6 @@ func GetCertificateWithPrivateKeyFromBytes(certBytes, keyBytes []byte) (*x509.Ce
 	return cert, key, nil
 }
 
-//nolint:nakedret
 func (c *CapsuleCA) GenerateCertificate(opts CertificateOptions) (certificatePem *bytes.Buffer, certificateKey *bytes.Buffer, err error) {
 	var certPrivKey *rsa.PrivateKey
 
