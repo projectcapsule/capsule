@@ -41,7 +41,7 @@ func (r *Manager) syncNamespaces(ctx context.Context, tenant *capsulev1beta2.Ten
 		err = fmt.Errorf("cannot sync Namespaces: %w", err)
 	}
 
-	return
+	return err
 }
 
 func (r *Manager) syncNamespaceMetadata(ctx context.Context, namespace string, tnt *capsulev1beta2.Tenant) (err error) {
@@ -170,7 +170,7 @@ func (r *Manager) collectNamespaces(ctx context.Context, tenant *capsulev1beta2.
 			Selector: fields.OneTermEqualSelector(".metadata.ownerReferences[*].capsule", tenant.GetName()),
 		})
 		if err != nil {
-			return
+			return err
 		}
 
 		_, err = controllerutil.CreateOrUpdate(ctx, r.Client, tenant.DeepCopy(), func() error {
@@ -179,7 +179,7 @@ func (r *Manager) collectNamespaces(ctx context.Context, tenant *capsulev1beta2.
 			return r.Client.Status().Update(ctx, tenant, &client.SubResourceUpdateOptions{})
 		})
 
-		return
+		return err
 	})
 }
 

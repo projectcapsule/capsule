@@ -61,7 +61,7 @@ func (r resourceClaimController) Reconcile(ctx context.Context, request ctrl.Req
 
 		log.Error(err, "Error reading the object")
 
-		return
+		return result, err
 	}
 
 	// Ensuring the Quota Status
@@ -291,5 +291,5 @@ func updateStatusAndEmitEvent(
 		claim.Status.Condition.Message,
 	)
 
-	return
+	return err
 }

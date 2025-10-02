@@ -5,6 +5,7 @@ run:
 linters:
   default: all
   disable:
+    - godoclint
     - depguard
     - err113
     - exhaustruct

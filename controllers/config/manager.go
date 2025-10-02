@@ -42,5 +42,5 @@ func (c *Manager) Reconcile(ctx context.Context, request reconcile.Request) (res
 
 	c.Log.Info("CapsuleConfiguration reconciliation finished", "request.name", request.Name)
 
-	return
+	return res, err
 }

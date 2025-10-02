@@ -19,7 +19,7 @@ func (in OwnerListSpec) FindOwner(name string, kind OwnerKind) (owner OwnerSpec)
 		return in[i]
 	}
 
-	return
+	return owner
 }
 
 type ByKindAndName OwnerListSpec
