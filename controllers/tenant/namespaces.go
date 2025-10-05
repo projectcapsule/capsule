@@ -30,7 +30,7 @@ func (r *Manager) reconcileNamespaces(ctx context.Context, tenant *capsulev1beta
 	if err = r.collectNamespaces(ctx, tenant); err != nil {
 		err = fmt.Errorf("cannot collect namespaces: %w", err)
 
-		return
+		return err
 	}
 
 	gcSet := make(map[string]struct{})
@@ -64,7 +64,7 @@ func (r *Manager) reconcileNamespaces(ctx context.Context, tenant *capsulev1beta
 
 	tenant.Status.Size = uint(len(tenant.Status.Namespaces))
 
-	return
+	return err
 }
 
 func (r *Manager) reconcileNamespace(ctx context.Context, namespace string, tnt *capsulev1beta2.Tenant) (err error) {
@@ -303,12 +303,12 @@ func (r *Manager) collectNamespaces(ctx context.Context, tenant *capsulev1beta2.
 		Selector: fields.OneTermEqualSelector(".metadata.ownerReferences[*].capsule", tenant.GetName()),
 	})
 	if err != nil {
-		return
+		return err
 	}
 
 	tenant.AssignNamespaces(list.Items)
 
-	return
+	return err
 }
 
 // applyTemplateMap applies templating to all values in the provided map in place.

@@ -36,6 +36,7 @@ func NewCapsuleConfiguration(ctx context.Context, client client.Client, name str
 					},
 				}
 			}
+
 			panic(errors.Wrap(err, "Cannot retrieve Capsule configuration with name "+name))
 		}
 

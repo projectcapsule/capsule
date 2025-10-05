@@ -481,6 +481,7 @@ webhooks:
       operations:
       - CREATE
       - UPDATE
+      - DELETE
       resources:
       - resourcepoolclaims
       scope: '*'

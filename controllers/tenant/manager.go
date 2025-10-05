@@ -47,7 +47,6 @@ func (r *Manager) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-//nolint:nakedret
 func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ctrl.Result, err error) {
 	r.Log = r.Log.WithValues("Request.Name", request.Name)
 	// Fetch the Tenant instance
@@ -64,7 +63,7 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 
 		r.Log.Error(err, "Error reading the object")
 
-		return
+		return result, err
 	}
 
 	defer func() {
@@ -81,7 +80,7 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 	if err = r.ensureMetadata(ctx, instance); err != nil {
 		err = fmt.Errorf("cannot ensure metadata: %w", err)
 
-		return
+		return result, err
 	}
 
 	// Ensuring ResourceQuota
@@ -90,24 +89,16 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 	if err = r.syncCustomResourceQuotaUsages(ctx, instance); err != nil {
 		err = fmt.Errorf("cannot count limited resources: %w", err)
 
-		return
-	}
-	// Ensuring all namespaces are collected
-	r.Log.Info("Ensuring all Namespaces are collected")
-
-	if err = r.collectNamespaces(ctx, instance); err != nil {
-		err = fmt.Errorf("cannot collect namespaces: %w", err)
-
-		return
+		return result, err
 	}
 
-	// Ensuring Namespace metadata
+	// Reconcile Namespaces
 	r.Log.Info("Starting processing of Namespaces", "items", len(instance.Status.Namespaces))
 
 	if err = r.reconcileNamespaces(ctx, instance); err != nil {
 		err = fmt.Errorf("namespace(s) had reconciliation errors")
 
-		return
+		return result, err
 	}
 
 	// Ensuring NetworkPolicy resources
@@ -116,7 +107,7 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 	if err = r.syncNetworkPolicies(ctx, instance); err != nil {
 		err = fmt.Errorf("cannot sync networkPolicy items: %w", err)
 
-		return
+		return result, err
 	}
 	// Ensuring LimitRange resources
 	r.Log.Info("Starting processing of Limit Ranges", "items", len(instance.Spec.LimitRanges.Items))
@@ -124,7 +115,7 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 	if err = r.syncLimitRanges(ctx, instance); err != nil {
 		err = fmt.Errorf("cannot sync limitrange items: %w", err)
 
-		return
+		return result, err
 	}
 	// Ensuring ResourceQuota resources
 	r.Log.Info("Starting processing of Resource Quotas", "items", len(instance.Spec.ResourceQuota.Items))
@@ -132,7 +123,7 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 	if err = r.syncResourceQuotas(ctx, instance); err != nil {
 		err = fmt.Errorf("cannot sync resourcequota items: %w", err)
 
-		return
+		return result, err
 	}
 	// Ensuring RoleBinding resources
 	r.Log.Info("Ensuring RoleBindings for Owners and Tenant")
@@ -140,7 +131,7 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 	if err = r.syncRoleBindings(ctx, instance); err != nil {
 		err = fmt.Errorf("cannot sync rolebindings items: %w", err)
 
-		return
+		return result, err
 	}
 
 	r.Log.Info("Tenant reconciling completed")

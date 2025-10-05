@@ -35,7 +35,7 @@ func (in ForbiddenListSpec) ExactMatch(value string) (ok bool) {
 		ok = i < len(in.Exact) && in.Exact[i] == value
 	}
 
-	return
+	return ok
 }
 
 func (in ForbiddenListSpec) RegexMatch(value string) (ok bool) {
@@ -43,7 +43,7 @@ func (in ForbiddenListSpec) RegexMatch(value string) (ok bool) {
 		ok = regexp.MustCompile(in.Regex).MatchString(value)
 	}
 
-	return
+	return ok
 }
 
 type ForbiddenError struct {
@@ -76,7 +76,7 @@ func (f *ForbiddenError) appendForbiddenError() (append string) {
 		append += fmt.Sprintf("matching the regex %s", f.spec.Regex)
 	}
 
-	return
+	return append
 }
 
 func ValidateForbidden(metadata map[string]string, forbiddenList ForbiddenListSpec) error {

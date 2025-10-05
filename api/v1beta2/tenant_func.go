@@ -93,7 +93,7 @@ func (in *Tenant) GetSubjectsByClusterRoles(ignoreOwnerKind []OwnerKind) (rolePe
 		}
 	}
 
-	return
+	return rolePerms
 }
 
 // Get the permissions for a tenant ordered by groups and users.

@@ -227,7 +227,7 @@ func resolveServiceAccountActor(
 ) (tnt *capsulev1beta2.Tenant, err error) {
 	parts := strings.Split(userInfo.Username, ":")
 	if len(parts) != 4 {
-		return
+		return tnt, err
 	}
 
 	namespace, saName := parts[2], parts[3]
@@ -235,28 +235,28 @@ func resolveServiceAccountActor(
 	sa := &corev1.ServiceAccount{}
 	if err = clt.Get(ctx, client.ObjectKey{Namespace: namespace, Name: saName}, sa); err != nil {
 		if apierrors.IsNotFound(err) {
-			return
+			return tnt, err
 		}
 
-		return
+		return tnt, err
 	}
 
 	if meta.OwnerPromotionLabelTriggers(ns) {
-		return
+		return tnt, err
 	}
 
 	tntList := &capsulev1beta2.TenantList{}
 	if err = clt.List(ctx, tntList, client.MatchingFieldsSelector{
 		Selector: fields.OneTermEqualSelector(".status.namespaces", namespace),
 	}); err != nil {
-		return
+		return tnt, err
 	}
 
 	if len(tntList.Items) > 0 {
 		tnt = &tntList.Items[0]
 	}
 
-	return
+	return tnt, err
 }
 
 func validateNamespacePrefix(ns *corev1.Namespace, tenant *capsulev1beta2.Tenant) bool {

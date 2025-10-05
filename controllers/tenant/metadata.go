@@ -20,7 +20,7 @@ func (r *Manager) ensureMetadata(ctx context.Context, tnt *capsulev1beta2.Tenant
 	}
 
 	if v, ok := tnt.Labels[capsuleapi.TenantNameLabel]; ok && v == tnt.Name {
-		return
+		return err
 	}
 
 	if err := r.Update(ctx, tnt); err != nil {

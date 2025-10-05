@@ -74,7 +74,7 @@ func (r *Manager) SetupWithManager(ctx context.Context, mgr ctrl.Manager, config
 		err = errors.Join(err, crbErr)
 	}
 
-	return
+	return err
 }
 
 // Reconcile serves both required ClusterRole and ClusterRoleBinding resources: that's ok, we're watching for multiple
@@ -99,7 +99,7 @@ func (r *Manager) Reconcile(ctx context.Context, request reconcile.Request) (res
 		}
 	}
 
-	return
+	return res, err
 }
 
 func (r *Manager) EnsureClusterRoleBindingsProvisioner(ctx context.Context) error {
@@ -168,7 +168,7 @@ func (r *Manager) EnsureClusterRole(ctx context.Context, roleName string) (err e
 		return nil
 	})
 
-	return
+	return err
 }
 
 // Start is the Runnable function triggered upon Manager start-up to perform the first RBAC reconciliation

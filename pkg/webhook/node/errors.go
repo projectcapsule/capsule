@@ -24,7 +24,7 @@ func appendForbiddenError(spec *capsulev1beta2.ForbiddenListSpec) (append string
 		append += fmt.Sprintf("matching the regex %s", spec.Regex)
 	}
 
-	return
+	return append
 }
 
 type nodeLabelForbiddenError struct {

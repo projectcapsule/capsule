@@ -112,5 +112,5 @@ func appendHostnameError(spec api.AllowedListSpec) (append string) {
 		append += fmt.Sprintf(", or matching the regex %s", spec.Regex)
 	}
 
-	return
+	return append
 }
