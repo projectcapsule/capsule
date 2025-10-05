@@ -16,6 +16,7 @@ type AdditionalMetadataSpec struct {
 
 type AdditionalMetadataSelectorSpec struct {
 	NamespaceSelector *metav1.LabelSelector `json:"namespaceSelector,omitempty"`
-	Labels            map[string]string     `json:"labels,omitempty"`
-	Annotations       map[string]string     `json:"annotations,omitempty"`
+
+	Labels      map[string]string `json:"labels,omitempty"`
+	Annotations map[string]string `json:"annotations,omitempty"`
 }

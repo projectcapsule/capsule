@@ -57,7 +57,8 @@ import (
 	"github.com/projectcapsule/capsule/pkg/webhook/route"
 	"github.com/projectcapsule/capsule/pkg/webhook/service"
 	"github.com/projectcapsule/capsule/pkg/webhook/serviceaccounts"
-	"github.com/projectcapsule/capsule/pkg/webhook/tenant"
+	tenantmutation "github.com/projectcapsule/capsule/pkg/webhook/tenant/mutation"
+	tenantvalidation "github.com/projectcapsule/capsule/pkg/webhook/tenant/validation"
 	tntresource "github.com/projectcapsule/capsule/pkg/webhook/tenantresource"
 	"github.com/projectcapsule/capsule/pkg/webhook/utils"
 )
@@ -227,19 +228,20 @@ func main() {
 	// webhooks: the order matters, don't change it and just append
 	webhooksList := append(
 		make([]webhook.Webhook, 0),
-		route.Pod(pod.ImagePullPolicy(), pod.ContainerRegistry(), pod.PriorityClass(), pod.RuntimeClass()),
+		route.Pod(pod.ImagePullPolicy(), pod.ContainerRegistry(cfg), pod.PriorityClass(), pod.RuntimeClass()),
 		route.Namespace(utils.InCapsuleGroups(cfg, namespacevalidation.PatchHandler(cfg), namespacevalidation.QuotaHandler(), namespacevalidation.FreezeHandler(cfg), namespacevalidation.PrefixHandler(cfg), namespacevalidation.UserMetadataHandler())),
 		route.Ingress(ingress.Class(cfg, kubeVersion), ingress.Hostnames(cfg), ingress.Collision(cfg), ingress.Wildcard()),
 		route.PVC(pvc.Validating(), pvc.PersistentVolumeReuse()),
 		route.Service(service.Handler()),
 		route.TenantResourceObjects(utils.InCapsuleGroups(cfg, tntresource.WriteOpsHandler())),
 		route.NetworkPolicy(utils.InCapsuleGroups(cfg, networkpolicy.Handler())),
-		route.Tenant(tenant.NameHandler(), tenant.RoleBindingRegexHandler(), tenant.IngressClassRegexHandler(), tenant.StorageClassRegexHandler(), tenant.ContainerRegistryRegexHandler(), tenant.HostnameRegexHandler(), tenant.FreezedEmitter(), tenant.ServiceAccountNameHandler(), tenant.ForbiddenAnnotationsRegexHandler(), tenant.ProtectedHandler(), tenant.MetaHandler()),
-		route.Cordoning(tenant.CordoningHandler(cfg)),
+		route.TenantMutating(tenantmutation.MetaHandler()),
+		route.TenantValidating(tenantvalidation.NameHandler(), tenantvalidation.RoleBindingRegexHandler(), tenantvalidation.IngressClassRegexHandler(), tenantvalidation.StorageClassRegexHandler(), tenantvalidation.ContainerRegistryRegexHandler(), tenantvalidation.HostnameRegexHandler(), tenantvalidation.FreezedEmitter(), tenantvalidation.ServiceAccountNameHandler(), tenantvalidation.ForbiddenAnnotationsRegexHandler(), tenantvalidation.ProtectedHandler()),
+		route.Cordoning(tenantvalidation.CordoningHandler(cfg)),
 		route.Node(utils.InCapsuleGroups(cfg, node.UserMetadataHandler(cfg, kubeVersion))),
 		route.ServiceAccounts(serviceaccounts.Handler(cfg)),
 		route.NamespacePatch(utils.InCapsuleGroups(cfg, namespacemutation.CordoningLabelHandler(cfg), namespacemutation.OwnerReferenceHandler(cfg), namespacemutation.MetadataHandler(cfg))),
-		route.CustomResources(tenant.ResourceCounterHandler(manager.GetClient())),
+		route.CustomResources(tenantvalidation.ResourceCounterHandler(manager.GetClient())),
 		route.Gateway(gateway.Class(cfg)),
 		route.Defaults(defaults.Handler(cfg, kubeVersion)),
 		route.ResourcePoolMutation((resourcepool.PoolMutationHandler(ctrl.Log.WithName("webhooks").WithName("resourcepool")))),

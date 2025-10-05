@@ -7,7 +7,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/projectcapsule/capsule/pkg/utils"
+	"github.com/projectcapsule/capsule/pkg/meta"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -60,6 +60,19 @@ var _ = Describe("cordoning a Tenant", Label("tenant"), func() {
 				},
 			},
 		}
+
+		By("Verifing Tenant Status", func() {
+			t := &capsulev1beta2.Tenant{}
+			Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: tnt.GetName()}, t)).Should(Succeed())
+
+			condition := t.Status.Conditions.GetConditionByType(meta.CordonedCondition)
+			Expect(condition).NotTo(BeNil(), "Condition instance should not be nil")
+
+			Expect(condition.Status).To(Equal(metav1.ConditionFalse), "Expected tenant condition status to be True")
+			Expect(condition.Type).To(Equal(meta.CordonedCondition), "Expected tenant condition type to be Ready")
+			Expect(condition.Reason).To(Equal(meta.ActiveReason), "Expected tenant condition reason to be Succeeded")
+		})
+
 		By("creating a Namespace", func() {
 			NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
 
@@ -79,8 +92,20 @@ var _ = Describe("cordoning a Tenant", Label("tenant"), func() {
 
 			Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: ns.GetName()}, ns)).Should(Succeed())
 
-			Expect(ns.Labels).To(HaveKey(utils.CordonedLabel))
+			Expect(ns.Labels).To(HaveKey(meta.CordonedLabel))
 
+		})
+
+		By("Verifing Tenant Status", func() {
+			t := &capsulev1beta2.Tenant{}
+			Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: tnt.GetName()}, t)).Should(Succeed())
+
+			condition := t.Status.Conditions.GetConditionByType(meta.CordonedCondition)
+			Expect(condition).NotTo(BeNil(), "Condition instance should not be nil")
+
+			Expect(condition.Status).To(Equal(metav1.ConditionTrue), "Expected tenant condition status to be True")
+			Expect(condition.Type).To(Equal(meta.CordonedCondition), "Expected tenant condition type to be Ready")
+			Expect(condition.Reason).To(Equal(meta.CordonedReason), "Expected tenant condition reason to be Succeeded")
 		})
 
 		By("cordoning the Tenant deletion must be blocked", func() {
@@ -116,8 +141,20 @@ var _ = Describe("cordoning a Tenant", Label("tenant"), func() {
 
 			Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: ns.GetName()}, ns)).Should(Succeed())
 
-			Expect(ns.Labels).ToNot(HaveKey(utils.CordonedLabel))
+			Expect(ns.Labels).ToNot(HaveKey(meta.CordonedLabel))
 
+		})
+
+		By("Verifing Tenant Status", func() {
+			t := &capsulev1beta2.Tenant{}
+			Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: tnt.GetName()}, t)).Should(Succeed())
+
+			condition := t.Status.Conditions.GetConditionByType(meta.CordonedCondition)
+			Expect(condition).NotTo(BeNil(), "Condition instance should not be nil")
+
+			Expect(condition.Status).To(Equal(metav1.ConditionFalse), "Expected tenant condition status to be True")
+			Expect(condition.Type).To(Equal(meta.CordonedCondition), "Expected tenant condition type to be Ready")
+			Expect(condition.Reason).To(Equal(meta.ActiveReason), "Expected tenant condition reason to be Succeeded")
 		})
 	})
 })

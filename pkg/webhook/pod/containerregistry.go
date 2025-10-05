@@ -13,14 +13,19 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/configuration"
 	capsulewebhook "github.com/projectcapsule/capsule/pkg/webhook"
 	"github.com/projectcapsule/capsule/pkg/webhook/utils"
 )
 
-type containerRegistryHandler struct{}
+type containerRegistryHandler struct {
+	configuration configuration.Configuration
+}
 
-func ContainerRegistry() capsulewebhook.Handler {
-	return &containerRegistryHandler{}
+func ContainerRegistry(configuration configuration.Configuration) capsulewebhook.Handler {
+	return &containerRegistryHandler{
+		configuration: configuration,
+	}
 }
 
 func (h *containerRegistryHandler) OnCreate(c client.Client, decoder admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
@@ -42,7 +47,13 @@ func (h *containerRegistryHandler) OnUpdate(c client.Client, decoder admission.D
 	}
 }
 
-func (h *containerRegistryHandler) validate(ctx context.Context, c client.Client, decoder admission.Decoder, recorder record.EventRecorder, req admission.Request) *admission.Response {
+func (h *containerRegistryHandler) validate(
+	ctx context.Context,
+	c client.Client,
+	decoder admission.Decoder,
+	recorder record.EventRecorder,
+	req admission.Request,
+) *admission.Response {
 	pod := &corev1.Pod{}
 	if err := decoder.Decode(req, pod); err != nil {
 		return utils.ErroredResponse(err)
@@ -61,34 +72,45 @@ func (h *containerRegistryHandler) validate(ctx context.Context, c client.Client
 
 	tnt := tntList.Items[0]
 
-	if tnt.Spec.ContainerRegistries != nil {
-		// Evaluate init containers
-		for _, container := range pod.Spec.InitContainers {
-			if response := h.verifyContainerRegistry(recorder, req, container, tnt); response != nil {
-				return response
-			}
-		}
+	if tnt.Spec.ContainerRegistries == nil {
+		return nil
+	}
 
-		// Evaluate containers
-		for _, container := range pod.Spec.Containers {
-			if response := h.verifyContainerRegistry(recorder, req, container, tnt); response != nil {
-				return response
-			}
+	for _, container := range pod.Spec.InitContainers {
+		if response := h.verifyContainerRegistry(recorder, req, container.Image, tnt); response != nil {
+			return response
+		}
+	}
+
+	for _, container := range pod.Spec.EphemeralContainers {
+		if response := h.verifyContainerRegistry(recorder, req, container.Image, tnt); response != nil {
+			return response
+		}
+	}
+
+	for _, container := range pod.Spec.Containers {
+		if response := h.verifyContainerRegistry(recorder, req, container.Image, tnt); response != nil {
+			return response
 		}
 	}
 
 	return nil
 }
 
-func (h *containerRegistryHandler) verifyContainerRegistry(recorder record.EventRecorder, req admission.Request, container corev1.Container, tnt capsulev1beta2.Tenant) *admission.Response {
+func (h *containerRegistryHandler) verifyContainerRegistry(
+	recorder record.EventRecorder,
+	req admission.Request,
+	image string,
+	tnt capsulev1beta2.Tenant,
+) *admission.Response {
 	var valid, matched bool
 
-	reg := NewRegistry(container.Image)
+	reg := NewRegistry(image, h.configuration)
 
 	if len(reg.Registry()) == 0 {
 		recorder.Eventf(&tnt, corev1.EventTypeWarning, "MissingFQCI", "Pod %s/%s is not using a fully qualified container image, cannot enforce registry the current Tenant", req.Namespace, req.Name, reg.Registry())
 
-		response := admission.Denied(NewContainerRegistryForbidden(container.Image, *tnt.Spec.ContainerRegistries).Error())
+		response := admission.Denied(NewContainerRegistryForbidden(image, *tnt.Spec.ContainerRegistries).Error())
 
 		return &response
 	}
@@ -100,7 +122,7 @@ func (h *containerRegistryHandler) verifyContainerRegistry(recorder record.Event
 	if !valid && !matched {
 		recorder.Eventf(&tnt, corev1.EventTypeWarning, "ForbiddenContainerRegistry", "Pod %s/%s is using a container hosted on registry %s that is forbidden for the current Tenant", req.Namespace, req.Name, reg.Registry())
 
-		response := admission.Denied(NewContainerRegistryForbidden(container.Image, *tnt.Spec.ContainerRegistries).Error())
+		response := admission.Denied(NewContainerRegistryForbidden(reg.FQCI(), *tnt.Spec.ContainerRegistries).Error())
 
 		return &response
 	}

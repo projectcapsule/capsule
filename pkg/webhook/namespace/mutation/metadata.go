@@ -13,7 +13,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	capsuletenant "github.com/projectcapsule/capsule/controllers/tenant"
+	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/configuration"
 	capsulewebhook "github.com/projectcapsule/capsule/pkg/webhook"
 )
@@ -49,11 +49,28 @@ func (h *metadataHandler) OnCreate(client client.Client, decoder admission.Decod
 		}
 
 		// sync namespace metadata
-		if err := capsuletenant.SyncNamespaceMetadata(tenant, ns); err != nil {
-			response := admission.Errored(http.StatusInternalServerError, err)
+		instance := tenant.Status.GetInstance(&capsulev1beta2.TenantStatusNamespaceItem{
+			Name: ns.GetName(),
+			UID:  ns.GetUID(),
+		})
 
-			return &response
+		if len(instance.Metadata.Labels) == 0 && len(instance.Metadata.Annotations) == 0 {
+			return nil
 		}
+
+		labels := ns.GetLabels()
+		for k, v := range instance.Metadata.Labels {
+			labels[k] = v
+		}
+
+		ns.SetLabels(labels)
+
+		annotations := ns.GetAnnotations()
+		for k, v := range instance.Metadata.Annotations {
+			annotations[k] = v
+		}
+
+		ns.SetAnnotations(annotations)
 
 		marshaled, err := json.Marshal(ns)
 		if err != nil {

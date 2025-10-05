@@ -572,6 +572,8 @@ webhooks:
       namespaceSelector: {}
       # -- [MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
       matchConditions: []
+      # -- [ReinvocationPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#reinvocation-policy)
+      reinvocationPolicy: Never
 
     tenantResourceObjects:
       # -- Enable the Hook

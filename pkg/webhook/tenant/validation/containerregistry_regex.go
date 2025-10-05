@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 //nolint:dupl
-package tenant
+package validation
 
 import (
 	"context"

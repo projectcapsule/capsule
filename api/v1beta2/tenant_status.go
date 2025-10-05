@@ -4,8 +4,9 @@
 package v1beta2
 
 import (
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8stypes "k8s.io/apimachinery/pkg/types"
+
+	"github.com/projectcapsule/capsule/pkg/meta"
 )
 
 // +kubebuilder:validation:Enum=Cordoned;Active
@@ -27,19 +28,19 @@ type TenantStatus struct {
 	Namespaces []string `json:"namespaces,omitempty"`
 	// Tracks state for the namespaces associated with this tenant
 	Spaces []*TenantStatusNamespaceItem `json:"spaces,omitempty"`
-	// Conditions represent the latest available observations of an instances state
-	Condition metav1.Condition `json:"condition,omitempty"`
+	// Tenant Condition
+	Conditions meta.ConditionList `json:"conditions"`
 }
 
 type TenantStatusNamespaceItem struct {
-	// Namespace Condition
-	Condition metav1.Condition `json:"condition"`
+	// Conditions
+	Conditions meta.ConditionList `json:"conditions"`
 	// Namespace Name
 	Name string `json:"name"`
 	// Namespace UID
 	UID k8stypes.UID `json:"uid,omitempty"`
 	// Managed Metadata
-	Metadata TenantStatusNamespaceMetadata `json:"metadata,omitempty"`
+	Metadata *TenantStatusNamespaceMetadata `json:"metadata,omitempty"`
 }
 
 type TenantStatusNamespaceMetadata struct {
@@ -86,9 +87,5 @@ func (ms *TenantStatus) RemoveInstance(stat *TenantStatusNamespaceItem) {
 }
 
 func (ms *TenantStatus) instancequal(a, b *TenantStatusNamespaceItem) bool {
-	if a.Name == b.Name {
-		return true
-	}
-
-	return false
+	return a.Name == b.Name
 }

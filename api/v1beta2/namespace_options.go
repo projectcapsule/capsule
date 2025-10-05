@@ -12,6 +12,7 @@ type NamespaceOptions struct {
 	// Specifies the maximum number of namespaces allowed for that Tenant. Once the namespace quota assigned to the Tenant has been reached, the Tenant owner cannot create further namespaces. Optional.
 	Quota *int32 `json:"quota,omitempty"`
 	// Specifies additional labels and annotations the Capsule operator places on any Namespace resource in the Tenant. Optional.
+	// Deprecated: Use additionalMetadataList instead
 	AdditionalMetadata *api.AdditionalMetadataSpec `json:"additionalMetadata,omitempty"`
 	// Specifies additional labels and annotations the Capsule operator places on any Namespace resource in the Tenant via a list. Optional.
 	AdditionalMetadataList []api.AdditionalMetadataSelectorSpec `json:"additionalMetadataList,omitempty"`
@@ -19,4 +20,7 @@ type NamespaceOptions struct {
 	ForbiddenLabels api.ForbiddenListSpec `json:"forbiddenLabels,omitempty"`
 	// Define the annotations that a Tenant Owner cannot set for their Namespace resources.
 	ForbiddenAnnotations api.ForbiddenListSpec `json:"forbiddenAnnotations,omitempty"`
+	// If enabled only metadata from additionalMetadata is reconciled to the namespaces.
+	//+kubebuilder:default:=false
+	ManagedMetadataOnly bool `json:"managedMetadataOnly,omitempty"`
 }
