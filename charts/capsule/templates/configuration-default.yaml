@@ -24,7 +24,6 @@ spec:
   ignoreUserWithGroups:
     {{- toYaml .Values.manager.options.ignoreUserWithGroups | nindent 4 }}
   protectedNamespaceRegex: {{ .Values.manager.options.protectedNamespaceRegex | quote }}
-  defaultRegistry: {{ .Values.manager.options.defaultRegistry }}
   {{- with .Values.manager.options.nodeMetadata }}
   nodeMetadata:
     {{- toYaml . | nindent 4 }}
