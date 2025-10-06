@@ -12,8 +12,6 @@ import (
 
 // Exposing Status Metrics for tenant.
 func (r *Manager) syncTenantStatusMetrics(tenant *capsulev1beta2.Tenant) {
-	var cordoned float64 = 0
-
 	// Expose namespace-tenant relationship
 	for _, ns := range tenant.Status.Namespaces {
 		r.Metrics.TenantNamespaceRelationshipGauge.WithLabelValues(tenant.GetName(), ns).Set(1)
@@ -21,10 +19,6 @@ func (r *Manager) syncTenantStatusMetrics(tenant *capsulev1beta2.Tenant) {
 
 	// Expose cordoned status
 	r.Metrics.TenantNamespaceCounterGauge.WithLabelValues(tenant.Name).Set(float64(tenant.Status.Size))
-
-	if tenant.Spec.Cordoned {
-		cordoned = 1
-	}
 
 	// Expose Status Metrics
 	for _, status := range []string{meta.ReadyCondition, meta.CordonedCondition} {
@@ -43,13 +37,6 @@ func (r *Manager) syncTenantStatusMetrics(tenant *capsulev1beta2.Tenant) {
 
 		r.Metrics.TenantConditionGauge.WithLabelValues(tenant.GetName(), status).Set(value)
 	}
-
-	// Expose the namespace counter (Deprecated)
-	if tenant.Spec.Cordoned {
-		cordoned = 1
-	}
-
-	r.Metrics.TenantCordonedStatusGauge.WithLabelValues(tenant.Name).Set(cordoned)
 }
 
 // Exposing Status Metrics for tenant.
