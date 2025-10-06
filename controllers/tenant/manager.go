@@ -5,12 +5,15 @@ package tenant
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/retry"
@@ -20,6 +23,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/meta"
 	"github.com/projectcapsule/capsule/pkg/metrics"
 )
 
@@ -52,7 +56,7 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 			r.Log.Info("Request object not found, could have been deleted after reconcile request")
 
 			// If tenant was deleted or cannot be found, clean up metrics
-			r.Metrics.DeleteAllMetrics(request.Name)
+			r.Metrics.DeleteAllMetricsForTenant(request.Name)
 
 			return reconcile.Result{}, nil
 		}
@@ -62,17 +66,19 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 		return result, err
 	}
 
-	preRecNamespaces := instance.Status.Namespaces
+	defer func() {
+		r.syncTenantStatusMetrics(instance)
 
-	// Ensuring the Tenant Status
-	if err = r.updateTenantStatus(ctx, instance); err != nil {
-		r.Log.Error(err, "Cannot update Tenant status")
+		if uerr := r.updateTenantStatus(ctx, instance, err); uerr != nil {
+			err = fmt.Errorf("cannot update tenant status: %w", uerr)
 
-		return result, err
-	}
-	// Ensuring Metadata
+			return
+		}
+	}()
+
+	// Ensuring Metadata.
 	if err = r.ensureMetadata(ctx, instance); err != nil {
-		r.Log.Error(err, "Cannot ensure metadata")
+		err = fmt.Errorf("cannot ensure metadata: %w", err)
 
 		return result, err
 	}
@@ -81,35 +87,25 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 	r.Log.Info("Ensuring limit resources count is updated")
 
 	if err = r.syncCustomResourceQuotaUsages(ctx, instance); err != nil {
-		r.Log.Error(err, "Cannot count limited resources")
+		err = fmt.Errorf("cannot count limited resources: %w", err)
 
 		return result, err
 	}
-	// Ensuring all namespaces are collected
-	r.Log.Info("Ensuring all Namespaces are collected")
 
-	if err = r.collectNamespaces(ctx, instance); err != nil {
-		r.Log.Error(err, "Cannot collect Namespace resources")
-
-		return result, err
-	}
-	// Ensuring Status metrics are exposed
-	r.Log.Info("Ensuring all status metrics are exposed")
-	r.syncStatusMetrics(instance, preRecNamespaces)
-
-	// Ensuring Namespace metadata
+	// Reconcile Namespaces
 	r.Log.Info("Starting processing of Namespaces", "items", len(instance.Status.Namespaces))
 
-	if err = r.syncNamespaces(ctx, instance); err != nil {
-		r.Log.Error(err, "Cannot sync Namespace items")
+	if err = r.reconcileNamespaces(ctx, instance); err != nil {
+		err = fmt.Errorf("namespace(s) had reconciliation errors")
 
 		return result, err
 	}
+
 	// Ensuring NetworkPolicy resources
 	r.Log.Info("Starting processing of Network Policies")
 
 	if err = r.syncNetworkPolicies(ctx, instance); err != nil {
-		r.Log.Error(err, "Cannot sync NetworkPolicy items")
+		err = fmt.Errorf("cannot sync networkPolicy items: %w", err)
 
 		return result, err
 	}
@@ -117,7 +113,7 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 	r.Log.Info("Starting processing of Limit Ranges", "items", len(instance.Spec.LimitRanges.Items))
 
 	if err = r.syncLimitRanges(ctx, instance); err != nil {
-		r.Log.Error(err, "Cannot sync LimitRange items")
+		err = fmt.Errorf("cannot sync limitrange items: %w", err)
 
 		return result, err
 	}
@@ -125,7 +121,7 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 	r.Log.Info("Starting processing of Resource Quotas", "items", len(instance.Spec.ResourceQuota.Items))
 
 	if err = r.syncResourceQuotas(ctx, instance); err != nil {
-		r.Log.Error(err, "Cannot sync ResourceQuota items")
+		err = fmt.Errorf("cannot sync resourcequota items: %w", err)
 
 		return result, err
 	}
@@ -133,15 +129,7 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 	r.Log.Info("Ensuring RoleBindings for Owners and Tenant")
 
 	if err = r.syncRoleBindings(ctx, instance); err != nil {
-		r.Log.Error(err, "Cannot sync RoleBindings items")
-
-		return result, err
-	}
-	// Ensuring Namespace count
-	r.Log.Info("Ensuring Namespace count")
-
-	if err = r.ensureNamespaceCount(ctx, instance); err != nil {
-		r.Log.Error(err, "Cannot sync Namespace count")
+		err = fmt.Errorf("cannot sync rolebindings items: %w", err)
 
 		return result, err
 	}
@@ -151,14 +139,40 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 	return ctrl.Result{}, err
 }
 
-func (r *Manager) updateTenantStatus(ctx context.Context, tnt *capsulev1beta2.Tenant) error {
+func (r *Manager) updateTenantStatus(ctx context.Context, tnt *capsulev1beta2.Tenant, reconcileError error) error {
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
-		if tnt.Spec.Cordoned {
-			tnt.Status.State = capsulev1beta2.TenantStateCordoned
-		} else {
-			tnt.Status.State = capsulev1beta2.TenantStateActive
+		latest := &capsulev1beta2.Tenant{}
+		if err = r.Get(ctx, types.NamespacedName{Name: tnt.GetName()}, latest); err != nil {
+			return err
 		}
 
-		return r.Client.Status().Update(ctx, tnt)
+		latest.Status = tnt.Status
+
+		// Set Ready Condition
+		readyCondition := meta.NewReadyCondition(tnt)
+		if reconcileError != nil {
+			readyCondition.Message = reconcileError.Error()
+			readyCondition.Status = metav1.ConditionFalse
+			readyCondition.Reason = meta.FailedReason
+		}
+
+		latest.Status.Conditions.UpdateConditionByType(readyCondition)
+
+		// Set Cordoned Condition
+		cordonedCondition := meta.NewCordonedCondition(tnt)
+
+		if tnt.Spec.Cordoned {
+			latest.Status.State = capsulev1beta2.TenantStateCordoned
+
+			cordonedCondition.Reason = meta.CordonedReason
+			cordonedCondition.Message = "Tenant is cordoned"
+			cordonedCondition.Status = metav1.ConditionTrue
+		} else {
+			latest.Status.State = capsulev1beta2.TenantStateActive
+		}
+
+		latest.Status.Conditions.UpdateConditionByType(cordonedCondition)
+
+		return r.Client.Status().Update(ctx, latest)
 	})
 }

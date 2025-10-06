@@ -7,18 +7,34 @@ import (
 	capsulewebhook "github.com/projectcapsule/capsule/pkg/webhook"
 )
 
-type tenant struct {
+type tenantValidating struct {
 	handlers []capsulewebhook.Handler
 }
 
-func Tenant(handler ...capsulewebhook.Handler) capsulewebhook.Webhook {
-	return &tenant{handlers: handler}
+func TenantValidating(handler ...capsulewebhook.Handler) capsulewebhook.Webhook {
+	return &tenantValidating{handlers: handler}
 }
 
-func (w *tenant) GetHandlers() []capsulewebhook.Handler {
+func (w *tenantValidating) GetHandlers() []capsulewebhook.Handler {
 	return w.handlers
 }
 
-func (w *tenant) GetPath() string {
-	return "/tenants"
+func (w *tenantValidating) GetPath() string {
+	return "/tenants/validating"
+}
+
+type tenantMutating struct {
+	handlers []capsulewebhook.Handler
+}
+
+func TenantMutating(handler ...capsulewebhook.Handler) capsulewebhook.Webhook {
+	return &tenantMutating{handlers: handler}
+}
+
+func (w *tenantMutating) GetHandlers() []capsulewebhook.Handler {
+	return w.handlers
+}
+
+func (w *tenantMutating) GetPath() string {
+	return "/tenants/mutating"
 }

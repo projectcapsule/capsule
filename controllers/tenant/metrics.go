@@ -3,13 +3,15 @@
 package tenant
 
 import (
-	"slices"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/meta"
 )
 
 // Exposing Status Metrics for tenant.
-func (r *Manager) syncStatusMetrics(tenant *capsulev1beta2.Tenant, preRecNamespaces []string) {
+func (r *Manager) syncTenantStatusMetrics(tenant *capsulev1beta2.Tenant) {
 	var cordoned float64 = 0
 
 	// Expose namespace-tenant relationship
@@ -17,18 +19,55 @@ func (r *Manager) syncStatusMetrics(tenant *capsulev1beta2.Tenant, preRecNamespa
 		r.Metrics.TenantNamespaceRelationshipGauge.WithLabelValues(tenant.GetName(), ns).Set(1)
 	}
 
-	// Cleanup deleted namespaces
-	for _, ns := range preRecNamespaces {
-		if !slices.Contains(tenant.Status.Namespaces, ns) {
-			r.Metrics.DeleteNamespaceRelationshipMetrics(ns)
-		}
-	}
+	// Expose cordoned status
+	r.Metrics.TenantNamespaceCounterGauge.WithLabelValues(tenant.Name).Set(float64(tenant.Status.Size))
 
 	if tenant.Spec.Cordoned {
 		cordoned = 1
 	}
-	// Expose cordoned status
-	r.Metrics.TenantNamespaceCounterGauge.WithLabelValues(tenant.Name).Set(float64(tenant.Status.Size))
-	// Expose the namespace counter
+
+	// Expose Status Metrics
+	for _, status := range []string{meta.ReadyCondition, meta.CordonedCondition} {
+		var value float64
+
+		cond := tenant.Status.Conditions.GetConditionByType(status)
+		if cond == nil {
+			r.Metrics.DeleteTenantConditionMetricByType(tenant.Name, status)
+
+			continue
+		}
+
+		if cond.Status == metav1.ConditionTrue {
+			value = 1
+		}
+
+		r.Metrics.TenantConditionGauge.WithLabelValues(tenant.GetName(), status).Set(value)
+	}
+
+	// Expose the namespace counter (Deprecated)
+	if tenant.Spec.Cordoned {
+		cordoned = 1
+	}
+
 	r.Metrics.TenantCordonedStatusGauge.WithLabelValues(tenant.Name).Set(cordoned)
+}
+
+// Exposing Status Metrics for tenant.
+func (r *Manager) syncNamespaceStatusMetrics(tenant *capsulev1beta2.Tenant, namespace *corev1.Namespace) {
+	for _, status := range []string{meta.ReadyCondition, meta.CordonedCondition} {
+		var value float64
+
+		cond := tenant.Status.Conditions.GetConditionByType(status)
+		if cond == nil {
+			r.Metrics.DeleteTenantNamespaceConditionMetricByType(namespace.Name, status)
+
+			continue
+		}
+
+		if cond.Status == metav1.ConditionTrue {
+			value = 1
+		}
+
+		r.Metrics.TenantNamespaceConditionGauge.WithLabelValues(tenant.GetName(), namespace.GetName(), status).Set(value)
+	}
 }

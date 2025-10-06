@@ -18,7 +18,7 @@ import (
 var _ = Describe("creating a Namespace for a Tenant with additional metadata", Label("namespace"), func() {
 	tnt := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "tenant-metadata",
+			Name: "tenant-metadata-controller",
 			OwnerReferences: []metav1.OwnerReference{
 				{
 					APIVersion: "cap",
@@ -68,6 +68,7 @@ var _ = Describe("creating a Namespace for a Tenant with additional metadata", L
 			Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: ns.GetName()}, ns)).Should(Succeed())
 			Expect(ns.Labels).ShouldNot(HaveKeyWithValue("newlabel", "foobazbar"))
 
+			Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: tnt.GetName()}, tnt)).Should(Succeed())
 			tnt.Spec.NamespaceOptions.AdditionalMetadata.Labels["newlabel"] = "foobazbar"
 			Expect(k8sClient.Update(context.TODO(), tnt)).Should(Succeed())
 
@@ -81,6 +82,7 @@ var _ = Describe("creating a Namespace for a Tenant with additional metadata", L
 			Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: ns.GetName()}, ns)).Should(Succeed())
 			Expect(ns.Labels).ShouldNot(HaveKeyWithValue("newannotation", "foobazbar"))
 
+			Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: tnt.GetName()}, tnt)).Should(Succeed())
 			tnt.Spec.NamespaceOptions.AdditionalMetadata.Annotations["newannotation"] = "foobazbar"
 			Expect(k8sClient.Update(context.TODO(), tnt)).Should(Succeed())
 

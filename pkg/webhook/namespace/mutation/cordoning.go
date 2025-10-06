@@ -9,6 +9,7 @@ import (
 	"net/http"
 
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -16,6 +17,7 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/configuration"
+	"github.com/projectcapsule/capsule/pkg/meta"
 	capsuleutils "github.com/projectcapsule/capsule/pkg/utils"
 	capsulewebhook "github.com/projectcapsule/capsule/pkg/webhook"
 	"github.com/projectcapsule/capsule/pkg/webhook/utils"
@@ -74,16 +76,21 @@ func (h *cordoningLabelHandler) syncNamespaceCordonLabel(ctx context.Context, c 
 		}
 	}
 
-	if !tnt.Spec.Cordoned {
+	condition := tnt.Status.Conditions.GetConditionByType(meta.CordonedCondition)
+	if condition == nil {
+		return nil
+	}
+
+	if condition.Status != metav1.ConditionTrue {
 		return nil
 	}
 
 	labels := ns.GetLabels()
-	if _, ok := labels[capsuleutils.CordonedLabel]; ok {
+	if _, ok := labels[meta.CordonedLabel]; ok {
 		return nil
 	}
 
-	ns.Labels[capsuleutils.CordonedLabel] = "true"
+	ns.Labels[meta.CordonedLabel] = "true"
 
 	marshaled, err := json.Marshal(ns)
 	if err != nil {
