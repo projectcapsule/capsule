@@ -12,7 +12,6 @@ type TenantRecorder struct {
 	TenantNamespaceRelationshipGauge *prometheus.GaugeVec
 	TenantNamespaceConditionGauge    *prometheus.GaugeVec
 	TenantConditionGauge             *prometheus.GaugeVec
-	TenantCordonedStatusGauge        *prometheus.GaugeVec
 	TenantNamespaceCounterGauge      *prometheus.GaugeVec
 	TenantResourceUsageGauge         *prometheus.GaugeVec
 	TenantResourceLimitGauge         *prometheus.GaugeVec
@@ -32,14 +31,14 @@ func NewTenantRecorder() *TenantRecorder {
 				Namespace: metricsPrefix,
 				Name:      "tenant_namespace_relationship",
 				Help:      "Mapping metric showing namespace to tenant relationships",
-			}, []string{"tenant", "namespace"},
+			}, []string{"tenant", "target_namespace"},
 		),
 		TenantNamespaceConditionGauge: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
 				Namespace: metricsPrefix,
 				Name:      "tenant_namespace_condition",
 				Help:      "Provides per namespace within a tenant condition status for each condition",
-			}, []string{"tenant", "namespace", "condition"},
+			}, []string{"tenant", "target_namespace", "condition"},
 		),
 
 		TenantConditionGauge: prometheus.NewGaugeVec(
@@ -48,13 +47,6 @@ func NewTenantRecorder() *TenantRecorder {
 				Name:      "tenant_condition",
 				Help:      "Provides per tenant condition status for each condition",
 			}, []string{"tenant", "condition"},
-		),
-		TenantCordonedStatusGauge: prometheus.NewGaugeVec(
-			prometheus.GaugeOpts{
-				Namespace: metricsPrefix,
-				Name:      "tenant_status",
-				Help:      "DEPRECATED: Tenant cordon state indicating if tenant operations are restricted (1) or allowed (0) for resource creation and modification",
-			}, []string{"tenant"},
 		),
 		TenantNamespaceCounterGauge: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
@@ -85,7 +77,6 @@ func (r *TenantRecorder) Collectors() []prometheus.Collector {
 		r.TenantNamespaceRelationshipGauge,
 		r.TenantNamespaceConditionGauge,
 		r.TenantConditionGauge,
-		r.TenantCordonedStatusGauge,
 		r.TenantNamespaceCounterGauge,
 		r.TenantResourceUsageGauge,
 		r.TenantResourceLimitGauge,
@@ -100,20 +91,20 @@ func (r *TenantRecorder) DeleteAllMetricsForNamespace(namespace string) {
 // DeleteCondition deletes the condition metrics for the ref.
 func (r *TenantRecorder) DeleteNamespaceRelationshipMetrics(namespace string) {
 	r.TenantNamespaceRelationshipGauge.DeletePartialMatch(map[string]string{
-		"namespace": namespace,
+		"target_namespace": namespace,
 	})
 }
 
 func (r *TenantRecorder) DeleteTenantNamespaceConditionMetrics(namespace string) {
 	r.TenantNamespaceConditionGauge.DeletePartialMatch(map[string]string{
-		"namespace": namespace,
+		"target_namespace": namespace,
 	})
 }
 
 func (r *TenantRecorder) DeleteTenantNamespaceConditionMetricByType(namespace string, condition string) {
 	r.TenantNamespaceConditionGauge.DeletePartialMatch(map[string]string{
-		"namespace": namespace,
-		"condition": condition,
+		"target_namespace": namespace,
+		"condition":        condition,
 	})
 }
 
@@ -150,9 +141,6 @@ func (r *TenantRecorder) DeleteTenantResourceMetrics(tenant string) {
 // DeleteCondition deletes the condition metrics for the ref.
 func (r *TenantRecorder) DeleteTenantStatusMetrics(tenant string) {
 	r.TenantNamespaceCounterGauge.DeletePartialMatch(map[string]string{
-		"tenant": tenant,
-	})
-	r.TenantCordonedStatusGauge.DeletePartialMatch(map[string]string{
 		"tenant": tenant,
 	})
 	r.TenantNamespaceRelationshipGauge.DeletePartialMatch(map[string]string{

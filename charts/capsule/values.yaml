@@ -314,7 +314,7 @@ monitoring:
     # Grafana Operator
     operator:
       # -- Enable Operator Resources (GrafanaDashboard)
-      enabled: true
+      enabled: false
       # -- Allow the Operator to match this resource with Grafanas outside the current namespace
       allowCrossNamespaceImport: true
       # -- How often the resource is synced, defaults to 10m0s if not set

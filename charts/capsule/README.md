@@ -135,7 +135,7 @@ The following Values have changed key or Value:
 | monitoring.dashboards.labels | object | `{}` | Labels for dashboard configmaps |
 | monitoring.dashboards.namespace | string | `""` | Custom namespace for dashboard configmaps |
 | monitoring.dashboards.operator.allowCrossNamespaceImport | bool | `true` | Allow the Operator to match this resource with Grafanas outside the current namespace |
-| monitoring.dashboards.operator.enabled | bool | `true` | Enable Operator Resources (GrafanaDashboard) |
+| monitoring.dashboards.operator.enabled | bool | `false` | Enable Operator Resources (GrafanaDashboard) |
 | monitoring.dashboards.operator.folder | string | `""` | folder assignment for dashboard |
 | monitoring.dashboards.operator.instanceSelector | object | `{}` | Selects Grafana instances for import |
 | monitoring.dashboards.operator.resyncPeriod | string | `"10m"` | How often the resource is synced, defaults to 10m0s if not set |

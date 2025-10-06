@@ -23,11 +23,19 @@ rules:
   - apiextensions.k8s.io
   resources:
   - customresourcedefinitions
+  resourceNames:
+  - capsuleconfigurations.capsule.clastix.io
+  - resourcepoolclaims.capsule.clastix.io
+  - resourcepools.capsule.clastix.io
+  - tenantresources.capsule.clastix.io
+  - globaltenantresources.capsule.clastix.io
+  - tenants.capsule.clastix.io
   verbs:
   - create
   - delete
   - get
   - patch
+  - update
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
