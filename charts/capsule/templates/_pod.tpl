@@ -18,7 +18,9 @@ spec:
   {{- if .Values.podSecurityContext.enabled }}
   securityContext: {{- omit .Values.podSecurityContext "enabled" | toYaml | nindent 4 }}
   {{- end }}
+  {{- if not .Values.manager.hostUsers }}
   hostUsers: {{ .Values.manager.hostUsers }}
+  {{- end }}
   {{- if .Values.manager.hostNetwork }}
   hostNetwork: true
   dnsPolicy: ClusterFirstWithHostNet
