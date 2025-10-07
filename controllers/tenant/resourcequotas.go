@@ -303,12 +303,19 @@ func (r *Manager) resourceQuotasUpdate(ctx context.Context, resourceName corev1.
 					if found.Annotations == nil {
 						found.Annotations = make(map[string]string)
 					}
+
+					if found.Labels == nil {
+						found.Labels = make(map[string]string, len(rq.Labels))
+					}
+
 					// Pruning the Capsule quota annotations:
 					// if the ResourceQuota is updated by removing some objects,
 					// we could still have left-overs which could be misleading.
 					// This will not lead to a reconciliation loop since the whole code is idempotent.
 					for k := range found.Annotations {
-						if (strings.HasPrefix(k, capsulev1beta2.HardCapsuleQuotaAnnotation) || strings.HasPrefix(k, capsulev1beta2.UsedCapsuleQuotaAnnotation)) && !annotationsToKeep.Has(k) {
+						if (strings.HasPrefix(k, capsulev1beta2.HardCapsuleQuotaAnnotation) ||
+							strings.HasPrefix(k, capsulev1beta2.UsedCapsuleQuotaAnnotation)) &&
+							(annotationsToKeep == nil || !annotationsToKeep.Has(k)) {
 							delete(found.Annotations, k)
 						}
 					}
@@ -321,8 +328,14 @@ func (r *Manager) resourceQuotasUpdate(ctx context.Context, resourceName corev1.
 					if limitKey, keyErr := capsulev1beta2.HardQuotaFor(resourceName); keyErr == nil {
 						found.Annotations[limitKey] = limit.String()
 					}
+
 					// Updating the Resource according to the actual.Cmp result
-					found.Spec.Hard = rq.Spec.Hard
+					if rq.Spec.Hard != nil {
+						found.Spec.Hard = rq.Spec.Hard.DeepCopy()
+					} else {
+						// Ensure it’s nil (or empty) consistently
+						found.Spec.Hard = nil
+					}
 
 					return nil
 				})
