@@ -614,7 +614,7 @@ webhooks:
 
     nodes:
       # -- Enable the Hook
-      enabled: true
+      enabled: false
       # -- [FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy)
       failurePolicy: Fail
       # -- [MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
