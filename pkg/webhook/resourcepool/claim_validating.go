@@ -32,8 +32,20 @@ func (h *claimValidationHandler) OnCreate(client.Client, admission.Decoder, reco
 	}
 }
 
-func (h *claimValidationHandler) OnDelete(client.Client, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
-	return func(context.Context, admission.Request) *admission.Response {
+func (h *claimValidationHandler) OnDelete(_ client.Client, decoder admission.Decoder, _ record.EventRecorder) capsulewebhook.Func {
+	return func(_ context.Context, req admission.Request) *admission.Response {
+		claim := &capsulev1beta2.ResourcePoolClaim{}
+
+		if err := decoder.DecodeRaw(req.OldObject, claim); err != nil {
+			return utils.ErroredResponse(fmt.Errorf("failed to decode old object: %w", err))
+		}
+
+		if claim.IsBoundToResourcePool() {
+			response := admission.Denied(fmt.Sprintf("cannot delete the pool while claim is bound to a resourcepool %s", claim.Status.Pool.Name))
+
+			return &response
+		}
+
 		return nil
 	}
 }

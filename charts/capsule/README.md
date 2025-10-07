@@ -115,6 +115,8 @@ The following Values have changed key or Value:
 | manager.options.logLevel | string | `"4"` | Set the log verbosity of the capsule with a value from 1 to 10 |
 | manager.options.nodeMetadata | object | `{"forbiddenAnnotations":{"denied":[],"deniedRegex":""},"forbiddenLabels":{"denied":[],"deniedRegex":""}}` | Allows to set the forbidden metadata for the worker nodes that could be patched by a Tenant |
 | manager.options.protectedNamespaceRegex | string | `""` | If specified, disallows creation of namespaces matching the passed regexp |
+| manager.options.serviceAccountClient | object | `{}` | Define custom service account client options for the Capsule manager container. |
+| manager.options.useProxyForServiceAccountClient | bool | `false` | If `proxy.enabled` is `true`, this option sets the `options.serviceAccountClient` according to the standard installation. Properties from `options.serviceAccountClient` are merged over the default values. |
 | manager.options.userNames | list | `[]` | Names of the users considered as Capsule users. |
 | manager.rbac.create | bool | `true` | Specifies whether RBAC resources should be created. |
 | manager.rbac.existingClusterRoles | list | `[]` | Specifies further cluster roles to be added to the Capsule manager service account. |
@@ -254,6 +256,7 @@ The following Values have changed key or Value:
 | webhooks.hooks.tenants.matchPolicy | string | `"Exact"` | [MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy) |
 | webhooks.hooks.tenants.namespaceSelector | object | `{}` | [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector) |
 | webhooks.hooks.tenants.objectSelector | object | `{}` | [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector) |
+| webhooks.hooks.tenants.reinvocationPolicy | string | `"Never"` | [ReinvocationPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#reinvocation-policy) |
 | webhooks.mutatingWebhooksTimeoutSeconds | int | `30` | Timeout in seconds for mutating webhooks |
 | webhooks.service.caBundle | string | `""` | CABundle for the webhook service |
 | webhooks.service.name | string | `""` | Custom service name for the webhook service |

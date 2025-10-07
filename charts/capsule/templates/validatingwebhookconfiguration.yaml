@@ -261,6 +261,7 @@ webhooks:
         - UPDATE
       resources:
         - pods
+        - pods/ephemeralcontainers
       scope: Namespaced
   sideEffects: None
   timeoutSeconds: {{ $.Values.webhooks.validatingWebhooksTimeoutSeconds }}
@@ -382,7 +383,7 @@ webhooks:
     - v1
     - v1beta1
   clientConfig:
-    {{- include "capsule.webhooks.service" (dict "path" "/tenants" "ctx" $) | nindent 4 }}
+    {{- include "capsule.webhooks.service" (dict "path" "/tenants/validating" "ctx" $) | nindent 4 }}
   failurePolicy:  {{ .failurePolicy }}
   matchPolicy: {{ .matchPolicy }}
   {{- with .namespaceSelector }}
@@ -408,7 +409,7 @@ webhooks:
         - DELETE
       resources:
         - tenants
-      scope: '*'
+      scope: 'Cluster'
   sideEffects: None
   timeoutSeconds: {{ $.Values.webhooks.validatingWebhooksTimeoutSeconds }}
   {{- end }}
@@ -480,6 +481,7 @@ webhooks:
       operations:
       - CREATE
       - UPDATE
+      - DELETE
       resources:
       - resourcepoolclaims
       scope: '*'

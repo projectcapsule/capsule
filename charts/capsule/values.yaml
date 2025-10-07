@@ -66,7 +66,7 @@ crds:
   # -- Only install the CRDs, no other primitives
   exclusive: false
   # -- Create additionally CapsuleConfiguration even if CRDs are exclusive
-  createConfig: false 
+  createConfig: false
   # -- Extra Labels for CRDs
   labels: {}
   # -- Extra Annotations for CRDs
@@ -576,6 +576,8 @@ webhooks:
       namespaceSelector: {}
       # -- [MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
       matchConditions: []
+      # -- [ReinvocationPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#reinvocation-policy)
+      reinvocationPolicy: Never
 
     tenantResourceObjects:
       # -- Enable the Hook

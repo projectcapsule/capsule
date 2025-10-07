@@ -377,6 +377,16 @@ var _ = Describe("ResourcePoolClaim Tests", Label("resourcepool"), func() {
 			Expect(claim.Status.Pool).To(Equal(expectedPool), "expected pool name to match")
 		})
 
+		By("Error on deleting bound claim", func() {
+			err := k8sClient.Get(context.TODO(), client.ObjectKey{Name: claim.Name, Namespace: claim.Namespace}, claim)
+			Expect(err).Should(Succeed())
+
+			isBoundCondition(claim)
+
+			err = k8sClient.Delete(context.TODO(), claim)
+			Expect(err).ShouldNot(Succeed())
+		})
+
 		By("Error on patching resources for claim (Increase)", func() {
 			err := k8sClient.Get(context.TODO(), client.ObjectKey{Name: claim.Name, Namespace: claim.Namespace}, claim)
 			Expect(err).Should(Succeed())

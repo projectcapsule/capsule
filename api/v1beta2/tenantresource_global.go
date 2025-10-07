@@ -32,7 +32,7 @@ type GlobalTenantResourceStatus struct {
 	// List of the replicated resources for the given TenantResource.
 	ProcessedItems ProcessedItems `json:"processedItems"`
 	// Condition of the GlobalTenantResource.
-	Condition api.Condition `json:"condition,omitempty"`
+	Conditions meta.ConditionList `json:"conditions,omitempty"`
 }
 
 func (p *GlobalTenantResource) SetCondition() {

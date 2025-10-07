@@ -1,7 +1,7 @@
 // Copyright 2020-2025 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package tenant
+package validation
 
 import (
 	"context"
@@ -102,15 +102,15 @@ func (r *resourceCounterHandler) OnDelete(clt client.Client, _ admission.Decoder
 		err = retry.RetryOnConflict(retry.DefaultRetry, func() (retryErr error) {
 			tnt := &capsulev1beta2.Tenant{}
 			if retryErr = clt.Get(ctx, types.NamespacedName{Name: tntName}, tnt); err != nil {
-				return
+				return retryErr
 			}
 
 			if tnt.Annotations == nil {
-				return
+				return retryErr
 			}
 
 			if _, ok := tnt.Annotations[capsulev1beta2.UsedAnnotationForResource(kgv)]; !ok {
-				return
+				return retryErr
 			}
 
 			used, _ := capsulev1beta2.GetUsedResourceFromTenant(*tnt, kgv)

@@ -15,10 +15,6 @@ import (
 	"github.com/projectcapsule/capsule/api/v1beta2"
 )
 
-const (
-	CordonedLabel = "projectcapsule.dev/cordoned"
-)
-
 func GetTypeLabel(t runtime.Object) (label string, err error) {
 	switch v := t.(type) {
 	case *v1beta1.Tenant, *v1beta2.Tenant:
@@ -37,5 +33,5 @@ func GetTypeLabel(t runtime.Object) (label string, err error) {
 		err = fmt.Errorf("type %T is not mapped as Capsule label recognized", v)
 	}
 
-	return
+	return label, err
 }

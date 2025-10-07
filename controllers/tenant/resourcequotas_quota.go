@@ -71,7 +71,7 @@ func (r *Manager) syncCustomResourceQuotaUsages(ctx context.Context, tenant *cap
 			err := retry.RetryOnConflict(retry.DefaultBackoff, func() (retryErr error) {
 				tnt := &capsulev1beta2.Tenant{}
 				if retryErr = r.Get(ctx, types.NamespacedName{Name: tenant.GetName()}, tnt); retryErr != nil {
-					return
+					return retryErr
 				}
 
 				if tnt.GetAnnotations() == nil {
@@ -123,7 +123,7 @@ func (r *Manager) syncCustomResourceQuotaUsages(ctx context.Context, tenant *cap
 				usedMap[key] += used
 			}
 
-			return
+			return scopeErr
 		})
 	}
 

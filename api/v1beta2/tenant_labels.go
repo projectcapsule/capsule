@@ -28,5 +28,5 @@ func GetTypeLabel(t metav1.Object) (label string, err error) {
 		err = fmt.Errorf("type %T is not mapped as Capsule label recognized", v)
 	}
 
-	return
+	return label, err
 }

@@ -50,6 +50,6 @@ func (s HostnamePath) Func() client.IndexerFunc {
 			}
 		}
 
-		return
+		return entries
 	}
 }

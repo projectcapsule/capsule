@@ -1041,7 +1041,7 @@ spec:
       status: {}
   - additionalPrinterColumns:
     - description: The actual state of the Tenant
-      jsonPath: .status.state
+      jsonPath: .status.conditions[?(@.type=="Cordoned")].reason
       name: State
       type: string
     - description: The max amount of Namespaces can be created
@@ -1055,6 +1055,14 @@ spec:
     - description: Node Selector applied to Pods
       jsonPath: .spec.nodeSelector
       name: Node selector
+      type: string
+    - description: Reconcile Status for the tenant
+      jsonPath: .status.conditions[?(@.type=="Ready")].status
+      name: Ready
+      type: string
+    - description: Reconcile Message for the tenant
+      jsonPath: .status.conditions[?(@.type=="Ready")].message
+      name: Status
       type: string
     - description: Age
       jsonPath: .metadata.creationTimestamp
@@ -1319,9 +1327,9 @@ spec:
                     type: string
                 type: object
               limitRanges:
-                description: Specifies the resource min/max usage restrictions to
-                  the Tenant. The assigned values are inherited by any namespace created
-                  in the Tenant. Optional.
+                description: |-
+                  Specifies the resource min/max usage restrictions to the Tenant. The assigned values are inherited by any namespace created in the Tenant. Optional.
+                  Deprecated: Use Tenant Replications instead (https://projectcapsule.dev/docs/replications/)
                 properties:
                   items:
                     items:
@@ -1410,8 +1418,9 @@ spec:
                   the Tenant owner cannot create further namespaces. Optional.
                 properties:
                   additionalMetadata:
-                    description: Specifies additional labels and annotations the Capsule
-                      operator places on any Namespace resource in the Tenant. Optional.
+                    description: |-
+                      Specifies additional labels and annotations the Capsule operator places on any Namespace resource in the Tenant. Optional.
+                      Deprecated: Use additionalMetadataList instead
                     properties:
                       annotations:
                         additionalProperties:
@@ -1509,6 +1518,11 @@ spec:
                       deniedRegex:
                         type: string
                     type: object
+                  managedMetadataOnly:
+                    default: false
+                    description: If enabled only metadata from additionalMetadata
+                      is reconciled to the namespaces.
+                    type: boolean
                   quota:
                     description: Specifies the maximum number of namespaces allowed
                       for that Tenant. Once the namespace quota assigned to the Tenant
@@ -1519,9 +1533,9 @@ spec:
                     type: integer
                 type: object
               networkPolicies:
-                description: Specifies the NetworkPolicies assigned to the Tenant.
-                  The assigned NetworkPolicies are inherited by any namespace created
-                  in the Tenant. Optional.
+                description: |-
+                  Specifies the NetworkPolicies assigned to the Tenant. The assigned NetworkPolicies are inherited by any namespace created in the Tenant. Optional.
+                  Deprecated: Use Tenant Replications instead (https://projectcapsule.dev/docs/replications/)
                 properties:
                   items:
                     items:
@@ -2423,14 +2437,159 @@ spec:
           status:
             description: Returns the observed state of the Tenant.
             properties:
+              conditions:
+                description: Tenant Condition
+                items:
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
               namespaces:
-                description: List of namespaces assigned to the Tenant.
+                description: List of namespaces assigned to the Tenant. (Deprecated)
                 items:
                   type: string
                 type: array
               size:
                 description: How many namespaces are assigned to the Tenant.
                 type: integer
+              spaces:
+                description: Tracks state for the namespaces associated with this
+                  tenant
+                items:
+                  properties:
+                    conditions:
+                      description: Conditions
+                      items:
+                        description: Condition contains details for one aspect of
+                          the current state of this API Resource.
+                        properties:
+                          lastTransitionTime:
+                            description: |-
+                              lastTransitionTime is the last time the condition transitioned from one status to another.
+                              This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                            format: date-time
+                            type: string
+                          message:
+                            description: |-
+                              message is a human readable message indicating details about the transition.
+                              This may be an empty string.
+                            maxLength: 32768
+                            type: string
+                          observedGeneration:
+                            description: |-
+                              observedGeneration represents the .metadata.generation that the condition was set based upon.
+                              For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                              with respect to the current state of the instance.
+                            format: int64
+                            minimum: 0
+                            type: integer
+                          reason:
+                            description: |-
+                              reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                              Producers of specific condition types may define expected values and meanings for this field,
+                              and whether the values are considered a guaranteed API.
+                              The value should be a CamelCase string.
+                              This field may not be empty.
+                            maxLength: 1024
+                            minLength: 1
+                            pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                            type: string
+                          status:
+                            description: status of the condition, one of True, False,
+                              Unknown.
+                            enum:
+                            - "True"
+                            - "False"
+                            - Unknown
+                            type: string
+                          type:
+                            description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                            maxLength: 316
+                            pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                            type: string
+                        required:
+                        - lastTransitionTime
+                        - message
+                        - reason
+                        - status
+                        - type
+                        type: object
+                      type: array
+                    metadata:
+                      description: Managed Metadata
+                      properties:
+                        annotations:
+                          additionalProperties:
+                            type: string
+                          description: Managed Annotations
+                          type: object
+                        labels:
+                          additionalProperties:
+                            type: string
+                          description: Managed Labels
+                          type: object
+                      type: object
+                    name:
+                      description: Namespace Name
+                      type: string
+                    uid:
+                      description: Namespace UID
+                      type: string
+                  required:
+                  - conditions
+                  - name
+                  type: object
+                type: array
               state:
                 default: Active
                 description: The operational state of the Tenant. Possible values
@@ -2440,6 +2599,7 @@ spec:
                 - Active
                 type: string
             required:
+            - conditions
             - size
             - state
             type: object

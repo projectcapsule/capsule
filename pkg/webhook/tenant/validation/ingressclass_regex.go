@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 //nolint:dupl
-package tenant
+package validation
 
 import (
 	"context"
@@ -17,13 +17,13 @@ import (
 	"github.com/projectcapsule/capsule/pkg/webhook/utils"
 )
 
-type hostnameRegexHandler struct{}
+type ingressClassRegexHandler struct{}
 
-func HostnameRegexHandler() capsulewebhook.Handler {
-	return &hostnameRegexHandler{}
+func IngressClassRegexHandler() capsulewebhook.Handler {
+	return &ingressClassRegexHandler{}
 }
 
-func (h *hostnameRegexHandler) OnCreate(_ client.Client, decoder admission.Decoder, _ record.EventRecorder) capsulewebhook.Func {
+func (h *ingressClassRegexHandler) OnCreate(_ client.Client, decoder admission.Decoder, _ record.EventRecorder) capsulewebhook.Func {
 	return func(_ context.Context, req admission.Request) *admission.Response {
 		if response := h.validate(decoder, req); response != nil {
 			return response
@@ -33,13 +33,13 @@ func (h *hostnameRegexHandler) OnCreate(_ client.Client, decoder admission.Decod
 	}
 }
 
-func (h *hostnameRegexHandler) OnDelete(client.Client, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
+func (h *ingressClassRegexHandler) OnDelete(client.Client, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (h *hostnameRegexHandler) OnUpdate(_ client.Client, decoder admission.Decoder, _ record.EventRecorder) capsulewebhook.Func {
+func (h *ingressClassRegexHandler) OnUpdate(_ client.Client, decoder admission.Decoder, _ record.EventRecorder) capsulewebhook.Func {
 	return func(_ context.Context, req admission.Request) *admission.Response {
 		if err := h.validate(decoder, req); err != nil {
 			return err
@@ -49,15 +49,15 @@ func (h *hostnameRegexHandler) OnUpdate(_ client.Client, decoder admission.Decod
 	}
 }
 
-func (h *hostnameRegexHandler) validate(decoder admission.Decoder, req admission.Request) *admission.Response {
+func (h *ingressClassRegexHandler) validate(decoder admission.Decoder, req admission.Request) *admission.Response {
 	tenant := &capsulev1beta2.Tenant{}
 	if err := decoder.Decode(req, tenant); err != nil {
 		return utils.ErroredResponse(err)
 	}
 
-	if tenant.Spec.IngressOptions.AllowedHostnames != nil && len(tenant.Spec.IngressOptions.AllowedHostnames.Regex) > 0 {
-		if _, err := regexp.Compile(tenant.Spec.IngressOptions.AllowedHostnames.Regex); err != nil {
-			response := admission.Denied("unable to compile allowedHostnames allowedRegex")
+	if tenant.Spec.IngressOptions.AllowedClasses != nil && len(tenant.Spec.IngressOptions.AllowedClasses.Regex) > 0 {
+		if _, err := regexp.Compile(tenant.Spec.IngressOptions.AllowedClasses.Regex); err != nil {
+			response := admission.Denied("unable to compile ingressClasses allowedRegex")
 
 			return &response
 		}

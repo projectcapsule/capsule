@@ -17,6 +17,9 @@ const (
 
 	OwnerPromotionLabel        = "owner.projectcapsule.dev/promote"
 	OwnerPromotionLabelTrigger = "true"
+
+	CordonedLabel        = "projectcapsule.dev/cordoned"
+	CordonedLabelTrigger = "true"
 )
 
 func FreezeLabelTriggers(obj client.Object) bool {

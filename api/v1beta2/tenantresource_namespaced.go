@@ -51,8 +51,8 @@ type RawExtension struct {
 type TenantResourceStatus struct {
 	// List of the replicated resources for the given TenantResource.
 	ProcessedItems ProcessedItems `json:"processedItems"`
-	// Condition of the TenantResource.
-	Condition api.Condition `json:"condition,omitempty"`
+	// Conditions of the TenantResource.
+	Conditions meta.ConditionList `json:"conditions,omitempty"`
 }
 
 func (p *TenantResource) SetCondition() {

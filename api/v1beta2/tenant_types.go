@@ -32,8 +32,10 @@ type TenantSpec struct {
 	// Specifies the label to control the placement of pods on a given pool of worker nodes. All namespaces created within the Tenant will have the node selector annotation. This annotation tells the Kubernetes scheduler to place pods on the nodes having the selector label. Optional.
 	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
 	// Specifies the NetworkPolicies assigned to the Tenant. The assigned NetworkPolicies are inherited by any namespace created in the Tenant. Optional.
+	// Deprecated: Use Tenant Replications instead (https://projectcapsule.dev/docs/replications/)
 	NetworkPolicies api.NetworkPolicySpec `json:"networkPolicies,omitempty"`
 	// Specifies the resource min/max usage restrictions to the Tenant. The assigned values are inherited by any namespace created in the Tenant. Optional.
+	// Deprecated: Use Tenant Replications instead (https://projectcapsule.dev/docs/replications/)
 	LimitRanges api.LimitRangesSpec `json:"limitRanges,omitempty"`
 	// Specifies a list of ResourceQuota resources assigned to the Tenant. The assigned values are inherited by any namespace created in the Tenant. The Capsule operator aggregates ResourceQuota at Tenant level, so that the hard quota is never crossed for the given Tenant. This permits the Tenant owner to consume resources in the Tenant regardless of the namespace. Optional.
 	ResourceQuota api.ResourceQuotaSpec `json:"resourceQuotas,omitempty"`
@@ -74,12 +76,13 @@ type TenantSpec struct {
 // +kubebuilder:storageversion
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:scope=Cluster,shortName=tnt
-// +kubebuilder:printcolumn:name="State",type="string",JSONPath=".status.state",description="The actual state of the Tenant"
+// +kubebuilder:printcolumn:name="State",type="string",JSONPath=".status.conditions[?(@.type==\"Cordoned\")].reason",description="The actual state of the Tenant"
 // +kubebuilder:printcolumn:name="Namespace quota",type="integer",JSONPath=".spec.namespaceOptions.quota",description="The max amount of Namespaces can be created"
 // +kubebuilder:printcolumn:name="Namespace count",type="integer",JSONPath=".status.size",description="The total amount of Namespaces in use"
 // +kubebuilder:printcolumn:name="Node selector",type="string",JSONPath=".spec.nodeSelector",description="Node Selector applied to Pods"
+// +kubebuilder:printcolumn:name="Ready",type="string",JSONPath=".status.conditions[?(@.type==\"Ready\")].status",description="Reconcile Status for the tenant"
+// +kubebuilder:printcolumn:name="Status",type="string",JSONPath=".status.conditions[?(@.type==\"Ready\")].message",description="Reconcile Message for the tenant"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp",description="Age"
-
 // Tenant is the Schema for the tenants API.
 type Tenant struct {
 	metav1.TypeMeta   `json:",inline"`
@@ -94,7 +97,7 @@ func (in *Tenant) GetNamespaces() (res []string) {
 
 	res = append(res, in.Status.Namespaces...)
 
-	return
+	return res
 }
 
 // +kubebuilder:object:root=true
