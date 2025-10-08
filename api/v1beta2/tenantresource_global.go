@@ -35,29 +35,6 @@ type GlobalTenantResourceStatus struct {
 	Conditions meta.ConditionList `json:"conditions,omitempty"`
 }
 
-func (p *GlobalTenantResource) SetCondition() {
-	failures := 0
-
-	for _, item := range p.Status.ProcessedItems {
-		if item.Status != metav1.ConditionTrue {
-			failures++
-		}
-	}
-
-	cond := meta.NewReadyCondition(p)
-	if failures > 0 {
-		cond.Status = metav1.ConditionFalse
-		cond.Reason = meta.FailedReason
-		cond.Message = "Reconcile completed with errors"
-	} else {
-		cond.Status = metav1.ConditionTrue
-		cond.Reason = meta.SucceededReason
-		cond.Message = "Reconcile completed successfully"
-	}
-
-	p.Status.Condition.UpdateCondition(cond)
-}
-
 type ProcessedItems []ObjectReferenceStatus
 
 func (p *ProcessedItems) AsSet() sets.Set[string] {

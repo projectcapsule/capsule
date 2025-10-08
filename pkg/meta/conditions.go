@@ -14,9 +14,6 @@ const (
 	CordonedCondition string = "Cordoned"
 	NotReadyCondition string = "NotReady"
 
-	PruningCondition     string = "Pruning"
-	ReplicationCondition string = "Replication"
-
 	AssignedCondition string = "Assigned"
 	BoundCondition    string = "Bound"
 
@@ -24,19 +21,12 @@ const (
 	SucceededReason          string = "Succeeded"
 	FailedReason             string = "Failed"
 	ActiveReason             string = "Active"
-	CordonedReason           string = "Cordoned"bvg
-	.0654
+	CordonedReason           string = "Cordoned"
 	PoolExhaustedReason      string = "PoolExhausted"
 	QueueExhaustedReason     string = "QueueExhausted"
 	NamespaceExhaustedReason string = "NamespaceExhausted"
 )
 
-<<<<<<< HEAD
-func NewReadyCondition(obj client.Object) metav1.Condition {
-	return metav1.Condition{
-		Type:               ReadyCondition,
-		ObservedGeneration: obj.GetGeneration(),
-=======
 // +kubebuilder:object:generate=true
 
 type ConditionList []Condition
@@ -91,13 +81,10 @@ func NewReadyCondition(obj client.Object) Condition {
 		Status:             metav1.ConditionTrue,
 		Reason:             SucceededReason,
 		Message:            "reconciled",
->>>>>>> 5ac0f83c5a309b93de13bf4631e7caf5c208d2dd
 		LastTransitionTime: metav1.Now(),
 	}
 }
 
-<<<<<<< HEAD
-=======
 func NewCordonedCondition(obj client.Object) Condition {
 	return Condition{
 		Type:               CordonedCondition,
@@ -132,7 +119,6 @@ func (c *Condition) UpdateCondition(condition Condition) (updated bool) {
 	return true
 }
 
->>>>>>> 5ac0f83c5a309b93de13bf4631e7caf5c208d2dd
 func NewBoundCondition(obj client.Object) metav1.Condition {
 	return metav1.Condition{
 		Type:               BoundCondition,

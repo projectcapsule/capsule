@@ -274,9 +274,6 @@ webhooks:
   timeoutSeconds: {{ $.Values.webhooks.mutatingWebhooksTimeoutSeconds }}
   {{- end }}
 {{- end }}
-<<<<<<< HEAD
-{{- end }}
-=======
 {{- with .Values.webhooks.hooks.tenants }}
   {{- if .enabled }}
 - name: tenants.projectcapsule.dev
@@ -318,4 +315,3 @@ webhooks:
 {{- end }}
 
 {{- end }}
->>>>>>> 5ac0f83c5a309b93de13bf4631e7caf5c208d2dd

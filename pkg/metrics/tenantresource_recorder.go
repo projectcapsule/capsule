@@ -5,10 +5,10 @@ package metrics
 
 import (
 	"github.com/prometheus/client_golang/prometheus"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	crtlmetrics "sigs.k8s.io/controller-runtime/pkg/metrics"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/meta"
 )
 
 type TenantResourceRecorder struct {
@@ -30,7 +30,7 @@ func NewTenantResourceRecorder() *TenantResourceRecorder {
 				Name:      "resource_condition",
 				Help:      "The current condition status of a tenant resource.",
 			},
-			[]string{"name", "target_namespace", "condition", "status"},
+			[]string{"tenant", "target_namespace", "condition", "status"},
 		),
 	}
 }
@@ -43,7 +43,7 @@ func (r *TenantResourceRecorder) Collectors() []prometheus.Collector {
 
 // RecordCondition records the condition as given for the ref.
 func (r *TenantResourceRecorder) RecordCondition(resource *capsulev1beta2.TenantResource) {
-	for _, status := range []metav1.ConditionStatus{metav1.ConditionTrue, metav1.ConditionFalse, metav1.ConditionUnknown} {
+	for _, status := range []string{meta.ReadyCondition} {
 		var value float64
 		if status == resource.Status.Condition.Status {
 			value = 1

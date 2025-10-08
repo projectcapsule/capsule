@@ -55,29 +55,6 @@ type TenantResourceStatus struct {
 	Conditions meta.ConditionList `json:"conditions,omitempty"`
 }
 
-func (p *TenantResource) SetCondition() {
-	failures := 0
-
-	for _, item := range p.Status.ProcessedItems {
-		if item.Status != metav1.ConditionTrue {
-			failures++
-		}
-	}
-
-	cond := meta.NewReadyCondition(p)
-	if failures > 0 {
-		cond.Status = metav1.ConditionFalse
-		cond.Reason = meta.FailedReason
-		cond.Message = "Reconcile completed with errors"
-	} else {
-		cond.Status = metav1.ConditionTrue
-		cond.Reason = meta.SucceededReason
-		cond.Message = "Reconcile completed successfully"
-	}
-
-	p.Status.Condition.UpdateCondition(cond)
-}
-
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="Status",type="string",JSONPath=".status.condition.type",description="Status for claim"
