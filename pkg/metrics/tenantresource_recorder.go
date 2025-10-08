@@ -5,6 +5,7 @@ package metrics
 
 import (
 	"github.com/prometheus/client_golang/prometheus"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	crtlmetrics "sigs.k8s.io/controller-runtime/pkg/metrics"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
@@ -30,7 +31,7 @@ func NewTenantResourceRecorder() *TenantResourceRecorder {
 				Name:      "resource_condition",
 				Help:      "The current condition status of a tenant resource.",
 			},
-			[]string{"tenant", "target_namespace", "condition", "status"},
+			[]string{"name", "target_namespace", "condition"},
 		),
 	}
 }
@@ -42,20 +43,38 @@ func (r *TenantResourceRecorder) Collectors() []prometheus.Collector {
 }
 
 // RecordCondition records the condition as given for the ref.
-func (r *TenantResourceRecorder) RecordCondition(resource *capsulev1beta2.TenantResource) {
+func (r *TenantResourceRecorder) RecordConditions(resource *capsulev1beta2.TenantResource) {
 	for _, status := range []string{meta.ReadyCondition} {
 		var value float64
-		if status == resource.Status.Condition.Status {
+
+		cond := resource.Status.Conditions.GetConditionByType(status)
+		if cond == nil {
+			r.DeleteConditionMetricByType(resource.GetName(), resource.GetNamespace(), status)
+
+			continue
+		}
+
+		if cond.Status == metav1.ConditionTrue {
 			value = 1
 		}
 
-		r.resourceConditionGauge.WithLabelValues(
-			resource.Name,
-			resource.Namespace,
-			resource.Status.Condition.Type,
-			string(resource.Status.Condition.Status),
-		).Set(value)
+		r.resourceConditionGauge.WithLabelValues(resource.GetName(), resource.GetNamespace(), status).Set(value)
 	}
+}
+
+func (r *TenantResourceRecorder) DeleteConditionMetrics(name string, namespace string) {
+	r.resourceConditionGauge.DeletePartialMatch(map[string]string{
+		"name":             name,
+		"target_namespace": namespace,
+	})
+}
+
+func (r *TenantResourceRecorder) DeleteConditionMetricByType(name string, namespace string, condition string) {
+	r.resourceConditionGauge.DeletePartialMatch(map[string]string{
+		"name":             name,
+		"target_namespace": namespace,
+		"condition":        condition,
+	})
 }
 
 // DeleteCondition deletes the condition metrics for the ref.
@@ -64,4 +83,6 @@ func (r *TenantResourceRecorder) DeleteMetrics(resourceName string, resourceName
 		"name":             resourceName,
 		"target_namespace": resourceNamespace,
 	})
+
+	r.DeleteConditionMetrics(resourceName, resourceNamespace)
 }

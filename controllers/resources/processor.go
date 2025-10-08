@@ -98,7 +98,7 @@ func (r *Processor) HandlePruning(
 
 			or.Status = metav1.ConditionFalse
 			or.Message = sectionErr.Error()
-			or.Type = meta.PruningCondition
+			or.Type = meta.ReadyCondition
 			processed.Insert(or.String())
 
 			err = errors.Join(sectionErr)
@@ -287,7 +287,7 @@ func (r *Processor) handleSection(
 				replicatedItem.Name = obj.GetName()
 				replicatedItem.Kind = obj.GetKind()
 				replicatedItem.APIVersion = obj.GetAPIVersion()
-				replicatedItem.Type = meta.ReplicationCondition
+				replicatedItem.Type = meta.ReadyCondition
 				replicatedItem.Scope = scope
 				replicatedItem.Tenant = tnt.GetName()
 
@@ -363,7 +363,7 @@ func (r *Processor) handleSection(
 		replicatedItem.Name = obj.GetName()
 		replicatedItem.Kind = obj.GetKind()
 		replicatedItem.APIVersion = obj.GetAPIVersion()
-		replicatedItem.Type = meta.ReplicationCondition
+		replicatedItem.Type = meta.ReadyCondition
 		replicatedItem.Scope = scope
 		replicatedItem.Tenant = tnt.GetName()
 

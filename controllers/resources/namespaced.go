@@ -115,9 +115,8 @@ func (r *namespacedResourceController) Reconcile(ctx context.Context, request re
 	}
 
 	defer func() {
-		r.metrics.RecordCondition(tntResource)
+		r.metrics.RecordConditions(tntResource)
 
-		tntResource.SetCondition()
 		if e := patchHelper.Patch(ctx, tntResource); e != nil {
 			if err == nil {
 				err = gherrors.Wrap(e, "failed to patch TenantResource")

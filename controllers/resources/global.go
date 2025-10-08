@@ -118,8 +118,7 @@ func (r *globalResourceController) Reconcile(ctx context.Context, request reconc
 	}
 
 	defer func() {
-		r.metrics.RecordCondition(tntResource)
-		tntResource.SetCondition()
+		r.metrics.RecordConditions(tntResource)
 
 		if e := patchHelper.Patch(ctx, tntResource); e != nil {
 			if err == nil {

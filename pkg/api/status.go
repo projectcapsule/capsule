@@ -8,7 +8,6 @@ import k8stypes "k8s.io/apimachinery/pkg/types"
 const (
 	ResourceScopeNamespace ResourceScope = "Namespace"
 	ResourceScopeTenant    ResourceScope = "Tenant"
-	ResourceScopeCluster   ResourceScope = "Cluster"
 )
 
 // +kubebuilder:validation:Enum=Namespace;Tenant

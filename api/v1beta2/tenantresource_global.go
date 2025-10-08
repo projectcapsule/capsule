@@ -14,7 +14,6 @@ import (
 // GlobalTenantResourceSpec defines the desired state of GlobalTenantResource.
 type GlobalTenantResourceSpec struct {
 	// Resource Scope, Can either be
-	// - Cluster: Just once per cluster
 	// - Tenant: Create Resources for each tenant  in selected Tenants
 	// - Namespace: Create Resources for each namespace in selected Tenants
 	// +kubebuilder:default:=Namespace
