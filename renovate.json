@@ -12,6 +12,7 @@
   "ignorePaths": [
       "docs"
   ],
+  "labels": ["renovate"],
   "flux": {
     "fileMatch": ["^.*flux\\.yaml$"]
   },
