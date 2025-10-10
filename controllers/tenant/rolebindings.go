@@ -45,6 +45,8 @@ func (r *Manager) ownerClusterRoleBindings(owner capsulev1beta2.OwnerSpec, clust
 		Subjects: []rbacv1.Subject{
 			subject,
 		},
+		Labels:      owner.Labels,
+		Annotations: owner.Annotations,
 	}
 }
 
@@ -129,17 +131,26 @@ func (r *Manager) syncAdditionalRoleBinding(ctx context.Context, tenant *capsule
 		var res controllerutil.OperationResult
 
 		res, err = controllerutil.CreateOrUpdate(ctx, r.Client, target, func() error {
-			if target.Labels == nil {
-				target.Labels = map[string]string{}
+			target.Labels = map[string]string{}
+			target.Annotations = map[string]string{}
+
+			if roleBinding.Labels != nil {
+				target.Labels = roleBinding.Labels
 			}
 
 			target.Labels[tenantLabel] = tenant.Name
 			target.Labels[roleBindingLabel] = roleBindingHashLabel
+
+			if roleBinding.Annotations != nil {
+				target.Annotations = roleBinding.Annotations
+			}
+
 			target.RoleRef = rbacv1.RoleRef{
 				APIGroup: rbacv1.GroupName,
 				Kind:     "ClusterRole",
 				Name:     roleBinding.ClusterRoleName,
 			}
+
 			target.Subjects = roleBinding.Subjects
 
 			return controllerutil.SetControllerReference(tenant, target, r.Scheme())
