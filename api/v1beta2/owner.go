@@ -13,6 +13,10 @@ type OwnerSpec struct {
 	ClusterRoles []string `json:"clusterRoles,omitempty"`
 	// Proxy settings for tenant owner.
 	ProxyOperations []ProxySettings `json:"proxySettings,omitempty"`
+	// Additional Labels for the synchronized rolebindings
+	Labels map[string]string `json:"labels,omitempty"`
+	// Additional Annotations for the synchronized rolebindings
+	Annotations map[string]string `json:"annotations,omitempty"`
 }
 
 // +kubebuilder:validation:Enum=User;Group;ServiceAccount
