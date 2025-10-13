@@ -24,6 +24,9 @@ This is a list of companies that have adopted Capsule, feel free to open a Pull-
 ### [KubeRocketCI](https://docs.kuberocketci.io/)
 ![KubeRocketCI](https://raw.githubusercontent.com/epam/edp-install/master/docs/assets/krci-logo-267×150-white.png)
 
+### [ODC-Noord](https://odc-noord.nl/)
+![ODC-Noord](./assets/customer_logo/odc-noord-logo.png)
+
 ### [PITS Global Data Recovery Services](https://www.pitsdatarecovery.net)
 ![PITS Global Data Recovery Services](https://www.pitsdatarecovery.net/wp-content/uploads/2020/09/pits-logo.svg)
 
