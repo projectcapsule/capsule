@@ -4,6 +4,7 @@
 
 {{- define "capsule.crds.annotations" -}}
 "helm.sh/hook": "pre-install,pre-upgrade"
+"argocd.argoproj.io/hook": "PreSync"
 {{- end }}
 
 {{- define "capsule.crds.component" -}}
