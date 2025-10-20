@@ -297,6 +297,10 @@
                             "description": "ServiceAccounts within tenant namespaces can be promoted to owners of the given tenant this can be achieved by labeling the serviceaccount and then they are considered owners. This can only be done by other owners of the tenant. However ServiceAccounts which have been promoted to owner can not promote further serviceAccounts.",
                             "type": "boolean"
                         },
+                        "annotations": {
+                            "description": "Additional annotations to add to the CapsuleConfiguration resource",
+                            "type": "object"
+                        },
                         "capsuleConfiguration": {
                             "description": "Change the default name of the capsule configuration name",
                             "type": "string"
@@ -319,6 +323,10 @@
                         "ignoreUserWithGroups": {
                             "description": "Define groups which when found in the request of a user will be ignored by the Capsule this might be useful if you have one group where all the users are in, but you want to separate administrators from normal users with additional groups.",
                             "type": "array"
+                        },
+                        "labels": {
+                            "description": "Additional labels to add to the CapsuleConfiguration resource",
+                            "type": "object"
                         },
                         "logLevel": {
                             "description": "Set the log verbosity of the capsule with a value from 1 to 10",
