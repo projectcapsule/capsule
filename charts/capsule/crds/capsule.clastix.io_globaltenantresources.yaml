@@ -52,6 +52,99 @@ spec:
           spec:
             description: GlobalTenantResourceSpec defines the desired state of GlobalTenantResource.
             properties:
+              context:
+                description: |-
+                  Provide additional template context, which can be used throughout all
+                  the declared items for the replication
+                properties:
+                  resources:
+                    items:
+                      properties:
+                        apiVersion:
+                          description: API version of the referent.
+                          type: string
+                        index:
+                          description: Index where the results are published in the
+                            templating/CEL
+                          type: string
+                        kind:
+                          description: |-
+                            Kind of the referent.
+                            More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+                          type: string
+                        name:
+                          description: |-
+                            Name of the values referent. This is useful
+                            when you traying to get a specific resource
+                          maxLength: 253
+                          minLength: 1
+                          type: string
+                        namespace:
+                          description: Namespace of the values referent.
+                          maxLength: 253
+                          minLength: 1
+                          type: string
+                        optional:
+                          default: false
+                          description: |-
+                            Optional indicates whether the referenced resource must exist, or whether to
+                            tolerate its absence. If true and the referenced resource is absent, proceed
+                            as if the resource was present but empty, without any variables defined.
+                          type: boolean
+                        selector:
+                          description: Selector which allows to get any amount of
+                            these resources based on labels
+                          properties:
+                            matchExpressions:
+                              description: matchExpressions is a list of label selector
+                                requirements. The requirements are ANDed.
+                              items:
+                                description: |-
+                                  A label selector requirement is a selector that contains values, a key, and an operator that
+                                  relates the key and values.
+                                properties:
+                                  key:
+                                    description: key is the label key that the selector
+                                      applies to.
+                                    type: string
+                                  operator:
+                                    description: |-
+                                      operator represents a key's relationship to a set of values.
+                                      Valid operators are In, NotIn, Exists and DoesNotExist.
+                                    type: string
+                                  values:
+                                    description: |-
+                                      values is an array of string values. If the operator is In or NotIn,
+                                      the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                                      the values array must be empty. This array is replaced during a strategic
+                                      merge patch.
+                                    items:
+                                      type: string
+                                    type: array
+                                    x-kubernetes-list-type: atomic
+                                required:
+                                - key
+                                - operator
+                                type: object
+                              type: array
+                              x-kubernetes-list-type: atomic
+                            matchLabels:
+                              additionalProperties:
+                                type: string
+                              description: |-
+                                matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+                                map is equivalent to an element of matchExpressions, whose key field is "key", the
+                                operator is "In", and the values array contains only "value". The requirements are ANDed.
+                              type: object
+                          type: object
+                          x-kubernetes-map-type: atomic
+                      required:
+                      - apiVersion
+                      - index
+                      - kind
+                      type: object
+                    type: array
+                type: object
               pruningOnDelete:
                 default: true
                 description: |-
@@ -77,6 +170,17 @@ spec:
                             type: string
                           type: object
                       type: object
+                    generators:
+                      description: Generators for advanced use cases
+                      items:
+                        properties:
+                          template:
+                            description: |-
+                              Template contains any amount of yaml which is applied to Kubernetes.
+                              This can be a single resource or multiple resources
+                            type: string
+                        type: object
+                      type: array
                     namespaceSelector:
                       description: |-
                         Defines the Namespace selector to select the Tenant Namespaces on which the resources must be propagated.

@@ -26,6 +26,9 @@ type TenantResourceSpec struct {
 	// Local ServiceAccount which will perform all the actions defined in the TenantResource
 	// You must provide permissions accordingly to that ServiceAccount
 	ServiceAccount *api.ServiceAccountReference `json:"serviceAccount,omitempty"`
+	// Provide additional template context, which can be used throughout all
+	// the declared items for the replication
+	Template *api.TemplateContext `json:"context,omitempty"`
 }
 
 type ResourceSpec struct {
@@ -39,6 +42,8 @@ type ResourceSpec struct {
 	// Besides the Capsule metadata required by TenantResource controller, defines additional metadata that must be
 	// added to the replicated resources.
 	AdditionalMetadata *api.AdditionalMetadataSpec `json:"additionalMetadata,omitempty"`
+	// Generators for advanced use cases
+	Generators []GeneratorItemSpec `json:"generators,omitempty"`
 }
 
 // +kubebuilder:validation:XEmbeddedResource

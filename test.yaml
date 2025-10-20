@@ -3,32 +3,22 @@ kind: GlobalTenantResource
 metadata:
   name: renewable-pull-secrets
 spec:
-  tenantSelector:
-    matchLabels:
-       energy: renewable
+  tenantSelector: {}
   resyncPeriod: 5s
+  scope: Tenant
   resources:
-    - templates:
-        resources:
-          - index: "sec"
-            apiVersion: v1
-            kind: Secret
-        items:
-          - |
-            ---
-            apiVersion: v1
-            kind: Secret
-            metadata:
-              name: "some-secret-bruv"
-            stringData:
-              username: "some-username"
-            ---
-            apiVersion: v1
-            kind: ConfigMap
-            metadata:
-              name: "the-context"
-            data:
-              context: |
-                {{ . | toYaml | nindent 4}}
-
+    - additionalMetadata:
+        labels:
+          "replicated-by": "capsule"
+      rawItems:
+      - apiVersion: v1
+        kind: Namespace
+        metadata:
+          name: "{{tenant.name}}-system"
+      - apiVersion: v1
+        kind: Secret
+        namespace: "{{tenant.name}}-system"
+        selector:
+          matchLabels:
+            tenant: renewable
 

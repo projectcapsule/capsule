@@ -9,7 +9,73 @@ import (
 
 	"github.com/projectcapsule/capsule/pkg/api"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
+
+type GeneratorItemSpec struct {
+	// Template contains any amount of yaml which is applied to Kubernetes.
+	// This can be a single resource or multiple resources
+	Template string `json:"template,omitempty"`
+}
+
+type ProcessedItems []ObjectReferenceStatus
+
+// Adds a condition by type.
+func (p *ProcessedItems) UpdateItem(item ObjectReferenceStatus) {
+	if !p.validItem(item) {
+		return
+	}
+
+	for i, cond := range *c {
+		if cond.Type == condition.Type {
+			(*c)[i].UpdateCondition(condition)
+
+			return
+		}
+	}
+
+	*c = append(*c, condition)
+}
+
+// Removes a condition by type.
+func (p *ProcessedItems) RemoveItem(item ObjectReferenceStatus) {
+	if c == nil {
+		return
+	}
+
+	filtered := make(ProcessedItems, 0, len(*c))
+
+	for _, cond := range *c {
+		if cond.Type != condition.Type {
+			filtered = append(filtered, cond)
+		}
+	}
+
+	*c = filtered
+}
+
+// Adds a condition by type.
+func (p *ProcessedItems) validItem(item ObjectReferenceStatus) bool {
+	if item.Name == "" {
+		return false
+	}
+
+	if item.Namespace == "" {
+		return false
+	}
+
+	return true
+}
+
+func (p *ProcessedItems) AsSet() sets.Set[string] {
+	set := sets.New[string]()
+
+	for _, i := range *p {
+		set.Insert(i.String())
+	}
+
+	return set
+}
 
 type ObjectReferenceAbstract struct {
 	// Kind of the referent.

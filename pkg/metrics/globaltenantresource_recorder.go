@@ -57,7 +57,7 @@ func (r *GlobalTenantResourceRecorder) RecordConditions(resource *capsulev1beta2
 			value = 1
 		}
 
-		r.resourceConditionGauge.WithLabelValues(resource.GetName(), resource.GetNamespace(), status).Set(value)
+		r.resourceConditionGauge.WithLabelValues(resource.GetName(), status).Set(value)
 	}
 }
 

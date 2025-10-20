@@ -6,6 +6,7 @@ package resources
 import (
 	"context"
 	"errors"
+	"fmt"
 	"reflect"
 
 	"github.com/go-logr/logr"
@@ -15,6 +16,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/cluster-api/util/patch"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
@@ -28,6 +30,7 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/configuration"
+	"github.com/projectcapsule/capsule/pkg/meta"
 	"github.com/projectcapsule/capsule/pkg/metrics"
 	"github.com/projectcapsule/capsule/pkg/utils"
 )
@@ -92,9 +95,7 @@ func (r *globalResourceController) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-func (r *globalResourceController) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
-	var err error
-
+func (r *globalResourceController) Reconcile(ctx context.Context, request reconcile.Request) (res reconcile.Result, err error) {
 	log := ctrllog.FromContext(ctx)
 
 	log.V(5).Info("start processing")
@@ -118,6 +119,12 @@ func (r *globalResourceController) Reconcile(ctx context.Context, request reconc
 	}
 
 	defer func() {
+		if uerr := r.updateGlobalResourceStatus(ctx, tntResource, err); uerr != nil {
+			err = fmt.Errorf("cannot update globaltenantresource status: %w", uerr)
+
+			return
+		}
+
 		r.metrics.RecordConditions(tntResource)
 
 		if e := patchHelper.Patch(ctx, tntResource); e != nil {
@@ -353,4 +360,27 @@ func (r *globalResourceController) loadClient(
 	}
 
 	return saClient, nil
+}
+
+func (r *globalResourceController) updateGlobalResourceStatus(ctx context.Context, instance *capsulev1beta2.GlobalTenantResource, reconcileError error) error {
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
+		latest := &capsulev1beta2.GlobalTenantResource{}
+		if err = r.client.Get(ctx, types.NamespacedName{Name: instance.GetName()}, latest); err != nil {
+			return err
+		}
+
+		latest.Status = instance.Status
+
+		// Set Ready Condition
+		readyCondition := meta.NewReadyCondition(instance)
+		if reconcileError != nil {
+			readyCondition.Message = reconcileError.Error()
+			readyCondition.Status = metav1.ConditionFalse
+			readyCondition.Reason = meta.FailedReason
+		}
+
+		latest.Status.Conditions.UpdateConditionByType(readyCondition)
+
+		return r.client.Status().Update(ctx, latest)
+	})
 }

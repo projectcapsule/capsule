@@ -18,7 +18,6 @@ type GlobalTenantResourceSpec struct {
 	// - Namespace: Create Resources for each namespace in selected Tenants
 	// +kubebuilder:default:=Namespace
 	Scope api.ResourceScope `json:"scope"`
-
 	// Defines the Tenant selector used target the tenants on which resources must be propagated.
 	TenantSelector     metav1.LabelSelector `json:"tenantSelector,omitempty"`
 	TenantResourceSpec `json:",inline"`
@@ -34,17 +33,7 @@ type GlobalTenantResourceStatus struct {
 	Conditions meta.ConditionList `json:"conditions,omitempty"`
 }
 
-type ProcessedItems []ObjectReferenceStatus
 
-func (p *ProcessedItems) AsSet() sets.Set[string] {
-	set := sets.New[string]()
-
-	for _, i := range *p {
-		set.Insert(i.String())
-	}
-
-	return set
-}
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
