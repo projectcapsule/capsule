@@ -12,11 +12,13 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 	log2 "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/controllers/utils"
 	capsuleutils "github.com/projectcapsule/capsule/pkg/utils"
 	webhookutils "github.com/projectcapsule/capsule/pkg/webhook/utils"
 )
@@ -24,6 +26,35 @@ import (
 type Controller struct {
 	client client.Client
 	label  string
+}
+
+func (c *Controller) SetupWithManager(mgr ctrl.Manager, cfg utils.ControllerOptions) error {
+	label, err := capsuleutils.GetTypeLabel(&capsulev1beta2.Tenant{})
+	if err != nil {
+		return err
+	}
+
+	c.client = mgr.GetClient()
+	c.label = label
+
+	return ctrl.NewControllerManagedBy(mgr).
+		For(&corev1.PersistentVolume{}, builder.WithPredicates(predicate.NewPredicateFuncs(func(object client.Object) bool {
+			pv, ok := object.(*corev1.PersistentVolume)
+			if !ok {
+				return false
+			}
+
+			if pv.Spec.ClaimRef == nil {
+				return false
+			}
+
+			labels := object.GetLabels()
+			_, ok = labels[c.label]
+
+			return !ok
+		}))).
+		WithOptions(controller.Options{MaxConcurrentReconciles: cfg.MaxConcurrentReconciles}).
+		Complete(c)
 }
 
 func (c *Controller) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
@@ -86,32 +117,4 @@ func (c *Controller) Reconcile(ctx context.Context, request reconcile.Request) (
 	}
 
 	return reconcile.Result{}, nil
-}
-
-func (c *Controller) SetupWithManager(mgr ctrl.Manager) error {
-	label, err := capsuleutils.GetTypeLabel(&capsulev1beta2.Tenant{})
-	if err != nil {
-		return err
-	}
-
-	c.client = mgr.GetClient()
-	c.label = label
-
-	return ctrl.NewControllerManagedBy(mgr).
-		For(&corev1.PersistentVolume{}, builder.WithPredicates(predicate.NewPredicateFuncs(func(object client.Object) bool {
-			pv, ok := object.(*corev1.PersistentVolume)
-			if !ok {
-				return false
-			}
-
-			if pv.Spec.ClaimRef == nil {
-				return false
-			}
-
-			labels := object.GetLabels()
-			_, ok = labels[c.label]
-
-			return !ok
-		}))).
-		Complete(c)
 }

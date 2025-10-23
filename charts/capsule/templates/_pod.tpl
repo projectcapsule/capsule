@@ -61,6 +61,7 @@ spec:
         - --webhook-port={{ .Values.manager.webhookPort }}
         - --zap-log-level={{ default 4 .Values.manager.options.logLevel }}
         - --configuration-name={{ .Values.manager.options.capsuleConfiguration }}
+        - --workers={{ .Values.manager.options.workers }}
         {{- with .Values.manager.extraArgs }}
           {{- toYaml . | nindent 8 }}
         {{- end }}
