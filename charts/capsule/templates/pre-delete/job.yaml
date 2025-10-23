@@ -1,6 +1,6 @@
 {{- $Values := mergeOverwrite $.Values.global.jobs.kubectl $.Values.jobs -}}
 
-{{- if not $.Values.crds.exclusive }}
+{{- if and (not $.Values.crds.exclusive) $.Values.global.jobs.preDelete.enabled }}
 ---
 apiVersion: batch/v1
 kind: Job

@@ -33,6 +33,9 @@
         {{- $p = $tmp -}}
       {{- end -}}
       {{- if $p }}
+        {{- if $.Values.crds.inline }}
+{{- printf "---\n%s" (toYaml $p) | nindent 0 }}
+        {{- else }}
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -52,5 +55,6 @@ data:
 
       {{- end }}
     {{ end }}
+    {{- end }}
   {{- end }}
 {{- end }}

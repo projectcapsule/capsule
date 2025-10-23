@@ -46,12 +46,12 @@ func (r *Global) Reconcile(ctx context.Context, request reconcile.Request) (reco
 
 	log := ctrllog.FromContext(ctx)
 
-	log.Info("start processing")
+	log.V(4).Info("start processing")
 	// Retrieving the GlobalTenantResource
 	tntResource := &capsulev1beta2.GlobalTenantResource{}
 	if err = r.client.Get(ctx, request.NamespacedName, tntResource); err != nil {
 		if apierrors.IsNotFound(err) {
-			log.Info("Request object not found, could have been deleted after reconcile request")
+			log.V(3).Info("Request object not found, could have been deleted after reconcile request")
 
 			return reconcile.Result{}, nil
 		}
@@ -188,7 +188,7 @@ func (r *Global) reconcileNormal(ctx context.Context, tntResource *capsulev1beta
 
 	tntResource.Status.SelectedTenants = tntSet.List()
 
-	log.Info("processing completed")
+	log.V(4).Info("processing completed")
 
 	return reconcile.Result{Requeue: true, RequeueAfter: tntResource.Spec.ResyncPeriod.Duration}, nil
 }
@@ -202,7 +202,7 @@ func (r *Global) reconcileDelete(ctx context.Context, tntResource *capsulev1beta
 		controllerutil.RemoveFinalizer(tntResource, finalizer)
 	}
 
-	log.Info("processing completed")
+	log.V(4).Info("processing completed")
 
 	return reconcile.Result{Requeue: true, RequeueAfter: tntResource.Spec.ResyncPeriod.Duration}, nil
 }

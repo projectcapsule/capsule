@@ -46,7 +46,7 @@ func (r *Manager) pruningResources(ctx context.Context, ns string, keys []string
 		selector = selector.Add(*notIn)
 	}
 
-	r.Log.Info("Pruning objects with label selector " + selector.String())
+	r.Log.V(3).Info("Pruning objects with label selector " + selector.String())
 
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		return r.DeleteAllOf(ctx, obj, &client.DeleteAllOfOptions{

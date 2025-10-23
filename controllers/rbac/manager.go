@@ -176,7 +176,7 @@ func (r *Manager) EnsureClusterRole(ctx context.Context, roleName string) (err e
 // is handled by the Reconciler implemented interface.
 func (r *Manager) Start(ctx context.Context) error {
 	for roleName := range clusterRoles {
-		r.Log.Info("setting up ClusterRoles", "ClusterRole", roleName)
+		r.Log.V(4).Info("setting up ClusterRoles", "ClusterRole", roleName)
 
 		if err := r.EnsureClusterRole(ctx, roleName); err != nil {
 			if apierrors.IsAlreadyExists(err) {
@@ -187,7 +187,7 @@ func (r *Manager) Start(ctx context.Context) error {
 		}
 	}
 
-	r.Log.Info("setting up ClusterRoleBindings")
+	r.Log.V(4).Info("setting up ClusterRoleBindings")
 
 	if err := r.EnsureClusterRoleBindingsProvisioner(ctx); err != nil {
 		if apierrors.IsAlreadyExists(err) {

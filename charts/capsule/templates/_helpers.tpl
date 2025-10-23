@@ -154,3 +154,20 @@ Capsule Webhook endpoint CA Bundle
 caBundle: {{ $.Values.webhooks.service.caBundle -}}
   {{- end -}}
 {{- end -}}
+
+
+{{- define "capsule.crdsSizeHash" -}}
+{{- $paths := list -}}
+{{- range $p, $_ := .Files.Glob "crds/**.yaml" }}
+  {{- $paths = append $paths $p -}}
+{{- end -}}
+{{- $paths = sortAlpha $paths -}}
+
+{{- $sizes := list -}}
+{{- range $paths }}
+  {{- $sizes = append $sizes (len ($.Files.Get .)) -}}
+{{- end -}}
+
+{{- $joined := join "," $sizes -}}
+{{- sha256sum $joined -}}
+{{- end -}}

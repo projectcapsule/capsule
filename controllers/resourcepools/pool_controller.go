@@ -76,7 +76,7 @@ func (r resourcePoolController) Reconcile(ctx context.Context, request ctrl.Requ
 	instance := &capsulev1beta2.ResourcePool{}
 	if err = r.Get(ctx, request.NamespacedName, instance); err != nil {
 		if apierrors.IsNotFound(err) {
-			log.V(5).Info("Request object not found, could have been deleted after reconcile request")
+			log.V(3).Info("Request object not found, could have been deleted after reconcile request")
 
 			r.metrics.DeleteResourcePoolMetric(request.Name)
 
@@ -104,9 +104,11 @@ func (r resourcePoolController) Reconcile(ctx context.Context, request ctrl.Requ
 
 		return r.Client.Status().Update(ctx, current)
 	})
-	if reconcileErr != nil || err != nil {
-		log.V(3).Info("Failed to reconcile ResourcePool", "error", err)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
 
+	if reconcileErr != nil {
 		return ctrl.Result{}, reconcileErr
 	}
 

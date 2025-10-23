@@ -34,6 +34,10 @@
                     "description": "Only install the CRDs, no other primitives",
                     "type": "boolean"
                 },
+                "inline": {
+                    "description": "Render CRDS inline (in this case use --skip-crds when installing the chart and create the capsuleconfiguration independently)",
+                    "type": "boolean"
+                },
                 "install": {
                     "description": "Install the CustomResourceDefinitions (This also manages the lifecycle of the CRDs for update operations)",
                     "type": "boolean"
@@ -191,6 +195,24 @@
                                     "type": "integer"
                                 }
                             }
+                        },
+                        "postInstall": {
+                            "type": "object",
+                            "properties": {
+                                "enabled": {
+                                    "description": "Enable Post Install Job",
+                                    "type": "boolean"
+                                }
+                            }
+                        },
+                        "preDelete": {
+                            "type": "object",
+                            "properties": {
+                                "enabled": {
+                                    "description": "Enable Pre Delete Job",
+                                    "type": "boolean"
+                                }
+                            }
                         }
                     }
                 }
@@ -329,7 +351,7 @@
                             "type": "object"
                         },
                         "logLevel": {
-                            "description": "Set the log verbosity of the capsule with a value from 1 to 10",
+                            "description": "Set the log verbosity of the capsule with a value from 1 to 5",
                             "type": "string"
                         },
                         "nodeMetadata": {
