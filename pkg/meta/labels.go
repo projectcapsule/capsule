@@ -20,6 +20,8 @@ const (
 
 	CordonedLabel        = "projectcapsule.dev/cordoned"
 	CordonedLabelTrigger = "true"
+
+	ManagedByCapsuleLabel = "capsule.clastix.io/managed-by"
 )
 
 func FreezeLabelTriggers(obj client.Object) bool {

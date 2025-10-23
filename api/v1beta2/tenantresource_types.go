@@ -9,6 +9,7 @@ import (
 
 	"github.com/projectcapsule/capsule/pkg/api"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	k8stypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
@@ -22,49 +23,32 @@ type ProcessedItems []ObjectReferenceStatus
 
 // Adds a condition by type.
 func (p *ProcessedItems) UpdateItem(item ObjectReferenceStatus) {
-	if !p.validItem(item) {
-		return
-	}
-
-	for i, cond := range *c {
-		if cond.Type == condition.Type {
-			(*c)[i].UpdateCondition(condition)
+	for i, stat := range *p {
+		if p.isEqual(stat, item) {
+			(*p)[i].ObjectReferenceStatusCondition = item.ObjectReferenceStatusCondition
 
 			return
 		}
 	}
 
-	*c = append(*c, condition)
+	*p = append(*p, item)
 }
 
 // Removes a condition by type.
 func (p *ProcessedItems) RemoveItem(item ObjectReferenceStatus) {
-	if c == nil {
-		return
-	}
+	filtered := make(ProcessedItems, 0, len(*p))
 
-	filtered := make(ProcessedItems, 0, len(*c))
-
-	for _, cond := range *c {
-		if cond.Type != condition.Type {
-			filtered = append(filtered, cond)
+	for _, stat := range *p {
+		if !p.isEqual(stat, item) {
+			filtered = append(filtered, stat)
 		}
 	}
 
-	*c = filtered
+	*p = filtered
 }
 
-// Adds a condition by type.
-func (p *ProcessedItems) validItem(item ObjectReferenceStatus) bool {
-	if item.Name == "" {
-		return false
-	}
-
-	if item.Namespace == "" {
-		return false
-	}
-
-	return true
+func (p *ProcessedItems) isEqual(a, b ObjectReferenceStatus) bool {
+	return a.Owner == b.Owner && a.APIVersion == b.APIVersion && a.Kind == b.Kind && a.Name == b.Name && a.Namespace == b.Namespace
 }
 
 func (p *ProcessedItems) AsSet() sets.Set[string] {
@@ -83,19 +67,32 @@ type ObjectReferenceAbstract struct {
 	Kind string `json:"kind"`
 	// Namespace of the referent.
 	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
-	Namespace string `json:"namespace"`
+	Namespace string `json:"namespace,omitempty"`
 	// API version of the referent.
 	APIVersion string `json:"apiVersion,omitempty"`
 }
 
 type ObjectReferenceStatus struct {
-	ObjectReferenceAbstract `json:",inline"`
-
 	// Name of the referent.
 	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
 	Name string `json:"name"`
 	// Tenant of the referent.
-	Tenant string `json:"tenant,omitempty"`
+	Owner ObjectReferenceStatusOwner `json:"owner,omitempty"`
+
+	ObjectReferenceAbstract        `json:",inline"`
+	ObjectReferenceStatusCondition `json:",inline"`
+}
+
+type ObjectReferenceStatusOwner struct {
+	// Name of the owning object.
+	Name string `json:"name,omitempty"`
+	// UID of the owning object.
+	k8stypes.UID `json:"uid,omitempty" protobuf:"bytes,5,opt,name=uid"`
+	// Scope of the owning object.
+	Scope api.ResourceScope `json:"scope,omitempty"`
+}
+
+type ObjectReferenceStatusCondition struct {
 	// status of the condition, one of True, False, Unknown.
 	// +required
 	// +kubebuilder:validation:Required
@@ -115,8 +112,6 @@ type ObjectReferenceStatus struct {
 	// +kubebuilder:validation:Pattern=`^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$`
 	// +kubebuilder:validation:MaxLength=316
 	Type string `json:"type" protobuf:"bytes,1,opt,name=type"`
-	// Resource Scope
-	Scope api.ResourceScope `json:"scope,omitempty"`
 }
 
 type ObjectReference struct {
@@ -128,14 +123,14 @@ type ObjectReference struct {
 
 func (in *ObjectReferenceStatus) String() string {
 	return fmt.Sprintf(
-		"Kind=%s,APIVersion=%s,Tenant=%s,Namespace=%s,Name=%s,Status=%s,Message=%s,Type=%s",
-		in.Kind, in.APIVersion, in.Tenant, in.Namespace, in.Name, in.Status, in.Message, in.Type)
+		"Kind=%s,APIVersion=%s,Namespace=%s,Name=%s,Message=%s,Type=%s,Owner=%s,UID=%s,Scope=%s",
+		in.Kind, in.APIVersion, in.Namespace, in.Name, in.Message, in.Type, in.Owner.Name, in.Owner.UID, in.Owner.Scope)
 }
 
 func (in *ObjectReferenceStatus) ParseFromString(value string) error {
 	rawParts := strings.Split(value, ",")
 
-	if len(rawParts) != 8 {
+	if len(rawParts) != 9 {
 		return fmt.Errorf("unexpected raw parts")
 	}
 
@@ -153,8 +148,6 @@ func (in *ObjectReferenceStatus) ParseFromString(value string) error {
 			in.Kind = v
 		case "APIVersion":
 			in.APIVersion = v
-		case "Tenant":
-			in.Tenant = v
 		case "Namespace":
 			in.Namespace = v
 		case "Name":
@@ -170,8 +163,12 @@ func (in *ObjectReferenceStatus) ParseFromString(value string) error {
 			in.Message = v
 		case "Type":
 			in.Type = v
+		case "Owner":
+			in.Owner.Name = v
+		case "UID":
+			in.Owner.UID = k8stypes.UID(v)
 		case "Scope":
-			in.Scope = api.ResourceScope(v)
+			in.Owner.Scope = api.ResourceScope(v)
 
 		default:
 			return fmt.Errorf("unrecognized marker: %s", k)

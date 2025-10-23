@@ -135,7 +135,11 @@ func (r *Processor) HandleSectionPreflight(
 			tenantLabel,
 			resourceIndex,
 			spec,
-			api.ResourceScopeTenant,
+			capsulev1beta2.ObjectReferenceStatusOwner{
+				Name:  tnt.GetName(),
+				UID:   tnt.GetUID(),
+				Scope: api.ResourceScopeTenant,
+			},
 			nil)
 	default:
 
@@ -179,7 +183,11 @@ func (r *Processor) HandleSectionPreflight(
 				tenantLabel,
 				resourceIndex,
 				spec,
-				api.ResourceScopeNamespace,
+				capsulev1beta2.ObjectReferenceStatusOwner{
+					Name:  ns.GetName(),
+					UID:   ns.GetUID(),
+					Scope: api.ResourceScopeNamespace,
+				},
 				&ns)
 			if perr != nil {
 				err = errors.Join(err, perr)
@@ -201,7 +209,7 @@ func (r *Processor) handleSection(
 	tenantLabel string,
 	resourceIndex int,
 	spec capsulev1beta2.ResourceSpec,
-	scope api.ResourceScope,
+	owner capsulev1beta2.ObjectReferenceStatusOwner,
 	ns *corev1.Namespace,
 ) ([]string, error) {
 	log := ctrllog.FromContext(ctx)
@@ -288,8 +296,7 @@ func (r *Processor) handleSection(
 				replicatedItem.Kind = obj.GetKind()
 				replicatedItem.APIVersion = obj.GetAPIVersion()
 				replicatedItem.Type = meta.ReadyCondition
-				replicatedItem.Scope = scope
-				replicatedItem.Tenant = tnt.GetName()
+				replicatedItem.Owner = owner
 
 				if ns != nil {
 					replicatedItem.Namespace = ns.Name
@@ -308,8 +315,6 @@ func (r *Processor) handleSection(
 				log.Info("resource has been replicated", kv...)
 
 				processedRaw[index] = replicatedItem.String()
-
-				return
 			}(i, obj)
 		}
 
@@ -364,8 +369,7 @@ func (r *Processor) handleSection(
 		replicatedItem.Kind = obj.GetKind()
 		replicatedItem.APIVersion = obj.GetAPIVersion()
 		replicatedItem.Type = meta.ReadyCondition
-		replicatedItem.Scope = scope
-		replicatedItem.Tenant = tnt.GetName()
+		replicatedItem.Owner = owner
 
 		if ns != nil {
 			replicatedItem.Namespace = ns.Name

@@ -68,8 +68,18 @@ spec:
                   the RoleBinding for the given ClusterRole. Optional.
                 items:
                   properties:
+                    annotations:
+                      additionalProperties:
+                        type: string
+                      description: Additional Annotations for the synchronized rolebindings
+                      type: object
                     clusterRoleName:
                       type: string
+                    labels:
+                      additionalProperties:
+                        type: string
+                      description: Additional Labels for the synchronized rolebindings
+                      type: object
                     subjects:
                       description: kubebuilder:validation:Minimum=1
                       items:
@@ -1099,8 +1109,18 @@ spec:
                   the RoleBinding for the given ClusterRole. Optional.
                 items:
                   properties:
+                    annotations:
+                      additionalProperties:
+                        type: string
+                      description: Additional Annotations for the synchronized rolebindings
+                      type: object
                     clusterRoleName:
                       type: string
+                    labels:
+                      additionalProperties:
+                        type: string
+                      description: Additional Labels for the synchronized rolebindings
+                      type: object
                     subjects:
                       description: kubebuilder:validation:Minimum=1
                       items:
@@ -2026,6 +2046,11 @@ spec:
                   Optional
                 items:
                   properties:
+                    annotations:
+                      additionalProperties:
+                        type: string
+                      description: Additional Annotations for the synchronized rolebindings
+                      type: object
                     clusterRoles:
                       default:
                       - admin
@@ -2043,6 +2068,11 @@ spec:
                       - Group
                       - ServiceAccount
                       type: string
+                    labels:
+                      additionalProperties:
+                        type: string
+                      description: Additional Labels for the synchronized rolebindings
+                      type: object
                     name:
                       description: Name of tenant owner.
                       type: string

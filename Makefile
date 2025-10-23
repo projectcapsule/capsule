@@ -260,7 +260,8 @@ e2e-install: ko-build-all
 		--set 'manager.resources=null'\
 		--set "manager.image.tag=$(VERSION)" \
 		--set 'manager.livenessProbe.failureThreshold=10' \
-		--set 'manager.readinessProbe.failureThreshold=10' \
+		--set 'webhooks.hooks.nodes.enabled=true' \
+		--set "webhooks.exclusive=true"\
 		capsule \
 		./charts/capsule
 
@@ -356,7 +357,7 @@ ginkgo:
 	$(call go-install-tool,$(GINKGO),github.com/onsi/ginkgo/v2/ginkgo)
 
 CT         := $(LOCALBIN)/ct
-CT_VERSION := v3.13.0
+CT_VERSION := v3.14.0
 CT_LOOKUP  := helm/chart-testing
 ct:
 	@test -s $(CT) && $(CT) version | grep -q $(CT_VERSION) || \
@@ -377,7 +378,7 @@ ko:
 	$(call go-install-tool,$(KO),github.com/$(KO_LOOKUP)@$(KO_VERSION))
 
 NWA           := $(LOCALBIN)/nwa
-NWA_VERSION   := v0.7.5
+NWA_VERSION   := v0.7.6
 NWA_LOOKUP    := B1NARY-GR0UP/nwa
 nwa:
 	@test -s $(NWA) && $(NWA) -h | grep -q $(NWA_VERSION) || \

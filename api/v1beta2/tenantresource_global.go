@@ -5,7 +5,6 @@ package v1beta2
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/sets"
 
 	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/meta"
@@ -32,8 +31,6 @@ type GlobalTenantResourceStatus struct {
 	// Condition of the GlobalTenantResource.
 	Conditions meta.ConditionList `json:"conditions,omitempty"`
 }
-
-
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status

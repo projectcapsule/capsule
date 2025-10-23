@@ -14,11 +14,4 @@ spec:
       - apiVersion: v1
         kind: Namespace
         metadata:
-          name: "{{tenant.name}}-system"
-      - apiVersion: v1
-        kind: Secret
-        namespace: "{{tenant.name}}-system"
-        selector:
-          matchLabels:
-            tenant: renewable
-
+          name: "meow-system"

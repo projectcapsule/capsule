@@ -296,7 +296,6 @@ spec:
                             x-kubernetes-map-type: atomic
                         required:
                         - kind
-                        - namespace
                         - selector
                         type: object
                       type: array
@@ -482,21 +481,28 @@ spec:
                         Namespace of the referent.
                         More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
                       type: string
-                    scope:
-                      description: Resource Scope
-                      enum:
-                      - Namespace
-                      - Tenant
-                      type: string
+                    owner:
+                      description: Tenant of the referent.
+                      properties:
+                        name:
+                          description: Name of the owning object.
+                          type: string
+                        scope:
+                          description: Scope of the owning object.
+                          enum:
+                          - Namespace
+                          - Tenant
+                          type: string
+                        uid:
+                          description: UID of the owning object.
+                          type: string
+                      type: object
                     status:
                       description: status of the condition, one of True, False, Unknown.
                       enum:
                       - "True"
                       - "False"
                       - Unknown
-                      type: string
-                    tenant:
-                      description: Tenant of the referent.
                       type: string
                     type:
                       description: type of condition in CamelCase or in foo.example.com/CamelCase.
@@ -506,7 +512,6 @@ spec:
                   required:
                   - kind
                   - name
-                  - namespace
                   - status
                   - type
                   type: object

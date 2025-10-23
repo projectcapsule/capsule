@@ -192,7 +192,7 @@ func (r *globalResourceController) reconcileNormal(
 	ctx context.Context,
 	c client.Client,
 	tntResource *capsulev1beta2.GlobalTenantResource,
-) (reconcile.Result, error) {
+) (res reconcile.Result, err error) {
 	log := ctrllog.FromContext(ctx)
 
 	if *tntResource.Spec.PruningOnDelete {
@@ -231,13 +231,18 @@ func (r *globalResourceController) reconcileNormal(
 		tntResource.Status.ProcessedItems = make([]capsulev1beta2.ObjectReferenceStatus, 0, len(processedItems))
 
 		for _, item := range processedItems.List() {
+			log.Info("PROCESSED", "ITEM", item)
+
 			or := capsulev1beta2.ObjectReferenceStatus{}
-			if err := or.ParseFromString(item); err == nil {
-				tntResource.Status.ProcessedItems = append(tntResource.Status.ProcessedItems, or)
+			if parseErr := or.ParseFromString(item); parseErr == nil {
+				tntResource.Status.ProcessedItems.UpdateItem(or)
 			} else {
-				log.Error(err, "failed to parse processed item", "item", item)
+				err = errors.Join(err, fmt.Errorf("processed item %q parse failed: %w", item, parseErr))
 			}
 		}
+
+		log.Info("STATUS", "STATUS", tntResource.Status)
+
 	}()
 
 	var itemErrors error

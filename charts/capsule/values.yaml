@@ -158,6 +158,10 @@ manager:
 
   # Additional Capsule Controller Options
   options:
+    # -- Additional labels to add to the CapsuleConfiguration resource
+    labels: {}
+    # -- Additional annotations to add to the CapsuleConfiguration resource
+    annotations: {}
     # -- Change the default name of the capsule configuration name
     capsuleConfiguration: default
     # -- Set the log verbosity of the capsule with a value from 1 to 10
@@ -618,7 +622,7 @@ webhooks:
 
     nodes:
       # -- Enable the Hook
-      enabled: true
+      enabled: false
       # -- [FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy)
       failurePolicy: Fail
       # -- [MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
