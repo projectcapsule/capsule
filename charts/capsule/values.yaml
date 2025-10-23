@@ -4,6 +4,12 @@
 
 global:
   jobs:
+    postInstall:
+      # -- Enable Post Install Job
+      enabled: true
+    preDelete:
+      # -- Enable Pre Delete Job
+      enabled: true
     kubectl:
       image:
         # -- Set the image repository of the helm chart job
@@ -71,6 +77,8 @@ crds:
   labels: {}
   # -- Extra Annotations for CRDs
   annnotations: {}
+  # -- Render CRDS inline (in this case use --skip-crds when installing the chart and create the capsuleconfiguration independently)
+  inline: false
 
 # Secret Options
 tls:
@@ -164,8 +172,8 @@ manager:
     annotations: {}
     # -- Change the default name of the capsule configuration name
     capsuleConfiguration: default
-    # -- Set the log verbosity of the capsule with a value from 1 to 10
-    logLevel: '4'
+    # -- Set the log verbosity of the capsule with a value from 1 to 5
+    logLevel: '3'
     # -- Names of the users considered as Capsule users.
     userNames: []
     # -- Names of the groups considered as Capsule users.
