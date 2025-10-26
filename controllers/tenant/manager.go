@@ -86,6 +86,7 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 
 		return result, err
 	}
+
 	if updated {
 		return result, nil
 	}
