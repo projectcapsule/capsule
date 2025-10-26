@@ -21,6 +21,8 @@ func (r *Manager) ensureMetadata(ctx context.Context, tnt *capsulev1beta2.Tenant
 		if err := r.Update(ctx, tnt); err != nil {
 			return err, false
 		}
+
+		return nil, true
 	}
 
 	return nil, false
