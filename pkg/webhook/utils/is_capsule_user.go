@@ -29,7 +29,7 @@ func IsCapsuleUser(ctx context.Context, req admission.Request, clt client.Client
 	//nolint:nestif
 	if sets.NewString(req.UserInfo.Groups...).Has("system:serviceaccounts") {
 		namespace, name, err := serviceaccount.SplitUsername(req.UserInfo.Username)
-		if err != nil {
+		if err == nil {
 			if namespace == os.Getenv("NAMESPACE") && name == os.Getenv("SERVICE_ACCOUNT") {
 				return false
 			}
