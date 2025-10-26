@@ -63,7 +63,7 @@ func (c *Controller) Reconcile(ctx context.Context, request reconcile.Request) (
 	persistentVolume := corev1.PersistentVolume{}
 	if err := c.client.Get(ctx, request.NamespacedName, &persistentVolume); err != nil {
 		if errors.IsNotFound(err) {
-			log.Info("skipping reconciliation, resource may have been deleted")
+			log.V(3).Info("skipping reconciliation, resource may have been deleted")
 
 			return reconcile.Result{}, nil
 		}
@@ -87,7 +87,7 @@ func (c *Controller) Reconcile(ctx context.Context, request reconcile.Request) (
 	}
 
 	if tnt == nil {
-		log.Info("skipping reconciliation, PV is claimed by a PVC not managed in a Tenant")
+		log.V(4).Info("skipping reconciliation, PV is claimed by a PVC not managed in a Tenant")
 
 		return reconcile.Result{}, nil
 	}
