@@ -1,9 +1,12 @@
 {{- define "capsule.pod" -}}
 metadata:
-  {{- with .Values.podAnnotations }}
   annotations:
-    {{- toYaml . | nindent 4 }}
-  {{- end }}
+    {{- with .Values.podAnnotations }}
+      {{- toYaml . | nindent 4 }}
+    {{- end }}
+    {{- if .Values.crds.install }}
+    projectcapsule.dev/crds-size-hash: {{ include "capsule.crdsSizeHash" . | quote }}
+    {{- end }}
   labels:
     {{- include "capsule.labels" . | nindent 4 }}
     {{- with .Values.podLabels }}
@@ -72,6 +75,10 @@ spec:
         valueFrom:
           fieldRef:
             fieldPath: metadata.namespace
+      - name: SERVICE_ACCOUNT
+        valueFrom:
+          fieldRef:
+            fieldPath: spec.serviceAccountName
       {{- with .Values.manager.env }}
         {{- toYaml . | nindent 6 }}
       {{- end }}

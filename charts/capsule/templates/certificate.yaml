@@ -4,6 +4,7 @@ apiVersion: cert-manager.io/v1
 kind: Issuer
 metadata:
   name: {{ include "capsule.fullname" . }}-webhook-selfsigned
+  namespace: {{ $.Release.Namespace }}
   labels:
     {{- include "capsule.labels" . | nindent 4 }}
   {{- with .Values.customAnnotations }}
@@ -17,6 +18,7 @@ apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
   name: {{ include "capsule.fullname" . }}-webhook-cert
+  namespace: {{ $.Release.Namespace }}
   labels:
     {{- include "capsule.labels" . | nindent 4 }}
   {{- with .Values.customAnnotations }}

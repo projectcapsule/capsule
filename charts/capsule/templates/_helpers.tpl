@@ -53,6 +53,15 @@ app.kubernetes.io/name: {{ include "capsule.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
+
+{{/*
+Release Annotations
+*/}}
+{{- define "capsule.releaseAnnotations" -}}
+meta.helm.sh/release-name: {{ $.Release.Name }}
+meta.helm.sh/release-namespace: {{ .Release.Namespace }}
+{{- end }}
+
 {{/*
 ServiceAccount annotations
 */}}
@@ -153,4 +162,21 @@ Capsule Webhook endpoint CA Bundle
   {{- if $.Values.webhooks.service.caBundle -}}
 caBundle: {{ $.Values.webhooks.service.caBundle -}}
   {{- end -}}
+{{- end -}}
+
+
+{{- define "capsule.crdsSizeHash" -}}
+{{- $paths := list -}}
+{{- range $p, $_ := .Files.Glob "crds/**.yaml" }}
+  {{- $paths = append $paths $p -}}
+{{- end -}}
+{{- $paths = sortAlpha $paths -}}
+
+{{- $sizes := list -}}
+{{- range $paths }}
+  {{- $sizes = append $sizes (len ($.Files.Get .)) -}}
+{{- end -}}
+
+{{- $joined := join "," $sizes -}}
+{{- sha256sum $joined -}}
 {{- end -}}

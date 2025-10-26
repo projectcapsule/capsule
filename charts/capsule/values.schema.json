@@ -34,6 +34,10 @@
                     "description": "Only install the CRDs, no other primitives",
                     "type": "boolean"
                 },
+                "inline": {
+                    "description": "Render CRDS inline (in this case use --skip-crds when installing the chart and create the capsuleconfiguration independently)",
+                    "type": "boolean"
+                },
                 "install": {
                     "description": "Install the CustomResourceDefinitions (This also manages the lifecycle of the CRDs for update operations)",
                     "type": "boolean"
@@ -51,6 +55,10 @@
         "customLabels": {
             "description": "Additional labels which will be added to all resources created by Capsule helm chart",
             "type": "object"
+        },
+        "extraManifests": {
+            "description": "Array of additional resources to be created alongside Capsule helm chart",
+            "type": "array"
         },
         "global": {
             "type": "object",
@@ -191,6 +199,24 @@
                                     "type": "integer"
                                 }
                             }
+                        },
+                        "postInstall": {
+                            "type": "object",
+                            "properties": {
+                                "enabled": {
+                                    "description": "Enable Post Install Job",
+                                    "type": "boolean"
+                                }
+                            }
+                        },
+                        "preDelete": {
+                            "type": "object",
+                            "properties": {
+                                "enabled": {
+                                    "description": "Enable Pre Delete Job",
+                                    "type": "boolean"
+                                }
+                            }
                         }
                     }
                 }
@@ -312,6 +338,10 @@
                                 "type": "string"
                             }
                         },
+                        "createConfiguration": {
+                            "description": "Create Configuration",
+                            "type": "boolean"
+                        },
                         "forceTenantPrefix": {
                             "description": "Boolean, enforces the Tenant owner, during Namespace creation, to name it using the selected Tenant name as prefix, separated by a dash",
                             "type": "boolean"
@@ -329,7 +359,7 @@
                             "type": "object"
                         },
                         "logLevel": {
-                            "description": "Set the log verbosity of the capsule with a value from 1 to 10",
+                            "description": "Set the log verbosity of the capsule with a value from 1 to 5",
                             "type": "string"
                         },
                         "nodeMetadata": {
@@ -367,6 +397,10 @@
                         "userNames": {
                             "description": "Names of the users considered as Capsule users.",
                             "type": "array"
+                        },
+                        "workers": {
+                            "description": "Workers (MaxConcurrentReconciles) is the maximum number of concurrent Reconciles which can be run (ALPHA).",
+                            "type": "integer"
                         }
                     }
                 },

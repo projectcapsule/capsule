@@ -1,4 +1,5 @@
-{{- if .Values.crds.install }}
+{{- if and .Values.crds.install (not $.Values.crds.inline) }}
+---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:

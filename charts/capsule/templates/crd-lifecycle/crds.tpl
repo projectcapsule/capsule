@@ -14,7 +14,7 @@
 
 
       {{/* Add Common Lables */}}
-      {{- $_ := set $p.metadata "annotations" (mergeOverwrite (default dict (get $p.metadata "annotations")) (default dict $.Values.crds.annotations)) -}}
+      {{- $_ := set $p.metadata "annotations" (mergeOverwrite (default dict (get $p.metadata "annotations")) (default dict $.Values.crds.annotations) (fromYaml (include "capsule.releaseAnnotations" $))) -}}
 
       {{/* Add Keep annotation to CRDs */}}
       {{- if $.Values.crds.keep }}
@@ -33,6 +33,9 @@
         {{- $p = $tmp -}}
       {{- end -}}
       {{- if $p }}
+        {{- if $.Values.crds.inline }}
+{{- printf "---\n%s" (toYaml $p) | nindent 0 }}
+        {{- else }}
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -52,5 +55,6 @@ data:
 
       {{- end }}
     {{ end }}
+    {{- end }}
   {{- end }}
 {{- end }}
