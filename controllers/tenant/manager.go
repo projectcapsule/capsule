@@ -19,11 +19,13 @@ import (
 	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	"github.com/projectcapsule/capsule/pkg/meta"
+	"github.com/projectcapsule/capsule/controllers/utils"
+	meta "github.com/projectcapsule/capsule/pkg/meta"
 	"github.com/projectcapsule/capsule/pkg/metrics"
 )
 
@@ -36,7 +38,7 @@ type Manager struct {
 	RESTConfig *rest.Config
 }
 
-func (r *Manager) SetupWithManager(mgr ctrl.Manager) error {
+func (r *Manager) SetupWithManager(mgr ctrl.Manager, cfg utils.ControllerOptions) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&capsulev1beta2.Tenant{}).
 		Owns(&networkingv1.NetworkPolicy{}).
@@ -44,6 +46,7 @@ func (r *Manager) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&corev1.ResourceQuota{}).
 		Owns(&rbacv1.RoleBinding{}).
 		Watches(&corev1.Namespace{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &capsulev1beta2.Tenant{})).
+		WithOptions(controller.Options{MaxConcurrentReconciles: cfg.MaxConcurrentReconciles}).
 		Complete(r)
 }
 
@@ -77,10 +80,15 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 	}()
 
 	// Ensuring Metadata.
-	if err = r.ensureMetadata(ctx, instance); err != nil {
+	err, updated := r.ensureMetadata(ctx, instance)
+	if err != nil {
 		err = fmt.Errorf("cannot ensure metadata: %w", err)
 
 		return result, err
+	}
+
+	if updated {
+		return result, nil
 	}
 
 	// Ensuring ResourceQuota

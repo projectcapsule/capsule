@@ -6,6 +6,7 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   name: "{{ include "capsule.post-install.name" . }}"
+  namespace: {{ $.Release.Namespace }}
   labels:
     app.kubernetes.io/component: {{ include "capsule.post-install.component" . | quote }}
     {{- include "capsule.labels" . | nindent 4 }}

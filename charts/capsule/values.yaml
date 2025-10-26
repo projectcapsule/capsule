@@ -166,12 +166,16 @@ manager:
 
   # Additional Capsule Controller Options
   options:
+    # -- Create Configuration
+    createConfiguration: true
+    # -- Change the default name of the capsule configuration name
+    capsuleConfiguration: default
     # -- Additional labels to add to the CapsuleConfiguration resource
     labels: {}
     # -- Additional annotations to add to the CapsuleConfiguration resource
     annotations: {}
-    # -- Change the default name of the capsule configuration name
-    capsuleConfiguration: default
+    # -- Workers (MaxConcurrentReconciles) is the maximum number of concurrent Reconciles which can be run (ALPHA).
+    workers: 1
     # -- Set the log verbosity of the capsule with a value from 1 to 5
     logLevel: '3'
     # -- Names of the users considered as Capsule users.

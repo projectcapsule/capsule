@@ -10,6 +10,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
+	"github.com/projectcapsule/capsule/controllers/utils"
 	"github.com/projectcapsule/capsule/pkg/metrics"
 )
 
@@ -17,13 +18,14 @@ func Add(
 	log logr.Logger,
 	mgr manager.Manager,
 	recorder record.EventRecorder,
+	cfg utils.ControllerOptions,
 ) (err error) {
 	if err = (&resourcePoolController{
 		Client:   mgr.GetClient(),
 		log:      log.WithName("Pools"),
 		recorder: recorder,
 		metrics:  metrics.MustMakeResourcePoolRecorder(),
-	}).SetupWithManager(mgr); err != nil {
+	}).SetupWithManager(mgr, cfg); err != nil {
 		return fmt.Errorf("unable to create pool controller: %w", err)
 	}
 
@@ -32,7 +34,7 @@ func Add(
 		log:      log.WithName("Claims"),
 		recorder: recorder,
 		metrics:  metrics.MustMakeClaimRecorder(),
-	}).SetupWithManager(mgr); err != nil {
+	}).SetupWithManager(mgr, cfg); err != nil {
 		return fmt.Errorf("unable to create claim controller: %w", err)
 	}
 

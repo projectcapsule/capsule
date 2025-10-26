@@ -5,10 +5,11 @@ package utils
 
 import (
 	"context"
-	"strings"
+	"os"
 
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
@@ -27,13 +28,14 @@ func IsCapsuleUser(ctx context.Context, req admission.Request, clt client.Client
 
 	//nolint:nestif
 	if sets.NewString(req.UserInfo.Groups...).Has("system:serviceaccounts") {
-		parts := strings.Split(req.UserInfo.Username, ":")
-
-		if len(parts) == 4 {
-			targetNamespace := parts[2]
+		namespace, name, err := serviceaccount.SplitUsername(req.UserInfo.Username)
+		if err == nil {
+			if namespace == os.Getenv("NAMESPACE") && name == os.Getenv("SERVICE_ACCOUNT") {
+				return false
+			}
 
 			tl := &capsulev1beta2.TenantList{}
-			if err := clt.List(ctx, tl, client.MatchingFieldsSelector{Selector: fields.OneTermEqualSelector(".status.namespaces", targetNamespace)}); err != nil {
+			if err := clt.List(ctx, tl, client.MatchingFieldsSelector{Selector: fields.OneTermEqualSelector(".status.namespaces", namespace)}); err != nil {
 				return false
 			}
 

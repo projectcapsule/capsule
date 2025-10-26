@@ -53,6 +53,15 @@ app.kubernetes.io/name: {{ include "capsule.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
+
+{{/*
+Release Annotations
+*/}}
+{{- define "capsule.releaseAnnotations" -}}
+meta.helm.sh/release-name: {{ $.Release.Name }}
+meta.helm.sh/release-namespace: {{ .Release.Namespace }}
+{{- end }}
+
 {{/*
 ServiceAccount annotations
 */}}

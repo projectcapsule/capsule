@@ -14,7 +14,7 @@
 
 
       {{/* Add Common Lables */}}
-      {{- $_ := set $p.metadata "annotations" (mergeOverwrite (default dict (get $p.metadata "annotations")) (default dict $.Values.crds.annotations)) -}}
+      {{- $_ := set $p.metadata "annotations" (mergeOverwrite (default dict (get $p.metadata "annotations")) (default dict $.Values.crds.annotations) (fromYaml (include "capsule.releaseAnnotations" $))) -}}
 
       {{/* Add Keep annotation to CRDs */}}
       {{- if $.Values.crds.keep }}

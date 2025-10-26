@@ -20,11 +20,13 @@ import (
 	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	ctrlutils "github.com/projectcapsule/capsule/controllers/utils"
 	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/meta"
 	"github.com/projectcapsule/capsule/pkg/metrics"
@@ -39,7 +41,7 @@ type resourcePoolController struct {
 	recorder record.EventRecorder
 }
 
-func (r *resourcePoolController) SetupWithManager(mgr ctrl.Manager) error {
+func (r *resourcePoolController) SetupWithManager(mgr ctrl.Manager, cfg ctrlutils.ControllerOptions) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&capsulev1beta2.ResourcePool{}).
 		Owns(&corev1.ResourceQuota{}).
@@ -67,6 +69,7 @@ func (r *resourcePoolController) SetupWithManager(mgr ctrl.Manager) error {
 				return requests
 			}),
 		).
+		WithOptions(controller.Options{MaxConcurrentReconciles: cfg.MaxConcurrentReconciles}).
 		Complete(r)
 }
 

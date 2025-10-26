@@ -1,8 +1,9 @@
-{{- if or (not $.Values.crds.exclusive) ($.Values.crds.createConfig) }}
+{{- if $.Values.manager.options.createConfiguration }}
 apiVersion: capsule.clastix.io/v1beta2
 kind: CapsuleConfiguration
 metadata:
-  name: default
+  name: {{ .Values.manager.options.capsuleConfiguration }}
+  namespace: {{ $.Release.Namespace }}
   labels:
   {{- include "capsule.labels" . | nindent 4 }}
   {{- with .Values.manager.options.labels }}

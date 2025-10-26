@@ -64,6 +64,7 @@ spec:
         - --webhook-port={{ .Values.manager.webhookPort }}
         - --zap-log-level={{ default 4 .Values.manager.options.logLevel }}
         - --configuration-name={{ .Values.manager.options.capsuleConfiguration }}
+        - --workers={{ .Values.manager.options.workers }}
         {{- with .Values.manager.extraArgs }}
           {{- toYaml . | nindent 8 }}
         {{- end }}
@@ -74,6 +75,10 @@ spec:
         valueFrom:
           fieldRef:
             fieldPath: metadata.namespace
+      - name: SERVICE_ACCOUNT
+        valueFrom:
+          fieldRef:
+            fieldPath: spec.serviceAccountName
       {{- with .Values.manager.env }}
         {{- toYaml . | nindent 6 }}
       {{- end }}

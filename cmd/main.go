@@ -40,6 +40,7 @@ import (
 	servicelabelscontroller "github.com/projectcapsule/capsule/controllers/servicelabels"
 	tenantcontroller "github.com/projectcapsule/capsule/controllers/tenant"
 	tlscontroller "github.com/projectcapsule/capsule/controllers/tls"
+	utilscontroller "github.com/projectcapsule/capsule/controllers/utils"
 	"github.com/projectcapsule/capsule/pkg/configuration"
 	"github.com/projectcapsule/capsule/pkg/indexer"
 	"github.com/projectcapsule/capsule/pkg/metrics"
@@ -87,6 +88,8 @@ func printVersion() {
 
 //nolint:maintidx
 func main() {
+	controllerConfig := utilscontroller.ControllerOptions{}
+
 	var enableLeaderElection, version bool
 
 	var metricsAddr, namespace, configurationName string
@@ -95,6 +98,7 @@ func main() {
 
 	var goFlagSet goflag.FlagSet
 
+	flag.IntVar(&controllerConfig.MaxConcurrentReconciles, "workers", 1, "MaxConcurrentReconciles is the maximum number of concurrent Reconciles which can be run.")
 	flag.IntVar(&webhookPort, "webhook-port", 9443, "The port the webhook server binds to.")
 	flag.StringVar(&metricsAddr, "metrics-addr", ":8080", "The address the metric endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "enable-leader-election", false,
@@ -203,7 +207,7 @@ func main() {
 		Metrics:    metrics.MustMakeTenantRecorder(),
 		Log:        ctrl.Log.WithName("controllers").WithName("Tenant"),
 		Recorder:   manager.GetEventRecorderFor("tenant-controller"),
-	}).SetupWithManager(manager); err != nil {
+	}).SetupWithManager(manager, controllerConfig); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Tenant")
 		os.Exit(1)
 	}
@@ -294,7 +298,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&pv.Controller{}).SetupWithManager(manager); err != nil {
+	if err = (&pv.Controller{}).SetupWithManager(manager, controllerConfig); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "PersistentVolume")
 		os.Exit(1)
 	}
@@ -306,12 +310,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&resources.Global{}).SetupWithManager(manager); err != nil {
+	if err = (&resources.Global{}).SetupWithManager(manager, controllerConfig); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "resources.Global")
 		os.Exit(1)
 	}
 
-	if err = (&resources.Namespaced{}).SetupWithManager(manager); err != nil {
+	if err = (&resources.Namespaced{}).SetupWithManager(manager, controllerConfig); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "resources.Namespaced")
 		os.Exit(1)
 	}
@@ -320,6 +324,7 @@ func main() {
 		ctrl.Log.WithName("controllers").WithName("ResourcePools"),
 		manager,
 		manager.GetEventRecorderFor("pools-ctrl"),
+		controllerConfig,
 	); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "resourcepools")
 		os.Exit(1)

@@ -14,7 +14,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
-	capsulev1beta2 "github.com/projectcapsule/capsule/pkg/utils"
+	"github.com/projectcapsule/capsule/pkg/utils"
 )
 
 // pruningResources is taking care of removing the no more requested sub-resources as LimitRange, ResourceQuota or
@@ -22,7 +22,7 @@ import (
 func (r *Manager) pruningResources(ctx context.Context, ns string, keys []string, obj client.Object) (err error) {
 	var capsuleLabel string
 
-	if capsuleLabel, err = capsulev1beta2.GetTypeLabel(obj); err != nil {
+	if capsuleLabel, err = utils.GetTypeLabel(obj); err != nil {
 		return err
 	}
 

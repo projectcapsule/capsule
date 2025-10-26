@@ -6,26 +6,24 @@ package tenant
 import (
 	"context"
 
-	"k8s.io/apimachinery/pkg/types"
-
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	capsuleapi "github.com/projectcapsule/capsule/pkg/api"
 )
 
 // Sets a label on the Tenant object with it's name.
-func (r *Manager) ensureMetadata(ctx context.Context, tnt *capsulev1beta2.Tenant) (err error) {
+func (r *Manager) ensureMetadata(ctx context.Context, tnt *capsulev1beta2.Tenant) (err error, changed bool) {
 	// Assign Labels
 	if tnt.Labels == nil {
 		tnt.Labels = make(map[string]string)
 	}
 
-	if v, ok := tnt.Labels[capsuleapi.TenantNameLabel]; ok && v == tnt.Name {
-		return err
+	if v, ok := tnt.Labels[capsuleapi.TenantNameLabel]; !ok || v != tnt.Name {
+		if err := r.Update(ctx, tnt); err != nil {
+			return err, false
+		}
+
+		return nil, true
 	}
 
-	if err := r.Update(ctx, tnt); err != nil {
-		return err
-	}
-
-	return r.Get(ctx, types.NamespacedName{Name: tnt.GetName()}, tnt)
+	return nil, false
 }

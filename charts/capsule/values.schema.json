@@ -338,6 +338,10 @@
                                 "type": "string"
                             }
                         },
+                        "createConfiguration": {
+                            "description": "Create Configuration",
+                            "type": "boolean"
+                        },
                         "forceTenantPrefix": {
                             "description": "Boolean, enforces the Tenant owner, during Namespace creation, to name it using the selected Tenant name as prefix, separated by a dash",
                             "type": "boolean"
@@ -393,6 +397,10 @@
                         "userNames": {
                             "description": "Names of the users considered as Capsule users.",
                             "type": "array"
+                        },
+                        "workers": {
+                            "description": "Workers (MaxConcurrentReconciles) is the maximum number of concurrent Reconciles which can be run (ALPHA).",
+                            "type": "integer"
                         }
                     }
                 },

@@ -17,11 +17,13 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/controllers/utils"
 	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/meta"
 	"github.com/projectcapsule/capsule/pkg/metrics"
@@ -35,7 +37,7 @@ type resourceClaimController struct {
 	recorder record.EventRecorder
 }
 
-func (r *resourceClaimController) SetupWithManager(mgr ctrl.Manager) error {
+func (r *resourceClaimController) SetupWithManager(mgr ctrl.Manager, cfg utils.ControllerOptions) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&capsulev1beta2.ResourcePoolClaim{}).
 		Watches(
@@ -43,6 +45,7 @@ func (r *resourceClaimController) SetupWithManager(mgr ctrl.Manager) error {
 			handler.EnqueueRequestsFromMapFunc(r.claimsWithoutPoolFromNamespaces),
 			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
 		).
+		WithOptions(controller.Options{MaxConcurrentReconciles: cfg.MaxConcurrentReconciles}).
 		Complete(r)
 }
 

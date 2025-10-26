@@ -16,12 +16,14 @@ import (
 	"sigs.k8s.io/cluster-api/util/patch"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/controllers/utils"
 )
 
 type Global struct {
@@ -29,7 +31,7 @@ type Global struct {
 	processor Processor
 }
 
-func (r *Global) SetupWithManager(mgr ctrl.Manager) error {
+func (r *Global) SetupWithManager(mgr ctrl.Manager, cfg utils.ControllerOptions) error {
 	r.client = mgr.GetClient()
 	r.processor = Processor{
 		client: mgr.GetClient(),
@@ -38,6 +40,7 @@ func (r *Global) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&capsulev1beta2.GlobalTenantResource{}).
 		Watches(&capsulev1beta2.Tenant{}, handler.EnqueueRequestsFromMapFunc(r.enqueueRequestFromTenant)).
+		WithOptions(controller.Options{MaxConcurrentReconciles: cfg.MaxConcurrentReconciles}).
 		Complete(r)
 }
 
