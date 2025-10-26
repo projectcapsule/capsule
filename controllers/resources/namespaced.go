@@ -43,12 +43,12 @@ func (r *Namespaced) SetupWithManager(mgr ctrl.Manager, cfg utils.ControllerOpti
 func (r *Namespaced) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	log := ctrllog.FromContext(ctx)
 
-	log.Info("start processing")
+	log.V(4).Info("start processing")
 	// Retrieving the TenantResource
 	tntResource := &capsulev1beta2.TenantResource{}
 	if err := r.client.Get(ctx, request.NamespacedName, tntResource); err != nil {
 		if apierrors.IsNotFound(err) {
-			log.Info("Request object not found, could have been deleted after reconcile request")
+			log.V(3).Info("Request object not found, could have been deleted after reconcile request")
 
 			return reconcile.Result{}, nil
 		}
@@ -100,7 +100,7 @@ func (r *Namespaced) reconcileNormal(ctx context.Context, tntResource *capsulev1
 	}
 
 	if len(tl.Items) == 0 {
-		log.Info("skipping sync, the current Namespace is not belonging to any Global")
+		log.V(4).Info("skipping sync, the current Namespace is not belonging to any Global")
 
 		return reconcile.Result{}, nil
 	}
@@ -146,7 +146,7 @@ func (r *Namespaced) reconcileNormal(ctx context.Context, tntResource *capsulev1
 		}
 	}
 
-	log.Info("processing completed")
+	log.V(4).Info("processing completed")
 
 	return reconcile.Result{Requeue: true, RequeueAfter: tntResource.Spec.ResyncPeriod.Duration}, nil
 }
@@ -160,7 +160,7 @@ func (r *Namespaced) reconcileDelete(ctx context.Context, tntResource *capsulev1
 
 	controllerutil.RemoveFinalizer(tntResource, finalizer)
 
-	log.Info("processing completed")
+	log.V(4).Info("processing completed")
 
 	return reconcile.Result{Requeue: true, RequeueAfter: tntResource.Spec.ResyncPeriod.Duration}, nil
 }

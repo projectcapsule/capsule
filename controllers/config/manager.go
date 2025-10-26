@@ -40,7 +40,7 @@ func (c *Manager) Reconcile(ctx context.Context, request reconcile.Request) (res
 		panic(errors.Wrap(err, "Invalid configuration for protected Namespace regex"))
 	}
 
-	c.Log.Info("CapsuleConfiguration reconciliation finished", "request.name", request.Name)
+	c.Log.V(5).Info("CapsuleConfiguration reconciliation finished", "request.name", request.Name)
 
 	return res, err
 }

@@ -162,7 +162,7 @@ func (r *Manager) syncAdditionalRoleBinding(ctx context.Context, tenant *capsule
 			r.Log.Error(err, "Cannot sync RoleBinding")
 		}
 
-		r.Log.Info(fmt.Sprintf("RoleBinding sync result: %s", string(res)), "name", target.Name, "namespace", target.Namespace)
+		r.Log.V(4).Info(fmt.Sprintf("RoleBinding sync result: %s", string(res)), "name", target.Name, "namespace", target.Namespace)
 
 		if err != nil {
 			return err

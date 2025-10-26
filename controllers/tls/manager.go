@@ -76,7 +76,7 @@ func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 func (r Reconciler) ReconcileCertificates(ctx context.Context, certSecret *corev1.Secret) error {
 	if r.shouldUpdateCertificate(certSecret) {
-		r.Log.Info("Generating new TLS certificate")
+		r.Log.V(3).Info("Generating new TLS certificate")
 
 		ca, err := cert.GenerateCertificateAuthority()
 		if err != nil {
@@ -122,7 +122,7 @@ func (r Reconciler) ReconcileCertificates(ctx context.Context, certSecret *corev
 		return fmt.Errorf("missing %s field in %s secret", corev1.ServiceAccountRootCAKey, r.Configuration.TLSSecretName())
 	}
 
-	r.Log.Info("Updating caBundle in webhooks and crd")
+	r.Log.V(4).Info("Updating caBundle in webhooks and crd")
 
 	group := new(errgroup.Group)
 	group.Go(func() error {
@@ -149,7 +149,7 @@ func (r Reconciler) ReconcileCertificates(ctx context.Context, certSecret *corev
 		return err
 	}
 
-	r.Log.Info("Updating capsule operator pods")
+	r.Log.V(4).Info("Updating capsule operator pods")
 
 	for _, pod := range operatorPods.Items {
 		p := pod
@@ -189,7 +189,7 @@ func (r Reconciler) Reconcile(ctx context.Context, request ctrl.Request) (ctrl.R
 	requeueTime := certificate.NotAfter.Add(-(certificateExpirationThreshold - 1*time.Second))
 	rq := requeueTime.Sub(now)
 
-	r.Log.Info("Reconciliation completed, processing back in " + rq.String())
+	r.Log.V(4).Info("Reconciliation completed, processing back in " + rq.String())
 
 	return reconcile.Result{Requeue: true, RequeueAfter: rq}, nil
 }
@@ -210,7 +210,7 @@ func (r Reconciler) shouldUpdateCertificate(secret *corev1.Secret) bool {
 		return true
 	}
 
-	r.Log.Info("Skipping TLS certificate generation as it is still valid")
+	r.Log.V(4).Info("Skipping TLS certificate generation as it is still valid")
 
 	return false
 }

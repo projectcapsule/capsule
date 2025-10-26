@@ -102,7 +102,7 @@ func (r *Manager) syncResourceQuotas(ctx context.Context, tenant *capsulev1beta2
 				// For this case, we're going to block the Quota setting the Hard as the
 				// used one.
 				for name, hardQuota := range resourceQuota.Hard {
-					r.Log.Info("Desired hard " + name.String() + " quota is " + hardQuota.String())
+					r.Log.V(4).Info("Desired hard " + name.String() + " quota is " + hardQuota.String())
 
 					// Getting the whole usage across all the Tenant Namespaces
 					var quantity resource.Quantity
@@ -110,7 +110,7 @@ func (r *Manager) syncResourceQuotas(ctx context.Context, tenant *capsulev1beta2
 						quantity.Add(item.Status.Used[name])
 					}
 
-					r.Log.Info("Computed " + name.String() + " quota for the whole Tenant is " + quantity.String())
+					r.Log.V(4).Info("Computed " + name.String() + " quota for the whole Tenant is " + quantity.String())
 
 					// Expose usage and limit metrics for the resource (name) of the ResourceQuota (index)
 					r.Metrics.TenantResourceUsageGauge.WithLabelValues(
@@ -259,7 +259,7 @@ func (r *Manager) syncResourceQuota(ctx context.Context, tenant *capsulev1beta2.
 
 		r.emitEvent(tenant, target.GetNamespace(), res, fmt.Sprintf("Ensuring ResourceQuota %s", target.GetName()), err)
 
-		r.Log.Info("Resource Quota sync result: "+string(res), "name", target.Name, "namespace", target.Namespace)
+		r.Log.V(4).Info("Resource Quota sync result: "+string(res), "name", target.Name, "namespace", target.Namespace)
 
 		if err != nil {
 			return err

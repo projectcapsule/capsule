@@ -35,7 +35,7 @@ func (r *Manager) syncCustomResourceQuotaUsages(ctx context.Context, tenant *cap
 
 		parts := strings.Split(k, "/")
 		if len(parts) != 2 {
-			r.Log.Info("non well-formed Resource Limit annotation", "key", k)
+			r.Log.V(4).Info("non well-formed Resource Limit annotation", "key", k)
 
 			continue
 		}
@@ -43,14 +43,14 @@ func (r *Manager) syncCustomResourceQuotaUsages(ctx context.Context, tenant *cap
 		parts = strings.Split(parts[1], "_")
 
 		if len(parts) != 2 {
-			r.Log.Info("non well-formed Resource Limit annotation, cannot retrieve version", "key", k)
+			r.Log.V(4).Info("non well-formed Resource Limit annotation, cannot retrieve version", "key", k)
 
 			continue
 		}
 
 		groupKindParts := strings.Split(parts[0], ".")
 		if len(groupKindParts) < 2 {
-			r.Log.Info("non well-formed Resource Limit annotation, cannot retrieve kind and group", "key", k)
+			r.Log.V(4).Info("non well-formed Resource Limit annotation, cannot retrieve kind and group", "key", k)
 
 			continue
 		}
