@@ -28,8 +28,8 @@ func (in *DefaultAllowedListSpec) MatchDefault(value string) bool {
 // +kubebuilder:object:generate=true
 
 type SelectorAllowedListSpec struct {
-	AllowedListSpec      `json:",inline"`
-	metav1.LabelSelector `json:",inline"`
+	AllowedListSpec       `json:",inline"`
+	SelectionListWithSpec `json:",inline"`
 }
 
 func (in *SelectorAllowedListSpec) MatchSelectByName(obj client.Object) bool {

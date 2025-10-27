@@ -150,13 +150,17 @@ dev-setup:
 		--namespace capsule-system \
 		--create-namespace \
 		--set 'crds.install=true' \
+		--set 'crds.inline=false' \
 		--set 'crds.exclusive=true'\
-        --set 'crds.createConfig=true'\
+		--set "tls.enableController=false" \
+		--set "tls.create=false" \
 		--set "webhooks.exclusive=true"\
 		--set "webhooks.service.url=$${WEBHOOK_URL}" \
 		--set "webhooks.service.caBundle=$${CA_BUNDLE}" \
 		capsule \
 		./charts/capsule
+
+
 	$(KUBECTL) -n capsule-system scale deployment capsule-controller-manager --replicas=0 || true
 
 ####################
@@ -378,7 +382,7 @@ ko:
 	$(call go-install-tool,$(KO),github.com/$(KO_LOOKUP)@$(KO_VERSION))
 
 NWA           := $(LOCALBIN)/nwa
-NWA_VERSION   := v0.7.6
+NWA_VERSION   := v0.7.7
 NWA_LOOKUP    := B1NARY-GR0UP/nwa
 nwa:
 	@test -s $(NWA) && $(NWA) -h | grep -q $(NWA_VERSION) || \
