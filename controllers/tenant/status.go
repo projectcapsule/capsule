@@ -14,13 +14,10 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api"
-	capsulemeta "github.com/projectcapsule/capsule/pkg/meta"
 )
 
 func (r *Manager) collectAvailableResources(ctx context.Context, tnt *capsulev1beta2.Tenant) (err error) {
@@ -135,42 +132,4 @@ func listNodeNamesBySelector(
 	}
 
 	return names, nil
-}
-
-func (r *Manager) updateTenantStatus(ctx context.Context, tnt *capsulev1beta2.Tenant, reconcileError error) error {
-	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
-		latest := &capsulev1beta2.Tenant{}
-		if err = r.Get(ctx, types.NamespacedName{Name: tnt.GetName()}, latest); err != nil {
-			return err
-		}
-
-		latest.Status = tnt.Status
-
-		// Set Ready Condition
-		readyCondition := capsulemeta.NewReadyCondition(tnt)
-		if reconcileError != nil {
-			readyCondition.Message = reconcileError.Error()
-			readyCondition.Status = metav1.ConditionFalse
-			readyCondition.Reason = capsulemeta.FailedReason
-		}
-
-		latest.Status.Conditions.UpdateConditionByType(readyCondition)
-
-		// Set Cordoned Condition
-		cordonedCondition := capsulemeta.NewCordonedCondition(tnt)
-
-		if tnt.Spec.Cordoned {
-			latest.Status.State = capsulev1beta2.TenantStateCordoned
-
-			cordonedCondition.Reason = capsulemeta.CordonedReason
-			cordonedCondition.Message = "Tenant is cordoned"
-			cordonedCondition.Status = metav1.ConditionTrue
-		} else {
-			latest.Status.State = capsulev1beta2.TenantStateActive
-		}
-
-		latest.Status.Conditions.UpdateConditionByType(cordonedCondition)
-
-		return r.Client.Status().Update(ctx, latest)
-	})
 }

@@ -90,6 +90,10 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 		return result, nil
 	}
 
+	if updated {
+		return result, nil
+	}
+
 	// Ensuring ResourceQuota
 	r.Log.V(4).Info("Ensuring limit resources count is updated")
 
@@ -137,6 +141,13 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 
 	if err = r.syncRoleBindings(ctx, instance); err != nil {
 		err = fmt.Errorf("cannot sync rolebindings items: %w", err)
+
+		return result, err
+	}
+
+	// Collect available resources
+	if err = r.collectAvailableResources(ctx, instance); err != nil {
+		err = fmt.Errorf("cannot collect available resources: %w", err)
 
 		return result, err
 	}

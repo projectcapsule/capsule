@@ -246,10 +246,10 @@ API_GW_LOOKUP  := kubernetes-sigs/gateway-api/
 e2e-install-deps:
 	@$(KUBECTL) apply --force-conflicts --server-side=true -f https://github.com/$(API_GW_LOOKUP)/releases/download/$(API_GW_VERSION)/standard-install.yaml
 
-e2e-build: kind
+e2e-build: e2e-build-cluster e2e-install-deps e2e-install
+
+e2e-build-cluster: kind
 	$(KIND) create cluster --wait=60s --name $(CLUSTER_NAME) --image kindest/node:$(KUBERNETES_SUPPORTED_VERSION)
-	$(MAKE) e2e-install-deps
-	$(MAKE) e2e-install
 
 .PHONY: e2e-install
 e2e-install: ko-build-all

@@ -2467,6 +2467,31 @@ spec:
           status:
             description: Returns the observed state of the Tenant.
             properties:
+              classes:
+                description: Available Class Types within Tenant
+                properties:
+                  gateway:
+                    description: Available GatewayClasses
+                    items:
+                      type: string
+                    type: array
+                  priority:
+                    description: Available PriorityClasses
+                    items:
+                      type: string
+                    type: array
+                  runtime:
+                    description: Available StorageClasses
+                    items:
+                      type: string
+                    type: array
+                  storage:
+                    description: Available Storageclasses (Only collected if any matching
+                      condition is specified)
+                    items:
+                      type: string
+                    type: array
+                type: object
               conditions:
                 description: Tenant Condition
                 items:
@@ -2526,6 +2551,11 @@ spec:
                 type: array
               namespaces:
                 description: List of namespaces assigned to the Tenant. (Deprecated)
+                items:
+                  type: string
+                type: array
+              nodes:
+                description: Available Nodes for Scheduling
                 items:
                   type: string
                 type: array
