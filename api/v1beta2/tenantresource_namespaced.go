@@ -21,14 +21,15 @@ type TenantResourceSpec struct {
 	// Disable this to keep replicated resources although the deletion of the replication manifest.
 	// +kubebuilder:default=true
 	PruningOnDelete *bool `json:"pruningOnDelete,omitempty"`
+	// When cordoning a replication it will no longer execute any applies or deletions (paused).
+	// This is useful for maintenances
+	// +kubebuilder:default=false
+	Cordoned *bool `json:"cordoned,omitempty"`
 	// Defines the rules to select targeting Namespace, along with the objects that must be replicated.
 	Resources []ResourceSpec `json:"resources"`
 	// Local ServiceAccount which will perform all the actions defined in the TenantResource
 	// You must provide permissions accordingly to that ServiceAccount
 	ServiceAccount *api.ServiceAccountReference `json:"serviceAccount,omitempty"`
-	// Provide additional template context, which can be used throughout all
-	// the declared items for the replication
-	Template *api.TemplateContext `json:"context,omitempty"`
 }
 
 type ResourceSpec struct {
@@ -44,6 +45,14 @@ type ResourceSpec struct {
 	AdditionalMetadata *api.AdditionalMetadataSpec `json:"additionalMetadata,omitempty"`
 	// Generators for advanced use cases
 	Generators []GeneratorItemSpec `json:"generators,omitempty"`
+	// Provide additional template context, which can be used throughout all
+	// the declared items for the replication
+	// +optional
+	Context *api.TemplateContext `json:"context,omitempty"`
+	// Ignore contains a list of rules for specifying which changes to ignore
+	// during diffing.
+	// +optional
+	Ignore []api.IgnoreRule `json:"ignore,omitempty"`
 }
 
 // +kubebuilder:validation:XEmbeddedResource
@@ -62,9 +71,9 @@ type TenantResourceStatus struct {
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:printcolumn:name="Status",type="string",JSONPath=".status.condition.type",description="Status for claim"
-// +kubebuilder:printcolumn:name="Reason",type="string",JSONPath=".status.condition.reason",description="Reason for status"
-// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp",description=""
+// +kubebuilder:printcolumn:name="Ready",type="string",JSONPath=".status.conditions[?(@.type==\"Ready\")].status",description="Reconcile Status for the tenant"
+// +kubebuilder:printcolumn:name="Status",type="string",JSONPath=".status.conditions[?(@.type==\"Ready\")].message",description="Reconcile Message for the tenant"
+// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp",description="Age"
 
 // TenantResource allows a Tenant Owner, if enabled with proper RBAC, to propagate resources in its Namespace.
 // The object must be deployed in a Tenant Namespace, and cannot reference object living in non-Tenant namespaces.

@@ -4,9 +4,18 @@
 package resources
 
 import (
+	"bytes"
+	"fmt"
+	"html/template"
+	"io"
+
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	kyaml "k8s.io/apimachinery/pkg/util/yaml"
+
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/configuration"
+	tpl "github.com/projectcapsule/capsule/pkg/template"
 	caputils "github.com/projectcapsule/capsule/pkg/utils"
 )
 
@@ -140,4 +149,56 @@ func setGlobalTenantDefaultResourceServiceAccount(
 	}
 
 	return true
+}
+
+// Field templating for the ArgoCD project properties. Needs to unmarshal in json, because of the json tags from argocd.
+func loadTenantToContext(
+	tenant *capsulev1beta2.Tenant,
+) (context map[string]interface{}) {
+	context = make(map[string]interface{})
+	context["Tenant"] = tenant
+
+	return
+}
+
+// Field templating for the ArgoCD project properties. Needs to unmarshal in json, because of the json tags from argocd.
+func renderGeneratorItem(
+	generator capsulev1beta2.GeneratorItemSpec,
+	context tpl.ReferenceContext,
+) (items []unstructured.Unstructured, err error) {
+	tmpl, err := template.New("tpl").Option("missingkey=" + generator.MissingKey.String()).Funcs(tpl.ExtraFuncMap()).Parse(generator.Template)
+	if err != nil {
+		return
+	}
+
+	var rendered bytes.Buffer
+	if err = tmpl.Execute(&rendered, context); err != nil {
+		return
+	}
+
+	dec := kyaml.NewYAMLOrJSONDecoder(bytes.NewReader(rendered.Bytes()), 4096)
+
+	var out []unstructured.Unstructured
+	for {
+		var obj map[string]any
+		if err := dec.Decode(&obj); err != nil {
+			if err == io.EOF {
+				break
+			}
+			// Skip pure whitespace/--- separators that decode to nil/empty
+			return nil, fmt.Errorf("decode yaml: %w", err)
+		}
+		if len(obj) == 0 {
+			continue
+		}
+
+		u := unstructured.Unstructured{Object: obj}
+		if u.GetAPIVersion() == "" && u.GetKind() == "" {
+			continue
+		}
+
+		out = append(out, u)
+	}
+
+	return out, nil
 }

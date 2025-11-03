@@ -119,7 +119,7 @@ func (r *globalResourceController) Reconcile(ctx context.Context, request reconc
 	}
 
 	defer func() {
-		if uerr := r.updateGlobalResourceStatus(ctx, tntResource, err); uerr != nil {
+		if uerr := r.updateStatus(ctx, tntResource, err); uerr != nil {
 			err = fmt.Errorf("cannot update globaltenantresource status: %w", uerr)
 
 			return
@@ -133,6 +133,10 @@ func (r *globalResourceController) Reconcile(ctx context.Context, request reconc
 			}
 		}
 	}()
+
+	if *tntResource.Spec.Cordoned {
+		log.V(5).Info("tenant resource is cordoned")
+	}
 
 	c, err := r.loadClient(ctx, log, tntResource)
 	if err != nil {
@@ -367,7 +371,7 @@ func (r *globalResourceController) loadClient(
 	return saClient, nil
 }
 
-func (r *globalResourceController) updateGlobalResourceStatus(ctx context.Context, instance *capsulev1beta2.GlobalTenantResource, reconcileError error) error {
+func (r *globalResourceController) updateStatus(ctx context.Context, instance *capsulev1beta2.GlobalTenantResource, reconcileError error) error {
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
 		latest := &capsulev1beta2.GlobalTenantResource{}
 		if err = r.client.Get(ctx, types.NamespacedName{Name: instance.GetName()}, latest); err != nil {
@@ -385,6 +389,17 @@ func (r *globalResourceController) updateGlobalResourceStatus(ctx context.Contex
 		}
 
 		latest.Status.Conditions.UpdateConditionByType(readyCondition)
+
+		// Set Cordoned Condition
+		cordonedCondition := meta.NewCordonedCondition(instance)
+
+		if *instance.Spec.Cordoned {
+			cordonedCondition.Reason = meta.CordonedReason
+			cordonedCondition.Message = "is cordoned"
+			cordonedCondition.Status = metav1.ConditionTrue
+		}
+
+		latest.Status.Conditions.UpdateConditionByType(cordonedCondition)
 
 		return r.client.Status().Update(ctx, latest)
 	})

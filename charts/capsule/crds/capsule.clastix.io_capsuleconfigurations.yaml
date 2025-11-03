@@ -131,6 +131,23 @@ spec:
                 description: Disallow creation of namespaces, whose name matches this
                   regexp
                 type: string
+              replications:
+                description: Omit Replications
+                properties:
+                  ignoreAnnotations:
+                    description: Define Annotations which are not reconciled for Global/TenantResources
+                    items:
+                      type: string
+                    type: array
+                  ignoreLabels:
+                    description: Define labels which are not reconciled for Global/TenantResources
+                    items:
+                      type: string
+                    type: array
+                required:
+                - ignoreAnnotations
+                - ignoreLabels
+                type: object
               serviceAccountClient:
                 description: Define Kubernetes-Client Configurations
                 properties:

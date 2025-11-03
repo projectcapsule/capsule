@@ -6,14 +6,17 @@ package resources
 import (
 	"context"
 	"errors"
+	"fmt"
 	"reflect"
 
 	"github.com/go-logr/logr"
 	gherrors "github.com/pkg/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/cluster-api/util/patch"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
@@ -28,6 +31,7 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/configuration"
+	"github.com/projectcapsule/capsule/pkg/meta"
 	"github.com/projectcapsule/capsule/pkg/metrics"
 	"github.com/projectcapsule/capsule/pkg/utils"
 )
@@ -115,6 +119,12 @@ func (r *namespacedResourceController) Reconcile(ctx context.Context, request re
 	}
 
 	defer func() {
+		if uerr := r.updateStatus(ctx, tntResource, err); uerr != nil {
+			err = fmt.Errorf("cannot update globaltenantresource status: %w", uerr)
+
+			return
+		}
+
 		r.metrics.RecordConditions(tntResource)
 
 		if e := patchHelper.Patch(ctx, tntResource); e != nil {
@@ -123,6 +133,10 @@ func (r *namespacedResourceController) Reconcile(ctx context.Context, request re
 			}
 		}
 	}()
+
+	if *tntResource.Spec.Cordoned {
+		log.V(5).Info("tenant resource is cordoned")
+	}
 
 	c, err := r.loadClient(ctx, log, tntResource)
 	if err != nil {
@@ -318,4 +332,38 @@ func (r *namespacedResourceController) loadClient(
 	}
 
 	return saClient, nil
+}
+
+func (r *namespacedResourceController) updateStatus(ctx context.Context, instance *capsulev1beta2.TenantResource, reconcileError error) error {
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
+		latest := &capsulev1beta2.TenantResource{}
+		if err = r.client.Get(ctx, types.NamespacedName{Name: instance.GetName()}, latest); err != nil {
+			return err
+		}
+
+		latest.Status = instance.Status
+
+		// Set Ready Condition
+		readyCondition := meta.NewReadyCondition(instance)
+		if reconcileError != nil {
+			readyCondition.Message = reconcileError.Error()
+			readyCondition.Status = metav1.ConditionFalse
+			readyCondition.Reason = meta.FailedReason
+		}
+
+		latest.Status.Conditions.UpdateConditionByType(readyCondition)
+
+		// Set Cordoned Condition
+		cordonedCondition := meta.NewCordonedCondition(instance)
+
+		if *instance.Spec.Cordoned {
+			cordonedCondition.Reason = meta.CordonedReason
+			cordonedCondition.Message = "is cordoned"
+			cordonedCondition.Status = metav1.ConditionTrue
+		}
+
+		latest.Status.Conditions.UpdateConditionByType(cordonedCondition)
+
+		return r.client.Status().Update(ctx, latest)
+	})
 }

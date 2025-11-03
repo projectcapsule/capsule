@@ -24,18 +24,20 @@ func (t *TemplateContext) GatherContext(
 	ctx context.Context,
 	kubeClient client.Client,
 	data map[string]interface{},
-	context tpl.ReferenceContext,
-) (errors []error) {
+	namespace string,
+) (context tpl.ReferenceContext, errors []error) {
+	context = tpl.ReferenceContext{}
+
 	// Template Context for Tenant
 	if len(data) != 0 {
 		if err := t.selfTemplate(data); err != nil {
-			return []error{fmt.Errorf("cloud not template: %w", err)}
+			return context, []error{fmt.Errorf("cloud not template: %w", err)}
 		}
 	}
 
 	// Load external Resources
-	for _, resource := range t.Resources {
-		val, err := resource.LoadResources(ctx, kubeClient)
+	for index, resource := range t.Resources {
+		val, err := resource.LoadResources(ctx, kubeClient, namespace)
 		if err != nil {
 			errors = append(errors, err)
 
@@ -43,6 +45,11 @@ func (t *TemplateContext) GatherContext(
 		}
 
 		if len(val) > 0 {
+			resourceIndex := resource.Index
+			if resourceIndex == "" {
+				resourceIndex = string(index)
+			}
+
 			context[resource.Index] = val
 		}
 	}
@@ -88,7 +95,7 @@ func (t *TemplateContext) selfTemplate(
 // +kubebuilder:object:generate=true
 type ResourceReference struct {
 	// Index where the results are published in the templating/CEL
-	Index string `json:"index"`
+	Index string `json:"index,omitempty"`
 	// Kind of the referent.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
 	Kind string `json:"kind" protobuf:"bytes,1,opt,name=kind"`
@@ -108,15 +115,38 @@ type ResourceReference struct {
 	// Selector which allows to get any amount of these resources based on labels
 	// +optional
 	Selector *metav1.LabelSelector `json:"selector,omitempty"`
-	// Optional indicates whether the referenced resource must exist, or whether to
-	// tolerate its absence. If true and the referenced resource is absent, proceed
-	// as if the resource was present but empty, without any variables defined.
-	// +kubebuilder:default:=false
-	// +optional
+	// Only relevant if name is set. If an item is not optional, there will be an error thrown when it does not exist
+	// +kubebuilder:default:=true
 	Optional bool `json:"optional,omitempty"`
 }
 
-func (t ResourceReference) LoadResources(ctx context.Context, kubeClient client.Client) ([]unstructured.Unstructured, error) {
+func (t ResourceReference) LoadResources(
+	ctx context.Context,
+	kubeClient client.Client,
+	namespace string,
+) ([]unstructured.Unstructured, error) {
+	if namespace != "" {
+		t.Namespace = namespace
+	}
+
+	// For a single item we are not using list
+	if t.Name != "" {
+		obj := &unstructured.Unstructured{}
+		obj.SetAPIVersion(t.APIVersion)
+		obj.SetKind(t.Kind)
+
+		key := client.ObjectKey{
+			Name:      t.Name,
+			Namespace: t.Namespace,
+		}
+
+		if err := kubeClient.Get(ctx, key, obj); err != nil {
+			return nil, fmt.Errorf("failed to get %s/%s: %w", t.Kind, t.Name, err)
+		}
+
+		return []unstructured.Unstructured{*obj}, nil
+	}
+
 	list := &unstructured.UnstructuredList{}
 	list.SetAPIVersion(t.APIVersion)
 	list.SetKind(t.Kind + "List")
@@ -135,11 +165,6 @@ func (t ResourceReference) LoadResources(ctx context.Context, kubeClient client.
 
 		opts = append(opts, client.MatchingLabelsSelector{Selector: selector})
 	}
-
-	// Optionally, if t.Name is specified, you can filter by name.
-	//if t.Name != "" {
-	//	opts = append(opts, client.MatchingFields{"metadata.name": t.Name})
-	//}
 
 	// List the resources.
 	if err := kubeClient.List(ctx, list, opts...); err != nil {

@@ -43,7 +43,7 @@ func (r *GlobalTenantResourceRecorder) Collectors() []prometheus.Collector {
 }
 
 func (r *GlobalTenantResourceRecorder) RecordConditions(resource *capsulev1beta2.GlobalTenantResource) {
-	for _, status := range []string{meta.ReadyCondition} {
+	for _, status := range []string{meta.ReadyCondition, meta.CordonedCondition} {
 		var value float64
 
 		cond := resource.Status.Conditions.GetConditionByType(status)

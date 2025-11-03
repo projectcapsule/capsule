@@ -165,10 +165,8 @@ func (r *Manager) updateTenantStatus(ctx context.Context, tnt *capsulev1beta2.Te
 			latest.Status.State = capsulev1beta2.TenantStateCordoned
 
 			cordonedCondition.Reason = meta.CordonedReason
-			cordonedCondition.Message = "Tenant is cordoned"
+			cordonedCondition.Message = "is cordoned"
 			cordonedCondition.Status = metav1.ConditionTrue
-		} else {
-			latest.Status.State = capsulev1beta2.TenantStateActive
 		}
 
 		latest.Status.Conditions.UpdateConditionByType(cordonedCondition)

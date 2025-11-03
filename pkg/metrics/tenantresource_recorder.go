@@ -44,7 +44,7 @@ func (r *TenantResourceRecorder) Collectors() []prometheus.Collector {
 
 // RecordCondition records the condition as given for the ref.
 func (r *TenantResourceRecorder) RecordConditions(resource *capsulev1beta2.TenantResource) {
-	for _, status := range []string{meta.ReadyCondition} {
+	for _, status := range []string{meta.ReadyCondition, meta.CordonedCondition} {
 		var value float64
 
 		cond := resource.Status.Conditions.GetConditionByType(status)

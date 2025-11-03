@@ -15,15 +15,16 @@ spec:
   scope: Cluster
   versions:
   - additionalPrinterColumns:
-    - description: Status for claim
-      jsonPath: .status.condition.type
+    - description: Reconcile Status for the tenant
+      jsonPath: .status.conditions[?(@.type=="Ready")].status
+      name: Ready
+      type: string
+    - description: Reconcile Message for the tenant
+      jsonPath: .status.conditions[?(@.type=="Ready")].message
       name: Status
       type: string
-    - description: Reason for status
-      jsonPath: .status.condition.reason
-      name: Reason
-      type: string
-    - jsonPath: .metadata.creationTimestamp
+    - description: Age
+      jsonPath: .metadata.creationTimestamp
       name: Age
       type: date
     name: v1beta2
@@ -52,99 +53,12 @@ spec:
           spec:
             description: GlobalTenantResourceSpec defines the desired state of GlobalTenantResource.
             properties:
-              context:
+              cordoned:
+                default: false
                 description: |-
-                  Provide additional template context, which can be used throughout all
-                  the declared items for the replication
-                properties:
-                  resources:
-                    items:
-                      properties:
-                        apiVersion:
-                          description: API version of the referent.
-                          type: string
-                        index:
-                          description: Index where the results are published in the
-                            templating/CEL
-                          type: string
-                        kind:
-                          description: |-
-                            Kind of the referent.
-                            More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
-                          type: string
-                        name:
-                          description: |-
-                            Name of the values referent. This is useful
-                            when you traying to get a specific resource
-                          maxLength: 253
-                          minLength: 1
-                          type: string
-                        namespace:
-                          description: Namespace of the values referent.
-                          maxLength: 253
-                          minLength: 1
-                          type: string
-                        optional:
-                          default: false
-                          description: |-
-                            Optional indicates whether the referenced resource must exist, or whether to
-                            tolerate its absence. If true and the referenced resource is absent, proceed
-                            as if the resource was present but empty, without any variables defined.
-                          type: boolean
-                        selector:
-                          description: Selector which allows to get any amount of
-                            these resources based on labels
-                          properties:
-                            matchExpressions:
-                              description: matchExpressions is a list of label selector
-                                requirements. The requirements are ANDed.
-                              items:
-                                description: |-
-                                  A label selector requirement is a selector that contains values, a key, and an operator that
-                                  relates the key and values.
-                                properties:
-                                  key:
-                                    description: key is the label key that the selector
-                                      applies to.
-                                    type: string
-                                  operator:
-                                    description: |-
-                                      operator represents a key's relationship to a set of values.
-                                      Valid operators are In, NotIn, Exists and DoesNotExist.
-                                    type: string
-                                  values:
-                                    description: |-
-                                      values is an array of string values. If the operator is In or NotIn,
-                                      the values array must be non-empty. If the operator is Exists or DoesNotExist,
-                                      the values array must be empty. This array is replaced during a strategic
-                                      merge patch.
-                                    items:
-                                      type: string
-                                    type: array
-                                    x-kubernetes-list-type: atomic
-                                required:
-                                - key
-                                - operator
-                                type: object
-                              type: array
-                              x-kubernetes-list-type: atomic
-                            matchLabels:
-                              additionalProperties:
-                                type: string
-                              description: |-
-                                matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
-                                map is equivalent to an element of matchExpressions, whose key field is "key", the
-                                operator is "In", and the values array contains only "value". The requirements are ANDed.
-                              type: object
-                          type: object
-                          x-kubernetes-map-type: atomic
-                      required:
-                      - apiVersion
-                      - index
-                      - kind
-                      type: object
-                    type: array
-                type: object
+                  When cordoning a replication it will no longer execute any applies or deletions (paused).
+                  This is useful for maintenances
+                type: boolean
               pruningOnDelete:
                 default: true
                 description: |-
@@ -170,15 +84,177 @@ spec:
                             type: string
                           type: object
                       type: object
+                    context:
+                      description: |-
+                        Provide additional template context, which can be used throughout all
+                        the declared items for the replication
+                      properties:
+                        resources:
+                          items:
+                            properties:
+                              apiVersion:
+                                description: API version of the referent.
+                                type: string
+                              index:
+                                description: Index where the results are published
+                                  in the templating/CEL
+                                type: string
+                              kind:
+                                description: |-
+                                  Kind of the referent.
+                                  More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+                                type: string
+                              name:
+                                description: |-
+                                  Name of the values referent. This is useful
+                                  when you traying to get a specific resource
+                                maxLength: 253
+                                minLength: 1
+                                type: string
+                              namespace:
+                                description: Namespace of the values referent.
+                                maxLength: 253
+                                minLength: 1
+                                type: string
+                              optional:
+                                default: true
+                                description: Only relevant if name is set. If an item
+                                  is not optional, there will be an error thrown when
+                                  it does not exist
+                                type: boolean
+                              selector:
+                                description: Selector which allows to get any amount
+                                  of these resources based on labels
+                                properties:
+                                  matchExpressions:
+                                    description: matchExpressions is a list of label
+                                      selector requirements. The requirements are
+                                      ANDed.
+                                    items:
+                                      description: |-
+                                        A label selector requirement is a selector that contains values, a key, and an operator that
+                                        relates the key and values.
+                                      properties:
+                                        key:
+                                          description: key is the label key that the
+                                            selector applies to.
+                                          type: string
+                                        operator:
+                                          description: |-
+                                            operator represents a key's relationship to a set of values.
+                                            Valid operators are In, NotIn, Exists and DoesNotExist.
+                                          type: string
+                                        values:
+                                          description: |-
+                                            values is an array of string values. If the operator is In or NotIn,
+                                            the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                                            the values array must be empty. This array is replaced during a strategic
+                                            merge patch.
+                                          items:
+                                            type: string
+                                          type: array
+                                          x-kubernetes-list-type: atomic
+                                      required:
+                                      - key
+                                      - operator
+                                      type: object
+                                    type: array
+                                    x-kubernetes-list-type: atomic
+                                  matchLabels:
+                                    additionalProperties:
+                                      type: string
+                                    description: |-
+                                      matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+                                      map is equivalent to an element of matchExpressions, whose key field is "key", the
+                                      operator is "In", and the values array contains only "value". The requirements are ANDed.
+                                    type: object
+                                type: object
+                                x-kubernetes-map-type: atomic
+                            required:
+                            - apiVersion
+                            - kind
+                            type: object
+                          type: array
+                      type: object
                     generators:
                       description: Generators for advanced use cases
                       items:
                         properties:
+                          missingKey:
+                            default: default
+                            description: Missing Key Option for templating
+                            enum:
+                            - default
+                            - zero
+                            - error
+                            type: string
                           template:
                             description: |-
                               Template contains any amount of yaml which is applied to Kubernetes.
                               This can be a single resource or multiple resources
                             type: string
+                        type: object
+                      type: array
+                    ignore:
+                      description: |-
+                        Ignore contains a list of rules for specifying which changes to ignore
+                        during diffing.
+                      items:
+                        properties:
+                          paths:
+                            description: |-
+                              Paths is a list of JSON Pointer (RFC 6901) paths to be excluded from
+                              consideration in a Kubernetes object.
+                            items:
+                              type: string
+                            type: array
+                          target:
+                            description: |-
+                              Target is a selector for specifying Kubernetes objects to which this
+                              rule applies.
+                              If Target is not set, the Paths will be ignored for all Kubernetes
+                              objects within the manifest of the Helm release.
+                            properties:
+                              annotationSelector:
+                                description: |-
+                                  AnnotationSelector is a string that follows the label selection expression
+                                  https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#api
+                                  It matches with the resource annotations.
+                                type: string
+                              group:
+                                description: |-
+                                  Group is the API group to select resources from.
+                                  Together with Version and Kind it is capable of unambiguously identifying and/or selecting resources.
+                                  https://github.com/kubernetes/community/blob/master/contributors/design-proposals/api-machinery/api-group.md
+                                type: string
+                              kind:
+                                description: |-
+                                  Kind of the API Group to select resources from.
+                                  Together with Group and Version it is capable of unambiguously
+                                  identifying and/or selecting resources.
+                                  https://github.com/kubernetes/community/blob/master/contributors/design-proposals/api-machinery/api-group.md
+                                type: string
+                              labelSelector:
+                                description: |-
+                                  LabelSelector is a string that follows the label selection expression
+                                  https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#api
+                                  It matches with the resource labels.
+                                type: string
+                              name:
+                                description: Name to match resources with.
+                                type: string
+                              namespace:
+                                description: Namespace to select resources from.
+                                type: string
+                              version:
+                                description: |-
+                                  Version of the API Group to select resources from.
+                                  Together with Group and Kind it is capable of unambiguously identifying and/or selecting resources.
+                                  https://github.com/kubernetes/community/blob/master/contributors/design-proposals/api-machinery/api-group.md
+                                type: string
+                            type: object
+                        required:
+                        - paths
                         type: object
                       type: array
                     namespaceSelector:

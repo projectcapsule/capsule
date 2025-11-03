@@ -13,10 +13,26 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
+// +kubebuilder:validation:Enum=default;zero;error
+type MissingKeyOption string
+
+func (p MissingKeyOption) String() string {
+	return string(p)
+}
+
+const (
+	MissingKeyDefault MissingKeyOption = "default"
+	MissingKeyZero    MissingKeyOption = "zero"
+	MissingKeyError   MissingKeyOption = "error"
+)
+
 type GeneratorItemSpec struct {
 	// Template contains any amount of yaml which is applied to Kubernetes.
 	// This can be a single resource or multiple resources
 	Template string `json:"template,omitempty"`
+	// Missing Key Option for templating
+	// +kubebuilder:default=default
+	MissingKey MissingKeyOption `json:"missingKey,omitempty"`
 }
 
 type ProcessedItems []ObjectReferenceStatus

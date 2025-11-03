@@ -7,6 +7,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/valyala/fasttemplate"
@@ -26,6 +28,7 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/meta"
+	tpl "github.com/projectcapsule/capsule/pkg/template"
 )
 
 const (
@@ -125,8 +128,15 @@ func (r *Processor) HandleSectionPreflight(
 ) (processed []string, err error) {
 	log := ctrllog.FromContext(ctx)
 
+	tplContext := loadTenantToContext(&tnt)
+
 	switch scope {
 	case api.ResourceScopeTenant:
+
+		tplContext, _ := spec.Context.GatherContext(ctx, c, nil, "")
+
+		log.Info("got context", "context", tplContext)
+
 		return r.handleSection(
 			ctx,
 			c,
@@ -140,7 +150,9 @@ func (r *Processor) HandleSectionPreflight(
 				UID:   tnt.GetUID(),
 				Scope: api.ResourceScopeTenant,
 			},
-			nil)
+			nil,
+			tplContext,
+		)
 	default:
 
 		// Creating Namespace selector
@@ -175,6 +187,9 @@ func (r *Processor) HandleSectionPreflight(
 		}
 
 		for _, ns := range namespaces.Items {
+
+			//spec.Context.GatherContext(ctx, c, nil, ns.GetName())
+
 			p, perr := r.handleSection(
 				ctx,
 				c,
@@ -188,7 +203,8 @@ func (r *Processor) HandleSectionPreflight(
 					UID:   ns.GetUID(),
 					Scope: api.ResourceScopeNamespace,
 				},
-				&ns)
+				&ns,
+				tplContext)
 			if perr != nil {
 				err = errors.Join(err, perr)
 			}
@@ -211,6 +227,7 @@ func (r *Processor) handleSection(
 	spec capsulev1beta2.ResourceSpec,
 	owner capsulev1beta2.ObjectReferenceStatusOwner,
 	ns *corev1.Namespace,
+	tmplContext tpl.ReferenceContext,
 ) ([]string, error) {
 	log := ctrllog.FromContext(ctx)
 
@@ -302,7 +319,7 @@ func (r *Processor) handleSection(
 					replicatedItem.Namespace = ns.Name
 				}
 
-				if opErr := r.createOrUpdate(ctx, c, &obj, objLabels, objAnnotations); opErr != nil {
+				if opErr := r.createOrPatch(ctx, c, &obj, objLabels, objAnnotations, spec.Ignore); opErr != nil {
 					log.Error(opErr, "unable to sync namespacedItems", kv...)
 					errorsChan <- opErr
 
@@ -375,7 +392,7 @@ func (r *Processor) handleSection(
 			replicatedItem.Namespace = ns.Name
 		}
 
-		if rawErr := r.createOrUpdate(ctx, c, &obj, objLabels, objAnnotations); rawErr != nil {
+		if rawErr := r.createOrPatch(ctx, c, &obj, objLabels, objAnnotations, spec.Ignore); rawErr != nil {
 			log.Info("unable to sync rawItem", keysAndValues...)
 
 			replicatedItem.Status = metav1.ConditionFalse
@@ -393,57 +410,285 @@ func (r *Processor) handleSection(
 		processed.Insert(replicatedItem.String())
 	}
 
+	// Run Generators
+	for generatorIndex, item := range spec.Generators {
+		keysAndValues := []interface{}{"index", generatorIndex}
+
+		log.V(5).Info("reconciling generator", keysAndValues...)
+
+		objs, err := renderGeneratorItem(item, tmplContext)
+		if err != nil {
+			syncErr = errors.Join(syncErr, err)
+
+			log.Error(err, "unable to deserialize rawItem", keysAndValues...)
+
+			continue
+
+		}
+
+		log.V(5).Info("obtained objects", "items", len(objs))
+
+		for _, obj := range objs {
+			if ns != nil {
+				obj.SetNamespace(ns.Name)
+			}
+
+			replicatedItem := &capsulev1beta2.ObjectReferenceStatus{}
+			replicatedItem.Name = obj.GetName()
+			replicatedItem.Kind = obj.GetKind()
+			replicatedItem.APIVersion = obj.GetAPIVersion()
+			replicatedItem.Type = meta.ReadyCondition
+			replicatedItem.Owner = owner
+
+			if ns != nil {
+				replicatedItem.Namespace = ns.Name
+			}
+
+			if rawErr := r.createOrPatch(ctx, c, &obj, objLabels, objAnnotations, spec.Ignore); rawErr != nil {
+				log.Info("unable to sync rawItem", keysAndValues...)
+
+				replicatedItem.Status = metav1.ConditionFalse
+				replicatedItem.Message = rawErr.Error()
+
+				// In case of error processing an item in one of any selected Namespaces, storing it to report it lately
+				// to the upper call to ensure a partial sync that will be fixed by a subsequent reconciliation.
+				syncErr = errors.Join(syncErr, rawErr)
+			} else {
+				log.Info("resource has been replicated", keysAndValues...)
+
+				replicatedItem.Status = metav1.ConditionTrue
+			}
+
+			processed.Insert(replicatedItem.String())
+		}
+	}
+
 	return processed.List(), syncErr
+}
+
+func (r *Processor) createOrPatch(
+	ctx context.Context,
+	c client.Client,
+	obj *unstructured.Unstructured,
+	labels, annotations map[string]string,
+	ignore []api.IgnoreRule,
+) error {
+	actual := &unstructured.Unstructured{}
+	actual.SetGroupVersionKind(obj.GroupVersionKind())
+	actual.SetNamespace(obj.GetNamespace())
+	actual.SetName(obj.GetName())
+
+	// Fetch current to have a stable mutate func input
+	_ = c.Get(ctx, client.ObjectKeyFromObject(actual), actual) // ignore notfound here
+
+	igPaths := matchIgnorePaths(ignore, obj.GetKind(), obj.GetAPIVersion())
+
+	_, err := controllerutil.CreateOrPatch(ctx, c, actual, func() error {
+		// Keep copies
+		live := actual.DeepCopy() // current from cluster (may be empty)
+		desired := obj.DeepCopy() // what we want
+
+		// Merge controller-managed labels/annotations into desired
+		mergeLabelsAnnotations(desired, labels, annotations)
+
+		// Preserve ignored JSON pointers: copy live -> desired at those paths
+		if len(igPaths) > 0 {
+			preserveIgnoredPaths(desired.Object, live.Object, igPaths)
+		}
+
+		// Replace actual content with the prepared desired content
+		uid := actual.GetUID()
+		rv := actual.GetResourceVersion()
+
+		actual.Object = desired.Object
+		actual.SetUID(uid)
+		actual.SetResourceVersion(rv)
+
+		return nil
+	})
+	return err
+}
+
+func mergeLabelsAnnotations(u *unstructured.Unstructured, ls, as map[string]string) {
+	lbl := u.GetLabels()
+	if lbl == nil {
+		lbl = map[string]string{}
+	}
+	for k, v := range ls {
+		lbl[k] = v
+	}
+	u.SetLabels(lbl)
+
+	ann := u.GetAnnotations()
+	if ann == nil {
+		ann = map[string]string{}
+	}
+	for k, v := range as {
+		ann[k] = v
+	}
+	u.SetAnnotations(ann)
+}
+
+// jsonPointerGet returns (value, true) if JSON pointer p exists.
+func jsonPointerGet(obj map[string]any, p string) (any, bool) {
+	if p == "" || p == "/" {
+		return obj, true
+	}
+	parts := strings.Split(p, "/")[1:]
+	cur := any(obj)
+	for _, raw := range parts {
+		key := strings.ReplaceAll(strings.ReplaceAll(raw, "~1", "/"), "~0", "~")
+		switch node := cur.(type) {
+		case map[string]any:
+			next, ok := node[key]
+			if !ok {
+				return nil, false
+			}
+			cur = next
+		case []any:
+			idx, err := strconv.Atoi(key)
+			if err != nil || idx < 0 || idx >= len(node) {
+				return nil, false
+			}
+			cur = node[idx]
+		default:
+			return nil, false
+		}
+	}
+	return cur, true
+}
+
+func jsonPointerSet(obj map[string]any, p string, val any) error {
+	if p == "" || p == "/" {
+		return fmt.Errorf("cannot set root with pointer")
+	}
+	parts := strings.Split(p, "/")[1:]
+	cur := obj
+	for i, raw := range parts {
+		key := strings.ReplaceAll(strings.ReplaceAll(raw, "~1", "/"), "~0", "~")
+		last := i == len(parts)-1
+		if last {
+			cur[key] = val
+			return nil
+		}
+		nxt, ok := cur[key]
+		if !ok {
+			n := map[string]any{}
+			cur[key] = n
+			cur = n
+			continue
+		}
+		switch m := nxt.(type) {
+		case map[string]any:
+			cur = m
+		default:
+			n := map[string]any{}
+			cur[key] = n
+			cur = n
+		}
+	}
+	return nil
+}
+
+func jsonPointerDelete(obj map[string]any, p string) error {
+	if p == "" || p == "/" {
+		return fmt.Errorf("cannot delete root with pointer")
+	}
+	parts := strings.Split(p, "/")[1:]
+	cur := obj
+	for i, raw := range parts {
+		key := strings.ReplaceAll(strings.ReplaceAll(raw, "~1", "/"), "~0", "~")
+		last := i == len(parts)-1
+		if last {
+			delete(cur, key)
+			return nil
+		}
+		nxt, ok := cur[key]
+		if !ok {
+			return nil
+		}
+		m, ok := nxt.(map[string]any)
+		if !ok {
+			return nil
+		}
+		cur = m
+	}
+	return nil
+}
+
+func preserveIgnoredPaths(desired, live map[string]any, ptrs []string) {
+	for _, p := range ptrs {
+		if v, ok := jsonPointerGet(live, p); ok {
+			_ = jsonPointerSet(desired, p, v)
+		} else {
+			_ = jsonPointerDelete(desired, p)
+		}
+	}
+}
+
+func matchIgnorePaths(rules []api.IgnoreRule, kind, apiver string) []string {
+	var out []string
+
+	for _, r := range rules {
+		if r.Target.Kind != "" && r.Target.Kind != kind {
+			continue
+		}
+		if r.Target.Version != "" && r.Target.Version != apiver {
+			continue
+		}
+		out = append(out, r.Paths...)
+	}
+	return out
 }
 
 // createOrUpdate replicates the provided unstructured object to all the provided Namespaces:
 // this function mimics the CreateOrUpdate, by retrieving the object to understand if it must be created or updated,
 // along adding the additional metadata, if required.
-func (r *Processor) createOrUpdate(
-	ctx context.Context,
-	c client.Client,
-	obj *unstructured.Unstructured,
-	labels map[string]string,
-	annotations map[string]string,
-) (err error) {
-	actual, desired := &unstructured.Unstructured{}, obj.DeepCopy()
-
-	actual.SetAPIVersion(desired.GetAPIVersion())
-	actual.SetKind(desired.GetKind())
-	actual.SetNamespace(desired.GetNamespace())
-	actual.SetName(desired.GetName())
-
-	_, err = controllerutil.CreateOrUpdate(ctx, c, actual, func() error {
-		UID := actual.GetUID()
-		rv := actual.GetResourceVersion()
-		actual.SetUnstructuredContent(desired.Object)
-
-		combinedLabels := obj.GetLabels()
-		if combinedLabels == nil {
-			combinedLabels = make(map[string]string)
-		}
-
-		for key, value := range labels {
-			combinedLabels[key] = value
-		}
-
-		actual.SetLabels(combinedLabels)
-
-		combinedAnnotations := obj.GetAnnotations()
-		if combinedAnnotations == nil {
-			combinedAnnotations = make(map[string]string)
-		}
-
-		for key, value := range annotations {
-			combinedAnnotations[key] = value
-		}
-
-		actual.SetAnnotations(combinedAnnotations)
-		actual.SetResourceVersion(rv)
-		actual.SetUID(UID)
-
-		return nil
-	})
-
-	return err
-}
+//func (r *Processor) createOrUpdate(
+//	ctx context.Context,
+//	c client.Client,
+//	obj *unstructured.Unstructured,
+//	labels map[string]string,
+//	annotations map[string]string,
+//) (err error) {
+//	actual, desired := &unstructured.Unstructured{}, obj.DeepCopy()
+//
+//	actual.SetAPIVersion(desired.GetAPIVersion())
+//	actual.SetKind(desired.GetKind())
+//	actual.SetNamespace(desired.GetNamespace())
+//	actual.SetName(desired.GetName())
+//
+//	_, err = controllerutil.CreateOrUpdate(ctx, c, actual, func() error {
+//		UID := actual.GetUID()
+//		rv := actual.GetResourceVersion()
+//		actual.SetUnstructuredContent(desired.Object)
+//
+//		combinedLabels := obj.GetLabels()
+//		if combinedLabels == nil {
+//			combinedLabels = make(map[string]string)
+//		}
+//
+//		for key, value := range labels {
+//			combinedLabels[key] = value
+//		}
+//
+//		actual.SetLabels(combinedLabels)
+//
+//		combinedAnnotations := obj.GetAnnotations()
+//		if combinedAnnotations == nil {
+//			combinedAnnotations = make(map[string]string)
+//		}
+//
+//		for key, value := range annotations {
+//			combinedAnnotations[key] = value
+//		}
+//
+//		actual.SetAnnotations(combinedAnnotations)
+//		actual.SetResourceVersion(rv)
+//		actual.SetUID(UID)
+//
+//		return nil
+//	})
+//
+//	return err
+//}

@@ -1,20 +1,54 @@
 apiVersion: capsule.clastix.io/v1beta2
-kind: GlobalTenantResource
+kind: GlobalTenantReplication
 metadata:
   name: global-scope
 spec:
-  tenantSelector:
-    matchLabels:
-       energy: renewable
   scope: Tenant
   resyncPeriod: 5s
+  ignore:
+    - paths: ["/metadata/labels/capsule.managed-by"]
+      target:
+        kind: Deployment
   resources:
-    - rawItems:
-      - apiVersion: v1
-        kind: Secret
-        metadata:
-          name: "some-secret-bruv"
-          namespace: "solar-test"
-        stringData:
-          username: "some-username"
-
+  - ignore:
+      - paths: ["/metadata/labels/capsule.managed-by"]
+        target:
+          kind: Deployment
+          name: {{.tenant.name}}-controller-manager
+    context:
+        resources:
+        - index: "sec"
+          apiVersion: v1
+          kind: Secret
+          name: capsule-tls
+          namespace: capsule-system
+      generators:
+        - template: |
+            ---
+            apiVersion: v1
+            kind: ConfigMap
+            metadata:
+              name: game-demo
+              namespace: default
+            data:
+              # property-like keys; each key maps to a simple value
+              player_initial_lives: "3"
+              ui_properties_file_name: "user-interface.properties"
+            
+              # file-like keys
+              game.properties: |
+                {{- toYaml . | nindent 4 }}
+            ---
+            apiVersion: v1
+            kind: ConfigMap
+            metadata:
+              name: game-demo-2
+              namespace: default
+            data:
+              # property-like keys; each key maps to a simple value
+              player_initial_lives: "3"
+              ui_properties_file_name: "user-interface.properties"
+            
+              # file-like keys
+              game.properties: |
+                {{- toYaml .Tenant.spec | nindent 4 }}
