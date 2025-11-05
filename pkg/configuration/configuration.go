@@ -7,8 +7,9 @@ import (
 	"context"
 	"regexp"
 
-	capsuleapi "github.com/projectcapsule/capsule/pkg/api"
 	"k8s.io/client-go/rest"
+
+	"github.com/projectcapsule/capsule/pkg/api"
 )
 
 const (
@@ -29,8 +30,9 @@ type Configuration interface {
 	UserNames() []string
 	UserGroups() []string
 	IgnoreUserWithGroups() []string
-	ForbiddenUserNodeLabels() *capsuleapi.ForbiddenListSpec
-	ForbiddenUserNodeAnnotations() *capsuleapi.ForbiddenListSpec
-	ServiceAccountClientProperties() *capsuleapi.ServiceAccountClient
+	ForbiddenUserNodeLabels() *api.ForbiddenListSpec
+	ForbiddenUserNodeAnnotations() *api.ForbiddenListSpec
+	ServiceAccountClientProperties() *api.ServiceAccountClient
+	ReplicationIgnoreRules() []api.IgnoreRule
 	ServiceAccountClient(context.Context) (*rest.Config, error)
 }

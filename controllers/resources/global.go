@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"strings"
 
 	"github.com/go-logr/logr"
 	gherrors "github.com/pkg/errors"
@@ -46,7 +47,8 @@ type globalResourceController struct {
 func (r *globalResourceController) SetupWithManager(mgr ctrl.Manager) error {
 	r.client = mgr.GetClient()
 	r.processor = Processor{
-		client: mgr.GetClient(),
+		client:        mgr.GetClient(),
+		configuration: r.configuration,
 	}
 
 	return ctrl.NewControllerManagedBy(mgr).
@@ -243,6 +245,8 @@ func (r *globalResourceController) reconcileNormal(
 			} else {
 				err = errors.Join(err, fmt.Errorf("processed item %q parse failed: %w", item, parseErr))
 			}
+
+			log.Info("PARSED", "OR", or)
 		}
 
 		log.Info("STATUS", "STATUS", tntResource.Status)
@@ -252,6 +256,8 @@ func (r *globalResourceController) reconcileNormal(
 	var itemErrors error
 
 	for index, resource := range tntResource.Spec.Resources {
+		owner := "cluster/" + strings.ToLower(tntResource.Name)
+
 		tenantLabel, labelErr := capsulev1beta2.GetTypeLabel(&capsulev1beta2.Tenant{})
 		if labelErr != nil {
 			log.Error(labelErr, "expected label for selection")
@@ -262,7 +268,7 @@ func (r *globalResourceController) reconcileNormal(
 		for _, tnt := range tntList.Items {
 			tntSet.Insert(tnt.GetName())
 
-			items, sectionErr := r.processor.HandleSectionPreflight(ctx, c, tnt, true, tenantLabel, index, resource, tntResource.Spec.Scope)
+			items, sectionErr := r.processor.HandleSectionPreflight(ctx, c, tnt, true, tenantLabel, index, resource, owner, tntResource.Spec.Scope)
 			if sectionErr != nil {
 				// Upon a process error storing the last error occurred and continuing to iterate,
 				// avoid to block the whole processing.
@@ -273,6 +279,10 @@ func (r *globalResourceController) reconcileNormal(
 
 			processedItems.Insert(items...)
 		}
+	}
+
+	if itemErrors != nil {
+		err = itemErrors
 	}
 
 	if err != nil {

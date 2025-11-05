@@ -8,6 +8,8 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"strconv"
+	"strings"
 
 	"github.com/go-logr/logr"
 	gherrors "github.com/pkg/errors"
@@ -47,7 +49,8 @@ type namespacedResourceController struct {
 func (r *namespacedResourceController) SetupWithManager(mgr ctrl.Manager) error {
 	r.client = mgr.GetClient()
 	r.processor = Processor{
-		client: mgr.GetClient(),
+		client:        mgr.GetClient(),
+		configuration: r.configuration,
 	}
 
 	return ctrl.NewControllerManagedBy(mgr).
@@ -216,7 +219,9 @@ func (r *namespacedResourceController) reconcileNormal(
 	var itemErrors error
 
 	for index, resource := range tntResource.Spec.Resources {
-		items, sectionErr := r.processor.HandleSectionPreflight(ctx, c, tl.Items[0], false, tenantLabel, index, resource, api.ResourceScopeNamespace)
+		owner := "cluster/" + strings.ToLower(tntResource.Name) + "/" + strconv.Itoa(index)
+
+		items, sectionErr := r.processor.HandleSectionPreflight(ctx, c, tl.Items[0], false, tenantLabel, index, resource, owner, api.ResourceScopeNamespace)
 		if sectionErr != nil {
 			// Upon a process error storing the last error occurred and continuing to iterate,
 			// avoid to block the whole processing.

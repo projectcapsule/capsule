@@ -176,6 +176,12 @@ spec:
                             type: object
                           type: array
                       type: object
+                    force:
+                      default: false
+                      description: Force indicates that in case of conflicts with
+                        server-side apply, the client should acquire ownership of
+                        the conflicting field.
+                      type: boolean
                     generators:
                       description: Generators for advanced use cases
                       items:

@@ -6,29 +6,25 @@ package resources
 import (
 	"context"
 	"errors"
-	"fmt"
 	"strconv"
-	"strings"
-	"sync"
 
-	"github.com/valyala/fasttemplate"
 	corev1 "k8s.io/api/core/v1"
 	apierr "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/configuration"
 	"github.com/projectcapsule/capsule/pkg/meta"
 	tpl "github.com/projectcapsule/capsule/pkg/template"
+	"github.com/projectcapsule/capsule/pkg/utils"
 )
 
 const (
@@ -36,7 +32,8 @@ const (
 )
 
 type Processor struct {
-	client client.Client
+	client        client.Client
+	configuration configuration.Configuration
 }
 
 func prepareAdditionalMetadata(m map[string]string) map[string]string {
@@ -124,6 +121,7 @@ func (r *Processor) HandleSectionPreflight(
 	tenantLabel string,
 	resourceIndex int,
 	spec capsulev1beta2.ResourceSpec,
+	fieldOwner string,
 	scope api.ResourceScope,
 ) (processed []string, err error) {
 	log := ctrllog.FromContext(ctx)
@@ -132,12 +130,12 @@ func (r *Processor) HandleSectionPreflight(
 
 	switch scope {
 	case api.ResourceScopeTenant:
+		tplContext, _ = spec.Context.GatherContext(ctx, c, nil, "")
+		tplContext["Tenant"] = tnt
 
-		tplContext, _ := spec.Context.GatherContext(ctx, c, nil, "")
+		owner := fieldOwner + "/" + tnt.Name + "/" + strconv.Itoa(resourceIndex)
 
-		log.Info("got context", "context", tplContext)
-
-		return r.handleSection(
+		return r.reconcile(
 			ctx,
 			c,
 			tnt,
@@ -145,6 +143,7 @@ func (r *Processor) HandleSectionPreflight(
 			tenantLabel,
 			resourceIndex,
 			spec,
+			owner,
 			capsulev1beta2.ObjectReferenceStatusOwner{
 				Name:  tnt.GetName(),
 				UID:   tnt.GetUID(),
@@ -190,7 +189,9 @@ func (r *Processor) HandleSectionPreflight(
 
 			//spec.Context.GatherContext(ctx, c, nil, ns.GetName())
 
-			p, perr := r.handleSection(
+			owner := fieldOwner + "/" + tnt.Name + "/" + ns.Name + "/" + strconv.Itoa(resourceIndex)
+
+			p, perr := r.reconcile(
 				ctx,
 				c,
 				tnt,
@@ -198,6 +199,7 @@ func (r *Processor) HandleSectionPreflight(
 				tenantLabel,
 				resourceIndex,
 				spec,
+				owner,
 				capsulev1beta2.ObjectReferenceStatusOwner{
 					Name:  ns.GetName(),
 					UID:   ns.GetUID(),
@@ -216,251 +218,68 @@ func (r *Processor) HandleSectionPreflight(
 	return
 }
 
-//nolint:gocognit
-func (r *Processor) handleSection(
+func (r *Processor) reconcile(
 	ctx context.Context,
 	c client.Client,
 	tnt capsulev1beta2.Tenant,
 	allowCrossNamespaceSelection bool,
 	tenantLabel string,
 	resourceIndex int,
-	spec capsulev1beta2.ResourceSpec,
+	resource capsulev1beta2.ResourceSpec,
+	fieldOwner string,
 	owner capsulev1beta2.ObjectReferenceStatusOwner,
 	ns *corev1.Namespace,
 	tmplContext tpl.ReferenceContext,
 ) ([]string, error) {
 	log := ctrllog.FromContext(ctx)
 
-	// Generating additional metadata
-	objAnnotations, objLabels := map[string]string{}, map[string]string{}
-
-	if spec.AdditionalMetadata != nil {
-		objAnnotations = prepareAdditionalMetadata(spec.AdditionalMetadata.Annotations)
-		objLabels = prepareAdditionalMetadata(spec.AdditionalMetadata.Labels)
+	// Collect Resources to apply
+	objects, err := r.handleResources(
+		ctx,
+		c,
+		tnt,
+		allowCrossNamespaceSelection,
+		tenantLabel,
+		resourceIndex,
+		resource,
+		owner,
+		ns,
+		tmplContext,
+	)
+	if err != nil {
+		log.Error(err, "some error happend", "here", "here")
+		return nil, err
 	}
-
-	objAnnotations[tenantLabel] = tnt.GetName()
-
-	objLabels[meta.ResourcesLabel] = fmt.Sprintf("%d", resourceIndex)
-	objLabels[tenantLabel] = tnt.GetName()
-	// processed will contain the sets of resources replicated, both for the raw and the Namespaced ones:
-	// these are required to perform a final pruning once the replication has been occurred.
-	processed := sets.NewString()
-
-	tntNamespaces := sets.NewString(tnt.Status.Namespaces...)
 
 	var syncErr error
 
-	codecFactory := serializer.NewCodecFactory(r.client.Scheme())
+	processed := sets.NewString()
 
-	for nsIndex, item := range spec.NamespacedItems {
-		keysAndValues := []any{"index", nsIndex, "namespace", item.Namespace, "tenant", tnt.GetName()}
-		// A TenantResource is created by a TenantOwner, and potentially, they could point to a resource in a non-owned
-		// Namespace: this must be blocked by checking it this is the case.
-		if !allowCrossNamespaceSelection && !tntNamespaces.Has(item.Namespace) {
-			log.Info("skipping processing of namespacedItem, referring a Namespace that is not part of the given Tenant", keysAndValues...)
+	log.V(4).Info("processing items", "items", len(objects))
 
-			continue
-		}
-		// Namespaced Items are relying on selecting resources, rather than specifying a specific name:
-		// creating it to get used by the client List action.
-		objSelector := item.Selector
-
-		itemSelector, selectorErr := metav1.LabelSelectorAsSelector(&objSelector)
-		if selectorErr != nil {
-			log.Error(selectorErr, "cannot create Selector for namespacedItem", keysAndValues...)
-
-			syncErr = errors.Join(syncErr, selectorErr)
-
-			continue
-		}
-
-		objs := unstructured.UnstructuredList{}
-		objs.SetGroupVersionKind(schema.FromAPIVersionAndKind(item.APIVersion, fmt.Sprintf("%sList", item.Kind)))
-
-		if clientErr := c.List(ctx, &objs, client.InNamespace(item.Namespace), client.MatchingLabelsSelector{Selector: itemSelector}); clientErr != nil {
-			log.Error(clientErr, "cannot retrieve object for namespacedItem", keysAndValues...)
-
-			syncErr = errors.Join(syncErr, clientErr)
-
-			continue
-		}
-
-		var wg sync.WaitGroup
-
-		errorsChan := make(chan error, len(objs.Items))
-		// processedRaw is used to avoid concurrent map writes during iteration of namespaced items:
-		// the objects will be then added to processed variable if the resulting string is not empty,
-		// meaning it has been processed correctly.
-		processedRaw := make([]string, len(objs.Items))
-		// Iterating over all the retrieved objects from the resource spec to get replicated in all the selected Namespaces:
-		// in case of error during the create or update function, this will be appended to the list of errors.
-		for i, o := range objs.Items {
-			obj := o
-			obj.SetNamespace(ns.Name)
-			obj.SetOwnerReferences(nil)
-
-			wg.Add(1)
-
-			go func(index int, obj unstructured.Unstructured) {
-				defer wg.Done()
-
-				kv := keysAndValues
-				kv = append(kv, "resource", fmt.Sprintf("%s/%s", obj.GetNamespace(), obj.GetNamespace()))
-
-				replicatedItem := &capsulev1beta2.ObjectReferenceStatus{}
-				replicatedItem.Name = obj.GetName()
-				replicatedItem.Kind = obj.GetKind()
-				replicatedItem.APIVersion = obj.GetAPIVersion()
-				replicatedItem.Type = meta.ReadyCondition
-				replicatedItem.Owner = owner
-
-				if ns != nil {
-					replicatedItem.Namespace = ns.Name
-				}
-
-				if opErr := r.createOrPatch(ctx, c, &obj, objLabels, objAnnotations, spec.Ignore); opErr != nil {
-					log.Error(opErr, "unable to sync namespacedItems", kv...)
-					errorsChan <- opErr
-
-					replicatedItem.Status = metav1.ConditionFalse
-					replicatedItem.Message = opErr.Error()
-				} else {
-					replicatedItem.Status = metav1.ConditionTrue
-				}
-
-				log.Info("resource has been replicated", kv...)
-
-				processedRaw[index] = replicatedItem.String()
-			}(i, obj)
-		}
-
-		wg.Wait()
-		close(errorsChan)
-
-		for err := range errorsChan {
-			if err != nil {
-				syncErr = errors.Join(syncErr, err)
-			}
-		}
-
-		for _, p := range processedRaw {
-			if p == "" {
-				continue
-			}
-
-			processed.Insert(p)
-		}
-	}
-
-	for rawIndex, item := range spec.RawItems {
-		template := string(item.Raw)
-
-		t := fasttemplate.New(template, "{{ ", " }}")
-
-		tContext := map[string]interface{}{
-			"tenant.name": tnt.Name,
-		}
-		if ns != nil {
-			tContext["namespace"] = ns.Name
-		}
-
-		tmplString := t.ExecuteString(tContext)
-
-		obj, keysAndValues := unstructured.Unstructured{}, []interface{}{"index", rawIndex}
-
-		if _, _, decodeErr := codecFactory.UniversalDeserializer().Decode([]byte(tmplString), nil, &obj); decodeErr != nil {
-			log.Error(decodeErr, "unable to deserialize rawItem", keysAndValues...)
-
-			syncErr = errors.Join(syncErr, decodeErr)
-
-			continue
-		}
-
-		if ns != nil {
-			obj.SetNamespace(ns.Name)
-		}
-
+	// Apply objects and return processed
+	for i, obj := range objects {
 		replicatedItem := &capsulev1beta2.ObjectReferenceStatus{}
 		replicatedItem.Name = obj.GetName()
 		replicatedItem.Kind = obj.GetKind()
 		replicatedItem.APIVersion = obj.GetAPIVersion()
-		replicatedItem.Type = meta.ReadyCondition
 		replicatedItem.Owner = owner
+		replicatedItem.Type = meta.ReadyCondition
 
 		if ns != nil {
-			replicatedItem.Namespace = ns.Name
+			replicatedItem.Namespace = ns.GetName()
 		}
 
-		if rawErr := r.createOrPatch(ctx, c, &obj, objLabels, objAnnotations, spec.Ignore); rawErr != nil {
-			log.Info("unable to sync rawItem", keysAndValues...)
+		fieldOwnerw := fieldOwner + "/" + tnt.Name + "/" + strconv.Itoa(i)
 
+		if err := r.createOrPatch(ctx, c, obj, resource, fieldOwnerw); err != nil {
 			replicatedItem.Status = metav1.ConditionFalse
-			replicatedItem.Message = rawErr.Error()
-
-			// In case of error processing an item in one of any selected Namespaces, storing it to report it lately
-			// to the upper call to ensure a partial sync that will be fixed by a subsequent reconciliation.
-			syncErr = errors.Join(syncErr, rawErr)
+			replicatedItem.Message = err.Error()
 		} else {
-			log.Info("resource has been replicated", keysAndValues...)
-
 			replicatedItem.Status = metav1.ConditionTrue
 		}
 
 		processed.Insert(replicatedItem.String())
-	}
-
-	// Run Generators
-	for generatorIndex, item := range spec.Generators {
-		keysAndValues := []interface{}{"index", generatorIndex}
-
-		log.V(5).Info("reconciling generator", keysAndValues...)
-
-		objs, err := renderGeneratorItem(item, tmplContext)
-		if err != nil {
-			syncErr = errors.Join(syncErr, err)
-
-			log.Error(err, "unable to deserialize rawItem", keysAndValues...)
-
-			continue
-
-		}
-
-		log.V(5).Info("obtained objects", "items", len(objs))
-
-		for _, obj := range objs {
-			if ns != nil {
-				obj.SetNamespace(ns.Name)
-			}
-
-			replicatedItem := &capsulev1beta2.ObjectReferenceStatus{}
-			replicatedItem.Name = obj.GetName()
-			replicatedItem.Kind = obj.GetKind()
-			replicatedItem.APIVersion = obj.GetAPIVersion()
-			replicatedItem.Type = meta.ReadyCondition
-			replicatedItem.Owner = owner
-
-			if ns != nil {
-				replicatedItem.Namespace = ns.Name
-			}
-
-			if rawErr := r.createOrPatch(ctx, c, &obj, objLabels, objAnnotations, spec.Ignore); rawErr != nil {
-				log.Info("unable to sync rawItem", keysAndValues...)
-
-				replicatedItem.Status = metav1.ConditionFalse
-				replicatedItem.Message = rawErr.Error()
-
-				// In case of error processing an item in one of any selected Namespaces, storing it to report it lately
-				// to the upper call to ensure a partial sync that will be fixed by a subsequent reconciliation.
-				syncErr = errors.Join(syncErr, rawErr)
-			} else {
-				log.Info("resource has been replicated", keysAndValues...)
-
-				replicatedItem.Status = metav1.ConditionTrue
-			}
-
-			processed.Insert(replicatedItem.String())
-		}
 	}
 
 	return processed.List(), syncErr
@@ -470,8 +289,8 @@ func (r *Processor) createOrPatch(
 	ctx context.Context,
 	c client.Client,
 	obj *unstructured.Unstructured,
-	labels, annotations map[string]string,
-	ignore []api.IgnoreRule,
+	resource capsulev1beta2.ResourceSpec,
+	fieldOwner string,
 ) error {
 	actual := &unstructured.Unstructured{}
 	actual.SetGroupVersionKind(obj.GroupVersionKind())
@@ -479,216 +298,19 @@ func (r *Processor) createOrPatch(
 	actual.SetName(obj.GetName())
 
 	// Fetch current to have a stable mutate func input
-	_ = c.Get(ctx, client.ObjectKeyFromObject(actual), actual) // ignore notfound here
+	_ = c.Get(ctx, client.ObjectKeyFromObject(actual), actual)
 
-	igPaths := matchIgnorePaths(ignore, obj.GetKind(), obj.GetAPIVersion())
+	if resource.AdditionalMetadata != nil {
+		obj.SetAnnotations(resource.AdditionalMetadata.Annotations)
+		obj.SetLabels(resource.AdditionalMetadata.Labels)
+	}
 
-	_, err := controllerutil.CreateOrPatch(ctx, c, actual, func() error {
-		// Keep copies
-		live := actual.DeepCopy() // current from cluster (may be empty)
-		desired := obj.DeepCopy() // what we want
-
-		// Merge controller-managed labels/annotations into desired
-		mergeLabelsAnnotations(desired, labels, annotations)
-
-		// Preserve ignored JSON pointers: copy live -> desired at those paths
-		if len(igPaths) > 0 {
-			preserveIgnoredPaths(desired.Object, live.Object, igPaths)
-		}
-
-		// Replace actual content with the prepared desired content
-		uid := actual.GetUID()
-		rv := actual.GetResourceVersion()
-
-		actual.Object = desired.Object
-		actual.SetUID(uid)
-		actual.SetResourceVersion(rv)
-
-		return nil
-	})
-	return err
+	return utils.CreateOrPatch(
+		ctx,
+		c,
+		obj,
+		fieldOwner,
+		append(resource.Ignore, r.configuration.ReplicationIgnoreRules()...),
+		*resource.Force,
+	)
 }
-
-func mergeLabelsAnnotations(u *unstructured.Unstructured, ls, as map[string]string) {
-	lbl := u.GetLabels()
-	if lbl == nil {
-		lbl = map[string]string{}
-	}
-	for k, v := range ls {
-		lbl[k] = v
-	}
-	u.SetLabels(lbl)
-
-	ann := u.GetAnnotations()
-	if ann == nil {
-		ann = map[string]string{}
-	}
-	for k, v := range as {
-		ann[k] = v
-	}
-	u.SetAnnotations(ann)
-}
-
-// jsonPointerGet returns (value, true) if JSON pointer p exists.
-func jsonPointerGet(obj map[string]any, p string) (any, bool) {
-	if p == "" || p == "/" {
-		return obj, true
-	}
-	parts := strings.Split(p, "/")[1:]
-	cur := any(obj)
-	for _, raw := range parts {
-		key := strings.ReplaceAll(strings.ReplaceAll(raw, "~1", "/"), "~0", "~")
-		switch node := cur.(type) {
-		case map[string]any:
-			next, ok := node[key]
-			if !ok {
-				return nil, false
-			}
-			cur = next
-		case []any:
-			idx, err := strconv.Atoi(key)
-			if err != nil || idx < 0 || idx >= len(node) {
-				return nil, false
-			}
-			cur = node[idx]
-		default:
-			return nil, false
-		}
-	}
-	return cur, true
-}
-
-func jsonPointerSet(obj map[string]any, p string, val any) error {
-	if p == "" || p == "/" {
-		return fmt.Errorf("cannot set root with pointer")
-	}
-	parts := strings.Split(p, "/")[1:]
-	cur := obj
-	for i, raw := range parts {
-		key := strings.ReplaceAll(strings.ReplaceAll(raw, "~1", "/"), "~0", "~")
-		last := i == len(parts)-1
-		if last {
-			cur[key] = val
-			return nil
-		}
-		nxt, ok := cur[key]
-		if !ok {
-			n := map[string]any{}
-			cur[key] = n
-			cur = n
-			continue
-		}
-		switch m := nxt.(type) {
-		case map[string]any:
-			cur = m
-		default:
-			n := map[string]any{}
-			cur[key] = n
-			cur = n
-		}
-	}
-	return nil
-}
-
-func jsonPointerDelete(obj map[string]any, p string) error {
-	if p == "" || p == "/" {
-		return fmt.Errorf("cannot delete root with pointer")
-	}
-	parts := strings.Split(p, "/")[1:]
-	cur := obj
-	for i, raw := range parts {
-		key := strings.ReplaceAll(strings.ReplaceAll(raw, "~1", "/"), "~0", "~")
-		last := i == len(parts)-1
-		if last {
-			delete(cur, key)
-			return nil
-		}
-		nxt, ok := cur[key]
-		if !ok {
-			return nil
-		}
-		m, ok := nxt.(map[string]any)
-		if !ok {
-			return nil
-		}
-		cur = m
-	}
-	return nil
-}
-
-func preserveIgnoredPaths(desired, live map[string]any, ptrs []string) {
-	for _, p := range ptrs {
-		if v, ok := jsonPointerGet(live, p); ok {
-			_ = jsonPointerSet(desired, p, v)
-		} else {
-			_ = jsonPointerDelete(desired, p)
-		}
-	}
-}
-
-func matchIgnorePaths(rules []api.IgnoreRule, kind, apiver string) []string {
-	var out []string
-
-	for _, r := range rules {
-		if r.Target.Kind != "" && r.Target.Kind != kind {
-			continue
-		}
-		if r.Target.Version != "" && r.Target.Version != apiver {
-			continue
-		}
-		out = append(out, r.Paths...)
-	}
-	return out
-}
-
-// createOrUpdate replicates the provided unstructured object to all the provided Namespaces:
-// this function mimics the CreateOrUpdate, by retrieving the object to understand if it must be created or updated,
-// along adding the additional metadata, if required.
-//func (r *Processor) createOrUpdate(
-//	ctx context.Context,
-//	c client.Client,
-//	obj *unstructured.Unstructured,
-//	labels map[string]string,
-//	annotations map[string]string,
-//) (err error) {
-//	actual, desired := &unstructured.Unstructured{}, obj.DeepCopy()
-//
-//	actual.SetAPIVersion(desired.GetAPIVersion())
-//	actual.SetKind(desired.GetKind())
-//	actual.SetNamespace(desired.GetNamespace())
-//	actual.SetName(desired.GetName())
-//
-//	_, err = controllerutil.CreateOrUpdate(ctx, c, actual, func() error {
-//		UID := actual.GetUID()
-//		rv := actual.GetResourceVersion()
-//		actual.SetUnstructuredContent(desired.Object)
-//
-//		combinedLabels := obj.GetLabels()
-//		if combinedLabels == nil {
-//			combinedLabels = make(map[string]string)
-//		}
-//
-//		for key, value := range labels {
-//			combinedLabels[key] = value
-//		}
-//
-//		actual.SetLabels(combinedLabels)
-//
-//		combinedAnnotations := obj.GetAnnotations()
-//		if combinedAnnotations == nil {
-//			combinedAnnotations = make(map[string]string)
-//		}
-//
-//		for key, value := range annotations {
-//			combinedAnnotations[key] = value
-//		}
-//
-//		actual.SetAnnotations(combinedAnnotations)
-//		actual.SetResourceVersion(rv)
-//		actual.SetUID(UID)
-//
-//		return nil
-//	})
-//
-//	return err
-//}

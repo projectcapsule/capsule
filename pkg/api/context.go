@@ -120,11 +120,12 @@ type ResourceReference struct {
 	Optional bool `json:"optional,omitempty"`
 }
 
+// Load Resources for the template context from the cluster
 func (t ResourceReference) LoadResources(
 	ctx context.Context,
 	kubeClient client.Client,
 	namespace string,
-) ([]unstructured.Unstructured, error) {
+) ([]*unstructured.Unstructured, error) {
 	if namespace != "" {
 		t.Namespace = namespace
 	}
@@ -144,7 +145,7 @@ func (t ResourceReference) LoadResources(
 			return nil, fmt.Errorf("failed to get %s/%s: %w", t.Kind, t.Name, err)
 		}
 
-		return []unstructured.Unstructured{*obj}, nil
+		return []*unstructured.Unstructured{obj}, nil
 	}
 
 	list := &unstructured.UnstructuredList{}
@@ -172,11 +173,10 @@ func (t ResourceReference) LoadResources(
 	}
 
 	// Prepare a result map. For example, mapping resource name to its UID.
-	results := []unstructured.Unstructured{}
+	results := []*unstructured.Unstructured{}
 	for _, item := range list.Items {
-		results = append(results, item)
+		results = append(results, &item)
 	}
 
 	return results, nil
-
 }

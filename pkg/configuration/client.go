@@ -17,7 +17,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	capsuleapi "github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api"
 )
 
 // capsuleConfiguration is the Capsule Configuration retrieval mode
@@ -114,7 +114,7 @@ func (c *capsuleConfiguration) IgnoreUserWithGroups() []string {
 	return c.retrievalFn().Spec.IgnoreUserWithGroups
 }
 
-func (c *capsuleConfiguration) ForbiddenUserNodeLabels() *capsuleapi.ForbiddenListSpec {
+func (c *capsuleConfiguration) ForbiddenUserNodeLabels() *api.ForbiddenListSpec {
 	if c.retrievalFn().Spec.NodeMetadata == nil {
 		return nil
 	}
@@ -122,7 +122,7 @@ func (c *capsuleConfiguration) ForbiddenUserNodeLabels() *capsuleapi.ForbiddenLi
 	return &c.retrievalFn().Spec.NodeMetadata.ForbiddenLabels
 }
 
-func (c *capsuleConfiguration) ForbiddenUserNodeAnnotations() *capsuleapi.ForbiddenListSpec {
+func (c *capsuleConfiguration) ForbiddenUserNodeAnnotations() *api.ForbiddenListSpec {
 	if c.retrievalFn().Spec.NodeMetadata == nil {
 		return nil
 	}
@@ -130,12 +130,17 @@ func (c *capsuleConfiguration) ForbiddenUserNodeAnnotations() *capsuleapi.Forbid
 	return &c.retrievalFn().Spec.NodeMetadata.ForbiddenAnnotations
 }
 
-func (c *capsuleConfiguration) ServiceAccountClientProperties() *capsuleapi.ServiceAccountClient {
+func (c *capsuleConfiguration) ServiceAccountClientProperties() *api.ServiceAccountClient {
 	if c.retrievalFn().Spec.ServiceAccountClient == nil {
 		return nil
 	}
 
 	return c.retrievalFn().Spec.ServiceAccountClient
+}
+
+func (c *capsuleConfiguration) ReplicationIgnoreRules() []api.IgnoreRule {
+
+	return c.retrievalFn().Spec.Replications.Ignore
 }
 
 func (c *capsuleConfiguration) ServiceAccountClient(ctx context.Context) (client *rest.Config, err error) {

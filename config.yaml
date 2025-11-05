@@ -1,0 +1,30 @@
+apiVersion: capsule.clastix.io/v1beta2
+kind: CapsuleConfiguration
+metadata:
+  annotations:
+    meta.helm.sh/release-name: capsule
+    meta.helm.sh/release-namespace: capsule-system
+  creationTimestamp: "2025-10-29T12:14:59Z"
+  generation: 2
+  labels:
+    app.kubernetes.io/instance: capsule
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: capsule
+    app.kubernetes.io/version: 0.0.0
+    helm.sh/chart: capsule-0.0.0
+  name: default
+  resourceVersion: "1185"
+  uid: 22c5cb09-3f3c-4faa-b183-18fb12d02e55
+spec:
+  replications:
+    serviceAccountClient:
+      endpoint: https://proxy.capsule-system.svc:9001
+
+      globalDefaultServiceAccount: "capsule"
+      globalDefaultServiceAccountNamespace: capsule-system
+      
+      tenantDefaultServiceAccount: default
+    ignore:
+      - paths:
+          - "/metadata/labels/company.com~1some-label"
+    

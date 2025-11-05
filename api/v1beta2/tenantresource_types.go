@@ -92,6 +92,10 @@ type ObjectReferenceStatus struct {
 	// Name of the referent.
 	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
 	Name string `json:"name"`
+
+	// The resource index this item was created from
+	ResourceIndex string `json:"index"`
+
 	// Tenant of the referent.
 	Owner ObjectReferenceStatusOwner `json:"owner,omitempty"`
 
@@ -139,14 +143,14 @@ type ObjectReference struct {
 
 func (in *ObjectReferenceStatus) String() string {
 	return fmt.Sprintf(
-		"Kind=%s,APIVersion=%s,Namespace=%s,Name=%s,Message=%s,Type=%s,Owner=%s,UID=%s,Scope=%s",
-		in.Kind, in.APIVersion, in.Namespace, in.Name, in.Message, in.Type, in.Owner.Name, in.Owner.UID, in.Owner.Scope)
+		"Kind=%s,APIVersion=%s,Namespace=%s,Name=%s,Message=%s,Type=%s,Status=%s,Owner=%s,UID=%s,Scope=%s,Index=%s",
+		in.Kind, in.APIVersion, in.Namespace, in.Name, in.Message, in.Type, in.Status, in.Owner.Name, in.Owner.UID, in.Owner.Scope, in.ResourceIndex)
 }
 
 func (in *ObjectReferenceStatus) ParseFromString(value string) error {
 	rawParts := strings.Split(value, ",")
 
-	if len(rawParts) != 9 {
+	if len(rawParts) != 11 {
 		return fmt.Errorf("unexpected raw parts")
 	}
 
@@ -185,6 +189,8 @@ func (in *ObjectReferenceStatus) ParseFromString(value string) error {
 			in.Owner.UID = k8stypes.UID(v)
 		case "Scope":
 			in.Owner.Scope = api.ResourceScope(v)
+		case "Index":
+			in.ResourceIndex = v
 
 		default:
 			return fmt.Errorf("unrecognized marker: %s", k)

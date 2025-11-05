@@ -1,54 +1,47 @@
 apiVersion: capsule.clastix.io/v1beta2
-kind: GlobalTenantReplication
+kind: GlobalTenantResource
 metadata:
   name: global-scope
 spec:
+  # New
   scope: Tenant
+
+
   resyncPeriod: 5s
-  ignore:
-    - paths: ["/metadata/labels/capsule.managed-by"]
-      target:
-        kind: Deployment
+
+  # New
+  #serviceaccount: 
+  #  name: capsule
+  #  namespace: capsule-system
+
   resources:
-  - ignore:
-      - paths: ["/metadata/labels/capsule.managed-by"]
-        target:
-          kind: Deployment
-          name: {{.tenant.name}}-controller-manager
-    context:
+    - #additionalMetadata:
+      #  labels:
+      #    "replicated-by": "capsule" 
+    
+      ignore:
+        - paths: ["/data/ui_properties_file_name"]
+          target:
+            kind: ConfigMap
+
+      context:
         resources:
-        - index: "sec"
-          apiVersion: v1
-          kind: Secret
-          name: capsule-tls
-          namespace: capsule-system
+          - index: "sec"
+            apiVersion: v1
+            kind: Secret
+            name: capsule-tls
+            namespace: capsule-system
+      force: false
+
       generators:
         - template: |
             ---
             apiVersion: v1
             kind: ConfigMap
             metadata:
-              name: game-demo
+              name: test-demo
               namespace: default
             data:
-              # property-like keys; each key maps to a simple value
-              player_initial_lives: "3"
-              ui_properties_file_name: "user-interface.properties"
-            
-              # file-like keys
-              game.properties: |
-                {{- toYaml . | nindent 4 }}
-            ---
-            apiVersion: v1
-            kind: ConfigMap
-            metadata:
-              name: game-demo-2
-              namespace: default
-            data:
-              # property-like keys; each key maps to a simple value
-              player_initial_lives: "3"
-              ui_properties_file_name: "user-interface.properties"
-            
-              # file-like keys
-              game.properties: |
-                {{- toYaml .Tenant.spec | nindent 4 }}
+              {{ .Tenant.ObjectMeta.Name }}.conf: |
+                1
+

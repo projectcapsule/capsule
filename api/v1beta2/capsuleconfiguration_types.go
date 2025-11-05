@@ -48,10 +48,10 @@ type CapsuleConfigurationSpec struct {
 }
 
 type ReplicationsSpec struct {
-	// Define labels which are not reconciled for Global/TenantResources
-	IgnoreLabels []string `json:"ignoreLabels"`
-	// Define Annotations which are not reconciled for Global/TenantResources
-	IgnoreAnnotations []string `json:"ignoreAnnotations"`
+	// Ignore contains a list of rules for specifying which changes to ignore
+	// during diffing.
+	// +optional
+	Ignore []api.IgnoreRule `json:"ignore,omitempty"`
 }
 
 type NodeMetadata struct {

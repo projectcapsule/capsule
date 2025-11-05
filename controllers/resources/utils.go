@@ -5,10 +5,13 @@ package resources
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"html/template"
 	"io"
+	"strings"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	kyaml "k8s.io/apimachinery/pkg/util/yaml"
 
@@ -151,6 +154,16 @@ func setGlobalTenantDefaultResourceServiceAccount(
 	return true
 }
 
+func maskSensitiveErrData(err error) error {
+	if apierrors.IsInvalid(err) {
+		// The last part of the error message is the reason for the error.
+		if i := strings.LastIndex(err.Error(), `:`); i != -1 {
+			err = errors.New(strings.TrimSpace(err.Error()[i+1:]))
+		}
+	}
+	return err
+}
+
 // Field templating for the ArgoCD project properties. Needs to unmarshal in json, because of the json tags from argocd.
 func loadTenantToContext(
 	tenant *capsulev1beta2.Tenant,
@@ -165,7 +178,7 @@ func loadTenantToContext(
 func renderGeneratorItem(
 	generator capsulev1beta2.GeneratorItemSpec,
 	context tpl.ReferenceContext,
-) (items []unstructured.Unstructured, err error) {
+) (items []*unstructured.Unstructured, err error) {
 	tmpl, err := template.New("tpl").Option("missingkey=" + generator.MissingKey.String()).Funcs(tpl.ExtraFuncMap()).Parse(generator.Template)
 	if err != nil {
 		return
@@ -178,7 +191,7 @@ func renderGeneratorItem(
 
 	dec := kyaml.NewYAMLOrJSONDecoder(bytes.NewReader(rendered.Bytes()), 4096)
 
-	var out []unstructured.Unstructured
+	var out []*unstructured.Unstructured
 	for {
 		var obj map[string]any
 		if err := dec.Decode(&obj); err != nil {
@@ -192,7 +205,7 @@ func renderGeneratorItem(
 			continue
 		}
 
-		u := unstructured.Unstructured{Object: obj}
+		u := &unstructured.Unstructured{Object: obj}
 		if u.GetAPIVersion() == "" && u.GetKind() == "" {
 			continue
 		}

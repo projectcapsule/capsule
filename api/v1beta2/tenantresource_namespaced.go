@@ -49,6 +49,14 @@ type ResourceSpec struct {
 	// the declared items for the replication
 	// +optional
 	Context *api.TemplateContext `json:"context,omitempty"`
+	// Automatically adds a label to all resources being patched by a tenantresource blocking any interactions from tenant users via admission webhook
+	// The label added is called
+	// +kubebuilder:default=true
+	Managed *bool `json:"managed,omitempty"`
+	// Force indicates that in case of conflicts with server-side apply, the client should acquire ownership of the conflicting field.
+	// You may create collisions with this.
+	// +kubebuilder:default=false
+	Force *bool `json:"force,omitempty"`
 	// Ignore contains a list of rules for specifying which changes to ignore
 	// during diffing.
 	// +optional
