@@ -7,13 +7,13 @@ spec:
   scope: Tenant
   #force: false
   resyncPeriod: 5s
-  #serviceaccount: 
+  #serviceaccount:
   #  name: capsule
   #  namespace: capsule-system
   resources:
     - #additionalMetadata:
       #  labels:
-      #    "replicated-by": "capsule" 
+      #    "replicated-by": "capsule"
       context:
         resources:
           - index: "sec"
@@ -34,8 +34,8 @@ spec:
 
     - #additionalMetadata:
       #  labels:
-      #    "replicated-by": "capsule" 
-    
+      #    "replicated-by": "capsule"
+
       context:
         resources:
           - index: "sec"
@@ -54,5 +54,3 @@ spec:
             data:
               {{ .Tenant.ObjectMeta.Name }}.conf: |
                 1
-
-
