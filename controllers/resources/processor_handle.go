@@ -7,63 +7,63 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 
 	"github.com/valyala/fasttemplate"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	"github.com/projectcapsule/capsule/pkg/meta"
+	"github.com/projectcapsule/capsule/pkg/api"
 	tpl "github.com/projectcapsule/capsule/pkg/template"
 )
+
+func (r *Processor) handleResources(
+	ctx context.Context,
+	c client.Client,
+	tnt capsulev1beta2.Tenant,
+	resourceIndex string,
+	spec capsulev1beta2.ResourceSpec,
+	ns *corev1.Namespace,
+	tmplContext tpl.ReferenceContext,
+	acc api.Accumulator,
+) (err error) {
+	return r.collectResources(ctx, c, tnt, resourceIndex, spec, ns, tmplContext, acc)
+
+}
 
 // With this function we are attempting to collect all the unstructured items
 // No Interacting is done with the kubernetes regarding applying etc.
 //
 //nolint:gocognit
-func (r *Processor) handleResources(
+func (r *Processor) collectResources(
 	ctx context.Context,
 	c client.Client,
 	tnt capsulev1beta2.Tenant,
-	allowCrossNamespaceSelection bool,
-	tenantLabel string,
-	resourceIndex int,
+	resourceIndex string,
 	spec capsulev1beta2.ResourceSpec,
-	owner capsulev1beta2.ObjectReferenceStatusOwner,
 	ns *corev1.Namespace,
 	tmplContext tpl.ReferenceContext,
-) (processed []*unstructured.Unstructured, err error) {
-	//log := ctrllog.FromContext(ctx)
-
-	// Generating additional metadata
-	objAnnotations, objLabels := map[string]string{}, map[string]string{}
-
-	if spec.AdditionalMetadata != nil {
-		objAnnotations = prepareAdditionalMetadata(spec.AdditionalMetadata.Annotations)
-		objLabels = prepareAdditionalMetadata(spec.AdditionalMetadata.Labels)
-	}
-
-	objAnnotations[tenantLabel] = tnt.GetName()
-
-	objLabels[meta.ResourcesLabel] = fmt.Sprintf("%d", resourceIndex)
-	objLabels[tenantLabel] = tnt.GetName()
-
+	acc api.Accumulator,
+) (err error) {
 	var syncErr error
-
-	codecFactory := serializer.NewCodecFactory(r.client.Scheme())
 
 	// Run Raw Items
 	for rawIndex, item := range spec.RawItems {
-		p, rawError := r.handleRawItem(ctx, c, codecFactory, rawIndex, item, ns, tnt)
+		p, rawError := r.handleRawItem(ctx, c, rawIndex, item, ns, tnt)
 		if rawError != nil {
 			syncErr = errors.Join(syncErr, rawError)
 
 			continue
 		}
 
-		processed = append(processed, p)
+		rawError = r.addToAccumulation(tnt, spec, acc, p, resourceIndex+"/gen-"+strconv.Itoa(rawIndex))
+		if rawError != nil {
+			syncErr = errors.Join(syncErr, rawError)
+
+			continue
+		}
 	}
 
 	// Run Generators
@@ -75,10 +75,36 @@ func (r *Processor) handleResources(
 			continue
 		}
 
-		processed = append(processed, p...)
+		for i, o := range p {
+			genError = r.addToAccumulation(tnt, spec, acc, o, resourceIndex+"/gen-"+strconv.Itoa(generatorIndex)+"-"+strconv.Itoa(i))
+			if genError != nil {
+				syncErr = errors.Join(syncErr, genError)
+
+				continue
+			}
+
+		}
 	}
 
-	return processed, syncErr
+	return syncErr
+}
+
+// Add an item to the accumulator
+// Mainly handles conflicts
+func (r *Processor) addToAccumulation(
+	tnt capsulev1beta2.Tenant,
+	spec capsulev1beta2.ResourceSpec,
+	acc api.Accumulator,
+	obj *unstructured.Unstructured,
+	index string,
+) (err error) {
+	r.handleResource(spec, obj)
+
+	key := api.NewResourceID(obj, tnt.GetName(), index)
+
+	acc[key] = obj
+
+	return nil
 }
 
 // Handles a single generator item
@@ -109,7 +135,6 @@ func (r *Processor) handleGeneratorItem(
 func (r *Processor) handleRawItem(
 	ctx context.Context,
 	c client.Client,
-	codecFactory serializer.CodecFactory,
 	index int,
 	item capsulev1beta2.RawExtension,
 	ns *corev1.Namespace,
@@ -129,7 +154,7 @@ func (r *Processor) handleRawItem(
 	tmplString := t.ExecuteString(tContext)
 
 	obj := &unstructured.Unstructured{}
-	if _, _, decodeErr := codecFactory.UniversalDeserializer().Decode([]byte(tmplString), nil, obj); decodeErr != nil {
+	if _, _, decodeErr := r.factory.UniversalDeserializer().Decode([]byte(tmplString), nil, obj); decodeErr != nil {
 		return nil, fmt.Errorf("error rendering raw: %w", err, "hello")
 	}
 
@@ -138,4 +163,14 @@ func (r *Processor) handleRawItem(
 	}
 
 	return obj, nil
+}
+
+func (r *Processor) handleResource(
+	spec capsulev1beta2.ResourceSpec,
+	obj *unstructured.Unstructured,
+) {
+	if spec.AdditionalMetadata != nil {
+		obj.SetAnnotations(spec.AdditionalMetadata.Annotations)
+		obj.SetLabels(spec.AdditionalMetadata.Labels)
+	}
 }

@@ -15,6 +15,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/indexer/tenantresource"
 	capsulewebhook "github.com/projectcapsule/capsule/pkg/webhook"
 	"github.com/projectcapsule/capsule/pkg/webhook/utils"
@@ -57,12 +58,13 @@ func (h *objectsValidatingHandler) handler(ctx context.Context, clt client.Clien
 	}
 	// Checking if the object is managed by a TenantResource, local or global
 	ors := capsulev1beta2.ObjectReferenceStatus{
-		ObjectReferenceAbstract: capsulev1beta2.ObjectReferenceAbstract{
-			Kind:       req.Kind.Kind,
-			Namespace:  req.Namespace,
-			APIVersion: req.Kind.Version,
+		ResourceID: api.ResourceID{
+			Kind:      req.Kind.Kind,
+			Namespace: req.Namespace,
+			Name:      req.Name,
+			Group:     req.Kind.Group,
+			Version:   req.Kind.Version,
 		},
-		Name: req.Name,
 	}
 
 	global, local := &capsulev1beta2.GlobalTenantResourceList{}, &capsulev1beta2.TenantResourceList{}

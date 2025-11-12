@@ -5,19 +5,16 @@ package resources
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"reflect"
-	"strconv"
-	"strings"
 
 	"github.com/go-logr/logr"
 	gherrors "github.com/pkg/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/cluster-api/util/patch"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -31,7 +28,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/configuration"
 	"github.com/projectcapsule/capsule/pkg/meta"
 	"github.com/projectcapsule/capsule/pkg/metrics"
@@ -48,9 +44,18 @@ type namespacedResourceController struct {
 
 func (r *namespacedResourceController) SetupWithManager(mgr ctrl.Manager) error {
 	r.client = mgr.GetClient()
+
+	tenantLabel, labelErr := capsulev1beta2.GetTypeLabel(&capsulev1beta2.Tenant{})
+	if labelErr != nil {
+		return labelErr
+	}
+
 	r.processor = Processor{
-		client:        mgr.GetClient(),
-		configuration: r.configuration,
+		client:                       mgr.GetClient(),
+		factory:                      serializer.NewCodecFactory(r.client.Scheme()),
+		configuration:                r.configuration,
+		allowCrossNamespaceSelection: false,
+		tenantLabel:                  tenantLabel,
 	}
 
 	return ctrl.NewControllerManagedBy(mgr).
@@ -190,74 +195,67 @@ func (r *namespacedResourceController) reconcileNormal(
 		return reconcile.Result{}, nil
 	}
 
-	// A TenantResource is made of several Resource sections, each one with specific options:
-	// the Status can be updated only in case of no errors across all of them to guarantee a valid and coherent status.
-	processedItems := sets.NewString()
-
-	tenantLabel, labelErr := capsulev1beta2.GetTypeLabel(&capsulev1beta2.Tenant{})
-	if labelErr != nil {
-		log.Error(labelErr, "expected label for selection")
-
-		return reconcile.Result{}, labelErr
-	}
-
-	// Always post the processed items, as they allow users to track errors
-	defer func() {
-		tntResource.Status.ProcessedItems = make([]capsulev1beta2.ObjectReferenceStatus, 0, len(processedItems))
-
-		for _, item := range processedItems.List() {
-			or := capsulev1beta2.ObjectReferenceStatus{}
-			if err := or.ParseFromString(item); err == nil {
-				tntResource.Status.ProcessedItems = append(tntResource.Status.ProcessedItems, or)
-			} else {
-				log.Error(err, "failed to parse processed item", "item", item)
-			}
-		}
-	}()
+	//// A TenantResource is made of several Resource sections, each one with specific options:
+	//// the Status can be updated only in case of no errors across all of them to guarantee a valid and coherent status.
+	//processedItems := sets.NewString()
+	//
+	//// Always post the processed items, as they allow users to track errors
+	//defer func() {
+	//	tntResource.Status.ProcessedItems = make([]capsulev1beta2.ObjectReferenceStatus, 0, len(processedItems))
+	//
+	//	for _, item := range processedItems.List() {
+	//		or := capsulev1beta2.ObjectReferenceStatus{}
+	//		if err := or.ParseFromString(item); err == nil {
+	//			tntResource.Status.ProcessedItems = append(tntResource.Status.ProcessedItems, or)
+	//		} else {
+	//			log.Error(err, "failed to parse processed item", "item", item)
+	//		}
+	//	}
+	//}()
 
 	// new empty error
-	var itemErrors error
-
-	for index, resource := range tntResource.Spec.Resources {
-		owner := "cluster/" + strings.ToLower(tntResource.Name) + "/" + strconv.Itoa(index)
-
-		items, sectionErr := r.processor.HandleSectionPreflight(ctx, c, tl.Items[0], false, tenantLabel, index, resource, owner, api.ResourceScopeNamespace)
-		if sectionErr != nil {
-			// Upon a process error storing the last error occurred and continuing to iterate,
-			// avoid to block the whole processing.
-			itemErrors = errors.Join(itemErrors, sectionErr)
-		}
-
-		log.Info("replicate items", "amount", len(items))
-
-		processedItems.Insert(items...)
-	}
-
-	if itemErrors != nil {
-		return reconcile.Result{}, nil
-	}
-
-	failedItems, err := r.processor.HandlePruning(
-		ctx,
-		c,
-		tntResource.Status.ProcessedItems.AsSet(),
-		sets.Set[string](processedItems),
-	)
-	if len(failedItems) > 0 {
-		tntResource.Status.ProcessedItems = make([]capsulev1beta2.ObjectReferenceStatus, 0, len(failedItems))
-
-		for _, item := range failedItems {
-			if or := (capsulev1beta2.ObjectReferenceStatus{}); or.ParseFromString(item) == nil {
-				tntResource.Status.ProcessedItems = append(tntResource.Status.ProcessedItems, or)
-			}
-		}
-	}
-
-	if err != nil {
-		return reconcile.Result{}, gherrors.Wrap(err, "failed to prune resources")
-	}
-
-	log.Info("processing completed")
+	//var itemErrors error
+	//
+	//acc := make(Accumulator)
+	//
+	//for index, resource := range tntResource.Spec.Resources {
+	//	owner := "cluster/" + strings.ToLower(tntResource.Name) + "/" + strconv.Itoa(index)
+	//
+	//	sectionErr := r.processor.HandleSectionPreflight(ctx, c, resource, strconv.Itoa(index), tl.Items[0], owner, api.ResourceScopeNamespace, acc)
+	//	if sectionErr != nil {
+	//		// Upon a process error storing the last error occurred and continuing to iterate,
+	//		// avoid to block the whole processing.
+	//		itemErrors = errors.Join(itemErrors, sectionErr)
+	//	}
+	//
+	//	log.Info("replicate items", "acc", len(acc), "items", acc)
+	//}
+	//
+	//if itemErrors != nil {
+	//	return reconcile.Result{}, nil
+	//}
+	//
+	//failedItems, err := r.processor.HandlePruning(
+	//	ctx,
+	//	c,
+	//	tntResource.Status.ProcessedItems.AsSet(),
+	//	sets.Set[string](processedItems),
+	//)
+	//if len(failedItems) > 0 {
+	//	tntResource.Status.ProcessedItems = make([]capsulev1beta2.ObjectReferenceStatus, 0, len(failedItems))
+	//
+	//	for _, item := range failedItems {
+	//		if or := (capsulev1beta2.ObjectReferenceStatus{}); or.ParseFromString(item) == nil {
+	//			tntResource.Status.ProcessedItems = append(tntResource.Status.ProcessedItems, or)
+	//		}
+	//	}
+	//}
+	//
+	//if err != nil {
+	//	return reconcile.Result{}, gherrors.Wrap(err, "failed to prune resources")
+	//}
+	//
+	//log.Info("processing completed")
 
 	return reconcile.Result{Requeue: true, RequeueAfter: tntResource.Spec.ResyncPeriod.Duration}, nil
 }
@@ -267,34 +265,34 @@ func (r *namespacedResourceController) reconcileDelete(
 	c client.Client,
 	tntResource *capsulev1beta2.TenantResource,
 ) (reconcile.Result, error) {
-	log := ctrllog.FromContext(ctx)
+	//log := ctrllog.FromContext(ctx)
+	//
+	//if *tntResource.Spec.PruningOnDelete {
+	//	failedItems, err := r.processor.HandlePruning(ctx, c, tntResource.Status.ProcessedItems.AsSet(), nil)
+	//	if len(failedItems) > 0 {
+	//		log.V(5).Info("failed items", "amount", len(failedItems), "items", failedItems)
+	//
+	//		tntResource.Status.ProcessedItems = make([]capsulev1beta2.ObjectReferenceStatus, 0, len(failedItems))
+	//
+	//		for _, item := range failedItems {
+	//			if or := (capsulev1beta2.ObjectReferenceStatus{}); or.ParseFromString(item) == nil {
+	//				tntResource.Status.ProcessedItems = append(tntResource.Status.ProcessedItems, or)
+	//			}
+	//		}
+	//
+	//		log.V(5).Info("new status", "status", tntResource.Status.ProcessedItems)
+	//
+	//	}
+	//
+	//	if len(failedItems) > 0 || err != nil {
+	//		return reconcile.Result{}, gherrors.Wrap(err, "failed to prune resources on delete")
+	//	}
+	//
+	//}
 
-	if *tntResource.Spec.PruningOnDelete {
-		failedItems, err := r.processor.HandlePruning(ctx, c, tntResource.Status.ProcessedItems.AsSet(), nil)
-		if len(failedItems) > 0 {
-			log.V(5).Info("failed items", "amount", len(failedItems), "items", failedItems)
-
-			tntResource.Status.ProcessedItems = make([]capsulev1beta2.ObjectReferenceStatus, 0, len(failedItems))
-
-			for _, item := range failedItems {
-				if or := (capsulev1beta2.ObjectReferenceStatus{}); or.ParseFromString(item) == nil {
-					tntResource.Status.ProcessedItems = append(tntResource.Status.ProcessedItems, or)
-				}
-			}
-
-			log.V(5).Info("new status", "status", tntResource.Status.ProcessedItems)
-
-		}
-
-		if len(failedItems) > 0 || err != nil {
-			return reconcile.Result{}, gherrors.Wrap(err, "failed to prune resources on delete")
-		}
-
-	}
-
-	controllerutil.RemoveFinalizer(tntResource, finalizer)
-
-	log.Info("processing completed")
+	//controllerutil.RemoveFinalizer(tntResource, finalizer)
+	//
+	//log.Info("processing completed")
 
 	return reconcile.Result{Requeue: true, RequeueAfter: tntResource.Spec.ResyncPeriod.Duration}, nil
 }

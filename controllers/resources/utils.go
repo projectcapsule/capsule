@@ -164,6 +164,14 @@ func maskSensitiveErrData(err error) error {
 	return err
 }
 
+func getFieldOwner(name string, namespace string, id api.ResourceID) string {
+	if namespace == "" {
+		namespace = "cluster"
+	}
+
+	return "capsule/" + namespace + "/" + name + "/" + id.Tenant + "/" + id.Namespace + "/" + id.Kind + "/" + id.Name + "/" + id.Index
+}
+
 // Field templating for the ArgoCD project properties. Needs to unmarshal in json, because of the json tags from argocd.
 func loadTenantToContext(
 	tenant *capsulev1beta2.Tenant,

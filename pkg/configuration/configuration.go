@@ -33,6 +33,5 @@ type Configuration interface {
 	ForbiddenUserNodeLabels() *api.ForbiddenListSpec
 	ForbiddenUserNodeAnnotations() *api.ForbiddenListSpec
 	ServiceAccountClientProperties() *api.ServiceAccountClient
-	ReplicationIgnoreRules() []api.IgnoreRule
 	ServiceAccountClient(context.Context) (*rest.Config, error)
 }

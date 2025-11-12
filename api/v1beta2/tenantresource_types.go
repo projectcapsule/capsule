@@ -5,13 +5,20 @@ package v1beta2
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/projectcapsule/capsule/pkg/api"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8stypes "k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/sets"
 )
+
+type ResourceOptions struct {
+	// Template contains any amount of yaml which is applied to Kubernetes.
+	// This can be a single resource or multiple resources
+	Template string `json:"template,omitempty"`
+	// Missing Key Option for templating
+	// +kubebuilder:default=default
+	MissingKey MissingKeyOption `json:"missingKey,omitempty"`
+}
 
 // +kubebuilder:validation:Enum=default;zero;error
 type MissingKeyOption string
@@ -64,17 +71,7 @@ func (p *ProcessedItems) RemoveItem(item ObjectReferenceStatus) {
 }
 
 func (p *ProcessedItems) isEqual(a, b ObjectReferenceStatus) bool {
-	return a.Owner == b.Owner && a.APIVersion == b.APIVersion && a.Kind == b.Kind && a.Name == b.Name && a.Namespace == b.Namespace
-}
-
-func (p *ProcessedItems) AsSet() sets.Set[string] {
-	set := sets.New[string]()
-
-	for _, i := range *p {
-		set.Insert(i.String())
-	}
-
-	return set
+	return a.ResourceID == b.ResourceID
 }
 
 type ObjectReferenceAbstract struct {
@@ -89,18 +86,12 @@ type ObjectReferenceAbstract struct {
 }
 
 type ObjectReferenceStatus struct {
-	// Name of the referent.
-	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-	Name string `json:"name"`
-
-	// The resource index this item was created from
-	ResourceIndex string `json:"index"`
-
-	// Tenant of the referent.
-	Owner ObjectReferenceStatusOwner `json:"owner,omitempty"`
-
-	ObjectReferenceAbstract        `json:",inline"`
+	api.ResourceID                 `json:",inline"`
 	ObjectReferenceStatusCondition `json:",inline"`
+}
+
+func (in *ObjectReferenceStatus) String() string {
+	return fmt.Sprintf("Kind=%s,Group=%s,APIVersion=%s,Namespace=%s,Name=%s", in.Kind, in.Group, in.Version, in.Namespace, in.Name)
 }
 
 type ObjectReferenceStatusOwner struct {
@@ -139,63 +130,4 @@ type ObjectReference struct {
 
 	// Label selector used to select the given resources in the given Namespace.
 	Selector metav1.LabelSelector `json:"selector"`
-}
-
-func (in *ObjectReferenceStatus) String() string {
-	return fmt.Sprintf(
-		"Kind=%s,APIVersion=%s,Namespace=%s,Name=%s,Message=%s,Type=%s,Status=%s,Owner=%s,UID=%s,Scope=%s,Index=%s",
-		in.Kind, in.APIVersion, in.Namespace, in.Name, in.Message, in.Type, in.Status, in.Owner.Name, in.Owner.UID, in.Owner.Scope, in.ResourceIndex)
-}
-
-func (in *ObjectReferenceStatus) ParseFromString(value string) error {
-	rawParts := strings.Split(value, ",")
-
-	if len(rawParts) != 11 {
-		return fmt.Errorf("unexpected raw parts")
-	}
-
-	for _, i := range rawParts {
-		parts := strings.Split(i, "=")
-
-		if len(parts) != 2 {
-			return fmt.Errorf("unrecognized separator")
-		}
-
-		k, v := parts[0], parts[1]
-
-		switch k {
-		case "Kind":
-			in.Kind = v
-		case "APIVersion":
-			in.APIVersion = v
-		case "Namespace":
-			in.Namespace = v
-		case "Name":
-			in.Name = v
-		case "Status":
-			switch metav1.ConditionStatus(v) {
-			case metav1.ConditionTrue, metav1.ConditionFalse, metav1.ConditionUnknown:
-				in.Status = metav1.ConditionStatus(v)
-			default:
-				return fmt.Errorf("invalid status value: %q", v)
-			}
-		case "Message":
-			in.Message = v
-		case "Type":
-			in.Type = v
-		case "Owner":
-			in.Owner.Name = v
-		case "UID":
-			in.Owner.UID = k8stypes.UID(v)
-		case "Scope":
-			in.Owner.Scope = api.ResourceScope(v)
-		case "Index":
-			in.ResourceIndex = v
-
-		default:
-			return fmt.Errorf("unrecognized marker: %s", k)
-		}
-	}
-
-	return nil
 }

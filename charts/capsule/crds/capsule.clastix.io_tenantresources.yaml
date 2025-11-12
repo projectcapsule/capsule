@@ -55,11 +55,23 @@ spec:
           spec:
             description: TenantResourceSpec defines the desired state of TenantResource.
             properties:
+              adopt:
+                default: false
+                description: Enabling this allows TenanResources to interact with
+                  objects which were not created by a TenantResource. In this case
+                  on prune no deletion of the entire object is made.
+                type: boolean
               cordoned:
                 default: false
                 description: |-
                   When cordoning a replication it will no longer execute any applies or deletions (paused).
                   This is useful for maintenances
+                type: boolean
+              force:
+                default: false
+                description: |-
+                  Force indicates that in case of conflicts with server-side apply, the client should acquire ownership of the conflicting field.
+                  You may create collisions with this.
                 type: boolean
               pruningOnDelete:
                 default: true
@@ -178,12 +190,6 @@ spec:
                             type: object
                           type: array
                       type: object
-                    force:
-                      default: false
-                      description: Force indicates that in case of conflicts with
-                        server-side apply, the client should acquire ownership of
-                        the conflicting field.
-                      type: boolean
                     generators:
                       description: Generators for advanced use cases
                       items:
@@ -203,68 +209,12 @@ spec:
                             type: string
                         type: object
                       type: array
-                    ignore:
+                    managed:
+                      default: true
                       description: |-
-                        Ignore contains a list of rules for specifying which changes to ignore
-                        during diffing.
-                      items:
-                        properties:
-                          paths:
-                            description: |-
-                              Paths is a list of JSON Pointer (RFC 6901) paths to be excluded from
-                              consideration in a Kubernetes object.
-                            items:
-                              type: string
-                            type: array
-                          target:
-                            description: |-
-                              Target is a selector for specifying Kubernetes objects to which this
-                              rule applies.
-                              If Target is not set, the Paths will be ignored for all Kubernetes
-                              objects within the manifest of the Helm release.
-                            properties:
-                              annotationSelector:
-                                description: |-
-                                  AnnotationSelector is a string that follows the label selection expression
-                                  https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#api
-                                  It matches with the resource annotations.
-                                type: string
-                              group:
-                                description: |-
-                                  Group is the API group to select resources from.
-                                  Together with Version and Kind it is capable of unambiguously identifying and/or selecting resources.
-                                  https://github.com/kubernetes/community/blob/master/contributors/design-proposals/api-machinery/api-group.md
-                                type: string
-                              kind:
-                                description: |-
-                                  Kind of the API Group to select resources from.
-                                  Together with Group and Version it is capable of unambiguously
-                                  identifying and/or selecting resources.
-                                  https://github.com/kubernetes/community/blob/master/contributors/design-proposals/api-machinery/api-group.md
-                                type: string
-                              labelSelector:
-                                description: |-
-                                  LabelSelector is a string that follows the label selection expression
-                                  https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#api
-                                  It matches with the resource labels.
-                                type: string
-                              name:
-                                description: Name to match resources with.
-                                type: string
-                              namespace:
-                                description: Namespace to select resources from.
-                                type: string
-                              version:
-                                description: |-
-                                  Version of the API Group to select resources from.
-                                  Together with Group and Kind it is capable of unambiguously identifying and/or selecting resources.
-                                  https://github.com/kubernetes/community/blob/master/contributors/design-proposals/api-machinery/api-group.md
-                                type: string
-                            type: object
-                        required:
-                        - paths
-                        type: object
-                      type: array
+                        Automatically adds a label to all resources being patched by a tenantresource blocking any interactions from tenant users via admission webhook
+                        The label added is called
+                      type: boolean
                     namespaceSelector:
                       description: |-
                         Defines the Namespace selector to select the Tenant Namespaces on which the resources must be propagated.
@@ -482,13 +432,11 @@ spec:
                 description: List of the replicated resources for the given TenantResource.
                 items:
                   properties:
-                    apiVersion:
-                      description: API version of the referent.
+                    group:
+                      type: string
+                    index:
                       type: string
                     kind:
-                      description: |-
-                        Kind of the referent.
-                        More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
                       type: string
                     message:
                       description: |-
@@ -497,31 +445,9 @@ spec:
                       maxLength: 32768
                       type: string
                     name:
-                      description: |-
-                        Name of the referent.
-                        More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                       type: string
                     namespace:
-                      description: |-
-                        Namespace of the referent.
-                        More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
                       type: string
-                    owner:
-                      description: Tenant of the referent.
-                      properties:
-                        name:
-                          description: Name of the owning object.
-                          type: string
-                        scope:
-                          description: Scope of the owning object.
-                          enum:
-                          - Namespace
-                          - Tenant
-                          type: string
-                        uid:
-                          description: UID of the owning object.
-                          type: string
-                      type: object
                     status:
                       description: status of the condition, one of True, False, Unknown.
                       enum:
@@ -529,20 +455,26 @@ spec:
                       - "False"
                       - Unknown
                       type: string
+                    tenant:
+                      type: string
                     type:
                       description: type of condition in CamelCase or in foo.example.com/CamelCase.
                       maxLength: 316
                       pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
                       type: string
+                    version:
+                      type: string
                   required:
-                  - kind
-                  - name
                   - status
                   - type
                   type: object
                 type: array
+              size:
+                description: How items are processed by this instance
+                type: integer
             required:
             - processedItems
+            - size
             type: object
         type: object
     served: true

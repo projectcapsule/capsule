@@ -22,8 +22,9 @@ spec:
 
       globalDefaultServiceAccount: "capsule"
       globalDefaultServiceAccountNamespace: capsule-system
-      
+
       tenantDefaultServiceAccount: default
+      
     ignore:
       - paths:
           - "/metadata/labels/company.com~1some-label"

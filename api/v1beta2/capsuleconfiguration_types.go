@@ -41,17 +41,8 @@ type CapsuleConfigurationSpec struct {
 	// when not using an already provided CA and certificate, or when these are managed externally with Vault, or cert-manager.
 	// +kubebuilder:default=true
 	EnableTLSReconciler bool `json:"enableTLSReconciler"` //nolint:tagliatelle
-	// Omit Replications
-	Replications ReplicationsSpec `json:"replications,omitempty"`
 	// Define Kubernetes-Client Configurations
 	ServiceAccountClient *api.ServiceAccountClient `json:"serviceAccountClient,omitempty"`
-}
-
-type ReplicationsSpec struct {
-	// Ignore contains a list of rules for specifying which changes to ignore
-	// during diffing.
-	// +optional
-	Ignore []api.IgnoreRule `json:"ignore,omitempty"`
 }
 
 type NodeMetadata struct {

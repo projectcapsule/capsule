@@ -138,11 +138,6 @@ func (c *capsuleConfiguration) ServiceAccountClientProperties() *api.ServiceAcco
 	return c.retrievalFn().Spec.ServiceAccountClient
 }
 
-func (c *capsuleConfiguration) ReplicationIgnoreRules() []api.IgnoreRule {
-
-	return c.retrievalFn().Spec.Replications.Ignore
-}
-
 func (c *capsuleConfiguration) ServiceAccountClient(ctx context.Context) (client *rest.Config, err error) {
 	props := c.ServiceAccountClientProperties()
 

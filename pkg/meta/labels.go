@@ -23,6 +23,10 @@ const (
 
 	ManagedByCapsuleLabel    = "capsule.clastix.io/managed-by"
 	NewManagedByCapsuleLabel = "projectcapsule.dev/managed-by"
+
+	CreatedByCapsuleLabel = "projectcapsule.dev/created-by"
+
+	ResourceCapsuleLabel = "capsule.clastix.io/resources"
 )
 
 func FreezeLabelTriggers(obj client.Object) bool {

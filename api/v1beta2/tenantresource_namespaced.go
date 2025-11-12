@@ -30,6 +30,13 @@ type TenantResourceSpec struct {
 	// Local ServiceAccount which will perform all the actions defined in the TenantResource
 	// You must provide permissions accordingly to that ServiceAccount
 	ServiceAccount *api.ServiceAccountReference `json:"serviceAccount,omitempty"`
+	// Enabling this allows TenanResources to interact with objects which were not created by a TenantResource. In this case on prune no deletion of the entire object is made.
+	// +kubebuilder:default=false
+	Adopt *bool `json:"adopt,omitempty"`
+	// Force indicates that in case of conflicts with server-side apply, the client should acquire ownership of the conflicting field.
+	// You may create collisions with this.
+	// +kubebuilder:default=false
+	Force *bool `json:"force,omitempty"`
 }
 
 type ResourceSpec struct {
@@ -53,14 +60,6 @@ type ResourceSpec struct {
 	// The label added is called
 	// +kubebuilder:default=true
 	Managed *bool `json:"managed,omitempty"`
-	// Force indicates that in case of conflicts with server-side apply, the client should acquire ownership of the conflicting field.
-	// You may create collisions with this.
-	// +kubebuilder:default=false
-	Force *bool `json:"force,omitempty"`
-	// Ignore contains a list of rules for specifying which changes to ignore
-	// during diffing.
-	// +optional
-	Ignore []api.IgnoreRule `json:"ignore,omitempty"`
 }
 
 // +kubebuilder:validation:XEmbeddedResource
@@ -71,6 +70,8 @@ type RawExtension struct {
 
 // TenantResourceStatus defines the observed state of TenantResource.
 type TenantResourceStatus struct {
+	// How items are processed by this instance
+	Size uint `json:"size"`
 	// List of the replicated resources for the given TenantResource.
 	ProcessedItems ProcessedItems `json:"processedItems"`
 	// Conditions of the TenantResource.
