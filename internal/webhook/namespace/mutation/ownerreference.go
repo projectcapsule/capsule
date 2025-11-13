@@ -13,6 +13,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
@@ -154,7 +155,7 @@ func namespaceIsOwned(
 			continue
 		}
 
-		ok, err := users.IsTenantOwner(ctx, c, tnt, req.UserInfo, cfg.AllowServiceAccountPromotion())
+		ok, err := users.IsTenantOwner(ctx, c, cfg, tnt, req.UserInfo)
 		if err != nil {
 			return false, err
 		}
@@ -175,6 +176,10 @@ func HandleCreateOwnerReference(
 	decoder admission.Decoder,
 	recorder record.EventRecorder,
 ) *admission.Response {
+	log := log.FromContext(ctx)
+
+	log.Info("HITTING")
+
 	ns := &corev1.Namespace{}
 	if err := decoder.Decode(req, ns); err != nil {
 		response := admission.Errored(http.StatusBadRequest, err)
@@ -193,6 +198,8 @@ func HandleCreateOwnerReference(
 	if errResponse != nil {
 		return errResponse
 	}
+
+	log.Info("TENANT", "tnt", tnt)
 
 	if tnt == nil {
 		response := admission.Denied("Unable to assign namespace to tenant. Please use " + ln + " label when creating a namespace")

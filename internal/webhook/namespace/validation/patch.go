@@ -23,11 +23,11 @@ import (
 )
 
 type patchHandler struct {
-	configuration configuration.Configuration
+	cfg configuration.Configuration
 }
 
 func PatchHandler(configuration configuration.Configuration) capsulewebhook.Handler {
-	return &patchHandler{configuration: configuration}
+	return &patchHandler{cfg: configuration}
 }
 
 func (r *patchHandler) OnCreate(client.Client, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
@@ -70,7 +70,7 @@ func (r *patchHandler) OnUpdate(c client.Client, decoder admission.Decoder, reco
 				return &response
 			}
 
-			ok, err := users.IsTenantOwner(ctx, c, tnt, req.UserInfo, r.configuration.AllowServiceAccountPromotion())
+			ok, err := users.IsTenantOwner(ctx, c, r.cfg, tnt, req.UserInfo)
 			if err != nil {
 				response := admission.Errored(http.StatusBadRequest, err)
 

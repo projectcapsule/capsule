@@ -12,7 +12,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	capsulewebhook "github.com/projectcapsule/capsule/internal/webhook"
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
 	"github.com/projectcapsule/capsule/pkg/utils/tenant"
@@ -42,13 +41,13 @@ func (r *quotaHandler) OnUpdate(client client.Client, decoder admission.Decoder,
 	}
 }
 
-func (r *quotaHandler) handle(client client.Client, decoder admission.Decoder, recorder record.EventRecorder, ctx context.Context, req admission.Request) *admission.Response {
+func (r *quotaHandler) handle(c client.Client, decoder admission.Decoder, recorder record.EventRecorder, ctx context.Context, req admission.Request) *admission.Response {
 	ns := &corev1.Namespace{}
 	if err := decoder.Decode(req, ns); err != nil {
 		return utils.ErroredResponse(err)
 	}
 
-	tnt, err := tenant.GetTenantByOwnerreferences(ctx, client, ns.OwnerReferences)
+	tnt, err := tenant.GetTenantByOwnerreferences(ctx, c, ns.OwnerReferences)
 	if err != nil {
 		return utils.ErroredResponse(err)
 	}
@@ -57,16 +56,6 @@ func (r *quotaHandler) handle(client client.Client, decoder admission.Decoder, r
 		return nil
 	}
 
-	return HandleIsFull(ctx, client, ns, tnt, recorder)
-}
-
-func HandleIsFull(
-	ctx context.Context,
-	c client.Client,
-	ns *corev1.Namespace,
-	tnt *capsulev1beta2.Tenant,
-	recorder record.EventRecorder,
-) *admission.Response {
 	if tnt.IsFull() {
 		// Checking if the Namespace already exists.
 		// If this is the case, no need to return the quota exceeded error:

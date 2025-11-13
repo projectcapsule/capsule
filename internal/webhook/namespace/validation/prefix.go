@@ -13,7 +13,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	capsulewebhook "github.com/projectcapsule/capsule/internal/webhook"
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
 	"github.com/projectcapsule/capsule/pkg/configuration"
@@ -45,15 +44,30 @@ func (r *prefixHandler) OnCreate(clt client.Client, decoder admission.Decoder, r
 		if tnt == nil {
 			return nil
 		}
+		if exp, _ := r.cfg.ProtectedNamespaceRegexp(); exp != nil {
+			if matched := exp.MatchString(ns.GetName()); matched {
+				response := admission.Denied(fmt.Sprintf("Creating namespaces with name matching %s regexp is not allowed; please, reach out to the system administrators", exp.String()))
 
-		return HandlePrefix(
-			ctx,
-			clt,
-			r.cfg,
-			ns,
-			tnt,
-			recorder,
-		)
+				return &response
+			}
+		}
+
+		if r.cfg.ForceTenantPrefix() {
+
+			if tnt.Spec.ForceTenantPrefix != nil && !*tnt.Spec.ForceTenantPrefix {
+				return nil
+			}
+
+			if e := fmt.Sprintf("%s-%s", tnt.GetName(), ns.GetName()); !strings.HasPrefix(ns.GetName(), fmt.Sprintf("%s-", tnt.GetName())) {
+				recorder.Eventf(tnt, corev1.EventTypeWarning, "InvalidTenantPrefix", "Namespace %s does not match the expected prefix for the current Tenant", ns.GetName())
+
+				response := admission.Denied(fmt.Sprintf("The namespace doesn't match the tenant prefix, expected %s", e))
+
+				return &response
+			}
+		}
+
+		return nil
 	}
 }
 
@@ -67,38 +81,4 @@ func (r *prefixHandler) OnUpdate(client.Client, admission.Decoder, record.EventR
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
-}
-
-func HandlePrefix(
-	ctx context.Context,
-	c client.Client,
-	cfg configuration.Configuration,
-	ns *corev1.Namespace,
-	tnt *capsulev1beta2.Tenant,
-	recorder record.EventRecorder,
-) *admission.Response {
-	if exp, _ := cfg.ProtectedNamespaceRegexp(); exp != nil {
-		if matched := exp.MatchString(ns.GetName()); matched {
-			response := admission.Denied(fmt.Sprintf("Creating namespaces with name matching %s regexp is not allowed; please, reach out to the system administrators", exp.String()))
-
-			return &response
-		}
-	}
-
-	if cfg.ForceTenantPrefix() {
-
-		if tnt.Spec.ForceTenantPrefix != nil && !*tnt.Spec.ForceTenantPrefix {
-			return nil
-		}
-
-		if e := fmt.Sprintf("%s-%s", tnt.GetName(), ns.GetName()); !strings.HasPrefix(ns.GetName(), fmt.Sprintf("%s-", tnt.GetName())) {
-			recorder.Eventf(tnt, corev1.EventTypeWarning, "InvalidTenantPrefix", "Namespace %s does not match the expected prefix for the current Tenant", ns.GetName())
-
-			response := admission.Denied(fmt.Sprintf("The namespace doesn't match the tenant prefix, expected %s", e))
-
-			return &response
-		}
-	}
-
-	return nil
 }

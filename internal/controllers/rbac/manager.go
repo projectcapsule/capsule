@@ -24,6 +24,7 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/internal/controllers/utils"
+	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/configuration"
 	"github.com/projectcapsule/capsule/pkg/meta"
 )
@@ -111,6 +112,21 @@ func (r *Manager) EnsureClusterRoleBindingsProvisioner(ctx context.Context) erro
 		_, err := controllerutil.CreateOrUpdate(ctx, r.Client, crb, func() error {
 			crb.RoleRef = provisionerClusterRoleBinding.RoleRef
 			crb.Subjects = nil
+
+			for _, entity := range r.Configuration.Administrators() {
+				switch entity.Kind {
+				case api.UserOwner:
+					crb.Subjects = append(crb.Subjects, rbacv1.Subject{
+						Kind: rbacv1.UserKind,
+						Name: entity.Name,
+					})
+				case api.GroupOwner:
+					crb.Subjects = append(crb.Subjects, rbacv1.Subject{
+						Kind: rbacv1.GroupKind,
+						Name: entity.Name,
+					})
+				}
+			}
 
 			for _, group := range r.Configuration.UserGroups() {
 				crb.Subjects = append(crb.Subjects, rbacv1.Subject{

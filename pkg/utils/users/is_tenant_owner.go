@@ -13,21 +13,27 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/configuration"
 	"github.com/projectcapsule/capsule/pkg/meta"
 )
 
 func IsTenantOwner(
 	ctx context.Context,
 	c client.Client,
+	cfg configuration.Configuration,
 	tenant *capsulev1beta2.Tenant,
 	userInfo authenticationv1.UserInfo,
-	promotedServiceAccountOwners bool,
 ) (bool, error) {
 	if isOwner := tenant.Spec.Owners.IsOwner(userInfo.Username, userInfo.Groups); isOwner {
 		return true, nil
 	}
 
-	if promotedServiceAccountOwners {
+	// Administrators are always Owners
+	if cfg.Administrators().IsPresent(userInfo.Username, userInfo.Groups) {
+		return true, nil
+	}
+
+	if cfg.AllowServiceAccountPromotion() {
 		parts := strings.Split(userInfo.Username, ":")
 
 		if len(parts) != 4 {

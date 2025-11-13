@@ -9,18 +9,18 @@ import (
 
 // +kubebuilder:object:generate=true
 
-type OwnerListSpec []OwnerSpec
+type UserListSpec []UserSpec
 
-func (o OwnerListSpec) IsOwner(name string, groups []string) bool {
-	for _, owner := range o {
-		switch owner.Kind {
+func (u UserListSpec) IsPresent(name string, groups []string) bool {
+	for _, user := range u {
+		switch user.Kind {
 		case UserOwner, ServiceAccountOwner:
-			if name == owner.Name {
+			if name == user.Name {
 				return true
 			}
 		case GroupOwner:
 			for _, group := range groups {
-				if group == owner.Name {
+				if group == user.Name {
 					return true
 				}
 			}
@@ -31,8 +31,8 @@ func (o OwnerListSpec) IsOwner(name string, groups []string) bool {
 
 }
 
-func (o OwnerListSpec) FindOwner(name string, kind OwnerKind) (owner OwnerSpec) {
-	sort.Sort(ByKindAndName(o))
+func (o UserListSpec) FindUser(name string, kind OwnerKind) (owner UserSpec) {
+	sort.Sort(ByKindName(o))
 	i := sort.Search(len(o), func(i int) bool {
 		return o[i].Kind >= kind && o[i].Name >= name
 	})
@@ -44,13 +44,13 @@ func (o OwnerListSpec) FindOwner(name string, kind OwnerKind) (owner OwnerSpec) 
 	return owner
 }
 
-type ByKindAndName OwnerListSpec
+type ByKindName UserListSpec
 
-func (b ByKindAndName) Len() int {
+func (b ByKindName) Len() int {
 	return len(b)
 }
 
-func (b ByKindAndName) Less(i, j int) bool {
+func (b ByKindName) Less(i, j int) bool {
 	if b[i].Kind.String() != b[j].Kind.String() {
 		return b[i].Kind.String() < b[j].Kind.String()
 	}
@@ -58,6 +58,6 @@ func (b ByKindAndName) Less(i, j int) bool {
 	return b[i].Name < b[j].Name
 }
 
-func (b ByKindAndName) Swap(i, j int) {
+func (b ByKindName) Swap(i, j int) {
 	b[i], b[j] = b[j], b[i]
 }

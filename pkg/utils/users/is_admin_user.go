@@ -9,6 +9,6 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api"
 )
 
-func IsAdminUser(req admission.Request, administrators api.OwnerListSpec) bool {
-	return administrators.IsOwner(req.UserInfo.Username, req.UserInfo.Groups)
+func IsAdminUser(req admission.Request, administrators api.UserListSpec) bool {
+	return administrators.IsPresent(req.UserInfo.Username, req.UserInfo.Groups)
 }

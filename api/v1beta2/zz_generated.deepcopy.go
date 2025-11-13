@@ -120,10 +120,8 @@ func (in *CapsuleConfigurationSpec) DeepCopyInto(out *CapsuleConfigurationSpec) 
 	}
 	if in.Administrators != nil {
 		in, out := &in.Administrators, &out.Administrators
-		*out = make(api.OwnerListSpec, len(*in))
-		for i := range *in {
-			(*in)[i].DeepCopyInto(&(*out)[i])
-		}
+		*out = make(api.UserListSpec, len(*in))
+		copy(*out, *in)
 	}
 }
 

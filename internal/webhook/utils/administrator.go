@@ -6,16 +6,18 @@ package utils
 import (
 	"context"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	"github.com/projectcapsule/capsule/internal/webhook"
 	"github.com/projectcapsule/capsule/pkg/configuration"
+	"github.com/projectcapsule/capsule/pkg/utils/tenant"
 	"github.com/projectcapsule/capsule/pkg/utils/users"
 )
 
-func CapsuleAdministrator(configuration configuration.Configuration, handlers ...webhook.Handler) webhook.Handler {
+func InCapsuleGroupsOrAdministrator(configuration configuration.Configuration, handlers ...webhook.Handler) webhook.Handler {
 	return &adminHandler{
 		cfg:      configuration,
 		handlers: handlers,
@@ -28,14 +30,30 @@ type adminHandler struct {
 }
 
 //nolint:dupl
-func (h *adminHandler) OnCreate(client client.Client, decoder admission.Decoder, recorder record.EventRecorder) webhook.Func {
+func (h *adminHandler) OnCreate(c client.Client, decoder admission.Decoder, recorder record.EventRecorder) webhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		if !users.IsAdminUser(req, h.cfg.Administrators()) {
-			return nil
+		if !users.IsCapsuleUser(ctx, c, h.cfg, req.UserInfo.Username, req.UserInfo.Groups) {
+			if !users.IsAdminUser(req, h.cfg.Administrators()) {
+				return nil
+			}
+
+			ns := &corev1.Namespace{}
+			if err := decoder.DecodeRaw(req.Object, ns); err != nil {
+				return ErroredResponse(err)
+			}
+
+			tnt, err := tenant.GetTenantByLabels(ctx, c, ns)
+			if err != nil {
+				return ErroredResponse(err)
+			}
+
+			if tnt == nil {
+				return nil
+			}
 		}
 
 		for _, hndl := range h.handlers {
-			if response := hndl.OnCreate(client, decoder, recorder)(ctx, req); response != nil {
+			if response := hndl.OnCreate(c, decoder, recorder)(ctx, req); response != nil {
 				return response
 			}
 		}
@@ -45,14 +63,30 @@ func (h *adminHandler) OnCreate(client client.Client, decoder admission.Decoder,
 }
 
 //nolint:dupl
-func (h *adminHandler) OnDelete(client client.Client, decoder admission.Decoder, recorder record.EventRecorder) webhook.Func {
+func (h *adminHandler) OnDelete(c client.Client, decoder admission.Decoder, recorder record.EventRecorder) webhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		if !users.IsAdminUser(req, h.cfg.Administrators()) {
-			return nil
+		if !users.IsCapsuleUser(ctx, c, h.cfg, req.UserInfo.Username, req.UserInfo.Groups) {
+			if !users.IsAdminUser(req, h.cfg.Administrators()) {
+				return nil
+			}
+
+			ns := &corev1.Namespace{}
+			if err := decoder.DecodeRaw(req.Object, ns); err != nil {
+				return ErroredResponse(err)
+			}
+
+			tnt, err := tenant.GetTenantByLabels(ctx, c, ns)
+			if err != nil {
+				return ErroredResponse(err)
+			}
+
+			if tnt == nil {
+				return nil
+			}
 		}
 
 		for _, hndl := range h.handlers {
-			if response := hndl.OnDelete(client, decoder, recorder)(ctx, req); response != nil {
+			if response := hndl.OnDelete(c, decoder, recorder)(ctx, req); response != nil {
 				return response
 			}
 		}
@@ -62,14 +96,30 @@ func (h *adminHandler) OnDelete(client client.Client, decoder admission.Decoder,
 }
 
 //nolint:dupl
-func (h *adminHandler) OnUpdate(client client.Client, decoder admission.Decoder, recorder record.EventRecorder) webhook.Func {
+func (h *adminHandler) OnUpdate(c client.Client, decoder admission.Decoder, recorder record.EventRecorder) webhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		if !users.IsAdminUser(req, h.cfg.Administrators()) {
-			return nil
+		if !users.IsCapsuleUser(ctx, c, h.cfg, req.UserInfo.Username, req.UserInfo.Groups) {
+			if !users.IsAdminUser(req, h.cfg.Administrators()) {
+				return nil
+			}
+
+			ns := &corev1.Namespace{}
+			if err := decoder.DecodeRaw(req.Object, ns); err != nil {
+				return ErroredResponse(err)
+			}
+
+			tnt, err := tenant.GetTenantByLabels(ctx, c, ns)
+			if err != nil {
+				return ErroredResponse(err)
+			}
+
+			if tnt == nil {
+				return nil
+			}
 		}
 
 		for _, hndl := range h.handlers {
-			if response := hndl.OnUpdate(client, decoder, recorder)(ctx, req); response != nil {
+			if response := hndl.OnUpdate(c, decoder, recorder)(ctx, req); response != nil {
 				return response
 			}
 		}
@@ -77,5 +127,3 @@ func (h *adminHandler) OnUpdate(client client.Client, decoder admission.Decoder,
 		return nil
 	}
 }
-
-func isAdminUser()

@@ -3,6 +3,8 @@
 
 package api
 
+// +kubebuilder:object:generate=true
+
 type OwnerSpec struct {
 	// Kind of tenant owner. Possible values are "User", "Group", and "ServiceAccount"
 	Kind OwnerKind `json:"kind"`
@@ -25,6 +27,8 @@ type OwnerKind string
 func (k OwnerKind) String() string {
 	return string(k)
 }
+
+// +kubebuilder:object:generate=true
 
 type ProxySettings struct {
 	Kind       ProxyServiceKind `json:"kind"`

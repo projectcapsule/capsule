@@ -74,7 +74,7 @@ func (r *handler) handle(ctx context.Context, clt client.Client, decoder admissi
 	}
 
 	// We don't want to allow promoted serviceaccounts to promote other serviceaccounts
-	allowed, err := users.IsTenantOwner(ctx, clt, tnt, req.UserInfo, false)
+	allowed, err := users.IsTenantOwner(ctx, clt, r.cfg, tnt, req.UserInfo)
 	if err != nil {
 		return utils.ErroredResponse(err)
 	}

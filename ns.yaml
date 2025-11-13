@@ -1,6 +1,6 @@
 kind: Namespace
 apiVersion: v1
 metadata:
-  name: green-production
+  name: green-production-1
   labels:
     capsule.clastix.io/tenant: green

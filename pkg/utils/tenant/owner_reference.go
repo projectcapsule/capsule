@@ -16,6 +16,14 @@ const (
 )
 
 func IsTenantOwnerReference(or metav1.OwnerReference) bool {
+	if or.Kind != ObjectReferenceTenantKind {
+		return false
+	}
+
+	if or.APIVersion == "" {
+		return false
+	}
+
 	parts := strings.Split(or.APIVersion, "/")
 	if len(parts) != 2 {
 		return false

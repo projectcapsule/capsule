@@ -260,14 +260,7 @@ func main() {
 			tenantvalidation.ProtectedHandler(),
 		),
 		route.NamespaceValidation(
-			utils.InCapsuleGroups(
-				cfg,
-				namespacevalidation.PatchHandler(cfg),
-				namespacevalidation.QuotaHandler(),
-				namespacevalidation.FreezeHandler(cfg),
-				namespacevalidation.PrefixHandler(cfg),
-				namespacevalidation.UserMetadataHandler()),
-			utils.CapsuleAdministrator(
+			utils.InCapsuleGroupsOrAdministrator(
 				cfg,
 				namespacevalidation.PatchHandler(cfg),
 				namespacevalidation.QuotaHandler(),
@@ -277,14 +270,9 @@ func main() {
 			),
 		),
 		route.NamespaceMutation(
-			utils.InCapsuleGroups(
+			utils.InCapsuleGroupsOrAdministrator(
 				cfg,
 				namespacemutation.CordoningLabelHandler(cfg),
-				namespacemutation.OwnerReferenceHandler(cfg),
-				namespacemutation.MetadataHandler(cfg),
-			),
-			utils.CapsuleAdministrator(
-				cfg,
 				namespacemutation.OwnerReferenceHandler(cfg),
 				namespacemutation.MetadataHandler(cfg),
 			),

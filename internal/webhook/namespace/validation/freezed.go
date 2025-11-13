@@ -54,9 +54,14 @@ func (r *freezedHandler) OnCreate(c client.Client, decoder admission.Decoder, re
 	}
 }
 
-func (r *freezedHandler) OnDelete(c client.Client, _ admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
+func (r *freezedHandler) OnDelete(c client.Client, decoder admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		tnt, err := tenant.TenantByStatusNamespace(ctx, c, req.Name)
+		ns := &corev1.Namespace{}
+		if err := decoder.Decode(req, ns); err != nil {
+			return utils.ErroredResponse(err)
+		}
+
+		tnt, err := tenant.GetTenantByOwnerreferences(ctx, c, ns.OwnerReferences)
 		if err != nil {
 			return utils.ErroredResponse(err)
 		}
@@ -84,12 +89,12 @@ func (r *freezedHandler) OnUpdate(c client.Client, decoder admission.Decoder, re
 			return utils.ErroredResponse(err)
 		}
 
-		tnt, err := tenant.TenantByStatusNamespace(ctx, c, req.Name)
+		tnt, err := tenant.GetTenantByOwnerreferences(ctx, c, ns.OwnerReferences)
 		if err != nil {
 			return utils.ErroredResponse(err)
 		}
 
-		if tnt != nil {
+		if tnt == nil {
 			return nil
 		}
 

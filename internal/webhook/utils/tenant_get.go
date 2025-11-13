@@ -12,12 +12,12 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/configuration"
 	"github.com/projectcapsule/capsule/pkg/utils/tenant"
-	"github.com/projectcapsule/capsule/pkg/utils/users"
 )
 
 // getNamespaceTenant returns namespace owner tenant.
@@ -29,7 +29,9 @@ func GetNamespaceTenant(
 	cfg configuration.Configuration,
 	recorder record.EventRecorder,
 ) (*capsulev1beta2.Tenant, *admission.Response) {
-	tnt, err := tenant.GetTenantByLabels(ctx, client, ns)
+	log := log.FromContext(ctx)
+
+	tnt, err := tenant.GetTenantByLabelsAndUser(ctx, client, cfg, ns, req.UserInfo)
 	if err != nil {
 		response := admission.Errored(http.StatusBadRequest, err)
 
@@ -37,22 +39,15 @@ func GetNamespaceTenant(
 	}
 
 	if tnt != nil {
-		ok, err := users.IsTenantOwner(ctx, client, tnt, req.UserInfo, cfg.AllowServiceAccountPromotion())
-		if err != nil {
-			response := admission.Errored(http.StatusBadRequest, err)
-
-			return nil, &response
-		}
-
-		if !ok {
-			recorder.Eventf(tnt, corev1.EventTypeWarning, "NonOwnedTenant", "Namespace %s cannot be assigned to the current Tenant", ns.GetName())
-
-			response := admission.Denied("Cannot assign the desired namespace to a non-owned Tenant")
-
-			return nil, &response
-		}
-	} else {
 		return tnt, nil
+
+		//if !ok {
+		//	recorder.Eventf(tnt, corev1.EventTypeWarning, "NonOwnedTenant", "Namespace %s cannot be assigned to the current Tenant", ns.GetName())
+		//
+		//	response := admission.Denied("Cannot assign the desired namespace to a non-owned Tenant")
+		//
+		//	return nil, &response
+		//}
 	}
 
 	tnts, err := tenant.GetTenantByUserInfo(ctx, client, cfg, ns, req.UserInfo.Username, req.UserInfo.Groups)
@@ -80,9 +75,9 @@ func GetNamespaceTenant(
 	}
 
 	if cfg.ForceTenantPrefix() {
-		for _, tnt := range tnts {
-			if strings.HasPrefix(ns.GetName(), fmt.Sprintf("%s-", tnt.GetName())) {
-				return &tnt, nil
+		for _, t := range tnts {
+			if strings.HasPrefix(ns.GetName(), fmt.Sprintf("%s-", t.GetName())) {
+				return &t, nil
 			}
 		}
 
@@ -90,6 +85,8 @@ func GetNamespaceTenant(
 
 		return nil, &response
 	}
+
+	log.Info("FINAL", "size", tnts)
 
 	return nil, nil
 }

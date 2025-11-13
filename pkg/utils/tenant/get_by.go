@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strings"
 
+	authenticationv1 "k8s.io/api/authentication/v1"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -24,7 +25,6 @@ func TenantByStatusNamespace(
 	namespace string,
 ) (*capsulev1beta2.Tenant, error) {
 	tntList := &capsulev1beta2.TenantList{}
-	tnt := &capsulev1beta2.Tenant{}
 
 	if err := c.List(ctx, tntList, client.MatchingFieldsSelector{
 		Selector: fields.OneTermEqualSelector(".status.namespaces", namespace),
@@ -33,9 +33,10 @@ func TenantByStatusNamespace(
 	}
 
 	if len(tntList.Items) == 0 {
-		return tnt, nil
+		return nil, nil
 	}
 
+	tnt := &capsulev1beta2.Tenant{}
 	*tnt = tntList.Items[0]
 
 	return tnt, nil
@@ -47,14 +48,12 @@ func GetTenantByOwnerreferences(
 	c client.Client,
 	refs []v1.OwnerReference,
 ) (tnt *capsulev1beta2.Tenant, err error) {
-	tnt = &capsulev1beta2.Tenant{}
-
 	for _, or := range refs {
 		if !IsTenantOwnerReference(or) {
 			continue
 		}
 
-		// retrieving the selected Tenant
+		tnt = &capsulev1beta2.Tenant{}
 		if err = c.Get(ctx, types.NamespacedName{Name: or.Name}, tnt); err != nil {
 			return nil, err
 		}
@@ -62,7 +61,7 @@ func GetTenantByOwnerreferences(
 		return tnt, nil
 	}
 
-	return
+	return nil, nil
 }
 
 //nolint:nestif
@@ -154,5 +153,33 @@ func GetTenantByLabels(
 	}
 
 	// Nothing found in the labels.
+	return nil, nil
+}
+
+func GetTenantByLabelsAndUser(
+	ctx context.Context,
+	c client.Client,
+	cfg configuration.Configuration,
+	ns *corev1.Namespace,
+	userInfo authenticationv1.UserInfo,
+) (*capsulev1beta2.Tenant, error) {
+	tnt, err := GetTenantByLabels(ctx, c, ns)
+	if err != nil {
+		return nil, err
+	}
+
+	if tnt != nil {
+		ok, err := users.IsTenantOwner(ctx, c, cfg, tnt, userInfo)
+		if err != nil {
+			return nil, err
+		}
+
+		if !ok {
+			return nil, fmt.Errorf("can not assign the desired namespace to a non-owned Tenant")
+		}
+
+		return tnt, nil
+	}
+
 	return nil, nil
 }

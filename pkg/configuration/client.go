@@ -114,6 +114,6 @@ func (c *capsuleConfiguration) ForbiddenUserNodeAnnotations() *capsuleapi.Forbid
 	return &c.retrievalFn().Spec.NodeMetadata.ForbiddenAnnotations
 }
 
-func (c *capsuleConfiguration) Administrators() capsuleapi.OwnerListSpec {
+func (c *capsuleConfiguration) Administrators() capsuleapi.UserListSpec {
 	return c.retrievalFn().Spec.Administrators
 }
