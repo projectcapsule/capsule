@@ -30,7 +30,7 @@ var _ = Describe("when Tenant handles Ingress classes with networking.k8s.io/v1"
 			Name: "ic-selector-networking-v1",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: []capsulev1beta2.OwnerSpec{
+			Owners: []api.OwnerSpec{
 				{
 					Name: "ingress-selector",
 					Kind: "User",
@@ -59,7 +59,7 @@ var _ = Describe("when Tenant handles Ingress classes with networking.k8s.io/v1"
 			Name: "ic-default-networking-v1",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: []capsulev1beta2.OwnerSpec{
+			Owners: []api.OwnerSpec{
 				{
 					Name: "ingress-default",
 					Kind: "User",

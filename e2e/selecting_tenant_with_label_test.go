@@ -6,6 +6,7 @@ package e2e
 import (
 	"context"
 
+	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -21,7 +22,7 @@ var _ = Describe("creating a Namespace with Tenant selector when user owns multi
 			Name: "tenant-one",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: capsulev1beta2.OwnerListSpec{
+			Owners: api.OwnerListSpec{
 				{
 					Name: "john",
 					Kind: "User",
@@ -34,7 +35,7 @@ var _ = Describe("creating a Namespace with Tenant selector when user owns multi
 			Name: "tenant-two",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: capsulev1beta2.OwnerListSpec{
+			Owners: api.OwnerListSpec{
 				{
 					Name: "john",
 					Kind: "User",

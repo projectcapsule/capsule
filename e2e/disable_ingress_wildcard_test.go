@@ -16,6 +16,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/utils"
 )
 
@@ -28,7 +29,7 @@ var _ = Describe("creating an Ingress with a wildcard when it is denied for the 
 			},
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: capsulev1beta2.OwnerListSpec{
+			Owners: api.OwnerListSpec{
 				{
 					Name: "scott",
 					Kind: "User",

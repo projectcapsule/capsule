@@ -14,6 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/meta"
 )
 
@@ -23,7 +24,7 @@ var _ = Describe("verify scalability", Label("scalability"), func() {
 			Name: "tenant-scalability",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: capsulev1beta2.OwnerListSpec{
+			Owners: api.OwnerListSpec{
 				{
 					Name: "gatsby",
 					Kind: "User",

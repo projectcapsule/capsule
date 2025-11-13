@@ -1,0 +1,158 @@
+package tenant
+
+import (
+	"context"
+	"fmt"
+	"sort"
+	"strings"
+
+	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/configuration"
+	"github.com/projectcapsule/capsule/pkg/utils"
+	"github.com/projectcapsule/capsule/pkg/utils/users"
+)
+
+func TenantByStatusNamespace(
+	ctx context.Context,
+	c client.Client,
+	namespace string,
+) (*capsulev1beta2.Tenant, error) {
+	tntList := &capsulev1beta2.TenantList{}
+	tnt := &capsulev1beta2.Tenant{}
+
+	if err := c.List(ctx, tntList, client.MatchingFieldsSelector{
+		Selector: fields.OneTermEqualSelector(".status.namespaces", namespace),
+	}); err != nil {
+		return nil, err
+	}
+
+	if len(tntList.Items) == 0 {
+		return tnt, nil
+	}
+
+	*tnt = tntList.Items[0]
+
+	return tnt, nil
+}
+
+// getNamespaceTenant returns namespace owner tenant.
+func GetTenantByOwnerreferences(
+	ctx context.Context,
+	c client.Client,
+	refs []v1.OwnerReference,
+) (tnt *capsulev1beta2.Tenant, err error) {
+	tnt = &capsulev1beta2.Tenant{}
+
+	for _, or := range refs {
+		if !IsTenantOwnerReference(or) {
+			continue
+		}
+
+		// retrieving the selected Tenant
+		if err = c.Get(ctx, types.NamespacedName{Name: or.Name}, tnt); err != nil {
+			return nil, err
+		}
+
+		return tnt, nil
+	}
+
+	return
+}
+
+//nolint:nestif
+func GetTenantByUserInfo(
+	ctx context.Context,
+	c client.Client,
+	cfg configuration.Configuration,
+	ns *corev1.Namespace,
+	username string,
+	groups []string,
+) (sortedTenants, error) {
+	var tenants sortedTenants
+
+	// User tenants.
+	userTntList := &capsulev1beta2.TenantList{}
+	fields := client.MatchingFields{
+		".spec.owner.ownerkind": fmt.Sprintf("User:%s", username),
+	}
+
+	err := c.List(ctx, userTntList, fields)
+	if err != nil {
+		return nil, err
+	}
+
+	tenants = userTntList.Items
+
+	// ServiceAccount tenants.
+	if strings.HasPrefix(username, "system:serviceaccount:") {
+		saTntList := &capsulev1beta2.TenantList{}
+		fields = client.MatchingFields{
+			".spec.owner.ownerkind": fmt.Sprintf("ServiceAccount:%s", username),
+		}
+
+		err = c.List(ctx, saTntList, fields)
+		if err != nil {
+			return nil, err
+		}
+
+		tenants = append(tenants, saTntList.Items...)
+
+		if cfg.AllowServiceAccountPromotion() {
+			if tnt, err := users.ResolveServiceAccountActor(ctx, c, ns, username, cfg); err != nil {
+				return nil, err
+			} else if tnt != nil {
+				tenants = append(tenants, *tnt)
+			}
+		}
+	}
+
+	// Group tenants.
+	groupTntList := &capsulev1beta2.TenantList{}
+
+	for _, group := range groups {
+		fields = client.MatchingFields{
+			".spec.owner.ownerkind": fmt.Sprintf("Group:%s", group),
+		}
+
+		err = c.List(ctx, groupTntList, fields)
+		if err != nil {
+			return nil, err
+		}
+
+		tenants = append(tenants, groupTntList.Items...)
+	}
+
+	sort.Sort(sort.Reverse(tenants))
+
+	return tenants, nil
+}
+
+// getTenantByLabels returns tenant from labels.
+func GetTenantByLabels(
+	ctx context.Context,
+	c client.Client,
+	ns *corev1.Namespace,
+) (*capsulev1beta2.Tenant, error) {
+	ln, err := utils.GetTypeLabel(&capsulev1beta2.Tenant{})
+	if err != nil {
+		return nil, err
+	}
+
+	if label, ok := ns.Labels[ln]; ok {
+		tnt := &capsulev1beta2.Tenant{}
+		if err = c.Get(ctx, types.NamespacedName{Name: label}, tnt); err != nil {
+			return nil, err
+		}
+
+		return tnt, nil
+	}
+
+	// Nothing found in the labels.
+	return nil, nil
+}

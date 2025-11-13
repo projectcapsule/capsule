@@ -13,6 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/api"
 )
 
 var _ = Describe("creating a nodePort service when it is enabled for Tenant", Label("tenant"), func() {
@@ -21,7 +22,7 @@ var _ = Describe("creating a nodePort service when it is enabled for Tenant", La
 			Name: "enable-node-ports",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: capsulev1beta2.OwnerListSpec{
+			Owners: api.OwnerListSpec{
 				{
 					Name: "google",
 					Kind: "User",

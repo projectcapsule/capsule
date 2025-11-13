@@ -13,6 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/api"
 )
 
 var _ = Describe("creating several Namespaces for a Tenant", Label("namespace"), func() {
@@ -21,7 +22,7 @@ var _ = Describe("creating several Namespaces for a Tenant", Label("namespace"),
 			Name: "capsule-labels",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: capsulev1beta2.OwnerListSpec{
+			Owners: api.OwnerListSpec{
 				{
 					Name: "charlie",
 					Kind: "User",

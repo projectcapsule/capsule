@@ -11,6 +11,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/api"
 )
 
 var _ = Describe("creating a Namespaces as different type of Tenant owners", Label("namespace"), func() {
@@ -19,7 +20,7 @@ var _ = Describe("creating a Namespaces as different type of Tenant owners", Lab
 			Name: "tenant-assigned",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: capsulev1beta2.OwnerListSpec{
+			Owners: api.OwnerListSpec{
 				{
 					Name: "alice",
 					Kind: "User",

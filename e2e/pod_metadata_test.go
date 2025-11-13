@@ -22,7 +22,7 @@ var _ = Describe("adding metadata to Pod objects", Label("pod"), func() {
 			Name: "pod-metadata",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: capsulev1beta2.OwnerListSpec{
+			Owners: api.OwnerListSpec{
 				{
 					Name: "gatsby",
 					Kind: "User",

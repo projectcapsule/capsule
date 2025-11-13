@@ -19,6 +19,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/api"
 )
 
 var _ = Describe("when Tenant limits custom Resource Quota", Label("resourcequota"), func() {
@@ -30,7 +31,7 @@ var _ = Describe("when Tenant limits custom Resource Quota", Label("resourcequot
 			},
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: capsulev1beta2.OwnerListSpec{
+			Owners: api.OwnerListSpec{
 				{
 					Name: "resource",
 					Kind: "User",

@@ -22,7 +22,7 @@ var _ = Describe("enforcing an allowed set of Service external IPs", Label("tena
 			Name: "allowed-external-ip",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: capsulev1beta2.OwnerListSpec{
+			Owners: api.OwnerListSpec{
 				{
 					Name: "google",
 					Kind: "User",

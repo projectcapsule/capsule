@@ -9,7 +9,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	"github.com/projectcapsule/capsule/pkg/utils"
+	"github.com/projectcapsule/capsule/pkg/utils/tenant"
 )
 
 type OwnerReference struct{}
@@ -24,11 +24,11 @@ func (o OwnerReference) Field() string {
 
 func (o OwnerReference) Func() client.IndexerFunc {
 	return func(object client.Object) []string {
-		tenant, ok := object.(*capsulev1beta2.Tenant)
+		tnt, ok := object.(*capsulev1beta2.Tenant)
 		if !ok {
-			panic(fmt.Errorf("expected type *capsulev1beta2.Tenant, got %T", tenant))
+			panic(fmt.Errorf("expected type *capsulev1beta2.Tenant, got %T", tnt))
 		}
 
-		return utils.GetOwnersWithKinds(tenant)
+		return tenant.GetOwnersWithKinds(tnt)
 	}
 }

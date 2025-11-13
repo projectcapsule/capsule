@@ -12,6 +12,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/api"
 )
 
 var _ = Describe("creating a Namespace as Tenant owner with custom --capsule-group", Label("config"), func() {
@@ -22,7 +23,7 @@ var _ = Describe("creating a Namespace as Tenant owner with custom --capsule-gro
 			Name: "tenant-assigned-custom-group",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: capsulev1beta2.OwnerListSpec{
+			Owners: api.OwnerListSpec{
 				{
 					Name: "alice",
 					Kind: "User",

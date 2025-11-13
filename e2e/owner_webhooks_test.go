@@ -25,7 +25,7 @@ var _ = Describe("when Tenant owner interacts with the webhooks", Label("tenant"
 			Name: "tenant-owner",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: capsulev1beta2.OwnerListSpec{
+			Owners: api.OwnerListSpec{
 				{
 					Name: "ruby",
 					Kind: "User",

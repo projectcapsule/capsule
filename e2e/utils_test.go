@@ -24,6 +24,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/api"
 )
 
 const (
@@ -46,7 +47,7 @@ func NewService(svc types.NamespacedName) *corev1.Service {
 	}
 }
 
-func ServiceCreation(svc *corev1.Service, owner capsulev1beta2.OwnerSpec, timeout time.Duration) AsyncAssertion {
+func ServiceCreation(svc *corev1.Service, owner api.OwnerSpec, timeout time.Duration) AsyncAssertion {
 	cs := ownerClient(owner)
 	return Eventually(func() (err error) {
 		_, err = cs.CoreV1().Services(svc.Namespace).Create(context.TODO(), svc, metav1.CreateOptions{})
@@ -72,7 +73,7 @@ func NewNamespace(name string, labels ...map[string]string) *corev1.Namespace {
 	}
 }
 
-func NamespaceCreation(ns *corev1.Namespace, owner capsulev1beta2.OwnerSpec, timeout time.Duration) AsyncAssertion {
+func NamespaceCreation(ns *corev1.Namespace, owner api.OwnerSpec, timeout time.Duration) AsyncAssertion {
 	cs := ownerClient(owner)
 	return Eventually(func() (err error) {
 		_, err = cs.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
@@ -108,7 +109,7 @@ func ModifyCapsuleConfigurationOpts(fn func(configuration *capsulev1beta2.Capsul
 	Expect(k8sClient.Update(context.Background(), config)).ToNot(HaveOccurred())
 }
 
-func CheckForOwnerRoleBindings(ns *corev1.Namespace, owner capsulev1beta2.OwnerSpec, roles map[string]bool) func() error {
+func CheckForOwnerRoleBindings(ns *corev1.Namespace, owner api.OwnerSpec, roles map[string]bool) func() error {
 	if roles == nil {
 		roles = map[string]bool{
 			"admin":                     false,
@@ -125,7 +126,7 @@ func CheckForOwnerRoleBindings(ns *corev1.Namespace, owner capsulev1beta2.OwnerS
 
 		var ownerName string
 
-		if owner.Kind == capsulev1beta2.ServiceAccountOwner {
+		if owner.Kind == api.ServiceAccountOwner {
 			parts := strings.Split(owner.Name, ":")
 
 			ownerName = parts[3]

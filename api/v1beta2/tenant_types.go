@@ -13,7 +13,7 @@ import (
 type TenantSpec struct {
 	// Specifies the owners of the Tenant.
 	// Optional
-	Owners OwnerListSpec `json:"owners,omitempty"`
+	Owners api.OwnerListSpec `json:"owners,omitempty"`
 	// Specifies options for the Namespaces, such as additional metadata or maximum number of namespaces allowed for that Tenant. Once the namespace quota assigned to the Tenant has been reached, the Tenant owner cannot create further namespaces. Optional.
 	NamespaceOptions *NamespaceOptions `json:"namespaceOptions,omitempty"`
 	// Specifies options for the Service, such as additional metadata or block of certain type of Services. Optional.

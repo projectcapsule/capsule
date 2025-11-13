@@ -26,26 +26,26 @@ func (in *Tenant) ConvertFrom(raw conversion.Hub) error {
 	}
 
 	in.ObjectMeta = src.ObjectMeta
-	in.Spec.Owners = make(OwnerListSpec, 0, len(src.Spec.Owners))
+	in.Spec.Owners = make(api.OwnerListSpec, 0, len(src.Spec.Owners))
 
 	for index, owner := range src.Spec.Owners {
-		proxySettings := make([]ProxySettings, 0, len(owner.ProxyOperations))
+		proxySettings := make([]api.ProxySettings, 0, len(owner.ProxyOperations))
 
 		for _, proxyOp := range owner.ProxyOperations {
-			ops := make([]ProxyOperation, 0, len(proxyOp.Operations))
+			ops := make([]api.ProxyOperation, 0, len(proxyOp.Operations))
 
 			for _, op := range proxyOp.Operations {
-				ops = append(ops, ProxyOperation(op))
+				ops = append(ops, api.ProxyOperation(op))
 			}
 
-			proxySettings = append(proxySettings, ProxySettings{
-				Kind:       ProxyServiceKind(proxyOp.Kind),
+			proxySettings = append(proxySettings, api.ProxySettings{
+				Kind:       api.ProxyServiceKind(proxyOp.Kind),
 				Operations: ops,
 			})
 		}
 
-		in.Spec.Owners = append(in.Spec.Owners, OwnerSpec{
-			Kind:            OwnerKind(owner.Kind),
+		in.Spec.Owners = append(in.Spec.Owners, api.OwnerSpec{
+			Kind:            api.OwnerKind(owner.Kind),
 			Name:            owner.Name,
 			ClusterRoles:    owner.GetRoles(*src, index),
 			ProxyOperations: proxySettings,

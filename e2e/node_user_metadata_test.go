@@ -15,8 +15,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/internal/webhook/utils"
 	"github.com/projectcapsule/capsule/pkg/api"
-	"github.com/projectcapsule/capsule/pkg/webhook/utils"
 )
 
 var _ = Describe("modifying node labels and annotations", Label("config", "nodes"), func() {
@@ -27,7 +27,7 @@ var _ = Describe("modifying node labels and annotations", Label("config", "nodes
 			Name: "tenant-node-user-metadata-forbidden",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: capsulev1beta2.OwnerListSpec{
+			Owners: api.OwnerListSpec{
 				{
 					Name: "gatsby",
 					Kind: "User",
