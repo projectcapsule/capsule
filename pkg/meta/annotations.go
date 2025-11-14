@@ -12,6 +12,13 @@ import (
 const (
 	ReleaseAnnotation        = "projectcapsule.dev/release"
 	ReleaseAnnotationTrigger = "true"
+
+	AvailableIngressClassesAnnotation       = "capsule.clastix.io/ingress-classes"
+	AvailableIngressClassesRegexpAnnotation = "capsule.clastix.io/ingress-classes-regexp"
+	AvailableStorageClassesAnnotation       = "capsule.clastix.io/storage-classes"
+	AvailableStorageClassesRegexpAnnotation = "capsule.clastix.io/storage-classes-regexp"
+	AllowedRegistriesAnnotation             = "capsule.clastix.io/allowed-registries"
+	AllowedRegistriesRegexpAnnotation       = "capsule.clastix.io/allowed-registries-regexp"
 )
 
 func ReleaseAnnotationTriggers(obj client.Object) bool {

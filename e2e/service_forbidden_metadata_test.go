@@ -32,7 +32,7 @@ var _ = Describe("creating a Service with user-specified labels and annotations"
 					Regex: "^gatsby-.*$",
 				},
 			},
-			Owners: capsulev1beta2.OwnerListSpec{
+			Owners: api.OwnerListSpec{
 				{
 					Name: "gatsby",
 					Kind: "User",

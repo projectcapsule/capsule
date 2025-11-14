@@ -11,6 +11,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/api"
 )
 
 var _ = Describe("creating a Namespace with Tenant name prefix enforcement", Label("tenant"), func() {
@@ -19,7 +20,7 @@ var _ = Describe("creating a Namespace with Tenant name prefix enforcement", Lab
 			Name: "awesome",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: capsulev1beta2.OwnerListSpec{
+			Owners: api.OwnerListSpec{
 				{
 					Name: "john",
 					Kind: "User",
@@ -32,7 +33,7 @@ var _ = Describe("creating a Namespace with Tenant name prefix enforcement", Lab
 			Name: "awesome-tenant",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: capsulev1beta2.OwnerListSpec{
+			Owners: api.OwnerListSpec{
 				{
 					Name: "john",
 					Kind: "User",

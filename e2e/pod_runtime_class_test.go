@@ -25,7 +25,7 @@ var _ = Describe("enforcing a Runtime Class", Label("pod"), func() {
 			Name: "runtime-class",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: capsulev1beta2.OwnerListSpec{
+			Owners: api.OwnerListSpec{
 				{
 					Name: "george",
 					Kind: "User",

@@ -27,7 +27,7 @@ var _ = Describe("exceeding a Tenant resource quota", Label("resourcequota"), fu
 			Name: "tenant-resources-changes",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: capsulev1beta2.OwnerListSpec{
+			Owners: api.OwnerListSpec{
 				{
 					Name: "bobby",
 					Kind: "User",

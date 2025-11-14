@@ -25,7 +25,7 @@ var _ = Describe("when disabling Ingress hostnames collision", Label("ingress"),
 			Name: "hostnames-collision-disabled",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: capsulev1beta2.OwnerListSpec{
+			Owners: api.OwnerListSpec{
 				{
 					Name: "ingress-disabled",
 					Kind: "User",

@@ -12,6 +12,7 @@ import (
 	"k8s.io/utils/ptr"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/api"
 )
 
 var _ = Describe("creating a Namespace in over-quota of three", Label("namespace"), func() {
@@ -20,7 +21,7 @@ var _ = Describe("creating a Namespace in over-quota of three", Label("namespace
 			Name: "over-quota-tenant",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: capsulev1beta2.OwnerListSpec{
+			Owners: api.OwnerListSpec{
 				{
 					Name: "bob",
 					Kind: "User",

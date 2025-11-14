@@ -20,6 +20,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/api"
 )
 
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to
@@ -64,7 +65,7 @@ var _ = AfterSuite(func() {
 	Expect(testEnv.Stop()).ToNot(HaveOccurred())
 })
 
-func ownerClient(owner capsulev1beta2.OwnerSpec) (cs kubernetes.Interface) {
+func ownerClient(owner api.OwnerSpec) (cs kubernetes.Interface) {
 	c, err := config.GetConfig()
 	Expect(err).ToNot(HaveOccurred())
 	c.Impersonate.Groups = []string{"projectcapsule.dev", owner.Name}

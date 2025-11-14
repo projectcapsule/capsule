@@ -13,7 +13,7 @@ import (
 
 var tenant = &Tenant{
 	Spec: TenantSpec{
-		Owners: []OwnerSpec{
+		Owners: []api.OwnerSpec{
 			{
 				Kind:         "User",
 				Name:         "user1",
@@ -25,7 +25,7 @@ var tenant = &Tenant{
 				ClusterRoles: []string{"edit"},
 			},
 			{
-				Kind:         ServiceAccountOwner,
+				Kind:         api.ServiceAccountOwner,
 				Name:         "service",
 				ClusterRoles: []string{"read-only"},
 			},
@@ -96,7 +96,7 @@ func TestGetSubjectsByClusterRoles(t *testing.T) {
 	}
 
 	// Ignore SubjectTypes (Ignores ServiceAccounts)
-	ignored := tenant.GetSubjectsByClusterRoles([]OwnerKind{"ServiceAccount"})
+	ignored := tenant.GetSubjectsByClusterRoles([]api.OwnerKind{"ServiceAccount"})
 	expectedIgnored := map[string][]rbacv1.Subject{
 		"cluster-admin": {
 			{Kind: "User", Name: "user1"},
@@ -156,7 +156,7 @@ func TestGetClusterRolesBySubject(t *testing.T) {
 	}
 
 	delete(expected, "ServiceAccount")
-	ignored := tenant.GetClusterRolesBySubject([]OwnerKind{"ServiceAccount"})
+	ignored := tenant.GetClusterRolesBySubject([]api.OwnerKind{"ServiceAccount"})
 
 	if !reflect.DeepEqual(ignored, expected) {
 		t.Errorf("Expected %v, but got %v", expected, ignored)

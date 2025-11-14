@@ -29,4 +29,5 @@ type Configuration interface {
 	IgnoreUserWithGroups() []string
 	ForbiddenUserNodeLabels() *capsuleapi.ForbiddenListSpec
 	ForbiddenUserNodeAnnotations() *capsuleapi.ForbiddenListSpec
+	Administrators() capsuleapi.UserListSpec
 }

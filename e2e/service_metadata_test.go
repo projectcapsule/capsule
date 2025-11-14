@@ -29,7 +29,7 @@ var _ = Describe("adding metadata to Service objects", Label("tenant", "service"
 			Name: "service-metadata",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: capsulev1beta2.OwnerListSpec{
+			Owners: api.OwnerListSpec{
 				{
 					Name: "gatsby",
 					Kind: "User",

@@ -23,7 +23,7 @@ var _ = Describe("creating an ExternalName service when it is disabled for Tenan
 			Name: "disable-external-service",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: capsulev1beta2.OwnerListSpec{
+			Owners: api.OwnerListSpec{
 				{
 					Name: "google",
 					Kind: "User",

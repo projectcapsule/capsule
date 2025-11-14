@@ -1,0 +1,10 @@
+apiVersion: capsule.clastix.io/v1beta2
+kind: Tenant
+metadata:
+  name: green
+spec:
+  owners:
+  - name: bob
+    kind: User
+  - name: system:serviceaccount:tenant-system:robot
+    kind: ServiceAccount

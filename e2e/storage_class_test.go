@@ -32,7 +32,7 @@ var _ = Describe("when Tenant handles Storage classes", Label("tenant", "storage
 			Name: "storage-class-selector",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: capsulev1beta2.OwnerListSpec{
+			Owners: api.OwnerListSpec{
 				{
 					Name: "selector",
 					Kind: "User",
@@ -59,7 +59,7 @@ var _ = Describe("when Tenant handles Storage classes", Label("tenant", "storage
 			Name: "storage-class-default",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: capsulev1beta2.OwnerListSpec{
+			Owners: api.OwnerListSpec{
 				{
 					Name: "default",
 					Kind: "User",

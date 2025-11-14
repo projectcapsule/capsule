@@ -30,7 +30,7 @@ var _ = Describe("Creating a TenantResource object", Label("tenantresource"), fu
 			Name: "energy-solar",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: capsulev1beta2.OwnerListSpec{
+			Owners: api.OwnerListSpec{
 				{
 					Name: "solar-user",
 					Kind: "User",

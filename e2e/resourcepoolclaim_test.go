@@ -28,7 +28,7 @@ var _ = Describe("ResourcePoolClaim Tests", Label("resourcepool"), func() {
 			},
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: capsulev1beta2.OwnerListSpec{
+			Owners: api.OwnerListSpec{
 				{
 					Name: "wind-user",
 					Kind: "User",

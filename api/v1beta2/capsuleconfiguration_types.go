@@ -41,6 +41,11 @@ type CapsuleConfigurationSpec struct {
 	// when not using an already provided CA and certificate, or when these are managed externally with Vault, or cert-manager.
 	// +kubebuilder:default=true
 	EnableTLSReconciler bool `json:"enableTLSReconciler"` //nolint:tagliatelle
+	// Define entities which can act as Administrators in the capsule construct
+	// These entities are automatically owners for all existing tenants. Meaning they can add namespaces to any tenant. However they must be specific by using the capsule label
+	// for interacting with namespaces. Because if that label is not defined, it's assumed that namespace interaction was not targeted towards a tenant and will therefor
+	// be ignored by capsule.
+	Administrators api.UserListSpec `json:"administrators,omitempty"`
 }
 
 type NodeMetadata struct {

@@ -25,7 +25,7 @@ var _ = Describe("when handling Tenant scoped Ingress hostnames collision", Labe
 			Name: "hostnames-collision-tenant",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: capsulev1beta2.OwnerListSpec{
+			Owners: api.OwnerListSpec{
 				{
 					Name: "ingress-tenant",
 					Kind: "User",

@@ -31,37 +31,37 @@ import (
 
 	capsulev1beta1 "github.com/projectcapsule/capsule/api/v1beta1"
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	configcontroller "github.com/projectcapsule/capsule/controllers/config"
-	podlabelscontroller "github.com/projectcapsule/capsule/controllers/pod"
-	"github.com/projectcapsule/capsule/controllers/pv"
-	rbaccontroller "github.com/projectcapsule/capsule/controllers/rbac"
-	"github.com/projectcapsule/capsule/controllers/resourcepools"
-	"github.com/projectcapsule/capsule/controllers/resources"
-	servicelabelscontroller "github.com/projectcapsule/capsule/controllers/servicelabels"
-	tenantcontroller "github.com/projectcapsule/capsule/controllers/tenant"
-	tlscontroller "github.com/projectcapsule/capsule/controllers/tls"
-	utilscontroller "github.com/projectcapsule/capsule/controllers/utils"
+	configcontroller "github.com/projectcapsule/capsule/internal/controllers/config"
+	podlabelscontroller "github.com/projectcapsule/capsule/internal/controllers/pod"
+	"github.com/projectcapsule/capsule/internal/controllers/pv"
+	rbaccontroller "github.com/projectcapsule/capsule/internal/controllers/rbac"
+	"github.com/projectcapsule/capsule/internal/controllers/resourcepools"
+	"github.com/projectcapsule/capsule/internal/controllers/resources"
+	servicelabelscontroller "github.com/projectcapsule/capsule/internal/controllers/servicelabels"
+	tenantcontroller "github.com/projectcapsule/capsule/internal/controllers/tenant"
+	tlscontroller "github.com/projectcapsule/capsule/internal/controllers/tls"
+	utilscontroller "github.com/projectcapsule/capsule/internal/controllers/utils"
+	"github.com/projectcapsule/capsule/internal/metrics"
+	"github.com/projectcapsule/capsule/internal/webhook"
+	"github.com/projectcapsule/capsule/internal/webhook/defaults"
+	"github.com/projectcapsule/capsule/internal/webhook/gateway"
+	"github.com/projectcapsule/capsule/internal/webhook/ingress"
+	namespacemutation "github.com/projectcapsule/capsule/internal/webhook/namespace/mutation"
+	namespacevalidation "github.com/projectcapsule/capsule/internal/webhook/namespace/validation"
+	"github.com/projectcapsule/capsule/internal/webhook/networkpolicy"
+	"github.com/projectcapsule/capsule/internal/webhook/node"
+	"github.com/projectcapsule/capsule/internal/webhook/pod"
+	"github.com/projectcapsule/capsule/internal/webhook/pvc"
+	"github.com/projectcapsule/capsule/internal/webhook/resourcepool"
+	"github.com/projectcapsule/capsule/internal/webhook/route"
+	"github.com/projectcapsule/capsule/internal/webhook/service"
+	"github.com/projectcapsule/capsule/internal/webhook/serviceaccounts"
+	tenantmutation "github.com/projectcapsule/capsule/internal/webhook/tenant/mutation"
+	tenantvalidation "github.com/projectcapsule/capsule/internal/webhook/tenant/validation"
+	tntresource "github.com/projectcapsule/capsule/internal/webhook/tenantresource"
+	"github.com/projectcapsule/capsule/internal/webhook/utils"
 	"github.com/projectcapsule/capsule/pkg/configuration"
 	"github.com/projectcapsule/capsule/pkg/indexer"
-	"github.com/projectcapsule/capsule/pkg/metrics"
-	"github.com/projectcapsule/capsule/pkg/webhook"
-	"github.com/projectcapsule/capsule/pkg/webhook/defaults"
-	"github.com/projectcapsule/capsule/pkg/webhook/gateway"
-	"github.com/projectcapsule/capsule/pkg/webhook/ingress"
-	namespacemutation "github.com/projectcapsule/capsule/pkg/webhook/namespace/mutation"
-	namespacevalidation "github.com/projectcapsule/capsule/pkg/webhook/namespace/validation"
-	"github.com/projectcapsule/capsule/pkg/webhook/networkpolicy"
-	"github.com/projectcapsule/capsule/pkg/webhook/node"
-	"github.com/projectcapsule/capsule/pkg/webhook/pod"
-	"github.com/projectcapsule/capsule/pkg/webhook/pvc"
-	"github.com/projectcapsule/capsule/pkg/webhook/resourcepool"
-	"github.com/projectcapsule/capsule/pkg/webhook/route"
-	"github.com/projectcapsule/capsule/pkg/webhook/service"
-	"github.com/projectcapsule/capsule/pkg/webhook/serviceaccounts"
-	tenantmutation "github.com/projectcapsule/capsule/pkg/webhook/tenant/mutation"
-	tenantvalidation "github.com/projectcapsule/capsule/pkg/webhook/tenant/validation"
-	tntresource "github.com/projectcapsule/capsule/pkg/webhook/tenantresource"
-	"github.com/projectcapsule/capsule/pkg/webhook/utils"
 )
 
 var (
@@ -233,21 +233,50 @@ func main() {
 	webhooksList := append(
 		make([]webhook.Webhook, 0),
 		route.Pod(pod.ImagePullPolicy(), pod.ContainerRegistry(cfg), pod.PriorityClass(), pod.RuntimeClass()),
-		route.Namespace(utils.InCapsuleGroups(cfg, namespacevalidation.PatchHandler(cfg), namespacevalidation.QuotaHandler(), namespacevalidation.FreezeHandler(cfg), namespacevalidation.PrefixHandler(cfg), namespacevalidation.UserMetadataHandler())),
 		route.Ingress(ingress.Class(cfg, kubeVersion), ingress.Hostnames(cfg), ingress.Collision(cfg), ingress.Wildcard()),
 		route.PVC(pvc.Validating(), pvc.PersistentVolumeReuse()),
 		route.Service(service.Handler()),
 		route.TenantResourceObjects(utils.InCapsuleGroups(cfg, tntresource.WriteOpsHandler())),
 		route.NetworkPolicy(utils.InCapsuleGroups(cfg, networkpolicy.Handler())),
-		route.TenantMutating(tenantmutation.MetaHandler()),
-		route.TenantValidating(tenantvalidation.NameHandler(), tenantvalidation.RoleBindingRegexHandler(), tenantvalidation.IngressClassRegexHandler(), tenantvalidation.StorageClassRegexHandler(), tenantvalidation.ContainerRegistryRegexHandler(), tenantvalidation.HostnameRegexHandler(), tenantvalidation.FreezedEmitter(), tenantvalidation.ServiceAccountNameHandler(), tenantvalidation.ForbiddenAnnotationsRegexHandler(), tenantvalidation.ProtectedHandler()),
 		route.Cordoning(tenantvalidation.CordoningHandler(cfg)),
 		route.Node(utils.InCapsuleGroups(cfg, node.UserMetadataHandler(cfg, kubeVersion))),
 		route.ServiceAccounts(serviceaccounts.Handler(cfg)),
-		route.NamespacePatch(utils.InCapsuleGroups(cfg, namespacemutation.CordoningLabelHandler(cfg), namespacemutation.OwnerReferenceHandler(cfg), namespacemutation.MetadataHandler(cfg))),
 		route.CustomResources(tenantvalidation.ResourceCounterHandler(manager.GetClient())),
 		route.Gateway(gateway.Class(cfg)),
 		route.Defaults(defaults.Handler(cfg, kubeVersion)),
+		route.TenantMutation(
+			tenantmutation.MetaHandler(),
+		),
+		route.TenantValidation(
+			tenantvalidation.NameHandler(),
+			tenantvalidation.RoleBindingRegexHandler(),
+			tenantvalidation.IngressClassRegexHandler(),
+			tenantvalidation.StorageClassRegexHandler(),
+			tenantvalidation.ContainerRegistryRegexHandler(),
+			tenantvalidation.HostnameRegexHandler(),
+			tenantvalidation.FreezedEmitter(),
+			tenantvalidation.ServiceAccountNameHandler(),
+			tenantvalidation.ForbiddenAnnotationsRegexHandler(),
+			tenantvalidation.ProtectedHandler(),
+		),
+		route.NamespaceValidation(
+			utils.InCapsuleGroupsOrAdministrator(
+				cfg,
+				namespacevalidation.PatchHandler(cfg),
+				namespacevalidation.QuotaHandler(),
+				namespacevalidation.FreezeHandler(cfg),
+				namespacevalidation.PrefixHandler(cfg),
+				namespacevalidation.UserMetadataHandler(),
+			),
+		),
+		route.NamespaceMutation(
+			utils.InCapsuleGroupsOrAdministrator(
+				cfg,
+				namespacemutation.CordoningLabelHandler(cfg),
+				namespacemutation.OwnerReferenceHandler(cfg),
+				namespacemutation.MetadataHandler(cfg),
+			),
+		),
 		route.ResourcePoolMutation((resourcepool.PoolMutationHandler(ctrl.Log.WithName("webhooks").WithName("resourcepool")))),
 		route.ResourcePoolValidation((resourcepool.PoolValidationHandler(ctrl.Log.WithName("webhooks").WithName("resourcepool")))),
 		route.ResourcePoolClaimMutation((resourcepool.ClaimMutationHandler(ctrl.Log.WithName("webhooks").WithName("resourcepoolclaims")))),

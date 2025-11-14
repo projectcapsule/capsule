@@ -11,6 +11,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/api"
 )
 
 var _ = Describe("defining dynamic Tenant Owner Cluster Roles", Label("tenant"), func() {
@@ -19,7 +20,7 @@ var _ = Describe("defining dynamic Tenant Owner Cluster Roles", Label("tenant"),
 			Name: "dynamic-tenant-owner-clusterroles",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: capsulev1beta2.OwnerListSpec{
+			Owners: api.OwnerListSpec{
 				{
 					Kind:         "User",
 					Name:         "michonne",

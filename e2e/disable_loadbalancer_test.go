@@ -23,7 +23,7 @@ var _ = Describe("creating a LoadBalancer service when it is disabled for Tenant
 			Name: "disable-loadbalancer-service",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: capsulev1beta2.OwnerListSpec{
+			Owners: api.OwnerListSpec{
 				{
 					Name: "amazon",
 					Kind: "User",

@@ -33,7 +33,7 @@ var _ = Describe("enforcing a Container Registry", Label("tenant", "images", "re
 			Name: "container-registry",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: capsulev1beta2.OwnerListSpec{
+			Owners: api.OwnerListSpec{
 				{
 					Name: "matt",
 					Kind: "User",

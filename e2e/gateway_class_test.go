@@ -5,11 +5,12 @@ package e2e
 
 import (
 	"context"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -49,7 +50,7 @@ var _ = Describe("when Tenant handles Gateway classes", Label("gateway"), func()
 			Name: "tnt-with-default-gateway-class-and-label-selector",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: []capsulev1beta2.OwnerSpec{
+			Owners: []api.OwnerSpec{
 				{
 					Name: "gateway-default-and-label-selector",
 					Kind: "User",
@@ -75,7 +76,7 @@ var _ = Describe("when Tenant handles Gateway classes", Label("gateway"), func()
 			Name: "tnt-with-label-selector-only",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: []capsulev1beta2.OwnerSpec{
+			Owners: []api.OwnerSpec{
 				{
 					Name: "gateway-with-label-selector-only",
 					Kind: "User",

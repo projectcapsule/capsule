@@ -27,7 +27,7 @@ var _ = Describe("enforcing a Priority Class", Label("pod"), func() {
 			Name: "priority-class-defaults",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: capsulev1beta2.OwnerListSpec{
+			Owners: api.OwnerListSpec{
 				{
 					Name: "paul",
 					Kind: "User",
@@ -51,7 +51,7 @@ var _ = Describe("enforcing a Priority Class", Label("pod"), func() {
 			Name: "priority-class-no-defaults",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: capsulev1beta2.OwnerListSpec{
+			Owners: api.OwnerListSpec{
 				{
 					Name: "george",
 					Kind: "User",

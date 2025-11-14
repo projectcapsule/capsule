@@ -7,6 +7,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/meta"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -24,7 +25,7 @@ var _ = Describe("cordoning a Tenant", Label("tenant"), func() {
 			Name: "tenant-cordoning",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: capsulev1beta2.OwnerListSpec{
+			Owners: api.OwnerListSpec{
 				{
 					Name: "jim",
 					Kind: "User",

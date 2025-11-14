@@ -25,7 +25,7 @@ var _ = Describe("when Tenant handles Ingress hostnames", Label("ingress"), func
 			Name: "ingress-hostnames",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: capsulev1beta2.OwnerListSpec{
+			Owners: api.OwnerListSpec{
 				{
 					Name: "hostname",
 					Kind: "User",
