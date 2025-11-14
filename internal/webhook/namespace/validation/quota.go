@@ -19,23 +19,23 @@ import (
 
 type quotaHandler struct{}
 
-func QuotaHandler() capsulewebhook.Handler {
+func QuotaHandler() capsulewebhook.TypedHandler[*corev1.Namespace] {
 	return &quotaHandler{}
 }
 
-func (r *quotaHandler) OnCreate(client client.Client, decoder admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
+func (r *quotaHandler) OnCreate(client client.Client, ns *corev1.Namespace, decoder admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		return r.handle(client, decoder, recorder, ctx, req)
 	}
 }
 
-func (r *quotaHandler) OnDelete(client.Client, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
+func (r *quotaHandler) OnDelete(client.Client, *corev1.Namespace, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (r *quotaHandler) OnUpdate(client client.Client, decoder admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
+func (r *quotaHandler) OnUpdate(client client.Client, ns *corev1.Namespace, _ *corev1.Namespace, decoder admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		return r.handle(client, decoder, recorder, ctx, req)
 	}

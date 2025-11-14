@@ -23,19 +23,19 @@ type prefixHandler struct {
 	cfg configuration.Configuration
 }
 
-func PrefixHandler(configuration configuration.Configuration) capsulewebhook.Handler {
+func PrefixHandler(configuration configuration.Configuration) capsulewebhook.TypedHandler[*corev1.Namespace] {
 	return &prefixHandler{
 		cfg: configuration,
 	}
 }
 
-func (r *prefixHandler) OnCreate(clt client.Client, decoder admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
+func (r *prefixHandler) OnCreate(
+	clt client.Client,
+	ns *corev1.Namespace,
+	decoder admission.Decoder,
+	recorder record.EventRecorder,
+) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		ns := &corev1.Namespace{}
-		if err := decoder.Decode(req, ns); err != nil {
-			return utils.ErroredResponse(err)
-		}
-
 		tnt, err := tenant.GetTenantByOwnerreferences(ctx, clt, ns.OwnerReferences)
 		if err != nil {
 			return utils.ErroredResponse(err)
@@ -71,13 +71,13 @@ func (r *prefixHandler) OnCreate(clt client.Client, decoder admission.Decoder, r
 	}
 }
 
-func (r *prefixHandler) OnDelete(client.Client, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
+func (r *prefixHandler) OnDelete(client.Client, *corev1.Namespace, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (r *prefixHandler) OnUpdate(client.Client, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
+func (r *prefixHandler) OnUpdate(client.Client, *corev1.Namespace, *corev1.Namespace, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}

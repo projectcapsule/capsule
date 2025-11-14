@@ -16,7 +16,6 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	capsulewebhook "github.com/projectcapsule/capsule/internal/webhook"
-	"github.com/projectcapsule/capsule/internal/webhook/utils"
 	"github.com/projectcapsule/capsule/pkg/configuration"
 	capsuleutils "github.com/projectcapsule/capsule/pkg/utils"
 	"github.com/projectcapsule/capsule/pkg/utils/users"
@@ -26,31 +25,30 @@ type patchHandler struct {
 	cfg configuration.Configuration
 }
 
-func PatchHandler(configuration configuration.Configuration) capsulewebhook.Handler {
+func PatchHandler(configuration configuration.Configuration) capsulewebhook.TypedHandler[*corev1.Namespace] {
 	return &patchHandler{cfg: configuration}
 }
 
-func (r *patchHandler) OnCreate(client.Client, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
+func (r *patchHandler) OnCreate(client.Client, *corev1.Namespace, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (r *patchHandler) OnDelete(client.Client, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
+func (r *patchHandler) OnDelete(client.Client, *corev1.Namespace, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (r *patchHandler) OnUpdate(c client.Client, decoder admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
+func (r *patchHandler) OnUpdate(
+	c client.Client,
+	ns *corev1.Namespace,
+	old *corev1.Namespace,
+	decoder admission.Decoder,
+	recorder record.EventRecorder,
+) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		// Decode Namespace
-		ns := &corev1.Namespace{}
-		if err := decoder.DecodeRaw(req.OldObject, ns); err != nil {
-			return utils.ErroredResponse(err)
-		}
-
-		// Get Tenant Label
 		ln, err := capsuleutils.GetTypeLabel(&capsulev1beta2.Tenant{})
 		if err != nil {
 			response := admission.Errored(http.StatusBadRequest, err)

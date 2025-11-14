@@ -17,7 +17,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/utils/users"
 )
 
-func InCapsuleGroupsOrAdministrator(configuration configuration.Configuration, handlers ...webhook.Handler) webhook.Handler {
+func InCapsuleGroupsOrAdministrator(configuration configuration.Configuration, handlers ...webhook.TypedHandler[*corev1.Namespace]) webhook.Handler {
 	return &adminHandler{
 		cfg:      configuration,
 		handlers: handlers,
@@ -26,34 +26,38 @@ func InCapsuleGroupsOrAdministrator(configuration configuration.Configuration, h
 
 type adminHandler struct {
 	cfg      configuration.Configuration
-	handlers []webhook.Handler
+	handlers []webhook.TypedHandler[*corev1.Namespace]
 }
 
 //nolint:dupl
 func (h *adminHandler) OnCreate(c client.Client, decoder admission.Decoder, recorder record.EventRecorder) webhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
+		userIsAdmin := false
+
 		if !users.IsCapsuleUser(ctx, c, h.cfg, req.UserInfo.Username, req.UserInfo.Groups) {
 			if !users.IsAdminUser(req, h.cfg.Administrators()) {
 				return nil
 			}
 
-			ns := &corev1.Namespace{}
-			if err := decoder.DecodeRaw(req.Object, ns); err != nil {
-				return ErroredResponse(err)
-			}
+			userIsAdmin = true
+		}
 
-			tnt, err := tenant.GetTenantByLabels(ctx, c, ns)
-			if err != nil {
-				return ErroredResponse(err)
-			}
+		ns := &corev1.Namespace{}
+		if err := decoder.DecodeRaw(req.Object, ns); err != nil {
+			return ErroredResponse(err)
+		}
 
-			if tnt == nil {
-				return nil
-			}
+		tnt, err := tenant.GetTenantByLabels(ctx, c, ns)
+		if err != nil {
+			return ErroredResponse(err)
+		}
+
+		if tnt == nil && userIsAdmin {
+			return nil
 		}
 
 		for _, hndl := range h.handlers {
-			if response := hndl.OnCreate(c, decoder, recorder)(ctx, req); response != nil {
+			if response := hndl.OnCreate(c, ns, decoder, recorder)(ctx, req); response != nil {
 				return response
 			}
 		}

@@ -22,17 +22,17 @@ type freezedHandler struct {
 	cfg configuration.Configuration
 }
 
-func FreezeHandler(configuration configuration.Configuration) capsulewebhook.Handler {
+func FreezeHandler(configuration configuration.Configuration) capsulewebhook.TypedHandler[*corev1.Namespace] {
 	return &freezedHandler{cfg: configuration}
 }
 
-func (r *freezedHandler) OnCreate(c client.Client, decoder admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
+func (r *freezedHandler) OnCreate(
+	c client.Client,
+	ns *corev1.Namespace,
+	decoder admission.Decoder,
+	recorder record.EventRecorder,
+) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		ns := &corev1.Namespace{}
-		if err := decoder.Decode(req, ns); err != nil {
-			return utils.ErroredResponse(err)
-		}
-
 		tnt, err := tenant.GetTenantByOwnerreferences(ctx, c, ns.OwnerReferences)
 		if err != nil {
 			return utils.ErroredResponse(err)
@@ -54,13 +54,13 @@ func (r *freezedHandler) OnCreate(c client.Client, decoder admission.Decoder, re
 	}
 }
 
-func (r *freezedHandler) OnDelete(c client.Client, decoder admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
+func (r *freezedHandler) OnDelete(
+	c client.Client,
+	ns *corev1.Namespace,
+	decoder admission.Decoder,
+	recorder record.EventRecorder,
+) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		ns := &corev1.Namespace{}
-		if err := decoder.Decode(req, ns); err != nil {
-			return utils.ErroredResponse(err)
-		}
-
 		tnt, err := tenant.GetTenantByOwnerreferences(ctx, c, ns.OwnerReferences)
 		if err != nil {
 			return utils.ErroredResponse(err)
@@ -82,13 +82,14 @@ func (r *freezedHandler) OnDelete(c client.Client, decoder admission.Decoder, re
 	}
 }
 
-func (r *freezedHandler) OnUpdate(c client.Client, decoder admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
+func (r *freezedHandler) OnUpdate(
+	c client.Client,
+	ns *corev1.Namespace,
+	old *corev1.Namespace,
+	decoder admission.Decoder,
+	recorder record.EventRecorder,
+) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		ns := &corev1.Namespace{}
-		if err := decoder.Decode(req, ns); err != nil {
-			return utils.ErroredResponse(err)
-		}
-
 		tnt, err := tenant.GetTenantByOwnerreferences(ctx, c, ns.OwnerReferences)
 		if err != nil {
 			return utils.ErroredResponse(err)

@@ -18,3 +18,9 @@ type Handler interface {
 	OnDelete(client client.Client, decoder admission.Decoder, recorder record.EventRecorder) Func
 	OnUpdate(client client.Client, decoder admission.Decoder, recorder record.EventRecorder) Func
 }
+
+type TypedHandler[T client.Object] interface {
+	OnCreate(c client.Client, obj T, decoder admission.Decoder, recorder record.EventRecorder) Func
+	OnUpdate(c client.Client, obj T, old T, decoder admission.Decoder, recorder record.EventRecorder) Func
+	OnDelete(c client.Client, obj T, decoder admission.Decoder, recorder record.EventRecorder) Func
+}
