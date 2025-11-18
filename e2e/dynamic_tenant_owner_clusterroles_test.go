@@ -11,6 +11,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/api"
 )
 
 var _ = Describe("defining dynamic Tenant Owner Cluster Roles", Label("tenant"), func() {
@@ -19,15 +20,19 @@ var _ = Describe("defining dynamic Tenant Owner Cluster Roles", Label("tenant"),
 			Name: "dynamic-tenant-owner-clusterroles",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: capsulev1beta2.OwnerListSpec{
+			Owners: api.OwnerListSpec{
 				{
-					Kind:         "User",
-					Name:         "michonne",
+					UserSpec: api.UserSpec{
+						Kind: "User",
+						Name: "michonne",
+					},
 					ClusterRoles: []string{"editor", "manager"},
 				},
 				{
-					Name:         "kingdom",
-					Kind:         "Group",
+					UserSpec: api.UserSpec{
+						Name: "kingdom",
+						Kind: "Group",
+					},
 					ClusterRoles: []string{"readonly"},
 				},
 			},
@@ -49,7 +54,7 @@ var _ = Describe("defining dynamic Tenant Owner Cluster Roles", Label("tenant"),
 	It("namespace should contains the dynamic rolebindings", func() {
 		for _, ns := range []string{"dynamnic-roles-1", "dynamnic-roles-2", "dynamnic-roles-3"} {
 			ns := NewNamespace(ns)
-			NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+			NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 			TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 			Eventually(CheckForOwnerRoleBindings(ns, tnt.Spec.Owners[0], map[string]bool{"editor": false, "manager": false}), defaultTimeoutInterval, defaultPollInterval).Should(Succeed())

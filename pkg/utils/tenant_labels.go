@@ -13,22 +13,23 @@ import (
 
 	"github.com/projectcapsule/capsule/api/v1beta1"
 	"github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/api/meta"
 )
 
 func GetTypeLabel(t runtime.Object) (label string, err error) {
 	switch v := t.(type) {
 	case *v1beta1.Tenant, *v1beta2.Tenant:
-		return "capsule.clastix.io/tenant", nil
+		return meta.TenantLabel, nil
 	case *v1beta2.ResourcePool:
-		return "projectcapsule.dev/pool", nil
+		return meta.ResourcePoolLabel, nil
 	case *corev1.LimitRange:
-		return "capsule.clastix.io/limit-range", nil
+		return meta.LimitRangeLabel, nil
 	case *networkingv1.NetworkPolicy:
-		return "capsule.clastix.io/network-policy", nil
+		return meta.NetworkPolicyLabel, nil
 	case *corev1.ResourceQuota:
-		return "capsule.clastix.io/resource-quota", nil
+		return meta.ResourceQuotaLabel, nil
 	case *rbacv1.RoleBinding:
-		return "capsule.clastix.io/role-binding", nil
+		return meta.RolebindingLabel, nil
 	default:
 		err = fmt.Errorf("type %T is not mapped as Capsule label recognized", v)
 	}

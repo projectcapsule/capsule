@@ -12,6 +12,7 @@ import (
 	"k8s.io/utils/ptr"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/api"
 )
 
 var _ = Describe("creating a Namespace in over-quota of three", Label("namespace"), func() {
@@ -20,10 +21,12 @@ var _ = Describe("creating a Namespace in over-quota of three", Label("namespace
 			Name: "over-quota-tenant",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: capsulev1beta2.OwnerListSpec{
+			Owners: api.OwnerListSpec{
 				{
-					Name: "bob",
-					Kind: "User",
+					UserSpec: api.UserSpec{
+						Name: "bob",
+						Kind: "User",
+					},
 				},
 			},
 			NamespaceOptions: &capsulev1beta2.NamespaceOptions{
@@ -45,14 +48,16 @@ var _ = Describe("creating a Namespace in over-quota of three", Label("namespace
 		By("creating three Namespaces", func() {
 			for _, name := range []string{"bob-dev", "bob-staging", "bob-production"} {
 				ns := NewNamespace(name)
-				NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+				NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 				TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 			}
 		})
 
-		ns := NewNamespace("")
-		cs := ownerClient(tnt.Spec.Owners[0])
-		_, err := cs.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
-		Expect(err).ShouldNot(Succeed())
+		By("creating additional namespace", func() {
+			ns := NewNamespace("")
+			cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
+			_, err := cs.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
+			Expect(err).ShouldNot(Succeed())
+		})
 	})
 })

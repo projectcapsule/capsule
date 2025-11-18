@@ -16,6 +16,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/api"
 )
 
 var _ = Describe("preventing PersistentVolume cross-tenant mount", Label("tenant", "storage"), func() {
@@ -24,10 +25,12 @@ var _ = Describe("preventing PersistentVolume cross-tenant mount", Label("tenant
 			Name: "pv-one",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: capsulev1beta2.OwnerListSpec{
+			Owners: api.OwnerListSpec{
 				{
-					Name: "jessica",
-					Kind: "User",
+					UserSpec: api.UserSpec{
+						Name: "jessica",
+						Kind: "User",
+					},
 				},
 			},
 		},
@@ -38,10 +41,12 @@ var _ = Describe("preventing PersistentVolume cross-tenant mount", Label("tenant
 			Name: "pv-two",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: capsulev1beta2.OwnerListSpec{
+			Owners: api.OwnerListSpec{
 				{
-					Name: "leto",
-					Kind: "User",
+					UserSpec: api.UserSpec{
+						Name: "leto",
+						Kind: "User",
+					},
 				},
 			},
 		},
@@ -65,7 +70,7 @@ var _ = Describe("preventing PersistentVolume cross-tenant mount", Label("tenant
 
 	It("should add labels to PersistentVolume and prevent cross-Tenant mount", func() {
 		ns := NewNamespace("")
-		NamespaceCreation(ns, tnt1.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreation(ns, tnt1.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(tnt1, defaultTimeoutInterval).Should(ContainElement(ns.Name))
 
 		pvc := corev1.PersistentVolumeClaim{
@@ -168,7 +173,7 @@ var _ = Describe("preventing PersistentVolume cross-tenant mount", Label("tenant
 		Expect(k8sClient.Delete(context.Background(), &pod, &client.DeleteOptions{GracePeriodSeconds: ptr.To(int64(0))})).ToNot(HaveOccurred())
 
 		ns2 := NewNamespace("")
-		NamespaceCreation(ns2, tnt2.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreation(ns2, tnt2.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(tnt2, defaultTimeoutInterval).Should(ContainElement(ns2.Name))
 
 		Consistently(func() error {

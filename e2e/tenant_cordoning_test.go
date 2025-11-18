@@ -7,7 +7,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/projectcapsule/capsule/pkg/meta"
+	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api/meta"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -24,10 +25,12 @@ var _ = Describe("cordoning a Tenant", Label("tenant"), func() {
 			Name: "tenant-cordoning",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: capsulev1beta2.OwnerListSpec{
+			Owners: api.OwnerListSpec{
 				{
-					Name: "jim",
-					Kind: "User",
+					UserSpec: api.UserSpec{
+						Name: "jim",
+						Kind: "User",
+					},
 				},
 			},
 		},
@@ -43,7 +46,7 @@ var _ = Describe("cordoning a Tenant", Label("tenant"), func() {
 		Expect(k8sClient.Delete(context.TODO(), tnt)).Should(Succeed())
 	})
 	It("should block or allow operations", func() {
-		cs := ownerClient(tnt.Spec.Owners[0])
+		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 
 		ns := NewNamespace("")
 
@@ -74,7 +77,7 @@ var _ = Describe("cordoning a Tenant", Label("tenant"), func() {
 		})
 
 		By("creating a Namespace", func() {
-			NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+			NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 
 			EventuallyCreation(func() error {
 				_, err := cs.CoreV1().Pods(ns.Name).Create(context.Background(), pod, metav1.CreateOptions{})

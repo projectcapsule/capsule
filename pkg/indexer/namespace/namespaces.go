@@ -9,7 +9,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/utils/tenant"
 )
 
 type OwnerReference struct{}
@@ -32,7 +32,7 @@ func (o OwnerReference) Func() client.IndexerFunc {
 		}
 
 		for _, or := range ns.OwnerReferences {
-			if or.APIVersion == capsulev1beta2.GroupVersion.String() {
+			if tenant.IsTenantOwnerReference(or) {
 				res = append(res, or.Name)
 			}
 		}

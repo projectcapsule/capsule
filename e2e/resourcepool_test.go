@@ -18,7 +18,7 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api"
-	"github.com/projectcapsule/capsule/pkg/meta"
+	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/utils"
 )
 
@@ -205,7 +205,7 @@ var _ = Describe("ResourcePool Tests", Label("resourcepool"), func() {
 				rq := &corev1.ResourceQuota{}
 
 				err := k8sClient.Get(context.TODO(), client.ObjectKey{
-					Name:      utils.PoolResourceQuotaName(pool),
+					Name:      pool.GetQuotaName(),
 					Namespace: ns},
 					rq)
 				Expect(err).Should(Succeed())
@@ -324,7 +324,7 @@ var _ = Describe("ResourcePool Tests", Label("resourcepool"), func() {
 				rq := &corev1.ResourceQuota{}
 
 				err := k8sClient.Get(context.TODO(), client.ObjectKey{
-					Name:      utils.PoolResourceQuotaName(pool),
+					Name:      pool.GetQuotaName(),
 					Namespace: ns},
 					rq)
 				Expect(err).Should(Succeed())
@@ -391,7 +391,7 @@ var _ = Describe("ResourcePool Tests", Label("resourcepool"), func() {
 				rq := &corev1.ResourceQuota{}
 
 				err := k8sClient.Get(context.TODO(), client.ObjectKey{
-					Name:      utils.PoolResourceQuotaName(pool),
+					Name:      pool.GetQuotaName(),
 					Namespace: ns},
 					rq)
 				Expect(err).Should(Succeed())
@@ -437,7 +437,7 @@ var _ = Describe("ResourcePool Tests", Label("resourcepool"), func() {
 			rq := &corev1.ResourceQuota{}
 			Eventually(func() error {
 				return k8sClient.Get(context.TODO(), client.ObjectKey{
-					Name:      utils.PoolResourceQuotaName(pool),
+					Name:      pool.GetQuotaName(),
 					Namespace: "ns-2-default-pool",
 				}, rq)
 			}, "30s", "1s").ShouldNot(Succeed(), "Expected ResourceQuota to be deleted from namespace %s", "ns-2-default-pool")
@@ -505,7 +505,7 @@ var _ = Describe("ResourcePool Tests", Label("resourcepool"), func() {
 				rq := &corev1.ResourceQuota{}
 				Eventually(func() error {
 					return k8sClient.Get(context.TODO(), client.ObjectKey{
-						Name:      utils.PoolResourceQuotaName(pool),
+						Name:      pool.GetQuotaName(),
 						Namespace: ns,
 					}, rq)
 				}, "30s", "1s").ShouldNot(Succeed(), "Expected ResourceQuota to be deleted from namespace %s", ns)
@@ -644,7 +644,7 @@ var _ = Describe("ResourcePool Tests", Label("resourcepool"), func() {
 				rq := &corev1.ResourceQuota{}
 
 				err := k8sClient.Get(context.TODO(), client.ObjectKey{
-					Name:      utils.PoolResourceQuotaName(pool),
+					Name:      pool.GetQuotaName(),
 					Namespace: ns},
 					rq)
 				Expect(err).Should(Succeed())
@@ -676,7 +676,7 @@ var _ = Describe("ResourcePool Tests", Label("resourcepool"), func() {
 				rq := &corev1.ResourceQuota{}
 				Eventually(func() error {
 					return k8sClient.Get(context.TODO(), client.ObjectKey{
-						Name:      utils.PoolResourceQuotaName(pool),
+						Name:      pool.GetQuotaName(),
 						Namespace: ns,
 					}, rq)
 				}, "30s", "1s").ShouldNot(Succeed(), "Expected ResourceQuota to be deleted from namespace %s", ns)
@@ -802,7 +802,7 @@ var _ = Describe("ResourcePool Tests", Label("resourcepool"), func() {
 			rq := &corev1.ResourceQuota{}
 
 			err := k8sClient.Get(context.TODO(), client.ObjectKey{
-				Name:      utils.PoolResourceQuotaName(pool),
+				Name:      pool.GetQuotaName(),
 				Namespace: "ns-1-pool-unordered"},
 				rq)
 			Expect(err).Should(Succeed())
@@ -1171,7 +1171,7 @@ var _ = Describe("ResourcePool Tests", Label("resourcepool"), func() {
 				rq := &corev1.ResourceQuota{}
 
 				err := k8sClient.Get(context.TODO(), client.ObjectKey{
-					Name:      utils.PoolResourceQuotaName(pool),
+					Name:      pool.GetQuotaName(),
 					Namespace: ns},
 					rq)
 				Expect(err).Should(Succeed())
@@ -1255,7 +1255,7 @@ var _ = Describe("ResourcePool Tests", Label("resourcepool"), func() {
 				rq := &corev1.ResourceQuota{}
 
 				err := k8sClient.Get(context.TODO(), client.ObjectKey{
-					Name:      utils.PoolResourceQuotaName(pool),
+					Name:      pool.GetQuotaName(),
 					Namespace: ns},
 					rq)
 				Expect(err).Should(Succeed())

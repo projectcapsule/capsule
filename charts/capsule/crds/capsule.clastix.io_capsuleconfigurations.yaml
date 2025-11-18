@@ -40,6 +40,30 @@ spec:
           spec:
             description: CapsuleConfigurationSpec defines the Capsule configuration.
             properties:
+              administrators:
+                description: |-
+                  Define entities which can act as Administrators in the capsule construct
+                  These entities are automatically owners for all existing tenants. Meaning they can add namespaces to any tenant. However they must be specific by using the capsule label
+                  for interacting with namespaces. Because if that label is not defined, it's assumed that namespace interaction was not targeted towards a tenant and will therefor
+                  be ignored by capsule.
+                items:
+                  properties:
+                    kind:
+                      description: Kind of entity. Possible values are "User", "Group",
+                        and "ServiceAccount"
+                      enum:
+                      - User
+                      - Group
+                      - ServiceAccount
+                      type: string
+                    name:
+                      description: Name of the entity.
+                      type: string
+                  required:
+                  - kind
+                  - name
+                  type: object
+                type: array
               allowServiceAccountPromotion:
                 default: false
                 description: |-

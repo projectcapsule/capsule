@@ -5,11 +5,12 @@ package e2e
 
 import (
 	"context"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -49,10 +50,12 @@ var _ = Describe("when Tenant handles Gateway classes", Label("gateway"), func()
 			Name: "tnt-with-default-gateway-class-and-label-selector",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: []capsulev1beta2.OwnerSpec{
+			Owners: []api.OwnerSpec{
 				{
-					Name: "gateway-default-and-label-selector",
-					Kind: "User",
+					UserSpec: api.UserSpec{
+						Name: "gateway-default-and-label-selector",
+						Kind: "User",
+					},
 				},
 			},
 			GatewayOptions: capsulev1beta2.GatewayOptions{
@@ -75,10 +78,12 @@ var _ = Describe("when Tenant handles Gateway classes", Label("gateway"), func()
 			Name: "tnt-with-label-selector-only",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: []capsulev1beta2.OwnerSpec{
+			Owners: []api.OwnerSpec{
 				{
-					Name: "gateway-with-label-selector-only",
-					Kind: "User",
+					UserSpec: api.UserSpec{
+						Name: "gateway-with-label-selector-only",
+						Kind: "User",
+					},
 				},
 			},
 			GatewayOptions: capsulev1beta2.GatewayOptions{
@@ -122,7 +127,7 @@ var _ = Describe("when Tenant handles Gateway classes", Label("gateway"), func()
 	})
 	It("should block Gateway", func() {
 		ns := NewNamespace("")
-		NamespaceCreation(ns, tntWithDefault.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreation(ns, tntWithDefault.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(tntWithDefault, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 		By("providing unauthorized gatewayClassName", func() {
@@ -173,7 +178,7 @@ var _ = Describe("when Tenant handles Gateway classes", Label("gateway"), func()
 	})
 	It("should allow Gateway", func() {
 		ns := NewNamespace("")
-		NamespaceCreation(ns, tntWithDefault.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreation(ns, tntWithDefault.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(tntWithDefault, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 		By("providing authorized class", func() {
 			Eventually(func() (err error) {
@@ -222,7 +227,7 @@ var _ = Describe("when Tenant handles Gateway classes", Label("gateway"), func()
 	})
 	It("should fail on invalid configuration", func() {
 		ns := NewNamespace("")
-		NamespaceCreation(ns, tntWithoutDefault.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreation(ns, tntWithoutDefault.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(tntWithoutDefault, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 		By("providing empty GatewayClassName", func() {
 			Eventually(func() (err error) {

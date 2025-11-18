@@ -6,7 +6,7 @@ package v1beta2
 import (
 	k8stypes "k8s.io/apimachinery/pkg/types"
 
-	"github.com/projectcapsule/capsule/pkg/meta"
+	"github.com/projectcapsule/capsule/pkg/api/meta"
 )
 
 // +kubebuilder:validation:Enum=Cordoned;Active

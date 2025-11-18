@@ -25,10 +25,12 @@ var _ = Describe("enforcing a Runtime Class", Label("pod"), func() {
 			Name: "runtime-class",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: capsulev1beta2.OwnerListSpec{
+			Owners: api.OwnerListSpec{
 				{
-					Name: "george",
-					Kind: "User",
+					UserSpec: api.UserSpec{
+						Name: "george",
+						Kind: "User",
+					},
 				},
 			},
 			RuntimeClasses: &api.DefaultAllowedListSpec{
@@ -72,7 +74,7 @@ var _ = Describe("enforcing a Runtime Class", Label("pod"), func() {
 		}()
 
 		ns := NewNamespace("rt-disallow")
-		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 		runtimeName := "disallowed"
 		pod := &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
@@ -89,7 +91,7 @@ var _ = Describe("enforcing a Runtime Class", Label("pod"), func() {
 			},
 		}
 
-		cs := ownerClient(tnt.Spec.Owners[0])
+		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 		EventuallyCreation(func() error {
 			_, err := cs.CoreV1().Pods(ns.GetName()).Create(context.Background(), pod, metav1.CreateOptions{})
 			return err
@@ -110,7 +112,7 @@ var _ = Describe("enforcing a Runtime Class", Label("pod"), func() {
 		}()
 
 		ns := NewNamespace("rt-exact-match")
-		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 		runtimeName := "legacy"
 		pod := &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
@@ -127,7 +129,7 @@ var _ = Describe("enforcing a Runtime Class", Label("pod"), func() {
 			},
 		}
 
-		cs := ownerClient(tnt.Spec.Owners[0])
+		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 		EventuallyCreation(func() error {
 			_, err := cs.CoreV1().Pods(ns.GetName()).Create(context.Background(), pod, metav1.CreateOptions{})
 			return err
@@ -137,7 +139,7 @@ var _ = Describe("enforcing a Runtime Class", Label("pod"), func() {
 	It("should allow regex match", func() {
 		ns := NewNamespace("rc-regex-match")
 
-		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 
 		for i, rt := range []string{"hardened-crio", "hardened-containerd", "hardened-dockerd"} {
 			runtimeName := strings.Join([]string{rt, "-", strconv.Itoa(i)}, "")
@@ -165,7 +167,7 @@ var _ = Describe("enforcing a Runtime Class", Label("pod"), func() {
 				},
 			}
 
-			cs := ownerClient(tnt.Spec.Owners[0])
+			cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 
 			EventuallyCreation(func() error {
 				_, err := cs.CoreV1().Pods(ns.GetName()).Create(context.Background(), pod, metav1.CreateOptions{})
@@ -179,7 +181,7 @@ var _ = Describe("enforcing a Runtime Class", Label("pod"), func() {
 	It("should allow selector match", func() {
 		ns := NewNamespace("rc-selector-match")
 
-		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 
 		for i, rt := range []string{"customer-containerd", "customer-crio", "customer-dockerd"} {
 			runtimeName := strings.Join([]string{rt, "-", strconv.Itoa(i)}, "")
@@ -211,7 +213,7 @@ var _ = Describe("enforcing a Runtime Class", Label("pod"), func() {
 				},
 			}
 
-			cs := ownerClient(tnt.Spec.Owners[0])
+			cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 
 			EventuallyCreation(func() error {
 				_, err := cs.CoreV1().Pods(ns.GetName()).Create(context.Background(), pod, metav1.CreateOptions{})
@@ -225,7 +227,7 @@ var _ = Describe("enforcing a Runtime Class", Label("pod"), func() {
 	It("should auto assign the default", func() {
 		ns := NewNamespace("rc-default")
 
-		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 
 		runtime := &nodev1.RuntimeClass{
 			ObjectMeta: metav1.ObjectMeta{
@@ -253,7 +255,7 @@ var _ = Describe("enforcing a Runtime Class", Label("pod"), func() {
 			},
 		}
 
-		cs := ownerClient(tnt.Spec.Owners[0])
+		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 
 		var createdPod *corev1.Pod
 

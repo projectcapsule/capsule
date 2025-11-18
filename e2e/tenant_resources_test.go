@@ -27,10 +27,12 @@ var _ = Describe("creating namespaces within a Tenant with resources", Label("te
 			Name: "tenant-resources",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: capsulev1beta2.OwnerListSpec{
+			Owners: api.OwnerListSpec{
 				{
-					Name: "john",
-					Kind: "User",
+					UserSpec: api.UserSpec{
+						Name: "john",
+						Kind: "User",
+					},
 				},
 			},
 			LimitRanges: api.LimitRangesSpec{Items: []corev1.LimitRangeSpec{
@@ -161,7 +163,7 @@ var _ = Describe("creating namespaces within a Tenant with resources", Label("te
 		By("creating the Namespaces", func() {
 			for _, i := range nsl {
 				ns := NewNamespace(i)
-				NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+				NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 				TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 			}
 		})

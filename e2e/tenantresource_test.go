@@ -30,10 +30,12 @@ var _ = Describe("Creating a TenantResource object", Label("tenantresource"), fu
 			Name: "energy-solar",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: capsulev1beta2.OwnerListSpec{
+			Owners: api.OwnerListSpec{
 				{
-					Name: "solar-user",
-					Kind: "User",
+					UserSpec: api.UserSpec{
+						Name: "solar-user",
+						Kind: "User",
+					},
 				},
 			},
 		},
@@ -192,7 +194,7 @@ var _ = Describe("Creating a TenantResource object", Label("tenantresource"), fu
 
 		By("creating solar Namespaces", func() {
 			for _, ns := range append(solarNs, "solar-system") {
-				NamespaceCreation(&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: ns}}, solar.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+				NamespaceCreation(&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: ns}}, solar.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 			}
 		})
 
@@ -316,7 +318,7 @@ var _ = Describe("Creating a TenantResource object", Label("tenantresource"), fu
 
 		By("checking replicated object cannot be deleted by a Tenant Owner", func() {
 			for _, name := range []string{"dummy-secret", "raw-secret-1", "raw-secret-2", "raw-secret-3"} {
-				cs := ownerClient(solar.Spec.Owners[0])
+				cs := ownerClient(solar.Spec.Owners[0].UserSpec)
 
 				Consistently(func() error {
 					return cs.CoreV1().Secrets("solar-three").Delete(context.TODO(), name, metav1.DeleteOptions{})
@@ -326,7 +328,7 @@ var _ = Describe("Creating a TenantResource object", Label("tenantresource"), fu
 
 		By("checking replicated object cannot be update by a Tenant Owner", func() {
 			for _, name := range []string{"dummy-secret", "raw-secret-1", "raw-secret-2", "raw-secret-3"} {
-				cs := ownerClient(solar.Spec.Owners[0])
+				cs := ownerClient(solar.Spec.Owners[0].UserSpec)
 
 				Consistently(func() error {
 					secret, err := cs.CoreV1().Secrets("solar-three").Get(context.TODO(), name, metav1.GetOptions{})

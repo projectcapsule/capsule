@@ -14,7 +14,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	"github.com/projectcapsule/capsule/pkg/meta"
+	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api/meta"
 )
 
 var _ = Describe("verify scalability", Label("scalability"), func() {
@@ -23,10 +24,12 @@ var _ = Describe("verify scalability", Label("scalability"), func() {
 			Name: "tenant-scalability",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: capsulev1beta2.OwnerListSpec{
+			Owners: api.OwnerListSpec{
 				{
-					Name: "gatsby",
-					Kind: "User",
+					UserSpec: api.UserSpec{
+						Name: "gatsby",
+						Kind: "User",
+					},
 				},
 			},
 		},
@@ -111,7 +114,7 @@ var _ = Describe("verify scalability", Label("scalability"), func() {
 		namespaces := make([]*corev1.Namespace, 0, amount)
 		for i := 0; i < amount; i++ {
 			ns := NewNamespace(fmt.Sprintf("scale-%d", i))
-			NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+			NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 			TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 			// Expect size bumped to i+1 and instance present

@@ -32,10 +32,12 @@ var _ = Describe("when Tenant handles Storage classes", Label("tenant", "storage
 			Name: "storage-class-selector",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: capsulev1beta2.OwnerListSpec{
+			Owners: api.OwnerListSpec{
 				{
-					Name: "selector",
-					Kind: "User",
+					UserSpec: api.UserSpec{
+						Name: "selector",
+						Kind: "User",
+					},
 				},
 			},
 			StorageClasses: &api.DefaultAllowedListSpec{
@@ -59,10 +61,12 @@ var _ = Describe("when Tenant handles Storage classes", Label("tenant", "storage
 			Name: "storage-class-default",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: capsulev1beta2.OwnerListSpec{
+			Owners: api.OwnerListSpec{
 				{
-					Name: "default",
-					Kind: "User",
+					UserSpec: api.UserSpec{
+						Name: "default",
+						Kind: "User",
+					},
 				},
 			},
 			StorageClasses: &api.DefaultAllowedListSpec{
@@ -137,12 +141,12 @@ var _ = Describe("when Tenant handles Storage classes", Label("tenant", "storage
 		k8sClient.Create(context.TODO(), tntNoDefaults)
 
 		ns := NewNamespace("")
-		NamespaceCreation(ns, tntNoDefaults.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreation(ns, tntNoDefaults.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(tntNoDefaults, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 		By("non-specifying it", func() {
 			Eventually(func() (err error) {
-				cs := ownerClient(tntNoDefaults.Spec.Owners[0])
+				cs := ownerClient(tntNoDefaults.Spec.Owners[0].UserSpec)
 				p := &corev1.PersistentVolumeClaim{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "denied-pvc",
@@ -162,7 +166,7 @@ var _ = Describe("when Tenant handles Storage classes", Label("tenant", "storage
 		})
 		By("specifying a forbidden one", func() {
 			Eventually(func() (err error) {
-				cs := ownerClient(tntNoDefaults.Spec.Owners[0])
+				cs := ownerClient(tntNoDefaults.Spec.Owners[0].UserSpec)
 				p := &corev1.PersistentVolumeClaim{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "mighty-storage",
@@ -209,7 +213,7 @@ var _ = Describe("when Tenant handles Storage classes", Label("tenant", "storage
 					},
 				}
 
-				cs := ownerClient(tntNoDefaults.Spec.Owners[0])
+				cs := ownerClient(tntNoDefaults.Spec.Owners[0].UserSpec)
 
 				EventuallyCreation(func() error {
 					_, err := cs.CoreV1().PersistentVolumeClaims(ns.GetName()).Create(context.Background(), p, metav1.CreateOptions{})
@@ -222,9 +226,9 @@ var _ = Describe("when Tenant handles Storage classes", Label("tenant", "storage
 
 	It("should allow", func() {
 		ns := NewNamespace("")
-		cs := ownerClient(tntNoDefaults.Spec.Owners[0])
+		cs := ownerClient(tntNoDefaults.Spec.Owners[0].UserSpec)
 
-		NamespaceCreation(ns, tntNoDefaults.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreation(ns, tntNoDefaults.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(tntNoDefaults, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 		By("using exact matches", func() {
 			for _, c := range tntNoDefaults.Spec.StorageClasses.Exact {
@@ -309,7 +313,7 @@ var _ = Describe("when Tenant handles Storage classes", Label("tenant", "storage
 
 	It("should mutate to default tenant StorageClass (class does not exists)", func() {
 		ns := NewNamespace("")
-		NamespaceCreation(ns, tntWithDefault.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreation(ns, tntWithDefault.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(tntWithDefault, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 		p := &corev1.PersistentVolumeClaim{
@@ -337,7 +341,7 @@ var _ = Describe("when Tenant handles Storage classes", Label("tenant", "storage
 		Expect(k8sClient.Create(context.TODO(), &class)).Should(Succeed())
 
 		ns := NewNamespace("")
-		NamespaceCreation(ns, tntWithDefault.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreation(ns, tntWithDefault.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(tntWithDefault, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 		p := &corev1.PersistentVolumeClaim{
@@ -369,7 +373,7 @@ var _ = Describe("when Tenant handles Storage classes", Label("tenant", "storage
 		Expect(k8sClient.Create(context.TODO(), &global)).Should(Succeed())
 
 		ns := NewNamespace("")
-		NamespaceCreation(ns, tntWithDefault.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreation(ns, tntWithDefault.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(tntWithDefault, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 		p := &corev1.PersistentVolumeClaim{
@@ -400,7 +404,7 @@ var _ = Describe("when Tenant handles Storage classes", Label("tenant", "storage
 		Expect(k8sClient.Create(context.TODO(), &global)).Should(Succeed())
 
 		ns := NewNamespace("")
-		NamespaceCreation(ns, tntWithDefault.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreation(ns, tntWithDefault.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(tntWithDefault, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 		p := &corev1.PersistentVolumeClaim{

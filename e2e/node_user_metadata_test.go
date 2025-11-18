@@ -15,8 +15,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/internal/webhook/utils"
 	"github.com/projectcapsule/capsule/pkg/api"
-	"github.com/projectcapsule/capsule/pkg/webhook/utils"
 )
 
 var _ = Describe("modifying node labels and annotations", Label("config", "nodes"), func() {
@@ -27,10 +27,12 @@ var _ = Describe("modifying node labels and annotations", Label("config", "nodes
 			Name: "tenant-node-user-metadata-forbidden",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: capsulev1beta2.OwnerListSpec{
+			Owners: api.OwnerListSpec{
 				{
-					Name: "gatsby",
-					Kind: "User",
+					UserSpec: api.UserSpec{
+						Name: "gatsby",
+						Kind: "User",
+					},
 				},
 			},
 		},
@@ -145,7 +147,7 @@ var _ = Describe("modifying node labels and annotations", Label("config", "nodes
 			EventuallyCreation(func() error {
 				return ModifyNode(func(node *corev1.Node) error {
 					node.Labels["bim"] = "baz"
-					cs := ownerClient(tnt.Spec.Owners[0])
+					cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 
 					_, err := cs.CoreV1().Nodes().Update(context.Background(), node, metav1.UpdateOptions{})
 					return err
@@ -156,7 +158,7 @@ var _ = Describe("modifying node labels and annotations", Label("config", "nodes
 			EventuallyCreation(func() error {
 				return ModifyNode(func(node *corev1.Node) error {
 					node.Labels["bim"] = "bom"
-					cs := ownerClient(tnt.Spec.Owners[0])
+					cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 
 					_, err := cs.CoreV1().Nodes().Update(context.Background(), node, metav1.UpdateOptions{})
 					return err
@@ -167,7 +169,7 @@ var _ = Describe("modifying node labels and annotations", Label("config", "nodes
 			EventuallyCreation(func() error {
 				return ModifyNode(func(node *corev1.Node) error {
 					node.Annotations["bim"] = "baz"
-					cs := ownerClient(tnt.Spec.Owners[0])
+					cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 
 					_, err := cs.CoreV1().Nodes().Update(context.Background(), node, metav1.UpdateOptions{})
 					return err
@@ -178,7 +180,7 @@ var _ = Describe("modifying node labels and annotations", Label("config", "nodes
 			EventuallyCreation(func() error {
 				return ModifyNode(func(node *corev1.Node) error {
 					node.Annotations["bim"] = "bom"
-					cs := ownerClient(tnt.Spec.Owners[0])
+					cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 
 					_, err := cs.CoreV1().Nodes().Update(context.Background(), node, metav1.UpdateOptions{})
 					return err
@@ -212,7 +214,7 @@ var _ = Describe("modifying node labels and annotations", Label("config", "nodes
 			EventuallyCreation(func() error {
 				return ModifyNode(func(node *corev1.Node) error {
 					node.Labels["bar"] = "baz"
-					cs := ownerClient(tnt.Spec.Owners[0])
+					cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 
 					_, err := cs.CoreV1().Nodes().Update(context.Background(), node, metav1.UpdateOptions{})
 					return err
@@ -223,7 +225,7 @@ var _ = Describe("modifying node labels and annotations", Label("config", "nodes
 			EventuallyCreation(func() error {
 				return ModifyNode(func(node *corev1.Node) error {
 					node.Labels["gatsby-foo"] = "baz"
-					cs := ownerClient(tnt.Spec.Owners[0])
+					cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 
 					_, err := cs.CoreV1().Nodes().Update(context.Background(), node, metav1.UpdateOptions{})
 					return err
@@ -234,7 +236,7 @@ var _ = Describe("modifying node labels and annotations", Label("config", "nodes
 			EventuallyCreation(func() error {
 				return ModifyNode(func(node *corev1.Node) error {
 					node.Labels["foo"] = "baz"
-					cs := ownerClient(tnt.Spec.Owners[0])
+					cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 
 					_, err := cs.CoreV1().Nodes().Update(context.Background(), node, metav1.UpdateOptions{})
 					return err
@@ -245,7 +247,7 @@ var _ = Describe("modifying node labels and annotations", Label("config", "nodes
 			EventuallyCreation(func() error {
 				return ModifyNode(func(node *corev1.Node) error {
 					node.Annotations["bar"] = "baz"
-					cs := ownerClient(tnt.Spec.Owners[0])
+					cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 
 					_, err := cs.CoreV1().Nodes().Update(context.Background(), node, metav1.UpdateOptions{})
 					return err
@@ -256,7 +258,7 @@ var _ = Describe("modifying node labels and annotations", Label("config", "nodes
 			EventuallyCreation(func() error {
 				return ModifyNode(func(node *corev1.Node) error {
 					node.Annotations["gatsby-foo"] = "baz"
-					cs := ownerClient(tnt.Spec.Owners[0])
+					cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 
 					_, err := cs.CoreV1().Nodes().Update(context.Background(), node, metav1.UpdateOptions{})
 					return err
@@ -267,7 +269,7 @@ var _ = Describe("modifying node labels and annotations", Label("config", "nodes
 			EventuallyCreation(func() error {
 				return ModifyNode(func(node *corev1.Node) error {
 					node.Annotations["foo"] = "baz"
-					cs := ownerClient(tnt.Spec.Owners[0])
+					cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 
 					_, err := cs.CoreV1().Nodes().Update(context.Background(), node, metav1.UpdateOptions{})
 					return err
