@@ -25,10 +25,12 @@ var _ = Describe("when Tenant handles Ingress classes with extensions/v1beta1", 
 			Name: "ingress-class-extensions-v1beta1",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: capsulev1beta2.OwnerListSpec{
+			Owners: api.OwnerListSpec{
 				{
-					Name: "ingress",
-					Kind: "User",
+					UserSpec: api.UserSpec{
+						Name: "ingress",
+						Kind: "User",
+					},
 				},
 			},
 			IngressOptions: capsulev1beta2.IngressOptions{
@@ -62,9 +64,9 @@ var _ = Describe("when Tenant handles Ingress classes with extensions/v1beta1", 
 
 	It("should block a non allowed class for extensions/v1beta1", func() {
 		ns := NewNamespace("")
-		cs := ownerClient(tnt.Spec.Owners[0])
+		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 
-		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 		By("non-specifying at all", func() {
@@ -144,9 +146,9 @@ var _ = Describe("when Tenant handles Ingress classes with extensions/v1beta1", 
 
 	It("should allow enabled class using the deprecated annotation", func() {
 		ns := NewNamespace("")
-		cs := ownerClient(tnt.Spec.Owners[0])
+		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 
-		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 		for _, c := range tnt.Spec.IngressOptions.AllowedClasses.Exact {
@@ -189,9 +191,9 @@ var _ = Describe("when Tenant handles Ingress classes with extensions/v1beta1", 
 		}
 
 		ns := NewNamespace("")
-		cs := ownerClient(tnt.Spec.Owners[0])
+		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 
-		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 		for _, c := range tnt.Spec.IngressOptions.AllowedClasses.Exact {
@@ -216,10 +218,10 @@ var _ = Describe("when Tenant handles Ingress classes with extensions/v1beta1", 
 
 	It("should allow enabled Ingress by regex using the deprecated annotation", func() {
 		ns := NewNamespace("")
-		cs := ownerClient(tnt.Spec.Owners[0])
+		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 		ingressClass := "oil-ingress"
 
-		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 		Eventually(func() (err error) {
@@ -250,10 +252,10 @@ var _ = Describe("when Tenant handles Ingress classes with extensions/v1beta1", 
 
 	It("should allow enabled Ingress by regex using the ingressClassName field", func() {
 		ns := NewNamespace("")
-		cs := ownerClient(tnt.Spec.Owners[0])
+		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 		ingressClass := "oil-haproxy"
 
-		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 		Eventually(func() (err error) {

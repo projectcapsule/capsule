@@ -29,10 +29,12 @@ var _ = Describe("adding metadata to Service objects", Label("tenant", "service"
 			Name: "service-metadata",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: capsulev1beta2.OwnerListSpec{
+			Owners: api.OwnerListSpec{
 				{
-					Name: "gatsby",
-					Kind: "User",
+					UserSpec: api.UserSpec{
+						Name: "gatsby",
+						Kind: "User",
+					},
 				},
 			},
 			ServiceOptions: &api.ServiceOptions{
@@ -64,7 +66,7 @@ var _ = Describe("adding metadata to Service objects", Label("tenant", "service"
 
 	It("should apply them to Service", func() {
 		ns := NewNamespace("")
-		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 		svc := &corev1.Service{
@@ -101,13 +103,13 @@ var _ = Describe("adding metadata to Service objects", Label("tenant", "service"
 					},
 				},
 			}
-			_, err = ownerClient(tnt.Spec.Owners[0]).CoreV1().Pods(ns.GetName()).Create(context.Background(), pod, metav1.CreateOptions{})
+			_, err = ownerClient(tnt.Spec.Owners[0].UserSpec).CoreV1().Pods(ns.GetName()).Create(context.Background(), pod, metav1.CreateOptions{})
 
 			return
 		}).Should(Succeed())
 
 		EventuallyCreation(func() (err error) {
-			_, err = ownerClient(tnt.Spec.Owners[0]).CoreV1().Services(ns.GetName()).Create(context.Background(), svc, metav1.CreateOptions{})
+			_, err = ownerClient(tnt.Spec.Owners[0].UserSpec).CoreV1().Services(ns.GetName()).Create(context.Background(), svc, metav1.CreateOptions{})
 
 			return
 		}).Should(Succeed())
@@ -147,7 +149,7 @@ var _ = Describe("adding metadata to Service objects", Label("tenant", "service"
 		}
 
 		ns := NewNamespace("")
-		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 		// Waiting for the reconciliation of required RBAC
 		EventuallyCreation(func() (err error) {
@@ -164,7 +166,7 @@ var _ = Describe("adding metadata to Service objects", Label("tenant", "service"
 					},
 				},
 			}
-			_, err = ownerClient(tnt.Spec.Owners[0]).CoreV1().Pods(ns.GetName()).Create(context.Background(), pod, metav1.CreateOptions{})
+			_, err = ownerClient(tnt.Spec.Owners[0].UserSpec).CoreV1().Pods(ns.GetName()).Create(context.Background(), pod, metav1.CreateOptions{})
 
 			return
 		}).Should(Succeed())

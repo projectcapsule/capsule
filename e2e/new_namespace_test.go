@@ -11,6 +11,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/api"
 )
 
 var _ = Describe("creating a Namespaces as different type of Tenant owners", Label("namespace"), func() {
@@ -19,18 +20,24 @@ var _ = Describe("creating a Namespaces as different type of Tenant owners", Lab
 			Name: "tenant-assigned",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: capsulev1beta2.OwnerListSpec{
+			Owners: api.OwnerListSpec{
 				{
-					Name: "alice",
-					Kind: "User",
+					UserSpec: api.UserSpec{
+						Name: "alice",
+						Kind: "User",
+					},
 				},
 				{
-					Name: "bob",
-					Kind: "Group",
+					UserSpec: api.UserSpec{
+						Name: "bob",
+						Kind: "Group",
+					},
 				},
 				{
-					Name: "system:serviceaccount:new-namespace-sa:default",
-					Kind: "ServiceAccount",
+					UserSpec: api.UserSpec{
+						Name: "system:serviceaccount:new-namespace-sa:default",
+						Kind: "ServiceAccount",
+					},
 				},
 			},
 		},
@@ -48,7 +55,7 @@ var _ = Describe("creating a Namespaces as different type of Tenant owners", Lab
 
 	It("should be available in Tenant namespaces list and RoleBindings should be present when created", func() {
 		ns := NewNamespace("")
-		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElements(ns.GetName()))
 
 		for _, owner := range tnt.Spec.Owners {
@@ -57,7 +64,7 @@ var _ = Describe("creating a Namespaces as different type of Tenant owners", Lab
 	})
 	It("should be available in Tenant namespaces list and RoleBindings should present when created as Group", func() {
 		ns := NewNamespace("")
-		NamespaceCreation(ns, tnt.Spec.Owners[1], defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreation(ns, tnt.Spec.Owners[1].UserSpec, defaultTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElements(ns.GetName()))
 
 		for _, owner := range tnt.Spec.Owners {
@@ -66,7 +73,7 @@ var _ = Describe("creating a Namespaces as different type of Tenant owners", Lab
 	})
 	It("should be available in Tenant namespaces list and RoleBindings should present when created as ServiceAccount", func() {
 		ns := NewNamespace("")
-		NamespaceCreation(ns, tnt.Spec.Owners[2], defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreation(ns, tnt.Spec.Owners[2].UserSpec, defaultTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElements(ns.GetName()))
 
 		for _, owner := range tnt.Spec.Owners {

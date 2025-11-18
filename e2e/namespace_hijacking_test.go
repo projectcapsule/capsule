@@ -13,24 +13,29 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/api"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
 
-var _ = Describe("creating several Namespaces for a Tenant", Label("namespace"), func() {
-	tnt := &capsulev1beta2.Tenant{
+var _ = Describe("creating several Namespaces for a Tenant", Label("namespace", "hijack"), func() {
+	tnt_1 := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "capsule-ns-attack-1",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: capsulev1beta2.OwnerListSpec{
+			Owners: api.OwnerListSpec{
 				{
-					Name: "charlie",
-					Kind: "User",
+					UserSpec: api.UserSpec{
+						Name: "gatsby",
+						Kind: "User",
+					},
 				},
 				{
-					Kind: "ServiceAccount",
-					Name: "system:serviceaccount:attacker-system:attacker",
+					UserSpec: api.UserSpec{
+						Kind: "ServiceAccount",
+						Name: "system:serviceaccount:attacker-system:attacker",
+					},
 				},
 			},
 		},
@@ -41,28 +46,29 @@ var _ = Describe("creating several Namespaces for a Tenant", Label("namespace"),
 			Name: "kube-system",
 		},
 	}
+
 	JustBeforeEach(func() {
 		EventuallyCreation(func() (err error) {
-			tnt.ResourceVersion = ""
-			err = k8sClient.Create(context.TODO(), tnt)
+			tnt_1.ResourceVersion = ""
+			err = k8sClient.Create(context.TODO(), tnt_1)
 
 			return
 		}).Should(Succeed())
 	})
 	JustAfterEach(func() {
-		Expect(k8sClient.Delete(context.TODO(), tnt)).Should(Succeed())
+		Expect(k8sClient.Delete(context.TODO(), tnt_1)).Should(Succeed())
 
 	})
 
 	It("Can't hijack offlimits namespace (Ownerreferences)", func() {
 		tenant := &capsulev1beta2.Tenant{}
-		Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: tnt.Name}, tenant)).Should(Succeed())
+		Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: tnt_1.Name}, tenant)).Should(Succeed())
 
 		// Get the namespace
 		Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: kubeSystem.GetName()}, kubeSystem)).Should(Succeed())
 
-		for _, owner := range tnt.Spec.Owners {
-			cs := ownerClient(owner)
+		for _, owner := range tnt_1.Spec.Owners {
+			cs := ownerClient(owner.UserSpec)
 
 			patch := []byte(fmt.Sprintf(`{"metadata":{"ownerReferences":[{"apiVersion":"%s/%s","kind":"Tenant","name":"%s","uid":"%s"}]}}`, capsulev1beta2.GroupVersion.Group, capsulev1beta2.GroupVersion.Version, tenant.GetName(), tenant.GetUID()))
 
@@ -74,13 +80,13 @@ var _ = Describe("creating several Namespaces for a Tenant", Label("namespace"),
 
 	It("Can't hijack offlimits namespace (Labels)", func() {
 		tenant := &capsulev1beta2.Tenant{}
-		Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: tnt.Name}, tenant)).Should(Succeed())
+		Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: tnt_1.Name}, tenant)).Should(Succeed())
 
 		// Get the namespace
 		Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: kubeSystem.GetName()}, kubeSystem)).Should(Succeed())
 
-		for _, owner := range tnt.Spec.Owners {
-			cs := ownerClient(owner)
+		for _, owner := range tnt_1.Spec.Owners {
+			cs := ownerClient(owner.UserSpec)
 
 			patch := []byte(fmt.Sprintf(`{"metadata":{"labels":{"%s":"%s"}}}`, "capsule.clastix.io/tenant", tenant.GetName()))
 
@@ -91,13 +97,13 @@ var _ = Describe("creating several Namespaces for a Tenant", Label("namespace"),
 
 	It("Can't hijack offlimits namespace (Annotations)", func() {
 		tenant := &capsulev1beta2.Tenant{}
-		Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: tnt.Name}, tenant)).Should(Succeed())
+		Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: tnt_1.Name}, tenant)).Should(Succeed())
 
 		// Get the namespace
 		Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: kubeSystem.GetName()}, kubeSystem)).Should(Succeed())
 
-		for _, owner := range tnt.Spec.Owners {
-			cs := ownerClient(owner)
+		for _, owner := range tnt_1.Spec.Owners {
+			cs := ownerClient(owner.UserSpec)
 
 			patch := []byte(fmt.Sprintf(`{"metadata":{"annotations":{"%s":"%s"}}}`, "capsule.clastix.io/tenant", tenant.GetName()))
 
@@ -107,16 +113,16 @@ var _ = Describe("creating several Namespaces for a Tenant", Label("namespace"),
 	})
 
 	It("Owners can create and attempt to patch new namespaces but patches should not be applied", func() {
-		for _, owner := range tnt.Spec.Owners {
-			cs := ownerClient(owner)
+		for _, owner := range tnt_1.Spec.Owners {
+			cs := ownerClient(owner.UserSpec)
 
 			// Each owner creates a new namespace
 			ns := NewNamespace("")
-			NamespaceCreation(ns, owner, defaultTimeoutInterval).Should(Succeed())
+			NamespaceCreation(ns, owner.UserSpec, defaultTimeoutInterval).Should(Succeed())
 
 			// Attempt to patch the owner references of the new namespace
 			tenant := &capsulev1beta2.Tenant{}
-			Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: tnt.Name}, tenant)).Should(Succeed())
+			Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: tnt_1.Name}, tenant)).Should(Succeed())
 
 			randomUID := types.UID(fmt.Sprintf("%d", rand.Int()))
 			randomName := fmt.Sprintf("random-tenant-%d", rand.Int())

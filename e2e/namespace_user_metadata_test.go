@@ -33,10 +33,12 @@ var _ = Describe("creating a Namespace with user-specified labels and annotation
 					Regex: "^gatsby-.*$",
 				},
 			},
-			Owners: capsulev1beta2.OwnerListSpec{
+			Owners: api.OwnerListSpec{
 				{
-					Name: "gatsby",
-					Kind: "User",
+					UserSpec: api.UserSpec{
+						Name: "gatsby",
+						Kind: "User",
+					},
 				},
 			},
 		},
@@ -56,12 +58,12 @@ var _ = Describe("creating a Namespace with user-specified labels and annotation
 		By("specifying non-forbidden labels", func() {
 			ns := NewNamespace("")
 			ns.SetLabels(map[string]string{"bim": "baz"})
-			NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+			NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 		})
 		By("specifying non-forbidden annotations", func() {
 			ns := NewNamespace("")
 			ns.SetAnnotations(map[string]string{"bim": "baz"})
-			NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+			NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 		})
 	})
 
@@ -69,22 +71,22 @@ var _ = Describe("creating a Namespace with user-specified labels and annotation
 		By("specifying forbidden labels using exact match", func() {
 			ns := NewNamespace("")
 			ns.SetLabels(map[string]string{"foo": "bar"})
-			NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).ShouldNot(Succeed())
+			NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).ShouldNot(Succeed())
 		})
 		By("specifying forbidden labels using regex match", func() {
 			ns := NewNamespace("")
 			ns.SetLabels(map[string]string{"gatsby-foo": "bar"})
-			NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).ShouldNot(Succeed())
+			NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).ShouldNot(Succeed())
 		})
 		By("specifying forbidden annotations using exact match", func() {
 			ns := NewNamespace("")
 			ns.SetAnnotations(map[string]string{"foo": "bar"})
-			NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).ShouldNot(Succeed())
+			NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).ShouldNot(Succeed())
 		})
 		By("specifying forbidden annotations using regex match", func() {
 			ns := NewNamespace("")
 			ns.SetAnnotations(map[string]string{"gatsby-foo": "bar"})
-			NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).ShouldNot(Succeed())
+			NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).ShouldNot(Succeed())
 		})
 	})
 
@@ -130,12 +132,12 @@ var _ = Describe("creating a Namespace with user-specified labels and annotation
 			Expect(k8sClient.Create(context.Background(), roleBinding)).To(Succeed())
 		}
 
-		cs := ownerClient(tnt.Spec.Owners[0])
+		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 
 		By("specifying forbidden labels using exact match", func() {
 			ns := NewNamespace("forbidden-labels-exact-match")
 
-			NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+			NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 			rbacPatch(ns.GetName())
 			Consistently(func() error {
 				if err := k8sClient.Get(context.Background(), types.NamespacedName{Name: ns.GetName()}, ns); err != nil {
@@ -152,7 +154,7 @@ var _ = Describe("creating a Namespace with user-specified labels and annotation
 		By("specifying forbidden labels using regex match", func() {
 			ns := NewNamespace("forbidden-labels-regex-match")
 
-			NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+			NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 			rbacPatch(ns.GetName())
 			Consistently(func() error {
 				if err := k8sClient.Get(context.Background(), types.NamespacedName{Name: ns.GetName()}, ns); err != nil {
@@ -169,7 +171,7 @@ var _ = Describe("creating a Namespace with user-specified labels and annotation
 		By("specifying forbidden annotations using exact match", func() {
 			ns := NewNamespace("forbidden-annotations-exact-match")
 
-			NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+			NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 			rbacPatch(ns.GetName())
 			Consistently(func() error {
 				if err := k8sClient.Get(context.Background(), types.NamespacedName{Name: ns.GetName()}, ns); err != nil {
@@ -186,7 +188,7 @@ var _ = Describe("creating a Namespace with user-specified labels and annotation
 		By("specifying forbidden annotations using regex match", func() {
 			ns := NewNamespace("forbidden-annotations-regex-match")
 
-			NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+			NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 			rbacPatch(ns.GetName())
 			Consistently(func() error {
 				if err := k8sClient.Get(context.Background(), types.NamespacedName{Name: ns.GetName()}, ns); err != nil {

@@ -15,7 +15,7 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api"
-	"github.com/projectcapsule/capsule/pkg/meta"
+	"github.com/projectcapsule/capsule/pkg/api/meta"
 )
 
 var _ = Describe("creating a Namespace for a Tenant with additional metadata", Label("namespace", "metadata"), func() {
@@ -32,10 +32,12 @@ var _ = Describe("creating a Namespace for a Tenant with additional metadata", L
 			},
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: capsulev1beta2.OwnerListSpec{
+			Owners: api.OwnerListSpec{
 				{
-					Name: "gatsby",
-					Kind: "User",
+					UserSpec: api.UserSpec{
+						Name: "gatsby",
+						Kind: "User",
+					},
 				},
 			},
 		},
@@ -71,7 +73,7 @@ var _ = Describe("creating a Namespace for a Tenant with additional metadata", L
 		})
 
 		ns := NewNamespace("")
-		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 		By("checking additional labels", func() {
@@ -187,7 +189,7 @@ var _ = Describe("creating a Namespace for a Tenant with additional metadata", L
 			"matching_namespace_label": "matching_namespace_label_value",
 		}
 		ns := NewNamespace("", labels)
-		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 		By("checking templated annotations", func() {
@@ -318,7 +320,7 @@ var _ = Describe("creating a Namespace for a Tenant with additional metadata", L
 		}
 
 		ns := NewNamespace("", labels)
-		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 		By("checking additional labels", func() {

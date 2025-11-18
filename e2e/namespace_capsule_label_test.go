@@ -13,6 +13,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api/meta"
 )
 
 var _ = Describe("creating several Namespaces for a Tenant", Label("namespace"), func() {
@@ -21,10 +23,12 @@ var _ = Describe("creating several Namespaces for a Tenant", Label("namespace"),
 			Name: "capsule-labels",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: capsulev1beta2.OwnerListSpec{
+			Owners: api.OwnerListSpec{
 				{
-					Name: "charlie",
-					Kind: "User",
+					UserSpec: api.UserSpec{
+						Name: "charlie",
+						Kind: "User",
+					},
 				},
 			},
 		},
@@ -47,10 +51,10 @@ var _ = Describe("creating several Namespaces for a Tenant", Label("namespace"),
 			NewNamespace(""),
 		}
 		for _, ns := range namespaces {
-			NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+			NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 			Eventually(func() (ok bool) {
 				Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: ns.GetName()}, ns)).Should(Succeed())
-				ok, _ = HaveKeyWithValue("capsule.clastix.io/tenant", tnt.Name).Match(ns.Labels)
+				ok, _ = HaveKeyWithValue(meta.TenantLabel, tnt.Name).Match(ns.Labels)
 				return
 			}, defaultTimeoutInterval, defaultPollInterval).Should(BeTrue())
 		}

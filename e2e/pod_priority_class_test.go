@@ -27,10 +27,12 @@ var _ = Describe("enforcing a Priority Class", Label("pod"), func() {
 			Name: "priority-class-defaults",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: capsulev1beta2.OwnerListSpec{
+			Owners: api.OwnerListSpec{
 				{
-					Name: "paul",
-					Kind: "User",
+					UserSpec: api.UserSpec{
+						Name: "paul",
+						Kind: "User",
+					},
 				},
 			},
 			PriorityClasses: &api.DefaultAllowedListSpec{
@@ -51,10 +53,12 @@ var _ = Describe("enforcing a Priority Class", Label("pod"), func() {
 			Name: "priority-class-no-defaults",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: capsulev1beta2.OwnerListSpec{
+			Owners: api.OwnerListSpec{
 				{
-					Name: "george",
-					Kind: "User",
+					UserSpec: api.UserSpec{
+						Name: "george",
+						Kind: "User",
+					},
 				},
 			},
 			PriorityClasses: &api.DefaultAllowedListSpec{
@@ -139,7 +143,7 @@ var _ = Describe("enforcing a Priority Class", Label("pod"), func() {
 
 	It("should block non allowed Priority Class", func() {
 		ns := NewNamespace("")
-		NamespaceCreation(ns, tntNoDefaults.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreation(ns, tntNoDefaults.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 
 		pod := &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
@@ -156,7 +160,7 @@ var _ = Describe("enforcing a Priority Class", Label("pod"), func() {
 			},
 		}
 
-		cs := ownerClient(tntNoDefaults.Spec.Owners[0])
+		cs := ownerClient(tntNoDefaults.Spec.Owners[0].UserSpec)
 		EventuallyCreation(func() error {
 			_, err := cs.CoreV1().Pods(ns.GetName()).Create(context.Background(), pod, metav1.CreateOptions{})
 			return err
@@ -194,9 +198,9 @@ var _ = Describe("enforcing a Priority Class", Label("pod"), func() {
 			}
 
 			ns := NewNamespace("")
-			cs := ownerClient(tntNoDefaults.Spec.Owners[0])
+			cs := ownerClient(tntNoDefaults.Spec.Owners[0].UserSpec)
 
-			NamespaceCreation(ns, tntNoDefaults.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+			NamespaceCreation(ns, tntNoDefaults.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 			TenantNamespaceList(tntNoDefaults, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 			EventuallyCreation(func() error {
@@ -220,7 +224,7 @@ var _ = Describe("enforcing a Priority Class", Label("pod"), func() {
 		Expect(k8sClient.Create(context.TODO(), pc)).Should(Succeed())
 
 		ns := NewNamespace("")
-		NamespaceCreation(ns, tntNoDefaults.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreation(ns, tntNoDefaults.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 
 		pod := &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
@@ -237,7 +241,7 @@ var _ = Describe("enforcing a Priority Class", Label("pod"), func() {
 			},
 		}
 
-		cs := ownerClient(tntNoDefaults.Spec.Owners[0])
+		cs := ownerClient(tntNoDefaults.Spec.Owners[0].UserSpec)
 		EventuallyCreation(func() error {
 			_, err := cs.CoreV1().Pods(ns.GetName()).Create(context.Background(), pod, metav1.CreateOptions{})
 			return err
@@ -246,7 +250,7 @@ var _ = Describe("enforcing a Priority Class", Label("pod"), func() {
 
 	It("should allow regex match", func() {
 		ns := NewNamespace("")
-		NamespaceCreation(ns, tntNoDefaults.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreation(ns, tntNoDefaults.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 
 		for i, pc := range []string{"pc-bronze", "pc-silver", "pc-gold"} {
 			class := &schedulingv1.PriorityClass{
@@ -315,9 +319,9 @@ var _ = Describe("enforcing a Priority Class", Label("pod"), func() {
 			}
 
 			ns := NewNamespace("")
-			cs := ownerClient(tntNoDefaults.Spec.Owners[0])
+			cs := ownerClient(tntNoDefaults.Spec.Owners[0].UserSpec)
 
-			NamespaceCreation(ns, tntNoDefaults.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+			NamespaceCreation(ns, tntNoDefaults.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 			TenantNamespaceList(tntNoDefaults, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 			EventuallyCreation(func() error {
@@ -343,9 +347,9 @@ var _ = Describe("enforcing a Priority Class", Label("pod"), func() {
 		}
 
 		ns := NewNamespace("")
-		cs := ownerClient(tntWithDefaults.Spec.Owners[0])
+		cs := ownerClient(tntWithDefaults.Spec.Owners[0].UserSpec)
 
-		NamespaceCreation(ns, tntWithDefaults.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreation(ns, tntWithDefaults.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(tntWithDefaults, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 		EventuallyCreation(func() error {
@@ -363,7 +367,7 @@ var _ = Describe("enforcing a Priority Class", Label("pod"), func() {
 		Expect(k8sClient.Create(context.TODO(), class)).Should(Succeed())
 
 		ns := NewNamespace("")
-		NamespaceCreation(ns, tntWithDefaults.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreation(ns, tntWithDefaults.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(tntWithDefaults, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 		pod := corev1.Pod{
@@ -401,7 +405,7 @@ var _ = Describe("enforcing a Priority Class", Label("pod"), func() {
 		Expect(k8sClient.Create(context.TODO(), global)).Should(Succeed())
 
 		ns := NewNamespace("")
-		NamespaceCreation(ns, tntWithDefaults.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreation(ns, tntWithDefaults.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(tntWithDefaults, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 		pod := &corev1.Pod{
@@ -438,7 +442,7 @@ var _ = Describe("enforcing a Priority Class", Label("pod"), func() {
 		Expect(k8sClient.Create(context.TODO(), global)).Should(Succeed())
 
 		ns := NewNamespace("")
-		NamespaceCreation(ns, tntWithDefaults.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreation(ns, tntWithDefaults.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(tntWithDefaults, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 		pod := &corev1.Pod{

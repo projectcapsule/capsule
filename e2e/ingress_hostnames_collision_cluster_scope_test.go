@@ -25,10 +25,12 @@ var _ = Describe("when handling Cluster scoped Ingress hostnames collision", Lab
 			Name: "hostnames-collision-cluster-one",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: capsulev1beta2.OwnerListSpec{
+			Owners: api.OwnerListSpec{
 				{
-					Name: "ingress-tenant-one",
-					Kind: "User",
+					UserSpec: api.UserSpec{
+						Name: "ingress-tenant-one",
+						Kind: "User",
+					},
 				},
 			},
 			IngressOptions: capsulev1beta2.IngressOptions{
@@ -41,10 +43,12 @@ var _ = Describe("when handling Cluster scoped Ingress hostnames collision", Lab
 			Name: "hostnames-collision-cluster-two",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: capsulev1beta2.OwnerListSpec{
+			Owners: api.OwnerListSpec{
 				{
-					Name: "ingress-tenant-two",
-					Kind: "User",
+					UserSpec: api.UserSpec{
+						Name: "ingress-tenant-two",
+						Kind: "User",
+					},
 				},
 			},
 			IngressOptions: capsulev1beta2.IngressOptions{
@@ -142,13 +146,13 @@ var _ = Describe("when handling Cluster scoped Ingress hostnames collision", Lab
 
 	It("should ensure Cluster scope for Ingress hostname and path collision", func() {
 		ns1 := NewNamespace("")
-		cs1 := ownerClient(tnt1.Spec.Owners[0])
-		NamespaceCreation(ns1, tnt1.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+		cs1 := ownerClient(tnt1.Spec.Owners[0].UserSpec)
+		NamespaceCreation(ns1, tnt1.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(tnt1, defaultTimeoutInterval).Should(ContainElement(ns1.GetName()))
 
 		ns2 := NewNamespace("")
-		cs2 := ownerClient(tnt2.Spec.Owners[0])
-		NamespaceCreation(ns2, tnt2.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+		cs2 := ownerClient(tnt2.Spec.Owners[0].UserSpec)
+		NamespaceCreation(ns2, tnt2.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(tnt2, defaultTimeoutInterval).Should(ContainElement(ns2.GetName()))
 
 		By("testing networking.k8s.io", func() {

@@ -11,22 +11,25 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/api"
 )
 
 var _ = Describe("creating a Namespace creation with no Tenant assigned", Label("tenant"), func() {
 	It("should fail", func() {
 		tnt := &capsulev1beta2.Tenant{
 			Spec: capsulev1beta2.TenantSpec{
-				Owners: capsulev1beta2.OwnerListSpec{
+				Owners: api.OwnerListSpec{
 					{
-						Name: "missing",
-						Kind: "User",
+						UserSpec: api.UserSpec{
+							Name: "missing",
+							Kind: "User",
+						},
 					},
 				},
 			},
 		}
 		ns := NewNamespace("")
-		cs := ownerClient(tnt.Spec.Owners[0])
+		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 		_, err := cs.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
 		Expect(err).ShouldNot(Succeed())
 	})

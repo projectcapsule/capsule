@@ -6,7 +6,7 @@ package v1beta2
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/projectcapsule/capsule/pkg/meta"
+	"github.com/projectcapsule/capsule/pkg/api/meta"
 )
 
 // Indicate the claim is bound to a resource pool.

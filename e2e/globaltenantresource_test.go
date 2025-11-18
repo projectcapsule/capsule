@@ -32,10 +32,12 @@ var _ = Describe("Creating a GlobalTenantResource object", func() {
 			},
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: capsulev1beta2.OwnerListSpec{
+			Owners: api.OwnerListSpec{
 				{
-					Name: "solar-user",
-					Kind: "User",
+					UserSpec: api.UserSpec{
+						Name: "solar-user",
+						Kind: "User",
+					},
 				},
 			},
 		},
@@ -49,10 +51,12 @@ var _ = Describe("Creating a GlobalTenantResource object", func() {
 			},
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: capsulev1beta2.OwnerListSpec{
+			Owners: api.OwnerListSpec{
 				{
-					Name: "wind-user",
-					Kind: "User",
+					UserSpec: api.UserSpec{
+						Name: "wind-user",
+						Kind: "User",
+					},
 				},
 			},
 		},
@@ -187,13 +191,13 @@ var _ = Describe("Creating a GlobalTenantResource object", func() {
 
 		By("creating solar Namespaces", func() {
 			for _, ns := range solarNs {
-				NamespaceCreation(&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: ns}}, solar.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+				NamespaceCreation(&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: ns}}, solar.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 			}
 		})
 
 		By("creating wind Namespaces", func() {
 			for _, ns := range windNs {
-				NamespaceCreation(&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: ns}}, wind.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+				NamespaceCreation(&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: ns}}, wind.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 			}
 		})
 

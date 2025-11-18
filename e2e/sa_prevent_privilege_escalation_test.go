@@ -18,6 +18,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/api"
 )
 
 var _ = Describe("trying to escalate from a Tenant Namespace ServiceAccount", Label("tenant"), func() {
@@ -26,10 +27,12 @@ var _ = Describe("trying to escalate from a Tenant Namespace ServiceAccount", La
 			Name: "sa-privilege-escalation",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: capsulev1beta2.OwnerListSpec{
+			Owners: api.OwnerListSpec{
 				{
-					Name: "mario",
-					Kind: "User",
+					UserSpec: api.UserSpec{
+						Name: "mario",
+						Kind: "User",
+					},
 				},
 			},
 			NodeSelector: map[string]string{
@@ -45,7 +48,7 @@ var _ = Describe("trying to escalate from a Tenant Namespace ServiceAccount", La
 			return k8sClient.Create(context.TODO(), tnt)
 		}).Should(Succeed())
 
-		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 	})
 

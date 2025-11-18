@@ -12,6 +12,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/api"
 )
 
 func getLabels(tnt capsulev1beta2.Tenant) (map[string]string, error) {
@@ -32,10 +33,12 @@ var _ = Describe("adding metadata to a Tenant", Label("tenant"), func() {
 			},
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: capsulev1beta2.OwnerListSpec{
+			Owners: api.OwnerListSpec{
 				{
-					Name: "jim",
-					Kind: "User",
+					UserSpec: api.UserSpec{
+						Name: "jim",
+						Kind: "User",
+					},
 				},
 			},
 		},

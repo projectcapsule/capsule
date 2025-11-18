@@ -12,7 +12,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	"github.com/projectcapsule/capsule/pkg/meta"
+	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api/meta"
 )
 
 var _ = Describe("creating namespace with status lifecycle", Label("namespace", "status"), func() {
@@ -21,10 +22,12 @@ var _ = Describe("creating namespace with status lifecycle", Label("namespace", 
 			Name: "tenant-status",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: capsulev1beta2.OwnerListSpec{
+			Owners: api.OwnerListSpec{
 				{
-					Name: "gatsby",
-					Kind: "User",
+					UserSpec: api.UserSpec{
+						Name: "gatsby",
+						Kind: "User",
+					},
 				},
 			},
 		},
@@ -43,15 +46,15 @@ var _ = Describe("creating namespace with status lifecycle", Label("namespace", 
 	It("verify namespace lifecycle (functionality)", func() {
 		ns1 := NewNamespace("")
 		By("creating first namespace", func() {
-			NamespaceCreation(ns1, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+			NamespaceCreation(ns1, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 			TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElements(ns1.GetName()))
 
 			t := &capsulev1beta2.Tenant{}
 			Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: tnt.GetName()}, t)).Should(Succeed())
 
-			Expect(tnt.Status.Size).To(Equal(uint(1)))
+			Expect(t.Status.Size).To(Equal(uint(1)))
 
-			instance := tnt.Status.GetInstance(&capsulev1beta2.TenantStatusNamespaceItem{Name: ns1.GetName(), UID: ns1.GetUID()})
+			instance := t.Status.GetInstance(&capsulev1beta2.TenantStatusNamespaceItem{Name: ns1.GetName(), UID: ns1.GetUID()})
 			Expect(instance).NotTo(BeNil(), "Namespace instance should not be nil")
 
 			condition := instance.Conditions.GetConditionByType(meta.ReadyCondition)
@@ -65,15 +68,15 @@ var _ = Describe("creating namespace with status lifecycle", Label("namespace", 
 
 		ns2 := NewNamespace("")
 		By("creating second namespace", func() {
-			NamespaceCreation(ns2, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+			NamespaceCreation(ns2, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 			TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElements(ns2.GetName()))
 
 			t := &capsulev1beta2.Tenant{}
 			Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: tnt.GetName()}, t)).Should(Succeed())
 
-			Expect(tnt.Status.Size).To(Equal(uint(2)))
+			Expect(t.Status.Size).To(Equal(uint(2)))
 
-			instance := tnt.Status.GetInstance(&capsulev1beta2.TenantStatusNamespaceItem{Name: ns2.GetName(), UID: ns2.GetUID()})
+			instance := t.Status.GetInstance(&capsulev1beta2.TenantStatusNamespaceItem{Name: ns2.GetName(), UID: ns2.GetUID()})
 			Expect(instance).NotTo(BeNil(), "Namespace instance should not be nil")
 
 			condition := instance.Conditions.GetConditionByType(meta.ReadyCondition)

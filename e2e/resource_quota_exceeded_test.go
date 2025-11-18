@@ -27,10 +27,12 @@ var _ = Describe("exceeding a Tenant resource quota", Label("resourcequota"), fu
 			Name: "tenant-resources-changes",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: capsulev1beta2.OwnerListSpec{
+			Owners: api.OwnerListSpec{
 				{
-					Name: "bobby",
-					Kind: "User",
+					UserSpec: api.UserSpec{
+						Name: "bobby",
+						Kind: "User",
+					},
 				},
 			},
 			LimitRanges: api.LimitRangesSpec{Items: []corev1.LimitRangeSpec{
@@ -115,7 +117,7 @@ var _ = Describe("exceeding a Tenant resource quota", Label("resourcequota"), fu
 		By("creating the Namespaces", func() {
 			for _, i := range nsl {
 				ns := NewNamespace(i)
-				NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+				NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 				TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 			}
 		})
@@ -125,7 +127,7 @@ var _ = Describe("exceeding a Tenant resource quota", Label("resourcequota"), fu
 	})
 
 	It("should block new Pods", func() {
-		cs := ownerClient(tnt.Spec.Owners[0])
+		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 		for _, namespace := range nsl {
 			Eventually(func() (err error) {
 				d := &appsv1.Deployment{
@@ -188,7 +190,7 @@ var _ = Describe("exceeding a Tenant resource quota", Label("resourcequota"), fu
 						},
 					},
 				}
-				cs := ownerClient(tnt.Spec.Owners[0])
+				cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 				EventuallyCreation(func() error {
 					_, err := cs.CoreV1().Pods(ns).Create(context.Background(), pod, metav1.CreateOptions{})
 					return err

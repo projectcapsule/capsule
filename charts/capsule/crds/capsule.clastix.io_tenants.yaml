@@ -2061,8 +2061,8 @@ spec:
                         type: string
                       type: array
                     kind:
-                      description: Kind of tenant owner. Possible values are "User",
-                        "Group", and "ServiceAccount"
+                      description: Kind of entity. Possible values are "User", "Group",
+                        and "ServiceAccount"
                       enum:
                       - User
                       - Group
@@ -2074,7 +2074,7 @@ spec:
                       description: Additional Labels for the synchronized rolebindings
                       type: object
                     name:
-                      description: Name of tenant owner.
+                      description: Name of the entity.
                       type: string
                     proxySettings:
                       description: Proxy settings for tenant owner.

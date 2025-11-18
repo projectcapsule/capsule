@@ -27,10 +27,12 @@ var _ = Describe("changing Tenant managed Kubernetes resources", Label("tenant")
 			Name: "tenant-resources-changes",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: capsulev1beta2.OwnerListSpec{
+			Owners: api.OwnerListSpec{
 				{
-					Name: "laura",
-					Kind: "User",
+					UserSpec: api.UserSpec{
+						Name: "laura",
+						Kind: "User",
+					},
 				},
 			},
 			LimitRanges: api.LimitRangesSpec{Items: []corev1.LimitRangeSpec{
@@ -162,7 +164,7 @@ var _ = Describe("changing Tenant managed Kubernetes resources", Label("tenant")
 		By("creating the Namespaces", func() {
 			for _, i := range nsl {
 				ns := NewNamespace(i)
-				NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+				NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 				TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 			}
 		})

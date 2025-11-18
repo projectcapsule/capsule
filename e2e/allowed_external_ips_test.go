@@ -22,10 +22,12 @@ var _ = Describe("enforcing an allowed set of Service external IPs", Label("tena
 			Name: "allowed-external-ip",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: capsulev1beta2.OwnerListSpec{
+			Owners: api.OwnerListSpec{
 				{
-					Name: "google",
-					Kind: "User",
+					UserSpec: api.UserSpec{
+						Name: "google",
+						Kind: "User",
+					},
 				},
 			},
 			ServiceOptions: &api.ServiceOptions{
@@ -51,7 +53,7 @@ var _ = Describe("enforcing an allowed set of Service external IPs", Label("tena
 
 	It("should fail creating an evil service", func() {
 		ns := NewNamespace("")
-		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 
 		svc := &corev1.Service{
 			ObjectMeta: metav1.ObjectMeta{
@@ -76,7 +78,7 @@ var _ = Describe("enforcing an allowed set of Service external IPs", Label("tena
 			},
 		}
 		EventuallyCreation(func() error {
-			cs := ownerClient(tnt.Spec.Owners[0])
+			cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 			_, err := cs.CoreV1().Services(ns.Name).Create(context.Background(), svc, metav1.CreateOptions{})
 			return err
 		}).ShouldNot(Succeed())
@@ -84,7 +86,7 @@ var _ = Describe("enforcing an allowed set of Service external IPs", Label("tena
 
 	It("should allow the first CIDR block", func() {
 		ns := NewNamespace("")
-		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 
 		svc := &corev1.Service{
 			ObjectMeta: metav1.ObjectMeta{
@@ -109,7 +111,7 @@ var _ = Describe("enforcing an allowed set of Service external IPs", Label("tena
 			},
 		}
 		EventuallyCreation(func() error {
-			cs := ownerClient(tnt.Spec.Owners[0])
+			cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 			_, err := cs.CoreV1().Services(ns.Name).Create(context.Background(), svc, metav1.CreateOptions{})
 			return err
 		}).Should(Succeed())
@@ -117,7 +119,7 @@ var _ = Describe("enforcing an allowed set of Service external IPs", Label("tena
 
 	It("should allow the /32 CIDR block", func() {
 		ns := NewNamespace("")
-		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 
 		svc := &corev1.Service{
 			ObjectMeta: metav1.ObjectMeta{
@@ -141,7 +143,7 @@ var _ = Describe("enforcing an allowed set of Service external IPs", Label("tena
 			},
 		}
 		EventuallyCreation(func() error {
-			cs := ownerClient(tnt.Spec.Owners[0])
+			cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 			_, err := cs.CoreV1().Services(ns.Name).Create(context.Background(), svc, metav1.CreateOptions{})
 			return err
 		}).Should(Succeed())

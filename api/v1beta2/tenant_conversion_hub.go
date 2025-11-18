@@ -12,6 +12,7 @@ import (
 
 	capsulev1beta1 "github.com/projectcapsule/capsule/api/v1beta1"
 	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api/meta"
 )
 
 func (in *Tenant) ConvertFrom(raw conversion.Hub) error {
@@ -26,27 +27,29 @@ func (in *Tenant) ConvertFrom(raw conversion.Hub) error {
 	}
 
 	in.ObjectMeta = src.ObjectMeta
-	in.Spec.Owners = make(OwnerListSpec, 0, len(src.Spec.Owners))
+	in.Spec.Owners = make(api.OwnerListSpec, 0, len(src.Spec.Owners))
 
 	for index, owner := range src.Spec.Owners {
-		proxySettings := make([]ProxySettings, 0, len(owner.ProxyOperations))
+		proxySettings := make([]api.ProxySettings, 0, len(owner.ProxyOperations))
 
 		for _, proxyOp := range owner.ProxyOperations {
-			ops := make([]ProxyOperation, 0, len(proxyOp.Operations))
+			ops := make([]api.ProxyOperation, 0, len(proxyOp.Operations))
 
 			for _, op := range proxyOp.Operations {
-				ops = append(ops, ProxyOperation(op))
+				ops = append(ops, api.ProxyOperation(op))
 			}
 
-			proxySettings = append(proxySettings, ProxySettings{
-				Kind:       ProxyServiceKind(proxyOp.Kind),
+			proxySettings = append(proxySettings, api.ProxySettings{
+				Kind:       api.ProxyServiceKind(proxyOp.Kind),
 				Operations: ops,
 			})
 		}
 
-		in.Spec.Owners = append(in.Spec.Owners, OwnerSpec{
-			Kind:            OwnerKind(owner.Kind),
-			Name:            owner.Name,
+		in.Spec.Owners = append(in.Spec.Owners, api.OwnerSpec{
+			UserSpec: api.UserSpec{
+				Kind: api.OwnerKind(owner.Kind),
+				Name: owner.Name,
+			},
 			ClusterRoles:    owner.GetRoles(*src, index),
 			ProxyOperations: proxySettings,
 		})
@@ -59,28 +62,28 @@ func (in *Tenant) ConvertFrom(raw conversion.Hub) error {
 
 		in.Spec.NamespaceOptions.AdditionalMetadata = nsOpts.AdditionalMetadata
 
-		if value, found := annotations[api.ForbiddenNamespaceLabelsAnnotation]; found {
+		if value, found := annotations[meta.ForbiddenNamespaceLabelsAnnotation]; found {
 			in.Spec.NamespaceOptions.ForbiddenLabels.Exact = strings.Split(value, ",")
 
-			delete(annotations, api.ForbiddenNamespaceLabelsAnnotation)
+			delete(annotations, meta.ForbiddenNamespaceLabelsAnnotation)
 		}
 
-		if value, found := annotations[api.ForbiddenNamespaceLabelsRegexpAnnotation]; found {
+		if value, found := annotations[meta.ForbiddenNamespaceLabelsRegexpAnnotation]; found {
 			in.Spec.NamespaceOptions.ForbiddenLabels.Regex = value
 
-			delete(annotations, api.ForbiddenNamespaceLabelsRegexpAnnotation)
+			delete(annotations, meta.ForbiddenNamespaceLabelsRegexpAnnotation)
 		}
 
-		if value, found := annotations[api.ForbiddenNamespaceAnnotationsAnnotation]; found {
+		if value, found := annotations[meta.ForbiddenNamespaceAnnotationsAnnotation]; found {
 			in.Spec.NamespaceOptions.ForbiddenAnnotations.Exact = strings.Split(value, ",")
 
-			delete(annotations, api.ForbiddenNamespaceAnnotationsAnnotation)
+			delete(annotations, meta.ForbiddenNamespaceAnnotationsAnnotation)
 		}
 
-		if value, found := annotations[api.ForbiddenNamespaceAnnotationsRegexpAnnotation]; found {
+		if value, found := annotations[meta.ForbiddenNamespaceAnnotationsRegexpAnnotation]; found {
 			in.Spec.NamespaceOptions.ForbiddenAnnotations.Regex = value
 
-			delete(annotations, api.ForbiddenNamespaceAnnotationsRegexpAnnotation)
+			delete(annotations, meta.ForbiddenNamespaceAnnotationsRegexpAnnotation)
 		}
 	}
 
@@ -144,10 +147,10 @@ func (in *Tenant) ConvertFrom(raw conversion.Hub) error {
 		in.Spec.Cordoned = value
 	}
 
-	if _, found := annotations[api.ProtectedTenantAnnotation]; found {
+	if _, found := annotations[meta.ProtectedTenantAnnotation]; found {
 		in.Spec.PreventDeletion = true
 
-		delete(annotations, api.ProtectedTenantAnnotation)
+		delete(annotations, meta.ProtectedTenantAnnotation)
 	}
 
 	in.SetAnnotations(annotations)
@@ -215,19 +218,19 @@ func (in *Tenant) ConvertTo(raw conversion.Hub) error {
 		dst.Spec.NamespaceOptions.AdditionalMetadata = nsOpts.AdditionalMetadata
 
 		if exact := nsOpts.ForbiddenAnnotations.Exact; len(exact) > 0 {
-			annotations[api.ForbiddenNamespaceAnnotationsAnnotation] = strings.Join(exact, ",")
+			annotations[meta.ForbiddenNamespaceAnnotationsAnnotation] = strings.Join(exact, ",")
 		}
 
 		if regex := nsOpts.ForbiddenAnnotations.Regex; len(regex) > 0 {
-			annotations[api.ForbiddenNamespaceAnnotationsRegexpAnnotation] = regex
+			annotations[meta.ForbiddenNamespaceAnnotationsRegexpAnnotation] = regex
 		}
 
 		if exact := nsOpts.ForbiddenLabels.Exact; len(exact) > 0 {
-			annotations[api.ForbiddenNamespaceLabelsAnnotation] = strings.Join(exact, ",")
+			annotations[meta.ForbiddenNamespaceLabelsAnnotation] = strings.Join(exact, ",")
 		}
 
 		if regex := nsOpts.ForbiddenLabels.Regex; len(regex) > 0 {
-			annotations[api.ForbiddenNamespaceLabelsRegexpAnnotation] = regex
+			annotations[meta.ForbiddenNamespaceLabelsRegexpAnnotation] = regex
 		}
 	}
 
@@ -264,7 +267,7 @@ func (in *Tenant) ConvertTo(raw conversion.Hub) error {
 	}
 
 	if in.Spec.PreventDeletion {
-		annotations[api.ProtectedTenantAnnotation] = "true" //nolint:goconst
+		annotations[meta.ProtectedTenantAnnotation] = "true" //nolint:goconst
 	}
 
 	if in.Spec.Cordoned {

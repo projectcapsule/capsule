@@ -12,7 +12,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/projectcapsule/capsule/pkg/api"
-	"github.com/projectcapsule/capsule/pkg/meta"
+	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/stretchr/testify/assert"
 )
 
