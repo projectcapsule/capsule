@@ -16,7 +16,7 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api"
-	"github.com/projectcapsule/capsule/pkg/meta"
+	"github.com/projectcapsule/capsule/pkg/api/meta"
 )
 
 var _ = Describe("ResourcePoolClaim Tests", Label("resourcepool"), func() {
@@ -28,10 +28,12 @@ var _ = Describe("ResourcePoolClaim Tests", Label("resourcepool"), func() {
 			},
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: capsulev1beta2.OwnerListSpec{
+			Owners: api.OwnerListSpec{
 				{
-					Name: "wind-user",
-					Kind: "User",
+					UserSpec: api.UserSpec{
+						Name: "wind-user",
+						Kind: "User",
+					},
 				},
 			},
 		},

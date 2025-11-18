@@ -11,6 +11,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/api"
 )
 
 var _ = Describe("creating a Namespace with Tenant name prefix enforcement at Tenant scope", Label("tenant", "config"), func() {
@@ -20,10 +21,12 @@ var _ = Describe("creating a Namespace with Tenant name prefix enforcement at Te
 		},
 		Spec: capsulev1beta2.TenantSpec{
 			ForceTenantPrefix: &[]bool{true}[0],
-			Owners: capsulev1beta2.OwnerListSpec{
+			Owners: api.OwnerListSpec{
 				{
-					Name: "john",
-					Kind: "User",
+					UserSpec: api.UserSpec{
+						Name: "john",
+						Kind: "User",
+					},
 				},
 			},
 		},
@@ -34,10 +37,12 @@ var _ = Describe("creating a Namespace with Tenant name prefix enforcement at Te
 		},
 		Spec: capsulev1beta2.TenantSpec{
 			ForceTenantPrefix: &[]bool{false}[0],
-			Owners: capsulev1beta2.OwnerListSpec{
+			Owners: api.OwnerListSpec{
 				{
-					Name: "john",
-					Kind: "User",
+					UserSpec: api.UserSpec{
+						Name: "john",
+						Kind: "User",
+					},
 				},
 			},
 		},
@@ -70,17 +75,17 @@ var _ = Describe("creating a Namespace with Tenant name prefix enforcement at Te
 			"capsule.clastix.io/tenant": t1.GetName(),
 		}
 		ns := NewNamespace("awesome", labels)
-		NamespaceCreation(ns, t1.Spec.Owners[0], defaultTimeoutInterval).ShouldNot(Succeed())
+		NamespaceCreation(ns, t1.Spec.Owners[0].UserSpec, defaultTimeoutInterval).ShouldNot(Succeed())
 	})
 
 	It("should fail using prefix without capsule.clastix.io/tenant label, where the user owns more than one Tenant, for a tenant with ForceTenantPrefix true and global ForceTenantPrefix false", func() {
 		ns := NewNamespace("awesome-namespace")
-		NamespaceCreation(ns, t1.Spec.Owners[0], defaultTimeoutInterval).ShouldNot(Succeed())
+		NamespaceCreation(ns, t1.Spec.Owners[0].UserSpec, defaultTimeoutInterval).ShouldNot(Succeed())
 	})
 
 	It("should fail using prefix without capsule.clastix.io/tenant label, where the user owns more than one Tenant, for a tenant with ForceTenantPrefix false and global ForceTenantPrefix true", func() {
 		ns := NewNamespace("awesome-namespace")
-		NamespaceCreation(ns, t2.Spec.Owners[0], defaultTimeoutInterval).ShouldNot(Succeed())
+		NamespaceCreation(ns, t2.Spec.Owners[0].UserSpec, defaultTimeoutInterval).ShouldNot(Succeed())
 	})
 
 	It("should succeed and be assigned with prefix and label, for a tenant with ForceTenantPrefix true and global ForceTenantPrefix false", func() {
@@ -88,7 +93,7 @@ var _ = Describe("creating a Namespace with Tenant name prefix enforcement at Te
 			"capsule.clastix.io/tenant": t1.GetName(),
 		}
 		ns := NewNamespace("awesome-tenant", labels)
-		NamespaceCreation(ns, t1.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreation(ns, t1.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 
 		TenantNamespaceList(t1, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 	})
@@ -101,7 +106,7 @@ var _ = Describe("creating a Namespace with Tenant name prefix enforcement at Te
 			"capsule.clastix.io/tenant": t1.GetName(),
 		}
 		ns := NewNamespace("awesome", labels)
-		NamespaceCreation(ns, t1.Spec.Owners[0], defaultTimeoutInterval).ShouldNot(Succeed())
+		NamespaceCreation(ns, t1.Spec.Owners[0].UserSpec, defaultTimeoutInterval).ShouldNot(Succeed())
 	})
 
 	It("should succeed and be assigned with prefix and label, for a tenant with ForceTenantPrefix true and global ForceTenantPrefix true", func() {
@@ -112,7 +117,7 @@ var _ = Describe("creating a Namespace with Tenant name prefix enforcement at Te
 			"capsule.clastix.io/tenant": t1.GetName(),
 		}
 		ns := NewNamespace("awesome-tenant", labels)
-		NamespaceCreation(ns, t1.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreation(ns, t1.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 
 		TenantNamespaceList(t1, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 	})
@@ -122,7 +127,7 @@ var _ = Describe("creating a Namespace with Tenant name prefix enforcement at Te
 			configuration.Spec.ForceTenantPrefix = true
 		})
 		ns := NewNamespace("awesome-namespace")
-		NamespaceCreation(ns, t1.Spec.Owners[0], defaultTimeoutInterval).ShouldNot(Succeed())
+		NamespaceCreation(ns, t1.Spec.Owners[0].UserSpec, defaultTimeoutInterval).ShouldNot(Succeed())
 	})
 
 	It("should succeed when not using prefix, with tenant label for a tenant with ForceTenantPrefix false and global ForceTenantPrefix false", func() {
@@ -130,7 +135,7 @@ var _ = Describe("creating a Namespace with Tenant name prefix enforcement at Te
 			"capsule.clastix.io/tenant": t2.GetName(),
 		}
 		ns := NewNamespace("awesome", labels)
-		NamespaceCreation(ns, t2.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreation(ns, t2.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 	})
 
 	It("should succeed when not using prefix, with tenant label for a tenant with ForceTenantPrefix false and global ForceTenantPrefix true", func() {
@@ -141,6 +146,6 @@ var _ = Describe("creating a Namespace with Tenant name prefix enforcement at Te
 			"capsule.clastix.io/tenant": t2.GetName(),
 		}
 		ns := NewNamespace("awesome", labels)
-		NamespaceCreation(ns, t2.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreation(ns, t2.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 	})
 })

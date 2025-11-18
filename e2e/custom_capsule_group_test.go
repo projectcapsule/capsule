@@ -12,6 +12,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/api"
 )
 
 var _ = Describe("creating a Namespace as Tenant owner with custom --capsule-group", Label("config"), func() {
@@ -22,14 +23,18 @@ var _ = Describe("creating a Namespace as Tenant owner with custom --capsule-gro
 			Name: "tenant-assigned-custom-group",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: capsulev1beta2.OwnerListSpec{
+			Owners: api.OwnerListSpec{
 				{
-					Name: "alice",
-					Kind: "User",
+					UserSpec: api.UserSpec{
+						Name: "alice",
+						Kind: "User",
+					},
 				},
 				{
-					Name: "bob",
-					Kind: "User",
+					UserSpec: api.UserSpec{
+						Name: "bob",
+						Kind: "User",
+					},
 				},
 			},
 		},
@@ -64,7 +69,7 @@ var _ = Describe("creating a Namespace as Tenant owner with custom --capsule-gro
 		})
 
 		ns := NewNamespace("")
-		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).ShouldNot(Succeed())
+		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).ShouldNot(Succeed())
 	})
 
 	It("should succeed and be available in Tenant namespaces list with multiple groups", func() {
@@ -74,7 +79,7 @@ var _ = Describe("creating a Namespace as Tenant owner with custom --capsule-gro
 
 		ns := NewNamespace("")
 
-		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 	})
 
@@ -85,7 +90,7 @@ var _ = Describe("creating a Namespace as Tenant owner with custom --capsule-gro
 
 		ns := NewNamespace("")
 
-		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 	})
 
@@ -97,7 +102,7 @@ var _ = Describe("creating a Namespace as Tenant owner with custom --capsule-gro
 
 		ns := NewNamespace("")
 
-		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).ShouldNot(Succeed())
+		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).ShouldNot(Succeed())
 	})
 
 	It("should succeed and be available in Tenant namespaces list with default single user", func() {
@@ -109,7 +114,7 @@ var _ = Describe("creating a Namespace as Tenant owner with custom --capsule-gro
 
 		ns := NewNamespace("")
 
-		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 	})
 
 	It("should succeed and be available in Tenant namespaces list with default single user", func() {
@@ -121,7 +126,7 @@ var _ = Describe("creating a Namespace as Tenant owner with custom --capsule-gro
 
 		ns := NewNamespace("")
 
-		NamespaceCreation(ns, tnt.Spec.Owners[1], defaultTimeoutInterval).ShouldNot(Succeed())
+		NamespaceCreation(ns, tnt.Spec.Owners[1].UserSpec, defaultTimeoutInterval).ShouldNot(Succeed())
 	})
 
 	It("should fail when group is ignored", func() {
@@ -133,7 +138,7 @@ var _ = Describe("creating a Namespace as Tenant owner with custom --capsule-gro
 
 		ns := NewNamespace("")
 
-		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).ShouldNot(Succeed())
+		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).ShouldNot(Succeed())
 	})
 
 })

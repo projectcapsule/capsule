@@ -22,10 +22,12 @@ var _ = Describe("enforcing a defined ImagePullPolicy", Label("tenant", "images"
 			Name: "image-pull-policy",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: capsulev1beta2.OwnerListSpec{
+			Owners: api.OwnerListSpec{
 				{
-					Name: "axel",
-					Kind: "User",
+					UserSpec: api.UserSpec{
+						Name: "axel",
+						Kind: "User",
+					},
 				},
 			},
 			ImagePullPolicies: []api.ImagePullPolicySpec{"Always"},
@@ -45,9 +47,9 @@ var _ = Describe("enforcing a defined ImagePullPolicy", Label("tenant", "images"
 
 	It("should just allow the defined policy", func() {
 		ns := NewNamespace("")
-		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 
-		cs := ownerClient(tnt.Spec.Owners[0])
+		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 
 		role := &rbacv1.Role{
 			ObjectMeta: metav1.ObjectMeta{

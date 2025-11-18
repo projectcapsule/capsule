@@ -23,10 +23,12 @@ var _ = Describe("creating an ExternalName service when it is disabled for Tenan
 			Name: "disable-external-service",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: capsulev1beta2.OwnerListSpec{
+			Owners: api.OwnerListSpec{
 				{
-					Name: "google",
-					Kind: "User",
+					UserSpec: api.UserSpec{
+						Name: "google",
+						Kind: "User",
+					},
 				},
 			},
 			ServiceOptions: &api.ServiceOptions{
@@ -50,7 +52,7 @@ var _ = Describe("creating an ExternalName service when it is disabled for Tenan
 
 	It("should fail creating a service with ExternalService type", func() {
 		ns := NewNamespace("")
-		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 
 		EventuallyCreation(func() error {
 			svc := &corev1.Service{
@@ -73,7 +75,7 @@ var _ = Describe("creating an ExternalName service when it is disabled for Tenan
 				},
 			}
 
-			cs := ownerClient(tnt.Spec.Owners[0])
+			cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 			_, err := cs.CoreV1().Services(ns.Name).Create(context.Background(), svc, metav1.CreateOptions{})
 			return err
 		}).Should(Succeed())
@@ -99,7 +101,7 @@ var _ = Describe("creating an ExternalName service when it is disabled for Tenan
 				},
 			}
 
-			cs := ownerClient(tnt.Spec.Owners[0])
+			cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 			_, err := cs.CoreV1().Services(ns.Name).Create(context.Background(), svc, metav1.CreateOptions{})
 			return err
 		}).ShouldNot(Succeed())

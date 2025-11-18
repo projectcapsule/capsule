@@ -11,6 +11,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/api"
 )
 
 var _ = Describe("creating a Tenant with wrong name", Label("tenant"), func() {
@@ -19,10 +20,12 @@ var _ = Describe("creating a Tenant with wrong name", Label("tenant"), func() {
 			Name: "non_rfc_dns_1123",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: capsulev1beta2.OwnerListSpec{
+			Owners: api.OwnerListSpec{
 				{
-					Name: "john",
-					Kind: "User",
+					UserSpec: api.UserSpec{
+						Name: "john",
+						Kind: "User",
+					},
 				},
 			},
 		},

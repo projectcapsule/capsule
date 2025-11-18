@@ -33,10 +33,12 @@ var _ = Describe("enforcing a Container Registry", Label("tenant", "images", "re
 			Name: "container-registry",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: capsulev1beta2.OwnerListSpec{
+			Owners: api.OwnerListSpec{
 				{
-					Name: "matt",
-					Kind: "User",
+					UserSpec: api.UserSpec{
+						Name: "matt",
+						Kind: "User",
+					},
 				},
 			},
 			ContainerRegistries: &api.AllowedListSpec{
@@ -72,7 +74,7 @@ var _ = Describe("enforcing a Container Registry", Label("tenant", "images", "re
 
 	It("should add labels to Namespace", func() {
 		ns := NewNamespace("")
-		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 		Eventually(func() (ok bool) {
 			Expect(k8sClient.Get(context.Background(), types.NamespacedName{Name: ns.Name}, ns)).Should(Succeed())
 			ok, _ = HaveKeyWithValue("capsule.clastix.io/allowed-registries", "docker.io,myregistry.azurecr.io").Match(ns.Annotations)
@@ -104,9 +106,9 @@ var _ = Describe("enforcing a Container Registry", Label("tenant", "images", "re
 			},
 		}
 
-		cs := ownerClient(tnt.Spec.Owners[0])
+		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 
-		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 		EventuallyCreation(func() error {
@@ -133,9 +135,9 @@ var _ = Describe("enforcing a Container Registry", Label("tenant", "images", "re
 			},
 		}
 
-		cs := ownerClient(tnt.Spec.Owners[0])
+		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 
-		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 		EventuallyCreation(func() error {
@@ -173,9 +175,9 @@ var _ = Describe("enforcing a Container Registry", Label("tenant", "images", "re
 			},
 		}
 
-		cs := ownerClient(tnt.Spec.Owners[0])
+		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 
-		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 		EventuallyCreation(func() error {
@@ -227,9 +229,9 @@ var _ = Describe("enforcing a Container Registry", Label("tenant", "images", "re
 			},
 		}
 
-		cs := ownerClient(tnt.Spec.Owners[0])
+		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 
-		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 		role := &rbacv1.Role{
@@ -316,9 +318,9 @@ var _ = Describe("enforcing a Container Registry", Label("tenant", "images", "re
 			},
 		}
 
-		cs := ownerClient(tnt.Spec.Owners[0])
+		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 
-		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 		EventuallyCreation(func() error {
@@ -359,9 +361,9 @@ var _ = Describe("enforcing a Container Registry", Label("tenant", "images", "re
 			},
 		}
 
-		cs := ownerClient(tnt.Spec.Owners[0])
+		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 
-		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 		EventuallyCreation(func() error {
@@ -402,9 +404,9 @@ var _ = Describe("enforcing a Container Registry", Label("tenant", "images", "re
 			},
 		}
 
-		cs := ownerClient(tnt.Spec.Owners[0])
+		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 
-		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 		role := &rbacv1.Role{
@@ -491,9 +493,9 @@ var _ = Describe("enforcing a Container Registry", Label("tenant", "images", "re
 			},
 		}
 
-		cs := ownerClient(tnt.Spec.Owners[0])
+		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 
-		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 		EventuallyCreation(func() error {
@@ -519,7 +521,7 @@ var _ = Describe("enforcing a Container Registry", Label("tenant", "images", "re
 
 	It("should allow using an exact match", func() {
 		ns := NewNamespace("")
-		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 
 		pod := &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
@@ -535,7 +537,7 @@ var _ = Describe("enforcing a Container Registry", Label("tenant", "images", "re
 			},
 		}
 
-		cs := ownerClient(tnt.Spec.Owners[0])
+		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 		EventuallyCreation(func() error {
 			_, err := cs.CoreV1().Pods(ns.Name).Create(context.Background(), pod, metav1.CreateOptions{})
 			return err
@@ -544,7 +546,7 @@ var _ = Describe("enforcing a Container Registry", Label("tenant", "images", "re
 
 	It("should allow using a regex match", func() {
 		ns := NewNamespace("")
-		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 
 		pod := &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
@@ -560,7 +562,7 @@ var _ = Describe("enforcing a Container Registry", Label("tenant", "images", "re
 			},
 		}
 
-		cs := ownerClient(tnt.Spec.Owners[0])
+		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 		EventuallyCreation(func() error {
 			_, err := cs.CoreV1().Pods(ns.Name).Create(context.Background(), pod, metav1.CreateOptions{})
 			return err

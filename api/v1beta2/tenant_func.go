@@ -37,14 +37,14 @@ func (in *Tenant) AssignNamespaces(namespaces []corev1.Namespace) {
 	in.Status.Size = uint(len(l))
 }
 
-func (in *Tenant) GetOwnerProxySettings(name string, kind OwnerKind) []ProxySettings {
+func (in *Tenant) GetOwnerProxySettings(name string, kind api.OwnerKind) []api.ProxySettings {
 	return in.Spec.Owners.FindOwner(name, kind).ProxyOperations
 }
 
 // GetClusterRolePermissions returns a map where the clusterRole is the key
 // and the value is a list of permission subjects (kind and name) that reference that role.
 // These mappings are gathered from the owners and additionalRolebindings spec.
-func (in *Tenant) GetSubjectsByClusterRoles(ignoreOwnerKind []OwnerKind) (rolePerms map[string][]rbacv1.Subject) {
+func (in *Tenant) GetSubjectsByClusterRoles(ignoreOwnerKind []api.OwnerKind) (rolePerms map[string][]rbacv1.Subject) {
 	rolePerms = make(map[string][]rbacv1.Subject)
 
 	// Helper to add permissions for a given clusterRole
@@ -97,7 +97,7 @@ func (in *Tenant) GetSubjectsByClusterRoles(ignoreOwnerKind []OwnerKind) (rolePe
 }
 
 // Get the permissions for a tenant ordered by groups and users.
-func (in *Tenant) GetClusterRolesBySubject(ignoreOwnerKind []OwnerKind) (maps map[string]map[string]api.TenantSubjectRoles) {
+func (in *Tenant) GetClusterRolesBySubject(ignoreOwnerKind []api.OwnerKind) (maps map[string]map[string]api.TenantSubjectRoles) {
 	maps = make(map[string]map[string]api.TenantSubjectRoles)
 
 	// Initialize a nested map for kind ("User", "Group") and name

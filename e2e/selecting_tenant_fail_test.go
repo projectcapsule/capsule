@@ -11,18 +11,21 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/api"
 )
 
-var _ = Describe("creating a Namespace without a Tenant selector when user owns multiple Tenants", Label("tenant"), func() {
+var _ = Describe("creating a Namespace without a Tenant selector when user owns multiple Tenants", Label("tenant", "assignment"), func() {
 	t1 := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "tenant-one",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: capsulev1beta2.OwnerListSpec{
+			Owners: api.OwnerListSpec{
 				{
-					Name: "john",
-					Kind: "User",
+					UserSpec: api.UserSpec{
+						Name: "john",
+						Kind: "User",
+					},
 				},
 			},
 		},
@@ -32,10 +35,12 @@ var _ = Describe("creating a Namespace without a Tenant selector when user owns 
 			Name: "tenant-two",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: capsulev1beta2.OwnerListSpec{
+			Owners: api.OwnerListSpec{
 				{
-					Name: "john",
-					Kind: "User",
+					UserSpec: api.UserSpec{
+						Name: "john",
+						Kind: "User",
+					},
 				},
 			},
 		},
@@ -45,10 +50,12 @@ var _ = Describe("creating a Namespace without a Tenant selector when user owns 
 			Name: "tenant-three",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: capsulev1beta2.OwnerListSpec{
+			Owners: api.OwnerListSpec{
 				{
-					Name: "john",
-					Kind: "Group",
+					UserSpec: api.UserSpec{
+						Name: "john",
+						Kind: "Group",
+					},
 				},
 			},
 		},
@@ -58,10 +65,12 @@ var _ = Describe("creating a Namespace without a Tenant selector when user owns 
 			Name: "tenant-four",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: capsulev1beta2.OwnerListSpec{
+			Owners: api.OwnerListSpec{
 				{
-					Name: "john",
-					Kind: "Group",
+					UserSpec: api.UserSpec{
+						Name: "john",
+						Kind: "Group",
+					},
 				},
 			},
 		},
@@ -72,16 +81,16 @@ var _ = Describe("creating a Namespace without a Tenant selector when user owns 
 		By("user owns 2 tenants", func() {
 			EventuallyCreation(func() error { return k8sClient.Create(context.TODO(), t1) }).Should(Succeed())
 			EventuallyCreation(func() error { return k8sClient.Create(context.TODO(), t2) }).Should(Succeed())
-			NamespaceCreation(ns, t1.Spec.Owners[0], defaultTimeoutInterval).ShouldNot(Succeed())
-			NamespaceCreation(ns, t2.Spec.Owners[0], defaultTimeoutInterval).ShouldNot(Succeed())
+			NamespaceCreation(ns, t1.Spec.Owners[0].UserSpec, defaultTimeoutInterval).ShouldNot(Succeed())
+			NamespaceCreation(ns, t2.Spec.Owners[0].UserSpec, defaultTimeoutInterval).ShouldNot(Succeed())
 			Expect(k8sClient.Delete(context.TODO(), t1)).Should(Succeed())
 			Expect(k8sClient.Delete(context.TODO(), t2)).Should(Succeed())
 		})
 		By("group owns 2 tenants", func() {
 			EventuallyCreation(func() error { return k8sClient.Create(context.TODO(), t3) }).Should(Succeed())
 			EventuallyCreation(func() error { return k8sClient.Create(context.TODO(), t4) }).Should(Succeed())
-			NamespaceCreation(ns, t3.Spec.Owners[0], defaultTimeoutInterval).ShouldNot(Succeed())
-			NamespaceCreation(ns, t4.Spec.Owners[0], defaultTimeoutInterval).ShouldNot(Succeed())
+			NamespaceCreation(ns, t3.Spec.Owners[0].UserSpec, defaultTimeoutInterval).ShouldNot(Succeed())
+			NamespaceCreation(ns, t4.Spec.Owners[0].UserSpec, defaultTimeoutInterval).ShouldNot(Succeed())
 			Expect(k8sClient.Delete(context.TODO(), t3)).Should(Succeed())
 			Expect(k8sClient.Delete(context.TODO(), t4)).Should(Succeed())
 		})
@@ -91,10 +100,10 @@ var _ = Describe("creating a Namespace without a Tenant selector when user owns 
 			EventuallyCreation(func() error { return k8sClient.Create(context.TODO(), t2) }).Should(Succeed())
 			EventuallyCreation(func() error { return k8sClient.Create(context.TODO(), t3) }).Should(Succeed())
 			EventuallyCreation(func() error { return k8sClient.Create(context.TODO(), t4) }).Should(Succeed())
-			NamespaceCreation(ns, t1.Spec.Owners[0], defaultTimeoutInterval).ShouldNot(Succeed())
-			NamespaceCreation(ns, t2.Spec.Owners[0], defaultTimeoutInterval).ShouldNot(Succeed())
-			NamespaceCreation(ns, t3.Spec.Owners[0], defaultTimeoutInterval).ShouldNot(Succeed())
-			NamespaceCreation(ns, t4.Spec.Owners[0], defaultTimeoutInterval).ShouldNot(Succeed())
+			NamespaceCreation(ns, t1.Spec.Owners[0].UserSpec, defaultTimeoutInterval).ShouldNot(Succeed())
+			NamespaceCreation(ns, t2.Spec.Owners[0].UserSpec, defaultTimeoutInterval).ShouldNot(Succeed())
+			NamespaceCreation(ns, t3.Spec.Owners[0].UserSpec, defaultTimeoutInterval).ShouldNot(Succeed())
+			NamespaceCreation(ns, t4.Spec.Owners[0].UserSpec, defaultTimeoutInterval).ShouldNot(Succeed())
 			Expect(k8sClient.Delete(context.TODO(), t1)).Should(Succeed())
 			Expect(k8sClient.Delete(context.TODO(), t2)).Should(Succeed())
 			Expect(k8sClient.Delete(context.TODO(), t3)).Should(Succeed())

@@ -22,10 +22,12 @@ var _ = Describe("adding metadata to Pod objects", Label("pod"), func() {
 			Name: "pod-metadata",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: capsulev1beta2.OwnerListSpec{
+			Owners: api.OwnerListSpec{
 				{
-					Name: "gatsby",
-					Kind: "User",
+					UserSpec: api.UserSpec{
+						Name: "gatsby",
+						Kind: "User",
+					},
 				},
 			},
 			PodOptions: &api.PodOptions{
@@ -57,7 +59,7 @@ var _ = Describe("adding metadata to Pod objects", Label("pod"), func() {
 
 	It("should apply them to Pod", func() {
 		ns := NewNamespace("")
-		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 		fmt.Sprint("namespace created")
 		//TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 		fmt.Sprint("tenant contains list namespace")
@@ -79,7 +81,7 @@ var _ = Describe("adding metadata to Pod objects", Label("pod"), func() {
 		}
 
 		EventuallyCreation(func() (err error) {
-			_, err = ownerClient(tnt.Spec.Owners[0]).CoreV1().Pods(ns.GetName()).Create(context.Background(), pod, metav1.CreateOptions{})
+			_, err = ownerClient(tnt.Spec.Owners[0].UserSpec).CoreV1().Pods(ns.GetName()).Create(context.Background(), pod, metav1.CreateOptions{})
 
 			return
 		}).Should(Succeed())

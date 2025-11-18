@@ -29,10 +29,12 @@ var _ = Describe("creating a Namespace for a Tenant with additional metadata", L
 			},
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: capsulev1beta2.OwnerListSpec{
+			Owners: api.OwnerListSpec{
 				{
-					Name: "gatsby",
-					Kind: "User",
+					UserSpec: api.UserSpec{
+						Name: "gatsby",
+						Kind: "User",
+					},
 				},
 			},
 			NamespaceOptions: &capsulev1beta2.NamespaceOptions{
@@ -61,7 +63,7 @@ var _ = Describe("creating a Namespace for a Tenant with additional metadata", L
 
 	It("should contain Namespace metadata after tenant update", func() {
 		ns := NewNamespace("")
-		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 		By("checking labels", func() {

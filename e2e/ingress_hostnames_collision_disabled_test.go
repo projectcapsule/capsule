@@ -25,10 +25,12 @@ var _ = Describe("when disabling Ingress hostnames collision", Label("ingress"),
 			Name: "hostnames-collision-disabled",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: capsulev1beta2.OwnerListSpec{
+			Owners: api.OwnerListSpec{
 				{
-					Name: "ingress-disabled",
-					Kind: "User",
+					UserSpec: api.UserSpec{
+						Name: "ingress-disabled",
+						Kind: "User",
+					},
 				},
 			},
 			IngressOptions: capsulev1beta2.IngressOptions{
@@ -119,9 +121,9 @@ var _ = Describe("when disabling Ingress hostnames collision", Label("ingress"),
 	It("should not check any kind of collision", func() {
 		ns1 := NewNamespace("")
 		ns2 := NewNamespace("")
-		cs := ownerClient(tnt.Spec.Owners[0])
-		NamespaceCreation(ns1, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
-		NamespaceCreation(ns2, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
+		NamespaceCreation(ns1, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreation(ns2, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns1.GetName()))
 		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns2.GetName()))
 

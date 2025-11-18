@@ -23,10 +23,12 @@ var _ = Describe("creating a LoadBalancer service when it is disabled for Tenant
 			Name: "disable-loadbalancer-service",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: capsulev1beta2.OwnerListSpec{
+			Owners: api.OwnerListSpec{
 				{
-					Name: "amazon",
-					Kind: "User",
+					UserSpec: api.UserSpec{
+						Name: "amazon",
+						Kind: "User",
+					},
 				},
 			},
 			ServiceOptions: &api.ServiceOptions{
@@ -50,7 +52,7 @@ var _ = Describe("creating a LoadBalancer service when it is disabled for Tenant
 	It("should fail creating a service with LoadBalancer type", func() {
 		ns := NewNamespace("")
 
-		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 
 		EventuallyCreation(func() error {
 			svc := &corev1.Service{
@@ -73,7 +75,7 @@ var _ = Describe("creating a LoadBalancer service when it is disabled for Tenant
 				},
 			}
 
-			cs := ownerClient(tnt.Spec.Owners[0])
+			cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 
 			_, err := cs.CoreV1().Services(ns.Name).Create(context.Background(), svc, metav1.CreateOptions{})
 
@@ -101,7 +103,7 @@ var _ = Describe("creating a LoadBalancer service when it is disabled for Tenant
 				},
 			}
 
-			cs := ownerClient(tnt.Spec.Owners[0])
+			cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 
 			_, err := cs.CoreV1().Services(ns.Name).Create(context.Background(), svc, metav1.CreateOptions{})
 

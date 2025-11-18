@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api/meta"
 )
 
 type NamespaceOptions struct {
@@ -18,11 +19,11 @@ type NamespaceOptions struct {
 }
 
 func (in *Tenant) hasForbiddenNamespaceLabelsAnnotations() bool {
-	if _, ok := in.Annotations[api.ForbiddenNamespaceLabelsAnnotation]; ok {
+	if _, ok := in.Annotations[meta.ForbiddenNamespaceLabelsAnnotation]; ok {
 		return true
 	}
 
-	if _, ok := in.Annotations[api.ForbiddenNamespaceLabelsRegexpAnnotation]; ok {
+	if _, ok := in.Annotations[meta.ForbiddenNamespaceLabelsRegexpAnnotation]; ok {
 		return true
 	}
 
@@ -30,11 +31,11 @@ func (in *Tenant) hasForbiddenNamespaceLabelsAnnotations() bool {
 }
 
 func (in *Tenant) hasForbiddenNamespaceAnnotationsAnnotations() bool {
-	if _, ok := in.Annotations[api.ForbiddenNamespaceAnnotationsAnnotation]; ok {
+	if _, ok := in.Annotations[meta.ForbiddenNamespaceAnnotationsAnnotation]; ok {
 		return true
 	}
 
-	if _, ok := in.Annotations[api.ForbiddenNamespaceAnnotationsRegexpAnnotation]; ok {
+	if _, ok := in.Annotations[meta.ForbiddenNamespaceAnnotationsRegexpAnnotation]; ok {
 		return true
 	}
 
@@ -47,8 +48,8 @@ func (in *Tenant) ForbiddenUserNamespaceLabels() *api.ForbiddenListSpec {
 	}
 
 	return &api.ForbiddenListSpec{
-		Exact: strings.Split(in.Annotations[api.ForbiddenNamespaceLabelsAnnotation], ","),
-		Regex: in.Annotations[api.ForbiddenNamespaceLabelsRegexpAnnotation],
+		Exact: strings.Split(in.Annotations[meta.ForbiddenNamespaceLabelsAnnotation], ","),
+		Regex: in.Annotations[meta.ForbiddenNamespaceLabelsRegexpAnnotation],
 	}
 }
 
@@ -58,7 +59,7 @@ func (in *Tenant) ForbiddenUserNamespaceAnnotations() *api.ForbiddenListSpec {
 	}
 
 	return &api.ForbiddenListSpec{
-		Exact: strings.Split(in.Annotations[api.ForbiddenNamespaceAnnotationsAnnotation], ","),
-		Regex: in.Annotations[api.ForbiddenNamespaceAnnotationsRegexpAnnotation],
+		Exact: strings.Split(in.Annotations[meta.ForbiddenNamespaceAnnotationsAnnotation], ","),
+		Regex: in.Annotations[meta.ForbiddenNamespaceAnnotationsRegexpAnnotation],
 	}
 }

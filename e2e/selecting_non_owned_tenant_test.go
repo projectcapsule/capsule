@@ -6,6 +6,7 @@ package e2e
 import (
 	"context"
 
+	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -22,10 +23,12 @@ var _ = Describe("creating a Namespace trying to select a third Tenant", Label("
 			Name: "tenant-non-owned",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: capsulev1beta2.OwnerListSpec{
+			Owners: api.OwnerListSpec{
 				{
-					Name: "undefined",
-					Kind: "User",
+					UserSpec: api.UserSpec{
+						Name: "undefined",
+						Kind: "User",
+					},
 				},
 			},
 		},
@@ -53,7 +56,7 @@ var _ = Describe("creating a Namespace trying to select a third Tenant", Label("
 			})
 		})
 
-		cs := ownerClient(capsulev1beta2.OwnerSpec{Name: "dale", Kind: "User"})
+		cs := ownerClient(api.UserSpec{Name: "dale", Kind: "User"})
 		_, err := cs.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
 		Expect(err).To(HaveOccurred())
 	})

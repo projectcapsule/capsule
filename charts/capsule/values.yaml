@@ -178,6 +178,13 @@ manager:
     workers: 1
     # -- Set the log verbosity of the capsule with a value from 1 to 5
     logLevel: '3'
+    # -- Define entities which can act as Administrators in the capsule construct
+    # These entities are automatically owners for all existing tenants. Meaning they can add namespaces to any tenant. However they must be specific by using the capsule label
+    # for interacting with namespaces. Because if that label is not defined, it's assumed that namespace interaction was not targeted towards a tenant and will therefor
+    # be ignored by capsule. May also be handy in GitOps scenarios where certain service accounts need to be able to manage namespaces for all tenants.
+    administrators: []
+    # - kind: User
+    #   name: alice
     # -- Names of the users considered as Capsule users.
     userNames: []
     # -- Names of the groups considered as Capsule users.

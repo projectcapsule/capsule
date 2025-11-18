@@ -5,6 +5,7 @@ package e2e
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"strings"
@@ -24,6 +25,8 @@ import (
 	"k8s.io/client-go/kubernetes"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api/meta"
 )
 
 const (
@@ -46,7 +49,7 @@ func NewService(svc types.NamespacedName) *corev1.Service {
 	}
 }
 
-func ServiceCreation(svc *corev1.Service, owner capsulev1beta2.OwnerSpec, timeout time.Duration) AsyncAssertion {
+func ServiceCreation(svc *corev1.Service, owner api.UserSpec, timeout time.Duration) AsyncAssertion {
 	cs := ownerClient(owner)
 	return Eventually(func() (err error) {
 		_, err = cs.CoreV1().Services(svc.Namespace).Create(context.TODO(), svc, metav1.CreateOptions{})
@@ -59,7 +62,9 @@ func NewNamespace(name string, labels ...map[string]string) *corev1.Namespace {
 		name = rand.String(10)
 	}
 
-	var namespaceLabels map[string]string
+	namespaceLabels := make(map[string]string)
+	namespaceLabels["env"] = "e2e"
+
 	if len(labels) > 0 {
 		namespaceLabels = labels[0]
 	}
@@ -72,7 +77,7 @@ func NewNamespace(name string, labels ...map[string]string) *corev1.Namespace {
 	}
 }
 
-func NamespaceCreation(ns *corev1.Namespace, owner capsulev1beta2.OwnerSpec, timeout time.Duration) AsyncAssertion {
+func NamespaceCreation(ns *corev1.Namespace, owner api.UserSpec, timeout time.Duration) AsyncAssertion {
 	cs := ownerClient(owner)
 	return Eventually(func() (err error) {
 		_, err = cs.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
@@ -80,9 +85,165 @@ func NamespaceCreation(ns *corev1.Namespace, owner capsulev1beta2.OwnerSpec, tim
 	}, timeout, defaultPollInterval)
 }
 
-func TenantNamespaceList(t *capsulev1beta2.Tenant, timeout time.Duration) AsyncAssertion {
+func NamespaceIsPartOfTenant(
+	tnt *capsulev1beta2.Tenant,
+	ns *corev1.Namespace,
+) func() error {
+
+	return func() error {
+		t := &capsulev1beta2.Tenant{}
+		if err := k8sClient.Get(
+			context.TODO(),
+			types.NamespacedName{Name: tnt.GetName()},
+			t,
+		); err != nil {
+			return fmt.Errorf("failed to get tenant: %w", err)
+		}
+
+		// reuse existing helper
+		namespaces := TenantNamespaceList(t, defaultTimeoutInterval)
+		if ok, _ := ContainElements(ns.GetName()).Match(namespaces); ok {
+			return fmt.Errorf(
+				"expected tenant %s to contain namespace %s, but got: %v",
+				t.GetName(), ns.GetName(), namespaces,
+			)
+		}
+
+		// reuse your existing method
+		instance := t.Status.GetInstance(
+			&capsulev1beta2.TenantStatusNamespaceItem{
+				Name: ns.GetName(),
+				UID:  ns.GetUID(),
+			})
+
+		if instance == nil {
+			return fmt.Errorf(
+				"tenant %s does not contain instance for namespace %s (uid=%s)",
+				t.GetName(), ns.GetName(), ns.GetUID(),
+			)
+		}
+
+		return nil
+	}
+}
+
+func GetTenantOwnerReference(
+	tnt *capsulev1beta2.Tenant,
+) (metav1.OwnerReference, error) {
+
+	t := &capsulev1beta2.Tenant{}
+	if err := k8sClient.Get(
+		context.TODO(),
+		types.NamespacedName{Name: tnt.GetName()},
+		t,
+	); err != nil {
+		return metav1.OwnerReference{}, fmt.Errorf("failed to get tenant: %w", err)
+	}
+
+	gvk := capsulev1beta2.GroupVersion.WithKind("Tenant")
+	return metav1.OwnerReference{
+		APIVersion: gvk.GroupVersion().String(),
+		Kind:       gvk.Kind,
+		Name:       t.GetName(),
+		UID:        t.GetUID(),
+	}, nil
+}
+
+func GetTenantOwnerReferenceAsPatch(
+	tnt *capsulev1beta2.Tenant,
+) (map[string]interface{}, error) {
+	ownerRef, err := GetTenantOwnerReference(tnt)
+	if err != nil {
+		return nil, err
+	}
+
+	return map[string]interface{}{
+		"apiVersion": ownerRef.APIVersion,
+		"kind":       ownerRef.Kind,
+		"name":       ownerRef.Name,
+		"uid":        string(ownerRef.UID),
+	}, nil
+
+}
+
+func PatchTenantLabelForNamespace(tnt *capsulev1beta2.Tenant, ns *corev1.Namespace, cs kubernetes.Interface, timeout time.Duration) AsyncAssertion {
+	return Eventually(func() (err error) {
+		patch := map[string]interface{}{
+			"metadata": map[string]interface{}{
+				"labels": map[string]interface{}{
+					meta.TenantLabel: tnt.GetName(),
+				},
+			},
+		}
+
+		return PatchNamespace(ns, cs, patch)
+	}, timeout, defaultPollInterval)
+}
+
+func PatchNamespace(ns *corev1.Namespace, cs kubernetes.Interface, patch map[string]interface{}) error {
+	patchBytes, err := json.Marshal(patch)
+	if err != nil {
+		return err
+	}
+
+	_, err = cs.CoreV1().Namespaces().Patch(
+		context.Background(),
+		ns.GetName(),
+		types.MergePatchType,
+		patchBytes,
+		metav1.PatchOptions{},
+	)
+
+	return err
+}
+
+func PatchTenantOwnerReferenceForNamespace(
+	tnt *capsulev1beta2.Tenant,
+	ns *corev1.Namespace,
+	cs kubernetes.Interface,
+	timeout time.Duration,
+) AsyncAssertion {
+	return Eventually(func() error {
+		// Build ownerRef for the tenant
+		ownerRef := metav1.OwnerReference{
+			APIVersion: capsulev1beta2.GroupVersion.String(),
+			Kind:       "Tenant",
+			Name:       tnt.GetName(),
+			UID:        tnt.GetUID(),
+		}
+
+		patch := map[string]interface{}{
+			"metadata": map[string]interface{}{
+				"ownerReferences": []map[string]interface{}{
+					{
+						"apiVersion": ownerRef.APIVersion,
+						"kind":       ownerRef.Kind,
+						"name":       ownerRef.Name,
+						"uid":        string(ownerRef.UID),
+					},
+				},
+			},
+		}
+
+		patchBytes, err := json.Marshal(patch)
+		Expect(err).ToNot(HaveOccurred())
+
+		_, err = cs.CoreV1().Namespaces().Patch(
+			context.Background(),
+			ns.GetName(),
+			types.StrategicMergePatchType,
+			patchBytes,
+			metav1.PatchOptions{},
+		)
+
+		return err
+	}, timeout, defaultPollInterval)
+}
+
+func TenantNamespaceList(tnt *capsulev1beta2.Tenant, timeout time.Duration) AsyncAssertion {
+	t := &capsulev1beta2.Tenant{}
 	return Eventually(func() []string {
-		Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: t.GetName()}, t)).Should(Succeed())
+		Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: tnt.GetName()}, t)).Should(Succeed())
 		return t.Status.Namespaces
 	}, timeout, defaultPollInterval)
 }
@@ -108,7 +269,7 @@ func ModifyCapsuleConfigurationOpts(fn func(configuration *capsulev1beta2.Capsul
 	Expect(k8sClient.Update(context.Background(), config)).ToNot(HaveOccurred())
 }
 
-func CheckForOwnerRoleBindings(ns *corev1.Namespace, owner capsulev1beta2.OwnerSpec, roles map[string]bool) func() error {
+func CheckForOwnerRoleBindings(ns *corev1.Namespace, owner api.OwnerSpec, roles map[string]bool) func() error {
 	if roles == nil {
 		roles = map[string]bool{
 			"admin":                     false,
@@ -125,7 +286,7 @@ func CheckForOwnerRoleBindings(ns *corev1.Namespace, owner capsulev1beta2.OwnerS
 
 		var ownerName string
 
-		if owner.Kind == capsulev1beta2.ServiceAccountOwner {
+		if owner.Kind == api.ServiceAccountOwner {
 			parts := strings.Split(owner.Name, ":")
 
 			ownerName = parts[3]

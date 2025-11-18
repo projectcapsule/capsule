@@ -12,6 +12,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/api"
 )
 
 var _ = Describe("creating a Namespace with a protected Namespace regex enabled", Label("namespace"), func() {
@@ -22,10 +23,12 @@ var _ = Describe("creating a Namespace with a protected Namespace regex enabled"
 			Name: "tenant-protected-namespace",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: capsulev1beta2.OwnerListSpec{
+			Owners: api.OwnerListSpec{
 				{
-					Name: "alice",
-					Kind: "User",
+					UserSpec: api.UserSpec{
+						Name: "alice",
+						Kind: "User",
+					},
 				},
 			},
 		},
@@ -61,13 +64,13 @@ var _ = Describe("creating a Namespace with a protected Namespace regex enabled"
 
 		ns := NewNamespace("test-ok")
 
-		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 	})
 
 	It("should fail using a value non matching the regex", func() {
 		ns := NewNamespace("test-system")
-		NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).ShouldNot(Succeed())
+		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).ShouldNot(Succeed())
 
 		ModifyCapsuleConfigurationOpts(func(configuration *capsulev1beta2.CapsuleConfiguration) {
 			configuration.Spec.ProtectedNamespaceRegexpString = ""

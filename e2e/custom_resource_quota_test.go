@@ -19,6 +19,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/api"
 )
 
 var _ = Describe("when Tenant limits custom Resource Quota", Label("resourcequota"), func() {
@@ -30,10 +31,12 @@ var _ = Describe("when Tenant limits custom Resource Quota", Label("resourcequot
 			},
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: capsulev1beta2.OwnerListSpec{
+			Owners: api.OwnerListSpec{
 				{
-					Name: "resource",
-					Kind: "User",
+					UserSpec: api.UserSpec{
+						Name: "resource",
+						Kind: "User",
+					},
 				},
 			},
 		},
@@ -102,7 +105,7 @@ var _ = Describe("when Tenant limits custom Resource Quota", Label("resourcequot
 		for _, i := range []int{1, 2, 3} {
 			ns := NewNamespace(fmt.Sprintf("limiting-resources-ns-%d", i))
 
-			NamespaceCreation(ns, tnt.Spec.Owners[0], defaultTimeoutInterval).Should(Succeed())
+			NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 			TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 			obj := &unstructured.Unstructured{
