@@ -34,7 +34,11 @@ func IsTenantOwnerReference(or metav1.OwnerReference) bool {
 	return group == capsulev1beta2.GroupVersion.Group && or.Kind == ObjectReferenceTenantKind
 }
 
-func IsTenantOwnerReferenceForTenant(or metav1.OwnerReference, tenant *capsulev1beta2.Tenant) bool {
+func IsTenantOwnerReferenceForTenant(or metav1.OwnerReference, tnt *capsulev1beta2.Tenant) bool {
+	if tnt == nil {
+		return false
+	}
+
 	if or.Kind != ObjectReferenceTenantKind {
 		return false
 	}
@@ -50,5 +54,5 @@ func IsTenantOwnerReferenceForTenant(or metav1.OwnerReference, tenant *capsulev1
 
 	group := parts[0]
 
-	return group == capsulev1beta2.GroupVersion.Group && or.Kind == ObjectReferenceTenantKind && or.Name == tenant.GetName() && or.UID == tenant.GetUID()
+	return group == capsulev1beta2.GroupVersion.Group && or.Kind == ObjectReferenceTenantKind && or.Name == tnt.GetName() && or.UID == tnt.GetUID()
 }
