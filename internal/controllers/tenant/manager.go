@@ -10,7 +10,10 @@ import (
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
+	nodev1 "k8s.io/api/node/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	schedulingv1 "k8s.io/api/scheduling/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -18,10 +21,12 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/internal/controllers/utils"
@@ -46,6 +51,31 @@ func (r *Manager) SetupWithManager(mgr ctrl.Manager, cfg utils.ControllerOptions
 		Owns(&corev1.ResourceQuota{}).
 		Owns(&rbacv1.RoleBinding{}).
 		Watches(&corev1.Namespace{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &capsulev1beta2.Tenant{})).
+		Watches(
+			&storagev1.StorageClass{},
+			handler.EnqueueRequestsFromMapFunc(r.enqueueAllTenants),
+			builder.WithPredicates(utils.UpdatedMetadataPredicate),
+		).
+		Watches(
+			&gatewayv1.GatewayClass{},
+			handler.EnqueueRequestsFromMapFunc(r.enqueueAllTenants),
+			builder.WithPredicates(utils.UpdatedMetadataPredicate),
+		).
+		Watches(
+			&networkingv1.IngressClass{},
+			handler.EnqueueRequestsFromMapFunc(r.enqueueAllTenants),
+			builder.WithPredicates(utils.UpdatedMetadataPredicate),
+		).
+		Watches(
+			&schedulingv1.PriorityClass{},
+			handler.EnqueueRequestsFromMapFunc(r.enqueueAllTenants),
+			builder.WithPredicates(utils.UpdatedMetadataPredicate),
+		).
+		Watches(
+			&nodev1.RuntimeClass{},
+			handler.EnqueueRequestsFromMapFunc(r.enqueueAllTenants),
+			builder.WithPredicates(utils.UpdatedMetadataPredicate),
+		).
 		WithOptions(controller.Options{MaxConcurrentReconciles: cfg.MaxConcurrentReconciles}).
 		Complete(r)
 }
@@ -85,9 +115,6 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 		err = fmt.Errorf("cannot ensure metadata: %w", err)
 
 		return result, err
-	}
-	if updated {
-		return result, nil
 	}
 
 	if updated {

@@ -14,51 +14,61 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
+	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api"
 )
 
 func (r *Manager) collectAvailableResources(ctx context.Context, tnt *capsulev1beta2.Tenant) (err error) {
-	tnt.Status.Classes.StorageClasses, err = listObjectNamesBySelector(
+	log := log.FromContext(ctx)
+
+	log.V(5).Info("collecting available storageclasses")
+
+	if tnt.Status.Classes.StorageClasses, err = listObjectNamesBySelector(
 		ctx,
 		r.Client,
 		tnt.Spec.StorageClasses,
 		&storagev1.StorageClassList{},
-	)
-	if err != nil {
-		return
+	); err != nil {
+		return err
 	}
 
-	tnt.Status.Classes.PriorityClasses, err = listObjectNamesBySelector(
+	log.V(5).Info("collected available storageclasses", "size", len(tnt.Status.Classes.StorageClasses))
+
+	if tnt.Status.Classes.PriorityClasses, err = listObjectNamesBySelector(
 		ctx,
 		r.Client,
 		tnt.Spec.PriorityClasses,
 		&schedulingv1.PriorityClassList{},
-	)
-	if err != nil {
-		return
+	); err != nil {
+		return err
 	}
 
-	//tnt.Status.Classes.GatewayClasses, err = listObjectNamesBySelector(
-	//	ctx,
-	//	r.Client,
-	//	tnt.Spec.GatewayOptions.AllowedClasses.SelectionListWithSpec,
-	//	&gatewayv1.GatewayClassList{},
-	//)
-	//if err != nil {
-	//	return
-	//}
+	log.V(5).Info("collected available priorityclasses", "size", len(tnt.Status.Classes.PriorityClasses))
 
-	tnt.Status.Classes.RuntimeClasses, err = listObjectNamesBySelector(
+	if tnt.Status.Classes.GatewayClasses, err = listObjectNamesBySelector(
+		ctx,
+		r.Client,
+		tnt.Spec.GatewayOptions.AllowedClasses,
+		&gatewayv1.GatewayClassList{},
+	); err != nil {
+		return err
+	}
+
+	log.V(5).Info("collected available gatewayclasses", "size", len(tnt.Status.Classes.GatewayClasses))
+
+	if tnt.Status.Classes.RuntimeClasses, err = listObjectNamesBySelector(
 		ctx,
 		r.Client,
 		tnt.Spec.RuntimeClasses,
 		&nodev1.RuntimeClassList{},
-	)
-	if err != nil {
-		return
+	); err != nil {
+		return err
 	}
+
+	log.V(5).Info("collected available runtimeclasses", "size", len(tnt.Status.Classes.RuntimeClasses))
 
 	return nil
 }
@@ -72,34 +82,13 @@ func listObjectNamesBySelector(
 	list client.ObjectList,
 	opts ...client.ListOption,
 ) (objects []string, err error) {
-	if allowed == nil {
-		return nil, nil
-	}
-
 	defer func() {
 		if err == nil {
 			sort.Strings(objects)
 		}
 	}()
 
-	if len(allowed.Exact) > 0 {
-		objects = append(objects, allowed.Exact...)
-	}
-
-	if len(allowed.LabelSelector.MatchLabels) == 0 && len(allowed.LabelSelector.MatchExpressions) == 0 {
-		return nil, nil
-	}
-
-	var sel labels.Selector
-	sel, err = metav1.LabelSelectorAsSelector(&allowed.LabelSelector)
-	if err != nil {
-		return nil, err
-	}
-
-	base := []client.ListOption{&client.MatchingLabelsSelector{Selector: sel}}
-	base = append(base, opts...)
-
-	if err := c.List(ctx, list, base...); err != nil {
+	if err := c.List(ctx, list, opts...); err != nil {
 		return nil, err
 	}
 
@@ -108,15 +97,76 @@ func listObjectNamesBySelector(
 		return nil, err
 	}
 
-	names := make([]string, 0, len(objs))
+	allNames := make(map[string]struct{})
+
+	selected := make(map[string]struct{})
+
+	hasSelector := false
+	if allowed != nil {
+		hasSelector = len(allowed.MatchLabels) > 0 ||
+			len(allowed.MatchExpressions) > 0
+	}
+
+	if allowed == nil || (!hasSelector && len(allowed.Exact) == 0) {
+		for _, o := range objs {
+			accessor, err := meta.Accessor(o)
+			if err != nil {
+				return nil, err
+			}
+
+			objects = append(objects, accessor.GetName())
+		}
+
+		return objects, nil
+	}
+
+	var sel labels.Selector
+	if hasSelector {
+		sel, err = metav1.LabelSelectorAsSelector(&allowed.LabelSelector)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	for _, obj := range objs {
 		accessor, err := meta.Accessor(obj)
 		if err != nil {
 			return nil, err
 		}
-		names = append(names, accessor.GetName())
+
+		name := accessor.GetName()
+
+		allNames[name] = struct{}{}
+
+		if hasSelector {
+			lbls := labels.Set(accessor.GetLabels())
+
+			if sel.Matches(lbls) {
+				selected[name] = struct{}{}
+			}
+		}
 	}
 
-	sort.Strings(names)
-	return names, nil
+	exact := allowed.Exact
+	if allowed.Default != "" {
+		exact = append(exact, allowed.Default)
+	}
+
+	for _, name := range exact {
+		if _, exists := allNames[name]; !exists {
+			continue
+		}
+
+		if _, already := selected[name]; already {
+			continue
+		}
+
+		selected[name] = struct{}{}
+	}
+
+	for name := range selected {
+		objects = append(objects, name)
+	}
+
+	return objects, nil
 }

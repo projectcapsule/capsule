@@ -21,6 +21,7 @@ const (
 type TenantStatus struct {
 	// Allowed Cluster Objects within Tenant
 	TenantAvailableStatus `json:",inline"`
+
 	// +kubebuilder:default=Active
 	// The operational state of the Tenant. Possible values are "Active", "Cordoned".
 	State tenantState `json:"state"`
@@ -37,8 +38,6 @@ type TenantStatus struct {
 type TenantAvailableStatus struct {
 	// Available Class Types within Tenant
 	Classes TenantAvailableClassesStatus `json:"classes,omitempty"`
-	// Available Nodes for Scheduling
-	Nodes []string `json:"nodes,omitempty"`
 }
 
 type TenantAvailableClassesStatus struct {

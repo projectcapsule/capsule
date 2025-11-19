@@ -18,6 +18,7 @@ import (
 type DefaultAllowedListSpec struct {
 	SelectorAllowedListSpec `json:",inline"`
 
+	// Default class for tenant, when no class is set. This may overwrite even the global default.
 	Default string `json:"default,omitempty"`
 }
 
@@ -28,8 +29,8 @@ func (in *DefaultAllowedListSpec) MatchDefault(value string) bool {
 // +kubebuilder:object:generate=true
 
 type SelectorAllowedListSpec struct {
-	AllowedListSpec       `json:",inline"`
-	SelectionListWithSpec `json:",inline"`
+	AllowedListSpec      `json:",inline"`
+	metav1.LabelSelector `json:",inline"`
 }
 
 func (in *SelectorAllowedListSpec) MatchSelectByName(obj client.Object) bool {
@@ -56,8 +57,10 @@ func (in *SelectorAllowedListSpec) SelectorMatch(obj client.Object) bool {
 // +kubebuilder:object:generate=true
 
 type AllowedListSpec struct {
+	// Match exact elements which are allowed as class names within this tenant
 	Exact []string `json:"allowed,omitempty"`
-	Regex string   `json:"allowedRegex,omitempty"`
+	// Match elements by regex (DEPRECATED)
+	Regex string `json:"allowedRegex,omitempty"`
 }
 
 func (in *AllowedListSpec) Match(value string) (ok bool) {

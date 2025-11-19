@@ -123,10 +123,13 @@ spec:
                   can use only one of the allowed trusted registries. Optional.
                 properties:
                   allowed:
+                    description: Match exact elements which are allowed as class names
+                      within this tenant
                     items:
                       type: string
                     type: array
                   allowedRegex:
+                    description: Match elements by regex (DEPRECATED)
                     type: string
                 type: object
               imagePullPolicies:
@@ -151,10 +154,13 @@ spec:
                       Optional.
                     properties:
                       allowed:
+                        description: Match exact elements which are allowed as class
+                          names within this tenant
                         items:
                           type: string
                         type: array
                       allowedRegex:
+                        description: Match elements by regex (DEPRECATED)
                         type: string
                     type: object
                   allowedHostnames:
@@ -164,10 +170,13 @@ spec:
                       Optional.
                     properties:
                       allowed:
+                        description: Match exact elements which are allowed as class
+                          names within this tenant
                         items:
                           type: string
                         type: array
                       allowedRegex:
+                        description: Match elements by regex (DEPRECATED)
                         type: string
                     type: object
                   hostnameCollisionScope:
@@ -840,10 +849,13 @@ spec:
                   can use only one of the allowed PriorityClasses. Optional.
                 properties:
                   allowed:
+                    description: Match exact elements which are allowed as class names
+                      within this tenant
                     items:
                       type: string
                     type: array
                   allowedRegex:
+                    description: Match elements by regex (DEPRECATED)
                     type: string
                 type: object
               resourceQuotas:
@@ -1012,10 +1024,13 @@ spec:
                   Optional.
                 properties:
                   allowed:
+                    description: Match exact elements which are allowed as class names
+                      within this tenant
                     items:
                       type: string
                     type: array
                   allowedRegex:
+                    description: Match elements by regex (DEPRECATED)
                     type: string
                 type: object
             required:
@@ -1164,10 +1179,13 @@ spec:
                   can use only one of the allowed trusted registries. Optional.
                 properties:
                   allowed:
+                    description: Match exact elements which are allowed as class names
+                      within this tenant
                     items:
                       type: string
                     type: array
                   allowedRegex:
+                    description: Match elements by regex (DEPRECATED)
                     type: string
                 type: object
               cordoned:
@@ -1191,7 +1209,18 @@ spec:
                 properties:
                   allowedClasses:
                     properties:
+                      allowed:
+                        description: Match exact elements which are allowed as class
+                          names within this tenant
+                        items:
+                          type: string
+                        type: array
+                      allowedRegex:
+                        description: Match elements by regex (DEPRECATED)
+                        type: string
                       default:
+                        description: Default class for tenant, when no class is set.
+                          This may overwrite even the global default.
                         type: string
                       matchExpressions:
                         description: matchExpressions is a list of label selector
@@ -1264,12 +1293,17 @@ spec:
                       Optional.
                     properties:
                       allowed:
+                        description: Match exact elements which are allowed as class
+                          names within this tenant
                         items:
                           type: string
                         type: array
                       allowedRegex:
+                        description: Match elements by regex (DEPRECATED)
                         type: string
                       default:
+                        description: Default class for tenant, when no class is set.
+                          This may overwrite even the global default.
                         type: string
                       matchExpressions:
                         description: matchExpressions is a list of label selector
@@ -1321,10 +1355,13 @@ spec:
                       Optional.
                     properties:
                       allowed:
+                        description: Match exact elements which are allowed as class
+                          names within this tenant
                         items:
                           type: string
                         type: array
                       allowedRegex:
+                        description: Match elements by regex (DEPRECATED)
                         type: string
                     type: object
                   hostnameCollisionScope:
@@ -2139,12 +2176,17 @@ spec:
                   Optional.
                 properties:
                   allowed:
+                    description: Match exact elements which are allowed as class names
+                      within this tenant
                     items:
                       type: string
                     type: array
                   allowedRegex:
+                    description: Match elements by regex (DEPRECATED)
                     type: string
                   default:
+                    description: Default class for tenant, when no class is set. This
+                      may overwrite even the global default.
                     type: string
                   matchExpressions:
                     description: matchExpressions is a list of label selector requirements.
@@ -2283,12 +2325,17 @@ spec:
                   Optional.
                 properties:
                   allowed:
+                    description: Match exact elements which are allowed as class names
+                      within this tenant
                     items:
                       type: string
                     type: array
                   allowedRegex:
+                    description: Match elements by regex (DEPRECATED)
                     type: string
                   default:
+                    description: Default class for tenant, when no class is set. This
+                      may overwrite even the global default.
                     type: string
                   matchExpressions:
                     description: matchExpressions is a list of label selector requirements.
@@ -2413,12 +2460,17 @@ spec:
                   Optional.
                 properties:
                   allowed:
+                    description: Match exact elements which are allowed as class names
+                      within this tenant
                     items:
                       type: string
                     type: array
                   allowedRegex:
+                    description: Match elements by regex (DEPRECATED)
                     type: string
                   default:
+                    description: Default class for tenant, when no class is set. This
+                      may overwrite even the global default.
                     type: string
                   matchExpressions:
                     description: matchExpressions is a list of label selector requirements.
@@ -2551,11 +2603,6 @@ spec:
                 type: array
               namespaces:
                 description: List of namespaces assigned to the Tenant. (Deprecated)
-                items:
-                  type: string
-                type: array
-              nodes:
-                description: Available Nodes for Scheduling
                 items:
                   type: string
                 type: array

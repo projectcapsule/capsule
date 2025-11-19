@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -34,6 +35,13 @@ const (
 	defaultPollInterval      = time.Second
 	defaultConfigurationName = "default"
 )
+
+func ignoreNotFound(err error) error {
+	if apierrors.IsNotFound(err) {
+		return nil
+	}
+	return err
+}
 
 func NewService(svc types.NamespacedName) *corev1.Service {
 	return &corev1.Service{
