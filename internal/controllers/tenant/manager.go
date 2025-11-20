@@ -10,7 +10,10 @@ import (
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
+	nodev1 "k8s.io/api/node/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	schedulingv1 "k8s.io/api/scheduling/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -18,35 +21,73 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/internal/controllers/utils"
 	"github.com/projectcapsule/capsule/internal/metrics"
 	meta "github.com/projectcapsule/capsule/pkg/api/meta"
+	"github.com/projectcapsule/capsule/pkg/configuration"
 )
 
 type Manager struct {
 	client.Client
 
-	Metrics    *metrics.TenantRecorder
-	Log        logr.Logger
-	Recorder   record.EventRecorder
-	RESTConfig *rest.Config
+	Metrics       *metrics.TenantRecorder
+	Log           logr.Logger
+	Recorder      record.EventRecorder
+	Configuration configuration.Configuration
+	RESTConfig    *rest.Config
 }
 
-func (r *Manager) SetupWithManager(mgr ctrl.Manager, cfg utils.ControllerOptions) error {
+func (r *Manager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.ControllerOptions) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&capsulev1beta2.Tenant{}).
 		Owns(&networkingv1.NetworkPolicy{}).
 		Owns(&corev1.LimitRange{}).
 		Owns(&corev1.ResourceQuota{}).
 		Owns(&rbacv1.RoleBinding{}).
-		Watches(&corev1.Namespace{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &capsulev1beta2.Tenant{})).
-		WithOptions(controller.Options{MaxConcurrentReconciles: cfg.MaxConcurrentReconciles}).
+		Watches(
+			&capsulev1beta2.CapsuleConfiguration{},
+			handler.EnqueueRequestsFromMapFunc(r.enqueueAllTenants),
+			utils.NamesMatchingPredicate(ctrlConfig.ConfigurationName),
+			builder.WithPredicates(utils.CapsuleConfigSpecChangedPredicate),
+		).
+		Watches(
+			&corev1.Namespace{},
+			handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &capsulev1beta2.Tenant{}),
+		).
+		Watches(
+			&storagev1.StorageClass{},
+			handler.EnqueueRequestsFromMapFunc(r.enqueueAllTenants),
+			builder.WithPredicates(utils.UpdatedMetadataPredicate),
+		).
+		Watches(
+			&gatewayv1.GatewayClass{},
+			handler.EnqueueRequestsFromMapFunc(r.enqueueAllTenants),
+			builder.WithPredicates(utils.UpdatedMetadataPredicate),
+		).
+		Watches(
+			&networkingv1.IngressClass{},
+			handler.EnqueueRequestsFromMapFunc(r.enqueueAllTenants),
+			builder.WithPredicates(utils.UpdatedMetadataPredicate),
+		).
+		Watches(
+			&schedulingv1.PriorityClass{},
+			handler.EnqueueRequestsFromMapFunc(r.enqueueAllTenants),
+			builder.WithPredicates(utils.UpdatedMetadataPredicate),
+		).
+		Watches(
+			&nodev1.RuntimeClass{},
+			handler.EnqueueRequestsFromMapFunc(r.enqueueAllTenants),
+			builder.WithPredicates(utils.UpdatedMetadataPredicate),
+		).
+		WithOptions(controller.Options{MaxConcurrentReconciles: ctrlConfig.MaxConcurrentReconciles}).
 		Complete(r)
 }
 
@@ -138,6 +179,13 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 
 	if err = r.syncRoleBindings(ctx, instance); err != nil {
 		err = fmt.Errorf("cannot sync rolebindings items: %w", err)
+
+		return result, err
+	}
+
+	// Collect available resources
+	if err = r.collectAvailableResources(ctx, instance); err != nil {
+		err = fmt.Errorf("cannot collect available resources: %w", err)
 
 		return result, err
 	}

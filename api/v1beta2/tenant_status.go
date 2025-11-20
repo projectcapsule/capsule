@@ -19,6 +19,9 @@ const (
 
 // Returns the observed state of the Tenant.
 type TenantStatus struct {
+	// Allowed Cluster Objects within Tenant
+	TenantAvailableStatus `json:",inline"`
+
 	// +kubebuilder:default=Active
 	// The operational state of the Tenant. Possible values are "Active", "Cordoned".
 	State tenantState `json:"state"`
@@ -48,6 +51,22 @@ type TenantStatusNamespaceMetadata struct {
 	Labels map[string]string `json:"labels,omitempty"`
 	// Managed Annotations
 	Annotations map[string]string `json:"annotations,omitempty"`
+}
+
+type TenantAvailableStatus struct {
+	// Available Class Types within Tenant
+	Classes TenantAvailableClassesStatus `json:"classes,omitempty"`
+}
+
+type TenantAvailableClassesStatus struct {
+	// Available Storageclasses (Only collected if any matching condition is specified)
+	StorageClasses []string `json:"storage,omitempty"`
+	// Available PriorityClasses
+	PriorityClasses []string `json:"priority,omitempty"`
+	// Available StorageClasses
+	RuntimeClasses []string `json:"runtime,omitempty"`
+	// Available GatewayClasses
+	GatewayClasses []string `json:"gateway,omitempty"`
 }
 
 func (ms *TenantStatus) GetInstance(stat *TenantStatusNamespaceItem) *TenantStatusNamespaceItem {

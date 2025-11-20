@@ -8,5 +8,5 @@ import (
 )
 
 type GatewayOptions struct {
-	AllowedClasses *api.SelectionListWithDefaultSpec `json:"allowedClasses,omitempty"`
+	AllowedClasses *api.DefaultAllowedListSpec `json:"allowedClasses,omitempty"`
 }
