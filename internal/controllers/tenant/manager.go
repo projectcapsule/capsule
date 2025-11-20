@@ -18,6 +18,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -27,26 +28,34 @@ import (
 	"github.com/projectcapsule/capsule/internal/controllers/utils"
 	"github.com/projectcapsule/capsule/internal/metrics"
 	meta "github.com/projectcapsule/capsule/pkg/api/meta"
+	"github.com/projectcapsule/capsule/pkg/configuration"
 )
 
 type Manager struct {
 	client.Client
 
-	Metrics    *metrics.TenantRecorder
-	Log        logr.Logger
-	Recorder   record.EventRecorder
-	RESTConfig *rest.Config
+	Metrics       *metrics.TenantRecorder
+	Log           logr.Logger
+	Recorder      record.EventRecorder
+	Configuration configuration.Configuration
+	RESTConfig    *rest.Config
 }
 
-func (r *Manager) SetupWithManager(mgr ctrl.Manager, cfg utils.ControllerOptions) error {
+func (r *Manager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.ControllerOptions) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&capsulev1beta2.Tenant{}).
 		Owns(&networkingv1.NetworkPolicy{}).
 		Owns(&corev1.LimitRange{}).
 		Owns(&corev1.ResourceQuota{}).
 		Owns(&rbacv1.RoleBinding{}).
+		Watches(
+			&capsulev1beta2.CapsuleConfiguration{},
+			handler.EnqueueRequestsFromMapFunc(r.enqueueAllTenants),
+			utils.NamesMatchingPredicate(ctrlConfig.ConfigurationName),
+			builder.WithPredicates(utils.CapsuleConfigSpecChangedPredicate),
+		).
 		Watches(&corev1.Namespace{}, handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &capsulev1beta2.Tenant{})).
-		WithOptions(controller.Options{MaxConcurrentReconciles: cfg.MaxConcurrentReconciles}).
+		WithOptions(controller.Options{MaxConcurrentReconciles: ctrlConfig.MaxConcurrentReconciles}).
 		Complete(r)
 }
 

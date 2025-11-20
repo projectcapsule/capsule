@@ -4,5 +4,6 @@
 package utils
 
 type ControllerOptions struct {
+	ConfigurationName       string
 	MaxConcurrentReconciles int
 }

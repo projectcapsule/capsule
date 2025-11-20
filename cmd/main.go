@@ -93,7 +93,7 @@ func main() {
 
 	var enableLeaderElection, version bool
 
-	var metricsAddr, ns, configurationName string
+	var metricsAddr, ns string
 
 	var webhookPort int
 
@@ -106,7 +106,7 @@ func main() {
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
 	flag.BoolVar(&version, "version", false, "Print the Capsule version and exit")
-	flag.StringVar(&configurationName, "configuration-name", "default", "The CapsuleConfiguration resource name to use")
+	flag.StringVar(&controllerConfig.ConfigurationName, "configuration-name", "default", "The CapsuleConfiguration resource name to use")
 
 	opts := zap.Options{
 		EncoderConfigOptions: append([]zap.EncoderConfigOption{}, func(config *zapcore.EncoderConfig) {
@@ -126,12 +126,14 @@ func main() {
 		os.Exit(0)
 	}
 
+	setupLog.V(5).Info("Controller", "Options", controllerConfig)
+
 	if ns = os.Getenv("NAMESPACE"); len(ns) == 0 {
 		setupLog.Error(fmt.Errorf("unable to determinate the Namespace Capsule is running on"), "unable to start manager")
 		os.Exit(1)
 	}
 
-	if len(configurationName) == 0 {
+	if len(controllerConfig.ConfigurationName) == 0 {
 		setupLog.Error(fmt.Errorf("missing CapsuleConfiguration resource name"), "unable to start manager")
 		os.Exit(1)
 	}
@@ -163,7 +165,7 @@ func main() {
 
 	ctx := ctrl.SetupSignalHandler()
 
-	cfg := configuration.NewCapsuleConfiguration(ctx, manager.GetClient(), configurationName)
+	cfg := configuration.NewCapsuleConfiguration(ctx, manager.GetClient(), controllerConfig.ConfigurationName)
 
 	directClient, err := client.New(ctrl.GetConfigOrDie(), client.Options{
 		Scheme: manager.GetScheme(),
@@ -174,7 +176,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	directCfg := configuration.NewCapsuleConfiguration(ctx, directClient, configurationName)
+	directCfg := configuration.NewCapsuleConfiguration(ctx, directClient, controllerConfig.ConfigurationName)
 
 	if directCfg.EnableTLSConfiguration() {
 		tlsReconciler := &tlscontroller.Reconciler{
@@ -203,11 +205,12 @@ func main() {
 	}
 
 	if err = (&tenantcontroller.Manager{
-		RESTConfig: manager.GetConfig(),
-		Client:     manager.GetClient(),
-		Metrics:    metrics.MustMakeTenantRecorder(),
-		Log:        ctrl.Log.WithName("controllers").WithName("Tenant"),
-		Recorder:   manager.GetEventRecorderFor("tenant-controller"),
+		RESTConfig:    manager.GetConfig(),
+		Client:        manager.GetClient(),
+		Metrics:       metrics.MustMakeTenantRecorder(),
+		Log:           ctrl.Log.WithName("controllers").WithName("Tenant"),
+		Recorder:      manager.GetEventRecorderFor("tenant-controller"),
+		Configuration: cfg,
 	}).SetupWithManager(manager, controllerConfig); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Tenant")
 		os.Exit(1)
@@ -305,7 +308,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = rbacManager.SetupWithManager(ctx, manager, configurationName); err != nil {
+	if err = rbacManager.SetupWithManager(ctx, manager, controllerConfig); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Rbac")
 		os.Exit(1)
 	}
@@ -335,7 +338,7 @@ func main() {
 
 	if err = (&configcontroller.Manager{
 		Log: ctrl.Log.WithName("controllers").WithName("CapsuleConfiguration"),
-	}).SetupWithManager(manager, configurationName); err != nil {
+	}).SetupWithManager(manager, controllerConfig); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "CapsuleConfiguration")
 		os.Exit(1)
 	}
