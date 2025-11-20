@@ -37,7 +37,7 @@ type Manager struct {
 }
 
 //nolint:revive
-func (r *Manager) SetupWithManager(ctx context.Context, mgr ctrl.Manager, configurationName string) (err error) {
+func (r *Manager) SetupWithManager(ctx context.Context, mgr ctrl.Manager, ctrlConfig utils.ControllerOptions) (err error) {
 	namesPredicate := utils.NamesMatchingPredicate(ProvisionerRoleName, DeleterRoleName)
 
 	crErr := ctrl.NewControllerManagedBy(mgr).
@@ -51,7 +51,7 @@ func (r *Manager) SetupWithManager(ctx context.Context, mgr ctrl.Manager, config
 		For(&rbacv1.ClusterRoleBinding{}, namesPredicate).
 		Watches(&capsulev1beta2.CapsuleConfiguration{}, handler.Funcs{
 			UpdateFunc: func(ctx context.Context, updateEvent event.TypedUpdateEvent[client.Object], limitingInterface workqueue.TypedRateLimitingInterface[reconcile.Request]) {
-				if updateEvent.ObjectNew.GetName() == configurationName {
+				if updateEvent.ObjectNew.GetName() == ctrlConfig.ConfigurationName {
 					if crbErr := r.EnsureClusterRoleBindingsProvisioner(ctx); crbErr != nil {
 						r.Log.Error(err, "cannot update ClusterRoleBinding upon CapsuleConfiguration update")
 					}

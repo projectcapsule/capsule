@@ -178,5 +178,13 @@ var _ = Describe("Administrators", Label("namespace", "permissions"), func() {
 			Expect(condition.Reason).To(Equal(meta.SucceededReason), "Expected namespace condition reason to be Succeeded")
 		})
 
+		By("deleting namespace", func() {
+			Expect(k8sClient.Delete(context.TODO(), ns2)).Should(Succeed())
+		})
+
+		By("deleting namespace", func() {
+			Expect(k8sClient.Delete(context.TODO(), ns1)).Should(Succeed())
+		})
+
 	})
 })

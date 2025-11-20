@@ -15,6 +15,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/internal/controllers/rbac"
 	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 )
@@ -22,6 +23,20 @@ import (
 // ownerClusterRoleBindings generates a Capsule AdditionalRoleBinding object for the Owner dynamic clusterrole in order
 // to take advantage of the additional role binding feature.
 func (r *Manager) ownerClusterRoleBindings(owner api.OwnerSpec, clusterRole string) api.AdditionalRoleBindingsSpec {
+	rb := r.userClusterRoleBindings(owner.UserSpec, clusterRole)
+
+	if owner.Labels != nil {
+		rb.Labels = owner.Labels
+	}
+
+	if owner.Annotations != nil {
+		rb.Labels = owner.Annotations
+	}
+
+	return rb
+}
+
+func (r *Manager) userClusterRoleBindings(owner api.UserSpec, clusterRole string) api.AdditionalRoleBindingsSpec {
 	var subject rbacv1.Subject
 
 	if owner.Kind == "ServiceAccount" {
@@ -45,8 +60,6 @@ func (r *Manager) ownerClusterRoleBindings(owner api.OwnerSpec, clusterRole stri
 		Subjects: []rbacv1.Subject{
 			subject,
 		},
-		Labels:      owner.Labels,
-		Annotations: owner.Annotations,
 	}
 }
 
@@ -80,6 +93,12 @@ func (r *Manager) syncRoleBindings(ctx context.Context, tenant *capsulev1beta2.T
 		keys = append(keys, hashFn(i))
 	}
 
+	for _, i := range r.Configuration.Administrators() {
+		cr := r.userClusterRoleBindings(i, rbac.DeleterRoleName)
+
+		keys = append(keys, hashFn(cr))
+	}
+
 	group := new(errgroup.Group)
 
 	for _, ns := range tenant.Status.Namespaces {
@@ -98,12 +117,16 @@ func (r *Manager) syncAdditionalRoleBinding(ctx context.Context, tenant *capsule
 		return err
 	}
 
-	var roleBindings []api.AdditionalRoleBindingsSpec
+	roleBindings := make([]api.AdditionalRoleBindingsSpec, 0)
 
 	for _, owner := range tenant.Spec.Owners {
 		for _, clusterRoleName := range owner.ClusterRoles {
 			roleBindings = append(roleBindings, r.ownerClusterRoleBindings(owner, clusterRoleName))
 		}
+	}
+
+	for _, a := range r.Configuration.Administrators() {
+		roleBindings = append(roleBindings, r.userClusterRoleBindings(a, rbac.DeleterRoleName))
 	}
 
 	roleBindings = append(roleBindings, tenant.Spec.AdditionalRoleBindings...)

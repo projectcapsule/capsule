@@ -23,11 +23,11 @@ type Manager struct {
 	Log logr.Logger
 }
 
-func (c *Manager) SetupWithManager(mgr ctrl.Manager, configurationName string) error {
+func (c *Manager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.ControllerOptions) error {
 	c.client = mgr.GetClient()
 
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&capsulev1beta2.CapsuleConfiguration{}, utils.NamesMatchingPredicate(configurationName)).
+		For(&capsulev1beta2.CapsuleConfiguration{}, utils.NamesMatchingPredicate(ctrlConfig.ConfigurationName)).
 		Complete(c)
 }
 

@@ -10,12 +10,35 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/selection"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
+	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/utils"
 )
+
+func (r *Manager) enqueueAllTenants(ctx context.Context, _ client.Object) []reconcile.Request {
+	var tenants capsulev1beta2.TenantList
+	if err := r.List(ctx, &tenants); err != nil {
+		r.Log.Error(err, "failed to list Tenants for class event")
+
+		return nil
+	}
+
+	reqs := make([]reconcile.Request, 0, len(tenants.Items))
+	for i := range tenants.Items {
+		reqs = append(reqs, reconcile.Request{
+			NamespacedName: types.NamespacedName{
+				Name: tenants.Items[i].Name,
+			},
+		})
+	}
+
+	return reqs
+}
 
 // pruningResources is taking care of removing the no more requested sub-resources as LimitRange, ResourceQuota or
 // NetworkPolicy using the "exists" and "notin" LabelSelector to perform an outer-join removal.
