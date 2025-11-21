@@ -56,8 +56,10 @@ func (in *SelectorAllowedListSpec) SelectorMatch(obj client.Object) bool {
 // +kubebuilder:object:generate=true
 
 type AllowedListSpec struct {
+	// Match exact elements which are allowed as class names within this tenant
 	Exact []string `json:"allowed,omitempty"`
-	Regex string   `json:"allowedRegex,omitempty"`
+	// Match elements by regex (DEPRECATED)
+	Regex string `json:"allowedRegex,omitempty"`
 }
 
 func (in *AllowedListSpec) Match(value string) (ok bool) {
@@ -94,6 +96,7 @@ func (in *AllowedListSpec) RegexMatch(value string) (ok bool) {
 type SelectionListWithDefaultSpec struct {
 	SelectionListWithSpec `json:",inline"`
 
+	// Default class for tenant, when no class is set. This may overwrite even the global default.
 	Default string `json:"default,omitempty"`
 }
 

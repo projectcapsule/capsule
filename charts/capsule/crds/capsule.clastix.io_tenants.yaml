@@ -123,10 +123,13 @@ spec:
                   can use only one of the allowed trusted registries. Optional.
                 properties:
                   allowed:
+                    description: Match exact elements which are allowed as class names
+                      within this tenant
                     items:
                       type: string
                     type: array
                   allowedRegex:
+                    description: Match elements by regex (DEPRECATED)
                     type: string
                 type: object
               imagePullPolicies:
@@ -151,10 +154,13 @@ spec:
                       Optional.
                     properties:
                       allowed:
+                        description: Match exact elements which are allowed as class
+                          names within this tenant
                         items:
                           type: string
                         type: array
                       allowedRegex:
+                        description: Match elements by regex (DEPRECATED)
                         type: string
                     type: object
                   allowedHostnames:
@@ -164,10 +170,13 @@ spec:
                       Optional.
                     properties:
                       allowed:
+                        description: Match exact elements which are allowed as class
+                          names within this tenant
                         items:
                           type: string
                         type: array
                       allowedRegex:
+                        description: Match elements by regex (DEPRECATED)
                         type: string
                     type: object
                   hostnameCollisionScope:
@@ -840,10 +849,13 @@ spec:
                   can use only one of the allowed PriorityClasses. Optional.
                 properties:
                   allowed:
+                    description: Match exact elements which are allowed as class names
+                      within this tenant
                     items:
                       type: string
                     type: array
                   allowedRegex:
+                    description: Match elements by regex (DEPRECATED)
                     type: string
                 type: object
               resourceQuotas:
@@ -1012,10 +1024,13 @@ spec:
                   Optional.
                 properties:
                   allowed:
+                    description: Match exact elements which are allowed as class names
+                      within this tenant
                     items:
                       type: string
                     type: array
                   allowedRegex:
+                    description: Match elements by regex (DEPRECATED)
                     type: string
                 type: object
             required:
@@ -1164,10 +1179,13 @@ spec:
                   can use only one of the allowed trusted registries. Optional.
                 properties:
                   allowed:
+                    description: Match exact elements which are allowed as class names
+                      within this tenant
                     items:
                       type: string
                     type: array
                   allowedRegex:
+                    description: Match elements by regex (DEPRECATED)
                     type: string
                 type: object
               cordoned:
@@ -1191,6 +1209,15 @@ spec:
                 properties:
                   allowedClasses:
                     properties:
+                      allowed:
+                        description: Match exact elements which are allowed as class
+                          names within this tenant
+                        items:
+                          type: string
+                        type: array
+                      allowedRegex:
+                        description: Match elements by regex (DEPRECATED)
+                        type: string
                       default:
                         type: string
                       matchExpressions:
@@ -1264,10 +1291,13 @@ spec:
                       Optional.
                     properties:
                       allowed:
+                        description: Match exact elements which are allowed as class
+                          names within this tenant
                         items:
                           type: string
                         type: array
                       allowedRegex:
+                        description: Match elements by regex (DEPRECATED)
                         type: string
                       default:
                         type: string
@@ -1321,10 +1351,13 @@ spec:
                       Optional.
                     properties:
                       allowed:
+                        description: Match exact elements which are allowed as class
+                          names within this tenant
                         items:
                           type: string
                         type: array
                       allowedRegex:
+                        description: Match elements by regex (DEPRECATED)
                         type: string
                     type: object
                   hostnameCollisionScope:
@@ -2139,10 +2172,13 @@ spec:
                   Optional.
                 properties:
                   allowed:
+                    description: Match exact elements which are allowed as class names
+                      within this tenant
                     items:
                       type: string
                     type: array
                   allowedRegex:
+                    description: Match elements by regex (DEPRECATED)
                     type: string
                   default:
                     type: string
@@ -2283,10 +2319,13 @@ spec:
                   Optional.
                 properties:
                   allowed:
+                    description: Match exact elements which are allowed as class names
+                      within this tenant
                     items:
                       type: string
                     type: array
                   allowedRegex:
+                    description: Match elements by regex (DEPRECATED)
                     type: string
                   default:
                     type: string
@@ -2413,10 +2452,13 @@ spec:
                   Optional.
                 properties:
                   allowed:
+                    description: Match exact elements which are allowed as class names
+                      within this tenant
                     items:
                       type: string
                     type: array
                   allowedRegex:
+                    description: Match elements by regex (DEPRECATED)
                     type: string
                   default:
                     type: string
@@ -2467,6 +2509,31 @@ spec:
           status:
             description: Returns the observed state of the Tenant.
             properties:
+              classes:
+                description: Available Class Types within Tenant
+                properties:
+                  gateway:
+                    description: Available GatewayClasses
+                    items:
+                      type: string
+                    type: array
+                  priority:
+                    description: Available PriorityClasses
+                    items:
+                      type: string
+                    type: array
+                  runtime:
+                    description: Available StorageClasses
+                    items:
+                      type: string
+                    type: array
+                  storage:
+                    description: Available Storageclasses (Only collected if any matching
+                      condition is specified)
+                    items:
+                      type: string
+                    type: array
+                type: object
               conditions:
                 description: Tenant Condition
                 items:

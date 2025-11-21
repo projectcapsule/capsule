@@ -103,10 +103,10 @@ func (r *class) validate(ctx context.Context, client client.Client, req admissio
 	switch {
 	case allowed.MatchDefault(gatewayClass.Name):
 		return nil
-	case selector:
+	case allowed.Match(gatewayClass.Name) || selector:
 		return nil
 	default:
-		recorder.Eventf(tnt, corev1.EventTypeWarning, "ForbiddenGatewaClass", "Gateway %s/%s GatewayClass %s is forbidden for the current Tenant", req.Namespace, req.Name, &gatewayClass)
+		recorder.Eventf(tnt, corev1.EventTypeWarning, "ForbiddenGatewayClass", "Gateway %s/%s GatewayClass %s is forbidden for the current Tenant", req.Namespace, req.Name, &gatewayClass)
 
 		response := admission.Denied(NewGatewayClassForbidden(gatewayObj.Name, *allowed).Error())
 

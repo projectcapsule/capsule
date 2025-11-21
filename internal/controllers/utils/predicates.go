@@ -32,6 +32,31 @@ var CapsuleConfigSpecChangedPredicate = predicate.Funcs{
 	GenericFunc: func(e event.GenericEvent) bool { return false },
 }
 
+var UpdatedMetadataPredicate = predicate.Funcs{
+	CreateFunc: func(e event.CreateEvent) bool { return true },
+	DeleteFunc: func(e event.DeleteEvent) bool { return true },
+
+	UpdateFunc: func(e event.UpdateEvent) bool {
+		return !labelsEqual(e.ObjectOld.GetLabels(), e.ObjectNew.GetLabels())
+	},
+
+	GenericFunc: func(e event.GenericEvent) bool { return false },
+}
+
+func labelsEqual(a, b map[string]string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+
+	for k, v := range a {
+		if bv, ok := b[k]; !ok || bv != v {
+			return false
+		}
+	}
+
+	return true
+}
+
 func NamesMatchingPredicate(names ...string) builder.Predicates {
 	return builder.WithPredicates(predicate.NewPredicateFuncs(func(object client.Object) bool {
 		for _, name := range names {

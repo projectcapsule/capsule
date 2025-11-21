@@ -12,10 +12,10 @@ import (
 
 type gatewayClassForbiddenError struct {
 	gatewayClassName string
-	spec             api.SelectionListWithDefaultSpec
+	spec             api.DefaultAllowedListSpec
 }
 
-func NewGatewayClassForbidden(class string, spec api.SelectionListWithDefaultSpec) error {
+func NewGatewayClassForbidden(class string, spec api.DefaultAllowedListSpec) error {
 	return &gatewayClassForbiddenError{
 		gatewayClassName: class,
 		spec:             spec,
@@ -25,19 +25,19 @@ func NewGatewayClassForbidden(class string, spec api.SelectionListWithDefaultSpe
 func (i gatewayClassForbiddenError) Error() string {
 	err := fmt.Sprintf("Gateway Class %s is forbidden for the current Tenant: ", i.gatewayClassName)
 
-	return utils.SelectionListWithDefaultErrorMessage(i.spec, err)
+	return utils.DefaultAllowedValuesErrorMessage(i.spec, err)
 }
 
 type gatewayClassUndefinedError struct {
-	spec api.SelectionListWithDefaultSpec
+	spec api.DefaultAllowedListSpec
 }
 
-func NewGatewayClassUndefined(spec api.SelectionListWithDefaultSpec) error {
+func NewGatewayClassUndefined(spec api.DefaultAllowedListSpec) error {
 	return &gatewayClassUndefinedError{
 		spec: spec,
 	}
 }
 
 func (i gatewayClassUndefinedError) Error() string {
-	return utils.SelectionListWithDefaultErrorMessage(i.spec, "No gateway Class is forbidden for the current Tenant. Specify a gateway Class which is allowed within the Tenant: ")
+	return utils.DefaultAllowedValuesErrorMessage(i.spec, "No gateway Class is forbidden for the current Tenant. Specify a gateway Class which is allowed within the Tenant: ")
 }
