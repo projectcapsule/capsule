@@ -9,6 +9,7 @@ import (
 	"os"
 	goRuntime "runtime"
 
+	"github.com/projectcapsule/capsule/internal/webhook/dra"
 	flag "github.com/spf13/pflag"
 	_ "go.uber.org/automaxprocs"
 	"go.uber.org/zap/zapcore"
@@ -247,6 +248,7 @@ func main() {
 		route.ServiceAccounts(serviceaccounts.Handler(cfg)),
 		route.CustomResources(tenantvalidation.ResourceCounterHandler(manager.GetClient())),
 		route.Gateway(gateway.Class(cfg)),
+		route.DeviceClass(dra.DeviceClass()),
 		route.Defaults(defaults.Handler(cfg, kubeVersion)),
 		route.TenantMutation(
 			tenantmutation.MetaHandler(),

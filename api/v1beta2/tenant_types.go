@@ -52,6 +52,7 @@ type TenantSpec struct {
 	// A default value can be specified, and all the Pod resources created will inherit the declared class.
 	// Optional.
 	PriorityClasses *api.DefaultAllowedListSpec `json:"priorityClasses,omitempty"`
+	DeviceClasses   *api.DefaultAllowedListSpec `json:"deviceClasses,omitempty"`
 	// Specifies options for the GatewayClass resources.
 	GatewayOptions GatewayOptions `json:"gatewayOptions,omitempty"`
 	// Toggling the Tenant resources cordoning, when enable resources cannot be deleted.
