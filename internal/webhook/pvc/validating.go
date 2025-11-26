@@ -13,33 +13,25 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
+	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	capsulewebhook "github.com/projectcapsule/capsule/internal/webhook"
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
-	"github.com/projectcapsule/capsule/pkg/utils/tenant"
 )
 
 type validating struct{}
 
-func Validating() capsulewebhook.Handler {
+func Validating() capsulewebhook.TypedHandlerWithTenant[*corev1.PersistentVolumeClaim] {
 	return &validating{}
 }
 
-func (h *validating) OnCreate(c client.Client, decoder admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
+func (h *validating) OnCreate(
+	c client.Client,
+	pvc *corev1.PersistentVolumeClaim,
+	decoder admission.Decoder,
+	recorder record.EventRecorder,
+	tnt *capsulev1beta2.Tenant,
+) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		pvc := &corev1.PersistentVolumeClaim{}
-		if err := decoder.Decode(req, pvc); err != nil {
-			return utils.ErroredResponse(err)
-		}
-
-		tnt, err := tenant.TenantByStatusNamespace(ctx, c, pvc.Namespace)
-		if err != nil {
-			return utils.ErroredResponse(err)
-		}
-
-		if tnt == nil {
-			return nil
-		}
-
 		allowed := tnt.Spec.StorageClasses
 
 		if allowed == nil {
@@ -88,13 +80,26 @@ func (h *validating) OnCreate(c client.Client, decoder admission.Decoder, record
 	}
 }
 
-func (h *validating) OnDelete(client.Client, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
+func (h *validating) OnUpdate(
+	client.Client,
+	*corev1.PersistentVolumeClaim,
+	*corev1.PersistentVolumeClaim,
+	admission.Decoder,
+	record.EventRecorder,
+	*capsulev1beta2.Tenant,
+) capsulewebhook.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (h *validating) OnUpdate(client.Client, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
+func (h *validating) OnDelete(
+	client.Client,
+	*corev1.PersistentVolumeClaim,
+	admission.Decoder,
+	record.EventRecorder,
+	*capsulev1beta2.Tenant,
+) capsulewebhook.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}

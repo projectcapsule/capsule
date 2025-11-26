@@ -14,51 +14,60 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
+	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	capsulewebhook "github.com/projectcapsule/capsule/internal/webhook"
-	"github.com/projectcapsule/capsule/internal/webhook/utils"
 	"github.com/projectcapsule/capsule/pkg/api"
-	"github.com/projectcapsule/capsule/pkg/utils/tenant"
 )
 
-type handler struct{}
+type validating struct{}
 
-func Handler() capsulewebhook.Handler {
-	return &handler{}
+func Validating() capsulewebhook.TypedHandlerWithTenant[*corev1.Service] {
+	return &validating{}
 }
 
-func (r *handler) OnCreate(client client.Client, decoder admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
+func (h *validating) OnCreate(
+	c client.Client,
+	svc *corev1.Service,
+	decoder admission.Decoder,
+	recorder record.EventRecorder,
+	tnt *capsulev1beta2.Tenant,
+) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		return r.handleService(ctx, client, decoder, req, recorder)
+		return h.handle(req, recorder, svc, tnt)
 	}
 }
 
-func (r *handler) OnUpdate(client client.Client, decoder admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
+func (h *validating) OnUpdate(
+	c client.Client,
+	old *corev1.Service,
+	svc *corev1.Service,
+	decoder admission.Decoder,
+	recorder record.EventRecorder,
+	tnt *capsulev1beta2.Tenant,
+) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		return r.handleService(ctx, client, decoder, req, recorder)
+		return h.handle(req, recorder, svc, tnt)
 	}
 }
 
-func (r *handler) OnDelete(client.Client, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
+func (h *validating) OnDelete(
+	client.Client,
+	*corev1.Service,
+	admission.Decoder,
+	record.EventRecorder,
+	*capsulev1beta2.Tenant,
+) capsulewebhook.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (r *handler) handleService(ctx context.Context, clt client.Client, decoder admission.Decoder, req admission.Request, recorder record.EventRecorder) *admission.Response {
-	svc := &corev1.Service{}
-	if err := decoder.Decode(req, svc); err != nil {
-		return utils.ErroredResponse(err)
-	}
-
-	tnt, err := tenant.TenantByStatusNamespace(ctx, clt, svc.GetNamespace())
-	if err != nil {
-		return utils.ErroredResponse(err)
-	}
-
-	if tnt == nil {
-		return nil
-	}
-
+func (h *validating) handle(
+	req admission.Request,
+	recorder record.EventRecorder,
+	svc *corev1.Service,
+	tnt *capsulev1beta2.Tenant,
+) *admission.Response {
 	if svc.Spec.Type == corev1.ServiceTypeNodePort && tnt.Spec.ServiceOptions != nil && tnt.Spec.ServiceOptions.AllowedServices != nil && !*tnt.Spec.ServiceOptions.AllowedServices.NodePort {
 		recorder.Eventf(tnt, corev1.EventTypeWarning, "ForbiddenNodePort", "Service %s/%s cannot be type of NodePort for the current Tenant", req.Namespace, req.Name)
 

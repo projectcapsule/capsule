@@ -313,5 +313,33 @@ webhooks:
   timeoutSeconds: {{ $.Values.webhooks.mutatingWebhooksTimeoutSeconds }}
   {{- end }}
 {{- end }}
-
+{{- with .Values.webhooks.hooks.tenantLabel }}
+  {{- if .enabled }}
+- name: assignment.misc.projectcapsule.dev
+  admissionReviewVersions:
+    - v1
+    - v1beta1
+  clientConfig:
+    {{- include "capsule.webhooks.service" (dict "path" "/misc/tenant-label" "ctx" $) | nindent 4 }}
+  failurePolicy:  {{ .failurePolicy }}
+  matchPolicy: {{ .matchPolicy }}
+  reinvocationPolicy: {{ .reinvocationPolicy }}
+  {{- with .namespaceSelector }}
+  namespaceSelector:
+    {{- toYaml . |  nindent 4 }}
+  {{- end }}
+  {{- with .objectSelector }}
+  objectSelector:
+    {{- toYaml . |  nindent 4 }}
+  {{- end }}
+  {{- with .matchConditions }}
+  matchConditions:
+    {{- toYaml . |  nindent 4 }}
+  {{- end }}
+  rules:
+    {{- toYaml .rules |  nindent 4 }}
+  sideEffects: None
+  timeoutSeconds: {{ $.Values.webhooks.mutatingWebhooksTimeoutSeconds }}
+  {{- end }}
+{{- end }}
 {{- end }}

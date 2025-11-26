@@ -12,33 +12,25 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
+	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	capsulewebhook "github.com/projectcapsule/capsule/internal/webhook"
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
-	"github.com/projectcapsule/capsule/pkg/utils/tenant"
 )
 
 type priorityClass struct{}
 
-func PriorityClass() capsulewebhook.Handler {
+func PriorityClass() capsulewebhook.TypedHandlerWithTenant[*corev1.Pod] {
 	return &priorityClass{}
 }
 
-func (h *priorityClass) OnCreate(c client.Client, decoder admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
+func (h *priorityClass) OnCreate(
+	c client.Client,
+	pod *corev1.Pod,
+	decoder admission.Decoder,
+	recorder record.EventRecorder,
+	tnt *capsulev1beta2.Tenant,
+) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		pod := &corev1.Pod{}
-		if err := decoder.Decode(req, pod); err != nil {
-			return utils.ErroredResponse(err)
-		}
-
-		tnt, err := tenant.TenantByStatusNamespace(ctx, c, pod.Namespace)
-		if err != nil {
-			return utils.ErroredResponse(err)
-		}
-
-		if tnt == nil {
-			return nil
-		}
-
 		allowed := tnt.Spec.PriorityClasses
 
 		if allowed == nil {
@@ -85,13 +77,26 @@ func (h *priorityClass) OnCreate(c client.Client, decoder admission.Decoder, rec
 	}
 }
 
-func (h *priorityClass) OnDelete(client.Client, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
+func (h *priorityClass) OnUpdate(
+	client.Client,
+	*corev1.Pod,
+	*corev1.Pod,
+	admission.Decoder,
+	record.EventRecorder,
+	*capsulev1beta2.Tenant,
+) capsulewebhook.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (h *priorityClass) OnUpdate(client.Client, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
+func (h *priorityClass) OnDelete(
+	client.Client,
+	*corev1.Pod,
+	admission.Decoder,
+	record.EventRecorder,
+	*capsulev1beta2.Tenant,
+) capsulewebhook.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}

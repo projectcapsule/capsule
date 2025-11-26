@@ -7,9 +7,7 @@ import (
 	"context"
 	"fmt"
 	"maps"
-	"strings"
 
-	"github.com/valyala/fasttemplate"
 	"golang.org/x/sync/errgroup"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -21,7 +19,7 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
-	"github.com/projectcapsule/capsule/pkg/utils"
+	"github.com/projectcapsule/capsule/pkg/utils/tenant"
 )
 
 // Ensuring all annotations are applied to each Namespace handled by the Tenant.
@@ -140,8 +138,6 @@ func (r *Manager) reconcileMetadata(
 	managed *capsulev1beta2.TenantStatusNamespaceMetadata,
 	err error,
 ) {
-	capsuleLabel, _ := utils.GetTypeLabel(&capsulev1beta2.Tenant{})
-
 	originLabels := ns.GetLabels()
 	if originLabels == nil {
 		originLabels = make(map[string]string)
@@ -152,28 +148,9 @@ func (r *Manager) reconcileMetadata(
 		originAnnotations = make(map[string]string)
 	}
 
-	managedAnnotations := buildNamespaceAnnotationsForTenant(tnt)
-	managedLabels := buildNamespaceLabelsForTenant(tnt)
-
-	if opts := tnt.Spec.NamespaceOptions; opts != nil && len(opts.AdditionalMetadataList) > 0 {
-		for _, md := range opts.AdditionalMetadataList {
-			var ok bool
-
-			ok, err = utils.IsNamespaceSelectedBySelector(ns, md.NamespaceSelector)
-			if err != nil {
-				return managed, err
-			}
-
-			if !ok {
-				continue
-			}
-
-			applyTemplateMap(md.Labels, tnt, ns)
-			applyTemplateMap(md.Annotations, tnt, ns)
-
-			utils.MapMergeNoOverrite(managedLabels, md.Labels)
-			utils.MapMergeNoOverrite(managedAnnotations, md.Annotations)
-		}
+	managedLabels, managedAnnotations, err := tenant.BuildNamespaceMetadataForTenant(ns, tnt)
+	if err != nil {
+		return nil, err
 	}
 
 	managedMetadataOnly := tnt.Spec.NamespaceOptions != nil && tnt.Spec.NamespaceOptions.ManagedMetadataOnly
@@ -217,82 +194,13 @@ func (r *Manager) reconcileMetadata(
 		originAnnotations = managedAnnotations
 	}
 
-	originLabels["kubernetes.io/metadata.name"] = ns.GetName()
-	originLabels[capsuleLabel] = tnt.GetName()
+	tenant.AddNamespaceNameLabels(originLabels, ns)
+	tenant.AddTenantNameLabel(originLabels, ns, tnt)
 
 	ns.SetLabels(originLabels)
 	ns.SetAnnotations(originAnnotations)
 
 	return managed, err
-}
-
-func buildNamespaceAnnotationsForTenant(tnt *capsulev1beta2.Tenant) map[string]string {
-	annotations := make(map[string]string)
-
-	if md := tnt.Spec.NamespaceOptions; md != nil && md.AdditionalMetadata != nil {
-		maps.Copy(annotations, md.AdditionalMetadata.Annotations)
-	}
-
-	if tnt.Spec.NodeSelector != nil {
-		annotations = utils.BuildNodeSelector(tnt, annotations)
-	}
-
-	if ic := tnt.Spec.IngressOptions.AllowedClasses; ic != nil {
-		if len(ic.Exact) > 0 {
-			annotations[meta.AvailableIngressClassesAnnotation] = strings.Join(ic.Exact, ",")
-		}
-
-		if len(ic.Regex) > 0 {
-			annotations[meta.AvailableIngressClassesRegexpAnnotation] = ic.Regex
-		}
-	}
-
-	if sc := tnt.Spec.StorageClasses; sc != nil {
-		if len(sc.Exact) > 0 {
-			annotations[meta.AvailableStorageClassesAnnotation] = strings.Join(sc.Exact, ",")
-		}
-
-		if len(sc.Regex) > 0 {
-			annotations[meta.AvailableStorageClassesRegexpAnnotation] = sc.Regex
-		}
-	}
-
-	if cr := tnt.Spec.ContainerRegistries; cr != nil {
-		if len(cr.Exact) > 0 {
-			annotations[meta.AllowedRegistriesAnnotation] = strings.Join(cr.Exact, ",")
-		}
-
-		if len(cr.Regex) > 0 {
-			annotations[meta.AllowedRegistriesRegexpAnnotation] = cr.Regex
-		}
-	}
-
-	for _, key := range []string{
-		meta.ForbiddenNamespaceLabelsAnnotation,
-		meta.ForbiddenNamespaceLabelsRegexpAnnotation,
-		meta.ForbiddenNamespaceAnnotationsAnnotation,
-		meta.ForbiddenNamespaceAnnotationsRegexpAnnotation,
-	} {
-		if value, ok := tnt.Annotations[key]; ok {
-			annotations[key] = value
-		}
-	}
-
-	return annotations
-}
-
-func buildNamespaceLabelsForTenant(tnt *capsulev1beta2.Tenant) map[string]string {
-	labels := make(map[string]string)
-
-	if md := tnt.Spec.NamespaceOptions; md != nil && md.AdditionalMetadata != nil {
-		maps.Copy(labels, md.AdditionalMetadata.Labels)
-	}
-
-	if tnt.Spec.Cordoned {
-		labels[meta.CordonedLabel] = "true"
-	}
-
-	return labels
 }
 
 func (r *Manager) collectNamespaces(ctx context.Context, tenant *capsulev1beta2.Tenant) (err error) {
@@ -308,21 +216,4 @@ func (r *Manager) collectNamespaces(ctx context.Context, tenant *capsulev1beta2.
 	tenant.AssignNamespaces(list.Items)
 
 	return err
-}
-
-// applyTemplateMap applies templating to all values in the provided map in place.
-func applyTemplateMap(m map[string]string, tnt *capsulev1beta2.Tenant, ns *corev1.Namespace) {
-	for k, v := range m {
-		if !strings.Contains(v, "{{ ") && !strings.Contains(v, " }}") {
-			continue
-		}
-
-		t := fasttemplate.New(v, "{{ ", " }}")
-		tmplString := t.ExecuteString(map[string]interface{}{
-			"tenant.name": tnt.Name,
-			"namespace":   ns.Name,
-		})
-
-		m[k] = tmplString
-	}
 }

@@ -13,55 +13,57 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	capsulewebhook "github.com/projectcapsule/capsule/internal/webhook"
-	"github.com/projectcapsule/capsule/internal/webhook/utils"
-	"github.com/projectcapsule/capsule/pkg/utils/tenant"
 )
 
 type imagePullPolicy struct{}
 
-func ImagePullPolicy() capsulewebhook.Handler {
+func ImagePullPolicy() capsulewebhook.TypedHandlerWithTenant[*corev1.Pod] {
 	return &imagePullPolicy{}
 }
 
-func (r *imagePullPolicy) OnCreate(c client.Client, decoder admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
+func (h *imagePullPolicy) OnCreate(
+	c client.Client,
+	pod *corev1.Pod,
+	decoder admission.Decoder,
+	recorder record.EventRecorder,
+	tnt *capsulev1beta2.Tenant,
+) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		return r.validate(ctx, c, decoder, recorder, req)
+		return h.validate(req, pod, tnt, recorder)
 	}
 }
 
-func (r *imagePullPolicy) OnUpdate(c client.Client, decoder admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
+func (h *imagePullPolicy) OnUpdate(
+	c client.Client,
+	old *corev1.Pod,
+	pod *corev1.Pod,
+	decoder admission.Decoder,
+	recorder record.EventRecorder,
+	tnt *capsulev1beta2.Tenant,
+) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		return r.validate(ctx, c, decoder, recorder, req)
+		return h.validate(req, pod, tnt, recorder)
 	}
 }
 
-func (r *imagePullPolicy) OnDelete(client.Client, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
+func (h *imagePullPolicy) OnDelete(
+	client.Client,
+	*corev1.Pod,
+	admission.Decoder,
+	record.EventRecorder,
+	*capsulev1beta2.Tenant,
+) capsulewebhook.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
 func (h *imagePullPolicy) validate(
-	ctx context.Context,
-	c client.Client,
-	decoder admission.Decoder,
-	recorder record.EventRecorder,
 	req admission.Request,
+	pod *corev1.Pod,
+	tnt *capsulev1beta2.Tenant,
+	recorder record.EventRecorder,
 ) *admission.Response {
-	pod := &corev1.Pod{}
-	if err := decoder.Decode(req, pod); err != nil {
-		return utils.ErroredResponse(err)
-	}
-
-	tnt, err := tenant.TenantByStatusNamespace(ctx, c, pod.GetNamespace())
-	if err != nil {
-		return utils.ErroredResponse(err)
-	}
-
-	if tnt == nil {
-		return nil
-	}
-
 	policy := NewPullPolicy(tnt)
 	if policy == nil {
 		return nil

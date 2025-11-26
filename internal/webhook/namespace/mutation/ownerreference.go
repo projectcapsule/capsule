@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"net/http"
 
+	authenticationv1 "k8s.io/api/authentication/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/record"
@@ -46,11 +47,10 @@ func (h *ownerReferenceHandler) OnCreate(c client.Client, ns *corev1.Namespace, 
 			return &response
 		}
 
-		if err := tenant.AddTenantLabelForNamespace(ns, tnt); err != nil {
-			response := admission.Errored(http.StatusBadRequest, err)
-
-			return &response
-		}
+		labels := ns.GetLabels()
+		tenant.AddNamespaceNameLabels(labels, ns)
+		tenant.AddTenantNameLabel(labels, ns, tnt)
+		ns.SetLabels(labels)
 
 		response := patchResponseForOwnerRef(c, tnt.DeepCopy(), ns, recorder)
 
@@ -66,7 +66,7 @@ func (h *ownerReferenceHandler) OnDelete(client.Client, *corev1.Namespace, admis
 
 func (h *ownerReferenceHandler) OnUpdate(c client.Client, newNs *corev1.Namespace, oldNs *corev1.Namespace, decoder admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		tnt, err := tenant.GetTenantByOwnerreferences(ctx, c, oldNs.OwnerReferences)
+		tnt, err := resolveTenantForNamespaceUpdate(ctx, c, h.cfg, oldNs, newNs, req.UserInfo)
 		if err != nil {
 			return utils.ErroredResponse(err)
 		}
@@ -75,11 +75,8 @@ func (h *ownerReferenceHandler) OnUpdate(c client.Client, newNs *corev1.Namespac
 			return nil
 		}
 
-		o, err := json.Marshal(newNs.DeepCopy())
-		if err != nil {
-			response := admission.Errored(http.StatusInternalServerError, err)
-
-			return &response
+		if err := assignToTenant(c, tnt, oldNs, recorder); err != nil {
+			return utils.ErroredResponse(err)
 		}
 
 		var refs []metav1.OwnerReference
@@ -98,28 +95,78 @@ func (h *ownerReferenceHandler) OnUpdate(c client.Client, newNs *corev1.Namespac
 
 		newNs.OwnerReferences = refs
 
-		if err := tenant.AddTenantLabelForNamespace(newNs, tnt); err != nil {
-			response := admission.Errored(http.StatusBadRequest, err)
+		labels := newNs.GetLabels()
+		tenant.AddNamespaceNameLabels(labels, oldNs)
+		tenant.AddTenantNameLabel(labels, oldNs, tnt)
+		newNs.SetLabels(labels)
 
-			return &response
-		}
-
-		obj, err := json.Marshal(newNs)
+		marshaled, err := json.Marshal(newNs)
 		if err != nil {
 			response := admission.Errored(http.StatusInternalServerError, err)
 
 			return &response
 		}
 
-		response := admission.PatchResponseFromRaw(o, obj)
+		response := admission.PatchResponseFromRaw(req.Object.Raw, marshaled)
 
 		return &response
 	}
 }
 
+func resolveTenantForNamespaceUpdate(
+	ctx context.Context,
+	c client.Client,
+	cfg configuration.Configuration,
+	oldNs, newNs *corev1.Namespace,
+	userInfo authenticationv1.UserInfo,
+) (*capsulev1beta2.Tenant, error) {
+	// 1) try old ownerRefs
+	if tnt, err := tenant.GetTenantByOwnerreferences(ctx, c, oldNs.OwnerReferences); err != nil {
+		return nil, err
+	} else if tnt != nil {
+		return tnt, nil
+	}
+
+	// 2) try new ownerRefs
+	if tnt, err := tenant.GetTenantByOwnerreferences(ctx, c, newNs.OwnerReferences); err != nil {
+		return nil, err
+	} else if tnt != nil {
+		return tnt, nil
+	}
+
+	// 3) fall back to labels + user
+	return tenant.GetTenantByLabelsAndUser(ctx, c, cfg, newNs, userInfo)
+}
+
+func assignToTenant(
+	c client.Client,
+	tnt *capsulev1beta2.Tenant,
+	ns *corev1.Namespace,
+	recorder record.EventRecorder,
+) error {
+	has, err := controllerutil.HasOwnerReference(ns.OwnerReferences, tnt, c.Scheme())
+	if err != nil {
+		return err
+	}
+
+	if has {
+		return nil
+	}
+
+	if err := controllerutil.SetOwnerReference(tnt, ns, c.Scheme()); err != nil {
+		recorder.Eventf(tnt, corev1.EventTypeWarning, "Error", "Namespace %s cannot be assigned to the desired Tenant", ns.GetName())
+
+		return err
+	}
+
+	recorder.Eventf(tnt, corev1.EventTypeNormal, "NamespaceCreationWebhook", "Namespace %s has been assigned to the desired Tenant", ns.GetName())
+
+	return nil
+}
+
 func patchResponseForOwnerRef(
 	c client.Client,
-	tenant *capsulev1beta2.Tenant,
+	tnt *capsulev1beta2.Tenant,
 	ns *corev1.Namespace,
 	recorder record.EventRecorder,
 ) admission.Response {
@@ -128,13 +175,9 @@ func patchResponseForOwnerRef(
 		return admission.Errored(http.StatusInternalServerError, err)
 	}
 
-	if err = controllerutil.SetOwnerReference(tenant, ns, c.Scheme()); err != nil {
-		recorder.Eventf(tenant, corev1.EventTypeWarning, "Error", "Namespace %s cannot be assigned to the desired Tenant", ns.GetName())
-
+	if err := assignToTenant(c, tnt, ns, recorder); err != nil {
 		return admission.Errored(http.StatusInternalServerError, err)
 	}
-
-	recorder.Eventf(tenant, corev1.EventTypeNormal, "NamespaceCreationWebhook", "Namespace %s has been assigned to the desired Tenant", ns.GetName())
 
 	obj, err := json.Marshal(ns)
 	if err != nil {

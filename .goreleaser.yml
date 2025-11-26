@@ -54,6 +54,8 @@ release:
   footer: |
     **Full Changelog**: https://github.com/projectcapsule/{{ .ProjectName }}/compare/{{ .PreviousTag }}...{{ .Tag }}
 
+    [Check out what's new in this release](https://projectcapsule.dev/docs/whats-new/)
+
     **Docker Images**
     - `ghcr.io/projectcapsule/{{ .ProjectName }}:{{ .Version }}`
     - `ghcr.io/projectcapsule/{{ .ProjectName }}:latest`

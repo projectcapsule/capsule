@@ -46,6 +46,7 @@ import (
 	"github.com/projectcapsule/capsule/internal/webhook/defaults"
 	"github.com/projectcapsule/capsule/internal/webhook/gateway"
 	"github.com/projectcapsule/capsule/internal/webhook/ingress"
+	"github.com/projectcapsule/capsule/internal/webhook/misc"
 	"github.com/projectcapsule/capsule/internal/webhook/namespace"
 	namespacemutation "github.com/projectcapsule/capsule/internal/webhook/namespace/mutation"
 	namespacevalidation "github.com/projectcapsule/capsule/internal/webhook/namespace/validation"
@@ -236,15 +237,35 @@ func main() {
 	// webhooks: the order matters, don't change it and just append
 	webhooksList := append(
 		make([]webhook.Webhook, 0),
-		route.Pod(pod.ImagePullPolicy(), pod.ContainerRegistry(cfg), pod.PriorityClass(), pod.RuntimeClass()),
+		route.Pod(
+			pod.Handler(
+				pod.ImagePullPolicy(),
+				pod.ContainerRegistry(cfg),
+				pod.PriorityClass(),
+				pod.RuntimeClass(),
+			),
+		),
 		route.Ingress(ingress.Class(cfg, kubeVersion), ingress.Hostnames(cfg), ingress.Collision(cfg), ingress.Wildcard()),
-		route.PVC(pvc.Validating(), pvc.PersistentVolumeReuse()),
-		route.Service(service.Handler()),
+		route.PVC(
+			pvc.Handler(
+				pvc.Validating(),
+				pvc.PersistentVolumeReuse(),
+			),
+		),
+		route.Service(
+			service.Handler(
+				service.Validating(),
+			),
+		),
 		route.TenantResourceObjects(utils.InCapsuleGroups(cfg, tntresource.WriteOpsHandler())),
 		route.NetworkPolicy(utils.InCapsuleGroups(cfg, networkpolicy.Handler())),
 		route.Cordoning(tenantvalidation.CordoningHandler(cfg)),
 		route.Node(utils.InCapsuleGroups(cfg, node.UserMetadataHandler(cfg, kubeVersion))),
-		route.ServiceAccounts(serviceaccounts.Handler(cfg)),
+		route.ServiceAccounts(
+			serviceaccounts.Handler(
+				serviceaccounts.Validating(cfg),
+			),
+		),
 		route.CustomResources(tenantvalidation.ResourceCounterHandler(manager.GetClient())),
 		route.Gateway(gateway.Class(cfg)),
 		route.Defaults(defaults.Handler(cfg, kubeVersion)),
@@ -262,6 +283,7 @@ func main() {
 			tenantvalidation.ServiceAccountNameHandler(),
 			tenantvalidation.ForbiddenAnnotationsRegexHandler(),
 			tenantvalidation.ProtectedHandler(),
+			tenantvalidation.WarningHandler(),
 		),
 		route.NamespaceValidation(
 			namespace.NamespaceHandler(
@@ -277,14 +299,17 @@ func main() {
 			namespace.NamespaceHandler(
 				cfg,
 				namespacemutation.OwnerReferenceHandler(cfg),
-				namespacemutation.CordoningLabelHandler(cfg),
 				namespacemutation.MetadataHandler(cfg),
+				namespacemutation.CordoningLabelHandler(cfg),
 			),
 		),
 		route.ResourcePoolMutation((resourcepool.PoolMutationHandler(ctrl.Log.WithName("webhooks").WithName("resourcepool")))),
 		route.ResourcePoolValidation((resourcepool.PoolValidationHandler(ctrl.Log.WithName("webhooks").WithName("resourcepool")))),
 		route.ResourcePoolClaimMutation((resourcepool.ClaimMutationHandler(ctrl.Log.WithName("webhooks").WithName("resourcepoolclaims")))),
 		route.ResourcePoolClaimValidation((resourcepool.ClaimValidationHandler(ctrl.Log.WithName("webhooks").WithName("resourcepoolclaims")))),
+		route.TenantAssignment(
+			misc.TenantAssignmentHandler(),
+		),
 	)
 
 	nodeWebhookSupported, _ := utils.NodeWebhookSupported(kubeVersion)

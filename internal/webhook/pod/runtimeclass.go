@@ -14,30 +14,48 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
+	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	capsulewebhook "github.com/projectcapsule/capsule/internal/webhook"
-	"github.com/projectcapsule/capsule/internal/webhook/utils"
-	"github.com/projectcapsule/capsule/pkg/utils/tenant"
 )
 
 type runtimeClass struct{}
 
-func RuntimeClass() capsulewebhook.Handler {
+func RuntimeClass() capsulewebhook.TypedHandlerWithTenant[*corev1.Pod] {
 	return &runtimeClass{}
 }
 
-func (h *runtimeClass) OnCreate(c client.Client, decoder admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
+func (h *runtimeClass) OnCreate(
+	c client.Client,
+	pod *corev1.Pod,
+	decoder admission.Decoder,
+	recorder record.EventRecorder,
+	tnt *capsulev1beta2.Tenant,
+) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		return h.validate(ctx, c, decoder, recorder, req)
+		return h.validate(ctx, c, recorder, req, pod, tnt)
 	}
 }
 
-func (h *runtimeClass) OnDelete(client.Client, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
+func (h *runtimeClass) OnUpdate(
+	client.Client,
+	*corev1.Pod,
+	*corev1.Pod,
+	admission.Decoder,
+	record.EventRecorder,
+	*capsulev1beta2.Tenant,
+) capsulewebhook.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (h *runtimeClass) OnUpdate(client.Client, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
+func (h *runtimeClass) OnDelete(
+	client.Client,
+	*corev1.Pod,
+	admission.Decoder,
+	record.EventRecorder,
+	*capsulev1beta2.Tenant,
+) capsulewebhook.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
@@ -56,21 +74,14 @@ func (h *runtimeClass) class(ctx context.Context, c client.Client, name string) 
 	return obj, nil
 }
 
-func (h *runtimeClass) validate(ctx context.Context, c client.Client, decoder admission.Decoder, recorder record.EventRecorder, req admission.Request) *admission.Response {
-	pod := &corev1.Pod{}
-	if err := decoder.Decode(req, pod); err != nil {
-		return utils.ErroredResponse(err)
-	}
-
-	tnt, err := tenant.TenantByStatusNamespace(ctx, c, pod.Namespace)
-	if err != nil {
-		return utils.ErroredResponse(err)
-	}
-
-	if tnt == nil {
-		return nil
-	}
-
+func (h *runtimeClass) validate(
+	ctx context.Context,
+	c client.Client,
+	recorder record.EventRecorder,
+	req admission.Request,
+	pod *corev1.Pod,
+	tnt *capsulev1beta2.Tenant,
+) *admission.Response {
 	allowed := tnt.Spec.RuntimeClasses
 
 	runtimeClassName := ""

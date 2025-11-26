@@ -337,7 +337,7 @@ $(LOCALBIN):
 
 HELM_SCHEMA_VERSION   := ""
 helm-plugin-schema:
-	@$(HELM) plugin install https://github.com/losisin/helm-values-schema-json.git --version $(HELM_SCHEMA_VERSION) || true
+	@$(HELM) plugin install https://github.com/losisin/helm-values-schema-json.git --version $(HELM_SCHEMA_VERSION) --verify=false || true
 
 HELM_DOCS         := $(LOCALBIN)/helm-docs
 HELM_DOCS_VERSION := v1.14.1
