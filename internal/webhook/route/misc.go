@@ -16,7 +16,7 @@ func TenantAssignment(handlers ...capsulewebhook.Handler) capsulewebhook.Webhook
 }
 
 func (w miscTenantAssignment) GetPath() string {
-	return "/misc/tenant_assignment"
+	return "/misc/tenant-label"
 }
 
 func (w miscTenantAssignment) GetHandlers() []capsulewebhook.Handler {

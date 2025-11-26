@@ -405,7 +405,7 @@ webhooks:
 
   # Admission Webhook Configuration
   hooks:
-    tenant_assignment:
+    tenantLabel:
       # -- Enable the Hook
       enabled: true
       # -- [FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy)
