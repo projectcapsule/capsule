@@ -17,51 +17,37 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	capsulewebhook "github.com/projectcapsule/capsule/internal/webhook"
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
-	"github.com/projectcapsule/capsule/pkg/utils/tenant"
+	"github.com/projectcapsule/capsule/pkg/api/meta"
 )
 
-type PV struct {
-	capsuleLabel string
+type pv struct{}
+
+func PersistentVolumeReuse() capsulewebhook.TypedHandlerWithTenant[*corev1.PersistentVolumeClaim] {
+	return &pv{}
 }
 
-func PersistentVolumeReuse() capsulewebhook.Handler {
-	value, err := capsulev1beta2.GetTypeLabel(&capsulev1beta2.Tenant{})
-	if err != nil {
-		panic(fmt.Sprintf("this shouldn't happen: %s", err.Error()))
-	}
-
-	return &PV{
-		capsuleLabel: value,
-	}
-}
-
-func (p PV) OnCreate(client client.Client, decoder admission.Decoder, _ record.EventRecorder) capsulewebhook.Func {
+func (h pv) OnCreate(
+	c client.Client,
+	pvc *corev1.PersistentVolumeClaim,
+	decoder admission.Decoder,
+	recorder record.EventRecorder,
+	tnt *capsulev1beta2.Tenant,
+) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		pvc := corev1.PersistentVolumeClaim{}
-		if err := decoder.Decode(req, &pvc); err != nil {
-			return utils.ErroredResponse(err)
-		}
-
-		tnt, err := tenant.TenantByStatusNamespace(ctx, client, pvc.GetNamespace())
-		if err != nil {
-			return utils.ErroredResponse(err)
-		}
-		// PVC is not in a Tenant Namespace, skipping
-		if tnt == nil {
-			return nil
-		}
 		// A PersistentVolume selector cannot help in preventing a cross-tenant mount:
 		// thus, disallowing that in first place.
 		if pvc.Spec.Selector != nil {
 			return utils.ErroredResponse(NewPVSelectorError())
 		}
+
 		// The PVC hasn't any volumeName pre-claimed, it can be skipped
 		if len(pvc.Spec.VolumeName) == 0 {
 			return nil
 		}
+
 		// Checking if the PV is labelled with the Tenant name
 		pv := corev1.PersistentVolume{}
-		if err = client.Get(ctx, types.NamespacedName{Name: pvc.Spec.VolumeName}, &pv); err != nil {
+		if err := c.Get(ctx, types.NamespacedName{Name: pvc.Spec.VolumeName}, &pv); err != nil {
 			if errors.IsNotFound(err) {
 				err = fmt.Errorf("cannot create a PVC referring to a not yet existing PV")
 			}
@@ -73,7 +59,7 @@ func (p PV) OnCreate(client client.Client, decoder admission.Decoder, _ record.E
 			return utils.ErroredResponse(NewMissingPVLabelsError(pv.GetName()))
 		}
 
-		value, ok := pv.GetLabels()[p.capsuleLabel]
+		value, ok := pv.GetLabels()[meta.TenantLabel]
 		if !ok {
 			return utils.ErroredResponse(NewMissingTenantPVLabelsError(pv.GetName()))
 		}
@@ -86,13 +72,26 @@ func (p PV) OnCreate(client client.Client, decoder admission.Decoder, _ record.E
 	}
 }
 
-func (p PV) OnDelete(client.Client, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
+func (h pv) OnUpdate(
+	client.Client,
+	*corev1.PersistentVolumeClaim,
+	*corev1.PersistentVolumeClaim,
+	admission.Decoder,
+	record.EventRecorder,
+	*capsulev1beta2.Tenant,
+) capsulewebhook.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (p PV) OnUpdate(client.Client, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
+func (h pv) OnDelete(
+	client.Client,
+	*corev1.PersistentVolumeClaim,
+	admission.Decoder,
+	record.EventRecorder,
+	*capsulev1beta2.Tenant,
+) capsulewebhook.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}

@@ -11,61 +11,72 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
+	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	capsulewebhook "github.com/projectcapsule/capsule/internal/webhook"
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/configuration"
-	"github.com/projectcapsule/capsule/pkg/utils/tenant"
 	"github.com/projectcapsule/capsule/pkg/utils/users"
 )
 
-type handler struct {
+type validating struct {
 	cfg configuration.Configuration
 }
 
-func Handler(cfg configuration.Configuration) capsulewebhook.Handler {
-	return &handler{cfg: cfg}
+func Validating(cfg configuration.Configuration) capsulewebhook.TypedHandlerWithTenant[*corev1.ServiceAccount] {
+	return &validating{cfg: cfg}
 }
 
-func (r *handler) OnCreate(client client.Client, decoder admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
+func (h *validating) OnCreate(
+	c client.Client,
+	sa *corev1.ServiceAccount,
+	decoder admission.Decoder,
+	recorder record.EventRecorder,
+	tnt *capsulev1beta2.Tenant,
+) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		return r.handle(ctx, client, decoder, req, recorder)
+		return h.handle(ctx, c, req, sa, tnt)
 	}
 }
 
-func (r *handler) OnUpdate(client client.Client, decoder admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
+func (h *validating) OnUpdate(
+	c client.Client,
+	old *corev1.ServiceAccount,
+	sa *corev1.ServiceAccount,
+	decoder admission.Decoder,
+	recorder record.EventRecorder,
+	tnt *capsulev1beta2.Tenant,
+) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		return r.handle(ctx, client, decoder, req, recorder)
+		return h.handle(ctx, c, req, sa, tnt)
 	}
 }
 
-func (r *handler) OnDelete(client.Client, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
+func (h *validating) OnDelete(
+	client.Client,
+	*corev1.ServiceAccount,
+	admission.Decoder,
+	record.EventRecorder,
+	*capsulev1beta2.Tenant,
+) capsulewebhook.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (r *handler) handle(ctx context.Context, clt client.Client, decoder admission.Decoder, req admission.Request, recorder record.EventRecorder) *admission.Response {
-	sa := &corev1.ServiceAccount{}
-	if err := decoder.Decode(req, sa); err != nil {
-		return utils.ErroredResponse(err)
-	}
-
-	tnt, err := tenant.TenantByStatusNamespace(ctx, clt, sa.GetNamespace())
-	if err != nil {
-		return utils.ErroredResponse(err)
-	}
-
-	if tnt == nil {
-		return nil
-	}
-
+func (h *validating) handle(
+	ctx context.Context,
+	c client.Client,
+	req admission.Request,
+	sa *corev1.ServiceAccount,
+	tnt *capsulev1beta2.Tenant,
+) *admission.Response {
 	_, hasOwnerPromotion := sa.Labels[meta.OwnerPromotionLabel]
 	if !hasOwnerPromotion {
 		return nil
 	}
 
-	if !r.cfg.AllowServiceAccountPromotion() {
+	if !h.cfg.AllowServiceAccountPromotion() {
 		response := admission.Denied(
 			"service account owner promotion is disabled. Contact your system administrators",
 		)
@@ -74,7 +85,7 @@ func (r *handler) handle(ctx context.Context, clt client.Client, decoder admissi
 	}
 
 	// We don't want to allow promoted serviceaccounts to promote other serviceaccounts
-	allowed, err := users.IsTenantOwner(ctx, clt, r.cfg, tnt, req.UserInfo)
+	allowed, err := users.IsTenantOwner(ctx, c, h.cfg, tnt, req.UserInfo)
 	if err != nil {
 		return utils.ErroredResponse(err)
 	}
