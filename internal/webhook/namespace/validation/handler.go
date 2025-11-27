@@ -1,37 +1,40 @@
 // Copyright 2020-2025 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package namespace
+package validation
 
 import (
 	"context"
+	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
+	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/internal/webhook"
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
+	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/configuration"
 	"github.com/projectcapsule/capsule/pkg/utils/tenant"
 	"github.com/projectcapsule/capsule/pkg/utils/users"
 )
 
-func NamespaceHandler(configuration configuration.Configuration, handlers ...webhook.TypedHandler[*corev1.Namespace]) webhook.Handler {
-	return &adminHandler{
+func NamespaceHandler(configuration configuration.Configuration, handlers ...webhook.TypedHandlerWithTenant[*corev1.Namespace]) webhook.Handler {
+	return &handler{
 		cfg:      configuration,
 		handlers: handlers,
 	}
 }
 
-type adminHandler struct {
+type handler struct {
 	cfg      configuration.Configuration
-	handlers []webhook.TypedHandler[*corev1.Namespace]
+	handlers []webhook.TypedHandlerWithTenant[*corev1.Namespace]
 }
 
 //nolint:dupl
-func (h *adminHandler) OnCreate(c client.Client, decoder admission.Decoder, recorder record.EventRecorder) webhook.Func {
+func (h *handler) OnCreate(c client.Client, decoder admission.Decoder, recorder record.EventRecorder) webhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		userIsAdmin := users.IsAdminUser(req, h.cfg.Administrators())
 
@@ -44,17 +47,17 @@ func (h *adminHandler) OnCreate(c client.Client, decoder admission.Decoder, reco
 			return utils.ErroredResponse(err)
 		}
 
-		tnt, err := tenant.GetTenantByLabels(ctx, c, ns)
+		tnt, err := h.verifyReference(ctx, c, ns)
 		if err != nil {
 			return utils.ErroredResponse(err)
 		}
 
-		if tnt == nil && userIsAdmin {
+		if tnt == nil {
 			return nil
 		}
 
 		for _, hndl := range h.handlers {
-			if response := hndl.OnCreate(c, ns, decoder, recorder)(ctx, req); response != nil {
+			if response := hndl.OnCreate(c, ns, decoder, recorder, tnt)(ctx, req); response != nil {
 				return response
 			}
 		}
@@ -64,7 +67,7 @@ func (h *adminHandler) OnCreate(c client.Client, decoder admission.Decoder, reco
 }
 
 //nolint:dupl
-func (h *adminHandler) OnDelete(c client.Client, decoder admission.Decoder, recorder record.EventRecorder) webhook.Func {
+func (h *handler) OnDelete(c client.Client, decoder admission.Decoder, recorder record.EventRecorder) webhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		userIsAdmin := users.IsAdminUser(req, h.cfg.Administrators())
 
@@ -77,17 +80,17 @@ func (h *adminHandler) OnDelete(c client.Client, decoder admission.Decoder, reco
 			return utils.ErroredResponse(err)
 		}
 
-		tnt, err := tenant.GetTenantByLabels(ctx, c, ns)
+		tnt, err := h.verifyReference(ctx, c, ns)
 		if err != nil {
 			return utils.ErroredResponse(err)
 		}
 
-		if tnt == nil && userIsAdmin {
+		if tnt == nil {
 			return nil
 		}
 
 		for _, hndl := range h.handlers {
-			if response := hndl.OnDelete(c, ns, decoder, recorder)(ctx, req); response != nil {
+			if response := hndl.OnDelete(c, ns, decoder, recorder, tnt)(ctx, req); response != nil {
 				return response
 			}
 		}
@@ -96,7 +99,7 @@ func (h *adminHandler) OnDelete(c client.Client, decoder admission.Decoder, reco
 	}
 }
 
-func (h *adminHandler) OnUpdate(c client.Client, decoder admission.Decoder, recorder record.EventRecorder) webhook.Func {
+func (h *handler) OnUpdate(c client.Client, decoder admission.Decoder, recorder record.EventRecorder) webhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		userIsAdmin := users.IsAdminUser(req, h.cfg.Administrators())
 
@@ -114,44 +117,58 @@ func (h *adminHandler) OnUpdate(c client.Client, decoder admission.Decoder, reco
 			return utils.ErroredResponse(err)
 		}
 
-		tnt, err := tenant.GetTenantByOwnerreferences(ctx, c, oldNs.OwnerReferences)
+		oldTenant, err := h.verifyReference(ctx, c, oldNs)
 		if err != nil {
 			return utils.ErroredResponse(err)
 		}
 
-		//nolint:nestif
-		if userIsAdmin {
-			if tnt == nil {
-				tnt, err = tenant.GetTenantByLabels(ctx, c, ns)
-				if err != nil {
-					return utils.ErroredResponse(err)
-				}
+		if oldTenant == nil {
+			return nil
+		}
 
-				if tnt == nil {
-					return nil
-				}
-			}
-		} else {
-			owned, err := tenant.NamespaceIsOwned(ctx, c, h.cfg, oldNs, tnt, req.UserInfo)
-			if err != nil {
-				return utils.ErroredResponse(err)
-			}
+		newTenant, err := h.verifyReference(ctx, c, ns)
+		if err != nil {
+			return utils.ErroredResponse(err)
+		}
 
-			if !owned {
-				recorder.Eventf(oldNs, corev1.EventTypeWarning, "NamespacePatch", "Namespace %s can not be patched", oldNs.GetName())
+		if newTenant.GetName() != oldTenant.GetName() {
+			err := fmt.Errorf("namespace can not be migrated between tenants")
 
-				response := admission.Denied("Denied patch request for this namespace")
-
-				return &response
-			}
+			return utils.ErroredResponse(err)
 		}
 
 		for _, hndl := range h.handlers {
-			if response := hndl.OnUpdate(c, ns, oldNs, decoder, recorder)(ctx, req); response != nil {
+			if response := hndl.OnUpdate(c, ns, oldNs, decoder, recorder, oldTenant)(ctx, req); response != nil {
 				return response
 			}
 		}
 
 		return nil
 	}
+}
+
+func (h *handler) verifyReference(
+	ctx context.Context,
+	c client.Client,
+	ns *corev1.Namespace,
+) (*capsulev1beta2.Tenant, error) {
+	tenantByOwnerreference, err := tenant.GetTenantByOwnerreferences(ctx, c, ns.OwnerReferences)
+	if err != nil {
+		return nil, err
+	}
+
+	name := ""
+	if tenantByOwnerreference != nil {
+		name = tenantByOwnerreference.GetName()
+	}
+
+	if name != ns.Labels[meta.TenantLabel] {
+		return nil, fmt.Errorf(
+			"namespace label %q does not match owner reference %q",
+			ns.Labels[meta.TenantLabel],
+			name,
+		)
+	}
+
+	return tenantByOwnerreference, nil
 }

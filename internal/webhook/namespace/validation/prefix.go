@@ -13,39 +13,30 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
+	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	capsulewebhook "github.com/projectcapsule/capsule/internal/webhook"
-	"github.com/projectcapsule/capsule/internal/webhook/utils"
 	"github.com/projectcapsule/capsule/pkg/configuration"
-	"github.com/projectcapsule/capsule/pkg/utils/tenant"
 )
 
 type prefixHandler struct {
 	cfg configuration.Configuration
 }
 
-func PrefixHandler(configuration configuration.Configuration) capsulewebhook.TypedHandler[*corev1.Namespace] {
+func PrefixHandler(configuration configuration.Configuration) capsulewebhook.TypedHandlerWithTenant[*corev1.Namespace] {
 	return &prefixHandler{
 		cfg: configuration,
 	}
 }
 
-func (r *prefixHandler) OnCreate(
-	clt client.Client,
+func (h *prefixHandler) OnCreate(
+	c client.Client,
 	ns *corev1.Namespace,
 	decoder admission.Decoder,
 	recorder record.EventRecorder,
+	tnt *capsulev1beta2.Tenant,
 ) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		tnt, err := tenant.GetTenantByOwnerreferences(ctx, clt, ns.OwnerReferences)
-		if err != nil {
-			return utils.ErroredResponse(err)
-		}
-
-		if tnt == nil {
-			return nil
-		}
-
-		if exp, _ := r.cfg.ProtectedNamespaceRegexp(); exp != nil {
+		if exp, _ := h.cfg.ProtectedNamespaceRegexp(); exp != nil {
 			if matched := exp.MatchString(ns.GetName()); matched {
 				response := admission.Denied(fmt.Sprintf("Creating namespaces with name matching %s regexp is not allowed; please, reach out to the system administrators", exp.String()))
 
@@ -53,7 +44,7 @@ func (r *prefixHandler) OnCreate(
 			}
 		}
 
-		if r.cfg.ForceTenantPrefix() {
+		if h.cfg.ForceTenantPrefix() {
 			if tnt.Spec.ForceTenantPrefix != nil && !*tnt.Spec.ForceTenantPrefix {
 				return nil
 			}
@@ -71,13 +62,26 @@ func (r *prefixHandler) OnCreate(
 	}
 }
 
-func (r *prefixHandler) OnDelete(client.Client, *corev1.Namespace, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
+func (h *prefixHandler) OnUpdate(
+	client.Client,
+	*corev1.Namespace,
+	*corev1.Namespace,
+	admission.Decoder,
+	record.EventRecorder,
+	*capsulev1beta2.Tenant,
+) capsulewebhook.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (r *prefixHandler) OnUpdate(client.Client, *corev1.Namespace, *corev1.Namespace, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
+func (h *prefixHandler) OnDelete(
+	client.Client,
+	*corev1.Namespace,
+	admission.Decoder,
+	record.EventRecorder,
+	*capsulev1beta2.Tenant,
+) capsulewebhook.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}

@@ -11,10 +11,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
+	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	capsulewebhook "github.com/projectcapsule/capsule/internal/webhook"
-	"github.com/projectcapsule/capsule/internal/webhook/utils"
 	"github.com/projectcapsule/capsule/pkg/configuration"
-	"github.com/projectcapsule/capsule/pkg/utils/tenant"
 	"github.com/projectcapsule/capsule/pkg/utils/users"
 )
 
@@ -22,26 +21,18 @@ type freezedHandler struct {
 	cfg configuration.Configuration
 }
 
-func FreezeHandler(configuration configuration.Configuration) capsulewebhook.TypedHandler[*corev1.Namespace] {
+func FreezeHandler(configuration configuration.Configuration) capsulewebhook.TypedHandlerWithTenant[*corev1.Namespace] {
 	return &freezedHandler{cfg: configuration}
 }
 
-func (r *freezedHandler) OnCreate(
+func (h *freezedHandler) OnCreate(
 	c client.Client,
 	ns *corev1.Namespace,
 	decoder admission.Decoder,
 	recorder record.EventRecorder,
+	tnt *capsulev1beta2.Tenant,
 ) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		tnt, err := tenant.GetTenantByOwnerreferences(ctx, c, ns.OwnerReferences)
-		if err != nil {
-			return utils.ErroredResponse(err)
-		}
-
-		if tnt == nil {
-			return nil
-		}
-
 		if tnt.Spec.Cordoned {
 			recorder.Eventf(tnt, corev1.EventTypeWarning, "TenantFreezed", "Namespace %s cannot be attached, the current Tenant is freezed", ns.GetName())
 
@@ -54,23 +45,15 @@ func (r *freezedHandler) OnCreate(
 	}
 }
 
-func (r *freezedHandler) OnDelete(
+func (h *freezedHandler) OnDelete(
 	c client.Client,
 	ns *corev1.Namespace,
 	decoder admission.Decoder,
 	recorder record.EventRecorder,
+	tnt *capsulev1beta2.Tenant,
 ) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		tnt, err := tenant.GetTenantByOwnerreferences(ctx, c, ns.OwnerReferences)
-		if err != nil {
-			return utils.ErroredResponse(err)
-		}
-
-		if tnt == nil {
-			return nil
-		}
-
-		if tnt.Spec.Cordoned && users.IsCapsuleUser(ctx, c, r.cfg, req.UserInfo.Username, req.UserInfo.Groups) {
+		if tnt.Spec.Cordoned && users.IsCapsuleUser(ctx, c, h.cfg, req.UserInfo.Username, req.UserInfo.Groups) {
 			recorder.Eventf(tnt, corev1.EventTypeWarning, "TenantFreezed", "Namespace %s cannot be deleted, the current Tenant is freezed", req.Name)
 
 			response := admission.Denied("the selected Tenant is freezed")
@@ -82,24 +65,16 @@ func (r *freezedHandler) OnDelete(
 	}
 }
 
-func (r *freezedHandler) OnUpdate(
+func (h *freezedHandler) OnUpdate(
 	c client.Client,
 	ns *corev1.Namespace,
 	old *corev1.Namespace,
 	decoder admission.Decoder,
 	recorder record.EventRecorder,
+	tnt *capsulev1beta2.Tenant,
 ) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		tnt, err := tenant.GetTenantByOwnerreferences(ctx, c, ns.OwnerReferences)
-		if err != nil {
-			return utils.ErroredResponse(err)
-		}
-
-		if tnt == nil {
-			return nil
-		}
-
-		if tnt.Spec.Cordoned && users.IsCapsuleUser(ctx, c, r.cfg, req.UserInfo.Username, req.UserInfo.Groups) {
+		if tnt.Spec.Cordoned && users.IsCapsuleUser(ctx, c, h.cfg, req.UserInfo.Username, req.UserInfo.Groups) {
 			recorder.Eventf(tnt, corev1.EventTypeWarning, "TenantFreezed", "Namespace %s cannot be updated, the current Tenant is freezed", ns.GetName())
 
 			response := admission.Denied("the selected Tenant is freezed")
