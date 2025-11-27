@@ -5,6 +5,19 @@ package api
 
 import k8stypes "k8s.io/apimachinery/pkg/types"
 
+const (
+	ResourceScopeNamespace ResourceScope = "Namespace"
+	ResourceScopeTenant    ResourceScope = "Tenant"
+	ResourceScopeCluster   ResourceScope = "Cluster"
+)
+
+// +kubebuilder:validation:Enum=Namespace;Tenant
+type ResourceScope string
+
+func (p ResourceScope) String() string {
+	return string(p)
+}
+
 // Name must be unique within a namespace. Is required when creating resources, although
 // some resources may allow a client to request the generation of an appropriate name
 // automatically. Name is primarily intended for creation idempotence and configuration
@@ -24,8 +37,10 @@ type StatusNameUID struct {
 	// UID of the tracked Tenant to pin point tracking
 	k8stypes.UID `json:"uid,omitempty" protobuf:"bytes,5,opt,name=uid"`
 
-	// Name
+	// Name of The Resource
 	Name Name `json:"name,omitempty"`
-	// Namespace
+	// Namespace of The Resource
 	Namespace Name `json:"namespace,omitempty"`
+	// Scope of The Resource
+	Scope ResourceScope `json:"scope,omitempty"`
 }

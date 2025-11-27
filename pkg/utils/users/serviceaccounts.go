@@ -5,14 +5,19 @@ package users
 
 import (
 	"context"
+	"fmt"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
+	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/configuration"
 )
@@ -56,4 +61,37 @@ func ResolveServiceAccountActor(
 	}
 
 	return tnt, err
+}
+
+// Returns a namespaced serviceaccount name
+func SanitizeServiceAccountProp(name string) string {
+	parts := strings.Split(name, ":")
+	if len(parts) == 1 {
+		return name
+	}
+
+	return parts[len(parts)-1]
+}
+
+// ImpersonatedKubernetesClientForServiceAccount returns a controller-runtime client.Client that impersonates a given ServiceAccount.
+func ImpersonatedKubernetesClientForServiceAccount(
+	base *rest.Config,
+	scheme *runtime.Scheme,
+	reference *api.ServiceAccountReference,
+) (client.Client, error) {
+	_, _, groups, err := reference.GetAttributes()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get service account groups: %w", err)
+	}
+
+	impersonated := rest.CopyConfig(base)
+	impersonated.Impersonate.UserName = reference.GetFullName()
+	impersonated.Impersonate.Groups = groups
+
+	k8sClient, err := client.New(impersonated, client.Options{Scheme: scheme})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create impersonated client: %w", err)
+	}
+
+	return k8sClient, nil
 }

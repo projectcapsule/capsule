@@ -4,11 +4,53 @@
 package v1beta2
 
 import (
-	"fmt"
-	"strings"
-
+	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api/misc"
+	tpl "github.com/projectcapsule/capsule/pkg/template"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	k8stypes "k8s.io/apimachinery/pkg/types"
 )
+
+type ProcessedItems []ObjectReferenceStatus
+
+// Adds a condition by type.
+func (p *ProcessedItems) UpdateItem(item ObjectReferenceStatus) {
+	for i, stat := range *p {
+		if p.isEqual(stat, item) {
+			(*p)[i].ObjectReferenceStatusCondition = item.ObjectReferenceStatusCondition
+
+			return
+		}
+	}
+
+	*p = append(*p, item)
+}
+
+// Removes a condition by type.
+func (p *ProcessedItems) RemoveItem(item ObjectReferenceStatus) {
+	filtered := make(ProcessedItems, 0, len(*p))
+
+	for _, stat := range *p {
+		if !p.isEqual(stat, item) {
+			filtered = append(filtered, stat)
+		}
+	}
+
+	*p = filtered
+}
+
+func (p *ProcessedItems) isEqual(a, b ObjectReferenceStatus) bool {
+	return a.ResourceID == b.ResourceID
+}
+
+type TemplateItemSpec struct {
+	// Template contains any amount of yaml which is applied to Kubernetes.
+	// This can be a single resource or multiple resources
+	Template string `json:"template,omitempty"`
+	// Missing Key Option for templating
+	// +kubebuilder:default=default
+	MissingKey tpl.MissingKeyOption `json:"missingKey,omitempty"`
+}
 
 type ObjectReferenceAbstract struct {
 	// Kind of the referent.
@@ -22,53 +64,37 @@ type ObjectReferenceAbstract struct {
 }
 
 type ObjectReferenceStatus struct {
-	ObjectReferenceAbstract `json:",inline"`
-
-	// Name of the referent.
-	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-	Name string `json:"name"`
+	misc.ResourceID                `json:",inline"`
+	ObjectReferenceStatusCondition `json:",inline"`
 }
 
-type ObjectReference struct {
-	ObjectReferenceAbstract `json:",inline"`
-
-	// Label selector used to select the given resources in the given Namespace.
-	Selector metav1.LabelSelector `json:"selector"`
+type ObjectReferenceStatusCondition struct {
+	// status of the condition, one of True, False, Unknown.
+	// +required
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Enum=True;False;Unknown
+	Status metav1.ConditionStatus `json:"status" protobuf:"bytes,2,opt,name=status"`
+	// message is a human readable message indicating details about the transition.
+	// This may be an empty string.
+	// +kubebuilder:validation:MaxLength=32768
+	Message string `json:"message,omitempty" protobuf:"bytes,6,opt,name=message"`
+	// type of condition in CamelCase or in foo.example.com/CamelCase.
+	// ---
+	// Many .condition.type values are consistent across resources like Available, but because arbitrary conditions can be
+	// useful (see .node.status.conditions), the ability to deconflict is important.
+	// The regex it matches is (dns1123SubdomainFmt/)?(qualifiedNameFmt)
+	// +required
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Pattern=`^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$`
+	// +kubebuilder:validation:MaxLength=316
+	Type string `json:"type" protobuf:"bytes,1,opt,name=type"`
 }
 
-func (in *ObjectReferenceStatus) String() string {
-	return fmt.Sprintf("Kind=%s,APIVersion=%s,Namespace=%s,Name=%s", in.Kind, in.APIVersion, in.Namespace, in.Name)
-}
-
-func (in *ObjectReferenceStatus) ParseFromString(value string) error {
-	rawParts := strings.Split(value, ",")
-
-	if len(rawParts) != 4 {
-		return fmt.Errorf("unexpected raw parts")
-	}
-
-	for _, i := range rawParts {
-		parts := strings.Split(i, "=")
-
-		if len(parts) != 2 {
-			return fmt.Errorf("unrecognized separator")
-		}
-
-		k, v := parts[0], parts[1]
-
-		switch k {
-		case "Kind":
-			in.Kind = v
-		case "APIVersion":
-			in.APIVersion = v
-		case "Namespace":
-			in.Namespace = v
-		case "Name":
-			in.Name = v
-		default:
-			return fmt.Errorf("unrecognized marker: %s", k)
-		}
-	}
-
-	return nil
+type ObjectReferenceStatusOwner struct {
+	// Name of the owning object.
+	Name string `json:"name,omitempty"`
+	// UID of the owning object.
+	k8stypes.UID `json:"uid,omitempty" protobuf:"bytes,5,opt,name=uid"`
+	// Scope of the owning object.
+	Scope api.ResourceScope `json:"scope,omitempty"`
 }

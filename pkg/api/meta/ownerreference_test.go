@@ -1,7 +1,7 @@
 // Copyright 2020-2025 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package meta
+package meta_test
 
 import (
 	"testing"
@@ -12,6 +12,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/stretchr/testify/assert"
+
+	"github.com/projectcapsule/capsule/pkg/api/meta"
 )
 
 func TestLooseOwnerReferenceHelpers(t *testing.T) {
@@ -34,7 +36,7 @@ func TestLooseOwnerReferenceHelpers(t *testing.T) {
 	}
 
 	t.Run("SetLooseOwnerReference adds and clears controller fields", func(t *testing.T) {
-		err := SetLooseOwnerReference(target, owner, scheme)
+		err := meta.SetLooseOwnerReference(target, owner, scheme)
 		assert.NoError(t, err)
 
 		refs := target.GetOwnerReferences()
@@ -46,18 +48,18 @@ func TestLooseOwnerReferenceHelpers(t *testing.T) {
 	})
 
 	t.Run("HasLooseOwnerReference returns true if present", func(t *testing.T) {
-		result := HasLooseOwnerReference(target, owner)
+		result := meta.HasLooseOwnerReference(target, owner)
 		assert.True(t, result)
 	})
 
 	t.Run("RemoveLooseOwnerReference removes the reference", func(t *testing.T) {
-		RemoveLooseOwnerReference(target, owner)
+		meta.RemoveLooseOwnerReference(target, owner)
 		refs := target.GetOwnerReferences()
 		assert.Len(t, refs, 0)
 	})
 
 	t.Run("HasLooseOwnerReference returns false if not present", func(t *testing.T) {
-		result := HasLooseOwnerReference(target, owner)
+		result := meta.HasLooseOwnerReference(target, owner)
 		assert.False(t, result)
 	})
 }

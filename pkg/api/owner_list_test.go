@@ -1,98 +1,100 @@
 // Copyright 2020-2025 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package api
+package api_test
 
 import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	"github.com/projectcapsule/capsule/pkg/api"
 )
 
 func TestOwnerListSpec_FindOwner(t *testing.T) {
-	bla := OwnerSpec{
-		UserSpec: UserSpec{
-			Kind: UserOwner,
+	bla := api.OwnerSpec{
+		UserSpec: api.UserSpec{
+			Kind: api.UserOwner,
 			Name: "bla",
 		},
-		ProxyOperations: []ProxySettings{
+		ProxyOperations: []api.ProxySettings{
 			{
-				Kind:       IngressClassesProxy,
-				Operations: []ProxyOperation{"Delete"},
+				Kind:       api.IngressClassesProxy,
+				Operations: []api.ProxyOperation{"Delete"},
 			},
 		},
 	}
-	bar := OwnerSpec{
-		UserSpec: UserSpec{
-			Kind: GroupOwner,
+	bar := api.OwnerSpec{
+		UserSpec: api.UserSpec{
+			Kind: api.GroupOwner,
 			Name: "bar",
 		},
-		ProxyOperations: []ProxySettings{
+		ProxyOperations: []api.ProxySettings{
 			{
-				Kind:       StorageClassesProxy,
-				Operations: []ProxyOperation{"Delete"},
+				Kind:       api.StorageClassesProxy,
+				Operations: []api.ProxyOperation{"Delete"},
 			},
 		},
 	}
-	baz := OwnerSpec{
-		UserSpec: UserSpec{
-			Kind: UserOwner,
+	baz := api.OwnerSpec{
+		UserSpec: api.UserSpec{
+			Kind: api.UserOwner,
 			Name: "baz",
 		},
-		ProxyOperations: []ProxySettings{
+		ProxyOperations: []api.ProxySettings{
 			{
-				Kind:       StorageClassesProxy,
-				Operations: []ProxyOperation{"Update"},
+				Kind:       api.StorageClassesProxy,
+				Operations: []api.ProxyOperation{"Update"},
 			},
 		},
 	}
-	fim := OwnerSpec{
-		UserSpec: UserSpec{
-			Kind: ServiceAccountOwner,
+	fim := api.OwnerSpec{
+		UserSpec: api.UserSpec{
+			Kind: api.ServiceAccountOwner,
 			Name: "fim",
 		},
-		ProxyOperations: []ProxySettings{
+		ProxyOperations: []api.ProxySettings{
 			{
-				Kind:       NodesProxy,
-				Operations: []ProxyOperation{"List"},
+				Kind:       api.NodesProxy,
+				Operations: []api.ProxyOperation{"List"},
 			},
 		},
 	}
-	bom := OwnerSpec{
-		UserSpec: UserSpec{
-			Kind: GroupOwner,
+	bom := api.OwnerSpec{
+		UserSpec: api.UserSpec{
+			Kind: api.GroupOwner,
 			Name: "bom",
 		},
-		ProxyOperations: []ProxySettings{
+		ProxyOperations: []api.ProxySettings{
 			{
-				Kind:       StorageClassesProxy,
-				Operations: []ProxyOperation{"Delete"},
+				Kind:       api.StorageClassesProxy,
+				Operations: []api.ProxyOperation{"Delete"},
 			},
 			{
-				Kind:       NodesProxy,
-				Operations: []ProxyOperation{"Delete"},
+				Kind:       api.NodesProxy,
+				Operations: []api.ProxyOperation{"Delete"},
 			},
 		},
 	}
-	qip := OwnerSpec{
-		UserSpec: UserSpec{
-			Kind: ServiceAccountOwner,
+	qip := api.OwnerSpec{
+		UserSpec: api.UserSpec{
+			Kind: api.ServiceAccountOwner,
 			Name: "qip",
 		},
-		ProxyOperations: []ProxySettings{
+		ProxyOperations: []api.ProxySettings{
 			{
-				Kind:       StorageClassesProxy,
-				Operations: []ProxyOperation{"List", "Delete"},
+				Kind:       api.StorageClassesProxy,
+				Operations: []api.ProxyOperation{"List", "Delete"},
 			},
 		},
 	}
-	owners := OwnerListSpec{bom, qip, bla, bar, baz, fim}
+	owners := api.OwnerListSpec{bom, qip, bla, bar, baz, fim}
 
-	assert.Equal(t, owners.FindOwner("bom", GroupOwner), bom)
-	assert.Equal(t, owners.FindOwner("qip", ServiceAccountOwner), qip)
-	assert.Equal(t, owners.FindOwner("bla", UserOwner), bla)
-	assert.Equal(t, owners.FindOwner("bar", GroupOwner), bar)
-	assert.Equal(t, owners.FindOwner("baz", UserOwner), baz)
-	assert.Equal(t, owners.FindOwner("fim", ServiceAccountOwner), fim)
-	assert.Equal(t, owners.FindOwner("notfound", ServiceAccountOwner), OwnerSpec{})
+	assert.Equal(t, owners.FindOwner("bom", api.GroupOwner), bom)
+	assert.Equal(t, owners.FindOwner("qip", api.ServiceAccountOwner), qip)
+	assert.Equal(t, owners.FindOwner("bla", api.UserOwner), bla)
+	assert.Equal(t, owners.FindOwner("bar", api.GroupOwner), bar)
+	assert.Equal(t, owners.FindOwner("baz", api.UserOwner), baz)
+	assert.Equal(t, owners.FindOwner("fim", api.ServiceAccountOwner), fim)
+	assert.Equal(t, owners.FindOwner("notfound", api.ServiceAccountOwner), api.OwnerSpec{})
 }

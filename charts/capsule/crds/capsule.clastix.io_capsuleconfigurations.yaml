@@ -155,6 +155,54 @@ spec:
                 description: Disallow creation of namespaces, whose name matches this
                   regexp
                 type: string
+              serviceAccountClient:
+                description: Service Account Client configuration for impersonation
+                  properties
+                properties:
+                  caSecretKey:
+                    default: ca.crt
+                    description: Key in the secret that holds the CA certificate (e.g.,
+                      "ca.crt")
+                    type: string
+                  caSecretName:
+                    description: Name of the secret containing the CA certificate
+                    type: string
+                  caSecretNamespace:
+                    description: Namespace where the CA certificate secret is located
+                    type: string
+                  endpoint:
+                    description: Kubernetes API Endpoint to use for impersonation
+                    type: string
+                  globalDefaultServiceAccount:
+                    description: |-
+                      Default ServiceAccount for global resources (GlobalTenantResource)
+                      When defined, users are required to use this ServiceAccount anywhere in the cluster
+                      unless they explicitly provide their own.
+                    maxLength: 253
+                    pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+                    type: string
+                  globalDefaultServiceAccountNamespace:
+                    description: |-
+                      Default ServiceAccount for global resources (GlobalTenantResource)
+                      When defined, users are required to use this ServiceAccount anywhere in the cluster
+                      unless they explicitly provide their own.
+                    maxLength: 253
+                    pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+                    type: string
+                  skipTlsVerify:
+                    default: false
+                    description: If true, TLS certificate verification is skipped
+                      (not recommended for production)
+                    type: boolean
+                  tenantDefaultServiceAccount:
+                    description: |-
+                      Default ServiceAccount for namespaced resources (TenantResource)
+                      When defined, users are required to use this ServiceAccount within the namespace
+                      where they deploy the resource, unless they explicitly provide their own.
+                    maxLength: 253
+                    pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+                    type: string
+                type: object
               userGroups:
                 default:
                 - capsule.clastix.io

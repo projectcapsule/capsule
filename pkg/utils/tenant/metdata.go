@@ -11,7 +11,6 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
-	"github.com/projectcapsule/capsule/pkg/template"
 	"github.com/projectcapsule/capsule/pkg/utils"
 )
 
@@ -59,8 +58,8 @@ func BuildNamespaceMetadataForTenant(ns *corev1.Namespace, tnt *capsulev1beta2.T
 				continue
 			}
 
-			template.TemplateForTenantAndNamespace(md.Labels, tnt, ns)
-			template.TemplateForTenantAndNamespace(md.Annotations, tnt, ns)
+			TemplateForTenantAndNamespace(md.Labels, tnt, ns)
+			TemplateForTenantAndNamespace(md.Annotations, tnt, ns)
 
 			utils.MapMergeNoOverrite(labels, md.Labels)
 			utils.MapMergeNoOverrite(annotations, md.Annotations)

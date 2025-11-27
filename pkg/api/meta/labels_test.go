@@ -1,12 +1,14 @@
 // Copyright 2020-2025 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package meta
+package meta_test
 
 import (
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
+
+	"github.com/projectcapsule/capsule/pkg/api/meta"
 )
 
 func TestFreezeLabel(t *testing.T) {
@@ -14,24 +16,24 @@ func TestFreezeLabel(t *testing.T) {
 	ns.SetLabels(map[string]string{})
 
 	// absent
-	if FreezeLabelTriggers(ns) {
+	if meta.FreezeLabelTriggers(ns) {
 		t.Errorf("expected FreezeLabelTriggers to be false when label is absent")
 	}
 
 	// set to trigger
-	ns.Labels[FreezeLabel] = FreezeLabelTrigger
-	if !FreezeLabelTriggers(ns) {
+	ns.Labels[meta.FreezeLabel] = meta.FreezeLabelTrigger
+	if !meta.FreezeLabelTriggers(ns) {
 		t.Errorf("expected FreezeLabelTriggers to be true when label is set to trigger")
 	}
 
-	ns.Labels[FreezeLabel] = "false"
-	if FreezeLabelTriggers(ns) {
+	ns.Labels[meta.FreezeLabel] = "false"
+	if meta.FreezeLabelTriggers(ns) {
 		t.Errorf("expected FreezeLabelTriggers to be false when label is not set to trigger")
 	}
 
 	// remove
-	FreezeLabelRemove(ns)
-	if _, ok := ns.Labels[FreezeLabel]; ok {
+	meta.FreezeLabelRemove(ns)
+	if _, ok := ns.Labels[meta.FreezeLabel]; ok {
 		t.Errorf("expected FreezeLabel to be removed")
 	}
 }
@@ -40,22 +42,22 @@ func TestOwnerPromotionLabel(t *testing.T) {
 	ns := &corev1.Namespace{}
 	ns.SetLabels(map[string]string{})
 
-	if OwnerPromotionLabelTriggers(ns) {
+	if meta.OwnerPromotionLabelTriggers(ns) {
 		t.Errorf("expected OwnerPromotionLabelTriggers to be false when label is absent")
 	}
 
-	ns.Labels[OwnerPromotionLabel] = OwnerPromotionLabelTrigger
-	if !OwnerPromotionLabelTriggers(ns) {
+	ns.Labels[meta.OwnerPromotionLabel] = meta.OwnerPromotionLabelTrigger
+	if !meta.OwnerPromotionLabelTriggers(ns) {
 		t.Errorf("expected OwnerPromotionLabelTriggers to be true when label is set to trigger")
 	}
 
-	ns.Labels[OwnerPromotionLabel] = "false"
-	if OwnerPromotionLabelTriggers(ns) {
+	ns.Labels[meta.OwnerPromotionLabel] = "false"
+	if meta.OwnerPromotionLabelTriggers(ns) {
 		t.Errorf("expected OwnerPromotionLabelTriggers to be false when label is not set to trigger")
 	}
 
-	OwnerPromotionLabelRemove(ns)
-	if _, ok := ns.Labels[OwnerPromotionLabel]; ok {
+	meta.OwnerPromotionLabelRemove(ns)
+	if _, ok := ns.Labels[meta.OwnerPromotionLabel]; ok {
 		t.Errorf("expected OwnerPromotionLabel to be removed")
 	}
 }

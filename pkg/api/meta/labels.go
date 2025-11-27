@@ -10,6 +10,8 @@ import (
 )
 
 const (
+	ResourcesLabel = "capsule.clastix.io/resources"
+
 	TenantNameLabel = "kubernetes.io/metadata.name"
 	TenantLabel     = "capsule.clastix.io/tenant"
 
@@ -24,7 +26,12 @@ const (
 	CordonedLabel        = "projectcapsule.dev/cordoned"
 	CordonedLabelTrigger = "true"
 
-	ManagedByCapsuleLabel = "capsule.clastix.io/managed-by"
+	ManagedByCapsuleLabel    = "capsule.clastix.io/managed-by"
+	NewManagedByCapsuleLabel = "projectcapsule.dev/managed-by"
+
+	CreatedByCapsuleLabel = "projectcapsule.dev/created-by"
+
+	ResourceCapsuleLabel = "capsule.clastix.io/resources"
 
 	LimitRangeLabel    = "capsule.clastix.io/limit-range"
 	NetworkPolicyLabel = "capsule.clastix.io/network-policy"

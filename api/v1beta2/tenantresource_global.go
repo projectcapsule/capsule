@@ -5,13 +5,20 @@ package v1beta2
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/sets"
+
+	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api/meta"
 )
 
 // GlobalTenantResourceSpec defines the desired state of GlobalTenantResource.
 type GlobalTenantResourceSpec struct {
 	TenantResourceSpec `json:",inline"`
 
+	// Resource Scope, Can either be
+	// - Tenant: Create Resources for each tenant  in selected Tenants
+	// - Namespace: Create Resources for each namespace in selected Tenants
+	// +kubebuilder:default:=Namespace
+	Scope api.ResourceScope `json:"scope"`
 	// Defines the Tenant selector used target the tenants on which resources must be propagated.
 	TenantSelector metav1.LabelSelector `json:"tenantSelector,omitempty"`
 }
@@ -22,23 +29,16 @@ type GlobalTenantResourceStatus struct {
 	SelectedTenants []string `json:"selectedTenants"`
 	// List of the replicated resources for the given TenantResource.
 	ProcessedItems ProcessedItems `json:"processedItems"`
-}
-
-type ProcessedItems []ObjectReferenceStatus
-
-func (p *ProcessedItems) AsSet() sets.Set[string] {
-	set := sets.New[string]()
-
-	for _, i := range *p {
-		set.Insert(i.String())
-	}
-
-	return set
+	// Condition of the GlobalTenantResource.
+	Conditions meta.ConditionList `json:"conditions,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:scope=Cluster
+// +kubebuilder:printcolumn:name="Ready",type="string",JSONPath=".status.conditions[?(@.type==\"Ready\")].status",description="Reconcile Status for the tenant"
+// +kubebuilder:printcolumn:name="Status",type="string",JSONPath=".status.conditions[?(@.type==\"Ready\")].message",description="Reconcile Message for the tenant"
+// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp",description="Age"
 
 // GlobalTenantResource allows to propagate resource replications to a specific subset of Tenant resources.
 type GlobalTenantResource struct {

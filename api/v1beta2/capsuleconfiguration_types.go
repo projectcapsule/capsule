@@ -46,6 +46,8 @@ type CapsuleConfigurationSpec struct {
 	// for interacting with namespaces. Because if that label is not defined, it's assumed that namespace interaction was not targeted towards a tenant and will therefor
 	// be ignored by capsule.
 	Administrators api.UserListSpec `json:"administrators,omitempty"`
+	// Service Account Client configuration for impersonation properties
+	ServiceAccountClient *api.ServiceAccountClient `json:"serviceAccountClient,omitempty"`
 }
 
 type NodeMetadata struct {

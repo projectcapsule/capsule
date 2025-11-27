@@ -60,7 +60,7 @@ import (
 	"github.com/projectcapsule/capsule/internal/webhook/serviceaccounts"
 	tenantmutation "github.com/projectcapsule/capsule/internal/webhook/tenant/mutation"
 	tenantvalidation "github.com/projectcapsule/capsule/internal/webhook/tenant/validation"
-	tntresource "github.com/projectcapsule/capsule/internal/webhook/tenantresource"
+	tntresourceglobal "github.com/projectcapsule/capsule/internal/webhook/tenantresource/global"
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
 	"github.com/projectcapsule/capsule/pkg/configuration"
 	"github.com/projectcapsule/capsule/pkg/indexer"
@@ -166,7 +166,7 @@ func main() {
 
 	ctx := ctrl.SetupSignalHandler()
 
-	cfg := configuration.NewCapsuleConfiguration(ctx, manager.GetClient(), controllerConfig.ConfigurationName)
+	cfg := configuration.NewCapsuleConfiguration(ctx, manager.GetClient(), manager.GetConfig(), controllerConfig.ConfigurationName)
 
 	directClient, err := client.New(ctrl.GetConfigOrDie(), client.Options{
 		Scheme: manager.GetScheme(),
@@ -177,7 +177,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	directCfg := configuration.NewCapsuleConfiguration(ctx, directClient, controllerConfig.ConfigurationName)
+	directCfg := configuration.NewCapsuleConfiguration(ctx, directClient, manager.GetConfig(), controllerConfig.ConfigurationName)
 
 	if directCfg.EnableTLSConfiguration() {
 		tlsReconciler := &tlscontroller.Reconciler{
@@ -257,7 +257,6 @@ func main() {
 				service.Validating(),
 			),
 		),
-		route.TenantResourceObjects(utils.InCapsuleGroups(cfg, tntresource.WriteOpsHandler())),
 		route.NetworkPolicy(utils.InCapsuleGroups(cfg, networkpolicy.Handler())),
 		route.Cordoning(tenantvalidation.CordoningHandler(cfg)),
 		route.Node(utils.InCapsuleGroups(cfg, node.UserMetadataHandler(cfg, kubeVersion))),
@@ -307,8 +306,14 @@ func main() {
 		route.ResourcePoolValidation((resourcepool.PoolValidationHandler(ctrl.Log.WithName("webhooks").WithName("resourcepool")))),
 		route.ResourcePoolClaimMutation((resourcepool.ClaimMutationHandler(ctrl.Log.WithName("webhooks").WithName("resourcepoolclaims")))),
 		route.ResourcePoolClaimValidation((resourcepool.ClaimValidationHandler(ctrl.Log.WithName("webhooks").WithName("resourcepoolclaims")))),
-		route.TenantAssignment(
+		route.TenantResourceNamespacedMutation(tntresource.NamespacedMutatingHandler(cfg)),
+		route.TenantResourceGlobalMutation(tntresourceglobal.GlobalMutatingHandler(cfg)),
+
+		route.MiscTenantAssignment(
 			misc.TenantAssignmentHandler(),
+		),
+		route.MiscManagedValidation(
+			misc.ManagedValidatingHandler(),
 		),
 	)
 
@@ -368,13 +373,13 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&resources.Global{}).SetupWithManager(manager, controllerConfig); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "resources.Global")
-		os.Exit(1)
-	}
-
-	if err = (&resources.Namespaced{}).SetupWithManager(manager, controllerConfig); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "resources.Namespaced")
+	if err := resources.Add(
+		ctrl.Log.WithName("controllers").WithName("TenantResources"),
+		manager,
+		cfg,
+		controllerConfig,
+	); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "tenantresources")
 		os.Exit(1)
 	}
 

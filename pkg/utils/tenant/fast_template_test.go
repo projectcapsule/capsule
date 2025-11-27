@@ -1,7 +1,7 @@
 // Copyright 2020-2025 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package template
+package tenant_test
 
 import (
 	"testing"
@@ -9,6 +9,8 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/projectcapsule/capsule/pkg/utils/tenant"
 )
 
 func newTenant(name string) *capsulev1beta2.Tenant {
@@ -36,7 +38,7 @@ func TestTemplateForTenantAndNamespace_ReplacesPlaceholders(t *testing.T) {
 		"key2": "plain-value",
 	}
 
-	TemplateForTenantAndNamespace(m, tnt, ns)
+	tenant.TemplateForTenantAndNamespace(m, tnt, ns)
 
 	if got := m["key1"]; got != "tenant=tenant-a, ns=ns-1" {
 		t.Fatalf("key1: expected %q, got %q", "tenant=tenant-a, ns=ns-1", got)
@@ -60,7 +62,7 @@ func TestTemplateForTenantAndNamespace_SkipsValuesWithoutDelimiters(t *testing.T
 	original1 := m["noTemplate1"]
 	original2 := m["noTemplate2"]
 
-	TemplateForTenantAndNamespace(m, tnt, ns)
+	tenant.TemplateForTenantAndNamespace(m, tnt, ns)
 
 	if got := m["noTemplate1"]; got != original1 {
 		t.Fatalf("noTemplate1: expected %q to remain unchanged, got %q", original1, got)
@@ -80,7 +82,7 @@ func TestTemplateForTenantAndNamespace_MixedKeys(t *testing.T) {
 		"none":       "static",
 	}
 
-	TemplateForTenantAndNamespace(m, tnt, ns)
+	tenant.TemplateForTenantAndNamespace(m, tnt, ns)
 
 	if got := m["onlyTenant"]; got != "T=tenant-x" {
 		t.Fatalf("onlyTenant: expected %q, got %q", "T=tenant-x", got)
@@ -101,7 +103,7 @@ func TestTemplateForTenantAndNamespace_UnknownKeyBecomesEmpty(t *testing.T) {
 		"unknown": "X={{ unknown.key }}",
 	}
 
-	TemplateForTenantAndNamespace(m, tnt, ns)
+	tenant.TemplateForTenantAndNamespace(m, tnt, ns)
 
 	// fasttemplate with missing key returns an empty string for that placeholder
 	if got := m["unknown"]; got != "X=" {

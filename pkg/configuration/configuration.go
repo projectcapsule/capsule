@@ -4,9 +4,12 @@
 package configuration
 
 import (
+	"context"
 	"regexp"
 
+	"github.com/projectcapsule/capsule/pkg/api"
 	capsuleapi "github.com/projectcapsule/capsule/pkg/api"
+	"k8s.io/client-go/rest"
 )
 
 const (
@@ -30,4 +33,6 @@ type Configuration interface {
 	ForbiddenUserNodeLabels() *capsuleapi.ForbiddenListSpec
 	ForbiddenUserNodeAnnotations() *capsuleapi.ForbiddenListSpec
 	Administrators() capsuleapi.UserListSpec
+	ServiceAccountClientProperties() *api.ServiceAccountClient
+	ServiceAccountClient(context.Context) (*rest.Config, error)
 }

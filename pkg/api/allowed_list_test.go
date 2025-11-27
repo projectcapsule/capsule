@@ -2,12 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 //nolint:dupl
-package api
+package api_test
 
 import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	"github.com/projectcapsule/capsule/pkg/api"
 )
 
 func TestAllowedListSpec_ExactMatch(t *testing.T) {
@@ -34,7 +36,7 @@ func TestAllowedListSpec_ExactMatch(t *testing.T) {
 			[]string{"any", "value"},
 		},
 	} {
-		a := AllowedListSpec{
+		a := api.AllowedListSpec{
 			Exact: tc.In,
 		}
 
@@ -59,7 +61,7 @@ func TestAllowedListSpec_RegexMatch(t *testing.T) {
 		{`first-\w+-pattern`, []string{"first-date-pattern", "first-year-pattern"}, []string{"broken", "first-year", "second-date-pattern"}},
 		{``, nil, []string{"any", "value"}},
 	} {
-		a := AllowedListSpec{
+		a := api.AllowedListSpec{
 			Regex: tc.Regex,
 		}
 

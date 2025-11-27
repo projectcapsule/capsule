@@ -1,7 +1,7 @@
 // Copyright 2020-2025 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package tenant
+package tenant_test
 
 import (
 	"testing"
@@ -9,6 +9,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/utils/tenant"
 )
 
 func TestIsTenantOwnerReference(t *testing.T) {
@@ -23,7 +24,7 @@ func TestIsTenantOwnerReference(t *testing.T) {
 			name: "valid tenant ownerRef with exact group and version",
 			or: metav1.OwnerReference{
 				APIVersion: capsuleGroup + "/v1beta2",
-				Kind:       ObjectReferenceTenantKind,
+				Kind:       tenant.ObjectReferenceTenantKind,
 				Name:       "my-tenant",
 			},
 			want: true,
@@ -32,7 +33,7 @@ func TestIsTenantOwnerReference(t *testing.T) {
 			name: "valid tenant ownerRef with same group but different version",
 			or: metav1.OwnerReference{
 				APIVersion: capsuleGroup + "/v1",
-				Kind:       ObjectReferenceTenantKind,
+				Kind:       tenant.ObjectReferenceTenantKind,
 				Name:       "my-tenant",
 			},
 			want: true, // we intentionally only check the group, not the version
@@ -41,7 +42,7 @@ func TestIsTenantOwnerReference(t *testing.T) {
 			name: "wrong group",
 			or: metav1.OwnerReference{
 				APIVersion: "other.group.io/v1beta2",
-				Kind:       ObjectReferenceTenantKind,
+				Kind:       tenant.ObjectReferenceTenantKind,
 				Name:       "my-tenant",
 			},
 			want: false,
@@ -59,7 +60,7 @@ func TestIsTenantOwnerReference(t *testing.T) {
 			name: "empty APIVersion",
 			or: metav1.OwnerReference{
 				APIVersion: "",
-				Kind:       ObjectReferenceTenantKind,
+				Kind:       tenant.ObjectReferenceTenantKind,
 				Name:       "my-tenant",
 			},
 			want: false,
@@ -68,7 +69,7 @@ func TestIsTenantOwnerReference(t *testing.T) {
 			name: "APIVersion without slash (only version)",
 			or: metav1.OwnerReference{
 				APIVersion: "v1beta2",
-				Kind:       ObjectReferenceTenantKind,
+				Kind:       tenant.ObjectReferenceTenantKind,
 				Name:       "my-tenant",
 			},
 			want: false,
@@ -77,7 +78,7 @@ func TestIsTenantOwnerReference(t *testing.T) {
 			name: "APIVersion with empty group",
 			or: metav1.OwnerReference{
 				APIVersion: "/v1beta2",
-				Kind:       ObjectReferenceTenantKind,
+				Kind:       tenant.ObjectReferenceTenantKind,
 				Name:       "my-tenant",
 			},
 			want: false,
@@ -86,7 +87,7 @@ func TestIsTenantOwnerReference(t *testing.T) {
 			name: "APIVersion with empty version",
 			or: metav1.OwnerReference{
 				APIVersion: "",
-				Kind:       ObjectReferenceTenantKind,
+				Kind:       tenant.ObjectReferenceTenantKind,
 				Name:       "my-tenant",
 			},
 			want: false,
@@ -95,7 +96,7 @@ func TestIsTenantOwnerReference(t *testing.T) {
 			name: "APIVersion with extra slash in version (still ok as long as group matches)",
 			or: metav1.OwnerReference{
 				APIVersion: capsuleGroup + "/v1beta2/extra",
-				Kind:       ObjectReferenceTenantKind,
+				Kind:       tenant.ObjectReferenceTenantKind,
 				Name:       "my-tenant",
 			},
 			want: false,
@@ -114,7 +115,7 @@ func TestIsTenantOwnerReference(t *testing.T) {
 	for _, tt := range tests {
 		tt := tt // capture
 		t.Run(tt.name, func(t *testing.T) {
-			got := IsTenantOwnerReference(tt.or)
+			got := tenant.IsTenantOwnerReference(tt.or)
 			if got != tt.want {
 				t.Fatalf("IsTenantOwnerReference(%+v) = %v, want %v", tt.or, got, tt.want)
 			}
@@ -135,7 +136,7 @@ func TestIsTenantOwnerReferenceForTenant(t *testing.T) {
 			name: "valid tenant ownerRef with exact group and version (same tenant)",
 			or: metav1.OwnerReference{
 				APIVersion: capsuleGroup + "/v1beta2",
-				Kind:       ObjectReferenceTenantKind,
+				Kind:       tenant.ObjectReferenceTenantKind,
 				Name:       "my-tenant",
 			},
 			tenant: &capsulev1beta2.Tenant{
@@ -149,7 +150,7 @@ func TestIsTenantOwnerReferenceForTenant(t *testing.T) {
 			name: "valid tenant ownerRef with exact group and version (different tenant)",
 			or: metav1.OwnerReference{
 				APIVersion: capsuleGroup + "/v1beta2",
-				Kind:       ObjectReferenceTenantKind,
+				Kind:       tenant.ObjectReferenceTenantKind,
 				Name:       "my-tenant",
 			},
 			tenant: &capsulev1beta2.Tenant{
@@ -163,7 +164,7 @@ func TestIsTenantOwnerReferenceForTenant(t *testing.T) {
 			name: "valid tenant ownerRef with same group but different version (same tenant)",
 			or: metav1.OwnerReference{
 				APIVersion: capsuleGroup + "/v1",
-				Kind:       ObjectReferenceTenantKind,
+				Kind:       tenant.ObjectReferenceTenantKind,
 				Name:       "my-tenant",
 			},
 			tenant: &capsulev1beta2.Tenant{
@@ -177,7 +178,7 @@ func TestIsTenantOwnerReferenceForTenant(t *testing.T) {
 			name: "valid tenant ownerRef with same group but different version (different tenant)",
 			or: metav1.OwnerReference{
 				APIVersion: capsuleGroup + "/v1",
-				Kind:       ObjectReferenceTenantKind,
+				Kind:       tenant.ObjectReferenceTenantKind,
 				Name:       "my-tenant",
 			},
 			tenant: &capsulev1beta2.Tenant{
@@ -191,7 +192,7 @@ func TestIsTenantOwnerReferenceForTenant(t *testing.T) {
 			name: "wrong group",
 			or: metav1.OwnerReference{
 				APIVersion: "other.group.io/v1beta2",
-				Kind:       ObjectReferenceTenantKind,
+				Kind:       tenant.ObjectReferenceTenantKind,
 				Name:       "my-tenant",
 			},
 			tenant: &capsulev1beta2.Tenant{
@@ -219,7 +220,7 @@ func TestIsTenantOwnerReferenceForTenant(t *testing.T) {
 			name: "empty APIVersion",
 			or: metav1.OwnerReference{
 				APIVersion: "",
-				Kind:       ObjectReferenceTenantKind,
+				Kind:       tenant.ObjectReferenceTenantKind,
 				Name:       "my-tenant",
 			},
 			tenant: &capsulev1beta2.Tenant{
@@ -233,7 +234,7 @@ func TestIsTenantOwnerReferenceForTenant(t *testing.T) {
 			name: "empty tenant",
 			or: metav1.OwnerReference{
 				APIVersion: capsuleGroup + "/v1",
-				Kind:       ObjectReferenceTenantKind,
+				Kind:       tenant.ObjectReferenceTenantKind,
 				Name:       "my-tenant",
 			},
 			tenant: nil,
@@ -243,7 +244,7 @@ func TestIsTenantOwnerReferenceForTenant(t *testing.T) {
 			name: "APIVersion without slash (only version)",
 			or: metav1.OwnerReference{
 				APIVersion: "v1beta2",
-				Kind:       ObjectReferenceTenantKind,
+				Kind:       tenant.ObjectReferenceTenantKind,
 				Name:       "my-tenant",
 			},
 			tenant: &capsulev1beta2.Tenant{
@@ -257,7 +258,7 @@ func TestIsTenantOwnerReferenceForTenant(t *testing.T) {
 			name: "APIVersion with empty group",
 			or: metav1.OwnerReference{
 				APIVersion: "/v1beta2",
-				Kind:       ObjectReferenceTenantKind,
+				Kind:       tenant.ObjectReferenceTenantKind,
 				Name:       "my-tenant",
 			},
 			tenant: &capsulev1beta2.Tenant{
@@ -271,7 +272,7 @@ func TestIsTenantOwnerReferenceForTenant(t *testing.T) {
 			name: "APIVersion with empty version",
 			or: metav1.OwnerReference{
 				APIVersion: "",
-				Kind:       ObjectReferenceTenantKind,
+				Kind:       tenant.ObjectReferenceTenantKind,
 				Name:       "my-tenant",
 			},
 			tenant: &capsulev1beta2.Tenant{
@@ -285,7 +286,7 @@ func TestIsTenantOwnerReferenceForTenant(t *testing.T) {
 			name: "APIVersion with extra slash in version (still ok as long as group matches)",
 			or: metav1.OwnerReference{
 				APIVersion: capsuleGroup + "/v1beta2/extra",
-				Kind:       ObjectReferenceTenantKind,
+				Kind:       tenant.ObjectReferenceTenantKind,
 				Name:       "my-tenant",
 			},
 			tenant: &capsulev1beta2.Tenant{
@@ -314,7 +315,7 @@ func TestIsTenantOwnerReferenceForTenant(t *testing.T) {
 	for _, tt := range tests {
 		tt := tt // capture
 		t.Run(tt.name, func(t *testing.T) {
-			got := IsTenantOwnerReferenceForTenant(tt.or, tt.tenant)
+			got := tenant.IsTenantOwnerReferenceForTenant(tt.or, tt.tenant)
 			if got != tt.want {
 				t.Fatalf("IsTenantOwnerReference(%+v) = %v, want %v", tt.or, got, tt.want)
 			}

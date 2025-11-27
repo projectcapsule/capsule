@@ -647,8 +647,10 @@ webhooks:
       # -- [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector)
       objectSelector:
         matchExpressions:
-          - key: capsule.clastix.io/tenant
-            operator: Exists
+          - key: "projectcapsule.dev/managed-by"
+            operator: In
+            values:
+              - replications
       # -- [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector)
       namespaceSelector:
         matchExpressions:
@@ -656,6 +658,18 @@ webhooks:
             operator: Exists
       # -- [MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
       matchConditions: []
+      # -- [Rules](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-rules)
+      rules:
+        - apiGroups:
+            - '*'
+          apiVersions:
+            - '*'
+          operations:
+            - UPDATE
+            - DELETE
+          resources:
+            - '*'
+          scope: "*"
 
     services:
       # -- Enable the Hook
