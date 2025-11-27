@@ -67,6 +67,8 @@ type TenantAvailableClassesStatus struct {
 	RuntimeClasses []string `json:"runtime,omitempty"`
 	// Available GatewayClasses
 	GatewayClasses []string `json:"gateway,omitempty"`
+	// Available DeviceClasses
+	DeviceClasses []string `json:"device,omitempty"`
 }
 
 func (ms *TenantStatus) GetInstance(stat *TenantStatusNamespaceItem) *TenantStatusNamespaceItem {

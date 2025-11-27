@@ -12,7 +12,7 @@ type deviceClass struct {
 }
 
 func DeviceClass(handler ...capsulewebhook.Handler) capsulewebhook.Webhook {
-	return &ingress{handlers: handler}
+	return &deviceClass{handlers: handler}
 }
 
 func (w *deviceClass) GetHandlers() []capsulewebhook.Handler {
@@ -20,5 +20,5 @@ func (w *deviceClass) GetHandlers() []capsulewebhook.Handler {
 }
 
 func (w *deviceClass) GetPath() string {
-	return "/deviceclasses"
+	return "/devices"
 }
