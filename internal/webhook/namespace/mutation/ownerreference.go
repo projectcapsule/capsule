@@ -52,7 +52,18 @@ func (h *ownerReferenceHandler) OnCreate(c client.Client, ns *corev1.Namespace, 
 		tenant.AddTenantNameLabel(labels, ns, tnt)
 		ns.SetLabels(labels)
 
-		response := patchResponseForOwnerRef(c, tnt.DeepCopy(), ns, recorder)
+		if err := assignToTenant(c, tnt, ns, recorder); err != nil {
+			return utils.ErroredResponse(err)
+		}
+
+		marshaled, err := json.Marshal(ns)
+		if err != nil {
+			response := admission.Errored(http.StatusInternalServerError, err)
+
+			return &response
+		}
+
+		response := admission.PatchResponseFromRaw(req.Object.Raw, marshaled)
 
 		return &response
 	}
@@ -162,27 +173,4 @@ func assignToTenant(
 	recorder.Eventf(tnt, corev1.EventTypeNormal, "NamespaceCreationWebhook", "Namespace %s has been assigned to the desired Tenant", ns.GetName())
 
 	return nil
-}
-
-func patchResponseForOwnerRef(
-	c client.Client,
-	tnt *capsulev1beta2.Tenant,
-	ns *corev1.Namespace,
-	recorder record.EventRecorder,
-) admission.Response {
-	o, err := json.Marshal(ns.DeepCopy())
-	if err != nil {
-		return admission.Errored(http.StatusInternalServerError, err)
-	}
-
-	if err := assignToTenant(c, tnt, ns, recorder); err != nil {
-		return admission.Errored(http.StatusInternalServerError, err)
-	}
-
-	obj, err := json.Marshal(ns)
-	if err != nil {
-		return admission.Errored(http.StatusInternalServerError, err)
-	}
-
-	return admission.PatchResponseFromRaw(o, obj)
 }

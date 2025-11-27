@@ -12,34 +12,25 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
+	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	capsulewebhook "github.com/projectcapsule/capsule/internal/webhook"
-	"github.com/projectcapsule/capsule/internal/webhook/utils"
 	"github.com/projectcapsule/capsule/pkg/api"
-	"github.com/projectcapsule/capsule/pkg/utils/tenant"
 )
 
 type userMetadataHandler struct{}
 
-func UserMetadataHandler() capsulewebhook.TypedHandler[*corev1.Namespace] {
+func UserMetadataHandler() capsulewebhook.TypedHandlerWithTenant[*corev1.Namespace] {
 	return &userMetadataHandler{}
 }
 
-func (r *userMetadataHandler) OnCreate(client client.Client, ns *corev1.Namespace, decoder admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
+func (h *userMetadataHandler) OnCreate(
+	c client.Client,
+	ns *corev1.Namespace,
+	decoder admission.Decoder,
+	recorder record.EventRecorder,
+	tnt *capsulev1beta2.Tenant,
+) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		ns := &corev1.Namespace{}
-		if err := decoder.Decode(req, ns); err != nil {
-			return utils.ErroredResponse(err)
-		}
-
-		tnt, err := tenant.GetTenantByOwnerreferences(ctx, client, ns.OwnerReferences)
-		if err != nil {
-			return utils.ErroredResponse(err)
-		}
-
-		if tnt == nil {
-			return nil
-		}
-
 		if tnt.Spec.NamespaceOptions != nil {
 			err := api.ValidateForbidden(ns.Annotations, tnt.Spec.NamespaceOptions.ForbiddenAnnotations)
 			if err != nil {
@@ -64,23 +55,15 @@ func (r *userMetadataHandler) OnCreate(client client.Client, ns *corev1.Namespac
 	}
 }
 
-func (r *userMetadataHandler) OnUpdate(
+func (h *userMetadataHandler) OnUpdate(
 	client client.Client,
 	newNs *corev1.Namespace,
 	oldNs *corev1.Namespace,
 	decoder admission.Decoder,
 	recorder record.EventRecorder,
+	tnt *capsulev1beta2.Tenant,
 ) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		tnt, err := tenant.GetTenantByOwnerreferences(ctx, client, newNs.OwnerReferences)
-		if err != nil {
-			return utils.ErroredResponse(err)
-		}
-
-		if tnt == nil {
-			return nil
-		}
-
 		if len(tnt.Spec.NodeSelector) > 0 {
 			v, ok := newNs.GetAnnotations()["scheduler.alpha.kubernetes.io/node-selector"]
 			if !ok {
@@ -164,7 +147,13 @@ func (r *userMetadataHandler) OnUpdate(
 	}
 }
 
-func (r *userMetadataHandler) OnDelete(client.Client, *corev1.Namespace, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
+func (h *userMetadataHandler) OnDelete(
+	client.Client,
+	*corev1.Namespace,
+	admission.Decoder,
+	record.EventRecorder,
+	*capsulev1beta2.Tenant,
+) capsulewebhook.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
