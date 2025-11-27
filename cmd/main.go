@@ -47,7 +47,6 @@ import (
 	"github.com/projectcapsule/capsule/internal/webhook/gateway"
 	"github.com/projectcapsule/capsule/internal/webhook/ingress"
 	"github.com/projectcapsule/capsule/internal/webhook/misc"
-	"github.com/projectcapsule/capsule/internal/webhook/namespace"
 	namespacemutation "github.com/projectcapsule/capsule/internal/webhook/namespace/mutation"
 	namespacevalidation "github.com/projectcapsule/capsule/internal/webhook/namespace/validation"
 	"github.com/projectcapsule/capsule/internal/webhook/networkpolicy"
@@ -285,7 +284,7 @@ func main() {
 			tenantvalidation.WarningHandler(),
 		),
 		route.NamespaceValidation(
-			namespace.NamespaceHandler(
+			namespacevalidation.NamespaceHandler(
 				cfg,
 				namespacevalidation.PatchHandler(cfg),
 				namespacevalidation.FreezeHandler(cfg),
@@ -295,7 +294,7 @@ func main() {
 			),
 		),
 		route.NamespaceMutation(
-			namespace.NamespaceHandler(
+			namespacemutation.NamespaceHandler(
 				cfg,
 				namespacemutation.OwnerReferenceHandler(cfg),
 				namespacemutation.MetadataHandler(cfg),

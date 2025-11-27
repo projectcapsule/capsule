@@ -9,6 +9,7 @@ on:
       - '.github/workflows/e2e.yml'
       - 'api/**'
       - 'controllers/**'
+      - 'internal/**'
       - 'pkg/**'
       - 'e2e/*'
       - 'Dockerfile'

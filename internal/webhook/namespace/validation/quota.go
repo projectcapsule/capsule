@@ -12,45 +12,60 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
+	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	capsulewebhook "github.com/projectcapsule/capsule/internal/webhook"
-	"github.com/projectcapsule/capsule/internal/webhook/utils"
-	"github.com/projectcapsule/capsule/pkg/utils/tenant"
 )
 
 type quotaHandler struct{}
 
-func QuotaHandler() capsulewebhook.TypedHandler[*corev1.Namespace] {
+func QuotaHandler() capsulewebhook.TypedHandlerWithTenant[*corev1.Namespace] {
 	return &quotaHandler{}
 }
 
-func (r *quotaHandler) OnCreate(client client.Client, ns *corev1.Namespace, decoder admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
+func (h *quotaHandler) OnCreate(
+	c client.Client,
+	ns *corev1.Namespace,
+	decoder admission.Decoder,
+	recorder record.EventRecorder,
+	tnt *capsulev1beta2.Tenant,
+) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		return r.handle(client, ns, recorder, ctx, req)
+		return h.handle(ctx, c, recorder, ns, tnt)
 	}
 }
 
-func (r *quotaHandler) OnDelete(client.Client, *corev1.Namespace, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
+func (h *quotaHandler) OnDelete(
+	client.Client,
+	*corev1.Namespace,
+	admission.Decoder,
+	record.EventRecorder,
+	*capsulev1beta2.Tenant,
+) capsulewebhook.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (r *quotaHandler) OnUpdate(client client.Client, ns *corev1.Namespace, _ *corev1.Namespace, decoder admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
+func (h *quotaHandler) OnUpdate(
+	c client.Client,
+	ns *corev1.Namespace,
+	_ *corev1.Namespace,
+	decoder admission.Decoder,
+	recorder record.EventRecorder,
+	tnt *capsulev1beta2.Tenant,
+) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		return r.handle(client, ns, recorder, ctx, req)
+		return h.handle(ctx, c, recorder, ns, tnt)
 	}
 }
 
-func (r *quotaHandler) handle(c client.Client, ns *corev1.Namespace, recorder record.EventRecorder, ctx context.Context, req admission.Request) *admission.Response {
-	tnt, err := tenant.GetTenantByOwnerreferences(ctx, c, ns.OwnerReferences)
-	if err != nil {
-		return utils.ErroredResponse(err)
-	}
-
-	if tnt == nil {
-		return nil
-	}
-
+func (h *quotaHandler) handle(
+	ctx context.Context,
+	c client.Client,
+	recorder record.EventRecorder,
+	ns *corev1.Namespace,
+	tnt *capsulev1beta2.Tenant,
+) *admission.Response {
 	if tnt.IsFull() {
 		// Checking if the Namespace already exists.
 		// If this is the case, no need to return the quota exceeded error:
