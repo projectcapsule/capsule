@@ -8,6 +8,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// +kubebuilder:object:generate=true
 type ReplicationSettings struct {
 	// Define the period of time upon a second reconciliation must be invoked.
 	// Keep in mind that any change to the manifests will trigger a new reconciliation.

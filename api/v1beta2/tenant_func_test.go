@@ -1,18 +1,20 @@
 // Copyright 2020-2025 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package v1beta2
+package v1beta2_test
 
 import (
 	"reflect"
 	"testing"
 
-	"github.com/projectcapsule/capsule/pkg/api"
 	rbacv1 "k8s.io/api/rbac/v1"
+
+	"github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/api"
 )
 
-var tenant = &Tenant{
-	Spec: TenantSpec{
+var tenant = &v1beta2.Tenant{
+	Spec: v1beta2.TenantSpec{
 		Owners: []api.OwnerSpec{
 			{
 				UserSpec: api.UserSpec{

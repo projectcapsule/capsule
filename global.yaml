@@ -1,0 +1,55 @@
+apiVersion: capsule.clastix.io/v1beta2
+kind: GlobalTenantResource
+metadata:
+  name: global-scope
+spec:
+  # New
+  scope: Tenant
+  #force: false
+  resyncPeriod: 5s
+  #serviceaccount:
+  #  name: capsule
+  #  namespace: capsule-system
+  resources:
+    - #additionalMetadata:
+      #  labels:
+      #    "replicated-by": "capsule"
+      context:
+        resources:
+          - index: "sec"
+            apiVersion: v1
+            kind: Secret
+            name: capsule-tls
+      generators:
+        - template: |
+            ---
+            apiVersion: v1
+            kind: ConfigMap
+            metadata:
+              name: test-demo
+              namespace: default
+            data:
+              {{ .Tenant.ObjectMeta.Name }}.conf: |
+                1
+    - #additionalMetadata:
+      #  labels:
+      #    "replicated-by": "capsule"
+
+      context:
+        resources:
+          - index: "sec"
+            apiVersion: v1
+            kind: Secret
+            name: capsule-tls
+
+      generators:
+        - template: |
+            ---
+            apiVersion: v1
+            kind: ConfigMap
+            metadata:
+              name: test-demo-2
+              namespace: default
+            data:
+              {{ .Tenant.ObjectMeta.Name }}.conf: |
+                1

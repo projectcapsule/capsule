@@ -1,26 +1,28 @@
 // Copyright 2020-2025 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package v1beta2
+package v1beta2_test
 
 import (
 	"testing"
 
-	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/api/meta"
 )
 
 func TestIsBoundToResourcePool(t *testing.T) {
 	tests := []struct {
 		name     string
-		claim    ResourcePoolClaim
+		claim    v1beta2.ResourcePoolClaim
 		expected bool
 	}{
 		{
 			name: "bound to resource pool (Assigned=True)",
-			claim: ResourcePoolClaim{
-				Status: ResourcePoolClaimStatus{
+			claim: v1beta2.ResourcePoolClaim{
+				Status: v1beta2.ResourcePoolClaimStatus{
 					Condition: metav1.Condition{
 						Type:   meta.BoundCondition,
 						Status: metav1.ConditionTrue,
@@ -31,8 +33,8 @@ func TestIsBoundToResourcePool(t *testing.T) {
 		},
 		{
 			name: "not bound - wrong condition type",
-			claim: ResourcePoolClaim{
-				Status: ResourcePoolClaimStatus{
+			claim: v1beta2.ResourcePoolClaim{
+				Status: v1beta2.ResourcePoolClaimStatus{
 					Condition: metav1.Condition{
 						Type:   "SomethingElse",
 						Status: metav1.ConditionTrue,
@@ -43,8 +45,8 @@ func TestIsBoundToResourcePool(t *testing.T) {
 		},
 		{
 			name: "not bound - status not true",
-			claim: ResourcePoolClaim{
-				Status: ResourcePoolClaimStatus{
+			claim: v1beta2.ResourcePoolClaim{
+				Status: v1beta2.ResourcePoolClaimStatus{
 					Condition: metav1.Condition{
 						Type:   meta.BoundCondition,
 						Status: metav1.ConditionFalse,
@@ -55,8 +57,8 @@ func TestIsBoundToResourcePool(t *testing.T) {
 		},
 		{
 			name: "not bound - empty condition",
-			claim: ResourcePoolClaim{
-				Status: ResourcePoolClaimStatus{},
+			claim: v1beta2.ResourcePoolClaim{
+				Status: v1beta2.ResourcePoolClaimStatus{},
 			},
 			expected: false,
 		},

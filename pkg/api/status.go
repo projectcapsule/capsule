@@ -3,7 +3,9 @@
 
 package api
 
-import k8stypes "k8s.io/apimachinery/pkg/types"
+import (
+	k8stypes "k8s.io/apimachinery/pkg/types"
+)
 
 const (
 	ResourceScopeNamespace ResourceScope = "Namespace"

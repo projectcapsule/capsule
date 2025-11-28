@@ -60,6 +60,7 @@ import (
 	tenantmutation "github.com/projectcapsule/capsule/internal/webhook/tenant/mutation"
 	tenantvalidation "github.com/projectcapsule/capsule/internal/webhook/tenant/validation"
 	tntresourceglobal "github.com/projectcapsule/capsule/internal/webhook/tenantresource/global"
+	tntresourcenamespaced "github.com/projectcapsule/capsule/internal/webhook/tenantresource/namespaced"
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
 	"github.com/projectcapsule/capsule/pkg/configuration"
 	"github.com/projectcapsule/capsule/pkg/indexer"
@@ -305,9 +306,8 @@ func main() {
 		route.ResourcePoolValidation((resourcepool.PoolValidationHandler(ctrl.Log.WithName("webhooks").WithName("resourcepool")))),
 		route.ResourcePoolClaimMutation((resourcepool.ClaimMutationHandler(ctrl.Log.WithName("webhooks").WithName("resourcepoolclaims")))),
 		route.ResourcePoolClaimValidation((resourcepool.ClaimValidationHandler(ctrl.Log.WithName("webhooks").WithName("resourcepoolclaims")))),
-		route.TenantResourceNamespacedMutation(tntresource.NamespacedMutatingHandler(cfg)),
+		route.TenantResourceNamespacedMutation(tntresourcenamespaced.NamespacedMutatingHandler(cfg)),
 		route.TenantResourceGlobalMutation(tntresourceglobal.GlobalMutatingHandler(cfg)),
-
 		route.MiscTenantAssignment(
 			misc.TenantAssignmentHandler(),
 		),

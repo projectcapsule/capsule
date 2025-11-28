@@ -20,6 +20,7 @@ type TemplateContext struct {
 	Resources []*TemplateResourceReference `json:"resources,omitempty"`
 }
 
+// +kubebuilder:object:generate=true
 type TemplateResourceReference struct {
 	misc.ResourceReference `json:",inline"`
 

@@ -19,7 +19,6 @@ import (
 	"github.com/projectcapsule/capsule/pkg/indexer/namespace"
 	"github.com/projectcapsule/capsule/pkg/indexer/resourcepool"
 	"github.com/projectcapsule/capsule/pkg/indexer/tenant"
-	"github.com/projectcapsule/capsule/pkg/indexer/tenantresource"
 	"github.com/projectcapsule/capsule/pkg/utils"
 )
 
@@ -39,8 +38,6 @@ func AddToManager(ctx context.Context, log logr.Logger, mgr manager.Manager) err
 		ingress.HostnamePath{Obj: &extensionsv1beta1.Ingress{}},
 		ingress.HostnamePath{Obj: &networkingv1beta1.Ingress{}},
 		ingress.HostnamePath{Obj: &networkingv1.Ingress{}},
-		tenantresource.GlobalProcessedItems{},
-		tenantresource.LocalProcessedItems{},
 	}
 
 	for _, f := range indexers {

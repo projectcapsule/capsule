@@ -637,7 +637,7 @@ webhooks:
       # -- [ReinvocationPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#reinvocation-policy)
       reinvocationPolicy: Never
 
-    tenantResourceObjects:
+    managed:
       # -- Enable the Hook
       enabled: true
       # -- [FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy)
@@ -648,9 +648,7 @@ webhooks:
       objectSelector:
         matchExpressions:
           - key: "projectcapsule.dev/managed-by"
-            operator: In
-            values:
-              - replications
+            operator: Exists
       # -- [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector)
       namespaceSelector:
         matchExpressions:
@@ -718,6 +716,9 @@ webhooks:
             operator: Exists
       # -- [MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
       matchConditions: []
+
+    # -- Deprecated, use webhooks.hooks.managed instead
+    tenantResourceObjects: {}
 
     # -- Deprecated, use webhooks.hooks.namespaces instead
     namespaceOwnerReference: {}

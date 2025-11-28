@@ -1,4 +1,5 @@
 {{- if $.Values.rbac.resourcepoolclaims.create }}
+---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
@@ -11,6 +12,7 @@ rules:
   verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
 {{- end }}
 {{- if $.Values.rbac.resources.create }}
+---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
