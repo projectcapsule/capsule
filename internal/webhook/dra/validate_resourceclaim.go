@@ -5,8 +5,11 @@ package dra
 
 import (
 	"context"
+	"net/http"
 
+	corev1 "k8s.io/api/core/v1"
 	resources "k8s.io/api/resource/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -41,12 +44,12 @@ func (h *deviceClass) OnUpdate(client.Client, admission.Decoder, record.EventRec
 }
 
 func (h *deviceClass) validate(ctx context.Context, c client.Client, decoder admission.Decoder, recorder record.EventRecorder, req admission.Request) *admission.Response {
-	rct := &resources.ResourceClaim{}
-	if err := decoder.Decode(req, rct); err != nil {
+	rc := &resources.ResourceClaim{}
+	if err := decoder.Decode(req, rc); err != nil {
 		return utils.ErroredResponse(err)
 	}
 
-	tnt, err := tenant.TenantByStatusNamespace(ctx, c, rct.Namespace)
+	tnt, err := tenant.TenantByStatusNamespace(ctx, c, rc.Namespace)
 	if err != nil {
 		return utils.ErroredResponse(err)
 	}
@@ -56,10 +59,36 @@ func (h *deviceClass) validate(ctx context.Context, c client.Client, decoder adm
 	}
 
 	allowed := tnt.Spec.DeviceClasses
-
 	if allowed == nil {
 		return nil
 	}
+	for _, dr := range rc.Spec.Devices.Requests {
+		dc, err := utils.GetDeviceClassByName(ctx, c, dr.Exactly.DeviceClassName)
+		if err != nil && !k8serrors.IsNotFound(err) {
+			response := admission.Errored(http.StatusInternalServerError, err)
 
+			return &response
+		}
+		if dc == nil {
+			recorder.Eventf(tnt, corev1.EventTypeWarning, "MissingDeviceClass", "ResourceClamim %s/%s is missing DeviceClass", req.Namespace, req.Name)
+
+			response := admission.Denied(NewDeviceClassUndefined(*allowed).Error())
+
+			return &response
+		}
+		selector := allowed.SelectorMatch(dc)
+		switch {
+		case allowed.MatchDefault(dc.Name):
+			return nil
+		case allowed.Match(dc.Name) || selector:
+			return nil
+		default:
+			recorder.Eventf(tnt, corev1.EventTypeWarning, "ForbiddenDeviceClass", "ResourceClaim %s/%s DeviceClass %s is forbidden for the current Tenant", req.Namespace, req.Name, &dc)
+
+			response := admission.Denied(NewDeviceClassForbidden(dc.Name, *allowed).Error())
+
+			return &response
+		}
+	}
 	return nil
 }

@@ -9,6 +9,7 @@ import (
 
 	networkingv1 "k8s.io/api/networking/v1"
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
+	resources "k8s.io/api/resource/v1"
 	schedulev1 "k8s.io/api/scheduling/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -75,6 +76,16 @@ func GetGatewayClassClassByObjectName(ctx context.Context, c client.Client, gate
 	}
 
 	return gatewayClass, nil
+}
+
+// Get DeviceClass by name (Does not return error if not found).
+func GetDeviceClassByName(ctx context.Context, c client.Client, name string) (*resources.DeviceClass, error) {
+	class := &resources.DeviceClass{}
+	if err := c.Get(ctx, types.NamespacedName{Name: name}, class); err != nil {
+		return nil, err
+	}
+
+	return class, nil
 }
 
 // IsDefaultPriorityClass checks if the given PriorityClass is cluster default.
