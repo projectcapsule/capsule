@@ -33,12 +33,14 @@ func (h *deviceClass) OnCreate(c client.Client, decoder admission.Decoder, recor
 			if err := decoder.Decode(req, rc); err != nil {
 				return utils.ErroredResponse(err)
 			}
+
 			return h.validateResourceRequest(ctx, c, decoder, recorder, req, rc.Namespace, rc.Spec.Devices.Requests)
 		case "ResourceClaimTemplate":
 			rct := &resources.ResourceClaimTemplate{}
 			if err := decoder.Decode(req, rct); err != nil {
 				return utils.ErroredResponse(err)
 			}
+
 			return h.validateResourceRequest(ctx, c, decoder, recorder, req, rct.Namespace, rct.Spec.Spec.Devices.Requests)
 		default:
 			return nil
@@ -59,7 +61,6 @@ func (h *deviceClass) OnUpdate(client.Client, admission.Decoder, record.EventRec
 }
 
 func (h *deviceClass) validateResourceRequest(ctx context.Context, c client.Client, _ admission.Decoder, recorder record.EventRecorder, req admission.Request, namespace string, requests []resources.DeviceRequest) *admission.Response {
-
 	tnt, err := tenant.TenantByStatusNamespace(ctx, c, namespace)
 	if err != nil {
 		return utils.ErroredResponse(err)
@@ -73,6 +74,7 @@ func (h *deviceClass) validateResourceRequest(ctx context.Context, c client.Clie
 	if allowed == nil {
 		return nil
 	}
+
 	for _, dr := range requests {
 		dc, err := utils.GetDeviceClassByName(ctx, c, dr.Exactly.DeviceClassName)
 		if err != nil && !k8serrors.IsNotFound(err) {
@@ -80,6 +82,7 @@ func (h *deviceClass) validateResourceRequest(ctx context.Context, c client.Clie
 
 			return &response
 		}
+
 		if dc == nil {
 			recorder.Eventf(tnt, corev1.EventTypeWarning, "MissingDeviceClass", "%s %s/%s is missing DeviceClass", req.Kind.Kind, req.Namespace, req.Name)
 
@@ -87,7 +90,9 @@ func (h *deviceClass) validateResourceRequest(ctx context.Context, c client.Clie
 
 			return &response
 		}
+
 		selector := allowed.SelectorMatch(dc)
+
 		switch {
 		case allowed.MatchDefault(dc.Name):
 			return nil
@@ -101,5 +106,6 @@ func (h *deviceClass) validateResourceRequest(ctx context.Context, c client.Clie
 			return &response
 		}
 	}
+
 	return nil
 }

@@ -8,6 +8,7 @@ import (
 	"sort"
 
 	nodev1 "k8s.io/api/node/v1"
+	resources "k8s.io/api/resource/v1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -69,6 +70,17 @@ func (r *Manager) collectAvailableResources(ctx context.Context, tnt *capsulev1b
 	}
 
 	log.V(5).Info("collected available runtimeclasses", "size", len(tnt.Status.Classes.RuntimeClasses))
+
+	if tnt.Status.Classes.DeviceClasses, err = listObjectNamesBySelector(
+		ctx,
+		r.Client,
+		tnt.Spec.DeviceClasses,
+		&resources.DeviceClassList{},
+	); err != nil {
+		return err
+	}
+
+	log.V(5).Info("collected available deviceclasses", "size", len(tnt.Status.Classes.DeviceClasses))
 
 	return nil
 }

@@ -9,7 +9,6 @@ import (
 	"os"
 	goRuntime "runtime"
 
-	"github.com/projectcapsule/capsule/internal/webhook/dra"
 	flag "github.com/spf13/pflag"
 	_ "go.uber.org/automaxprocs"
 	"go.uber.org/zap/zapcore"
@@ -45,6 +44,7 @@ import (
 	"github.com/projectcapsule/capsule/internal/metrics"
 	"github.com/projectcapsule/capsule/internal/webhook"
 	"github.com/projectcapsule/capsule/internal/webhook/defaults"
+	"github.com/projectcapsule/capsule/internal/webhook/dra"
 	"github.com/projectcapsule/capsule/internal/webhook/gateway"
 	"github.com/projectcapsule/capsule/internal/webhook/ingress"
 	"github.com/projectcapsule/capsule/internal/webhook/misc"

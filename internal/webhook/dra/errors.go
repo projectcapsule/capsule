@@ -16,6 +16,7 @@ type deviceClassForbiddenError struct {
 
 func (i deviceClassForbiddenError) Error() string {
 	err := fmt.Sprintf("Device Class %s is forbidden for the current Tenant: ", i.deviceClassName)
+
 	return utils.DefaultAllowedValuesErrorMessage(i.spec, err)
 }
 
