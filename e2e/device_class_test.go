@@ -1,0 +1,234 @@
+// Copyright 2020-2023 Project Capsule Authors.
+// SPDX-License-Identifier: Apache-2.0
+
+package e2e
+
+import (
+	"context"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+	resources "k8s.io/api/resource/v1"
+
+	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/api"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/selection"
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+)
+
+var _ = Describe("when Tenant handles Device classes", Label("tenant", "classes", "device"), func() {
+	erm := "nvidia.com/gpu"
+	authorized := &resources.DeviceClass{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "gpu.example.com",
+			Labels: map[string]string{
+				"env": "authorized",
+			},
+		},
+		Spec: resources.DeviceClassSpec{
+			Selectors: []resources.DeviceSelector{
+				{
+					CEL: &resources.CELDeviceSelector{
+						Expression: "device.driver == 'gpu.example.com' && device.attributes['gpu.example.com'].type == 'gpu'",
+					},
+				},
+			},
+			ExtendedResourceName: &erm,
+		},
+	}
+	unauthorized := &resources.DeviceClass{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "gpu3.example.com",
+			Labels: map[string]string{
+				"env": "unauthorized",
+			},
+		},
+		Spec: resources.DeviceClassSpec{
+			Selectors: []resources.DeviceSelector{
+				{
+					CEL: &resources.CELDeviceSelector{
+						Expression: "device.driver == 'gpu.example.com' && device.attributes['gpu.example.com'].type == 'gpu'",
+					},
+				},
+			},
+			ExtendedResourceName: &erm,
+		},
+	}
+
+	tntWithAuthorized := &capsulev1beta2.Tenant{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "e2e-authorized-deviceclass",
+		},
+		Spec: capsulev1beta2.TenantSpec{
+			Owners: []api.OwnerSpec{
+				{
+					UserSpec: api.UserSpec{
+						Name: "authorized-deviceclass",
+						Kind: "User",
+					},
+				},
+			},
+			DeviceClasses: &api.DefaultAllowedListSpec{
+				SelectorAllowedListSpec: api.SelectorAllowedListSpec{
+					LabelSelector: v1.LabelSelector{
+						MatchLabels: map[string]string{
+							"env": "authorized",
+						},
+					},
+				},
+			},
+		},
+	}
+	tntWithUnauthorized := &capsulev1beta2.Tenant{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "e2e-unauthorized-deviceclass",
+		},
+		Spec: capsulev1beta2.TenantSpec{
+			Owners: []api.OwnerSpec{
+				{
+					UserSpec: api.UserSpec{
+						Name: "unauthorized-deviceclass",
+						Kind: "User",
+					},
+				},
+			},
+			DeviceClasses: &api.DefaultAllowedListSpec{
+				SelectorAllowedListSpec: api.SelectorAllowedListSpec{
+					LabelSelector: v1.LabelSelector{
+						MatchLabels: map[string]string{
+							"env": "production",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	JustBeforeEach(func() {
+		for _, crd := range []*resources.DeviceClass{authorized, unauthorized} {
+			EventuallyCreation(func() error {
+				return k8sClient.Create(context.TODO(), crd)
+			}).Should(Succeed())
+		}
+
+		for _, tnt := range []*capsulev1beta2.Tenant{tntWithAuthorized, tntWithUnauthorized} {
+			tnt.ResourceVersion = ""
+			EventuallyCreation(func() error {
+				return k8sClient.Create(context.TODO(), tnt)
+			}).Should(Succeed())
+		}
+
+	})
+	JustAfterEach(func() {
+		for _, tnt := range []*capsulev1beta2.Tenant{tntWithAuthorized, tntWithUnauthorized} {
+			EventuallyCreation(func() error {
+				return ignoreNotFound(k8sClient.Delete(context.TODO(), tnt))
+			}).Should(Succeed())
+		}
+
+		Eventually(func() (err error) {
+			req, _ := labels.NewRequirement("env", selection.Exists, nil)
+
+			return k8sClient.DeleteAllOf(context.TODO(), &resources.DeviceClass{}, &client.DeleteAllOfOptions{
+				ListOptions: client.ListOptions{
+					LabelSelector: labels.NewSelector().Add(*req),
+				},
+			})
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+	})
+	It("should allow", func() {
+		By("Verify Status (Creation)", func() {
+			Eventually(func() ([]string, error) {
+				t := &capsulev1beta2.Tenant{}
+				if err := k8sClient.Get(
+					context.TODO(),
+					types.NamespacedName{Name: tntWithAuthorized.GetName()},
+					t,
+				); err != nil {
+					return nil, err
+				}
+
+				return t.Status.Classes.DeviceClasses, nil
+			}, defaultTimeoutInterval, defaultPollInterval).
+				Should(ConsistOf(authorized.GetName()))
+		})
+
+		ns := NewNamespace("")
+		NamespaceCreation(ns, tntWithAuthorized.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+		TenantNamespaceList(tntWithAuthorized, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
+
+		By("providing authorized deviceclass", func() {
+			for _, class := range []*resources.DeviceClass{authorized} {
+				Eventually(func() (err error) {
+					g := &resources.ResourceClaim{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      class.GetName() + "-resource-claim",
+							Namespace: ns.GetName(),
+						},
+						Spec: resources.ResourceClaimSpec{
+							Devices: resources.DeviceClaim{
+								Requests: []resources.DeviceRequest{
+									{
+										Name: "authorized-device-class-resource-claim",
+										Exactly: &resources.ExactDeviceRequest{
+											DeviceClassName: "gpu.example.com",
+											Selectors: []resources.DeviceSelector{
+												{
+													CEL: &resources.CELDeviceSelector{
+														Expression: "device.driver == 'gpu.example.com' && device.attributes['gpu.example.com'].type == 'gpu'",
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					}
+
+					err = k8sClient.Create(context.TODO(), g)
+					return
+				}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+			}
+		})
+
+		By("providing unauthorized deviceclass", func() {
+			for _, class := range []*resources.DeviceClass{unauthorized} {
+				Eventually(func() (err error) {
+					g := &resources.ResourceClaim{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      class.GetName() + "-resource-claim",
+							Namespace: ns.GetName(),
+						},
+						Spec: resources.ResourceClaimSpec{
+							Devices: resources.DeviceClaim{
+								Requests: []resources.DeviceRequest{
+									{
+										Name: "unauthorized-device-class-resource-claim",
+										Exactly: &resources.ExactDeviceRequest{
+											DeviceClassName: "gpu3.example.com",
+											Selectors: []resources.DeviceSelector{
+												{
+													CEL: &resources.CELDeviceSelector{
+														Expression: "device.driver == 'gpu.example.com' && device.attributes['gpu.example.com'].type == 'gpu'",
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					}
+
+					err = k8sClient.Create(context.TODO(), g)
+					return
+				}, defaultTimeoutInterval, defaultPollInterval).ShouldNot(Succeed())
+			}
+		})
+	})
+})
