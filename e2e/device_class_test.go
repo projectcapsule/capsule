@@ -8,10 +8,9 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	resources "k8s.io/api/resource/v1"
-
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api"
+	resources "k8s.io/api/resource/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -109,19 +108,17 @@ var _ = Describe("when Tenant handles Device classes", Label("tenant", "classes"
 	}
 
 	JustBeforeEach(func() {
-		for _, crd := range []*resources.DeviceClass{authorized, unauthorized} {
-			EventuallyCreation(func() error {
-				return k8sClient.Create(context.TODO(), crd)
-			}).Should(Succeed())
-		}
-
 		for _, tnt := range []*capsulev1beta2.Tenant{tntWithAuthorized, tntWithUnauthorized} {
 			tnt.ResourceVersion = ""
 			EventuallyCreation(func() error {
 				return k8sClient.Create(context.TODO(), tnt)
 			}).Should(Succeed())
 		}
-
+		for _, crd := range []*resources.DeviceClass{authorized, unauthorized} {
+			EventuallyCreation(func() error {
+				return k8sClient.Create(context.TODO(), crd)
+			}).Should(Succeed())
+		}
 	})
 	JustAfterEach(func() {
 		for _, tnt := range []*capsulev1beta2.Tenant{tntWithAuthorized, tntWithUnauthorized} {
@@ -161,7 +158,7 @@ var _ = Describe("when Tenant handles Device classes", Label("tenant", "classes"
 		NamespaceCreation(ns, tntWithAuthorized.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(tntWithAuthorized, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
-		By("providing authorized deviceclass", func() {
+		By("providing authorized device class", func() {
 			for _, class := range []*resources.DeviceClass{authorized} {
 				Eventually(func() (err error) {
 					g := &resources.ResourceClaim{
@@ -196,7 +193,7 @@ var _ = Describe("when Tenant handles Device classes", Label("tenant", "classes"
 			}
 		})
 
-		By("providing unauthorized deviceclass", func() {
+		By("providing unauthorized device class", func() {
 			for _, class := range []*resources.DeviceClass{unauthorized} {
 				Eventually(func() (err error) {
 					g := &resources.ResourceClaim{
@@ -229,6 +226,24 @@ var _ = Describe("when Tenant handles Device classes", Label("tenant", "classes"
 					return
 				}, defaultTimeoutInterval, defaultPollInterval).ShouldNot(Succeed())
 			}
+		})
+		By("Verify Status (Deletion)", func() {
+			for _, class := range []*resources.DeviceClass{authorized} {
+				Expect(ignoreNotFound(k8sClient.Delete(context.TODO(), class))).To(Succeed())
+			}
+			Eventually(func() ([]string, error) {
+				t := &capsulev1beta2.Tenant{}
+				if err := k8sClient.Get(
+					context.TODO(),
+					types.NamespacedName{Name: tntWithAuthorized.GetName()},
+					t,
+				); err != nil {
+					return nil, err
+				}
+
+				return t.Status.Classes.DeviceClasses, nil
+			}, defaultTimeoutInterval, defaultPollInterval).
+				Should(ConsistOf(authorized.GetName()))
 		})
 	})
 })

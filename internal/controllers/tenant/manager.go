@@ -12,6 +12,7 @@ import (
 	networkingv1 "k8s.io/api/networking/v1"
 	nodev1 "k8s.io/api/node/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	resources "k8s.io/api/resource/v1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -84,6 +85,11 @@ func (r *Manager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.Controller
 		).
 		Watches(
 			&nodev1.RuntimeClass{},
+			handler.EnqueueRequestsFromMapFunc(r.enqueueAllTenants),
+			builder.WithPredicates(utils.UpdatedMetadataPredicate),
+		).
+		Watches(
+			&resources.DeviceClass{},
 			handler.EnqueueRequestsFromMapFunc(r.enqueueAllTenants),
 			builder.WithPredicates(utils.UpdatedMetadataPredicate),
 		).
