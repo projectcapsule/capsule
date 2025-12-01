@@ -23,7 +23,7 @@ jobs:
     name: Trigger internal E2E Testing
     runs-on:
       labels: ubuntu-latest
-    if: github.event.pull_request.head.repo.full_name == github.repository
+    if: github.repository_owner == 'projectcapsule'
     steps:
       - name: Trigger internal e2e repo
         env:
