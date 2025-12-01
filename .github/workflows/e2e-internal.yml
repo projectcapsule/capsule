@@ -29,7 +29,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.INTERNAL_E2E_PAT }}
         run: |
-          curl -X POST \
+          curl -fsS -X POST \
             -H "Accept: application/vnd.github+json" \
             -H "Authorization: Bearer $GH_TOKEN" \
             https://api.github.com/repos/projectcapsule/enterprise-e2e/dispatches \
