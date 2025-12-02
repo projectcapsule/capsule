@@ -25,9 +25,11 @@ var _ = Describe("creating an ExternalName service when it is disabled for Tenan
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: api.OwnerListSpec{
 				{
-					UserSpec: api.UserSpec{
-						Name: "google",
-						Kind: "User",
+					CoreOwnerSpec: api.CoreOwnerSpec{
+						UserSpec: api.UserSpec{
+							Name: "google",
+							Kind: "User",
+						},
 					},
 				},
 			},

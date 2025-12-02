@@ -29,9 +29,11 @@ var _ = Describe("creating namespaces within a Tenant with resources", Label("te
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: api.OwnerListSpec{
 				{
-					UserSpec: api.UserSpec{
-						Name: "john",
-						Kind: "User",
+					CoreOwnerSpec: api.CoreOwnerSpec{
+						UserSpec: api.UserSpec{
+							Name: "john",
+							Kind: "User",
+						},
 					},
 				},
 			},

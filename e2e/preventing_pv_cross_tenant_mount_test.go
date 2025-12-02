@@ -27,9 +27,11 @@ var _ = Describe("preventing PersistentVolume cross-tenant mount", Label("tenant
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: api.OwnerListSpec{
 				{
-					UserSpec: api.UserSpec{
-						Name: "jessica",
-						Kind: "User",
+					CoreOwnerSpec: api.CoreOwnerSpec{
+						UserSpec: api.UserSpec{
+							Name: "jessica",
+							Kind: "User",
+						},
 					},
 				},
 			},
@@ -43,9 +45,11 @@ var _ = Describe("preventing PersistentVolume cross-tenant mount", Label("tenant
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: api.OwnerListSpec{
 				{
-					UserSpec: api.UserSpec{
-						Name: "leto",
-						Kind: "User",
+					CoreOwnerSpec: api.CoreOwnerSpec{
+						UserSpec: api.UserSpec{
+							Name: "leto",
+							Kind: "User",
+						},
 					},
 				},
 			},

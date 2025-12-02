@@ -38,7 +38,7 @@ type Manager struct {
 
 //nolint:revive
 func (r *Manager) SetupWithManager(ctx context.Context, mgr ctrl.Manager, ctrlConfig utils.ControllerOptions) (err error) {
-	namesPredicate := utils.NamesMatchingPredicate(ProvisionerRoleName, DeleterRoleName)
+	namesPredicate := utils.NamesMatchingPredicate(api.ProvisionerRoleName, api.DeleterRoleName)
 
 	crErr := ctrl.NewControllerManagedBy(mgr).
 		For(&rbacv1.ClusterRole{}, namesPredicate).
@@ -63,7 +63,7 @@ func (r *Manager) SetupWithManager(ctx context.Context, mgr ctrl.Manager, ctrlCo
 				r.handleSAChange(ctx, e.Object)
 			},
 			UpdateFunc: func(ctx context.Context, e event.TypedUpdateEvent[client.Object], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
-				if promotionLabelsChanged(e.ObjectOld.GetLabels(), e.ObjectNew.GetLabels()) {
+				if utils.LabelsChanged([]string{meta.OwnerPromotionLabel}, e.ObjectOld.GetLabels(), e.ObjectNew.GetLabels()) {
 					r.handleSAChange(ctx, e.ObjectNew)
 				}
 			},
@@ -83,9 +83,9 @@ func (r *Manager) SetupWithManager(ctx context.Context, mgr ctrl.Manager, ctrlCo
 // Resource kinds and we're just interested to the ones with the said name since they're bounded together.
 func (r *Manager) Reconcile(ctx context.Context, request reconcile.Request) (res reconcile.Result, err error) {
 	switch request.Name {
-	case ProvisionerRoleName:
-		if err = r.EnsureClusterRole(ctx, ProvisionerRoleName); err != nil {
-			r.Log.Error(err, "Reconciliation for ClusterRole failed", "ClusterRole", ProvisionerRoleName)
+	case api.ProvisionerRoleName:
+		if err = r.EnsureClusterRole(ctx, api.ProvisionerRoleName); err != nil {
+			r.Log.Error(err, "Reconciliation for ClusterRole failed", "ClusterRole", api.ProvisionerRoleName)
 
 			break
 		}
@@ -95,9 +95,9 @@ func (r *Manager) Reconcile(ctx context.Context, request reconcile.Request) (res
 
 			break
 		}
-	case DeleterRoleName:
-		if err = r.EnsureClusterRole(ctx, DeleterRoleName); err != nil {
-			r.Log.Error(err, "Reconciliation for ClusterRole failed", "ClusterRole", DeleterRoleName)
+	case api.DeleterRoleName:
+		if err = r.EnsureClusterRole(ctx, api.DeleterRoleName); err != nil {
+			r.Log.Error(err, "Reconciliation for ClusterRole failed", "ClusterRole", api.DeleterRoleName)
 		}
 	}
 
@@ -106,12 +106,12 @@ func (r *Manager) Reconcile(ctx context.Context, request reconcile.Request) (res
 
 func (r *Manager) EnsureClusterRoleBindingsProvisioner(ctx context.Context) error {
 	crb := &rbacv1.ClusterRoleBinding{
-		ObjectMeta: metav1.ObjectMeta{Name: ProvisionerRoleName},
+		ObjectMeta: metav1.ObjectMeta{Name: api.ProvisionerRoleName},
 	}
 
 	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		_, err := controllerutil.CreateOrUpdate(ctx, r.Client, crb, func() error {
-			crb.RoleRef = provisionerClusterRoleBinding.RoleRef
+			crb.RoleRef = api.ProvisionerClusterRoleBinding.RoleRef
 			crb.Subjects = nil
 
 			for _, entity := range r.Configuration.Administrators() {
@@ -179,7 +179,7 @@ func (r *Manager) EnsureClusterRoleBindingsProvisioner(ctx context.Context) erro
 }
 
 func (r *Manager) EnsureClusterRole(ctx context.Context, roleName string) (err error) {
-	role, ok := clusterRoles[roleName]
+	role, ok := api.ClusterRoles[roleName]
 	if !ok {
 		return fmt.Errorf("clusterRole %s is not mapped", roleName)
 	}
@@ -203,7 +203,7 @@ func (r *Manager) EnsureClusterRole(ctx context.Context, roleName string) (err e
 // since we're not creating empty CR and CRB upon Capsule installation: it's a run-once task, since the reconciliation
 // is handled by the Reconciler implemented interface.
 func (r *Manager) Start(ctx context.Context) error {
-	for roleName := range clusterRoles {
+	for roleName := range api.ClusterRoles {
 		r.Log.V(4).Info("setting up ClusterRoles", "ClusterRole", roleName)
 
 		if err := r.EnsureClusterRole(ctx, roleName); err != nil {
@@ -236,21 +236,4 @@ func (r *Manager) handleSAChange(ctx context.Context, obj client.Object) {
 	if err := r.EnsureClusterRoleBindingsProvisioner(ctx); err != nil {
 		r.Log.Error(err, "cannot update ClusterRoleBinding upon ServiceAccount event")
 	}
-}
-
-func promotionLabelsChanged(oldLabels, newLabels map[string]string) bool {
-	keys := []string{
-		meta.OwnerPromotionLabel,
-	}
-
-	for _, key := range keys {
-		oldVal, oldOK := oldLabels[key]
-		newVal, newOK := newLabels[key]
-
-		if oldOK != newOK || oldVal != newVal {
-			return true
-		}
-	}
-
-	return false
 }

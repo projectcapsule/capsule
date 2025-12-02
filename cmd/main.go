@@ -282,7 +282,7 @@ func main() {
 			tenantvalidation.ServiceAccountNameHandler(),
 			tenantvalidation.ForbiddenAnnotationsRegexHandler(),
 			tenantvalidation.ProtectedHandler(),
-			tenantvalidation.WarningHandler(),
+			tenantvalidation.WarningHandler(cfg),
 		),
 		route.NamespaceValidation(
 			namespacevalidation.NamespaceHandler(

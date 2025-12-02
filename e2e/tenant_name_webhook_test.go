@@ -22,9 +22,11 @@ var _ = Describe("creating a Tenant with wrong name", Label("tenant"), func() {
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: api.OwnerListSpec{
 				{
-					UserSpec: api.UserSpec{
-						Name: "john",
-						Kind: "User",
+					CoreOwnerSpec: api.CoreOwnerSpec{
+						UserSpec: api.UserSpec{
+							Name: "john",
+							Kind: "User",
+						},
 					},
 				},
 			},

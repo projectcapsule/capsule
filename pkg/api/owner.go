@@ -6,17 +6,24 @@ package api
 // +kubebuilder:object:generate=true
 
 type OwnerSpec struct {
-	UserSpec `json:",inline"`
+	CoreOwnerSpec `json:",inline"`
 
-	// Defines additional cluster-roles for the specific Owner.
-	// +kubebuilder:default={admin,capsule-namespace-deleter}
-	ClusterRoles []string `json:"clusterRoles,omitempty"`
 	// Proxy settings for tenant owner.
 	ProxyOperations []ProxySettings `json:"proxySettings,omitempty"`
 	// Additional Labels for the synchronized rolebindings
 	Labels map[string]string `json:"labels,omitempty"`
 	// Additional Annotations for the synchronized rolebindings
 	Annotations map[string]string `json:"annotations,omitempty"`
+}
+
+// +kubebuilder:object:generate=true
+
+type CoreOwnerSpec struct {
+	UserSpec `json:",inline"`
+
+	// Defines additional cluster-roles for the specific Owner.
+	// +kubebuilder:default={admin,capsule-namespace-deleter}
+	ClusterRoles []string `json:"clusterRoles,omitempty"`
 }
 
 // +kubebuilder:validation:Enum=User;Group;ServiceAccount

@@ -27,9 +27,11 @@ var _ = Describe("when handling Namespace scoped Ingress hostnames collision", L
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: api.OwnerListSpec{
 				{
-					UserSpec: api.UserSpec{
-						Name: "ingress-namespace",
-						Kind: "User",
+					CoreOwnerSpec: api.CoreOwnerSpec{
+						UserSpec: api.UserSpec{
+							Name: "ingress-namespace",
+							Kind: "User",
+						},
 					},
 				},
 			},

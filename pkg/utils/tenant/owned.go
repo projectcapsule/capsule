@@ -22,14 +22,14 @@ func NamespaceIsOwned(
 	ns *corev1.Namespace,
 	tnt *capsulev1beta2.Tenant,
 	userInfo authenticationv1.UserInfo,
-) (bool, error) {
+) bool {
 	for _, ownerRef := range ns.OwnerReferences {
 		if !IsTenantOwnerReferenceForTenant(ownerRef, tnt) {
 			continue
 		}
 
-		return users.IsTenantOwner(ctx, c, cfg, tnt, userInfo)
+		return users.IsTenantOwnerByStatus(ctx, c, cfg, tnt, userInfo)
 	}
 
-	return false, nil
+	return false
 }
