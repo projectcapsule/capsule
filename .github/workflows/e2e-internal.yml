@@ -2,7 +2,7 @@ name: e2e-internal
 permissions: {}
 
 on:
-  pull_request:
+  pull_request_target:
     branches:
       - "*"
     paths:
