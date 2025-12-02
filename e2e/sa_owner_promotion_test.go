@@ -18,7 +18,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	ctrlrbac "github.com/projectcapsule/capsule/internal/controllers/rbac"
 	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 )
@@ -33,9 +32,11 @@ var _ = Describe("Promoting ServiceAccounts to Owners", Label("config"), Label("
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: api.OwnerListSpec{
 				{
-					UserSpec: api.UserSpec{
-						Name: "alice",
-						Kind: "User",
+					CoreOwnerSpec: api.CoreOwnerSpec{
+						UserSpec: api.UserSpec{
+							Name: "alice",
+							Kind: "User",
+						},
 					},
 				},
 			},
@@ -280,7 +281,7 @@ var _ = Describe("Promoting ServiceAccounts to Owners", Label("config"), Label("
 
 		Eventually(func(g Gomega) []rbacv1.Subject {
 			crb := &rbacv1.ClusterRoleBinding{}
-			err := k8sClient.Get(context.TODO(), types.NamespacedName{Name: ctrlrbac.ProvisionerRoleName}, crb)
+			err := k8sClient.Get(context.TODO(), types.NamespacedName{Name: api.ProvisionerRoleName}, crb)
 			g.Expect(err).NotTo(HaveOccurred())
 
 			return crb.Subjects
@@ -329,7 +330,7 @@ var _ = Describe("Promoting ServiceAccounts to Owners", Label("config"), Label("
 
 		Eventually(func(g Gomega) []rbacv1.Subject {
 			crb := &rbacv1.ClusterRoleBinding{}
-			err := k8sClient.Get(context.TODO(), types.NamespacedName{Name: ctrlrbac.ProvisionerRoleName}, crb)
+			err := k8sClient.Get(context.TODO(), types.NamespacedName{Name: api.ProvisionerRoleName}, crb)
 			g.Expect(err).NotTo(HaveOccurred())
 
 			return crb.Subjects
@@ -351,5 +352,4 @@ var _ = Describe("Promoting ServiceAccounts to Owners", Label("config"), Label("
 		Expect(saClient.Delete(context.TODO(), secondNs)).To(Not(Succeed()))
 
 	})
-
 })

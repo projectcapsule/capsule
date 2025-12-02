@@ -22,18 +22,22 @@ var _ = Describe("defining dynamic Tenant Owner Cluster Roles", Label("tenant"),
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: api.OwnerListSpec{
 				{
-					UserSpec: api.UserSpec{
-						Kind: "User",
-						Name: "michonne",
+					CoreOwnerSpec: api.CoreOwnerSpec{
+						UserSpec: api.UserSpec{
+							Kind: "User",
+							Name: "michonne",
+						},
+						ClusterRoles: []string{"editor", "manager"},
 					},
-					ClusterRoles: []string{"editor", "manager"},
 				},
 				{
-					UserSpec: api.UserSpec{
-						Name: "kingdom",
-						Kind: "Group",
+					CoreOwnerSpec: api.CoreOwnerSpec{
+						UserSpec: api.UserSpec{
+							Name: "kingdom",
+							Kind: "Group",
+						},
+						ClusterRoles: []string{"readonly"},
 					},
-					ClusterRoles: []string{"readonly"},
 				},
 			},
 		},

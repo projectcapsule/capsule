@@ -26,15 +26,19 @@ var _ = Describe("creating several Namespaces for a Tenant", Label("namespace", 
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: api.OwnerListSpec{
 				{
-					UserSpec: api.UserSpec{
-						Name: "gatsby",
-						Kind: "User",
+					CoreOwnerSpec: api.CoreOwnerSpec{
+						UserSpec: api.UserSpec{
+							Name: "gatsby",
+							Kind: "User",
+						},
 					},
 				},
 				{
-					UserSpec: api.UserSpec{
-						Kind: "ServiceAccount",
-						Name: "system:serviceaccount:attacker-system:attacker",
+					CoreOwnerSpec: api.CoreOwnerSpec{
+						UserSpec: api.UserSpec{
+							Kind: "ServiceAccount",
+							Name: "system:serviceaccount:attacker-system:attacker",
+						},
 					},
 				},
 			},

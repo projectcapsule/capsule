@@ -17,20 +17,25 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/retry"
+	"k8s.io/client-go/util/workqueue"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/internal/controllers/utils"
 	"github.com/projectcapsule/capsule/internal/metrics"
+	"github.com/projectcapsule/capsule/pkg/api"
 	meta "github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/configuration"
 )
@@ -47,7 +52,12 @@ type Manager struct {
 
 func (r *Manager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.ControllerOptions) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&capsulev1beta2.Tenant{}).
+		For(
+			&capsulev1beta2.Tenant{},
+			builder.WithPredicates(
+				predicate.GenerationChangedPredicate{},
+			),
+		).
 		Owns(&networkingv1.NetworkPolicy{}).
 		Owns(&corev1.LimitRange{}).
 		Owns(&corev1.ResourceQuota{}).
@@ -64,28 +74,128 @@ func (r *Manager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.Controller
 		).
 		Watches(
 			&storagev1.StorageClass{},
-			handler.EnqueueRequestsFromMapFunc(r.enqueueAllTenants),
+			r.statusOnlyHandlerClasses(
+				r.reconcileClassStatus,
+				r.collectAvailableStorageClasses,
+				"cannot collect storage classes",
+			),
 			builder.WithPredicates(utils.UpdatedMetadataPredicate),
 		).
 		Watches(
 			&gatewayv1.GatewayClass{},
-			handler.EnqueueRequestsFromMapFunc(r.enqueueAllTenants),
-			builder.WithPredicates(utils.UpdatedMetadataPredicate),
-		).
-		Watches(
-			&networkingv1.IngressClass{},
-			handler.EnqueueRequestsFromMapFunc(r.enqueueAllTenants),
+			r.statusOnlyHandlerClasses(
+				r.reconcileClassStatus,
+				r.collectAvailableGatewayClasses,
+				"cannot collect gateway classes",
+			),
 			builder.WithPredicates(utils.UpdatedMetadataPredicate),
 		).
 		Watches(
 			&schedulingv1.PriorityClass{},
-			handler.EnqueueRequestsFromMapFunc(r.enqueueAllTenants),
+			r.statusOnlyHandlerClasses(
+				r.reconcileClassStatus,
+				r.collectAvailablePriorityClasses,
+				"cannot collect priority classes",
+			),
 			builder.WithPredicates(utils.UpdatedMetadataPredicate),
 		).
 		Watches(
 			&nodev1.RuntimeClass{},
-			handler.EnqueueRequestsFromMapFunc(r.enqueueAllTenants),
+			r.statusOnlyHandlerClasses(
+				r.reconcileClassStatus,
+				r.collectAvailableRuntimeClasses,
+				"cannot collect runtime classes",
+			),
 			builder.WithPredicates(utils.UpdatedMetadataPredicate),
+		).
+		Watches(
+			&capsulev1beta2.TenantOwner{},
+			handler.TypedFuncs[client.Object, ctrl.Request]{
+				CreateFunc: func(
+					ctx context.Context,
+					e event.TypedCreateEvent[client.Object],
+					q workqueue.TypedRateLimitingInterface[reconcile.Request],
+				) {
+					r.enqueueForTenantsWithCondition(
+						ctx,
+						e.Object,
+						q,
+						func(tnt *capsulev1beta2.Tenant, c client.Object) bool {
+							return len(tnt.Spec.Permissions.MatchOwners) > 0
+						})
+				},
+				UpdateFunc: func(
+					ctx context.Context,
+					e event.TypedUpdateEvent[client.Object],
+					q workqueue.TypedRateLimitingInterface[reconcile.Request],
+				) {
+					r.enqueueForTenantsWithCondition(
+						ctx,
+						e.ObjectNew,
+						q,
+						func(tnt *capsulev1beta2.Tenant, c client.Object) bool {
+							return len(tnt.Spec.Permissions.MatchOwners) > 0
+						})
+				},
+
+				DeleteFunc: func(
+					ctx context.Context,
+					e event.TypedDeleteEvent[client.Object],
+					q workqueue.TypedRateLimitingInterface[reconcile.Request],
+				) {
+					r.enqueueTenantsForTenantOwner(ctx, e.Object, q)
+				},
+			},
+		).
+		Watches(
+			&corev1.ServiceAccount{},
+			handler.TypedFuncs[client.Object, ctrl.Request]{
+				CreateFunc: func(
+					ctx context.Context,
+					e event.TypedCreateEvent[client.Object],
+					q workqueue.TypedRateLimitingInterface[reconcile.Request],
+				) {
+					r.enqueueForTenantsWithCondition(ctx, e.Object, q, func(tnt *capsulev1beta2.Tenant, c client.Object) bool {
+						for _, n := range tnt.Status.Namespaces {
+							if n == c.GetNamespace() {
+								return true
+							}
+						}
+
+						return false
+					})
+				},
+				UpdateFunc: func(
+					ctx context.Context,
+					e event.TypedUpdateEvent[client.Object],
+					q workqueue.TypedRateLimitingInterface[reconcile.Request],
+				) {
+					r.enqueueForTenantsWithCondition(ctx, e.ObjectNew, q, func(tnt *capsulev1beta2.Tenant, c client.Object) bool {
+						for _, n := range tnt.Status.Namespaces {
+							if n == c.GetNamespace() {
+								return true
+							}
+						}
+
+						return false
+					})
+				},
+				DeleteFunc: func(
+					ctx context.Context,
+					e event.TypedDeleteEvent[client.Object],
+					q workqueue.TypedRateLimitingInterface[reconcile.Request],
+				) {
+					r.enqueueForTenantsWithCondition(ctx, e.Object, q, func(tnt *capsulev1beta2.Tenant, c client.Object) bool {
+						_, found := tnt.Status.Owners.FindOwner(
+							serviceaccount.ServiceAccountUsernamePrefix+c.GetNamespace()+":"+c.GetName(),
+							api.ServiceAccountOwner,
+						)
+
+						return found
+					})
+				},
+			},
+			builder.WithPredicates(utils.PromotedServiceaccountPredicate),
 		).
 		WithOptions(controller.Options{MaxConcurrentReconciles: ctrlConfig.MaxConcurrentReconciles}).
 		Complete(r)
@@ -119,6 +229,13 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 			return
 		}
 	}()
+
+	// Collect Ownership for Status
+	if err = r.collectOwners(ctx, instance); err != nil {
+		err = fmt.Errorf("cannot collect available owners: %w", err)
+
+		return result, err
+	}
 
 	// Ensuring Metadata.
 	err, updated := r.ensureMetadata(ctx, instance)

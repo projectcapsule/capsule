@@ -31,9 +31,11 @@ var _ = Describe("creating an Ingress with a wildcard when it is denied for the 
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: api.OwnerListSpec{
 				{
-					UserSpec: api.UserSpec{
-						Name: "scott",
-						Kind: "User",
+					CoreOwnerSpec: api.CoreOwnerSpec{
+						UserSpec: api.UserSpec{
+							Name: "scott",
+							Kind: "User",
+						},
 					},
 				},
 			},

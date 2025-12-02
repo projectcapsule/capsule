@@ -46,11 +46,13 @@ func (in *Tenant) ConvertFrom(raw conversion.Hub) error {
 		}
 
 		in.Spec.Owners = append(in.Spec.Owners, api.OwnerSpec{
-			UserSpec: api.UserSpec{
-				Kind: api.OwnerKind(owner.Kind),
-				Name: owner.Name,
+			CoreOwnerSpec: api.CoreOwnerSpec{
+				UserSpec: api.UserSpec{
+					Kind: api.OwnerKind(owner.Kind),
+					Name: owner.Name,
+				},
+				ClusterRoles: owner.GetRoles(*src, index),
 			},
-			ClusterRoles:    owner.GetRoles(*src, index),
 			ProxyOperations: proxySettings,
 		})
 	}

@@ -17,6 +17,7 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
+	"github.com/projectcapsule/capsule/pkg/api/misc"
 )
 
 var _ = Describe("ResourcePoolClaim Tests", Label("resourcepool"), func() {
@@ -30,9 +31,11 @@ var _ = Describe("ResourcePoolClaim Tests", Label("resourcepool"), func() {
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: api.OwnerListSpec{
 				{
-					UserSpec: api.UserSpec{
-						Name: "wind-user",
-						Kind: "User",
+					CoreOwnerSpec: api.CoreOwnerSpec{
+						UserSpec: api.UserSpec{
+							Name: "wind-user",
+							Kind: "User",
+						},
 					},
 				},
 			},
@@ -99,7 +102,7 @@ var _ = Describe("ResourcePoolClaim Tests", Label("resourcepool"), func() {
 				},
 			},
 			Spec: capsulev1beta2.ResourcePoolSpec{
-				Selectors: []api.NamespaceSelector{
+				Selectors: []misc.NamespaceSelector{
 					{
 						LabelSelector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
@@ -302,7 +305,7 @@ var _ = Describe("ResourcePoolClaim Tests", Label("resourcepool"), func() {
 				Config: capsulev1beta2.ResourcePoolSpecConfiguration{
 					DeleteBoundResources: ptr.To(false),
 				},
-				Selectors: []api.NamespaceSelector{
+				Selectors: []misc.NamespaceSelector{
 					{
 						LabelSelector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
@@ -492,7 +495,7 @@ var _ = Describe("ResourcePoolClaim Tests", Label("resourcepool"), func() {
 				Config: capsulev1beta2.ResourcePoolSpecConfiguration{
 					DeleteBoundResources: ptr.To(false),
 				},
-				Selectors: []api.NamespaceSelector{
+				Selectors: []misc.NamespaceSelector{
 					{
 						LabelSelector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
@@ -521,7 +524,7 @@ var _ = Describe("ResourcePoolClaim Tests", Label("resourcepool"), func() {
 				Config: capsulev1beta2.ResourcePoolSpecConfiguration{
 					DeleteBoundResources: ptr.To(false),
 				},
-				Selectors: []api.NamespaceSelector{
+				Selectors: []misc.NamespaceSelector{
 					{
 						LabelSelector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{

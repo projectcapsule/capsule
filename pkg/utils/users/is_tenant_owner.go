@@ -21,13 +21,33 @@ func IsTenantOwner(
 	ctx context.Context,
 	c client.Client,
 	cfg configuration.Configuration,
-	tenant *capsulev1beta2.Tenant,
+	tnt *capsulev1beta2.Tenant,
 	userInfo authenticationv1.UserInfo,
 ) (bool, error) {
-	if isOwner := tenant.Spec.Owners.IsOwner(userInfo.Username, userInfo.Groups); isOwner {
+	if isOwner := tnt.Spec.Owners.IsOwner(userInfo.Username, userInfo.Groups); isOwner {
 		return true, nil
 	}
 
+	return IsCommonOwner(ctx, c, cfg, tnt, userInfo)
+}
+
+func IsTenantOwnerByStatus(
+	ctx context.Context,
+	c client.Client,
+	cfg configuration.Configuration,
+	tnt *capsulev1beta2.Tenant,
+	userInfo authenticationv1.UserInfo,
+) bool {
+	return tnt.Status.Owners.IsOwner(userInfo.Username, userInfo.Groups)
+}
+
+func IsCommonOwner(
+	ctx context.Context,
+	c client.Client,
+	cfg configuration.Configuration,
+	tnt *capsulev1beta2.Tenant,
+	userInfo authenticationv1.UserInfo,
+) (bool, error) {
 	// Administrators are always Owners
 	if cfg.Administrators().IsPresent(userInfo.Username, userInfo.Groups) {
 		return true, nil

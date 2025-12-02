@@ -26,9 +26,11 @@ var _ = Describe("creating a Namespace with Tenant selector when user owns multi
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: api.OwnerListSpec{
 				{
-					UserSpec: api.UserSpec{
-						Name: "john",
-						Kind: "User",
+					CoreOwnerSpec: api.CoreOwnerSpec{
+						UserSpec: api.UserSpec{
+							Name: "john",
+							Kind: "User",
+						},
 					},
 				},
 			},
@@ -41,9 +43,11 @@ var _ = Describe("creating a Namespace with Tenant selector when user owns multi
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: api.OwnerListSpec{
 				{
-					UserSpec: api.UserSpec{
-						Name: "john",
-						Kind: "User",
+					CoreOwnerSpec: api.CoreOwnerSpec{
+						UserSpec: api.UserSpec{
+							Name: "john",
+							Kind: "User",
+						},
 					},
 				},
 			},

@@ -35,9 +35,11 @@ var _ = Describe("creating a Namespace with user-specified labels and annotation
 			},
 			Owners: api.OwnerListSpec{
 				{
-					UserSpec: api.UserSpec{
-						Name: "gatsby",
-						Kind: "User",
+					CoreOwnerSpec: api.CoreOwnerSpec{
+						UserSpec: api.UserSpec{
+							Name: "gatsby",
+							Kind: "User",
+						},
 					},
 				},
 			},

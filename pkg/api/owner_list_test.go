@@ -11,9 +11,11 @@ import (
 
 func TestOwnerListSpec_FindOwner(t *testing.T) {
 	bla := OwnerSpec{
-		UserSpec: UserSpec{
-			Kind: UserOwner,
-			Name: "bla",
+		CoreOwnerSpec: CoreOwnerSpec{
+			UserSpec: UserSpec{
+				Kind: UserOwner,
+				Name: "bla",
+			},
 		},
 		ProxyOperations: []ProxySettings{
 			{
@@ -23,9 +25,11 @@ func TestOwnerListSpec_FindOwner(t *testing.T) {
 		},
 	}
 	bar := OwnerSpec{
-		UserSpec: UserSpec{
-			Kind: GroupOwner,
-			Name: "bar",
+		CoreOwnerSpec: CoreOwnerSpec{
+			UserSpec: UserSpec{
+				Kind: GroupOwner,
+				Name: "bar",
+			},
 		},
 		ProxyOperations: []ProxySettings{
 			{
@@ -35,9 +39,11 @@ func TestOwnerListSpec_FindOwner(t *testing.T) {
 		},
 	}
 	baz := OwnerSpec{
-		UserSpec: UserSpec{
-			Kind: UserOwner,
-			Name: "baz",
+		CoreOwnerSpec: CoreOwnerSpec{
+			UserSpec: UserSpec{
+				Kind: UserOwner,
+				Name: "baz",
+			},
 		},
 		ProxyOperations: []ProxySettings{
 			{
@@ -47,9 +53,11 @@ func TestOwnerListSpec_FindOwner(t *testing.T) {
 		},
 	}
 	fim := OwnerSpec{
-		UserSpec: UserSpec{
-			Kind: ServiceAccountOwner,
-			Name: "fim",
+		CoreOwnerSpec: CoreOwnerSpec{
+			UserSpec: UserSpec{
+				Kind: ServiceAccountOwner,
+				Name: "fim",
+			},
 		},
 		ProxyOperations: []ProxySettings{
 			{
@@ -59,9 +67,11 @@ func TestOwnerListSpec_FindOwner(t *testing.T) {
 		},
 	}
 	bom := OwnerSpec{
-		UserSpec: UserSpec{
-			Kind: GroupOwner,
-			Name: "bom",
+		CoreOwnerSpec: CoreOwnerSpec{
+			UserSpec: UserSpec{
+				Kind: GroupOwner,
+				Name: "bom",
+			},
 		},
 		ProxyOperations: []ProxySettings{
 			{
@@ -75,9 +85,11 @@ func TestOwnerListSpec_FindOwner(t *testing.T) {
 		},
 	}
 	qip := OwnerSpec{
-		UserSpec: UserSpec{
-			Kind: ServiceAccountOwner,
-			Name: "qip",
+		CoreOwnerSpec: CoreOwnerSpec{
+			UserSpec: UserSpec{
+				Kind: ServiceAccountOwner,
+				Name: "qip",
+			},
 		},
 		ProxyOperations: []ProxySettings{
 			{

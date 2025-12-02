@@ -17,8 +17,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
+	"github.com/projectcapsule/capsule/pkg/api/misc"
 	"github.com/projectcapsule/capsule/pkg/utils"
 )
 
@@ -83,7 +83,7 @@ var _ = Describe("ResourcePool Tests", Label("resourcepool"), func() {
 				},
 			},
 			Spec: capsulev1beta2.ResourcePoolSpec{
-				Selectors: []api.NamespaceSelector{
+				Selectors: []misc.NamespaceSelector{
 					{
 						LabelSelector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
@@ -522,7 +522,7 @@ var _ = Describe("ResourcePool Tests", Label("resourcepool"), func() {
 				},
 			},
 			Spec: capsulev1beta2.ResourcePoolSpec{
-				Selectors: []api.NamespaceSelector{
+				Selectors: []misc.NamespaceSelector{
 					{
 						LabelSelector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
@@ -694,7 +694,7 @@ var _ = Describe("ResourcePool Tests", Label("resourcepool"), func() {
 				},
 			},
 			Spec: capsulev1beta2.ResourcePoolSpec{
-				Selectors: []api.NamespaceSelector{
+				Selectors: []misc.NamespaceSelector{
 					{
 						LabelSelector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
@@ -950,7 +950,7 @@ var _ = Describe("ResourcePool Tests", Label("resourcepool"), func() {
 				},
 			},
 			Spec: capsulev1beta2.ResourcePoolSpec{
-				Selectors: []api.NamespaceSelector{
+				Selectors: []misc.NamespaceSelector{
 					{
 						LabelSelector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
@@ -1292,7 +1292,7 @@ var _ = Describe("ResourcePool Tests", Label("resourcepool"), func() {
 				},
 			},
 			Spec: capsulev1beta2.ResourcePoolSpec{
-				Selectors: []api.NamespaceSelector{
+				Selectors: []misc.NamespaceSelector{
 					{
 						LabelSelector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
@@ -1450,7 +1450,7 @@ var _ = Describe("ResourcePool Tests", Label("resourcepool"), func() {
 				},
 			},
 			Spec: capsulev1beta2.ResourcePoolSpec{
-				Selectors: []api.NamespaceSelector{
+				Selectors: []misc.NamespaceSelector{
 					{
 						LabelSelector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
@@ -1558,7 +1558,7 @@ var _ = Describe("ResourcePool Tests", Label("resourcepool"), func() {
 				},
 			},
 			Spec: capsulev1beta2.ResourcePoolSpec{
-				Selectors: []api.NamespaceSelector{
+				Selectors: []misc.NamespaceSelector{
 					{
 						LabelSelector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
@@ -1666,7 +1666,7 @@ var _ = Describe("ResourcePool Tests", Label("resourcepool"), func() {
 				},
 			},
 			Spec: capsulev1beta2.ResourcePoolSpec{
-				Selectors: []api.NamespaceSelector{
+				Selectors: []misc.NamespaceSelector{
 					{
 						LabelSelector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{

@@ -6,6 +6,7 @@ package v1beta2
 import (
 	k8stypes "k8s.io/apimachinery/pkg/types"
 
+	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 )
 
@@ -22,6 +23,8 @@ type TenantStatus struct {
 	// Allowed Cluster Objects within Tenant
 	TenantAvailableStatus `json:",inline"`
 
+	// Collected owners for this tenant
+	Owners api.OwnerStatusListSpec `json:"owners,omitempty"`
 	// +kubebuilder:default=Active
 	// The operational state of the Tenant. Possible values are "Active", "Cordoned".
 	State tenantState `json:"state"`

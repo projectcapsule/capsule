@@ -32,9 +32,11 @@ var _ = Describe("when Tenant handles Ingress classes with networking.k8s.io/v1"
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: []api.OwnerSpec{
 				{
-					UserSpec: api.UserSpec{
-						Name: "ingress-selector",
-						Kind: "User",
+					CoreOwnerSpec: api.CoreOwnerSpec{
+						UserSpec: api.UserSpec{
+							Name: "ingress-selector",
+							Kind: "User",
+						},
 					},
 				},
 			},
@@ -63,9 +65,11 @@ var _ = Describe("when Tenant handles Ingress classes with networking.k8s.io/v1"
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: []api.OwnerSpec{
 				{
-					UserSpec: api.UserSpec{
-						Name: "ingress-default",
-						Kind: "User",
+					CoreOwnerSpec: api.CoreOwnerSpec{
+						UserSpec: api.UserSpec{
+							Name: "ingress-default",
+							Kind: "User",
+						},
 					},
 				},
 			},

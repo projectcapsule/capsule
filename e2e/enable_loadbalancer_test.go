@@ -25,9 +25,11 @@ var _ = Describe("creating a LoadBalancer service when it is enabled for Tenant"
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: api.OwnerListSpec{
 				{
-					UserSpec: api.UserSpec{
-						Name: "netflix",
-						Kind: "User",
+					CoreOwnerSpec: api.CoreOwnerSpec{
+						UserSpec: api.UserSpec{
+							Name: "netflix",
+							Kind: "User",
+						},
 					},
 				},
 			},
