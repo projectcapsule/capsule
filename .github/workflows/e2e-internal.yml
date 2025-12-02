@@ -29,6 +29,11 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.INTERNAL_E2E_PAT }}
         run: |
+          if [ -z "${GH_TOKEN}" ]; then
+            echo "GH_TOKEN is empty; secrets are not available. Skipping."
+            exit 1
+          fi
+
           curl -fsS -X POST \
             -H "Accept: application/vnd.github+json" \
             -H "Authorization: Bearer $GH_TOKEN" \
