@@ -1194,6 +1194,7 @@ spec:
                   resources cannot be deleted.
                 type: boolean
               deviceClasses:
+                description: Specifies options for the DeviceClass resources.
                 properties:
                   allowed:
                     description: Match exact elements which are allowed as class names
