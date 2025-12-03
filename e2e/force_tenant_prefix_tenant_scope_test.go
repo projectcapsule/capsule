@@ -23,9 +23,11 @@ var _ = Describe("creating a Namespace with Tenant name prefix enforcement at Te
 			ForceTenantPrefix: &[]bool{true}[0],
 			Owners: api.OwnerListSpec{
 				{
-					UserSpec: api.UserSpec{
-						Name: "john",
-						Kind: "User",
+					CoreOwnerSpec: api.CoreOwnerSpec{
+						UserSpec: api.UserSpec{
+							Name: "john",
+							Kind: "User",
+						},
 					},
 				},
 			},
@@ -39,9 +41,11 @@ var _ = Describe("creating a Namespace with Tenant name prefix enforcement at Te
 			ForceTenantPrefix: &[]bool{false}[0],
 			Owners: api.OwnerListSpec{
 				{
-					UserSpec: api.UserSpec{
-						Name: "john",
-						Kind: "User",
+					CoreOwnerSpec: api.CoreOwnerSpec{
+						UserSpec: api.UserSpec{
+							Name: "john",
+							Kind: "User",
+						},
 					},
 				},
 			},

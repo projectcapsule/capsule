@@ -24,9 +24,11 @@ var _ = Describe("creating a Namespace with an additional Role Binding", Label("
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: api.OwnerListSpec{
 				{
-					UserSpec: api.UserSpec{
-						Name: "dale",
-						Kind: "User",
+					CoreOwnerSpec: api.CoreOwnerSpec{
+						UserSpec: api.UserSpec{
+							Name: "dale",
+							Kind: "User",
+						},
 					},
 				},
 			},

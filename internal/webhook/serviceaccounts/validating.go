@@ -13,7 +13,6 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	capsulewebhook "github.com/projectcapsule/capsule/internal/webhook"
-	"github.com/projectcapsule/capsule/internal/webhook/utils"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/configuration"
 	"github.com/projectcapsule/capsule/pkg/utils/users"
@@ -85,12 +84,7 @@ func (h *validating) handle(
 	}
 
 	// We don't want to allow promoted serviceaccounts to promote other serviceaccounts
-	allowed, err := users.IsTenantOwner(ctx, c, h.cfg, tnt, req.UserInfo)
-	if err != nil {
-		return utils.ErroredResponse(err)
-	}
-
-	if allowed {
+	if ok := users.IsTenantOwnerByStatus(ctx, c, h.cfg, tnt, req.UserInfo); ok {
 		return nil
 	}
 

@@ -20,9 +20,11 @@ var _ = Describe("creating a Namespace creation with no Tenant assigned", Label(
 			Spec: capsulev1beta2.TenantSpec{
 				Owners: api.OwnerListSpec{
 					{
-						UserSpec: api.UserSpec{
-							Name: "missing",
-							Kind: "User",
+						CoreOwnerSpec: api.CoreOwnerSpec{
+							UserSpec: api.UserSpec{
+								Name: "missing",
+								Kind: "User",
+							},
 						},
 					},
 				},

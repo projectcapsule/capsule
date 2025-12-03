@@ -1,7 +1,7 @@
 // Copyright 2020-2025 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package rbac
+package api
 
 import (
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -14,7 +14,7 @@ const (
 )
 
 var (
-	clusterRoles = map[string]*rbacv1.ClusterRole{
+	ClusterRoles = map[string]*rbacv1.ClusterRole{
 		ProvisionerRoleName: {
 			ObjectMeta: metav1.ObjectMeta{
 				Name: ProvisionerRoleName,
@@ -41,7 +41,7 @@ var (
 		},
 	}
 
-	provisionerClusterRoleBinding = &rbacv1.ClusterRoleBinding{
+	ProvisionerClusterRoleBinding = &rbacv1.ClusterRoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: ProvisionerRoleName,
 		},

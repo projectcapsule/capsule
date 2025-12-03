@@ -5,6 +5,7 @@ package tenant
 
 import (
 	"context"
+	"fmt"
 	"sort"
 
 	nodev1 "k8s.io/api/node/v1"
@@ -22,11 +23,86 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api"
 )
 
+// Sets a label on the Tenant object with it's name.
+func (r *Manager) collectOwners(ctx context.Context, tnt *capsulev1beta2.Tenant) (err error) {
+	owners, err := tnt.CollectOwners(
+		ctx,
+		r.Client,
+		r.Configuration.AllowServiceAccountPromotion(),
+		r.Configuration.Administrators(),
+	)
+	if err != nil {
+		return err
+	}
+
+	// No Direct Update needed as status is always posted
+	tnt.Status.Owners = owners
+
+	return nil
+}
+
+func (r Manager) reconcileClassStatus(
+	ctx context.Context,
+	fn func(context.Context, *capsulev1beta2.Tenant) error,
+) (err error) {
+	tntList := &capsulev1beta2.TenantList{}
+	if err = r.List(ctx, tntList); err != nil {
+		return err
+	}
+
+	for i := range tntList.Items {
+		t := &tntList.Items[i]
+
+		// Collect Ownership for Status
+		if err = fn(ctx, t); err != nil {
+			err = fmt.Errorf("cannot collect available classes: %w", err)
+
+			return err
+		}
+
+		if err = r.updateTenantStatus(ctx, t, err); err != nil {
+			err = fmt.Errorf("cannot update tenant status: %w", err)
+
+			return err
+		}
+	}
+
+	return err
+}
+
 func (r *Manager) collectAvailableResources(ctx context.Context, tnt *capsulev1beta2.Tenant) (err error) {
 	log := log.FromContext(ctx)
 
 	log.V(5).Info("collecting available storageclasses")
 
+	if err = r.collectAvailableStorageClasses(ctx, tnt); err != nil {
+		return err
+	}
+
+	log.V(5).Info("collected available storageclasses", "size", len(tnt.Status.Classes.StorageClasses))
+
+	if err = r.collectAvailablePriorityClasses(ctx, tnt); err != nil {
+		return err
+	}
+
+	log.V(5).Info("collected available priorityclasses", "size", len(tnt.Status.Classes.PriorityClasses))
+
+	if err = r.collectAvailableGatewayClasses(ctx, tnt); err != nil {
+		return err
+	}
+
+	log.V(5).Info("collected available gatewayclasses", "size", len(tnt.Status.Classes.GatewayClasses))
+
+	if err = r.collectAvailableRuntimeClasses(ctx, tnt); err != nil {
+		return err
+	}
+
+	log.V(5).Info("collected available runtimeclasses", "size", len(tnt.Status.Classes.RuntimeClasses))
+
+	return nil
+}
+
+func (r *Manager) collectAvailableStorageClasses(ctx context.Context, tnt *capsulev1beta2.Tenant) (err error) {
 	if tnt.Status.Classes.StorageClasses, err = listObjectNamesBySelector(
 		ctx,
 		r.Client,
@@ -36,8 +112,10 @@ func (r *Manager) collectAvailableResources(ctx context.Context, tnt *capsulev1b
 		return err
 	}
 
-	log.V(5).Info("collected available storageclasses", "size", len(tnt.Status.Classes.StorageClasses))
+	return nil
+}
 
+func (r *Manager) collectAvailablePriorityClasses(ctx context.Context, tnt *capsulev1beta2.Tenant) (err error) {
 	if tnt.Status.Classes.PriorityClasses, err = listObjectNamesBySelector(
 		ctx,
 		r.Client,
@@ -47,8 +125,10 @@ func (r *Manager) collectAvailableResources(ctx context.Context, tnt *capsulev1b
 		return err
 	}
 
-	log.V(5).Info("collected available priorityclasses", "size", len(tnt.Status.Classes.PriorityClasses))
+	return nil
+}
 
+func (r *Manager) collectAvailableGatewayClasses(ctx context.Context, tnt *capsulev1beta2.Tenant) (err error) {
 	if tnt.Status.Classes.GatewayClasses, err = listObjectNamesBySelector(
 		ctx,
 		r.Client,
@@ -58,8 +138,10 @@ func (r *Manager) collectAvailableResources(ctx context.Context, tnt *capsulev1b
 		return err
 	}
 
-	log.V(5).Info("collected available gatewayclasses", "size", len(tnt.Status.Classes.GatewayClasses))
+	return nil
+}
 
+func (r *Manager) collectAvailableRuntimeClasses(ctx context.Context, tnt *capsulev1beta2.Tenant) (err error) {
 	if tnt.Status.Classes.RuntimeClasses, err = listObjectNamesBySelector(
 		ctx,
 		r.Client,
@@ -68,19 +150,6 @@ func (r *Manager) collectAvailableResources(ctx context.Context, tnt *capsulev1b
 	); err != nil {
 		return err
 	}
-
-	log.V(5).Info("collected available runtimeclasses", "size", len(tnt.Status.Classes.RuntimeClasses))
-
-	if tnt.Status.Classes.DeviceClasses, err = listObjectNamesBySelector(
-		ctx,
-		r.Client,
-		tnt.Spec.DeviceClasses,
-		&resources.DeviceClassList{},
-	); err != nil {
-		return err
-	}
-
-	log.V(5).Info("collected available deviceclasses", "size", len(tnt.Status.Classes.DeviceClasses))
 
 	return nil
 }
@@ -93,13 +162,7 @@ func listObjectNamesBySelector(
 	allowed *api.DefaultAllowedListSpec,
 	list client.ObjectList,
 	opts ...client.ListOption,
-) (objects []string, err error) {
-	defer func() {
-		if err == nil {
-			sort.Strings(objects)
-		}
-	}()
-
+) ([]string, error) {
 	if err := c.List(ctx, list, opts...); err != nil {
 		return nil, err
 	}
@@ -109,8 +172,9 @@ func listObjectNamesBySelector(
 		return nil, err
 	}
 
-	allNames := make(map[string]struct{})
+	objects := make([]string, 0)
 
+	allNames := make(map[string]struct{})
 	selected := make(map[string]struct{})
 
 	hasSelector := false
@@ -129,9 +193,12 @@ func listObjectNamesBySelector(
 			objects = append(objects, accessor.GetName())
 		}
 
+		sort.Strings(objects)
+
 		return objects, nil
 	}
 
+	// Prepare selector
 	var sel labels.Selector
 	if hasSelector {
 		sel, err = metav1.LabelSelectorAsSelector(&allowed.LabelSelector)
@@ -140,6 +207,7 @@ func listObjectNamesBySelector(
 		}
 	}
 
+	// Evaluate objects
 	for _, obj := range objs {
 		accessor, err := meta.Accessor(obj)
 		if err != nil {
@@ -152,7 +220,6 @@ func listObjectNamesBySelector(
 
 		if hasSelector {
 			lbls := labels.Set(accessor.GetLabels())
-
 			if sel.Matches(lbls) {
 				selected[name] = struct{}{}
 			}
@@ -169,16 +236,14 @@ func listObjectNamesBySelector(
 			continue
 		}
 
-		if _, already := selected[name]; already {
-			continue
-		}
-
 		selected[name] = struct{}{}
 	}
 
 	for name := range selected {
 		objects = append(objects, name)
 	}
+
+	sort.Strings(objects)
 
 	return objects, nil
 }

@@ -68,9 +68,11 @@ var _ = Describe("creating a tenant with various forbidden regexes", Label("tena
 				Spec: capsulev1beta2.TenantSpec{
 					Owners: api.OwnerListSpec{
 						{
-							UserSpec: api.UserSpec{
-								Name: "alice",
-								Kind: "User",
+							CoreOwnerSpec: api.CoreOwnerSpec{
+								UserSpec: api.UserSpec{
+									Name: "alice",
+									Kind: "User",
+								},
 							},
 						},
 					},

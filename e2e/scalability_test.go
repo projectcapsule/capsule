@@ -26,9 +26,11 @@ var _ = Describe("verify scalability", Label("scalability"), func() {
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: api.OwnerListSpec{
 				{
-					UserSpec: api.UserSpec{
-						Name: "gatsby",
-						Kind: "User",
+					CoreOwnerSpec: api.CoreOwnerSpec{
+						UserSpec: api.UserSpec{
+							Name: "gatsby",
+							Kind: "User",
+						},
 					},
 				},
 			},

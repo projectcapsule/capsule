@@ -4,13 +4,19 @@
 package v1beta2
 
 import (
+	"context"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api/misc"
 )
 
 // TenantSpec defines the desired state of Tenant.
 type TenantSpec struct {
+	// Specify Permissions for the Tenant.
+	Permissions Permissions `json:"permissions,omitempty"`
 	// Specifies the owners of the Tenant.
 	// Optional
 	Owners api.OwnerListSpec `json:"owners,omitempty"`
@@ -71,6 +77,21 @@ type TenantSpec struct {
 	// If unset, Tenant uses CapsuleConfiguration's forceTenantPrefix
 	// Optional
 	ForceTenantPrefix *bool `json:"forceTenantPrefix,omitempty"`
+}
+
+type Permissions struct {
+	// Matches TenantOwner objects which are promoted to owners of this tenant
+	// The elements are OR operations and independent. You can see the resulting Tenant Owners
+	// in the Status.Owners specification of the Tenant.
+	MatchOwners []*metav1.LabelSelector `json:"matchOwners,omitempty"`
+}
+
+func (p *Permissions) ListMatchingOwners(
+	ctx context.Context,
+	c client.Client,
+	opts ...client.ListOption,
+) ([]*TenantOwner, error) {
+	return misc.ListBySelectors[*TenantOwner](ctx, c, &TenantOwnerList{}, p.MatchOwners)
 }
 
 // +kubebuilder:object:root=true

@@ -24,9 +24,11 @@ var _ = Describe("Deleting a tenant with protected annotation", Label("tenant"),
 			PreventDeletion: true,
 			Owners: api.OwnerListSpec{
 				{
-					UserSpec: api.UserSpec{
-						Name: "john",
-						Kind: "User",
+					CoreOwnerSpec: api.CoreOwnerSpec{
+						UserSpec: api.UserSpec{
+							Name: "john",
+							Kind: "User",
+						},
 					},
 				},
 			},

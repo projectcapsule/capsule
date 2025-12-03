@@ -7,13 +7,13 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api/misc"
 )
 
 // ResourcePoolSpec.
 type ResourcePoolSpec struct {
 	// Selector to match the namespaces that should be managed by the GlobalResourceQuota
-	Selectors []api.NamespaceSelector `json:"selectors,omitempty"`
+	Selectors []misc.NamespaceSelector `json:"selectors,omitempty"`
 	// Define the resourcequota served by this resourcepool.
 	Quota corev1.ResourceQuotaSpec `json:"quota"`
 	// The Defaults given for each namespace, the default is not counted towards the total allocation

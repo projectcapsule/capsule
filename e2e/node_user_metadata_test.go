@@ -29,9 +29,11 @@ var _ = Describe("modifying node labels and annotations", Label("config", "nodes
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: api.OwnerListSpec{
 				{
-					UserSpec: api.UserSpec{
-						Name: "gatsby",
-						Kind: "User",
+					CoreOwnerSpec: api.CoreOwnerSpec{
+						UserSpec: api.UserSpec{
+							Name: "gatsby",
+							Kind: "User",
+						},
 					},
 				},
 			},

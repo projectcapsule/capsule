@@ -79,9 +79,11 @@ var _ = Describe("when Tenant handles Gateway classes", Label("tenant", "classes
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: []api.OwnerSpec{
 				{
-					UserSpec: api.UserSpec{
-						Name: "gateway-default-and-label-selector",
-						Kind: "User",
+					CoreOwnerSpec: api.CoreOwnerSpec{
+						UserSpec: api.UserSpec{
+							Name: "gateway-default-and-label-selector",
+							Kind: "User",
+						},
 					},
 				},
 			},
@@ -110,9 +112,11 @@ var _ = Describe("when Tenant handles Gateway classes", Label("tenant", "classes
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: []api.OwnerSpec{
 				{
-					UserSpec: api.UserSpec{
-						Name: "gateway-with-label-selector-only",
-						Kind: "User",
+					CoreOwnerSpec: api.CoreOwnerSpec{
+						UserSpec: api.UserSpec{
+							Name: "gateway-with-label-selector-only",
+							Kind: "User",
+						},
 					},
 				},
 			},
@@ -140,9 +144,11 @@ var _ = Describe("when Tenant handles Gateway classes", Label("tenant", "classes
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: []api.OwnerSpec{
 				{
-					UserSpec: api.UserSpec{
-						Name: "e2e-gateway-no-restrictions",
-						Kind: "User",
+					CoreOwnerSpec: api.CoreOwnerSpec{
+						UserSpec: api.UserSpec{
+							Name: "e2e-gateway-no-restrictions",
+							Kind: "User",
+						},
 					},
 				},
 			},

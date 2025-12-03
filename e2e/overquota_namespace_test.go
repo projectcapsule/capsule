@@ -23,9 +23,11 @@ var _ = Describe("creating a Namespace in over-quota of three", Label("namespace
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: api.OwnerListSpec{
 				{
-					UserSpec: api.UserSpec{
-						Name: "bob",
-						Kind: "User",
+					CoreOwnerSpec: api.CoreOwnerSpec{
+						UserSpec: api.UserSpec{
+							Name: "bob",
+							Kind: "User",
+						},
 					},
 				},
 			},

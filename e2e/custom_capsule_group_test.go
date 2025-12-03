@@ -25,15 +25,19 @@ var _ = Describe("creating a Namespace as Tenant owner with custom --capsule-gro
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: api.OwnerListSpec{
 				{
-					UserSpec: api.UserSpec{
-						Name: "alice",
-						Kind: "User",
+					CoreOwnerSpec: api.CoreOwnerSpec{
+						UserSpec: api.UserSpec{
+							Name: "alice",
+							Kind: "User",
+						},
 					},
 				},
 				{
-					UserSpec: api.UserSpec{
-						Name: "bob",
-						Kind: "User",
+					CoreOwnerSpec: api.CoreOwnerSpec{
+						UserSpec: api.UserSpec{
+							Name: "bob",
+							Kind: "User",
+						},
 					},
 				},
 			},

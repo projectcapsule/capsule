@@ -1,7 +1,6 @@
 // Copyright 2020-2025 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
-//nolint:dupl
 package api
 
 import (
@@ -29,6 +28,15 @@ func (o OwnerListSpec) IsOwner(name string, groups []string) bool {
 	}
 
 	return false
+}
+
+func (o OwnerListSpec) ToStatusOwners() OwnerStatusListSpec {
+	list := OwnerStatusListSpec{}
+	for _, owner := range o {
+		list = append(list, owner.CoreOwnerSpec)
+	}
+
+	return list
 }
 
 func (o OwnerListSpec) FindOwner(name string, kind OwnerKind) (owner OwnerSpec) {

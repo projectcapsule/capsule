@@ -27,9 +27,11 @@ var _ = Describe("Administrators", Label("namespace", "permissions"), func() {
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: api.OwnerListSpec{
 				{
-					UserSpec: api.UserSpec{
-						Name: "paul",
-						Kind: "User",
+					CoreOwnerSpec: api.CoreOwnerSpec{
+						UserSpec: api.UserSpec{
+							Name: "paul",
+							Kind: "User",
+						},
 					},
 				},
 			},
@@ -43,9 +45,11 @@ var _ = Describe("Administrators", Label("namespace", "permissions"), func() {
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: api.OwnerListSpec{
 				{
-					UserSpec: api.UserSpec{
-						Name: "george",
-						Kind: "User",
+					CoreOwnerSpec: api.CoreOwnerSpec{
+						UserSpec: api.UserSpec{
+							Name: "george",
+							Kind: "User",
+						},
 					},
 				},
 			},

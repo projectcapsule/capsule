@@ -24,9 +24,11 @@ var _ = Describe("creating a nodePort service when it is enabled for Tenant", La
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: api.OwnerListSpec{
 				{
-					UserSpec: api.UserSpec{
-						Name: "google",
-						Kind: "User",
+					CoreOwnerSpec: api.CoreOwnerSpec{
+						UserSpec: api.UserSpec{
+							Name: "google",
+							Kind: "User",
+						},
 					},
 				},
 			},
