@@ -11,16 +11,16 @@ import (
 
 type deviceClassForbiddenError struct {
 	deviceClassName string
-	spec            api.DefaultAllowedListSpec
+	spec            api.SelectorAllowedListSpec
 }
 
 func (i deviceClassForbiddenError) Error() string {
 	err := fmt.Sprintf("Device Class %s is forbidden for the current Tenant: ", i.deviceClassName)
 
-	return utils.DefaultAllowedValuesErrorMessage(i.spec, err)
+	return utils.AllowedValuesErrorMessage(i.spec, err)
 }
 
-func NewDeviceClassForbidden(class string, spec api.DefaultAllowedListSpec) error {
+func NewDeviceClassForbidden(class string, spec api.SelectorAllowedListSpec) error {
 	return &deviceClassForbiddenError{
 		deviceClassName: class,
 		spec:            spec,
@@ -28,15 +28,15 @@ func NewDeviceClassForbidden(class string, spec api.DefaultAllowedListSpec) erro
 }
 
 type deviceClassUndefinedError struct {
-	spec api.DefaultAllowedListSpec
+	spec api.SelectorAllowedListSpec
 }
 
-func NewDeviceClassUndefined(spec api.DefaultAllowedListSpec) error {
+func NewDeviceClassUndefined(spec api.SelectorAllowedListSpec) error {
 	return &deviceClassUndefinedError{
 		spec: spec,
 	}
 }
 
 func (i deviceClassUndefinedError) Error() string {
-	return utils.DefaultAllowedValuesErrorMessage(i.spec, "Selected DeviceClass is forbidden for the current Tenant or does not exist. Specify a device Class which is allowed by ")
+	return utils.AllowedValuesErrorMessage(i.spec, "Selected DeviceClass is forbidden for the current Tenant or does not exist. Specify a device Class which is allowed by ")
 }

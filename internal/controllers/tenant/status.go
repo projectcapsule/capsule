@@ -78,6 +78,7 @@ func (r *Manager) collectAvailableResources(ctx context.Context, tnt *capsulev1b
 	if err = r.collectAvailableDeviceClasses(ctx, tnt); err != nil {
 		return err
 	}
+
 	log.V(5).Info("collected available deviceclasses", "size", len(tnt.Status.Classes.DeviceClasses))
 
 	log.V(5).Info("collecting available storageclasses")
@@ -110,8 +111,7 @@ func (r *Manager) collectAvailableResources(ctx context.Context, tnt *capsulev1b
 }
 
 func (r *Manager) collectAvailableDeviceClasses(ctx context.Context, tnt *capsulev1beta2.Tenant) (err error) {
-	fmt.Println(tnt.Spec.DeviceClasses)
-	if tnt.Status.Classes.DeviceClasses, err = listObjectNamesBySelector(
+	if tnt.Status.Classes.DeviceClasses, err = listObjectNamesBySelector2(
 		ctx,
 		r.Client,
 		tnt.Spec.DeviceClasses,
@@ -119,7 +119,7 @@ func (r *Manager) collectAvailableDeviceClasses(ctx context.Context, tnt *capsul
 	); err != nil {
 		return err
 	}
-	fmt.Println("Kurec %s %s \n", tnt.Status.Classes.DeviceClasses, err)
+
 	return nil
 }
 
@@ -250,6 +250,95 @@ func listObjectNamesBySelector(
 	if allowed.Default != "" {
 		exact = append(exact, allowed.Default)
 	}
+
+	for _, name := range exact {
+		if _, exists := allNames[name]; !exists {
+			continue
+		}
+
+		selected[name] = struct{}{}
+	}
+
+	for name := range selected {
+		objects = append(objects, name)
+	}
+
+	sort.Strings(objects)
+
+	return objects, nil
+}
+
+func listObjectNamesBySelector2(
+	ctx context.Context,
+	c client.Client,
+	allowed *api.SelectorAllowedListSpec,
+	list client.ObjectList,
+	opts ...client.ListOption,
+) ([]string, error) {
+	if err := c.List(ctx, list, opts...); err != nil {
+		return nil, err
+	}
+
+	objs, err := meta.ExtractList(list)
+	if err != nil {
+		return nil, err
+	}
+
+	objects := make([]string, 0)
+
+	allNames := make(map[string]struct{})
+	selected := make(map[string]struct{})
+
+	hasSelector := false
+	if allowed != nil {
+		hasSelector = len(allowed.MatchLabels) > 0 ||
+			len(allowed.MatchExpressions) > 0
+	}
+
+	if allowed == nil || (!hasSelector && len(allowed.Exact) == 0) {
+		for _, o := range objs {
+			accessor, err := meta.Accessor(o)
+			if err != nil {
+				return nil, err
+			}
+
+			objects = append(objects, accessor.GetName())
+		}
+
+		sort.Strings(objects)
+
+		return objects, nil
+	}
+
+	// Prepare selector
+	var sel labels.Selector
+	if hasSelector {
+		sel, err = metav1.LabelSelectorAsSelector(&allowed.LabelSelector)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// Evaluate objects
+	for _, obj := range objs {
+		accessor, err := meta.Accessor(obj)
+		if err != nil {
+			return nil, err
+		}
+
+		name := accessor.GetName()
+
+		allNames[name] = struct{}{}
+
+		if hasSelector {
+			lbls := labels.Set(accessor.GetLabels())
+			if sel.Matches(lbls) {
+				selected[name] = struct{}{}
+			}
+		}
+	}
+
+	exact := allowed.Exact
 
 	for _, name := range exact {
 		if _, exists := allNames[name]; !exists {

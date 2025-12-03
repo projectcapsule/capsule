@@ -1282,7 +1282,7 @@ func (in *TenantSpec) DeepCopyInto(out *TenantSpec) {
 	}
 	if in.DeviceClasses != nil {
 		in, out := &in.DeviceClasses, &out.DeviceClasses
-		*out = new(api.DefaultAllowedListSpec)
+		*out = new(api.SelectorAllowedListSpec)
 		(*in).DeepCopyInto(*out)
 	}
 	in.GatewayOptions.DeepCopyInto(&out.GatewayOptions)

@@ -94,8 +94,6 @@ func (h *deviceClass) validateResourceRequest(ctx context.Context, c client.Clie
 		selector := allowed.SelectorMatch(dc)
 
 		switch {
-		case allowed.MatchDefault(dc.Name):
-			return nil
 		case allowed.Match(dc.Name) || selector:
 			return nil
 		default:

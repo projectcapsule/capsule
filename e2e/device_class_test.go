@@ -91,12 +91,10 @@ var _ = Describe("when Tenant handles Device classes", Label("tenant", "classes"
 					},
 				},
 			},
-			DeviceClasses: &api.DefaultAllowedListSpec{
-				SelectorAllowedListSpec: api.SelectorAllowedListSpec{
-					LabelSelector: v1.LabelSelector{
-						MatchLabels: map[string]string{
-							"env": "authorized",
-						},
+			DeviceClasses: &api.SelectorAllowedListSpec{
+				LabelSelector: v1.LabelSelector{
+					MatchLabels: map[string]string{
+						"env": "authorized",
 					},
 				},
 			},
@@ -117,12 +115,10 @@ var _ = Describe("when Tenant handles Device classes", Label("tenant", "classes"
 					},
 				},
 			},
-			DeviceClasses: &api.DefaultAllowedListSpec{
-				SelectorAllowedListSpec: api.SelectorAllowedListSpec{
-					LabelSelector: v1.LabelSelector{
-						MatchLabels: map[string]string{
-							"env": "production",
-						},
+			DeviceClasses: &api.SelectorAllowedListSpec{
+				LabelSelector: v1.LabelSelector{
+					MatchLabels: map[string]string{
+						"env": "production",
 					},
 				},
 			},
