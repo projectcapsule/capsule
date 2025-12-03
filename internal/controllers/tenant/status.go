@@ -73,6 +73,13 @@ func (r Manager) reconcileClassStatus(
 func (r *Manager) collectAvailableResources(ctx context.Context, tnt *capsulev1beta2.Tenant) (err error) {
 	log := log.FromContext(ctx)
 
+	log.V(5).Info("collecting available deviceclasses")
+
+	if err = r.collectAvailableDeviceClasses(ctx, tnt); err != nil {
+		return err
+	}
+	log.V(5).Info("collected available deviceclasses", "size", len(tnt.Status.Classes.DeviceClasses))
+
 	log.V(5).Info("collecting available storageclasses")
 
 	if err = r.collectAvailableStorageClasses(ctx, tnt); err != nil {
@@ -102,6 +109,20 @@ func (r *Manager) collectAvailableResources(ctx context.Context, tnt *capsulev1b
 	return nil
 }
 
+func (r *Manager) collectAvailableDeviceClasses(ctx context.Context, tnt *capsulev1beta2.Tenant) (err error) {
+	fmt.Println(tnt.Spec.DeviceClasses)
+	if tnt.Status.Classes.DeviceClasses, err = listObjectNamesBySelector(
+		ctx,
+		r.Client,
+		tnt.Spec.DeviceClasses,
+		&resources.DeviceClassList{},
+	); err != nil {
+		return err
+	}
+	fmt.Println("Kurec %s %s \n", tnt.Status.Classes.DeviceClasses, err)
+	return nil
+}
+
 func (r *Manager) collectAvailableStorageClasses(ctx context.Context, tnt *capsulev1beta2.Tenant) (err error) {
 	if tnt.Status.Classes.StorageClasses, err = listObjectNamesBySelector(
 		ctx,
@@ -111,7 +132,6 @@ func (r *Manager) collectAvailableStorageClasses(ctx context.Context, tnt *capsu
 	); err != nil {
 		return err
 	}
-
 	return nil
 }
 

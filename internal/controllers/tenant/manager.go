@@ -74,6 +74,15 @@ func (r *Manager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.Controller
 			handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &capsulev1beta2.Tenant{}),
 		).
 		Watches(
+			&resources.DeviceClass{},
+			r.statusOnlyHandlerClasses(
+				r.reconcileClassStatus,
+				r.collectAvailableDeviceClasses,
+				"cannot collect device classes",
+			),
+			builder.WithPredicates(utils.UpdatedMetadataPredicate),
+		).
+		Watches(
 			&storagev1.StorageClass{},
 			r.statusOnlyHandlerClasses(
 				r.reconcileClassStatus,

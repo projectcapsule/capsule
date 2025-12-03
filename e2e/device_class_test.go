@@ -83,9 +83,11 @@ var _ = Describe("when Tenant handles Device classes", Label("tenant", "classes"
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: []api.OwnerSpec{
 				{
-					UserSpec: api.UserSpec{
-						Name: "authorized-deviceclass",
-						Kind: "User",
+					CoreOwnerSpec: api.CoreOwnerSpec{
+						UserSpec: api.UserSpec{
+							Name: "authorized-deviceclass",
+							Kind: "User",
+						},
 					},
 				},
 			},
@@ -107,9 +109,11 @@ var _ = Describe("when Tenant handles Device classes", Label("tenant", "classes"
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: []api.OwnerSpec{
 				{
-					UserSpec: api.UserSpec{
-						Name: "unauthorized-deviceclass",
-						Kind: "User",
+					CoreOwnerSpec: api.CoreOwnerSpec{
+						UserSpec: api.UserSpec{
+							Name: "unauthorized-deviceclass",
+							Kind: "User",
+						},
 					},
 				},
 			},
