@@ -132,6 +132,7 @@ func (r *Manager) collectAvailableStorageClasses(ctx context.Context, tnt *capsu
 	); err != nil {
 		return err
 	}
+
 	return nil
 }
 
