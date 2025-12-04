@@ -129,7 +129,10 @@ spec:
                       type: string
                     type: array
                   allowedRegex:
-                    description: Match elements by regex (DEPRECATED)
+                    description: |-
+                      Deprecated: will be removed in a future release
+
+                      Match elements by regex.
                     type: string
                 type: object
               imagePullPolicies:
@@ -160,7 +163,10 @@ spec:
                           type: string
                         type: array
                       allowedRegex:
-                        description: Match elements by regex (DEPRECATED)
+                        description: |-
+                          Deprecated: will be removed in a future release
+
+                          Match elements by regex.
                         type: string
                     type: object
                   allowedHostnames:
@@ -176,7 +182,10 @@ spec:
                           type: string
                         type: array
                       allowedRegex:
-                        description: Match elements by regex (DEPRECATED)
+                        description: |-
+                          Deprecated: will be removed in a future release
+
+                          Match elements by regex.
                         type: string
                     type: object
                   hostnameCollisionScope:
@@ -855,7 +864,10 @@ spec:
                       type: string
                     type: array
                   allowedRegex:
-                    description: Match elements by regex (DEPRECATED)
+                    description: |-
+                      Deprecated: will be removed in a future release
+
+                      Match elements by regex.
                     type: string
                 type: object
               resourceQuotas:
@@ -1030,7 +1042,10 @@ spec:
                       type: string
                     type: array
                   allowedRegex:
-                    description: Match elements by regex (DEPRECATED)
+                    description: |-
+                      Deprecated: will be removed in a future release
+
+                      Match elements by regex.
                     type: string
                 type: object
             required:
@@ -1185,7 +1200,10 @@ spec:
                       type: string
                     type: array
                   allowedRegex:
-                    description: Match elements by regex (DEPRECATED)
+                    description: |-
+                      Deprecated: will be removed in a future release
+
+                      Match elements by regex.
                     type: string
                 type: object
               cordoned:
@@ -1203,7 +1221,10 @@ spec:
                       type: string
                     type: array
                   allowedRegex:
-                    description: Match elements by regex (DEPRECATED)
+                    description: |-
+                      Deprecated: will be removed in a future release
+
+                      Match elements by regex.
                     type: string
                   matchExpressions:
                     description: matchExpressions is a list of label selector requirements.
@@ -1271,7 +1292,10 @@ spec:
                           type: string
                         type: array
                       allowedRegex:
-                        description: Match elements by regex (DEPRECATED)
+                        description: |-
+                          Deprecated: will be removed in a future release
+
+                          Match elements by regex.
                         type: string
                       default:
                         type: string
@@ -1352,7 +1376,10 @@ spec:
                           type: string
                         type: array
                       allowedRegex:
-                        description: Match elements by regex (DEPRECATED)
+                        description: |-
+                          Deprecated: will be removed in a future release
+
+                          Match elements by regex.
                         type: string
                       default:
                         type: string
@@ -1412,7 +1439,10 @@ spec:
                           type: string
                         type: array
                       allowedRegex:
-                        description: Match elements by regex (DEPRECATED)
+                        description: |-
+                          Deprecated: will be removed in a future release
+
+                          Match elements by regex.
                         type: string
                     type: object
                   hostnameCollisionScope:
@@ -1436,8 +1466,9 @@ spec:
                 type: object
               limitRanges:
                 description: |-
-                  Specifies the resource min/max usage restrictions to the Tenant. The assigned values are inherited by any namespace created in the Tenant. Optional.
                   Deprecated: Use Tenant Replications instead (https://projectcapsule.dev/docs/replications/)
+
+                  Specifies the resource min/max usage restrictions to the Tenant. The assigned values are inherited by any namespace created in the Tenant. Optional.
                 properties:
                   items:
                     items:
@@ -1527,8 +1558,9 @@ spec:
                 properties:
                   additionalMetadata:
                     description: |-
+                      Deprecated: Use additionalMetadataList instead (https://projectcapsule.dev/docs/tenants/metadata/#additionalmetadatalist)
+
                       Specifies additional labels and annotations the Capsule operator places on any Namespace resource in the Tenant. Optional.
-                      Deprecated: Use additionalMetadataList instead
                     properties:
                       annotations:
                         additionalProperties:
@@ -1642,8 +1674,9 @@ spec:
                 type: object
               networkPolicies:
                 description: |-
-                  Specifies the NetworkPolicies assigned to the Tenant. The assigned NetworkPolicies are inherited by any namespace created in the Tenant. Optional.
                   Deprecated: Use Tenant Replications instead (https://projectcapsule.dev/docs/replications/)
+
+                  Specifies the NetworkPolicies assigned to the Tenant. The assigned NetworkPolicies are inherited by any namespace created in the Tenant. Optional.
                 properties:
                   items:
                     items:
@@ -2292,7 +2325,10 @@ spec:
                       type: string
                     type: array
                   allowedRegex:
-                    description: Match elements by regex (DEPRECATED)
+                    description: |-
+                      Deprecated: will be removed in a future release
+
+                      Match elements by regex.
                     type: string
                   default:
                     type: string
@@ -2439,7 +2475,10 @@ spec:
                       type: string
                     type: array
                   allowedRegex:
-                    description: Match elements by regex (DEPRECATED)
+                    description: |-
+                      Deprecated: will be removed in a future release
+
+                      Match elements by regex.
                     type: string
                   default:
                     type: string
@@ -2572,7 +2611,10 @@ spec:
                       type: string
                     type: array
                   allowedRegex:
-                    description: Match elements by regex (DEPRECATED)
+                    description: |-
+                      Deprecated: will be removed in a future release
+
+                      Match elements by regex.
                     type: string
                   default:
                     type: string

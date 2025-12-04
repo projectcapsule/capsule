@@ -108,6 +108,7 @@ func appendHostnameError(spec api.AllowedListSpec) (append string) {
 		append = fmt.Sprintf(", specify one of the following (%s)", strings.Join(spec.Exact, ", "))
 	}
 
+	//nolint:staticcheck
 	if len(spec.Regex) > 0 {
 		append += fmt.Sprintf(", or matching the regex %s", spec.Regex)
 	}

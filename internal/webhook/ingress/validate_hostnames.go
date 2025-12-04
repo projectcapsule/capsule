@@ -114,6 +114,7 @@ func (r *hostnames) validateHostnames(tenant capsulev1beta2.Tenant, hostnames se
 
 	var notMatchingHostnames []string
 
+	//nolint:staticcheck
 	if allowedRegex := tenant.Spec.IngressOptions.AllowedHostnames.Regex; len(allowedRegex) > 0 {
 		for currentHostname := range hostnames {
 			matched, _ = regexp.MatchString(allowedRegex, currentHostname)

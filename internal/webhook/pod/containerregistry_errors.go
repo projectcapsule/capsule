@@ -43,6 +43,7 @@ func (f registryClassForbiddenError) Error() (err string) {
 		extra = append(extra, fmt.Sprintf("use one from the following list (%s)", strings.Join(f.spec.Exact, ", ")))
 	}
 
+	//nolint:staticcheck
 	if len(f.spec.Regex) > 0 {
 		extra = append(extra, fmt.Sprintf(" use one matching the following regex (%s)", f.spec.Regex))
 	}

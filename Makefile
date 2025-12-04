@@ -97,9 +97,7 @@ helm-test: kind
 	@$(KIND) delete cluster --name capsule-charts
 
 helm-test-exec: ct helm-controller-version ko-build-all
-	$(MAKE) docker-build-capsule-trace
 	$(MAKE) e2e-load-image CLUSTER_NAME=capsule-charts IMAGE=$(CAPSULE_IMG) VERSION=v0.0.0
-	$(MAKE) e2e-load-image CLUSTER_NAME=capsule-charts IMAGE=$(CAPSULE_IMG) VERSION=tracing
 	@$(KUBECTL) create ns capsule-system || true
 	@$(KUBECTL) apply --force-conflicts --server-side=true -f https://github.com/grafana/grafana-operator/releases/download/v5.18.0/crds.yaml
 	@$(KUBECTL) apply --force-conflicts --server-side=true -f https://github.com/cert-manager/cert-manager/releases/download/v1.9.1/cert-manager.crds.yaml
@@ -159,6 +157,26 @@ dev-setup:
 		capsule \
 		./charts/capsule
 	$(KUBECTL) -n capsule-system scale deployment capsule-controller-manager --replicas=0 || true
+
+setup-monitoring: dev-setup-fluxcd
+	@$(KUBECTL) kustomize --load-restrictor='LoadRestrictionsNone' hack/distro/monitoring | envsubst | kubectl apply -f -
+	@$(KUBECTL) kustomize --load-restrictor='LoadRestrictionsNone' hack/distro/monitoring/dashboards | kubectl apply -f -
+	@$(MAKE) wait-for-helmreleases
+	@printf "\n\033[32mAccess Grafana:\033[0m\n\n"
+	@printf "  \033[1mkubectl port-forward svc/kube-prometheus-stack-grafana 9090:80 -n monitoring-system\033[0m\n\n"
+
+dev-setup-monitoring: setup-monitoring
+	@$(KUBECTL) kustomize --load-restrictor='LoadRestrictionsNone' hack/distro/host-proxy | envsubst | kubectl apply -f -
+
+dev-setup-fluxcd:
+	@$(KUBECTL) kustomize --load-restrictor='LoadRestrictionsNone' hack/distro/fluxcd | envsubst | kubectl apply -f -
+
+wait-for-helmreleases:
+	@ echo "Waiting for all HelmReleases to have observedGeneration >= 0..."
+	@while [ "$$($(KUBECTL) get helmrelease -A -o jsonpath='{range .items[?(@.status.observedGeneration<0)]}{.metadata.namespace}{" "}{.metadata.name}{"\n"}{end}' | wc -l)" -ne 0 ]; do \
+	  sleep 5; \
+	done
+
 
 ####################
 # -- Docker

@@ -29,6 +29,7 @@ func AllowedValuesErrorMessage(allowed api.SelectorAllowedListSpec, err string) 
 		extra = append(extra, fmt.Sprintf("use one from the following list (%s)", strings.Join(allowed.Exact, ", ")))
 	}
 
+	//nolint:staticcheck
 	if len(allowed.Regex) > 0 {
 		extra = append(extra, fmt.Sprintf("use one matching the following regex (%s)", allowed.Regex))
 	}

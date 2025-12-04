@@ -21,8 +21,9 @@ import (
 // Ensuring all the LimitRange are applied to each Namespace handled by the Tenant.
 func (r *Manager) syncLimitRanges(ctx context.Context, tenant *capsulev1beta2.Tenant) error { //nolint:dupl
 	// getting requested LimitRange keys
-	keys := make([]string, 0, len(tenant.Spec.LimitRanges.Items))
+	keys := make([]string, 0, len(tenant.Spec.LimitRanges.Items)) //nolint:staticcheck
 
+	//nolint:staticcheck
 	for i := range tenant.Spec.LimitRanges.Items {
 		keys = append(keys, strconv.Itoa(i))
 	}
@@ -45,6 +46,7 @@ func (r *Manager) syncLimitRange(ctx context.Context, tenant *capsulev1beta2.Ten
 		return err
 	}
 
+	//nolint:staticcheck
 	for i, spec := range tenant.Spec.LimitRanges.Items { //nolint:dupl
 		target := &corev1.LimitRange{
 			ObjectMeta: metav1.ObjectMeta{

@@ -8,21 +8,23 @@ import (
 )
 
 // +kubebuilder:object:generate=true
-
 type UserListSpec []UserSpec
 
 func (u UserListSpec) IsPresent(name string, groups []string) bool {
+	groupSet := make(map[string]struct{}, len(groups))
+	for _, g := range groups {
+		groupSet[g] = struct{}{}
+	}
+
 	for _, user := range u {
 		switch user.Kind {
 		case UserOwner, ServiceAccountOwner:
-			if name == user.Name {
+			if user.Name == name {
 				return true
 			}
 		case GroupOwner:
-			for _, group := range groups {
-				if group == user.Name {
-					return true
-				}
+			if _, ok := groupSet[user.Name]; ok {
+				return true
 			}
 		}
 	}
@@ -30,17 +32,60 @@ func (u UserListSpec) IsPresent(name string, groups []string) bool {
 	return false
 }
 
-func (o UserListSpec) FindUser(name string, kind OwnerKind) (owner UserSpec) {
+//nolint:dupl
+func (o UserListSpec) FindUser(name string, kind OwnerKind) (UserSpec, bool) {
 	sort.Sort(ByKindName(o))
-	i := sort.Search(len(o), func(i int) bool {
-		return o[i].Kind >= kind && o[i].Name >= name
+
+	targetKind := kind.String()
+	n := len(o)
+
+	idx := sort.Search(n, func(i int) bool {
+		ki := o[i].Kind.String()
+
+		switch {
+		case ki > targetKind:
+			return true
+		case ki < targetKind:
+			return false
+		default:
+			return o[i].Name >= name
+		}
 	})
 
-	if i < len(o) && o[i].Kind == kind && o[i].Name == name {
-		return o[i]
+	if idx < n &&
+		o[idx].Kind.String() == targetKind &&
+		o[idx].Name == name {
+		return o[idx], true
 	}
 
-	return owner
+	return UserSpec{}, false
+}
+
+func (o UserListSpec) GetByKinds(kinds []OwnerKind) []string {
+	if len(o) == 0 || len(kinds) == 0 {
+		return nil
+	}
+
+	kindSet := make(map[OwnerKind]struct{}, len(kinds))
+	for _, k := range kinds {
+		kindSet[k] = struct{}{}
+	}
+
+	names := make([]string, 0, len(o))
+
+	for _, u := range o {
+		if _, ok := kindSet[u.Kind]; ok {
+			names = append(names, u.Name)
+		}
+	}
+
+	if len(names) == 0 {
+		return nil
+	}
+
+	sort.Strings(names)
+
+	return names
 }
 
 type ByKindName UserListSpec

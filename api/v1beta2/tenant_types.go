@@ -37,11 +37,13 @@ type TenantSpec struct {
 	ContainerRegistries *api.AllowedListSpec `json:"containerRegistries,omitempty"`
 	// Specifies the label to control the placement of pods on a given pool of worker nodes. All namespaces created within the Tenant will have the node selector annotation. This annotation tells the Kubernetes scheduler to place pods on the nodes having the selector label. Optional.
 	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
+	// Deprecated: Use Tenant Replications instead (https://projectcapsule.dev/docs/replications/)
+	//
 	// Specifies the NetworkPolicies assigned to the Tenant. The assigned NetworkPolicies are inherited by any namespace created in the Tenant. Optional.
-	// Deprecated: Use Tenant Replications instead (https://projectcapsule.dev/docs/replications/)
 	NetworkPolicies api.NetworkPolicySpec `json:"networkPolicies,omitempty"`
-	// Specifies the resource min/max usage restrictions to the Tenant. The assigned values are inherited by any namespace created in the Tenant. Optional.
 	// Deprecated: Use Tenant Replications instead (https://projectcapsule.dev/docs/replications/)
+	//
+	// Specifies the resource min/max usage restrictions to the Tenant. The assigned values are inherited by any namespace created in the Tenant. Optional.
 	LimitRanges api.LimitRangesSpec `json:"limitRanges,omitempty"`
 	// Specifies a list of ResourceQuota resources assigned to the Tenant. The assigned values are inherited by any namespace created in the Tenant. The Capsule operator aggregates ResourceQuota at Tenant level, so that the hard quota is never crossed for the given Tenant. This permits the Tenant owner to consume resources in the Tenant regardless of the namespace. Optional.
 	ResourceQuota api.ResourceQuotaSpec `json:"resourceQuotas,omitempty"`

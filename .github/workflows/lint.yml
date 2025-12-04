@@ -23,6 +23,7 @@ jobs:
           go-version-file: 'go.mod'
       - name: Generate manifests
         run: |
+          make generate
           make manifests
           if [[ $(git diff --stat) != '' ]]; then
             echo -e '\033[0;31mManifests outdated! (Run make manifests locally and commit)\033[0m ❌'

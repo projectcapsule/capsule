@@ -11,8 +11,15 @@ import (
 
 // CapsuleConfigurationSpec defines the Capsule configuration.
 type CapsuleConfigurationSpec struct {
+	// Define entities which are considered part of the Capsule construct
+	// Users not mentioned here will be ignored by Capsule
+	Users api.UserListSpec `json:"users,omitempty"`
+	// Deprecated: use users property instead (https://projectcapsule.dev/docs/operating/setup/configuration/#users)
+	//
 	// Names of the users considered as Capsule users.
 	UserNames []string `json:"userNames,omitempty"`
+	// Deprecated: use users property instead (https://projectcapsule.dev/docs/operating/setup/configuration/#users)
+	//
 	// Names of the groups considered as Capsule users.
 	// +kubebuilder:default={capsule.clastix.io}
 	UserGroups []string `json:"userGroups,omitempty"`
