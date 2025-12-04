@@ -70,9 +70,13 @@ $ make deploy
 # To retrieve your laptop's IP and execute `make dev-setup` to setup dev env
 # For example: LAPTOP_HOST_IP=192.168.10.101 make dev-setup
 $ LAPTOP_HOST_IP="<YOUR_LAPTOP_IP>" make dev-setup
+
+
+# Monitoring Setup (Grafana/Prometheus/Pyroscope)
+$ LAPTOP_HOST_IP="<YOUR_LAPTOP_IP>" make dev-setup-monitoring
 ```
 
-### Explenation
+### Setup
 
 We recommend to setup the development environment with the make `dev-setup` target. However here is a step by step guide to setup the development environment for understanding.
 
