@@ -44,6 +44,44 @@ webhooks:
   timeoutSeconds: {{ $.Values.webhooks.validatingWebhooksTimeoutSeconds }}
   {{- end }}
 {{- end }}
+{{- with .Values.webhooks.hooks.devices }}
+  {{- if .enabled }}
+- name: devices.projectcapsule.dev
+  admissionReviewVersions:
+    - v1
+    - v1beta1
+  clientConfig:
+    {{- include "capsule.webhooks.service" (dict "path" "/devices" "ctx" $) | nindent 4 }}
+  failurePolicy: {{ .failurePolicy }}
+  matchPolicy: {{ .matchPolicy }}
+  {{- with .namespaceSelector }}
+  namespaceSelector:
+    {{- toYaml . |  nindent 4 }}
+  {{- end }}
+  {{- with .objectSelector }}
+  objectSelector:
+    {{- toYaml . |  nindent 4 }}
+  {{- end }}
+  {{- with .matchConditions }}
+  matchConditions:
+    {{- toYaml . |  nindent 4 }}
+  {{- end }}
+  rules:
+    - apiGroups:
+        - resource.k8s.io
+      apiVersions:
+        - v1
+      operations:
+        - CREATE
+        - UPDATE
+      resources:
+        - resourceclaimtemplates
+        - resourceclaims
+      scope: Namespaced
+  sideEffects: None
+  timeoutSeconds: {{ $.Values.webhooks.validatingWebhooksTimeoutSeconds }}
+  {{- end }}
+{{- end }}
 {{- with .Values.webhooks.hooks.gateways }}
   {{- if .enabled }}
 - name: gateway.projectcapsule.dev

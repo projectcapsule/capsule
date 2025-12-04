@@ -44,6 +44,7 @@ import (
 	"github.com/projectcapsule/capsule/internal/metrics"
 	"github.com/projectcapsule/capsule/internal/webhook"
 	"github.com/projectcapsule/capsule/internal/webhook/defaults"
+	"github.com/projectcapsule/capsule/internal/webhook/dra"
 	"github.com/projectcapsule/capsule/internal/webhook/gateway"
 	"github.com/projectcapsule/capsule/internal/webhook/ingress"
 	"github.com/projectcapsule/capsule/internal/webhook/misc"
@@ -267,6 +268,7 @@ func main() {
 		),
 		route.CustomResources(tenantvalidation.ResourceCounterHandler(manager.GetClient())),
 		route.Gateway(gateway.Class(cfg)),
+		route.DeviceClass(dra.DeviceClass()),
 		route.Defaults(defaults.Handler(cfg, kubeVersion)),
 		route.TenantMutation(
 			tenantmutation.MetaHandler(),

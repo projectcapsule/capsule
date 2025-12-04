@@ -12,6 +12,7 @@ import (
 	networkingv1 "k8s.io/api/networking/v1"
 	nodev1 "k8s.io/api/node/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	resources "k8s.io/api/resource/v1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -71,6 +72,15 @@ func (r *Manager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.Controller
 		Watches(
 			&corev1.Namespace{},
 			handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &capsulev1beta2.Tenant{}),
+		).
+		Watches(
+			&resources.DeviceClass{},
+			r.statusOnlyHandlerClasses(
+				r.reconcileClassStatus,
+				r.collectAvailableDeviceClasses,
+				"cannot collect device classes",
+			),
+			builder.WithPredicates(utils.UpdatedMetadataPredicate),
 		).
 		Watches(
 			&storagev1.StorageClass{},
