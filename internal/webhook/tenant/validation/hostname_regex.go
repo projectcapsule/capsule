@@ -49,6 +49,7 @@ func (h *hostnameRegexHandler) OnUpdate(_ client.Client, decoder admission.Decod
 	}
 }
 
+//nolint:staticcheck
 func (h *hostnameRegexHandler) validate(decoder admission.Decoder, req admission.Request) *admission.Response {
 	tenant := &capsulev1beta2.Tenant{}
 	if err := decoder.Decode(req, tenant); err != nil {

@@ -43,6 +43,7 @@ import (
 	utilscontroller "github.com/projectcapsule/capsule/internal/controllers/utils"
 	"github.com/projectcapsule/capsule/internal/metrics"
 	"github.com/projectcapsule/capsule/internal/webhook"
+	cfgvalidation "github.com/projectcapsule/capsule/internal/webhook/cfg"
 	"github.com/projectcapsule/capsule/internal/webhook/defaults"
 	"github.com/projectcapsule/capsule/internal/webhook/dra"
 	"github.com/projectcapsule/capsule/internal/webhook/gateway"
@@ -88,11 +89,11 @@ func printVersion() {
 	setupLog.Info(fmt.Sprintf("Go OS/Arch: %s/%s", goRuntime.GOOS, goRuntime.GOARCH))
 }
 
-//nolint:maintidx
+//nolint:maintidx,cyclop
 func main() {
 	controllerConfig := utilscontroller.ControllerOptions{}
 
-	var enableLeaderElection, version bool
+	var enableLeaderElection, enablePprof, version bool
 
 	var metricsAddr, ns string
 
@@ -108,6 +109,7 @@ func main() {
 			"Enabling this will ensure there is only one active controller manager.")
 	flag.BoolVar(&version, "version", false, "Print the Capsule version and exit")
 	flag.StringVar(&controllerConfig.ConfigurationName, "configuration-name", "default", "The CapsuleConfiguration resource name to use")
+	flag.BoolVar(&enablePprof, "enable-pprof", false, "Enables Pprof endpoint for profiling (not recommend in production)")
 
 	opts := zap.Options{
 		EncoderConfigOptions: append([]zap.EncoderConfigOption{}, func(config *zapcore.EncoderConfig) {
@@ -139,7 +141,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	manager, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
+	ctrlOpts := ctrl.Options{
 		Scheme: scheme,
 		Metrics: metricsserver.Options{
 			BindAddress: metricsAddr,
@@ -155,7 +157,13 @@ func main() {
 
 			return client.New(config, options)
 		},
-	})
+	}
+
+	if enablePprof {
+		ctrlOpts.PprofBindAddress = ":8082"
+	}
+
+	manager, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrlOpts)
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
 		os.Exit(1)
@@ -310,6 +318,9 @@ func main() {
 		route.ResourcePoolClaimValidation((resourcepool.ClaimValidationHandler(ctrl.Log.WithName("webhooks").WithName("resourcepoolclaims")))),
 		route.TenantAssignment(
 			misc.TenantAssignmentHandler(),
+		),
+		route.ConfigValidation(
+			cfgvalidation.WarningHandler(),
 		),
 	)
 

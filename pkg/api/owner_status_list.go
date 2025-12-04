@@ -88,6 +88,7 @@ func (o OwnerStatusListSpec) IsOwner(name string, groups []string) bool {
 	return false
 }
 
+//nolint:dupl
 func (o OwnerStatusListSpec) FindOwner(name string, kind OwnerKind) (CoreOwnerSpec, bool) {
 	// Sort in-place by (Kind.String(), Name).
 	sort.Sort(GetByKindAndName(o))

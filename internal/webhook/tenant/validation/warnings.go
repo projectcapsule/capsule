@@ -63,32 +63,53 @@ func (h *warningHandler) handle(tnt *capsulev1beta2.Tenant, decoder admission.De
 		},
 	}
 
+	//nolint:staticcheck
 	if len(tnt.Spec.LimitRanges.Items) > 0 {
-		response.Warnings = append(response.Warnings, "Limitranges are deprecated and will be removed int the future. You need to consider to migrate to TenantReplications: https://projectcapsule.dev/docs/tenants/enforcement/#limitrange-distribution-with-tenantreplications.")
+		response.Warnings = append(response.Warnings,
+			"The field `limitRanges` is deprecated and will be removed in a future release. Please migrate to TenantReplications. See: https://projectcapsule.dev/docs/tenants/enforcement/#limitrange-distribution-with-tenantreplications.",
+		)
 	}
 
+	//nolint:staticcheck
 	if len(tnt.Spec.NetworkPolicies.Items) > 0 {
-		response.Warnings = append(response.Warnings, "NetworkPolicies are deprecated and will be removed int the future. You need to consider to migrate to TenantReplications: https://projectcapsule.dev/docs/tenants/enforcement/#networkpolicy-distribution-with-tenantreplications.")
+		response.Warnings = append(response.Warnings,
+			"The field `networkPolicies` is deprecated and will be removed in a future release. Please migrate to TenantReplications. See: https://projectcapsule.dev/docs/tenants/enforcement/#networkpolicy-distribution-with-tenantreplications.",
+		)
 	}
 
+	//nolint:staticcheck
 	if tnt.Spec.NamespaceOptions != nil && tnt.Spec.NamespaceOptions.AdditionalMetadata != nil {
-		response.Warnings = append(response.Warnings, "additionalMetadata is deprecated and will be removed int the future. You need to consider to migrate to AdditionalMetadataList: https://projectcapsule.dev/docs/tenants/enforcement/#additionalmetadatalist.")
+		response.Warnings = append(response.Warnings,
+			"The field `additionalMetadata` is deprecated and will be removed in a future release. Please migrate to `additionalMetadataList`. See: https://projectcapsule.dev/docs/tenants/metadata/#additionalmetadatalist.",
+		)
 	}
 
+	//nolint:staticcheck
 	if tnt.Spec.StorageClasses != nil && tnt.Spec.StorageClasses.Regex != "" {
-		response.Warnings = append(response.Warnings, "Using the regex property to select StorageClasses is deprecated and will be removed int the future.")
+		response.Warnings = append(response.Warnings,
+			"The `regex` selector for StorageClasses is deprecated and will be removed in a future release.",
+		)
 	}
 
+	//nolint:staticcheck
 	if tnt.Spec.GatewayOptions.AllowedClasses != nil && tnt.Spec.GatewayOptions.AllowedClasses.Regex != "" {
-		response.Warnings = append(response.Warnings, "Using the regex property to select GatewayClasses is deprecated and will be removed int the future.")
+		response.Warnings = append(response.Warnings,
+			"The `regex` selector for GatewayClasses is deprecated and will be removed in a future release.",
+		)
 	}
 
+	//nolint:staticcheck
 	if tnt.Spec.PriorityClasses != nil && tnt.Spec.PriorityClasses.Regex != "" {
-		response.Warnings = append(response.Warnings, "Using the regex property to select PriorityClasses is deprecated and will be removed int the future.")
+		response.Warnings = append(response.Warnings,
+			"The `regex` selector for PriorityClasses is deprecated and will be removed in a future release.",
+		)
 	}
 
+	//nolint:staticcheck
 	if tnt.Spec.RuntimeClasses != nil && tnt.Spec.RuntimeClasses.Regex != "" {
-		response.Warnings = append(response.Warnings, "Using the regex property to select RuntimeClasses is deprecated and will be removed int the future.")
+		response.Warnings = append(response.Warnings,
+			"The `regex` selector for RuntimeClasses is deprecated and will be removed in a future release.",
+		)
 	}
 
 	return response

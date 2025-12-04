@@ -73,6 +73,7 @@ func BuildNamespaceMetadataForTenant(ns *corev1.Namespace, tnt *capsulev1beta2.T
 func BuildNamespaceAnnotationsForTenant(tnt *capsulev1beta2.Tenant) map[string]string {
 	annotations := make(map[string]string)
 
+	//nolint:staticcheck
 	if md := tnt.Spec.NamespaceOptions; md != nil && md.AdditionalMetadata != nil {
 		maps.Copy(annotations, md.AdditionalMetadata.Annotations)
 	}
@@ -86,6 +87,7 @@ func BuildNamespaceAnnotationsForTenant(tnt *capsulev1beta2.Tenant) map[string]s
 			annotations[meta.AvailableIngressClassesAnnotation] = strings.Join(ic.Exact, ",")
 		}
 
+		//nolint:staticcheck
 		if len(ic.Regex) > 0 {
 			annotations[meta.AvailableIngressClassesRegexpAnnotation] = ic.Regex
 		}
@@ -96,6 +98,7 @@ func BuildNamespaceAnnotationsForTenant(tnt *capsulev1beta2.Tenant) map[string]s
 			annotations[meta.AvailableStorageClassesAnnotation] = strings.Join(sc.Exact, ",")
 		}
 
+		//nolint:staticcheck
 		if len(sc.Regex) > 0 {
 			annotations[meta.AvailableStorageClassesRegexpAnnotation] = sc.Regex
 		}
@@ -106,6 +109,7 @@ func BuildNamespaceAnnotationsForTenant(tnt *capsulev1beta2.Tenant) map[string]s
 			annotations[meta.AllowedRegistriesAnnotation] = strings.Join(cr.Exact, ",")
 		}
 
+		//nolint:staticcheck
 		if len(cr.Regex) > 0 {
 			annotations[meta.AllowedRegistriesRegexpAnnotation] = cr.Regex
 		}
@@ -128,6 +132,7 @@ func BuildNamespaceAnnotationsForTenant(tnt *capsulev1beta2.Tenant) map[string]s
 func BuildNamespaceLabelsForTenant(tnt *capsulev1beta2.Tenant) map[string]string {
 	labels := make(map[string]string)
 
+	//nolint:staticcheck
 	if md := tnt.Spec.NamespaceOptions; md != nil && md.AdditionalMetadata != nil {
 		maps.Copy(labels, md.AdditionalMetadata.Labels)
 	}

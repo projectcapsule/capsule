@@ -285,14 +285,16 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 
 		return result, err
 	}
+
 	// Ensuring LimitRange resources
-	r.Log.V(4).Info("Starting processing of Limit Ranges", "items", len(instance.Spec.LimitRanges.Items))
+	r.Log.V(4).Info("Starting processing of Limit Ranges", "items", len(instance.Spec.LimitRanges.Items)) //nolint:staticcheck
 
 	if err = r.syncLimitRanges(ctx, instance); err != nil {
 		err = fmt.Errorf("cannot sync limitrange items: %w", err)
 
 		return result, err
 	}
+
 	// Ensuring ResourceQuota resources
 	r.Log.V(4).Info("Starting processing of Resource Quotas", "items", len(instance.Spec.ResourceQuota.Items))
 
@@ -301,6 +303,7 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 
 		return result, err
 	}
+
 	// Ensuring RoleBinding resources
 	r.Log.V(4).Info("Ensuring RoleBindings for Owners and Tenant")
 
