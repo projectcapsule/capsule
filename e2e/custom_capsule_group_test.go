@@ -69,7 +69,9 @@ var _ = Describe("creating a Namespace as Tenant owner with custom --capsule-gro
 
 	It("should fail using a User non matching the capsule-user-group flag", func() {
 		ModifyCapsuleConfigurationOpts(func(configuration *capsulev1beta2.CapsuleConfiguration) {
-			configuration.Spec.UserGroups = []string{"test"}
+			configuration.Spec.UserNames = []string{}
+			configuration.Spec.UserGroups = []string{}
+			configuration.Spec.Users = []api.UserSpec{{Kind: api.GroupOwner, Name: "test"}}
 		})
 
 		ns := NewNamespace("")
@@ -78,7 +80,9 @@ var _ = Describe("creating a Namespace as Tenant owner with custom --capsule-gro
 
 	It("should succeed and be available in Tenant namespaces list with multiple groups", func() {
 		ModifyCapsuleConfigurationOpts(func(configuration *capsulev1beta2.CapsuleConfiguration) {
-			configuration.Spec.UserGroups = []string{"test", "alice"}
+			configuration.Spec.UserNames = []string{}
+			configuration.Spec.UserGroups = []string{}
+			configuration.Spec.Users = []api.UserSpec{{Kind: api.UserOwner, Name: "alice"}, {Kind: api.GroupOwner, Name: "test"}}
 		})
 
 		ns := NewNamespace("")
@@ -89,7 +93,9 @@ var _ = Describe("creating a Namespace as Tenant owner with custom --capsule-gro
 
 	It("should succeed and be available in Tenant namespaces list with default single group", func() {
 		ModifyCapsuleConfigurationOpts(func(configuration *capsulev1beta2.CapsuleConfiguration) {
-			configuration.Spec.UserGroups = []string{"projectcapsule.dev"}
+			configuration.Spec.UserNames = []string{}
+			configuration.Spec.UserGroups = []string{}
+			configuration.Spec.Users = []api.UserSpec{{Kind: api.GroupOwner, Name: "projectcapsule.dev"}}
 		})
 
 		ns := NewNamespace("")
@@ -100,7 +106,9 @@ var _ = Describe("creating a Namespace as Tenant owner with custom --capsule-gro
 
 	It("should fail when group is ignored", func() {
 		ModifyCapsuleConfigurationOpts(func(configuration *capsulev1beta2.CapsuleConfiguration) {
-			configuration.Spec.UserGroups = []string{"projectcapsule.dev"}
+			configuration.Spec.UserNames = []string{}
+			configuration.Spec.UserGroups = []string{}
+			configuration.Spec.Users = []api.UserSpec{{Kind: api.GroupOwner, Name: "projectcapsule.dev"}}
 			configuration.Spec.IgnoreUserWithGroups = []string{"projectcapsule.dev"}
 		})
 
@@ -111,9 +119,10 @@ var _ = Describe("creating a Namespace as Tenant owner with custom --capsule-gro
 
 	It("should succeed and be available in Tenant namespaces list with default single user", func() {
 		ModifyCapsuleConfigurationOpts(func(configuration *capsulev1beta2.CapsuleConfiguration) {
+			configuration.Spec.UserNames = []string{}
 			configuration.Spec.UserGroups = []string{}
+			configuration.Spec.Users = []api.UserSpec{{Kind: api.UserOwner, Name: tnt.Spec.Owners[0].Name}}
 			configuration.Spec.IgnoreUserWithGroups = []string{}
-			configuration.Spec.UserNames = []string{tnt.Spec.Owners[0].Name}
 		})
 
 		ns := NewNamespace("")
@@ -123,9 +132,10 @@ var _ = Describe("creating a Namespace as Tenant owner with custom --capsule-gro
 
 	It("should succeed and be available in Tenant namespaces list with default single user", func() {
 		ModifyCapsuleConfigurationOpts(func(configuration *capsulev1beta2.CapsuleConfiguration) {
+			configuration.Spec.UserNames = []string{}
 			configuration.Spec.UserGroups = []string{}
 			configuration.Spec.IgnoreUserWithGroups = []string{}
-			configuration.Spec.UserNames = []string{tnt.Spec.Owners[0].Name}
+			configuration.Spec.Users = []api.UserSpec{{Kind: api.UserOwner, Name: tnt.Spec.Owners[0].Name}}
 		})
 
 		ns := NewNamespace("")
@@ -135,8 +145,9 @@ var _ = Describe("creating a Namespace as Tenant owner with custom --capsule-gro
 
 	It("should fail when group is ignored", func() {
 		ModifyCapsuleConfigurationOpts(func(configuration *capsulev1beta2.CapsuleConfiguration) {
+			configuration.Spec.UserNames = []string{}
 			configuration.Spec.UserGroups = []string{}
-			configuration.Spec.UserNames = []string{tnt.Spec.Owners[0].Name}
+			configuration.Spec.Users = []api.UserSpec{{Kind: api.UserOwner, Name: tnt.Spec.Owners[0].Name}}
 			configuration.Spec.IgnoreUserWithGroups = []string{"projectcapsule.dev"}
 		})
 

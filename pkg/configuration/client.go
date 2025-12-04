@@ -30,7 +30,7 @@ func NewCapsuleConfiguration(ctx context.Context, client client.Client, name str
 			if apierrors.IsNotFound(err) {
 				return &capsulev1beta2.CapsuleConfiguration{
 					Spec: capsulev1beta2.CapsuleConfigurationSpec{
-						UserGroups:                     []string{"projectcapsule.dev"},
+						Users:                          []capsuleapi.UserSpec{{Name: "projectcapsule.dev", Kind: capsuleapi.GroupOwner}},
 						ForceTenantPrefix:              false,
 						ProtectedNamespaceRegexpString: "",
 					},
@@ -86,12 +86,14 @@ func (c *capsuleConfiguration) ValidatingWebhookConfigurationName() (name string
 	return c.retrievalFn().Spec.CapsuleResources.ValidatingWebhookConfigurationName
 }
 
+//nolint:staticcheck
 func (c *capsuleConfiguration) UserGroups() []string {
-	return c.retrievalFn().Spec.UserGroups
+	return append(c.retrievalFn().Spec.UserGroups, c.retrievalFn().Spec.Users.GetByKinds([]capsuleapi.OwnerKind{capsuleapi.GroupOwner})...)
 }
 
+//nolint:staticcheck
 func (c *capsuleConfiguration) UserNames() []string {
-	return c.retrievalFn().Spec.UserNames
+	return append(c.retrievalFn().Spec.UserNames, c.retrievalFn().Spec.Users.GetByKinds([]capsuleapi.OwnerKind{capsuleapi.UserOwner, capsuleapi.ServiceAccountOwner})...)
 }
 
 func (c *capsuleConfiguration) IgnoreUserWithGroups() []string {

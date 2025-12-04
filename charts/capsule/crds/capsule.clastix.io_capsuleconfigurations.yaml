@@ -158,14 +158,42 @@ spec:
               userGroups:
                 default:
                 - capsule.clastix.io
-                description: Names of the groups considered as Capsule users.
+                description: |-
+                  Deprecated: use users property instead (https://projectcapsule.dev/docs/operating/setup/configuration/#users)
+
+                  Names of the groups considered as Capsule users.
                 items:
                   type: string
                 type: array
               userNames:
-                description: Names of the users considered as Capsule users.
+                description: |-
+                  Deprecated: use users property instead (https://projectcapsule.dev/docs/operating/setup/configuration/#users)
+
+                  Names of the users considered as Capsule users.
                 items:
                   type: string
+                type: array
+              users:
+                description: |-
+                  Define entities which are considered part of the Capsule construct
+                  Users not mentioned here will be ignored by Capsule
+                items:
+                  properties:
+                    kind:
+                      description: Kind of entity. Possible values are "User", "Group",
+                        and "ServiceAccount"
+                      enum:
+                      - User
+                      - Group
+                      - ServiceAccount
+                      type: string
+                    name:
+                      description: Name of the entity.
+                      type: string
+                  required:
+                  - kind
+                  - name
+                  type: object
                 type: array
             required:
             - enableTLSReconciler

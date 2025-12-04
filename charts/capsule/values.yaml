@@ -178,6 +178,11 @@ manager:
     workers: 1
     # -- Set the log verbosity of the capsule with a value from 1 to 5
     logLevel: '3'
+    # -- Define entities which are considered part of the Capsule construct.
+    # Users not mentioned here will be ignored by Capsule
+    users:
+      - kind: "Group"
+        name: "projectcapsule.dev"
     # -- Define entities which can act as Administrators in the capsule construct
     # These entities are automatically owners for all existing tenants. Meaning they can add namespaces to any tenant. However they must be specific by using the capsule label
     # for interacting with namespaces. Because if that label is not defined, it's assumed that namespace interaction was not targeted towards a tenant and will therefor
@@ -185,10 +190,6 @@ manager:
     administrators: []
     # - kind: User
     #   name: alice
-    # -- Names of the users considered as Capsule users.
-    userNames: []
-    # -- Names of the groups considered as Capsule users.
-    capsuleUserGroups: ["projectcapsule.dev"]
     # -- Define groups which when found in the request of a user will be ignored by the Capsule
     # this might be useful if you have one group where all the users are in, but you want to separate administrators from normal users with additional groups.
     ignoreUserWithGroups: []
@@ -210,6 +211,13 @@ manager:
       forbiddenAnnotations:
         denied: []
         deniedRegex: ""
+    # -- DEPRECATED: use users properties.
+    # Names of the users considered as Capsule users.
+    userNames: []
+    # -- DEPRECATED: use users properties.
+    # Names of the users considered as Capsule users.
+    capsuleUserGroups: []
+
 
   # -- A list of extra arguments for the capsule controller
   extraArgs:
@@ -643,6 +651,22 @@ webhooks:
       enabled: true
       # -- [FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy)
       failurePolicy: Fail
+      # -- [MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
+      matchPolicy: Exact
+      # -- [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector)
+      objectSelector: {}
+      # -- [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector)
+      namespaceSelector: {}
+      # -- [MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
+      matchConditions: []
+      # -- [ReinvocationPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#reinvocation-policy)
+      reinvocationPolicy: Never
+
+    config:
+      # -- Enable the Hook
+      enabled: true
+      # -- [FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy)
+      failurePolicy: Ignore
       # -- [MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
       matchPolicy: Exact
       # -- [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector)
