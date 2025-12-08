@@ -27,9 +27,11 @@ var _ = Describe("when handling Cluster scoped Ingress hostnames collision", Lab
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: api.OwnerListSpec{
 				{
-					UserSpec: api.UserSpec{
-						Name: "ingress-tenant-one",
-						Kind: "User",
+					CoreOwnerSpec: api.CoreOwnerSpec{
+						UserSpec: api.UserSpec{
+							Name: "ingress-tenant-one",
+							Kind: "User",
+						},
 					},
 				},
 			},
@@ -45,9 +47,11 @@ var _ = Describe("when handling Cluster scoped Ingress hostnames collision", Lab
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: api.OwnerListSpec{
 				{
-					UserSpec: api.UserSpec{
-						Name: "ingress-tenant-two",
-						Kind: "User",
+					CoreOwnerSpec: api.CoreOwnerSpec{
+						UserSpec: api.UserSpec{
+							Name: "ingress-tenant-two",
+							Kind: "User",
+						},
 					},
 				},
 			},

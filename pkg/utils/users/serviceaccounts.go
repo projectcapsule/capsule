@@ -39,7 +39,7 @@ func ResolveServiceAccountActor(
 	sa := &corev1.ServiceAccount{}
 	if err = c.Get(ctx, client.ObjectKey{Namespace: namespace, Name: name}, sa); err != nil {
 		if apierrors.IsNotFound(err) {
-			return tnt, err
+			return nil, nil
 		}
 
 		return tnt, err

@@ -132,12 +132,7 @@ func (h *handler) OnUpdate(c client.Client, decoder admission.Decoder, recorder 
 				}
 			}
 		} else {
-			owned, err := tenant.NamespaceIsOwned(ctx, c, h.cfg, oldNs, tnt, req.UserInfo)
-			if err != nil {
-				return utils.ErroredResponse(err)
-			}
-
-			if !owned {
+			if owned := tenant.NamespaceIsOwned(ctx, c, h.cfg, oldNs, tnt, req.UserInfo); !owned {
 				recorder.Eventf(oldNs, corev1.EventTypeWarning, "NamespacePatch", "Namespace %s can not be patched", oldNs.GetName())
 
 				response := admission.Denied("Denied patch request for this namespace")

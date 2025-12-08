@@ -43,22 +43,20 @@ func NewCapsuleConfiguration(ctx context.Context, client client.Client, rest *re
 							Name: name,
 						},
 						Spec: capsulev1beta2.CapsuleConfigurationSpec{
-							UserGroups:                     []string{"projectcapsule.dev"},
+							Users:                          []capsuleapi.UserSpec{{Name: "projectcapsule.dev", Kind: capsuleapi.GroupOwner}},
 							ForceTenantPrefix:              false,
 							ProtectedNamespaceRegexpString: "",
 						},
 					}
-
-					_ = client.Create(ctx, config)
-
-					return config
-
 				}
+
 				panic(errors.Wrap(err, "Cannot retrieve Capsule configuration with name "+name))
+
 			}
 
 			return config
-		}}
+		},
+	}
 }
 
 func (c *capsuleConfiguration) ProtectedNamespaceRegexp() (*regexp.Regexp, error) {
@@ -103,12 +101,14 @@ func (c *capsuleConfiguration) ValidatingWebhookConfigurationName() (name string
 	return c.retrievalFn().Spec.CapsuleResources.ValidatingWebhookConfigurationName
 }
 
+//nolint:staticcheck
 func (c *capsuleConfiguration) UserGroups() []string {
-	return c.retrievalFn().Spec.UserGroups
+	return append(c.retrievalFn().Spec.UserGroups, c.retrievalFn().Spec.Users.GetByKinds([]capsuleapi.OwnerKind{capsuleapi.GroupOwner})...)
 }
 
+//nolint:staticcheck
 func (c *capsuleConfiguration) UserNames() []string {
-	return c.retrievalFn().Spec.UserNames
+	return append(c.retrievalFn().Spec.UserNames, c.retrievalFn().Spec.Users.GetByKinds([]capsuleapi.OwnerKind{capsuleapi.UserOwner, capsuleapi.ServiceAccountOwner})...)
 }
 
 func (c *capsuleConfiguration) IgnoreUserWithGroups() []string {

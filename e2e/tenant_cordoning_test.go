@@ -27,9 +27,11 @@ var _ = Describe("cordoning a Tenant", Label("tenant"), func() {
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: api.OwnerListSpec{
 				{
-					UserSpec: api.UserSpec{
-						Name: "jim",
-						Kind: "User",
+					CoreOwnerSpec: api.CoreOwnerSpec{
+						UserSpec: api.UserSpec{
+							Name: "jim",
+							Kind: "User",
+						},
 					},
 				},
 			},

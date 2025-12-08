@@ -5,6 +5,7 @@ metadata:
 spec:
   # New
   scope: Tenant
+
   #force: false
   resyncPeriod: 5s
   #serviceaccount:
@@ -14,13 +15,14 @@ spec:
     - #additionalMetadata:
       #  labels:
       #    "replicated-by": "capsule"
+      force: true
       context:
         resources:
           - index: "sec"
             apiVersion: v1
             kind: Secret
             name: capsule-tls
-      generators:
+      templates:
         - template: |
             ---
             apiVersion: v1
@@ -31,25 +33,10 @@ spec:
             data:
               {{ .Tenant.ObjectMeta.Name }}.conf: |
                 1
-    - #additionalMetadata:
-      #  labels:
-      #    "replicated-by": "capsule"
-
+    - force: true
       context:
         resources:
           - index: "sec"
             apiVersion: v1
             kind: Secret
             name: capsule-tls
-
-      generators:
-        - template: |
-            ---
-            apiVersion: v1
-            kind: ConfigMap
-            metadata:
-              name: test-demo-2
-              namespace: default
-            data:
-              {{ .Tenant.ObjectMeta.Name }}.conf: |
-                1

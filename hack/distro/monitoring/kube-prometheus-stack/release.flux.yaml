@@ -1,0 +1,100 @@
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: kube-prometheus-stack
+  namespace: flux-system
+spec:
+  serviceAccountName: kustomize-controller
+  interval: 30s
+  timeout: 10m
+  targetNamespace: monitoring-system
+  releaseName: "kube-prometheus-stack"
+  chart:
+    spec:
+      chart: kube-prometheus-stack
+      version: "79.12.0"
+      sourceRef:
+        kind: HelmRepository
+        name: kube-prometheus-stack
+      interval: 24h
+  install:
+    createNamespace: true
+    remediation:
+      retries: -1
+  upgrade:
+    remediation:
+      remediateLastFailure: true
+      retries: -1
+  driftDetection:
+    mode: enabled
+  values:
+    grafana:
+      additionalDataSources:
+        - name: Pyroscope
+          type: grafana-pyroscope-datasource
+          uid: pyroscope
+          url: http://pyroscope.{{ $.Release.Namespace }}.svc.cluster.local.:4040/
+      adminPassword: admin
+      global:
+        dnsService: "kube-dns"
+        dnsNamespace: "kube-system"
+      assertNoLeakedSecrets: false
+      deploymentStrategy:
+        type: Recreate
+      persistence:
+        enabled: false
+      initChownData:
+        enabled: false
+      plugins:
+        - grafana-llm-app
+        - grafana-resourcesexporter-app
+        - grafana-pyroscope-app
+        - grafana-exploretraces-app
+      env:
+        GF_AUTH_ANONYMOUS_ENABLED: "true"
+        GF_AUTH_ANONYMOUS_ORG_ROLE: "Admin"
+        GF_DIAGNOSTICS_PROFILING_ENABLED: "true"
+        GF_DIAGNOSTICS_PROFILING_ADDR: "0.0.0.0"
+        GF_DIAGNOSTICS_PROFILING_PORT: "9094"
+      sidecar:
+        enableUniqueFilenames: true
+        datasources:
+          enabled: true
+        dashboards:
+          enabled: true
+          folderAnnotation: "k8s-sidecar-target-directory"
+          annotations:
+            k8s-sidecar-target-directory: /tmp/dashboards/Kube Prometheus Stack
+          provider:
+            foldersFromFilesStructure: true
+      # https://grafana.com/docs/grafana/latest/setup-grafana/configure-grafana/
+      grafana.ini:
+        analytics:
+          reporting_enabled: false
+          check_for_updates: false
+          check_for_plugin_updates: false
+        security:
+          disable_gravatar: true
+          cookie_secure: true
+          cookie_samesite: lax
+          strict_transport_security: true
+          strict_transport_security_preload: true
+          strict_transport_security_subdomains: true
+          content_security_policy: true
+        auth:
+          disable_login_form: false
+        users:
+          allow_sign_up: true
+          auto_assign_org: true
+        server:
+          root_url: "http://localhost:9090"
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: kube-prometheus-stack
+  namespace: flux-system
+spec:
+  interval: 24h0m0s
+  url: https://prometheus-community.github.io/helm-charts

@@ -34,9 +34,11 @@ var _ = Describe("Creating a GlobalTenantResource object", func() {
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: api.OwnerListSpec{
 				{
-					UserSpec: api.UserSpec{
-						Name: "solar-user",
-						Kind: "User",
+					CoreOwnerSpec: api.CoreOwnerSpec{
+						UserSpec: api.UserSpec{
+							Name: "solar-user",
+							Kind: "User",
+						},
 					},
 				},
 			},
@@ -53,9 +55,11 @@ var _ = Describe("Creating a GlobalTenantResource object", func() {
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: api.OwnerListSpec{
 				{
-					UserSpec: api.UserSpec{
-						Name: "wind-user",
-						Kind: "User",
+					CoreOwnerSpec: api.CoreOwnerSpec{
+						UserSpec: api.UserSpec{
+							Name: "wind-user",
+							Kind: "User",
+						},
 					},
 				},
 			},

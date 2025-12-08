@@ -64,8 +64,15 @@ type ObjectReferenceAbstract struct {
 }
 
 type ObjectReferenceStatus struct {
-	misc.ResourceID                `json:",inline"`
-	ObjectReferenceStatusCondition `json:",inline"`
+	ResourceIDWithOptions `json:",inline"`
+
+	ObjectReferenceStatusCondition `json:"status,omitempty"`
+}
+
+type ResourceIDWithOptions struct {
+	misc.ResourceID `json:",inline"`
+
+	*ResourceSpecSettings `json:"settings,omitempty"`
 }
 
 type ObjectReferenceStatusCondition struct {

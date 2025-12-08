@@ -11,9 +11,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-// Keeps track of generated items
-type Accumulator = map[ResourceID]*unstructured.Unstructured
-
 // ResourceID represents the decomposed parts of a Kubernetes resource identity.
 type ResourceID struct {
 	Group     string `json:"group,omitempty"`

@@ -5,6 +5,8 @@ package e2e
 
 import (
 	"context"
+	"slices"
+	"strings"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -17,8 +19,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
+	"github.com/projectcapsule/capsule/pkg/api/misc"
 	"github.com/projectcapsule/capsule/pkg/utils"
 )
 
@@ -83,7 +85,7 @@ var _ = Describe("ResourcePool Tests", Label("resourcepool"), func() {
 				},
 			},
 			Spec: capsulev1beta2.ResourcePoolSpec{
-				Selectors: []api.NamespaceSelector{
+				Selectors: []misc.NamespaceSelector{
 					{
 						LabelSelector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
@@ -522,7 +524,7 @@ var _ = Describe("ResourcePool Tests", Label("resourcepool"), func() {
 				},
 			},
 			Spec: capsulev1beta2.ResourcePoolSpec{
-				Selectors: []api.NamespaceSelector{
+				Selectors: []misc.NamespaceSelector{
 					{
 						LabelSelector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
@@ -694,7 +696,7 @@ var _ = Describe("ResourcePool Tests", Label("resourcepool"), func() {
 				},
 			},
 			Spec: capsulev1beta2.ResourcePoolSpec{
-				Selectors: []api.NamespaceSelector{
+				Selectors: []misc.NamespaceSelector{
 					{
 						LabelSelector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
@@ -832,7 +834,13 @@ var _ = Describe("ResourcePool Tests", Label("resourcepool"), func() {
 			err = k8sClient.Get(context.TODO(), client.ObjectKey{Name: claim.Name, Namespace: claim.Namespace}, claim)
 			Expect(err).Should(Succeed())
 
-			Expect(claim.Status.Condition.Message).To(Equal("requested: requests.cpu=4, available: requests.cpu=2"), "Actual message"+claim.Status.Condition.Message)
+			conditions := extractResourcePoolMessage(claim.Status.Condition.Message)
+			expected := []string{
+				"requested.requests.cpu=4",
+				"available.requests.cpu=2",
+			}
+
+			Expect(containsAll(conditions, expected)).To(BeTrue(), "Actual message"+claim.Status.Condition.Message)
 			Expect(claim.Status.Condition.Reason).To(Equal(meta.PoolExhaustedReason))
 			Expect(claim.Status.Condition.Status).To(Equal(metav1.ConditionFalse))
 			Expect(claim.Status.Condition.Type).To(Equal(meta.BoundCondition))
@@ -934,7 +942,13 @@ var _ = Describe("ResourcePool Tests", Label("resourcepool"), func() {
 			err = k8sClient.Get(context.TODO(), client.ObjectKey{Name: claim.Name, Namespace: claim.Namespace}, claim)
 			Expect(err).Should(Succeed())
 
-			Expect(claim.Status.Condition.Message).To(Equal("requested: requests.cpu=4, available: requests.cpu=0"), "Actual message"+claim.Status.Condition.Message)
+			conditions := extractResourcePoolMessage(claim.Status.Condition.Message)
+			expected := []string{
+				"requested.requests.cpu=4",
+				"available.requests.cpu=0",
+			}
+
+			Expect(containsAll(conditions, expected)).To(BeTrue(), "Actual message"+claim.Status.Condition.Message)
 			Expect(claim.Status.Condition.Reason).To(Equal(meta.PoolExhaustedReason))
 			Expect(claim.Status.Condition.Status).To(Equal(metav1.ConditionFalse))
 			Expect(claim.Status.Condition.Type).To(Equal(meta.BoundCondition))
@@ -950,7 +964,7 @@ var _ = Describe("ResourcePool Tests", Label("resourcepool"), func() {
 				},
 			},
 			Spec: capsulev1beta2.ResourcePoolSpec{
-				Selectors: []api.NamespaceSelector{
+				Selectors: []misc.NamespaceSelector{
 					{
 						LabelSelector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
@@ -1090,7 +1104,13 @@ var _ = Describe("ResourcePool Tests", Label("resourcepool"), func() {
 			err = k8sClient.Get(context.TODO(), client.ObjectKey{Name: claim.Name, Namespace: claim.Namespace}, claim)
 			Expect(err).Should(Succeed())
 
-			Expect(claim.Status.Condition.Message).To(Equal("requested: requests.cpu=4, available: requests.cpu=2"), "Actual message"+claim.Status.Condition.Message)
+			conditions := extractResourcePoolMessage(claim.Status.Condition.Message)
+			expected := []string{
+				"requested.requests.cpu=4",
+				"available.requests.cpu=2",
+			}
+
+			Expect(containsAll(conditions, expected)).To(BeTrue(), "Actual message"+claim.Status.Condition.Message)
 			Expect(claim.Status.Condition.Reason).To(Equal(meta.PoolExhaustedReason))
 			Expect(claim.Status.Condition.Status).To(Equal(metav1.ConditionFalse))
 			Expect(claim.Status.Condition.Type).To(Equal(meta.BoundCondition))
@@ -1117,7 +1137,13 @@ var _ = Describe("ResourcePool Tests", Label("resourcepool"), func() {
 			err = k8sClient.Get(context.TODO(), client.ObjectKey{Name: claim.Name, Namespace: claim.Namespace}, claim)
 			Expect(err).Should(Succeed())
 
-			Expect(claim.Status.Condition.Message).To(Equal("requested: limits.cpu=4, available: limits.cpu=2"), "Actual message"+claim.Status.Condition.Message)
+			conditions := extractResourcePoolMessage(claim.Status.Condition.Message)
+			expected := []string{
+				"requested.limits.cpu=4",
+				"available.limits.cpu=2",
+			}
+
+			Expect(containsAll(conditions, expected)).To(BeTrue(), "Actual message"+claim.Status.Condition.Message)
 			Expect(claim.Status.Condition.Reason).To(Equal(meta.PoolExhaustedReason))
 			Expect(claim.Status.Condition.Status).To(Equal(metav1.ConditionFalse))
 			Expect(claim.Status.Condition.Type).To(Equal(meta.BoundCondition))
@@ -1145,7 +1171,15 @@ var _ = Describe("ResourcePool Tests", Label("resourcepool"), func() {
 			err = k8sClient.Get(context.TODO(), client.ObjectKey{Name: claim.Name, Namespace: claim.Namespace}, claim)
 			Expect(err).Should(Succeed())
 
-			Expect(claim.Status.Condition.Message).To(Equal("requested: limits.cpu=2, queued: limits.cpu=4; requested: requests.cpu=2, queued: requests.cpu=4"), "Actual message"+claim.Status.Condition.Message)
+			conditions := extractResourcePoolMessage(claim.Status.Condition.Message)
+			expected := []string{
+				"requested.limits.cpu=2",
+				"queued.limits.cpu=4",
+				"requested.requests.cpu=2",
+				"queued.requests.cpu=4",
+			}
+
+			Expect(containsAll(conditions, expected)).To(BeTrue(), "Actual message"+claim.Status.Condition.Message)
 			Expect(claim.Status.Condition.Reason).To(Equal(meta.QueueExhaustedReason))
 			Expect(claim.Status.Condition.Status).To(Equal(metav1.ConditionFalse))
 			Expect(claim.Status.Condition.Type).To(Equal(meta.BoundCondition))
@@ -1275,8 +1309,15 @@ var _ = Describe("ResourcePool Tests", Label("resourcepool"), func() {
 
 			err = k8sClient.Get(context.TODO(), client.ObjectKey{Name: claim.Name, Namespace: claim.Namespace}, claim)
 			Expect(err).Should(Succeed())
+			conditions := extractResourcePoolMessage(claim.Status.Condition.Message)
+			expected := []string{
+				"requested.limits.cpu=2",
+				"available.limits.cpu=0",
+				"requested.requests.cpu=2",
+				"available.requests.cpu=0",
+			}
 
-			Expect(claim.Status.Condition.Message).To(Equal("requested: limits.cpu=2, available: limits.cpu=0; requested: requests.cpu=2, available: requests.cpu=0"), "Actual message "+claim.Status.Condition.Message)
+			Expect(containsAll(conditions, expected)).To(BeTrue(), "Actual message"+claim.Status.Condition.Message)
 			Expect(claim.Status.Condition.Reason).To(Equal(meta.PoolExhaustedReason))
 			Expect(claim.Status.Condition.Status).To(Equal(metav1.ConditionFalse))
 			Expect(claim.Status.Condition.Type).To(Equal(meta.BoundCondition))
@@ -1292,7 +1333,7 @@ var _ = Describe("ResourcePool Tests", Label("resourcepool"), func() {
 				},
 			},
 			Spec: capsulev1beta2.ResourcePoolSpec{
-				Selectors: []api.NamespaceSelector{
+				Selectors: []misc.NamespaceSelector{
 					{
 						LabelSelector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
@@ -1450,7 +1491,7 @@ var _ = Describe("ResourcePool Tests", Label("resourcepool"), func() {
 				},
 			},
 			Spec: capsulev1beta2.ResourcePoolSpec{
-				Selectors: []api.NamespaceSelector{
+				Selectors: []misc.NamespaceSelector{
 					{
 						LabelSelector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
@@ -1558,7 +1599,7 @@ var _ = Describe("ResourcePool Tests", Label("resourcepool"), func() {
 				},
 			},
 			Spec: capsulev1beta2.ResourcePoolSpec{
-				Selectors: []api.NamespaceSelector{
+				Selectors: []misc.NamespaceSelector{
 					{
 						LabelSelector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
@@ -1666,7 +1707,7 @@ var _ = Describe("ResourcePool Tests", Label("resourcepool"), func() {
 				},
 			},
 			Spec: capsulev1beta2.ResourcePoolSpec{
-				Selectors: []api.NamespaceSelector{
+				Selectors: []misc.NamespaceSelector{
 					{
 						LabelSelector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
@@ -2023,4 +2064,36 @@ func isBoundToPool(pool *capsulev1beta2.ResourcePool, claim *capsulev1beta2.Reso
 	}
 
 	return true
+}
+
+func containsAll[T comparable](haystack []T, needles []T) bool {
+	for _, n := range needles {
+		if !slices.Contains(haystack, n) {
+			return false
+		}
+	}
+	return true
+}
+
+func extractResourcePoolMessage(msg string) []string {
+	var out []string
+
+	parts := strings.FieldsFunc(msg, func(r rune) bool {
+		return r == ',' || r == ';'
+	})
+
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+
+		kv := strings.SplitN(p, ": ", 2)
+		if len(kv) != 2 {
+			continue
+		}
+
+		kind := kv[0]
+		value := kv[1]
+
+		out = append(out, kind+"."+value)
+	}
+	return out
 }

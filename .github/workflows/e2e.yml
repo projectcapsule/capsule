@@ -23,18 +23,45 @@ concurrency:
 
 jobs:
   e2e:
-    name: E2E Testing
+    name: E2E Testing (CE)
     runs-on:
       labels: ubuntu-latest-8-cores
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
         with:
           fetch-depth: 0
+
       - uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c # v6.1.0
         with:
           go-version-file: 'go.mod'
+
       - uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4 # v4
-        with:
-          version: v3.14.2
+
       - name: e2e
         run: sudo make e2e
+  run-e2e:
+    name: E2E Testing
+    strategy:
+      fail-fast: false
+      matrix:
+        k8s-version:
+          - '1.30.0'
+          - '1.31.0'
+          - '1.32.0'
+          - '1.33.0'
+    runs-on:
+      labels: ubuntu-latest-8-cores
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+        with:
+          repository: ${{ github.event.client_payload.repo }}
+          ref: ${{ github.event.client_payload.sha }}
+
+      - uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c # v6.1.0
+        with:
+          go-version-file: 'go.mod'
+
+      - uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4 # v4
+
+      - name: e2e (Enterprise)
+        run: KUBERNETES_SUPPORTED_VERSION=${{ matrix.k8s-version }} sudo make e2e

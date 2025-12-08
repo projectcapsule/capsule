@@ -22,21 +22,27 @@ var _ = Describe("creating a Namespaces as different type of Tenant owners", Lab
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: api.OwnerListSpec{
 				{
-					UserSpec: api.UserSpec{
-						Name: "alice",
-						Kind: "User",
+					CoreOwnerSpec: api.CoreOwnerSpec{
+						UserSpec: api.UserSpec{
+							Name: "alice",
+							Kind: "User",
+						},
 					},
 				},
 				{
-					UserSpec: api.UserSpec{
-						Name: "bob",
-						Kind: "Group",
+					CoreOwnerSpec: api.CoreOwnerSpec{
+						UserSpec: api.UserSpec{
+							Name: "bob",
+							Kind: "Group",
+						},
 					},
 				},
 				{
-					UserSpec: api.UserSpec{
-						Name: "system:serviceaccount:new-namespace-sa:default",
-						Kind: "ServiceAccount",
+					CoreOwnerSpec: api.CoreOwnerSpec{
+						UserSpec: api.UserSpec{
+							Name: "system:serviceaccount:new-namespace-sa:default",
+							Kind: "ServiceAccount",
+						},
 					},
 				},
 			},

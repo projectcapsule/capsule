@@ -1,0 +1,33 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: capsule
+  namespace: monitoring-system
+  labels:
+    app: capsule
+    release: kube-prometheus-stack
+spec:
+  selector:
+    app: capsule
+  ports:
+    - name: metrics
+      port: 8080
+      targetPort: 8080
+      protocol: TCP
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: capsule
+  namespace: monitoring-system
+  labels:
+    release: kube-prometheus-stack
+spec:
+  selector:
+    matchLabels:
+      app: capsule
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 5s

@@ -167,12 +167,7 @@ func GetTenantByLabelsAndUser(
 	}
 
 	if tnt != nil {
-		ok, err := users.IsTenantOwner(ctx, c, cfg, tnt, userInfo)
-		if err != nil {
-			return nil, err
-		}
-
-		if !ok {
+		if ok := users.IsTenantOwnerByStatus(ctx, c, cfg, tnt, userInfo); !ok {
 			return nil, fmt.Errorf("can not assign the desired namespace to a non-owned Tenant")
 		}
 

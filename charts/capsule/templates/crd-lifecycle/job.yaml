@@ -87,7 +87,7 @@ spec:
           # piping stderr to stdout means kubectl's errors are surfaced
           # in the pod's logs.
 
-          kubectl apply --server-side=true --overwrite=true --force-conflicts=true -f /data/ 2>&1
+          kubectl apply --server-side=true --overwrite=true --force-conflicts=true --field-manager='capsule/crd-lifecycle' -f /data/ 2>&1
         volumeMounts:
 {{- range $path, $_ := .Files.Glob "crds/**.yaml" }}
         - name: {{ $path | base | trimSuffix ".yaml" | regexFind "[^_]+$" }}

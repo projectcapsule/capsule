@@ -4,13 +4,19 @@
 package v1beta2
 
 import (
+	"context"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api/misc"
 )
 
 // TenantSpec defines the desired state of Tenant.
 type TenantSpec struct {
+	// Specify Permissions for the Tenant.
+	Permissions Permissions `json:"permissions,omitempty"`
 	// Specifies the owners of the Tenant.
 	// Optional
 	Owners api.OwnerListSpec `json:"owners,omitempty"`
@@ -31,11 +37,13 @@ type TenantSpec struct {
 	ContainerRegistries *api.AllowedListSpec `json:"containerRegistries,omitempty"`
 	// Specifies the label to control the placement of pods on a given pool of worker nodes. All namespaces created within the Tenant will have the node selector annotation. This annotation tells the Kubernetes scheduler to place pods on the nodes having the selector label. Optional.
 	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
+	// Deprecated: Use Tenant Replications instead (https://projectcapsule.dev/docs/replications/)
+	//
 	// Specifies the NetworkPolicies assigned to the Tenant. The assigned NetworkPolicies are inherited by any namespace created in the Tenant. Optional.
-	// Deprecated: Use Tenant Replications instead (https://projectcapsule.dev/docs/replications/)
 	NetworkPolicies api.NetworkPolicySpec `json:"networkPolicies,omitempty"`
-	// Specifies the resource min/max usage restrictions to the Tenant. The assigned values are inherited by any namespace created in the Tenant. Optional.
 	// Deprecated: Use Tenant Replications instead (https://projectcapsule.dev/docs/replications/)
+	//
+	// Specifies the resource min/max usage restrictions to the Tenant. The assigned values are inherited by any namespace created in the Tenant. Optional.
 	LimitRanges api.LimitRangesSpec `json:"limitRanges,omitempty"`
 	// Specifies a list of ResourceQuota resources assigned to the Tenant. The assigned values are inherited by any namespace created in the Tenant. The Capsule operator aggregates ResourceQuota at Tenant level, so that the hard quota is never crossed for the given Tenant. This permits the Tenant owner to consume resources in the Tenant regardless of the namespace. Optional.
 	ResourceQuota api.ResourceQuotaSpec `json:"resourceQuotas,omitempty"`
@@ -52,6 +60,8 @@ type TenantSpec struct {
 	// A default value can be specified, and all the Pod resources created will inherit the declared class.
 	// Optional.
 	PriorityClasses *api.DefaultAllowedListSpec `json:"priorityClasses,omitempty"`
+	// Specifies options for the DeviceClass resources.
+	DeviceClasses *api.SelectorAllowedListSpec `json:"deviceClasses,omitempty"`
 	// Specifies options for the GatewayClass resources.
 	GatewayOptions GatewayOptions `json:"gatewayOptions,omitempty"`
 	// Toggling the Tenant resources cordoning, when enable resources cannot be deleted.
@@ -70,6 +80,21 @@ type TenantSpec struct {
 	// If unset, Tenant uses CapsuleConfiguration's forceTenantPrefix
 	// Optional
 	ForceTenantPrefix *bool `json:"forceTenantPrefix,omitempty"`
+}
+
+type Permissions struct {
+	// Matches TenantOwner objects which are promoted to owners of this tenant
+	// The elements are OR operations and independent. You can see the resulting Tenant Owners
+	// in the Status.Owners specification of the Tenant.
+	MatchOwners []*metav1.LabelSelector `json:"matchOwners,omitempty"`
+}
+
+func (p *Permissions) ListMatchingOwners(
+	ctx context.Context,
+	c client.Client,
+	opts ...client.ListOption,
+) ([]*TenantOwner, error) {
+	return misc.ListBySelectors[*TenantOwner](ctx, c, &TenantOwnerList{}, p.MatchOwners)
 }
 
 // +kubebuilder:object:root=true

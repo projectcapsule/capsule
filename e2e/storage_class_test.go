@@ -35,9 +35,11 @@ var _ = Describe("when Tenant handles Storage classes", Label("tenant", "classes
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: api.OwnerListSpec{
 				{
-					UserSpec: api.UserSpec{
-						Name: "selector",
-						Kind: "User",
+					CoreOwnerSpec: api.CoreOwnerSpec{
+						UserSpec: api.UserSpec{
+							Name: "selector",
+							Kind: "User",
+						},
 					},
 				},
 			},
@@ -64,9 +66,11 @@ var _ = Describe("when Tenant handles Storage classes", Label("tenant", "classes
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: api.OwnerListSpec{
 				{
-					UserSpec: api.UserSpec{
-						Name: "default",
-						Kind: "User",
+					CoreOwnerSpec: api.CoreOwnerSpec{
+						UserSpec: api.UserSpec{
+							Name: "default",
+							Kind: "User",
+						},
 					},
 				},
 			},
@@ -90,9 +94,11 @@ var _ = Describe("when Tenant handles Storage classes", Label("tenant", "classes
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: api.OwnerListSpec{
 				{
-					UserSpec: api.UserSpec{
-						Name: "no-restrictions",
-						Kind: "User",
+					CoreOwnerSpec: api.CoreOwnerSpec{
+						UserSpec: api.UserSpec{
+							Name: "no-restrictions",
+							Kind: "User",
+						},
 					},
 				},
 			},

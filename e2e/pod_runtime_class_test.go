@@ -31,9 +31,11 @@ var _ = Describe("enforcing a Runtime Class", Label("pod", "classes", "current")
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: api.OwnerListSpec{
 				{
-					UserSpec: api.UserSpec{
-						Name: "george",
-						Kind: "User",
+					CoreOwnerSpec: api.CoreOwnerSpec{
+						UserSpec: api.UserSpec{
+							Name: "george",
+							Kind: "User",
+						},
 					},
 				},
 			},
@@ -61,9 +63,11 @@ var _ = Describe("enforcing a Runtime Class", Label("pod", "classes", "current")
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: []api.OwnerSpec{
 				{
-					UserSpec: api.UserSpec{
-						Name: "e2e-gateway-no-restrictions",
-						Kind: "User",
+					CoreOwnerSpec: api.CoreOwnerSpec{
+						UserSpec: api.UserSpec{
+							Name: "e2e-gateway-no-restrictions",
+							Kind: "User",
+						},
 					},
 				},
 			},

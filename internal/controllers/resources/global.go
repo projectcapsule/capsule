@@ -32,7 +32,6 @@ import (
 	"github.com/projectcapsule/capsule/internal/metrics"
 	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
-	"github.com/projectcapsule/capsule/pkg/api/misc"
 	"github.com/projectcapsule/capsule/pkg/configuration"
 	"github.com/projectcapsule/capsule/pkg/utils/users"
 )
@@ -218,7 +217,7 @@ func (r *globalResourceController) reconcileNormal(
 	//}()
 
 	//status := capsulev1beta2.ProcessedItems{}
-	acc := misc.Accumulator{}
+	acc := Accumulator{}
 
 	// Gather Resources
 	for index, resource := range tntResource.Spec.Resources {
@@ -259,13 +258,13 @@ func (r *globalResourceController) reconcileNormal(
 
 	// Prune first, to work on a consistent Status
 	for _, p := range tntResource.Status.ProcessedItems {
-		if _, exists := acc[p.ResourceID]; !exists {
+		if _, exists := acc[p.ResourceIDWithOptions]; !exists {
 			obj := &unstructured.Unstructured{}
 			obj.SetGroupVersionKind(p.GetGVK())
 			obj.SetNamespace(p.GetNamespace())
 			obj.SetName(p.GetName())
 
-			if *tntResource.Spec.PruningOnDelete {
+			if *p.Prune {
 				err := r.processor.Prune(ctx, c, obj, getFieldOwner(tntResource.GetName(), "", p.ResourceID))
 				if err != nil {
 					p.Status = metav1.ConditionFalse
@@ -285,7 +284,7 @@ func (r *globalResourceController) reconcileNormal(
 	// Apply
 	for id, obj := range acc {
 		or := capsulev1beta2.ObjectReferenceStatus{
-			ResourceID: id,
+			ResourceIDWithOptions: id,
 			ObjectReferenceStatusCondition: capsulev1beta2.ObjectReferenceStatusCondition{
 				Type: meta.ReadyCondition,
 			},
@@ -297,9 +296,9 @@ func (r *globalResourceController) reconcileNormal(
 			ctx,
 			c,
 			obj,
-			getFieldOwner(tntResource.GetName(), "", id),
-			*tntResource.Spec.Force,
-			*tntResource.Spec.Adopt,
+			getFieldOwner(tntResource.GetName(), "", id.ResourceID),
+			*id.Force,
+			*id.Adopt,
 		)
 		if err != nil {
 			or.Status = metav1.ConditionTrue

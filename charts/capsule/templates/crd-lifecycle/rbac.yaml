@@ -31,6 +31,7 @@ rules:
   - tenantresources.capsule.clastix.io
   - globaltenantresources.capsule.clastix.io
   - tenants.capsule.clastix.io
+  - tenantowners.capsule.clastix.io
   verbs:
   - create
   - delete

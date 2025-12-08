@@ -30,9 +30,11 @@ var _ = Describe("enforcing a Priority Class", Label("pod", "classes"), func() {
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: api.OwnerListSpec{
 				{
-					UserSpec: api.UserSpec{
-						Name: "paul",
-						Kind: "User",
+					CoreOwnerSpec: api.CoreOwnerSpec{
+						UserSpec: api.UserSpec{
+							Name: "paul",
+							Kind: "User",
+						},
 					},
 				},
 			},
@@ -56,9 +58,11 @@ var _ = Describe("enforcing a Priority Class", Label("pod", "classes"), func() {
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: api.OwnerListSpec{
 				{
-					UserSpec: api.UserSpec{
-						Name: "george",
-						Kind: "User",
+					CoreOwnerSpec: api.CoreOwnerSpec{
+						UserSpec: api.UserSpec{
+							Name: "george",
+							Kind: "User",
+						},
 					},
 				},
 			},
@@ -85,9 +89,11 @@ var _ = Describe("enforcing a Priority Class", Label("pod", "classes"), func() {
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: []api.OwnerSpec{
 				{
-					UserSpec: api.UserSpec{
-						Name: "e2e-priority-class-no-restrictions",
-						Kind: "User",
+					CoreOwnerSpec: api.CoreOwnerSpec{
+						UserSpec: api.UserSpec{
+							Name: "e2e-priority-class-no-restrictions",
+							Kind: "User",
+						},
 					},
 				},
 			},

@@ -96,6 +96,12 @@ spec:
                             type: string
                           type: object
                       type: object
+                    adopt:
+                      default: false
+                      description: Enabling this allows TenanResources to interact
+                        with objects which were not created by a TenantResource. In
+                        this case on prune no deletion of the entire object is made.
+                      type: boolean
                     context:
                       description: |-
                         Provide additional template context, which can be used throughout all
@@ -188,6 +194,12 @@ spec:
                             type: object
                           type: array
                       type: object
+                    force:
+                      default: false
+                      description: |-
+                        Force indicates that in case of conflicts with server-side apply, the client should acquire ownership of the conflicting field.
+                        You may create collisions with this.
+                      type: boolean
                     namespaceSelector:
                       description: |-
                         Defines the Namespace selector to select the Tenant Namespaces on which the resources must be propagated.
@@ -320,6 +332,12 @@ spec:
                         - kind
                         type: object
                       type: array
+                    pruningOnDelete:
+                      default: true
+                      description: |-
+                        When the replicated resource manifest is deleted, all the objects replicated so far will be automatically deleted.
+                        Disable this to keep replicated resources although the deletion of the replication manifest.
+                      type: boolean
                     rawItems:
                       description: List of raw resources that must be replicated.
                       items:
@@ -503,35 +521,61 @@ spec:
                       type: string
                     kind:
                       type: string
-                    message:
-                      description: |-
-                        message is a human readable message indicating details about the transition.
-                        This may be an empty string.
-                      maxLength: 32768
-                      type: string
                     name:
                       type: string
                     namespace:
                       type: string
+                    settings:
+                      properties:
+                        adopt:
+                          default: false
+                          description: Enabling this allows TenanResources to interact
+                            with objects which were not created by a TenantResource.
+                            In this case on prune no deletion of the entire object
+                            is made.
+                          type: boolean
+                        force:
+                          default: false
+                          description: |-
+                            Force indicates that in case of conflicts with server-side apply, the client should acquire ownership of the conflicting field.
+                            You may create collisions with this.
+                          type: boolean
+                        pruningOnDelete:
+                          default: true
+                          description: |-
+                            When the replicated resource manifest is deleted, all the objects replicated so far will be automatically deleted.
+                            Disable this to keep replicated resources although the deletion of the replication manifest.
+                          type: boolean
+                      type: object
                     status:
-                      description: status of the condition, one of True, False, Unknown.
-                      enum:
-                      - "True"
-                      - "False"
-                      - Unknown
-                      type: string
+                      properties:
+                        message:
+                          description: |-
+                            message is a human readable message indicating details about the transition.
+                            This may be an empty string.
+                          maxLength: 32768
+                          type: string
+                        status:
+                          description: status of the condition, one of True, False,
+                            Unknown.
+                          enum:
+                          - "True"
+                          - "False"
+                          - Unknown
+                          type: string
+                        type:
+                          description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                          maxLength: 316
+                          pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                          type: string
+                      required:
+                      - status
+                      - type
+                      type: object
                     tenant:
-                      type: string
-                    type:
-                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
-                      maxLength: 316
-                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
                       type: string
                     version:
                       type: string
-                  required:
-                  - status
-                  - type
                   type: object
                 type: array
               selectedTenants:

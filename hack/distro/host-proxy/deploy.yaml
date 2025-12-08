@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: capsule
+  namespace: monitoring-system
+  labels:
+    app: capsule
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: capsule
+  template:
+    metadata:
+      labels:
+        app: capsule
+      annotations:
+        prometheus.io/scrape: 'true'
+        prometheus.io/path: '/metrics'
+        prometheus.io/port: '8080'
+        profiles.grafana.com/memory.scrape: "true"
+        profiles.grafana.com/memory.port: "8082"
+        profiles.grafana.com/cpu.scrape: "true"
+        profiles.grafana.com/cpu.port: "8082"
+        profiles.grafana.com/goroutine.scrape: "true"
+        profiles.grafana.com/goroutine.port: "8082"
+    spec:
+      containers:
+        - name: tcp-proxy
+          image: alpine/socat
+          ports:
+            - containerPort: 8080
+            - containerPort: 8082
+          command: ["sh", "-c"]
+          args:
+            - |
+              set -e
+              echo "Starting TCP proxy to ${LAPTOP_HOST_IP}..."
+              # Forward 8080 -> TARGET_HOST:8080
+              socat TCP-LISTEN:8080,fork,reuseaddr TCP:${LAPTOP_HOST_IP}:8080 &
+              # Forward 8082 -> TARGET_HOST:8082
+              socat TCP-LISTEN:8082,fork,reuseaddr TCP:${LAPTOP_HOST_IP}:8082 &
+              wait

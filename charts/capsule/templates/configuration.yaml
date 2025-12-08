@@ -14,6 +14,10 @@ metadata:
     {{- toYaml . | nindent 4 }}
   {{- end }}
 spec:
+  administrators:
+    {{- toYaml .Values.manager.options.administrators | nindent 4 }}
+  users:
+    {{- toYaml .Values.manager.options.users | nindent 4 }}
   enableTLSReconciler: {{ .Values.tls.enableController }}
   overrides:
     mutatingWebhookConfigurationName: {{ include "capsule.fullname" . }}-mutating-webhook-configuration

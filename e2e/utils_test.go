@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"sort"
 	"strings"
 	"time"
 
@@ -325,6 +326,66 @@ func CheckForOwnerRoleBindings(ns *corev1.Namespace, owner api.OwnerSpec, roles 
 
 		return nil
 	}
+}
+
+func VerifyTenantRoleBindings(
+	tnt *capsulev1beta2.Tenant,
+) {
+	Eventually(func(g Gomega) {
+		// List all RoleBindings once per namespace to avoid repeated API calls.
+		for _, ns := range tnt.Status.Namespaces {
+			for i, owner := range tnt.Status.Owners {
+				for _, role := range owner.ClusterRoles {
+					rbName := fmt.Sprintf("capsule-%s-%d-%s", tnt.Name, i, role)
+
+					rb := &rbacv1.RoleBinding{}
+					err := k8sClient.Get(context.Background(), client.ObjectKey{
+						Namespace: ns,
+						Name:      rbName,
+					}, rb)
+
+					g.Expect(err).ToNot(HaveOccurred(),
+						"expected RoleBinding %s/%s to exist", ns, rbName)
+
+					g.Expect(rb.RoleRef.Name).To(Equal(role),
+						"expected RoleBinding %s/%s to have RoleRef.Name=%q",
+						ns, rbName, role)
+
+					g.Expect(rb.Subjects).ToNot(BeEmpty(),
+						"expected RoleBinding %s/%s to have at least one subject", ns, rbName)
+
+					foundSubject := false
+					for _, s := range rb.Subjects {
+						if s.Kind == string(owner.Kind) && s.Name == owner.Name {
+							foundSubject = true
+							break
+						}
+					}
+
+					g.Expect(foundSubject).To(BeTrue(),
+						"expected RoleBinding %s/%s to contain subject %s/%s",
+						ns, rb.Name, owner.Kind, owner.Name)
+
+				}
+			}
+		}
+	}).WithTimeout(30 * time.Second).WithPolling(500 * time.Millisecond).Should(Succeed())
+}
+
+func normalizeOwners(in api.OwnerStatusListSpec) api.OwnerStatusListSpec {
+	// copy to avoid mutating the original
+	out := make(api.OwnerStatusListSpec, len(in))
+	copy(out, in)
+
+	// sort outer slice by kind+name
+	sort.Sort(api.GetByKindAndName(out))
+
+	// sort roles inside each owner so role order doesn't matter
+	for i := range out {
+		sort.Strings(out[i].ClusterRoles)
+	}
+
+	return out
 }
 
 func GetKubernetesVersion() *versionUtil.Version {

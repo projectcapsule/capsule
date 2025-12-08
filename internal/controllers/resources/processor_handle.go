@@ -31,7 +31,7 @@ func (r *Processor) handleResources(
 	spec capsulev1beta2.ResourceSpec,
 	ns *corev1.Namespace,
 	tmplContext tpl.ReferenceContext,
-	acc misc.Accumulator,
+	acc Accumulator,
 ) (err error) {
 	return r.collectResources(ctx, c, tnt, resourceIndex, spec, ns, tmplContext, acc)
 }
@@ -48,7 +48,7 @@ func (r *Processor) collectResources(
 	spec capsulev1beta2.ResourceSpec,
 	ns *corev1.Namespace,
 	tmplContext tpl.ReferenceContext,
-	acc misc.Accumulator,
+	acc Accumulator,
 ) (err error) {
 	var syncErr error
 
@@ -115,13 +115,16 @@ func (r *Processor) collectResources(
 func (r *Processor) addToAccumulation(
 	tnt capsulev1beta2.Tenant,
 	spec capsulev1beta2.ResourceSpec,
-	acc misc.Accumulator,
+	acc Accumulator,
 	obj *unstructured.Unstructured,
 	index string,
 ) (err error) {
 	r.handleResource(spec, obj)
 
-	key := misc.NewResourceID(obj, tnt.GetName(), index)
+	key := capsulev1beta2.ResourceIDWithOptions{
+		ResourceID:           misc.NewResourceID(obj, tnt.GetName(), index),
+		ResourceSpecSettings: &spec.ResourceSpecSettings,
+	}
 
 	acc[key] = obj
 

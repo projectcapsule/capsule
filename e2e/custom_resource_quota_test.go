@@ -33,9 +33,11 @@ var _ = Describe("when Tenant limits custom Resource Quota", Label("resourcequot
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: api.OwnerListSpec{
 				{
-					UserSpec: api.UserSpec{
-						Name: "resource",
-						Kind: "User",
+					CoreOwnerSpec: api.CoreOwnerSpec{
+						UserSpec: api.UserSpec{
+							Name: "resource",
+							Kind: "User",
+						},
 					},
 				},
 			},

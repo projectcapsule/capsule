@@ -17,25 +17,31 @@ var tenant = &v1beta2.Tenant{
 	Spec: v1beta2.TenantSpec{
 		Owners: []api.OwnerSpec{
 			{
-				UserSpec: api.UserSpec{
-					Kind: "User",
-					Name: "user1",
+				CoreOwnerSpec: api.CoreOwnerSpec{
+					UserSpec: api.UserSpec{
+						Kind: "User",
+						Name: "user1",
+					},
+					ClusterRoles: []string{"cluster-admin", "read-only"},
 				},
-				ClusterRoles: []string{"cluster-admin", "read-only"},
 			},
 			{
-				UserSpec: api.UserSpec{
-					Kind: "Group",
-					Name: "group1",
+				CoreOwnerSpec: api.CoreOwnerSpec{
+					UserSpec: api.UserSpec{
+						Kind: "Group",
+						Name: "group1",
+					},
+					ClusterRoles: []string{"edit"},
 				},
-				ClusterRoles: []string{"edit"},
 			},
 			{
-				UserSpec: api.UserSpec{
-					Kind: api.ServiceAccountOwner,
-					Name: "service",
+				CoreOwnerSpec: api.CoreOwnerSpec{
+					UserSpec: api.UserSpec{
+						Kind: api.ServiceAccountOwner,
+						Name: "service",
+					},
+					ClusterRoles: []string{"read-only"},
 				},
-				ClusterRoles: []string{"read-only"},
 			},
 		},
 		AdditionalRoleBindings: []api.AdditionalRoleBindingsSpec{

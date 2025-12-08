@@ -29,9 +29,11 @@ var _ = Describe("changing Tenant managed Kubernetes resources", Label("tenant")
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: api.OwnerListSpec{
 				{
-					UserSpec: api.UserSpec{
-						Name: "laura",
-						Kind: "User",
+					CoreOwnerSpec: api.CoreOwnerSpec{
+						UserSpec: api.UserSpec{
+							Name: "laura",
+							Kind: "User",
+						},
 					},
 				},
 			},

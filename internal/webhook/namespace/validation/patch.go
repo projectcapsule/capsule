@@ -6,7 +6,6 @@ package validation
 import (
 	"context"
 	"fmt"
-	"net/http"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/record"
@@ -62,14 +61,7 @@ func (h *patchHandler) OnUpdate(
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		e := fmt.Sprintf("namespace/%s can not be patched", ns.Name)
 
-		ok, err := users.IsTenantOwner(ctx, c, h.cfg, tnt, req.UserInfo)
-		if err != nil {
-			response := admission.Errored(http.StatusBadRequest, err)
-
-			return &response
-		}
-
-		if ok {
+		if ok := users.IsTenantOwnerByStatus(ctx, c, h.cfg, tnt, req.UserInfo); ok {
 			return nil
 		}
 

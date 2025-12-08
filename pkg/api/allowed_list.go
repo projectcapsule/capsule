@@ -58,7 +58,9 @@ func (in *SelectorAllowedListSpec) SelectorMatch(obj client.Object) bool {
 type AllowedListSpec struct {
 	// Match exact elements which are allowed as class names within this tenant
 	Exact []string `json:"allowed,omitempty"`
-	// Match elements by regex (DEPRECATED)
+	// Deprecated: will be removed in a future release
+	//
+	// Match elements by regex.
 	Regex string `json:"allowedRegex,omitempty"`
 }
 

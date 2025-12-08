@@ -129,7 +129,10 @@ spec:
                       type: string
                     type: array
                   allowedRegex:
-                    description: Match elements by regex (DEPRECATED)
+                    description: |-
+                      Deprecated: will be removed in a future release
+
+                      Match elements by regex.
                     type: string
                 type: object
               imagePullPolicies:
@@ -160,7 +163,10 @@ spec:
                           type: string
                         type: array
                       allowedRegex:
-                        description: Match elements by regex (DEPRECATED)
+                        description: |-
+                          Deprecated: will be removed in a future release
+
+                          Match elements by regex.
                         type: string
                     type: object
                   allowedHostnames:
@@ -176,7 +182,10 @@ spec:
                           type: string
                         type: array
                       allowedRegex:
-                        description: Match elements by regex (DEPRECATED)
+                        description: |-
+                          Deprecated: will be removed in a future release
+
+                          Match elements by regex.
                         type: string
                     type: object
                   hostnameCollisionScope:
@@ -855,7 +864,10 @@ spec:
                       type: string
                     type: array
                   allowedRegex:
-                    description: Match elements by regex (DEPRECATED)
+                    description: |-
+                      Deprecated: will be removed in a future release
+
+                      Match elements by regex.
                     type: string
                 type: object
               resourceQuotas:
@@ -1030,7 +1042,10 @@ spec:
                       type: string
                     type: array
                   allowedRegex:
-                    description: Match elements by regex (DEPRECATED)
+                    description: |-
+                      Deprecated: will be removed in a future release
+
+                      Match elements by regex.
                     type: string
                 type: object
             required:
@@ -1185,7 +1200,10 @@ spec:
                       type: string
                     type: array
                   allowedRegex:
-                    description: Match elements by regex (DEPRECATED)
+                    description: |-
+                      Deprecated: will be removed in a future release
+
+                      Match elements by regex.
                     type: string
                 type: object
               cordoned:
@@ -1193,6 +1211,64 @@ spec:
                 description: Toggling the Tenant resources cordoning, when enable
                   resources cannot be deleted.
                 type: boolean
+              deviceClasses:
+                description: Specifies options for the DeviceClass resources.
+                properties:
+                  allowed:
+                    description: Match exact elements which are allowed as class names
+                      within this tenant
+                    items:
+                      type: string
+                    type: array
+                  allowedRegex:
+                    description: |-
+                      Deprecated: will be removed in a future release
+
+                      Match elements by regex.
+                    type: string
+                  matchExpressions:
+                    description: matchExpressions is a list of label selector requirements.
+                      The requirements are ANDed.
+                    items:
+                      description: |-
+                        A label selector requirement is a selector that contains values, a key, and an operator that
+                        relates the key and values.
+                      properties:
+                        key:
+                          description: key is the label key that the selector applies
+                            to.
+                          type: string
+                        operator:
+                          description: |-
+                            operator represents a key's relationship to a set of values.
+                            Valid operators are In, NotIn, Exists and DoesNotExist.
+                          type: string
+                        values:
+                          description: |-
+                            values is an array of string values. If the operator is In or NotIn,
+                            the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                            the values array must be empty. This array is replaced during a strategic
+                            merge patch.
+                          items:
+                            type: string
+                          type: array
+                          x-kubernetes-list-type: atomic
+                      required:
+                      - key
+                      - operator
+                      type: object
+                    type: array
+                    x-kubernetes-list-type: atomic
+                  matchLabels:
+                    additionalProperties:
+                      type: string
+                    description: |-
+                      matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+                      map is equivalent to an element of matchExpressions, whose key field is "key", the
+                      operator is "In", and the values array contains only "value". The requirements are ANDed.
+                    type: object
+                type: object
+                x-kubernetes-map-type: atomic
               forceTenantPrefix:
                 description: |-
                   Use this if you want to disable/enable the Tenant name prefix to specific Tenants, overriding global forceTenantPrefix in CapsuleConfiguration.
@@ -1216,7 +1292,10 @@ spec:
                           type: string
                         type: array
                       allowedRegex:
-                        description: Match elements by regex (DEPRECATED)
+                        description: |-
+                          Deprecated: will be removed in a future release
+
+                          Match elements by regex.
                         type: string
                       default:
                         type: string
@@ -1297,7 +1376,10 @@ spec:
                           type: string
                         type: array
                       allowedRegex:
-                        description: Match elements by regex (DEPRECATED)
+                        description: |-
+                          Deprecated: will be removed in a future release
+
+                          Match elements by regex.
                         type: string
                       default:
                         type: string
@@ -1357,7 +1439,10 @@ spec:
                           type: string
                         type: array
                       allowedRegex:
-                        description: Match elements by regex (DEPRECATED)
+                        description: |-
+                          Deprecated: will be removed in a future release
+
+                          Match elements by regex.
                         type: string
                     type: object
                   hostnameCollisionScope:
@@ -1381,8 +1466,9 @@ spec:
                 type: object
               limitRanges:
                 description: |-
-                  Specifies the resource min/max usage restrictions to the Tenant. The assigned values are inherited by any namespace created in the Tenant. Optional.
                   Deprecated: Use Tenant Replications instead (https://projectcapsule.dev/docs/replications/)
+
+                  Specifies the resource min/max usage restrictions to the Tenant. The assigned values are inherited by any namespace created in the Tenant. Optional.
                 properties:
                   items:
                     items:
@@ -1472,8 +1558,9 @@ spec:
                 properties:
                   additionalMetadata:
                     description: |-
+                      Deprecated: Use additionalMetadataList instead (https://projectcapsule.dev/docs/tenants/metadata/#additionalmetadatalist)
+
                       Specifies additional labels and annotations the Capsule operator places on any Namespace resource in the Tenant. Optional.
-                      Deprecated: Use additionalMetadataList instead
                     properties:
                       annotations:
                         additionalProperties:
@@ -1587,8 +1674,9 @@ spec:
                 type: object
               networkPolicies:
                 description: |-
-                  Specifies the NetworkPolicies assigned to the Tenant. The assigned NetworkPolicies are inherited by any namespace created in the Tenant. Optional.
                   Deprecated: Use Tenant Replications instead (https://projectcapsule.dev/docs/replications/)
+
+                  Specifies the NetworkPolicies assigned to the Tenant. The assigned NetworkPolicies are inherited by any namespace created in the Tenant. Optional.
                 properties:
                   items:
                     items:
@@ -2140,6 +2228,65 @@ spec:
                   - name
                   type: object
                 type: array
+              permissions:
+                description: Specify Permissions for the Tenant.
+                properties:
+                  matchOwners:
+                    description: |-
+                      Matches TenantOwner objects which are promoted to owners of this tenant
+                      The elements are OR operations and independent. You can see the resulting Tenant Owners
+                      in the Status.Owners specification of the Tenant.
+                    items:
+                      description: |-
+                        A label selector is a label query over a set of resources. The result of matchLabels and
+                        matchExpressions are ANDed. An empty label selector matches all objects. A null
+                        label selector matches no objects.
+                      properties:
+                        matchExpressions:
+                          description: matchExpressions is a list of label selector
+                            requirements. The requirements are ANDed.
+                          items:
+                            description: |-
+                              A label selector requirement is a selector that contains values, a key, and an operator that
+                              relates the key and values.
+                            properties:
+                              key:
+                                description: key is the label key that the selector
+                                  applies to.
+                                type: string
+                              operator:
+                                description: |-
+                                  operator represents a key's relationship to a set of values.
+                                  Valid operators are In, NotIn, Exists and DoesNotExist.
+                                type: string
+                              values:
+                                description: |-
+                                  values is an array of string values. If the operator is In or NotIn,
+                                  the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                                  the values array must be empty. This array is replaced during a strategic
+                                  merge patch.
+                                items:
+                                  type: string
+                                type: array
+                                x-kubernetes-list-type: atomic
+                            required:
+                            - key
+                            - operator
+                            type: object
+                          type: array
+                          x-kubernetes-list-type: atomic
+                        matchLabels:
+                          additionalProperties:
+                            type: string
+                          description: |-
+                            matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+                            map is equivalent to an element of matchExpressions, whose key field is "key", the
+                            operator is "In", and the values array contains only "value". The requirements are ANDed.
+                          type: object
+                      type: object
+                      x-kubernetes-map-type: atomic
+                    type: array
+                type: object
               podOptions:
                 description: Specifies options for the Pods deployed in the Tenant
                   namespaces, such as additional metadata.
@@ -2178,7 +2325,10 @@ spec:
                       type: string
                     type: array
                   allowedRegex:
-                    description: Match elements by regex (DEPRECATED)
+                    description: |-
+                      Deprecated: will be removed in a future release
+
+                      Match elements by regex.
                     type: string
                   default:
                     type: string
@@ -2325,7 +2475,10 @@ spec:
                       type: string
                     type: array
                   allowedRegex:
-                    description: Match elements by regex (DEPRECATED)
+                    description: |-
+                      Deprecated: will be removed in a future release
+
+                      Match elements by regex.
                     type: string
                   default:
                     type: string
@@ -2458,7 +2611,10 @@ spec:
                       type: string
                     type: array
                   allowedRegex:
-                    description: Match elements by regex (DEPRECATED)
+                    description: |-
+                      Deprecated: will be removed in a future release
+
+                      Match elements by regex.
                     type: string
                   default:
                     type: string
@@ -2512,6 +2668,11 @@ spec:
               classes:
                 description: Available Class Types within Tenant
                 properties:
+                  device:
+                    description: Available DeviceClasses
+                    items:
+                      type: string
+                    type: array
                   gateway:
                     description: Available GatewayClasses
                     items:
@@ -2595,6 +2756,35 @@ spec:
                 description: List of namespaces assigned to the Tenant. (Deprecated)
                 items:
                   type: string
+                type: array
+              owners:
+                description: Collected owners for this tenant
+                items:
+                  properties:
+                    clusterRoles:
+                      default:
+                      - admin
+                      - capsule-namespace-deleter
+                      description: Defines additional cluster-roles for the specific
+                        Owner.
+                      items:
+                        type: string
+                      type: array
+                    kind:
+                      description: Kind of entity. Possible values are "User", "Group",
+                        and "ServiceAccount"
+                      enum:
+                      - User
+                      - Group
+                      - ServiceAccount
+                      type: string
+                    name:
+                      description: Name of the entity.
+                      type: string
+                  required:
+                  - kind
+                  - name
+                  type: object
                 type: array
               size:
                 description: How many namespaces are assigned to the Tenant.

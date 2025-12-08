@@ -29,9 +29,11 @@ var _ = Describe("trying to escalate from a Tenant Namespace ServiceAccount", La
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: api.OwnerListSpec{
 				{
-					UserSpec: api.UserSpec{
-						Name: "mario",
-						Kind: "User",
+					CoreOwnerSpec: api.CoreOwnerSpec{
+						UserSpec: api.UserSpec{
+							Name: "mario",
+							Kind: "User",
+						},
 					},
 				},
 			},

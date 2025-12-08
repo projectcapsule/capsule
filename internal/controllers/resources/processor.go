@@ -5,8 +5,10 @@ package resources
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
+	ssa "github.com/fluxcd/pkg/ssa"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -14,12 +16,12 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/selection"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
-	"github.com/projectcapsule/capsule/pkg/api/misc"
 	"github.com/projectcapsule/capsule/pkg/configuration"
 	tpl "github.com/projectcapsule/capsule/pkg/template"
 	"github.com/projectcapsule/capsule/pkg/utils"
@@ -106,7 +108,7 @@ func (r *Processor) foreachTenantNamespace(
 	resource capsulev1beta2.ResourceSpec,
 	resourceIndex string,
 	tmplContext tpl.ReferenceContext,
-	acc misc.Accumulator,
+	acc Accumulator,
 ) (err error) {
 	log := ctrllog.FromContext(ctx)
 
@@ -263,6 +265,7 @@ func (r *Processor) Prune(
 	obj *unstructured.Unstructured,
 	fieldOwner string,
 ) (err error) {
+
 	target := &unstructured.Unstructured{}
 	target.SetGroupVersionKind(obj.GroupVersionKind())
 	target.SetNamespace(obj.GetNamespace())
@@ -396,4 +399,27 @@ func (r *Processor) handleApplyAdoption(
 		"capsule/controller/resources",
 		false,
 	)
+}
+
+func (r *Processor) handlePatching(
+	ctx context.Context,
+	c client.Client,
+	obj *unstructured.Unstructured,
+	manager string,
+) (err error) {
+	existingObject := obj.DeepCopy()
+	var patches []ssa.JSONPatch
+
+	if len(patches) == 0 {
+		return nil
+	}
+
+	rawPatch, err := json.Marshal(patches)
+	if err != nil {
+		return err
+	}
+
+	patch := client.RawPatch(types.JSONPatchType, rawPatch)
+
+	return c.Patch(ctx, existingObject, patch, client.FieldOwner(manager))
 }

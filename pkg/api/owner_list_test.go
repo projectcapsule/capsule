@@ -6,16 +6,17 @@ package api_test
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-
 	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestOwnerListSpec_FindOwner(t *testing.T) {
 	bla := api.OwnerSpec{
-		UserSpec: api.UserSpec{
-			Kind: api.UserOwner,
-			Name: "bla",
+		CoreOwnerSpec: api.CoreOwnerSpec{
+			UserSpec: api.UserSpec{
+				Kind: api.UserOwner,
+				Name: "bla",
+			},
 		},
 		ProxyOperations: []api.ProxySettings{
 			{
@@ -25,9 +26,11 @@ func TestOwnerListSpec_FindOwner(t *testing.T) {
 		},
 	}
 	bar := api.OwnerSpec{
-		UserSpec: api.UserSpec{
-			Kind: api.GroupOwner,
-			Name: "bar",
+		CoreOwnerSpec: api.CoreOwnerSpec{
+			UserSpec: api.UserSpec{
+				Kind: api.GroupOwner,
+				Name: "bar",
+			},
 		},
 		ProxyOperations: []api.ProxySettings{
 			{
@@ -37,9 +40,11 @@ func TestOwnerListSpec_FindOwner(t *testing.T) {
 		},
 	}
 	baz := api.OwnerSpec{
-		UserSpec: api.UserSpec{
-			Kind: api.UserOwner,
-			Name: "baz",
+		CoreOwnerSpec: api.CoreOwnerSpec{
+			UserSpec: api.UserSpec{
+				Kind: api.UserOwner,
+				Name: "baz",
+			},
 		},
 		ProxyOperations: []api.ProxySettings{
 			{
@@ -49,9 +54,11 @@ func TestOwnerListSpec_FindOwner(t *testing.T) {
 		},
 	}
 	fim := api.OwnerSpec{
-		UserSpec: api.UserSpec{
-			Kind: api.ServiceAccountOwner,
-			Name: "fim",
+		CoreOwnerSpec: api.CoreOwnerSpec{
+			UserSpec: api.UserSpec{
+				Kind: api.ServiceAccountOwner,
+				Name: "fim",
+			},
 		},
 		ProxyOperations: []api.ProxySettings{
 			{
@@ -61,9 +68,11 @@ func TestOwnerListSpec_FindOwner(t *testing.T) {
 		},
 	}
 	bom := api.OwnerSpec{
-		UserSpec: api.UserSpec{
-			Kind: api.GroupOwner,
-			Name: "bom",
+		CoreOwnerSpec: api.CoreOwnerSpec{
+			UserSpec: api.UserSpec{
+				Kind: api.GroupOwner,
+				Name: "bom",
+			},
 		},
 		ProxyOperations: []api.ProxySettings{
 			{
@@ -77,9 +86,11 @@ func TestOwnerListSpec_FindOwner(t *testing.T) {
 		},
 	}
 	qip := api.OwnerSpec{
-		UserSpec: api.UserSpec{
-			Kind: api.ServiceAccountOwner,
-			Name: "qip",
+		CoreOwnerSpec: api.CoreOwnerSpec{
+			UserSpec: api.UserSpec{
+				Kind: api.ServiceAccountOwner,
+				Name: "qip",
+			},
 		},
 		ProxyOperations: []api.ProxySettings{
 			{

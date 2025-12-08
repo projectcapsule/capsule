@@ -21,8 +21,9 @@ import (
 // Ensuring all the NetworkPolicies are applied to each Namespace handled by the Tenant.
 func (r *Manager) syncNetworkPolicies(ctx context.Context, tenant *capsulev1beta2.Tenant) error { //nolint:dupl
 	// getting requested NetworkPolicy keys
-	keys := make([]string, 0, len(tenant.Spec.NetworkPolicies.Items))
+	keys := make([]string, 0, len(tenant.Spec.NetworkPolicies.Items)) //nolint:staticcheck
 
+	//nolint:staticcheck
 	for i := range tenant.Spec.NetworkPolicies.Items {
 		keys = append(keys, strconv.Itoa(i))
 	}
@@ -45,6 +46,7 @@ func (r *Manager) syncNetworkPolicy(ctx context.Context, tenant *capsulev1beta2.
 		return err
 	}
 
+	//nolint:staticcheck
 	for i, spec := range tenant.Spec.NetworkPolicies.Items { //nolint:dupl
 		target := &networkingv1.NetworkPolicy{
 			ObjectMeta: metav1.ObjectMeta{

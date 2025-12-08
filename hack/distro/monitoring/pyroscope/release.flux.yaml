@@ -1,0 +1,57 @@
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: pyroscope
+  namespace: flux-system
+spec:
+  serviceAccountName: kustomize-controller
+  interval: 30s
+  timeout: 10m
+  targetNamespace: monitoring-system
+  releaseName: "pyroscope"
+  chart:
+    spec:
+      chart: pyroscope
+      version: "1.16.0"
+      sourceRef:
+        kind: HelmRepository
+        name: pyroscope
+      interval: 24h
+  install:
+    createNamespace: true
+    remediation:
+      retries: -1
+  upgrade:
+    remediation:
+      remediateLastFailure: true
+      retries: -1
+  driftDetection:
+    mode: enabled
+  values:
+    global:
+      dnsService: "kube-dns"
+      dnsNamespace: "kube-system"
+      clusterLabelOverride: "kind"
+    pyroscope:
+      persistence:
+        size: 10Gi
+      podAnnotations:
+        profiles.grafana.com/memory.scrape: "false"
+        profiles.grafana.com/goroutine.scrape: "false"
+        profiles.grafana.com/cpu.scrape: "false"
+    alloy:
+      controller:
+        podAnnotations:
+          profiles.grafana.com/memory.scrape: "false"
+          profiles.grafana.com/goroutine.scrape: "false"
+          profiles.grafana.com/cpu.scrape: "false"
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: pyroscope
+  namespace: flux-system
+spec:
+  interval: 24h0m0s
+  url: https://grafana.github.io/helm-charts
