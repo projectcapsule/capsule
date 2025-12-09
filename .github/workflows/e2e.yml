@@ -45,10 +45,10 @@ jobs:
       fail-fast: false
       matrix:
         k8s-version:
-          - '1.30.0'
-          - '1.31.0'
-          - '1.32.0'
-          - '1.33.0'
+          - 'v1.30.0'
+          - 'v1.31.0'
+          - 'v1.32.0'
+          - 'v1.33.0'
     runs-on:
       labels: ubuntu-latest-8-cores
     steps:
@@ -64,4 +64,4 @@ jobs:
       - uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4 # v4
 
       - name: e2e (Enterprise)
-        run: KUBERNETES_SUPPORTED_VERSION=${{ matrix.k8s-version }} sudo make e2e
+        run: sudo KUBERNETES_SUPPORTED_VERSION=${{ matrix.k8s-version }} make e2e
