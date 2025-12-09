@@ -5,11 +5,13 @@ package e2e
 
 import (
 	"context"
+	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/utils"
 	resources "k8s.io/api/resource/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -132,6 +134,13 @@ var _ = Describe("when Tenant handles Device classes", Label("tenant", "classes"
 				return k8sClient.Create(context.TODO(), tnt)
 			}).Should(Succeed())
 		}
+
+		if err := k8sClient.List(context.Background(), &resources.DeviceClassList{}); err != nil {
+			if utils.IsUnsupportedAPI(err) {
+				Skip(fmt.Sprintf("Running test due to unsupported API kind: %s", err.Error()))
+			}
+		}
+
 		for _, crd := range []*resources.DeviceClass{authorized, authorized2, unauthorized} {
 			crd.ResourceVersion = ""
 			EventuallyCreation(func() error {
@@ -146,6 +155,12 @@ var _ = Describe("when Tenant handles Device classes", Label("tenant", "classes"
 			}).Should(Succeed())
 		}
 
+		if err := k8sClient.List(context.Background(), &resources.DeviceClassList{}); err != nil {
+			if utils.IsUnsupportedAPI(err) {
+				Skip(fmt.Sprintf("Running test due to unsupported API kind: %s", err.Error()))
+			}
+		}
+
 		Eventually(func() (err error) {
 			req, _ := labels.NewRequirement("env", selection.Exists, nil)
 
@@ -157,6 +172,12 @@ var _ = Describe("when Tenant handles Device classes", Label("tenant", "classes"
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 	})
 	It("ResourceClaims", func() {
+		if err := k8sClient.List(context.Background(), &resources.DeviceClassList{}); err != nil {
+			if utils.IsUnsupportedAPI(err) {
+				Skip(fmt.Sprintf("Running test due to unsupported API kind: %s", err.Error()))
+			}
+		}
+
 		By("Verify Status (Creation)", func() {
 			Eventually(func() ([]string, error) {
 				t := &capsulev1beta2.Tenant{}
@@ -303,6 +324,11 @@ var _ = Describe("when Tenant handles Device classes", Label("tenant", "classes"
 		})
 	})
 	It("ResourceClaimTemplates", func() {
+		if err := k8sClient.List(context.Background(), &resources.DeviceClassList{}); err != nil {
+			if utils.IsUnsupportedAPI(err) {
+				Skip(fmt.Sprintf("Running test due to unsupported API kind: %s", err.Error()))
+			}
+		}
 
 		ns := NewNamespace("")
 		NamespaceCreation(ns, tntWithAuthorized.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())

@@ -73,13 +73,15 @@ func (r Manager) reconcileClassStatus(
 func (r *Manager) collectAvailableResources(ctx context.Context, tnt *capsulev1beta2.Tenant) (err error) {
 	log := log.FromContext(ctx)
 
-	log.V(5).Info("collecting available deviceclasses")
+	if r.classes.device {
+		log.V(5).Info("collecting available deviceclasses")
 
-	if err = r.collectAvailableDeviceClasses(ctx, tnt); err != nil {
-		return err
+		if err = r.collectAvailableDeviceClasses(ctx, tnt); err != nil {
+			return err
+		}
+
+		log.V(5).Info("collected available deviceclasses", "size", len(tnt.Status.Classes.DeviceClasses))
 	}
-
-	log.V(5).Info("collected available deviceclasses", "size", len(tnt.Status.Classes.DeviceClasses))
 
 	log.V(5).Info("collecting available storageclasses")
 
@@ -93,13 +95,15 @@ func (r *Manager) collectAvailableResources(ctx context.Context, tnt *capsulev1b
 		return err
 	}
 
-	log.V(5).Info("collected available priorityclasses", "size", len(tnt.Status.Classes.PriorityClasses))
+	if r.classes.gateway {
+		log.V(5).Info("collected available priorityclasses", "size", len(tnt.Status.Classes.PriorityClasses))
 
-	if err = r.collectAvailableGatewayClasses(ctx, tnt); err != nil {
-		return err
+		if err = r.collectAvailableGatewayClasses(ctx, tnt); err != nil {
+			return err
+		}
+
+		log.V(5).Info("collected available gatewayclasses", "size", len(tnt.Status.Classes.GatewayClasses))
 	}
-
-	log.V(5).Info("collected available gatewayclasses", "size", len(tnt.Status.Classes.GatewayClasses))
 
 	if err = r.collectAvailableRuntimeClasses(ctx, tnt); err != nil {
 		return err

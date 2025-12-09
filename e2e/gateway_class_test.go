@@ -5,6 +5,7 @@ package e2e
 
 import (
 	"context"
+	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -21,6 +22,7 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/utils"
 )
 
 var _ = Describe("when Tenant handles Gateway classes", Label("tenant", "classes", "gateway"), func() {
@@ -156,13 +158,21 @@ var _ = Describe("when Tenant handles Gateway classes", Label("tenant", "classes
 	}
 
 	JustBeforeEach(func() {
-		utilruntime.Must(gatewayv1.Install(scheme.Scheme))
 		for _, tnt := range []*capsulev1beta2.Tenant{tntWithDefault, tntWithoutDefault, tntNoRestrictions} {
 			tnt.ResourceVersion = ""
 			EventuallyCreation(func() error {
 				return k8sClient.Create(context.TODO(), tnt)
 			}).Should(Succeed())
 		}
+
+		if err := k8sClient.List(context.Background(), &gatewayv1.GatewayClassList{}); err != nil {
+			if utils.IsUnsupportedAPI(err) {
+				Skip(fmt.Sprintf("Running test due to unsupported API kind: %s", err.Error()))
+			}
+		}
+
+		utilruntime.Must(gatewayv1.Install(scheme.Scheme))
+
 		for _, crd := range []*gatewayv1.GatewayClass{authorized, unauthorized, exact, exactU} {
 			Eventually(func() error {
 				crd.ResourceVersion = ""
@@ -178,6 +188,12 @@ var _ = Describe("when Tenant handles Gateway classes", Label("tenant", "classes
 			}).Should(Succeed())
 		}
 
+		if err := k8sClient.List(context.Background(), &gatewayv1.GatewayClassList{}); err != nil {
+			if utils.IsUnsupportedAPI(err) {
+				Skip(fmt.Sprintf("Running test due to unsupported API kind: %s", err.Error()))
+			}
+		}
+
 		Eventually(func() (err error) {
 			req, _ := labels.NewRequirement("env", selection.Exists, nil)
 
@@ -189,6 +205,12 @@ var _ = Describe("when Tenant handles Gateway classes", Label("tenant", "classes
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 	})
 	It("should allow all classes", func() {
+		if err := k8sClient.List(context.Background(), &gatewayv1.GatewayClassList{}); err != nil {
+			if utils.IsUnsupportedAPI(err) {
+				Skip(fmt.Sprintf("Running test due to unsupported API kind: %s", err.Error()))
+			}
+		}
+
 		By("Verify Status (Creation)", func() {
 			Eventually(func() ([]string, error) {
 				t := &capsulev1beta2.Tenant{}
@@ -281,6 +303,12 @@ var _ = Describe("when Tenant handles Gateway classes", Label("tenant", "classes
 	})
 
 	It("should block Gateway", func() {
+		if err := k8sClient.List(context.Background(), &gatewayv1.GatewayClassList{}); err != nil {
+			if utils.IsUnsupportedAPI(err) {
+				Skip(fmt.Sprintf("Running test due to unsupported API kind: %s", err.Error()))
+			}
+		}
+
 		By("Verify Status (Creation)", func() {
 			Eventually(func() ([]string, error) {
 				t := &capsulev1beta2.Tenant{}
@@ -391,6 +419,12 @@ var _ = Describe("when Tenant handles Gateway classes", Label("tenant", "classes
 
 	})
 	It("should allow Gateway", func() {
+		if err := k8sClient.List(context.Background(), &gatewayv1.GatewayClassList{}); err != nil {
+			if utils.IsUnsupportedAPI(err) {
+				Skip(fmt.Sprintf("Running test due to unsupported API kind: %s", err.Error()))
+			}
+		}
+
 		By("Verify Status (Creation)", func() {
 			Eventually(func() ([]string, error) {
 				t := &capsulev1beta2.Tenant{}
@@ -483,6 +517,12 @@ var _ = Describe("when Tenant handles Gateway classes", Label("tenant", "classes
 		})
 	})
 	It("should fail on invalid configuration", func() {
+		if err := k8sClient.List(context.Background(), &gatewayv1.GatewayClassList{}); err != nil {
+			if utils.IsUnsupportedAPI(err) {
+				Skip(fmt.Sprintf("Running test due to unsupported API kind: %s", err.Error()))
+			}
+		}
+
 		By("Verify Status (Creation)", func() {
 			Eventually(func() ([]string, error) {
 				t := &capsulev1beta2.Tenant{}

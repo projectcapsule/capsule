@@ -12,11 +12,12 @@ import (
 	networkingv1 "k8s.io/api/networking/v1"
 	nodev1 "k8s.io/api/node/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	resources "k8s.io/api/resource/v1"
+	resourcesv1 "k8s.io/api/resource/v1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/client-go/rest"
@@ -49,10 +50,16 @@ type Manager struct {
 	Recorder      record.EventRecorder
 	Configuration configuration.Configuration
 	RESTConfig    *rest.Config
+	classes       supportedClasses
+}
+
+type supportedClasses struct {
+	device  bool
+	gateway bool
 }
 
 func (r *Manager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.ControllerOptions) error {
-	return ctrl.NewControllerManagedBy(mgr).
+	ctrlBuilder := ctrl.NewControllerManagedBy(mgr).
 		For(
 			&capsulev1beta2.Tenant{},
 			builder.WithPredicates(
@@ -74,29 +81,11 @@ func (r *Manager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.Controller
 			handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &capsulev1beta2.Tenant{}),
 		).
 		Watches(
-			&resources.DeviceClass{},
-			r.statusOnlyHandlerClasses(
-				r.reconcileClassStatus,
-				r.collectAvailableDeviceClasses,
-				"cannot collect device classes",
-			),
-			builder.WithPredicates(utils.UpdatedMetadataPredicate),
-		).
-		Watches(
 			&storagev1.StorageClass{},
 			r.statusOnlyHandlerClasses(
 				r.reconcileClassStatus,
 				r.collectAvailableStorageClasses,
 				"cannot collect storage classes",
-			),
-			builder.WithPredicates(utils.UpdatedMetadataPredicate),
-		).
-		Watches(
-			&gatewayv1.GatewayClass{},
-			r.statusOnlyHandlerClasses(
-				r.reconcileClassStatus,
-				r.collectAvailableGatewayClasses,
-				"cannot collect gateway classes",
 			),
 			builder.WithPredicates(utils.UpdatedMetadataPredicate),
 		).
@@ -207,8 +196,47 @@ func (r *Manager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.Controller
 			},
 			builder.WithPredicates(utils.PromotedServiceaccountPredicate),
 		).
-		WithOptions(controller.Options{MaxConcurrentReconciles: ctrlConfig.MaxConcurrentReconciles}).
-		Complete(r)
+		WithOptions(controller.Options{MaxConcurrentReconciles: ctrlConfig.MaxConcurrentReconciles})
+
+	// GatewayClass is Optional
+	r.classes.gateway = utils.HasGVK(mgr.GetRESTMapper(), schema.GroupVersionKind{
+		Group:   "gateway.networking.k8s.io",
+		Version: "v1",
+		Kind:    "GatewayClass",
+	})
+
+	if r.classes.gateway {
+		ctrlBuilder = ctrlBuilder.Watches(
+			&gatewayv1.GatewayClass{},
+			r.statusOnlyHandlerClasses(
+				r.reconcileClassStatus,
+				r.collectAvailableGatewayClasses,
+				"cannot collect gateway classes",
+			),
+			builder.WithPredicates(utils.UpdatedMetadataPredicate),
+		)
+	}
+
+	// DeviceClass is Optional
+	r.classes.device = utils.HasGVK(mgr.GetRESTMapper(), schema.GroupVersionKind{
+		Group:   "resource.k8s.io",
+		Version: "v1",
+		Kind:    "DeviceClass",
+	})
+
+	if r.classes.device {
+		ctrlBuilder = ctrlBuilder.Watches(
+			&resourcesv1.DeviceClass{},
+			r.statusOnlyHandlerClasses(
+				r.reconcileClassStatus,
+				r.collectAvailableDeviceClasses,
+				"cannot collect device classes",
+			),
+			builder.WithPredicates(utils.UpdatedMetadataPredicate),
+		)
+	}
+
+	return ctrlBuilder.Complete(r)
 }
 
 func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ctrl.Result, err error) {
