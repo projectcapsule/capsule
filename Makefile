@@ -168,6 +168,14 @@ setup-monitoring: dev-setup-fluxcd
 dev-setup-monitoring: setup-monitoring
 	@$(KUBECTL) kustomize --load-restrictor='LoadRestrictionsNone' hack/distro/host-proxy | envsubst | kubectl apply -f -
 
+dev-setup-argocd: dev-setup-fluxcd
+	@$(KUBECTL) kustomize --load-restrictor='LoadRestrictionsNone' hack/distro/argocd | envsubst | kubectl apply -f -
+	@$(MAKE) wait-for-helmreleases
+	@$(KUBECTL) kustomize --load-restrictor='LoadRestrictionsNone' hack/distro/argocd/application | envsubst | kubectl apply -f -
+	@printf "\n\033[32mAccess ArgoCD:\033[0m\n\n"
+	@printf "  \033[1mkubectl get secret -n argocd argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d\033[0m\n\n"
+	@printf "  \033[1mkubectl port-forward svc/argocd-server 9091:80 -n argocd\033[0m\n\n"
+
 dev-setup-fluxcd:
 	@$(KUBECTL) kustomize --load-restrictor='LoadRestrictionsNone' hack/distro/fluxcd | envsubst | kubectl apply -f -
 

@@ -1,0 +1,231 @@
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: argocd
+  namespace: flux-system
+spec:
+  serviceAccountName: kustomize-controller
+  interval: 30s
+  timeout: 10m
+  targetNamespace: argocd
+  releaseName: "argocd"
+  chart:
+    spec:
+      chart: argo-cd
+      version: "9.1.6"
+      sourceRef:
+        kind: HelmRepository
+        name: argocd
+      interval: 24h
+  install:
+    createNamespace: true
+    remediation:
+      retries: -1
+  upgrade:
+    remediation:
+      remediateLastFailure: true
+      retries: -1
+  driftDetection:
+    mode: enabled
+  values:
+    configs:
+      cm:
+        create: true
+
+
+        resource.customizations.health.capsule.clastix.io_Tenant: |
+          hs = {}
+          if obj.status ~= nil then
+            if obj.status.conditions ~= nil then
+              for i, condition in ipairs(obj.status.conditions) do
+                if condition.type == "Cordoned" and condition.status == "True" then
+                  hs.status = "Suspended"
+                  hs.message = condition.message
+                  return hs
+                end
+              end
+              for i, condition in ipairs(obj.status.conditions) do
+                if condition.type == "Ready" and condition.status == "False" then
+                  hs.status = "Degraded"
+                  hs.message = condition.message
+                  return hs
+                end
+                if condition.type == "Ready" and condition.status == "True" then
+                  hs.status = "Healthy"
+                  hs.message = condition.message
+                  return hs
+                end
+              end
+            end
+          end
+
+          hs.status = "Progressing"
+          hs.message = "Waiting for Status"
+          return hs
+
+        resource.customizations.actions.capsule.clastix.io_Tenant: |
+          mergeBuiltinActions: true
+          discovery.lua: |
+            actions = {}
+            actions["cordon"] = {
+              ["iconClass"] = "fa fa-solid fa-pause",
+              ["disabled"] = true,
+            }
+            actions["uncordon"] = {
+              ["iconClass"] = "fa fa-solid fa-play",
+              ["disabled"] = true,
+            }
+
+            local suspend = false
+            if obj.spec ~= nil and obj.spec.cordoned ~= nil then
+              suspend = obj.spec.cordoned
+            end
+
+            if suspend then
+              actions["uncordon"]["disabled"] = false
+            else
+              actions["cordon"]["disabled"] = false
+            end
+
+            return actions
+
+          definitions:
+            - name: cordon
+              action.lua: |
+                if obj.spec == nil then
+                  obj.spec = {}
+                end
+                obj.spec.cordoned = true
+                return obj
+
+            - name: uncordon
+              action.lua: |
+                if obj.spec ~= nil and obj.spec.cordoned ~= nil and obj.spec.cordoned then
+                  obj.spec.cordoned = false
+                end
+                return obj
+
+        resource.customizations.health.Namespace: |
+          hs = {}
+
+          local function has_managed_ownerref()
+            if obj.metadata == nil or obj.metadata.ownerReferences == nil then
+              return false
+            end
+
+            for _, ref in ipairs(obj.metadata.ownerReferences) do
+              if ref.kind == "Tenant" and ref.apiVersion == "capsule.clastix.io/v1beta2" then
+                return true
+              end
+            end
+
+            return false
+          end
+
+          local labels = {}
+          if obj.metadata ~= nil and obj.metadata.labels ~= nil then
+            labels = obj.metadata.labels
+          end
+
+          local cordoned = labels["projectcapsule.dev/cordoned"] == "true"
+
+          if cordoned and has_managed_ownerref() then
+            hs.status = "Suspended"
+            hs.message = "Namespace is cordoned (tenant-managed)"
+            return hs
+          end
+
+          if obj.status ~= nil and obj.status.phase ~= nil then
+            if obj.status.phase == "Active" then
+              hs.status = "Healthy"
+              hs.message = "Namespace is Active"
+              return hs
+            else
+              hs.status = "Progressing"
+              hs.message = "Namespace phase is " .. obj.status.phase
+              return hs
+            end
+          end
+
+          hs.status = "Progressing"
+          hs.message = "Waiting for Namespace status"
+          return hs
+
+        resource.customizations.actions.Namespace: |
+          mergeBuiltinActions: true
+          discovery.lua: |
+            actions = {
+              cordon = {
+                iconClass = "fa fa-solid fa-pause",
+                disabled = true,
+              },
+              uncordon = {
+                iconClass = "fa fa-solid fa-play",
+                disabled = true,
+              },
+            }
+
+            local function has_managed_ownerref()
+              if obj.metadata == nil or obj.metadata.ownerReferences == nil then
+                return false
+              end
+
+              for _, ref in ipairs(obj.metadata.ownerReferences) do
+                if ref.kind == "Tenant" and ref.apiVersion == "capsule.clastix.io/v1beta2" then
+                  return true
+                end
+              end
+
+              return false
+            end
+
+            if not has_managed_ownerref() then
+              return {}
+            end
+
+            local labels = {}
+            if obj.metadata ~= nil and obj.metadata.labels ~= nil then
+              labels = obj.metadata.labels
+            end
+
+            local cordoned = labels["projectcapsule.dev/cordoned"] == "true"
+
+            if cordoned then
+              actions["uncordon"].disabled = false
+            else
+              actions["cordon"].disabled = false
+            end
+
+            return actions
+
+          definitions:
+            - name: cordon
+              action.lua: |
+                if obj.metadata == nil then
+                  obj.metadata = {}
+                end
+                if obj.metadata.labels == nil then
+                  obj.metadata.labels = {}
+                end
+
+                obj.metadata.labels["projectcapsule.dev/cordoned"] = "true"
+                return obj
+
+            - name: uncordon
+              action.lua: |
+                if obj.metadata ~= nil and obj.metadata.labels ~= nil then
+                  obj.metadata.labels["projectcapsule.dev/cordoned"] = "false"
+                end
+
+                return obj
+
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: argocd
+  namespace: flux-system
+spec:
+  interval: 24h0m0s
+  url: https://argoproj.github.io/argo-helm
