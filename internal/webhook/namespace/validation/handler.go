@@ -33,7 +33,6 @@ type handler struct {
 	handlers []webhook.TypedHandlerWithTenant[*corev1.Namespace]
 }
 
-//nolint:dupl
 func (h *handler) OnCreate(c client.Client, decoder admission.Decoder, recorder record.EventRecorder) webhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		userIsAdmin := users.IsAdminUser(req, h.cfg.Administrators())
@@ -66,7 +65,6 @@ func (h *handler) OnCreate(c client.Client, decoder admission.Decoder, recorder 
 	}
 }
 
-//nolint:dupl
 func (h *handler) OnDelete(c client.Client, decoder admission.Decoder, recorder record.EventRecorder) webhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		userIsAdmin := users.IsAdminUser(req, h.cfg.Administrators())

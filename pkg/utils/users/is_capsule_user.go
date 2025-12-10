@@ -50,6 +50,7 @@ func IsCapsuleUser(
 		}
 	}
 
+	//nolint:modernize
 	for _, group := range cfg.UserGroups() {
 		if groupList.Find(group) {
 			if len(cfg.IgnoreUserWithGroups()) > 0 {

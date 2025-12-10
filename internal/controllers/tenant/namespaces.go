@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"maps"
+	"slices"
 
 	"golang.org/x/sync/errgroup"
 	corev1 "k8s.io/api/core/v1"
@@ -213,7 +214,12 @@ func (r *Manager) collectNamespaces(ctx context.Context, tenant *capsulev1beta2.
 		return err
 	}
 
-	tenant.AssignNamespaces(list.Items)
+	// Drop namespaces that are currently being deleted (DeletionTimestamp != nil)
+	activeNamespaces := slices.DeleteFunc(list.Items, func(ns corev1.Namespace) bool {
+		return ns.DeletionTimestamp != nil
+	})
+
+	tenant.AssignNamespaces(activeNamespaces)
 
 	return err
 }

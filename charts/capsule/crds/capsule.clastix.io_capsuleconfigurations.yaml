@@ -72,7 +72,7 @@ spec:
                   However ServiceAccounts which have been promoted to owner can not promote further serviceAccounts.
                 type: boolean
               enableTLSReconciler:
-                default: true
+                default: false
                 description: |-
                   Toggles the TLS reconciler, the controller that is able to generate CA and certificates for the webhooks
                   when not using an already provided CA and certificate, or when these are managed externally with Vault, or cert-manager.
@@ -117,9 +117,6 @@ spec:
                       deniedRegex:
                         type: string
                     type: object
-                required:
-                - forbiddenAnnotations
-                - forbiddenLabels
                 type: object
               overrides:
                 default:
@@ -198,6 +195,8 @@ spec:
             required:
             - enableTLSReconciler
             type: object
+        required:
+        - spec
         type: object
     served: true
     storage: true

@@ -6,6 +6,7 @@ package mutation
 import (
 	"context"
 	"encoding/json"
+	"maps"
 	"net/http"
 
 	corev1 "k8s.io/api/core/v1"
@@ -134,12 +135,10 @@ func mergeStringMap(dst, src map[string]string) map[string]string {
 	}
 
 	if dst == nil {
-		dst = make(map[string]string, len(src))
+		return maps.Clone(src)
 	}
 
-	for k, v := range src {
-		dst[k] = v
-	}
+	maps.Copy(dst, src)
 
 	return dst
 }

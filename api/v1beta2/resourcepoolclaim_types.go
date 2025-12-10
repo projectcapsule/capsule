@@ -22,9 +22,11 @@ type ResourcePoolClaimSpec struct {
 // ResourceQuotaClaimStatus defines the observed state of ResourceQuotaClaim.
 type ResourcePoolClaimStatus struct {
 	// Reference to the GlobalQuota being claimed from
-	Pool api.StatusNameUID `json:"pool,omitempty"`
+	// +optional
+	Pool api.StatusNameUID `json:"pool,omitzero"`
 	// Condtion for this resource claim
-	Condition metav1.Condition `json:"condition,omitempty"`
+	// +optional
+	Condition metav1.Condition `json:"condition,omitzero"`
 }
 
 // +kubebuilder:object:root=true
@@ -37,11 +39,15 @@ type ResourcePoolClaimStatus struct {
 
 // ResourcePoolClaim is the Schema for the resourcepoolclaims API.
 type ResourcePoolClaim struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"`
+	metav1.TypeMeta `json:",inline"`
 
-	Spec   ResourcePoolClaimSpec   `json:"spec,omitempty"`
-	Status ResourcePoolClaimStatus `json:"status,omitempty"`
+	// +optional
+	metav1.ObjectMeta `json:"metadata,omitzero"`
+
+	Spec ResourcePoolClaimSpec `json:"spec"`
+
+	// +optional
+	Status ResourcePoolClaimStatus `json:"status,omitzero"`
 }
 
 // +kubebuilder:object:root=true
@@ -49,7 +55,9 @@ type ResourcePoolClaim struct {
 // ResourceQuotaClaimList contains a list of ResourceQuotaClaim.
 type ResourcePoolClaimList struct {
 	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata,omitempty"`
+
+	// +optional
+	metav1.ListMeta `json:"metadata,omitzero"`
 
 	Items []ResourcePoolClaim `json:"items"`
 }

@@ -21,9 +21,11 @@ type ResourcePoolStatus struct {
 	// Namespaces which are considered for claims
 	Namespaces []string `json:"namespaces,omitempty"`
 	// Tracks the quotas for the Resource.
-	Claims ResourcePoolNamespaceClaimsStatus `json:"claims,omitempty"`
+	// +optional
+	Claims ResourcePoolNamespaceClaimsStatus `json:"claims,omitzero"`
 	// Tracks the Usage from Claimed against what has been granted from the pool
-	Allocation ResourcePoolQuotaStatus `json:"allocation,omitempty"`
+	// +optional
+	Allocation ResourcePoolQuotaStatus `json:"allocation,omitzero"`
 	// Exhaustions from claims associated with the pool
 	Exhaustions map[string]api.PoolExhaustionResource `json:"exhaustions,omitempty"`
 }

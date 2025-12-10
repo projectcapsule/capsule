@@ -20,7 +20,7 @@ func TemplateForTenantAndNamespace(m map[string]string, tnt *capsulev1beta2.Tena
 		}
 
 		t := fasttemplate.New(v, "{{ ", " }}")
-		tmplString := t.ExecuteString(map[string]interface{}{
+		tmplString := t.ExecuteString(map[string]any{
 			"tenant.name": tnt.Name,
 			"namespace":   ns.Name,
 		})

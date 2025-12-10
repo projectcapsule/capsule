@@ -12,7 +12,6 @@ import (
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
@@ -115,16 +114,17 @@ func ownerClient(owner api.UserSpec) (cs kubernetes.Interface) {
 	return cs
 }
 
-func impersonationClient(user string, groups []string, scheme *runtime.Scheme) client.Client {
-	c, err := config.GetConfig()
-	Expect(err).ToNot(HaveOccurred())
-	c.Impersonate = rest.ImpersonationConfig{
+func impersonationClient(user string, groups []string) client.Client {
+	impersonatedCfg := rest.CopyConfig(cfg)
+	impersonatedCfg.Impersonate = rest.ImpersonationConfig{
 		UserName: user,
 		Groups:   groups,
 	}
-	cl, err := client.New(c, client.Options{Scheme: scheme})
+
+	c, err := client.New(impersonatedCfg, client.Options{Scheme: k8sClient.Scheme()})
 	Expect(err).ToNot(HaveOccurred())
-	return cl
+
+	return c
 }
 
 func withDefaultGroups(groups []string) []string {

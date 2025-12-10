@@ -249,6 +249,7 @@ spec:
             required:
             - resources
             - resyncPeriod
+            - tenantSelector
             type: object
           status:
             description: GlobalTenantResourceStatus defines the observed state of
@@ -291,6 +292,8 @@ spec:
             - processedItems
             - selectedTenants
             type: object
+        required:
+        - spec
         type: object
     served: true
     storage: true

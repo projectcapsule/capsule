@@ -4,6 +4,7 @@
 package api
 
 import (
+	"slices"
 	"sort"
 )
 
@@ -19,10 +20,8 @@ func (o OwnerListSpec) IsOwner(name string, groups []string) bool {
 				return true
 			}
 		case GroupOwner:
-			for _, group := range groups {
-				if group == owner.Name {
-					return true
-				}
+			if slices.Contains(groups, owner.Name) {
+				return true
 			}
 		}
 	}

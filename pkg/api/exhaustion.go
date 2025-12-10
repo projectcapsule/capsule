@@ -10,7 +10,9 @@ import (
 // +kubebuilder:object:generate=true
 type PoolExhaustionResource struct {
 	// Available Resources to be claimed
-	Available resource.Quantity `json:"available,omitempty"`
+	// +optional
+	Available resource.Quantity `json:"available,omitzero"`
 	// Requesting Resources
-	Requesting resource.Quantity `json:"requesting,omitempty"`
+	// +optional
+	Requesting resource.Quantity `json:"requesting,omitzero"`
 }

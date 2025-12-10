@@ -16,7 +16,8 @@ import (
 // TenantSpec defines the desired state of Tenant.
 type TenantSpec struct {
 	// Specify Permissions for the Tenant.
-	Permissions Permissions `json:"permissions,omitempty"`
+	// +optional
+	Permissions Permissions `json:"permissions,omitzero"`
 	// Specifies the owners of the Tenant.
 	// Optional
 	Owners api.OwnerListSpec `json:"owners,omitempty"`
@@ -32,7 +33,8 @@ type TenantSpec struct {
 	// Optional.
 	StorageClasses *api.DefaultAllowedListSpec `json:"storageClasses,omitempty"`
 	// Specifies options for the Ingress resources, such as allowed hostnames and IngressClass. Optional.
-	IngressOptions IngressOptions `json:"ingressOptions,omitempty"`
+	// +optional
+	IngressOptions IngressOptions `json:"ingressOptions,omitzero"`
 	// Specifies the trusted Image Registries assigned to the Tenant. Capsule assures that all Pods resources created in the Tenant can use only one of the allowed trusted registries. Optional.
 	ContainerRegistries *api.AllowedListSpec `json:"containerRegistries,omitempty"`
 	// Specifies the label to control the placement of pods on a given pool of worker nodes. All namespaces created within the Tenant will have the node selector annotation. This annotation tells the Kubernetes scheduler to place pods on the nodes having the selector label. Optional.
@@ -40,13 +42,16 @@ type TenantSpec struct {
 	// Deprecated: Use Tenant Replications instead (https://projectcapsule.dev/docs/replications/)
 	//
 	// Specifies the NetworkPolicies assigned to the Tenant. The assigned NetworkPolicies are inherited by any namespace created in the Tenant. Optional.
-	NetworkPolicies api.NetworkPolicySpec `json:"networkPolicies,omitempty"`
+	// +optional
+	NetworkPolicies api.NetworkPolicySpec `json:"networkPolicies,omitzero"`
 	// Deprecated: Use Tenant Replications instead (https://projectcapsule.dev/docs/replications/)
 	//
 	// Specifies the resource min/max usage restrictions to the Tenant. The assigned values are inherited by any namespace created in the Tenant. Optional.
-	LimitRanges api.LimitRangesSpec `json:"limitRanges,omitempty"`
+	// +optional
+	LimitRanges api.LimitRangesSpec `json:"limitRanges,omitzero"`
 	// Specifies a list of ResourceQuota resources assigned to the Tenant. The assigned values are inherited by any namespace created in the Tenant. The Capsule operator aggregates ResourceQuota at Tenant level, so that the hard quota is never crossed for the given Tenant. This permits the Tenant owner to consume resources in the Tenant regardless of the namespace. Optional.
-	ResourceQuota api.ResourceQuotaSpec `json:"resourceQuotas,omitempty"`
+	// +optional
+	ResourceQuota api.ResourceQuotaSpec `json:"resourceQuotas,omitzero"`
 	// Specifies additional RoleBindings assigned to the Tenant. Capsule will ensure that all namespaces in the Tenant always contain the RoleBinding for the given ClusterRole. Optional.
 	AdditionalRoleBindings []api.AdditionalRoleBindingsSpec `json:"additionalRoleBindings,omitempty"`
 	// Specify the allowed values for the imagePullPolicies option in Pod resources. Capsule assures that all Pod resources created in the Tenant can use only one of the allowed policy. Optional.
@@ -63,7 +68,8 @@ type TenantSpec struct {
 	// Specifies options for the DeviceClass resources.
 	DeviceClasses *api.SelectorAllowedListSpec `json:"deviceClasses,omitempty"`
 	// Specifies options for the GatewayClass resources.
-	GatewayOptions GatewayOptions `json:"gatewayOptions,omitempty"`
+	// +optional
+	GatewayOptions GatewayOptions `json:"gatewayOptions,omitzero"`
 	// Toggling the Tenant resources cordoning, when enable resources cannot be deleted.
 	//+kubebuilder:default:=false
 	Cordoned bool `json:"cordoned,omitempty"`
@@ -110,11 +116,15 @@ func (p *Permissions) ListMatchingOwners(
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp",description="Age"
 // Tenant is the Schema for the tenants API.
 type Tenant struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"`
+	metav1.TypeMeta `json:",inline"`
 
-	Spec   TenantSpec   `json:"spec,omitempty"`
-	Status TenantStatus `json:"status,omitempty"`
+	// +optional
+	metav1.ObjectMeta `json:"metadata,omitzero"`
+
+	Spec TenantSpec `json:"spec"`
+
+	// +optional
+	Status TenantStatus `json:"status,omitzero"`
 }
 
 func (in *Tenant) GetNamespaces() (res []string) {
@@ -130,7 +140,7 @@ func (in *Tenant) GetNamespaces() (res []string) {
 // TenantList contains a list of Tenant.
 type TenantList struct {
 	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata,omitempty"`
+	metav1.ListMeta `json:"metadata,omitzero"`
 
 	Items []Tenant `json:"items"`
 }

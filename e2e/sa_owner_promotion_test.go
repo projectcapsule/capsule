@@ -104,9 +104,9 @@ var _ = Describe("Promoting ServiceAccounts to Owners", Label("config"), Label("
 			client  client.Client
 			matcher otypes.GomegaMatcher
 		}{
-			"owner":   {client: impersonationClient(tnt.Spec.Owners[0].Name, withDefaultGroups(make([]string, 0)), k8sClient.Scheme()), matcher: Not(Succeed())},
-			"rb-user": {client: impersonationClient("bob", withDefaultGroups(make([]string, 0)), k8sClient.Scheme()), matcher: Not(Succeed())},
-			"rb-sa":   {client: impersonationClient("system:serviceaccount:"+sa.GetNamespace()+":default", withDefaultGroups(make([]string, 0)), k8sClient.Scheme()), matcher: Not(Succeed())},
+			"owner":   {client: impersonationClient(tnt.Spec.Owners[0].Name, withDefaultGroups(make([]string, 0))), matcher: Not(Succeed())},
+			"rb-user": {client: impersonationClient("bob", withDefaultGroups(make([]string, 0))), matcher: Not(Succeed())},
+			"rb-sa":   {client: impersonationClient("system:serviceaccount:"+sa.GetNamespace()+":default", withDefaultGroups(make([]string, 0))), matcher: Not(Succeed())},
 		}
 
 		for name, tc := range personas {
@@ -197,9 +197,9 @@ var _ = Describe("Promoting ServiceAccounts to Owners", Label("config"), Label("
 			client  client.Client
 			matcher otypes.GomegaMatcher
 		}{
-			"rb-user": {client: impersonationClient("bob", withDefaultGroups(make([]string, 0)), k8sClient.Scheme()), matcher: Not(Succeed())},
-			"rb-sa":   {client: impersonationClient("system:serviceaccount:"+sa.GetNamespace()+":default", withDefaultGroups(make([]string, 0)), k8sClient.Scheme()), matcher: Not(Succeed())},
-			"owner":   {client: impersonationClient(tnt.Spec.Owners[0].Name, withDefaultGroups(make([]string, 0)), k8sClient.Scheme()), matcher: Succeed()},
+			"rb-user": {client: impersonationClient("bob", withDefaultGroups(make([]string, 0))), matcher: Not(Succeed())},
+			"rb-sa":   {client: impersonationClient("system:serviceaccount:"+sa.GetNamespace()+":default", withDefaultGroups(make([]string, 0))), matcher: Not(Succeed())},
+			"owner":   {client: impersonationClient(tnt.Spec.Owners[0].Name, withDefaultGroups(make([]string, 0))), matcher: Succeed()},
 		}
 
 		for name, tc := range personas {
@@ -258,7 +258,7 @@ var _ = Describe("Promoting ServiceAccounts to Owners", Label("config"), Label("
 			client  client.Client
 			matcher otypes.GomegaMatcher
 		}{
-			"owner": {client: impersonationClient(tnt.Spec.Owners[0].Name, withDefaultGroups(make([]string, 0)), k8sClient.Scheme()), matcher: Succeed()},
+			"owner": {client: impersonationClient(tnt.Spec.Owners[0].Name, withDefaultGroups(make([]string, 0))), matcher: Succeed()},
 		}
 
 		for name, tc := range personas {
@@ -294,14 +294,21 @@ var _ = Describe("Promoting ServiceAccounts to Owners", Label("config"), Label("
 		saClient := impersonationClient(
 			fmt.Sprintf("system:serviceaccount:%s:%s", ns.Name, sa.Name),
 			nil,
-			k8sClient.Scheme(),
 		)
 
-		newNs := NewNamespace("")
-		Expect(saClient.Create(context.TODO(), newNs)).To(Succeed())
-		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElements(ns.GetName()))
+		By("preventing the service account from deleting the namespace", func() {
+			newNs := NewNamespace("")
+			Expect(saClient.Create(context.TODO(), newNs)).To(Succeed())
 
-		Expect(saClient.Delete(context.TODO(), newNs)).To(Not(Succeed()))
+			TenantNamespaceList(tnt, defaultTimeoutInterval).
+				Should(ContainElements(ns.GetName(), newNs.GetName()))
+
+			Eventually(func(g Gomega) {
+				// Deletion should eventually be forbidden / fail
+				g.Expect(saClient.Delete(context.TODO(), newNs)).
+					ToNot(Succeed())
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		})
 
 		for name, tc := range personas {
 			By(fmt.Sprintf("trying to promote SA as %s", name))
