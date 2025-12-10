@@ -91,7 +91,12 @@ var _ = Describe("creating namespace with status lifecycle", Label("namespace", 
 		})
 
 		By("removing first namespace", func() {
-			Expect(k8sClient.Delete(context.TODO(), ns1)).Should(Succeed())
+			cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
+
+			err := cs.CoreV1().
+				Namespaces().
+				Delete(context.TODO(), ns1.Name, metav1.DeleteOptions{})
+			Expect(err).ShouldNot(HaveOccurred())
 
 			t := &capsulev1beta2.Tenant{}
 			Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: tnt.GetName()}, t)).Should(Succeed())
@@ -103,7 +108,12 @@ var _ = Describe("creating namespace with status lifecycle", Label("namespace", 
 		})
 
 		By("removing second namespace", func() {
-			Expect(k8sClient.Delete(context.TODO(), ns2)).Should(Succeed())
+			cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
+
+			err := cs.CoreV1().
+				Namespaces().
+				Delete(context.TODO(), ns2.Name, metav1.DeleteOptions{})
+			Expect(err).ShouldNot(HaveOccurred())
 
 			t := &capsulev1beta2.Tenant{}
 			Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: tnt.GetName()}, t)).Should(Succeed())
