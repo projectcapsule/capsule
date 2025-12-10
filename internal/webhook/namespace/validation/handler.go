@@ -76,7 +76,7 @@ func (h *handler) OnDelete(c client.Client, decoder admission.Decoder, recorder 
 		}
 
 		ns := &corev1.Namespace{}
-		if err := decoder.Decode(req, ns); err != nil {
+		if err := decoder.DecodeRaw(req.OldObject, ns); err != nil {
 			return utils.ErroredResponse(err)
 		}
 
