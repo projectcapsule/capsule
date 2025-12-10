@@ -13,6 +13,7 @@ type GlobalTenantResourceSpec struct {
 	TenantResourceSpec `json:",inline"`
 
 	// Defines the Tenant selector used target the tenants on which resources must be propagated.
+	// +optional
 	TenantSelector metav1.LabelSelector `json:"tenantSelector,omitzero"`
 }
 
