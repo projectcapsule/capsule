@@ -14,12 +14,12 @@ require (
 	go.uber.org/automaxprocs v1.6.0
 	go.uber.org/zap v1.27.1
 	golang.org/x/sync v0.19.0
-	k8s.io/api v0.34.2
+	k8s.io/api v0.34.3
 	k8s.io/apiextensions-apiserver v0.34.2
-	k8s.io/apimachinery v0.34.2
-	k8s.io/apiserver v0.34.2
-	k8s.io/client-go v0.34.2
-	k8s.io/dynamic-resource-allocation v0.34.2
+	k8s.io/apimachinery v0.34.3
+	k8s.io/apiserver v0.34.3
+	k8s.io/client-go v0.34.3
+	k8s.io/dynamic-resource-allocation v0.34.3
 	k8s.io/utils v0.0.0-20251002143259-bc988d571ff4
 	sigs.k8s.io/cluster-api v1.11.3
 	sigs.k8s.io/controller-runtime v0.22.4
