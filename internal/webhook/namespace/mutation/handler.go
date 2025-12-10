@@ -30,7 +30,6 @@ type handler struct {
 	handlers []webhook.TypedHandler[*corev1.Namespace]
 }
 
-//nolint:dupl
 func (h *handler) OnCreate(c client.Client, decoder admission.Decoder, recorder record.EventRecorder) webhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		userIsAdmin := users.IsAdminUser(req, h.cfg.Administrators())
@@ -63,35 +62,8 @@ func (h *handler) OnCreate(c client.Client, decoder admission.Decoder, recorder 
 	}
 }
 
-//nolint:dupl
 func (h *handler) OnDelete(c client.Client, decoder admission.Decoder, recorder record.EventRecorder) webhook.Func {
-	return func(ctx context.Context, req admission.Request) *admission.Response {
-		userIsAdmin := users.IsAdminUser(req, h.cfg.Administrators())
-
-		if !userIsAdmin && !users.IsCapsuleUser(ctx, c, h.cfg, req.UserInfo.Username, req.UserInfo.Groups) {
-			return nil
-		}
-
-		ns := &corev1.Namespace{}
-		if err := decoder.DecodeRaw(req.OldObject, ns); err != nil {
-			return utils.ErroredResponse(err)
-		}
-
-		tnt, err := tenant.GetTenantByLabels(ctx, c, ns)
-		if err != nil {
-			return utils.ErroredResponse(err)
-		}
-
-		if tnt == nil && userIsAdmin {
-			return nil
-		}
-
-		for _, hndl := range h.handlers {
-			if response := hndl.OnDelete(c, ns, decoder, recorder)(ctx, req); response != nil {
-				return response
-			}
-		}
-
+	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }

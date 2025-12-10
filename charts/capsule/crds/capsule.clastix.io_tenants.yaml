@@ -1049,7 +1049,11 @@ spec:
                     type: string
                 type: object
             required:
+            - ingressOptions
+            - limitRanges
+            - networkPolicies
             - owners
+            - resourceQuotas
             type: object
           status:
             description: Returns the observed state of the Tenant.
@@ -2890,6 +2894,8 @@ spec:
             - size
             - state
             type: object
+        required:
+        - spec
         type: object
     served: true
     storage: true

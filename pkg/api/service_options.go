@@ -13,7 +13,9 @@ type ServiceOptions struct {
 	// Specifies the external IPs that can be used in Services with type ClusterIP. An empty list means no IPs are allowed. Optional.
 	ExternalServiceIPs *ExternalServiceIPsSpec `json:"externalIPs,omitempty"`
 	// Define the labels that a Tenant Owner cannot set for their Service resources.
-	ForbiddenLabels ForbiddenListSpec `json:"forbiddenLabels,omitempty"`
+	// +optional
+	ForbiddenLabels ForbiddenListSpec `json:"forbiddenLabels,omitzero"`
 	// Define the annotations that a Tenant Owner cannot set for their Service resources.
-	ForbiddenAnnotations ForbiddenListSpec `json:"forbiddenAnnotations,omitempty"`
+	// +optional
+	ForbiddenAnnotations ForbiddenListSpec `json:"forbiddenAnnotations,omitzero"`
 }

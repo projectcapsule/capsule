@@ -6,6 +6,7 @@ package tenant
 import (
 	"context"
 	"fmt"
+	"slices"
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
@@ -155,13 +156,7 @@ func (r *Manager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.Controller
 					q workqueue.TypedRateLimitingInterface[reconcile.Request],
 				) {
 					r.enqueueForTenantsWithCondition(ctx, e.Object, q, func(tnt *capsulev1beta2.Tenant, c client.Object) bool {
-						for _, n := range tnt.Status.Namespaces {
-							if n == c.GetNamespace() {
-								return true
-							}
-						}
-
-						return false
+						return slices.Contains(tnt.Status.Namespaces, c.GetNamespace())
 					})
 				},
 				UpdateFunc: func(
@@ -170,13 +165,7 @@ func (r *Manager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.Controller
 					q workqueue.TypedRateLimitingInterface[reconcile.Request],
 				) {
 					r.enqueueForTenantsWithCondition(ctx, e.ObjectNew, q, func(tnt *capsulev1beta2.Tenant, c client.Object) bool {
-						for _, n := range tnt.Status.Namespaces {
-							if n == c.GetNamespace() {
-								return true
-							}
-						}
-
-						return false
+						return slices.Contains(tnt.Status.Namespaces, c.GetNamespace())
 					})
 				},
 				DeleteFunc: func(
@@ -241,6 +230,7 @@ func (r *Manager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.Controller
 
 func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ctrl.Result, err error) {
 	r.Log = r.Log.WithValues("Request.Name", request.Name)
+
 	// Fetch the Tenant instance
 	instance := &capsulev1beta2.Tenant{}
 	if err = r.Get(ctx, request.NamespacedName, instance); err != nil {
