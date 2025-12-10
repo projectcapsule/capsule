@@ -91,15 +91,26 @@ var _ = Describe("creating namespace with status lifecycle", Label("namespace", 
 		})
 
 		By("removing first namespace", func() {
-			Expect(k8sClient.Delete(context.TODO(), ns1)).Should(Succeed())
+			cs := impersonationClient(tnt.Spec.Owners[0].UserSpec.Name, withDefaultGroups(nil))
+			Expect(cs.Delete(context.TODO(), ns1)).Should(Succeed())
 
-			t := &capsulev1beta2.Tenant{}
-			Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: tnt.GetName()}, t)).Should(Succeed())
+			Eventually(func(g Gomega) {
+				t := &capsulev1beta2.Tenant{}
 
-			Expect(t.Status.Size).To(Equal(uint(1)))
+				err := k8sClient.Get(
+					context.TODO(),
+					types.NamespacedName{Name: tnt.GetName()},
+					t,
+				)
+				g.Expect(err).ToNot(HaveOccurred())
+				g.Expect(t.Status.Size).To(Equal(uint(1)))
 
-			instance := t.Status.GetInstance(&capsulev1beta2.TenantStatusNamespaceItem{Name: ns1.GetName(), UID: ns1.GetUID()})
-			Expect(instance).To(BeNil(), "Namespace instance should be nil")
+				instance := t.Status.GetInstance(&capsulev1beta2.TenantStatusNamespaceItem{
+					Name: ns1.GetName(),
+					UID:  ns1.GetUID(),
+				})
+				g.Expect(instance).To(BeNil(), "Namespace instance should be nil")
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		})
 
 		By("removing second namespace", func() {

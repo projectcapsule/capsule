@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"sync"
 
 	"github.com/valyala/fasttemplate"
@@ -40,13 +41,8 @@ func prepareAdditionalMetadata(m map[string]string) map[string]string {
 		return make(map[string]string)
 	}
 
-	// we need to create a new map to avoid modifying the original one
-	copied := make(map[string]string, len(m))
-	for k, v := range m {
-		copied[k] = v
-	}
-
-	return copied
+	// clone without mutating the original
+	return maps.Clone(m)
 }
 
 func (r *Processor) HandlePruning(ctx context.Context, current, desired sets.Set[string]) (updateStatus bool) {
@@ -249,12 +245,12 @@ func (r *Processor) HandleSection(ctx context.Context, tnt capsulev1beta2.Tenant
 
 			t := fasttemplate.New(template, "{{ ", " }}")
 
-			tmplString := t.ExecuteString(map[string]interface{}{
+			tmplString := t.ExecuteString(map[string]any{
 				"tenant.name": tnt.Name,
 				"namespace":   ns.Name,
 			})
 
-			obj, keysAndValues := unstructured.Unstructured{}, []interface{}{"index", rawIndex}
+			obj, keysAndValues := unstructured.Unstructured{}, []any{"index", rawIndex}
 
 			if _, _, decodeErr := codecFactory.UniversalDeserializer().Decode([]byte(tmplString), nil, &obj); decodeErr != nil {
 				log.Error(decodeErr, "unable to deserialize rawItem", keysAndValues...)
@@ -304,27 +300,18 @@ func (r *Processor) createOrUpdate(ctx context.Context, obj *unstructured.Unstru
 		rv := actual.GetResourceVersion()
 		actual.SetUnstructuredContent(desired.Object)
 
-		combinedLabels := obj.GetLabels()
-		if combinedLabels == nil {
-			combinedLabels = make(map[string]string)
-		}
-
-		for key, value := range labels {
-			combinedLabels[key] = value
-		}
+		combinedLabels := map[string]string{}
+		maps.Copy(combinedLabels, obj.GetLabels())
+		maps.Copy(combinedLabels, labels)
 
 		actual.SetLabels(combinedLabels)
 
-		combinedAnnotations := obj.GetAnnotations()
-		if combinedAnnotations == nil {
-			combinedAnnotations = make(map[string]string)
-		}
-
-		for key, value := range annotations {
-			combinedAnnotations[key] = value
-		}
+		combinedAnnotations := map[string]string{}
+		maps.Copy(combinedAnnotations, obj.GetAnnotations())
+		maps.Copy(combinedAnnotations, annotations)
 
 		actual.SetAnnotations(combinedAnnotations)
+
 		actual.SetResourceVersion(rv)
 		actual.SetUID(UID)
 

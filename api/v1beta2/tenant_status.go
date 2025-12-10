@@ -58,7 +58,8 @@ type TenantStatusNamespaceMetadata struct {
 
 type TenantAvailableStatus struct {
 	// Available Class Types within Tenant
-	Classes TenantAvailableClassesStatus `json:"classes,omitempty"`
+	// +optional
+	Classes TenantAvailableClassesStatus `json:"classes,omitzero"`
 }
 
 type TenantAvailableClassesStatus struct {
