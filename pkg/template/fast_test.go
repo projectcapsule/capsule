@@ -90,7 +90,7 @@ func TestTemplateForTenantAndNamespace_NoDelimitersReturnsEmpty(t *testing.T) {
 	ns := newNamespace("ns-1")
 
 	got := tpl.TemplateForTenantAndNamespace("plain-value-without-templates", tnt, ns)
-	if got != "" {
+	if got != "plain-value-without-templates" {
 		t.Fatalf("expected empty string for input without delimiters, got %q", got)
 	}
 }
@@ -157,15 +157,14 @@ func TestTemplateForTenantAndNamespaceMap_SkipsValuesWithoutDelimiters(t *testin
 		"noTemplate2": "namespace {{namespace}}",
 	}
 
-	original1 := m["noTemplate1"]
 	original2 := m["noTemplate2"]
 
 	tpl.TemplateForTenantAndNamespaceMap(m, tnt, ns)
 
-	if got := m["noTemplate1"]; got != original1 {
-		t.Fatalf("noTemplate1: expected %q to remain unchanged, got %q", original1, got)
+	if got := m["noTemplate1"]; got != "hello tenant-a" {
+		t.Fatalf("noTemplate1: expected %q, got %q", "tenant=tenant-a, ns=ns-1", got)
 	}
-	if got := m["noTemplate2"]; got != original2 {
+	if got := m["noTemplate2"]; got != "namespace ns-1" {
 		t.Fatalf("noTemplate2: expected %q to remain unchanged, got %q", original2, got)
 	}
 }

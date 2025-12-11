@@ -4,6 +4,7 @@
 package template
 
 import (
+	"io"
 	"strings"
 
 	"github.com/valyala/fasttemplate"
@@ -15,14 +16,23 @@ import (
 // TemplateForTenantAndNamespace applies templatingto the provided string.
 func TemplateForTenantAndNamespace(template string, tnt *capsulev1beta2.Tenant, ns *corev1.Namespace) string {
 	if !strings.Contains(template, "{{") && !strings.Contains(template, "}}") {
-		return ""
+		return template
 	}
 
 	t := fasttemplate.New(template, "{{", "}}")
 
-	return t.ExecuteString(map[string]any{
+	values := map[string]string{
 		"tenant.name": tnt.Name,
 		"namespace":   ns.Name,
+	}
+
+	return t.ExecuteFuncString(func(w io.Writer, tag string) (int, error) {
+		key := strings.TrimSpace(tag)
+		if v, ok := values[key]; ok {
+			return w.Write([]byte(v))
+		}
+
+		return 0, nil
 	})
 }
 
