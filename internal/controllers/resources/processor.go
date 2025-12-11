@@ -10,7 +10,6 @@ import (
 	"maps"
 	"sync"
 
-	"github.com/valyala/fasttemplate"
 	corev1 "k8s.io/api/core/v1"
 	apierr "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -25,6 +24,7 @@ import (
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	tpl "github.com/projectcapsule/capsule/pkg/template"
 )
 
 const (
@@ -243,12 +243,7 @@ func (r *Processor) HandleSection(ctx context.Context, tnt capsulev1beta2.Tenant
 		for rawIndex, item := range spec.RawItems {
 			template := string(item.Raw)
 
-			t := fasttemplate.New(template, "{{ ", " }}")
-
-			tmplString := t.ExecuteString(map[string]any{
-				"tenant.name": tnt.Name,
-				"namespace":   ns.Name,
-			})
+			tmplString := tpl.TemplateForTenantAndNamespace(template, &tnt, &ns)
 
 			obj, keysAndValues := unstructured.Unstructured{}, []any{"index", rawIndex}
 
