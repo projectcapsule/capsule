@@ -32,6 +32,7 @@ import (
 	capsulev1beta1 "github.com/projectcapsule/capsule/api/v1beta1"
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	configcontroller "github.com/projectcapsule/capsule/internal/controllers/cfg"
+	customquotacontroller "github.com/projectcapsule/capsule/internal/controllers/customquotas"
 	podlabelscontroller "github.com/projectcapsule/capsule/internal/controllers/pod"
 	"github.com/projectcapsule/capsule/internal/controllers/pv"
 	rbaccontroller "github.com/projectcapsule/capsule/internal/controllers/rbac"
@@ -44,6 +45,7 @@ import (
 	"github.com/projectcapsule/capsule/internal/metrics"
 	"github.com/projectcapsule/capsule/internal/webhook"
 	cfgvalidation "github.com/projectcapsule/capsule/internal/webhook/cfg"
+	customquota "github.com/projectcapsule/capsule/internal/webhook/customquota/validation"
 	"github.com/projectcapsule/capsule/internal/webhook/defaults"
 	"github.com/projectcapsule/capsule/internal/webhook/dra"
 	"github.com/projectcapsule/capsule/internal/webhook/gateway"
@@ -322,6 +324,7 @@ func main() {
 		route.ConfigValidation(
 			cfgvalidation.WarningHandler(),
 		),
+		route.CustomQuotas(customquota.CustomQuotasHandler(manager.GetClient(), ctrl.Log.WithName("webhooks").WithName("customquotas"))),
 	)
 
 	nodeWebhookSupported, _ := utils.NodeWebhookSupported(kubeVersion)
@@ -397,6 +400,15 @@ func main() {
 		controllerConfig,
 	); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "resourcepools")
+		os.Exit(1)
+	}
+
+	if err = customquotacontroller.Add(ctrl.Log.WithName("controllers").WithName("CustomQuotas"),
+		manager,
+		manager.GetEventRecorderFor("customquotas-ctrl"),
+		controllerConfig,
+	); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "customquotas")
 		os.Exit(1)
 	}
 

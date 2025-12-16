@@ -568,6 +568,44 @@ webhooks:
 {{- end }}
 {{- with .Values.webhooks.hooks.serviceaccounts }}
   {{- if .enabled }}
+- name: customquota.tenant.projectcapsule.dev
+  admissionReviewVersions:
+    - v1
+    - v1beta1
+  clientConfig:
+    {{- include "capsule.webhooks.service" (dict "path" "/customquotas" "ctx" $) | nindent 4 }}
+  failurePolicy:  {{ .failurePolicy }}
+  matchPolicy: {{ .matchPolicy }}
+  {{- with .namespaceSelector }}
+  namespaceSelector:
+    {{- toYaml . |  nindent 4 }}
+  {{- end }}
+  {{- with .objectSelector }}
+  objectSelector:
+    {{- toYaml . |  nindent 4 }}
+  {{- end }}
+  {{- with .matchConditions }}
+  matchConditions:
+    {{- toYaml . |  nindent 4 }}
+  {{- end }}
+  rules:
+    - apiGroups:
+        - '*'
+      apiVersions:
+        - '*'
+      operations:
+        - CREATE
+        - UPDATE
+        - DELETE
+      resources:
+        - '*'
+      scope: Namespaced
+  sideEffects: None
+  timeoutSeconds: {{ $.Values.webhooks.validatingWebhooksTimeoutSeconds }}
+  {{- end }}
+{{- end }}
+{{- with .Values.webhooks.hooks.serviceaccounts }}
+  {{- if .enabled }}
 - name: serviceaccounts.tenant.projectcapsule.dev
   admissionReviewVersions:
     - v1
