@@ -181,6 +181,12 @@ The following Values have changed key or Value:
 | webhooks.hooks.cordoning.namespaceSelector | object | `{"matchExpressions":[{"key":"capsule.clastix.io/tenant","operator":"Exists"},{"key":"projectcapsule.dev/cordoned","operator":"Exists"}]}` | [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector) |
 | webhooks.hooks.cordoning.objectSelector | object | `{}` | [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector) |
 | webhooks.hooks.cordoning.rules | list | `[{"apiGroups":["*"],"apiVersions":["*"],"operations":["CREATE","UPDATE","DELETE"],"resources":["*"],"scope":"Namespaced"}]` | [Rules](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-rules) |
+| webhooks.hooks.customquotas.enabled | bool | `true` | Enable the Hook |
+| webhooks.hooks.customquotas.failurePolicy | string | `"Fail"` | [FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy) |
+| webhooks.hooks.customquotas.matchConditions | list | `[]` | [MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy) |
+| webhooks.hooks.customquotas.matchPolicy | string | `"Equivalent"` | [MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy) |
+| webhooks.hooks.customquotas.namespaceSelector | object | `{"matchExpressions":[{"key":"capsule.clastix.io/tenant","operator":"Exists"}]}` | [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector) |
+| webhooks.hooks.customquotas.objectSelector | object | `{}` | [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector) |
 | webhooks.hooks.customresources.enabled | bool | `true` | Enable the Hook |
 | webhooks.hooks.customresources.failurePolicy | string | `"Fail"` | [FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy) |
 | webhooks.hooks.customresources.matchConditions | list | `[]` | [MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy) |

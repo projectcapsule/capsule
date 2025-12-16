@@ -11,7 +11,7 @@ import (
 // CustomQuotaSpec.
 type CustomQuotaSpec struct {
 	Selectors []metav1.LabelSelector `json:"selectors,omitempty"`
-	Limit     resource.Quantity      `json:"limit,omitempty"`
+	Limit     resource.Quantity      `json:"limit"`
 	//+kubebuilder:default:={}
 	Source CustomQuotaSpecSource `json:"source,omitzero"`
 }

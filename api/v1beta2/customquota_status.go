@@ -7,7 +7,7 @@ import "k8s.io/apimachinery/pkg/api/resource"
 
 // CustomQuotaStatus defines the observed state of GlobalResourceQuota.
 type CustomQuotaStatus struct {
-	Used      resource.Quantity `json:"used,omitempty"`
-	Available resource.Quantity `json:"available,omitempty"`
+	Used      resource.Quantity `json:"used"`
+	Available resource.Quantity `json:"available"`
 	Claims    []string          `json:"claims,omitempty"`
 }

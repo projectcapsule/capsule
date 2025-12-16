@@ -119,6 +119,7 @@ spec:
                     type: string
                 type: object
             required:
+            - limit
             - source
             type: object
           status:
@@ -140,6 +141,9 @@ spec:
                 - type: string
                 pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                 x-kubernetes-int-or-string: true
+            required:
+            - available
+            - used
             type: object
         required:
         - spec

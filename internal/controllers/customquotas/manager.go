@@ -19,7 +19,6 @@ func Add(
 	recorder record.EventRecorder,
 	cfg utils.ControllerOptions,
 ) (err error) {
-
 	if err = (&customQuotaClaimController{
 		Client:   mgr.GetClient(),
 		log:      log.WithName("CustomQuota"),

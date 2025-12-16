@@ -31,6 +31,7 @@ import (
 
 type customQuotaClaimController struct {
 	client.Client
+
 	log      logr.Logger
 	recorder record.EventRecorder
 }
@@ -47,6 +48,7 @@ func (r *customQuotaClaimController) SetupWithManager(mgr ctrl.Manager, cfg util
 
 func (r customQuotaClaimController) Reconcile(ctx context.Context, request ctrl.Request) (result ctrl.Result, err error) {
 	log := r.log.WithValues("Request.Name", request.Name)
+
 	instance := &capsulev1beta2.CustomQuota{}
 	if err = r.Get(ctx, request.NamespacedName, instance); err != nil {
 		if apierrors.IsNotFound(err) {
@@ -62,12 +64,84 @@ func (r customQuotaClaimController) Reconcile(ctx context.Context, request ctrl.
 
 	// Ensuring the Quota Status
 	err = r.reconcile(ctx, log, instance)
-
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 
 	return ctrl.Result{}, err
+}
+
+func (r *customQuotaClaimController) OnUpdate(e event.TypedUpdateEvent[client.Object]) bool {
+	//nolint:forcetypeassert
+	customQuotaOld := e.ObjectOld.(*capsulev1beta2.CustomQuota)
+	//nolint:forcetypeassert
+	customQuotaNew := e.ObjectNew.(*capsulev1beta2.CustomQuota)
+
+	if !equality.Semantic.DeepEqual(customQuotaOld.Spec.Selectors, customQuotaNew.Spec.Selectors) ||
+		!equality.Semantic.DeepEqual(customQuotaOld.Spec.Source, customQuotaNew.Spec.Source) {
+		customQuotaNew.Status = capsulev1beta2.CustomQuotaStatus{}
+
+		items, err := r.getRessources(customQuotaNew)
+		if err != nil {
+			r.log.Error(err, "Error getting ressources while updating CustomQuota usage")
+
+			return true
+		}
+
+		for _, item := range items {
+			val, err := GetUsageFromUnstructured(item, customQuotaNew.Spec.Source.Path)
+			if err != nil {
+				r.log.Error(err, "Error getting usage from unstructured while updating CustomQuota usage")
+
+				continue
+			}
+
+			quant, err := resource.ParseQuantity(val)
+			if err != nil {
+				r.log.Error(err, "Error parsing quantity while updating CustomQuota usage")
+
+				continue
+			}
+
+			customQuotaNew.Status.Used.Add(quant)
+
+			claim := fmt.Sprintf("%s.%s", item.GetNamespace(), item.GetName())
+			customQuotaNew.Status.Claims = append(customQuotaNew.Status.Claims, claim)
+		}
+	}
+
+	return true
+}
+
+func (r *customQuotaClaimController) getRessources(customQuota *capsulev1beta2.CustomQuota) ([]unstructured.Unstructured, error) {
+	items := []unstructured.Unstructured{}
+
+	for _, selector := range customQuota.Spec.Selectors {
+		u := &unstructured.UnstructuredList{}
+
+		labelSelector, err := metav1.LabelSelectorAsSelector(&selector)
+		if err != nil {
+			return nil, err
+		}
+
+		u.SetGroupVersionKind(schema.GroupVersionKind{
+			Group:   "",
+			Kind:    customQuota.Spec.Source.Kind + "List",
+			Version: customQuota.Spec.Source.Version,
+		})
+
+		err = r.List(context.Background(), u, &client.ListOptions{
+			Namespace:     customQuota.Namespace,
+			LabelSelector: labelSelector,
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		items = slices.Concat(items, u.Items)
+	}
+
+	return items, nil
 }
 
 // This Controller is responsible for keeping the CustomQuota Status in sync with the actual usage.
@@ -79,75 +153,24 @@ func (r customQuotaClaimController) reconcile(
 ) (err error) {
 	customQuota.Status.Available = customQuota.Spec.Limit.DeepCopy()
 	customQuota.Status.Available.Sub(customQuota.Status.Used)
+
 	return r.Client.Status().Update(ctx, customQuota)
-}
-
-func (r *customQuotaClaimController) OnUpdate(e event.TypedUpdateEvent[client.Object]) bool {
-	customQuotaOld := e.ObjectOld.(*capsulev1beta2.CustomQuota)
-	customQuotaNew := e.ObjectNew.(*capsulev1beta2.CustomQuota)
-
-	if !equality.Semantic.DeepEqual(customQuotaOld.Spec.Selectors, customQuotaNew.Spec.Selectors) ||
-		!equality.Semantic.DeepEqual(customQuotaOld.Spec.Source, customQuotaNew.Spec.Source) {
-		customQuotaNew.Status = capsulev1beta2.CustomQuotaStatus{}
-		items, err := r.getRessources(customQuotaNew)
-		if err != nil {
-			r.log.Error(err, "Error getting ressources while updating CustomQuota usage")
-			return true
-		}
-		for _, item := range items {
-			val, err := GetUsageFromUnstructured(item, customQuotaNew.Spec.Source.Path)
-			if err != nil {
-				r.log.Error(err, "Error getting usage from unstructured while updating CustomQuota usage")
-				continue
-			}
-			quant, err := resource.ParseQuantity(val)
-			if err != nil {
-				r.log.Error(err, "Error parsing quantity while updating CustomQuota usage")
-				continue
-			}
-			customQuotaNew.Status.Used.Add(quant)
-			claim := fmt.Sprintf("%s.%s", item.GetNamespace(), item.GetName())
-			customQuotaNew.Status.Claims = append(customQuotaNew.Status.Claims, claim)
-		}
-	}
-	return true
-}
-
-func (r *customQuotaClaimController) getRessources(customQuota *capsulev1beta2.CustomQuota) ([]unstructured.Unstructured, error) {
-	items := []unstructured.Unstructured{}
-	for _, selector := range customQuota.Spec.Selectors {
-		u := &unstructured.UnstructuredList{}
-		labelSelector, err := metav1.LabelSelectorAsSelector(&selector)
-		if err != nil {
-			return nil, err
-		}
-		u.SetGroupVersionKind(schema.GroupVersionKind{
-			Group:   "",
-			Kind:    customQuota.Spec.Source.Kind + "List",
-			Version: customQuota.Spec.Source.Version,
-		})
-		err = r.Client.List(context.Background(), u, &client.ListOptions{
-			Namespace:     customQuota.Namespace,
-			LabelSelector: labelSelector,
-		})
-		if err != nil {
-			return nil, err
-		}
-		items = slices.Concat(items, u.Items)
-	}
-	return items, nil
 }
 
 func GetUsageFromUnstructured(u unstructured.Unstructured, sourcePath string) (string, error) {
 	j := jsonpath.New("usagePath")
+
 	err := j.Parse(fmt.Sprintf("{%s}", sourcePath))
 	if err != nil {
 		return "", err
 	}
+
 	buf := new(bytes.Buffer)
+
 	err = j.Execute(buf, u.Object)
 	if err != nil {
 		return "", err
 	}
+
 	return buf.String(), nil
 }
