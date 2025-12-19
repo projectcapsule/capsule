@@ -27,5 +27,13 @@ func Add(
 		return fmt.Errorf("unable to create custom quota controller: %w", err)
 	}
 
+	if err = (&clusterCustomQuotaClaimController{
+		Client:   mgr.GetClient(),
+		log:      log.WithName("ClusterCustomQuota"),
+		recorder: recorder,
+	}).SetupWithManager(mgr, cfg); err != nil {
+		return fmt.Errorf("unable to create custom quota controller: %w", err)
+	}
+
 	return nil
 }

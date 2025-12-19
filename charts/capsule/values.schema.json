@@ -865,6 +865,51 @@
                                 }
                             }
                         },
+                        "customquotas": {
+                            "type": "object",
+                            "properties": {
+                                "enabled": {
+                                    "description": "Enable the Hook",
+                                    "type": "boolean"
+                                },
+                                "failurePolicy": {
+                                    "description": "[FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy)",
+                                    "type": "string"
+                                },
+                                "matchConditions": {
+                                    "description": "[MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)",
+                                    "type": "array"
+                                },
+                                "matchPolicy": {
+                                    "description": "[MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)",
+                                    "type": "string"
+                                },
+                                "namespaceSelector": {
+                                    "description": "[NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector)",
+                                    "type": "object",
+                                    "properties": {
+                                        "matchExpressions": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "key": {
+                                                        "type": "string"
+                                                    },
+                                                    "operator": {
+                                                        "type": "string"
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                "objectSelector": {
+                                    "description": "[ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector)",
+                                    "type": "object"
+                                }
+                            }
+                        },
                         "customresources": {
                             "type": "object",
                             "properties": {

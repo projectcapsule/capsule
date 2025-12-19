@@ -33,6 +33,7 @@ rules:
   - tenants.capsule.clastix.io
   - tenantowners.capsule.clastix.io
   - customquotas.capsule.clastix.io
+  - clustercustomquotas.capsule.clastix.io
   verbs:
   - create
   - delete

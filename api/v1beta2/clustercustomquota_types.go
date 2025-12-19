@@ -4,37 +4,30 @@
 package v1beta2
 
 import (
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// CustomQuotaSpec.
-type CustomQuotaSpec struct {
-	ScopeSelectors []metav1.LabelSelector `json:"scopeSelectors,omitempty"`
-	Limit          resource.Quantity      `json:"limit"`
-	//+kubebuilder:default:={}
-	Source CustomQuotaSpecSource `json:"source,omitzero"`
-}
+// ClusterCustomQuotaSpec.
+type ClusterCustomQuotaSpec struct {
+	CustomQuotaSpec `json:",inline"`
 
-type CustomQuotaSpecSource struct {
-	Version string `json:"version,omitempty"`
-	Kind    string `json:"kind,omitempty"`
-	Path    string `json:"path,omitempty"`
+	Selectors []metav1.LabelSelector `json:"selectors,omitempty"`
 }
 
 // +kubebuilder:object:root=true
+// +kubebuilder:resource:scope=Cluster
 // +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="Used",type="string",JSONPath=".status.used",description="The total used amount"
 // +kubebuilder:printcolumn:name="Limit",type="string",JSONPath=".spec.limit",description="The total limit available"
 // +kubebuilder:printcolumn:name="Available",type="string",JSONPath=".status.available",description="The total amount available"
 
-type CustomQuota struct {
+type ClusterCustomQuota struct {
 	metav1.TypeMeta `json:",inline"`
 
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitzero"`
 
-	Spec CustomQuotaSpec `json:"spec"`
+	Spec ClusterCustomQuotaSpec `json:"spec"`
 
 	// +optional
 	Status CustomQuotaStatus `json:"status,omitzero"`
@@ -42,16 +35,16 @@ type CustomQuota struct {
 
 // +kubebuilder:object:root=true
 
-// CustomQuotaList contains a list of CustomQuota.
-type CustomQuotaList struct {
+// ClusterCustomQuotaList contains a list of ClusterCustomQuota.
+type ClusterCustomQuotaList struct {
 	metav1.TypeMeta `json:",inline"`
 
 	// +optional
 	metav1.ListMeta `json:"metadata,omitzero"`
 
-	Items []CustomQuota `json:"items"`
+	Items []ClusterCustomQuota `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&CustomQuota{}, &CustomQuotaList{})
+	SchemeBuilder.Register(&ClusterCustomQuota{}, &ClusterCustomQuotaList{})
 }
