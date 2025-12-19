@@ -5,6 +5,7 @@ package template
 
 import (
 	"io"
+	"maps"
 	"strings"
 
 	"github.com/valyala/fasttemplate"
@@ -37,8 +38,15 @@ func TemplateForTenantAndNamespace(template string, tnt *capsulev1beta2.Tenant, 
 }
 
 // TemplateForTenantAndNamespace applies templating to all values in the provided map in place.
-func TemplateForTenantAndNamespaceMap(m map[string]string, tnt *capsulev1beta2.Tenant, ns *corev1.Namespace) {
-	for k, v := range m {
-		m[k] = TemplateForTenantAndNamespace(v, tnt, ns)
+func TemplateForTenantAndNamespaceMap(m map[string]string, tnt *capsulev1beta2.Tenant, ns *corev1.Namespace) map[string]string {
+	if len(m) == 0 {
+		return map[string]string{}
 	}
+
+	out := maps.Clone(m)
+	for k, v := range out {
+		out[k] = TemplateForTenantAndNamespace(v, tnt, ns)
+	}
+
+	return out
 }
