@@ -59,11 +59,11 @@ func BuildNamespaceMetadataForTenant(ns *corev1.Namespace, tnt *capsulev1beta2.T
 				continue
 			}
 
-			template.TemplateForTenantAndNamespaceMap(md.Labels, tnt, ns)
-			template.TemplateForTenantAndNamespaceMap(md.Annotations, tnt, ns)
+			tLabels := template.TemplateForTenantAndNamespaceMap(md.Labels, tnt, ns)
+			tAnnotations := template.TemplateForTenantAndNamespaceMap(md.Annotations, tnt, ns)
 
-			utils.MapMergeNoOverrite(labels, md.Labels)
-			utils.MapMergeNoOverrite(annotations, md.Annotations)
+			utils.MapMergeNoOverrite(labels, tLabels)
+			utils.MapMergeNoOverrite(annotations, tAnnotations)
 		}
 	}
 
