@@ -19,7 +19,7 @@ require (
 	k8s.io/apimachinery v0.35.0
 	k8s.io/apiserver v0.35.0
 	k8s.io/client-go v0.35.0
-	k8s.io/dynamic-resource-allocation v0.34.3
+	k8s.io/dynamic-resource-allocation v0.35.0
 	k8s.io/utils v0.0.0-20251218160917-61b37f7a4624
 	sigs.k8s.io/cluster-api v1.11.3
 	sigs.k8s.io/controller-runtime v0.22.4
