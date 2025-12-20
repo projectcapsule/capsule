@@ -64,7 +64,7 @@ func GetNamespacesMatchingSelectors(ctx context.Context, namespaceSelector []met
 	return slices.Collect(maps.Keys(set)), nil
 }
 
-func getResources(source *capsulev1beta2.CustomQuotaSpecSource, kubeClient client.Client, scopeSelectors []metav1.LabelSelector, namespaces ...string) ([]unstructured.Unstructured, error) {
+func getResources(ctx context.Context, source *capsulev1beta2.CustomQuotaSpecSource, kubeClient client.Client, scopeSelectors []metav1.LabelSelector, namespaces ...string) ([]unstructured.Unstructured, error) {
 	items := []unstructured.Unstructured{}
 
 	for _, selector := range scopeSelectors {
@@ -82,7 +82,7 @@ func getResources(source *capsulev1beta2.CustomQuotaSpecSource, kubeClient clien
 		})
 
 		for _, namespace := range namespaces {
-			err = kubeClient.List(context.TODO(), u, &client.ListOptions{
+			err = kubeClient.List(ctx, u, &client.ListOptions{
 				Namespace:     namespace,
 				LabelSelector: labelSelector,
 			})

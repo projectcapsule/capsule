@@ -7,16 +7,16 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/projectcapsule/capsule/pkg/api"
-	"k8s.io/apimachinery/pkg/api/resource"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+
+	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/api"
 )
 
 var _ = Describe("exceeding a Cluster Custom resource quota", Label("clustercustomresourcequota"), func() {
@@ -37,7 +37,7 @@ var _ = Describe("exceeding a Cluster Custom resource quota", Label("clustercust
 			},
 		},
 	}
-	nsl := []string{"easy", "peasy"}
+	nsl := []string{"cluster-custom-resource-quota-ns1", "cluster-custom-resource-quota-ns2"}
 
 	customresource := &capsulev1beta2.ClusterCustomQuota{
 		ObjectMeta: metav1.ObjectMeta{

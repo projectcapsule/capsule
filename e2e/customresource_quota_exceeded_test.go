@@ -37,7 +37,7 @@ var _ = Describe("exceeding a Custom resource quota", Label("customresourcequota
 			},
 		},
 	}
-	nsName := "easy"
+	nsName := "custom-resource-quota-ns"
 
 	customresource := &capsulev1beta2.CustomQuota{
 		ObjectMeta: metav1.ObjectMeta{

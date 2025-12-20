@@ -32,7 +32,7 @@ func Add(
 		log:      log.WithName("ClusterCustomQuota"),
 		recorder: recorder,
 	}).SetupWithManager(mgr, cfg); err != nil {
-		return fmt.Errorf("unable to create custom quota controller: %w", err)
+		return fmt.Errorf("unable to create cluster custom quota controller: %w", err)
 	}
 
 	return nil

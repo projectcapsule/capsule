@@ -60,9 +60,6 @@ func (h *customquotasHandler) OnCreate(c client.Client, decoder admission.Decode
 
 		for _, cq := range customQuotasMatched {
 			typeName := getType(cq)
-			claimList := cq.Status.Claims
-			claimList = append(claimList, fmt.Sprintf("%s.%s", req.Namespace, req.Name))
-			cq.Status.Claims = claimList
 
 			usage, err := customquotas.GetUsageFromUnstructured(u, cq.Spec.Source.Path)
 			if err != nil {
@@ -82,6 +79,7 @@ func (h *customquotasHandler) OnCreate(c client.Client, decoder admission.Decode
 
 			cq.Status.Used.Add(resource.MustParse(usage))
 			cq.Status.Available.Sub(resource.MustParse(usage))
+			cq.Status.Claims = append(cq.Status.Claims, fmt.Sprintf("%s.%s", req.Namespace, req.Name))
 
 			err = h.updateSubResStatusCustomQuota(ctx, cq)
 			if err != nil {
@@ -182,9 +180,8 @@ func (h *customquotasHandler) OnUpdate(c client.Client, _ admission.Decoder, rec
 
 			if errOldUsage != nil {
 				oldUsage = "0"
-				claimList := cq.Status.Claims
-				claimList = append(claimList, fmt.Sprintf("%s.%s", req.Namespace, req.Name))
-				cq.Status.Claims = claimList
+
+				cq.Status.Claims = append(cq.Status.Claims, fmt.Sprintf("%s.%s", req.Namespace, req.Name))
 			}
 
 			newUsed := cq.Status.Used.DeepCopy()
@@ -353,5 +350,5 @@ func getUnstructured(rawExt runtime.RawExtension) (unstructured.Unstructured, er
 
 	u := unstructured.Unstructured{Object: innerObj}
 
-	return u, err
+	return u, nil
 }

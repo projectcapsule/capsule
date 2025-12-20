@@ -12,11 +12,13 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/retry"
+	"k8s.io/client-go/util/workqueue"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/event"
-	"sigs.k8s.io/controller-runtime/pkg/predicate"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
@@ -34,7 +36,7 @@ func (r *customQuotaClaimController) SetupWithManager(mgr ctrl.Manager, cfg util
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&capsulev1beta2.CustomQuota{}).
 		WithOptions(controller.Options{MaxConcurrentReconciles: cfg.MaxConcurrentReconciles}).
-		WithEventFilter(predicate.Funcs{
+		Watches(&capsulev1beta2.CustomQuota{}, handler.Funcs{
 			CreateFunc: r.OnCreate,
 			UpdateFunc: r.OnUpdate,
 		}).
@@ -59,26 +61,28 @@ func (r *customQuotaClaimController) Reconcile(ctx context.Context, request ctrl
 	}
 
 	// Ensuring the CustomQuota Status
-	err = r.reconcile(ctx, log, instance)
-	if err != nil {
+	if err = r.reconcile(ctx, log, instance); err != nil {
 		return ctrl.Result{}, err
 	}
 
-	return ctrl.Result{}, err
+	return ctrl.Result{}, nil
 }
 
-func (r *customQuotaClaimController) OnCreate(e event.TypedCreateEvent[client.Object]) bool {
+func (r *customQuotaClaimController) OnCreate(ctx context.Context, e event.TypedCreateEvent[client.Object], w workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	//nolint:forcetypeassert
 	cq := e.Object.(*capsulev1beta2.CustomQuota)
 
+	// start with a fresh status
 	cq.Status = capsulev1beta2.CustomQuotaStatus{}
 
-	items, err := getResources(&cq.Spec.Source, r.Client, cq.Spec.ScopeSelectors, cq.Namespace)
+	items, err := getResources(ctx, &cq.Spec.Source, r.Client, cq.Spec.ScopeSelectors, cq.Namespace)
 	if err != nil {
 		r.log.Error(err, "Error getting resources while updating CustomQuota usage")
 
-		return true
+		return
 	}
+
+	changed := false
 
 	for _, item := range items {
 		val, err := GetUsageFromUnstructured(item, cq.Spec.Source.Path)
@@ -99,51 +103,95 @@ func (r *customQuotaClaimController) OnCreate(e event.TypedCreateEvent[client.Ob
 
 		claim := fmt.Sprintf("%s.%s", item.GetNamespace(), item.GetName())
 		cq.Status.Claims = append(cq.Status.Claims, claim)
+		changed = true
 	}
 
-	return true
+	if !changed {
+		return
+	}
+
+	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		latest := &capsulev1beta2.CustomQuota{}
+
+		nn := client.ObjectKey{Namespace: cq.Namespace, Name: cq.Name}
+
+		if getErr := r.Get(ctx, nn, latest); getErr != nil {
+			return getErr
+		}
+
+		latest.Status = cq.Status
+
+		return r.Client.Status().Update(ctx, latest)
+	})
+	if retryErr != nil {
+		r.log.Error(retryErr, "Error updating CustomQuota status on creation")
+	}
 }
 
-func (r *customQuotaClaimController) OnUpdate(e event.TypedUpdateEvent[client.Object]) bool {
+func (r *customQuotaClaimController) OnUpdate(ctx context.Context, e event.TypedUpdateEvent[client.Object], w workqueue.TypedRateLimitingInterface[reconcile.Request]) {
 	//nolint:forcetypeassert
 	customQuotaOld := e.ObjectOld.(*capsulev1beta2.CustomQuota)
 	//nolint:forcetypeassert
 	customQuotaNew := e.ObjectNew.(*capsulev1beta2.CustomQuota)
 
-	if !equality.Semantic.DeepEqual(customQuotaOld.Spec.ScopeSelectors, customQuotaNew.Spec.ScopeSelectors) ||
-		!equality.Semantic.DeepEqual(customQuotaOld.Spec.Source, customQuotaNew.Spec.Source) {
-		customQuotaNew.Status = capsulev1beta2.CustomQuotaStatus{}
-
-		items, err := getResources(&customQuotaNew.Spec.Source, r.Client, customQuotaNew.Spec.ScopeSelectors, customQuotaNew.Namespace)
-		if err != nil {
-			r.log.Error(err, "Error getting resources while updating CustomQuota usage")
-
-			return true
-		}
-
-		for _, item := range items {
-			val, err := GetUsageFromUnstructured(item, customQuotaNew.Spec.Source.Path)
-			if err != nil {
-				r.log.Error(err, "Error getting usage from unstructured while updating CustomQuota usage")
-
-				continue
-			}
-
-			quant, err := resource.ParseQuantity(val)
-			if err != nil {
-				r.log.Error(err, "Error parsing quantity while updating CustomQuota usage")
-
-				continue
-			}
-
-			customQuotaNew.Status.Used.Add(quant)
-
-			claim := fmt.Sprintf("%s.%s", item.GetNamespace(), item.GetName())
-			customQuotaNew.Status.Claims = append(customQuotaNew.Status.Claims, claim)
-		}
+	if equality.Semantic.DeepEqual(customQuotaOld.Spec.ScopeSelectors, customQuotaNew.Spec.ScopeSelectors) &&
+		equality.Semantic.DeepEqual(customQuotaOld.Spec.Source, customQuotaNew.Spec.Source) {
+		return
 	}
 
-	return true
+	customQuotaNew.Status = capsulev1beta2.CustomQuotaStatus{}
+
+	items, err := getResources(ctx, &customQuotaNew.Spec.Source, r.Client, customQuotaNew.Spec.ScopeSelectors, customQuotaNew.Namespace)
+	if err != nil {
+		r.log.Error(err, "Error getting resources while updating CustomQuota usage")
+
+		return
+	}
+
+	changed := false
+
+	for _, item := range items {
+		val, err := GetUsageFromUnstructured(item, customQuotaNew.Spec.Source.Path)
+		if err != nil {
+			r.log.Error(err, "Error getting usage from unstructured while updating CustomQuota usage")
+
+			continue
+		}
+
+		quant, err := resource.ParseQuantity(val)
+		if err != nil {
+			r.log.Error(err, "Error parsing quantity while updating CustomQuota usage")
+
+			continue
+		}
+
+		customQuotaNew.Status.Used.Add(quant)
+
+		claim := fmt.Sprintf("%s.%s", item.GetNamespace(), item.GetName())
+		customQuotaNew.Status.Claims = append(customQuotaNew.Status.Claims, claim)
+		changed = true
+	}
+
+	if !changed {
+		return
+	}
+
+	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		latest := &capsulev1beta2.CustomQuota{}
+
+		nn := client.ObjectKey{Namespace: customQuotaNew.Namespace, Name: customQuotaNew.Name}
+
+		if getErr := r.Get(ctx, nn, latest); getErr != nil {
+			return getErr
+		}
+
+		latest.Status = customQuotaNew.Status
+
+		return r.Client.Status().Update(ctx, latest)
+	})
+	if retryErr != nil {
+		r.log.Error(retryErr, "Error updating CustomQuota status on creation")
+	}
 }
 
 // This Controller is responsible for keeping the CustomQuota Status in sync with the actual usage.
