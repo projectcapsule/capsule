@@ -61,15 +61,20 @@ func (h *customquotasHandler) OnCreate(c client.Client, decoder admission.Decode
 		for _, cq := range customQuotasMatched {
 			typeName := getType(cq)
 
-			usage, err := customquotas.GetUsageFromUnstructured(u, cq.Spec.Source.Path)
+			usageValue, err := customquotas.GetUsageFromUnstructured(u, cq.Spec.Source.Path)
 			if err != nil {
 				h.log.Error(err, fmt.Sprintf("error getting usage from object for %s %s: %v", typeName, cq.Name, err))
 
 				continue
 			}
 
+			usage, err := resource.ParseQuantity(usageValue)
+			if err != nil {
+				usage = resource.MustParse("0")
+			}
+
 			newUsed := cq.Status.Used.DeepCopy()
-			newUsed.Add(resource.MustParse(usage))
+			newUsed.Add(usage)
 
 			if newUsed.Cmp(cq.Spec.Limit) == 1 {
 				response := admission.Denied(fmt.Sprintf("updating resource exceeds limit for %s %s", typeName, cq.Name))
@@ -77,8 +82,8 @@ func (h *customquotasHandler) OnCreate(c client.Client, decoder admission.Decode
 				return &response
 			}
 
-			cq.Status.Used.Add(resource.MustParse(usage))
-			cq.Status.Available.Sub(resource.MustParse(usage))
+			cq.Status.Used.Add(usage)
+			cq.Status.Available.Sub(usage)
 			cq.Status.Claims = append(cq.Status.Claims, fmt.Sprintf("%s.%s", req.Namespace, req.Name))
 
 			err = h.updateSubResStatusCustomQuota(ctx, cq)
@@ -165,13 +170,17 @@ func (h *customquotasHandler) OnUpdate(c client.Client, _ admission.Decoder, rec
 				continue
 			}
 
-			oldUsage, errOldUsage := customquotas.GetUsageFromUnstructured(oldObj, cq.Spec.Source.Path)
+			oldUsageValue, errOldUsageValue := customquotas.GetUsageFromUnstructured(oldObj, cq.Spec.Source.Path)
+			newUsageValue, errNewUsageValue := customquotas.GetUsageFromUnstructured(newObj, cq.Spec.Source.Path)
+			newUsage, errNewUsageParse := resource.ParseQuantity(newUsageValue)
+			oldUsage, errOldUsageParse := resource.ParseQuantity(oldUsageValue)
+			errNewUsage := errors.Join(errNewUsageValue, errNewUsageParse)
+			errOldUsage := errors.Join(errOldUsageValue, errOldUsageParse)
 
-			newUsage, errNewUsage := customquotas.GetUsageFromUnstructured(newObj, cq.Spec.Source.Path)
 			if errNewUsage != nil {
 				h.log.Error(errNewUsage, fmt.Sprintf("error getting usage from object for %s %s: %v", typeName, cq.Name, errNewUsage))
 
-				newUsage = "0"
+				newUsage = resource.MustParse("0")
 			}
 
 			if oldUsage == newUsage {
@@ -179,14 +188,14 @@ func (h *customquotasHandler) OnUpdate(c client.Client, _ admission.Decoder, rec
 			}
 
 			if errOldUsage != nil {
-				oldUsage = "0"
+				oldUsage = resource.MustParse("0")
 
 				cq.Status.Claims = append(cq.Status.Claims, fmt.Sprintf("%s.%s", req.Namespace, req.Name))
 			}
 
 			newUsed := cq.Status.Used.DeepCopy()
-			newUsed.Sub(resource.MustParse(oldUsage))
-			newUsed.Add(resource.MustParse(newUsage))
+			newUsed.Sub(oldUsage)
+			newUsed.Add(newUsage)
 
 			if newUsed.Cmp(cq.Spec.Limit) == 1 {
 				response := admission.Denied(fmt.Sprintf("updating resource exceeds limit for %s %s", typeName, cq.Name))
@@ -194,10 +203,10 @@ func (h *customquotasHandler) OnUpdate(c client.Client, _ admission.Decoder, rec
 				return &response
 			}
 
-			cq.Status.Used.Sub(resource.MustParse(oldUsage))
-			cq.Status.Available.Add(resource.MustParse(oldUsage))
-			cq.Status.Used.Add(resource.MustParse(newUsage))
-			cq.Status.Available.Sub(resource.MustParse(newUsage))
+			cq.Status.Used.Sub(oldUsage)
+			cq.Status.Available.Add(oldUsage)
+			cq.Status.Used.Add(newUsage)
+			cq.Status.Available.Sub(newUsage)
 
 			err = h.updateSubResStatusCustomQuota(ctx, cq)
 			if err != nil {
@@ -216,13 +225,18 @@ func (h *customquotasHandler) deleteResourceFromCustomQuota(ctx context.Context,
 	claimList = slices.Delete(claimList, slices.Index(claimList, claim), slices.Index(claimList, claim)+1)
 	cq.Status.Claims = claimList
 
-	usage, err := customquotas.GetUsageFromUnstructured(obj, cq.Spec.Source.Path)
+	usageValue, err := customquotas.GetUsageFromUnstructured(obj, cq.Spec.Source.Path)
 	if err != nil {
 		return fmt.Errorf("error getting usage from object for %s %s: %w", typeName, cq.Name, err)
 	}
 
-	cq.Status.Used.Sub(resource.MustParse(usage))
-	cq.Status.Available.Add(resource.MustParse(usage))
+	usage, err := resource.ParseQuantity(usageValue)
+	if err != nil {
+		usage = resource.MustParse("0")
+	}
+
+	cq.Status.Used.Sub(usage)
+	cq.Status.Available.Add(usage)
 
 	return h.updateSubResStatusCustomQuota(ctx, cq)
 }
