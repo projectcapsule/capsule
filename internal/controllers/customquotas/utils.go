@@ -75,10 +75,15 @@ func getResources(ctx context.Context, source *capsulev1beta2.CustomQuotaSpecSou
 			return nil, err
 		}
 
+		gr, err := schema.ParseGroupVersion(source.Version)
+		if err != nil {
+			return nil, err
+		}
+
 		u.SetGroupVersionKind(schema.GroupVersionKind{
-			Group:   "",
+			Group:   gr.Group,
 			Kind:    source.Kind + "List",
-			Version: source.Version,
+			Version: gr.Version,
 		})
 
 		for _, namespace := range namespaces {

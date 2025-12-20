@@ -60,11 +60,6 @@ func (r *clusterCustomQuotaClaimController) Reconcile(ctx context.Context, reque
 		return result, err
 	}
 
-	// Ensuring the CustomQuota Status
-	if err = r.reconcile(ctx, log, instance); err != nil {
-		return ctrl.Result{}, err
-	}
-
 	return ctrl.Result{}, nil
 }
 
@@ -206,17 +201,4 @@ func (r *clusterCustomQuotaClaimController) OnUpdate(ctx context.Context, e even
 	if retryErr != nil {
 		r.log.Error(retryErr, "Error updating ClusterCustomQuota status on update")
 	}
-}
-
-// This Controller is responsible for keeping the ClusterCustomQuota Status in sync with the actual usage.
-// Everything else will be handled by the CustomQuota Validating Webhook.
-func (r *clusterCustomQuotaClaimController) reconcile(
-	ctx context.Context,
-	log logr.Logger,
-	customQuota *capsulev1beta2.ClusterCustomQuota,
-) (err error) {
-	customQuota.Status.Available = customQuota.Spec.Limit.DeepCopy()
-	customQuota.Status.Available.Sub(customQuota.Status.Used)
-
-	return r.Client.Status().Update(ctx, customQuota)
 }

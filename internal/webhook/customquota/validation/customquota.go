@@ -14,6 +14,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -81,7 +82,8 @@ func (h *customquotasHandler) OnCreate(c client.Client, decoder admission.Decode
 			}
 
 			cq.Status.Used.Add(usage)
-			cq.Status.Available.Sub(usage)
+			cq.Status.Available = cq.Spec.Limit.DeepCopy()
+			cq.Status.Available.Sub(cq.Status.Used)
 			cq.Status.Claims = append(cq.Status.Claims, fmt.Sprintf("%s.%s", req.Namespace, req.Name))
 
 			err = h.updateSubResStatusCustomQuota(ctx, cq)
@@ -184,7 +186,7 @@ func (h *customquotasHandler) OnUpdate(c client.Client, _ admission.Decoder, rec
 				oldUsage = resource.MustParse("0")
 			}
 
-			if oldUsage == newUsage {
+			if oldUsage.Cmp(newUsage) == 0 {
 				continue
 			}
 
@@ -203,9 +205,9 @@ func (h *customquotasHandler) OnUpdate(c client.Client, _ admission.Decoder, rec
 			}
 
 			cq.Status.Used.Sub(oldUsage)
-			cq.Status.Available.Add(oldUsage)
 			cq.Status.Used.Add(newUsage)
-			cq.Status.Available.Sub(newUsage)
+			cq.Status.Available = cq.Spec.Limit.DeepCopy()
+			cq.Status.Available.Sub(cq.Status.Used)
 
 			err = h.updateSubResStatusCustomQuota(ctx, cq)
 			if err != nil {
@@ -240,7 +242,8 @@ func (h *customquotasHandler) deleteResourceFromCustomQuota(ctx context.Context,
 	}
 
 	cq.Status.Used.Sub(usage)
-	cq.Status.Available.Add(usage)
+	cq.Status.Available = cq.Spec.Limit.DeepCopy()
+	cq.Status.Available.Sub(cq.Status.Used)
 
 	return h.updateSubResStatusCustomQuota(ctx, cq)
 }
@@ -254,7 +257,14 @@ func (h *customquotasHandler) getCustomQuotaMatched(ctx context.Context, req adm
 	var customQuotasMatched []capsulev1beta2.CustomQuota
 
 	for _, cq := range list.Items {
-		if cq.Spec.Source.Kind != req.Kind.Kind || cq.Spec.Source.Version != req.Kind.Version {
+		gr, err := schema.ParseGroupVersion(cq.Spec.Source.Version)
+		if err != nil {
+			h.log.Error(err, fmt.Sprintf("error parsing GroupVersion for custom quota %s", cq.Name))
+
+			continue
+		}
+
+		if cq.Spec.Source.Kind != req.Kind.Kind || gr.Version != req.Kind.Version || gr.Group != req.Kind.Group {
 			continue
 		}
 
@@ -285,13 +295,18 @@ func (h *customquotasHandler) getClusterCustomQuotaMatched(ctx context.Context, 
 	var customQuotasMatched []capsulev1beta2.CustomQuota
 
 	for _, cq := range list.Items {
-		if cq.Spec.Source.Kind != req.Kind.Kind || cq.Spec.Source.Version != req.Kind.Version {
+		gr, err := schema.ParseGroupVersion(cq.Spec.Source.Version)
+		if err != nil {
+			h.log.Error(err, fmt.Sprintf("error parsing GroupVersion for cluster custom quota %s", cq.Name))
+
+			continue
+		}
+
+		if cq.Spec.Source.Kind != req.Kind.Kind || gr.Version != req.Kind.Version || gr.Group != req.Kind.Group {
 			continue
 		}
 
 		var namespaces []string
-
-		var err error
 
 		if namespaces, err = customquotas.GetNamespacesMatchingSelectors(ctx, cq.Spec.Selectors, h.client); err != nil {
 			h.log.Error(err, fmt.Sprintf("error getting namespaces matching selectors for ClusterCustomQuota %s: %v", cq.Name, err))
