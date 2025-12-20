@@ -130,7 +130,7 @@ func (r *clusterCustomQuotaClaimController) OnCreate(ctx context.Context, e even
 		return r.Client.Status().Update(ctx, latest)
 	})
 	if retryErr != nil {
-		r.log.Error(retryErr, "Error updating CustomQuota status on creation")
+		r.log.Error(retryErr, "Error updating ClusterCustomQuota status on creation")
 	}
 }
 
@@ -204,7 +204,7 @@ func (r *clusterCustomQuotaClaimController) OnUpdate(ctx context.Context, e even
 		return r.Client.Status().Update(ctx, latest)
 	})
 	if retryErr != nil {
-		r.log.Error(retryErr, "Error updating CustomQuota status on creation")
+		r.log.Error(retryErr, "Error updating ClusterCustomQuota status on update")
 	}
 }
 

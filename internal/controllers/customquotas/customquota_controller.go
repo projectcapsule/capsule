@@ -190,7 +190,7 @@ func (r *customQuotaClaimController) OnUpdate(ctx context.Context, e event.Typed
 		return r.Client.Status().Update(ctx, latest)
 	})
 	if retryErr != nil {
-		r.log.Error(retryErr, "Error updating CustomQuota status on creation")
+		r.log.Error(retryErr, "Error updating CustomQuota status on update")
 	}
 }
 

@@ -13,9 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -41,7 +39,7 @@ func (h *customquotasHandler) OnCreate(c client.Client, decoder admission.Decode
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		u, err := getUnstructured(req.Object)
 		if err != nil {
-			h.log.Error(err, fmt.Sprintf("error getting unstructured: %v", err))
+			h.log.Error(err, "error getting unstructured")
 
 			return nil
 		}
@@ -51,7 +49,7 @@ func (h *customquotasHandler) OnCreate(c client.Client, decoder admission.Decode
 
 		err = errors.Join(errNamespaced, errCluster)
 		if err != nil {
-			h.log.Error(err, fmt.Sprintf("error getting matched CustomQuotas: %v", err))
+			h.log.Error(err, "error getting matched CustomQuotas")
 
 			return nil
 		}
@@ -88,7 +86,7 @@ func (h *customquotasHandler) OnCreate(c client.Client, decoder admission.Decode
 
 			err = h.updateSubResStatusCustomQuota(ctx, cq)
 			if err != nil {
-				h.log.Error(err, fmt.Sprintf("error updating Sub-Resource for %s %s status: %v", typeName, cq.Name, err))
+				h.log.Error(err, fmt.Sprintf("error updating Sub-Resource for %s %s status", typeName, cq.Name))
 			}
 		}
 
@@ -110,7 +108,7 @@ func (h *customquotasHandler) OnDelete(c client.Client, _ admission.Decoder, rec
 
 		err = errors.Join(errNamespaced, errCluster)
 		if err != nil {
-			h.log.Error(err, fmt.Sprintf("error getting matched CustomQuotas: %v", err))
+			h.log.Error(err, "error getting matched CustomQuotas")
 
 			return nil
 		}
@@ -129,7 +127,7 @@ func (h *customquotasHandler) OnDelete(c client.Client, _ admission.Decoder, rec
 
 			err = h.deleteResourceFromCustomQuota(ctx, obj, cq)
 			if err != nil {
-				h.log.Error(err, fmt.Sprintf("error deleting resource from %s %s: %v", typeName, cq.Name, err))
+				h.log.Error(err, fmt.Sprintf("error deleting resource from %s %s", typeName, cq.Name))
 			}
 		}
 
@@ -164,7 +162,7 @@ func (h *customquotasHandler) OnUpdate(c client.Client, _ admission.Decoder, rec
 			}) {
 				err := h.deleteResourceFromCustomQuota(ctx, oldObj, cq)
 				if err != nil {
-					h.log.Error(err, fmt.Sprintf("error deleting resource from %s %s: %v", typeName, cq.Name, err))
+					h.log.Error(err, fmt.Sprintf("error deleting resource from %s %s", typeName, cq.Name))
 				}
 
 				continue
@@ -174,22 +172,23 @@ func (h *customquotasHandler) OnUpdate(c client.Client, _ admission.Decoder, rec
 			newUsageValue, errNewUsageValue := customquotas.GetUsageFromUnstructured(newObj, cq.Spec.Source.Path)
 			newUsage, errNewUsageParse := resource.ParseQuantity(newUsageValue)
 			oldUsage, errOldUsageParse := resource.ParseQuantity(oldUsageValue)
-			errNewUsage := errors.Join(errNewUsageValue, errNewUsageParse)
-			errOldUsage := errors.Join(errOldUsageValue, errOldUsageParse)
 
+			errNewUsage := errors.Join(errNewUsageValue, errNewUsageParse)
 			if errNewUsage != nil {
-				h.log.Error(errNewUsage, fmt.Sprintf("error getting usage from object for %s %s: %v", typeName, cq.Name, errNewUsage))
+				h.log.Error(errNewUsage, fmt.Sprintf("error getting usage from object for %s %s", typeName, cq.Name))
 
 				newUsage = resource.MustParse("0")
+			}
+
+			if errOldUsageParse != nil {
+				oldUsage = resource.MustParse("0")
 			}
 
 			if oldUsage == newUsage {
 				continue
 			}
 
-			if errOldUsage != nil {
-				oldUsage = resource.MustParse("0")
-
+			if errOldUsageValue != nil {
 				cq.Status.Claims = append(cq.Status.Claims, fmt.Sprintf("%s.%s", req.Namespace, req.Name))
 			}
 
@@ -210,7 +209,7 @@ func (h *customquotasHandler) OnUpdate(c client.Client, _ admission.Decoder, rec
 
 			err = h.updateSubResStatusCustomQuota(ctx, cq)
 			if err != nil {
-				h.log.Error(err, fmt.Sprintf("error updating Sub-Resource for %s %s status: %v", typeName, cq.Name, err))
+				h.log.Error(err, fmt.Sprintf("error updating Sub-Resource for %s %s status", typeName, cq.Name))
 			}
 		}
 
@@ -221,9 +220,14 @@ func (h *customquotasHandler) OnUpdate(c client.Client, _ admission.Decoder, rec
 func (h *customquotasHandler) deleteResourceFromCustomQuota(ctx context.Context, obj unstructured.Unstructured, cq capsulev1beta2.CustomQuota) error {
 	typeName := getType(cq)
 	claim := fmt.Sprintf("%s.%s", obj.GetNamespace(), obj.GetName())
-	claimList := cq.Status.Claims
-	claimList = slices.Delete(claimList, slices.Index(claimList, claim), slices.Index(claimList, claim)+1)
-	cq.Status.Claims = claimList
+
+	idx := slices.Index(cq.Status.Claims, claim)
+
+	if idx == -1 {
+		h.log.Info("claim not found in CustomQuota claims list, skipping deletion", "claim", claim, "customQuota", cq.Name)
+	} else {
+		cq.Status.Claims = slices.Delete(cq.Status.Claims, idx, idx+1)
+	}
 
 	usageValue, err := customquotas.GetUsageFromUnstructured(obj, cq.Spec.Source.Path)
 	if err != nil {
@@ -257,7 +261,7 @@ func (h *customquotasHandler) getCustomQuotaMatched(ctx context.Context, req adm
 		for _, selector := range cq.Spec.ScopeSelectors {
 			sel, err := metav1.LabelSelectorAsSelector(&selector)
 			if err != nil {
-				h.log.Error(err, fmt.Sprintf("error converting custom selector: %v", err))
+				h.log.Error(err, "error converting custom selector")
 
 				continue
 			}
@@ -302,7 +306,7 @@ func (h *customquotasHandler) getClusterCustomQuotaMatched(ctx context.Context, 
 		for _, selector := range cq.Spec.ScopeSelectors {
 			sel, err := metav1.LabelSelectorAsSelector(&selector)
 			if err != nil {
-				h.log.Error(err, fmt.Sprintf("error converting custom selector: %v", err))
+				h.log.Error(err, "error converting custom selector")
 
 				continue
 			}
@@ -344,25 +348,4 @@ func (h *customquotasHandler) updateSubResStatusCustomQuota(ctx context.Context,
 	}
 
 	return nil
-}
-
-func getUnstructured(rawExt runtime.RawExtension) (unstructured.Unstructured, error) {
-	var (
-		obj   runtime.Object
-		scope conversion.Scope
-	)
-
-	err := runtime.Convert_runtime_RawExtension_To_runtime_Object(&rawExt, &obj, scope)
-	if err != nil {
-		return unstructured.Unstructured{}, err
-	}
-
-	innerObj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
-	if err != nil {
-		return unstructured.Unstructured{}, err
-	}
-
-	u := unstructured.Unstructured{Object: innerObj}
-
-	return u, nil
 }
