@@ -316,6 +316,7 @@ func (h *customquotasHandler) updateSubResStatusCustomQuota(ctx context.Context,
 		if err := h.client.Status().Update(ctx, &cq); err != nil {
 			return fmt.Errorf("error updating CustomQuota %s status: %w", cq.Name, err)
 		}
+
 		return nil
 	}
 
