@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"maps"
 	"slices"
 
 	v1 "k8s.io/api/core/v1"
@@ -38,7 +39,7 @@ func GetUsageFromUnstructured(u unstructured.Unstructured, sourcePath string) (s
 }
 
 func GetNamespacesMatchingSelectors(ctx context.Context, namespaceSelector []metav1.LabelSelector, kubeClient client.Client) ([]string, error) {
-	namespaces := []string{}
+	set := map[string]struct{}{}
 
 	for _, selector := range namespaceSelector {
 		labelSelector, err := metav1.LabelSelectorAsSelector(&selector)
@@ -56,14 +57,14 @@ func GetNamespacesMatchingSelectors(ctx context.Context, namespaceSelector []met
 		}
 
 		for _, ns := range nsList.Items {
-			namespaces = append(namespaces, ns.Name)
+			set[ns.Name] = struct{}{}
 		}
 	}
 
-	return namespaces, nil
+	return slices.Collect(maps.Keys(set)), nil
 }
 
-func getRessources(source *capsulev1beta2.CustomQuotaSpecSource, kubeClient client.Client, scopeSelectors []metav1.LabelSelector, namespaces ...string) ([]unstructured.Unstructured, error) {
+func getResources(source *capsulev1beta2.CustomQuotaSpecSource, kubeClient client.Client, scopeSelectors []metav1.LabelSelector, namespaces ...string) ([]unstructured.Unstructured, error) {
 	items := []unstructured.Unstructured{}
 
 	for _, selector := range scopeSelectors {
@@ -81,7 +82,7 @@ func getRessources(source *capsulev1beta2.CustomQuotaSpecSource, kubeClient clie
 		})
 
 		for _, namespace := range namespaces {
-			err = kubeClient.List(context.Background(), u, &client.ListOptions{
+			err = kubeClient.List(context.TODO(), u, &client.ListOptions{
 				Namespace:     namespace,
 				LabelSelector: labelSelector,
 			})

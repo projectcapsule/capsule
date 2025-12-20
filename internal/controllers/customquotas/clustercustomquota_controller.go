@@ -80,9 +80,9 @@ func (r *clusterCustomQuotaClaimController) OnCreate(e event.TypedCreateEvent[cl
 		return true
 	}
 
-	items, err := getRessources(&cq.Spec.Source, r.Client, cq.Spec.ScopeSelectors, namespaces...)
+	items, err := getResources(&cq.Spec.Source, r.Client, cq.Spec.ScopeSelectors, namespaces...)
 	if err != nil {
-		r.log.Error(err, "Error getting ressources while updating CustomQuota usage")
+		r.log.Error(err, "Error getting resources while updating CustomQuota usage")
 
 		return true
 	}
@@ -129,9 +129,9 @@ func (r *clusterCustomQuotaClaimController) OnUpdate(e event.TypedUpdateEvent[cl
 			return true
 		}
 
-		items, err := getRessources(&customQuotaNew.Spec.Source, r.Client, customQuotaNew.Spec.ScopeSelectors, namespaces...)
+		items, err := getResources(&customQuotaNew.Spec.Source, r.Client, customQuotaNew.Spec.ScopeSelectors, namespaces...)
 		if err != nil {
-			r.log.Error(err, "Error getting ressources while updating CustomQuota usage")
+			r.log.Error(err, "Error getting resources while updating CustomQuota usage")
 
 			return true
 		}
@@ -162,7 +162,7 @@ func (r *clusterCustomQuotaClaimController) OnUpdate(e event.TypedUpdateEvent[cl
 }
 
 // This Controller is responsible for keeping the ClusterCustomQuota Status in sync with the actual usage.
-// Everything else will be handeled by the CustomQuota Validating Webhook.
+// Everything else will be handled by the CustomQuota Validating Webhook.
 func (r *clusterCustomQuotaClaimController) reconcile(
 	ctx context.Context,
 	log logr.Logger,

@@ -41,7 +41,7 @@ func (h *customquotasHandler) OnCreate(c client.Client, decoder admission.Decode
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		u, err := getUnstructured(req.Object)
 		if err != nil {
-			h.log.Error(err, fmt.Sprintf("error getting unstrutured: %v", err))
+			h.log.Error(err, fmt.Sprintf("error getting unstructured: %v", err))
 
 			return nil
 		}
@@ -97,7 +97,7 @@ func (h *customquotasHandler) OnDelete(c client.Client, _ admission.Decoder, rec
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		obj, err := getUnstructured(req.OldObject)
 		if err != nil {
-			h.log.Error(err, fmt.Sprintf("error getting unstrutured: %v", err))
+			h.log.Error(err, fmt.Sprintf("error getting unstructured: %v", err))
 
 			return nil
 		}
@@ -171,7 +171,7 @@ func (h *customquotasHandler) OnUpdate(c client.Client, _ admission.Decoder, rec
 
 			newUsage, errNewUsage := customquotas.GetUsageFromUnstructured(newObj, cq.Spec.Source.Path)
 			if errNewUsage != nil {
-				h.log.Error(errNewUsage, fmt.Sprintf("error getting usage from object for %s %s: %v", typeName, cq.Name, err))
+				h.log.Error(errNewUsage, fmt.Sprintf("error getting usage from object for %s %s: %v", typeName, cq.Name, errNewUsage))
 
 				newUsage = "0"
 			}
@@ -239,7 +239,7 @@ func (h *customquotasHandler) getCustomQuotaMatched(ctx context.Context, req adm
 	var customQuotasMatched []capsulev1beta2.CustomQuota
 
 	for _, cq := range list.Items {
-		if cq.Spec.Source.Kind != req.Kind.Kind && cq.Spec.Source.Version != req.Kind.Version {
+		if cq.Spec.Source.Kind != req.Kind.Kind || cq.Spec.Source.Version != req.Kind.Version {
 			continue
 		}
 
@@ -270,7 +270,7 @@ func (h *customquotasHandler) getClusterCustomQuotaMatched(ctx context.Context, 
 	var customQuotasMatched []capsulev1beta2.CustomQuota
 
 	for _, cq := range list.Items {
-		if cq.Spec.Source.Kind != req.Kind.Kind && cq.Spec.Source.Version != req.Kind.Version {
+		if cq.Spec.Source.Kind != req.Kind.Kind || cq.Spec.Source.Version != req.Kind.Version {
 			continue
 		}
 
@@ -316,6 +316,7 @@ func (h *customquotasHandler) updateSubResStatusCustomQuota(ctx context.Context,
 		if err := h.client.Status().Update(ctx, &cq); err != nil {
 			return fmt.Errorf("error updating CustomQuota %s status: %w", cq.Name, err)
 		}
+		return nil
 	}
 
 	clusterCustomQuota := &capsulev1beta2.ClusterCustomQuota{

@@ -73,9 +73,9 @@ func (r *customQuotaClaimController) OnCreate(e event.TypedCreateEvent[client.Ob
 
 	cq.Status = capsulev1beta2.CustomQuotaStatus{}
 
-	items, err := getRessources(&cq.Spec.Source, r.Client, cq.Spec.ScopeSelectors, cq.Namespace)
+	items, err := getResources(&cq.Spec.Source, r.Client, cq.Spec.ScopeSelectors, cq.Namespace)
 	if err != nil {
-		r.log.Error(err, "Error getting ressources while updating CustomQuota usage")
+		r.log.Error(err, "Error getting resources while updating CustomQuota usage")
 
 		return true
 	}
@@ -114,9 +114,9 @@ func (r *customQuotaClaimController) OnUpdate(e event.TypedUpdateEvent[client.Ob
 		!equality.Semantic.DeepEqual(customQuotaOld.Spec.Source, customQuotaNew.Spec.Source) {
 		customQuotaNew.Status = capsulev1beta2.CustomQuotaStatus{}
 
-		items, err := getRessources(&customQuotaNew.Spec.Source, r.Client, customQuotaNew.Spec.ScopeSelectors, customQuotaNew.Namespace)
+		items, err := getResources(&customQuotaNew.Spec.Source, r.Client, customQuotaNew.Spec.ScopeSelectors, customQuotaNew.Namespace)
 		if err != nil {
-			r.log.Error(err, "Error getting ressources while updating CustomQuota usage")
+			r.log.Error(err, "Error getting resources while updating CustomQuota usage")
 
 			return true
 		}
@@ -147,7 +147,7 @@ func (r *customQuotaClaimController) OnUpdate(e event.TypedUpdateEvent[client.Ob
 }
 
 // This Controller is responsible for keeping the CustomQuota Status in sync with the actual usage.
-// Everything else will be handeled by the CustomQuota Validating Webhook.
+// Everything else will be handled by the CustomQuota Validating Webhook.
 func (r *customQuotaClaimController) reconcile(
 	ctx context.Context,
 	log logr.Logger,

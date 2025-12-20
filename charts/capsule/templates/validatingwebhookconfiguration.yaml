@@ -566,7 +566,7 @@ webhooks:
   timeoutSeconds: {{ $.Values.webhooks.validatingWebhooksTimeoutSeconds }}
   {{- end }}
 {{- end }}
-{{- with .Values.webhooks.hooks.serviceaccounts }}
+{{- with .Values.webhooks.hooks.customquotas }}
   {{- if .enabled }}
 - name: customquota.tenant.projectcapsule.dev
   admissionReviewVersions:
