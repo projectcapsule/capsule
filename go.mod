@@ -21,7 +21,7 @@ require (
 	k8s.io/client-go v0.35.0
 	k8s.io/dynamic-resource-allocation v0.35.0
 	k8s.io/utils v0.0.0-20251219084037-98d557b7f1e7
-	sigs.k8s.io/cluster-api v1.11.3
+	sigs.k8s.io/cluster-api v1.12.1
 	sigs.k8s.io/controller-runtime v0.22.4
 	sigs.k8s.io/gateway-api v1.4.1
 )
@@ -57,7 +57,7 @@ require (
 	github.com/google/btree v1.1.3 // indirect
 	github.com/google/gnostic-models v0.7.0 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
-	github.com/google/pprof v0.0.0-20250403155104-27863c87afa6 // indirect
+	github.com/google/pprof v0.0.0-20250820193118-f64d9cf942d6 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
