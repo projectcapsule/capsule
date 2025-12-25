@@ -18,10 +18,12 @@ type ResourcePoolSpec struct {
 	Quota corev1.ResourceQuotaSpec `json:"quota"`
 	// The Defaults given for each namespace, the default is not counted towards the total allocation
 	// When you use claims it's recommended to provision Defaults as the prevent the scheduling of any resources
-	Defaults corev1.ResourceList `json:"defaults,omitempty"`
+	// +optional
+	Defaults corev1.ResourceList `json:"defaults,omitzero"`
 	// Additional Configuration
 	//+kubebuilder:default:={}
-	Config ResourcePoolSpecConfiguration `json:"config,omitempty"`
+	// +optional
+	Config ResourcePoolSpecConfiguration `json:"config,omitzero"`
 }
 
 type ResourcePoolSpecConfiguration struct {
@@ -55,11 +57,15 @@ type ResourcePoolSpecConfiguration struct {
 // it's up the group of users within these namespaces, to manage the resources they consume per namespace. Each Resourcepool provisions a ResourceQuotainto all the selected namespaces. Then essentially the ResourcePoolClaims, when they can be assigned to the ResourcePool stack resources on top of that
 // ResourceQuota based on the namspace, where the ResourcePoolClaim was made from.
 type ResourcePool struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"`
+	metav1.TypeMeta `json:",inline"`
 
-	Spec   ResourcePoolSpec   `json:"spec,omitempty"`
-	Status ResourcePoolStatus `json:"status,omitempty"`
+	// +optional
+	metav1.ObjectMeta `json:"metadata,omitzero"`
+
+	Spec ResourcePoolSpec `json:"spec"`
+
+	// +optional
+	Status ResourcePoolStatus `json:"status,omitzero"`
 }
 
 // +kubebuilder:object:root=true
@@ -67,7 +73,9 @@ type ResourcePool struct {
 // ResourcePoolList contains a list of ResourcePool.
 type ResourcePoolList struct {
 	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata,omitempty"`
+
+	// +optional
+	metav1.ListMeta `json:"metadata,omitzero"`
 
 	Items []ResourcePool `json:"items"`
 }

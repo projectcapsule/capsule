@@ -97,11 +97,15 @@ type TenantResourceStatus struct {
 // The object must be deployed in a Tenant Namespace, and cannot reference object living in non-Tenant namespaces.
 // For such cases, the GlobalTenantResource must be used.
 type TenantResource struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"`
+	metav1.TypeMeta `json:",inline"`
 
-	Spec   TenantResourceSpec   `json:"spec,omitempty"`
-	Status TenantResourceStatus `json:"status,omitempty"`
+	// +optional
+	metav1.ObjectMeta `json:"metadata,omitzero"`
+
+	Spec TenantResourceSpec `json:"spec"`
+
+	// +optional
+	Status TenantResourceStatus `json:"status,omitzero"`
 }
 
 // +kubebuilder:object:root=true
@@ -109,7 +113,7 @@ type TenantResource struct {
 // TenantResourceList contains a list of TenantResource.
 type TenantResourceList struct {
 	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata,omitempty"`
+	metav1.ListMeta `json:"metadata,omitzero"`
 
 	Items []TenantResource `json:"items"`
 }

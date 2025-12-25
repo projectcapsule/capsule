@@ -177,7 +177,7 @@ manager:
     # -- Workers (MaxConcurrentReconciles) is the maximum number of concurrent Reconciles which can be run (ALPHA).
     workers: 1
     # -- Set the log verbosity of the capsule with a value from 1 to 5
-    logLevel: '3'
+    logLevel: "info"
     # -- Define entities which are considered part of the Capsule construct.
     # Users not mentioned here will be ignored by Capsule
     users:

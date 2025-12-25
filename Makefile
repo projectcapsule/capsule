@@ -46,7 +46,7 @@ all: manager
 # Run tests
 .PHONY: test
 test: test-clean generate manifests test-clean
-	@GO111MODULE=on go test -v $(shell go list ./... | grep -v "e2e") -coverprofile coverage.out
+	@GO111MODULE=on go test -race -v $(shell go list ./... | grep -v "e2e") -coverprofile coverage.out
 
 .PHONY: test-clean
 test-clean: ## Clean tests cache
@@ -150,6 +150,7 @@ dev-setup:
 		--set 'crds.install=true' \
 		--set 'crds.exclusive=true'\
         --set 'crds.createConfig=true'\
+        --set "tls.enableController=false"\
 		--set "webhooks.exclusive=true"\
 		--set "webhooks.hooks.nodes.enabled=true"\
 		--set "webhooks.service.url=$${WEBHOOK_URL}" \
@@ -167,6 +168,14 @@ setup-monitoring: dev-setup-fluxcd
 
 dev-setup-monitoring: setup-monitoring
 	@$(KUBECTL) kustomize --load-restrictor='LoadRestrictionsNone' hack/distro/host-proxy | envsubst | kubectl apply -f -
+
+dev-setup-argocd: dev-setup-fluxcd
+	@$(KUBECTL) kustomize --load-restrictor='LoadRestrictionsNone' hack/distro/argocd | envsubst | kubectl apply -f -
+	@$(MAKE) wait-for-helmreleases
+	@$(KUBECTL) kustomize --load-restrictor='LoadRestrictionsNone' hack/distro/argocd/application | envsubst | kubectl apply -f -
+	@printf "\n\033[32mAccess ArgoCD:\033[0m\n\n"
+	@printf "  \033[1mkubectl get secret -n argocd argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d\033[0m\n\n"
+	@printf "  \033[1mkubectl port-forward svc/argocd-server 9091:80 -n argocd\033[0m\n\n"
 
 dev-setup-fluxcd:
 	@$(KUBECTL) kustomize --load-restrictor='LoadRestrictionsNone' hack/distro/fluxcd | envsubst | kubectl apply -f -
@@ -386,7 +395,7 @@ ct:
 	$(call go-install-tool,$(CT),github.com/$(CT_LOOKUP)/v3/ct@$(CT_VERSION))
 
 KIND         := $(LOCALBIN)/kind
-KIND_VERSION := v0.30.0
+KIND_VERSION := v0.31.0
 KIND_LOOKUP  := kubernetes-sigs/kind
 kind:
 	@test -s $(KIND) && $(KIND) --version | grep -q $(KIND_VERSION) || \
@@ -407,7 +416,7 @@ nwa:
 	$(call go-install-tool,$(NWA),github.com/$(NWA_LOOKUP)@$(NWA_VERSION))
 
 GOLANGCI_LINT          := $(LOCALBIN)/golangci-lint
-GOLANGCI_LINT_VERSION  := v2.5.0
+GOLANGCI_LINT_VERSION  := v2.7.2
 GOLANGCI_LINT_LOOKUP   := golangci/golangci-lint
 golangci-lint: ## Download golangci-lint locally if necessary.
 	@test -s $(GOLANGCI_LINT) && $(GOLANGCI_LINT) -h | grep -q $(GOLANGCI_LINT_VERSION) || \

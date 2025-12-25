@@ -1074,6 +1074,8 @@ spec:
             - size
             - state
             type: object
+        required:
+        - spec
         type: object
     served: true
     storage: false
@@ -2890,6 +2892,8 @@ spec:
             - size
             - state
             type: object
+        required:
+        - spec
         type: object
     served: true
     storage: true

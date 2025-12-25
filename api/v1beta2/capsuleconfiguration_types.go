@@ -40,13 +40,14 @@ type CapsuleConfigurationSpec struct {
 	// Allows to set different name rather than the canonical one for the Capsule configuration objects,
 	// such as webhook secret or configurations.
 	// +kubebuilder:default={TLSSecretName:"capsule-tls",mutatingWebhookConfigurationName:"capsule-mutating-webhook-configuration",validatingWebhookConfigurationName:"capsule-validating-webhook-configuration"}
-	CapsuleResources CapsuleResources `json:"overrides,omitempty"`
+	// +optional
+	CapsuleResources CapsuleResources `json:"overrides,omitzero"`
 	// Allows to set the forbidden metadata for the worker nodes that could be patched by a Tenant.
 	// This applies only if the Tenant has an active NodeSelector, and the Owner have right to patch their nodes.
 	NodeMetadata *NodeMetadata `json:"nodeMetadata,omitempty"`
 	// Toggles the TLS reconciler, the controller that is able to generate CA and certificates for the webhooks
 	// when not using an already provided CA and certificate, or when these are managed externally with Vault, or cert-manager.
-	// +kubebuilder:default=true
+	// +kubebuilder:default=false
 	EnableTLSReconciler bool `json:"enableTLSReconciler"` //nolint:tagliatelle
 	// Define entities which can act as Administrators in the capsule construct
 	// These entities are automatically owners for all existing tenants. Meaning they can add namespaces to any tenant. However they must be specific by using the capsule label
@@ -59,9 +60,11 @@ type CapsuleConfigurationSpec struct {
 
 type NodeMetadata struct {
 	// Define the labels that a Tenant Owner cannot set for their nodes.
-	ForbiddenLabels api.ForbiddenListSpec `json:"forbiddenLabels"`
+	// +optional
+	ForbiddenLabels api.ForbiddenListSpec `json:"forbiddenLabels,omitzero"`
 	// Define the annotations that a Tenant Owner cannot set for their nodes.
-	ForbiddenAnnotations api.ForbiddenListSpec `json:"forbiddenAnnotations"`
+	// +optional
+	ForbiddenAnnotations api.ForbiddenListSpec `json:"forbiddenAnnotations,omitzero"`
 }
 
 type CapsuleResources struct {
@@ -83,10 +86,12 @@ type CapsuleResources struct {
 
 // CapsuleConfiguration is the Schema for the Capsule configuration API.
 type CapsuleConfiguration struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"`
+	metav1.TypeMeta `json:",inline"`
 
-	Spec CapsuleConfigurationSpec `json:"spec,omitempty"`
+	// +optional
+	metav1.ObjectMeta `json:"metadata,omitzero"`
+
+	Spec CapsuleConfigurationSpec `json:"spec"`
 }
 
 // +kubebuilder:object:root=true
@@ -94,7 +99,7 @@ type CapsuleConfiguration struct {
 // CapsuleConfigurationList contains a list of CapsuleConfiguration.
 type CapsuleConfigurationList struct {
 	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata,omitempty"`
+	metav1.ListMeta `json:"metadata,omitzero"`
 
 	Items []CapsuleConfiguration `json:"items"`
 }
