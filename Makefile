@@ -19,7 +19,7 @@ CAPSULE_IMG     ?= $(REGISTRY)/$(IMG_BASE)
 CLUSTER_NAME    ?= capsule
 
 ## Kubernetes Version Support
-KUBERNETES_SUPPORTED_VERSION ?= "v1.34.0"
+KUBERNETES_SUPPORTED_VERSION ?= "v1.35.0"
 
 ## Tool Binaries
 KUBECTL ?= kubectl
