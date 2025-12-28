@@ -49,6 +49,7 @@ jobs:
           - 'v1.31.0'
           - 'v1.32.0'
           - 'v1.33.0'
+          - 'v1.34.0'
     runs-on:
       labels: ubuntu-latest-8-cores
     steps:
