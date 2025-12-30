@@ -46,7 +46,7 @@ all: manager
 # Run tests
 .PHONY: test
 test: test-clean generate manifests test-clean
-	@CGO_ENABLED=0 GO111MODULE=on go test -race -v $(shell go list ./... | grep -v "e2e") -coverprofile coverage.out
+	@GO111MODULE=on go test -race -v $(shell go list ./... | grep -v "e2e") -coverprofile coverage.out
 
 .PHONY: test-clean
 test-clean: ## Clean tests cache
@@ -157,9 +157,6 @@ dev-setup:
 	export WEBHOOK_URL="https://$${LAPTOP_HOST_IP}:9443"; \
 	export CA_BUNDLE=`openssl base64 -in /tmp/k8s-webhook-server/serving-certs/tls.crt | tr -d '\n'`; \
 	$(HELM) upgrade \
-	    --server-side=true \
-	    --force-conflicts \
-		--take-ownership \
 	    --dependency-update \
 		--debug \
 		--install \
@@ -305,7 +302,6 @@ e2e-build: kind
 e2e-install: ko-build-all
 	$(MAKE) e2e-load-image CLUSTER_NAME=$(CLUSTER_NAME) IMAGE=$(CAPSULE_IMG) VERSION=$(VERSION)
 	$(HELM) upgrade \
-	    --force-conflicts=true \
 	    --dependency-update \
 		--debug \
 		--install \
