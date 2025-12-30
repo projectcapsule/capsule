@@ -1,0 +1,42 @@
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: capsule
+  namespace: flux-system
+spec:
+  serviceAccountName: kustomize-controller
+  interval: 30s
+  timeout: 10m
+  targetNamespace: capsule-system
+  releaseName: "capsule"
+  chart:
+    spec:
+      chart: capsule
+      version: "0.12.4"
+      sourceRef:
+        kind: HelmRepository
+        name: capsule
+      interval: 24h
+  install:
+    createNamespace: true
+    remediation:
+      retries: -1
+  upgrade:
+    remediation:
+      remediateLastFailure: true
+      retries: -1
+  driftDetection:
+    mode: enabled
+    ignore:
+      - paths: ["/spec/replicas"]
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: capsule
+  namespace: flux-system
+spec:
+  type: "oci"
+  interval: 12h0m0s
+  url: oci://ghcr.io/projectcapsule/charts
