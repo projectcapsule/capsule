@@ -13,7 +13,7 @@ spec:
   chart:
     spec:
       chart: kube-prometheus-stack
-      version: "80.8.0"
+      version: "80.8.2"
       sourceRef:
         kind: HelmRepository
         name: kube-prometheus-stack
