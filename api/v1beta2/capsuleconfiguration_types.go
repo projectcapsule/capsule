@@ -79,6 +79,7 @@ type CapsuleResources struct {
 }
 
 // +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
 // +kubebuilder:resource:scope=Cluster
 // +kubebuilder:storageversion
 
@@ -90,6 +91,9 @@ type CapsuleConfiguration struct {
 	metav1.ObjectMeta `json:"metadata,omitzero"`
 
 	Spec CapsuleConfigurationSpec `json:"spec"`
+
+	// +optional
+	Status CapsuleConfigurationStatus `json:"status,omitzero"`
 }
 
 // +kubebuilder:object:root=true

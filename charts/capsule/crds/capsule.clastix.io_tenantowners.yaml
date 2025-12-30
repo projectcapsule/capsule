@@ -39,6 +39,13 @@ spec:
           spec:
             description: spec defines the desired state of TenantOwner.
             properties:
+              aggregate:
+                default: true
+                description: |-
+                  Adds the given subject as capsule user. When enabled this subject does not have to be
+                  mentioned in the CapsuleConfiguration as Capsule User. In almost all scenarios Tenant Owners
+                  must be Capsule Users.
+                type: boolean
               clusterRoles:
                 default:
                 - admin
@@ -59,6 +66,7 @@ spec:
                 description: Name of the entity.
                 type: string
             required:
+            - aggregate
             - kind
             - name
             type: object

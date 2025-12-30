@@ -74,6 +74,18 @@ func (in *Tenant) CollectOwners(ctx context.Context, c client.Client, allowPromo
 	return owners, nil
 }
 
+func (in *Tenant) GetRoleBindings() []api.AdditionalRoleBindingsSpec {
+	roleBindings := make([]api.AdditionalRoleBindingsSpec, 0)
+
+	for _, owner := range in.Status.Owners {
+		roleBindings = append(roleBindings, owner.ToAdditionalRolebindings()...)
+	}
+
+	roleBindings = append(roleBindings, in.Spec.AdditionalRoleBindings...)
+
+	return roleBindings
+}
+
 func (in *Tenant) IsFull() bool {
 	// we don't have limits on assigned Namespaces
 	if in.Spec.NamespaceOptions == nil || in.Spec.NamespaceOptions.Quota == nil {
