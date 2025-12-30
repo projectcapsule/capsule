@@ -23,7 +23,10 @@ type NamespaceSelector struct {
 }
 
 // GetMatchingNamespaces retrieves the list of namespaces that match the NamespaceSelector.
-func (s *NamespaceSelector) GetMatchingNamespaces(ctx context.Context, client client.Client) ([]corev1.Namespace, error) {
+func (s *NamespaceSelector) GetMatchingNamespaces(
+	ctx context.Context,
+	c client.Client,
+) ([]corev1.Namespace, error) {
 	if s.LabelSelector == nil {
 		return nil, nil // No namespace selector means all namespaces
 	}
@@ -34,7 +37,7 @@ func (s *NamespaceSelector) GetMatchingNamespaces(ctx context.Context, client cl
 	}
 
 	namespaceList := &corev1.NamespaceList{}
-	if err := client.List(ctx, namespaceList); err != nil {
+	if err := c.List(ctx, namespaceList); err != nil {
 		return nil, fmt.Errorf("failed to list namespaces: %w", err)
 	}
 

@@ -180,6 +180,27 @@ var _ = Describe("Owners", Label("tenant", "permissions", "owners"), func() {
 		},
 	}
 
+	tnt1Owner := &capsulev1beta2.TenantOwner{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "e2e-owners-tnt",
+			Labels: map[string]string{
+				meta.NewTenantLabel: tnt1.GetName(),
+			},
+		},
+		Spec: capsulev1beta2.TenantOwnerSpec{
+			Aggregate: true,
+			CoreOwnerSpec: api.CoreOwnerSpec{
+				UserSpec: api.UserSpec{
+					Kind: api.UserOwner,
+					Name: "tnt-1-user",
+				},
+				ClusterRoles: []string{
+					"service-admin",
+				},
+			},
+		},
+	}
+
 	userOwnersCommon := &capsulev1beta2.TenantOwner{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "e2e-owners-common-user",
@@ -213,7 +234,7 @@ var _ = Describe("Owners", Label("tenant", "permissions", "owners"), func() {
 			}).Should(Succeed())
 		}
 
-		for _, tnt := range []*capsulev1beta2.TenantOwner{ownersInfra, ownersDevops, ownersCommon, userOwnersCommon} {
+		for _, tnt := range []*capsulev1beta2.TenantOwner{ownersInfra, ownersDevops, ownersCommon, userOwnersCommon, tnt1Owner} {
 			EventuallyCreation(func() error {
 				tnt.ResourceVersion = ""
 
@@ -228,7 +249,7 @@ var _ = Describe("Owners", Label("tenant", "permissions", "owners"), func() {
 			Expect(client.IgnoreNotFound(err)).To(Succeed())
 		}
 
-		for _, owners := range []*capsulev1beta2.TenantOwner{ownersInfra, ownersDevops, ownersCommon, userOwnersCommon} {
+		for _, owners := range []*capsulev1beta2.TenantOwner{ownersInfra, ownersDevops, ownersCommon, userOwnersCommon, tnt1Owner} {
 			err := k8sClient.Delete(context.TODO(), owners)
 			Expect(client.IgnoreNotFound(err)).To(Succeed())
 		}
@@ -249,6 +270,7 @@ var _ = Describe("Owners", Label("tenant", "permissions", "owners"), func() {
 					{Kind: ownersInfra.Spec.Kind, Name: ownersInfra.Spec.Name},
 					{Kind: ownersDevops.Spec.Kind, Name: ownersDevops.Spec.Name},
 					{Kind: ownersCommon.Spec.Kind, Name: ownersCommon.Spec.Name},
+					{Kind: tnt1Owner.Spec.Kind, Name: tnt1Owner.Spec.Name},
 					{Kind: api.GroupOwner, Name: "projectcapsule.dev"},
 				}
 
@@ -300,6 +322,13 @@ var _ = Describe("Owners", Label("tenant", "permissions", "owners"), func() {
 					},
 					ClusterRoles: []string{"service-admin"},
 				},
+				{
+					UserSpec: api.UserSpec{
+						Kind: tnt1Owner.Spec.Kind,
+						Name: tnt1Owner.Spec.Name,
+					},
+					ClusterRoles: []string{"service-admin"},
+				},
 			}
 
 			Expect(normalizeOwners(t.Status.Owners)).
@@ -329,6 +358,10 @@ var _ = Describe("Owners", Label("tenant", "permissions", "owners"), func() {
 				api.UserSpec{
 					Kind: userOwnersCommon.Spec.Kind,
 					Name: userOwnersCommon.Spec.Name,
+				},
+				api.UserSpec{
+					Kind: tnt1Owner.Spec.Kind,
+					Name: tnt1Owner.Spec.Name,
 				},
 			} {
 				ns := NewNamespace("", map[string]string{
@@ -436,6 +469,7 @@ var _ = Describe("Owners", Label("tenant", "permissions", "owners"), func() {
 				expected := api.UserListSpec{
 					{Kind: ownersInfra.Spec.Kind, Name: ownersInfra.Spec.Name},
 					{Kind: ownersDevops.Spec.Kind, Name: ownersDevops.Spec.Name},
+					{Kind: tnt1Owner.Spec.Kind, Name: tnt1Owner.Spec.Name},
 					{Kind: api.GroupOwner, Name: "projectcapsule.dev"},
 				}
 
@@ -480,6 +514,13 @@ var _ = Describe("Owners", Label("tenant", "permissions", "owners"), func() {
 					UserSpec: api.UserSpec{
 						Kind: userOwnersCommon.Spec.Kind,
 						Name: userOwnersCommon.Spec.Name,
+					},
+					ClusterRoles: []string{"service-admin"},
+				},
+				{
+					UserSpec: api.UserSpec{
+						Kind: tnt1Owner.Spec.Kind,
+						Name: tnt1Owner.Spec.Name,
 					},
 					ClusterRoles: []string{"service-admin"},
 				},
@@ -555,6 +596,7 @@ var _ = Describe("Owners", Label("tenant", "permissions", "owners"), func() {
 
 				expected := api.UserListSpec{
 					{Kind: ownersDevops.Spec.Kind, Name: ownersDevops.Spec.Name},
+					{Kind: tnt1Owner.Spec.Kind, Name: tnt1Owner.Spec.Name},
 					{Kind: api.GroupOwner, Name: "projectcapsule.dev"},
 				}
 
@@ -599,6 +641,13 @@ var _ = Describe("Owners", Label("tenant", "permissions", "owners"), func() {
 					UserSpec: api.UserSpec{
 						Kind: userOwnersCommon.Spec.Kind,
 						Name: userOwnersCommon.Spec.Name,
+					},
+					ClusterRoles: []string{"service-admin"},
+				},
+				{
+					UserSpec: api.UserSpec{
+						Kind: tnt1Owner.Spec.Kind,
+						Name: tnt1Owner.Spec.Name,
 					},
 					ClusterRoles: []string{"service-admin"},
 				},
@@ -666,6 +715,7 @@ var _ = Describe("Owners", Label("tenant", "permissions", "owners"), func() {
 				g.Expect(err).ToNot(HaveOccurred())
 
 				expected := api.UserListSpec{
+					{Kind: tnt1Owner.Spec.Kind, Name: tnt1Owner.Spec.Name},
 					{Kind: api.GroupOwner, Name: "projectcapsule.dev"},
 				}
 
@@ -703,6 +753,13 @@ var _ = Describe("Owners", Label("tenant", "permissions", "owners"), func() {
 					UserSpec: api.UserSpec{
 						Kind: userOwnersCommon.Spec.Kind,
 						Name: userOwnersCommon.Spec.Name,
+					},
+					ClusterRoles: []string{"service-admin"},
+				},
+				{
+					UserSpec: api.UserSpec{
+						Kind: tnt1Owner.Spec.Kind,
+						Name: tnt1Owner.Spec.Name,
 					},
 					ClusterRoles: []string{"service-admin"},
 				},

@@ -8,6 +8,8 @@ spec:
     matchOwners:
     - matchLabels:
         team: platform
+    - matchLabels:
+        tenant: solar
   owners:
   - name: alice
     kind: User
@@ -27,6 +29,8 @@ spec:
     matchOwners:
     - matchLabels:
         team: devops
+    - matchLabels:
+        tenant: green
   owners:
   - name: bob
     kind: User
@@ -46,6 +50,8 @@ spec:
     matchOwners:
     - matchLabels:
         team: devops
+    - matchLabels:
+        tenant: wind
   owners:
   - name: joe
     kind: User

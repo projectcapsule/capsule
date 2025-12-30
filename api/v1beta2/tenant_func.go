@@ -62,7 +62,7 @@ func (in *Tenant) CollectOwners(ctx context.Context, c client.Client, allowPromo
 	}
 
 	// Dedicated Owner Objects
-	listed, err := in.Spec.Permissions.ListMatchingOwners(ctx, c)
+	listed, err := in.Spec.Permissions.ListMatchingOwners(ctx, c, in.GetName())
 	if err != nil {
 		return nil, err
 	}
