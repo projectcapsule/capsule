@@ -6,8 +6,6 @@ package tenant
 import (
 	"context"
 	"fmt"
-	"hash/fnv"
-	"strings"
 
 	"golang.org/x/sync/errgroup"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -17,64 +15,21 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
+	"github.com/projectcapsule/capsule/pkg/utils"
 )
-
-func (r *Manager) userClusterRoleBindings(owner api.CoreOwnerSpec, clusterRole string) api.AdditionalRoleBindingsSpec {
-	var subject rbacv1.Subject
-
-	if owner.Kind == "ServiceAccount" {
-		splitName := strings.Split(owner.Name, ":")
-
-		subject = rbacv1.Subject{
-			Kind:      owner.Kind.String(),
-			Name:      splitName[len(splitName)-1],
-			Namespace: splitName[len(splitName)-2],
-		}
-	} else {
-		subject = rbacv1.Subject{
-			APIGroup: rbacv1.GroupName,
-			Kind:     owner.Kind.String(),
-			Name:     owner.Name,
-		}
-	}
-
-	return api.AdditionalRoleBindingsSpec{
-		ClusterRoleName: clusterRole,
-		Subjects: []rbacv1.Subject{
-			subject,
-		},
-	}
-}
 
 // Sync the dynamic Tenant Owner specific cluster-roles and additional Role Bindings, which can be used in many ways:
 // applying Pod Security Policies or giving access to CRDs or specific API groups.
 func (r *Manager) syncRoleBindings(ctx context.Context, tenant *capsulev1beta2.Tenant) (err error) {
-	// hashing the RoleBinding name due to DNS RFC-1123 applied to Kubernetes labels
-	hashFn := func(binding api.AdditionalRoleBindingsSpec) string {
-		h := fnv.New64a()
+	roleBindings := tenant.GetRoleBindings()
 
-		_, _ = h.Write([]byte(binding.ClusterRoleName))
+	// Hashing
+	hashes := map[string]api.AdditionalRoleBindingsSpec{}
 
-		for _, sub := range binding.Subjects {
-			_, _ = h.Write([]byte(sub.Kind + sub.Name))
-		}
+	for _, binding := range roleBindings {
+		hash := utils.RoleBindingHashFunc(binding)
 
-		return fmt.Sprintf("%x", h.Sum64())
-	}
-
-	// getting requested Role Binding keys
-	keys := make([]string, 0, len(tenant.Status.Owners))
-	// Generating for dynamic tenant owners cluster roles
-	for _, owner := range tenant.Status.Owners {
-		for _, clusterRoleName := range owner.ClusterRoles {
-			cr := r.userClusterRoleBindings(owner, clusterRoleName)
-
-			keys = append(keys, hashFn(cr))
-		}
-	}
-	// Generating hash of additional role bindings
-	for _, i := range tenant.Spec.AdditionalRoleBindings {
-		keys = append(keys, hashFn(i))
+		hashes[hash] = binding
 	}
 
 	group := new(errgroup.Group)
@@ -83,34 +38,29 @@ func (r *Manager) syncRoleBindings(ctx context.Context, tenant *capsulev1beta2.T
 		namespace := ns
 
 		group.Go(func() error {
-			return r.syncAdditionalRoleBinding(ctx, tenant, namespace, keys, hashFn)
+			return r.syncAdditionalRoleBinding(ctx, tenant, namespace, hashes)
 		})
 	}
 
 	return group.Wait()
 }
 
-func (r *Manager) syncAdditionalRoleBinding(ctx context.Context, tenant *capsulev1beta2.Tenant, ns string, keys []string, hashFn func(binding api.AdditionalRoleBindingsSpec) string) (err error) {
-	if err = r.pruningResources(ctx, ns, keys, &rbacv1.RoleBinding{}); err != nil {
-		return err
-	}
+func (r *Manager) syncAdditionalRoleBinding(
+	ctx context.Context,
+	tenant *capsulev1beta2.Tenant,
+	ns string,
+	bindings map[string]api.AdditionalRoleBindingsSpec,
+) (err error) {
+	keys := []string{}
 
-	roleBindings := make([]api.AdditionalRoleBindingsSpec, 0)
+	for hash, roleBinding := range bindings {
+		name := meta.NameForManagedRoleBindings(hash)
 
-	for _, owner := range tenant.Status.Owners {
-		for _, clusterRoleName := range owner.ClusterRoles {
-			roleBindings = append(roleBindings, r.userClusterRoleBindings(owner, clusterRoleName))
-		}
-	}
-
-	roleBindings = append(roleBindings, tenant.Spec.AdditionalRoleBindings...)
-
-	for i, roleBinding := range roleBindings {
-		roleBindingHashLabel := hashFn(roleBinding)
+		keys = append(keys, hash)
 
 		target := &rbacv1.RoleBinding{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      fmt.Sprintf("capsule-%s-%d-%s", tenant.Name, i, roleBinding.ClusterRoleName),
+				Name:      name,
 				Namespace: ns,
 			},
 		}
@@ -126,7 +76,7 @@ func (r *Manager) syncAdditionalRoleBinding(ctx context.Context, tenant *capsule
 			}
 
 			target.Labels[meta.TenantLabel] = tenant.Name
-			target.Labels[meta.RolebindingLabel] = roleBindingHashLabel
+			target.Labels[meta.RolebindingLabel] = hash
 
 			if roleBinding.Annotations != nil {
 				target.Annotations = roleBinding.Annotations
@@ -156,5 +106,6 @@ func (r *Manager) syncAdditionalRoleBinding(ctx context.Context, tenant *capsule
 		}
 	}
 
-	return nil
+	// Prune at finish to prevent gaps
+	return r.pruningResources(ctx, ns, keys, &rbacv1.RoleBinding{})
 }
