@@ -62,7 +62,7 @@ func (in *Tenant) CollectOwners(ctx context.Context, c client.Client, allowPromo
 	}
 
 	// Dedicated Owner Objects
-	listed, err := in.Spec.Permissions.ListMatchingOwners(ctx, c)
+	listed, err := in.Spec.Permissions.ListMatchingOwners(ctx, c, in.GetName())
 	if err != nil {
 		return nil, err
 	}
@@ -72,6 +72,18 @@ func (in *Tenant) CollectOwners(ctx context.Context, c client.Client, allowPromo
 	}
 
 	return owners, nil
+}
+
+func (in *Tenant) GetRoleBindings() []api.AdditionalRoleBindingsSpec {
+	roleBindings := make([]api.AdditionalRoleBindingsSpec, 0)
+
+	for _, owner := range in.Status.Owners {
+		roleBindings = append(roleBindings, owner.ToAdditionalRolebindings()...)
+	}
+
+	roleBindings = append(roleBindings, in.Spec.AdditionalRoleBindings...)
+
+	return roleBindings
 }
 
 func (in *Tenant) IsFull() bool {

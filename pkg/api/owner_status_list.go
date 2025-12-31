@@ -48,6 +48,8 @@ func (o *OwnerStatusListSpec) Upsert(
 			}
 		}
 
+		sort.Strings(existing.ClusterRoles)
+
 		*o = owners
 
 		return

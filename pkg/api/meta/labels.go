@@ -11,7 +11,9 @@ import (
 
 const (
 	TenantNameLabel = "kubernetes.io/metadata.name"
-	TenantLabel     = "capsule.clastix.io/tenant"
+
+	TenantLabel    = "capsule.clastix.io/tenant"
+	NewTenantLabel = "projectcapsule.dev/tenant"
 
 	ResourcePoolLabel = "projectcapsule.dev/pool"
 
