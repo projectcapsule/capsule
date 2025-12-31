@@ -10,6 +10,37 @@ import (
 // +kubebuilder:object:generate=true
 type UserListSpec []UserSpec
 
+func (o *UserListSpec) Upsert(newUser UserSpec) {
+	users := *o
+
+	// Comparator consistent with ByKindName
+	less := func(a, b UserSpec) bool {
+		ak, bk := a.Kind.String(), b.Kind.String()
+		if ak != bk {
+			return ak < bk
+		}
+
+		return a.Name < b.Name
+	}
+
+	// Ensure sorted before binary search
+	sort.Sort(ByKindName(users))
+
+	// Find first index where users[i] >= newUser
+	idx := sort.Search(len(users), func(i int) bool {
+		return !less(users[i], newUser)
+	})
+
+	// In this case merging for duplicates makes little sense as the values are identical
+	if idx < len(users) && !less(newUser, users[idx]) && !less(users[idx], newUser) {
+		return
+	}
+
+	users = append(users, newUser)
+	sort.Sort(ByKindName(users))
+	*o = users
+}
+
 func (u UserListSpec) IsPresent(name string, groups []string) bool {
 	groupSet := make(map[string]struct{}, len(groups))
 	for _, g := range groups {

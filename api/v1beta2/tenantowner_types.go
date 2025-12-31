@@ -11,7 +11,14 @@ import (
 
 // TenantOwnerSpec defines the desired state of TenantOwner.
 type TenantOwnerSpec struct {
+	// Subject
 	api.CoreOwnerSpec `json:",inline"`
+
+	// Adds the given subject as capsule user. When enabled this subject does not have to be
+	// mentioned in the CapsuleConfiguration as Capsule User. In almost all scenarios Tenant Owners
+	// must be Capsule Users.
+	//+kubebuilder:default:=true
+	Aggregate bool `json:"aggregate"`
 }
 
 // TenantOwnerStatus defines the observed state of TenantOwner.

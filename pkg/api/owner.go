@@ -3,6 +3,10 @@
 
 package api
 
+import (
+	rbacv1 "k8s.io/api/rbac/v1"
+)
+
 // +kubebuilder:object:generate=true
 
 type OwnerSpec struct {
@@ -24,6 +28,21 @@ type CoreOwnerSpec struct {
 	// Defines additional cluster-roles for the specific Owner.
 	// +kubebuilder:default={admin,capsule-namespace-deleter}
 	ClusterRoles []string `json:"clusterRoles,omitempty"`
+}
+
+func (o CoreOwnerSpec) ToAdditionalRolebindings() []AdditionalRoleBindingsSpec {
+	bindings := make([]AdditionalRoleBindingsSpec, 0, len(o.ClusterRoles))
+
+	for _, clusterRoleName := range o.ClusterRoles {
+		bindings = append(bindings, AdditionalRoleBindingsSpec{
+			ClusterRoleName: clusterRoleName,
+			Subjects: []rbacv1.Subject{
+				o.Subject(),
+			},
+		})
+	}
+
+	return bindings
 }
 
 // +kubebuilder:validation:Enum=User;Group;ServiceAccount

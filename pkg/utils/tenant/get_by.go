@@ -67,7 +67,6 @@ func GetTenantByOwnerreferences(
 	return nil, nil
 }
 
-//nolint:nestif
 func GetTenantByUserInfo(
 	ctx context.Context,
 	c client.Client,
@@ -104,14 +103,6 @@ func GetTenantByUserInfo(
 		}
 
 		tenants = append(tenants, saTntList.Items...)
-
-		if cfg.AllowServiceAccountPromotion() {
-			if tnt, err := users.ResolveServiceAccountActor(ctx, c, ns, username, cfg); err != nil {
-				return nil, err
-			} else if tnt != nil {
-				tenants = append(tenants, *tnt)
-			}
-		}
 	}
 
 	// Group tenants.

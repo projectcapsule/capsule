@@ -13,6 +13,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/configuration"
 )
 
@@ -50,8 +51,10 @@ func IsCapsuleUser(
 		}
 	}
 
+	capsuleUsers := cfg.GetUsersByStatus()
+
 	//nolint:modernize
-	for _, group := range cfg.UserGroups() {
+	for _, group := range capsuleUsers.GetByKinds([]api.OwnerKind{api.GroupOwner}) {
 		if groupList.Find(group) {
 			if len(cfg.IgnoreUserWithGroups()) > 0 {
 				for _, ignoreGroup := range cfg.IgnoreUserWithGroups() {
@@ -65,7 +68,8 @@ func IsCapsuleUser(
 		}
 	}
 
-	if len(cfg.UserNames()) > 0 && sets.New[string](cfg.UserNames()...).Has(user) {
+	users := capsuleUsers.GetByKinds([]api.OwnerKind{api.UserOwner})
+	if len(users) > 0 && sets.New[string](users...).Has(user) {
 		return true
 	}
 

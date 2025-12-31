@@ -1,0 +1,63 @@
+---
+apiVersion: capsule.clastix.io/v1beta2
+kind: Tenant
+metadata:
+  name: solar
+spec:
+  permissions:
+    matchOwners:
+    - matchLabels:
+        team: platform
+    - matchLabels:
+        tenant: solar
+  owners:
+  - name: alice
+    kind: User
+  additionalRoleBindings:
+  - clusterRoleName: 'view'
+    subjects:
+    - apiGroup: rbac.authorization.k8s.io
+      kind: User
+      name: joe
+---
+apiVersion: capsule.clastix.io/v1beta2
+kind: Tenant
+metadata:
+  name: green
+spec:
+  permissions:
+    matchOwners:
+    - matchLabels:
+        team: devops
+    - matchLabels:
+        tenant: green
+  owners:
+  - name: bob
+    kind: User
+  additionalRoleBindings:
+  - clusterRoleName: 'view'
+    subjects:
+    - apiGroup: rbac.authorization.k8s.io
+      kind: User
+      name: alice
+---
+apiVersion: capsule.clastix.io/v1beta2
+kind: Tenant
+metadata:
+  name: wind
+spec:
+  permissions:
+    matchOwners:
+    - matchLabels:
+        team: devops
+    - matchLabels:
+        tenant: wind
+  owners:
+  - name: joe
+    kind: User
+  additionalRoleBindings:
+  - clusterRoleName: 'view'
+    subjects:
+    - apiGroup: rbac.authorization.k8s.io
+      kind: Group
+      name: wind-users

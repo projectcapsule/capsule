@@ -105,6 +105,20 @@ helm-test-exec: ct helm-controller-version ko-build-all
 	@$(CT) install --config $(SRC_ROOT)/.github/configs/ct.yaml --namespace=capsule-system --all --debug
 
 # Setup development env
+dev-build: kind
+	$(KIND) create cluster --wait=60s --name $(CLUSTER_NAME) --image kindest/node:$(KUBERNETES_SUPPORTED_VERSION)
+	$(MAKE) dev-install-deps
+
+.PHONY: dev-destroy
+dev-destroy: kind
+	$(KIND) delete cluster --name capsule
+
+API_GW         := none
+API_GW_VERSION := v1.3.0
+API_GW_LOOKUP  := kubernetes-sigs/gateway-api
+dev-install-deps:
+	@$(KUBECTL) apply --force-conflicts --server-side=true -f https://github.com/$(API_GW_LOOKUP)/releases/download/$(API_GW_VERSION)/standard-install.yaml
+
 # Usage:
 # 	LAPTOP_HOST_IP=<YOUR_LAPTOP_IP> make dev-setup
 # For example:
@@ -127,6 +141,7 @@ IP.1   = $(LAPTOP_HOST_IP)
 endef
 export TLS_CNF
 dev-setup:
+	$(KUBECTL) -n capsule-system scale deployment capsule-controller-manager --replicas=0 || true
 	mkdir -p /tmp/k8s-webhook-server/serving-certs
 	echo "$${TLS_CNF}" > _tls.cnf
 	openssl req -newkey rsa:4096 -days 3650 -nodes -x509 \
@@ -156,8 +171,7 @@ dev-setup:
 		--set "webhooks.service.url=$${WEBHOOK_URL}" \
 		--set "webhooks.service.caBundle=$${CA_BUNDLE}" \
 		capsule \
-		./charts/capsule
-	$(KUBECTL) -n capsule-system scale deployment capsule-controller-manager --replicas=0 || true
+		./charts/capsule || true
 
 setup-monitoring: dev-setup-fluxcd
 	@$(KUBECTL) kustomize --load-restrictor='LoadRestrictionsNone' hack/distro/monitoring | envsubst | kubectl apply -f -
@@ -179,6 +193,22 @@ dev-setup-argocd: dev-setup-fluxcd
 
 dev-setup-fluxcd:
 	@$(KUBECTL) kustomize --load-restrictor='LoadRestrictionsNone' hack/distro/fluxcd | envsubst | kubectl apply -f -
+
+# Here to setup the current capsule version
+# Intended to test updates to new version
+dev-setup-capsule: dev-setup-fluxcd
+	@$(KUBECTL) kustomize --load-restrictor='LoadRestrictionsNone' hack/distro/capsule | envsubst | kubectl apply -f -
+	@$(MAKE) wait-for-helmreleases
+	@$(MAKE) dev-setup-capsule-example
+
+dev-setup-capsule-example: dev-setup-fluxcd
+	@$(KUBECTL) kustomize --load-restrictor='LoadRestrictionsNone' hack/distro/capsule/example-setup | envsubst | kubectl apply -f -
+	@$(KUBECTL) create ns wind-test --as joe --as-group projectcapsule.dev
+	@$(KUBECTL) create ns wind-prod --as joe --as-group projectcapsule.dev
+	@$(KUBECTL) create ns green-test --as bob --as-group projectcapsule.dev
+	@$(KUBECTL) create ns green-prod --as bob --as-group projectcapsule.dev
+	@$(KUBECTL) create ns solar-test --as alice --as-group projectcapsule.dev
+	@$(KUBECTL) create ns solar-prod --as alice --as-group projectcapsule.dev
 
 wait-for-helmreleases:
 	@ echo "Waiting for all HelmReleases to have observedGeneration >= 0..."
@@ -264,19 +294,9 @@ golint-fix: golangci-lint
 e2e: ginkgo
 	$(MAKE) e2e-build && $(MAKE) e2e-exec && $(MAKE) e2e-destroy
 
-API_GW         := none
-API_GW_VERSION := v1.3.0
-API_GW_LOOKUP  := kubernetes-sigs/gateway-api/
-e2e-install-deps:
-	@$(KUBECTL) apply --force-conflicts --server-side=true -f https://github.com/$(API_GW_LOOKUP)/releases/download/$(API_GW_VERSION)/standard-install.yaml
-
 e2e-build: kind
-	$(MAKE) e2e-build-cluster
+	$(MAKE) dev-build
 	$(MAKE) e2e-install
-
-e2e-build-cluster: kind
-	$(KIND) create cluster --wait=60s --name $(CLUSTER_NAME) --image kindest/node:$(KUBERNETES_SUPPORTED_VERSION)
-	$(MAKE) e2e-install-deps
 
 .PHONY: e2e-install
 e2e-install: ko-build-all
@@ -339,8 +359,7 @@ e2e-exec: ginkgo
 	$(GINKGO) -v -tags e2e ./e2e
 
 .PHONY: e2e-destroy
-e2e-destroy: kind
-	$(KIND) delete cluster --name capsule
+e2e-destroy: dev-destroy
 
 SPELL_CHECKER = npx spellchecker-cli
 docs-lint:

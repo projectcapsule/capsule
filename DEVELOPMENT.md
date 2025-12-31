@@ -63,9 +63,8 @@ So the TL;DR answer is:
 **Make sure a *KinD* cluster is running on your laptop, and then run `make dev-setup` to setup the dev environment.**. This is not done in the `make dev-setup` setup.
 
 ```bash
-# If you haven't installed or run `make deploy` before, do it first
-# Note: please retry if you saw errors
-$ make deploy
+# Create a KinD cluster if not already created
+$ make dev-cluster
 
 # To retrieve your laptop's IP and execute `make dev-setup` to setup dev env
 # For example: LAPTOP_HOST_IP=192.168.10.101 make dev-setup

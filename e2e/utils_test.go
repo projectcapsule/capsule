@@ -29,6 +29,7 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
+	"github.com/projectcapsule/capsule/pkg/utils"
 )
 
 const (
@@ -332,43 +333,38 @@ func VerifyTenantRoleBindings(
 	tnt *capsulev1beta2.Tenant,
 ) {
 	Eventually(func(g Gomega) {
+		roles := tnt.GetRoleBindings()
+
 		// List all RoleBindings once per namespace to avoid repeated API calls.
 		for _, ns := range tnt.Status.Namespaces {
-			for i, owner := range tnt.Status.Owners {
-				for _, role := range owner.ClusterRoles {
-					rbName := fmt.Sprintf("capsule-%s-%d-%s", tnt.Name, i, role)
+			for _, role := range roles {
+				rbName := meta.NameForManagedRoleBindings(utils.RoleBindingHashFunc(role))
 
-					rb := &rbacv1.RoleBinding{}
-					err := k8sClient.Get(context.Background(), client.ObjectKey{
-						Namespace: ns,
-						Name:      rbName,
-					}, rb)
+				rb := &rbacv1.RoleBinding{}
+				err := k8sClient.Get(context.Background(), client.ObjectKey{
+					Namespace: ns,
+					Name:      rbName,
+				}, rb)
 
-					g.Expect(err).ToNot(HaveOccurred(),
-						"expected RoleBinding %s/%s to exist", ns, rbName)
+				g.Expect(err).ToNot(HaveOccurred(),
+					"expected RoleBinding %s/%s to exist (Owner: %s)", ns, rbName, role.Subjects,
+				)
 
-					g.Expect(rb.RoleRef.Name).To(Equal(role),
-						"expected RoleBinding %s/%s to have RoleRef.Name=%q",
-						ns, rbName, role)
+				g.Expect(rb.RoleRef.Name).To(Equal(role.ClusterRoleName),
+					"expected RoleBinding %s/%s to have RoleRef.Name=%q",
+					ns, rbName, role.ClusterRoleName)
 
-					g.Expect(rb.Subjects).ToNot(BeEmpty(),
-						"expected RoleBinding %s/%s to have at least one subject", ns, rbName)
+				g.Expect(rb.Subjects).ToNot(BeEmpty(),
+					"expected RoleBinding %s/%s to have at least one subject", ns, rbName)
 
-					foundSubject := false
-					for _, s := range rb.Subjects {
-						if s.Kind == string(owner.Kind) && s.Name == owner.Name {
-							foundSubject = true
-							break
-						}
-					}
+				g.Expect(rb.Subjects).To(ConsistOf(role.Subjects),
+					"expected RoleBinding %s/%s to have exact subjects",
+					ns, rb.Name,
+				)
 
-					g.Expect(foundSubject).To(BeTrue(),
-						"expected RoleBinding %s/%s to contain subject %s/%s",
-						ns, rb.Name, owner.Kind, owner.Name)
-
-				}
 			}
 		}
+
 	}).WithTimeout(30 * time.Second).WithPolling(500 * time.Millisecond).Should(Succeed())
 }
 
