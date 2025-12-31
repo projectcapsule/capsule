@@ -153,8 +153,6 @@ spec:
                   regexp
                 type: string
               userGroups:
-                default:
-                - capsule.clastix.io
                 description: |-
                   Deprecated: use users property instead (https://projectcapsule.dev/docs/operating/setup/configuration/#users)
 

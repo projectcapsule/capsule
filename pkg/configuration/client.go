@@ -23,6 +23,19 @@ type capsuleConfiguration struct {
 	retrievalFn func() *capsulev1beta2.CapsuleConfiguration
 }
 
+func DefaultCapsuleConfiguration() capsulev1beta2.CapsuleConfigurationSpec {
+	return capsulev1beta2.CapsuleConfigurationSpec{
+		Users: []capsuleapi.UserSpec{
+			{
+				Name: "projectcapsule.dev",
+				Kind: capsuleapi.GroupOwner,
+			},
+		},
+		ForceTenantPrefix:              false,
+		ProtectedNamespaceRegexpString: "",
+	}
+}
+
 func NewCapsuleConfiguration(ctx context.Context, c client.Client, name string) Configuration {
 	return &capsuleConfiguration{retrievalFn: func() *capsulev1beta2.CapsuleConfiguration {
 		cfg := &capsulev1beta2.CapsuleConfiguration{}
@@ -38,16 +51,7 @@ func NewCapsuleConfiguration(ctx context.Context, c client.Client, name string) 
 			ObjectMeta: metav1.ObjectMeta{
 				Name: name,
 			},
-			Spec: capsulev1beta2.CapsuleConfigurationSpec{
-				Users: []capsuleapi.UserSpec{
-					{
-						Name: "projectcapsule.dev",
-						Kind: capsuleapi.GroupOwner,
-					},
-				},
-				ForceTenantPrefix:              false,
-				ProtectedNamespaceRegexpString: "",
-			},
+			Spec: DefaultCapsuleConfiguration(),
 		}
 
 		if err := c.Create(ctx, cfg); err != nil {
