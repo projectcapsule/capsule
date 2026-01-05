@@ -41,4 +41,4 @@ spec:
         #      - admin
         #    kind: ServiceAccount
         #    name: "system:serviceaccount:{{namespace}}:gitops-reconciler"
-          
+
