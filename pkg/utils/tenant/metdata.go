@@ -11,6 +11,7 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
+	tpl "github.com/projectcapsule/capsule/pkg/template"
 	"github.com/projectcapsule/capsule/pkg/utils"
 )
 
@@ -45,6 +46,8 @@ func BuildNamespaceMetadataForTenant(ns *corev1.Namespace, tnt *capsulev1beta2.T
 	annotations = BuildNamespaceAnnotationsForTenant(tnt)
 	labels = BuildNamespaceLabelsForTenant(tnt)
 
+	fastContext := ContextForTenantAndNamespace(tnt, ns)
+
 	if opts := tnt.Spec.NamespaceOptions; opts != nil && len(opts.AdditionalMetadataList) > 0 {
 		for _, md := range opts.AdditionalMetadataList {
 			var ok bool
@@ -58,13 +61,8 @@ func BuildNamespaceMetadataForTenant(ns *corev1.Namespace, tnt *capsulev1beta2.T
 				continue
 			}
 
-<<<<<<< HEAD
-			TemplateForTenantAndNamespace(md.Labels, tnt, ns)
-			TemplateForTenantAndNamespace(md.Annotations, tnt, ns)
-=======
-			tLabels := template.TemplateForTenantAndNamespaceMap(md.Labels, tnt, ns)
-			tAnnotations := template.TemplateForTenantAndNamespaceMap(md.Annotations, tnt, ns)
->>>>>>> 7efaa9eb460450f9c60905f0eacf4bfe42a9d470
+			tLabels := tpl.TemplateForTenantAndNamespaceMap(md.Labels, fastContext)
+			tAnnotations := tpl.TemplateForTenantAndNamespaceMap(md.Annotations, fastContext)
 
 			utils.MapMergeNoOverrite(labels, tLabels)
 			utils.MapMergeNoOverrite(annotations, tAnnotations)

@@ -25,6 +25,7 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/configuration"
 )
 
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to
@@ -65,6 +66,11 @@ var _ = BeforeSuite(func() {
 	Expect(ctrlClient).ToNot(BeNil())
 
 	k8sClient = &e2eClient{Client: ctrlClient}
+
+	ModifyCapsuleConfigurationOpts(func(cfg *capsulev1beta2.CapsuleConfiguration) {
+		cfg.Spec = configuration.DefaultCapsuleConfiguration()
+	})
+
 })
 
 var _ = AfterSuite(func() {

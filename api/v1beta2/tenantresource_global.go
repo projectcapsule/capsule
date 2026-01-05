@@ -27,27 +27,13 @@ type GlobalTenantResourceSpec struct {
 // GlobalTenantResourceStatus defines the observed state of GlobalTenantResource.
 type GlobalTenantResourceStatus struct {
 	// List of Tenants addressed by the GlobalTenantResource.
-	SelectedTenants []string `json:"selectedTenants"`
-	// List of the replicated resources for the given TenantResource.
-<<<<<<< HEAD
-	ProcessedItems ProcessedItems `json:"processedItems"`
+	SelectedTenants []string `json:"selectedTenants,omitempty"`
+
 	// Condition of the GlobalTenantResource.
 	Conditions meta.ConditionList `json:"conditions,omitempty"`
-=======
+
+	// List of the replicated resources for the given TenantResource.
 	ProcessedItems ProcessedItems `json:"processedItems,omitzero"`
-}
-
-type ProcessedItems []ObjectReferenceStatus
-
-func (p *ProcessedItems) AsSet() sets.Set[string] {
-	set := sets.New[string]()
-
-	for _, i := range *p {
-		set.Insert(i.String())
-	}
-
-	return set
->>>>>>> 7efaa9eb460450f9c60905f0eacf4bfe42a9d470
 }
 
 // +kubebuilder:object:root=true

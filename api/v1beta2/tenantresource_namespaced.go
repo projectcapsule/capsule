@@ -15,8 +15,6 @@ import (
 
 // TenantResourceSpec defines the desired state of TenantResource.
 type TenantResourceSpec struct {
-	misc.ReplicationSettings `json:",inline"`
-
 	// Define the period of time upon a second reconciliation must be invoked.
 	// Keep in mind that any change to the manifests will trigger a new reconciliation.
 	// +kubebuilder:default="60s"
@@ -39,7 +37,8 @@ type TenantResourceSpec struct {
 }
 
 type ResourceSpec struct {
-	ResourceSpecSettings `json:",inline"`
+	// +kubebuilder:default={}
+	ResourceSpecSettings `json:"settings,omitzero"`
 
 	// Defines the Namespace selector to select the Tenant Namespaces on which the resources must be propagated.
 	// In case of nil value, all the Tenant Namespaces are targeted.

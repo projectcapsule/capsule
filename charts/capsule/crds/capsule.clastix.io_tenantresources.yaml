@@ -3,7 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.19.0
+    controller-gen.kubebuilder.io/version: v0.20.0
   name: tenantresources.capsule.clastix.io
 spec:
   group: capsule.clastix.io
@@ -55,27 +55,17 @@ spec:
           spec:
             description: TenantResourceSpec defines the desired state of TenantResource.
             properties:
-              adopt:
-                default: false
-                description: Enabling this allows TenanResources to interact with
-                  objects which were not created by a TenantResource. In this case
-                  on prune no deletion of the entire object is made.
-                type: boolean
               cordoned:
                 default: false
                 description: |-
                   When cordoning a replication it will no longer execute any applies or deletions (paused).
                   This is useful for maintenances
                 type: boolean
-              force:
-                default: false
-                description: |-
-                  Force indicates that in case of conflicts with server-side apply, the client should acquire ownership of the conflicting field.
-                  You may create collisions with this.
-                type: boolean
               pruningOnDelete:
                 default: true
                 description: |-
+                  Deprecated: Each Resource now declares it's own Prune property
+
                   When the replicated resource manifest is deleted, all the objects replicated so far will be automatically deleted.
                   Disable this to keep replicated resources although the deletion of the replication manifest.
                 type: boolean
@@ -98,12 +88,6 @@ spec:
                             type: string
                           type: object
                       type: object
-                    adopt:
-                      default: false
-                      description: Enabling this allows TenanResources to interact
-                        with objects which were not created by a TenantResource. In
-                        this case on prune no deletion of the entire object is made.
-                      type: boolean
                     context:
                       description: |-
                         Provide additional template context, which can be used throughout all
@@ -196,12 +180,6 @@ spec:
                             type: object
                           type: array
                       type: object
-                    force:
-                      default: false
-                      description: |-
-                        Force indicates that in case of conflicts with server-side apply, the client should acquire ownership of the conflicting field.
-                        You may create collisions with this.
-                      type: boolean
                     namespaceSelector:
                       description: |-
                         Defines the Namespace selector to select the Tenant Namespaces on which the resources must be propagated.
@@ -334,12 +312,6 @@ spec:
                         - kind
                         type: object
                       type: array
-                    pruningOnDelete:
-                      default: true
-                      description: |-
-                        When the replicated resource manifest is deleted, all the objects replicated so far will be automatically deleted.
-                        Disable this to keep replicated resources although the deletion of the replication manifest.
-                      type: boolean
                     rawItems:
                       description: List of raw resources that must be replicated.
                       items:
@@ -347,6 +319,29 @@ spec:
                         x-kubernetes-embedded-resource: true
                         x-kubernetes-preserve-unknown-fields: true
                       type: array
+                    settings:
+                      default: {}
+                      properties:
+                        adopt:
+                          default: false
+                          description: Enabling this allows TenanResources to interact
+                            with objects which were not created by a TenantResource.
+                            In this case on prune no deletion of the entire object
+                            is made.
+                          type: boolean
+                        force:
+                          default: false
+                          description: |-
+                            Force indicates that in case of conflicts with server-side apply, the client should acquire ownership of the conflicting field.
+                            You may create collisions with this.
+                          type: boolean
+                        prune:
+                          default: true
+                          description: |-
+                            When the replicated resource manifest is deleted, all the objects replicated so far will be automatically deleted.
+                            Disable this to keep replicated resources although the deletion of the replication manifest.
+                          type: boolean
+                      type: object
                     templates:
                       description: Templates for advanced use cases
                       items:
@@ -366,6 +361,8 @@ spec:
                             type: string
                         type: object
                       type: array
+                  required:
+                  - settings
                   type: object
                 type: array
               resyncPeriod:
@@ -483,7 +480,7 @@ spec:
                             Force indicates that in case of conflicts with server-side apply, the client should acquire ownership of the conflicting field.
                             You may create collisions with this.
                           type: boolean
-                        pruningOnDelete:
+                        prune:
                           default: true
                           description: |-
                             When the replicated resource manifest is deleted, all the objects replicated so far will be automatically deleted.

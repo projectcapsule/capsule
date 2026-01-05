@@ -114,7 +114,12 @@ func (r *Manager) EnsureClusterRoleBindingsProvisioner(ctx context.Context) erro
 			crb.RoleRef = api.ProvisionerClusterRoleBinding.RoleRef
 			crb.Subjects = nil
 
-			for _, entity := range r.Configuration.Administrators() {
+			users := r.Configuration.GetUsersByStatus()
+			for _, u := range r.Configuration.Administrators() {
+				users.Upsert(u)
+			}
+
+			for _, entity := range users {
 				switch entity.Kind {
 				case api.UserOwner:
 					crb.Subjects = append(crb.Subjects, rbacv1.Subject{
@@ -138,20 +143,6 @@ func (r *Manager) EnsureClusterRoleBindingsProvisioner(ctx context.Context) erro
 						Namespace: namespace,
 					})
 				}
-			}
-
-			for _, group := range r.Configuration.UserGroups() {
-				crb.Subjects = append(crb.Subjects, rbacv1.Subject{
-					Kind: rbacv1.GroupKind,
-					Name: group,
-				})
-			}
-
-			for _, user := range r.Configuration.UserNames() {
-				crb.Subjects = append(crb.Subjects, rbacv1.Subject{
-					Kind: rbacv1.UserKind,
-					Name: user,
-				})
 			}
 
 			if r.Configuration.AllowServiceAccountPromotion() {

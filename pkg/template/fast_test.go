@@ -1,11 +1,7 @@
 // Copyright 2020-2025 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
-<<<<<<< HEAD:pkg/utils/tenant/fast_template_test.go
-package tenant_test
-=======
 package template_test
->>>>>>> 7efaa9eb460450f9c60905f0eacf4bfe42a9d470:pkg/template/fast_test.go
 
 import (
 	"sync"
@@ -14,12 +10,8 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-<<<<<<< HEAD:pkg/utils/tenant/fast_template_test.go
-	"github.com/projectcapsule/capsule/pkg/utils/tenant"
-=======
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	tpl "github.com/projectcapsule/capsule/pkg/template"
->>>>>>> 7efaa9eb460450f9c60905f0eacf4bfe42a9d470:pkg/template/fast_test.go
 )
 
 func newTenant(name string) *capsulev1beta2.Tenant {
@@ -35,82 +27,60 @@ func newNamespace(name string) *v1.Namespace {
 }
 
 func TestTemplateForTenantAndNamespace_ReplacesPlaceholders(t *testing.T) {
-	tnt := newTenant("tenant-a")
-	ns := newNamespace("ns-1")
+	tplContext := map[string]string{
+		"tenant.name": "tenant-a",
+		"namespace":   "ns-1",
+	}
 
 	got := tpl.TemplateForTenantAndNamespace(
 		"tenant={{tenant.name}}, ns={{namespace}}",
-		tnt,
-		ns,
+		tplContext,
 	)
 
-<<<<<<< HEAD:pkg/utils/tenant/fast_template_test.go
-	tenant.TemplateForTenantAndNamespace(m, tnt, ns)
-
-	if got := m["key1"]; got != "tenant=tenant-a, ns=ns-1" {
-		t.Fatalf("key1: expected %q, got %q", "tenant=tenant-a, ns=ns-1", got)
-	}
-
-	if got := m["key2"]; got != "plain-value" {
-		t.Fatalf("key2: expected %q to remain unchanged, got %q", "plain-value", got)
-=======
 	want := "tenant=tenant-a, ns=ns-1"
 	if got != want {
 		t.Fatalf("expected %q, got %q", want, got)
->>>>>>> 7efaa9eb460450f9c60905f0eacf4bfe42a9d470:pkg/template/fast_test.go
 	}
 }
 
 func TestTemplateForTenantAndNamespace_ReplacesPlaceholdersSpaces(t *testing.T) {
-	tnt := newTenant("tenant-a")
-	ns := newNamespace("ns-1")
+	tplContext := map[string]string{
+		"tenant.name": "tenant-a",
+		"namespace":   "ns-1",
+	}
 
 	got := tpl.TemplateForTenantAndNamespace(
 		"tenant={{ tenant.name }}, ns={{ namespace }}",
-		tnt,
-		ns,
+		tplContext,
 	)
 
-<<<<<<< HEAD:pkg/utils/tenant/fast_template_test.go
-	original1 := m["noTemplate1"]
-	original2 := m["noTemplate2"]
-
-	tenant.TemplateForTenantAndNamespace(m, tnt, ns)
-
-	if got := m["noTemplate1"]; got != original1 {
-		t.Fatalf("noTemplate1: expected %q to remain unchanged, got %q", original1, got)
-	}
-	if got := m["noTemplate2"]; got != original2 {
-		t.Fatalf("noTemplate2: expected %q to remain unchanged, got %q", original2, got)
-=======
 	want := "tenant=tenant-a, ns=ns-1"
 	if got != want {
 		t.Fatalf("expected %q, got %q", want, got)
->>>>>>> 7efaa9eb460450f9c60905f0eacf4bfe42a9d470:pkg/template/fast_test.go
 	}
 }
 
 func TestTemplateForTenantAndNamespace_OnlyTenant(t *testing.T) {
-	tnt := newTenant("tenant-x")
-	ns := newNamespace("ns-y")
+	tplContext := map[string]string{
+		"tenant.name": "tenant-x",
+		"namespace":   "ns-y",
+	}
 
-	got := tpl.TemplateForTenantAndNamespace("T={{tenant.name}}", tnt, ns)
+	got := tpl.TemplateForTenantAndNamespace("T={{tenant.name}}", tplContext)
 	want := "T=tenant-x"
 
-<<<<<<< HEAD:pkg/utils/tenant/fast_template_test.go
-	tenant.TemplateForTenantAndNamespace(m, tnt, ns)
-=======
 	if got != want {
 		t.Fatalf("expected %q, got %q", want, got)
 	}
 }
->>>>>>> 7efaa9eb460450f9c60905f0eacf4bfe42a9d470:pkg/template/fast_test.go
 
 func TestTemplateForTenantAndNamespace_OnlyNamespace(t *testing.T) {
-	tnt := newTenant("tenant-x")
-	ns := newNamespace("ns-y")
+	tplContext := map[string]string{
+		"tenant.name": "tenant-x",
+		"namespace":   "ns-y",
+	}
 
-	got := tpl.TemplateForTenantAndNamespace("N={{namespace}}", tnt, ns)
+	got := tpl.TemplateForTenantAndNamespace("N={{namespace}}", tplContext)
 	want := "N=ns-y"
 
 	if got != want {
@@ -119,11 +89,13 @@ func TestTemplateForTenantAndNamespace_OnlyNamespace(t *testing.T) {
 }
 
 func TestTemplateForTenantAndNamespace_NoDelimiters_ReturnsInput(t *testing.T) {
-	tnt := newTenant("tenant-a")
-	ns := newNamespace("ns-1")
+	tplContext := map[string]string{
+		"tenant.name": "tenant-a",
+		"namespace":   "ns-1",
+	}
 
 	in := "plain-value-without-templates"
-	got := tpl.TemplateForTenantAndNamespace(in, tnt, ns)
+	got := tpl.TemplateForTenantAndNamespace(in, tplContext)
 
 	if got != in {
 		t.Fatalf("expected %q, got %q", in, got)
@@ -131,10 +103,12 @@ func TestTemplateForTenantAndNamespace_NoDelimiters_ReturnsInput(t *testing.T) {
 }
 
 func TestTemplateForTenantAndNamespace_UnknownKeyBecomesEmpty(t *testing.T) {
-	tnt := newTenant("tenant-a")
-	ns := newNamespace("ns-1")
+	tplContext := map[string]string{
+		"tenant.name": "tenant-a",
+		"namespace":   "ns-1",
+	}
 
-	got := tpl.TemplateForTenantAndNamespace("X={{unknown.key}}", tnt, ns)
+	got := tpl.TemplateForTenantAndNamespace("X={{unknown.key}}", tplContext)
 	want := "X="
 
 	if got != want {
@@ -143,15 +117,17 @@ func TestTemplateForTenantAndNamespace_UnknownKeyBecomesEmpty(t *testing.T) {
 }
 
 func TestTemplateForTenantAndNamespaceMap_ReplacesPlaceholders(t *testing.T) {
-	tnt := newTenant("tenant-a")
-	ns := newNamespace("ns-1")
+	tplContext := map[string]string{
+		"tenant.name": "tenant-a",
+		"namespace":   "ns-1",
+	}
 
 	orig := map[string]string{
 		"key1": "tenant={{tenant.name}}, ns={{namespace}}",
 		"key2": "plain-value",
 	}
 
-	out := tpl.TemplateForTenantAndNamespaceMap(orig, tnt, ns)
+	out := tpl.TemplateForTenantAndNamespaceMap(orig, tplContext)
 
 	// output is templated
 	if got := out["key1"]; got != "tenant=tenant-a, ns=ns-1" {
@@ -168,15 +144,17 @@ func TestTemplateForTenantAndNamespaceMap_ReplacesPlaceholders(t *testing.T) {
 }
 
 func TestTemplateForTenantAndNamespaceMap_ReplacesPlaceholdersSpaces(t *testing.T) {
-	tnt := newTenant("tenant-a")
-	ns := newNamespace("ns-1")
+	tplContext := map[string]string{
+		"tenant.name": "tenant-a",
+		"namespace":   "ns-1",
+	}
 
 	orig := map[string]string{
 		"key1": "tenant={{ tenant.name }}, ns={{ namespace }}",
 		"key2": "plain-value",
 	}
 
-	out := tpl.TemplateForTenantAndNamespaceMap(orig, tnt, ns)
+	out := tpl.TemplateForTenantAndNamespaceMap(orig, tplContext)
 
 	if got := out["key1"]; got != "tenant=tenant-a, ns=ns-1" {
 		t.Fatalf("key1: expected %q, got %q", "tenant=tenant-a, ns=ns-1", got)
@@ -192,8 +170,10 @@ func TestTemplateForTenantAndNamespaceMap_ReplacesPlaceholdersSpaces(t *testing.
 }
 
 func TestTemplateForTenantAndNamespaceMap_TransformsValuesWithDelimiters(t *testing.T) {
-	tnt := newTenant("tenant-a")
-	ns := newNamespace("ns-1")
+	tplContext := map[string]string{
+		"tenant.name": "tenant-a",
+		"namespace":   "ns-1",
+	}
 
 	orig := map[string]string{
 		"t1": "hello {{tenant.name}}",
@@ -201,7 +181,7 @@ func TestTemplateForTenantAndNamespaceMap_TransformsValuesWithDelimiters(t *test
 		"t3": "static",
 	}
 
-	out := tpl.TemplateForTenantAndNamespaceMap(orig, tnt, ns)
+	out := tpl.TemplateForTenantAndNamespaceMap(orig, tplContext)
 
 	if got := out["t1"]; got != "hello tenant-a" {
 		t.Fatalf("t1: expected %q, got %q", "hello tenant-a", got)
@@ -215,8 +195,10 @@ func TestTemplateForTenantAndNamespaceMap_TransformsValuesWithDelimiters(t *test
 }
 
 func TestTemplateForTenantAndNamespaceMap_MixedKeys(t *testing.T) {
-	tnt := newTenant("tenant-x")
-	ns := newNamespace("ns-x")
+	tplContext := map[string]string{
+		"tenant.name": "tenant-x",
+		"namespace":   "ns-x",
+	}
 
 	orig := map[string]string{
 		"onlyTenant": "T={{ tenant.name }}",
@@ -224,7 +206,7 @@ func TestTemplateForTenantAndNamespaceMap_MixedKeys(t *testing.T) {
 		"none":       "static",
 	}
 
-	out := tpl.TemplateForTenantAndNamespaceMap(orig, tnt, ns)
+	out := tpl.TemplateForTenantAndNamespaceMap(orig, tplContext)
 
 	if got := out["onlyTenant"]; got != "T=tenant-x" {
 		t.Fatalf("onlyTenant: expected %q, got %q", "T=tenant-x", got)
@@ -238,18 +220,16 @@ func TestTemplateForTenantAndNamespaceMap_MixedKeys(t *testing.T) {
 }
 
 func TestTemplateForTenantAndNamespaceMap_UnknownKeyBecomesEmpty(t *testing.T) {
-	tnt := newTenant("tenant-a")
-	ns := newNamespace("ns-1")
+	tplContext := map[string]string{
+		"tenant.name": "tenant-a",
+		"namespace":   "ns-1",
+	}
 
 	orig := map[string]string{
 		"unknown": "X={{ unknown.key }}",
 	}
 
-<<<<<<< HEAD:pkg/utils/tenant/fast_template_test.go
-	tenant.TemplateForTenantAndNamespace(m, tnt, ns)
-=======
-	out := tpl.TemplateForTenantAndNamespaceMap(orig, tnt, ns)
->>>>>>> 7efaa9eb460450f9c60905f0eacf4bfe42a9d470:pkg/template/fast_test.go
+	out := tpl.TemplateForTenantAndNamespaceMap(orig, tplContext)
 
 	if got := out["unknown"]; got != "X=" {
 		t.Fatalf("unknown: expected %q, got %q", "X=", got)
@@ -257,11 +237,13 @@ func TestTemplateForTenantAndNamespaceMap_UnknownKeyBecomesEmpty(t *testing.T) {
 }
 
 func TestTemplateForTenantAndNamespaceMap_EmptyOrNilInput(t *testing.T) {
-	tnt := newTenant("tenant-a")
-	ns := newNamespace("ns-1")
+	tplContext := map[string]string{
+		"tenant.name": "tenant-a",
+		"namespace":   "ns-1",
+	}
 
 	// nil map
-	outNil := tpl.TemplateForTenantAndNamespaceMap(nil, tnt, ns)
+	outNil := tpl.TemplateForTenantAndNamespaceMap(nil, tplContext)
 	if outNil == nil {
 		t.Fatalf("expected non-nil map for nil input")
 	}
@@ -270,7 +252,7 @@ func TestTemplateForTenantAndNamespaceMap_EmptyOrNilInput(t *testing.T) {
 	}
 
 	// empty map
-	outEmpty := tpl.TemplateForTenantAndNamespaceMap(map[string]string{}, tnt, ns)
+	outEmpty := tpl.TemplateForTenantAndNamespaceMap(map[string]string{}, tplContext)
 	if outEmpty == nil || len(outEmpty) != 0 {
 		t.Fatalf("expected empty map, got %v", outEmpty)
 	}
@@ -279,8 +261,10 @@ func TestTemplateForTenantAndNamespaceMap_EmptyOrNilInput(t *testing.T) {
 // Concurrency test: should never panic with "concurrent map writes"
 // Run with: go test -race ./...
 func TestTemplateForTenantAndNamespaceMap_Concurrency(t *testing.T) {
-	tnt := newTenant("tenant-a")
-	ns := newNamespace("ns-1")
+	tplContext := map[string]string{
+		"tenant.name": "tenant-a",
+		"namespace":   "ns-1",
+	}
 
 	// Shared input map across goroutines (this used to be unsafe if the function mutated in-place)
 	shared := map[string]string{
@@ -299,7 +283,7 @@ func TestTemplateForTenantAndNamespaceMap_Concurrency(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			for j := 0; j < iterations; j++ {
-				out := tpl.TemplateForTenantAndNamespaceMap(shared, tnt, ns)
+				out := tpl.TemplateForTenantAndNamespaceMap(shared, tplContext)
 
 				// sanity checks
 				if out["k1"] != "tenant=tenant-a" {

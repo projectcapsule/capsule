@@ -7,9 +7,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"strconv"
 
-	"github.com/valyala/fasttemplate"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -17,10 +17,13 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
+	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api/misc"
 	tpl "github.com/projectcapsule/capsule/pkg/template"
+	"github.com/projectcapsule/capsule/pkg/utils/tenant"
 )
 
 func (r *Processor) handleResources(
@@ -50,10 +53,20 @@ func (r *Processor) collectResources(
 	tmplContext tpl.ReferenceContext,
 	acc Accumulator,
 ) (err error) {
+	log := ctrllog.FromContext(ctx)
+
 	var syncErr error
+
+	fastContext := tenant.ContextForTenantAndNamespace(&tnt, ns)
+
+	labels, annotations := r.gatherAdditionalMetadata(spec, fastContext)
+
+	log.V(5).Info("using additional metadata", "labels", labels, "annotations", annotations)
 
 	// Run Items
 	for nsIndex, item := range spec.NamespacedItems {
+		log.V(5).Info("processing namespaced item", "index", nsIndex)
+
 		p, rawError := r.handleNamespacedItem(ctx, c, nsIndex, item, ns, tnt)
 		if rawError != nil {
 			syncErr = errors.Join(syncErr, rawError)
@@ -61,8 +74,10 @@ func (r *Processor) collectResources(
 			continue
 		}
 
+		log.V(5).Info("loaded resources", "amount", len(p))
+
 		for i, o := range p {
-			rawError = r.addToAccumulation(tnt, spec, acc, &o, resourceIndex+"/gen-"+strconv.Itoa(nsIndex)+"-"+strconv.Itoa(i))
+			rawError = r.addToAccumulation(tnt, spec, acc, &o, resourceIndex+"/gen-"+strconv.Itoa(nsIndex)+"-"+strconv.Itoa(i), labels, annotations)
 			if rawError != nil {
 				syncErr = errors.Join(syncErr, rawError)
 
@@ -73,14 +88,18 @@ func (r *Processor) collectResources(
 
 	// Run Raw Items
 	for rawIndex, item := range spec.RawItems {
-		p, rawError := r.handleRawItem(ctx, c, rawIndex, item, ns, tnt)
+		log.V(5).Info("processing raw item", "index", rawIndex)
+
+		p, rawError := r.handleRawItem(ctx, c, item, ns, fastContext)
 		if rawError != nil {
 			syncErr = errors.Join(syncErr, rawError)
 
 			continue
 		}
 
-		rawError = r.addToAccumulation(tnt, spec, acc, p, resourceIndex+"/raw-"+strconv.Itoa(rawIndex))
+		log.V(7).Info("evaluated raw item", "object", p)
+
+		rawError = r.addToAccumulation(tnt, spec, acc, p, resourceIndex+"/raw-"+strconv.Itoa(rawIndex), labels, annotations)
 		if rawError != nil {
 			syncErr = errors.Join(syncErr, rawError)
 
@@ -90,6 +109,8 @@ func (r *Processor) collectResources(
 
 	// Run Generators
 	for generatorIndex, item := range spec.Templates {
+		log.V(5).Info("processing generator item", "index", generatorIndex)
+
 		p, genError := r.handleGeneratorItem(ctx, c, generatorIndex, item, ns, tmplContext)
 		if genError != nil {
 			syncErr = errors.Join(syncErr, genError)
@@ -97,8 +118,11 @@ func (r *Processor) collectResources(
 			continue
 		}
 
+		log.V(5).Info("loaded resources", "amount", len(p))
+
 		for i, o := range p {
-			genError = r.addToAccumulation(tnt, spec, acc, o, resourceIndex+"/gen-"+strconv.Itoa(generatorIndex)+"-"+strconv.Itoa(i))
+
+			genError = r.addToAccumulation(tnt, spec, acc, o, resourceIndex+"/gen-"+strconv.Itoa(generatorIndex)+"-"+strconv.Itoa(i), labels, annotations)
 			if genError != nil {
 				syncErr = errors.Join(syncErr, genError)
 
@@ -118,8 +142,11 @@ func (r *Processor) addToAccumulation(
 	acc Accumulator,
 	obj *unstructured.Unstructured,
 	index string,
+	labels map[string]string,
+	annotations map[string]string,
+
 ) (err error) {
-	r.handleResource(spec, obj)
+	r.copyAdditionalMetadata(obj, labels, annotations)
 
 	key := capsulev1beta2.ResourceIDWithOptions{
 		ResourceID:           misc.NewResourceID(obj, tnt.GetName(), index),
@@ -199,27 +226,19 @@ func (r *Processor) handleGeneratorItem(
 func (r *Processor) handleRawItem(
 	ctx context.Context,
 	c client.Client,
-	index int,
 	item capsulev1beta2.RawExtension,
 	ns *corev1.Namespace,
-	tnt capsulev1beta2.Tenant,
+	fastContext map[string]string,
 ) (processed *unstructured.Unstructured, err error) {
-	template := string(item.Raw)
+	tmplString := tpl.TemplateForTenantAndNamespace(string(item.Raw), fastContext)
 
-	t := fasttemplate.New(template, "{{ ", " }}")
+	log := log.FromContext(ctx)
 
-	tContext := map[string]interface{}{
-		"tenant.name": tnt.Name,
-	}
-	if ns != nil {
-		tContext["namespace"] = ns.Name
-	}
-
-	tmplString := t.ExecuteString(tContext)
+	log.Info("TEMP", "template", tmplString)
 
 	obj := &unstructured.Unstructured{}
-	if _, _, decodeErr := r.factory.UniversalDeserializer().Decode([]byte(tmplString), nil, obj); decodeErr != nil {
-		return nil, fmt.Errorf("error rendering raw: %w", err, "hello")
+	if _, _, err := unstructured.UnstructuredJSONScheme.Decode([]byte(tmplString), nil, obj); err != nil {
+		return nil, fmt.Errorf("decode unstructured: %w", err)
 	}
 
 	if ns != nil {
@@ -229,12 +248,59 @@ func (r *Processor) handleRawItem(
 	return obj, nil
 }
 
-func (r *Processor) handleResource(
+// Allows templating in
+func (r *Processor) gatherAdditionalMetadata(
 	spec capsulev1beta2.ResourceSpec,
-	obj *unstructured.Unstructured,
-) {
-	if spec.AdditionalMetadata != nil {
-		obj.SetAnnotations(spec.AdditionalMetadata.Annotations)
-		obj.SetLabels(spec.AdditionalMetadata.Labels)
+	fastContext map[string]string,
+) (labels map[string]string, annotations map[string]string) {
+	labels = make(map[string]string)
+	annotations = make(map[string]string)
+
+	md := spec.AdditionalMetadata
+	if md == nil {
+		return labels, annotations
 	}
+
+	if md.Labels != nil {
+		labels = tpl.TemplateForTenantAndNamespaceMap(maps.Clone(md.Labels), fastContext)
+	}
+
+	if md.Annotations != nil {
+		annotations = tpl.TemplateForTenantAndNamespaceMap(maps.Clone(md.Annotations), fastContext)
+	}
+
+	return labels, annotations
+}
+
+func (r *Processor) copyAdditionalMetadata(
+	obj *unstructured.Unstructured,
+	labels map[string]string,
+	annotations map[string]string,
+) {
+	if obj == nil {
+		return
+	}
+
+	if len(labels) > 0 {
+		dst := obj.GetLabels()
+		if dst == nil {
+			dst = make(map[string]string, len(labels))
+		}
+
+		maps.Copy(dst, labels)
+
+		obj.SetLabels(dst)
+	}
+
+	if len(annotations) > 0 {
+		dst := obj.GetAnnotations()
+		if dst == nil {
+			dst = make(map[string]string, len(annotations))
+		}
+
+		maps.Copy(dst, annotations)
+
+		obj.SetAnnotations(dst)
+	}
+
 }

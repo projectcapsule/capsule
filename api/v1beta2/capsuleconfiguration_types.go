@@ -21,7 +21,6 @@ type CapsuleConfigurationSpec struct {
 	// Deprecated: use users property instead (https://projectcapsule.dev/docs/operating/setup/configuration/#users)
 	//
 	// Names of the groups considered as Capsule users.
-	// +kubebuilder:default={capsule.clastix.io}
 	UserGroups []string `json:"userGroups,omitempty"`
 	// Define groups which when found in the request of a user will be ignored by the Capsule
 	// this might be useful if you have one group where all the users are in, but you want to separate administrators from normal users with additional groups.
@@ -81,6 +80,7 @@ type CapsuleResources struct {
 }
 
 // +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
 // +kubebuilder:resource:scope=Cluster
 // +kubebuilder:storageversion
 
@@ -92,6 +92,9 @@ type CapsuleConfiguration struct {
 	metav1.ObjectMeta `json:"metadata,omitzero"`
 
 	Spec CapsuleConfigurationSpec `json:"spec"`
+
+	// +optional
+	Status CapsuleConfigurationStatus `json:"status,omitzero"`
 }
 
 // +kubebuilder:object:root=true

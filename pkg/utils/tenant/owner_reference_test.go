@@ -9,11 +9,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-<<<<<<< HEAD
-	"github.com/projectcapsule/capsule/pkg/utils/tenant"
-=======
 	tenant "github.com/projectcapsule/capsule/pkg/utils/tenant"
->>>>>>> 7efaa9eb460450f9c60905f0eacf4bfe42a9d470
 )
 
 func TestIsTenantOwnerReference(t *testing.T) {

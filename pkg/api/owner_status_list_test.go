@@ -132,7 +132,7 @@ func TestUpsert_DeduplicatesClusterRoles(t *testing.T) {
 	}
 	got := list[0]
 
-	expected := []string{"admin", "viewer", "editor"}
+	expected := []string{"admin", "editor", "viewer"}
 	if !reflect.DeepEqual(got.ClusterRoles, expected) {
 		t.Fatalf("expected roles %v, got %v", expected, got.ClusterRoles)
 	}

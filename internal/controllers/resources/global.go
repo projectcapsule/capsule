@@ -33,6 +33,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/configuration"
+	"github.com/projectcapsule/capsule/pkg/template"
 	"github.com/projectcapsule/capsule/pkg/utils/users"
 )
 
@@ -187,6 +188,9 @@ func (r *globalResourceController) reconcileNormal(
 
 		return reconcile.Result{}, err
 	}
+
+	log.Info("FOUND TNTS", "SIZE", len(tntList.Items))
+
 	// This is the list of newer Tenants that are matching the provided GlobalTenantResource Selector:
 	// upon replication and pruning, this will be updated in the status of the resource.
 	tntSet := sets.NewString()
@@ -196,35 +200,49 @@ func (r *globalResourceController) reconcileNormal(
 	//processedItems := sets.NewString()
 
 	// Always post the processed items, as they allow users to track errors
-	//defer func() {
-	//	tntResource.Status.ProcessedItems = make([]capsulev1beta2.ObjectReferenceStatus, 0, len(processedItems))
-	//
-	//	for _, item := range processedItems.List() {
-	//		log.Info("PROCESSED", "ITEM", item)
-	//
-	//		or := capsulev1beta2.ObjectReferenceStatus{}
-	//		if parseErr := or.ParseFromString(item); parseErr == nil {
-	//			tntResource.Status.ProcessedItems.UpdateItem(or)
-	//		} else {
-	//			err = errors.Join(err, fmt.Errorf("processed item %q parse failed: %w", item, parseErr))
-	//		}
-	//
-	//		log.Info("PARSED", "OR", or)
-	//	}
-	//
-	//	log.Info("STATUS", "STATUS", tntResource.Status)
-	//
-	//}()
+	defer func() {
+		tntResource.AssignTenants(tntList.Items)
+
+		log.Info("FOUND STATUS", "SIZE", tntResource.Status.SelectedTenants)
+
+		//	tntResource.Status.ProcessedItems = make([]capsulev1beta2.ObjectReferenceStatus, 0, len(processedItems))
+		//
+		//	for _, item := range processedItems.List() {
+		//		log.Info("PROCESSED", "ITEM", item)
+		//
+		//		or := capsulev1beta2.ObjectReferenceStatus{}
+		//		if parseErr := or.ParseFromString(item); parseErr == nil {
+		//			tntResource.Status.ProcessedItems.UpdateItem(or)
+		//		} else {
+		//			err = errors.Join(err, fmt.Errorf("processed item %q parse failed: %w", item, parseErr))
+		//		}
+		//
+		//		log.Info("PARSED", "OR", or)
+		//	}
+		//
+		//	log.Info("STATUS", "STATUS", tntResource.Status)
+		//
+	}()
 
 	//status := capsulev1beta2.ProcessedItems{}
 	acc := Accumulator{}
 
 	// Gather Resources
 	for index, resource := range tntResource.Spec.Resources {
+		ilog := log.WithValues("resource", index)
+
 		for _, tnt := range tntList.Items {
+			ilog = log.WithValues("tenant", tnt.GetName())
+
 			var resourceError error
 
-			tplContext, _ := resource.Context.GatherContext(ctx, c, nil, "")
+			tplContext := template.ReferenceContext{}
+
+			if resource.Context != nil {
+				tplContext, _ = resource.Context.GatherContext(ctx, c, nil, "")
+
+			}
+
 			tplContext["Tenant"] = tnt
 
 			switch tntResource.Spec.Scope {
@@ -233,6 +251,8 @@ func (r *globalResourceController) reconcileNormal(
 				//tplContext["Tenant"] = tnt
 
 				//owner := fieldOwner + "/" + tnt.Name + "/"
+
+				ilog.V(5).Info("replicating for each tenant")
 
 				resourceError = r.processor.handleResources(
 					ctx,
@@ -245,7 +265,9 @@ func (r *globalResourceController) reconcileNormal(
 					acc,
 				)
 			default:
-				resourceError = r.processor.foreachTenantNamespace(ctx, c, tnt, resource, strconv.Itoa(index), tplContext, acc)
+				ilog.V(5).Info("replicating for each namespace")
+
+				resourceError = r.processor.foreachTenantNamespace(ctx, ilog, c, tnt, resource, strconv.Itoa(index), tplContext, acc)
 
 			}
 
@@ -255,6 +277,8 @@ func (r *globalResourceController) reconcileNormal(
 			}
 		}
 	}
+
+	log.V(4).Info("accumulation", "items", len(acc))
 
 	// Prune first, to work on a consistent Status
 	for _, p := range tntResource.Status.ProcessedItems {
@@ -301,7 +325,7 @@ func (r *globalResourceController) reconcileNormal(
 			*id.Adopt,
 		)
 		if err != nil {
-			or.Status = metav1.ConditionTrue
+			or.Status = metav1.ConditionFalse
 			or.Message = err.Error()
 		} else {
 			or.Status = metav1.ConditionTrue

@@ -29,34 +29,54 @@ type capsuleConfiguration struct {
 	client      client.Client
 }
 
-func NewCapsuleConfiguration(ctx context.Context, client client.Client, rest *rest.Config, name string) Configuration {
+func DefaultCapsuleConfiguration() capsulev1beta2.CapsuleConfigurationSpec {
+	return capsulev1beta2.CapsuleConfigurationSpec{
+		Users: []capsuleapi.UserSpec{
+			{
+				Name: "projectcapsule.dev",
+				Kind: capsuleapi.GroupOwner,
+			},
+		},
+		ForceTenantPrefix:              false,
+		ProtectedNamespaceRegexpString: "",
+	}
+}
+
+func NewCapsuleConfiguration(ctx context.Context, c client.Client, rest *rest.Config, name string) Configuration {
 	return &capsuleConfiguration{
-		client: client,
+		client: c,
 		rest:   rest,
 		retrievalFn: func() *capsulev1beta2.CapsuleConfiguration {
-			config := &capsulev1beta2.CapsuleConfiguration{}
+			cfg := &capsulev1beta2.CapsuleConfiguration{}
+			key := types.NamespacedName{Name: name}
 
-			if err := client.Get(ctx, types.NamespacedName{Name: name}, config); err != nil {
-				if apierrors.IsNotFound(err) {
-					config = &capsulev1beta2.CapsuleConfiguration{
-						ObjectMeta: metav1.ObjectMeta{
-							Name: name,
-						},
-						Spec: capsulev1beta2.CapsuleConfigurationSpec{
-							Users:                          []capsuleapi.UserSpec{{Name: "projectcapsule.dev", Kind: capsuleapi.GroupOwner}},
-							ForceTenantPrefix:              false,
-							ProtectedNamespaceRegexpString: "",
-						},
-					}
-				}
-
-				panic(errors.Wrap(err, "Cannot retrieve Capsule configuration with name "+name))
-
+			if err := c.Get(ctx, key, cfg); err == nil {
+				return cfg
+			} else if !apierrors.IsNotFound(err) {
+				panic(errors.Wrap(err, "cannot retrieve Capsule configuration with name "+name))
 			}
 
-			return config
-		},
-	}
+			cfg = &capsulev1beta2.CapsuleConfiguration{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: name,
+				},
+				Spec: DefaultCapsuleConfiguration(),
+			}
+
+			if err := c.Create(ctx, cfg); err != nil {
+				if apierrors.IsAlreadyExists(err) {
+					if err := c.Get(ctx, key, cfg); err != nil {
+						panic(errors.Wrap(err, "configuration created concurrently but cannot be retrieved"))
+					}
+
+					return cfg
+				}
+
+				panic(errors.Wrap(err, "cannot create Capsule configuration with name "+name))
+			}
+
+			return cfg
+		}}
 }
 
 func (c *capsuleConfiguration) ProtectedNamespaceRegexp() (*regexp.Regexp, error) {
@@ -109,6 +129,30 @@ func (c *capsuleConfiguration) UserGroups() []string {
 //nolint:staticcheck
 func (c *capsuleConfiguration) UserNames() []string {
 	return append(c.retrievalFn().Spec.UserNames, c.retrievalFn().Spec.Users.GetByKinds([]capsuleapi.OwnerKind{capsuleapi.UserOwner, capsuleapi.ServiceAccountOwner})...)
+}
+
+func (c *capsuleConfiguration) Users() capsuleapi.UserListSpec {
+	out := capsuleapi.UserListSpec{}
+
+	for _, user := range c.UserNames() {
+		out.Upsert(capsuleapi.UserSpec{
+			Kind: capsuleapi.UserOwner,
+			Name: user,
+		})
+	}
+
+	for _, group := range c.UserGroups() {
+		out.Upsert(capsuleapi.UserSpec{
+			Kind: capsuleapi.GroupOwner,
+			Name: group,
+		})
+	}
+
+	return out
+}
+
+func (c *capsuleConfiguration) GetUsersByStatus() capsuleapi.UserListSpec {
+	return c.retrievalFn().Status.Users
 }
 
 func (c *capsuleConfiguration) IgnoreUserWithGroups() []string {

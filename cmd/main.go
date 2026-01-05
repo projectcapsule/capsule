@@ -379,7 +379,9 @@ func main() {
 	}
 
 	if err = (&configcontroller.Manager{
-		Log: ctrl.Log.WithName("controllers").WithName("CapsuleConfiguration"),
+		Log:    ctrl.Log.WithName("controllers").WithName("CapsuleConfiguration"),
+		Client: manager.GetClient(),
+		Rest:   manager.GetConfig(),
 	}).SetupWithManager(manager, controllerConfig); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "CapsuleConfiguration")
 		os.Exit(1)

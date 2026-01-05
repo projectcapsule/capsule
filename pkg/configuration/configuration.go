@@ -29,6 +29,8 @@ type Configuration interface {
 	TenantCRDName() string
 	UserNames() []string
 	UserGroups() []string
+	Users() capsuleapi.UserListSpec
+	GetUsersByStatus() capsuleapi.UserListSpec
 	IgnoreUserWithGroups() []string
 	ForbiddenUserNodeLabels() *capsuleapi.ForbiddenListSpec
 	ForbiddenUserNodeAnnotations() *capsuleapi.ForbiddenListSpec
