@@ -10,4 +10,10 @@ import (
 )
 
 // Keeps track of generated items
-type Accumulator = map[capsulev1beta2.ResourceIDWithOptions]*unstructured.Unstructured
+type Accumulator = map[string]*AccumulatorItem
+
+// Keeps track of generated items
+type AccumulatorItem struct {
+	Options capsulev1beta2.ResourceIDWithOptions
+	Object  *unstructured.Unstructured
+}

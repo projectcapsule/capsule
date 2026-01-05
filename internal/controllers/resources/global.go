@@ -237,10 +237,8 @@ func (r *globalResourceController) reconcileNormal(
 			var resourceError error
 
 			tplContext := template.ReferenceContext{}
-
 			if resource.Context != nil {
 				tplContext, _ = resource.Context.GatherContext(ctx, c, nil, "")
-
 			}
 
 			tplContext["Tenant"] = tnt
@@ -278,11 +276,16 @@ func (r *globalResourceController) reconcileNormal(
 		}
 	}
 
-	log.V(4).Info("accumulation", "items", len(acc))
+	log.V(4).Info("accumulation", "items", len(acc), "accumnulator", acc)
+
+	log.V(4).Info("starting pruning items", "present", len(tntResource.Status.ProcessedItems))
 
 	// Prune first, to work on a consistent Status
 	for _, p := range tntResource.Status.ProcessedItems {
-		if _, exists := acc[p.ResourceIDWithOptions]; !exists {
+		if _, exists := acc[p.GetKey()]; !exists {
+
+			log.V(4).Info("pruning resources", "Kind", p.Kind, "Name", p.Name, "Namespace", p.Namespace)
+
 			obj := &unstructured.Unstructured{}
 			obj.SetGroupVersionKind(p.GetGVK())
 			obj.SetNamespace(p.GetNamespace())
@@ -306,9 +309,9 @@ func (r *globalResourceController) reconcileNormal(
 	log.Info("accumulation", "items", len(acc))
 
 	// Apply
-	for id, obj := range acc {
+	for _, item := range acc {
 		or := capsulev1beta2.ObjectReferenceStatus{
-			ResourceIDWithOptions: id,
+			ResourceIDWithOptions: item.Options,
 			ObjectReferenceStatusCondition: capsulev1beta2.ObjectReferenceStatusCondition{
 				Type: meta.ReadyCondition,
 			},
@@ -319,14 +322,14 @@ func (r *globalResourceController) reconcileNormal(
 		err := r.processor.Apply(
 			ctx,
 			c,
-			obj,
-			getFieldOwner(tntResource.GetName(), "", id.ResourceID),
-			*id.Force,
-			*id.Adopt,
+			item.Object,
+			getFieldOwner(tntResource.GetName(), "", item.Options.ResourceID),
+			*item.Options.Force,
+			*item.Options.Adopt,
 		)
 		if err != nil {
 			or.Status = metav1.ConditionFalse
-			or.Message = err.Error()
+			or.Message = fmt.Errorf("pruning failed", err)
 		} else {
 			or.Status = metav1.ConditionTrue
 		}

@@ -50,7 +50,8 @@ type GlobalTenantResource struct {
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitzero"`
 
-	Spec GlobalTenantResourceSpec `json:"spec"`
+	// +optional
+	Spec GlobalTenantResourceSpec `json:"spec,omitempty"`
 
 	// +optional
 	Status GlobalTenantResourceStatus `json:"status,omitzero"`

@@ -21,10 +21,18 @@ import (
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/api/misc"
 	tpl "github.com/projectcapsule/capsule/pkg/template"
 	"github.com/projectcapsule/capsule/pkg/utils/tenant"
 )
+
+var reservedLabelSet = map[string]struct{}{
+	meta.ResourcesLabel:           {},
+	meta.CreatedByCapsuleLabel:    {},
+	meta.ManagedByCapsuleLabel:    {},
+	meta.NewManagedByCapsuleLabel: {},
+}
 
 func (r *Processor) handleResources(
 	ctx context.Context,
@@ -146,14 +154,17 @@ func (r *Processor) addToAccumulation(
 	annotations map[string]string,
 
 ) (err error) {
-	r.copyAdditionalMetadata(obj, labels, annotations)
+	r.handleMetadata(obj, labels, annotations)
 
-	key := capsulev1beta2.ResourceIDWithOptions{
-		ResourceID:           misc.NewResourceID(obj, tnt.GetName(), index),
-		ResourceSpecSettings: &spec.ResourceSpecSettings,
+	resource := misc.NewResourceID(obj, tnt.GetName(), index)
+
+	acc[resource.GetKey()] = &AccumulatorItem{
+		Object: obj,
+		Options: capsulev1beta2.ResourceIDWithOptions{
+			ResourceID:           resource,
+			ResourceSpecSettings: &spec.ResourceSpecSettings,
+		},
 	}
-
-	acc[key] = obj
 
 	return nil
 }
@@ -272,7 +283,7 @@ func (r *Processor) gatherAdditionalMetadata(
 	return labels, annotations
 }
 
-func (r *Processor) copyAdditionalMetadata(
+func (r *Processor) handleMetadata(
 	obj *unstructured.Unstructured,
 	labels map[string]string,
 	annotations map[string]string,
@@ -288,8 +299,9 @@ func (r *Processor) copyAdditionalMetadata(
 		}
 
 		maps.Copy(dst, labels)
-
 		obj.SetLabels(dst)
+
+		meta.SetFilteredLabels(obj, reservedLabelSet)
 	}
 
 	if len(annotations) > 0 {
@@ -302,5 +314,4 @@ func (r *Processor) copyAdditionalMetadata(
 
 		obj.SetAnnotations(dst)
 	}
-
 }

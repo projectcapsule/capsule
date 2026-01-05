@@ -31,7 +31,6 @@ spec:
             annotations:
               kubernetes.io/enforce-mountable-secrets: "true"
             name: gitops-reconciler
-
         #- apiVersion: capsule.clastix.io/v1beta2
         #  kind: TenantOwner
         #  metadata:

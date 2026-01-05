@@ -84,12 +84,16 @@ func (r ResourceID) GetIndex() string {
 	return i
 }
 
-// Key returns the string key form again (inverse of ParseResourceKey).
 func (r ResourceID) GetKey() string {
-	ns := r.Namespace
-	if ns == "" {
-		ns = "_"
-	}
-	return fmt.Sprintf("%s/%s/%s/%s/%s",
-		r.Group, r.Version, r.Kind, ns, r.Name)
+	// Use a delimiter that won’t appear in fields normally; '\x1f' (unit separator) is great.
+	sep := "\x1f"
+	return fmt.Sprintf("%s%s%s%s%s%s%s%s%s%s%s%s%s",
+		r.Group, sep,
+		r.Version, sep,
+		r.Kind, sep,
+		r.Namespace, sep,
+		r.Name, sep,
+		r.Tenant, sep,
+		r.Index,
+	)
 }

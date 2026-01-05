@@ -5,11 +5,8 @@ package resources
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"strings"
 
-	ssa "github.com/fluxcd/pkg/ssa"
 	"github.com/go-logr/logr"
 
 	corev1 "k8s.io/api/core/v1"
@@ -19,12 +16,12 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/selection"
-	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
+	clt "github.com/projectcapsule/capsule/pkg/client"
 	"github.com/projectcapsule/capsule/pkg/configuration"
 	tpl "github.com/projectcapsule/capsule/pkg/template"
 	"github.com/projectcapsule/capsule/pkg/utils"
@@ -341,118 +338,72 @@ func (r *Processor) Apply(
 
 	// We need to mark an item if we create it with our patch to make proper Garbage Collection
 	// If it does not yet exist mark it
-	_, _, err = r.isAdoptable(ctx, c, obj)
+	patches, adoptable, err := r.handleControllerMetadata(ctx, c, obj)
 	if err != nil {
 		return fmt.Errorf("resource adoption failed", err)
 	}
 
-	//if !present {
-	//	return nil
-	//}
-	//
-	//if !adopt && !adoptable {
-	//	return fmt.Errorf("resource exists and can not be adopted")
-	//}
-
-	b, err := obj.MarshalJSON()
-	if err != nil {
-		return fmt.Errorf("marshal obj: %w", err)
+	if !adoptable {
+		return fmt.Errorf("resource exists and can not be adopted")
 	}
-	log.Info("OBJ_JSON", "obj", string(b))
 
-	return utils.CreateOrPatch(
+	err = utils.CreateOrPatch(
 		ctx,
 		c,
 		obj,
 		fieldOwner,
 		force,
 	)
+	if err != nil {
+		return fmt.Errorf("applying object failed: %w", err)
+	}
 
-	// Handle Adoption
+	log.V(4).Info("applying patches", "items", len(patches))
+
+	if len(patches) == 0 {
+		return
+	}
+
+	return clt.ApplyPatches(ctx, c, obj, patches, fieldOwner)
 }
 
-func (r *Processor) isAdoptable(
+func (r *Processor) handleControllerMetadata(
 	ctx context.Context,
 	c client.Client,
 	obj *unstructured.Unstructured,
-) (present bool, adoptable bool, err error) {
+) (patches []clt.JSONPatch, adoptable bool, err error) {
 	adoptable = false
-	present = true
 
 	existingObject := obj.DeepCopy()
 
 	err = c.Get(ctx, client.ObjectKeyFromObject(existingObject), existingObject)
 	switch {
 	case apierrors.IsNotFound(err):
-		present = false
+		patches = append(patches, clt.AddLabelsPatch(existingObject, map[string]string{
+			meta.CreatedByCapsuleLabel: "controller",
+		})...)
+
+		return patches, true, nil
 	case err != nil:
-		return
+		return patches, false, err
 	default:
 		labels := existingObject.GetLabels()
 
 		if _, ok := labels[meta.ResourceCapsuleLabel]; ok {
 			adoptable = true
 
-			return
+			patches = append(patches, clt.PatchRemoveLabels(existingObject, []string{
+				meta.ResourceCapsuleLabel,
+			})...,
+			)
+
+			if v, ok := labels[meta.CreatedByCapsuleLabel]; !ok || v != "controller" {
+				patches = append(patches, clt.AddLabelsPatch(existingObject, map[string]string{
+					meta.CreatedByCapsuleLabel: "controller",
+				})...)
+			}
 		}
 	}
 
-	if !adoptable {
-		return
-	}
-
-	return
-
-	//patch := []map[string]any{
-	//	{
-	//		"op":    "add",
-	//		"path":  "/metadata/labels/capsule.clastix.io~1created-by",
-	//		"value": "controller",
-	//	},
-	//}
-	//
-	//rawPatch, err := json.Marshal(patch)
-	//if err != nil {
-	//	return false, false, err
-	//}
-	//
-	//return false, true, c.Patch(ctx, existingObject, client.RawPatch(types.JSONPatchType, rawPatch))
-}
-
-func (r *Processor) handlePatching(
-	ctx context.Context,
-	c client.Client,
-	obj *unstructured.Unstructured,
-	manager string,
-) (err error) {
-	existingObject := obj.DeepCopy()
-	var patches []ssa.JSONPatch
-
-	if len(patches) == 0 {
-		return nil
-	}
-
-	rawPatch, err := json.Marshal(patches)
-	if err != nil {
-		return err
-	}
-
-	patch := client.RawPatch(types.JSONPatchType, rawPatch)
-
-	return c.Patch(ctx, existingObject, patch, client.FieldOwner(manager))
-}
-
-func patchAddLabels(object *unstructured.Unstructured, keys []string) []ssa.JSONPatch {
-	var patches []ssa.JSONPatch
-	labels := object.GetLabels()
-	for _, key := range keys {
-		if _, ok := labels[key]; ok {
-			path := fmt.Sprintf("/metadata/labels/%s", strings.ReplaceAll(key, "/", "~1"))
-			patches = append(patches, ssa.JSONPatch{
-				Operation: "replace",
-				Path:      path,
-			})
-		}
-	}
-	return patches
+	return patches, adoptable, err
 }
