@@ -10,6 +10,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/api/misc"
 )
 
@@ -98,9 +99,16 @@ type Permissions struct {
 func (p *Permissions) ListMatchingOwners(
 	ctx context.Context,
 	c client.Client,
+	tnt string,
 	opts ...client.ListOption,
 ) ([]*TenantOwner, error) {
-	return misc.ListBySelectors[*TenantOwner](ctx, c, &TenantOwnerList{}, p.MatchOwners)
+	defaultSelector := &metav1.LabelSelector{
+		MatchLabels: map[string]string{
+			meta.NewTenantLabel: tnt,
+		},
+	}
+
+	return misc.ListBySelectors[*TenantOwner](ctx, c, &TenantOwnerList{}, append(p.MatchOwners, defaultSelector))
 }
 
 // +kubebuilder:object:root=true

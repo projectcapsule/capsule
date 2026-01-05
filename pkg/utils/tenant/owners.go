@@ -10,7 +10,7 @@ import (
 )
 
 func GetOwnersWithKinds(tenant *capsulev1beta2.Tenant) (owners []string) {
-	for _, owner := range tenant.Spec.Owners {
+	for _, owner := range tenant.Status.Owners {
 		owners = append(owners, fmt.Sprintf("%s:%s", owner.Kind.String(), owner.Name))
 	}
 
