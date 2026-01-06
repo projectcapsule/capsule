@@ -10,22 +10,12 @@ spec:
   rules:
     # Matches all Namespaces
     - enforce:
-        # Here would come most ot the core spec (all class rules, serviceOpts)
+        # Here would come most ot the core spec (all class rules,)
         registries:
         -  endpoint: "harbor/v2/customer-registry/*"
            pullPolicy: [ "ifNotPresent" ]
-           validation:
-              - Images
-              - Volumes
-      permissions:
-          additionalRoleBindings:
-  - clusterRoleName: 'view'
-    subjects:
-    - apiGroup: rbac.authorization.k8s.io
-      kind: User
-      name: alice
-
-
+           pods: true
+           volumes: true
 
     # Select a subset of namespaces to apply metadata on
     - namespaceSelector:
@@ -37,9 +27,8 @@ spec:
         registries:
          -  endpoint: "harbor/v2/prod-registry/*"
             pullPolicy: [ "ifNotPresent" ]
-            validation:
-               - Images
-               - Volumes
+            pods: true
+            volumes: true
 
 
 ---
