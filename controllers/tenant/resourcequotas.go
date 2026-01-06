@@ -65,7 +65,7 @@ func (r *Manager) syncResourceQuotas(ctx context.Context, tenant *capsulev1beta2
 		group := new(errgroup.Group)
 
 		for i, q := range tenant.Spec.ResourceQuota.Items {
-			index, resourceQuota := i, q
+			index, resourceQuota := i, q.DeepCopy()
 
 			toKeep := sets.New[corev1.ResourceName]()
 			for k := range resourceQuota.Hard {
@@ -288,16 +288,16 @@ func (r *Manager) resourceQuotasUpdate(ctx context.Context, resourceName corev1.
 	}
 
 	for _, item := range list {
-		rq := item
+		rq := item.DeepCopy()
 
 		group.Go(func() (err error) {
-			found := &corev1.ResourceQuota{}
-			if err = r.Get(ctx, types.NamespacedName{Namespace: rq.Namespace, Name: rq.Name}, found); err != nil {
-				return err
-			}
-
 			return retry.RetryOnConflict(retry.DefaultBackoff, func() (retryErr error) {
-				_, retryErr = controllerutil.CreateOrUpdate(ctx, r.Client, found, func() error {
+				var found corev1.ResourceQuota
+				if err = r.Get(ctx, types.NamespacedName{Namespace: rq.Namespace, Name: rq.Name}, &found); err != nil {
+					return err
+				}
+
+				_, retryErr = controllerutil.CreateOrUpdate(ctx, r.Client, &found, func() error {
 					// Ensuring annotation map is there to avoid uninitialized map error and
 					// assigning the overall usage
 					if found.Annotations == nil {
@@ -334,7 +334,7 @@ func (r *Manager) resourceQuotasUpdate(ctx context.Context, resourceName corev1.
 						found.Spec.Hard = rq.Spec.Hard.DeepCopy()
 					} else {
 						// Ensure it’s nil (or empty) consistently
-						found.Spec.Hard = nil
+						found.Spec.Hard = map[corev1.ResourceName]resource.Quantity{}
 					}
 
 					return nil
