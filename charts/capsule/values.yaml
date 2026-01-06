@@ -83,9 +83,9 @@ crds:
 # Secret Options
 tls:
   # -- Start the Capsule controller that injects the CA into mutating and validating webhooks, and CRD as well.
-  enableController: true
+  enableController: false
   # -- When cert-manager is disabled, Capsule will generate the TLS certificate for webhook and CRDs conversion.
-  create: true
+  create: false
   # -- Override name of the Capsule TLS Secret name when externally managed.
   name: ""
 
@@ -320,7 +320,7 @@ serviceAccount:
 
 certManager:
   # -- Specifies whether capsule webhooks certificates should be generated using cert-manager
-  generateCertificates: false
+  generateCertificates: true
   # -- Specify additional SANS to add to the certificate
   additionalSANS: []
 # -- Additional labels which will be added to all resources created by Capsule helm chart

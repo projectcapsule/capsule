@@ -67,7 +67,7 @@ The following Values have changed key or Value:
 |-----|------|---------|-------------|
 | affinity | object | `{}` | Set affinity rules for the Capsule pod |
 | certManager.additionalSANS | list | `[]` | Specify additional SANS to add to the certificate |
-| certManager.generateCertificates | bool | `false` | Specifies whether capsule webhooks certificates should be generated using cert-manager |
+| certManager.generateCertificates | bool | `true` | Specifies whether capsule webhooks certificates should be generated using cert-manager |
 | customAnnotations | object | `{}` | Additional annotations which will be added to all resources created by Capsule helm chart |
 | customLabels | object | `{}` | Additional labels which will be added to all resources created by Capsule helm chart |
 | extraManifests | list | `[]` | Array of additional resources to be created alongside Capsule helm chart |
@@ -89,8 +89,8 @@ The following Values have changed key or Value:
 | serviceAccount.annotations | object | `{}` | Annotations to add to the service account. |
 | serviceAccount.create | bool | `true` | Specifies whether a service account should be created. |
 | serviceAccount.name | string | `""` | The name of the service account to use. If not set and `serviceAccount.create=true`, a name is generated using the fullname template |
-| tls.create | bool | `true` | When cert-manager is disabled, Capsule will generate the TLS certificate for webhook and CRDs conversion. |
-| tls.enableController | bool | `true` | Start the Capsule controller that injects the CA into mutating and validating webhooks, and CRD as well. |
+| tls.create | bool | `false` | When cert-manager is disabled, Capsule will generate the TLS certificate for webhook and CRDs conversion. |
+| tls.enableController | bool | `false` | Start the Capsule controller that injects the CA into mutating and validating webhooks, and CRD as well. |
 | tls.name | string | `""` | Override name of the Capsule TLS Secret name when externally managed. |
 | tolerations | list | `[]` | Set list of tolerations for the Capsule pod |
 | topologySpreadConstraints | list | `[]` | Set topology spread constraints for the Capsule pod |
