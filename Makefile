@@ -113,10 +113,7 @@ dev-build: kind
 dev-destroy: kind
 	$(KIND) delete cluster --name capsule
 
-dev-install-deps:
-	$(MAKE) dev-setup-cert-manager
-	$(MAKE) dev-install-grafana-operator-crds
-	$(MAKE) dev-install-prometheus-crds
+dev-install-deps: dev-setup-fluxcd dev-setup-cert-manager dev-install-grafana-operator-crds dev-install-prometheus-crds wait-for-helmreleases
 
 API_GW         := none
 API_GW_VERSION := v1.3.0
