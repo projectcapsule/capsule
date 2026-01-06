@@ -100,20 +100,23 @@ helm-test-exec: ct helm-controller-version ko-build-all
 	$(MAKE) e2e-load-image CLUSTER_NAME=capsule-charts IMAGE=$(CAPSULE_IMG) VERSION=v0.0.0
 	@$(KUBECTL) create ns capsule-system || true
 	$(MAKE) dev-setup-fluxcd
-	$(MAKE) dev-setup-cert-manager
-	$(MAKE) dev-install-grafana-operator-crds
-	$(MAKE) dev-install-prometheus-crds
+	$(MAKE) dev-install-deps
 	$(MAKE) wait-for-helmreleases
 	@$(CT) install --config $(SRC_ROOT)/.github/configs/ct.yaml --namespace=capsule-system --all --debug
 
 # Setup development env
 dev-build: kind
 	$(KIND) create cluster --wait=60s --name $(CLUSTER_NAME) --image kindest/node:$(KUBERNETES_SUPPORTED_VERSION)
-	$(MAKE) dev-install-gw-api-crds
+	$(MAKE) dev-install-deps
 
 .PHONY: dev-destroy
 dev-destroy: kind
 	$(KIND) delete cluster --name capsule
+
+dev-install-deps:
+	$(MAKE) dev-setup-cert-manager
+	$(MAKE) dev-install-grafana-operator-crds
+	$(MAKE) dev-install-prometheus-crds
 
 API_GW         := none
 API_GW_VERSION := v1.3.0
@@ -211,6 +214,7 @@ dev-setup-cert-manager:
 
 dev-setup-fluxcd:
 	@$(KUBECTL) kustomize --load-restrictor='LoadRestrictionsNone' hack/distro/fluxcd | envsubst | kubectl apply -f -
+
 
 # Here to setup the current capsule version
 # Intended to test updates to new version
