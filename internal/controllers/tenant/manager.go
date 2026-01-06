@@ -36,6 +36,7 @@ import (
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/internal/cache"
 	"github.com/projectcapsule/capsule/internal/controllers/utils"
 	"github.com/projectcapsule/capsule/internal/metrics"
 	"github.com/projectcapsule/capsule/pkg/api"
@@ -52,6 +53,8 @@ type Manager struct {
 	Configuration configuration.Configuration
 	RESTConfig    *rest.Config
 	classes       supportedClasses
+
+	Cache *cache.NamespaceRegistriesCache
 }
 
 type supportedClasses struct {
@@ -294,6 +297,9 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 
 		return result, err
 	}
+
+	n, u := r.Cache.Stats()
+	r.Log.V(5).Info("registry cache updated", "namespaces", n, "uniqueRuleSets", u)
 
 	// Ensuring NetworkPolicy resources
 	r.Log.V(4).Info("Starting processing of Network Policies")

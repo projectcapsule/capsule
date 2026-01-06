@@ -31,6 +31,7 @@ import (
 
 	capsulev1beta1 "github.com/projectcapsule/capsule/api/v1beta1"
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/internal/cache"
 	configcontroller "github.com/projectcapsule/capsule/internal/controllers/cfg"
 	podlabelscontroller "github.com/projectcapsule/capsule/internal/controllers/pod"
 	"github.com/projectcapsule/capsule/internal/controllers/pv"
@@ -213,6 +214,8 @@ func main() {
 		}
 	}
 
+	registryCache := cache.NewNamespaceRegistriesCache()
+
 	if err = (&tenantcontroller.Manager{
 		RESTConfig:    manager.GetConfig(),
 		Client:        manager.GetClient(),
@@ -220,6 +223,7 @@ func main() {
 		Log:           ctrl.Log.WithName("controllers").WithName("Tenant"),
 		Recorder:      manager.GetEventRecorderFor("tenant-controller"),
 		Configuration: cfg,
+		Cache:         registryCache,
 	}).SetupWithManager(manager, controllerConfig); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Tenant")
 		os.Exit(1)
@@ -248,7 +252,8 @@ func main() {
 		route.Pod(
 			pod.Handler(
 				pod.ImagePullPolicy(),
-				pod.ContainerRegistry(cfg),
+				pod.ContainerRegistryLegacy(cfg),
+				pod.ContainerRegistry(cfg, registryCache),
 				pod.PriorityClass(),
 				pod.RuntimeClass(),
 			),

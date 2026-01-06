@@ -47,6 +47,14 @@ type TenantStatusNamespaceItem struct {
 	UID k8stypes.UID `json:"uid,omitempty"`
 	// Managed Metadata
 	Metadata *TenantStatusNamespaceMetadata `json:"metadata,omitempty"`
+	// Managed Metadata
+	//+optional
+	Enforce TenantStatusNamespaceEnforcement `json:"enforce,omitzero"`
+}
+
+type TenantStatusNamespaceEnforcement struct {
+	// Registries which are allowed within this namespace
+	Registries []api.OCIRegistry `json:"registry,omitempty"`
 }
 
 type TenantStatusNamespaceMetadata struct {

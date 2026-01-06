@@ -16,17 +16,17 @@ import (
 	"github.com/projectcapsule/capsule/pkg/configuration"
 )
 
-type containerRegistryHandler struct {
+type containerRegistryLegacyHandler struct {
 	configuration configuration.Configuration
 }
 
-func ContainerRegistry(configuration configuration.Configuration) capsulewebhook.TypedHandlerWithTenant[*corev1.Pod] {
-	return &containerRegistryHandler{
+func ContainerRegistryLegacy(configuration configuration.Configuration) capsulewebhook.TypedHandlerWithTenant[*corev1.Pod] {
+	return &containerRegistryLegacyHandler{
 		configuration: configuration,
 	}
 }
 
-func (h *containerRegistryHandler) OnCreate(
+func (h *containerRegistryLegacyHandler) OnCreate(
 	c client.Client,
 	pod *corev1.Pod,
 	decoder admission.Decoder,
@@ -38,7 +38,7 @@ func (h *containerRegistryHandler) OnCreate(
 	}
 }
 
-func (h *containerRegistryHandler) OnUpdate(
+func (h *containerRegistryLegacyHandler) OnUpdate(
 	c client.Client,
 	old *corev1.Pod,
 	pod *corev1.Pod,
@@ -51,7 +51,7 @@ func (h *containerRegistryHandler) OnUpdate(
 	}
 }
 
-func (h *containerRegistryHandler) OnDelete(
+func (h *containerRegistryLegacyHandler) OnDelete(
 	client.Client,
 	*corev1.Pod,
 	admission.Decoder,
@@ -63,7 +63,7 @@ func (h *containerRegistryHandler) OnDelete(
 	}
 }
 
-func (h *containerRegistryHandler) validate(
+func (h *containerRegistryLegacyHandler) validate(
 	req admission.Request,
 	pod *corev1.Pod,
 	tnt *capsulev1beta2.Tenant,
@@ -94,7 +94,7 @@ func (h *containerRegistryHandler) validate(
 	return nil
 }
 
-func (h *containerRegistryHandler) verifyContainerRegistry(
+func (h *containerRegistryLegacyHandler) verifyContainerRegistry(
 	recorder record.EventRecorder,
 	req admission.Request,
 	image string,

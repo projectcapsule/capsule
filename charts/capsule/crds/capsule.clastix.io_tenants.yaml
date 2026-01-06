@@ -1191,9 +1191,10 @@ spec:
                   type: object
                 type: array
               containerRegistries:
-                description: Specifies the trusted Image Registries assigned to the
-                  Tenant. Capsule assures that all Pods resources created in the Tenant
-                  can use only one of the allowed trusted registries. Optional.
+                description: |-
+                  Deprecated: Use Enforcement.Registries instead
+
+                  Specifies the trusted Image Registries assigned to the Tenant. Capsule assures that all Pods resources created in the Tenant can use only one of the allowed trusted registries. Optional.
                 properties:
                   allowed:
                     description: Match exact elements which are allowed as class names
@@ -1271,6 +1272,46 @@ spec:
                     type: object
                 type: object
                 x-kubernetes-map-type: atomic
+              enforcement:
+                description: |-
+                  Specify enforcement specifications for the scope of the Tenant. We are moving all configuration regarding enforcement under this struct in future releases. It's currently not final.
+
+                  Read More: https://projectcapsule.dev/docs/tenants/enforcement/
+                properties:
+                  registries:
+                    description: |-
+                      Define registries which are allowed to be used within this tenant
+                      The rules are aggregated, since you can use Regular Expressions the match registry endpoints
+                    items:
+                      properties:
+                        policy:
+                          description: Allowed PullPolicy for the given registry.
+                            Supplying no value allows all policies.
+                          items:
+                            description: PullPolicy describes a policy for if/when
+                              to pull a container image
+                            type: string
+                          type: array
+                        url:
+                          description: OCI Registry endpoint, is treated as regular
+                            expression.
+                          type: string
+                        validation:
+                          default:
+                          - Images
+                          - Volumes
+                          description: Requesting Resources
+                          items:
+                            enum:
+                            - Images
+                            - Volumes
+                            type: string
+                          type: array
+                      required:
+                      - url
+                      type: object
+                    type: array
+                type: object
               forceTenantPrefix:
                 description: |-
                   Use this if you want to disable/enable the Tenant name prefix to specific Tenants, overriding global forceTenantPrefix in CapsuleConfiguration.
@@ -1346,9 +1387,10 @@ spec:
                     x-kubernetes-map-type: atomic
                 type: object
               imagePullPolicies:
-                description: Specify the allowed values for the imagePullPolicies
-                  option in Pod resources. Capsule assures that all Pod resources
-                  created in the Tenant can use only one of the allowed policy. Optional.
+                description: |-
+                  Deprecated: Use Enforcement.Registries instead
+
+                  Specify the allowed values for the imagePullPolicies option in Pod resources. Capsule assures that all Pod resources created in the Tenant can use only one of the allowed policy. Optional.
                 items:
                   enum:
                   - Always
@@ -2854,6 +2896,41 @@ spec:
                         - type
                         type: object
                       type: array
+                    enforce:
+                      description: Managed Metadata
+                      properties:
+                        registry:
+                          description: Registries which are allowed within this namespace
+                          items:
+                            properties:
+                              policy:
+                                description: Allowed PullPolicy for the given registry.
+                                  Supplying no value allows all policies.
+                                items:
+                                  description: PullPolicy describes a policy for if/when
+                                    to pull a container image
+                                  type: string
+                                type: array
+                              url:
+                                description: OCI Registry endpoint, is treated as
+                                  regular expression.
+                                type: string
+                              validation:
+                                default:
+                                - Images
+                                - Volumes
+                                description: Requesting Resources
+                                items:
+                                  enum:
+                                  - Images
+                                  - Volumes
+                                  type: string
+                                type: array
+                            required:
+                            - url
+                            type: object
+                          type: array
+                      type: object
                     metadata:
                       description: Managed Metadata
                       properties:

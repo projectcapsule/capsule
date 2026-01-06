@@ -64,6 +64,15 @@ func (h *warningHandler) handle(tnt *capsulev1beta2.Tenant, decoder admission.De
 	}
 
 	//nolint:staticcheck
+	if tnt.Spec.ContainerRegistries != nil {
+		if len(tnt.Spec.ContainerRegistries.Exact) > 0 || len(tnt.Spec.ContainerRegistries.Regex) > 0 {
+			response.Warnings = append(response.Warnings,
+				"The field `containerRegistries` is deprecated and will be removed in a future release. Please migrate to enforcement.registries. See: https://projectcapsule.dev/docs/tenants/enforcement/#registries.",
+			)
+		}
+	}
+
+	//nolint:staticcheck
 	if len(tnt.Spec.LimitRanges.Items) > 0 {
 		response.Warnings = append(response.Warnings,
 			"The field `limitRanges` is deprecated and will be removed in a future release. Please migrate to TenantReplications. See: https://projectcapsule.dev/docs/tenants/enforcement/#limitrange-distribution-with-tenantreplications.",

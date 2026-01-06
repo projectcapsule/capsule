@@ -58,6 +58,8 @@ func (r *Manager) reconcileNamespaces(ctx context.Context, tenant *capsulev1beta
 		tenant.Status.RemoveInstance(&capsulev1beta2.TenantStatusNamespaceItem{
 			Name: name,
 		})
+
+		r.Cache.Delete(name)
 	}
 
 	tenant.Status.Size = uint(len(tenant.Status.Namespaces))
@@ -66,6 +68,80 @@ func (r *Manager) reconcileNamespaces(ctx context.Context, tenant *capsulev1beta
 }
 
 func (r *Manager) reconcileNamespace(ctx context.Context, namespace string, tnt *capsulev1beta2.Tenant) (err error) {
+	ns := &corev1.Namespace{}
+	if err = r.Get(ctx, types.NamespacedName{Name: namespace}, ns); err != nil {
+		return err
+	}
+
+	stat := &capsulev1beta2.TenantStatusNamespaceItem{
+		Name: namespace,
+		UID:  ns.GetUID(),
+		Enforce: capsulev1beta2.TenantStatusNamespaceEnforcement{
+			Registries: tnt.Spec.Enforcement.Registries,
+		},
+	}
+
+	metaStatus := &capsulev1beta2.TenantStatusNamespaceMetadata{}
+
+	// Always update tenant status condition after reconciliation
+	defer func() {
+		instance := tnt.Status.GetInstance(stat)
+		if instance != nil {
+			stat = instance
+		}
+
+		readCondition := meta.NewReadyCondition(ns)
+
+		if err != nil {
+			readCondition.Status = metav1.ConditionFalse
+			readCondition.Reason = meta.FailedReason
+			readCondition.Message = fmt.Sprintf("Failed to reconcile: %v", err)
+
+			if instance != nil && instance.Metadata != nil {
+				stat.Metadata = instance.Metadata
+			}
+		} else if metaStatus != nil {
+			stat.Metadata = metaStatus
+		}
+
+		stat.Conditions.UpdateConditionByType(readCondition)
+
+		cordonedCondition := meta.NewCordonedCondition(ns)
+
+		if ns.Labels[meta.CordonedLabel] == meta.CordonedLabelTrigger {
+			cordonedCondition.Reason = meta.CordonedReason
+			cordonedCondition.Message = "namespace is cordoned"
+			cordonedCondition.Status = metav1.ConditionTrue
+		}
+
+		stat.Conditions.UpdateConditionByType(cordonedCondition)
+
+		tnt.Status.UpdateInstance(stat)
+
+		r.syncNamespaceStatusMetrics(tnt, ns)
+	}()
+
+	// Build Cache
+	if len(tnt.Spec.Enforcement.Registries) > 0 {
+		r.Cache.Set(namespace, tnt.Spec.Enforcement.Registries)
+	} else {
+		r.Cache.Delete(namespace)
+	}
+
+	err = retry.RetryOnConflict(retry.DefaultBackoff, func() (conflictErr error) {
+		_, conflictErr = controllerutil.CreateOrUpdate(ctx, r.Client, ns, func() error {
+			metaStatus, err = r.reconcileNamespaceMetadata(ctx, ns, tnt, stat)
+
+			return err
+		})
+
+		return conflictErr
+	})
+
+	return err
+}
+
+func (r *Manager) collectNamespaceEnforcement(ctx context.Context, namespace string, tnt *capsulev1beta2.Tenant) (err error) {
 	ns := &corev1.Namespace{}
 	if err = r.Get(ctx, types.NamespacedName{Name: namespace}, ns); err != nil {
 		return err
@@ -118,7 +194,7 @@ func (r *Manager) reconcileNamespace(ctx context.Context, namespace string, tnt 
 
 	err = retry.RetryOnConflict(retry.DefaultBackoff, func() (conflictErr error) {
 		_, conflictErr = controllerutil.CreateOrUpdate(ctx, r.Client, ns, func() error {
-			metaStatus, err = r.reconcileMetadata(ctx, ns, tnt, stat)
+			metaStatus, err = r.reconcileNamespaceMetadata(ctx, ns, tnt, stat)
 
 			return err
 		})
@@ -130,7 +206,7 @@ func (r *Manager) reconcileNamespace(ctx context.Context, namespace string, tnt 
 }
 
 //nolint:nestif
-func (r *Manager) reconcileMetadata(
+func (r *Manager) reconcileNamespaceMetadata(
 	ctx context.Context,
 	ns *corev1.Namespace,
 	tnt *capsulev1beta2.Tenant,

@@ -203,12 +203,12 @@ dev-setup-capsule: dev-setup-fluxcd
 
 dev-setup-capsule-example: dev-setup-fluxcd
 	@$(KUBECTL) kustomize --load-restrictor='LoadRestrictionsNone' hack/distro/capsule/example-setup | envsubst | kubectl apply -f -
-	@$(KUBECTL) create ns wind-test --as joe --as-group projectcapsule.dev
-	@$(KUBECTL) create ns wind-prod --as joe --as-group projectcapsule.dev
-	@$(KUBECTL) create ns green-test --as bob --as-group projectcapsule.dev
-	@$(KUBECTL) create ns green-prod --as bob --as-group projectcapsule.dev
-	@$(KUBECTL) create ns solar-test --as alice --as-group projectcapsule.dev
-	@$(KUBECTL) create ns solar-prod --as alice --as-group projectcapsule.dev
+	@$(KUBECTL) create ns wind-test --as joe --as-group projectcapsule.dev || true
+	@$(KUBECTL) create ns wind-prod --as joe --as-group projectcapsule.dev || true
+	@$(KUBECTL) create ns green-test --as bob --as-group projectcapsule.dev || true
+	@$(KUBECTL) create ns green-prod --as bob --as-group projectcapsule.dev || true
+	@$(KUBECTL) create ns solar-test --as alice --as-group projectcapsule.dev || true
+	@$(KUBECTL) create ns solar-prod --as alice --as-group projectcapsule.dev || true
 
 wait-for-helmreleases:
 	@ echo "Waiting for all HelmReleases to have observedGeneration >= 0..."

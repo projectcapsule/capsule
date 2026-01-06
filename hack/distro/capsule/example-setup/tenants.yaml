@@ -4,6 +4,54 @@ kind: Tenant
 metadata:
   name: solar
 spec:
+  owners:
+  - name: alice
+    kind: User
+  rules:
+    # Matches all Namespaces
+    - enforce:
+        # Here would come most ot the core spec (all class rules, serviceOpts)
+        registries:
+        -  endpoint: "harbor/v2/customer-registry/*"
+           pullPolicy: [ "ifNotPresent" ]
+           validation:
+              - Images
+              - Volumes
+      permissions:
+          additionalRoleBindings:
+  - clusterRoleName: 'view'
+    subjects:
+    - apiGroup: rbac.authorization.k8s.io
+      kind: User
+      name: alice
+
+
+
+    # Select a subset of namespaces to apply metadata on
+    - namespaceSelector:
+        matchExpressions:
+          - key: env
+            operator: In
+            values: ["prod"]
+      enforce:    
+        registries:
+         -  endpoint: "harbor/v2/prod-registry/*"
+            pullPolicy: [ "ifNotPresent" ]
+            validation:
+               - Images
+               - Volumes
+
+
+---
+apiVersion: capsule.clastix.io/v1beta2
+kind: Tenant
+metadata:
+  name: solar
+spec:
+  enforcement:
+    registries:
+    - url: "docker.io/library/debian"
+      policy: [ "Always" ]
   permissions:
     matchOwners:
     - matchLabels:

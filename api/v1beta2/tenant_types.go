@@ -19,6 +19,13 @@ type TenantSpec struct {
 	// Specify Permissions for the Tenant.
 	// +optional
 	Permissions Permissions `json:"permissions,omitzero"`
+
+	// Specify enforcement specifications for the scope of the Tenant. We are moving all configuration regarding enforcement under this struct in future releases. It's currently not final.
+	//
+	// Read More: https://projectcapsule.dev/docs/tenants/enforcement/
+	//+optional
+	Enforcement api.EnforcementSpec `json:"enforcement,omitzero"`
+
 	// Specifies the owners of the Tenant.
 	// Optional
 	Owners api.OwnerListSpec `json:"owners,omitempty"`
@@ -36,27 +43,13 @@ type TenantSpec struct {
 	// Specifies options for the Ingress resources, such as allowed hostnames and IngressClass. Optional.
 	// +optional
 	IngressOptions IngressOptions `json:"ingressOptions,omitzero"`
-	// Specifies the trusted Image Registries assigned to the Tenant. Capsule assures that all Pods resources created in the Tenant can use only one of the allowed trusted registries. Optional.
-	ContainerRegistries *api.AllowedListSpec `json:"containerRegistries,omitempty"`
 	// Specifies the label to control the placement of pods on a given pool of worker nodes. All namespaces created within the Tenant will have the node selector annotation. This annotation tells the Kubernetes scheduler to place pods on the nodes having the selector label. Optional.
 	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
-	// Deprecated: Use Tenant Replications instead (https://projectcapsule.dev/docs/replications/)
-	//
-	// Specifies the NetworkPolicies assigned to the Tenant. The assigned NetworkPolicies are inherited by any namespace created in the Tenant. Optional.
-	// +optional
-	NetworkPolicies api.NetworkPolicySpec `json:"networkPolicies,omitzero"`
-	// Deprecated: Use Tenant Replications instead (https://projectcapsule.dev/docs/replications/)
-	//
-	// Specifies the resource min/max usage restrictions to the Tenant. The assigned values are inherited by any namespace created in the Tenant. Optional.
-	// +optional
-	LimitRanges api.LimitRangesSpec `json:"limitRanges,omitzero"`
 	// Specifies a list of ResourceQuota resources assigned to the Tenant. The assigned values are inherited by any namespace created in the Tenant. The Capsule operator aggregates ResourceQuota at Tenant level, so that the hard quota is never crossed for the given Tenant. This permits the Tenant owner to consume resources in the Tenant regardless of the namespace. Optional.
 	// +optional
 	ResourceQuota api.ResourceQuotaSpec `json:"resourceQuotas,omitzero"`
 	// Specifies additional RoleBindings assigned to the Tenant. Capsule will ensure that all namespaces in the Tenant always contain the RoleBinding for the given ClusterRole. Optional.
 	AdditionalRoleBindings []api.AdditionalRoleBindingsSpec `json:"additionalRoleBindings,omitempty"`
-	// Specify the allowed values for the imagePullPolicies option in Pod resources. Capsule assures that all Pod resources created in the Tenant can use only one of the allowed policy. Optional.
-	ImagePullPolicies []api.ImagePullPolicySpec `json:"imagePullPolicies,omitempty"`
 	// Specifies the allowed RuntimeClasses assigned to the Tenant.
 	// Capsule assures that all Pods resources created in the Tenant can use only one of the allowed RuntimeClasses.
 	// Optional.
@@ -87,6 +80,26 @@ type TenantSpec struct {
 	// If unset, Tenant uses CapsuleConfiguration's forceTenantPrefix
 	// Optional
 	ForceTenantPrefix *bool `json:"forceTenantPrefix,omitempty"`
+
+	// Deprecated: Use Enforcement.Registries instead
+	//
+	// Specifies the trusted Image Registries assigned to the Tenant. Capsule assures that all Pods resources created in the Tenant can use only one of the allowed trusted registries. Optional.
+	ContainerRegistries *api.AllowedListSpec `json:"containerRegistries,omitempty"`
+	// Deprecated: Use Enforcement.Registries instead
+	//
+	// Specify the allowed values for the imagePullPolicies option in Pod resources. Capsule assures that all Pod resources created in the Tenant can use only one of the allowed policy. Optional.
+	ImagePullPolicies []api.ImagePullPolicySpec `json:"imagePullPolicies,omitempty"`
+
+	// Deprecated: Use Tenant Replications instead (https://projectcapsule.dev/docs/replications/)
+	//
+	// Specifies the NetworkPolicies assigned to the Tenant. The assigned NetworkPolicies are inherited by any namespace created in the Tenant. Optional.
+	// +optional
+	NetworkPolicies api.NetworkPolicySpec `json:"networkPolicies,omitzero"`
+	// Deprecated: Use Tenant Replications instead (https://projectcapsule.dev/docs/replications/)
+	//
+	// Specifies the resource min/max usage restrictions to the Tenant. The assigned values are inherited by any namespace created in the Tenant. Optional.
+	// +optional
+	LimitRanges api.LimitRangesSpec `json:"limitRanges,omitzero"`
 }
 
 type Permissions struct {
