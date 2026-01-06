@@ -99,9 +99,7 @@ helm-test: kind
 helm-test-exec: ct helm-controller-version ko-build-all
 	$(MAKE) e2e-load-image CLUSTER_NAME=capsule-charts IMAGE=$(CAPSULE_IMG) VERSION=v0.0.0
 	@$(KUBECTL) create ns capsule-system || true
-	$(MAKE) dev-setup-fluxcd
 	$(MAKE) dev-install-deps
-	$(MAKE) wait-for-helmreleases
 	@$(CT) install --config $(SRC_ROOT)/.github/configs/ct.yaml --namespace=capsule-system --all --debug
 
 # Setup development env
