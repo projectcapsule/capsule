@@ -109,7 +109,7 @@ helm-test-exec: ct helm-controller-version ko-build-all
 # Setup development env
 dev-build: kind
 	$(KIND) create cluster --wait=60s --name $(CLUSTER_NAME) --image kindest/node:$(KUBERNETES_SUPPORTED_VERSION)
-	$(MAKE) dev-install-deps
+	$(MAKE) dev-install-gw-api-crds
 
 .PHONY: dev-destroy
 dev-destroy: kind
