@@ -99,9 +99,11 @@ helm-test: kind
 helm-test-exec: ct helm-controller-version ko-build-all
 	$(MAKE) e2e-load-image CLUSTER_NAME=capsule-charts IMAGE=$(CAPSULE_IMG) VERSION=v0.0.0
 	@$(KUBECTL) create ns capsule-system || true
-	@$(KUBECTL) apply --force-conflicts --server-side=true -f https://github.com/grafana/grafana-operator/releases/download/v5.18.0/crds.yaml
-	@$(KUBECTL) apply --force-conflicts --server-side=true -f https://github.com/cert-manager/cert-manager/releases/download/v1.9.1/cert-manager.crds.yaml
-	@$(KUBECTL) apply --force-conflicts --server-side=true -f https://github.com/prometheus-operator/prometheus-operator/releases/download/v0.58.0/bundle.yaml
+	$(MAKE) dev-setup-fluxcd
+	$(MAKE) dev-setup-cert-manager
+	$(MAKE) dev-install-grafana-operator-crds
+	$(MAKE) dev-install-prometheus-crds
+	$(MAKE) wait-for-helmreleases
 	@$(CT) install --config $(SRC_ROOT)/.github/configs/ct.yaml --namespace=capsule-system --all --debug
 
 # Setup development env
@@ -116,8 +118,21 @@ dev-destroy: kind
 API_GW         := none
 API_GW_VERSION := v1.3.0
 API_GW_LOOKUP  := kubernetes-sigs/gateway-api
-dev-install-deps:
+dev-install-gw-api-crds:
 	@$(KUBECTL) apply --force-conflicts --server-side=true -f https://github.com/$(API_GW_LOOKUP)/releases/download/$(API_GW_VERSION)/standard-install.yaml
+
+GRAFANA         := none
+GRAFANA_VERSION := v5.18.0
+GRAFANA_LOOKUP  := grafana/grafana-operator
+dev-install-grafana-operator-crds:
+	@$(KUBECTL) apply --force-conflicts --server-side=true -f https://github.com/grafana/grafana-operator/releases/download/$(GRAFANA_VERSION)/crds.yaml
+
+PROMETHEUS         := none
+PROMETHEUS_VERSION := v0.58.0
+PROMETHEUS_LOOKUP  := prometheus-operator/prometheus-operator
+dev-install-prometheus-crds:
+	@$(KUBECTL) apply --force-conflicts --server-side=true -f https://github.com/prometheus-operator/prometheus-operator/releases/download/$(PROMETHEUS_VERSION)/bundle.yaml
+
 
 # Usage:
 # 	LAPTOP_HOST_IP=<YOUR_LAPTOP_IP> make dev-setup
@@ -190,6 +205,9 @@ dev-setup-argocd: dev-setup-fluxcd
 	@printf "\n\033[32mAccess ArgoCD:\033[0m\n\n"
 	@printf "  \033[1mkubectl get secret -n argocd argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d\033[0m\n\n"
 	@printf "  \033[1mkubectl port-forward svc/argocd-server 9091:80 -n argocd\033[0m\n\n"
+
+dev-setup-cert-manager:
+	@$(KUBECTL) kustomize --load-restrictor='LoadRestrictionsNone' hack/distro/cert-manager | envsubst | kubectl apply -f -
 
 dev-setup-fluxcd:
 	@$(KUBECTL) kustomize --load-restrictor='LoadRestrictionsNone' hack/distro/fluxcd | envsubst | kubectl apply -f -
@@ -307,6 +325,7 @@ e2e-install: ko-build-all
 		--install \
 		--namespace capsule-system \
 		--create-namespace \
+		--set 'replicaCount=2'\
 		--set 'manager.image.pullPolicy=Never' \
 		--set 'manager.resources=null'\
 		--set "manager.image.tag=$(VERSION)" \
