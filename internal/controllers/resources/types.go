@@ -10,7 +10,7 @@ import (
 )
 
 // Keeps track of generated items
-type Accumulator = map[string]*AccumulatorItem
+type Accumulator = map[string]*[]AccumulatorItem
 
 // Keeps track of generated items
 type AccumulatorItem struct {

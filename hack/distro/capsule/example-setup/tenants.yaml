@@ -19,6 +19,16 @@ spec:
     - apiGroup: rbac.authorization.k8s.io
       kind: User
       name: joe
+  resourceQuotas:
+    scope: Tenant
+    items:
+    - hard:
+        limits.cpu: "8"
+        limits.memory: 16Gi
+        requests.cpu: "8"
+        requests.memory: 16Gi
+    - hard:
+        pods: "10"
 ---
 apiVersion: capsule.clastix.io/v1beta2
 kind: Tenant
