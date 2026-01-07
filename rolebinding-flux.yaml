@@ -11,6 +11,13 @@ spec:
           projectcapsule.dev/tenant: "{{tenant.name}}"
       rawItems:
         - apiVersion: v1
+          kind: ServiceAccount
+          metadata:
+            annotations:
+              kubernetes.io/enforce-mountable-secrets: "false"
+            name: gitops-reconciler
+
+        - apiVersion: v1
           kind: LimitRange
           metadata:
             name: cpu-resource-constraint
@@ -31,14 +38,14 @@ spec:
             annotations:
               kubernetes.io/enforce-mountable-secrets: "true"
             name: gitops-reconciler
-        #- apiVersion: capsule.clastix.io/v1beta2
-        #  kind: TenantOwner
-        #  metadata:
-        #    name: "{{tenant.name}}-{{namespace}}"
-        #  spec:
-        #    clusterRoles:
-        #      - capsule-namespace-deleter
-        #      - admin
-        #    kind: ServiceAccount
-        #    name: "system:serviceaccount:{{namespace}}:gitops-reconciler"
 
+        - apiVersion: capsule.clastix.io/v1beta2
+          kind: TenantOwner
+          metadata:
+            name: "{{tenant.name}}-{{namespace}}"
+          spec:
+            clusterRoles:
+              - capsule-namespace-deleter
+              - admin
+            kind: ServiceAccount
+            name: "system:serviceaccount:{{namespace}}:gitops-reconciler"

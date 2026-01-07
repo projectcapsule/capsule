@@ -286,20 +286,26 @@ func (r *Processor) Prune(
 		return err
 	}
 
-	if err = utils.CreateOrPatch(
+	deletable, err := r.handlePruneDeletion(
+		ctx,
+		c,
+		actual,
+		fieldOwner,
+	)
+	if err != nil {
+		return err
+	}
+
+	if deletable {
+		return nil
+	}
+
+	return utils.CreateOrPatch(
 		ctx,
 		c,
 		obj,
 		fieldOwner,
 		false,
-	); err != nil {
-		return
-	}
-
-	return r.handlePruneDeletion(
-		ctx,
-		c,
-		obj,
 	)
 }
 
@@ -307,18 +313,29 @@ func (r *Processor) Prune(
 func (r *Processor) handlePruneDeletion(
 	ctx context.Context,
 	c client.Client,
-	obj *unstructured.Unstructured,
-) (err error) {
-	if len(obj.GetManagedFields()) > 0 {
-		return
-	}
-
-	labels := obj.GetLabels()
+	actual *unstructured.Unstructured,
+	fieldOwner string,
+) (deletable bool, err error) {
+	labels := actual.GetLabels()
 	if _, ok := labels[meta.CreatedByCapsuleLabel]; !ok {
+		return false, nil
+	}
+
+	deletable = meta.HasExactlyCapsuleOwners(actual, []string{
+		fieldOwner,
+		meta.ControllerFieldOwner(),
+	})
+
+	if !deletable {
 		return
 	}
 
-	return c.Delete(ctx, obj)
+	err = c.Delete(ctx, actual)
+	if apierrors.IsNotFound(err) {
+		return deletable, nil
+	}
+
+	return deletable, err
 }
 
 func (r *Processor) Apply(
@@ -364,7 +381,7 @@ func (r *Processor) Apply(
 		return
 	}
 
-	return clt.ApplyPatches(ctx, c, obj, patches, fieldOwner)
+	return clt.ApplyPatches(ctx, c, obj, patches, meta.ControllerFieldOwner())
 }
 
 func (r *Processor) handleControllerMetadata(
@@ -388,6 +405,10 @@ func (r *Processor) handleControllerMetadata(
 		return patches, false, err
 	default:
 		labels := existingObject.GetLabels()
+
+		if v, ok := labels[meta.CreatedByCapsuleLabel]; ok || v == "controller" {
+			adoptable = true
+		}
 
 		if _, ok := labels[meta.ResourceCapsuleLabel]; ok {
 			adoptable = true

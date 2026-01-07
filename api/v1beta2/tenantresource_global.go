@@ -18,6 +18,7 @@ type GlobalTenantResourceSpec struct {
 	// - Tenant: Create Resources for each tenant  in selected Tenants
 	// - Namespace: Create Resources for each namespace in selected Tenants
 	// +kubebuilder:default:=Namespace
+	// +optional
 	Scope api.ResourceScope `json:"scope"`
 	// Defines the Tenant selector used target the tenants on which resources must be propagated.
 	// +optional
@@ -50,8 +51,7 @@ type GlobalTenantResource struct {
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitzero"`
 
-	// +optional
-	Spec GlobalTenantResourceSpec `json:"spec,omitempty"`
+	Spec GlobalTenantResourceSpec `json:"spec"`
 
 	// +optional
 	Status GlobalTenantResourceStatus `json:"status,omitzero"`

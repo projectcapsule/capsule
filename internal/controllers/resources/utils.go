@@ -6,6 +6,7 @@ package resources
 import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/api/misc"
 	"github.com/projectcapsule/capsule/pkg/configuration"
 	"github.com/projectcapsule/capsule/pkg/utils/users"
@@ -16,7 +17,7 @@ func getFieldOwner(name string, namespace string, id misc.ResourceID) string {
 		namespace = "cluster"
 	}
 
-	return "capsule/" + namespace + "/" + name + "/" + id.Tenant + "/" + id.Namespace + "/" + id.Kind + "/" + id.Name + "/" + id.Index
+	return meta.CapsuleFieldOwnerPrefix + "/" + namespace + "/" + name + "/" + id.Tenant + "/" + id.Namespace + "/" + id.Index
 }
 
 func SetGlobalTenantResourceServiceAccount(

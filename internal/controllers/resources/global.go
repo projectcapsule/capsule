@@ -115,13 +115,21 @@ func (r *globalResourceController) Reconcile(ctx context.Context, request reconc
 		return reconcile.Result{}, nil
 	}
 
-	// Handle deleted GlobalTenantResource
-	if !tntResource.DeletionTimestamp.IsZero() {
-		return r.reconcileDelete(ctx, c, tntResource)
+	// Handle non-deleted GlobalTenantResource
+	err = r.reconcileNormal(ctx, c, tntResource)
+
+	if len(tntResource.Status.ProcessedItems) > 0 {
+		controllerutil.AddFinalizer(tntResource, meta.ControllerFinalizer)
+	} else {
+		controllerutil.RemoveFinalizer(tntResource, meta.ControllerFinalizer)
 	}
 
-	// Handle non-deleted GlobalTenantResource
-	return r.reconcileNormal(ctx, c, tntResource)
+	controllerutil.RemoveFinalizer(tntResource, meta.LegacyResourceFinalizer)
+
+	return reconcile.Result{
+		Requeue:      true,
+		RequeueAfter: tntResource.Spec.ResyncPeriod.Duration,
+	}, nil
 }
 
 func (r *globalResourceController) enqueueRequestFromTenant(ctx context.Context, object client.Object) (reqs []reconcile.Request) {
@@ -162,12 +170,8 @@ func (r *globalResourceController) reconcileNormal(
 	ctx context.Context,
 	c client.Client,
 	tntResource *capsulev1beta2.GlobalTenantResource,
-) (res reconcile.Result, err error) {
+) (err error) {
 	log := ctrllog.FromContext(ctx)
-
-	if *tntResource.Spec.PruningOnDelete {
-		controllerutil.AddFinalizer(tntResource, finalizer)
-	}
 
 	if tntResource.Status.ProcessedItems == nil {
 		tntResource.Status.ProcessedItems = make([]capsulev1beta2.ObjectReferenceStatus, 0)
@@ -178,7 +182,7 @@ func (r *globalResourceController) reconcileNormal(
 	if err != nil {
 		log.Error(err, "cannot create MatchingLabelsSelector for Global filtering")
 
-		return reconcile.Result{}, err
+		return err
 	}
 
 	// Use Controller Client.
@@ -186,7 +190,7 @@ func (r *globalResourceController) reconcileNormal(
 	if err = r.client.List(ctx, &tntList, &client.MatchingLabelsSelector{Selector: tntSelector}); err != nil {
 		log.Error(err, "cannot list Tenants matching the provided selector")
 
-		return reconcile.Result{}, err
+		return err
 	}
 
 	log.Info("FOUND TNTS", "SIZE", len(tntList.Items))
@@ -228,10 +232,117 @@ func (r *globalResourceController) reconcileNormal(
 	acc := Accumulator{}
 
 	// Gather Resources
+	if tntResource.ObjectMeta.DeletionTimestamp.IsZero() {
+		err := r.gatherResources(
+			ctx,
+			c,
+			log,
+			tntResource,
+			tntList,
+			acc,
+		)
+
+		if err != nil {
+			return err
+		}
+	}
+
+	log.V(4).Info("accumulation", "items", len(acc), "accumulator", acc)
+
+	log.V(4).Info("starting pruning items", "present", len(tntResource.Status.ProcessedItems))
+
+	// Prune first, to work on a consistent Status
+	for _, p := range tntResource.Status.ProcessedItems {
+		if _, exists := acc[p.GetKey()]; !exists {
+
+			log.V(4).Info("pruning resources", "Kind", p.Kind, "Name", p.Name, "Namespace", p.Namespace)
+
+			obj := &unstructured.Unstructured{}
+			obj.SetGroupVersionKind(p.GetGVK())
+			obj.SetNamespace(p.GetNamespace())
+			obj.SetName(p.GetName())
+
+			if *p.Prune {
+				err := r.processor.Prune(ctx, c, obj, getFieldOwner(tntResource.GetName(), "", p.ResourceID))
+				if err != nil {
+					p.Status = metav1.ConditionFalse
+					p.Message = "pruning failed: " + err.Error()
+					tntResource.Status.ProcessedItems.UpdateItem(p)
+
+					continue
+				}
+			}
+
+			tntResource.Status.ProcessedItems.RemoveItem(p)
+		}
+	}
+
+	// Finalizing based on inventory
+
+	//
+	log.Info("accumulation", "items", len(acc))
+
+	// Apply
+	for _, item := range acc {
+		or := capsulev1beta2.ObjectReferenceStatus{
+			ResourceIDWithOptions: item.Options,
+			ObjectReferenceStatusCondition: capsulev1beta2.ObjectReferenceStatusCondition{
+				Type: meta.ReadyCondition,
+			},
+		}
+
+		err := r.processor.Apply(
+			ctx,
+			c,
+			item.Object,
+			getFieldOwner(tntResource.GetName(), "", item.Options.ResourceID),
+			*item.Options.Force,
+			*item.Options.Adopt,
+		)
+		if err != nil {
+			or.Status = metav1.ConditionFalse
+			or.Message = "apply failed: " + err.Error()
+		} else {
+			or.Status = metav1.ConditionTrue
+		}
+
+		tntResource.Status.ProcessedItems.UpdateItem(or)
+	}
+
+	// Prune Resources
+	//failed, err := r.processor.HandlePruning(ctx, c, tntResource.Status.ProcessedItems.AsSet(), sets.Set[string](processedItems))
+	//if err != nil {
+	//	return reconcile.Result{}, gherrors.Wrap(err, "failed to prune resources")
+	//}
+	//if len(failed) > 0 {
+	//	tntResource.Status.ProcessedItems = make([]capsulev1beta2.ObjectReferenceStatus, 0, len(processedItems))
+	//
+	//	for _, item := range processedItems.List() {
+	//		if or := (capsulev1beta2.ObjectReferenceStatus{}); or.ParseFromString(item) == nil {
+	//			tntResource.Status.ProcessedItems = append(tntResource.Status.ProcessedItems, or)
+	//		}
+	//	}
+	//}
+
+	tntResource.Status.SelectedTenants = tntSet.List()
+
+	log.Info("processing completed")
+
+	return nil
+}
+
+func (r *globalResourceController) gatherResources(
+	ctx context.Context,
+	c client.Client,
+	log logr.Logger,
+	tntResource *capsulev1beta2.GlobalTenantResource,
+	tnts capsulev1beta2.TenantList,
+	acc Accumulator,
+) error {
 	for index, resource := range tntResource.Spec.Resources {
 		ilog := log.WithValues("resource", index)
 
-		for _, tnt := range tntList.Items {
+		for _, tnt := range tnts.Items {
 			ilog = log.WithValues("tenant", tnt.GetName())
 
 			var resourceError error
@@ -271,92 +382,12 @@ func (r *globalResourceController) reconcileNormal(
 
 			// Only start pruning when the resource item itself did not throw an error
 			if resourceError != nil {
-				return reconcile.Result{}, resourceError
+				return resourceError
 			}
 		}
 	}
 
-	log.V(4).Info("accumulation", "items", len(acc), "accumnulator", acc)
-
-	log.V(4).Info("starting pruning items", "present", len(tntResource.Status.ProcessedItems))
-
-	// Prune first, to work on a consistent Status
-	for _, p := range tntResource.Status.ProcessedItems {
-		if _, exists := acc[p.GetKey()]; !exists {
-
-			log.V(4).Info("pruning resources", "Kind", p.Kind, "Name", p.Name, "Namespace", p.Namespace)
-
-			obj := &unstructured.Unstructured{}
-			obj.SetGroupVersionKind(p.GetGVK())
-			obj.SetNamespace(p.GetNamespace())
-			obj.SetName(p.GetName())
-
-			if *p.Prune {
-				err := r.processor.Prune(ctx, c, obj, getFieldOwner(tntResource.GetName(), "", p.ResourceID))
-				if err != nil {
-					p.Status = metav1.ConditionFalse
-					p.Message = err.Error()
-					tntResource.Status.ProcessedItems.UpdateItem(p)
-
-					continue
-				}
-			}
-
-			tntResource.Status.ProcessedItems.RemoveItem(p)
-		}
-	}
-	//
-	log.Info("accumulation", "items", len(acc))
-
-	// Apply
-	for _, item := range acc {
-		or := capsulev1beta2.ObjectReferenceStatus{
-			ResourceIDWithOptions: item.Options,
-			ObjectReferenceStatusCondition: capsulev1beta2.ObjectReferenceStatusCondition{
-				Type: meta.ReadyCondition,
-			},
-		}
-
-		//id.Index
-
-		err := r.processor.Apply(
-			ctx,
-			c,
-			item.Object,
-			getFieldOwner(tntResource.GetName(), "", item.Options.ResourceID),
-			*item.Options.Force,
-			*item.Options.Adopt,
-		)
-		if err != nil {
-			or.Status = metav1.ConditionFalse
-			or.Message = fmt.Errorf("pruning failed", err)
-		} else {
-			or.Status = metav1.ConditionTrue
-		}
-
-		tntResource.Status.ProcessedItems.UpdateItem(or)
-	}
-
-	// Prune Resources
-	//failed, err := r.processor.HandlePruning(ctx, c, tntResource.Status.ProcessedItems.AsSet(), sets.Set[string](processedItems))
-	//if err != nil {
-	//	return reconcile.Result{}, gherrors.Wrap(err, "failed to prune resources")
-	//}
-	//if len(failed) > 0 {
-	//	tntResource.Status.ProcessedItems = make([]capsulev1beta2.ObjectReferenceStatus, 0, len(processedItems))
-	//
-	//	for _, item := range processedItems.List() {
-	//		if or := (capsulev1beta2.ObjectReferenceStatus{}); or.ParseFromString(item) == nil {
-	//			tntResource.Status.ProcessedItems = append(tntResource.Status.ProcessedItems, or)
-	//		}
-	//	}
-	//}
-
-	tntResource.Status.SelectedTenants = tntSet.List()
-
-	log.Info("processing completed")
-
-	return reconcile.Result{Requeue: true, RequeueAfter: tntResource.Spec.ResyncPeriod.Duration}, nil
+	return nil
 }
 
 func (r *globalResourceController) reconcileDelete(

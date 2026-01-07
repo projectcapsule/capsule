@@ -942,6 +942,11 @@ func (in *ResourcePoolStatus) DeepCopy() *ResourcePoolStatus {
 func (in *ResourceSpec) DeepCopyInto(out *ResourceSpec) {
 	*out = *in
 	in.ResourceSpecSettings.DeepCopyInto(&out.ResourceSpecSettings)
+	if in.ServiceAccount != nil {
+		in, out := &in.ServiceAccount, &out.ServiceAccount
+		*out = new(api.ServiceAccountReference)
+		**out = **in
+	}
 	if in.NamespaceSelector != nil {
 		in, out := &in.NamespaceSelector, &out.NamespaceSelector
 		*out = new(metav1.LabelSelector)

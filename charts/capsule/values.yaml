@@ -688,6 +688,8 @@ webhooks:
       # -- [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector)
       objectSelector:
         matchExpressions:
+          - key: "projectcapsule.dev/created-by"
+            operator: Exists
           - key: "projectcapsule.dev/managed-by"
             operator: Exists
       # -- [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector)

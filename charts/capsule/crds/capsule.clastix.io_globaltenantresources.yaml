@@ -317,6 +317,22 @@ spec:
                         x-kubernetes-embedded-resource: true
                         x-kubernetes-preserve-unknown-fields: true
                       type: array
+                    serviceAccount:
+                      description: |-
+                        Local ServiceAccount which will perform all the actions defined in the TenantResource
+                        You must provide permissions accordingly to that ServiceAccount
+                      properties:
+                        name:
+                          description: ServiceAccount Name Reference
+                          maxLength: 253
+                          pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+                          type: string
+                        namespace:
+                          description: ServiceAccount Namespace Reference
+                          maxLength: 253
+                          pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+                          type: string
+                      type: object
                     settings:
                       default: {}
                       properties:
@@ -359,8 +375,6 @@ spec:
                             type: string
                         type: object
                       type: array
-                  required:
-                  - settings
                   type: object
                 type: array
               resyncPeriod:
@@ -445,7 +459,6 @@ spec:
             required:
             - resources
             - resyncPeriod
-            - scope
             type: object
           status:
             description: GlobalTenantResourceStatus defines the observed state of

@@ -37,9 +37,13 @@ type TenantResourceSpec struct {
 }
 
 type ResourceSpec struct {
+	// +optional
 	// +kubebuilder:default={}
 	ResourceSpecSettings `json:"settings,omitzero"`
 
+	// Local ServiceAccount which will perform all the actions defined in the TenantResource
+	// You must provide permissions accordingly to that ServiceAccount
+	ServiceAccount *api.ServiceAccountReference `json:"serviceAccount,omitempty"`
 	// Defines the Namespace selector to select the Tenant Namespaces on which the resources must be propagated.
 	// In case of nil value, all the Tenant Namespaces are targeted.
 	NamespaceSelector *metav1.LabelSelector `json:"namespaceSelector,omitempty"`
@@ -101,8 +105,7 @@ type TenantResource struct {
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitzero"`
 
-	// +optional
-	Spec TenantSpec `json:"spec,omitzero"`
+	Spec TenantResourceSpec `json:"spec"`
 
 	// +optional
 	Status TenantResourceStatus `json:"status,omitzero"`

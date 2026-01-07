@@ -4,5 +4,6 @@
 package meta
 
 const (
-	ControllerFinalizer = "controller.projectcapsule.dev/finalize"
+	ControllerFinalizer     = "controller.projectcapsule.dev/finalize"
+	LegacyResourceFinalizer = "capsule.clastix.io/resources"
 )
