@@ -343,6 +343,7 @@ func (r *resourcePoolController) handleClaimOrderedExhaustion(
 
 	return queued, err
 }
+
 func (r *resourcePoolController) handleClaimResourceExhaustion(
 	ctx context.Context,
 	claim *capsulev1beta2.ResourcePoolClaim,
@@ -350,7 +351,7 @@ func (r *resourcePoolController) handleClaimResourceExhaustion(
 	exhaustions map[string]api.PoolExhaustionResource,
 ) (err error) {
 	status := make([]string, 0) //nolint:prealloc
-	
+
 	resourceNames := make([]string, 0) //nolint:prealloc
 	for resourceName := range currentExhaustions {
 		resourceNames = append(resourceNames, resourceName)
