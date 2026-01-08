@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Project Capsule Authors
+// Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package tenant
@@ -25,7 +25,7 @@ func (r *Manager) syncCustomResourceQuotaUsages(ctx context.Context, tenant *cap
 		group   string
 		version string
 	}
-	//nolint:prealloc
+	//nolintlint:prealloc
 	var resourceList []resource
 
 	for k := range tenant.GetAnnotations() {
