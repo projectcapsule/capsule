@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Project Capsule Authors
+// Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package resourcepools
@@ -350,9 +350,9 @@ func (r *resourcePoolController) handleClaimResourceExhaustion(
 	currentExhaustions map[string]api.PoolExhaustionResource,
 	exhaustions map[string]api.PoolExhaustionResource,
 ) (err error) {
-	status := make([]string, 0)
+	status := make([]string, 0) //nolint:prealloc
 
-	resourceNames := make([]string, 0)
+	resourceNames := make([]string, 0) //nolint:prealloc
 	for resourceName := range currentExhaustions {
 		resourceNames = append(resourceNames, resourceName)
 	}
