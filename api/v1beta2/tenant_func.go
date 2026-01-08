@@ -75,7 +75,7 @@ func (in *Tenant) CollectOwners(ctx context.Context, c client.Client, allowPromo
 }
 
 func (in *Tenant) GetRoleBindings() []api.AdditionalRoleBindingsSpec {
-	roleBindings := make([]api.AdditionalRoleBindingsSpec, 0)
+	roleBindings := make([]api.AdditionalRoleBindingsSpec, 0) //nolint:prealloc
 
 	for _, owner := range in.Status.Owners {
 		roleBindings = append(roleBindings, owner.ToAdditionalRolebindings()...)
