@@ -126,7 +126,7 @@ dev-install-grafana-operator-crds:
 	@$(KUBECTL) apply --force-conflicts --server-side=true -f https://github.com/grafana/grafana-operator/releases/download/$(GRAFANA_VERSION)/crds.yaml
 
 PROMETHEUS         := none
-PROMETHEUS_VERSION := v0.58.0
+PROMETHEUS_VERSION := v0.87.1
 PROMETHEUS_LOOKUP  := prometheus-operator/prometheus-operator
 dev-install-prometheus-crds:
 	@$(KUBECTL) apply --force-conflicts --server-side=true -f https://github.com/prometheus-operator/prometheus-operator/releases/download/$(PROMETHEUS_VERSION)/bundle.yaml
