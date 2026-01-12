@@ -71,6 +71,11 @@ spec:
                   this can be achieved by labeling the serviceaccount and then they are considered owners. This can only be done by other owners of the tenant.
                   However ServiceAccounts which have been promoted to owner can not promote further serviceAccounts.
                 type: boolean
+              cacheInvalidation:
+                default: 24h
+                description: Define the period of time upon a cache invalidation is
+                  executed for all caches.
+                type: string
               enableTLSReconciler:
                 default: false
                 description: |-
@@ -90,6 +95,58 @@ spec:
                 items:
                   type: string
                 type: array
+              impersonation:
+                description: Service Account Client configuration for impersonation
+                  properties
+                properties:
+                  caSecretKey:
+                    default: ca.crt
+                    description: Key in the secret that holds the CA certificate (e.g.,
+                      "ca.crt")
+                    type: string
+                  caSecretName:
+                    description: Name of the secret containing the CA certificate
+                    maxLength: 63
+                    pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+                    type: string
+                  caSecretNamespace:
+                    description: Namespace where the CA certificate secret is located
+                    maxLength: 253
+                    pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
+                    type: string
+                  endpoint:
+                    description: Kubernetes API Endpoint to use for impersonation
+                    type: string
+                  globalDefaultServiceAccount:
+                    description: |-
+                      Default ServiceAccount for global resources (GlobalTenantResource)
+                      When defined, users are required to use this ServiceAccount anywhere in the cluster
+                      unless they explicitly provide their own.
+                    maxLength: 63
+                    pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+                    type: string
+                  globalDefaultServiceAccountNamespace:
+                    description: |-
+                      Default ServiceAccount for global resources (GlobalTenantResource)
+                      When defined, users are required to use this ServiceAccount anywhere in the cluster
+                      unless they explicitly provide their own.
+                    maxLength: 253
+                    pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
+                    type: string
+                  skipTlsVerify:
+                    default: false
+                    description: If true, TLS certificate verification is skipped
+                      (not recommended for production)
+                    type: boolean
+                  tenantDefaultServiceAccount:
+                    description: |-
+                      Default ServiceAccount for namespaced resources (TenantResource)
+                      When defined, users are required to use this ServiceAccount within the namespace
+                      where they deploy the resource, unless they explicitly provide their own.
+                    maxLength: 63
+                    pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+                    type: string
+                type: object
               nodeMetadata:
                 description: |-
                   Allows to set the forbidden metadata for the worker nodes that could be patched by a Tenant.
@@ -152,52 +209,19 @@ spec:
                 description: Disallow creation of namespaces, whose name matches this
                   regexp
                 type: string
-              serviceAccountClient:
-                description: Service Account Client configuration for impersonation
-                  properties
+              rbac:
+                default: {}
+                description: Define Properties for managed ClusterRoles by Capsule
                 properties:
-                  caSecretKey:
-                    default: ca.crt
-                    description: Key in the secret that holds the CA certificate (e.g.,
-                      "ca.crt")
+                  deleter:
+                    default: capsule-namespace-deleter
+                    description: Name for the ClusterRole required to grant Namespace
+                      Deletion permissions.
                     type: string
-                  caSecretName:
-                    description: Name of the secret containing the CA certificate
-                    type: string
-                  caSecretNamespace:
-                    description: Namespace where the CA certificate secret is located
-                    type: string
-                  endpoint:
-                    description: Kubernetes API Endpoint to use for impersonation
-                    type: string
-                  globalDefaultServiceAccount:
-                    description: |-
-                      Default ServiceAccount for global resources (GlobalTenantResource)
-                      When defined, users are required to use this ServiceAccount anywhere in the cluster
-                      unless they explicitly provide their own.
-                    maxLength: 253
-                    pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
-                    type: string
-                  globalDefaultServiceAccountNamespace:
-                    description: |-
-                      Default ServiceAccount for global resources (GlobalTenantResource)
-                      When defined, users are required to use this ServiceAccount anywhere in the cluster
-                      unless they explicitly provide their own.
-                    maxLength: 253
-                    pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
-                    type: string
-                  skipTlsVerify:
-                    default: false
-                    description: If true, TLS certificate verification is skipped
-                      (not recommended for production)
-                    type: boolean
-                  tenantDefaultServiceAccount:
-                    description: |-
-                      Default ServiceAccount for namespaced resources (TenantResource)
-                      When defined, users are required to use this ServiceAccount within the namespace
-                      where they deploy the resource, unless they explicitly provide their own.
-                    maxLength: 253
-                    pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+                  provisioner:
+                    default: capsule-namespace-provisioner
+                    description: Name for the ClusterRole required to grant Namespace
+                      Provision permissions.
                     type: string
                 type: object
               userGroups:
@@ -239,7 +263,9 @@ spec:
                   type: object
                 type: array
             required:
+            - cacheInvalidation
             - enableTLSReconciler
+            - rbac
             type: object
           status:
             description: CapsuleConfigurationStatus defines the Capsule configuration

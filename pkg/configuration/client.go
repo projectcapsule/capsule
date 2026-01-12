@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"time"
 
 	"github.com/pkg/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -17,8 +18,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	"github.com/projectcapsule/capsule/pkg/api"
 	capsuleapi "github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api/meta"
 )
 
 // capsuleConfiguration is the Capsule Configuration retrieval mode
@@ -30,12 +31,21 @@ type capsuleConfiguration struct {
 }
 
 func DefaultCapsuleConfiguration() capsulev1beta2.CapsuleConfigurationSpec {
+	d, _ := time.ParseDuration("24h")
+
 	return capsulev1beta2.CapsuleConfigurationSpec{
 		Users: []capsuleapi.UserSpec{
 			{
 				Name: "projectcapsule.dev",
 				Kind: capsuleapi.GroupOwner,
 			},
+		},
+		CacheInvalidation: metav1.Duration{
+			Duration: d,
+		},
+		RBAC: &capsulev1beta2.RbacConfiguration{
+			DeleterClusterRole:     "capsule-namespace-deleter",
+			ProvisionerClusterRole: "capsule-namespace-provisioner",
 		},
 		ForceTenantPrefix:              false,
 		ProtectedNamespaceRegexpString: "",
@@ -179,22 +189,22 @@ func (c *capsuleConfiguration) Administrators() capsuleapi.UserListSpec {
 	return c.retrievalFn().Spec.Administrators
 }
 
-func (c *capsuleConfiguration) ServiceAccountClientProperties() *api.ServiceAccountClient {
-	if c.retrievalFn().Spec.ServiceAccountClient == nil {
-		return nil
-	}
+func (c *capsuleConfiguration) ServiceAccountClientProperties() capsulev1beta2.ServiceAccountClient {
+	return c.retrievalFn().Spec.Impersonation
+}
 
-	return c.retrievalFn().Spec.ServiceAccountClient
+func (c *capsuleConfiguration) RBAC() *capsulev1beta2.RbacConfiguration {
+	return c.retrievalFn().Spec.RBAC
+}
+
+func (c *capsuleConfiguration) CacheInvalidation() metav1.Duration {
+	return c.retrievalFn().Spec.CacheInvalidation
 }
 
 func (c *capsuleConfiguration) ServiceAccountClient(ctx context.Context) (client *rest.Config, err error) {
 	props := c.ServiceAccountClientProperties()
 
 	client = c.rest
-
-	if props == nil {
-		return
-	}
 
 	if props.Endpoint != "" {
 		client.Host = c.rest.Host
@@ -206,10 +216,10 @@ func (c *capsuleConfiguration) ServiceAccountClient(ctx context.Context) (client
 		if props.CASecretName != "" {
 			namespace := props.CASecretNamespace
 			if namespace == "" {
-				namespace = os.Getenv("NAMESPACE")
+				namespace = meta.RFC1123SubdomainName(os.Getenv("NAMESPACE"))
 			}
 
-			caData, err := fetchCACertFromSecret(ctx, c.client, namespace, props.CASecretName, props.CASecretKey)
+			caData, err := fetchCACertFromSecret(ctx, c.client, namespace.String(), props.CASecretName.String(), props.CASecretKey)
 			if err != nil {
 				return nil, fmt.Errorf("could not fetch CA cert: %w", err)
 			}

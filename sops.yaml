@@ -1,0 +1,23 @@
+---
+apiVersion: capsule.clastix.io/v1beta2
+kind: GlobalTenantResource
+metadata:
+  name: tenant-sops-providers
+spec:
+  resyncPeriod: 600s
+  scope: Namespace
+  resources:
+    - rawItems:
+        - apiVersion: addons.projectcapsule.dev/v1alpha1
+          kind: SopsProvider
+          metadata:
+            name: "{{tenant.name}}-{{namespace}}-secrets"
+          spec:
+            keys:
+            - namespaceSelector:
+                matchLabels:
+                  capsule.clastix.io/tenant: "{{tenant.name}}"
+            sops:
+            - namespaceSelector:
+                matchLabels:
+                  capsule.clastix.io/tenant: "{{tenant.name}}"

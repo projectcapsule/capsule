@@ -98,6 +98,27 @@ func LabelsChanged(keys []string, oldLabels, newLabels map[string]string) bool {
 	return false
 }
 
+func LabelsMatchingPredicate(match map[string]string) builder.Predicates {
+	return builder.WithPredicates(predicate.NewPredicateFuncs(func(obj client.Object) bool {
+		if len(match) == 0 {
+			return true
+		}
+
+		labels := obj.GetLabels()
+		if labels == nil {
+			return false
+		}
+
+		for k, v := range match {
+			if labels[k] != v {
+				return false
+			}
+		}
+
+		return true
+	}))
+}
+
 func NamesMatchingPredicate(names ...string) builder.Predicates {
 	return builder.WithPredicates(predicate.NewPredicateFuncs(func(object client.Object) bool {
 		return slices.Contains(names, object.GetName())

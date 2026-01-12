@@ -15,6 +15,10 @@ spec:
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
+    - description: The total amount of items being replicated
+      jsonPath: .status.size
+      name: Items
+      type: integer
     - description: Reconcile Status for the tenant
       jsonPath: .status.conditions[?(@.type=="Ready")].status
       name: Ready
@@ -55,17 +59,45 @@ spec:
           spec:
             description: TenantResourceSpec defines the desired state of TenantResource.
             properties:
+              adopt:
+                default: false
+                description: Enabling this allows TenanResources to interact with
+                  objects which were not created by a TenantResource. In this case
+                  on prune no deletion of the entire object is made.
+                type: boolean
               cordoned:
                 default: false
                 description: |-
                   When cordoning a replication it will no longer execute any applies or deletions (paused).
                   This is useful for maintenances
                 type: boolean
+              dependsOn:
+                description: |-
+                  DependsOn may contain a meta.NamespacedObjectReference slice
+                  with references to TenantResource resources that must be ready before this
+                  TenantResource can be reconciled.
+                items:
+                  description: LocalObjectReference contains enough information to
+                    locate the referenced Kubernetes resource object.
+                  properties:
+                    name:
+                      description: Name of the referent.
+                      maxLength: 63
+                      pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+                      type: string
+                  required:
+                  - name
+                  type: object
+                type: array
+              force:
+                default: false
+                description: |-
+                  Force indicates that in case of conflicts with server-side apply, the client should acquire ownership of the conflicting field.
+                  You may create collisions with this.
+                type: boolean
               pruningOnDelete:
                 default: true
                 description: |-
-                  Deprecated: Each Resource now declares it's own Prune property
-
                   When the replicated resource manifest is deleted, all the objects replicated so far will be automatically deleted.
                   Disable this to keep replicated resources although the deletion of the replication manifest.
                 type: boolean
@@ -118,7 +150,7 @@ spec:
                               namespace:
                                 description: Namespace of the values referent.
                                 maxLength: 253
-                                minLength: 1
+                                pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
                                 type: string
                               optional:
                                 default: true
@@ -252,7 +284,7 @@ spec:
                           namespace:
                             description: Namespace of the values referent.
                             maxLength: 253
-                            minLength: 1
+                            pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
                             type: string
                           optional:
                             default: true
@@ -316,48 +348,8 @@ spec:
                       description: List of raw resources that must be replicated.
                       items:
                         type: object
-                        x-kubernetes-embedded-resource: true
                         x-kubernetes-preserve-unknown-fields: true
                       type: array
-                    serviceAccount:
-                      description: |-
-                        Local ServiceAccount which will perform all the actions defined in the TenantResource
-                        You must provide permissions accordingly to that ServiceAccount
-                      properties:
-                        name:
-                          description: ServiceAccount Name Reference
-                          maxLength: 253
-                          pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
-                          type: string
-                        namespace:
-                          description: ServiceAccount Namespace Reference
-                          maxLength: 253
-                          pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
-                          type: string
-                      type: object
-                    settings:
-                      default: {}
-                      properties:
-                        adopt:
-                          default: false
-                          description: Enabling this allows TenanResources to interact
-                            with objects which were not created by a TenantResource.
-                            In this case on prune no deletion of the entire object
-                            is made.
-                          type: boolean
-                        force:
-                          default: false
-                          description: |-
-                            Force indicates that in case of conflicts with server-side apply, the client should acquire ownership of the conflicting field.
-                            You may create collisions with this.
-                          type: boolean
-                        prune:
-                          default: true
-                          description: |-
-                            When the replicated resource manifest is deleted, all the objects replicated so far will be automatically deleted.
-                            Disable this to keep replicated resources although the deletion of the replication manifest.
-                          type: boolean
-                      type: object
                     templates:
                       description: Templates for advanced use cases
                       items:
@@ -391,15 +383,12 @@ spec:
                   You must provide permissions accordingly to that ServiceAccount
                 properties:
                   name:
-                    description: ServiceAccount Name Reference
-                    maxLength: 253
+                    description: Name of the referent.
+                    maxLength: 63
                     pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
                     type: string
-                  namespace:
-                    description: ServiceAccount Namespace Reference
-                    maxLength: 253
-                    pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
-                    type: string
+                required:
+                - name
                 type: object
             required:
             - resources
@@ -471,38 +460,28 @@ spec:
                   properties:
                     group:
                       type: string
-                    index:
-                      type: string
                     kind:
                       type: string
                     name:
                       type: string
                     namespace:
                       type: string
-                    settings:
-                      properties:
-                        adopt:
-                          default: false
-                          description: Enabling this allows TenanResources to interact
-                            with objects which were not created by a TenantResource.
-                            In this case on prune no deletion of the entire object
-                            is made.
-                          type: boolean
-                        force:
-                          default: false
-                          description: |-
-                            Force indicates that in case of conflicts with server-side apply, the client should acquire ownership of the conflicting field.
-                            You may create collisions with this.
-                          type: boolean
-                        prune:
-                          default: true
-                          description: |-
-                            When the replicated resource manifest is deleted, all the objects replicated so far will be automatically deleted.
-                            Disable this to keep replicated resources although the deletion of the replication manifest.
-                          type: boolean
-                      type: object
                     status:
                       properties:
+                        lastApply:
+                          description: |-
+                            An opaque value that represents the internal version of this object that can
+                            be used by clients to determine when objects have changed. May be used for optimistic
+                            concurrency, change detection, and the watch operation on a resource or set of resources.
+                            Clients must treat these values as opaque and passed unmodified back to the server.
+                            They may only be valid for a particular resource or set of resources.
+
+                            Populated by the system.
+                            Read-only.
+                            Value must be treated as opaque by clients and .
+                            More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency
+                          format: date-time
+                          type: string
                         message:
                           description: |-
                             message is a human readable message indicating details about the transition.
@@ -532,8 +511,11 @@ spec:
                       type: string
                   type: object
                 type: array
+              size:
+                description: How many items are being replicated by the TenantResource.
+                type: integer
             required:
-            - processedItems
+            - size
             type: object
         required:
         - spec

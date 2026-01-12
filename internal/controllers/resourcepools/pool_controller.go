@@ -441,7 +441,7 @@ func (r *resourcePoolController) handleClaimDisassociation(
 
 		if !*pool.Spec.Config.DeleteBoundResources || meta.ReleaseAnnotationTriggers(current) {
 			patch := client.MergeFrom(current.DeepCopy())
-			meta.RemoveLooseOwnerReference(current, pool)
+			meta.RemoveLooseOwnerReference(current, meta.GetLooseOwnerReference(pool))
 			meta.ReleaseAnnotationRemove(current)
 
 			if err := r.Patch(ctx, current, patch); err != nil {

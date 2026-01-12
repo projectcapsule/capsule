@@ -12,8 +12,12 @@ import (
 
 // GlobalTenantResourceSpec defines the desired state of GlobalTenantResource.
 type GlobalTenantResourceSpec struct {
-	TenantResourceSpec `json:",inline"`
+	TenantResourceCommonSpec `json:",inline"`
 
+	// Local ServiceAccount which will perform all the actions defined in the TenantResource
+	// You must provide permissions accordingly to that ServiceAccount
+	//+optional
+	ServiceAccount *meta.NamespacedRFC1123ObjectReferenceWithNamespace `json:"serviceAccount,omitzero"`
 	// Resource Scope, Can either be
 	// - Tenant: Create Resources for each tenant  in selected Tenants
 	// - Namespace: Create Resources for each namespace in selected Tenants
@@ -27,19 +31,16 @@ type GlobalTenantResourceSpec struct {
 
 // GlobalTenantResourceStatus defines the observed state of GlobalTenantResource.
 type GlobalTenantResourceStatus struct {
+	TenantResourceCommonStatus `json:",inline"`
+
 	// List of Tenants addressed by the GlobalTenantResource.
 	SelectedTenants []string `json:"selectedTenants,omitempty"`
-
-	// Condition of the GlobalTenantResource.
-	Conditions meta.ConditionList `json:"conditions,omitempty"`
-
-	// List of the replicated resources for the given TenantResource.
-	ProcessedItems ProcessedItems `json:"processedItems,omitzero"`
 }
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:scope=Cluster
+// +kubebuilder:printcolumn:name="Items",type="integer",JSONPath=".status.size",description="The total amount of items being replicated"
 // +kubebuilder:printcolumn:name="Ready",type="string",JSONPath=".status.conditions[?(@.type==\"Ready\")].status",description="Reconcile Status for the tenant"
 // +kubebuilder:printcolumn:name="Status",type="string",JSONPath=".status.conditions[?(@.type==\"Ready\")].message",description="Reconcile Message for the tenant"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp",description="Age"

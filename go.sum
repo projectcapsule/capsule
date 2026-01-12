@@ -59,6 +59,8 @@ github.com/fluxcd/cli-utils v0.37.0-flux.1 h1:k/VvPNT3tGa/l2N+qzHduaQr3GVbgoWS6n
 github.com/fluxcd/cli-utils v0.37.0-flux.1/go.mod h1:aND5wX3LuTFtB7eUT7vsWr8mmxRVSPR2Wkvbn0SqPfw=
 github.com/fluxcd/pkg/apis/kustomize v1.14.0 h1:PmWqMpRX0v7/aCAUNWfohe4o1qa9G3Cg/vVr5PCedI4=
 github.com/fluxcd/pkg/apis/kustomize v1.14.0/go.mod h1:CGRpU9Od4ht5+MHL6QlMfWaW87U9UTfGVM5CM4PZ28I=
+github.com/fluxcd/pkg/apis/meta v1.24.0 h1:+e33T4OL9oqMWZSltsgImvi+/Punx42X9NqFlPesH6o=
+github.com/fluxcd/pkg/apis/meta v1.24.0/go.mod h1:UWsIbBPCxYvoVklr2mV2uLFBf/n17dNAmKFjRfApdDo=
 github.com/fluxcd/pkg/ssa v0.61.0 h1:GeueQfZVrjPLEzmEkq6gpFTBr1MDcqUihCQDf6AaIo8=
 github.com/fluxcd/pkg/ssa v0.61.0/go.mod h1:PNRlgihYbmlQU5gzsB14nrsNMbtACNanBnKhLCWmeX8=
 github.com/frankban/quicktest v1.14.6 h1:7Xjx+VpznH+oBnejlPUj8oUpdxnVs4f8XU8WnHkI4W8=

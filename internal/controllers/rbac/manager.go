@@ -6,7 +6,6 @@ package rbac
 import (
 	"context"
 	"errors"
-	"fmt"
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
@@ -30,6 +29,10 @@ import (
 	"github.com/projectcapsule/capsule/pkg/configuration"
 )
 
+var (
+	controllerManager = "rbac-controller"
+)
+
 type Manager struct {
 	Log           logr.Logger
 	Client        client.Client
@@ -38,7 +41,9 @@ type Manager struct {
 
 //nolint:revive
 func (r *Manager) SetupWithManager(ctx context.Context, mgr ctrl.Manager, ctrlConfig utils.ControllerOptions) (err error) {
-	namesPredicate := utils.NamesMatchingPredicate(api.ProvisionerRoleName, api.DeleterRoleName)
+	namesPredicate := utils.LabelsMatchingPredicate(map[string]string{
+		meta.CreatedByCapsuleLabel: controllerManager,
+	})
 
 	crErr := ctrl.NewControllerManagedBy(mgr).
 		For(&rbacv1.ClusterRole{}, namesPredicate).
@@ -82,22 +87,18 @@ func (r *Manager) SetupWithManager(ctx context.Context, mgr ctrl.Manager, ctrlCo
 // Reconcile serves both required ClusterRole and ClusterRoleBinding resources: that's ok, we're watching for multiple
 // Resource kinds and we're just interested to the ones with the said name since they're bounded together.
 func (r *Manager) Reconcile(ctx context.Context, request reconcile.Request) (res reconcile.Result, err error) {
+	rbac := r.Configuration.RBAC()
+
 	switch request.Name {
-	case api.ProvisionerRoleName:
-		if err = r.EnsureClusterRole(ctx, api.ProvisionerRoleName); err != nil {
-			r.Log.Error(err, "Reconciliation for ClusterRole failed", "ClusterRole", api.ProvisionerRoleName)
+	case rbac.ProvisionerClusterRole:
+		if err = r.EnsureClusterRoleProvisioner(ctx); err != nil {
+			r.Log.Error(err, "Reconciliation for ClusterRole failed", "ClusterRole", rbac.ProvisionerClusterRole)
 
 			break
 		}
-
-		if err = r.EnsureClusterRoleBindingsProvisioner(ctx); err != nil {
-			r.Log.Error(err, "Reconciliation for ClusterRoleBindings (Provisioner) failed")
-
-			break
-		}
-	case api.DeleterRoleName:
-		if err = r.EnsureClusterRole(ctx, api.DeleterRoleName); err != nil {
-			r.Log.Error(err, "Reconciliation for ClusterRole failed", "ClusterRole", api.DeleterRoleName)
+	case rbac.DeleterClusterRole:
+		if err = r.EnsureClusterRoleDeleter(ctx); err != nil {
+			r.Log.Error(err, "Reconciliation for ClusterRole failed", "ClusterRole", rbac.DeleterClusterRole)
 		}
 	}
 
@@ -105,13 +106,29 @@ func (r *Manager) Reconcile(ctx context.Context, request reconcile.Request) (res
 }
 
 func (r *Manager) EnsureClusterRoleBindingsProvisioner(ctx context.Context) error {
+	rbac := r.Configuration.RBAC()
+
 	crb := &rbacv1.ClusterRoleBinding{
-		ObjectMeta: metav1.ObjectMeta{Name: api.ProvisionerRoleName},
+		ObjectMeta: metav1.ObjectMeta{Name: rbac.ProvisionerClusterRole},
 	}
 
 	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		_, err := controllerutil.CreateOrUpdate(ctx, r.Client, crb, func() error {
-			crb.RoleRef = api.ProvisionerClusterRoleBinding.RoleRef
+			crb.RoleRef = rbacv1.RoleRef{
+				Kind:     "ClusterRole",
+				Name:     rbac.ProvisionerClusterRole,
+				APIGroup: rbacv1.GroupName,
+			}
+
+			labels := crb.GetLabels()
+			if labels == nil {
+				labels = make(map[string]string)
+			}
+
+			labels[meta.CreatedByCapsuleLabel] = "rbac-controller"
+
+			crb.SetLabels(labels)
+
 			crb.Subjects = nil
 
 			users := r.Configuration.GetUsersByStatus()
@@ -169,20 +186,69 @@ func (r *Manager) EnsureClusterRoleBindingsProvisioner(ctx context.Context) erro
 	})
 }
 
-func (r *Manager) EnsureClusterRole(ctx context.Context, roleName string) (err error) {
-	role, ok := api.ClusterRoles[roleName]
-	if !ok {
-		return fmt.Errorf("clusterRole %s is not mapped", roleName)
-	}
-
+func (r *Manager) EnsureClusterRoleProvisioner(ctx context.Context) (err error) {
 	clusterRole := &rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: role.GetName(),
+			Name: r.Configuration.RBAC().ProvisionerClusterRole,
 		},
 	}
 
 	_, err = controllerutil.CreateOrUpdate(ctx, r.Client, clusterRole, func() error {
-		clusterRole.Rules = role.Rules
+		labels := clusterRole.GetLabels()
+		if labels == nil {
+			labels = make(map[string]string)
+		}
+
+		labels[meta.CreatedByCapsuleLabel] = "rbac-controller"
+
+		clusterRole.SetLabels(labels)
+
+		clusterRole.Rules = []rbacv1.PolicyRule{
+			{
+				APIGroups: []string{""},
+				Resources: []string{"namespaces"},
+				Verbs:     []string{"create", "patch"},
+			},
+		}
+
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	err = r.EnsureClusterRoleBindingsProvisioner(ctx)
+	if err != nil && apierrors.IsAlreadyExists(err) {
+		return nil
+	}
+
+	return err
+}
+
+func (r *Manager) EnsureClusterRoleDeleter(ctx context.Context) (err error) {
+	clusterRole := &rbacv1.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: r.Configuration.RBAC().DeleterClusterRole,
+		},
+	}
+
+	_, err = controllerutil.CreateOrUpdate(ctx, r.Client, clusterRole, func() error {
+		labels := clusterRole.GetLabels()
+		if labels == nil {
+			labels = make(map[string]string)
+		}
+
+		labels[meta.CreatedByCapsuleLabel] = "rbac-controller"
+
+		clusterRole.SetLabels(labels)
+
+		clusterRole.Rules = []rbacv1.PolicyRule{
+			{
+				APIGroups: []string{""},
+				Resources: []string{"namespaces"},
+				Verbs:     []string{"delete"},
+			},
+		}
 
 		return nil
 	})
@@ -194,25 +260,11 @@ func (r *Manager) EnsureClusterRole(ctx context.Context, roleName string) (err e
 // since we're not creating empty CR and CRB upon Capsule installation: it's a run-once task, since the reconciliation
 // is handled by the Reconciler implemented interface.
 func (r *Manager) Start(ctx context.Context) error {
-	for roleName := range api.ClusterRoles {
-		r.Log.V(4).Info("setting up ClusterRoles", "ClusterRole", roleName)
-
-		if err := r.EnsureClusterRole(ctx, roleName); err != nil {
-			if apierrors.IsAlreadyExists(err) {
-				continue
-			}
-
-			return err
-		}
+	if err := r.EnsureClusterRoleProvisioner(ctx); err != nil && !apierrors.IsAlreadyExists(err) {
+		return err
 	}
 
-	r.Log.V(4).Info("setting up ClusterRoleBindings")
-
-	if err := r.EnsureClusterRoleBindingsProvisioner(ctx); err != nil {
-		if apierrors.IsAlreadyExists(err) {
-			return nil
-		}
-
+	if err := r.EnsureClusterRoleDeleter(ctx); err != nil && !apierrors.IsAlreadyExists(err) {
 		return err
 	}
 

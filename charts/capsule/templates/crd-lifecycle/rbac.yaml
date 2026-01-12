@@ -3,7 +3,7 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: {{ include "capsule.crds.name" . }}
+  name: capsule:{{ .Release.Name }}:crds
   namespace: {{ .Release.Namespace | quote }}
   annotations:
     # create hook dependencies in the right order
@@ -42,7 +42,7 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: {{ include "capsule.crds.name" . }}
+  name: capsule:{{ .Release.Name }}:crds
   namespace: {{ .Release.Namespace | quote }}
   annotations:
     # create hook dependencies in the right order
@@ -54,7 +54,7 @@ metadata:
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: {{ include "capsule.crds.name" . }}
+  name: capsule:{{ .Release.Name }}:crds
 subjects:
   - kind: ServiceAccount
     name: {{ include "capsule.crds.name" . }}

@@ -37,6 +37,7 @@ import (
 	rbaccontroller "github.com/projectcapsule/capsule/internal/controllers/rbac"
 	"github.com/projectcapsule/capsule/internal/controllers/resourcepools"
 	"github.com/projectcapsule/capsule/internal/controllers/resources"
+	serviceaccountcontroller "github.com/projectcapsule/capsule/internal/controllers/serviceaccounts"
 	servicelabelscontroller "github.com/projectcapsule/capsule/internal/controllers/servicelabels"
 	tenantcontroller "github.com/projectcapsule/capsule/internal/controllers/tenant"
 	tlscontroller "github.com/projectcapsule/capsule/internal/controllers/tls"
@@ -64,6 +65,7 @@ import (
 	tntresourceglobal "github.com/projectcapsule/capsule/internal/webhook/tenantresource/global"
 	tntresourcenamespaced "github.com/projectcapsule/capsule/internal/webhook/tenantresource/namespaced"
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
+	"github.com/projectcapsule/capsule/pkg/cache"
 	"github.com/projectcapsule/capsule/pkg/configuration"
 	"github.com/projectcapsule/capsule/pkg/indexer"
 )
@@ -214,6 +216,9 @@ func main() {
 		}
 	}
 
+	// Initialize Caches
+	impersonationCache := cache.NewImpersonationCache()
+
 	if err = (&tenantcontroller.Manager{
 		RESTConfig:    manager.GetConfig(),
 		Client:        manager.GetClient(),
@@ -326,6 +331,7 @@ func main() {
 		),
 		route.ConfigValidation(
 			cfgvalidation.WarningHandler(),
+			cfgvalidation.ServiceAccountHandler(),
 		),
 	)
 
@@ -387,11 +393,22 @@ func main() {
 		os.Exit(1)
 	}
 
+	if err = (&serviceaccountcontroller.Manager{
+		Log:           ctrl.Log.WithName("chache").WithName("clients"),
+		Client:        manager.GetClient(),
+		Configuration: cfg,
+		Cache:         impersonationCache,
+	}).SetupWithManager(manager, controllerConfig); err != nil {
+		setupLog.Error(err, "unable to create controller", "cache", "ServiceAccounts")
+		os.Exit(1)
+	}
+
 	if err := resources.Add(
 		ctrl.Log.WithName("controllers").WithName("TenantResources"),
 		manager,
 		cfg,
 		controllerConfig,
+		impersonationCache,
 	); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "tenantresources")
 		os.Exit(1)

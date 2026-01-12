@@ -1,5 +1,340 @@
 {{- if not $.Values.crds.exclusive }}
   {{- if $.Values.manager.rbac.create }}
+    {{- if $.Values.manager.rbac.minimal }}
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: capsule:{{ include "capsule.fullname" . }}:controller
+  labels:
+    {{- include "capsule.labels" . | nindent 4 }}
+  {{- with .Values.customAnnotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: capsule:{{ .Release.Name }}:controller
+subjects:
+- kind: ServiceAccount
+  name: {{ include "capsule.serviceAccountName" . }}
+  namespace: {{ .Release.Namespace }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: capsule:{{ .Release.Name }}:controller
+  labels:
+    {{- include "capsule.labels" . | nindent 4 }}
+  {{- with .Values.customAnnotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+aggregationRule:
+  clusterRoleSelectors:
+  - matchLabels:
+      projectcapsule.dev/aggregate-to-controller: "true"
+  - matchLabels:
+      projectcapsule.dev/aggregate-to-controller-instance: {{ .Release.Name }}
+rules:
+- apiGroups: [""]
+  resources: ["events"]
+  verbs: ["create", "patch"]
+- apiGroups:
+  - "capsule.clastix.io"
+  resources:
+  - capsuleconfigurations
+  - capsuleconfigurations/status
+  - resourcepoolclaims
+  - resourcepoolclaims/status
+  - resourcepools
+  - resourcepools/status
+  - tenantresources
+  - tenantresources/status
+  - globaltenantresources
+  - globaltenantresources/status
+  - tenants
+  - tenants/status
+  - tenantowners
+  - tenantowners/status
+  verbs:
+  - create
+  - delete
+  - get
+  - patch
+  - update
+  - list
+  - watch
+- apiGroups:
+  - apiextensions.k8s.io
+  resources:
+  - customresourcedefinitions
+  verbs:
+  - list
+  - watch
+- apiGroups:
+  - apiextensions.k8s.io
+  resources:
+  - customresourcedefinitions
+  resourceNames:
+  - capsuleconfigurations.capsule.clastix.io
+  - resourcepoolclaims.capsule.clastix.io
+  - resourcepools.capsule.clastix.io
+  - tenantresources.capsule.clastix.io
+  - globaltenantresources.capsule.clastix.io
+  - tenants.capsule.clastix.io
+  - tenantowners.capsule.clastix.io
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - ""
+  resources:
+  - "serviceaccounts"
+  verbs:
+  - "get"
+  - "list"
+  - "watch"
+
+- apiGroups:
+  - ""
+  resources:
+  - "services"
+  - "pods"
+  - "limitranges"
+  - "resourcequotas"
+  - "persistentvolumes"
+  verbs:
+  - "get"
+  - "list"
+  - "watch"
+  - "patch"
+  - "update"
+- apiGroups:
+  - ""
+  resources:
+  - "namespaces"
+  verbs:
+  - "get"
+  - "list"
+  - "watch"
+  - "patch"
+  - "update"
+  - "delete"
+  - "create"
+- apiGroups:
+  - ""
+  resources:
+  - "limitranges"
+  - "resourcequotas"
+  verbs:
+  - "get"
+  - "list"
+  - "watch"
+  - "create"
+  - "patch"
+  - "update"
+  - "delete"
+  - "deletecollection"
+- apiGroups:
+  - ""
+  resources:
+  - "secrets"
+  verbs:
+  - "list"
+  - "watch"
+- apiGroups:
+  - "networking.k8s.io"
+  resources:
+  - "networkpolicies"
+  verbs:
+  - "get"
+  - "list"
+  - "watch"
+  - "patch"
+  - "update"
+  - "delete"
+  - "deletecollection"
+- apiGroups:
+  - "discovery.k8s.io"
+  resources:
+  - "endpointslices"
+  verbs:
+  - "get"
+  - "list"
+  - "watch"
+  - "patch"
+  - "update"
+- apiGroups:
+  - "rbac.authorization.k8s.io"
+  resources:
+  - "rolebindings"
+  verbs:
+  - "get"
+  - "list"
+  - "watch"
+  - "create"
+  - "patch"
+  - "update"
+  - "delete"
+  - "deletecollection"
+- apiGroups:
+  - "gateway.networking.k8s.io"
+  resources:
+  - "gatewayclasses"
+  verbs:
+  - "get"
+  - "list"
+  - "watch"
+- apiGroups:
+  - "networking.k8s.io"
+  resources:
+  - "ingressclasses"
+  - "ingresses"
+  verbs:
+  - "get"
+  - "list"
+  - "watch"
+- apiGroups:
+  - "node.k8s.io"
+  resources:
+  - "runtimeclasses"
+  verbs:
+  - "get"
+  - "list"
+  - "watch"
+- apiGroups:
+  - "resource.k8s.io"
+  resources:
+  - "deviceclasses"
+  verbs:
+  - "get"
+  - "list"
+  - "watch"
+- apiGroups:
+  - "scheduling.k8s.io"
+  resources:
+  - "priorityclasses"
+  verbs:
+  - "get"
+  - "list"
+  - "watch"
+- apiGroups:
+  - "storage.k8s.io"
+  resources:
+  - "storageclasses"
+  verbs:
+  - "get"
+  - "list"
+  - "watch"
+- apiGroups:
+  - admissionregistration.k8s.io
+  resources:
+  - mutatingwebhookconfigurations
+  verbs:
+  - watch
+  - list
+- apiGroups:
+  - admissionregistration.k8s.io
+  resources:
+  - mutatingwebhookconfigurations
+  resourceNames:
+  -  {{ include "capsule.fullname" . }}-mutating-webhook-configuration
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - admissionregistration.k8s.io
+  resources:
+  - validatingwebhookconfigurations
+  verbs:
+  - watch
+  - list
+- apiGroups:
+  - admissionregistration.k8s.io
+  resources:
+  - validatingwebhookconfigurations
+  resourceNames:
+  -  {{ include "capsule.fullname" . }}-validating-webhook-configuration
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups: ["rbac.authorization.k8s.io"]
+  resources: ["clusterroles"]
+  verbs:
+  - "list"
+  - "watch"
+  - get
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups: ["rbac.authorization.k8s.io"]
+  resources: ["clusterroles"]
+  resourceNames:
+    - {{ $.Values.manager.options.rbac.provisioner}}
+    - {{ $.Values.manager.options.rbac.deleter}}
+  verbs:
+  - get
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups: ["rbac.authorization.k8s.io"]
+  resources: ["clusterrolebindings"]
+  verbs:
+  - "list"
+  - "watch"
+  - get
+  - create
+  - update
+  - patch
+  - delete
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: capsule:{{ .Release.Name }}:controller
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "capsule.labels" . | nindent 4 }}
+  {{- with .Values.customAnnotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+rules:
+- apiGroups: ["coordination.k8s.io"]
+  resources: ["leases"]
+  verbs: ["get", "list", "watch", "create", "update", "patch"]
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["get", "list", "watch", "create", "update", "patch"]
+
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: capsule:{{ .Release.Name }}:controller
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "capsule.labels" $ | nindent 4 }}
+  {{- with $.Values.customAnnotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: capsule:{{ .Release.Name }}:controller
+subjects:
+- kind: ServiceAccount
+  name: {{ include "capsule.serviceAccountName" $ }}
+  namespace: {{ $.Release.Namespace }}
+    {{- else }}
 ---
 kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
@@ -19,13 +354,14 @@ subjects:
 - kind: ServiceAccount
   name: {{ include "capsule.serviceAccountName" . }}
   namespace: {{ .Release.Namespace }}
+    {{- end }}
   {{- end }}
   {{- range $_, $cr := $.Values.manager.rbac.existingClusterRoles }}
 ---
 kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
-  name: {{ include "capsule.fullname" $ }}-{{ $cr }}
+  name: capsule:{{ include "capsule.fullname" $ }}:{{ $cr }}
   labels:
     {{- include "capsule.labels" $ | nindent 4 }}
   {{- with $.Values.customAnnotations }}
@@ -46,7 +382,7 @@ subjects:
 kind: RoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
-  name: {{ include "capsule.fullname" $ }}-{{ $nr }}
+  name: capsule:{{ include "capsule.fullname" $ }}:{{ $nr }}
   namespace: {{ $.Release.Namespace }}
   labels:
     {{- include "capsule.labels" $ | nindent 4 }}

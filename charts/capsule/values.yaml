@@ -96,10 +96,12 @@ proxy:
 
 # These are ClusterRoles which grant permissions for Capsule CRDs to Tenant Owners
 rbac:
+  # -- Allow the creation of TenantResources
   resources:
     create: false
     labels:
       rbac.authorization.k8s.io/aggregate-to-admin: "true"
+  # -- Allow the creation of ResourcePoolClaims
   resourcepoolclaims:
     create: false
     labels:
@@ -112,9 +114,15 @@ manager:
   rbac:
     # -- Specifies whether RBAC resources should be created.
     create: true
+
+    # -- Strongly restrict the RBAC assigned to Capsule Controller.
+    # When set to true you must aggregate further permissions by yourself.
+    strict: false
+
     # -- Specifies further cluster roles to be added to the Capsule manager service account.
     existingClusterRoles: []
     # - cluster-admin
+
     # -- Specifies further cluster roles to be added to the Capsule manager service account.
     existingRoles: []
     # - namespace-admin
@@ -211,6 +219,18 @@ manager:
       forbiddenAnnotations:
         denied: []
         deniedRegex: ""
+
+    # -- Duration after which the in-memory cache is invalidated (based on usaage) and re-fetched from the API server
+    cacheInvalidation: 24h0m0s
+
+    # -- Managed RBAC configuration for the controller
+    rbac:
+      deleter: capsule-namespace-deleter
+      provisioner: capsule-namespace-provisioner
+
+    # -- Impersonation
+    impersonation: {}
+
     # -- DEPRECATED: use users properties.
     # Names of the users considered as Capsule users.
     userNames: []

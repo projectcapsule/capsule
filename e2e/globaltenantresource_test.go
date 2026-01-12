@@ -21,6 +21,7 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api/misc"
 )
 
 var _ = Describe("Creating a GlobalTenantResource object", func() {
@@ -87,19 +88,18 @@ var _ = Describe("Creating a GlobalTenantResource object", func() {
 					"replicate": "true",
 				},
 			},
-			TenantResourceSpec: capsulev1beta2.TenantResourceSpec{
+
+			TenantResourceCommonSpec: capsulev1beta2.TenantResourceCommonSpec{
 				ResyncPeriod:    metav1.Duration{Duration: time.Minute},
 				PruningOnDelete: ptr.To(true),
 				Resources: []capsulev1beta2.ResourceSpec{
 					{
-						NamespacedItems: []capsulev1beta2.ObjectReference{
+						NamespacedItems: []misc.ResourceReference{
 							{
-								ObjectReferenceAbstract: capsulev1beta2.ObjectReferenceAbstract{
-									Kind:       "Secret",
-									Namespace:  "default",
-									APIVersion: "v1",
-								},
-								Selector: metav1.LabelSelector{
+								Kind:       "Secret",
+								Namespace:  "default",
+								APIVersion: "v1",
+								Selector: &metav1.LabelSelector{
 									MatchLabels: map[string]string{
 										"replicate": "true",
 									},

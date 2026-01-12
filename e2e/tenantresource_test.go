@@ -22,6 +22,7 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api/misc"
 )
 
 var _ = Describe("Creating a TenantResource object", Label("tenantresource"), func() {
@@ -78,97 +79,97 @@ var _ = Describe("Creating a TenantResource object", Label("tenantresource"), fu
 			Namespace: "solar-system",
 		},
 		Spec: capsulev1beta2.TenantResourceSpec{
-			ResyncPeriod:    metav1.Duration{Duration: time.Minute},
-			PruningOnDelete: ptr.To(true),
-			Resources: []capsulev1beta2.ResourceSpec{
-				{
-					NamespaceSelector: &metav1.LabelSelector{
-						MatchLabels: map[string]string{
-							"replicate": "true",
+			TenantResourceCommonSpec: capsulev1beta2.TenantResourceCommonSpec{
+				ResyncPeriod:    metav1.Duration{Duration: time.Minute},
+				PruningOnDelete: ptr.To(true),
+				Resources: []capsulev1beta2.ResourceSpec{
+					{
+						NamespaceSelector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{
+								"replicate": "true",
+							},
 						},
-					},
-					NamespacedItems: []capsulev1beta2.ObjectReference{
-						{
-							ObjectReferenceAbstract: capsulev1beta2.ObjectReferenceAbstract{
+						NamespacedItems: []misc.ResourceReference{
+							{
 								Kind:       "Secret",
 								Namespace:  "solar-system",
 								APIVersion: "v1",
-							},
-							Selector: metav1.LabelSelector{
-								MatchLabels: map[string]string{
-									"replicate": "true",
-								},
-							},
-						},
-					},
-					RawItems: []capsulev1beta2.RawExtension{
-						{
-							RawExtension: runtime.RawExtension{
-								Object: &corev1.Secret{
-									TypeMeta: metav1.TypeMeta{
-										Kind:       "Secret",
-										APIVersion: "v1",
-									},
-									ObjectMeta: metav1.ObjectMeta{
-										Name:        "raw-secret-1",
-										Labels:      testLabels,
-										Annotations: testAnnotations,
-									},
-									Type: corev1.SecretTypeOpaque,
-									Data: map[string][]byte{
-										"{{ tenant.name }}": []byte("Cg=="),
-										"{{ namespace }}":   []byte("Cg=="),
+								Selector: &metav1.LabelSelector{
+									MatchLabels: map[string]string{
+										"replicate": "true",
 									},
 								},
 							},
 						},
-						{
-							RawExtension: runtime.RawExtension{
-								Object: &corev1.Secret{
-									TypeMeta: metav1.TypeMeta{
-										Kind:       "Secret",
-										APIVersion: "v1",
+						RawItems: []capsulev1beta2.RawExtension{
+							{
+								RawExtension: runtime.RawExtension{
+									Object: &corev1.Secret{
+										TypeMeta: metav1.TypeMeta{
+											Kind:       "Secret",
+											APIVersion: "v1",
+										},
+										ObjectMeta: metav1.ObjectMeta{
+											Name:        "raw-secret-1",
+											Labels:      testLabels,
+											Annotations: testAnnotations,
+										},
+										Type: corev1.SecretTypeOpaque,
+										Data: map[string][]byte{
+											"{{ tenant.name }}": []byte("Cg=="),
+											"{{ namespace }}":   []byte("Cg=="),
+										},
 									},
-									ObjectMeta: metav1.ObjectMeta{
-										Name:        "raw-secret-2",
-										Labels:      testLabels,
-										Annotations: testAnnotations,
+								},
+							},
+							{
+								RawExtension: runtime.RawExtension{
+									Object: &corev1.Secret{
+										TypeMeta: metav1.TypeMeta{
+											Kind:       "Secret",
+											APIVersion: "v1",
+										},
+										ObjectMeta: metav1.ObjectMeta{
+											Name:        "raw-secret-2",
+											Labels:      testLabels,
+											Annotations: testAnnotations,
+										},
+										Type: corev1.SecretTypeOpaque,
+										Data: map[string][]byte{
+											"{{ tenant.name }}": []byte("Cg=="),
+											"{{ namespace }}":   []byte("Cg=="),
+										},
 									},
-									Type: corev1.SecretTypeOpaque,
-									Data: map[string][]byte{
-										"{{ tenant.name }}": []byte("Cg=="),
-										"{{ namespace }}":   []byte("Cg=="),
+								},
+							},
+							{
+								RawExtension: runtime.RawExtension{
+									Object: &corev1.Secret{
+										TypeMeta: metav1.TypeMeta{
+											Kind:       "Secret",
+											APIVersion: "v1",
+										},
+										ObjectMeta: metav1.ObjectMeta{
+											Name:        "raw-secret-3",
+											Labels:      testLabels,
+											Annotations: testAnnotations,
+										},
+										Type: corev1.SecretTypeOpaque,
+										Data: map[string][]byte{
+											"{{ tenant.name }}": []byte("Cg=="),
+											"{{ namespace }}":   []byte("Cg=="),
+										},
 									},
 								},
 							},
 						},
-						{
-							RawExtension: runtime.RawExtension{
-								Object: &corev1.Secret{
-									TypeMeta: metav1.TypeMeta{
-										Kind:       "Secret",
-										APIVersion: "v1",
-									},
-									ObjectMeta: metav1.ObjectMeta{
-										Name:        "raw-secret-3",
-										Labels:      testLabels,
-										Annotations: testAnnotations,
-									},
-									Type: corev1.SecretTypeOpaque,
-									Data: map[string][]byte{
-										"{{ tenant.name }}": []byte("Cg=="),
-										"{{ namespace }}":   []byte("Cg=="),
-									},
-								},
+						AdditionalMetadata: &api.AdditionalMetadataSpec{
+							Labels: map[string]string{
+								"labels.energy.io": "replicate",
 							},
-						},
-					},
-					AdditionalMetadata: &api.AdditionalMetadataSpec{
-						Labels: map[string]string{
-							"labels.energy.io": "replicate",
-						},
-						Annotations: map[string]string{
-							"annotations.energy.io": "replicate",
+							Annotations: map[string]string{
+								"annotations.energy.io": "replicate",
+							},
 						},
 					},
 				},
@@ -350,13 +351,11 @@ var _ = Describe("Creating a TenantResource object", Label("tenantresource"), fu
 
 		By("checking that cross-namespace objects are not replicated", func() {
 			Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: tr.GetName(), Namespace: "solar-system"}, tr)).ToNot(HaveOccurred())
-			tr.Spec.Resources[0].NamespacedItems = append(tr.Spec.Resources[0].NamespacedItems, capsulev1beta2.ObjectReference{
-				ObjectReferenceAbstract: capsulev1beta2.ObjectReferenceAbstract{
-					Kind:       crossNamespaceItem.Kind,
-					Namespace:  crossNamespaceItem.GetName(),
-					APIVersion: crossNamespaceItem.APIVersion,
-				},
-				Selector: metav1.LabelSelector{
+			tr.Spec.Resources[0].NamespacedItems = append(tr.Spec.Resources[0].NamespacedItems, misc.ResourceReference{
+				Kind:       crossNamespaceItem.Kind,
+				Namespace:  crossNamespaceItem.GetName(),
+				APIVersion: crossNamespaceItem.APIVersion,
+				Selector: &metav1.LabelSelector{
 					MatchLabels: crossNamespaceItem.GetLabels(),
 				},
 			})

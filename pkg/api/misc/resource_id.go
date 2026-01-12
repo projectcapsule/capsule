@@ -5,26 +5,35 @@ package misc
 
 import (
 	"fmt"
-	"strings"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
+type TenantResourceID struct {
+	Tenant string `json:"tenant,omitempty"`
+}
+
+type TenantResourceIDWithOrigin struct {
+	TenantResourceID `json:",inline"`
+
+	Origin string `json:"origin,omitempty"`
+}
+
 // ResourceID represents the decomposed parts of a Kubernetes resource identity.
 type ResourceID struct {
+	TenantResourceID `json:",inline"`
+
 	Group     string `json:"group,omitempty"`
 	Version   string `json:"version,omitempty"`
 	Kind      string `json:"kind,omitempty"`
 	Name      string `json:"name,omitempty"`
 	Namespace string `json:"namespace,omitempty"`
-	Tenant    string `json:"tenant,omitempty"`
-	Index     string `json:"index,omitempty"`
 }
 
 // ResourceKey builds the canonical key string used for maps/sets.
 // Non-namespaced objects will have "_" as the namespace component.
-func NewResourceID(u *unstructured.Unstructured, tenant string, index string) ResourceID {
+func NewResourceID(u *unstructured.Unstructured, tenant string, origin string) ResourceID {
 	gvk := u.GroupVersionKind()
 
 	return ResourceID{
@@ -33,28 +42,10 @@ func NewResourceID(u *unstructured.Unstructured, tenant string, index string) Re
 		Kind:      gvk.Kind,
 		Name:      u.GetName(),
 		Namespace: u.GetNamespace(),
-		Tenant:    tenant,
-		Index:     index,
+		TenantResourceID: TenantResourceID{
+			Tenant: tenant,
+		},
 	}
-}
-
-// ParseResourceKey parses a key created by ResourceKey back into structured form.
-func ParseResourceKey(key string) (ResourceID, error) {
-	parts := strings.Split(key, ",")
-	if len(parts) != 5 {
-		return ResourceID{}, fmt.Errorf("invalid resource key: %q", key)
-	}
-	id := ResourceID{
-		Group:     parts[0],
-		Version:   parts[1],
-		Kind:      parts[2],
-		Namespace: parts[3],
-		Name:      parts[4],
-	}
-	if id.Namespace == "_" {
-		id.Namespace = ""
-	}
-	return id, nil
 }
 
 func (r ResourceID) GetName() string {
@@ -74,26 +65,28 @@ func (r ResourceID) GetGVK() schema.GroupVersionKind {
 	}
 }
 
-// Key returns the string key form again (inverse of ParseResourceKey).
-func (r ResourceID) GetIndex() string {
-	i := r.Index
-	if i == "" {
-		i = r.GetKey()
-	}
-
-	return i
-}
-
-func (r ResourceID) GetKey() string {
+func (r ResourceID) GetKey(sep string) string {
 	// Use a delimiter that won’t appear in fields normally; '\x1f' (unit separator) is great.
-	sep := "\x1f"
-	return fmt.Sprintf("%s%s%s%s%s%s%s%s%s%s%s%s%s",
+	if sep == "" {
+		sep = "\x1f"
+	}
+	return fmt.Sprintf("%s%s%s%s%s%s%s%s%s%s%s%s",
 		r.Group, sep,
 		r.Version, sep,
 		r.Kind, sep,
 		r.Namespace, sep,
 		r.Name, sep,
 		r.Tenant, sep,
-		r.Index,
+	)
+}
+
+func (r ResourceID) FieldOwner(sep string) string {
+	// Use a delimiter that won’t appear in fields normally; '\x1f' (unit separator) is great.
+	if sep == "" {
+		sep = "/"
+	}
+	return fmt.Sprintf("%s%s%s%s",
+		r.Namespace, sep,
+		r.Tenant, sep,
 	)
 }

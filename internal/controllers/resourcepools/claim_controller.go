@@ -209,12 +209,14 @@ func (r resourceClaimController) allocateResourcePool(
 		UID:  pool.GetUID(),
 	}
 
-	if !meta.HasLooseOwnerReference(cl, pool) {
+	reference := meta.GetLooseOwnerReference(pool)
+
+	if !meta.HasLooseOwnerReference(cl, reference) {
 		log.V(4).Info("adding ownerreference for", "pool", pool.Name)
 
 		patch := client.MergeFrom(cl.DeepCopy())
 
-		if err := meta.SetLooseOwnerReference(cl, pool, r.Scheme()); err != nil {
+		if err := meta.SetLooseOwnerReference(cl, reference); err != nil {
 			return err
 		}
 

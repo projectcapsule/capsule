@@ -10,21 +10,23 @@ import (
 
 	"github.com/go-logr/logr"
 	gherrors "github.com/pkg/errors"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/cluster-api/util/patch"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
@@ -32,33 +34,140 @@ import (
 	"github.com/projectcapsule/capsule/internal/metrics"
 	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
+	"github.com/projectcapsule/capsule/pkg/api/processor"
+	"github.com/projectcapsule/capsule/pkg/cache"
+	clt "github.com/projectcapsule/capsule/pkg/client"
 	"github.com/projectcapsule/capsule/pkg/configuration"
 	"github.com/projectcapsule/capsule/pkg/template"
-	"github.com/projectcapsule/capsule/pkg/utils/users"
 )
 
 type globalResourceController struct {
 	client        client.Client
 	log           logr.Logger
-	processor     Processor
+	processor     processor.Processor
 	configuration configuration.Configuration
 	metrics       *metrics.GlobalTenantResourceRecorder
+
+	impersonation *cache.ImpersonationCache
 }
 
 func (r *globalResourceController) SetupWithManager(mgr ctrl.Manager, cfg utils.ControllerOptions) error {
 	r.client = mgr.GetClient()
-	r.processor = Processor{
-		client:                       mgr.GetClient(),
-		factory:                      serializer.NewCodecFactory(r.client.Scheme()),
-		configuration:                r.configuration,
-		allowCrossNamespaceSelection: false,
+	r.processor = processor.Processor{
+		Configuration:                r.configuration,
+		AllowCrossNamespaceSelection: false,
 	}
 
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&capsulev1beta2.GlobalTenantResource{}).
-		Watches(&capsulev1beta2.Tenant{}, handler.EnqueueRequestsFromMapFunc(r.enqueueRequestFromTenant)).
+		For(
+			&capsulev1beta2.GlobalTenantResource{},
+			builder.WithPredicates(predicate.GenerationChangedPredicate{}),
+		).
+		Watches(
+			&capsulev1beta2.GlobalTenantResource{},
+			handler.EnqueueRequestsFromMapFunc(r.enqueueDependentGlobalTenantResources),
+		).
+		Watches(
+			&capsulev1beta2.Tenant{},
+			handler.EnqueueRequestsFromMapFunc(r.enqueueRequestFromTenant),
+		).
+		// Performs Cache Invalidation for all Impersonations Clients
+		Watches(
+			&corev1.ServiceAccount{},
+			handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, o client.Object) []ctrl.Request {
+				return nil
+			}),
+			builder.WithPredicates(predicate.Funcs{
+				CreateFunc: func(e event.CreateEvent) bool {
+					return false
+				},
+				UpdateFunc: func(e event.UpdateEvent) bool {
+					return false
+				},
+				GenericFunc: func(e event.GenericEvent) bool {
+					return false
+				},
+				DeleteFunc: func(e event.DeleteEvent) bool {
+					sa, ok := e.Object.(*corev1.ServiceAccount)
+					if !ok {
+						return false
+					}
+
+					r.impersonation.Invalidate(sa.Namespace, sa.Name)
+
+					return false
+				},
+			}),
+		).
 		WithOptions(controller.Options{MaxConcurrentReconciles: cfg.MaxConcurrentReconciles}).
 		Complete(r)
+}
+
+func (r *globalResourceController) enqueueDependentGlobalTenantResources(
+	ctx context.Context,
+	obj client.Object,
+) []ctrl.Request {
+	changed, ok := obj.(*capsulev1beta2.GlobalTenantResource)
+	if !ok {
+		return nil
+	}
+
+	var list capsulev1beta2.GlobalTenantResourceList
+	if err := r.client.List(ctx, &list); err != nil {
+		return nil
+	}
+
+	reqs := make([]ctrl.Request, 0)
+
+	for _, gtr := range list.Items {
+		for _, dep := range gtr.Spec.DependsOn {
+			if dep.Name.String() == changed.Name {
+				reqs = append(reqs, ctrl.Request{
+					NamespacedName: types.NamespacedName{
+						Name:      gtr.Name,
+						Namespace: gtr.Namespace,
+					},
+				})
+				break
+			}
+		}
+	}
+
+	return reqs
+}
+
+func (r *globalResourceController) enqueueRequestFromTenant(ctx context.Context, object client.Object) (reqs []reconcile.Request) {
+	tnt := object.(*capsulev1beta2.Tenant) //nolint:forcetypeassert
+
+	resList := capsulev1beta2.GlobalTenantResourceList{}
+	if err := r.client.List(ctx, &resList); err != nil {
+		return nil
+	}
+
+	set := sets.NewString()
+
+	for _, res := range resList.Items {
+		tntSelector := res.Spec.TenantSelector
+
+		selector, err := metav1.LabelSelectorAsSelector(&tntSelector)
+		if err != nil {
+			continue
+		}
+
+		if selector.Matches(labels.Set(tnt.GetLabels())) {
+			set.Insert(res.GetName())
+		}
+	}
+	// No need of ordered value here
+	for res := range set {
+		reqs = append(reqs, reconcile.Request{
+			NamespacedName: types.NamespacedName{
+				Name: res,
+			},
+		})
+	}
+
+	return reqs
 }
 
 func (r *globalResourceController) Reconcile(ctx context.Context, request reconcile.Request) (res reconcile.Result, err error) {
@@ -98,10 +207,55 @@ func (r *globalResourceController) Reconcile(ctx context.Context, request reconc
 				err = gherrors.Wrap(e, "failed to patch GlobalTenantResource")
 			}
 		}
+
+		// Controller-Runtime should never receive error
+		err = nil
 	}()
+
+	// Reconcile Request
+	patches := clt.PatchRemoveAnnotations(tntResource.GetAnnotations(), []string{meta.ReconcileAnnotation})
+	if len(patches) > 0 {
+		log.V(4).Info("removing reconcile annotation", "items", len(patches))
+		err = clt.ApplyPatches(ctx, r.client, tntResource.DeepCopy(), patches, meta.ResourceControllerFieldOwnerPrefix())
+
+		return reconcile.Result{
+			Requeue:      true,
+			RequeueAfter: tntResource.Spec.ResyncPeriod.Duration,
+		}, nil
+	}
 
 	if *tntResource.Spec.Cordoned {
 		log.V(5).Info("tenant resource is cordoned")
+	}
+
+	for _, dep := range tntResource.Spec.DependsOn {
+		d := &capsulev1beta2.GlobalTenantResource{}
+		err = r.client.Get(ctx, types.NamespacedName{Name: dep.Name.String(), Namespace: ""}, d)
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				err = fmt.Errorf("dependency %s not found", dep.Name)
+			}
+
+			return reconcile.Result{
+				Requeue:      true,
+				RequeueAfter: tntResource.Spec.ResyncPeriod.Duration,
+			}, err
+		}
+
+		stat := d.Status.Conditions.GetConditionByType(meta.ReadyCondition)
+		if stat.Status != metav1.ConditionTrue {
+			err = fmt.Errorf("dependency %s not ready", dep.Name)
+
+			return reconcile.Result{
+				Requeue:      true,
+				RequeueAfter: tntResource.Spec.ResyncPeriod.Duration,
+			}, err
+		}
+	}
+
+	err = r.updateReconcilingStatus(ctx, tntResource)
+	if err != nil {
+		return reconcile.Result{}, gherrors.Wrap(err, "failed to update status")
 	}
 
 	c, err := r.loadClient(ctx, log, tntResource)
@@ -115,9 +269,9 @@ func (r *globalResourceController) Reconcile(ctx context.Context, request reconc
 		return reconcile.Result{}, nil
 	}
 
-	// Handle non-deleted GlobalTenantResource
 	err = r.reconcileNormal(ctx, c, tntResource)
 
+	// Finalizers
 	if len(tntResource.Status.ProcessedItems) > 0 {
 		controllerutil.AddFinalizer(tntResource, meta.ControllerFinalizer)
 	} else {
@@ -126,44 +280,19 @@ func (r *globalResourceController) Reconcile(ctx context.Context, request reconc
 
 	controllerutil.RemoveFinalizer(tntResource, meta.LegacyResourceFinalizer)
 
+	// Annotations
+	annos := tntResource.GetAnnotations()
+	if annos != nil {
+		log.V(5).Info("removing reconcile annotation")
+
+		delete(annos, meta.ReconcileAnnotation)
+		tntResource.SetAnnotations(annos)
+	}
+
 	return reconcile.Result{
 		Requeue:      true,
 		RequeueAfter: tntResource.Spec.ResyncPeriod.Duration,
 	}, nil
-}
-
-func (r *globalResourceController) enqueueRequestFromTenant(ctx context.Context, object client.Object) (reqs []reconcile.Request) {
-	tnt := object.(*capsulev1beta2.Tenant) //nolint:forcetypeassert
-
-	resList := capsulev1beta2.GlobalTenantResourceList{}
-	if err := r.client.List(ctx, &resList); err != nil {
-		return nil
-	}
-
-	set := sets.NewString()
-
-	for _, res := range resList.Items {
-		tntSelector := res.Spec.TenantSelector
-
-		selector, err := metav1.LabelSelectorAsSelector(&tntSelector)
-		if err != nil {
-			continue
-		}
-
-		if selector.Matches(labels.Set(tnt.GetLabels())) {
-			set.Insert(res.GetName())
-		}
-	}
-	// No need of ordered value here
-	for res := range set {
-		reqs = append(reqs, reconcile.Request{
-			NamespacedName: types.NamespacedName{
-				Name: res,
-			},
-		})
-	}
-
-	return reqs
 }
 
 func (r *globalResourceController) reconcileNormal(
@@ -193,43 +322,22 @@ func (r *globalResourceController) reconcileNormal(
 		return err
 	}
 
-	log.Info("FOUND TNTS", "SIZE", len(tntList.Items))
+	filtered := make([]capsulev1beta2.Tenant, 0, len(tntList.Items))
+	for _, tnt := range tntList.Items {
+		if tnt.DeletionTimestamp != nil {
+			continue
+		}
 
-	// This is the list of newer Tenants that are matching the provided GlobalTenantResource Selector:
-	// upon replication and pruning, this will be updated in the status of the resource.
-	tntSet := sets.NewString()
-
-	// A TenantResource is made of several Resource sections, each one with specific options:
-	// the Status can be updated only in case of no errors across all of them to guarantee a valid and coherent status.
-	//processedItems := sets.NewString()
+		filtered = append(filtered, tnt)
+	}
 
 	// Always post the processed items, as they allow users to track errors
 	defer func() {
-		tntResource.AssignTenants(tntList.Items)
-
-		log.Info("FOUND STATUS", "SIZE", tntResource.Status.SelectedTenants)
-
-		//	tntResource.Status.ProcessedItems = make([]capsulev1beta2.ObjectReferenceStatus, 0, len(processedItems))
-		//
-		//	for _, item := range processedItems.List() {
-		//		log.Info("PROCESSED", "ITEM", item)
-		//
-		//		or := capsulev1beta2.ObjectReferenceStatus{}
-		//		if parseErr := or.ParseFromString(item); parseErr == nil {
-		//			tntResource.Status.ProcessedItems.UpdateItem(or)
-		//		} else {
-		//			err = errors.Join(err, fmt.Errorf("processed item %q parse failed: %w", item, parseErr))
-		//		}
-		//
-		//		log.Info("PARSED", "OR", or)
-		//	}
-		//
-		//	log.Info("STATUS", "STATUS", tntResource.Status)
-		//
+		tntResource.AssignTenants(filtered)
 	}()
 
-	//status := capsulev1beta2.ProcessedItems{}
-	acc := Accumulator{}
+	acc := processor.Accumulator{}
+	owner := meta.GetLooseOwnerReference(tntResource)
 
 	// Gather Resources
 	if tntResource.ObjectMeta.DeletionTimestamp.IsZero() {
@@ -241,94 +349,24 @@ func (r *globalResourceController) reconcileNormal(
 			tntList,
 			acc,
 		)
-
 		if err != nil {
 			return err
 		}
 	}
 
-	log.V(4).Info("accumulation", "items", len(acc), "accumulator", acc)
-
-	log.V(4).Info("starting pruning items", "present", len(tntResource.Status.ProcessedItems))
-
-	// Prune first, to work on a consistent Status
-	for _, p := range tntResource.Status.ProcessedItems {
-		if _, exists := acc[p.GetKey()]; !exists {
-
-			log.V(4).Info("pruning resources", "Kind", p.Kind, "Name", p.Name, "Namespace", p.Namespace)
-
-			obj := &unstructured.Unstructured{}
-			obj.SetGroupVersionKind(p.GetGVK())
-			obj.SetNamespace(p.GetNamespace())
-			obj.SetName(p.GetName())
-
-			if *p.Prune {
-				err := r.processor.Prune(ctx, c, obj, getFieldOwner(tntResource.GetName(), "", p.ResourceID))
-				if err != nil {
-					p.Status = metav1.ConditionFalse
-					p.Message = "pruning failed: " + err.Error()
-					tntResource.Status.ProcessedItems.UpdateItem(p)
-
-					continue
-				}
-			}
-
-			tntResource.Status.ProcessedItems.RemoveItem(p)
-		}
-	}
-
-	// Finalizing based on inventory
-
-	//
-	log.Info("accumulation", "items", len(acc))
-
-	// Apply
-	for _, item := range acc {
-		or := capsulev1beta2.ObjectReferenceStatus{
-			ResourceIDWithOptions: item.Options,
-			ObjectReferenceStatusCondition: capsulev1beta2.ObjectReferenceStatusCondition{
-				Type: meta.ReadyCondition,
-			},
-		}
-
-		err := r.processor.Apply(
-			ctx,
-			c,
-			item.Object,
-			getFieldOwner(tntResource.GetName(), "", item.Options.ResourceID),
-			*item.Options.Force,
-			*item.Options.Adopt,
-		)
-		if err != nil {
-			or.Status = metav1.ConditionFalse
-			or.Message = "apply failed: " + err.Error()
-		} else {
-			or.Status = metav1.ConditionTrue
-		}
-
-		tntResource.Status.ProcessedItems.UpdateItem(or)
-	}
-
-	// Prune Resources
-	//failed, err := r.processor.HandlePruning(ctx, c, tntResource.Status.ProcessedItems.AsSet(), sets.Set[string](processedItems))
-	//if err != nil {
-	//	return reconcile.Result{}, gherrors.Wrap(err, "failed to prune resources")
-	//}
-	//if len(failed) > 0 {
-	//	tntResource.Status.ProcessedItems = make([]capsulev1beta2.ObjectReferenceStatus, 0, len(processedItems))
-	//
-	//	for _, item := range processedItems.List() {
-	//		if or := (capsulev1beta2.ObjectReferenceStatus{}); or.ParseFromString(item) == nil {
-	//			tntResource.Status.ProcessedItems = append(tntResource.Status.ProcessedItems, or)
-	//		}
-	//	}
-	//}
-
-	tntResource.Status.SelectedTenants = tntSet.List()
-
-	log.Info("processing completed")
-
-	return nil
+	return r.processor.Reconcile(
+		ctx,
+		log,
+		c,
+		&tntResource.Status.ProcessedItems,
+		acc,
+		processor.ProcessorOptions{
+			FieldOwnerPrefix: getFieldOwner(tntResource.GetName(), tntResource.GetNamespace()),
+			Prune:            *tntResource.Spec.PruningOnDelete,
+			Adopt:            *tntResource.Spec.Adopt,
+			Force:            *tntResource.Spec.Force,
+			Owner:            &owner,
+		})
 }
 
 func (r *globalResourceController) gatherResources(
@@ -337,7 +375,7 @@ func (r *globalResourceController) gatherResources(
 	log logr.Logger,
 	tntResource *capsulev1beta2.GlobalTenantResource,
 	tnts capsulev1beta2.TenantList,
-	acc Accumulator,
+	acc processor.Accumulator,
 ) error {
 	for index, resource := range tntResource.Spec.Resources {
 		ilog := log.WithValues("resource", index)
@@ -363,7 +401,7 @@ func (r *globalResourceController) gatherResources(
 
 				ilog.V(5).Info("replicating for each tenant")
 
-				resourceError = r.processor.handleResources(
+				resourceError = collectResources(
 					ctx,
 					c,
 					tnt,
@@ -372,12 +410,12 @@ func (r *globalResourceController) gatherResources(
 					nil,
 					tplContext,
 					acc,
+					true,
 				)
 			default:
 				ilog.V(5).Info("replicating for each namespace")
 
-				resourceError = r.processor.foreachTenantNamespace(ctx, ilog, c, tnt, resource, strconv.Itoa(index), tplContext, acc)
-
+				resourceError = foreachTenantNamespace(ctx, ilog, c, r.client, tnt, resource, strconv.Itoa(index), tplContext, acc, true)
 			}
 
 			// Only start pruning when the resource item itself did not throw an error
@@ -390,76 +428,94 @@ func (r *globalResourceController) gatherResources(
 	return nil
 }
 
-func (r *globalResourceController) reconcileDelete(
-	ctx context.Context,
-	c client.Client,
-	tntResource *capsulev1beta2.GlobalTenantResource,
-) (reconcile.Result, error) {
-	//_ := ctrllog.FromContext(ctx)
-
-	//if *tntResource.Spec.PruningOnDelete {
-	//	failedItems, err := r.processor.HandlePruning(ctx, c, tntResource.Status.ProcessedItems.AsSet(), nil)
-	//	if len(failedItems) > 0 {
-	//		tntResource.Status.ProcessedItems = make([]capsulev1beta2.ObjectReferenceStatus, 0, len(failedItems))
-	//
-	//		for _, item := range failedItems {
-	//			if or := (capsulev1beta2.ObjectReferenceStatus{}); or.ParseFromString(item) == nil {
-	//				tntResource.Status.ProcessedItems = append(tntResource.Status.ProcessedItems, or)
-	//			}
-	//		}
-	//	}
-	//
-	//	if len(failedItems) > 0 || err != nil {
-	//		return reconcile.Result{}, gherrors.Wrap(err, "failed to prune resources on delete")
-	//	}
-	//
-	//	controllerutil.RemoveFinalizer(tntResource, finalizer)
-	//}
-	//
-	//log.Info("processing completed")
-
-	return reconcile.Result{Requeue: true, RequeueAfter: tntResource.Spec.ResyncPeriod.Duration}, nil
-}
-
 func (r *globalResourceController) loadClient(
 	ctx context.Context,
 	log logr.Logger,
 	tntResource *capsulev1beta2.GlobalTenantResource,
 ) (client.Client, error) {
-	// Add ServiceAccount if required, Retriggers reconcile
-	// This is done in the background, Everything else should be handeled at admission
-	if changed := SetGlobalTenantResourceServiceAccount(r.configuration, tntResource); changed {
-		log.V(5).Info("adding default serviceAccount '%s'", tntResource.Spec.ServiceAccount.GetFullName())
+	sa := r.impersonatedServiceAccount(ctx, log, tntResource)
+	if sa == nil {
+		log.V(4).Info("using controller client")
 
-		return nil, nil
+		return r.client, nil
 	}
 
-	// Load impersonation client
-	saClient := r.client
-	if tntResource.Spec.ServiceAccount != nil {
-		re, err := r.configuration.ServiceAccountClient(ctx)
-		if err != nil {
-			log.Error(err, "failed to load impersonated rest client")
+	re, err := r.configuration.ServiceAccountClient(ctx)
+	if err != nil {
+		log.Error(err, "failed to load impersonated rest client")
 
-			return nil, err
+		return nil, err
+	}
+
+	log.V(5).Info("using impersonation client", "serviceaccount", sa.Name, "namespace", sa.Namespace)
+
+	return r.impersonation.LoadOrCreate(ctx, log, re, r.client.Scheme(), *sa)
+}
+
+func (r *globalResourceController) impersonatedServiceAccount(
+	ctx context.Context,
+	log logr.Logger,
+	tntResource *capsulev1beta2.GlobalTenantResource,
+) *meta.NamespacedRFC1123ObjectReferenceWithNamespace {
+	if sa := tntResource.Spec.ServiceAccount; sa != nil {
+		name := sa.Name.String()
+		ns := sa.Namespace.String()
+
+		if name == "" || ns == "" {
+			log.V(4).Info("serviceAccount reference is set but incomplete; ignoring",
+				"name", name, "namespace", ns,
+			)
+
+			return nil
 		}
 
-		saClient, err = users.ImpersonatedKubernetesClientForServiceAccount(
-			re,
-			r.client.Scheme(),
-			tntResource.Spec.ServiceAccount,
+		return &meta.NamespacedRFC1123ObjectReferenceWithNamespace{
+			Name:      sa.Name,
+			Namespace: sa.Namespace,
+		}
+	}
+
+	cfg := r.configuration.ServiceAccountClientProperties()
+
+	name := cfg.GlobalDefaultServiceAccount.String()
+	ns := cfg.GlobalDefaultServiceAccountNamespace.String()
+
+	nameSet := name != ""
+	nsSet := ns != ""
+
+	if nameSet != nsSet {
+		log.V(2).Info("invalid config: global default service account requires both name and namespace",
+			"name", name, "namespace", ns,
 		)
-		if err != nil {
-			log.Error(err, "failed to create impersonated client")
-
-			return nil, err
-		}
+		return nil
 	}
 
-	return saClient, nil
+	if !nameSet && !nsSet {
+		return nil
+	}
+
+	return &meta.NamespacedRFC1123ObjectReferenceWithNamespace{
+		Name:      cfg.GlobalDefaultServiceAccount,
+		Namespace: cfg.GlobalDefaultServiceAccountNamespace,
+	}
+}
+
+func (r *globalResourceController) updateReconcilingStatus(ctx context.Context, instance *capsulev1beta2.GlobalTenantResource) error {
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
+		latest := &capsulev1beta2.GlobalTenantResource{}
+		if err = r.client.Get(ctx, types.NamespacedName{Name: instance.GetName()}, latest); err != nil {
+			return err
+		}
+
+		latest.Status.Conditions.UpdateConditionByType(meta.NewReadyConditionReconcilingReason(instance))
+
+		return r.client.Status().Update(ctx, latest)
+	})
 }
 
 func (r *globalResourceController) updateStatus(ctx context.Context, instance *capsulev1beta2.GlobalTenantResource, reconcileError error) error {
+	instance.Status.UpdateStats()
+
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
 		latest := &capsulev1beta2.GlobalTenantResource{}
 		if err = r.client.Get(ctx, types.NamespacedName{Name: instance.GetName()}, latest); err != nil {

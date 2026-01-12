@@ -1,0 +1,59 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  # "namespace" omitted since ClusterRoles are not namespaced
+  name: capsule-tenant-replications
+rules:
+- apiGroups: [""]
+  #
+  # at the HTTP level, the name of the resource for accessing Secret
+  # objects is "secrets"
+  resources: ["limitranges"]
+  verbs: ["get", "patch", "create", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+# This cluster role binding allows anyone in the "manager" group to read secrets in any namespace.
+kind: ClusterRoleBinding
+metadata:
+  name: capsule-tenant-replications
+subjects:
+- kind: ServiceAccount
+  name: default
+  namespace: kube-system
+roleRef:
+  kind: ClusterRole
+  name: capsule-tenant-replications
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: capsule.clastix.io/v1beta2
+kind: GlobalTenantResource
+metadata:
+  name: tenant-resource-replications
+spec:
+  resyncPeriod: 5s
+  serviceAccount:
+    name: "default"
+    namespace: "kube-system"
+  #dependsOn:
+  #  - name: flux-service-account
+  resources:
+    - additionalMetadata:
+        labels:
+          projectcapsule.dev/tenant: "{{tenant.name}}"
+      rawItems:
+      - apiVersion: v1
+        kind: LimitRange
+        metadata:
+          name: memory-resource-constraint
+        spec:
+          limits:
+          - default: # this section defines default limits
+              cpu: 500m
+            defaultRequest: # this section defines default requests
+              cpu: 500m
+            max: # max and min define the limit range
+              cpu: "1"
+            min:
+              cpu: 100m
+            type: Container

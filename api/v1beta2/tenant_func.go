@@ -17,7 +17,14 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 )
 
-func (in *Tenant) CollectOwners(ctx context.Context, c client.Client, allowPromotion bool, admins api.UserListSpec) (api.OwnerStatusListSpec, error) {
+func (in *Tenant) CollectOwners(
+	ctx context.Context,
+	c client.Client,
+	allowPromotion bool,
+	admins api.UserListSpec,
+	DeleterClusterRole string,
+	ProvisionerClusterRole string,
+) (api.OwnerStatusListSpec, error) {
 	owners := in.Spec.Owners.ToStatusOwners()
 
 	// Promoted ServiceAccounts
@@ -43,8 +50,8 @@ func (in *Tenant) CollectOwners(ctx context.Context, c client.Client, allowPromo
 						Name: serviceaccount.ServiceAccountUsernamePrefix + sa.Namespace + ":" + sa.Name,
 					},
 					ClusterRoles: []string{
-						api.ProvisionerRoleName,
-						api.DeleterRoleName,
+						ProvisionerClusterRole,
+						DeleterClusterRole,
 					},
 				})
 			}
@@ -56,7 +63,7 @@ func (in *Tenant) CollectOwners(ctx context.Context, c client.Client, allowPromo
 		owners.Upsert(api.CoreOwnerSpec{
 			UserSpec: a,
 			ClusterRoles: []string{
-				api.DeleterRoleName,
+				DeleterClusterRole,
 			},
 		})
 	}

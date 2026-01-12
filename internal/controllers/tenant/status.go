@@ -30,6 +30,8 @@ func (r *Manager) collectOwners(ctx context.Context, tnt *capsulev1beta2.Tenant)
 		r.Client,
 		r.Configuration.AllowServiceAccountPromotion(),
 		r.Configuration.Administrators(),
+		r.Configuration.RBAC().DeleterClusterRole,
+		r.Configuration.RBAC().ProvisionerClusterRole,
 	)
 	if err != nil {
 		return err

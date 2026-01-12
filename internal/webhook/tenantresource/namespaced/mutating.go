@@ -5,15 +5,12 @@ package mutating
 
 import (
 	"context"
-	"encoding/json"
-	"net/http"
 
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	"github.com/projectcapsule/capsule/internal/controllers/resources"
 	capsulewebhook "github.com/projectcapsule/capsule/internal/webhook"
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
 	"github.com/projectcapsule/capsule/pkg/configuration"
@@ -53,19 +50,5 @@ func (h *namespacedMutatingHandler) handler(ctx context.Context, clt client.Clie
 		return utils.ErroredResponse(err)
 	}
 
-	changed := resources.SetTenantResourceServiceAccount(h.configuration, resource)
-	if !changed {
-		return nil
-	}
-
-	// Marshal Manifest
-	marshaled, err := json.Marshal(resource)
-	if err != nil {
-		response := admission.Errored(http.StatusInternalServerError, err)
-
-		return &response
-	}
-	response := admission.PatchResponseFromRaw(req.Object.Raw, marshaled)
-
-	return &response
+	return nil
 }

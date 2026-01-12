@@ -21,14 +21,17 @@ func ControllerFieldOwnerPrefix(fieldowner string) string {
 	return CapsuleFieldOwnerPrefix + "/" + fieldowner
 }
 
+func ResourceControllerFieldOwnerPrefix() string {
+	return CapsuleFieldOwnerPrefix + "/resource/controller"
+}
+
 // CapsuleFieldOwners returns the set of managers that start with the Capsule prefix.
-func CapsuleFieldOwners(obj *unstructured.Unstructured) map[string]struct{} {
+func CapsuleFieldOwners(obj *unstructured.Unstructured, prefix string) map[string]struct{} {
 	out := map[string]struct{}{}
 	if obj == nil {
 		return out
 	}
 
-	prefix := CapsuleFieldOwnerPrefix + "/"
 	for _, mf := range obj.GetManagedFields() {
 		mgr := mf.Manager
 		if mgr == "" {
@@ -41,8 +44,8 @@ func CapsuleFieldOwners(obj *unstructured.Unstructured) map[string]struct{} {
 	return out
 }
 
-func HasExactlyCapsuleOwners(obj *unstructured.Unstructured, allowed []string) bool {
-	owners := CapsuleFieldOwners(obj)
+func HasExactlyCapsuleOwners(obj *unstructured.Unstructured, prefix string, allowed []string) bool {
+	owners := CapsuleFieldOwners(obj, prefix)
 
 	if len(owners) != len(allowed) {
 		return false

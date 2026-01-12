@@ -14,6 +14,11 @@ metadata:
     {{- toYaml . | nindent 4 }}
   {{- end }}
 spec:
+  cacheInvalidation: {{ .Values.manager.options.cacheInvalidation }}
+  rbac:
+    {{- toYaml .Values.manager.options.rbac | nindent 4 }}
+  impersonation:
+    {{- toYaml .Values.manager.options.impersonation | nindent 4 }}
   administrators:
     {{- toYaml .Values.manager.options.administrators | nindent 4 }}
   users:

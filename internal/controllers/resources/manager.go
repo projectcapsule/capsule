@@ -11,6 +11,7 @@ import (
 
 	"github.com/projectcapsule/capsule/internal/controllers/utils"
 	"github.com/projectcapsule/capsule/internal/metrics"
+	"github.com/projectcapsule/capsule/pkg/cache"
 	"github.com/projectcapsule/capsule/pkg/configuration"
 )
 
@@ -19,11 +20,14 @@ func Add(
 	mgr manager.Manager,
 	configuration configuration.Configuration,
 	opts utils.ControllerOptions,
+	cache *cache.ImpersonationCache,
 ) (err error) {
 	if err = (&globalResourceController{
 		log:           log.WithName("Global"),
 		configuration: configuration,
 		metrics:       metrics.MustMakeGlobalTenantResourceRecorder(),
+
+		impersonation: cache,
 	}).SetupWithManager(mgr, opts); err != nil {
 		return fmt.Errorf("unable to create global controller: %w", err)
 	}
@@ -32,6 +36,8 @@ func Add(
 		log:           log.WithName("Namespaced"),
 		configuration: configuration,
 		metrics:       metrics.MustMakeTenantResourceRecorder(),
+
+		impersonation: cache,
 	}).SetupWithManager(mgr, opts); err != nil {
 		return fmt.Errorf("unable to create namespaced controller: %w", err)
 	}

@@ -7,6 +7,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api/meta"
 )
 
 // CapsuleConfigurationSpec defines the Capsule configuration.
@@ -30,6 +31,9 @@ type CapsuleConfigurationSpec struct {
 	// However ServiceAccounts which have been promoted to owner can not promote further serviceAccounts.
 	// +kubebuilder:default=false
 	AllowServiceAccountPromotion bool `json:"allowServiceAccountPromotion,omitempty"`
+	// Define Properties for managed ClusterRoles by Capsule
+	// +kubebuilder:default={}
+	RBAC *RbacConfiguration `json:"rbac"`
 	// Enforces the Tenant owner, during Namespace creation, to name it using the selected Tenant name as prefix,
 	// separated by a dash. This is useful to avoid Namespace name collision in a public CaaS environment.
 	// +kubebuilder:default=false
@@ -54,7 +58,20 @@ type CapsuleConfigurationSpec struct {
 	// be ignored by capsule.
 	Administrators api.UserListSpec `json:"administrators,omitempty"`
 	// Service Account Client configuration for impersonation properties
-	ServiceAccountClient *api.ServiceAccountClient `json:"serviceAccountClient,omitempty"`
+	// +optional
+	Impersonation ServiceAccountClient `json:"impersonation,omitzero"`
+	// Define the period of time upon a cache invalidation is executed for all caches.
+	// +kubebuilder:default="24h"
+	CacheInvalidation metav1.Duration `json:"cacheInvalidation"`
+}
+
+type RbacConfiguration struct {
+	// Name for the ClusterRole required to grant Namespace Deletion permissions.
+	// +kubebuilder:default=capsule-namespace-deleter
+	DeleterClusterRole string `json:"deleter,omitempty"`
+	// Name for the ClusterRole required to grant Namespace Provision permissions.
+	// +kubebuilder:default=capsule-namespace-provisioner
+	ProvisionerClusterRole string `json:"provisioner,omitempty"`
 }
 
 type NodeMetadata struct {
@@ -77,6 +94,35 @@ type CapsuleResources struct {
 	// Name of the ValidatingWebhookConfiguration which contains the dynamic admission controller paths and resources.
 	// +kubebuilder:default=capsule-validating-webhook-configuration
 	ValidatingWebhookConfigurationName string `json:"validatingWebhookConfigurationName"`
+}
+
+// +kubebuilder:object:generate=true
+type ServiceAccountClient struct {
+	// Kubernetes API Endpoint to use for impersonation
+	Endpoint string `json:"endpoint,omitempty"`
+	// Namespace where the CA certificate secret is located
+	CASecretNamespace meta.RFC1123SubdomainName `json:"caSecretNamespace,omitempty"`
+	// Name of the secret containing the CA certificate
+	CASecretName meta.RFC1123Name `json:"caSecretName,omitempty"`
+	// Key in the secret that holds the CA certificate (e.g., "ca.crt")
+	// +kubebuilder:default=ca.crt
+	CASecretKey string `json:"caSecretKey,omitempty"`
+	// If true, TLS certificate verification is skipped (not recommended for production)
+	// +kubebuilder:default=false
+	SkipTLSVerify bool `json:"skipTlsVerify,omitempty"`
+	// Default ServiceAccount for global resources (GlobalTenantResource)
+	// When defined, users are required to use this ServiceAccount anywhere in the cluster
+	// unless they explicitly provide their own.
+	GlobalDefaultServiceAccount meta.RFC1123Name `json:"globalDefaultServiceAccount,omitempty"`
+	// Default ServiceAccount for global resources (GlobalTenantResource)
+	// When defined, users are required to use this ServiceAccount anywhere in the cluster
+	// unless they explicitly provide their own.
+	// +optional
+	GlobalDefaultServiceAccountNamespace meta.RFC1123SubdomainName `json:"globalDefaultServiceAccountNamespace,omitempty"`
+	// Default ServiceAccount for namespaced resources (TenantResource)
+	// When defined, users are required to use this ServiceAccount within the namespace
+	// where they deploy the resource, unless they explicitly provide their own.
+	TenantDefaultServiceAccount meta.RFC1123Name `json:"tenantDefaultServiceAccount,omitempty"`
 }
 
 // +kubebuilder:object:root=true

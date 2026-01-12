@@ -307,10 +307,12 @@ e2e-install: ko-build-all
 		--install \
 		--namespace capsule-system \
 		--create-namespace \
+		--set 'replicaCount=2'\
 		--set 'manager.image.pullPolicy=Never' \
 		--set 'manager.resources=null'\
 		--set "manager.image.tag=$(VERSION)" \
 		--set 'manager.livenessProbe.failureThreshold=10' \
+		--set 'manager.rbac.minimal=true' \
 		--set 'webhooks.hooks.nodes.enabled=true' \
 		--set "webhooks.exclusive=true"\
 		capsule \

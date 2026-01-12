@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/projectcapsule/capsule/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -26,10 +27,8 @@ type ResourceReference struct {
 	// +optional
 	Name string `json:"name,omitempty"`
 	// Namespace of the values referent.
-	// +kubebuilder:validation:MinLength=1
-	// +kubebuilder:validation:MaxLength=253
 	// +optional
-	Namespace string `json:"namespace,omitempty"`
+	Namespace meta.RFC1123SubdomainName `json:"namespace,omitempty"`
 	// Selector which allows to get any amount of these resources based on labels
 	// +optional
 	Selector *metav1.LabelSelector `json:"selector,omitempty"`
@@ -44,7 +43,7 @@ func (t ResourceReference) LoadResources(
 	namespace string,
 ) ([]*unstructured.Unstructured, error) {
 	if namespace != "" {
-		t.Namespace = namespace
+		t.Namespace = meta.RFC1123SubdomainName(namespace)
 	}
 
 	// For a single item we are not using list
@@ -55,7 +54,7 @@ func (t ResourceReference) LoadResources(
 
 		key := client.ObjectKey{
 			Name:      t.Name,
-			Namespace: t.Namespace,
+			Namespace: string(t.Namespace),
 		}
 
 		if err := kubeClient.Get(ctx, key, obj); err != nil {

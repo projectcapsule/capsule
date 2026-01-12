@@ -256,6 +256,9 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 
 			return
 		}
+
+		// Controller-Runtime should never receive error
+		err = nil
 	}()
 
 	// Collect Ownership for Status
@@ -338,9 +341,14 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 		return result, err
 	}
 
+	var reconcileError error
+	if err != nil {
+		reconcileError = fmt.Errorf("tenant had errors reconciling, check tenant's status")
+	}
+
 	r.Log.V(4).Info("Tenant reconciling completed")
 
-	return ctrl.Result{}, err
+	return ctrl.Result{}, reconcileError
 }
 
 func (r *Manager) updateTenantStatus(ctx context.Context, tnt *capsulev1beta2.Tenant, reconcileError error) error {
