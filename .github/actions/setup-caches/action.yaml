@@ -9,11 +9,11 @@ inputs:
 runs:
   using: composite
   steps:
-    - uses: actions/cache@9255dc7a253b0ccc959486e2bca901246202afeb # v5.0.1
+    - uses: actions/cache@8b402f58fbc84540c8b491a91e594a4576fec3d7 # v5.0.2
       with:
         path: ~/go/pkg/mod
         key: ${{ runner.os }}-go-pkg-mod-${{ hashFiles('**/go.sum') }}-${{ hashFiles('Makefile') }}
-    - uses: actions/cache@9255dc7a253b0ccc959486e2bca901246202afeb # v5.0.1
+    - uses: actions/cache@8b402f58fbc84540c8b491a91e594a4576fec3d7 # v5.0.2
       if: ${{ inputs.build-cache-key }}
       with:
         path: ~/.cache/go-build
