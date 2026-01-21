@@ -39,6 +39,7 @@ type resourceClaimController struct {
 
 func (r *resourceClaimController) SetupWithManager(mgr ctrl.Manager, cfg utils.ControllerOptions) error {
 	return ctrl.NewControllerManagedBy(mgr).
+		Named("resourcepool/claims").
 		For(&capsulev1beta2.ResourcePoolClaim{}).
 		Watches(
 			&capsulev1beta2.ResourcePool{},

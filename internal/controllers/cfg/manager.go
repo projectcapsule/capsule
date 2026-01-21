@@ -24,7 +24,8 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/internal/controllers/utils"
 	"github.com/projectcapsule/capsule/pkg/api"
-	"github.com/projectcapsule/capsule/pkg/configuration"
+	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
+	"github.com/projectcapsule/capsule/pkg/runtime/predicates"
 )
 
 type Manager struct {
@@ -36,7 +37,11 @@ type Manager struct {
 
 func (r *Manager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.ControllerOptions) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&capsulev1beta2.CapsuleConfiguration{}, utils.NamesMatchingPredicate(ctrlConfig.ConfigurationName)).
+		Named("configuration").
+		For(
+			&capsulev1beta2.CapsuleConfiguration{},
+			predicates.NamesMatching(ctrlConfig.ConfigurationName),
+		).
 		Watches(
 			&capsulev1beta2.TenantOwner{},
 			handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {

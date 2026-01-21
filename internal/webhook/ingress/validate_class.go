@@ -17,7 +17,8 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	capsulewebhook "github.com/projectcapsule/capsule/internal/webhook"
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
-	"github.com/projectcapsule/capsule/pkg/configuration"
+	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
+	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 )
 
 type class struct {
@@ -78,7 +79,7 @@ func (r *class) validate(ctx context.Context, version *version.Version, client c
 	if ingressClass == nil {
 		recorder.Eventf(tnt, corev1.EventTypeWarning, "MissingIngressClass", "Ingress %s/%s is missing IngressClass", req.Namespace, req.Name)
 
-		response := admission.Denied(NewIngressClassUndefined(*allowed).Error())
+		response := admission.Denied(caperrors.NewIngressClassUndefined(*allowed).Error())
 
 		return &response
 	}
@@ -108,7 +109,7 @@ func (r *class) validate(ctx context.Context, version *version.Version, client c
 	default:
 		recorder.Eventf(tnt, corev1.EventTypeWarning, "ForbiddenIngressClass", "Ingress %s/%s IngressClass %s is forbidden for the current Tenant", req.Namespace, req.Name, &ingressClass)
 
-		response := admission.Denied(NewIngressClassForbidden(*ingressClass, *allowed).Error())
+		response := admission.Denied(caperrors.NewIngressClassForbidden(*ingressClass, *allowed).Error())
 
 		return &response
 	}

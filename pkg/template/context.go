@@ -10,8 +10,11 @@ import (
 	"fmt"
 	"text/template"
 
-	"github.com/projectcapsule/capsule/pkg/api/misc"
+	k8smeta "k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/labels"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/projectcapsule/capsule/pkg/runtime/sanitize"
 )
 
 // Additional Context to enhance templating
@@ -22,7 +25,7 @@ type TemplateContext struct {
 
 // +kubebuilder:object:generate=true
 type TemplateResourceReference struct {
-	misc.ResourceReference `json:",inline"`
+	ResourceReference `json:",inline"`
 
 	// Index to mount the resource in the template context
 	Index string `json:"index,omitempty"`
@@ -31,8 +34,10 @@ type TemplateResourceReference struct {
 func (t *TemplateContext) GatherContext(
 	ctx context.Context,
 	kubeClient client.Client,
+	restMapper k8smeta.RESTMapper,
 	data map[string]interface{},
 	namespace string,
+	additionSelectors []labels.Selector,
 ) (context ReferenceContext, errors []error) {
 	context = ReferenceContext{}
 
@@ -49,7 +54,7 @@ func (t *TemplateContext) GatherContext(
 
 	// Load external Resources
 	for index, resource := range t.Resources {
-		res, err := resource.LoadResources(ctx, kubeClient, namespace)
+		res, err := resource.LoadResources(ctx, kubeClient, restMapper, namespace, additionSelectors, map[string]string{}, true)
 		if err != nil {
 			errors = append(errors, err)
 
@@ -63,8 +68,7 @@ func (t *TemplateContext) GatherContext(
 			}
 
 			for _, u := range res {
-				SanitizeUnstructured(u, DefaultSanitizeUnstructuredOptions())
-
+				sanitize.SanitizeUnstructured(u, sanitize.DefaultSanitizeOptions())
 			}
 
 			context[resource.Index] = res

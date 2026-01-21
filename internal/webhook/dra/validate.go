@@ -16,7 +16,8 @@ import (
 
 	capsulewebhook "github.com/projectcapsule/capsule/internal/webhook"
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
-	"github.com/projectcapsule/capsule/pkg/utils/tenant"
+	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
+	"github.com/projectcapsule/capsule/pkg/tenant"
 )
 
 type deviceClass struct{}
@@ -86,7 +87,7 @@ func (h *deviceClass) validateResourceRequest(ctx context.Context, c client.Clie
 		if dc == nil {
 			recorder.Eventf(tnt, corev1.EventTypeWarning, "MissingDeviceClass", "%s %s/%s is missing DeviceClass", req.Kind.Kind, req.Namespace, req.Name)
 
-			response := admission.Denied(NewDeviceClassUndefined(*allowed).Error())
+			response := admission.Denied(caperrors.NewDeviceClassUndefined(*allowed).Error())
 
 			return &response
 		}
@@ -99,7 +100,7 @@ func (h *deviceClass) validateResourceRequest(ctx context.Context, c client.Clie
 		default:
 			recorder.Eventf(tnt, corev1.EventTypeWarning, "ForbiddenDeviceClass", "%s %s/%s DeviceClass %s is forbidden for the current Tenant", req.Kind.Kind, req.Namespace, req.Name, &dc)
 
-			response := admission.Denied(NewDeviceClassForbidden(dc.Name, *allowed).Error())
+			response := admission.Denied(caperrors.NewDeviceClassForbidden(dc.Name, *allowed).Error())
 
 			return &response
 		}

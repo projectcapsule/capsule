@@ -66,6 +66,12 @@ type CapsuleConfigurationSpec struct {
 }
 
 type RbacConfiguration struct {
+	// The ClusterRoles applied for Administrators
+	// +kubebuilder:default={capsule-namespace-deleter}
+	AdministrationClusterRoles []string `json:"adminitrationClusterRoles,omitempty"`
+	// The ClusterRoles applied for ServiceAccounts which had owner Promotion
+	// +kubebuilder:default={capsule-namespace-provisioner,capsule-namespace-deleter}
+	PromotionClusterRoles []string `json:"promotionClusterRoles,omitempty"`
 	// Name for the ClusterRole required to grant Namespace Deletion permissions.
 	// +kubebuilder:default=capsule-namespace-deleter
 	DeleterClusterRole string `json:"deleter,omitempty"`

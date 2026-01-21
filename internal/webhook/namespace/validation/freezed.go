@@ -13,8 +13,8 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	capsulewebhook "github.com/projectcapsule/capsule/internal/webhook"
-	"github.com/projectcapsule/capsule/pkg/configuration"
-	"github.com/projectcapsule/capsule/pkg/utils/users"
+	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
+	"github.com/projectcapsule/capsule/pkg/users"
 )
 
 type freezedHandler struct {

@@ -13,9 +13,9 @@ import (
 
 	"github.com/projectcapsule/capsule/internal/webhook"
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
-	"github.com/projectcapsule/capsule/pkg/configuration"
-	"github.com/projectcapsule/capsule/pkg/utils/tenant"
-	"github.com/projectcapsule/capsule/pkg/utils/users"
+	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
+	"github.com/projectcapsule/capsule/pkg/tenant"
+	"github.com/projectcapsule/capsule/pkg/users"
 )
 
 func NamespaceHandler(configuration configuration.Configuration, handlers ...webhook.TypedHandler[*corev1.Namespace]) webhook.Handler {

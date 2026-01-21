@@ -17,7 +17,7 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
-	clt "github.com/projectcapsule/capsule/pkg/client"
+	clt "github.com/projectcapsule/capsule/pkg/runtime/client"
 )
 
 func (p *Processor) Reconcile(
@@ -96,7 +96,7 @@ func (p *Processor) Reconcile(
 			if err != nil {
 				hadError = true
 				or.Status = metav1.ConditionFalse
-				or.Message = "apply failed for item '" + obj.Origin.Origin + "': " + err.Error()
+				or.Message = "apply failed for item " + obj.Origin.Origin + ": " + err.Error()
 				or.Created = created
 
 				log.V(4).Info("failed to apply item", "item", obj.Origin.Origin)
@@ -226,11 +226,13 @@ func (r *Processor) Apply(
 	actual.SetNamespace(obj.GetNamespace())
 	actual.SetName(obj.GetName())
 
+	log.Info("LOOKING UP", "name", obj.GetName(), "namespace", obj.GetNamespace())
+
 	// We need to mark an item if we create it with our patch to make proper Garbage Collection
 	// If it does not yet exist mark it
 	patches, created, err := r.handleControllerMetadata(ctx, c, obj, ownerreference)
 	if err != nil {
-		return nil, created, fmt.Errorf("resource adoption failed", err)
+		return nil, created, fmt.Errorf("resource evaluation: %w", err)
 	}
 
 	if !created {
@@ -271,7 +273,7 @@ func (r *Processor) handleControllerMetadata(
 	switch {
 	case apierrors.IsNotFound(err):
 		patches = append(patches, clt.AddLabelsPatch(existingObject.GetLabels(), map[string]string{
-			meta.CreatedByCapsuleLabel: "controller",
+			meta.CreatedByCapsuleLabel: meta.ResourceControllerValue,
 		})...)
 
 		if ownerreference != nil {
@@ -284,7 +286,7 @@ func (r *Processor) handleControllerMetadata(
 	default:
 		labels := existingObject.GetLabels()
 
-		if v, ok := labels[meta.CreatedByCapsuleLabel]; ok || v == "controller" {
+		if v, ok := labels[meta.CreatedByCapsuleLabel]; ok || v == meta.ResourceControllerValue {
 			adoptable = true
 		}
 
@@ -300,9 +302,9 @@ func (r *Processor) handleControllerMetadata(
 			})...,
 			)
 
-			if v, ok := labels[meta.CreatedByCapsuleLabel]; !ok || v != "controller" {
+			if v, ok := labels[meta.CreatedByCapsuleLabel]; !ok || v != meta.ResourceControllerValue {
 				patches = append(patches, clt.AddLabelsPatch(existingObject.GetLabels(), map[string]string{
-					meta.CreatedByCapsuleLabel: "controller",
+					meta.CreatedByCapsuleLabel: meta.ResourceControllerValue,
 				})...)
 			}
 		}

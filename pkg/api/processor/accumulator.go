@@ -24,14 +24,17 @@ type AccumulatorObject struct {
 	Object *unstructured.Unstructured
 }
 
-func AccumulatorAdd(acc Accumulator, resource misc.ResourceID, obj AccumulatorObject) {
+func AccumulatorAdd(
+	acc Accumulator,
+	resource misc.ResourceID,
+	obj AccumulatorObject,
+) {
 	if acc == nil {
 		return
 	}
 
 	key := resource.GetKey("")
 
-	// Existing entry => append
 	if entry, ok := acc[key]; ok && entry != nil {
 		if entry.Objects == nil {
 			list := make([]AccumulatorObject, 0, 1)
@@ -41,9 +44,7 @@ func AccumulatorAdd(acc Accumulator, resource misc.ResourceID, obj AccumulatorOb
 		return
 	}
 
-	// New entry => init + append
-	list := make([]AccumulatorObject, 0, 1)
-	list = append(list, obj)
+	list := []AccumulatorObject{obj}
 
 	acc[key] = &AccumulatorItem{
 		Resource: resource,

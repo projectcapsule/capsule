@@ -1,0 +1,28 @@
+// Copyright 2020-2025 Project Capsule Authors
+// SPDX-License-Identifier: Apache-2.0
+
+package users_test
+
+import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+
+	"github.com/projectcapsule/capsule/pkg/users"
+)
+
+func TestIsInCapsuleGroups(t *testing.T) {
+	groups := []string{
+		"DPS-QQ-DeparEE-Upload_RW",
+		"vsphere - glonqqqq-devopsq",
+		"OSAAA-WOO",
+		"crownuser-qq4",
+		"kubernetes-abilitytologin",
+		"waaazzz-prod-user",
+		"Zaxxxq_Global_Team_Leader_Automation",
+	}
+
+	capsuleGroup := "kubernetes-abilitytologin"
+
+	assert.True(t, users.NewUserGroupList(groups).Find(capsuleGroup), nil)
+}

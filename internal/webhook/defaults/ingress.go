@@ -18,6 +18,7 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	capsuleingress "github.com/projectcapsule/capsule/internal/webhook/ingress"
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
+	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
 )
 
 func mutateIngressDefaults(ctx context.Context, req admission.Request, version *version.Version, c client.Client, decoder admission.Decoder, recorder record.EventRecorder, namespace string) *admission.Response {
@@ -51,7 +52,7 @@ func mutateIngressDefaults(ctx context.Context, req admission.Request, version *
 
 	if ingressClassName := ingress.IngressClass(); ingressClassName != nil && *ingressClassName != allowed.Default {
 		if ingressClass, err = utils.GetIngressClassByName(ctx, version, c, ingressClassName); err != nil && !k8serrors.IsNotFound(err) {
-			response := admission.Denied(NewIngressClassError(*ingressClassName, err).Error())
+			response := admission.Denied(caperrors.NewIngressClassError(*ingressClassName, err).Error())
 
 			return &response
 		}

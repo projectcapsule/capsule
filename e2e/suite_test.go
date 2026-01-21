@@ -25,7 +25,7 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api"
-	"github.com/projectcapsule/capsule/pkg/configuration"
+	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 )
 
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to

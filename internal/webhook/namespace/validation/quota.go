@@ -14,6 +14,7 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	capsulewebhook "github.com/projectcapsule/capsule/internal/webhook"
+	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
 )
 
 type quotaHandler struct{}
@@ -77,7 +78,7 @@ func (h *quotaHandler) handle(
 
 		recorder.Eventf(tnt, corev1.EventTypeWarning, "NamespaceQuotaExceded", "Namespace %s cannot be attached, quota exceeded for the current Tenant", ns.GetName())
 
-		response := admission.Denied(NewNamespaceQuotaExceededError().Error())
+		response := admission.Denied(caperrors.NewNamespaceQuotaExceededError().Error())
 
 		return &response
 	}

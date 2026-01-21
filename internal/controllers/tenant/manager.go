@@ -40,7 +40,9 @@ import (
 	"github.com/projectcapsule/capsule/internal/metrics"
 	"github.com/projectcapsule/capsule/pkg/api"
 	meta "github.com/projectcapsule/capsule/pkg/api/meta"
-	"github.com/projectcapsule/capsule/pkg/configuration"
+	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
+	"github.com/projectcapsule/capsule/pkg/runtime/gvk"
+	"github.com/projectcapsule/capsule/pkg/runtime/predicates"
 )
 
 type Manager struct {
@@ -61,6 +63,7 @@ type supportedClasses struct {
 
 func (r *Manager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.ControllerOptions) error {
 	ctrlBuilder := ctrl.NewControllerManagedBy(mgr).
+		Named("tenant").
 		For(
 			&capsulev1beta2.Tenant{},
 			builder.WithPredicates(
@@ -74,8 +77,8 @@ func (r *Manager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.Controller
 		Watches(
 			&capsulev1beta2.CapsuleConfiguration{},
 			handler.EnqueueRequestsFromMapFunc(r.enqueueAllTenants),
-			utils.NamesMatchingPredicate(ctrlConfig.ConfigurationName),
-			builder.WithPredicates(utils.CapsuleConfigSpecChangedPredicate),
+			builder.WithPredicates(predicates.CapsuleConfigSpecChangedPredicate{}),
+			predicates.NamesMatching(ctrlConfig.ConfigurationName),
 		).
 		Watches(
 			&corev1.Namespace{},
@@ -88,7 +91,7 @@ func (r *Manager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.Controller
 				r.collectAvailableStorageClasses,
 				"cannot collect storage classes",
 			),
-			builder.WithPredicates(utils.UpdatedMetadataPredicate),
+			builder.WithPredicates(predicates.UpdatedLabelsPredicate{}),
 		).
 		Watches(
 			&schedulingv1.PriorityClass{},
@@ -97,7 +100,7 @@ func (r *Manager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.Controller
 				r.collectAvailablePriorityClasses,
 				"cannot collect priority classes",
 			),
-			builder.WithPredicates(utils.UpdatedMetadataPredicate),
+			builder.WithPredicates(predicates.UpdatedLabelsPredicate{}),
 		).
 		Watches(
 			&nodev1.RuntimeClass{},
@@ -106,7 +109,7 @@ func (r *Manager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.Controller
 				r.collectAvailableRuntimeClasses,
 				"cannot collect runtime classes",
 			),
-			builder.WithPredicates(utils.UpdatedMetadataPredicate),
+			builder.WithPredicates(predicates.UpdatedLabelsPredicate{}),
 		).
 		Watches(
 			&capsulev1beta2.TenantOwner{},
@@ -183,12 +186,12 @@ func (r *Manager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.Controller
 					})
 				},
 			},
-			builder.WithPredicates(utils.PromotedServiceaccountPredicate),
+			builder.WithPredicates(predicates.PromotedServiceaccountPredicate{}),
 		).
 		WithOptions(controller.Options{MaxConcurrentReconciles: ctrlConfig.MaxConcurrentReconciles})
 
 	// GatewayClass is Optional
-	r.classes.gateway = utils.HasGVK(mgr.GetRESTMapper(), schema.GroupVersionKind{
+	r.classes.gateway = gvk.HasGVK(mgr.GetRESTMapper(), schema.GroupVersionKind{
 		Group:   "gateway.networking.k8s.io",
 		Version: "v1",
 		Kind:    "GatewayClass",
@@ -202,12 +205,12 @@ func (r *Manager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.Controller
 				r.collectAvailableGatewayClasses,
 				"cannot collect gateway classes",
 			),
-			builder.WithPredicates(utils.UpdatedMetadataPredicate),
+			builder.WithPredicates(predicates.UpdatedLabelsPredicate{}),
 		)
 	}
 
 	// DeviceClass is Optional
-	r.classes.device = utils.HasGVK(mgr.GetRESTMapper(), schema.GroupVersionKind{
+	r.classes.device = gvk.HasGVK(mgr.GetRESTMapper(), schema.GroupVersionKind{
 		Group:   "resource.k8s.io",
 		Version: "v1",
 		Kind:    "DeviceClass",
@@ -221,7 +224,7 @@ func (r *Manager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.Controller
 				r.collectAvailableDeviceClasses,
 				"cannot collect device classes",
 			),
-			builder.WithPredicates(utils.UpdatedMetadataPredicate),
+			builder.WithPredicates(predicates.UpdatedLabelsPredicate{}),
 		)
 	}
 

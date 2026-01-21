@@ -213,11 +213,27 @@ spec:
                 default: {}
                 description: Define Properties for managed ClusterRoles by Capsule
                 properties:
+                  adminitrationClusterRoles:
+                    default:
+                    - capsule-namespace-deleter
+                    description: The ClusterRoles applied for Administrators
+                    items:
+                      type: string
+                    type: array
                   deleter:
                     default: capsule-namespace-deleter
                     description: Name for the ClusterRole required to grant Namespace
                       Deletion permissions.
                     type: string
+                  promotionClusterRoles:
+                    default:
+                    - capsule-namespace-provisioner
+                    - capsule-namespace-deleter
+                    description: The ClusterRoles applied for ServiceAccounts which
+                      had owner Promotion
+                    items:
+                      type: string
+                    type: array
                   provisioner:
                     default: capsule-namespace-provisioner
                     description: Name for the ClusterRole required to grant Namespace

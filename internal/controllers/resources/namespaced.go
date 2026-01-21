@@ -6,7 +6,7 @@ package resources
 import (
 	"context"
 	"fmt"
-	"reflect"
+	"strconv"
 
 	"github.com/go-logr/logr"
 	gherrors "github.com/pkg/errors"
@@ -19,7 +19,8 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
@@ -31,13 +32,16 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/api/processor"
 	"github.com/projectcapsule/capsule/pkg/cache"
-	"github.com/projectcapsule/capsule/pkg/configuration"
+	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
+	"github.com/projectcapsule/capsule/pkg/runtime/predicates"
+	"github.com/projectcapsule/capsule/pkg/tenant"
 )
 
 type namespacedResourceController struct {
 	client        client.Client
 	log           logr.Logger
 	processor     processor.Processor
+	collector     Collector
 	configuration configuration.Configuration
 	metrics       *metrics.TenantResourceRecorder
 
@@ -46,55 +50,64 @@ type namespacedResourceController struct {
 
 func (r *namespacedResourceController) SetupWithManager(mgr ctrl.Manager, cfg utils.ControllerOptions) error {
 	r.client = mgr.GetClient()
-
 	r.processor = processor.Processor{
 		Configuration:                r.configuration,
 		AllowCrossNamespaceSelection: false,
 	}
+	r.collector = NewCollector(
+		r.client,
+		mgr.GetRESTMapper(),
+	)
 
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&capsulev1beta2.TenantResource{}).
-		Watches(
-			&capsulev1beta2.CapsuleConfiguration{},
-			handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, _ client.Object) []reconcile.Request {
-				var list capsulev1beta2.TenantResourceList
-				if err := r.client.List(ctx, &list); err != nil {
-					r.log.Error(err, "unable to list TenantResources")
-
-					return nil
-				}
-
-				var requests []reconcile.Request
-				for _, s := range list.Items {
-					requests = append(requests, reconcile.Request{
-						NamespacedName: types.NamespacedName{
-							Name:      s.Name,
-							Namespace: s.Namespace,
-						},
-					})
-				}
-
-				return requests
-			}),
-			builder.WithPredicates(predicate.Funcs{
-				CreateFunc: func(event.CreateEvent) bool {
-					return false
-				},
-				UpdateFunc: func(e event.UpdateEvent) bool {
-					oldObj, okOld := e.ObjectOld.(*capsulev1beta2.CapsuleConfiguration)
-					newObj, okNew := e.ObjectNew.(*capsulev1beta2.CapsuleConfiguration)
-					if !okOld || !okNew {
-						return false
-					}
-
-					return !reflect.DeepEqual(oldObj.Spec.Impersonation, newObj.Spec.Impersonation)
-				},
-				DeleteFunc: func(event.DeleteEvent) bool {
-					return false
-				},
-			}),
+		For(
+			&capsulev1beta2.TenantResource{},
+			builder.WithPredicates(
+				predicate.Or(
+					predicate.GenerationChangedPredicate{},
+					predicates.ReconcileRequestedPredicate{},
+				),
+			),
 		).
+		Watches(
+			&capsulev1beta2.TenantResource{},
+			handler.EnqueueRequestsFromMapFunc(r.enqueueDependentTenantResources),
+		).
+		WithOptions(controller.Options{MaxConcurrentReconciles: cfg.MaxConcurrentReconciles}).
 		Complete(r)
+}
+
+func (r *namespacedResourceController) enqueueDependentTenantResources(
+	ctx context.Context,
+	obj client.Object,
+) []ctrl.Request {
+	changed, ok := obj.(*capsulev1beta2.TenantResource)
+	if !ok {
+		return nil
+	}
+
+	var list capsulev1beta2.TenantResourceList
+	if err := r.client.List(ctx, &list); err != nil {
+		return nil
+	}
+
+	reqs := make([]ctrl.Request, 0)
+
+	for _, gtr := range list.Items {
+		for _, dep := range gtr.Spec.DependsOn {
+			if dep.Name.String() == changed.Name {
+				reqs = append(reqs, ctrl.Request{
+					NamespacedName: types.NamespacedName{
+						Name:      gtr.Name,
+						Namespace: gtr.Namespace,
+					},
+				})
+				break
+			}
+		}
+	}
+
+	return reqs
 }
 
 func (r *namespacedResourceController) Reconcile(ctx context.Context, request reconcile.Request) (res reconcile.Result, err error) {
@@ -122,7 +135,7 @@ func (r *namespacedResourceController) Reconcile(ctx context.Context, request re
 
 	defer func() {
 		if uerr := r.updateStatus(ctx, tntResource, err); uerr != nil {
-			err = fmt.Errorf("cannot update globaltenantresource status: %w", uerr)
+			err = fmt.Errorf("cannot update tenantresource status: %w", uerr)
 
 			return
 		}
@@ -134,35 +147,80 @@ func (r *namespacedResourceController) Reconcile(ctx context.Context, request re
 				err = gherrors.Wrap(e, "failed to patch TenantResource")
 			}
 		}
+
+		// Controller-Runtime should never receive error
+		err = nil
 	}()
 
 	if *tntResource.Spec.Cordoned {
 		log.V(5).Info("tenant resource is cordoned")
+
+		return reconcile.Result{}, err
+	}
+
+	for _, dep := range tntResource.Spec.DependsOn {
+		d := &capsulev1beta2.TenantResource{}
+		err = r.client.Get(ctx, types.NamespacedName{Name: dep.Name.String(), Namespace: tntResource.GetNamespace()}, d)
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				err = fmt.Errorf("dependency %s not found", dep.Name)
+			}
+
+			return reconcile.Result{
+				Requeue:      true,
+				RequeueAfter: tntResource.Spec.ResyncPeriod.Duration,
+			}, err
+		}
+
+		stat := d.Status.Conditions.GetConditionByType(meta.ReadyCondition)
+		if stat.Status != metav1.ConditionTrue {
+			err = fmt.Errorf("dependency %s not ready", dep.Name)
+
+			return reconcile.Result{
+				Requeue:      true,
+				RequeueAfter: tntResource.Spec.ResyncPeriod.Duration,
+			}, err
+		}
+	}
+
+	err = r.updateReconcilingStatus(ctx, tntResource)
+	if err != nil {
+		return reconcile.Result{}, gherrors.Wrap(err, "failed to update status")
 	}
 
 	c, err := r.loadClient(ctx, log, tntResource)
 	if err != nil {
 		return reconcile.Result{}, gherrors.Wrap(err, "failed to load serviceaccount client")
 	}
+
 	if c == nil {
-		log.V(3).Info("received empty client for serviceaccount")
-		return reconcile.Result{}, nil
+		err = fmt.Errorf("received empty client for serviceaccount")
+
+		return reconcile.Result{}, err
 	}
 
-	// Handle deleted TenantResource
-	//if !tntResource.DeletionTimestamp.IsZero() {
-	//	return r.reconcileDelete(ctx, c, tntResource)
-	//}
+	err = r.reconcile(ctx, c, tntResource)
 
-	// Handle non-deleted TenantResource
-	return r.reconcileNormal(ctx, c, tntResource)
+	// Finalizers
+	if len(tntResource.Status.ProcessedItems) > 0 {
+		controllerutil.AddFinalizer(tntResource, meta.ControllerFinalizer)
+	} else {
+		controllerutil.RemoveFinalizer(tntResource, meta.ControllerFinalizer)
+	}
+
+	controllerutil.RemoveFinalizer(tntResource, meta.LegacyResourceFinalizer)
+
+	return reconcile.Result{
+		Requeue:      true,
+		RequeueAfter: tntResource.Spec.ResyncPeriod.Duration,
+	}, err
 }
 
-func (r *namespacedResourceController) reconcileNormal(
+func (r *namespacedResourceController) reconcile(
 	ctx context.Context,
 	c client.Client,
 	tntResource *capsulev1beta2.TenantResource,
-) (reconcile.Result, error) {
+) error {
 	log := ctrllog.FromContext(ctx)
 
 	// Adding the default value for the status
@@ -176,78 +234,125 @@ func (r *namespacedResourceController) reconcileNormal(
 	if err := r.client.List(ctx, tl, client.MatchingFieldsSelector{Selector: fields.OneTermEqualSelector(".status.namespaces", tntResource.GetNamespace())}); err != nil {
 		log.Error(err, "unable to detect the Tenant for the given TenantResource")
 
-		return reconcile.Result{}, err
+		return err
 	}
 
 	if len(tl.Items) == 0 {
-		log.Info("skipping sync, the current Namespace is not belonging to any Global")
+		log.Info("skipping sync, the current Namespace is not belonging to any Tenant")
 
-		return reconcile.Result{}, nil
+		return nil
 	}
 
-	//// A TenantResource is made of several Resource sections, each one with specific options:
-	//// the Status can be updated only in case of no errors across all of them to guarantee a valid and coherent status.
-	//processedItems := sets.NewString()
-	//
-	//// Always post the processed items, as they allow users to track errors
-	//defer func() {
-	//	tntResource.Status.ProcessedItems = make([]capsulev1beta2.ObjectReferenceStatus, 0, len(processedItems))
-	//
-	//	for _, item := range processedItems.List() {
-	//		or := capsulev1beta2.ObjectReferenceStatus{}
-	//		if err := or.ParseFromString(item); err == nil {
-	//			tntResource.Status.ProcessedItems = append(tntResource.Status.ProcessedItems, or)
-	//		} else {
-	//			log.Error(err, "failed to parse processed item", "item", item)
-	//		}
-	//	}
-	//}()
+	tnt := tl.Items[0]
+	acc := processor.Accumulator{}
 
-	// new empty error
-	//var itemErrors error
-	//
-	//acc := make(Accumulator)
-	//
-	//for index, resource := range tntResource.Spec.Resources {
-	//	owner := "cluster/" + strings.ToLower(tntResource.Name) + "/" + strconv.Itoa(index)
-	//
-	//	sectionErr := r.processor.HandleSectionPreflight(ctx, c, resource, strconv.Itoa(index), tl.Items[0], owner, api.ResourceScopeNamespace, acc)
-	//	if sectionErr != nil {
-	//		// Upon a process error storing the last error occurred and continuing to iterate,
-	//		// avoid to block the whole processing.
-	//		itemErrors = errors.Join(itemErrors, sectionErr)
-	//	}
-	//
-	//	log.Info("replicate items", "acc", len(acc), "items", acc)
-	//}
-	//
-	//if itemErrors != nil {
-	//	return reconcile.Result{}, nil
-	//}
-	//
-	//failedItems, err := r.processor.HandlePruning(
-	//	ctx,
-	//	c,
-	//	tntResource.Status.ProcessedItems.AsSet(),
-	//	sets.Set[string](processedItems),
-	//)
-	//if len(failedItems) > 0 {
-	//	tntResource.Status.ProcessedItems = make([]capsulev1beta2.ObjectReferenceStatus, 0, len(failedItems))
-	//
-	//	for _, item := range failedItems {
-	//		if or := (capsulev1beta2.ObjectReferenceStatus{}); or.ParseFromString(item) == nil {
-	//			tntResource.Status.ProcessedItems = append(tntResource.Status.ProcessedItems, or)
-	//		}
-	//	}
-	//}
-	//
-	//if err != nil {
-	//	return reconcile.Result{}, gherrors.Wrap(err, "failed to prune resources")
-	//}
-	//
-	//log.Info("processing completed")
+	// Gather Resources
+	if tntResource.ObjectMeta.DeletionTimestamp.IsZero() {
+		err := r.gatherResources(
+			ctx,
+			c,
+			log,
+			tntResource,
+			tnt,
+			acc,
+		)
+		if err != nil {
+			return err
+		}
+	}
 
-	return reconcile.Result{Requeue: true, RequeueAfter: tntResource.Spec.ResyncPeriod.Duration}, nil
+	return r.processor.Reconcile(
+		ctx,
+		log,
+		c,
+		&tntResource.Status.ProcessedItems,
+		acc,
+		processor.ProcessorOptions{
+			FieldOwnerPrefix: getFieldOwner(tntResource.GetName(), tntResource.GetNamespace()),
+			Prune:            *tntResource.Spec.PruningOnDelete,
+			Adopt:            *tntResource.Spec.Adopt,
+			Force:            *tntResource.Spec.Force,
+			Owner:            nil,
+		})
+}
+
+func (r *namespacedResourceController) gatherResources(
+	ctx context.Context,
+	c client.Client,
+	log logr.Logger,
+	tntResource *capsulev1beta2.TenantResource,
+	tnt capsulev1beta2.Tenant,
+	acc processor.Accumulator,
+) (err error) {
+	//replicaAccumulator := processor.Accumulator{}
+	//seen := make(map[gvk.ResourceKey]struct{})
+
+	opts := CollectorOptions{
+		Accumulator:                  acc,
+		AllowCrossNamespaceSelection: false,
+	}
+
+	for resourceIndex, resource := range tntResource.Spec.Resources {
+		namespaces, err := tenant.CollectTenantNamespaceByLabel(ctx, r.client, tnt, resource.NamespaceSelector)
+		if err != nil {
+			return err
+		}
+
+		for _, ns := range namespaces {
+			opts.Iterator = NewCollectorIteratorOptions(&tnt, &ns, resource)
+
+			objs, err := r.collector.CollectNamespacedItems(ctx, c, opts, resource, &ns, tnt)
+			if err != nil {
+				return err
+			}
+
+			for _, obj := range objs {
+				for _, innerNs := range namespaces {
+					if obj.GetNamespace() == innerNs.GetName() {
+						continue
+					}
+
+					target := obj.DeepCopy()
+					target.SetNamespace(innerNs.GetName())
+
+					log.V(4).Info("adding replication for namespaced item", "name", target.GetName(), "namespace", target.GetNamespace(), "kind", target.GetKind())
+
+					err = r.collector.AddToAccumulation(tnt, &innerNs, opts, resource, target, "sad-1", false)
+					if err != nil {
+						if err != nil {
+							return err
+						}
+
+						continue
+					}
+
+				}
+			}
+
+			err = r.collector.Collect(
+				ctx,
+				c,
+				opts,
+				tnt,
+				string(resourceIndex),
+				resource,
+				&ns,
+			)
+			if err != nil {
+				return err
+			}
+
+		}
+	}
+
+	for index, resource := range tntResource.Spec.Resources {
+		err = r.collector.foreachTenantNamespace(ctx, log, c, tnt, resource, strconv.Itoa(index), acc, false)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (r *namespacedResourceController) loadClient(
@@ -297,7 +402,7 @@ func (r *namespacedResourceController) impersonatedServiceAccount(
 func (r *namespacedResourceController) updateReconcilingStatus(ctx context.Context, instance *capsulev1beta2.TenantResource) error {
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
 		latest := &capsulev1beta2.TenantResource{}
-		if err = r.client.Get(ctx, types.NamespacedName{Name: instance.GetName()}, latest); err != nil {
+		if err = r.client.Get(ctx, types.NamespacedName{Name: instance.GetName(), Namespace: instance.GetNamespace()}, latest); err != nil {
 			return err
 		}
 
@@ -310,7 +415,7 @@ func (r *namespacedResourceController) updateReconcilingStatus(ctx context.Conte
 func (r *namespacedResourceController) updateStatus(ctx context.Context, instance *capsulev1beta2.TenantResource, reconcileError error) error {
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
 		latest := &capsulev1beta2.TenantResource{}
-		if err = r.client.Get(ctx, types.NamespacedName{Name: instance.GetName()}, latest); err != nil {
+		if err = r.client.Get(ctx, types.NamespacedName{Name: instance.GetName(), Namespace: instance.GetNamespace()}, latest); err != nil {
 			return err
 		}
 

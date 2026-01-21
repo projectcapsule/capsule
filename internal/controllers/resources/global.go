@@ -12,6 +12,7 @@ import (
 	gherrors "github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	k8smeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
@@ -36,15 +37,16 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/api/processor"
 	"github.com/projectcapsule/capsule/pkg/cache"
-	clt "github.com/projectcapsule/capsule/pkg/client"
-	"github.com/projectcapsule/capsule/pkg/configuration"
-	"github.com/projectcapsule/capsule/pkg/template"
+	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
+	"github.com/projectcapsule/capsule/pkg/runtime/predicates"
 )
 
 type globalResourceController struct {
 	client        client.Client
+	mapper        k8smeta.RESTMapper
 	log           logr.Logger
 	processor     processor.Processor
+	collector     Collector
 	configuration configuration.Configuration
 	metrics       *metrics.GlobalTenantResourceRecorder
 
@@ -55,13 +57,22 @@ func (r *globalResourceController) SetupWithManager(mgr ctrl.Manager, cfg utils.
 	r.client = mgr.GetClient()
 	r.processor = processor.Processor{
 		Configuration:                r.configuration,
-		AllowCrossNamespaceSelection: false,
+		AllowCrossNamespaceSelection: true,
 	}
+	r.collector = NewCollector(
+		r.client,
+		mgr.GetRESTMapper(),
+	)
 
 	return ctrl.NewControllerManagedBy(mgr).
 		For(
 			&capsulev1beta2.GlobalTenantResource{},
-			builder.WithPredicates(predicate.GenerationChangedPredicate{}),
+			builder.WithPredicates(
+				predicate.Or(
+					predicate.GenerationChangedPredicate{},
+					predicates.ReconcileRequestedPredicate{},
+				),
+			),
 		).
 		Watches(
 			&capsulev1beta2.GlobalTenantResource{},
@@ -212,20 +223,10 @@ func (r *globalResourceController) Reconcile(ctx context.Context, request reconc
 		err = nil
 	}()
 
-	// Reconcile Request
-	patches := clt.PatchRemoveAnnotations(tntResource.GetAnnotations(), []string{meta.ReconcileAnnotation})
-	if len(patches) > 0 {
-		log.V(4).Info("removing reconcile annotation", "items", len(patches))
-		err = clt.ApplyPatches(ctx, r.client, tntResource.DeepCopy(), patches, meta.ResourceControllerFieldOwnerPrefix())
-
-		return reconcile.Result{
-			Requeue:      true,
-			RequeueAfter: tntResource.Spec.ResyncPeriod.Duration,
-		}, nil
-	}
-
 	if *tntResource.Spec.Cordoned {
 		log.V(5).Info("tenant resource is cordoned")
+
+		return reconcile.Result{}, err
 	}
 
 	for _, dep := range tntResource.Spec.DependsOn {
@@ -264,12 +265,12 @@ func (r *globalResourceController) Reconcile(ctx context.Context, request reconc
 	}
 
 	if c == nil {
-		log.V(5).Info("received empty client for serviceaccount")
+		err = fmt.Errorf("received empty client for serviceaccount")
 
 		return reconcile.Result{}, nil
 	}
 
-	err = r.reconcileNormal(ctx, c, tntResource)
+	err = r.reconcile(ctx, c, tntResource)
 
 	// Finalizers
 	if len(tntResource.Status.ProcessedItems) > 0 {
@@ -280,22 +281,13 @@ func (r *globalResourceController) Reconcile(ctx context.Context, request reconc
 
 	controllerutil.RemoveFinalizer(tntResource, meta.LegacyResourceFinalizer)
 
-	// Annotations
-	annos := tntResource.GetAnnotations()
-	if annos != nil {
-		log.V(5).Info("removing reconcile annotation")
-
-		delete(annos, meta.ReconcileAnnotation)
-		tntResource.SetAnnotations(annos)
-	}
-
 	return reconcile.Result{
 		Requeue:      true,
 		RequeueAfter: tntResource.Spec.ResyncPeriod.Duration,
-	}, nil
+	}, err
 }
 
-func (r *globalResourceController) reconcileNormal(
+func (r *globalResourceController) reconcile(
 	ctx context.Context,
 	c client.Client,
 	tntResource *capsulev1beta2.GlobalTenantResource,
@@ -377,6 +369,12 @@ func (r *globalResourceController) gatherResources(
 	tnts capsulev1beta2.TenantList,
 	acc processor.Accumulator,
 ) error {
+
+	opts := CollectorOptions{
+		Accumulator:                  acc,
+		AllowCrossNamespaceSelection: true,
+	}
+
 	for index, resource := range tntResource.Spec.Resources {
 		ilog := log.WithValues("resource", index)
 
@@ -385,37 +383,25 @@ func (r *globalResourceController) gatherResources(
 
 			var resourceError error
 
-			tplContext := template.ReferenceContext{}
-			if resource.Context != nil {
-				tplContext, _ = resource.Context.GatherContext(ctx, c, nil, "")
-			}
-
-			tplContext["Tenant"] = tnt
-
 			switch tntResource.Spec.Scope {
 			case api.ResourceScopeTenant:
-				//tplContext, _ = spec.Context.GatherContext(ctx, c, nil, "")
-				//tplContext["Tenant"] = tnt
-
-				//owner := fieldOwner + "/" + tnt.Name + "/"
-
 				ilog.V(5).Info("replicating for each tenant")
 
-				resourceError = collectResources(
+				opts.Iterator = NewCollectorIteratorOptions(&tnt, nil, resource)
+
+				resourceError = r.collector.Collect(
 					ctx,
 					c,
+					opts,
 					tnt,
 					strconv.Itoa(index),
 					resource,
 					nil,
-					tplContext,
-					acc,
-					true,
 				)
 			default:
 				ilog.V(5).Info("replicating for each namespace")
 
-				resourceError = foreachTenantNamespace(ctx, ilog, c, r.client, tnt, resource, strconv.Itoa(index), tplContext, acc, true)
+				resourceError = r.collector.foreachTenantNamespace(ctx, ilog, c, tnt, resource, strconv.Itoa(index), acc, true)
 			}
 
 			// Only start pruning when the resource item itself did not throw an error

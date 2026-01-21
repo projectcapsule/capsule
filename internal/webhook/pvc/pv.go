@@ -17,6 +17,7 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	capsulewebhook "github.com/projectcapsule/capsule/internal/webhook"
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
+	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 )
 
@@ -37,7 +38,7 @@ func (h pv) OnCreate(
 		// A PersistentVolume selector cannot help in preventing a cross-tenant mount:
 		// thus, disallowing that in first place.
 		if pvc.Spec.Selector != nil {
-			return utils.ErroredResponse(NewPVSelectorError())
+			return utils.ErroredResponse(caperrors.NewPVSelectorError())
 		}
 
 		// The PVC hasn't any volumeName pre-claimed, it can be skipped
@@ -56,16 +57,16 @@ func (h pv) OnCreate(
 		}
 
 		if pv.GetLabels() == nil {
-			return utils.ErroredResponse(NewMissingPVLabelsError(pv.GetName()))
+			return utils.ErroredResponse(caperrors.NewMissingPVLabelsError(pv.GetName()))
 		}
 
 		value, ok := pv.GetLabels()[meta.TenantLabel]
 		if !ok {
-			return utils.ErroredResponse(NewMissingTenantPVLabelsError(pv.GetName()))
+			return utils.ErroredResponse(caperrors.NewMissingTenantPVLabelsError(pv.GetName()))
 		}
 
 		if value != tnt.Name {
-			return utils.ErroredResponse(NewCrossTenantPVMountError(pv.GetName()))
+			return utils.ErroredResponse(caperrors.NewCrossTenantPVMountError(pv.GetName()))
 		}
 
 		return nil

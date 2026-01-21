@@ -18,6 +18,8 @@ type TenantResourceIDWithOrigin struct {
 	TenantResourceID `json:",inline"`
 
 	Origin string `json:"origin,omitempty"`
+
+	Generated bool `json:"source,omitempty"`
 }
 
 // ResourceID represents the decomposed parts of a Kubernetes resource identity.

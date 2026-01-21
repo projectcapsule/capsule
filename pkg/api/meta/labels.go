@@ -32,6 +32,8 @@ const (
 	ManagedByCapsuleLabel    = "capsule.clastix.io/managed-by"
 	NewManagedByCapsuleLabel = "projectcapsule.dev/managed-by"
 
+	ResourceControllerValue = "resources"
+
 	CreatedByCapsuleLabel = "projectcapsule.dev/created-by"
 
 	ResourceCapsuleLabel = "capsule.clastix.io/resources"

@@ -11,12 +11,15 @@ import (
 	"strconv"
 
 	corev1 "k8s.io/api/core/v1"
+	k8smeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 
 	"github.com/go-logr/logr"
@@ -24,70 +27,101 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/api/misc"
 	"github.com/projectcapsule/capsule/pkg/api/processor"
+	"github.com/projectcapsule/capsule/pkg/runtime/gvk"
+	"github.com/projectcapsule/capsule/pkg/runtime/sanitize"
+	"github.com/projectcapsule/capsule/pkg/template"
 	tpl "github.com/projectcapsule/capsule/pkg/template"
-	"github.com/projectcapsule/capsule/pkg/utils/tenant"
+	"github.com/projectcapsule/capsule/pkg/tenant"
 )
 
-var reservedLabelSet = map[string]struct{}{
-	meta.ResourcesLabel:           {},
-	meta.CreatedByCapsuleLabel:    {},
-	meta.ManagedByCapsuleLabel:    {},
-	meta.NewManagedByCapsuleLabel: {},
+type Collector struct {
+	gatherClient           client.Client
+	mapper                 k8smeta.RESTMapper
+	contextSanitizeOptions sanitize.SanitizeOptions
+	objectSanitizeOptions  sanitize.SanitizeOptions
+	reservedLabelSet       map[string]struct{}
+}
+
+type CollectorOptions struct {
+	AllowCrossNamespaceSelection bool
+	Accumulator                  processor.Accumulator
+	Iterator                     CollectorIteratorOptions
+}
+
+type CollectorIteratorOptions struct {
+	Labels      map[string]string
+	Annotations map[string]string
+	FastContext map[string]string
+}
+
+func NewCollectorIteratorOptions(
+	tnt *capsulev1beta2.Tenant,
+	ns *corev1.Namespace,
+	spec capsulev1beta2.ResourceSpec,
+) CollectorIteratorOptions {
+	opts := CollectorIteratorOptions{}
+
+	opts.FastContext = tenant.ContextForTenantAndNamespace(tnt, ns)
+
+	labels, annotations := GatherAdditionalMetadata(spec, opts.FastContext)
+	opts.Labels = labels
+	opts.Annotations = annotations
+
+	return opts
+}
+
+func NewCollector(c client.Client, mapper k8smeta.RESTMapper) Collector {
+	return Collector{
+		gatherClient: c,
+		mapper:       mapper,
+		contextSanitizeOptions: sanitize.SanitizeOptions{
+			StripUID:           false,
+			StripManagedFields: true,
+			StripLastApplied:   true,
+			StripStatus:        false,
+		},
+		objectSanitizeOptions: sanitize.DefaultSanitizeOptions(),
+		reservedLabelSet: map[string]struct{}{
+			meta.ResourcesLabel:           {},
+			meta.CreatedByCapsuleLabel:    {},
+			meta.ManagedByCapsuleLabel:    {},
+			meta.NewManagedByCapsuleLabel: {},
+		},
+	}
 }
 
 // With this function we are attempting to collect all the unstructured items
 // No Interacting is done with the kubernetes regarding applying etc.
 //
 //nolint:gocognit
-func collectResources(
+func (co *Collector) Collect(
 	ctx context.Context,
 	c client.Client,
+	opts CollectorOptions,
 	tnt capsulev1beta2.Tenant,
 	resourceIndex string,
 	spec capsulev1beta2.ResourceSpec,
 	ns *corev1.Namespace,
-	tmplContext tpl.ReferenceContext,
-	acc processor.Accumulator,
-	allowCrossNamespaceSelection bool,
 ) (err error) {
 	log := ctrllog.FromContext(ctx)
 
 	var syncErr error
 
-	fastContext := tenant.ContextForTenantAndNamespace(&tnt, ns)
+	tplContext := template.ReferenceContext{}
+	//if spec.Context != nil {
+	//	tplContext, _ = resource.Context.GatherContext(ctx, c, nil, "", nil)
+	//}
 
-	labels, annotations := gatherAdditionalMetadata(spec, fastContext)
-
-	log.V(5).Info("using additional metadata", "labels", labels, "annotations", annotations)
-
-	// Run Items
-	for nsIndex, item := range spec.NamespacedItems {
-		log.V(5).Info("processing namespaced item", "index", nsIndex)
-
-		p, rawError := handleNamespacedItem(ctx, c, nsIndex, item, ns, tnt, allowCrossNamespaceSelection)
-		if rawError != nil {
-			syncErr = errors.Join(syncErr, rawError)
-
-			continue
-		}
-
-		log.V(5).Info("loaded resources", "amount", len(p))
-
-		for i, o := range p {
-			rawError = addToAccumulation(tnt, ns, spec, acc, o, resourceIndex+"/namespaced-"+strconv.Itoa(nsIndex)+"-"+strconv.Itoa(i), labels, annotations, allowCrossNamespaceSelection)
-			if rawError != nil {
-				syncErr = errors.Join(syncErr, rawError)
-
-				continue
-			}
-		}
+	if ns != nil {
+		tplContext["Namespace"] = sanitize.SanitizeObject(ns, c.Scheme(), co.contextSanitizeOptions)
 	}
+	tplContext["Tenant"] = sanitize.SanitizeObject(&tnt, c.Scheme(), co.contextSanitizeOptions)
 
 	// Run Raw Items
 	for rawIndex, item := range spec.RawItems {
 		log.V(5).Info("processing raw item", "index", rawIndex)
 
-		p, rawError := handleRawItem(ctx, c, item, ns, fastContext)
+		p, rawError := co.handleRawItem(ctx, c, opts, item, ns)
 		if rawError != nil {
 			syncErr = errors.Join(syncErr, rawError)
 
@@ -96,7 +130,7 @@ func collectResources(
 
 		log.V(7).Info("evaluated raw item", "object", p)
 
-		rawError = addToAccumulation(tnt, ns, spec, acc, p, resourceIndex+"/raw-"+strconv.Itoa(rawIndex), labels, annotations, allowCrossNamespaceSelection)
+		rawError = co.AddToAccumulation(tnt, ns, opts, spec, p, resourceIndex+"/raw-"+strconv.Itoa(rawIndex), true)
 		if rawError != nil {
 			syncErr = errors.Join(syncErr, rawError)
 
@@ -108,7 +142,7 @@ func collectResources(
 	for generatorIndex, item := range spec.Templates {
 		log.V(5).Info("processing generator item", "index", generatorIndex)
 
-		p, genError := handleGeneratorItem(ctx, c, generatorIndex, item, ns, tmplContext)
+		p, genError := co.handleGeneratorItem(ctx, c, generatorIndex, item, ns, tplContext)
 		if genError != nil {
 			syncErr = errors.Join(syncErr, genError)
 
@@ -119,7 +153,7 @@ func collectResources(
 
 		for i, o := range p {
 
-			genError = addToAccumulation(tnt, ns, spec, acc, o, resourceIndex+"/template-"+strconv.Itoa(generatorIndex)+"-"+strconv.Itoa(i), labels, annotations, allowCrossNamespaceSelection)
+			genError = co.AddToAccumulation(tnt, ns, opts, spec, o, resourceIndex+"/template-"+strconv.Itoa(generatorIndex)+"-"+strconv.Itoa(i), true)
 			if genError != nil {
 				syncErr = errors.Join(syncErr, genError)
 
@@ -133,50 +167,57 @@ func collectResources(
 
 // Add an item to the accumulator
 // Mainly handles conflicts
-func addToAccumulation(
+func (co *Collector) AddToAccumulation(
 	tnt capsulev1beta2.Tenant,
 	ns *corev1.Namespace,
+	opts CollectorOptions,
 	spec capsulev1beta2.ResourceSpec,
-	acc processor.Accumulator,
 	obj *unstructured.Unstructured,
 	origin string,
-	labels map[string]string,
-	annotations map[string]string,
-	allowCrossNamespaceSelection bool,
+	combine bool,
 ) (err error) {
 	if obj == nil {
 		return
 	}
 
-	if allowCrossNamespaceSelection {
+	resource := misc.NewResourceID(obj, tnt.GetName(), origin)
+
+	if !combine {
+		if _, k := opts.Accumulator[resource.GetKey("")]; k {
+			return nil
+		}
+	}
+
+	if !opts.AllowCrossNamespaceSelection && ns != nil {
 		obj.SetNamespace(ns.GetName())
 	}
 
-	if len(labels) > 0 {
+	if len(opts.Iterator.Labels) > 0 {
 		dst := obj.GetLabels()
 		if dst == nil {
-			dst = make(map[string]string, len(labels))
+			dst = make(map[string]string, len(opts.Iterator.Labels))
 		}
 
-		maps.Copy(dst, labels)
+		maps.Copy(dst, opts.Iterator.Labels)
 		obj.SetLabels(dst)
 
-		meta.SetFilteredLabels(obj, reservedLabelSet)
+		meta.SetFilteredLabels(obj, co.reservedLabelSet)
 	}
 
-	if len(annotations) > 0 {
+	if len(opts.Iterator.Annotations) > 0 {
 		dst := obj.GetAnnotations()
 		if dst == nil {
-			dst = make(map[string]string, len(annotations))
+			dst = make(map[string]string, len(opts.Iterator.Annotations))
 		}
 
-		maps.Copy(dst, annotations)
+		maps.Copy(dst, opts.Iterator.Annotations)
 
 		obj.SetAnnotations(dst)
 	}
 
-	resource := misc.NewResourceID(obj, tnt.GetName(), origin)
-	processor.AccumulatorAdd(acc, resource, processor.AccumulatorObject{
+	sanitize.SanitizeUnstructured(obj, co.objectSanitizeOptions)
+
+	processor.AccumulatorAdd(opts.Accumulator, resource, processor.AccumulatorObject{
 		Object: obj,
 		Origin: misc.TenantResourceIDWithOrigin{
 			TenantResourceID: misc.TenantResourceID{
@@ -189,36 +230,84 @@ func addToAccumulation(
 	return nil
 }
 
-func handleNamespacedItem(
+func (co *Collector) CollectNamespacedItems(
 	ctx context.Context,
 	c client.Client,
-	index int,
-	item misc.ResourceReference,
+	opts CollectorOptions,
+	spec capsulev1beta2.ResourceSpec,
 	ns *corev1.Namespace,
 	tnt capsulev1beta2.Tenant,
-	allowCrossNamespaceSelection bool,
+) (items map[gvk.ResourceKey]*unstructured.Unstructured, err error) {
+	var totalError error
 
-) (processed []*unstructured.Unstructured, err error) {
+	seen := make(map[gvk.ResourceKey]*unstructured.Unstructured)
+
+	log := log.FromContext(ctx)
 	tntNamespaces := sets.NewString(tnt.Status.Namespaces...)
+
+	namespace := ""
+	if !opts.AllowCrossNamespaceSelection && ns != nil {
+		namespace = ns.GetName()
+	}
 
 	// A TenantResource is created by a TenantOwner, and potentially, they could point to a resource in a non-owned
 	// Namespace: this must be blocked by checking it this is the case.
-	if !allowCrossNamespaceSelection && !tntNamespaces.Has(string(item.Namespace)) {
+	if !opts.AllowCrossNamespaceSelection && !tntNamespaces.Has(string(namespace)) {
 		err = fmt.Errorf("cross-namespace selection is not allowed. Referring a Namespace that is not part of the given Tenant")
 
 		return nil, err
 	}
 
-	namespace := ""
-	if ns != nil {
-		namespace = ns.GetName()
+	selector, err := getSelectorForCreatedResourcesExclusion()
+	if err != nil {
+		return nil, err
 	}
 
-	return item.LoadResources(ctx, c, namespace)
+	for _, item := range spec.NamespacedItems {
+		p, err := item.LoadResources(ctx, c, co.mapper, namespace, []labels.Selector{selector}, opts.Iterator.FastContext, false)
+		if err != nil {
+			totalError = errors.Join(totalError, err)
+
+			continue
+		}
+
+		for _, o := range p {
+			// Namespaced Items are different. Even if we allow cross namespace loading
+			// If a target namespace is given it always is used
+			if ns != nil && ns.GetName() != "" {
+				o.SetNamespace(ns.GetName())
+			}
+
+			k, ok := gvk.KeyFromUnstructured(o)
+			if ok {
+				if _, already := seen[k]; already {
+					log.V(6).Info("skipping duplicate loaded resource",
+						"gvk", schema.GroupVersionKind{Group: k.Group, Version: k.Version, Kind: k.Kind}.String(),
+						"namespace", k.Namespace,
+						"name", k.Name,
+					)
+					continue
+				}
+				seen[k] = o
+			} else {
+				log.V(4).Info("resource missing identity; cannot dedupe reliably",
+					"apiVersion", o.GetAPIVersion(), "kind", o.GetKind(), "namespace", o.GetNamespace(), "name", o.GetName(),
+				)
+			}
+
+		}
+	}
+
+	objs := make([]*unstructured.Unstructured, 0, len(seen))
+	for _, obj := range seen {
+		objs = append(objs, obj)
+	}
+
+	return seen, totalError
 }
 
 // Handles a single generator item
-func handleGeneratorItem(
+func (co *Collector) handleGeneratorItem(
 	ctx context.Context,
 	c client.Client,
 	index int,
@@ -228,7 +317,7 @@ func handleGeneratorItem(
 ) (processed []*unstructured.Unstructured, err error) {
 	objs, err := tpl.RenderUnstructuredItems(tmplContext, item.MissingKey, item.Template)
 	if err != nil {
-		return nil, fmt.Errorf("error running generator: %w", err, "hello")
+		return nil, fmt.Errorf("error running generator: %w", err)
 	}
 
 	for _, obj := range objs {
@@ -242,14 +331,14 @@ func handleGeneratorItem(
 	return
 }
 
-func handleRawItem(
+func (co *Collector) handleRawItem(
 	ctx context.Context,
 	c client.Client,
+	opts CollectorOptions,
 	item capsulev1beta2.RawExtension,
 	ns *corev1.Namespace,
-	fastContext map[string]string,
 ) (processed *unstructured.Unstructured, err error) {
-	tmplString := tpl.TemplateForTenantAndNamespace(string(item.Raw), fastContext)
+	tmplString := tpl.FastTemplate(string(item.Raw), opts.Iterator.FastContext)
 
 	obj := &unstructured.Unstructured{}
 	if _, _, err := unstructured.UnstructuredJSONScheme.Decode([]byte(tmplString), nil, obj); err != nil {
@@ -264,7 +353,7 @@ func handleRawItem(
 }
 
 // Allows templating in
-func gatherAdditionalMetadata(
+func GatherAdditionalMetadata(
 	spec capsulev1beta2.ResourceSpec,
 	fastContext map[string]string,
 ) (labels map[string]string, annotations map[string]string) {
@@ -277,26 +366,24 @@ func gatherAdditionalMetadata(
 	}
 
 	if md.Labels != nil {
-		labels = tpl.TemplateForTenantAndNamespaceMap(maps.Clone(md.Labels), fastContext)
+		labels = tpl.FastTemplateMap(maps.Clone(md.Labels), fastContext)
 	}
 
 	if md.Annotations != nil {
-		annotations = tpl.TemplateForTenantAndNamespaceMap(maps.Clone(md.Annotations), fastContext)
+		annotations = tpl.FastTemplateMap(maps.Clone(md.Annotations), fastContext)
 	}
 
 	return labels, annotations
 }
 
 //nolint:gocognit
-func foreachTenantNamespace(
+func (co *Collector) foreachTenantNamespace(
 	ctx context.Context,
 	log logr.Logger,
 	c client.Client,
-	gatherClient client.Client,
 	tnt capsulev1beta2.Tenant,
 	resource capsulev1beta2.ResourceSpec,
 	resourceIndex string,
-	tmplContext tpl.ReferenceContext,
 	acc processor.Accumulator,
 	allowCrossNamespaceSelection bool,
 ) (err error) {
@@ -325,7 +412,7 @@ func foreachTenantNamespace(
 	selector = selector.Add(*tntRequirement)
 	// Selecting the targeted Namespace according to the TenantResource specification.
 	namespaces := corev1.NamespaceList{}
-	if err = gatherClient.List(ctx, &namespaces, client.MatchingLabelsSelector{Selector: selector}); err != nil {
+	if err = co.gatherClient.List(ctx, &namespaces, client.MatchingLabelsSelector{Selector: selector}); err != nil {
 		log.Error(err, "cannot retrieve Namespaces for resource")
 
 		return err
@@ -334,18 +421,16 @@ func foreachTenantNamespace(
 	log.V(5).Info("retrieved namespaces", "size", len(namespaces.Items))
 
 	for _, ns := range namespaces.Items {
+		log.V(5).Info("reconciling for", "namespace", ns.Name)
 
-		//spec.Context.GatherContext(ctx, c, nil, ns.GetName())
-		err = collectResources(
+		err = co.Collect(
 			ctx,
 			c,
+			CollectorOptions{},
 			tnt,
 			resourceIndex,
 			resource,
 			&ns,
-			tmplContext,
-			acc,
-			allowCrossNamespaceSelection,
 		)
 		if err != nil {
 			return

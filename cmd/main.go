@@ -66,8 +66,8 @@ import (
 	tntresourcenamespaced "github.com/projectcapsule/capsule/internal/webhook/tenantresource/namespaced"
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
 	"github.com/projectcapsule/capsule/pkg/cache"
-	"github.com/projectcapsule/capsule/pkg/configuration"
-	"github.com/projectcapsule/capsule/pkg/indexer"
+	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
+	"github.com/projectcapsule/capsule/pkg/runtime/indexers"
 )
 
 var (
@@ -236,7 +236,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = indexer.AddToManager(ctx, setupLog, manager); err != nil {
+	if err = indexers.AddToManager(ctx, setupLog, manager); err != nil {
 		setupLog.Error(err, "unable to setup indexers")
 		os.Exit(1)
 	}

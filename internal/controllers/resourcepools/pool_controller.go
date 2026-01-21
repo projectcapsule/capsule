@@ -43,6 +43,7 @@ type resourcePoolController struct {
 
 func (r *resourcePoolController) SetupWithManager(mgr ctrl.Manager, cfg ctrlutils.ControllerOptions) error {
 	return ctrl.NewControllerManagedBy(mgr).
+		Named("resourcepool/pools").
 		For(&capsulev1beta2.ResourcePool{}).
 		Owns(&corev1.ResourceQuota{}).
 		Watches(&capsulev1beta2.ResourcePoolClaim{},

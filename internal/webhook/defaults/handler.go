@@ -13,7 +13,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulewebhook "github.com/projectcapsule/capsule/internal/webhook"
-	"github.com/projectcapsule/capsule/pkg/configuration"
+	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 )
 
 type handler struct {

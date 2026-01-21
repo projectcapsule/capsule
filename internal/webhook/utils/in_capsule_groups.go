@@ -11,8 +11,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	"github.com/projectcapsule/capsule/internal/webhook"
-	"github.com/projectcapsule/capsule/pkg/configuration"
-	"github.com/projectcapsule/capsule/pkg/utils/users"
+	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
+	"github.com/projectcapsule/capsule/pkg/users"
 )
 
 func InCapsuleGroups(configuration configuration.Configuration, handlers ...webhook.Handler) webhook.Handler {

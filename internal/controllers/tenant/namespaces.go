@@ -20,7 +20,7 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
-	"github.com/projectcapsule/capsule/pkg/utils/tenant"
+	"github.com/projectcapsule/capsule/pkg/tenant"
 )
 
 // Ensuring all annotations are applied to each Namespace handled by the Tenant.

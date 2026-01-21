@@ -13,7 +13,7 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/internal/webhook"
-	"github.com/projectcapsule/capsule/pkg/utils/tenant"
+	"github.com/projectcapsule/capsule/pkg/tenant"
 )
 
 type newObjectFunc[T client.Object] func() T

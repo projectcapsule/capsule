@@ -28,9 +28,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	"github.com/projectcapsule/capsule/internal/controllers/utils"
-	"github.com/projectcapsule/capsule/pkg/cert"
-	"github.com/projectcapsule/capsule/pkg/configuration"
+	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
+	"github.com/projectcapsule/capsule/pkg/runtime/cert"
+	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
+	"github.com/projectcapsule/capsule/pkg/runtime/predicates"
 )
 
 const (
@@ -61,7 +62,8 @@ func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 	})
 
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&corev1.Secret{}, utils.NamesMatchingPredicate(r.Configuration.TLSSecretName())).
+		Named("tls").
+		For(&corev1.Secret{}, predicates.NamesMatching(r.Configuration.TLSSecretName())).
 		Watches(&admissionregistrationv1.ValidatingWebhookConfiguration{}, enqueueFn, builder.WithPredicates(predicate.NewPredicateFuncs(func(object client.Object) bool {
 			return object.GetName() == r.Configuration.ValidatingWebhookConfigurationName()
 		}))).
@@ -140,7 +142,7 @@ func (r Reconciler) ReconcileCertificates(ctx context.Context, certSecret *corev
 
 	operatorPods, err := r.getOperatorPods(ctx)
 	if err != nil {
-		if errors.As(err, &RunningInOutOfClusterModeError{}) {
+		if errors.As(err, &caperrors.RunningInOutOfClusterModeError{}) {
 			r.Log.Info("skipping annotation of Pods for cert-manager", "error", err.Error())
 
 			return nil
@@ -331,7 +333,7 @@ func (r Reconciler) getOperatorPods(ctx context.Context) (*corev1.PodList, error
 	leaderPod := &corev1.Pod{}
 
 	if err := r.Get(ctx, types.NamespacedName{Namespace: os.Getenv("NAMESPACE"), Name: hostname}, leaderPod); err != nil {
-		return nil, RunningInOutOfClusterModeError{}
+		return nil, caperrors.RunningInOutOfClusterModeError{}
 	}
 
 	podList := &corev1.PodList{}

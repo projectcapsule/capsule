@@ -13,7 +13,8 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	capsulewebhook "github.com/projectcapsule/capsule/internal/webhook"
-	"github.com/projectcapsule/capsule/pkg/configuration"
+	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
+	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 )
 
 type containerRegistryHandler struct {
@@ -107,7 +108,7 @@ func (h *containerRegistryHandler) verifyContainerRegistry(
 	if len(reg.Registry()) == 0 {
 		recorder.Eventf(tnt, corev1.EventTypeWarning, "MissingFQCI", "Pod %s/%s is not using a fully qualified container image, cannot enforce registry the current Tenant", req.Namespace, req.Name, reg.Registry())
 
-		response := admission.Denied(NewContainerRegistryForbidden(image, *tnt.Spec.ContainerRegistries).Error())
+		response := admission.Denied(caperrors.NewContainerRegistryForbidden(image, *tnt.Spec.ContainerRegistries).Error())
 
 		return &response
 	}
@@ -119,7 +120,7 @@ func (h *containerRegistryHandler) verifyContainerRegistry(
 	if !valid && !matched {
 		recorder.Eventf(tnt, corev1.EventTypeWarning, "ForbiddenContainerRegistry", "Pod %s/%s is using a container hosted on registry %s that is forbidden for the current Tenant", req.Namespace, req.Name, reg.Registry())
 
-		response := admission.Denied(NewContainerRegistryForbidden(reg.FQCI(), *tnt.Spec.ContainerRegistries).Error())
+		response := admission.Denied(caperrors.NewContainerRegistryForbidden(reg.FQCI(), *tnt.Spec.ContainerRegistries).Error())
 
 		return &response
 	}

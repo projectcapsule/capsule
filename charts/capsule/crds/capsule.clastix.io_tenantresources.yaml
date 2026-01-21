@@ -468,6 +468,10 @@ spec:
                       type: string
                     status:
                       properties:
+                        created:
+                          description: Indicates wether the resource was created or
+                            adopted
+                          type: boolean
                         lastApply:
                           description: |-
                             An opaque value that represents the internal version of this object that can

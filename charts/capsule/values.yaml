@@ -225,7 +225,16 @@ manager:
 
     # -- Managed RBAC configuration for the controller
     rbac:
+      # -- The ClusterRoles applied for Administrators
+      adminitrationClusterRoles: 
+        - capsule-namespace-deleter
+      # -- The ClusterRoles applied for ServiceAccounts which had owner Promotion
+      promotionClusterRoles:
+        - capsule-namespace-provisioner
+        - capsule-namespace-deleter
+      # -- Name for the ClusterRole required to grant Namespace Deletion permissions.
       deleter: capsule-namespace-deleter
+      # -- Name for the ClusterRole required to grant Namespace Provision permissions.
       provisioner: capsule-namespace-provisioner
 
     # -- Impersonation

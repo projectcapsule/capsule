@@ -26,7 +26,8 @@ import (
 	"github.com/projectcapsule/capsule/internal/controllers/utils"
 	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
-	"github.com/projectcapsule/capsule/pkg/configuration"
+	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
+	"github.com/projectcapsule/capsule/pkg/runtime/predicates"
 )
 
 var (
@@ -41,11 +42,12 @@ type Manager struct {
 
 //nolint:revive
 func (r *Manager) SetupWithManager(ctx context.Context, mgr ctrl.Manager, ctrlConfig utils.ControllerOptions) (err error) {
-	namesPredicate := utils.LabelsMatchingPredicate(map[string]string{
+	namesPredicate := predicates.LabelsMatching(map[string]string{
 		meta.CreatedByCapsuleLabel: controllerManager,
 	})
 
 	crErr := ctrl.NewControllerManagedBy(mgr).
+		Named("rbac/roles").
 		For(&rbacv1.ClusterRole{}, namesPredicate).
 		Complete(r)
 	if crErr != nil {
@@ -53,6 +55,7 @@ func (r *Manager) SetupWithManager(ctx context.Context, mgr ctrl.Manager, ctrlCo
 	}
 
 	crbErr := ctrl.NewControllerManagedBy(mgr).
+		Named("rbac/bindings").
 		For(&rbacv1.ClusterRoleBinding{}, namesPredicate).
 		Watches(&capsulev1beta2.CapsuleConfiguration{}, handler.Funcs{
 			UpdateFunc: func(ctx context.Context, updateEvent event.TypedUpdateEvent[client.Object], limitingInterface workqueue.TypedRateLimitingInterface[reconcile.Request]) {
@@ -68,7 +71,7 @@ func (r *Manager) SetupWithManager(ctx context.Context, mgr ctrl.Manager, ctrlCo
 				r.handleSAChange(ctx, e.Object)
 			},
 			UpdateFunc: func(ctx context.Context, e event.TypedUpdateEvent[client.Object], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
-				if utils.LabelsChanged([]string{meta.OwnerPromotionLabel}, e.ObjectOld.GetLabels(), e.ObjectNew.GetLabels()) {
+				if predicates.LabelsChanged([]string{meta.OwnerPromotionLabel}, e.ObjectOld.GetLabels(), e.ObjectNew.GetLabels()) {
 					r.handleSAChange(ctx, e.ObjectNew)
 				}
 			},

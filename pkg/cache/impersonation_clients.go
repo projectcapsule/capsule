@@ -8,11 +8,12 @@ import (
 	"sync"
 
 	"github.com/go-logr/logr"
-	"github.com/projectcapsule/capsule/pkg/api/meta"
-	"github.com/projectcapsule/capsule/pkg/utils/users"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/projectcapsule/capsule/pkg/api/meta"
+	"github.com/projectcapsule/capsule/pkg/users"
 )
 
 type Key struct {
@@ -72,9 +73,6 @@ func (c *ImpersonationCache) Stats() (entries int) {
 
 // LoadOrCreate returns a cached impersonated client for the given service account,
 // creating and caching it if missing.
-//
-// - baseRESTProvider should return a base rest.Config used for impersonation.
-// - schemeClient is only used to get the Scheme() for building the new client.
 func (c *ImpersonationCache) LoadOrCreate(
 	ctx context.Context,
 	log logr.Logger,

@@ -15,7 +15,7 @@ import (
 	capsulewebhook "github.com/projectcapsule/capsule/internal/webhook"
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
-	"github.com/projectcapsule/capsule/pkg/utils/tenant"
+	"github.com/projectcapsule/capsule/pkg/tenant"
 )
 
 type tenantAssignmentHandler struct{}

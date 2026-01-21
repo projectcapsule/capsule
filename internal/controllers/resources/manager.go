@@ -12,7 +12,7 @@ import (
 	"github.com/projectcapsule/capsule/internal/controllers/utils"
 	"github.com/projectcapsule/capsule/internal/metrics"
 	"github.com/projectcapsule/capsule/pkg/cache"
-	"github.com/projectcapsule/capsule/pkg/configuration"
+	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 )
 
 func Add(

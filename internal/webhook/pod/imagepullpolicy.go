@@ -13,6 +13,7 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	capsulewebhook "github.com/projectcapsule/capsule/internal/webhook"
+	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
 )
 
 type imagePullPolicy struct{}
@@ -101,7 +102,7 @@ func (h *imagePullPolicy) verifyPullPolicy(
 	if !policy.IsPolicySupported(usedPullPolicy) {
 		recorder.Eventf(tnt, corev1.EventTypeWarning, "ForbiddenPullPolicy", "Pod %s/%s pull policy %s is forbidden for the current Tenant", req.Namespace, req.Name, usedPullPolicy)
 
-		response := admission.Denied(NewImagePullPolicyForbidden(usedPullPolicy, container, policy.AllowedPullPolicies()).Error())
+		response := admission.Denied(caperrors.NewImagePullPolicyForbidden(usedPullPolicy, container, policy.AllowedPullPolicies()).Error())
 
 		return &response
 	}

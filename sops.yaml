@@ -5,13 +5,13 @@ metadata:
   name: tenant-sops-providers
 spec:
   resyncPeriod: 600s
-  scope: Namespace
+  scope: Tenant
   resources:
     - rawItems:
         - apiVersion: addons.projectcapsule.dev/v1alpha1
           kind: SopsProvider
           metadata:
-            name: "{{tenant.name}}-{{namespace}}-secrets"
+            name: "{{tenant.name}}-secrets"
           spec:
             keys:
             - namespaceSelector:

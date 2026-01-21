@@ -17,6 +17,7 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	capsulewebhook "github.com/projectcapsule/capsule/internal/webhook"
 	"github.com/projectcapsule/capsule/pkg/api"
+	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
 )
 
 type validating struct{}
@@ -71,7 +72,7 @@ func (h *validating) handle(
 	if svc.Spec.Type == corev1.ServiceTypeNodePort && tnt.Spec.ServiceOptions != nil && tnt.Spec.ServiceOptions.AllowedServices != nil && !*tnt.Spec.ServiceOptions.AllowedServices.NodePort {
 		recorder.Eventf(tnt, corev1.EventTypeWarning, "ForbiddenNodePort", "Service %s/%s cannot be type of NodePort for the current Tenant", req.Namespace, req.Name)
 
-		response := admission.Denied(NewNodePortDisabledError().Error())
+		response := admission.Denied(caperrors.NewNodePortDisabledError().Error())
 
 		return &response
 	}
@@ -79,7 +80,7 @@ func (h *validating) handle(
 	if svc.Spec.Type == corev1.ServiceTypeExternalName && tnt.Spec.ServiceOptions != nil && tnt.Spec.ServiceOptions.AllowedServices != nil && !*tnt.Spec.ServiceOptions.AllowedServices.ExternalName {
 		recorder.Eventf(tnt, corev1.EventTypeWarning, "ForbiddenExternalName", "Service %s/%s cannot be type of ExternalName for the current Tenant", req.Namespace, req.Name)
 
-		response := admission.Denied(NewExternalNameDisabledError().Error())
+		response := admission.Denied(caperrors.NewExternalNameDisabledError().Error())
 
 		return &response
 	}
@@ -87,7 +88,7 @@ func (h *validating) handle(
 	if svc.Spec.Type == corev1.ServiceTypeLoadBalancer && tnt.Spec.ServiceOptions != nil && tnt.Spec.ServiceOptions.AllowedServices != nil && !*tnt.Spec.ServiceOptions.AllowedServices.LoadBalancer {
 		recorder.Eventf(tnt, corev1.EventTypeWarning, "ForbiddenLoadBalancer", "Service %s/%s cannot be type of LoadBalancer for the current Tenant", req.Namespace, req.Name)
 
-		response := admission.Denied(NewLoadBalancerDisabled().Error())
+		response := admission.Denied(caperrors.NewLoadBalancerDisabled().Error())
 
 		return &response
 	}
@@ -138,7 +139,7 @@ func (h *validating) handle(
 		if !ipInCIDR(ip) {
 			recorder.Eventf(tnt, corev1.EventTypeWarning, "ForbiddenExternalServiceIP", "Service %s/%s external IP %s is forbidden for the current Tenant", req.Namespace, req.Name, ip.String())
 
-			response := admission.Denied(NewExternalServiceIPForbidden(tnt.Spec.ServiceOptions.ExternalServiceIPs.Allowed).Error())
+			response := admission.Denied(caperrors.NewExternalServiceIPForbidden(tnt.Spec.ServiceOptions.ExternalServiceIPs.Allowed).Error())
 
 			return &response
 		}

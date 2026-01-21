@@ -21,17 +21,16 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/tenant"
 )
 
 // Sets a label on the Tenant object with it's name.
 func (r *Manager) collectOwners(ctx context.Context, tnt *capsulev1beta2.Tenant) (err error) {
-	owners, err := tnt.CollectOwners(
+	owners, err := tenant.CollectOwners(
 		ctx,
 		r.Client,
-		r.Configuration.AllowServiceAccountPromotion(),
-		r.Configuration.Administrators(),
-		r.Configuration.RBAC().DeleterClusterRole,
-		r.Configuration.RBAC().ProvisionerClusterRole,
+		tnt,
+		r.Configuration,
 	)
 	if err != nil {
 		return err

@@ -63,7 +63,7 @@ type ResourceSpec struct {
 	// In case of nil value, all the Tenant Namespaces are targeted.
 	NamespaceSelector *metav1.LabelSelector `json:"namespaceSelector,omitempty"`
 	// List of the resources already existing in other Namespaces that must be replicated.
-	NamespacedItems []misc.ResourceReference `json:"namespacedItems,omitempty"`
+	NamespacedItems []tpl.ResourceReference `json:"namespacedItems,omitempty"`
 	// List of raw resources that must be replicated.
 	RawItems []RawExtension `json:"rawItems,omitempty"`
 	// Besides the Capsule metadata required by TenantResource controller, defines additional metadata that must be
