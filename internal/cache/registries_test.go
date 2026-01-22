@@ -18,7 +18,7 @@ func TestNamespaceRegistriesCache_DedupAndRefCount(t *testing.T) {
 		{
 			Registry:   "^docker\\.io/.*$",
 			Policy:     []corev1.PullPolicy{corev1.PullIfNotPresent},
-			Validation: []api.RegistryValidationTarget{"Images"},
+			Validation: []api.RegistryValidationTarget{api.ValidateImages},
 		},
 	}
 
@@ -108,10 +108,10 @@ func TestNamespaceRegistriesCache_ReassignNamespaceAdjustsRefCounts(t *testing.T
 	c := NewNamespaceRegistriesCache()
 
 	rulesA := []api.OCIRegistry{
-		{Registry: "^docker\\.io/.*$", Validation: []api.RegistryValidationTarget{"Images"}},
+		{Registry: "^docker\\.io/.*$", Validation: []api.RegistryValidationTarget{api.ValidateImages}},
 	}
 	rulesB := []api.OCIRegistry{
-		{Registry: "^ghcr\\.io/.*$", Validation: []api.RegistryValidationTarget{"Volumes"}},
+		{Registry: "^ghcr\\.io/.*$", Validation: []api.RegistryValidationTarget{api.ValidateVolumes}},
 	}
 
 	// ns1 -> A, ns2 -> A
@@ -196,8 +196,8 @@ func TestHashRules_PolicyAndValidationOrderDoesNotAffectHash(t *testing.T) {
 				corev1.PullIfNotPresent,
 			},
 			Validation: []api.RegistryValidationTarget{
-				"Volumes",
-				"Images",
+				api.ValidateVolumes,
+				api.ValidateImages,
 			},
 		},
 	}
@@ -209,8 +209,8 @@ func TestHashRules_PolicyAndValidationOrderDoesNotAffectHash(t *testing.T) {
 				corev1.PullAlways,
 			},
 			Validation: []api.RegistryValidationTarget{
-				"Images",
-				"Volumes",
+				api.ValidateVolumes,
+				api.ValidateImages,
 			},
 		},
 	}
@@ -257,8 +257,8 @@ func TestBuildRuleSet_AllowedPolicyNilWhenEmpty(t *testing.T) {
 
 func TestBuildRuleSet_FlagsAggregateAcrossRules(t *testing.T) {
 	rs, err := buildRuleSet([]api.OCIRegistry{
-		{Registry: "^img\\.io/.*$", Validation: []api.RegistryValidationTarget{"Images"}},
-		{Registry: "^vol\\.io/.*$", Validation: []api.RegistryValidationTarget{"Volumes"}},
+		{Registry: "^img\\.io/.*$", Validation: []api.RegistryValidationTarget{api.ValidateImages}},
+		{Registry: "^vol\\.io/.*$", Validation: []api.RegistryValidationTarget{api.ValidateVolumes}},
 	})
 	if err != nil {
 		t.Fatalf("buildRuleSet: %v", err)

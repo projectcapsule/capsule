@@ -350,14 +350,14 @@ func (r *resourcePoolController) handleClaimResourceExhaustion(
 	currentExhaustions map[string]api.PoolExhaustionResource,
 	exhaustions map[string]api.PoolExhaustionResource,
 ) (err error) {
-	status := make([]string, 0)
-
-	resourceNames := make([]string, 0)
+	resourceNames := make([]string, 0, len(currentExhaustions))
 	for resourceName := range currentExhaustions {
 		resourceNames = append(resourceNames, resourceName)
 	}
 
 	sort.Strings(resourceNames)
+
+	status := make([]string, 0, len(resourceNames))
 
 	for _, resourceName := range resourceNames {
 		ex := currentExhaustions[resourceName]
