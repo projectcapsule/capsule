@@ -192,5 +192,5 @@ func (r *Manager) emitEvent(object runtime.Object, namespace string, res control
 		res = "Error"
 	}
 
-	r.Recorder.AnnotatedEventf(object, map[string]string{"OperationResult": string(res)}, eventType, namespace, msg)
+	r.Recorder.Eventf(object, nil, eventType, namespace, msg, "")
 }

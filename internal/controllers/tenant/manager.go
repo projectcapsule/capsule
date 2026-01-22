@@ -22,7 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/client-go/util/workqueue"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -49,7 +49,7 @@ type Manager struct {
 
 	Metrics       *metrics.TenantRecorder
 	Log           logr.Logger
-	Recorder      record.EventRecorder
+	Recorder      events.EventRecorder
 	Configuration configuration.Configuration
 	RESTConfig    *rest.Config
 	classes       supportedClasses
