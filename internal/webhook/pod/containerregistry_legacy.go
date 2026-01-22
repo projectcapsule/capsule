@@ -69,6 +69,7 @@ func (h *containerRegistryLegacyHandler) validate(
 	tnt *capsulev1beta2.Tenant,
 	recorder record.EventRecorder,
 ) *admission.Response {
+	//nolint:staticcheck
 	if tnt.Spec.ContainerRegistries == nil {
 		return nil
 	}
@@ -107,18 +108,22 @@ func (h *containerRegistryLegacyHandler) verifyContainerRegistry(
 	if len(reg.Registry()) == 0 {
 		recorder.Eventf(tnt, corev1.EventTypeWarning, "MissingFQCI", "Pod %s/%s is not using a fully qualified container image, cannot enforce registry the current Tenant", req.Namespace, req.Name, reg.Registry())
 
+		//nolint:staticcheck
 		response := admission.Denied(NewContainerRegistryForbidden(image, *tnt.Spec.ContainerRegistries).Error())
 
 		return &response
 	}
 
+	//nolint:staticcheck
 	valid = tnt.Spec.ContainerRegistries.ExactMatch(reg.Registry())
 
+	//nolint:staticcheck
 	matched = tnt.Spec.ContainerRegistries.RegexMatch(reg.Registry())
 
 	if !valid && !matched {
 		recorder.Eventf(tnt, corev1.EventTypeWarning, "ForbiddenContainerRegistry", "Pod %s/%s is using a container hosted on registry %s that is forbidden for the current Tenant", req.Namespace, req.Name, reg.Registry())
 
+		//nolint:staticcheck
 		response := admission.Denied(NewContainerRegistryForbidden(reg.FQCI(), *tnt.Spec.ContainerRegistries).Error())
 
 		return &response

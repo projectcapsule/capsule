@@ -678,7 +678,7 @@ webhooks:
       # -- [ReinvocationPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#reinvocation-policy)
       reinvocationPolicy: Never
 
-    tenantResourceObjects:
+    managed:
       # -- Enable the Hook
       enabled: true
       # -- [FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy)
@@ -688,7 +688,7 @@ webhooks:
       # -- [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector)
       objectSelector:
         matchExpressions:
-          - key: capsule.clastix.io/tenant
+          - key: "projectcapsule.dev/managed-by"
             operator: Exists
       # -- [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector)
       namespaceSelector:
@@ -697,6 +697,18 @@ webhooks:
             operator: Exists
       # -- [MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
       matchConditions: []
+      # -- [Rules](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-rules)
+      rules:
+        - apiGroups:
+            - '*'
+          apiVersions:
+            - '*'
+          operations:
+            - UPDATE
+            - DELETE
+          resources:
+            - '*'
+          scope: '*'
 
     services:
       # -- Enable the Hook
@@ -756,3 +768,6 @@ webhooks:
       pvc: {}
       # -- Deprecated, use webhooks.hooks.pods instead
       pods: {}
+
+    # -- Deprecated, use webhooks.hooks.managed instead
+    tenantResourceObjects: {}

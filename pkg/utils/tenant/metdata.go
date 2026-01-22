@@ -104,6 +104,7 @@ func BuildNamespaceAnnotationsForTenant(tnt *capsulev1beta2.Tenant) map[string]s
 		}
 	}
 
+	//nolint:staticcheck
 	if cr := tnt.Spec.ContainerRegistries; cr != nil {
 		if len(cr.Exact) > 0 {
 			annotations[meta.AllowedRegistriesAnnotation] = strings.Join(cr.Exact, ",")

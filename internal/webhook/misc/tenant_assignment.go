@@ -66,11 +66,23 @@ func (r *tenantAssignmentHandler) handle(ctx context.Context, c client.Client, d
 		labels = map[string]string{}
 	}
 
-	if currentValue, exists := labels[meta.ManagedByCapsuleLabel]; exists && currentValue == tnt.GetName() {
+	want := tnt.GetName()
+
+	managedOK := labels[meta.ManagedByCapsuleLabel] == want
+	tenantOK := labels[meta.NewTenantLabel] == want
+
+	if managedOK && tenantOK {
 		return nil
 	}
 
-	labels[meta.ManagedByCapsuleLabel] = tnt.GetName()
+	if !managedOK {
+		labels[meta.ManagedByCapsuleLabel] = want
+	}
+
+	if !tenantOK {
+		labels[meta.NewTenantLabel] = want
+	}
+
 	obj.SetLabels(labels)
 
 	marshaledObj, err := json.Marshal(obj)

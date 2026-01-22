@@ -12,12 +12,12 @@ func (i ImagePullPolicySpec) String() string {
 	return string(i)
 }
 
-// +kubebuilder:validation:Enum=Images;Volumes
+// +kubebuilder:validation:Enum=pod/images;pod/volumes
 type RegistryValidationTarget string
 
 const (
-	ValidateImages  RegistryValidationTarget = "Images"
-	ValidateVolumes RegistryValidationTarget = "Volumes"
+	ValidateImages  RegistryValidationTarget = "pod/images"
+	ValidateVolumes RegistryValidationTarget = "pod/volumes"
 )
 
 // +kubebuilder:object:generate=true
@@ -27,9 +27,10 @@ type OCIRegistry struct {
 
 	// Allowed PullPolicy for the given registry. Supplying no value allows all policies.
 	// +optional
+	// +kubebuilder:validation:Items:Enum=Always;Never;IfNotPresent
 	Policy []corev1.PullPolicy `json:"policy,omitempty"`
 
 	// Requesting Resources
-	//+kubebuilder:default:={Images,Volumes}
+	//+kubebuilder:default:={pod/images,pod/volumes}
 	Validation []RegistryValidationTarget `json:"validation,omitempty"`
 }

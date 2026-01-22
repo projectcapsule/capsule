@@ -1272,46 +1272,6 @@ spec:
                     type: object
                 type: object
                 x-kubernetes-map-type: atomic
-              enforcement:
-                description: |-
-                  Specify enforcement specifications for the scope of the Tenant. We are moving all configuration regarding enforcement under this struct in future releases. It's currently not final.
-
-                  Read More: https://projectcapsule.dev/docs/tenants/enforcement/
-                properties:
-                  registries:
-                    description: |-
-                      Define registries which are allowed to be used within this tenant
-                      The rules are aggregated, since you can use Regular Expressions the match registry endpoints
-                    items:
-                      properties:
-                        policy:
-                          description: Allowed PullPolicy for the given registry.
-                            Supplying no value allows all policies.
-                          items:
-                            description: PullPolicy describes a policy for if/when
-                              to pull a container image
-                            type: string
-                          type: array
-                        url:
-                          description: OCI Registry endpoint, is treated as regular
-                            expression.
-                          type: string
-                        validation:
-                          default:
-                          - Images
-                          - Volumes
-                          description: Requesting Resources
-                          items:
-                            enum:
-                            - Images
-                            - Volumes
-                            type: string
-                          type: array
-                      required:
-                      - url
-                      type: object
-                    type: array
-                type: object
               forceTenantPrefix:
                 description: |-
                   Use this if you want to disable/enable the Tenant name prefix to specific Tenants, overriding global forceTenantPrefix in CapsuleConfiguration.
@@ -2506,6 +2466,100 @@ spec:
                     - Namespace
                     type: string
                 type: object
+              rules:
+                description: |-
+                  Specify enforcement specifications for the scope of the Tenant.
+                   We are moving all configuration enforcement. per namespace into a rule construct.
+                   It's currently not final.
+
+                  Read More: https://projectcapsule.dev/docs/tenants/rules/
+                items:
+                  properties:
+                    enforce:
+                      description: Enforcement Rules applied
+                      properties:
+                        registries:
+                          description: |-
+                            Define registries which are allowed to be used within this tenant
+                            The rules are aggregated, since you can use Regular Expressions the match registry endpoints
+                          items:
+                            properties:
+                              policy:
+                                description: Allowed PullPolicy for the given registry.
+                                  Supplying no value allows all policies.
+                                items:
+                                  description: PullPolicy describes a policy for if/when
+                                    to pull a container image
+                                  type: string
+                                type: array
+                              url:
+                                description: OCI Registry endpoint, is treated as
+                                  regular expression.
+                                type: string
+                              validation:
+                                default:
+                                - pod/images
+                                - pod/volumes
+                                description: Requesting Resources
+                                items:
+                                  enum:
+                                  - pod/images
+                                  - pod/volumes
+                                  type: string
+                                type: array
+                            required:
+                            - url
+                            type: object
+                          type: array
+                      type: object
+                    namespaceSelector:
+                      description: Select namespaces which are going to usese
+                      properties:
+                        matchExpressions:
+                          description: matchExpressions is a list of label selector
+                            requirements. The requirements are ANDed.
+                          items:
+                            description: |-
+                              A label selector requirement is a selector that contains values, a key, and an operator that
+                              relates the key and values.
+                            properties:
+                              key:
+                                description: key is the label key that the selector
+                                  applies to.
+                                type: string
+                              operator:
+                                description: |-
+                                  operator represents a key's relationship to a set of values.
+                                  Valid operators are In, NotIn, Exists and DoesNotExist.
+                                type: string
+                              values:
+                                description: |-
+                                  values is an array of string values. If the operator is In or NotIn,
+                                  the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                                  the values array must be empty. This array is replaced during a strategic
+                                  merge patch.
+                                items:
+                                  type: string
+                                type: array
+                                x-kubernetes-list-type: atomic
+                            required:
+                            - key
+                            - operator
+                            type: object
+                          type: array
+                          x-kubernetes-list-type: atomic
+                        matchLabels:
+                          additionalProperties:
+                            type: string
+                          description: |-
+                            matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+                            map is equivalent to an element of matchExpressions, whose key field is "key", the
+                            operator is "In", and the values array contains only "value". The requirements are ANDed.
+                          type: object
+                      type: object
+                      x-kubernetes-map-type: atomic
+                  type: object
+                type: array
               runtimeClasses:
                 description: |-
                   Specifies the allowed RuntimeClasses assigned to the Tenant.
@@ -2917,13 +2971,13 @@ spec:
                                 type: string
                               validation:
                                 default:
-                                - Images
-                                - Volumes
+                                - pod/images
+                                - pod/volumes
                                 description: Requesting Resources
                                 items:
                                   enum:
-                                  - Images
-                                  - Volumes
+                                  - pod/images
+                                  - pod/volumes
                                   type: string
                                 type: array
                             required:

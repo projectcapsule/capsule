@@ -26,12 +26,15 @@ const (
 	CordonedLabel        = "projectcapsule.dev/cordoned"
 	CordonedLabelTrigger = "true"
 
-	ManagedByCapsuleLabel = "capsule.clastix.io/managed-by"
+	NewManagedByCapsuleLabel = "projectcapsule.dev/managed-by"
+	ManagedByCapsuleLabel    = "capsule.clastix.io/managed-by"
 
 	LimitRangeLabel    = "capsule.clastix.io/limit-range"
 	NetworkPolicyLabel = "capsule.clastix.io/network-policy"
 	ResourceQuotaLabel = "capsule.clastix.io/resource-quota"
 	RolebindingLabel   = "capsule.clastix.io/role-binding"
+
+	ControllerValue = "controller"
 )
 
 func FreezeLabelTriggers(obj client.Object) bool {

@@ -67,7 +67,7 @@ func (h *warningHandler) handle(tnt *capsulev1beta2.Tenant, decoder admission.De
 	if tnt.Spec.ContainerRegistries != nil {
 		if len(tnt.Spec.ContainerRegistries.Exact) > 0 || len(tnt.Spec.ContainerRegistries.Regex) > 0 {
 			response.Warnings = append(response.Warnings,
-				"The field `containerRegistries` is deprecated and will be removed in a future release. Please migrate to enforcement.registries. See: https://projectcapsule.dev/docs/tenants/enforcement/#registries.",
+				"The field `containerRegistries` is deprecated and will be removed in a future release. Please migrate to rules. See: https://projectcapsule.dev/docs/tenants/rules.",
 			)
 		}
 	}

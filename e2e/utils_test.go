@@ -76,7 +76,11 @@ func NewNamespace(name string, labels ...map[string]string) *corev1.Namespace {
 	namespaceLabels["env"] = "e2e"
 
 	if len(labels) > 0 {
-		namespaceLabels = labels[0]
+		for _, lab := range labels {
+			for k, v := range lab {
+				namespaceLabels[k] = v
+			}
+		}
 	}
 
 	return &corev1.Namespace{

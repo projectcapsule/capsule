@@ -85,6 +85,11 @@ func (r *Manager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.Controller
 			handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &capsulev1beta2.Tenant{}),
 		).
 		Watches(
+			&capsulev1beta2.RuleStatus{},
+			handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &capsulev1beta2.Tenant{}),
+			builder.WithPredicates(predicate.GenerationChangedPredicate{}),
+		).
+		Watches(
 			&storagev1.StorageClass{},
 			r.statusOnlyHandlerClasses(
 				r.reconcileClassStatus,

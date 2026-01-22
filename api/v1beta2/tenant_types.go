@@ -19,12 +19,13 @@ type TenantSpec struct {
 	// Specify Permissions for the Tenant.
 	// +optional
 	Permissions Permissions `json:"permissions,omitzero"`
-
-	// Specify enforcement specifications for the scope of the Tenant. We are moving all configuration regarding enforcement under this struct in future releases. It's currently not final.
+	// Specify enforcement specifications for the scope of the Tenant.
+	//  We are moving all configuration enforcement. per namespace into a rule construct.
+	//  It's currently not final.
 	//
-	// Read More: https://projectcapsule.dev/docs/tenants/enforcement/
+	// Read More: https://projectcapsule.dev/docs/tenants/rules/
 	//+optional
-	Enforcement api.EnforcementSpec `json:"enforcement,omitzero"`
+	Rules []*NamespaceRule `json:"rules,omitzero"`
 
 	// Specifies the owners of the Tenant.
 	// Optional

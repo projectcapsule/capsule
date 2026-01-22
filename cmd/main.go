@@ -292,6 +292,7 @@ func main() {
 			tenantvalidation.IngressClassRegexHandler(),
 			tenantvalidation.StorageClassRegexHandler(),
 			tenantvalidation.ContainerRegistryRegexHandler(),
+			tenantvalidation.RuleHandler(),
 			tenantvalidation.HostnameRegexHandler(),
 			tenantvalidation.FreezedEmitter(),
 			tenantvalidation.ServiceAccountNameHandler(),
@@ -321,8 +322,11 @@ func main() {
 		route.ResourcePoolValidation((resourcepool.PoolValidationHandler(ctrl.Log.WithName("webhooks").WithName("resourcepool")))),
 		route.ResourcePoolClaimMutation((resourcepool.ClaimMutationHandler(ctrl.Log.WithName("webhooks").WithName("resourcepoolclaims")))),
 		route.ResourcePoolClaimValidation((resourcepool.ClaimValidationHandler(ctrl.Log.WithName("webhooks").WithName("resourcepoolclaims")))),
-		route.TenantAssignment(
+		route.MiscTenantAssignment(
 			misc.TenantAssignmentHandler(),
+		),
+		route.MiscManagedValidation(
+			utils.InCapsuleGroups(cfg, misc.ManagedValidatingHandler()),
 		),
 		route.ConfigValidation(
 			cfgvalidation.WarningHandler(),

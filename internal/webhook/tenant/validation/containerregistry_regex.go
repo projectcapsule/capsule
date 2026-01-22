@@ -6,7 +6,6 @@ package validation
 
 import (
 	"context"
-	"fmt"
 	"regexp"
 
 	"k8s.io/client-go/tools/record"
@@ -52,25 +51,13 @@ func (h *containerRegistryRegexHandler) OnUpdate(_ client.Client, decoder admiss
 
 //nolint:staticcheck
 func (h *containerRegistryRegexHandler) validate(decoder admission.Decoder, req admission.Request) *admission.Response {
-	tnt := &capsulev1beta2.Tenant{}
-	if err := decoder.Decode(req, tnt); err != nil {
+	tenant := &capsulev1beta2.Tenant{}
+	if err := decoder.Decode(req, tenant); err != nil {
 		return utils.ErroredResponse(err)
 	}
 
-	if len(tnt.Spec.Enforcement.Registries) > 0 {
-		for _, r := range tnt.Spec.Enforcement.Registries {
-			if _, err := regexp.Compile(r.Registry); err != nil {
-				resp := admission.Denied(
-					fmt.Sprintf("unable to compile regex %q: %v", r.Registry, err),
-				)
-				return &resp
-			}
-		}
-	}
-
-	//nolint:staticcheck
-	if tnt.Spec.ContainerRegistries != nil && len(tnt.Spec.ContainerRegistries.Regex) > 0 {
-		if _, err := regexp.Compile(tnt.Spec.ContainerRegistries.Regex); err != nil {
+	if tenant.Spec.ContainerRegistries != nil && len(tenant.Spec.ContainerRegistries.Regex) > 0 {
+		if _, err := regexp.Compile(tenant.Spec.ContainerRegistries.Regex); err != nil {
 			response := admission.Denied("unable to compile containerRegistries allowedRegex")
 
 			return &response

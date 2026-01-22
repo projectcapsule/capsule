@@ -5,6 +5,10 @@ package meta
 
 import "fmt"
 
+func NameForManagedRuleStatus() string {
+	return "capsule-managed-rules"
+}
+
 func NameForManagedRoleBindings(hash string) string {
 	return fmt.Sprintf("capsule:managed:%s", hash)
 }

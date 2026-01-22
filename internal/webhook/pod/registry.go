@@ -6,6 +6,7 @@ package pod
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -68,6 +69,7 @@ func (h *registryHandler) OnDelete(
 		return nil
 	}
 }
+
 func (h *registryHandler) validate(
 	req admission.Request,
 	pod *corev1.Pod,
@@ -77,6 +79,7 @@ func (h *registryHandler) validate(
 	rs, ok := h.cache.Get(req.Namespace)
 	if !ok || rs == nil {
 		resp := admission.Allowed("no registry rules for namespace")
+
 		return &resp
 	}
 
@@ -142,6 +145,7 @@ func (h *registryHandler) validateVolumes(
 		ref := strings.TrimSpace(v.Image.Reference)
 		if ref == "" {
 			resp := admission.Denied(fmt.Sprintf("volume %q has empty image.reference", v.Name))
+
 			return &resp
 		}
 
@@ -170,7 +174,7 @@ func resolveRegistryConfig(
 ) resolvedRegistryConfig {
 	var res resolvedRegistryConfig
 
-	for i := 0; i < len(rules); i++ {
+	for i := range rules {
 		r := rules[i]
 
 		switch target {
@@ -212,6 +216,7 @@ func (h *registryHandler) verifyOCIReference(
 	ref := strings.TrimSpace(reference)
 	if ref == "" {
 		resp := admission.Denied(fmt.Sprintf("%s has empty reference", where))
+
 		return &resp
 	}
 
@@ -220,20 +225,47 @@ func (h *registryHandler) verifyOCIReference(
 	cfg := resolveRegistryConfig(rs.Compiled, ref, target)
 	if !cfg.allowed {
 		resp := admission.Denied(fmt.Sprintf("%s reference %q is not allowed", where, ref))
+
 		return &resp
 	}
 
 	// No defaulting: enforce only if restricted; empty pullPolicy is rejected under restriction.
 	if cfg.allowedPolicy != nil {
+		allowed := formatAllowedPullPolicies(cfg.allowedPolicy)
+
 		if pullPolicy == "" {
-			resp := admission.Denied(fmt.Sprintf("%s reference %q must explicitly set pullPolicy", where, ref))
+			resp := admission.Denied(fmt.Sprintf(
+				"%s reference %q must explicitly set pullPolicy (allowed: %s)",
+				where, ref, allowed,
+			))
+
 			return &resp
 		}
+
 		if _, ok := cfg.allowedPolicy[pullPolicy]; !ok {
-			resp := admission.Denied(fmt.Sprintf("%s reference %q uses pullPolicy=%s which is not allowed", where, ref, pullPolicy))
+			resp := admission.Denied(fmt.Sprintf(
+				"%s reference %q uses pullPolicy=%s which is not allowed (allowed: %s)",
+				where, ref, pullPolicy, allowed,
+			))
+
 			return &resp
 		}
 	}
 
 	return nil
+}
+
+func formatAllowedPullPolicies(policies map[corev1.PullPolicy]struct{}) string {
+	if len(policies) == 0 {
+		return ""
+	}
+
+	out := make([]string, 0, len(policies))
+	for p := range policies {
+		out = append(out, string(p))
+	}
+
+	sort.Strings(out)
+
+	return strings.Join(out, ", ")
 }
