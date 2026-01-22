@@ -15,7 +15,7 @@ jobs:
       pull-requests: write
     steps:
       - name: Close stale pull requests
-        uses: actions/stale@a21a0816299b11691f9592ef0d63d08e02f06d9d
+        uses: actions/stale@d6f8a33132340b15a7006f552936e4b9b39c00ec
         with:
           stale-issue-message: 'This issue is stale because it has been open 60 days with no activity. Remove stale label or comment or this will be closed in 30 days.'
           stale-pr-message: 'This pull request has been marked as stale because it has been inactive for more than 30 days. Please update this pull request or it will be automatically closed in 30 days.'
