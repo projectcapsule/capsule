@@ -350,9 +350,9 @@ func (r *resourcePoolController) handleClaimResourceExhaustion(
 	currentExhaustions map[string]api.PoolExhaustionResource,
 	exhaustions map[string]api.PoolExhaustionResource,
 ) (err error) {
-	status := make([]string, 0) //nolint:prealloc
+	status := make([]string, 0)
 
-	resourceNames := make([]string, 0) //nolint:prealloc
+	resourceNames := make([]string, 0)
 	for resourceName := range currentExhaustions {
 		resourceNames = append(resourceNames, resourceName)
 	}
