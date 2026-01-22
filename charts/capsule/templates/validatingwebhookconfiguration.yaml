@@ -191,6 +191,8 @@ webhooks:
         - DELETE
       resources:
         - namespaces
+        - namespaces/status
+        - namespace/finalize
       scope: '*'
   sideEffects: None
   timeoutSeconds: {{ $.Values.webhooks.validatingWebhooksTimeoutSeconds }}
