@@ -327,7 +327,7 @@ e2e-install: ko-build-all
 		--set 'replicaCount=2'\
 		--set 'manager.image.pullPolicy=Never' \
 		--set 'manager.resources=null'\
-		--set "manager.image.tag=$(VERSION)" \
+		--set "manager.image.tag='$(VERSION)'" \
 		--set 'manager.livenessProbe.failureThreshold=10' \
 		--set 'webhooks.hooks.nodes.enabled=true' \
 		--set "webhooks.exclusive=true"\
