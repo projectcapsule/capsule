@@ -11,7 +11,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
@@ -32,13 +32,13 @@ func CordoningLabelHandler(cfg configuration.Configuration) capsulewebhook.Typed
 	}
 }
 
-func (h *cordoningLabelHandler) OnCreate(client.Client, *corev1.Namespace, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
+func (h *cordoningLabelHandler) OnCreate(client.Client, *corev1.Namespace, admission.Decoder, events.EventRecorder) capsulewebhook.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (h *cordoningLabelHandler) OnDelete(client.Client, *corev1.Namespace, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
+func (h *cordoningLabelHandler) OnDelete(client.Client, *corev1.Namespace, admission.Decoder, events.EventRecorder) capsulewebhook.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
@@ -49,7 +49,7 @@ func (h *cordoningLabelHandler) OnUpdate(
 	ns *corev1.Namespace,
 	old *corev1.Namespace,
 	decoder admission.Decoder,
-	_ record.EventRecorder,
+	_ events.EventRecorder,
 ) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		return h.handle(ctx, c, req, ns)

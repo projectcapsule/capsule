@@ -8,7 +8,7 @@ import (
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
@@ -30,7 +30,7 @@ func (h *patchHandler) OnCreate(
 	client.Client,
 	*corev1.Namespace,
 	admission.Decoder,
-	record.EventRecorder,
+	events.EventRecorder,
 	*capsulev1beta2.Tenant,
 ) capsulewebhook.Func {
 	return func(context.Context, admission.Request) *admission.Response {
@@ -42,7 +42,7 @@ func (h *patchHandler) OnDelete(
 	client.Client,
 	*corev1.Namespace,
 	admission.Decoder,
-	record.EventRecorder,
+	events.EventRecorder,
 	*capsulev1beta2.Tenant,
 ) capsulewebhook.Func {
 	return func(context.Context, admission.Request) *admission.Response {
@@ -55,7 +55,7 @@ func (h *patchHandler) OnUpdate(
 	ns *corev1.Namespace,
 	old *corev1.Namespace,
 	decoder admission.Decoder,
-	recorder record.EventRecorder,
+	recorder events.EventRecorder,
 	tnt *capsulev1beta2.Tenant,
 ) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
@@ -65,7 +65,7 @@ func (h *patchHandler) OnUpdate(
 			return nil
 		}
 
-		recorder.Eventf(ns, corev1.EventTypeWarning, "NamespacePatch", e)
+		recorder.Eventf(tnt, ns, corev1.EventTypeWarning, "NamespacePatch", e, "")
 		response := admission.Denied(e)
 
 		return &response

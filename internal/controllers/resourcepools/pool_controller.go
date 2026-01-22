@@ -16,7 +16,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -38,7 +38,7 @@ type resourcePoolController struct {
 
 	metrics  *metrics.ResourcePoolRecorder
 	log      logr.Logger
-	recorder record.EventRecorder
+	recorder events.EventRecorder
 }
 
 func (r *resourcePoolController) SetupWithManager(mgr ctrl.Manager, cfg ctrlutils.ControllerOptions) error {
@@ -454,15 +454,13 @@ func (r *resourcePoolController) handleClaimDisassociation(
 			return fmt.Errorf("failed to update claim status: %w", err)
 		}
 
-		r.recorder.AnnotatedEventf(
+		r.recorder.Eventf(
+			pool,
 			current,
-			map[string]string{
-				"Status": string(metav1.ConditionFalse),
-				"Type":   meta.NotReadyCondition,
-			},
 			corev1.EventTypeNormal,
 			"Disassociated",
 			"Claim is disassociated from the pool",
+			"",
 		)
 
 		return nil

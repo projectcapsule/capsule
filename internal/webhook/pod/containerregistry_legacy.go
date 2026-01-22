@@ -7,7 +7,7 @@ import (
 	"context"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
@@ -30,7 +30,7 @@ func (h *containerRegistryLegacyHandler) OnCreate(
 	c client.Client,
 	pod *corev1.Pod,
 	decoder admission.Decoder,
-	recorder record.EventRecorder,
+	recorder events.EventRecorder,
 	tnt *capsulev1beta2.Tenant,
 ) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
@@ -43,7 +43,7 @@ func (h *containerRegistryLegacyHandler) OnUpdate(
 	old *corev1.Pod,
 	pod *corev1.Pod,
 	decoder admission.Decoder,
-	recorder record.EventRecorder,
+	recorder events.EventRecorder,
 	tnt *capsulev1beta2.Tenant,
 ) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
@@ -55,7 +55,7 @@ func (h *containerRegistryLegacyHandler) OnDelete(
 	client.Client,
 	*corev1.Pod,
 	admission.Decoder,
-	record.EventRecorder,
+	events.EventRecorder,
 	*capsulev1beta2.Tenant,
 ) capsulewebhook.Func {
 	return func(context.Context, admission.Request) *admission.Response {
@@ -67,7 +67,7 @@ func (h *containerRegistryLegacyHandler) validate(
 	req admission.Request,
 	pod *corev1.Pod,
 	tnt *capsulev1beta2.Tenant,
-	recorder record.EventRecorder,
+	recorder events.EventRecorder,
 ) *admission.Response {
 	//nolint:staticcheck
 	if tnt.Spec.ContainerRegistries == nil {
@@ -75,19 +75,19 @@ func (h *containerRegistryLegacyHandler) validate(
 	}
 
 	for _, container := range pod.Spec.InitContainers {
-		if response := h.verifyContainerRegistry(recorder, req, container.Image, tnt); response != nil {
+		if response := h.verifyContainerRegistry(recorder, pod, req, container.Image, tnt); response != nil {
 			return response
 		}
 	}
 
 	for _, container := range pod.Spec.EphemeralContainers {
-		if response := h.verifyContainerRegistry(recorder, req, container.Image, tnt); response != nil {
+		if response := h.verifyContainerRegistry(recorder, pod, req, container.Image, tnt); response != nil {
 			return response
 		}
 	}
 
 	for _, container := range pod.Spec.Containers {
-		if response := h.verifyContainerRegistry(recorder, req, container.Image, tnt); response != nil {
+		if response := h.verifyContainerRegistry(recorder, pod, req, container.Image, tnt); response != nil {
 			return response
 		}
 	}
@@ -96,7 +96,8 @@ func (h *containerRegistryLegacyHandler) validate(
 }
 
 func (h *containerRegistryLegacyHandler) verifyContainerRegistry(
-	recorder record.EventRecorder,
+	recorder events.EventRecorder,
+	pod *corev1.Pod,
 	req admission.Request,
 	image string,
 	tnt *capsulev1beta2.Tenant,
@@ -106,7 +107,7 @@ func (h *containerRegistryLegacyHandler) verifyContainerRegistry(
 	reg := NewRegistry(image, h.configuration)
 
 	if len(reg.Registry()) == 0 {
-		recorder.Eventf(tnt, corev1.EventTypeWarning, "MissingFQCI", "Pod %s/%s is not using a fully qualified container image, cannot enforce registry the current Tenant", req.Namespace, req.Name, reg.Registry())
+		recorder.Eventf(tnt, pod, corev1.EventTypeWarning, "MissingFQCI", "Pod %s/%s is not using a fully qualified container image, cannot enforce registry the current Tenant", req.Namespace, req.Name, reg.Registry())
 
 		//nolint:staticcheck
 		response := admission.Denied(NewContainerRegistryForbidden(image, *tnt.Spec.ContainerRegistries).Error())
@@ -121,7 +122,7 @@ func (h *containerRegistryLegacyHandler) verifyContainerRegistry(
 	matched = tnt.Spec.ContainerRegistries.RegexMatch(reg.Registry())
 
 	if !valid && !matched {
-		recorder.Eventf(tnt, corev1.EventTypeWarning, "ForbiddenContainerRegistry", "Pod %s/%s is using a container hosted on registry %s that is forbidden for the current Tenant", req.Namespace, req.Name, reg.Registry())
+		recorder.Eventf(tnt, pod, corev1.EventTypeWarning, "ForbiddenContainerRegistry", "Pod %s/%s is using a container hosted on registry %s that is forbidden for the current Tenant", req.Namespace, req.Name, reg.Registry())
 
 		//nolint:staticcheck
 		response := admission.Denied(NewContainerRegistryForbidden(reg.FQCI(), *tnt.Spec.ContainerRegistries).Error())

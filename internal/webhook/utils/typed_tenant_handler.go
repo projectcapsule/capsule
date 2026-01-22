@@ -7,7 +7,7 @@ package utils
 import (
 	"context"
 
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
@@ -23,7 +23,7 @@ type TypedTenantHandler[T client.Object] struct {
 	Handlers []webhook.TypedHandlerWithTenant[T]
 }
 
-func (h *TypedTenantHandler[T]) OnCreate(c client.Client, decoder admission.Decoder, recorder record.EventRecorder) webhook.Func {
+func (h *TypedTenantHandler[T]) OnCreate(c client.Client, decoder admission.Decoder, recorder events.EventRecorder) webhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		tnt, err := h.resolveTenant(ctx, c, req)
 		if err != nil {
@@ -49,7 +49,7 @@ func (h *TypedTenantHandler[T]) OnCreate(c client.Client, decoder admission.Deco
 	}
 }
 
-func (h *TypedTenantHandler[T]) OnUpdate(c client.Client, decoder admission.Decoder, recorder record.EventRecorder) webhook.Func {
+func (h *TypedTenantHandler[T]) OnUpdate(c client.Client, decoder admission.Decoder, recorder events.EventRecorder) webhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		tnt, err := h.resolveTenant(ctx, c, req)
 		if err != nil {
@@ -80,7 +80,7 @@ func (h *TypedTenantHandler[T]) OnUpdate(c client.Client, decoder admission.Deco
 	}
 }
 
-func (h *TypedTenantHandler[T]) OnDelete(c client.Client, decoder admission.Decoder, recorder record.EventRecorder) webhook.Func {
+func (h *TypedTenantHandler[T]) OnDelete(c client.Client, decoder admission.Decoder, recorder events.EventRecorder) webhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		tnt, err := h.resolveTenant(ctx, c, req)
 		if err != nil {

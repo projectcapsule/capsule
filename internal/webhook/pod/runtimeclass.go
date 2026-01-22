@@ -10,7 +10,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	nodev1 "k8s.io/api/node/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
@@ -28,7 +28,7 @@ func (h *runtimeClass) OnCreate(
 	c client.Client,
 	pod *corev1.Pod,
 	decoder admission.Decoder,
-	recorder record.EventRecorder,
+	recorder events.EventRecorder,
 	tnt *capsulev1beta2.Tenant,
 ) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
@@ -41,7 +41,7 @@ func (h *runtimeClass) OnUpdate(
 	*corev1.Pod,
 	*corev1.Pod,
 	admission.Decoder,
-	record.EventRecorder,
+	events.EventRecorder,
 	*capsulev1beta2.Tenant,
 ) capsulewebhook.Func {
 	return func(context.Context, admission.Request) *admission.Response {
@@ -53,7 +53,7 @@ func (h *runtimeClass) OnDelete(
 	client.Client,
 	*corev1.Pod,
 	admission.Decoder,
-	record.EventRecorder,
+	events.EventRecorder,
 	*capsulev1beta2.Tenant,
 ) capsulewebhook.Func {
 	return func(context.Context, admission.Request) *admission.Response {
@@ -77,7 +77,7 @@ func (h *runtimeClass) class(ctx context.Context, c client.Client, name string) 
 func (h *runtimeClass) validate(
 	ctx context.Context,
 	c client.Client,
-	recorder record.EventRecorder,
+	recorder events.EventRecorder,
 	req admission.Request,
 	pod *corev1.Pod,
 	tnt *capsulev1beta2.Tenant,
@@ -104,7 +104,7 @@ func (h *runtimeClass) validate(
 		// Delegating mutating webhook to specify a default RuntimeClass
 		return nil
 	case !allowed.MatchSelectByName(class):
-		recorder.Eventf(tnt, corev1.EventTypeWarning, "ForbiddenRuntimeClass", "Pod %s/%s is using Runtime Class %s is forbidden for the current Tenant", pod.Namespace, pod.Name, runtimeClassName)
+		recorder.Eventf(tnt, pod, corev1.EventTypeWarning, "ForbiddenRuntimeClass", "Pod %s/%s is using Runtime Class %s is forbidden for the current Tenant", pod.Namespace, pod.Name, runtimeClassName)
 
 		response := admission.Denied(NewPodRuntimeClassForbidden(runtimeClassName, *allowed).Error())
 

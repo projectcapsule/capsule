@@ -6,7 +6,7 @@ package utils
 import (
 	"context"
 
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
@@ -28,7 +28,7 @@ type handler struct {
 }
 
 //nolint:dupl
-func (h *handler) OnCreate(client client.Client, decoder admission.Decoder, recorder record.EventRecorder) webhook.Func {
+func (h *handler) OnCreate(client client.Client, decoder admission.Decoder, recorder events.EventRecorder) webhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		if !users.IsCapsuleUser(ctx, client, h.configuration, req.UserInfo.Username, req.UserInfo.Groups) {
 			return nil
@@ -45,7 +45,7 @@ func (h *handler) OnCreate(client client.Client, decoder admission.Decoder, reco
 }
 
 //nolint:dupl
-func (h *handler) OnDelete(client client.Client, decoder admission.Decoder, recorder record.EventRecorder) webhook.Func {
+func (h *handler) OnDelete(client client.Client, decoder admission.Decoder, recorder events.EventRecorder) webhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		if !users.IsCapsuleUser(ctx, client, h.configuration, req.UserInfo.Username, req.UserInfo.Groups) {
 			return nil
@@ -62,7 +62,7 @@ func (h *handler) OnDelete(client client.Client, decoder admission.Decoder, reco
 }
 
 //nolint:dupl
-func (h *handler) OnUpdate(client client.Client, decoder admission.Decoder, recorder record.EventRecorder) webhook.Func {
+func (h *handler) OnUpdate(client client.Client, decoder admission.Decoder, recorder events.EventRecorder) webhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		if !users.IsCapsuleUser(ctx, client, h.configuration, req.UserInfo.Username, req.UserInfo.Groups) {
 			return nil

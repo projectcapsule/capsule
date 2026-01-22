@@ -8,7 +8,7 @@ import (
 	"context"
 	"regexp"
 
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
@@ -23,7 +23,7 @@ func IngressClassRegexHandler() capsulewebhook.Handler {
 	return &ingressClassRegexHandler{}
 }
 
-func (h *ingressClassRegexHandler) OnCreate(_ client.Client, decoder admission.Decoder, _ record.EventRecorder) capsulewebhook.Func {
+func (h *ingressClassRegexHandler) OnCreate(_ client.Client, decoder admission.Decoder, _ events.EventRecorder) capsulewebhook.Func {
 	return func(_ context.Context, req admission.Request) *admission.Response {
 		if response := h.validate(decoder, req); response != nil {
 			return response
@@ -33,13 +33,13 @@ func (h *ingressClassRegexHandler) OnCreate(_ client.Client, decoder admission.D
 	}
 }
 
-func (h *ingressClassRegexHandler) OnDelete(client.Client, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
+func (h *ingressClassRegexHandler) OnDelete(client.Client, admission.Decoder, events.EventRecorder) capsulewebhook.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (h *ingressClassRegexHandler) OnUpdate(_ client.Client, decoder admission.Decoder, _ record.EventRecorder) capsulewebhook.Func {
+func (h *ingressClassRegexHandler) OnUpdate(_ client.Client, decoder admission.Decoder, _ events.EventRecorder) capsulewebhook.Func {
 	return func(_ context.Context, req admission.Request) *admission.Response {
 		if err := h.validate(decoder, req); err != nil {
 			return err

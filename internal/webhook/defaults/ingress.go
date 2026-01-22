@@ -11,7 +11,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/version"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
@@ -20,7 +20,7 @@ import (
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
 )
 
-func mutateIngressDefaults(ctx context.Context, req admission.Request, version *version.Version, c client.Client, decoder admission.Decoder, recorder record.EventRecorder, namespace string) *admission.Response {
+func mutateIngressDefaults(ctx context.Context, req admission.Request, version *version.Version, c client.Client, decoder admission.Decoder, recorder events.EventRecorder, namespace string) *admission.Response {
 	ingress, err := capsuleingress.FromRequest(req, decoder)
 	if err != nil {
 		return utils.ErroredResponse(err)
@@ -72,7 +72,7 @@ func mutateIngressDefaults(ctx context.Context, req admission.Request, version *
 		return &response
 	}
 
-	recorder.Eventf(tnt, corev1.EventTypeNormal, "TenantDefault", "Assigned Tenant default Ingress Class %s to %s/%s", allowed.Default, ingress.Name(), ingress.Namespace())
+	recorder.Eventf(tnt, ingressClass, corev1.EventTypeNormal, "TenantDefault", "Assigned Tenant default Ingress Class %s to %s/%s", allowed.Default, ingress.Name(), ingress.Namespace())
 
 	response := admission.PatchResponseFromRaw(req.Object.Raw, marshaled)
 

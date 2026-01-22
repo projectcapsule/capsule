@@ -7,7 +7,7 @@ import (
 	"context"
 
 	admissionv1 "k8s.io/api/admission/v1"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
@@ -27,7 +27,7 @@ func WarningHandler(cfg configuration.Configuration) capsulewebhook.Handler {
 	}
 }
 
-func (h *warningHandler) OnCreate(c client.Client, decoder admission.Decoder, _ record.EventRecorder) capsulewebhook.Func {
+func (h *warningHandler) OnCreate(c client.Client, decoder admission.Decoder, _ events.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		tnt := &capsulev1beta2.Tenant{}
 		if err := decoder.Decode(req, tnt); err != nil {
@@ -38,13 +38,13 @@ func (h *warningHandler) OnCreate(c client.Client, decoder admission.Decoder, _ 
 	}
 }
 
-func (h *warningHandler) OnDelete(client.Client, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
+func (h *warningHandler) OnDelete(client.Client, admission.Decoder, events.EventRecorder) capsulewebhook.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (h *warningHandler) OnUpdate(_ client.Client, decoder admission.Decoder, _ record.EventRecorder) capsulewebhook.Func {
+func (h *warningHandler) OnUpdate(_ client.Client, decoder admission.Decoder, _ events.EventRecorder) capsulewebhook.Func {
 	return func(_ context.Context, req admission.Request) *admission.Response {
 		tnt := &capsulev1beta2.Tenant{}
 		if err := decoder.Decode(req, tnt); err != nil {

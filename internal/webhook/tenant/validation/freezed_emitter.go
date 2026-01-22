@@ -7,7 +7,7 @@ import (
 	"context"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
@@ -22,19 +22,19 @@ func FreezedEmitter() capsulewebhook.Handler {
 	return &freezedEmitterHandler{}
 }
 
-func (h *freezedEmitterHandler) OnCreate(client.Client, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
+func (h *freezedEmitterHandler) OnCreate(client.Client, admission.Decoder, events.EventRecorder) capsulewebhook.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (h *freezedEmitterHandler) OnDelete(client.Client, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
+func (h *freezedEmitterHandler) OnDelete(client.Client, admission.Decoder, events.EventRecorder) capsulewebhook.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (h *freezedEmitterHandler) OnUpdate(_ client.Client, decoder admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
+func (h *freezedEmitterHandler) OnUpdate(_ client.Client, decoder admission.Decoder, recorder events.EventRecorder) capsulewebhook.Func {
 	return func(_ context.Context, req admission.Request) *admission.Response {
 		oldTnt := &capsulev1beta2.Tenant{}
 		if err := decoder.DecodeRaw(req.OldObject, oldTnt); err != nil {
@@ -48,9 +48,9 @@ func (h *freezedEmitterHandler) OnUpdate(_ client.Client, decoder admission.Deco
 
 		switch {
 		case !oldTnt.Spec.Cordoned && newTnt.Spec.Cordoned:
-			recorder.Eventf(newTnt, corev1.EventTypeNormal, "TenantCordoned", "Tenant has been cordoned")
+			recorder.Eventf(newTnt, nil, corev1.EventTypeNormal, "TenantCordoned", "Tenant has been cordoned", "")
 		case oldTnt.Spec.Cordoned && !newTnt.Spec.Cordoned:
-			recorder.Eventf(newTnt, corev1.EventTypeNormal, "TenantUncordoned", "Tenant has been uncordoned")
+			recorder.Eventf(newTnt, nil, corev1.EventTypeNormal, "TenantUncordoned", "Tenant has been uncordoned", "")
 		}
 
 		return nil

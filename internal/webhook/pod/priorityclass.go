@@ -8,7 +8,7 @@ import (
 	"net/http"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
@@ -27,7 +27,7 @@ func (h *priorityClass) OnCreate(
 	c client.Client,
 	pod *corev1.Pod,
 	decoder admission.Decoder,
-	recorder record.EventRecorder,
+	recorder events.EventRecorder,
 	tnt *capsulev1beta2.Tenant,
 ) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
@@ -68,7 +68,7 @@ func (h *priorityClass) OnCreate(
 		case allowed.Match(priorityClassName) || selector:
 			return nil
 		default:
-			recorder.Eventf(tnt, corev1.EventTypeWarning, "ForbiddenPriorityClass", "Pod %s/%s is using Priority Class %s is forbidden for the current Tenant", pod.Namespace, pod.Name, priorityClassName)
+			recorder.Eventf(tnt, pod, corev1.EventTypeWarning, "ForbiddenPriorityClass", "Pod %s/%s is using Priority Class %s is forbidden for the current Tenant", pod.Namespace, pod.Name, priorityClassName)
 
 			response := admission.Denied(NewPodPriorityClassForbidden(priorityClassName, *allowed).Error())
 
@@ -82,7 +82,7 @@ func (h *priorityClass) OnUpdate(
 	*corev1.Pod,
 	*corev1.Pod,
 	admission.Decoder,
-	record.EventRecorder,
+	events.EventRecorder,
 	*capsulev1beta2.Tenant,
 ) capsulewebhook.Func {
 	return func(context.Context, admission.Request) *admission.Response {
@@ -94,7 +94,7 @@ func (h *priorityClass) OnDelete(
 	client.Client,
 	*corev1.Pod,
 	admission.Decoder,
-	record.EventRecorder,
+	events.EventRecorder,
 	*capsulev1beta2.Tenant,
 ) capsulewebhook.Func {
 	return func(context.Context, admission.Request) *admission.Response {

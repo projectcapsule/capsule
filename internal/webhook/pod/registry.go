@@ -10,7 +10,7 @@ import (
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
@@ -37,7 +37,7 @@ func (h *registryHandler) OnCreate(
 	c client.Client,
 	pod *corev1.Pod,
 	decoder admission.Decoder,
-	recorder record.EventRecorder,
+	recorder events.EventRecorder,
 	tnt *capsulev1beta2.Tenant,
 ) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
@@ -50,7 +50,7 @@ func (h *registryHandler) OnUpdate(
 	old *corev1.Pod,
 	pod *corev1.Pod,
 	decoder admission.Decoder,
-	recorder record.EventRecorder,
+	recorder events.EventRecorder,
 	tnt *capsulev1beta2.Tenant,
 ) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
@@ -62,7 +62,7 @@ func (h *registryHandler) OnDelete(
 	client.Client,
 	*corev1.Pod,
 	admission.Decoder,
-	record.EventRecorder,
+	events.EventRecorder,
 	*capsulev1beta2.Tenant,
 ) capsulewebhook.Func {
 	return func(context.Context, admission.Request) *admission.Response {
@@ -74,7 +74,7 @@ func (h *registryHandler) validate(
 	req admission.Request,
 	pod *corev1.Pod,
 	tnt *capsulev1beta2.Tenant,
-	recorder record.EventRecorder,
+	recorder events.EventRecorder,
 ) *admission.Response {
 	rs, ok := h.cache.Get(req.Namespace)
 	if !ok || rs == nil {
@@ -102,7 +102,7 @@ func (h *registryHandler) validateContainers(
 	req admission.Request,
 	pod *corev1.Pod,
 	tnt *capsulev1beta2.Tenant,
-	recorder record.EventRecorder,
+	recorder events.EventRecorder,
 	rs *cache.RuleSet,
 ) *admission.Response {
 	for i := range pod.Spec.InitContainers {
@@ -133,7 +133,7 @@ func (h *registryHandler) validateVolumes(
 	req admission.Request,
 	pod *corev1.Pod,
 	tnt *capsulev1beta2.Tenant,
-	recorder record.EventRecorder,
+	recorder events.EventRecorder,
 	rs *cache.RuleSet,
 ) *admission.Response {
 	for i := range pod.Spec.Volumes {
@@ -204,7 +204,7 @@ func resolveRegistryConfig(
 }
 
 func (h *registryHandler) verifyOCIReference(
-	recorder record.EventRecorder,
+	recorder events.EventRecorder,
 	req admission.Request,
 	tnt *capsulev1beta2.Tenant,
 	rs *cache.RuleSet,

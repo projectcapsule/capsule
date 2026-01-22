@@ -9,7 +9,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
@@ -28,7 +28,7 @@ func (h *validating) OnCreate(
 	c client.Client,
 	pvc *corev1.PersistentVolumeClaim,
 	decoder admission.Decoder,
-	recorder record.EventRecorder,
+	recorder events.EventRecorder,
 	tnt *capsulev1beta2.Tenant,
 ) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
@@ -41,7 +41,7 @@ func (h *validating) OnCreate(
 		storageClass := pvc.Spec.StorageClassName
 
 		if storageClass == nil {
-			recorder.Eventf(tnt, corev1.EventTypeWarning, "MissingStorageClass", "PersistentVolumeClaim %s/%s is missing StorageClass", req.Namespace, req.Name)
+			recorder.Eventf(tnt, pvc, corev1.EventTypeWarning, "MissingStorageClass", "PersistentVolumeClaim %s/%s is missing StorageClass", req.Namespace, req.Name)
 
 			response := admission.Denied(NewStorageClassNotValid(*tnt.Spec.StorageClasses).Error())
 
@@ -71,7 +71,7 @@ func (h *validating) OnCreate(
 		case allowed.Match(*storageClass) || selector:
 			return nil
 		default:
-			recorder.Eventf(tnt, corev1.EventTypeWarning, "ForbiddenStorageClass", "PersistentVolumeClaim %s/%s StorageClass %s is forbidden for the current Tenant", req.Namespace, req.Name, *storageClass)
+			recorder.Eventf(tnt, pvc, corev1.EventTypeWarning, "ForbiddenStorageClass", "PersistentVolumeClaim %s/%s StorageClass %s is forbidden for the current Tenant", req.Namespace, req.Name, *storageClass)
 
 			response := admission.Denied(NewStorageClassForbidden(*pvc.Spec.StorageClassName, *tnt.Spec.StorageClasses).Error())
 
@@ -85,7 +85,7 @@ func (h *validating) OnUpdate(
 	*corev1.PersistentVolumeClaim,
 	*corev1.PersistentVolumeClaim,
 	admission.Decoder,
-	record.EventRecorder,
+	events.EventRecorder,
 	*capsulev1beta2.Tenant,
 ) capsulewebhook.Func {
 	return func(context.Context, admission.Request) *admission.Response {
@@ -97,7 +97,7 @@ func (h *validating) OnDelete(
 	client.Client,
 	*corev1.PersistentVolumeClaim,
 	admission.Decoder,
-	record.EventRecorder,
+	events.EventRecorder,
 	*capsulev1beta2.Tenant,
 ) capsulewebhook.Func {
 	return func(context.Context, admission.Request) *admission.Response {

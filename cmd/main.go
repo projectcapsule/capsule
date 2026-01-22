@@ -221,7 +221,7 @@ func main() {
 		Client:        manager.GetClient(),
 		Metrics:       metrics.MustMakeTenantRecorder(),
 		Log:           ctrl.Log.WithName("controllers").WithName("Tenant"),
-		Recorder:      manager.GetEventRecorderFor("tenant-controller"),
+		Recorder:      manager.GetEventRecorder("tenant-controller"),
 		Configuration: cfg,
 		Cache:         registryCache,
 	}).SetupWithManager(manager, controllerConfig); err != nil {
@@ -403,7 +403,7 @@ func main() {
 	if err := resourcepools.Add(
 		ctrl.Log.WithName("controllers").WithName("ResourcePools"),
 		manager,
-		manager.GetEventRecorderFor("pools-ctrl"),
+		manager.GetEventRecorder("pools-ctrl"),
 		controllerConfig,
 	); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "resourcepools")

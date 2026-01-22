@@ -10,7 +10,7 @@ import (
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -31,7 +31,7 @@ func ResourceCounterHandler(client client.Client) capsulewebhook.Handler {
 	}
 }
 
-func (r *resourceCounterHandler) OnCreate(clt client.Client, _ admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
+func (r *resourceCounterHandler) OnCreate(clt client.Client, _ admission.Decoder, recorder events.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		var tntName string
 
@@ -74,7 +74,7 @@ func (r *resourceCounterHandler) OnCreate(clt client.Client, _ admission.Decoder
 		})
 		if err != nil {
 			if errors.As(err, &customResourceQuotaError{}) {
-				recorder.Eventf(tnt, corev1.EventTypeWarning, "ResourceQuota", "Resource %s/%s in API group %s cannot be created, limit usage of %d has been reached", req.Namespace, req.Name, kgv, limit)
+				recorder.Eventf(tnt, nil, corev1.EventTypeWarning, "ResourceQuota", "Resource %s/%s in API group %s cannot be created, limit usage of %d has been reached", req.Namespace, req.Name, kgv, limit)
 			}
 
 			return utils.ErroredResponse(err)
@@ -84,7 +84,7 @@ func (r *resourceCounterHandler) OnCreate(clt client.Client, _ admission.Decoder
 	}
 }
 
-func (r *resourceCounterHandler) OnDelete(clt client.Client, _ admission.Decoder, _ record.EventRecorder) capsulewebhook.Func {
+func (r *resourceCounterHandler) OnDelete(clt client.Client, _ admission.Decoder, _ events.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		var tntName string
 
@@ -127,7 +127,7 @@ func (r *resourceCounterHandler) OnDelete(clt client.Client, _ admission.Decoder
 	}
 }
 
-func (r *resourceCounterHandler) OnUpdate(client.Client, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
+func (r *resourceCounterHandler) OnUpdate(client.Client, admission.Decoder, events.EventRecorder) capsulewebhook.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}

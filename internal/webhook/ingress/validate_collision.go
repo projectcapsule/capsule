@@ -14,7 +14,7 @@ import (
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
@@ -34,25 +34,25 @@ func Collision(configuration configuration.Configuration) capsulewebhook.Handler
 	return &collision{configuration: configuration}
 }
 
-func (r *collision) OnCreate(client client.Client, decoder admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
+func (r *collision) OnCreate(client client.Client, decoder admission.Decoder, recorder events.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		return r.validate(ctx, client, req, decoder, recorder)
 	}
 }
 
-func (r *collision) OnUpdate(client client.Client, decoder admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
+func (r *collision) OnUpdate(client client.Client, decoder admission.Decoder, recorder events.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		return r.validate(ctx, client, req, decoder, recorder)
 	}
 }
 
-func (r *collision) OnDelete(client.Client, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
+func (r *collision) OnDelete(client.Client, admission.Decoder, events.EventRecorder) capsulewebhook.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (r *collision) validate(ctx context.Context, client client.Client, req admission.Request, decoder admission.Decoder, recorder record.EventRecorder) *admission.Response {
+func (r *collision) validate(ctx context.Context, client client.Client, req admission.Request, decoder admission.Decoder, recorder events.EventRecorder) *admission.Response {
 	ing, err := FromRequest(req, decoder)
 	if err != nil {
 		return utils.ErroredResponse(err)
@@ -75,7 +75,7 @@ func (r *collision) validate(ctx context.Context, client client.Client, req admi
 
 	var collisionErr *ingressHostnameCollisionError
 	if errors.As(err, &collisionErr) {
-		recorder.Eventf(tenant, corev1.EventTypeWarning, "IngressHostnameCollision", "Ingress %s/%s hostname is colliding", ing.Namespace(), ing.Name())
+		recorder.Eventf(tenant, nil, corev1.EventTypeWarning, "IngressHostnameCollision", "Ingress %s/%s hostname is colliding", ing.Namespace(), ing.Name())
 	}
 
 	response := admission.Denied(err.Error())

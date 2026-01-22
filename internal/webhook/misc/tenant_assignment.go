@@ -8,7 +8,7 @@ import (
 	"encoding/json"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
@@ -24,19 +24,19 @@ func TenantAssignmentHandler() capsulewebhook.Handler {
 	return &tenantAssignmentHandler{}
 }
 
-func (r *tenantAssignmentHandler) OnCreate(c client.Client, decoder admission.Decoder, _ record.EventRecorder) capsulewebhook.Func {
+func (r *tenantAssignmentHandler) OnCreate(c client.Client, decoder admission.Decoder, _ events.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		return r.handle(ctx, c, decoder, req)
 	}
 }
 
-func (r *tenantAssignmentHandler) OnDelete(client.Client, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
+func (r *tenantAssignmentHandler) OnDelete(client.Client, admission.Decoder, events.EventRecorder) capsulewebhook.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (r *tenantAssignmentHandler) OnUpdate(c client.Client, decoder admission.Decoder, _ record.EventRecorder) capsulewebhook.Func {
+func (r *tenantAssignmentHandler) OnUpdate(c client.Client, decoder admission.Decoder, _ events.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		return r.handle(ctx, c, decoder, req)
 	}

@@ -8,7 +8,7 @@ import (
 
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
@@ -27,7 +27,7 @@ func (h *userMetadataHandler) OnCreate(
 	c client.Client,
 	ns *corev1.Namespace,
 	decoder admission.Decoder,
-	recorder record.EventRecorder,
+	recorder events.EventRecorder,
 	tnt *capsulev1beta2.Tenant,
 ) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
@@ -35,7 +35,7 @@ func (h *userMetadataHandler) OnCreate(
 			err := api.ValidateForbidden(ns.Annotations, tnt.Spec.NamespaceOptions.ForbiddenAnnotations)
 			if err != nil {
 				err = errors.Wrap(err, "namespace annotations validation failed")
-				recorder.Eventf(tnt, corev1.EventTypeWarning, api.ForbiddenAnnotationReason, err.Error())
+				recorder.Eventf(tnt, ns, corev1.EventTypeWarning, api.ForbiddenAnnotationReason, err.Error(), "")
 				response := admission.Denied(err.Error())
 
 				return &response
@@ -44,7 +44,7 @@ func (h *userMetadataHandler) OnCreate(
 			err = api.ValidateForbidden(ns.Labels, tnt.Spec.NamespaceOptions.ForbiddenLabels)
 			if err != nil {
 				err = errors.Wrap(err, "namespace labels validation failed")
-				recorder.Eventf(tnt, corev1.EventTypeWarning, api.ForbiddenLabelReason, err.Error())
+				recorder.Eventf(tnt, ns, corev1.EventTypeWarning, api.ForbiddenLabelReason, err.Error(), "")
 				response := admission.Denied(err.Error())
 
 				return &response
@@ -60,7 +60,7 @@ func (h *userMetadataHandler) OnUpdate(
 	newNs *corev1.Namespace,
 	oldNs *corev1.Namespace,
 	decoder admission.Decoder,
-	recorder record.EventRecorder,
+	recorder events.EventRecorder,
 	tnt *capsulev1beta2.Tenant,
 ) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
@@ -69,7 +69,7 @@ func (h *userMetadataHandler) OnUpdate(
 			if !ok {
 				response := admission.Denied("the node-selector annotation is enforced, cannot be removed")
 
-				recorder.Eventf(tnt, corev1.EventTypeWarning, "ForbiddenNodeSelectorDeletion", string(response.Result.Reason))
+				recorder.Eventf(tnt, oldNs, corev1.EventTypeWarning, "ForbiddenNodeSelectorDeletion", string(response.Result.Reason), "")
 
 				return &response
 			}
@@ -77,7 +77,7 @@ func (h *userMetadataHandler) OnUpdate(
 			if v != oldNs.GetAnnotations()["scheduler.alpha.kubernetes.io/node-selector"] {
 				response := admission.Denied("the node-selector annotation is enforced, cannot be updated")
 
-				recorder.Eventf(tnt, corev1.EventTypeWarning, "ForbiddenNodeSelectorUpdate", string(response.Result.Reason))
+				recorder.Eventf(tnt, oldNs, corev1.EventTypeWarning, "ForbiddenNodeSelectorUpdate", string(response.Result.Reason), "")
 
 				return &response
 			}
@@ -127,7 +127,7 @@ func (h *userMetadataHandler) OnUpdate(
 			err := api.ValidateForbidden(annotations, tnt.Spec.NamespaceOptions.ForbiddenAnnotations)
 			if err != nil {
 				err = errors.Wrap(err, "namespace annotations validation failed")
-				recorder.Eventf(tnt, corev1.EventTypeWarning, api.ForbiddenAnnotationReason, err.Error())
+				recorder.Eventf(tnt, oldNs, corev1.EventTypeWarning, api.ForbiddenAnnotationReason, err.Error(), "")
 				response := admission.Denied(err.Error())
 
 				return &response
@@ -136,7 +136,7 @@ func (h *userMetadataHandler) OnUpdate(
 			err = api.ValidateForbidden(labels, tnt.Spec.NamespaceOptions.ForbiddenLabels)
 			if err != nil {
 				err = errors.Wrap(err, "namespace labels validation failed")
-				recorder.Eventf(tnt, corev1.EventTypeWarning, api.ForbiddenLabelReason, err.Error())
+				recorder.Eventf(tnt, oldNs, corev1.EventTypeWarning, api.ForbiddenLabelReason, err.Error(), "")
 				response := admission.Denied(err.Error())
 
 				return &response
@@ -151,7 +151,7 @@ func (h *userMetadataHandler) OnDelete(
 	client.Client,
 	*corev1.Namespace,
 	admission.Decoder,
-	record.EventRecorder,
+	events.EventRecorder,
 	*capsulev1beta2.Tenant,
 ) capsulewebhook.Func {
 	return func(context.Context, admission.Request) *admission.Response {

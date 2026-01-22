@@ -10,7 +10,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	resources "k8s.io/api/resource/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
@@ -25,7 +25,7 @@ func DeviceClass() capsulewebhook.Handler {
 	return &deviceClass{}
 }
 
-func (h *deviceClass) OnCreate(c client.Client, decoder admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
+func (h *deviceClass) OnCreate(c client.Client, decoder admission.Decoder, recorder events.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		switch res := req.Kind.Kind; res {
 		case "ResourceClaim":
@@ -48,19 +48,19 @@ func (h *deviceClass) OnCreate(c client.Client, decoder admission.Decoder, recor
 	}
 }
 
-func (h *deviceClass) OnDelete(client.Client, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
+func (h *deviceClass) OnDelete(client.Client, admission.Decoder, events.EventRecorder) capsulewebhook.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (h *deviceClass) OnUpdate(client.Client, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
+func (h *deviceClass) OnUpdate(client.Client, admission.Decoder, events.EventRecorder) capsulewebhook.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (h *deviceClass) validateResourceRequest(ctx context.Context, c client.Client, _ admission.Decoder, recorder record.EventRecorder, req admission.Request, namespace string, requests []resources.DeviceRequest) *admission.Response {
+func (h *deviceClass) validateResourceRequest(ctx context.Context, c client.Client, _ admission.Decoder, recorder events.EventRecorder, req admission.Request, namespace string, requests []resources.DeviceRequest) *admission.Response {
 	tnt, err := tenant.TenantByStatusNamespace(ctx, c, namespace)
 	if err != nil {
 		return utils.ErroredResponse(err)
@@ -84,7 +84,7 @@ func (h *deviceClass) validateResourceRequest(ctx context.Context, c client.Clie
 		}
 
 		if dc == nil {
-			recorder.Eventf(tnt, corev1.EventTypeWarning, "MissingDeviceClass", "%s %s/%s is missing DeviceClass", req.Kind.Kind, req.Namespace, req.Name)
+			recorder.Eventf(tnt, dc, corev1.EventTypeWarning, "MissingDeviceClass", "%s %s/%s is missing DeviceClass", req.Kind.Kind, req.Namespace, req.Name)
 
 			response := admission.Denied(NewDeviceClassUndefined(*allowed).Error())
 
@@ -97,7 +97,7 @@ func (h *deviceClass) validateResourceRequest(ctx context.Context, c client.Clie
 		case allowed.Match(dc.Name) || selector:
 			return nil
 		default:
-			recorder.Eventf(tnt, corev1.EventTypeWarning, "ForbiddenDeviceClass", "%s %s/%s DeviceClass %s is forbidden for the current Tenant", req.Kind.Kind, req.Namespace, req.Name, &dc)
+			recorder.Eventf(tnt, dc, corev1.EventTypeWarning, "ForbiddenDeviceClass", "%s %s/%s DeviceClass %s is forbidden for the current Tenant", req.Kind.Kind, req.Namespace, req.Name, &dc)
 
 			response := admission.Denied(NewDeviceClassForbidden(dc.Name, *allowed).Error())
 

@@ -10,7 +10,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
@@ -19,7 +19,7 @@ import (
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
 )
 
-func mutateGatewayDefaults(ctx context.Context, req admission.Request, c client.Client, decoder admission.Decoder, recorder record.EventRecorder, namespce string) *admission.Response {
+func mutateGatewayDefaults(ctx context.Context, req admission.Request, c client.Client, decoder admission.Decoder, recorder events.EventRecorder, namespce string) *admission.Response {
 	gatewayObj := &gatewayv1.Gateway{}
 	if err := decoder.Decode(req, gatewayObj); err != nil {
 		return utils.ErroredResponse(err)
@@ -79,7 +79,7 @@ func mutateGatewayDefaults(ctx context.Context, req admission.Request, c client.
 		return &response
 	}
 
-	recorder.Eventf(tnt, corev1.EventTypeNormal, "TenantDefault", "Assigned Tenant default Gateway Class %s to %s/%s", allowed.Default, gatewayObj.Name, gatewayObj.Namespace)
+	recorder.Eventf(tnt, gatewayObj, corev1.EventTypeNormal, "TenantDefault", "Assigned Tenant default Gateway Class %s to %s/%s", allowed.Default, gatewayObj.Name, gatewayObj.Namespace)
 
 	response := admission.PatchResponseFromRaw(req.Object.Raw, marshaled)
 

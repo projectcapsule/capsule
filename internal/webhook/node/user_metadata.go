@@ -9,7 +9,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/version"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
@@ -30,19 +30,19 @@ func UserMetadataHandler(configuration configuration.Configuration, ver *version
 	}
 }
 
-func (r *userMetadataHandler) OnCreate(client.Client, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
+func (r *userMetadataHandler) OnCreate(client.Client, admission.Decoder, events.EventRecorder) capsulewebhook.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (r *userMetadataHandler) OnDelete(client.Client, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
+func (r *userMetadataHandler) OnDelete(client.Client, admission.Decoder, events.EventRecorder) capsulewebhook.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (r *userMetadataHandler) OnUpdate(_ client.Client, decoder admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
+func (r *userMetadataHandler) OnUpdate(_ client.Client, decoder admission.Decoder, recorder events.EventRecorder) capsulewebhook.Func {
 	return func(_ context.Context, req admission.Request) *admission.Response {
 		nodeWebhookSupported, _ := utils.NodeWebhookSupported(r.version)
 
@@ -65,7 +65,7 @@ func (r *userMetadataHandler) OnUpdate(_ client.Client, decoder admission.Decode
 			newNodeForbiddenLabels := r.getForbiddenNodeLabels(newNode)
 
 			if !reflect.DeepEqual(oldNodeForbiddenLabels, newNodeForbiddenLabels) {
-				recorder.Eventf(newNode, corev1.EventTypeWarning, "ForbiddenNodeLabel", "Denied modifying forbidden labels on node")
+				recorder.Eventf(newNode, oldNode, corev1.EventTypeWarning, "ForbiddenNodeLabel", "Denied modifying forbidden labels on node", "")
 
 				response := admission.Denied(NewNodeLabelForbiddenError(r.configuration.ForbiddenUserNodeLabels()).Error())
 
@@ -78,7 +78,7 @@ func (r *userMetadataHandler) OnUpdate(_ client.Client, decoder admission.Decode
 			newNodeForbiddenAnnotations := r.getForbiddenNodeAnnotations(newNode)
 
 			if !reflect.DeepEqual(oldNodeForbiddenAnnotations, newNodeForbiddenAnnotations) {
-				recorder.Eventf(newNode, corev1.EventTypeWarning, "ForbiddenNodeLabel", "Denied modifying forbidden annotations on node")
+				recorder.Eventf(newNode, oldNode, corev1.EventTypeWarning, "ForbiddenNodeLabel", "Denied modifying forbidden annotations on node", "")
 
 				response := admission.Denied(NewNodeAnnotationForbiddenError(r.configuration.ForbiddenUserNodeAnnotations()).Error())
 

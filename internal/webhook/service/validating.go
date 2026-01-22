@@ -10,7 +10,7 @@ import (
 
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
@@ -29,7 +29,7 @@ func (h *validating) OnCreate(
 	c client.Client,
 	svc *corev1.Service,
 	decoder admission.Decoder,
-	recorder record.EventRecorder,
+	recorder events.EventRecorder,
 	tnt *capsulev1beta2.Tenant,
 ) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
@@ -42,7 +42,7 @@ func (h *validating) OnUpdate(
 	old *corev1.Service,
 	svc *corev1.Service,
 	decoder admission.Decoder,
-	recorder record.EventRecorder,
+	recorder events.EventRecorder,
 	tnt *capsulev1beta2.Tenant,
 ) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
@@ -54,7 +54,7 @@ func (h *validating) OnDelete(
 	client.Client,
 	*corev1.Service,
 	admission.Decoder,
-	record.EventRecorder,
+	events.EventRecorder,
 	*capsulev1beta2.Tenant,
 ) capsulewebhook.Func {
 	return func(context.Context, admission.Request) *admission.Response {
@@ -64,12 +64,12 @@ func (h *validating) OnDelete(
 
 func (h *validating) handle(
 	req admission.Request,
-	recorder record.EventRecorder,
+	recorder events.EventRecorder,
 	svc *corev1.Service,
 	tnt *capsulev1beta2.Tenant,
 ) *admission.Response {
 	if svc.Spec.Type == corev1.ServiceTypeNodePort && tnt.Spec.ServiceOptions != nil && tnt.Spec.ServiceOptions.AllowedServices != nil && !*tnt.Spec.ServiceOptions.AllowedServices.NodePort {
-		recorder.Eventf(tnt, corev1.EventTypeWarning, "ForbiddenNodePort", "Service %s/%s cannot be type of NodePort for the current Tenant", req.Namespace, req.Name)
+		recorder.Eventf(tnt, svc, corev1.EventTypeWarning, "ForbiddenNodePort", "Service %s/%s cannot be type of NodePort for the current Tenant", req.Namespace, req.Name)
 
 		response := admission.Denied(NewNodePortDisabledError().Error())
 
@@ -77,7 +77,7 @@ func (h *validating) handle(
 	}
 
 	if svc.Spec.Type == corev1.ServiceTypeExternalName && tnt.Spec.ServiceOptions != nil && tnt.Spec.ServiceOptions.AllowedServices != nil && !*tnt.Spec.ServiceOptions.AllowedServices.ExternalName {
-		recorder.Eventf(tnt, corev1.EventTypeWarning, "ForbiddenExternalName", "Service %s/%s cannot be type of ExternalName for the current Tenant", req.Namespace, req.Name)
+		recorder.Eventf(tnt, svc, corev1.EventTypeWarning, "ForbiddenExternalName", "Service %s/%s cannot be type of ExternalName for the current Tenant", req.Namespace, req.Name)
 
 		response := admission.Denied(NewExternalNameDisabledError().Error())
 
@@ -85,7 +85,7 @@ func (h *validating) handle(
 	}
 
 	if svc.Spec.Type == corev1.ServiceTypeLoadBalancer && tnt.Spec.ServiceOptions != nil && tnt.Spec.ServiceOptions.AllowedServices != nil && !*tnt.Spec.ServiceOptions.AllowedServices.LoadBalancer {
-		recorder.Eventf(tnt, corev1.EventTypeWarning, "ForbiddenLoadBalancer", "Service %s/%s cannot be type of LoadBalancer for the current Tenant", req.Namespace, req.Name)
+		recorder.Eventf(tnt, svc, corev1.EventTypeWarning, "ForbiddenLoadBalancer", "Service %s/%s cannot be type of LoadBalancer for the current Tenant", req.Namespace, req.Name)
 
 		response := admission.Denied(NewLoadBalancerDisabled().Error())
 
@@ -96,7 +96,7 @@ func (h *validating) handle(
 		err := api.ValidateForbidden(svc.Annotations, tnt.Spec.ServiceOptions.ForbiddenAnnotations)
 		if err != nil {
 			err = errors.Wrap(err, "service annotations validation failed")
-			recorder.Eventf(tnt, corev1.EventTypeWarning, api.ForbiddenAnnotationReason, err.Error())
+			recorder.Eventf(tnt, svc, corev1.EventTypeWarning, api.ForbiddenAnnotationReason, err.Error(), "")
 			response := admission.Denied(err.Error())
 
 			return &response
@@ -105,7 +105,7 @@ func (h *validating) handle(
 		err = api.ValidateForbidden(svc.Labels, tnt.Spec.ServiceOptions.ForbiddenLabels)
 		if err != nil {
 			err = errors.Wrap(err, "service labels validation failed")
-			recorder.Eventf(tnt, corev1.EventTypeWarning, api.ForbiddenLabelReason, err.Error())
+			recorder.Eventf(tnt, svc, corev1.EventTypeWarning, api.ForbiddenLabelReason, err.Error(), "")
 			response := admission.Denied(err.Error())
 
 			return &response
@@ -136,7 +136,7 @@ func (h *validating) handle(
 		ip := net.ParseIP(externalIP)
 
 		if !ipInCIDR(ip) {
-			recorder.Eventf(tnt, corev1.EventTypeWarning, "ForbiddenExternalServiceIP", "Service %s/%s external IP %s is forbidden for the current Tenant", req.Namespace, req.Name, ip.String())
+			recorder.Eventf(tnt, svc, corev1.EventTypeWarning, "ForbiddenExternalServiceIP", "Service %s/%s external IP %s is forbidden for the current Tenant", req.Namespace, req.Name, ip.String())
 
 			response := admission.Denied(NewExternalServiceIPForbidden(tnt.Spec.ServiceOptions.ExternalServiceIPs.Allowed).Error())
 

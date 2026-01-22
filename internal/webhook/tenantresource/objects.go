@@ -10,7 +10,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
@@ -27,25 +27,25 @@ func WriteOpsHandler() capsulewebhook.Handler {
 	return &cordoningHandler{}
 }
 
-func (h *cordoningHandler) OnCreate(client.Client, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
+func (h *cordoningHandler) OnCreate(client.Client, admission.Decoder, events.EventRecorder) capsulewebhook.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (h *cordoningHandler) OnDelete(client client.Client, _ admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
+func (h *cordoningHandler) OnDelete(client client.Client, _ admission.Decoder, recorder events.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		return h.handler(ctx, client, req, recorder)
 	}
 }
 
-func (h *cordoningHandler) OnUpdate(client client.Client, _ admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
+func (h *cordoningHandler) OnUpdate(client client.Client, _ admission.Decoder, recorder events.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		return h.handler(ctx, client, req, recorder)
 	}
 }
 
-func (h *cordoningHandler) handler(ctx context.Context, clt client.Client, req admission.Request, recorder record.EventRecorder) *admission.Response {
+func (h *cordoningHandler) handler(ctx context.Context, clt client.Client, req admission.Request, recorder events.EventRecorder) *admission.Response {
 	tnt, err := tenant.TenantByStatusNamespace(ctx, clt, req.Namespace)
 	if err != nil {
 		return utils.ErroredResponse(err)
@@ -76,7 +76,7 @@ func (h *cordoningHandler) handler(ctx context.Context, clt client.Client, req a
 	}
 
 	if len(local.Items) > 0 || len(global.Items) > 0 {
-		recorder.Eventf(tnt, corev1.EventTypeWarning, "TenantResourceWriteOp", "%s %s/%s cannot be %sd, resource is managed by the Tenant", req.Kind.String(), req.Namespace, req.Name, strings.ToLower(string(req.Operation)))
+		recorder.Eventf(tnt, nil, corev1.EventTypeWarning, "TenantResourceWriteOp", "%s %s/%s cannot be %sd, resource is managed by the Tenant", req.Kind.String(), req.Namespace, req.Name, strings.ToLower(string(req.Operation)))
 
 		response := admission.Denied(fmt.Sprintf("resource %s is managed at the Tenant level", req.Name))
 

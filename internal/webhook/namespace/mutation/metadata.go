@@ -10,7 +10,7 @@ import (
 	"net/http"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
@@ -30,7 +30,7 @@ func MetadataHandler(cfg configuration.Configuration) capsulewebhook.TypedHandle
 	}
 }
 
-func (h *metadataHandler) OnCreate(client client.Client, ns *corev1.Namespace, decoder admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
+func (h *metadataHandler) OnCreate(client client.Client, ns *corev1.Namespace, decoder admission.Decoder, recorder events.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		tnt, errResponse := utils.GetNamespaceTenant(ctx, client, ns, req, h.cfg, recorder)
 		if errResponse != nil {
@@ -73,13 +73,13 @@ func (h *metadataHandler) OnCreate(client client.Client, ns *corev1.Namespace, d
 	}
 }
 
-func (h *metadataHandler) OnDelete(client.Client, *corev1.Namespace, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
+func (h *metadataHandler) OnDelete(client.Client, *corev1.Namespace, admission.Decoder, events.EventRecorder) capsulewebhook.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (h *metadataHandler) OnUpdate(c client.Client, newNs *corev1.Namespace, oldNs *corev1.Namespace, decoder admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
+func (h *metadataHandler) OnUpdate(c client.Client, newNs *corev1.Namespace, oldNs *corev1.Namespace, decoder admission.Decoder, recorder events.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		tnt, errResponse := utils.GetNamespaceTenant(ctx, c, oldNs, req, h.cfg, recorder)
 		if errResponse != nil {

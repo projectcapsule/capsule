@@ -12,7 +12,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
@@ -34,7 +34,7 @@ type resourceClaimController struct {
 
 	metrics  *metrics.ClaimRecorder
 	log      logr.Logger
-	recorder record.EventRecorder
+	recorder events.EventRecorder
 }
 
 func (r *resourceClaimController) SetupWithManager(mgr ctrl.Manager, cfg utils.ControllerOptions) error {
@@ -250,7 +250,7 @@ func (r resourceClaimController) allocateResourcePool(
 func updateStatusAndEmitEvent(
 	ctx context.Context,
 	c client.Client,
-	recorder record.EventRecorder,
+	recorder events.EventRecorder,
 	claim *capsulev1beta2.ResourcePoolClaim,
 	condition metav1.Condition,
 ) (err error) {
@@ -283,15 +283,13 @@ func updateStatusAndEmitEvent(
 		eventType = corev1.EventTypeWarning
 	}
 
-	recorder.AnnotatedEventf(
+	recorder.Eventf(
 		claim,
-		map[string]string{
-			"Status": string(claim.Status.Condition.Status),
-			"Type":   claim.Status.Condition.Type,
-		},
+		nil,
 		eventType,
 		claim.Status.Condition.Reason,
 		claim.Status.Condition.Message,
+		"",
 	)
 
 	return err

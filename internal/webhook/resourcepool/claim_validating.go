@@ -9,7 +9,7 @@ import (
 	"reflect"
 
 	"github.com/go-logr/logr"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
@@ -26,13 +26,13 @@ func ClaimValidationHandler(log logr.Logger) capsulewebhook.Handler {
 	return &claimValidationHandler{log: log}
 }
 
-func (h *claimValidationHandler) OnCreate(client.Client, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
+func (h *claimValidationHandler) OnCreate(client.Client, admission.Decoder, events.EventRecorder) capsulewebhook.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (h *claimValidationHandler) OnDelete(_ client.Client, decoder admission.Decoder, _ record.EventRecorder) capsulewebhook.Func {
+func (h *claimValidationHandler) OnDelete(_ client.Client, decoder admission.Decoder, _ events.EventRecorder) capsulewebhook.Func {
 	return func(_ context.Context, req admission.Request) *admission.Response {
 		claim := &capsulev1beta2.ResourcePoolClaim{}
 
@@ -50,7 +50,7 @@ func (h *claimValidationHandler) OnDelete(_ client.Client, decoder admission.Dec
 	}
 }
 
-func (h *claimValidationHandler) OnUpdate(_ client.Client, decoder admission.Decoder, _ record.EventRecorder) capsulewebhook.Func {
+func (h *claimValidationHandler) OnUpdate(_ client.Client, decoder admission.Decoder, _ events.EventRecorder) capsulewebhook.Func {
 	return func(_ context.Context, req admission.Request) *admission.Response {
 		oldClaim := &capsulev1beta2.ResourcePoolClaim{}
 		newClaim := &capsulev1beta2.ResourcePoolClaim{}
