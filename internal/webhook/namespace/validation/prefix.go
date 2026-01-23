@@ -16,6 +16,7 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	capsulewebhook "github.com/projectcapsule/capsule/internal/webhook"
 	"github.com/projectcapsule/capsule/pkg/configuration"
+	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 )
 
 type prefixHandler struct {
@@ -50,7 +51,7 @@ func (h *prefixHandler) OnCreate(
 			}
 
 			if e := fmt.Sprintf("%s-%s", tnt.GetName(), ns.GetName()); !strings.HasPrefix(ns.GetName(), fmt.Sprintf("%s-", tnt.GetName())) {
-				recorder.Eventf(tnt, ns, corev1.EventTypeWarning, "InvalidTenantPrefix", "Namespace %s does not match the expected prefix for the current Tenant", ns.GetName())
+				recorder.Eventf(tnt, ns, corev1.EventTypeWarning, evt.ReasonInvalidTenantPrefix, evt.ActionValidationDenied, "Namespace %s does not match the expected prefix for the current Tenant", ns.GetName())
 
 				response := admission.Denied(fmt.Sprintf("The namespace doesn't match the tenant prefix, expected %s", e))
 

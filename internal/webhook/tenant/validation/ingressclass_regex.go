@@ -49,13 +49,13 @@ func (h *ingressClassRegexHandler) OnUpdate(_ client.Client, decoder admission.D
 	}
 }
 
-//nolint:staticcheck
 func (h *ingressClassRegexHandler) validate(decoder admission.Decoder, req admission.Request) *admission.Response {
 	tenant := &capsulev1beta2.Tenant{}
 	if err := decoder.Decode(req, tenant); err != nil {
 		return utils.ErroredResponse(err)
 	}
 
+	//nolint:staticcheck
 	if tenant.Spec.IngressOptions.AllowedClasses != nil && len(tenant.Spec.IngressOptions.AllowedClasses.Regex) > 0 {
 		if _, err := regexp.Compile(tenant.Spec.IngressOptions.AllowedClasses.Regex); err != nil {
 			response := admission.Denied("unable to compile ingressClasses allowedRegex")

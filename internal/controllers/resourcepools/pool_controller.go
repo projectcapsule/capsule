@@ -30,6 +30,7 @@ import (
 	"github.com/projectcapsule/capsule/internal/metrics"
 	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
+	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/utils"
 )
 
@@ -458,9 +459,9 @@ func (r *resourcePoolController) handleClaimDisassociation(
 			pool,
 			current,
 			corev1.EventTypeNormal,
-			"Disassociated",
-			"Claim is disassociated from the pool",
-			"",
+			evt.ReasonDisassociated,
+			evt.ActionDisassociating,
+			"claim is disassociated from the pool",
 		)
 
 		return nil

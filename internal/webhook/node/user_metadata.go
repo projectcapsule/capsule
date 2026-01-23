@@ -16,6 +16,7 @@ import (
 	capsulewebhook "github.com/projectcapsule/capsule/internal/webhook"
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
 	"github.com/projectcapsule/capsule/pkg/configuration"
+	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 )
 
 type userMetadataHandler struct {
@@ -65,7 +66,7 @@ func (r *userMetadataHandler) OnUpdate(_ client.Client, decoder admission.Decode
 			newNodeForbiddenLabels := r.getForbiddenNodeLabels(newNode)
 
 			if !reflect.DeepEqual(oldNodeForbiddenLabels, newNodeForbiddenLabels) {
-				recorder.Eventf(newNode, oldNode, corev1.EventTypeWarning, "ForbiddenNodeLabel", "Denied modifying forbidden labels on node", "")
+				recorder.Eventf(newNode, oldNode, corev1.EventTypeWarning, evt.ReasonForbiddenLabel, evt.ActionValidationDenied, "Denied modifying forbidden labels on node")
 
 				response := admission.Denied(NewNodeLabelForbiddenError(r.configuration.ForbiddenUserNodeLabels()).Error())
 
@@ -78,7 +79,7 @@ func (r *userMetadataHandler) OnUpdate(_ client.Client, decoder admission.Decode
 			newNodeForbiddenAnnotations := r.getForbiddenNodeAnnotations(newNode)
 
 			if !reflect.DeepEqual(oldNodeForbiddenAnnotations, newNodeForbiddenAnnotations) {
-				recorder.Eventf(newNode, oldNode, corev1.EventTypeWarning, "ForbiddenNodeLabel", "Denied modifying forbidden annotations on node", "")
+				recorder.Eventf(newNode, oldNode, corev1.EventTypeWarning, evt.ReasonForbiddenLabel, evt.ActionValidationDenied, "Denied modifying forbidden annotations on node")
 
 				response := admission.Denied(NewNodeAnnotationForbiddenError(r.configuration.ForbiddenUserNodeAnnotations()).Error())
 

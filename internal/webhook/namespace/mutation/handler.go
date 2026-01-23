@@ -14,6 +14,7 @@ import (
 	"github.com/projectcapsule/capsule/internal/webhook"
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
 	"github.com/projectcapsule/capsule/pkg/configuration"
+	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/utils/tenant"
 	"github.com/projectcapsule/capsule/pkg/utils/users"
 )
@@ -105,7 +106,7 @@ func (h *handler) OnUpdate(c client.Client, decoder admission.Decoder, recorder 
 			}
 		} else {
 			if owned := tenant.NamespaceIsOwned(ctx, c, h.cfg, oldNs, tnt, req.UserInfo); !owned {
-				recorder.Eventf(tnt, oldNs, corev1.EventTypeWarning, "NamespacePatch", "Namespace %s can not be patched", oldNs.GetName())
+				recorder.Eventf(tnt, oldNs, corev1.EventTypeWarning, "NamespacePatch", evt.ActionValidationDenied, "Namespace %s can not be patched", oldNs.GetName())
 
 				response := admission.Denied("Denied patch request for this namespace")
 

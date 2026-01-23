@@ -18,6 +18,7 @@ import (
 	capsulewebhook "github.com/projectcapsule/capsule/internal/webhook"
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
 	"github.com/projectcapsule/capsule/pkg/configuration"
+	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 )
 
 type class struct {
@@ -77,7 +78,7 @@ func (r *class) validate(ctx context.Context, client client.Client, req admissio
 	}
 
 	if gatewayClass == nil {
-		recorder.Eventf(tnt, gatewayClass, corev1.EventTypeWarning, "MissingGatewayClass", "Gateway %s/%s is missing GatewayClass", req.Namespace, req.Name)
+		recorder.Eventf(tnt, gatewayClass, corev1.EventTypeWarning, evt.ReasonMissingGatewayClass, evt.ActionValidationDenied, "Gateway %s/%s is missing GatewayClass", req.Namespace, req.Name)
 
 		response := admission.Denied(NewGatewayClassUndefined(*allowed).Error())
 
@@ -106,7 +107,7 @@ func (r *class) validate(ctx context.Context, client client.Client, req admissio
 	case allowed.Match(gatewayClass.Name) || selector:
 		return nil
 	default:
-		recorder.Eventf(tnt, gatewayClass, corev1.EventTypeWarning, "ForbiddenGatewayClass", "Gateway %s/%s GatewayClass %s is forbidden for the current Tenant", req.Namespace, req.Name, &gatewayClass)
+		recorder.Eventf(tnt, gatewayClass, corev1.EventTypeWarning, evt.ReasonForbiddenGatewayClass, evt.ActionValidationDenied, "Gateway %s/%s GatewayClass %s is forbidden for the current Tenant", req.Namespace, req.Name, &gatewayClass)
 
 		response := admission.Denied(NewGatewayClassForbidden(gatewayObj.Name, *allowed).Error())
 

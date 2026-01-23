@@ -18,6 +18,7 @@ import (
 	capsulewebhook "github.com/projectcapsule/capsule/internal/webhook"
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
 	"github.com/projectcapsule/capsule/pkg/configuration"
+	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 )
 
 type hostnames struct {
@@ -67,7 +68,7 @@ func (r *hostnames) validate(ctx context.Context, client client.Client, req admi
 
 	for hostname := range ingress.HostnamePathsPairs() {
 		if len(hostname) == 0 {
-			recorder.Eventf(tenant, nil, corev1.EventTypeWarning, "IngressHostnameEmpty", "Ingress %s/%s hostname is empty", ingress.Namespace(), ingress.Name())
+			recorder.Eventf(tenant, nil, corev1.EventTypeWarning, evt.ReasonIngressHostnameEmpty, evt.ActionValidationDenied, "Ingress %s/%s hostname is empty", ingress.Namespace(), ingress.Name())
 
 			return utils.ErroredResponse(NewEmptyIngressHostname(*tenant.Spec.IngressOptions.AllowedHostnames))
 		}
@@ -81,7 +82,7 @@ func (r *hostnames) validate(ctx context.Context, client client.Client, req admi
 
 	var hostnameNotValidErr *ingressHostnameNotValidError
 	if errors.As(err, &hostnameNotValidErr) {
-		recorder.Eventf(tenant, nil, corev1.EventTypeWarning, "IngressHostnameNotValid", "Ingress %s/%s hostname is not valid", ingress.Namespace(), ingress.Name())
+		recorder.Eventf(tenant, nil, corev1.EventTypeWarning, evt.ReasonIngressHostnameNotValid, evt.ActionValidationDenied, "Ingress %s/%s hostname is not valid", ingress.Namespace(), ingress.Name())
 
 		response := admission.Denied(err.Error())
 

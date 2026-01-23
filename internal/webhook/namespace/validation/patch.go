@@ -15,6 +15,7 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	capsulewebhook "github.com/projectcapsule/capsule/internal/webhook"
 	"github.com/projectcapsule/capsule/pkg/configuration"
+	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/utils/users"
 )
 
@@ -65,7 +66,7 @@ func (h *patchHandler) OnUpdate(
 			return nil
 		}
 
-		recorder.Eventf(tnt, ns, corev1.EventTypeWarning, "NamespacePatch", e, "")
+		recorder.Eventf(tnt, ns, corev1.EventTypeWarning, evt.ReasonNamespaceHijack, evt.ActionValidationDenied, e)
 		response := admission.Denied(e)
 
 		return &response

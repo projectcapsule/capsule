@@ -16,6 +16,7 @@ import (
 
 	capsulewebhook "github.com/projectcapsule/capsule/internal/webhook"
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
+	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/utils/tenant"
 )
 
@@ -84,7 +85,7 @@ func (h *deviceClass) validateResourceRequest(ctx context.Context, c client.Clie
 		}
 
 		if dc == nil {
-			recorder.Eventf(tnt, dc, corev1.EventTypeWarning, "MissingDeviceClass", "%s %s/%s is missing DeviceClass", req.Kind.Kind, req.Namespace, req.Name)
+			recorder.Eventf(tnt, dc, corev1.EventTypeWarning, evt.ReasonMissingDeviceClass, evt.ActionValidationDenied, "%s %s/%s is missing DeviceClass", req.Kind.Kind, req.Namespace, req.Name)
 
 			response := admission.Denied(NewDeviceClassUndefined(*allowed).Error())
 
@@ -97,7 +98,7 @@ func (h *deviceClass) validateResourceRequest(ctx context.Context, c client.Clie
 		case allowed.Match(dc.Name) || selector:
 			return nil
 		default:
-			recorder.Eventf(tnt, dc, corev1.EventTypeWarning, "ForbiddenDeviceClass", "%s %s/%s DeviceClass %s is forbidden for the current Tenant", req.Kind.Kind, req.Namespace, req.Name, &dc)
+			recorder.Eventf(tnt, dc, corev1.EventTypeWarning, "ForbiddenDeviceClass", evt.ActionValidationDenied, "%s %s/%s DeviceClass %s is forbidden for the current Tenant", req.Kind.Kind, req.Namespace, req.Name, &dc)
 
 			response := admission.Denied(NewDeviceClassForbidden(dc.Name, *allowed).Error())
 

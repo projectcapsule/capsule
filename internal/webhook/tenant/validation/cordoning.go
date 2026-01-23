@@ -16,6 +16,7 @@ import (
 	capsulewebhook "github.com/projectcapsule/capsule/internal/webhook"
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
 	"github.com/projectcapsule/capsule/pkg/configuration"
+	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/utils/tenant"
 	"github.com/projectcapsule/capsule/pkg/utils/users"
 )
@@ -59,7 +60,7 @@ func (h *cordoningHandler) cordonHandler(ctx context.Context, c client.Client, r
 	}
 
 	if tnt.Spec.Cordoned && users.IsCapsuleUser(ctx, c, h.configuration, req.UserInfo.Username, req.UserInfo.Groups) {
-		recorder.Eventf(tnt, nil, corev1.EventTypeWarning, "TenantFreezed", "%s %s/%s cannot be %sd, current Tenant is freezed", req.Kind.String(), req.Namespace, req.Name, strings.ToLower(string(req.Operation)))
+		recorder.Eventf(tnt, nil, corev1.EventTypeWarning, evt.ReasonCordoning, evt.ActionValidationDenied, "%s %s/%s cannot be %sd, current Tenant is cordoned", req.Kind.String(), req.Namespace, req.Name, strings.ToLower(string(req.Operation)))
 
 		response := admission.Denied(fmt.Sprintf("tenant %s is freezed: please, reach out to the system administrator", tnt.GetName()))
 

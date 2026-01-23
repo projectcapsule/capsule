@@ -14,6 +14,7 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	capsulewebhook "github.com/projectcapsule/capsule/internal/webhook"
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
+	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 )
 
 type freezedEmitterHandler struct{}
@@ -48,9 +49,9 @@ func (h *freezedEmitterHandler) OnUpdate(_ client.Client, decoder admission.Deco
 
 		switch {
 		case !oldTnt.Spec.Cordoned && newTnt.Spec.Cordoned:
-			recorder.Eventf(newTnt, nil, corev1.EventTypeNormal, "TenantCordoned", "Tenant has been cordoned", "")
+			recorder.Eventf(newTnt, nil, corev1.EventTypeNormal, evt.ReasonCordoning, evt.ActionCordoned, "Tenant has been cordoned", "")
 		case oldTnt.Spec.Cordoned && !newTnt.Spec.Cordoned:
-			recorder.Eventf(newTnt, nil, corev1.EventTypeNormal, "TenantUncordoned", "Tenant has been uncordoned", "")
+			recorder.Eventf(newTnt, nil, corev1.EventTypeNormal, evt.ReasonCordoning, evt.ActionUncordoned, "Tenant has been uncordoned", "")
 		}
 
 		return nil

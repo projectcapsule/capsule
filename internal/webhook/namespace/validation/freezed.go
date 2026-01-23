@@ -14,6 +14,7 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	capsulewebhook "github.com/projectcapsule/capsule/internal/webhook"
 	"github.com/projectcapsule/capsule/pkg/configuration"
+	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/utils/users"
 )
 
@@ -34,7 +35,7 @@ func (h *freezedHandler) OnCreate(
 ) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		if tnt.Spec.Cordoned {
-			recorder.Eventf(tnt, ns, corev1.EventTypeWarning, "TenantFreezed", "Namespace %s cannot be attached, the current Tenant is freezed", ns.GetName())
+			recorder.Eventf(tnt, ns, corev1.EventTypeWarning, evt.ReasonCordoning, evt.ActionValidationDenied, "Namespace %s cannot be attached, the current Tenant is freezed", ns.GetName())
 
 			response := admission.Denied("the selected Tenant is freezed")
 
@@ -54,7 +55,7 @@ func (h *freezedHandler) OnDelete(
 ) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		if tnt.Spec.Cordoned && users.IsCapsuleUser(ctx, c, h.cfg, req.UserInfo.Username, req.UserInfo.Groups) {
-			recorder.Eventf(tnt, ns, corev1.EventTypeWarning, "TenantFreezed", "Namespace %s cannot be deleted, the current Tenant is freezed", req.Name)
+			recorder.Eventf(tnt, ns, corev1.EventTypeWarning, "TenantFreezed", "Denied", "Namespace %s cannot be deleted, the current Tenant is freezed", req.Name)
 
 			response := admission.Denied("the selected Tenant is freezed")
 
@@ -75,7 +76,7 @@ func (h *freezedHandler) OnUpdate(
 ) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		if tnt.Spec.Cordoned && users.IsCapsuleUser(ctx, c, h.cfg, req.UserInfo.Username, req.UserInfo.Groups) {
-			recorder.Eventf(tnt, ns, corev1.EventTypeWarning, "TenantFreezed", "Namespace %s cannot be updated, the current Tenant is freezed", ns.GetName())
+			recorder.Eventf(tnt, ns, corev1.EventTypeWarning, "TenantFreezed", "Denied", "Namespace %s cannot be updated, the current Tenant is freezed", ns.GetName())
 
 			response := admission.Denied("the selected Tenant is freezed")
 

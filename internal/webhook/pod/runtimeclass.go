@@ -16,6 +16,7 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	capsulewebhook "github.com/projectcapsule/capsule/internal/webhook"
+	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 )
 
 type runtimeClass struct{}
@@ -104,7 +105,7 @@ func (h *runtimeClass) validate(
 		// Delegating mutating webhook to specify a default RuntimeClass
 		return nil
 	case !allowed.MatchSelectByName(class):
-		recorder.Eventf(tnt, pod, corev1.EventTypeWarning, "ForbiddenRuntimeClass", "Pod %s/%s is using Runtime Class %s is forbidden for the current Tenant", pod.Namespace, pod.Name, runtimeClassName)
+		recorder.Eventf(tnt, pod, corev1.EventTypeWarning, evt.ReasonForbiddenRuntimeClass, evt.ActionValidationDenied, "Pod %s/%s is using Runtime Class %s is forbidden for the current Tenant", pod.Namespace, pod.Name, runtimeClassName)
 
 		response := admission.Denied(NewPodRuntimeClassForbidden(runtimeClassName, *allowed).Error())
 

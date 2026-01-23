@@ -27,6 +27,7 @@ import (
 	"github.com/projectcapsule/capsule/internal/metrics"
 	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
+	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 )
 
 type resourceClaimController struct {
@@ -288,8 +289,8 @@ func updateStatusAndEmitEvent(
 		nil,
 		eventType,
 		claim.Status.Condition.Reason,
+		evt.ActionReconciled,
 		claim.Status.Condition.Message,
-		"",
 	)
 
 	return err

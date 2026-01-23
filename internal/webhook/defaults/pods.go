@@ -10,7 +10,6 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	schedulev1 "k8s.io/api/scheduling/v1"
-	"k8s.io/client-go/tools/events"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -20,7 +19,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/utils/tenant"
 )
 
-func mutatePodDefaults(ctx context.Context, req admission.Request, c client.Client, decoder admission.Decoder, recorder events.EventRecorder, namespace string) *admission.Response {
+func mutatePodDefaults(ctx context.Context, req admission.Request, c client.Client, decoder admission.Decoder, namespace string) *admission.Response {
 	var pod corev1.Pod
 	if err := decoder.Decode(req, &pod); err != nil {
 		return utils.ErroredResponse(err)
@@ -40,23 +39,9 @@ func mutatePodDefaults(ctx context.Context, req admission.Request, c client.Clie
 	pcMutated, pcErr := handlePriorityClassDefault(ctx, c, tnt.Spec.PriorityClasses, &pod)
 	if pcErr != nil {
 		return utils.ErroredResponse(pcErr)
-	} else if pcMutated {
-		defer func() {
-			if err == nil {
-				recorder.Eventf(tnt, &pod, corev1.EventTypeNormal, "TenantDefault", "Assigned Tenant default Priority Class %s to %s/%s", tnt.Spec.PriorityClasses.Default, pod.Namespace, pod.Name)
-			}
-		}()
 	}
 
 	rcMutated := handleRuntimeClassDefault(tnt.Spec.RuntimeClasses, &pod)
-	if rcMutated {
-		defer func() {
-			if err == nil {
-				recorder.Eventf(tnt, &pod, corev1.EventTypeNormal, "TenantDefault", "Assigned Tenant default Runtime Class %s to %s/%s", tnt.Spec.RuntimeClasses.Default, pod.Namespace, pod.Name)
-			}
-		}()
-	}
-
 	if !rcMutated && !pcMutated {
 		return nil
 	}

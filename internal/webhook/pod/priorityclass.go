@@ -15,6 +15,7 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	capsulewebhook "github.com/projectcapsule/capsule/internal/webhook"
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
+	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 )
 
 type priorityClass struct{}
@@ -68,7 +69,7 @@ func (h *priorityClass) OnCreate(
 		case allowed.Match(priorityClassName) || selector:
 			return nil
 		default:
-			recorder.Eventf(tnt, pod, corev1.EventTypeWarning, "ForbiddenPriorityClass", "Pod %s/%s is using Priority Class %s is forbidden for the current Tenant", pod.Namespace, pod.Name, priorityClassName)
+			recorder.Eventf(tnt, pod, corev1.EventTypeWarning, evt.ReasonForbiddenPriorityClass, evt.ActionValidationDenied, "Pod %s/%s is using Priority Class %s is forbidden for the current Tenant", pod.Namespace, pod.Name, priorityClassName)
 
 			response := admission.Denied(NewPodPriorityClassForbidden(priorityClassName, *allowed).Error())
 

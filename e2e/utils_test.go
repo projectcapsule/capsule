@@ -73,7 +73,6 @@ func NewNamespace(name string, labels ...map[string]string) *corev1.Namespace {
 	}
 
 	namespaceLabels := make(map[string]string)
-	namespaceLabels["env"] = "e2e"
 
 	if len(labels) > 0 {
 		for _, lab := range labels {
@@ -82,6 +81,8 @@ func NewNamespace(name string, labels ...map[string]string) *corev1.Namespace {
 			}
 		}
 	}
+
+	namespaceLabels["env"] = "e2e"
 
 	return &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{

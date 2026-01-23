@@ -21,6 +21,7 @@ import (
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/configuration"
+	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/utils/tenant"
 )
 
@@ -165,12 +166,12 @@ func assignToTenant(
 	}
 
 	if err := controllerutil.SetOwnerReference(tnt, ns, c.Scheme()); err != nil {
-		recorder.Eventf(tnt, ns, corev1.EventTypeWarning, "Error", "Namespace %s cannot be assigned to the desired Tenant", ns.GetName())
+		recorder.Eventf(tnt, ns, corev1.EventTypeWarning, evt.ReasonNamespaceHijack, evt.ActionValidationDenied, "Namespace %s cannot be assigned to the desired Tenant", ns.GetName())
 
 		return err
 	}
 
-	recorder.Eventf(tnt, ns, corev1.EventTypeNormal, "NamespaceCreationWebhook", "Namespace %s has been assigned to the desired Tenant", ns.GetName())
+	recorder.Eventf(tnt, ns, corev1.EventTypeNormal, evt.ReasonTenantAssigned, evt.ActionValidationDenied, "Namespace %s has been assigned to the desired Tenant", ns.GetName())
 
 	return nil
 }

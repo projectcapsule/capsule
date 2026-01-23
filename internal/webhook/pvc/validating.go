@@ -16,6 +16,7 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	capsulewebhook "github.com/projectcapsule/capsule/internal/webhook"
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
+	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 )
 
 type validating struct{}
@@ -41,7 +42,7 @@ func (h *validating) OnCreate(
 		storageClass := pvc.Spec.StorageClassName
 
 		if storageClass == nil {
-			recorder.Eventf(tnt, pvc, corev1.EventTypeWarning, "MissingStorageClass", "PersistentVolumeClaim %s/%s is missing StorageClass", req.Namespace, req.Name)
+			recorder.Eventf(tnt, pvc, corev1.EventTypeWarning, evt.ReasonMissingStorageClass, evt.ActionValidationDenied, "PersistentVolumeClaim %s/%s is missing StorageClass", req.Namespace, req.Name)
 
 			response := admission.Denied(NewStorageClassNotValid(*tnt.Spec.StorageClasses).Error())
 
@@ -71,7 +72,7 @@ func (h *validating) OnCreate(
 		case allowed.Match(*storageClass) || selector:
 			return nil
 		default:
-			recorder.Eventf(tnt, pvc, corev1.EventTypeWarning, "ForbiddenStorageClass", "PersistentVolumeClaim %s/%s StorageClass %s is forbidden for the current Tenant", req.Namespace, req.Name, *storageClass)
+			recorder.Eventf(tnt, pvc, corev1.EventTypeWarning, evt.ReasonForbiddenStorageClass, evt.ActionValidationDenied, "PersistentVolumeClaim %s/%s StorageClass %s is forbidden for the current Tenant", req.Namespace, req.Name, *storageClass)
 
 			response := admission.Denied(NewStorageClassForbidden(*pvc.Spec.StorageClassName, *tnt.Spec.StorageClasses).Error())
 

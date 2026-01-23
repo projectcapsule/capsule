@@ -18,6 +18,7 @@ import (
 	capsulewebhook "github.com/projectcapsule/capsule/internal/webhook"
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
 	"github.com/projectcapsule/capsule/pkg/configuration"
+	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 )
 
 type class struct {
@@ -83,7 +84,7 @@ func (r *class) validate(
 	ingressClass := ingress.IngressClass()
 
 	if ingressClass == nil {
-		recorder.Eventf(tnt, nil, corev1.EventTypeWarning, "MissingIngressClass", "Ingress %s/%s is missing IngressClass", req.Namespace, req.Name)
+		recorder.Eventf(tnt, nil, corev1.EventTypeWarning, evt.ReasonMissingIngressClass, evt.ActionValidationDenied, "Ingress %s/%s is missing IngressClass", req.Namespace, req.Name)
 
 		response := admission.Denied(NewIngressClassUndefined(*allowed).Error())
 
@@ -113,7 +114,7 @@ func (r *class) validate(
 	case allowed.Match(*ingressClass) || selector:
 		return nil
 	default:
-		recorder.Eventf(tnt, nil, corev1.EventTypeWarning, "ForbiddenIngressClass", "Ingress %s/%s IngressClass %s is forbidden for the current Tenant", req.Namespace, req.Name, &ingressClass)
+		recorder.Eventf(tnt, nil, corev1.EventTypeWarning, evt.ReasonForbiddenIngressClass, evt.ActionValidationDenied, "Ingress %s/%s IngressClass %s is forbidden for the current Tenant", req.Namespace, req.Name, &ingressClass)
 
 		response := admission.Denied(NewIngressClassForbidden(*ingressClass, *allowed).Error())
 

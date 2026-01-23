@@ -28,9 +28,9 @@ func Handler(cfg configuration.Configuration, version *version.Version) capsulew
 	}
 }
 
-func (h *handler) OnCreate(client client.Client, decoder admission.Decoder, recorder events.EventRecorder) capsulewebhook.Func {
+func (h *handler) OnCreate(client client.Client, decoder admission.Decoder, _ events.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		return h.mutate(ctx, req, client, decoder, recorder)
+		return h.mutate(ctx, req, client, decoder)
 	}
 }
 
@@ -40,24 +40,24 @@ func (h *handler) OnDelete(client.Client, admission.Decoder, events.EventRecorde
 	}
 }
 
-func (h *handler) OnUpdate(client client.Client, decoder admission.Decoder, recorder events.EventRecorder) capsulewebhook.Func {
+func (h *handler) OnUpdate(client client.Client, decoder admission.Decoder, _ events.EventRecorder) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		return h.mutate(ctx, req, client, decoder, recorder)
+		return h.mutate(ctx, req, client, decoder)
 	}
 }
 
-func (h *handler) mutate(ctx context.Context, req admission.Request, c client.Client, decoder admission.Decoder, recorder events.EventRecorder) *admission.Response {
+func (h *handler) mutate(ctx context.Context, req admission.Request, c client.Client, decoder admission.Decoder) *admission.Response {
 	var response *admission.Response
 
 	switch req.Resource {
 	case metav1.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}:
-		response = mutatePodDefaults(ctx, req, c, decoder, recorder, req.Namespace)
+		response = mutatePodDefaults(ctx, req, c, decoder, req.Namespace)
 	case metav1.GroupVersionResource{Group: "", Version: "v1", Resource: "persistentvolumeclaims"}:
-		response = mutatePVCDefaults(ctx, req, c, decoder, recorder, req.Namespace)
+		response = mutatePVCDefaults(ctx, req, c, decoder, req.Namespace)
 	case metav1.GroupVersionResource{Group: "networking.k8s.io", Version: "v1", Resource: "ingresses"}, metav1.GroupVersionResource{Group: "networking.k8s.io", Version: "v1beta1", Resource: "ingresses"}:
-		response = mutateIngressDefaults(ctx, req, h.version, c, decoder, recorder, req.Namespace)
+		response = mutateIngressDefaults(ctx, req, h.version, c, decoder, req.Namespace)
 	case metav1.GroupVersionResource{Group: "gateway.networking.k8s.io", Version: "v1", Resource: "gateways"}:
-		response = mutateGatewayDefaults(ctx, req, c, decoder, recorder, req.Namespace)
+		response = mutateGatewayDefaults(ctx, req, c, decoder, req.Namespace)
 	}
 
 	if response == nil {

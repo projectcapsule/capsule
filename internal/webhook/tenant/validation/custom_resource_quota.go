@@ -18,6 +18,7 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	capsulewebhook "github.com/projectcapsule/capsule/internal/webhook"
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
+	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/utils/tenant"
 )
 
@@ -74,7 +75,7 @@ func (r *resourceCounterHandler) OnCreate(clt client.Client, _ admission.Decoder
 		})
 		if err != nil {
 			if errors.As(err, &customResourceQuotaError{}) {
-				recorder.Eventf(tnt, nil, corev1.EventTypeWarning, "ResourceQuota", "Resource %s/%s in API group %s cannot be created, limit usage of %d has been reached", req.Namespace, req.Name, kgv, limit)
+				recorder.Eventf(tnt, nil, corev1.EventTypeWarning, evt.ReasonOverprovision, evt.ActionValidationDenied, "Resource %s/%s in API group %s cannot be created, limit usage of %d has been reached", req.Namespace, req.Name, kgv, limit)
 			}
 
 			return utils.ErroredResponse(err)

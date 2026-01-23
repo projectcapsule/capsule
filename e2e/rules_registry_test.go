@@ -7,10 +7,12 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -67,7 +69,7 @@ var _ = Describe("enforcing a Container Registry", Label("tenant", "rules", "ima
 				{
 					NamespaceSelector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{
-							"env": "prod",
+							"environment": "prod",
 						},
 					},
 					NamespaceRuleBody: capsulev1beta2.NamespaceRuleBody{
@@ -111,10 +113,25 @@ var _ = Describe("enforcing a Container Registry", Label("tenant", "rules", "ima
 	}
 
 	createPodAndExpectDenied := func(cs kubernetes.Interface, nsName string, pod *corev1.Pod, substrings ...string) {
+		base := pod.DeepCopy()
+		baseName := base.Name
+		if baseName == "" {
+			baseName = "pod"
+		}
+
 		Eventually(func() error {
-			_, err := cs.CoreV1().Pods(nsName).Create(context.Background(), pod, metav1.CreateOptions{})
+			// unique name per attempt to avoid AlreadyExists
+			p := base.DeepCopy()
+			p.Name = fmt.Sprintf("%s-%d", baseName, int(time.Now().UnixNano()%1e6))
+
+			_, err := cs.CoreV1().Pods(nsName).Create(context.Background(), p, metav1.CreateOptions{})
 			if err == nil {
+				_ = cs.CoreV1().Pods(nsName).Delete(context.Background(), p.Name, metav1.DeleteOptions{})
 				return fmt.Errorf("expected create to be denied, but it succeeded")
+			}
+
+			if apierrors.IsAlreadyExists(err) {
+				return fmt.Errorf("unexpected AlreadyExists: %v", err)
 			}
 
 			msg := err.Error()
@@ -183,8 +200,9 @@ var _ = Describe("enforcing a Container Registry", Label("tenant", "rules", "ima
 	})
 
 	It("aggregates enforcement rules into NamespaceStatus for a prod namespace", func() {
-		ns := NewNamespace("")
-		ns.Labels = map[string]string{"env": "prod"}
+		ns := NewNamespace("", map[string]string{
+			"environment": "prod",
+		})
 
 		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 
@@ -354,8 +372,9 @@ var _ = Describe("enforcing a Container Registry", Label("tenant", "rules", "ima
 	})
 
 	It("allows prod-specific image only with Always, still enforcing global policy", func() {
-		ns := NewNamespace("")
-		ns.Labels = map[string]string{"env": "prod"}
+		ns := NewNamespace("", map[string]string{
+			"environment": "prod",
+		})
 
 		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 

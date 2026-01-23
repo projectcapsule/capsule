@@ -24,6 +24,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/configuration"
 	"github.com/projectcapsule/capsule/pkg/indexer/ingress"
+	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 )
 
 type collision struct {
@@ -75,7 +76,7 @@ func (r *collision) validate(ctx context.Context, client client.Client, req admi
 
 	var collisionErr *ingressHostnameCollisionError
 	if errors.As(err, &collisionErr) {
-		recorder.Eventf(tenant, nil, corev1.EventTypeWarning, "IngressHostnameCollision", "Ingress %s/%s hostname is colliding", ing.Namespace(), ing.Name())
+		recorder.Eventf(tenant, nil, corev1.EventTypeWarning, evt.ReasonIngressHostnameCollision, evt.ActionValidationDenied, "Ingress %s/%s hostname is colliding", ing.Namespace(), ing.Name())
 	}
 
 	response := admission.Denied(err.Error())

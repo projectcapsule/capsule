@@ -18,6 +18,7 @@ import (
 	capsulewebhook "github.com/projectcapsule/capsule/internal/webhook"
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
 	"github.com/projectcapsule/capsule/pkg/indexer/tenantresource"
+	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/utils/tenant"
 )
 
@@ -76,7 +77,7 @@ func (h *cordoningHandler) handler(ctx context.Context, clt client.Client, req a
 	}
 
 	if len(local.Items) > 0 || len(global.Items) > 0 {
-		recorder.Eventf(tnt, nil, corev1.EventTypeWarning, "TenantResourceWriteOp", "%s %s/%s cannot be %sd, resource is managed by the Tenant", req.Kind.String(), req.Namespace, req.Name, strings.ToLower(string(req.Operation)))
+		recorder.Eventf(tnt, nil, corev1.EventTypeWarning, evt.ReasonTenantResourceWriteOp, evt.ActionValidationDenied, "%s %s/%s cannot be %sd, resource is managed by the Tenant", req.Kind.String(), req.Namespace, req.Name, strings.ToLower(string(req.Operation)))
 
 		response := admission.Denied(fmt.Sprintf("resource %s is managed at the Tenant level", req.Name))
 

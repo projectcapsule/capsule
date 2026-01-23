@@ -17,6 +17,7 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	capsulewebhook "github.com/projectcapsule/capsule/internal/webhook"
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
+	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 )
 
 type wildcard struct{}
@@ -70,7 +71,7 @@ func (h *wildcard) validate(ctx context.Context, clt client.Client, req admissio
 			// Check if one of the host has wildcard.
 			if strings.HasPrefix(host, "*") {
 				// In case of wildcard, generate an event and then return.
-				recorder.Eventf(&tnt, nil, corev1.EventTypeWarning, "Wildcard denied", "%s %s/%s cannot be %s", req.Kind.String(), req.Namespace, req.Name, strings.ToLower(string(req.Operation)))
+				recorder.Eventf(&tnt, nil, corev1.EventTypeWarning, evt.ReasonWildcardDenied, evt.ActionValidationDenied, "%s %s/%s cannot be %s", req.Kind.String(), req.Namespace, req.Name, strings.ToLower(string(req.Operation)))
 
 				response := admission.Denied(fmt.Sprintf("Wildcard denied for tenant %s\n", tnt.GetName()))
 
