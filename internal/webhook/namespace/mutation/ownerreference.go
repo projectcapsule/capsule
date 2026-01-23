@@ -166,12 +166,12 @@ func assignToTenant(
 	}
 
 	if err := controllerutil.SetOwnerReference(tnt, ns, c.Scheme()); err != nil {
-		recorder.Eventf(tnt, ns, corev1.EventTypeWarning, evt.ReasonNamespaceHijack, evt.ActionValidationDenied, "Namespace %s cannot be assigned to the desired Tenant", ns.GetName())
+		recorder.Eventf(ns, tnt, corev1.EventTypeWarning, evt.ReasonNamespaceHijack, evt.ActionValidationDenied, "Namespace %s cannot be assigned to the desired tenant %s", ns.GetName(), tnt.GetName())
 
 		return err
 	}
 
-	recorder.Eventf(tnt, ns, corev1.EventTypeNormal, evt.ReasonTenantAssigned, evt.ActionValidationDenied, "Namespace %s has been assigned to the desired Tenant", ns.GetName())
+	recorder.Eventf(ns, tnt, corev1.EventTypeNormal, evt.ReasonTenantAssigned, evt.ActionValidationDenied, "Namespace %s has been assigned to the desired tenant %s", ns.GetName(), tnt.GetName())
 
 	return nil
 }

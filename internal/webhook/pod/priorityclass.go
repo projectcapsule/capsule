@@ -69,7 +69,14 @@ func (h *priorityClass) OnCreate(
 		case allowed.Match(priorityClassName) || selector:
 			return nil
 		default:
-			recorder.Eventf(tnt, pod, corev1.EventTypeWarning, evt.ReasonForbiddenPriorityClass, evt.ActionValidationDenied, "Pod %s/%s is using Priority Class %s is forbidden for the current Tenant", pod.Namespace, pod.Name, priorityClassName)
+			recorder.Eventf(
+				pod,
+				tnt,
+				corev1.EventTypeWarning,
+				evt.ReasonForbiddenPriorityClass,
+				evt.ActionValidationDenied,
+				"Using Priority Class %s is forbidden for the tenant %s", priorityClassName, tnt.GetName(),
+			)
 
 			response := admission.Denied(NewPodPriorityClassForbidden(priorityClassName, *allowed).Error())
 

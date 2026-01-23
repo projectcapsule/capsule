@@ -108,7 +108,14 @@ func (h *containerRegistryLegacyHandler) verifyContainerRegistry(
 	reg := NewRegistry(image, h.configuration)
 
 	if len(reg.Registry()) == 0 {
-		recorder.Eventf(tnt, pod, corev1.EventTypeWarning, evt.ReasonMissingFQCI, evt.ActionValidationDenied, "Pod %s/%s is not using a fully qualified container image, cannot enforce registry the current Tenant", req.Namespace, req.Name, reg.Registry())
+		recorder.Eventf(
+			pod,
+			tnt,
+			corev1.EventTypeWarning,
+			evt.ReasonMissingFQCI,
+			evt.ActionValidationDenied,
+			"Using a fully qualified container image, cannot enforce registry for the tenant %s", reg.Registry(), tnt.GetName(),
+		)
 
 		//nolint:staticcheck
 		response := admission.Denied(NewContainerRegistryForbidden(image, *tnt.Spec.ContainerRegistries).Error())
@@ -123,7 +130,14 @@ func (h *containerRegistryLegacyHandler) verifyContainerRegistry(
 	matched = tnt.Spec.ContainerRegistries.RegexMatch(reg.Registry())
 
 	if !valid && !matched {
-		recorder.Eventf(tnt, pod, corev1.EventTypeWarning, evt.ReasonForbiddenContainerRegistry, evt.ActionValidationDenied, "Pod %s/%s is using a container hosted on registry %s that is forbidden for the current Tenant", req.Namespace, req.Name, reg.Registry())
+		recorder.Eventf(
+			pod,
+			tnt,
+			corev1.EventTypeWarning,
+			evt.ReasonForbiddenContainerRegistry,
+			evt.ActionValidationDenied,
+			"Using a container hosted on registry %s that is forbidden for the tenant %s", reg.Registry(), tnt.GetName(),
+		)
 
 		//nolint:staticcheck
 		response := admission.Denied(NewContainerRegistryForbidden(reg.FQCI(), *tnt.Spec.ContainerRegistries).Error())

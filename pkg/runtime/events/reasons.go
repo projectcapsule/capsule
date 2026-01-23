@@ -20,6 +20,7 @@ const (
 	ReasonTenantDefaulted     string = "TenantDefaulted"
 	ReasonTenantAssigned      string = "TenantAssigned"
 	ReasonInvalidTenantPrefix string = "InvalidTenantPrefix"
+	ReasonPromotionDenied     string = "ReasonPromotionDenied"
 
 	// Classes.
 	ReasonMissingStorageClass    string = "MissingStorageClass"
@@ -49,6 +50,9 @@ const (
 	ReasonForbiddenLoadBalancer      string = "ForbiddenLoadBalancer"
 	ReasonForbiddenExternalName      string = "ForbiddenExternalName"
 	ReasonForbiddenNodePort          string = "ForbiddenNodePort"
+
+	// Storage.
+	ReasonCrossTenantReference string = "CrossTenantReference"
 
 	// ResourcePools.
 	ReasonDisassociated string = "Disassociated"

@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: image-volume
+spec:
+  containers:
+
+  - name: shell
+    command: ["sleep", "infinity"]
+    imagePullPolicy: Never
+    image: harbor/v2/prod-registry/debian
+    volumeMounts:
+    - name: volume
+      mountPath: /volume
+
+  volumes:
+  - name: volume
+    image:
+      reference: quay.io/crio/artifact:v2.3.5
+      pullPolicy: IfNotPresent

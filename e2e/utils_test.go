@@ -407,6 +407,74 @@ func GetKubernetesVersion() *versionUtil.Version {
 	return ver
 }
 
+func GrantEphemeralContainersUpdate(ns string, username string) (cleanup func()) {
+	role := &rbacv1.Role{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "e2e-ephemeralcontainers",
+			Namespace: ns,
+		},
+		Rules: []rbacv1.PolicyRule{
+			{
+				APIGroups: []string{""},
+				Resources: []string{"pods/ephemeralcontainers"},
+				Verbs:     []string{"update", "patch"},
+			},
+			// Optional but often useful for the test flow:
+			{
+				APIGroups: []string{""},
+				Resources: []string{"pods"},
+				Verbs:     []string{"get", "list", "watch"},
+			},
+		},
+	}
+
+	rb := &rbacv1.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "e2e-ephemeralcontainers",
+			Namespace: ns,
+		},
+		Subjects: []rbacv1.Subject{
+			{
+				Kind:     rbacv1.UserKind,
+				Name:     username,
+				APIGroup: rbacv1.GroupName,
+			},
+		},
+		RoleRef: rbacv1.RoleRef{
+			APIGroup: rbacv1.GroupName,
+			Kind:     "Role",
+			Name:     role.Name,
+		},
+	}
+
+	// Create-or-update (simple)
+	EventuallyCreation(func() error {
+		_ = k8sClient.Delete(context.Background(), rb)
+		_ = k8sClient.Delete(context.Background(), role)
+
+		if err := k8sClient.Create(context.Background(), role); err != nil && !apierrors.IsAlreadyExists(err) {
+			return err
+		}
+		if err := k8sClient.Create(context.Background(), rb); err != nil && !apierrors.IsAlreadyExists(err) {
+			return err
+		}
+		return nil
+	}).Should(Succeed())
+
+	// Give RBAC a moment to propagate in the apiserver authorizer cache
+	Eventually(func() error {
+		cs := ownerClient(api.UserSpec{Name: username, Kind: "User"})
+		_, err := cs.CoreV1().Pods(ns).List(context.Background(), metav1.ListOptions{Limit: 1})
+		return err
+	}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+
+	return func() {
+		// Best-effort cleanup
+		_ = k8sClient.Delete(context.Background(), rb)
+		_ = k8sClient.Delete(context.Background(), role)
+	}
+}
+
 func DeepCompare(expected, actual interface{}) (bool, string) {
 	expVal := reflect.ValueOf(expected)
 	actVal := reflect.ValueOf(actual)

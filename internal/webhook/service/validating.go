@@ -70,7 +70,14 @@ func (h *validating) handle(
 	tnt *capsulev1beta2.Tenant,
 ) *admission.Response {
 	if svc.Spec.Type == corev1.ServiceTypeNodePort && tnt.Spec.ServiceOptions != nil && tnt.Spec.ServiceOptions.AllowedServices != nil && !*tnt.Spec.ServiceOptions.AllowedServices.NodePort {
-		recorder.Eventf(tnt, svc, corev1.EventTypeWarning, evt.ReasonForbiddenNodePort, evt.ActionValidationDenied, "Service %s/%s cannot be type of NodePort for the current Tenant", req.Namespace, req.Name)
+		recorder.Eventf(
+			svc,
+			tnt,
+			corev1.EventTypeWarning,
+			evt.ReasonForbiddenNodePort,
+			evt.ActionValidationDenied,
+			"Cannot be type of NodePort for the Tenant %s", tnt.GetName(),
+		)
 
 		response := admission.Denied(NewNodePortDisabledError().Error())
 
@@ -78,7 +85,14 @@ func (h *validating) handle(
 	}
 
 	if svc.Spec.Type == corev1.ServiceTypeExternalName && tnt.Spec.ServiceOptions != nil && tnt.Spec.ServiceOptions.AllowedServices != nil && !*tnt.Spec.ServiceOptions.AllowedServices.ExternalName {
-		recorder.Eventf(tnt, svc, corev1.EventTypeWarning, evt.ReasonForbiddenExternalName, evt.ActionValidationDenied, "Service %s/%s cannot be type of ExternalName for the current Tenant", req.Namespace, req.Name)
+		recorder.Eventf(
+			svc,
+			tnt,
+			corev1.EventTypeWarning,
+			evt.ReasonForbiddenExternalName,
+			evt.ActionValidationDenied,
+			"Cannot be type of ExternalName for the Tenant %s", tnt.GetName(),
+		)
 
 		response := admission.Denied(NewExternalNameDisabledError().Error())
 
@@ -86,7 +100,14 @@ func (h *validating) handle(
 	}
 
 	if svc.Spec.Type == corev1.ServiceTypeLoadBalancer && tnt.Spec.ServiceOptions != nil && tnt.Spec.ServiceOptions.AllowedServices != nil && !*tnt.Spec.ServiceOptions.AllowedServices.LoadBalancer {
-		recorder.Eventf(tnt, svc, corev1.EventTypeWarning, evt.ReasonForbiddenLoadBalancer, evt.ActionValidationDenied, "Service %s/%s cannot be type of LoadBalancer for the current Tenant", req.Namespace, req.Name)
+		recorder.Eventf(
+			tnt,
+			svc,
+			corev1.EventTypeWarning,
+			evt.ReasonForbiddenLoadBalancer,
+			evt.ActionValidationDenied,
+			"Cannot be type of LoadBalancer for the Tenant %s", tnt.GetName(),
+		)
 
 		response := admission.Denied(NewLoadBalancerDisabled().Error())
 
@@ -96,8 +117,17 @@ func (h *validating) handle(
 	if tnt.Spec.ServiceOptions != nil {
 		err := api.ValidateForbidden(svc.Annotations, tnt.Spec.ServiceOptions.ForbiddenAnnotations)
 		if err != nil {
-			err = errors.Wrap(err, "service annotations validation failed")
-			recorder.Eventf(tnt, svc, corev1.EventTypeWarning, evt.ReasonForbiddenAnnotation, evt.ActionValidationDenied, err.Error())
+			err = errors.Wrap(err, "annotations validation failed")
+
+			recorder.Eventf(
+				svc,
+				tnt,
+				corev1.EventTypeWarning,
+				evt.ReasonForbiddenAnnotation,
+				evt.ActionValidationDenied,
+				err.Error(),
+			)
+
 			response := admission.Denied(err.Error())
 
 			return &response
@@ -105,8 +135,17 @@ func (h *validating) handle(
 
 		err = api.ValidateForbidden(svc.Labels, tnt.Spec.ServiceOptions.ForbiddenLabels)
 		if err != nil {
-			err = errors.Wrap(err, "service labels validation failed")
-			recorder.Eventf(tnt, svc, corev1.EventTypeWarning, evt.ReasonForbiddenLabel, evt.ActionValidationDenied, err.Error())
+			err = errors.Wrap(err, "labels validation failed")
+
+			recorder.Eventf(
+				svc,
+				tnt,
+				corev1.EventTypeWarning,
+				evt.ReasonForbiddenLabel,
+				evt.ActionValidationDenied,
+				err.Error(),
+			)
+
 			response := admission.Denied(err.Error())
 
 			return &response
@@ -137,7 +176,14 @@ func (h *validating) handle(
 		ip := net.ParseIP(externalIP)
 
 		if !ipInCIDR(ip) {
-			recorder.Eventf(tnt, svc, corev1.EventTypeWarning, evt.ReasonForbiddenExternalServiceIP, evt.ActionValidationDenied, "Service %s/%s external IP %s is forbidden for the current Tenant", req.Namespace, req.Name, ip.String())
+			recorder.Eventf(
+				svc,
+				tnt,
+				corev1.EventTypeWarning,
+				evt.ReasonForbiddenExternalServiceIP,
+				evt.ActionValidationDenied,
+				"External IP %s is forbidden for the Tenant %s", ip.String(), tnt.GetName(),
+			)
 
 			response := admission.Denied(NewExternalServiceIPForbidden(tnt.Spec.ServiceOptions.ExternalServiceIPs.Allowed).Error())
 

@@ -101,7 +101,14 @@ func (h *imagePullPolicy) verifyPullPolicy(
 	tnt *capsulev1beta2.Tenant,
 ) *admission.Response {
 	if !policy.IsPolicySupported(usedPullPolicy) {
-		recorder.Eventf(tnt, pod, corev1.EventTypeWarning, evt.ReasonForbiddenPullPolicy, evt.ActionValidationDenied, "Pod %s/%s pull policy %s is forbidden for the current Tenant", req.Namespace, req.Name, usedPullPolicy)
+		recorder.Eventf(
+			pod,
+			tnt,
+			corev1.EventTypeWarning,
+			evt.ReasonForbiddenPullPolicy,
+			evt.ActionValidationDenied,
+			"PullPolicy %s is forbidden for the tenant %s", usedPullPolicy, tnt.GetName(),
+		)
 
 		response := admission.Denied(NewImagePullPolicyForbidden(usedPullPolicy, container, policy.AllowedPullPolicies()).Error())
 

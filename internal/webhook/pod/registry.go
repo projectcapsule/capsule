@@ -19,6 +19,7 @@ import (
 	capsulewebhook "github.com/projectcapsule/capsule/internal/webhook"
 	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/configuration"
+	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 )
 
 type registryHandler struct {
@@ -107,21 +108,21 @@ func (h *registryHandler) validateContainers(
 ) *admission.Response {
 	for i := range pod.Spec.InitContainers {
 		c := pod.Spec.InitContainers[i]
-		if resp := h.verifyOCIReference(recorder, req, tnt, rs, api.ValidateImages, c.Image, c.ImagePullPolicy, fmt.Sprintf("initContainers[%d]", i)); resp != nil {
+		if resp := h.verifyOCIReference(recorder, req, tnt, pod, rs, api.ValidateImages, c.Image, c.ImagePullPolicy, fmt.Sprintf("initContainers[%d]", i)); resp != nil {
 			return resp
 		}
 	}
 
 	for i := range pod.Spec.EphemeralContainers {
 		c := pod.Spec.EphemeralContainers[i]
-		if resp := h.verifyOCIReference(recorder, req, tnt, rs, api.ValidateImages, c.Image, c.ImagePullPolicy, fmt.Sprintf("ephemeralContainers[%d]", i)); resp != nil {
+		if resp := h.verifyOCIReference(recorder, req, tnt, pod, rs, api.ValidateImages, c.Image, c.ImagePullPolicy, fmt.Sprintf("ephemeralContainers[%d]", i)); resp != nil {
 			return resp
 		}
 	}
 
 	for i := range pod.Spec.Containers {
 		c := pod.Spec.Containers[i]
-		if resp := h.verifyOCIReference(recorder, req, tnt, rs, api.ValidateImages, c.Image, c.ImagePullPolicy, fmt.Sprintf("containers[%d]", i)); resp != nil {
+		if resp := h.verifyOCIReference(recorder, req, tnt, pod, rs, api.ValidateImages, c.Image, c.ImagePullPolicy, fmt.Sprintf("containers[%d]", i)); resp != nil {
 			return resp
 		}
 	}
@@ -150,7 +151,7 @@ func (h *registryHandler) validateVolumes(
 		}
 
 		if resp := h.verifyOCIReference(
-			recorder, req, tnt,
+			recorder, req, tnt, pod,
 			rs, api.ValidateVolumes,
 			ref, v.Image.PullPolicy,
 			fmt.Sprintf("volumes[%d](%s)", i, v.Name),
@@ -207,6 +208,7 @@ func (h *registryHandler) verifyOCIReference(
 	recorder events.EventRecorder,
 	req admission.Request,
 	tnt *capsulev1beta2.Tenant,
+	pod *corev1.Pod,
 	rs *cache.RuleSet,
 	target api.RegistryValidationTarget,
 	reference string,
@@ -215,7 +217,18 @@ func (h *registryHandler) verifyOCIReference(
 ) *admission.Response {
 	ref := strings.TrimSpace(reference)
 	if ref == "" {
-		resp := admission.Denied(fmt.Sprintf("%s has empty reference", where))
+		msg := fmt.Sprintf("%s has empty reference", where)
+
+		resp := admission.Denied(msg)
+
+		recorder.Eventf(
+			pod,
+			tnt,
+			corev1.EventTypeWarning,
+			evt.ReasonForbiddenContainerRegistry,
+			evt.ActionValidationDenied,
+			msg,
+		)
 
 		return &resp
 	}
@@ -224,7 +237,18 @@ func (h *registryHandler) verifyOCIReference(
 	// This avoids relying on parsing logic and supports nested paths, digests, etc.
 	cfg := resolveRegistryConfig(rs.Compiled, ref, target)
 	if !cfg.allowed {
-		resp := admission.Denied(fmt.Sprintf("%s reference %q is not allowed", where, ref))
+		msg := fmt.Sprintf("%s reference %q is not allowed", where, ref)
+
+		resp := admission.Denied(msg)
+
+		recorder.Eventf(
+			pod,
+			tnt,
+			corev1.EventTypeWarning,
+			evt.ReasonForbiddenContainerRegistry,
+			evt.ActionValidationDenied,
+			msg,
+		)
 
 		return &resp
 	}
@@ -234,19 +258,41 @@ func (h *registryHandler) verifyOCIReference(
 		allowed := formatAllowedPullPolicies(cfg.allowedPolicy)
 
 		if pullPolicy == "" {
-			resp := admission.Denied(fmt.Sprintf(
+			msg := fmt.Sprintf(
 				"%s reference %q must explicitly set pullPolicy (allowed: %s)",
 				where, ref, allowed,
-			))
+			)
+
+			resp := admission.Denied(msg)
+
+			recorder.Eventf(
+				pod,
+				tnt,
+				corev1.EventTypeWarning,
+				evt.ReasonForbiddenPullPolicy,
+				evt.ActionValidationDenied,
+				msg,
+			)
 
 			return &resp
 		}
 
 		if _, ok := cfg.allowedPolicy[pullPolicy]; !ok {
-			resp := admission.Denied(fmt.Sprintf(
+			msg := fmt.Sprintf(
 				"%s reference %q uses pullPolicy=%s which is not allowed (allowed: %s)",
 				where, ref, pullPolicy, allowed,
-			))
+			)
+
+			resp := admission.Denied(msg)
+
+			recorder.Eventf(
+				pod,
+				tnt,
+				corev1.EventTypeWarning,
+				evt.ReasonForbiddenPullPolicy,
+				evt.ActionValidationDenied,
+				msg,
+			)
 
 			return &resp
 		}

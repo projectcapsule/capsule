@@ -5,6 +5,7 @@ package serviceaccounts
 
 import (
 	"context"
+	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/events"
@@ -15,6 +16,7 @@ import (
 	capsulewebhook "github.com/projectcapsule/capsule/internal/webhook"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/configuration"
+	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/utils/users"
 )
 
@@ -34,7 +36,7 @@ func (h *validating) OnCreate(
 	tnt *capsulev1beta2.Tenant,
 ) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		return h.handle(ctx, c, req, sa, tnt)
+		return h.handle(ctx, c, req, recorder, sa, tnt)
 	}
 }
 
@@ -47,7 +49,7 @@ func (h *validating) OnUpdate(
 	tnt *capsulev1beta2.Tenant,
 ) capsulewebhook.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		return h.handle(ctx, c, req, sa, tnt)
+		return h.handle(ctx, c, req, recorder, sa, tnt)
 	}
 }
 
@@ -67,6 +69,7 @@ func (h *validating) handle(
 	ctx context.Context,
 	c client.Client,
 	req admission.Request,
+	recorder events.EventRecorder,
 	sa *corev1.ServiceAccount,
 	tnt *capsulev1beta2.Tenant,
 ) *admission.Response {
@@ -88,9 +91,18 @@ func (h *validating) handle(
 		return nil
 	}
 
-	response := admission.Denied(
-		"not permitted to promote serviceaccounts as owners",
+	msg := fmt.Sprintf("%s not allowed to promote serviceaccount to tenant owner", req.UserInfo.Username)
+
+	recorder.Eventf(
+		sa,
+		tnt,
+		corev1.EventTypeWarning,
+		evt.ReasonPromotionDenied,
+		evt.ActionValidationDenied,
+		msg,
 	)
+
+	response := admission.Denied(msg)
 
 	return &response
 }

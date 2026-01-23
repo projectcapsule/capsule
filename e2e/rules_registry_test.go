@@ -406,4 +406,120 @@ var _ = Describe("enforcing a Container Registry", Label("tenant", "rules", "ima
 		}
 		createPodAndExpectAllowed(cs, ns.Name, good)
 	})
+
+	It("denies adding an ephemeral container with wrong pullPolicy on UPDATE", func() {
+		ns := NewNamespace("")
+		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
+
+		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
+		expectNamespaceStatusRegistries(ns.GetName(), []string{".*", "harbor/.*"})
+
+		cleanupRBAC := GrantEphemeralContainersUpdate(ns.Name, tnt.Spec.Owners[0].UserSpec.Name)
+		defer cleanupRBAC()
+
+		// Create an allowed pod
+		pod := &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: "base"},
+			Spec: corev1.PodSpec{
+				Containers: []corev1.Container{
+					{Name: "c", Image: "harbor/some-team/app:1", ImagePullPolicy: corev1.PullAlways},
+				},
+			},
+		}
+		createPodAndExpectAllowed(cs, ns.Name, pod)
+
+		// Now attempt to add an ephemeral container with IfNotPresent (should be denied)
+		ephem := corev1.EphemeralContainer{
+			EphemeralContainerCommon: corev1.EphemeralContainerCommon{
+				Name:            "debug",
+				Image:           "harbor/some-team/debug:1",
+				ImagePullPolicy: corev1.PullIfNotPresent,
+			},
+		}
+
+		Eventually(func() error {
+			// Must use the ephemeralcontainers subresource
+			cur, err := cs.CoreV1().Pods(ns.Name).Get(context.Background(), pod.Name, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+
+			cur.Spec.EphemeralContainers = append(cur.Spec.EphemeralContainers, ephem)
+
+			_, err = cs.CoreV1().Pods(ns.Name).UpdateEphemeralContainers(
+				context.Background(),
+				cur.Name,
+				cur,
+				metav1.UpdateOptions{},
+			)
+			if err == nil {
+				return fmt.Errorf("expected UpdateEphemeralContainers to be denied, but it succeeded")
+			}
+
+			msg := err.Error()
+			// Your webhook reports "ephemeralContainers[0]" location
+			if !strings.Contains(msg, "ephemeralContainers") || !strings.Contains(msg, "pullPolicy=IfNotPresent") {
+				return fmt.Errorf("unexpected error: %v", err)
+			}
+			return nil
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+	})
+
+	It("denies a pod when volume image reference changes to a disallowed pullPolicy (recreate)", func() {
+		ns := NewNamespace("")
+		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
+
+		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
+		expectNamespaceStatusRegistries(ns.GetName(), []string{".*", "harbor/.*"})
+
+		pod1 := &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: "vol-ok"},
+			Spec: corev1.PodSpec{
+				Containers: []corev1.Container{
+					{Name: "c", Image: "harbor/some-team/app:1", ImagePullPolicy: corev1.PullAlways},
+				},
+				Volumes: []corev1.Volume{
+					{
+						Name: "imgvol",
+						VolumeSource: corev1.VolumeSource{
+							Image: &corev1.ImageVolumeSource{
+								Reference:  "harbor/some-team/volimg:1",
+								PullPolicy: corev1.PullAlways,
+							},
+						},
+					},
+				},
+			},
+		}
+		createPodAndExpectAllowed(cs, ns.Name, pod1)
+
+		pod2 := &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: "vol-bad"},
+			Spec: corev1.PodSpec{
+				Containers: []corev1.Container{
+					{Name: "c", Image: "harbor/some-team/app:1", ImagePullPolicy: corev1.PullAlways},
+				},
+				Volumes: []corev1.Volume{
+					{
+						Name: "imgvol",
+						VolumeSource: corev1.VolumeSource{
+							Image: &corev1.ImageVolumeSource{
+								Reference:  "harbor/some-team/volimg:2",
+								PullPolicy: corev1.PullIfNotPresent,
+							},
+						},
+					},
+				},
+			},
+		}
+
+		createPodAndExpectDenied(cs, ns.Name, pod2,
+			"volumes[0](imgvol)",
+			"pullPolicy=IfNotPresent",
+			"allowed:",
+		)
+	})
+
 })
