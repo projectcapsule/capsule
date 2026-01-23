@@ -316,7 +316,7 @@ e2e-build: kind
 	$(MAKE) e2e-install
 
 .PHONY: e2e-install
-e2e-install: ko-build-all
+e2e-install: helm-controller-version ko-build-all
 	$(MAKE) e2e-load-image CLUSTER_NAME=$(CLUSTER_NAME) IMAGE=$(CAPSULE_IMG) VERSION=$(VERSION)
 	$(HELM) upgrade \
 	    --dependency-update \
@@ -327,7 +327,7 @@ e2e-install: ko-build-all
 		--set 'replicaCount=2'\
 		--set 'manager.image.pullPolicy=Never' \
 		--set 'manager.resources=null'\
-		--set "manager.image.tag='$(VERSION)'" \
+		--set "manager.image.tag=$(VERSION)" \
 		--set 'manager.livenessProbe.failureThreshold=10' \
 		--set 'webhooks.hooks.nodes.enabled=true' \
 		--set "webhooks.exclusive=true"\
