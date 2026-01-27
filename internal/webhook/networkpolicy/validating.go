@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Project Capsule Authors
+// Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package networkpolicy
@@ -8,28 +8,28 @@ import (
 
 	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	capsulewebhook "github.com/projectcapsule/capsule/internal/webhook"
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
+	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 	capsuleutils "github.com/projectcapsule/capsule/pkg/utils"
 )
 
 type handler struct{}
 
-func Handler() capsulewebhook.Handler {
+func Handler() handlers.Handler {
 	return &handler{}
 }
 
-func (r *handler) OnCreate(client.Client, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
+func (r *handler) OnCreate(client.Client, admission.Decoder, events.EventRecorder) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (r *handler) OnDelete(client client.Client, decoder admission.Decoder, _ record.EventRecorder) capsulewebhook.Func {
+func (r *handler) OnDelete(client client.Client, decoder admission.Decoder, _ events.EventRecorder) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		allowed, err := r.handle(ctx, req, client, decoder)
 		if err != nil {
@@ -46,7 +46,7 @@ func (r *handler) OnDelete(client client.Client, decoder admission.Decoder, _ re
 	}
 }
 
-func (r *handler) OnUpdate(client client.Client, decoder admission.Decoder, _ record.EventRecorder) capsulewebhook.Func {
+func (r *handler) OnUpdate(client client.Client, decoder admission.Decoder, _ events.EventRecorder) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		allowed, err := r.handle(ctx, req, client, decoder)
 		if err != nil {

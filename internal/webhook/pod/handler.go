@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Project Capsule Authors
+// Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package pod
@@ -6,15 +6,14 @@ package pod
 import (
 	corev1 "k8s.io/api/core/v1"
 
-	"github.com/projectcapsule/capsule/internal/webhook"
-	"github.com/projectcapsule/capsule/internal/webhook/utils"
+	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
 
-func Handler(handlers ...webhook.TypedHandlerWithTenant[*corev1.Pod]) webhook.Handler {
-	return &utils.TypedTenantHandler[*corev1.Pod]{
+func Handler(handler ...handlers.TypedHandlerWithTenantWithRuleset[*corev1.Pod]) handlers.Handler {
+	return &handlers.TypedTenantWithRulesetHandler[*corev1.Pod]{
 		Factory: func() *corev1.Pod {
 			return &corev1.Pod{}
 		},
-		Handlers: handlers,
+		Handlers: handler,
 	}
 }

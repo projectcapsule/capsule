@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Project Capsule Authors
+// Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package defaults
@@ -8,18 +8,17 @@ import (
 	"encoding/json"
 	"net/http"
 
-	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	capsulegateway "github.com/projectcapsule/capsule/internal/webhook/gateway"
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
+	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
 )
 
-func mutateGatewayDefaults(ctx context.Context, req admission.Request, c client.Client, decoder admission.Decoder, recorder record.EventRecorder, namespce string) *admission.Response {
+func mutateGatewayDefaults(ctx context.Context, req admission.Request, c client.Client, decoder admission.Decoder, namespce string) *admission.Response {
 	gatewayObj := &gatewayv1.Gateway{}
 	if err := decoder.Decode(req, gatewayObj); err != nil {
 		return utils.ErroredResponse(err)
@@ -50,7 +49,7 @@ func mutateGatewayDefaults(ctx context.Context, req admission.Request, c client.
 		if gatewayObj.Spec.GatewayClassName == ("") {
 			mutate = true
 		} else {
-			response := admission.Denied(NewGatewayError(gatewayObj.Spec.GatewayClassName, err).Error())
+			response := admission.Denied(caperrors.NewGatewayError(gatewayObj.Spec.GatewayClassName, err).Error())
 
 			return &response
 		}
@@ -58,7 +57,7 @@ func mutateGatewayDefaults(ctx context.Context, req admission.Request, c client.
 
 	if gatewayClass != nil && gatewayClass.Name != allowed.Default {
 		if err != nil && !k8serrors.IsNotFound(err) {
-			response := admission.Denied(NewGatewayClassError(gatewayClass.Name, err).Error())
+			response := admission.Denied(caperrors.NewGatewayClassError(gatewayClass.Name, err).Error())
 
 			return &response
 		}
@@ -78,8 +77,6 @@ func mutateGatewayDefaults(ctx context.Context, req admission.Request, c client.
 
 		return &response
 	}
-
-	recorder.Eventf(tnt, corev1.EventTypeNormal, "TenantDefault", "Assigned Tenant default Gateway Class %s to %s/%s", allowed.Default, gatewayObj.Name, gatewayObj.Namespace)
 
 	response := admission.PatchResponseFromRaw(req.Object.Raw, marshaled)
 

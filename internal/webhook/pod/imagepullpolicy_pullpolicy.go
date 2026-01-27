@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Project Capsule Authors
+// Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package pod
@@ -32,6 +32,7 @@ func (i imagePullPolicyValidator) AllowedPullPolicies() []string {
 	return i.allowedPolicies
 }
 
+//nolint:staticcheck
 func NewPullPolicy(tenant *capsulev1beta2.Tenant) PullPolicy {
 	// the Tenant doesn't enforce the allowed image pull policy, returning nil
 	if len(tenant.Spec.ImagePullPolicies) == 0 {

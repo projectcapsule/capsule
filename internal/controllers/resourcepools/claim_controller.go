@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Project Capsule Authors
+// Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package resourcepools
@@ -12,7 +12,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
@@ -27,6 +27,7 @@ import (
 	"github.com/projectcapsule/capsule/internal/metrics"
 	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
+	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 )
 
 type resourceClaimController struct {
@@ -34,11 +35,12 @@ type resourceClaimController struct {
 
 	metrics  *metrics.ClaimRecorder
 	log      logr.Logger
-	recorder record.EventRecorder
+	recorder events.EventRecorder
 }
 
 func (r *resourceClaimController) SetupWithManager(mgr ctrl.Manager, cfg utils.ControllerOptions) error {
 	return ctrl.NewControllerManagedBy(mgr).
+		Named("capsule/resourcepools/claims").
 		For(&capsulev1beta2.ResourcePoolClaim{}).
 		Watches(
 			&capsulev1beta2.ResourcePool{},
@@ -209,12 +211,14 @@ func (r resourceClaimController) allocateResourcePool(
 		UID:  pool.GetUID(),
 	}
 
-	if !meta.HasLooseOwnerReference(cl, pool) {
+	reference := meta.GetLooseOwnerReference(pool)
+
+	if !meta.HasLooseOwnerReference(cl, reference) {
 		log.V(4).Info("adding ownerreference for", "pool", pool.Name)
 
 		patch := client.MergeFrom(cl.DeepCopy())
 
-		if err := meta.SetLooseOwnerReference(cl, pool, r.Scheme()); err != nil {
+		if err := meta.SetLooseOwnerReference(cl, reference); err != nil {
 			return err
 		}
 
@@ -250,7 +254,7 @@ func (r resourceClaimController) allocateResourcePool(
 func updateStatusAndEmitEvent(
 	ctx context.Context,
 	c client.Client,
-	recorder record.EventRecorder,
+	recorder events.EventRecorder,
 	claim *capsulev1beta2.ResourcePoolClaim,
 	condition metav1.Condition,
 ) (err error) {
@@ -283,14 +287,12 @@ func updateStatusAndEmitEvent(
 		eventType = corev1.EventTypeWarning
 	}
 
-	recorder.AnnotatedEventf(
+	recorder.Eventf(
 		claim,
-		map[string]string{
-			"Status": string(claim.Status.Condition.Status),
-			"Type":   claim.Status.Condition.Type,
-		},
+		nil,
 		eventType,
 		claim.Status.Condition.Reason,
+		evt.ActionReconciled,
 		claim.Status.Condition.Message,
 	)
 

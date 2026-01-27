@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Project Capsule Authors
+// Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package utils
@@ -10,13 +10,13 @@ import (
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	"github.com/projectcapsule/capsule/pkg/configuration"
-	"github.com/projectcapsule/capsule/pkg/utils/tenant"
+	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
+	"github.com/projectcapsule/capsule/pkg/tenant"
 )
 
 // getNamespaceTenant returns namespace owner tenant.
@@ -26,7 +26,7 @@ func GetNamespaceTenant(
 	ns *corev1.Namespace,
 	req admission.Request,
 	cfg configuration.Configuration,
-	recorder record.EventRecorder,
+	recorder events.EventRecorder,
 ) (*capsulev1beta2.Tenant, *admission.Response) {
 	tnt, err := tenant.GetTenantByLabelsAndUser(ctx, client, cfg, ns, req.UserInfo)
 	if err != nil {

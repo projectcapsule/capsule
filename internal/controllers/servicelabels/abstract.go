@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Project Capsule Authors
+// Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package servicelabels
@@ -21,6 +21,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
 	"github.com/projectcapsule/capsule/pkg/utils"
 )
 
@@ -33,9 +34,9 @@ type abstractServiceLabelsReconciler struct {
 func (r *abstractServiceLabelsReconciler) Reconcile(ctx context.Context, request ctrl.Request) (ctrl.Result, error) {
 	tenant, err := r.getTenant(ctx, request.NamespacedName, r.client)
 	if err != nil {
-		noTenantObjError := &NonTenantObjectError{}
+		noTenantObjError := &caperrors.NonTenantObjectError{}
 
-		noSvcMetaError := &NoServicesMetadataError{}
+		noSvcMetaError := &caperrors.NoServicesMetadataError{}
 		if errors.As(err, &noTenantObjError) || errors.As(err, &noSvcMetaError) {
 			return reconcile.Result{}, nil
 		}
@@ -85,7 +86,7 @@ func (r *abstractServiceLabelsReconciler) getTenant(ctx context.Context, namespa
 
 	capsuleLabel, _ := utils.GetTypeLabel(&capsulev1beta2.Tenant{})
 	if _, ok := ns.GetLabels()[capsuleLabel]; !ok {
-		return nil, NewNonTenantObject(namespacedName.Name)
+		return nil, caperrors.NewNonTenantObject(namespacedName.Name)
 	}
 
 	if err := client.Get(ctx, types.NamespacedName{Name: ns.Labels[capsuleLabel]}, tenant); err != nil {
@@ -93,7 +94,7 @@ func (r *abstractServiceLabelsReconciler) getTenant(ctx context.Context, namespa
 	}
 
 	if tenant.Spec.ServiceOptions == nil || tenant.Spec.ServiceOptions.AdditionalMetadata == nil {
-		return nil, NewNoServicesMetadata(namespacedName.Name)
+		return nil, caperrors.NewNoServicesMetadata(namespacedName.Name)
 	}
 
 	return tenant, nil

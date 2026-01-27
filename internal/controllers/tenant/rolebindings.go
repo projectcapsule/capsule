@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Project Capsule Authors
+// Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package tenant
@@ -92,14 +92,11 @@ func (r *Manager) syncAdditionalRoleBinding(
 
 			return controllerutil.SetControllerReference(tenant, target, r.Scheme())
 		})
-
-		r.emitEvent(tenant, target.GetNamespace(), res, fmt.Sprintf("Ensuring RoleBinding %s", target.GetName()), err)
-
 		if err != nil {
-			r.Log.Error(err, "Cannot sync RoleBinding")
+			r.Log.Error(err, "cannot sync RoleBinding")
 		}
 
-		r.Log.V(4).Info(fmt.Sprintf("RoleBinding sync result: %s", string(res)), "name", target.Name, "namespace", target.Namespace)
+		r.Log.V(4).Info(fmt.Sprintf("roleBinding sync result: %s", string(res)), "name", target.Name, "namespace", target.Namespace)
 
 		if err != nil {
 			return err

@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Project Capsule Authors
+// Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package resourcepools
@@ -7,7 +7,7 @@ import (
 	"fmt"
 
 	"github.com/go-logr/logr"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	"github.com/projectcapsule/capsule/internal/controllers/utils"
@@ -17,7 +17,7 @@ import (
 func Add(
 	log logr.Logger,
 	mgr manager.Manager,
-	recorder record.EventRecorder,
+	recorder events.EventRecorder,
 	cfg utils.ControllerOptions,
 ) (err error) {
 	if err = (&resourcePoolController{

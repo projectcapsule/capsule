@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Project Capsule Authors
+// Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package misc
@@ -8,35 +8,35 @@ import (
 	"encoding/json"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	capsulewebhook "github.com/projectcapsule/capsule/internal/webhook"
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
-	"github.com/projectcapsule/capsule/pkg/utils/tenant"
+	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
+	"github.com/projectcapsule/capsule/pkg/tenant"
 )
 
 type tenantAssignmentHandler struct{}
 
-func TenantAssignmentHandler() capsulewebhook.Handler {
+func TenantAssignmentHandler() handlers.Handler {
 	return &tenantAssignmentHandler{}
 }
 
-func (r *tenantAssignmentHandler) OnCreate(c client.Client, decoder admission.Decoder, _ record.EventRecorder) capsulewebhook.Func {
+func (r *tenantAssignmentHandler) OnCreate(c client.Client, decoder admission.Decoder, _ events.EventRecorder) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		return r.handle(ctx, c, decoder, req)
 	}
 }
 
-func (r *tenantAssignmentHandler) OnDelete(client.Client, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
+func (r *tenantAssignmentHandler) OnDelete(client.Client, admission.Decoder, events.EventRecorder) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (r *tenantAssignmentHandler) OnUpdate(c client.Client, decoder admission.Decoder, _ record.EventRecorder) capsulewebhook.Func {
+func (r *tenantAssignmentHandler) OnUpdate(c client.Client, decoder admission.Decoder, _ events.EventRecorder) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		return r.handle(ctx, c, decoder, req)
 	}
@@ -66,11 +66,23 @@ func (r *tenantAssignmentHandler) handle(ctx context.Context, c client.Client, d
 		labels = map[string]string{}
 	}
 
-	if currentValue, exists := labels[meta.ManagedByCapsuleLabel]; exists && currentValue == tnt.GetName() {
+	want := tnt.GetName()
+
+	managedOK := labels[meta.ManagedByCapsuleLabel] == want
+	tenantOK := labels[meta.NewTenantLabel] == want
+
+	if managedOK && tenantOK {
 		return nil
 	}
 
-	labels[meta.ManagedByCapsuleLabel] = tnt.GetName()
+	if !managedOK {
+		labels[meta.ManagedByCapsuleLabel] = want
+	}
+
+	if !tenantOK {
+		labels[meta.NewTenantLabel] = want
+	}
+
 	obj.SetLabels(labels)
 
 	marshaledObj, err := json.Marshal(obj)

@@ -1,7 +1,7 @@
 // Copyright 2020-2025 Project Capsule Authors.
 // SPDX-License-Identifier: Apache-2.0
 
-package meta
+package meta_test
 
 import (
 	"testing"
@@ -9,11 +9,13 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/projectcapsule/capsule/pkg/api/meta"
 )
 
 // helper
-func makeCond(tpe, status, reason, msg string, gen int64) Condition {
-	return Condition{
+func makeCond(tpe, status, reason, msg string, gen int64) meta.Condition {
+	return meta.Condition{
 		Type:               tpe,
 		Status:             metav1.ConditionStatus(status),
 		Reason:             reason,
@@ -25,7 +27,7 @@ func makeCond(tpe, status, reason, msg string, gen int64) Condition {
 
 func TestConditionList_GetConditionByType(t *testing.T) {
 	t.Run("returns matching condition", func(t *testing.T) {
-		list := ConditionList{
+		list := meta.ConditionList{
 			makeCond("Ready", "False", "Init", "starting", 1),
 			makeCond("Synced", "True", "Ok", "done", 2),
 		}
@@ -39,14 +41,14 @@ func TestConditionList_GetConditionByType(t *testing.T) {
 	})
 
 	t.Run("returns nil when not found", func(t *testing.T) {
-		list := ConditionList{
+		list := meta.ConditionList{
 			makeCond("Ready", "False", "Init", "starting", 1),
 		}
 		assert.Nil(t, list.GetConditionByType("Missing"))
 	})
 
 	t.Run("returned pointer refers to slice element (not copy)", func(t *testing.T) {
-		list := ConditionList{
+		list := meta.ConditionList{
 			makeCond("Ready", "False", "Init", "starting", 1),
 			makeCond("Synced", "True", "Ok", "done", 2),
 		}
@@ -64,13 +66,13 @@ func TestConditionList_UpdateConditionByType(t *testing.T) {
 	now := metav1.Now()
 
 	t.Run("updates existing condition in place", func(t *testing.T) {
-		list := ConditionList{
+		list := meta.ConditionList{
 			makeCond("Ready", "False", "Init", "starting", 1),
 			makeCond("Synced", "True", "Ok", "done", 2),
 		}
 		beforeLen := len(list)
 
-		list.UpdateConditionByType(Condition{
+		list.UpdateConditionByType(meta.Condition{
 			Type:               "Ready",
 			Status:             metav1.ConditionTrue,
 			Reason:             "Reconciled",
@@ -89,12 +91,12 @@ func TestConditionList_UpdateConditionByType(t *testing.T) {
 	})
 
 	t.Run("appends when condition type not present", func(t *testing.T) {
-		list := ConditionList{
+		list := meta.ConditionList{
 			makeCond("Ready", "True", "Ok", "ready", 1),
 		}
 		beforeLen := len(list)
 
-		list.UpdateConditionByType(Condition{
+		list.UpdateConditionByType(meta.Condition{
 			Type:               "Synced",
 			Status:             metav1.ConditionTrue,
 			Reason:             "Done",
@@ -115,32 +117,32 @@ func TestConditionList_UpdateConditionByType(t *testing.T) {
 
 func TestConditionList_RemoveConditionByType(t *testing.T) {
 	t.Run("removes all conditions with matching type", func(t *testing.T) {
-		list := ConditionList{
+		list := meta.ConditionList{
 			makeCond("A", "True", "x", "m1", 1),
 			makeCond("B", "True", "y", "m2", 1),
 			makeCond("A", "False", "z", "m3", 2),
 		}
-		list.RemoveConditionByType(Condition{Type: "A"})
+		list.RemoveConditionByType(meta.Condition{Type: "A"})
 
 		assert.Len(t, list, 1)
 		assert.Equal(t, "B", list[0].Type)
 	})
 
 	t.Run("no-op when type not present", func(t *testing.T) {
-		orig := ConditionList{
+		orig := meta.ConditionList{
 			makeCond("A", "True", "x", "m1", 1),
 		}
-		list := append(ConditionList{}, orig...) // copy
+		list := append(meta.ConditionList{}, orig...) // copy
 
-		list.RemoveConditionByType(Condition{Type: "Missing"})
+		list.RemoveConditionByType(meta.Condition{Type: "Missing"})
 
 		assert.Equal(t, orig, list)
 	})
 
 	t.Run("nil receiver is safe", func(t *testing.T) {
-		var list *ConditionList // nil receiver
+		var list *meta.ConditionList // nil receiver
 		assert.NotPanics(t, func() {
-			list.RemoveConditionByType(Condition{Type: "X"})
+			list.RemoveConditionByType(meta.Condition{Type: "X"})
 		})
 	})
 }
@@ -149,14 +151,14 @@ func TestUpdateCondition(t *testing.T) {
 	now := metav1.Now()
 
 	t.Run("no update when all relevant fields match", func(t *testing.T) {
-		c := &Condition{
+		c := &meta.Condition{
 			Type:    "Ready",
 			Status:  "True",
 			Reason:  "Success",
 			Message: "All good",
 		}
 
-		updated := c.UpdateCondition(Condition{
+		updated := c.UpdateCondition(meta.Condition{
 			Type:               "Ready",
 			Status:             "True",
 			Reason:             "Success",
@@ -168,14 +170,14 @@ func TestUpdateCondition(t *testing.T) {
 	})
 
 	t.Run("update occurs on message change", func(t *testing.T) {
-		c := &Condition{
+		c := &meta.Condition{
 			Type:    "Ready",
 			Status:  "True",
 			Reason:  "Success",
 			Message: "Old message",
 		}
 
-		updated := c.UpdateCondition(Condition{
+		updated := c.UpdateCondition(meta.Condition{
 			Type:               "Ready",
 			Status:             "True",
 			Reason:             "Success",
@@ -188,14 +190,14 @@ func TestUpdateCondition(t *testing.T) {
 	})
 
 	t.Run("update occurs on status change", func(t *testing.T) {
-		c := &Condition{
+		c := &meta.Condition{
 			Type:    "Ready",
 			Status:  "False",
 			Reason:  "Pending",
 			Message: "Not ready yet",
 		}
 
-		updated := c.UpdateCondition(Condition{
+		updated := c.UpdateCondition(meta.Condition{
 			Type:               "Ready",
 			Status:             "True",
 			Reason:             "Success",

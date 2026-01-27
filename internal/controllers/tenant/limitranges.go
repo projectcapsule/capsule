@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Project Capsule Authors
+// Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 //nolint:dupl
@@ -71,8 +71,6 @@ func (r *Manager) syncLimitRange(ctx context.Context, tenant *capsulev1beta2.Ten
 
 			return controllerutil.SetControllerReference(tenant, target, r.Scheme())
 		})
-
-		r.emitEvent(tenant, target.GetNamespace(), res, fmt.Sprintf("Ensuring LimitRange %s", target.GetName()), err)
 
 		r.Log.V(4).Info("LimitRange sync result: "+string(res), "name", target.Name, "namespace", target.Namespace)
 

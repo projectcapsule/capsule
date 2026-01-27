@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Project Capsule Authors
+// Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package resources
@@ -25,6 +25,7 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	tpl "github.com/projectcapsule/capsule/pkg/template"
+	"github.com/projectcapsule/capsule/pkg/tenant"
 )
 
 const (
@@ -243,7 +244,9 @@ func (r *Processor) HandleSection(ctx context.Context, tnt capsulev1beta2.Tenant
 		for rawIndex, item := range spec.RawItems {
 			template := string(item.Raw)
 
-			tmplString := tpl.TemplateForTenantAndNamespace(template, &tnt, &ns)
+			fastContext := tenant.ContextForTenantAndNamespace(&tnt, &ns)
+
+			tmplString := tpl.FastTemplate(template, fastContext)
 
 			obj, keysAndValues := unstructured.Unstructured{}, []any{"index", rawIndex}
 

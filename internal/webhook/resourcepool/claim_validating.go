@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Project Capsule Authors
+// Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package resourcepool
@@ -9,30 +9,30 @@ import (
 	"reflect"
 
 	"github.com/go-logr/logr"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	capsulewebhook "github.com/projectcapsule/capsule/internal/webhook"
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
+	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
 
 type claimValidationHandler struct {
 	log logr.Logger
 }
 
-func ClaimValidationHandler(log logr.Logger) capsulewebhook.Handler {
+func ClaimValidationHandler(log logr.Logger) handlers.Handler {
 	return &claimValidationHandler{log: log}
 }
 
-func (h *claimValidationHandler) OnCreate(client.Client, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
+func (h *claimValidationHandler) OnCreate(client.Client, admission.Decoder, events.EventRecorder) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (h *claimValidationHandler) OnDelete(_ client.Client, decoder admission.Decoder, _ record.EventRecorder) capsulewebhook.Func {
+func (h *claimValidationHandler) OnDelete(_ client.Client, decoder admission.Decoder, _ events.EventRecorder) handlers.Func {
 	return func(_ context.Context, req admission.Request) *admission.Response {
 		claim := &capsulev1beta2.ResourcePoolClaim{}
 
@@ -50,7 +50,7 @@ func (h *claimValidationHandler) OnDelete(_ client.Client, decoder admission.Dec
 	}
 }
 
-func (h *claimValidationHandler) OnUpdate(_ client.Client, decoder admission.Decoder, _ record.EventRecorder) capsulewebhook.Func {
+func (h *claimValidationHandler) OnUpdate(_ client.Client, decoder admission.Decoder, _ events.EventRecorder) handlers.Func {
 	return func(_ context.Context, req admission.Request) *admission.Response {
 		oldClaim := &capsulev1beta2.ResourcePoolClaim{}
 		newClaim := &capsulev1beta2.ResourcePoolClaim{}

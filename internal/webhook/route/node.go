@@ -1,21 +1,19 @@
-// Copyright 2020-2025 Project Capsule Authors
+// Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package route
 
-import (
-	capsulewebhook "github.com/projectcapsule/capsule/internal/webhook"
-)
+import "github.com/projectcapsule/capsule/pkg/runtime/handlers"
 
 type node struct {
-	handlers []capsulewebhook.Handler
+	handlers []handlers.Handler
 }
 
-func Node(handler ...capsulewebhook.Handler) capsulewebhook.Webhook {
+func Node(handler ...handlers.Handler) handlers.Webhook {
 	return &node{handlers: handler}
 }
 
-func (n *node) GetHandlers() []capsulewebhook.Handler {
+func (n *node) GetHandlers() []handlers.Handler {
 	return n.handlers
 }
 

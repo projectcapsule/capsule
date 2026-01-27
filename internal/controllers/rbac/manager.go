@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Project Capsule Authors
+// Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package rbac
@@ -6,7 +6,6 @@ package rbac
 import (
 	"context"
 	"errors"
-	"fmt"
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
@@ -27,7 +26,12 @@ import (
 	"github.com/projectcapsule/capsule/internal/controllers/utils"
 	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
-	"github.com/projectcapsule/capsule/pkg/configuration"
+	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
+	"github.com/projectcapsule/capsule/pkg/runtime/predicates"
+)
+
+const (
+	controllerManager = "rbac-controller"
 )
 
 type Manager struct {
@@ -38,9 +42,12 @@ type Manager struct {
 
 //nolint:revive
 func (r *Manager) SetupWithManager(ctx context.Context, mgr ctrl.Manager, ctrlConfig utils.ControllerOptions) (err error) {
-	namesPredicate := utils.NamesMatchingPredicate(api.ProvisionerRoleName, api.DeleterRoleName)
+	namesPredicate := predicates.LabelsMatching(map[string]string{
+		meta.CreatedByCapsuleLabel: controllerManager,
+	})
 
 	crErr := ctrl.NewControllerManagedBy(mgr).
+		Named("capsule/rbac/roles").
 		For(&rbacv1.ClusterRole{}, namesPredicate).
 		Complete(r)
 	if crErr != nil {
@@ -48,6 +55,7 @@ func (r *Manager) SetupWithManager(ctx context.Context, mgr ctrl.Manager, ctrlCo
 	}
 
 	crbErr := ctrl.NewControllerManagedBy(mgr).
+		Named("capsule/rbac/bindings").
 		For(&rbacv1.ClusterRoleBinding{}, namesPredicate).
 		Watches(&capsulev1beta2.CapsuleConfiguration{}, handler.Funcs{
 			UpdateFunc: func(ctx context.Context, updateEvent event.TypedUpdateEvent[client.Object], limitingInterface workqueue.TypedRateLimitingInterface[reconcile.Request]) {
@@ -63,7 +71,7 @@ func (r *Manager) SetupWithManager(ctx context.Context, mgr ctrl.Manager, ctrlCo
 				r.handleSAChange(ctx, e.Object)
 			},
 			UpdateFunc: func(ctx context.Context, e event.TypedUpdateEvent[client.Object], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
-				if utils.LabelsChanged([]string{meta.OwnerPromotionLabel}, e.ObjectOld.GetLabels(), e.ObjectNew.GetLabels()) {
+				if predicates.LabelsChanged([]string{meta.OwnerPromotionLabel}, e.ObjectOld.GetLabels(), e.ObjectNew.GetLabels()) {
 					r.handleSAChange(ctx, e.ObjectNew)
 				}
 			},
@@ -82,22 +90,18 @@ func (r *Manager) SetupWithManager(ctx context.Context, mgr ctrl.Manager, ctrlCo
 // Reconcile serves both required ClusterRole and ClusterRoleBinding resources: that's ok, we're watching for multiple
 // Resource kinds and we're just interested to the ones with the said name since they're bounded together.
 func (r *Manager) Reconcile(ctx context.Context, request reconcile.Request) (res reconcile.Result, err error) {
+	rbac := r.Configuration.RBAC()
+
 	switch request.Name {
-	case api.ProvisionerRoleName:
-		if err = r.EnsureClusterRole(ctx, api.ProvisionerRoleName); err != nil {
-			r.Log.Error(err, "Reconciliation for ClusterRole failed", "ClusterRole", api.ProvisionerRoleName)
+	case rbac.ProvisionerClusterRole:
+		if err = r.EnsureClusterRoleProvisioner(ctx); err != nil {
+			r.Log.Error(err, "reconciliation for ClusterRole failed", "ClusterRole", rbac.ProvisionerClusterRole)
 
 			break
 		}
-
-		if err = r.EnsureClusterRoleBindingsProvisioner(ctx); err != nil {
-			r.Log.Error(err, "Reconciliation for ClusterRoleBindings (Provisioner) failed")
-
-			break
-		}
-	case api.DeleterRoleName:
-		if err = r.EnsureClusterRole(ctx, api.DeleterRoleName); err != nil {
-			r.Log.Error(err, "Reconciliation for ClusterRole failed", "ClusterRole", api.DeleterRoleName)
+	case rbac.DeleterClusterRole:
+		if err = r.EnsureClusterRoleDeleter(ctx); err != nil {
+			r.Log.Error(err, "reconciliation for ClusterRole failed", "ClusterRole", rbac.DeleterClusterRole)
 		}
 	}
 
@@ -105,13 +109,29 @@ func (r *Manager) Reconcile(ctx context.Context, request reconcile.Request) (res
 }
 
 func (r *Manager) EnsureClusterRoleBindingsProvisioner(ctx context.Context) error {
+	rbac := r.Configuration.RBAC()
+
 	crb := &rbacv1.ClusterRoleBinding{
-		ObjectMeta: metav1.ObjectMeta{Name: api.ProvisionerRoleName},
+		ObjectMeta: metav1.ObjectMeta{Name: rbac.ProvisionerClusterRole},
 	}
 
 	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		_, err := controllerutil.CreateOrUpdate(ctx, r.Client, crb, func() error {
-			crb.RoleRef = api.ProvisionerClusterRoleBinding.RoleRef
+			crb.RoleRef = rbacv1.RoleRef{
+				Kind:     "ClusterRole",
+				Name:     rbac.ProvisionerClusterRole,
+				APIGroup: rbacv1.GroupName,
+			}
+
+			labels := crb.GetLabels()
+			if labels == nil {
+				labels = make(map[string]string)
+			}
+
+			labels[meta.CreatedByCapsuleLabel] = controllerManager
+
+			crb.SetLabels(labels)
+
 			crb.Subjects = nil
 
 			users := r.Configuration.GetUsersByStatus()
@@ -169,54 +189,92 @@ func (r *Manager) EnsureClusterRoleBindingsProvisioner(ctx context.Context) erro
 	})
 }
 
-func (r *Manager) EnsureClusterRole(ctx context.Context, roleName string) (err error) {
-	role, ok := api.ClusterRoles[roleName]
-	if !ok {
-		return fmt.Errorf("clusterRole %s is not mapped", roleName)
-	}
-
+func (r *Manager) EnsureClusterRoleProvisioner(ctx context.Context) (err error) {
 	clusterRole := &rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: role.GetName(),
+			Name: r.Configuration.RBAC().ProvisionerClusterRole,
 		},
 	}
 
 	_, err = controllerutil.CreateOrUpdate(ctx, r.Client, clusterRole, func() error {
-		clusterRole.Rules = role.Rules
+		labels := clusterRole.GetLabels()
+		if labels == nil {
+			labels = make(map[string]string)
+		}
+
+		labels[meta.CreatedByCapsuleLabel] = controllerManager
+
+		clusterRole.SetLabels(labels)
+
+		clusterRole.Rules = []rbacv1.PolicyRule{
+			{
+				APIGroups: []string{""},
+				Resources: []string{"namespaces"},
+				Verbs:     []string{"create", "patch"},
+			},
+		}
 
 		return nil
 	})
+	if err != nil {
+		return err
+	}
 
-	return err
+	err = r.EnsureClusterRoleBindingsProvisioner(ctx)
+	if err != nil && apierrors.IsAlreadyExists(err) {
+		return nil
+	}
+
+	return r.garbageCollectRBAC(ctx)
+}
+
+func (r *Manager) EnsureClusterRoleDeleter(ctx context.Context) (err error) {
+	clusterRole := &rbacv1.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: r.Configuration.RBAC().DeleterClusterRole,
+		},
+	}
+
+	_, err = controllerutil.CreateOrUpdate(ctx, r.Client, clusterRole, func() error {
+		labels := clusterRole.GetLabels()
+		if labels == nil {
+			labels = make(map[string]string)
+		}
+
+		labels[meta.CreatedByCapsuleLabel] = controllerManager
+
+		clusterRole.SetLabels(labels)
+
+		clusterRole.Rules = []rbacv1.PolicyRule{
+			{
+				APIGroups: []string{""},
+				Resources: []string{"namespaces"},
+				Verbs:     []string{"delete"},
+			},
+		}
+
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	return r.garbageCollectRBAC(ctx)
 }
 
 // Start is the Runnable function triggered upon Manager start-up to perform the first RBAC reconciliation
 // since we're not creating empty CR and CRB upon Capsule installation: it's a run-once task, since the reconciliation
 // is handled by the Reconciler implemented interface.
 func (r *Manager) Start(ctx context.Context) error {
-	for roleName := range api.ClusterRoles {
-		r.Log.V(4).Info("setting up ClusterRoles", "ClusterRole", roleName)
-
-		if err := r.EnsureClusterRole(ctx, roleName); err != nil {
-			if apierrors.IsAlreadyExists(err) {
-				continue
-			}
-
-			return err
-		}
-	}
-
-	r.Log.V(4).Info("setting up ClusterRoleBindings")
-
-	if err := r.EnsureClusterRoleBindingsProvisioner(ctx); err != nil {
-		if apierrors.IsAlreadyExists(err) {
-			return nil
-		}
-
+	if err := r.EnsureClusterRoleProvisioner(ctx); err != nil && !apierrors.IsAlreadyExists(err) {
 		return err
 	}
 
-	return nil
+	if err := r.EnsureClusterRoleDeleter(ctx); err != nil && !apierrors.IsAlreadyExists(err) {
+		return err
+	}
+
+	return r.garbageCollectRBAC(ctx)
 }
 
 func (r *Manager) handleSAChange(ctx context.Context, obj client.Object) {
@@ -227,4 +285,73 @@ func (r *Manager) handleSAChange(ctx context.Context, obj client.Object) {
 	if err := r.EnsureClusterRoleBindingsProvisioner(ctx); err != nil {
 		r.Log.Error(err, "cannot update ClusterRoleBinding upon ServiceAccount event")
 	}
+}
+
+func (r *Manager) garbageCollectRBAC(ctx context.Context) error {
+	rbac := r.Configuration.RBAC()
+
+	desiredCR := map[string]struct{}{
+		rbac.ProvisionerClusterRole: {},
+		rbac.DeleterClusterRole:     {},
+	}
+
+	desiredCRB := map[string]struct{}{
+		rbac.ProvisionerClusterRole: {},
+	}
+
+	if err := r.garbageCollectClusterRoles(ctx, desiredCR); err != nil {
+		return err
+	}
+
+	if err := r.garbageCollectClusterRoleBindings(ctx, desiredCRB); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+//nolint:dupl
+func (r *Manager) garbageCollectClusterRoles(ctx context.Context, desired map[string]struct{}) error {
+	list := &rbacv1.ClusterRoleList{}
+	if err := r.Client.List(ctx, list, client.MatchingLabels{
+		meta.CreatedByCapsuleLabel: controllerManager,
+	}); err != nil {
+		return err
+	}
+
+	for i := range list.Items {
+		cr := &list.Items[i]
+		if _, ok := desired[cr.Name]; ok {
+			continue
+		}
+
+		if err := r.Client.Delete(ctx, cr); err != nil && !apierrors.IsNotFound(err) {
+			return err
+		}
+	}
+
+	return nil
+}
+
+//nolint:dupl
+func (r *Manager) garbageCollectClusterRoleBindings(ctx context.Context, desired map[string]struct{}) error {
+	list := &rbacv1.ClusterRoleBindingList{}
+	if err := r.Client.List(ctx, list, client.MatchingLabels{
+		meta.CreatedByCapsuleLabel: controllerManager,
+	}); err != nil {
+		return err
+	}
+
+	for i := range list.Items {
+		crb := &list.Items[i]
+		if _, ok := desired[crb.Name]; ok {
+			continue
+		}
+
+		if err := r.Client.Delete(ctx, crb); err != nil && !apierrors.IsNotFound(err) {
+			return err
+		}
+	}
+
+	return nil
 }

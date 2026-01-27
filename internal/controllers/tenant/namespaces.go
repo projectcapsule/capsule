@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Project Capsule Authors
+// Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package tenant
@@ -20,7 +20,7 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
-	"github.com/projectcapsule/capsule/pkg/utils/tenant"
+	"github.com/projectcapsule/capsule/pkg/tenant"
 )
 
 // Ensuring all annotations are applied to each Namespace handled by the Tenant.
@@ -116,9 +116,20 @@ func (r *Manager) reconcileNamespace(ctx context.Context, namespace string, tnt 
 		r.syncNamespaceStatusMetrics(tnt, ns)
 	}()
 
+	// Collect Rules for namespace
+	ruleBody, err := tenant.BuildNamespaceRuleBodyForNamespace(ns, tnt)
+	if err != nil {
+		return err
+	}
+
+	err = r.ensureRuleStatus(ctx, ns, tnt, ruleBody, namespace)
+	if err != nil {
+		return err
+	}
+
 	err = retry.RetryOnConflict(retry.DefaultBackoff, func() (conflictErr error) {
 		_, conflictErr = controllerutil.CreateOrUpdate(ctx, r.Client, ns, func() error {
-			metaStatus, err = r.reconcileMetadata(ctx, ns, tnt, stat)
+			metaStatus, err = r.reconcileNamespaceMetadata(ctx, ns, tnt, stat)
 
 			return err
 		})
@@ -129,8 +140,53 @@ func (r *Manager) reconcileNamespace(ctx context.Context, namespace string, tnt 
 	return err
 }
 
+func (r *Manager) ensureRuleStatus(
+	ctx context.Context,
+	ns *corev1.Namespace,
+	tnt *capsulev1beta2.Tenant,
+	rule *capsulev1beta2.NamespaceRuleBody,
+	namespace string,
+) error {
+	nsStatus := &capsulev1beta2.RuleStatus{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      meta.NameForManagedRuleStatus(),
+			Namespace: namespace,
+		},
+	}
+
+	_, err := controllerutil.CreateOrUpdate(ctx, r.Client, nsStatus, func() error {
+		labels := nsStatus.GetLabels()
+		if labels == nil {
+			labels = make(map[string]string)
+		}
+
+		labels[meta.NewManagedByCapsuleLabel] = meta.ControllerValue
+		labels[meta.CapsuleNameLabel] = nsStatus.Name
+
+		nsStatus.SetLabels(labels)
+
+		err := controllerutil.SetOwnerReference(tnt, nsStatus, r.Scheme())
+		if err != nil {
+			return err
+		}
+
+		return controllerutil.SetOwnerReference(ns, nsStatus, r.Scheme())
+	})
+	if err != nil {
+		return err
+	}
+
+	nsStatus.Status.Rule = *rule
+
+	if err := r.Status().Update(ctx, nsStatus); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 //nolint:nestif
-func (r *Manager) reconcileMetadata(
+func (r *Manager) reconcileNamespaceMetadata(
 	ctx context.Context,
 	ns *corev1.Namespace,
 	tnt *capsulev1beta2.Tenant,

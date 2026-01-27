@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Project Capsule Authors
+// Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package servicelabels
@@ -28,5 +28,6 @@ func (r *EndpointSlicesLabelsReconciler) SetupWithManager(ctx context.Context, m
 
 	return ctrl.NewControllerManagedBy(mgr).
 		For(r.abstractServiceLabelsReconciler.obj, r.abstractServiceLabelsReconciler.forOptionPerInstanceName(ctx)).
+		Named("capsule/endpointslices").
 		Complete(r)
 }

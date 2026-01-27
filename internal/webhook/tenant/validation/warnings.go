@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Project Capsule Authors
+// Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package validation
@@ -7,27 +7,27 @@ import (
 	"context"
 
 	admissionv1 "k8s.io/api/admission/v1"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	capsulewebhook "github.com/projectcapsule/capsule/internal/webhook"
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
-	"github.com/projectcapsule/capsule/pkg/configuration"
+	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
+	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
 
 type warningHandler struct {
 	cfg configuration.Configuration
 }
 
-func WarningHandler(cfg configuration.Configuration) capsulewebhook.Handler {
+func WarningHandler(cfg configuration.Configuration) handlers.Handler {
 	return &warningHandler{
 		cfg: cfg,
 	}
 }
 
-func (h *warningHandler) OnCreate(c client.Client, decoder admission.Decoder, _ record.EventRecorder) capsulewebhook.Func {
+func (h *warningHandler) OnCreate(c client.Client, decoder admission.Decoder, _ events.EventRecorder) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		tnt := &capsulev1beta2.Tenant{}
 		if err := decoder.Decode(req, tnt); err != nil {
@@ -38,13 +38,13 @@ func (h *warningHandler) OnCreate(c client.Client, decoder admission.Decoder, _ 
 	}
 }
 
-func (h *warningHandler) OnDelete(client.Client, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
+func (h *warningHandler) OnDelete(client.Client, admission.Decoder, events.EventRecorder) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (h *warningHandler) OnUpdate(_ client.Client, decoder admission.Decoder, _ record.EventRecorder) capsulewebhook.Func {
+func (h *warningHandler) OnUpdate(_ client.Client, decoder admission.Decoder, _ events.EventRecorder) handlers.Func {
 	return func(_ context.Context, req admission.Request) *admission.Response {
 		tnt := &capsulev1beta2.Tenant{}
 		if err := decoder.Decode(req, tnt); err != nil {
@@ -61,6 +61,15 @@ func (h *warningHandler) handle(tnt *capsulev1beta2.Tenant, decoder admission.De
 			UID:     req.UID,
 			Allowed: true,
 		},
+	}
+
+	//nolint:staticcheck
+	if tnt.Spec.ContainerRegistries != nil {
+		if len(tnt.Spec.ContainerRegistries.Exact) > 0 || len(tnt.Spec.ContainerRegistries.Regex) > 0 {
+			response.Warnings = append(response.Warnings,
+				"The field `containerRegistries` is deprecated and will be removed in a future release. Please migrate to rules. See: https://projectcapsule.dev/docs/tenants/rules.",
+			)
+		}
 	}
 
 	//nolint:staticcheck

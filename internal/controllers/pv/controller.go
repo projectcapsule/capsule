@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Project Capsule Authors
+// Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package pv
@@ -19,8 +19,8 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/internal/controllers/utils"
+	"github.com/projectcapsule/capsule/pkg/tenant"
 	capsuleutils "github.com/projectcapsule/capsule/pkg/utils"
-	"github.com/projectcapsule/capsule/pkg/utils/tenant"
 )
 
 type Controller struct {
@@ -38,6 +38,7 @@ func (c *Controller) SetupWithManager(mgr ctrl.Manager, cfg utils.ControllerOpti
 	c.label = label
 
 	return ctrl.NewControllerManagedBy(mgr).
+		Named("capsule/persistentvolumes").
 		For(&corev1.PersistentVolume{}, builder.WithPredicates(predicate.NewPredicateFuncs(func(object client.Object) bool {
 			pv, ok := object.(*corev1.PersistentVolume)
 			if !ok {

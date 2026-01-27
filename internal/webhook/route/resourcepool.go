@@ -1,21 +1,19 @@
-// Copyright 2020-2025 Project Capsule Authors
+// Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package route
 
-import (
-	capsulewebhook "github.com/projectcapsule/capsule/internal/webhook"
-)
+import "github.com/projectcapsule/capsule/pkg/runtime/handlers"
 
 type poolmutation struct {
-	handlers []capsulewebhook.Handler
+	handlers []handlers.Handler
 }
 
-func ResourcePoolMutation(handler ...capsulewebhook.Handler) capsulewebhook.Webhook {
+func ResourcePoolMutation(handler ...handlers.Handler) handlers.Webhook {
 	return &poolmutation{handlers: handler}
 }
 
-func (w *poolmutation) GetHandlers() []capsulewebhook.Handler {
+func (w *poolmutation) GetHandlers() []handlers.Handler {
 	return w.handlers
 }
 
@@ -24,14 +22,14 @@ func (w *poolmutation) GetPath() string {
 }
 
 type poolclaimmutation struct {
-	handlers []capsulewebhook.Handler
+	handlers []handlers.Handler
 }
 
-func ResourcePoolClaimMutation(handler ...capsulewebhook.Handler) capsulewebhook.Webhook {
+func ResourcePoolClaimMutation(handler ...handlers.Handler) handlers.Webhook {
 	return &poolclaimmutation{handlers: handler}
 }
 
-func (w *poolclaimmutation) GetHandlers() []capsulewebhook.Handler {
+func (w *poolclaimmutation) GetHandlers() []handlers.Handler {
 	return w.handlers
 }
 
@@ -40,14 +38,14 @@ func (w *poolclaimmutation) GetPath() string {
 }
 
 type poolValidation struct {
-	handlers []capsulewebhook.Handler
+	handlers []handlers.Handler
 }
 
-func ResourcePoolValidation(handler ...capsulewebhook.Handler) capsulewebhook.Webhook {
+func ResourcePoolValidation(handler ...handlers.Handler) handlers.Webhook {
 	return &poolValidation{handlers: handler}
 }
 
-func (w *poolValidation) GetHandlers() []capsulewebhook.Handler {
+func (w *poolValidation) GetHandlers() []handlers.Handler {
 	return w.handlers
 }
 
@@ -56,14 +54,14 @@ func (w *poolValidation) GetPath() string {
 }
 
 type poolclaimValidation struct {
-	handlers []capsulewebhook.Handler
+	handlers []handlers.Handler
 }
 
-func ResourcePoolClaimValidation(handler ...capsulewebhook.Handler) capsulewebhook.Webhook {
+func ResourcePoolClaimValidation(handler ...handlers.Handler) handlers.Webhook {
 	return &poolclaimValidation{handlers: handler}
 }
 
-func (w *poolclaimValidation) GetHandlers() []capsulewebhook.Handler {
+func (w *poolclaimValidation) GetHandlers() []handlers.Handler {
 	return w.handlers
 }
 

@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Project Capsule Authors
+// Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package v1beta1
@@ -15,7 +15,6 @@ func (in *Tenant) SetupWebhookWithManager(mgr ctrl.Manager) error {
 		return nil
 	}
 
-	return ctrl.NewWebhookManagedBy(mgr).
-		For(in).
+	return ctrl.NewWebhookManagedBy(mgr, in).
 		Complete()
 }
