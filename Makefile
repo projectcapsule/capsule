@@ -92,7 +92,7 @@ helm-schema: helm-plugin-schema
 helm-test: HELM_KIND_CONFIG ?= ""
 helm-test: kind
 	@mkdir -p /tmp/results || true
-	@$(KIND) create cluster --wait=60s --name capsule-charts --image kindest/node:$(KUBERNETES_SUPPORTED_VERSION) --config $(HELM_KIND_CONFIG)
+	@$(KIND) create cluster --wait=60s --name capsule-charts --image kindest/node:$(KUBERNETES_SUPPORTED_VERSION) --config ./hack/kind-cluster.yaml
 	@make helm-test-exec
 	@$(KIND) delete cluster --name capsule-charts
 
