@@ -4,18 +4,18 @@
 package route
 
 import (
-	capsulewebhook "github.com/projectcapsule/capsule/internal/webhook"
+	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
 
 type configValidating struct {
-	handlers []capsulewebhook.Handler
+	handlers []handlers.Handler
 }
 
-func ConfigValidation(handler ...capsulewebhook.Handler) capsulewebhook.Webhook {
+func ConfigValidation(handler ...handlers.Handler) handlers.Webhook {
 	return &configValidating{handlers: handler}
 }
 
-func (w *configValidating) GetHandlers() []capsulewebhook.Handler {
+func (w *configValidating) GetHandlers() []handlers.Handler {
 	return w.handlers
 }
 

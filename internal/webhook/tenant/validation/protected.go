@@ -7,28 +7,28 @@ import (
 	"context"
 
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	capsulewebhook "github.com/projectcapsule/capsule/internal/webhook"
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
+	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
 
 type protectedHandler struct{}
 
-func ProtectedHandler() capsulewebhook.Handler {
+func ProtectedHandler() handlers.Handler {
 	return &protectedHandler{}
 }
 
-func (h *protectedHandler) OnCreate(client.Client, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
+func (h *protectedHandler) OnCreate(client.Client, admission.Decoder, events.EventRecorder) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (h *protectedHandler) OnDelete(clt client.Client, _ admission.Decoder, _ record.EventRecorder) capsulewebhook.Func {
+func (h *protectedHandler) OnDelete(clt client.Client, _ admission.Decoder, _ events.EventRecorder) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		tenant := &capsulev1beta2.Tenant{}
 
@@ -46,7 +46,7 @@ func (h *protectedHandler) OnDelete(clt client.Client, _ admission.Decoder, _ re
 	}
 }
 
-func (h *protectedHandler) OnUpdate(client.Client, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
+func (h *protectedHandler) OnUpdate(client.Client, admission.Decoder, events.EventRecorder) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}

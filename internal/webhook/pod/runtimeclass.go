@@ -10,17 +10,19 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	nodev1 "k8s.io/api/node/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	capsulewebhook "github.com/projectcapsule/capsule/internal/webhook"
+	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
+	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
+	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
 
 type runtimeClass struct{}
 
-func RuntimeClass() capsulewebhook.TypedHandlerWithTenant[*corev1.Pod] {
+func RuntimeClass() handlers.TypedHandlerWithTenantWithRuleset[*corev1.Pod] {
 	return &runtimeClass{}
 }
 
@@ -28,9 +30,10 @@ func (h *runtimeClass) OnCreate(
 	c client.Client,
 	pod *corev1.Pod,
 	decoder admission.Decoder,
-	recorder record.EventRecorder,
+	recorder events.EventRecorder,
 	tnt *capsulev1beta2.Tenant,
-) capsulewebhook.Func {
+	_ *capsulev1beta2.NamespaceRuleBody,
+) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		return h.validate(ctx, c, recorder, req, pod, tnt)
 	}
@@ -41,9 +44,10 @@ func (h *runtimeClass) OnUpdate(
 	*corev1.Pod,
 	*corev1.Pod,
 	admission.Decoder,
-	record.EventRecorder,
+	events.EventRecorder,
 	*capsulev1beta2.Tenant,
-) capsulewebhook.Func {
+	*capsulev1beta2.NamespaceRuleBody,
+) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
@@ -53,9 +57,10 @@ func (h *runtimeClass) OnDelete(
 	client.Client,
 	*corev1.Pod,
 	admission.Decoder,
-	record.EventRecorder,
+	events.EventRecorder,
 	*capsulev1beta2.Tenant,
-) capsulewebhook.Func {
+	*capsulev1beta2.NamespaceRuleBody,
+) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
@@ -77,7 +82,7 @@ func (h *runtimeClass) class(ctx context.Context, c client.Client, name string) 
 func (h *runtimeClass) validate(
 	ctx context.Context,
 	c client.Client,
-	recorder record.EventRecorder,
+	recorder events.EventRecorder,
 	req admission.Request,
 	pod *corev1.Pod,
 	tnt *capsulev1beta2.Tenant,
@@ -104,9 +109,16 @@ func (h *runtimeClass) validate(
 		// Delegating mutating webhook to specify a default RuntimeClass
 		return nil
 	case !allowed.MatchSelectByName(class):
-		recorder.Eventf(tnt, corev1.EventTypeWarning, "ForbiddenRuntimeClass", "Pod %s/%s is using Runtime Class %s is forbidden for the current Tenant", pod.Namespace, pod.Name, runtimeClassName)
+		recorder.Eventf(
+			tnt,
+			pod,
+			corev1.EventTypeWarning,
+			evt.ReasonForbiddenRuntimeClass,
+			evt.ActionValidationDenied,
+			"Using Runtime Class %s is forbidden for the tenant %s", runtimeClassName, tnt.GetName(),
+		)
 
-		response := admission.Denied(NewPodRuntimeClassForbidden(runtimeClassName, *allowed).Error())
+		response := admission.Denied(caperrors.NewPodRuntimeClassForbidden(runtimeClassName, *allowed).Error())
 
 		return &response
 	default:

@@ -92,7 +92,7 @@ helm-schema: helm-plugin-schema
 helm-test: HELM_KIND_CONFIG ?= ""
 helm-test: kind
 	@mkdir -p /tmp/results || true
-	@$(KIND) create cluster --wait=60s --name capsule-charts --image kindest/node:$(KUBERNETES_SUPPORTED_VERSION) --config $(HELM_KIND_CONFIG)
+	@$(KIND) create cluster --wait=60s --name capsule-charts --image kindest/node:$(KUBERNETES_SUPPORTED_VERSION) --config ./hack/kind-cluster.yaml
 	@make helm-test-exec
 	@$(KIND) delete cluster --name capsule-charts
 
@@ -104,7 +104,7 @@ helm-test-exec: ct helm-controller-version ko-build-all
 
 # Setup development env
 dev-build: kind
-	$(KIND) create cluster --wait=60s --name $(CLUSTER_NAME) --image kindest/node:$(KUBERNETES_SUPPORTED_VERSION)
+	$(KIND) create cluster --wait=60s --name $(CLUSTER_NAME) --image kindest/node:$(KUBERNETES_SUPPORTED_VERSION) --config ./hack/kind-cluster.yaml
 	$(MAKE) dev-install-deps
 
 .PHONY: dev-destroy
@@ -220,12 +220,12 @@ dev-setup-capsule: dev-setup-fluxcd
 
 dev-setup-capsule-example: dev-setup-fluxcd
 	@$(KUBECTL) kustomize --load-restrictor='LoadRestrictionsNone' hack/distro/capsule/example-setup | envsubst | kubectl apply -f -
-	@$(KUBECTL) create ns wind-test --as joe --as-group projectcapsule.dev
-	@$(KUBECTL) create ns wind-prod --as joe --as-group projectcapsule.dev
-	@$(KUBECTL) create ns green-test --as bob --as-group projectcapsule.dev
-	@$(KUBECTL) create ns green-prod --as bob --as-group projectcapsule.dev
-	@$(KUBECTL) create ns solar-test --as alice --as-group projectcapsule.dev
-	@$(KUBECTL) create ns solar-prod --as alice --as-group projectcapsule.dev
+	@$(KUBECTL) create ns wind-test --as joe --as-group projectcapsule.dev || true
+	@$(KUBECTL) create ns wind-prod --as joe --as-group projectcapsule.dev || true
+	@$(KUBECTL) create ns green-test --as bob --as-group projectcapsule.dev || true
+	@$(KUBECTL) create ns green-prod --as bob --as-group projectcapsule.dev || true
+	@$(KUBECTL) create ns solar-test --as alice --as-group projectcapsule.dev || true
+	@$(KUBECTL) create ns solar-prod --as alice --as-group projectcapsule.dev || true
 
 wait-for-helmreleases:
 	@ echo "Waiting for all HelmReleases to have observedGeneration >= 0..."
@@ -316,7 +316,7 @@ e2e-build: kind
 	$(MAKE) e2e-install
 
 .PHONY: e2e-install
-e2e-install: ko-build-all
+e2e-install: helm-controller-version ko-build-all
 	$(MAKE) e2e-load-image CLUSTER_NAME=$(CLUSTER_NAME) IMAGE=$(CAPSULE_IMG) VERSION=$(VERSION)
 	$(HELM) upgrade \
 	    --dependency-update \
@@ -331,6 +331,7 @@ e2e-install: ko-build-all
 		--set 'manager.livenessProbe.failureThreshold=10' \
 		--set 'webhooks.hooks.nodes.enabled=true' \
 		--set "webhooks.exclusive=true"\
+		--set "manager.options.logLevel=debug"\
 		capsule \
 		./charts/capsule
 

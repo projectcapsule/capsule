@@ -393,6 +393,7 @@ var _ = Describe("creating a Namespace for a Tenant with additional metadata", L
 				"matching_namespace_label":    "matching_namespace_label_value",
 				"capsule.clastix.io/tenant":   tnt.GetName(),
 				"kubernetes.io/metadata.name": ns.GetName(),
+				"env":                         "e2e",
 			}
 
 			Eventually(func() map[string]string {
@@ -490,6 +491,7 @@ var _ = Describe("creating a Namespace for a Tenant with additional metadata", L
 				"matching_namespace_label":    "matching_namespace_label_value",
 				"capsule.clastix.io/tenant":   tnt.GetName(),
 				"kubernetes.io/metadata.name": ns.GetName(),
+				"env":                         "e2e",
 			}
 			Eventually(func() map[string]string {
 				got := &corev1.Namespace{}
@@ -579,6 +581,7 @@ var _ = Describe("creating a Namespace for a Tenant with additional metadata", L
 				"matching_namespace_label":    "matching_namespace_label_value",
 				"capsule.clastix.io/tenant":   tnt.GetName(),
 				"kubernetes.io/metadata.name": ns.GetName(),
+				"env":                         "e2e",
 			}
 			Eventually(func() map[string]string {
 				got := &corev1.Namespace{}
@@ -660,6 +663,7 @@ var _ = Describe("creating a Namespace for a Tenant with additional metadata", L
 				"matching_namespace_label":    "matching_namespace_label_value",
 				"capsule.clastix.io/tenant":   tnt.GetName(),
 				"kubernetes.io/metadata.name": ns.GetName(),
+				"env":                         "e2e",
 			}
 			Eventually(func() map[string]string {
 				got := &corev1.Namespace{}

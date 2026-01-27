@@ -11,37 +11,37 @@ import (
 
 	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	capsulewebhook "github.com/projectcapsule/capsule/internal/webhook"
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
+	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
 
 type claimMutationHandler struct {
 	log logr.Logger
 }
 
-func ClaimMutationHandler(log logr.Logger) capsulewebhook.Handler {
+func ClaimMutationHandler(log logr.Logger) handlers.Handler {
 	return &claimMutationHandler{log: log}
 }
 
-func (h *claimMutationHandler) OnUpdate(c client.Client, decoder admission.Decoder, _ record.EventRecorder) capsulewebhook.Func {
+func (h *claimMutationHandler) OnUpdate(c client.Client, decoder admission.Decoder, _ events.EventRecorder) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		return h.handle(ctx, req, decoder, c)
 	}
 }
 
-func (h *claimMutationHandler) OnDelete(client.Client, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
+func (h *claimMutationHandler) OnDelete(client.Client, admission.Decoder, events.EventRecorder) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (h *claimMutationHandler) OnCreate(c client.Client, decoder admission.Decoder, _ record.EventRecorder) capsulewebhook.Func {
+func (h *claimMutationHandler) OnCreate(c client.Client, decoder admission.Decoder, _ events.EventRecorder) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		return h.handle(ctx, req, decoder, c)
 	}

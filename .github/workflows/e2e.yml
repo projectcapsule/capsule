@@ -45,7 +45,6 @@ jobs:
       fail-fast: false
       matrix:
         k8s-version:
-          - 'v1.30.0'
           - 'v1.31.0'
           - 'v1.32.0'
           - 'v1.33.0'

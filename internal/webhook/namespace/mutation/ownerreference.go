@@ -11,30 +11,31 @@ import (
 	authenticationv1 "k8s.io/api/authentication/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	capsulewebhook "github.com/projectcapsule/capsule/internal/webhook"
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
-	"github.com/projectcapsule/capsule/pkg/configuration"
-	"github.com/projectcapsule/capsule/pkg/utils/tenant"
+	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
+	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
+	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
+	"github.com/projectcapsule/capsule/pkg/tenant"
 )
 
 type ownerReferenceHandler struct {
 	cfg configuration.Configuration
 }
 
-func OwnerReferenceHandler(cfg configuration.Configuration) capsulewebhook.TypedHandler[*corev1.Namespace] {
+func OwnerReferenceHandler(cfg configuration.Configuration) handlers.TypedHandler[*corev1.Namespace] {
 	return &ownerReferenceHandler{
 		cfg: cfg,
 	}
 }
 
-func (h *ownerReferenceHandler) OnCreate(c client.Client, ns *corev1.Namespace, decoder admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
+func (h *ownerReferenceHandler) OnCreate(c client.Client, ns *corev1.Namespace, decoder admission.Decoder, recorder events.EventRecorder) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		tnt, errResponse := utils.GetNamespaceTenant(ctx, c, ns, req, h.cfg, recorder)
 		if errResponse != nil {
@@ -69,13 +70,13 @@ func (h *ownerReferenceHandler) OnCreate(c client.Client, ns *corev1.Namespace, 
 	}
 }
 
-func (h *ownerReferenceHandler) OnDelete(client.Client, *corev1.Namespace, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
+func (h *ownerReferenceHandler) OnDelete(client.Client, *corev1.Namespace, admission.Decoder, events.EventRecorder) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (h *ownerReferenceHandler) OnUpdate(c client.Client, newNs *corev1.Namespace, oldNs *corev1.Namespace, decoder admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
+func (h *ownerReferenceHandler) OnUpdate(c client.Client, newNs *corev1.Namespace, oldNs *corev1.Namespace, decoder admission.Decoder, recorder events.EventRecorder) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		tnt, err := resolveTenantForNamespaceUpdate(ctx, c, h.cfg, oldNs, newNs, req.UserInfo)
 		if err != nil {
@@ -153,7 +154,7 @@ func assignToTenant(
 	c client.Client,
 	tnt *capsulev1beta2.Tenant,
 	ns *corev1.Namespace,
-	recorder record.EventRecorder,
+	recorder events.EventRecorder,
 ) error {
 	has, err := controllerutil.HasOwnerReference(ns.OwnerReferences, tnt, c.Scheme())
 	if err != nil {
@@ -165,12 +166,12 @@ func assignToTenant(
 	}
 
 	if err := controllerutil.SetOwnerReference(tnt, ns, c.Scheme()); err != nil {
-		recorder.Eventf(tnt, corev1.EventTypeWarning, "Error", "Namespace %s cannot be assigned to the desired Tenant", ns.GetName())
+		recorder.Eventf(ns, tnt, corev1.EventTypeWarning, evt.ReasonNamespaceHijack, evt.ActionValidationDenied, "Namespace %s cannot be assigned to the desired tenant %s", ns.GetName(), tnt.GetName())
 
 		return err
 	}
 
-	recorder.Eventf(tnt, corev1.EventTypeNormal, "NamespaceCreationWebhook", "Namespace %s has been assigned to the desired Tenant", ns.GetName())
+	recorder.Eventf(ns, tnt, corev1.EventTypeNormal, evt.ReasonTenantAssigned, evt.ActionValidationDenied, "Namespace %s has been assigned to the desired tenant %s", ns.GetName(), tnt.GetName())
 
 	return nil
 }

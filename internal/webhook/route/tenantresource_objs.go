@@ -3,15 +3,13 @@
 
 package route
 
-import (
-	capsulewebhook "github.com/projectcapsule/capsule/internal/webhook"
-)
+import "github.com/projectcapsule/capsule/pkg/runtime/handlers"
 
 type tntResourceObjs struct {
-	handlers []capsulewebhook.Handler
+	handlers []handlers.Handler
 }
 
-func TenantResourceObjects(handlers ...capsulewebhook.Handler) capsulewebhook.Webhook {
+func TenantResourceObjects(handlers ...handlers.Handler) handlers.Webhook {
 	return &tntResourceObjs{handlers: handlers}
 }
 
@@ -19,6 +17,6 @@ func (t tntResourceObjs) GetPath() string {
 	return "/tenantresource-objects"
 }
 
-func (t tntResourceObjs) GetHandlers() []capsulewebhook.Handler {
+func (t tntResourceObjs) GetHandlers() []handlers.Handler {
 	return t.handlers
 }

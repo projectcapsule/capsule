@@ -6,15 +6,12 @@ package tenant
 import (
 	"context"
 
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/client-go/util/workqueue"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -171,7 +168,7 @@ func (r *Manager) pruningResources(ctx context.Context, ns string, keys []string
 		selector = selector.Add(*notIn)
 	}
 
-	r.Log.V(3).Info("Pruning objects with label selector " + selector.String())
+	r.Log.V(4).Info("pruning objects with label selector " + selector.String())
 
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		return r.DeleteAllOf(ctx, obj, &client.DeleteAllOfOptions{
@@ -182,15 +179,4 @@ func (r *Manager) pruningResources(ctx context.Context, ns string, keys []string
 			DeleteOptions: client.DeleteOptions{},
 		})
 	})
-}
-
-func (r *Manager) emitEvent(object runtime.Object, namespace string, res controllerutil.OperationResult, msg string, err error) {
-	eventType := corev1.EventTypeNormal
-
-	if err != nil {
-		eventType = corev1.EventTypeWarning
-		res = "Error"
-	}
-
-	r.Recorder.AnnotatedEventf(object, map[string]string{"OperationResult": string(res)}, eventType, namespace, msg)
 }

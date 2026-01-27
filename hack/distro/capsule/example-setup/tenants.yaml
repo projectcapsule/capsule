@@ -4,21 +4,38 @@ kind: Tenant
 metadata:
   name: solar
 spec:
+  owners:
+  - name: alice
+    kind: User
   permissions:
     matchOwners:
     - matchLabels:
         team: platform
     - matchLabels:
         tenant: solar
-  owners:
-  - name: alice
-    kind: User
   additionalRoleBindings:
   - clusterRoleName: 'view'
     subjects:
     - apiGroup: rbac.authorization.k8s.io
       kind: User
       name: joe
+  rules:
+    - enforce:
+        registries:
+        - url: "harbor/.*"
+          policy:
+          - "Never"
+    - namespaceSelector:
+        matchExpressions:
+          - key: env
+            operator: In
+            values:
+            - "prod"
+      enforce:
+        registries:
+        - url: "harbor/v2/customer-registry/prod-image/.*"
+          policy:
+          - "Always"
 ---
 apiVersion: capsule.clastix.io/v1beta2
 kind: Tenant

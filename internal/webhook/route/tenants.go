@@ -4,19 +4,17 @@
 //nolint:dupl
 package route
 
-import (
-	capsulewebhook "github.com/projectcapsule/capsule/internal/webhook"
-)
+import "github.com/projectcapsule/capsule/pkg/runtime/handlers"
 
 type tenantValidating struct {
-	handlers []capsulewebhook.Handler
+	handlers []handlers.Handler
 }
 
-func TenantValidation(handler ...capsulewebhook.Handler) capsulewebhook.Webhook {
+func TenantValidation(handler ...handlers.Handler) handlers.Webhook {
 	return &tenantValidating{handlers: handler}
 }
 
-func (w *tenantValidating) GetHandlers() []capsulewebhook.Handler {
+func (w *tenantValidating) GetHandlers() []handlers.Handler {
 	return w.handlers
 }
 
@@ -25,14 +23,14 @@ func (w *tenantValidating) GetPath() string {
 }
 
 type tenantMutating struct {
-	handlers []capsulewebhook.Handler
+	handlers []handlers.Handler
 }
 
-func TenantMutation(handler ...capsulewebhook.Handler) capsulewebhook.Webhook {
+func TenantMutation(handler ...handlers.Handler) handlers.Webhook {
 	return &tenantMutating{handlers: handler}
 }
 
-func (w *tenantMutating) GetHandlers() []capsulewebhook.Handler {
+func (w *tenantMutating) GetHandlers() []handlers.Handler {
 	return w.handlers
 }
 

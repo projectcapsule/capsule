@@ -16,7 +16,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -30,6 +30,7 @@ import (
 	"github.com/projectcapsule/capsule/internal/metrics"
 	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
+	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/utils"
 )
 
@@ -38,11 +39,12 @@ type resourcePoolController struct {
 
 	metrics  *metrics.ResourcePoolRecorder
 	log      logr.Logger
-	recorder record.EventRecorder
+	recorder events.EventRecorder
 }
 
 func (r *resourcePoolController) SetupWithManager(mgr ctrl.Manager, cfg ctrlutils.ControllerOptions) error {
 	return ctrl.NewControllerManagedBy(mgr).
+		Named("capsule/resourcepools/pools").
 		For(&capsulev1beta2.ResourcePool{}).
 		Owns(&corev1.ResourceQuota{}).
 		Watches(&capsulev1beta2.ResourcePoolClaim{},
@@ -350,14 +352,14 @@ func (r *resourcePoolController) handleClaimResourceExhaustion(
 	currentExhaustions map[string]api.PoolExhaustionResource,
 	exhaustions map[string]api.PoolExhaustionResource,
 ) (err error) {
-	status := make([]string, 0) //nolint:prealloc
-
-	resourceNames := make([]string, 0) //nolint:prealloc
+	resourceNames := make([]string, 0, len(currentExhaustions))
 	for resourceName := range currentExhaustions {
 		resourceNames = append(resourceNames, resourceName)
 	}
 
 	sort.Strings(resourceNames)
+
+	status := make([]string, 0, len(resourceNames))
 
 	for _, resourceName := range resourceNames {
 		ex := currentExhaustions[resourceName]
@@ -441,7 +443,7 @@ func (r *resourcePoolController) handleClaimDisassociation(
 
 		if !*pool.Spec.Config.DeleteBoundResources || meta.ReleaseAnnotationTriggers(current) {
 			patch := client.MergeFrom(current.DeepCopy())
-			meta.RemoveLooseOwnerReference(current, pool)
+			meta.RemoveLooseOwnerReference(current, meta.GetLooseOwnerReference(pool))
 			meta.ReleaseAnnotationRemove(current)
 
 			if err := r.Patch(ctx, current, patch); err != nil {
@@ -454,15 +456,13 @@ func (r *resourcePoolController) handleClaimDisassociation(
 			return fmt.Errorf("failed to update claim status: %w", err)
 		}
 
-		r.recorder.AnnotatedEventf(
+		r.recorder.Eventf(
+			pool,
 			current,
-			map[string]string{
-				"Status": string(metav1.ConditionFalse),
-				"Type":   meta.NotReadyCondition,
-			},
 			corev1.EventTypeNormal,
-			"Disassociated",
-			"Claim is disassociated from the pool",
+			evt.ReasonDisassociated,
+			evt.ActionDisassociating,
+			"claim is disassociated from the pool",
 		)
 
 		return nil

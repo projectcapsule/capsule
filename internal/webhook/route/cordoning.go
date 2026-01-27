@@ -3,15 +3,13 @@
 
 package route
 
-import (
-	capsulewebhook "github.com/projectcapsule/capsule/internal/webhook"
-)
+import "github.com/projectcapsule/capsule/pkg/runtime/handlers"
 
 type cordoning struct {
-	handlers []capsulewebhook.Handler
+	handlers []handlers.Handler
 }
 
-func Cordoning(handlers ...capsulewebhook.Handler) capsulewebhook.Webhook {
+func Cordoning(handlers ...handlers.Handler) handlers.Webhook {
 	return &cordoning{handlers: handlers}
 }
 
@@ -19,6 +17,6 @@ func (w cordoning) GetPath() string {
 	return "/cordoning"
 }
 
-func (w cordoning) GetHandlers() []capsulewebhook.Handler {
+func (w cordoning) GetHandlers() []handlers.Handler {
 	return w.handlers
 }

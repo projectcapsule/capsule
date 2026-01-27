@@ -3,19 +3,17 @@
 
 package route
 
-import (
-	capsulewebhook "github.com/projectcapsule/capsule/internal/webhook"
-)
+import "github.com/projectcapsule/capsule/pkg/runtime/handlers"
 
 type networkPolicy struct {
-	handlers []capsulewebhook.Handler
+	handlers []handlers.Handler
 }
 
-func NetworkPolicy(handler ...capsulewebhook.Handler) capsulewebhook.Webhook {
+func NetworkPolicy(handler ...handlers.Handler) handlers.Webhook {
 	return &networkPolicy{handlers: handler}
 }
 
-func (w *networkPolicy) GetHandlers() []capsulewebhook.Handler {
+func (w *networkPolicy) GetHandlers() []handlers.Handler {
 	return w.handlers
 }
 

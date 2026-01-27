@@ -25,8 +25,8 @@ func (r *Manager) syncCustomResourceQuotaUsages(ctx context.Context, tenant *cap
 		group   string
 		version string
 	}
-	//nolintlint:prealloc
-	var resourceList []resource
+
+	resourceList := make([]resource, 0, len(tenant.GetAnnotations()))
 
 	for k := range tenant.GetAnnotations() {
 		if !strings.HasPrefix(k, capsulev1beta2.ResourceQuotaAnnotationPrefix) {

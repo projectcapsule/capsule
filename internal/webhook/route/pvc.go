@@ -3,19 +3,17 @@
 
 package route
 
-import (
-	capsulewebhook "github.com/projectcapsule/capsule/internal/webhook"
-)
+import "github.com/projectcapsule/capsule/pkg/runtime/handlers"
 
 type pvc struct {
-	handlers []capsulewebhook.Handler
+	handlers []handlers.Handler
 }
 
-func PVC(handler ...capsulewebhook.Handler) capsulewebhook.Webhook {
+func PVC(handler ...handlers.Handler) handlers.Webhook {
 	return &pvc{handlers: handler}
 }
 
-func (w *pvc) GetHandlers() []capsulewebhook.Handler {
+func (w *pvc) GetHandlers() []handlers.Handler {
 	return w.handlers
 }
 
