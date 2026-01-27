@@ -13,6 +13,8 @@ const (
 	ReleaseAnnotation        = "projectcapsule.dev/release"
 	ReleaseAnnotationTrigger = "true"
 
+	ReconcileAnnotation = "reconcile.projectcapsule.dev/requestedAt"
+
 	AvailableIngressClassesAnnotation       = "capsule.clastix.io/ingress-classes"
 	AvailableIngressClassesRegexpAnnotation = "capsule.clastix.io/ingress-classes-regexp"
 	AvailableStorageClassesAnnotation       = "capsule.clastix.io/storage-classes"

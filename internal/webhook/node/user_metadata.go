@@ -14,6 +14,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
+	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
@@ -68,7 +69,7 @@ func (r *userMetadataHandler) OnUpdate(_ client.Client, decoder admission.Decode
 			if !reflect.DeepEqual(oldNodeForbiddenLabels, newNodeForbiddenLabels) {
 				recorder.Eventf(newNode, oldNode, corev1.EventTypeWarning, evt.ReasonForbiddenLabel, evt.ActionValidationDenied, "Denied modifying forbidden labels on node")
 
-				response := admission.Denied(NewNodeLabelForbiddenError(r.configuration.ForbiddenUserNodeLabels()).Error())
+				response := admission.Denied(caperrors.NewNodeLabelForbiddenError(r.configuration.ForbiddenUserNodeLabels()).Error())
 
 				return &response
 			}
@@ -81,7 +82,7 @@ func (r *userMetadataHandler) OnUpdate(_ client.Client, decoder admission.Decode
 			if !reflect.DeepEqual(oldNodeForbiddenAnnotations, newNodeForbiddenAnnotations) {
 				recorder.Eventf(newNode, oldNode, corev1.EventTypeWarning, evt.ReasonForbiddenLabel, evt.ActionValidationDenied, "Denied modifying forbidden annotations on node")
 
-				response := admission.Denied(NewNodeAnnotationForbiddenError(r.configuration.ForbiddenUserNodeAnnotations()).Error())
+				response := admission.Denied(caperrors.NewNodeAnnotationForbiddenError(r.configuration.ForbiddenUserNodeAnnotations()).Error())
 
 				return &response
 			}

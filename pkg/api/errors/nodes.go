@@ -1,7 +1,7 @@
 // Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package node
+package errors
 
 import (
 	"fmt"
@@ -27,30 +27,30 @@ func appendForbiddenError(spec *capsulev1beta2.ForbiddenListSpec) (append string
 	return append
 }
 
-type nodeLabelForbiddenError struct {
+type NodeLabelForbiddenError struct {
 	spec *capsulev1beta2.ForbiddenListSpec
 }
 
 func NewNodeLabelForbiddenError(forbiddenSpec *capsulev1beta2.ForbiddenListSpec) error {
-	return &nodeLabelForbiddenError{
+	return &NodeLabelForbiddenError{
 		spec: forbiddenSpec,
 	}
 }
 
-func (f nodeLabelForbiddenError) Error() string {
+func (f NodeLabelForbiddenError) Error() string {
 	return fmt.Sprintf("Unable to update node as some labels are marked as forbidden by system administrator. %s", appendForbiddenError(f.spec))
 }
 
-type nodeAnnotationForbiddenError struct {
+type NodeAnnotationForbiddenError struct {
 	spec *capsulev1beta2.ForbiddenListSpec
 }
 
 func NewNodeAnnotationForbiddenError(forbiddenSpec *capsulev1beta2.ForbiddenListSpec) error {
-	return &nodeAnnotationForbiddenError{
+	return &NodeAnnotationForbiddenError{
 		spec: forbiddenSpec,
 	}
 }
 
-func (f nodeAnnotationForbiddenError) Error() string {
+func (f NodeAnnotationForbiddenError) Error() string {
 	return fmt.Sprintf("Unable to update node as some annotations are marked as forbidden by system administrator. %s", appendForbiddenError(f.spec))
 }

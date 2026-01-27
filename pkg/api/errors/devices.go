@@ -1,7 +1,7 @@
 // Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package dra
+package errors
 
 import (
 	"fmt"
@@ -10,34 +10,34 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api"
 )
 
-type deviceClassForbiddenError struct {
+type DeviceClassForbiddenError struct {
 	deviceClassName string
 	spec            api.SelectorAllowedListSpec
 }
 
-func (i deviceClassForbiddenError) Error() string {
+func (i DeviceClassForbiddenError) Error() string {
 	err := fmt.Sprintf("Device Class %s is forbidden for the current Tenant: ", i.deviceClassName)
 
 	return utils.AllowedValuesErrorMessage(i.spec, err)
 }
 
 func NewDeviceClassForbidden(class string, spec api.SelectorAllowedListSpec) error {
-	return &deviceClassForbiddenError{
+	return &DeviceClassForbiddenError{
 		deviceClassName: class,
 		spec:            spec,
 	}
 }
 
-type deviceClassUndefinedError struct {
+type DeviceClassUndefinedError struct {
 	spec api.SelectorAllowedListSpec
 }
 
 func NewDeviceClassUndefined(spec api.SelectorAllowedListSpec) error {
-	return &deviceClassUndefinedError{
+	return &DeviceClassUndefinedError{
 		spec: spec,
 	}
 }
 
-func (i deviceClassUndefinedError) Error() string {
+func (i DeviceClassUndefinedError) Error() string {
 	return utils.AllowedValuesErrorMessage(i.spec, "Selected DeviceClass is forbidden for the current Tenant or does not exist. Specify a device Class which is allowed by ")
 }

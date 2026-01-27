@@ -16,6 +16,7 @@ import (
 
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
 	"github.com/projectcapsule/capsule/pkg/api"
+	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
 	"github.com/projectcapsule/capsule/pkg/tenant"
 )
 
@@ -89,7 +90,7 @@ func handlePriorityClassDefault(ctx context.Context, c client.Client, allowed *a
 		cpc, err = utils.GetPriorityClassByName(ctx, c, priorityClassPod)
 		// Should not happen, since API already checks if PC present
 		if err != nil {
-			return false, NewPriorityClassError(priorityClassPod, err)
+			return false, caperrors.NewPriorityClassError(priorityClassPod, err)
 		}
 	} else {
 		mutated = true

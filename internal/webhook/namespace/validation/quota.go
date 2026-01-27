@@ -13,6 +13,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
 	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
@@ -78,7 +79,7 @@ func (h *quotaHandler) handle(
 
 		recorder.Eventf(tnt, ns, corev1.EventTypeWarning, evt.ReasonOverprovision, evt.ActionValidationDenied, "Namespace %s cannot be attached, quota exceeded for the current Tenant", ns.GetName())
 
-		response := admission.Denied(NewNamespaceQuotaExceededError().Error())
+		response := admission.Denied(caperrors.NewNamespaceQuotaExceededError().Error())
 
 		return &response
 	}

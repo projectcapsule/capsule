@@ -16,6 +16,7 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api"
+	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
 	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
@@ -79,7 +80,7 @@ func (h *validating) handle(
 			"Cannot be type of NodePort for the Tenant %s", tnt.GetName(),
 		)
 
-		response := admission.Denied(NewNodePortDisabledError().Error())
+		response := admission.Denied(caperrors.NewNodePortDisabledError().Error())
 
 		return &response
 	}
@@ -94,7 +95,7 @@ func (h *validating) handle(
 			"Cannot be type of ExternalName for the Tenant %s", tnt.GetName(),
 		)
 
-		response := admission.Denied(NewExternalNameDisabledError().Error())
+		response := admission.Denied(caperrors.NewExternalNameDisabledError().Error())
 
 		return &response
 	}
@@ -109,7 +110,7 @@ func (h *validating) handle(
 			"Cannot be type of LoadBalancer for the Tenant %s", tnt.GetName(),
 		)
 
-		response := admission.Denied(NewLoadBalancerDisabled().Error())
+		response := admission.Denied(caperrors.NewLoadBalancerDisabled().Error())
 
 		return &response
 	}
@@ -185,7 +186,7 @@ func (h *validating) handle(
 				"External IP %s is forbidden for the Tenant %s", ip.String(), tnt.GetName(),
 			)
 
-			response := admission.Denied(NewExternalServiceIPForbidden(tnt.Spec.ServiceOptions.ExternalServiceIPs.Allowed).Error())
+			response := admission.Denied(caperrors.NewExternalServiceIPForbidden(tnt.Spec.ServiceOptions.ExternalServiceIPs.Allowed).Error())
 
 			return &response
 		}

@@ -12,6 +12,22 @@ import (
 	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 )
 
+type StorageClassError struct {
+	storageClass string
+	msg          error
+}
+
+func NewStorageClassError(class string, msg error) error {
+	return &StorageClassError{
+		storageClass: class,
+		msg:          msg,
+	}
+}
+
+func (e StorageClassError) Error() string {
+	return fmt.Sprintf("Failed to resolve Storage Class %s: %s", e.storageClass, e.msg)
+}
+
 type StorageClassNotValidError struct {
 	spec api.DefaultAllowedListSpec
 }

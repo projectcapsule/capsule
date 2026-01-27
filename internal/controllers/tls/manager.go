@@ -29,6 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"github.com/projectcapsule/capsule/internal/controllers/utils"
+	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
 	"github.com/projectcapsule/capsule/pkg/runtime/cert"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 )
@@ -141,7 +142,7 @@ func (r Reconciler) ReconcileCertificates(ctx context.Context, certSecret *corev
 
 	operatorPods, err := r.getOperatorPods(ctx)
 	if err != nil {
-		if errors.As(err, &RunningInOutOfClusterModeError{}) {
+		if errors.As(err, &caperrors.RunningInOutOfClusterModeError{}) {
 			r.Log.Info("skipping annotation of Pods for cert-manager", "error", err.Error())
 
 			return nil
@@ -332,7 +333,7 @@ func (r Reconciler) getOperatorPods(ctx context.Context) (*corev1.PodList, error
 	leaderPod := &corev1.Pod{}
 
 	if err := r.Get(ctx, types.NamespacedName{Namespace: os.Getenv("NAMESPACE"), Name: hostname}, leaderPod); err != nil {
-		return nil, RunningInOutOfClusterModeError{}
+		return nil, caperrors.RunningInOutOfClusterModeError{}
 	}
 
 	podList := &corev1.PodList{}

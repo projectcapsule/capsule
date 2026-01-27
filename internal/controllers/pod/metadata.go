@@ -21,6 +21,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
 	"github.com/projectcapsule/capsule/pkg/utils"
 )
 
@@ -42,9 +43,9 @@ func (m *MetadataReconciler) Reconcile(ctx context.Context, request ctrl.Request
 
 	tenant, err := m.getTenant(ctx, request.NamespacedName, m.Client)
 	if err != nil {
-		noTenantObjError := &NonTenantObjectError{}
+		noTenantObjError := &caperrors.NonTenantObjectError{}
 
-		noPodMetaError := &NoPodMetadataError{}
+		noPodMetaError := &caperrors.NoPodMetadataError{}
 		if errors.As(err, &noTenantObjError) || errors.As(err, &noPodMetaError) {
 			return reconcile.Result{}, nil
 		}
@@ -83,7 +84,7 @@ func (m *MetadataReconciler) getTenant(ctx context.Context, namespacedName types
 
 	capsuleLabel, _ := utils.GetTypeLabel(&capsulev1beta2.Tenant{})
 	if _, ok := ns.GetLabels()[capsuleLabel]; !ok {
-		return nil, NewNonTenantObject(namespacedName.Name)
+		return nil, caperrors.NewNonTenantObject(namespacedName.Name)
 	}
 
 	if err := client.Get(ctx, types.NamespacedName{Name: ns.Labels[capsuleLabel]}, tenant); err != nil {
@@ -91,7 +92,7 @@ func (m *MetadataReconciler) getTenant(ctx context.Context, namespacedName types
 	}
 
 	if tenant.Spec.PodOptions == nil || tenant.Spec.PodOptions.AdditionalMetadata == nil {
-		return nil, NewNoPodMetadata(namespacedName.Name)
+		return nil, caperrors.NewNoPodMetadata(namespacedName.Name)
 	}
 
 	return tenant, nil

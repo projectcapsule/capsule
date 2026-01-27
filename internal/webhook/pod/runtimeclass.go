@@ -15,6 +15,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
 	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
@@ -117,7 +118,7 @@ func (h *runtimeClass) validate(
 			"Using Runtime Class %s is forbidden for the tenant %s", runtimeClassName, tnt.GetName(),
 		)
 
-		response := admission.Denied(NewPodRuntimeClassForbidden(runtimeClassName, *allowed).Error())
+		response := admission.Denied(caperrors.NewPodRuntimeClassForbidden(runtimeClassName, *allowed).Error())
 
 		return &response
 	default:

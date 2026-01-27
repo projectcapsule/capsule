@@ -6,6 +6,7 @@ package meta
 import (
 	"strings"
 
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -77,4 +78,24 @@ func labelTriggers(obj client.Object, anno string, trigger string) bool {
 	}
 
 	return false
+}
+
+// SetFilteredLabels Removes given labels by key.
+func SetFilteredLabels(obj *unstructured.Unstructured, filter map[string]struct{}) {
+	if obj == nil || len(filter) == 0 {
+		return
+	}
+
+	labels := obj.GetLabels()
+	if labels == nil {
+		labels = make(map[string]string, len(filter))
+	}
+
+	for k := range labels {
+		if _, reserved := filter[k]; reserved {
+			delete(labels, k)
+		}
+	}
+
+	obj.SetLabels(labels)
 }

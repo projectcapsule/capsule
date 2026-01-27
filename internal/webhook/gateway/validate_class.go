@@ -16,6 +16,7 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
+	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
@@ -80,7 +81,7 @@ func (r *class) validate(ctx context.Context, client client.Client, req admissio
 	if gatewayClass == nil {
 		recorder.Eventf(tnt, gatewayClass, corev1.EventTypeWarning, evt.ReasonMissingGatewayClass, evt.ActionValidationDenied, "Gateway %s/%s is missing GatewayClass", req.Namespace, req.Name)
 
-		response := admission.Denied(NewGatewayClassUndefined(*allowed).Error())
+		response := admission.Denied(caperrors.NewGatewayClassUndefined(*allowed).Error())
 
 		return &response
 	}
@@ -109,7 +110,7 @@ func (r *class) validate(ctx context.Context, client client.Client, req admissio
 	default:
 		recorder.Eventf(tnt, gatewayClass, corev1.EventTypeWarning, evt.ReasonForbiddenGatewayClass, evt.ActionValidationDenied, "Gateway %s/%s GatewayClass %s is forbidden for the current Tenant", req.Namespace, req.Name, &gatewayClass)
 
-		response := admission.Denied(NewGatewayClassForbidden(gatewayObj.Name, *allowed).Error())
+		response := admission.Denied(caperrors.NewGatewayClassForbidden(gatewayObj.Name, *allowed).Error())
 
 		return &response
 	}

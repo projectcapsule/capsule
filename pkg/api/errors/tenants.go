@@ -1,7 +1,7 @@
 // Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package pod
+package errors
 
 import "fmt"
 
@@ -15,16 +15,4 @@ func NewNonTenantObject(objectName string) error {
 
 func (n NonTenantObjectError) Error() string {
 	return fmt.Sprintf("Skipping labels sync for %s as it doesn't belong to tenant", n.objectName)
-}
-
-type NoPodMetadataError struct {
-	objectName string
-}
-
-func NewNoPodMetadata(objectName string) error {
-	return &NoPodMetadataError{objectName: objectName}
-}
-
-func (n NoPodMetadataError) Error() string {
-	return fmt.Sprintf("Skipping labels sync for %s because no AdditionalLabels or AdditionalAnnotations presents in Tenant spec", n.objectName)
 }

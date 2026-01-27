@@ -21,6 +21,7 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
 	"github.com/projectcapsule/capsule/pkg/api"
+	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
@@ -74,7 +75,7 @@ func (r *collision) validate(ctx context.Context, client client.Client, req admi
 		return nil
 	}
 
-	var collisionErr *ingressHostnameCollisionError
+	var collisionErr *caperrors.IngressHostnameCollisionError
 	if errors.As(err, &collisionErr) {
 		recorder.Eventf(tenant, nil, corev1.EventTypeWarning, evt.ReasonIngressHostnameCollision, evt.ActionValidationDenied, "Ingress %s/%s hostname is colliding", ing.Namespace(), ing.Name())
 	}
@@ -152,7 +153,7 @@ func (r *collision) validateCollision(ctx context.Context, clt client.Client, in
 
 					fallthrough
 				default:
-					return NewIngressHostnameCollision(hostname)
+					return caperrors.NewIngressHostnameCollision(hostname)
 				}
 			case *networkingv1.IngressList:
 				for index, item := range list.Items {
@@ -171,7 +172,7 @@ func (r *collision) validateCollision(ctx context.Context, clt client.Client, in
 
 					fallthrough
 				default:
-					return NewIngressHostnameCollision(hostname)
+					return caperrors.NewIngressHostnameCollision(hostname)
 				}
 			case *networkingv1beta1.IngressList:
 				for index, item := range list.Items {
@@ -190,7 +191,7 @@ func (r *collision) validateCollision(ctx context.Context, clt client.Client, in
 
 					fallthrough
 				default:
-					return NewIngressHostnameCollision(hostname)
+					return caperrors.NewIngressHostnameCollision(hostname)
 				}
 			}
 		}

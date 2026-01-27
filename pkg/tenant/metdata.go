@@ -11,7 +11,7 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
-	"github.com/projectcapsule/capsule/pkg/template"
+	tpl "github.com/projectcapsule/capsule/pkg/template"
 	"github.com/projectcapsule/capsule/pkg/utils"
 )
 
@@ -46,6 +46,8 @@ func BuildNamespaceMetadataForTenant(ns *corev1.Namespace, tnt *capsulev1beta2.T
 	annotations = BuildNamespaceAnnotationsForTenant(tnt)
 	labels = BuildNamespaceLabelsForTenant(tnt)
 
+	fastContext := ContextForTenantAndNamespace(tnt, ns)
+
 	if opts := tnt.Spec.NamespaceOptions; opts != nil && len(opts.AdditionalMetadataList) > 0 {
 		for _, md := range opts.AdditionalMetadataList {
 			var ok bool
@@ -59,8 +61,8 @@ func BuildNamespaceMetadataForTenant(ns *corev1.Namespace, tnt *capsulev1beta2.T
 				continue
 			}
 
-			tLabels := template.TemplateForTenantAndNamespaceMap(md.Labels, tnt, ns)
-			tAnnotations := template.TemplateForTenantAndNamespaceMap(md.Annotations, tnt, ns)
+			tLabels := tpl.FastTemplateMap(md.Labels, fastContext)
+			tAnnotations := tpl.FastTemplateMap(md.Annotations, fastContext)
 
 			utils.MapMergeNoOverrite(labels, tLabels)
 			utils.MapMergeNoOverrite(annotations, tAnnotations)

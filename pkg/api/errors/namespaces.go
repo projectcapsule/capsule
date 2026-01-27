@@ -1,14 +1,14 @@
 // Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package validation
+package errors
 
-type namespaceQuotaExceededError struct{}
+type NamespaceQuotaExceededError struct{}
 
 func NewNamespaceQuotaExceededError() error {
-	return &namespaceQuotaExceededError{}
+	return &NamespaceQuotaExceededError{}
 }
 
-func (namespaceQuotaExceededError) Error() string {
+func (NamespaceQuotaExceededError) Error() string {
 	return "Cannot exceed Namespace quota: please, reach out to the system administrators"
 }
