@@ -88,7 +88,7 @@ func SetFilteredLabels(obj *unstructured.Unstructured, filter map[string]struct{
 
 	labels := obj.GetLabels()
 	if labels == nil {
-		labels = make(map[string]string, len(filter))
+		return
 	}
 
 	for k := range labels {

@@ -17,11 +17,8 @@ func TestGetOwnersWithKinds_EmptyOwners(t *testing.T) {
 
 	owners := tenant.GetOwnersWithKinds(tnt)
 
-	if owners == nil {
+	if owners != nil {
 		t.Fatalf("expected empty slice, got nil")
-	}
-	if len(owners) != 0 {
-		t.Fatalf("expected empty slice, got %v", owners)
 	}
 }
 

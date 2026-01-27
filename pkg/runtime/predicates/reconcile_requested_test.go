@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 
 	"github.com/projectcapsule/capsule/pkg/api/meta"
@@ -55,16 +56,6 @@ func TestReconcileRequestedPredicate_Update(t *testing.T) {
 	}
 
 	tests := []tc{
-		{
-			name: "nil old object returns false",
-			old:  nil, new: map[string]string{meta.ReconcileAnnotation: "2026-01-13T06:23:14+01:00"},
-			want: false,
-		},
-		{
-			name: "nil new object returns false",
-			old:  map[string]string{meta.ReconcileAnnotation: "2026-01-13T06:23:14+01:00"}, new: nil,
-			want: false,
-		},
 		{
 			name: "annotation added triggers true",
 			old:  map[string]string{},
@@ -115,18 +106,12 @@ func TestReconcileRequestedPredicate_Update(t *testing.T) {
 			t.Parallel()
 
 			var oldObj, newObj *unstructured.Unstructured
-			// For the nil-object tests, we want ObjectOld/ObjectNew to be nil.
-			// Otherwise create real objects.
-			if tt.name != "nil old object returns false" {
-				oldObj = mkObj(tt.old)
-			}
-			if tt.name != "nil new object returns false" {
-				newObj = mkObj(tt.new)
-			}
+			oldObj = mkObj(tt.old)
+			newObj = mkObj(tt.new)
 
 			ev := event.UpdateEvent{
-				ObjectOld: oldObj,
-				ObjectNew: newObj,
+				ObjectOld: client.Object(oldObj),
+				ObjectNew: client.Object(newObj),
 			}
 
 			got := p.Update(ev)

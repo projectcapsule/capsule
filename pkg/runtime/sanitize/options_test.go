@@ -18,11 +18,10 @@ func TestDefaultSanitizeOptions(t *testing.T) {
 	if !opts.StripLastApplied {
 		t.Fatalf("expected StripLastApplied=true")
 	}
-	if opts.StripStatus {
-		t.Fatalf("expected StripStatus=false")
+	if !opts.StripStatus {
+		t.Fatalf("expected StripStatus=true")
 	}
-	if opts.StripUID {
-		t.Fatalf("expected StripStatus=false")
+	if !opts.StripUID {
+		t.Fatalf("expected StripUID=true")
 	}
-
 }

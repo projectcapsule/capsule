@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"text/template"
 
 	k8smeta "k8s.io/apimachinery/pkg/api/meta"
@@ -64,7 +65,7 @@ func (t *TemplateContext) GatherContext(
 		if len(res) > 0 {
 			resourceIndex := resource.Index
 			if resourceIndex == "" {
-				resourceIndex = string(index)
+				resourceIndex = strconv.Itoa(index)
 			}
 
 			for _, u := range res {

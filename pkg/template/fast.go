@@ -6,7 +6,6 @@ package template
 import (
 	"fmt"
 	"io"
-	"maps"
 	"strings"
 
 	"github.com/valyala/fasttemplate"
@@ -17,11 +16,7 @@ import (
 func RequiresFastTemplate(
 	template string,
 ) bool {
-	if !strings.Contains(template, "{{") && !strings.Contains(template, "}}") {
-		return false
-	}
-
-	return true
+	return strings.Contains(template, "{{") && strings.Contains(template, "}}")
 }
 
 // FastTemplate applies templating to the provided string.
@@ -54,8 +49,8 @@ func FastTemplateMap(
 		return map[string]string{}
 	}
 
-	out := maps.Clone(m)
-	for k, v := range out {
+	out := make(map[string]string, len(m))
+	for k, v := range m {
 		out[FastTemplate(k, templateContext)] = FastTemplate(v, templateContext)
 	}
 
@@ -82,6 +77,7 @@ func SelectorRequiresTemplating(sel *metav1.LabelSelector) bool {
 			}
 		}
 	}
+
 	return false
 }
 
@@ -96,7 +92,7 @@ func FastTemplateLabelSelector(
 
 	out := in.DeepCopy()
 
-	out.MatchLabels = FastTemplateMap(out.MatchLabels, templateContext)
+	out.MatchLabels = FastTemplateMap(in.MatchLabels, templateContext)
 
 	for i := range out.MatchExpressions {
 		out.MatchExpressions[i].Key = FastTemplate(out.MatchExpressions[i].Key, templateContext)

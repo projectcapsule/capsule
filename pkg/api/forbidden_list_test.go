@@ -1,12 +1,14 @@
 // Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package api
+package api_test
 
 import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	"github.com/projectcapsule/capsule/pkg/api"
 )
 
 func TestForbiddenListSpec_ExactMatch(t *testing.T) {
@@ -33,7 +35,7 @@ func TestForbiddenListSpec_ExactMatch(t *testing.T) {
 			[]string{"any", "value"},
 		},
 	} {
-		a := ForbiddenListSpec{
+		a := api.ForbiddenListSpec{
 			Exact: tc.In,
 		}
 
@@ -58,7 +60,7 @@ func TestForbiddenListSpec_RegexMatch(t *testing.T) {
 		{`first-\w+-pattern`, []string{"first-date-pattern", "first-year-pattern"}, []string{"broken", "first-year", "second-date-pattern"}},
 		{``, nil, []string{"any", "value"}},
 	} {
-		a := ForbiddenListSpec{
+		a := api.ForbiddenListSpec{
 			Regex: tc.Regex,
 		}
 
@@ -75,46 +77,46 @@ func TestForbiddenListSpec_RegexMatch(t *testing.T) {
 func TestValidateForbidden(t *testing.T) {
 	type tc struct {
 		Keys          map[string]string
-		ForbiddenSpec ForbiddenListSpec
+		ForbiddenSpec api.ForbiddenListSpec
 		HasError      bool
 	}
 
 	for _, tc := range []tc{
 		{
 			Keys: map[string]string{"foobar": "", "thesecondkey": "", "anotherkey": ""},
-			ForbiddenSpec: ForbiddenListSpec{
+			ForbiddenSpec: api.ForbiddenListSpec{
 				Exact: []string{"foobar", "somelabelkey1"},
 			},
 			HasError: true,
 		},
 		{
 			Keys: map[string]string{"foobar": ""},
-			ForbiddenSpec: ForbiddenListSpec{
+			ForbiddenSpec: api.ForbiddenListSpec{
 				Exact: []string{"foobar.io", "somelabelkey1", "test-exact"},
 			},
 			HasError: false,
 		},
 		{
 			Keys: map[string]string{"foobar": "", "barbaz": ""},
-			ForbiddenSpec: ForbiddenListSpec{
+			ForbiddenSpec: api.ForbiddenListSpec{
 				Regex: "foo.*",
 			},
 			HasError: true,
 		},
 		{
 			Keys: map[string]string{"foobar": "", "another-annotation-key": ""},
-			ForbiddenSpec: ForbiddenListSpec{
+			ForbiddenSpec: api.ForbiddenListSpec{
 				Regex: "foo1111",
 			},
 			HasError: false,
 		},
 	} {
 		if tc.HasError {
-			assert.Error(t, ValidateForbidden(tc.Keys, tc.ForbiddenSpec))
+			assert.Error(t, api.ValidateForbidden(tc.Keys, tc.ForbiddenSpec))
 		}
 
 		if !tc.HasError {
-			assert.NoError(t, ValidateForbidden(tc.Keys, tc.ForbiddenSpec))
+			assert.NoError(t, api.ValidateForbidden(tc.Keys, tc.ForbiddenSpec))
 		}
 	}
 }

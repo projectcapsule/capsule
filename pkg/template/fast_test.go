@@ -28,12 +28,12 @@ func TestRequiresFastTemplate(t *testing.T) {
 		{
 			name:     "only opening braces",
 			input:    "value with {{ but no closing",
-			expected: true,
+			expected: false,
 		},
 		{
 			name:     "only closing braces",
 			input:    "value with }} but no opening",
-			expected: true,
+			expected: false,
 		},
 		{
 			name:     "proper template expression",

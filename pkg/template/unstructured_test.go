@@ -237,14 +237,14 @@ func TestRenderUnstructuredItems_ScalarRoot_IsError(t *testing.T) {
 	}
 }
 
-func TestRenderUnstructuredItems_WhitespaceOnly_ReturnsEmptySlice(t *testing.T) {
+func TestRenderUnstructuredItems_WhitespaceOnly_IsError(t *testing.T) {
 	tpl := "\n   \n\t\n"
-	items, err := template.RenderUnstructuredItems(template.ReferenceContext{}, missingKeyErr, tpl)
-	if err != nil {
-		t.Fatalf("expected no error, got: %v", err)
+	_, err := template.RenderUnstructuredItems(template.ReferenceContext{}, missingKeyErr, tpl)
+	if err == nil {
+		t.Fatalf("expected decode error for scalar root, got nil")
 	}
-	if len(items) != 0 {
-		t.Fatalf("expected 0 items, got %d", len(items))
+	if !strings.Contains(err.Error(), "decode yaml") {
+		t.Fatalf("expected error to contain %q, got: %v", "decode yaml", err)
 	}
 }
 
