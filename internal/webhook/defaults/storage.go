@@ -10,16 +10,16 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
-	"github.com/projectcapsule/capsule/pkg/utils/tenant"
+	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
+	"github.com/projectcapsule/capsule/pkg/tenant"
 )
 
-func mutatePVCDefaults(ctx context.Context, req admission.Request, c client.Client, decoder admission.Decoder, recorder record.EventRecorder, namespace string) *admission.Response {
+func mutatePVCDefaults(ctx context.Context, req admission.Request, c client.Client, decoder admission.Decoder, namespace string) *admission.Response {
 	var err error
 
 	pvc := &corev1.PersistentVolumeClaim{}
@@ -53,7 +53,7 @@ func mutatePVCDefaults(ctx context.Context, req admission.Request, c client.Clie
 	if storageClassName := pvc.Spec.StorageClassName; storageClassName != nil && *storageClassName != allowed.Default {
 		csc, err = utils.GetStorageClassByName(ctx, c, *storageClassName)
 		if err != nil && !k8serrors.IsNotFound(err) {
-			response := admission.Denied(NewStorageClassError(*storageClassName, err).Error())
+			response := admission.Denied(caperrors.NewStorageClassError(*storageClassName, err).Error())
 
 			return &response
 		}
@@ -71,8 +71,6 @@ func mutatePVCDefaults(ctx context.Context, req admission.Request, c client.Clie
 	if err != nil {
 		return utils.ErroredResponse(err)
 	}
-
-	recorder.Eventf(tnt, corev1.EventTypeNormal, "TenantDefault", "Assigned Tenant default Storage Class %s to %s/%s", allowed.Default, pvc.Namespace, pvc.Name)
 
 	response := admission.PatchResponseFromRaw(req.Object.Raw, marshaled)
 

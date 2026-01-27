@@ -8,17 +8,19 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	capsulewebhook "github.com/projectcapsule/capsule/internal/webhook"
+	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
+	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
+	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
 
 type quotaHandler struct{}
 
-func QuotaHandler() capsulewebhook.TypedHandlerWithTenant[*corev1.Namespace] {
+func QuotaHandler() handlers.TypedHandlerWithTenant[*corev1.Namespace] {
 	return &quotaHandler{}
 }
 
@@ -26,9 +28,9 @@ func (h *quotaHandler) OnCreate(
 	c client.Client,
 	ns *corev1.Namespace,
 	decoder admission.Decoder,
-	recorder record.EventRecorder,
+	recorder events.EventRecorder,
 	tnt *capsulev1beta2.Tenant,
-) capsulewebhook.Func {
+) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		return h.handle(ctx, c, recorder, ns, tnt)
 	}
@@ -38,9 +40,9 @@ func (h *quotaHandler) OnDelete(
 	client.Client,
 	*corev1.Namespace,
 	admission.Decoder,
-	record.EventRecorder,
+	events.EventRecorder,
 	*capsulev1beta2.Tenant,
-) capsulewebhook.Func {
+) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
@@ -51,9 +53,9 @@ func (h *quotaHandler) OnUpdate(
 	ns *corev1.Namespace,
 	_ *corev1.Namespace,
 	decoder admission.Decoder,
-	recorder record.EventRecorder,
+	recorder events.EventRecorder,
 	tnt *capsulev1beta2.Tenant,
-) capsulewebhook.Func {
+) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		return h.handle(ctx, c, recorder, ns, tnt)
 	}
@@ -62,7 +64,7 @@ func (h *quotaHandler) OnUpdate(
 func (h *quotaHandler) handle(
 	ctx context.Context,
 	c client.Client,
-	recorder record.EventRecorder,
+	recorder events.EventRecorder,
 	ns *corev1.Namespace,
 	tnt *capsulev1beta2.Tenant,
 ) *admission.Response {
@@ -75,9 +77,9 @@ func (h *quotaHandler) handle(
 			return nil
 		}
 
-		recorder.Eventf(tnt, corev1.EventTypeWarning, "NamespaceQuotaExceded", "Namespace %s cannot be attached, quota exceeded for the current Tenant", ns.GetName())
+		recorder.Eventf(tnt, ns, corev1.EventTypeWarning, evt.ReasonOverprovision, evt.ActionValidationDenied, "Namespace %s cannot be attached, quota exceeded for the current Tenant", ns.GetName())
 
-		response := admission.Denied(NewNamespaceQuotaExceededError().Error())
+		response := admission.Denied(caperrors.NewNamespaceQuotaExceededError().Error())
 
 		return &response
 	}

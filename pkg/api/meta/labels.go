@@ -6,6 +6,7 @@ package meta
 import (
 	"strings"
 
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -26,12 +27,19 @@ const (
 	CordonedLabel        = "projectcapsule.dev/cordoned"
 	CordonedLabelTrigger = "true"
 
-	ManagedByCapsuleLabel = "capsule.clastix.io/managed-by"
+	CapsuleNameLabel = "projectcapsule.dev/name"
+
+	CreatedByCapsuleLabel = "projectcapsule.dev/created-by"
+
+	NewManagedByCapsuleLabel = "projectcapsule.dev/managed-by"
+	ManagedByCapsuleLabel    = "capsule.clastix.io/managed-by"
 
 	LimitRangeLabel    = "capsule.clastix.io/limit-range"
 	NetworkPolicyLabel = "capsule.clastix.io/network-policy"
 	ResourceQuotaLabel = "capsule.clastix.io/resource-quota"
 	RolebindingLabel   = "capsule.clastix.io/role-binding"
+
+	ControllerValue = "controller"
 )
 
 func FreezeLabelTriggers(obj client.Object) bool {
@@ -70,4 +78,24 @@ func labelTriggers(obj client.Object, anno string, trigger string) bool {
 	}
 
 	return false
+}
+
+// SetFilteredLabels Removes given labels by key.
+func SetFilteredLabels(obj *unstructured.Unstructured, filter map[string]struct{}) {
+	if obj == nil || len(filter) == 0 {
+		return
+	}
+
+	labels := obj.GetLabels()
+	if labels == nil {
+		return
+	}
+
+	for k := range labels {
+		if _, reserved := filter[k]; reserved {
+			delete(labels, k)
+		}
+	}
+
+	obj.SetLabels(labels)
 }

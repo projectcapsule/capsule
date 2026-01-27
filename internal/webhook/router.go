@@ -7,15 +7,17 @@ import (
 	"context"
 
 	admissionv1 "k8s.io/api/admission/v1"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	controllerruntime "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+
+	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
 
-func Register(manager controllerruntime.Manager, webhookList ...Webhook) error {
-	recorder := manager.GetEventRecorderFor("tenant-webhook")
+func Register(manager controllerruntime.Manager, webhookList ...handlers.Webhook) error {
+	recorder := manager.GetEventRecorder("admission")
 
 	server := manager.GetWebhookServer()
 
@@ -36,9 +38,9 @@ func Register(manager controllerruntime.Manager, webhookList ...Webhook) error {
 type handlerRouter struct {
 	client   client.Client
 	decoder  admission.Decoder
-	recorder record.EventRecorder
+	recorder events.EventRecorder
 
-	handlers []Handler
+	handlers []handlers.Handler
 }
 
 func (r *handlerRouter) Handle(ctx context.Context, req admission.Request) admission.Response {

@@ -211,13 +211,31 @@ manager:
       forbiddenAnnotations:
         denied: []
         deniedRegex: ""
+
+    # -- Duration after which the in-memory cache is invalidated (based on usaage) and re-fetched from the API server
+    cacheInvalidation: 24h0m0s
+
+    # -- Managed RBAC configuration for the controller
+    rbac:
+      # -- The ClusterRoles applied for Administrators
+      administrationClusterRoles:
+        - capsule-namespace-deleter
+      # -- The ClusterRoles applied for ServiceAccounts which had owner Promotion
+      promotionClusterRoles:
+        - capsule-namespace-provisioner
+        - capsule-namespace-deleter
+      # -- Name for the ClusterRole required to grant Namespace Deletion permissions.
+      deleter: capsule-namespace-deleter
+      # -- Name for the ClusterRole required to grant Namespace Provision permissions.
+      provisioner: capsule-namespace-provisioner
+
+
     # -- DEPRECATED: use users properties.
     # Names of the users considered as Capsule users.
     userNames: []
     # -- DEPRECATED: use users properties.
     # Names of the users considered as Capsule users.
     capsuleUserGroups: []
-
 
   # -- A list of extra arguments for the capsule controller
   extraArgs:
@@ -397,6 +415,12 @@ webhooks:
   mutatingWebhooksTimeoutSeconds: 30
   # -- Timeout in seconds for validating webhooks
   validatingWebhooksTimeoutSeconds: 30
+
+  # -- Additional Labels for all webhooks
+  labels: {}
+
+  # -- Additional Annotations for all webhooks
+  annotations: {}
 
   # Configure custom webhook service
   service:
@@ -678,7 +702,7 @@ webhooks:
       # -- [ReinvocationPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#reinvocation-policy)
       reinvocationPolicy: Never
 
-    tenantResourceObjects:
+    managed:
       # -- Enable the Hook
       enabled: true
       # -- [FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy)
@@ -688,7 +712,7 @@ webhooks:
       # -- [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector)
       objectSelector:
         matchExpressions:
-          - key: capsule.clastix.io/tenant
+          - key: "projectcapsule.dev/managed-by"
             operator: Exists
       # -- [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector)
       namespaceSelector:
@@ -697,6 +721,18 @@ webhooks:
             operator: Exists
       # -- [MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
       matchConditions: []
+      # -- [Rules](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-rules)
+      rules:
+        - apiGroups:
+            - '*'
+          apiVersions:
+            - '*'
+          operations:
+            - UPDATE
+            - DELETE
+          resources:
+            - '*'
+          scope: '*'
 
     services:
       # -- Enable the Hook
@@ -756,3 +792,6 @@ webhooks:
       pvc: {}
       # -- Deprecated, use webhooks.hooks.pods instead
       pods: {}
+
+    # -- Deprecated, use webhooks.hooks.managed instead
+    tenantResourceObjects: {}

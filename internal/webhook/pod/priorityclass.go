@@ -8,18 +8,20 @@ import (
 	"net/http"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	capsulewebhook "github.com/projectcapsule/capsule/internal/webhook"
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
+	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
+	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
+	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
 
 type priorityClass struct{}
 
-func PriorityClass() capsulewebhook.TypedHandlerWithTenant[*corev1.Pod] {
+func PriorityClass() handlers.TypedHandlerWithTenantWithRuleset[*corev1.Pod] {
 	return &priorityClass{}
 }
 
@@ -27,9 +29,10 @@ func (h *priorityClass) OnCreate(
 	c client.Client,
 	pod *corev1.Pod,
 	decoder admission.Decoder,
-	recorder record.EventRecorder,
+	recorder events.EventRecorder,
 	tnt *capsulev1beta2.Tenant,
-) capsulewebhook.Func {
+	_ *capsulev1beta2.NamespaceRuleBody,
+) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		allowed := tnt.Spec.PriorityClasses
 
@@ -68,9 +71,16 @@ func (h *priorityClass) OnCreate(
 		case allowed.Match(priorityClassName) || selector:
 			return nil
 		default:
-			recorder.Eventf(tnt, corev1.EventTypeWarning, "ForbiddenPriorityClass", "Pod %s/%s is using Priority Class %s is forbidden for the current Tenant", pod.Namespace, pod.Name, priorityClassName)
+			recorder.Eventf(
+				pod,
+				tnt,
+				corev1.EventTypeWarning,
+				evt.ReasonForbiddenPriorityClass,
+				evt.ActionValidationDenied,
+				"Using Priority Class %s is forbidden for the tenant %s", priorityClassName, tnt.GetName(),
+			)
 
-			response := admission.Denied(NewPodPriorityClassForbidden(priorityClassName, *allowed).Error())
+			response := admission.Denied(caperrors.NewPodPriorityClassForbidden(priorityClassName, *allowed).Error())
 
 			return &response
 		}
@@ -82,9 +92,10 @@ func (h *priorityClass) OnUpdate(
 	*corev1.Pod,
 	*corev1.Pod,
 	admission.Decoder,
-	record.EventRecorder,
+	events.EventRecorder,
 	*capsulev1beta2.Tenant,
-) capsulewebhook.Func {
+	*capsulev1beta2.NamespaceRuleBody,
+) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
@@ -94,9 +105,10 @@ func (h *priorityClass) OnDelete(
 	client.Client,
 	*corev1.Pod,
 	admission.Decoder,
-	record.EventRecorder,
+	events.EventRecorder,
 	*capsulev1beta2.Tenant,
-) capsulewebhook.Func {
+	*capsulev1beta2.NamespaceRuleBody,
+) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}

@@ -11,14 +11,14 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	capsulewebhook "github.com/projectcapsule/capsule/internal/webhook"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
-	"github.com/projectcapsule/capsule/pkg/configuration"
+	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
+	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 	capsuleutils "github.com/projectcapsule/capsule/pkg/utils"
 )
 
@@ -26,19 +26,19 @@ type cordoningLabelHandler struct {
 	cfg configuration.Configuration
 }
 
-func CordoningLabelHandler(cfg configuration.Configuration) capsulewebhook.TypedHandler[*corev1.Namespace] {
+func CordoningLabelHandler(cfg configuration.Configuration) handlers.TypedHandler[*corev1.Namespace] {
 	return &cordoningLabelHandler{
 		cfg: cfg,
 	}
 }
 
-func (h *cordoningLabelHandler) OnCreate(client.Client, *corev1.Namespace, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
+func (h *cordoningLabelHandler) OnCreate(client.Client, *corev1.Namespace, admission.Decoder, events.EventRecorder) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (h *cordoningLabelHandler) OnDelete(client.Client, *corev1.Namespace, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
+func (h *cordoningLabelHandler) OnDelete(client.Client, *corev1.Namespace, admission.Decoder, events.EventRecorder) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
@@ -49,8 +49,8 @@ func (h *cordoningLabelHandler) OnUpdate(
 	ns *corev1.Namespace,
 	old *corev1.Namespace,
 	decoder admission.Decoder,
-	_ record.EventRecorder,
-) capsulewebhook.Func {
+	_ events.EventRecorder,
+) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		return h.handle(ctx, c, req, ns)
 	}

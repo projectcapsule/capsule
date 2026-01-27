@@ -10,14 +10,16 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/version"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	capsulewebhook "github.com/projectcapsule/capsule/internal/webhook"
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
-	"github.com/projectcapsule/capsule/pkg/configuration"
+	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
+	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
+	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
+	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
 
 type class struct {
@@ -25,32 +27,39 @@ type class struct {
 	version       *version.Version
 }
 
-func Class(configuration configuration.Configuration, version *version.Version) capsulewebhook.Handler {
+func Class(configuration configuration.Configuration, version *version.Version) handlers.Handler {
 	return &class{
 		configuration: configuration,
 		version:       version,
 	}
 }
 
-func (r *class) OnCreate(client client.Client, decoder admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
+func (r *class) OnCreate(client client.Client, decoder admission.Decoder, recorder events.EventRecorder) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		return r.validate(ctx, r.version, client, req, decoder, recorder)
 	}
 }
 
-func (r *class) OnUpdate(client client.Client, decoder admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
+func (r *class) OnUpdate(client client.Client, decoder admission.Decoder, recorder events.EventRecorder) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		return r.validate(ctx, r.version, client, req, decoder, recorder)
 	}
 }
 
-func (r *class) OnDelete(client.Client, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
+func (r *class) OnDelete(client.Client, admission.Decoder, events.EventRecorder) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (r *class) validate(ctx context.Context, version *version.Version, client client.Client, req admission.Request, decoder admission.Decoder, recorder record.EventRecorder) *admission.Response {
+func (r *class) validate(
+	ctx context.Context,
+	version *version.Version,
+	client client.Client,
+	req admission.Request,
+	decoder admission.Decoder,
+	recorder events.EventRecorder,
+) *admission.Response {
 	ingress, err := FromRequest(req, decoder)
 	if err != nil {
 		return utils.ErroredResponse(err)
@@ -76,9 +85,9 @@ func (r *class) validate(ctx context.Context, version *version.Version, client c
 	ingressClass := ingress.IngressClass()
 
 	if ingressClass == nil {
-		recorder.Eventf(tnt, corev1.EventTypeWarning, "MissingIngressClass", "Ingress %s/%s is missing IngressClass", req.Namespace, req.Name)
+		recorder.Eventf(tnt, nil, corev1.EventTypeWarning, evt.ReasonMissingIngressClass, evt.ActionValidationDenied, "Ingress %s/%s is missing IngressClass", req.Namespace, req.Name)
 
-		response := admission.Denied(NewIngressClassUndefined(*allowed).Error())
+		response := admission.Denied(caperrors.NewIngressClassUndefined(*allowed).Error())
 
 		return &response
 	}
@@ -106,9 +115,9 @@ func (r *class) validate(ctx context.Context, version *version.Version, client c
 	case allowed.Match(*ingressClass) || selector:
 		return nil
 	default:
-		recorder.Eventf(tnt, corev1.EventTypeWarning, "ForbiddenIngressClass", "Ingress %s/%s IngressClass %s is forbidden for the current Tenant", req.Namespace, req.Name, &ingressClass)
+		recorder.Eventf(tnt, nil, corev1.EventTypeWarning, evt.ReasonForbiddenIngressClass, evt.ActionValidationDenied, "Ingress %s/%s IngressClass %s is forbidden for the current Tenant", req.Namespace, req.Name, &ingressClass)
 
-		response := admission.Denied(NewIngressClassForbidden(*ingressClass, *allowed).Error())
+		response := admission.Denied(caperrors.NewIngressClassForbidden(*ingressClass, *allowed).Error())
 
 		return &response
 	}

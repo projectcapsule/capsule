@@ -4,19 +4,17 @@
 //nolint:dupl
 package route
 
-import (
-	capsulewebhook "github.com/projectcapsule/capsule/internal/webhook"
-)
+import "github.com/projectcapsule/capsule/pkg/runtime/handlers"
 
 type namespace struct {
-	handlers []capsulewebhook.Handler
+	handlers []handlers.Handler
 }
 
-func NamespaceValidation(handler ...capsulewebhook.Handler) capsulewebhook.Webhook {
+func NamespaceValidation(handler ...handlers.Handler) handlers.Webhook {
 	return &namespace{handlers: handler}
 }
 
-func (w *namespace) GetHandlers() []capsulewebhook.Handler {
+func (w *namespace) GetHandlers() []handlers.Handler {
 	return w.handlers
 }
 
@@ -25,14 +23,14 @@ func (w *namespace) GetPath() string {
 }
 
 type namespacePatch struct {
-	handlers []capsulewebhook.Handler
+	handlers []handlers.Handler
 }
 
-func NamespaceMutation(handlers ...capsulewebhook.Handler) capsulewebhook.Webhook {
+func NamespaceMutation(handlers ...handlers.Handler) handlers.Webhook {
 	return &namespacePatch{handlers: handlers}
 }
 
-func (w *namespacePatch) GetHandlers() []capsulewebhook.Handler {
+func (w *namespacePatch) GetHandlers() []handlers.Handler {
 	return w.handlers
 }
 

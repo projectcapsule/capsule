@@ -5,14 +5,10 @@ metadata:
   name: {{ include "capsule.fullname" . }}-validating-webhook-configuration
   namespace: {{ $.Release.Namespace }}
   labels:
-    {{- include "capsule.labels" . | nindent 4 }}
+    {{- include "capsule.labels" $ | nindent 4 }}
+    {{- include "admission.labels" . | nindent 4 }}
   annotations:
-  {{- if .Values.certManager.generateCertificates }}
-    cert-manager.io/inject-ca-from: {{ .Release.Namespace }}/{{ include "capsule.fullname" . }}-webhook-cert
-  {{-  end }}
-  {{- with .Values.customAnnotations }}
-    {{- toYaml . | nindent 4 }}
-  {{- end }}
+    {{- include "admission.annotations" . | nindent 4 }}
 webhooks:
 {{- with .Values.webhooks.hooks.cordoning }}
   {{- if .enabled }}
@@ -191,6 +187,8 @@ webhooks:
         - DELETE
       resources:
         - namespaces
+        - namespaces/status
+        - namespace/finalize
       scope: '*'
   sideEffects: None
   timeoutSeconds: {{ $.Values.webhooks.validatingWebhooksTimeoutSeconds }}
@@ -379,13 +377,13 @@ webhooks:
   timeoutSeconds: {{ $.Values.webhooks.validatingWebhooksTimeoutSeconds }}
   {{- end }}
 {{- end }}
-{{- with .Values.webhooks.hooks.tenantResourceObjects }}
+{{- with (mergeOverwrite .Values.webhooks.hooks.managed .Values.webhooks.hooks.tenantResourceObjects) }}
   {{- if .enabled }}
 - name: resource-objects.tenant.projectcapsule.dev
   admissionReviewVersions:
     - v1
   clientConfig:
-    {{- include "capsule.webhooks.service" (dict "path" "/tenantresource-objects" "ctx" $) | nindent 4 }}
+    {{- include "capsule.webhooks.service" (dict "path" "/misc/managed" "ctx" $) | nindent 4 }}
   failurePolicy: {{ .failurePolicy }}
   matchPolicy: {{ .matchPolicy }}
   {{- with .namespaceSelector }}
@@ -401,16 +399,7 @@ webhooks:
     {{- toYaml . |  nindent 4 }}
   {{- end }}
   rules:
-    - apiGroups:
-        - '*'
-      apiVersions:
-        - '*'
-      operations:
-        - UPDATE
-        - DELETE
-      resources:
-        - '*'
-      scope: Namespaced
+    {{- toYaml .rules | nindent 4 }}
   sideEffects: None
   timeoutSeconds: {{ $.Values.webhooks.validatingWebhooksTimeoutSeconds }}
   {{- end }}

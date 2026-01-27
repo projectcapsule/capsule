@@ -11,13 +11,6 @@ import (
 	"strings"
 )
 
-const (
-	// ForbiddenLabelReason used as reason string to deny forbidden labels.
-	ForbiddenLabelReason = "ForbiddenLabel"
-	// ForbiddenAnnotationReason used as reason string to deny forbidden annotations.
-	ForbiddenAnnotationReason = "ForbiddenAnnotation"
-)
-
 // +kubebuilder:object:generate=true
 type ForbiddenListSpec struct {
 	Exact []string `json:"denied,omitempty"`

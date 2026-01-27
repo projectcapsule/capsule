@@ -3,15 +3,12 @@ apiVersion: admissionregistration.k8s.io/v1
 kind: MutatingWebhookConfiguration
 metadata:
   name: {{ include "capsule.fullname" . }}-mutating-webhook-configuration
+  namespace: {{ $.Release.Namespace }}
   labels:
-    {{- include "capsule.labels" . | nindent 4 }}
+    {{- include "capsule.labels" $ | nindent 4 }}
+    {{- include "admission.labels" . | nindent 4 }}
   annotations:
-  {{- if .Values.certManager.generateCertificates }}
-    cert-manager.io/inject-ca-from: {{ .Release.Namespace }}/{{ include "capsule.fullname" . }}-webhook-cert
-  {{-  end }}
-  {{- with .Values.customAnnotations }}
-    {{- toYaml . | nindent 4 }}
-  {{- end }}
+    {{- include "admission.annotations" . | nindent 4 }}
 webhooks:
 {{- with (mergeOverwrite .Values.webhooks.hooks.pods .Values.webhooks.hooks.defaults.pods) }}
   {{- if .enabled }}

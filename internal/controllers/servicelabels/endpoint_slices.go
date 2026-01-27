@@ -28,5 +28,6 @@ func (r *EndpointSlicesLabelsReconciler) SetupWithManager(ctx context.Context, m
 
 	return ctrl.NewControllerManagedBy(mgr).
 		For(r.abstractServiceLabelsReconciler.obj, r.abstractServiceLabelsReconciler.forOptionPerInstanceName(ctx)).
+		Named("capsule/endpointslices").
 		Complete(r)
 }

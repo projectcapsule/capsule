@@ -281,7 +281,7 @@ var _ = Describe("Promoting ServiceAccounts to Owners", Label("config"), Label("
 
 		Eventually(func(g Gomega) []rbacv1.Subject {
 			crb := &rbacv1.ClusterRoleBinding{}
-			err := k8sClient.Get(context.TODO(), types.NamespacedName{Name: api.ProvisionerRoleName}, crb)
+			err := k8sClient.Get(context.TODO(), types.NamespacedName{Name: originConfig.Spec.RBAC.ProvisionerClusterRole}, crb)
 			g.Expect(err).NotTo(HaveOccurred())
 
 			return crb.Subjects
@@ -337,7 +337,7 @@ var _ = Describe("Promoting ServiceAccounts to Owners", Label("config"), Label("
 
 		Eventually(func(g Gomega) []rbacv1.Subject {
 			crb := &rbacv1.ClusterRoleBinding{}
-			err := k8sClient.Get(context.TODO(), types.NamespacedName{Name: api.ProvisionerRoleName}, crb)
+			err := k8sClient.Get(context.TODO(), types.NamespacedName{Name: originConfig.Spec.RBAC.ProvisionerClusterRole}, crb)
 			g.Expect(err).NotTo(HaveOccurred())
 
 			return crb.Subjects

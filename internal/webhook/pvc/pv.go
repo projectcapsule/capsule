@@ -5,24 +5,26 @@ package pvc
 
 import (
 	"context"
-	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	capsulewebhook "github.com/projectcapsule/capsule/internal/webhook"
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
+	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
+	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
+	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
 
 type pv struct{}
 
-func PersistentVolumeReuse() capsulewebhook.TypedHandlerWithTenant[*corev1.PersistentVolumeClaim] {
+func PersistentVolumeReuse() handlers.TypedHandlerWithTenant[*corev1.PersistentVolumeClaim] {
 	return &pv{}
 }
 
@@ -30,45 +32,25 @@ func (h pv) OnCreate(
 	c client.Client,
 	pvc *corev1.PersistentVolumeClaim,
 	decoder admission.Decoder,
-	recorder record.EventRecorder,
+	recorder events.EventRecorder,
 	tnt *capsulev1beta2.Tenant,
-) capsulewebhook.Func {
+) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		// A PersistentVolume selector cannot help in preventing a cross-tenant mount:
-		// thus, disallowing that in first place.
-		if pvc.Spec.Selector != nil {
-			return utils.ErroredResponse(NewPVSelectorError())
-		}
-
-		// The PVC hasn't any volumeName pre-claimed, it can be skipped
-		if len(pvc.Spec.VolumeName) == 0 {
+		pvObj, err := h.handle(ctx, c, pvc, tnt.Name)
+		if err == nil {
 			return nil
 		}
 
-		// Checking if the PV is labelled with the Tenant name
-		pv := corev1.PersistentVolume{}
-		if err := c.Get(ctx, types.NamespacedName{Name: pvc.Spec.VolumeName}, &pv); err != nil {
-			if errors.IsNotFound(err) {
-				err = fmt.Errorf("cannot create a PVC referring to a not yet existing PV")
-			}
-
-			return utils.ErroredResponse(err)
+		var related runtime.Object
+		if pvObj != nil {
+			related = pvObj
+		} else {
+			related = tnt
 		}
 
-		if pv.GetLabels() == nil {
-			return utils.ErroredResponse(NewMissingPVLabelsError(pv.GetName()))
-		}
+		caperrors.RecordTypedErrorEvent(recorder, pvc, related, err)
 
-		value, ok := pv.GetLabels()[meta.TenantLabel]
-		if !ok {
-			return utils.ErroredResponse(NewMissingTenantPVLabelsError(pv.GetName()))
-		}
-
-		if value != tnt.Name {
-			return utils.ErroredResponse(NewCrossTenantPVMountError(pv.GetName()))
-		}
-
-		return nil
+		return utils.ErroredResponse(err)
 	}
 }
 
@@ -77,10 +59,10 @@ func (h pv) OnUpdate(
 	*corev1.PersistentVolumeClaim,
 	*corev1.PersistentVolumeClaim,
 	admission.Decoder,
-	record.EventRecorder,
+	events.EventRecorder,
 	*capsulev1beta2.Tenant,
-) capsulewebhook.Func {
-	return func(context.Context, admission.Request) *admission.Response {
+) handlers.Func {
+	return func(ctx context.Context, req admission.Request) *admission.Response {
 		return nil
 	}
 }
@@ -89,10 +71,53 @@ func (h pv) OnDelete(
 	client.Client,
 	*corev1.PersistentVolumeClaim,
 	admission.Decoder,
-	record.EventRecorder,
+	events.EventRecorder,
 	*capsulev1beta2.Tenant,
-) capsulewebhook.Func {
+) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
+}
+
+func (h pv) handle(
+	ctx context.Context,
+	c client.Client,
+	pvc *corev1.PersistentVolumeClaim,
+	tenantName string,
+) (*corev1.PersistentVolume, error) {
+	if pvc.Spec.Selector != nil {
+		return nil, caperrors.NewPVSelectorError(evt.ActionValidationDenied)
+	}
+
+	if pvc.Spec.VolumeName == "" {
+		return nil, nil
+	}
+
+	pv := &corev1.PersistentVolume{}
+	if err := c.Get(ctx, types.NamespacedName{Name: pvc.Spec.VolumeName}, pv); err != nil {
+		if errors.IsNotFound(err) {
+			return nil, caperrors.NewPvNotFoundError(
+				pvc.Spec.VolumeName,
+				evt.ActionValidationDenied,
+			)
+		}
+
+		return nil, err
+	}
+
+	labels := pv.GetLabels()
+
+	value, ok := labels[meta.TenantLabel]
+	if !ok {
+		return pv, caperrors.NewMissingTenantPVLabelsError(
+			pv.GetName(),
+			evt.ActionValidationDenied,
+		)
+	}
+
+	if value != tenantName {
+		return pv, caperrors.NewCrossTenantPVMountError(pv.GetName(), evt.ActionValidationDenied)
+	}
+
+	return pv, nil
 }

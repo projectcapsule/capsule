@@ -155,6 +155,24 @@ service:
   {{- end }}
 {{- end }}
 
+
+{{/*
+Capsule Webhook service (Without Path)
+
+*/}}
+{{- define "capsule.webhooks.serviceConfig" -}}
+  {{- include "capsule.webhooks.cabundle" $ | nindent 0 }}
+  {{- if $.Values.webhooks.service.url }}
+url: {{ trimSuffix "/" $.Values.webhooks.service.url }}
+  {{- else }}
+service:
+  name: {{ default (printf "%s-webhook-service" (include "capsule.fullname" $)) $.Values.webhooks.service.name }}
+  namespace: {{ default $.Release.Namespace $.Values.webhooks.service.namespace }}
+  port: {{ default 443 $.Values.webhooks.service.port }}
+  {{- end }}
+{{- end }}
+
+
 {{/*
 Capsule Webhook endpoint CA Bundle
 */}}
@@ -180,3 +198,22 @@ caBundle: {{ $.Values.webhooks.service.caBundle -}}
 {{- $joined := join "," $sizes -}}
 {{- sha256sum $joined -}}
 {{- end -}}
+
+{{- define "admission.labels" -}}
+  {{- with $.Values.webhooks.labels }}
+    {{- toYaml . | nindent 0 }}
+  {{- end }}
+{{- end }}
+
+
+{{- define "admission.annotations" -}}
+  {{- if and ($.Values.certManager.generateCertificates) (not $.Values.webhooks.service.caBundle) }}
+cert-manager.io/inject-ca-from: {{ $.Release.Namespace }}/{{ include "capsule.fullname" $ }}-webhook-cert
+  {{-  end }}
+  {{- with $.Values.customAnnotations }}
+    {{- toYaml . | nindent 0 }}
+  {{- end }}
+  {{- with $.Values.webhooks.annotations }}
+    {{- toYaml . | nindent 0 }}
+  {{- end }}
+{{- end }}

@@ -6,12 +6,14 @@ package config
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -21,20 +23,34 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/internal/cache"
 	"github.com/projectcapsule/capsule/internal/controllers/utils"
 	"github.com/projectcapsule/capsule/pkg/api"
-	"github.com/projectcapsule/capsule/pkg/configuration"
+	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
+	"github.com/projectcapsule/capsule/pkg/runtime/predicates"
 )
 
 type Manager struct {
 	client.Client
 
-	Log logr.Logger
+	configName string
+
+	RegistryCache *cache.RegistryRuleSetCache
+	Log           logr.Logger
 }
 
-func (r *Manager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.ControllerOptions) error {
-	return ctrl.NewControllerManagedBy(mgr).
-		For(&capsulev1beta2.CapsuleConfiguration{}, utils.NamesMatchingPredicate(ctrlConfig.ConfigurationName)).
+func (r *Manager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.ControllerOptions) (err error) {
+	r.configName = ctrlConfig.ConfigurationName
+
+	err = ctrl.NewControllerManagedBy(mgr).
+		Named("capsule/configuration").
+		For(
+			&capsulev1beta2.CapsuleConfiguration{},
+			builder.WithPredicates(
+				predicate.GenerationChangedPredicate{},
+				predicates.NamesMatchingPredicate{Names: []string{ctrlConfig.ConfigurationName}},
+			),
+		).
 		Watches(
 			&capsulev1beta2.TenantOwner{},
 			handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
@@ -82,22 +98,41 @@ func (r *Manager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.Controller
 			}),
 		).
 		Complete(r)
+	if err != nil {
+		return err
+	}
+
+	// register Start(ctx) as a manager runnable.
+	return mgr.Add(r)
+}
+
+// Start is the Runnable function triggered upon Manager start-up to perform cache population.
+func (r *Manager) Start(ctx context.Context) error {
+	if err := r.populateCaches(ctx, r.Log); err != nil {
+		r.Log.Error(err, "cache population failed")
+
+		return nil
+	}
+
+	r.Log.Info("caches populated")
+
+	return nil
 }
 
 func (r *Manager) Reconcile(ctx context.Context, request reconcile.Request) (res reconcile.Result, err error) {
-	r.Log.V(5).Info("CapsuleConfiguration reconciliation started", "request.name", request.Name)
+	log := r.Log.WithValues("configuration", request.Name)
 
 	cfg := configuration.NewCapsuleConfiguration(ctx, r.Client, request.Name)
 
 	instance := &capsulev1beta2.CapsuleConfiguration{}
 	if err = r.Get(ctx, request.NamespacedName, instance); err != nil {
 		if apierrors.IsNotFound(err) {
-			r.Log.V(3).Info("Request object not found, could have been deleted after reconcile request")
+			log.V(3).Info("requested object not found, could have been deleted after reconcile request")
 
 			return reconcile.Result{}, nil
 		}
 
-		r.Log.Error(err, "Error reading the object")
+		log.Error(err, "error reading the object")
 
 		return res, err
 	}
@@ -110,20 +145,30 @@ func (r *Manager) Reconcile(ctx context.Context, request reconcile.Request) (res
 		}
 	}()
 
-	// Validating the Capsule Configuration options
+	// Validating the Capsule Configuration options.
 	if _, err = cfg.ProtectedNamespaceRegexp(); err != nil {
-		panic(errors.Wrap(err, "Invalid configuration for protected Namespace regex"))
+		panic(errors.Wrap(err, "invalid configuration for protected Namespace regex"))
 	}
-
-	r.Log.V(5).Info("Validated Regex")
 
 	if err := r.gatherCapsuleUsers(ctx, instance, cfg); err != nil {
 		return reconcile.Result{}, err
 	}
 
-	r.Log.V(5).Info("Gathered users", "users", len(instance.Status.Users))
+	log.V(5).Info("gathering capsule users", "users", len(instance.Status.Users))
 
-	return res, err
+	interval := cfg.CacheInvalidation()
+	if cache.ShouldInvalidate(ptr.To(instance.Status.LastCacheInvalidation), time.Now(), interval.Duration) {
+		log.V(3).Info("invalidating caches")
+
+		if err := r.invalidateCaches(ctx, log); err != nil {
+			return res, err
+		}
+	}
+
+	return reconcile.Result{
+		Requeue:      true,
+		RequeueAfter: interval.Duration,
+	}, err
 }
 
 func (r *Manager) gatherCapsuleUsers(

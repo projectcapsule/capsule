@@ -15,7 +15,6 @@ func (in *Tenant) SetupWebhookWithManager(mgr ctrl.Manager) error {
 		return nil
 	}
 
-	return ctrl.NewWebhookManagedBy(mgr).
-		For(in).
+	return ctrl.NewWebhookManagedBy(mgr, in).
 		Complete()
 }
