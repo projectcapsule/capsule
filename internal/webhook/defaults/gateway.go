@@ -15,6 +15,7 @@ import (
 
 	capsulegateway "github.com/projectcapsule/capsule/internal/webhook/gateway"
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
+	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
 )
 
 func mutateGatewayDefaults(ctx context.Context, req admission.Request, c client.Client, decoder admission.Decoder, namespce string) *admission.Response {
@@ -48,7 +49,7 @@ func mutateGatewayDefaults(ctx context.Context, req admission.Request, c client.
 		if gatewayObj.Spec.GatewayClassName == ("") {
 			mutate = true
 		} else {
-			response := admission.Denied(NewGatewayError(gatewayObj.Spec.GatewayClassName, err).Error())
+			response := admission.Denied(caperrors.NewGatewayError(gatewayObj.Spec.GatewayClassName, err).Error())
 
 			return &response
 		}
@@ -56,7 +57,7 @@ func mutateGatewayDefaults(ctx context.Context, req admission.Request, c client.
 
 	if gatewayClass != nil && gatewayClass.Name != allowed.Default {
 		if err != nil && !k8serrors.IsNotFound(err) {
-			response := admission.Denied(NewGatewayClassError(gatewayClass.Name, err).Error())
+			response := admission.Denied(caperrors.NewGatewayClassError(gatewayClass.Name, err).Error())
 
 			return &response
 		}

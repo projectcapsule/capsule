@@ -12,6 +12,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
 	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
@@ -113,7 +114,7 @@ func (h *imagePullPolicy) verifyPullPolicy(
 			"PullPolicy %s is forbidden for the tenant %s", usedPullPolicy, tnt.GetName(),
 		)
 
-		response := admission.Denied(NewImagePullPolicyForbidden(usedPullPolicy, container, policy.AllowedPullPolicies()).Error())
+		response := admission.Denied(caperrors.NewImagePullPolicyForbidden(usedPullPolicy, container, policy.AllowedPullPolicies()).Error())
 
 		return &response
 	}

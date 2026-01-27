@@ -12,6 +12,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
@@ -121,7 +122,7 @@ func (h *containerRegistryLegacyHandler) verifyContainerRegistry(
 		)
 
 		//nolint:staticcheck
-		response := admission.Denied(NewContainerRegistryForbidden(image, *tnt.Spec.ContainerRegistries).Error())
+		response := admission.Denied(caperrors.NewContainerRegistryForbidden(image, *tnt.Spec.ContainerRegistries).Error())
 
 		return &response
 	}
@@ -143,7 +144,7 @@ func (h *containerRegistryLegacyHandler) verifyContainerRegistry(
 		)
 
 		//nolint:staticcheck
-		response := admission.Denied(NewContainerRegistryForbidden(reg.FQCI(), *tnt.Spec.ContainerRegistries).Error())
+		response := admission.Denied(caperrors.NewContainerRegistryForbidden(reg.FQCI(), *tnt.Spec.ContainerRegistries).Error())
 
 		return &response
 	}

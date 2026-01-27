@@ -15,6 +15,7 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
+	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
 	"github.com/projectcapsule/capsule/pkg/tenant"
 )
 
@@ -52,7 +53,7 @@ func mutatePVCDefaults(ctx context.Context, req admission.Request, c client.Clie
 	if storageClassName := pvc.Spec.StorageClassName; storageClassName != nil && *storageClassName != allowed.Default {
 		csc, err = utils.GetStorageClassByName(ctx, c, *storageClassName)
 		if err != nil && !k8serrors.IsNotFound(err) {
-			response := admission.Denied(NewStorageClassError(*storageClassName, err).Error())
+			response := admission.Denied(caperrors.NewStorageClassError(*storageClassName, err).Error())
 
 			return &response
 		}

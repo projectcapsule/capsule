@@ -16,6 +16,7 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
+	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
@@ -86,7 +87,7 @@ func (r *class) validate(
 	if ingressClass == nil {
 		recorder.Eventf(tnt, nil, corev1.EventTypeWarning, evt.ReasonMissingIngressClass, evt.ActionValidationDenied, "Ingress %s/%s is missing IngressClass", req.Namespace, req.Name)
 
-		response := admission.Denied(NewIngressClassUndefined(*allowed).Error())
+		response := admission.Denied(caperrors.NewIngressClassUndefined(*allowed).Error())
 
 		return &response
 	}
@@ -116,7 +117,7 @@ func (r *class) validate(
 	default:
 		recorder.Eventf(tnt, nil, corev1.EventTypeWarning, evt.ReasonForbiddenIngressClass, evt.ActionValidationDenied, "Ingress %s/%s IngressClass %s is forbidden for the current Tenant", req.Namespace, req.Name, &ingressClass)
 
-		response := admission.Denied(NewIngressClassForbidden(*ingressClass, *allowed).Error())
+		response := admission.Denied(caperrors.NewIngressClassForbidden(*ingressClass, *allowed).Error())
 
 		return &response
 	}
