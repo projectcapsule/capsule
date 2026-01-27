@@ -14,6 +14,8 @@ import (
 
 // SanitizeObject removes metadata (and optionally status) from a client.Object in-place.
 // For StripStatus it converts to unstructured and back (generic, but only when needed).
+//
+//nolint:nestif
 func SanitizeObject(obj client.Object, scheme *runtime.Scheme, opts SanitizeOptions) error {
 	if obj == nil {
 		return nil
@@ -34,6 +36,7 @@ func SanitizeObject(obj client.Object, scheme *runtime.Scheme, opts SanitizeOpti
 		anns := obj.GetAnnotations()
 		if len(anns) > 0 {
 			delete(anns, "kubectl.kubernetes.io/last-applied-configuration")
+
 			if len(anns) == 0 {
 				obj.SetAnnotations(nil)
 			} else {

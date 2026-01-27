@@ -6,13 +6,14 @@ package template
 import (
 	"fmt"
 	"io"
+	"slices"
 	"strings"
 
 	"github.com/valyala/fasttemplate"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// RequiresFastTemplate evaluates if given string requires templating
+// RequiresFastTemplate evaluates if given string requires templating.
 func RequiresFastTemplate(
 	template string,
 ) bool {
@@ -57,31 +58,32 @@ func FastTemplateMap(
 	return out
 }
 
-// FastTemplateMap evaluates if given LabelSelector requires templating
+// FastTemplateMap evaluates if given LabelSelector requires templating.
 func SelectorRequiresTemplating(sel *metav1.LabelSelector) bool {
 	if sel == nil {
 		return false
 	}
+
 	for k, v := range sel.MatchLabels {
 		if RequiresFastTemplate(k) || RequiresFastTemplate(v) {
 			return true
 		}
 	}
+
 	for _, expr := range sel.MatchExpressions {
 		if RequiresFastTemplate(expr.Key) {
 			return true
 		}
-		for _, v := range expr.Values {
-			if RequiresFastTemplate(v) {
-				return true
-			}
+
+		if slices.ContainsFunc(expr.Values, RequiresFastTemplate) {
+			return true
 		}
 	}
 
 	return false
 }
 
-// FastTemplateMap templates a Labelselector (all keys and values)
+// FastTemplateMap templates a Labelselector (all keys and values).
 func FastTemplateLabelSelector(
 	in *metav1.LabelSelector,
 	templateContext map[string]string,
@@ -98,8 +100,7 @@ func FastTemplateLabelSelector(
 		out.MatchExpressions[i].Key = FastTemplate(out.MatchExpressions[i].Key, templateContext)
 
 		for j := range out.MatchExpressions[i].Values {
-			out.MatchExpressions[i].Values[j] =
-				FastTemplate(out.MatchExpressions[i].Values[j], templateContext)
+			out.MatchExpressions[i].Values[j] = FastTemplate(out.MatchExpressions[i].Values[j], templateContext)
 		}
 	}
 

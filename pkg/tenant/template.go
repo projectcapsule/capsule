@@ -4,8 +4,9 @@
 package tenant
 
 import (
-	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	corev1 "k8s.io/api/core/v1"
+
+	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 )
 
 // TemplateForTenantAndNamespace applies templatingto the provided string.

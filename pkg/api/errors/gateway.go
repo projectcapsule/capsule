@@ -7,9 +7,10 @@ import (
 	"fmt"
 	"reflect"
 
+	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
+
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
 	"github.com/projectcapsule/capsule/pkg/api"
-	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
 
 type GatewayClassError struct {

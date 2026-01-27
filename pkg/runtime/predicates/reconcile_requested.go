@@ -9,7 +9,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 )
 
-// Only Trigger a Reconcile when the requested annotation has changed value or was added
+// Only Trigger a Reconcile when the requested annotation has changed value or was added.
 type ReconcileRequestedPredicate struct{}
 
 func (ReconcileRequestedPredicate) Create(e event.CreateEvent) bool   { return false }
@@ -28,6 +28,7 @@ func (ReconcileRequestedPredicate) Update(e event.UpdateEvent) bool {
 	if oldA != nil {
 		oldV = oldA[meta.ReconcileAnnotation]
 	}
+
 	newV := ""
 	if newA != nil {
 		newV = newA[meta.ReconcileAnnotation]
