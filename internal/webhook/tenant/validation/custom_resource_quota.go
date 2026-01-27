@@ -16,23 +16,23 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	capsulewebhook "github.com/projectcapsule/capsule/internal/webhook"
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
 	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
-	"github.com/projectcapsule/capsule/pkg/utils/tenant"
+	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
+	"github.com/projectcapsule/capsule/pkg/tenant"
 )
 
 type resourceCounterHandler struct {
 	client client.Client
 }
 
-func ResourceCounterHandler(client client.Client) capsulewebhook.Handler {
+func ResourceCounterHandler(client client.Client) handlers.Handler {
 	return &resourceCounterHandler{
 		client: client,
 	}
 }
 
-func (r *resourceCounterHandler) OnCreate(clt client.Client, _ admission.Decoder, recorder events.EventRecorder) capsulewebhook.Func {
+func (r *resourceCounterHandler) OnCreate(clt client.Client, _ admission.Decoder, recorder events.EventRecorder) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		var tntName string
 
@@ -85,7 +85,7 @@ func (r *resourceCounterHandler) OnCreate(clt client.Client, _ admission.Decoder
 	}
 }
 
-func (r *resourceCounterHandler) OnDelete(clt client.Client, _ admission.Decoder, _ events.EventRecorder) capsulewebhook.Func {
+func (r *resourceCounterHandler) OnDelete(clt client.Client, _ admission.Decoder, _ events.EventRecorder) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		var tntName string
 
@@ -128,7 +128,7 @@ func (r *resourceCounterHandler) OnDelete(clt client.Client, _ admission.Decoder
 	}
 }
 
-func (r *resourceCounterHandler) OnUpdate(client.Client, admission.Decoder, events.EventRecorder) capsulewebhook.Func {
+func (r *resourceCounterHandler) OnUpdate(client.Client, admission.Decoder, events.EventRecorder) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}

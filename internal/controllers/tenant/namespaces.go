@@ -20,7 +20,7 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
-	"github.com/projectcapsule/capsule/pkg/utils/tenant"
+	"github.com/projectcapsule/capsule/pkg/tenant"
 )
 
 // Ensuring all annotations are applied to each Namespace handled by the Tenant.
@@ -58,8 +58,6 @@ func (r *Manager) reconcileNamespaces(ctx context.Context, tenant *capsulev1beta
 		tenant.Status.RemoveInstance(&capsulev1beta2.TenantStatusNamespaceItem{
 			Name: name,
 		})
-
-		r.Cache.Delete(name)
 	}
 
 	tenant.Status.Size = uint(len(tenant.Status.Namespaces))
@@ -124,15 +122,6 @@ func (r *Manager) reconcileNamespace(ctx context.Context, namespace string, tnt 
 		return err
 	}
 
-	// Build Cache
-	if len(ruleBody.Enforce.Registries) > 0 {
-		if cacheErr := r.Cache.Set(namespace, ruleBody.Enforce.Registries); cacheErr != nil {
-			return cacheErr
-		}
-	} else {
-		r.Cache.Delete(namespace)
-	}
-
 	err = r.ensureRuleStatus(ctx, ns, tnt, ruleBody, namespace)
 	if err != nil {
 		return err
@@ -172,6 +161,7 @@ func (r *Manager) ensureRuleStatus(
 		}
 
 		labels[meta.NewManagedByCapsuleLabel] = meta.ControllerValue
+		labels[meta.CapsuleNameLabel] = nsStatus.Name
 
 		nsStatus.SetLabels(labels)
 

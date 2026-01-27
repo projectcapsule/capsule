@@ -44,6 +44,7 @@ type resourcePoolController struct {
 
 func (r *resourcePoolController) SetupWithManager(mgr ctrl.Manager, cfg ctrlutils.ControllerOptions) error {
 	return ctrl.NewControllerManagedBy(mgr).
+		Named("capsule/resourcepools/pools").
 		For(&capsulev1beta2.ResourcePool{}).
 		Owns(&corev1.ResourceQuota{}).
 		Watches(&capsulev1beta2.ResourcePoolClaim{},
@@ -442,7 +443,7 @@ func (r *resourcePoolController) handleClaimDisassociation(
 
 		if !*pool.Spec.Config.DeleteBoundResources || meta.ReleaseAnnotationTriggers(current) {
 			patch := client.MergeFrom(current.DeepCopy())
-			meta.RemoveLooseOwnerReference(current, pool)
+			meta.RemoveLooseOwnerReference(current, meta.GetLooseOwnerReference(pool))
 			meta.ReleaseAnnotationRemove(current)
 
 			if err := r.Patch(ctx, current, patch); err != nil {

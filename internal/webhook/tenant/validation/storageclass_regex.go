@@ -13,17 +13,17 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	capsulewebhook "github.com/projectcapsule/capsule/internal/webhook"
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
+	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
 
 type storageClassRegexHandler struct{}
 
-func StorageClassRegexHandler() capsulewebhook.Handler {
+func StorageClassRegexHandler() handlers.Handler {
 	return &storageClassRegexHandler{}
 }
 
-func (h *storageClassRegexHandler) OnCreate(_ client.Client, decoder admission.Decoder, _ events.EventRecorder) capsulewebhook.Func {
+func (h *storageClassRegexHandler) OnCreate(_ client.Client, decoder admission.Decoder, _ events.EventRecorder) handlers.Func {
 	return func(_ context.Context, req admission.Request) *admission.Response {
 		if err := h.validate(decoder, req); err != nil {
 			return err
@@ -33,13 +33,13 @@ func (h *storageClassRegexHandler) OnCreate(_ client.Client, decoder admission.D
 	}
 }
 
-func (h *storageClassRegexHandler) OnDelete(client.Client, admission.Decoder, events.EventRecorder) capsulewebhook.Func {
+func (h *storageClassRegexHandler) OnDelete(client.Client, admission.Decoder, events.EventRecorder) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (h *storageClassRegexHandler) OnUpdate(_ client.Client, decoder admission.Decoder, _ events.EventRecorder) capsulewebhook.Func {
+func (h *storageClassRegexHandler) OnUpdate(_ client.Client, decoder admission.Decoder, _ events.EventRecorder) handlers.Func {
 	return func(_ context.Context, req admission.Request) *admission.Response {
 		if err := h.validate(decoder, req); err != nil {
 			return err

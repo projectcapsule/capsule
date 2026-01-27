@@ -11,28 +11,28 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	capsulewebhook "github.com/projectcapsule/capsule/internal/webhook"
+	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
 
 type managedValidatingHandler struct{}
 
-func ManagedValidatingHandler() capsulewebhook.Handler {
+func ManagedValidatingHandler() handlers.Handler {
 	return &managedValidatingHandler{}
 }
 
-func (h *managedValidatingHandler) OnCreate(client.Client, admission.Decoder, events.EventRecorder) capsulewebhook.Func {
+func (h *managedValidatingHandler) OnCreate(client.Client, admission.Decoder, events.EventRecorder) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (h *managedValidatingHandler) OnDelete(client client.Client, _ admission.Decoder, recorder events.EventRecorder) capsulewebhook.Func {
+func (h *managedValidatingHandler) OnDelete(client client.Client, _ admission.Decoder, recorder events.EventRecorder) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		return h.handler(ctx, client, req, recorder)
 	}
 }
 
-func (h *managedValidatingHandler) OnUpdate(client client.Client, _ admission.Decoder, recorder events.EventRecorder) capsulewebhook.Func {
+func (h *managedValidatingHandler) OnUpdate(client client.Client, _ admission.Decoder, recorder events.EventRecorder) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		return h.handler(ctx, client, req, recorder)
 	}

@@ -12,31 +12,31 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	capsulewebhook "github.com/projectcapsule/capsule/internal/webhook"
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
-	"github.com/projectcapsule/capsule/pkg/utils/tenant"
+	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
+	"github.com/projectcapsule/capsule/pkg/tenant"
 )
 
 type tenantAssignmentHandler struct{}
 
-func TenantAssignmentHandler() capsulewebhook.Handler {
+func TenantAssignmentHandler() handlers.Handler {
 	return &tenantAssignmentHandler{}
 }
 
-func (r *tenantAssignmentHandler) OnCreate(c client.Client, decoder admission.Decoder, _ events.EventRecorder) capsulewebhook.Func {
+func (r *tenantAssignmentHandler) OnCreate(c client.Client, decoder admission.Decoder, _ events.EventRecorder) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		return r.handle(ctx, c, decoder, req)
 	}
 }
 
-func (r *tenantAssignmentHandler) OnDelete(client.Client, admission.Decoder, events.EventRecorder) capsulewebhook.Func {
+func (r *tenantAssignmentHandler) OnDelete(client.Client, admission.Decoder, events.EventRecorder) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (r *tenantAssignmentHandler) OnUpdate(c client.Client, decoder admission.Decoder, _ events.EventRecorder) capsulewebhook.Func {
+func (r *tenantAssignmentHandler) OnUpdate(c client.Client, decoder admission.Decoder, _ events.EventRecorder) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		return r.handle(ctx, c, decoder, req)
 	}

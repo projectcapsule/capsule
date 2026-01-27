@@ -68,20 +68,20 @@ func (r *Manager) syncResourceQuotas(ctx context.Context, tenant *capsulev1beta2
 				var tntRequirement *labels.Requirement
 
 				if tntRequirement, scopeErr = labels.NewRequirement(meta.TenantLabel, selection.Equals, []string{tenant.Name}); scopeErr != nil {
-					r.Log.Error(scopeErr, "Cannot build ResourceQuota Tenant requirement")
+					r.Log.Error(scopeErr, "cannot build ResourceQuota Tenant requirement")
 				}
 				// Requirement to list ResourceQuota for the current index
 				var indexRequirement *labels.Requirement
 
 				if indexRequirement, scopeErr = labels.NewRequirement(meta.ResourceQuotaLabel, selection.Equals, []string{strconv.Itoa(index)}); scopeErr != nil {
-					r.Log.Error(scopeErr, "Cannot build ResourceQuota index requirement")
+					r.Log.Error(scopeErr, "cannot build ResourceQuota index requirement")
 				}
 				// Listing all the ResourceQuota according to the said requirements.
 				// These are required since Capsule is going to sum all the used quota to
 				// sum them and get the Tenant one.
 				list := &corev1.ResourceQuotaList{}
 				if scopeErr = r.List(ctx, list, &client.ListOptions{LabelSelector: labels.NewSelector().Add(*tntRequirement).Add(*indexRequirement)}); scopeErr != nil {
-					r.Log.Error(scopeErr, "Cannot list ResourceQuota", "tenantFilter", tntRequirement.String(), "indexFilter", indexRequirement.String())
+					r.Log.Error(scopeErr, "cannot list ResourceQuota", "tenantFilter", tntRequirement.String(), "indexFilter", indexRequirement.String())
 
 					return scopeErr
 				}
@@ -92,7 +92,7 @@ func (r *Manager) syncResourceQuotas(ctx context.Context, tenant *capsulev1beta2
 				// For this case, we're going to block the Quota setting the Hard as the
 				// used one.
 				for name, hardQuota := range resourceQuota.Hard {
-					r.Log.V(4).Info("Desired hard " + name.String() + " quota is " + hardQuota.String())
+					r.Log.V(4).Info("desired hard " + name.String() + " quota is " + hardQuota.String())
 
 					// Getting the whole usage across all the Tenant Namespaces
 					var quantity resource.Quantity
@@ -100,7 +100,7 @@ func (r *Manager) syncResourceQuotas(ctx context.Context, tenant *capsulev1beta2
 						quantity.Add(item.Status.Used[name])
 					}
 
-					r.Log.V(4).Info("Computed " + name.String() + " quota for the whole Tenant is " + quantity.String())
+					r.Log.V(4).Info("computed " + name.String() + " quota for the whole Tenant is " + quantity.String())
 
 					// Expose usage and limit metrics for the resource (name) of the ResourceQuota (index)
 					r.Metrics.TenantResourceUsageGauge.WithLabelValues(
@@ -247,7 +247,7 @@ func (r *Manager) syncResourceQuota(ctx context.Context, tenant *capsulev1beta2.
 			return retryErr
 		})
 
-		r.Log.V(4).Info("Resource Quota sync result: "+string(res), "name", target.Name, "namespace", target.Namespace)
+		r.Log.V(4).Info("resource Quota sync result: "+string(res), "name", target.Name, "namespace", target.Namespace)
 
 		if err != nil {
 			return err
@@ -336,7 +336,7 @@ func (r *Manager) resourceQuotasUpdate(ctx context.Context, resourceName corev1.
 	if err = group.Wait(); err != nil {
 		// We had an error and we mark the whole transaction as failed
 		// to process it another time according to the Tenant controller back-off factor.
-		r.Log.Error(err, "Cannot update outer ResourceQuotas", "resourceName", resourceName.String())
+		r.Log.Error(err, "cannot update outer ResourceQuotas", "resourceName", resourceName.String())
 		err = fmt.Errorf("update of outer ResourceQuota items has failed: %w", err)
 	}
 

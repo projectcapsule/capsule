@@ -14,19 +14,19 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	capsulewebhook "github.com/projectcapsule/capsule/internal/webhook"
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
 	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
-	"github.com/projectcapsule/capsule/pkg/utils/tenant"
+	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
+	"github.com/projectcapsule/capsule/pkg/tenant"
 )
 
 type deviceClass struct{}
 
-func DeviceClass() capsulewebhook.Handler {
+func DeviceClass() handlers.Handler {
 	return &deviceClass{}
 }
 
-func (h *deviceClass) OnCreate(c client.Client, decoder admission.Decoder, recorder events.EventRecorder) capsulewebhook.Func {
+func (h *deviceClass) OnCreate(c client.Client, decoder admission.Decoder, recorder events.EventRecorder) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		switch res := req.Kind.Kind; res {
 		case "ResourceClaim":
@@ -49,13 +49,13 @@ func (h *deviceClass) OnCreate(c client.Client, decoder admission.Decoder, recor
 	}
 }
 
-func (h *deviceClass) OnDelete(client.Client, admission.Decoder, events.EventRecorder) capsulewebhook.Func {
+func (h *deviceClass) OnDelete(client.Client, admission.Decoder, events.EventRecorder) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (h *deviceClass) OnUpdate(client.Client, admission.Decoder, events.EventRecorder) capsulewebhook.Func {
+func (h *deviceClass) OnUpdate(client.Client, admission.Decoder, events.EventRecorder) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
@@ -98,7 +98,7 @@ func (h *deviceClass) validateResourceRequest(ctx context.Context, c client.Clie
 		case allowed.Match(dc.Name) || selector:
 			return nil
 		default:
-			recorder.Eventf(tnt, dc, corev1.EventTypeWarning, "ForbiddenDeviceClass", evt.ActionValidationDenied, "%s %s/%s DeviceClass %s is forbidden for the current Tenant", req.Kind.Kind, req.Namespace, req.Name, &dc)
+			recorder.Eventf(tnt, dc, corev1.EventTypeWarning, evt.ReasonForbiddenDeviceClass, evt.ActionValidationDenied, "%s %s/%s DeviceClass %s is forbidden for the current Tenant", req.Kind.Kind, req.Namespace, req.Name, &dc)
 
 			response := admission.Denied(NewDeviceClassForbidden(dc.Name, *allowed).Error())
 

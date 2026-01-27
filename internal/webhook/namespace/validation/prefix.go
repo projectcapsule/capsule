@@ -14,16 +14,16 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	capsulewebhook "github.com/projectcapsule/capsule/internal/webhook"
-	"github.com/projectcapsule/capsule/pkg/configuration"
+	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
+	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
 
 type prefixHandler struct {
 	cfg configuration.Configuration
 }
 
-func PrefixHandler(configuration configuration.Configuration) capsulewebhook.TypedHandlerWithTenant[*corev1.Namespace] {
+func PrefixHandler(configuration configuration.Configuration) handlers.TypedHandlerWithTenant[*corev1.Namespace] {
 	return &prefixHandler{
 		cfg: configuration,
 	}
@@ -35,7 +35,7 @@ func (h *prefixHandler) OnCreate(
 	decoder admission.Decoder,
 	recorder events.EventRecorder,
 	tnt *capsulev1beta2.Tenant,
-) capsulewebhook.Func {
+) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		if exp, _ := h.cfg.ProtectedNamespaceRegexp(); exp != nil {
 			if matched := exp.MatchString(ns.GetName()); matched {
@@ -70,7 +70,7 @@ func (h *prefixHandler) OnUpdate(
 	admission.Decoder,
 	events.EventRecorder,
 	*capsulev1beta2.Tenant,
-) capsulewebhook.Func {
+) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
@@ -82,7 +82,7 @@ func (h *prefixHandler) OnDelete(
 	admission.Decoder,
 	events.EventRecorder,
 	*capsulev1beta2.Tenant,
-) capsulewebhook.Func {
+) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}

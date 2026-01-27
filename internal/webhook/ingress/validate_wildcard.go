@@ -15,30 +15,30 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	capsulewebhook "github.com/projectcapsule/capsule/internal/webhook"
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
 	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
+	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
 
 type wildcard struct{}
 
-func Wildcard() capsulewebhook.Handler {
+func Wildcard() handlers.Handler {
 	return &wildcard{}
 }
 
-func (h *wildcard) OnCreate(client client.Client, decoder admission.Decoder, recorder events.EventRecorder) capsulewebhook.Func {
+func (h *wildcard) OnCreate(client client.Client, decoder admission.Decoder, recorder events.EventRecorder) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		return h.validate(ctx, client, req, recorder, decoder)
 	}
 }
 
-func (h *wildcard) OnDelete(client.Client, admission.Decoder, events.EventRecorder) capsulewebhook.Func {
+func (h *wildcard) OnDelete(client.Client, admission.Decoder, events.EventRecorder) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (h *wildcard) OnUpdate(client client.Client, decoder admission.Decoder, recorder events.EventRecorder) capsulewebhook.Func {
+func (h *wildcard) OnUpdate(client client.Client, decoder admission.Decoder, recorder events.EventRecorder) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		return h.validate(ctx, client, req, recorder, decoder)
 	}

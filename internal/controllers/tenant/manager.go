@@ -36,12 +36,13 @@ import (
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	"github.com/projectcapsule/capsule/internal/cache"
 	"github.com/projectcapsule/capsule/internal/controllers/utils"
 	"github.com/projectcapsule/capsule/internal/metrics"
 	"github.com/projectcapsule/capsule/pkg/api"
 	meta "github.com/projectcapsule/capsule/pkg/api/meta"
-	"github.com/projectcapsule/capsule/pkg/configuration"
+	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
+	"github.com/projectcapsule/capsule/pkg/runtime/gvk"
+	"github.com/projectcapsule/capsule/pkg/runtime/predicates"
 )
 
 type Manager struct {
@@ -53,8 +54,6 @@ type Manager struct {
 	Configuration configuration.Configuration
 	RESTConfig    *rest.Config
 	classes       supportedClasses
-
-	Cache *cache.NamespaceRegistriesCache
 }
 
 type supportedClasses struct {
@@ -64,6 +63,7 @@ type supportedClasses struct {
 
 func (r *Manager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.ControllerOptions) error {
 	ctrlBuilder := ctrl.NewControllerManagedBy(mgr).
+		Named("capsule/tenants").
 		For(
 			&capsulev1beta2.Tenant{},
 			builder.WithPredicates(
@@ -77,17 +77,14 @@ func (r *Manager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.Controller
 		Watches(
 			&capsulev1beta2.CapsuleConfiguration{},
 			handler.EnqueueRequestsFromMapFunc(r.enqueueAllTenants),
-			utils.NamesMatchingPredicate(ctrlConfig.ConfigurationName),
-			builder.WithPredicates(utils.CapsuleConfigSpecChangedPredicate),
+			builder.WithPredicates(
+				predicates.CapsuleConfigSpecChangedPredicate{},
+				predicates.NamesMatchingPredicate{Names: []string{ctrlConfig.ConfigurationName}},
+			),
 		).
 		Watches(
 			&corev1.Namespace{},
 			handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &capsulev1beta2.Tenant{}),
-		).
-		Watches(
-			&capsulev1beta2.RuleStatus{},
-			handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &capsulev1beta2.Tenant{}),
-			builder.WithPredicates(predicate.GenerationChangedPredicate{}),
 		).
 		Watches(
 			&storagev1.StorageClass{},
@@ -96,7 +93,7 @@ func (r *Manager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.Controller
 				r.collectAvailableStorageClasses,
 				"cannot collect storage classes",
 			),
-			builder.WithPredicates(utils.UpdatedMetadataPredicate),
+			builder.WithPredicates(predicates.UpdatedLabelsPredicate{}),
 		).
 		Watches(
 			&schedulingv1.PriorityClass{},
@@ -105,7 +102,7 @@ func (r *Manager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.Controller
 				r.collectAvailablePriorityClasses,
 				"cannot collect priority classes",
 			),
-			builder.WithPredicates(utils.UpdatedMetadataPredicate),
+			builder.WithPredicates(predicates.UpdatedLabelsPredicate{}),
 		).
 		Watches(
 			&nodev1.RuntimeClass{},
@@ -114,7 +111,7 @@ func (r *Manager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.Controller
 				r.collectAvailableRuntimeClasses,
 				"cannot collect runtime classes",
 			),
-			builder.WithPredicates(utils.UpdatedMetadataPredicate),
+			builder.WithPredicates(predicates.UpdatedLabelsPredicate{}),
 		).
 		Watches(
 			&capsulev1beta2.TenantOwner{},
@@ -191,12 +188,12 @@ func (r *Manager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.Controller
 					})
 				},
 			},
-			builder.WithPredicates(utils.PromotedServiceaccountPredicate),
+			builder.WithPredicates(predicates.PromotedServiceaccountPredicate{}),
 		).
 		WithOptions(controller.Options{MaxConcurrentReconciles: ctrlConfig.MaxConcurrentReconciles})
 
 	// GatewayClass is Optional
-	r.classes.gateway = utils.HasGVK(mgr.GetRESTMapper(), schema.GroupVersionKind{
+	r.classes.gateway = gvk.HasGVK(mgr.GetRESTMapper(), schema.GroupVersionKind{
 		Group:   "gateway.networking.k8s.io",
 		Version: "v1",
 		Kind:    "GatewayClass",
@@ -210,12 +207,12 @@ func (r *Manager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.Controller
 				r.collectAvailableGatewayClasses,
 				"cannot collect gateway classes",
 			),
-			builder.WithPredicates(utils.UpdatedMetadataPredicate),
+			builder.WithPredicates(predicates.UpdatedLabelsPredicate{}),
 		)
 	}
 
 	// DeviceClass is Optional
-	r.classes.device = utils.HasGVK(mgr.GetRESTMapper(), schema.GroupVersionKind{
+	r.classes.device = gvk.HasGVK(mgr.GetRESTMapper(), schema.GroupVersionKind{
 		Group:   "resource.k8s.io",
 		Version: "v1",
 		Kind:    "DeviceClass",
@@ -229,7 +226,7 @@ func (r *Manager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.Controller
 				r.collectAvailableDeviceClasses,
 				"cannot collect device classes",
 			),
-			builder.WithPredicates(utils.UpdatedMetadataPredicate),
+			builder.WithPredicates(predicates.UpdatedLabelsPredicate{}),
 		)
 	}
 
@@ -243,7 +240,7 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 	instance := &capsulev1beta2.Tenant{}
 	if err = r.Get(ctx, request.NamespacedName, instance); err != nil {
 		if apierrors.IsNotFound(err) {
-			r.Log.V(3).Info("Request object not found, could have been deleted after reconcile request")
+			r.Log.V(3).Info("request object not found, could have been deleted after reconcile request")
 
 			// If tenant was deleted or cannot be found, clean up metrics
 			r.Metrics.DeleteAllMetricsForTenant(request.Name)
@@ -251,7 +248,7 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 			return reconcile.Result{}, nil
 		}
 
-		r.Log.Error(err, "Error reading the object")
+		r.Log.Error(err, "error reading the object")
 
 		return result, err
 	}
@@ -286,7 +283,7 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 	}
 
 	// Ensuring ResourceQuota
-	r.Log.V(4).Info("Ensuring limit resources count is updated")
+	r.Log.V(4).Info("ensuring limit resources count is updated")
 
 	if err = r.syncCustomResourceQuotaUsages(ctx, instance); err != nil {
 		err = fmt.Errorf("cannot count limited resources: %w", err)
@@ -295,7 +292,7 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 	}
 
 	// Reconcile Namespaces
-	r.Log.V(4).Info("Starting processing of Namespaces", "items", len(instance.Status.Namespaces))
+	r.Log.V(4).Info("starting processing of Namespaces", "items", len(instance.Status.Namespaces))
 
 	if err = r.reconcileNamespaces(ctx, instance); err != nil {
 		err = fmt.Errorf("namespace(s) had reconciliation errors")
@@ -303,11 +300,8 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 		return result, err
 	}
 
-	n, u := r.Cache.Stats()
-	r.Log.V(5).Info("registry cache updated", "namespaces", n, "uniqueRuleSets", u)
-
 	// Ensuring NetworkPolicy resources
-	r.Log.V(4).Info("Starting processing of Network Policies")
+	r.Log.V(4).Info("starting processing of Network Policies")
 
 	if err = r.syncNetworkPolicies(ctx, instance); err != nil {
 		err = fmt.Errorf("cannot sync networkPolicy items: %w", err)

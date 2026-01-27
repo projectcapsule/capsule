@@ -3,19 +3,17 @@
 
 package route
 
-import (
-	capsulewebhook "github.com/projectcapsule/capsule/internal/webhook"
-)
+import "github.com/projectcapsule/capsule/pkg/runtime/handlers"
 
 type service struct {
-	handlers []capsulewebhook.Handler
+	handlers []handlers.Handler
 }
 
-func Service(handler ...capsulewebhook.Handler) capsulewebhook.Webhook {
+func Service(handler ...handlers.Handler) handlers.Webhook {
 	return &service{handlers: handler}
 }
 
-func (w *service) GetHandlers() []capsulewebhook.Handler {
+func (w *service) GetHandlers() []handlers.Handler {
 	return w.handlers
 }
 

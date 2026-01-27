@@ -4,75 +4,14 @@
 package v1beta2
 
 import (
-	"context"
 	"slices"
 	"sort"
 
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	"k8s.io/apiserver/pkg/authentication/serviceaccount"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/projectcapsule/capsule/pkg/api"
-	"github.com/projectcapsule/capsule/pkg/api/meta"
 )
-
-func (in *Tenant) CollectOwners(ctx context.Context, c client.Client, allowPromotion bool, admins api.UserListSpec) (api.OwnerStatusListSpec, error) {
-	owners := in.Spec.Owners.ToStatusOwners()
-
-	// Promoted ServiceAccounts
-	if allowPromotion && len(in.Status.Namespaces) > 0 {
-		saList := &corev1.ServiceAccountList{}
-		if err := c.List(ctx, saList,
-			client.MatchingLabels{
-				meta.OwnerPromotionLabel: meta.OwnerPromotionLabelTrigger,
-			},
-		); err != nil {
-			return nil, err
-		}
-
-		for _, sa := range saList.Items {
-			for _, ns := range in.Status.Namespaces {
-				if sa.GetNamespace() != ns {
-					continue
-				}
-
-				owners.Upsert(api.CoreOwnerSpec{
-					UserSpec: api.UserSpec{
-						Kind: api.ServiceAccountOwner,
-						Name: serviceaccount.ServiceAccountUsernamePrefix + sa.Namespace + ":" + sa.Name,
-					},
-					ClusterRoles: []string{
-						api.ProvisionerRoleName,
-						api.DeleterRoleName,
-					},
-				})
-			}
-		}
-	}
-
-	// Administrators
-	for _, a := range admins {
-		owners.Upsert(api.CoreOwnerSpec{
-			UserSpec: a,
-			ClusterRoles: []string{
-				api.DeleterRoleName,
-			},
-		})
-	}
-
-	// Dedicated Owner Objects
-	listed, err := in.Spec.Permissions.ListMatchingOwners(ctx, c, in.GetName())
-	if err != nil {
-		return nil, err
-	}
-
-	for _, o := range listed {
-		owners.Upsert(o.Spec.CoreOwnerSpec)
-	}
-
-	return owners, nil
-}
 
 func (in *Tenant) GetRoleBindings() []api.AdditionalRoleBindingsSpec {
 	roleBindings := make([]api.AdditionalRoleBindingsSpec, 0, len(in.Spec.AdditionalRoleBindings))

@@ -26,6 +26,10 @@ const (
 	CordonedLabel        = "projectcapsule.dev/cordoned"
 	CordonedLabelTrigger = "true"
 
+	CapsuleNameLabel = "projectcapsule.dev/name"
+
+	CreatedByCapsuleLabel = "projectcapsule.dev/created-by"
+
 	NewManagedByCapsuleLabel = "projectcapsule.dev/managed-by"
 	ManagedByCapsuleLabel    = "capsule.clastix.io/managed-by"
 

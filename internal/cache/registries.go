@@ -32,146 +32,93 @@ type CompiledRule struct {
 	ValidateVolumes bool
 }
 
-type NamespaceRegistriesCache struct {
+type RegistryRuleSetCache struct {
 	mu sync.RWMutex
-
-	byNamespace map[string]*RuleSet // ns -> ruleset pointer
-
-	ruleSets map[string]*RuleSet // id -> unique ruleset
-	refCount map[string]int      // id -> number of namespaces referencing
+	rs map[string]*RuleSet
 }
 
-func NewNamespaceRegistriesCache() *NamespaceRegistriesCache {
-	return &NamespaceRegistriesCache{
-		byNamespace: map[string]*RuleSet{},
-		ruleSets:    map[string]*RuleSet{},
-		refCount:    map[string]int{},
+func NewRegistryRuleSetCache() *RegistryRuleSetCache {
+	return &RegistryRuleSetCache{
+		rs: make(map[string]*RuleSet),
 	}
 }
 
-// Set builds (or reuses) a ruleset from specRules and assigns it to the namespace.
-func (c *NamespaceRegistriesCache) Set(namespace string, specRules []api.OCIRegistry) error {
-	rs, err := buildRuleSet(specRules)
+func (c *RegistryRuleSetCache) GetOrBuild(specRules []api.OCIRegistry) (rs *RuleSet, fromCache bool, err error) {
+	if len(specRules) == 0 {
+		return nil, false, nil
+	}
+
+	id := c.HashRules(specRules)
+
+	c.mu.RLock()
+	rs = c.rs[id]
+	c.mu.RUnlock()
+
+	if rs != nil {
+		return rs, true, nil
+	}
+
+	// Build outside locks (regex compile etc.)
+	built, err := buildRuleSet(id, specRules)
 	if err != nil {
-		return err
+		return nil, false, err
 	}
 
+	// Insert with double-check
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	// Dedup by ruleset ID
-	if existing, ok := c.ruleSets[rs.ID]; ok {
-		rs = existing
-	} else {
-		c.ruleSets[rs.ID] = rs
-		c.refCount[rs.ID] = 0
+	if c.rs == nil {
+		c.rs = make(map[string]*RuleSet)
 	}
 
-	// Adjust old reference if needed
-	if old, ok := c.byNamespace[namespace]; ok && old != nil {
-		if old.ID == rs.ID {
-			return nil
-		}
-
-		c.refCount[old.ID]--
-		if c.refCount[old.ID] <= 0 {
-			delete(c.refCount, old.ID)
-			delete(c.ruleSets, old.ID)
-		}
+	// Another goroutine may have inserted meanwhile
+	if rs = c.rs[id]; rs != nil {
+		return rs, true, nil
 	}
 
-	c.byNamespace[namespace] = rs
-	c.refCount[rs.ID]++
+	c.rs[id] = built
 
-	return nil
+	return built, false, nil
 }
 
-func (c *NamespaceRegistriesCache) Delete(namespace string) {
+func (c *RegistryRuleSetCache) Stats() int {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	return len(c.rs)
+}
+
+// activeIDs: set of ids currently referenced by RuleStatus in cluster.
+func (c *RegistryRuleSetCache) PruneActive(activeIDs map[string]struct{}) int {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	old, ok := c.byNamespace[namespace]
-	if !ok || old == nil {
-		return
-	}
+	removed := 0
 
-	delete(c.byNamespace, namespace)
-
-	c.refCount[old.ID]--
-	if c.refCount[old.ID] <= 0 {
-		delete(c.refCount, old.ID)
-		delete(c.ruleSets, old.ID)
-	}
-}
-
-func (c *NamespaceRegistriesCache) Get(namespace string) (*RuleSet, bool) {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
-	rs, ok := c.byNamespace[namespace]
-
-	return rs, ok && rs != nil
-}
-
-func (c *NamespaceRegistriesCache) Stats() (namespaces int, uniqueRuleSets int) {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
-	return len(c.byNamespace), len(c.ruleSets)
-}
-
-func buildRuleSet(specRules []api.OCIRegistry) (*RuleSet, error) {
-	id := hashRules(specRules)
-
-	rs := &RuleSet{
-		ID:       id,
-		Compiled: make([]CompiledRule, 0, len(specRules)),
-	}
-
-	for _, r := range specRules {
-		re, err := regexp.Compile(r.Registry)
-		if err != nil {
-			return nil, fmt.Errorf("invalid registry regex %q: %w", r.Registry, err)
+	for id := range c.rs {
+		if _, ok := activeIDs[id]; ok {
+			continue
 		}
 
-		cr := CompiledRule{
-			Registry: r.Registry,
-			RE:       re,
-		}
+		delete(c.rs, id)
 
-		if len(r.Policy) > 0 {
-			cr.AllowedPolicy = make(map[corev1.PullPolicy]struct{}, len(r.Policy))
-			for _, p := range r.Policy {
-				cr.AllowedPolicy[p] = struct{}{}
-			}
-		}
-
-		for _, v := range r.Validation {
-			switch v {
-			case api.ValidateImages:
-				cr.ValidateImages = true
-				rs.HasImages = true
-			case api.ValidateVolumes:
-				cr.ValidateVolumes = true
-				rs.HasVolumes = true
-			}
-		}
-
-		rs.Compiled = append(rs.Compiled, cr)
+		removed++
 	}
 
-	return rs, nil
+	return removed
 }
 
-func hashRules(specRules []api.OCIRegistry) string {
-	// IMPORTANT: preserve rule order (later wins)
+func (c *RegistryRuleSetCache) HashRules(specRules []api.OCIRegistry) string {
 	var b strings.Builder
 
 	b.Grow(len(specRules) * 64)
 
-	sepRule := "\n"
-	sepField := "\x1f"
-	sepList := "\x1e"
+	const (
+		sepRule  = "\n"
+		sepField = "\x1f"
+		sepList  = "\x1e"
+	)
 
 	for _, r := range specRules {
 		url := strings.TrimSpace(r.Registry)
@@ -217,4 +164,69 @@ func hashRules(specRules []api.OCIRegistry) string {
 	sum := sha256.Sum256([]byte(b.String()))
 
 	return hex.EncodeToString(sum[:])
+}
+
+// Has is useful in tests and debugging.
+func (c *RegistryRuleSetCache) Has(id string) bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	_, ok := c.rs[id]
+
+	return ok
+}
+
+// InsertForTest can be behind a build tag if you prefer, but it's fine to keep simple.
+//
+//nolint:unused
+func (c *RegistryRuleSetCache) insertForTest(id string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if c.rs == nil {
+		c.rs = make(map[string]*RuleSet)
+	}
+
+	c.rs[id] = &RuleSet{ID: id}
+}
+
+func buildRuleSet(id string, specRules []api.OCIRegistry) (*RuleSet, error) {
+	rs := &RuleSet{
+		ID:       id,
+		Compiled: make([]CompiledRule, 0, len(specRules)),
+	}
+
+	for _, r := range specRules {
+		re, err := regexp.Compile(r.Registry)
+		if err != nil {
+			return nil, fmt.Errorf("invalid registry regex %q: %w", r.Registry, err)
+		}
+
+		cr := CompiledRule{
+			Registry: r.Registry,
+			RE:       re,
+		}
+
+		if len(r.Policy) > 0 {
+			cr.AllowedPolicy = make(map[corev1.PullPolicy]struct{}, len(r.Policy))
+			for _, p := range r.Policy {
+				cr.AllowedPolicy[p] = struct{}{}
+			}
+		}
+
+		for _, v := range r.Validation {
+			switch v {
+			case api.ValidateImages:
+				cr.ValidateImages = true
+				rs.HasImages = true
+			case api.ValidateVolumes:
+				cr.ValidateVolumes = true
+				rs.HasVolumes = true
+			}
+		}
+
+		rs.Compiled = append(rs.Compiled, cr)
+	}
+
+	return rs, nil
 }

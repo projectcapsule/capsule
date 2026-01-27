@@ -15,32 +15,32 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	capsulewebhook "github.com/projectcapsule/capsule/internal/webhook"
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
-	"github.com/projectcapsule/capsule/pkg/indexer/tenantresource"
 	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
-	"github.com/projectcapsule/capsule/pkg/utils/tenant"
+	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
+	"github.com/projectcapsule/capsule/pkg/runtime/indexers/tenantresource"
+	"github.com/projectcapsule/capsule/pkg/tenant"
 )
 
 type cordoningHandler struct{}
 
-func WriteOpsHandler() capsulewebhook.Handler {
+func WriteOpsHandler() handlers.Handler {
 	return &cordoningHandler{}
 }
 
-func (h *cordoningHandler) OnCreate(client.Client, admission.Decoder, events.EventRecorder) capsulewebhook.Func {
+func (h *cordoningHandler) OnCreate(client.Client, admission.Decoder, events.EventRecorder) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (h *cordoningHandler) OnDelete(client client.Client, _ admission.Decoder, recorder events.EventRecorder) capsulewebhook.Func {
+func (h *cordoningHandler) OnDelete(client client.Client, _ admission.Decoder, recorder events.EventRecorder) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		return h.handler(ctx, client, req, recorder)
 	}
 }
 
-func (h *cordoningHandler) OnUpdate(client client.Client, _ admission.Decoder, recorder events.EventRecorder) capsulewebhook.Func {
+func (h *cordoningHandler) OnUpdate(client client.Client, _ admission.Decoder, recorder events.EventRecorder) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		return h.handler(ctx, client, req, recorder)
 	}

@@ -6,6 +6,7 @@ package pod
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"sort"
 	"strings"
 
@@ -16,18 +17,18 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/internal/cache"
-	capsulewebhook "github.com/projectcapsule/capsule/internal/webhook"
 	"github.com/projectcapsule/capsule/pkg/api"
-	"github.com/projectcapsule/capsule/pkg/configuration"
+	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
+	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
 
 type registryHandler struct {
 	configuration configuration.Configuration
-	cache         *cache.NamespaceRegistriesCache
+	cache         *cache.RegistryRuleSetCache
 }
 
-func ContainerRegistry(configuration configuration.Configuration, cache *cache.NamespaceRegistriesCache) capsulewebhook.TypedHandlerWithTenant[*corev1.Pod] {
+func ContainerRegistry(configuration configuration.Configuration, cache *cache.RegistryRuleSetCache) handlers.TypedHandlerWithTenantWithRuleset[*corev1.Pod] {
 	return &registryHandler{
 		configuration: configuration,
 		cache:         cache,
@@ -40,9 +41,10 @@ func (h *registryHandler) OnCreate(
 	decoder admission.Decoder,
 	recorder events.EventRecorder,
 	tnt *capsulev1beta2.Tenant,
-) capsulewebhook.Func {
+	rule *capsulev1beta2.NamespaceRuleBody,
+) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		return h.validate(req, pod, tnt, recorder)
+		return h.validate(req, pod, tnt, recorder, rule)
 	}
 }
 
@@ -53,9 +55,10 @@ func (h *registryHandler) OnUpdate(
 	decoder admission.Decoder,
 	recorder events.EventRecorder,
 	tnt *capsulev1beta2.Tenant,
-) capsulewebhook.Func {
+	rule *capsulev1beta2.NamespaceRuleBody,
+) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		return h.validate(req, pod, tnt, recorder)
+		return h.validate(req, pod, tnt, recorder, rule)
 	}
 }
 
@@ -65,7 +68,8 @@ func (h *registryHandler) OnDelete(
 	admission.Decoder,
 	events.EventRecorder,
 	*capsulev1beta2.Tenant,
-) capsulewebhook.Func {
+	*capsulev1beta2.NamespaceRuleBody,
+) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
@@ -76,10 +80,23 @@ func (h *registryHandler) validate(
 	pod *corev1.Pod,
 	tnt *capsulev1beta2.Tenant,
 	recorder events.EventRecorder,
+	rule *capsulev1beta2.NamespaceRuleBody,
 ) *admission.Response {
-	rs, ok := h.cache.Get(req.Namespace)
-	if !ok || rs == nil {
-		resp := admission.Allowed("no registry rules for namespace")
+	if rule == nil || len(rule.Enforce.Registries) == 0 {
+		resp := admission.Allowed("no registry rules")
+
+		return &resp
+	}
+
+	rs, _, err := h.cache.GetOrBuild(rule.Enforce.Registries)
+	if err != nil {
+		resp := admission.Errored(http.StatusInternalServerError, err)
+
+		return &resp
+	}
+
+	if rs == nil {
+		resp := admission.Allowed("no registry rules")
 
 		return &resp
 	}

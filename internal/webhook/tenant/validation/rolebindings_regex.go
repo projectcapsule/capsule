@@ -15,29 +15,29 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	capsulewebhook "github.com/projectcapsule/capsule/internal/webhook"
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
+	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
 
 type rbRegexHandler struct{}
 
-func RoleBindingRegexHandler() capsulewebhook.Handler {
+func RoleBindingRegexHandler() handlers.Handler {
 	return &rbRegexHandler{}
 }
 
-func (h *rbRegexHandler) OnCreate(_ client.Client, decoder admission.Decoder, _ events.EventRecorder) capsulewebhook.Func {
+func (h *rbRegexHandler) OnCreate(_ client.Client, decoder admission.Decoder, _ events.EventRecorder) handlers.Func {
 	return func(_ context.Context, req admission.Request) *admission.Response {
 		return h.validate(req, decoder)
 	}
 }
 
-func (h *rbRegexHandler) OnDelete(client.Client, admission.Decoder, events.EventRecorder) capsulewebhook.Func {
+func (h *rbRegexHandler) OnDelete(client.Client, admission.Decoder, events.EventRecorder) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (h *rbRegexHandler) OnUpdate(_ client.Client, decoder admission.Decoder, _ events.EventRecorder) capsulewebhook.Func {
+func (h *rbRegexHandler) OnUpdate(_ client.Client, decoder admission.Decoder, _ events.EventRecorder) handlers.Func {
 	return func(_ context.Context, req admission.Request) *admission.Response {
 		return h.validate(req, decoder)
 	}

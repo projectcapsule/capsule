@@ -30,6 +30,7 @@ type MetadataReconciler struct {
 
 func (m *MetadataReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
+		Named("capsule/pod").
 		For(&corev1.Pod{}, m.forOptionPerInstanceName(ctx)).
 		Complete(m)
 }

@@ -143,7 +143,8 @@ type Tenant struct {
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitzero"`
 
-	Spec TenantSpec `json:"spec"`
+	// +optional
+	Spec TenantSpec `json:"spec,omitzero"`
 
 	// +optional
 	Status TenantStatus `json:"status,omitzero"`

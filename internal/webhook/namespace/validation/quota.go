@@ -13,13 +13,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	capsulewebhook "github.com/projectcapsule/capsule/internal/webhook"
 	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
+	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
 
 type quotaHandler struct{}
 
-func QuotaHandler() capsulewebhook.TypedHandlerWithTenant[*corev1.Namespace] {
+func QuotaHandler() handlers.TypedHandlerWithTenant[*corev1.Namespace] {
 	return &quotaHandler{}
 }
 
@@ -29,7 +29,7 @@ func (h *quotaHandler) OnCreate(
 	decoder admission.Decoder,
 	recorder events.EventRecorder,
 	tnt *capsulev1beta2.Tenant,
-) capsulewebhook.Func {
+) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		return h.handle(ctx, c, recorder, ns, tnt)
 	}
@@ -41,7 +41,7 @@ func (h *quotaHandler) OnDelete(
 	admission.Decoder,
 	events.EventRecorder,
 	*capsulev1beta2.Tenant,
-) capsulewebhook.Func {
+) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
@@ -54,7 +54,7 @@ func (h *quotaHandler) OnUpdate(
 	decoder admission.Decoder,
 	recorder events.EventRecorder,
 	tnt *capsulev1beta2.Tenant,
-) capsulewebhook.Func {
+) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		return h.handle(ctx, c, recorder, ns, tnt)
 	}

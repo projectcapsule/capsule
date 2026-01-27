@@ -12,16 +12,16 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	capsulewebhook "github.com/projectcapsule/capsule/internal/webhook"
-	"github.com/projectcapsule/capsule/pkg/configuration"
+	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
+	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
 
 type containerRegistryLegacyHandler struct {
 	configuration configuration.Configuration
 }
 
-func ContainerRegistryLegacy(configuration configuration.Configuration) capsulewebhook.TypedHandlerWithTenant[*corev1.Pod] {
+func ContainerRegistryLegacy(configuration configuration.Configuration) handlers.TypedHandlerWithTenantWithRuleset[*corev1.Pod] {
 	return &containerRegistryLegacyHandler{
 		configuration: configuration,
 	}
@@ -33,7 +33,8 @@ func (h *containerRegistryLegacyHandler) OnCreate(
 	decoder admission.Decoder,
 	recorder events.EventRecorder,
 	tnt *capsulev1beta2.Tenant,
-) capsulewebhook.Func {
+	_ *capsulev1beta2.NamespaceRuleBody,
+) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		return h.validate(req, pod, tnt, recorder)
 	}
@@ -46,7 +47,8 @@ func (h *containerRegistryLegacyHandler) OnUpdate(
 	decoder admission.Decoder,
 	recorder events.EventRecorder,
 	tnt *capsulev1beta2.Tenant,
-) capsulewebhook.Func {
+	_ *capsulev1beta2.NamespaceRuleBody,
+) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		return h.validate(req, pod, tnt, recorder)
 	}
@@ -58,7 +60,8 @@ func (h *containerRegistryLegacyHandler) OnDelete(
 	admission.Decoder,
 	events.EventRecorder,
 	*capsulev1beta2.Tenant,
-) capsulewebhook.Func {
+	*capsulev1beta2.NamespaceRuleBody,
+) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}

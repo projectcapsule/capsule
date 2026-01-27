@@ -15,10 +15,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	capsulewebhook "github.com/projectcapsule/capsule/internal/webhook"
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
-	"github.com/projectcapsule/capsule/pkg/configuration"
+	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
+	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
 
 type class struct {
@@ -26,26 +26,26 @@ type class struct {
 	version       *version.Version
 }
 
-func Class(configuration configuration.Configuration, version *version.Version) capsulewebhook.Handler {
+func Class(configuration configuration.Configuration, version *version.Version) handlers.Handler {
 	return &class{
 		configuration: configuration,
 		version:       version,
 	}
 }
 
-func (r *class) OnCreate(client client.Client, decoder admission.Decoder, recorder events.EventRecorder) capsulewebhook.Func {
+func (r *class) OnCreate(client client.Client, decoder admission.Decoder, recorder events.EventRecorder) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		return r.validate(ctx, r.version, client, req, decoder, recorder)
 	}
 }
 
-func (r *class) OnUpdate(client client.Client, decoder admission.Decoder, recorder events.EventRecorder) capsulewebhook.Func {
+func (r *class) OnUpdate(client client.Client, decoder admission.Decoder, recorder events.EventRecorder) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		return r.validate(ctx, r.version, client, req, decoder, recorder)
 	}
 }
 
-func (r *class) OnDelete(client.Client, admission.Decoder, events.EventRecorder) capsulewebhook.Func {
+func (r *class) OnDelete(client.Client, admission.Decoder, events.EventRecorder) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}

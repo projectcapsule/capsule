@@ -17,31 +17,31 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	capsulewebhook "github.com/projectcapsule/capsule/internal/webhook"
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
+	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
 
 type poolMutationHandler struct {
 	log logr.Logger
 }
 
-func PoolMutationHandler(log logr.Logger) capsulewebhook.Handler {
+func PoolMutationHandler(log logr.Logger) handlers.Handler {
 	return &poolMutationHandler{log: log}
 }
 
-func (h *poolMutationHandler) OnCreate(_ client.Client, decoder admission.Decoder, _ events.EventRecorder) capsulewebhook.Func {
+func (h *poolMutationHandler) OnCreate(_ client.Client, decoder admission.Decoder, _ events.EventRecorder) handlers.Func {
 	return func(_ context.Context, req admission.Request) *admission.Response {
 		return h.handle(req, decoder)
 	}
 }
 
-func (h *poolMutationHandler) OnDelete(client.Client, admission.Decoder, events.EventRecorder) capsulewebhook.Func {
+func (h *poolMutationHandler) OnDelete(client.Client, admission.Decoder, events.EventRecorder) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (h *poolMutationHandler) OnUpdate(_ client.Client, decoder admission.Decoder, _ events.EventRecorder) capsulewebhook.Func {
+func (h *poolMutationHandler) OnUpdate(_ client.Client, decoder admission.Decoder, _ events.EventRecorder) handlers.Func {
 	return func(_ context.Context, req admission.Request) *admission.Response {
 		return h.handle(req, decoder)
 	}

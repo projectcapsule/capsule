@@ -8,7 +8,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/projectcapsule/capsule/pkg/configuration"
+	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 )
 
 type registry map[string]string

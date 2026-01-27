@@ -331,6 +331,10 @@
                             "description": "Additional annotations to add to the CapsuleConfiguration resource",
                             "type": "object"
                         },
+                        "cacheInvalidation": {
+                            "description": "Duration after which the in-memory cache is invalidated (based on usaage) and re-fetched from the API server",
+                            "type": "string"
+                        },
                         "capsuleConfiguration": {
                             "description": "Change the default name of the capsule configuration name",
                             "type": "string"
@@ -394,6 +398,34 @@
                         "protectedNamespaceRegex": {
                             "description": "If specified, disallows creation of namespaces matching the passed regexp",
                             "type": "string"
+                        },
+                        "rbac": {
+                            "description": "Managed RBAC configuration for the controller",
+                            "type": "object",
+                            "properties": {
+                                "administrationClusterRoles": {
+                                    "description": "The ClusterRoles applied for Administrators",
+                                    "type": "array",
+                                    "items": {
+                                        "type": "string"
+                                    }
+                                },
+                                "deleter": {
+                                    "description": "Name for the ClusterRole required to grant Namespace Deletion permissions.",
+                                    "type": "string"
+                                },
+                                "promotionClusterRoles": {
+                                    "description": "The ClusterRoles applied for ServiceAccounts which had owner Promotion",
+                                    "type": "array",
+                                    "items": {
+                                        "type": "string"
+                                    }
+                                },
+                                "provisioner": {
+                                    "description": "Name for the ClusterRole required to grant Namespace Provision permissions.",
+                                    "type": "string"
+                                }
+                            }
                         },
                         "userNames": {
                             "description": "DEPRECATED: use users properties. Names of the users considered as Capsule users.",
@@ -744,6 +776,10 @@
         "webhooks": {
             "type": "object",
             "properties": {
+                "annotations": {
+                    "description": "Additional Annotations for all webhooks",
+                    "type": "object"
+                },
                 "exclusive": {
                     "description": "When `crds.exclusive` is `true` the webhooks will be installed",
                     "type": "boolean"
@@ -1652,6 +1688,10 @@
                             }
                         }
                     }
+                },
+                "labels": {
+                    "description": "Additional Labels for all webhooks",
+                    "type": "object"
                 },
                 "mutatingWebhooksTimeoutSeconds": {
                     "description": "Timeout in seconds for mutating webhooks",

@@ -72,7 +72,7 @@ func (r *Manager) syncNetworkPolicy(ctx context.Context, tenant *capsulev1beta2.
 			return controllerutil.SetControllerReference(tenant, target, r.Scheme())
 		})
 
-		r.Log.V(4).Info("Network Policy sync result: "+string(res), "name", target.Name, "namespace", target.Namespace)
+		r.Log.V(4).Info("network Policy sync result: "+string(res), "name", target.Name, "namespace", target.Namespace)
 
 		if err != nil {
 			return err

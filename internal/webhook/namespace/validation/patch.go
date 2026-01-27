@@ -13,17 +13,17 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	capsulewebhook "github.com/projectcapsule/capsule/internal/webhook"
-	"github.com/projectcapsule/capsule/pkg/configuration"
+	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
-	"github.com/projectcapsule/capsule/pkg/utils/users"
+	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
+	"github.com/projectcapsule/capsule/pkg/users"
 )
 
 type patchHandler struct {
 	cfg configuration.Configuration
 }
 
-func PatchHandler(configuration configuration.Configuration) capsulewebhook.TypedHandlerWithTenant[*corev1.Namespace] {
+func PatchHandler(configuration configuration.Configuration) handlers.TypedHandlerWithTenant[*corev1.Namespace] {
 	return &patchHandler{cfg: configuration}
 }
 
@@ -33,7 +33,7 @@ func (h *patchHandler) OnCreate(
 	admission.Decoder,
 	events.EventRecorder,
 	*capsulev1beta2.Tenant,
-) capsulewebhook.Func {
+) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
@@ -45,7 +45,7 @@ func (h *patchHandler) OnDelete(
 	admission.Decoder,
 	events.EventRecorder,
 	*capsulev1beta2.Tenant,
-) capsulewebhook.Func {
+) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
@@ -58,7 +58,7 @@ func (h *patchHandler) OnUpdate(
 	decoder admission.Decoder,
 	recorder events.EventRecorder,
 	tnt *capsulev1beta2.Tenant,
-) capsulewebhook.Func {
+) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		e := fmt.Sprintf("namespace/%s can not be patched", ns.Name)
 

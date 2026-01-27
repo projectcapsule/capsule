@@ -13,14 +13,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	capsulewebhook "github.com/projectcapsule/capsule/internal/webhook"
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
 	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
+	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
 
 type priorityClass struct{}
 
-func PriorityClass() capsulewebhook.TypedHandlerWithTenant[*corev1.Pod] {
+func PriorityClass() handlers.TypedHandlerWithTenantWithRuleset[*corev1.Pod] {
 	return &priorityClass{}
 }
 
@@ -30,7 +30,8 @@ func (h *priorityClass) OnCreate(
 	decoder admission.Decoder,
 	recorder events.EventRecorder,
 	tnt *capsulev1beta2.Tenant,
-) capsulewebhook.Func {
+	_ *capsulev1beta2.NamespaceRuleBody,
+) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		allowed := tnt.Spec.PriorityClasses
 
@@ -92,7 +93,8 @@ func (h *priorityClass) OnUpdate(
 	admission.Decoder,
 	events.EventRecorder,
 	*capsulev1beta2.Tenant,
-) capsulewebhook.Func {
+	*capsulev1beta2.NamespaceRuleBody,
+) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
@@ -104,7 +106,8 @@ func (h *priorityClass) OnDelete(
 	admission.Decoder,
 	events.EventRecorder,
 	*capsulev1beta2.Tenant,
-) capsulewebhook.Func {
+	*capsulev1beta2.NamespaceRuleBody,
+) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}

@@ -13,17 +13,17 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	capsulewebhook "github.com/projectcapsule/capsule/internal/webhook"
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
+	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
 
 type forbiddenAnnotationsRegexHandler struct{}
 
-func ForbiddenAnnotationsRegexHandler() capsulewebhook.Handler {
+func ForbiddenAnnotationsRegexHandler() handlers.Handler {
 	return &forbiddenAnnotationsRegexHandler{}
 }
 
-func (h *forbiddenAnnotationsRegexHandler) OnCreate(_ client.Client, decoder admission.Decoder, _ events.EventRecorder) capsulewebhook.Func {
+func (h *forbiddenAnnotationsRegexHandler) OnCreate(_ client.Client, decoder admission.Decoder, _ events.EventRecorder) handlers.Func {
 	return func(_ context.Context, req admission.Request) *admission.Response {
 		if err := h.validate(decoder, req); err != nil {
 			return err
@@ -33,13 +33,13 @@ func (h *forbiddenAnnotationsRegexHandler) OnCreate(_ client.Client, decoder adm
 	}
 }
 
-func (h *forbiddenAnnotationsRegexHandler) OnDelete(client.Client, admission.Decoder, events.EventRecorder) capsulewebhook.Func {
+func (h *forbiddenAnnotationsRegexHandler) OnDelete(client.Client, admission.Decoder, events.EventRecorder) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (h *forbiddenAnnotationsRegexHandler) OnUpdate(_ client.Client, decoder admission.Decoder, _ events.EventRecorder) capsulewebhook.Func {
+func (h *forbiddenAnnotationsRegexHandler) OnUpdate(_ client.Client, decoder admission.Decoder, _ events.EventRecorder) handlers.Func {
 	return func(_ context.Context, req admission.Request) *admission.Response {
 		if response := h.validate(decoder, req); response != nil {
 			return response

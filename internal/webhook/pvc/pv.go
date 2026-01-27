@@ -15,16 +15,16 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	capsulewebhook "github.com/projectcapsule/capsule/internal/webhook"
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
 	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
+	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
 
 type pv struct{}
 
-func PersistentVolumeReuse() capsulewebhook.TypedHandlerWithTenant[*corev1.PersistentVolumeClaim] {
+func PersistentVolumeReuse() handlers.TypedHandlerWithTenant[*corev1.PersistentVolumeClaim] {
 	return &pv{}
 }
 
@@ -34,7 +34,7 @@ func (h pv) OnCreate(
 	decoder admission.Decoder,
 	recorder events.EventRecorder,
 	tnt *capsulev1beta2.Tenant,
-) capsulewebhook.Func {
+) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		pvObj, err := h.handle(ctx, c, pvc, tnt.Name)
 		if err == nil {
@@ -61,7 +61,7 @@ func (h pv) OnUpdate(
 	admission.Decoder,
 	events.EventRecorder,
 	*capsulev1beta2.Tenant,
-) capsulewebhook.Func {
+) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		return nil
 	}
@@ -73,7 +73,7 @@ func (h pv) OnDelete(
 	admission.Decoder,
 	events.EventRecorder,
 	*capsulev1beta2.Tenant,
-) capsulewebhook.Func {
+) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}

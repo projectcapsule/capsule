@@ -13,37 +13,37 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	capsulewebhook "github.com/projectcapsule/capsule/internal/webhook"
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
-	"github.com/projectcapsule/capsule/pkg/configuration"
+	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
-	"github.com/projectcapsule/capsule/pkg/utils/tenant"
-	"github.com/projectcapsule/capsule/pkg/utils/users"
+	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
+	"github.com/projectcapsule/capsule/pkg/tenant"
+	"github.com/projectcapsule/capsule/pkg/users"
 )
 
 type cordoningHandler struct {
 	configuration configuration.Configuration
 }
 
-func CordoningHandler(configuration configuration.Configuration) capsulewebhook.Handler {
+func CordoningHandler(configuration configuration.Configuration) handlers.Handler {
 	return &cordoningHandler{
 		configuration: configuration,
 	}
 }
 
-func (h *cordoningHandler) OnCreate(c client.Client, _ admission.Decoder, recorder events.EventRecorder) capsulewebhook.Func {
+func (h *cordoningHandler) OnCreate(c client.Client, _ admission.Decoder, recorder events.EventRecorder) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		return h.cordonHandler(ctx, c, req, recorder)
 	}
 }
 
-func (h *cordoningHandler) OnDelete(c client.Client, _ admission.Decoder, recorder events.EventRecorder) capsulewebhook.Func {
+func (h *cordoningHandler) OnDelete(c client.Client, _ admission.Decoder, recorder events.EventRecorder) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		return h.cordonHandler(ctx, c, req, recorder)
 	}
 }
 
-func (h *cordoningHandler) OnUpdate(c client.Client, _ admission.Decoder, recorder events.EventRecorder) capsulewebhook.Func {
+func (h *cordoningHandler) OnUpdate(c client.Client, _ admission.Decoder, recorder events.EventRecorder) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		return h.cordonHandler(ctx, c, req, recorder)
 	}

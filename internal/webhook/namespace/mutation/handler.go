@@ -11,15 +11,15 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	"github.com/projectcapsule/capsule/internal/webhook"
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
-	"github.com/projectcapsule/capsule/pkg/configuration"
+	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
-	"github.com/projectcapsule/capsule/pkg/utils/tenant"
-	"github.com/projectcapsule/capsule/pkg/utils/users"
+	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
+	"github.com/projectcapsule/capsule/pkg/tenant"
+	"github.com/projectcapsule/capsule/pkg/users"
 )
 
-func NamespaceHandler(configuration configuration.Configuration, handlers ...webhook.TypedHandler[*corev1.Namespace]) webhook.Handler {
+func NamespaceHandler(configuration configuration.Configuration, handlers ...handlers.TypedHandler[*corev1.Namespace]) handlers.Handler {
 	return &handler{
 		cfg:      configuration,
 		handlers: handlers,
@@ -28,10 +28,10 @@ func NamespaceHandler(configuration configuration.Configuration, handlers ...web
 
 type handler struct {
 	cfg      configuration.Configuration
-	handlers []webhook.TypedHandler[*corev1.Namespace]
+	handlers []handlers.TypedHandler[*corev1.Namespace]
 }
 
-func (h *handler) OnCreate(c client.Client, decoder admission.Decoder, recorder events.EventRecorder) webhook.Func {
+func (h *handler) OnCreate(c client.Client, decoder admission.Decoder, recorder events.EventRecorder) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		userIsAdmin := users.IsAdminUser(req, h.cfg.Administrators())
 
@@ -63,13 +63,13 @@ func (h *handler) OnCreate(c client.Client, decoder admission.Decoder, recorder 
 	}
 }
 
-func (h *handler) OnDelete(c client.Client, decoder admission.Decoder, recorder events.EventRecorder) webhook.Func {
+func (h *handler) OnDelete(c client.Client, decoder admission.Decoder, recorder events.EventRecorder) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (h *handler) OnUpdate(c client.Client, decoder admission.Decoder, recorder events.EventRecorder) webhook.Func {
+func (h *handler) OnUpdate(c client.Client, decoder admission.Decoder, recorder events.EventRecorder) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		userIsAdmin := users.IsAdminUser(req, h.cfg.Administrators())
 

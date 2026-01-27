@@ -93,10 +93,10 @@ func (r *Manager) syncAdditionalRoleBinding(
 			return controllerutil.SetControllerReference(tenant, target, r.Scheme())
 		})
 		if err != nil {
-			r.Log.Error(err, "Cannot sync RoleBinding")
+			r.Log.Error(err, "cannot sync RoleBinding")
 		}
 
-		r.Log.V(4).Info(fmt.Sprintf("RoleBinding sync result: %s", string(res)), "name", target.Name, "namespace", target.Namespace)
+		r.Log.V(4).Info(fmt.Sprintf("roleBinding sync result: %s", string(res)), "name", target.Name, "namespace", target.Namespace)
 
 		if err != nil {
 			return err

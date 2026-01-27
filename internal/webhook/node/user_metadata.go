@@ -13,10 +13,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	capsulewebhook "github.com/projectcapsule/capsule/internal/webhook"
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
-	"github.com/projectcapsule/capsule/pkg/configuration"
+	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
+	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
 
 type userMetadataHandler struct {
@@ -24,26 +24,26 @@ type userMetadataHandler struct {
 	version       *version.Version
 }
 
-func UserMetadataHandler(configuration configuration.Configuration, ver *version.Version) capsulewebhook.Handler {
+func UserMetadataHandler(configuration configuration.Configuration, ver *version.Version) handlers.Handler {
 	return &userMetadataHandler{
 		configuration: configuration,
 		version:       ver,
 	}
 }
 
-func (r *userMetadataHandler) OnCreate(client.Client, admission.Decoder, events.EventRecorder) capsulewebhook.Func {
+func (r *userMetadataHandler) OnCreate(client.Client, admission.Decoder, events.EventRecorder) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (r *userMetadataHandler) OnDelete(client.Client, admission.Decoder, events.EventRecorder) capsulewebhook.Func {
+func (r *userMetadataHandler) OnDelete(client.Client, admission.Decoder, events.EventRecorder) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (r *userMetadataHandler) OnUpdate(_ client.Client, decoder admission.Decoder, recorder events.EventRecorder) capsulewebhook.Func {
+func (r *userMetadataHandler) OnUpdate(_ client.Client, decoder admission.Decoder, recorder events.EventRecorder) handlers.Func {
 	return func(_ context.Context, req admission.Request) *admission.Response {
 		nodeWebhookSupported, _ := utils.NodeWebhookSupported(r.version)
 
