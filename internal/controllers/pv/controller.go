@@ -80,14 +80,14 @@ func (c *Controller) Reconcile(ctx context.Context, request reconcile.Request) (
 		return reconcile.Result{}, nil
 	}
 
-	tnt, err := tenant.TenantByStatusNamespace(ctx, c.client, persistentVolume.Spec.ClaimRef.Namespace)
+	tnt, err := tenant.GetTenantNameByStatusNamespace(ctx, c.client, persistentVolume.Spec.ClaimRef.Namespace)
 	if err != nil {
 		log.Error(err, "unable to retrieve Tenant from the claimRef")
 
 		return reconcile.Result{}, err
 	}
 
-	if tnt == nil {
+	if tnt == "" {
 		log.V(4).Info("skipping reconciliation, PV is claimed by a PVC not managed in a Tenant")
 
 		return reconcile.Result{}, nil
@@ -105,7 +105,7 @@ func (c *Controller) Reconcile(ctx context.Context, request reconcile.Request) (
 			labels = map[string]string{}
 		}
 
-		labels[c.label] = tnt.GetName()
+		labels[c.label] = tnt
 
 		pv.SetLabels(labels)
 

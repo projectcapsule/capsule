@@ -6,7 +6,7 @@ metadata:
   namespace: flux-system
 spec:
   serviceAccountName: kustomize-controller
-  interval: 30s
+  interval: 5m
   timeout: 10m
   targetNamespace: monitoring-system
   releaseName: "kube-prometheus-stack"
@@ -24,7 +24,6 @@ spec:
       retries: -1
   upgrade:
     remediation:
-      remediateLastFailure: true
       retries: -1
   driftDetection:
     mode: enabled

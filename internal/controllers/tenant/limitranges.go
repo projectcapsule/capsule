@@ -1,7 +1,6 @@
 // Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
-//nolint:dupl
 package tenant
 
 import (
@@ -19,7 +18,9 @@ import (
 )
 
 // Ensuring all the LimitRange are applied to each Namespace handled by the Tenant.
-func (r *Manager) syncLimitRanges(ctx context.Context, tenant *capsulev1beta2.Tenant) error { //nolint:dupl
+//
+//nolint:dupl
+func (r *Manager) syncLimitRanges(ctx context.Context, tenant *capsulev1beta2.Tenant) error {
 	// getting requested LimitRange keys
 	keys := make([]string, 0, len(tenant.Spec.LimitRanges.Items)) //nolint:staticcheck
 
@@ -47,7 +48,7 @@ func (r *Manager) syncLimitRange(ctx context.Context, tenant *capsulev1beta2.Ten
 	}
 
 	//nolint:staticcheck
-	for i, spec := range tenant.Spec.LimitRanges.Items { //nolint:dupl
+	for i, spec := range tenant.Spec.LimitRanges.Items {
 		target := &corev1.LimitRange{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      fmt.Sprintf("capsule-%s-%d", tenant.Name, i),
@@ -63,8 +64,12 @@ func (r *Manager) syncLimitRange(ctx context.Context, tenant *capsulev1beta2.Ten
 				labels = map[string]string{}
 			}
 
-			labels[meta.TenantLabel] = tenant.Name
+			labels[meta.NewManagedByCapsuleLabel] = meta.ValueController
+			labels[meta.NewTenantLabel] = tenant.Name
 			labels[meta.LimitRangeLabel] = strconv.Itoa(i)
+
+			// Remove Legacy labels
+			delete(target.Labels, meta.TenantLabel)
 
 			target.SetLabels(labels)
 			target.Spec = spec

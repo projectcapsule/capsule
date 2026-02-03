@@ -3,7 +3,11 @@
 
 package predicates
 
-import "sigs.k8s.io/controller-runtime/pkg/event"
+import (
+	"sigs.k8s.io/controller-runtime/pkg/event"
+
+	"github.com/projectcapsule/capsule/pkg/utils"
+)
 
 type UpdatedLabelsPredicate struct{}
 
@@ -16,5 +20,5 @@ func (UpdatedLabelsPredicate) Update(e event.UpdateEvent) bool {
 		return false
 	}
 
-	return !LabelsEqual(e.ObjectOld.GetLabels(), e.ObjectNew.GetLabels())
+	return !utils.MapEqual(e.ObjectOld.GetLabels(), e.ObjectNew.GetLabels())
 }

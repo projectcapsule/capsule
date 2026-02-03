@@ -10,7 +10,6 @@ import (
 	"net/http"
 
 	"github.com/go-logr/logr"
-	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -31,7 +30,7 @@ func ClaimMutationHandler(log logr.Logger) handlers.Handler {
 
 func (h *claimMutationHandler) OnUpdate(c client.Client, decoder admission.Decoder, _ events.EventRecorder) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		return h.handle(ctx, req, decoder, c)
+		return h.handle(ctx, req, decoder, c, h.handleReleaseAnnotation)
 	}
 }
 
@@ -43,7 +42,9 @@ func (h *claimMutationHandler) OnDelete(client.Client, admission.Decoder, events
 
 func (h *claimMutationHandler) OnCreate(c client.Client, decoder admission.Decoder, _ events.EventRecorder) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		return h.handle(ctx, req, decoder, c)
+		return h.handle(ctx, req, decoder, c, func(claim *capsulev1beta2.ResourcePoolClaim) {
+			meta.ReleaseAnnotationRemove(claim)
+		})
 	}
 }
 
@@ -52,6 +53,7 @@ func (h *claimMutationHandler) handle(
 	req admission.Request,
 	decoder admission.Decoder,
 	c client.Client,
+	annoHandler func(c *capsulev1beta2.ResourcePoolClaim),
 ) *admission.Response {
 	claim := &capsulev1beta2.ResourcePoolClaim{}
 
@@ -59,13 +61,13 @@ func (h *claimMutationHandler) handle(
 		return utils.ErroredResponse(fmt.Errorf("failed to decode new object: %w", err))
 	}
 
+	annoHandler(claim)
+
 	if err := h.autoAssignPools(ctx, c, claim); err != nil {
 		response := admission.Errored(http.StatusInternalServerError, err)
 
 		return &response
 	}
-
-	h.handleReleaseAnnotation(claim)
 
 	marshaled, err := json.Marshal(claim)
 	if err != nil {
@@ -87,7 +89,7 @@ func (h *claimMutationHandler) handleReleaseAnnotation(
 		return
 	}
 
-	if !claim.IsBoundToResourcePool() {
+	if !claim.IsBoundInResourcePool() {
 		return
 	}
 
@@ -104,9 +106,7 @@ func (h *claimMutationHandler) autoAssignPools(
 	}
 
 	poolList := &capsulev1beta2.ResourcePoolList{}
-	if err := c.List(ctx, poolList, client.MatchingFieldsSelector{
-		Selector: fields.OneTermEqualSelector(".status.namespaces", claim.Namespace),
-	}); err != nil {
+	if err := c.List(ctx, poolList, client.MatchingFields{".status.namespaces": claim.Namespace}); err != nil {
 		return err
 	}
 

@@ -154,7 +154,7 @@ spec:
                         type: object
                       name:
                         description: Name the Admission Webhook
-                        maxLength: 253
+                        maxLength: 63
                         pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
                         type: string
                     required:
@@ -246,7 +246,7 @@ spec:
                         type: object
                       name:
                         description: Name the Admission Webhook
-                        maxLength: 253
+                        maxLength: 63
                         pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
                         type: string
                     required:

@@ -75,8 +75,12 @@ func (r *Manager) syncAdditionalRoleBinding(
 				target.Labels = roleBinding.Labels
 			}
 
-			target.Labels[meta.TenantLabel] = tenant.Name
+			target.Labels[meta.NewTenantLabel] = tenant.Name
 			target.Labels[meta.RolebindingLabel] = hash
+			target.Labels[meta.NewManagedByCapsuleLabel] = meta.ValueController
+
+			// Remove Legacy labels
+			delete(target.Labels, meta.TenantLabel)
 
 			if roleBinding.Annotations != nil {
 				target.Annotations = roleBinding.Annotations

@@ -25,6 +25,14 @@ spec:
       jsonPath: .status.namespaceCount
       name: Namespaces
       type: integer
+    - description: Reconcile Status
+      jsonPath: .status.conditions[?(@.type=="Ready")].status
+      name: Ready
+      type: string
+    - description: Reconcile Message
+      jsonPath: .status.conditions[?(@.type=="Ready")].message
+      name: Status
+      type: string
     - description: Age
       jsonPath: .metadata.creationTimestamp
       name: Age
@@ -66,13 +74,13 @@ spec:
                   defaultsZero:
                     default: false
                     description: With this option all resources which can be allocated
-                      are set to 0 for the resourcequota defaults.
+                      are set to 0 for the resourcequota defaults. (Default false)
                     type: boolean
                   deleteBoundResources:
                     default: false
                     description: |-
                       When a resourcepool is deleted, the resourceclaims bound to it are disassociated from the resourcepool but not deleted.
-                      By Enabling this option, the resourceclaims will be deleted when the resourcepool is deleted, if they are in bound state.
+                      By Enabling this option, the resourceclaims will be deleted when the resourcepool is deleted, if they are in bound state. (Default false)
                     type: boolean
                   orderedQueue:
                     default: false
@@ -82,7 +90,7 @@ spec:
                       but if a lower priority claim still has enough space in the available resources, it will be able to claim them. Eventough
                       it's priority was lower
                       Enabling this option respects to Order. Meaning the Creationtimestamp matters and if a resource is put into the queue, no
-                      other claim can claim the same resources with lower priority.
+                      other claim can claim the same resources with lower priority. (Default false)
                     type: boolean
                 type: object
               defaults:
@@ -275,22 +283,83 @@ spec:
                         description: Claimed resources
                         type: object
                       name:
-                        description: Name
-                        maxLength: 253
+                        description: Name of the referent.
+                        maxLength: 63
                         pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
                         type: string
                       namespace:
-                        description: Namespace
+                        description: Namespace of the referent.
                         maxLength: 253
-                        pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+                        pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
                         type: string
                       uid:
                         description: UID of the tracked Tenant to pin point tracking
                         type: string
+                    required:
+                    - name
+                    - namespace
+                    - uid
                     type: object
                   type: array
                 description: Tracks the quotas for the Resource.
                 type: object
+              conditions:
+                description: Conditions for the resource claim
+                items:
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
               exhaustions:
                 additionalProperties:
                   properties:
@@ -320,6 +389,8 @@ spec:
                 items:
                   type: string
                 type: array
+            required:
+            - conditions
             type: object
         required:
         - spec

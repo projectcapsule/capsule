@@ -12,7 +12,6 @@ import (
 	"golang.org/x/sync/errgroup"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -103,7 +102,7 @@ func (r *Manager) reconcileNamespace(ctx context.Context, namespace string, tnt 
 
 		cordonedCondition := meta.NewCordonedCondition(ns)
 
-		if ns.Labels[meta.CordonedLabel] == meta.CordonedLabelTrigger {
+		if ns.Labels[meta.CordonedLabel] == meta.ValueTrue {
 			cordonedCondition.Reason = meta.CordonedReason
 			cordonedCondition.Message = "namespace is cordoned"
 			cordonedCondition.Status = metav1.ConditionTrue
@@ -160,7 +159,7 @@ func (r *Manager) ensureRuleStatus(
 			labels = make(map[string]string)
 		}
 
-		labels[meta.NewManagedByCapsuleLabel] = meta.ControllerValue
+		labels[meta.NewManagedByCapsuleLabel] = meta.ValueController
 		labels[meta.CapsuleNameLabel] = nsStatus.Name
 
 		nsStatus.SetLabels(labels)
@@ -252,7 +251,7 @@ func (r *Manager) reconcileNamespaceMetadata(
 	}
 
 	tenant.AddNamespaceNameLabels(originLabels, ns)
-	tenant.AddTenantNameLabel(originLabels, ns, tnt)
+	tenant.AddTenantNameLabel(originLabels, tnt)
 
 	ns.SetLabels(originLabels)
 	ns.SetAnnotations(originAnnotations)
@@ -263,9 +262,7 @@ func (r *Manager) reconcileNamespaceMetadata(
 func (r *Manager) collectNamespaces(ctx context.Context, tenant *capsulev1beta2.Tenant) (err error) {
 	list := &corev1.NamespaceList{}
 
-	err = r.List(ctx, list, client.MatchingFieldsSelector{
-		Selector: fields.OneTermEqualSelector(".metadata.ownerReferences[*].capsule", tenant.GetName()),
-	})
+	err = r.List(ctx, list, client.MatchingFields{".metadata.ownerReferences[*].capsule": tenant.GetName()})
 	if err != nil {
 		return err
 	}

@@ -1675,6 +1675,20 @@ spec:
                     format: int32
                     minimum: 1
                     type: integer
+                  requiredMetadata:
+                    description: Required Metadata for namespace within this tenant
+                    properties:
+                      annotations:
+                        additionalProperties:
+                          type: string
+                        description: Annotations that must be defined for each namespace
+                        type: object
+                      labels:
+                        additionalProperties:
+                          type: string
+                        description: Labels that must be defined for each namespace
+                        type: object
+                    type: object
                 type: object
               networkPolicies:
                 description: |-

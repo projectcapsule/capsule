@@ -13,19 +13,23 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	"github.com/projectcapsule/capsule/internal/webhook/utils"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
 
 type hostnameRegexHandler struct{}
 
-func HostnameRegexHandler() handlers.Handler {
+func HostnameRegexHandler() handlers.TypedHandler[*capsulev1beta2.Tenant] {
 	return &hostnameRegexHandler{}
 }
 
-func (h *hostnameRegexHandler) OnCreate(_ client.Client, decoder admission.Decoder, _ events.EventRecorder) handlers.Func {
+func (h *hostnameRegexHandler) OnCreate(
+	_ client.Client,
+	tnt *capsulev1beta2.Tenant,
+	decoder admission.Decoder,
+	_ events.EventRecorder,
+) handlers.Func {
 	return func(_ context.Context, req admission.Request) *admission.Response {
-		if response := h.validate(decoder, req); response != nil {
+		if response := h.validate(tnt, req); response != nil {
 			return response
 		}
 
@@ -33,15 +37,21 @@ func (h *hostnameRegexHandler) OnCreate(_ client.Client, decoder admission.Decod
 	}
 }
 
-func (h *hostnameRegexHandler) OnDelete(client.Client, admission.Decoder, events.EventRecorder) handlers.Func {
+func (h *hostnameRegexHandler) OnDelete(client.Client, *capsulev1beta2.Tenant, admission.Decoder, events.EventRecorder) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (h *hostnameRegexHandler) OnUpdate(_ client.Client, decoder admission.Decoder, _ events.EventRecorder) handlers.Func {
+func (h *hostnameRegexHandler) OnUpdate(
+	_ client.Client,
+	old *capsulev1beta2.Tenant,
+	tnt *capsulev1beta2.Tenant,
+	decoder admission.Decoder,
+	_ events.EventRecorder,
+) handlers.Func {
 	return func(_ context.Context, req admission.Request) *admission.Response {
-		if err := h.validate(decoder, req); err != nil {
+		if err := h.validate(tnt, req); err != nil {
 			return err
 		}
 
@@ -50,14 +60,12 @@ func (h *hostnameRegexHandler) OnUpdate(_ client.Client, decoder admission.Decod
 }
 
 //nolint:staticcheck
-func (h *hostnameRegexHandler) validate(decoder admission.Decoder, req admission.Request) *admission.Response {
-	tenant := &capsulev1beta2.Tenant{}
-	if err := decoder.Decode(req, tenant); err != nil {
-		return utils.ErroredResponse(err)
-	}
-
-	if tenant.Spec.IngressOptions.AllowedHostnames != nil && len(tenant.Spec.IngressOptions.AllowedHostnames.Regex) > 0 {
-		if _, err := regexp.Compile(tenant.Spec.IngressOptions.AllowedHostnames.Regex); err != nil {
+func (h *hostnameRegexHandler) validate(
+	tnt *capsulev1beta2.Tenant,
+	req admission.Request,
+) *admission.Response {
+	if tnt.Spec.IngressOptions.AllowedHostnames != nil && len(tnt.Spec.IngressOptions.AllowedHostnames.Regex) > 0 {
+		if _, err := regexp.Compile(tnt.Spec.IngressOptions.AllowedHostnames.Regex); err != nil {
 			response := admission.Denied("unable to compile allowedHostnames allowedRegex")
 
 			return &response

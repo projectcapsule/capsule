@@ -5,15 +5,16 @@ package misc
 
 import (
 	"context"
-	"encoding/json"
 
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	admissionv1 "k8s.io/api/admission/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
+	clt "github.com/projectcapsule/capsule/pkg/runtime/client"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 	"github.com/projectcapsule/capsule/pkg/tenant"
 )
@@ -47,50 +48,40 @@ func (r *tenantAssignmentHandler) handle(ctx context.Context, c client.Client, d
 		return nil
 	}
 
-	obj := &unstructured.Unstructured{}
+	obj := &metav1.PartialObjectMetadata{}
 	if err := decoder.Decode(req, obj); err != nil {
 		return utils.ErroredResponse(err)
 	}
 
-	tnt, err := tenant.TenantByStatusNamespace(ctx, c, req.Namespace)
+	tnt, err := tenant.GetTenantNameByStatusNamespace(ctx, c, req.Namespace)
 	if err != nil {
 		return utils.ErroredResponse(err)
 	}
 
-	if tnt == nil {
+	if tnt == "" {
 		return nil
 	}
 
 	labels := obj.GetLabels()
-	if labels == nil {
-		labels = map[string]string{}
+
+	desired := map[string]string{}
+	if labels == nil || labels[meta.ManagedByCapsuleLabel] != tnt {
+		desired[meta.ManagedByCapsuleLabel] = tnt
 	}
 
-	want := tnt.GetName()
+	if labels == nil || labels[meta.NewTenantLabel] != tnt {
+		desired[meta.NewTenantLabel] = tnt
+	}
 
-	managedOK := labels[meta.ManagedByCapsuleLabel] == want
-	tenantOK := labels[meta.NewTenantLabel] == want
-
-	if managedOK && tenantOK {
+	patches := clt.AddLabelsPatch(labels, desired)
+	if len(patches) == 0 {
 		return nil
 	}
 
-	if !managedOK {
-		labels[meta.ManagedByCapsuleLabel] = want
+	return &admission.Response{
+		AdmissionResponse: admissionv1.AdmissionResponse{
+			Allowed: true,
+		},
+		Patches: clt.JSONPatchesToJSONPatchOperation(patches),
 	}
-
-	if !tenantOK {
-		labels[meta.NewTenantLabel] = want
-	}
-
-	obj.SetLabels(labels)
-
-	marshaledObj, err := json.Marshal(obj)
-	if err != nil {
-		return utils.ErroredResponse(err)
-	}
-
-	response := admission.PatchResponseFromRaw(req.Object.Raw, marshaledObj)
-
-	return &response
 }

@@ -23,7 +23,7 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 )
 
-var _ = Describe("enforcing a Runtime Class", Label("pod", "classes", "current"), func() {
+var _ = Describe("enforcing a Runtime Class", Label("pod", "classes"), func() {
 	tntWithDefault := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "e2e-runtime-selection",

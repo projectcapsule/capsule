@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"strings"
 
+	"gomodules.xyz/jsonpatch/v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -35,8 +36,34 @@ func (j JSONPatchOperation) String() string {
 	return string(j)
 }
 
+func EscapeJSONPointer(s string) string {
+	s = strings.ReplaceAll(s, "~", "~0")
+	s = strings.ReplaceAll(s, "/", "~1")
+
+	return s
+}
+
 func JSONPatchesToRawPatch(patches []JSONPatch) (patch []byte, err error) {
 	return json.Marshal(patches)
+}
+
+func JSONPatchesToJSONPatchOperation(
+	patches []JSONPatch,
+) []jsonpatch.JsonPatchOperation {
+	if len(patches) == 0 {
+		return nil
+	}
+
+	ops := make([]jsonpatch.JsonPatchOperation, 0, len(patches))
+	for _, p := range patches {
+		ops = append(ops, jsonpatch.JsonPatchOperation{
+			Operation: p.Operation.String(),
+			Path:      p.Path,
+			Value:     p.Value,
+		})
+	}
+
+	return ops
 }
 
 func ApplyPatches(
@@ -95,7 +122,7 @@ func AddLabelsPatch(labels map[string]string, keys map[string]string) []JSONPatc
 
 		patches = append(patches, JSONPatch{
 			Operation: op,
-			Path:      fmt.Sprintf("/metadata/labels/%s", strings.ReplaceAll(key, "/", "~1")),
+			Path:      fmt.Sprintf("/metadata/labels/%s", EscapeJSONPointer(key)),
 			Value:     val,
 		})
 	}
@@ -134,7 +161,7 @@ func AddAnnotationsPatch(annotations map[string]string, keys map[string]string) 
 
 		patches = append(patches, JSONPatch{
 			Operation: op,
-			Path:      fmt.Sprintf("/metadata/annotations/%s", strings.ReplaceAll(key, "/", "~1")),
+			Path:      fmt.Sprintf("/metadata/annotations/%s", EscapeJSONPointer(key)),
 			Value:     val,
 		})
 	}
@@ -152,7 +179,7 @@ func PatchRemoveLabels(labels map[string]string, keys []string) []JSONPatch {
 
 	for _, key := range keys {
 		if _, ok := labels[key]; ok {
-			path := fmt.Sprintf("/metadata/labels/%s", strings.ReplaceAll(key, "/", "~1"))
+			path := fmt.Sprintf("/metadata/labels/%s", EscapeJSONPointer(key))
 			patches = append(patches, JSONPatch{
 				Operation: JSONPatchRemove,
 				Path:      path,
@@ -173,7 +200,7 @@ func PatchRemoveAnnotations(annotations map[string]string, keys []string) []JSON
 
 	for _, key := range keys {
 		if _, ok := annotations[key]; ok {
-			path := fmt.Sprintf("/metadata/annotations/%s", strings.ReplaceAll(key, "/", "~1"))
+			path := fmt.Sprintf("/metadata/annotations/%s", EscapeJSONPointer(key))
 			patches = append(patches, JSONPatch{
 				Operation: JSONPatchRemove,
 				Path:      path,

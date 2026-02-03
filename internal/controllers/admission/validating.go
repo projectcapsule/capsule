@@ -85,7 +85,7 @@ func (r *validatingReconciler) reconcileValidatingConfiguration(
 
 	maps.Copy(labels, cfg.Labels)
 
-	labels[meta.CreatedByCapsuleLabel] = meta.ControllerValue
+	labels[meta.CreatedByCapsuleLabel] = meta.ValueController
 
 	obj.SetLabels(labels)
 
@@ -124,7 +124,7 @@ func (r *validatingReconciler) reconcileValidatingConfiguration(
 func (r *validatingReconciler) listManagedValidatingWebhookConfigs(ctx context.Context) ([]admissionv1.ValidatingWebhookConfiguration, error) {
 	list := &admissionv1.ValidatingWebhookConfigurationList{}
 	if err := r.client.List(ctx, list, client.MatchingLabels{
-		meta.CreatedByCapsuleLabel: meta.ControllerValue,
+		meta.CreatedByCapsuleLabel: meta.ValueController,
 	}); err != nil {
 		return nil, err
 	}

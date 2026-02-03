@@ -12,7 +12,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	"github.com/projectcapsule/capsule/internal/webhook/utils"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
@@ -21,41 +20,42 @@ type warningHandler struct {
 	cfg configuration.Configuration
 }
 
-func WarningHandler(cfg configuration.Configuration) handlers.Handler {
+func WarningHandler(cfg configuration.Configuration) handlers.TypedHandler[*capsulev1beta2.Tenant] {
 	return &warningHandler{
 		cfg: cfg,
 	}
 }
 
-func (h *warningHandler) OnCreate(c client.Client, decoder admission.Decoder, _ events.EventRecorder) handlers.Func {
+func (h *warningHandler) OnCreate(
+	_ client.Client,
+	tnt *capsulev1beta2.Tenant,
+	_ admission.Decoder,
+	_ events.EventRecorder,
+) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		tnt := &capsulev1beta2.Tenant{}
-		if err := decoder.Decode(req, tnt); err != nil {
-			return utils.ErroredResponse(err)
-		}
-
-		return h.handle(tnt, decoder, req)
+		return h.handle(tnt, req)
 	}
 }
 
-func (h *warningHandler) OnDelete(client.Client, admission.Decoder, events.EventRecorder) handlers.Func {
+func (h *warningHandler) OnDelete(client.Client, *capsulev1beta2.Tenant, admission.Decoder, events.EventRecorder) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (h *warningHandler) OnUpdate(_ client.Client, decoder admission.Decoder, _ events.EventRecorder) handlers.Func {
+func (h *warningHandler) OnUpdate(
+	_ client.Client,
+	tnt *capsulev1beta2.Tenant,
+	old *capsulev1beta2.Tenant,
+	_ admission.Decoder,
+	_ events.EventRecorder,
+) handlers.Func {
 	return func(_ context.Context, req admission.Request) *admission.Response {
-		tnt := &capsulev1beta2.Tenant{}
-		if err := decoder.Decode(req, tnt); err != nil {
-			return utils.ErroredResponse(err)
-		}
-
-		return h.handle(tnt, decoder, req)
+		return h.handle(tnt, req)
 	}
 }
 
-func (h *warningHandler) handle(tnt *capsulev1beta2.Tenant, decoder admission.Decoder, req admission.Request) *admission.Response {
+func (h *warningHandler) handle(tnt *capsulev1beta2.Tenant, req admission.Request) *admission.Response {
 	response := &admission.Response{
 		AdmissionResponse: admissionv1.AdmissionResponse{
 			UID:     req.UID,

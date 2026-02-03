@@ -18,5 +18,5 @@ func (n *node) GetHandlers() []handlers.Handler {
 }
 
 func (n *node) GetPath() string {
-	return "/nodes"
+	return "/nodes/validating"
 }

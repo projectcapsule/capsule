@@ -6,7 +6,7 @@ package tenant
 import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/projectcapsule/capsule/pkg/api"
+	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 )
 
 type NamespacesReference struct {
@@ -24,6 +24,11 @@ func (o NamespacesReference) Field() string {
 //nolint:forcetypeassert
 func (o NamespacesReference) Func() client.IndexerFunc {
 	return func(object client.Object) []string {
-		return object.(api.Tenant).GetNamespaces()
+		t, ok := object.(*capsulev1beta2.Tenant)
+		if !ok {
+			return nil
+		}
+
+		return t.Status.Namespaces
 	}
 }

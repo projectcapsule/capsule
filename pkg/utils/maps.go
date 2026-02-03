@@ -14,3 +14,17 @@ func MapMergeNoOverrite(dst, src map[string]string) {
 		}
 	}
 }
+
+func MapEqual(a, b map[string]string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+
+	for k, v := range a {
+		if bv, ok := b[k]; !ok || bv != v {
+			return false
+		}
+	}
+
+	return true
+}

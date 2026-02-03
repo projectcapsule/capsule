@@ -55,7 +55,7 @@ func (h *metadataHandler) OnCreate(client client.Client, ns *corev1.Namespace, d
 		}
 
 		tenant.AddNamespaceNameLabels(labels, ns)
-		tenant.AddTenantNameLabel(labels, ns, tnt)
+		tenant.AddTenantNameLabel(labels, tnt)
 
 		ns.SetLabels(labels)
 		ns.SetAnnotations(annotations)
@@ -105,13 +105,13 @@ func (h *metadataHandler) OnUpdate(c client.Client, newNs *corev1.Namespace, old
 		}
 
 		managedMetadataOnly := tnt.Spec.NamespaceOptions != nil && tnt.Spec.NamespaceOptions.ManagedMetadataOnly
-		if !managedMetadataOnly {
+		if managedMetadataOnly {
 			labels = mergeStringMap(newNs.GetLabels(), labels)
 			annotations = mergeStringMap(newNs.GetAnnotations(), annotations)
 		}
 
 		tenant.AddNamespaceNameLabels(labels, oldNs)
-		tenant.AddTenantNameLabel(labels, oldNs, tnt)
+		tenant.AddTenantNameLabel(labels, tnt)
 
 		newNs.SetLabels(labels)
 		newNs.SetAnnotations(annotations)

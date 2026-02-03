@@ -12,24 +12,23 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	"github.com/projectcapsule/capsule/internal/webhook/utils"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
 
 type nameHandler struct{}
 
-func NameHandler() handlers.Handler {
+func NameHandler() handlers.TypedHandler[*capsulev1beta2.Tenant] {
 	return &nameHandler{}
 }
 
-func (h *nameHandler) OnCreate(_ client.Client, decoder admission.Decoder, _ events.EventRecorder) handlers.Func {
+func (h *nameHandler) OnCreate(
+	_ client.Client,
+	tnt *capsulev1beta2.Tenant,
+	decoder admission.Decoder,
+	_ events.EventRecorder,
+) handlers.Func {
 	return func(_ context.Context, req admission.Request) *admission.Response {
-		tenant := &capsulev1beta2.Tenant{}
-		if err := decoder.Decode(req, tenant); err != nil {
-			return utils.ErroredResponse(err)
-		}
-
-		matched, _ := regexp.MatchString(`[a-z0-9]([-a-z0-9]*[a-z0-9])?`, tenant.GetName())
+		matched, _ := regexp.MatchString(`[a-z0-9]([-a-z0-9]*[a-z0-9])?`, tnt.GetName())
 		if !matched {
 			response := admission.Denied("tenant name has forbidden characters")
 
@@ -40,13 +39,24 @@ func (h *nameHandler) OnCreate(_ client.Client, decoder admission.Decoder, _ eve
 	}
 }
 
-func (h *nameHandler) OnDelete(client.Client, admission.Decoder, events.EventRecorder) handlers.Func {
+func (h *nameHandler) OnDelete(
+	client.Client,
+	*capsulev1beta2.Tenant,
+	admission.Decoder,
+	events.EventRecorder,
+) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (h *nameHandler) OnUpdate(client.Client, admission.Decoder, events.EventRecorder) handlers.Func {
+func (h *nameHandler) OnUpdate(
+	client.Client,
+	*capsulev1beta2.Tenant,
+	*capsulev1beta2.Tenant,
+	admission.Decoder,
+	events.EventRecorder,
+) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}

@@ -77,6 +77,7 @@ var _ = Describe("creating a Namespace for a Tenant with additional metadata", L
 			for k, v := range tnt.Spec.NamespaceOptions.AdditionalMetadata.Labels {
 				Expect(ns.Labels).To(HaveKeyWithValue(k, v))
 			}
+
 			return
 		})
 		By("checking additional annotations", func() {

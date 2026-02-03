@@ -1,0 +1,51 @@
+
+{{- if $.Values.monitoring.diagnostics.enabled }}
+  {{ range $path, $_ :=  .Files.Glob "dashboards/**-dashboard.json" }}
+    {{- with $ }}
+      {{- $content := (.Files.Get $path) }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "capsule.fullname" . }}-{{ $path | base | trimSuffix "-dashboard.json" | regexFind "[^_]+$"  }}-dashboard
+  namespace: {{ default $.Release.Namespace $.Values.monitoring.diagnostics.namespace | quote }}
+  annotations:
+    {{- with $.Values.monitoring.diagnostics.annotations }}
+      {{- toYaml . | nindent 4 }}
+    {{- end }}
+  labels:
+    {{- include "capsule.labels" $ | nindent 4 }}
+    {{- with $.Values.monitoring.diagnostics.labels }}
+      {{- toYaml . | nindent 4 }}
+    {{- end }}
+data:
+  {{ base $path }}: |-
+    {{- $content | nindent 4 }}
+
+  {{- if $.Values.monitoring.diagnostics.operator.enabled }}
+---
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDashboard
+metadata:
+  name: {{ include "capsule.fullname" $ }}-{{ $path | base | trimSuffix "-dashboard.json" | regexFind "[^_]+$"  }}
+  namespace: {{ default $.Release.Namespace $.Values.monitoring.diagnostics.namespace | quote }}
+  annotations:
+    {{- with $.Values.monitoring.diagnostics.annotations }}
+      {{- toYaml . | nindent 4 }}
+    {{- end }}
+  labels:
+    {{- include "capsule.labels" $ | nindent 4 }}
+    {{- with $.Values.monitoring.diagnostics.labels }}
+      {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  configMapRef:
+    name: {{ include "capsule.fullname" $ }}-{{ $path | base | trimSuffix "-dashboard.json" | regexFind "[^_]+$"  }}-dashboard
+    key: {{ base $path }}
+    {{- with (omit $.Values.monitoring.diagnostics.operator "enabled") }}
+      {{- toYaml . | nindent 2 }}
+    {{- end }}
+  {{- end }}
+    {{- end }}
+  {{- end }}
+{{- end }}

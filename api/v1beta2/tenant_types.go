@@ -11,7 +11,7 @@ import (
 
 	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
-	"github.com/projectcapsule/capsule/pkg/api/misc"
+	"github.com/projectcapsule/capsule/pkg/runtime/selectors"
 )
 
 // TenantSpec defines the desired state of Tenant.
@@ -122,7 +122,7 @@ func (p *Permissions) ListMatchingOwners(
 		},
 	}
 
-	return misc.ListBySelectors[*TenantOwner](ctx, c, &TenantOwnerList{}, append(p.MatchOwners, defaultSelector))
+	return selectors.ListBySelectors[*TenantOwner](ctx, c, &TenantOwnerList{}, append(p.MatchOwners, defaultSelector))
 }
 
 // +kubebuilder:object:root=true
@@ -151,11 +151,7 @@ type Tenant struct {
 }
 
 func (in *Tenant) GetNamespaces() (res []string) {
-	res = make([]string, 0, len(in.Status.Namespaces))
-
-	res = append(res, in.Status.Namespaces...)
-
-	return res
+	return in.Status.Namespaces
 }
 
 // +kubebuilder:object:root=true

@@ -39,13 +39,13 @@ var PromotedServiceaccountPredicate = predicate.TypedFuncs[client.Object]{
 	CreateFunc: func(e event.TypedCreateEvent[client.Object]) bool {
 		v, ok := e.Object.GetLabels()[meta.OwnerPromotionLabel]
 
-		return ok && v == meta.OwnerPromotionLabelTrigger
+		return ok && v == meta.ValueTrue
 	},
 
 	DeleteFunc: func(e event.TypedDeleteEvent[client.Object]) bool {
 		v, ok := e.Object.GetLabels()[meta.OwnerPromotionLabel]
 
-		return ok && v == meta.OwnerPromotionLabelTrigger
+		return ok && v == meta.ValueTrue
 	},
 
 	UpdateFunc: func(e event.TypedUpdateEvent[client.Object]) bool {

@@ -18,18 +18,17 @@ const (
 
 	ResourcePoolLabel = "projectcapsule.dev/pool"
 
-	FreezeLabel        = "projectcapsule.dev/freeze"
-	FreezeLabelTrigger = "true"
+	FreezeLabel = "projectcapsule.dev/freeze"
 
-	OwnerPromotionLabel        = "owner.projectcapsule.dev/promote"
-	OwnerPromotionLabelTrigger = "true"
+	OwnerPromotionLabel = "owner.projectcapsule.dev/promote"
 
-	CordonedLabel        = "projectcapsule.dev/cordoned"
-	CordonedLabelTrigger = "true"
+	CordonedLabel = "projectcapsule.dev/cordoned"
 
 	CapsuleNameLabel = "projectcapsule.dev/name"
 
 	CreatedByCapsuleLabel = "projectcapsule.dev/created-by"
+
+	CustomResourcesLabel = "projectcapsule.dev/custom-resources"
 
 	NewManagedByCapsuleLabel = "projectcapsule.dev/managed-by"
 	ManagedByCapsuleLabel    = "capsule.clastix.io/managed-by"
@@ -38,12 +37,10 @@ const (
 	NetworkPolicyLabel = "capsule.clastix.io/network-policy"
 	ResourceQuotaLabel = "capsule.clastix.io/resource-quota"
 	RolebindingLabel   = "capsule.clastix.io/role-binding"
-
-	ControllerValue = "controller"
 )
 
 func FreezeLabelTriggers(obj client.Object) bool {
-	return labelTriggers(obj, FreezeLabel, FreezeLabelTrigger)
+	return labelTriggers(obj, FreezeLabel, ValueTrue)
 }
 
 func FreezeLabelRemove(obj client.Object) {
@@ -51,7 +48,7 @@ func FreezeLabelRemove(obj client.Object) {
 }
 
 func OwnerPromotionLabelTriggers(obj client.Object) bool {
-	return labelTriggers(obj, OwnerPromotionLabel, OwnerPromotionLabelTrigger)
+	return labelTriggers(obj, OwnerPromotionLabel, ValueTrue)
 }
 
 func OwnerPromotionLabelRemove(obj client.Object) {
@@ -98,4 +95,18 @@ func SetFilteredLabels(obj *unstructured.Unstructured, filter map[string]struct{
 	}
 
 	obj.SetLabels(labels)
+}
+
+// LabelsChanged indicates if the given label keys have changed.
+func LabelsChanged(keys []string, oldLabels, newLabels map[string]string) bool {
+	for _, key := range keys {
+		oldVal, oldOK := oldLabels[key]
+		newVal, newOK := newLabels[key]
+
+		if oldOK != newOK || oldVal != newVal {
+			return true
+		}
+	}
+
+	return false
 }

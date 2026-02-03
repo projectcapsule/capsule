@@ -1,0 +1,32 @@
+---
+apiVersion: capsule.clastix.io/v1beta2
+kind: ResourcePool
+metadata:
+  name: solar-pool
+spec:
+  quota:
+    hard:
+      limits.cpu: "2"
+      limits.memory: 2Gi
+      requests.cpu: "2"
+      requests.memory: 2Gi
+      requests.storage: "5Gi"
+  selectors:
+  - matchLabels:
+      capsule.clastix.io/tenant: solar
+---
+apiVersion: capsule.clastix.io/v1beta2
+kind: ResourcePool
+metadata:
+  name: customer-pool
+spec:
+  quota:
+    hard:
+      limits.cpu: "2"
+      limits.memory: 2Gi
+      requests.cpu: "2"
+      requests.memory: 2Gi
+      requests.storage: "5Gi"
+  selectors:
+  - matchLabels:
+      customer: a

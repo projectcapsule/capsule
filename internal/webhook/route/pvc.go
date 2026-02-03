@@ -18,5 +18,5 @@ func (w *pvc) GetHandlers() []handlers.Handler {
 }
 
 func (w *pvc) GetPath() string {
-	return "/persistentvolumeclaims"
+	return "/persistentvolumeclaims/validating"
 }

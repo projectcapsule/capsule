@@ -21,7 +21,7 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 )
 
-var _ = Describe("changing Tenant managed Kubernetes resources", Label("tenant"), func() {
+var _ = Describe("changing Tenant managed Kubernetes resources", Label("tenant", "managed", "current"), func() {
 	tnt := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "tenant-resources-changes",
@@ -184,6 +184,10 @@ var _ = Describe("changing Tenant managed Kubernetes resources", Label("tenant")
 						return k8sClient.Get(context.TODO(), types.NamespacedName{Name: n, Namespace: ns}, lr)
 					}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 
+					cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
+					err := cs.CoreV1().LimitRanges(ns).Delete(context.TODO(), n, metav1.DeleteOptions{})
+					Expect(err).To(HaveOccurred())
+
 					c := lr.DeepCopy()
 					c.Spec.Limits = []corev1.LimitRangeItem{}
 					Expect(k8sClient.Update(context.TODO(), c, &client.UpdateOptions{})).Should(Succeed())
@@ -203,6 +207,10 @@ var _ = Describe("changing Tenant managed Kubernetes resources", Label("tenant")
 					}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 					Expect(np.Spec).Should(Equal(s))
 
+					cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
+					err := cs.NetworkingV1().NetworkPolicies(ns).Delete(context.TODO(), n, metav1.DeleteOptions{})
+					Expect(err).To(HaveOccurred())
+
 					c := np.DeepCopy()
 					c.Spec.Egress = []networkingv1.NetworkPolicyEgressRule{}
 					c.Spec.Ingress = []networkingv1.NetworkPolicyIngressRule{}
@@ -221,6 +229,10 @@ var _ = Describe("changing Tenant managed Kubernetes resources", Label("tenant")
 					Eventually(func() error {
 						return k8sClient.Get(context.TODO(), types.NamespacedName{Name: n, Namespace: ns}, rq)
 					}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+
+					cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
+					err := cs.CoreV1().ResourceQuotas(ns).Delete(context.TODO(), n, metav1.DeleteOptions{})
+					Expect(err).To(HaveOccurred())
 
 					c := rq.DeepCopy()
 					c.Spec.Hard = map[corev1.ResourceName]resource.Quantity{}

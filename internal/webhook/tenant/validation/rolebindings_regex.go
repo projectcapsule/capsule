@@ -15,42 +15,52 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	"github.com/projectcapsule/capsule/internal/webhook/utils"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
 
 type rbRegexHandler struct{}
 
-func RoleBindingRegexHandler() handlers.Handler {
+func RoleBindingRegexHandler() handlers.TypedHandler[*capsulev1beta2.Tenant] {
 	return &rbRegexHandler{}
 }
 
-func (h *rbRegexHandler) OnCreate(_ client.Client, decoder admission.Decoder, _ events.EventRecorder) handlers.Func {
+func (h *rbRegexHandler) OnCreate(
+	_ client.Client,
+	tnt *capsulev1beta2.Tenant,
+	decoder admission.Decoder,
+	_ events.EventRecorder,
+) handlers.Func {
 	return func(_ context.Context, req admission.Request) *admission.Response {
-		return h.validate(req, decoder)
+		return h.validate(tnt, decoder)
 	}
 }
 
-func (h *rbRegexHandler) OnDelete(client.Client, admission.Decoder, events.EventRecorder) handlers.Func {
+func (h *rbRegexHandler) OnDelete(
+	client.Client,
+	*capsulev1beta2.Tenant,
+	admission.Decoder,
+	events.EventRecorder,
+) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (h *rbRegexHandler) OnUpdate(_ client.Client, decoder admission.Decoder, _ events.EventRecorder) handlers.Func {
+func (h *rbRegexHandler) OnUpdate(
+	_ client.Client,
+	tnt *capsulev1beta2.Tenant,
+	old *capsulev1beta2.Tenant,
+	decoder admission.Decoder,
+	_ events.EventRecorder,
+) handlers.Func {
 	return func(_ context.Context, req admission.Request) *admission.Response {
-		return h.validate(req, decoder)
+		return h.validate(tnt, decoder)
 	}
 }
 
-func (h *rbRegexHandler) validate(req admission.Request, decoder admission.Decoder) *admission.Response {
-	tenant := &capsulev1beta2.Tenant{}
-	if err := decoder.Decode(req, tenant); err != nil {
-		return utils.ErroredResponse(err)
-	}
-
-	if len(tenant.Spec.AdditionalRoleBindings) > 0 {
-		for _, binding := range tenant.Spec.AdditionalRoleBindings {
+func (h *rbRegexHandler) validate(tnt *capsulev1beta2.Tenant, decoder admission.Decoder) *admission.Response {
+	if len(tnt.Spec.AdditionalRoleBindings) > 0 {
+		for _, binding := range tnt.Spec.AdditionalRoleBindings {
 			for _, subject := range binding.Subjects {
 				if subject.Kind == rbacv1.ServiceAccountKind {
 					err := validation.IsDNS1123Subdomain(subject.Name)

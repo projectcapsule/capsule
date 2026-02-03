@@ -1,22 +1,22 @@
 // Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package validation
+package errors
 
 import "fmt"
 
-type customResourceQuotaError struct {
+type CustomResourceQuotaError struct {
 	kindGroup string
 	limit     int64
 }
 
 func NewCustomResourceQuotaError(kindGroup string, limit int64) error {
-	return &customResourceQuotaError{
+	return &CustomResourceQuotaError{
 		kindGroup: kindGroup,
 		limit:     limit,
 	}
 }
 
-func (r customResourceQuotaError) Error() string {
+func (r CustomResourceQuotaError) Error() string {
 	return fmt.Sprintf("resource %s has reached quota limit of %d items", r.kindGroup, r.limit)
 }

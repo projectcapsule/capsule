@@ -5,10 +5,12 @@ package e2e
 
 import (
 	"context"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
@@ -17,7 +19,7 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
-	"github.com/projectcapsule/capsule/pkg/api/misc"
+	"github.com/projectcapsule/capsule/pkg/runtime/selectors"
 )
 
 var _ = Describe("ResourcePoolClaim Tests", Label("resourcepool"), func() {
@@ -102,7 +104,7 @@ var _ = Describe("ResourcePoolClaim Tests", Label("resourcepool"), func() {
 				},
 			},
 			Spec: capsulev1beta2.ResourcePoolSpec{
-				Selectors: []misc.NamespaceSelector{
+				Selectors: []selectors.NamespaceSelector{
 					{
 						LabelSelector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
@@ -230,16 +232,7 @@ var _ = Describe("ResourcePoolClaim Tests", Label("resourcepool"), func() {
 			err = k8sClient.Get(context.TODO(), client.ObjectKey{Name: claim1.Name, Namespace: claim1.Namespace}, claim1)
 			Expect(err).Should(Succeed())
 
-			isSuccessfullyBoundToPool(pool1, claim1)
-
-			expectedPool := api.StatusNameUID{
-				Name: api.Name(pool1.Name),
-				UID:  pool1.GetUID(),
-			}
-			Expect(claim1.Status.Pool).To(Equal(expectedPool), "expected pool name to match")
-			Expect(claim1.Status.Condition.Status).To(Equal(metav1.ConditionTrue), "failed to verify condition status")
-			Expect(claim1.Status.Condition.Type).To(Equal(meta.BoundCondition), "failed to verify condition type")
-			Expect(claim1.Status.Condition.Reason).To(Equal(meta.SucceededReason), "failed to verify condition reason")
+			isSuccessfullyBoundAndUnsedToPool(pool1, claim1)
 		})
 
 		By("Create a second claim and verify binding", func() {
@@ -249,16 +242,7 @@ var _ = Describe("ResourcePoolClaim Tests", Label("resourcepool"), func() {
 			err = k8sClient.Get(context.TODO(), client.ObjectKey{Name: claim2.Name, Namespace: claim2.Namespace}, claim2)
 			Expect(err).Should(Succeed())
 
-			isSuccessfullyBoundToPool(pool1, claim2)
-
-			expectedPool := api.StatusNameUID{
-				Name: api.Name(pool1.Name),
-				UID:  pool1.GetUID(),
-			}
-			Expect(claim2.Status.Pool).To(Equal(expectedPool), "expected pool name to match")
-			Expect(claim2.Status.Condition.Status).To(Equal(metav1.ConditionTrue), "failed to verify condition status")
-			Expect(claim2.Status.Condition.Type).To(Equal(meta.BoundCondition), "failed to verify condition type")
-			Expect(claim2.Status.Condition.Reason).To(Equal(meta.SucceededReason), "failed to verify condition reason")
+			isSuccessfullyBoundAndUnsedToPool(pool1, claim2)
 		})
 
 		By("Create a third claim and verify error", func() {
@@ -284,12 +268,15 @@ var _ = Describe("ResourcePoolClaim Tests", Label("resourcepool"), func() {
 			err = k8sClient.Get(context.TODO(), client.ObjectKey{Name: claim.Name, Namespace: claim.Namespace}, claim)
 			Expect(err).Should(Succeed())
 
-			expectedPool := api.StatusNameUID{}
+			expectedPool := meta.LocalRFC1123ObjectReferenceWithUID{}
 			Expect(claim.Status.Pool).To(Equal(expectedPool), "expected pool name to be empty")
 
-			Expect(claim.Status.Condition.Status).To(Equal(metav1.ConditionFalse), "failed to verify condition status")
-			Expect(claim.Status.Condition.Type).To(Equal(meta.AssignedCondition), "failed to verify condition type")
-			Expect(claim.Status.Condition.Reason).To(Equal(meta.FailedReason), "failed to verify condition reason")
+			Expect(len(claim.Status.Conditions)).To(Equal(1), "expected single condition")
+			Expect(len(claim.OwnerReferences)).To(Equal(0), "expected no ownerreferences")
+			assigned := claim.Status.Conditions.GetConditionByType(meta.ReadyCondition)
+			Expect(assigned.Status).To(Equal(metav1.ConditionFalse), "failed to verify condition status")
+			Expect(assigned.Type).To(Equal(meta.ReadyCondition), "failed to verify condition type")
+			Expect(assigned.Reason).To(Equal(meta.FailedReason), "failed to verify condition reason")
 		})
 	})
 
@@ -305,7 +292,7 @@ var _ = Describe("ResourcePoolClaim Tests", Label("resourcepool"), func() {
 				Config: capsulev1beta2.ResourcePoolSpecConfiguration{
 					DeleteBoundResources: ptr.To(false),
 				},
-				Selectors: []misc.NamespaceSelector{
+				Selectors: []selectors.NamespaceSelector{
 					{
 						LabelSelector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
@@ -373,20 +360,56 @@ var _ = Describe("ResourcePoolClaim Tests", Label("resourcepool"), func() {
 			err := k8sClient.Get(context.TODO(), client.ObjectKey{Name: claim.Name, Namespace: claim.Namespace}, claim)
 			Expect(err).Should(Succeed())
 
-			expectedPool := api.StatusNameUID{
-				Name: api.Name(pool.Name),
+			expectedPool := meta.LocalRFC1123ObjectReferenceWithUID{
+				Name: meta.RFC1123Name(pool.Name),
 				UID:  pool.GetUID(),
 			}
 
-			isBoundCondition(claim)
+			isBoundAndUnusedCondition(claim)
 			Expect(claim.Status.Pool).To(Equal(expectedPool), "expected pool name to match")
 		})
 
-		By("Error on deleting bound claim", func() {
+		By("Create a pod with resource requests/limits", func() {
+			pod := &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "claim-pod",
+					Namespace: claim.Namespace,
+					Labels: map[string]string{
+						"e2e": "claim-pod",
+					},
+				},
+				Spec: corev1.PodSpec{
+					// optional: helps schedule quickly, avoid restarts
+					RestartPolicy: corev1.RestartPolicyNever,
+					Containers: []corev1.Container{
+						{
+							Name:  "pause",
+							Image: "registry.k8s.io/pause:3.9",
+							Resources: corev1.ResourceRequirements{
+								Requests: corev1.ResourceList{
+									corev1.ResourceCPU:    resource.MustParse("10m"),
+									corev1.ResourceMemory: resource.MustParse("16Mi"),
+								},
+								Limits: corev1.ResourceList{
+									corev1.ResourceCPU:    resource.MustParse("20m"),
+									corev1.ResourceMemory: resource.MustParse("32Mi"),
+								},
+							},
+						},
+					},
+				},
+			}
+
+			Expect(k8sClient.Create(context.TODO(), pod)).To(Succeed())
+		})
+
+		By("Verify the claim is used", func() {
+			time.Sleep(250 * time.Millisecond)
+
 			err := k8sClient.Get(context.TODO(), client.ObjectKey{Name: claim.Name, Namespace: claim.Namespace}, claim)
 			Expect(err).Should(Succeed())
 
-			isBoundCondition(claim)
+			isBoundAndUsedCondition(claim)
 
 			err = k8sClient.Delete(context.TODO(), claim)
 			Expect(err).ShouldNot(Succeed())
@@ -430,6 +453,82 @@ var _ = Describe("ResourcePoolClaim Tests", Label("resourcepool"), func() {
 
 			err = k8sClient.Update(context.TODO(), claim)
 			Expect(err).ShouldNot(Succeed(), "Expected error when updating resources in bound state %s", claim)
+		})
+
+		By("Make the claim unused", func() {
+			key := client.ObjectKey{Name: "claim-pod", Namespace: claim.Namespace}
+
+			pod := &corev1.Pod{}
+			err := k8sClient.Get(context.TODO(), key, pod)
+			Expect(err).To(Succeed(), "pod must exist before deleting")
+
+			Expect(k8sClient.Delete(context.TODO(), pod, &client.DeleteOptions{
+				GracePeriodSeconds: ptr.To(int64(0)),
+			})).To(Succeed())
+
+			Eventually(func() bool {
+				p := &corev1.Pod{}
+				err := k8sClient.Get(
+					context.TODO(),
+					key,
+					p,
+				)
+				return apierrors.IsNotFound(err)
+			}, defaultTimeoutInterval, defaultPollInterval).Should(BeTrue())
+
+		})
+
+		By("Bind a claim", func() {
+			err := k8sClient.Get(context.TODO(), client.ObjectKey{Name: claim.Name, Namespace: claim.Namespace}, claim)
+			Expect(err).Should(Succeed())
+
+			expectedPool := meta.LocalRFC1123ObjectReferenceWithUID{
+				Name: meta.RFC1123Name(pool.Name),
+				UID:  pool.GetUID(),
+			}
+
+			isBoundAndUnusedCondition(claim)
+			Expect(claim.Status.Pool).To(Equal(expectedPool), "expected pool name to match")
+		})
+
+		By("Allow on patching resources for claim (Increase)", func() {
+			err := k8sClient.Get(context.TODO(), client.ObjectKey{Name: claim.Name, Namespace: claim.Namespace}, claim)
+			Expect(err).Should(Succeed())
+
+			claim.Spec.ResourceClaims = corev1.ResourceList{
+				corev1.ResourceLimitsCPU:      resource.MustParse("2"),
+				corev1.ResourceLimitsMemory:   resource.MustParse("2Gi"),
+				corev1.ResourceRequestsCPU:    resource.MustParse("2"),
+				corev1.ResourceRequestsMemory: resource.MustParse("2Gi"),
+			}
+
+			err = k8sClient.Update(context.TODO(), claim)
+			Expect(err).Should(Succeed(), "Expected error when updating resources in bound state %s", claim)
+		})
+
+		By("Allow on patching resources for claim (Decrease)", func() {
+			err := k8sClient.Get(context.TODO(), client.ObjectKey{Name: claim.Name, Namespace: claim.Namespace}, claim)
+			Expect(err).Should(Succeed())
+
+			claim.Spec.ResourceClaims = corev1.ResourceList{
+				corev1.ResourceLimitsCPU:      resource.MustParse("0"),
+				corev1.ResourceLimitsMemory:   resource.MustParse("0Gi"),
+				corev1.ResourceRequestsCPU:    resource.MustParse("0"),
+				corev1.ResourceRequestsMemory: resource.MustParse("0Gi"),
+			}
+
+			err = k8sClient.Update(context.TODO(), claim)
+			Expect(err).Should(Succeed(), "Expected error when updating resources in bound state %s", claim)
+		})
+
+		By("Allow on patching pool name", func() {
+			err := k8sClient.Get(context.TODO(), client.ObjectKey{Name: claim.Name, Namespace: claim.Namespace}, claim)
+			Expect(err).Should(Succeed())
+
+			claim.Spec.Pool = "some-random-pool"
+
+			err = k8sClient.Update(context.TODO(), claim)
+			Expect(err).Should(Succeed(), "Expected error when updating resources in bound state %s", claim)
 		})
 
 		By("Delete Pool", func() {
@@ -495,7 +594,7 @@ var _ = Describe("ResourcePoolClaim Tests", Label("resourcepool"), func() {
 				Config: capsulev1beta2.ResourcePoolSpecConfiguration{
 					DeleteBoundResources: ptr.To(false),
 				},
-				Selectors: []misc.NamespaceSelector{
+				Selectors: []selectors.NamespaceSelector{
 					{
 						LabelSelector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
@@ -524,7 +623,7 @@ var _ = Describe("ResourcePoolClaim Tests", Label("resourcepool"), func() {
 				Config: capsulev1beta2.ResourcePoolSpecConfiguration{
 					DeleteBoundResources: ptr.To(false),
 				},
-				Selectors: []misc.NamespaceSelector{
+				Selectors: []selectors.NamespaceSelector{
 					{
 						LabelSelector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
@@ -666,17 +765,33 @@ func isUnassignedCondition(claim *capsulev1beta2.ResourcePoolClaim) {
 	err := k8sClient.Get(context.TODO(), client.ObjectKey{Name: claim.Name, Namespace: claim.Namespace}, cl)
 	Expect(err).Should(Succeed())
 
-	Expect(cl.Status.Condition.Status).To(Equal(metav1.ConditionFalse), "failed to verify condition status")
-	Expect(cl.Status.Condition.Type).To(Equal(meta.AssignedCondition), "failed to verify condition type")
-	Expect(cl.Status.Condition.Reason).To(Equal(meta.FailedReason), "failed to verify condition reason")
+	assigned := cl.Status.Conditions.GetConditionByType(meta.ReadyCondition)
+
+	Expect(assigned.Status).To(Equal(metav1.ConditionFalse), "failed to verify condition status")
+	Expect(assigned.Type).To(Equal(meta.ReadyCondition), "failed to verify condition type")
+	Expect(assigned.Reason).To(Equal(meta.FailedReason), "failed to verify condition reason")
 }
 
-func isBoundCondition(claim *capsulev1beta2.ResourcePoolClaim) {
+func isBoundAndUnusedCondition(claim *capsulev1beta2.ResourcePoolClaim) {
 	cl := &capsulev1beta2.ResourcePoolClaim{}
 	err := k8sClient.Get(context.TODO(), client.ObjectKey{Name: claim.Name, Namespace: claim.Namespace}, cl)
 	Expect(err).Should(Succeed())
 
-	Expect(cl.Status.Condition.Status).To(Equal(metav1.ConditionTrue), "failed to verify condition status")
-	Expect(cl.Status.Condition.Type).To(Equal(meta.BoundCondition), "failed to verify condition type")
-	Expect(cl.Status.Condition.Reason).To(Equal(meta.SucceededReason), "failed to verify condition reason")
+	bound := cl.Status.Conditions.GetConditionByType(meta.BoundCondition)
+
+	Expect(bound.Type).To(Equal(meta.BoundCondition), "failed to verify condition type")
+	Expect(bound.Reason).To(Equal(meta.UnusedReason), "failed to verify condition reason")
+	Expect(bound.Status).To(Equal(metav1.ConditionFalse), "failed to verify condition status")
+}
+
+func isBoundAndUsedCondition(claim *capsulev1beta2.ResourcePoolClaim) {
+	cl := &capsulev1beta2.ResourcePoolClaim{}
+	err := k8sClient.Get(context.TODO(), client.ObjectKey{Name: claim.Name, Namespace: claim.Namespace}, cl)
+	Expect(err).Should(Succeed())
+
+	bound := cl.Status.Conditions.GetConditionByType(meta.BoundCondition)
+
+	Expect(bound.Status).To(Equal(metav1.ConditionTrue), "failed to verify condition status")
+	Expect(bound.Type).To(Equal(meta.BoundCondition), "failed to verify condition type")
+	Expect(bound.Reason).To(Equal(meta.InUseReason), "failed to verify condition reason")
 }

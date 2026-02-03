@@ -40,8 +40,8 @@ func (h *claimValidationHandler) OnDelete(_ client.Client, decoder admission.Dec
 			return utils.ErroredResponse(fmt.Errorf("failed to decode old object: %w", err))
 		}
 
-		if claim.IsBoundToResourcePool() {
-			response := admission.Denied(fmt.Sprintf("cannot delete the pool while claim is bound to a resourcepool %s", claim.Status.Pool.Name))
+		if claim.IsBoundInResourcePool() {
+			response := admission.Denied(fmt.Sprintf("cannot delete the pool while claim is used in resourcepool %s", claim.Status.Pool.Name))
 
 			return &response
 		}
@@ -63,17 +63,9 @@ func (h *claimValidationHandler) OnUpdate(_ client.Client, decoder admission.Dec
 			return utils.ErroredResponse(fmt.Errorf("failed to decode new object: %w", err))
 		}
 
-		if !reflect.DeepEqual(oldClaim.Spec.ResourceClaims, newClaim.Spec.ResourceClaims) {
-			if oldClaim.IsBoundToResourcePool() {
-				response := admission.Denied(fmt.Sprintf("cannot change the requested resources while claim is bound to a resourcepool %s", oldClaim.Status.Pool.Name))
-
-				return &response
-			}
-		}
-
-		if !reflect.DeepEqual(oldClaim.Spec.Pool, newClaim.Spec.Pool) {
-			if oldClaim.IsBoundToResourcePool() {
-				response := admission.Denied(fmt.Sprintf("cannot change the pool while claim is bound to a resourcepool %s", oldClaim.Status.Pool.Name))
+		if oldClaim.IsBoundInResourcePool() {
+			if oldClaim.Spec.Pool != newClaim.Spec.Pool || !reflect.DeepEqual(oldClaim.Spec.ResourceClaims, newClaim.Spec.ResourceClaims) {
+				response := admission.Denied(fmt.Sprintf("cannot change the requested resources while claim is allocated to a resourcepool %s", oldClaim.Status.Pool.Name))
 
 				return &response
 			}

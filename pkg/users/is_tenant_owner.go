@@ -64,7 +64,7 @@ func IsCommonOwner(
 		if err := c.List(ctx, saList,
 			client.InNamespace(parts[2]),
 			client.MatchingLabels{
-				meta.OwnerPromotionLabel: meta.OwnerPromotionLabelTrigger,
+				meta.OwnerPromotionLabel: meta.ValueTrue,
 			}); err != nil {
 			return false, err
 		}

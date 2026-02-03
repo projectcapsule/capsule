@@ -27,6 +27,9 @@ const (
 	ForbiddenNamespaceAnnotationsAnnotation       = "capsule.clastix.io/forbidden-namespace-annotations"
 	ForbiddenNamespaceAnnotationsRegexpAnnotation = "capsule.clastix.io/forbidden-namespace-annotations-regexp"
 	ProtectedTenantAnnotation                     = "capsule.clastix.io/protected"
+
+	ResourceQuotaAnnotationPrefix = "quota.resources.capsule.clastix.io"
+	ResourceUsedAnnotationPrefix  = "used.resources.capsule.clastix.io"
 )
 
 func ReleaseAnnotationTriggers(obj client.Object) bool {

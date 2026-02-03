@@ -23,7 +23,7 @@ func TestFreezeLabel(t *testing.T) {
 	}
 
 	// set to trigger
-	ns.Labels[meta.FreezeLabel] = meta.FreezeLabelTrigger
+	ns.Labels[meta.FreezeLabel] = meta.ValueTrue
 	if !meta.FreezeLabelTriggers(ns) {
 		t.Errorf("expected FreezeLabelTriggers to be true when label is set to trigger")
 	}
@@ -48,7 +48,7 @@ func TestOwnerPromotionLabel(t *testing.T) {
 		t.Errorf("expected OwnerPromotionLabelTriggers to be false when label is absent")
 	}
 
-	ns.Labels[meta.OwnerPromotionLabel] = meta.OwnerPromotionLabelTrigger
+	ns.Labels[meta.OwnerPromotionLabel] = meta.ValueTrue
 	if !meta.OwnerPromotionLabelTriggers(ns) {
 		t.Errorf("expected OwnerPromotionLabelTriggers to be true when label is set to trigger")
 	}
@@ -170,4 +170,124 @@ func copyStructSet(in map[string]struct{}) map[string]struct{} {
 		out[k] = struct{}{}
 	}
 	return out
+}
+
+func TestLabelsChanged(t *testing.T) {
+	t.Parallel()
+
+	type tc struct {
+		name      string
+		keys      []string
+		oldLabels map[string]string
+		newLabels map[string]string
+		want      bool
+	}
+
+	tests := []tc{
+		{
+			name:      "no keys => unchanged (false)",
+			keys:      nil,
+			oldLabels: map[string]string{"a": "1"},
+			newLabels: map[string]string{"a": "2"},
+			want:      false,
+		},
+		{
+			name:      "key unchanged => false",
+			keys:      []string{"a"},
+			oldLabels: map[string]string{"a": "1"},
+			newLabels: map[string]string{"a": "1"},
+			want:      false,
+		},
+		{
+			name:      "value changed => true",
+			keys:      []string{"a"},
+			oldLabels: map[string]string{"a": "1"},
+			newLabels: map[string]string{"a": "2"},
+			want:      true,
+		},
+		{
+			name:      "key added => true",
+			keys:      []string{"a"},
+			oldLabels: map[string]string{},
+			newLabels: map[string]string{"a": "1"},
+			want:      true,
+		},
+		{
+			name:      "key removed => true",
+			keys:      []string{"a"},
+			oldLabels: map[string]string{"a": "1"},
+			newLabels: map[string]string{},
+			want:      true,
+		},
+		{
+			name:      "old nil new has key => true",
+			keys:      []string{"a"},
+			oldLabels: nil,
+			newLabels: map[string]string{"a": "1"},
+			want:      true,
+		},
+		{
+			name:      "old has key new nil => true",
+			keys:      []string{"a"},
+			oldLabels: map[string]string{"a": "1"},
+			newLabels: nil,
+			want:      true,
+		},
+		{
+			name:      "both nil and key missing => false",
+			keys:      []string{"a"},
+			oldLabels: nil,
+			newLabels: nil,
+			want:      false,
+		},
+		{
+			name:      "multiple keys: one changed => true",
+			keys:      []string{"a", "b"},
+			oldLabels: map[string]string{"a": "1", "b": "2"},
+			newLabels: map[string]string{"a": "1", "b": "3"},
+			want:      true,
+		},
+		{
+			name:      "multiple keys: only non-watched key changed => false",
+			keys:      []string{"a"},
+			oldLabels: map[string]string{"a": "1", "x": "old"},
+			newLabels: map[string]string{"a": "1", "x": "new"},
+			want:      false,
+		},
+		{
+			name:      "watched key absent in both even if other keys differ => false",
+			keys:      []string{"a"},
+			oldLabels: map[string]string{"x": "1"},
+			newLabels: map[string]string{"x": "2"},
+			want:      false,
+		},
+		{
+			name:      "duplicate keys in keys slice still behaves correctly",
+			keys:      []string{"a", "a"},
+			oldLabels: map[string]string{"a": "1"},
+			newLabels: map[string]string{"a": "1"},
+			want:      false,
+		},
+		{
+			name:      "duplicate keys in keys slice with change => true",
+			keys:      []string{"a", "a"},
+			oldLabels: map[string]string{"a": "1"},
+			newLabels: map[string]string{"a": "2"},
+			want:      true,
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := meta.LabelsChanged(tt.keys, tt.oldLabels, tt.newLabels)
+			if got != tt.want {
+				t.Fatalf("LabelsChanged(keys=%v, old=%v, new=%v) = %v, want %v",
+					tt.keys, tt.oldLabels, tt.newLabels, got, tt.want,
+				)
+			}
+		})
+	}
 }

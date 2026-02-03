@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -47,9 +46,7 @@ func (h *wildcard) OnUpdate(client client.Client, decoder admission.Decoder, rec
 func (h *wildcard) validate(ctx context.Context, clt client.Client, req admission.Request, recorder events.EventRecorder, decoder admission.Decoder) *admission.Response {
 	tntList := &capsulev1beta2.TenantList{}
 
-	if err := clt.List(ctx, tntList, client.MatchingFieldsSelector{
-		Selector: fields.OneTermEqualSelector(".status.namespaces", req.Namespace),
-	}); err != nil {
+	if err := clt.List(ctx, tntList, client.MatchingFields{".status.namespaces": req.Namespace}); err != nil {
 		return utils.ErroredResponse(err)
 	}
 

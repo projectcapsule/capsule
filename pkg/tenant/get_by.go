@@ -12,7 +12,6 @@ import (
 	authenticationv1 "k8s.io/api/authentication/v1"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -27,11 +26,8 @@ func TenantByStatusNamespace(
 	c client.Client,
 	namespace string,
 ) (*capsulev1beta2.Tenant, error) {
-	tntList := &capsulev1beta2.TenantList{}
-
-	if err := c.List(ctx, tntList, client.MatchingFieldsSelector{
-		Selector: fields.OneTermEqualSelector(".status.namespaces", namespace),
-	}); err != nil {
+	var tntList capsulev1beta2.TenantList
+	if err := c.List(ctx, &tntList, client.MatchingFields{".status.namespaces": namespace}); err != nil {
 		return nil, err
 	}
 
@@ -39,10 +35,43 @@ func TenantByStatusNamespace(
 		return nil, nil
 	}
 
-	tnt := &capsulev1beta2.Tenant{}
-	*tnt = tntList.Items[0]
+	t := tntList.Items[0].DeepCopy()
 
-	return tnt, nil
+	return t, nil
+}
+
+func GetTenantNameByStatusNamespace(
+	ctx context.Context,
+	c client.Client,
+	namespace string,
+) (string, error) {
+	var tntList capsulev1beta2.TenantList
+	if err := c.List(ctx, &tntList, client.MatchingFields{".status.namespaces": namespace}); err != nil {
+		return "", err
+	}
+
+	if len(tntList.Items) == 0 {
+		return "", nil
+	}
+
+	return tntList.Items[0].GetName(), nil
+}
+
+func IsNamespaceInTenant(
+	ctx context.Context,
+	c client.Client,
+	namespace string,
+) (bool, error) {
+	var tntList capsulev1beta2.TenantList
+	if err := c.List(ctx, &tntList, client.MatchingFields{".status.namespaces": namespace}); err != nil {
+		return false, err
+	}
+
+	if len(tntList.Items) == 0 {
+		return false, nil
+	}
+
+	return true, nil
 }
 
 // getNamespaceTenant returns namespace owner tenant.

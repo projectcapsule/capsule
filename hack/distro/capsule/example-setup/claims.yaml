@@ -1,0 +1,35 @@
+---
+apiVersion: capsule.clastix.io/v1beta2
+kind: ResourcePoolClaim
+metadata:
+  name: get-me-solar
+  namespace: solar-test
+spec:
+  pool: "solar-pool"
+  claim:
+    requests.cpu: "2"
+    requests.memory: 2Gi
+---
+apiVersion: capsule.clastix.io/v1beta2
+kind: ResourcePoolClaim
+metadata:
+  name: get-me-solar-2
+  namespace: solar-test
+spec:
+  pool: "solar-pool"
+  claim:
+    requests.cpu: "2"
+    requests.memory: 2Gi
+---
+apiVersion: capsule.clastix.io/v1beta2
+kind: ResourcePoolClaim
+metadata:
+  name: get-me-customer
+  annotations:
+    "projectcapsule.dev/release": "true"
+  namespace: solar-test
+spec:
+  pool: "customer-pool"
+  claim:
+    requests.cpu: "2"
+    requests.memory: 2Gi

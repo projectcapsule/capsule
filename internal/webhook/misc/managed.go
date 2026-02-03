@@ -20,26 +20,24 @@ func ManagedValidatingHandler() handlers.Handler {
 	return &managedValidatingHandler{}
 }
 
-func (h *managedValidatingHandler) OnCreate(client.Client, admission.Decoder, events.EventRecorder) handlers.Func {
-	return func(context.Context, admission.Request) *admission.Response {
+func (h *managedValidatingHandler) OnCreate(c client.Client, decoder admission.Decoder, _ events.EventRecorder) handlers.Func {
+	return func(ctx context.Context, req admission.Request) *admission.Response {
 		return nil
 	}
 }
 
 func (h *managedValidatingHandler) OnDelete(client client.Client, _ admission.Decoder, recorder events.EventRecorder) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		return h.handler(ctx, client, req, recorder)
+		response := admission.Denied(fmt.Sprintf("resource %s is managed by capsule and can not by modified by capsule users", req.Name))
+
+		return &response
 	}
 }
 
 func (h *managedValidatingHandler) OnUpdate(client client.Client, _ admission.Decoder, recorder events.EventRecorder) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		return h.handler(ctx, client, req, recorder)
+		response := admission.Denied(fmt.Sprintf("resource %s is managed by capsule and can not by modified by capsule users", req.Name))
+
+		return &response
 	}
-}
-
-func (h *managedValidatingHandler) handler(ctx context.Context, clt client.Client, req admission.Request, recorder events.EventRecorder) *admission.Response {
-	response := admission.Denied(fmt.Sprintf("resource %s is managed by capsule and can not by modified by capsule users", req.Name))
-
-	return &response
 }

@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/projectcapsule/capsule/pkg/api/meta"
+	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -252,4 +253,127 @@ func TestLooseOwnerReferenceEqual(t *testing.T) {
 			t.Fatalf("expected not equal")
 		}
 	})
+}
+
+func TestRemoveLooseOwnerReferenceForKindExceptGiven(t *testing.T) {
+	type testCase struct {
+		name     string
+		initial  []metav1.OwnerReference
+		keep     metav1.OwnerReference
+		expected []metav1.OwnerReference
+	}
+
+	given := metav1.OwnerReference{
+		APIVersion: "capsule.clastix.io/v1beta2",
+		Kind:       "ResourcePool",
+		Name:       "pool-a",
+		UID:        types.UID("uid-given"),
+	}
+
+	sameKindOtherUID := metav1.OwnerReference{
+		APIVersion: "capsule.clastix.io/v1beta2",
+		Kind:       "ResourcePool",
+		Name:       "pool-b",
+		UID:        types.UID("uid-other"),
+	}
+
+	sameKindSameUIDDifferentName := metav1.OwnerReference{
+		APIVersion: "capsule.clastix.io/v1beta2",
+		Kind:       "ResourcePool",
+		Name:       "pool-a-renamed",
+		UID:        types.UID("uid-given"),
+	}
+
+	differentKind := metav1.OwnerReference{
+		APIVersion: "capsule.clastix.io/v1beta2",
+		Kind:       "Tenant",
+		Name:       "t-1",
+		UID:        types.UID("uid-tenant"),
+	}
+
+	differentAPIVersion := metav1.OwnerReference{
+		APIVersion: "capsule.clastix.io/v1alpha1",
+		Kind:       "ResourcePool",
+		Name:       "pool-old",
+		UID:        types.UID("uid-old"),
+	}
+
+	tests := []testCase{
+		{
+			name: "keeps given ref and removes other refs with same kind/apiversion",
+			initial: []metav1.OwnerReference{
+				differentKind,
+				sameKindOtherUID,
+				given,
+				differentAPIVersion,
+			},
+			keep: given,
+			expected: []metav1.OwnerReference{
+				differentKind,
+				given,
+				differentAPIVersion,
+			},
+		},
+		{
+			name: "preserves refs of different kind/apiversion even if given is absent; removes matching kind/apiversion",
+			initial: []metav1.OwnerReference{
+				differentKind,
+				sameKindOtherUID,
+				differentAPIVersion,
+			},
+			keep: given, // given not present in initial
+			expected: []metav1.OwnerReference{
+				differentKind,
+				differentAPIVersion,
+			},
+		},
+		{
+			name: "keeps the ref with matching UID even if other fields differ (UID is identity)",
+			initial: []metav1.OwnerReference{
+				sameKindOtherUID,
+				sameKindSameUIDDifferentName, // same UID as given, but different Name
+				differentKind,
+			},
+			keep: given,
+			expected: []metav1.OwnerReference{
+				sameKindSameUIDDifferentName,
+				differentKind,
+			},
+		},
+		{
+			name:     "no ownerReferences results in no ownerReferences",
+			initial:  []metav1.OwnerReference{},
+			keep:     given,
+			expected: []metav1.OwnerReference{
+				// empty
+			},
+		},
+		{
+			name: "only matching kind/apiversion present; leaves only given if present",
+			initial: []metav1.OwnerReference{
+				sameKindOtherUID,
+				given,
+			},
+			keep: given,
+			expected: []metav1.OwnerReference{
+				given,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			obj := &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "cm",
+					Namespace:       "ns",
+					OwnerReferences: append([]metav1.OwnerReference(nil), tt.initial...),
+				},
+			}
+
+			meta.RemoveLooseOwnerReferenceForKindExceptGiven(obj, tt.keep)
+
+			assert.Equal(t, tt.expected, obj.GetOwnerReferences())
+		})
+	}
 }

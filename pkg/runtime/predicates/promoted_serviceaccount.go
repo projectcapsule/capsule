@@ -20,7 +20,7 @@ func (PromotedServiceaccountPredicate) Create(e event.CreateEvent) bool {
 
 	v, ok := e.Object.GetLabels()[meta.OwnerPromotionLabel]
 
-	return ok && v == meta.OwnerPromotionLabelTrigger
+	return ok && v == meta.ValueTrue
 }
 
 func (PromotedServiceaccountPredicate) Delete(e event.DeleteEvent) bool {
@@ -30,7 +30,7 @@ func (PromotedServiceaccountPredicate) Delete(e event.DeleteEvent) bool {
 
 	v, ok := e.Object.GetLabels()[meta.OwnerPromotionLabel]
 
-	return ok && v == meta.OwnerPromotionLabelTrigger
+	return ok && v == meta.ValueTrue
 }
 
 func (PromotedServiceaccountPredicate) Update(e event.UpdateEvent) bool {

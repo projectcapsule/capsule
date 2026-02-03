@@ -119,7 +119,7 @@ var _ = Describe("Promoting ServiceAccounts to Owners", Label("config"), Label("
 				if saCopy.Labels == nil {
 					saCopy.Labels = map[string]string{}
 				}
-				saCopy.Labels[meta.OwnerPromotionLabel] = meta.OwnerPromotionLabelTrigger
+				saCopy.Labels[meta.OwnerPromotionLabel] = meta.ValueTrue
 
 				return tc.client.Update(context.TODO(), saCopy)
 			}, defaultTimeoutInterval, defaultPollInterval).Should(tc.matcher, "persona=%s", name)
@@ -212,7 +212,7 @@ var _ = Describe("Promoting ServiceAccounts to Owners", Label("config"), Label("
 				if saCopy.Labels == nil {
 					saCopy.Labels = map[string]string{}
 				}
-				saCopy.Labels[meta.OwnerPromotionLabel] = meta.OwnerPromotionLabelTrigger
+				saCopy.Labels[meta.OwnerPromotionLabel] = meta.ValueTrue
 
 				return tc.client.Update(context.TODO(), saCopy)
 			}, defaultTimeoutInterval, defaultPollInterval).Should(tc.matcher, "persona=%s", name)
@@ -271,7 +271,7 @@ var _ = Describe("Promoting ServiceAccounts to Owners", Label("config"), Label("
 				if saCopy.Labels == nil {
 					saCopy.Labels = map[string]string{}
 				}
-				saCopy.Labels[meta.OwnerPromotionLabel] = meta.OwnerPromotionLabelTrigger
+				saCopy.Labels[meta.OwnerPromotionLabel] = meta.ValueTrue
 
 				return tc.client.Update(context.TODO(), saCopy)
 			}, defaultTimeoutInterval, defaultPollInterval).Should(tc.matcher, "persona=%s", name)

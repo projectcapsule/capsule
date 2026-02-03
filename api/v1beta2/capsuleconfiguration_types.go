@@ -8,6 +8,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api/meta"
 )
 
 // CapsuleConfigurationSpec defines the Capsule configuration.
@@ -89,7 +90,7 @@ type DynamicAdmission struct {
 
 type DynamicAdmissionConfig struct {
 	// Name the Admission Webhook
-	Name api.Name `json:"name,omitempty"`
+	Name meta.RFC1123Name `json:"name,omitempty"`
 	// Labels added to the Admission Webhook
 	// +optional
 	Labels map[string]string `json:"labels,omitempty"`

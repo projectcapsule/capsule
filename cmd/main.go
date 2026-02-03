@@ -53,7 +53,6 @@ import (
 	"github.com/projectcapsule/capsule/internal/webhook/misc"
 	namespacemutation "github.com/projectcapsule/capsule/internal/webhook/namespace/mutation"
 	namespacevalidation "github.com/projectcapsule/capsule/internal/webhook/namespace/validation"
-	"github.com/projectcapsule/capsule/internal/webhook/networkpolicy"
 	"github.com/projectcapsule/capsule/internal/webhook/node"
 	"github.com/projectcapsule/capsule/internal/webhook/pod"
 	"github.com/projectcapsule/capsule/internal/webhook/pvc"
@@ -272,15 +271,14 @@ func main() {
 			),
 		),
 		route.TenantResourceObjects(handlers.InCapsuleGroups(cfg, tntresource.WriteOpsHandler())),
-		route.NetworkPolicy(handlers.InCapsuleGroups(cfg, networkpolicy.Handler())),
-		route.Cordoning(tenantvalidation.CordoningHandler(cfg)),
+		route.Cordoning(handlers.InCapsuleGroups(cfg, misc.CordoningHandler(cfg))),
 		route.Node(handlers.InCapsuleGroups(cfg, node.UserMetadataHandler(cfg, kubeVersion))),
 		route.ServiceAccounts(
 			serviceaccounts.Handler(
 				serviceaccounts.Validating(cfg),
 			),
 		),
-		route.CustomResources(tenantvalidation.ResourceCounterHandler(manager.GetClient())),
+		route.MiscCustomResources(misc.ResourceCounterHandler(manager.GetClient())),
 		route.Gateway(gateway.Class(cfg)),
 		route.DeviceClass(dra.DeviceClass()),
 		route.Defaults(defaults.Handler(cfg, kubeVersion)),
@@ -288,18 +286,21 @@ func main() {
 			tenantmutation.MetaHandler(),
 		),
 		route.TenantValidation(
-			tenantvalidation.NameHandler(),
-			tenantvalidation.RoleBindingRegexHandler(),
-			tenantvalidation.IngressClassRegexHandler(),
-			tenantvalidation.StorageClassRegexHandler(),
-			tenantvalidation.ContainerRegistryRegexHandler(),
-			tenantvalidation.RuleHandler(),
-			tenantvalidation.HostnameRegexHandler(),
-			tenantvalidation.FreezedEmitter(),
-			tenantvalidation.ServiceAccountNameHandler(),
-			tenantvalidation.ForbiddenAnnotationsRegexHandler(),
-			tenantvalidation.ProtectedHandler(),
-			tenantvalidation.WarningHandler(cfg),
+			tenantvalidation.Handler(cfg,
+				tenantvalidation.NameHandler(),
+				tenantvalidation.RoleBindingRegexHandler(),
+				tenantvalidation.IngressClassRegexHandler(),
+				tenantvalidation.StorageClassRegexHandler(),
+				tenantvalidation.ContainerRegistryRegexHandler(),
+				tenantvalidation.RuleHandler(),
+				tenantvalidation.HostnameRegexHandler(),
+				tenantvalidation.FreezedEmitter(),
+				tenantvalidation.ServiceAccountNameHandler(),
+				tenantvalidation.ForbiddenAnnotationsRegexHandler(),
+				tenantvalidation.ProtectedHandler(),
+				tenantvalidation.RequiredMetadataHandler(),
+				tenantvalidation.WarningHandler(cfg),
+			),
 		),
 		route.NamespaceValidation(
 			namespacevalidation.NamespaceHandler(
@@ -309,6 +310,7 @@ func main() {
 				namespacevalidation.QuotaHandler(),
 				namespacevalidation.PrefixHandler(cfg),
 				namespacevalidation.UserMetadataHandler(),
+				namespacevalidation.RequiredMetadataHandler(),
 			),
 		),
 		route.NamespaceMutation(
@@ -373,7 +375,10 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "EndpointSliceLabels")
 	}
 
-	if err = (&podlabelscontroller.MetadataReconciler{Client: manager.GetClient()}).SetupWithManager(ctx, manager); err != nil {
+	if err = (&podlabelscontroller.MetadataReconciler{
+		Client: manager.GetClient(),
+		Log:    ctrl.Log.WithName("capsule.ctrl").WithName("pods"),
+	}).SetupWithManager(ctx, manager); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "PodLabels")
 		os.Exit(1)
 	}
