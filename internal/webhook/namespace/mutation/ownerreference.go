@@ -50,7 +50,7 @@ func (h *ownerReferenceHandler) OnCreate(c client.Client, ns *corev1.Namespace, 
 
 		labels := ns.GetLabels()
 		tenant.AddNamespaceNameLabels(labels, ns)
-		tenant.AddTenantNameLabel(labels, ns, tnt)
+		tenant.AddTenantNameLabel(labels, tnt)
 		ns.SetLabels(labels)
 
 		if err := assignToTenant(c, tnt, ns, recorder); err != nil {
@@ -109,7 +109,7 @@ func (h *ownerReferenceHandler) OnUpdate(c client.Client, newNs *corev1.Namespac
 
 		labels := newNs.GetLabels()
 		tenant.AddNamespaceNameLabels(labels, oldNs)
-		tenant.AddTenantNameLabel(labels, oldNs, tnt)
+		tenant.AddTenantNameLabel(labels, tnt)
 		newNs.SetLabels(labels)
 
 		marshaled, err := json.Marshal(newNs)

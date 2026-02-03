@@ -557,6 +557,48 @@
                         }
                     }
                 },
+                "diagnostics": {
+                    "type": "object",
+                    "properties": {
+                        "annotations": {
+                            "description": "Annotations for dashboard configmaps",
+                            "type": "object"
+                        },
+                        "enabled": {
+                            "description": "Enable Diagnostic Dashboards to be deployed",
+                            "type": "boolean"
+                        },
+                        "labels": {
+                            "description": "Labels for dashboard configmaps",
+                            "type": "object"
+                        },
+                        "operator": {
+                            "type": "object",
+                            "properties": {
+                                "allowCrossNamespaceImport": {
+                                    "description": "Allow the Operator to match this resource with Grafanas outside the current namespace",
+                                    "type": "boolean"
+                                },
+                                "enabled": {
+                                    "description": "Enable Operator Resources (GrafanaDashboard)",
+                                    "type": "boolean"
+                                },
+                                "folder": {
+                                    "description": "folder assignment for dashboard",
+                                    "type": "string"
+                                },
+                                "instanceSelector": {
+                                    "description": "Selects Grafana instances for import",
+                                    "type": "object"
+                                },
+                                "resyncPeriod": {
+                                    "description": "How often the resource is synced, defaults to 10m0s if not set",
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                },
                 "serviceMonitor": {
                     "type": "object",
                     "properties": {
@@ -742,6 +784,9 @@
                     "description": "Specifies whether a service account should be created.",
                     "type": "boolean"
                 },
+                "imagePullSecrets": {
+                    "type": "array"
+                },
                 "name": {
                     "description": "The name of the service account to use. If not set and `serviceAccount.create=true`, a name is generated using the fullname template",
                     "type": "string"
@@ -833,7 +878,18 @@
                                 },
                                 "matchConditions": {
                                     "description": "[MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)",
-                                    "type": "array"
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "expression": {
+                                                "type": "string"
+                                            },
+                                            "name": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
                                 },
                                 "matchPolicy": {
                                     "description": "[MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)",
@@ -853,6 +909,12 @@
                                                     },
                                                     "operator": {
                                                         "type": "string"
+                                                    },
+                                                    "values": {
+                                                        "type": "array",
+                                                        "items": {
+                                                            "type": "string"
+                                                        }
                                                     }
                                                 }
                                             }
@@ -914,7 +976,18 @@
                                 },
                                 "matchConditions": {
                                     "description": "[MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)",
-                                    "type": "array"
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "expression": {
+                                                "type": "string"
+                                            },
+                                            "name": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
                                 },
                                 "matchPolicy": {
                                     "description": "[MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)",
@@ -1240,51 +1313,6 @@
                                 }
                             }
                         },
-                        "networkpolicies": {
-                            "type": "object",
-                            "properties": {
-                                "enabled": {
-                                    "description": "Enable the Hook",
-                                    "type": "boolean"
-                                },
-                                "failurePolicy": {
-                                    "description": "[FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy)",
-                                    "type": "string"
-                                },
-                                "matchConditions": {
-                                    "description": "[MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)",
-                                    "type": "array"
-                                },
-                                "matchPolicy": {
-                                    "description": "[MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)",
-                                    "type": "string"
-                                },
-                                "namespaceSelector": {
-                                    "description": "[NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector)",
-                                    "type": "object",
-                                    "properties": {
-                                        "matchExpressions": {
-                                            "type": "array",
-                                            "items": {
-                                                "type": "object",
-                                                "properties": {
-                                                    "key": {
-                                                        "type": "string"
-                                                    },
-                                                    "operator": {
-                                                        "type": "string"
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                },
-                                "objectSelector": {
-                                    "description": "[ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector)",
-                                    "type": "object"
-                                }
-                            }
-                        },
                         "nodes": {
                             "type": "object",
                             "properties": {
@@ -1578,7 +1606,18 @@
                                 },
                                 "matchConditions": {
                                     "description": "[MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)",
-                                    "type": "array"
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "expression": {
+                                                "type": "string"
+                                            },
+                                            "name": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
                                 },
                                 "matchPolicy": {
                                     "description": "[MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)",

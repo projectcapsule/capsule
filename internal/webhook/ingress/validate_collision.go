@@ -12,7 +12,6 @@ import (
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	networkingv1 "k8s.io/api/networking/v1"
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
-	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -113,10 +112,8 @@ func (r *collision) validateCollision(ctx context.Context, clt client.Client, in
 					namespaces.Insert(tenant.Status.Namespaces...)
 				}
 			case api.HostnameCollisionScopeTenant:
-				selector := client.MatchingFieldsSelector{Selector: fields.OneTermEqualSelector(".status.namespaces", ing.Namespace())}
-
 				tenantList := &capsulev1beta2.TenantList{}
-				if err := clt.List(ctx, tenantList, selector); err != nil {
+				if err := clt.List(ctx, tenantList, client.MatchingFields{".status.namespaces": ing.Namespace()}); err != nil {
 					return err
 				}
 
@@ -127,9 +124,7 @@ func (r *collision) validateCollision(ctx context.Context, clt client.Client, in
 				namespaces.Insert(ing.Namespace())
 			}
 
-			fieldSelector := fields.OneTermEqualSelector(ingress.HostPathPair, fmt.Sprintf("%s;%s", hostname, path))
-
-			if err := clt.List(ctx, ingressObjList, client.MatchingFieldsSelector{Selector: fieldSelector}); err != nil {
+			if err := clt.List(ctx, ingressObjList, client.MatchingFields{ingress.HostPathPair: fmt.Sprintf("%s;%s", hostname, path)}); err != nil {
 				return err
 			}
 

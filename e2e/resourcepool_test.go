@@ -20,7 +20,7 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
-	"github.com/projectcapsule/capsule/pkg/api/misc"
+	"github.com/projectcapsule/capsule/pkg/runtime/selectors"
 	"github.com/projectcapsule/capsule/pkg/utils"
 )
 
@@ -85,7 +85,7 @@ var _ = Describe("ResourcePool Tests", Label("resourcepool"), func() {
 				},
 			},
 			Spec: capsulev1beta2.ResourcePoolSpec{
-				Selectors: []misc.NamespaceSelector{
+				Selectors: []selectors.NamespaceSelector{
 					{
 						LabelSelector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
@@ -243,7 +243,7 @@ var _ = Describe("ResourcePool Tests", Label("resourcepool"), func() {
 			err := k8sClient.Create(context.TODO(), claim1)
 			Expect(err).Should(Succeed(), "Failed to create Claim %s", claim1)
 
-			isSuccessfullyBoundToPool(pool, claim1)
+			isSuccessfullyBoundAndUnsedToPool(pool, claim1)
 
 			claim2 := &capsulev1beta2.ResourcePoolClaim{
 				ObjectMeta: metav1.ObjectMeta{
@@ -260,7 +260,7 @@ var _ = Describe("ResourcePool Tests", Label("resourcepool"), func() {
 			err = k8sClient.Create(context.TODO(), claim2)
 			Expect(err).Should(Succeed(), "Failed to create Claim %s", claim2)
 
-			isSuccessfullyBoundToPool(pool, claim2)
+			isSuccessfullyBoundAndUnsedToPool(pool, claim2)
 
 			claim3 := &capsulev1beta2.ResourcePoolClaim{
 				ObjectMeta: metav1.ObjectMeta{
@@ -524,7 +524,7 @@ var _ = Describe("ResourcePool Tests", Label("resourcepool"), func() {
 				},
 			},
 			Spec: capsulev1beta2.ResourcePoolSpec{
-				Selectors: []misc.NamespaceSelector{
+				Selectors: []selectors.NamespaceSelector{
 					{
 						LabelSelector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
@@ -696,7 +696,7 @@ var _ = Describe("ResourcePool Tests", Label("resourcepool"), func() {
 				},
 			},
 			Spec: capsulev1beta2.ResourcePoolSpec{
-				Selectors: []misc.NamespaceSelector{
+				Selectors: []selectors.NamespaceSelector{
 					{
 						LabelSelector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
@@ -769,7 +769,7 @@ var _ = Describe("ResourcePool Tests", Label("resourcepool"), func() {
 			err := k8sClient.Create(context.TODO(), claim)
 			Expect(err).Should(Succeed(), "Failed to create Claim %s", claim)
 
-			isSuccessfullyBoundToPool(pool, claim)
+			isSuccessfullyBoundAndUnsedToPool(pool, claim)
 		})
 
 		By("Verify Status was correctly initialized", func() {
@@ -834,16 +834,16 @@ var _ = Describe("ResourcePool Tests", Label("resourcepool"), func() {
 			err = k8sClient.Get(context.TODO(), client.ObjectKey{Name: claim.Name, Namespace: claim.Namespace}, claim)
 			Expect(err).Should(Succeed())
 
-			conditions := extractResourcePoolMessage(claim.Status.Condition.Message)
 			expected := []string{
 				"requested.requests.cpu=4",
 				"available.requests.cpu=2",
 			}
 
-			Expect(containsAll(conditions, expected)).To(BeTrue(), "Actual message"+claim.Status.Condition.Message)
-			Expect(claim.Status.Condition.Reason).To(Equal(meta.PoolExhaustedReason))
-			Expect(claim.Status.Condition.Status).To(Equal(metav1.ConditionFalse))
-			Expect(claim.Status.Condition.Type).To(Equal(meta.BoundCondition))
+			exhausted := claim.Status.Conditions.GetConditionByType(meta.ExhaustedCondition)
+			Expect(containsAll(extractResourcePoolMessage(exhausted.Message), expected)).To(BeTrue(), "Actual message"+exhausted.Message)
+			Expect(exhausted.Reason).To(Equal(meta.PoolExhaustedReason))
+			Expect(exhausted.Status).To(Equal(metav1.ConditionTrue))
+			Expect(exhausted.Type).To(Equal(meta.ExhaustedCondition))
 		})
 
 		By("Create claim for request.memory", func() {
@@ -862,7 +862,7 @@ var _ = Describe("ResourcePool Tests", Label("resourcepool"), func() {
 			err := k8sClient.Create(context.TODO(), claim)
 			Expect(err).Should(Succeed(), "Failed to create Claim %s", claim)
 
-			isSuccessfullyBoundToPool(pool, claim)
+			isSuccessfullyBoundAndUnsedToPool(pool, claim)
 		})
 
 		By("Verify Status was correctly initialized", func() {
@@ -905,7 +905,7 @@ var _ = Describe("ResourcePool Tests", Label("resourcepool"), func() {
 			err := k8sClient.Create(context.TODO(), claim)
 			Expect(err).Should(Succeed(), "Failed to create Claim %s", claim)
 
-			isSuccessfullyBoundToPool(pool, claim)
+			isSuccessfullyBoundAndUnsedToPool(pool, claim)
 		})
 
 		By("Verify Status was correctly initialized", func() {
@@ -942,16 +942,15 @@ var _ = Describe("ResourcePool Tests", Label("resourcepool"), func() {
 			err = k8sClient.Get(context.TODO(), client.ObjectKey{Name: claim.Name, Namespace: claim.Namespace}, claim)
 			Expect(err).Should(Succeed())
 
-			conditions := extractResourcePoolMessage(claim.Status.Condition.Message)
+			exhausted := claim.Status.Conditions.GetConditionByType(meta.ExhaustedCondition)
 			expected := []string{
 				"requested.requests.cpu=4",
 				"available.requests.cpu=0",
 			}
 
-			Expect(containsAll(conditions, expected)).To(BeTrue(), "Actual message"+claim.Status.Condition.Message)
-			Expect(claim.Status.Condition.Reason).To(Equal(meta.PoolExhaustedReason))
-			Expect(claim.Status.Condition.Status).To(Equal(metav1.ConditionFalse))
-			Expect(claim.Status.Condition.Type).To(Equal(meta.BoundCondition))
+			Expect(containsAll(extractResourcePoolMessage(exhausted.Message), expected)).To(BeTrue(), "Actual message"+claim.Status.Condition.Message)
+			Expect(exhausted.Reason).To(Equal(meta.PoolExhaustedReason))
+			Expect(exhausted.Status).To(Equal(metav1.ConditionTrue))
 		})
 	})
 
@@ -964,7 +963,7 @@ var _ = Describe("ResourcePool Tests", Label("resourcepool"), func() {
 				},
 			},
 			Spec: capsulev1beta2.ResourcePoolSpec{
-				Selectors: []misc.NamespaceSelector{
+				Selectors: []selectors.NamespaceSelector{
 					{
 						LabelSelector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
@@ -1037,7 +1036,7 @@ var _ = Describe("ResourcePool Tests", Label("resourcepool"), func() {
 			err := k8sClient.Create(context.TODO(), claim)
 			Expect(err).Should(Succeed(), "Failed to create Claim %s", claim)
 
-			isSuccessfullyBoundToPool(pool, claim)
+			isSuccessfullyBoundAndUnsedToPool(pool, claim)
 		})
 
 		By("Create claim for requests.requests", func() {
@@ -1056,7 +1055,7 @@ var _ = Describe("ResourcePool Tests", Label("resourcepool"), func() {
 			err := k8sClient.Create(context.TODO(), claim)
 			Expect(err).Should(Succeed(), "Failed to create Claim %s", claim)
 
-			isSuccessfullyBoundToPool(pool, claim)
+			isSuccessfullyBoundAndUnsedToPool(pool, claim)
 		})
 
 		By("Verify Status was correctly initialized", func() {
@@ -1104,16 +1103,15 @@ var _ = Describe("ResourcePool Tests", Label("resourcepool"), func() {
 			err = k8sClient.Get(context.TODO(), client.ObjectKey{Name: claim.Name, Namespace: claim.Namespace}, claim)
 			Expect(err).Should(Succeed())
 
-			conditions := extractResourcePoolMessage(claim.Status.Condition.Message)
+			exhausted := claim.Status.Conditions.GetConditionByType(meta.ExhaustedCondition)
 			expected := []string{
 				"requested.requests.cpu=4",
 				"available.requests.cpu=2",
 			}
 
-			Expect(containsAll(conditions, expected)).To(BeTrue(), "Actual message"+claim.Status.Condition.Message)
-			Expect(claim.Status.Condition.Reason).To(Equal(meta.PoolExhaustedReason))
-			Expect(claim.Status.Condition.Status).To(Equal(metav1.ConditionFalse))
-			Expect(claim.Status.Condition.Type).To(Equal(meta.BoundCondition))
+			Expect(containsAll(extractResourcePoolMessage(exhausted.Message), expected)).To(BeTrue(), "Actual message"+exhausted.Message)
+			Expect(exhausted.Reason).To(Equal(meta.PoolExhaustedReason))
+			Expect(exhausted.Status).To(Equal(metav1.ConditionTrue))
 		})
 
 		By("Create claim exhausting limits.cpu", func() {
@@ -1137,16 +1135,15 @@ var _ = Describe("ResourcePool Tests", Label("resourcepool"), func() {
 			err = k8sClient.Get(context.TODO(), client.ObjectKey{Name: claim.Name, Namespace: claim.Namespace}, claim)
 			Expect(err).Should(Succeed())
 
-			conditions := extractResourcePoolMessage(claim.Status.Condition.Message)
+			exhausted := claim.Status.Conditions.GetConditionByType(meta.ExhaustedCondition)
 			expected := []string{
 				"requested.limits.cpu=4",
 				"available.limits.cpu=2",
 			}
 
-			Expect(containsAll(conditions, expected)).To(BeTrue(), "Actual message"+claim.Status.Condition.Message)
-			Expect(claim.Status.Condition.Reason).To(Equal(meta.PoolExhaustedReason))
-			Expect(claim.Status.Condition.Status).To(Equal(metav1.ConditionFalse))
-			Expect(claim.Status.Condition.Type).To(Equal(meta.BoundCondition))
+			Expect(containsAll(extractResourcePoolMessage(exhausted.Message), expected)).To(BeTrue(), "Actual message"+exhausted.Message)
+			Expect(exhausted.Reason).To(Equal(meta.PoolExhaustedReason))
+			Expect(exhausted.Status).To(Equal(metav1.ConditionTrue))
 		})
 
 		By("Create claim for requests.cpu (attempt to skip exhausting one)", func() {
@@ -1171,7 +1168,7 @@ var _ = Describe("ResourcePool Tests", Label("resourcepool"), func() {
 			err = k8sClient.Get(context.TODO(), client.ObjectKey{Name: claim.Name, Namespace: claim.Namespace}, claim)
 			Expect(err).Should(Succeed())
 
-			conditions := extractResourcePoolMessage(claim.Status.Condition.Message)
+			exhausted := claim.Status.Conditions.GetConditionByType(meta.ExhaustedCondition)
 			expected := []string{
 				"requested.limits.cpu=2",
 				"queued.limits.cpu=4",
@@ -1179,10 +1176,9 @@ var _ = Describe("ResourcePool Tests", Label("resourcepool"), func() {
 				"queued.requests.cpu=4",
 			}
 
-			Expect(containsAll(conditions, expected)).To(BeTrue(), "Actual message"+claim.Status.Condition.Message)
-			Expect(claim.Status.Condition.Reason).To(Equal(meta.QueueExhaustedReason))
-			Expect(claim.Status.Condition.Status).To(Equal(metav1.ConditionFalse))
-			Expect(claim.Status.Condition.Type).To(Equal(meta.BoundCondition))
+			Expect(containsAll(extractResourcePoolMessage(exhausted.Message), expected)).To(BeTrue(), "Actual message"+exhausted.Message)
+			Expect(exhausted.Reason).To(Equal(meta.QueueExhaustedReason))
+			Expect(exhausted.Status).To(Equal(metav1.ConditionTrue))
 		})
 
 		By("Verify ResourceQuotas for namespaces", func() {
@@ -1257,7 +1253,7 @@ var _ = Describe("ResourcePool Tests", Label("resourcepool"), func() {
 			err := k8sClient.Get(context.TODO(), types.NamespacedName{Name: "simple-2", Namespace: "ns-2-pool-ordered"}, claim)
 			Expect(err).Should(Succeed(), "Failed to create Claim %s", claim)
 
-			isSuccessfullyBoundToPool(pool, claim)
+			isSuccessfullyBoundAndUnsedToPool(pool, claim)
 		})
 
 		By("Verify queued claim can be allocated", func() {
@@ -1266,7 +1262,7 @@ var _ = Describe("ResourcePool Tests", Label("resourcepool"), func() {
 			err := k8sClient.Get(context.TODO(), types.NamespacedName{Name: "simple-3", Namespace: "ns-1-pool-ordered"}, claim)
 			Expect(err).Should(Succeed(), "Failed to create Claim %s", claim)
 
-			isSuccessfullyBoundToPool(pool, claim)
+			isSuccessfullyBoundAndUnsedToPool(pool, claim)
 		})
 
 		By("Verify ResourceQuotas for namespaces", func() {
@@ -1309,7 +1305,8 @@ var _ = Describe("ResourcePool Tests", Label("resourcepool"), func() {
 
 			err = k8sClient.Get(context.TODO(), client.ObjectKey{Name: claim.Name, Namespace: claim.Namespace}, claim)
 			Expect(err).Should(Succeed())
-			conditions := extractResourcePoolMessage(claim.Status.Condition.Message)
+
+			exhausted := claim.Status.Conditions.GetConditionByType(meta.ExhaustedCondition)
 			expected := []string{
 				"requested.limits.cpu=2",
 				"available.limits.cpu=0",
@@ -1317,10 +1314,9 @@ var _ = Describe("ResourcePool Tests", Label("resourcepool"), func() {
 				"available.requests.cpu=0",
 			}
 
-			Expect(containsAll(conditions, expected)).To(BeTrue(), "Actual message"+claim.Status.Condition.Message)
-			Expect(claim.Status.Condition.Reason).To(Equal(meta.PoolExhaustedReason))
-			Expect(claim.Status.Condition.Status).To(Equal(metav1.ConditionFalse))
-			Expect(claim.Status.Condition.Type).To(Equal(meta.BoundCondition))
+			Expect(containsAll(extractResourcePoolMessage(exhausted.Message), expected)).To(BeTrue(), "Actual message"+exhausted.Message)
+			Expect(exhausted.Reason).To(Equal(meta.PoolExhaustedReason))
+			Expect(exhausted.Status).To(Equal(metav1.ConditionTrue))
 		})
 	})
 
@@ -1333,7 +1329,7 @@ var _ = Describe("ResourcePool Tests", Label("resourcepool"), func() {
 				},
 			},
 			Spec: capsulev1beta2.ResourcePoolSpec{
-				Selectors: []misc.NamespaceSelector{
+				Selectors: []selectors.NamespaceSelector{
 					{
 						LabelSelector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
@@ -1414,14 +1410,7 @@ var _ = Describe("ResourcePool Tests", Label("resourcepool"), func() {
 			err := k8sClient.Create(context.TODO(), claim)
 			Expect(err).Should(Succeed(), "Failed to create Claim %s", claim)
 
-			isSuccessfullyBoundToPool(pool, claim)
-
-			err = k8sClient.Get(context.TODO(), client.ObjectKey{Name: claim.Name, Namespace: claim.Namespace}, claim)
-			Expect(err).Should(Succeed())
-
-			Expect(claim.Status.Condition.Reason).To(Equal(meta.SucceededReason))
-			Expect(claim.Status.Condition.Status).To(Equal(metav1.ConditionTrue))
-			Expect(claim.Status.Condition.Type).To(Equal(meta.BoundCondition))
+			isSuccessfullyBoundAndUnsedToPool(pool, claim)
 		})
 
 		By("Create claim non matching namespace", func() {
@@ -1446,9 +1435,11 @@ var _ = Describe("ResourcePool Tests", Label("resourcepool"), func() {
 			err = k8sClient.Get(context.TODO(), client.ObjectKey{Name: claim.Name, Namespace: claim.Namespace}, claim)
 			Expect(err).Should(Succeed())
 
-			Expect(claim.Status.Condition.Reason).To(Equal(meta.FailedReason))
-			Expect(claim.Status.Condition.Status).To(Equal(metav1.ConditionFalse))
-			Expect(claim.Status.Condition.Type).To(Equal(meta.AssignedCondition))
+			assigned := claim.Status.Conditions.GetConditionByType(meta.ReadyCondition)
+
+			Expect(assigned.Reason).To(Equal(meta.FailedReason))
+			Expect(assigned.Status).To(Equal(metav1.ConditionFalse))
+			Expect(assigned.Type).To(Equal(meta.ReadyCondition))
 		})
 
 		By("Update Namespace Labels to become matching", func() {
@@ -1477,7 +1468,7 @@ var _ = Describe("ResourcePool Tests", Label("resourcepool"), func() {
 			err := k8sClient.Get(context.TODO(), client.ObjectKey{Name: claim.Name, Namespace: claim.Namespace}, claim)
 			Expect(err).Should(Succeed())
 
-			isSuccessfullyBoundToPool(pool, claim)
+			isSuccessfullyBoundAndUnsedToPool(pool, claim)
 		})
 
 	})
@@ -1491,7 +1482,7 @@ var _ = Describe("ResourcePool Tests", Label("resourcepool"), func() {
 				},
 			},
 			Spec: capsulev1beta2.ResourcePoolSpec{
-				Selectors: []misc.NamespaceSelector{
+				Selectors: []selectors.NamespaceSelector{
 					{
 						LabelSelector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
@@ -1599,7 +1590,7 @@ var _ = Describe("ResourcePool Tests", Label("resourcepool"), func() {
 				},
 			},
 			Spec: capsulev1beta2.ResourcePoolSpec{
-				Selectors: []misc.NamespaceSelector{
+				Selectors: []selectors.NamespaceSelector{
 					{
 						LabelSelector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
@@ -1707,7 +1698,7 @@ var _ = Describe("ResourcePool Tests", Label("resourcepool"), func() {
 				},
 			},
 			Spec: capsulev1beta2.ResourcePoolSpec{
-				Selectors: []misc.NamespaceSelector{
+				Selectors: []selectors.NamespaceSelector{
 					{
 						LabelSelector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
@@ -1779,14 +1770,7 @@ var _ = Describe("ResourcePool Tests", Label("resourcepool"), func() {
 			err := k8sClient.Create(context.TODO(), claim)
 			Expect(err).Should(Succeed(), "Failed to create Claim %s", claim)
 
-			isSuccessfullyBoundToPool(pool, claim)
-
-			err = k8sClient.Get(context.TODO(), client.ObjectKey{Name: claim.Name, Namespace: claim.Namespace}, claim)
-			Expect(err).Should(Succeed())
-
-			Expect(claim.Status.Condition.Reason).To(Equal(meta.SucceededReason))
-			Expect(claim.Status.Condition.Status).To(Equal(metav1.ConditionTrue))
-			Expect(claim.Status.Condition.Type).To(Equal(meta.BoundCondition))
+			isSuccessfullyBoundAndUnsedToPool(pool, claim)
 		})
 
 		By("Create claims", func() {
@@ -1805,14 +1789,7 @@ var _ = Describe("ResourcePool Tests", Label("resourcepool"), func() {
 			err := k8sClient.Create(context.TODO(), claim)
 			Expect(err).Should(Succeed(), "Failed to create Claim %s", claim)
 
-			isSuccessfullyBoundToPool(pool, claim)
-
-			err = k8sClient.Get(context.TODO(), client.ObjectKey{Name: claim.Name, Namespace: claim.Namespace}, claim)
-			Expect(err).Should(Succeed())
-
-			Expect(claim.Status.Condition.Reason).To(Equal(meta.SucceededReason))
-			Expect(claim.Status.Condition.Status).To(Equal(metav1.ConditionTrue))
-			Expect(claim.Status.Condition.Type).To(Equal(meta.BoundCondition))
+			isSuccessfullyBoundAndUnsedToPool(pool, claim)
 		})
 
 		By("Verify ResourcePool Status Allocation", func() {
@@ -2026,7 +2003,7 @@ var _ = Describe("ResourcePool Tests", Label("resourcepool"), func() {
 	})
 })
 
-func isSuccessfullyBoundToPool(pool *capsulev1beta2.ResourcePool, claim *capsulev1beta2.ResourcePoolClaim) {
+func isSuccessfullyBoundAndUnsedToPool(pool *capsulev1beta2.ResourcePool, claim *capsulev1beta2.ResourcePoolClaim) {
 	fetchedPool := &capsulev1beta2.ResourcePool{}
 	err := k8sClient.Get(context.TODO(), client.ObjectKey{Name: pool.Name}, fetchedPool)
 	Expect(err).Should(Succeed())
@@ -2040,9 +2017,32 @@ func isSuccessfullyBoundToPool(pool *capsulev1beta2.ResourcePool, claim *capsule
 	Expect(fetchedClaim.Status.Pool.Name.String()).To(Equal(fetchedPool.Name))
 	Expect(fetchedClaim.Status.Pool.UID).To(Equal(fetchedPool.GetUID()))
 
-	Expect(fetchedClaim.Status.Condition.Type).To(Equal(meta.BoundCondition))
-	Expect(fetchedClaim.Status.Condition.Status).To(Equal(metav1.ConditionTrue))
-	Expect(fetchedClaim.Status.Condition.Reason).To(Equal(meta.SucceededReason))
+	bound := fetchedClaim.Status.Conditions.GetConditionByType(meta.BoundCondition)
+
+	Expect(bound.Type).To(Equal(meta.BoundCondition))
+	Expect(bound.Status).To(Equal(metav1.ConditionFalse))
+	Expect(bound.Reason).To(Equal(meta.UnusedReason))
+}
+
+func isSuccessfullyBoundAndUsedToPool(pool *capsulev1beta2.ResourcePool, claim *capsulev1beta2.ResourcePoolClaim) {
+	fetchedPool := &capsulev1beta2.ResourcePool{}
+	err := k8sClient.Get(context.TODO(), client.ObjectKey{Name: pool.Name}, fetchedPool)
+	Expect(err).Should(Succeed())
+
+	fetchedClaim := &capsulev1beta2.ResourcePoolClaim{}
+	err = k8sClient.Get(context.TODO(), client.ObjectKey{Name: claim.Name, Namespace: claim.Namespace}, fetchedClaim)
+	Expect(err).Should(Succeed())
+
+	isBoundToPool(fetchedPool, fetchedClaim)
+
+	Expect(fetchedClaim.Status.Pool.Name.String()).To(Equal(fetchedPool.Name))
+	Expect(fetchedClaim.Status.Pool.UID).To(Equal(fetchedPool.GetUID()))
+
+	bound := fetchedClaim.Status.Conditions.GetConditionByType(meta.BoundCondition)
+
+	Expect(bound.Type).To(Equal(meta.BoundCondition))
+	Expect(bound.Status).To(Equal(metav1.ConditionTrue))
+	Expect(bound.Reason).To(Equal(meta.InUseReason))
 }
 
 func isBoundToPool(pool *capsulev1beta2.ResourcePool, claim *capsulev1beta2.ResourcePoolClaim) bool {

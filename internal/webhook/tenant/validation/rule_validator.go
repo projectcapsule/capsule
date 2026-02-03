@@ -14,19 +14,23 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	"github.com/projectcapsule/capsule/internal/webhook/utils"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
 
 type RuleValidationHandler struct{}
 
-func RuleHandler() handlers.Handler {
+func RuleHandler() handlers.TypedHandler[*capsulev1beta2.Tenant] {
 	return &RuleValidationHandler{}
 }
 
-func (h *RuleValidationHandler) OnCreate(_ client.Client, decoder admission.Decoder, _ events.EventRecorder) handlers.Func {
+func (h *RuleValidationHandler) OnCreate(
+	_ client.Client,
+	tnt *capsulev1beta2.Tenant,
+	decoder admission.Decoder,
+	_ events.EventRecorder,
+) handlers.Func {
 	return func(_ context.Context, req admission.Request) *admission.Response {
-		if err := ValidateRule(decoder, req); err != nil {
+		if err := ValidateRule(tnt, req); err != nil {
 			return err
 		}
 
@@ -34,15 +38,21 @@ func (h *RuleValidationHandler) OnCreate(_ client.Client, decoder admission.Deco
 	}
 }
 
-func (h *RuleValidationHandler) OnDelete(client.Client, admission.Decoder, events.EventRecorder) handlers.Func {
+func (h *RuleValidationHandler) OnDelete(client.Client, *capsulev1beta2.Tenant, admission.Decoder, events.EventRecorder) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (h *RuleValidationHandler) OnUpdate(_ client.Client, decoder admission.Decoder, _ events.EventRecorder) handlers.Func {
+func (h *RuleValidationHandler) OnUpdate(
+	_ client.Client,
+	tnt *capsulev1beta2.Tenant,
+	old *capsulev1beta2.Tenant,
+	decoder admission.Decoder,
+	_ events.EventRecorder,
+) handlers.Func {
 	return func(_ context.Context, req admission.Request) *admission.Response {
-		if response := ValidateRule(decoder, req); response != nil {
+		if response := ValidateRule(tnt, req); response != nil {
 			return response
 		}
 
@@ -50,12 +60,7 @@ func (h *RuleValidationHandler) OnUpdate(_ client.Client, decoder admission.Deco
 	}
 }
 
-func ValidateRule(decoder admission.Decoder, req admission.Request) *admission.Response {
-	tnt := &capsulev1beta2.Tenant{}
-	if err := decoder.Decode(req, tnt); err != nil {
-		return utils.ErroredResponse(err)
-	}
-
+func ValidateRule(tnt *capsulev1beta2.Tenant, req admission.Request) *admission.Response {
 	if len(tnt.Spec.Rules) == 0 {
 		return nil
 	}

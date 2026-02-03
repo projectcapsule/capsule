@@ -1,72 +1,112 @@
-// Copyright 2020-2025 Project Capsule Authors
-// SPDX-License-Identifier: Apache-2.0
-
 package predicates_test
 
 import (
 	"testing"
 
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	. "github.com/onsi/gomega"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 
 	"github.com/projectcapsule/capsule/pkg/runtime/predicates"
 )
 
-func TestUpdatedMetadataPredicate_StaticFuncs(t *testing.T) {
-	t.Parallel()
-
+func TestUpdatedLabelsPredicate_StaticEvents(t *testing.T) {
+	g := NewWithT(t)
 	p := predicates.UpdatedLabelsPredicate{}
 
-	if got := p.Generic(event.GenericEvent{}); got {
-		t.Fatalf("Generic() = %v, want false", got)
-	}
-	if got := p.Create(event.CreateEvent{}); !got {
-		t.Fatalf("Create() = %v, want true", got)
-	}
-	if got := p.Delete(event.DeleteEvent{}); !got {
-		t.Fatalf("Delete() = %v, want true", got)
-	}
+	g.Expect(p.Create(event.CreateEvent{})).To(BeTrue())
+	g.Expect(p.Delete(event.DeleteEvent{})).To(BeTrue())
+	g.Expect(p.Generic(event.GenericEvent{})).To(BeFalse())
 }
 
-func TestUpdatedMetadataPredicate_Update(t *testing.T) {
-	t.Parallel()
+func TestUpdatedLabelsPredicate_Update(t *testing.T) {
+	pod := func(labels map[string]string) *corev1.Pod {
+		return &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: "default",
+				Name:      "p",
+				Labels:    labels,
+			},
+		}
+	}
 
 	p := predicates.UpdatedLabelsPredicate{}
-
-	mk := func(lbl map[string]string) *unstructured.Unstructured {
-		u := &unstructured.Unstructured{}
-		u.SetAPIVersion("v1")
-		u.SetKind("ConfigMap")
-		u.SetName("cm")
-		u.SetNamespace("ns")
-		u.SetLabels(lbl)
-		return u
-	}
 
 	tests := []struct {
 		name string
-		old  map[string]string
-		new  map[string]string
+		old  *corev1.Pod
+		new  *corev1.Pod
 		want bool
 	}{
-		{"both nil", nil, nil, false},
-		{"nil to empty", nil, map[string]string{}, false},
-		{"same labels", map[string]string{"a": "1"}, map[string]string{"a": "1"}, false},
-		{"label added", nil, map[string]string{"a": "1"}, true},
-		{"label removed", map[string]string{"a": "1"}, nil, true},
-		{"label value changed", map[string]string{"a": "1"}, map[string]string{"a": "2"}, true},
-		{"label key changed", map[string]string{"a": "1"}, map[string]string{"b": "1"}, true},
+		{
+			name: "nil old => false",
+			old:  pod(nil),
+			new:  pod(map[string]string{"a": "1"}),
+			want: true,
+		},
+		{
+			name: "nil new => false",
+			old:  pod(map[string]string{"a": "1"}),
+			new:  pod(nil),
+			want: true,
+		},
+		{
+			name: "both nil => false",
+			old:  pod(nil),
+			new:  pod(nil),
+			want: false,
+		},
+		{
+			name: "labels unchanged => false",
+			old:  pod(map[string]string{"a": "1", "b": "2"}),
+			new:  pod(map[string]string{"b": "2", "a": "1"}), // order irrelevant
+			want: false,
+		},
+		{
+			name: "label value changed => true",
+			old:  pod(map[string]string{"a": "1"}),
+			new:  pod(map[string]string{"a": "2"}),
+			want: true,
+		},
+		{
+			name: "label added => true",
+			old:  pod(map[string]string{"a": "1"}),
+			new:  pod(map[string]string{"a": "1", "b": "2"}),
+			want: true,
+		},
+		{
+			name: "label removed => true",
+			old:  pod(map[string]string{"a": "1", "b": "2"}),
+			new:  pod(map[string]string{"a": "1"}),
+			want: true,
+		},
+		{
+			name: "nil vs empty labels => unchanged (MapEqual treats both len==0 as equal)",
+			old:  pod(nil),
+			new:  pod(map[string]string{}),
+			want: false,
+		},
+		{
+			name: "empty vs nil labels => unchanged (MapEqual treats both len==0 as equal)",
+			old:  pod(map[string]string{}),
+			new:  pod(nil),
+			want: false,
+		},
 	}
 
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
+			g := NewWithT(t)
 
-			ev := event.UpdateEvent{ObjectOld: mk(tt.old), ObjectNew: mk(tt.new)}
-			if got := p.Update(ev); got != tt.want {
-				t.Fatalf("Update() = %v, want %v", got, tt.want)
+			ev := event.UpdateEvent{
+				ObjectOld: tt.old,
+				ObjectNew: tt.new,
 			}
+
+			got := p.Update(ev)
+			g.Expect(got).To(Equal(tt.want))
 		})
 	}
 }

@@ -18,7 +18,7 @@ func (w *poolmutation) GetHandlers() []handlers.Handler {
 }
 
 func (w *poolmutation) GetPath() string {
-	return "/resourcepool/mutating"
+	return "/resourcepools/mutating"
 }
 
 type poolclaimmutation struct {
@@ -34,7 +34,7 @@ func (w *poolclaimmutation) GetHandlers() []handlers.Handler {
 }
 
 func (w *poolclaimmutation) GetPath() string {
-	return "/resourcepool/claim/mutating"
+	return "/resourcepools/claim/mutating"
 }
 
 type poolValidation struct {
@@ -50,7 +50,7 @@ func (w *poolValidation) GetHandlers() []handlers.Handler {
 }
 
 func (w *poolValidation) GetPath() string {
-	return "/resourcepool/validating"
+	return "/resourcepools/validating"
 }
 
 type poolclaimValidation struct {
@@ -66,5 +66,5 @@ func (w *poolclaimValidation) GetHandlers() []handlers.Handler {
 }
 
 func (w *poolclaimValidation) GetPath() string {
-	return "/resourcepool/claim/validating"
+	return "/resourcepools/claim/validating"
 }

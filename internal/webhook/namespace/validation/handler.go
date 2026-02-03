@@ -67,32 +67,6 @@ func (h *handler) OnCreate(c client.Client, decoder admission.Decoder, recorder 
 
 func (h *handler) OnDelete(c client.Client, decoder admission.Decoder, recorder events.EventRecorder) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		userIsAdmin := users.IsAdminUser(req, h.cfg.Administrators())
-
-		if !userIsAdmin && !users.IsCapsuleUser(ctx, c, h.cfg, req.UserInfo.Username, req.UserInfo.Groups) {
-			return nil
-		}
-
-		ns := &corev1.Namespace{}
-		if err := decoder.DecodeRaw(req.OldObject, ns); err != nil {
-			return utils.ErroredResponse(err)
-		}
-
-		tnt, err := h.verifyReference(ctx, c, ns)
-		if err != nil {
-			return utils.ErroredResponse(err)
-		}
-
-		if tnt == nil {
-			return nil
-		}
-
-		for _, hndl := range h.handlers {
-			if response := hndl.OnDelete(c, ns, decoder, recorder, tnt)(ctx, req); response != nil {
-				return response
-			}
-		}
-
 		return nil
 	}
 }

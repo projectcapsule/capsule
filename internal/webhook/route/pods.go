@@ -18,5 +18,5 @@ func (w *pod) GetHandlers() []handlers.Handler {
 }
 
 func (w *pod) GetPath() string {
-	return "/pods"
+	return "/pods/validating"
 }

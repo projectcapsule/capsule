@@ -30,7 +30,7 @@ func CollectOwners(
 		saList := &corev1.ServiceAccountList{}
 		if err := c.List(ctx, saList,
 			client.MatchingLabels{
-				meta.OwnerPromotionLabel: meta.OwnerPromotionLabelTrigger,
+				meta.OwnerPromotionLabel: meta.ValueTrue,
 			},
 		); err != nil {
 			return nil, err

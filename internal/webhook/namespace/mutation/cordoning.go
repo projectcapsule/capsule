@@ -93,7 +93,7 @@ func (h *cordoningLabelHandler) handle(
 		return nil
 	}
 
-	ns.Labels[meta.CordonedLabel] = "true"
+	ns.Labels[meta.CordonedLabel] = meta.ValueTrue
 
 	marshaled, err := json.Marshal(ns)
 	if err != nil {

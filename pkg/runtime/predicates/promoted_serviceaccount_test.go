@@ -49,7 +49,7 @@ func TestPromotedServiceaccountPredicate_CreateDelete(t *testing.T) {
 			t.Fatalf("Create() = %v, want false (wrong value)", got)
 		}
 
-		if got := p.Create(event.CreateEvent{Object: mk(map[string]string{meta.OwnerPromotionLabel: meta.OwnerPromotionLabelTrigger})}); !got {
+		if got := p.Create(event.CreateEvent{Object: mk(map[string]string{meta.OwnerPromotionLabel: meta.ValueTrue})}); !got {
 			t.Fatalf("Create() = %v, want true (trigger)", got)
 		}
 	})
@@ -65,7 +65,7 @@ func TestPromotedServiceaccountPredicate_CreateDelete(t *testing.T) {
 			t.Fatalf("Delete() = %v, want false (wrong value)", got)
 		}
 
-		if got := p.Delete(event.DeleteEvent{Object: mk(map[string]string{meta.OwnerPromotionLabel: meta.OwnerPromotionLabelTrigger})}); !got {
+		if got := p.Delete(event.DeleteEvent{Object: mk(map[string]string{meta.OwnerPromotionLabel: meta.ValueTrue})}); !got {
 			t.Fatalf("Delete() = %v, want true (trigger)", got)
 		}
 	})
@@ -93,8 +93,8 @@ func TestPromotedServiceaccountPredicate_Update(t *testing.T) {
 		want bool
 	}{
 		{"no label in either", nil, nil, false},
-		{"label added", nil, map[string]string{meta.OwnerPromotionLabel: meta.OwnerPromotionLabelTrigger}, true},
-		{"label removed", map[string]string{meta.OwnerPromotionLabel: meta.OwnerPromotionLabelTrigger}, nil, true},
+		{"label added", nil, map[string]string{meta.OwnerPromotionLabel: meta.ValueTrue}, true},
+		{"label removed", map[string]string{meta.OwnerPromotionLabel: meta.ValueTrue}, nil, true},
 		{"label value changed", map[string]string{meta.OwnerPromotionLabel: "a"}, map[string]string{meta.OwnerPromotionLabel: "b"}, true},
 		{"label unchanged", map[string]string{meta.OwnerPromotionLabel: "a"}, map[string]string{meta.OwnerPromotionLabel: "a"}, false},
 	}

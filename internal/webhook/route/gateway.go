@@ -18,5 +18,5 @@ func (w *gateway) GetHandlers() []handlers.Handler {
 }
 
 func (w *gateway) GetPath() string {
-	return "/gateways"
+	return "/gateways/validating"
 }

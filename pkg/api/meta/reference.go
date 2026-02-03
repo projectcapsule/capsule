@@ -3,6 +3,8 @@
 
 package meta
 
+import k8stypes "k8s.io/apimachinery/pkg/types"
+
 // NamespaceName must be a lowercase RFC1123 label.
 // +kubebuilder:validation:Pattern=^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
 // +kubebuilder:validation:MaxLength=63
@@ -81,6 +83,33 @@ type NamespacedObjectReferenceWithNamespace struct {
 // namespace. But the namespace is required.
 // +kubebuilder:object:generate=true
 type NamespacedRFC1123ObjectReferenceWithNamespace struct {
+	// Name of the referent.
+	// +required
+	Name RFC1123Name `json:"name"`
+
+	// Namespace of the referent.
+	// +required
+	Namespace RFC1123SubdomainName `json:"namespace,omitempty"`
+}
+
+type LocalRFC1123ObjectReferenceWithUID struct {
+	// UID of the tracked Tenant to pin point tracking
+	// +required
+	k8stypes.UID `json:"uid,omitempty" protobuf:"bytes,5,opt,name=uid"`
+
+	// Name of the referent.
+	// +required
+	Name RFC1123Name `json:"name,omitempty"`
+}
+
+// NamespacedObjectReference contains enough information to locate the referenced Kubernetes resource object in any
+// namespace. But the namespace is required.
+// +kubebuilder:object:generate=true
+type NamespacedRFC1123ObjectReferenceWithNamespaceWithUID struct {
+	// UID of the tracked Tenant to pin point tracking
+	// +required
+	k8stypes.UID `json:"uid,omitempty" protobuf:"bytes,5,opt,name=uid"`
+
 	// Name of the referent.
 	// +required
 	Name RFC1123Name `json:"name"`

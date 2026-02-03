@@ -10,14 +10,52 @@ metadata:
   annotations:
     {{- include "admission.annotations" . | nindent 4 }}
 webhooks:
-{{- with .Values.webhooks.hooks.cordoning }}
+{{- with .Values.webhooks.hooks.customresources }}
   {{- if .enabled }}
-- name: cordoning.tenant.projectcapsule.dev
+- name: customresources.misc.projectcapsule.dev
   admissionReviewVersions:
     - v1
     - v1beta1
   clientConfig:
-    {{- include "capsule.webhooks.service" (dict "path" "/cordoning" "ctx" $) | nindent 4 }}
+    {{- include "capsule.webhooks.service" (dict "path" "/misc/customresources" "ctx" $) | nindent 4 }}
+  failurePolicy:  {{ .failurePolicy }}
+  matchPolicy: {{ .matchPolicy }}
+  {{- with .namespaceSelector }}
+  namespaceSelector:
+    {{- toYaml . |  nindent 4 }}
+  {{- end }}
+  {{- with .objectSelector }}
+  objectSelector:
+    {{- toYaml . |  nindent 4 }}
+  {{- end }}
+  {{- with .matchConditions }}
+  matchConditions:
+    {{- toYaml . |  nindent 4 }}
+  {{- end }}
+  rules:
+    - apiGroups:
+        - '*'
+      apiVersions:
+        - '*'
+      operations:
+        - CREATE
+        - UPDATE
+        - DELETE
+      resources:
+        - '*'
+      scope: Namespaced
+  sideEffects: None
+  timeoutSeconds: {{ $.Values.webhooks.validatingWebhooksTimeoutSeconds }}
+  {{- end }}
+{{- end }}
+{{- with .Values.webhooks.hooks.cordoning }}
+  {{- if .enabled }}
+- name: cordoning.misc.projectcapsule.dev
+  admissionReviewVersions:
+    - v1
+    - v1beta1
+  clientConfig:
+    {{- include "capsule.webhooks.service" (dict "path" "/misc/cordoning" "ctx" $) | nindent 4 }}
   failurePolicy: {{ .failurePolicy }}
   matchPolicy: {{ .matchPolicy }}
   {{- with .namespaceSelector }}
@@ -47,7 +85,7 @@ webhooks:
     - v1
     - v1beta1
   clientConfig:
-    {{- include "capsule.webhooks.service" (dict "path" "/devices" "ctx" $) | nindent 4 }}
+    {{- include "capsule.webhooks.service" (dict "path" "/devices/validating" "ctx" $) | nindent 4 }}
   failurePolicy: {{ .failurePolicy }}
   matchPolicy: {{ .matchPolicy }}
   {{- with .namespaceSelector }}
@@ -85,7 +123,7 @@ webhooks:
     - v1
     - v1beta1
   clientConfig:
-    {{- include "capsule.webhooks.service" (dict "path" "/gateways" "ctx" $) | nindent 4 }}
+    {{- include "capsule.webhooks.service" (dict "path" "/gateways/validating" "ctx" $) | nindent 4 }}
   failurePolicy: {{ .failurePolicy }}
   matchPolicy: {{ .matchPolicy }}
   {{- with .namespaceSelector }}
@@ -122,7 +160,7 @@ webhooks:
     - v1
     - v1beta1
   clientConfig:
-    {{- include "capsule.webhooks.service" (dict "path" "/ingresses" "ctx" $) | nindent 4 }}
+    {{- include "capsule.webhooks.service" (dict "path" "/ingresses/validating" "ctx" $) | nindent 4 }}
   failurePolicy: {{ .failurePolicy }}
   matchPolicy: {{ .matchPolicy }}
   {{- with .namespaceSelector }}
@@ -161,7 +199,7 @@ webhooks:
     - v1
     - v1beta1
   clientConfig:
-    {{- include "capsule.webhooks.service" (dict "path" "/namespaces" "ctx" $) | nindent 4 }}
+    {{- include "capsule.webhooks.service" (dict "path" "/namespaces/validating " "ctx" $) | nindent 4 }}
   failurePolicy: {{ .failurePolicy }}
   matchPolicy: {{ .matchPolicy }}
   {{- with .namespaceSelector }}
@@ -194,43 +232,6 @@ webhooks:
   timeoutSeconds: {{ $.Values.webhooks.validatingWebhooksTimeoutSeconds }}
   {{- end }}
 {{- end }}
-{{- with .Values.webhooks.hooks.networkpolicies }}
-  {{- if .enabled }}
-- name: networkpolicies.projectcapsule.dev
-  admissionReviewVersions:
-    - v1
-    - v1beta1
-  clientConfig:
-    {{- include "capsule.webhooks.service" (dict "path" "/networkpolicies" "ctx" $) | nindent 4 }}
-  failurePolicy: {{ .failurePolicy }}
-  matchPolicy: {{ .matchPolicy }}
-  {{- with .namespaceSelector }}
-  namespaceSelector:
-    {{- toYaml . |  nindent 4 }}
-  {{- end }}
-  {{- with .objectSelector }}
-  objectSelector:
-    {{- toYaml . |  nindent 4 }}
-  {{- end }}
-  {{- with .matchConditions }}
-  matchConditions:
-    {{- toYaml . |  nindent 4 }}
-  {{- end }}
-  rules:
-    - apiGroups:
-        - networking.k8s.io
-      apiVersions:
-        - v1
-      operations:
-        - UPDATE
-        - DELETE
-      resources:
-        - networkpolicies
-      scope: Namespaced
-  sideEffects: None
-  timeoutSeconds: {{ $.Values.webhooks.validatingWebhooksTimeoutSeconds }}
-  {{- end }}
-{{- end }}
 {{- with .Values.webhooks.hooks.nodes }}
   {{- if .enabled }}
 - name: nodes.projectcapsule.dev
@@ -238,7 +239,7 @@ webhooks:
     - v1
     - v1beta1
   clientConfig:
-    {{- include "capsule.webhooks.service" (dict "path" "/nodes" "ctx" $) | nindent 4 }}
+    {{- include "capsule.webhooks.service" (dict "path" "/nodes/validating" "ctx" $) | nindent 4 }}
   failurePolicy: {{ .failurePolicy }}
   matchPolicy: {{ .matchPolicy }}
   {{- with .namespaceSelector }}
@@ -273,7 +274,7 @@ webhooks:
     - v1
     - v1beta1
   clientConfig:
-    {{- include "capsule.webhooks.service" (dict "path" "/pods" "ctx" $) | nindent 4 }}
+    {{- include "capsule.webhooks.service" (dict "path" "/pods/validating" "ctx" $) | nindent 4 }}
   failurePolicy: {{ .failurePolicy }}
   matchPolicy: {{ .matchPolicy }}
   {{- with .namespaceSelector }}
@@ -311,7 +312,7 @@ webhooks:
     - v1
     - v1beta1
   clientConfig:
-    {{- include "capsule.webhooks.service" (dict "path" "/persistentvolumeclaims" "ctx" $) | nindent 4 }}
+    {{- include "capsule.webhooks.service" (dict "path" "/persistentvolumeclaims/validating" "ctx" $) | nindent 4 }}
   failurePolicy: {{ .failurePolicy }}
   matchPolicy: {{ .matchPolicy }}
   {{- with .namespaceSelector }}
@@ -347,7 +348,7 @@ webhooks:
     - v1
     - v1beta1
   clientConfig:
-    {{- include "capsule.webhooks.service" (dict "path" "/services" "ctx" $) | nindent 4 }}
+    {{- include "capsule.webhooks.service" (dict "path" "/services/validating" "ctx" $) | nindent 4 }}
   failurePolicy: {{ .failurePolicy }}
   matchPolicy: {{ .matchPolicy }}
   {{- with .namespaceSelector }}
@@ -449,7 +450,7 @@ webhooks:
     - v1
     - v1beta1
   clientConfig:
-    {{- include "capsule.webhooks.service" (dict "path" "/resourcepool/validating" "ctx" $) | nindent 4 }}
+    {{- include "capsule.webhooks.service" (dict "path" "/resourcepools/validating" "ctx" $) | nindent 4 }}
   failurePolicy:  {{ .failurePolicy }}
   matchPolicy: {{ .matchPolicy }}
   {{- with .namespaceSelector }}
@@ -486,7 +487,7 @@ webhooks:
     - v1
     - v1beta1
   clientConfig:
-    {{- include "capsule.webhooks.service" (dict "path" "/resourcepool/claim/validating" "ctx" $) | nindent 4 }}
+    {{- include "capsule.webhooks.service" (dict "path" "/resourcepools/claim/validating" "ctx" $) | nindent 4 }}
   failurePolicy:  {{ .failurePolicy }}
   matchPolicy: {{ .matchPolicy }}
   {{- with .namespaceSelector }}
@@ -517,52 +518,14 @@ webhooks:
   timeoutSeconds: {{ $.Values.webhooks.validatingWebhooksTimeoutSeconds }}
   {{- end }}
 {{- end }}
-{{- with .Values.webhooks.hooks.customresources }}
-  {{- if .enabled }}
-- name: customresources.tenant.projectcapsule.dev
-  admissionReviewVersions:
-    - v1
-    - v1beta1
-  clientConfig:
-    {{- include "capsule.webhooks.service" (dict "path" "/customresources" "ctx" $) | nindent 4 }}
-  failurePolicy:  {{ .failurePolicy }}
-  matchPolicy: {{ .matchPolicy }}
-  {{- with .namespaceSelector }}
-  namespaceSelector:
-    {{- toYaml . |  nindent 4 }}
-  {{- end }}
-  {{- with .objectSelector }}
-  objectSelector:
-    {{- toYaml . |  nindent 4 }}
-  {{- end }}
-  {{- with .matchConditions }}
-  matchConditions:
-    {{- toYaml . |  nindent 4 }}
-  {{- end }}
-  rules:
-    - apiGroups:
-        - '*'
-      apiVersions:
-        - '*'
-      operations:
-        - CREATE
-        - UPDATE
-        - DELETE
-      resources:
-        - '*'
-      scope: Namespaced
-  sideEffects: None
-  timeoutSeconds: {{ $.Values.webhooks.validatingWebhooksTimeoutSeconds }}
-  {{- end }}
-{{- end }}
 {{- with .Values.webhooks.hooks.serviceaccounts }}
   {{- if .enabled }}
-- name: serviceaccounts.tenant.projectcapsule.dev
+- name: serviceaccounts.projectcapsule.dev
   admissionReviewVersions:
     - v1
     - v1beta1
   clientConfig:
-    {{- include "capsule.webhooks.service" (dict "path" "/serviceaccounts" "ctx" $) | nindent 4 }}
+    {{- include "capsule.webhooks.service" (dict "path" "/serviceaccounts/validating" "ctx" $) | nindent 4 }}
   failurePolicy:  {{ .failurePolicy }}
   matchPolicy: {{ .matchPolicy }}
   {{- with .namespaceSelector }}
