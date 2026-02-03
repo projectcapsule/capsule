@@ -18,5 +18,5 @@ func (w *service) GetHandlers() []handlers.Handler {
 }
 
 func (w *service) GetPath() string {
-	return "/services"
+	return "/services/validating"
 }

@@ -71,7 +71,7 @@ func (r *Manager) SetupWithManager(ctx context.Context, mgr ctrl.Manager, ctrlCo
 				r.handleSAChange(ctx, e.Object)
 			},
 			UpdateFunc: func(ctx context.Context, e event.TypedUpdateEvent[client.Object], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
-				if predicates.LabelsChanged([]string{meta.OwnerPromotionLabel}, e.ObjectOld.GetLabels(), e.ObjectNew.GetLabels()) {
+				if meta.LabelsChanged([]string{meta.OwnerPromotionLabel}, e.ObjectOld.GetLabels(), e.ObjectNew.GetLabels()) {
 					r.handleSAChange(ctx, e.ObjectNew)
 				}
 			},
@@ -168,7 +168,7 @@ func (r *Manager) EnsureClusterRoleBindingsProvisioner(ctx context.Context) erro
 			if r.Configuration.AllowServiceAccountPromotion() {
 				saList := &corev1.ServiceAccountList{}
 				if err := r.Client.List(ctx, saList, client.MatchingLabels{
-					meta.OwnerPromotionLabel: meta.OwnerPromotionLabelTrigger,
+					meta.OwnerPromotionLabel: meta.ValueTrue,
 				}); err != nil {
 					return err
 				}

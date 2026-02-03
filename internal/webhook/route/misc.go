@@ -5,6 +5,22 @@ package route
 
 import "github.com/projectcapsule/capsule/pkg/runtime/handlers"
 
+type miscCustomResourcesHandler struct {
+	handlers []handlers.Handler
+}
+
+func MiscCustomResources(handlers ...handlers.Handler) handlers.Webhook {
+	return &miscCustomResourcesHandler{handlers: handlers}
+}
+
+func (w *miscCustomResourcesHandler) GetHandlers() []handlers.Handler {
+	return w.handlers
+}
+
+func (w *miscCustomResourcesHandler) GetPath() string {
+	return "/misc/customresources"
+}
+
 type miscTenantAssignment struct {
 	handlers []handlers.Handler
 }

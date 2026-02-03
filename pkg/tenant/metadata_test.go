@@ -72,10 +72,9 @@ func TestAddTenantNameLabel(t *testing.T) {
 	t.Parallel()
 
 	labels := map[string]string{}
-	n := ns("myns", "u1")
 	tt := tenantWithName("mytenant")
 
-	tenant.AddTenantNameLabel(labels, n, tt)
+	tenant.AddTenantNameLabel(labels, tt)
 
 	if got := labels[meta.TenantLabel]; got != "mytenant" {
 		t.Fatalf("expected %s to be %q, got %q", meta.TenantLabel, "mytenant", got)

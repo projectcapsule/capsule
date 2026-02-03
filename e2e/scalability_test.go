@@ -9,6 +9,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -49,6 +50,7 @@ var _ = Describe("verify scalability", Label("scalability"), func() {
 
 	It("verify lifecycle (scalability)", func() {
 		const amount = 50
+		const podsPerNamespace int32 = 1
 
 		getTenant := func() *capsulev1beta2.Tenant {
 			t := &capsulev1beta2.Tenant{}
@@ -123,6 +125,15 @@ var _ = Describe("verify scalability", Label("scalability"), func() {
 			waitSize(uint(i + 1))
 			waitInstancePresent(ns)
 
+			// --- NEW: create low-impact traffic pods in the namespace ---
+			dep := newTrafficDeployment(ns.GetName(), podsPerNamespace)
+			EventuallyCreation(func() error {
+				return k8sClient.Create(context.TODO(), dep)
+			}).Should(Succeed())
+
+			// Wait until pods are actually scheduled & ready
+			waitDeploymentReady(context.TODO(), ns.GetName(), dep.Name, podsPerNamespace)
+
 			namespaces = append(namespaces, ns)
 		}
 
@@ -139,3 +150,56 @@ var _ = Describe("verify scalability", Label("scalability"), func() {
 	})
 
 })
+
+func newTrafficDeployment(ns string, replicas int32) *appsv1.Deployment {
+	labels := map[string]string{"app": "traffic-pause"}
+
+	return &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "traffic-pause",
+			Namespace: ns,
+		},
+		Spec: appsv1.DeploymentSpec{
+			Replicas: &replicas,
+			Selector: &metav1.LabelSelector{MatchLabels: labels},
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{Labels: labels},
+				Spec: corev1.PodSpec{
+					// pause container keeps footprint tiny
+					Containers: []corev1.Container{
+						{
+							Name:  "pause",
+							Image: "registry.k8s.io/pause:3.9",
+							// No resources specified => requests/limits default to zero.
+							// Resources: corev1.ResourceRequirements{},
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func scaleDeployment(ctx context.Context, ns, name string, replicas int32) {
+	Eventually(func() error {
+		d := &appsv1.Deployment{}
+		if err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: name}, d); err != nil {
+			return err
+		}
+		*d.Spec.Replicas = replicas
+		return k8sClient.Update(ctx, d)
+	}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+
+	waitDeploymentReady(ctx, ns, name, replicas)
+}
+
+func waitDeploymentReady(ctx context.Context, ns, name string, replicas int32) {
+	Eventually(func() (int32, error) {
+		d := &appsv1.Deployment{}
+		err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: name}, d)
+		if err != nil {
+			return 0, err
+		}
+		return d.Status.ReadyReplicas, nil
+	}, defaultTimeoutInterval, defaultPollInterval).Should(Equal(replicas))
+}

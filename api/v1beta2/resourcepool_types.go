@@ -7,13 +7,13 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/projectcapsule/capsule/pkg/api/misc"
+	"github.com/projectcapsule/capsule/pkg/runtime/selectors"
 )
 
 // ResourcePoolSpec.
 type ResourcePoolSpec struct {
 	// Selector to match the namespaces that should be managed by the GlobalResourceQuota
-	Selectors []misc.NamespaceSelector `json:"selectors,omitempty"`
+	Selectors []selectors.NamespaceSelector `json:"selectors,omitempty"`
 	// Define the resourcequota served by this resourcepool.
 	Quota corev1.ResourceQuotaSpec `json:"quota"`
 	// The Defaults given for each namespace, the default is not counted towards the total allocation
@@ -27,7 +27,7 @@ type ResourcePoolSpec struct {
 }
 
 type ResourcePoolSpecConfiguration struct {
-	// With this option all resources which can be allocated are set to 0 for the resourcequota defaults.
+	// With this option all resources which can be allocated are set to 0 for the resourcequota defaults. (Default false)
 	// +kubebuilder:default=false
 	DefaultsAssignZero *bool `json:"defaultsZero,omitempty"`
 	// Claims are queued whenever they are allocated to a pool. A pool tries to allocate claims in order based on their
@@ -35,11 +35,11 @@ type ResourcePoolSpecConfiguration struct {
 	// but if a lower priority claim still has enough space in the available resources, it will be able to claim them. Eventough
 	// it's priority was lower
 	// Enabling this option respects to Order. Meaning the Creationtimestamp matters and if a resource is put into the queue, no
-	// other claim can claim the same resources with lower priority.
+	// other claim can claim the same resources with lower priority. (Default false)
 	// +kubebuilder:default=false
 	OrderedQueue *bool `json:"orderedQueue,omitempty"`
 	// When a resourcepool is deleted, the resourceclaims bound to it are disassociated from the resourcepool but not deleted.
-	// By Enabling this option, the resourceclaims will be deleted when the resourcepool is deleted, if they are in bound state.
+	// By Enabling this option, the resourceclaims will be deleted when the resourcepool is deleted, if they are in bound state. (Default false)
 	// +kubebuilder:default=false
 	DeleteBoundResources *bool `json:"deleteBoundResources,omitempty"`
 }
@@ -49,6 +49,8 @@ type ResourcePoolSpecConfiguration struct {
 // +kubebuilder:resource:scope=Cluster,shortName=quotapool
 // +kubebuilder:printcolumn:name="Claims",type="integer",JSONPath=".status.claimCount",description="The total amount of Claims bound"
 // +kubebuilder:printcolumn:name="Namespaces",type="integer",JSONPath=".status.namespaceCount",description="The total amount of Namespaces considered"
+// +kubebuilder:printcolumn:name="Ready",type="string",JSONPath=".status.conditions[?(@.type==\"Ready\")].status",description="Reconcile Status"
+// +kubebuilder:printcolumn:name="Status",type="string",JSONPath=".status.conditions[?(@.type==\"Ready\")].message",description="Reconcile Message"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp",description="Age"
 
 // Resourcepools allows you to define a set of resources as known from ResoureQuotas. The Resourcepools are defined at cluster-scope an should

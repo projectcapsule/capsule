@@ -14,7 +14,7 @@ func Cordoning(handlers ...handlers.Handler) handlers.Webhook {
 }
 
 func (w cordoning) GetPath() string {
-	return "/cordoning"
+	return "/misc/cordoning"
 }
 
 func (w cordoning) GetHandlers() []handlers.Handler {

@@ -6,7 +6,6 @@ package gateway
 import (
 	"context"
 
-	"k8s.io/apimachinery/pkg/fields"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	v1 "sigs.k8s.io/gateway-api/apis/v1"
 
@@ -15,9 +14,7 @@ import (
 
 func TenantFromGateway(ctx context.Context, c client.Client, gateway *v1.Gateway) (*capsulev1beta2.Tenant, error) {
 	tenantList := &capsulev1beta2.TenantList{}
-	if err := c.List(ctx, tenantList, client.MatchingFieldsSelector{
-		Selector: fields.OneTermEqualSelector(".status.namespaces", gateway.Namespace),
-	}); err != nil {
+	if err := c.List(ctx, tenantList, client.MatchingFields{".status.namespaces": gateway.Namespace}); err != nil {
 		return nil, err
 	}
 

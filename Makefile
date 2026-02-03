@@ -100,6 +100,7 @@ helm-test-exec: ct helm-controller-version ko-build-all
 	$(MAKE) e2e-load-image CLUSTER_NAME=capsule-charts IMAGE=$(CAPSULE_IMG) VERSION=v0.0.0
 	@$(KUBECTL) create ns capsule-system || true
 	$(MAKE) dev-install-deps
+	$(MAKE) dev-install-grafana-operator-crds
 	@$(CT) install --config $(SRC_ROOT)/.github/configs/ct.yaml --namespace=capsule-system --all --debug
 
 # Setup development env
@@ -111,7 +112,7 @@ dev-build: kind
 dev-destroy: kind
 	$(KIND) delete cluster --name capsule
 
-dev-install-deps: dev-setup-fluxcd dev-setup-cert-manager dev-install-gw-api-crds dev-install-grafana-operator-crds dev-install-prometheus-crds wait-for-helmreleases
+dev-install-deps: dev-setup-fluxcd dev-setup-cert-manager dev-install-gw-api-crds  wait-for-helmreleases
 
 API_GW         := none
 API_GW_VERSION := v1.3.0
@@ -171,6 +172,7 @@ dev-setup:
 	export CA_BUNDLE=`openssl base64 -in /tmp/k8s-webhook-server/serving-certs/tls.crt | tr -d '\n'`; \
 	$(HELM) upgrade \
 	    --dependency-update \
+		--force-conflicts \
 		--debug \
 		--install \
 		--namespace capsule-system \
@@ -226,6 +228,8 @@ dev-setup-capsule-example: dev-setup-fluxcd
 	@$(KUBECTL) create ns green-prod --as bob --as-group projectcapsule.dev || true
 	@$(KUBECTL) create ns solar-test --as alice --as-group projectcapsule.dev || true
 	@$(KUBECTL) create ns solar-prod --as alice --as-group projectcapsule.dev || true
+	@$(KUBECTL) apply -f hack/distro/capsule/example-setup/claims.yaml
+
 
 wait-for-helmreleases:
 	@ echo "Waiting for all HelmReleases to have observedGeneration >= 0..."
@@ -233,6 +237,42 @@ wait-for-helmreleases:
 	  sleep 5; \
 	done
 
+
+ENTERPRISE_VERSION  ?= "0.13.0-rc.2"
+ENTERPRISE_REGISTRY ?= "oci.peakscale.ch"
+
+enterprise-prerelease:
+	mkdir -p ./builds
+	$(MAKE) CAPSULE_IMG=$(ENTERPRISE_REGISTRY)/prereleases/images/capsule VERSION=$(ENTERPRISE_VERSION) ko-publish-capsule
+	$(HELM) package ./charts/capsule --app-version=$(ENTERPRISE_VERSION) --version=$(ENTERPRISE_VERSION) --destination ./builds/
+	$(HELM) push ./builds/capsule-$(ENTERPRISE_VERSION).tgz oci://$(ENTERPRISE_REGISTRY)/prereleases/charts/
+	$(MAKE) deploy-enterprise
+	rm -rf ./builds
+
+deploy-enterprise:
+	@echo ""
+	@echo "Deploying Capsule Prerelease (Enterprise) $(ENTERPRISE_VERSION)"
+	@echo ""
+	@echo "1) Create image pull secret (Change the credentials with the ones provided to you):"
+	@echo ""
+	@echo "kubectl create secret docker-registry capsule-enterprise -n capsule-system \\"
+	@echo "  --docker-username='robot\$$name' \\"
+	@echo "  --docker-password='serviceaccount-password' \\"
+	@echo "  --docker-server='$(ENTERPRISE_REGISTRY)'"
+	@echo ""
+	@echo "2) Deploy Capsule:"
+	@echo ""
+	@echo "helm upgrade --install capsule \\"
+	@echo "  oci://$(ENTERPRISE_REGISTRY)/prereleases/charts/capsule \\"
+	@echo "  --namespace capsule-system \\"
+	@echo "  --version $(ENTERPRISE_VERSION) \\"
+	@echo "  --reuse-values \\"
+	@echo "  --set manager.image.registry=$(ENTERPRISE_REGISTRY) \\"
+	@echo "  --set manager.image.repository=prereleases/images/capsule \\"
+	@echo "  --set manager.image.tag=$(ENTERPRISE_VERSION) \\"
+	@echo "  --set manager.image.pullPolicy=Always \\"
+	@echo "  --set 'serviceAccount.imagePullSecrets={capsule-enterprise}'"
+	@echo ""
 
 ####################
 # -- Docker

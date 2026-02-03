@@ -4,3 +4,4 @@ resources:
   - owners.yaml
   - tenants.yaml
   - resource.yaml
+  - pools.yaml

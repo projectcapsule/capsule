@@ -12,46 +12,41 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	"github.com/projectcapsule/capsule/internal/webhook/utils"
 	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
 
 type freezedEmitterHandler struct{}
 
-func FreezedEmitter() handlers.Handler {
+func FreezedEmitter() handlers.TypedHandler[*capsulev1beta2.Tenant] {
 	return &freezedEmitterHandler{}
 }
 
-func (h *freezedEmitterHandler) OnCreate(client.Client, admission.Decoder, events.EventRecorder) handlers.Func {
+func (h *freezedEmitterHandler) OnCreate(client.Client, *capsulev1beta2.Tenant, admission.Decoder, events.EventRecorder) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (h *freezedEmitterHandler) OnDelete(client.Client, admission.Decoder, events.EventRecorder) handlers.Func {
+func (h *freezedEmitterHandler) OnDelete(client.Client, *capsulev1beta2.Tenant, admission.Decoder, events.EventRecorder) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (h *freezedEmitterHandler) OnUpdate(_ client.Client, decoder admission.Decoder, recorder events.EventRecorder) handlers.Func {
+func (h *freezedEmitterHandler) OnUpdate(
+	_ client.Client,
+	tnt *capsulev1beta2.Tenant,
+	old *capsulev1beta2.Tenant,
+	decoder admission.Decoder,
+	recorder events.EventRecorder,
+) handlers.Func {
 	return func(_ context.Context, req admission.Request) *admission.Response {
-		oldTnt := &capsulev1beta2.Tenant{}
-		if err := decoder.DecodeRaw(req.OldObject, oldTnt); err != nil {
-			return utils.ErroredResponse(err)
-		}
-
-		newTnt := &capsulev1beta2.Tenant{}
-		if err := decoder.Decode(req, newTnt); err != nil {
-			return utils.ErroredResponse(err)
-		}
-
 		switch {
-		case !oldTnt.Spec.Cordoned && newTnt.Spec.Cordoned:
-			recorder.Eventf(newTnt, newTnt, corev1.EventTypeNormal, evt.ReasonCordoning, evt.ActionCordoned, "Tenant has been cordoned", "")
-		case oldTnt.Spec.Cordoned && !newTnt.Spec.Cordoned:
-			recorder.Eventf(newTnt, newTnt, corev1.EventTypeNormal, evt.ReasonCordoning, evt.ActionUncordoned, "Tenant has been uncordoned", "")
+		case !old.Spec.Cordoned && tnt.Spec.Cordoned:
+			recorder.Eventf(tnt, tnt, corev1.EventTypeNormal, evt.ReasonCordoning, evt.ActionCordoned, "Tenant has been cordoned", "")
+		case old.Spec.Cordoned && !tnt.Spec.Cordoned:
+			recorder.Eventf(tnt, tnt, corev1.EventTypeNormal, evt.ReasonCordoning, evt.ActionUncordoned, "Tenant has been uncordoned", "")
 		}
 
 		return nil

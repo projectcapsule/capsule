@@ -67,7 +67,10 @@ func (r *Manager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.Controller
 		For(
 			&capsulev1beta2.Tenant{},
 			builder.WithPredicates(
-				predicate.GenerationChangedPredicate{},
+				predicate.Or(
+					predicate.GenerationChangedPredicate{},
+					predicates.UpdatedMetadataPredicate{},
+				),
 			),
 		).
 		Owns(&networkingv1.NetworkPolicy{}).
@@ -282,20 +285,20 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 		return result, nil
 	}
 
-	// Ensuring ResourceQuota
-	r.Log.V(4).Info("ensuring limit resources count is updated")
-
-	if err = r.syncCustomResourceQuotaUsages(ctx, instance); err != nil {
-		err = fmt.Errorf("cannot count limited resources: %w", err)
-
-		return result, err
-	}
-
 	// Reconcile Namespaces
 	r.Log.V(4).Info("starting processing of Namespaces", "items", len(instance.Status.Namespaces))
 
 	if err = r.reconcileNamespaces(ctx, instance); err != nil {
 		err = fmt.Errorf("namespace(s) had reconciliation errors")
+
+		return result, err
+	}
+
+	// Ensuring ResourceQuota
+	r.Log.V(4).Info("ensuring limit resources count is updated")
+
+	if err = r.syncCustomResourceQuotaUsages(ctx, instance); err != nil {
+		err = fmt.Errorf("cannot count limited resources: %w", err)
 
 		return result, err
 	}

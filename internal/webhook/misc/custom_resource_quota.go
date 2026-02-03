@@ -1,7 +1,7 @@
 // Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package validation
+package misc
 
 import (
 	"context"
@@ -17,6 +17,7 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
+	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
 	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 	"github.com/projectcapsule/capsule/pkg/tenant"
@@ -66,7 +67,7 @@ func (r *resourceCounterHandler) OnCreate(clt client.Client, _ admission.Decoder
 
 			used, _ := capsulev1beta2.GetUsedResourceFromTenant(*tnt, kgv)
 			if used >= limit {
-				return NewCustomResourceQuotaError(kgv, limit)
+				return caperrors.NewCustomResourceQuotaError(kgv, limit)
 			}
 
 			tnt.Annotations[capsulev1beta2.UsedAnnotationForResource(kgv)] = fmt.Sprintf("%d", used+1)
@@ -74,7 +75,7 @@ func (r *resourceCounterHandler) OnCreate(clt client.Client, _ admission.Decoder
 			return clt.Update(ctx, tnt)
 		})
 		if err != nil {
-			if errors.As(err, &customResourceQuotaError{}) {
+			if errors.As(err, &caperrors.CustomResourceQuotaError{}) {
 				recorder.Eventf(tnt, nil, corev1.EventTypeWarning, evt.ReasonOverprovision, evt.ActionValidationDenied, "Resource %s/%s in API group %s cannot be created, limit usage of %d has been reached", req.Namespace, req.Name, kgv, limit)
 			}
 

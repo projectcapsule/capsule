@@ -50,6 +50,37 @@ func RemoveLooseOwnerReference(
 	obj.SetOwnerReferences(refs)
 }
 
+// RemoveLooseOwnerReferenceForKindExceptGiven removes all ownerReferences that have the same
+// APIVersion and Kind as the given owner, except the given owner itself (matched by UID).
+// OwnerReferences with different APIVersion/Kind are preserved.
+//
+// If the given owner is not present on the object, all ownerReferences with that APIVersion/Kind
+// are removed.
+func RemoveLooseOwnerReferenceForKindExceptGiven(
+	obj client.Object,
+	owner metav1.OwnerReference,
+) {
+	in := obj.GetOwnerReferences()
+	out := make([]metav1.OwnerReference, 0, len(in))
+
+	for _, ref := range in {
+		sameKind := ref.Kind == owner.Kind
+		sameAPIVersion := ref.APIVersion == owner.APIVersion
+
+		if !sameKind || !sameAPIVersion {
+			out = append(out, ref)
+
+			continue
+		}
+
+		if ref.UID == owner.UID {
+			out = append(out, ref)
+		}
+	}
+
+	obj.SetOwnerReferences(out)
+}
+
 // If not returns false.
 func HasLooseOwnerReference(
 	obj client.Object,

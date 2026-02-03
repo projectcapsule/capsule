@@ -17,6 +17,9 @@ type NamespaceOptions struct {
 	AdditionalMetadata *api.AdditionalMetadataSpec `json:"additionalMetadata,omitempty"`
 	// Specifies additional labels and annotations the Capsule operator places on any Namespace resource in the Tenant via a list. Optional.
 	AdditionalMetadataList []api.AdditionalMetadataSelectorSpec `json:"additionalMetadataList,omitempty"`
+	// Required Metadata for namespace within this tenant
+	// +optional
+	RequiredMetadata *RequiredMetadata `json:"requiredMetadata,omitzero"`
 	// Define the labels that a Tenant Owner cannot set for their Namespace resources.
 	// +optional
 	ForbiddenLabels api.ForbiddenListSpec `json:"forbiddenLabels,omitzero"`
@@ -26,4 +29,14 @@ type NamespaceOptions struct {
 	// If enabled only metadata from additionalMetadata is reconciled to the namespaces.
 	//+kubebuilder:default:=false
 	ManagedMetadataOnly bool `json:"managedMetadataOnly,omitempty"`
+}
+
+type RequiredMetadata struct {
+	// Labels that must be defined for each namespace
+	// +optional
+	Labels map[string]string `json:"labels,omitzero"`
+
+	// Annotations that must be defined for each namespace
+	// +optional
+	Annotations map[string]string `json:"annotations,omitzero"`
 }
