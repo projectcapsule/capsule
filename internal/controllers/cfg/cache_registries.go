@@ -17,7 +17,7 @@ func (r *Manager) getItemsForStatusRegistryCache(ctx context.Context) ([]capsule
 	rsList := &capsulev1beta2.RuleStatusList{}
 	if err := r.List(ctx, rsList,
 		client.MatchingLabels{
-			meta.NewManagedByCapsuleLabel: meta.ControllerValue,
+			meta.NewManagedByCapsuleLabel: meta.ValueController,
 			meta.CapsuleNameLabel:         meta.NameForManagedRuleStatus(),
 		},
 	); err != nil {

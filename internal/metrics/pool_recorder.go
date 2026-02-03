@@ -5,10 +5,12 @@ package metrics
 
 import (
 	"github.com/prometheus/client_golang/prometheus"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	crtlmetrics "sigs.k8s.io/controller-runtime/pkg/metrics"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api/meta"
 )
 
 type ResourcePoolRecorder struct {
@@ -21,6 +23,7 @@ type ResourcePoolRecorder struct {
 	poolResourceExhaustionPercentage     *prometheus.GaugeVec
 	poolNamespaceResourceUsage           *prometheus.GaugeVec
 	poolNamespaceResourceUsagePercentage *prometheus.GaugeVec
+	poolConditions                       *prometheus.GaugeVec
 }
 
 func MustMakeResourcePoolRecorder() *ResourcePoolRecorder {
@@ -88,6 +91,15 @@ func NewResourcePoolRecorder() *ResourcePoolRecorder {
 			},
 			[]string{"pool", "resource"},
 		),
+		poolConditions: prometheus.NewGaugeVec(
+			prometheus.GaugeOpts{
+				Namespace: metricsPrefix,
+				Name:      "pool_condition",
+				Help:      "Current conditions for a given resource in a resource pool",
+			},
+			[]string{"pool", "condition"},
+		),
+
 		poolNamespaceResourceUsage: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
 				Namespace: metricsPrefix,
@@ -118,6 +130,7 @@ func (r *ResourcePoolRecorder) Collectors() []prometheus.Collector {
 		r.poolResourceExhaustionPercentage,
 		r.poolNamespaceResourceUsage,
 		r.poolNamespaceResourceUsagePercentage,
+		r.poolConditions,
 	}
 }
 
@@ -133,6 +146,24 @@ func (r *ResourcePoolRecorder) ResourceUsageMetrics(pool *capsulev1beta2.Resourc
 			pool.Name,
 			resourceName.String(),
 		).Set(float64(1))
+
+		// Expose Condition Metrics
+		for _, status := range []string{meta.ReadyCondition, meta.ExhaustedCondition} {
+			var value float64
+
+			cond := pool.Status.Conditions.GetConditionByType(status)
+			if cond == nil {
+				r.DeleteConditionMetricByType(pool.Name, status)
+
+				continue
+			}
+
+			if cond.Status == metav1.ConditionTrue {
+				value = 1
+			}
+
+			r.poolConditions.WithLabelValues(pool.GetName(), status).Set(value)
+		}
 
 		claimed, exists := pool.Status.Allocation.Claimed[resourceName]
 		if !exists {
@@ -219,6 +250,13 @@ func (r *ResourcePoolRecorder) DeleteResourcePoolSingleResourceMetric(pool strin
 	r.cleanupAllMetricForLabels(map[string]string{"pool": pool, "resource": resourceName})
 }
 
+func (r *ResourcePoolRecorder) DeleteConditionMetricByType(pool string, condition string) {
+	r.poolConditions.DeletePartialMatch(map[string]string{
+		"pool":      pool,
+		"condition": condition,
+	})
+}
+
 func (r *ResourcePoolRecorder) cleanupAllMetricForLabels(labels map[string]string) {
 	r.poolResourceLimit.DeletePartialMatch(labels)
 	r.poolResourceAvailable.DeletePartialMatch(labels)
@@ -228,6 +266,7 @@ func (r *ResourcePoolRecorder) cleanupAllMetricForLabels(labels map[string]strin
 	r.poolNamespaceResourceUsagePercentage.DeletePartialMatch(labels)
 	r.poolResource.DeletePartialMatch(labels)
 	r.poolResourceExhaustion.DeletePartialMatch(labels)
+	r.poolConditions.DeletePartialMatch(labels)
 }
 
 // Calculate allocation per namespace for metric.

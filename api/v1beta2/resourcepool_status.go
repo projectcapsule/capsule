@@ -8,6 +8,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api/meta"
 )
 
 // GlobalResourceQuotaStatus defines the observed state of GlobalResourceQuota.
@@ -28,6 +29,8 @@ type ResourcePoolStatus struct {
 	Allocation ResourcePoolQuotaStatus `json:"allocation,omitzero"`
 	// Exhaustions from claims associated with the pool
 	Exhaustions map[string]api.PoolExhaustionResource `json:"exhaustions,omitempty"`
+	// Conditions for the resource claim
+	Conditions meta.ConditionList `json:"conditions,omitzero"`
 }
 
 type ResourcePoolNamespaceClaimsStatus map[string]ResourcePoolClaimsList
@@ -60,7 +63,7 @@ func (r *ResourcePoolClaimsList) GetClaimByUID(uid types.UID) *ResourcePoolClaim
 // ResourceQuotaClaimStatus defines the observed state of ResourceQuotaClaim.
 type ResourcePoolClaimsItem struct {
 	// Reference to the GlobalQuota being claimed from
-	api.StatusNameUID `json:",inline"`
+	meta.NamespacedRFC1123ObjectReferenceWithNamespaceWithUID `json:",inline"`
 
 	// Claimed resources
 	Claims corev1.ResourceList `json:"claims,omitempty"`

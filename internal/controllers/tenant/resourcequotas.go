@@ -67,7 +67,7 @@ func (r *Manager) syncResourceQuotas(ctx context.Context, tenant *capsulev1beta2
 				// Requirement to list ResourceQuota of the current Tenant
 				var tntRequirement *labels.Requirement
 
-				if tntRequirement, scopeErr = labels.NewRequirement(meta.TenantLabel, selection.Equals, []string{tenant.Name}); scopeErr != nil {
+				if tntRequirement, scopeErr = labels.NewRequirement(meta.NewTenantLabel, selection.Equals, []string{tenant.Name}); scopeErr != nil {
 					r.Log.Error(scopeErr, "cannot build ResourceQuota Tenant requirement")
 				}
 				// Requirement to list ResourceQuota for the current index
@@ -198,11 +198,7 @@ func (r *Manager) syncResourceQuotas(ctx context.Context, tenant *capsulev1beta2
 
 func (r *Manager) syncResourceQuota(ctx context.Context, tenant *capsulev1beta2.Tenant, namespace string, keys []string) (err error) {
 	// getting ResourceQuota labels for the mutateFn
-	var tenantLabel, typeLabel string
-
-	if tenantLabel, err = utils.GetTypeLabel(&capsulev1beta2.Tenant{}); err != nil {
-		return err
-	}
+	var typeLabel string
 
 	if typeLabel, err = utils.GetTypeLabel(&corev1.ResourceQuota{}); err != nil {
 		return err
@@ -229,8 +225,12 @@ func (r *Manager) syncResourceQuota(ctx context.Context, tenant *capsulev1beta2.
 					targetLabels = map[string]string{}
 				}
 
-				targetLabels[tenantLabel] = tenant.Name
+				targetLabels[meta.NewTenantLabel] = tenant.Name
 				targetLabels[typeLabel] = strconv.Itoa(index)
+				targetLabels[meta.NewManagedByCapsuleLabel] = meta.ValueController
+
+				// Remove Legacy labels
+				delete(targetLabels, meta.TenantLabel)
 
 				target.SetLabels(targetLabels)
 				target.Spec.Scopes = resQuota.Scopes

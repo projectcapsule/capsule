@@ -11,7 +11,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 
-	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api/meta"
 )
 
 func (r *ResourcePool) GetQuotaName() string {
@@ -79,9 +79,10 @@ func (r *ResourcePool) AddClaimToStatus(claim *ResourcePoolClaim) {
 	}
 
 	scl := &ResourcePoolClaimsItem{
-		StatusNameUID: api.StatusNameUID{
-			UID:  claim.UID,
-			Name: api.Name(claim.Name),
+		NamespacedRFC1123ObjectReferenceWithNamespaceWithUID: meta.NamespacedRFC1123ObjectReferenceWithNamespaceWithUID{
+			UID:       claim.UID,
+			Name:      meta.RFC1123Name(claim.Name),
+			Namespace: meta.RFC1123SubdomainName(claim.Namespace),
 		},
 		Claims: claim.Spec.ResourceClaims,
 	}

@@ -11,7 +11,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
-	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/stretchr/testify/assert"
 )
@@ -34,7 +33,7 @@ func TestGetClaimFromStatus(t *testing.T) {
 			Claims: ResourcePoolNamespaceClaimsStatus{
 				ns: {
 					&ResourcePoolClaimsItem{
-						StatusNameUID: api.StatusNameUID{
+						NamespacedRFC1123ObjectReferenceWithNamespaceWithUID: meta.NamespacedRFC1123ObjectReferenceWithNamespaceWithUID{
 							UID: testUID,
 						},
 						Claims: corev1.ResourceList{
@@ -127,8 +126,9 @@ func TestAddRemoveClaimToStatus(t *testing.T) {
 	pool.AddClaimToStatus(claim)
 
 	stored := pool.GetClaimFromStatus(claim)
+
 	assert.NotNil(t, stored)
-	assert.Equal(t, api.Name("claim-1"), stored.Name)
+	assert.Equal(t, meta.RFC1123Name("claim-1"), stored.Name)
 
 	pool.RemoveClaimFromStatus(claim)
 	assert.Nil(t, pool.GetClaimFromStatus(claim))
@@ -219,7 +219,7 @@ func TestGetNamespaceClaims(t *testing.T) {
 			Claims: ResourcePoolNamespaceClaimsStatus{
 				"ns": {
 					&ResourcePoolClaimsItem{
-						StatusNameUID: api.StatusNameUID{UID: "uid1"},
+						NamespacedRFC1123ObjectReferenceWithNamespaceWithUID: meta.NamespacedRFC1123ObjectReferenceWithNamespaceWithUID{UID: "uid1"},
 						Claims: corev1.ResourceList{
 							corev1.ResourceLimitsCPU: resource.MustParse("1"),
 						},
@@ -260,36 +260,59 @@ func TestIsBoundToResourcePool_2(t *testing.T) {
 	t.Run("bound to resource pool (Assigned=True)", func(t *testing.T) {
 		claim := &ResourcePoolClaim{
 			Status: ResourcePoolClaimStatus{
-				Condition: metav1.Condition{
-					Type:   meta.BoundCondition,
-					Status: metav1.ConditionTrue,
-				},
+				Conditions: meta.ConditionList{},
 			},
 		}
-		assert.Equal(t, true, claim.IsBoundToResourcePool())
+
+		assert.Equal(t, false, claim.IsBoundInResourcePool())
 	})
 
 	t.Run("not bound - wrong condition type", func(t *testing.T) {
 		claim := &ResourcePoolClaim{
 			Status: ResourcePoolClaimStatus{
-				Condition: metav1.Condition{
-					Type:   "Other",
-					Status: metav1.ConditionTrue,
+				Conditions: meta.ConditionList{
+					meta.Condition{},
 				},
 			},
 		}
-		assert.Equal(t, false, claim.IsBoundToResourcePool())
+
+		cond := meta.NewAssignedCondition(claim)
+		cond.Status = metav1.ConditionFalse
+		claim.Status.Conditions.UpdateConditionByType(cond)
+
+		assert.Equal(t, false, claim.IsBoundInResourcePool())
 	})
 
 	t.Run("not bound - condition not true", func(t *testing.T) {
 		claim := &ResourcePoolClaim{
 			Status: ResourcePoolClaimStatus{
-				Condition: metav1.Condition{
-					Type:   meta.BoundCondition,
-					Status: metav1.ConditionFalse,
+				Conditions: meta.ConditionList{
+					meta.Condition{},
 				},
 			},
 		}
-		assert.Equal(t, false, claim.IsBoundToResourcePool())
+
+		cond := meta.NewBoundCondition(claim)
+		cond.Status = metav1.ConditionFalse
+		claim.Status.Conditions.UpdateConditionByType(cond)
+
+		assert.Equal(t, false, claim.IsBoundInResourcePool())
 	})
+
+	t.Run("not bound - condition not true", func(t *testing.T) {
+		claim := &ResourcePoolClaim{
+			Status: ResourcePoolClaimStatus{
+				Conditions: meta.ConditionList{
+					meta.Condition{},
+				},
+			},
+		}
+
+		cond := meta.NewBoundCondition(claim)
+		cond.Status = metav1.ConditionTrue
+		claim.Status.Conditions.UpdateConditionByType(cond)
+
+		assert.Equal(t, true, claim.IsBoundInResourcePool())
+	})
+
 }
