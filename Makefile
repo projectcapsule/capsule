@@ -238,7 +238,7 @@ wait-for-helmreleases:
 	done
 
 
-ENTERPRISE_VERSION  ?= "0.13.0-rc.2"
+ENTERPRISE_VERSION  ?= "v1.14.2"
 ENTERPRISE_REGISTRY ?= "oci.peakscale.ch"
 
 enterprise-prerelease:
