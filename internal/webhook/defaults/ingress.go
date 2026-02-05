@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Project Capsule Authors
+// Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package defaults
@@ -8,10 +8,8 @@ import (
 	"encoding/json"
 	"net/http"
 
-	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/version"
-	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
@@ -21,7 +19,7 @@ import (
 	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
 )
 
-func mutateIngressDefaults(ctx context.Context, req admission.Request, version *version.Version, c client.Client, decoder admission.Decoder, recorder record.EventRecorder, namespace string) *admission.Response {
+func mutateIngressDefaults(ctx context.Context, req admission.Request, version *version.Version, c client.Client, decoder admission.Decoder, namespace string) *admission.Response {
 	ingress, err := capsuleingress.FromRequest(req, decoder)
 	if err != nil {
 		return utils.ErroredResponse(err)
@@ -72,8 +70,6 @@ func mutateIngressDefaults(ctx context.Context, req admission.Request, version *
 
 		return &response
 	}
-
-	recorder.Eventf(tnt, corev1.EventTypeNormal, "TenantDefault", "Assigned Tenant default Ingress Class %s to %s/%s", allowed.Default, ingress.Name(), ingress.Namespace())
 
 	response := admission.PatchResponseFromRaw(req.Object.Raw, marshaled)
 

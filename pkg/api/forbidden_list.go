@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Project Capsule Authors
+// Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package api
@@ -9,13 +9,6 @@ import (
 	"regexp"
 	"sort"
 	"strings"
-)
-
-const (
-	// ForbiddenLabelReason used as reason string to deny forbidden labels.
-	ForbiddenLabelReason = "ForbiddenLabel"
-	// ForbiddenAnnotationReason used as reason string to deny forbidden annotations.
-	ForbiddenAnnotationReason = "ForbiddenAnnotation"
 )
 
 // +kubebuilder:object:generate=true

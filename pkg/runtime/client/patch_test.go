@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Project Capsule Authors
+// Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package client_test
@@ -23,6 +23,7 @@ func TestAddLabelsPatch_MapInput(t *testing.T) {
 		})
 
 		want := []client.JSONPatch{
+			{Operation: "add", Path: "/metadata/labels", Value: map[string]string{}},
 			{Operation: "add", Path: "/metadata/labels/a", Value: "1"},
 		}
 
@@ -101,6 +102,7 @@ func TestAddAnnotationsPatch_MapInput(t *testing.T) {
 		})
 
 		want := []client.JSONPatch{
+			{Operation: "add", Path: "/metadata/annotations", Value: map[string]string{}},
 			{Operation: "add", Path: "/metadata/annotations/a", Value: "1"},
 		}
 

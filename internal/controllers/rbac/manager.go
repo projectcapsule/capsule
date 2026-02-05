@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Project Capsule Authors
+// Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package rbac
@@ -30,9 +30,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/runtime/predicates"
 )
 
-var (
-	controllerManager = "rbac-controller"
-)
+const controllerManager = "rbac-controller"
 
 type Manager struct {
 	Log           logr.Logger
@@ -47,7 +45,7 @@ func (r *Manager) SetupWithManager(ctx context.Context, mgr ctrl.Manager, ctrlCo
 	})
 
 	crErr := ctrl.NewControllerManagedBy(mgr).
-		Named("rbac/roles").
+		Named("capsule/rbac/roles").
 		For(&rbacv1.ClusterRole{}, namesPredicate).
 		Complete(r)
 	if crErr != nil {
@@ -55,7 +53,7 @@ func (r *Manager) SetupWithManager(ctx context.Context, mgr ctrl.Manager, ctrlCo
 	}
 
 	crbErr := ctrl.NewControllerManagedBy(mgr).
-		Named("rbac/bindings").
+		Named("capsule/rbac/bindings").
 		For(&rbacv1.ClusterRoleBinding{}, namesPredicate).
 		Watches(&capsulev1beta2.CapsuleConfiguration{}, handler.Funcs{
 			UpdateFunc: func(ctx context.Context, updateEvent event.TypedUpdateEvent[client.Object], limitingInterface workqueue.TypedRateLimitingInterface[reconcile.Request]) {
@@ -71,7 +69,7 @@ func (r *Manager) SetupWithManager(ctx context.Context, mgr ctrl.Manager, ctrlCo
 				r.handleSAChange(ctx, e.Object)
 			},
 			UpdateFunc: func(ctx context.Context, e event.TypedUpdateEvent[client.Object], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
-				if predicates.LabelsChanged([]string{meta.OwnerPromotionLabel}, e.ObjectOld.GetLabels(), e.ObjectNew.GetLabels()) {
+				if meta.LabelsChanged([]string{meta.OwnerPromotionLabel}, e.ObjectOld.GetLabels(), e.ObjectNew.GetLabels()) {
 					r.handleSAChange(ctx, e.ObjectNew)
 				}
 			},
@@ -95,13 +93,13 @@ func (r *Manager) Reconcile(ctx context.Context, request reconcile.Request) (res
 	switch request.Name {
 	case rbac.ProvisionerClusterRole:
 		if err = r.EnsureClusterRoleProvisioner(ctx); err != nil {
-			r.Log.Error(err, "Reconciliation for ClusterRole failed", "ClusterRole", rbac.ProvisionerClusterRole)
+			r.Log.Error(err, "reconciliation for ClusterRole failed", "ClusterRole", rbac.ProvisionerClusterRole)
 
 			break
 		}
 	case rbac.DeleterClusterRole:
 		if err = r.EnsureClusterRoleDeleter(ctx); err != nil {
-			r.Log.Error(err, "Reconciliation for ClusterRole failed", "ClusterRole", rbac.DeleterClusterRole)
+			r.Log.Error(err, "reconciliation for ClusterRole failed", "ClusterRole", rbac.DeleterClusterRole)
 		}
 	}
 
@@ -128,7 +126,7 @@ func (r *Manager) EnsureClusterRoleBindingsProvisioner(ctx context.Context) erro
 				labels = make(map[string]string)
 			}
 
-			labels[meta.CreatedByCapsuleLabel] = "rbac-controller"
+			labels[meta.CreatedByCapsuleLabel] = controllerManager
 
 			crb.SetLabels(labels)
 
@@ -168,7 +166,7 @@ func (r *Manager) EnsureClusterRoleBindingsProvisioner(ctx context.Context) erro
 			if r.Configuration.AllowServiceAccountPromotion() {
 				saList := &corev1.ServiceAccountList{}
 				if err := r.Client.List(ctx, saList, client.MatchingLabels{
-					meta.OwnerPromotionLabel: meta.OwnerPromotionLabelTrigger,
+					meta.OwnerPromotionLabel: meta.ValueTrue,
 				}); err != nil {
 					return err
 				}
@@ -202,7 +200,7 @@ func (r *Manager) EnsureClusterRoleProvisioner(ctx context.Context) (err error) 
 			labels = make(map[string]string)
 		}
 
-		labels[meta.CreatedByCapsuleLabel] = "rbac-controller"
+		labels[meta.CreatedByCapsuleLabel] = controllerManager
 
 		clusterRole.SetLabels(labels)
 
@@ -225,7 +223,7 @@ func (r *Manager) EnsureClusterRoleProvisioner(ctx context.Context) (err error) 
 		return nil
 	}
 
-	return err
+	return r.garbageCollectRBAC(ctx)
 }
 
 func (r *Manager) EnsureClusterRoleDeleter(ctx context.Context) (err error) {
@@ -241,7 +239,7 @@ func (r *Manager) EnsureClusterRoleDeleter(ctx context.Context) (err error) {
 			labels = make(map[string]string)
 		}
 
-		labels[meta.CreatedByCapsuleLabel] = "rbac-controller"
+		labels[meta.CreatedByCapsuleLabel] = controllerManager
 
 		clusterRole.SetLabels(labels)
 
@@ -255,8 +253,11 @@ func (r *Manager) EnsureClusterRoleDeleter(ctx context.Context) (err error) {
 
 		return nil
 	})
+	if err != nil {
+		return err
+	}
 
-	return err
+	return r.garbageCollectRBAC(ctx)
 }
 
 // Start is the Runnable function triggered upon Manager start-up to perform the first RBAC reconciliation
@@ -271,7 +272,7 @@ func (r *Manager) Start(ctx context.Context) error {
 		return err
 	}
 
-	return nil
+	return r.garbageCollectRBAC(ctx)
 }
 
 func (r *Manager) handleSAChange(ctx context.Context, obj client.Object) {
@@ -282,4 +283,73 @@ func (r *Manager) handleSAChange(ctx context.Context, obj client.Object) {
 	if err := r.EnsureClusterRoleBindingsProvisioner(ctx); err != nil {
 		r.Log.Error(err, "cannot update ClusterRoleBinding upon ServiceAccount event")
 	}
+}
+
+func (r *Manager) garbageCollectRBAC(ctx context.Context) error {
+	rbac := r.Configuration.RBAC()
+
+	desiredCR := map[string]struct{}{
+		rbac.ProvisionerClusterRole: {},
+		rbac.DeleterClusterRole:     {},
+	}
+
+	desiredCRB := map[string]struct{}{
+		rbac.ProvisionerClusterRole: {},
+	}
+
+	if err := r.garbageCollectClusterRoles(ctx, desiredCR); err != nil {
+		return err
+	}
+
+	if err := r.garbageCollectClusterRoleBindings(ctx, desiredCRB); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+//nolint:dupl
+func (r *Manager) garbageCollectClusterRoles(ctx context.Context, desired map[string]struct{}) error {
+	list := &rbacv1.ClusterRoleList{}
+	if err := r.Client.List(ctx, list, client.MatchingLabels{
+		meta.CreatedByCapsuleLabel: controllerManager,
+	}); err != nil {
+		return err
+	}
+
+	for i := range list.Items {
+		cr := &list.Items[i]
+		if _, ok := desired[cr.Name]; ok {
+			continue
+		}
+
+		if err := r.Client.Delete(ctx, cr); err != nil && !apierrors.IsNotFound(err) {
+			return err
+		}
+	}
+
+	return nil
+}
+
+//nolint:dupl
+func (r *Manager) garbageCollectClusterRoleBindings(ctx context.Context, desired map[string]struct{}) error {
+	list := &rbacv1.ClusterRoleBindingList{}
+	if err := r.Client.List(ctx, list, client.MatchingLabels{
+		meta.CreatedByCapsuleLabel: controllerManager,
+	}); err != nil {
+		return err
+	}
+
+	for i := range list.Items {
+		crb := &list.Items[i]
+		if _, ok := desired[crb.Name]; ok {
+			continue
+		}
+
+		if err := r.Client.Delete(ctx, crb); err != nil && !apierrors.IsNotFound(err) {
+			return err
+		}
+	}
+
+	return nil
 }

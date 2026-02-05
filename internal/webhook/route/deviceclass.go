@@ -1,24 +1,22 @@
-// Copyright 2020-2025 Project Capsule Authors
+// Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package route
 
-import (
-	capsulewebhook "github.com/projectcapsule/capsule/internal/webhook"
-)
+import "github.com/projectcapsule/capsule/pkg/runtime/handlers"
 
 type deviceClass struct {
-	handlers []capsulewebhook.Handler
+	handlers []handlers.Handler
 }
 
-func DeviceClass(handler ...capsulewebhook.Handler) capsulewebhook.Webhook {
+func DeviceClass(handler ...handlers.Handler) handlers.Webhook {
 	return &deviceClass{handlers: handler}
 }
 
-func (w *deviceClass) GetHandlers() []capsulewebhook.Handler {
+func (w *deviceClass) GetHandlers() []handlers.Handler {
 	return w.handlers
 }
 
 func (w *deviceClass) GetPath() string {
-	return "/devices"
+	return "/devices/validating"
 }

@@ -122,7 +122,7 @@ func TestConditionList_RemoveConditionByType(t *testing.T) {
 			makeCond("B", "True", "y", "m2", 1),
 			makeCond("A", "False", "z", "m3", 2),
 		}
-		list.RemoveConditionByType(meta.Condition{Type: "A"})
+		list.RemoveConditionByType("A")
 
 		assert.Len(t, list, 1)
 		assert.Equal(t, "B", list[0].Type)
@@ -134,7 +134,7 @@ func TestConditionList_RemoveConditionByType(t *testing.T) {
 		}
 		list := append(meta.ConditionList{}, orig...) // copy
 
-		list.RemoveConditionByType(meta.Condition{Type: "Missing"})
+		list.RemoveConditionByType("Missing")
 
 		assert.Equal(t, orig, list)
 	})
@@ -142,7 +142,7 @@ func TestConditionList_RemoveConditionByType(t *testing.T) {
 	t.Run("nil receiver is safe", func(t *testing.T) {
 		var list *meta.ConditionList // nil receiver
 		assert.NotPanics(t, func() {
-			list.RemoveConditionByType(meta.Condition{Type: "X"})
+			list.RemoveConditionByType("X")
 		})
 	})
 }

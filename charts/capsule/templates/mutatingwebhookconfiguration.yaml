@@ -3,15 +3,12 @@ apiVersion: admissionregistration.k8s.io/v1
 kind: MutatingWebhookConfiguration
 metadata:
   name: {{ include "capsule.fullname" . }}-mutating-webhook-configuration
+  namespace: {{ $.Release.Namespace }}
   labels:
-    {{- include "capsule.labels" . | nindent 4 }}
+    {{- include "capsule.labels" $ | nindent 4 }}
+    {{- include "admission.labels" . | nindent 4 }}
   annotations:
-  {{- if .Values.certManager.generateCertificates }}
-    cert-manager.io/inject-ca-from: {{ .Release.Namespace }}/{{ include "capsule.fullname" . }}-webhook-cert
-  {{-  end }}
-  {{- with .Values.customAnnotations }}
-    {{- toYaml . | nindent 4 }}
-  {{- end }}
+    {{- include "admission.annotations" . | nindent 4 }}
 webhooks:
 {{- with (mergeOverwrite .Values.webhooks.hooks.pods .Values.webhooks.hooks.defaults.pods) }}
   {{- if .enabled }}
@@ -167,7 +164,7 @@ webhooks:
     - v1
     - v1beta1
   clientConfig:
-    {{- include "capsule.webhooks.service" (dict "path" "/namespace-patch" "ctx" $) | nindent 4 }}
+    {{- include "capsule.webhooks.service" (dict "path" "/namespaces/mutating" "ctx" $) | nindent 4 }}
   failurePolicy: {{ .failurePolicy }}
   matchPolicy: {{ .matchPolicy }}
   reinvocationPolicy: {{ .reinvocationPolicy }}
@@ -205,7 +202,7 @@ webhooks:
     - v1
     - v1beta1
   clientConfig:
-    {{- include "capsule.webhooks.service" (dict "path" "/resourcepool/mutating" "ctx" $) | nindent 4 }}
+    {{- include "capsule.webhooks.service" (dict "path" "/resourcepools/mutating" "ctx" $) | nindent 4 }}
   failurePolicy: {{ .failurePolicy }}
   matchPolicy: {{ .matchPolicy }}
   reinvocationPolicy: {{ .reinvocationPolicy }}
@@ -243,7 +240,7 @@ webhooks:
     - v1
     - v1beta1
   clientConfig:
-    {{- include "capsule.webhooks.service" (dict "path" "/resourcepool/claim/mutating" "ctx" $) | nindent 4 }}
+    {{- include "capsule.webhooks.service" (dict "path" "/resourcepools/claim/mutating" "ctx" $) | nindent 4 }}
   failurePolicy: {{ .failurePolicy }}
   matchPolicy: {{ .matchPolicy }}
   reinvocationPolicy: {{ .reinvocationPolicy }}
@@ -301,7 +298,7 @@ webhooks:
     - apiGroups:
         - capsule.clastix.io
       apiVersions:
-        - v1beta2
+        - "*"
       operations:
         - CREATE
         - UPDATE
@@ -315,7 +312,7 @@ webhooks:
 {{- end }}
 {{- with .Values.webhooks.hooks.tenantLabel }}
   {{- if .enabled }}
-- name: assignment.misc.projectcapsule.dev
+- name: assign.misc.projectcapsule.dev
   admissionReviewVersions:
     - v1
     - v1beta1

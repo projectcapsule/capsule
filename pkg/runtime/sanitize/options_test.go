@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Project Capsule Authors
+// Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package sanitize_test
@@ -18,11 +18,10 @@ func TestDefaultSanitizeOptions(t *testing.T) {
 	if !opts.StripLastApplied {
 		t.Fatalf("expected StripLastApplied=true")
 	}
-	if opts.StripStatus {
-		t.Fatalf("expected StripStatus=false")
+	if !opts.StripStatus {
+		t.Fatalf("expected StripStatus=true")
 	}
-	if opts.StripUID {
-		t.Fatalf("expected StripStatus=false")
+	if !opts.StripUID {
+		t.Fatalf("expected StripUID=true")
 	}
-
 }

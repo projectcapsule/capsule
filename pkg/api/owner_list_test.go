@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Project Capsule Authors
+// Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package api_test
@@ -8,6 +8,8 @@ import (
 
 	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/projectcapsule/capsule/pkg/api"
 )
 
 func TestOwnerListSpec_FindOwner(t *testing.T) {

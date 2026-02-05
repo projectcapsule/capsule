@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Project Capsule Authors
+// Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package users
@@ -64,7 +64,7 @@ func IsCommonOwner(
 		if err := c.List(ctx, saList,
 			client.InNamespace(parts[2]),
 			client.MatchingLabels{
-				meta.OwnerPromotionLabel: meta.OwnerPromotionLabelTrigger,
+				meta.OwnerPromotionLabel: meta.ValueTrue,
 			}); err != nil {
 			return false, err
 		}

@@ -92,32 +92,46 @@ helm-schema: helm-plugin-schema
 helm-test: HELM_KIND_CONFIG ?= ""
 helm-test: kind
 	@mkdir -p /tmp/results || true
-	@$(KIND) create cluster --wait=60s --name capsule-charts --image kindest/node:$(KUBERNETES_SUPPORTED_VERSION) --config $(HELM_KIND_CONFIG)
+	@$(KIND) create cluster --wait=60s --name capsule-charts --image kindest/node:$(KUBERNETES_SUPPORTED_VERSION) --config ./hack/kind-cluster.yaml
 	@make helm-test-exec
 	@$(KIND) delete cluster --name capsule-charts
 
 helm-test-exec: ct helm-controller-version ko-build-all
 	$(MAKE) e2e-load-image CLUSTER_NAME=capsule-charts IMAGE=$(CAPSULE_IMG) VERSION=v0.0.0
 	@$(KUBECTL) create ns capsule-system || true
-	@$(KUBECTL) apply --force-conflicts --server-side=true -f https://github.com/grafana/grafana-operator/releases/download/v5.18.0/crds.yaml
-	@$(KUBECTL) apply --force-conflicts --server-side=true -f https://github.com/cert-manager/cert-manager/releases/download/v1.9.1/cert-manager.crds.yaml
-	@$(KUBECTL) apply --force-conflicts --server-side=true -f https://github.com/prometheus-operator/prometheus-operator/releases/download/v0.58.0/bundle.yaml
+	$(MAKE) dev-install-deps
+	$(MAKE) dev-install-grafana-operator-crds
 	@$(CT) install --config $(SRC_ROOT)/.github/configs/ct.yaml --namespace=capsule-system --all --debug
 
 # Setup development env
 dev-build: kind
-	$(KIND) create cluster --wait=60s --name $(CLUSTER_NAME) --image kindest/node:$(KUBERNETES_SUPPORTED_VERSION)
+	$(KIND) create cluster --wait=60s --name $(CLUSTER_NAME) --image kindest/node:$(KUBERNETES_SUPPORTED_VERSION) --config ./hack/kind-cluster.yaml
 	$(MAKE) dev-install-deps
 
 .PHONY: dev-destroy
 dev-destroy: kind
 	$(KIND) delete cluster --name capsule
 
+dev-install-deps: dev-setup-fluxcd dev-setup-cert-manager dev-install-gw-api-crds  wait-for-helmreleases
+
 API_GW         := none
 API_GW_VERSION := v1.3.0
 API_GW_LOOKUP  := kubernetes-sigs/gateway-api
-dev-install-deps:
+dev-install-gw-api-crds:
 	@$(KUBECTL) apply --force-conflicts --server-side=true -f https://github.com/$(API_GW_LOOKUP)/releases/download/$(API_GW_VERSION)/standard-install.yaml
+
+GRAFANA         := none
+GRAFANA_VERSION := v5.18.0
+GRAFANA_LOOKUP  := grafana/grafana-operator
+dev-install-grafana-operator-crds:
+	@$(KUBECTL) apply --force-conflicts --server-side=true -f https://github.com/grafana/grafana-operator/releases/download/$(GRAFANA_VERSION)/crds.yaml
+
+PROMETHEUS         := none
+PROMETHEUS_VERSION := v0.88.0
+PROMETHEUS_LOOKUP  := prometheus-operator/prometheus-operator
+dev-install-prometheus-crds:
+	@$(KUBECTL) apply --force-conflicts --server-side=true -f https://github.com/prometheus-operator/prometheus-operator/releases/download/$(PROMETHEUS_VERSION)/bundle.yaml
+
 
 # Usage:
 # 	LAPTOP_HOST_IP=<YOUR_LAPTOP_IP> make dev-setup
@@ -158,6 +172,7 @@ dev-setup:
 	export CA_BUNDLE=`openssl base64 -in /tmp/k8s-webhook-server/serving-certs/tls.crt | tr -d '\n'`; \
 	$(HELM) upgrade \
 	    --dependency-update \
+		--force-conflicts \
 		--debug \
 		--install \
 		--namespace capsule-system \
@@ -191,8 +206,12 @@ dev-setup-argocd: dev-setup-fluxcd
 	@printf "  \033[1mkubectl get secret -n argocd argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d\033[0m\n\n"
 	@printf "  \033[1mkubectl port-forward svc/argocd-server 9091:80 -n argocd\033[0m\n\n"
 
+dev-setup-cert-manager:
+	@$(KUBECTL) kustomize --load-restrictor='LoadRestrictionsNone' hack/distro/cert-manager | envsubst | kubectl apply -f -
+
 dev-setup-fluxcd:
 	@$(KUBECTL) kustomize --load-restrictor='LoadRestrictionsNone' hack/distro/fluxcd | envsubst | kubectl apply -f -
+
 
 # Here to setup the current capsule version
 # Intended to test updates to new version
@@ -203,12 +222,14 @@ dev-setup-capsule: dev-setup-fluxcd
 
 dev-setup-capsule-example: dev-setup-fluxcd
 	@$(KUBECTL) kustomize --load-restrictor='LoadRestrictionsNone' hack/distro/capsule/example-setup | envsubst | kubectl apply -f -
-	@$(KUBECTL) create ns wind-test --as joe --as-group projectcapsule.dev
-	@$(KUBECTL) create ns wind-prod --as joe --as-group projectcapsule.dev
-	@$(KUBECTL) create ns green-test --as bob --as-group projectcapsule.dev
-	@$(KUBECTL) create ns green-prod --as bob --as-group projectcapsule.dev
-	@$(KUBECTL) create ns solar-test --as alice --as-group projectcapsule.dev
-	@$(KUBECTL) create ns solar-prod --as alice --as-group projectcapsule.dev
+	@$(KUBECTL) create ns wind-test --as joe --as-group projectcapsule.dev || true
+	@$(KUBECTL) create ns wind-prod --as joe --as-group projectcapsule.dev || true
+	@$(KUBECTL) create ns green-test --as bob --as-group projectcapsule.dev || true
+	@$(KUBECTL) create ns green-prod --as bob --as-group projectcapsule.dev || true
+	@$(KUBECTL) create ns solar-test --as alice --as-group projectcapsule.dev || true
+	@$(KUBECTL) create ns solar-prod --as alice --as-group projectcapsule.dev || true
+	@$(KUBECTL) apply -f hack/distro/capsule/example-setup/claims.yaml
+
 
 wait-for-helmreleases:
 	@ echo "Waiting for all HelmReleases to have observedGeneration >= 0..."
@@ -216,6 +237,42 @@ wait-for-helmreleases:
 	  sleep 5; \
 	done
 
+
+ENTERPRISE_VERSION  ?= "0.13.0-rc.2"
+ENTERPRISE_REGISTRY ?= "oci.peakscale.ch"
+
+enterprise-prerelease:
+	mkdir -p ./builds
+	$(MAKE) CAPSULE_IMG=$(ENTERPRISE_REGISTRY)/prereleases/images/capsule VERSION=$(ENTERPRISE_VERSION) ko-publish-capsule
+	$(HELM) package ./charts/capsule --app-version=$(ENTERPRISE_VERSION) --version=$(ENTERPRISE_VERSION) --destination ./builds/
+	$(HELM) push ./builds/capsule-$(ENTERPRISE_VERSION).tgz oci://$(ENTERPRISE_REGISTRY)/prereleases/charts/
+	$(MAKE) deploy-enterprise
+	rm -rf ./builds
+
+deploy-enterprise:
+	@echo ""
+	@echo "Deploying Capsule Prerelease (Enterprise) $(ENTERPRISE_VERSION)"
+	@echo ""
+	@echo "1) Create image pull secret (Change the credentials with the ones provided to you):"
+	@echo ""
+	@echo "kubectl create secret docker-registry capsule-enterprise -n capsule-system \\"
+	@echo "  --docker-username='robot\$$name' \\"
+	@echo "  --docker-password='serviceaccount-password' \\"
+	@echo "  --docker-server='$(ENTERPRISE_REGISTRY)'"
+	@echo ""
+	@echo "2) Deploy Capsule:"
+	@echo ""
+	@echo "helm upgrade --install capsule \\"
+	@echo "  oci://$(ENTERPRISE_REGISTRY)/prereleases/charts/capsule \\"
+	@echo "  --namespace capsule-system \\"
+	@echo "  --version $(ENTERPRISE_VERSION) \\"
+	@echo "  --reuse-values \\"
+	@echo "  --set manager.image.registry=$(ENTERPRISE_REGISTRY) \\"
+	@echo "  --set manager.image.repository=prereleases/images/capsule \\"
+	@echo "  --set manager.image.tag=$(ENTERPRISE_VERSION) \\"
+	@echo "  --set manager.image.pullPolicy=Always \\"
+	@echo "  --set 'serviceAccount.imagePullSecrets={capsule-enterprise}'"
+	@echo ""
 
 ####################
 # -- Docker
@@ -299,7 +356,7 @@ e2e-build: kind
 	$(MAKE) e2e-install
 
 .PHONY: e2e-install
-e2e-install: ko-build-all
+e2e-install: helm-controller-version ko-build-all
 	$(MAKE) e2e-load-image CLUSTER_NAME=$(CLUSTER_NAME) IMAGE=$(CAPSULE_IMG) VERSION=$(VERSION)
 	$(HELM) upgrade \
 	    --dependency-update \
@@ -315,6 +372,7 @@ e2e-install: ko-build-all
 		--set 'manager.rbac.minimal=true' \
 		--set 'webhooks.hooks.nodes.enabled=true' \
 		--set "webhooks.exclusive=true"\
+		--set "manager.options.logLevel=debug"\
 		capsule \
 		./charts/capsule
 
@@ -437,7 +495,7 @@ nwa:
 	$(call go-install-tool,$(NWA),github.com/$(NWA_LOOKUP)@$(NWA_VERSION))
 
 GOLANGCI_LINT          := $(LOCALBIN)/golangci-lint
-GOLANGCI_LINT_VERSION  := v2.7.2
+GOLANGCI_LINT_VERSION  := v2.8.0
 GOLANGCI_LINT_LOOKUP   := golangci/golangci-lint
 golangci-lint: ## Download golangci-lint locally if necessary.
 	@test -s $(GOLANGCI_LINT) && $(GOLANGCI_LINT) -h | grep -q $(GOLANGCI_LINT_VERSION) || \

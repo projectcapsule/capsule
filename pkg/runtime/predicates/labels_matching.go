@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Project Capsule Authors
+// Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package predicates
@@ -16,12 +16,15 @@ type LabelsMatchingPredicate struct {
 func (p LabelsMatchingPredicate) Create(e event.CreateEvent) bool {
 	return p.matches(e.Object)
 }
+
 func (p LabelsMatchingPredicate) Delete(e event.DeleteEvent) bool {
 	return p.matches(e.Object)
 }
+
 func (p LabelsMatchingPredicate) Generic(e event.GenericEvent) bool {
 	return p.matches(e.Object)
 }
+
 func (p LabelsMatchingPredicate) Update(e event.UpdateEvent) bool {
 	return p.matches(e.ObjectNew)
 }
@@ -30,9 +33,11 @@ func (p LabelsMatchingPredicate) matches(obj client.Object) bool {
 	if obj == nil {
 		return false
 	}
+
 	if len(p.Match) == 0 {
 		return true
 	}
+
 	labels := obj.GetLabels()
 	if labels == nil {
 		return false
@@ -42,10 +47,10 @@ func (p LabelsMatchingPredicate) matches(obj client.Object) bool {
 			return false
 		}
 	}
+
 	return true
 }
 
-// convenience wrapper to keep existing call sites
 func LabelsMatching(match map[string]string) builder.Predicates {
 	return builder.WithPredicates(LabelsMatchingPredicate{Match: match})
 }

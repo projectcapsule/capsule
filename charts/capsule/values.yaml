@@ -83,9 +83,9 @@ crds:
 # Secret Options
 tls:
   # -- Start the Capsule controller that injects the CA into mutating and validating webhooks, and CRD as well.
-  enableController: true
+  enableController: false
   # -- When cert-manager is disabled, Capsule will generate the TLS certificate for webhook and CRDs conversion.
-  create: true
+  create: false
   # -- Override name of the Capsule TLS Secret name when externally managed.
   name: ""
 
@@ -226,7 +226,7 @@ manager:
     # -- Managed RBAC configuration for the controller
     rbac:
       # -- The ClusterRoles applied for Administrators
-      adminitrationClusterRoles: 
+      administrationClusterRoles:
         - capsule-namespace-deleter
       # -- The ClusterRoles applied for ServiceAccounts which had owner Promotion
       promotionClusterRoles:
@@ -246,7 +246,6 @@ manager:
     # -- DEPRECATED: use users properties.
     # Names of the users considered as Capsule users.
     capsuleUserGroups: []
-
 
   # -- A list of extra arguments for the capsule controller
   extraArgs:
@@ -347,9 +346,12 @@ serviceAccount:
   # -- The name of the service account to use. If not set and `serviceAccount.create=true`, a name is generated using the fullname template
   name: ""
 
+  imagePullSecrets: []
+  # just string array [ "sec-1", "sec-2" ]
+
 certManager:
   # -- Specifies whether capsule webhooks certificates should be generated using cert-manager
-  generateCertificates: false
+  generateCertificates: true
   # -- Specify additional SANS to add to the certificate
   additionalSANS: []
 # -- Additional labels which will be added to all resources created by Capsule helm chart
@@ -370,6 +372,28 @@ extraManifests: []
 # Monitoring Settings
 monitoring:
 
+  diagnostics:
+    # -- Enable Diagnostic Dashboards to be deployed
+    enabled: false
+    # -- Annotations for dashboard configmaps
+    annotations: {}
+    # -- Labels for dashboard configmaps
+    labels: {}
+    # grafana_dashboard: "1"
+
+    # Grafana Operator
+    operator:
+      # -- Enable Operator Resources (GrafanaDashboard)
+      enabled: false
+      # -- Allow the Operator to match this resource with Grafanas outside the current namespace
+      allowCrossNamespaceImport: true
+      # -- How often the resource is synced, defaults to 10m0s if not set
+      resyncPeriod: "10m"
+      # -- Selects Grafana instances for import
+      instanceSelector: {}
+      # -- folder assignment for dashboard
+      folder: ""
+
   dashboards:
     # -- Enable Dashboards to be deployed
     enabled: false
@@ -380,6 +404,7 @@ monitoring:
     # grafana_dashboard: "1"
     # -- Custom namespace for dashboard configmaps
     namespace: ""
+
     # Grafana Operator
     operator:
       # -- Enable Operator Resources (GrafanaDashboard)
@@ -427,6 +452,12 @@ webhooks:
   # -- Timeout in seconds for validating webhooks
   validatingWebhooksTimeoutSeconds: 30
 
+  # -- Additional Labels for all webhooks
+  labels: {}
+
+  # -- Additional Annotations for all webhooks
+  annotations: {}
+
   # Configure custom webhook service
   service:
     # -- The URL where the capsule webhook services are running (Overwrites cluster scoped service definition)
@@ -457,7 +488,12 @@ webhooks:
           - key: capsule.clastix.io/tenant
             operator: Exists
       # -- [MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
-      matchConditions: []
+      matchConditions:
+        - name: ignore-subresources
+          expression: '!has(request.subResource) || request.subResource == ""'
+        - name: ignore-events
+          expression: 'request.resource.resource != "events"'
+
       # -- [ReinvocationPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#reinvocation-policy)
       reinvocationPolicy: Never
       # -- [Rules](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-rules)
@@ -516,8 +552,16 @@ webhooks:
         matchExpressions:
           - key: capsule.clastix.io/tenant
             operator: Exists
+          - key: projectcapsule.dev/custom-resources
+            operator: Exists
+
       # -- [MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
-      matchConditions: []
+      matchConditions:
+        - name: ignore-subresources
+          expression: '!has(request.subResource) || request.subResource == ""'
+        - name: ignore-events
+          expression: 'request.resource.resource != "events"'
+
 
     namespaces:
       # -- Enable the Hook
@@ -550,9 +594,15 @@ webhooks:
           - key: capsule.clastix.io/tenant
             operator: Exists
           - key: projectcapsule.dev/cordoned
-            operator: Exists
+            operator: In
+            values:
+              - "true"
       # -- [MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
-      matchConditions: []
+      matchConditions:
+        - name: ignore-subresources
+          expression: '!has(request.subResource) || request.subResource == ""'
+        - name: ignore-events
+          expression: 'request.resource.resource != "events"'
       # -- [Rules](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-rules)
       rules:
       - apiGroups:
@@ -620,22 +670,6 @@ webhooks:
       matchConditions: []
       # -- [ReinvocationPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#reinvocation-policy)
       reinvocationPolicy: Never
-    networkpolicies:
-      # -- Enable the Hook
-      enabled: true
-      # -- [FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy)
-      failurePolicy: Fail
-      # -- [MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
-      matchPolicy: Equivalent
-      # -- [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector)
-      objectSelector: {}
-      # -- [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector)
-      namespaceSelector:
-        matchExpressions:
-          - key: capsule.clastix.io/tenant
-            operator: Exists
-      # -- [MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
-      matchConditions: []
 
     pods:
       # -- Enable the Hook
@@ -789,9 +823,6 @@ webhooks:
       # -- [MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
       matchConditions: []
 
-    # -- Deprecated, use webhooks.hooks.managed instead
-    tenantResourceObjects: {}
-
     # -- Deprecated, use webhooks.hooks.namespaces instead
     namespaceOwnerReference: {}
 
@@ -802,3 +833,6 @@ webhooks:
       pvc: {}
       # -- Deprecated, use webhooks.hooks.pods instead
       pods: {}
+
+    # -- Deprecated, use webhooks.hooks.managed instead
+    tenantResourceObjects: {}

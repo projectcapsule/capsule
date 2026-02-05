@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Project Capsule Authors
+// Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package predicates
@@ -9,7 +9,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 )
 
-// Only Trigger a Reconcile when the requested annotation has changed value or was added
+// Only Trigger a Reconcile when the requested annotation has changed value or was added.
 type ReconcileRequestedPredicate struct{}
 
 func (ReconcileRequestedPredicate) Create(e event.CreateEvent) bool   { return false }

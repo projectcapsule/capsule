@@ -21,7 +21,7 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api"
-	"github.com/projectcapsule/capsule/pkg/api/misc"
+	"github.com/projectcapsule/capsule/pkg/runtime/gvk"
 )
 
 var _ = Describe("Creating a GlobalTenantResource object", func() {
@@ -94,7 +94,7 @@ var _ = Describe("Creating a GlobalTenantResource object", func() {
 				PruningOnDelete: ptr.To(true),
 				Resources: []capsulev1beta2.ResourceSpec{
 					{
-						NamespacedItems: []misc.ResourceReference{
+						NamespacedItems: []gvk.ResourceReference{
 							{
 								Kind:       "Secret",
 								Namespace:  "default",

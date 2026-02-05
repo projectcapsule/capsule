@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Project Capsule Authors
+// Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package tenant_test
@@ -72,10 +72,9 @@ func TestAddTenantNameLabel(t *testing.T) {
 	t.Parallel()
 
 	labels := map[string]string{}
-	n := ns("myns", "u1")
 	tt := tenantWithName("mytenant")
 
-	tenant.AddTenantNameLabel(labels, n, tt)
+	tenant.AddTenantNameLabel(labels, tt)
 
 	if got := labels[meta.TenantLabel]; got != "mytenant" {
 		t.Fatalf("expected %s to be %q, got %q", meta.TenantLabel, "mytenant", got)

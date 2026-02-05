@@ -1,9 +1,10 @@
-// Copyright 2020-2025 Project Capsule Authors
+// Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package v1beta2
 
 import (
+	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/projectcapsule/capsule/pkg/api"
@@ -31,9 +32,6 @@ type CapsuleConfigurationSpec struct {
 	// However ServiceAccounts which have been promoted to owner can not promote further serviceAccounts.
 	// +kubebuilder:default=false
 	AllowServiceAccountPromotion bool `json:"allowServiceAccountPromotion,omitempty"`
-	// Define Properties for managed ClusterRoles by Capsule
-	// +kubebuilder:default={}
-	RBAC *RbacConfiguration `json:"rbac"`
 	// Enforces the Tenant owner, during Namespace creation, to name it using the selected Tenant name as prefix,
 	// separated by a dash. This is useful to avoid Namespace name collision in a public CaaS environment.
 	// +kubebuilder:default=false
@@ -57,18 +55,23 @@ type CapsuleConfigurationSpec struct {
 	// for interacting with namespaces. Because if that label is not defined, it's assumed that namespace interaction was not targeted towards a tenant and will therefor
 	// be ignored by capsule.
 	Administrators api.UserListSpec `json:"administrators,omitempty"`
-	// Service Account Client configuration for impersonation properties
-	// +optional
-	Impersonation ServiceAccountClient `json:"impersonation,omitzero"`
+	// Configuration for dynamic Validating and Mutating Admission webhooks managed by Capsule.
+	Admission DynamicAdmission `json:"admission,omitempty"`
+	// Define Properties for managed ClusterRoles by Capsule
+	// +kubebuilder:default={}
+	RBAC *RBACConfiguration `json:"rbac"`
 	// Define the period of time upon a cache invalidation is executed for all caches.
 	// +kubebuilder:default="24h"
 	CacheInvalidation metav1.Duration `json:"cacheInvalidation"`
+	// Service Account Client configuration for impersonation properties
+	// +optional
+	Impersonation ServiceAccountClient `json:"impersonation,omitzero"`
 }
 
-type RbacConfiguration struct {
+type RBACConfiguration struct {
 	// The ClusterRoles applied for Administrators
 	// +kubebuilder:default={capsule-namespace-deleter}
-	AdministrationClusterRoles []string `json:"adminitrationClusterRoles,omitempty"`
+	AdministrationClusterRoles []string `json:"administrationClusterRoles,omitempty"`
 	// The ClusterRoles applied for ServiceAccounts which had owner Promotion
 	// +kubebuilder:default={capsule-namespace-provisioner,capsule-namespace-deleter}
 	PromotionClusterRoles []string `json:"promotionClusterRoles,omitempty"`
@@ -78,6 +81,27 @@ type RbacConfiguration struct {
 	// Name for the ClusterRole required to grant Namespace Provision permissions.
 	// +kubebuilder:default=capsule-namespace-provisioner
 	ProvisionerClusterRole string `json:"provisioner,omitempty"`
+}
+
+type DynamicAdmission struct {
+	// Configure dynamic Mutating Admission for Capsule
+	Mutating DynamicAdmissionConfig `json:"mutating,omitempty"`
+
+	// Configure dynamic Validating Admission for Capsule
+	Validating DynamicAdmissionConfig `json:"validating,omitempty"`
+}
+
+type DynamicAdmissionConfig struct {
+	// Name the Admission Webhook
+	Name meta.RFC1123Name `json:"name,omitempty"`
+	// Labels added to the Admission Webhook
+	// +optional
+	Labels map[string]string `json:"labels,omitempty"`
+	// Annotations added to the Admission Webhook
+	// +optional
+	Annotations map[string]string `json:"annotations,omitempty"`
+	// From the upstram struct
+	Client admissionregistrationv1.WebhookClientConfig `json:"client"`
 }
 
 type NodeMetadata struct {

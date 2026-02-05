@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Project Capsule Authors
+// Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package users
@@ -7,7 +7,6 @@ import (
 	"context"
 	"os"
 
-	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -40,8 +39,8 @@ func IsCapsuleUser(
 				return false
 			}
 
-			tl := &capsulev1beta2.TenantList{}
-			if err := c.List(ctx, tl, client.MatchingFieldsSelector{Selector: fields.OneTermEqualSelector(".status.namespaces", namespace)}); err != nil {
+			var tl capsulev1beta2.TenantList
+			if err := c.List(ctx, &tl, client.MatchingFields{".status.namespaces": namespace}); err != nil {
 				return false
 			}
 

@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Project Capsule Authors
+// Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package resourcepools
@@ -8,12 +8,13 @@ import (
 	"fmt"
 
 	"github.com/go-logr/logr"
-	corev1 "k8s.io/api/core/v1"
+	gherrors "github.com/pkg/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/util/retry"
+	"sigs.k8s.io/cluster-api/util/patch"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -25,7 +26,6 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/internal/controllers/utils"
 	"github.com/projectcapsule/capsule/internal/metrics"
-	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 )
 
@@ -34,13 +34,18 @@ type resourceClaimController struct {
 
 	metrics  *metrics.ClaimRecorder
 	log      logr.Logger
-	recorder record.EventRecorder
+	recorder events.EventRecorder
 }
 
 func (r *resourceClaimController) SetupWithManager(mgr ctrl.Manager, cfg utils.ControllerOptions) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		Named("resourcepool/claims").
-		For(&capsulev1beta2.ResourcePoolClaim{}).
+		Named("capsule/resourcepools/claims").
+		For(
+			&capsulev1beta2.ResourcePoolClaim{},
+			builder.WithPredicates(
+				predicate.GenerationChangedPredicate{},
+			),
+		).
 		Watches(
 			&capsulev1beta2.ResourcePool{},
 			handler.EnqueueRequestsFromMapFunc(r.claimsWithoutPoolFromNamespaces),
@@ -68,15 +73,30 @@ func (r resourceClaimController) Reconcile(ctx context.Context, request ctrl.Req
 		return result, err
 	}
 
-	// Ensuring the Quota Status
-	err = r.reconcile(ctx, log, instance)
-
-	// Emit a Metric in any case
-	r.metrics.RecordClaimCondition(instance)
-
+	patchHelper, err := patch.NewHelper(instance, r.Client)
 	if err != nil {
-		return ctrl.Result{}, err
+		return reconcile.Result{}, gherrors.Wrap(err, "failed to init patch helper")
 	}
+
+	defer func() {
+		if uerr := r.updateStatus(ctx, instance, err); uerr != nil {
+			err = uerr
+
+			return
+		}
+
+		r.metrics.RecordClaimCondition(instance)
+
+		if e := patchHelper.Patch(ctx, instance); e != nil {
+			err = e
+
+			return
+		}
+
+		err = nil
+	}()
+
+	err = r.reconcile(ctx, log, instance)
 
 	return ctrl.Result{}, err
 }
@@ -123,20 +143,7 @@ func (r resourceClaimController) reconcile(
 ) (err error) {
 	pool, err := r.evaluateResourcePool(ctx, claim)
 	if err != nil {
-		claim.Status.Pool = api.StatusNameUID{}
-
-		cond := meta.NewAssignedCondition(claim)
-		cond.Status = metav1.ConditionFalse
-		cond.Reason = meta.FailedReason
-		cond.Message = err.Error()
-
-		return updateStatusAndEmitEvent(
-			ctx,
-			r.Client,
-			r.recorder,
-			claim,
-			cond,
-		)
+		return err
 	}
 
 	return r.allocateResourcePool(ctx, log, claim, pool)
@@ -205,97 +212,75 @@ func (r resourceClaimController) allocateResourcePool(
 	cl *capsulev1beta2.ResourcePoolClaim,
 	pool *capsulev1beta2.ResourcePool,
 ) (err error) {
-	allocate := api.StatusNameUID{
-		Name: api.Name(pool.GetName()),
+	target := meta.LocalRFC1123ObjectReferenceWithUID{
+		Name: meta.RFC1123Name(pool.GetName()),
 		UID:  pool.GetUID(),
 	}
 
-	reference := meta.GetLooseOwnerReference(pool)
+	if cl.Status.Pool.Name != "" || cl.Status.Pool.UID != "" {
+		if cl.Status.Pool.Name != target.Name ||
+			cl.Status.Pool.UID != target.UID {
+			if cl.IsBoundInResourcePool() {
+				return fmt.Errorf("can not change pool while claim is in use for pool %s", cl.Status.Pool.Name)
+			}
 
-	if !meta.HasLooseOwnerReference(cl, reference) {
-		log.V(4).Info("adding ownerreference for", "pool", pool.Name)
+			// Removes old pool reference
+			meta.RemoveLooseOwnerReference(cl, metav1.OwnerReference{
+				APIVersion: pool.APIVersion,
+				Kind:       pool.Kind,
+				Name:       string(cl.Status.Pool.Name),
+				UID:        cl.Status.Pool.UID,
+			})
 
-		patch := client.MergeFrom(cl.DeepCopy())
+			r.metrics.DeletePoolAssociation(cl.GetName(), cl.GetNamespace(), string(cl.Status.Pool.Name))
+		}
+	}
 
-		if err := meta.SetLooseOwnerReference(cl, reference); err != nil {
+	ref := meta.GetLooseOwnerReference(pool)
+
+	// Sanitize any previous References
+	meta.RemoveLooseOwnerReferenceForKindExceptGiven(cl, ref)
+
+	if !meta.HasLooseOwnerReference(cl, ref) {
+		log.V(4).Info("adding ownerreference", "pool", pool.Name)
+
+		if err := meta.SetLooseOwnerReference(cl, ref); err != nil {
 			return err
 		}
-
-		if err := r.Patch(ctx, cl, patch); err != nil {
-			return err
-		}
 	}
 
-	if cl.Status.Pool.Name == allocate.Name &&
-		cl.Status.Pool.UID == allocate.UID {
-		return nil
-	}
-
-	cond := meta.NewAssignedCondition(cl)
-	cond.Status = metav1.ConditionTrue
-	cond.Reason = meta.SucceededReason
-
-	// Set claim pool in status and condition
-	cl.Status = capsulev1beta2.ResourcePoolClaimStatus{
-		Pool:      allocate,
-		Condition: cond,
-	}
-
-	// Update status in a separate call
-	if err := r.Client.Status().Update(ctx, cl); err != nil {
-		return err
-	}
+	cl.Status.Pool = target
 
 	return nil
 }
 
-// Update the Status of a claim and emit an event if Status changed.
-func updateStatusAndEmitEvent(
+func (r *resourceClaimController) updateStatus(
 	ctx context.Context,
-	c client.Client,
-	recorder record.EventRecorder,
-	claim *capsulev1beta2.ResourcePoolClaim,
-	condition metav1.Condition,
-) (err error) {
-	if claim.Status.Condition.Type == condition.Type &&
-		claim.Status.Condition.Status == condition.Status &&
-		claim.Status.Condition.Reason == condition.Reason &&
-		claim.Status.Condition.Message == condition.Message {
-		return nil
-	}
-
-	err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		current := &capsulev1beta2.ResourcePoolClaim{}
-		if err := c.Get(ctx, client.ObjectKeyFromObject(claim), current); err != nil {
-			return fmt.Errorf("failed to refetch instance before update: %w", err)
+	instance *capsulev1beta2.ResourcePoolClaim,
+	reconcileError error,
+) error {
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
+		latest := &capsulev1beta2.ResourcePoolClaim{}
+		if err = r.Get(ctx, types.NamespacedName{Name: instance.GetName(), Namespace: instance.GetNamespace()}, latest); err != nil {
+			return err
 		}
 
-		current.Status.Condition = condition
+		latest.Status = instance.Status
 
-		return c.Status().Update(ctx, current)
+		// Set Ready Condition
+		readyCondition := meta.NewReadyCondition(instance)
+		if reconcileError != nil {
+			readyCondition.Message = reconcileError.Error()
+			readyCondition.Status = metav1.ConditionFalse
+			readyCondition.Reason = meta.FailedReason
+		}
+
+		latest.Status.Conditions.UpdateConditionByType(readyCondition)
+
+		// Unset legacy Status
+		//nolint:staticcheck
+		latest.Status.Condition = metav1.Condition{}
+
+		return r.Client.Status().Update(ctx, latest)
 	})
-
-	claim.Status.Condition = condition
-
-	if err != nil {
-		return err
-	}
-
-	eventType := corev1.EventTypeNormal
-	if claim.Status.Condition.Status == metav1.ConditionFalse {
-		eventType = corev1.EventTypeWarning
-	}
-
-	recorder.AnnotatedEventf(
-		claim,
-		map[string]string{
-			"Status": string(claim.Status.Condition.Status),
-			"Type":   claim.Status.Condition.Type,
-		},
-		eventType,
-		claim.Status.Condition.Reason,
-		claim.Status.Condition.Message,
-	)
-
-	return err
 }

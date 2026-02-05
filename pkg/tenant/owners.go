@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Project Capsule Authors
+// Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package tenant
@@ -30,7 +30,7 @@ func CollectOwners(
 		saList := &corev1.ServiceAccountList{}
 		if err := c.List(ctx, saList,
 			client.MatchingLabels{
-				meta.OwnerPromotionLabel: meta.OwnerPromotionLabelTrigger,
+				meta.OwnerPromotionLabel: meta.ValueTrue,
 			},
 		); err != nil {
 			return nil, err

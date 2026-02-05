@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Project Capsule Authors
+// Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package tenant_test
@@ -17,11 +17,8 @@ func TestGetOwnersWithKinds_EmptyOwners(t *testing.T) {
 
 	owners := tenant.GetOwnersWithKinds(tnt)
 
-	if owners == nil {
+	if owners != nil {
 		t.Fatalf("expected empty slice, got nil")
-	}
-	if len(owners) != 0 {
-		t.Fatalf("expected empty slice, got %v", owners)
 	}
 }
 

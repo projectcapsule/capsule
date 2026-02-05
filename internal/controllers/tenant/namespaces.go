@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Project Capsule Authors
+// Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package tenant
@@ -12,7 +12,6 @@ import (
 	"golang.org/x/sync/errgroup"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -103,7 +102,7 @@ func (r *Manager) reconcileNamespace(ctx context.Context, namespace string, tnt 
 
 		cordonedCondition := meta.NewCordonedCondition(ns)
 
-		if ns.Labels[meta.CordonedLabel] == meta.CordonedLabelTrigger {
+		if ns.Labels[meta.CordonedLabel] == meta.ValueTrue {
 			cordonedCondition.Reason = meta.CordonedReason
 			cordonedCondition.Message = "namespace is cordoned"
 			cordonedCondition.Status = metav1.ConditionTrue
@@ -116,9 +115,20 @@ func (r *Manager) reconcileNamespace(ctx context.Context, namespace string, tnt 
 		r.syncNamespaceStatusMetrics(tnt, ns)
 	}()
 
+	// Collect Rules for namespace
+	ruleBody, err := tenant.BuildNamespaceRuleBodyForNamespace(ns, tnt)
+	if err != nil {
+		return err
+	}
+
+	err = r.ensureRuleStatus(ctx, ns, tnt, ruleBody, namespace)
+	if err != nil {
+		return err
+	}
+
 	err = retry.RetryOnConflict(retry.DefaultBackoff, func() (conflictErr error) {
 		_, conflictErr = controllerutil.CreateOrUpdate(ctx, r.Client, ns, func() error {
-			metaStatus, err = r.reconcileMetadata(ctx, ns, tnt, stat)
+			metaStatus, err = r.reconcileNamespaceMetadata(ctx, ns, tnt, stat)
 
 			return err
 		})
@@ -129,8 +139,53 @@ func (r *Manager) reconcileNamespace(ctx context.Context, namespace string, tnt 
 	return err
 }
 
+func (r *Manager) ensureRuleStatus(
+	ctx context.Context,
+	ns *corev1.Namespace,
+	tnt *capsulev1beta2.Tenant,
+	rule *capsulev1beta2.NamespaceRuleBody,
+	namespace string,
+) error {
+	nsStatus := &capsulev1beta2.RuleStatus{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      meta.NameForManagedRuleStatus(),
+			Namespace: namespace,
+		},
+	}
+
+	_, err := controllerutil.CreateOrUpdate(ctx, r.Client, nsStatus, func() error {
+		labels := nsStatus.GetLabels()
+		if labels == nil {
+			labels = make(map[string]string)
+		}
+
+		labels[meta.NewManagedByCapsuleLabel] = meta.ValueController
+		labels[meta.CapsuleNameLabel] = nsStatus.Name
+
+		nsStatus.SetLabels(labels)
+
+		err := controllerutil.SetOwnerReference(tnt, nsStatus, r.Scheme())
+		if err != nil {
+			return err
+		}
+
+		return controllerutil.SetOwnerReference(ns, nsStatus, r.Scheme())
+	})
+	if err != nil {
+		return err
+	}
+
+	nsStatus.Status.Rule = *rule
+
+	if err := r.Status().Update(ctx, nsStatus); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 //nolint:nestif
-func (r *Manager) reconcileMetadata(
+func (r *Manager) reconcileNamespaceMetadata(
 	ctx context.Context,
 	ns *corev1.Namespace,
 	tnt *capsulev1beta2.Tenant,
@@ -196,7 +251,7 @@ func (r *Manager) reconcileMetadata(
 	}
 
 	tenant.AddNamespaceNameLabels(originLabels, ns)
-	tenant.AddTenantNameLabel(originLabels, ns, tnt)
+	tenant.AddTenantNameLabel(originLabels, tnt)
 
 	ns.SetLabels(originLabels)
 	ns.SetAnnotations(originAnnotations)
@@ -207,9 +262,7 @@ func (r *Manager) reconcileMetadata(
 func (r *Manager) collectNamespaces(ctx context.Context, tenant *capsulev1beta2.Tenant) (err error) {
 	list := &corev1.NamespaceList{}
 
-	err = r.List(ctx, list, client.MatchingFieldsSelector{
-		Selector: fields.OneTermEqualSelector(".metadata.ownerReferences[*].capsule", tenant.GetName()),
-	})
+	err = r.List(ctx, list, client.MatchingFields{".metadata.ownerReferences[*].capsule": tenant.GetName()})
 	if err != nil {
 		return err
 	}

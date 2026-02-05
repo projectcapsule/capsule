@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Project Capsule Authors
+// Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package validation
@@ -8,18 +8,19 @@ import (
 
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	capsulewebhook "github.com/projectcapsule/capsule/internal/webhook"
 	"github.com/projectcapsule/capsule/pkg/api"
+	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
+	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
 
 type userMetadataHandler struct{}
 
-func UserMetadataHandler() capsulewebhook.TypedHandlerWithTenant[*corev1.Namespace] {
+func UserMetadataHandler() handlers.TypedHandlerWithTenant[*corev1.Namespace] {
 	return &userMetadataHandler{}
 }
 
@@ -27,15 +28,15 @@ func (h *userMetadataHandler) OnCreate(
 	c client.Client,
 	ns *corev1.Namespace,
 	decoder admission.Decoder,
-	recorder record.EventRecorder,
+	recorder events.EventRecorder,
 	tnt *capsulev1beta2.Tenant,
-) capsulewebhook.Func {
+) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		if tnt.Spec.NamespaceOptions != nil {
 			err := api.ValidateForbidden(ns.Annotations, tnt.Spec.NamespaceOptions.ForbiddenAnnotations)
 			if err != nil {
 				err = errors.Wrap(err, "namespace annotations validation failed")
-				recorder.Eventf(tnt, corev1.EventTypeWarning, api.ForbiddenAnnotationReason, err.Error())
+				recorder.Eventf(tnt, ns, corev1.EventTypeWarning, evt.ReasonForbiddenAnnotation, evt.ActionValidationDenied, err.Error())
 				response := admission.Denied(err.Error())
 
 				return &response
@@ -44,7 +45,7 @@ func (h *userMetadataHandler) OnCreate(
 			err = api.ValidateForbidden(ns.Labels, tnt.Spec.NamespaceOptions.ForbiddenLabels)
 			if err != nil {
 				err = errors.Wrap(err, "namespace labels validation failed")
-				recorder.Eventf(tnt, corev1.EventTypeWarning, api.ForbiddenLabelReason, err.Error())
+				recorder.Eventf(tnt, ns, corev1.EventTypeWarning, evt.ReasonForbiddenLabel, evt.ActionValidationDenied, err.Error())
 				response := admission.Denied(err.Error())
 
 				return &response
@@ -60,16 +61,16 @@ func (h *userMetadataHandler) OnUpdate(
 	newNs *corev1.Namespace,
 	oldNs *corev1.Namespace,
 	decoder admission.Decoder,
-	recorder record.EventRecorder,
+	recorder events.EventRecorder,
 	tnt *capsulev1beta2.Tenant,
-) capsulewebhook.Func {
+) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		if len(tnt.Spec.NodeSelector) > 0 {
 			v, ok := newNs.GetAnnotations()["scheduler.alpha.kubernetes.io/node-selector"]
 			if !ok {
 				response := admission.Denied("the node-selector annotation is enforced, cannot be removed")
 
-				recorder.Eventf(tnt, corev1.EventTypeWarning, "ForbiddenNodeSelectorDeletion", string(response.Result.Reason))
+				recorder.Eventf(tnt, oldNs, corev1.EventTypeWarning, "ForbiddenNodeSelectorDeletion", "Denied", string(response.Result.Reason))
 
 				return &response
 			}
@@ -77,7 +78,7 @@ func (h *userMetadataHandler) OnUpdate(
 			if v != oldNs.GetAnnotations()["scheduler.alpha.kubernetes.io/node-selector"] {
 				response := admission.Denied("the node-selector annotation is enforced, cannot be updated")
 
-				recorder.Eventf(tnt, corev1.EventTypeWarning, "ForbiddenNodeSelectorUpdate", string(response.Result.Reason))
+				recorder.Eventf(tnt, oldNs, corev1.EventTypeWarning, "ForbiddenNodeSelectorUpdate", "Denied", string(response.Result.Reason))
 
 				return &response
 			}
@@ -127,7 +128,7 @@ func (h *userMetadataHandler) OnUpdate(
 			err := api.ValidateForbidden(annotations, tnt.Spec.NamespaceOptions.ForbiddenAnnotations)
 			if err != nil {
 				err = errors.Wrap(err, "namespace annotations validation failed")
-				recorder.Eventf(tnt, corev1.EventTypeWarning, api.ForbiddenAnnotationReason, err.Error())
+				recorder.Eventf(tnt, oldNs, corev1.EventTypeWarning, evt.ReasonForbiddenAnnotation, evt.ActionValidationDenied, err.Error())
 				response := admission.Denied(err.Error())
 
 				return &response
@@ -136,7 +137,7 @@ func (h *userMetadataHandler) OnUpdate(
 			err = api.ValidateForbidden(labels, tnt.Spec.NamespaceOptions.ForbiddenLabels)
 			if err != nil {
 				err = errors.Wrap(err, "namespace labels validation failed")
-				recorder.Eventf(tnt, corev1.EventTypeWarning, api.ForbiddenLabelReason, err.Error())
+				recorder.Eventf(tnt, oldNs, corev1.EventTypeWarning, evt.ReasonForbiddenLabel, evt.ActionValidationDenied, err.Error())
 				response := admission.Denied(err.Error())
 
 				return &response
@@ -151,9 +152,9 @@ func (h *userMetadataHandler) OnDelete(
 	client.Client,
 	*corev1.Namespace,
 	admission.Decoder,
-	record.EventRecorder,
+	events.EventRecorder,
 	*capsulev1beta2.Tenant,
-) capsulewebhook.Func {
+) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}

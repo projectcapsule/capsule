@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Project Capsule Authors
+// Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package template
@@ -6,22 +6,18 @@ package template
 import (
 	"fmt"
 	"io"
-	"maps"
+	"slices"
 	"strings"
 
 	"github.com/valyala/fasttemplate"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// RequiresFastTemplate evaluates if given string requires templating
+// RequiresFastTemplate evaluates if given string requires templating.
 func RequiresFastTemplate(
 	template string,
 ) bool {
-	if !strings.Contains(template, "{{") && !strings.Contains(template, "}}") {
-		return false
-	}
-
-	return true
+	return strings.Contains(template, "{{") && strings.Contains(template, "}}")
 }
 
 // FastTemplate applies templating to the provided string.
@@ -54,15 +50,15 @@ func FastTemplateMap(
 		return map[string]string{}
 	}
 
-	out := maps.Clone(m)
-	for k, v := range out {
+	out := make(map[string]string, len(m))
+	for k, v := range m {
 		out[FastTemplate(k, templateContext)] = FastTemplate(v, templateContext)
 	}
 
 	return out
 }
 
-// FastTemplateMap evaluates if given LabelSelector requires templating
+// FastTemplateMap evaluates if given LabelSelector requires templating.
 func SelectorRequiresTemplating(sel *metav1.LabelSelector) bool {
 	if sel == nil {
 		return false
@@ -76,16 +72,16 @@ func SelectorRequiresTemplating(sel *metav1.LabelSelector) bool {
 		if RequiresFastTemplate(expr.Key) {
 			return true
 		}
-		for _, v := range expr.Values {
-			if RequiresFastTemplate(v) {
-				return true
-			}
+
+		if slices.ContainsFunc(expr.Values, RequiresFastTemplate) {
+			return true
 		}
 	}
+
 	return false
 }
 
-// FastTemplateMap templates a Labelselector (all keys and values)
+// FastTemplateMap templates a Labelselector (all keys and values).
 func FastTemplateLabelSelector(
 	in *metav1.LabelSelector,
 	templateContext map[string]string,
@@ -96,14 +92,13 @@ func FastTemplateLabelSelector(
 
 	out := in.DeepCopy()
 
-	out.MatchLabels = FastTemplateMap(out.MatchLabels, templateContext)
+	out.MatchLabels = FastTemplateMap(in.MatchLabels, templateContext)
 
 	for i := range out.MatchExpressions {
 		out.MatchExpressions[i].Key = FastTemplate(out.MatchExpressions[i].Key, templateContext)
 
 		for j := range out.MatchExpressions[i].Values {
-			out.MatchExpressions[i].Values[j] =
-				FastTemplate(out.MatchExpressions[i].Values[j], templateContext)
+			out.MatchExpressions[i].Values[j] = FastTemplate(out.MatchExpressions[i].Values[j], templateContext)
 		}
 	}
 

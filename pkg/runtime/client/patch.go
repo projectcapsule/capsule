@@ -1,6 +1,7 @@
-// Copyright 2020-2025 Project Capsule Authors
+// Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
+//nolint:dupl
 package client
 
 import (
@@ -9,6 +10,7 @@ import (
 	"fmt"
 	"strings"
 
+	"gomodules.xyz/jsonpatch/v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -17,13 +19,51 @@ import (
 )
 
 type JSONPatch struct {
-	Operation string `json:"op"`
-	Path      string `json:"path"`
-	Value     any    `json:"value,omitempty"`
+	Operation JSONPatchOperation `json:"op"`
+	Path      string             `json:"path"`
+	Value     any                `json:"value,omitempty"`
+}
+
+type JSONPatchOperation string
+
+const (
+	JSONPatchAdd     JSONPatchOperation = "add"
+	JSONPatchReplace JSONPatchOperation = "replace"
+	JSONPatchRemove  JSONPatchOperation = "remove"
+)
+
+func (j JSONPatchOperation) String() string {
+	return string(j)
+}
+
+func EscapeJSONPointer(s string) string {
+	s = strings.ReplaceAll(s, "~", "~0")
+	s = strings.ReplaceAll(s, "/", "~1")
+
+	return s
 }
 
 func JSONPatchesToRawPatch(patches []JSONPatch) (patch []byte, err error) {
 	return json.Marshal(patches)
+}
+
+func JSONPatchesToJSONPatchOperation(
+	patches []JSONPatch,
+) []jsonpatch.JsonPatchOperation {
+	if len(patches) == 0 {
+		return nil
+	}
+
+	ops := make([]jsonpatch.JsonPatchOperation, 0, len(patches))
+	for _, p := range patches {
+		ops = append(ops, jsonpatch.JsonPatchOperation{
+			Operation: p.Operation.String(),
+			Path:      p.Path,
+			Value:     p.Value,
+		})
+	}
+
+	return ops
 }
 
 func ApplyPatches(
@@ -61,25 +101,28 @@ func AddLabelsPatch(labels map[string]string, keys map[string]string) []JSONPatc
 	// JSONPatch add/replace to /metadata/labels/<k> requires /metadata/labels to exist.
 	if labels == nil {
 		patches = append(patches, JSONPatch{
-			Operation: "add",
+			Operation: JSONPatchAdd,
 			Path:      "/metadata/labels",
 			Value:     map[string]string{},
 		})
+
 		labels = map[string]string{} // local view for replace/add decision
 	}
 
 	for key, val := range keys {
-		op := "add"
+		op := JSONPatchAdd
+
 		if existing, ok := labels[key]; ok {
 			if existing == val {
 				continue
 			}
-			op = "replace"
+
+			op = JSONPatchReplace
 		}
 
 		patches = append(patches, JSONPatch{
 			Operation: op,
-			Path:      fmt.Sprintf("/metadata/labels/%s", strings.ReplaceAll(key, "/", "~1")),
+			Path:      fmt.Sprintf("/metadata/labels/%s", EscapeJSONPointer(key)),
 			Value:     val,
 		})
 	}
@@ -98,7 +141,7 @@ func AddAnnotationsPatch(annotations map[string]string, keys map[string]string) 
 	// JSONPatch add/replace to /metadata/annotations/<k> requires /metadata/annotations to exist.
 	if annotations == nil {
 		patches = append(patches, JSONPatch{
-			Operation: "add",
+			Operation: JSONPatchAdd,
 			Path:      "/metadata/annotations",
 			Value:     map[string]string{},
 		})
@@ -106,17 +149,19 @@ func AddAnnotationsPatch(annotations map[string]string, keys map[string]string) 
 	}
 
 	for key, val := range keys {
-		op := "add"
+		op := JSONPatchAdd
+
 		if existing, ok := annotations[key]; ok {
 			if existing == val {
 				continue
 			}
-			op = "replace"
+
+			op = JSONPatchReplace
 		}
 
 		patches = append(patches, JSONPatch{
 			Operation: op,
-			Path:      fmt.Sprintf("/metadata/annotations/%s", strings.ReplaceAll(key, "/", "~1")),
+			Path:      fmt.Sprintf("/metadata/annotations/%s", EscapeJSONPointer(key)),
 			Value:     val,
 		})
 	}
@@ -134,9 +179,9 @@ func PatchRemoveLabels(labels map[string]string, keys []string) []JSONPatch {
 
 	for _, key := range keys {
 		if _, ok := labels[key]; ok {
-			path := fmt.Sprintf("/metadata/labels/%s", strings.ReplaceAll(key, "/", "~1"))
+			path := fmt.Sprintf("/metadata/labels/%s", EscapeJSONPointer(key))
 			patches = append(patches, JSONPatch{
-				Operation: "remove",
+				Operation: JSONPatchRemove,
 				Path:      path,
 			})
 		}
@@ -155,9 +200,9 @@ func PatchRemoveAnnotations(annotations map[string]string, keys []string) []JSON
 
 	for _, key := range keys {
 		if _, ok := annotations[key]; ok {
-			path := fmt.Sprintf("/metadata/annotations/%s", strings.ReplaceAll(key, "/", "~1"))
+			path := fmt.Sprintf("/metadata/annotations/%s", EscapeJSONPointer(key))
 			patches = append(patches, JSONPatch{
-				Operation: "remove",
+				Operation: JSONPatchRemove,
 				Path:      path,
 			})
 		}
@@ -179,16 +224,17 @@ func AddOwnerReferencePatch(
 	// Ensure parent exists if missing (nil slice usually means field absent)
 	if ownerrefs == nil {
 		patches = append(patches, JSONPatch{
-			Operation: "add",
+			Operation: JSONPatchAdd,
 			Path:      "/metadata/ownerReferences",
 			Value:     []metav1.OwnerReference{},
 		})
 
 		patches = append(patches, JSONPatch{
-			Operation: "add",
+			Operation: JSONPatchAdd,
 			Path:      "/metadata/ownerReferences/-",
 			Value:     ownerreference,
 		})
+
 		return patches
 	}
 
@@ -204,16 +250,17 @@ func AddOwnerReferencePatch(
 		}
 
 		patches = append(patches, JSONPatch{
-			Operation: "replace",
+			Operation: JSONPatchReplace,
 			Path:      fmt.Sprintf("/metadata/ownerReferences/%d", i),
 			Value:     ownerreference,
 		})
+
 		return patches
 	}
 
 	// Otherwise append
 	patches = append(patches, JSONPatch{
-		Operation: "add",
+		Operation: JSONPatchAdd,
 		Path:      "/metadata/ownerReferences/-",
 		Value:     ownerreference,
 	})
@@ -234,9 +281,11 @@ func RemoveOwnerReferencePatch(
 	}
 
 	idx := -1
+
 	for i := range ownerRefs {
 		if meta.LooseOwnerReferenceEqual(ownerRefs[i], *toRemove) {
 			idx = i
+
 			break
 		}
 	}
@@ -247,14 +296,14 @@ func RemoveOwnerReferencePatch(
 
 	patches := []JSONPatch{
 		{
-			Operation: "remove",
+			Operation: JSONPatchRemove,
 			Path:      fmt.Sprintf("/metadata/ownerReferences/%d", idx),
 		},
 	}
 
 	if len(ownerRefs) == 1 {
 		patches = append(patches, JSONPatch{
-			Operation: "remove",
+			Operation: JSONPatchRemove,
 			Path:      "/metadata/ownerReferences",
 		})
 	}

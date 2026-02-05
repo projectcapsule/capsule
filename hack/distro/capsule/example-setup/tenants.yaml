@@ -3,16 +3,30 @@ apiVersion: capsule.clastix.io/v1beta2
 kind: Tenant
 metadata:
   name: solar
+  labels:
+    customer: a
 spec:
+  owners:
+  - name: alice
+    kind: User
   permissions:
     matchOwners:
     - matchLabels:
         team: platform
     - matchLabels:
         tenant: solar
-  owners:
-  - name: alice
-    kind: User
+  namespaceOptions:
+    requiredMetadata:
+      labels:
+        env: "prod|test|dev"
+    additionalMetadata:
+      labels:
+        team: platform
+      annotations:
+        owner: "team-platform"
+    additionalMetadataList:
+      - labels:
+          customer: a
   additionalRoleBindings:
   - clusterRoleName: 'view'
     subjects:
@@ -34,7 +48,13 @@ apiVersion: capsule.clastix.io/v1beta2
 kind: Tenant
 metadata:
   name: green
+  labels:
+    customer: a
 spec:
+  namespaceOptions:
+    requiredMetadata:
+      labels:
+        env: "prod|test|dev"
   permissions:
     matchOwners:
     - matchLabels:
@@ -50,6 +70,23 @@ spec:
     - apiGroup: rbac.authorization.k8s.io
       kind: User
       name: alice
+  rules:
+    - enforce:
+        registries:
+        - url: "harbor/.*"
+          policy:
+          - "Never"
+    - namespaceSelector:
+        matchExpressions:
+          - key: env
+            operator: In
+            values:
+            - "prod"
+      enforce:
+        registries:
+        - url: "harbor/v2/customer-registry/prod-image/.*"
+          policy:
+          - "Always"
 ---
 apiVersion: capsule.clastix.io/v1beta2
 kind: Tenant

@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Project Capsule Authors
+// Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package v1beta2
@@ -14,7 +14,7 @@ import (
 )
 
 func (in *Tenant) GetRoleBindings() []api.AdditionalRoleBindingsSpec {
-	roleBindings := make([]api.AdditionalRoleBindingsSpec, 0)
+	roleBindings := make([]api.AdditionalRoleBindingsSpec, 0, len(in.Spec.AdditionalRoleBindings))
 
 	for _, owner := range in.Status.Owners {
 		roleBindings = append(roleBindings, owner.ToAdditionalRolebindings()...)

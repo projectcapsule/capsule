@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Project Capsule Authors
+// Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package tenant
@@ -17,6 +17,7 @@ import (
 	"k8s.io/client-go/util/retry"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/api/meta"
 )
 
 func (r *Manager) syncCustomResourceQuotaUsages(ctx context.Context, tenant *capsulev1beta2.Tenant) error {
@@ -25,11 +26,11 @@ func (r *Manager) syncCustomResourceQuotaUsages(ctx context.Context, tenant *cap
 		group   string
 		version string
 	}
-	//nolint:prealloc
-	var resourceList []resource
+
+	resourceList := make([]resource, 0, len(tenant.GetAnnotations()))
 
 	for k := range tenant.GetAnnotations() {
-		if !strings.HasPrefix(k, capsulev1beta2.ResourceQuotaAnnotationPrefix) {
+		if !strings.HasPrefix(k, meta.ResourceQuotaAnnotationPrefix) {
 			continue
 		}
 

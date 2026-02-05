@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Project Capsule Authors
+// Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package configuration
@@ -38,7 +38,8 @@ type Configuration interface {
 	ForbiddenUserNodeAnnotations() *capsuleapi.ForbiddenListSpec
 	Administrators() capsuleapi.UserListSpec
 	ServiceAccountClientProperties() capsulev1beta2.ServiceAccountClient
-	RBAC() *capsulev1beta2.RbacConfiguration
 	ServiceAccountClient(context.Context) (*rest.Config, error)
+	Admission() capsulev1beta2.DynamicAdmission
+	RBAC() *capsulev1beta2.RBACConfiguration
 	CacheInvalidation() metav1.Duration
 }

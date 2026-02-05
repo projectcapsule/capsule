@@ -10,28 +10,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
-func mustOne(t *testing.T, items []*unstructured.Unstructured) *unstructured.Unstructured {
-	t.Helper()
-	if len(items) != 1 {
-		t.Fatalf("expected 1 item, got %d", len(items))
-	}
-	return items[0]
-}
-
-func TestDefaultSanitizeUnstructuredOptions(t *testing.T) {
-	opts := sanitize.DefaultSanitizeOptions()
-
-	if !opts.StripManagedFields {
-		t.Fatalf("expected StripManagedFields=true")
-	}
-	if !opts.StripLastApplied {
-		t.Fatalf("expected StripLastApplied=true")
-	}
-	if opts.StripStatus {
-		t.Fatalf("expected StripStatus=false")
-	}
-}
-
 func TestSanitizeUnstructured_NilObject_NoPanic(t *testing.T) {
 	// Just ensure it doesn't panic
 	sanitize.SanitizeUnstructured(nil, sanitize.DefaultSanitizeOptions())

@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Project Capsule Authors
+// Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package errors
@@ -10,6 +10,40 @@ import (
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
 	"github.com/projectcapsule/capsule/pkg/api"
 )
+
+type IngressClassError struct {
+	ingressClass string
+	msg          error
+}
+
+func NewIngressClassError(class string, msg error) error {
+	return &IngressClassError{
+		ingressClass: class,
+		msg:          msg,
+	}
+}
+
+func (e IngressClassError) Error() string {
+	return fmt.Sprintf("Failed to resolve Ingress Class %s: %s", e.ingressClass, e.msg)
+}
+
+type IngressClassForbiddenError struct {
+	ingressClassName string
+	spec             api.DefaultAllowedListSpec
+}
+
+func NewIngressClassForbidden(class string, spec api.DefaultAllowedListSpec) error {
+	return &IngressClassForbiddenError{
+		ingressClassName: class,
+		spec:             spec,
+	}
+}
+
+func (i IngressClassForbiddenError) Error() string {
+	err := fmt.Sprintf("Ingress Class %s is forbidden for the current Tenant: ", i.ingressClassName)
+
+	return utils.DefaultAllowedValuesErrorMessage(i.spec, err)
+}
 
 type IngressHostnameNotValidError struct {
 	invalidHostnames     []string

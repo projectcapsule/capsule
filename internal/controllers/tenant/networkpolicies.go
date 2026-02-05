@@ -1,7 +1,6 @@
-// Copyright 2020-2025 Project Capsule Authors
+// Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
-//nolint:dupl
 package tenant
 
 import (
@@ -19,8 +18,9 @@ import (
 )
 
 // Ensuring all the NetworkPolicies are applied to each Namespace handled by the Tenant.
-func (r *Manager) syncNetworkPolicies(ctx context.Context, tenant *capsulev1beta2.Tenant) error { //nolint:dupl
-	// getting requested NetworkPolicy keys
+//
+//nolint:dupl
+func (r *Manager) syncNetworkPolicies(ctx context.Context, tenant *capsulev1beta2.Tenant) error {
 	keys := make([]string, 0, len(tenant.Spec.NetworkPolicies.Items)) //nolint:staticcheck
 
 	//nolint:staticcheck
@@ -47,7 +47,7 @@ func (r *Manager) syncNetworkPolicy(ctx context.Context, tenant *capsulev1beta2.
 	}
 
 	//nolint:staticcheck
-	for i, spec := range tenant.Spec.NetworkPolicies.Items { //nolint:dupl
+	for i, spec := range tenant.Spec.NetworkPolicies.Items {
 		target := &networkingv1.NetworkPolicy{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      fmt.Sprintf("capsule-%s-%d", tenant.Name, i),
@@ -63,8 +63,12 @@ func (r *Manager) syncNetworkPolicy(ctx context.Context, tenant *capsulev1beta2.
 				labels = map[string]string{}
 			}
 
-			labels[meta.TenantLabel] = tenant.Name
+			labels[meta.NewManagedByCapsuleLabel] = meta.ValueController
+			labels[meta.NewTenantLabel] = tenant.Name
 			labels[meta.NetworkPolicyLabel] = strconv.Itoa(i)
+
+			// Remove Legacy labels
+			delete(labels, meta.TenantLabel)
 
 			target.SetLabels(labels)
 			target.Spec = spec
@@ -72,9 +76,7 @@ func (r *Manager) syncNetworkPolicy(ctx context.Context, tenant *capsulev1beta2.
 			return controllerutil.SetControllerReference(tenant, target, r.Scheme())
 		})
 
-		r.emitEvent(tenant, target.GetNamespace(), res, fmt.Sprintf("Ensuring NetworkPolicy %s", target.GetName()), err)
-
-		r.Log.V(4).Info("Network Policy sync result: "+string(res), "name", target.Name, "namespace", target.Namespace)
+		r.Log.V(4).Info("network Policy sync result: "+string(res), "name", target.Name, "namespace", target.Namespace)
 
 		if err != nil {
 			return err

@@ -1,9 +1,13 @@
-// Copyright 2020-2025 Project Capsule Authors
+// Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package predicates
 
-import "sigs.k8s.io/controller-runtime/pkg/event"
+import (
+	"sigs.k8s.io/controller-runtime/pkg/event"
+
+	"github.com/projectcapsule/capsule/pkg/utils"
+)
 
 type UpdatedLabelsPredicate struct{}
 
@@ -16,5 +20,5 @@ func (UpdatedLabelsPredicate) Update(e event.UpdateEvent) bool {
 		return false
 	}
 
-	return !LabelsEqual(e.ObjectOld.GetLabels(), e.ObjectNew.GetLabels())
+	return !utils.MapEqual(e.ObjectOld.GetLabels(), e.ObjectNew.GetLabels())
 }

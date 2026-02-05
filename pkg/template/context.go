@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"text/template"
 
 	k8smeta "k8s.io/apimachinery/pkg/api/meta"
@@ -23,19 +24,11 @@ type TemplateContext struct {
 	Resources []*TemplateResourceReference `json:"resources,omitempty"`
 }
 
-// +kubebuilder:object:generate=true
-type TemplateResourceReference struct {
-	ResourceReference `json:",inline"`
-
-	// Index to mount the resource in the template context
-	Index string `json:"index,omitempty"`
-}
-
 func (t *TemplateContext) GatherContext(
 	ctx context.Context,
 	kubeClient client.Client,
 	restMapper k8smeta.RESTMapper,
-	data map[string]interface{},
+	data map[string]any,
 	namespace string,
 	additionSelectors []labels.Selector,
 ) (context ReferenceContext, errors []error) {
@@ -64,24 +57,23 @@ func (t *TemplateContext) GatherContext(
 		if len(res) > 0 {
 			resourceIndex := resource.Index
 			if resourceIndex == "" {
-				resourceIndex = string(index)
+				resourceIndex = strconv.Itoa(index)
 			}
 
 			for _, u := range res {
 				sanitize.SanitizeUnstructured(u, sanitize.DefaultSanitizeOptions())
 			}
 
-			context[resource.Index] = res
+			context[resourceIndex] = res
 		}
 	}
 
 	return
 }
 
-// Templates itself with the option to populate tenant fields
-// this can be useful if you have per tenant items, that you want to interact with
+// Templates itself with the option to populate tenant fields.
 func (t *TemplateContext) selfTemplate(
-	data map[string]interface{},
+	data map[string]any,
 ) (err error) {
 	dataBytes, err := json.Marshal(t)
 	if err != nil {
@@ -114,7 +106,7 @@ func (t *TemplateContext) selfTemplate(
 }
 
 // +kubebuilder:object:generate=false
-type ReferenceContext map[string]interface{}
+type ReferenceContext map[string]any
 
 func (t *ReferenceContext) String() (string, error) {
 	dataBytes, err := json.Marshal(t)

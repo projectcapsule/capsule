@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Project Capsule Authors
+// Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package template_test
@@ -28,12 +28,12 @@ func TestRequiresFastTemplate(t *testing.T) {
 		{
 			name:     "only opening braces",
 			input:    "value with {{ but no closing",
-			expected: true,
+			expected: false,
 		},
 		{
 			name:     "only closing braces",
 			input:    "value with }} but no opening",
-			expected: true,
+			expected: false,
 		},
 		{
 			name:     "proper template expression",

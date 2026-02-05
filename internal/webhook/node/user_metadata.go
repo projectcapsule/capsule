@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Project Capsule Authors
+// Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package node
@@ -9,13 +9,15 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/version"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	capsulewebhook "github.com/projectcapsule/capsule/internal/webhook"
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
+	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
+	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
+	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
 
 type userMetadataHandler struct {
@@ -23,26 +25,26 @@ type userMetadataHandler struct {
 	version       *version.Version
 }
 
-func UserMetadataHandler(configuration configuration.Configuration, ver *version.Version) capsulewebhook.Handler {
+func UserMetadataHandler(configuration configuration.Configuration, ver *version.Version) handlers.Handler {
 	return &userMetadataHandler{
 		configuration: configuration,
 		version:       ver,
 	}
 }
 
-func (r *userMetadataHandler) OnCreate(client.Client, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
+func (r *userMetadataHandler) OnCreate(client.Client, admission.Decoder, events.EventRecorder) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (r *userMetadataHandler) OnDelete(client.Client, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
+func (r *userMetadataHandler) OnDelete(client.Client, admission.Decoder, events.EventRecorder) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (r *userMetadataHandler) OnUpdate(_ client.Client, decoder admission.Decoder, recorder record.EventRecorder) capsulewebhook.Func {
+func (r *userMetadataHandler) OnUpdate(_ client.Client, decoder admission.Decoder, recorder events.EventRecorder) handlers.Func {
 	return func(_ context.Context, req admission.Request) *admission.Response {
 		nodeWebhookSupported, _ := utils.NodeWebhookSupported(r.version)
 
@@ -65,9 +67,9 @@ func (r *userMetadataHandler) OnUpdate(_ client.Client, decoder admission.Decode
 			newNodeForbiddenLabels := r.getForbiddenNodeLabels(newNode)
 
 			if !reflect.DeepEqual(oldNodeForbiddenLabels, newNodeForbiddenLabels) {
-				recorder.Eventf(newNode, corev1.EventTypeWarning, "ForbiddenNodeLabel", "Denied modifying forbidden labels on node")
+				recorder.Eventf(newNode, oldNode, corev1.EventTypeWarning, evt.ReasonForbiddenLabel, evt.ActionValidationDenied, "Denied modifying forbidden labels on node")
 
-				response := admission.Denied(NewNodeLabelForbiddenError(r.configuration.ForbiddenUserNodeLabels()).Error())
+				response := admission.Denied(caperrors.NewNodeLabelForbiddenError(r.configuration.ForbiddenUserNodeLabels()).Error())
 
 				return &response
 			}
@@ -78,9 +80,9 @@ func (r *userMetadataHandler) OnUpdate(_ client.Client, decoder admission.Decode
 			newNodeForbiddenAnnotations := r.getForbiddenNodeAnnotations(newNode)
 
 			if !reflect.DeepEqual(oldNodeForbiddenAnnotations, newNodeForbiddenAnnotations) {
-				recorder.Eventf(newNode, corev1.EventTypeWarning, "ForbiddenNodeLabel", "Denied modifying forbidden annotations on node")
+				recorder.Eventf(newNode, oldNode, corev1.EventTypeWarning, evt.ReasonForbiddenLabel, evt.ActionValidationDenied, "Denied modifying forbidden annotations on node")
 
-				response := admission.Denied(NewNodeAnnotationForbiddenError(r.configuration.ForbiddenUserNodeAnnotations()).Error())
+				response := admission.Denied(caperrors.NewNodeAnnotationForbiddenError(r.configuration.ForbiddenUserNodeAnnotations()).Error())
 
 				return &response
 			}

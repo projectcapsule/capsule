@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Project Capsule Authors
+// Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package pvc
@@ -9,19 +9,20 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	capsulewebhook "github.com/projectcapsule/capsule/internal/webhook"
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
 	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
+	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
+	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
 
 type validating struct{}
 
-func Validating() capsulewebhook.TypedHandlerWithTenant[*corev1.PersistentVolumeClaim] {
+func Validating() handlers.TypedHandlerWithTenant[*corev1.PersistentVolumeClaim] {
 	return &validating{}
 }
 
@@ -29,9 +30,9 @@ func (h *validating) OnCreate(
 	c client.Client,
 	pvc *corev1.PersistentVolumeClaim,
 	decoder admission.Decoder,
-	recorder record.EventRecorder,
+	recorder events.EventRecorder,
 	tnt *capsulev1beta2.Tenant,
-) capsulewebhook.Func {
+) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		allowed := tnt.Spec.StorageClasses
 
@@ -42,7 +43,14 @@ func (h *validating) OnCreate(
 		storageClass := pvc.Spec.StorageClassName
 
 		if storageClass == nil {
-			recorder.Eventf(tnt, corev1.EventTypeWarning, "MissingStorageClass", "PersistentVolumeClaim %s/%s is missing StorageClass", req.Namespace, req.Name)
+			recorder.Eventf(
+				pvc,
+				&tnt,
+				corev1.EventTypeWarning,
+				evt.ReasonMissingStorageClass,
+				evt.ActionValidationDenied,
+				"Requires a StorageClass",
+			)
 
 			response := admission.Denied(caperrors.NewStorageClassNotValid(*tnt.Spec.StorageClasses).Error())
 
@@ -72,7 +80,13 @@ func (h *validating) OnCreate(
 		case allowed.Match(*storageClass) || selector:
 			return nil
 		default:
-			recorder.Eventf(tnt, corev1.EventTypeWarning, "ForbiddenStorageClass", "PersistentVolumeClaim %s/%s StorageClass %s is forbidden for the current Tenant", req.Namespace, req.Name, *storageClass)
+			recorder.Eventf(
+				pvc,
+				tnt,
+				corev1.EventTypeWarning,
+				evt.ReasonForbiddenStorageClass,
+				evt.ActionValidationDenied,
+				"StorageClass %s is forbidden for the Tenant %s", *storageClass, tnt.GetName())
 
 			response := admission.Denied(caperrors.NewStorageClassForbidden(*pvc.Spec.StorageClassName, *tnt.Spec.StorageClasses).Error())
 
@@ -86,9 +100,9 @@ func (h *validating) OnUpdate(
 	*corev1.PersistentVolumeClaim,
 	*corev1.PersistentVolumeClaim,
 	admission.Decoder,
-	record.EventRecorder,
+	events.EventRecorder,
 	*capsulev1beta2.Tenant,
-) capsulewebhook.Func {
+) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
@@ -98,9 +112,9 @@ func (h *validating) OnDelete(
 	client.Client,
 	*corev1.PersistentVolumeClaim,
 	admission.Decoder,
-	record.EventRecorder,
+	events.EventRecorder,
 	*capsulev1beta2.Tenant,
-) capsulewebhook.Func {
+) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}

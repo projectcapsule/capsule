@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Project Capsule Authors
+// Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package defaults
@@ -10,7 +10,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
@@ -20,7 +19,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/tenant"
 )
 
-func mutatePVCDefaults(ctx context.Context, req admission.Request, c client.Client, decoder admission.Decoder, recorder record.EventRecorder, namespace string) *admission.Response {
+func mutatePVCDefaults(ctx context.Context, req admission.Request, c client.Client, decoder admission.Decoder, namespace string) *admission.Response {
 	var err error
 
 	pvc := &corev1.PersistentVolumeClaim{}
@@ -72,8 +71,6 @@ func mutatePVCDefaults(ctx context.Context, req admission.Request, c client.Clie
 	if err != nil {
 		return utils.ErroredResponse(err)
 	}
-
-	recorder.Eventf(tnt, corev1.EventTypeNormal, "TenantDefault", "Assigned Tenant default Storage Class %s to %s/%s", allowed.Default, pvc.Namespace, pvc.Name)
 
 	response := admission.PatchResponseFromRaw(req.Object.Raw, marshaled)
 

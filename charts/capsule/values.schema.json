@@ -331,6 +331,10 @@
                             "description": "Additional annotations to add to the CapsuleConfiguration resource",
                             "type": "object"
                         },
+                        "cacheInvalidation": {
+                            "description": "Duration after which the in-memory cache is invalidated (based on usaage) and re-fetched from the API server",
+                            "type": "string"
+                        },
                         "capsuleConfiguration": {
                             "description": "Change the default name of the capsule configuration name",
                             "type": "string"
@@ -354,6 +358,10 @@
                         "ignoreUserWithGroups": {
                             "description": "Define groups which when found in the request of a user will be ignored by the Capsule this might be useful if you have one group where all the users are in, but you want to separate administrators from normal users with additional groups.",
                             "type": "array"
+                        },
+                        "impersonation": {
+                            "description": "Impersonation",
+                            "type": "object"
                         },
                         "labels": {
                             "description": "Additional labels to add to the CapsuleConfiguration resource",
@@ -395,6 +403,34 @@
                             "description": "If specified, disallows creation of namespaces matching the passed regexp",
                             "type": "string"
                         },
+                        "rbac": {
+                            "description": "Managed RBAC configuration for the controller",
+                            "type": "object",
+                            "properties": {
+                                "administrationClusterRoles": {
+                                    "description": "The ClusterRoles applied for Administrators",
+                                    "type": "array",
+                                    "items": {
+                                        "type": "string"
+                                    }
+                                },
+                                "deleter": {
+                                    "description": "Name for the ClusterRole required to grant Namespace Deletion permissions.",
+                                    "type": "string"
+                                },
+                                "promotionClusterRoles": {
+                                    "description": "The ClusterRoles applied for ServiceAccounts which had owner Promotion",
+                                    "type": "array",
+                                    "items": {
+                                        "type": "string"
+                                    }
+                                },
+                                "provisioner": {
+                                    "description": "Name for the ClusterRole required to grant Namespace Provision permissions.",
+                                    "type": "string"
+                                }
+                            }
+                        },
                         "userNames": {
                             "description": "DEPRECATED: use users properties. Names of the users considered as Capsule users.",
                             "type": "array"
@@ -434,6 +470,10 @@
                         "existingRoles": {
                             "description": "Specifies further cluster roles to be added to the Capsule manager service account.",
                             "type": "array"
+                        },
+                        "strict": {
+                            "description": "Strongly restrict the RBAC assigned to Capsule Controller. When set to true you must aggregate further permissions by yourself.",
+                            "type": "boolean"
                         }
                     }
                 },
@@ -497,6 +537,48 @@
                         "namespace": {
                             "description": "Custom namespace for dashboard configmaps",
                             "type": "string"
+                        },
+                        "operator": {
+                            "type": "object",
+                            "properties": {
+                                "allowCrossNamespaceImport": {
+                                    "description": "Allow the Operator to match this resource with Grafanas outside the current namespace",
+                                    "type": "boolean"
+                                },
+                                "enabled": {
+                                    "description": "Enable Operator Resources (GrafanaDashboard)",
+                                    "type": "boolean"
+                                },
+                                "folder": {
+                                    "description": "folder assignment for dashboard",
+                                    "type": "string"
+                                },
+                                "instanceSelector": {
+                                    "description": "Selects Grafana instances for import",
+                                    "type": "object"
+                                },
+                                "resyncPeriod": {
+                                    "description": "How often the resource is synced, defaults to 10m0s if not set",
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                },
+                "diagnostics": {
+                    "type": "object",
+                    "properties": {
+                        "annotations": {
+                            "description": "Annotations for dashboard configmaps",
+                            "type": "object"
+                        },
+                        "enabled": {
+                            "description": "Enable Diagnostic Dashboards to be deployed",
+                            "type": "boolean"
+                        },
+                        "labels": {
+                            "description": "Labels for dashboard configmaps",
+                            "type": "object"
                         },
                         "operator": {
                             "type": "object",
@@ -636,6 +718,7 @@
             "type": "object",
             "properties": {
                 "resourcepoolclaims": {
+                    "description": "Allow the creation of ResourcePoolClaims",
                     "type": "object",
                     "properties": {
                         "create": {
@@ -652,6 +735,7 @@
                     }
                 },
                 "resources": {
+                    "description": "Allow the creation of TenantResources",
                     "type": "object",
                     "properties": {
                         "create": {
@@ -710,6 +794,9 @@
                     "description": "Specifies whether a service account should be created.",
                     "type": "boolean"
                 },
+                "imagePullSecrets": {
+                    "type": "array"
+                },
                 "name": {
                     "description": "The name of the service account to use. If not set and `serviceAccount.create=true`, a name is generated using the fullname template",
                     "type": "string"
@@ -744,6 +831,10 @@
         "webhooks": {
             "type": "object",
             "properties": {
+                "annotations": {
+                    "description": "Additional Annotations for all webhooks",
+                    "type": "object"
+                },
                 "exclusive": {
                     "description": "When `crds.exclusive` is `true` the webhooks will be installed",
                     "type": "boolean"
@@ -797,7 +888,18 @@
                                 },
                                 "matchConditions": {
                                     "description": "[MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)",
-                                    "type": "array"
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "expression": {
+                                                "type": "string"
+                                            },
+                                            "name": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
                                 },
                                 "matchPolicy": {
                                     "description": "[MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)",
@@ -817,6 +919,12 @@
                                                     },
                                                     "operator": {
                                                         "type": "string"
+                                                    },
+                                                    "values": {
+                                                        "type": "array",
+                                                        "items": {
+                                                            "type": "string"
+                                                        }
                                                     }
                                                 }
                                             }
@@ -878,7 +986,18 @@
                                 },
                                 "matchConditions": {
                                     "description": "[MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)",
-                                    "type": "array"
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "expression": {
+                                                "type": "string"
+                                            },
+                                            "name": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
                                 },
                                 "matchPolicy": {
                                     "description": "[MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)",
@@ -1204,51 +1323,6 @@
                                 }
                             }
                         },
-                        "networkpolicies": {
-                            "type": "object",
-                            "properties": {
-                                "enabled": {
-                                    "description": "Enable the Hook",
-                                    "type": "boolean"
-                                },
-                                "failurePolicy": {
-                                    "description": "[FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy)",
-                                    "type": "string"
-                                },
-                                "matchConditions": {
-                                    "description": "[MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)",
-                                    "type": "array"
-                                },
-                                "matchPolicy": {
-                                    "description": "[MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)",
-                                    "type": "string"
-                                },
-                                "namespaceSelector": {
-                                    "description": "[NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector)",
-                                    "type": "object",
-                                    "properties": {
-                                        "matchExpressions": {
-                                            "type": "array",
-                                            "items": {
-                                                "type": "object",
-                                                "properties": {
-                                                    "key": {
-                                                        "type": "string"
-                                                    },
-                                                    "operator": {
-                                                        "type": "string"
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                },
-                                "objectSelector": {
-                                    "description": "[ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector)",
-                                    "type": "object"
-                                }
-                            }
-                        },
                         "nodes": {
                             "type": "object",
                             "properties": {
@@ -1542,7 +1616,18 @@
                                 },
                                 "matchConditions": {
                                     "description": "[MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)",
-                                    "type": "array"
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "expression": {
+                                                "type": "string"
+                                            },
+                                            "name": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    }
                                 },
                                 "matchPolicy": {
                                     "description": "[MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)",
@@ -1652,6 +1737,10 @@
                             }
                         }
                     }
+                },
+                "labels": {
+                    "description": "Additional Labels for all webhooks",
+                    "type": "object"
                 },
                 "mutatingWebhooksTimeoutSeconds": {
                     "description": "Timeout in seconds for mutating webhooks",

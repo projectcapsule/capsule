@@ -25,7 +25,6 @@ import (
 	"github.com/go-logr/logr"
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
-	"github.com/projectcapsule/capsule/pkg/api/misc"
 	"github.com/projectcapsule/capsule/pkg/api/processor"
 	"github.com/projectcapsule/capsule/pkg/runtime/gvk"
 	"github.com/projectcapsule/capsule/pkg/runtime/sanitize"
@@ -180,7 +179,7 @@ func (co *Collector) AddToAccumulation(
 		return
 	}
 
-	resource := misc.NewResourceID(obj, tnt.GetName(), origin)
+	resource := gvk.NewResourceID(obj, tnt.GetName(), origin)
 
 	if !combine {
 		if _, k := opts.Accumulator[resource.GetKey("")]; k {
@@ -219,8 +218,8 @@ func (co *Collector) AddToAccumulation(
 
 	processor.AccumulatorAdd(opts.Accumulator, resource, processor.AccumulatorObject{
 		Object: obj,
-		Origin: misc.TenantResourceIDWithOrigin{
-			TenantResourceID: misc.TenantResourceID{
+		Origin: gvk.TenantResourceIDWithOrigin{
+			TenantResourceID: gvk.TenantResourceID{
 				Tenant: tnt.GetName(),
 			},
 			Origin: origin,

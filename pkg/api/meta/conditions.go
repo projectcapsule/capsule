@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Project Capsule Authors
+// Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package meta
@@ -14,8 +14,9 @@ const (
 	CordonedCondition string = "Cordoned"
 	NotReadyCondition string = "NotReady"
 
-	AssignedCondition string = "Assigned"
-	BoundCondition    string = "Bound"
+	AssignedCondition  string = "Assigned"
+	BoundCondition     string = "Bound"
+	ExhaustedCondition string = "Exhausted"
 
 	// FailedReason indicates a condition or event observed a failure (Claim Rejected).
 	SucceededReason          string = "Succeeded"
@@ -26,6 +27,9 @@ const (
 	PoolExhaustedReason      string = "PoolExhausted"
 	QueueExhaustedReason     string = "QueueExhausted"
 	NamespaceExhaustedReason string = "NamespaceExhausted"
+	NoExhaustionsReason      string = "NoExhaustions"
+	InUseReason              string = "InUse"
+	UnusedReason             string = "Unused"
 )
 
 // +kubebuilder:object:generate=true
@@ -56,8 +60,20 @@ func (c *ConditionList) UpdateConditionByType(condition Condition) {
 	*c = append(*c, condition)
 }
 
+func (c *ConditionList) UpdateConditionByTypeWithStatus(condition Condition) (updated bool) {
+	for i, cond := range *c {
+		if cond.Type == condition.Type {
+			return (*c)[i].UpdateCondition(condition)
+		}
+	}
+
+	*c = append(*c, condition)
+
+	return true
+}
+
 // Removes a condition by type.
-func (c *ConditionList) RemoveConditionByType(condition Condition) {
+func (c *ConditionList) RemoveConditionByType(condition string) {
 	if c == nil {
 		return
 	}
@@ -65,7 +81,7 @@ func (c *ConditionList) RemoveConditionByType(condition Condition) {
 	filtered := make(ConditionList, 0, len(*c))
 
 	for _, cond := range *c {
-		if cond.Type != condition.Type {
+		if cond.Type != condition {
 			filtered = append(filtered, cond)
 		}
 	}
@@ -96,13 +112,32 @@ func NewCordonedCondition(obj client.Object) Condition {
 	}
 }
 
-func NewReadyConditionReconcilingReason(obj client.Object) Condition {
+func NewExhaustedCondition(obj client.Object) Condition {
 	return Condition{
-		Type:               ReadyCondition,
-		Status:             metav1.ConditionUnknown,
-		Reason:             ReconcilingReason,
-		Message:            "processing",
+		Type:               ExhaustedCondition,
+		ObservedGeneration: obj.GetGeneration(),
 		LastTransitionTime: metav1.Now(),
+		Reason:             NoExhaustionsReason,
+		Message:            "no exhaustions",
+		Status:             metav1.ConditionFalse,
+	}
+}
+
+func NewBoundCondition(obj client.Object) Condition {
+	return Condition{
+		Type:               BoundCondition,
+		ObservedGeneration: obj.GetGeneration(),
+		LastTransitionTime: metav1.Now(),
+		Message:            "bound by pool",
+	}
+}
+
+func NewAssignedCondition(obj client.Object) Condition {
+	return Condition{
+		Type:               AssignedCondition,
+		ObservedGeneration: obj.GetGeneration(),
+		LastTransitionTime: metav1.Now(),
+		Message:            "assigned to pool",
 	}
 }
 
@@ -128,20 +163,4 @@ func (c *Condition) UpdateCondition(condition Condition) (updated bool) {
 	c.LastTransitionTime = condition.LastTransitionTime
 
 	return true
-}
-
-func NewBoundCondition(obj client.Object) metav1.Condition {
-	return metav1.Condition{
-		Type:               BoundCondition,
-		ObservedGeneration: obj.GetGeneration(),
-		LastTransitionTime: metav1.Now(),
-	}
-}
-
-func NewAssignedCondition(obj client.Object) metav1.Condition {
-	return metav1.Condition{
-		Type:               AssignedCondition,
-		ObservedGeneration: obj.GetGeneration(),
-		LastTransitionTime: metav1.Now(),
-	}
 }

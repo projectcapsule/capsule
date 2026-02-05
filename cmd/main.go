@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Project Capsule Authors
+// Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package main
@@ -31,6 +31,8 @@ import (
 
 	capsulev1beta1 "github.com/projectcapsule/capsule/api/v1beta1"
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/internal/cache"
+	"github.com/projectcapsule/capsule/internal/controllers/admission"
 	configcontroller "github.com/projectcapsule/capsule/internal/controllers/cfg"
 	podlabelscontroller "github.com/projectcapsule/capsule/internal/controllers/pod"
 	"github.com/projectcapsule/capsule/internal/controllers/pv"
@@ -52,7 +54,6 @@ import (
 	"github.com/projectcapsule/capsule/internal/webhook/misc"
 	namespacemutation "github.com/projectcapsule/capsule/internal/webhook/namespace/mutation"
 	namespacevalidation "github.com/projectcapsule/capsule/internal/webhook/namespace/validation"
-	"github.com/projectcapsule/capsule/internal/webhook/networkpolicy"
 	"github.com/projectcapsule/capsule/internal/webhook/node"
 	"github.com/projectcapsule/capsule/internal/webhook/pod"
 	"github.com/projectcapsule/capsule/internal/webhook/pvc"
@@ -62,11 +63,9 @@ import (
 	"github.com/projectcapsule/capsule/internal/webhook/serviceaccounts"
 	tenantmutation "github.com/projectcapsule/capsule/internal/webhook/tenant/mutation"
 	tenantvalidation "github.com/projectcapsule/capsule/internal/webhook/tenant/validation"
-	tntresourceglobal "github.com/projectcapsule/capsule/internal/webhook/tenantresource/global"
-	tntresourcenamespaced "github.com/projectcapsule/capsule/internal/webhook/tenantresource/namespaced"
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
-	"github.com/projectcapsule/capsule/pkg/cache"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
+	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 	"github.com/projectcapsule/capsule/pkg/runtime/indexers"
 )
 
@@ -193,7 +192,7 @@ func main() {
 	if directCfg.EnableTLSConfiguration() {
 		tlsReconciler := &tlscontroller.Reconciler{
 			Client:        directClient,
-			Log:           ctrl.Log.WithName("controllers").WithName("TLS"),
+			Log:           ctrl.Log.WithName("capsule.ctrl").WithName("tls"),
 			Namespace:     ns,
 			Configuration: directCfg,
 		}
@@ -218,13 +217,14 @@ func main() {
 
 	// Initialize Caches
 	impersonationCache := cache.NewImpersonationCache()
+	registryCache := cache.NewRegistryRuleSetCache()
 
 	if err = (&tenantcontroller.Manager{
 		RESTConfig:    manager.GetConfig(),
 		Client:        manager.GetClient(),
 		Metrics:       metrics.MustMakeTenantRecorder(),
-		Log:           ctrl.Log.WithName("controllers").WithName("Tenant"),
-		Recorder:      manager.GetEventRecorderFor("tenant-controller"),
+		Log:           ctrl.Log.WithName("capsule.ctrl").WithName("tenant"),
+		Recorder:      manager.GetEventRecorder("tenant-controller"),
 		Configuration: cfg,
 	}).SetupWithManager(manager, controllerConfig); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Tenant")
@@ -250,11 +250,12 @@ func main() {
 
 	// webhooks: the order matters, don't change it and just append
 	webhooksList := append(
-		make([]webhook.Webhook, 0),
+		make([]handlers.Webhook, 0),
 		route.Pod(
 			pod.Handler(
 				pod.ImagePullPolicy(),
-				pod.ContainerRegistry(cfg),
+				pod.ContainerRegistryLegacy(cfg),
+				pod.ContainerRegistry(cfg, registryCache),
 				pod.PriorityClass(),
 				pod.RuntimeClass(),
 			),
@@ -271,15 +272,15 @@ func main() {
 				service.Validating(),
 			),
 		),
-		route.NetworkPolicy(utils.InCapsuleGroups(cfg, networkpolicy.Handler())),
-		route.Cordoning(tenantvalidation.CordoningHandler(cfg)),
 		route.Node(utils.InCapsuleGroups(cfg, node.UserMetadataHandler(cfg, kubeVersion))),
+		route.Cordoning(handlers.InCapsuleGroups(cfg, misc.CordoningHandler(cfg))),
+		route.Node(handlers.InCapsuleGroups(cfg, node.UserMetadataHandler(cfg, kubeVersion))),
 		route.ServiceAccounts(
 			serviceaccounts.Handler(
 				serviceaccounts.Validating(cfg),
 			),
 		),
-		route.CustomResources(tenantvalidation.ResourceCounterHandler(manager.GetClient())),
+		route.MiscCustomResources(misc.ResourceCounterHandler(manager.GetClient())),
 		route.Gateway(gateway.Class(cfg)),
 		route.DeviceClass(dra.DeviceClass()),
 		route.Defaults(defaults.Handler(cfg, kubeVersion)),
@@ -287,17 +288,21 @@ func main() {
 			tenantmutation.MetaHandler(),
 		),
 		route.TenantValidation(
-			tenantvalidation.NameHandler(),
-			tenantvalidation.RoleBindingRegexHandler(),
-			tenantvalidation.IngressClassRegexHandler(),
-			tenantvalidation.StorageClassRegexHandler(),
-			tenantvalidation.ContainerRegistryRegexHandler(),
-			tenantvalidation.HostnameRegexHandler(),
-			tenantvalidation.FreezedEmitter(),
-			tenantvalidation.ServiceAccountNameHandler(),
-			tenantvalidation.ForbiddenAnnotationsRegexHandler(),
-			tenantvalidation.ProtectedHandler(),
-			tenantvalidation.WarningHandler(cfg),
+			tenantvalidation.Handler(cfg,
+				tenantvalidation.NameHandler(),
+				tenantvalidation.RoleBindingRegexHandler(),
+				tenantvalidation.IngressClassRegexHandler(),
+				tenantvalidation.StorageClassRegexHandler(),
+				tenantvalidation.ContainerRegistryRegexHandler(),
+				tenantvalidation.RuleHandler(),
+				tenantvalidation.HostnameRegexHandler(),
+				tenantvalidation.FreezedEmitter(),
+				tenantvalidation.ServiceAccountNameHandler(),
+				tenantvalidation.ForbiddenAnnotationsRegexHandler(),
+				tenantvalidation.ProtectedHandler(),
+				tenantvalidation.RequiredMetadataHandler(),
+				tenantvalidation.WarningHandler(cfg),
+			),
 		),
 		route.NamespaceValidation(
 			namespacevalidation.NamespaceHandler(
@@ -307,6 +312,7 @@ func main() {
 				namespacevalidation.QuotaHandler(),
 				namespacevalidation.PrefixHandler(cfg),
 				namespacevalidation.UserMetadataHandler(),
+				namespacevalidation.RequiredMetadataHandler(),
 			),
 		),
 		route.NamespaceMutation(
@@ -321,13 +327,11 @@ func main() {
 		route.ResourcePoolValidation((resourcepool.PoolValidationHandler(ctrl.Log.WithName("webhooks").WithName("resourcepool")))),
 		route.ResourcePoolClaimMutation((resourcepool.ClaimMutationHandler(ctrl.Log.WithName("webhooks").WithName("resourcepoolclaims")))),
 		route.ResourcePoolClaimValidation((resourcepool.ClaimValidationHandler(ctrl.Log.WithName("webhooks").WithName("resourcepoolclaims")))),
-		route.TenantResourceNamespacedMutation(tntresourcenamespaced.NamespacedMutatingHandler(cfg)),
-		route.TenantResourceGlobalMutation(tntresourceglobal.GlobalMutatingHandler(cfg)),
 		route.MiscTenantAssignment(
 			misc.TenantAssignmentHandler(),
 		),
 		route.MiscManagedValidation(
-			misc.ManagedValidatingHandler(),
+			handlers.InCapsuleGroups(cfg, misc.ManagedValidatingHandler()),
 		),
 		route.ConfigValidation(
 			cfgvalidation.WarningHandler(),
@@ -337,7 +341,7 @@ func main() {
 
 	nodeWebhookSupported, _ := utils.NodeWebhookSupported(kubeVersion)
 	if !nodeWebhookSupported {
-		setupLog.Info("Disabling node labels verification webhook as current Kubernetes version doesn't have fix for CVE-2021-25735")
+		setupLog.Info("disabling node labels verification webhook as current Kubernetes version doesn't have fix for CVE-2021-25735")
 	}
 
 	if err = webhook.Register(manager, webhooksList...); err != nil {
@@ -346,7 +350,7 @@ func main() {
 	}
 
 	rbacManager := &rbaccontroller.Manager{
-		Log:           ctrl.Log.WithName("controllers").WithName("Rbac"),
+		Log:           ctrl.Log.WithName("capsule.ctrl").WithName("rbac"),
 		Client:        manager.GetClient(),
 		Configuration: cfg,
 	}
@@ -362,19 +366,22 @@ func main() {
 	}
 
 	if err = (&servicelabelscontroller.ServicesLabelsReconciler{
-		Log: ctrl.Log.WithName("controllers").WithName("ServiceLabels"),
+		Log: ctrl.Log.WithName("capsule.ctrl").WithName("services"),
 	}).SetupWithManager(ctx, manager); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ServiceLabels")
 		os.Exit(1)
 	}
 
 	if err = (&servicelabelscontroller.EndpointSlicesLabelsReconciler{
-		Log: ctrl.Log.WithName("controllers").WithName("EndpointSliceLabels"),
+		Log: ctrl.Log.WithName("capsule.ctrl").WithName("endpointslices"),
 	}).SetupWithManager(ctx, manager); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "EndpointSliceLabels")
 	}
 
-	if err = (&podlabelscontroller.MetadataReconciler{Client: manager.GetClient()}).SetupWithManager(ctx, manager); err != nil {
+	if err = (&podlabelscontroller.MetadataReconciler{
+		Client: manager.GetClient(),
+		Log:    ctrl.Log.WithName("capsule.ctrl").WithName("pods"),
+	}).SetupWithManager(ctx, manager); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "PodLabels")
 		os.Exit(1)
 	}
@@ -385,9 +392,10 @@ func main() {
 	}
 
 	if err = (&configcontroller.Manager{
-		Log:    ctrl.Log.WithName("controllers").WithName("CapsuleConfiguration"),
-		Client: manager.GetClient(),
-		Rest:   manager.GetConfig(),
+		Rest:          manager.GetConfig(),
+		Client:        manager.GetClient(),
+		RegistryCache: registryCache,
+		Log:           ctrl.Log.WithName("capsule.ctrl").WithName("configuration"),
 	}).SetupWithManager(manager, controllerConfig); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "CapsuleConfiguration")
 		os.Exit(1)
@@ -414,10 +422,21 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := resourcepools.Add(
-		ctrl.Log.WithName("controllers").WithName("ResourcePools"),
+	if err := admission.Add(
+		ctrl.Log.WithName("capsule.ctrl").WithName("admission"),
 		manager,
-		manager.GetEventRecorderFor("pools-ctrl"),
+		manager.GetEventRecorder("admission-ctrl"),
+		controllerConfig,
+		cfg,
+	); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "admission")
+		os.Exit(1)
+	}
+
+	if err := resourcepools.Add(
+		ctrl.Log.WithName("capsule.ctrl").WithName("resourcepools"),
+		manager,
+		manager.GetEventRecorder("pools-ctrl"),
 		controllerConfig,
 	); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "resourcepools")

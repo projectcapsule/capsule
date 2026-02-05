@@ -190,7 +190,7 @@ func (r *Processor) handlePruneDeletion(
 		return false, nil
 	}
 
-	deletable = meta.HasExactlyCapsuleOwners(actual, meta.CapsuleFieldOwnerPrefix+"/resource/",
+	deletable = meta.HasExactlyCapsuleOwners(actual, meta.FieldManagerCapsulePrefix+"/resource/",
 		[]string{
 			fieldOwner,
 			meta.ResourceControllerFieldOwnerPrefix(),
@@ -273,7 +273,7 @@ func (r *Processor) handleControllerMetadata(
 	switch {
 	case apierrors.IsNotFound(err):
 		patches = append(patches, clt.AddLabelsPatch(existingObject.GetLabels(), map[string]string{
-			meta.CreatedByCapsuleLabel: meta.ResourceControllerValue,
+			meta.CreatedByCapsuleLabel: meta.ValueController,
 		})...)
 
 		if ownerreference != nil {
@@ -286,7 +286,7 @@ func (r *Processor) handleControllerMetadata(
 	default:
 		labels := existingObject.GetLabels()
 
-		if v, ok := labels[meta.CreatedByCapsuleLabel]; ok || v == meta.ResourceControllerValue {
+		if v, ok := labels[meta.CreatedByCapsuleLabel]; ok || v == meta.ValueController {
 			adoptable = true
 		}
 
@@ -302,9 +302,9 @@ func (r *Processor) handleControllerMetadata(
 			})...,
 			)
 
-			if v, ok := labels[meta.CreatedByCapsuleLabel]; !ok || v != meta.ResourceControllerValue {
+			if v, ok := labels[meta.CreatedByCapsuleLabel]; !ok || v != meta.ValueController {
 				patches = append(patches, clt.AddLabelsPatch(existingObject.GetLabels(), map[string]string{
-					meta.CreatedByCapsuleLabel: meta.ResourceControllerValue,
+					meta.CreatedByCapsuleLabel: meta.ValueController,
 				})...)
 			}
 		}

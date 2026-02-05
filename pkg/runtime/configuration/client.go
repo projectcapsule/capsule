@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Project Capsule Authors
+// Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package configuration
@@ -189,16 +189,20 @@ func (c *capsuleConfiguration) Administrators() capsuleapi.UserListSpec {
 	return c.retrievalFn().Spec.Administrators
 }
 
-func (c *capsuleConfiguration) ServiceAccountClientProperties() capsulev1beta2.ServiceAccountClient {
-	return c.retrievalFn().Spec.Impersonation
+func (c *capsuleConfiguration) Admission() capsulev1beta2.DynamicAdmission {
+	return c.retrievalFn().Spec.Admission
 }
 
-func (c *capsuleConfiguration) RBAC() *capsulev1beta2.RbacConfiguration {
+func (c *capsuleConfiguration) RBAC() *capsulev1beta2.RBACConfiguration {
 	return c.retrievalFn().Spec.RBAC
 }
 
 func (c *capsuleConfiguration) CacheInvalidation() metav1.Duration {
 	return c.retrievalFn().Spec.CacheInvalidation
+}
+
+func (c *capsuleConfiguration) ServiceAccountClientProperties() capsulev1beta2.ServiceAccountClient {
+	return c.retrievalFn().Spec.Impersonation
 }
 
 func (c *capsuleConfiguration) ServiceAccountClient(ctx context.Context) (client *rest.Config, err error) {

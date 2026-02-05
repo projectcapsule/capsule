@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Project Capsule Authors
+// Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package predicates_test
@@ -49,7 +49,11 @@ func TestPromotedServiceaccountPredicate_CreateDelete(t *testing.T) {
 			t.Fatalf("Create() = %v, want false (wrong value)", got)
 		}
 
+<<<<<<< HEAD
 		if got := p.Create(event.CreateEvent{Object: mk(map[string]string{meta.OwnerPromotionLabel: meta.OwnerPromotionLabelTrigger})}); !got {
+=======
+		if got := p.Create(event.CreateEvent{Object: mk(map[string]string{meta.OwnerPromotionLabel: meta.ValueTrue})}); !got {
+>>>>>>> 0abc77b56a14062656f7d90f876e3d188f155b2f
 			t.Fatalf("Create() = %v, want true (trigger)", got)
 		}
 	})
@@ -65,7 +69,11 @@ func TestPromotedServiceaccountPredicate_CreateDelete(t *testing.T) {
 			t.Fatalf("Delete() = %v, want false (wrong value)", got)
 		}
 
+<<<<<<< HEAD
 		if got := p.Delete(event.DeleteEvent{Object: mk(map[string]string{meta.OwnerPromotionLabel: meta.OwnerPromotionLabelTrigger})}); !got {
+=======
+		if got := p.Delete(event.DeleteEvent{Object: mk(map[string]string{meta.OwnerPromotionLabel: meta.ValueTrue})}); !got {
+>>>>>>> 0abc77b56a14062656f7d90f876e3d188f155b2f
 			t.Fatalf("Delete() = %v, want true (trigger)", got)
 		}
 	})
@@ -93,8 +101,13 @@ func TestPromotedServiceaccountPredicate_Update(t *testing.T) {
 		want bool
 	}{
 		{"no label in either", nil, nil, false},
+<<<<<<< HEAD
 		{"label added", nil, map[string]string{meta.OwnerPromotionLabel: meta.OwnerPromotionLabelTrigger}, true},
 		{"label removed", map[string]string{meta.OwnerPromotionLabel: meta.OwnerPromotionLabelTrigger}, nil, true},
+=======
+		{"label added", nil, map[string]string{meta.OwnerPromotionLabel: meta.ValueTrue}, true},
+		{"label removed", map[string]string{meta.OwnerPromotionLabel: meta.ValueTrue}, nil, true},
+>>>>>>> 0abc77b56a14062656f7d90f876e3d188f155b2f
 		{"label value changed", map[string]string{meta.OwnerPromotionLabel: "a"}, map[string]string{meta.OwnerPromotionLabel: "b"}, true},
 		{"label unchanged", map[string]string{meta.OwnerPromotionLabel: "a"}, map[string]string{meta.OwnerPromotionLabel: "a"}, false},
 	}

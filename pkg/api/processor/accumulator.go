@@ -6,7 +6,7 @@ package processor
 import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
-	"github.com/projectcapsule/capsule/pkg/api/misc"
+	"github.com/projectcapsule/capsule/pkg/runtime/gvk"
 )
 
 // Keeps track of generated items
@@ -14,19 +14,19 @@ type Accumulator = map[string]*AccumulatorItem
 
 // Keeps track of generated items
 type AccumulatorItem struct {
-	Resource misc.ResourceID
+	Resource gvk.ResourceID
 	Objects  *[]AccumulatorObject
 }
 
 // Keeps track of generated items
 type AccumulatorObject struct {
-	Origin misc.TenantResourceIDWithOrigin
+	Origin gvk.TenantResourceIDWithOrigin
 	Object *unstructured.Unstructured
 }
 
 func AccumulatorAdd(
 	acc Accumulator,
-	resource misc.ResourceID,
+	resource gvk.ResourceID,
 	obj AccumulatorObject,
 ) {
 	if acc == nil {

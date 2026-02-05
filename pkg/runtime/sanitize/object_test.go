@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Project Capsule Authors
+// Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package sanitize_test
@@ -89,7 +89,7 @@ func TestSanitizeObject_LastApplied_AnnotationMapRemovedWhenEmpty(t *testing.T) 
 		t.Fatalf("expected nil error, got %v", err)
 	}
 
-	if anns := pod.GetAnnotations(); anns != nil && len(anns) != 0 {
+	if anns := pod.GetAnnotations(); len(anns) != 0 {
 		t.Fatalf("expected annotations cleared (nil or empty) after removing last-applied, got %#v", anns)
 	}
 }
@@ -205,7 +205,7 @@ func TestSanitizeObject_Unstructured_FastPathMetadataAndStatus(t *testing.T) {
 
 	// scheme not needed for unstructured if your implementation detects it and uses map operations.
 	// If your implementation requires scheme even for unstructured, pass a scheme.
-	if err := sanitize.SanitizeObject(u, nil, opts); err != nil {
+	if err := sanitize.SanitizeObject(u, runtime.NewScheme(), opts); err != nil {
 		t.Fatalf("expected nil error, got %v", err)
 	}
 

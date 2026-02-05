@@ -1,16 +1,17 @@
-// Copyright 2020-2025 Project Capsule Authors
+// Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package v1beta2
 
 import (
-	"github.com/projectcapsule/capsule/pkg/api"
-	"github.com/projectcapsule/capsule/pkg/api/meta"
-	"github.com/projectcapsule/capsule/pkg/api/misc"
-	tpl "github.com/projectcapsule/capsule/pkg/template"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	k8stypes "k8s.io/apimachinery/pkg/types"
+
+	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api/meta"
+	"github.com/projectcapsule/capsule/pkg/runtime/gvk"
+	tpl "github.com/projectcapsule/capsule/pkg/template"
 )
 
 type TenantResourceCommonStatus struct {
@@ -145,7 +146,7 @@ type ObjectReferenceAbstract struct {
 }
 
 type ObjectReferenceStatus struct {
-	misc.ResourceID `json:",inline"`
+	gvk.ResourceID `json:",inline"`
 
 	ObjectReferenceStatusCondition `json:"status,omitempty"`
 }

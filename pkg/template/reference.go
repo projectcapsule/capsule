@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Project Capsule Authors
+// Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 package template
 
@@ -114,6 +114,26 @@ func (t ResourceReference) LoadResources(
 	return ref.loadResources(ctx, kubeClient, restMapper, namespace, additionSelectors)
 }
 
+func (t ResourceReference) IsNamespacedGVK(
+	restMapper k8smeta.RESTMapper,
+) (bool, error) {
+	gv, err := schema.ParseGroupVersion(t.APIVersion)
+	if err != nil {
+		return false, fmt.Errorf("invalid apiVersion %q: %w", t.APIVersion, err)
+	}
+
+	gvk := gv.WithKind(t.Kind)
+
+	mapping, err := restMapper.RESTMapping(gvk.GroupKind(), gvk.Version)
+	if err != nil {
+		return false, fmt.Errorf("failed to resolve GVK %s: %w", gvk.String(), err)
+	}
+
+	isNamespaced := mapping.Scope.Name() == k8smeta.RESTScopeNameNamespace
+
+	return isNamespaced, nil
+}
+
 func (t ResourceReference) loadResources(
 	ctx context.Context,
 	kubeClient client.Client,
@@ -148,7 +168,6 @@ func (t ResourceReference) loadResources(
 		return []*unstructured.Unstructured{obj}, nil
 	}
 
-	// LIST path
 	list := &unstructured.UnstructuredList{}
 	list.SetAPIVersion(t.APIVersion)
 	list.SetKind(t.Kind + "List")
@@ -193,23 +212,4 @@ func (t ResourceReference) loadResources(
 	}
 
 	return results, nil
-}
-
-func (t ResourceReference) IsNamespacedGVK(
-	restMapper k8smeta.RESTMapper,
-) (bool, error) {
-	gv, err := schema.ParseGroupVersion(t.APIVersion)
-	if err != nil {
-		return false, fmt.Errorf("invalid apiVersion %q: %w", t.APIVersion, err)
-	}
-	gvk := gv.WithKind(t.Kind)
-
-	mapping, err := restMapper.RESTMapping(gvk.GroupKind(), gvk.Version)
-	if err != nil {
-		return false, fmt.Errorf("failed to resolve GVK %s: %w", gvk.String(), err)
-	}
-
-	isNamespaced := mapping.Scope.Name() == k8smeta.RESTScopeNameNamespace
-
-	return isNamespaced, nil
 }

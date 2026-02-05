@@ -19,6 +19,31 @@ spec:
     {{- toYaml .Values.manager.options.rbac | nindent 4 }}
   impersonation:
     {{- toYaml .Values.manager.options.impersonation | nindent 4 }}
+  admission:
+    validating:
+      name: "{{ include "capsule.fullname" . }}-dynamic"
+      client:
+        {{- include "capsule.webhooks.serviceConfig" $ | nindent 8 }}
+      {{- if (include "admission.labels" $) }}
+      labels:
+        {{- include "admission.labels" $ | nindent 8 }}
+      {{- end }}
+      {{- if (include "admission.annotations" $) }}
+      annotations:
+        {{- include "admission.annotations" $ | nindent 8 }}
+      {{- end }}
+    mutating:
+      name: "{{ include "capsule.fullname" . }}-dynamic"
+      client:
+        {{- include "capsule.webhooks.serviceConfig" $ | nindent 8 }}
+      {{- if (include "admission.labels" $) }}
+      labels:
+        {{- include "admission.labels" $ | nindent 8 }}
+      {{- end }}
+      {{- if (include "admission.annotations" $) }}
+      annotations:
+        {{- include "admission.annotations" $ | nindent 8 }}
+      {{- end }}
   administrators:
     {{- toYaml .Values.manager.options.administrators | nindent 4 }}
   users:

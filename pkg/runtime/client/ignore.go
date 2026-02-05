@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Project Capsule Authors
+// Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package client
@@ -53,10 +53,14 @@ func JsonPointerGet(obj map[string]any, p string) (any, bool) {
 	if p == "" || p == "/" {
 		return obj, true
 	}
+
 	parts := strings.Split(p, "/")[1:]
+
 	cur := any(obj)
+
 	for _, raw := range parts {
 		key := strings.ReplaceAll(strings.ReplaceAll(raw, "~1", "/"), "~0", "~")
+
 		switch node := cur.(type) {
 		case map[string]any:
 			next, ok := node[key]
@@ -81,22 +85,30 @@ func JsonPointerSet(obj map[string]any, p string, val any) error {
 	if p == "" || p == "/" {
 		return fmt.Errorf("cannot set root with pointer")
 	}
+
 	parts := strings.Split(p, "/")[1:]
+
 	cur := obj
+
 	for i, raw := range parts {
 		key := strings.ReplaceAll(strings.ReplaceAll(raw, "~1", "/"), "~0", "~")
+
 		last := i == len(parts)-1
 		if last {
 			cur[key] = val
+
 			return nil
 		}
+
 		nxt, ok := cur[key]
 		if !ok {
 			n := map[string]any{}
 			cur[key] = n
 			cur = n
+
 			continue
 		}
+
 		switch m := nxt.(type) {
 		case map[string]any:
 			cur = m
@@ -113,15 +125,20 @@ func JsonPointerDelete(obj map[string]any, p string) error {
 	if p == "" || p == "/" {
 		return fmt.Errorf("cannot delete root with pointer")
 	}
+
 	parts := strings.Split(p, "/")[1:]
 	cur := obj
+
 	for i, raw := range parts {
 		key := strings.ReplaceAll(strings.ReplaceAll(raw, "~1", "/"), "~0", "~")
+
 		last := i == len(parts)-1
 		if last {
 			delete(cur, key)
+
 			return nil
 		}
+
 		nxt, ok := cur[key]
 		if !ok {
 			return nil
@@ -130,8 +147,10 @@ func JsonPointerDelete(obj map[string]any, p string) error {
 		if !ok {
 			return nil
 		}
+
 		cur = m
 	}
+
 	return nil
 }
 

@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Project Capsule Authors
+// Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package errors
@@ -7,10 +7,27 @@ import (
 	"fmt"
 	"reflect"
 
+	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
+
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
 	"github.com/projectcapsule/capsule/pkg/api"
-	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
+
+type GatewayClassError struct {
+	gatewayClass string
+	msg          error
+}
+
+func NewGatewayClassError(class string, msg error) error {
+	return &GatewayClassError{
+		gatewayClass: class,
+		msg:          msg,
+	}
+}
+
+func (e GatewayClassError) Error() string {
+	return fmt.Sprintf("Failed to resolve Gateway Class %s: %s", e.gatewayClass, e.msg)
+}
 
 type GatewayError struct {
 	gateway string

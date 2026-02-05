@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Project Capsule Authors
+// Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package tenant
@@ -22,7 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/client-go/util/workqueue"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -50,7 +50,7 @@ type Manager struct {
 
 	Metrics       *metrics.TenantRecorder
 	Log           logr.Logger
-	Recorder      record.EventRecorder
+	Recorder      events.EventRecorder
 	Configuration configuration.Configuration
 	RESTConfig    *rest.Config
 	classes       supportedClasses
@@ -63,11 +63,14 @@ type supportedClasses struct {
 
 func (r *Manager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.ControllerOptions) error {
 	ctrlBuilder := ctrl.NewControllerManagedBy(mgr).
-		Named("tenant").
+		Named("capsule/tenants").
 		For(
 			&capsulev1beta2.Tenant{},
 			builder.WithPredicates(
-				predicate.GenerationChangedPredicate{},
+				predicate.Or(
+					predicate.GenerationChangedPredicate{},
+					predicates.UpdatedMetadataPredicate{},
+				),
 			),
 		).
 		Owns(&networkingv1.NetworkPolicy{}).
@@ -77,8 +80,10 @@ func (r *Manager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.Controller
 		Watches(
 			&capsulev1beta2.CapsuleConfiguration{},
 			handler.EnqueueRequestsFromMapFunc(r.enqueueAllTenants),
-			builder.WithPredicates(predicates.CapsuleConfigSpecChangedPredicate{}),
-			predicates.NamesMatching(ctrlConfig.ConfigurationName),
+			builder.WithPredicates(
+				predicates.CapsuleConfigSpecChangedPredicate{},
+				predicates.NamesMatchingPredicate{Names: []string{ctrlConfig.ConfigurationName}},
+			),
 		).
 		Watches(
 			&corev1.Namespace{},
@@ -238,7 +243,7 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 	instance := &capsulev1beta2.Tenant{}
 	if err = r.Get(ctx, request.NamespacedName, instance); err != nil {
 		if apierrors.IsNotFound(err) {
-			r.Log.V(3).Info("Request object not found, could have been deleted after reconcile request")
+			r.Log.V(3).Info("request object not found, could have been deleted after reconcile request")
 
 			// If tenant was deleted or cannot be found, clean up metrics
 			r.Metrics.DeleteAllMetricsForTenant(request.Name)
@@ -246,7 +251,7 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 			return reconcile.Result{}, nil
 		}
 
-		r.Log.Error(err, "Error reading the object")
+		r.Log.Error(err, "error reading the object")
 
 		return result, err
 	}
@@ -283,17 +288,8 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 		return result, nil
 	}
 
-	// Ensuring ResourceQuota
-	r.Log.V(4).Info("Ensuring limit resources count is updated")
-
-	if err = r.syncCustomResourceQuotaUsages(ctx, instance); err != nil {
-		err = fmt.Errorf("cannot count limited resources: %w", err)
-
-		return result, err
-	}
-
 	// Reconcile Namespaces
-	r.Log.V(4).Info("Starting processing of Namespaces", "items", len(instance.Status.Namespaces))
+	r.Log.V(4).Info("starting processing of Namespaces", "items", len(instance.Status.Namespaces))
 
 	if err = r.reconcileNamespaces(ctx, instance); err != nil {
 		err = fmt.Errorf("namespace(s) had reconciliation errors")
@@ -301,8 +297,17 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 		return result, err
 	}
 
+	// Ensuring ResourceQuota
+	r.Log.V(4).Info("ensuring limit resources count is updated")
+
+	if err = r.syncCustomResourceQuotaUsages(ctx, instance); err != nil {
+		err = fmt.Errorf("cannot count limited resources: %w", err)
+
+		return result, err
+	}
+
 	// Ensuring NetworkPolicy resources
-	r.Log.V(4).Info("Starting processing of Network Policies")
+	r.Log.V(4).Info("starting processing of Network Policies")
 
 	if err = r.syncNetworkPolicies(ctx, instance); err != nil {
 		err = fmt.Errorf("cannot sync networkPolicy items: %w", err)

@@ -1,23 +1,25 @@
-// Copyright 2020-2025 Project Capsule Authors
+// Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package resourcepools
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
 
 	"github.com/go-logr/logr"
+	gherrors "github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/util/retry"
+	"sigs.k8s.io/cluster-api/util/patch"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -30,6 +32,7 @@ import (
 	"github.com/projectcapsule/capsule/internal/metrics"
 	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
+	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/utils"
 )
 
@@ -38,12 +41,12 @@ type resourcePoolController struct {
 
 	metrics  *metrics.ResourcePoolRecorder
 	log      logr.Logger
-	recorder record.EventRecorder
+	recorder events.EventRecorder
 }
 
 func (r *resourcePoolController) SetupWithManager(mgr ctrl.Manager, cfg ctrlutils.ControllerOptions) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		Named("resourcepool/pools").
+		Named("capsule/resourcepools/pools").
 		For(&capsulev1beta2.ResourcePool{}).
 		Owns(&corev1.ResourceQuota{}).
 		Watches(&capsulev1beta2.ResourcePoolClaim{},
@@ -76,6 +79,7 @@ func (r *resourcePoolController) SetupWithManager(mgr ctrl.Manager, cfg ctrlutil
 
 func (r resourcePoolController) Reconcile(ctx context.Context, request ctrl.Request) (result ctrl.Result, err error) {
 	log := r.log.WithValues("Request.Name", request.Name)
+
 	// Fetch the Tenant instance
 	instance := &capsulev1beta2.ResourcePool{}
 	if err = r.Get(ctx, request.NamespacedName, instance); err != nil {
@@ -92,31 +96,31 @@ func (r resourcePoolController) Reconcile(ctx context.Context, request ctrl.Requ
 		return result, err
 	}
 
-	// ResourceQuota Reconciliation
-	reconcileErr := r.reconcile(ctx, log, instance)
+	patchHelper, err := patch.NewHelper(instance, r.Client)
+	if err != nil {
+		return reconcile.Result{}, gherrors.Wrap(err, "failed to init patch helper")
+	}
 
-	r.metrics.ResourceUsageMetrics(instance)
+	defer func() {
+		r.finalize(ctx, instance)
 
-	// Always Post Status
-	err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		current := &capsulev1beta2.ResourcePool{}
-		if err := r.Get(ctx, client.ObjectKeyFromObject(instance), current); err != nil {
-			return fmt.Errorf("failed to refetch instance before update: %w", err)
+		if uerr := r.updateStatus(ctx, instance, err); uerr != nil {
+			err = fmt.Errorf("cannot update pool status: %w", uerr)
+
+			return
 		}
 
-		current.Status = instance.Status
+		r.metrics.ResourceUsageMetrics(instance)
 
-		return r.Client.Status().Update(ctx, current)
-	})
-	if err != nil {
-		return ctrl.Result{}, err
-	}
+		if e := patchHelper.Patch(ctx, instance); e != nil {
+			err = e
 
-	if reconcileErr != nil {
-		return ctrl.Result{}, reconcileErr
-	}
+			return
+		}
+	}()
 
-	err = r.finalize(ctx, instance)
+	// ResourceQuota Reconciliation
+	err = r.reconcile(ctx, log, instance)
 
 	return ctrl.Result{}, err
 }
@@ -124,40 +128,16 @@ func (r resourcePoolController) Reconcile(ctx context.Context, request ctrl.Requ
 func (r *resourcePoolController) finalize(
 	ctx context.Context,
 	pool *capsulev1beta2.ResourcePool,
-) error {
-	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		// Re-fetch latest version of the object
-		latest := &capsulev1beta2.ResourcePool{}
-		if err := r.Get(ctx, client.ObjectKeyFromObject(pool), latest); err != nil {
-			if apierrors.IsNotFound(err) {
-				return nil
-			}
+) {
+	// Case: all claims are gone, remove finalizer
+	if pool.Status.ClaimSize == 0 && controllerutil.ContainsFinalizer(pool, meta.ControllerFinalizer) {
+		controllerutil.RemoveFinalizer(pool, meta.ControllerFinalizer)
+	}
 
-			return err
-		}
-
-		changed := false
-
-		// Case: all claims are gone, remove finalizer
-		if latest.Status.ClaimSize == 0 && controllerutil.ContainsFinalizer(latest, meta.ControllerFinalizer) {
-			controllerutil.RemoveFinalizer(latest, meta.ControllerFinalizer)
-
-			changed = true
-		}
-
-		// Case: claims still exist, add finalizer if not already present
-		if latest.Status.ClaimSize > 0 && !controllerutil.ContainsFinalizer(latest, meta.ControllerFinalizer) {
-			controllerutil.AddFinalizer(latest, meta.ControllerFinalizer)
-
-			changed = true
-		}
-
-		if changed {
-			return r.Update(ctx, latest)
-		}
-
-		return nil
-	})
+	// Case: claims still exist, add finalizer if not already present
+	if pool.Status.ClaimSize > 0 && !controllerutil.ContainsFinalizer(pool, meta.ControllerFinalizer) {
+		controllerutil.AddFinalizer(pool, meta.ControllerFinalizer)
+	}
 }
 
 func (r *resourcePoolController) reconcile(
@@ -169,8 +149,6 @@ func (r *resourcePoolController) reconcile(
 
 	namespaces, err := r.gatherMatchingNamespaces(ctx, log, pool)
 	if err != nil {
-		log.Error(err, "Can not get matching namespaces")
-
 		return err
 	}
 
@@ -181,16 +159,12 @@ func (r *resourcePoolController) reconcile(
 
 	claims, err := r.gatherMatchingClaims(ctx, log, pool, currentNamespaces)
 	if err != nil {
-		log.Error(err, "Can not get matching namespaces")
-
 		return err
 	}
 
 	log.V(5).Info("Collected assigned claims", "count", len(claims))
 
 	if err := r.garbageCollection(ctx, log, pool, claims, currentNamespaces); err != nil {
-		log.Error(err, "Failed to garbage collect ResourceQuotas")
-
 		return err
 	}
 
@@ -205,14 +179,26 @@ func (r *resourcePoolController) reconcile(
 	// This is only required when Ordered is active
 	exhaustions := make(map[string]api.PoolExhaustionResource)
 
-	// You can now iterate over `allClaims` in order
-	for _, claim := range claims {
-		log.V(5).Info("Found claim", "name", claim.Name, "namespace", claim.Namespace, "created", claim.CreationTimestamp)
+	// Soft-fail step: reconcile each claim, collect errors, continue
+	var errs []error
 
-		err = r.reconcileResourceClaim(ctx, log.WithValues("Claim", claim.Name), pool, &claim, exhaustions)
-		if err != nil {
-			log.Error(err, "Failed to reconcile ResourceQuotaClaim", "claim", claim.Name)
+	for i := range claims {
+		claim := &claims[i]
+
+		log.V(5).Info("Found claim",
+			"name", claim.Name,
+			"namespace", claim.Namespace,
+			"created", claim.CreationTimestamp,
+		)
+
+		if err := r.reconcileResourceClaim(ctx, log.WithValues("Claim", claim.Name), pool, claim, exhaustions); err != nil {
+			log.Error(err, "Failed to reconcile ResourceQuotaClaim", "claim", claim.Name, "namespace", claim.Namespace)
+			errs = append(errs, fmt.Errorf("claim %s/%s: %w", claim.Namespace, claim.Name, err))
 		}
+	}
+
+	if err := errors.Join(errs...); err != nil {
+		return err
 	}
 
 	log.V(7).Info("finalized reconciling claims", "exhaustions", exhaustions)
@@ -223,7 +209,123 @@ func (r *resourcePoolController) reconcile(
 	pool.CalculateClaimedResources()
 	pool.AssignClaims()
 
-	return r.syncResourceQuotas(ctx, r.Client, pool, namespaces)
+	if err := r.syncResourceQuotas(ctx, r.Client, pool, namespaces); err != nil {
+		return fmt.Errorf("sync resourcequotas: %w", err)
+	}
+
+	claimsByNS := make(map[string][]capsulev1beta2.ResourcePoolClaim, 16)
+
+	for i := range claims {
+		cl := &claims[i]
+
+		exhausted := cl.Status.Conditions.GetConditionByType(meta.ExhaustedCondition)
+		if exhausted == nil || exhausted.Status != metav1.ConditionTrue {
+			claimsByNS[cl.Namespace] = append(claimsByNS[cl.Namespace], *cl)
+
+			continue
+		}
+
+		cond := meta.NewBoundCondition(cl)
+		cond.Status = metav1.ConditionFalse
+		cond.Reason = meta.FailedReason
+		cond.Message = "claim causes exhaustions"
+
+		if err := updateStatusAndEmitEvent(ctx, r.Client, r.recorder, cl, cond); err != nil {
+			errs = append(errs, fmt.Errorf("update exhausted claim condition %s/%s: %w", cl.Namespace, cl.Name, err))
+		}
+	}
+
+	if err := r.reconcileClaimsInUse(ctx, log, pool, claimsByNS); err != nil {
+		errs = append(errs, fmt.Errorf("reconcile claims in use: %w", err))
+	}
+
+	return errors.Join(errs...)
+}
+
+func (r *resourcePoolController) reconcileClaimsInUse(
+	ctx context.Context,
+	log logr.Logger,
+	pool *capsulev1beta2.ResourcePool,
+	claimsByNS map[string][]capsulev1beta2.ResourcePoolClaim,
+) error {
+	group := new(errgroup.Group)
+
+	for ns, nsClaims := range claimsByNS {
+		group.Go(func() error {
+			if err := r.reconcileClaimsInUseForNamespace(ctx, log, pool, ns, nsClaims); err != nil {
+				return fmt.Errorf("namespace %s: %w", ns, err)
+			}
+
+			return nil
+		})
+	}
+
+	return group.Wait()
+}
+
+func (r *resourcePoolController) reconcileClaimsInUseForNamespace(
+	ctx context.Context,
+	log logr.Logger,
+	pool *capsulev1beta2.ResourcePool,
+	namespace string,
+	claims []capsulev1beta2.ResourcePoolClaim,
+) error {
+	// Fetch the quota we manage for this namespace
+	rq := &corev1.ResourceQuota{}
+	if err := r.Get(ctx, types.NamespacedName{
+		Name: pool.GetQuotaName(), Namespace: namespace,
+	}, rq); err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
+
+		return err
+	}
+
+	used := rq.Status.Used.DeepCopy()
+	if used == nil {
+		used = corev1.ResourceList{}
+	}
+
+	// Consider only resources the pool manages (pool.Spec.Quota.Hard keys).
+	used = filterResourceListByKeys(used, pool.Spec.Quota.Hard)
+
+	// Compute selected claims (by UID) needed to cover used.
+	selected := selectClaimsCoveringUsageGreedy(used, claims)
+
+	// Update conditions only when needed (avoid write storms).
+	for i := range claims {
+		cl := &claims[i]
+
+		_, shouldBeInUse := selected[string(cl.UID)]
+
+		cond := meta.NewBoundCondition(cl)
+		if !shouldBeInUse {
+			cond.Status = metav1.ConditionFalse
+			cond.Reason = meta.UnusedReason
+			cond.Message = "claim is unused"
+		} else {
+			cond.Status = metav1.ConditionTrue
+			cond.Reason = meta.InUseReason
+			cond.Message = "claim is used"
+		}
+
+		err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+			current := &capsulev1beta2.ResourcePoolClaim{}
+			if err := r.Get(ctx, client.ObjectKeyFromObject(cl), current); err != nil {
+				return fmt.Errorf("failed to refetch instance before update: %w", err)
+			}
+
+			current.Status.Conditions.UpdateConditionByType(cond)
+
+			return r.Status().Update(ctx, current)
+		})
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // Reconciles a single ResourceClaim.
@@ -334,8 +436,8 @@ func (r *resourcePoolController) handleClaimOrderedExhaustion(
 	if len(status) != 0 {
 		queued = true
 
-		cond := meta.NewBoundCondition(claim)
-		cond.Status = metav1.ConditionFalse
+		cond := meta.NewExhaustedCondition(claim)
+		cond.Status = metav1.ConditionTrue
 		cond.Reason = meta.QueueExhaustedReason
 		cond.Message = strings.Join(status, "; ")
 
@@ -351,14 +453,14 @@ func (r *resourcePoolController) handleClaimResourceExhaustion(
 	currentExhaustions map[string]api.PoolExhaustionResource,
 	exhaustions map[string]api.PoolExhaustionResource,
 ) (err error) {
-	status := make([]string, 0)
-
-	resourceNames := make([]string, 0)
+	resourceNames := make([]string, 0, len(currentExhaustions))
 	for resourceName := range currentExhaustions {
 		resourceNames = append(resourceNames, resourceName)
 	}
 
 	sort.Strings(resourceNames)
+
+	status := make([]string, 0, len(resourceNames))
 
 	for _, resourceName := range resourceNames {
 		ex := currentExhaustions[resourceName]
@@ -383,8 +485,8 @@ func (r *resourcePoolController) handleClaimResourceExhaustion(
 	}
 
 	if len(status) != 0 {
-		cond := meta.NewBoundCondition(claim)
-		cond.Status = metav1.ConditionFalse
+		cond := meta.NewExhaustedCondition(claim)
+		cond.Status = metav1.ConditionTrue
 		cond.Reason = meta.PoolExhaustedReason
 		cond.Message = strings.Join(status, "; ")
 
@@ -399,10 +501,10 @@ func (r *resourcePoolController) handleClaimToPoolBinding(
 	pool *capsulev1beta2.ResourcePool,
 	claim *capsulev1beta2.ResourcePoolClaim,
 ) (err error) {
-	cond := meta.NewBoundCondition(claim)
-	cond.Status = metav1.ConditionTrue
-	cond.Reason = meta.SucceededReason
-	cond.Message = "Claimed resources"
+	cond := meta.NewExhaustedCondition(claim)
+	cond.Status = metav1.ConditionFalse
+	cond.Reason = meta.NoExhaustionsReason
+	cond.Message = "resource claimable from pool"
 
 	if err = updateStatusAndEmitEvent(ctx, r.Client, r.recorder, claim, cond); err != nil {
 		return err
@@ -440,6 +542,15 @@ func (r *resourcePoolController) handleClaimDisassociation(
 			return fmt.Errorf("failed to refetch claim before patch: %w", err)
 		}
 
+		// Remove Status Items
+		current.Status.Pool = meta.LocalRFC1123ObjectReferenceWithUID{}
+		current.Status.Conditions.RemoveConditionByType(meta.BoundCondition)
+		current.Status.Conditions.RemoveConditionByType(meta.ExhaustedCondition)
+
+		if err := r.Client.Status().Update(ctx, current); err != nil {
+			return fmt.Errorf("failed to update claim status: %w", err)
+		}
+
 		if !*pool.Spec.Config.DeleteBoundResources || meta.ReleaseAnnotationTriggers(current) {
 			patch := client.MergeFrom(current.DeepCopy())
 			meta.RemoveLooseOwnerReference(current, meta.GetLooseOwnerReference(pool))
@@ -450,20 +561,13 @@ func (r *resourcePoolController) handleClaimDisassociation(
 			}
 		}
 
-		current.Status.Pool = api.StatusNameUID{}
-		if err := r.Client.Status().Update(ctx, current); err != nil {
-			return fmt.Errorf("failed to update claim status: %w", err)
-		}
-
-		r.recorder.AnnotatedEventf(
+		r.recorder.Eventf(
+			pool,
 			current,
-			map[string]string{
-				"Status": string(metav1.ConditionFalse),
-				"Type":   meta.NotReadyCondition,
-			},
 			corev1.EventTypeNormal,
-			"Disassociated",
-			"Claim is disassociated from the pool",
+			evt.ReasonDisassociated,
+			evt.ActionDisassociating,
+			"claim is disassociated from the pool",
 		)
 
 		return nil
@@ -532,6 +636,7 @@ func (r *resourcePoolController) syncResourceQuota(
 			}
 
 			targetLabels[quotaLabel] = pool.Name
+			targetLabels[meta.NewManagedByCapsuleLabel] = meta.ValueController
 
 			target.SetLabels(targetLabels)
 			target.Spec.Scopes = pool.Spec.Quota.Scopes
@@ -618,9 +723,7 @@ func (r *resourcePoolController) gatherMatchingClaims(
 	}
 
 	claimList := &capsulev1beta2.ResourcePoolClaimList{}
-	if err := r.List(ctx, claimList, client.MatchingFieldsSelector{
-		Selector: fields.OneTermEqualSelector(".status.pool.uid", string(pool.GetUID())),
-	}); err != nil {
+	if err := r.List(ctx, claimList, client.MatchingFields{".status.pool.uid": string(pool.GetUID())}); err != nil {
 		log.Error(err, "failed to list ResourceQuotaClaims")
 
 		return claims, err
@@ -704,7 +807,7 @@ func (r *resourcePoolController) garbageCollection(
 			if nsMarked || !claimActive {
 				log.V(5).Info("Disassociating claim", "claim", cl.Name, "namespace", ns, "uid", cl.UID, "nsGC", nsMarked, "claimGC", claimActive)
 
-				cl.Namespace = api.Name(ns)
+				cl.Namespace = meta.RFC1123SubdomainName(ns)
 				if err := r.handleClaimDisassociation(ctx, log, pool, cl); err != nil {
 					r.log.Error(err, "Failed to disassociate claim", "namespace", ns, "uid", cl.UID)
 
@@ -772,4 +875,37 @@ func (r *resourcePoolController) garbageCollectNamespace(
 	}
 
 	return nil
+}
+
+func (r *resourcePoolController) updateStatus(ctx context.Context, pool *capsulev1beta2.ResourcePool, reconcileError error) error {
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
+		latest := &capsulev1beta2.ResourcePool{}
+		if err = r.Get(ctx, types.NamespacedName{Name: pool.GetName()}, latest); err != nil {
+			return err
+		}
+
+		latest.Status = pool.Status
+
+		// Set Ready Condition
+		readyCondition := meta.NewReadyCondition(pool)
+		if reconcileError != nil {
+			readyCondition.Message = reconcileError.Error()
+			readyCondition.Status = metav1.ConditionFalse
+			readyCondition.Reason = meta.FailedReason
+		}
+
+		latest.Status.Conditions.UpdateConditionByType(readyCondition)
+
+		// Set Exhaustion Condition
+		exCondition := meta.NewExhaustedCondition(pool)
+		if len(latest.Status.Exhaustions) != 0 {
+			exCondition.Message = "Pool has exhaustions"
+			exCondition.Status = metav1.ConditionTrue
+			exCondition.Reason = meta.PoolExhaustedReason
+		}
+
+		latest.Status.Conditions.UpdateConditionByType(exCondition)
+
+		return r.Client.Status().Update(ctx, latest)
+	})
 }

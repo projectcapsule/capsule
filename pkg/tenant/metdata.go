@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Project Capsule Authors
+// Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package tenant
@@ -19,8 +19,20 @@ func AddNamespaceNameLabels(labels map[string]string, ns *corev1.Namespace) {
 	labels["kubernetes.io/metadata.name"] = ns.GetName()
 }
 
-func AddTenantNameLabel(labels map[string]string, ns *corev1.Namespace, tnt *capsulev1beta2.Tenant) {
+func AddTenantNameLabel(labels map[string]string, tnt *capsulev1beta2.Tenant) {
 	labels[meta.TenantLabel] = tnt.GetName()
+}
+
+func HasCustomResourceQuotaAnnotation(tenant *capsulev1beta2.Tenant) bool {
+	for k := range tenant.GetAnnotations() {
+		if !strings.HasPrefix(k, meta.ResourceQuotaAnnotationPrefix) {
+			continue
+		}
+
+		return true
+	}
+
+	return false
 }
 
 func BuildInstanceMetadataForNamespace(ns *corev1.Namespace, tnt *capsulev1beta2.Tenant) (labels map[string]string, annotations map[string]string) {
@@ -106,6 +118,7 @@ func BuildNamespaceAnnotationsForTenant(tnt *capsulev1beta2.Tenant) map[string]s
 		}
 	}
 
+	//nolint:staticcheck
 	if cr := tnt.Spec.ContainerRegistries; cr != nil {
 		if len(cr.Exact) > 0 {
 			annotations[meta.AllowedRegistriesAnnotation] = strings.Join(cr.Exact, ",")
@@ -134,13 +147,17 @@ func BuildNamespaceAnnotationsForTenant(tnt *capsulev1beta2.Tenant) map[string]s
 func BuildNamespaceLabelsForTenant(tnt *capsulev1beta2.Tenant) map[string]string {
 	labels := make(map[string]string)
 
+	if HasCustomResourceQuotaAnnotation(tnt) {
+		labels[meta.CustomResourcesLabel] = meta.ValueTrue
+	}
+
 	//nolint:staticcheck
 	if md := tnt.Spec.NamespaceOptions; md != nil && md.AdditionalMetadata != nil {
 		maps.Copy(labels, md.AdditionalMetadata.Labels)
 	}
 
 	if tnt.Spec.Cordoned {
-		labels[meta.CordonedLabel] = "true"
+		labels[meta.CordonedLabel] = meta.ValueTrue
 	}
 
 	return labels

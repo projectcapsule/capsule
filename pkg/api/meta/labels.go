@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Project Capsule Authors
+// Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package meta
@@ -20,23 +20,19 @@ const (
 
 	ResourcePoolLabel = "projectcapsule.dev/pool"
 
-	FreezeLabel        = "projectcapsule.dev/freeze"
-	FreezeLabelTrigger = "true"
+	FreezeLabel = "projectcapsule.dev/freeze"
 
-	OwnerPromotionLabel        = "owner.projectcapsule.dev/promote"
-	OwnerPromotionLabelTrigger = "true"
+	OwnerPromotionLabel = "owner.projectcapsule.dev/promote"
 
-	CordonedLabel        = "projectcapsule.dev/cordoned"
-	CordonedLabelTrigger = "true"
+	CordonedLabel = "projectcapsule.dev/cordoned"
 
-	ManagedByCapsuleLabel    = "capsule.clastix.io/managed-by"
-	NewManagedByCapsuleLabel = "projectcapsule.dev/managed-by"
-
-	ResourceControllerValue = "resources"
+	CapsuleNameLabel = "projectcapsule.dev/name"
 
 	CreatedByCapsuleLabel = "projectcapsule.dev/created-by"
+	CustomResourcesLabel  = "projectcapsule.dev/custom-resources"
 
-	ResourceCapsuleLabel = "capsule.clastix.io/resources"
+	NewManagedByCapsuleLabel = "projectcapsule.dev/managed-by"
+	ManagedByCapsuleLabel    = "capsule.clastix.io/managed-by"
 
 	LimitRangeLabel    = "capsule.clastix.io/limit-range"
 	NetworkPolicyLabel = "capsule.clastix.io/network-policy"
@@ -45,7 +41,7 @@ const (
 )
 
 func FreezeLabelTriggers(obj client.Object) bool {
-	return labelTriggers(obj, FreezeLabel, FreezeLabelTrigger)
+	return labelTriggers(obj, FreezeLabel, ValueTrue)
 }
 
 func FreezeLabelRemove(obj client.Object) {
@@ -53,7 +49,7 @@ func FreezeLabelRemove(obj client.Object) {
 }
 
 func OwnerPromotionLabelTriggers(obj client.Object) bool {
-	return labelTriggers(obj, OwnerPromotionLabel, OwnerPromotionLabelTrigger)
+	return labelTriggers(obj, OwnerPromotionLabel, ValueTrue)
 }
 
 func OwnerPromotionLabelRemove(obj client.Object) {
@@ -90,7 +86,7 @@ func SetFilteredLabels(obj *unstructured.Unstructured, filter map[string]struct{
 
 	labels := obj.GetLabels()
 	if labels == nil {
-		labels = make(map[string]string, len(filter))
+		return
 	}
 
 	for k := range labels {
@@ -100,4 +96,18 @@ func SetFilteredLabels(obj *unstructured.Unstructured, filter map[string]struct{
 	}
 
 	obj.SetLabels(labels)
+}
+
+// LabelsChanged indicates if the given label keys have changed.
+func LabelsChanged(keys []string, oldLabels, newLabels map[string]string) bool {
+	for _, key := range keys {
+		oldVal, oldOK := oldLabels[key]
+		newVal, newOK := newLabels[key]
+
+		if oldOK != newOK || oldVal != newVal {
+			return true
+		}
+	}
+
+	return false
 }
