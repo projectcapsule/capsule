@@ -21,7 +21,6 @@ func (o NamespacesReference) Field() string {
 	return ".status.namespaces"
 }
 
-//nolint:forcetypeassert
 func (o NamespacesReference) Func() client.IndexerFunc {
 	return func(object client.Object) []string {
 		t, ok := object.(*capsulev1beta2.Tenant)
