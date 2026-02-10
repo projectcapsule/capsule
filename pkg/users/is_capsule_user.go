@@ -5,7 +5,6 @@ package users
 
 import (
 	"context"
-	"os"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
@@ -35,7 +34,7 @@ func IsCapsuleUser(
 	if sets.NewString(groups...).Has("system:serviceaccounts") {
 		namespace, name, err := serviceaccount.SplitUsername(user)
 		if err == nil {
-			if namespace == os.Getenv("NAMESPACE") && name == os.Getenv("SERVICE_ACCOUNT") {
+			if configuration.IsControllerServiceAccount(name, namespace) {
 				return false
 			}
 

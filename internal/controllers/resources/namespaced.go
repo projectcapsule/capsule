@@ -27,11 +27,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/internal/cache"
 	"github.com/projectcapsule/capsule/internal/controllers/utils"
 	"github.com/projectcapsule/capsule/internal/metrics"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/api/processor"
-	"github.com/projectcapsule/capsule/pkg/cache"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	"github.com/projectcapsule/capsule/pkg/runtime/predicates"
 	"github.com/projectcapsule/capsule/pkg/tenant"
@@ -270,8 +270,8 @@ func (r *namespacedResourceController) reconcile(
 		processor.ProcessorOptions{
 			FieldOwnerPrefix: getFieldOwner(tntResource.GetName(), tntResource.GetNamespace()),
 			Prune:            *tntResource.Spec.PruningOnDelete,
-			Adopt:            *tntResource.Spec.Adopt,
-			Force:            *tntResource.Spec.Force,
+			Adopt:            *tntResource.Spec.Settings.Adopt,
+			Force:            *tntResource.Spec.Settings.Force,
 			Owner:            nil,
 		})
 }
@@ -346,7 +346,15 @@ func (r *namespacedResourceController) gatherResources(
 	}
 
 	for index, resource := range tntResource.Spec.Resources {
-		err = r.collector.foreachTenantNamespace(ctx, log, c, tnt, resource, strconv.Itoa(index), acc, false)
+		err = r.collector.foreachTenantNamespace(
+			ctx,
+			log,
+			c,
+			opts,
+			tnt,
+			resource,
+			strconv.Itoa(index),
+		)
 		if err != nil {
 			return err
 		}
@@ -362,7 +370,19 @@ func (r *namespacedResourceController) loadClient(
 ) (client.Client, error) {
 	sa := r.impersonatedServiceAccount(ctx, log, tntResource)
 	if sa == nil {
+		sa, ns := configuration.ControllerServiceAccount()
+
+		tntResource.Status.ServiceAccount = &meta.NamespacedRFC1123ObjectReferenceWithNamespace{
+			Name:      meta.RFC1123Name(sa),
+			Namespace: meta.RFC1123SubdomainName(ns),
+		}
+
 		return r.client, nil
+	}
+
+	tntResource.Status.ServiceAccount = &meta.NamespacedRFC1123ObjectReferenceWithNamespace{
+		Name:      sa.Name,
+		Namespace: sa.Namespace,
 	}
 
 	re, err := r.configuration.ServiceAccountClient(ctx)
@@ -371,6 +391,8 @@ func (r *namespacedResourceController) loadClient(
 
 		return nil, err
 	}
+
+	log.V(5).Info("using impersonation client", "serviceaccount", sa.Name, "namespace", sa.Namespace)
 
 	return r.impersonation.LoadOrCreate(ctx, log, re, r.client.Scheme(), *sa)
 }
@@ -413,6 +435,8 @@ func (r *namespacedResourceController) updateReconcilingStatus(ctx context.Conte
 }
 
 func (r *namespacedResourceController) updateStatus(ctx context.Context, instance *capsulev1beta2.TenantResource, reconcileError error) error {
+	instance.Status.UpdateStats()
+
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
 		latest := &capsulev1beta2.TenantResource{}
 		if err = r.client.Get(ctx, types.NamespacedName{Name: instance.GetName(), Namespace: instance.GetNamespace()}, latest); err != nil {

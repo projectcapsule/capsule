@@ -141,6 +141,16 @@ func NewAssignedCondition(obj client.Object) Condition {
 	}
 }
 
+func NewReadyConditionReconcilingReason(obj client.Object) Condition {
+	return Condition{
+		Type:               ReadyCondition,
+		Status:             metav1.ConditionUnknown,
+		Reason:             ReconcilingReason,
+		Message:            "processing",
+		LastTransitionTime: metav1.Now(),
+	}
+}
+
 // Disregards fields like LastTransitionTime and Version, which are not relevant for the API.
 func (c *Condition) UpdateCondition(condition Condition) (updated bool) {
 	if condition.Type == c.Type &&

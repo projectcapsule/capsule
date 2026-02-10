@@ -45,7 +45,7 @@ func (h *validating) OnCreate(
 		if storageClass == nil {
 			recorder.Eventf(
 				pvc,
-				&tnt,
+				tnt,
 				corev1.EventTypeWarning,
 				evt.ReasonMissingStorageClass,
 				evt.ActionValidationDenied,

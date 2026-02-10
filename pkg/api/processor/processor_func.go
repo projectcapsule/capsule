@@ -12,6 +12,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
@@ -32,35 +33,72 @@ func (p *Processor) Reconcile(
 
 	log.V(5).Info("starting pruning items", "present", len(*processed))
 
+	failAndContinue := func(i capsulev1beta2.ObjectReferenceStatus, msg string, err error) bool { // replace ItemType
+		if err == nil {
+			return false
+		}
+
+		itemErrors++
+		i.Status = metav1.ConditionFalse
+		i.Message = msg + err.Error()
+		processed.UpdateItem(i)
+
+		return true
+	}
+
 	// Prune first, to work on a consistent Status
+	var reconErr error
+
 	for _, i := range *processed {
 		if _, exists := acc[i.GetKey("")]; !exists {
+			obj := &unstructured.Unstructured{}
+			obj.SetGroupVersionKind(i.GetGVK())
+			obj.SetNamespace(i.GetNamespace())
+			obj.SetName(i.GetName())
+
 			if opts.Prune {
 				if !i.LastApply.IsZero() {
 					log.V(4).Info("pruning resources", "Kind", i.Kind, "Name", i.Name, "Namespace", i.Namespace)
 
-					obj := &unstructured.Unstructured{}
-					obj.SetGroupVersionKind(i.GetGVK())
-					obj.SetNamespace(i.GetNamespace())
-					obj.SetName(i.GetName())
-
 					fieldOwner := opts.FieldOwnerPrefix + "/" + i.FieldOwner("")
 
-					err := p.Prune(ctx, c, obj, fieldOwner)
-					if err != nil {
-						itemErrors++
+					_, reconErr = p.Prune(ctx, c, obj, fieldOwner)
+					if failAndContinue(i, "pruning failed for item: ", reconErr) {
+						continue
+					}
+				}
+			}
 
-						i.Status = metav1.ConditionFalse
-						i.Message = "pruning failed for item: " + err.Error()
-						processed.UpdateItem(i)
+			// Disown item (only when GET succeeded)
+			patches, err := p.handleRemoveManagedMetadata(ctx, c, obj, opts.Owner)
+			if err != nil {
+				if apierrors.IsNotFound(err) {
+					processed.RemoveItem(i)
+
+					continue
+				}
+
+				if failAndContinue(i, "disowning failed for item: ", err) {
+					continue
+				}
+			}
+
+			if len(patches) > 0 {
+				err = clt.ApplyPatches(ctx, c, obj, patches, meta.ResourceControllerFieldOwnerPrefix())
+				if err != nil {
+					if apierrors.IsNotFound(err) {
+						processed.RemoveItem(i)
 
 						continue
 					}
 
+					if failAndContinue(i, "removing metdata failed for item: ", err) {
+						continue
+					}
 				}
-
-				processed.RemoveItem(i)
 			}
+
+			processed.RemoveItem(i)
 		}
 	}
 
@@ -93,11 +131,12 @@ func (p *Processor) Reconcile(
 				opts.Owner,
 			)
 
+			or.Created = created
+
 			if err != nil {
 				hadError = true
 				or.Status = metav1.ConditionFalse
 				or.Message = "apply failed for item " + obj.Origin.Origin + ": " + err.Error()
-				or.Created = created
 
 				log.V(4).Info("failed to apply item", "item", obj.Origin.Origin)
 			} else {
@@ -134,13 +173,7 @@ func (r *Processor) Prune(
 	c client.Client,
 	obj *unstructured.Unstructured,
 	fieldOwner string,
-) (err error) {
-
-	target := &unstructured.Unstructured{}
-	target.SetGroupVersionKind(obj.GroupVersionKind())
-	target.SetNamespace(obj.GetNamespace())
-	target.SetName(obj.GetName())
-
+) (deleted bool, err error) {
 	actual := &unstructured.Unstructured{}
 	actual.SetGroupVersionKind(obj.GroupVersionKind())
 	actual.SetNamespace(obj.GetNamespace())
@@ -149,10 +182,10 @@ func (r *Processor) Prune(
 	err = c.Get(ctx, client.ObjectKeyFromObject(actual), actual)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			return nil
+			return true, nil
 		}
 
-		return err
+		return false, err
 	}
 
 	deletable, err := r.handlePruneDeletion(
@@ -162,20 +195,19 @@ func (r *Processor) Prune(
 		fieldOwner,
 	)
 	if err != nil {
-		return err
+		return deletable, err
 	}
 
 	if deletable {
-		return nil
+		return deletable, nil
 	}
 
-	return clt.CreateOrPatch(
-		ctx,
-		c,
-		obj,
-		fieldOwner,
-		false,
-	)
+	err = clt.PatchApply(ctx, c, obj, fieldOwner, false)
+	if apierrors.IsNotFound(err) {
+		return true, nil
+	}
+
+	return false, err
 }
 
 // Completely prune the resource when there's no more managers and the resource was created by the controller
@@ -208,6 +240,41 @@ func (r *Processor) handlePruneDeletion(
 	return deletable, err
 }
 
+// Remove metadata from the controller when an object
+// is not pruned
+func (r *Processor) handleRemoveManagedMetadata(
+	ctx context.Context,
+	c client.Client,
+	obj *unstructured.Unstructured,
+	ownerreference *metav1.OwnerReference,
+) (patches []clt.JSONPatch, err error) {
+	existingObject := obj.DeepCopy()
+
+	err = c.Get(ctx, client.ObjectKeyFromObject(existingObject), existingObject)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	// Remove Ownerreference if given
+	if ownerreference != nil {
+		patches = append(patches, clt.RemoveOwnerReferencePatch(existingObject.GetOwnerReferences(), ownerreference)...)
+	}
+
+	// Remove Managed Labels
+	if v, ok := existingObject.GetLabels()[meta.NewManagedByCapsuleLabel]; !ok || v != meta.ValueControllerResources {
+		return patches, nil
+	}
+
+	patches = append(patches, clt.PatchRemoveLabels(existingObject.GetLabels(), []string{
+		meta.NewManagedByCapsuleLabel,
+	})...)
+
+	return patches, nil
+}
+
 func (r *Processor) Apply(
 	ctx context.Context,
 	c client.Client,
@@ -219,28 +286,32 @@ func (r *Processor) Apply(
 ) (lastApply *metav1.Time, created bool, err error) {
 	log := log.FromContext(ctx)
 
-	obj.GetOwnerReferences()
-
 	actual := &unstructured.Unstructured{}
 	actual.SetGroupVersionKind(obj.GroupVersionKind())
 	actual.SetNamespace(obj.GetNamespace())
 	actual.SetName(obj.GetName())
-
-	log.Info("LOOKING UP", "name", obj.GetName(), "namespace", obj.GetNamespace())
+	key := client.ObjectKeyFromObject(actual)
 
 	// We need to mark an item if we create it with our patch to make proper Garbage Collection
 	// If it does not yet exist mark it
-	patches, created, err := r.handleControllerMetadata(ctx, c, obj, ownerreference)
+	patches, created, err := r.handleCreatedMetadata(ctx, c, obj, ownerreference, adopt)
 	if err != nil {
-		return nil, created, fmt.Errorf("resource evaluation: %w", err)
+		return nil, created, fmt.Errorf("evaluating managed metadata: %w", err)
 	}
 
-	if !created {
-		return nil, created, fmt.Errorf("resource exists and can not be adopted")
-	}
-
-	if err := clt.CreateOrPatch(ctx, c, obj, fieldOwner, force); err != nil {
+	if err := clt.PatchApply(ctx, c, obj, fieldOwner, force); err != nil {
 		return nil, created, fmt.Errorf("applying object failed: %w", err)
+	}
+
+	err = retry.OnError(
+		retry.DefaultBackoff,
+		apierrors.IsNotFound,
+		func() error {
+			return c.Get(ctx, key, actual)
+		},
+	)
+	if err != nil {
+		return nil, created, fmt.Errorf("failed to get object after apply: %w", err)
 	}
 
 	// Apply metadata patches if needed
@@ -251,64 +322,78 @@ func (r *Processor) Apply(
 		}
 	}
 
-	// Fetch live object to get the updated generation
-	if err := c.Get(ctx, client.ObjectKeyFromObject(actual), actual); err != nil {
-		return nil, created, fmt.Errorf("failed to get object after apply: %w", err)
-	}
-
 	return clt.LastApplyTimeForManager(actual, fieldOwner), created, nil
 }
 
-func (r *Processor) handleControllerMetadata(
+func (r *Processor) handleCreatedMetadata(
 	ctx context.Context,
 	c client.Client,
 	obj *unstructured.Unstructured,
 	ownerreference *metav1.OwnerReference,
-) (patches []clt.JSONPatch, adoptable bool, err error) {
-	adoptable = false
+	allowAdoption bool,
+) (patches []clt.JSONPatch, created bool, err error) {
+	created = false
 
 	existingObject := obj.DeepCopy()
 
 	err = c.Get(ctx, client.ObjectKeyFromObject(existingObject), existingObject)
 	switch {
 	case apierrors.IsNotFound(err):
-		patches = append(patches, clt.AddLabelsPatch(existingObject.GetLabels(), map[string]string{
-			meta.CreatedByCapsuleLabel: meta.ValueController,
-		})...)
-
-		if ownerreference != nil {
-			patches = append(patches, clt.AddOwnerReferencePatch(existingObject.GetOwnerReferences(), ownerreference)...)
-		}
-
-		return patches, true, nil
+		created = true
+		err = nil
 	case err != nil:
-		return patches, false, err
+		return nil, created, err
 	default:
 		labels := existingObject.GetLabels()
 
-		if v, ok := labels[meta.CreatedByCapsuleLabel]; ok || v == meta.ValueController {
-			adoptable = true
+		if v, ok := labels[meta.CreatedByCapsuleLabel]; ok && v == meta.ValueControllerResources {
+			created = true
 		}
 
+		if _, ok := labels[meta.ResourcesLabel]; ok {
+			created = true
+
+			patches = append(patches, clt.PatchRemoveLabels(existingObject.GetLabels(), []string{
+				meta.ResourcesLabel,
+			})...,
+			)
+		}
+	}
+
+	if created {
 		if ownerreference != nil {
 			patches = append(patches, clt.AddOwnerReferencePatch(existingObject.GetOwnerReferences(), ownerreference)...)
 		}
 
-		if _, ok := labels[meta.ResourceCapsuleLabel]; ok {
-			adoptable = true
+		if v, ok := existingObject.GetLabels()[meta.CreatedByCapsuleLabel]; !ok || v != meta.ValueControllerResources {
+			patches = append(patches, clt.AddLabelsPatch(existingObject.GetLabels(), map[string]string{
+				meta.CreatedByCapsuleLabel: meta.ValueControllerResources,
+			})...)
 
-			patches = append(patches, clt.PatchRemoveLabels(existingObject.GetLabels(), []string{
-				meta.ResourceCapsuleLabel,
-			})...,
-			)
-
-			if v, ok := labels[meta.CreatedByCapsuleLabel]; !ok || v != meta.ValueController {
-				patches = append(patches, clt.AddLabelsPatch(existingObject.GetLabels(), map[string]string{
-					meta.CreatedByCapsuleLabel: meta.ValueController,
-				})...)
+			// Ensure There are labels otherwise the next patch overwrites labels struct
+			if existingObject.GetLabels() == nil {
+				existingObject.SetLabels(map[string]string{
+					meta.CreatedByCapsuleLabel: meta.ValueControllerResources,
+				})
 			}
 		}
 	}
 
-	return patches, adoptable, err
+	if created || allowAdoption {
+		if v, ok := existingObject.GetLabels()[meta.NewManagedByCapsuleLabel]; !ok || v != meta.ValueControllerResources {
+			patches = append(patches, clt.AddLabelsPatch(existingObject.GetLabels(), map[string]string{
+				meta.NewManagedByCapsuleLabel: meta.ValueControllerResources,
+			})...)
+		}
+
+		return patches, created, err
+	}
+
+	return nil, created, fmt.Errorf(
+		"object %s/%s %s/%s exists and cannot be adopted",
+		existingObject.GetAPIVersion(),
+		existingObject.GetKind(),
+		existingObject.GetNamespace(),
+		existingObject.GetName(),
+	)
 }

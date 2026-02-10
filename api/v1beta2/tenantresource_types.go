@@ -6,7 +6,6 @@ package v1beta2
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	k8stypes "k8s.io/apimachinery/pkg/types"
 
 	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
@@ -24,6 +23,10 @@ type TenantResourceCommonStatus struct {
 
 	// How many items are being replicated by the TenantResource.
 	Size uint `json:"size"`
+
+	// Serviceaccount used for impersonation
+	//+optional
+	ServiceAccount *meta.NamespacedRFC1123ObjectReferenceWithNamespace `json:"serviceAccount,omitzero"`
 }
 
 func (s *TenantResourceCommonStatus) UpdateStats() {
@@ -31,6 +34,9 @@ func (s *TenantResourceCommonStatus) UpdateStats() {
 }
 
 type TenantResourceCommonSpec struct {
+	// Provide additional settings
+	// +kubebuilder:default={}
+	Settings TenantResourceCommonSpecSettings `json:"settings,omitzero"`
 	// DependsOn may contain a meta.NamespacedObjectReference slice
 	// with references to TenantResource resources that must be ready before this
 	// TenantResource can be reconciled.
@@ -40,13 +46,6 @@ type TenantResourceCommonSpec struct {
 	// Keep in mind that any change to the manifests will trigger a new reconciliation.
 	// +kubebuilder:default="60s"
 	ResyncPeriod metav1.Duration `json:"resyncPeriod"`
-	// Enabling this allows TenanResources to interact with objects which were not created by a TenantResource. In this case on prune no deletion of the entire object is made.
-	// +kubebuilder:default=false
-	Adopt *bool `json:"adopt,omitempty"`
-	// Force indicates that in case of conflicts with server-side apply, the client should acquire ownership of the conflicting field.
-	// You may create collisions with this.
-	// +kubebuilder:default=false
-	Force *bool `json:"force,omitempty"`
 	// When the replicated resource manifest is deleted, all the objects replicated so far will be automatically deleted.
 	// Disable this to keep replicated resources although the deletion of the replication manifest.
 	// +kubebuilder:default=true
@@ -59,7 +58,21 @@ type TenantResourceCommonSpec struct {
 	Resources []ResourceSpec `json:"resources"`
 }
 
+type TenantResourceCommonSpecSettings struct {
+	// Enabling this allows TenanResources to interact with objects which were not created by a TenantResource. In this case on prune no deletion of the entire object is made.
+	// +kubebuilder:default=false
+	Adopt *bool `json:"adopt,omitempty"`
+	// Force indicates that in case of conflicts with server-side apply, the client should acquire ownership of the conflicting field.
+	// You may create collisions with this.
+	// +kubebuilder:default=false
+	Force *bool `json:"force,omitempty"`
+}
+
 type ResourceSpec struct {
+	// Adds the managed label to the unique resources
+	// This Label prevents any updates from Capsule Users
+	// +kubebuilder:default=true
+	Managed *bool `json:"managed,omitempty"`
 	// Defines the Namespace selector to select the Tenant Namespaces on which the resources must be propagated.
 	// In case of nil value, all the Tenant Namespaces are targeted.
 	NamespaceSelector *metav1.LabelSelector `json:"namespaceSelector,omitempty"`
@@ -130,7 +143,7 @@ type TemplateItemSpec struct {
 	// This can be a single resource or multiple resources
 	Template string `json:"template,omitempty"`
 	// Missing Key Option for templating
-	// +kubebuilder:default=default
+	// +kubebuilder:default=zero
 	MissingKey tpl.MissingKeyOption `json:"missingKey,omitempty"`
 }
 
@@ -187,12 +200,4 @@ type ObjectReferenceStatusCondition struct {
 
 	// Indicates wether the resource was created or adopted
 	Created bool `json:"created,omitempty"`
-}
-type ObjectReferenceStatusOwner struct {
-	// Name of the owning object.
-	Name string `json:"name,omitempty"`
-	// UID of the owning object.
-	k8stypes.UID `json:"uid,omitempty" protobuf:"bytes,5,opt,name=uid"`
-	// Scope of the owning object.
-	Scope api.ResourceScope `json:"scope,omitempty"`
 }

@@ -33,7 +33,9 @@ func AddToManager(ctx context.Context, log logr.Logger, mgr manager.Manager) err
 	indexers := []CustomIndexer{
 		tenant.NamespacesReference{Obj: &capsulev1beta2.Tenant{}},
 		tenantresource.GlobalServiceAccount{},
+		tenantresource.GlobalProcessedItems{},
 		tenantresource.NamespacedServiceAccount{},
+		tenantresource.NamespacedProcessedItems{},
 		resourcepool.NamespacesReference{Obj: &capsulev1beta2.ResourcePool{}},
 		resourcepool.PoolUIDReference{Obj: &capsulev1beta2.ResourcePoolClaim{}},
 		tenant.OwnerReference{},

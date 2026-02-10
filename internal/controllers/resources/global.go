@@ -31,12 +31,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/internal/cache"
 	"github.com/projectcapsule/capsule/internal/controllers/utils"
 	"github.com/projectcapsule/capsule/internal/metrics"
 	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/api/processor"
-	"github.com/projectcapsule/capsule/pkg/cache"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	"github.com/projectcapsule/capsule/pkg/runtime/predicates"
 )
@@ -256,12 +256,16 @@ func (r *globalResourceController) Reconcile(ctx context.Context, request reconc
 
 	err = r.updateReconcilingStatus(ctx, tntResource)
 	if err != nil {
-		return reconcile.Result{}, gherrors.Wrap(err, "failed to update status")
+		err := gherrors.Wrap(err, "failed to update status")
+
+		return reconcile.Result{}, err
 	}
 
 	c, err := r.loadClient(ctx, log, tntResource)
 	if err != nil {
-		return reconcile.Result{}, gherrors.Wrap(err, "failed to load serviceaccount client")
+		err = gherrors.Wrap(err, "failed to load serviceaccount client")
+
+		return reconcile.Result{}, err
 	}
 
 	if c == nil {
@@ -355,8 +359,8 @@ func (r *globalResourceController) reconcile(
 		processor.ProcessorOptions{
 			FieldOwnerPrefix: getFieldOwner(tntResource.GetName(), tntResource.GetNamespace()),
 			Prune:            *tntResource.Spec.PruningOnDelete,
-			Adopt:            *tntResource.Spec.Adopt,
-			Force:            *tntResource.Spec.Force,
+			Adopt:            *tntResource.Spec.Settings.Adopt,
+			Force:            *tntResource.Spec.Settings.Force,
 			Owner:            &owner,
 		})
 }
@@ -401,7 +405,17 @@ func (r *globalResourceController) gatherResources(
 			default:
 				ilog.V(5).Info("replicating for each namespace")
 
-				resourceError = r.collector.foreachTenantNamespace(ctx, ilog, c, tnt, resource, strconv.Itoa(index), acc, true)
+				opts.AllowCrossNamespaceSelection = false
+
+				resourceError = r.collector.foreachTenantNamespace(
+					ctx,
+					ilog,
+					c,
+					opts,
+					tnt,
+					resource,
+					strconv.Itoa(index),
+				)
 			}
 
 			// Only start pruning when the resource item itself did not throw an error
@@ -421,9 +435,19 @@ func (r *globalResourceController) loadClient(
 ) (client.Client, error) {
 	sa := r.impersonatedServiceAccount(ctx, log, tntResource)
 	if sa == nil {
-		log.V(4).Info("using controller client")
+		sa, ns := configuration.ControllerServiceAccount()
+
+		tntResource.Status.ServiceAccount = &meta.NamespacedRFC1123ObjectReferenceWithNamespace{
+			Name:      meta.RFC1123Name(sa),
+			Namespace: meta.RFC1123SubdomainName(ns),
+		}
 
 		return r.client, nil
+	}
+
+	tntResource.Status.ServiceAccount = &meta.NamespacedRFC1123ObjectReferenceWithNamespace{
+		Name:      sa.Name,
+		Namespace: sa.Namespace,
 	}
 
 	re, err := r.configuration.ServiceAccountClient(ctx)

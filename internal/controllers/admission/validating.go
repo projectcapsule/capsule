@@ -98,7 +98,7 @@ func (r *validatingReconciler) reconcileValidatingConfiguration(
 
 	obj.SetAnnotations(annotations)
 
-	if err := clt.CreateOrPatch(ctx, r.client, obj, meta.FieldManagerCapsuleController, true); err != nil {
+	if err := clt.PatchApply(ctx, r.client, obj, meta.FieldManagerCapsuleController, true); err != nil {
 		return err
 	}
 

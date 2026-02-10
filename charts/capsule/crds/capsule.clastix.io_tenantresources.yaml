@@ -59,12 +59,6 @@ spec:
           spec:
             description: TenantResourceSpec defines the desired state of TenantResource.
             properties:
-              adopt:
-                default: false
-                description: Enabling this allows TenanResources to interact with
-                  objects which were not created by a TenantResource. In this case
-                  on prune no deletion of the entire object is made.
-                type: boolean
               cordoned:
                 default: false
                 description: |-
@@ -89,12 +83,6 @@ spec:
                   - name
                   type: object
                 type: array
-              force:
-                default: false
-                description: |-
-                  Force indicates that in case of conflicts with server-side apply, the client should acquire ownership of the conflicting field.
-                  You may create collisions with this.
-                type: boolean
               pruningOnDelete:
                 default: true
                 description: |-
@@ -149,8 +137,6 @@ spec:
                                 type: string
                               namespace:
                                 description: Namespace of the values referent.
-                                maxLength: 253
-                                pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
                                 type: string
                               optional:
                                 default: true
@@ -212,6 +198,12 @@ spec:
                             type: object
                           type: array
                       type: object
+                    managed:
+                      default: true
+                      description: |-
+                        Adds the managed label to the unique resources
+                        This Label prevents any updates from Capsule Users
+                      type: boolean
                     namespaceSelector:
                       description: |-
                         Defines the Namespace selector to select the Tenant Namespaces on which the resources must be propagated.
@@ -283,8 +275,6 @@ spec:
                             type: string
                           namespace:
                             description: Namespace of the values referent.
-                            maxLength: 253
-                            pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
                             type: string
                           optional:
                             default: true
@@ -355,10 +345,10 @@ spec:
                       items:
                         properties:
                           missingKey:
-                            default: default
+                            default: zero
                             description: Missing Key Option for templating
                             enum:
-                            - default
+                            - invalid
                             - zero
                             - error
                             type: string
@@ -390,9 +380,27 @@ spec:
                 required:
                 - name
                 type: object
+              settings:
+                default: {}
+                description: Provide additional settings
+                properties:
+                  adopt:
+                    default: false
+                    description: Enabling this allows TenanResources to interact with
+                      objects which were not created by a TenantResource. In this
+                      case on prune no deletion of the entire object is made.
+                    type: boolean
+                  force:
+                    default: false
+                    description: |-
+                      Force indicates that in case of conflicts with server-side apply, the client should acquire ownership of the conflicting field.
+                      You may create collisions with this.
+                    type: boolean
+                type: object
             required:
             - resources
             - resyncPeriod
+            - settings
             type: object
           status:
             description: TenantResourceStatus defines the observed state of TenantResource.
@@ -515,6 +523,23 @@ spec:
                       type: string
                   type: object
                 type: array
+              serviceAccount:
+                description: Serviceaccount used for impersonation
+                properties:
+                  name:
+                    description: Name of the referent.
+                    maxLength: 63
+                    pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+                    type: string
+                  namespace:
+                    description: Namespace of the referent.
+                    maxLength: 253
+                    pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
+                    type: string
+                required:
+                - name
+                - namespace
+                type: object
               size:
                 description: How many items are being replicated by the TenantResource.
                 type: integer

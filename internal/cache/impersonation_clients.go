@@ -36,11 +36,11 @@ func NewImpersonationCache() *ImpersonationCache {
 }
 
 // Get returns a cached client if present.
-func (c *ImpersonationCache) Get(namespace, name string) (client.Client, bool) {
+func (c *ImpersonationCache) Get(ns, name string) (client.Client, bool) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	cl, ok := c.clients[Key{Namespace: namespace, Name: name}]
-	return cl, ok && cl != nil
+	cl, ok := c.clients[Key{Namespace: ns, Name: name}]
+	return cl, ok
 }
 
 // Set stores a client explicitly (rarely needed).

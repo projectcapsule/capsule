@@ -9,26 +9,26 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 )
 
-type NamespacedServiceAccount struct{}
+type GlobalServiceAccount struct{}
 
-func (g NamespacedServiceAccount) Object() client.Object {
-	return &capsulev1beta2.TenantResource{}
+func (g GlobalServiceAccount) Object() client.Object {
+	return &capsulev1beta2.GlobalTenantResource{}
 }
 
-func (g NamespacedServiceAccount) Field() string {
+func (g GlobalServiceAccount) Field() string {
 	return ServiceAccountIndexerFieldName
 }
 
-func (g NamespacedServiceAccount) Func() client.IndexerFunc {
+func (g GlobalServiceAccount) Func() client.IndexerFunc {
 	return func(object client.Object) []string {
-		tgr := object.(*capsulev1beta2.TenantResource) //nolint:forcetypeassert
+		tgr := object.(*capsulev1beta2.GlobalTenantResource) //nolint:forcetypeassert
 
-		imp := tgr.Spec.ServiceAccount
+		imp := tgr.Status.ServiceAccount
 		if imp == nil {
 			return nil
 		}
 
-		ns := tgr.GetNamespace()
+		ns := imp.Namespace.String()
 		name := imp.Name.String()
 		if ns == "" || name == "" {
 			return nil

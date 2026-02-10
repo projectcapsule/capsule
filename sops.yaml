@@ -1,23 +1,64 @@
 ---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  # "namespace" omitted since ClusterRoles are not namespaced
+  name: capsule-tenant-replications-2
+rules:
+- nonResourceURLs: ["/api", "/apis"]
+  verbs: ["get"]
+
+- nonResourceURLs: ["/openapi", "/openapi/*"]
+  verbs: ["get"]
+
+- apiGroups: [""]
+  #
+  # at the HTTP level, the name of the resource for accessing Secret
+  # objects is "secrets"
+  resources: ["configmaps"]
+  verbs: ["*"]
+
+- apiGroups: ["addons.projectcapsule.dev"]
+  #
+  # at the HTTP level, the name of the resource for accessing Secret
+  # objects is "secrets"
+  resources: ["sopsproviders"]
+  verbs: ["list", "get", "patch", "create", "delete"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+# This cluster role binding allows anyone in the "manager" group to read secrets in any namespace.
+kind: ClusterRoleBinding
+metadata:
+  name: capsule-tenant-replications-2
+subjects:
+- kind: ServiceAccount
+  name: default
+  namespace: green-system
+roleRef:
+  kind: ClusterRole
+  name: capsule-tenant-replications-2
+  apiGroup: rbac.authorization.k8s.io
+---
 apiVersion: capsule.clastix.io/v1beta2
 kind: GlobalTenantResource
 metadata:
-  name: tenant-sops-providers
+  name: tenant-cm-registration
 spec:
-  resyncPeriod: 600s
   scope: Tenant
+  resyncPeriod: 5s
+  serviceAccount:
+    name: "default"
+    namespace: "green-system"
   resources:
-    - rawItems:
-        - apiVersion: addons.projectcapsule.dev/v1alpha1
-          kind: SopsProvider
-          metadata:
-            name: "{{tenant.name}}-secrets"
-          spec:
-            keys:
-            - namespaceSelector:
-                matchLabels:
-                  capsule.clastix.io/tenant: "{{tenant.name}}"
-            sops:
-            - namespaceSelector:
-                matchLabels:
-                  capsule.clastix.io/tenant: "{{tenant.name}}"
+    - templates:
+        - template: |
+            ---
+            apiVersion: v1
+            kind: ConfigMap
+            metadata:
+              name: {{ $.tenant.metadata.name }}-config-test
+              namespace: default
+            data:
+              common.conf: |
+                {{ deterministicUUID "test" "this" "function" "bro"}}

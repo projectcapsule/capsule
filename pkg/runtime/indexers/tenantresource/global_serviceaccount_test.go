@@ -35,7 +35,7 @@ func TestGlobalServiceAccount_Func(t *testing.T) {
 
 	t.Run("nil serviceAccount => nil", func(t *testing.T) {
 		tgr := &capsulev1beta2.GlobalTenantResource{}
-		tgr.Spec.ServiceAccount = nil
+		tgr.Status.ServiceAccount = nil
 
 		got := fn(tgr)
 		if got != nil {
@@ -45,7 +45,7 @@ func TestGlobalServiceAccount_Func(t *testing.T) {
 
 	t.Run("empty namespace => nil", func(t *testing.T) {
 		tgr := &capsulev1beta2.GlobalTenantResource{}
-		tgr.Spec.ServiceAccount = &meta.NamespacedRFC1123ObjectReferenceWithNamespace{
+		tgr.Status.ServiceAccount = &meta.NamespacedRFC1123ObjectReferenceWithNamespace{
 			Name:      meta.RFC1123Name("sa"),
 			Namespace: meta.RFC1123SubdomainName(""),
 		}
@@ -58,7 +58,7 @@ func TestGlobalServiceAccount_Func(t *testing.T) {
 
 	t.Run("empty name => nil", func(t *testing.T) {
 		tgr := &capsulev1beta2.GlobalTenantResource{}
-		tgr.Spec.ServiceAccount = &meta.NamespacedRFC1123ObjectReferenceWithNamespace{
+		tgr.Status.ServiceAccount = &meta.NamespacedRFC1123ObjectReferenceWithNamespace{
 			Name:      meta.RFC1123Name(""),
 			Namespace: meta.RFC1123SubdomainName("kube-system"),
 		}
@@ -71,7 +71,7 @@ func TestGlobalServiceAccount_Func(t *testing.T) {
 
 	t.Run("both set => returns ns/name key", func(t *testing.T) {
 		tgr := &capsulev1beta2.GlobalTenantResource{}
-		tgr.Spec.ServiceAccount = &meta.NamespacedRFC1123ObjectReferenceWithNamespace{
+		tgr.Status.ServiceAccount = &meta.NamespacedRFC1123ObjectReferenceWithNamespace{
 			Name:      meta.RFC1123Name("default"),
 			Namespace: meta.RFC1123SubdomainName("kube-system"),
 		}

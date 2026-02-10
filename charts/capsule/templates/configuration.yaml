@@ -1,4 +1,5 @@
-{{- if $.Values.manager.options.createConfiguration }}
+{{- if or (and $.Values.crds.exclusive $.Values.crds.createConfig) (not $.Values.crds.exclusive) }}
+  {{- if $.Values.manager.options.createConfiguration }}
 apiVersion: capsule.clastix.io/v1beta2
 kind: CapsuleConfiguration
 metadata:
@@ -66,4 +67,5 @@ spec:
   nodeMetadata:
     {{- toYaml . | nindent 4 }}
   {{- end }}
+{{- end }}
 {{- end }}

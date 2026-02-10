@@ -67,6 +67,19 @@ func (r ResourceID) GetGVK() schema.GroupVersionKind {
 	}
 }
 
+func (r ResourceID) GetGVKKey(sep string) string {
+	if sep == "" {
+		sep = "\x1f"
+	}
+	return fmt.Sprintf("%s%s%s%s%s%s%s%s%s%s",
+		r.Group, sep,
+		r.Version, sep,
+		r.Kind, sep,
+		r.Namespace, sep,
+		r.Name, sep,
+	)
+}
+
 func (r ResourceID) GetKey(sep string) string {
 	// Use a delimiter that won’t appear in fields normally; '\x1f' (unit separator) is great.
 	if sep == "" {

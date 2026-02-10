@@ -17,7 +17,7 @@ webhooks:
     - v1
     - v1beta1
   clientConfig:
-    {{- include "capsule.webhooks.service" (dict "path" "/misc/customresources" "ctx" $) | nindent 4 }}
+    {{- include "capsule.webhooks.service" (dict "path" "/generic/customresources" "ctx" $) | nindent 4 }}
   failurePolicy:  {{ .failurePolicy }}
   matchPolicy: {{ .matchPolicy }}
   {{- with .namespaceSelector }}
@@ -384,7 +384,7 @@ webhooks:
   admissionReviewVersions:
     - v1
   clientConfig:
-    {{- include "capsule.webhooks.service" (dict "path" "/misc/managed" "ctx" $) | nindent 4 }}
+    {{- include "capsule.webhooks.service" (dict "path" "/generic/managed" "ctx" $) | nindent 4 }}
   failurePolicy: {{ .failurePolicy }}
   matchPolicy: {{ .matchPolicy }}
   {{- with .namespaceSelector }}
@@ -405,6 +405,34 @@ webhooks:
   timeoutSeconds: {{ $.Values.webhooks.validatingWebhooksTimeoutSeconds }}
   {{- end }}
 {{- end }}
+{{- with  .Values.webhooks.hooks.replicas }}
+  {{- if .enabled }}
+- name: replicas.tenant.projectcapsule.dev
+  admissionReviewVersions:
+    - v1
+  clientConfig:
+    {{- include "capsule.webhooks.service" (dict "path" "/generic/replicas" "ctx" $) | nindent 4 }}
+  failurePolicy: {{ .failurePolicy }}
+  matchPolicy: {{ .matchPolicy }}
+  {{- with .namespaceSelector }}
+  namespaceSelector:
+    {{- toYaml . |  nindent 4 }}
+  {{- end }}
+  {{- with .objectSelector }}
+  objectSelector:
+    {{- toYaml . |  nindent 4 }}
+  {{- end }}
+  {{- with .matchConditions }}
+  matchConditions:
+    {{- toYaml . |  nindent 4 }}
+  {{- end }}
+  rules:
+    {{- toYaml .rules | nindent 4 }}
+  sideEffects: None
+  timeoutSeconds: {{ $.Values.webhooks.validatingWebhooksTimeoutSeconds }}
+  {{- end }}
+{{- end }}
+
 {{- with .Values.webhooks.hooks.tenants }}
   {{- if .enabled }}
 - name: tenants.projectcapsule.dev

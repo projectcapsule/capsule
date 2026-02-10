@@ -79,14 +79,14 @@ func ImpersonatedKubernetesClientForServiceAccount(
 	scheme *runtime.Scheme,
 	reference meta.NamespacedRFC1123ObjectReferenceWithNamespace,
 ) (client.Client, error) {
-	impersonated := rest.CopyConfig(base)
-	impersonated.Impersonate.UserName = GetServiceAccountFullName(reference)
-	impersonated.Impersonate.Groups = GetServiceAccountGroups(reference.Namespace.String())
+	imp := rest.CopyConfig(base)
+	imp.Impersonate = rest.ImpersonationConfig{
+		UserName: GetServiceAccountFullName(reference),
+	}
 
-	k8sClient, err := client.New(impersonated, client.Options{Scheme: scheme})
+	k8sClient, err := client.New(imp, client.Options{Scheme: scheme})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create impersonated client: %w", err)
 	}
-
 	return k8sClient, nil
 }

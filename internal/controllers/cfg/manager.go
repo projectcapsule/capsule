@@ -32,8 +32,8 @@ import (
 )
 
 type Manager struct {
-	Client client.Client
-	Rest   *rest.Config
+	client.Client
+	Rest *rest.Config
 
 	configName string
 
@@ -120,12 +120,13 @@ func (r *Manager) Start(ctx context.Context) error {
 
 	return nil
 }
-
 func (r *Manager) Reconcile(ctx context.Context, request reconcile.Request) (res reconcile.Result, err error) {
 	log := r.Log.WithValues("configuration", request.Name)
 
+	cfg := configuration.NewCapsuleConfiguration(ctx, r.Client, r.Rest, request.Name)
+
 	instance := &capsulev1beta2.CapsuleConfiguration{}
-	if err = r.Client.Get(ctx, request.NamespacedName, instance); err != nil {
+	if err = r.Get(ctx, request.NamespacedName, instance); err != nil {
 		if apierrors.IsNotFound(err) {
 			log.V(3).Info("requested object not found, could have been deleted after reconcile request")
 

@@ -69,16 +69,22 @@ global:
 crds:
   # -- Install the CustomResourceDefinitions (This also manages the lifecycle of the CRDs for update operations)
   install: true
-  # -- Only install the CRDs, no other primitives
-  exclusive: false
-  # -- Create additionally CapsuleConfiguration even if CRDs are exclusive
-  createConfig: false
   # -- Extra Labels for CRDs
   labels: {}
   # -- Extra Annotations for CRDs
   annnotations: {}
   # -- Render CRDS inline (in this case use --skip-crds when installing the chart and create the capsuleconfiguration independently)
   inline: false
+  # -- Only install the CRDs, no other primitives
+  exclusive: false
+  # -- Create additionally CapsuleConfiguration even if CRDs are exclusive
+  createConfig: false
+  # -- Create RBAC and Serviceaccount even if CRDs are exclusive
+  createRBAC: false
+  # -- Create Diagnostic Dashboards even if CRDs are exclusive
+  createDiagnostics: false
+
+
 
 # Secret Options
 tls:
@@ -195,7 +201,9 @@ manager:
     # These entities are automatically owners for all existing tenants. Meaning they can add namespaces to any tenant. However they must be specific by using the capsule label
     # for interacting with namespaces. Because if that label is not defined, it's assumed that namespace interaction was not targeted towards a tenant and will therefor
     # be ignored by capsule. May also be handy in GitOps scenarios where certain service accounts need to be able to manage namespaces for all tenants.
-    administrators: []
+    administrators:
+      - kind: "User"
+        name: "kubernetes-admin"
     # - kind: User
     #   name: alice
     # -- Define groups which when found in the request of a user will be ignored by the Capsule
@@ -221,7 +229,7 @@ manager:
         deniedRegex: ""
 
     # -- Duration after which the in-memory cache is invalidated (based on usaage) and re-fetched from the API server
-    cacheInvalidation: 24h0m0s
+    cacheInvalidation: 0h30m0s
 
     # -- Managed RBAC configuration for the controller
     rbac:
@@ -239,6 +247,7 @@ manager:
 
     # -- Impersonation
     impersonation: {}
+
 
     # -- DEPRECATED: use users properties.
     # Names of the users considered as Capsule users.
@@ -378,8 +387,8 @@ monitoring:
     # -- Annotations for dashboard configmaps
     annotations: {}
     # -- Labels for dashboard configmaps
-    labels: {}
-    # grafana_dashboard: "1"
+    labels:
+      grafana_dashboard: "1"
 
     # Grafana Operator
     operator:
@@ -400,8 +409,8 @@ monitoring:
     # -- Annotations for dashboard configmaps
     annotations: {}
     # -- Labels for dashboard configmaps
-    labels: {}
-    # grafana_dashboard: "1"
+    labels:
+      grafana_dashboard: "1"
     # -- Custom namespace for dashboard configmaps
     namespace: ""
 
@@ -747,21 +756,71 @@ webhooks:
       # -- [FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy)
       failurePolicy: Fail
       # -- [MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
-      matchPolicy: Exact
+      matchPolicy: Equivalent
       # -- [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector)
       objectSelector:
         matchExpressions:
-          - key: "projectcapsule.dev/created-by"
-            operator: Exists
-          - key: "projectcapsule.dev/managed-by"
-            operator: Exists
+          - key:  projectcapsule.dev/managed-by
+            operator: In
+            values:
+              - "controller"
       # -- [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector)
       namespaceSelector:
         matchExpressions:
-          - key: capsule.clastix.io/tenant
+          - key: "capsule.clastix.io/tenant"
             operator: Exists
       # -- [MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
-      matchConditions: []
+      matchConditions:
+        - name: "exclude-privileged-users"
+          expression: >
+            !(
+              request.userInfo.username in [
+                "kubernetes-admin"
+              ]
+            )
+      # -- [Rules](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-rules)
+      rules:
+        - apiGroups:
+            - '*'
+          apiVersions:
+            - '*'
+          operations:
+            - CREATE
+            - UPDATE
+            - DELETE
+          resources:
+            - '*'
+          scope: "Namespaced"
+
+    replicas:
+      # -- Enable the Hook
+      enabled: true
+      # -- [FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy)
+      failurePolicy: Fail
+      # -- [MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
+      matchPolicy: Equivalent
+      # -- [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector)
+      objectSelector:
+        matchExpressions:
+          - key:  projectcapsule.dev/created-by
+            operator: In
+            values:
+              - "resources"
+      # -- [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector)
+      namespaceSelector:
+        matchExpressions:
+          - key: "capsule.clastix.io/tenant"
+            operator: Exists
+      # -- [MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
+      matchConditions:
+        - name: "exclude-privileged-users"
+          expression: >
+            !(
+              request.userInfo.username in [
+                "kubernetes-admin"
+              ]
+            )
+
       # -- [Rules](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-rules)
       rules:
         - apiGroups:
@@ -774,6 +833,8 @@ webhooks:
           resources:
             - '*'
           scope: "*"
+
+
 
     services:
       # -- Enable the Hook

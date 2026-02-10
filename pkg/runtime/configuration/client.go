@@ -31,7 +31,7 @@ type capsuleConfiguration struct {
 }
 
 func DefaultCapsuleConfiguration() capsulev1beta2.CapsuleConfigurationSpec {
-	d, _ := time.ParseDuration("24h")
+	d, _ := time.ParseDuration("1h")
 
 	return capsulev1beta2.CapsuleConfigurationSpec{
 		Users: []capsuleapi.UserSpec{
@@ -43,7 +43,7 @@ func DefaultCapsuleConfiguration() capsulev1beta2.CapsuleConfigurationSpec {
 		CacheInvalidation: metav1.Duration{
 			Duration: d,
 		},
-		RBAC: &capsulev1beta2.RbacConfiguration{
+		RBAC: &capsulev1beta2.RBACConfiguration{
 			DeleterClusterRole:     "capsule-namespace-deleter",
 			ProvisionerClusterRole: "capsule-namespace-provisioner",
 		},

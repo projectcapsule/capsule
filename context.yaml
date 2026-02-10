@@ -1,0 +1,28 @@
+---
+apiVersion: capsule.clastix.io/v1beta2
+kind: GlobalTenantResource
+metadata:
+  name: tenant-cluster-rbac
+spec:
+  scope: Tenant
+  resources:
+    - additionalMetadata:
+        labels:
+          k8s.company.com/tenant: "{{tenant.name}}"
+        annotations:
+          k8s.company.com/cost-center: "inv-120"
+      templates:
+        - missingKey: error
+          template: |
+            ---
+            apiVersion: rbac.authorization.k8s.io/v1
+            kind: ClusterRole
+            metadata:
+              name: tenant:{{$.tenant.metadata.name}}:priority
+              labels:
+                k8s.company.com/tenant: "test"
+            rules:
+              - apiGroups: ["scheduling.k8s.io"]
+                verbs: ["get"]
+                resources: ["priorityclasses"]
+

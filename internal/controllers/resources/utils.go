@@ -14,7 +14,7 @@ func getFieldOwner(name string, namespace string) string {
 		namespace = "cluster"
 	}
 
-	return meta.CapsuleFieldOwnerPrefix + "/" + "resource" + "/" + namespace + "/" + name + "/"
+	return meta.FieldManagerCapsulePrefix + "/" + "resource" + "/" + namespace + "/" + name + "/"
 }
 
 func getSelectorForCreatedResourcesExclusion() (labels.Selector, error) {
@@ -23,7 +23,7 @@ func getSelectorForCreatedResourcesExclusion() (labels.Selector, error) {
 	req, err := labels.NewRequirement(
 		meta.CreatedByCapsuleLabel,
 		selection.NotIn,
-		[]string{meta.ResourceControllerValue},
+		[]string{meta.ValueControllerResources},
 	)
 
 	if err != nil {

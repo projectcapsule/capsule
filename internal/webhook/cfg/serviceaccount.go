@@ -6,45 +6,50 @@ package cfg
 import (
 	"context"
 
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	capsulewebhook "github.com/projectcapsule/capsule/internal/webhook"
-	"github.com/projectcapsule/capsule/internal/webhook/utils"
+	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
 
 type serviceAccountHandler struct{}
 
-func ServiceAccountHandler() capsulewebhook.Handler {
+func ServiceAccountHandler() handlers.TypedHandler[*capsulev1beta2.CapsuleConfiguration] {
 	return &serviceAccountHandler{}
 }
 
-func (h *serviceAccountHandler) OnCreate(_ client.Client, decoder admission.Decoder, _ record.EventRecorder) capsulewebhook.Func {
+func (h *serviceAccountHandler) OnCreate(
+	_ client.Client,
+	cfg *capsulev1beta2.CapsuleConfiguration,
+	_ admission.Decoder,
+	_ events.EventRecorder,
+) handlers.Func {
 	return func(_ context.Context, req admission.Request) *admission.Response {
-		return h.handle(decoder, req)
+		return h.handle(cfg, req)
 	}
 }
 
-func (h *serviceAccountHandler) OnDelete(client.Client, admission.Decoder, record.EventRecorder) capsulewebhook.Func {
+func (h *serviceAccountHandler) OnDelete(client.Client, *capsulev1beta2.CapsuleConfiguration, admission.Decoder, events.EventRecorder) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (h *serviceAccountHandler) OnUpdate(_ client.Client, decoder admission.Decoder, _ record.EventRecorder) capsulewebhook.Func {
+func (h *serviceAccountHandler) OnUpdate(
+	_ client.Client,
+	cfg *capsulev1beta2.CapsuleConfiguration,
+	old *capsulev1beta2.CapsuleConfiguration,
+	_ admission.Decoder,
+	_ events.EventRecorder,
+) handlers.Func {
 	return func(_ context.Context, req admission.Request) *admission.Response {
-		return h.handle(decoder, req)
+		return h.handle(cfg, req)
 	}
 }
 
-func (h *serviceAccountHandler) handle(decoder admission.Decoder, req admission.Request) *admission.Response {
-	config := &capsulev1beta2.CapsuleConfiguration{}
-	if err := decoder.Decode(req, config); err != nil {
-		return utils.ErroredResponse(err)
-	}
-
+func (h *serviceAccountHandler) handle(config *capsulev1beta2.CapsuleConfiguration, req admission.Request) *admission.Response {
 	nameSet := config.Spec.Impersonation.GlobalDefaultServiceAccount != ""
 	nsSet := config.Spec.Impersonation.GlobalDefaultServiceAccountNamespace != ""
 

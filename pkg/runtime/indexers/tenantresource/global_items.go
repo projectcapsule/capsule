@@ -1,0 +1,34 @@
+// Copyright 2020-2026 Project Capsule Authors
+// SPDX-License-Identifier: Apache-2.0
+
+//nolint:dupl
+package tenantresource
+
+import (
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+)
+
+type GlobalProcessedItems struct{}
+
+func (g GlobalProcessedItems) Object() client.Object {
+	return &capsulev1beta2.GlobalTenantResource{}
+}
+
+func (g GlobalProcessedItems) Field() string {
+	return ProcessedIndexerFieldName
+}
+
+func (g GlobalProcessedItems) Func() client.IndexerFunc {
+	return func(object client.Object) []string {
+		tgr := object.(*capsulev1beta2.GlobalTenantResource) //nolint:forcetypeassert
+
+		out := make([]string, 0, len(tgr.Status.ProcessedItems))
+		for _, pi := range tgr.Status.ProcessedItems {
+			out = append(out, pi.GetGVKKey(""))
+		}
+
+		return out
+	}
+}

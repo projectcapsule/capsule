@@ -22,7 +22,7 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api"
-	"github.com/projectcapsule/capsule/pkg/runtime/gvk"
+	"github.com/projectcapsule/capsule/pkg/template"
 )
 
 var _ = Describe("Creating a TenantResource object", Label("tenantresource"), func() {
@@ -89,7 +89,7 @@ var _ = Describe("Creating a TenantResource object", Label("tenantresource"), fu
 								"replicate": "true",
 							},
 						},
-						NamespacedItems: []gvk.ResourceReference{
+						NamespacedItems: []template.ResourceReference{
 							{
 								Kind:       "Secret",
 								Namespace:  "solar-system",
@@ -351,7 +351,7 @@ var _ = Describe("Creating a TenantResource object", Label("tenantresource"), fu
 
 		By("checking that cross-namespace objects are not replicated", func() {
 			Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: tr.GetName(), Namespace: "solar-system"}, tr)).ToNot(HaveOccurred())
-			tr.Spec.Resources[0].NamespacedItems = append(tr.Spec.Resources[0].NamespacedItems, gvk.ResourceReference{
+			tr.Spec.Resources[0].NamespacedItems = append(tr.Spec.Resources[0].NamespacedItems, template.ResourceReference{
 				Kind:       crossNamespaceItem.Kind,
 				Namespace:  crossNamespaceItem.GetName(),
 				APIVersion: crossNamespaceItem.APIVersion,

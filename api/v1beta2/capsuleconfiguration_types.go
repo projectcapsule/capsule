@@ -84,6 +84,9 @@ type RBACConfiguration struct {
 }
 
 type DynamicAdmission struct {
+	// Request from these entities are ignored for critical admission webhooks (eg)
+	Ignore api.UserListSpec `json:"ignores,omitempty"`
+
 	// Configure dynamic Mutating Admission for Capsule
 	Mutating DynamicAdmissionConfig `json:"mutating,omitempty"`
 

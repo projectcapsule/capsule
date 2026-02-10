@@ -31,6 +31,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/template"
 	tpl "github.com/projectcapsule/capsule/pkg/template"
 	"github.com/projectcapsule/capsule/pkg/tenant"
+	"github.com/projectcapsule/capsule/pkg/utils"
 )
 
 type Collector struct {
@@ -107,14 +108,52 @@ func (co *Collector) Collect(
 	var syncErr error
 
 	tplContext := template.ReferenceContext{}
-	//if spec.Context != nil {
-	//	tplContext, _ = resource.Context.GatherContext(ctx, c, nil, "", nil)
-	//}
+	if spec.Context != nil {
+		namespace := ""
+		if ns != nil {
+			namespace = ns.GetName()
+		}
+
+		tplContext, err = spec.Context.GatherContext(
+			ctx,
+			c,
+			co.mapper,
+			nil,
+			namespace,
+			nil,
+		)
+		if err != nil {
+			return err
+		}
+	}
+
+	err = sanitize.SanitizeObject(&tnt, c.Scheme(), co.contextSanitizeOptions)
+	if err != nil {
+		return err
+	}
+
+	tntMap, err := utils.ToMap(&tnt)
+	if err != nil {
+		return err
+	}
+
+	tplContext["tenant"] = tntMap
 
 	if ns != nil {
-		tplContext["Namespace"] = sanitize.SanitizeObject(ns, c.Scheme(), co.contextSanitizeOptions)
+		err = sanitize.SanitizeObject(ns, c.Scheme(), co.contextSanitizeOptions)
+		if err != nil {
+			return err
+		}
+
+		nsMap, err := utils.ToMap(&ns)
+		if err != nil {
+			return err
+		}
+
+		tplContext["namespace"] = nsMap
 	}
-	tplContext["Tenant"] = sanitize.SanitizeObject(&tnt, c.Scheme(), co.contextSanitizeOptions)
+
+	log.V(7).Info("available context", "context", tplContext)
 
 	// Run Raw Items
 	for rawIndex, item := range spec.RawItems {
@@ -380,11 +419,10 @@ func (co *Collector) foreachTenantNamespace(
 	ctx context.Context,
 	log logr.Logger,
 	c client.Client,
+	opts CollectorOptions,
 	tnt capsulev1beta2.Tenant,
 	resource capsulev1beta2.ResourceSpec,
 	resourceIndex string,
-	acc processor.Accumulator,
-	allowCrossNamespaceSelection bool,
 ) (err error) {
 	// Creating Namespace selector
 	var selector labels.Selector
@@ -422,10 +460,12 @@ func (co *Collector) foreachTenantNamespace(
 	for _, ns := range namespaces.Items {
 		log.V(5).Info("reconciling for", "namespace", ns.Name)
 
+		opts.Iterator = NewCollectorIteratorOptions(&tnt, &ns, resource)
+
 		err = co.Collect(
 			ctx,
 			c,
-			CollectorOptions{},
+			opts,
 			tnt,
 			resourceIndex,
 			resource,

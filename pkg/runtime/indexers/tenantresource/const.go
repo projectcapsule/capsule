@@ -4,5 +4,6 @@
 package tenantresource
 
 const (
-	ServiceAccountIndexerFieldName = "spec.serviceaccount"
+	ServiceAccountIndexerFieldName string = "spec.serviceaccount"
+	ProcessedIndexerFieldName      string = "status.items"
 )

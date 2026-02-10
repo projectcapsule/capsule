@@ -14,7 +14,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/runtime/selectors"
 )
 
@@ -34,7 +33,7 @@ type ResourceReference struct {
 	Name string `json:"name,omitempty"`
 	// Namespace of the values referent.
 	// +optional
-	Namespace meta.RFC1123SubdomainName `json:"namespace,omitempty"`
+	Namespace string `json:"namespace,omitempty"`
 	// Selector which allows to get any amount of these resources based on labels
 	// +optional
 	Selector *metav1.LabelSelector `json:"selector,omitempty"`
@@ -71,9 +70,7 @@ func (t ResourceReference) LoadTemplated(templateContext map[string]string) (Res
 		out.Name = FastTemplate(out.Name, templateContext)
 	}
 	if out.Namespace != "" {
-		out.Namespace = meta.RFC1123SubdomainName(
-			FastTemplate(string(out.Namespace), templateContext),
-		)
+		out.Namespace = FastTemplate(string(out.Namespace), templateContext)
 	}
 
 	// Selector
@@ -144,7 +141,7 @@ func (t ResourceReference) loadResources(
 	ns := t.Namespace
 
 	if namespace != "" {
-		ns = meta.RFC1123SubdomainName(namespace)
+		ns = namespace
 	}
 
 	// GET path (single object)

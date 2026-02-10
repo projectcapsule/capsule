@@ -68,6 +68,27 @@ spec:
                 description: Configuration for dynamic Validating and Mutating Admission
                   webhooks managed by Capsule.
                 properties:
+                  ignores:
+                    description: Request from these entities are ignored for critical
+                      admission webhooks (eg)
+                    items:
+                      properties:
+                        kind:
+                          description: Kind of entity. Possible values are "User",
+                            "Group", and "ServiceAccount"
+                          enum:
+                          - User
+                          - Group
+                          - ServiceAccount
+                          type: string
+                        name:
+                          description: Name of the entity.
+                          type: string
+                      required:
+                      - kind
+                      - name
+                      type: object
+                    type: array
                   mutating:
                     description: Configure dynamic Mutating Admission for Capsule
                     properties:

@@ -28,7 +28,10 @@ metadata:
 subjects:
 - kind: ServiceAccount
   name: default
-  namespace: kube-system
+  namespace: green-system
+- kind: Group
+  name: system:serviceaccounts:capsule-system
+
 roleRef:
   kind: ClusterRole
   name: capsule-tenant-replications
@@ -42,9 +45,7 @@ spec:
   resyncPeriod: 5s
   serviceAccount:
     name: "default"
-    namespace: "kube-system"
-  #dependsOn:
-  #  - name: flux-service-account
+    namespace: "green-system"
   resources:
     - namespacedItems:
       - apiVersion: v1

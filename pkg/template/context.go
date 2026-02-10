@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strconv"
 	"text/template"
@@ -31,44 +32,57 @@ func (t *TemplateContext) GatherContext(
 	data map[string]any,
 	namespace string,
 	additionSelectors []labels.Selector,
-) (context ReferenceContext, errors []error) {
-	context = ReferenceContext{}
+) (ReferenceContext, error) {
+	result := ReferenceContext{}
 
 	if t.Resources == nil {
-		return
+		return result, nil
 	}
 
-	// Template Context for Tenant
+	var errs []error
+
+	// Template Context
 	if len(data) != 0 {
 		if err := t.selfTemplate(data); err != nil {
-			return context, []error{fmt.Errorf("cloud not template: %w", err)}
+			return result, fmt.Errorf("could not template: %w", err)
 		}
 	}
 
-	// Load external Resources
+	// Load external resources
 	for index, resource := range t.Resources {
-		res, err := resource.LoadResources(ctx, kubeClient, restMapper, namespace, additionSelectors, map[string]string{}, true)
+		res, err := resource.LoadResources(
+			ctx,
+			kubeClient,
+			restMapper,
+			namespace,
+			additionSelectors,
+			map[string]string{},
+			true,
+		)
 		if err != nil {
-			errors = append(errors, err)
-
+			errs = append(errs, err)
 			continue
 		}
 
-		if len(res) > 0 {
-			resourceIndex := resource.Index
-			if resourceIndex == "" {
-				resourceIndex = strconv.Itoa(index)
-			}
-
-			for _, u := range res {
-				sanitize.SanitizeUnstructured(u, sanitize.DefaultSanitizeOptions())
-			}
-
-			context[resourceIndex] = res
+		if len(res) == 0 {
+			continue
 		}
+
+		resourceIndex := resource.Index
+		if resourceIndex == "" {
+			resourceIndex = strconv.Itoa(index)
+		}
+
+		items := make([]map[string]any, 0, len(res))
+		for _, u := range res {
+			sanitize.SanitizeUnstructured(u, sanitize.DefaultSanitizeOptions())
+			items = append(items, u.UnstructuredContent())
+		}
+
+		result[resourceIndex] = items
 	}
 
-	return
+	return result, errors.Join(errs...)
 }
 
 // Templates itself with the option to populate tenant fields.

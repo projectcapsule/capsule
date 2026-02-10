@@ -360,6 +360,7 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 }
 
 func (r *Manager) updateTenantStatus(ctx context.Context, tnt *capsulev1beta2.Tenant, reconcileError error) error {
+
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
 		latest := &capsulev1beta2.Tenant{}
 		if err = r.Get(ctx, types.NamespacedName{Name: tnt.GetName()}, latest); err != nil {
