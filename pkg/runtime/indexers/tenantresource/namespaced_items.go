@@ -10,23 +10,23 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 )
 
-type LocalProcessedItems struct{}
+type NamespacedProcessedItems struct{}
 
-func (g LocalProcessedItems) Object() client.Object {
+func (g NamespacedProcessedItems) Object() client.Object {
 	return &capsulev1beta2.TenantResource{}
 }
 
-func (g LocalProcessedItems) Field() string {
-	return IndexerFieldName
+func (g NamespacedProcessedItems) Field() string {
+	return ProcessedIndexerFieldName
 }
 
-func (g LocalProcessedItems) Func() client.IndexerFunc {
+func (g NamespacedProcessedItems) Func() client.IndexerFunc {
 	return func(object client.Object) []string {
 		tgr := object.(*capsulev1beta2.TenantResource) //nolint:forcetypeassert
 
 		out := make([]string, 0, len(tgr.Status.ProcessedItems))
 		for _, pi := range tgr.Status.ProcessedItems {
-			out = append(out, pi.String())
+			out = append(out, pi.GetGVKKey(""))
 		}
 
 		return out

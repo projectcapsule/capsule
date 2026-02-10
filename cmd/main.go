@@ -39,6 +39,7 @@ import (
 	rbaccontroller "github.com/projectcapsule/capsule/internal/controllers/rbac"
 	"github.com/projectcapsule/capsule/internal/controllers/resourcepools"
 	"github.com/projectcapsule/capsule/internal/controllers/resources"
+	serviceaccountcontroller "github.com/projectcapsule/capsule/internal/controllers/serviceaccounts"
 	servicelabelscontroller "github.com/projectcapsule/capsule/internal/controllers/servicelabels"
 	tenantcontroller "github.com/projectcapsule/capsule/internal/controllers/tenant"
 	tlscontroller "github.com/projectcapsule/capsule/internal/controllers/tls"
@@ -49,8 +50,8 @@ import (
 	"github.com/projectcapsule/capsule/internal/webhook/defaults"
 	"github.com/projectcapsule/capsule/internal/webhook/dra"
 	"github.com/projectcapsule/capsule/internal/webhook/gateway"
+	"github.com/projectcapsule/capsule/internal/webhook/generic"
 	"github.com/projectcapsule/capsule/internal/webhook/ingress"
-	"github.com/projectcapsule/capsule/internal/webhook/misc"
 	namespacemutation "github.com/projectcapsule/capsule/internal/webhook/namespace/mutation"
 	namespacevalidation "github.com/projectcapsule/capsule/internal/webhook/namespace/validation"
 	"github.com/projectcapsule/capsule/internal/webhook/node"
@@ -62,7 +63,6 @@ import (
 	"github.com/projectcapsule/capsule/internal/webhook/serviceaccounts"
 	tenantmutation "github.com/projectcapsule/capsule/internal/webhook/tenant/mutation"
 	tenantvalidation "github.com/projectcapsule/capsule/internal/webhook/tenant/validation"
-	tntresource "github.com/projectcapsule/capsule/internal/webhook/tenantresource"
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
@@ -133,8 +133,13 @@ func main() {
 
 	setupLog.V(5).Info("Controller", "Options", controllerConfig)
 
-	if ns = os.Getenv("NAMESPACE"); len(ns) == 0 {
-		setupLog.Error(fmt.Errorf("unable to determinate the Namespace Capsule is running on"), "unable to start manager")
+	if ns = os.Getenv(configuration.EnvironmentControllerNamespace); len(ns) == 0 {
+		setupLog.Error(fmt.Errorf("unable to determinate the Namespace Capsule is running on. Please export %s", configuration.EnvironmentControllerNamespace), "unable to start manager")
+		os.Exit(1)
+	}
+
+	if ns = os.Getenv(configuration.EnvironmentServiceaccountName); len(ns) == 0 {
+		setupLog.Error(fmt.Errorf("unable to determinate the ServiceAccount Capsule is running with. Please export %s", configuration.EnvironmentServiceaccountName), "unable to start manager")
 		os.Exit(1)
 	}
 
@@ -176,7 +181,7 @@ func main() {
 
 	ctx := ctrl.SetupSignalHandler()
 
-	cfg := configuration.NewCapsuleConfiguration(ctx, manager.GetClient(), controllerConfig.ConfigurationName)
+	cfg := configuration.NewCapsuleConfiguration(ctx, manager.GetClient(), manager.GetConfig(), controllerConfig.ConfigurationName)
 
 	directClient, err := client.New(ctrl.GetConfigOrDie(), client.Options{
 		Scheme: manager.GetScheme(),
@@ -187,7 +192,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	directCfg := configuration.NewCapsuleConfiguration(ctx, directClient, controllerConfig.ConfigurationName)
+	directCfg := configuration.NewCapsuleConfiguration(ctx, directClient, manager.GetConfig(), controllerConfig.ConfigurationName)
 
 	if directCfg.EnableTLSConfiguration() {
 		tlsReconciler := &tlscontroller.Reconciler{
@@ -215,6 +220,8 @@ func main() {
 		}
 	}
 
+	// Initialize Caches
+	impersonationCache := cache.NewImpersonationCache()
 	registryCache := cache.NewRegistryRuleSetCache()
 
 	if err = (&tenantcontroller.Manager{
@@ -249,6 +256,8 @@ func main() {
 	// webhooks: the order matters, don't change it and just append
 	webhooksList := append(
 		make([]handlers.Webhook, 0),
+		route.GenericReplicasHandler(),
+		route.GenericManagedHandler(cfg),
 		route.Pod(
 			pod.Handler(
 				pod.ImagePullPolicy(),
@@ -270,15 +279,14 @@ func main() {
 				service.Validating(),
 			),
 		),
-		route.TenantResourceObjects(handlers.InCapsuleGroups(cfg, tntresource.WriteOpsHandler())),
-		route.Cordoning(handlers.InCapsuleGroups(cfg, misc.CordoningHandler(cfg))),
 		route.Node(handlers.InCapsuleGroups(cfg, node.UserMetadataHandler(cfg, kubeVersion))),
+		route.Cordoning(handlers.InCapsuleGroups(cfg, generic.CordoningHandler(cfg))),
 		route.ServiceAccounts(
 			serviceaccounts.Handler(
 				serviceaccounts.Validating(cfg),
 			),
 		),
-		route.MiscCustomResources(misc.ResourceCounterHandler(manager.GetClient())),
+		route.GenericCustomResources(generic.ResourceCounterHandler(manager.GetClient())),
 		route.Gateway(gateway.Class(cfg)),
 		route.DeviceClass(dra.DeviceClass()),
 		route.Defaults(defaults.Handler(cfg, kubeVersion)),
@@ -325,14 +333,14 @@ func main() {
 		route.ResourcePoolValidation((resourcepool.PoolValidationHandler(ctrl.Log.WithName("webhooks").WithName("resourcepool")))),
 		route.ResourcePoolClaimMutation((resourcepool.ClaimMutationHandler(ctrl.Log.WithName("webhooks").WithName("resourcepoolclaims")))),
 		route.ResourcePoolClaimValidation((resourcepool.ClaimValidationHandler(ctrl.Log.WithName("webhooks").WithName("resourcepoolclaims")))),
-		route.MiscTenantAssignment(
-			misc.TenantAssignmentHandler(),
-		),
-		route.MiscManagedValidation(
-			handlers.InCapsuleGroups(cfg, misc.ManagedValidatingHandler()),
+		route.GenericTenantAssignment(
+			generic.TenantAssignmentHandler(),
 		),
 		route.ConfigValidation(
-			cfgvalidation.WarningHandler(),
+			cfgvalidation.Handler(cfg,
+				cfgvalidation.WarningHandler(),
+				cfgvalidation.ServiceAccountHandler(),
+			),
 		),
 	)
 
@@ -389,6 +397,7 @@ func main() {
 	}
 
 	if err = (&configcontroller.Manager{
+		Rest:          manager.GetConfig(),
 		Client:        manager.GetClient(),
 		RegistryCache: registryCache,
 		Log:           ctrl.Log.WithName("capsule.ctrl").WithName("configuration"),
@@ -397,13 +406,24 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&resources.Global{}).SetupWithManager(manager, controllerConfig); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "resources.Global")
+	if err = (&serviceaccountcontroller.Manager{
+		Log:           ctrl.Log.WithName("chache").WithName("clients"),
+		Client:        manager.GetClient(),
+		Configuration: cfg,
+		Cache:         impersonationCache,
+	}).SetupWithManager(manager, controllerConfig); err != nil {
+		setupLog.Error(err, "unable to create controller", "cache", "ServiceAccounts")
 		os.Exit(1)
 	}
 
-	if err = (&resources.Namespaced{}).SetupWithManager(manager, controllerConfig); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "resources.Namespaced")
+	if err := resources.Add(
+		ctrl.Log.WithName("controllers").WithName("TenantResources"),
+		manager,
+		cfg,
+		controllerConfig,
+		impersonationCache,
+	); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "tenantresources")
 		os.Exit(1)
 	}
 

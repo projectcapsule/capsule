@@ -21,7 +21,6 @@ func SetLooseOwnerReference(obj client.Object, owner metav1.OwnerReference) erro
 		if ownerRefs[i].UID == owner.UID {
 			ownerRefs[i] = owner
 			obj.SetOwnerReferences(ownerRefs)
-
 			return nil
 		}
 	}

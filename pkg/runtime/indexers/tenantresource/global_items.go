@@ -17,7 +17,7 @@ func (g GlobalProcessedItems) Object() client.Object {
 }
 
 func (g GlobalProcessedItems) Field() string {
-	return IndexerFieldName
+	return ProcessedIndexerFieldName
 }
 
 func (g GlobalProcessedItems) Func() client.IndexerFunc {
@@ -26,7 +26,7 @@ func (g GlobalProcessedItems) Func() client.IndexerFunc {
 
 		out := make([]string, 0, len(tgr.Status.ProcessedItems))
 		for _, pi := range tgr.Status.ProcessedItems {
-			out = append(out, pi.String())
+			out = append(out, pi.GetGVKKey(""))
 		}
 
 		return out

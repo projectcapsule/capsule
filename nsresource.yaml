@@ -1,0 +1,57 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: config-namespace
+  namespace: solar-test
+data:
+  # property-like keys; each key maps to a simple value
+  player_initial_lives: "3"
+  ui_properties_file_name: "user-interface.properties"
+
+  # file-like keys
+  game.properties: |
+    enemy.types=aliens,monsters
+    player.maximum-lives=5    
+  user-interface.properties: |
+    color.good=purple
+    color.bad=yellow
+    allow.textmode=true   
+---
+apiVersion: capsule.clastix.io/v1beta2
+kind: TenantResource
+metadata:
+  name: solar-configmap-replication
+  namespace: solar-test
+  # solar-prod, solar-uat, solar-test
+spec:
+  resyncPeriod: 5s
+  resources:
+  - namespacedItems:
+    - apiVersion: v1
+      kind: ConfigMap
+      selector:
+        matchLabels:
+          projectcapsule.dev/replicate: "{{.tenant.name}}"
+      optional: true
+    - apiVersion: v1
+      kind: ConfigMap
+      selector:
+        matchLabels:
+          projectcapsule.dev/replicate: "{{.tenant.name}}"
+      optional: true
+
+  - namespaceSelector:
+      matchLabels:
+        name: "solar-prod"
+    namespacedItems:
+    - apiVersion: v1
+      kind: ConfigMap
+      selector:
+        matchLabels:
+          projectcapsule.dev/replicate: "{{.tenant.name}}"
+      optional: true
+
+
+# Namespaced Items (Source/Unique) - Iterate over context ( solar-prod, solar-uat, solar-test) - Except iteration == source = skip
+

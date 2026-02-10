@@ -12,6 +12,7 @@ import (
 	"github.com/pkg/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -32,6 +33,7 @@ import (
 
 type Manager struct {
 	client.Client
+	Rest *rest.Config
 
 	configName string
 
@@ -118,11 +120,10 @@ func (r *Manager) Start(ctx context.Context) error {
 
 	return nil
 }
-
 func (r *Manager) Reconcile(ctx context.Context, request reconcile.Request) (res reconcile.Result, err error) {
 	log := r.Log.WithValues("configuration", request.Name)
 
-	cfg := configuration.NewCapsuleConfiguration(ctx, r.Client, request.Name)
+	cfg := configuration.NewCapsuleConfiguration(ctx, r.Client, r.Rest, request.Name)
 
 	instance := &capsulev1beta2.CapsuleConfiguration{}
 	if err = r.Get(ctx, request.NamespacedName, instance); err != nil {
@@ -179,7 +180,7 @@ func (r *Manager) gatherCapsuleUsers(
 	users := cfg.Users()
 
 	toList := &capsulev1beta2.TenantOwnerList{}
-	if err := r.List(ctx, toList); err != nil {
+	if err := r.Client.List(ctx, toList); err != nil {
 		return fmt.Errorf("listing TenantOwner CRs: %w", err)
 	}
 
@@ -207,12 +208,12 @@ func (r *Manager) updateConfigStatus(
 ) error {
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
 		latest := &capsulev1beta2.CapsuleConfiguration{}
-		if err = r.Get(ctx, types.NamespacedName{Name: instance.GetName(), Namespace: instance.GetNamespace()}, latest); err != nil {
+		if err = r.Client.Get(ctx, types.NamespacedName{Name: instance.GetName(), Namespace: instance.GetNamespace()}, latest); err != nil {
 			return err
 		}
 
 		latest.Status = instance.Status
 
-		return r.Status().Update(ctx, latest)
+		return r.Client.Status().Update(ctx, latest)
 	})
 }

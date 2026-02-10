@@ -4,6 +4,8 @@ package template
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"maps"
 	"strings"
@@ -18,50 +20,50 @@ import (
 func ExtraFuncMap() template.FuncMap {
 	funcMap := sprigin.FuncMap()
 
-	extraFuncs := template.FuncMap{
-		"toToml":        toTOML,
-		"fromToml":      fromTOML,
-		"toYaml":        toYAML,
-		"fromYaml":      fromYAML,
-		"fromYamlArray": fromYAMLArray,
-		"toJson":        toJSON,
-		"fromJson":      fromJSON,
-		"fromJsonArray": fromJSONArray,
-	}
+	maps.Copy(funcMap, CustomFuncMap())
 
-	maps.Copy(funcMap, extraFuncs)
+	// Remove unsafe methods
+	delete(funcMap, "env")
+	delete(funcMap, "expandEnv")
 
 	return funcMap
 }
 
-// toYAML takes an interface, marshals it to yaml, and returns a string. It will
-// always return a string, even on marshal error (empty string).
-//
-// This is designed to be called from a template.
-func toYAML(v any) string {
-	data, err := yaml.Marshal(v)
-	if err != nil {
-		// Swallow errors inside of a template.
-		return ""
+// CustomFuncMap return our custom templates
+func CustomFuncMap() template.FuncMap {
+	return template.FuncMap{
+		"toToml":            toTOML,
+		"fromToml":          fromTOML,
+		"fromYamlArray":     fromYAMLArray,
+		"fromJsonArray":     fromJSONArray,
+		"deterministicUUID": deterministicUUID,
 	}
-
-	return strings.TrimSuffix(string(data), "\n")
 }
 
-// fromYAML converts a YAML document into a map[string]interface{}.
-//
-// This is not a general-purpose YAML parser, and will not parse all valid
-// YAML documents. Additionally, because its intended use is within templates
-// it tolerates errors. It will insert the returned error message string into
-// m["Error"] in the returned map.
-func fromYAML(str string) map[string]any {
-	m := map[string]any{}
-
-	if err := yaml.Unmarshal([]byte(str), &m); err != nil {
-		m["Error"] = err.Error()
+func deterministicUUID(parts ...string) string {
+	// Normalize: trim whitespace; keep empty strings if caller passes them intentionally.
+	// If you prefer to skip empties, filter them out here.
+	clean := make([]string, 0, len(parts))
+	for _, p := range parts {
+		clean = append(clean, strings.TrimSpace(p))
 	}
 
-	return m
+	// Deterministic stable separator. Using a non-printable delimiter reduces accidental collisions.
+	// "|" is also fine; \x1f is "unit separator" and common for this use.
+	msg := strings.Join(clean, "\x1f")
+
+	sum := sha256.Sum256([]byte(msg))
+	b := sum[:16] // 128-bit UUID material
+
+	// Set RFC4122 variant (10xxxxxx)
+	b[8] = (b[8] & 0x3f) | 0x80
+	// Set version 5 (0101xxxx)
+	b[6] = (b[6] & 0x0f) | 0x50
+
+	// Format as 8-4-4-4-12 hex
+	hex32 := hex.EncodeToString(b) // 32 lowercase hex chars
+	uuid := hex32[0:8] + "-" + hex32[8:12] + "-" + hex32[12:16] + "-" + hex32[16:20] + "-" + hex32[20:32]
+	return strings.ToUpper(uuid)
 }
 
 // fromYAMLArray converts a YAML array into a []interface{}.
@@ -106,36 +108,6 @@ func fromTOML(str string) map[string]any {
 	m := make(map[string]any)
 
 	if err := toml.Unmarshal([]byte(str), &m); err != nil {
-		m["Error"] = err.Error()
-	}
-
-	return m
-}
-
-// toJSON takes an interface, marshals it to json, and returns a string. It will
-// always return a string, even on marshal error (empty string).
-//
-// This is designed to be called from a template.
-func toJSON(v any) string {
-	data, err := json.Marshal(v)
-	if err != nil {
-		// Swallow errors inside of a template.
-		return ""
-	}
-
-	return string(data)
-}
-
-// fromJSON converts a JSON document into a map[string]interface{}.
-//
-// This is not a general-purpose JSON parser, and will not parse all valid
-// JSON documents. Additionally, because its intended use is within templates
-// it tolerates errors. It will insert the returned error message string into
-// m["Error"] in the returned map.
-func fromJSON(str string) map[string]any {
-	m := make(map[string]any)
-
-	if err := json.Unmarshal([]byte(str), &m); err != nil {
 		m["Error"] = err.Error()
 	}
 

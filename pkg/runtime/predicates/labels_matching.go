@@ -42,7 +42,6 @@ func (p LabelsMatchingPredicate) matches(obj client.Object) bool {
 	if labels == nil {
 		return false
 	}
-
 	for k, v := range p.Match {
 		if labels[k] != v {
 			return false

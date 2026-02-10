@@ -19,7 +19,7 @@ func (o OwnerReference) Object() client.Object {
 }
 
 func (o OwnerReference) Field() string {
-	return ".spec.owner.ownerkind"
+	return OwnerKindIndexerFieldName
 }
 
 func (o OwnerReference) Func() client.IndexerFunc {

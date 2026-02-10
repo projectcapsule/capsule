@@ -220,6 +220,134 @@ spec:
 
                 return obj
 
+        resource.customizations.health.capsule.clastix.io_GlobalTenantResource: |
+          hs = {}
+          if obj.status ~= nil then
+            if obj.status.conditions ~= nil then
+              for i, condition in ipairs(obj.status.conditions) do
+                if condition.type == "Cordoned" and condition.status == "True" then
+                  hs.status = "Suspended"
+                  hs.message = condition.message
+                  return hs
+                end
+              end
+              for i, condition in ipairs(obj.status.conditions) do
+                if condition.type == "Ready" and condition.status == "False" then
+                  hs.status = "Degraded"
+                  hs.message = condition.message
+                  return hs
+                end
+                if condition.type == "Ready" and condition.status == "True" then
+                  hs.status = "Healthy"
+                  hs.message = condition.message
+                  return hs
+                end
+              end
+            end
+          end
+
+          hs.status = "Progressing"
+          hs.message = "Waiting for Status"
+          return hs
+
+        resource.customizations.actions.capsule.clastix.io_GlobalTenantResource: |
+          mergeBuiltinActions: true
+          discovery.lua: |
+            actions = {}
+
+            actions["cordon"] = {
+              ["iconClass"] = "fa fa-solid fa-pause",
+              ["disabled"] = true,
+            }
+            actions["uncordon"] = {
+              ["iconClass"] = "fa fa-solid fa-play",
+              ["disabled"] = true,
+            }
+            actions["reconcile"] = {
+              ["iconClass"] = "fa fa-solid fa-sync",
+              ["disabled"] = false,
+            }
+
+            local suspend = false
+            if obj.spec ~= nil and obj.spec.cordoned ~= nil then
+              suspend = obj.spec.cordoned
+            end
+
+            if suspend then
+              actions["uncordon"]["disabled"] = false
+            else
+              actions["cordon"]["disabled"] = false
+            end
+
+            return actions
+
+          definitions:
+            - name: cordon
+              action.lua: |
+                if obj.spec == nil then
+                  obj.spec = {}
+                end
+                obj.spec.cordoned = true
+                return obj
+
+            - name: uncordon
+              action.lua: |
+                if obj.spec ~= nil and obj.spec.cordoned ~= nil and obj.spec.cordoned then
+                  obj.spec.cordoned = false
+                end
+                return obj
+
+            - name: reconcile
+              action.lua: |
+                if obj.metadata == nil then
+                  obj.metadata = {}
+                end
+                if obj.metadata.annotations == nil then
+                  obj.metadata.annotations = {}
+                end
+
+                local key = "reconcile.projectcapsule.dev/requested"
+
+                local ts = nil
+                if os ~= nil and os.time ~= nil then
+                  ts = tostring(os.time())
+                else
+                  ts = "true"
+                end
+
+                obj.metadata.annotations[key] = ts
+                return obj
+
+
+        resource.customizations.health.capsule.clastix.io_TenantResource: |
+          hs = {}
+          if obj.status ~= nil then
+            if obj.status.conditions ~= nil then
+              for i, condition in ipairs(obj.status.conditions) do
+                if condition.type == "Cordoned" and condition.status == "True" then
+                  hs.status = "Suspended"
+                  hs.message = condition.message
+                  return hs
+                end
+              end
+              for i, condition in ipairs(obj.status.conditions) do
+                if condition.type == "Ready" and condition.status == "False" then
+                  hs.status = "Degraded"
+                  hs.message = condition.message
+                  return hs
+                end
+                if condition.type == "Ready" and condition.status == "True" then
+                  hs.status = "Healthy"
+                  hs.message = condition.message
+                  return hs
+                end
+              end
+            end
+          end
+
+          hs.status = "Progressing"
+          hs.message = "Waiting for Status"
+          return hs
 ---
 apiVersion: source.toolkit.fluxcd.io/v1
 kind: HelmRepository

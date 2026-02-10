@@ -3,6 +3,8 @@
 
 package utils
 
+import "k8s.io/apimachinery/pkg/runtime"
+
 func MapMergeNoOverrite(dst, src map[string]string) {
 	if len(src) == 0 {
 		return
@@ -27,4 +29,12 @@ func MapEqual(a, b map[string]string) bool {
 	}
 
 	return true
+}
+
+func ToMap(obj any) (map[string]any, error) {
+	m, err := runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
+	if err != nil {
+		return nil, err
+	}
+	return m, nil
 }

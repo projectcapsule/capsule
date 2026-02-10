@@ -1,0 +1,24 @@
+apiVersion: capsule.clastix.io/v1beta2
+kind: TenantResource
+metadata:
+  name: tenant-ns-cm-registration
+spec:
+  resyncPeriod: 5s
+  resources:
+    - templates:
+        - template: |
+            ---
+            apiVersion: v1
+            kind: ConfigMap
+            metadata:
+              name: common-config
+            data:
+              {{ $.namespace.metadata.name }}.conf: |
+                {{ toYaml $.namespace.metadata | nindent 4 }}
+    - rawItems:
+        - apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: common-config
+          data:
+            additional-data: "raw"

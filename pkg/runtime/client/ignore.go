@@ -45,7 +45,6 @@ func (i *IgnoreRule) Matches(obj *unstructured.Unstructured) bool {
 	if err != nil {
 		return false
 	}
-
 	return sr.MatchUnstructured(obj)
 }
 
@@ -68,20 +67,17 @@ func JsonPointerGet(obj map[string]any, p string) (any, bool) {
 			if !ok {
 				return nil, false
 			}
-
 			cur = next
 		case []any:
 			idx, err := strconv.Atoi(key)
 			if err != nil || idx < 0 || idx >= len(node) {
 				return nil, false
 			}
-
 			cur = node[idx]
 		default:
 			return nil, false
 		}
 	}
-
 	return cur, true
 }
 
@@ -122,7 +118,6 @@ func JsonPointerSet(obj map[string]any, p string, val any) error {
 			cur = n
 		}
 	}
-
 	return nil
 }
 
@@ -148,7 +143,6 @@ func JsonPointerDelete(obj map[string]any, p string) error {
 		if !ok {
 			return nil
 		}
-
 		m, ok := nxt.(map[string]any)
 		if !ok {
 			return nil
@@ -172,7 +166,6 @@ func PreserveIgnoredPaths(desired, live map[string]any, ptrs []string) {
 
 func MatchIgnorePaths(rules []IgnoreRule, obj *unstructured.Unstructured) []string {
 	var out []string
-
 	for _, r := range rules {
 		if !r.Matches(obj) {
 			continue

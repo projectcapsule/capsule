@@ -120,6 +120,17 @@ func ownerClient(owner api.UserSpec) (cs kubernetes.Interface) {
 	return cs
 }
 
+func impersonationClientSet(user string, groups []string) (cs kubernetes.Interface) {
+	c, err := config.GetConfig()
+	Expect(err).ToNot(HaveOccurred())
+	c.Impersonate.Groups = groups
+	c.Impersonate.UserName = user
+	cs, err = kubernetes.NewForConfig(c)
+	Expect(err).ToNot(HaveOccurred())
+
+	return cs
+}
+
 func impersonationClient(user string, groups []string) client.Client {
 	impersonatedCfg := rest.CopyConfig(cfg)
 	impersonatedCfg.Impersonate = rest.ImpersonationConfig{

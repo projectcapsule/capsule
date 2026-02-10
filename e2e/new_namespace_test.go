@@ -76,6 +76,12 @@ var _ = Describe("creating a Namespaces as different type of Tenant owners", Lab
 		for _, owner := range tnt.Spec.Owners {
 			Eventually(CheckForOwnerRoleBindings(ns, owner, nil), defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		}
+
+		c := impersonationClient(tnt.Spec.Owners[1].UserSpec.Name, withDefaultGroups(nil))
+
+		err := c.Delete(context.TODO(), ns)
+		Expect(err).ToNot(HaveOccurred())
+
 	})
 	It("should be available in Tenant namespaces list and RoleBindings should present when created as ServiceAccount", func() {
 		ns := NewNamespace("")

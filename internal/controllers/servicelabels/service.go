@@ -25,6 +25,7 @@ func (r *ServicesLabelsReconciler) SetupWithManager(ctx context.Context, mgr ctr
 	}
 
 	return ctrl.NewControllerManagedBy(mgr).
+		Named("service").
 		For(r.abstractServiceLabelsReconciler.obj, r.abstractServiceLabelsReconciler.forOptionPerInstanceName(ctx)).
 		Named("capsule/services").
 		Complete(r)

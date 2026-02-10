@@ -30,9 +30,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/runtime/predicates"
 )
 
-const (
-	controllerManager = "rbac-controller"
-)
+const controllerManager = "rbac-controller"
 
 type Manager struct {
 	Log           logr.Logger
