@@ -1,6 +1,6 @@
 dependencies:
 - name: capsule-proxy
   repository: oci://ghcr.io/projectcapsule/charts
-  version: 0.10.0
-digest: sha256:b268fe0a87e4fa4d0196e5dac82c7e8ae20e96053f5ca860b1f7c44e3a357406
-generated: "2025-12-09T15:58:45.796317945Z"
+  version: 0.10.1
+digest: sha256:df6f104b33c48fad3f7b32b9ccd114fd6857f33efe8a98cc35c75726bbb4d23d
+generated: "2026-02-12T18:02:21.24793369Z"
