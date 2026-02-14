@@ -27,12 +27,12 @@ jobs:
           value: ${{ secrets.FOSSA_API_KEY }}
       - name: "Run FOSSA Scan"
         if: steps.checksecret.outputs.result == 'true'
-        uses: fossas/fossa-action@3ebcea1862c6ffbd5cf1b4d0bd6b3fe7bd6f2cac # v1.7.0
+        uses: fossas/fossa-action@c414b9ad82eaad041e47a7cf62a4f02411f427a0 # v1.8.0
         with:
           api-key: ${{ secrets.FOSSA_API_KEY }}
       - name: "Run FOSSA Test"
         if: steps.checksecret.outputs.result == 'true'
-        uses: fossas/fossa-action@3ebcea1862c6ffbd5cf1b4d0bd6b3fe7bd6f2cac # v1.7.0
+        uses: fossas/fossa-action@c414b9ad82eaad041e47a7cf62a4f02411f427a0 # v1.8.0
         with:
           api-key: ${{ secrets.FOSSA_API_KEY }}
           run-tests: true
@@ -52,7 +52,7 @@ jobs:
         with:
           go-version-file: 'go.mod'
       - name: Run Gosec Security Scanner
-        uses: securego/gosec@424fc4cd9c82ea0fd6bee9cd49c2db2c3cc0c93f # v2.22.11
+        uses: securego/gosec@398ad549bbf1a51dc978fd966169f660c59774de # v2.23.0
         with:
           args: '-no-fail -fmt sarif -out gosec.sarif ./...'
       - name: Upload SARIF file
