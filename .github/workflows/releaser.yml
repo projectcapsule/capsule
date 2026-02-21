@@ -30,7 +30,7 @@ jobs:
         timeout-minutes: 5
         continue-on-error: true
       - uses: creekorful/goreportcard-action@1f35ced8cdac2cba28c9a2f2288a16aacfd507f9 # v1.0
-      - uses: anchore/sbom-action/download-syft@5620efe7f17de3b70cbc020fc49ce9048f1bbacf
+      - uses: anchore/sbom-action/download-syft@6d473d38434d5fdbb356f61f8d2df69a83a05875
       - name: Install Cosign
         uses: sigstore/cosign-installer@faadad0cce49287aee09b3a48701e75088a2c6ad # v4.0.0
       - name: Run GoReleaser
