@@ -7,8 +7,9 @@ package api_test
 import (
 	"testing"
 
-	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/projectcapsule/capsule/pkg/api"
 )
 
 func TestAllowedListSpec_ExactMatch(t *testing.T) {

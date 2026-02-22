@@ -4,12 +4,14 @@
 package configuration
 
 import (
+	"context"
 	"regexp"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	capsuleapi "github.com/projectcapsule/capsule/pkg/api"
+	"k8s.io/client-go/rest"
 )
 
 const (
@@ -35,6 +37,8 @@ type Configuration interface {
 	ForbiddenUserNodeLabels() *capsuleapi.ForbiddenListSpec
 	ForbiddenUserNodeAnnotations() *capsuleapi.ForbiddenListSpec
 	Administrators() capsuleapi.UserListSpec
+	ServiceAccountClientProperties() capsulev1beta2.ServiceAccountClient
+	ServiceAccountClient(context.Context) (*rest.Config, error)
 	Admission() capsulev1beta2.DynamicAdmission
 	RBAC() *capsulev1beta2.RBACConfiguration
 	CacheInvalidation() metav1.Duration

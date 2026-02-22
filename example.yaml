@@ -1,0 +1,17 @@
+---
+apiVersion: capsule.clastix.io/v1beta2
+kind: Tenant
+metadata:
+  name: solar
+spec: {}
+---
+apiVersion: capsule.clastix.io/v1beta2
+kind: TenantOwner
+metadata:
+  labels:
+    projectcapsule.dev/tenant: "solar"
+  name: solar-test-gitops-reconciler
+spec:
+  kind: ServiceAccount
+  name: "system:serviceaccount:solar-test:gitops-reconciler"
+

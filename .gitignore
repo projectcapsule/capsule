@@ -9,6 +9,7 @@ bin
 dist/
 config/
 builds/
+hack/generated/
 
 # Test binary, build with `go test -c`
 *.test

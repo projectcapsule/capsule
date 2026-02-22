@@ -317,7 +317,7 @@ webhooks:
     - v1
     - v1beta1
   clientConfig:
-    {{- include "capsule.webhooks.service" (dict "path" "/misc/tenant-label" "ctx" $) | nindent 4 }}
+    {{- include "capsule.webhooks.service" (dict "path" "/generic/tenant-label" "ctx" $) | nindent 4 }}
   failurePolicy:  {{ .failurePolicy }}
   matchPolicy: {{ .matchPolicy }}
   reinvocationPolicy: {{ .reinvocationPolicy }}

@@ -5,25 +5,34 @@ package configuration
 
 import (
 	"context"
+	"fmt"
+	"os"
 	"regexp"
+	"time"
 
 	"github.com/pkg/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	capsuleapi "github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api/meta"
 )
 
 // capsuleConfiguration is the Capsule Configuration retrieval mode
 // using a closure that provides the desired configuration.
 type capsuleConfiguration struct {
 	retrievalFn func() *capsulev1beta2.CapsuleConfiguration
+	rest        *rest.Config
+	client      client.Client
 }
 
 func DefaultCapsuleConfiguration() capsulev1beta2.CapsuleConfigurationSpec {
+	d, _ := time.ParseDuration("1h")
+
 	return capsulev1beta2.CapsuleConfigurationSpec{
 		Users: []capsuleapi.UserSpec{
 			{
@@ -31,43 +40,53 @@ func DefaultCapsuleConfiguration() capsulev1beta2.CapsuleConfigurationSpec {
 				Kind: capsuleapi.GroupOwner,
 			},
 		},
+		CacheInvalidation: metav1.Duration{
+			Duration: d,
+		},
+		RBAC: &capsulev1beta2.RBACConfiguration{
+			DeleterClusterRole:     "capsule-namespace-deleter",
+			ProvisionerClusterRole: "capsule-namespace-provisioner",
+		},
 		ForceTenantPrefix:              false,
 		ProtectedNamespaceRegexpString: "",
 	}
 }
 
-func NewCapsuleConfiguration(ctx context.Context, c client.Client, name string) Configuration {
-	return &capsuleConfiguration{retrievalFn: func() *capsulev1beta2.CapsuleConfiguration {
-		cfg := &capsulev1beta2.CapsuleConfiguration{}
-		key := types.NamespacedName{Name: name}
+func NewCapsuleConfiguration(ctx context.Context, c client.Client, rest *rest.Config, name string) Configuration {
+	return &capsuleConfiguration{
+		client: c,
+		rest:   rest,
+		retrievalFn: func() *capsulev1beta2.CapsuleConfiguration {
+			cfg := &capsulev1beta2.CapsuleConfiguration{}
+			key := types.NamespacedName{Name: name}
 
-		if err := c.Get(ctx, key, cfg); err == nil {
-			return cfg
-		} else if !apierrors.IsNotFound(err) {
-			panic(errors.Wrap(err, "cannot retrieve Capsule configuration with name "+name))
-		}
-
-		cfg = &capsulev1beta2.CapsuleConfiguration{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: name,
-			},
-			Spec: DefaultCapsuleConfiguration(),
-		}
-
-		if err := c.Create(ctx, cfg); err != nil {
-			if apierrors.IsAlreadyExists(err) {
-				if err := c.Get(ctx, key, cfg); err != nil {
-					panic(errors.Wrap(err, "configuration created concurrently but cannot be retrieved"))
-				}
-
+			if err := c.Get(ctx, key, cfg); err == nil {
 				return cfg
+			} else if !apierrors.IsNotFound(err) {
+				panic(errors.Wrap(err, "cannot retrieve Capsule configuration with name "+name))
 			}
 
-			panic(errors.Wrap(err, "cannot create Capsule configuration with name "+name))
-		}
+			cfg = &capsulev1beta2.CapsuleConfiguration{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: name,
+				},
+				Spec: DefaultCapsuleConfiguration(),
+			}
 
-		return cfg
-	}}
+			if err := c.Create(ctx, cfg); err != nil {
+				if apierrors.IsAlreadyExists(err) {
+					if err := c.Get(ctx, key, cfg); err != nil {
+						panic(errors.Wrap(err, "configuration created concurrently but cannot be retrieved"))
+					}
+
+					return cfg
+				}
+
+				panic(errors.Wrap(err, "cannot create Capsule configuration with name "+name))
+			}
+
+			return cfg
+		}}
 }
 
 func (c *capsuleConfiguration) ProtectedNamespaceRegexp() (*regexp.Regexp, error) {
@@ -180,4 +199,38 @@ func (c *capsuleConfiguration) RBAC() *capsulev1beta2.RBACConfiguration {
 
 func (c *capsuleConfiguration) CacheInvalidation() metav1.Duration {
 	return c.retrievalFn().Spec.CacheInvalidation
+}
+
+func (c *capsuleConfiguration) ServiceAccountClientProperties() capsulev1beta2.ServiceAccountClient {
+	return c.retrievalFn().Spec.Impersonation
+}
+
+func (c *capsuleConfiguration) ServiceAccountClient(ctx context.Context) (client *rest.Config, err error) {
+	props := c.ServiceAccountClientProperties()
+
+	client = c.rest
+
+	if props.Endpoint != "" {
+		client.Host = c.rest.Host
+	}
+
+	if props.SkipTLSVerify {
+		client.TLSClientConfig.Insecure = true
+	} else {
+		if props.CASecretName != "" {
+			namespace := props.CASecretNamespace
+			if namespace == "" {
+				namespace = meta.RFC1123SubdomainName(os.Getenv("NAMESPACE"))
+			}
+
+			caData, err := fetchCACertFromSecret(ctx, c.client, namespace.String(), props.CASecretName.String(), props.CASecretKey)
+			if err != nil {
+				return nil, fmt.Errorf("could not fetch CA cert: %w", err)
+			}
+
+			client.TLSClientConfig.CAData = caData
+		}
+	}
+
+	return client, nil
 }

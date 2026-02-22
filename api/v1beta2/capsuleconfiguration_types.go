@@ -63,6 +63,9 @@ type CapsuleConfigurationSpec struct {
 	// Define the period of time upon a cache invalidation is executed for all caches.
 	// +kubebuilder:default="24h"
 	CacheInvalidation metav1.Duration `json:"cacheInvalidation"`
+	// Service Account Client configuration for impersonation properties
+	// +optional
+	Impersonation ServiceAccountClient `json:"impersonation,omitzero"`
 }
 
 type RBACConfiguration struct {
@@ -81,6 +84,9 @@ type RBACConfiguration struct {
 }
 
 type DynamicAdmission struct {
+	// Request from these entities are ignored for critical admission webhooks (eg)
+	Ignore api.UserListSpec `json:"ignores,omitempty"`
+
 	// Configure dynamic Mutating Admission for Capsule
 	Mutating DynamicAdmissionConfig `json:"mutating,omitempty"`
 
@@ -121,6 +127,35 @@ type CapsuleResources struct {
 	// Name of the ValidatingWebhookConfiguration which contains the dynamic admission controller paths and resources.
 	// +kubebuilder:default=capsule-validating-webhook-configuration
 	ValidatingWebhookConfigurationName string `json:"validatingWebhookConfigurationName"`
+}
+
+// +kubebuilder:object:generate=true
+type ServiceAccountClient struct {
+	// Kubernetes API Endpoint to use for impersonation
+	Endpoint string `json:"endpoint,omitempty"`
+	// Namespace where the CA certificate secret is located
+	CASecretNamespace meta.RFC1123SubdomainName `json:"caSecretNamespace,omitempty"`
+	// Name of the secret containing the CA certificate
+	CASecretName meta.RFC1123Name `json:"caSecretName,omitempty"`
+	// Key in the secret that holds the CA certificate (e.g., "ca.crt")
+	// +kubebuilder:default=ca.crt
+	CASecretKey string `json:"caSecretKey,omitempty"`
+	// If true, TLS certificate verification is skipped (not recommended for production)
+	// +kubebuilder:default=false
+	SkipTLSVerify bool `json:"skipTlsVerify,omitempty"`
+	// Default ServiceAccount for global resources (GlobalTenantResource)
+	// When defined, users are required to use this ServiceAccount anywhere in the cluster
+	// unless they explicitly provide their own.
+	GlobalDefaultServiceAccount meta.RFC1123Name `json:"globalDefaultServiceAccount,omitempty"`
+	// Default ServiceAccount for global resources (GlobalTenantResource)
+	// When defined, users are required to use this ServiceAccount anywhere in the cluster
+	// unless they explicitly provide their own.
+	// +optional
+	GlobalDefaultServiceAccountNamespace meta.RFC1123SubdomainName `json:"globalDefaultServiceAccountNamespace,omitempty"`
+	// Default ServiceAccount for namespaced resources (TenantResource)
+	// When defined, users are required to use this ServiceAccount within the namespace
+	// where they deploy the resource, unless they explicitly provide their own.
+	TenantDefaultServiceAccount meta.RFC1123Name `json:"tenantDefaultServiceAccount,omitempty"`
 }
 
 // +kubebuilder:object:root=true

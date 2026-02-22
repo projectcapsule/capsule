@@ -11,6 +11,8 @@ import (
 )
 
 const (
+	ResourcesLabel = "capsule.clastix.io/resources"
+
 	TenantNameLabel = "kubernetes.io/metadata.name"
 
 	TenantLabel    = "capsule.clastix.io/tenant"
@@ -27,8 +29,7 @@ const (
 	CapsuleNameLabel = "projectcapsule.dev/name"
 
 	CreatedByCapsuleLabel = "projectcapsule.dev/created-by"
-
-	CustomResourcesLabel = "projectcapsule.dev/custom-resources"
+	CustomResourcesLabel  = "projectcapsule.dev/custom-resources"
 
 	NewManagedByCapsuleLabel = "projectcapsule.dev/managed-by"
 	ManagedByCapsuleLabel    = "capsule.clastix.io/managed-by"

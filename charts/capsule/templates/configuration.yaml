@@ -1,4 +1,5 @@
-{{- if $.Values.manager.options.createConfiguration }}
+{{- if or (and $.Values.crds.exclusive $.Values.crds.createConfig) (not $.Values.crds.exclusive) }}
+  {{- if $.Values.manager.options.createConfiguration }}
 apiVersion: capsule.clastix.io/v1beta2
 kind: CapsuleConfiguration
 metadata:
@@ -17,6 +18,8 @@ spec:
   cacheInvalidation: {{ .Values.manager.options.cacheInvalidation }}
   rbac:
     {{- toYaml .Values.manager.options.rbac | nindent 4 }}
+  impersonation:
+    {{- toYaml .Values.manager.options.impersonation | nindent 4 }}
   admission:
     validating:
       name: "{{ include "capsule.fullname" . }}-dynamic"
@@ -64,4 +67,5 @@ spec:
   nodeMetadata:
     {{- toYaml . | nindent 4 }}
   {{- end }}
+{{- end }}
 {{- end }}

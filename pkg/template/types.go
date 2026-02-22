@@ -3,7 +3,7 @@
 
 package template
 
-// +kubebuilder:validation:Enum=default;zero;error
+// +kubebuilder:validation:Enum=invalid;zero;error
 type MissingKeyOption string
 
 func (p MissingKeyOption) String() string {
@@ -11,7 +11,7 @@ func (p MissingKeyOption) String() string {
 }
 
 const (
-	MissingKeyDefault MissingKeyOption = "default"
+	MissingKeyInvalid MissingKeyOption = "invalid"
 	MissingKeyZero    MissingKeyOption = "zero"
 	MissingKeyError   MissingKeyOption = "error"
 )

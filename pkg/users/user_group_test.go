@@ -1,12 +1,14 @@
 // Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package users
+package users_test
 
 import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	"github.com/projectcapsule/capsule/pkg/users"
 )
 
 func TestIsInCapsuleGroups(t *testing.T) {
@@ -22,5 +24,5 @@ func TestIsInCapsuleGroups(t *testing.T) {
 
 	capsuleGroup := "kubernetes-abilitytologin"
 
-	assert.True(t, NewUserGroupList(groups).Find(capsuleGroup), nil)
+	assert.True(t, users.NewUserGroupList(groups).Find(capsuleGroup), nil)
 }

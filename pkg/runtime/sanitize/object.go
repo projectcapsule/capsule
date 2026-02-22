@@ -36,7 +36,6 @@ func SanitizeObject(obj client.Object, scheme *runtime.Scheme, opts SanitizeOpti
 		anns := obj.GetAnnotations()
 		if len(anns) > 0 {
 			delete(anns, "kubectl.kubernetes.io/last-applied-configuration")
-
 			if len(anns) == 0 {
 				obj.SetAnnotations(nil)
 			} else {

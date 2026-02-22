@@ -23,6 +23,7 @@ const (
 	FailedReason             string = "Failed"
 	ActiveReason             string = "Active"
 	CordonedReason           string = "Cordoned"
+	ReconcilingReason        string = "Reconciling"
 	PoolExhaustedReason      string = "PoolExhausted"
 	QueueExhaustedReason     string = "QueueExhausted"
 	NamespaceExhaustedReason string = "NamespaceExhausted"
@@ -137,6 +138,16 @@ func NewAssignedCondition(obj client.Object) Condition {
 		ObservedGeneration: obj.GetGeneration(),
 		LastTransitionTime: metav1.Now(),
 		Message:            "assigned to pool",
+	}
+}
+
+func NewReadyConditionReconcilingReason(obj client.Object) Condition {
+	return Condition{
+		Type:               ReadyCondition,
+		Status:             metav1.ConditionUnknown,
+		Reason:             ReconcilingReason,
+		Message:            "processing",
+		LastTransitionTime: metav1.Now(),
 	}
 }
 

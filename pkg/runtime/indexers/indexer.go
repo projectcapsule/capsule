@@ -32,6 +32,10 @@ type CustomIndexer interface {
 func AddToManager(ctx context.Context, log logr.Logger, mgr manager.Manager) error {
 	indexers := []CustomIndexer{
 		tenant.NamespacesReference{Obj: &capsulev1beta2.Tenant{}},
+		tenantresource.GlobalServiceAccount{},
+		tenantresource.GlobalProcessedItems{},
+		tenantresource.NamespacedServiceAccount{},
+		tenantresource.NamespacedProcessedItems{},
 		resourcepool.NamespacesReference{Obj: &capsulev1beta2.ResourcePool{}},
 		resourcepool.PoolUIDReference{Obj: &capsulev1beta2.ResourcePoolClaim{}},
 		tenant.OwnerReference{},
@@ -39,8 +43,6 @@ func AddToManager(ctx context.Context, log logr.Logger, mgr manager.Manager) err
 		ingress.HostnamePath{Obj: &extensionsv1beta1.Ingress{}},
 		ingress.HostnamePath{Obj: &networkingv1beta1.Ingress{}},
 		ingress.HostnamePath{Obj: &networkingv1.Ingress{}},
-		tenantresource.GlobalProcessedItems{},
-		tenantresource.LocalProcessedItems{},
 	}
 
 	for _, f := range indexers {

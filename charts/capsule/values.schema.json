@@ -359,6 +359,10 @@
                             "description": "Define groups which when found in the request of a user will be ignored by the Capsule this might be useful if you have one group where all the users are in, but you want to separate administrators from normal users with additional groups.",
                             "type": "array"
                         },
+                        "impersonation": {
+                            "description": "Impersonation",
+                            "type": "object"
+                        },
                         "labels": {
                             "description": "Additional labels to add to the CapsuleConfiguration resource",
                             "type": "object"
@@ -466,6 +470,10 @@
                         "existingRoles": {
                             "description": "Specifies further cluster roles to be added to the Capsule manager service account.",
                             "type": "array"
+                        },
+                        "strict": {
+                            "description": "Strongly restrict the RBAC assigned to Capsule Controller. When set to true you must aggregate further permissions by yourself.",
+                            "type": "boolean"
                         }
                     }
                 },
@@ -710,6 +718,7 @@
             "type": "object",
             "properties": {
                 "resourcepoolclaims": {
+                    "description": "Allow the creation of ResourcePoolClaims",
                     "type": "object",
                     "properties": {
                         "create": {
@@ -726,6 +735,7 @@
                     }
                 },
                 "resources": {
+                    "description": "Allow the creation of TenantResources",
                     "type": "object",
                     "properties": {
                         "create": {

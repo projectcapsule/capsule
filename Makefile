@@ -180,6 +180,10 @@ dev-setup:
 		--set 'crds.install=true' \
 		--set 'crds.exclusive=true'\
         --set 'crds.createConfig=true'\
+        --set 'crds.createRBAC=true'\
+        --set 'crds.createDiagnostics=true'\
+        --set "monitoring.diagnostics.enabled=true"\
+		--set "manager.rbac.minimal=true"\
         --set "tls.enableController=false"\
 		--set "webhooks.exclusive=true"\
 		--set "webhooks.hooks.nodes.enabled=true"\
@@ -187,6 +191,8 @@ dev-setup:
 		--set "webhooks.service.caBundle=$${CA_BUNDLE}" \
 		capsule \
 		./charts/capsule || true
+	mkdir -p ./hack/generated/ || true
+	bash ./hack/kubeconfig-for-sa.sh $(CLUSTER_NAME) "capsule-system" "capsule" "./hack/generated/kubeconfig.yaml"
 
 setup-monitoring: dev-setup-fluxcd
 	@$(KUBECTL) kustomize --load-restrictor='LoadRestrictionsNone' hack/distro/monitoring | envsubst | kubectl apply -f -
@@ -369,6 +375,7 @@ e2e-install: helm-controller-version ko-build-all
 		--set 'manager.resources=null'\
 		--set "manager.image.tag=$(VERSION)" \
 		--set 'manager.livenessProbe.failureThreshold=10' \
+		--set 'manager.rbac.minimal=true' \
 		--set 'webhooks.hooks.nodes.enabled=true' \
 		--set "webhooks.exclusive=true"\
 		--set "manager.options.logLevel=debug"\

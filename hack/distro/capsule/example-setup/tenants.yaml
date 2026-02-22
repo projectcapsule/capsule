@@ -16,9 +16,6 @@ spec:
     - matchLabels:
         tenant: solar
   namespaceOptions:
-    requiredMetadata:
-      labels:
-        env: "prod|test|dev"
     additionalMetadata:
       labels:
         team: platform
@@ -33,6 +30,16 @@ spec:
     - apiGroup: rbac.authorization.k8s.io
       kind: User
       name: joe
+  resourceQuotas:
+    scope: Tenant
+    items:
+    - hard:
+        limits.cpu: "8"
+        limits.memory: 16Gi
+        requests.cpu: "8"
+        requests.memory: 16Gi
+    - hard:
+        pods: "10"
 ---
 apiVersion: capsule.clastix.io/v1beta2
 kind: Tenant
@@ -41,10 +48,6 @@ metadata:
   labels:
     customer: a
 spec:
-  namespaceOptions:
-    requiredMetadata:
-      labels:
-        env: "prod|test|dev"
   permissions:
     matchOwners:
     - matchLabels:
@@ -83,6 +86,16 @@ kind: Tenant
 metadata:
   name: wind
 spec:
+  limitRanges:
+    items:
+      - limits:
+          - type: Pod
+            min:
+              cpu: "50m"
+              memory: "5Mi"
+            max:
+              cpu: "1"
+              memory: "1Gi"
   permissions:
     matchOwners:
     - matchLabels:
@@ -92,6 +105,9 @@ spec:
   owners:
   - name: joe
     kind: User
+  - name: alice
+    kind: User
+
   additionalRoleBindings:
   - clusterRoleName: 'view'
     subjects:
