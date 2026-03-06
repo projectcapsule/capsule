@@ -19,6 +19,9 @@
   </a>
   <a href="https://app.fossa.com/projects/git%2Bgithub.com%2Fprojectcapsule%2Fcapsule?ref=badge_shield&issueType=license" alt="FOSSA Status">
     <img src="https://app.fossa.com/api/projects/git%2Bgithub.com%2Fprojectcapsule%2Fcapsule.svg?type=shield&issueType=license"/>
+  <a href="https://releaserun.com/badges/kubernetes/">
+    <img src="https://img.releaserun.com/badge/health/kubernetes.svg" alt="Kubernetes Health"/>
+  </a>
   </a>
 </p>
 
