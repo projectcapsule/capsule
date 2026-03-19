@@ -24,7 +24,7 @@ import (
 // if a serviceaccount is in a tenant namespace they will return the tenant.
 func ResolveServiceAccountActor(
 	ctx context.Context,
-	c client.Client,
+	c client.Reader,
 	ns *corev1.Namespace,
 	username string,
 	cfg configuration.Configuration,
@@ -61,7 +61,7 @@ func ResolveServiceAccountActor(
 
 // GetServiceAccountFullName return the full qualified name for the serviceaccount
 func GetServiceAccountFullName(ref meta.NamespacedRFC1123ObjectReferenceWithNamespace) string {
-	return fmt.Sprintf("%s%s:%s", serviceaccount.ServiceAccountUsernamePrefix, ref.Namespace, ref.Name)
+	return serviceaccount.ServiceAccountUsernamePrefix + string(ref.Namespace) + ":" + string(ref.Name)
 }
 
 // GetServiceAccountGroups returns all groups associated with a ServiceAccount

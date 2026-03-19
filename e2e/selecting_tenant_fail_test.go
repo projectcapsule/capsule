@@ -11,7 +11,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api/rbac"
 )
 
 var _ = Describe("creating a Namespace without a Tenant selector when user owns multiple Tenants", Label("tenant", "assignment"), func() {
@@ -20,10 +20,10 @@ var _ = Describe("creating a Namespace without a Tenant selector when user owns 
 			Name: "tenant-one",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: api.OwnerListSpec{
+			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: api.CoreOwnerSpec{
-						UserSpec: api.UserSpec{
+					CoreOwnerSpec: rbac.CoreOwnerSpec{
+						UserSpec: rbac.UserSpec{
 							Name: "john",
 							Kind: "User",
 						},
@@ -37,10 +37,10 @@ var _ = Describe("creating a Namespace without a Tenant selector when user owns 
 			Name: "tenant-two",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: api.OwnerListSpec{
+			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: api.CoreOwnerSpec{
-						UserSpec: api.UserSpec{
+					CoreOwnerSpec: rbac.CoreOwnerSpec{
+						UserSpec: rbac.UserSpec{
 							Name: "john",
 							Kind: "User",
 						},
@@ -54,10 +54,10 @@ var _ = Describe("creating a Namespace without a Tenant selector when user owns 
 			Name: "tenant-three",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: api.OwnerListSpec{
+			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: api.CoreOwnerSpec{
-						UserSpec: api.UserSpec{
+					CoreOwnerSpec: rbac.CoreOwnerSpec{
+						UserSpec: rbac.UserSpec{
 							Name: "john",
 							Kind: "Group",
 						},
@@ -71,10 +71,10 @@ var _ = Describe("creating a Namespace without a Tenant selector when user owns 
 			Name: "tenant-four",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: api.OwnerListSpec{
+			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: api.CoreOwnerSpec{
-						UserSpec: api.UserSpec{
+					CoreOwnerSpec: rbac.CoreOwnerSpec{
+						UserSpec: rbac.UserSpec{
 							Name: "john",
 							Kind: "Group",
 						},
@@ -91,16 +91,16 @@ var _ = Describe("creating a Namespace without a Tenant selector when user owns 
 			EventuallyCreation(func() error { return k8sClient.Create(context.TODO(), t2) }).Should(Succeed())
 			NamespaceCreation(ns, t1.Spec.Owners[0].UserSpec, defaultTimeoutInterval).ShouldNot(Succeed())
 			NamespaceCreation(ns, t2.Spec.Owners[0].UserSpec, defaultTimeoutInterval).ShouldNot(Succeed())
-			Expect(k8sClient.Delete(context.TODO(), t1)).Should(Succeed())
-			Expect(k8sClient.Delete(context.TODO(), t2)).Should(Succeed())
+			EventuallyDeletion(t1)
+			EventuallyDeletion(t2)
 		})
 		By("group owns 2 tenants", func() {
 			EventuallyCreation(func() error { return k8sClient.Create(context.TODO(), t3) }).Should(Succeed())
 			EventuallyCreation(func() error { return k8sClient.Create(context.TODO(), t4) }).Should(Succeed())
 			NamespaceCreation(ns, t3.Spec.Owners[0].UserSpec, defaultTimeoutInterval).ShouldNot(Succeed())
 			NamespaceCreation(ns, t4.Spec.Owners[0].UserSpec, defaultTimeoutInterval).ShouldNot(Succeed())
-			Expect(k8sClient.Delete(context.TODO(), t3)).Should(Succeed())
-			Expect(k8sClient.Delete(context.TODO(), t4)).Should(Succeed())
+			EventuallyDeletion(t3)
+			EventuallyDeletion(t4)
 		})
 		By("user and group owns 4 tenants", func() {
 			t1.ResourceVersion, t2.ResourceVersion, t3.ResourceVersion, t4.ResourceVersion = "", "", "", ""
@@ -112,10 +112,10 @@ var _ = Describe("creating a Namespace without a Tenant selector when user owns 
 			NamespaceCreation(ns, t2.Spec.Owners[0].UserSpec, defaultTimeoutInterval).ShouldNot(Succeed())
 			NamespaceCreation(ns, t3.Spec.Owners[0].UserSpec, defaultTimeoutInterval).ShouldNot(Succeed())
 			NamespaceCreation(ns, t4.Spec.Owners[0].UserSpec, defaultTimeoutInterval).ShouldNot(Succeed())
-			Expect(k8sClient.Delete(context.TODO(), t1)).Should(Succeed())
-			Expect(k8sClient.Delete(context.TODO(), t2)).Should(Succeed())
-			Expect(k8sClient.Delete(context.TODO(), t3)).Should(Succeed())
-			Expect(k8sClient.Delete(context.TODO(), t4)).Should(Succeed())
+			EventuallyDeletion(t1)
+			EventuallyDeletion(t2)
+			EventuallyDeletion(t3)
+			EventuallyDeletion(t4)
 		})
 	})
 })

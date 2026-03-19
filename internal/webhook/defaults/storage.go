@@ -16,6 +16,7 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
 	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
+	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/tenant"
 )
 
@@ -24,7 +25,7 @@ func mutatePVCDefaults(ctx context.Context, req admission.Request, c client.Clie
 
 	pvc := &corev1.PersistentVolumeClaim{}
 	if err = decoder.Decode(req, pvc); err != nil {
-		return utils.ErroredResponse(err)
+		return ad.ErroredResponse(err)
 	}
 
 	pvc.SetNamespace(namespace)
@@ -33,7 +34,7 @@ func mutatePVCDefaults(ctx context.Context, req admission.Request, c client.Clie
 
 	tnt, err = tenant.TenantByStatusNamespace(ctx, c, pvc.Namespace)
 	if err != nil {
-		return utils.ErroredResponse(err)
+		return ad.ErroredResponse(err)
 	}
 
 	if tnt == nil {
@@ -69,7 +70,7 @@ func mutatePVCDefaults(ctx context.Context, req admission.Request, c client.Clie
 	// Marshal Manifest
 	marshaled, err := json.Marshal(pvc)
 	if err != nil {
-		return utils.ErroredResponse(err)
+		return ad.ErroredResponse(err)
 	}
 
 	response := admission.PatchResponseFromRaw(req.Object.Raw, marshaled)

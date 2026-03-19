@@ -1,24 +1,23 @@
+
+---
 apiVersion: capsule.clastix.io/v1beta2
 kind: TenantResource
 metadata:
-  name: tenant-ns-cm-registration
+  name: app-config
 spec:
-  resyncPeriod: 5s
+  resyncPeriod: 300s
+  settings:
+    adopt: true
   resources:
-    - templates:
-        - template: |
-            ---
-            apiVersion: v1
-            kind: ConfigMap
-            metadata:
-              name: common-config
-            data:
-              {{ $.namespace.metadata.name }}.conf: |
-                {{ toYaml $.namespace.metadata | nindent 4 }}
     - rawItems:
-        - apiVersion: v1
-          kind: ConfigMap
-          metadata:
-            name: common-config
-          data:
-            additional-data: "raw"
+      - apiVersion: v1
+        kind: LimitRange
+        metadata:
+          name: "{{tenant.name}}-{{namespace}}-resource-constraint"
+        spec:
+          limits:
+          - default: # this section defines default limits
+              cpu: 500m
+            defaultRequest: # this section defines default requests
+              cpu: 500m
+            type: Container

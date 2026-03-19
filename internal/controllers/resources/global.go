@@ -10,7 +10,6 @@ import (
 
 	"github.com/go-logr/logr"
 	gherrors "github.com/pkg/errors"
-	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	k8smeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -24,7 +23,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
@@ -39,6 +37,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api/processor"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	"github.com/projectcapsule/capsule/pkg/runtime/predicates"
+	"github.com/projectcapsule/capsule/pkg/runtime/sanitize"
 )
 
 type globalResourceController struct {
@@ -57,10 +56,11 @@ func (r *globalResourceController) SetupWithManager(mgr ctrl.Manager, cfg utils.
 	r.client = mgr.GetClient()
 	r.processor = processor.Processor{
 		Configuration:                r.configuration,
+		GatherClient:                 mgr.GetAPIReader(),
 		AllowCrossNamespaceSelection: true,
 	}
 	r.collector = NewCollector(
-		r.client,
+		mgr.GetAPIReader(),
 		mgr.GetRESTMapper(),
 	)
 
@@ -75,40 +75,20 @@ func (r *globalResourceController) SetupWithManager(mgr ctrl.Manager, cfg utils.
 			),
 		).
 		Watches(
+			&capsulev1beta2.CapsuleConfiguration{},
+			handler.EnqueueRequestsFromMapFunc(r.enqueueAllResources),
+			builder.WithPredicates(
+				predicates.CapsuleConfigSpecImpersonationChangedPredicate{},
+				predicates.NamesMatchingPredicate{Names: []string{cfg.ConfigurationName}},
+			),
+		).
+		Watches(
 			&capsulev1beta2.GlobalTenantResource{},
 			handler.EnqueueRequestsFromMapFunc(r.enqueueDependentGlobalTenantResources),
 		).
 		Watches(
 			&capsulev1beta2.Tenant{},
 			handler.EnqueueRequestsFromMapFunc(r.enqueueRequestFromTenant),
-		).
-		// Performs Cache Invalidation for all Impersonations Clients
-		Watches(
-			&corev1.ServiceAccount{},
-			handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, o client.Object) []ctrl.Request {
-				return nil
-			}),
-			builder.WithPredicates(predicate.Funcs{
-				CreateFunc: func(e event.CreateEvent) bool {
-					return false
-				},
-				UpdateFunc: func(e event.UpdateEvent) bool {
-					return false
-				},
-				GenericFunc: func(e event.GenericEvent) bool {
-					return false
-				},
-				DeleteFunc: func(e event.DeleteEvent) bool {
-					sa, ok := e.Object.(*corev1.ServiceAccount)
-					if !ok {
-						return false
-					}
-
-					r.impersonation.Invalidate(sa.Namespace, sa.Name)
-
-					return false
-				},
-			}),
 		).
 		WithOptions(controller.Options{MaxConcurrentReconciles: cfg.MaxConcurrentReconciles}).
 		Complete(r)
@@ -174,6 +154,27 @@ func (r *globalResourceController) enqueueRequestFromTenant(ctx context.Context,
 		reqs = append(reqs, reconcile.Request{
 			NamespacedName: types.NamespacedName{
 				Name: res,
+			},
+		})
+	}
+
+	return reqs
+}
+
+func (r *globalResourceController) enqueueAllResources(ctx context.Context, _ client.Object) []reconcile.Request {
+	var list capsulev1beta2.GlobalTenantResourceList
+	if err := r.client.List(ctx, &list); err != nil {
+		r.log.V(1).Error(err, "unable to list GlobalTenantResourceList for config-triggered reconcile")
+
+		return nil
+	}
+
+	reqs := make([]reconcile.Request, 0, len(list.Items))
+	for i := range list.Items {
+		reqs = append(reqs, reconcile.Request{
+			NamespacedName: types.NamespacedName{
+				Name:      list.Items[i].Name,
+				Namespace: list.Items[i].Namespace,
 			},
 		})
 	}
@@ -299,7 +300,7 @@ func (r *globalResourceController) reconcile(
 	log := ctrllog.FromContext(ctx)
 
 	if tntResource.Status.ProcessedItems == nil {
-		tntResource.Status.ProcessedItems = make([]capsulev1beta2.ObjectReferenceStatus, 0)
+		tntResource.Status.ProcessedItems = make([]meta.ObjectReferenceStatus, 0)
 	}
 
 	// Retrieving the list of the Tenants up to the selector provided by the GlobalTenantResource resource.
@@ -379,8 +380,9 @@ func (r *globalResourceController) gatherResources(
 		AllowCrossNamespaceSelection: true,
 	}
 
-	for index, resource := range tntResource.Spec.Resources {
-		ilog := log.WithValues("resource", index)
+	// Collect Available Generated Items
+	for resourceIndex, resource := range tntResource.Spec.Resources {
+		ilog := log.WithValues("resource", resourceIndex)
 
 		for _, tnt := range tnts.Items {
 			ilog = log.WithValues("tenant", tnt.GetName())
@@ -397,25 +399,71 @@ func (r *globalResourceController) gatherResources(
 					ctx,
 					c,
 					opts,
-					tnt,
-					strconv.Itoa(index),
+					&tnt,
+					strconv.Itoa(resourceIndex),
 					resource,
 					nil,
 				)
 			default:
 				ilog.V(5).Info("replicating for each namespace")
 
+				opts.AllowCrossNamespaceSelection = true
+
+				objs, err := r.collector.CollectNamespacedItems(ctx, c, opts, resource, nil, tnt)
+				if err != nil {
+					return err
+				}
+
+				for g := range objs {
+					ilog.V(5).Info("found replication source object", "name", g.Name, "namespace", g.Namespace, "kind", g.Kind)
+				}
+
+				namespaces, err := r.collector.selectedTenantNamespaces(ctx, log, tnt, resource)
+				if err != nil {
+					return err
+				}
+
+				i := 0
+
 				opts.AllowCrossNamespaceSelection = false
 
-				resourceError = r.collector.foreachTenantNamespace(
-					ctx,
-					ilog,
-					c,
-					opts,
-					tnt,
-					resource,
-					strconv.Itoa(index),
-				)
+				for _, innerNs := range namespaces {
+
+					opts.Iterator = NewCollectorIteratorOptions(&tnt, innerNs, resource)
+
+					for _, obj := range objs {
+						if obj.GetNamespace() == innerNs.GetName() {
+							continue
+						}
+
+						target := obj.DeepCopy()
+						sanitize.SanitizeObject(target, c.Scheme(), r.collector.objectSanitizeOptions)
+						target.SetNamespace(innerNs.GetName())
+
+						log.V(4).Info("adding replication for namespaced item", "name", target.GetName(), "namespace", target.GetNamespace(), "kind", target.GetKind())
+
+						err = r.collector.AddToAccumulation(&tnt, innerNs, opts, resource, target, "replica", false)
+						if err != nil {
+							return err
+						}
+
+					}
+
+					err = r.collector.Collect(
+						ctx,
+						c,
+						opts,
+						&tnt,
+						strconv.Itoa((resourceIndex)),
+						resource,
+						innerNs,
+					)
+					if err != nil {
+						return err
+					}
+
+					i++
+				}
 			}
 
 			// Only start pruning when the resource item itself did not throw an error

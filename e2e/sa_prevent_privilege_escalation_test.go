@@ -18,7 +18,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api/rbac"
 )
 
 var _ = Describe("trying to escalate from a Tenant Namespace ServiceAccount", Label("tenant"), func() {
@@ -27,10 +27,10 @@ var _ = Describe("trying to escalate from a Tenant Namespace ServiceAccount", La
 			Name: "sa-privilege-escalation",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: api.OwnerListSpec{
+			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: api.CoreOwnerSpec{
-						UserSpec: api.UserSpec{
+					CoreOwnerSpec: rbac.CoreOwnerSpec{
+						UserSpec: rbac.UserSpec{
 							Name: "mario",
 							Kind: "User",
 						},
@@ -55,7 +55,7 @@ var _ = Describe("trying to escalate from a Tenant Namespace ServiceAccount", La
 	})
 
 	JustAfterEach(func() {
-		Expect(k8sClient.Delete(context.TODO(), tnt)).Should(Succeed())
+		EventuallyDeletion(tnt)
 	})
 
 	It("should block Namespace changes", func() {

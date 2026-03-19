@@ -5,7 +5,7 @@ metadata:
   name: green
 spec:
   owners:
-  - name: alice
+  - name: bob
     kind: User
 ---
 apiVersion: capsule.clastix.io/v1beta2

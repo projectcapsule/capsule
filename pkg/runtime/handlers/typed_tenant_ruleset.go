@@ -133,7 +133,7 @@ func (h *TypedTenantWithRulesetHandler[T]) resolveTenant(ctx context.Context, c 
 		return nil, nil
 	}
 
-	return tenant.TenantByStatusNamespace(ctx, c, req.Namespace)
+	return tenant.GetTenantByNamespace(ctx, c, req.Namespace)
 }
 
 // Resolve the corresponding managed ruleset for this namespace

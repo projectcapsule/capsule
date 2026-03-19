@@ -7,11 +7,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/projectcapsule/capsule/internal/webhook/utils"
-	"github.com/projectcapsule/capsule/pkg/api/meta"
-	"github.com/projectcapsule/capsule/pkg/runtime/gvk"
-	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
-	"github.com/projectcapsule/capsule/pkg/tenant"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/client-go/tools/events"
@@ -19,7 +14,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/api/meta"
+	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
+	"github.com/projectcapsule/capsule/pkg/runtime/gvk"
+	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 	"github.com/projectcapsule/capsule/pkg/runtime/indexers/tenantresource"
+	"github.com/projectcapsule/capsule/pkg/tenant"
 )
 
 type replicaHandler struct{}
@@ -34,22 +34,29 @@ func (h *replicaHandler) OnCreate(client.Client, admission.Decoder, events.Event
 	}
 }
 
-func (h *replicaHandler) OnDelete(client client.Client, _ admission.Decoder, recorder events.EventRecorder) handlers.Func {
+func (h *replicaHandler) OnDelete(c client.Client, _ admission.Decoder, recorder events.EventRecorder) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		return h.handler(ctx, client, req, recorder)
+		if resp := h.handler(ctx, c, req, recorder); resp != nil {
+			return resp
+		}
+
+		// Make sure resources are kept longer than other resources with finalizers
+		// this prevents cases where eg. a pod awas given a finalizer and a cr netpol is deleted first
+		// providing the pod with no guardrails.
+		return namespaceHasFinalizers(ctx, c, req.Namespace)
 	}
 }
 
-func (h *replicaHandler) OnUpdate(client client.Client, _ admission.Decoder, recorder events.EventRecorder) handlers.Func {
+func (h *replicaHandler) OnUpdate(c client.Client, _ admission.Decoder, recorder events.EventRecorder) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		return h.handler(ctx, client, req, recorder)
+		return h.handler(ctx, c, req, recorder)
 	}
 }
 
-func (h *replicaHandler) handler(ctx context.Context, clt client.Client, req admission.Request, recorder events.EventRecorder) *admission.Response {
-	tnt, err := tenant.TenantByStatusNamespace(ctx, clt, req.Namespace)
+func (h *replicaHandler) handler(ctx context.Context, c client.Reader, req admission.Request, recorder events.EventRecorder) *admission.Response {
+	tnt, err := tenant.TenantByStatusNamespace(ctx, c, req.Namespace)
 	if err != nil {
-		return utils.ErroredResponse(err)
+		return ad.ErroredResponse(err)
 	}
 
 	if tnt == nil {
@@ -68,14 +75,14 @@ func (h *replicaHandler) handler(ctx context.Context, clt client.Client, req adm
 	gvkKey := ref.GetGVKKey("")
 
 	global := &capsulev1beta2.GlobalTenantResourceList{}
-	if err := clt.List(
+	if err := c.List(
 		ctx,
 		global,
 		client.MatchingFieldsSelector{
 			Selector: fields.OneTermEqualSelector(tenantresource.ProcessedIndexerFieldName, gvkKey),
 		},
 	); err != nil {
-		return utils.ErroredResponse(err)
+		return ad.ErroredResponse(err)
 	}
 
 	if len(global.Items) > 0 {
@@ -88,14 +95,14 @@ func (h *replicaHandler) handler(ctx context.Context, clt client.Client, req adm
 	}
 
 	local := &capsulev1beta2.TenantResourceList{}
-	if err := clt.List(
+	if err := c.List(
 		ctx,
 		local,
 		client.MatchingFieldsSelector{
 			Selector: fields.OneTermEqualSelector(tenantresource.ProcessedIndexerFieldName, gvkKey),
 		},
 	); err != nil {
-		return utils.ErroredResponse(err)
+		return ad.ErroredResponse(err)
 	}
 
 	if len(local.Items) > 0 {

@@ -5,6 +5,7 @@ package processor
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 )
@@ -16,6 +17,7 @@ const (
 type Processor struct {
 	Configuration                configuration.Configuration
 	AllowCrossNamespaceSelection bool
+	GatherClient                 client.Reader
 }
 
 type ProcessorOptions struct {

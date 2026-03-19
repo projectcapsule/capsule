@@ -6,7 +6,6 @@ package api
 const (
 	ResourceScopeNamespace ResourceScope = "Namespace"
 	ResourceScopeTenant    ResourceScope = "Tenant"
-	ResourceScopeCluster   ResourceScope = "Cluster"
 )
 
 // +kubebuilder:validation:Enum=Namespace;Tenant

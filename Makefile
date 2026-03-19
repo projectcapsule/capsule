@@ -18,6 +18,11 @@ IMG             ?= $(IMG_BASE):$(VERSION)
 CAPSULE_IMG     ?= $(REGISTRY)/$(IMG_BASE)
 CLUSTER_NAME    ?= capsule
 
+LABELER_BASE     ?= $(REPOSITORY)-labeler
+LABELER_IMG_FULL ?= $(LABELER_BASE):$(VERSION)
+LABELER_IMG      ?= $(REGISTRY)/$(LABELER_BASE)
+
+
 ## Kubernetes Version Support
 KUBERNETES_SUPPORTED_VERSION ?= "v1.35.0"
 
@@ -154,6 +159,8 @@ subjectAltName = @alt_names
 IP.1   = $(LAPTOP_HOST_IP)
 endef
 export TLS_CNF
+CHART           ?= "./charts/capsule"
+CHART_VERSION   ?= "./charts/capsule"
 dev-setup:
 	$(KUBECTL) -n capsule-system scale deployment capsule-controller-manager --replicas=0 || true
 	mkdir -p /tmp/k8s-webhook-server/serving-certs
@@ -171,27 +178,30 @@ dev-setup:
 	export WEBHOOK_URL="https://$${LAPTOP_HOST_IP}:9443"; \
 	export CA_BUNDLE=`openssl base64 -in /tmp/k8s-webhook-server/serving-certs/tls.crt | tr -d '\n'`; \
 	$(HELM) upgrade \
-	    --dependency-update \
+		--dependency-update \
 		--force-conflicts \
+		--take-ownership \
 		--debug \
 		--install \
 		--namespace capsule-system \
 		--create-namespace \
+		--version=$(CHART_VERSION) \
 		--set 'crds.install=true' \
 		--set 'crds.exclusive=true'\
-        --set 'crds.createConfig=true'\
-        --set 'crds.createRBAC=true'\
-        --set 'crds.createDiagnostics=true'\
-        --set "monitoring.diagnostics.enabled=true"\
+		--set 'crds.createConfig=true'\
+		--set 'crds.createRBAC=true'\
+		--set 'crds.createDiagnostics=true'\
+		--set "monitoring.diagnostics.enabled=true"\
 		--set "manager.rbac.minimal=true"\
-        --set "tls.enableController=false"\
+		--set "tls.enableController=false"\
 		--set "webhooks.exclusive=true"\
 		--set "webhooks.hooks.nodes.enabled=true"\
 		--set "webhooks.service.url=$${WEBHOOK_URL}" \
 		--set "webhooks.service.caBundle=$${CA_BUNDLE}" \
 		capsule \
-		./charts/capsule || true
+		$(CHART)
 	mkdir -p ./hack/generated/ || true
+	$(KUBECTL) label clusterrole admin projectcapsule.dev/aggregate-to-controller=true
 	bash ./hack/kubeconfig-for-sa.sh $(CLUSTER_NAME) "capsule-system" "capsule" "./hack/generated/kubeconfig.yaml"
 
 setup-monitoring: dev-setup-fluxcd
@@ -308,8 +318,14 @@ ko-build-capsule: ko
 	@LD_FLAGS=$(LD_FLAGS) KOCACHE=$(KOCACHE) KO_DOCKER_REPO=$(CAPSULE_IMG) \
 		$(KO) build ./cmd/ --bare --tags=$(KO_TAGS) --push=false --local --platform=$(KO_PLATFORM)
 
+.PHONY: ko-build-helper-labler
+ko-build-helper-labler: ko
+	@echo Building Helper Labeler $(KO_TAGS) for $(KO_PLATFORM) >&2
+	@LD_FLAGS=$(LD_FLAGS) KOCACHE=$(KOCACHE) KO_DOCKER_REPO=$(LABELER_IMG) \
+		$(KO) build ./hack/helpers/labeler --bare --tags=$(KO_TAGS) --push=false --local --platform=$(KO_PLATFORM)
+
 .PHONY: ko-build-all
-ko-build-all: ko-build-capsule
+ko-build-all: ko-build-capsule ko-build-helper-labler
 
 .PHONY: docker-build-capsule-trace
 docker-build-capsule-trace: ko-build-capsule
@@ -364,6 +380,7 @@ e2e-build: kind
 .PHONY: e2e-install
 e2e-install: helm-controller-version ko-build-all
 	$(MAKE) e2e-load-image CLUSTER_NAME=$(CLUSTER_NAME) IMAGE=$(CAPSULE_IMG) VERSION=$(VERSION)
+	$(KUBECTL) label clusterrole admin projectcapsule.dev/aggregate-to-controller=true
 	$(HELM) upgrade \
 	    --dependency-update \
 		--debug \

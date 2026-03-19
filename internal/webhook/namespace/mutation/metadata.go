@@ -15,6 +15,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
+	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 	"github.com/projectcapsule/capsule/pkg/tenant"
@@ -45,7 +46,7 @@ func (h *metadataHandler) OnCreate(client client.Client, ns *corev1.Namespace, d
 
 		labels, annotations, err := tenant.BuildNamespaceMetadataForTenant(ns, tnt)
 		if err != nil {
-			return utils.ErroredResponse(err)
+			return ad.ErroredResponse(err)
 		}
 
 		managedMetadataOnly := tnt.Spec.NamespaceOptions != nil && tnt.Spec.NamespaceOptions.ManagedMetadataOnly
@@ -101,7 +102,7 @@ func (h *metadataHandler) OnUpdate(c client.Client, newNs *corev1.Namespace, old
 
 		labels, annotations, err := tenant.BuildNamespaceMetadataForTenant(newNs, tnt)
 		if err != nil {
-			return utils.ErroredResponse(err)
+			return ad.ErroredResponse(err)
 		}
 
 		managedMetadataOnly := tnt.Spec.NamespaceOptions != nil && tnt.Spec.NamespaceOptions.ManagedMetadataOnly

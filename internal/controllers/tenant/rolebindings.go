@@ -12,19 +12,20 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
+	"github.com/go-logr/logr"
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
+	"github.com/projectcapsule/capsule/pkg/api/rbac"
 	"github.com/projectcapsule/capsule/pkg/utils"
 )
 
 // Sync the dynamic Tenant Owner specific cluster-roles and additional Role Bindings, which can be used in many ways:
 // applying Pod Security Policies or giving access to CRDs or specific API groups.
-func (r *Manager) syncRoleBindings(ctx context.Context, tenant *capsulev1beta2.Tenant) (err error) {
+func (r *Manager) syncRoleBindings(ctx context.Context, log logr.Logger, tenant *capsulev1beta2.Tenant) (err error) {
 	roleBindings := tenant.GetRoleBindings()
 
 	// Hashing
-	hashes := map[string]api.AdditionalRoleBindingsSpec{}
+	hashes := map[string]rbac.AdditionalRoleBindingsSpec{}
 
 	for _, binding := range roleBindings {
 		hash := utils.RoleBindingHashFunc(binding)
@@ -34,11 +35,21 @@ func (r *Manager) syncRoleBindings(ctx context.Context, tenant *capsulev1beta2.T
 
 	group := new(errgroup.Group)
 
-	for _, ns := range tenant.Status.Namespaces {
-		namespace := ns
+	for _, ns := range tenant.Status.Spaces {
+		cleanup := false
+		namespace := ns.Name
+
+		cond := ns.Conditions.GetConditionByType(meta.TerminatingCondition)
+		if cond != nil {
+			if cond.Status == metav1.ConditionTrue {
+				cleanup = true
+			} else {
+				continue
+			}
+		}
 
 		group.Go(func() error {
-			return r.syncAdditionalRoleBinding(ctx, tenant, namespace, hashes)
+			return r.syncAdditionalRoleBinding(ctx, tenant, namespace, hashes, cleanup)
 		})
 	}
 
@@ -49,61 +60,64 @@ func (r *Manager) syncAdditionalRoleBinding(
 	ctx context.Context,
 	tenant *capsulev1beta2.Tenant,
 	ns string,
-	bindings map[string]api.AdditionalRoleBindingsSpec,
+	bindings map[string]rbac.AdditionalRoleBindingsSpec,
+	cleanup bool,
 ) (err error) {
 	keys := []string{}
 
-	for hash, roleBinding := range bindings {
-		name := meta.NameForManagedRoleBindings(hash)
+	if !cleanup {
+		for hash, roleBinding := range bindings {
+			name := meta.NameForManagedRoleBindings(hash)
 
-		keys = append(keys, hash)
+			keys = append(keys, hash)
 
-		target := &rbacv1.RoleBinding{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      name,
-				Namespace: ns,
-			},
-		}
-
-		var res controllerutil.OperationResult
-
-		res, err = controllerutil.CreateOrUpdate(ctx, r.Client, target, func() error {
-			target.Labels = map[string]string{}
-			target.Annotations = map[string]string{}
-
-			if roleBinding.Labels != nil {
-				target.Labels = roleBinding.Labels
+			target := &rbacv1.RoleBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      name,
+					Namespace: ns,
+				},
 			}
 
-			target.Labels[meta.NewTenantLabel] = tenant.Name
-			target.Labels[meta.RolebindingLabel] = hash
-			target.Labels[meta.NewManagedByCapsuleLabel] = meta.ValueController
+			var res controllerutil.OperationResult
 
-			// Remove Legacy labels
-			delete(target.Labels, meta.TenantLabel)
+			res, err = controllerutil.CreateOrUpdate(ctx, r.Client, target, func() error {
+				target.Labels = map[string]string{}
+				target.Annotations = map[string]string{}
 
-			if roleBinding.Annotations != nil {
-				target.Annotations = roleBinding.Annotations
+				if roleBinding.Labels != nil {
+					target.Labels = roleBinding.Labels
+				}
+
+				target.Labels[meta.NewTenantLabel] = tenant.Name
+				target.Labels[meta.RolebindingLabel] = hash
+				target.Labels[meta.NewManagedByCapsuleLabel] = meta.ValueController
+
+				// Remove Legacy labels
+				delete(target.Labels, meta.TenantLabel)
+
+				if roleBinding.Annotations != nil {
+					target.Annotations = roleBinding.Annotations
+				}
+
+				target.RoleRef = rbacv1.RoleRef{
+					APIGroup: rbacv1.GroupName,
+					Kind:     "ClusterRole",
+					Name:     roleBinding.ClusterRoleName,
+				}
+
+				target.Subjects = roleBinding.Subjects
+
+				return controllerutil.SetControllerReference(tenant, target, r.Scheme())
+			})
+			if err != nil {
+				r.Log.Error(err, "cannot sync RoleBinding")
 			}
 
-			target.RoleRef = rbacv1.RoleRef{
-				APIGroup: rbacv1.GroupName,
-				Kind:     "ClusterRole",
-				Name:     roleBinding.ClusterRoleName,
+			r.Log.V(4).Info(fmt.Sprintf("roleBinding sync result: %s", string(res)), "name", target.Name, "namespace", target.Namespace)
+
+			if err != nil {
+				return fmt.Errorf("%w (role: %s)", err, roleBinding.ClusterRoleName)
 			}
-
-			target.Subjects = roleBinding.Subjects
-
-			return controllerutil.SetControllerReference(tenant, target, r.Scheme())
-		})
-		if err != nil {
-			r.Log.Error(err, "cannot sync RoleBinding")
-		}
-
-		r.Log.V(4).Info(fmt.Sprintf("roleBinding sync result: %s", string(res)), "name", target.Name, "namespace", target.Namespace)
-
-		if err != nil {
-			return err
 		}
 	}
 

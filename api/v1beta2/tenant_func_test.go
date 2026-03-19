@@ -11,6 +11,7 @@ import (
 
 	"github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api/rbac"
 )
 
 var tenant = &v1beta2.Tenant{
@@ -134,47 +135,105 @@ func TestGetSubjectsByClusterRoles(t *testing.T) {
 	}
 
 }
+func TestGetClusterRolesBySubjectSorted(t *testing.T) {
+	tenant := &v1beta2.Tenant{
+		Spec: v1beta2.TenantSpec{
+			AdditionalRoleBindings: []api.AdditionalRoleBindingsSpec{
 
-func TestGetClusterRolesBySubject(t *testing.T) {
-
-	expected := map[string]map[string]api.TenantSubjectRoles{
-		"User": {
-			"user1": {
-				ClusterRoles: []string{"cluster-admin", "read-only"},
-			},
-			"user2": {
-				ClusterRoles: []string{"developer"},
-			},
-			"user3": {
-				ClusterRoles: []string{"cluster-admin"},
+				{
+					ClusterRoleName: "test",
+					Subjects: ,
 			},
 		},
-		"Group": {
-			"group1": {
-				ClusterRoles: []string{"edit", "developer", "cluster-admin"},
+		Status: v1beta2.TenantStatus{
+			Owners: []v1beta2.TenantOwner{
+				{
+					Kind:         api.UserOwner,
+					Name:         "user1",
+					ClusterRoles: []string{"cluster-admin", "read-only"},
+				},
+				{
+					Kind:         api.UserOwner,
+					Name:         "user2",
+					ClusterRoles: []string{"developer"},
+				},
+				{
+					Kind:         api.UserOwner,
+					Name:         "user3",
+					ClusterRoles: []string{"cluster-admin"},
+				},
+				{
+					Kind:         api.GroupOwner,
+					Name:         "group1",
+					ClusterRoles: []string{"edit", "developer", "cluster-admin"},
+				},
+				{
+					Kind:         api.ServiceAccountOwner,
+					Name:         "service",
+					ClusterRoles: []string{"read-only"},
+				},
 			},
 		},
-		"ServiceAccount": {
-			"service": {
-				ClusterRoles: []string{"read-only"},
-			},
-			"system:serviceaccount:argocd:argo-operator": {
-				ClusterRoles: []string{"deployer"},
+		Spec: TenantSpec{
+			AdditionalRoleBindings: []api.AdditionalRoleBindingSpec{
+				{
+					ClusterRoleName: "deployer",
+					Subjects: []api.Subject{
+						{
+							Kind: "ServiceAccount",
+							Name: "system:serviceaccount:argocd:argo-operator",
+						},
+					},
+				},
+				// Add duplicates to verify dedup
+				{
+					ClusterRoleName: "developer",
+					Subjects: []api.Subject{
+						{Kind: "Group", Name: "group1"},
+					},
+				},
 			},
 		},
 	}
 
-	permissions := tenant.GetClusterRolesBySubject(nil)
-	if !reflect.DeepEqual(permissions, expected) {
-		t.Errorf("Expected %v, but got %v", expected, permissions)
+	expected := []rbac.SubjectRoles{
+		{Kind: "Group", Name: "group1", Roles: []string{"cluster-admin", "developer", "edit"}},
+		{Kind: "ServiceAccount", Name: "service", Roles: []string{"read-only"}},
+		{Kind: "ServiceAccount", Name: "system:serviceaccount:argocd:argo-operator", Roles: []string{"deployer"}},
+		{Kind: "User", Name: "user1", Roles: []string{"cluster-admin", "read-only"}},
+		{Kind: "User", Name: "user2", Roles: []string{"developer"}},
+		{Kind: "User", Name: "user3", Roles: []string{"cluster-admin"}},
 	}
 
-	delete(expected, "ServiceAccount")
-	ignored := tenant.GetClusterRolesBySubject([]api.OwnerKind{"ServiceAccount"})
+	t.Run("includes all kinds and is deterministic + deduped + sorted", func(t *testing.T) {
+		got := tenant.GetClusterRolesBySubject(nil)
+		if !reflect.DeepEqual(got, expected) {
+			t.Fatalf("expected %#v\n got %#v", expected, got)
+		}
+	})
 
-	if !reflect.DeepEqual(ignored, expected) {
-		t.Errorf("Expected %v, but got %v", expected, ignored)
-	}
+	t.Run("ignores ServiceAccount kind", func(t *testing.T) {
+		got := tenant.GetClusterRolesBySubject([]api.OwnerKind{api.ServiceAccountOwner})
+
+		expectedIgnored := []rbac.SubjectRoles{
+			{Kind: "Group", Name: "group1", Roles: []string{"cluster-admin", "developer", "edit"}},
+			{Kind: "User", Name: "user1", Roles: []string{"cluster-admin", "read-only"}},
+			{Kind: "User", Name: "user2", Roles: []string{"developer"}},
+			{Kind: "User", Name: "user3", Roles: []string{"cluster-admin"}},
+		}
+
+		if !reflect.DeepEqual(got, expectedIgnored) {
+			t.Fatalf("expected %#v\n got %#v", expectedIgnored, got)
+		}
+	})
+
+	t.Run("empty tenant yields empty slice", func(t *testing.T) {
+		empty := &v1beta2.Tenant{}
+		got := empty.GetClusterRolesBySubjectSorted(nil)
+		if len(got) != 0 {
+			t.Fatalf("expected empty, got %#v", got)
+		}
+	})
 }
 
 // Helper function to run tests

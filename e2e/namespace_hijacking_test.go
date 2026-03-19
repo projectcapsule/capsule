@@ -13,7 +13,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api/rbac"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
@@ -24,18 +24,18 @@ var _ = Describe("creating several Namespaces for a Tenant", Label("namespace", 
 			Name: "capsule-ns-attack-1",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: api.OwnerListSpec{
+			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: api.CoreOwnerSpec{
-						UserSpec: api.UserSpec{
+					CoreOwnerSpec: rbac.CoreOwnerSpec{
+						UserSpec: rbac.UserSpec{
 							Name: "gatsby",
 							Kind: "User",
 						},
 					},
 				},
 				{
-					CoreOwnerSpec: api.CoreOwnerSpec{
-						UserSpec: api.UserSpec{
+					CoreOwnerSpec: rbac.CoreOwnerSpec{
+						UserSpec: rbac.UserSpec{
 							Kind: "ServiceAccount",
 							Name: "system:serviceaccount:attacker-system:attacker",
 						},
@@ -60,8 +60,7 @@ var _ = Describe("creating several Namespaces for a Tenant", Label("namespace", 
 		}).Should(Succeed())
 	})
 	JustAfterEach(func() {
-		Expect(k8sClient.Delete(context.TODO(), tnt_1)).Should(Succeed())
-
+		EventuallyDeletion(tnt_1)
 	})
 
 	It("Can't hijack offlimits namespace (Ownerreferences)", func() {

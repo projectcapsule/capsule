@@ -9,7 +9,6 @@ import (
 
 	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
-	"github.com/projectcapsule/capsule/pkg/runtime/gvk"
 	tpl "github.com/projectcapsule/capsule/pkg/template"
 )
 
@@ -19,7 +18,7 @@ type TenantResourceCommonStatus struct {
 
 	// List of the replicated resources for the given TenantResource.
 	//+optional
-	ProcessedItems ProcessedItems `json:"processedItems,omitzero"`
+	ProcessedItems meta.ProcessedItems `json:"processedItems,omitzero"`
 
 	// How many items are being replicated by the TenantResource.
 	Size uint `json:"size"`
@@ -69,10 +68,6 @@ type TenantResourceCommonSpecSettings struct {
 }
 
 type ResourceSpec struct {
-	// Adds the managed label to the unique resources
-	// This Label prevents any updates from Capsule Users
-	// +kubebuilder:default=true
-	Managed *bool `json:"managed,omitempty"`
 	// Defines the Namespace selector to select the Tenant Namespaces on which the resources must be propagated.
 	// In case of nil value, all the Tenant Namespaces are targeted.
 	NamespaceSelector *metav1.LabelSelector `json:"namespaceSelector,omitempty"`
@@ -84,7 +79,7 @@ type ResourceSpec struct {
 	// added to the replicated resources.
 	AdditionalMetadata *api.AdditionalMetadataSpec `json:"additionalMetadata,omitempty"`
 	// Templates for advanced use cases
-	Templates []TemplateItemSpec `json:"templates,omitempty"`
+	Generators []TemplateItemSpec `json:"generators,omitempty"`
 	// Provide additional template context, which can be used throughout all
 	// the declared items for the replication
 	// +optional
@@ -96,48 +91,6 @@ type RawExtension struct {
 	runtime.RawExtension `json:",inline"`
 }
 
-type ProcessedItems []ObjectReferenceStatus
-
-// Adds a condition by type.
-func (p *ProcessedItems) UpdateItem(item ObjectReferenceStatus) {
-	for i, stat := range *p {
-		if p.isEqual(stat, item) {
-			(*p)[i].ObjectReferenceStatusCondition = item.ObjectReferenceStatusCondition
-
-			return
-		}
-	}
-
-	*p = append(*p, item)
-}
-
-// Removes a condition by type.
-func (p *ProcessedItems) RemoveItem(item ObjectReferenceStatus) {
-	filtered := make(ProcessedItems, 0, len(*p))
-
-	for _, stat := range *p {
-		if !p.isEqual(stat, item) {
-			filtered = append(filtered, stat)
-		}
-	}
-
-	*p = filtered
-}
-
-func (p *ProcessedItems) isEqual(a, b ObjectReferenceStatus) bool {
-	return a.ResourceID == b.ResourceID
-}
-
-type ObjectReference struct {
-	// Name of the referent.
-	// +required
-	Name string `json:"name"`
-
-	// Namespace of the referent, when not specified it acts as LocalObjectReference.
-	// +optional
-	Namespace string `json:"namespace,omitempty"`
-}
-
 type TemplateItemSpec struct {
 	// Template contains any amount of yaml which is applied to Kubernetes.
 	// This can be a single resource or multiple resources
@@ -145,59 +98,4 @@ type TemplateItemSpec struct {
 	// Missing Key Option for templating
 	// +kubebuilder:default=zero
 	MissingKey tpl.MissingKeyOption `json:"missingKey,omitempty"`
-}
-
-type ObjectReferenceAbstract struct {
-	// Kind of the referent.
-	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
-	Kind string `json:"kind"`
-	// Namespace of the referent.
-	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
-	Namespace string `json:"namespace"`
-	// API version of the referent.
-	APIVersion string `json:"apiVersion,omitempty"`
-}
-
-type ObjectReferenceStatus struct {
-	gvk.ResourceID `json:",inline"`
-
-	ObjectReferenceStatusCondition `json:"status,omitempty"`
-}
-
-type ObjectReferenceStatusCondition struct {
-	// status of the condition, one of True, False, Unknown.
-	// +required
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:Enum=True;False;Unknown
-	Status metav1.ConditionStatus `json:"status" protobuf:"bytes,2,opt,name=status"`
-	// message is a human readable message indicating details about the transition.
-	// This may be an empty string.
-	// +kubebuilder:validation:MaxLength=32768
-	Message string `json:"message,omitempty" protobuf:"bytes,6,opt,name=message"`
-	// type of condition in CamelCase or in foo.example.com/CamelCase.
-	// ---
-	// Many .condition.type values are consistent across resources like Available, but because arbitrary conditions can be
-	// useful (see .node.status.conditions), the ability to deconflict is important.
-	// The regex it matches is (dns1123SubdomainFmt/)?(qualifiedNameFmt)
-	// +required
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:Pattern=`^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$`
-	// +kubebuilder:validation:MaxLength=316
-	Type string `json:"type" protobuf:"bytes,1,opt,name=type"`
-
-	// An opaque value that represents the internal version of this object that can
-	// be used by clients to determine when objects have changed. May be used for optimistic
-	// concurrency, change detection, and the watch operation on a resource or set of resources.
-	// Clients must treat these values as opaque and passed unmodified back to the server.
-	// They may only be valid for a particular resource or set of resources.
-	//
-	// Populated by the system.
-	// Read-only.
-	// Value must be treated as opaque by clients and .
-	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency
-	// +optional
-	LastApply metav1.Time `json:"lastApply,omitempty,omitzero" protobuf:"bytes,8,opt,name=lastApply"`
-
-	// Indicates wether the resource was created or adopted
-	Created bool `json:"created,omitempty"`
 }

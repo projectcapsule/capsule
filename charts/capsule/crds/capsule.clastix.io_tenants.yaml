@@ -1214,6 +1214,11 @@ spec:
                 description: Toggling the Tenant resources cordoning, when enable
                   resources cannot be deleted.
                 type: boolean
+              data:
+                description: |-
+                  Specify additional data relating to the tenant.
+                  Mainly useable in templating and more accessible than labels/annotations.
+                x-kubernetes-preserve-unknown-fields: true
               deviceClasses:
                 description: Specifies options for the DeviceClass resources.
                 properties:
@@ -2304,6 +2309,80 @@ spec:
                       type: object
                       x-kubernetes-map-type: atomic
                     type: array
+                  promotions:
+                    description: |-
+                      Define Promotion Rules which distributed additional ClusterRoles across the Tenant
+                      for promoted ServiceAccounts.
+                    properties:
+                      allowOwnerPromotion:
+                        default: true
+                        description: ClusterRoles granted to the promoted ServiceAccounts
+                          across the Tenant
+                        type: boolean
+                      rules:
+                        description: |-
+                          Define Promotion Rules which distributed additional ClusterRoles across the Tenant
+                          for promoted ServiceAccounts.
+                        items:
+                          properties:
+                            clusterRoles:
+                              description: |-
+                                ClusterRoles granted to the promoted ServiceAccounts across the Tenant
+                                kubebuilder:validation:Minimum=1
+                              items:
+                                type: string
+                              type: array
+                            selector:
+                              description: |-
+                                Match ServiceAccounts which are promoted which are granted these additional ClusterRoles
+                                across the Tenant
+                              properties:
+                                matchExpressions:
+                                  description: matchExpressions is a list of label
+                                    selector requirements. The requirements are ANDed.
+                                  items:
+                                    description: |-
+                                      A label selector requirement is a selector that contains values, a key, and an operator that
+                                      relates the key and values.
+                                    properties:
+                                      key:
+                                        description: key is the label key that the
+                                          selector applies to.
+                                        type: string
+                                      operator:
+                                        description: |-
+                                          operator represents a key's relationship to a set of values.
+                                          Valid operators are In, NotIn, Exists and DoesNotExist.
+                                        type: string
+                                      values:
+                                        description: |-
+                                          values is an array of string values. If the operator is In or NotIn,
+                                          the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                                          the values array must be empty. This array is replaced during a strategic
+                                          merge patch.
+                                        items:
+                                          type: string
+                                        type: array
+                                        x-kubernetes-list-type: atomic
+                                    required:
+                                    - key
+                                    - operator
+                                    type: object
+                                  type: array
+                                  x-kubernetes-list-type: atomic
+                                matchLabels:
+                                  additionalProperties:
+                                    type: string
+                                  description: |-
+                                    matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+                                    map is equivalent to an element of matchExpressions, whose key field is "key", the
+                                    operator is "In", and the values array contains only "value". The requirements are ANDed.
+                                  type: object
+                              type: object
+                              x-kubernetes-map-type: atomic
+                          type: object
+                        type: array
+                    type: object
                 type: object
               podOptions:
                 description: Specifies options for the Pods deployed in the Tenant
@@ -2871,6 +2950,35 @@ spec:
                 type: array
               owners:
                 description: Collected owners for this tenant
+                items:
+                  properties:
+                    clusterRoles:
+                      default:
+                      - admin
+                      - capsule-namespace-deleter
+                      description: Defines additional cluster-roles for the specific
+                        Owner.
+                      items:
+                        type: string
+                      type: array
+                    kind:
+                      description: Kind of entity. Possible values are "User", "Group",
+                        and "ServiceAccount"
+                      enum:
+                      - User
+                      - Group
+                      - ServiceAccount
+                      type: string
+                    name:
+                      description: Name of the entity.
+                      type: string
+                  required:
+                  - kind
+                  - name
+                  type: object
+                type: array
+              promotions:
+                description: Promoted ServiceAccounts across the Tenant
                 items:
                   properties:
                     clusterRoles:

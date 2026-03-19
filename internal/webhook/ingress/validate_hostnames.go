@@ -15,8 +15,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	"github.com/projectcapsule/capsule/internal/webhook/utils"
 	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
+	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
@@ -51,14 +51,14 @@ func (r *hostnames) OnDelete(client.Client, admission.Decoder, events.EventRecor
 func (r *hostnames) validate(ctx context.Context, client client.Client, req admission.Request, decoder admission.Decoder, recorder events.EventRecorder) *admission.Response {
 	ingress, err := FromRequest(req, decoder)
 	if err != nil {
-		return utils.ErroredResponse(err)
+		return ad.ErroredResponse(err)
 	}
 
 	var tenant *capsulev1beta2.Tenant
 
 	tenant, err = TenantFromIngress(ctx, client, ingress)
 	if err != nil {
-		return utils.ErroredResponse(err)
+		return ad.ErroredResponse(err)
 	}
 
 	if tenant == nil || tenant.Spec.IngressOptions.AllowedHostnames == nil {
@@ -71,7 +71,7 @@ func (r *hostnames) validate(ctx context.Context, client client.Client, req admi
 		if len(hostname) == 0 {
 			recorder.Eventf(tenant, nil, corev1.EventTypeWarning, evt.ReasonIngressHostnameEmpty, evt.ActionValidationDenied, "Ingress %s/%s hostname is empty", ingress.Namespace(), ingress.Name())
 
-			return utils.ErroredResponse(caperrors.NewEmptyIngressHostname(*tenant.Spec.IngressOptions.AllowedHostnames))
+			return ad.ErroredResponse(caperrors.NewEmptyIngressHostname(*tenant.Spec.IngressOptions.AllowedHostnames))
 		}
 
 		hostnameList.Insert(hostname)
@@ -90,7 +90,7 @@ func (r *hostnames) validate(ctx context.Context, client client.Client, req admi
 		return &response
 	}
 
-	return utils.ErroredResponse(err)
+	return ad.ErroredResponse(err)
 }
 
 func (r *hostnames) validateHostnames(tenant capsulev1beta2.Tenant, hostnames sets.Set[string]) error {

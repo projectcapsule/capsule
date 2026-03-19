@@ -5,11 +5,22 @@ metadata:
   name: solar
   labels:
     customer: a
-spec:
+spec:  
   owners:
   - name: alice
     kind: User
   permissions:
+    promotions:
+      rules:
+      - clusterRoles: 
+        - "configmap-replicator"
+      - clusterRoles: 
+        - "secret-replicator"
+        selector:
+          matchLabels:
+            super: "account"
+          
+
     matchOwners:
     - matchLabels:
         team: platform
@@ -63,23 +74,23 @@ spec:
     - apiGroup: rbac.authorization.k8s.io
       kind: User
       name: alice
-  rules:
-    - enforce:
-        registries:
-        - url: "harbor/.*"
-          policy:
-          - "Never"
-    - namespaceSelector:
-        matchExpressions:
-          - key: env
-            operator: In
-            values:
-            - "prod"
-      enforce:
-        registries:
-        - url: "harbor/v2/customer-registry/prod-image/.*"
-          policy:
-          - "Always"
+  #rules:
+  #  - enforce:
+  #      registries:
+  #      - url: "harbor/.*"
+  #        policy:
+  #        - "Never"
+  #  - namespaceSelector:
+  #      matchExpressions:
+  #        - key: env
+  #          operator: In
+  #          values:
+  #          - "prod"
+  #    enforce:
+  #      registries:
+  #      - url: "harbor/v2/customer-registry/prod-image/.*"
+  #        policy:
+  #        - "Always"
 ---
 apiVersion: capsule.clastix.io/v1beta2
 kind: Tenant
@@ -104,8 +115,6 @@ spec:
         tenant: wind
   owners:
   - name: joe
-    kind: User
-  - name: alice
     kind: User
 
   additionalRoleBindings:

@@ -12,7 +12,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api/rbac"
 )
 
 var _ = Describe("creating a Namespace as Tenant owner with custom --capsule-group", Label("config"), func() {
@@ -23,18 +23,18 @@ var _ = Describe("creating a Namespace as Tenant owner with custom --capsule-gro
 			Name: "tenant-assigned-custom-group",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: api.OwnerListSpec{
+			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: api.CoreOwnerSpec{
-						UserSpec: api.UserSpec{
+					CoreOwnerSpec: rbac.CoreOwnerSpec{
+						UserSpec: rbac.UserSpec{
 							Name: "alice",
 							Kind: "User",
 						},
 					},
 				},
 				{
-					CoreOwnerSpec: api.CoreOwnerSpec{
-						UserSpec: api.UserSpec{
+					CoreOwnerSpec: rbac.CoreOwnerSpec{
+						UserSpec: rbac.UserSpec{
 							Name: "bob",
 							Kind: "User",
 						},
@@ -53,7 +53,7 @@ var _ = Describe("creating a Namespace as Tenant owner with custom --capsule-gro
 		}).Should(Succeed())
 	})
 	JustAfterEach(func() {
-		Expect(k8sClient.Delete(context.TODO(), tnt)).Should(Succeed())
+		EventuallyDeletion(tnt)
 
 		// Restore Configuration
 		Eventually(func() error {
@@ -71,7 +71,7 @@ var _ = Describe("creating a Namespace as Tenant owner with custom --capsule-gro
 		ModifyCapsuleConfigurationOpts(func(configuration *capsulev1beta2.CapsuleConfiguration) {
 			configuration.Spec.UserNames = []string{}
 			configuration.Spec.UserGroups = []string{}
-			configuration.Spec.Users = []api.UserSpec{{Kind: api.GroupOwner, Name: "test"}}
+			configuration.Spec.Users = []rbac.UserSpec{{Kind: rbac.GroupOwner, Name: "test"}}
 		})
 
 		ns := NewNamespace("")
@@ -82,7 +82,7 @@ var _ = Describe("creating a Namespace as Tenant owner with custom --capsule-gro
 		ModifyCapsuleConfigurationOpts(func(configuration *capsulev1beta2.CapsuleConfiguration) {
 			configuration.Spec.UserNames = []string{}
 			configuration.Spec.UserGroups = []string{}
-			configuration.Spec.Users = []api.UserSpec{{Kind: api.UserOwner, Name: "alice"}, {Kind: api.GroupOwner, Name: "test"}}
+			configuration.Spec.Users = []rbac.UserSpec{{Kind: rbac.UserOwner, Name: "alice"}, {Kind: rbac.GroupOwner, Name: "test"}}
 		})
 
 		ns := NewNamespace("")
@@ -95,7 +95,7 @@ var _ = Describe("creating a Namespace as Tenant owner with custom --capsule-gro
 		ModifyCapsuleConfigurationOpts(func(configuration *capsulev1beta2.CapsuleConfiguration) {
 			configuration.Spec.UserNames = []string{}
 			configuration.Spec.UserGroups = []string{}
-			configuration.Spec.Users = []api.UserSpec{{Kind: api.GroupOwner, Name: "projectcapsule.dev"}}
+			configuration.Spec.Users = []rbac.UserSpec{{Kind: rbac.GroupOwner, Name: "projectcapsule.dev"}}
 		})
 
 		ns := NewNamespace("")
@@ -108,7 +108,7 @@ var _ = Describe("creating a Namespace as Tenant owner with custom --capsule-gro
 		ModifyCapsuleConfigurationOpts(func(configuration *capsulev1beta2.CapsuleConfiguration) {
 			configuration.Spec.UserNames = []string{}
 			configuration.Spec.UserGroups = []string{}
-			configuration.Spec.Users = []api.UserSpec{{Kind: api.GroupOwner, Name: "projectcapsule.dev"}}
+			configuration.Spec.Users = []rbac.UserSpec{{Kind: rbac.GroupOwner, Name: "projectcapsule.dev"}}
 			configuration.Spec.IgnoreUserWithGroups = []string{"projectcapsule.dev"}
 		})
 
@@ -121,7 +121,7 @@ var _ = Describe("creating a Namespace as Tenant owner with custom --capsule-gro
 		ModifyCapsuleConfigurationOpts(func(configuration *capsulev1beta2.CapsuleConfiguration) {
 			configuration.Spec.UserNames = []string{}
 			configuration.Spec.UserGroups = []string{}
-			configuration.Spec.Users = []api.UserSpec{{Kind: api.UserOwner, Name: tnt.Spec.Owners[0].Name}}
+			configuration.Spec.Users = []rbac.UserSpec{{Kind: rbac.UserOwner, Name: tnt.Spec.Owners[0].Name}}
 			configuration.Spec.IgnoreUserWithGroups = []string{}
 		})
 
@@ -135,7 +135,7 @@ var _ = Describe("creating a Namespace as Tenant owner with custom --capsule-gro
 			configuration.Spec.UserNames = []string{}
 			configuration.Spec.UserGroups = []string{}
 			configuration.Spec.IgnoreUserWithGroups = []string{}
-			configuration.Spec.Users = []api.UserSpec{{Kind: api.UserOwner, Name: tnt.Spec.Owners[0].Name}}
+			configuration.Spec.Users = []rbac.UserSpec{{Kind: rbac.UserOwner, Name: tnt.Spec.Owners[0].Name}}
 		})
 
 		ns := NewNamespace("")
@@ -147,7 +147,7 @@ var _ = Describe("creating a Namespace as Tenant owner with custom --capsule-gro
 		ModifyCapsuleConfigurationOpts(func(configuration *capsulev1beta2.CapsuleConfiguration) {
 			configuration.Spec.UserNames = []string{}
 			configuration.Spec.UserGroups = []string{}
-			configuration.Spec.Users = []api.UserSpec{{Kind: api.UserOwner, Name: tnt.Spec.Owners[0].Name}}
+			configuration.Spec.Users = []rbac.UserSpec{{Kind: rbac.UserOwner, Name: tnt.Spec.Owners[0].Name}}
 			configuration.Spec.IgnoreUserWithGroups = []string{"projectcapsule.dev"}
 		})
 

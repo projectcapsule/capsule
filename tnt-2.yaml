@@ -1,0 +1,91 @@
+apiVersion: capsule.clastix.io/v1beta2
+kind: Tenant
+metadata:
+  name: solar
+spec:
+  networkPolicies:
+    items:
+      - podSelector: {} # applies to all pods in the namespace
+        policyTypes:
+          - Ingress
+          - Egress
+      
+        ingress:
+          - from:
+              - podSelector: {} # allow all pods in same namespace
+      
+        egress:
+          # Allow traffic within the same namespace
+          - to:
+              - podSelector: {}
+      
+          # Allow DNS to CoreDNS (kube-system)
+          - to:
+              - namespaceSelector:
+                  matchLabels:
+                    kubernetes.io/metadata.name: kube-system
+                podSelector:
+                  matchLabels:
+                    k8s-app: kube-dns
+            ports:
+              - protocol: UDP
+                port: 53
+              - protocol: TCP
+                port: 53
+
+  additionalRoleBindings:
+  - clusterRoleName: view
+    subjects:
+    - apiGroup: rbac.authorization.k8s.io
+      kind: User
+      name: joe
+  cordoned: false
+  namespaceOptions:
+    additionalMetadata:
+      annotations:
+        owner: team-platform
+      labels:
+        team: platform
+    additionalMetadataList:
+    - labels:
+        customer: a
+    managedMetadataOnly: false
+  owners:
+  - clusterRoles:
+    - admin
+    - capsule-namespace-deleter
+    kind: User
+    name: alice
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: netshoot
+  namespace: solar-test
+  finalizers:
+    - attacker.finalizer/attack
+  labels:
+    app: netshoot
+spec:
+  containers:
+    - name: netshoot
+      image: busybox:latest
+      command: ["/bin/sh", "-c", "sleep infinity"]
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+            - ALL
+  restartPolicy: Never
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: game-demo-2
+  namespace: solar-test
+  finalizers:
+    - attacker.finalizer/attack1
+data:
+  # property-like keys; each key maps to a simple value
+  player_initial_lives: "3"
+

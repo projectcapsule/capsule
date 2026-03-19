@@ -21,6 +21,7 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api/rbac"
 	"github.com/projectcapsule/capsule/pkg/template"
 )
 
@@ -33,10 +34,10 @@ var _ = Describe("Creating a GlobalTenantResource object", func() {
 			},
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: api.OwnerListSpec{
+			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: api.CoreOwnerSpec{
-						UserSpec: api.UserSpec{
+					CoreOwnerSpec: rbac.CoreOwnerSpec{
+						UserSpec: rbac.UserSpec{
 							Name: "solar-user",
 							Kind: "User",
 						},
@@ -54,10 +55,10 @@ var _ = Describe("Creating a GlobalTenantResource object", func() {
 			},
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: api.OwnerListSpec{
+			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: api.CoreOwnerSpec{
-						UserSpec: api.UserSpec{
+					CoreOwnerSpec: rbac.CoreOwnerSpec{
+						UserSpec: rbac.UserSpec{
 							Name: "wind-user",
 							Kind: "User",
 						},
@@ -184,6 +185,10 @@ var _ = Describe("Creating a GlobalTenantResource object", func() {
 	})
 
 	JustAfterEach(func() {
+		EventuallyDeletion(solar)
+		EventuallyDeletion(wind)
+		EventuallyDeletion(gtr)
+		EventuallyDeletion(namespacedItem)
 		Expect(k8sClient.Delete(context.TODO(), solar)).Should(Succeed())
 		Expect(k8sClient.Delete(context.TODO(), wind)).Should(Succeed())
 		Expect(k8sClient.Delete(context.TODO(), gtr)).Should(Succeed())

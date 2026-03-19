@@ -14,7 +14,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	"github.com/projectcapsule/capsule/internal/webhook/utils"
+	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
 
@@ -37,7 +37,7 @@ func (h *claimValidationHandler) OnDelete(_ client.Client, decoder admission.Dec
 		claim := &capsulev1beta2.ResourcePoolClaim{}
 
 		if err := decoder.DecodeRaw(req.OldObject, claim); err != nil {
-			return utils.ErroredResponse(fmt.Errorf("failed to decode old object: %w", err))
+			return ad.ErroredResponse(fmt.Errorf("failed to decode old object: %w", err))
 		}
 
 		if claim.IsBoundInResourcePool() {
@@ -56,11 +56,11 @@ func (h *claimValidationHandler) OnUpdate(_ client.Client, decoder admission.Dec
 		newClaim := &capsulev1beta2.ResourcePoolClaim{}
 
 		if err := decoder.DecodeRaw(req.OldObject, oldClaim); err != nil {
-			return utils.ErroredResponse(fmt.Errorf("failed to decode old object: %w", err))
+			return ad.ErroredResponse(fmt.Errorf("failed to decode old object: %w", err))
 		}
 
 		if err := decoder.Decode(req, newClaim); err != nil {
-			return utils.ErroredResponse(fmt.Errorf("failed to decode new object: %w", err))
+			return ad.ErroredResponse(fmt.Errorf("failed to decode new object: %w", err))
 		}
 
 		if oldClaim.IsBoundInResourcePool() {

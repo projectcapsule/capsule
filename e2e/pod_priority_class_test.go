@@ -20,6 +20,7 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api/rbac"
 )
 
 var _ = Describe("enforcing a Priority Class", Label("pod", "classes"), func() {
@@ -28,10 +29,10 @@ var _ = Describe("enforcing a Priority Class", Label("pod", "classes"), func() {
 			Name: "priority-class-defaults",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: api.OwnerListSpec{
+			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: api.CoreOwnerSpec{
-						UserSpec: api.UserSpec{
+					CoreOwnerSpec: rbac.CoreOwnerSpec{
+						UserSpec: rbac.UserSpec{
 							Name: "paul",
 							Kind: "User",
 						},
@@ -56,10 +57,10 @@ var _ = Describe("enforcing a Priority Class", Label("pod", "classes"), func() {
 			Name: "priority-class-no-defaults",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: api.OwnerListSpec{
+			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: api.CoreOwnerSpec{
-						UserSpec: api.UserSpec{
+					CoreOwnerSpec: rbac.CoreOwnerSpec{
+						UserSpec: rbac.UserSpec{
 							Name: "george",
 							Kind: "User",
 						},
@@ -87,10 +88,10 @@ var _ = Describe("enforcing a Priority Class", Label("pod", "classes"), func() {
 			Name: "e2e-priority-class-no-restrictions",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: []api.OwnerSpec{
+			Owners: []rbac.OwnerSpec{
 				{
-					CoreOwnerSpec: api.CoreOwnerSpec{
-						UserSpec: api.UserSpec{
+					CoreOwnerSpec: rbac.CoreOwnerSpec{
+						UserSpec: rbac.UserSpec{
 							Name: "e2e-priority-class-no-restrictions",
 							Kind: "User",
 						},
@@ -190,7 +191,7 @@ var _ = Describe("enforcing a Priority Class", Label("pod", "classes"), func() {
 
 	JustAfterEach(func() {
 		for _, tnt := range []*capsulev1beta2.Tenant{tntWithDefaults, tntNoDefaults, tntNoRestrictions} {
-			Expect(k8sClient.Delete(context.TODO(), tnt)).Should(Succeed())
+			EventuallyDeletion(tnt)
 		}
 
 		Eventually(func() (err error) {

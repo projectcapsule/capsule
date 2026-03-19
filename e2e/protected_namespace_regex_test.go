@@ -12,7 +12,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api/rbac"
 )
 
 var _ = Describe("creating a Namespace with a protected Namespace regex enabled", Label("namespace"), func() {
@@ -23,10 +23,10 @@ var _ = Describe("creating a Namespace with a protected Namespace regex enabled"
 			Name: "tenant-protected-namespace",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: api.OwnerListSpec{
+			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: api.CoreOwnerSpec{
-						UserSpec: api.UserSpec{
+					CoreOwnerSpec: rbac.CoreOwnerSpec{
+						UserSpec: rbac.UserSpec{
 							Name: "alice",
 							Kind: "User",
 						},
@@ -45,7 +45,7 @@ var _ = Describe("creating a Namespace with a protected Namespace regex enabled"
 		}).Should(Succeed())
 	})
 	JustAfterEach(func() {
-		Expect(k8sClient.Delete(context.TODO(), tnt)).Should(Succeed())
+		EventuallyDeletion(tnt)
 
 		// Restore Configuration
 		Eventually(func() error {

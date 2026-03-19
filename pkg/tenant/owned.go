@@ -17,7 +17,7 @@ import (
 
 func NamespaceIsOwned(
 	ctx context.Context,
-	c client.Client,
+	c client.Reader,
 	cfg configuration.Configuration,
 	ns *corev1.Namespace,
 	tnt *capsulev1beta2.Tenant,
@@ -28,7 +28,7 @@ func NamespaceIsOwned(
 			continue
 		}
 
-		return users.IsTenantOwnerByStatus(ctx, c, cfg, tnt, userInfo)
+		return users.IsTenantOwnerByStatus(tnt, userInfo)
 	}
 
 	return false

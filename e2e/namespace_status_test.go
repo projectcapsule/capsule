@@ -12,8 +12,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
+	"github.com/projectcapsule/capsule/pkg/api/rbac"
 )
 
 var _ = Describe("creating namespace with status lifecycle", Label("namespace", "status"), func() {
@@ -22,10 +22,10 @@ var _ = Describe("creating namespace with status lifecycle", Label("namespace", 
 			Name: "tenant-status",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: api.OwnerListSpec{
+			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: api.CoreOwnerSpec{
-						UserSpec: api.UserSpec{
+					CoreOwnerSpec: rbac.CoreOwnerSpec{
+						UserSpec: rbac.UserSpec{
 							Name: "gatsby",
 							Kind: "User",
 						},
@@ -42,7 +42,7 @@ var _ = Describe("creating namespace with status lifecycle", Label("namespace", 
 		}).Should(Succeed())
 	})
 	JustAfterEach(func() {
-		Expect(k8sClient.Delete(context.TODO(), tnt)).Should(Succeed())
+		EventuallyDeletion(tnt)
 	})
 
 	It("verify namespace lifecycle (functionality)", func() {
@@ -116,13 +116,25 @@ var _ = Describe("creating namespace with status lifecycle", Label("namespace", 
 		By("removing second namespace", func() {
 			Expect(k8sClient.Delete(context.TODO(), ns2)).Should(Succeed())
 
-			t := &capsulev1beta2.Tenant{}
-			Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: tnt.GetName()}, t)).Should(Succeed())
+			Eventually(func(g Gomega) {
+				t := &capsulev1beta2.Tenant{}
 
-			Expect(t.Status.Size).To(Equal(uint(0)))
+				err := k8sClient.Get(
+					context.TODO(),
+					types.NamespacedName{Name: tnt.GetName()},
+					t,
+				)
+				g.Expect(err).ToNot(HaveOccurred())
 
-			instance := t.Status.GetInstance(&capsulev1beta2.TenantStatusNamespaceItem{Name: ns2.GetName(), UID: ns2.GetUID()})
-			Expect(instance).To(BeNil(), "Namespace instance should be nil")
+				instance := t.Status.GetInstance(&capsulev1beta2.TenantStatusNamespaceItem{
+					Name: ns2.GetName(),
+					UID:  ns2.GetUID(),
+				})
+				g.Expect(instance).To(BeNil(), "Namespace instance should be nil")
+
+				g.Expect(t.Status.Size).To(Equal(uint(0)))
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+
 		})
 	})
 })

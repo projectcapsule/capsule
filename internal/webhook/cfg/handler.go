@@ -11,7 +11,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	"github.com/projectcapsule/capsule/internal/webhook/utils"
+	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
@@ -32,7 +32,7 @@ func (h *handler) OnCreate(c client.Client, decoder admission.Decoder, recorder 
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		config := &capsulev1beta2.CapsuleConfiguration{}
 		if err := decoder.Decode(req, config); err != nil {
-			return utils.ErroredResponse(err)
+			return ad.ErroredResponse(err)
 		}
 
 		for _, hndl := range h.handlers {
@@ -49,7 +49,7 @@ func (h *handler) OnDelete(c client.Client, decoder admission.Decoder, recorder 
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		config := &capsulev1beta2.CapsuleConfiguration{}
 		if err := decoder.Decode(req, config); err != nil {
-			return utils.ErroredResponse(err)
+			return ad.ErroredResponse(err)
 		}
 
 		for _, hndl := range h.handlers {
@@ -66,12 +66,12 @@ func (h *handler) OnUpdate(c client.Client, decoder admission.Decoder, recorder 
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		config := &capsulev1beta2.CapsuleConfiguration{}
 		if err := decoder.Decode(req, config); err != nil {
-			return utils.ErroredResponse(err)
+			return ad.ErroredResponse(err)
 		}
 
 		old := &capsulev1beta2.CapsuleConfiguration{}
 		if err := decoder.DecodeRaw(req.OldObject, old); err != nil {
-			return utils.ErroredResponse(err)
+			return ad.ErroredResponse(err)
 		}
 
 		for _, hndl := range h.handlers {

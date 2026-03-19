@@ -35,7 +35,7 @@ import (
 )
 
 type Collector struct {
-	gatherClient           client.Client
+	gatherClient           client.Reader
 	mapper                 k8smeta.RESTMapper
 	contextSanitizeOptions sanitize.SanitizeOptions
 	objectSanitizeOptions  sanitize.SanitizeOptions
@@ -61,7 +61,7 @@ func NewCollectorIteratorOptions(
 ) CollectorIteratorOptions {
 	opts := CollectorIteratorOptions{}
 
-	opts.FastContext = tenant.ContextForTenantAndNamespace(tnt, ns)
+	opts.FastContext = tenant.FastContextForTenantAndNamespace(tnt, ns)
 
 	labels, annotations := GatherAdditionalMetadata(spec, opts.FastContext)
 	opts.Labels = labels
@@ -70,7 +70,7 @@ func NewCollectorIteratorOptions(
 	return opts
 }
 
-func NewCollector(c client.Client, mapper k8smeta.RESTMapper) Collector {
+func NewCollector(c client.Reader, mapper k8smeta.RESTMapper) Collector {
 	return Collector{
 		gatherClient: c,
 		mapper:       mapper,
@@ -98,7 +98,7 @@ func (co *Collector) Collect(
 	ctx context.Context,
 	c client.Client,
 	opts CollectorOptions,
-	tnt capsulev1beta2.Tenant,
+	tnt *capsulev1beta2.Tenant,
 	resourceIndex string,
 	spec capsulev1beta2.ResourceSpec,
 	ns *corev1.Namespace,
@@ -127,17 +127,14 @@ func (co *Collector) Collect(
 		}
 	}
 
-	err = sanitize.SanitizeObject(&tnt, c.Scheme(), co.contextSanitizeOptions)
-	if err != nil {
-		return err
-	}
+	if tnt != nil {
+		tCtx, err := tenant.NewTenantContext(tnt, c.Scheme(), co.contextSanitizeOptions)
+		if err != nil {
+			return err
+		}
 
-	tntMap, err := utils.ToMap(&tnt)
-	if err != nil {
-		return err
+		tplContext["tenant"] = tCtx
 	}
-
-	tplContext["tenant"] = tntMap
 
 	if ns != nil {
 		err = sanitize.SanitizeObject(ns, c.Scheme(), co.contextSanitizeOptions)
@@ -145,7 +142,7 @@ func (co *Collector) Collect(
 			return err
 		}
 
-		nsMap, err := utils.ToMap(&ns)
+		nsMap, err := utils.ToUnstructuredMap(&ns)
 		if err != nil {
 			return err
 		}
@@ -177,7 +174,7 @@ func (co *Collector) Collect(
 	}
 
 	// Run Generators
-	for generatorIndex, item := range spec.Templates {
+	for generatorIndex, item := range spec.Generators {
 		log.V(5).Info("processing generator item", "index", generatorIndex)
 
 		p, genError := co.handleGeneratorItem(ctx, c, generatorIndex, item, ns, tplContext)
@@ -191,7 +188,7 @@ func (co *Collector) Collect(
 
 		for i, o := range p {
 
-			genError = co.AddToAccumulation(tnt, ns, opts, spec, o, resourceIndex+"/template-"+strconv.Itoa(generatorIndex)+"-"+strconv.Itoa(i), true)
+			genError = co.AddToAccumulation(tnt, ns, opts, spec, o, resourceIndex+"/generator-"+strconv.Itoa(generatorIndex)+"-"+strconv.Itoa(i), true)
 			if genError != nil {
 				syncErr = errors.Join(syncErr, genError)
 
@@ -206,7 +203,7 @@ func (co *Collector) Collect(
 // Add an item to the accumulator
 // Mainly handles conflicts
 func (co *Collector) AddToAccumulation(
-	tnt capsulev1beta2.Tenant,
+	tnt *capsulev1beta2.Tenant,
 	ns *corev1.Namespace,
 	opts CollectorOptions,
 	spec capsulev1beta2.ResourceSpec,
@@ -218,7 +215,12 @@ func (co *Collector) AddToAccumulation(
 		return
 	}
 
-	resource := gvk.NewResourceID(obj, tnt.GetName(), origin)
+	tntName := ""
+	if tnt != nil {
+		tntName = tnt.GetName()
+	}
+
+	resource := gvk.NewResourceID(obj, tntName, origin)
 
 	if !combine {
 		if _, k := opts.Accumulator[resource.GetKey("")]; k {
@@ -259,7 +261,7 @@ func (co *Collector) AddToAccumulation(
 		Object: obj,
 		Origin: gvk.TenantResourceIDWithOrigin{
 			TenantResourceID: gvk.TenantResourceID{
-				Tenant: tnt.GetName(),
+				Tenant: tntName,
 			},
 			Origin: origin,
 		},
@@ -309,6 +311,9 @@ func (co *Collector) CollectNamespacedItems(
 			continue
 		}
 
+		// Remove the keys from the result by which they were sourced.
+		filterKeys := meta.LabelSelectorKeys(item.Selector)
+
 		for _, o := range p {
 			// Namespaced Items are different. Even if we allow cross namespace loading
 			// If a target namespace is given it always is used
@@ -326,6 +331,15 @@ func (co *Collector) CollectNamespacedItems(
 					)
 					continue
 				}
+
+				log.V(6).Info("loaded resource",
+					"gvk", schema.GroupVersionKind{Group: k.Group, Version: k.Version, Kind: k.Kind}.String(),
+					"namespace", k.Namespace,
+					"name", k.Name,
+				)
+
+				meta.SetFilteredLabels(o, filterKeys)
+
 				seen[k] = o
 			} else {
 				log.V(4).Info("resource missing identity; cannot dedupe reliably",
@@ -415,12 +429,59 @@ func GatherAdditionalMetadata(
 }
 
 //nolint:gocognit
+func (co *Collector) selectedTenantNamespaces(
+	ctx context.Context,
+	log logr.Logger,
+	tnt capsulev1beta2.Tenant,
+	resource capsulev1beta2.ResourceSpec,
+) (ns []*corev1.Namespace, err error) {
+	// Creating Namespace selector
+	var selector labels.Selector
+
+	if resource.NamespaceSelector != nil {
+		selector, err = metav1.LabelSelectorAsSelector(resource.NamespaceSelector)
+		if err != nil {
+			log.Error(err, "cannot create Namespace selector for Namespace filtering and resource replication")
+
+			return nil, err
+		}
+	} else {
+		selector = labels.NewSelector()
+	}
+	// Resources can be replicated only on Namespaces belonging to the same Global:
+	// preventing a boundary cross by enforcing the selection.
+	tntRequirement, err := labels.NewRequirement(meta.TenantLabel, selection.Equals, []string{tnt.GetName()})
+	if err != nil {
+		log.Error(err, "unable to create requirement for Namespace filtering and resource replication")
+
+		return nil, err
+	}
+
+	selector = selector.Add(*tntRequirement)
+	// Selecting the targeted Namespace according to the TenantResource specification.
+	namespaces := corev1.NamespaceList{}
+	if err = co.gatherClient.List(ctx, &namespaces, client.MatchingLabelsSelector{Selector: selector}); err != nil {
+		log.Error(err, "cannot retrieve Namespaces for resource")
+
+		return nil, err
+	}
+
+	log.V(5).Info("retrieved namespaces", "size", len(namespaces.Items))
+
+	for _, names := range namespaces.Items {
+		ns = append(ns, &names)
+	}
+
+	return ns, nil
+}
+
+//nolint:gocognit
 func (co *Collector) foreachTenantNamespace(
 	ctx context.Context,
 	log logr.Logger,
 	c client.Client,
 	opts CollectorOptions,
-	tnt capsulev1beta2.Tenant,
+	tnt *capsulev1beta2.Tenant,
 	resource capsulev1beta2.ResourceSpec,
 	resourceIndex string,
 ) (err error) {
@@ -460,7 +521,7 @@ func (co *Collector) foreachTenantNamespace(
 	for _, ns := range namespaces.Items {
 		log.V(5).Info("reconciling for", "namespace", ns.Name)
 
-		opts.Iterator = NewCollectorIteratorOptions(&tnt, &ns, resource)
+		opts.Iterator = NewCollectorIteratorOptions(tnt, &ns, resource)
 
 		err = co.Collect(
 			ctx,

@@ -19,7 +19,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api/rbac"
 )
 
 var _ = Describe("when Tenant limits custom Resource Quota", Label("resourcequota"), func() {
@@ -31,10 +31,10 @@ var _ = Describe("when Tenant limits custom Resource Quota", Label("resourcequot
 			},
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: api.OwnerListSpec{
+			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: api.CoreOwnerSpec{
-						UserSpec: api.UserSpec{
+					CoreOwnerSpec: rbac.CoreOwnerSpec{
+						UserSpec: rbac.UserSpec{
 							Name: "resource",
 							Kind: "User",
 						},
@@ -98,7 +98,7 @@ var _ = Describe("when Tenant limits custom Resource Quota", Label("resourcequot
 	JustAfterEach(func() {
 		Expect(k8sClient.Delete(context.TODO(), crd)).Should(Succeed())
 
-		Expect(k8sClient.Delete(context.TODO(), tnt)).Should(Succeed())
+		EventuallyDeletion(tnt)
 	})
 
 	It("should block resources in overflow", func() {

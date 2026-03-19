@@ -11,7 +11,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api/rbac"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 )
 
@@ -52,7 +52,7 @@ func IsCapsuleUser(
 	capsuleUsers := cfg.GetUsersByStatus()
 
 	//nolint:modernize
-	for _, group := range capsuleUsers.GetByKinds([]api.OwnerKind{api.GroupOwner}) {
+	for _, group := range capsuleUsers.GetByKinds([]rbac.OwnerKind{rbac.GroupOwner}) {
 		if groupList.Find(group) {
 			if len(cfg.IgnoreUserWithGroups()) > 0 {
 				for _, ignoreGroup := range cfg.IgnoreUserWithGroups() {
@@ -66,7 +66,7 @@ func IsCapsuleUser(
 		}
 	}
 
-	users := capsuleUsers.GetByKinds([]api.OwnerKind{api.UserOwner})
+	users := capsuleUsers.GetByKinds([]rbac.OwnerKind{rbac.UserOwner})
 	if len(users) > 0 && sets.New[string](users...).Has(user) {
 		return true
 	}

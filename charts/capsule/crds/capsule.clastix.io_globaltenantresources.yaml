@@ -196,12 +196,25 @@ spec:
                             type: object
                           type: array
                       type: object
-                    managed:
-                      default: true
-                      description: |-
-                        Adds the managed label to the unique resources
-                        This Label prevents any updates from Capsule Users
-                      type: boolean
+                    generators:
+                      description: Templates for advanced use cases
+                      items:
+                        properties:
+                          missingKey:
+                            default: zero
+                            description: Missing Key Option for templating
+                            enum:
+                            - invalid
+                            - zero
+                            - error
+                            type: string
+                          template:
+                            description: |-
+                              Template contains any amount of yaml which is applied to Kubernetes.
+                              This can be a single resource or multiple resources
+                            type: string
+                        type: object
+                      type: array
                     namespaceSelector:
                       description: |-
                         Defines the Namespace selector to select the Tenant Namespaces on which the resources must be propagated.
@@ -338,25 +351,6 @@ spec:
                         type: object
                         x-kubernetes-preserve-unknown-fields: true
                       type: array
-                    templates:
-                      description: Templates for advanced use cases
-                      items:
-                        properties:
-                          missingKey:
-                            default: zero
-                            description: Missing Key Option for templating
-                            enum:
-                            - invalid
-                            - zero
-                            - error
-                            type: string
-                          template:
-                            description: |-
-                              Template contains any amount of yaml which is applied to Kubernetes.
-                              This can be a single resource or multiple resources
-                            type: string
-                        type: object
-                      type: array
                   type: object
                 type: array
               resyncPeriod:
@@ -374,6 +368,7 @@ spec:
                 enum:
                 - Namespace
                 - Tenant
+                - Cluster
                 type: string
               serviceAccount:
                 description: |-
@@ -527,6 +522,7 @@ spec:
               processedItems:
                 description: List of the replicated resources for the given TenantResource.
                 items:
+                  description: Advanced Status Item for pin pointing items in tenants/namespaces.
                   properties:
                     group:
                       type: string
@@ -535,6 +531,8 @@ spec:
                     name:
                       type: string
                     namespace:
+                      type: string
+                    origin:
                       type: string
                     status:
                       properties:

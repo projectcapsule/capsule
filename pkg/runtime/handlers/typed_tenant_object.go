@@ -114,5 +114,5 @@ func (h *TypedTenantHandler[T]) resolveTenant(ctx context.Context, c client.Clie
 		return nil, nil
 	}
 
-	return tenant.TenantByStatusNamespace(ctx, c, req.Namespace)
+	return tenant.GetTenantByNamespace(ctx, c, req.Namespace)
 }

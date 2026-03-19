@@ -1,5 +1,41 @@
 {{- if or (and $.Values.crds.exclusive $.Values.crds.createRBAC) (not $.Values.crds.exclusive) }}
   {{- if $.Values.manager.rbac.create }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: capsule:{{ .Release.Name }}:aggregate
+  labels:
+    {{- include "capsule.labels" . | nindent 4 }}
+  {{- with .Values.customAnnotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+aggregationRule:
+  clusterRoleSelectors:
+  - matchLabels:
+      projectcapsule.dev/aggregate-to-controller: "true"
+  - matchLabels:
+      projectcapsule.dev/aggregate-to-controller-instance: {{ .Release.Name }}
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: capsule:{{ include "capsule.fullname" . }}:aggregate
+  labels:
+    {{- include "capsule.labels" . | nindent 4 }}
+  {{- with .Values.customAnnotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: capsule:{{ .Release.Name }}:aggregate
+subjects:
+- kind: ServiceAccount
+  name: {{ include "capsule.serviceAccountName" . }}
+  namespace: {{ .Release.Namespace }}
     {{- if $.Values.manager.rbac.minimal }}
 ---
 kind: ClusterRoleBinding
@@ -31,12 +67,6 @@ metadata:
   annotations:
     {{- toYaml . | nindent 4 }}
   {{- end }}
-aggregationRule:
-  clusterRoleSelectors:
-  - matchLabels:
-      projectcapsule.dev/aggregate-to-controller: "true"
-  - matchLabels:
-      projectcapsule.dev/aggregate-to-controller-instance: {{ .Release.Name }}
 rules:
 - apiGroups: [""]
   resources: ["serviceaccounts"]
@@ -96,10 +126,9 @@ rules:
   - patch
   - update
 - apiGroups:
-  - ""
+  - "*"
   resources:
-  - "serviceaccounts"
-  - "configmaps"
+  - "*"
   verbs:
   - "get"
   - "list"
@@ -245,11 +274,14 @@ rules:
   resources:
   - mutatingwebhookconfigurations
   resourceNames:
-  -  {{ include "capsule.fullname" . }}-mutating-webhook-configuration
+  - "{{ include "capsule.fullname" . }}-mutating-webhook-configuration"
+  - "{{ include "capsule.fullname" . }}-dynamic-webhook"
   verbs:
   - get
+  - create
   - patch
   - update
+  - delete
 - apiGroups:
   - admissionregistration.k8s.io
   resources:
@@ -263,10 +295,13 @@ rules:
   - validatingwebhookconfigurations
   resourceNames:
   -  {{ include "capsule.fullname" . }}-validating-webhook-configuration
+  - "{{ include "capsule.fullname" . }}-dynamic-webhook"
   verbs:
   - get
+  - create
   - patch
   - update
+  - delete
 - apiGroups: ["rbac.authorization.k8s.io"]
   resources: ["clusterroles"]
   verbs:

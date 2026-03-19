@@ -8,8 +8,8 @@ import (
 	. "github.com/onsi/gomega"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
+	"github.com/projectcapsule/capsule/pkg/api/rbac"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -23,10 +23,10 @@ var _ = Describe("NamespaceStatus objects", Label("tenant", "rules"), func() {
 	tntA := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{Name: "nsstatus-a"},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: api.OwnerListSpec{
+			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: api.CoreOwnerSpec{
-						UserSpec: api.UserSpec{Name: "matt", Kind: "User"},
+					CoreOwnerSpec: rbac.CoreOwnerSpec{
+						UserSpec: rbac.UserSpec{Name: "matt", Kind: "User"},
 					},
 				},
 			},
@@ -36,10 +36,10 @@ var _ = Describe("NamespaceStatus objects", Label("tenant", "rules"), func() {
 	tntB := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{Name: "nsstatus-b"},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: api.OwnerListSpec{
+			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: api.CoreOwnerSpec{
-						UserSpec: api.UserSpec{Name: "matt", Kind: "User"},
+					CoreOwnerSpec: rbac.CoreOwnerSpec{
+						UserSpec: rbac.UserSpec{Name: "matt", Kind: "User"},
 					},
 				},
 			},
@@ -95,10 +95,10 @@ var _ = Describe("NamespaceStatus objects", Label("tenant", "rules"), func() {
 
 		// Delete tenants
 		if tntA != nil {
-			_ = k8sClient.Delete(ctx, tntA)
+			EventuallyDeletion(tntA)
 		}
 		if tntB != nil {
-			_ = k8sClient.Delete(ctx, tntB)
+			EventuallyDeletion(tntB)
 		}
 	})
 

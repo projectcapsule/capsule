@@ -10,9 +10,9 @@ import (
 
 	"github.com/go-logr/logr"
 	gherrors "github.com/pkg/errors"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/cluster-api/util/patch"
@@ -34,6 +34,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api/processor"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	"github.com/projectcapsule/capsule/pkg/runtime/predicates"
+	"github.com/projectcapsule/capsule/pkg/runtime/sanitize"
 	"github.com/projectcapsule/capsule/pkg/tenant"
 )
 
@@ -53,9 +54,10 @@ func (r *namespacedResourceController) SetupWithManager(mgr ctrl.Manager, cfg ut
 	r.processor = processor.Processor{
 		Configuration:                r.configuration,
 		AllowCrossNamespaceSelection: false,
+		GatherClient:                 mgr.GetAPIReader(),
 	}
 	r.collector = NewCollector(
-		r.client,
+		mgr.GetAPIReader(),
 		mgr.GetRESTMapper(),
 	)
 
@@ -72,6 +74,21 @@ func (r *namespacedResourceController) SetupWithManager(mgr ctrl.Manager, cfg ut
 		Watches(
 			&capsulev1beta2.TenantResource{},
 			handler.EnqueueRequestsFromMapFunc(r.enqueueDependentTenantResources),
+		).
+		Watches(
+			&capsulev1beta2.CapsuleConfiguration{},
+			handler.EnqueueRequestsFromMapFunc(r.enqueueAllResources),
+			builder.WithPredicates(
+				predicates.CapsuleConfigSpecImpersonationChangedPredicate{},
+				predicates.NamesMatchingPredicate{Names: []string{cfg.ConfigurationName}},
+			),
+		).
+		Watches(
+			&corev1.Namespace{},
+			handler.EnqueueRequestsFromMapFunc(r.enqueueTenantResourcesForNamespace),
+			builder.WithPredicates(
+				predicates.LabelPresentPredicate{Label: meta.TenantLabel},
+			),
 		).
 		WithOptions(controller.Options{MaxConcurrentReconciles: cfg.MaxConcurrentReconciles}).
 		Complete(r)
@@ -105,6 +122,88 @@ func (r *namespacedResourceController) enqueueDependentTenantResources(
 				break
 			}
 		}
+	}
+
+	return reqs
+}
+
+// Requeue TenantResources if there is changes to namespaces of the same tenant
+// We are not relying on the tenant status, as we might have a terminating lock caused by TenantResources
+func (r *namespacedResourceController) enqueueTenantResourcesForNamespace(
+	ctx context.Context,
+	obj client.Object,
+) []reconcile.Request {
+	ns, ok := obj.(*corev1.Namespace)
+	if !ok {
+		return nil
+	}
+
+	labelValue, ok := ns.Labels[meta.TenantLabel]
+	if !ok || labelValue == "" {
+		return nil
+	}
+
+	var namespaces corev1.NamespaceList
+	if err := r.client.List(
+		ctx,
+		&namespaces,
+		client.MatchingLabels{meta.TenantLabel: labelValue},
+	); err != nil {
+		r.log.Error(err, "failed to list namespaces by label", "label", meta.TenantLabel, "value", labelValue)
+
+		return nil
+	}
+
+	requests := make([]reconcile.Request, 0, 16)
+	seen := make(map[types.NamespacedName]struct{})
+
+	for i := range namespaces.Items {
+		var trList capsulev1beta2.TenantResourceList
+		if err := r.client.List(
+			ctx,
+			&trList,
+			client.InNamespace(namespaces.Items[i].Name),
+		); err != nil {
+			r.log.Error(err, "failed to list TenantResources", "namespace", namespaces.Items[i].Name)
+
+			continue
+		}
+
+		for j := range trList.Items {
+			key := types.NamespacedName{
+				Namespace: trList.Items[j].Namespace,
+				Name:      trList.Items[j].Name,
+			}
+
+			if _, exists := seen[key]; exists {
+				continue
+			}
+
+			seen[key] = struct{}{}
+
+			requests = append(requests, reconcile.Request{NamespacedName: key})
+		}
+	}
+
+	return requests
+}
+
+func (r *namespacedResourceController) enqueueAllResources(ctx context.Context, _ client.Object) []reconcile.Request {
+	var list capsulev1beta2.TenantResourceList
+	if err := r.client.List(ctx, &list); err != nil {
+		r.log.V(1).Error(err, "unable to list TenantResources for config-triggered reconcile")
+
+		return nil
+	}
+
+	reqs := make([]reconcile.Request, 0, len(list.Items))
+	for i := range list.Items {
+		reqs = append(reqs, reconcile.Request{
+			NamespacedName: types.NamespacedName{
+				Name:      list.Items[i].Name,
+				Namespace: list.Items[i].Namespace,
+			},
+		})
 	}
 
 	return reqs
@@ -225,25 +324,29 @@ func (r *namespacedResourceController) reconcile(
 
 	// Adding the default value for the status
 	if tntResource.Status.ProcessedItems == nil {
-		tntResource.Status.ProcessedItems = make([]capsulev1beta2.ObjectReferenceStatus, 0)
+		tntResource.Status.ProcessedItems = make([]meta.ObjectReferenceStatus, 0)
 	}
 
 	// Retrieving the parent of the Tenant Resource:
 	// can be owned, or being deployed in one of its Namespace.
-	tl := &capsulev1beta2.TenantList{}
-	if err := r.client.List(ctx, tl, client.MatchingFieldsSelector{Selector: fields.OneTermEqualSelector(".status.namespaces", tntResource.GetNamespace())}); err != nil {
-		log.Error(err, "unable to detect the Tenant for the given TenantResource")
-
+	// we cant resolve via status.namespaces, as when a namespace is deleted it is no longer references by the tenant
+	// causing a deletion blockade.
+	ns := &corev1.Namespace{}
+	if err := r.client.Get(ctx, types.NamespacedName{Name: tntResource.GetNamespace()}, ns); err != nil {
 		return err
 	}
 
-	if len(tl.Items) == 0 {
+	tnt, err := tenant.GetTenantByOwnerreferences(ctx, r.client, ns.GetOwnerReferences())
+	if err != nil {
+		return err
+	}
+
+	if tnt == nil {
 		log.Info("skipping sync, the current Namespace is not belonging to any Tenant")
 
 		return nil
 	}
 
-	tnt := tl.Items[0]
 	acc := processor.Accumulator{}
 
 	// Gather Resources
@@ -253,7 +356,7 @@ func (r *namespacedResourceController) reconcile(
 			c,
 			log,
 			tntResource,
-			tnt,
+			*tnt,
 			acc,
 		)
 		if err != nil {
@@ -284,79 +387,63 @@ func (r *namespacedResourceController) gatherResources(
 	tnt capsulev1beta2.Tenant,
 	acc processor.Accumulator,
 ) (err error) {
-	//replicaAccumulator := processor.Accumulator{}
-	//seen := make(map[gvk.ResourceKey]struct{})
-
 	opts := CollectorOptions{
 		Accumulator:                  acc,
 		AllowCrossNamespaceSelection: false,
 	}
 
 	for resourceIndex, resource := range tntResource.Spec.Resources {
-		namespaces, err := tenant.CollectTenantNamespaceByLabel(ctx, r.client, tnt, resource.NamespaceSelector)
+		objs, err := r.collector.CollectNamespacedItems(ctx, c, opts, resource, &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: tntResource.GetNamespace()}}, tnt)
 		if err != nil {
 			return err
 		}
 
-		for _, ns := range namespaces {
-			opts.Iterator = NewCollectorIteratorOptions(&tnt, &ns, resource)
+		for g := range objs {
+			log.V(5).Info("found replication source object", "name", g.Name, "namespace", g.Namespace, "kind", g.Kind)
+		}
 
-			objs, err := r.collector.CollectNamespacedItems(ctx, c, opts, resource, &ns, tnt)
-			if err != nil {
-				return err
-			}
+		namespaces, err := r.collector.selectedTenantNamespaces(ctx, log, tnt, resource)
+		if err != nil {
+			return err
+		}
+
+		i := 0
+		for _, innerNs := range namespaces {
+
+			opts.Iterator = NewCollectorIteratorOptions(&tnt, innerNs, resource)
 
 			for _, obj := range objs {
-				for _, innerNs := range namespaces {
-					if obj.GetNamespace() == innerNs.GetName() {
-						continue
-					}
-
-					target := obj.DeepCopy()
-					target.SetNamespace(innerNs.GetName())
-
-					log.V(4).Info("adding replication for namespaced item", "name", target.GetName(), "namespace", target.GetNamespace(), "kind", target.GetKind())
-
-					err = r.collector.AddToAccumulation(tnt, &innerNs, opts, resource, target, "sad-1", false)
-					if err != nil {
-						if err != nil {
-							return err
-						}
-
-						continue
-					}
-
+				if obj.GetNamespace() == innerNs.GetName() {
+					continue
 				}
+
+				target := obj.DeepCopy()
+				sanitize.SanitizeObject(target, c.Scheme(), r.collector.objectSanitizeOptions)
+				target.SetNamespace(innerNs.GetName())
+
+				log.V(4).Info("adding replication for namespaced item", "name", target.GetName(), "namespace", target.GetNamespace(), "kind", target.GetKind())
+
+				err = r.collector.AddToAccumulation(&tnt, innerNs, opts, resource, target, "replica", false)
+				if err != nil {
+					return err
+				}
+
 			}
 
 			err = r.collector.Collect(
 				ctx,
 				c,
 				opts,
-				tnt,
-				string(resourceIndex),
+				&tnt,
+				strconv.Itoa((resourceIndex)),
 				resource,
-				&ns,
+				innerNs,
 			)
 			if err != nil {
 				return err
 			}
 
-		}
-	}
-
-	for index, resource := range tntResource.Spec.Resources {
-		err = r.collector.foreachTenantNamespace(
-			ctx,
-			log,
-			c,
-			opts,
-			tnt,
-			resource,
-			strconv.Itoa(index),
-		)
-		if err != nil {
-			return err
+			i++
 		}
 	}
 
@@ -468,4 +555,82 @@ func (r *namespacedResourceController) updateStatus(ctx context.Context, instanc
 
 		return r.client.Status().Update(ctx, latest)
 	})
+}
+
+func ForeachNamespace(
+	ctx context.Context,
+	controllerClient client.Client,
+	resourceClient client.Client,
+	collector Collector,
+	opts CollectorOptions,
+	log logr.Logger,
+	resource capsulev1beta2.ResourceSpec,
+	resourceIndex int,
+	tnt capsulev1beta2.Tenant,
+	acc processor.Accumulator,
+) (err error) {
+	namespaces, err := tenant.CollectTenantNamespaceByLabel(ctx, controllerClient, tnt, resource.NamespaceSelector)
+	if err != nil {
+		return err
+	}
+
+	for _, ns := range namespaces {
+		if ns.DeletionTimestamp != nil {
+			terminating, err := tenant.NamespaceIsPendingUnmanagedTerminationByStatus(ctx, controllerClient, &ns)
+			if err != nil {
+				return err
+			}
+
+			// Skip this namespace so resources are cleaned
+			if terminating {
+				continue
+			}
+		}
+
+		opts.Iterator = NewCollectorIteratorOptions(&tnt, &ns, resource)
+
+		objs, err := collector.CollectNamespacedItems(ctx, resourceClient, opts, resource, &ns, tnt)
+		if err != nil {
+			return err
+		}
+
+		i := 0
+
+		for _, obj := range objs {
+			for _, innerNs := range namespaces {
+				if obj.GetNamespace() == innerNs.GetName() {
+					continue
+				}
+
+				target := obj.DeepCopy()
+				target.SetNamespace(innerNs.GetName())
+
+				log.V(4).Info("adding replication for namespaced item", "name", target.GetName(), "namespace", target.GetNamespace(), "kind", target.GetKind())
+
+				err = collector.AddToAccumulation(&tnt, &innerNs, opts, resource, target, strconv.Itoa(resourceIndex)+"/replica-"+strconv.Itoa(i), true)
+				if err != nil {
+					return err
+				}
+
+			}
+
+			i++
+		}
+
+		err = collector.Collect(
+			ctx,
+			resourceClient,
+			opts,
+			&tnt,
+			strconv.Itoa((resourceIndex)),
+			resource,
+			&ns,
+		)
+		if err != nil {
+			return err
+		}
+
+	}
+
+	return nil
 }

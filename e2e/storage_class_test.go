@@ -25,6 +25,7 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api/rbac"
 )
 
 var _ = Describe("when Tenant handles Storage classes", Label("tenant", "classes", "storage"), func() {
@@ -33,10 +34,10 @@ var _ = Describe("when Tenant handles Storage classes", Label("tenant", "classes
 			Name: "storage-class-selector",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: api.OwnerListSpec{
+			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: api.CoreOwnerSpec{
-						UserSpec: api.UserSpec{
+					CoreOwnerSpec: rbac.CoreOwnerSpec{
+						UserSpec: rbac.UserSpec{
 							Name: "selector",
 							Kind: "User",
 						},
@@ -64,10 +65,10 @@ var _ = Describe("when Tenant handles Storage classes", Label("tenant", "classes
 			Name: "storage-class-default",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: api.OwnerListSpec{
+			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: api.CoreOwnerSpec{
-						UserSpec: api.UserSpec{
+					CoreOwnerSpec: rbac.CoreOwnerSpec{
+						UserSpec: rbac.UserSpec{
 							Name: "default",
 							Kind: "User",
 						},
@@ -92,10 +93,10 @@ var _ = Describe("when Tenant handles Storage classes", Label("tenant", "classes
 			Name: "e2e-storage-no-restrictions",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: api.OwnerListSpec{
+			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: api.CoreOwnerSpec{
-						UserSpec: api.UserSpec{
+					CoreOwnerSpec: rbac.CoreOwnerSpec{
+						UserSpec: rbac.UserSpec{
 							Name: "no-restrictions",
 							Kind: "User",
 						},
@@ -164,7 +165,7 @@ var _ = Describe("when Tenant handles Storage classes", Label("tenant", "classes
 	})
 	JustAfterEach(func() {
 		for _, tnt := range []*capsulev1beta2.Tenant{tntNoDefaults, tntWithDefault, tntNoRestrictions} {
-			Expect(k8sClient.Delete(context.TODO(), tnt)).Should(Succeed())
+			EventuallyDeletion(tnt)
 		}
 
 		Eventually(func() (err error) {

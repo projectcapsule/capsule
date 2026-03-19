@@ -11,7 +11,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	"github.com/projectcapsule/capsule/internal/webhook/utils"
+	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
@@ -41,12 +41,12 @@ func (h *handler) OnCreate(c client.Client, decoder admission.Decoder, recorder 
 
 		ns := &corev1.Namespace{}
 		if err := decoder.Decode(req, ns); err != nil {
-			return utils.ErroredResponse(err)
+			return ad.ErroredResponse(err)
 		}
 
 		tnt, err := tenant.GetTenantByLabels(ctx, c, ns)
 		if err != nil {
-			return utils.ErroredResponse(err)
+			return ad.ErroredResponse(err)
 		}
 
 		if tnt == nil && userIsAdmin {
@@ -79,17 +79,17 @@ func (h *handler) OnUpdate(c client.Client, decoder admission.Decoder, recorder 
 
 		ns := &corev1.Namespace{}
 		if err := decoder.Decode(req, ns); err != nil {
-			return utils.ErroredResponse(err)
+			return ad.ErroredResponse(err)
 		}
 
 		oldNs := &corev1.Namespace{}
 		if err := decoder.DecodeRaw(req.OldObject, oldNs); err != nil {
-			return utils.ErroredResponse(err)
+			return ad.ErroredResponse(err)
 		}
 
 		tnt, err := tenant.GetTenantByOwnerreferences(ctx, c, oldNs.OwnerReferences)
 		if err != nil {
-			return utils.ErroredResponse(err)
+			return ad.ErroredResponse(err)
 		}
 
 		//nolint:nestif
@@ -97,7 +97,7 @@ func (h *handler) OnUpdate(c client.Client, decoder admission.Decoder, recorder 
 			if tnt == nil {
 				tnt, err = tenant.GetTenantByLabels(ctx, c, ns)
 				if err != nil {
-					return utils.ErroredResponse(err)
+					return ad.ErroredResponse(err)
 				}
 
 				if tnt == nil {

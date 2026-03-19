@@ -6,7 +6,6 @@ package errors
 import (
 	"fmt"
 
-	"github.com/projectcapsule/capsule/internal/webhook/utils"
 	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
@@ -41,7 +40,7 @@ func NewStorageClassNotValid(storageClasses api.DefaultAllowedListSpec) error {
 func (s StorageClassNotValidError) Error() (err string) {
 	msg := "A valid Storage Class must be used: "
 
-	return utils.DefaultAllowedValuesErrorMessage(s.spec, msg)
+	return DefaultAllowedValuesErrorMessage(s.spec, msg)
 }
 
 type StorageClassForbiddenError struct {
@@ -59,7 +58,7 @@ func NewStorageClassForbidden(className string, storageClasses api.DefaultAllowe
 func (f StorageClassForbiddenError) Error() string {
 	msg := fmt.Sprintf("Storage Class %s is forbidden for the current Tenant ", f.className)
 
-	return utils.DefaultAllowedValuesErrorMessage(f.spec, msg)
+	return DefaultAllowedValuesErrorMessage(f.spec, msg)
 }
 
 type MissingPVTenantLabelsError struct {

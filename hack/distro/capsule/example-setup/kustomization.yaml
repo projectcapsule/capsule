@@ -3,5 +3,6 @@ kind: Kustomization
 resources:
   - owners.yaml
   - tenants.yaml
-  - resource.yaml
+  - resource-legacy.yaml
   - pools.yaml
+  - rbac.yaml

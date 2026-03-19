@@ -19,6 +19,7 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
+	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
@@ -54,7 +55,7 @@ func (h *ownerReferenceHandler) OnCreate(c client.Client, ns *corev1.Namespace, 
 		ns.SetLabels(labels)
 
 		if err := assignToTenant(c, tnt, ns, recorder); err != nil {
-			return utils.ErroredResponse(err)
+			return ad.ErroredResponse(err)
 		}
 
 		marshaled, err := json.Marshal(ns)
@@ -80,7 +81,7 @@ func (h *ownerReferenceHandler) OnUpdate(c client.Client, newNs *corev1.Namespac
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		tnt, err := resolveTenantForNamespaceUpdate(ctx, c, h.cfg, oldNs, newNs, req.UserInfo)
 		if err != nil {
-			return utils.ErroredResponse(err)
+			return ad.ErroredResponse(err)
 		}
 
 		if tnt == nil {
@@ -88,7 +89,7 @@ func (h *ownerReferenceHandler) OnUpdate(c client.Client, newNs *corev1.Namespac
 		}
 
 		if err := assignToTenant(c, tnt, oldNs, recorder); err != nil {
-			return utils.ErroredResponse(err)
+			return ad.ErroredResponse(err)
 		}
 
 		var refs []metav1.OwnerReference
@@ -165,7 +166,9 @@ func assignToTenant(
 		return nil
 	}
 
-	if err := controllerutil.SetOwnerReference(tnt, ns, c.Scheme()); err != nil {
+	controllerutil.WithBlockOwnerDeletion(true)
+
+	if err := controllerutil.SetOwnerReference(tnt, ns, c.Scheme(), controllerutil.WithBlockOwnerDeletion(true)); err != nil {
 		recorder.Eventf(ns, tnt, corev1.EventTypeWarning, evt.ReasonNamespaceHijack, evt.ActionValidationDenied, "Namespace %s cannot be assigned to the desired tenant %s", ns.GetName(), tnt.GetName())
 
 		return err

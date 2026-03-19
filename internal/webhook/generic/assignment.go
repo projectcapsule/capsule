@@ -12,8 +12,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	"github.com/projectcapsule/capsule/internal/webhook/utils"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
+	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	clt "github.com/projectcapsule/capsule/pkg/runtime/client"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 	"github.com/projectcapsule/capsule/pkg/tenant"
@@ -50,12 +50,12 @@ func (r *tenantAssignmentHandler) handle(ctx context.Context, c client.Client, d
 
 	obj := &metav1.PartialObjectMetadata{}
 	if err := decoder.Decode(req, obj); err != nil {
-		return utils.ErroredResponse(err)
+		return ad.ErroredResponse(err)
 	}
 
-	tnt, err := tenant.GetTenantNameByStatusNamespace(ctx, c, req.Namespace)
+	tnt, err := tenant.GetTenantNameByNamespace(ctx, c, req.Namespace)
 	if err != nil {
-		return utils.ErroredResponse(err)
+		return ad.ErroredResponse(err)
 	}
 
 	if tnt == "" {

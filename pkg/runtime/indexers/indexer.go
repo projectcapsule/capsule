@@ -36,6 +36,7 @@ func AddToManager(ctx context.Context, log logr.Logger, mgr manager.Manager) err
 		tenantresource.GlobalProcessedItems{},
 		tenantresource.NamespacedServiceAccount{},
 		tenantresource.NamespacedProcessedItems{},
+		tenantresource.NamespacedResourceNamespace{},
 		resourcepool.NamespacesReference{Obj: &capsulev1beta2.ResourcePool{}},
 		resourcepool.PoolUIDReference{Obj: &capsulev1beta2.ResourcePoolClaim{}},
 		tenant.OwnerReference{},

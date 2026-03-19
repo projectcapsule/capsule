@@ -6,9 +6,9 @@ package users
 import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api/rbac"
 )
 
-func IsAdminUser(req admission.Request, administrators api.UserListSpec) bool {
+func IsAdminUser(req admission.Request, administrators rbac.UserListSpec) bool {
 	return administrators.IsPresent(req.UserInfo.Username, req.UserInfo.Groups)
 }

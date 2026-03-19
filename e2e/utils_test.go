@@ -25,10 +25,11 @@ import (
 	versionUtil "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/util/retry"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
+	"github.com/projectcapsule/capsule/pkg/api/rbac"
 	"github.com/projectcapsule/capsule/pkg/utils"
 )
 
@@ -59,7 +60,7 @@ func NewService(svc types.NamespacedName) *corev1.Service {
 	}
 }
 
-func ServiceCreation(svc *corev1.Service, owner api.UserSpec, timeout time.Duration) AsyncAssertion {
+func ServiceCreation(svc *corev1.Service, owner rbac.UserSpec, timeout time.Duration) AsyncAssertion {
 	cs := ownerClient(owner)
 	return Eventually(func() (err error) {
 		_, err = cs.CoreV1().Services(svc.Namespace).Create(context.TODO(), svc, metav1.CreateOptions{})
@@ -92,7 +93,7 @@ func NewNamespace(name string, labels ...map[string]string) *corev1.Namespace {
 	}
 }
 
-func NamespaceCreation(ns *corev1.Namespace, owner api.UserSpec, timeout time.Duration) AsyncAssertion {
+func NamespaceCreation(ns *corev1.Namespace, owner rbac.UserSpec, timeout time.Duration) AsyncAssertion {
 	cs := ownerClient(owner)
 	return Eventually(func() (err error) {
 		_, err = cs.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
@@ -275,16 +276,47 @@ func EventuallyCreation(f interface{}) AsyncAssertion {
 	return Eventually(f, defaultTimeoutInterval, defaultPollInterval)
 }
 
-func ModifyCapsuleConfigurationOpts(fn func(configuration *capsulev1beta2.CapsuleConfiguration)) {
-	config := &capsulev1beta2.CapsuleConfiguration{}
-	Expect(k8sClient.Get(context.Background(), types.NamespacedName{Name: defaultConfigurationName}, config)).ToNot(HaveOccurred())
+func EventuallyDeletion(obj client.Object) {
+	key := client.ObjectKeyFromObject(obj)
 
-	fn(config)
+	Eventually(func() error {
+		// Retry delete until the object is really gone.
+		err := k8sClient.Delete(context.TODO(), obj)
+		if err != nil && !apierrors.IsNotFound(err) {
+			return err
+		}
 
-	Expect(k8sClient.Update(context.Background(), config)).ToNot(HaveOccurred())
+		// Read into a fresh copy to avoid stale in-memory state.
+		current := obj.DeepCopyObject().(client.Object)
+		err = k8sClient.Get(context.TODO(), key, current)
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+
+		return fmt.Errorf("%T %q still exists", obj, obj.GetName())
+	}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 }
 
-func CheckForOwnerRoleBindings(ns *corev1.Namespace, owner api.OwnerSpec, roles map[string]bool) func() error {
+func ModifyCapsuleConfigurationOpts(fn func(configuration *capsulev1beta2.CapsuleConfiguration)) {
+	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		config := &capsulev1beta2.CapsuleConfiguration{}
+
+		if err := k8sClient.Get(context.Background(), types.NamespacedName{Name: defaultConfigurationName}, config); err != nil {
+			return err
+		}
+
+		fn(config)
+
+		return k8sClient.Update(context.Background(), config)
+	})
+
+	Expect(err).ToNot(HaveOccurred())
+}
+
+func CheckForOwnerRoleBindings(ns *corev1.Namespace, owner rbac.OwnerSpec, roles map[string]bool) func() error {
 	if roles == nil {
 		roles = map[string]bool{
 			"admin":                     false,
@@ -301,7 +333,7 @@ func CheckForOwnerRoleBindings(ns *corev1.Namespace, owner api.OwnerSpec, roles 
 
 		var ownerName string
 
-		if owner.Kind == api.ServiceAccountOwner {
+		if owner.Kind == rbac.ServiceAccountOwner {
 			parts := strings.Split(owner.Name, ":")
 
 			ownerName = parts[3]
@@ -373,13 +405,13 @@ func VerifyTenantRoleBindings(
 	}).WithTimeout(30 * time.Second).WithPolling(500 * time.Millisecond).Should(Succeed())
 }
 
-func normalizeOwners(in api.OwnerStatusListSpec) api.OwnerStatusListSpec {
+func normalizeOwners(in rbac.OwnerStatusListSpec) rbac.OwnerStatusListSpec {
 	// copy to avoid mutating the original
-	out := make(api.OwnerStatusListSpec, len(in))
+	out := make(rbac.OwnerStatusListSpec, len(in))
 	copy(out, in)
 
 	// sort outer slice by kind+name
-	sort.Sort(api.GetByKindAndName(out))
+	sort.Sort(rbac.GetByKindAndName(out))
 
 	// sort roles inside each owner so role order doesn't matter
 	for i := range out {
@@ -387,6 +419,67 @@ func normalizeOwners(in api.OwnerStatusListSpec) api.OwnerStatusListSpec {
 	}
 
 	return out
+}
+
+func EnsureServiceAccount(ctx context.Context, c client.Client, name string, namespace string) {
+	sa := &corev1.ServiceAccount{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+	}
+
+	err := c.Create(ctx, sa)
+	if err != nil && !apierrors.IsAlreadyExists(err) {
+		Expect(err).ToNot(HaveOccurred())
+	}
+}
+
+func EnsureRoleAndBindingForNamespaces(ctx context.Context, c client.Client, saName string, saNamespace string, namespaces []string) {
+	for _, ns := range namespaces {
+		role := &rbacv1.Role{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      saName + "-" + saNamespace,
+				Namespace: ns,
+			},
+			Rules: []rbacv1.PolicyRule{
+				{
+					APIGroups: []string{""},
+					Resources: []string{"secrets"},
+					Verbs:     []string{"get", "list", "watch", "create", "update", "patch", "delete"},
+				},
+			},
+		}
+
+		err := c.Create(ctx, role)
+		if err != nil && !apierrors.IsAlreadyExists(err) {
+			Expect(err).ToNot(HaveOccurred())
+		}
+
+		rb := &rbacv1.RoleBinding{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      saName + "-" + saNamespace,
+				Namespace: ns,
+			},
+			Subjects: []rbacv1.Subject{
+				{
+					Kind:      "ServiceAccount",
+					Name:      saName,
+					Namespace: saNamespace,
+				},
+			},
+			RoleRef: rbacv1.RoleRef{
+				APIGroup: "rbac.authorization.k8s.io",
+				Kind:     "Role",
+				Name:     saName + "-" + saNamespace,
+			},
+		}
+
+		err = c.Create(ctx, rb)
+		if err != nil && !apierrors.IsAlreadyExists(err) {
+			Expect(err).ToNot(HaveOccurred())
+		}
+	}
 }
 
 func GetKubernetesVersion() *versionUtil.Version {
@@ -463,7 +556,7 @@ func GrantEphemeralContainersUpdate(ns string, username string) (cleanup func())
 
 	// Give RBAC a moment to propagate in the apiserver authorizer cache
 	Eventually(func() error {
-		cs := ownerClient(api.UserSpec{Name: username, Kind: "User"})
+		cs := ownerClient(rbac.UserSpec{Name: username, Kind: "User"})
 		_, err := cs.CoreV1().Pods(ns).List(context.Background(), metav1.ListOptions{Limit: 1})
 		return err
 	}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())

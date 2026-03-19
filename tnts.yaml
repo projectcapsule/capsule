@@ -1,22 +1,4 @@
 ---
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: argocd-rbac-cm
-  namespace: argocd
-  labels:
-    app.kubernetes.io/name: argocd-rbac-cm
-    app.kubernetes.io/part-of: argocd
-data:
-  policy.csv: |
-    p, my-org:team-alpha, applications, sync, my-project/*, allow
-    g, my-org:team-beta, role:admin
-    g, user@example.org, role:admin
-    g, admin, role:admin
-    g, role:admin, role:readonly
-  policy.default: role:readonly
-  scopes: '[groups, email]'
----
 apiVersion: capsule.clastix.io/v1beta2
 kind: GlobalTenantResource
 metadata:
@@ -26,16 +8,14 @@ spec:
   settings:
     adopt: true
   resources:
-    - templates:
+    - generators:
         - template: |
             ---
             apiVersion: v1
             kind: ConfigMap
             metadata:
-              name: argocd-rbac-cm
-              namespace: argocd
+              name: {{$.tenant.metadata.name}}-show-context
+              namespace: capsule-system
             data:
-              {{ .Tenant.ObjectMeta.Name }}.csv: |
-              {{ range .Tenant.Status.Owners }}
-                p, {{ .Name }}, applications, sync, my-project/*, allow
-              {{- end }}
+              context.yaml: |
+                {{- toYAML $.tenant.rbac | nindent 4 }}      

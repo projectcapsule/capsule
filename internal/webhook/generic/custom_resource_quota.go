@@ -16,8 +16,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	"github.com/projectcapsule/capsule/internal/webhook/utils"
 	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
+	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 	"github.com/projectcapsule/capsule/pkg/tenant"
@@ -39,7 +39,7 @@ func (r *resourceCounterHandler) OnCreate(clt client.Client, _ admission.Decoder
 
 		var err error
 		if tntName, err = r.getTenantName(ctx, clt, req); err != nil {
-			return utils.ErroredResponse(err)
+			return ad.ErroredResponse(err)
 		}
 
 		if len(tntName) == 0 {
@@ -79,7 +79,7 @@ func (r *resourceCounterHandler) OnCreate(clt client.Client, _ admission.Decoder
 				recorder.Eventf(tnt, nil, corev1.EventTypeWarning, evt.ReasonOverprovision, evt.ActionValidationDenied, "Resource %s/%s in API group %s cannot be created, limit usage of %d has been reached", req.Namespace, req.Name, kgv, limit)
 			}
 
-			return utils.ErroredResponse(err)
+			return ad.ErroredResponse(err)
 		}
 
 		return nil
@@ -92,7 +92,7 @@ func (r *resourceCounterHandler) OnDelete(clt client.Client, _ admission.Decoder
 
 		var err error
 		if tntName, err = r.getTenantName(ctx, clt, req); err != nil {
-			return utils.ErroredResponse(err)
+			return ad.ErroredResponse(err)
 		}
 
 		if len(tntName) == 0 {
@@ -122,7 +122,7 @@ func (r *resourceCounterHandler) OnDelete(clt client.Client, _ admission.Decoder
 			return clt.Update(ctx, tnt)
 		})
 		if err != nil {
-			return utils.ErroredResponse(err)
+			return ad.ErroredResponse(err)
 		}
 
 		return nil

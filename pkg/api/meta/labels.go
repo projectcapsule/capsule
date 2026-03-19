@@ -6,6 +6,7 @@ package meta
 import (
 	"strings"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -22,7 +23,8 @@ const (
 
 	FreezeLabel = "projectcapsule.dev/freeze"
 
-	OwnerPromotionLabel = "owner.projectcapsule.dev/promote"
+	OwnerPromotionLabel          = "owner.projectcapsule.dev/promote"
+	ServiceAccountPromotionLabel = "projectcapsule.dev/promote"
 
 	CordonedLabel = "projectcapsule.dev/cordoned"
 
@@ -110,4 +112,22 @@ func LabelsChanged(keys []string, oldLabels, newLabels map[string]string) bool {
 	}
 
 	return false
+}
+
+// Collect all mentioned keys from a LabelSelector
+func LabelSelectorKeys(sel *metav1.LabelSelector) map[string]struct{} {
+	out := map[string]struct{}{}
+	if sel == nil {
+		return out
+	}
+
+	for k := range sel.MatchLabels {
+		out[k] = struct{}{}
+	}
+	for _, expr := range sel.MatchExpressions {
+		if expr.Key != "" {
+			out[expr.Key] = struct{}{}
+		}
+	}
+	return out
 }

@@ -9,14 +9,15 @@ import (
 
 	"github.com/go-logr/logr"
 
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	clt "github.com/projectcapsule/capsule/pkg/runtime/client"
 )
@@ -25,7 +26,7 @@ func (p *Processor) Reconcile(
 	ctx context.Context,
 	log logr.Logger,
 	c client.Client,
-	processed *capsulev1beta2.ProcessedItems,
+	processed *meta.ProcessedItems,
 	acc Accumulator,
 	opts ProcessorOptions,
 ) (err error) {
@@ -33,7 +34,7 @@ func (p *Processor) Reconcile(
 
 	log.V(5).Info("starting pruning items", "present", len(*processed))
 
-	failAndContinue := func(i capsulev1beta2.ObjectReferenceStatus, msg string, err error) bool { // replace ItemType
+	failAndContinue := func(i meta.ObjectReferenceStatus, msg string, err error) bool { // replace ItemType
 		if err == nil {
 			return false
 		}
@@ -46,45 +47,37 @@ func (p *Processor) Reconcile(
 		return true
 	}
 
-	// Prune first, to work on a consistent Status
-	var reconErr error
-
 	for _, i := range *processed {
 		if _, exists := acc[i.GetKey("")]; !exists {
 			obj := &unstructured.Unstructured{}
 			obj.SetGroupVersionKind(i.GetGVK())
-			obj.SetNamespace(i.GetNamespace())
 			obj.SetName(i.GetName())
 
-			if opts.Prune {
-				if !i.LastApply.IsZero() {
+			ns := i.GetNamespace()
+			if ns != "" {
+				obj.SetNamespace(ns)
+			}
+
+			if !i.LastApply.IsZero() {
+				if opts.Prune {
 					log.V(4).Info("pruning resources", "Kind", i.Kind, "Name", i.Name, "Namespace", i.Namespace)
 
 					fieldOwner := opts.FieldOwnerPrefix + "/" + i.FieldOwner("")
 
-					_, reconErr = p.Prune(ctx, c, obj, fieldOwner)
+					deleted, reconErr := p.Prune(ctx, c, obj, fieldOwner, &i)
 					if failAndContinue(i, "pruning failed for item: ", reconErr) {
 						continue
 					}
-				}
-			}
 
-			// Disown item (only when GET succeeded)
-			patches, err := p.handleRemoveManagedMetadata(ctx, c, obj, opts.Owner)
-			if err != nil {
-				if apierrors.IsNotFound(err) {
-					processed.RemoveItem(i)
+					if deleted {
+						processed.RemoveItem(i)
 
-					continue
+						continue
+					}
 				}
 
-				if failAndContinue(i, "disowning failed for item: ", err) {
-					continue
-				}
-			}
-
-			if len(patches) > 0 {
-				err = clt.ApplyPatches(ctx, c, obj, patches, meta.ResourceControllerFieldOwnerPrefix())
+				// Disown item (only when GET succeeded)
+				patches, err := p.handleRemoveManagedMetadata(ctx, c, obj, opts.Owner)
 				if err != nil {
 					if apierrors.IsNotFound(err) {
 						processed.RemoveItem(i)
@@ -92,8 +85,23 @@ func (p *Processor) Reconcile(
 						continue
 					}
 
-					if failAndContinue(i, "removing metdata failed for item: ", err) {
+					if failAndContinue(i, "disowning failed for item: ", err) {
 						continue
+					}
+				}
+
+				if len(patches) > 0 {
+					err = clt.ApplyPatches(ctx, c, obj, patches, meta.ResourceControllerFieldOwnerPrefix())
+					if err != nil {
+						if apierrors.IsNotFound(err) {
+							processed.RemoveItem(i)
+
+							continue
+						}
+
+						if failAndContinue(i, "removing metdata failed for item: ", err) {
+							continue
+						}
 					}
 				}
 			}
@@ -109,9 +117,9 @@ func (p *Processor) Reconcile(
 	log.V(5).Info("accumulation after pruning", "items", len(acc))
 
 	for _, item := range acc {
-		or := capsulev1beta2.ObjectReferenceStatus{
+		or := meta.ObjectReferenceStatus{
 			ResourceID: item.Resource,
-			ObjectReferenceStatusCondition: capsulev1beta2.ObjectReferenceStatusCondition{
+			ObjectReferenceStatusCondition: meta.ObjectReferenceStatusCondition{
 				Type: meta.ReadyCondition,
 			},
 		}
@@ -129,6 +137,7 @@ func (p *Processor) Reconcile(
 				opts.Force,
 				opts.Adopt,
 				opts.Owner,
+				processed.GetItem(item.Resource),
 			)
 
 			or.Created = created
@@ -161,6 +170,8 @@ func (p *Processor) Reconcile(
 		return fmt.Errorf("applying of %d resources failed", itemErrors)
 	}
 
+	// Running Healthchecks
+
 	log.V(4).Info("processing completed")
 
 	return nil
@@ -173,11 +184,25 @@ func (r *Processor) Prune(
 	c client.Client,
 	obj *unstructured.Unstructured,
 	fieldOwner string,
+	current *meta.ObjectReferenceStatus,
 ) (deleted bool, err error) {
 	actual := &unstructured.Unstructured{}
 	actual.SetGroupVersionKind(obj.GroupVersionKind())
-	actual.SetNamespace(obj.GetNamespace())
 	actual.SetName(obj.GetName())
+
+	namespace := obj.GetNamespace()
+	if namespace != "" {
+		actual.SetNamespace(namespace)
+
+		ns := &corev1.Namespace{}
+		if err := r.GatherClient.Get(ctx, types.NamespacedName{Name: namespace}, ns); err != nil {
+			if apierrors.IsNotFound(err) {
+				return true, nil
+			}
+
+			return false, err
+		}
+	}
 
 	err = c.Get(ctx, client.ObjectKeyFromObject(actual), actual)
 	if err != nil {
@@ -193,13 +218,19 @@ func (r *Processor) Prune(
 		c,
 		actual,
 		fieldOwner,
+		current,
 	)
 	if err != nil {
 		return deletable, err
 	}
 
 	if deletable {
-		return deletable, nil
+		err = c.Delete(ctx, actual)
+		if apierrors.IsNotFound(err) {
+			return deletable, nil
+		}
+
+		return deletable, err
 	}
 
 	err = clt.PatchApply(ctx, c, obj, fieldOwner, false)
@@ -216,7 +247,14 @@ func (r *Processor) handlePruneDeletion(
 	c client.Client,
 	actual *unstructured.Unstructured,
 	fieldOwner string,
+	current *meta.ObjectReferenceStatus,
 ) (deletable bool, err error) {
+	if current != nil {
+		if current.Created {
+			deletable = true
+		}
+	}
+
 	labels := actual.GetLabels()
 	if _, ok := labels[meta.CreatedByCapsuleLabel]; !ok {
 		return false, nil
@@ -227,15 +265,6 @@ func (r *Processor) handlePruneDeletion(
 			fieldOwner,
 			meta.ResourceControllerFieldOwnerPrefix(),
 		})
-
-	if !deletable {
-		return
-	}
-
-	err = c.Delete(ctx, actual)
-	if apierrors.IsNotFound(err) {
-		return deletable, nil
-	}
 
 	return deletable, err
 }
@@ -283,23 +312,36 @@ func (r *Processor) Apply(
 	force bool,
 	adopt bool,
 	ownerreference *metav1.OwnerReference,
+	current *meta.ObjectReferenceStatus,
 ) (lastApply *metav1.Time, created bool, err error) {
 	log := log.FromContext(ctx)
 
 	actual := &unstructured.Unstructured{}
 	actual.SetGroupVersionKind(obj.GroupVersionKind())
-	actual.SetNamespace(obj.GetNamespace())
 	actual.SetName(obj.GetName())
+
+	ns := obj.GetNamespace()
+	if ns != "" {
+		actual.SetNamespace(ns)
+	}
+
 	key := client.ObjectKeyFromObject(actual)
 
 	// We need to mark an item if we create it with our patch to make proper Garbage Collection
 	// If it does not yet exist mark it
-	patches, created, err := r.handleCreatedMetadata(ctx, c, obj, ownerreference, adopt)
+	patches, created, err := r.handleCreatedMetadata(ctx, c, obj, ownerreference, adopt, current)
 	if err != nil {
 		return nil, created, fmt.Errorf("evaluating managed metadata: %w", err)
 	}
 
-	if err := clt.PatchApply(ctx, c, obj, fieldOwner, force); err != nil {
+	err = retry.OnError(
+		retry.DefaultBackoff,
+		apierrors.IsConflict,
+		func() error {
+			return clt.PatchApply(ctx, c, obj, fieldOwner, force)
+		},
+	)
+	if err != nil {
 		return nil, created, fmt.Errorf("applying object failed: %w", err)
 	}
 
@@ -331,6 +373,7 @@ func (r *Processor) handleCreatedMetadata(
 	obj *unstructured.Unstructured,
 	ownerreference *metav1.OwnerReference,
 	allowAdoption bool,
+	current *meta.ObjectReferenceStatus,
 ) (patches []clt.JSONPatch, created bool, err error) {
 	created = false
 
@@ -344,6 +387,12 @@ func (r *Processor) handleCreatedMetadata(
 	case err != nil:
 		return nil, created, err
 	default:
+		if current != nil {
+			if current.Created {
+				created = true
+			}
+		}
+
 		labels := existingObject.GetLabels()
 
 		if v, ok := labels[meta.CreatedByCapsuleLabel]; ok && v == meta.ValueControllerResources {

@@ -24,7 +24,7 @@ type NamespaceSelector struct {
 // GetMatchingNamespaces retrieves the list of namespaces that match the NamespaceSelector.
 func (s *NamespaceSelector) GetMatchingNamespaces(
 	ctx context.Context,
-	c client.Client,
+	c client.Reader,
 ) ([]corev1.Namespace, error) {
 	if s.LabelSelector == nil {
 		return nil, nil // No namespace selector means all namespaces
@@ -64,7 +64,7 @@ type SelectorWithNamespaceSelector struct {
 
 func (s *SelectorWithNamespaceSelector) MatchObjects(
 	ctx context.Context,
-	c client.Client,
+	c client.Reader,
 	objects []metav1.Object,
 ) ([]metav1.Object, error) {
 	if s == nil {

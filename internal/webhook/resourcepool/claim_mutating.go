@@ -15,8 +15,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	"github.com/projectcapsule/capsule/internal/webhook/utils"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
+	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
 
@@ -58,7 +58,7 @@ func (h *claimMutationHandler) handle(
 	claim := &capsulev1beta2.ResourcePoolClaim{}
 
 	if err := decoder.Decode(req, claim); err != nil {
-		return utils.ErroredResponse(fmt.Errorf("failed to decode new object: %w", err))
+		return ad.ErroredResponse(fmt.Errorf("failed to decode new object: %w", err))
 	}
 
 	annoHandler(claim)

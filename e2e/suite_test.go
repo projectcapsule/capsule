@@ -24,8 +24,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	"github.com/projectcapsule/capsule/pkg/api"
-	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
+	"github.com/projectcapsule/capsule/pkg/api/rbac"
 )
 
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to
@@ -66,11 +65,6 @@ var _ = BeforeSuite(func() {
 	Expect(ctrlClient).ToNot(BeNil())
 
 	k8sClient = &e2eClient{Client: ctrlClient}
-
-	ModifyCapsuleConfigurationOpts(func(cfg *capsulev1beta2.CapsuleConfiguration) {
-		cfg.Spec = configuration.DefaultCapsuleConfiguration()
-	})
-
 })
 
 var _ = AfterSuite(func() {
@@ -109,7 +103,7 @@ var _ = AfterSuite(func() {
 	Expect(testEnv.Stop()).ToNot(HaveOccurred())
 })
 
-func ownerClient(owner api.UserSpec) (cs kubernetes.Interface) {
+func ownerClient(owner rbac.UserSpec) (cs kubernetes.Interface) {
 	c, err := config.GetConfig()
 	Expect(err).ToNot(HaveOccurred())
 	c.Impersonate.Groups = []string{"projectcapsule.dev", owner.Name}

@@ -10,26 +10,29 @@ import (
 
 const (
 	// ReadyCondition indicates the resource is ready and fully reconciled.
-	ReadyCondition    string = "Ready"
-	CordonedCondition string = "Cordoned"
-	NotReadyCondition string = "NotReady"
+	ReadyCondition       string = "Ready"
+	CordonedCondition    string = "Cordoned"
+	TerminatingCondition string = "Terminating"
+	NotReadyCondition    string = "NotReady"
 
 	AssignedCondition  string = "Assigned"
 	BoundCondition     string = "Bound"
 	ExhaustedCondition string = "Exhausted"
 
 	// FailedReason indicates a condition or event observed a failure (Claim Rejected).
-	SucceededReason          string = "Succeeded"
-	FailedReason             string = "Failed"
-	ActiveReason             string = "Active"
-	CordonedReason           string = "Cordoned"
-	ReconcilingReason        string = "Reconciling"
-	PoolExhaustedReason      string = "PoolExhausted"
-	QueueExhaustedReason     string = "QueueExhausted"
-	NamespaceExhaustedReason string = "NamespaceExhausted"
-	NoExhaustionsReason      string = "NoExhaustions"
-	InUseReason              string = "InUse"
-	UnusedReason             string = "Unused"
+	SucceededReason               string = "Succeeded"
+	FailedReason                  string = "Failed"
+	ActiveReason                  string = "Active"
+	CordonedReason                string = "Cordoned"
+	TerminatingReason             string = "Terminating"
+	ReconcilingReason             string = "Reconciling"
+	PoolExhaustedReason           string = "PoolExhausted"
+	QueueExhaustedReason          string = "QueueExhausted"
+	NamespaceExhaustedReason      string = "NamespaceExhausted"
+	NoExhaustionsReason           string = "NoExhaustions"
+	InUseReason                   string = "InUse"
+	UnusedReason                  string = "Unused"
+	PendingUnmanagedContentReason string = "PendingUnmanagedContent"
 )
 
 // +kubebuilder:object:generate=true
@@ -147,6 +150,16 @@ func NewReadyConditionReconcilingReason(obj client.Object) Condition {
 		Status:             metav1.ConditionUnknown,
 		Reason:             ReconcilingReason,
 		Message:            "processing",
+		LastTransitionTime: metav1.Now(),
+	}
+}
+
+func NewTerminatingConditionReason(obj client.Object) Condition {
+	return Condition{
+		Type:               TerminatingCondition,
+		Status:             metav1.ConditionTrue,
+		Reason:             SucceededReason,
+		Message:            "cleaning up",
 		LastTransitionTime: metav1.Now(),
 	}
 }

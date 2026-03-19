@@ -15,9 +15,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	"github.com/projectcapsule/capsule/internal/webhook/utils"
 	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
+	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
@@ -50,7 +50,7 @@ func (h pv) OnCreate(
 
 		caperrors.RecordTypedErrorEvent(recorder, pvc, related, err)
 
-		return utils.ErroredResponse(err)
+		return ad.ErroredResponse(err)
 	}
 }
 

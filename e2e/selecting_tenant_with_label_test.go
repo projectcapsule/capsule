@@ -6,8 +6,8 @@ package e2e
 import (
 	"context"
 
-	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
+	"github.com/projectcapsule/capsule/pkg/api/rbac"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -24,10 +24,10 @@ var _ = Describe("creating a Namespace with Tenant selector when user owns multi
 			Name: "tenant-one",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: api.OwnerListSpec{
+			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: api.CoreOwnerSpec{
-						UserSpec: api.UserSpec{
+					CoreOwnerSpec: rbac.CoreOwnerSpec{
+						UserSpec: rbac.UserSpec{
 							Name: "john",
 							Kind: "User",
 						},
@@ -41,10 +41,10 @@ var _ = Describe("creating a Namespace with Tenant selector when user owns multi
 			Name: "tenant-two",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: api.OwnerListSpec{
+			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: api.CoreOwnerSpec{
-						UserSpec: api.UserSpec{
+					CoreOwnerSpec: rbac.CoreOwnerSpec{
+						UserSpec: rbac.UserSpec{
 							Name: "john",
 							Kind: "User",
 						},
@@ -65,8 +65,8 @@ var _ = Describe("creating a Namespace with Tenant selector when user owns multi
 		}).Should(Succeed())
 	})
 	JustAfterEach(func() {
-		Expect(k8sClient.Delete(context.TODO(), t1)).Should(Succeed())
-		Expect(k8sClient.Delete(context.TODO(), t2)).Should(Succeed())
+		EventuallyDeletion(t1)
+		EventuallyDeletion(t2)
 	})
 
 	It("should be assigned to the selected Tenant", func() {

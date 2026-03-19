@@ -12,12 +12,15 @@ import (
 	flag "github.com/spf13/pflag"
 	_ "go.uber.org/automaxprocs"
 	"go.uber.org/zap/zapcore"
+	admissionv1 "k8s.io/api/admissionregistration/v1"
 	corev1 "k8s.io/api/core/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	utilVersion "k8s.io/apimachinery/pkg/util/version"
+	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/dynamic"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	"k8s.io/client-go/rest"
@@ -33,13 +36,13 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/internal/cache"
 	"github.com/projectcapsule/capsule/internal/controllers/admission"
-	configcontroller "github.com/projectcapsule/capsule/internal/controllers/cfg"
+	cachecontroller "github.com/projectcapsule/capsule/internal/controllers/cfg/caches"
+	configcontroller "github.com/projectcapsule/capsule/internal/controllers/cfg/status"
 	podlabelscontroller "github.com/projectcapsule/capsule/internal/controllers/pod"
 	"github.com/projectcapsule/capsule/internal/controllers/pv"
 	rbaccontroller "github.com/projectcapsule/capsule/internal/controllers/rbac"
 	"github.com/projectcapsule/capsule/internal/controllers/resourcepools"
 	"github.com/projectcapsule/capsule/internal/controllers/resources"
-	serviceaccountcontroller "github.com/projectcapsule/capsule/internal/controllers/serviceaccounts"
 	servicelabelscontroller "github.com/projectcapsule/capsule/internal/controllers/servicelabels"
 	tenantcontroller "github.com/projectcapsule/capsule/internal/controllers/tenant"
 	tlscontroller "github.com/projectcapsule/capsule/internal/controllers/tls"
@@ -63,10 +66,10 @@ import (
 	"github.com/projectcapsule/capsule/internal/webhook/serviceaccounts"
 	tenantmutation "github.com/projectcapsule/capsule/internal/webhook/tenant/mutation"
 	tenantvalidation "github.com/projectcapsule/capsule/internal/webhook/tenant/validation"
-	"github.com/projectcapsule/capsule/internal/webhook/utils"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 	"github.com/projectcapsule/capsule/pkg/runtime/indexers"
+	"github.com/projectcapsule/capsule/pkg/utils"
 )
 
 var (
@@ -81,6 +84,8 @@ func init() {
 	utilruntime.Must(capsulev1beta2.AddToScheme(scheme))
 	utilruntime.Must(apiextensionsv1.AddToScheme(scheme))
 	utilruntime.Must(gatewayv1.Install(scheme))
+	utilruntime.Must(admissionv1.AddToScheme(scheme))
+
 }
 
 func printVersion() {
@@ -170,6 +175,8 @@ func main() {
 		ctrlOpts.PprofBindAddress = ":8082"
 	}
 
+	setupLog.Info("initializing manager")
+
 	manager, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrlOpts)
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
@@ -180,6 +187,20 @@ func main() {
 	_ = manager.AddHealthzCheck("ping", healthz.Ping)
 
 	ctx := ctrl.SetupSignalHandler()
+
+	dc, err := discovery.NewDiscoveryClientForConfig(manager.GetConfig())
+	if err != nil {
+		setupLog.Error(err, "unable to create discovery client")
+		os.Exit(1)
+	}
+
+	dynamicClient, err := dynamic.NewForConfig(manager.GetConfig())
+	if err != nil {
+		setupLog.Error(err, "unable to create dynamic client")
+		os.Exit(1)
+	}
+
+	setupLog.Info("initializing capsule configuration")
 
 	cfg := configuration.NewCapsuleConfiguration(ctx, manager.GetClient(), manager.GetConfig(), controllerConfig.ConfigurationName)
 
@@ -220,17 +241,21 @@ func main() {
 		}
 	}
 
+	setupLog.Info("initializing caches")
+
 	// Initialize Caches
 	impersonationCache := cache.NewImpersonationCache()
 	registryCache := cache.NewRegistryRuleSetCache()
 
 	if err = (&tenantcontroller.Manager{
-		RESTConfig:    manager.GetConfig(),
-		Client:        manager.GetClient(),
-		Metrics:       metrics.MustMakeTenantRecorder(),
-		Log:           ctrl.Log.WithName("capsule.ctrl").WithName("tenant"),
-		Recorder:      manager.GetEventRecorder("tenant-controller"),
-		Configuration: cfg,
+		RESTConfig:      manager.GetConfig(),
+		Client:          manager.GetClient(),
+		DynamicClient:   dynamicClient,
+		DiscoveryClient: dc,
+		Metrics:         metrics.MustMakeTenantRecorder(),
+		Log:             ctrl.Log.WithName("capsule.ctrl").WithName("tenant"),
+		Recorder:        manager.GetEventRecorder("tenant-controller"),
+		Configuration:   cfg,
 	}).SetupWithManager(manager, controllerConfig); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Tenant")
 		os.Exit(1)
@@ -241,6 +266,8 @@ func main() {
 		os.Exit(1)
 	}
 
+	setupLog.Info("registering indexers")
+
 	if err = indexers.AddToManager(ctx, setupLog, manager); err != nil {
 		setupLog.Error(err, "unable to setup indexers")
 		os.Exit(1)
@@ -248,10 +275,12 @@ func main() {
 
 	var kubeVersion *utilVersion.Version
 
-	if kubeVersion, err = utils.GetK8sVersion(); err != nil {
+	if kubeVersion, err = utils.GetK8sVersionFromConfig(dc); err != nil {
 		setupLog.Error(err, "unable to get kubernetes version")
 		os.Exit(1)
 	}
+
+	setupLog.Info("registering webhooks")
 
 	// webhooks: the order matters, don't change it and just append
 	webhooksList := append(
@@ -283,7 +312,8 @@ func main() {
 		route.Cordoning(handlers.InCapsuleGroups(cfg, generic.CordoningHandler(cfg))),
 		route.ServiceAccounts(
 			serviceaccounts.Handler(
-				serviceaccounts.Validating(cfg),
+				serviceaccounts.Promotion(cfg),
+				serviceaccounts.OwnerPromotion(cfg),
 			),
 		),
 		route.GenericCustomResources(generic.ResourceCounterHandler(manager.GetClient())),
@@ -308,6 +338,7 @@ func main() {
 				tenantvalidation.ProtectedHandler(),
 				tenantvalidation.RequiredMetadataHandler(),
 				tenantvalidation.WarningHandler(cfg),
+				tenantvalidation.RemainingNamespaceHandler(),
 			),
 		),
 		route.NamespaceValidation(
@@ -397,20 +428,22 @@ func main() {
 	}
 
 	if err = (&configcontroller.Manager{
-		Rest:          manager.GetConfig(),
-		Client:        manager.GetClient(),
-		RegistryCache: registryCache,
-		Log:           ctrl.Log.WithName("capsule.ctrl").WithName("configuration"),
+		Rest:   manager.GetConfig(),
+		Client: manager.GetClient(),
+		Log:    ctrl.Log.WithName("capsule.ctrl").WithName("configuration"),
 	}).SetupWithManager(manager, controllerConfig); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "CapsuleConfiguration")
 		os.Exit(1)
 	}
 
-	if err = (&serviceaccountcontroller.Manager{
-		Log:           ctrl.Log.WithName("chache").WithName("clients"),
-		Client:        manager.GetClient(),
-		Configuration: cfg,
-		Cache:         impersonationCache,
+	setupLog.Info("initializing", "controller", "serviceaccounts")
+
+	if err = (&cachecontroller.Manager{
+		Log:                ctrl.Log.WithName("chache").WithName("clients"),
+		Client:             manager.GetClient(),
+		Configuration:      cfg,
+		ImpersonationCache: impersonationCache,
+		RegistryCache:      registryCache,
 	}).SetupWithManager(manager, controllerConfig); err != nil {
 		setupLog.Error(err, "unable to create controller", "cache", "ServiceAccounts")
 		os.Exit(1)
@@ -432,7 +465,7 @@ func main() {
 		manager,
 		manager.GetEventRecorder("admission-ctrl"),
 		controllerConfig,
-		cfg,
+		directCfg,
 	); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "admission")
 		os.Exit(1)

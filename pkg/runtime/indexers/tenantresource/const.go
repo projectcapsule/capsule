@@ -6,4 +6,5 @@ package tenantresource
 const (
 	ServiceAccountIndexerFieldName string = "spec.serviceaccount"
 	ProcessedIndexerFieldName      string = "status.items"
+	NamespaceIndexerFieldName      string = "metadata.namespace"
 )

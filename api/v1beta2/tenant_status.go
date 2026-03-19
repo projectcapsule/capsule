@@ -8,6 +8,7 @@ import (
 
 	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
+	"github.com/projectcapsule/capsule/pkg/api/rbac"
 )
 
 // +kubebuilder:validation:Enum=Cordoned;Active
@@ -24,7 +25,9 @@ type TenantStatus struct {
 	TenantAvailableStatus `json:",inline"`
 
 	// Collected owners for this tenant
-	Owners api.OwnerStatusListSpec `json:"owners,omitempty"`
+	Owners rbac.OwnerStatusListSpec `json:"owners,omitempty"`
+	// Promoted ServiceAccounts across the Tenant
+	Promotions rbac.OwnerStatusListSpec `json:"promotions,omitempty"`
 	// +kubebuilder:default=Active
 	// The operational state of the Tenant. Possible values are "Active", "Cordoned".
 	State tenantState `json:"state"`

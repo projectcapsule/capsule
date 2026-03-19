@@ -7,8 +7,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
+	"github.com/projectcapsule/capsule/pkg/api/rbac"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -25,10 +25,10 @@ var _ = Describe("cordoning a Tenant", Label("tenant"), func() {
 			Name: "tenant-cordoning",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: api.OwnerListSpec{
+			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: api.CoreOwnerSpec{
-						UserSpec: api.UserSpec{
+					CoreOwnerSpec: rbac.CoreOwnerSpec{
+						UserSpec: rbac.UserSpec{
 							Name: "jim",
 							Kind: "User",
 						},
@@ -45,7 +45,7 @@ var _ = Describe("cordoning a Tenant", Label("tenant"), func() {
 	})
 
 	JustAfterEach(func() {
-		Expect(k8sClient.Delete(context.TODO(), tnt)).Should(Succeed())
+		EventuallyDeletion(tnt)
 	})
 	It("should block or allow operations", func() {
 		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)

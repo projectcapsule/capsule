@@ -18,13 +18,11 @@ type TenantResourceIDWithOrigin struct {
 	TenantResourceID `json:",inline"`
 
 	Origin string `json:"origin,omitempty"`
-
-	Generated bool `json:"source,omitempty"`
 }
 
 // ResourceID represents the decomposed parts of a Kubernetes resource identity.
 type ResourceID struct {
-	TenantResourceID `json:",inline"`
+	TenantResourceIDWithOrigin `json:",inline"`
 
 	Group     string `json:"group,omitempty"`
 	Version   string `json:"version,omitempty"`
@@ -44,8 +42,11 @@ func NewResourceID(u *unstructured.Unstructured, tenant string, origin string) R
 		Kind:      gvk.Kind,
 		Name:      u.GetName(),
 		Namespace: u.GetNamespace(),
-		TenantResourceID: TenantResourceID{
-			Tenant: tenant,
+		TenantResourceIDWithOrigin: TenantResourceIDWithOrigin{
+			TenantResourceID: TenantResourceID{
+				Tenant: tenant,
+			},
+			Origin: origin,
 		},
 	}
 }
@@ -85,13 +86,14 @@ func (r ResourceID) GetKey(sep string) string {
 	if sep == "" {
 		sep = "\x1f"
 	}
-	return fmt.Sprintf("%s%s%s%s%s%s%s%s%s%s%s%s",
+	return fmt.Sprintf("%s%s%s%s%s%s%s%s%s%s%s%s%s%s",
 		r.Group, sep,
 		r.Version, sep,
 		r.Kind, sep,
 		r.Namespace, sep,
 		r.Name, sep,
 		r.Tenant, sep,
+		r.Origin, sep,
 	)
 }
 
@@ -100,8 +102,10 @@ func (r ResourceID) FieldOwner(sep string) string {
 	if sep == "" {
 		sep = "/"
 	}
-	return fmt.Sprintf("%s%s%s%s",
+
+	return fmt.Sprintf("%s%s%s%s%s%s",
 		r.Namespace, sep,
 		r.Tenant, sep,
+		r.Origin, sep,
 	)
 }

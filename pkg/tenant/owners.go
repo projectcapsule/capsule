@@ -12,39 +12,43 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
+	"github.com/projectcapsule/capsule/pkg/api/rbac"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 )
 
 func CollectOwners(
 	ctx context.Context,
-	c client.Client,
+	c client.Reader,
 	tnt *capsulev1beta2.Tenant,
 	cfg configuration.Configuration,
-) (api.OwnerStatusListSpec, error) {
+) (rbac.OwnerStatusListSpec, error) {
 	owners := tnt.Spec.Owners.ToStatusOwners()
 
-	// Promoted ServiceAccounts
-	if cfg.AllowServiceAccountPromotion() && len(tnt.Status.Namespaces) > 0 {
-		saList := &corev1.ServiceAccountList{}
-		if err := c.List(ctx, saList,
-			client.MatchingLabels{
-				meta.OwnerPromotionLabel: meta.ValueTrue,
-			},
-		); err != nil {
-			return nil, err
+	if cfg.AllowServiceAccountPromotion() &&
+		tnt.Spec.Permissions.Promotions.AllowOwnerPromotion &&
+		len(tnt.Status.Namespaces) > 0 {
+
+		nsSet := make(map[string]struct{}, len(tnt.Status.Namespaces))
+		for _, ns := range tnt.Status.Namespaces {
+			nsSet[ns] = struct{}{}
 		}
 
-		for _, sa := range saList.Items {
-			for _, ns := range tnt.Status.Namespaces {
-				if sa.GetNamespace() != ns {
-					continue
-				}
+		for ns := range nsSet {
+			saList := &corev1.ServiceAccountList{}
+			if err := c.List(ctx, saList,
+				client.InNamespace(ns),
+				client.MatchingLabels{
+					meta.OwnerPromotionLabel: meta.ValueTrue,
+				},
+			); err != nil {
+				return nil, err
+			}
 
-				owners.Upsert(api.CoreOwnerSpec{
-					UserSpec: api.UserSpec{
-						Kind: api.ServiceAccountOwner,
+			for _, sa := range saList.Items {
+				owners.Upsert(rbac.CoreOwnerSpec{
+					UserSpec: rbac.UserSpec{
+						Kind: rbac.ServiceAccountOwner,
 						Name: serviceaccount.ServiceAccountUsernamePrefix + sa.Namespace + ":" + sa.Name,
 					},
 					ClusterRoles: cfg.RBAC().PromotionClusterRoles,
@@ -53,15 +57,13 @@ func CollectOwners(
 		}
 	}
 
-	// Administrators
 	for _, a := range cfg.Administrators() {
-		owners.Upsert(api.CoreOwnerSpec{
+		owners.Upsert(rbac.CoreOwnerSpec{
 			UserSpec:     a,
 			ClusterRoles: cfg.RBAC().AdministrationClusterRoles,
 		})
 	}
 
-	// Dedicated Owner Objects
 	listed, err := tnt.Spec.Permissions.ListMatchingOwners(ctx, c, tnt.GetName())
 	if err != nil {
 		return nil, err

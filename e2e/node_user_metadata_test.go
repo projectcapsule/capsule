@@ -15,8 +15,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	"github.com/projectcapsule/capsule/internal/webhook/utils"
 	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api/rbac"
+	"github.com/projectcapsule/capsule/pkg/utils"
 )
 
 var _ = Describe("modifying node labels and annotations", Label("config", "nodes"), func() {
@@ -27,10 +28,10 @@ var _ = Describe("modifying node labels and annotations", Label("config", "nodes
 			Name: "tenant-node-user-metadata-forbidden",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: api.OwnerListSpec{
+			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: api.CoreOwnerSpec{
-						UserSpec: api.UserSpec{
+					CoreOwnerSpec: rbac.CoreOwnerSpec{
+						UserSpec: rbac.UserSpec{
 							Name: "gatsby",
 							Kind: "User",
 						},
@@ -95,9 +96,10 @@ var _ = Describe("modifying node labels and annotations", Label("config", "nodes
 		}).Should(Succeed())
 	})
 	JustAfterEach(func() {
-		Expect(k8sClient.Delete(context.TODO(), tnt)).Should(Succeed())
-		Expect(k8sClient.Delete(context.TODO(), crb)).Should(Succeed())
-		Expect(k8sClient.Delete(context.TODO(), cr)).Should(Succeed())
+		EventuallyDeletion(tnt)
+		EventuallyDeletion(crb)
+		EventuallyDeletion(cr)
+
 		EventuallyCreation(func() error {
 			return ModifyNode(func(node *corev1.Node) error {
 				annotations := node.GetAnnotations()

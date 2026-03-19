@@ -73,6 +73,6 @@ func (t miscManagedValidation) GetPath() string {
 
 func (t miscManagedValidation) GetHandlers() []handlers.Handler {
 	return []handlers.Handler{
-		handlers.InCapsuleGroups(t.configuration, generic.ManagedValidatingHandler()),
+		generic.ManagedValidatingHandler(t.configuration),
 	}
 }
