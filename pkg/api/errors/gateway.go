@@ -6,6 +6,7 @@ package errors
 import (
 	"fmt"
 	"reflect"
+	"strings"
 
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 
@@ -75,4 +76,42 @@ func NewGatewayClassUndefined(spec api.DefaultAllowedListSpec) error {
 
 func (i GatewayClassUndefinedError) Error() string {
 	return utils.DefaultAllowedValuesErrorMessage(i.spec, "No gateway Class is forbidden for the current Tenant. Specify a gateway Class which is allowed within the Tenant: ")
+}
+
+// GatewayForbiddenError is returned when an HTTPRoute references a Gateway that
+// is not in the allowed list for the Tenant's namespace rules.
+type GatewayForbiddenError struct {
+	gatewayNamespace string
+	gatewayName      string
+	spec             api.AllowedGatewaySpec
+}
+
+func NewGatewayForbidden(name, namespace string, spec api.AllowedGatewaySpec) error {
+	return &GatewayForbiddenError{
+		gatewayNamespace: namespace,
+		gatewayName:      name,
+		spec:             spec,
+	}
+}
+
+func (e GatewayForbiddenError) Error() string {
+	msg := fmt.Sprintf("Gateway %s/%s is forbidden for the current Tenant: ", e.gatewayNamespace, e.gatewayName)
+
+	parts := []string{msg}
+
+	if e.spec.Default != nil {
+		parts = append(parts, fmt.Sprintf("default: %s/%s", e.spec.Default.Namespace, e.spec.Default.Name))
+	}
+
+	if len(e.spec.Allowed) > 0 {
+		names := make([]string, 0, len(e.spec.Allowed))
+
+		for _, a := range e.spec.Allowed {
+			names = append(names, fmt.Sprintf("%s/%s", a.Namespace, a.Name))
+		}
+
+		parts = append(parts, fmt.Sprintf("allowed: [%s]", strings.Join(names, ", ")))
+	}
+
+	return strings.Join(parts, " ")
 }

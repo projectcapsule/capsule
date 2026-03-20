@@ -58,6 +58,8 @@ func (h *handler) mutate(ctx context.Context, req admission.Request, c client.Cl
 		response = mutateIngressDefaults(ctx, req, h.version, c, decoder, req.Namespace)
 	case metav1.GroupVersionResource{Group: "gateway.networking.k8s.io", Version: "v1", Resource: "gateways"}:
 		response = mutateGatewayDefaults(ctx, req, c, decoder, req.Namespace)
+	case metav1.GroupVersionResource{Group: "gateway.networking.k8s.io", Version: "v1", Resource: "httproutes"}:
+		response = mutateHTTPRouteDefaults(ctx, req, c, decoder, req.Namespace)
 	}
 
 	if response == nil {

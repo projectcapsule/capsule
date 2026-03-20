@@ -30,4 +30,9 @@ type NamespaceRuleEnforceBody struct {
 	// Define registries which are allowed to be used within this tenant
 	// The rules are aggregated, since you can use Regular Expressions the match registry endpoints
 	Registries []api.OCIRegistry `json:"registries,omitempty"`
+
+	// Define gateway rules for this namespace, restricting which Gateway resources
+	// Routes may reference and optionally injecting a default Gateway parentRef.
+	// +optional
+	Gateways *api.GatewayRuleSpec `json:"gateways,omitempty"`
 }
