@@ -3135,10 +3135,11 @@ spec:
               state:
                 default: Active
                 description: The operational state of the Tenant. Possible values
-                  are "Active", "Cordoned".
+                  are "Active", "Cordoned" or "Terminating".
                 enum:
                 - Cordoned
                 - Active
+                - Terminating
                 type: string
             required:
             - conditions

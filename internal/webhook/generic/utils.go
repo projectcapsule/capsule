@@ -16,6 +16,10 @@ import (
 )
 
 func namespaceHasFinalizers(ctx context.Context, c client.Reader, namespace string) *admission.Response {
+	if namespace == "" {
+		return nil
+	}
+
 	ns := &corev1.Namespace{}
 	if err := c.Get(ctx, types.NamespacedName{Name: namespace}, ns); err != nil {
 		return ad.ErroredResponse(err)

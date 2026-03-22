@@ -55,6 +55,7 @@ func (r *namespacedResourceController) SetupWithManager(mgr ctrl.Manager, cfg ut
 		Configuration:                r.configuration,
 		AllowCrossNamespaceSelection: false,
 		GatherClient:                 mgr.GetAPIReader(),
+		Mapper:                       mgr.GetRESTMapper(),
 	}
 	r.collector = NewCollector(
 		mgr.GetAPIReader(),

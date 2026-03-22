@@ -38,25 +38,47 @@ func (h *prefixHandler) OnCreate(
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		if exp, _ := h.cfg.ProtectedNamespaceRegexp(); exp != nil {
-			if matched := exp.MatchString(ns.GetName()); matched {
-				response := admission.Denied(fmt.Sprintf("Creating namespaces with name matching %s regexp is not allowed; please, reach out to the system administrators", exp.String()))
+			if exp.MatchString(ns.GetName()) {
+				response := admission.Denied(
+					fmt.Sprintf(
+						"Creating namespaces with name matching %s regexp is not allowed; please, reach out to the system administrators",
+						exp.String(),
+					),
+				)
 
 				return &response
 			}
 		}
 
-		if h.cfg.ForceTenantPrefix() {
-			if tnt.Spec.ForceTenantPrefix != nil && !*tnt.Spec.ForceTenantPrefix {
-				return nil
-			}
+		enforcePrefix := h.cfg.ForceTenantPrefix()
+		if tnt.Spec.ForceTenantPrefix != nil {
+			enforcePrefix = *tnt.Spec.ForceTenantPrefix
+		}
 
-			if e := fmt.Sprintf("%s-%s", tnt.GetName(), ns.GetName()); !strings.HasPrefix(ns.GetName(), fmt.Sprintf("%s-", tnt.GetName())) {
-				recorder.Eventf(tnt, ns, corev1.EventTypeWarning, evt.ReasonInvalidTenantPrefix, evt.ActionValidationDenied, "Namespace %s does not match the expected prefix for the current Tenant", ns.GetName())
+		if !enforcePrefix {
+			return nil
+		}
 
-				response := admission.Denied(fmt.Sprintf("The namespace doesn't match the tenant prefix, expected %s", e))
+		expectedPrefix := tnt.GetName() + "-"
+		if !strings.HasPrefix(ns.GetName(), expectedPrefix) {
+			recorder.Eventf(
+				tnt,
+				ns,
+				corev1.EventTypeWarning,
+				evt.ReasonInvalidTenantPrefix,
+				evt.ActionValidationDenied,
+				"Namespace %s does not match the expected prefix for the current Tenant",
+				ns.GetName(),
+			)
 
-				return &response
-			}
+			response := admission.Denied(
+				fmt.Sprintf(
+					"The namespace doesn't match the tenant prefix, expected prefix %q",
+					expectedPrefix,
+				),
+			)
+
+			return &response
 		}
 
 		return nil

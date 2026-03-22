@@ -1,0 +1,28 @@
+---
+apiVersion: capsule.clastix.io/v1beta2
+kind: GlobalTenantResource
+metadata:
+  name: default-serviceaccount-non-renewable
+spec:
+  resyncPeriod: 60s
+  resources:
+    - context:
+        resources:
+          - index: secrets
+            apiVersion: v1
+            kind: Secret
+            namespace: "capsule-system"
+            selector:
+              matchLabels:
+                energy: non-renewable
+
+      generators:
+        - template: |
+            ---
+            apiVersion: v1
+            kind: ConfigMap
+            metadata:
+              name: show-context
+            data:
+              context.yaml: |
+                {{- toYAML $ | nindent 4 }}

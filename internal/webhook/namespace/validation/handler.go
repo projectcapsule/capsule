@@ -11,6 +11,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
@@ -83,11 +84,17 @@ func (h *handler) OnDelete(c client.Client, decoder admission.Decoder, recorder 
 
 func (h *handler) OnUpdate(c client.Client, decoder admission.Decoder, recorder events.EventRecorder) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
+		log := log.FromContext(ctx)
+
+		log.Info("FUCK 1")
+
 		userIsAdmin := users.IsAdminUser(req, h.cfg.Administrators())
 
 		if !userIsAdmin && !users.IsCapsuleUser(ctx, c, h.cfg, req.UserInfo.Username, req.UserInfo.Groups) {
 			return nil
 		}
+
+		log.Info("FUCK 2")
 
 		ns := &corev1.Namespace{}
 		if err := decoder.Decode(req, ns); err != nil {
@@ -98,6 +105,8 @@ func (h *handler) OnUpdate(c client.Client, decoder admission.Decoder, recorder 
 		if err := decoder.DecodeRaw(req.OldObject, oldNs); err != nil {
 			return ad.ErroredResponse(err)
 		}
+
+		log.Info("FUCK 3")
 
 		oldTenant, err := h.verifyReference(ctx, c, oldNs)
 		if err != nil {
@@ -127,6 +136,8 @@ func (h *handler) OnUpdate(c client.Client, decoder admission.Decoder, recorder 
 		); terminating != nil {
 			return terminating
 		}
+
+		log.Info("FUCK 4")
 
 		for _, hndl := range h.handlers {
 			if response := hndl.OnUpdate(c, ns, oldNs, decoder, recorder, oldTenant)(ctx, req); response != nil {

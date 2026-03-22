@@ -8,9 +8,9 @@ import (
 	"fmt"
 
 	"github.com/go-logr/logr"
-
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	k8smeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
@@ -190,8 +190,14 @@ func (r *Processor) Prune(
 	actual.SetGroupVersionKind(obj.GroupVersionKind())
 	actual.SetName(obj.GetName())
 
-	namespace := obj.GetNamespace()
-	if namespace != "" {
+	mapping, err := r.Mapper.RESTMapping(obj.GroupVersionKind().GroupKind(), obj.GroupVersionKind().Version)
+	if err != nil {
+		return false, err
+	}
+
+	// Handles the case where the namespace was already deleted
+	if mapping.Scope.Name() == k8smeta.RESTScopeNameNamespace {
+		namespace := obj.GetNamespace()
 		actual.SetNamespace(namespace)
 
 		ns := &corev1.Namespace{}

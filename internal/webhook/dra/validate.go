@@ -87,8 +87,6 @@ func (h *deviceClass) validateResourceRequest(ctx context.Context, c client.Clie
 		}
 
 		if dc == nil {
-			recorder.Eventf(tnt, dc, corev1.EventTypeWarning, evt.ReasonMissingDeviceClass, evt.ActionValidationDenied, "%s %s/%s is missing DeviceClass", req.Kind.Kind, req.Namespace, req.Name)
-
 			response := admission.Denied(caperrors.NewDeviceClassUndefined(*allowed).Error())
 
 			return &response

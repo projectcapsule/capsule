@@ -58,6 +58,7 @@ func (r *globalResourceController) SetupWithManager(mgr ctrl.Manager, cfg utils.
 		Configuration:                r.configuration,
 		GatherClient:                 mgr.GetAPIReader(),
 		AllowCrossNamespaceSelection: true,
+		Mapper:                       mgr.GetRESTMapper(),
 	}
 	r.collector = NewCollector(
 		mgr.GetAPIReader(),

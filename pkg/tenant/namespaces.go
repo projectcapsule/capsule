@@ -21,7 +21,6 @@ import (
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
@@ -79,36 +78,19 @@ func NamespacedCascadingCleanup(
 	dyn dynamic.Interface,
 	ns *corev1.Namespace,
 ) (cleaned bool, err error) {
-	log := log.FromContext(ctx)
-
-	unmanagedCleanup, err := removeFinalizersFromRemainingNamespacedResources(ctx, disco, dyn, ns.Name, meta.WithoutCapsuleManagedResourcesLabelSelector, []string{})
+	_, err = removeFinalizersFromRemainingNamespacedResources(ctx, disco, dyn, ns.Name, []string{})
 	if err != nil {
-		log.Error(err, "failed cascading")
-
 		return true, err
 	}
 
-	// Important: if we removed finalizers, deletion is still asynchronous.
-	// Requeue once and let the namespace controller finish deleting the objects.
-	if unmanagedCleanup {
-		return true, nil
-	}
-
-	managedCleanup, err := removeFinalizersFromRemainingNamespacedResources(ctx, disco, dyn, ns.Name, meta.WithCapsuleManagedResourcesLabelSelector, []string{})
-	if err != nil {
-		log.Error(err, "failed cascading")
-
-		return true, err
-	}
-
-	return managedCleanup, nil
+	return false, nil
 }
+
 func removeFinalizersFromRemainingNamespacedResources(
 	ctx context.Context,
 	disco discovery.DiscoveryInterface,
 	dyn dynamic.Interface,
 	namespace string,
-	selector string,
 	ignoredFinalizers []string,
 ) (bool, error) {
 	var errs []error
@@ -144,7 +126,7 @@ func removeFinalizersFromRemainingNamespacedResources(
 		gvr := gvr
 
 		g.Go(func() error {
-			cleaned, err := processResourceType(ctx, dyn, gvr, namespace, selector, ignored)
+			cleaned, err := processResourceType(ctx, dyn, gvr, namespace, ignored)
 
 			mu.Lock()
 			defer mu.Unlock()
@@ -152,6 +134,7 @@ func removeFinalizersFromRemainingNamespacedResources(
 			if cleaned {
 				cleanedAny = true
 			}
+
 			if err != nil {
 				errs = append(errs, fmt.Errorf("process %s in namespace %q: %w", gvr.String(), namespace, err))
 			}
@@ -170,12 +153,9 @@ func processResourceType(
 	dyn dynamic.Interface,
 	gvr schema.GroupVersionResource,
 	namespace string,
-	selector string,
 	ignoredFinalizers map[string]struct{},
 ) (bool, error) {
-	list, err := dyn.Resource(gvr).Namespace(namespace).List(ctx, metav1.ListOptions{
-		LabelSelector: selector,
-	})
+	list, err := dyn.Resource(gvr).Namespace(namespace).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		if apierrors.IsNotFound(err) || apierrors.IsMethodNotSupported(err) {
 			return false, nil

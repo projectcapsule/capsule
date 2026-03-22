@@ -9,6 +9,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
@@ -33,11 +34,17 @@ type handler struct {
 
 func (h *handler) OnCreate(c client.Client, decoder admission.Decoder, recorder events.EventRecorder) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
+		log := log.FromContext(ctx)
+
 		userIsAdmin := users.IsAdminUser(req, h.cfg.Administrators())
+
+		log.Info("Mutating HANDLER 1")
 
 		if !userIsAdmin && !users.IsCapsuleUser(ctx, c, h.cfg, req.UserInfo.Username, req.UserInfo.Groups) {
 			return nil
 		}
+
+		log.Info("Mutating HANDLER 2")
 
 		ns := &corev1.Namespace{}
 		if err := decoder.Decode(req, ns); err != nil {
@@ -49,9 +56,13 @@ func (h *handler) OnCreate(c client.Client, decoder admission.Decoder, recorder 
 			return ad.ErroredResponse(err)
 		}
 
+		log.Info("Mutating HANDLER 3")
+
 		if tnt == nil && userIsAdmin {
 			return nil
 		}
+
+		log.Info("Mutating HANDLER 4")
 
 		for _, hndl := range h.handlers {
 			if response := hndl.OnCreate(c, ns, decoder, recorder)(ctx, req); response != nil {

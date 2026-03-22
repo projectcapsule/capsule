@@ -30,12 +30,19 @@ func IsCapsuleUser(
 		return false
 	}
 
+	capsuleUsers := cfg.GetUsersByStatus()
+
 	//nolint:nestif
 	if sets.NewString(groups...).Has("system:serviceaccounts") {
 		namespace, name, err := serviceaccount.SplitUsername(user)
 		if err == nil {
 			if configuration.IsControllerServiceAccount(name, namespace) {
 				return false
+			}
+
+			serviceaccounts := capsuleUsers.GetByKinds([]rbac.OwnerKind{rbac.ServiceAccountOwner})
+			if len(serviceaccounts) > 0 && sets.New[string](serviceaccounts...).Has(user) {
+				return true
 			}
 
 			var tl capsulev1beta2.TenantList
@@ -48,8 +55,6 @@ func IsCapsuleUser(
 			}
 		}
 	}
-
-	capsuleUsers := cfg.GetUsersByStatus()
 
 	//nolint:modernize
 	for _, group := range capsuleUsers.GetByKinds([]rbac.OwnerKind{rbac.GroupOwner}) {

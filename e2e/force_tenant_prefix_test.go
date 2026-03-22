@@ -73,6 +73,25 @@ var _ = Describe("creating a Namespace with Tenant name prefix enforcement", Lab
 		})
 	})
 
+	It("should fail when non using prefix (Single Tenant)", func() {
+		EventuallyDeletion(t2)
+		ns := NewNamespace("custom")
+		NamespaceCreation(ns, t1.Spec.Owners[0].UserSpec, defaultTimeoutInterval).ShouldNot(Succeed())
+	})
+
+	It("should fail when non using prefix (Single Tenant)", func() {
+		EventuallyDeletion(t2)
+		ns := NewNamespace("awesome")
+		NamespaceCreation(ns, t1.Spec.Owners[0].UserSpec, defaultTimeoutInterval).ShouldNot(Succeed())
+	})
+
+	It("should succeed using prefix (Single Tenant)", func() {
+		EventuallyDeletion(t2)
+
+		ns := NewNamespace("awesome-namespace")
+		NamespaceCreation(ns, t1.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+	})
+
 	It("should fail when non using prefix", func() {
 		ns := NewNamespace("awesome")
 		NamespaceCreation(ns, t1.Spec.Owners[0].UserSpec, defaultTimeoutInterval).ShouldNot(Succeed())
