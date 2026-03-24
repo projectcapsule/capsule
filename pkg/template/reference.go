@@ -13,6 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"github.com/projectcapsule/capsule/pkg/runtime/selectors"
 )
@@ -140,9 +141,14 @@ func (t ResourceReference) loadResources(
 ) ([]*unstructured.Unstructured, error) {
 	ns := t.Namespace
 
-	if namespace != "" {
+	// Handle this somewhere else
+	if ns == "" && namespace != "" {
 		ns = namespace
 	}
+
+	log := log.FromContext(ctx)
+
+	log.Info("GATHERING IN NAMESPACE", "NAMESPACE", ns)
 
 	// GET path (single object)
 	if t.Name != "" {
@@ -199,9 +205,13 @@ func (t ResourceReference) loadResources(
 		opts = append(opts, client.MatchingLabelsSelector{Selector: combined})
 	}
 
+	log.Info("COMBINED SELECTORS", "SELECTORS", len(all), "CEL", all)
+
 	if err := kubeClient.List(ctx, list, opts...); err != nil {
 		return nil, fmt.Errorf("failed to list %s: %w", t.Kind, err)
 	}
+
+	log.Info("FOUND ITEMS", "ITEMS", len(list.Items))
 
 	results := make([]*unstructured.Unstructured, 0, len(list.Items))
 	for i := range list.Items {

@@ -93,6 +93,10 @@ rules:
   - tenantowners/status
   - rulestatuses
   - rulestatuses/status
+  - customquotas
+  - customquotas/status
+  - globalcustomquotas
+  - globalcustomquotas/status
   verbs:
   - create
   - delete

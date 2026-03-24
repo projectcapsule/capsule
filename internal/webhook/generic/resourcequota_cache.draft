@@ -1,0 +1,142 @@
+// Copyright 2020-2026 Project Capsule Authors
+// SPDX-License-Identifier: Apache-2.0
+
+package generic
+
+import (
+	"context"
+
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/client-go/tools/events"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+
+	"github.com/projectcapsule/capsule/internal/cache"
+	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
+	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
+)
+
+type resourceQuotaCacheHandler struct {
+	configuration configuration.Configuration
+
+	cache cache.QuantitiesCache
+}
+
+func ResourceQuotaCacheHandler(configuration configuration.Configuration) handlers.Handler {
+	return &resourceQuotaCacheHandler{
+		configuration: configuration,
+	}
+}
+
+func (h *resourceQuotaCacheHandler) OnCreate(c client.Client, decoder admission.Decoder, _ events.EventRecorder) handlers.Func {
+	return func(ctx context.Context, req admission.Request) *admission.Response {
+		namespace := req.Namespace
+		if namespace == "" {
+			return nil
+		}
+
+		incoming, cares, err := h.incomingUsageOnCreate(ctx, decoder, req)
+		if err != nil {
+			response := admission.Errored(400, err)
+			return &response
+		}
+		if !cares || isZero(incoming) {
+			return nil
+		}
+
+		inflight := corev1.ResourceList(nil)
+		if entry, ok := h.cache.Get(namespace); ok && !entry.Applied {
+			inflight = entry.Value
+		}
+
+		allowed, message, err := h.checkQuotaWithInflight(ctx, c, namespace, inflight, incoming)
+		if err != nil {
+			response := admission.Errored(500, err)
+			return &response
+		}
+		if !allowed {
+			response := admission.Denied(message)
+			return &response
+		}
+
+		h.cache.Upsert(namespace, func(old cache.Entry, exists bool) (corev1.ResourceList, bool) {
+			if !exists || old.Applied {
+				return copyResourceList(incoming), false
+			}
+			return addResourceLists(old.Value, incoming), false
+		})
+
+		return nil
+	}
+}
+
+func (h *resourceQuotaCacheHandler) OnDelete(c client.Client, _ admission.Decoder, recorder events.EventRecorder) handlers.Func {
+	return func(ctx context.Context, req admission.Request) *admission.Response {
+		namespace := req.Namespace
+		if namespace == "" {
+			return nil
+		}
+
+		outgoing, cares, err := h.outgoingUsageOnDelete(ctx, decoder, req)
+		if err != nil {
+			response := admission.Errored(400, err)
+			return &response
+		}
+		if !cares || isZero(outgoing) {
+			return nil
+		}
+
+		// Deletes generally free resources. If you use the cache as in-flight delta tracking,
+		// subtract the outgoing usage so concurrent creates see the most realistic view.
+		h.cache.Upsert(namespace, func(old cache.Entry, exists bool) (corev1.ResourceList, bool) {
+			if !exists || old.Applied {
+				return negateResourceList(outgoing), false
+			}
+			return subResourceLists(old.Value, outgoing), false
+		})
+
+		return nil
+	}
+}
+
+func (h *resourceQuotaCacheHandler) OnUpdate(c client.Client, decoder admission.Decoder, recorder events.EventRecorder) handlers.Func {
+	return func(ctx context.Context, req admission.Request) *admission.Response {
+		namespace := req.Namespace
+		if namespace == "" {
+			return nil
+		}
+
+		delta, cares, err := h.deltaUsageOnUpdate(ctx, decoder, req)
+		if err != nil {
+			response := admission.Errored(400, err)
+			return &response
+		}
+		if !cares || isZero(delta) {
+			return nil
+		}
+
+		inflight := corev1.ResourceList(nil)
+		if entry, ok := h.cache.Get(namespace); ok && !entry.Applied {
+			inflight = entry.Value
+		}
+
+		allowed, message, err := h.checkQuotaWithInflight(ctx, c, namespace, inflight, delta)
+		if err != nil {
+			response := admission.Errored(500, err)
+			return &response
+		}
+		if !allowed {
+			response := admission.Denied(message)
+			return &response
+		}
+
+		h.cache.Upsert(namespace, func(old cache.Entry, exists bool) (corev1.ResourceList, bool) {
+			if !exists || old.Applied {
+				return copyResourceList(delta), false
+			}
+			return addResourceLists(old.Value, delta), false
+		})
+
+		return nil
+	}
+}

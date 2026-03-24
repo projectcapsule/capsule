@@ -61,6 +61,22 @@ func (r *validatingReconciler) SetupWithManager(mgr ctrl.Manager, ctrlConfig uti
 				predicates.NamesMatchingPredicate{Names: []string{ctrlConfig.ConfigurationName}},
 			),
 		).
+		Watches(
+			&capsulev1beta2.CustomQuota{},
+			handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
+				return []reconcile.Request{{
+					NamespacedName: types.NamespacedName{Name: string(r.configuration.Admission().Validating.Name)},
+				}}
+			}),
+		).
+		Watches(
+			&capsulev1beta2.GlobalCustomQuota{},
+			handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
+				return []reconcile.Request{{
+					NamespacedName: types.NamespacedName{Name: string(r.configuration.Admission().Validating.Name)},
+				}}
+			}),
+		).
 		WithOptions(controller.Options{MaxConcurrentReconciles: ctrlConfig.MaxConcurrentReconciles}).
 		Complete(r)
 }

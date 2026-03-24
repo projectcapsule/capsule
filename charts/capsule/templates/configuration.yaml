@@ -735,6 +735,70 @@ spec:
         timeoutSeconds: {{ $.Values.webhooks.validatingWebhooksTimeoutSeconds }}
         {{- end }}
       {{- end }}
+      {{- with .Values.webhooks.hooks.customquotas }}
+        {{- if .enabled }}
+          {{- $any = true }}
+      - name: namespaced.custom-quotas.projectcapsule.dev
+        {{- with .opts }}
+        opts:
+          {{- toYaml . |  nindent 10 }}
+        {{- end }}
+        admissionReviewVersions:
+          - v1
+          - v1beta1
+        path: "/custom-quotas/namespaced/validating"
+        failurePolicy:  {{ .failurePolicy }}
+        matchPolicy: {{ .matchPolicy }}
+        {{- with .namespaceSelector }}
+        namespaceSelector:
+          {{- toYaml . |  nindent 10 }}
+        {{- end }}
+        {{- with .objectSelector }}
+        objectSelector:
+          {{- toYaml . |  nindent 10 }}
+        {{- end }}
+        {{- with .matchConditions }}
+        matchConditions:
+          {{- toYaml . |  nindent 10 }}
+        {{- end }}
+        rules:
+          {{- toYaml .rules | nindent 10 }}
+        sideEffects: None
+        timeoutSeconds: {{ $.Values.webhooks.validatingWebhooksTimeoutSeconds }}
+        {{- end }}
+      {{- end }}
+      {{- with .Values.webhooks.hooks.globalcustomquotas }}
+        {{- if .enabled }}
+          {{- $any = true }}
+      - name: cluster.custom-quotas.projectcapsule.dev
+        {{- with .opts }}
+        opts:
+          {{- toYaml . |  nindent 10 }}
+        {{- end }}
+        admissionReviewVersions:
+          - v1
+          - v1beta1
+        path: "/custom-quotas/cluster/validating"
+        failurePolicy:  {{ .failurePolicy }}
+        matchPolicy: {{ .matchPolicy }}
+        {{- with .namespaceSelector }}
+        namespaceSelector:
+          {{- toYaml . |  nindent 10 }}
+        {{- end }}
+        {{- with .objectSelector }}
+        objectSelector:
+          {{- toYaml . |  nindent 10 }}
+        {{- end }}
+        {{- with .matchConditions }}
+        matchConditions:
+          {{- toYaml . |  nindent 10 }}
+        {{- end }}
+        rules:
+          {{- toYaml .rules | nindent 10 }}
+        sideEffects: None
+        timeoutSeconds: {{ $.Values.webhooks.validatingWebhooksTimeoutSeconds }}
+        {{- end }}
+      {{- end }}
       {{- if not $any }}
         []
       {{- end }}

@@ -11,6 +11,8 @@ spec:
     kind: GlobalTenantResource
     listKind: GlobalTenantResourceList
     plural: globaltenantresources
+    shortNames:
+    - gtr
     singular: globaltenantresource
   scope: Cluster
   versions:

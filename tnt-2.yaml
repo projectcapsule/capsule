@@ -67,6 +67,10 @@ metadata:
   labels:
     app: netshoot
 spec:
+  resources:
+    requests:
+      cpu: 0.1
+      memory: 128Mi
   containers:
     - name: netshoot
       image: busybox:latest

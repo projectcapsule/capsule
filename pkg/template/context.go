@@ -15,6 +15,7 @@ import (
 	k8smeta "k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/labels"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"github.com/projectcapsule/capsule/pkg/runtime/sanitize"
 )
@@ -33,6 +34,8 @@ func (t *TemplateContext) GatherContext(
 	namespace string,
 	additionSelectors []labels.Selector,
 ) (ReferenceContext, error) {
+	log := log.FromContext(ctx)
+
 	result := ReferenceContext{}
 
 	if t.Resources == nil {
@@ -48,6 +51,8 @@ func (t *TemplateContext) GatherContext(
 		}
 	}
 
+	log.Info("GATHER PER RESOURCES")
+
 	// Load external resources
 	for index, resource := range t.Resources {
 		res, err := resource.LoadResources(
@@ -61,8 +66,11 @@ func (t *TemplateContext) GatherContext(
 		)
 		if err != nil {
 			errs = append(errs, err)
+
 			continue
 		}
+
+		log.Info("FOUND RESOURCES", "AMOUNT", len(res))
 
 		if len(res) == 0 {
 			continue

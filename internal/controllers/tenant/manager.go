@@ -268,13 +268,13 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 	}
 
 	defer func() {
-		r.syncTenantStatusMetrics(instance)
-
 		if uerr := r.updateTenantStatus(ctx, instance, err); uerr != nil {
 			err = fmt.Errorf("cannot update tenant status: %w", uerr)
 
 			return
 		}
+
+		r.syncTenantStatusMetrics(instance)
 
 		if e := patchHelper.Patch(ctx, instance); e != nil {
 			err = fmt.Errorf("cannot patch tenant: %w", e)

@@ -26,6 +26,7 @@ import (
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
@@ -38,6 +39,7 @@ import (
 	"github.com/projectcapsule/capsule/internal/controllers/admission"
 	cachecontroller "github.com/projectcapsule/capsule/internal/controllers/cfg/caches"
 	configcontroller "github.com/projectcapsule/capsule/internal/controllers/cfg/status"
+	customquotacontroller "github.com/projectcapsule/capsule/internal/controllers/customquotas"
 	podlabelscontroller "github.com/projectcapsule/capsule/internal/controllers/pod"
 	"github.com/projectcapsule/capsule/internal/controllers/pv"
 	rbaccontroller "github.com/projectcapsule/capsule/internal/controllers/rbac"
@@ -50,6 +52,7 @@ import (
 	"github.com/projectcapsule/capsule/internal/metrics"
 	"github.com/projectcapsule/capsule/internal/webhook"
 	cfgvalidation "github.com/projectcapsule/capsule/internal/webhook/cfg"
+	customquotavalidation "github.com/projectcapsule/capsule/internal/webhook/customquota"
 	"github.com/projectcapsule/capsule/internal/webhook/defaults"
 	"github.com/projectcapsule/capsule/internal/webhook/dra"
 	"github.com/projectcapsule/capsule/internal/webhook/gateway"
@@ -243,9 +246,14 @@ func main() {
 
 	setupLog.Info("initializing caches")
 
+	// Initialize Notifiers (Channels)
+	customQuotaCh := make(chan event.TypedGenericEvent[*capsulev1beta2.CustomQuota], 1024)
+	globalCustomQuotaCh := make(chan event.TypedGenericEvent[*capsulev1beta2.GlobalCustomQuota], 1024)
+
 	// Initialize Caches
 	impersonationCache := cache.NewImpersonationCache()
 	registryCache := cache.NewRegistryRuleSetCache()
+	customQuotaQuantityCache := cache.NewQuantityCache[string]()
 
 	if err = (&tenantcontroller.Manager{
 		RESTConfig:      manager.GetConfig(),
@@ -364,6 +372,8 @@ func main() {
 		route.ResourcePoolValidation((resourcepool.PoolValidationHandler(ctrl.Log.WithName("webhooks").WithName("resourcepool")))),
 		route.ResourcePoolClaimMutation((resourcepool.ClaimMutationHandler(ctrl.Log.WithName("webhooks").WithName("resourcepoolclaims")))),
 		route.ResourcePoolClaimValidation((resourcepool.ClaimValidationHandler(ctrl.Log.WithName("webhooks").WithName("resourcepoolclaims")))),
+		route.CustomQuotaValidation((customquotavalidation.CustomQuotaValidationHandler())),
+		route.GlobalCustomQuotaValidation((customquotavalidation.GlobalCustomQuotaValidationHandler())),
 		route.GenericTenantAssignment(
 			generic.TenantAssignmentHandler(),
 		),
@@ -372,6 +382,9 @@ func main() {
 				cfgvalidation.WarningHandler(),
 				cfgvalidation.ServiceAccountHandler(),
 			),
+		),
+		route.GenericCustomQuotas(
+			generic.CustomQuotasHandler(customQuotaQuantityCache, customQuotaCh, globalCustomQuotaCh),
 		),
 	)
 
@@ -478,6 +491,18 @@ func main() {
 		controllerConfig,
 	); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "resourcepools")
+		os.Exit(1)
+	}
+
+	if err = customquotacontroller.Add(ctrl.Log.WithName("controllers").WithName("CustomQuotas"),
+		manager,
+		manager.GetEventRecorderFor("customquotas-ctrl"),
+		controllerConfig,
+		customQuotaQuantityCache,
+		customQuotaCh,
+		globalCustomQuotaCh,
+	); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "customquotas")
 		os.Exit(1)
 	}
 

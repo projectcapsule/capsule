@@ -15,6 +15,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/runtime/indexers/customquota"
 	"github.com/projectcapsule/capsule/pkg/runtime/indexers/ingress"
 	"github.com/projectcapsule/capsule/pkg/runtime/indexers/namespace"
 	"github.com/projectcapsule/capsule/pkg/runtime/indexers/resourcepool"
@@ -37,6 +38,10 @@ func AddToManager(ctx context.Context, log logr.Logger, mgr manager.Manager) err
 		tenantresource.NamespacedServiceAccount{},
 		tenantresource.NamespacedProcessedItems{},
 		tenantresource.NamespacedResourceNamespace{},
+		customquota.NamespacedTargetReference{},
+		customquota.NamespacedObjectUIDReference{},
+		customquota.GlobalTargetReference{},
+		customquota.GlobalObjectUIDReference{},
 		resourcepool.NamespacesReference{Obj: &capsulev1beta2.ResourcePool{}},
 		resourcepool.PoolUIDReference{Obj: &capsulev1beta2.ResourcePoolClaim{}},
 		tenant.OwnerReference{},

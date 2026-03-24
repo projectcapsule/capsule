@@ -76,3 +76,19 @@ func (t miscManagedValidation) GetHandlers() []handlers.Handler {
 		generic.ManagedValidatingHandler(t.configuration),
 	}
 }
+
+type customQuotasHandler struct {
+	handlers []handlers.Handler
+}
+
+func GenericCustomQuotas(handler ...handlers.Handler) handlers.Webhook {
+	return &customQuotasHandler{handlers: handler}
+}
+
+func (w *customQuotasHandler) GetHandlers() []handlers.Handler {
+	return w.handlers
+}
+
+func (w *customQuotasHandler) GetPath() string {
+	return "/generic/custom-quota"
+}

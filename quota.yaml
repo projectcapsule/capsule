@@ -1,0 +1,30 @@
+---
+apiVersion: capsule.clastix.io/v1beta2
+kind: CustomQuota
+metadata:
+  name: pvc-storage-limit
+spec:
+  limit: "200Gi"
+  source:
+    group: ""
+    version: v1
+    kind: PersistentVolumeClaim
+    path: .spec.resources.requests.storage
+  scopeSelectors:
+    - matchLabels:
+        team: platform
+---
+apiVersion: capsule.clastix.io/v1beta2
+kind: CustomQuota
+metadata:
+  name: pvc-storage-limit-lower
+spec:
+  limit: "2Gi"
+  source:
+    group: ""
+    version: v1
+    kind: PersistentVolumeClaim
+    path: .spec.resources.requests.storage
+  scopeSelectors:
+    - matchLabels:
+        team: platform

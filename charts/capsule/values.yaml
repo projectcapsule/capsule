@@ -485,6 +485,92 @@ webhooks:
 
   # Admission Webhook Configuration
   hooks:
+
+
+    customquotas:
+      # -- Enable the Hook
+      enabled: true
+      # -- [FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy)
+      failurePolicy: Fail
+      # -- [MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
+      matchPolicy: Equivalent
+      # -- [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector)
+      objectSelector: {}
+      # -- [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector)
+      namespaceSelector: {}
+      # -- [MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
+      matchConditions: []
+      # -- [Rules](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-rules)
+      rules:
+        - apiGroups:
+            - capsule.clastix.io
+          apiVersions:
+            - v1beta2
+          operations:
+            - CREATE
+            - UPDATE
+            - DELETE
+          resources:
+            - customquotas
+          scope: 'Namespaced'
+    globalcustomquotas:
+      # -- Enable the Hook
+      enabled: true
+      # -- [FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy)
+      failurePolicy: Fail
+      # -- [MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
+      matchPolicy: Equivalent
+      # -- [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector)
+      objectSelector: {}
+      # -- [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector)
+      namespaceSelector: {}
+      # -- [MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
+      matchConditions: []
+      # -- [Rules](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-rules)
+      rules:
+        - apiGroups:
+            - capsule.clastix.io
+          apiVersions:
+            - v1beta2
+          operations:
+            - CREATE
+            - UPDATE
+            - DELETE
+          resources:
+            - globalcustomquotas
+          scope: 'Cluster'
+
+
+    customquotasobjs:
+      # -- Enable the Hook
+      enabled: true
+      # -- [FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy)
+      failurePolicy: Fail
+      # -- [MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
+      matchPolicy: Equivalent
+      # -- [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector)
+      objectSelector: {}
+      # -- [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector)
+      namespaceSelector:
+        matchExpressions:
+          - key: capsule.clastix.io/tenant
+            operator: Exists
+      # -- [MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
+      matchConditions: []
+      rules:
+          - apiGroups:
+              - '*'
+            apiVersions:
+              - '*'
+            operations:
+              - CREATE
+              - UPDATE
+              - DELETE
+            resources:
+              - '*'
+            scope: Namespaced
+
+
     metadata:
       # -- Enable the Hook
       enabled: true
@@ -586,7 +672,6 @@ webhooks:
           expression: '!has(request.subResource) || request.subResource == ""'
         - name: ignore-events
           expression: 'request.resource.resource != "events"'
-
 
     namespaces:
       # -- Enable the Hook
@@ -796,7 +881,7 @@ webhooks:
       # -- Capsule Hook Options
       opts: {}
       # -- [FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy)
-      failurePolicy: Fail
+      failurePolicy: Ignore
       # -- [MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
       matchPolicy: Equivalent
       # -- [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector)
@@ -812,14 +897,7 @@ webhooks:
           - key: "capsule.clastix.io/tenant"
             operator: Exists
       # -- [MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
-      matchConditions:
-        - name: "exclude-privileged-users"
-          expression: >
-            !(
-              request.userInfo.username in [
-                "kubernetes-admin"
-              ]
-            )
+      matchConditions: []
       # -- [Rules](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-rules)
       rules:
         - apiGroups:

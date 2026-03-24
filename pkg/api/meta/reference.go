@@ -72,6 +72,23 @@ type NamespacedObjectReference struct {
 }
 
 // NamespacedObjectReference contains enough information to locate the referenced Kubernetes resource object in any
+// namespace.
+// +kubebuilder:object:generate=true
+type NamespacedObjectWithUIDReference struct {
+	// Name of the referent.
+	// +required
+	Name string `json:"name"`
+
+	// UID of the tracked Tenant to pin point tracking
+	// +required
+	k8stypes.UID `json:"uid,omitempty" protobuf:"bytes,5,opt,name=uid"`
+
+	// Namespace of the referent, when not specified it acts as LocalObjectReference.
+	// +optional
+	Namespace RFC1123SubdomainName `json:"namespace,omitempty"`
+}
+
+// NamespacedObjectReference contains enough information to locate the referenced Kubernetes resource object in any
 // namespace. But the namespace is required.
 // +kubebuilder:object:generate=true
 type NamespacedObjectReferenceWithNamespace struct {
