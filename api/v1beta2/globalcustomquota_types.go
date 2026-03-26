@@ -33,7 +33,7 @@ type GlobalCustomQuota struct {
 	Spec GlobalCustomQuotaSpec `json:"spec"`
 
 	// +optional
-	Status CustomQuotaStatus `json:"status,omitzero"`
+	Status GlobalCustomQuotaStatus `json:"status,omitzero"`
 }
 
 // +kubebuilder:object:root=true

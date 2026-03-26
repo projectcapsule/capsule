@@ -5,13 +5,13 @@ package customquotas
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/go-logr/logr"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	k8smeta "k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -32,15 +32,15 @@ import (
 	"github.com/projectcapsule/capsule/internal/controllers/utils"
 	"github.com/projectcapsule/capsule/internal/metrics"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
-	clt "github.com/projectcapsule/capsule/pkg/runtime/client"
+	"github.com/projectcapsule/capsule/pkg/runtime/quota"
 )
 
 type customQuotaClaimController struct {
 	client.Client
 
-	metrics  *metrics.CustomQuotaRecorder
 	log      logr.Logger
 	recorder record.EventRecorder
+	metrics  *metrics.CustomQuotaRecorder
 	mapper   k8smeta.RESTMapper
 
 	admissionNotifier chan event.TypedGenericEvent[*capsulev1beta2.CustomQuota]
@@ -72,6 +72,7 @@ func (r *customQuotaClaimController) Reconcile(ctx context.Context, request ctrl
 			log.V(3).Info("Request object not found, could have been deleted after reconcile request")
 
 			r.metrics.DeleteAllMetricsForCustomQuota(request.Name, request.Namespace)
+			r.cache.Delete(MakeCustomQuotaCacheKey(request.Namespace, request.Name))
 
 			return reconcile.Result{}, nil
 		}
@@ -115,7 +116,7 @@ func (r *customQuotaClaimController) Reconcile(ctx context.Context, request ctrl
 		return ctrl.Result{RequeueAfter: 500 * time.Millisecond}, nil
 	}
 
-	r.cache.Delete(MakeCustomQuotaCacheKey(*instance))
+	r.cache.Delete(MakeCustomQuotaCacheKey(request.Namespace, request.Name))
 
 	return ctrl.Result{}, err
 }
@@ -125,7 +126,7 @@ func (r *customQuotaClaimController) reconcile(
 	instance *capsulev1beta2.CustomQuota,
 ) error {
 	// Rebuilding
-	instance.Status.Target = capsulev1beta2.CustomQuotaSpecSource{}
+	instance.Status.Target = capsulev1beta2.CustomQuotaStatusTarget{}
 	instance.Status.Usage = capsulev1beta2.CustomQuotaStatusUsage{}
 	instance.Status.Claims = nil
 
@@ -133,11 +134,6 @@ func (r *customQuotaClaimController) reconcile(
 		Group:   instance.Spec.Source.GroupVersionKind.Group,
 		Version: instance.Spec.Source.GroupVersionKind.Version,
 		Kind:    instance.Spec.Source.GroupVersionKind.Kind,
-	}
-
-	_, err := r.Client.Scheme().New(kind)
-	if err != nil {
-		return fmt.Errorf("GVK %s is not registered in scheme: %w", kind.String(), err)
 	}
 
 	mapping, err := r.mapper.RESTMapping(kind.GroupKind(), kind.Version)
@@ -149,30 +145,34 @@ func (r *customQuotaClaimController) reconcile(
 		return fmt.Errorf("GVK %s is not namespaced", kind.String())
 	}
 
-	instance.Status.Target = instance.Spec.Source
+	instance.Status.Target = capsulev1beta2.CustomQuotaStatusTarget{
+		CustomQuotaSpecSource: instance.Spec.Source,
+		Scope:                 mapping.Scope.Name(),
+	}
 	instance.Status.Usage = capsulev1beta2.CustomQuotaStatusUsage{}
 
-	items, err := getResources(ctx, &instance.Status.Target, r.Client, instance.Spec.ScopeSelectors, instance.Namespace)
+	items, err := getResources(ctx, &instance.Status.Target.CustomQuotaSpecSource, r.Client, instance.Spec.ScopeSelectors, instance.Namespace)
 	if err != nil {
 		return err
 	}
 
+	var errs []error
+
 	for _, item := range items {
-		val, err := clt.GetUsageFromUnstructured(item, instance.Spec.Source.Path)
+		usage, err := quota.ParseQuantityFromUnstructured(item, instance.Spec.Source.Path)
 		if err != nil {
-			r.log.Error(err, "Error getting usage from unstructured while updating CustomQuota usage")
+			errs = append(errs, fmt.Errorf(
+				"get usage from %s/%s (%s): %w",
+				item.GetNamespace(),
+				item.GetName(),
+				item.GetObjectKind().GroupVersionKind().String(),
+				err,
+			))
 
 			continue
 		}
 
-		quant, err := resource.ParseQuantity(val)
-		if err != nil {
-			r.log.Error(err, "Error parsing quantity while updating CustomQuota usage")
-
-			continue
-		}
-
-		instance.Status.Usage.Used.Add(quant)
+		instance.Status.Usage.Used.Add(usage)
 
 		instance.Status.Claims = append(instance.Status.Claims, meta.NamespacedObjectWithUIDReference{
 			Name:      item.GetName(),
@@ -184,6 +184,10 @@ func (r *customQuotaClaimController) reconcile(
 	// Calculate Delta
 	instance.Status.Usage.Available = instance.Spec.Limit
 	instance.Status.Usage.Available.Sub(instance.Status.Usage.Used)
+
+	if len(errs) > 0 {
+		return errors.Join(errs...)
+	}
 
 	return nil
 }
@@ -262,7 +266,7 @@ func (r *customQuotaClaimController) hasConsistentReservedUsage(instance *capsul
 		return true
 	}
 
-	entry, ok := r.cache.Get(MakeCustomQuotaCacheKey(*instance))
+	entry, ok := r.cache.Get(MakeCustomQuotaCacheKey(instance.GetNamespace(), instance.GetName()))
 	if !ok || entry.Reserved.IsZero() {
 		return true
 	}
@@ -275,13 +279,13 @@ func (r *customQuotaClaimController) hasConsistentPendingDeletes(instance *capsu
 		return true
 	}
 
-	entry, ok := r.cache.Get(MakeCustomQuotaCacheKey(*instance))
+	entry, ok := r.cache.Get(MakeCustomQuotaCacheKey(instance.GetNamespace(), instance.GetName()))
 	if !ok || len(entry.PendingDeletes) == 0 {
 		return true
 	}
 
 	for _, hint := range entry.PendingDeletes {
-		if hasClaimUID(instance.Status.Claims, hint.UID) {
+		if instance.Status.HasClaimUID(hint.UID) {
 			return false
 		}
 	}

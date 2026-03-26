@@ -540,7 +540,6 @@ webhooks:
             - globalcustomquotas
           scope: 'Cluster'
 
-
     customquotasobjs:
       # -- Enable the Hook
       enabled: true

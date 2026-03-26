@@ -41,6 +41,7 @@ func Add(
 		Client:            mgr.GetClient(),
 		log:               log.WithName("ClusterCustomQuota"),
 		recorder:          recorder,
+		metrics:           metrics.MustMakeGlobalCustomQuotaRecorder(),
 		admissionNotifier: globalNotifier,
 		cache:             cache,
 	}).SetupWithManager(mgr, cfg); err != nil {

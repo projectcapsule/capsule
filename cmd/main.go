@@ -374,6 +374,9 @@ func main() {
 		route.ResourcePoolClaimValidation((resourcepool.ClaimValidationHandler(ctrl.Log.WithName("webhooks").WithName("resourcepoolclaims")))),
 		route.CustomQuotaValidation((customquotavalidation.CustomQuotaValidationHandler())),
 		route.GlobalCustomQuotaValidation((customquotavalidation.GlobalCustomQuotaValidationHandler())),
+		route.GenericCustomQuotas(
+			customquotavalidation.ObjectCalculationHandler(customQuotaQuantityCache, customQuotaCh, globalCustomQuotaCh),
+		),
 		route.GenericTenantAssignment(
 			generic.TenantAssignmentHandler(),
 		),
@@ -382,9 +385,6 @@ func main() {
 				cfgvalidation.WarningHandler(),
 				cfgvalidation.ServiceAccountHandler(),
 			),
-		),
-		route.GenericCustomQuotas(
-			generic.CustomQuotasHandler(customQuotaQuantityCache, customQuotaCh, globalCustomQuotaCh),
 		),
 	)
 

@@ -265,6 +265,11 @@ spec:
                   - type
                   type: object
                 type: array
+              namespaces:
+                description: Observed Namespaces
+                items:
+                  type: string
+                type: array
               target:
                 description: Targeting GVK
                 properties:
@@ -273,6 +278,9 @@ spec:
                   kind:
                     type: string
                   path:
+                    description: Path on GVK where usage is evaluated
+                    type: string
+                  scope:
                     description: Path on GVK where usage is evaluated
                     type: string
                   version:

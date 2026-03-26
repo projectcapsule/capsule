@@ -164,5 +164,5 @@ func assignToTenant(
 		return nil
 	}
 
-	return controllerutil.SetOwnerReference(tnt, ns, c.Scheme(), controllerutil.WithBlockOwnerDeletion(true))
+	return controllerutil.SetOwnerReference(tnt, ns, c.Scheme())
 }

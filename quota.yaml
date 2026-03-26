@@ -1,5 +1,20 @@
 ---
 apiVersion: capsule.clastix.io/v1beta2
+kind: GlobalCustomQuota
+metadata:
+  name: pvc-storage-limit
+spec:
+  limit: "1Gi"
+  source:
+    group: ""
+    version: v1
+    kind: Pod
+    path: .spec.containers[*].resources.limits.cpu
+  namespaceSelectors:
+    - matchLabels:
+        capsule.clastix.io/tenant: solar
+---
+apiVersion: capsule.clastix.io/v1beta2
 kind: CustomQuota
 metadata:
   name: pvc-storage-limit

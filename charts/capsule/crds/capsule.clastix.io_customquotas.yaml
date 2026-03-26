@@ -233,6 +233,9 @@ spec:
                   path:
                     description: Path on GVK where usage is evaluated
                     type: string
+                  scope:
+                    description: Path on GVK where usage is evaluated
+                    type: string
                   version:
                     type: string
                 required:

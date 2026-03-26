@@ -799,6 +799,39 @@ spec:
         timeoutSeconds: {{ $.Values.webhooks.validatingWebhooksTimeoutSeconds }}
         {{- end }}
       {{- end }}
+      {{- with .Values.webhooks.hooks.customquotasobjs }}
+        {{- if .enabled }}
+          {{- $any = true }}
+      - name: generic.custom-quotas.projectcapsule.dev
+        {{- with .opts }}
+        opts:
+          {{- toYaml . |  nindent 10 }}
+        {{- end }}
+        admissionReviewVersions:
+          - v1
+          - v1beta1
+        path: "/generic/custom-quota"
+        failurePolicy:  {{ .failurePolicy }}
+        matchPolicy: {{ .matchPolicy }}
+        {{- with .namespaceSelector }}
+        namespaceSelector:
+          {{- toYaml . |  nindent 10 }}
+        {{- end }}
+        {{- with .objectSelector }}
+        objectSelector:
+          {{- toYaml . |  nindent 10 }}
+        {{- end }}
+        {{- with .matchConditions }}
+        matchConditions:
+          {{- toYaml . |  nindent 10 }}
+        {{- end }}
+        rules:
+          {{- toYaml .rules | nindent 10 }}
+        sideEffects: None
+        timeoutSeconds: {{ $.Values.webhooks.validatingWebhooksTimeoutSeconds }}
+        {{- end }}
+      {{- end }}
+
       {{- if not $any }}
         []
       {{- end }}

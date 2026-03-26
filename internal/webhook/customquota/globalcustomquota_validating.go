@@ -18,7 +18,7 @@ import (
 type globalCustomQuotaValidationHandler struct{}
 
 func GlobalCustomQuotaValidationHandler() handlers.Handler {
-	return &customQuotaValidationHandler{}
+	return &globalCustomQuotaValidationHandler{}
 }
 
 func (h *globalCustomQuotaValidationHandler) OnCreate(_ client.Client, decoder admission.Decoder, _ events.EventRecorder) handlers.Func {

@@ -16,12 +16,12 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 )
 
-func MakeCustomQuotaCacheKey(cq capsulev1beta2.CustomQuota) string {
-	return cq.Namespace + "/" + cq.Name
+func MakeCustomQuotaCacheKey(namespace, name string) string {
+	return namespace + "/" + name
 }
 
-func MakeGlobalCustomQuotaCacheKey(cq capsulev1beta2.GlobalCustomQuota) string {
-	return "C/" + cq.Name
+func MakeGlobalCustomQuotaCacheKey(name string) string {
+	return "C/" + name
 }
 func getResources(
 	ctx context.Context,
