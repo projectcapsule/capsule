@@ -351,6 +351,33 @@ golint-fix: golangci-lint
 e2e: ginkgo
 	$(MAKE) e2e-build && $(MAKE) e2e-exec && $(MAKE) e2e-destroy
 
+# Running e2e tests against an existing Minishift/OpenShift cluster.
+# The Docker environment must point to Minishift's daemon before running:
+#   eval $(minishift docker-env)
+#   eval $(minishift oc-env)
+.PHONY: e2e-minishift
+e2e-minishift: ginkgo
+	$(MAKE) e2e-install-minishift && $(MAKE) e2e-exec
+
+.PHONY: e2e-install-minishift
+e2e-install-minishift: helm-controller-version ko-build-all
+	$(HELM) upgrade \
+	    --dependency-update \
+		--debug \
+		--install \
+		--namespace capsule-system \
+		--create-namespace \
+		--set 'replicaCount=2'\
+		--set 'manager.image.pullPolicy=Never' \
+		--set 'manager.resources=null'\
+		--set "manager.image.tag=$(VERSION)" \
+		--set 'manager.livenessProbe.failureThreshold=10' \
+		--set 'webhooks.hooks.nodes.enabled=true' \
+		--set "webhooks.exclusive=true"\
+		--set "manager.options.logLevel=debug"\
+		capsule \
+		./charts/capsule
+
 e2e-build: kind
 	$(MAKE) dev-build
 	$(MAKE) e2e-install
