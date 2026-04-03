@@ -352,6 +352,9 @@ e2e-build-openshift: minc
 	$(MINC) config set provider docker
 	$(MINC) create
 	$(MINC) status
+	$(MAKE) dev-install-deps
+	$(MAKE) e2e-install
+
 e2e-destroy-openshift: minc
 	$(MINC) delete
 # Running e2e tests in a KinD instance
