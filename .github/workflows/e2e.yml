@@ -65,8 +65,8 @@ jobs:
 
       - name: e2e (Enterprise)
         run: sudo KUBERNETES_SUPPORTED_VERSION=${{ matrix.k8s-version }} make e2e
-  e2e-minishift:
-    name: E2E Testing (Minishift)
+  e2e-openshift:
+    name: E2E Testing (MINC)
     runs-on: ubuntu-latest-8-cores
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -79,16 +79,5 @@ jobs:
 
       - uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4 # v4
 
-      - name: Install MINC
-        run: |
-          curl -L -o minc  https://github.com/minc-org/minc/releases/latest/download/minc_linux_amd64
-          chmod +x ./minc
-
-      - name: Start Minishift
-        run: |
-          ./minc config set provider docker
-          ./minc create --log-level debug
-          ./minc status
-
       - name: e2e
-        run: sudo make e2e
+        run: sudo make e2e-openshift

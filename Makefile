@@ -345,7 +345,15 @@ golint: golangci-lint
 golint-fix: golangci-lint
 	$(GOLANGCI_LINT) run -c .golangci.yaml --verbose --fix
 
-
+.PHONY: e2e-openshift
+e2e-openshift: ginkgo
+	$(MAKE) e2e-build-openshift && $(MAKE) e2e-exec && $(MAKE) e2e-destroy-openshift
+e2e-build-openshift: minc
+	$(MINC) config set provider docker
+	$(MINC) create
+	$(MINC) status
+e2e-destroy-openshift: minc
+	$(MINC) delete
 # Running e2e tests in a KinD instance
 .PHONY: e2e
 e2e: ginkgo
@@ -471,6 +479,13 @@ CT_LOOKUP  := helm/chart-testing
 ct:
 	@test -s $(CT) && $(CT) version | grep -q $(CT_VERSION) || \
 	$(call go-install-tool,$(CT),github.com/$(CT_LOOKUP)/v3/ct@$(CT_VERSION))
+
+MINC:= $(LOCALBIN)/minc
+MINC_VERSION := v0.1.0
+MINC_LOOKUP  := minc-org/minc
+minc:
+	echo "Installing minc to $(MINC)" && \
+	$(call go-install-tool,$(MINC),github.com/$(MINC_LOOKUP)/cmd/minc@$(MINC_VERSION))
 
 KIND         := $(LOCALBIN)/kind
 KIND_VERSION := v0.31.0
