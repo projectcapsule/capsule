@@ -86,8 +86,8 @@ jobs:
 
       - name: Start Minishift
         run: |
-          minc create
-          minc status
+          ./minc create
+          ./minc status
 
       - name: e2e
         run: sudo make e2e
