@@ -67,7 +67,7 @@ jobs:
         run: sudo KUBERNETES_SUPPORTED_VERSION=${{ matrix.k8s-version }} make e2e
   e2e-minishift:
     name: E2E Testing (Minishift)
-    runs-on: ubuntu-latest
+    runs-on: oracle-vm-16cpu-64gb-x86-64
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -79,37 +79,15 @@ jobs:
 
       - uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4 # v4
 
-      - name: Enable KVM
+      - name: Install MINC
         run: |
-          sudo apt-get update
-          sudo apt-get install -y qemu-kvm libvirt-daemon-system libvirt-clients bridge-utils libvirt-daemon-system
-          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
-          sudo udevadm control --reload-rules
-          sudo udevadm trigger --name-match=kvm
-          sudo adduser $USER kvm
-
-      - name: Install Minishift
-        env:
-          MINISHIFT_VERSION: 1.34.3
-        run: |
-          curl -Lo minishift.tgz \
-            https://github.com/minishift/minishift/releases/download/v${MINISHIFT_VERSION}/minishift-${MINISHIFT_VERSION}-linux-amd64.tgz
-          tar -xzf minishift.tgz
-          sudo mv minishift-${MINISHIFT_VERSION}-linux-amd64/minishift /usr/local/bin/minishift
-          minishift version
+          curl -L -o minc  https://github.com/minc-org/minc/releases/latest/download/minc_linux_amd64
+          chmod +x minc
 
       - name: Start Minishift
         run: |
-          minishift start --memory 8192 --cpus 4 --disk-size 40g
-          minishift status
+          minc create
+          minc status
 
-      - name: Configure Docker and kubectl for Minishift
-        run: |
-          eval $(minishift docker-env)
-          eval $(minishift oc-env)
-          # Export Docker daemon variables so subsequent steps can use them
-          minishift docker-env | grep -v '^#' | grep '=' >> "$GITHUB_ENV"
-          echo "$(minishift oc-env | grep PATH | sed 's/export PATH=//' | tr -d '"' | cut -d: -f1)" >> "$GITHUB_PATH"
-
-      - name: e2e on Minishift
-        run: make e2e-minishift
+      - name: e2e
+        run: sudo make e2e
