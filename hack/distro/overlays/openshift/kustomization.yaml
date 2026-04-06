@@ -1,0 +1,35 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../fluxcd
+
+patches:
+  - target:
+      kind: Deployment
+      labelSelector: app.kubernetes.io/part-of=flux
+    patch: |
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: not-used-with-target
+      spec:
+        template:
+          spec:
+            securityContext:
+              $patch: delete
+            containers:
+              - name: manager
+                securityContext:
+                  runAsUser: 65534
+                  seccompProfile:
+                    $patch: delete
+
+  - target:
+      kind: Namespace
+      labelSelector: app.kubernetes.io/part-of=flux
+    patch: |-
+      - op: remove
+        path: /metadata/labels/pod-security.kubernetes.io~1warn
+      - op: remove
+        path: /metadata/labels/pod-security.kubernetes.io~1warn-version
