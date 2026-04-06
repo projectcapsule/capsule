@@ -359,7 +359,7 @@ e2e-openshift: ginkgo
 e2e-build-openshift: minc
 	export DISTRO=openshift
 	$(MINC) config set provider docker
-	$(MINC) create
+	$(MINC) create --disable-overlay-cache true
 	$(MINC) status
 	$(MAKE) dev-install-deps
 	$(MAKE) e2e-install
