@@ -189,6 +189,7 @@ dev-setup:
 		./charts/capsule || true
 
 setup-monitoring: dev-setup-fluxcd
+
 	@$(KUBECTL) kustomize --load-restrictor='LoadRestrictionsNone' hack/distro/monitoring | envsubst | kubectl apply -f -
 	@$(KUBECTL) kustomize --load-restrictor='LoadRestrictionsNone' hack/distro/monitoring/dashboards | kubectl apply -f -
 	@$(MAKE) wait-for-helmreleases
@@ -210,7 +211,14 @@ dev-setup-cert-manager:
 	@$(KUBECTL) kustomize --load-restrictor='LoadRestrictionsNone' hack/distro/cert-manager | envsubst | kubectl apply -f -
 
 dev-setup-fluxcd:
-	@$(KUBECTL) kustomize --load-restrictor='LoadRestrictionsNone' hack/distro/fluxcd | envsubst | kubectl apply -f -
+	if [ "$$DISTRO" = "openshift" ]; then \
+		echo "Running OpenShift"; \
+		@$(KUBECTL) kustomize --load-restrictor='LoadRestrictionsNone' hack/distro/overlays/openshift | envsubst | kubectl apply -f -
+	else \
+		echo "Other distro"; \
+		@$(KUBECTL) kustomize --load-restrictor='LoadRestrictionsNone' hack/distro/fluxcd | envsubst | kubectl apply -f -
+	fi
+
 
 
 # Here to setup the current capsule version
@@ -349,6 +357,7 @@ golint-fix: golangci-lint
 e2e-openshift: ginkgo
 	$(MAKE) e2e-build-openshift && $(MAKE) e2e-exec && $(MAKE) e2e-destroy-openshift
 e2e-build-openshift: minc
+	export DISTRO=openshift
 	$(MINC) config set provider docker
 	$(MINC) create
 	$(MINC) status
