@@ -3,7 +3,7 @@ kind: Kustomization
 
 resources:
   - ../../fluxcd
-
+  - https://raw.githubusercontent.com/fluxcd/flux2/main/manifests/openshift/scc.yaml
 patches:
   - target:
       kind: Deployment
@@ -12,7 +12,7 @@ patches:
       apiVersion: apps/v1
       kind: Deployment
       metadata:
-        name: not-used-with-target
+        name: all
       spec:
         template:
           spec:
@@ -21,7 +21,6 @@ patches:
             containers:
               - name: manager
                 securityContext:
-                  runAsUser: 65534
                   seccompProfile:
                     $patch: delete
 

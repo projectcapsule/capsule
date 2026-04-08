@@ -113,7 +113,7 @@ dev-destroy: kind
 	$(KIND) delete cluster --name capsule
 
 dev-install-deps: dev-setup-fluxcd dev-setup-cert-manager dev-install-gw-api-crds  wait-for-helmreleases
-
+dev-install-deps-openshift: dev-setup-fluxcd-openshift dev-setup-cert-manager dev-install-gw-api-crds  wait-for-helmreleases
 API_GW         := none
 API_GW_VERSION := v1.3.0
 API_GW_LOOKUP  := kubernetes-sigs/gateway-api
@@ -211,13 +211,13 @@ dev-setup-cert-manager:
 	@$(KUBECTL) kustomize --load-restrictor='LoadRestrictionsNone' hack/distro/cert-manager | envsubst | kubectl apply -f -
 
 dev-setup-fluxcd:
-	if [ "$$DISTRO" = "openshift" ]; then \
-		echo "Running OpenShift"; \
-		@$(KUBECTL) kustomize --load-restrictor='LoadRestrictionsNone' hack/distro/overlays/openshift | envsubst | kubectl apply -f -
-	else \
-		echo "Other distro"; \
-		@$(KUBECTL) kustomize --load-restrictor='LoadRestrictionsNone' hack/distro/fluxcd | envsubst | kubectl apply -f -
-	fi
+	@$(KUBECTL) kustomize --load-restrictor='LoadRestrictionsNone' hack/distro/fluxcd | envsubst | kubectl apply -f -; \
+
+dev-setup-cert-manager-openshift:
+	@$(KUBECTL) kustomize --load-restrictor='LoadRestrictionsNone' hack/distro/cert-manager | envsubst | kubectl apply -f -
+
+dev-setup-fluxcd-openshift:
+	@$(KUBECTL) kustomize --load-restrictor='LoadRestrictionsNone' hack/distro/overlays/openshift | envsubst | kubectl apply -f -; \
 
 
 
@@ -357,15 +357,15 @@ golint-fix: golangci-lint
 e2e-openshift: ginkgo
 	$(MAKE) e2e-build-openshift && $(MAKE) e2e-exec && $(MAKE) e2e-destroy-openshift
 e2e-build-openshift: minc
-	export DISTRO=openshift
 	$(MINC) config set provider docker
 	$(MINC) create --disable-overlay-cache true
 	$(MINC) status
-	$(MAKE) dev-install-deps
-	$(MAKE) e2e-install
+	$(MAKE) dev-install-deps-openshift
+	$(MAKE) e2e-install-openshift
 
 e2e-destroy-openshift: minc
 	$(MINC) delete
+
 # Running e2e tests in a KinD instance
 .PHONY: e2e
 e2e: ginkgo
@@ -392,6 +392,28 @@ e2e-install: helm-controller-version ko-build-all
 		--set 'webhooks.hooks.nodes.enabled=true' \
 		--set "webhooks.exclusive=true"\
 		--set "manager.options.logLevel=debug"\
+		capsule \
+		./charts/capsule
+
+.PHONY: e2e-install-openshift
+e2e-install-openshift: helm-controller-version ko-build-all
+	$(MAKE) e2e-load-image-openshift IMAGE=$(CAPSULE_IMG) VERSION=$(VERSION)
+	$(HELM) upgrade \
+	    --dependency-update \
+		--debug \
+		--install \
+		--namespace capsule-system \
+		--create-namespace \
+		--set 'replicaCount=2'\
+		--set 'manager.image.pullPolicy=Never' \
+		--set 'manager.resources=null'\
+		--set "manager.image.tag=$(VERSION)" \
+		--set 'manager.livenessProbe.failureThreshold=10' \
+		--set 'webhooks.hooks.nodes.enabled=true' \
+		--set "webhooks.exclusive=true"\
+		--set "manager.options.logLevel=debug"\
+		--set "jobs.podSecurityContext.enabled=false"\
+		--set "jobs.securityContext.enabled=false"\
 		capsule \
 		./charts/capsule
 
@@ -432,6 +454,12 @@ seccomp:
 .PHONY: e2e-load-image
 e2e-load-image: kind
 	$(KIND) load docker-image $(IMAGE):$(VERSION) --name $(CLUSTER_NAME)
+
+.PHONY: e2e-load-image-openshift
+e2e-load-image-openshift: minc
+	docker save $(IMAGE):$(VERSION) > capsule.tar
+	docker cp capsule.tar microshift:/tmp/
+	docker exec -it microshift sh -c 'podman load -i /tmp/capsule.tar'
 
 .PHONY: e2e-exec
 e2e-exec: ginkgo
