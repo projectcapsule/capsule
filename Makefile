@@ -462,7 +462,7 @@ e2e-load-image: kind
 e2e-load-image-openshift: minc
 	docker save $(IMAGE):$(VERSION) > capsule.tar
 	docker cp capsule.tar microshift:/tmp/
-	docker exec -it microshift sh -c 'podman load -i /tmp/capsule.tar'
+	docker exec microshift sh -c 'podman load -i /tmp/capsule.tar'
 
 .PHONY: e2e-exec
 e2e-exec: ginkgo
