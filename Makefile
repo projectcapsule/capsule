@@ -214,9 +214,6 @@ dev-setup-cert-manager:
 dev-setup-fluxcd:
 	@$(KUBECTL) kustomize --load-restrictor='LoadRestrictionsNone' hack/distro/fluxcd | envsubst | kubectl apply -f -; \
 
-dev-setup-cert-manager-openshift:
-	@$(KUBECTL) kustomize --load-restrictor='LoadRestrictionsNone' hack/distro/cert-manager | envsubst | kubectl apply -f -
-
 dev-setup-fluxcd-openshift:
 	@$(KUBECTL) kustomize --load-restrictor='LoadRestrictionsNone' hack/distro/overlays/openshift | envsubst | kubectl apply -f -; \
 
