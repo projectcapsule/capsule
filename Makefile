@@ -525,7 +525,7 @@ ct:
 	$(call go-install-tool,$(CT),github.com/$(CT_LOOKUP)/v3/ct@$(CT_VERSION))
 
 MINC:= $(LOCALBIN)/minc
-MINC_VERSION := v0.1.0
+MINC_VERSION := 5d70364166af05edf00fe0d1ea8e731f138b5c51
 MINC_LOOKUP  := minc-org/minc
 minc:
 	echo "Installing minc to $(MINC)" && \
