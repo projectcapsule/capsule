@@ -7,9 +7,10 @@ import (
 	"os"
 
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
 
-func (in *Tenant) SetupWebhookWithManager(mgr ctrl.Manager) error {
+func (in *Tenant) SetupWebhookWithManager(mgr manager.Manager) error {
 	certData, _ := os.ReadFile("/tmp/k8s-webhook-server/serving-certs/tls.crt")
 	if len(certData) == 0 {
 		return nil
