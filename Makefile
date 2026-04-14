@@ -354,7 +354,7 @@ golint-fix: golangci-lint
 
 .PHONY: e2e-openshift
 e2e-openshift: ginkgo
-	$(MAKE) e2e-build-openshift && $(MAKE) e2e-exec FILTER='--label-filter="!skip && skip-on-openshift"' && $(MAKE) e2e-destroy-openshift
+	$(MAKE) e2e-build-openshift && $(MAKE) e2e-exec FILTER='--label-filter="!skip && !skip-on-openshift"' && $(MAKE) e2e-destroy-openshift
 
 e2e-build-openshift: minc
 	$(MINC) config set provider docker
