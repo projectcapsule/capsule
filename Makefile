@@ -215,10 +215,10 @@ dev-setup-cert-manager:
 	@$(KUBECTL) kustomize --load-restrictor='LoadRestrictionsNone' hack/distro/cert-manager | envsubst | kubectl apply -f -
 
 dev-setup-fluxcd:
-	@$(KUBECTL) kustomize --load-restrictor='LoadRestrictionsNone' hack/distro/fluxcd | envsubst | kubectl apply -f -; \
+	@$(KUBECTL) kustomize --load-restrictor='LoadRestrictionsNone' hack/distro/fluxcd | envsubst | kubectl apply -f -
 
 dev-setup-fluxcd-openshift:
-	@$(KUBECTL) kustomize --load-restrictor='LoadRestrictionsNone' hack/distro/overlays/openshift | envsubst | kubectl apply -f -; \
+	@$(KUBECTL) kustomize --load-restrictor='LoadRestrictionsNone' hack/distro/overlays/openshift | envsubst | kubectl apply -f -
 
 dev-setup-openshift-specifics:
 	@$(KUBECTL) apply -f hack/distro/openshift/extend-admin-role.yaml
@@ -364,7 +364,7 @@ e2e-build-openshift: minc
 	$(MINC) config set microshift-version $(OS_SUPPORTED_VERSION)
 	$(MINC) create --disable-overlay-cache true
 	$(MINC) status
-	$(MAKE) dev-install-deps-openshift
+	$(MAKE) dev-install-deps-optarenshift
 	$(MAKE) dev-setup-openshift-specifics
 	$(MAKE) e2e-install-openshift
 
@@ -466,6 +466,7 @@ e2e-load-image-openshift: minc
 	docker save $(IMAGE):$(VERSION) > capsule.tar
 	docker cp capsule.tar microshift:/tmp/
 	docker exec microshift sh -c 'podman load -i /tmp/capsule.tar'
+	rm -rf capsule.tar
 
 .PHONY: e2e-exec
 e2e-exec: ginkgo
