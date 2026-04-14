@@ -90,7 +90,7 @@ jobs:
         run: sudo OS_SUPPORTED_VERSION=${{ matrix.os-version }} make e2e-openshift
 
   e2e-openshift-CE:
-    name: E2E Testing (CE)
+    name: E2E OpenShift Testing (CE)
     runs-on:
       labels: ubuntu-latest-8-cores
     steps:
