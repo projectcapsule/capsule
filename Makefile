@@ -17,7 +17,7 @@ IMG_BASE        ?= $(REPOSITORY)
 IMG             ?= $(IMG_BASE):$(VERSION)
 CAPSULE_IMG     ?= $(REGISTRY)/$(IMG_BASE)
 CLUSTER_NAME    ?= capsule
-
+FILTER		 	?= --label-filter="!skip && !skip-openshift"
 ## Kubernetes Version Support
 KUBERNETES_SUPPORTED_VERSION ?= "v1.35.0"
 
@@ -361,7 +361,9 @@ e2e-build-openshift: minc
 	$(MINC) create --disable-overlay-cache true
 	$(MINC) status
 	$(MAKE) dev-install-deps-openshift
+	$(MAKE) dev-setup-openshift-specifics
 	$(MAKE) e2e-install-openshift
+
 
 e2e-destroy-openshift: minc
 	$(MINC) delete
@@ -463,8 +465,7 @@ e2e-load-image-openshift: minc
 
 .PHONY: e2e-exec
 e2e-exec: ginkgo
-	$(MAKE) dev-setup-openshift-specifics
-	$(GINKGO) -v -tags e2e ./e2e
+	$(GINKGO) -v -tags e2e $(FILTER) ./e2e
 
 .PHONY: e2e-destroy
 e2e-destroy: dev-destroy
