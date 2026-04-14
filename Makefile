@@ -21,6 +21,9 @@ FILTER		 	?= --label-filter="!skip"
 ## Kubernetes Version Support
 KUBERNETES_SUPPORTED_VERSION ?= "v1.35.0"
 
+## Openshift Version Support
+OS_SUPPORTED_VERSION ?= "4.22.0-okd-scos.ec.10"
+
 ## Tool Binaries
 KUBECTL ?= kubectl
 HELM ?= helm
@@ -358,6 +361,7 @@ e2e-openshift: ginkgo
 
 e2e-build-openshift: minc
 	$(MINC) config set provider docker
+	$(MINC) config set microshift-version $(OS_SUPPORTED_VERSION)
 	$(MINC) create --disable-overlay-cache true
 	$(MINC) status
 	$(MAKE) dev-install-deps-openshift
