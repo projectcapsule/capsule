@@ -204,7 +204,7 @@ var _ = Describe("enforcing a Priority Class", Label("pod", "classes"), func() {
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 	})
 
-	It("should allow all classes", Label("skip-on-openshift"), Label("skip-on-openshift"), func() {
+	It("should allow all classes", Label("skip-on-openshift"), func() {
 		all := []string{"system-cluster-critical", "system-node-critical", customerBronze.GetName(), customerSilver.GetName(), customerGold.GetName()}
 
 		By("Verify Status (Creation)", func() {

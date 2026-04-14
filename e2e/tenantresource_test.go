@@ -191,7 +191,7 @@ var _ = Describe("Creating a TenantResource object", Label("tenantresource"), fu
 		_ = k8sClient.Delete(context.TODO(), solar)
 	})
 
-	It("should replicate resources to all Tenant Namespaces", Label("skip-on-openshift"), func() {
+	It("should replicate resources to all Tenant Namespaces", Label("skip"), func() {
 		solarNs := []string{"solar-one", "solar-two", "solar-three"}
 
 		By("creating solar Namespaces", func() {

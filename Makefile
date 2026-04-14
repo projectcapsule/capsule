@@ -17,7 +17,7 @@ IMG_BASE        ?= $(REPOSITORY)
 IMG             ?= $(IMG_BASE):$(VERSION)
 CAPSULE_IMG     ?= $(REGISTRY)/$(IMG_BASE)
 CLUSTER_NAME    ?= capsule
-FILTER		 	?= --label-filter="!skip && !skip-openshift"
+FILTER		 	?= --label-filter="!skip"
 ## Kubernetes Version Support
 KUBERNETES_SUPPORTED_VERSION ?= "v1.35.0"
 
@@ -354,7 +354,7 @@ golint-fix: golangci-lint
 
 .PHONY: e2e-openshift
 e2e-openshift: ginkgo
-	$(MAKE) e2e-build-openshift && $(MAKE) e2e-exec
+	$(MAKE) e2e-build-openshift && $(MAKE) e2e-exec FILTER='--label-filter="!skip && skip-on-openshift"' && $(MAKE) e2e-destroy-openshift
 
 e2e-build-openshift: minc
 	$(MINC) config set provider docker

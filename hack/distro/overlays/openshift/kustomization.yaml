@@ -3,7 +3,7 @@ kind: Kustomization
 
 resources:
   - ../../fluxcd
-  - https://raw.githubusercontent.com/fluxcd/flux2/main/manifests/openshift/scc.yaml
+  - https://raw.githubusercontent.com/fluxcd/flux2/v2.4.0/manifests/openshift/scc.yaml
 patches:
   - target:
       kind: Deployment
