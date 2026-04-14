@@ -364,7 +364,7 @@ e2e-build-openshift: minc
 	$(MINC) config set microshift-version $(OS_SUPPORTED_VERSION)
 	$(MINC) create --disable-overlay-cache true
 	$(MINC) status
-	$(MAKE) dev-install-deps-optarenshift
+	$(MAKE) dev-install-deps-openshift
 	$(MAKE) dev-setup-openshift-specifics
 	$(MAKE) e2e-install-openshift
 
