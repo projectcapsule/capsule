@@ -108,4 +108,3 @@ jobs:
 
       - name: e2e
         run: sudo OS_SUPPORTED_VERSION=${{ matrix.os-version }} make e2e-openshift
-        
