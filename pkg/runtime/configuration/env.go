@@ -10,8 +10,12 @@ const (
 	EnvironmentControllerNamespace string = "NAMESPACE"
 )
 
+func ControllerNamespace() (namespace string) {
+	return os.Getenv("NAMESPACE")
+}
+
 func ControllerServiceAccount() (name string, namespace string) {
-	return os.Getenv("SERVICE_ACCOUNT"), os.Getenv("NAMESPACE")
+	return os.Getenv("SERVICE_ACCOUNT"), ControllerNamespace()
 }
 
 func IsControllerServiceAccount(name string, namespace string) bool {

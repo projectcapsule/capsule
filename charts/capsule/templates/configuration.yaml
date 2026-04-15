@@ -110,7 +110,7 @@ spec:
         {{- with .opts }}
         opts:
           {{- toYaml . |  nindent 10 }}
-        {{- end }}    
+        {{- end }}
         admissionReviewVersions:
           - v1
           - v1beta1
@@ -799,10 +799,10 @@ spec:
         timeoutSeconds: {{ $.Values.webhooks.validatingWebhooksTimeoutSeconds }}
         {{- end }}
       {{- end }}
-      {{- with .Values.webhooks.hooks.customquotasobjs }}
+      {{- with .Values.webhooks.hooks.calculations }}
         {{- if .enabled }}
           {{- $any = true }}
-      - name: generic.custom-quotas.projectcapsule.dev
+      - name: calculation.custom-quotas.projectcapsule.dev
         {{- with .opts }}
         opts:
           {{- toYaml . |  nindent 10 }}
@@ -1149,7 +1149,7 @@ spec:
         admissionReviewVersions:
           - v1
           - v1beta1
-        path: "/tenants/mutating" 
+        path: "/tenants/mutating"
         failurePolicy:  {{ .failurePolicy }}
         matchPolicy: {{ .matchPolicy }}
         reinvocationPolicy: {{ .reinvocationPolicy }}

@@ -1,0 +1,11 @@
+version: 1 # optional for v1 files, there is no v2 yet
+defaults:
+  interval: 60m # all sync checks run hourly
+sync:
+  # SOPS Operator
+  - source: oci.peakscale.ch/prereleases/images/capsule
+    target: registry.projectcapsule.dev/prereleases/capsule
+    type: repository
+    tagSets:
+      - allow:
+        - "*"

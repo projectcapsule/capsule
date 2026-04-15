@@ -24,8 +24,12 @@ func (o GlobalTargetReference) Func() client.IndexerFunc {
 	return func(object client.Object) []string {
 		tr := object.(*capsulev1beta2.GlobalCustomQuota) //nolint:forcetypeassert
 
-		target := tr.Status.Target
+		targets := []string{}
+		for _, t := range tr.Status.Targets {
+			targets = append(targets, t.String())
 
-		return []string{target.String()}
+		}
+
+		return targets
 	}
 }

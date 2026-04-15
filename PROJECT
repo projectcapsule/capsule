@@ -71,4 +71,13 @@ resources:
   kind: TenantOwner
   path: github.com/projectcapsule/capsule/api/v1beta2
   version: v1beta2
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: clastix.io
+  group: capsule
+  kind: QuantityLedger
+  path: github.com/projectcapsule/capsule/api/v1beta2
+  version: v1beta2
 version: "3"

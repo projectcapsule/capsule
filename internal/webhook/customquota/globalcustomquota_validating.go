@@ -13,6 +13,7 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
+	"github.com/projectcapsule/capsule/pkg/runtime/quota"
 )
 
 type globalCustomQuotaValidationHandler struct{}
@@ -23,13 +24,13 @@ func GlobalCustomQuotaValidationHandler() handlers.Handler {
 
 func (h *globalCustomQuotaValidationHandler) OnCreate(_ client.Client, decoder admission.Decoder, _ events.EventRecorder) handlers.Func {
 	return func(_ context.Context, req admission.Request) *admission.Response {
-		quota := &capsulev1beta2.GlobalCustomQuota{}
+		q := &capsulev1beta2.GlobalCustomQuota{}
 
-		if err := decoder.Decode(req, quota); err != nil {
+		if err := decoder.Decode(req, q); err != nil {
 			return ad.ErroredResponse(fmt.Errorf("failed to decode new object: %w", err))
 		}
 
-		if err := validateQuantity(quota.Spec.Limit); err != nil {
+		if err := quota.ValidateQuantity(q.Spec.Limit); err != nil {
 			response := admission.Denied(fmt.Sprintf("invalid spec.limit: %v", err))
 			return &response
 		}
@@ -57,7 +58,7 @@ func (h *globalCustomQuotaValidationHandler) OnUpdate(_ client.Client, decoder a
 			return ad.ErroredResponse(fmt.Errorf("failed to decode new object: %w", err))
 		}
 
-		if err := validateQuantity(newQuota.Spec.Limit); err != nil {
+		if err := quota.ValidateQuantity(newQuota.Spec.Limit); err != nil {
 			response := admission.Denied(fmt.Sprintf("invalid spec.limit: %v", err))
 			return &response
 		}
@@ -68,10 +69,11 @@ func (h *globalCustomQuotaValidationHandler) OnUpdate(_ client.Client, decoder a
 		hasUsage := used.Sign() > 0
 
 		if hasUsage {
-			if sourceChanged(oldQuota.Spec.Source, newQuota.Spec.Source) {
+			if sourcesChanged(oldQuota.Spec.Sources, newQuota.Spec.Sources) {
 				response := admission.Denied(
-					"spec.source cannot be changed while usage is recorded; create a new CustomQuota instead",
+					fmt.Sprintf("spec.sources cannot be changed while usage is recorded (usage: %s); create a new CustomQuota instead", used.String()),
 				)
+
 				return &response
 			}
 

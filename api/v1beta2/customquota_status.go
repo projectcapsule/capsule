@@ -6,6 +6,7 @@ package v1beta2
 import (
 	k8smeta "k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/projectcapsule/capsule/pkg/api/meta"
@@ -17,9 +18,9 @@ type CustomQuotaStatus struct {
 	// +optional
 	Usage CustomQuotaStatusUsage `json:"usage,omitempty"`
 	// Objects regarding this policy
-	Claims []meta.NamespacedObjectWithUIDReference `json:"claims,omitempty"`
+	Claims []CustomQuotaClaimItem `json:"claims,omitempty"`
 	// Targeting GVK
-	Target CustomQuotaStatusTarget `json:"target"`
+	Targets []CustomQuotaStatusTarget `json:"targets"`
 	// Conditions
 	Conditions meta.ConditionList `json:"conditions"`
 }
@@ -32,6 +33,14 @@ func (s *CustomQuotaStatus) HasClaimUID(uid types.UID) bool {
 	}
 
 	return false
+}
+
+type CustomQuotaClaimItem struct {
+	metav1.GroupVersionKind               `json:",inline"`
+	meta.NamespacedObjectWithUIDReference `json:",inline"`
+
+	// Resource Quantity for given item
+	Usage resource.Quantity `json:"usage"`
 }
 
 type CustomQuotaStatusTarget struct {

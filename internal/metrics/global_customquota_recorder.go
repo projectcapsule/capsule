@@ -13,6 +13,7 @@ type GlobalCustomQuotaRecorder struct {
 	ResourceUsageGauge     *prometheus.GaugeVec
 	ResourceLimitGauge     *prometheus.GaugeVec
 	ResourceAvailableGauge *prometheus.GaugeVec
+	ResourceItemUsageGauge *prometheus.GaugeVec
 }
 
 func MustMakeGlobalCustomQuotaRecorder() *GlobalCustomQuotaRecorder {
@@ -52,6 +53,13 @@ func NewGlobalCustomQuotaRecorder() *GlobalCustomQuotaRecorder {
 				Help:      "Available resources for given global_custom quota",
 			}, []string{"custom_quota"},
 		),
+		ResourceItemUsageGauge: prometheus.NewGaugeVec(
+			prometheus.GaugeOpts{
+				Namespace: metricsPrefix,
+				Name:      "global_custom_quota_resource_item_usage",
+				Help:      "Claimed resources from given item",
+			}, []string{"custom_quota", "name", "target_namespace", "kind", "group"},
+		),
 	}
 }
 
@@ -61,6 +69,7 @@ func (r *GlobalCustomQuotaRecorder) Collectors() []prometheus.Collector {
 		r.ResourceUsageGauge,
 		r.ResourceLimitGauge,
 		r.ResourceAvailableGauge,
+		r.ResourceItemUsageGauge,
 	}
 }
 
@@ -77,6 +86,10 @@ func (r *GlobalCustomQuotaRecorder) DeleteAllMetricsForGlobalCustomQuota(name st
 	r.ResourceAvailableGauge.DeletePartialMatch(map[string]string{
 		"custom_quota": name,
 	})
+	r.ResourceItemUsageGauge.DeletePartialMatch(map[string]string{
+		"custom_quota": name,
+	})
+
 }
 
 func (r *GlobalCustomQuotaRecorder) DeleteConditionMetricByType(name string, condition string) {

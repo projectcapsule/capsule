@@ -20,9 +20,11 @@ type GlobalCustomQuotaSpec struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:resource:scope=Cluster
 // +kubebuilder:subresource:status
-// +kubebuilder:printcolumn:name="Used",type="string",JSONPath=".status.used",description="The total used amount"
 // +kubebuilder:printcolumn:name="Limit",type="string",JSONPath=".spec.limit",description="The total limit available"
-// +kubebuilder:printcolumn:name="Available",type="string",JSONPath=".status.available",description="The total amount available"
+// +kubebuilder:printcolumn:name="Used",type="string",JSONPath=".status.usage.used",description="The total used amount"
+// +kubebuilder:printcolumn:name="Available",type="string",JSONPath=".status.usage.available",description="The total amount available"
+// +kubebuilder:printcolumn:name="Ready",type="string",JSONPath=".status.conditions[?(@.type==\"Ready\")].status",description="Reconcile Status"
+// +kubebuilder:printcolumn:name="Status",type="string",JSONPath=".status.conditions[?(@.type==\"Ready\")].message",description="Reconcile Message"
 
 type GlobalCustomQuota struct {
 	metav1.TypeMeta `json:",inline"`

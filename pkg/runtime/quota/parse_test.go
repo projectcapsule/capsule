@@ -9,6 +9,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
+	"github.com/projectcapsule/capsule/pkg/runtime/jsonpath"
 	"github.com/projectcapsule/capsule/pkg/runtime/quota"
 )
 
@@ -159,7 +160,12 @@ func TestParseUsageFromUnstructured_Success(t *testing.T) {
 		},
 	}
 
-	got, err := quota.ParseUsageFromUnstructured(u, ".spec.resources.requests.cpu")
+	jp, err := jsonpath.CompileJSONPath(".spec.resources.requests.cpu")
+	if err == nil {
+		t.Fatal("expected no error, got error", err)
+	}
+
+	got, err := quota.ParseUsageFromUnstructured(u, jp)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -178,7 +184,12 @@ func TestParseUsageFromUnstructured_TrimsWhitespace(t *testing.T) {
 		},
 	}
 
-	got, err := quota.ParseUsageFromUnstructured(u, ".spec.value")
+	jp, err := jsonpath.CompileJSONPath(".spec.value")
+	if err == nil {
+		t.Fatal("expected no error, got error", err)
+	}
+
+	got, err := quota.ParseUsageFromUnstructured(u, jp)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -195,7 +206,12 @@ func TestParseUsageFromUnstructured_MissingPath(t *testing.T) {
 		},
 	}
 
-	_, err := quota.ParseUsageFromUnstructured(u, ".spec.resources.requests.cpu")
+	jp, err := jsonpath.CompileJSONPath(".spec.resources.requests.cpu")
+	if err == nil {
+		t.Fatal("expected no error, got error", err)
+	}
+
+	_, err = quota.ParseUsageFromUnstructured(u, jp)
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -206,7 +222,12 @@ func TestParseUsageFromUnstructured_InvalidJSONPath(t *testing.T) {
 		Object: map[string]interface{}{},
 	}
 
-	_, err := quota.ParseUsageFromUnstructured(u, ".spec[")
+	jp, err := jsonpath.CompileJSONPath(".spec[")
+	if err == nil {
+		t.Fatal("expected no error, got error", err)
+	}
+
+	_, err = quota.ParseUsageFromUnstructured(u, jp)
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -217,7 +238,12 @@ func TestParseUsageFromUnstructured_EmptySourcePath(t *testing.T) {
 		Object: map[string]interface{}{},
 	}
 
-	_, err := quota.ParseUsageFromUnstructured(u, "")
+	jp, err := jsonpath.CompileJSONPath("")
+	if err != nil {
+		t.Fatal("expected error, got nil")
+	}
+
+	_, err = quota.ParseUsageFromUnstructured(u, jp)
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -228,7 +254,12 @@ func TestParseUsageFromUnstructured_SourcePathMustStartWithDot(t *testing.T) {
 		Object: map[string]interface{}{},
 	}
 
-	_, err := quota.ParseUsageFromUnstructured(u, "spec.resources.requests.cpu")
+	jp, err := jsonpath.CompileJSONPath("spec.resources.requests.cpu")
+	if err != nil {
+		t.Fatal("expected error, got nil")
+	}
+
+	_, err = quota.ParseUsageFromUnstructured(u, jp)
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -239,7 +270,12 @@ func TestParseUsageFromUnstructured_RejectsControlWhitespace(t *testing.T) {
 		Object: map[string]interface{}{},
 	}
 
-	_, err := quota.ParseUsageFromUnstructured(u, ".spec.\nrequests.cpu")
+	jp, err := jsonpath.CompileJSONPath(".spec.\nrequests.cpu")
+	if err != nil {
+		t.Fatal("expected error, got nil")
+	}
+
+	_, err = quota.ParseUsageFromUnstructured(u, jp)
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}

@@ -8,6 +8,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/labels"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -112,6 +113,10 @@ func LabelsChanged(keys []string, oldLabels, newLabels map[string]string) bool {
 	}
 
 	return false
+}
+
+func LabelsChangedUnstructured(oldObj, newObj unstructured.Unstructured) bool {
+	return !labels.Equals(labels.Set(oldObj.GetLabels()), labels.Set(newObj.GetLabels()))
 }
 
 // Collect all mentioned keys from a LabelSelector

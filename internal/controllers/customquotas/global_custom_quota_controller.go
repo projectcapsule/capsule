@@ -12,25 +12,30 @@ import (
 	"github.com/go-logr/logr"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	k8smeta "k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/cluster-api/util/patch"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
-	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/internal/cache"
 	"github.com/projectcapsule/capsule/internal/controllers/utils"
 	"github.com/projectcapsule/capsule/internal/metrics"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
+	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
+	"github.com/projectcapsule/capsule/pkg/runtime/predicates"
 	"github.com/projectcapsule/capsule/pkg/runtime/quota"
 	"github.com/projectcapsule/capsule/pkg/runtime/selectors"
 )
@@ -39,47 +44,48 @@ type clusterCustomQuotaClaimController struct {
 	client.Client
 
 	log      logr.Logger
-	recorder record.EventRecorder
+	recorder events.EventRecorder
 	metrics  *metrics.GlobalCustomQuotaRecorder
 	mapper   k8smeta.RESTMapper
 
-	admissionNotifier chan event.TypedGenericEvent[*capsulev1beta2.GlobalCustomQuota]
-	cache             *cache.QuantityCache[string]
+	jsonPathCache *cache.JSONPathCache
+	targetsCache  *cache.CompiledTargetsCache[string]
 }
 
 func (r *clusterCustomQuotaClaimController) SetupWithManager(mgr ctrl.Manager, cfg utils.ControllerOptions) error {
 	r.mapper = mgr.GetRESTMapper()
 
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&capsulev1beta2.GlobalCustomQuota{}).
-		WatchesRawSource(
-			source.Channel(
-				r.admissionNotifier,
-				&handler.TypedEnqueueRequestForObject[*capsulev1beta2.GlobalCustomQuota]{},
+		For(
+			&capsulev1beta2.GlobalCustomQuota{},
+			builder.WithPredicates(
+				predicate.Or(
+					predicate.GenerationChangedPredicate{},
+					predicates.ReconcileRequestedPredicate{},
+				),
 			),
+		).
+		Watches(
+			&capsulev1beta2.QuantityLedger{},
+			handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &capsulev1beta2.GlobalCustomQuota{}),
 		).
 		WithOptions(controller.Options{MaxConcurrentReconciles: cfg.MaxConcurrentReconciles}).
 		Complete(r)
 }
 
-//nolint:dupl
-func (r *clusterCustomQuotaClaimController) Reconcile(ctx context.Context, request ctrl.Request) (result ctrl.Result, err error) {
+func (r *clusterCustomQuotaClaimController) Reconcile(ctx context.Context, request ctrl.Request) (ctrl.Result, error) {
 	log := r.log.WithValues("Request.Name", request.Name)
 
 	instance := &capsulev1beta2.GlobalCustomQuota{}
-	if err = r.Get(ctx, request.NamespacedName, instance); err != nil {
+	if err := r.Get(ctx, request.NamespacedName, instance); err != nil {
 		if apierrors.IsNotFound(err) {
 			log.V(3).Info("Request object not found, could have been deleted after reconcile request")
-
 			r.metrics.DeleteAllMetricsForGlobalCustomQuota(request.Name)
-			r.cache.Delete(MakeGlobalCustomQuotaCacheKey(request.Namespace))
-
 			return reconcile.Result{}, nil
 		}
 
 		log.Error(err, "Error reading the object")
-
-		return result, err
+		return reconcile.Result{}, err
 	}
 
 	patchHelper, err := patch.NewHelper(instance, r.Client)
@@ -87,113 +93,239 @@ func (r *clusterCustomQuotaClaimController) Reconcile(ctx context.Context, reque
 		return reconcile.Result{}, err
 	}
 
-	defer func() {
-		if uerr := r.updateStatus(ctx, instance, err); uerr != nil {
-			err = fmt.Errorf("cannot update status: %w", uerr)
+	if err := r.ensureQuotaLedger(ctx, instance); err != nil {
+		return reconcile.Result{}, err
+	}
 
-			return
-		}
+	reconcileErr := r.reconcile(ctx, log, instance)
 
-		r.emitMetrics(instance)
+	if err := r.updateStatus(ctx, instance, reconcileErr); err != nil {
+		return reconcile.Result{}, fmt.Errorf("cannot update status: %w", err)
+	}
 
-		if e := patchHelper.Patch(ctx, instance); e != nil {
-			err = fmt.Errorf("cannot patch: %w", e)
+	r.emitMetrics(instance)
 
-			return
-		}
+	if err := patchHelper.Patch(ctx, instance); err != nil {
+		return reconcile.Result{}, fmt.Errorf("cannot patch: %w", err)
+	}
 
-		err = nil
-	}()
+	if reconcileErr != nil {
+		return reconcile.Result{}, reconcileErr
+	}
 
-	err = r.reconcile(ctx, instance)
+	needsRequeue, err := r.reconcileLedger(ctx, log, instance)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
 
-	if !r.hasConsistentStateWithCache(instance) {
-		log.Info("recomputed usage is not yet consistent with admission cache, requeueing",
+	if needsRequeue {
+		log.V(3).Info("ledger still has pending work, requeueing",
 			"customQuota", instance.Name,
-			"used", instance.Status.Usage.Used.String(),
 		)
-
 		return ctrl.Result{RequeueAfter: 500 * time.Millisecond}, nil
 	}
 
-	r.cache.Delete(MakeGlobalCustomQuotaCacheKey(request.Name))
-
-	return ctrl.Result{}, err
+	return ctrl.Result{}, nil
 }
-
 func (r *clusterCustomQuotaClaimController) reconcile(
 	ctx context.Context,
+	log logr.Logger,
 	instance *capsulev1beta2.GlobalCustomQuota,
 ) error {
-	// Rebuilding
-	instance.Status.Target = capsulev1beta2.CustomQuotaStatusTarget{}
+	instance.Status.Targets = []capsulev1beta2.CustomQuotaStatusTarget{}
 	instance.Status.Usage = capsulev1beta2.CustomQuotaStatusUsage{}
 	instance.Status.Claims = nil
 
-	kind := schema.GroupVersionKind{
-		Group:   instance.Spec.Source.GroupVersionKind.Group,
-		Version: instance.Spec.Source.GroupVersionKind.Version,
-		Kind:    instance.Spec.Source.GroupVersionKind.Kind,
-	}
-
-	mapping, err := r.mapper.RESTMapping(kind.GroupKind(), kind.Version)
-	if err != nil {
-		return fmt.Errorf("failed to resolve REST mapping for %s: %w", kind.String(), err)
-	}
-
-	instance.Status.Target = capsulev1beta2.CustomQuotaStatusTarget{
-		CustomQuotaSpecSource: instance.Spec.Source,
-		Scope:                 mapping.Scope.Name(),
-	}
-	instance.Status.Usage = capsulev1beta2.CustomQuotaStatusUsage{}
-
-	namespaces, err := selectors.GetNamespacesMatchingSelectorsStrings(ctx, r.Client, instance.Spec.NamespaceSelectors)
-	if err != nil {
-		return err
-	}
-
-	if len(namespaces) > 0 {
-		instance.Status.Namespaces = namespaces
-	} else {
-		instance.Status.Namespaces = []string{"*"}
-	}
-
-	items, err := getResources(ctx, &instance.Status.Target.CustomQuotaSpecSource, r.Client, instance.Spec.ScopeSelectors, namespaces...)
-	if err != nil {
-		return err
-	}
-
-	var errs []error
-
-	for _, item := range items {
-		usage, err := quota.ParseQuantityFromUnstructured(item, instance.Spec.Source.Path)
-		if err != nil {
-			errs = append(errs, fmt.Errorf(
-				"get usage from %s/%s (%s): %w",
-				item.GetNamespace(),
-				item.GetName(),
-				item.GetObjectKind().GroupVersionKind().String(),
-				err,
-			))
-
-			continue
+	for _, src := range instance.Spec.Sources {
+		kind := schema.GroupVersionKind{
+			Group:   src.GroupVersionKind.Group,
+			Version: src.GroupVersionKind.Version,
+			Kind:    src.GroupVersionKind.Kind,
 		}
 
-		instance.Status.Usage.Used.Add(usage)
+		mapping, err := r.mapper.RESTMapping(kind.GroupKind(), kind.Version)
+		if err != nil {
+			return fmt.Errorf("failed to resolve REST mapping for %s: %w", kind.String(), err)
+		}
 
-		instance.Status.Claims = append(instance.Status.Claims, meta.NamespacedObjectWithUIDReference{
-			Name:      item.GetName(),
-			Namespace: meta.RFC1123SubdomainName(item.GetNamespace()),
-			UID:       types.UID(item.GetUID()),
+		instance.Status.Targets = append(instance.Status.Targets, capsulev1beta2.CustomQuotaStatusTarget{
+			CustomQuotaSpecSource: src,
+			Scope:                 mapping.Scope.Name(),
 		})
 	}
 
-	// Calculate Delta
-	instance.Status.Usage.Available = instance.Spec.Limit
+	var namespaces []string
+	var err error
+
+	if len(instance.Spec.NamespaceSelectors) > 0 {
+		namespaces, err = selectors.GetNamespacesMatchingSelectorsStrings(
+			ctx,
+			r.Client,
+			instance.Spec.NamespaceSelectors,
+		)
+		if err != nil {
+			return err
+		}
+	} else {
+		namespaces = []string{"*"}
+	}
+
+	instance.Status.Namespaces = namespaces
+
+	var errs []error
+	seenClaims := make(map[types.UID]struct{})
+	itemsByGVK := make(map[schema.GroupVersionKind][]unstructured.Unstructured, len(instance.Status.Targets))
+
+	targets, err := CompileTargets(r.jsonPathCache, instance.Status.Targets)
+	if err != nil {
+		return err
+	}
+
+	r.targetsCache.Set(MakeGlobalCustomQuotaCacheKey(instance.GetName()), targets)
+
+	for _, target := range targets {
+		gvk := schema.GroupVersionKind{
+			Group:   target.GroupVersionKind.Group,
+			Version: target.GroupVersionKind.Version,
+			Kind:    target.GroupVersionKind.Kind,
+		}
+
+		items, ok := itemsByGVK[gvk]
+		if !ok {
+			items, err = getResourcesByGVK(ctx, gvk, r.Client, instance.Spec.ScopeSelectors, namespaces...)
+			if err != nil {
+				errs = append(errs, fmt.Errorf("list resources for %s: %w", gvk.String(), err))
+				continue
+			}
+			itemsByGVK[gvk] = items
+		}
+
+		log.V(3).Info("listed resources for target",
+			"gvk", gvk.String(),
+			"count", len(items),
+			"namespaces", namespaces,
+			"scopeSelectors", instance.Spec.ScopeSelectors,
+		)
+
+		for _, item := range items {
+			matches, err := MatchesCompiledSelectorsWithFields(item, target.CompiledSelectors)
+			if err != nil {
+				errs = append(errs, fmt.Errorf(
+					"evaluate selectors for %s/%s (%s): %w",
+					item.GetNamespace(),
+					item.GetName(),
+					item.GetObjectKind().GroupVersionKind().String(),
+					err,
+				))
+				continue
+			}
+			if !matches {
+				continue
+			}
+
+			var usage resource.Quantity
+
+			switch target.Operation {
+			case quota.OpCount:
+				usage = *resource.NewQuantity(1, resource.DecimalSI)
+
+			case quota.OpAdd, quota.OpSub:
+				usage, err = quota.ParseQuantityFromUnstructured(item, target.CompiledPath)
+				if err != nil {
+					errs = append(errs, fmt.Errorf(
+						"get usage from %s/%s (%s) path %q op %q: %w",
+						item.GetNamespace(),
+						item.GetName(),
+						item.GetObjectKind().GroupVersionKind().String(),
+						target.Path,
+						target.Operation,
+						err,
+					))
+					continue
+				}
+
+			default:
+				errs = append(errs, fmt.Errorf(
+					"unsupported operation %q for %s/%s (%s)",
+					target.Operation,
+					item.GetNamespace(),
+					item.GetName(),
+					item.GetObjectKind().GroupVersionKind().String(),
+				))
+				continue
+			}
+
+			switch target.Operation {
+			case quota.OpSub:
+				usage.Neg()
+				instance.Status.Usage.Used.Add(usage)
+				quota.ClampQuantityToZero(&instance.Status.Usage.Used)
+			default:
+				instance.Status.Usage.Used.Add(usage)
+			}
+
+			uid := types.UID(item.GetUID())
+			if _, exists := seenClaims[uid]; !exists {
+				seenClaims[uid] = struct{}{}
+				instance.Status.Claims = append(instance.Status.Claims, capsulev1beta2.CustomQuotaClaimItem{
+					GroupVersionKind: metav1.GroupVersionKind(item.GroupVersionKind()),
+					NamespacedObjectWithUIDReference: meta.NamespacedObjectWithUIDReference{
+						Name:      item.GetName(),
+						Namespace: meta.RFC1123SubdomainName(item.GetNamespace()),
+						UID:       uid,
+					},
+					Usage: usage,
+				})
+			}
+		}
+	}
+
+	if instance.Status.Usage.Used.Sign() < 0 {
+		instance.Status.Usage.Used = resource.MustParse("0")
+	}
+
+	instance.Status.Usage.Available = instance.Spec.Limit.DeepCopy()
 	instance.Status.Usage.Available.Sub(instance.Status.Usage.Used)
+	if instance.Status.Usage.Available.Sign() < 0 {
+		instance.Status.Usage.Available = resource.MustParse("0")
+	}
 
 	if len(errs) > 0 {
 		return errors.Join(errs...)
+	}
+
+	return nil
+}
+func (r *clusterCustomQuotaClaimController) ensureQuotaLedger(
+	ctx context.Context,
+	instance *capsulev1beta2.GlobalCustomQuota,
+) error {
+	ledger := &capsulev1beta2.QuantityLedger{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      instance.GetName(),
+			Namespace: configuration.ControllerNamespace(),
+		},
+	}
+
+	_, err := controllerutil.CreateOrUpdate(ctx, r.Client, ledger, func() error {
+		if ledger.Labels == nil {
+			ledger.Labels = map[string]string{}
+		}
+
+		ledger.Labels[meta.ManagedByCapsuleLabel] = meta.ValueController
+
+		ledger.Spec.TargetRef = capsulev1beta2.QuantityLedgerTargetRef{
+			APIGroup: capsulev1beta2.GroupVersion.Group,
+			Kind:     "GlobalCustomQuota",
+			Name:     instance.GetName(),
+			UID:      instance.GetUID(),
+		}
+
+		return controllerutil.SetControllerReference(instance, ledger, r.Scheme())
+	})
+	if err != nil {
+		return fmt.Errorf("create or update QuantityLedger %s/%s for GlobalCustomQuota %s: %w",
+			ledger.Namespace, ledger.Name, instance.GetName(), err)
 	}
 
 	return nil
@@ -222,8 +354,23 @@ func (r *clusterCustomQuotaClaimController) emitMetrics(
 
 	// Usage Metrics
 	r.metrics.ResourceUsageGauge.WithLabelValues(instance.GetName()).Set(float64(instance.Status.Usage.Used.MilliValue()) / 1000)
-	r.metrics.ResourceUsageGauge.WithLabelValues(instance.GetName()).Set(float64(instance.Status.Usage.Available.MilliValue()) / 1000)
-	r.metrics.ResourceUsageGauge.WithLabelValues(instance.GetName()).Set(float64(instance.Spec.Limit.MilliValue()) / 1000)
+	r.metrics.ResourceAvailableGauge.WithLabelValues(instance.GetName()).Set(float64(instance.Status.Usage.Available.MilliValue()) / 1000)
+	r.metrics.ResourceLimitGauge.WithLabelValues(instance.GetName()).Set(float64(instance.Spec.Limit.MilliValue()) / 1000)
+
+	// Emit for Claims
+	r.metrics.ResourceItemUsageGauge.DeletePartialMatch(map[string]string{
+		"custom_quota": instance.GetName(),
+	})
+
+	for _, claim := range instance.Status.Claims {
+		r.metrics.ResourceItemUsageGauge.WithLabelValues(
+			instance.GetName(),
+			claim.Name,
+			string(claim.Namespace),
+			claim.Kind,
+			claim.Group,
+		).Set(float64(claim.Usage.MilliValue()) / 1000)
+	}
 }
 
 func (r *clusterCustomQuotaClaimController) updateStatus(
@@ -253,39 +400,136 @@ func (r *clusterCustomQuotaClaimController) updateStatus(
 	})
 }
 
-func (r *clusterCustomQuotaClaimController) hasConsistentStateWithCache(instance *capsulev1beta2.GlobalCustomQuota) bool {
-	return r.hasConsistentReservedUsage(instance) &&
-		r.hasConsistentPendingDeletes(instance)
+func (r *clusterCustomQuotaClaimController) reconcileLedger(
+	ctx context.Context,
+	log logr.Logger,
+	instance *capsulev1beta2.GlobalCustomQuota,
+) (bool, error) {
+	key := types.NamespacedName{
+		Name:      instance.GetName(),
+		Namespace: configuration.ControllerNamespace(),
+	}
+
+	var needsRequeue bool
+
+	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		ledger := &capsulev1beta2.QuantityLedger{}
+		if err := r.Get(ctx, key, ledger); err != nil {
+			if apierrors.IsNotFound(err) {
+				return nil
+			}
+			return err
+		}
+
+		now := metav1.Now()
+		pendingDeleteTTL := 30 * time.Second
+
+		activeReservations := make([]capsulev1beta2.QuantityLedgerReservation, 0, len(ledger.Status.Reservations))
+		for _, res := range ledger.Status.Reservations {
+			materialized := reservationMaterializedLedger(res, instance.Status.Claims)
+			expired := res.ExpiresAt != nil && res.ExpiresAt.Before(&now)
+
+			log.V(3).Info("evaluating ledger reservation",
+				"ledger", key.String(),
+				"reservationID", res.ID,
+				"usage", res.Usage.String(),
+				"uid", string(res.ObjectRef.UID),
+				"group", res.ObjectRef.APIGroup,
+				"version", res.ObjectRef.APIVersion,
+				"kind", res.ObjectRef.Kind,
+				"namespace", res.ObjectRef.Namespace,
+				"name", res.ObjectRef.Name,
+				"materialized", materialized,
+				"expired", expired,
+			)
+
+			if materialized || expired {
+				continue
+			}
+			activeReservations = append(activeReservations, res)
+		}
+
+		activeDeletes := make([]capsulev1beta2.QuantityLedgerPendingDelete, 0, len(ledger.Status.PendingDeletes))
+		for _, pd := range ledger.Status.PendingDeletes {
+			stillPresent := pendingDeleteStillPresent(pd, instance.Status.Claims)
+			expired := now.Sub(pd.CreatedAt.Time) >= pendingDeleteTTL
+
+			log.V(3).Info("evaluating pending delete",
+				"ledger", key.String(),
+				"uid", string(pd.ObjectRef.UID),
+				"group", pd.ObjectRef.APIGroup,
+				"version", pd.ObjectRef.APIVersion,
+				"kind", pd.ObjectRef.Kind,
+				"namespace", pd.ObjectRef.Namespace,
+				"name", pd.ObjectRef.Name,
+				"stillPresent", stillPresent,
+				"expired", expired,
+			)
+
+			switch {
+			case stillPresent:
+				activeDeletes = append(activeDeletes, pd)
+				needsRequeue = true
+			case expired:
+				// drop stale hint
+			default:
+				// object disappeared from claims, drop hint
+			}
+		}
+
+		ledger.Status.Reservations = activeReservations
+		ledger.Status.PendingDeletes = activeDeletes
+		ledger.Status.Reserved = resource.MustParse("0")
+		for _, res := range activeReservations {
+			ledger.Status.Reserved.Add(res.Usage)
+		}
+
+		return r.Status().Update(ctx, ledger)
+	})
+
+	if err != nil {
+		return false, err
+	}
+
+	return needsRequeue, nil
 }
+func pendingDeleteStillPresent(
+	pd capsulev1beta2.QuantityLedgerPendingDelete,
+	claims []capsulev1beta2.CustomQuotaClaimItem,
+) bool {
+	for _, claim := range claims {
+		if pd.ObjectRef.UID != "" && claim.UID != "" && pd.ObjectRef.UID == claim.UID {
+			return true
+		}
 
-func (r *clusterCustomQuotaClaimController) hasConsistentReservedUsage(instance *capsulev1beta2.GlobalCustomQuota) bool {
-	if r.cache == nil {
-		return true
-	}
-
-	entry, ok := r.cache.Get(MakeGlobalCustomQuotaCacheKey(instance.GetName()))
-	if !ok || entry.Reserved.IsZero() {
-		return true
-	}
-
-	return instance.Status.Usage.Used.Cmp(entry.Reserved) >= 0
-}
-
-func (r *clusterCustomQuotaClaimController) hasConsistentPendingDeletes(instance *capsulev1beta2.GlobalCustomQuota) bool {
-	if r.cache == nil {
-		return true
-	}
-
-	entry, ok := r.cache.Get(MakeGlobalCustomQuotaCacheKey(instance.GetName()))
-	if !ok || len(entry.PendingDeletes) == 0 {
-		return true
-	}
-
-	for _, hint := range entry.PendingDeletes {
-		if hasClaimUID(instance.Status.Claims, hint.UID) {
-			return false
+		if pd.ObjectRef.APIGroup == claim.Group &&
+			pd.ObjectRef.APIVersion == claim.Version &&
+			pd.ObjectRef.Kind == claim.Kind &&
+			pd.ObjectRef.Namespace == string(claim.Namespace) &&
+			pd.ObjectRef.Name == claim.Name {
+			return true
 		}
 	}
 
-	return true
+	return false
+}
+
+func reservationMaterializedLedger(
+	res capsulev1beta2.QuantityLedgerReservation,
+	claims []capsulev1beta2.CustomQuotaClaimItem,
+) bool {
+	for _, claim := range claims {
+		if res.ObjectRef.UID != "" && claim.UID != "" && res.ObjectRef.UID == claim.UID {
+			return true
+		}
+
+		if res.ObjectRef.APIGroup == claim.Group &&
+			res.ObjectRef.APIVersion == claim.Version &&
+			res.ObjectRef.Kind == claim.Kind &&
+			res.ObjectRef.Namespace == string(claim.Namespace) &&
+			res.ObjectRef.Name == claim.Name {
+			return true
+		}
+	}
+	return false
 }

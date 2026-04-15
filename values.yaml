@@ -1,0 +1,6 @@
+image:
+  registry: registry.projectcapsule.dev
+  repository: enterprise/observability-tenancy/cortex-proxy
+
+imagePullSecrets:
+  - name: "capsule-enterprise"

@@ -13,6 +13,7 @@ type CustomQuotaRecorder struct {
 	ResourceUsageGauge     *prometheus.GaugeVec
 	ResourceLimitGauge     *prometheus.GaugeVec
 	ResourceAvailableGauge *prometheus.GaugeVec
+	ResourceItemUsageGauge *prometheus.GaugeVec
 }
 
 func MustMakeCustomQuotaRecorder() *CustomQuotaRecorder {
@@ -52,6 +53,13 @@ func NewCustomQuotaRecorder() *CustomQuotaRecorder {
 				Help:      "Available resources for given custom quota",
 			}, []string{"custom_quota", "target_namespace"},
 		),
+		ResourceItemUsageGauge: prometheus.NewGaugeVec(
+			prometheus.GaugeOpts{
+				Namespace: metricsPrefix,
+				Name:      "custom_quota_resource_item_usage",
+				Help:      "Claimed resources from given item",
+			}, []string{"custom_quota", "target_namespace", "name", "kind", "group"},
+		),
 	}
 }
 
@@ -61,6 +69,7 @@ func (r *CustomQuotaRecorder) Collectors() []prometheus.Collector {
 		r.ResourceUsageGauge,
 		r.ResourceLimitGauge,
 		r.ResourceAvailableGauge,
+		r.ResourceItemUsageGauge,
 	}
 }
 
@@ -78,6 +87,10 @@ func (r *CustomQuotaRecorder) DeleteAllMetricsForCustomQuota(name string, namesp
 		"target_namespace": namespace,
 	})
 	r.ResourceAvailableGauge.DeletePartialMatch(map[string]string{
+		"custom_quota":     name,
+		"target_namespace": namespace,
+	})
+	r.ResourceItemUsageGauge.DeletePartialMatch(map[string]string{
 		"custom_quota":     name,
 		"target_namespace": namespace,
 	})

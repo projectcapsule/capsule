@@ -3,28 +3,116 @@
 package customquota
 
 import (
-	"fmt"
+	"context"
+	"time"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/api/meta"
+	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
-func validateQuantity(q resource.Quantity) error {
-	parsed, err := resource.ParseQuantity(q.String())
-	if err != nil {
-		return fmt.Errorf("invalid quantity %q: %w", q.String(), err)
+func quantityLedgerKeyForMatchedQuota(item evaluatedQuota) types.NamespacedName {
+	if item.IsGlobal {
+		return types.NamespacedName{
+			Name:      item.Name,
+			Namespace: configuration.ControllerNamespace(),
+		}
 	}
 
-	if parsed.Sign() <= 0 {
-		return fmt.Errorf("quantity must not be negative or 0: %q", q.String())
+	return types.NamespacedName{
+		Name:      item.Name,
+		Namespace: item.Namespace,
 	}
-
-	return nil
 }
 
-func sourceChanged(a, b capsulev1beta2.CustomQuotaSpecSource) bool {
-	return a.GroupVersionKind.Group != b.GroupVersionKind.Group ||
-		a.GroupVersionKind.Version != b.GroupVersionKind.Version ||
-		a.GroupVersionKind.Kind != b.GroupVersionKind.Kind ||
-		a.Path != b.Path
+func buildReservation(
+	req admission.Request,
+	u unstructured.Unstructured,
+	usage resource.Quantity,
+) capsulev1beta2.QuantityLedgerReservation {
+	namespace := u.GetNamespace()
+	if namespace == "" {
+		namespace = req.Namespace
+	}
+
+	name := u.GetName()
+	if name == "" {
+		name = req.Name
+	}
+
+	now := metav1.Now()
+	expiresAt := metav1.NewTime(now.Add(15 * time.Second))
+
+	return capsulev1beta2.QuantityLedgerReservation{
+		ID:    string(req.UID),
+		Usage: usage.DeepCopy(),
+		ObjectRef: capsulev1beta2.QuantityLedgerObjectRef{
+			APIGroup:   req.Kind.Group,
+			APIVersion: req.Kind.Version,
+			Kind:       req.Kind.Kind,
+			Namespace:  namespace,
+			Name:       name,
+			UID:        u.GetUID(),
+		},
+		CreatedAt: now,
+		UpdatedAt: now,
+		ExpiresAt: &expiresAt,
+	}
+}
+
+func allKeys[K comparable, V any](a map[K]V, b map[K]V) []K {
+	out := make([]K, 0, len(a)+len(b))
+	seen := make(map[K]struct{}, len(a)+len(b))
+
+	for k := range a {
+		seen[k] = struct{}{}
+		out = append(out, k)
+	}
+
+	for k := range b {
+		if _, ok := seen[k]; ok {
+			continue
+		}
+
+		out = append(out, k)
+	}
+
+	return out
+}
+
+func sourcesChanged(a, b []capsulev1beta2.CustomQuotaSpecSource) bool {
+	if len(a) != len(b) {
+		return true
+	}
+
+	for i := range a {
+		if a[i].GroupVersionKind.Group != b[i].GroupVersionKind.Group ||
+			a[i].GroupVersionKind.Version != b[i].GroupVersionKind.Version ||
+			a[i].GroupVersionKind.Kind != b[i].GroupVersionKind.Kind ||
+			a[i].Path != b[i].Path ||
+			a[i].Operation != b[i].Operation {
+			return true
+		}
+	}
+
+	return false
+}
+
+func touchQuantityLedger(
+	ctx context.Context,
+	c client.Client,
+	item types.NamespacedName,
+) error {
+	return meta.TriggerRequestReconcileAnnotation(
+		ctx,
+		c,
+		capsulev1beta2.GroupVersion.WithKind("QuantityLedger"),
+		item,
+	)
 }

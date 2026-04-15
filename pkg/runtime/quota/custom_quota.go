@@ -6,24 +6,27 @@ package quota
 import (
 	"k8s.io/apimachinery/pkg/api/resource"
 
-	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/runtime/jsonpath"
 )
 
 // Overlay for Global/Namespace CustomQuotas
 type MatchedQuota struct {
-	Key       string
-	Name      string
-	Namespace string
-	Path      string
-	Limit     resource.Quantity
-	Used      resource.Quantity
-	IsGlobal  bool
+	Key          string
+	Name         string
+	Namespace    string
+	Path         string
+	CompiledPath *jsonpath.CompiledJSONPath
+	Operation    Operation
+	Limit        resource.Quantity
+	Used         resource.Quantity
+	IsGlobal     bool
+	SourceRank   int
 }
 
 func MakeCustomQuotaCacheKey(namespace, name string) string {
 	return namespace + "/" + name
 }
 
-func MakeGlobalCustomQuotaCacheKey(cq capsulev1beta2.GlobalCustomQuota) string {
-	return "C/" + cq.Name
+func MakeGlobalCustomQuotaCacheKey(name string) string {
+	return "C/" + name
 }

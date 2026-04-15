@@ -455,6 +455,22 @@ monitoring:
       relabelings: []
 
 
+# Conversions Webhook configurations
+conversions:
+  # Configure custom webhook service
+  service:
+    # -- The URL where the capsule webhook services are running (Overwrites cluster scoped service definition)
+    url: ""
+    # -- CABundle for the webhook service
+    caBundle: ""
+    # -- Custom service name for the webhook service
+    name: ""
+    # -- Custom service namespace for the webhook service
+    namespace: ""
+    # -- Custom service port for the webhook service
+    port:
+
+
 # Webhooks configurations
 webhooks:
   # -- When `crds.exclusive` is `true` the webhooks will be installed
@@ -485,7 +501,6 @@ webhooks:
 
   # Admission Webhook Configuration
   hooks:
-
 
     customquotas:
       # -- Enable the Hook
@@ -540,7 +555,7 @@ webhooks:
             - globalcustomquotas
           scope: 'Cluster'
 
-    customquotasobjs:
+    calculations:
       # -- Enable the Hook
       enabled: true
       # -- [FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy)
@@ -568,7 +583,6 @@ webhooks:
             resources:
               - '*'
             scope: Namespaced
-
 
     metadata:
       # -- Enable the Hook
@@ -676,7 +690,7 @@ webhooks:
       # -- Enable the Hook
       enabled: true
       # -- Capsule Hook Options
-      opts: 
+      opts:
         capsuleUsers: true
       # -- [FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy)
       failurePolicy: Fail

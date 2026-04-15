@@ -7,7 +7,7 @@ import (
 	"fmt"
 
 	"github.com/go-logr/logr"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
@@ -20,30 +20,32 @@ import (
 func Add(
 	log logr.Logger,
 	mgr manager.Manager,
-	recorder record.EventRecorder,
+	recorder events.EventRecorder,
 	cfg utils.ControllerOptions,
-	cache *cache.QuantityCache[string],
+	quantityCache *cache.QuantityCache[string],
+	jsonPathCache *cache.JSONPathCache,
+	targetsCache *cache.CompiledTargetsCache[string],
 	namespaceNotifier chan event.TypedGenericEvent[*capsulev1beta2.CustomQuota],
 	globalNotifier chan event.TypedGenericEvent[*capsulev1beta2.GlobalCustomQuota],
 ) (err error) {
 	if err = (&customQuotaClaimController{
-		Client:            mgr.GetClient(),
-		log:               log.WithName("CustomQuota"),
-		recorder:          recorder,
-		metrics:           metrics.MustMakeCustomQuotaRecorder(),
-		admissionNotifier: namespaceNotifier,
-		cache:             cache,
+		Client:        mgr.GetClient(),
+		log:           log.WithName("CustomQuota"),
+		recorder:      recorder,
+		metrics:       metrics.MustMakeCustomQuotaRecorder(),
+		jsonPathCache: jsonPathCache,
+		targetsCache:  targetsCache,
 	}).SetupWithManager(mgr, cfg); err != nil {
 		return fmt.Errorf("unable to create custom quota controller: %w", err)
 	}
 
 	if err = (&clusterCustomQuotaClaimController{
-		Client:            mgr.GetClient(),
-		log:               log.WithName("ClusterCustomQuota"),
-		recorder:          recorder,
-		metrics:           metrics.MustMakeGlobalCustomQuotaRecorder(),
-		admissionNotifier: globalNotifier,
-		cache:             cache,
+		Client:        mgr.GetClient(),
+		log:           log.WithName("ClusterCustomQuota"),
+		recorder:      recorder,
+		metrics:       metrics.MustMakeGlobalCustomQuotaRecorder(),
+		jsonPathCache: jsonPathCache,
+		targetsCache:  targetsCache,
 	}).SetupWithManager(mgr, cfg); err != nil {
 		return fmt.Errorf("unable to create cluster custom quota controller: %w", err)
 	}

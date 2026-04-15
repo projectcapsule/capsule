@@ -16,7 +16,7 @@ spec:
   versions:
   - additionalPrinterColumns:
     - description: The total limit available
-      jsonPath: .status.spec.limit
+      jsonPath: .spec.limit
       name: Limit
       type: string
     - description: The total used amount
@@ -118,26 +118,102 @@ spec:
                   type: object
                   x-kubernetes-map-type: atomic
                 type: array
-              source:
+              sources:
                 description: Target resource
-                properties:
-                  group:
-                    type: string
-                  kind:
-                    type: string
-                  path:
-                    description: Path on GVK where usage is evaluated
-                    type: string
-                  version:
-                    type: string
-                required:
-                - group
-                - kind
-                - version
-                type: object
+                items:
+                  properties:
+                    group:
+                      type: string
+                    kind:
+                      type: string
+                    op:
+                      default: add
+                      description: Operation used to evaluate usage.
+                      enum:
+                      - add
+                      - sub
+                      - count
+                      type: string
+                    path:
+                      description: |-
+                        Path on GVK where usage is evaluated.
+                        Must be empty when op is "count".
+                        Required and non-empty for all other operations.
+                      type: string
+                    selectors:
+                      description: |-
+                        Provide more granular selectors for these sources
+                        The ScopeSelector and NamespaceSelector are always applied
+                        Allowing these selectors to make further selecting on the resulting subset.
+                      items:
+                        properties:
+                          fieldSelectors:
+                            description: |-
+                              Additional boolean JSONPath expressions.
+                              All must evaluate to true for this selector to match.
+                            items:
+                              type: string
+                            type: array
+                          matchExpressions:
+                            description: matchExpressions is a list of label selector
+                              requirements. The requirements are ANDed.
+                            items:
+                              description: |-
+                                A label selector requirement is a selector that contains values, a key, and an operator that
+                                relates the key and values.
+                              properties:
+                                key:
+                                  description: key is the label key that the selector
+                                    applies to.
+                                  type: string
+                                operator:
+                                  description: |-
+                                    operator represents a key's relationship to a set of values.
+                                    Valid operators are In, NotIn, Exists and DoesNotExist.
+                                  type: string
+                                values:
+                                  description: |-
+                                    values is an array of string values. If the operator is In or NotIn,
+                                    the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                                    the values array must be empty. This array is replaced during a strategic
+                                    merge patch.
+                                  items:
+                                    type: string
+                                  type: array
+                                  x-kubernetes-list-type: atomic
+                              required:
+                              - key
+                              - operator
+                              type: object
+                            type: array
+                            x-kubernetes-list-type: atomic
+                          matchLabels:
+                            additionalProperties:
+                              type: string
+                            description: |-
+                              matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+                              map is equivalent to an element of matchExpressions, whose key field is "key", the
+                              operator is "In", and the values array contains only "value". The requirements are ANDed.
+                            type: object
+                        type: object
+                        x-kubernetes-map-type: atomic
+                      type: array
+                    version:
+                      type: string
+                  required:
+                  - group
+                  - kind
+                  - version
+                  type: object
+                  x-kubernetes-validations:
+                  - message: path must be empty when op is 'count'; otherwise path
+                      must be set and non-empty
+                    rule: 'self.op == ''count'' ? !has(self.path) || size(self.path)
+                      == 0 : has(self.path) && size(self.path) > 0'
+                type: array
             required:
             - limit
-            - source
+            - sources
             type: object
           status:
             description: CustomQuotaStatus defines the observed state of GlobalResourceQuota.
@@ -145,10 +221,11 @@ spec:
               claims:
                 description: Objects regarding this policy
                 items:
-                  description: |-
-                    NamespacedObjectReference contains enough information to locate the referenced Kubernetes resource object in any
-                    namespace.
                   properties:
+                    group:
+                      type: string
+                    kind:
+                      type: string
                     name:
                       description: Name of the referent.
                       type: string
@@ -161,9 +238,22 @@ spec:
                     uid:
                       description: UID of the tracked Tenant to pin point tracking
                       type: string
+                    usage:
+                      anyOf:
+                      - type: integer
+                      - type: string
+                      description: Resource Quantity for given item
+                      pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                      x-kubernetes-int-or-string: true
+                    version:
+                      type: string
                   required:
+                  - group
+                  - kind
                   - name
                   - uid
+                  - usage
+                  - version
                   type: object
                 type: array
               conditions:
@@ -223,26 +313,102 @@ spec:
                   - type
                   type: object
                 type: array
-              target:
+              targets:
                 description: Targeting GVK
-                properties:
-                  group:
-                    type: string
-                  kind:
-                    type: string
-                  path:
-                    description: Path on GVK where usage is evaluated
-                    type: string
-                  scope:
-                    description: Path on GVK where usage is evaluated
-                    type: string
-                  version:
-                    type: string
-                required:
-                - group
-                - kind
-                - version
-                type: object
+                items:
+                  properties:
+                    group:
+                      type: string
+                    kind:
+                      type: string
+                    op:
+                      default: add
+                      description: Operation used to evaluate usage.
+                      enum:
+                      - add
+                      - sub
+                      - count
+                      type: string
+                    path:
+                      description: |-
+                        Path on GVK where usage is evaluated.
+                        Must be empty when op is "count".
+                        Required and non-empty for all other operations.
+                      type: string
+                    scope:
+                      description: Path on GVK where usage is evaluated
+                      type: string
+                    selectors:
+                      description: |-
+                        Provide more granular selectors for these sources
+                        The ScopeSelector and NamespaceSelector are always applied
+                        Allowing these selectors to make further selecting on the resulting subset.
+                      items:
+                        properties:
+                          fieldSelectors:
+                            description: |-
+                              Additional boolean JSONPath expressions.
+                              All must evaluate to true for this selector to match.
+                            items:
+                              type: string
+                            type: array
+                          matchExpressions:
+                            description: matchExpressions is a list of label selector
+                              requirements. The requirements are ANDed.
+                            items:
+                              description: |-
+                                A label selector requirement is a selector that contains values, a key, and an operator that
+                                relates the key and values.
+                              properties:
+                                key:
+                                  description: key is the label key that the selector
+                                    applies to.
+                                  type: string
+                                operator:
+                                  description: |-
+                                    operator represents a key's relationship to a set of values.
+                                    Valid operators are In, NotIn, Exists and DoesNotExist.
+                                  type: string
+                                values:
+                                  description: |-
+                                    values is an array of string values. If the operator is In or NotIn,
+                                    the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                                    the values array must be empty. This array is replaced during a strategic
+                                    merge patch.
+                                  items:
+                                    type: string
+                                  type: array
+                                  x-kubernetes-list-type: atomic
+                              required:
+                              - key
+                              - operator
+                              type: object
+                            type: array
+                            x-kubernetes-list-type: atomic
+                          matchLabels:
+                            additionalProperties:
+                              type: string
+                            description: |-
+                              matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+                              map is equivalent to an element of matchExpressions, whose key field is "key", the
+                              operator is "In", and the values array contains only "value". The requirements are ANDed.
+                            type: object
+                        type: object
+                        x-kubernetes-map-type: atomic
+                      type: array
+                    version:
+                      type: string
+                  required:
+                  - group
+                  - kind
+                  - version
+                  type: object
+                  x-kubernetes-validations:
+                  - message: path must be empty when op is 'count'; otherwise path
+                      must be set and non-empty
+                    rule: 'self.op == ''count'' ? !has(self.path) || size(self.path)
+                      == 0 : has(self.path) && size(self.path) > 0'
+                type: array
               usage:
                 description: Usage measurements
                 properties:
@@ -264,7 +430,7 @@ spec:
                 type: object
             required:
             - conditions
-            - target
+            - targets
             type: object
         required:
         - spec

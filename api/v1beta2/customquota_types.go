@@ -4,6 +4,8 @@
 package v1beta2
 
 import (
+	"github.com/projectcapsule/capsule/pkg/runtime/quota"
+	"github.com/projectcapsule/capsule/pkg/runtime/selectors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -15,19 +17,32 @@ type CustomQuotaSpec struct {
 	// Resource Quantity as limit
 	Limit resource.Quantity `json:"limit"`
 	// Target resource
-	Source CustomQuotaSpecSource `json:"source,omitzero"`
+	Sources []CustomQuotaSpecSource `json:"sources,omitzero"`
 }
 
+// +kubebuilder:validation:XValidation:rule="self.op == 'count' ? !has(self.path) || size(self.path) == 0 : has(self.path) && size(self.path) > 0",message="path must be empty when op is 'count'; otherwise path must be set and non-empty"
 type CustomQuotaSpecSource struct {
 	metav1.GroupVersionKind `json:",inline"`
 
-	// Path on GVK where usage is evaluated
+	// Path on GVK where usage is evaluated.
+	// Must be empty when op is "count".
+	// Required and non-empty for all other operations.
+	// +optional
 	Path string `json:"path,omitempty"`
+
+	// Operation used to evaluate usage.
+	// +kubebuilder:default:=add
+	Operation quota.Operation `json:"op,omitempty"`
+
+	// Provide more granular selectors for these sources
+	// The ScopeSelector and NamespaceSelector are always applied
+	// Allowing these selectors to make further selecting on the resulting subset.
+	Selectors []selectors.SelectorWithFields `json:"selectors,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:printcolumn:name="Limit",type="string",JSONPath=".status.spec.limit",description="The total limit available"
+// +kubebuilder:printcolumn:name="Limit",type="string",JSONPath=".spec.limit",description="The total limit available"
 // +kubebuilder:printcolumn:name="Used",type="string",JSONPath=".status.usage.used",description="The total used amount"
 // +kubebuilder:printcolumn:name="Available",type="string",JSONPath=".status.usage.available",description="The total amount available"
 // +kubebuilder:printcolumn:name="Ready",type="string",JSONPath=".status.conditions[?(@.type==\"Ready\")].status",description="Reconcile Status"

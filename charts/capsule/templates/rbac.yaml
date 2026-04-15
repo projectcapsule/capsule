@@ -97,6 +97,8 @@ rules:
   - customquotas/status
   - globalcustomquotas
   - globalcustomquotas/status
+  - quantityledgers
+  - quantityledgers/status
   verbs:
   - create
   - delete

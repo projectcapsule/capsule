@@ -35,6 +35,7 @@ rules:
   - rulestatuses.capsule.clastix.io
   - customquotas.capsule.clastix.io
   - globalcustomquotas.capsule.clastix.io
+  - quantityledgers.capsule.clastix.io
   verbs:
   - create
   - delete

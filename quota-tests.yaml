@@ -1,0 +1,55 @@
+---
+apiVersion: capsule.clastix.io/v1beta2
+kind: GlobalCustomQuota
+metadata:
+  name: storage-aggregate
+spec:
+  limit: 5Gi
+  namespaceSelectors:
+  - matchLabels:
+      capsule.clastix.io/tenant: solar
+  sources:
+    - group: ""
+      version: v1
+      kind: Pod
+      op: add
+      path: ".spec.volumes[*].ephemeral.volumeClaimTemplate.spec.resources.requests.storage"
+
+    - group: ""
+      version: v1
+      kind: PersistentVolumeClaim
+      op: add
+      path: ".spec.resources.requests.storage"
+      selectors:
+        - fieldSelectors:
+            - '.spec.accessModes[?(@=="ReadWriteOnce")]'
+---
+apiVersion: capsule.clastix.io/v1beta2
+kind: GlobalCustomQuota
+metadata:
+  name: cpu-limits
+spec:
+  limit: 5
+  namespaceSelectors:
+  - matchLabels:
+      capsule.clastix.io/tenant: solar
+  sources:
+    - group: ""
+      version: v1
+      kind: Pod
+      path: ".spec.containers[*].resources.limits.cpu"
+---
+apiVersion: capsule.clastix.io/v1beta2
+kind: GlobalCustomQuota
+metadata:
+  name: pod-count-limit
+spec:
+  limit: 3
+  namespaceSelectors:
+  - matchLabels:
+      capsule.clastix.io/tenant: solar
+  sources:
+  - group: ""
+    kind: Pod
+    op: count
+    version: v1

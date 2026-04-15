@@ -17,8 +17,22 @@ type PendingDeleteHint struct {
 	CreatedAt time.Time
 }
 
+type Reservation struct {
+	ID        string
+	Usage     resource.Quantity
+	UID       types.UID
+	Group     string
+	Version   string
+	Kind      string
+	Namespace string
+	Name      string
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
 type QuantityEntry struct {
 	Reserved       resource.Quantity
+	Reservations   map[string]Reservation
 	PendingDeletes []PendingDeleteHint
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
@@ -80,37 +94,15 @@ func (c *QuantityCache[K]) Snapshot() map[K]QuantityEntry {
 	return out
 }
 
-func (c *QuantityCache[K]) PurgeOlderThan(ttl time.Duration) int {
-	if ttl <= 0 {
-		return 0
-	}
-
-	threshold := c.clock().Add(-ttl)
-
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	deleted := 0
-	for k, v := range c.data {
-		if v.UpdatedAt.Before(threshold) {
-			delete(c.data, k)
-			deleted++
-		}
-	}
-
-	return deleted
-}
-
-// CheckAndReserve atomically validates:
+// UpsertReservation ensures a reservation is idempotent per (key, reservationID).
+// It validates:
 //
-//	persistedUsed + inflightReserved + delta <= limit
-//
-// If valid, delta is added to Reserved.
-func (c *QuantityCache[K]) CheckAndReserve(
+//	persistedUsed + sum(all reservations including this one) <= limit
+func (c *QuantityCache[K]) UpsertReservation(
 	key K,
+	reservation Reservation,
 	persistedUsed resource.Quantity,
 	limit resource.Quantity,
-	delta resource.Quantity,
 ) (allowed bool, effectiveUsed resource.Quantity, entry QuantityEntry) {
 	now := c.clock()
 
@@ -118,54 +110,115 @@ func (c *QuantityCache[K]) CheckAndReserve(
 	defer c.mu.Unlock()
 
 	current, exists := c.data[key]
-
-	inflight := resource.MustParse("0")
-	if exists {
-		inflight = current.Reserved.DeepCopy()
+	if !exists {
+		current = QuantityEntry{
+			Reserved:     resource.MustParse("0"),
+			Reservations: make(map[string]Reservation),
+			CreatedAt:    now,
+			UpdatedAt:    now,
+			LastAccess:   now,
+		}
+	} else if current.Reservations == nil {
+		current.Reservations = make(map[string]Reservation)
 	}
 
-	effectiveUsed = persistedUsed.DeepCopy()
-	effectiveUsed.Add(inflight)
+	previous, hadPrevious := current.Reservations[reservation.ID]
 
-	newUsed := effectiveUsed.DeepCopy()
-	newUsed.Add(delta)
+	// Fast path: same reservation, same usage and identity.
+	if hadPrevious &&
+		previous.Usage.Cmp(reservation.Usage) == 0 &&
+		previous.UID == reservation.UID &&
+		previous.Group == reservation.Group &&
+		previous.Version == reservation.Version &&
+		previous.Kind == reservation.Kind &&
+		previous.Namespace == reservation.Namespace &&
+		previous.Name == reservation.Name {
+		current.LastAccess = now
+		c.data[key] = current
+
+		effectiveUsed = persistedUsed.DeepCopy()
+		effectiveUsed.Add(current.Reserved)
+		if effectiveUsed.Sign() < 0 {
+			effectiveUsed = resource.MustParse("0")
+		}
+
+		return true, effectiveUsed, copyEntry(current)
+	}
+
+	candidateReservations := make(map[string]Reservation, len(current.Reservations)+1)
+	for id, r := range current.Reservations {
+		candidateReservations[id] = Reservation{
+			ID:        r.ID,
+			Usage:     r.Usage.DeepCopy(),
+			UID:       r.UID,
+			Group:     r.Group,
+			Version:   r.Version,
+			Kind:      r.Kind,
+			Namespace: r.Namespace,
+			Name:      r.Name,
+			CreatedAt: r.CreatedAt,
+			UpdatedAt: r.UpdatedAt,
+		}
+	}
+
+	reservation.CreatedAt = func() time.Time {
+		if hadPrevious {
+			return previous.CreatedAt
+		}
+		return now
+	}()
+	reservation.UpdatedAt = now
+
+	candidateReservations[reservation.ID] = reservation
+
+	newReserved := sumReservations(candidateReservations)
+
+	newUsed := persistedUsed.DeepCopy()
+	newUsed.Add(newReserved)
+	if newUsed.Sign() < 0 {
+		newUsed = resource.MustParse("0")
+	}
 
 	if newUsed.Cmp(limit) > 0 {
+		effectiveUsed = persistedUsed.DeepCopy()
+		effectiveUsed.Add(current.Reserved)
+		if effectiveUsed.Sign() < 0 {
+			effectiveUsed = resource.MustParse("0")
+		}
 		return false, effectiveUsed, copyEntry(current)
 	}
 
-	if !exists {
-		current = QuantityEntry{
-			Reserved:   delta.DeepCopy(),
-			CreatedAt:  now,
-			UpdatedAt:  now,
-			LastAccess: now,
-		}
-	} else {
-		current.Reserved.Add(delta)
-		current.UpdatedAt = now
-		current.LastAccess = now
+	current.Reservations = candidateReservations
+	current.Reserved = newReserved
+	current.UpdatedAt = now
+	current.LastAccess = now
+
+	if current.Reserved.IsZero() && len(current.PendingDeletes) == 0 {
+		delete(c.data, key)
+		return true, newUsed, QuantityEntry{}
 	}
 
 	c.data[key] = current
-
 	return true, newUsed, copyEntry(current)
 }
 
-// Release subtracts delta from Reserved.
-// If the result reaches zero and there are no pending deletes, the entry is deleted.
-func (c *QuantityCache[K]) Release(key K, delta resource.Quantity) bool {
+func (c *QuantityCache[K]) DeleteReservation(key K, reservationID string) bool {
 	now := c.clock()
 
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	current, ok := c.data[key]
-	if !ok {
+	if !ok || current.Reservations == nil {
 		return false
 	}
 
-	current.Reserved.Sub(delta)
+	if _, exists := current.Reservations[reservationID]; !exists {
+		return false
+	}
+
+	delete(current.Reservations, reservationID)
+	current.Reserved = sumReservations(current.Reservations)
 	current.UpdatedAt = now
 	current.LastAccess = now
 
@@ -178,7 +231,46 @@ func (c *QuantityCache[K]) Release(key K, delta resource.Quantity) bool {
 	return true
 }
 
-// AddPendingDelete registers a UID that should disappear from the rebuilt claims.
+// PurgeReservationsForKey removes reservations for which shouldDelete returns true.
+// Returns number of removed reservations.
+func (c *QuantityCache[K]) PurgeReservationsForKey(
+	key K,
+	shouldDelete func(Reservation) bool,
+) int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	entry, ok := c.data[key]
+	if !ok || len(entry.Reservations) == 0 {
+		return 0
+	}
+
+	deleted := 0
+	for id, r := range entry.Reservations {
+		if shouldDelete(r) {
+			delete(entry.Reservations, id)
+			deleted++
+		}
+	}
+
+	if deleted == 0 {
+		return 0
+	}
+
+	now := c.clock()
+	entry.Reserved = sumReservations(entry.Reservations)
+	entry.UpdatedAt = now
+	entry.LastAccess = now
+
+	if entry.Reserved.IsZero() && len(entry.PendingDeletes) == 0 {
+		delete(c.data, key)
+		return deleted
+	}
+
+	c.data[key] = entry
+	return deleted
+}
+
 func (c *QuantityCache[K]) AddPendingDelete(key K, uid types.UID) {
 	if uid == "" {
 		return
@@ -192,9 +284,12 @@ func (c *QuantityCache[K]) AddPendingDelete(key K, uid types.UID) {
 	current, exists := c.data[key]
 	if !exists {
 		current = QuantityEntry{
-			Reserved:  resource.MustParse("0"),
-			CreatedAt: now,
+			Reserved:     resource.MustParse("0"),
+			Reservations: make(map[string]Reservation),
+			CreatedAt:    now,
 		}
+	} else if current.Reservations == nil {
+		current.Reservations = make(map[string]Reservation)
 	}
 
 	if !containsPendingDelete(current.PendingDeletes, uid) {
@@ -209,8 +304,6 @@ func (c *QuantityCache[K]) AddPendingDelete(key K, uid types.UID) {
 	c.data[key] = current
 }
 
-// RemovePendingDelete removes one deletion hint.
-// If the entry becomes empty, it is deleted.
 func (c *QuantityCache[K]) RemovePendingDelete(key K, uid types.UID) bool {
 	now := c.clock()
 
@@ -240,7 +333,6 @@ func (c *QuantityCache[K]) RemovePendingDelete(key K, uid types.UID) bool {
 	return true
 }
 
-// PendingDeletes returns a copy of pending delete UIDs for the key.
 func (c *QuantityCache[K]) PendingDeletes(key K) []types.UID {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
@@ -258,7 +350,6 @@ func (c *QuantityCache[K]) PendingDeletes(key K) []types.UID {
 	return out
 }
 
-// HasPendingDeletes reports whether the key has any deletion hints.
 func (c *QuantityCache[K]) HasPendingDeletes(key K) bool {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
@@ -273,6 +364,24 @@ func copyEntry(in QuantityEntry) QuantityEntry {
 		CreatedAt:  in.CreatedAt,
 		UpdatedAt:  in.UpdatedAt,
 		LastAccess: in.LastAccess,
+	}
+
+	if len(in.Reservations) > 0 {
+		out.Reservations = make(map[string]Reservation, len(in.Reservations))
+		for id, r := range in.Reservations {
+			out.Reservations[id] = Reservation{
+				ID:        r.ID,
+				Usage:     r.Usage.DeepCopy(),
+				UID:       r.UID,
+				Group:     r.Group,
+				Version:   r.Version,
+				Kind:      r.Kind,
+				Namespace: r.Namespace,
+				Name:      r.Name,
+				CreatedAt: r.CreatedAt,
+				UpdatedAt: r.UpdatedAt,
+			}
+		}
 	}
 
 	if len(in.PendingDeletes) > 0 {
@@ -294,4 +403,15 @@ func indexPendingDelete(in []PendingDeleteHint, uid types.UID) int {
 		}
 	}
 	return -1
+}
+
+func sumReservations(in map[string]Reservation) resource.Quantity {
+	total := resource.MustParse("0")
+	for _, r := range in {
+		total.Add(r.Usage)
+	}
+	if total.Sign() < 0 {
+		total = resource.MustParse("0")
+	}
+	return total
 }

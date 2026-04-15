@@ -4,42 +4,18 @@ kind: GlobalCustomQuota
 metadata:
   name: pvc-storage-limit
 spec:
-  limit: "1Gi"
-  source:
-    group: ""
-    version: v1
-    kind: Pod
-    path: .spec.containers[*].resources.limits.cpu
+  limit: "5"
+  sources:
+    - group: ""
+      version: v1
+      kind: Pod
+      path: ".spec.containers[*].resources.limits.cpu"
+    - group: ""
+      version: v1
+      kind: Pod
+      path: ".spec.initContainers[*].resources.limits.cpu"
+      op: sub
   namespaceSelectors:
     - matchLabels:
         capsule.clastix.io/tenant: solar
----
-apiVersion: capsule.clastix.io/v1beta2
-kind: CustomQuota
-metadata:
-  name: pvc-storage-limit
-spec:
-  limit: "200Gi"
-  source:
-    group: ""
-    version: v1
-    kind: PersistentVolumeClaim
-    path: .spec.resources.requests.storage
-  scopeSelectors:
-    - matchLabels:
-        team: platform
----
-apiVersion: capsule.clastix.io/v1beta2
-kind: CustomQuota
-metadata:
-  name: pvc-storage-limit-lower
-spec:
-  limit: "2Gi"
-  source:
-    group: ""
-    version: v1
-    kind: PersistentVolumeClaim
-    path: .spec.resources.requests.storage
-  scopeSelectors:
-    - matchLabels:
-        team: platform
+

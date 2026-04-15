@@ -255,13 +255,13 @@ wait-for-helmreleases:
 
 
 ENTERPRISE_VERSION  ?= "0.13.0-rc.2"
-ENTERPRISE_REGISTRY ?= "oci.peakscale.ch"
+ENTERPRISE_REGISTRY ?= "registry.projectcapsule.dev"
 
 enterprise-prerelease:
 	mkdir -p ./builds
-	$(MAKE) CAPSULE_IMG=$(ENTERPRISE_REGISTRY)/prereleases/images/capsule VERSION=$(ENTERPRISE_VERSION) ko-publish-capsule
+	$(MAKE) CAPSULE_IMG=$(ENTERPRISE_REGISTRY)/prereleases/capsule VERSION=$(ENTERPRISE_VERSION) ko-publish-capsule
 	$(HELM) package ./charts/capsule --app-version=$(ENTERPRISE_VERSION) --version=$(ENTERPRISE_VERSION) --destination ./builds/
-	$(HELM) push ./builds/capsule-$(ENTERPRISE_VERSION).tgz oci://$(ENTERPRISE_REGISTRY)/prereleases/charts/
+	$(HELM) push ./builds/capsule-$(ENTERPRISE_VERSION).tgz oci://$(ENTERPRISE_REGISTRY)/charts/prereleases/
 	$(MAKE) deploy-enterprise
 	rm -rf ./builds
 
@@ -279,12 +279,12 @@ deploy-enterprise:
 	@echo "2) Deploy Capsule:"
 	@echo ""
 	@echo "helm upgrade --install capsule \\"
-	@echo "  oci://$(ENTERPRISE_REGISTRY)/prereleases/charts/capsule \\"
+	@echo "  oci://$(ENTERPRISE_REGISTRY)/charts/prereleases/capsule \\"
 	@echo "  --namespace capsule-system \\"
 	@echo "  --version $(ENTERPRISE_VERSION) \\"
 	@echo "  --reuse-values \\"
 	@echo "  --set manager.image.registry=$(ENTERPRISE_REGISTRY) \\"
-	@echo "  --set manager.image.repository=prereleases/images/capsule \\"
+	@echo "  --set manager.image.repository=prereleases/capsule \\"
 	@echo "  --set manager.image.tag=$(ENTERPRISE_VERSION) \\"
 	@echo "  --set manager.image.pullPolicy=Always \\"
 	@echo "  --set 'serviceAccount.imagePullSecrets={capsule-enterprise}'"
@@ -318,14 +318,8 @@ ko-build-capsule: ko
 	@LD_FLAGS=$(LD_FLAGS) KOCACHE=$(KOCACHE) KO_DOCKER_REPO=$(CAPSULE_IMG) \
 		$(KO) build ./cmd/ --bare --tags=$(KO_TAGS) --push=false --local --platform=$(KO_PLATFORM)
 
-.PHONY: ko-build-helper-labler
-ko-build-helper-labler: ko
-	@echo Building Helper Labeler $(KO_TAGS) for $(KO_PLATFORM) >&2
-	@LD_FLAGS=$(LD_FLAGS) KOCACHE=$(KOCACHE) KO_DOCKER_REPO=$(LABELER_IMG) \
-		$(KO) build ./hack/helpers/labeler --bare --tags=$(KO_TAGS) --push=false --local --platform=$(KO_PLATFORM)
-
 .PHONY: ko-build-all
-ko-build-all: ko-build-capsule ko-build-helper-labler
+ko-build-all: ko-build-capsule
 
 .PHONY: docker-build-capsule-trace
 docker-build-capsule-trace: ko-build-capsule

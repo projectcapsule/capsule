@@ -205,13 +205,9 @@ func (t ResourceReference) loadResources(
 		opts = append(opts, client.MatchingLabelsSelector{Selector: combined})
 	}
 
-	log.Info("COMBINED SELECTORS", "SELECTORS", len(all), "CEL", all)
-
 	if err := kubeClient.List(ctx, list, opts...); err != nil {
 		return nil, fmt.Errorf("failed to list %s: %w", t.Kind, err)
 	}
-
-	log.Info("FOUND ITEMS", "ITEMS", len(list.Items))
 
 	results := make([]*unstructured.Unstructured, 0, len(list.Items))
 	for i := range list.Items {

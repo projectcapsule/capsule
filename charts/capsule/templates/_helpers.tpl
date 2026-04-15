@@ -150,7 +150,7 @@ url: {{ printf "%s/%s" (trimSuffix "/" $.ctx.Values.webhooks.service.url ) (trim
 service:
   name: {{ default (printf "%s-webhook-service" (include "capsule.fullname" $.ctx)) $.ctx.Values.webhooks.service.name }}
   namespace: {{ default $.ctx.Release.Namespace $.ctx.Values.webhooks.service.namespace }}
-  port: {{ default 443 $.ctx.Values.webhooks.service.port }}
+  port: {{ default 9443 $.ctx.Values.webhooks.service.port }}
   path: {{ required "Path is required for the function" $.path }}
   {{- end }}
 {{- end }}
@@ -158,7 +158,6 @@ service:
 
 {{/*
 Capsule Webhook service (Without Path)
-
 */}}
 {{- define "capsule.webhooks.serviceConfig" -}}
   {{- include "capsule.webhooks.cabundle" $ | nindent 0 }}
@@ -168,10 +167,9 @@ url: {{ trimSuffix "/" $.Values.webhooks.service.url }}
 service:
   name: {{ default (printf "%s-webhook-service" (include "capsule.fullname" $)) $.Values.webhooks.service.name }}
   namespace: {{ default $.Release.Namespace $.Values.webhooks.service.namespace }}
-  port: {{ default 443 $.Values.webhooks.service.port }}
+  port: {{ default 9443 $.Values.webhooks.service.port }}
   {{- end }}
 {{- end }}
-
 
 {{/*
 Capsule Webhook endpoint CA Bundle

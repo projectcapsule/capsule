@@ -1,7 +1,7 @@
 // Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package client
+package jsonpath
 
 import (
 	"strings"
@@ -10,7 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
-func TestCompileUsageJSONPath(t *testing.T) {
+func TestCompileJSONPath(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -70,7 +70,7 @@ func TestCompileUsageJSONPath(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, err := CompileUsageJSONPath(tt.sourcePath)
+			got, err := CompileJSONPath(tt.sourcePath)
 			if tt.wantErr {
 				if err == nil {
 					t.Fatalf("expected error, got nil")
@@ -190,7 +190,7 @@ func TestCompiledJSONPathExecute(t *testing.T) {
 			compiled := tt.compiled
 			if tt.prepareJP != "" {
 				var err error
-				compiled, err = CompileUsageJSONPath(tt.prepareJP)
+				compiled, err = CompileJSONPath(tt.prepareJP)
 				if err != nil {
 					t.Fatalf("failed to compile jsonpath for test: %v", err)
 				}
@@ -217,219 +217,8 @@ func TestCompiledJSONPathExecute(t *testing.T) {
 	}
 }
 
-func TestWrapJSONPath(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name       string
-		sourcePath string
-		want       string
-	}{
-		{
-			name:       "simple path",
-			sourcePath: ".spec.resources.requests.cpu",
-			want:       "{.spec.resources.requests.cpu}",
-		},
-		{
-			name:       "empty path",
-			sourcePath: "",
-			want:       "{}",
-		},
-	}
-
-	for _, tt := range tests {
-		tt := tt
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			got := wrapJSONPath(tt.sourcePath)
-			if got != tt.want {
-				t.Fatalf("expected %q, got %q", tt.want, got)
-			}
-		})
-	}
-}
-
-func TestValidateSourcePath(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name       string
-		sourcePath string
-		wantErr    bool
-		errMsg     string
-	}{
-		{
-			name:       "valid path",
-			sourcePath: ".spec.resources.requests.cpu",
-		},
-		{
-			name:       "valid minimal path",
-			sourcePath: ".a",
-		},
-		{
-			name:       "empty path",
-			sourcePath: "",
-			wantErr:    true,
-			errMsg:     "sourcePath must not be empty",
-		},
-		{
-			name:       "too long",
-			sourcePath: "." + strings.Repeat("a", maxJSONPathLength),
-			wantErr:    true,
-			errMsg:     "sourcePath exceeds max length",
-		},
-		{
-			name:       "missing dot prefix",
-			sourcePath: "spec.value",
-			wantErr:    true,
-			errMsg:     "sourcePath must start with '.'",
-		},
-		{
-			name:       "contains carriage return",
-			sourcePath: ".spec\r.value",
-			wantErr:    true,
-			errMsg:     "sourcePath must not contain control whitespace",
-		},
-		{
-			name:       "contains newline",
-			sourcePath: ".spec\nvalue",
-			wantErr:    true,
-			errMsg:     "sourcePath must not contain control whitespace",
-		},
-		{
-			name:       "contains tab",
-			sourcePath: ".spec\tvalue",
-			wantErr:    true,
-			errMsg:     "sourcePath must not contain control whitespace",
-		},
-	}
-
-	for _, tt := range tests {
-		tt := tt
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			err := validateSourcePath(tt.sourcePath)
-			if tt.wantErr {
-				if err == nil {
-					t.Fatalf("expected error, got nil")
-				}
-				if !strings.Contains(err.Error(), tt.errMsg) {
-					t.Fatalf("expected error to contain %q, got %q", tt.errMsg, err.Error())
-				}
-				return
-			}
-
-			if err != nil {
-				t.Fatalf("expected no error, got %v", err)
-			}
-		})
-	}
-}
-
-func TestGetUsageFromUnstructured_Success(t *testing.T) {
-	u := unstructured.Unstructured{
-		Object: map[string]interface{}{
-			"spec": map[string]interface{}{
-				"resources": map[string]interface{}{
-					"requests": map[string]interface{}{
-						"cpu":    "250m",
-						"memory": "512Mi",
-					},
-				},
-			},
-		},
-	}
-
-	got, err := GetUsageFromUnstructured(u, ".spec.resources.requests.cpu")
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-
-	if got != "250m" {
-		t.Fatalf("expected %q, got %q", "250m", got)
-	}
-}
-
-func TestGetUsageFromUnstructured_TrimsWhitespace(t *testing.T) {
-	u := unstructured.Unstructured{
-		Object: map[string]interface{}{
-			"spec": map[string]interface{}{
-				"value": " hello ",
-			},
-		},
-	}
-
-	got, err := GetUsageFromUnstructured(u, ".spec.value")
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-
-	if got != "hello" {
-		t.Fatalf("expected %q, got %q", "hello", got)
-	}
-}
-
-func TestGetUsageFromUnstructured_MissingPath(t *testing.T) {
-	u := unstructured.Unstructured{
-		Object: map[string]interface{}{
-			"spec": map[string]interface{}{},
-		},
-	}
-
-	_, err := GetUsageFromUnstructured(u, ".spec.resources.requests.cpu")
-	if err == nil {
-		t.Fatal("expected error, got nil")
-	}
-}
-
-func TestGetUsageFromUnstructured_InvalidJSONPath(t *testing.T) {
-	u := unstructured.Unstructured{
-		Object: map[string]interface{}{},
-	}
-
-	_, err := GetUsageFromUnstructured(u, ".spec[")
-	if err == nil {
-		t.Fatal("expected error, got nil")
-	}
-}
-
-func TestGetUsageFromUnstructured_EmptySourcePath(t *testing.T) {
-	u := unstructured.Unstructured{
-		Object: map[string]interface{}{},
-	}
-
-	_, err := GetUsageFromUnstructured(u, "")
-	if err == nil {
-		t.Fatal("expected error, got nil")
-	}
-}
-
-func TestGetUsageFromUnstructured_SourcePathMustStartWithDot(t *testing.T) {
-	u := unstructured.Unstructured{
-		Object: map[string]interface{}{},
-	}
-
-	_, err := GetUsageFromUnstructured(u, "spec.resources.requests.cpu")
-	if err == nil {
-		t.Fatal("expected error, got nil")
-	}
-}
-
-func TestGetUsageFromUnstructured_RejectsControlWhitespace(t *testing.T) {
-	u := unstructured.Unstructured{
-		Object: map[string]interface{}{},
-	}
-
-	_, err := GetUsageFromUnstructured(u, ".spec.\nrequests.cpu")
-	if err == nil {
-		t.Fatal("expected error, got nil")
-	}
-}
-
 func TestCompileUsageJSONPath_Execute_Success(t *testing.T) {
-	compiled, err := CompileUsageJSONPath(".spec.resources.requests.memory")
+	compiled, err := CompileJSONPath(".spec.resources.requests.memory")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
