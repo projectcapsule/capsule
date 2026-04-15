@@ -86,7 +86,7 @@ var _ = Describe("enforcing an allowed set of Service external IPs", Label("tena
 		}).ShouldNot(Succeed())
 	})
 
-	It("should allow the first CIDR block", func() {
+	It("should allow the first CIDR block", Label("skip-on-openshift"), func() {
 		ns := NewNamespace("")
 		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 
@@ -119,7 +119,7 @@ var _ = Describe("enforcing an allowed set of Service external IPs", Label("tena
 		}).Should(Succeed())
 	})
 
-	It("should allow the /32 CIDR block", func() {
+	It("should allow the /32 CIDR block", Label("skip-on-openshift"), func() {
 		ns := NewNamespace("")
 		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 

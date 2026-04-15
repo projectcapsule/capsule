@@ -72,7 +72,7 @@ var _ = Describe("preventing PersistentVolume cross-tenant mount", Label("tenant
 		}
 	})
 
-	It("should add labels to PersistentVolume and prevent cross-Tenant mount", func() {
+	It("should add labels to PersistentVolume and prevent cross-Tenant mount", Label("skip-on-openshift"), func() {
 		ns := NewNamespace("")
 		NamespaceCreation(ns, tnt1.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 		TenantNamespaceList(tnt1, defaultTimeoutInterval).Should(ContainElement(ns.Name))

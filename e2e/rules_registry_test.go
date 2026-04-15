@@ -336,7 +336,7 @@ var _ = Describe("enforcing a Container Registry", Label("tenant", "rules", "ima
 		)
 	})
 
-	It("denies volume image pullPolicy if not allowed (dev)", func() {
+	It("denies volume image pullPolicy if not allowed (dev)", Label("skip-on-openshift"), func() {
 		ns := NewNamespace("")
 		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 
@@ -466,7 +466,7 @@ var _ = Describe("enforcing a Container Registry", Label("tenant", "rules", "ima
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 	})
 
-	It("denies a pod when volume image reference changes to a disallowed pullPolicy (recreate)", func() {
+	It("denies a pod when volume image reference changes to a disallowed pullPolicy (recreate)", Label("skip-on-openshift"), func() {
 		ns := NewNamespace("")
 		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 

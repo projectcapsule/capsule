@@ -1,0 +1,22 @@
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: extend-admin-role
+  labels:
+    rbac.authorization.k8s.io/aggregate-to-admin: 'true'
+rules:
+  - verbs:
+      - update
+    apiGroups:
+      - capsule.clastix.io
+    resources:
+      - '*/finalizers'
+  - apiGroups:
+      - security.openshift.io
+    resources:
+      - securitycontextconstraints
+    resourceNames:
+      - restricted-v2
+      - nonroot-v2
+    verbs:
+      - 'use'

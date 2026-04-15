@@ -47,7 +47,7 @@ var _ = Describe("enforcing some defined ImagePullPolicy", Label("tenant", "imag
 		Expect(k8sClient.Delete(context.TODO(), tnt)).Should(Succeed())
 	})
 
-	It("should just allow the defined policies", func() {
+	It("should just allow the defined policies", Label("skip-on-openshift"), func() {
 		ns := NewNamespace("")
 		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 
