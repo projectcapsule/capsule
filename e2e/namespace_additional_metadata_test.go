@@ -286,7 +286,7 @@ var _ = Describe("creating a Namespace for a Tenant with additional metadata", L
 		})
 	})
 
-	It("should contain additional Namespace metadata", func() {
+	It("should contain additional Namespace metadata", Label("skip-on-openshift"), func() {
 		By("prepare tenant", func() {
 			tnt.Spec.NamespaceOptions = &capsulev1beta2.NamespaceOptions{
 				ManagedMetadataOnly: false,

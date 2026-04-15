@@ -204,7 +204,7 @@ var _ = Describe("enforcing a Priority Class", Label("pod", "classes"), func() {
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 	})
 
-	It("should allow all classes", func() {
+	It("should allow all classes", Label("skip-on-openshift"), func() {
 		all := []string{"system-cluster-critical", "system-node-critical", customerBronze.GetName(), customerSilver.GetName(), customerGold.GetName()}
 
 		By("Verify Status (Creation)", func() {
@@ -272,7 +272,7 @@ var _ = Describe("enforcing a Priority Class", Label("pod", "classes"), func() {
 		})
 	})
 
-	It("should block non allowed Priority Class", func() {
+	It("should block non allowed Priority Class", Label("skip-on-openshift"), func() {
 		ns := NewNamespace("")
 		NamespaceCreation(ns, tntNoDefaults.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 
@@ -383,7 +383,7 @@ var _ = Describe("enforcing a Priority Class", Label("pod", "classes"), func() {
 		}).Should(Succeed())
 	})
 
-	It("should allow regex match", func() {
+	It("should allow regex match", Label("skip-on-openshift"), func() {
 		ns := NewNamespace("")
 		NamespaceCreation(ns, tntNoDefaults.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 
@@ -517,7 +517,7 @@ var _ = Describe("enforcing a Priority Class", Label("pod", "classes"), func() {
 		})
 	})
 
-	It("should mutate to default tenant PriorityClass", func() {
+	It("should mutate to default tenant PriorityClass", Label("skip-on-openshift"), func() {
 		By("creating default tenant class", func() {
 			class := tenantDefault.DeepCopy()
 			class.SetResourceVersion("")
@@ -568,7 +568,7 @@ var _ = Describe("enforcing a Priority Class", Label("pod", "classes"), func() {
 		})
 	})
 
-	It("should mutate to default tenant PriorityClass although the cluster global one is not allowed", func() {
+	It("should mutate to default tenant PriorityClass although the cluster global one is not allowed", Label("skip-on-openshift"), func() {
 		class := tenantDefault.DeepCopy()
 		class.SetResourceVersion("")
 
@@ -622,7 +622,7 @@ var _ = Describe("enforcing a Priority Class", Label("pod", "classes"), func() {
 		})
 	})
 
-	It("should mutate to default tenant PriorityClass although the cluster global one is allowed", func() {
+	It("should mutate to default tenant PriorityClass although the cluster global one is allowed", Label("skip-on-openshift"), func() {
 		class := tenantDefault.DeepCopy()
 		class.SetResourceVersion("")
 		Expect(k8sClient.Create(context.TODO(), class)).Should(Succeed())

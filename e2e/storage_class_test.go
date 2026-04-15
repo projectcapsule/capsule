@@ -178,7 +178,7 @@ var _ = Describe("when Tenant handles Storage classes", Label("tenant", "classes
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 	})
 
-	It("should allow all classes", func() {
+	It("should allow all classes", Label("skip-on-openshift"), func() {
 		By("Verify Status (Creation)", func() {
 			Eventually(func() ([]string, error) {
 				t := &capsulev1beta2.Tenant{}

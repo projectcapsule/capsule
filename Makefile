@@ -17,9 +17,12 @@ IMG_BASE        ?= $(REPOSITORY)
 IMG             ?= $(IMG_BASE):$(VERSION)
 CAPSULE_IMG     ?= $(REGISTRY)/$(IMG_BASE)
 CLUSTER_NAME    ?= capsule
-
+FILTER		 	?= --label-filter="!skip"
 ## Kubernetes Version Support
 KUBERNETES_SUPPORTED_VERSION ?= "v1.35.0"
+
+## Openshift Version Support
+OS_SUPPORTED_VERSION ?= "4.22.0-okd-scos.ec.10"
 
 ## Tool Binaries
 KUBECTL ?= kubectl
@@ -113,6 +116,7 @@ dev-destroy: kind
 	$(KIND) delete cluster --name capsule
 
 dev-install-deps: dev-setup-fluxcd dev-setup-cert-manager dev-install-gw-api-crds  wait-for-helmreleases
+dev-install-deps-openshift: dev-setup-fluxcd-openshift dev-setup-cert-manager dev-install-gw-api-crds  wait-for-helmreleases
 
 API_GW         := none
 API_GW_VERSION := v1.3.0
@@ -189,6 +193,7 @@ dev-setup:
 		./charts/capsule || true
 
 setup-monitoring: dev-setup-fluxcd
+
 	@$(KUBECTL) kustomize --load-restrictor='LoadRestrictionsNone' hack/distro/monitoring | envsubst | kubectl apply -f -
 	@$(KUBECTL) kustomize --load-restrictor='LoadRestrictionsNone' hack/distro/monitoring/dashboards | kubectl apply -f -
 	@$(MAKE) wait-for-helmreleases
@@ -212,7 +217,12 @@ dev-setup-cert-manager:
 dev-setup-fluxcd:
 	@$(KUBECTL) kustomize --load-restrictor='LoadRestrictionsNone' hack/distro/fluxcd | envsubst | kubectl apply -f -
 
+dev-setup-fluxcd-openshift:
+	@$(KUBECTL) kustomize --load-restrictor='LoadRestrictionsNone' hack/distro/overlays/openshift | envsubst | kubectl apply -f -
 
+dev-setup-openshift-specifics:
+	@$(KUBECTL) apply -f hack/distro/openshift/extend-admin-role.yaml
+	@$(KUBECTL) apply -f hack/distro/openshift/capsule-namespace-deleter.yaml
 # Here to setup the current capsule version
 # Intended to test updates to new version
 dev-setup-capsule: dev-setup-fluxcd
@@ -345,6 +355,22 @@ golint: golangci-lint
 golint-fix: golangci-lint
 	$(GOLANGCI_LINT) run -c .golangci.yaml --verbose --fix
 
+.PHONY: e2e-openshift
+e2e-openshift: ginkgo
+	$(MAKE) e2e-build-openshift && $(MAKE) e2e-exec FILTER='--label-filter="!skip && !skip-on-openshift"' && $(MAKE) e2e-destroy-openshift
+
+e2e-build-openshift: minc
+	$(MINC) config set provider docker
+	$(MINC) config set microshift-version $(OS_SUPPORTED_VERSION)
+	$(MINC) create --disable-overlay-cache true
+	$(MINC) status
+	$(MAKE) dev-install-deps-openshift
+	$(MAKE) dev-setup-openshift-specifics
+	$(MAKE) e2e-install-openshift
+
+
+e2e-destroy-openshift: minc
+	$(MINC) delete
 
 # Running e2e tests in a KinD instance
 .PHONY: e2e
@@ -372,6 +398,28 @@ e2e-install: helm-controller-version ko-build-all
 		--set 'webhooks.hooks.nodes.enabled=true' \
 		--set "webhooks.exclusive=true"\
 		--set "manager.options.logLevel=debug"\
+		capsule \
+		./charts/capsule
+
+.PHONY: e2e-install-openshift
+e2e-install-openshift: helm-controller-version ko-build-all
+	$(MAKE) e2e-load-image-openshift IMAGE=$(CAPSULE_IMG) VERSION=$(VERSION)
+	$(HELM) upgrade \
+	    --dependency-update \
+		--debug \
+		--install \
+		--namespace capsule-system \
+		--create-namespace \
+		--set 'replicaCount=2'\
+		--set 'manager.image.pullPolicy=Never' \
+		--set 'manager.resources=null'\
+		--set "manager.image.tag=$(VERSION)" \
+		--set 'manager.livenessProbe.failureThreshold=10' \
+		--set 'webhooks.hooks.nodes.enabled=true' \
+		--set "webhooks.exclusive=true"\
+		--set "manager.options.logLevel=debug"\
+		--set "jobs.podSecurityContext.enabled=false"\
+		--set "jobs.securityContext.enabled=false"\
 		capsule \
 		./charts/capsule
 
@@ -413,9 +461,16 @@ seccomp:
 e2e-load-image: kind
 	$(KIND) load docker-image $(IMAGE):$(VERSION) --name $(CLUSTER_NAME)
 
+.PHONY: e2e-load-image-openshift
+e2e-load-image-openshift: minc
+	docker save $(IMAGE):$(VERSION) > capsule.tar
+	docker cp capsule.tar microshift:/tmp/
+	docker exec microshift sh -c 'podman load -i /tmp/capsule.tar'
+	rm -rf capsule.tar
+
 .PHONY: e2e-exec
 e2e-exec: ginkgo
-	$(GINKGO) -v -tags e2e ./e2e
+	$(GINKGO) -v -tags e2e $(FILTER) ./e2e
 
 .PHONY: e2e-destroy
 e2e-destroy: dev-destroy
@@ -471,6 +526,13 @@ CT_LOOKUP  := helm/chart-testing
 ct:
 	@test -s $(CT) && $(CT) version | grep -q $(CT_VERSION) || \
 	$(call go-install-tool,$(CT),github.com/$(CT_LOOKUP)/v3/ct@$(CT_VERSION))
+
+MINC:= $(LOCALBIN)/minc
+MINC_VERSION := 5d70364166af05edf00fe0d1ea8e731f138b5c51
+MINC_LOOKUP  := minc-org/minc
+minc:
+	echo "Installing minc to $(MINC)" && \
+	$(call go-install-tool,$(MINC),github.com/$(MINC_LOOKUP)/cmd/minc@$(MINC_VERSION))
 
 KIND         := $(LOCALBIN)/kind
 KIND_VERSION := v0.31.0

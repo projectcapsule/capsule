@@ -389,7 +389,7 @@ var _ = Describe("enforcing a Container Registry", Label("tenant", "images", "re
 		}).ShouldNot(Succeed())
 	})
 
-	It("should allow patching a matching registry after applying with a matching (EphemeralContainer)", func() {
+	It("should allow patching a matching registry after applying with a matching (EphemeralContainer)", Label("skip-on-openshift"), func() {
 		ns := NewNamespace("")
 
 		pod := &corev1.Pod{
