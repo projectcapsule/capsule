@@ -116,6 +116,18 @@ spec:
                   type: object
                   x-kubernetes-map-type: atomic
                 type: array
+              options:
+                default:
+                  emitMetricPerClaimUsage: false
+                description: Additional Options for the CustomQuotaSpecification
+                properties:
+                  emitMetricPerClaimUsage:
+                    default: false
+                    description: |-
+                      Additionaly expose usage metrics for each claim contributing to the quota.
+                      This is disabled by default to avoid high cardinality in the metrics, but can be enabled for more granular monitoring and alerting.
+                    type: boolean
+                type: object
               scopeSelectors:
                 description: Select items governed by this quota
                 items:
@@ -263,6 +275,7 @@ spec:
                 type: array
             required:
             - limit
+            - options
             - sources
             type: object
           status:

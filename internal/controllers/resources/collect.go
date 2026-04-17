@@ -107,12 +107,8 @@ func (co *Collector) Collect(
 
 	var syncErr error
 
-	log.Info("CONTEXT HERE")
-
 	tplContext := template.ReferenceContext{}
 	if spec.Context != nil {
-		log.Info("Gathering Context")
-
 		namespace := ""
 		if ns != nil {
 			namespace = ns.GetName()
@@ -129,9 +125,6 @@ func (co *Collector) Collect(
 		if err != nil {
 			return err
 		}
-
-		log.Info("Gathered", "Context", tplContext)
-
 	}
 
 	if tnt != nil {

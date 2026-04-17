@@ -110,7 +110,7 @@ func (r *customQuotaClaimController) Reconcile(ctx context.Context, request ctrl
 	r.emitMetrics(instance)
 
 	if err := patchHelper.Patch(ctx, instance); err != nil {
-		return reconcile.Result{}, fmt.Errorf("cannot patch: %w", err)
+		return reconcile.Result{}, client.IgnoreNotFound(fmt.Errorf("failed to patch claim: %w", err))
 	}
 
 	if reconcileErr != nil {
@@ -453,6 +453,11 @@ func (r *customQuotaClaimController) emitMetrics(
 		"target_namespace": instance.GetNamespace(),
 	})
 
+	// Skip emitting metrics on claim basis
+	if !instance.Spec.Options.EmitPerClaimMetrics {
+		return
+	}
+
 	for _, claim := range instance.Status.Claims {
 		r.metrics.ResourceItemUsageGauge.WithLabelValues(
 			instance.GetName(),
@@ -488,6 +493,15 @@ func (r *customQuotaClaimController) updateStatus(
 
 		latest.Status.Conditions.UpdateConditionByType(readyCondition)
 
-		return r.Client.Status().Update(ctx, latest)
+		latest.Status.Conditions.UpdateConditionByType(readyCondition)
+
+		if err := r.Client.Status().Update(ctx, latest); err != nil {
+			return err
+		}
+
+		// Keep the in-memory object aligned with what we just wrote.
+		instance.Status = latest.Status
+
+		return nil
 	})
 }

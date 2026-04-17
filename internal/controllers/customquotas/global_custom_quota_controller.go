@@ -7,9 +7,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 	"time"
 
 	"github.com/go-logr/logr"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	k8smeta "k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -25,6 +27,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -69,8 +72,86 @@ func (r *clusterCustomQuotaClaimController) SetupWithManager(mgr ctrl.Manager, c
 			&capsulev1beta2.QuantityLedger{},
 			handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &capsulev1beta2.GlobalCustomQuota{}),
 		).
+		Watches(
+			&corev1.Namespace{},
+			handler.EnqueueRequestsFromMapFunc(r.mapNamespaceToGlobalCustomQuotas),
+			builder.WithPredicates(predicate.Funcs{
+				CreateFunc: func(e event.CreateEvent) bool {
+					return true
+				},
+				DeleteFunc: func(e event.DeleteEvent) bool {
+					return true
+				},
+				UpdateFunc: func(e event.UpdateEvent) bool {
+					if e.ObjectOld == nil || e.ObjectNew == nil {
+						return false
+					}
+
+					oldNs, okOld := e.ObjectOld.(*corev1.Namespace)
+					newNs, okNew := e.ObjectNew.(*corev1.Namespace)
+					if !okOld || !okNew {
+						return false
+					}
+
+					return !reflect.DeepEqual(oldNs.Labels, newNs.Labels) ||
+						!reflect.DeepEqual(oldNs.Annotations, newNs.Annotations)
+				},
+				GenericFunc: func(e event.GenericEvent) bool {
+					return false
+				},
+			}),
+		).
 		WithOptions(controller.Options{MaxConcurrentReconciles: cfg.MaxConcurrentReconciles}).
 		Complete(r)
+}
+
+func (r *clusterCustomQuotaClaimController) mapNamespaceToGlobalCustomQuotas(
+	ctx context.Context,
+	obj client.Object,
+) []reconcile.Request {
+	ns, ok := obj.(*corev1.Namespace)
+	if !ok {
+		return nil
+	}
+
+	var quotaList capsulev1beta2.GlobalCustomQuotaList
+	if err := r.List(ctx, &quotaList); err != nil {
+		r.log.Error(err, "cannot list GlobalCustomQuota objects for namespace event", "namespace", ns.Name)
+		return nil
+	}
+
+	requests := make([]reconcile.Request, 0, len(quotaList.Items))
+
+	for i := range quotaList.Items {
+		gcq := &quotaList.Items[i]
+
+		if shouldReconcileForNamespaceEvent(gcq, ns.Name) {
+			requests = append(requests, reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Name: gcq.Name,
+				},
+			})
+		}
+	}
+
+	return requests
+}
+
+func shouldReconcileForNamespaceEvent(
+	instance *capsulev1beta2.GlobalCustomQuota,
+	namespace string,
+) bool {
+	if len(instance.Spec.NamespaceSelectors) > 0 {
+		return true
+	}
+
+	for _, ns := range instance.Status.Namespaces {
+		if ns == namespace {
+			return true
+		}
+	}
+
+	return false
 }
 
 func (r *clusterCustomQuotaClaimController) Reconcile(ctx context.Context, request ctrl.Request) (ctrl.Result, error) {
@@ -88,6 +169,10 @@ func (r *clusterCustomQuotaClaimController) Reconcile(ctx context.Context, reque
 		return reconcile.Result{}, err
 	}
 
+	defer func() {
+		r.emitMetrics(instance)
+	}()
+
 	patchHelper, err := patch.NewHelper(instance, r.Client)
 	if err != nil {
 		return reconcile.Result{}, err
@@ -103,10 +188,8 @@ func (r *clusterCustomQuotaClaimController) Reconcile(ctx context.Context, reque
 		return reconcile.Result{}, fmt.Errorf("cannot update status: %w", err)
 	}
 
-	r.emitMetrics(instance)
-
 	if err := patchHelper.Patch(ctx, instance); err != nil {
-		return reconcile.Result{}, fmt.Errorf("cannot patch: %w", err)
+		return reconcile.Result{}, client.IgnoreNotFound(fmt.Errorf("failed to patch claim: %w", err))
 	}
 
 	if reconcileErr != nil {
@@ -362,6 +445,11 @@ func (r *clusterCustomQuotaClaimController) emitMetrics(
 		"custom_quota": instance.GetName(),
 	})
 
+	// Skip emitting metrics on claim basis
+	if !instance.Spec.Options.EmitPerClaimMetrics {
+		return
+	}
+
 	for _, claim := range instance.Status.Claims {
 		r.metrics.ResourceItemUsageGauge.WithLabelValues(
 			instance.GetName(),
@@ -396,7 +484,14 @@ func (r *clusterCustomQuotaClaimController) updateStatus(
 
 		latest.Status.Conditions.UpdateConditionByType(readyCondition)
 
-		return r.Client.Status().Update(ctx, latest)
+		if err := r.Client.Status().Update(ctx, latest); err != nil {
+			return err
+		}
+
+		// Keep the in-memory object aligned with what we just wrote.
+		instance.Status = latest.Status
+
+		return nil
 	})
 }
 

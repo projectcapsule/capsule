@@ -5,6 +5,7 @@ package validation
 
 import (
 	"context"
+	"strings"
 
 	admissionv1 "k8s.io/api/admission/v1"
 	"k8s.io/client-go/tools/events"
@@ -12,6 +13,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
@@ -119,6 +121,16 @@ func (h *warningHandler) handle(tnt *capsulev1beta2.Tenant, req admission.Reques
 		response.Warnings = append(response.Warnings,
 			"The `regex` selector for RuntimeClasses is deprecated and will be removed in a future release.",
 		)
+	}
+
+	if tnt.GetAnnotations() != nil {
+		for k := range tnt.GetAnnotations() {
+			if strings.HasPrefix(k, meta.ResourceQuotaAnnotationPrefix) {
+				response.Warnings = append(response.Warnings,
+					"custom quotas via tenant annotations are deprecated and will be removed in a future release.  Please migrate to GlobalCustomQuotas. See: https://projectcapsule.dev/docs/resource-management/customquotas/#globalcustomquota.",
+				)
+			}
+		}
 	}
 
 	return response

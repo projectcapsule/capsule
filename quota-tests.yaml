@@ -34,20 +34,39 @@ spec:
   - matchLabels:
       capsule.clastix.io/tenant: solar
   sources:
-    - group: ""
-      version: v1
-      kind: Pod
-      path: ".spec.containers[*].resources.limits.cpu"
+  - group: ""
+    kind: Pod
+    op: add
+    path: .spec.containers[*].resources.limits.cpu
+    version: v1
+  - group: ""
+    kind: Pod
+    op: add
+    path: .spec.initContainers[*].resources.limits.cpu
+    version: v1
 ---
 apiVersion: capsule.clastix.io/v1beta2
 kind: GlobalCustomQuota
 metadata:
   name: pod-count-limit
 spec:
-  limit: 3
+  limit: 6
   namespaceSelectors:
   - matchLabels:
       capsule.clastix.io/tenant: solar
+  sources:
+  - group: ""
+    kind: Pod
+    op: count
+    version: v1
+---
+apiVersion: capsule.clastix.io/v1beta2
+kind: CustomQuota
+metadata:
+  name: pod-count-limit
+  namespace: solar-test
+spec:
+  limit: 3
   sources:
   - group: ""
     kind: Pod

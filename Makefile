@@ -386,10 +386,10 @@ e2e-install: helm-controller-version ko-build-all
 		--set 'manager.resources=null'\
 		--set "manager.image.tag=$(VERSION)" \
 		--set 'manager.livenessProbe.failureThreshold=10' \
+		--set 'manager.options.logLevel=debug' \
 		--set 'manager.rbac.minimal=true' \
 		--set 'webhooks.hooks.nodes.enabled=true' \
 		--set "webhooks.exclusive=true"\
-		--set "manager.options.logLevel=debug"\
 		capsule \
 		./charts/capsule
 

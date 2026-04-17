@@ -93,6 +93,12 @@ func (r resourceClaimController) Reconcile(ctx context.Context, request ctrl.Req
 			return
 		}
 
+		if e := patchHelper.Patch(ctx, instance); err != nil {
+			if !apierrors.IsNotFound(err) {
+				err = e
+			}
+		}
+
 		err = nil
 	}()
 
@@ -281,6 +287,13 @@ func (r *resourceClaimController) updateStatus(
 		//nolint:staticcheck
 		latest.Status.Condition = metav1.Condition{}
 
-		return r.Client.Status().Update(ctx, latest)
+		if err := r.Client.Status().Update(ctx, latest); err != nil {
+			return err
+		}
+
+		// Keep the in-memory object aligned with what we just wrote.
+		instance.Status = latest.Status
+
+		return nil
 	})
 }

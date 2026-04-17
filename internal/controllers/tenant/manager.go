@@ -276,10 +276,10 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 
 		r.syncTenantStatusMetrics(instance)
 
-		if e := patchHelper.Patch(ctx, instance); e != nil {
-			err = fmt.Errorf("cannot patch tenant: %w", e)
-
-			return
+		if e := patchHelper.Patch(ctx, instance); err != nil {
+			if !apierrors.IsNotFound(err) {
+				err = e
+			}
 		}
 
 		// Controller-Runtime should never receive error
@@ -372,18 +372,18 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 	return ctrl.Result{}, reconcileError
 }
 
-func (r *Manager) updateTenantStatus(ctx context.Context, tnt *capsulev1beta2.Tenant, reconcileError error) error {
+func (r *Manager) updateTenantStatus(ctx context.Context, instance *capsulev1beta2.Tenant, reconcileError error) error {
 
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
 		latest := &capsulev1beta2.Tenant{}
-		if err = r.Get(ctx, types.NamespacedName{Name: tnt.GetName()}, latest); err != nil {
+		if err = r.Get(ctx, types.NamespacedName{Name: instance.GetName()}, latest); err != nil {
 			return err
 		}
 
-		latest.Status = tnt.Status
+		latest.Status = instance.Status
 
 		// Set Ready Condition
-		readyCondition := meta.NewReadyCondition(tnt)
+		readyCondition := meta.NewReadyCondition(instance)
 		if reconcileError != nil {
 			readyCondition.Message = reconcileError.Error()
 			readyCondition.Status = metav1.ConditionFalse
@@ -393,9 +393,9 @@ func (r *Manager) updateTenantStatus(ctx context.Context, tnt *capsulev1beta2.Te
 		latest.Status.Conditions.UpdateConditionByType(readyCondition)
 
 		// Set Cordoned Condition
-		cordonedCondition := meta.NewCordonedCondition(tnt)
+		cordonedCondition := meta.NewCordonedCondition(instance)
 
-		if tnt.Spec.Cordoned {
+		if instance.Spec.Cordoned {
 			latest.Status.State = capsulev1beta2.TenantStateCordoned
 
 			cordonedCondition.Reason = meta.CordonedReason
@@ -407,6 +407,13 @@ func (r *Manager) updateTenantStatus(ctx context.Context, tnt *capsulev1beta2.Te
 
 		latest.Status.Conditions.UpdateConditionByType(cordonedCondition)
 
-		return r.Client.Status().Update(ctx, latest)
+		if err := r.Client.Status().Update(ctx, latest); err != nil {
+			return err
+		}
+
+		// Keep the in-memory object aligned with what we just wrote.
+		instance.Status = latest.Status
+
+		return nil
 	})
 }

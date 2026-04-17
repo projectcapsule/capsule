@@ -554,7 +554,14 @@ func (r *namespacedResourceController) updateStatus(ctx context.Context, instanc
 
 		latest.Status.Conditions.UpdateConditionByType(cordonedCondition)
 
-		return r.client.Status().Update(ctx, latest)
+		if err := r.client.Status().Update(ctx, latest); err != nil {
+			return err
+		}
+
+		// Keep the in-memory object aligned with what we just wrote.
+		instance.Status = latest.Status
+
+		return nil
 	})
 }
 

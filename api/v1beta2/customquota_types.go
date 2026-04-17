@@ -18,6 +18,17 @@ type CustomQuotaSpec struct {
 	Limit resource.Quantity `json:"limit"`
 	// Target resource
 	Sources []CustomQuotaSpecSource `json:"sources,omitzero"`
+	// Additional Options for the CustomQuotaSpecification
+	// +kubebuilder:default:={emitMetricPerClaimUsage:false}
+	Options *CustomQuotaOptionsSpec `json:"options,omitzero"`
+}
+
+// CustomQuotaOptionsSpec.
+type CustomQuotaOptionsSpec struct {
+	// Additionaly expose usage metrics for each claim contributing to the quota.
+	// This is disabled by default to avoid high cardinality in the metrics, but can be enabled for more granular monitoring and alerting.
+	// +kubebuilder:default:=false
+	EmitPerClaimMetrics bool `json:"emitMetricPerClaimUsage,omitempty"`
 }
 
 // +kubebuilder:validation:XValidation:rule="self.op == 'count' ? !has(self.path) || size(self.path) == 0 : has(self.path) && size(self.path) > 0",message="path must be empty when op is 'count'; otherwise path must be set and non-empty"

@@ -174,11 +174,18 @@ func getResourcesByGVK(
 		compiledSelectors = append(compiledSelectors, sel)
 	}
 
+	filterByNamespace := true
 	namespaceSet := make(map[string]struct{}, len(namespaces))
+
 	for _, ns := range namespaces {
+		if ns == "*" {
+			filterByNamespace = false
+			namespaceSet = nil
+			break
+		}
+
 		namespaceSet[ns] = struct{}{}
 	}
-
 	list := &unstructured.UnstructuredList{}
 	list.SetGroupVersionKind(schema.GroupVersionKind{
 		Group:   gvk.Group,
@@ -203,7 +210,7 @@ func getResourcesByGVK(
 		}
 
 		// Namespace filter
-		if len(namespaceSet) > 0 {
+		if filterByNamespace {
 			if _, ok := namespaceSet[item.GetNamespace()]; !ok {
 				continue
 			}

@@ -145,7 +145,7 @@ func main() {
 	flag.BoolVar(
 		&secureMetrics,
 		"metrics-secure",
-		true,
+		false,
 		"If set, the metrics endpoint is served securely via HTTPS. Use --metrics-secure=false to use HTTP instead.",
 	)
 	flag.StringVar(
