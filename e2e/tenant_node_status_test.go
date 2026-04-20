@@ -63,8 +63,8 @@ var _ = Describe("when Tenant handles Node status", Label("tenant", "nodes", "st
 	}
 
 	var (
-		allNodeNames []string
-		primaryNode  string
+		allNodeNames  []string
+		primaryNode   string
 		secondaryNode string
 	)
 
