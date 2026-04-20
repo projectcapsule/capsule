@@ -13,6 +13,8 @@ const (
 
 // Returns the observed state of the Tenant.
 type TenantStatus struct {
+	// List of nodes assigned to the Tenant.
+	Nodes []string `json:"nodes,omitempty"`
 	// +kubebuilder:default=Active
 	// The operational state of the Tenant. Possible values are "Active", "Cordoned".
 	State tenantState `json:"state"`
