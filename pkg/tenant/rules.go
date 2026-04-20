@@ -58,6 +58,11 @@ func BuildNamespaceRuleBodyForNamespace(
 		if len(rule.Enforce.Registries) > 0 {
 			out.Enforce.Registries = append(out.Enforce.Registries, rule.Enforce.Registries...)
 		}
+
+		// Merge gateway rules: last non-nil gateway rule wins.
+		if rule.Enforce.Gateways != nil {
+			out.Enforce.Gateways = rule.Enforce.Gateways.DeepCopy()
+		}
 	}
 
 	return out, nil

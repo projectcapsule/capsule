@@ -51,6 +51,86 @@ spec:
                   enforce:
                     description: Enforcement Rules applied
                     properties:
+                      gateways:
+                        description: Define gateway rules for this namespace, restricting
+                          which Gateway resources Routes may reference and optionally
+                          injecting a default Gateway parentRef.
+                        properties:
+                          gateway:
+                            description: Gateway restricts which Gateways Routes may
+                              reference and optionally specifies a default Gateway injected
+                              when no parentRef is provided.
+                            properties:
+                              allowed:
+                                description: Allowed is an explicit list of Gateways
+                                  (by name and optional namespace) that Routes in this
+                                  namespace may reference.
+                                items:
+                                  properties:
+                                    name:
+                                      description: Name of the Gateway.
+                                      type: string
+                                    namespace:
+                                      description: Namespace of the Gateway. When empty,
+                                        the Route's namespace is assumed.
+                                      type: string
+                                  required:
+                                  - name
+                                  type: object
+                                type: array
+                              default:
+                                description: Default is the Gateway injected as parentRef
+                                  when no parentRef is specified in a Route resource.
+                                properties:
+                                  name:
+                                    description: Name of the Gateway.
+                                    type: string
+                                  namespace:
+                                    description: Namespace of the Gateway. When empty,
+                                      the Route's namespace is assumed.
+                                    type: string
+                                required:
+                                - name
+                                type: object
+                              matchExpressions:
+                                description: matchExpressions is a list of label selector
+                                  requirements. The requirements are ANDed.
+                                items:
+                                  description: |-
+                                    A label selector requirement is a selector that contains values, a key, and an operator that
+                                    relates the key and values.
+                                  properties:
+                                    key:
+                                      description: key is the label key that the selector
+                                        applies to.
+                                      type: string
+                                    operator:
+                                      description: |-
+                                        operator represents a key's relationship to a set of values.
+                                        Valid operators are In, NotIn, Exists and DoesNotExist.
+                                      type: string
+                                    values:
+                                      description: |-
+                                        values is an array of string values. If the operator is In or NotIn,
+                                        the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                                        the values array must be empty.
+                                      items:
+                                        type: string
+                                      type: array
+                                      x-kubernetes-list-type: atomic
+                                  required:
+                                  - key
+                                  - operator
+                                  type: object
+                                type: array
+                                x-kubernetes-list-type: atomic
+                              matchLabels:
+                                additionalProperties:
+                                  type: string
+                                description: matchLabels is a map of {key,value} pairs.
+                                type: object
+                            type: object
+                        type: object
                       registries:
                         description: |-
                           Define registries which are allowed to be used within this tenant
