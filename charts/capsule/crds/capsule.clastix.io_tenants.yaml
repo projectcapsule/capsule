@@ -1059,11 +1059,6 @@ spec:
                 items:
                   type: string
                 type: array
-              nodes:
-                description: List of nodes assigned to the Tenant.
-                items:
-                  type: string
-                type: array
               size:
                 description: How many namespaces are assigned to the Tenant.
                 type: integer

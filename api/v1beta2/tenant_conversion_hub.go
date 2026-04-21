@@ -158,7 +158,6 @@ func (in *Tenant) ConvertFrom(raw conversion.Hub) error {
 	in.SetAnnotations(annotations)
 
 	in.Status.Namespaces = src.Status.Namespaces
-	in.Status.Nodes = src.Status.Nodes
 	in.Status.Size = src.Status.Size
 
 	switch src.Status.State {
@@ -281,7 +280,6 @@ func (in *Tenant) ConvertTo(raw conversion.Hub) error {
 
 	dst.Status.Size = in.Status.Size
 	dst.Status.Namespaces = in.Status.Namespaces
-	dst.Status.Nodes = in.Status.Nodes
 
 	switch in.Status.State {
 	case TenantStateActive:
