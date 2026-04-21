@@ -5,6 +5,7 @@ package tenant
 
 import (
 	"context"
+	"slices"
 
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
@@ -17,6 +18,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/runtime/predicates"
 	"github.com/projectcapsule/capsule/pkg/utils"
 )
 
@@ -53,6 +55,81 @@ func (r *Manager) statusOnlyHandlerClasses(
 				r.Log.Error(err, errMsg)
 			}
 		},
+	}
+}
+
+func (r *Manager) statusOnlyHandlerNodes() *handler.TypedFuncs[client.Object, reconcile.Request] {
+	metadataPredicate := predicates.UpdatedMetadataPredicate{}
+
+	return &handler.TypedFuncs[client.Object, reconcile.Request]{
+		CreateFunc: func(
+			ctx context.Context,
+			e event.TypedCreateEvent[client.Object],
+			_ workqueue.TypedRateLimitingInterface[reconcile.Request],
+		) {
+			r.reconcileNodeStatusForMatchingTenants(ctx, e.Object, func(tnt *capsulev1beta2.Tenant, node client.Object) bool {
+				return tenantNodeSelectorMatch(tnt, node)
+			})
+		},
+		UpdateFunc: func(
+			ctx context.Context,
+			e event.TypedUpdateEvent[client.Object],
+			_ workqueue.TypedRateLimitingInterface[reconcile.Request],
+		) {
+			if !metadataPredicate.Update(event.UpdateEvent{
+				ObjectOld: e.ObjectOld,
+				ObjectNew: e.ObjectNew,
+			}) {
+				return
+			}
+
+			r.reconcileNodeStatusForMatchingTenants(ctx, e.ObjectNew, func(tnt *capsulev1beta2.Tenant, node client.Object) bool {
+				return tenantNodeSelectorMatch(tnt, node) || slices.Contains(tnt.Status.Nodes, node.GetName())
+			})
+		},
+		DeleteFunc: func(
+			ctx context.Context,
+			e event.TypedDeleteEvent[client.Object],
+			_ workqueue.TypedRateLimitingInterface[reconcile.Request],
+		) {
+			r.reconcileNodeStatusForMatchingTenants(ctx, e.Object, func(tnt *capsulev1beta2.Tenant, node client.Object) bool {
+				return slices.Contains(tnt.Status.Nodes, node.GetName())
+			})
+		},
+	}
+}
+
+func (r *Manager) reconcileNodeStatusForMatchingTenants(
+	ctx context.Context,
+	node client.Object,
+	tenantMatchFn func(*capsulev1beta2.Tenant, client.Object) bool,
+) {
+	if node == nil {
+		return
+	}
+
+	var tenants capsulev1beta2.TenantList
+	if err := r.List(ctx, &tenants); err != nil {
+		r.Log.Error(err, "failed to list Tenants for node event")
+
+		return
+	}
+
+	for i := range tenants.Items {
+		tnt := &tenants.Items[i]
+		if !tenantMatchFn(tnt, node) {
+			continue
+		}
+
+		if err := r.collectAvailableNodes(ctx, tnt); err != nil {
+			r.Log.Error(err, "cannot collect node status", "tenant", tnt.GetName(), "node", node.GetName())
+
+			continue
+		}
+
+		if err := r.updateTenantStatus(ctx, tnt, nil); err != nil {
+			r.Log.Error(err, "cannot update tenant status", "tenant", tnt.GetName())
+		}
 	}
 }
 

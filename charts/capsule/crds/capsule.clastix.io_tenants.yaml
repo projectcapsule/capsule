@@ -2869,6 +2869,11 @@ spec:
                 items:
                   type: string
                 type: array
+              nodes:
+                description: Available Nodes within Tenant
+                items:
+                  type: string
+                type: array
               owners:
                 description: Collected owners for this tenant
                 items:
