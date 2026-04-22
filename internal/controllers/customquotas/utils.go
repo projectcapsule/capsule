@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -252,4 +253,14 @@ func getResourcesByGVK(
 	})
 
 	return items, nil
+}
+
+func minDurationPtr(cur *time.Duration, cand time.Duration) *time.Duration {
+	if cand < 0 {
+		cand = 0
+	}
+	if cur == nil || cand < *cur {
+		return &cand
+	}
+	return cur
 }

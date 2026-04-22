@@ -55,6 +55,8 @@ type clusterCustomQuotaClaimController struct {
 	targetsCache  *cache.CompiledTargetsCache[string]
 }
 
+const immediatePendingDeleteRequeue = 500 * time.Millisecond
+
 func (r *clusterCustomQuotaClaimController) SetupWithManager(mgr ctrl.Manager, cfg utils.ControllerOptions) error {
 	r.mapper = mgr.GetRESTMapper()
 
@@ -185,7 +187,7 @@ func (r *clusterCustomQuotaClaimController) Reconcile(ctx context.Context, reque
 	reconcileErr := r.reconcile(ctx, log, instance)
 
 	// Normalize ledger state against freshly rebuilt claims first.
-	needsRequeue, ledgerErr := r.reconcileLedger(ctx, log, instance)
+	requeueAfter, ledgerErr := r.reconcileLedger(ctx, log, instance)
 	if ledgerErr != nil {
 		return reconcile.Result{}, ledgerErr
 	}
@@ -202,11 +204,12 @@ func (r *clusterCustomQuotaClaimController) Reconcile(ctx context.Context, reque
 		return reconcile.Result{}, reconcileErr
 	}
 
-	if needsRequeue {
+	if requeueAfter != nil {
 		log.V(3).Info("ledger still has pending work, requeueing",
 			"customQuota", instance.Name,
 		)
-		return ctrl.Result{RequeueAfter: 500 * time.Millisecond}, nil
+
+		return ctrl.Result{RequeueAfter: *requeueAfter}, nil
 	}
 
 	return ctrl.Result{}, nil
@@ -500,13 +503,13 @@ func (r *clusterCustomQuotaClaimController) reconcileLedger(
 	ctx context.Context,
 	log logr.Logger,
 	instance *capsulev1beta2.GlobalCustomQuota,
-) (bool, error) {
+) (*time.Duration, error) {
 	key := types.NamespacedName{
 		Name:      instance.GetName(),
 		Namespace: configuration.ControllerNamespace(),
 	}
 
-	var needsRequeue bool
+	var requeueAfter *time.Duration
 
 	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		ledger := &capsulev1beta2.QuantityLedger{}
@@ -543,11 +546,16 @@ func (r *clusterCustomQuotaClaimController) reconcileLedger(
 				"materialized", materialized,
 				"expired", expired,
 			)
-
 			if materialized || expired {
 				continue
 			}
+
 			activeReservations = append(activeReservations, res)
+
+			// NEW: schedule requeue on reservation expiry
+			if res.ExpiresAt != nil {
+				requeueAfter = minDurationPtr(requeueAfter, time.Until(res.ExpiresAt.Time))
+			}
 		}
 
 		activeDeletes := make([]capsulev1beta2.QuantityLedgerPendingDelete, 0, len(ledger.Status.PendingDeletes))
@@ -570,11 +578,13 @@ func (r *clusterCustomQuotaClaimController) reconcileLedger(
 			switch {
 			case stillPresent:
 				activeDeletes = append(activeDeletes, pd)
-				needsRequeue = true
+				requeueAfter = minDurationPtr(requeueAfter, immediatePendingDeleteRequeue)
+
 			case expired:
 				// drop stale hint
+
 			default:
-				// object disappeared from claims, drop hint
+				// object is no longer collected by the controller; remove hint now
 			}
 		}
 
@@ -635,10 +645,10 @@ func (r *clusterCustomQuotaClaimController) reconcileLedger(
 	})
 
 	if err != nil {
-		return false, err
+		return nil, err
 	}
 
-	return needsRequeue, nil
+	return requeueAfter, nil
 }
 
 func pendingDeleteStillPresent(

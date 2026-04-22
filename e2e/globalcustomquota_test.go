@@ -200,9 +200,29 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Lab
 			g.Expect(k8sClient.Get(ctx, types.NamespacedName{
 				Name:      name,
 				Namespace: configuration.ControllerNamespace(),
-			}, obj)).To(Succeed())
-			g.Expect(obj.Status.Reserved.IsZero()).To(BeTrue())
-			g.Expect(obj.Status.PendingDeletes).To(BeEmpty())
+			}, obj)).To(Succeed(),
+				"failed to get QuantityLedger %s/%s",
+				configuration.ControllerNamespace(),
+				name,
+			)
+
+			g.Expect(obj.Status.Reserved.IsZero()).To(BeTrue(),
+				"ledger %s/%s still has reserved=%q reservations=%+v pendingDeletes=%+v",
+				configuration.ControllerNamespace(),
+				name,
+				obj.Status.Reserved.String(),
+				obj.Status.Reservations,
+				obj.Status.PendingDeletes,
+			)
+
+			g.Expect(obj.Status.PendingDeletes).To(BeEmpty(),
+				"ledger %s/%s still has pendingDeletes=%+v reserved=%q reservations=%+v",
+				configuration.ControllerNamespace(),
+				name,
+				obj.Status.PendingDeletes,
+				obj.Status.Reserved.String(),
+				obj.Status.Reservations,
+			)
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 	}
 
@@ -362,6 +382,235 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Lab
 		EventuallyDeletion(ns)
 	})
 
+	It("posts wildcard namespace status when no namespaceSelectors are configured and keeps it stable as namespaces change", func() {
+		quota := &capsulev1beta2.GlobalCustomQuota{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "gq-nsstatus-all",
+				Labels: map[string]string{
+					"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
+				},
+			},
+			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
+				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
+					Limit: resource.MustParse("10"),
+					Sources: []capsulev1beta2.CustomQuotaSpecSource{
+						{
+							GroupVersionKind: metav1.GroupVersionKind{
+								Group:   "",
+								Version: "v1",
+								Kind:    "Pod",
+							},
+							Operation: quota.OpCount,
+						},
+					},
+				},
+			},
+		}
+
+		extraA := NewNamespace("gq-nsstatus-all-a", map[string]string{"purpose": "e2e"})
+		extraB := NewNamespace("gq-nsstatus-all-b", map[string]string{"purpose": "e2e"})
+
+		EventuallyCreation(func() error { return k8sClient.Create(ctx, quota) }).Should(Succeed())
+		awaitGlobalQuotaReady(quota.GetName())
+
+		expectGlobalQuotaWildcardNamespaces(quota.GetName())
+
+		NamespaceDeletionAdmin(extraA, defaultTimeoutInterval)
+		expectGlobalQuotaWildcardNamespaces(quota.GetName())
+
+		NamespaceDeletionAdmin(extraB, defaultTimeoutInterval)
+		expectGlobalQuotaWildcardNamespaces(quota.GetName())
+
+		NamespaceDeletionAdmin(extraA, defaultTimeoutInterval)
+		expectGlobalQuotaWildcardNamespaces(quota.GetName())
+
+		NamespaceDeletionAdmin(extraB, defaultTimeoutInterval)
+		expectGlobalQuotaWildcardNamespaces(quota.GetName())
+	})
+
+	It("posts all namespaces matched by multiple namespaceSelectors and updates status on namespace create and delete", func() {
+		nsA1 := NewNamespace("gq-nsstatus-a1", map[string]string{"team": "a"})
+		nsA2 := NewNamespace("gq-nsstatus-a2", map[string]string{"team": "a"})
+		nsB1 := NewNamespace("gq-nsstatus-b1", map[string]string{"team": "b"})
+		nsOther := NewNamespace("gq-nsstatus-other", map[string]string{"team": "other"})
+
+		NamespaceCreationAdmin(nsA1, defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreationAdmin(nsB1, defaultTimeoutInterval).Should(Succeed())
+		NamespaceCreationAdmin(nsOther, defaultTimeoutInterval).Should(Succeed())
+
+		quota := &capsulev1beta2.GlobalCustomQuota{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "gq-nsstatus-multi-selectors",
+				Labels: map[string]string{
+					"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
+				},
+			},
+			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
+				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
+					Limit: resource.MustParse("10"),
+					Sources: []capsulev1beta2.CustomQuotaSpecSource{
+						{
+							GroupVersionKind: metav1.GroupVersionKind{
+								Group:   "",
+								Version: "v1",
+								Kind:    "Pod",
+							},
+							Operation: quota.OpCount,
+						},
+					},
+				},
+				NamespaceSelectors: []selectors.NamespaceSelector{
+					{
+						LabelSelector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{
+								"team": "a",
+							},
+						},
+					},
+					{
+						LabelSelector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{
+								"team": "b",
+							},
+						},
+					},
+				},
+			},
+		}
+
+		EventuallyCreation(func() error { return k8sClient.Create(ctx, quota) }).Should(Succeed())
+		awaitGlobalQuotaReady(quota.GetName())
+
+		expectGlobalQuotaNamespaces(quota.GetName(),
+			"gq-nsstatus-a1",
+			"gq-nsstatus-b1",
+		)
+
+		NamespaceCreationAdmin(nsA2, defaultTimeoutInterval).Should(Succeed())
+		expectGlobalQuotaNamespaces(quota.GetName(),
+			"gq-nsstatus-a1",
+			"gq-nsstatus-a2",
+			"gq-nsstatus-b1",
+		)
+
+		NamespaceDeletionAdmin(nsB1, defaultTimeoutInterval).Should(Succeed())
+		expectGlobalQuotaNamespaces(quota.GetName(),
+			"gq-nsstatus-a1",
+			"gq-nsstatus-a2",
+		)
+	})
+
+	It("posts an empty namespace status when namespaceSelectors match no namespaces and updates when matches appear or disappear", func() {
+		quota := &capsulev1beta2.GlobalCustomQuota{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "gq-nsstatus-empty",
+				Labels: map[string]string{
+					"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
+				},
+			},
+			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
+				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
+					Limit: resource.MustParse("10"),
+					Sources: []capsulev1beta2.CustomQuotaSpecSource{
+						{
+							GroupVersionKind: metav1.GroupVersionKind{
+								Group:   "",
+								Version: "v1",
+								Kind:    "Pod",
+							},
+							Operation: quota.OpCount,
+						},
+					},
+				},
+				NamespaceSelectors: []selectors.NamespaceSelector{
+					{
+						LabelSelector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{
+								"team": "does-not-exist",
+							},
+						},
+					},
+				},
+			},
+		}
+
+		EventuallyCreation(func() error { return k8sClient.Create(ctx, quota) }).Should(Succeed())
+		awaitGlobalQuotaReady(quota.GetName())
+
+		expectGlobalQuotaNamespaces(quota.GetName())
+
+		ns := NewNamespace("gq-nsstatus-empty-match", map[string]string{"team": "does-not-exist"})
+		NamespaceCreationAdmin(ns, defaultTimeoutInterval).Should(Succeed())
+
+		expectGlobalQuotaNamespaces(quota.GetName(), "gq-nsstatus-empty-match")
+
+		NamespaceDeletionAdmin(ns, defaultTimeoutInterval).Should(Succeed())
+		expectGlobalQuotaNamespaces(quota.GetName())
+	})
+
+	It("aggregates a custom pod quantity path and settles the corresponding ledger", func() {
+		q := &capsulev1beta2.GlobalCustomQuota{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "gq-pod-cpu-requests",
+				Labels: map[string]string{
+					"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
+				},
+			},
+			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
+				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
+					Limit: resource.MustParse("500m"),
+					Sources: []capsulev1beta2.CustomQuotaSpecSource{
+						{
+							GroupVersionKind: metav1.GroupVersionKind{
+								Group:   "",
+								Version: "v1",
+								Kind:    "Pod",
+							},
+							Operation: quota.OpAdd,
+							Path:      ".spec.containers[*].resources.requests.cpu",
+							Selectors: []selectors.SelectorWithFields{
+								{
+									LabelSelector: &metav1.LabelSelector{
+										MatchLabels: map[string]string{
+											"track": "yes",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		EventuallyCreation(func() error {
+			return k8sClient.Create(ctx, q)
+		}).Should(Succeed())
+		awaitGlobalQuotaReady(q.GetName())
+
+		dep := makeDeployment(testNamespace, "cpu-requests", 2, map[string]string{
+			"track": "yes",
+		}, "100m")
+		EventuallyCreation(func() error {
+			dep.ResourceVersion = ""
+			return k8sClient.Create(ctx, dep)
+		}).Should(Succeed())
+
+		expectQuotaUsedAndClaims(q.GetName(), "200m", 2)
+		expectLedgerSettled(q.GetName())
+
+		scaleDeployment(testNamespace, "cpu-requests", 4)
+		expectQuotaUsedAndClaims(q.GetName(), "400m", 4)
+		expectLedgerSettled(q.GetName())
+
+		ledger := getLedger(q.GetName())
+		Expect(ledger.Spec.TargetRef.Kind).To(Equal("GlobalCustomQuota"))
+		Expect(ledger.Spec.TargetRef.Name).To(Equal(q.GetName()))
+
+		gq := getGlobalQuota(q.GetName())
+		Expect(gq.Status.Usage.Used.Cmp(resource.MustParse("400m"))).To(Equal(0))
+	})
+
 	It("does not produce negative usage when a matching pod is relabeled to no longer match", func() {
 		q := &capsulev1beta2.GlobalCustomQuota{
 			ObjectMeta: metav1.ObjectMeta{
@@ -428,69 +677,6 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Lab
 			g.Expect(obj.Status.Usage.Used.Cmp(resource.MustParse("0"))).To(Equal(0))
 			g.Expect(len(obj.Status.Claims)).To(Equal(0))
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
-	})
-
-	It("aggregates a custom pod quantity path and settles the corresponding ledger", func() {
-		q := &capsulev1beta2.GlobalCustomQuota{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "gq-pod-cpu-requests",
-				Labels: map[string]string{
-					"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
-				},
-			},
-			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
-				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
-					Limit: resource.MustParse("500m"),
-					Sources: []capsulev1beta2.CustomQuotaSpecSource{
-						{
-							GroupVersionKind: metav1.GroupVersionKind{
-								Group:   "",
-								Version: "v1",
-								Kind:    "Pod",
-							},
-							Operation: quota.OpAdd,
-							Path:      ".spec.containers[*].resources.requests.cpu",
-							Selectors: []selectors.SelectorWithFields{
-								{
-									LabelSelector: &metav1.LabelSelector{
-										MatchLabels: map[string]string{
-											"track": "yes",
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-		}
-
-		EventuallyCreation(func() error {
-			return k8sClient.Create(ctx, q)
-		}).Should(Succeed())
-		awaitGlobalQuotaReady(q.GetName())
-
-		dep := makeDeployment(testNamespace, "cpu-requests", 2, map[string]string{
-			"track": "yes",
-		}, "100m")
-		EventuallyCreation(func() error {
-			dep.ResourceVersion = ""
-			return k8sClient.Create(ctx, dep)
-		}).Should(Succeed())
-
-		expectQuotaUsedAndClaims(q.GetName(), "200m", 2)
-		expectLedgerSettled(q.GetName())
-
-		scaleDeployment(testNamespace, "cpu-requests", 4)
-		expectQuotaUsedAndClaims(q.GetName(), "400m", 4)
-		expectLedgerSettled(q.GetName())
-
-		ledger := getLedger(q.GetName())
-		Expect(ledger.Spec.TargetRef.Kind).To(Equal("GlobalCustomQuota"))
-		Expect(ledger.Spec.TargetRef.Name).To(Equal(q.GetName()))
-
-		gq := getGlobalQuota(q.GetName())
-		Expect(gq.Status.Usage.Used.Cmp(resource.MustParse("400m"))).To(Equal(0))
 	})
 
 	It("counts pods correctly while scaling a deployment", func() {
@@ -1927,180 +2113,4 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Lab
 		expectQuotaUsedAndClaims(cpuQuota.GetName(), "200m", 2)
 		expectQuotaUsedAndClaims(emptyDirQuota.GetName(), "2Gi", 2)
 	})
-
-	It("posts wildcard namespace status when no namespaceSelectors are configured and keeps it stable as namespaces change", func() {
-		quota := &capsulev1beta2.GlobalCustomQuota{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "gq-nsstatus-all",
-				Labels: map[string]string{
-					"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
-				},
-			},
-			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
-				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
-					Limit: resource.MustParse("10"),
-					Sources: []capsulev1beta2.CustomQuotaSpecSource{
-						{
-							GroupVersionKind: metav1.GroupVersionKind{
-								Group:   "",
-								Version: "v1",
-								Kind:    "Pod",
-							},
-							Operation: quota.OpCount,
-						},
-					},
-				},
-				NamespaceSelectors: []selectors.NamespaceSelector{
-					{
-						LabelSelector: &metav1.LabelSelector{
-							MatchLabels: map[string]string{
-								meta.TenantLabel: tenantValue,
-							},
-						},
-					},
-				},
-			},
-		}
-
-		extraA := NewNamespace("gq-nsstatus-all-a", map[string]string{"purpose": "e2e"})
-		extraB := NewNamespace("gq-nsstatus-all-b", map[string]string{"purpose": "e2e"})
-
-		EventuallyCreation(func() error { return k8sClient.Create(ctx, quota) }).Should(Succeed())
-		awaitGlobalQuotaReady(quota.GetName())
-
-		expectGlobalQuotaWildcardNamespaces(quota.GetName())
-
-		NamespaceDeletionAdmin(extraA, defaultTimeoutInterval)
-		expectGlobalQuotaWildcardNamespaces(quota.GetName())
-
-		NamespaceDeletionAdmin(extraB, defaultTimeoutInterval)
-		expectGlobalQuotaWildcardNamespaces(quota.GetName())
-
-		NamespaceDeletionAdmin(extraA, defaultTimeoutInterval)
-		expectGlobalQuotaWildcardNamespaces(quota.GetName())
-
-		NamespaceDeletionAdmin(extraB, defaultTimeoutInterval)
-		expectGlobalQuotaWildcardNamespaces(quota.GetName())
-	})
-
-	It("posts all namespaces matched by multiple namespaceSelectors and updates status on namespace create and delete", func() {
-		nsA1 := NewNamespace("gq-nsstatus-a1", map[string]string{"team": "a"})
-		nsA2 := NewNamespace("gq-nsstatus-a2", map[string]string{"team": "a"})
-		nsB1 := NewNamespace("gq-nsstatus-b1", map[string]string{"team": "b"})
-		nsOther := NewNamespace("gq-nsstatus-other", map[string]string{"team": "other"})
-
-		NamespaceCreationAdmin(nsA1, defaultTimeoutInterval)
-		NamespaceCreationAdmin(nsB1, defaultTimeoutInterval)
-		NamespaceCreationAdmin(nsOther, defaultTimeoutInterval)
-
-		quota := &capsulev1beta2.GlobalCustomQuota{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "gq-nsstatus-multi-selectors",
-				Labels: map[string]string{
-					"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
-				},
-			},
-			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
-				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
-					Limit: resource.MustParse("10"),
-					Sources: []capsulev1beta2.CustomQuotaSpecSource{
-						{
-							GroupVersionKind: metav1.GroupVersionKind{
-								Group:   "",
-								Version: "v1",
-								Kind:    "Pod",
-							},
-							Operation: quota.OpCount,
-						},
-					},
-				},
-				NamespaceSelectors: []selectors.NamespaceSelector{
-					{
-						LabelSelector: &metav1.LabelSelector{
-							MatchLabels: map[string]string{
-								"team": "a",
-							},
-						},
-					},
-					{
-						LabelSelector: &metav1.LabelSelector{
-							MatchLabels: map[string]string{
-								"team": "b",
-							},
-						},
-					},
-				},
-			},
-		}
-
-		EventuallyCreation(func() error { return k8sClient.Create(ctx, quota) }).Should(Succeed())
-		awaitGlobalQuotaReady(quota.GetName())
-
-		expectGlobalQuotaNamespaces(quota.GetName(),
-			"gq-nsstatus-a1",
-			"gq-nsstatus-b1",
-		)
-
-		NamespaceCreationAdmin(nsA2, defaultTimeoutInterval)
-		expectGlobalQuotaNamespaces(quota.GetName(),
-			"gq-nsstatus-a1",
-			"gq-nsstatus-a2",
-			"gq-nsstatus-b1",
-		)
-
-		NamespaceDeletionAdmin(nsB1, defaultTimeoutInterval)
-		expectGlobalQuotaNamespaces(quota.GetName(),
-			"gq-nsstatus-a1",
-			"gq-nsstatus-a2",
-		)
-	})
-
-	It("posts an empty namespace status when namespaceSelectors match no namespaces and updates when matches appear or disappear", func() {
-		quota := &capsulev1beta2.GlobalCustomQuota{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "gq-nsstatus-empty",
-				Labels: map[string]string{
-					"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
-				},
-			},
-			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
-				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
-					Limit: resource.MustParse("10"),
-					Sources: []capsulev1beta2.CustomQuotaSpecSource{
-						{
-							GroupVersionKind: metav1.GroupVersionKind{
-								Group:   "",
-								Version: "v1",
-								Kind:    "Pod",
-							},
-							Operation: quota.OpCount,
-						},
-					},
-				},
-				NamespaceSelectors: []selectors.NamespaceSelector{
-					{
-						LabelSelector: &metav1.LabelSelector{
-							MatchLabels: map[string]string{
-								"team": "does-not-exist",
-							},
-						},
-					},
-				},
-			},
-		}
-
-		EventuallyCreation(func() error { return k8sClient.Create(ctx, quota) }).Should(Succeed())
-		awaitGlobalQuotaReady(quota.GetName())
-
-		expectGlobalQuotaNamespaces(quota.GetName())
-
-		ns := NewNamespace("gq-nsstatus-empty-match", map[string]string{"team": "does-not-exist"})
-		NamespaceCreationAdmin(ns, defaultTimeoutInterval)
-
-		expectGlobalQuotaNamespaces(quota.GetName(), "gq-nsstatus-empty-match")
-
-		NamespaceDeletionAdmin(ns, defaultTimeoutInterval)
-		expectGlobalQuotaNamespaces(quota.GetName())
-	})
-
 })

@@ -146,16 +146,6 @@ func (h *objectCalculationHandler) OnCreate(c client.Client, decoder admission.D
 			})
 		}
 
-		for _, item := range evaluated {
-			if err := touchQuantityLedger(ctx, c, quantityLedgerKeyForMatchedQuota(item)); err != nil {
-				for _, a := range applied {
-					_ = deleteLedgerReservation(ctx, c, a.LedgerKey, a.ReservationID)
-				}
-
-				return ad.ErroredResponse(err)
-			}
-		}
-
 		return nil
 	}
 }
@@ -208,17 +198,6 @@ func (h *objectCalculationHandler) OnUpdate(c client.Client, _ admission.Decoder
 
 		if !relevantChange {
 			return nil
-		}
-
-		previousRefs, err := previouslyReferencedQuotas(
-			ctx,
-			c,
-			oldObj.GetUID(),
-			newObj.GetUID(),
-			req,
-		)
-		if err != nil {
-			return ad.ErroredResponse(err)
 		}
 
 		type appliedReservation struct {
@@ -318,57 +297,6 @@ func (h *objectCalculationHandler) OnUpdate(c client.Client, _ admission.Decoder
 			})
 		}
 
-		seenNotifications := make(map[string]struct{}, len(oldByKey)+len(newByKey))
-		for _, item := range oldEvaluated {
-			if _, seen := seenNotifications[item.Key]; seen {
-				continue
-			}
-			seenNotifications[item.Key] = struct{}{}
-
-			if err := touchQuantityLedger(ctx, c, quantityLedgerKeyForMatchedQuota(item)); err != nil {
-				for _, a := range applied {
-					_ = deleteLedgerReservation(ctx, c, a.LedgerKey, a.ReservationID)
-				}
-				return ad.ErroredResponse(err)
-			}
-		}
-
-		for _, item := range newEvaluated {
-			if _, seen := seenNotifications[item.Key]; seen {
-				continue
-			}
-			seenNotifications[item.Key] = struct{}{}
-
-			if err := touchQuantityLedger(ctx, c, quantityLedgerKeyForMatchedQuota(item)); err != nil {
-				for _, a := range applied {
-					_ = deleteLedgerReservation(ctx, c, a.LedgerKey, a.ReservationID)
-				}
-				return ad.ErroredResponse(err)
-			}
-		}
-
-		for _, item := range previousRefs {
-			if _, seen := seenNotifications[item.Key]; seen {
-				continue
-			}
-			seenNotifications[item.Key] = struct{}{}
-
-			ledgerKey := types.NamespacedName{Name: item.Name}
-			if item.IsGlobal {
-				ledgerKey.Namespace = configuration.ControllerNamespace()
-			} else {
-				ledgerKey.Namespace = item.Namespace
-			}
-
-			if err := touchQuantityLedger(ctx, c, ledgerKey); err != nil {
-				for _, a := range applied {
-					_ = deleteLedgerReservation(ctx, c, a.LedgerKey, a.ReservationID)
-				}
-
-				return ad.ErroredResponse(err)
-			}
-		}
-
 		return nil
 	}
 }
@@ -410,10 +338,6 @@ func (h *objectCalculationHandler) OnDelete(c client.Client, _ admission.Decoder
 			if err := addLedgerPendingDelete(ctx, c, ledgerKey, objRef); err != nil {
 				return ad.ErroredResponse(err)
 			}
-
-			if err := touchQuantityLedger(ctx, c, ledgerKey); err != nil {
-				return ad.ErroredResponse(err)
-			}
 		}
 
 		globalcq := &capsulev1beta2.GlobalCustomQuotaList{}
@@ -430,10 +354,6 @@ func (h *objectCalculationHandler) OnDelete(c client.Client, _ admission.Decoder
 			}
 
 			if err := addLedgerPendingDelete(ctx, c, ledgerKey, objRef); err != nil {
-				return ad.ErroredResponse(err)
-			}
-
-			if err := touchQuantityLedger(ctx, c, ledgerKey); err != nil {
 				return ad.ErroredResponse(err)
 			}
 		}
