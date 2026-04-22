@@ -25,7 +25,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/template"
 )
 
-var _ = Describe("Creating a GlobalTenantResource object", func() {
+var _ = Describe("Creating a GlobalTenantResource object", Label("global", "tenantresource"), func() {
 	solar := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "energy-solar",

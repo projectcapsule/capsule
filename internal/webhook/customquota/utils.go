@@ -3,21 +3,16 @@
 package customquota
 
 import (
-	"context"
-	"sort"
 	"time"
 
-	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	controller "github.com/projectcapsule/capsule/internal/controllers/customquotas"
-	"github.com/projectcapsule/capsule/pkg/api/meta"
-	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
-	index "github.com/projectcapsule/capsule/pkg/runtime/indexers/customquota"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+
+	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 )
 
 func quantityLedgerKeyForMatchedQuota(item evaluatedQuota) types.NamespacedName {
@@ -105,117 +100,4 @@ func sourcesChanged(a, b []capsulev1beta2.CustomQuotaSpecSource) bool {
 	}
 
 	return false
-}
-
-func touchQuantityLedger(
-	ctx context.Context,
-	c client.Client,
-	item types.NamespacedName,
-) error {
-	return meta.TriggerRequestReconcileAnnotation(
-		ctx,
-		c,
-		capsulev1beta2.GroupVersion.WithKind("QuantityLedger"),
-		item,
-	)
-}
-
-type touchedQuotaRef struct {
-	Key       string
-	Name      string
-	Namespace string
-	IsGlobal  bool
-}
-
-func previouslyReferencedQuotas(
-	ctx context.Context,
-	c client.Client,
-	oldUID types.UID,
-	newUID types.UID,
-	req admission.Request,
-) ([]touchedQuotaRef, error) {
-	seen := map[string]touchedQuotaRef{}
-
-	addCustom := func(uid types.UID, namespace string) error {
-		if uid == "" || namespace == "" {
-			return nil
-		}
-
-		list := &capsulev1beta2.CustomQuotaList{}
-		if err := c.List(ctx, list,
-			client.InNamespace(namespace),
-			client.MatchingFields{
-				index.ObjectUIDIndexerFieldName: string(uid),
-			},
-		); err != nil {
-			return err
-		}
-
-		for _, item := range list.Items {
-			key := controller.MakeCustomQuotaCacheKey(item.Namespace, item.Name)
-			seen[key] = touchedQuotaRef{
-				Key:       key,
-				Name:      item.Name,
-				Namespace: item.Namespace,
-				IsGlobal:  false,
-			}
-		}
-
-		return nil
-	}
-
-	addGlobal := func(uid types.UID) error {
-		if uid == "" {
-			return nil
-		}
-
-		list := &capsulev1beta2.GlobalCustomQuotaList{}
-		if err := c.List(ctx, list, client.MatchingFields{
-			index.ObjectUIDIndexerFieldName: string(uid),
-		}); err != nil {
-			return err
-		}
-
-		for _, item := range list.Items {
-			key := controller.MakeGlobalCustomQuotaCacheKey(item.Name)
-			seen[key] = touchedQuotaRef{
-				Key:       key,
-				Name:      item.Name,
-				Namespace: "",
-				IsGlobal:  true,
-			}
-		}
-
-		return nil
-	}
-
-	if err := addCustom(oldUID, req.Namespace); err != nil {
-		return nil, err
-	}
-	if err := addCustom(newUID, req.Namespace); err != nil {
-		return nil, err
-	}
-	if err := addGlobal(oldUID); err != nil {
-		return nil, err
-	}
-	if err := addGlobal(newUID); err != nil {
-		return nil, err
-	}
-
-	out := make([]touchedQuotaRef, 0, len(seen))
-	for _, item := range seen {
-		out = append(out, item)
-	}
-
-	sort.SliceStable(out, func(i, j int) bool {
-		if out[i].IsGlobal != out[j].IsGlobal {
-			return out[i].IsGlobal
-		}
-		if out[i].Namespace != out[j].Namespace {
-			return out[i].Namespace < out[j].Namespace
-		}
-		return out[i].Name < out[j].Name
-	})
-
-	return out, nil
 }

@@ -103,6 +103,11 @@ func (r *customQuotaClaimController) Reconcile(ctx context.Context, request ctrl
 
 	reconcileErr := r.reconcile(ctx, log, instance)
 
+	requeueAfter, err := r.reconcileLedger(ctx, log, instance)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+
 	if err := r.updateStatus(ctx, instance, reconcileErr); err != nil {
 		return reconcile.Result{}, fmt.Errorf("cannot update status: %w", err)
 	}
@@ -117,17 +122,14 @@ func (r *customQuotaClaimController) Reconcile(ctx context.Context, request ctrl
 		return reconcile.Result{}, reconcileErr
 	}
 
-	needsRequeue, err := r.reconcileLedger(ctx, log, instance)
-	if err != nil {
-		return reconcile.Result{}, err
-	}
-
-	if needsRequeue {
+	if requeueAfter != nil {
 		log.V(3).Info("ledger still has pending work, requeueing",
 			"customQuota", instance.Name,
 			"namespace", instance.Namespace,
+			"after", requeueAfter.String(),
 		)
-		return ctrl.Result{RequeueAfter: 500 * time.Millisecond}, nil
+
+		return ctrl.Result{RequeueAfter: *requeueAfter}, nil
 	}
 
 	return ctrl.Result{}, nil
@@ -289,25 +291,33 @@ func (r *customQuotaClaimController) reconcile(
 
 	return nil
 }
-
 func (r *customQuotaClaimController) reconcileLedger(
 	ctx context.Context,
 	log logr.Logger,
 	instance *capsulev1beta2.CustomQuota,
-) (bool, error) {
+) (*time.Duration, error) {
 	key := types.NamespacedName{
 		Name:      instance.GetName(),
 		Namespace: instance.GetNamespace(),
 	}
 
-	var needsRequeue bool
+	var requeueAfter *time.Duration
 
 	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		ledger := &capsulev1beta2.QuantityLedger{}
+
 		if err := r.Get(ctx, key, ledger); err != nil {
 			if apierrors.IsNotFound(err) {
+				instance.Status.Usage.Available = instance.Spec.Limit.DeepCopy()
+				instance.Status.Usage.Available.Sub(instance.Status.Usage.Used)
+
+				if instance.Status.Usage.Available.Sign() < 0 {
+					instance.Status.Usage.Available = resource.MustParse("0")
+				}
+
 				return nil
 			}
+
 			return err
 		}
 
@@ -336,7 +346,12 @@ func (r *customQuotaClaimController) reconcileLedger(
 			if materialized || expired {
 				continue
 			}
+
 			activeReservations = append(activeReservations, res)
+
+			if res.ExpiresAt != nil {
+				requeueAfter = minDurationPtr(requeueAfter, time.Until(res.ExpiresAt.Time))
+			}
 		}
 
 		activeDeletes := make([]capsulev1beta2.QuantityLedgerPendingDelete, 0, len(ledger.Status.PendingDeletes))
@@ -359,11 +374,11 @@ func (r *customQuotaClaimController) reconcileLedger(
 			switch {
 			case stillPresent:
 				activeDeletes = append(activeDeletes, pd)
-				needsRequeue = true
+				requeueAfter = minDurationPtr(requeueAfter, immediatePendingDeleteRequeue)
 			case expired:
 				// drop stale hint
 			default:
-				// object disappeared from claims, drop hint
+				// object is no longer collected by the controller; remove hint now
 			}
 		}
 
@@ -374,14 +389,60 @@ func (r *customQuotaClaimController) reconcileLedger(
 			ledger.Status.Reserved.Add(res.Usage)
 		}
 
-		return r.Status().Update(ctx, ledger)
+		if err := r.Status().Update(ctx, ledger); err != nil {
+			return err
+		}
+
+		seenUIDs := make(map[types.UID]struct{}, len(instance.Status.Claims))
+		for _, claim := range instance.Status.Claims {
+			if claim.UID != "" {
+				seenUIDs[claim.UID] = struct{}{}
+			}
+		}
+
+		for _, res := range activeReservations {
+			instance.Status.Usage.Used.Add(res.Usage)
+
+			if res.ObjectRef.UID != "" {
+				if _, exists := seenUIDs[res.ObjectRef.UID]; exists {
+					continue
+				}
+				seenUIDs[res.ObjectRef.UID] = struct{}{}
+			}
+
+			instance.Status.Claims = append(instance.Status.Claims, capsulev1beta2.CustomQuotaClaimItem{
+				GroupVersionKind: metav1.GroupVersionKind{
+					Group:   res.ObjectRef.APIGroup,
+					Version: res.ObjectRef.APIVersion,
+					Kind:    res.ObjectRef.Kind,
+				},
+				NamespacedObjectWithUIDReference: meta.NamespacedObjectWithUIDReference{
+					Name:      res.ObjectRef.Name,
+					Namespace: meta.RFC1123SubdomainName(res.ObjectRef.Namespace),
+					UID:       res.ObjectRef.UID,
+				},
+				Usage: res.Usage.DeepCopy(),
+			})
+		}
+
+		if instance.Status.Usage.Used.Sign() < 0 {
+			instance.Status.Usage.Used = resource.MustParse("0")
+		}
+
+		instance.Status.Usage.Available = instance.Spec.Limit.DeepCopy()
+		instance.Status.Usage.Available.Sub(instance.Status.Usage.Used)
+		if instance.Status.Usage.Available.Sign() < 0 {
+			instance.Status.Usage.Available = resource.MustParse("0")
+		}
+
+		return nil
 	})
 
 	if err != nil {
-		return false, err
+		return nil, err
 	}
 
-	return needsRequeue, nil
+	return requeueAfter, nil
 }
 
 func (r *customQuotaClaimController) ensureQuotaLedger(
@@ -490,8 +551,6 @@ func (r *customQuotaClaimController) updateStatus(
 			readyCondition.Status = metav1.ConditionFalse
 			readyCondition.Reason = meta.FailedReason
 		}
-
-		latest.Status.Conditions.UpdateConditionByType(readyCondition)
 
 		latest.Status.Conditions.UpdateConditionByType(readyCondition)
 

@@ -13,11 +13,14 @@ import (
 	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	. "github.com/onsi/gomega"
 	"github.com/stretchr/testify/assert"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -120,6 +123,40 @@ func NamespaceDeletionAdmin(ns *corev1.Namespace, timeout time.Duration) AsyncAs
 			ns,
 		)
 	}, timeout, defaultPollInterval)
+}
+
+func ForceDeleteNamespace(ctx context.Context, name string) {
+	Eventually(func() error {
+		ns := &corev1.Namespace{}
+		err := k8sClient.Get(ctx, types.NamespacedName{Name: name}, ns)
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+
+		// Trigger deletion if not already happening
+		if ns.DeletionTimestamp.IsZero() {
+			if err := k8sClient.Delete(ctx, ns); err != nil && !apierrors.IsNotFound(err) {
+				return err
+			}
+			return fmt.Errorf("namespace %s deletion triggered", name)
+		}
+
+		// Force-remove finalizers (THIS is the key part)
+		if len(ns.Finalizers) > 0 {
+			ns.Finalizers = nil
+			if err := k8sClient.Update(ctx, ns); err != nil {
+				return err
+			}
+			return fmt.Errorf("namespace %s finalizers removed", name)
+		}
+
+		// wait until fully gone
+		return fmt.Errorf("namespace %s still terminating", name)
+	}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed(),
+		"failed to force delete namespace %s", name)
 }
 
 func NamespaceCreation(ns *corev1.Namespace, owner rbac.UserSpec, timeout time.Duration) AsyncAssertion {
@@ -649,4 +686,139 @@ type dummyT struct {
 
 func (d *dummyT) Errorf(format string, args ...interface{}) {
 	d.errors = append(d.errors, fmt.Sprintf(format, args...))
+}
+
+func MakePod(namespace, name string, labels map[string]string, annotations map[string]string, image string, cpuRequest string, emptyDirSize string) *corev1.Pod {
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        name,
+			Namespace:   namespace,
+			Labels:      labels,
+			Annotations: annotations,
+		},
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
+				{
+					Name:  "main",
+					Image: image,
+				},
+			},
+			RestartPolicy: corev1.RestartPolicyAlways,
+		},
+	}
+
+	if cpuRequest != "" {
+		pod.Spec.Containers[0].Resources.Requests = corev1.ResourceList{
+			corev1.ResourceCPU: resource.MustParse(cpuRequest),
+		}
+	}
+
+	if emptyDirSize != "" {
+		pod.Spec.Volumes = []corev1.Volume{
+			{
+				Name: "cache",
+				VolumeSource: corev1.VolumeSource{
+					EmptyDir: &corev1.EmptyDirVolumeSource{
+						SizeLimit: ptr.To(resource.MustParse(emptyDirSize)),
+					},
+				},
+			},
+		}
+		pod.Spec.Containers[0].VolumeMounts = []corev1.VolumeMount{
+			{
+				Name:      "cache",
+				MountPath: "/cache",
+			},
+		}
+	}
+
+	return pod
+}
+
+func MakeDeployment(namespace, name string, replicas int32, labels map[string]string, cpuRequest string) *appsv1.Deployment {
+	dep := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		Spec: appsv1.DeploymentSpec{
+			Replicas: ptr.To(replicas),
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"app": name,
+				},
+			},
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: mergeMaps(map[string]string{"app": name}, labels),
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:  "nginx",
+							Image: "nginx:1.27.0",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	if cpuRequest != "" {
+		dep.Spec.Template.Spec.Containers[0].Resources.Requests = corev1.ResourceList{
+			corev1.ResourceCPU: resource.MustParse(cpuRequest),
+		}
+	}
+
+	return dep
+}
+
+func MakePVC(namespace, name, size string) *corev1.PersistentVolumeClaim {
+	return &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		Spec: corev1.PersistentVolumeClaimSpec{
+			AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+			Resources: corev1.VolumeResourceRequirements{
+				Requests: corev1.ResourceList{
+					corev1.ResourceStorage: resource.MustParse(size),
+				},
+			},
+		},
+	}
+}
+
+func ScaleDeployment(ctx context.Context, namespace, name string, replicas int32) {
+	Eventually(func() error {
+		dep := &appsv1.Deployment{}
+		if err := k8sClient.Get(ctx, types.NamespacedName{Name: name, Namespace: namespace}, dep); err != nil {
+			return err
+		}
+		dep.Spec.Replicas = ptr.To(replicas)
+		return k8sClient.Update(ctx, dep)
+	}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+}
+
+func UpdatePodLabels(ctx context.Context, namespace, name string, labels map[string]string) {
+	Eventually(func() error {
+		pod := &corev1.Pod{}
+		if err := k8sClient.Get(ctx, types.NamespacedName{Name: name, Namespace: namespace}, pod); err != nil {
+			return err
+		}
+		pod.Labels = labels
+		return k8sClient.Update(ctx, pod)
+	}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+}
+
+func UpdatePodImage(ctx context.Context, namespace, name, image string) {
+	Eventually(func() error {
+		pod := &corev1.Pod{}
+		if err := k8sClient.Get(ctx, types.NamespacedName{Name: name, Namespace: namespace}, pod); err != nil {
+			return err
+		}
+		pod.Spec.Containers[0].Image = image
+		return k8sClient.Update(ctx, pod)
+	}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 }

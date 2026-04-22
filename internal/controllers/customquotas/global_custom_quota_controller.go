@@ -55,8 +55,6 @@ type clusterCustomQuotaClaimController struct {
 	targetsCache  *cache.CompiledTargetsCache[string]
 }
 
-const immediatePendingDeleteRequeue = 500 * time.Millisecond
-
 func (r *clusterCustomQuotaClaimController) SetupWithManager(mgr ctrl.Manager, cfg utils.ControllerOptions) error {
 	r.mapper = mgr.GetRESTMapper()
 
@@ -383,121 +381,6 @@ func (r *clusterCustomQuotaClaimController) reconcile(
 
 	return nil
 }
-func (r *clusterCustomQuotaClaimController) ensureQuotaLedger(
-	ctx context.Context,
-	instance *capsulev1beta2.GlobalCustomQuota,
-) error {
-	ledger := &capsulev1beta2.QuantityLedger{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      instance.GetName(),
-			Namespace: configuration.ControllerNamespace(),
-		},
-	}
-
-	_, err := controllerutil.CreateOrUpdate(ctx, r.Client, ledger, func() error {
-		if ledger.Labels == nil {
-			ledger.Labels = map[string]string{}
-		}
-
-		ledger.Labels[meta.ManagedByCapsuleLabel] = meta.ValueController
-
-		ledger.Spec.TargetRef = capsulev1beta2.QuantityLedgerTargetRef{
-			APIGroup: capsulev1beta2.GroupVersion.Group,
-			Kind:     "GlobalCustomQuota",
-			Name:     instance.GetName(),
-			UID:      instance.GetUID(),
-		}
-
-		return controllerutil.SetControllerReference(instance, ledger, r.Scheme())
-	})
-	if err != nil {
-		return fmt.Errorf("create or update QuantityLedger %s/%s for GlobalCustomQuota %s: %w",
-			ledger.Namespace, ledger.Name, instance.GetName(), err)
-	}
-
-	return nil
-}
-
-func (r *clusterCustomQuotaClaimController) emitMetrics(
-	instance *capsulev1beta2.GlobalCustomQuota,
-) {
-	// Condition Metrics
-	for _, status := range []string{meta.ReadyCondition} {
-		var value float64
-
-		cond := instance.Status.Conditions.GetConditionByType(status)
-		if cond == nil {
-			r.metrics.DeleteConditionMetricByType(instance.GetName(), status)
-
-			continue
-		}
-
-		if cond.Status == metav1.ConditionTrue {
-			value = 1
-		}
-
-		r.metrics.ConditionGauge.WithLabelValues(instance.GetName(), status).Set(value)
-	}
-
-	// Usage Metrics
-	r.metrics.ResourceUsageGauge.WithLabelValues(instance.GetName()).Set(float64(instance.Status.Usage.Used.MilliValue()) / 1000)
-	r.metrics.ResourceAvailableGauge.WithLabelValues(instance.GetName()).Set(float64(instance.Status.Usage.Available.MilliValue()) / 1000)
-	r.metrics.ResourceLimitGauge.WithLabelValues(instance.GetName()).Set(float64(instance.Spec.Limit.MilliValue()) / 1000)
-
-	// Emit for Claims
-	r.metrics.ResourceItemUsageGauge.DeletePartialMatch(map[string]string{
-		"custom_quota": instance.GetName(),
-	})
-
-	// Skip emitting metrics on claim basis
-	if !instance.Spec.Options.EmitPerClaimMetrics {
-		return
-	}
-
-	for _, claim := range instance.Status.Claims {
-		r.metrics.ResourceItemUsageGauge.WithLabelValues(
-			instance.GetName(),
-			claim.Name,
-			string(claim.Namespace),
-			claim.Kind,
-			claim.Group,
-		).Set(float64(claim.Usage.MilliValue()) / 1000)
-	}
-}
-
-func (r *clusterCustomQuotaClaimController) updateStatus(
-	ctx context.Context,
-	instance *capsulev1beta2.GlobalCustomQuota,
-	reconcileError error,
-) error {
-	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
-		latest := &capsulev1beta2.GlobalCustomQuota{}
-		if err = r.Get(ctx, types.NamespacedName{Name: instance.GetName()}, latest); err != nil {
-			return err
-		}
-
-		latest.Status = instance.Status
-
-		// Set Ready Condition
-		readyCondition := meta.NewReadyCondition(instance)
-		if reconcileError != nil {
-			readyCondition.Message = reconcileError.Error()
-			readyCondition.Status = metav1.ConditionFalse
-			readyCondition.Reason = meta.FailedReason
-		}
-
-		latest.Status.Conditions.UpdateConditionByType(readyCondition)
-
-		if err := r.Client.Status().Update(ctx, latest); err != nil {
-			return err
-		}
-
-		// Keep the in-memory object aligned with what we just wrote.
-		instance.Status = latest.Status
-
-		return nil
-	})
-}
 
 func (r *clusterCustomQuotaClaimController) reconcileLedger(
 	ctx context.Context,
@@ -649,6 +532,122 @@ func (r *clusterCustomQuotaClaimController) reconcileLedger(
 	}
 
 	return requeueAfter, nil
+}
+
+func (r *clusterCustomQuotaClaimController) ensureQuotaLedger(
+	ctx context.Context,
+	instance *capsulev1beta2.GlobalCustomQuota,
+) error {
+	ledger := &capsulev1beta2.QuantityLedger{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      instance.GetName(),
+			Namespace: configuration.ControllerNamespace(),
+		},
+	}
+
+	_, err := controllerutil.CreateOrUpdate(ctx, r.Client, ledger, func() error {
+		if ledger.Labels == nil {
+			ledger.Labels = map[string]string{}
+		}
+
+		ledger.Labels[meta.ManagedByCapsuleLabel] = meta.ValueController
+
+		ledger.Spec.TargetRef = capsulev1beta2.QuantityLedgerTargetRef{
+			APIGroup: capsulev1beta2.GroupVersion.Group,
+			Kind:     "GlobalCustomQuota",
+			Name:     instance.GetName(),
+			UID:      instance.GetUID(),
+		}
+
+		return controllerutil.SetControllerReference(instance, ledger, r.Scheme())
+	})
+	if err != nil {
+		return fmt.Errorf("create or update QuantityLedger %s/%s for GlobalCustomQuota %s: %w",
+			ledger.Namespace, ledger.Name, instance.GetName(), err)
+	}
+
+	return nil
+}
+
+func (r *clusterCustomQuotaClaimController) emitMetrics(
+	instance *capsulev1beta2.GlobalCustomQuota,
+) {
+	// Condition Metrics
+	for _, status := range []string{meta.ReadyCondition} {
+		var value float64
+
+		cond := instance.Status.Conditions.GetConditionByType(status)
+		if cond == nil {
+			r.metrics.DeleteConditionMetricByType(instance.GetName(), status)
+
+			continue
+		}
+
+		if cond.Status == metav1.ConditionTrue {
+			value = 1
+		}
+
+		r.metrics.ConditionGauge.WithLabelValues(instance.GetName(), status).Set(value)
+	}
+
+	// Usage Metrics
+	r.metrics.ResourceUsageGauge.WithLabelValues(instance.GetName()).Set(float64(instance.Status.Usage.Used.MilliValue()) / 1000)
+	r.metrics.ResourceAvailableGauge.WithLabelValues(instance.GetName()).Set(float64(instance.Status.Usage.Available.MilliValue()) / 1000)
+	r.metrics.ResourceLimitGauge.WithLabelValues(instance.GetName()).Set(float64(instance.Spec.Limit.MilliValue()) / 1000)
+
+	// Emit for Claims
+	r.metrics.ResourceItemUsageGauge.DeletePartialMatch(map[string]string{
+		"custom_quota": instance.GetName(),
+	})
+
+	// Skip emitting metrics on claim basis
+	if !instance.Spec.Options.EmitPerClaimMetrics {
+		return
+	}
+
+	for _, claim := range instance.Status.Claims {
+		r.metrics.ResourceItemUsageGauge.WithLabelValues(
+			instance.GetName(),
+			claim.Name,
+			string(claim.Namespace),
+			claim.Kind,
+			claim.Group,
+		).Set(float64(claim.Usage.MilliValue()) / 1000)
+	}
+}
+
+func (r *clusterCustomQuotaClaimController) updateStatus(
+	ctx context.Context,
+	instance *capsulev1beta2.GlobalCustomQuota,
+	reconcileError error,
+) error {
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
+		latest := &capsulev1beta2.GlobalCustomQuota{}
+		if err = r.Get(ctx, types.NamespacedName{Name: instance.GetName()}, latest); err != nil {
+			return err
+		}
+
+		latest.Status = instance.Status
+
+		// Set Ready Condition
+		readyCondition := meta.NewReadyCondition(instance)
+		if reconcileError != nil {
+			readyCondition.Message = reconcileError.Error()
+			readyCondition.Status = metav1.ConditionFalse
+			readyCondition.Reason = meta.FailedReason
+		}
+
+		latest.Status.Conditions.UpdateConditionByType(readyCondition)
+
+		if err := r.Client.Status().Update(ctx, latest); err != nil {
+			return err
+		}
+
+		// Keep the in-memory object aligned with what we just wrote.
+		instance.Status = latest.Status
+
+		return nil
+	})
 }
 
 func pendingDeleteStillPresent(

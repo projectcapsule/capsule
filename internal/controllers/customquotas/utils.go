@@ -22,6 +22,8 @@ import (
 	"github.com/projectcapsule/capsule/pkg/runtime/selectors"
 )
 
+const immediatePendingDeleteRequeue = 500 * time.Millisecond
+
 type GroupedTarget struct {
 	GVK     schema.GroupVersionKind
 	Targets []capsulev1beta2.CustomQuotaStatusTarget
