@@ -39,6 +39,17 @@ const (
 	defaultConfigurationName = "default"
 )
 
+func mergeMaps(base map[string]string, extra map[string]string) map[string]string {
+	out := map[string]string{}
+	for k, v := range base {
+		out[k] = v
+	}
+	for k, v := range extra {
+		out[k] = v
+	}
+	return out
+}
+
 func ignoreNotFound(err error) error {
 	if apierrors.IsNotFound(err) {
 		return nil
@@ -91,6 +102,24 @@ func NewNamespace(name string, labels ...map[string]string) *corev1.Namespace {
 			Labels: namespaceLabels,
 		},
 	}
+}
+
+func NamespaceCreationAdmin(ns *corev1.Namespace, timeout time.Duration) AsyncAssertion {
+	return Eventually(func() (err error) {
+		return k8sClient.Create(
+			context.TODO(),
+			ns,
+		)
+	}, timeout, defaultPollInterval)
+}
+
+func NamespaceDeletionAdmin(ns *corev1.Namespace, timeout time.Duration) AsyncAssertion {
+	return Eventually(func() (err error) {
+		return k8sClient.Delete(
+			context.TODO(),
+			ns,
+		)
+	}, timeout, defaultPollInterval)
 }
 
 func NamespaceCreation(ns *corev1.Namespace, owner rbac.UserSpec, timeout time.Duration) AsyncAssertion {

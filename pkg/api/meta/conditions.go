@@ -35,6 +35,15 @@ const (
 	PendingUnmanagedContentReason string = "PendingUnmanagedContent"
 )
 
+func IsStatusConditionTrue(conditions ConditionList, conditionType string) bool {
+	cond := conditions.GetConditionByType(conditionType)
+	if cond == nil {
+		return false
+	}
+
+	return cond.Status == metav1.ConditionTrue
+}
+
 // +kubebuilder:object:generate=true
 
 type ConditionList []Condition

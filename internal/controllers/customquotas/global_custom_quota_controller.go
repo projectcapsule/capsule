@@ -184,6 +184,12 @@ func (r *clusterCustomQuotaClaimController) Reconcile(ctx context.Context, reque
 
 	reconcileErr := r.reconcile(ctx, log, instance)
 
+	// Normalize ledger state against freshly rebuilt claims first.
+	needsRequeue, ledgerErr := r.reconcileLedger(ctx, log, instance)
+	if ledgerErr != nil {
+		return reconcile.Result{}, ledgerErr
+	}
+
 	if err := r.updateStatus(ctx, instance, reconcileErr); err != nil {
 		return reconcile.Result{}, fmt.Errorf("cannot update status: %w", err)
 	}
@@ -194,11 +200,6 @@ func (r *clusterCustomQuotaClaimController) Reconcile(ctx context.Context, reque
 
 	if reconcileErr != nil {
 		return reconcile.Result{}, reconcileErr
-	}
-
-	needsRequeue, err := r.reconcileLedger(ctx, log, instance)
-	if err != nil {
-		return reconcile.Result{}, err
 	}
 
 	if needsRequeue {
@@ -511,6 +512,11 @@ func (r *clusterCustomQuotaClaimController) reconcileLedger(
 		ledger := &capsulev1beta2.QuantityLedger{}
 		if err := r.Get(ctx, key, ledger); err != nil {
 			if apierrors.IsNotFound(err) {
+				instance.Status.Usage.Available = instance.Spec.Limit.DeepCopy()
+				instance.Status.Usage.Available.Sub(instance.Status.Usage.Used)
+				if instance.Status.Usage.Available.Sign() < 0 {
+					instance.Status.Usage.Available = resource.MustParse("0")
+				}
 				return nil
 			}
 			return err
@@ -579,7 +585,53 @@ func (r *clusterCustomQuotaClaimController) reconcileLedger(
 			ledger.Status.Reserved.Add(res.Usage)
 		}
 
-		return r.Status().Update(ctx, ledger)
+		if err := r.Status().Update(ctx, ledger); err != nil {
+			return err
+		}
+
+		seenUIDs := make(map[types.UID]struct{}, len(instance.Status.Claims))
+		for _, claim := range instance.Status.Claims {
+			if claim.UID != "" {
+				seenUIDs[claim.UID] = struct{}{}
+			}
+		}
+
+		for _, res := range activeReservations {
+			instance.Status.Usage.Used.Add(res.Usage)
+
+			if res.ObjectRef.UID != "" {
+				if _, exists := seenUIDs[res.ObjectRef.UID]; exists {
+					continue
+				}
+				seenUIDs[res.ObjectRef.UID] = struct{}{}
+			}
+
+			instance.Status.Claims = append(instance.Status.Claims, capsulev1beta2.CustomQuotaClaimItem{
+				GroupVersionKind: metav1.GroupVersionKind{
+					Group:   res.ObjectRef.APIGroup,
+					Version: res.ObjectRef.APIVersion,
+					Kind:    res.ObjectRef.Kind,
+				},
+				NamespacedObjectWithUIDReference: meta.NamespacedObjectWithUIDReference{
+					Name:      res.ObjectRef.Name,
+					Namespace: meta.RFC1123SubdomainName(res.ObjectRef.Namespace),
+					UID:       res.ObjectRef.UID,
+				},
+				Usage: res.Usage.DeepCopy(),
+			})
+		}
+
+		if instance.Status.Usage.Used.Sign() < 0 {
+			instance.Status.Usage.Used = resource.MustParse("0")
+		}
+
+		instance.Status.Usage.Available = instance.Spec.Limit.DeepCopy()
+		instance.Status.Usage.Available.Sub(instance.Status.Usage.Used)
+		if instance.Status.Usage.Available.Sign() < 0 {
+			instance.Status.Usage.Available = resource.MustParse("0")
+		}
+
+		return nil
 	})
 
 	if err != nil {
@@ -588,6 +640,7 @@ func (r *clusterCustomQuotaClaimController) reconcileLedger(
 
 	return needsRequeue, nil
 }
+
 func pendingDeleteStillPresent(
 	pd capsulev1beta2.QuantityLedgerPendingDelete,
 	claims []capsulev1beta2.CustomQuotaClaimItem,

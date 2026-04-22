@@ -76,6 +76,8 @@ func (h *objectCalculationHandler) OnCreate(c client.Client, decoder admission.D
 			return ad.ErroredResponse(err)
 		}
 
+		log.V(5).Info("HELLLLLLLLLLLLLLLLLOOOOO - evaluated matching quotas", "count", len(evaluated))
+
 		type appliedReservation struct {
 			LedgerKey     types.NamespacedName
 			ReservationID string
@@ -158,10 +160,6 @@ func (h *objectCalculationHandler) OnCreate(c client.Client, decoder admission.D
 	}
 }
 
-func quantityString(q resource.Quantity) string {
-	return q.String()
-}
-
 func (h *objectCalculationHandler) OnUpdate(c client.Client, _ admission.Decoder, recorder events.EventRecorder) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		oldObj, err := getUnstructured(req.OldObject)
@@ -208,6 +206,21 @@ func (h *objectCalculationHandler) OnUpdate(c client.Client, _ admission.Decoder
 			}
 		}
 
+		if !relevantChange {
+			return nil
+		}
+
+		previousRefs, err := previouslyReferencedQuotas(
+			ctx,
+			c,
+			oldObj.GetUID(),
+			newObj.GetUID(),
+			req,
+		)
+		if err != nil {
+			return ad.ErroredResponse(err)
+		}
+
 		type appliedReservation struct {
 			LedgerKey     types.NamespacedName
 			ReservationID string
@@ -235,6 +248,28 @@ func (h *objectCalculationHandler) OnUpdate(c client.Client, _ admission.Decoder
 			}
 
 			ledgerKey := quantityLedgerKeyForMatchedQuota(base)
+
+			objRef := capsulev1beta2.QuantityLedgerObjectRef{
+				APIGroup:   req.Kind.Group,
+				APIVersion: req.Kind.Version,
+				Kind:       req.Kind.Kind,
+				Namespace:  oldObj.GetNamespace(),
+				Name:       oldObj.GetName(),
+				UID:        oldObj.GetUID(),
+			}
+
+			// Old object matched this quota, new object no longer matches:
+			// keep reconciling until the old materialized claim is gone.
+			if hadOld && !hadNew {
+				if err := addLedgerPendingDelete(ctx, c, ledgerKey, objRef); err != nil {
+					for _, a := range applied {
+						_ = deleteLedgerReservation(ctx, c, a.LedgerKey, a.ReservationID)
+					}
+
+					return ad.ErroredResponse(err)
+				}
+			}
+
 			reservation := buildReservation(req, newObj, targetUsage)
 
 			allowed, effectiveUsed, reserved, err := upsertLedgerReservation(
@@ -297,6 +332,7 @@ func (h *objectCalculationHandler) OnUpdate(c client.Client, _ admission.Decoder
 				return ad.ErroredResponse(err)
 			}
 		}
+
 		for _, item := range newEvaluated {
 			if _, seen := seenNotifications[item.Key]; seen {
 				continue
@@ -307,6 +343,28 @@ func (h *objectCalculationHandler) OnUpdate(c client.Client, _ admission.Decoder
 				for _, a := range applied {
 					_ = deleteLedgerReservation(ctx, c, a.LedgerKey, a.ReservationID)
 				}
+				return ad.ErroredResponse(err)
+			}
+		}
+
+		for _, item := range previousRefs {
+			if _, seen := seenNotifications[item.Key]; seen {
+				continue
+			}
+			seenNotifications[item.Key] = struct{}{}
+
+			ledgerKey := types.NamespacedName{Name: item.Name}
+			if item.IsGlobal {
+				ledgerKey.Namespace = configuration.ControllerNamespace()
+			} else {
+				ledgerKey.Namespace = item.Namespace
+			}
+
+			if err := touchQuantityLedger(ctx, c, ledgerKey); err != nil {
+				for _, a := range applied {
+					_ = deleteLedgerReservation(ctx, c, a.LedgerKey, a.ReservationID)
+				}
+
 				return ad.ErroredResponse(err)
 			}
 		}
