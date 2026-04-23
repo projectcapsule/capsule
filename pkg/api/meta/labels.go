@@ -129,10 +129,12 @@ func LabelSelectorKeys(sel *metav1.LabelSelector) map[string]struct{} {
 	for k := range sel.MatchLabels {
 		out[k] = struct{}{}
 	}
+
 	for _, expr := range sel.MatchExpressions {
 		if expr.Key != "" {
 			out[expr.Key] = struct{}{}
 		}
 	}
+
 	return out
 }

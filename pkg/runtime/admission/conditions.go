@@ -19,6 +19,7 @@ func BuildGatingUserCondition(opts WebhookOptions, users rbac.UserListSpec, admi
 		parts = append(parts, ServiceAccountGroupGuardExpr())
 		parts = append(parts, CelUserOrGroupExpr(users))
 	}
+
 	if opts.Administrators {
 		parts = append(parts, CelUserOrGroupExpr(admins))
 	}
@@ -65,6 +66,7 @@ func CelStringList(items []string) string {
 	for _, it := range items {
 		q = append(q, CelQuote(it))
 	}
+
 	return "[" + strings.Join(q, ",") + "]"
 }
 
@@ -73,5 +75,6 @@ func CelQuote(s string) string {
 	s = strings.ReplaceAll(s, `'`, `\'`)
 	s = strings.ReplaceAll(s, "\n", `\n`)
 	s = strings.ReplaceAll(s, "\t", `\t`)
+
 	return "'" + s + "'"
 }

@@ -37,6 +37,7 @@ func NamespaceIsPendingPodTerminating(
 	if err := c.List(ctx, &podList, client.InNamespace(ns.Name)); err != nil {
 		return false, fmt.Errorf("list pods in namespace %q: %w", ns.Name, err)
 	}
+
 	if len(podList.Items) > 0 {
 		return true, nil
 	}

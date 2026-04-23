@@ -25,6 +25,7 @@ func (c *JSONPathCache) Get(path string) (*jsonpath.CompiledJSONPath, bool) {
 	defer c.mu.RUnlock()
 
 	v, ok := c.data[path]
+
 	return v, ok
 }
 
@@ -32,6 +33,7 @@ func (c *JSONPathCache) GetOrCompile(path string) (*jsonpath.CompiledJSONPath, e
 	c.mu.RLock()
 	compiled, ok := c.data[path]
 	c.mu.RUnlock()
+
 	if ok {
 		return compiled, nil
 	}
@@ -44,12 +46,14 @@ func (c *JSONPathCache) GetOrCompile(path string) (*jsonpath.CompiledJSONPath, e
 	}
 
 	var err error
+
 	compiled, err = jsonpath.CompileJSONPath(path)
 	if err != nil {
 		return nil, err
 	}
 
 	c.data[path] = compiled
+
 	return compiled, nil
 }
 

@@ -29,7 +29,9 @@ func (g GlobalServiceAccount) Func() client.IndexerFunc {
 		}
 
 		ns := imp.Namespace.String()
+
 		name := imp.Name.String()
+
 		if ns == "" || name == "" {
 			return nil
 		}

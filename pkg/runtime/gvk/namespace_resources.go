@@ -44,6 +44,7 @@ func NamespacedListableResources(resourceLists []*metav1.APIResourceList) ([]sch
 			}
 
 			seen[gvr] = struct{}{}
+
 			gvrs = append(gvrs, gvr)
 		}
 	}
@@ -57,5 +58,6 @@ func SupportsVerb(verbs metav1.Verbs, want string) bool {
 			return true
 		}
 	}
+
 	return false
 }

@@ -64,7 +64,6 @@ func (h *remainingNamespaceHandler) OnDelete(
 				response := admission.Denied("tenant has remaining namespace referencing it (" + ns.GetName() + ")")
 
 				return &response
-
 			}
 		}
 

@@ -15,6 +15,7 @@ func (p LabelPresentPredicate) Create(e event.CreateEvent) bool {
 	if e.Object == nil {
 		return false
 	}
+
 	_, ok := e.Object.GetLabels()[p.Label]
 
 	return ok

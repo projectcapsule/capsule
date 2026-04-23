@@ -88,7 +88,9 @@ func (r *clusterCustomQuotaClaimController) SetupWithManager(mgr ctrl.Manager, c
 					}
 
 					oldNs, okOld := e.ObjectOld.(*corev1.Namespace)
+
 					newNs, okNew := e.ObjectNew.(*corev1.Namespace)
+
 					if !okOld || !okNew {
 						return false
 					}
@@ -240,6 +242,7 @@ func (r *clusterCustomQuotaClaimController) reconcile(
 	}
 
 	var namespaces []string
+
 	var err error
 
 	if len(instance.Spec.NamespaceSelectors) > 0 {
@@ -472,8 +475,11 @@ func (r *clusterCustomQuotaClaimController) reconcileLedger(
 		}
 
 		ledger.Status.Reservations = activeReservations
+
 		ledger.Status.PendingDeletes = activeDeletes
+
 		ledger.Status.Reserved = resource.MustParse("0")
+
 		for _, res := range activeReservations {
 			ledger.Status.Reserved.Add(res.Usage)
 		}
@@ -519,7 +525,9 @@ func (r *clusterCustomQuotaClaimController) reconcileLedger(
 		}
 
 		instance.Status.Usage.Available = instance.Spec.Limit.DeepCopy()
+
 		instance.Status.Usage.Available.Sub(instance.Status.Usage.Used)
+
 		if instance.Status.Usage.Available.Sign() < 0 {
 			instance.Status.Usage.Available = resource.MustParse("0")
 		}

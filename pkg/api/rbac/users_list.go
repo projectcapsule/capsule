@@ -37,7 +37,9 @@ func (o *UserListSpec) Upsert(newUser UserSpec) {
 	}
 
 	users = append(users, newUser)
+
 	sort.Sort(ByKindName(users))
+
 	*o = users
 }
 
@@ -100,6 +102,7 @@ func (o UserListSpec) SplitUsersAndGroups() (users []string, groups []string) {
 		if s.Name == "" {
 			continue
 		}
+
 		switch s.Kind {
 		case UserOwner:
 			seenU[s.Name] = struct{}{}
@@ -113,11 +116,13 @@ func (o UserListSpec) SplitUsersAndGroups() (users []string, groups []string) {
 	for u := range seenU {
 		users = append(users, u)
 	}
+
 	for g := range seenG {
 		groups = append(groups, g)
 	}
 
 	sort.Strings(users)
+
 	sort.Strings(groups)
 
 	return users, groups

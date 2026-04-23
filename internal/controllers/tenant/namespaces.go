@@ -127,6 +127,7 @@ func (r *Manager) reconcileNamespace(ctx context.Context, namespace *corev1.Name
 	// Always update tenant status condition after reconciliation
 	defer func() {
 		readCondition := meta.NewReadyCondition(namespace)
+
 		switch {
 		case terminating:
 			readCondition.Status = metav1.ConditionFalse
@@ -163,6 +164,7 @@ func (r *Manager) reconcileNamespace(ctx context.Context, namespace *corev1.Name
 
 	// Verify if namespace is still active or terminating
 	cleanup := false
+
 	if namespace.DeletionTimestamp != nil {
 		terminating = true
 
@@ -225,7 +227,6 @@ func (r *Manager) reconcileNamespace(ctx context.Context, namespace *corev1.Name
 		if err != nil {
 			return stat, err
 		}
-
 	} else {
 		obj := &capsulev1beta2.RuleStatus{
 			ObjectMeta: metav1.ObjectMeta{

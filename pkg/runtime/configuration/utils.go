@@ -13,6 +13,7 @@ import (
 
 func fetchCACertFromSecret(ctx context.Context, k8sClient client.Client, namespace, secretName, secretCaKey string) ([]byte, error) {
 	var secret corev1.Secret
+
 	key := client.ObjectKey{Namespace: namespace, Name: secretName}
 
 	if err := k8sClient.Get(ctx, key, &secret); err != nil {

@@ -28,6 +28,7 @@ func (ReconcileRequestedPredicate) Update(e event.UpdateEvent) bool {
 	if oldA != nil {
 		oldV = oldA[meta.ReconcileAnnotation]
 	}
+
 	newV := ""
 	if newA != nil {
 		newV = newA[meta.ReconcileAnnotation]

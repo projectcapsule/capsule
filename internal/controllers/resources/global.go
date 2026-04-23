@@ -233,6 +233,7 @@ func (r *globalResourceController) Reconcile(ctx context.Context, request reconc
 
 	for _, dep := range tntResource.Spec.DependsOn {
 		d := &capsulev1beta2.GlobalTenantResource{}
+
 		err = r.client.Get(ctx, types.NamespacedName{Name: dep.Name.String(), Namespace: ""}, d)
 		if err != nil {
 			if apierrors.IsNotFound(err) {
@@ -429,7 +430,6 @@ func (r *globalResourceController) gatherResources(
 				opts.AllowCrossNamespaceSelection = false
 
 				for _, innerNs := range namespaces {
-
 					opts.Iterator = NewCollectorIteratorOptions(&tnt, innerNs, resource)
 
 					for _, obj := range objs {
@@ -447,7 +447,6 @@ func (r *globalResourceController) gatherResources(
 						if err != nil {
 							return err
 						}
-
 					}
 
 					err = r.collector.Collect(

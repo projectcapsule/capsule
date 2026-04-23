@@ -27,6 +27,7 @@ func KeyFromUnstructured(o *unstructured.Unstructured) (ResourceKey, bool) {
 	gvk := o.GroupVersionKind()
 	if gvk.Empty() {
 		gvk.Kind = o.GetKind()
+
 		gv, err := schema.ParseGroupVersion(o.GetAPIVersion())
 		if err == nil {
 			gvk.Group = gv.Group

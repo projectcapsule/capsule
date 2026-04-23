@@ -63,11 +63,13 @@ func SelectorRequiresTemplating(sel *metav1.LabelSelector) bool {
 	if sel == nil {
 		return false
 	}
+
 	for k, v := range sel.MatchLabels {
 		if RequiresFastTemplate(k) || RequiresFastTemplate(v) {
 			return true
 		}
 	}
+
 	for _, expr := range sel.MatchExpressions {
 		if RequiresFastTemplate(expr.Key) {
 			return true

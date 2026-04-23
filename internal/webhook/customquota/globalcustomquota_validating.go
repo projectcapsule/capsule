@@ -87,14 +87,6 @@ func (h *globalCustomQuotaValidationHandler) OnUpdate(_ client.Client, decoder a
 				)
 				return &response
 			}
-
-			// Unsure
-			//if !reflect.DeepEqual(oldQuota.Spec.ScopeSelectors, newQuota.Spec.ScopeSelectors) {
-			//	response := admission.Denied(
-			//		"spec.scopeSelectors cannot be changed while usage is recorded",
-			//	)
-			//	return &response
-			//}
 		}
 
 		return nil

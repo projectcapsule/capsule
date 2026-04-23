@@ -70,6 +70,7 @@ func (t ResourceReference) LoadTemplated(templateContext map[string]string) (Res
 	if out.Name != "" {
 		out.Name = FastTemplate(out.Name, templateContext)
 	}
+
 	if out.Namespace != "" {
 		out.Namespace = FastTemplate(string(out.Namespace), templateContext)
 	}
@@ -80,6 +81,7 @@ func (t ResourceReference) LoadTemplated(templateContext map[string]string) (Res
 		if err != nil {
 			return ResourceReference{}, err
 		}
+
 		out.Selector = selCopy
 	}
 
@@ -180,28 +182,32 @@ func (t ResourceReference) loadResources(
 		opts = append(opts, client.InNamespace(string(ns)))
 	}
 
-	// Convert t.Selector (metav1) to labels.Selector if present
 	var tenantSel labels.Selector
+
 	if t.Selector != nil {
 		s, err := metav1.LabelSelectorAsSelector(t.Selector)
 		if err != nil {
 			return nil, fmt.Errorf("invalid label selector: %w", err)
 		}
+
 		tenantSel = s
 	}
 
 	all := make([]labels.Selector, 0, len(additionSelectors)+1)
+
 	for _, s := range additionSelectors {
 		if s != nil {
 			all = append(all, s)
 		}
 	}
+
 	if tenantSel != nil {
 		all = append(all, tenantSel)
 	}
 
 	if len(all) > 0 {
 		combined := selectors.CombineSelectors(all...)
+
 		opts = append(opts, client.MatchingLabelsSelector{Selector: combined})
 	}
 

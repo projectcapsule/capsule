@@ -260,6 +260,7 @@ func (r *namespacedResourceController) Reconcile(ctx context.Context, request re
 
 	for _, dep := range tntResource.Spec.DependsOn {
 		d := &capsulev1beta2.TenantResource{}
+
 		err = r.client.Get(ctx, types.NamespacedName{Name: dep.Name.String(), Namespace: tntResource.GetNamespace()}, d)
 		if err != nil {
 			if apierrors.IsNotFound(err) {
@@ -410,7 +411,6 @@ func (r *namespacedResourceController) gatherResources(
 
 		i := 0
 		for _, innerNs := range namespaces {
-
 			opts.Iterator = NewCollectorIteratorOptions(&tnt, innerNs, resource)
 
 			for _, obj := range objs {
@@ -428,7 +428,6 @@ func (r *namespacedResourceController) gatherResources(
 				if err != nil {
 					return err
 				}
-
 			}
 
 			err = r.collector.Collect(
@@ -619,7 +618,6 @@ func ForeachNamespace(
 				if err != nil {
 					return err
 				}
-
 			}
 
 			i++
@@ -637,7 +635,6 @@ func ForeachNamespace(
 		if err != nil {
 			return err
 		}
-
 	}
 
 	return nil

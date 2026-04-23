@@ -39,6 +39,7 @@ func CollectPromotions(
 	}
 
 	staticSel := labels.NewSelector().Add(*promoReq)
+
 	for _, ns := range tnt.Status.Namespaces {
 		namespace := ns
 
@@ -50,10 +51,12 @@ func CollectPromotions(
 				if err != nil {
 					return nil, fmt.Errorf("invalid promotion selector for tenant %s: %w", tnt.Name, err)
 				}
+
 				combinedSel = selectors.CombineSelectors(staticSel, ruleSel)
 			}
 
 			saList := &corev1.ServiceAccountList{}
+
 			if err := c.List(ctx, saList,
 				client.InNamespace(namespace),
 				client.MatchingLabelsSelector{Selector: combinedSel},

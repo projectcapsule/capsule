@@ -39,7 +39,9 @@ func NewImpersonationCache() *ImpersonationCache {
 func (c *ImpersonationCache) Get(ns, name string) (client.Client, bool) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
+
 	cl, ok := c.clients[Key{Namespace: ns, Name: name}]
+
 	return cl, ok
 }
 
@@ -47,6 +49,7 @@ func (c *ImpersonationCache) Get(ns, name string) (client.Client, bool) {
 func (c *ImpersonationCache) Set(namespace, name string, cl client.Client) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+
 	c.clients[Key{Namespace: namespace, Name: name}] = cl
 }
 
@@ -54,6 +57,7 @@ func (c *ImpersonationCache) Set(namespace, name string, cl client.Client) {
 func (c *ImpersonationCache) Invalidate(namespace, name string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+
 	delete(c.clients, Key{Namespace: namespace, Name: name})
 }
 
@@ -61,6 +65,7 @@ func (c *ImpersonationCache) Invalidate(namespace, name string) {
 func (c *ImpersonationCache) Clear() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+
 	c.clients = make(map[Key]client.Client)
 }
 
@@ -68,6 +73,7 @@ func (c *ImpersonationCache) Clear() {
 func (c *ImpersonationCache) Stats() (entries int) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
+
 	return len(c.clients)
 }
 
@@ -100,9 +106,12 @@ func (c *ImpersonationCache) LoadOrCreate(
 	// Store (double-check to avoid duplicate creation races)
 	c.mu.Lock()
 	defer c.mu.Unlock()
+
 	if existing := c.clients[key]; existing != nil {
 		return existing, nil
 	}
+
 	c.clients[key] = cl
+
 	return cl, nil
 }

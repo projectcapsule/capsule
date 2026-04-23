@@ -386,6 +386,7 @@ func (r *Processor) handleCreatedMetadata(
 	existingObject := obj.DeepCopy()
 
 	err = c.Get(ctx, client.ObjectKeyFromObject(existingObject), existingObject)
+
 	switch {
 	case apierrors.IsNotFound(err):
 		created = true

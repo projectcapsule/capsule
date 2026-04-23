@@ -278,6 +278,7 @@ func main() {
 		)
 
 		var err error
+
 		webhookCertWatcher, err = certwatcher.New(
 			filepath.Join(webhookCertPath, webhookCertName),
 			filepath.Join(webhookCertPath, webhookCertKey),
@@ -330,6 +331,7 @@ func main() {
 		)
 
 		var err error
+
 		metricsCertWatcher, err = certwatcher.New(
 			filepath.Join(metricsCertPath, metricsCertName),
 			filepath.Join(metricsCertPath, metricsCertKey),

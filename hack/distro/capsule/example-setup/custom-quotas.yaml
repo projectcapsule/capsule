@@ -7,7 +7,7 @@ spec:
   limit: 5Gi
   namespaceSelectors:
   - matchLabels:
-      capsule.clastix.io/tenant: solar
+      capsule.clastix.io/tenant: wind
   sources:
     - group: ""
       version: v1
@@ -32,7 +32,7 @@ spec:
   limit: 5
   namespaceSelectors:
   - matchLabels:
-      capsule.clastix.io/tenant: solar
+      capsule.clastix.io/tenant: wdin
   sources:
   - group: ""
     kind: Pod
@@ -46,25 +46,10 @@ spec:
     version: v1
 ---
 apiVersion: capsule.clastix.io/v1beta2
-kind: GlobalCustomQuota
-metadata:
-  name: pod-count-limit
-spec:
-  limit: 6
-  namespaceSelectors:
-  - matchLabels:
-      capsule.clastix.io/tenant: solar
-  sources:
-  - group: ""
-    kind: Pod
-    op: count
-    version: v1
----
-apiVersion: capsule.clastix.io/v1beta2
 kind: CustomQuota
 metadata:
   name: pod-count-limit
-  namespace: solar-test
+  namespace: wind-test
 spec:
   limit: 3
   sources:

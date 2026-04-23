@@ -6,3 +6,4 @@ resources:
   - resource-legacy.yaml
   - pools.yaml
   - rbac.yaml
+  - custom-quotas.yaml

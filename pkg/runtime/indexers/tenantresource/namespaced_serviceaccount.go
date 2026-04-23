@@ -29,7 +29,9 @@ func (g NamespacedServiceAccount) Func() client.IndexerFunc {
 		}
 
 		ns := tgr.GetNamespace()
+
 		name := imp.Name.String()
+
 		if ns == "" || name == "" {
 			return nil
 		}

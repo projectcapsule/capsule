@@ -383,8 +383,11 @@ func (r *customQuotaClaimController) reconcileLedger(
 		}
 
 		ledger.Status.Reservations = activeReservations
+
 		ledger.Status.PendingDeletes = activeDeletes
+
 		ledger.Status.Reserved = resource.MustParse("0")
+
 		for _, res := range activeReservations {
 			ledger.Status.Reserved.Add(res.Usage)
 		}
@@ -430,7 +433,9 @@ func (r *customQuotaClaimController) reconcileLedger(
 		}
 
 		instance.Status.Usage.Available = instance.Spec.Limit.DeepCopy()
+
 		instance.Status.Usage.Available.Sub(instance.Status.Usage.Used)
+
 		if instance.Status.Usage.Available.Sign() < 0 {
 			instance.Status.Usage.Available = resource.MustParse("0")
 		}

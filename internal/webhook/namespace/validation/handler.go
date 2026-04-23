@@ -171,7 +171,9 @@ func (h *handler) rejectOnTermination(
 	t *capsulev1beta2.Tenant,
 ) *admission.Response {
 	tnt := &capsulev1beta2.Tenant{}
+
 	_ = c.Get(ctx, types.NamespacedName{Name: t.GetName()}, tnt)
+
 	if tnt.DeletionTimestamp == nil {
 		return nil
 	}

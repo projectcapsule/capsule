@@ -37,9 +37,10 @@ import (
 )
 
 const (
-	defaultTimeoutInterval   = 40 * time.Second
-	defaultPollInterval      = time.Second
-	defaultConfigurationName = "default"
+	defaultTimeoutInterval            = 40 * time.Second
+	defaultTerminationTimeoutInterval = 60 * time.Second
+	defaultPollInterval               = time.Second
+	defaultConfigurationName          = "default"
 )
 
 func mergeMaps(base map[string]string, extra map[string]string) map[string]string {
@@ -155,7 +156,7 @@ func ForceDeleteNamespace(ctx context.Context, name string) {
 
 		// wait until fully gone
 		return fmt.Errorf("namespace %s still terminating", name)
-	}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed(),
+	}, defaultTerminationTimeoutInterval, defaultPollInterval).Should(Succeed(),
 		"failed to force delete namespace %s", name)
 }
 

@@ -38,10 +38,12 @@ func CapsuleFieldOwners(obj *unstructured.Unstructured, prefix string) map[strin
 		if mgr == "" {
 			continue
 		}
+
 		if strings.HasPrefix(mgr, prefix) {
 			out[mgr] = struct{}{}
 		}
 	}
+
 	return out
 }
 

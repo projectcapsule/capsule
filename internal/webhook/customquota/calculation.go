@@ -76,12 +76,11 @@ func (h *objectCalculationHandler) OnCreate(c client.Client, decoder admission.D
 			return ad.ErroredResponse(err)
 		}
 
-		log.V(5).Info("HELLLLLLLLLLLLLLLLLOOOOO - evaluated matching quotas", "count", len(evaluated))
-
 		type appliedReservation struct {
 			LedgerKey     types.NamespacedName
 			ReservationID string
 		}
+
 		applied := make([]appliedReservation, 0, len(evaluated))
 
 		for _, item := range evaluated {
@@ -96,6 +95,7 @@ func (h *objectCalculationHandler) OnCreate(c client.Client, decoder admission.D
 				item.Limit,
 				reservation,
 			)
+
 			if err != nil {
 				for _, a := range applied {
 					_ = deleteLedgerReservation(ctx, c, a.LedgerKey, a.ReservationID)
@@ -109,7 +109,9 @@ func (h *objectCalculationHandler) OnCreate(c client.Client, decoder admission.D
 				}
 
 				available := item.Limit.DeepCopy()
+
 				available.Sub(effectiveUsed)
+
 				if available.Sign() < 0 {
 					available = resource.MustParse("0")
 				}
@@ -137,6 +139,7 @@ func (h *objectCalculationHandler) OnCreate(c client.Client, decoder admission.D
 						reserved.String(),
 					),
 				)
+
 				return &resp
 			}
 
@@ -212,6 +215,7 @@ func (h *objectCalculationHandler) OnUpdate(c client.Client, _ admission.Decoder
 			newItem, hadNew := newByKey[key]
 
 			var base evaluatedQuota
+
 			switch {
 			case hadNew:
 				base = newItem
@@ -263,6 +267,7 @@ func (h *objectCalculationHandler) OnUpdate(c client.Client, _ admission.Decoder
 				for _, a := range applied {
 					_ = deleteLedgerReservation(ctx, c, a.LedgerKey, a.ReservationID)
 				}
+
 				return ad.ErroredResponse(err)
 			}
 			if !allowed {
@@ -271,7 +276,9 @@ func (h *objectCalculationHandler) OnUpdate(c client.Client, _ admission.Decoder
 				}
 
 				available := base.Limit.DeepCopy()
+
 				available.Sub(effectiveUsed)
+
 				if available.Sign() < 0 {
 					available = resource.MustParse("0")
 				}
@@ -288,6 +295,7 @@ func (h *objectCalculationHandler) OnUpdate(c client.Client, _ admission.Decoder
 						reserved.String(),
 					),
 				)
+
 				return &resp
 			}
 
@@ -374,6 +382,7 @@ func deleteLedgerReservation(
 			if apierrors.IsNotFound(err) {
 				return nil
 			}
+
 			return err
 		}
 
@@ -382,11 +391,14 @@ func deleteLedgerReservation(
 			if res.ID == reservationID {
 				continue
 			}
+
 			active = append(active, res)
 		}
 
 		ledger.Status.Reservations = active
+
 		ledger.Status.Reserved = resource.MustParse("0")
+
 		for _, res := range active {
 			ledger.Status.Reserved.Add(res.Usage)
 		}
@@ -418,11 +430,14 @@ func (h *objectCalculationHandler) effectiveAvailableForSort(
 	ledger := &capsulev1beta2.QuantityLedger{}
 	if err := c.Get(ctx, ledgerKey, ledger); err == nil {
 		used.Add(ledger.Status.Reserved)
+
 		quota.ClampQuantityToZero(&used)
 	}
 
 	available := mq.Limit.DeepCopy()
+
 	available.Sub(used)
+
 	if available.Sign() < 0 {
 		return resource.MustParse("0")
 	}
@@ -447,7 +462,9 @@ func (h *objectCalculationHandler) matchAllQuotas(
 	}
 
 	out := make([]quota.MatchedQuota, 0, len(namespaced)+len(global))
+
 	out = append(out, namespaced...)
+
 	out = append(out, global...)
 
 	sort.SliceStable(out, func(i, j int) bool {
@@ -489,6 +506,7 @@ func (h *objectCalculationHandler) matchCustomQuotas(
 	}
 
 	list := &capsulev1beta2.CustomQuotaList{}
+
 	err := c.List(ctx, list,
 		client.InNamespace(req.Namespace),
 		client.MatchingFields{
@@ -534,6 +552,7 @@ func (h *objectCalculationHandler) matchCustomQuotas(
 					err,
 				)
 			}
+
 			if !matches {
 				continue
 			}
@@ -563,6 +582,7 @@ func (h *objectCalculationHandler) matchGlobalCustomQuotas(
 	u unstructured.Unstructured,
 ) ([]quota.MatchedQuota, error) {
 	list := &capsulev1beta2.GlobalCustomQuotaList{}
+
 	err := c.List(ctx, list, client.MatchingFields{
 		index.TargetIndexerFieldName: req.Kind.String(),
 	})
@@ -575,6 +595,7 @@ func (h *objectCalculationHandler) matchGlobalCustomQuotas(
 	}
 
 	objLabels := labels.Set(u.GetLabels())
+
 	out := make([]quota.MatchedQuota, 0)
 
 	for _, gcq := range list.Items {
@@ -608,6 +629,7 @@ func (h *objectCalculationHandler) matchGlobalCustomQuotas(
 					err,
 				)
 			}
+
 			if !matches {
 				continue
 			}
@@ -672,6 +694,7 @@ func (h *objectCalculationHandler) evaluateMatchedQuotas(
 	log := log.FromContext(ctx)
 
 	usageByPath := make(map[string]resource.Quantity, len(matched))
+
 	for _, mq := range matched {
 		// count does not use a path
 		if mq.Operation == quota.OpCount {
@@ -688,10 +711,12 @@ func (h *objectCalculationHandler) evaluateMatchedQuotas(
 		}
 
 		log.V(5).Info("parsed usage", "path", mq.Path, "parsed", usage.String())
+
 		usageByPath[mq.Path] = usage
 	}
 
 	byKey := make(map[string]evaluatedQuota, len(matched))
+
 	order := make([]string, 0, len(matched))
 
 	for _, mq := range matched {
@@ -701,6 +726,7 @@ func (h *objectCalculationHandler) evaluateMatchedQuotas(
 				MatchedQuota: mq,
 				Usage:        resource.MustParse("0"),
 			}
+
 			order = append(order, mq.Key)
 		}
 
@@ -745,7 +771,9 @@ func upsertLedgerReservation(
 	reservation capsulev1beta2.QuantityLedgerReservation,
 ) (bool, resource.Quantity, resource.Quantity, error) {
 	var allowed bool
+
 	var effectiveUsed resource.Quantity
+
 	var reserved resource.Quantity
 
 	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
@@ -780,12 +808,15 @@ func upsertLedgerReservation(
 		}
 
 		newReserved := resource.MustParse("0")
+
 		for _, r := range active {
 			newReserved.Add(r.Usage)
 		}
 
 		newEffectiveUsed := persistedUsed.DeepCopy()
+
 		newEffectiveUsed.Add(newReserved)
+
 		if newEffectiveUsed.Sign() < 0 {
 			newEffectiveUsed = resource.MustParse("0")
 		}
@@ -798,6 +829,7 @@ func upsertLedgerReservation(
 		}
 
 		ledger.Status.Reservations = active
+
 		ledger.Status.Reserved = newReserved
 
 		if err := c.Status().Update(ctx, ledger); err != nil {
@@ -805,8 +837,11 @@ func upsertLedgerReservation(
 		}
 
 		allowed = true
+
 		effectiveUsed = newEffectiveUsed
+
 		reserved = newReserved
+
 		return nil
 	})
 

@@ -42,6 +42,7 @@ func (c *CompiledJSONPath) Execute(u unstructured.Unstructured) (string, error) 
 	if c == nil || c.jp == nil {
 		return "", fmt.Errorf("compiled jsonpath is nil")
 	}
+
 	var buf bytes.Buffer
 	if err := c.jp.Execute(&buf, u.Object); err != nil {
 		return "", fmt.Errorf("execute usage jsonpath: %w", err)

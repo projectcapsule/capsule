@@ -71,6 +71,7 @@ func NewCapsuleConfiguration(ctx context.Context, c client.Client, rest *rest.Co
 			if err == nil {
 				return cfg
 			}
+
 			if !apierrors.IsNotFound(err) {
 				panic(errors.Wrap(err, "cannot retrieve Capsule configuration with name "+name))
 			}

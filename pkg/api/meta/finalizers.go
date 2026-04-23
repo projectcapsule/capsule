@@ -22,6 +22,7 @@ func FilterFinalizers(finalizers []string, ignored map[string]struct{}) (remaini
 	}
 
 	remaining = make([]string, 0, len(finalizers))
+
 	removed = false
 
 	for _, f := range finalizers {
@@ -29,6 +30,7 @@ func FilterFinalizers(finalizers []string, ignored map[string]struct{}) (remaini
 			remaining = append(remaining, f)
 			continue
 		}
+
 		removed = true
 	}
 
@@ -47,6 +49,7 @@ func BuildFinalizersMergePatch(finalizers []string) []byte {
 	type metadata struct {
 		Finalizers []string `json:"finalizers"`
 	}
+
 	type patch struct {
 		Metadata metadata `json:"metadata"`
 	}

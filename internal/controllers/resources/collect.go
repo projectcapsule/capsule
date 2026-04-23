@@ -187,7 +187,6 @@ func (co *Collector) Collect(
 		log.V(5).Info("loaded resources", "amount", len(p))
 
 		for i, o := range p {
-
 			genError = co.AddToAccumulation(tnt, ns, opts, spec, o, resourceIndex+"/generator-"+strconv.Itoa(generatorIndex)+"-"+strconv.Itoa(i), true)
 			if genError != nil {
 				syncErr = errors.Join(syncErr, genError)
@@ -346,7 +345,6 @@ func (co *Collector) CollectNamespacedItems(
 					"apiVersion", o.GetAPIVersion(), "kind", o.GetKind(), "namespace", o.GetNamespace(), "name", o.GetName(),
 				)
 			}
-
 		}
 	}
 
