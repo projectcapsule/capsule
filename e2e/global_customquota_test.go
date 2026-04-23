@@ -365,7 +365,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Lab
 		}).Should(Succeed())
 		awaitGlobalQuotaReady(ctx, q.GetName())
 
-		const total = 30
+		const total = 100
 
 		type result struct {
 			name string
@@ -425,7 +425,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Lab
 			ledger.Status.PendingDeletes,
 		)
 
-		Expect(failed).To(Equal(20),
+		Expect(failed).To(Equal(90),
 			"unexpected number of failed concurrent pod creations\nsuccesses=%d\nfailures=%d\nsuccessNames=%v\nfailureDetails=%v\nquotaUsed=%q\nquotaAvailable=%q\nclaims=%d\nledgerReserved=%q\nledgerReservations=%+v\nledgerPendingDeletes=%+v",
 			succeeded,
 			failed,

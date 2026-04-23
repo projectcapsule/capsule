@@ -121,7 +121,7 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Label("na
 		}).Should(Succeed())
 		awaitCustomQuotaReady(ctx, testNamespace, q.GetName())
 
-		const total = 30
+		const total = 100
 		type result struct {
 			name string
 			err  error
@@ -159,7 +159,7 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Label("na
 		}
 
 		Expect(succeeded).To(Equal(10))
-		Expect(failed).To(Equal(20))
+		Expect(failed).To(Equal(90))
 
 		expectCustomQuotaUsedAndClaims(ctx, testNamespace, q.GetName(), "10", 10)
 		expectLedgerSettled(ctx, testNamespace, q.GetName())

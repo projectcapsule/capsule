@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -15,6 +16,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -32,6 +34,13 @@ import (
 	"github.com/projectcapsule/capsule/pkg/runtime/quota"
 	"github.com/projectcapsule/capsule/pkg/runtime/selectors"
 )
+
+var customAdmissionBackoff = wait.Backoff{
+	Steps:    8,
+	Duration: 20 * time.Millisecond,
+	Factor:   1.8,
+	Jitter:   0.2,
+}
 
 type objectCalculationHandler struct {
 	targetsCache  *cache.CompiledTargetsCache[string]
@@ -63,97 +72,103 @@ func (h *objectCalculationHandler) OnCreate(c client.Client, decoder admission.D
 			return ad.ErroredResponse(err)
 		}
 
-		matched, err := h.matchAllQuotas(ctx, c, req, u)
-		if err != nil {
-			return ad.ErroredResponse(err)
-		}
+		var finalResp *admission.Response
 
-		if len(matched) == 0 {
-			return nil
-		}
-
-		evaluated, err := h.evaluateMatchedQuotas(ctx, u, matched)
-		if err != nil {
-			return ad.ErroredResponse(err)
-		}
-
-		type appliedReservation struct {
-			LedgerKey     types.NamespacedName
-			ReservationID string
-		}
-
-		applied := make([]appliedReservation, 0, len(evaluated))
-
-		for _, item := range evaluated {
-			ledgerKey := quantityLedgerKeyForMatchedQuota(item)
-			reservation := buildReservation(req, u, item.Usage)
-
-			allowed, effectiveUsed, reserved, err := upsertLedgerReservation(
-				ctx,
-				c,
-				ledgerKey,
-				item.Used,
-				item.Limit,
-				reservation,
-			)
+		err = retry.OnError(customAdmissionBackoff, apierrors.IsConflict, func() error {
+			matched, err := h.matchAllQuotas(ctx, c, req, u)
 			if err != nil {
-				for _, a := range applied {
-					_ = deleteLedgerReservation(ctx, c, a.LedgerKey, a.ReservationID)
-				}
-
-				return ad.ErroredResponse(err)
+				finalResp = ad.ErroredResponse(err)
+				return nil
+			}
+			if len(matched) == 0 {
+				finalResp = nil
+				return nil
 			}
 
-			if !allowed {
-				for _, a := range applied {
-					_ = deleteLedgerReservation(ctx, c, a.LedgerKey, a.ReservationID)
-				}
-
-				available := item.Limit.DeepCopy()
-
-				available.Sub(effectiveUsed)
-
-				if available.Sign() < 0 {
-					available = resource.MustParse("0")
-				}
-
-				log.V(5).Info("denying create due to quota",
-					"quotaKey", item.Key,
-					"quotaName", item.Name,
-					"isGlobal", item.IsGlobal,
-					"requestedUsage", item.Usage.String(),
-					"currentUsed", effectiveUsed.String(),
-					"available", available.String(),
-					"limit", item.Limit.String(),
-					"inflightReserved", reserved.String(),
-				)
-
-				resp := admission.Denied(
-					fmt.Sprintf(
-						"creating resource exceeds limit for %s %q (requested=%s, currentUsed=%s, available=%s, limit=%s, inflightReserved=%s)",
-						quotaTypeName(item.IsGlobal),
-						item.Name,
-						item.Usage.String(),
-						effectiveUsed.String(),
-						available.String(),
-						item.Limit.String(),
-						reserved.String(),
-					),
-				)
-
-				return &resp
+			evaluated, err := h.evaluateMatchedQuotas(ctx, u, matched)
+			if err != nil {
+				finalResp = ad.ErroredResponse(err)
+				return nil
 			}
 
-			applied = append(applied, appliedReservation{
-				LedgerKey:     ledgerKey,
-				ReservationID: reservation.ID,
-			})
+			type appliedReservation struct {
+				LedgerKey     types.NamespacedName
+				ReservationID string
+			}
+			applied := make([]appliedReservation, 0, len(evaluated))
+
+			for _, item := range evaluated {
+				ledgerKey := quantityLedgerKeyForMatchedQuota(item)
+				reservation := buildReservation(req, u, item.Usage)
+
+				allowed, effectiveUsed, reserved, err := mutateLedger(
+					ctx,
+					c,
+					item,
+					&reservation,
+					nil,
+				)
+				if err != nil {
+					for _, a := range applied {
+						_ = deleteLedgerReservation(ctx, c, a.LedgerKey, a.ReservationID)
+					}
+					return err
+				}
+
+				if !allowed {
+					for _, a := range applied {
+						_ = deleteLedgerReservation(ctx, c, a.LedgerKey, a.ReservationID)
+					}
+
+					available := item.Limit.DeepCopy()
+					available.Sub(effectiveUsed)
+					if available.Sign() < 0 {
+						available = resource.MustParse("0")
+					}
+
+					log.V(5).Info("denying create due to quota",
+						"quotaKey", item.Key,
+						"quotaName", item.Name,
+						"isGlobal", item.IsGlobal,
+						"requestedUsage", item.Usage.String(),
+						"currentUsed", effectiveUsed.String(),
+						"available", available.String(),
+						"limit", item.Limit.String(),
+						"inflightReserved", reserved.String(),
+					)
+
+					resp := admission.Denied(
+						fmt.Sprintf(
+							"creating resource exceeds limit for %s %q (requested=%s, currentUsed=%s, available=%s, limit=%s, inflightReserved=%s)",
+							quotaTypeName(item.IsGlobal),
+							item.Name,
+							item.Usage.String(),
+							effectiveUsed.String(),
+							available.String(),
+							item.Limit.String(),
+							reserved.String(),
+						),
+					)
+					finalResp = &resp
+					return nil
+				}
+
+				applied = append(applied, appliedReservation{
+					LedgerKey:     ledgerKey,
+					ReservationID: reservation.ID,
+				})
+			}
+
+			finalResp = nil
+			return nil
+		})
+		if err != nil {
+			return ad.ErroredResponse(err)
 		}
 
-		return nil
+		return finalResp
 	}
 }
-
 func (h *objectCalculationHandler) OnUpdate(c client.Client, _ admission.Decoder, recorder events.EventRecorder) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		oldObj, err := getUnstructured(req.OldObject)
@@ -166,149 +181,150 @@ func (h *objectCalculationHandler) OnUpdate(c client.Client, _ admission.Decoder
 			return ad.ErroredResponse(err)
 		}
 
-		oldMatched, err := h.matchAllQuotas(ctx, c, req, oldObj)
-		if err != nil {
-			return ad.ErroredResponse(err)
-		}
+		var finalResp *admission.Response
 
-		newMatched, err := h.matchAllQuotas(ctx, c, req, newObj)
-		if err != nil {
-			return ad.ErroredResponse(err)
-		}
+		err = retry.OnError(customAdmissionBackoff, apierrors.IsConflict, func() error {
+			oldMatched, err := h.matchAllQuotas(ctx, c, req, oldObj)
+			if err != nil {
+				finalResp = ad.ErroredResponse(err)
+				return nil
+			}
 
-		oldEvaluated, err := h.evaluateMatchedQuotas(ctx, oldObj, oldMatched)
-		if err != nil {
-			return ad.ErroredResponse(err)
-		}
+			newMatched, err := h.matchAllQuotas(ctx, c, req, newObj)
+			if err != nil {
+				finalResp = ad.ErroredResponse(err)
+				return nil
+			}
 
-		newEvaluated, err := h.evaluateMatchedQuotas(ctx, newObj, newMatched)
-		if err != nil {
-			return ad.ErroredResponse(err)
-		}
+			oldEvaluated, err := h.evaluateMatchedQuotas(ctx, oldObj, oldMatched)
+			if err != nil {
+				finalResp = ad.ErroredResponse(err)
+				return nil
+			}
 
-		oldByKey := evaluatedByKey(oldEvaluated)
-		newByKey := evaluatedByKey(newEvaluated)
+			newEvaluated, err := h.evaluateMatchedQuotas(ctx, newObj, newMatched)
+			if err != nil {
+				finalResp = ad.ErroredResponse(err)
+				return nil
+			}
 
-		relevantChange := meta.LabelsChangedUnstructured(oldObj, newObj) || len(oldByKey) != len(newByKey)
-		if !relevantChange {
-			for key, oldItem := range oldByKey {
-				newItem, ok := newByKey[key]
-				if !ok || oldItem.Usage.Cmp(newItem.Usage) != 0 {
-					relevantChange = true
+			oldByKey := evaluatedByKey(oldEvaluated)
+			newByKey := evaluatedByKey(newEvaluated)
 
-					break
+			relevantChange := meta.LabelsChangedUnstructured(oldObj, newObj) || len(oldByKey) != len(newByKey)
+			if !relevantChange {
+				for key, oldItem := range oldByKey {
+					newItem, ok := newByKey[key]
+					if !ok || oldItem.Usage.Cmp(newItem.Usage) != 0 {
+						relevantChange = true
+						break
+					}
 				}
 			}
-		}
 
-		if !relevantChange {
-			return nil
-		}
-
-		type appliedReservation struct {
-			LedgerKey     types.NamespacedName
-			ReservationID string
-		}
-
-		applied := make([]appliedReservation, 0, len(oldByKey)+len(newByKey))
-
-		for _, key := range allKeys(oldByKey, newByKey) {
-			oldItem, hadOld := oldByKey[key]
-			newItem, hadNew := newByKey[key]
-
-			var base evaluatedQuota
-
-			switch {
-			case hadNew:
-				base = newItem
-			case hadOld:
-				base = oldItem
-			default:
-				continue
+			if !relevantChange {
+				finalResp = nil
+				return nil
 			}
 
-			targetUsage := resource.MustParse("0")
-			if hadNew {
-				targetUsage = newItem.Usage.DeepCopy()
+			type appliedReservation struct {
+				LedgerKey     types.NamespacedName
+				ReservationID string
 			}
 
-			ledgerKey := quantityLedgerKeyForMatchedQuota(base)
+			applied := make([]appliedReservation, 0, len(oldByKey)+len(newByKey))
 
-			objRef := capsulev1beta2.QuantityLedgerObjectRef{
-				APIGroup:   req.Kind.Group,
-				APIVersion: req.Kind.Version,
-				Kind:       req.Kind.Kind,
-				Namespace:  oldObj.GetNamespace(),
-				Name:       oldObj.GetName(),
-				UID:        oldObj.GetUID(),
-			}
+			for _, key := range allKeys(oldByKey, newByKey) {
+				oldItem, hadOld := oldByKey[key]
+				newItem, hadNew := newByKey[key]
 
-			// Old object matched this quota, new object no longer matches:
-			// keep reconciling until the old materialized claim is gone.
-			if hadOld && !hadNew {
-				if err := addLedgerPendingDelete(ctx, c, ledgerKey, objRef); err != nil {
+				var base evaluatedQuota
+				switch {
+				case hadNew:
+					base = newItem
+				case hadOld:
+					base = oldItem
+				default:
+					continue
+				}
+
+				targetUsage := resource.MustParse("0")
+				if hadNew {
+					targetUsage = newItem.Usage.DeepCopy()
+				}
+
+				ledgerKey := quantityLedgerKeyForMatchedQuota(base)
+
+				var pendingDelete *capsulev1beta2.QuantityLedgerObjectRef
+				if hadOld && !hadNew {
+					objRef := capsulev1beta2.QuantityLedgerObjectRef{
+						APIGroup:   req.Kind.Group,
+						APIVersion: req.Kind.Version,
+						Kind:       req.Kind.Kind,
+						Namespace:  oldObj.GetNamespace(),
+						Name:       oldObj.GetName(),
+						UID:        oldObj.GetUID(),
+					}
+					pendingDelete = &objRef
+				}
+
+				reservation := buildReservation(req, newObj, targetUsage)
+
+				allowed, effectiveUsed, reserved, err := mutateLedger(
+					ctx,
+					c,
+					base,
+					&reservation,
+					pendingDelete,
+				)
+				if err != nil {
+					for _, a := range applied {
+						_ = deleteLedgerReservation(ctx, c, a.LedgerKey, a.ReservationID)
+					}
+					return err
+				}
+
+				if !allowed {
 					for _, a := range applied {
 						_ = deleteLedgerReservation(ctx, c, a.LedgerKey, a.ReservationID)
 					}
 
-					return ad.ErroredResponse(err)
+					available := base.Limit.DeepCopy()
+					available.Sub(effectiveUsed)
+					if available.Sign() < 0 {
+						available = resource.MustParse("0")
+					}
+
+					resp := admission.Denied(
+						fmt.Sprintf(
+							"updating resource exceeds limit for %s %q (requested=%s, currentUsed=%s, available=%s, limit=%s, inflightReserved=%s)",
+							quotaTypeName(base.IsGlobal),
+							base.Name,
+							targetUsage.String(),
+							effectiveUsed.String(),
+							available.String(),
+							base.Limit.String(),
+							reserved.String(),
+						),
+					)
+					finalResp = &resp
+					return nil
 				}
+
+				applied = append(applied, appliedReservation{
+					LedgerKey:     ledgerKey,
+					ReservationID: reservation.ID,
+				})
 			}
 
-			reservation := buildReservation(req, newObj, targetUsage)
-
-			allowed, effectiveUsed, reserved, err := upsertLedgerReservation(
-				ctx,
-				c,
-				ledgerKey,
-				base.Used,
-				base.Limit,
-				reservation,
-			)
-			if err != nil {
-				for _, a := range applied {
-					_ = deleteLedgerReservation(ctx, c, a.LedgerKey, a.ReservationID)
-				}
-
-				return ad.ErroredResponse(err)
-			}
-
-			if !allowed {
-				for _, a := range applied {
-					_ = deleteLedgerReservation(ctx, c, a.LedgerKey, a.ReservationID)
-				}
-
-				available := base.Limit.DeepCopy()
-
-				available.Sub(effectiveUsed)
-
-				if available.Sign() < 0 {
-					available = resource.MustParse("0")
-				}
-
-				resp := admission.Denied(
-					fmt.Sprintf(
-						"updating resource exceeds limit for %s %q (requested=%s, currentUsed=%s, available=%s, limit=%s, inflightReserved=%s)",
-						quotaTypeName(base.IsGlobal),
-						base.Name,
-						targetUsage.String(),
-						effectiveUsed.String(),
-						available.String(),
-						base.Limit.String(),
-						reserved.String(),
-					),
-				)
-
-				return &resp
-			}
-
-			applied = append(applied, appliedReservation{
-				LedgerKey:     ledgerKey,
-				ReservationID: reservation.ID,
-			})
+			finalResp = nil
+			return nil
+		})
+		if err != nil {
+			return ad.ErroredResponse(err)
 		}
 
-		return nil
+		return finalResp
 	}
 }
 
@@ -768,22 +784,25 @@ func (h *objectCalculationHandler) evaluateMatchedQuotas(
 
 	return out, nil
 }
-
-func upsertLedgerReservation(
+func mutateLedger(
 	ctx context.Context,
 	c client.Client,
-	ledgerKey types.NamespacedName,
-	persistedUsed resource.Quantity,
-	limit resource.Quantity,
-	reservation capsulev1beta2.QuantityLedgerReservation,
+	item evaluatedQuota,
+	reservation *capsulev1beta2.QuantityLedgerReservation,
+	pendingDelete *capsulev1beta2.QuantityLedgerObjectRef,
 ) (bool, resource.Quantity, resource.Quantity, error) {
 	var allowed bool
-
 	var effectiveUsed resource.Quantity
-
 	var reserved resource.Quantity
 
+	ledgerKey := quantityLedgerKeyForMatchedQuota(item)
+
 	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		latestUsed, err := latestPersistedUsedForQuota(ctx, c, item)
+		if err != nil {
+			return err
+		}
+
 		ledger := &capsulev1beta2.QuantityLedger{}
 		if err := c.Get(ctx, ledgerKey, ledger); err != nil {
 			return err
@@ -791,53 +810,68 @@ func upsertLedgerReservation(
 
 		now := metav1.Now()
 
-		active := make([]capsulev1beta2.QuantityLedgerReservation, 0, len(ledger.Status.Reservations))
-		found := false
+		activeReservations := make([]capsulev1beta2.QuantityLedgerReservation, 0, len(ledger.Status.Reservations))
+		foundReservation := false
 
 		for _, existing := range ledger.Status.Reservations {
 			if existing.ExpiresAt != nil && existing.ExpiresAt.Before(&now) {
 				continue
 			}
 
-			if existing.ID == reservation.ID {
+			if reservation != nil && existing.ID == reservation.ID {
 				existing.Usage = reservation.Usage.DeepCopy()
 				existing.ObjectRef = reservation.ObjectRef
 				existing.UpdatedAt = now
 				existing.ExpiresAt = reservation.ExpiresAt
-				found = true
+				foundReservation = true
 			}
 
-			active = append(active, existing)
+			activeReservations = append(activeReservations, existing)
 		}
 
-		if !found {
-			active = append(active, reservation)
+		if reservation != nil && !foundReservation {
+			activeReservations = append(activeReservations, *reservation)
+		}
+
+		activeDeletes := make([]capsulev1beta2.QuantityLedgerPendingDelete, 0, len(ledger.Status.PendingDeletes))
+		activeDeletes = append(activeDeletes, ledger.Status.PendingDeletes...)
+
+		if pendingDelete != nil {
+			exists := false
+			for _, pd := range activeDeletes {
+				if pd.ObjectRef.UID != "" && pd.ObjectRef.UID == pendingDelete.UID {
+					exists = true
+					break
+				}
+			}
+			if !exists {
+				activeDeletes = append(activeDeletes, capsulev1beta2.QuantityLedgerPendingDelete{
+					ObjectRef: *pendingDelete,
+					CreatedAt: now,
+				})
+			}
 		}
 
 		newReserved := resource.MustParse("0")
-
-		for _, r := range active {
+		for _, r := range activeReservations {
 			newReserved.Add(r.Usage)
 		}
 
-		newEffectiveUsed := persistedUsed.DeepCopy()
-
+		newEffectiveUsed := latestUsed.DeepCopy()
 		newEffectiveUsed.Add(newReserved)
-
 		if newEffectiveUsed.Sign() < 0 {
 			newEffectiveUsed = resource.MustParse("0")
 		}
 
-		if newEffectiveUsed.Cmp(limit) > 0 {
+		if newEffectiveUsed.Cmp(item.Limit) > 0 {
 			allowed = false
 			effectiveUsed = newEffectiveUsed
 			reserved = newReserved
-
 			return nil
 		}
 
-		ledger.Status.Reservations = active
-
+		ledger.Status.Reservations = activeReservations
+		ledger.Status.PendingDeletes = activeDeletes
 		ledger.Status.Reserved = newReserved
 
 		if err := c.Status().Update(ctx, ledger); err != nil {
@@ -845,15 +879,35 @@ func upsertLedgerReservation(
 		}
 
 		allowed = true
-
 		effectiveUsed = newEffectiveUsed
-
 		reserved = newReserved
-
 		return nil
 	})
 
 	return allowed, effectiveUsed, reserved, err
+}
+
+func latestPersistedUsedForQuota(
+	ctx context.Context,
+	c client.Client,
+	item evaluatedQuota,
+) (resource.Quantity, error) {
+	if item.IsGlobal {
+		obj := &capsulev1beta2.GlobalCustomQuota{}
+		if err := c.Get(ctx, types.NamespacedName{Name: item.Name}, obj); err != nil {
+			return resource.Quantity{}, err
+		}
+		return obj.Status.Usage.Used.DeepCopy(), nil
+	}
+
+	obj := &capsulev1beta2.CustomQuota{}
+	if err := c.Get(ctx, types.NamespacedName{
+		Name:      item.Name,
+		Namespace: item.Namespace,
+	}, obj); err != nil {
+		return resource.Quantity{}, err
+	}
+	return obj.Status.Usage.Used.DeepCopy(), nil
 }
 
 func addLedgerPendingDelete(
