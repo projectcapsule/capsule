@@ -19,7 +19,6 @@ func (o NamespacedObjectUIDReference) Field() string {
 	return ObjectUIDIndexerFieldName
 }
 
-//nolint:forcetypeassert
 func (o NamespacedObjectUIDReference) Func() client.IndexerFunc {
 	return func(object client.Object) []string {
 		tr := object.(*capsulev1beta2.CustomQuota) //nolint:forcetypeassert

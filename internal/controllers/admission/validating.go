@@ -91,7 +91,7 @@ func (r *validatingReconciler) reconcileValidatingConfiguration(
 	ctx context.Context,
 	cfg *capsulev1beta2.DynamicValidatingAdmissionConfig,
 ) error {
-	desiredName := string(cfg.DynamicAdmissionConfig.Name)
+	desiredName := string(cfg.Name)
 
 	hooks, err := r.validatingWebhooks(ctx, cfg)
 	if err != nil {
@@ -120,7 +120,7 @@ func (r *validatingReconciler) reconcileValidatingConfiguration(
 			APIVersion: admissionv1.SchemeGroupVersion.String(),
 			Kind:       "ValidatingWebhookConfiguration",
 		},
-		ObjectMeta: metav1.ObjectMeta{Name: string(cfg.DynamicAdmissionConfig.Name)},
+		ObjectMeta: metav1.ObjectMeta{Name: string(cfg.Name)},
 		Webhooks:   hooks,
 	}
 
@@ -131,7 +131,7 @@ func (r *validatingReconciler) reconcileValidatingConfiguration(
 		labels = make(map[string]string)
 	}
 
-	maps.Copy(labels, cfg.DynamicAdmissionConfig.Labels)
+	maps.Copy(labels, cfg.Labels)
 
 	labels[meta.CreatedByCapsuleLabel] = meta.ValueController
 
@@ -142,7 +142,7 @@ func (r *validatingReconciler) reconcileValidatingConfiguration(
 		annotations = make(map[string]string)
 	}
 
-	maps.Copy(annotations, cfg.DynamicAdmissionConfig.Annotations)
+	maps.Copy(annotations, cfg.Annotations)
 
 	obj.SetAnnotations(annotations)
 
@@ -202,7 +202,7 @@ func (r *validatingReconciler) validatingWebhooks(
 	cfg *capsulev1beta2.DynamicValidatingAdmissionConfig,
 ) (hooks []admissionv1.ValidatingWebhook, err error) {
 	for _, hook := range cfg.Webhooks {
-		h, err := admission.NewValidatingWebhook(hook, cfg.DynamicAdmissionConfig.Client, r.configuration.Users(), r.configuration.Administrators())
+		h, err := admission.NewValidatingWebhook(hook, cfg.Client, r.configuration.Users(), r.configuration.Administrators())
 		if err != nil {
 			return nil, err
 		}

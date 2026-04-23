@@ -29,7 +29,6 @@ func DynamicClientWithPath(
 	in admissionregistrationv1.WebhookClientConfig,
 	webhookPath string,
 ) admissionregistrationv1.WebhookClientConfig {
-
 	out := in // shallow copy (safe)
 
 	cleanPath := normalizePath(webhookPath)
@@ -41,6 +40,7 @@ func DynamicClientWithPath(
 	if out.URL != nil && *out.URL != "" {
 		u := strings.TrimRight(*out.URL, "/") + cleanPath
 		out.URL = &u
+
 		return out
 	}
 

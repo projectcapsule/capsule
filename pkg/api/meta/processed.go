@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Project Capsule Authors
+// Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package meta
@@ -38,7 +38,7 @@ func (p *ProcessedItems) RemoveItem(item ObjectReferenceStatus) {
 }
 
 // Removes a condition by type.
-// Returns actual item pointer, not a copy
+// Returns actual item pointer, not a copy.
 func (p *ProcessedItems) GetItem(ref gvk.ResourceID) *ObjectReferenceStatus {
 	for i := range *p {
 		if (*p)[i].ResourceID == ref {

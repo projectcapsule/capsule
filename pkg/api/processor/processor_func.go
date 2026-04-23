@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Project Capsule Authors
+// Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package processor
@@ -30,7 +30,7 @@ func (p *Processor) Reconcile(
 	acc Accumulator,
 	opts ProcessorOptions,
 ) (err error) {
-	var itemErrors = 0
+	itemErrors := 0
 
 	log.V(5).Info("starting pruning items", "present", len(*processed))
 
@@ -178,7 +178,7 @@ func (p *Processor) Reconcile(
 }
 
 // Prune by reverting the patch by the given fieldOwner
-// If the item was created by the controller and has no more field-managers we are going to delete
+// If the item was created by the controller and has no more field-managers we are going to delete.
 func (r *Processor) Prune(
 	ctx context.Context,
 	c client.Client,
@@ -247,7 +247,7 @@ func (r *Processor) Prune(
 	return false, err
 }
 
-// Completely prune the resource when there's no more managers and the resource was created by the controller
+// Completely prune the resource when there's no more managers and the resource was created by the controller.
 func (r *Processor) handlePruneDeletion(
 	ctx context.Context,
 	c client.Client,
@@ -276,7 +276,7 @@ func (r *Processor) handlePruneDeletion(
 }
 
 // Remove metadata from the controller when an object
-// is not pruned
+// is not pruned.
 func (r *Processor) handleRemoveManagedMetadata(
 	ctx context.Context,
 	c client.Client,
@@ -290,6 +290,7 @@ func (r *Processor) handleRemoveManagedMetadata(
 		if apierrors.IsNotFound(err) {
 			return nil, nil
 		}
+
 		return nil, err
 	}
 
@@ -364,6 +365,7 @@ func (r *Processor) Apply(
 
 	// Apply metadata patches if needed
 	log.V(4).Info("applying patches", "items", len(patches))
+
 	if len(patches) > 0 {
 		if err := clt.ApplyPatches(ctx, c, actual, patches, meta.ResourceControllerFieldOwnerPrefix()); err != nil {
 			return nil, created, err

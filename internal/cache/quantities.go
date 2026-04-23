@@ -56,6 +56,7 @@ func (c *QuantityCache[K]) Get(key K) (QuantityEntry, bool) {
 	c.mu.RLock()
 	entry, ok := c.data[key]
 	c.mu.RUnlock()
+
 	if !ok {
 		return QuantityEntry{}, false
 	}
@@ -138,6 +139,7 @@ func (c *QuantityCache[K]) UpsertReservation(
 
 		effectiveUsed = persistedUsed.DeepCopy()
 		effectiveUsed.Add(current.Reserved)
+
 		if effectiveUsed.Sign() < 0 {
 			effectiveUsed = resource.MustParse("0")
 		}
@@ -165,6 +167,7 @@ func (c *QuantityCache[K]) UpsertReservation(
 		if hadPrevious {
 			return previous.CreatedAt
 		}
+
 		return now
 	}()
 	reservation.UpdatedAt = now
@@ -175,6 +178,7 @@ func (c *QuantityCache[K]) UpsertReservation(
 
 	newUsed := persistedUsed.DeepCopy()
 	newUsed.Add(newReserved)
+
 	if newUsed.Sign() < 0 {
 		newUsed = resource.MustParse("0")
 	}
@@ -182,9 +186,11 @@ func (c *QuantityCache[K]) UpsertReservation(
 	if newUsed.Cmp(limit) > 0 {
 		effectiveUsed = persistedUsed.DeepCopy()
 		effectiveUsed.Add(current.Reserved)
+
 		if effectiveUsed.Sign() < 0 {
 			effectiveUsed = resource.MustParse("0")
 		}
+
 		return false, effectiveUsed, copyEntry(current)
 	}
 
@@ -195,10 +201,12 @@ func (c *QuantityCache[K]) UpsertReservation(
 
 	if current.Reserved.IsZero() && len(current.PendingDeletes) == 0 {
 		delete(c.data, key)
+
 		return true, newUsed, QuantityEntry{}
 	}
 
 	c.data[key] = current
+
 	return true, newUsed, copyEntry(current)
 }
 
@@ -224,10 +232,12 @@ func (c *QuantityCache[K]) DeleteReservation(key K, reservationID string) bool {
 
 	if current.Reserved.IsZero() && len(current.PendingDeletes) == 0 {
 		delete(c.data, key)
+
 		return true
 	}
 
 	c.data[key] = current
+
 	return true
 }
 
@@ -246,9 +256,11 @@ func (c *QuantityCache[K]) PurgeReservationsForKey(
 	}
 
 	deleted := 0
+
 	for id, r := range entry.Reservations {
 		if shouldDelete(r) {
 			delete(entry.Reservations, id)
+
 			deleted++
 		}
 	}
@@ -264,10 +276,12 @@ func (c *QuantityCache[K]) PurgeReservationsForKey(
 
 	if entry.Reserved.IsZero() && len(entry.PendingDeletes) == 0 {
 		delete(c.data, key)
+
 		return deleted
 	}
 
 	c.data[key] = entry
+
 	return deleted
 }
 
@@ -326,10 +340,12 @@ func (c *QuantityCache[K]) RemovePendingDelete(key K, uid types.UID) bool {
 
 	if current.Reserved.IsZero() && len(current.PendingDeletes) == 0 {
 		delete(c.data, key)
+
 		return true
 	}
 
 	c.data[key] = current
+
 	return true
 }
 
@@ -355,6 +371,7 @@ func (c *QuantityCache[K]) HasPendingDeletes(key K) bool {
 	defer c.mu.RUnlock()
 
 	current, ok := c.data[key]
+
 	return ok && len(current.PendingDeletes) > 0
 }
 
@@ -402,6 +419,7 @@ func indexPendingDelete(in []PendingDeleteHint, uid types.UID) int {
 			return i
 		}
 	}
+
 	return -1
 }
 
@@ -410,8 +428,10 @@ func sumReservations(in map[string]Reservation) resource.Quantity {
 	for _, r := range in {
 		total.Add(r.Usage)
 	}
+
 	if total.Sign() < 0 {
 		total = resource.MustParse("0")
 	}
+
 	return total
 }

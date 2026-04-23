@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Project Capsule Authors
+// Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package customquotas
@@ -15,7 +15,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/events"
@@ -76,7 +75,6 @@ func (r *customQuotaClaimController) SetupWithManager(mgr ctrl.Manager, cfg util
 		Complete(r)
 }
 
-//nolint:dupl
 func (r *customQuotaClaimController) Reconcile(ctx context.Context, request ctrl.Request) (ctrl.Result, error) {
 	log := r.log.WithValues("Request.Name", request.Name, "Request.Namespace", request.Namespace)
 
@@ -85,10 +83,12 @@ func (r *customQuotaClaimController) Reconcile(ctx context.Context, request ctrl
 		if apierrors.IsNotFound(err) {
 			log.V(3).Info("Request object not found, could have been deleted after reconcile request")
 			r.metrics.DeleteAllMetricsForCustomQuota(request.Name, request.Namespace)
+
 			return reconcile.Result{}, nil
 		}
 
 		log.Error(err, "Error reading the object")
+
 		return reconcile.Result{}, err
 	}
 
@@ -146,9 +146,9 @@ func (r *customQuotaClaimController) reconcile(
 
 	for _, src := range instance.Spec.Sources {
 		kind := schema.GroupVersionKind{
-			Group:   src.GroupVersionKind.Group,
-			Version: src.GroupVersionKind.Version,
-			Kind:    src.GroupVersionKind.Kind,
+			Group:   src.Group,
+			Version: src.Version,
+			Kind:    src.Kind,
 		}
 
 		mapping, err := r.mapper.RESTMapping(kind.GroupKind(), kind.Version)
@@ -167,6 +167,7 @@ func (r *customQuotaClaimController) reconcile(
 	}
 
 	var errs []error
+
 	seenClaims := make(map[types.UID]struct{})
 	itemsByGVK := make(map[schema.GroupVersionKind][]unstructured.Unstructured, len(instance.Status.Targets))
 
@@ -179,9 +180,9 @@ func (r *customQuotaClaimController) reconcile(
 
 	for _, target := range targets {
 		gvk := schema.GroupVersionKind{
-			Group:   target.GroupVersionKind.Group,
-			Version: target.GroupVersionKind.Version,
-			Kind:    target.GroupVersionKind.Kind,
+			Group:   target.Group,
+			Version: target.Version,
+			Kind:    target.Kind,
 		}
 
 		items, ok := itemsByGVK[gvk]
@@ -189,6 +190,7 @@ func (r *customQuotaClaimController) reconcile(
 			items, err = getResourcesByGVK(ctx, gvk, r.Client, instance.Spec.ScopeSelectors, instance.Namespace)
 			if err != nil {
 				errs = append(errs, fmt.Errorf("list resources for %s: %w", gvk.String(), err))
+
 				continue
 			}
 
@@ -212,8 +214,10 @@ func (r *customQuotaClaimController) reconcile(
 					item.GetObjectKind().GroupVersionKind().String(),
 					err,
 				))
+
 				continue
 			}
+
 			if !matches {
 				continue
 			}
@@ -236,6 +240,7 @@ func (r *customQuotaClaimController) reconcile(
 						target.Operation,
 						err,
 					))
+
 					continue
 				}
 
@@ -247,6 +252,7 @@ func (r *customQuotaClaimController) reconcile(
 					item.GetName(),
 					item.GetObjectKind().GroupVersionKind().String(),
 				))
+
 				continue
 			}
 
@@ -259,9 +265,10 @@ func (r *customQuotaClaimController) reconcile(
 				instance.Status.Usage.Used.Add(usage)
 			}
 
-			uid := types.UID(item.GetUID())
+			uid := item.GetUID()
 			if _, exists := seenClaims[uid]; !exists {
 				seenClaims[uid] = struct{}{}
+
 				instance.Status.Claims = append(instance.Status.Claims, capsulev1beta2.CustomQuotaClaimItem{
 					GroupVersionKind: metav1.GroupVersionKind(item.GroupVersionKind()),
 					NamespacedObjectWithUIDReference: meta.NamespacedObjectWithUIDReference{
@@ -281,6 +288,7 @@ func (r *customQuotaClaimController) reconcile(
 
 	instance.Status.Usage.Available = instance.Spec.Limit.DeepCopy()
 	instance.Status.Usage.Available.Sub(instance.Status.Usage.Used)
+
 	if instance.Status.Usage.Available.Sign() < 0 {
 		instance.Status.Usage.Available = resource.MustParse("0")
 	}
@@ -291,6 +299,7 @@ func (r *customQuotaClaimController) reconcile(
 
 	return nil
 }
+
 func (r *customQuotaClaimController) reconcileLedger(
 	ctx context.Context,
 	log logr.Logger,
@@ -325,6 +334,7 @@ func (r *customQuotaClaimController) reconcileLedger(
 		pendingDeleteTTL := 30 * time.Second
 
 		activeReservations := make([]capsulev1beta2.QuantityLedgerReservation, 0, len(ledger.Status.Reservations))
+
 		for _, res := range ledger.Status.Reservations {
 			materialized := reservationMaterializedLedger(res, instance.Status.Claims)
 			expired := res.ExpiresAt != nil && res.ExpiresAt.Before(&now)
@@ -355,6 +365,7 @@ func (r *customQuotaClaimController) reconcileLedger(
 		}
 
 		activeDeletes := make([]capsulev1beta2.QuantityLedgerPendingDelete, 0, len(ledger.Status.PendingDeletes))
+
 		for _, pd := range ledger.Status.PendingDeletes {
 			stillPresent := pendingDeleteStillPresent(pd, instance.Status.Claims)
 			expired := now.Sub(pd.CreatedAt.Time) >= pendingDeleteTTL
@@ -397,6 +408,7 @@ func (r *customQuotaClaimController) reconcileLedger(
 		}
 
 		seenUIDs := make(map[types.UID]struct{}, len(instance.Status.Claims))
+
 		for _, claim := range instance.Status.Claims {
 			if claim.UID != "" {
 				seenUIDs[claim.UID] = struct{}{}
@@ -410,6 +422,7 @@ func (r *customQuotaClaimController) reconcileLedger(
 				if _, exists := seenUIDs[res.ObjectRef.UID]; exists {
 					continue
 				}
+
 				seenUIDs[res.ObjectRef.UID] = struct{}{}
 			}
 
@@ -442,7 +455,6 @@ func (r *customQuotaClaimController) reconcileLedger(
 
 		return nil
 	})
-
 	if err != nil {
 		return nil, err
 	}
@@ -489,7 +501,6 @@ func (r *customQuotaClaimController) ensureQuotaLedger(
 func (r *customQuotaClaimController) emitMetrics(
 	instance *capsulev1beta2.CustomQuota,
 ) {
-
 	// Condition Metrics
 	for _, status := range []string{meta.ReadyCondition} {
 		var value float64
@@ -533,7 +544,6 @@ func (r *customQuotaClaimController) emitMetrics(
 			claim.Group,
 		).Set(float64(claim.Usage.MilliValue()) / 1000)
 	}
-
 }
 
 func (r *customQuotaClaimController) updateStatus(

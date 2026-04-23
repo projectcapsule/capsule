@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Project Capsule Authors
+// Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package cache
@@ -24,9 +24,6 @@ type Key struct {
 type ImpersonationCache struct {
 	mu      sync.RWMutex
 	clients map[Key]client.Client
-
-	baseMu   sync.RWMutex
-	baseREST *rest.Config
 }
 
 func NewImpersonationCache() *ImpersonationCache {
@@ -100,6 +97,7 @@ func (c *ImpersonationCache) LoadOrCreate(
 	)
 	if err != nil {
 		log.Error(err, "failed to create impersonated client", "namespace", key.Namespace, "name", key.Name)
+
 		return nil, err
 	}
 

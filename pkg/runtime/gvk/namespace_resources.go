@@ -5,6 +5,7 @@ package gvk
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -53,11 +54,5 @@ func NamespacedListableResources(resourceLists []*metav1.APIResourceList) ([]sch
 }
 
 func SupportsVerb(verbs metav1.Verbs, want string) bool {
-	for _, v := range verbs {
-		if v == want {
-			return true
-		}
-	}
-
-	return false
+	return slices.Contains(verbs, want)
 }

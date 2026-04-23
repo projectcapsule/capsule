@@ -32,6 +32,7 @@ func (h *globalCustomQuotaValidationHandler) OnCreate(_ client.Client, decoder a
 
 		if err := quota.ValidateQuantity(q.Spec.Limit); err != nil {
 			response := admission.Denied(fmt.Sprintf("invalid spec.limit: %v", err))
+
 			return &response
 		}
 
@@ -60,6 +61,7 @@ func (h *globalCustomQuotaValidationHandler) OnUpdate(_ client.Client, decoder a
 
 		if err := quota.ValidateQuantity(newQuota.Spec.Limit); err != nil {
 			response := admission.Denied(fmt.Sprintf("invalid spec.limit: %v", err))
+
 			return &response
 		}
 
@@ -85,6 +87,7 @@ func (h *globalCustomQuotaValidationHandler) OnUpdate(_ client.Client, decoder a
 						newQuota.Spec.Limit.String(),
 					),
 				)
+
 				return &response
 			}
 		}

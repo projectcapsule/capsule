@@ -23,6 +23,7 @@ func PatchApply(
 		opts = append(opts, client.ForceOwnership)
 	}
 
+	//nolint:staticcheck
 	return c.Patch(ctx, obj, client.Apply, opts...)
 }
 

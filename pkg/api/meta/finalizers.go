@@ -28,6 +28,7 @@ func FilterFinalizers(finalizers []string, ignored map[string]struct{}) (remaini
 	for _, f := range finalizers {
 		if _, ok := ignored[f]; ok {
 			remaining = append(remaining, f)
+
 			continue
 		}
 

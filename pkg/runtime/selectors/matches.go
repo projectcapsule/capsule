@@ -9,7 +9,7 @@ import (
 )
 
 // Attempt so verify multiple selector objects against a labels.Set
-// If selectors are not set, it is always considered a match
+// If selectors are not set, it is always considered a match.
 func MatchesSelectors(objLabels labels.Set, selectors []metav1.LabelSelector) bool {
 	if len(selectors) == 0 {
 		return true

@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Project Capsule Authors
+// Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package customquotas
@@ -56,11 +56,12 @@ func CompileTargets(
 				return nil, fmt.Errorf(
 					"compile usage path %q for %s %q: %w",
 					target.Path,
-					target.GroupVersionKind.String(),
+					target.String(),
 					target.Operation,
 					err,
 				)
 			}
+
 			pt.CompiledPath = compiledPath
 		}
 
@@ -68,10 +69,11 @@ func CompileTargets(
 		if err != nil {
 			return nil, fmt.Errorf(
 				"compile selectors for %s: %w",
-				target.GroupVersionKind.String(),
+				target.String(),
 				err,
 			)
 		}
+
 		pt.CompiledSelectors = compiledSelectors
 
 		out = append(out, pt)
@@ -96,13 +98,16 @@ func MatchesCompiledSelectorsWithFields(
 		}
 
 		allFieldsMatch := true
+
 		for _, matcher := range sel.FieldMatchers {
 			ok, err := jsonpath.EvaluateTruthyFromCompiled(u, matcher)
 			if err != nil {
 				return false, err
 			}
+
 			if !ok {
 				allFieldsMatch = false
+
 				break
 			}
 		}
@@ -135,20 +140,24 @@ func CompileSelectorsWithFields(
 
 	for _, selector := range in {
 		lblSel := labels.Everything()
+
 		if selector.LabelSelector != nil {
 			compiled, err := metav1.LabelSelectorAsSelector(selector.LabelSelector)
 			if err != nil {
 				return nil, fmt.Errorf("compile label selector with fields: %w", err)
 			}
+
 			lblSel = compiled
 		}
 
 		fieldMatchers := make([]*jsonpath.CompiledJSONPath, 0, len(selector.FieldSelectors))
+
 		for _, path := range selector.FieldSelectors {
 			compiledPath, err := cache.GetOrCompile(path)
 			if err != nil {
 				return nil, fmt.Errorf("compile field selector path %q: %w", path, err)
 			}
+
 			fieldMatchers = append(fieldMatchers, compiledPath)
 		}
 
@@ -169,11 +178,13 @@ func getResourcesByGVK(
 	namespaces ...string,
 ) ([]unstructured.Unstructured, error) {
 	compiledSelectors := make([]labels.Selector, 0, len(scopeSelectors))
+
 	for _, selector := range scopeSelectors {
 		sel, err := metav1.LabelSelectorAsSelector(&selector)
 		if err != nil {
 			return nil, err
 		}
+
 		compiledSelectors = append(compiledSelectors, sel)
 	}
 
@@ -184,11 +195,13 @@ func getResourcesByGVK(
 		if ns == "*" {
 			filterByNamespace = false
 			namespaceSet = nil
+
 			break
 		}
 
 		namespaceSet[ns] = struct{}{}
 	}
+
 	list := &unstructured.UnstructuredList{}
 	list.SetGroupVersionKind(schema.GroupVersionKind{
 		Group:   gvk.Group,
@@ -224,9 +237,11 @@ func getResourcesByGVK(
 			itemLabels := labels.Set(item.GetLabels())
 
 			matched := false
+
 			for _, sel := range compiledSelectors {
 				if sel.Matches(itemLabels) {
 					matched = true
+
 					break
 				}
 			}
@@ -246,6 +261,7 @@ func getResourcesByGVK(
 		}
 
 		seen[key] = struct{}{}
+
 		items = append(items, item)
 	}
 
@@ -261,8 +277,10 @@ func minDurationPtr(cur *time.Duration, cand time.Duration) *time.Duration {
 	if cand < 0 {
 		cand = 0
 	}
+
 	if cur == nil || cand < *cur {
 		return &cand
 	}
+
 	return cur
 }

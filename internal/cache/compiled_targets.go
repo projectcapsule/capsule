@@ -1,3 +1,6 @@
+// Copyright 2020-2026 Project Capsule Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package cache
 
 import (
@@ -56,9 +59,11 @@ func (c *CompiledTargetsCache[K]) GetOrBuild(key K, build func() ([]CompiledTarg
 	c.mu.RLock()
 	v, ok := c.data[key]
 	c.mu.RUnlock()
+
 	if ok {
 		out := make([]CompiledTarget, len(v))
 		copy(out, v)
+
 		return out, nil
 	}
 
@@ -68,6 +73,7 @@ func (c *CompiledTargetsCache[K]) GetOrBuild(key K, build func() ([]CompiledTarg
 	if v, ok := c.data[key]; ok {
 		out := make([]CompiledTarget, len(v))
 		copy(out, v)
+
 		return out, nil
 	}
 
@@ -95,6 +101,7 @@ func (c *CompiledTargetsCache[K]) Delete(key K) bool {
 	if ok {
 		delete(c.data, key)
 	}
+
 	return ok
 }
 

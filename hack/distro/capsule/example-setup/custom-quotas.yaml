@@ -32,7 +32,7 @@ spec:
   limit: 5
   namespaceSelectors:
   - matchLabels:
-      capsule.clastix.io/tenant: wdin
+      capsule.clastix.io/tenant: wind
   sources:
   - group: ""
     kind: Pod
@@ -43,17 +43,4 @@ spec:
     kind: Pod
     op: add
     path: .spec.initContainers[*].resources.limits.cpu
-    version: v1
----
-apiVersion: capsule.clastix.io/v1beta2
-kind: CustomQuota
-metadata:
-  name: pod-count-limit
-  namespace: wind-test
-spec:
-  limit: 3
-  sources:
-  - group: ""
-    kind: Pod
-    op: count
     version: v1

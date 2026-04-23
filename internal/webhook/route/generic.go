@@ -9,9 +9,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
 
-type replicasResourcesHandler struct {
-	handlers []handlers.Handler
-}
+type replicasResourcesHandler struct{}
 
 func GenericReplicasHandler() handlers.Webhook {
 	return &replicasResourcesHandler{}
@@ -43,19 +41,19 @@ func (w *genericCustomResourcesHandler) GetPath() string {
 	return "/generic/customresources"
 }
 
-type genericTenantAssignment struct {
+type genericMetadataAssignment struct {
 	handlers []handlers.Handler
 }
 
 func GenericTenantAssignment(handlers ...handlers.Handler) handlers.Webhook {
-	return &genericTenantAssignment{handlers: handlers}
+	return &genericMetadataAssignment{handlers: handlers}
 }
 
-func (w genericTenantAssignment) GetPath() string {
-	return "/generic/tenant-label"
+func (w genericMetadataAssignment) GetPath() string {
+	return "/generic/metadata"
 }
 
-func (w genericTenantAssignment) GetHandlers() []handlers.Handler {
+func (w genericMetadataAssignment) GetHandlers() []handlers.Handler {
 	return w.handlers
 }
 
@@ -75,20 +73,4 @@ func (t miscManagedValidation) GetHandlers() []handlers.Handler {
 	return []handlers.Handler{
 		generic.ManagedValidatingHandler(t.configuration),
 	}
-}
-
-type customQuotasHandler struct {
-	handlers []handlers.Handler
-}
-
-func GenericCustomQuotas(handler ...handlers.Handler) handlers.Webhook {
-	return &customQuotasHandler{handlers: handler}
-}
-
-func (w *customQuotasHandler) GetHandlers() []handlers.Handler {
-	return w.handlers
-}
-
-func (w *customQuotasHandler) GetPath() string {
-	return "/generic/custom-quota"
 }

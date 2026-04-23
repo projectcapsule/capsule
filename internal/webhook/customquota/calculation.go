@@ -67,6 +67,7 @@ func (h *objectCalculationHandler) OnCreate(c client.Client, decoder admission.D
 		if err != nil {
 			return ad.ErroredResponse(err)
 		}
+
 		if len(matched) == 0 {
 			return nil
 		}
@@ -95,11 +96,11 @@ func (h *objectCalculationHandler) OnCreate(c client.Client, decoder admission.D
 				item.Limit,
 				reservation,
 			)
-
 			if err != nil {
 				for _, a := range applied {
 					_ = deleteLedgerReservation(ctx, c, a.LedgerKey, a.ReservationID)
 				}
+
 				return ad.ErroredResponse(err)
 			}
 
@@ -194,6 +195,7 @@ func (h *objectCalculationHandler) OnUpdate(c client.Client, _ admission.Decoder
 				newItem, ok := newByKey[key]
 				if !ok || oldItem.Usage.Cmp(newItem.Usage) != 0 {
 					relevantChange = true
+
 					break
 				}
 			}
@@ -270,6 +272,7 @@ func (h *objectCalculationHandler) OnUpdate(c client.Client, _ admission.Decoder
 
 				return ad.ErroredResponse(err)
 			}
+
 			if !allowed {
 				for _, a := range applied {
 					_ = deleteLedgerReservation(ctx, c, a.LedgerKey, a.ReservationID)
@@ -387,6 +390,7 @@ func deleteLedgerReservation(
 		}
 
 		active := make([]capsulev1beta2.QuantityLedgerReservation, 0, len(ledger.Status.Reservations))
+
 		for _, res := range ledger.Status.Reservations {
 			if res.ID == reservationID {
 				continue
@@ -535,9 +539,9 @@ func (h *objectCalculationHandler) matchCustomQuotas(
 		}
 
 		for i, target := range compiledTargets {
-			if target.GroupVersionKind.Group != req.Kind.Group ||
-				target.GroupVersionKind.Version != req.Kind.Version ||
-				target.GroupVersionKind.Kind != req.Kind.Kind {
+			if target.Group != req.Kind.Group ||
+				target.Version != req.Kind.Version ||
+				target.Kind != req.Kind.Kind {
 				continue
 			}
 
@@ -563,7 +567,7 @@ func (h *objectCalculationHandler) matchCustomQuotas(
 				Namespace:    cq.Namespace,
 				Path:         target.Path,
 				CompiledPath: target.CompiledPath,
-				Operation:    quota.Operation(target.Operation),
+				Operation:    target.Operation,
 				Limit:        cq.Spec.Limit.DeepCopy(),
 				Used:         cq.Status.Usage.Used.DeepCopy(),
 				IsGlobal:     false,
@@ -613,9 +617,9 @@ func (h *objectCalculationHandler) matchGlobalCustomQuotas(
 		}
 
 		for i, target := range compiledTargets {
-			if target.GroupVersionKind.Group != req.Kind.Group ||
-				target.GroupVersionKind.Version != req.Kind.Version ||
-				target.GroupVersionKind.Kind != req.Kind.Kind {
+			if target.Group != req.Kind.Group ||
+				target.Version != req.Kind.Version ||
+				target.Kind != req.Kind.Kind {
 				continue
 			}
 
@@ -640,7 +644,7 @@ func (h *objectCalculationHandler) matchGlobalCustomQuotas(
 				Namespace:    "",
 				Path:         target.Path,
 				CompiledPath: target.CompiledPath,
-				Operation:    quota.Operation(target.Operation),
+				Operation:    target.Operation,
 				Limit:        gcq.Spec.Limit.DeepCopy(),
 				Used:         gcq.Status.Usage.Used.DeepCopy(),
 				IsGlobal:     true,
@@ -683,6 +687,7 @@ func quotaTypeName(global bool) string {
 
 type evaluatedQuota struct {
 	quota.MatchedQuota
+
 	Usage resource.Quantity
 }
 
@@ -742,6 +747,7 @@ func (h *objectCalculationHandler) evaluateMatchedQuotas(
 			ev.Usage.Add(usage)
 			quota.ClampQuantityToZero(&ev.Usage)
 			byKey[mq.Key] = ev
+
 			continue
 
 		case quota.OpAdd:
@@ -762,6 +768,7 @@ func (h *objectCalculationHandler) evaluateMatchedQuotas(
 
 	return out, nil
 }
+
 func upsertLedgerReservation(
 	ctx context.Context,
 	c client.Client,
@@ -825,6 +832,7 @@ func upsertLedgerReservation(
 			allowed = false
 			effectiveUsed = newEffectiveUsed
 			reserved = newReserved
+
 			return nil
 		}
 
@@ -889,6 +897,7 @@ func (h *objectCalculationHandler) getOrCompileCustomQuotaTargets(
 				CustomQuotaSpecSource: src,
 			})
 		}
+
 		return controller.CompileTargets(h.jsonPathCache, targets)
 	})
 }
@@ -905,6 +914,7 @@ func (h *objectCalculationHandler) getOrCompileGlobalCustomQuotaTargets(
 				CustomQuotaSpecSource: src,
 			})
 		}
+
 		return controller.CompileTargets(h.jsonPathCache, targets)
 	})
 }
@@ -917,6 +927,7 @@ func evaluatedByKey(in []evaluatedQuota) map[string]evaluatedQuota {
 			copyItem := item
 			copyItem.Usage = item.Usage.DeepCopy()
 			out[item.Key] = copyItem
+
 			continue
 		}
 

@@ -9,7 +9,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/runtime/jsonpath"
 )
 
-// Overlay for Global/Namespace CustomQuotas
+// Overlay for Global/Namespace CustomQuotas.
 type MatchedQuota struct {
 	Key          string
 	Name         string

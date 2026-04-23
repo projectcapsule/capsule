@@ -89,7 +89,6 @@ func (r *GlobalCustomQuotaRecorder) DeleteAllMetricsForGlobalCustomQuota(name st
 	r.ResourceItemUsageGauge.DeletePartialMatch(map[string]string{
 		"custom_quota": name,
 	})
-
 }
 
 func (r *GlobalCustomQuotaRecorder) DeleteConditionMetricByType(name string, condition string) {

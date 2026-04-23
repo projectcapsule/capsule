@@ -30,6 +30,7 @@ import (
 
 type Manager struct {
 	client.Client
+
 	Rest *rest.Config
 
 	configName string
@@ -160,7 +161,7 @@ func (r *Manager) gatherCapsuleUsers(
 	users := cfg.Users()
 
 	toList := &capsulev1beta2.TenantOwnerList{}
-	if err := r.Client.List(ctx, toList); err != nil {
+	if err := r.List(ctx, toList); err != nil {
 		return fmt.Errorf("listing TenantOwner CRs: %w", err)
 	}
 
@@ -188,7 +189,7 @@ func (r *Manager) updateConfigStatus(
 ) error {
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
 		latest := &capsulev1beta2.CapsuleConfiguration{}
-		if err = r.Client.Get(ctx, types.NamespacedName{Name: instance.GetName(), Namespace: instance.GetNamespace()}, latest); err != nil {
+		if err = r.Get(ctx, types.NamespacedName{Name: instance.GetName(), Namespace: instance.GetNamespace()}, latest); err != nil {
 			return err
 		}
 

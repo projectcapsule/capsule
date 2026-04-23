@@ -52,7 +52,7 @@ func (s *NamespaceSelector) GetMatchingNamespaces(
 	return matchingNamespaces, nil
 }
 
-// Takes a list of NamespaceSelectors and returns unique ordered Namespaces
+// Takes a list of NamespaceSelectors and returns unique ordered Namespaces.
 func GetNamespacesMatchingSelectors(
 	ctx context.Context,
 	c client.Reader,

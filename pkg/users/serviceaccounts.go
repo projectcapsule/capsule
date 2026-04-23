@@ -59,12 +59,12 @@ func ResolveServiceAccountActor(
 	return tnt, err
 }
 
-// GetServiceAccountFullName return the full qualified name for the serviceaccount
+// GetServiceAccountFullName return the full qualified name for the serviceaccount.
 func GetServiceAccountFullName(ref meta.NamespacedRFC1123ObjectReferenceWithNamespace) string {
 	return serviceaccount.ServiceAccountUsernamePrefix + string(ref.Namespace) + ":" + string(ref.Name)
 }
 
-// GetServiceAccountGroups returns all groups associated with a ServiceAccount
+// GetServiceAccountGroups returns all groups associated with a ServiceAccount.
 func GetServiceAccountGroups(namespace string) []string {
 	return []string{
 		fmt.Sprintf("%s%s", serviceaccount.ServiceAccountGroupPrefix, namespace),
@@ -88,5 +88,6 @@ func ImpersonatedKubernetesClientForServiceAccount(
 	if err != nil {
 		return nil, fmt.Errorf("failed to create impersonated client: %w", err)
 	}
+
 	return k8sClient, nil
 }

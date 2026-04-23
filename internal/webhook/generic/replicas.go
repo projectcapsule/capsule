@@ -91,6 +91,7 @@ func (h *replicaHandler) handler(ctx context.Context, c client.Reader, req admis
 		}
 
 		resp := admission.Denied(fmt.Sprintf("resource %s is managed by a global capsule replication '%s'", req.Name, global.Items[0].GetName()))
+
 		return &resp
 	}
 
@@ -111,6 +112,7 @@ func (h *replicaHandler) handler(ctx context.Context, c client.Reader, req admis
 		}
 
 		resp := admission.Denied(fmt.Sprintf("resource %s is managed by a tenant capsule replication %s/%s", req.Name, local.Items[0].GetName(), local.Items[0].GetNamespace()))
+
 		return &resp
 	}
 

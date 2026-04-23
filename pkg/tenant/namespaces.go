@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Project Capsule Authors
+// Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package tenant
@@ -12,12 +12,11 @@ import (
 	"golang.org/x/sync/errgroup"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/types"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/selection"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -71,7 +70,7 @@ func NamespaceIsPendingUnmanagedTerminationByStatus(ctx context.Context, c clien
 }
 
 // First deletes (remove finalizers and deleted) all resources which are not managed by capsule
-// Once fullfilled, remove all managed resources
+// Once fulfilled, remove all managed resources.
 func NamespacedCascadingCleanup(
 	ctx context.Context,
 	c client.Reader,
@@ -124,8 +123,6 @@ func removeFinalizersFromRemainingNamespacedResources(
 	// g.SetLimit(8)
 
 	for _, gvr := range gvrs {
-		gvr := gvr
-
 		g.Go(func() error {
 			cleaned, err := processResourceType(ctx, dyn, gvr, namespace, ignored)
 
@@ -161,10 +158,12 @@ func processResourceType(
 		if apierrors.IsNotFound(err) || apierrors.IsMethodNotSupported(err) {
 			return false, nil
 		}
+
 		return false, fmt.Errorf("list %s in namespace %q: %w", gvr.String(), namespace, err)
 	}
 
 	var errs []error
+
 	cleanedAny := false
 
 	for i := range list.Items {
@@ -185,6 +184,7 @@ func processResourceType(
 						obj.GetName(),
 						err,
 					))
+
 					continue
 				}
 			} else {
@@ -220,6 +220,7 @@ func processResourceType(
 					obj.GetName(),
 					err,
 				))
+
 				continue
 			}
 		} else {
@@ -230,17 +231,6 @@ func processResourceType(
 	return cleanedAny, errors.Join(errs...)
 }
 
-func hasNamespaceConditionTrue(ns *corev1.Namespace, t corev1.NamespaceConditionType) bool {
-	for _, c := range ns.Status.Conditions {
-		if c.Type == t && c.Status == corev1.ConditionTrue {
-			return true
-		}
-	}
-
-	return false
-}
-
-//nolint:gocognit
 func CollectTenantNamespaceByLabel(
 	ctx context.Context,
 	c client.Client,

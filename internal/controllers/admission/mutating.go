@@ -186,7 +186,7 @@ func (r *mutatingReconciler) webhooks(
 	cfg *capsulev1beta2.DynamicMutatingAdmissionConfig,
 ) (hooks []admissionv1.MutatingWebhook, err error) {
 	for _, hook := range cfg.Webhooks {
-		h, err := admission.NewMutatingWebhook(hook, cfg.DynamicAdmissionConfig.Client, r.configuration.Users(), r.configuration.Administrators())
+		h, err := admission.NewMutatingWebhook(hook, cfg.Client, r.configuration.Users(), r.configuration.Administrators())
 		if err != nil {
 			return nil, err
 		}

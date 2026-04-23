@@ -97,16 +97,6 @@ kind: Tenant
 metadata:
   name: wind
 spec:
-  limitRanges:
-    items:
-      - limits:
-          - type: Pod
-            min:
-              cpu: "50m"
-              memory: "5Mi"
-            max:
-              cpu: "1"
-              memory: "1Gi"
   permissions:
     matchOwners:
     - matchLabels:

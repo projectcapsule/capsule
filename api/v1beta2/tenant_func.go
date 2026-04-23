@@ -123,11 +123,13 @@ func (in *Tenant) GetClusterRolesBySubject(ignoreOwnerKind []rbac.OwnerKind) []r
 			km = map[string]map[string]struct{}{}
 			roleSet[kind] = km
 		}
+
 		ns, ok := km[name]
 		if !ok {
 			ns = map[string]struct{}{}
 			km[name] = ns
 		}
+
 		return ns
 	}
 
@@ -159,14 +161,17 @@ func (in *Tenant) GetClusterRolesBySubject(ignoreOwnerKind []rbac.OwnerKind) []r
 	for k := range roleSet {
 		kinds = append(kinds, k)
 	}
+
 	sort.Strings(kinds)
 
 	out := make([]rbac.SubjectRoles, 0)
+
 	for _, kind := range kinds {
 		names := make([]string, 0, len(roleSet[kind]))
 		for n := range roleSet[kind] {
 			names = append(names, n)
 		}
+
 		sort.Strings(names)
 
 		for _, name := range names {
@@ -174,6 +179,7 @@ func (in *Tenant) GetClusterRolesBySubject(ignoreOwnerKind []rbac.OwnerKind) []r
 			for r := range roleSet[kind][name] {
 				roles = append(roles, r)
 			}
+
 			sort.Strings(roles)
 
 			out = append(out, rbac.SubjectRoles{Kind: kind, Name: name, Roles: roles})

@@ -198,6 +198,14 @@ dev-setup:
 		--set "webhooks.hooks.nodes.enabled=true"\
 		--set "webhooks.service.url=$${WEBHOOK_URL}" \
 		--set "webhooks.service.caBundle=$${CA_BUNDLE}" \
+		--set 'webhooks.hooks.calculations.enabled=true' \
+		--set 'webhooks.hooks.calculations.rules[0].apiGroups[0]=*' \
+		--set 'webhooks.hooks.calculations.rules[0].apiVersions[0]=*' \
+		--set 'webhooks.hooks.calculations.rules[0].operations[0]=CREATE' \
+		--set 'webhooks.hooks.calculations.rules[0].operations[1]=UPDATE' \
+		--set 'webhooks.hooks.calculations.rules[0].operations[2]=DELETE' \
+		--set 'webhooks.hooks.calculations.rules[0].resources[0]=*' \
+		--set 'webhooks.hooks.calculations.rules[0].scope=Namespaced' \
 		capsule \
 		$(CHART)
 	mkdir -p ./hack/generated/ || true
@@ -390,6 +398,14 @@ e2e-install: helm-controller-version ko-build-all
 		--set 'manager.rbac.minimal=true' \
 		--set 'webhooks.hooks.nodes.enabled=true' \
 		--set "webhooks.exclusive=true"\
+		--set 'webhooks.hooks.calculations.enabled=true' \
+		--set 'webhooks.hooks.calculations.rules[0].apiGroups[0]=*' \
+		--set 'webhooks.hooks.calculations.rules[0].apiVersions[0]=*' \
+		--set 'webhooks.hooks.calculations.rules[0].operations[0]=CREATE' \
+		--set 'webhooks.hooks.calculations.rules[0].operations[1]=UPDATE' \
+		--set 'webhooks.hooks.calculations.rules[0].operations[2]=DELETE' \
+		--set 'webhooks.hooks.calculations.rules[0].resources[0]=*' \
+		--set 'webhooks.hooks.calculations.rules[0].scope=Namespaced' \
 		capsule \
 		./charts/capsule
 

@@ -32,7 +32,7 @@ func (h *managedValidatingHandler) OnCreate(c client.Client, decoder admission.D
 			return nil
 		}
 
-		msg := fmt.Sprintf("Labeling resources as controller managed can only be done by the controller or administrators")
+		msg := "Labeling resources as controller managed can only be done by the controller or administrators"
 
 		response := admission.Denied(msg)
 

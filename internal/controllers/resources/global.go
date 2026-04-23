@@ -11,7 +11,6 @@ import (
 	"github.com/go-logr/logr"
 	gherrors "github.com/pkg/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	k8smeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
@@ -41,8 +40,8 @@ import (
 )
 
 type globalResourceController struct {
-	client        client.Client
-	mapper        k8smeta.RESTMapper
+	client client.Client
+
 	log           logr.Logger
 	processor     processor.Processor
 	collector     Collector
@@ -93,94 +92,6 @@ func (r *globalResourceController) SetupWithManager(mgr ctrl.Manager, cfg utils.
 		).
 		WithOptions(controller.Options{MaxConcurrentReconciles: cfg.MaxConcurrentReconciles}).
 		Complete(r)
-}
-
-func (r *globalResourceController) enqueueDependentGlobalTenantResources(
-	ctx context.Context,
-	obj client.Object,
-) []ctrl.Request {
-	changed, ok := obj.(*capsulev1beta2.GlobalTenantResource)
-	if !ok {
-		return nil
-	}
-
-	var list capsulev1beta2.GlobalTenantResourceList
-	if err := r.client.List(ctx, &list); err != nil {
-		return nil
-	}
-
-	reqs := make([]ctrl.Request, 0)
-
-	for _, gtr := range list.Items {
-		for _, dep := range gtr.Spec.DependsOn {
-			if dep.Name.String() == changed.Name {
-				reqs = append(reqs, ctrl.Request{
-					NamespacedName: types.NamespacedName{
-						Name:      gtr.Name,
-						Namespace: gtr.Namespace,
-					},
-				})
-				break
-			}
-		}
-	}
-
-	return reqs
-}
-
-func (r *globalResourceController) enqueueRequestFromTenant(ctx context.Context, object client.Object) (reqs []reconcile.Request) {
-	tnt := object.(*capsulev1beta2.Tenant) //nolint:forcetypeassert
-
-	resList := capsulev1beta2.GlobalTenantResourceList{}
-	if err := r.client.List(ctx, &resList); err != nil {
-		return nil
-	}
-
-	set := sets.NewString()
-
-	for _, res := range resList.Items {
-		tntSelector := res.Spec.TenantSelector
-
-		selector, err := metav1.LabelSelectorAsSelector(&tntSelector)
-		if err != nil {
-			continue
-		}
-
-		if selector.Matches(labels.Set(tnt.GetLabels())) {
-			set.Insert(res.GetName())
-		}
-	}
-	// No need of ordered value here
-	for res := range set {
-		reqs = append(reqs, reconcile.Request{
-			NamespacedName: types.NamespacedName{
-				Name: res,
-			},
-		})
-	}
-
-	return reqs
-}
-
-func (r *globalResourceController) enqueueAllResources(ctx context.Context, _ client.Object) []reconcile.Request {
-	var list capsulev1beta2.GlobalTenantResourceList
-	if err := r.client.List(ctx, &list); err != nil {
-		r.log.V(1).Error(err, "unable to list GlobalTenantResourceList for config-triggered reconcile")
-
-		return nil
-	}
-
-	reqs := make([]reconcile.Request, 0, len(list.Items))
-	for i := range list.Items {
-		reqs = append(reqs, reconcile.Request{
-			NamespacedName: types.NamespacedName{
-				Name:      list.Items[i].Name,
-				Namespace: list.Items[i].Namespace,
-			},
-		})
-	}
-
-	return reqs
 }
 
 func (r *globalResourceController) Reconcile(ctx context.Context, request reconcile.Request) (res reconcile.Result, err error) {
@@ -294,6 +205,95 @@ func (r *globalResourceController) Reconcile(ctx context.Context, request reconc
 	}, err
 }
 
+func (r *globalResourceController) enqueueDependentGlobalTenantResources(
+	ctx context.Context,
+	obj client.Object,
+) []ctrl.Request {
+	changed, ok := obj.(*capsulev1beta2.GlobalTenantResource)
+	if !ok {
+		return nil
+	}
+
+	var list capsulev1beta2.GlobalTenantResourceList
+	if err := r.client.List(ctx, &list); err != nil {
+		return nil
+	}
+
+	reqs := make([]ctrl.Request, 0)
+
+	for _, gtr := range list.Items {
+		for _, dep := range gtr.Spec.DependsOn {
+			if dep.Name.String() == changed.Name {
+				reqs = append(reqs, ctrl.Request{
+					NamespacedName: types.NamespacedName{
+						Name:      gtr.Name,
+						Namespace: gtr.Namespace,
+					},
+				})
+
+				break
+			}
+		}
+	}
+
+	return reqs
+}
+
+func (r *globalResourceController) enqueueRequestFromTenant(ctx context.Context, object client.Object) (reqs []reconcile.Request) {
+	tnt := object.(*capsulev1beta2.Tenant) //nolint:forcetypeassert
+
+	resList := capsulev1beta2.GlobalTenantResourceList{}
+	if err := r.client.List(ctx, &resList); err != nil {
+		return nil
+	}
+
+	set := sets.NewString()
+
+	for _, res := range resList.Items {
+		tntSelector := res.Spec.TenantSelector
+
+		selector, err := metav1.LabelSelectorAsSelector(&tntSelector)
+		if err != nil {
+			continue
+		}
+
+		if selector.Matches(labels.Set(tnt.GetLabels())) {
+			set.Insert(res.GetName())
+		}
+	}
+	// No need of ordered value here
+	for res := range set {
+		reqs = append(reqs, reconcile.Request{
+			NamespacedName: types.NamespacedName{
+				Name: res,
+			},
+		})
+	}
+
+	return reqs
+}
+
+func (r *globalResourceController) enqueueAllResources(ctx context.Context, _ client.Object) []reconcile.Request {
+	var list capsulev1beta2.GlobalTenantResourceList
+	if err := r.client.List(ctx, &list); err != nil {
+		r.log.V(1).Error(err, "unable to list GlobalTenantResourceList for config-triggered reconcile")
+
+		return nil
+	}
+
+	reqs := make([]reconcile.Request, 0, len(list.Items))
+	for i := range list.Items {
+		reqs = append(reqs, reconcile.Request{
+			NamespacedName: types.NamespacedName{
+				Name:      list.Items[i].Name,
+				Namespace: list.Items[i].Namespace,
+			},
+		})
+	}
+
+	return reqs
+}
+
 func (r *globalResourceController) reconcile(
 	ctx context.Context,
 	c client.Client,
@@ -322,6 +322,7 @@ func (r *globalResourceController) reconcile(
 	}
 
 	filtered := make([]capsulev1beta2.Tenant, 0, len(tntList.Items))
+
 	for _, tnt := range tntList.Items {
 		if tnt.DeletionTimestamp != nil {
 			continue
@@ -339,7 +340,7 @@ func (r *globalResourceController) reconcile(
 	owner := meta.GetLooseOwnerReference(tntResource)
 
 	// Gather Resources
-	if tntResource.ObjectMeta.DeletionTimestamp.IsZero() {
+	if tntResource.DeletionTimestamp.IsZero() {
 		err := r.gatherResources(
 			ctx,
 			c,
@@ -376,7 +377,6 @@ func (r *globalResourceController) gatherResources(
 	tnts capsulev1beta2.TenantList,
 	acc processor.Accumulator,
 ) error {
-
 	opts := CollectorOptions{
 		Accumulator:                  acc,
 		AllowCrossNamespaceSelection: true,
@@ -384,10 +384,8 @@ func (r *globalResourceController) gatherResources(
 
 	// Collect Available Generated Items
 	for resourceIndex, resource := range tntResource.Spec.Resources {
-		ilog := log.WithValues("resource", resourceIndex)
-
 		for _, tnt := range tnts.Items {
-			ilog = log.WithValues("tenant", tnt.GetName())
+			ilog := log.WithValues("tenant", tnt.GetName(), "resource", resourceIndex)
 
 			var resourceError error
 
@@ -545,6 +543,7 @@ func (r *globalResourceController) impersonatedServiceAccount(
 		log.V(2).Info("invalid config: global default service account requires both name and namespace",
 			"name", name, "namespace", ns,
 		)
+
 		return nil
 	}
 

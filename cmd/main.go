@@ -92,7 +92,6 @@ func init() {
 	utilruntime.Must(apiextensionsv1.AddToScheme(scheme))
 	utilruntime.Must(gatewayv1.Install(scheme))
 	utilruntime.Must(admissionv1.AddToScheme(scheme))
-
 }
 
 func printVersion() {
@@ -107,10 +106,12 @@ func printVersion() {
 func main() {
 	controllerConfig := utilscontroller.ControllerOptions{}
 
-	var metricsAddr, metricsCertPath, metricsCertName, metricsCertKey string
-	var webhookCertPath, webhookCertName, webhookCertKey string
-	var enableLeaderElection, enablePprof, version, secureMetrics, enableHTTP2 bool
-	var webhookPort int
+	var (
+		metricsAddr, metricsCertPath, metricsCertName, metricsCertKey          string
+		webhookCertPath, webhookCertName, webhookCertKey                       string
+		enableLeaderElection, enablePprof, version, secureMetrics, enableHTTP2 bool
+		webhookPort                                                            int
+	)
 
 	var goFlagSet goflag.FlagSet
 
@@ -253,6 +254,7 @@ func main() {
 	// - https://github.com/advisories/GHSA-4374-p667-p6c8
 	disableHTTP2 := func(c *tls.Config) {
 		setupLog.Info("disabling http/2")
+
 		c.NextProtos = []string{"http/1.1"}
 	}
 
@@ -568,7 +570,7 @@ func main() {
 		route.ResourcePoolClaimValidation((resourcepool.ClaimValidationHandler(ctrl.Log.WithName("webhooks").WithName("resourcepoolclaims")))),
 		route.CustomQuotaValidation((customquotavalidation.CustomQuotaValidationHandler())),
 		route.GlobalCustomQuotaValidation((customquotavalidation.GlobalCustomQuotaValidationHandler())),
-		route.GenericCustomQuotas(
+		route.CalculationCustomQuotas(
 			customquotavalidation.ObjectCalculationHandler(
 				targetsCache,
 				jsonPathCache,

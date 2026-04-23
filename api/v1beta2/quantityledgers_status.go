@@ -4,9 +4,10 @@
 package v1beta2
 
 import (
-	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/projectcapsule/capsule/pkg/api/meta"
 )
 
 // QuantityLedgerReservation represents one active inflight reservation.

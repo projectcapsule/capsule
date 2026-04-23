@@ -36,3 +36,19 @@ func (w *globalCustomQuotaValidation) GetHandlers() []handlers.Handler {
 func (w *globalCustomQuotaValidation) GetPath() string {
 	return "/custom-quotas/cluster/validating"
 }
+
+type customQuotasCalculation struct {
+	handlers []handlers.Handler
+}
+
+func CalculationCustomQuotas(handler ...handlers.Handler) handlers.Webhook {
+	return &customQuotasCalculation{handlers: handler}
+}
+
+func (w *customQuotasCalculation) GetHandlers() []handlers.Handler {
+	return w.handlers
+}
+
+func (w *customQuotasCalculation) GetPath() string {
+	return "/custom-quotas/calculations"
+}

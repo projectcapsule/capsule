@@ -12,7 +12,6 @@ import (
 	authenticationv1 "k8s.io/api/authentication/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -142,7 +141,7 @@ func GetTenantNameByOwnerreferences(
 func GetTenantByOwnerreferences(
 	ctx context.Context,
 	c client.Reader,
-	refs []v1.OwnerReference,
+	refs []metav1.OwnerReference,
 ) (tnt *capsulev1beta2.Tenant, err error) {
 	for _, or := range refs {
 		if !IsTenantOwnerReference(or) {

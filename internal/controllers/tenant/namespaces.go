@@ -84,10 +84,10 @@ func (r *Manager) reconcileNamespaces(ctx context.Context, tnt *capsulev1beta2.T
 	for stat := range results {
 		if stat == nil {
 			continue
-
 		}
 
 		tnt.Status.UpdateInstance(stat)
+
 		desiredStatus[stat.Name] = struct{}{}
 	}
 
@@ -235,7 +235,7 @@ func (r *Manager) reconcileNamespace(ctx context.Context, namespace *corev1.Name
 			},
 		}
 
-		err := r.Client.Delete(ctx, obj)
+		err := r.Delete(ctx, obj)
 		if apierrors.IsNotFound(err) {
 			err = nil
 		}

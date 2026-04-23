@@ -12,7 +12,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/utils"
 )
 
-// NewTenantContext returns the context for the tenant
+// NewTenantContext returns the context for the tenant.
 func NewTenantContext(tnt *capsulev1beta2.Tenant, scheme *runtime.Scheme, opts sanitize.SanitizeOptions) (context map[string]any, err error) {
 	// initialize context
 	context = map[string]any{}

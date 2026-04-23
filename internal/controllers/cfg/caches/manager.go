@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
-	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
@@ -25,12 +24,12 @@ import (
 	"github.com/projectcapsule/capsule/internal/cache"
 	"github.com/projectcapsule/capsule/internal/controllers/utils"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
-	"github.com/projectcapsule/capsule/pkg/runtime/indexers/tenantresource"
 	"github.com/projectcapsule/capsule/pkg/runtime/predicates"
 )
 
 type Manager struct {
 	client.Client
+
 	Rest *rest.Config
 	Log  logr.Logger
 
@@ -74,7 +73,6 @@ func (r *Manager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.Controller
 
 	// register Start(ctx) as a manager runnable.
 	return mgr.Add(r)
-
 }
 
 func (r *Manager) Reconcile(ctx context.Context, request reconcile.Request) (res reconcile.Result, err error) {
@@ -118,48 +116,13 @@ func (r *Manager) Reconcile(ctx context.Context, request reconcile.Request) (res
 	}, err
 }
 
-func (r *Manager) checkReferences(
-	ctx context.Context,
-	sa *corev1.ServiceAccount,
-) (ref bool, err error) {
-	key := sa.GetNamespace() + "/" + sa.GetName()
-
-	var gtr capsulev1beta2.GlobalTenantResourceList
-	if err := r.List(
-		ctx,
-		&gtr,
-		client.MatchingFields{tenantresource.ServiceAccountIndexerFieldName: key},
-	); err != nil {
-		return false, err
-	}
-
-	if len(gtr.Items) > 0 {
-		return true, nil
-	}
-
-	var ntr capsulev1beta2.TenantResourceList
-	if err := r.List(
-		ctx,
-		&ntr,
-		client.MatchingFields{tenantresource.ServiceAccountIndexerFieldName: key},
-	); err != nil {
-		return false, err
-	}
-
-	if len(ntr.Items) > 0 {
-		return true, nil
-	}
-
-	return false, nil
-}
-
 func (r *Manager) updateConfigStatus(
 	ctx context.Context,
 	instance *capsulev1beta2.CapsuleConfiguration,
 ) error {
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
 		latest := &capsulev1beta2.CapsuleConfiguration{}
-		if err = r.Client.Get(ctx, types.NamespacedName{Name: instance.GetName(), Namespace: instance.GetNamespace()}, latest); err != nil {
+		if err = r.Get(ctx, types.NamespacedName{Name: instance.GetName(), Namespace: instance.GetNamespace()}, latest); err != nil {
 			return err
 		}
 

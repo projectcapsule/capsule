@@ -810,7 +810,7 @@ spec:
         admissionReviewVersions:
           - v1
           - v1beta1
-        path: "/generic/custom-quota"
+        path: "/custom-quotas/calculations"
         failurePolicy:  {{ .failurePolicy }}
         matchPolicy: {{ .matchPolicy }}
         {{- with .namespaceSelector }}
@@ -1184,7 +1184,7 @@ spec:
       {{- with .Values.webhooks.hooks.metadata }}
         {{- if .enabled }}
           {{- $any = true }}
-      - name: assign.misc.projectcapsule.dev
+      - name: metadata.misc.projectcapsule.dev
         {{- with .opts }}
         opts:
           {{- toYaml . |  nindent 10 }}
@@ -1192,7 +1192,7 @@ spec:
         admissionReviewVersions:
           - v1
           - v1beta1
-        path: "/generic/tenant-label"
+        path: "/generic/metadata"
         failurePolicy:  {{ .failurePolicy }}
         matchPolicy: {{ .matchPolicy }}
         reinvocationPolicy: {{ .reinvocationPolicy }}

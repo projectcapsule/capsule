@@ -95,121 +95,6 @@ func (r *namespacedResourceController) SetupWithManager(mgr ctrl.Manager, cfg ut
 		Complete(r)
 }
 
-func (r *namespacedResourceController) enqueueDependentTenantResources(
-	ctx context.Context,
-	obj client.Object,
-) []ctrl.Request {
-	changed, ok := obj.(*capsulev1beta2.TenantResource)
-	if !ok {
-		return nil
-	}
-
-	var list capsulev1beta2.TenantResourceList
-	if err := r.client.List(ctx, &list); err != nil {
-		return nil
-	}
-
-	reqs := make([]ctrl.Request, 0)
-
-	for _, gtr := range list.Items {
-		for _, dep := range gtr.Spec.DependsOn {
-			if dep.Name.String() == changed.Name {
-				reqs = append(reqs, ctrl.Request{
-					NamespacedName: types.NamespacedName{
-						Name:      gtr.Name,
-						Namespace: gtr.Namespace,
-					},
-				})
-				break
-			}
-		}
-	}
-
-	return reqs
-}
-
-// Requeue TenantResources if there is changes to namespaces of the same tenant
-// We are not relying on the tenant status, as we might have a terminating lock caused by TenantResources
-func (r *namespacedResourceController) enqueueTenantResourcesForNamespace(
-	ctx context.Context,
-	obj client.Object,
-) []reconcile.Request {
-	ns, ok := obj.(*corev1.Namespace)
-	if !ok {
-		return nil
-	}
-
-	labelValue, ok := ns.Labels[meta.TenantLabel]
-	if !ok || labelValue == "" {
-		return nil
-	}
-
-	var namespaces corev1.NamespaceList
-	if err := r.client.List(
-		ctx,
-		&namespaces,
-		client.MatchingLabels{meta.TenantLabel: labelValue},
-	); err != nil {
-		r.log.Error(err, "failed to list namespaces by label", "label", meta.TenantLabel, "value", labelValue)
-
-		return nil
-	}
-
-	requests := make([]reconcile.Request, 0, 16)
-	seen := make(map[types.NamespacedName]struct{})
-
-	for i := range namespaces.Items {
-		var trList capsulev1beta2.TenantResourceList
-		if err := r.client.List(
-			ctx,
-			&trList,
-			client.InNamespace(namespaces.Items[i].Name),
-		); err != nil {
-			r.log.Error(err, "failed to list TenantResources", "namespace", namespaces.Items[i].Name)
-
-			continue
-		}
-
-		for j := range trList.Items {
-			key := types.NamespacedName{
-				Namespace: trList.Items[j].Namespace,
-				Name:      trList.Items[j].Name,
-			}
-
-			if _, exists := seen[key]; exists {
-				continue
-			}
-
-			seen[key] = struct{}{}
-
-			requests = append(requests, reconcile.Request{NamespacedName: key})
-		}
-	}
-
-	return requests
-}
-
-func (r *namespacedResourceController) enqueueAllResources(ctx context.Context, _ client.Object) []reconcile.Request {
-	var list capsulev1beta2.TenantResourceList
-	if err := r.client.List(ctx, &list); err != nil {
-		r.log.V(1).Error(err, "unable to list TenantResources for config-triggered reconcile")
-
-		return nil
-	}
-
-	reqs := make([]reconcile.Request, 0, len(list.Items))
-	for i := range list.Items {
-		reqs = append(reqs, reconcile.Request{
-			NamespacedName: types.NamespacedName{
-				Name:      list.Items[i].Name,
-				Namespace: list.Items[i].Namespace,
-			},
-		})
-	}
-
-	return reqs
-}
-
 func (r *namespacedResourceController) Reconcile(ctx context.Context, request reconcile.Request) (res reconcile.Result, err error) {
 	log := ctrllog.FromContext(ctx)
 
@@ -317,6 +202,122 @@ func (r *namespacedResourceController) Reconcile(ctx context.Context, request re
 	}, err
 }
 
+func (r *namespacedResourceController) enqueueDependentTenantResources(
+	ctx context.Context,
+	obj client.Object,
+) []ctrl.Request {
+	changed, ok := obj.(*capsulev1beta2.TenantResource)
+	if !ok {
+		return nil
+	}
+
+	var list capsulev1beta2.TenantResourceList
+	if err := r.client.List(ctx, &list); err != nil {
+		return nil
+	}
+
+	reqs := make([]ctrl.Request, 0)
+
+	for _, gtr := range list.Items {
+		for _, dep := range gtr.Spec.DependsOn {
+			if dep.Name.String() == changed.Name {
+				reqs = append(reqs, ctrl.Request{
+					NamespacedName: types.NamespacedName{
+						Name:      gtr.Name,
+						Namespace: gtr.Namespace,
+					},
+				})
+
+				break
+			}
+		}
+	}
+
+	return reqs
+}
+
+// Requeue TenantResources if there is changes to namespaces of the same tenant
+// We are not relying on the tenant status, as we might have a terminating lock caused by TenantResources.
+func (r *namespacedResourceController) enqueueTenantResourcesForNamespace(
+	ctx context.Context,
+	obj client.Object,
+) []reconcile.Request {
+	ns, ok := obj.(*corev1.Namespace)
+	if !ok {
+		return nil
+	}
+
+	labelValue, ok := ns.Labels[meta.TenantLabel]
+	if !ok || labelValue == "" {
+		return nil
+	}
+
+	var namespaces corev1.NamespaceList
+	if err := r.client.List(
+		ctx,
+		&namespaces,
+		client.MatchingLabels{meta.TenantLabel: labelValue},
+	); err != nil {
+		r.log.Error(err, "failed to list namespaces by label", "label", meta.TenantLabel, "value", labelValue)
+
+		return nil
+	}
+
+	requests := make([]reconcile.Request, 0, 16)
+	seen := make(map[types.NamespacedName]struct{})
+
+	for i := range namespaces.Items {
+		var trList capsulev1beta2.TenantResourceList
+		if err := r.client.List(
+			ctx,
+			&trList,
+			client.InNamespace(namespaces.Items[i].Name),
+		); err != nil {
+			r.log.Error(err, "failed to list TenantResources", "namespace", namespaces.Items[i].Name)
+
+			continue
+		}
+
+		for j := range trList.Items {
+			key := types.NamespacedName{
+				Namespace: trList.Items[j].Namespace,
+				Name:      trList.Items[j].Name,
+			}
+
+			if _, exists := seen[key]; exists {
+				continue
+			}
+
+			seen[key] = struct{}{}
+
+			requests = append(requests, reconcile.Request{NamespacedName: key})
+		}
+	}
+
+	return requests
+}
+
+func (r *namespacedResourceController) enqueueAllResources(ctx context.Context, _ client.Object) []reconcile.Request {
+	var list capsulev1beta2.TenantResourceList
+	if err := r.client.List(ctx, &list); err != nil {
+		r.log.V(1).Error(err, "unable to list TenantResources for config-triggered reconcile")
+
+		return nil
+	}
+
+	reqs := make([]reconcile.Request, 0, len(list.Items))
+	for i := range list.Items {
+		reqs = append(reqs, reconcile.Request{
+			NamespacedName: types.NamespacedName{
+				Name:      list.Items[i].Name,
+				Namespace: list.Items[i].Namespace,
+			},
+		})
+	}
+
+	return reqs
+}
+
 func (r *namespacedResourceController) reconcile(
 	ctx context.Context,
 	c client.Client,
@@ -352,7 +353,7 @@ func (r *namespacedResourceController) reconcile(
 	acc := processor.Accumulator{}
 
 	// Gather Resources
-	if tntResource.ObjectMeta.DeletionTimestamp.IsZero() {
+	if tntResource.DeletionTimestamp.IsZero() {
 		err := r.gatherResources(
 			ctx,
 			c,
@@ -410,6 +411,7 @@ func (r *namespacedResourceController) gatherResources(
 		}
 
 		i := 0
+
 		for _, innerNs := range namespaces {
 			opts.Iterator = NewCollectorIteratorOptions(&tnt, innerNs, resource)
 

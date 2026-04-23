@@ -43,11 +43,7 @@ func (CapsuleConfigSpecImpersonationChangedPredicate) Update(e event.UpdateEvent
 	oldSpec := oldCfg.Spec
 	newSpec := newCfg.Spec
 
-	if oldSpec.Impersonation != newSpec.Impersonation {
-		return true
-	}
-
-	return false
+	return oldSpec.Impersonation != newSpec.Impersonation
 }
 
 type CapsuleConfigSpecAdmissionChangedPredicate struct{}
@@ -67,9 +63,5 @@ func (CapsuleConfigSpecAdmissionChangedPredicate) Update(e event.UpdateEvent) bo
 	oldSpec := oldCfg.Spec
 	newSpec := newCfg.Spec
 
-	if oldSpec.Admission != newSpec.Admission {
-		return true
-	}
-
-	return false
+	return oldSpec.Admission != newSpec.Admission
 }

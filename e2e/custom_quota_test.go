@@ -2,6 +2,7 @@ package e2e
 
 import (
 	"context"
+	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -18,7 +19,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 )
 
-var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Label("namespaced", "customquota", "ledger"), Ordered, func() {
+var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Label("namespaced", "namespacedcustomquota", "customquota", "ledger"), Ordered, func() {
 	const (
 		testNamespace = "custom-quota-e2e-test"
 		tenantLabel   = "capsule.clastix.io/tenant"
@@ -80,6 +81,88 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Label("na
 				}
 			}
 		}
+	})
+
+	It("remains consistent under concurrent pod creations for a CustomQuota", func() {
+		q := &capsulev1beta2.CustomQuota{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "cq-concurrent-pod-count",
+				Namespace: testNamespace,
+				Labels: map[string]string{
+					"e2e.capsule.dev/test-suite": "customquota-ledger",
+				},
+			},
+			Spec: capsulev1beta2.CustomQuotaSpec{
+				Limit: resource.MustParse("10"),
+				Sources: []capsulev1beta2.CustomQuotaSpecSource{
+					{
+						GroupVersionKind: metav1.GroupVersionKind{
+							Group:   "",
+							Version: "v1",
+							Kind:    "Pod",
+						},
+						Operation: quota.OpCount,
+						Selectors: []selectors.SelectorWithFields{
+							{
+								LabelSelector: &metav1.LabelSelector{
+									MatchLabels: map[string]string{
+										"track": "yes",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		EventuallyCreation(func() error {
+			return k8sClient.Create(ctx, q)
+		}).Should(Succeed())
+		awaitCustomQuotaReady(ctx, testNamespace, q.GetName())
+
+		const total = 30
+		type result struct {
+			name string
+			err  error
+		}
+
+		results := make(chan result, total)
+
+		for i := 0; i < total; i++ {
+			i := i
+			go func() {
+				name := fmt.Sprintf("cq-concurrent-pod-%02d", i)
+				pod := MakePod(
+					testNamespace,
+					name,
+					map[string]string{"track": "yes"},
+					nil,
+					"nginx:1.27.0",
+					"",
+					"",
+				)
+
+				err := k8sClient.Create(ctx, pod)
+				results <- result{name: name, err: err}
+			}()
+		}
+
+		var succeeded, failed int
+		for i := 0; i < total; i++ {
+			res := <-results
+			if res.err == nil {
+				succeeded++
+			} else {
+				failed++
+			}
+		}
+
+		Expect(succeeded).To(Equal(10))
+		Expect(failed).To(Equal(20))
+
+		expectCustomQuotaUsedAndClaims(ctx, testNamespace, q.GetName(), "10", 10)
+		expectLedgerSettled(ctx, testNamespace, q.GetName())
 	})
 
 	It("tracks different paths independently when global and namespaced quotas match the same pod gvk", func() {

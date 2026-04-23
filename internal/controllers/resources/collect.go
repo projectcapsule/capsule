@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Project Capsule Authors
+// Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package resources
@@ -10,6 +10,7 @@ import (
 	"maps"
 	"strconv"
 
+	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	k8smeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -20,15 +21,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 
-	"github.com/go-logr/logr"
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/api/processor"
 	"github.com/projectcapsule/capsule/pkg/runtime/gvk"
 	"github.com/projectcapsule/capsule/pkg/runtime/sanitize"
-	"github.com/projectcapsule/capsule/pkg/template"
 	tpl "github.com/projectcapsule/capsule/pkg/template"
 	"github.com/projectcapsule/capsule/pkg/tenant"
 	"github.com/projectcapsule/capsule/pkg/utils"
@@ -93,7 +91,7 @@ func NewCollector(c client.Reader, mapper k8smeta.RESTMapper) Collector {
 // With this function we are attempting to collect all the unstructured items
 // No Interacting is done with the kubernetes regarding applying etc.
 //
-//nolint:gocognit
+
 func (co *Collector) Collect(
 	ctx context.Context,
 	c client.Client,
@@ -103,11 +101,12 @@ func (co *Collector) Collect(
 	spec capsulev1beta2.ResourceSpec,
 	ns *corev1.Namespace,
 ) (err error) {
-	log := ctrllog.FromContext(ctx)
+	log := log.FromContext(ctx)
 
 	var syncErr error
 
-	tplContext := template.ReferenceContext{}
+	tplContext := tpl.ReferenceContext{}
+
 	if spec.Context != nil {
 		namespace := ""
 		if ns != nil {
@@ -200,7 +199,7 @@ func (co *Collector) Collect(
 }
 
 // Add an item to the accumulator
-// Mainly handles conflicts
+// Mainly handles conflicts.
 func (co *Collector) AddToAccumulation(
 	tnt *capsulev1beta2.Tenant,
 	ns *corev1.Namespace,
@@ -211,7 +210,7 @@ func (co *Collector) AddToAccumulation(
 	combine bool,
 ) (err error) {
 	if obj == nil {
-		return
+		return err
 	}
 
 	tntName := ""
@@ -291,7 +290,7 @@ func (co *Collector) CollectNamespacedItems(
 
 	// A TenantResource is created by a TenantOwner, and potentially, they could point to a resource in a non-owned
 	// Namespace: this must be blocked by checking it this is the case.
-	if !opts.AllowCrossNamespaceSelection && !tntNamespaces.Has(string(namespace)) {
+	if !opts.AllowCrossNamespaceSelection && !tntNamespaces.Has(namespace) {
 		err = fmt.Errorf("cross-namespace selection is not allowed. Referring a Namespace that is not part of the given Tenant")
 
 		return nil, err
@@ -328,6 +327,7 @@ func (co *Collector) CollectNamespacedItems(
 						"namespace", k.Namespace,
 						"name", k.Name,
 					)
+
 					continue
 				}
 
@@ -356,7 +356,31 @@ func (co *Collector) CollectNamespacedItems(
 	return seen, totalError
 }
 
-// Handles a single generator item
+// Allows templating in.
+func GatherAdditionalMetadata(
+	spec capsulev1beta2.ResourceSpec,
+	fastContext map[string]string,
+) (labels map[string]string, annotations map[string]string) {
+	labels = make(map[string]string)
+	annotations = make(map[string]string)
+
+	md := spec.AdditionalMetadata
+	if md == nil {
+		return labels, annotations
+	}
+
+	if md.Labels != nil {
+		labels = tpl.FastTemplateMap(maps.Clone(md.Labels), fastContext)
+	}
+
+	if md.Annotations != nil {
+		annotations = tpl.FastTemplateMap(maps.Clone(md.Annotations), fastContext)
+	}
+
+	return labels, annotations
+}
+
+// Handles a single generator item.
 func (co *Collector) handleGeneratorItem(
 	ctx context.Context,
 	c client.Client,
@@ -402,31 +426,6 @@ func (co *Collector) handleRawItem(
 	return obj, nil
 }
 
-// Allows templating in
-func GatherAdditionalMetadata(
-	spec capsulev1beta2.ResourceSpec,
-	fastContext map[string]string,
-) (labels map[string]string, annotations map[string]string) {
-	labels = make(map[string]string)
-	annotations = make(map[string]string)
-
-	md := spec.AdditionalMetadata
-	if md == nil {
-		return labels, annotations
-	}
-
-	if md.Labels != nil {
-		labels = tpl.FastTemplateMap(maps.Clone(md.Labels), fastContext)
-	}
-
-	if md.Annotations != nil {
-		annotations = tpl.FastTemplateMap(maps.Clone(md.Annotations), fastContext)
-	}
-
-	return labels, annotations
-}
-
-//nolint:gocognit
 func (co *Collector) selectedTenantNamespaces(
 	ctx context.Context,
 	log logr.Logger,
@@ -471,69 +470,4 @@ func (co *Collector) selectedTenantNamespaces(
 	}
 
 	return ns, nil
-}
-
-//nolint:gocognit
-func (co *Collector) foreachTenantNamespace(
-	ctx context.Context,
-	log logr.Logger,
-	c client.Client,
-	opts CollectorOptions,
-	tnt *capsulev1beta2.Tenant,
-	resource capsulev1beta2.ResourceSpec,
-	resourceIndex string,
-) (err error) {
-	// Creating Namespace selector
-	var selector labels.Selector
-
-	if resource.NamespaceSelector != nil {
-		selector, err = metav1.LabelSelectorAsSelector(resource.NamespaceSelector)
-		if err != nil {
-			log.Error(err, "cannot create Namespace selector for Namespace filtering and resource replication")
-
-			return err
-		}
-	} else {
-		selector = labels.NewSelector()
-	}
-	// Resources can be replicated only on Namespaces belonging to the same Global:
-	// preventing a boundary cross by enforcing the selection.
-	tntRequirement, err := labels.NewRequirement(meta.TenantLabel, selection.Equals, []string{tnt.GetName()})
-	if err != nil {
-		log.Error(err, "unable to create requirement for Namespace filtering and resource replication")
-
-		return err
-	}
-
-	selector = selector.Add(*tntRequirement)
-	// Selecting the targeted Namespace according to the TenantResource specification.
-	namespaces := corev1.NamespaceList{}
-	if err = co.gatherClient.List(ctx, &namespaces, client.MatchingLabelsSelector{Selector: selector}); err != nil {
-		log.Error(err, "cannot retrieve Namespaces for resource")
-
-		return err
-	}
-
-	log.V(5).Info("retrieved namespaces", "size", len(namespaces.Items))
-
-	for _, ns := range namespaces.Items {
-		log.V(5).Info("reconciling for", "namespace", ns.Name)
-
-		opts.Iterator = NewCollectorIteratorOptions(tnt, &ns, resource)
-
-		err = co.Collect(
-			ctx,
-			c,
-			opts,
-			tnt,
-			resourceIndex,
-			resource,
-			&ns,
-		)
-		if err != nil {
-			return
-		}
-	}
-
-	return
 }

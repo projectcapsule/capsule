@@ -555,9 +555,10 @@ webhooks:
             - globalcustomquotas
           scope: 'Cluster'
 
+    # -- Webhook for Custom Quota Calculations ([Read More](https://projectcapsule.dev/docs/resource-management/customquotas/#admission))
     calculations:
       # -- Enable the Hook
-      enabled: true
+      enabled: false
       # -- [FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy)
       failurePolicy: Fail
       # -- [MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
@@ -571,18 +572,8 @@ webhooks:
             operator: Exists
       # -- [MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
       matchConditions: []
-      rules:
-          - apiGroups:
-              - '*'
-            apiVersions:
-              - '*'
-            operations:
-              - CREATE
-              - UPDATE
-              - DELETE
-            resources:
-              - '*'
-            scope: Namespaced
+      # -- [Rules](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-rules)
+      rules: []
 
     metadata:
       # -- Enable the Hook

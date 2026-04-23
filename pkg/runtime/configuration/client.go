@@ -96,7 +96,8 @@ func NewCapsuleConfiguration(ctx context.Context, c client.Client, rest *rest.Co
 			}
 
 			return cfg
-		}}
+		},
+	}
 }
 
 func (c *capsuleConfiguration) GetConfigObject() *capsulev1beta2.CapsuleConfiguration {
@@ -229,9 +230,9 @@ func (c *capsuleConfiguration) ServiceAccountClient(ctx context.Context) (*rest.
 	}
 
 	if props.SkipTLSVerify {
-		cfg.TLSClientConfig.Insecure = true
-		cfg.TLSClientConfig.CAData = nil
-		cfg.TLSClientConfig.CAFile = ""
+		cfg.Insecure = true
+		cfg.CAData = nil
+		cfg.CAFile = ""
 	} else {
 		if props.CASecretName != "" {
 			namespace := props.CASecretNamespace
@@ -249,8 +250,8 @@ func (c *capsuleConfiguration) ServiceAccountClient(ctx context.Context) (*rest.
 				return nil, fmt.Errorf("could not fetch CA cert: %w", err)
 			}
 
-			cfg.TLSClientConfig.CAData = caData
-			cfg.TLSClientConfig.CAFile = ""
+			cfg.CAData = caData
+			cfg.CAFile = ""
 		}
 	}
 

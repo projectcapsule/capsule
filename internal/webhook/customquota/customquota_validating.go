@@ -32,6 +32,7 @@ func (h *customQuotaValidationHandler) OnCreate(_ client.Client, decoder admissi
 
 		if err := quota.ValidateQuantity(q.Spec.Limit); err != nil {
 			response := admission.Denied(fmt.Sprintf("invalid spec.limit: %v", err))
+
 			return &response
 		}
 
@@ -60,6 +61,7 @@ func (h *customQuotaValidationHandler) OnUpdate(_ client.Client, decoder admissi
 
 		if err := quota.ValidateQuantity(newQuota.Spec.Limit); err != nil {
 			response := admission.Denied(fmt.Sprintf("invalid spec.limit: %v", err))
+
 			return &response
 		}
 

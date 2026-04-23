@@ -35,7 +35,7 @@ func (h *remainingNamespaceHandler) OnCreate(
 }
 
 // This happens when a tenant has not yet reconciled it's namespaces but is deleted
-// and in the meantime a new namespace was created referencing the same tenant
+// and in the meantime a new namespace was created referencing the same tenant.
 func (h *remainingNamespaceHandler) OnDelete(
 	c client.Client,
 	tnt *capsulev1beta2.Tenant,

@@ -215,7 +215,7 @@ func getLedger(ctx context.Context, namespace, name string) *capsulev1beta2.Quan
 	return obj
 }
 
-var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Label("global", "customquota", "ledger"), Ordered, func() {
+var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Label("global", "globalcustomquota", "customquota", "ledger"), Ordered, func() {
 	const (
 		testNamespace = "global-custom-quota-e2e-test"
 		tenantLabel   = "capsule.clastix.io/tenant"
@@ -315,6 +315,132 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Lab
 				}
 			}
 		}
+	})
+
+	It("remains consistent under concurrent pod creations for a GlobalCustomQuota", func() {
+		q := &capsulev1beta2.GlobalCustomQuota{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "gq-concurrent-pod-count",
+				Labels: map[string]string{
+					"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
+				},
+			},
+			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
+				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
+					Limit: resource.MustParse("10"),
+					Sources: []capsulev1beta2.CustomQuotaSpecSource{
+						{
+							GroupVersionKind: metav1.GroupVersionKind{
+								Group:   "",
+								Version: "v1",
+								Kind:    "Pod",
+							},
+							Operation: quota.OpCount,
+							Selectors: []selectors.SelectorWithFields{
+								{
+									LabelSelector: &metav1.LabelSelector{
+										MatchLabels: map[string]string{
+											"track": "yes",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+				NamespaceSelectors: []selectors.NamespaceSelector{
+					{
+						LabelSelector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{
+								meta.TenantLabel: tenantValue,
+							},
+						},
+					},
+				},
+			},
+		}
+
+		EventuallyCreation(func() error {
+			return k8sClient.Create(ctx, q)
+		}).Should(Succeed())
+		awaitGlobalQuotaReady(ctx, q.GetName())
+
+		const total = 30
+
+		type result struct {
+			name string
+			err  error
+		}
+
+		results := make(chan result, total)
+
+		for i := 0; i < total; i++ {
+			i := i
+			go func() {
+				name := fmt.Sprintf("gq-concurrent-pod-%02d", i)
+				pod := MakePod(
+					testNamespace,
+					name,
+					map[string]string{"track": "yes"},
+					nil,
+					"nginx:1.27.0",
+					"",
+					"",
+				)
+
+				err := k8sClient.Create(ctx, pod)
+				results <- result{name: name, err: err}
+			}()
+		}
+
+		var succeeded, failed int
+		var failedMsgs []string
+		var successNames []string
+
+		for i := 0; i < total; i++ {
+			res := <-results
+			if res.err == nil {
+				succeeded++
+				successNames = append(successNames, res.name)
+			} else {
+				failed++
+				failedMsgs = append(failedMsgs, fmt.Sprintf("%s: %v", res.name, res.err))
+			}
+		}
+
+		gq := getGlobalQuota(ctx, q.GetName())
+		ledger := getLedger(ctx, configuration.ControllerNamespace(), q.GetName())
+
+		Expect(succeeded).To(Equal(10),
+			"unexpected number of successful concurrent pod creations\nsuccesses=%d\nfailures=%d\nsuccessNames=%v\nfailureDetails=%v\nquotaUsed=%q\nquotaAvailable=%q\nclaims=%d\nledgerReserved=%q\nledgerReservations=%+v\nledgerPendingDeletes=%+v",
+			succeeded,
+			failed,
+			successNames,
+			failedMsgs,
+			gq.Status.Usage.Used.String(),
+			gq.Status.Usage.Available.String(),
+			len(gq.Status.Claims),
+			ledger.Status.Reserved.String(),
+			ledger.Status.Reservations,
+			ledger.Status.PendingDeletes,
+		)
+
+		Expect(failed).To(Equal(20),
+			"unexpected number of failed concurrent pod creations\nsuccesses=%d\nfailures=%d\nsuccessNames=%v\nfailureDetails=%v\nquotaUsed=%q\nquotaAvailable=%q\nclaims=%d\nledgerReserved=%q\nledgerReservations=%+v\nledgerPendingDeletes=%+v",
+			succeeded,
+			failed,
+			successNames,
+			failedMsgs,
+			gq.Status.Usage.Used.String(),
+			gq.Status.Usage.Available.String(),
+			len(gq.Status.Claims),
+			ledger.Status.Reserved.String(),
+			ledger.Status.Reservations,
+			ledger.Status.PendingDeletes,
+		)
+
+		expectGlobalQuotaUsedAndClaims(ctx, q.GetName(), "10", 10)
+		expectLedgerSettled(ctx, configuration.ControllerNamespace(), q.GetName())
 	})
 
 	It("uses the smallest matching quota as authoritative while accounting successful pod count in both global and namespaced quotas", func() {

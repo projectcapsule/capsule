@@ -70,6 +70,7 @@ func allKeys[K comparable, V any](a map[K]V, b map[K]V) []K {
 
 	for k := range a {
 		seen[k] = struct{}{}
+
 		out = append(out, k)
 	}
 
@@ -90,9 +91,9 @@ func sourcesChanged(a, b []capsulev1beta2.CustomQuotaSpecSource) bool {
 	}
 
 	for i := range a {
-		if a[i].GroupVersionKind.Group != b[i].GroupVersionKind.Group ||
-			a[i].GroupVersionKind.Version != b[i].GroupVersionKind.Version ||
-			a[i].GroupVersionKind.Kind != b[i].GroupVersionKind.Kind ||
+		if a[i].Group != b[i].Group ||
+			a[i].Version != b[i].Version ||
+			a[i].Kind != b[i].Kind ||
 			a[i].Path != b[i].Path ||
 			a[i].Operation != b[i].Operation {
 			return true

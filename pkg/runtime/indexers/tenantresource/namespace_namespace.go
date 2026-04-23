@@ -1,7 +1,6 @@
 // Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
-//nolint:dupl
 package tenantresource
 
 import (
@@ -26,6 +25,7 @@ func (g NamespacedResourceNamespace) Func() client.IndexerFunc {
 		if tr.Namespace == "" {
 			return nil
 		}
+
 		return []string{tr.Namespace}
 	}
 }

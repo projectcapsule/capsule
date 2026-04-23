@@ -1,13 +1,14 @@
-// Copyright 2020-2025 Project Capsule Authors
+// Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package v1beta2
 
 import (
-	"github.com/projectcapsule/capsule/pkg/runtime/quota"
-	"github.com/projectcapsule/capsule/pkg/runtime/selectors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/projectcapsule/capsule/pkg/runtime/quota"
+	"github.com/projectcapsule/capsule/pkg/runtime/selectors"
 )
 
 // CustomQuotaSpec.
@@ -25,7 +26,7 @@ type CustomQuotaSpec struct {
 
 // CustomQuotaOptionsSpec.
 type CustomQuotaOptionsSpec struct {
-	// Additionaly expose usage metrics for each claim contributing to the quota.
+	// Additionally expose usage metrics for each claim contributing to the quota.
 	// This is disabled by default to avoid high cardinality in the metrics, but can be enabled for more granular monitoring and alerting.
 	// +kubebuilder:default:=false
 	EmitPerClaimMetrics bool `json:"emitMetricPerClaimUsage,omitempty"`

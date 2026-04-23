@@ -119,7 +119,7 @@ func LabelsChangedUnstructured(oldObj, newObj unstructured.Unstructured) bool {
 	return !labels.Equals(labels.Set(oldObj.GetLabels()), labels.Set(newObj.GetLabels()))
 }
 
-// Collect all mentioned keys from a LabelSelector
+// Collect all mentioned keys from a LabelSelector.
 func LabelSelectorKeys(sel *metav1.LabelSelector) map[string]struct{} {
 	out := map[string]struct{}{}
 	if sel == nil {

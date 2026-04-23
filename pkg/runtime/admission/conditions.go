@@ -7,9 +7,10 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/projectcapsule/capsule/pkg/api/rbac"
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
+
+	"github.com/projectcapsule/capsule/pkg/api/rbac"
 )
 
 func BuildGatingUserCondition(opts WebhookOptions, users rbac.UserListSpec, admins rbac.UserListSpec) []admissionregistrationv1.MatchCondition {

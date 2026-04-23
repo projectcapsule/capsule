@@ -19,7 +19,6 @@ func (o NamespacedTargetReference) Field() string {
 	return TargetIndexerFieldName
 }
 
-//nolint:forcetypeassert
 func (o NamespacedTargetReference) Func() client.IndexerFunc {
 	return func(object client.Object) []string {
 		tr := object.(*capsulev1beta2.CustomQuota) //nolint:forcetypeassert
@@ -27,7 +26,6 @@ func (o NamespacedTargetReference) Func() client.IndexerFunc {
 		targets := []string{}
 		for _, t := range tr.Status.Targets {
 			targets = append(targets, t.String())
-
 		}
 
 		return targets

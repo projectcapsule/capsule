@@ -41,11 +41,12 @@ func ToUnstructuredMap(obj any) (map[string]any, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return m, nil
 }
 
 func Mapify(data any) map[string]any {
-	result := make(map[string]interface{})
+	result := make(map[string]any)
 	v := reflect.ValueOf(data)
 
 	// If the provided data is a pointer, resolve to the underlying value
@@ -77,7 +78,7 @@ func Mapify(data any) map[string]any {
 			case reflect.Struct:
 				result[field.Name] = Mapify(value.Interface())
 			case reflect.Slice:
-				var slice []interface{}
+				var slice []any
 
 				for j := range value.Len() {
 					item := value.Index(j)
@@ -90,7 +91,7 @@ func Mapify(data any) map[string]any {
 
 				result[field.Name] = slice
 			case reflect.Map:
-				mapResult := make(map[string]interface{})
+				mapResult := make(map[string]any)
 				for _, key := range value.MapKeys() {
 					mapResult[fmt.Sprint(key)] = value.MapIndex(key).Interface()
 				}

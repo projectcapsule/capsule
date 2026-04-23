@@ -4,9 +4,10 @@
 package admission
 
 import (
-	"github.com/projectcapsule/capsule/pkg/api/rbac"
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/projectcapsule/capsule/pkg/api/rbac"
 )
 
 // +kubebuilder:object:generate=true
@@ -40,6 +41,7 @@ func NewValidatingWebhook(in *ValidatingWebhook, c admissionregistrationv1.Webho
 
 	if len(in.MatchConditions) > 0 {
 		out.MatchConditions = append([]admissionregistrationv1.MatchCondition(nil), in.MatchConditions...)
+
 		return out, nil
 	}
 
@@ -202,7 +204,7 @@ type ValidatingWebhook struct {
 	// +listType=map
 	// +listMapKey=name
 	// +optional
-	MatchConditions []admissionregistrationv1.MatchCondition `json:"matchConditions,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,11,opt,name=matchConditions"`
+	MatchConditions []admissionregistrationv1.MatchCondition `json:"matchConditions,omitempty" patchMergeKey:"name" patchStrategy:"merge" protobuf:"bytes,11,opt,name=matchConditions"`
 }
 
 func NewMutatingWebhook(in *MutatingWebhook, c admissionregistrationv1.WebhookClientConfig, users rbac.UserListSpec, admins rbac.UserListSpec) (admissionregistrationv1.MutatingWebhook, error) {
@@ -224,6 +226,7 @@ func NewMutatingWebhook(in *MutatingWebhook, c admissionregistrationv1.WebhookCl
 
 	if len(in.MatchConditions) > 0 {
 		out.MatchConditions = append([]admissionregistrationv1.MatchCondition(nil), in.MatchConditions...)
+
 		return out, nil
 	}
 
@@ -404,5 +407,5 @@ type MutatingWebhook struct {
 	// +listType=map
 	// +listMapKey=name
 	// +optional
-	MatchConditions []admissionregistrationv1.MatchCondition `json:"matchConditions,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,12,opt,name=matchConditions"`
+	MatchConditions []admissionregistrationv1.MatchCondition `json:"matchConditions,omitempty" patchMergeKey:"name" patchStrategy:"merge" protobuf:"bytes,12,opt,name=matchConditions"`
 }

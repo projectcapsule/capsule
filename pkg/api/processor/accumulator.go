@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Project Capsule Authors.
+// Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package processor
@@ -9,16 +9,16 @@ import (
 	"github.com/projectcapsule/capsule/pkg/runtime/gvk"
 )
 
-// Keeps track of generated items
+// Keeps track of generated items.
 type Accumulator = map[string]*AccumulatorItem
 
-// Keeps track of generated items
+// Keeps track of generated items.
 type AccumulatorItem struct {
 	Resource gvk.ResourceID
 	Objects  *[]AccumulatorObject
 }
 
-// Keeps track of generated items
+// Keeps track of generated items.
 type AccumulatorObject struct {
 	Origin gvk.TenantResourceIDWithOrigin
 	Object *unstructured.Unstructured
@@ -40,7 +40,9 @@ func AccumulatorAdd(
 			list := make([]AccumulatorObject, 0, 1)
 			entry.Objects = &list
 		}
+
 		*entry.Objects = append(*entry.Objects, obj)
+
 		return
 	}
 

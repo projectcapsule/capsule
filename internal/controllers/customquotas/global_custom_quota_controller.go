@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Project Capsule Authors
+// Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package customquotas
@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"slices"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -119,6 +120,7 @@ func (r *clusterCustomQuotaClaimController) mapNamespaceToGlobalCustomQuotas(
 	var quotaList capsulev1beta2.GlobalCustomQuotaList
 	if err := r.List(ctx, &quotaList); err != nil {
 		r.log.Error(err, "cannot list GlobalCustomQuota objects for namespace event", "namespace", ns.Name)
+
 		return nil
 	}
 
@@ -147,13 +149,7 @@ func shouldReconcileForNamespaceEvent(
 		return true
 	}
 
-	for _, ns := range instance.Status.Namespaces {
-		if ns == namespace {
-			return true
-		}
-	}
-
-	return false
+	return slices.Contains(instance.Status.Namespaces, namespace)
 }
 
 func (r *clusterCustomQuotaClaimController) Reconcile(ctx context.Context, request ctrl.Request) (ctrl.Result, error) {
@@ -164,10 +160,12 @@ func (r *clusterCustomQuotaClaimController) Reconcile(ctx context.Context, reque
 		if apierrors.IsNotFound(err) {
 			log.V(3).Info("Request object not found, could have been deleted after reconcile request")
 			r.metrics.DeleteAllMetricsForGlobalCustomQuota(request.Name)
+
 			return reconcile.Result{}, nil
 		}
 
 		log.Error(err, "Error reading the object")
+
 		return reconcile.Result{}, err
 	}
 
@@ -214,6 +212,7 @@ func (r *clusterCustomQuotaClaimController) Reconcile(ctx context.Context, reque
 
 	return ctrl.Result{}, nil
 }
+
 func (r *clusterCustomQuotaClaimController) reconcile(
 	ctx context.Context,
 	log logr.Logger,
@@ -225,9 +224,9 @@ func (r *clusterCustomQuotaClaimController) reconcile(
 
 	for _, src := range instance.Spec.Sources {
 		kind := schema.GroupVersionKind{
-			Group:   src.GroupVersionKind.Group,
-			Version: src.GroupVersionKind.Version,
-			Kind:    src.GroupVersionKind.Kind,
+			Group:   src.Group,
+			Version: src.Version,
+			Kind:    src.Kind,
 		}
 
 		mapping, err := r.mapper.RESTMapping(kind.GroupKind(), kind.Version)
@@ -261,6 +260,7 @@ func (r *clusterCustomQuotaClaimController) reconcile(
 	instance.Status.Namespaces = namespaces
 
 	var errs []error
+
 	seenClaims := make(map[types.UID]struct{})
 	itemsByGVK := make(map[schema.GroupVersionKind][]unstructured.Unstructured, len(instance.Status.Targets))
 
@@ -273,9 +273,9 @@ func (r *clusterCustomQuotaClaimController) reconcile(
 
 	for _, target := range targets {
 		gvk := schema.GroupVersionKind{
-			Group:   target.GroupVersionKind.Group,
-			Version: target.GroupVersionKind.Version,
-			Kind:    target.GroupVersionKind.Kind,
+			Group:   target.Group,
+			Version: target.Version,
+			Kind:    target.Kind,
 		}
 
 		items, ok := itemsByGVK[gvk]
@@ -283,8 +283,10 @@ func (r *clusterCustomQuotaClaimController) reconcile(
 			items, err = getResourcesByGVK(ctx, gvk, r.Client, instance.Spec.ScopeSelectors, namespaces...)
 			if err != nil {
 				errs = append(errs, fmt.Errorf("list resources for %s: %w", gvk.String(), err))
+
 				continue
 			}
+
 			itemsByGVK[gvk] = items
 		}
 
@@ -305,8 +307,10 @@ func (r *clusterCustomQuotaClaimController) reconcile(
 					item.GetObjectKind().GroupVersionKind().String(),
 					err,
 				))
+
 				continue
 			}
+
 			if !matches {
 				continue
 			}
@@ -329,6 +333,7 @@ func (r *clusterCustomQuotaClaimController) reconcile(
 						target.Operation,
 						err,
 					))
+
 					continue
 				}
 
@@ -340,6 +345,7 @@ func (r *clusterCustomQuotaClaimController) reconcile(
 					item.GetName(),
 					item.GetObjectKind().GroupVersionKind().String(),
 				))
+
 				continue
 			}
 
@@ -352,9 +358,10 @@ func (r *clusterCustomQuotaClaimController) reconcile(
 				instance.Status.Usage.Used.Add(usage)
 			}
 
-			uid := types.UID(item.GetUID())
+			uid := item.GetUID()
 			if _, exists := seenClaims[uid]; !exists {
 				seenClaims[uid] = struct{}{}
+
 				instance.Status.Claims = append(instance.Status.Claims, capsulev1beta2.CustomQuotaClaimItem{
 					GroupVersionKind: metav1.GroupVersionKind(item.GroupVersionKind()),
 					NamespacedObjectWithUIDReference: meta.NamespacedObjectWithUIDReference{
@@ -374,6 +381,7 @@ func (r *clusterCustomQuotaClaimController) reconcile(
 
 	instance.Status.Usage.Available = instance.Spec.Limit.DeepCopy()
 	instance.Status.Usage.Available.Sub(instance.Status.Usage.Used)
+
 	if instance.Status.Usage.Available.Sign() < 0 {
 		instance.Status.Usage.Available = resource.MustParse("0")
 	}
@@ -403,11 +411,14 @@ func (r *clusterCustomQuotaClaimController) reconcileLedger(
 			if apierrors.IsNotFound(err) {
 				instance.Status.Usage.Available = instance.Spec.Limit.DeepCopy()
 				instance.Status.Usage.Available.Sub(instance.Status.Usage.Used)
+
 				if instance.Status.Usage.Available.Sign() < 0 {
 					instance.Status.Usage.Available = resource.MustParse("0")
 				}
+
 				return nil
 			}
+
 			return err
 		}
 
@@ -415,6 +426,7 @@ func (r *clusterCustomQuotaClaimController) reconcileLedger(
 		pendingDeleteTTL := 30 * time.Second
 
 		activeReservations := make([]capsulev1beta2.QuantityLedgerReservation, 0, len(ledger.Status.Reservations))
+
 		for _, res := range ledger.Status.Reservations {
 			materialized := reservationMaterializedLedger(res, instance.Status.Claims)
 			expired := res.ExpiresAt != nil && res.ExpiresAt.Before(&now)
@@ -432,6 +444,7 @@ func (r *clusterCustomQuotaClaimController) reconcileLedger(
 				"materialized", materialized,
 				"expired", expired,
 			)
+
 			if materialized || expired {
 				continue
 			}
@@ -445,6 +458,7 @@ func (r *clusterCustomQuotaClaimController) reconcileLedger(
 		}
 
 		activeDeletes := make([]capsulev1beta2.QuantityLedgerPendingDelete, 0, len(ledger.Status.PendingDeletes))
+
 		for _, pd := range ledger.Status.PendingDeletes {
 			stillPresent := pendingDeleteStillPresent(pd, instance.Status.Claims)
 			expired := now.Sub(pd.CreatedAt.Time) >= pendingDeleteTTL
@@ -489,6 +503,7 @@ func (r *clusterCustomQuotaClaimController) reconcileLedger(
 		}
 
 		seenUIDs := make(map[types.UID]struct{}, len(instance.Status.Claims))
+
 		for _, claim := range instance.Status.Claims {
 			if claim.UID != "" {
 				seenUIDs[claim.UID] = struct{}{}
@@ -502,6 +517,7 @@ func (r *clusterCustomQuotaClaimController) reconcileLedger(
 				if _, exists := seenUIDs[res.ObjectRef.UID]; exists {
 					continue
 				}
+
 				seenUIDs[res.ObjectRef.UID] = struct{}{}
 			}
 
@@ -534,7 +550,6 @@ func (r *clusterCustomQuotaClaimController) reconcileLedger(
 
 		return nil
 	})
-
 	if err != nil {
 		return nil, err
 	}
@@ -696,5 +711,6 @@ func reservationMaterializedLedger(
 			return true
 		}
 	}
+
 	return false
 }

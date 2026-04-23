@@ -29,7 +29,7 @@ func ExtraFuncMap() template.FuncMap {
 	return funcMap
 }
 
-// CustomFuncMap return our custom templates
+// CustomFuncMap return our custom templates.
 func CustomFuncMap() template.FuncMap {
 	return template.FuncMap{
 		"toToml":            toTOML,
@@ -63,6 +63,7 @@ func deterministicUUID(parts ...string) string {
 	// Format as 8-4-4-4-12 hex
 	hex32 := hex.EncodeToString(b) // 32 lowercase hex chars
 	uuid := hex32[0:8] + "-" + hex32[8:12] + "-" + hex32[12:16] + "-" + hex32[16:20] + "-" + hex32[20:32]
+
 	return strings.ToUpper(uuid)
 }
 

@@ -20,6 +20,7 @@ func (p LabelPresentPredicate) Create(e event.CreateEvent) bool {
 
 	return ok
 }
+
 func (p LabelPresentPredicate) Delete(e event.DeleteEvent) bool {
 	if e.Object == nil {
 		return false

@@ -19,7 +19,6 @@ func (o GlobalObjectUIDReference) Field() string {
 	return ObjectUIDIndexerFieldName
 }
 
-//nolint:forcetypeassert
 func (o GlobalObjectUIDReference) Func() client.IndexerFunc {
 	return func(object client.Object) []string {
 		tr := object.(*capsulev1beta2.GlobalCustomQuota) //nolint:forcetypeassert

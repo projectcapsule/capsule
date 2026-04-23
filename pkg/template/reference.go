@@ -48,7 +48,7 @@ func (t ResourceReference) RequiresTemplating() bool {
 		return true
 	}
 
-	if RequiresFastTemplate(string(t.Namespace)) {
+	if RequiresFastTemplate(t.Namespace) {
 		return true
 	}
 
@@ -72,7 +72,7 @@ func (t ResourceReference) LoadTemplated(templateContext map[string]string) (Res
 	}
 
 	if out.Namespace != "" {
-		out.Namespace = FastTemplate(string(out.Namespace), templateContext)
+		out.Namespace = FastTemplate(out.Namespace, templateContext)
 	}
 
 	// Selector
@@ -160,13 +160,14 @@ func (t ResourceReference) loadResources(
 
 		key := client.ObjectKey{
 			Name:      t.Name,
-			Namespace: string(ns),
+			Namespace: ns,
 		}
 
 		if err := kubeClient.Get(ctx, key, obj); err != nil {
 			if apierrors.IsNotFound(err) && t.Optional {
 				return nil, nil
 			}
+
 			return nil, fmt.Errorf("failed to get %s/%s: %w", t.Kind, t.Name, err)
 		}
 
@@ -179,7 +180,7 @@ func (t ResourceReference) loadResources(
 
 	var opts []client.ListOption
 	if ns != "" {
-		opts = append(opts, client.InNamespace(string(ns)))
+		opts = append(opts, client.InNamespace(ns))
 	}
 
 	var tenantSel labels.Selector

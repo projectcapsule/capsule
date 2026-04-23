@@ -8,11 +8,11 @@ import (
 	"regexp"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/rest"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	capsuleapi "github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/api/rbac"
-	"k8s.io/client-go/rest"
 )
 
 const (

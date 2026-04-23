@@ -72,6 +72,7 @@ func (r ResourceID) GetGVKKey(sep string) string {
 	if sep == "" {
 		sep = "\x1f"
 	}
+
 	return fmt.Sprintf("%s%s%s%s%s%s%s%s%s%s",
 		r.Group, sep,
 		r.Version, sep,
@@ -86,6 +87,7 @@ func (r ResourceID) GetKey(sep string) string {
 	if sep == "" {
 		sep = "\x1f"
 	}
+
 	return fmt.Sprintf("%s%s%s%s%s%s%s%s%s%s%s%s%s%s",
 		r.Group, sep,
 		r.Version, sep,

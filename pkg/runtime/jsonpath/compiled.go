@@ -20,7 +20,7 @@ type CompiledJSONPath struct {
 }
 
 // CompileJSONPath parses and validates a JSONPath source path once.
-// Example sourcePath: ".spec.resources.requests.cpu"
+// Example sourcePath: ".spec.resources.requests.cpu".
 func CompileJSONPath(sourcePath string) (*CompiledJSONPath, error) {
 	sourcePath = strings.TrimSpace(sourcePath)
 	if err := validateSourcePath(sourcePath); err != nil {

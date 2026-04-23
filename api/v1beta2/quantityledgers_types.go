@@ -89,7 +89,8 @@ type QuantityLedger struct {
 type QuantityLedgerList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []QuantityLedger `json:"items"`
+
+	Items []QuantityLedger `json:"items"`
 }
 
 func init() {

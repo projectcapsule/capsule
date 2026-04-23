@@ -66,6 +66,7 @@ func (c *JSONPathCache) Delete(path string) bool {
 	}
 
 	delete(c.data, path)
+
 	return true
 }
 
