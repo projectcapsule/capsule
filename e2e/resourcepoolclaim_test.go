@@ -280,7 +280,7 @@ var _ = Describe("ResourcePoolClaim Tests", Label("resourcepool"), func() {
 		})
 	})
 
-	It("Admission (Validation) - Patch Guard", func() {
+	It("Admission (Validation) - Patch Guard", Label("skip-on-openshift"), func() {
 		pool := &capsulev1beta2.ResourcePool{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "test-admission-claims",
@@ -582,7 +582,7 @@ var _ = Describe("ResourcePoolClaim Tests", Label("resourcepool"), func() {
 
 	})
 
-	It("Admission (Mutation) - Auto Pool Assign", func() {
+	It("Admission (Mutation) - Auto Pool Assign", Label("skip-on-openshift"), func() {
 		pool1 := &capsulev1beta2.ResourcePool{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "test-auto-assign-1",

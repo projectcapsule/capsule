@@ -48,7 +48,7 @@ var _ = Describe("enforcing a defined ImagePullPolicy", Label("tenant", "images"
 		EventuallyDeletion(tnt)
 	})
 
-	It("should just allow the defined policy", func() {
+	It("should just allow the defined policy", Label("skip-on-openshift"), func() {
 		ns := NewNamespace("")
 		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 

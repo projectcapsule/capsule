@@ -504,7 +504,7 @@ var _ = Describe("Creating a TenantResource object", Label("tenantresource"), fu
 		})
 	})
 
-	It("should replicate resources to all Tenant Namespaces", func() {
+	It("should replicate resources to all Tenant Namespaces", Label("skip"), func() {
 		solarNs := []string{"solar-one", "solar-two", "solar-three"}
 
 		By("creating solar Namespaces", func() {

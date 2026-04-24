@@ -170,7 +170,7 @@ var _ = Describe("enforcing a Runtime Class", Label("pod", "classes"), func() {
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 	})
 
-	It("should allow all classes", func() {
+	It("should allow all classes", Label("skip-on-openshift"), func() {
 		all := []string{customerUni.GetName(), customerKubevirt.GetName(), customerContainerd.GetName(), legacy.GetName(), disallowed.GetName()}
 
 		By("Verify Status (Creation)", func() {
