@@ -14,7 +14,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	"github.com/projectcapsule/capsule/internal/webhook/utils"
+	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
@@ -47,7 +47,7 @@ func (h *wildcard) validate(ctx context.Context, clt client.Client, req admissio
 	tntList := &capsulev1beta2.TenantList{}
 
 	if err := clt.List(ctx, tntList, client.MatchingFields{".status.namespaces": req.Namespace}); err != nil {
-		return utils.ErroredResponse(err)
+		return ad.ErroredResponse(err)
 	}
 
 	// resource is not inside a Tenant namespace
@@ -61,7 +61,7 @@ func (h *wildcard) validate(ctx context.Context, clt client.Client, req admissio
 		// Retrieve ingress resource from request.
 		ingress, err := FromRequest(req, decoder)
 		if err != nil {
-			return utils.ErroredResponse(err)
+			return ad.ErroredResponse(err)
 		}
 		// Loop over all the hosts present on the ingress.
 		for host := range ingress.HostnamePathsPairs() {

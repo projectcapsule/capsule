@@ -16,6 +16,7 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api/rbac"
 	"github.com/projectcapsule/capsule/pkg/utils"
 )
 
@@ -25,10 +26,10 @@ var _ = Describe("when handling Tenant scoped Ingress hostnames collision", Labe
 			Name: "hostnames-collision-tenant",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: api.OwnerListSpec{
+			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: api.CoreOwnerSpec{
-						UserSpec: api.UserSpec{
+					CoreOwnerSpec: rbac.CoreOwnerSpec{
+						UserSpec: rbac.UserSpec{
 							Name: "ingress-tenant",
 							Kind: "User",
 						},
@@ -116,7 +117,7 @@ var _ = Describe("when handling Tenant scoped Ingress hostnames collision", Labe
 	})
 
 	JustAfterEach(func() {
-		Expect(k8sClient.Delete(context.TODO(), tnt)).Should(Succeed())
+		EventuallyDeletion(tnt)
 	})
 
 	It("should ensure Tenant scope for Ingress hostname and path collision", func() {

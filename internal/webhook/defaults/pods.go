@@ -17,20 +17,21 @@ import (
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
 	"github.com/projectcapsule/capsule/pkg/api"
 	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
+	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/tenant"
 )
 
 func mutatePodDefaults(ctx context.Context, req admission.Request, c client.Client, decoder admission.Decoder, namespace string) *admission.Response {
 	var pod corev1.Pod
 	if err := decoder.Decode(req, &pod); err != nil {
-		return utils.ErroredResponse(err)
+		return ad.ErroredResponse(err)
 	}
 
 	pod.SetNamespace(namespace)
 
 	tnt, tErr := tenant.TenantByStatusNamespace(ctx, c, pod.Namespace)
 	if tErr != nil {
-		return utils.ErroredResponse(tErr)
+		return ad.ErroredResponse(tErr)
 	} else if tnt == nil {
 		return nil
 	}
@@ -39,7 +40,7 @@ func mutatePodDefaults(ctx context.Context, req admission.Request, c client.Clie
 
 	pcMutated, pcErr := handlePriorityClassDefault(ctx, c, tnt.Spec.PriorityClasses, &pod)
 	if pcErr != nil {
-		return utils.ErroredResponse(pcErr)
+		return ad.ErroredResponse(pcErr)
 	}
 
 	rcMutated := handleRuntimeClassDefault(tnt.Spec.RuntimeClasses, &pod)
@@ -50,7 +51,7 @@ func mutatePodDefaults(ctx context.Context, req admission.Request, c client.Clie
 	var marshaled []byte
 
 	if marshaled, err = json.Marshal(pod); err != nil {
-		return utils.ErroredResponse(err)
+		return ad.ErroredResponse(err)
 	}
 
 	return ptr.To(admission.PatchResponseFromRaw(req.Object.Raw, marshaled))

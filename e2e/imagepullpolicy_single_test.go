@@ -14,6 +14,7 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api/rbac"
 )
 
 var _ = Describe("enforcing a defined ImagePullPolicy", Label("tenant", "images", "policy"), func() {
@@ -22,10 +23,10 @@ var _ = Describe("enforcing a defined ImagePullPolicy", Label("tenant", "images"
 			Name: "image-pull-policy",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: api.OwnerListSpec{
+			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: api.CoreOwnerSpec{
-						UserSpec: api.UserSpec{
+					CoreOwnerSpec: rbac.CoreOwnerSpec{
+						UserSpec: rbac.UserSpec{
 							Name: "axel",
 							Kind: "User",
 						},
@@ -44,7 +45,7 @@ var _ = Describe("enforcing a defined ImagePullPolicy", Label("tenant", "images"
 	})
 
 	JustAfterEach(func() {
-		Expect(k8sClient.Delete(context.TODO(), tnt)).Should(Succeed())
+		EventuallyDeletion(tnt)
 	})
 
 	It("should just allow the defined policy", Label("skip-on-openshift"), func() {

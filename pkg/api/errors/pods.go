@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/projectcapsule/capsule/internal/webhook/utils"
 	"github.com/projectcapsule/capsule/pkg/api"
 )
 
@@ -115,7 +114,7 @@ func NewPodPriorityClassForbidden(priorityClassName string, spec api.DefaultAllo
 func (f PodPriorityClassForbiddenError) Error() (err string) {
 	msg := fmt.Sprintf("Pod Priority Class %s is forbidden for the current Tenant: ", f.priorityClassName)
 
-	return utils.DefaultAllowedValuesErrorMessage(f.spec, msg)
+	return DefaultAllowedValuesErrorMessage(f.spec, msg)
 }
 
 type PodRuntimeClassForbiddenError struct {
@@ -133,5 +132,5 @@ func NewPodRuntimeClassForbidden(runtimeClassName string, spec api.DefaultAllowe
 func (f PodRuntimeClassForbiddenError) Error() (err string) {
 	err = fmt.Sprintf("Pod Runtime Class %s is forbidden for the current Tenant: ", f.runtimeClassName)
 
-	return utils.DefaultAllowedValuesErrorMessage(f.spec, err)
+	return DefaultAllowedValuesErrorMessage(f.spec, err)
 }

@@ -16,6 +16,7 @@ import (
 
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
 	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
+	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 	"github.com/projectcapsule/capsule/pkg/tenant"
@@ -33,14 +34,14 @@ func (h *deviceClass) OnCreate(c client.Client, decoder admission.Decoder, recor
 		case "ResourceClaim":
 			rc := &resources.ResourceClaim{}
 			if err := decoder.Decode(req, rc); err != nil {
-				return utils.ErroredResponse(err)
+				return ad.ErroredResponse(err)
 			}
 
 			return h.validateResourceRequest(ctx, c, decoder, recorder, req, rc.Namespace, rc.Spec.Devices.Requests)
 		case "ResourceClaimTemplate":
 			rct := &resources.ResourceClaimTemplate{}
 			if err := decoder.Decode(req, rct); err != nil {
-				return utils.ErroredResponse(err)
+				return ad.ErroredResponse(err)
 			}
 
 			return h.validateResourceRequest(ctx, c, decoder, recorder, req, rct.Namespace, rct.Spec.Spec.Devices.Requests)
@@ -65,7 +66,7 @@ func (h *deviceClass) OnUpdate(client.Client, admission.Decoder, events.EventRec
 func (h *deviceClass) validateResourceRequest(ctx context.Context, c client.Client, _ admission.Decoder, recorder events.EventRecorder, req admission.Request, namespace string, requests []resources.DeviceRequest) *admission.Response {
 	tnt, err := tenant.TenantByStatusNamespace(ctx, c, namespace)
 	if err != nil {
-		return utils.ErroredResponse(err)
+		return ad.ErroredResponse(err)
 	}
 
 	if tnt == nil {
@@ -86,8 +87,6 @@ func (h *deviceClass) validateResourceRequest(ctx context.Context, c client.Clie
 		}
 
 		if dc == nil {
-			recorder.Eventf(tnt, dc, corev1.EventTypeWarning, evt.ReasonMissingDeviceClass, evt.ActionValidationDenied, "%s %s/%s is missing DeviceClass", req.Kind.Kind, req.Namespace, req.Name)
-
 			response := admission.Denied(caperrors.NewDeviceClassUndefined(*allowed).Error())
 
 			return &response

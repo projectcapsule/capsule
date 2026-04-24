@@ -62,7 +62,7 @@ func (h *patchHandler) OnUpdate(
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		e := fmt.Sprintf("namespace/%s can not be patched", ns.Name)
 
-		if ok := users.IsTenantOwnerByStatus(ctx, c, h.cfg, tnt, req.UserInfo); ok {
+		if ok := users.IsTenantOwnerByStatus(tnt, req.UserInfo); ok {
 			return nil
 		}
 

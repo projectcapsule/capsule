@@ -13,11 +13,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	"github.com/projectcapsule/capsule/internal/webhook/utils"
 	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
+	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
+	caputils "github.com/projectcapsule/capsule/pkg/utils"
 )
 
 type userMetadataHandler struct {
@@ -46,7 +47,7 @@ func (r *userMetadataHandler) OnDelete(client.Client, admission.Decoder, events.
 
 func (r *userMetadataHandler) OnUpdate(_ client.Client, decoder admission.Decoder, recorder events.EventRecorder) handlers.Func {
 	return func(_ context.Context, req admission.Request) *admission.Response {
-		nodeWebhookSupported, _ := utils.NodeWebhookSupported(r.version)
+		nodeWebhookSupported, _ := caputils.NodeWebhookSupported(r.version)
 
 		if !nodeWebhookSupported {
 			return nil
@@ -54,12 +55,12 @@ func (r *userMetadataHandler) OnUpdate(_ client.Client, decoder admission.Decode
 
 		oldNode := &corev1.Node{}
 		if err := decoder.DecodeRaw(req.OldObject, oldNode); err != nil {
-			return utils.ErroredResponse(err)
+			return ad.ErroredResponse(err)
 		}
 
 		newNode := &corev1.Node{}
 		if err := decoder.Decode(req, newNode); err != nil {
-			return utils.ErroredResponse(err)
+			return ad.ErroredResponse(err)
 		}
 
 		if r.configuration.ForbiddenUserNodeLabels() != nil {

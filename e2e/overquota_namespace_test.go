@@ -12,7 +12,7 @@ import (
 	"k8s.io/utils/ptr"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api/rbac"
 )
 
 var _ = Describe("creating a Namespace in over-quota of three", Label("namespace"), func() {
@@ -21,10 +21,10 @@ var _ = Describe("creating a Namespace in over-quota of three", Label("namespace
 			Name: "over-quota-tenant",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: api.OwnerListSpec{
+			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: api.CoreOwnerSpec{
-						UserSpec: api.UserSpec{
+					CoreOwnerSpec: rbac.CoreOwnerSpec{
+						UserSpec: rbac.UserSpec{
 							Name: "bob",
 							Kind: "User",
 						},
@@ -43,7 +43,7 @@ var _ = Describe("creating a Namespace in over-quota of three", Label("namespace
 		}).Should(Succeed())
 	})
 	JustAfterEach(func() {
-		Expect(k8sClient.Delete(context.TODO(), tnt)).Should(Succeed())
+		EventuallyDeletion(tnt)
 	})
 
 	It("should fail", func() {

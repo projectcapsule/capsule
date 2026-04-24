@@ -31,20 +31,38 @@ func (r *Manager) syncLimitRanges(ctx context.Context, tenant *capsulev1beta2.Te
 
 	group := new(errgroup.Group)
 
-	for _, ns := range tenant.Status.Namespaces {
-		namespace := ns
+	for _, ns := range tenant.Status.Spaces {
+		cleanup := false
+		namespace := ns.Name
+
+		cond := ns.Conditions.GetConditionByType(meta.TerminatingCondition)
+		if cond != nil {
+			if cond.Status == metav1.ConditionTrue {
+				cleanup = true
+			} else {
+				continue
+			}
+		}
 
 		group.Go(func() error {
-			return r.syncLimitRange(ctx, tenant, namespace, keys)
+			return r.syncLimitRange(ctx, tenant, namespace, keys, cleanup)
 		})
 	}
 
 	return group.Wait()
 }
 
-func (r *Manager) syncLimitRange(ctx context.Context, tenant *capsulev1beta2.Tenant, namespace string, keys []string) (err error) {
+func (r *Manager) syncLimitRange(ctx context.Context, tenant *capsulev1beta2.Tenant, namespace string, keys []string, cleanup bool) (err error) {
+	if cleanup {
+		keys = []string{}
+	}
+
 	if err = r.pruningResources(ctx, namespace, keys, &corev1.LimitRange{}); err != nil {
 		return err
+	}
+
+	if cleanup {
+		return nil
 	}
 
 	//nolint:staticcheck

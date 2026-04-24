@@ -58,7 +58,7 @@ func BuildNamespaceMetadataForTenant(ns *corev1.Namespace, tnt *capsulev1beta2.T
 	annotations = BuildNamespaceAnnotationsForTenant(tnt)
 	labels = BuildNamespaceLabelsForTenant(tnt)
 
-	fastContext := ContextForTenantAndNamespace(tnt, ns)
+	fastContext := FastContextForTenantAndNamespace(tnt, ns)
 
 	if opts := tnt.Spec.NamespaceOptions; opts != nil && len(opts.AdditionalMetadataList) > 0 {
 		for _, md := range opts.AdditionalMetadataList {

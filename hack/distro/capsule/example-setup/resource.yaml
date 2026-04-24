@@ -2,20 +2,23 @@
 apiVersion: capsule.clastix.io/v1beta2
 kind: GlobalTenantResource
 metadata:
-  name: custom-cm
-  namespace: solar-system
+  name: gitops-owners
 spec:
   resyncPeriod: 60s
+  dependsOn:
+    - name: custom-cm-2
   resources:
     - additionalMetadata:
         labels:
           "replicated-by": "capsule"
       rawItems:
-        - apiVersion: v1
-          kind: ConfigMap
+        - apiVersion: capsule.clastix.io/v1beta2
+          kind: TenantOwner
           metadata:
-            name: game-demo
-          data:
-            # property-like keys; each key maps to a simple value
-            player_initial_lives: "3"
-            ui_properties_file_name: "user-interface.properties"
+            name: "{{tenant.name}}-{{namespace}}"
+          spec:
+            clusterRoles:
+              - capsule-namespace-deleter
+              - admin
+            kind: ServiceAccount
+            name: "system:serviceaccount:{{namespace}}:gitops-reconciler"

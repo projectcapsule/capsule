@@ -15,7 +15,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	"github.com/projectcapsule/capsule/internal/webhook/utils"
+	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
 
@@ -43,12 +43,12 @@ func (h *poolValidationHandler) OnUpdate(_ client.Client, decoder admission.Deco
 	return func(_ context.Context, req admission.Request) *admission.Response {
 		oldPool := &capsulev1beta2.ResourcePool{}
 		if err := decoder.DecodeRaw(req.OldObject, oldPool); err != nil {
-			return utils.ErroredResponse(err)
+			return ad.ErroredResponse(err)
 		}
 
 		pool := &capsulev1beta2.ResourcePool{}
 		if err := decoder.Decode(req, pool); err != nil {
-			return utils.ErroredResponse(err)
+			return ad.ErroredResponse(err)
 		}
 
 		// Verify if resource decrease is allowed or no

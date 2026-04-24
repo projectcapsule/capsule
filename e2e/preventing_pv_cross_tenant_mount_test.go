@@ -16,7 +16,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api/rbac"
 )
 
 var _ = Describe("preventing PersistentVolume cross-tenant mount", Label("tenant", "storage"), func() {
@@ -25,10 +25,10 @@ var _ = Describe("preventing PersistentVolume cross-tenant mount", Label("tenant
 			Name: "pv-one",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: api.OwnerListSpec{
+			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: api.CoreOwnerSpec{
-						UserSpec: api.UserSpec{
+					CoreOwnerSpec: rbac.CoreOwnerSpec{
+						UserSpec: rbac.UserSpec{
 							Name: "jessica",
 							Kind: "User",
 						},
@@ -43,10 +43,10 @@ var _ = Describe("preventing PersistentVolume cross-tenant mount", Label("tenant
 			Name: "pv-two",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: api.OwnerListSpec{
+			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: api.CoreOwnerSpec{
-						UserSpec: api.UserSpec{
+					CoreOwnerSpec: rbac.CoreOwnerSpec{
+						UserSpec: rbac.UserSpec{
 							Name: "leto",
 							Kind: "User",
 						},
@@ -68,7 +68,7 @@ var _ = Describe("preventing PersistentVolume cross-tenant mount", Label("tenant
 
 	JustAfterEach(func() {
 		for _, tnt := range []*capsulev1beta2.Tenant{tnt1, tnt2} {
-			Expect(k8sClient.Delete(context.TODO(), tnt)).Should(Succeed())
+			EventuallyDeletion(tnt)
 		}
 	})
 

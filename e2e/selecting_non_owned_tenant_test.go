@@ -6,7 +6,7 @@ package e2e
 import (
 	"context"
 
-	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api/rbac"
 	"github.com/projectcapsule/capsule/pkg/utils"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -23,10 +23,10 @@ var _ = Describe("creating a Namespace trying to select a third Tenant", Label("
 			Name: "tenant-non-owned",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: api.OwnerListSpec{
+			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: api.CoreOwnerSpec{
-						UserSpec: api.UserSpec{
+					CoreOwnerSpec: rbac.CoreOwnerSpec{
+						UserSpec: rbac.UserSpec{
 							Name: "undefined",
 							Kind: "User",
 						},
@@ -42,7 +42,7 @@ var _ = Describe("creating a Namespace trying to select a third Tenant", Label("
 		}).Should(Succeed())
 	})
 	JustAfterEach(func() {
-		Expect(k8sClient.Delete(context.TODO(), tnt)).Should(Succeed())
+		EventuallyDeletion(tnt)
 	})
 
 	It("should fail", func() {
@@ -58,7 +58,7 @@ var _ = Describe("creating a Namespace trying to select a third Tenant", Label("
 			})
 		})
 
-		cs := ownerClient(api.UserSpec{Name: "dale", Kind: "User"})
+		cs := ownerClient(rbac.UserSpec{Name: "dale", Kind: "User"})
 		_, err := cs.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
 		Expect(err).To(HaveOccurred())
 	})

@@ -1,0 +1,10 @@
+// Copyright 2020-2026 Project Capsule Authors
+// SPDX-License-Identifier: Apache-2.0
+
+package tenantresource
+
+const (
+	ServiceAccountIndexerFieldName string = "spec.serviceaccount"
+	ProcessedIndexerFieldName      string = "status.items"
+	NamespaceIndexerFieldName      string = "metadata.namespace"
+)

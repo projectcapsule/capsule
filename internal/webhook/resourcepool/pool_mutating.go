@@ -17,7 +17,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	"github.com/projectcapsule/capsule/internal/webhook/utils"
+	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
 
@@ -53,7 +53,7 @@ func (h *poolMutationHandler) handle(
 ) *admission.Response {
 	pool := &capsulev1beta2.ResourcePool{}
 	if err := decoder.Decode(req, pool); err != nil {
-		return utils.ErroredResponse(fmt.Errorf("failed to decode object: %w", err))
+		return ad.ErroredResponse(fmt.Errorf("failed to decode object: %w", err))
 	}
 
 	// Correctly set the defaults

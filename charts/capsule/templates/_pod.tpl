@@ -84,9 +84,9 @@ spec:
       {{- end }}
       ports:
         {{- if not (.Values.manager.hostNetwork) }}
-        - name: webhook-server
-          containerPort: {{ .Values.manager.webhookPort }}
+        - name: admission
           protocol: TCP
+          containerPort: 9443
         - name: metrics
           containerPort: 8080
           protocol: TCP

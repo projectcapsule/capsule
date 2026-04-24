@@ -1,0 +1,15 @@
+---
+apiVersion: capsule.clastix.io/v1beta2
+kind: CustomQuota
+metadata:
+  name: pod-count-limit
+  namespace: wind-test
+spec:
+  limit: 3
+  sources:
+  - group: ""
+    kind: Pod
+    op: count
+    version: v1
+  options:
+    emitMetricPerClaimUsage: true

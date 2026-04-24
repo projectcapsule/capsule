@@ -13,8 +13,8 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/runtime/selectors"
 )
 
@@ -34,7 +34,7 @@ type ResourceReference struct {
 	Name string `json:"name,omitempty"`
 	// Namespace of the values referent.
 	// +optional
-	Namespace meta.RFC1123SubdomainName `json:"namespace,omitempty"`
+	Namespace string `json:"namespace,omitempty"`
 	// Selector which allows to get any amount of these resources based on labels
 	// +optional
 	Selector *metav1.LabelSelector `json:"selector,omitempty"`
@@ -48,7 +48,7 @@ func (t ResourceReference) RequiresTemplating() bool {
 		return true
 	}
 
-	if RequiresFastTemplate(string(t.Namespace)) {
+	if RequiresFastTemplate(t.Namespace) {
 		return true
 	}
 
@@ -72,9 +72,7 @@ func (t ResourceReference) LoadTemplated(templateContext map[string]string) (Res
 	}
 
 	if out.Namespace != "" {
-		out.Namespace = meta.RFC1123SubdomainName(
-			FastTemplate(string(out.Namespace), templateContext),
-		)
+		out.Namespace = FastTemplate(out.Namespace, templateContext)
 	}
 
 	// Selector
@@ -145,9 +143,14 @@ func (t ResourceReference) loadResources(
 ) ([]*unstructured.Unstructured, error) {
 	ns := t.Namespace
 
-	if namespace != "" {
-		ns = meta.RFC1123SubdomainName(namespace)
+	// Handle this somewhere else
+	if ns == "" && namespace != "" {
+		ns = namespace
 	}
+
+	log := log.FromContext(ctx)
+
+	log.Info("GATHERING IN NAMESPACE", "NAMESPACE", ns)
 
 	// GET path (single object)
 	if t.Name != "" {
@@ -157,7 +160,7 @@ func (t ResourceReference) loadResources(
 
 		key := client.ObjectKey{
 			Name:      t.Name,
-			Namespace: string(ns),
+			Namespace: ns,
 		}
 
 		if err := kubeClient.Get(ctx, key, obj); err != nil {
@@ -177,10 +180,9 @@ func (t ResourceReference) loadResources(
 
 	var opts []client.ListOption
 	if ns != "" {
-		opts = append(opts, client.InNamespace(string(ns)))
+		opts = append(opts, client.InNamespace(ns))
 	}
 
-	// Convert t.Selector (metav1) to labels.Selector if present
 	var tenantSel labels.Selector
 
 	if t.Selector != nil {
@@ -206,6 +208,7 @@ func (t ResourceReference) loadResources(
 
 	if len(all) > 0 {
 		combined := selectors.CombineSelectors(all...)
+
 		opts = append(opts, client.MatchingLabelsSelector{Selector: combined})
 	}
 

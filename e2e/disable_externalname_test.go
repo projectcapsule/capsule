@@ -15,6 +15,7 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api/rbac"
 )
 
 var _ = Describe("creating an ExternalName service when it is disabled for Tenant", Label("tenant"), func() {
@@ -23,10 +24,10 @@ var _ = Describe("creating an ExternalName service when it is disabled for Tenan
 			Name: "disable-external-service",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: api.OwnerListSpec{
+			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: api.CoreOwnerSpec{
-						UserSpec: api.UserSpec{
+					CoreOwnerSpec: rbac.CoreOwnerSpec{
+						UserSpec: rbac.UserSpec{
 							Name: "google",
 							Kind: "User",
 						},
@@ -49,7 +50,7 @@ var _ = Describe("creating an ExternalName service when it is disabled for Tenan
 	})
 
 	JustAfterEach(func() {
-		Expect(k8sClient.Delete(context.TODO(), tnt)).Should(Succeed())
+		EventuallyDeletion(tnt)
 	})
 
 	It("should fail creating a service with ExternalService type", func() {

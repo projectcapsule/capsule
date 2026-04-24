@@ -19,7 +19,7 @@ import (
 
 func IsTenantOwner(
 	ctx context.Context,
-	c client.Client,
+	c client.Reader,
 	cfg configuration.Configuration,
 	tnt *capsulev1beta2.Tenant,
 	userInfo authenticationv1.UserInfo,
@@ -32,9 +32,6 @@ func IsTenantOwner(
 }
 
 func IsTenantOwnerByStatus(
-	ctx context.Context,
-	c client.Client,
-	cfg configuration.Configuration,
 	tnt *capsulev1beta2.Tenant,
 	userInfo authenticationv1.UserInfo,
 ) bool {
@@ -43,7 +40,7 @@ func IsTenantOwnerByStatus(
 
 func IsCommonOwner(
 	ctx context.Context,
-	c client.Client,
+	c client.Reader,
 	cfg configuration.Configuration,
 	tnt *capsulev1beta2.Tenant,
 	userInfo authenticationv1.UserInfo,

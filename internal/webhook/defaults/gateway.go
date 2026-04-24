@@ -16,19 +16,20 @@ import (
 	capsulegateway "github.com/projectcapsule/capsule/internal/webhook/gateway"
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
 	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
+	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 )
 
 func mutateGatewayDefaults(ctx context.Context, req admission.Request, c client.Client, decoder admission.Decoder, namespce string) *admission.Response {
 	gatewayObj := &gatewayv1.Gateway{}
 	if err := decoder.Decode(req, gatewayObj); err != nil {
-		return utils.ErroredResponse(err)
+		return ad.ErroredResponse(err)
 	}
 
 	gatewayObj.SetNamespace(namespce)
 
 	tnt, err := capsulegateway.TenantFromGateway(ctx, c, gatewayObj)
 	if err != nil {
-		return utils.ErroredResponse(err)
+		return ad.ErroredResponse(err)
 	}
 
 	if tnt == nil {

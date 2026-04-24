@@ -13,11 +13,14 @@ import (
 	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	. "github.com/onsi/gomega"
 	"github.com/stretchr/testify/assert"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -25,18 +28,31 @@ import (
 	versionUtil "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/util/retry"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
+	"github.com/projectcapsule/capsule/pkg/api/rbac"
 	"github.com/projectcapsule/capsule/pkg/utils"
 )
 
 const (
-	defaultTimeoutInterval   = 40 * time.Second
-	defaultPollInterval      = time.Second
-	defaultConfigurationName = "default"
+	defaultTimeoutInterval            = 40 * time.Second
+	defaultTerminationTimeoutInterval = 60 * time.Second
+	defaultPollInterval               = time.Second
+	defaultConfigurationName          = "default"
 )
+
+func mergeMaps(base map[string]string, extra map[string]string) map[string]string {
+	out := map[string]string{}
+	for k, v := range base {
+		out[k] = v
+	}
+	for k, v := range extra {
+		out[k] = v
+	}
+	return out
+}
 
 func ignoreNotFound(err error) error {
 	if apierrors.IsNotFound(err) {
@@ -59,7 +75,7 @@ func NewService(svc types.NamespacedName) *corev1.Service {
 	}
 }
 
-func ServiceCreation(svc *corev1.Service, owner api.UserSpec, timeout time.Duration) AsyncAssertion {
+func ServiceCreation(svc *corev1.Service, owner rbac.UserSpec, timeout time.Duration) AsyncAssertion {
 	cs := ownerClient(owner)
 	return Eventually(func() (err error) {
 		_, err = cs.CoreV1().Services(svc.Namespace).Create(context.TODO(), svc, metav1.CreateOptions{})
@@ -92,7 +108,59 @@ func NewNamespace(name string, labels ...map[string]string) *corev1.Namespace {
 	}
 }
 
-func NamespaceCreation(ns *corev1.Namespace, owner api.UserSpec, timeout time.Duration) AsyncAssertion {
+func NamespaceCreationAdmin(ns *corev1.Namespace, timeout time.Duration) AsyncAssertion {
+	return Eventually(func() (err error) {
+		return k8sClient.Create(
+			context.TODO(),
+			ns,
+		)
+	}, timeout, defaultPollInterval)
+}
+
+func NamespaceDeletionAdmin(ns *corev1.Namespace, timeout time.Duration) AsyncAssertion {
+	return Eventually(func() (err error) {
+		return k8sClient.Delete(
+			context.TODO(),
+			ns,
+		)
+	}, timeout, defaultPollInterval)
+}
+
+func ForceDeleteNamespace(ctx context.Context, name string) {
+	Eventually(func() error {
+		ns := &corev1.Namespace{}
+		err := k8sClient.Get(ctx, types.NamespacedName{Name: name}, ns)
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+
+		// Trigger deletion if not already happening
+		if ns.DeletionTimestamp.IsZero() {
+			if err := k8sClient.Delete(ctx, ns); err != nil && !apierrors.IsNotFound(err) {
+				return err
+			}
+			return fmt.Errorf("namespace %s deletion triggered", name)
+		}
+
+		// Force-remove finalizers (THIS is the key part)
+		if len(ns.Finalizers) > 0 {
+			ns.Finalizers = nil
+			if err := k8sClient.Update(ctx, ns); err != nil {
+				return err
+			}
+			return fmt.Errorf("namespace %s finalizers removed", name)
+		}
+
+		// wait until fully gone
+		return fmt.Errorf("namespace %s still terminating", name)
+	}, defaultTerminationTimeoutInterval, defaultPollInterval).Should(Succeed(),
+		"failed to force delete namespace %s", name)
+}
+
+func NamespaceCreation(ns *corev1.Namespace, owner rbac.UserSpec, timeout time.Duration) AsyncAssertion {
 	cs := ownerClient(owner)
 	return Eventually(func() (err error) {
 		_, err = cs.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
@@ -275,16 +343,47 @@ func EventuallyCreation(f interface{}) AsyncAssertion {
 	return Eventually(f, defaultTimeoutInterval, defaultPollInterval)
 }
 
-func ModifyCapsuleConfigurationOpts(fn func(configuration *capsulev1beta2.CapsuleConfiguration)) {
-	config := &capsulev1beta2.CapsuleConfiguration{}
-	Expect(k8sClient.Get(context.Background(), types.NamespacedName{Name: defaultConfigurationName}, config)).ToNot(HaveOccurred())
+func EventuallyDeletion(obj client.Object) {
+	key := client.ObjectKeyFromObject(obj)
 
-	fn(config)
+	Eventually(func() error {
+		// Retry delete until the object is really gone.
+		err := k8sClient.Delete(context.TODO(), obj)
+		if err != nil && !apierrors.IsNotFound(err) {
+			return err
+		}
 
-	Expect(k8sClient.Update(context.Background(), config)).ToNot(HaveOccurred())
+		// Read into a fresh copy to avoid stale in-memory state.
+		current := obj.DeepCopyObject().(client.Object)
+		err = k8sClient.Get(context.TODO(), key, current)
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+
+		return fmt.Errorf("%T %q still exists", obj, obj.GetName())
+	}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 }
 
-func CheckForOwnerRoleBindings(ns *corev1.Namespace, owner api.OwnerSpec, roles map[string]bool) func() error {
+func ModifyCapsuleConfigurationOpts(fn func(configuration *capsulev1beta2.CapsuleConfiguration)) {
+	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		config := &capsulev1beta2.CapsuleConfiguration{}
+
+		if err := k8sClient.Get(context.Background(), types.NamespacedName{Name: defaultConfigurationName}, config); err != nil {
+			return err
+		}
+
+		fn(config)
+
+		return k8sClient.Update(context.Background(), config)
+	})
+
+	Expect(err).ToNot(HaveOccurred())
+}
+
+func CheckForOwnerRoleBindings(ns *corev1.Namespace, owner rbac.OwnerSpec, roles map[string]bool) func() error {
 	if roles == nil {
 		roles = map[string]bool{
 			"admin":                     false,
@@ -301,7 +400,7 @@ func CheckForOwnerRoleBindings(ns *corev1.Namespace, owner api.OwnerSpec, roles 
 
 		var ownerName string
 
-		if owner.Kind == api.ServiceAccountOwner {
+		if owner.Kind == rbac.ServiceAccountOwner {
 			parts := strings.Split(owner.Name, ":")
 
 			ownerName = parts[3]
@@ -373,13 +472,13 @@ func VerifyTenantRoleBindings(
 	}).WithTimeout(30 * time.Second).WithPolling(500 * time.Millisecond).Should(Succeed())
 }
 
-func normalizeOwners(in api.OwnerStatusListSpec) api.OwnerStatusListSpec {
+func normalizeOwners(in rbac.OwnerStatusListSpec) rbac.OwnerStatusListSpec {
 	// copy to avoid mutating the original
-	out := make(api.OwnerStatusListSpec, len(in))
+	out := make(rbac.OwnerStatusListSpec, len(in))
 	copy(out, in)
 
 	// sort outer slice by kind+name
-	sort.Sort(api.GetByKindAndName(out))
+	sort.Sort(rbac.GetByKindAndName(out))
 
 	// sort roles inside each owner so role order doesn't matter
 	for i := range out {
@@ -387,6 +486,67 @@ func normalizeOwners(in api.OwnerStatusListSpec) api.OwnerStatusListSpec {
 	}
 
 	return out
+}
+
+func EnsureServiceAccount(ctx context.Context, c client.Client, name string, namespace string) {
+	sa := &corev1.ServiceAccount{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+	}
+
+	err := c.Create(ctx, sa)
+	if err != nil && !apierrors.IsAlreadyExists(err) {
+		Expect(err).ToNot(HaveOccurred())
+	}
+}
+
+func EnsureRoleAndBindingForNamespaces(ctx context.Context, c client.Client, saName string, saNamespace string, namespaces []string) {
+	for _, ns := range namespaces {
+		role := &rbacv1.Role{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      saName + "-" + saNamespace,
+				Namespace: ns,
+			},
+			Rules: []rbacv1.PolicyRule{
+				{
+					APIGroups: []string{""},
+					Resources: []string{"secrets"},
+					Verbs:     []string{"get", "list", "watch", "create", "update", "patch", "delete"},
+				},
+			},
+		}
+
+		err := c.Create(ctx, role)
+		if err != nil && !apierrors.IsAlreadyExists(err) {
+			Expect(err).ToNot(HaveOccurred())
+		}
+
+		rb := &rbacv1.RoleBinding{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      saName + "-" + saNamespace,
+				Namespace: ns,
+			},
+			Subjects: []rbacv1.Subject{
+				{
+					Kind:      "ServiceAccount",
+					Name:      saName,
+					Namespace: saNamespace,
+				},
+			},
+			RoleRef: rbacv1.RoleRef{
+				APIGroup: "rbac.authorization.k8s.io",
+				Kind:     "Role",
+				Name:     saName + "-" + saNamespace,
+			},
+		}
+
+		err = c.Create(ctx, rb)
+		if err != nil && !apierrors.IsAlreadyExists(err) {
+			Expect(err).ToNot(HaveOccurred())
+		}
+	}
 }
 
 func GetKubernetesVersion() *versionUtil.Version {
@@ -463,7 +623,7 @@ func GrantEphemeralContainersUpdate(ns string, username string) (cleanup func())
 
 	// Give RBAC a moment to propagate in the apiserver authorizer cache
 	Eventually(func() error {
-		cs := ownerClient(api.UserSpec{Name: username, Kind: "User"})
+		cs := ownerClient(rbac.UserSpec{Name: username, Kind: "User"})
 		_, err := cs.CoreV1().Pods(ns).List(context.Background(), metav1.ListOptions{Limit: 1})
 		return err
 	}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
@@ -527,4 +687,139 @@ type dummyT struct {
 
 func (d *dummyT) Errorf(format string, args ...interface{}) {
 	d.errors = append(d.errors, fmt.Sprintf(format, args...))
+}
+
+func MakePod(namespace, name string, labels map[string]string, annotations map[string]string, image string, cpuRequest string, emptyDirSize string) *corev1.Pod {
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        name,
+			Namespace:   namespace,
+			Labels:      labels,
+			Annotations: annotations,
+		},
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
+				{
+					Name:  "main",
+					Image: image,
+				},
+			},
+			RestartPolicy: corev1.RestartPolicyAlways,
+		},
+	}
+
+	if cpuRequest != "" {
+		pod.Spec.Containers[0].Resources.Requests = corev1.ResourceList{
+			corev1.ResourceCPU: resource.MustParse(cpuRequest),
+		}
+	}
+
+	if emptyDirSize != "" {
+		pod.Spec.Volumes = []corev1.Volume{
+			{
+				Name: "cache",
+				VolumeSource: corev1.VolumeSource{
+					EmptyDir: &corev1.EmptyDirVolumeSource{
+						SizeLimit: ptr.To(resource.MustParse(emptyDirSize)),
+					},
+				},
+			},
+		}
+		pod.Spec.Containers[0].VolumeMounts = []corev1.VolumeMount{
+			{
+				Name:      "cache",
+				MountPath: "/cache",
+			},
+		}
+	}
+
+	return pod
+}
+
+func MakeDeployment(namespace, name string, replicas int32, labels map[string]string, cpuRequest string) *appsv1.Deployment {
+	dep := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		Spec: appsv1.DeploymentSpec{
+			Replicas: ptr.To(replicas),
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"app": name,
+				},
+			},
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: mergeMaps(map[string]string{"app": name}, labels),
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:  "nginx",
+							Image: "nginx:1.27.0",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	if cpuRequest != "" {
+		dep.Spec.Template.Spec.Containers[0].Resources.Requests = corev1.ResourceList{
+			corev1.ResourceCPU: resource.MustParse(cpuRequest),
+		}
+	}
+
+	return dep
+}
+
+func MakePVC(namespace, name, size string) *corev1.PersistentVolumeClaim {
+	return &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		Spec: corev1.PersistentVolumeClaimSpec{
+			AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+			Resources: corev1.VolumeResourceRequirements{
+				Requests: corev1.ResourceList{
+					corev1.ResourceStorage: resource.MustParse(size),
+				},
+			},
+		},
+	}
+}
+
+func ScaleDeployment(ctx context.Context, namespace, name string, replicas int32) {
+	Eventually(func() error {
+		dep := &appsv1.Deployment{}
+		if err := k8sClient.Get(ctx, types.NamespacedName{Name: name, Namespace: namespace}, dep); err != nil {
+			return err
+		}
+		dep.Spec.Replicas = ptr.To(replicas)
+		return k8sClient.Update(ctx, dep)
+	}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+}
+
+func UpdatePodLabels(ctx context.Context, namespace, name string, labels map[string]string) {
+	Eventually(func() error {
+		pod := &corev1.Pod{}
+		if err := k8sClient.Get(ctx, types.NamespacedName{Name: name, Namespace: namespace}, pod); err != nil {
+			return err
+		}
+		pod.Labels = labels
+		return k8sClient.Update(ctx, pod)
+	}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+}
+
+func UpdatePodImage(ctx context.Context, namespace, name, image string) {
+	Eventually(func() error {
+		pod := &corev1.Pod{}
+		if err := k8sClient.Get(ctx, types.NamespacedName{Name: name, Namespace: namespace}, pod); err != nil {
+			return err
+		}
+		pod.Spec.Containers[0].Image = image
+		return k8sClient.Update(ctx, pod)
+	}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 }

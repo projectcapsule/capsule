@@ -9,6 +9,7 @@ package v1beta1
 
 import (
 	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api/rbac"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -323,7 +324,7 @@ func (in *TenantSpec) DeepCopyInto(out *TenantSpec) {
 	in.ResourceQuota.DeepCopyInto(&out.ResourceQuota)
 	if in.AdditionalRoleBindings != nil {
 		in, out := &in.AdditionalRoleBindings, &out.AdditionalRoleBindings
-		*out = make([]api.AdditionalRoleBindingsSpec, len(*in))
+		*out = make([]rbac.AdditionalRoleBindingsSpec, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}

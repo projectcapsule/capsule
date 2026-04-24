@@ -7,10 +7,10 @@ import (
 	"fmt"
 	"hash/fnv"
 
-	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api/rbac"
 )
 
-func RoleBindingHashFunc(binding api.AdditionalRoleBindingsSpec) string {
+func RoleBindingHashFunc(binding rbac.AdditionalRoleBindingsSpec) string {
 	h := fnv.New64a()
 
 	_, _ = h.Write([]byte(binding.ClusterRoleName))
