@@ -1,0 +1,656 @@
+package e2e
+
+import (
+	"context"
+	"fmt"
+	"strings"
+	"time"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/api"
+	apimeta "github.com/projectcapsule/capsule/pkg/api/meta"
+	"github.com/projectcapsule/capsule/pkg/api/rbac"
+	"github.com/projectcapsule/capsule/pkg/runtime/gvk"
+	"github.com/projectcapsule/capsule/pkg/template"
+)
+
+const (
+	managedByLabel = "projectcapsule.dev/managed-by"
+	createdByLabel = "projectcapsule.dev/created-by"
+	resourcesLabel = "resources"
+)
+
+var _ = Describe("TenantResource SSA", Label("replications", "namespace", "tenantresource"), Ordered, func() {
+	var (
+		ctx                   context.Context
+		tnt                   *capsulev1beta2.Tenant
+		baseNamespace         string
+		targetNamespaces      []string
+		tenantOwner           rbac.UserSpec
+		additionalBindingUser rbac.UserSpec
+		sharedSourceSecret    *corev1.Secret
+		contextSecretOne      *corev1.Secret
+		contextSecretTwo      *corev1.Secret
+	)
+
+	originalConfig := &capsulev1beta2.CapsuleConfiguration{}
+
+	BeforeEach(func() {
+		ctx = context.Background()
+		baseNamespace = "solar-system"
+		targetNamespaces = []string{"solar-one", "solar-two", "solar-three"}
+		tenantOwner = rbac.UserSpec{Name: "solar-user", Kind: rbac.OwnerKind("User")}
+		additionalBindingUser = rbac.UserSpec{Name: "bob", Kind: rbac.OwnerKind("User")}
+
+		Expect(k8sClient.Get(context.Background(), client.ObjectKey{Name: defaultConfigurationName}, originalConfig)).To(Succeed())
+
+		tnt = &capsulev1beta2.Tenant{
+			ObjectMeta: metav1.ObjectMeta{Name: "tenantresource-ssa"},
+			Spec: capsulev1beta2.TenantSpec{
+				Owners: rbac.OwnerListSpec{{
+					CoreOwnerSpec: rbac.CoreOwnerSpec{UserSpec: tenantOwner},
+				}},
+				AdditionalRoleBindings: []rbac.AdditionalRoleBindingsSpec{{
+					ClusterRoleName: "admin",
+					Subjects:        []rbacv1.Subject{{Kind: "User", Name: additionalBindingUser.Name}},
+				}},
+			},
+		}
+
+		sharedSourceSecret = &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "seed-secret",
+				Namespace: baseNamespace,
+				Labels: map[string]string{
+					"replicate": "true",
+					"source":    "static",
+				},
+			},
+			Type:       corev1.SecretTypeOpaque,
+			StringData: map[string]string{"seed": "base"},
+		}
+
+		contextSecretOne = &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "pull-secret-one",
+				Namespace: "solar-one",
+				Labels:    map[string]string{"pullsecret.company.com": "true"},
+			},
+			Type:       corev1.SecretTypeOpaque,
+			StringData: map[string]string{".dockerconfigjson": "e30="},
+		}
+		contextSecretTwo = &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "pull-secret-two",
+				Namespace: "solar-one",
+				Labels:    map[string]string{"pullsecret.company.com": "true"},
+			},
+			Type:       corev1.SecretTypeOpaque,
+			StringData: map[string]string{".dockerconfigjson": "e30="},
+		}
+
+		Expect(k8sClient.Get(ctx, client.ObjectKey{Name: defaultConfigurationName}, originalConfig)).To(Succeed())
+
+		EventuallyCreation(func() error {
+			tnt.ResourceVersion = ""
+			return k8sClient.Create(ctx, tnt)
+		}).Should(Succeed())
+
+		for _, ns := range append(append([]string{}, targetNamespaces...), baseNamespace) {
+			namespace := NewNamespace(ns, map[string]string{apimeta.TenantLabel: tnt.GetName()})
+			NamespaceCreation(namespace, tenantOwner, defaultTimeoutInterval).Should(Succeed())
+		}
+	})
+
+	AfterEach(func() {
+		ignoreNotFound(k8sClient.Delete(ctx, sharedSourceSecret))
+		ignoreNotFound(k8sClient.Delete(ctx, contextSecretOne))
+		ignoreNotFound(k8sClient.Delete(ctx, contextSecretTwo))
+
+		for _, ns := range append([]string{baseNamespace}, targetNamespaces...) {
+			ForceDeleteNamespace(ctx, ns)
+		}
+
+		EventuallyDeletion(tnt)
+
+		ModifyCapsuleConfigurationOpts(func(configuration *capsulev1beta2.CapsuleConfiguration) {
+			configuration.Spec = originalConfig.Spec
+		})
+	})
+
+	Context("impersonation", func() {
+		It("reflects the resolved service account in status", func() {
+			tr := newRawConfigMapTenantResource(baseNamespace, "sa-resolution", map[string]string{"mode": "default-controller"})
+			tr.Spec.ServiceAccount = nil
+
+			By("creating the TenantResource without an explicit ServiceAccount")
+			EventuallyCreation(func() error { return k8sClient.Create(ctx, tr) }).Should(Succeed())
+
+			By("defaulting to the controller service account")
+			expectResolvedServiceAccount(baseNamespace, tr.Name, "capsule", "capsule-system")
+
+			By("configuring a tenant default service account")
+			ModifyCapsuleConfigurationOpts(func(configuration *capsulev1beta2.CapsuleConfiguration) {
+				configuration.Spec.Impersonation.TenantDefaultServiceAccount = "default"
+			})
+			expectResolvedServiceAccount(baseNamespace, tr.Name, "default", baseNamespace)
+
+			By("overriding with an explicit service account on the TenantResource")
+			Eventually(func() error {
+				current := &capsulev1beta2.TenantResource{}
+				if err := k8sClient.Get(ctx, types.NamespacedName{Name: tr.Name, Namespace: baseNamespace}, current); err != nil {
+					return err
+				}
+				current.Spec.ServiceAccount = &apimeta.LocalRFC1123ObjectReference{Name: apimeta.RFC1123Name("custom-account")}
+				return k8sClient.Update(ctx, current)
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+			expectResolvedServiceAccount(baseNamespace, tr.Name, "custom-account", baseNamespace)
+
+			By("removing the explicit override again")
+			Eventually(func() error {
+				current := &capsulev1beta2.TenantResource{}
+				if err := k8sClient.Get(ctx, types.NamespacedName{Name: tr.Name, Namespace: baseNamespace}, current); err != nil {
+					return err
+				}
+				current.Spec.ServiceAccount = nil
+				return k8sClient.Update(ctx, current)
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+			expectResolvedServiceAccount(baseNamespace, tr.Name, "default", baseNamespace)
+		})
+	})
+
+	Context("apply lifecycle with prune enabled", func() {
+		It("applies, updates and prunes raw items", func() {
+			tr := newRawConfigMapTenantResource(baseNamespace, "raw-prune-enabled", map[string]string{
+				"mode": "before",
+				"foo":  "one",
+			})
+			tr.Spec.PruningOnDelete = ptr.To(true)
+
+			By("creating the TenantResource")
+			EventuallyCreation(func() error { return k8sClient.Create(ctx, tr) }).Should(Succeed())
+			expectTenantResourceReady(baseNamespace, tr.Name)
+
+			By("verifying the created ConfigMaps and status entries")
+			for _, ns := range targetNamespaces {
+				expectConfigMapData(ns, "shared-config", map[string]string{"mode": "before", "foo": "one"})
+				expectManagedLabelsOnConfigMap(ns, "shared-config", true)
+				expectProcessedItemStatus(baseNamespace, tr.Name, configMapRID(tnt.Name, ns, "shared-config", "0/raw-0"), metav1.ConditionTrue, true, "")
+			}
+
+			By("updating the applied data")
+			Eventually(func() error {
+				current := &capsulev1beta2.TenantResource{}
+				if err := k8sClient.Get(ctx, types.NamespacedName{Name: tr.Name, Namespace: baseNamespace}, current); err != nil {
+					return err
+				}
+				cm := current.Spec.Resources[0].RawItems[0].RawExtension.Object.(*corev1.ConfigMap)
+				cm.Data = map[string]string{"mode": "after", "foo": "two", "bar": "three"}
+				return k8sClient.Update(ctx, current)
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+
+			for _, ns := range targetNamespaces {
+				expectConfigMapData(ns, "shared-config", map[string]string{"mode": "after", "foo": "two", "bar": "three"})
+				expectProcessedItemApplied(baseNamespace, tr.Name, configMapRID(tnt.Name, ns, "shared-config", "0/raw-0"))
+			}
+
+			By("deleting the TenantResource and pruning created objects")
+			Expect(k8sClient.Delete(ctx, tr)).To(Succeed())
+			for _, ns := range targetNamespaces {
+				expectConfigMapDeleted(ns, "shared-config")
+			}
+		})
+	})
+
+	Context("apply lifecycle with prune disabled", func() {
+		It("applies, updates and keeps objects while removing managed ownership", func() {
+			tr := newRawConfigMapTenantResource(baseNamespace, "raw-prune-disabled", map[string]string{"mode": "keep"})
+			tr.Spec.PruningOnDelete = ptr.To(false)
+
+			EventuallyCreation(func() error { return k8sClient.Create(ctx, tr) }).Should(Succeed())
+			expectTenantResourceReady(baseNamespace, tr.Name)
+
+			for _, ns := range targetNamespaces {
+				expectConfigMapData(ns, "shared-config", map[string]string{"mode": "keep"})
+				expectManagedLabelsOnConfigMap(ns, "shared-config", true)
+			}
+
+			Expect(k8sClient.Delete(ctx, tr)).To(Succeed())
+
+			By("verifying the ConfigMaps remain but are no longer managed")
+			for _, ns := range targetNamespaces {
+				Eventually(func(g Gomega) {
+					cm := &corev1.ConfigMap{}
+					g.Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "shared-config", Namespace: ns}, cm)).To(Succeed())
+					g.Expect(cm.Labels).To(HaveKeyWithValue(createdByLabel, resourcesLabel))
+					g.Expect(cm.Labels).ToNot(HaveKey(managedByLabel))
+					g.Expect(cm.Data).To(HaveKeyWithValue("mode", "keep"))
+				}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+			}
+		})
+	})
+
+	Context("adoption", func() {
+		It("fails without adopt and succeeds with adopt", func() {
+			preexisting := &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{Name: "adopt-me", Namespace: "solar-one"},
+				Data:       map[string]string{"existing": "true"},
+			}
+			EventuallyCreation(func() error { return k8sClient.Create(ctx, preexisting) }).Should(Succeed())
+
+			withoutAdopt := newGeneratorConfigMapTenantResource(baseNamespace, "adopt-disabled", `---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: adopt-me
+data:
+  source: generator
+  namespace: "{{ $.namespace.metadata.name }}"
+`)
+			withoutAdopt.Spec.PruningOnDelete = ptr.To(true)
+			withoutAdopt.Spec.Settings.Adopt = ptr.To(false)
+
+			EventuallyCreation(func() error { return k8sClient.Create(ctx, withoutAdopt) }).Should(Succeed())
+			expectTenantResourceFailed(baseNamespace, withoutAdopt.Name, "applying of")
+			expectProcessedItemStatus(baseNamespace, withoutAdopt.Name, configMapRID(tnt.Name, "solar-one", "adopt-me", "0/generator-0-0"), metav1.ConditionFalse, false, "cannot be adopted")
+
+			By("recreating a second resource with adoption enabled")
+			withAdopt := newGeneratorConfigMapTenantResource(baseNamespace, "adopt-enabled", `---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: adopt-me
+data:
+  source: generator
+  namespace: "{{ $.namespace.metadata.name }}"
+`)
+			withAdopt.Spec.PruningOnDelete = ptr.To(true)
+			withAdopt.Spec.Settings.Adopt = ptr.To(true)
+
+			EventuallyCreation(func() error { return k8sClient.Create(ctx, withAdopt) }).Should(Succeed())
+			expectTenantResourceReady(baseNamespace, withAdopt.Name)
+			expectConfigMapData("solar-one", "adopt-me", map[string]string{"source": "generator", "namespace": "solar-one"})
+
+			Eventually(func(g Gomega) {
+				cm := &corev1.ConfigMap{}
+				g.Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "adopt-me", Namespace: "solar-one"}, cm)).To(Succeed())
+				g.Expect(cm.Labels).To(HaveKeyWithValue(managedByLabel, resourcesLabel))
+				g.Expect(cm.Labels).ToNot(HaveKey(createdByLabel))
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+			expectProcessedItemStatus(baseNamespace, withAdopt.Name, configMapRID(tnt.Name, "solar-one", "adopt-me", "0/generator-0-0"), metav1.ConditionTrue, false, "")
+		})
+	})
+
+	Context("same object within one TenantResource", func() {
+		It("merges non-conflicting fields from generator and raw item", func() {
+			tr := &capsulev1beta2.TenantResource{
+				ObjectMeta: metav1.ObjectMeta{Name: "same-object-merge", Namespace: baseNamespace},
+				Spec: capsulev1beta2.TenantResourceSpec{
+					TenantResourceCommonSpec: capsulev1beta2.TenantResourceCommonSpec{
+						PruningOnDelete: ptr.To(true),
+						ResyncPeriod:    metav1.Duration{Duration: time.Minute},
+						Resources: []capsulev1beta2.ResourceSpec{{
+							Generators: []capsulev1beta2.TemplateItemSpec{{
+								MissingKey: "error",
+								Template: `---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: common-config
+data:
+  generated-{{ $.namespace.metadata.name }}: from-generator
+`,
+							}},
+							RawItems: []capsulev1beta2.RawExtension{{RawExtension: runtime.RawExtension{Object: &corev1.ConfigMap{
+								TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: "ConfigMap"},
+								ObjectMeta: metav1.ObjectMeta{Name: "common-config"},
+								Data:       map[string]string{"additional-data": "raw"},
+							}}}},
+						}},
+					},
+				},
+			}
+
+			EventuallyCreation(func() error { return k8sClient.Create(ctx, tr) }).Should(Succeed())
+			expectTenantResourceReady(baseNamespace, tr.Name)
+
+			for _, ns := range targetNamespaces {
+				expectConfigMapData(ns, "common-config", map[string]string{
+					fmt.Sprintf("generated-%s", ns): "from-generator",
+					"additional-data":               "raw",
+				})
+			}
+		})
+	})
+
+	Context("generators and template context", func() {
+		It("renders generator templates with tenant and namespace data", func() {
+			tr := newGeneratorConfigMapTenantResource(baseNamespace, "generator-template", `---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: generated-{{ $.namespace.metadata.name }}
+data:
+  tenant: "{{ $.tenant.metadata.name }}"
+  namespace: "{{ $.namespace.metadata.name }}"
+`)
+
+			EventuallyCreation(func() error { return k8sClient.Create(ctx, tr) }).Should(Succeed())
+			expectTenantResourceReady(baseNamespace, tr.Name)
+
+			for _, ns := range targetNamespaces {
+				expectConfigMapData(ns, fmt.Sprintf("generated-%s", ns), map[string]string{
+					"tenant":    tnt.Name,
+					"namespace": ns,
+				})
+				expectProcessedItemStatus(baseNamespace, tr.Name, configMapRID(tnt.Name, ns, fmt.Sprintf("generated-%s", ns), "0/generator-0-0"), metav1.ConditionTrue, true, "")
+			}
+		})
+
+		It("loads additional resources into the template context", func() {
+			EventuallyCreation(func() error { return k8sClient.Create(ctx, contextSecretOne) }).Should(Succeed())
+			EventuallyCreation(func() error { return k8sClient.Create(ctx, contextSecretTwo) }).Should(Succeed())
+
+			tr := &capsulev1beta2.TenantResource{
+				ObjectMeta: metav1.ObjectMeta{Name: "context-loading", Namespace: baseNamespace},
+				Spec: capsulev1beta2.TenantResourceSpec{
+					TenantResourceCommonSpec: capsulev1beta2.TenantResourceCommonSpec{
+						PruningOnDelete: ptr.To(true),
+						ResyncPeriod:    metav1.Duration{Duration: time.Minute},
+						Resources: []capsulev1beta2.ResourceSpec{{
+							Context: &template.TemplateContext{Resources: []*template.TemplateResourceReference{{
+								Index: "secrets",
+								ResourceReference: template.ResourceReference{
+									APIVersion: "v1",
+									Kind:       "Secret",
+									Namespace:  "{{.namespace}}",
+									Selector: &metav1.LabelSelector{MatchLabels: map[string]string{
+										"pullsecret.company.com": "true",
+									}},
+								},
+							}}},
+							Generators: []capsulev1beta2.TemplateItemSpec{{
+								MissingKey: "error",
+								Template: `---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: show-context
+data:
+  count: "{{ len $.secrets }}"
+`,
+							}},
+						}},
+					},
+				},
+			}
+
+			EventuallyCreation(func() error { return k8sClient.Create(ctx, tr) }).Should(Succeed())
+			expectTenantResourceReady(baseNamespace, tr.Name)
+			expectConfigMapData("solar-one", "show-context", map[string]string{"count": "2"})
+			expectConfigMapData("solar-two", "show-context", map[string]string{"count": "0"})
+			expectConfigMapData("solar-three", "show-context", map[string]string{"count": "0"})
+		})
+	})
+
+	Context("multiple TenantResources targeting the same object", func() {
+		It("allows non-conflicting ownership without force", func() {
+			first := newGeneratorConfigMapTenantResource(baseNamespace, "same-object-no-force-a", `---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: owned-together
+data:
+  from-a: one
+`)
+			second := newRawConfigMapTenantResource(baseNamespace, "same-object-no-force-b", map[string]string{"from-b": "two"})
+			second.Spec.Resources[0].RawItems[0].RawExtension.Object.(*corev1.ConfigMap).Name = "owned-together"
+
+			EventuallyCreation(func() error { return k8sClient.Create(ctx, first) }).Should(Succeed())
+			EventuallyCreation(func() error { return k8sClient.Create(ctx, second) }).Should(Succeed())
+
+			expectTenantResourceReady(baseNamespace, first.Name)
+			expectTenantResourceReady(baseNamespace, second.Name)
+
+			for _, ns := range targetNamespaces {
+				expectConfigMapData(ns, "owned-together", map[string]string{"from-a": "one", "from-b": "two"})
+			}
+		})
+
+		It("fails on conflicting ownership without force", func() {
+			first := newRawConfigMapTenantResource(baseNamespace, "same-object-conflict-a", map[string]string{"shared": "one"})
+			first.Spec.Resources[0].RawItems[0].RawExtension.Object.(*corev1.ConfigMap).Name = "force-target"
+
+			second := newRawConfigMapTenantResource(baseNamespace, "same-object-conflict-b", map[string]string{"shared": "two"})
+			second.Spec.Resources[0].RawItems[0].RawExtension.Object.(*corev1.ConfigMap).Name = "force-target"
+			second.Spec.Settings.Force = ptr.To(false)
+
+			EventuallyCreation(func() error { return k8sClient.Create(ctx, first) }).Should(Succeed())
+			expectTenantResourceReady(baseNamespace, first.Name)
+
+			EventuallyCreation(func() error { return k8sClient.Create(ctx, second) }).Should(Succeed())
+			expectTenantResourceFailed(baseNamespace, second.Name, "applying of")
+
+			for _, ns := range targetNamespaces {
+				expectConfigMapData(ns, "force-target", map[string]string{"shared": "one"})
+			}
+		})
+
+		It("wins conflicting ownership with force", func() {
+			first := newRawConfigMapTenantResource(baseNamespace, "same-object-force-a", map[string]string{"shared": "one"})
+			first.Spec.Resources[0].RawItems[0].RawExtension.Object.(*corev1.ConfigMap).Name = "forced-target"
+
+			second := newRawConfigMapTenantResource(baseNamespace, "same-object-force-b", map[string]string{"shared": "two"})
+			second.Spec.Resources[0].RawItems[0].RawExtension.Object.(*corev1.ConfigMap).Name = "forced-target"
+			second.Spec.Settings.Force = ptr.To(true)
+
+			EventuallyCreation(func() error { return k8sClient.Create(ctx, first) }).Should(Succeed())
+			expectTenantResourceReady(baseNamespace, first.Name)
+
+			EventuallyCreation(func() error { return k8sClient.Create(ctx, second) }).Should(Succeed())
+			expectTenantResourceReady(baseNamespace, second.Name)
+
+			for _, ns := range targetNamespaces {
+				expectConfigMapData(ns, "forced-target", map[string]string{"shared": "two"})
+			}
+		})
+	})
+
+	Context("namespaced item replication", func() {
+		It("replicates source objects and strips selector labels to avoid loops", func() {
+			EventuallyCreation(func() error { return k8sClient.Create(ctx, sharedSourceSecret) }).Should(Succeed())
+
+			tr := &capsulev1beta2.TenantResource{
+				ObjectMeta: metav1.ObjectMeta{Name: "selector-replication", Namespace: baseNamespace},
+				Spec: capsulev1beta2.TenantResourceSpec{
+					ServiceAccount: &apimeta.LocalRFC1123ObjectReference{Name: apimeta.RFC1123Name("replicator")},
+					TenantResourceCommonSpec: capsulev1beta2.TenantResourceCommonSpec{
+						PruningOnDelete: ptr.To(true),
+						ResyncPeriod:    metav1.Duration{Duration: time.Minute},
+						Resources: []capsulev1beta2.ResourceSpec{{
+							NamespacedItems: []template.ResourceReference{{
+								APIVersion: "v1",
+								Kind:       "Secret",
+								Namespace:  baseNamespace,
+								Selector: &metav1.LabelSelector{MatchLabels: map[string]string{
+									"replicate": "true",
+								}},
+							}},
+						}},
+					},
+				},
+			}
+
+			EnsureServiceAccount(ctx, k8sClient, tr.Spec.ServiceAccount.Name.String(), baseNamespace)
+			EnsureRoleAndBindingForNamespaces(ctx, k8sClient, tr.Spec.ServiceAccount.Name.String(), baseNamespace, append(targetNamespaces, baseNamespace))
+
+			EventuallyCreation(func() error { return k8sClient.Create(ctx, tr) }).Should(Succeed())
+			expectTenantResourceReady(baseNamespace, tr.Name)
+
+			for _, ns := range targetNamespaces {
+				Eventually(func(g Gomega) {
+					sec := &corev1.Secret{}
+					g.Expect(k8sClient.Get(ctx, types.NamespacedName{Name: sharedSourceSecret.Name, Namespace: ns}, sec)).To(Succeed())
+					g.Expect(sec.Labels).ToNot(HaveKey("replicate"))
+					g.Expect(sec.Labels).To(HaveKeyWithValue("source", "static"))
+					g.Expect(sec.Labels).To(HaveKeyWithValue(createdByLabel, resourcesLabel))
+					g.Expect(sec.Labels).To(HaveKeyWithValue(managedByLabel, resourcesLabel))
+				}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+			}
+		})
+	})
+})
+
+func newRawConfigMapTenantResource(namespace, name string, data map[string]string) *capsulev1beta2.TenantResource {
+	return &capsulev1beta2.TenantResource{
+		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace},
+		Spec: capsulev1beta2.TenantResourceSpec{
+			TenantResourceCommonSpec: capsulev1beta2.TenantResourceCommonSpec{
+				ResyncPeriod:    metav1.Duration{Duration: time.Minute},
+				PruningOnDelete: ptr.To(true),
+				Resources: []capsulev1beta2.ResourceSpec{{
+					RawItems: []capsulev1beta2.RawExtension{{RawExtension: runtime.RawExtension{Object: &corev1.ConfigMap{
+						TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: "ConfigMap"},
+						ObjectMeta: metav1.ObjectMeta{Name: "shared-config"},
+						Data:       data,
+					}}}},
+					AdditionalMetadata: &api.AdditionalMetadataSpec{Labels: map[string]string{"extra-label": "set-by-tr"}},
+				}},
+			},
+		},
+	}
+}
+
+func newGeneratorConfigMapTenantResource(namespace, name, tpl string) *capsulev1beta2.TenantResource {
+	return &capsulev1beta2.TenantResource{
+		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace},
+		Spec: capsulev1beta2.TenantResourceSpec{
+			TenantResourceCommonSpec: capsulev1beta2.TenantResourceCommonSpec{
+				ResyncPeriod:    metav1.Duration{Duration: time.Minute},
+				PruningOnDelete: ptr.To(true),
+				Resources: []capsulev1beta2.ResourceSpec{{
+					Generators: []capsulev1beta2.TemplateItemSpec{{MissingKey: "error", Template: tpl}},
+				}},
+			},
+		},
+	}
+}
+
+func getTenantResource(namespace, name string) *capsulev1beta2.TenantResource {
+	tr := &capsulev1beta2.TenantResource{}
+	Expect(k8sClient.Get(context.Background(), types.NamespacedName{Name: name, Namespace: namespace}, tr)).To(Succeed())
+	return tr
+}
+
+func expectTenantResourceReady(namespace, name string) {
+	Eventually(func(g Gomega) {
+		tr := &capsulev1beta2.TenantResource{}
+		g.Expect(k8sClient.Get(context.Background(), types.NamespacedName{Name: name, Namespace: namespace}, tr)).To(Succeed())
+		rdy := tr.Status.Conditions.GetConditionByType(apimeta.ReadyCondition)
+		g.Expect(rdy).ToNot(BeNil())
+		g.Expect(rdy.Status).To(Equal(metav1.ConditionTrue))
+		g.Expect(tr.Status.Size).To(BeNumerically(">", 0))
+	}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+}
+
+func expectTenantResourceFailed(namespace, name, contains string) {
+	Eventually(func(g Gomega) {
+		tr := &capsulev1beta2.TenantResource{}
+		g.Expect(k8sClient.Get(context.Background(), types.NamespacedName{Name: name, Namespace: namespace}, tr)).To(Succeed())
+		rdy := tr.Status.Conditions.GetConditionByType(apimeta.ReadyCondition)
+		g.Expect(rdy).ToNot(BeNil())
+		g.Expect(rdy.Status).To(Equal(metav1.ConditionFalse))
+		g.Expect(strings.ToLower(rdy.Message)).To(ContainSubstring(strings.ToLower(contains)))
+	}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+}
+
+func expectResolvedServiceAccount(namespace, name, saName, saNamespace string) {
+	Eventually(func(g Gomega) {
+		tr := &capsulev1beta2.TenantResource{}
+		g.Expect(k8sClient.Get(context.Background(), types.NamespacedName{Name: name, Namespace: namespace}, tr)).To(Succeed())
+		g.Expect(tr.Status.ServiceAccount).ToNot(BeNil())
+		g.Expect(tr.Status.ServiceAccount.Name).To(Equal(apimeta.RFC1123Name(saName)))
+		g.Expect(tr.Status.ServiceAccount.Namespace).To(Equal(apimeta.RFC1123SubdomainName(saNamespace)))
+	}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+}
+
+func expectConfigMapData(namespace, name string, expected map[string]string) {
+	Eventually(func(g Gomega) {
+		cm := &corev1.ConfigMap{}
+		g.Expect(k8sClient.Get(context.Background(), types.NamespacedName{Name: name, Namespace: namespace}, cm)).To(Succeed())
+		for k, v := range expected {
+			g.Expect(cm.Data).To(HaveKeyWithValue(k, v))
+		}
+	}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+}
+
+func expectConfigMapDeleted(namespace, name string) {
+	Eventually(func() error {
+		cm := &corev1.ConfigMap{}
+		err := k8sClient.Get(context.Background(), types.NamespacedName{Name: name, Namespace: namespace}, cm)
+		return client.IgnoreNotFound(err)
+	}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+
+	Consistently(func() bool {
+		cm := &corev1.ConfigMap{}
+		err := k8sClient.Get(context.Background(), types.NamespacedName{Name: name, Namespace: namespace}, cm)
+		return client.IgnoreNotFound(err) == nil
+	}, 3*time.Second, defaultPollInterval).Should(BeTrue())
+}
+
+func expectManagedLabelsOnConfigMap(namespace, name string, created bool) {
+	Eventually(func(g Gomega) {
+		cm := &corev1.ConfigMap{}
+		g.Expect(k8sClient.Get(context.Background(), types.NamespacedName{Name: name, Namespace: namespace}, cm)).To(Succeed())
+		g.Expect(cm.Labels).To(HaveKeyWithValue(managedByLabel, resourcesLabel))
+		if created {
+			g.Expect(cm.Labels).To(HaveKeyWithValue(createdByLabel, resourcesLabel))
+		}
+	}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+}
+
+func expectProcessedItemApplied(namespace, trName string, rid gvk.ResourceID) {
+	Eventually(func(g Gomega) {
+		tr := getTenantResource(namespace, trName)
+		item := tr.Status.ProcessedItems.GetItem(rid)
+		g.Expect(item).ToNot(BeNil())
+		g.Expect(item.LastApply).ToNot(BeNil())
+	}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+}
+
+func expectProcessedItemStatus(namespace, trName string, rid gvk.ResourceID, cond metav1.ConditionStatus, created bool, msgContains string) {
+	Eventually(func(g Gomega) {
+		tr := getTenantResource(namespace, trName)
+		item := tr.Status.ProcessedItems.GetItem(rid)
+		g.Expect(item).ToNot(BeNil(), "processed item %+v not found", rid)
+		g.Expect(item.ObjectReferenceStatusCondition.Status).To(Equal(cond))
+		g.Expect(item.ObjectReferenceStatusCondition.Type).To(Equal(apimeta.ReadyCondition))
+		g.Expect(item.ObjectReferenceStatusCondition.Created).To(Equal(created))
+		if msgContains != "" {
+			g.Expect(strings.ToLower(item.ObjectReferenceStatusCondition.Message)).To(ContainSubstring(strings.ToLower(msgContains)))
+		}
+	}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+}
+
+func configMapRID(tenant, namespace, name, origin string) gvk.ResourceID {
+	return gvk.ResourceID{
+		Version:   "v1",
+		Kind:      "ConfigMap",
+		Name:      name,
+		Namespace: namespace,
+		TenantResourceIDWithOrigin: gvk.TenantResourceIDWithOrigin{
+			Origin:           origin,
+			TenantResourceID: gvk.TenantResourceID{Tenant: tenant},
+		},
+	}
+}

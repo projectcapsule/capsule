@@ -568,8 +568,14 @@ func main() {
 		route.ResourcePoolValidation((resourcepool.PoolValidationHandler(ctrl.Log.WithName("webhooks").WithName("resourcepool")))),
 		route.ResourcePoolClaimMutation((resourcepool.ClaimMutationHandler(ctrl.Log.WithName("webhooks").WithName("resourcepoolclaims")))),
 		route.ResourcePoolClaimValidation((resourcepool.ClaimValidationHandler(ctrl.Log.WithName("webhooks").WithName("resourcepoolclaims")))),
-		route.CustomQuotaValidation((customquotavalidation.CustomQuotaValidationHandler())),
-		route.GlobalCustomQuotaValidation((customquotavalidation.GlobalCustomQuotaValidationHandler())),
+		route.CustomQuotaValidation((customquotavalidation.CustomQuotaValidationHandler(
+			targetsCache,
+			jsonPathCache,
+		))),
+		route.GlobalCustomQuotaValidation((customquotavalidation.GlobalCustomQuotaValidationHandler(
+			targetsCache,
+			jsonPathCache,
+		))),
 		route.CalculationCustomQuotas(
 			customquotavalidation.ObjectCalculationHandler(
 				targetsCache,
@@ -648,16 +654,18 @@ func main() {
 		os.Exit(1)
 	}
 
-	setupLog.Info("initializing", "controller", "serviceaccounts")
+	setupLog.Info("initializing", "controller")
 
 	if err = (&cachecontroller.Manager{
-		Log:                ctrl.Log.WithName("chache").WithName("clients"),
+		Log:                ctrl.Log.WithName("capsule.ctrl").WithName("caches"),
 		Client:             manager.GetClient(),
-		Configuration:      cfg,
+		Configuration:      directCfg,
 		ImpersonationCache: impersonationCache,
 		RegistryCache:      registryCache,
+		JSONPathCache:      jsonPathCache,
+		TargetsCache:       targetsCache,
 	}).SetupWithManager(manager, controllerConfig); err != nil {
-		setupLog.Error(err, "unable to create controller", "cache", "ServiceAccounts")
+		setupLog.Error(err, "unable to create controller", "controller", "caches")
 		os.Exit(1)
 	}
 

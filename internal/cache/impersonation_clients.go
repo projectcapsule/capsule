@@ -59,7 +59,7 @@ func (c *ImpersonationCache) Invalidate(namespace, name string) {
 }
 
 // Clear drops all cached clients.
-func (c *ImpersonationCache) Clear() {
+func (c *ImpersonationCache) Reset() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 

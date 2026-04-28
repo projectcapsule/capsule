@@ -105,9 +105,31 @@ func (c *CompiledTargetsCache[K]) Delete(key K) bool {
 	return ok
 }
 
-func (c *CompiledTargetsCache[K]) Clear() {
+func (c *CompiledTargetsCache[K]) Reset() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	clear(c.data)
+}
+
+func (c *CompiledTargetsCache[K]) Stats() int {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	return len(c.data)
+}
+
+func (c *CompiledTargetsCache[K]) PruneActive(active map[K]struct{}) int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	pruned := 0
+	for key := range c.data {
+		if _, ok := active[key]; !ok {
+			delete(c.data, key)
+			pruned++
+		}
+	}
+
+	return pruned
 }

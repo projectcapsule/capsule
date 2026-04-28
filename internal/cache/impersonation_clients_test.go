@@ -83,7 +83,7 @@ func TestImpersonationCache_Basics(t *testing.T) {
 		if entries := c.Stats(); entries != 2 {
 			t.Fatalf("expected Stats()=2 before Clear, got %d", entries)
 		}
-		c.Clear()
+		c.Reset()
 		if entries := c.Stats(); entries != 0 {
 			t.Fatalf("expected Stats()=0 after Clear, got %d", entries)
 		}

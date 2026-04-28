@@ -35,11 +35,19 @@ import (
 	"github.com/projectcapsule/capsule/pkg/runtime/selectors"
 )
 
+// Might need some tuning in the
 var customAdmissionBackoff = wait.Backoff{
-	Steps:    8,
+	Steps:    6,
 	Duration: 20 * time.Millisecond,
-	Factor:   1.8,
+	Factor:   1.5,
 	Jitter:   0.2,
+}
+
+var ledgerMutationBackoff = wait.Backoff{
+	Steps:    1,
+	Duration: 0,
+	Factor:   1,
+	Jitter:   0,
 }
 
 type objectCalculationHandler struct {
@@ -163,6 +171,18 @@ func (h *objectCalculationHandler) OnCreate(c client.Client, decoder admission.D
 			return nil
 		})
 		if err != nil {
+			if apierrors.IsConflict(err) {
+				resp := admission.Denied(
+					fmt.Sprintf(
+						"custom quota admission could not reserve usage due to concurrent quota updates after %d attempts; please retry the request: %v",
+						customAdmissionBackoff.Steps,
+						err,
+					),
+				)
+
+				return &resp
+			}
+
 			return ad.ErroredResponse(err)
 		}
 
@@ -321,6 +341,18 @@ func (h *objectCalculationHandler) OnUpdate(c client.Client, _ admission.Decoder
 			return nil
 		})
 		if err != nil {
+			if apierrors.IsConflict(err) {
+				resp := admission.Denied(
+					fmt.Sprintf(
+						"custom quota admission could not reserve usage due to concurrent quota updates after %d attempts; please retry the request: %v",
+						customAdmissionBackoff.Steps,
+						err,
+					),
+				)
+
+				return &resp
+			}
+
 			return ad.ErroredResponse(err)
 		}
 
@@ -797,7 +829,7 @@ func mutateLedger(
 
 	ledgerKey := quantityLedgerKeyForMatchedQuota(item)
 
-	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+	err := retry.RetryOnConflict(ledgerMutationBackoff, func() error {
 		latestUsed, err := latestPersistedUsedForQuota(ctx, c, item)
 		if err != nil {
 			return err
@@ -916,7 +948,7 @@ func addLedgerPendingDelete(
 	ledgerKey types.NamespacedName,
 	objRef capsulev1beta2.QuantityLedgerObjectRef,
 ) error {
-	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+	return retry.RetryOnConflict(ledgerMutationBackoff, func() error {
 		ledger := &capsulev1beta2.QuantityLedger{}
 		if err := c.Get(ctx, ledgerKey, ledger); err != nil {
 			return err

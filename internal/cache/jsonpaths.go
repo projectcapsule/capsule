@@ -70,16 +70,51 @@ func (c *JSONPathCache) Delete(path string) bool {
 	return true
 }
 
-func (c *JSONPathCache) Clear() {
+func (c *JSONPathCache) DeleteMany(expressions ...string) int {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	clear(c.data)
+	deleted := 0
+
+	for _, expr := range expressions {
+		if expr == "" {
+			continue
+		}
+
+		if _, ok := c.data[expr]; ok {
+			delete(c.data, expr)
+			deleted++
+		}
+	}
+
+	return deleted
 }
 
-func (c *JSONPathCache) Len() int {
+func (c *JSONPathCache) Reset() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.data = make(map[string]*jsonpath.CompiledJSONPath)
+}
+
+func (c *JSONPathCache) Stats() int {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
 	return len(c.data)
+}
+
+func (c *JSONPathCache) PruneActive(active map[string]struct{}) int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	pruned := 0
+	for path := range c.data {
+		if _, ok := active[path]; !ok {
+			delete(c.data, path)
+			pruned++
+		}
+	}
+
+	return pruned
 }

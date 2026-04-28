@@ -11,15 +11,26 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/internal/cache"
+	controller "github.com/projectcapsule/capsule/internal/controllers/customquotas"
 	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 	"github.com/projectcapsule/capsule/pkg/runtime/quota"
 )
 
-type globalCustomQuotaValidationHandler struct{}
+type globalCustomQuotaValidationHandler struct {
+	targetsCache  *cache.CompiledTargetsCache[string]
+	jsonPathCache *cache.JSONPathCache
+}
 
-func GlobalCustomQuotaValidationHandler() handlers.Handler {
-	return &globalCustomQuotaValidationHandler{}
+func GlobalCustomQuotaValidationHandler(
+	targetsCache *cache.CompiledTargetsCache[string],
+	jsonPathCache *cache.JSONPathCache,
+) handlers.Handler {
+	return &globalCustomQuotaValidationHandler{
+		targetsCache:  targetsCache,
+		jsonPathCache: jsonPathCache,
+	}
 }
 
 func (h *globalCustomQuotaValidationHandler) OnCreate(_ client.Client, decoder admission.Decoder, _ events.EventRecorder) handlers.Func {
@@ -42,6 +53,19 @@ func (h *globalCustomQuotaValidationHandler) OnCreate(_ client.Client, decoder a
 
 func (h *globalCustomQuotaValidationHandler) OnDelete(_ client.Client, decoder admission.Decoder, _ events.EventRecorder) handlers.Func {
 	return func(_ context.Context, req admission.Request) *admission.Response {
+		obj := &capsulev1beta2.GlobalCustomQuota{}
+		if err := decoder.DecodeRaw(req.OldObject, obj); err != nil {
+			return ad.ErroredResponse(err)
+		}
+
+		key := controller.MakeGlobalCustomQuotaCacheKey(obj.GetName())
+
+		if h.targetsCache != nil {
+			h.targetsCache.Delete(key)
+		}
+
+		h.jsonPathCache.DeleteMany(obj.Spec.CollectJSONPathExpressions()...)
+
 		return nil
 	}
 }

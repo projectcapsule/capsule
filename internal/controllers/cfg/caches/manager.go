@@ -5,18 +5,23 @@ package caches
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/go-logr/logr"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/retry"
+	"k8s.io/client-go/util/workqueue"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
@@ -37,12 +42,14 @@ type Manager struct {
 	Configuration configuration.Configuration
 
 	RegistryCache      *cache.RegistryRuleSetCache
+	TargetsCache       *cache.CompiledTargetsCache[string]
+	JSONPathCache      *cache.JSONPathCache
 	ImpersonationCache *cache.ImpersonationCache
 }
 
 // Start is the Runnable function triggered upon Manager start-up to perform cache population.
 func (r *Manager) Start(ctx context.Context) error {
-	if err := r.populateCaches(ctx, r.Log); err != nil {
+	if err := r.rebuildCaches(ctx, r.Log); err != nil {
 		r.Log.Error(err, "cache population failed")
 
 		return nil
@@ -62,8 +69,58 @@ func (r *Manager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.Controller
 			&capsulev1beta2.CapsuleConfiguration{},
 			builder.WithPredicates(
 				predicate.GenerationChangedPredicate{},
+				predicates.NamesMatchingPredicate{Names: []string{ctrlConfig.ConfigurationName}},
+			),
+		).
+		Watches(
+			&capsulev1beta2.CapsuleConfiguration{},
+			handler.Funcs{
+				UpdateFunc: func(ctx context.Context, updateEvent event.TypedUpdateEvent[client.Object], limitingInterface workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+					if err := r.rebuildImpersonationCache(ctx, r.Log); err != nil {
+						r.Log.Error(err, "unable to invalidate impersonation cache")
+					}
+				},
+			},
+			builder.WithPredicates(
 				predicates.CapsuleConfigSpecImpersonationChangedPredicate{},
 				predicates.NamesMatchingPredicate{Names: []string{ctrlConfig.ConfigurationName}},
+			),
+		).
+		Watches(
+			&corev1.ServiceAccount{},
+			handler.Funcs{
+				DeleteFunc: func(
+					ctx context.Context,
+					e event.TypedDeleteEvent[client.Object],
+					q workqueue.TypedRateLimitingInterface[reconcile.Request],
+				) {
+					sa, ok := e.Object.(*corev1.ServiceAccount)
+					if !ok {
+						return
+					}
+
+					if err := r.invalidateServiceAccount(ctx, sa); err != nil {
+						r.Log.Error(err, "unable to invalidate serviceaccount cache",
+							"namespace", sa.GetNamespace(),
+							"name", sa.GetName(),
+						)
+					}
+				},
+			},
+			builder.WithPredicates(predicate.Funcs{
+				DeleteFunc: func(e event.DeleteEvent) bool {
+					return true
+				},
+				CreateFunc: func(e event.CreateEvent) bool {
+					return false
+				},
+				UpdateFunc: func(e event.UpdateEvent) bool {
+					return false
+				},
+				GenericFunc: func(e event.GenericEvent) bool {
+					return false
+				},
+			},
 			),
 		).
 		Complete(r)
@@ -105,7 +162,7 @@ func (r *Manager) Reconcile(ctx context.Context, request reconcile.Request) (res
 	if cache.ShouldInvalidate(ptr.To(instance.Status.LastCacheInvalidation), time.Now(), interval.Duration) {
 		log.V(3).Info("invalidating caches")
 
-		if err := r.invalidateCaches(ctx, log); err != nil {
+		if err := r.rebuildCaches(ctx, log); err != nil {
 			return res, err
 		}
 	}
@@ -130,4 +187,34 @@ func (r *Manager) updateConfigStatus(
 
 		return r.Client.Status().Update(ctx, latest)
 	})
+}
+
+// invalidateCaches invokes for all caches their invalidation functions.
+func (r *Manager) rebuildCaches(
+	ctx context.Context,
+	log logr.Logger,
+) error {
+	var errs []error
+
+	if err := r.rebuildJSONPathCache(ctx, log); err != nil {
+		errs = append(errs, fmt.Errorf("rebuild JSONPath cache: %w", err))
+	}
+
+	if err := r.rebuildTargetsCache(ctx, log); err != nil {
+		errs = append(errs, fmt.Errorf("rebuild targets cache: %w", err))
+	}
+
+	if err := r.rebuildRuleStatusRegistryCache(ctx, log); err != nil {
+		errs = append(errs, fmt.Errorf("rebuild registry cache: %w", err))
+	}
+
+	if err := r.rebuildImpersonationCache(ctx, log); err != nil {
+		errs = append(errs, fmt.Errorf("rebuild impersonation cache: %w", err))
+	}
+
+	if len(errs) > 0 {
+		return errors.Join(errs...)
+	}
+
+	return nil
 }
