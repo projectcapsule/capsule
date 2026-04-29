@@ -19,7 +19,7 @@ CAPSULE_IMG     ?= $(REGISTRY)/$(IMG_BASE)
 CLUSTER_NAME    ?= capsule
 FILTER		 	?= --label-filter="!skip"
 ## Kubernetes Version Support
-KUBERNETES_SUPPORTED_VERSION ?= "v1.35.0"
+KUBERNETES_SUPPORTED_VERSION ?= "v1.36.0"
 
 ## Openshift Version Support
 OS_SUPPORTED_VERSION ?= "4.22.0-okd-scos.ec.10"
@@ -95,6 +95,7 @@ helm-schema: helm-plugin-schema
 helm-test: HELM_KIND_CONFIG ?= ""
 helm-test: kind
 	@mkdir -p /tmp/results || true
+	@$(KIND) build node-image $(KUBERNETES_SUPPORTED_VERSION) --image kindest/node:$(KUBERNETES_SUPPORTED_VERSION)
 	@$(KIND) create cluster --wait=60s --name capsule-charts --image kindest/node:$(KUBERNETES_SUPPORTED_VERSION) --config ./hack/kind-cluster.yaml
 	@make helm-test-exec
 	@$(KIND) delete cluster --name capsule-charts
@@ -108,6 +109,7 @@ helm-test-exec: ct helm-controller-version ko-build-all
 
 # Setup development env
 dev-build: kind
+	$(KIND) build node-image $(KUBERNETES_SUPPORTED_VERSION) --image kindest/node:$(KUBERNETES_SUPPORTED_VERSION)
 	$(KIND) create cluster --wait=60s --name $(CLUSTER_NAME) --image kindest/node:$(KUBERNETES_SUPPORTED_VERSION) --config ./hack/kind-cluster.yaml
 	$(MAKE) dev-install-deps
 
@@ -441,6 +443,7 @@ trace-install:
 .PHONY: trace-e2e
 trace-e2e: kind
 	$(MAKE) docker-build-capsule-trace
+	$(KIND) build node-image $(KUBERNETES_SUPPORTED_VERSION) --image kindest/node:$(KUBERNETES_SUPPORTED_VERSION)
 	$(KIND) create cluster --wait=60s --image kindest/node:$(KUBERNETES_SUPPORTED_VERSION) --config hack/kind-cluster.yml
 	$(MAKE) e2e-load-image CLUSTER_NAME=capsule-tracing IMAGE=$(CAPSULE_IMG) VERSION=tracing
 	$(MAKE) trace-install
