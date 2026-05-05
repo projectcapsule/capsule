@@ -20,6 +20,12 @@
   <a href="https://app.fossa.com/projects/git%2Bgithub.com%2Fprojectcapsule%2Fcapsule?ref=badge_shield&issueType=license" alt="FOSSA Status">
     <img src="https://app.fossa.com/api/projects/git%2Bgithub.com%2Fprojectcapsule%2Fcapsule.svg?type=shield&issueType=license"/>
   </a>
+  <a href="https://insights.linuxfoundation.org/project/capsule" alt="LFX Active Contributors">
+    <img src="https://insights.linuxfoundation.org/api/badge/active-contributors?project=capsule"/>
+  </a>
+  <a href="https://insights.linuxfoundation.org/project/capsule" alt="LFX Health Score">
+    <img src="https://insights.linuxfoundation.org/api/badge/health-score?project=capsule"/>
+  </a>
 </p>
 
 <p align="center">
