@@ -49,6 +49,7 @@ import (
 	"github.com/projectcapsule/capsule/internal/webhook/defaults"
 	"github.com/projectcapsule/capsule/internal/webhook/dra"
 	"github.com/projectcapsule/capsule/internal/webhook/gateway"
+	"github.com/projectcapsule/capsule/internal/webhook/httproute"
 	"github.com/projectcapsule/capsule/internal/webhook/ingress"
 	"github.com/projectcapsule/capsule/internal/webhook/misc"
 	namespacemutation "github.com/projectcapsule/capsule/internal/webhook/namespace/mutation"
@@ -280,6 +281,11 @@ func main() {
 		),
 		route.MiscCustomResources(misc.ResourceCounterHandler(manager.GetClient())),
 		route.Gateway(gateway.Class(cfg)),
+		route.HTTPRoute(
+			httproute.Handler(
+				httproute.GatewayValidator(),
+			),
+		),
 		route.DeviceClass(dra.DeviceClass()),
 		route.Defaults(defaults.Handler(cfg, kubeVersion)),
 		route.TenantMutation(

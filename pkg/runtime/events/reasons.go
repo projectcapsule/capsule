@@ -33,6 +33,7 @@ const (
 	ReasonMissingGatewayClass    string = "MissingGatewayClass"
 	ReasonMissingDeviceClass     string = "MissingDeviceClass"
 	ReasonForbiddenDeviceClass   string = "ForbiddenDeviceClass"
+	ReasonForbiddenGateway       string = "ForbiddenGateway"
 
 	// Pods.
 	ReasonMissingFQCI                string = "MissingFQCI"
