@@ -64,10 +64,10 @@ jobs:
       fail-fast: false
       matrix:
         k8s-version:
-          - 'v1.31.0'
           - 'v1.32.0'
           - 'v1.33.0'
           - 'v1.34.0'
+          - 'v1.35.0'
     runs-on:
       labels: ubuntu-latest-8-cores
     steps:
@@ -91,7 +91,6 @@ jobs:
       fail-fast: false
       matrix:
         os-version: # https://quay.io/repository/minc-org/minc?tab=tags&tag=latest
-          - '4.18.0-okd-scos.9'
           - '4.19.0-okd-scos.17'
     runs-on: ubuntu-latest-8-cores
     steps:
