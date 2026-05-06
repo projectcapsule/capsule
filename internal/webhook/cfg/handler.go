@@ -28,6 +28,7 @@ type handler struct {
 	handlers []handlers.TypedHandler[*capsulev1beta2.CapsuleConfiguration]
 }
 
+//nolint:dupl
 func (h *handler) OnCreate(c client.Client, decoder admission.Decoder, recorder events.EventRecorder) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		config := &capsulev1beta2.CapsuleConfiguration{}
@@ -45,6 +46,7 @@ func (h *handler) OnCreate(c client.Client, decoder admission.Decoder, recorder 
 	}
 }
 
+//nolint:dupl
 func (h *handler) OnDelete(c client.Client, decoder admission.Decoder, recorder events.EventRecorder) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		config := &capsulev1beta2.CapsuleConfiguration{}

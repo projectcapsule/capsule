@@ -108,50 +108,6 @@ func (r *clusterCustomQuotaClaimController) SetupWithManager(mgr ctrl.Manager, c
 		Complete(r)
 }
 
-func (r *clusterCustomQuotaClaimController) mapNamespaceToGlobalCustomQuotas(
-	ctx context.Context,
-	obj client.Object,
-) []reconcile.Request {
-	ns, ok := obj.(*corev1.Namespace)
-	if !ok {
-		return nil
-	}
-
-	var quotaList capsulev1beta2.GlobalCustomQuotaList
-	if err := r.List(ctx, &quotaList); err != nil {
-		r.log.Error(err, "cannot list GlobalCustomQuota objects for namespace event", "namespace", ns.Name)
-
-		return nil
-	}
-
-	requests := make([]reconcile.Request, 0, len(quotaList.Items))
-
-	for i := range quotaList.Items {
-		gcq := &quotaList.Items[i]
-
-		if shouldReconcileForNamespaceEvent(gcq, ns.Name) {
-			requests = append(requests, reconcile.Request{
-				NamespacedName: types.NamespacedName{
-					Name: gcq.Name,
-				},
-			})
-		}
-	}
-
-	return requests
-}
-
-func shouldReconcileForNamespaceEvent(
-	instance *capsulev1beta2.GlobalCustomQuota,
-	namespace string,
-) bool {
-	if len(instance.Spec.NamespaceSelectors) > 0 {
-		return true
-	}
-
-	return slices.Contains(instance.Status.Namespaces, namespace)
-}
-
 func (r *clusterCustomQuotaClaimController) Reconcile(ctx context.Context, request ctrl.Request) (ctrl.Result, error) {
 	log := r.log.WithValues("Request.Name", request.Name)
 
@@ -206,10 +162,55 @@ func (r *clusterCustomQuotaClaimController) Reconcile(ctx context.Context, reque
 			"customQuota", instance.Name,
 			"after", requeueAfter.String(),
 		)
+
 		return ctrl.Result{RequeueAfter: *requeueAfter}, nil
 	}
 
 	return ctrl.Result{}, nil
+}
+
+func (r *clusterCustomQuotaClaimController) mapNamespaceToGlobalCustomQuotas(
+	ctx context.Context,
+	obj client.Object,
+) []reconcile.Request {
+	ns, ok := obj.(*corev1.Namespace)
+	if !ok {
+		return nil
+	}
+
+	var quotaList capsulev1beta2.GlobalCustomQuotaList
+	if err := r.List(ctx, &quotaList); err != nil {
+		r.log.Error(err, "cannot list GlobalCustomQuota objects for namespace event", "namespace", ns.Name)
+
+		return nil
+	}
+
+	requests := make([]reconcile.Request, 0, len(quotaList.Items))
+
+	for i := range quotaList.Items {
+		gcq := &quotaList.Items[i]
+
+		if shouldReconcileForNamespaceEvent(gcq, ns.Name) {
+			requests = append(requests, reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Name: gcq.Name,
+				},
+			})
+		}
+	}
+
+	return requests
+}
+
+func shouldReconcileForNamespaceEvent(
+	instance *capsulev1beta2.GlobalCustomQuota,
+	namespace string,
+) bool {
+	if len(instance.Spec.NamespaceSelectors) > 0 {
+		return true
+	}
+
+	return slices.Contains(instance.Status.Namespaces, namespace)
 }
 
 func (r *clusterCustomQuotaClaimController) reconcile(
@@ -353,7 +354,7 @@ func (r *clusterCustomQuotaClaimController) reconcile(
 				usage.Neg()
 				instance.Status.Usage.Used.Add(usage)
 				quota.ClampQuantityToZero(&instance.Status.Usage.Used)
-			default:
+			case quota.OpAdd, quota.OpCount:
 				instance.Status.Usage.Used.Add(usage)
 			}
 
@@ -392,83 +393,7 @@ func (r *clusterCustomQuotaClaimController) reconcile(
 	return nil
 }
 
-func (r *clusterCustomQuotaClaimController) applyActiveLedgerReservationsToStatus(
-	ctx context.Context,
-	instance *capsulev1beta2.GlobalCustomQuota,
-) error {
-	key := types.NamespacedName{
-		Name:      instance.GetName(),
-		Namespace: configuration.ControllerNamespace(),
-	}
-
-	ledger := &capsulev1beta2.QuantityLedger{}
-	if err := r.Get(ctx, key, ledger); err != nil {
-		if apierrors.IsNotFound(err) {
-			instance.Status.Usage.Available = instance.Spec.Limit.DeepCopy()
-			instance.Status.Usage.Available.Sub(instance.Status.Usage.Used)
-			if instance.Status.Usage.Available.Sign() < 0 {
-				instance.Status.Usage.Available = resource.MustParse("0")
-			}
-			return nil
-		}
-		return err
-	}
-
-	now := metav1.Now()
-
-	seenUIDs := make(map[types.UID]struct{}, len(instance.Status.Claims))
-	for _, claim := range instance.Status.Claims {
-		if claim.UID != "" {
-			seenUIDs[claim.UID] = struct{}{}
-		}
-	}
-
-	for _, res := range ledger.Status.Reservations {
-		if res.ExpiresAt != nil && res.ExpiresAt.Before(&now) {
-			continue
-		}
-
-		if reservationMaterializedLedger(res, instance.Status.Claims) {
-			continue
-		}
-
-		instance.Status.Usage.Used.Add(res.Usage)
-
-		if res.ObjectRef.UID != "" {
-			if _, exists := seenUIDs[res.ObjectRef.UID]; exists {
-				continue
-			}
-			seenUIDs[res.ObjectRef.UID] = struct{}{}
-		}
-
-		instance.Status.Claims = append(instance.Status.Claims, capsulev1beta2.CustomQuotaClaimItem{
-			GroupVersionKind: metav1.GroupVersionKind{
-				Group:   res.ObjectRef.APIGroup,
-				Version: res.ObjectRef.APIVersion,
-				Kind:    res.ObjectRef.Kind,
-			},
-			NamespacedObjectWithUIDReference: meta.NamespacedObjectWithUIDReference{
-				Name:      res.ObjectRef.Name,
-				Namespace: meta.RFC1123SubdomainName(res.ObjectRef.Namespace),
-				UID:       res.ObjectRef.UID,
-			},
-			Usage: res.Usage.DeepCopy(),
-		})
-	}
-
-	if instance.Status.Usage.Used.Sign() < 0 {
-		instance.Status.Usage.Used = resource.MustParse("0")
-	}
-
-	instance.Status.Usage.Available = instance.Spec.Limit.DeepCopy()
-	instance.Status.Usage.Available.Sub(instance.Status.Usage.Used)
-	if instance.Status.Usage.Available.Sign() < 0 {
-		instance.Status.Usage.Available = resource.MustParse("0")
-	}
-
-	return nil
-}
-
+//nolint:dupl
 func (r *clusterCustomQuotaClaimController) reconcileLedger(
 	ctx context.Context,
 	log logr.Logger,
@@ -487,6 +412,7 @@ func (r *clusterCustomQuotaClaimController) reconcileLedger(
 			if apierrors.IsNotFound(err) {
 				return nil
 			}
+
 			return err
 		}
 
@@ -494,6 +420,7 @@ func (r *clusterCustomQuotaClaimController) reconcileLedger(
 		pendingDeleteTTL := 30 * time.Second
 
 		activeReservations := make([]capsulev1beta2.QuantityLedgerReservation, 0, len(ledger.Status.Reservations))
+
 		for _, res := range ledger.Status.Reservations {
 			materialized := reservationMaterializedLedger(res, instance.Status.Claims)
 			expired := res.ExpiresAt != nil && res.ExpiresAt.Before(&now)
@@ -524,6 +451,7 @@ func (r *clusterCustomQuotaClaimController) reconcileLedger(
 		}
 
 		activeDeletes := make([]capsulev1beta2.QuantityLedgerPendingDelete, 0, len(ledger.Status.PendingDeletes))
+
 		for _, pd := range ledger.Status.PendingDeletes {
 			stillPresent := pendingDeleteStillPresent(pd, instance.Status.Claims)
 			expired := now.Sub(pd.CreatedAt.Time) >= pendingDeleteTTL
@@ -545,15 +473,15 @@ func (r *clusterCustomQuotaClaimController) reconcileLedger(
 				activeDeletes = append(activeDeletes, pd)
 				requeueAfter = minDurationPtr(requeueAfter, immediatePendingDeleteRequeue)
 			case expired:
-				// drop stale hint
 			default:
-				// object is no longer collected by the controller; remove hint now
 			}
 		}
 
 		ledger.Status.Reservations = activeReservations
 		ledger.Status.PendingDeletes = activeDeletes
+
 		ledger.Status.Reserved = resource.MustParse("0")
+
 		for _, res := range activeReservations {
 			ledger.Status.Reserved.Add(res.Usage)
 		}
@@ -681,46 +609,4 @@ func (r *clusterCustomQuotaClaimController) updateStatus(
 
 		return nil
 	})
-}
-
-func pendingDeleteStillPresent(
-	pd capsulev1beta2.QuantityLedgerPendingDelete,
-	claims []capsulev1beta2.CustomQuotaClaimItem,
-) bool {
-	for _, claim := range claims {
-		if pd.ObjectRef.UID != "" && claim.UID != "" && pd.ObjectRef.UID == claim.UID {
-			return true
-		}
-
-		if pd.ObjectRef.APIGroup == claim.Group &&
-			pd.ObjectRef.APIVersion == claim.Version &&
-			pd.ObjectRef.Kind == claim.Kind &&
-			pd.ObjectRef.Namespace == string(claim.Namespace) &&
-			pd.ObjectRef.Name == claim.Name {
-			return true
-		}
-	}
-
-	return false
-}
-
-func reservationMaterializedLedger(
-	res capsulev1beta2.QuantityLedgerReservation,
-	claims []capsulev1beta2.CustomQuotaClaimItem,
-) bool {
-	for _, claim := range claims {
-		if res.ObjectRef.UID != "" && claim.UID != "" && res.ObjectRef.UID == claim.UID {
-			return true
-		}
-
-		if res.ObjectRef.APIGroup == claim.Group &&
-			res.ObjectRef.APIVersion == claim.Version &&
-			res.ObjectRef.Kind == claim.Kind &&
-			res.ObjectRef.Namespace == string(claim.Namespace) &&
-			res.ObjectRef.Name == claim.Name {
-			return true
-		}
-	}
-
-	return false
 }

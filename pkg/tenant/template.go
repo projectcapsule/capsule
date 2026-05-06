@@ -13,22 +13,17 @@ import (
 )
 
 // NewTenantContext returns the context for the tenant.
-func NewTenantContext(tnt *capsulev1beta2.Tenant, scheme *runtime.Scheme, opts sanitize.SanitizeOptions) (context map[string]any, err error) {
-	// initialize context
-	context = map[string]any{}
-
+func NewTenantContext(tnt *capsulev1beta2.Tenant, scheme *runtime.Scheme, opts sanitize.SanitizeOptions) (map[string]any, error) {
 	if err := sanitize.SanitizeObject(tnt, scheme, opts); err != nil {
 		return nil, err
 	}
 
-	context, err = utils.ToUnstructuredMap(tnt)
+	context, err := utils.ToUnstructuredMap(tnt)
 	if err != nil {
 		return nil, err
 	}
 
-	roles := tnt.GetClusterRolesBySubject(nil)
-
-	context["rbac"] = roles
+	context["rbac"] = tnt.GetClusterRolesBySubject(nil)
 
 	return context, nil
 }

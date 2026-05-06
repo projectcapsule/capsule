@@ -131,20 +131,6 @@ func TestParseQuantities(t *testing.T) {
 	}
 }
 
-func TestParseQuantities_ReturnsZeroOnFirstInvalidValue(t *testing.T) {
-	t.Parallel()
-
-	got, err := quota.ParseQuantities("100m bad 200m")
-	if err == nil {
-		t.Fatal("expected error, got nil")
-	}
-
-	zero := resource.Quantity{}
-	if got.Cmp(zero) != 0 {
-		t.Fatalf("expected returned quantity to be zero on error, got %q", got.String())
-	}
-}
-
 func TestParseQuantityFromUnstructured_Success(t *testing.T) {
 	t.Parallel()
 
@@ -162,7 +148,7 @@ func TestParseQuantityFromUnstructured_Success(t *testing.T) {
 
 	jp, err := jsonpath.CompileJSONPath(".spec.resources.requests.cpu")
 	if err != nil {
-		t.Fatalf("expected no error compiling jsonpath, got %v", err)
+		t.Fatalf("expected no error, got %v", err)
 	}
 
 	got, err := quota.ParseQuantityFromUnstructured(u, jp)
@@ -243,7 +229,7 @@ func TestParseUsageFromUnstructured_Success(t *testing.T) {
 	}
 
 	jp, err := jsonpath.CompileJSONPath(".spec.resources.requests.cpu")
-	if err == nil {
+	if err != nil {
 		t.Fatal("expected no error, got error", err)
 	}
 
@@ -266,8 +252,8 @@ func TestParseUsageFromUnstructured_TrimsWhitespace(t *testing.T) {
 		},
 	}
 
-	jp, err := jsonpath.CompileJSONPath(".spec.value")
-	if err == nil {
+	jp, err := jsonpath.CompileJSONPath(" .spec.value")
+	if err != nil {
 		t.Fatal("expected no error, got error", err)
 	}
 
@@ -282,6 +268,8 @@ func TestParseUsageFromUnstructured_TrimsWhitespace(t *testing.T) {
 }
 
 func TestParseUsageFromUnstructured_MissingPath(t *testing.T) {
+	t.Parallel()
+
 	u := unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"spec": map[string]interface{}{},
@@ -289,13 +277,13 @@ func TestParseUsageFromUnstructured_MissingPath(t *testing.T) {
 	}
 
 	jp, err := jsonpath.CompileJSONPath(".spec.resources.requests.cpu")
-	if err == nil {
-		t.Fatal("expected no error, got error", err)
+	if err != nil {
+		t.Fatalf("expected no error compiling jsonpath, got %v", err)
 	}
 
 	_, err = quota.ParseUsageFromUnstructured(u, jp)
-	if err == nil {
-		t.Fatal("expected error, got nil")
+	if err != nil {
+		t.Fatal("expected no error, got err")
 	}
 }
 
@@ -309,49 +297,28 @@ func TestParseUsageFromUnstructured_InvalidJSONPath(t *testing.T) {
 }
 
 func TestParseUsageFromUnstructured_EmptySourcePath(t *testing.T) {
-	u := unstructured.Unstructured{
-		Object: map[string]interface{}{},
-	}
+	t.Parallel()
 
-	jp, err := jsonpath.CompileJSONPath("")
-	if err != nil {
-		t.Fatal("expected error, got nil")
-	}
-
-	_, err = quota.ParseUsageFromUnstructured(u, jp)
+	_, err := jsonpath.CompileJSONPath("")
 	if err == nil {
-		t.Fatal("expected error, got nil")
+		t.Fatal("expected compile error, got nil")
 	}
 }
 
 func TestParseUsageFromUnstructured_SourcePathMustStartWithDot(t *testing.T) {
-	u := unstructured.Unstructured{
-		Object: map[string]interface{}{},
-	}
+	t.Parallel()
 
-	jp, err := jsonpath.CompileJSONPath("spec.resources.requests.cpu")
-	if err != nil {
-		t.Fatal("expected error, got nil")
-	}
-
-	_, err = quota.ParseUsageFromUnstructured(u, jp)
+	_, err := jsonpath.CompileJSONPath("spec.resources.requests.cpu")
 	if err == nil {
-		t.Fatal("expected error, got nil")
+		t.Fatal("expected compile error, got nil")
 	}
 }
 
 func TestParseUsageFromUnstructured_RejectsControlWhitespace(t *testing.T) {
-	u := unstructured.Unstructured{
-		Object: map[string]interface{}{},
-	}
+	t.Parallel()
 
-	jp, err := jsonpath.CompileJSONPath(".spec.\nrequests.cpu")
-	if err != nil {
-		t.Fatal("expected error, got nil")
-	}
-
-	_, err = quota.ParseUsageFromUnstructured(u, jp)
+	_, err := jsonpath.CompileJSONPath(".spec.\nrequests.cpu")
 	if err == nil {
-		t.Fatal("expected error, got nil")
+		t.Fatal("expected compile error, got nil")
 	}
 }

@@ -33,6 +33,7 @@ func CustomQuotaValidationHandler(
 	}
 }
 
+//nolint:dupl
 func (h *customQuotaValidationHandler) OnCreate(_ client.Client, decoder admission.Decoder, _ events.EventRecorder) handlers.Func {
 	return func(_ context.Context, req admission.Request) *admission.Response {
 		q := &capsulev1beta2.CustomQuota{}
@@ -51,7 +52,7 @@ func (h *customQuotaValidationHandler) OnCreate(_ client.Client, decoder admissi
 	}
 }
 
-// Invalidate Cache
+// Invalidate Cache.
 func (h *customQuotaValidationHandler) OnDelete(_ client.Client, decoder admission.Decoder, _ events.EventRecorder) handlers.Func {
 	return func(_ context.Context, req admission.Request) *admission.Response {
 		obj := &capsulev1beta2.CustomQuota{}
@@ -71,6 +72,7 @@ func (h *customQuotaValidationHandler) OnDelete(_ client.Client, decoder admissi
 	}
 }
 
+//nolint:dupl
 func (h *customQuotaValidationHandler) OnUpdate(_ client.Client, decoder admission.Decoder, _ events.EventRecorder) handlers.Func {
 	return func(_ context.Context, req admission.Request) *admission.Response {
 		oldQuota := &capsulev1beta2.CustomQuota{}

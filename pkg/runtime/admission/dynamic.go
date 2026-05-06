@@ -29,24 +29,38 @@ func DynamicClientWithPath(
 	in admissionregistrationv1.WebhookClientConfig,
 	webhookPath string,
 ) admissionregistrationv1.WebhookClientConfig {
-	out := in // shallow copy (safe)
+	out := in
 
 	cleanPath := normalizePath(webhookPath)
 	if cleanPath == "" {
 		return out
 	}
 
-	// URL mode
 	if out.URL != nil && *out.URL != "" {
-		u := strings.TrimRight(*out.URL, "/") + cleanPath
+		base := strings.TrimRight(*out.URL, "/")
+
+		if base == strings.TrimRight(cleanPath, "/") {
+			u := cleanPath
+			out.URL = &u
+
+			return out
+		}
+
+		if strings.HasSuffix(base, cleanPath) {
+			u := base
+			out.URL = &u
+
+			return out
+		}
+
+		u := base + cleanPath
 		out.URL = &u
 
 		return out
 	}
 
-	// Service mode
 	if out.Service != nil {
-		svc := *out.Service // copy to avoid mutating original
+		svc := *out.Service
 		svc.Path = &cleanPath
 		out.Service = &svc
 	}

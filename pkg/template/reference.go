@@ -145,6 +145,7 @@ func (t ResourceReference) IsNamespacedGVK(
 
 	return isNamespaced, nil
 }
+
 func (t ResourceReference) loadResources(
 	ctx context.Context,
 	kubeClient client.Client,
@@ -218,6 +219,7 @@ func (t ResourceReference) loadResources(
 		combined := selectors.CombineSelectors(all...)
 
 		selectorStrings := make([]string, 0, len(all))
+
 		for _, s := range all {
 			if s != nil {
 				selectorStrings = append(selectorStrings, s.String())

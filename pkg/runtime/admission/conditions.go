@@ -13,6 +13,10 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api/rbac"
 )
 
+const (
+	falseValue string = "false"
+)
+
 func BuildGatingUserCondition(opts WebhookOptions, users rbac.UserListSpec, admins rbac.UserListSpec) []admissionregistrationv1.MatchCondition {
 	var parts []string
 
@@ -30,8 +34,8 @@ func BuildGatingUserCondition(opts WebhookOptions, users rbac.UserListSpec, admi
 	}
 
 	expr := parts[0]
-	if len(parts) == 2 {
-		expr = fmt.Sprintf("(%s) || (%s)", parts[0], parts[1])
+	for i := 1; i < len(parts); i++ {
+		expr = fmt.Sprintf("(%s) || (%s)", expr, parts[i])
 	}
 
 	return []admissionregistrationv1.MatchCondition{
@@ -49,12 +53,12 @@ func ServiceAccountGroupGuardExpr() string {
 func CelUserOrGroupExpr(l rbac.UserListSpec) string {
 	users, groups := l.SplitUsersAndGroups()
 
-	userExpr := "false"
+	userExpr := falseValue
 	if len(users) > 0 {
 		userExpr = fmt.Sprintf("request.userInfo.username in %s", CelStringList(users))
 	}
 
-	groupExpr := "false"
+	groupExpr := falseValue
 	if len(groups) > 0 {
 		groupExpr = fmt.Sprintf("request.userInfo.groups.exists(g, g in %s)", CelStringList(groups))
 	}

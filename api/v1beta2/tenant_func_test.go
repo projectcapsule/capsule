@@ -10,77 +10,69 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 
 	"github.com/projectcapsule/capsule/api/v1beta2"
-	"github.com/projectcapsule/capsule/pkg/api"
-	"github.com/projectcapsule/capsule/pkg/api/rbac"
+	capsulerbac "github.com/projectcapsule/capsule/pkg/api/rbac"
 )
 
-var tenant = &v1beta2.Tenant{
-	Spec: v1beta2.TenantSpec{
-		Owners: []api.OwnerSpec{
-			{
-				CoreOwnerSpec: api.CoreOwnerSpec{
-					UserSpec: api.UserSpec{
-						Kind: "User",
+func testTenant() *v1beta2.Tenant {
+	return &v1beta2.Tenant{
+		Spec: v1beta2.TenantSpec{
+			AdditionalRoleBindings: []capsulerbac.AdditionalRoleBindingsSpec{
+				{
+					ClusterRoleName: "developer",
+					Subjects: []rbacv1.Subject{
+						{Kind: "User", Name: "user2"},
+						{Kind: "Group", Name: "group1"},
+					},
+				},
+				{
+					ClusterRoleName: "cluster-admin",
+					Subjects: []rbacv1.Subject{
+						{Kind: "User", Name: "user3"},
+						{Kind: "Group", Name: "group1"},
+					},
+				},
+				{
+					ClusterRoleName: "deployer",
+					Subjects: []rbacv1.Subject{
+						{Kind: "ServiceAccount", Name: "system:serviceaccount:argocd:argo-operator"},
+					},
+				},
+			},
+		},
+		Status: v1beta2.TenantStatus{
+			Owners: capsulerbac.OwnerStatusListSpec{
+				{
+					UserSpec: capsulerbac.UserSpec{
+						Kind: capsulerbac.UserOwner,
 						Name: "user1",
 					},
 					ClusterRoles: []string{"cluster-admin", "read-only"},
 				},
-			},
-			{
-				CoreOwnerSpec: api.CoreOwnerSpec{
-					UserSpec: api.UserSpec{
-						Kind: "Group",
+				{
+					UserSpec: capsulerbac.UserSpec{
+						Kind: capsulerbac.GroupOwner,
 						Name: "group1",
 					},
 					ClusterRoles: []string{"edit"},
 				},
-			},
-			{
-				CoreOwnerSpec: api.CoreOwnerSpec{
-					UserSpec: api.UserSpec{
-						Kind: api.ServiceAccountOwner,
+				{
+					UserSpec: capsulerbac.UserSpec{
+						Kind: capsulerbac.ServiceAccountOwner,
 						Name: "service",
 					},
 					ClusterRoles: []string{"read-only"},
 				},
 			},
 		},
-		AdditionalRoleBindings: []api.AdditionalRoleBindingsSpec{
-			{
-				ClusterRoleName: "developer",
-				Subjects: []rbacv1.Subject{
-					{Kind: "User", Name: "user2"},
-					{Kind: "Group", Name: "group1"},
-				},
-			},
-			{
-				ClusterRoleName: "cluster-admin",
-				Subjects: []rbacv1.Subject{
-					{
-						Kind: "User",
-						Name: "user3",
-					},
-					{
-						Kind: "Group",
-						Name: "group1",
-					},
-				},
-			},
-			{
-				ClusterRoleName: "deployer",
-				Subjects: []rbacv1.Subject{
-					{
-						Kind: "ServiceAccount",
-						Name: "system:serviceaccount:argocd:argo-operator",
-					},
-				},
-			},
-		},
-	},
+	}
+
 }
 
-// TestGetClusterRolePermissions tests the GetClusterRolePermissions function
 func TestGetSubjectsByClusterRoles(t *testing.T) {
+	t.Parallel()
+
+	tenant := testTenant()
+
 	expected := map[string][]rbacv1.Subject{
 		"cluster-admin": {
 			{Kind: "User", Name: "user1"},
@@ -103,15 +95,11 @@ func TestGetSubjectsByClusterRoles(t *testing.T) {
 		},
 	}
 
-	// Call the function to test
-	permissions := tenant.GetSubjectsByClusterRoles(nil)
-
-	if !reflect.DeepEqual(permissions, expected) {
-		t.Errorf("Expected %v, but got %v", expected, permissions)
+	got := tenant.GetSubjectsByClusterRoles(nil)
+	if !reflect.DeepEqual(got, expected) {
+		t.Fatalf("expected %#v\n got %#v", expected, got)
 	}
 
-	// Ignore SubjectTypes (Ignores ServiceAccounts)
-	ignored := tenant.GetSubjectsByClusterRoles([]api.OwnerKind{"ServiceAccount"})
 	expectedIgnored := map[string][]rbacv1.Subject{
 		"cluster-admin": {
 			{Kind: "User", Name: "user1"},
@@ -130,73 +118,80 @@ func TestGetSubjectsByClusterRoles(t *testing.T) {
 		},
 	}
 
-	if !reflect.DeepEqual(ignored, expectedIgnored) {
-		t.Errorf("Expected %v, but got %v", expectedIgnored, ignored)
+	gotIgnored := tenant.GetSubjectsByClusterRoles([]capsulerbac.OwnerKind{capsulerbac.ServiceAccountOwner})
+	if !reflect.DeepEqual(gotIgnored, expectedIgnored) {
+		t.Fatalf("expected %#v\n got %#v", expectedIgnored, gotIgnored)
 	}
-
 }
+
 func TestGetClusterRolesBySubjectSorted(t *testing.T) {
+	t.Parallel()
+
 	tenant := &v1beta2.Tenant{
 		Spec: v1beta2.TenantSpec{
-			AdditionalRoleBindings: []api.AdditionalRoleBindingsSpec{
-
-				{
-					ClusterRoleName: "test",
-					Subjects: ,
-			},
-		},
-		Status: v1beta2.TenantStatus{
-			Owners: []v1beta2.TenantOwner{
-				{
-					Kind:         api.UserOwner,
-					Name:         "user1",
-					ClusterRoles: []string{"cluster-admin", "read-only"},
-				},
-				{
-					Kind:         api.UserOwner,
-					Name:         "user2",
-					ClusterRoles: []string{"developer"},
-				},
-				{
-					Kind:         api.UserOwner,
-					Name:         "user3",
-					ClusterRoles: []string{"cluster-admin"},
-				},
-				{
-					Kind:         api.GroupOwner,
-					Name:         "group1",
-					ClusterRoles: []string{"edit", "developer", "cluster-admin"},
-				},
-				{
-					Kind:         api.ServiceAccountOwner,
-					Name:         "service",
-					ClusterRoles: []string{"read-only"},
-				},
-			},
-		},
-		Spec: TenantSpec{
-			AdditionalRoleBindings: []api.AdditionalRoleBindingSpec{
+			AdditionalRoleBindings: []capsulerbac.AdditionalRoleBindingsSpec{
 				{
 					ClusterRoleName: "deployer",
-					Subjects: []api.Subject{
+					Subjects: []rbacv1.Subject{
 						{
 							Kind: "ServiceAccount",
 							Name: "system:serviceaccount:argocd:argo-operator",
 						},
 					},
 				},
-				// Add duplicates to verify dedup
 				{
 					ClusterRoleName: "developer",
-					Subjects: []api.Subject{
-						{Kind: "Group", Name: "group1"},
+					Subjects: []rbacv1.Subject{
+						{
+							Kind: "Group",
+							Name: "group1",
+						},
 					},
+				},
+			},
+		},
+		Status: v1beta2.TenantStatus{
+			Owners: capsulerbac.OwnerStatusListSpec{
+				{
+					UserSpec: capsulerbac.UserSpec{
+						Kind: capsulerbac.UserOwner,
+						Name: "user1",
+					},
+					ClusterRoles: []string{"cluster-admin", "read-only"},
+				},
+				{
+					UserSpec: capsulerbac.UserSpec{
+						Kind: capsulerbac.UserOwner,
+						Name: "user2",
+					},
+					ClusterRoles: []string{"developer"},
+				},
+				{
+					UserSpec: capsulerbac.UserSpec{
+						Kind: capsulerbac.UserOwner,
+						Name: "user3",
+					},
+					ClusterRoles: []string{"cluster-admin"},
+				},
+				{
+					UserSpec: capsulerbac.UserSpec{
+						Kind: capsulerbac.GroupOwner,
+						Name: "group1",
+					},
+					ClusterRoles: []string{"edit", "developer", "cluster-admin"},
+				},
+				{
+					UserSpec: capsulerbac.UserSpec{
+						Kind: capsulerbac.ServiceAccountOwner,
+						Name: "service",
+					},
+					ClusterRoles: []string{"read-only"},
 				},
 			},
 		},
 	}
 
-	expected := []rbac.SubjectRoles{
+	expected := []capsulerbac.SubjectRoles{
 		{Kind: "Group", Name: "group1", Roles: []string{"cluster-admin", "developer", "edit"}},
 		{Kind: "ServiceAccount", Name: "service", Roles: []string{"read-only"}},
 		{Kind: "ServiceAccount", Name: "system:serviceaccount:argocd:argo-operator", Roles: []string{"deployer"}},
@@ -205,7 +200,9 @@ func TestGetClusterRolesBySubjectSorted(t *testing.T) {
 		{Kind: "User", Name: "user3", Roles: []string{"cluster-admin"}},
 	}
 
-	t.Run("includes all kinds and is deterministic + deduped + sorted", func(t *testing.T) {
+	t.Run("includes all kinds and is deterministic, deduped and sorted", func(t *testing.T) {
+		t.Parallel()
+
 		got := tenant.GetClusterRolesBySubject(nil)
 		if !reflect.DeepEqual(got, expected) {
 			t.Fatalf("expected %#v\n got %#v", expected, got)
@@ -213,9 +210,11 @@ func TestGetClusterRolesBySubjectSorted(t *testing.T) {
 	})
 
 	t.Run("ignores ServiceAccount kind", func(t *testing.T) {
-		got := tenant.GetClusterRolesBySubject([]api.OwnerKind{api.ServiceAccountOwner})
+		t.Parallel()
 
-		expectedIgnored := []rbac.SubjectRoles{
+		got := tenant.GetClusterRolesBySubject([]capsulerbac.OwnerKind{capsulerbac.ServiceAccountOwner})
+
+		expectedIgnored := []capsulerbac.SubjectRoles{
 			{Kind: "Group", Name: "group1", Roles: []string{"cluster-admin", "developer", "edit"}},
 			{Kind: "User", Name: "user1", Roles: []string{"cluster-admin", "read-only"}},
 			{Kind: "User", Name: "user2", Roles: []string{"developer"}},
@@ -228,38 +227,12 @@ func TestGetClusterRolesBySubjectSorted(t *testing.T) {
 	})
 
 	t.Run("empty tenant yields empty slice", func(t *testing.T) {
+		t.Parallel()
+
 		empty := &v1beta2.Tenant{}
-		got := empty.GetClusterRolesBySubjectSorted(nil)
+		got := empty.GetClusterRolesBySubject(nil)
 		if len(got) != 0 {
 			t.Fatalf("expected empty, got %#v", got)
 		}
 	})
-}
-
-// Helper function to run tests
-func TestMain(t *testing.M) {
-	t.Run()
-}
-
-// permissionsEqual checks the equality of two TenantPermission structs.
-func permissionsEqual(a, b api.TenantSubjectRoles) bool {
-	if a.Kind != b.Kind {
-		return false
-	}
-	if len(a.ClusterRoles) != len(b.ClusterRoles) {
-		return false
-	}
-
-	// Create a map to count occurrences of cluster roles
-	counts := make(map[string]int)
-	for _, role := range a.ClusterRoles {
-		counts[role]++
-	}
-	for _, role := range b.ClusterRoles {
-		counts[role]--
-		if counts[role] < 0 {
-			return false // More occurrences in b than in a
-		}
-	}
-	return true
 }

@@ -102,7 +102,7 @@ func printVersion() {
 	setupLog.Info(fmt.Sprintf("Go OS/Arch: %s/%s", goRuntime.GOOS, goRuntime.GOARCH))
 }
 
-//nolint:maintidx,cyclop
+//nolint:maintidx,gocyclo,cyclop
 func main() {
 	controllerConfig := utilscontroller.ControllerOptions{}
 
@@ -317,10 +317,6 @@ func main() {
 	// generate self-signed certificates for the metrics server. While convenient for development and testing,
 	// this setup is not recommended for production.
 	//
-	// TODO(user): If you enable certManager, uncomment the following lines:
-	// - [METRICS-WITH-CERTS] at config/default/kustomization.yaml to generate and use certificates
-	// managed by cert-manager for the metrics server.
-	// - [PROMETHEUS-WITH-CERTS] at config/prometheus/kustomization.yaml for TLS certification.
 	if len(metricsCertPath) > 0 {
 		setupLog.Info(
 			"Initializing metrics certificate watcher using provided certificates",
@@ -654,7 +650,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	setupLog.Info("initializing", "controller")
+	setupLog.Info("initializing controllers")
 
 	localInvalidator := &cacheinvalidator.CacheInvalidator{
 		Log:                ctrl.Log.WithName("capsule.ctrl").WithName("invalidator"),
@@ -666,7 +662,7 @@ func main() {
 		TargetsCache:       targetsCache,
 	}
 
-	if err := manager.Add(localInvalidator); err != nil {
+	if err := localInvalidator.SetupWithManager(manager, controllerConfig); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "invalidator")
 		os.Exit(1)
 	}

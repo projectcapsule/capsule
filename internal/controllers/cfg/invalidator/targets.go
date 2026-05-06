@@ -15,12 +15,12 @@ import (
 
 func (r *CacheInvalidator) rebuildTargetsCache(ctx context.Context, log logr.Logger) error {
 	customQuotas := &capsulev1beta2.CustomQuotaList{}
-	if err := r.Client.List(ctx, customQuotas); err != nil {
+	if err := r.List(ctx, customQuotas); err != nil {
 		return err
 	}
 
 	globalCustomQuotas := &capsulev1beta2.GlobalCustomQuotaList{}
-	if err := r.Client.List(ctx, globalCustomQuotas); err != nil {
+	if err := r.List(ctx, globalCustomQuotas); err != nil {
 		return err
 	}
 

@@ -23,7 +23,7 @@ func (o NamespacedObjectUIDReference) Func() client.IndexerFunc {
 	return func(object client.Object) []string {
 		tr := object.(*capsulev1beta2.CustomQuota) //nolint:forcetypeassert
 
-		objs := []string{}
+		objs := make([]string, 0, len(tr.Status.Claims))
 
 		for _, obj := range tr.Status.Claims {
 			objs = append(objs, string(obj.UID))

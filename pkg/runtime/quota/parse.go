@@ -27,7 +27,7 @@ func ParseBoolFromUnstructured(u unstructured.Unstructured, compiled *jsonpath.C
 
 	parsed, err := strconv.ParseBool(value)
 	if err != nil {
-		return false, fmt.Errorf("condition path %q did not resolve to a boolean, got %q: %w", compiled, value, err)
+		return false, fmt.Errorf("condition path %v did not resolve to a boolean, got %q: %w", compiled, value, err)
 	}
 
 	return parsed, nil

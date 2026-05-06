@@ -52,6 +52,7 @@ func (r *CacheInvalidator) rebuildImpersonationCache(
 		}
 
 		seen[key] = struct{}{}
+
 		referencedServiceAccounts = append(referencedServiceAccounts, meta.NamespacedRFC1123ObjectReferenceWithNamespace{
 			Name:      meta.RFC1123Name(sa.Name),
 			Namespace: meta.RFC1123SubdomainName(sa.Namespace),
@@ -85,6 +86,7 @@ func (r *CacheInvalidator) rebuildImpersonationCache(
 		}
 
 		seen[key] = struct{}{}
+
 		referencedServiceAccounts = append(referencedServiceAccounts, meta.NamespacedRFC1123ObjectReferenceWithNamespace{
 			Name:      meta.RFC1123Name(sa.Name),
 			Namespace: meta.RFC1123SubdomainName(sa.Namespace),
@@ -110,7 +112,7 @@ func (r *CacheInvalidator) rebuildImpersonationCache(
 			ctx,
 			log,
 			re,
-			r.Client.Scheme(),
+			r.Scheme(),
 			sa,
 		); err != nil {
 			return err

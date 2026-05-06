@@ -124,7 +124,9 @@ func (r *validatingReconciler) reconcileValidatingConfiguration(
 		Webhooks:   hooks,
 	}
 
-	controllerutil.SetOwnerReference(r.configuration.GetConfigObject(), obj, r.client.Scheme())
+	if err := controllerutil.SetOwnerReference(r.configuration.GetConfigObject(), obj, r.client.Scheme()); err != nil {
+		return err
+	}
 
 	labels := obj.GetLabels()
 	if labels == nil {

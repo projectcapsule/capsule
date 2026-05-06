@@ -8,7 +8,7 @@ import (
 )
 
 func (in *GlobalTenantResource) AssignTenants(tnts []Tenant) {
-	var l []string
+	l := make([]string, 0, len(tnts))
 
 	for _, tnt := range tnts {
 		l = append(l, tnt.GetName())

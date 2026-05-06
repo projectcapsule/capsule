@@ -55,7 +55,7 @@ func BuildFinalizersMergePatch(finalizers []string) []byte {
 		Metadata metadata `json:"metadata"`
 	}
 
-	raw, _ := json.Marshal(patch{
+	raw, _ := json.Marshal(patch{ //nolint:errchkjson
 		Metadata: metadata{
 			Finalizers: finalizers,
 		},

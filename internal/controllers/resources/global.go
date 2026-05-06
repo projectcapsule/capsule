@@ -137,7 +137,7 @@ func (r *globalResourceController) Reconcile(ctx context.Context, request reconc
 	}()
 
 	if *tntResource.Spec.Cordoned {
-		log.V(5).Info("tenant resource is cordoned")
+		log.V(5).Info("global tenant resource cordoned")
 
 		return reconcile.Result{}, err
 	}
@@ -205,6 +205,7 @@ func (r *globalResourceController) Reconcile(ctx context.Context, request reconc
 	}, err
 }
 
+//nolint:dupl
 func (r *globalResourceController) enqueueDependentGlobalTenantResources(
 	ctx context.Context,
 	obj client.Object,
@@ -273,6 +274,7 @@ func (r *globalResourceController) enqueueRequestFromTenant(ctx context.Context,
 	return reqs
 }
 
+//nolint:dupl
 func (r *globalResourceController) enqueueAllResources(ctx context.Context, _ client.Object) []reconcile.Request {
 	var list capsulev1beta2.GlobalTenantResourceList
 	if err := r.client.List(ctx, &list); err != nil {
@@ -369,6 +371,7 @@ func (r *globalResourceController) reconcile(
 		})
 }
 
+//nolint:gocognit
 func (r *globalResourceController) gatherResources(
 	ctx context.Context,
 	c client.Client,
@@ -429,7 +432,7 @@ func (r *globalResourceController) gatherResources(
 				}
 			}
 
-		default:
+		case api.ResourceScopeNamespace:
 			for _, tnt := range tnts.Items {
 				ilog := log.WithValues("tenant", tnt.GetName(), "resource", resourceIndex)
 				ilog.V(5).Info("replicating for each namespace")
@@ -461,7 +464,10 @@ func (r *globalResourceController) gatherResources(
 						}
 
 						target := obj.DeepCopy()
-						sanitize.SanitizeObject(target, c.Scheme(), r.collector.objectSanitizeOptions)
+						if err := sanitize.SanitizeObject(target, c.Scheme(), r.collector.objectSanitizeOptions); err != nil {
+							return err
+						}
+
 						target.SetNamespace(innerNs.GetName())
 
 						log.V(4).Info(
@@ -495,6 +501,7 @@ func (r *globalResourceController) gatherResources(
 	return nil
 }
 
+//nolint:dupl
 func (r *globalResourceController) loadClient(
 	ctx context.Context,
 	log logr.Logger,
@@ -617,7 +624,7 @@ func (r *globalResourceController) updateStatus(ctx context.Context, instance *c
 
 		if *instance.Spec.Cordoned {
 			cordonedCondition.Reason = meta.CordonedReason
-			cordonedCondition.Message = "is cordoned"
+			cordonedCondition.Message = "is cordoned" //nolint:goconst
 			cordonedCondition.Status = metav1.ConditionTrue
 		}
 

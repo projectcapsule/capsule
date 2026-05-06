@@ -11,9 +11,7 @@ import (
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/util/retry"
 	"k8s.io/client-go/util/workqueue"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
@@ -137,6 +135,8 @@ func (r *CacheInvalidator) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.C
 func (r *CacheInvalidator) Reconcile(ctx context.Context, request reconcile.Request) (res reconcile.Result, err error) {
 	log := r.Log.WithValues("configuration", request.Name)
 
+	log.Info("BUILDING CACHEEEEEEEE AFTER INTERVAL")
+
 	cfg := configuration.NewCapsuleConfiguration(ctx, r.Client, r.Rest, request.Name)
 
 	instance := &capsulev1beta2.CapsuleConfiguration{}
@@ -152,14 +152,6 @@ func (r *CacheInvalidator) Reconcile(ctx context.Context, request reconcile.Requ
 		return res, err
 	}
 
-	defer func() {
-		if uerr := r.updateConfigStatus(ctx, instance); uerr != nil {
-			err = fmt.Errorf("cannot update config status: %w", uerr)
-
-			return
-		}
-	}()
-
 	if err := r.rebuildCaches(ctx, log); err != nil {
 		return res, err
 	}
@@ -170,22 +162,6 @@ func (r *CacheInvalidator) Reconcile(ctx context.Context, request reconcile.Requ
 		Requeue:      true,
 		RequeueAfter: interval.Duration,
 	}, err
-}
-
-func (r *CacheInvalidator) updateConfigStatus(
-	ctx context.Context,
-	instance *capsulev1beta2.CapsuleConfiguration,
-) error {
-	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
-		latest := &capsulev1beta2.CapsuleConfiguration{}
-		if err = r.Get(ctx, types.NamespacedName{Name: instance.GetName(), Namespace: instance.GetNamespace()}, latest); err != nil {
-			return err
-		}
-
-		latest.Status = instance.Status
-
-		return r.Client.Status().Update(ctx, latest)
-	})
 }
 
 // invalidateCaches invokes for all caches their invalidation functions.

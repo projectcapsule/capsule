@@ -124,9 +124,11 @@ func (c *CompiledTargetsCache[K]) PruneActive(active map[K]struct{}) int {
 	defer c.mu.Unlock()
 
 	pruned := 0
+
 	for key := range c.data {
 		if _, ok := active[key]; !ok {
 			delete(c.data, key)
+
 			pruned++
 		}
 	}

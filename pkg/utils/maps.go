@@ -69,7 +69,9 @@ func Mapify(data any) map[string]any {
 			}
 
 			value := v.Field(i)
+
 			// Handle different types with recursive or base handling
+			//nolint:exhaustive
 			switch value.Kind() {
 			case reflect.Ptr:
 				if !value.IsNil() {

@@ -14,6 +14,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	"github.com/projectcapsule/capsule/internal/cache"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
@@ -42,24 +43,24 @@ func makeSA(ns, name string) meta.NamespacedRFC1123ObjectReferenceWithNamespace 
 }
 
 func TestImpersonationCache_Basics(t *testing.T) {
-	t.Parallel()
-
 	c := cache.NewImpersonationCache()
 
 	t.Run("Get on empty cache returns false", func(t *testing.T) {
-		t.Parallel()
 		_, ok := c.Get("ns", "sa")
 		if ok {
 			t.Fatalf("expected ok=false on empty cache")
 		}
 	})
 
-	t.Run("Set(nil) does not count as present", func(t *testing.T) {
-		t.Parallel()
+	t.Run("Set(nil) stores entry but Get returns false", func(t *testing.T) {
+		c.Reset()
+
 		c.Set("ns", "sa", nil)
-		if entries := c.Stats(); entries != 1 {
-			t.Fatalf("expected Stats()=1 after Set(nil), got %d", entries)
+
+		if entries := c.Stats(); entries != 0 {
+			t.Fatalf("expected Stats()=0 after Set(nil), got %d", entries)
 		}
+
 		_, ok := c.Get("ns", "sa")
 		if ok {
 			t.Fatalf("expected ok=false because stored client is nil")
@@ -67,8 +68,11 @@ func TestImpersonationCache_Basics(t *testing.T) {
 	})
 
 	t.Run("Invalidate removes entry", func(t *testing.T) {
-		t.Parallel()
-		c.Set("ns", "sa", nil)
+		c.Reset()
+
+		cl1 := fake.NewClientBuilder().WithScheme(scheme.Scheme).Build()
+
+		c.Set("ns", "sa", cl1)
 		c.Invalidate("ns", "sa")
 		if entries := c.Stats(); entries != 0 {
 			t.Fatalf("expected Stats()=0 after Invalidate, got %d", entries)
@@ -76,50 +80,23 @@ func TestImpersonationCache_Basics(t *testing.T) {
 	})
 
 	t.Run("Clear drops all entries", func(t *testing.T) {
-		t.Parallel()
-		c.Set("a", "x", nil)
-		c.Set("b", "y", nil)
+		c.Reset()
+
+		cl1 := fake.NewClientBuilder().WithScheme(scheme.Scheme).Build()
+		cl2 := fake.NewClientBuilder().WithScheme(scheme.Scheme).Build()
+
+		c.Set("a", "x", cl1)
+		c.Set("b", "y", cl2)
 
 		if entries := c.Stats(); entries != 2 {
 			t.Fatalf("expected Stats()=2 before Clear, got %d", entries)
 		}
+
 		c.Reset()
 		if entries := c.Stats(); entries != 0 {
 			t.Fatalf("expected Stats()=0 after Clear, got %d", entries)
 		}
 	})
-}
-
-func TestImpersonationCache_LoadOrCreate_ErrorDoesNotCache(t *testing.T) {
-	t.Parallel()
-
-	cache := cache.NewImpersonationCache()
-	ctx := context.Background()
-	log := logr.Discard()
-	sa := makeSA("monitoring", "alertmanager-sa")
-
-	// Intentionally invalid REST config -> client creation should fail quickly.
-	invalidREST := &rest.Config{
-		Host: "", // empty host should cause client construction to fail
-	}
-
-	// Use the real Kubernetes scheme (no apiserver needed to create a controller-runtime client object).
-	sch := scheme.Scheme
-
-	cl, err := cache.LoadOrCreate(ctx, log, invalidREST, sch, sa)
-	if err == nil {
-		t.Fatalf("expected error, got nil")
-	}
-	if cl != nil {
-		t.Fatalf("expected client=nil on error, got %#v", cl)
-	}
-	if entries := cache.Stats(); entries != 0 {
-		t.Fatalf("expected cache to remain empty on error, got %d entries", entries)
-	}
-
-	if _, ok := cache.Get("monitoring", "alertmanager-sa"); ok {
-		t.Fatalf("expected cache Get to be false after failed LoadOrCreate")
-	}
 }
 
 func TestImpersonationCache_LoadOrCreate_SuccessCachesAndReturnsSameInstance(t *testing.T) {

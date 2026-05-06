@@ -49,10 +49,6 @@ func (p *ProcessedItems) GetItem(ref gvk.ResourceID) *ObjectReferenceStatus {
 	return nil
 }
 
-func (p *ProcessedItems) isEqual(a, b ObjectReferenceStatus) bool {
-	return a.ResourceID == b.ResourceID
-}
-
 func (p ProcessedItems) SortDeterministic() {
 	sort.Slice(p, func(i, j int) bool {
 		a, b := p[i], p[j]
@@ -71,4 +67,8 @@ func (p ProcessedItems) SortDeterministic() {
 
 		return a.Kind < b.Kind
 	})
+}
+
+func (p *ProcessedItems) isEqual(a, b ObjectReferenceStatus) bool {
+	return a.ResourceID == b.ResourceID
 }

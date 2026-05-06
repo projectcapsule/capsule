@@ -389,13 +389,13 @@ func TestUserListSpec_SplitUsersAndGroups(t *testing.T) {
 			wantGroups: nil,
 		},
 		{
-			name: "unknown_kind_is_ignored",
+			name: "all_kinds",
 			in: rbac.UserListSpec{
 				{Kind: rbac.ServiceAccountOwner, Name: "x"},
 				{Kind: rbac.UserOwner, Name: "alice"},
 				{Kind: rbac.GroupOwner, Name: "dev"},
 			},
-			wantUsers:  []string{"alice"},
+			wantUsers:  []string{"alice", "x"},
 			wantGroups: []string{"dev"},
 		},
 		{

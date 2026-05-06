@@ -282,6 +282,7 @@ func (in *Tenant) ConvertTo(raw conversion.Hub) error {
 	dst.Status.Size = in.Status.Size
 	dst.Status.Namespaces = in.Status.Namespaces
 
+	//nolint:exhaustive
 	switch in.Status.State {
 	case TenantStateActive:
 		dst.Status.State = capsulev1beta1.TenantStateActive

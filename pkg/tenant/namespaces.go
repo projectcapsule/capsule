@@ -141,7 +141,9 @@ func removeFinalizersFromRemainingNamespacedResources(
 		})
 	}
 
-	g.Wait()
+	if err := g.Wait(); err != nil {
+		return cleanedAny, err
+	}
 
 	return cleanedAny, errors.Join(errs...)
 }
@@ -253,7 +255,7 @@ func CollectTenantNamespaceByLabel(
 	// preventing a boundary cross by enforcing the selection.
 	tntRequirement, err := labels.NewRequirement(meta.TenantLabel, selection.Equals, []string{tnt.GetName()})
 	if err != nil {
-		err = fmt.Errorf("unable to create requirement for Namespace filtering and resource replication", err)
+		err = fmt.Errorf("unable to create requirement for Namespace filtering and resource replication: %w", err)
 
 		return nil, err
 	}
@@ -262,7 +264,7 @@ func CollectTenantNamespaceByLabel(
 	// Selecting the targeted Namespace according to the TenantResource specification.
 	ns := corev1.NamespaceList{}
 	if err = c.List(ctx, &ns, client.MatchingLabelsSelector{Selector: selector}); err != nil {
-		err = fmt.Errorf("cannot retrieve Namespaces for resource", err)
+		err = fmt.Errorf("cannot retrieve Namespaces for resource: %w", err)
 
 		return nil, err
 	}

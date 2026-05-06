@@ -108,6 +108,7 @@ func (r *namespacedResourceController) SetupWithManager(mgr ctrl.Manager, cfg ut
 					},
 					UpdateFunc: func(e event.UpdateEvent) bool {
 						oldObj, okOld := e.ObjectOld.(*capsulev1beta2.Tenant)
+
 						newObj, okNew := e.ObjectNew.(*capsulev1beta2.Tenant)
 						if !okOld || !okNew {
 							return false
@@ -172,7 +173,7 @@ func (r *namespacedResourceController) Reconcile(ctx context.Context, request re
 	}()
 
 	if *tntResource.Spec.Cordoned {
-		log.V(5).Info("tenant resource is cordoned")
+		log.V(5).Info("tenant resource cordoned")
 
 		return reconcile.Result{}, err
 	}
@@ -259,7 +260,9 @@ func (r *namespacedResourceController) enqueueTenantResourcesForTenant(ctx conte
 			if _, exists := seen[key]; exists {
 				continue
 			}
+
 			seen[key] = struct{}{}
+
 			out = append(out, reconcile.Request{NamespacedName: key})
 		}
 	}
@@ -267,6 +270,7 @@ func (r *namespacedResourceController) enqueueTenantResourcesForTenant(ctx conte
 	return out
 }
 
+//nolint:dupl
 func (r *namespacedResourceController) enqueueDependentTenantResources(
 	ctx context.Context,
 	obj client.Object,
@@ -362,6 +366,7 @@ func (r *namespacedResourceController) enqueueTenantResourcesForNamespace(
 	return requests
 }
 
+//nolint:dupl
 func (r *namespacedResourceController) enqueueAllResources(ctx context.Context, _ client.Object) []reconcile.Request {
 	var list capsulev1beta2.TenantResourceList
 	if err := r.client.List(ctx, &list); err != nil {
@@ -487,7 +492,10 @@ func (r *namespacedResourceController) gatherResources(
 				}
 
 				target := obj.DeepCopy()
-				sanitize.SanitizeObject(target, c.Scheme(), r.collector.objectSanitizeOptions)
+				if err := sanitize.SanitizeObject(target, c.Scheme(), r.collector.objectSanitizeOptions); err != nil {
+					return err
+				}
+
 				target.SetNamespace(innerNs.GetName())
 
 				log.V(4).Info("adding replication for namespaced item", "name", target.GetName(), "namespace", target.GetNamespace(), "kind", target.GetKind())
@@ -518,6 +526,7 @@ func (r *namespacedResourceController) gatherResources(
 	return nil
 }
 
+//nolint:dupl
 func (r *namespacedResourceController) loadClient(
 	ctx context.Context,
 	log logr.Logger,

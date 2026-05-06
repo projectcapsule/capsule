@@ -10,6 +10,8 @@ import (
 	"github.com/projectcapsule/capsule/pkg/runtime/admission"
 )
 
+const serviceAccountGuard = "request.userInfo.groups.exists(g, g == 'system:serviceaccounts')"
+
 func TestCelQuote(t *testing.T) {
 	t.Parallel()
 
@@ -164,9 +166,10 @@ func TestBuildGatingUserCondition(t *testing.T) {
 			wantNil: true,
 		},
 		{
-			name:     "capsule_users_only",
-			opts:     admission.WebhookOptions{CapsuleUsers: true},
-			wantExpr: "(request.userInfo.username in ['alice']) || (request.userInfo.groups.exists(g, g in ['projectcapsule.dev']))",
+			name: "capsule_users_only",
+			opts: admission.WebhookOptions{CapsuleUsers: true},
+			wantExpr: "(" + serviceAccountGuard + ") || " +
+				"((request.userInfo.username in ['alice']) || (request.userInfo.groups.exists(g, g in ['projectcapsule.dev'])))",
 		},
 		{
 			name:     "administrators_only",
@@ -174,15 +177,16 @@ func TestBuildGatingUserCondition(t *testing.T) {
 			wantExpr: "(request.userInfo.username in ['root']) || (request.userInfo.groups.exists(g, g in ['system:masters']))",
 		},
 		{
-			name:     "both_enabled_or_combined",
-			opts:     admission.WebhookOptions{CapsuleUsers: true, Administrators: true},
-			wantExpr: "((request.userInfo.username in ['alice']) || (request.userInfo.groups.exists(g, g in ['projectcapsule.dev']))) || ((request.userInfo.username in ['root']) || (request.userInfo.groups.exists(g, g in ['system:masters'])))",
+			name: "both_enabled_or_combined",
+			opts: admission.WebhookOptions{CapsuleUsers: true, Administrators: true},
+			wantExpr: "((" + serviceAccountGuard + ") || " +
+				"((request.userInfo.username in ['alice']) || (request.userInfo.groups.exists(g, g in ['projectcapsule.dev'])))) || " +
+				"((request.userInfo.username in ['root']) || (request.userInfo.groups.exists(g, g in ['system:masters'])))",
 		},
 		{
 			name:     "capsule_users_enabled_but_empty_list",
 			opts:     admission.WebhookOptions{CapsuleUsers: true},
-			wantExpr: "(false) || (false)",
-			// We'll pass empty list explicitly below in the test body for this case.
+			wantExpr: "(" + serviceAccountGuard + ") || ((false) || (false))",
 		},
 	}
 

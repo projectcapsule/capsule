@@ -28,10 +28,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	"github.com/projectcapsule/capsule/internal/controllers/utils"
 	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
 	"github.com/projectcapsule/capsule/pkg/runtime/cert"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
+	"github.com/projectcapsule/capsule/pkg/runtime/predicates"
 )
 
 const (
@@ -62,11 +62,21 @@ func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 	})
 
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&corev1.Secret{}, utils.NamesMatchingPredicate(r.Configuration.TLSSecretName())).
+		For(
+			&corev1.Secret{},
+			builder.WithPredicates(
+				predicates.NamesMatchingPredicate{Names: []string{r.Configuration.TLSSecretName()}},
+			),
+		).
 		Named("capsule/tls").
-		Watches(&admissionregistrationv1.ValidatingWebhookConfiguration{}, enqueueFn, builder.WithPredicates(predicate.NewPredicateFuncs(func(object client.Object) bool {
-			return object.GetName() == r.Configuration.ValidatingWebhookConfigurationName()
-		}))).
+		Watches(
+			&admissionregistrationv1.ValidatingWebhookConfiguration{},
+			enqueueFn,
+			builder.WithPredicates(predicate.NewPredicateFuncs(func(object client.Object) bool {
+				return object.GetName() == r.Configuration.ValidatingWebhookConfigurationName()
+			},
+			)),
+		).
 		Watches(&admissionregistrationv1.MutatingWebhookConfiguration{}, enqueueFn, builder.WithPredicates(predicate.NewPredicateFuncs(func(object client.Object) bool {
 			return object.GetName() == r.Configuration.MutatingWebhookConfigurationName()
 		}))).

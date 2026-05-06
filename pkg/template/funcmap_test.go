@@ -56,10 +56,10 @@ func TestDeterministicUUID(t *testing.T) {
 
 			// Basic UUID formatting checks
 			assert.Len(t, uA, 36)
-			assert.Equal(t, '-', uA[8])
-			assert.Equal(t, '-', uA[13])
-			assert.Equal(t, '-', uA[18])
-			assert.Equal(t, '-', uA[23])
+			assert.Equal(t, byte('-'), uA[8])
+			assert.Equal(t, byte('-'), uA[13])
+			assert.Equal(t, byte('-'), uA[18])
+			assert.Equal(t, byte('-'), uA[23])
 
 			if tt.wantUpper {
 				assert.Equal(t, strings.ToUpper(uA), uA)
@@ -90,7 +90,7 @@ func TestFromYAMLArray(t *testing.T) {
 		{
 			name: "valid yaml array",
 			in:   "- a\n- b\n- 3\n- true\n",
-			want: []any{"a", "b", 3, true},
+			want: []any{"a", "b", float64(3), true},
 		},
 		{
 			name:        "invalid yaml returns single error string element",

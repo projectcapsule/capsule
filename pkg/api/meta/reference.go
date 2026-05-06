@@ -75,13 +75,13 @@ type NamespacedObjectReference struct {
 // namespace.
 // +kubebuilder:object:generate=true
 type NamespacedObjectWithUIDReference struct {
-	// Name of the referent.
-	// +required
-	Name string `json:"name"`
-
 	// UID of the tracked Tenant to pin point tracking
 	// +required
 	k8stypes.UID `json:"uid,omitempty" protobuf:"bytes,5,opt,name=uid"`
+
+	// Name of the referent.
+	// +required
+	Name string `json:"name"`
 
 	// Namespace of the referent, when not specified it acts as LocalObjectReference.
 	// +optional

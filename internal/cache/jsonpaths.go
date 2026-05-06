@@ -83,6 +83,7 @@ func (c *JSONPathCache) DeleteMany(expressions ...string) int {
 
 		if _, ok := c.data[expr]; ok {
 			delete(c.data, expr)
+
 			deleted++
 		}
 	}
@@ -109,9 +110,11 @@ func (c *JSONPathCache) PruneActive(active map[string]struct{}) int {
 	defer c.mu.Unlock()
 
 	pruned := 0
+
 	for path := range c.data {
 		if _, ok := active[path]; !ok {
 			delete(c.data, path)
+
 			pruned++
 		}
 	}

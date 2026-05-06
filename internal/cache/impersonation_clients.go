@@ -47,6 +47,10 @@ func (c *ImpersonationCache) Set(namespace, name string, cl client.Client) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
+	if cl == nil {
+		return
+	}
+
 	c.clients[Key{Namespace: namespace, Name: name}] = cl
 }
 

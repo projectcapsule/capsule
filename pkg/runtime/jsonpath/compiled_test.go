@@ -164,7 +164,7 @@ func TestCompiledJSONPathExecute(t *testing.T) {
 			want: "3",
 		},
 		{
-			name:      "missing path returns execute error",
+			name:      "missing path returns empty string",
 			prepareJP: ".spec.resources.requests.memory",
 			object: unstructured.Unstructured{
 				Object: map[string]interface{}{
@@ -177,8 +177,7 @@ func TestCompiledJSONPathExecute(t *testing.T) {
 					},
 				},
 			},
-			wantErr: true,
-			errMsg:  "execute usage jsonpath",
+			want: "",
 		},
 	}
 

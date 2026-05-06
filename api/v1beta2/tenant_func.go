@@ -38,7 +38,7 @@ func (in *Tenant) IsFull() bool {
 }
 
 func (in *Tenant) AssignNamespaces(namespaces []corev1.Namespace) {
-	var l []string
+	l := make([]string, 0, len(namespaces))
 
 	for _, ns := range namespaces {
 		l = append(l, ns.GetName())
@@ -164,7 +164,12 @@ func (in *Tenant) GetClusterRolesBySubject(ignoreOwnerKind []rbac.OwnerKind) []r
 
 	sort.Strings(kinds)
 
-	out := make([]rbac.SubjectRoles, 0)
+	totalSubjects := 0
+	for _, byName := range roleSet {
+		totalSubjects += len(byName)
+	}
+
+	out := make([]rbac.SubjectRoles, 0, totalSubjects)
 
 	for _, kind := range kinds {
 		names := make([]string, 0, len(roleSet[kind]))

@@ -22,6 +22,7 @@ import (
 	clt "github.com/projectcapsule/capsule/pkg/runtime/client"
 )
 
+//nolint:gocognit
 func (p *Processor) Reconcile(
 	ctx context.Context,
 	log logr.Logger,
@@ -48,66 +49,73 @@ func (p *Processor) Reconcile(
 	}
 
 	for _, i := range *processed {
-		if _, exists := acc[i.GetKey("")]; !exists {
-			obj := &unstructured.Unstructured{}
-			obj.SetGroupVersionKind(i.GetGVK())
-			obj.SetName(i.GetName())
-
-			ns := i.GetNamespace()
-			if ns != "" {
-				obj.SetNamespace(ns)
-			}
-
-			if !i.LastApply.IsZero() {
-				if opts.Prune {
-					log.V(4).Info("pruning resources", "Kind", i.Kind, "Name", i.Name, "Namespace", i.Namespace)
-
-					fieldOwner := opts.FieldOwnerPrefix + "/" + i.FieldOwner("")
-
-					deleted, reconErr := p.Prune(ctx, c, obj, fieldOwner, &i)
-					if failAndContinue(i, "pruning failed for item: ", reconErr) {
-						continue
-					}
-
-					if deleted {
-						processed.RemoveItem(i)
-
-						continue
-					}
-				}
-
-				// Disown item (only when GET succeeded)
-				patches, err := p.handleRemoveManagedMetadata(ctx, c, obj, opts.Owner)
-				if err != nil {
-					if apierrors.IsNotFound(err) {
-						processed.RemoveItem(i)
-
-						continue
-					}
-
-					if failAndContinue(i, "disowning failed for item: ", err) {
-						continue
-					}
-				}
-
-				if len(patches) > 0 {
-					err = clt.ApplyPatches(ctx, c, obj, patches, meta.ResourceControllerFieldOwnerPrefix())
-					if err != nil {
-						if apierrors.IsNotFound(err) {
-							processed.RemoveItem(i)
-
-							continue
-						}
-
-						if failAndContinue(i, "removing metdata failed for item: ", err) {
-							continue
-						}
-					}
-				}
-			}
-
-			processed.RemoveItem(i)
+		if _, exists := acc[i.GetKey("")]; exists {
+			continue
 		}
+
+		obj := &unstructured.Unstructured{}
+		obj.SetGroupVersionKind(i.GetGVK())
+		obj.SetName(i.GetName())
+
+		ns := i.GetNamespace()
+		if ns != "" {
+			obj.SetNamespace(ns)
+		}
+
+		if i.LastApply.IsZero() {
+			processed.RemoveItem(i)
+
+			continue
+		}
+
+		if opts.Prune {
+			log.V(4).Info("pruning resources", "Kind", i.Kind, "Name", i.Name, "Namespace", i.Namespace)
+
+			fieldOwner := opts.FieldOwnerPrefix + "/" + i.FieldOwner("")
+
+			deleted, reconErr := p.Prune(ctx, c, obj, fieldOwner, &i)
+			if failAndContinue(i, "pruning failed for item: ", reconErr) {
+				continue
+			}
+
+			if deleted {
+				processed.RemoveItem(i)
+
+				continue
+			}
+		}
+
+		// Disown item (only when GET succeeded)
+		patches, err := p.handleRemoveManagedMetadata(ctx, c, obj, opts.Owner)
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				processed.RemoveItem(i)
+
+				continue
+			}
+
+			if failAndContinue(i, "disowning failed for item: ", err) {
+				continue
+			}
+		}
+
+		//nolint:nestif
+		if len(patches) > 0 {
+			err = clt.ApplyPatches(ctx, c, obj, patches, meta.ResourceControllerFieldOwnerPrefix())
+			if err != nil {
+				if apierrors.IsNotFound(err) {
+					processed.RemoveItem(i)
+
+					continue
+				}
+
+				if failAndContinue(i, "removing metdata failed for item: ", err) {
+					continue
+				}
+			}
+		}
+
+		processed.RemoveItem(i)
 	}
 
 	if itemErrors > 0 {
@@ -254,11 +262,9 @@ func (r *Processor) handlePruneDeletion(
 	actual *unstructured.Unstructured,
 	fieldOwner string,
 	current *meta.ObjectReferenceStatus,
-) (deletable bool, err error) {
-	if current != nil {
-		if current.Created {
-			deletable = true
-		}
+) (bool, error) {
+	if current != nil && current.Created {
+		return true, nil
 	}
 
 	labels := actual.GetLabels()
@@ -266,13 +272,10 @@ func (r *Processor) handlePruneDeletion(
 		return false, nil
 	}
 
-	deletable = meta.HasExactlyCapsuleOwners(actual, meta.FieldManagerCapsulePrefix+"/resource/",
-		[]string{
-			fieldOwner,
-			meta.ResourceControllerFieldOwnerPrefix(),
-		})
-
-	return deletable, err
+	return meta.HasExactlyCapsuleOwners(actual, meta.FieldManagerCapsulePrefix+"/resource/", []string{
+		fieldOwner,
+		meta.ResourceControllerFieldOwnerPrefix(),
+	}), nil
 }
 
 // Remove metadata from the controller when an object

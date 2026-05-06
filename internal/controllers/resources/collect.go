@@ -27,7 +27,6 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api/processor"
 	"github.com/projectcapsule/capsule/pkg/runtime/gvk"
 	"github.com/projectcapsule/capsule/pkg/runtime/sanitize"
-	"github.com/projectcapsule/capsule/pkg/template"
 	tpl "github.com/projectcapsule/capsule/pkg/template"
 	"github.com/projectcapsule/capsule/pkg/tenant"
 	"github.com/projectcapsule/capsule/pkg/utils"
@@ -45,7 +44,7 @@ type CollectorOptions struct {
 	AllowCrossNamespaceSelection bool
 	Accumulator                  processor.Accumulator
 	Iterator                     CollectorIteratorOptions
-	ValidatorNamespaces          template.NamespaceValidator
+	ValidatorNamespaces          tpl.NamespaceValidator
 }
 
 type CollectorIteratorOptions struct {
@@ -350,11 +349,6 @@ func (co *Collector) CollectNamespacedItems(
 				)
 			}
 		}
-	}
-
-	objs := make([]*unstructured.Unstructured, 0, len(seen))
-	for _, obj := range seen {
-		objs = append(objs, obj)
 	}
 
 	return seen, totalError

@@ -88,11 +88,14 @@ func fromYAMLArray(str string) []any {
 //
 // This is designed to be called from a template.
 func toTOML(v any) string {
+	if v == nil {
+		return ""
+	}
+
 	b := bytes.NewBuffer(nil)
 	e := toml.NewEncoder(b)
 
-	err := e.Encode(v)
-	if err != nil {
+	if err := e.Encode(v); err != nil {
 		return err.Error()
 	}
 

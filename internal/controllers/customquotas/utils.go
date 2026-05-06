@@ -50,7 +50,8 @@ func CompileTargets(
 		switch target.Operation {
 		case quota.OpCount:
 			// no usage path needed
-		default:
+
+		case quota.OpAdd, quota.OpSub:
 			compiledPath, err := jcache.GetOrCompile(target.Path)
 			if err != nil {
 				return nil, fmt.Errorf(
@@ -63,6 +64,9 @@ func CompileTargets(
 			}
 
 			pt.CompiledPath = compiledPath
+
+		default:
+			return nil, fmt.Errorf("unsupported operation %q for %s", target.Operation, target.String())
 		}
 
 		compiledSelectors, err := CompileSelectorsWithFields(jcache, target.Selectors)
@@ -283,4 +287,48 @@ func minDurationPtr(cur *time.Duration, cand time.Duration) *time.Duration {
 	}
 
 	return cur
+}
+
+//nolint:dupl
+func pendingDeleteStillPresent(
+	pd capsulev1beta2.QuantityLedgerPendingDelete,
+	claims []capsulev1beta2.CustomQuotaClaimItem,
+) bool {
+	for _, claim := range claims {
+		if pd.ObjectRef.UID != "" && claim.UID != "" && pd.ObjectRef.UID == claim.UID {
+			return true
+		}
+
+		if pd.ObjectRef.APIGroup == claim.Group &&
+			pd.ObjectRef.APIVersion == claim.Version &&
+			pd.ObjectRef.Kind == claim.Kind &&
+			pd.ObjectRef.Namespace == string(claim.Namespace) &&
+			pd.ObjectRef.Name == claim.Name {
+			return true
+		}
+	}
+
+	return false
+}
+
+//nolint:dupl
+func reservationMaterializedLedger(
+	res capsulev1beta2.QuantityLedgerReservation,
+	claims []capsulev1beta2.CustomQuotaClaimItem,
+) bool {
+	for _, claim := range claims {
+		if res.ObjectRef.UID != "" && claim.UID != "" && res.ObjectRef.UID == claim.UID {
+			return true
+		}
+
+		if res.ObjectRef.APIGroup == claim.Group &&
+			res.ObjectRef.APIVersion == claim.Version &&
+			res.ObjectRef.Kind == claim.Kind &&
+			res.ObjectRef.Namespace == string(claim.Namespace) &&
+			res.ObjectRef.Name == claim.Name {
+			return true
+		}
+	}
+
+	return false
 }

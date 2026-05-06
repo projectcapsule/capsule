@@ -37,7 +37,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/runtime/selectors"
 )
 
-// Might need some tuning in the
+// Might need some tuning in the.
 var customAdmissionBackoff = wait.Backoff{
 	Steps:    6,
 	Duration: 20 * time.Millisecond,
@@ -151,6 +151,7 @@ func (h *objectCalculationHandler) OnCreate(c client.Client, decoder admission.D
 
 					available := item.Limit.DeepCopy()
 					available.Sub(effectiveUsed)
+
 					if available.Sign() < 0 {
 						available = resource.MustParse("0")
 					}
@@ -190,6 +191,7 @@ func (h *objectCalculationHandler) OnCreate(c client.Client, decoder admission.D
 						),
 					)
 					finalResp = &resp
+
 					return nil
 				}
 
@@ -222,6 +224,8 @@ func (h *objectCalculationHandler) OnCreate(c client.Client, decoder admission.D
 		return finalResp
 	}
 }
+
+//nolint:gocognit,cyclop,maintidx
 func (h *objectCalculationHandler) OnUpdate(c client.Client, _ admission.Decoder, recorder events.EventRecorder) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		oldObj, err := getUnstructured(req.OldObject)
@@ -302,6 +306,7 @@ func (h *objectCalculationHandler) OnUpdate(c client.Client, _ admission.Decoder
 					newItem, ok := newByKey[key]
 					if !ok || oldItem.Usage.Cmp(newItem.Usage) != 0 {
 						relevantChange = true
+
 						break
 					}
 				}
@@ -309,6 +314,7 @@ func (h *objectCalculationHandler) OnUpdate(c client.Client, _ admission.Decoder
 
 			if !relevantChange {
 				finalResp = nil
+
 				return nil
 			}
 
@@ -324,6 +330,7 @@ func (h *objectCalculationHandler) OnUpdate(c client.Client, _ admission.Decoder
 				newItem, hadNew := newByKey[key]
 
 				var base evaluatedQuota
+
 				switch {
 				case hadNew:
 					base = newItem
@@ -341,6 +348,7 @@ func (h *objectCalculationHandler) OnUpdate(c client.Client, _ admission.Decoder
 				ledgerKey := quantityLedgerKeyForMatchedQuota(base)
 
 				var pendingDelete *capsulev1beta2.QuantityLedgerObjectRef
+
 				if hadOld && !hadNew {
 					objRef := capsulev1beta2.QuantityLedgerObjectRef{
 						APIGroup:   req.Kind.Group,
@@ -378,6 +386,7 @@ func (h *objectCalculationHandler) OnUpdate(c client.Client, _ admission.Decoder
 
 					available := base.Limit.DeepCopy()
 					available.Sub(effectiveUsed)
+
 					if available.Sign() < 0 {
 						available = resource.MustParse("0")
 					}
@@ -904,6 +913,7 @@ func (h *objectCalculationHandler) evaluateMatchedQuotas(
 
 	return out, nil
 }
+
 func mutateLedger(
 	ctx context.Context,
 	c client.Client,
@@ -911,9 +921,11 @@ func mutateLedger(
 	reservation *capsulev1beta2.QuantityLedgerReservation,
 	pendingDelete *capsulev1beta2.QuantityLedgerObjectRef,
 ) (bool, resource.Quantity, resource.Quantity, error) {
-	var allowed bool
-	var effectiveUsed resource.Quantity
-	var reserved resource.Quantity
+	var (
+		allowed       bool
+		effectiveUsed resource.Quantity
+		reserved      resource.Quantity
+	)
 
 	ledgerKey := quantityLedgerKeyForMatchedQuota(item)
 
@@ -958,12 +970,15 @@ func mutateLedger(
 
 		if pendingDelete != nil {
 			exists := false
+
 			for _, pd := range activeDeletes {
 				if pd.ObjectRef.UID != "" && pd.ObjectRef.UID == pendingDelete.UID {
 					exists = true
+
 					break
 				}
 			}
+
 			if !exists {
 				activeDeletes = append(activeDeletes, capsulev1beta2.QuantityLedgerPendingDelete{
 					ObjectRef: *pendingDelete,
@@ -979,6 +994,7 @@ func mutateLedger(
 
 		newEffectiveUsed := latestUsed.DeepCopy()
 		newEffectiveUsed.Add(newReserved)
+
 		if newEffectiveUsed.Sign() < 0 {
 			newEffectiveUsed = resource.MustParse("0")
 		}
@@ -987,6 +1003,7 @@ func mutateLedger(
 			allowed = false
 			effectiveUsed = newEffectiveUsed
 			reserved = newReserved
+
 			return nil
 		}
 
@@ -1001,6 +1018,7 @@ func mutateLedger(
 		allowed = true
 		effectiveUsed = newEffectiveUsed
 		reserved = newReserved
+
 		return nil
 	})
 
@@ -1017,6 +1035,7 @@ func latestPersistedUsedForQuota(
 		if err := c.Get(ctx, types.NamespacedName{Name: item.Name}, obj); err != nil {
 			return resource.Quantity{}, err
 		}
+
 		return obj.Status.Usage.Used.DeepCopy(), nil
 	}
 
@@ -1027,6 +1046,7 @@ func latestPersistedUsedForQuota(
 	}, obj); err != nil {
 		return resource.Quantity{}, err
 	}
+
 	return obj.Status.Usage.Used.DeepCopy(), nil
 }
 

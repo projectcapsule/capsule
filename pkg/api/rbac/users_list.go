@@ -95,8 +95,8 @@ func (o UserListSpec) FindUser(name string, kind OwnerKind) (UserSpec, bool) {
 }
 
 func (o UserListSpec) SplitUsersAndGroups() (users []string, groups []string) {
-	seenU := map[string]struct{}{}
-	seenG := map[string]struct{}{}
+	seenU := make(map[string]struct{}, len(o))
+	seenG := make(map[string]struct{}, len(o))
 
 	for _, s := range o {
 		if s.Name == "" {
@@ -104,26 +104,34 @@ func (o UserListSpec) SplitUsersAndGroups() (users []string, groups []string) {
 		}
 
 		switch s.Kind {
-		case UserOwner:
-			seenU[s.Name] = struct{}{}
-		case ServiceAccountOwner:
+		case UserOwner, ServiceAccountOwner:
 			seenU[s.Name] = struct{}{}
 		case GroupOwner:
 			seenG[s.Name] = struct{}{}
+		default:
+			continue
 		}
 	}
 
-	for u := range seenU {
-		users = append(users, u)
+	if len(seenU) > 0 {
+		users = make([]string, 0, len(seenU))
+
+		for u := range seenU {
+			users = append(users, u)
+		}
+
+		sort.Strings(users)
 	}
 
-	for g := range seenG {
-		groups = append(groups, g)
+	if len(seenG) > 0 {
+		groups = make([]string, 0, len(seenG))
+
+		for g := range seenG {
+			groups = append(groups, g)
+		}
+
+		sort.Strings(groups)
 	}
-
-	sort.Strings(users)
-
-	sort.Strings(groups)
 
 	return users, groups
 }

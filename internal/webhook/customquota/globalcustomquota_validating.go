@@ -33,6 +33,7 @@ func GlobalCustomQuotaValidationHandler(
 	}
 }
 
+//nolint:dupl
 func (h *globalCustomQuotaValidationHandler) OnCreate(_ client.Client, decoder admission.Decoder, _ events.EventRecorder) handlers.Func {
 	return func(_ context.Context, req admission.Request) *admission.Response {
 		q := &capsulev1beta2.GlobalCustomQuota{}
@@ -70,6 +71,7 @@ func (h *globalCustomQuotaValidationHandler) OnDelete(_ client.Client, decoder a
 	}
 }
 
+//nolint:dupl
 func (h *globalCustomQuotaValidationHandler) OnUpdate(_ client.Client, decoder admission.Decoder, _ events.EventRecorder) handlers.Func {
 	return func(_ context.Context, req admission.Request) *admission.Response {
 		oldQuota := &capsulev1beta2.GlobalCustomQuota{}

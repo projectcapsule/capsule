@@ -10,6 +10,7 @@ import (
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -233,6 +234,225 @@ var _ = Describe("TenantResource SSA", Label("replications", "namespace", "tenan
 			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 			expectResolvedServiceAccount(baseNamespace, tr.Name, "default", baseNamespace)
 		})
+
+		It("fails to apply raw items when the impersonated service account cannot create target resources", func() {
+			saName := "restricted-creator"
+			ensureServiceAccount(baseNamespace, saName)
+
+			// Intentionally do not grant create/update/patch on configmaps in tenant namespaces.
+
+			tr := newRawConfigMapTenantResource(baseNamespace, "sa-no-create", map[string]string{
+				"mode": "blocked",
+			})
+			tr.Spec.ServiceAccount = &apimeta.LocalRFC1123ObjectReference{
+				Name: apimeta.RFC1123Name(saName),
+			}
+			renameFirstTenantResourceRawConfigMap(tr, "blocked-create-config")
+
+			EventuallyCreation(func() error { return k8sClient.Create(ctx, tr) }).Should(Succeed())
+
+			expectResolvedServiceAccount(baseNamespace, tr.Name, saName, baseNamespace)
+			expectTenantResourceFailed(baseNamespace, tr.Name, "applying of")
+
+			for _, ns := range targetNamespaces {
+				expectConfigMapAbsent(ns, "blocked-create-config")
+			}
+		})
+
+		It("fails to render generators when the impersonated service account cannot read context resources", func() {
+			saName := "restricted-context-reader"
+			ensureServiceAccount(baseNamespace, saName)
+
+			// Create context source secret.
+			sec := &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "ctx-secret",
+					Namespace: "solar-one",
+					Labels: map[string]string{
+						"pullsecret.company.com": "true",
+					},
+				},
+				Type:       corev1.SecretTypeOpaque,
+				StringData: map[string]string{".dockerconfigjson": "e30="},
+			}
+			EventuallyCreation(func() error { return k8sClient.Create(ctx, sec) }).Should(Succeed())
+
+			// Grant write on ConfigMaps in target namespaces if you want to isolate the failure to context loading.
+			for _, ns := range targetNamespaces {
+				bindServiceAccountToConfigMapWriter(baseNamespace, saName, ns)
+			}
+			// But do NOT grant get/list on secrets in solar-one.
+
+			tr := &capsulev1beta2.TenantResource{
+				ObjectMeta: metav1.ObjectMeta{Name: "sa-no-context-read", Namespace: baseNamespace},
+				Spec: capsulev1beta2.TenantResourceSpec{
+					ServiceAccount: &apimeta.LocalRFC1123ObjectReference{
+						Name: apimeta.RFC1123Name(saName),
+					},
+					TenantResourceCommonSpec: capsulev1beta2.TenantResourceCommonSpec{
+						ResyncPeriod:    resyncPeriod,
+						PruningOnDelete: ptr.To(true),
+						Resources: []capsulev1beta2.ResourceSpec{{
+							Context: &template.TemplateContext{
+								Resources: []*template.TemplateResourceReference{{
+									Index: "secrets",
+									ResourceReference: template.ResourceReference{
+										APIVersion: "v1",
+										Kind:       "Secret",
+										Namespace:  "solar-one",
+										Selector: &metav1.LabelSelector{
+											MatchLabels: map[string]string{
+												"pullsecret.company.com": "true",
+											},
+										},
+									},
+								}},
+							},
+							Generators: []capsulev1beta2.TemplateItemSpec{{
+								MissingKey: "error",
+								Template: `---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: blocked-context
+data:
+  count: '{{ if $.secrets }}{{ len $.secrets }}{{ else }}0{{ end }}'
+`,
+							}},
+						}},
+					},
+				},
+			}
+
+			EventuallyCreation(func() error { return k8sClient.Create(ctx, tr) }).Should(Succeed())
+
+			expectResolvedServiceAccount(baseNamespace, tr.Name, saName, baseNamespace)
+			expectTenantResourceFailed(baseNamespace, tr.Name, "forbidden")
+
+			for _, ns := range targetNamespaces {
+				expectConfigMapAbsent(ns, "blocked-context")
+			}
+		})
+
+		It("fails to prune replicated resources when the impersonated service account cannot delete them", func() {
+			saCreate := "creator-ok"
+			saNoDelete := "creator-no-delete"
+
+			ensureServiceAccount(baseNamespace, saCreate)
+			ensureServiceAccount(baseNamespace, saNoDelete)
+
+			// Phase 1: creator can fully reconcile objects in every targeted namespace.
+			for _, ns := range append(targetNamespaces, baseNamespace) {
+				bindServiceAccountToConfigMapWriter(baseNamespace, saCreate, ns)
+			}
+
+			// Phase 2 SA can still read/apply, but has no delete verb.
+			for _, ns := range append(targetNamespaces, baseNamespace) {
+				bindServiceAccountToConfigMapWriter(baseNamespace, saNoDelete, ns)
+			}
+
+			tr := newRawConfigMapTenantResource(baseNamespace, "sa-no-prune", map[string]string{
+				"mode": "created",
+			})
+			tr.Spec.ServiceAccount = &apimeta.LocalRFC1123ObjectReference{
+				Name: apimeta.RFC1123Name(saCreate),
+			}
+			tr.Spec.PruningOnDelete = ptr.To(true)
+			renameFirstTenantResourceRawConfigMap(tr, "prune-protected")
+
+			EventuallyCreation(func() error { return k8sClient.Create(ctx, tr) }).Should(Succeed())
+			expectTenantResourceReady(baseNamespace, tr.Name)
+
+			for _, ns := range append(targetNamespaces, baseNamespace) {
+				expectConfigMapData(ns, "prune-protected", map[string]string{"mode": "created"})
+			}
+
+			// Switch to the SA that cannot delete.
+			Eventually(func() error {
+				current := &capsulev1beta2.TenantResource{}
+				if err := k8sClient.Get(ctx, types.NamespacedName{Name: tr.Name, Namespace: baseNamespace}, current); err != nil {
+					return err
+				}
+				current.Spec.ServiceAccount = &apimeta.LocalRFC1123ObjectReference{
+					Name: apimeta.RFC1123Name(saNoDelete),
+				}
+				return k8sClient.Update(ctx, current)
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+
+			Eventually(func(g Gomega) {
+				current := &capsulev1beta2.TenantResource{}
+				g.Expect(k8sClient.Get(ctx, types.NamespacedName{Name: tr.Name, Namespace: baseNamespace}, current)).To(Succeed())
+				g.Expect(current.Status.ServiceAccount).ToNot(BeNil())
+				g.Expect(current.Status.ServiceAccount.Name).To(Equal(apimeta.RFC1123Name(saNoDelete)))
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+
+			Expect(k8sClient.Delete(ctx, tr)).To(Succeed())
+
+			// Objects should remain because prune cannot delete them.
+			for _, ns := range append(targetNamespaces, baseNamespace) {
+				Eventually(func(g Gomega) {
+					cm := &corev1.ConfigMap{}
+					g.Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "prune-protected", Namespace: ns}, cm)).To(Succeed())
+				}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+			}
+		})
+		It("fails to replicate namespacedItems when the impersonated service account cannot read source resources", func() {
+			saName := "restricted-source-reader"
+			ensureServiceAccount(baseNamespace, saName)
+
+			source := &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "source-secret",
+					Namespace: baseNamespace,
+					Labels: map[string]string{
+						"replicate": "true",
+					},
+				},
+				Type:       corev1.SecretTypeOpaque,
+				StringData: map[string]string{"token": "abc"},
+			}
+			EventuallyCreation(func() error { return k8sClient.Create(ctx, source) }).Should(Succeed())
+
+			// Allow write into targets only, but do not grant read on source namespace secrets.
+			for _, ns := range targetNamespaces {
+				bindServiceAccountToSecretWriter(baseNamespace, saName, ns)
+			}
+
+			tr := &capsulev1beta2.TenantResource{
+				ObjectMeta: metav1.ObjectMeta{Name: "sa-no-namespaceditem-read", Namespace: baseNamespace},
+				Spec: capsulev1beta2.TenantResourceSpec{
+					ServiceAccount: &apimeta.LocalRFC1123ObjectReference{
+						Name: apimeta.RFC1123Name(saName),
+					},
+					TenantResourceCommonSpec: capsulev1beta2.TenantResourceCommonSpec{
+						ResyncPeriod:    resyncPeriod,
+						PruningOnDelete: ptr.To(true),
+						Resources: []capsulev1beta2.ResourceSpec{{
+							NamespacedItems: []template.ResourceReference{{
+								APIVersion: "v1",
+								Kind:       "Secret",
+								Namespace:  baseNamespace,
+								Selector: &metav1.LabelSelector{
+									MatchLabels: map[string]string{
+										"replicate": "true",
+									},
+								},
+							}},
+						}},
+					},
+				},
+			}
+
+			EventuallyCreation(func() error { return k8sClient.Create(ctx, tr) }).Should(Succeed())
+
+			expectResolvedServiceAccount(baseNamespace, tr.Name, saName, baseNamespace)
+			expectTenantResourceFailed(baseNamespace, tr.Name, "forbidden")
+
+			for _, ns := range targetNamespaces {
+				expectSecretAbsent(ns, "source-secret")
+			}
+		})
+
 	})
 
 	Context("advanced TenantResource ownership and namespace behavior", func() {
@@ -1454,4 +1674,159 @@ func expectConfigMapAbsent(namespace, name string) {
 			Namespace: namespace,
 		}, &corev1.ConfigMap{})
 	}, 5*time.Second, defaultPollInterval).Should(HaveOccurred())
+}
+
+func expectSecretAbsent(namespace, name string) {
+	Consistently(func() error {
+		return k8sClient.Get(context.Background(), types.NamespacedName{
+			Name:      name,
+			Namespace: namespace,
+		}, &corev1.Secret{})
+	}, 5*time.Second, defaultPollInterval).Should(HaveOccurred())
+}
+
+func renameFirstTenantResourceRawConfigMap(tr *capsulev1beta2.TenantResource, name string) {
+	tr.Spec.Resources[0].RawItems[0] = capsulev1beta2.RawExtension{
+		RawExtension: runtime.RawExtension{
+			Object: &corev1.ConfigMap{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "v1",
+					Kind:       "ConfigMap",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name: name,
+				},
+				Data: tr.Spec.Resources[0].RawItems[0].RawExtension.Object.(*corev1.ConfigMap).Data,
+			},
+		},
+	}
+}
+
+func bindServiceAccountToNamespacedResource(
+	saNamespace, saName, targetNamespace string,
+	resources, verbs []string,
+) {
+	ctx := context.Background()
+
+	resourceKey := strings.Join(resources, "-")
+	roleName := fmt.Sprintf("sa-%s-%s-%s", saName, resourceKey, targetNamespace)
+	roleBindingName := fmt.Sprintf("sa-%s-%s-%s-binding", saName, resourceKey, targetNamespace)
+
+	role := &rbacv1.Role{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      roleName,
+			Namespace: targetNamespace,
+		},
+		Rules: []rbacv1.PolicyRule{{
+			APIGroups: []string{""},
+			Resources: resources,
+			Verbs:     verbs,
+		}},
+	}
+
+	roleBinding := &rbacv1.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      roleBindingName,
+			Namespace: targetNamespace,
+		},
+		Subjects: []rbacv1.Subject{{
+			Kind:      "ServiceAccount",
+			Name:      saName,
+			Namespace: saNamespace,
+		}},
+		RoleRef: rbacv1.RoleRef{
+			APIGroup: rbacv1.GroupName,
+			Kind:     "Role",
+			Name:     roleName,
+		},
+	}
+
+	Eventually(func() error {
+		current := &rbacv1.Role{}
+		err := k8sClient.Get(ctx, types.NamespacedName{Name: roleName, Namespace: targetNamespace}, current)
+		if apierrors.IsNotFound(err) {
+			return k8sClient.Create(ctx, role)
+		}
+		if err != nil {
+			return err
+		}
+
+		current.Rules = role.Rules
+		return k8sClient.Update(ctx, current)
+	}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+
+	Eventually(func() error {
+		current := &rbacv1.RoleBinding{}
+		err := k8sClient.Get(ctx, types.NamespacedName{Name: roleBindingName, Namespace: targetNamespace}, current)
+		if apierrors.IsNotFound(err) {
+			return k8sClient.Create(ctx, roleBinding)
+		}
+		if err != nil {
+			return err
+		}
+
+		current.Subjects = roleBinding.Subjects
+		current.RoleRef = roleBinding.RoleRef
+		return k8sClient.Update(ctx, current)
+	}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+}
+
+func bindServiceAccountToSecretWriter(saNamespace, saName, targetNamespace string) {
+	bindServiceAccountToNamespacedResource(
+		saNamespace,
+		saName,
+		targetNamespace,
+		[]string{"secrets"},
+		[]string{"get", "list", "watch", "create", "update", "patch"},
+	)
+}
+
+func bindServiceAccountToSecretReader(saNamespace, saName, targetNamespace string) {
+	bindServiceAccountToNamespacedResource(
+		saNamespace,
+		saName,
+		targetNamespace,
+		[]string{"secrets"},
+		[]string{"get", "list", "watch"},
+	)
+}
+
+func bindServiceAccountToConfigMapWriter(saNamespace, saName, targetNamespace string) {
+	bindServiceAccountToNamespacedResource(
+		saNamespace,
+		saName,
+		targetNamespace,
+		[]string{"configmaps"},
+		[]string{"get", "list", "watch", "create", "update", "patch"},
+	)
+}
+
+func bindServiceAccountToConfigMapDeleter(saNamespace, saName, targetNamespace string) {
+	bindServiceAccountToNamespacedResource(
+		saNamespace,
+		saName,
+		targetNamespace,
+		[]string{"configmaps"},
+		[]string{"get", "list", "watch", "delete"},
+	)
+}
+
+func ensureServiceAccount(namespace, name string) {
+	ctx := context.Background()
+
+	sa := &corev1.ServiceAccount{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+	}
+
+	Eventually(func() error {
+		current := &corev1.ServiceAccount{}
+		err := k8sClient.Get(ctx, types.NamespacedName{Name: name, Namespace: namespace}, current)
+		if apierrors.IsNotFound(err) {
+			return k8sClient.Create(ctx, sa)
+		}
+		return err
+	}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 }
