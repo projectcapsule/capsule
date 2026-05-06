@@ -96,6 +96,7 @@ func (t ResourceReference) LoadResources(
 	additionSelectors []labels.Selector,
 	templateContext map[string]string,
 	allowClusterScoped bool,
+	validateNamespace NamespaceValidator,
 ) ([]*unstructured.Unstructured, error) {
 	isNamespaced, err := t.IsNamespacedGVK(restMapper)
 	if err != nil {
@@ -111,7 +112,18 @@ func (t ResourceReference) LoadResources(
 		return nil, err
 	}
 
-	return ref.loadResources(ctx, kubeClient, restMapper, namespace, additionSelectors)
+	ns := ref.Namespace
+	if ns == "" && namespace != "" {
+		ns = namespace
+	}
+
+	if validateNamespace != nil && ns != "" {
+		if err := validateNamespace(ns); err != nil {
+			return nil, err
+		}
+	}
+
+	return ref.loadResources(ctx, kubeClient, ns, additionSelectors)
 }
 
 func (t ResourceReference) IsNamespacedGVK(
@@ -133,24 +145,20 @@ func (t ResourceReference) IsNamespacedGVK(
 
 	return isNamespaced, nil
 }
-
 func (t ResourceReference) loadResources(
 	ctx context.Context,
 	kubeClient client.Client,
-	restMapper k8smeta.RESTMapper,
 	namespace string,
 	additionSelectors []labels.Selector,
 ) ([]*unstructured.Unstructured, error) {
-	ns := t.Namespace
-
-	// Handle this somewhere else
-	if ns == "" && namespace != "" {
-		ns = namespace
-	}
-
 	log := log.FromContext(ctx)
 
-	log.Info("GATHERING IN NAMESPACE", "NAMESPACE", ns)
+	log.V(5).Info("gathering resources",
+		"apiVersion", t.APIVersion,
+		"kind", t.Kind,
+		"name", t.Name,
+		"namespace", namespace,
+	)
 
 	// GET path (single object)
 	if t.Name != "" {
@@ -160,7 +168,7 @@ func (t ResourceReference) loadResources(
 
 		key := client.ObjectKey{
 			Name:      t.Name,
-			Namespace: ns,
+			Namespace: namespace,
 		}
 
 		if err := kubeClient.Get(ctx, key, obj); err != nil {
@@ -179,8 +187,8 @@ func (t ResourceReference) loadResources(
 	list.SetKind(t.Kind + "List")
 
 	var opts []client.ListOption
-	if ns != "" {
-		opts = append(opts, client.InNamespace(ns))
+	if namespace != "" {
+		opts = append(opts, client.InNamespace(namespace))
 	}
 
 	var tenantSel labels.Selector
@@ -209,7 +217,24 @@ func (t ResourceReference) loadResources(
 	if len(all) > 0 {
 		combined := selectors.CombineSelectors(all...)
 
+		selectorStrings := make([]string, 0, len(all))
+		for _, s := range all {
+			if s != nil {
+				selectorStrings = append(selectorStrings, s.String())
+			}
+		}
+
+		log.V(5).Info("applying combined label selector",
+			"namespace", namespace,
+			"selectors", selectorStrings,
+			"combinedSelector", combined.String(),
+		)
+
 		opts = append(opts, client.MatchingLabelsSelector{Selector: combined})
+	} else {
+		log.V(5).Info("listing without label selector",
+			"namespace", namespace,
+		)
 	}
 
 	if err := kubeClient.List(ctx, list, opts...); err != nil {
@@ -220,6 +245,11 @@ func (t ResourceReference) loadResources(
 	for i := range list.Items {
 		results = append(results, list.Items[i].DeepCopy())
 	}
+
+	log.V(5).Info("gathered resources",
+		"namespace", namespace,
+		"count", len(results),
+	)
 
 	return results, nil
 }

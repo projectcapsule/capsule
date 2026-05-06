@@ -36,14 +36,7 @@ func (h *replicaHandler) OnCreate(client.Client, admission.Decoder, events.Event
 
 func (h *replicaHandler) OnDelete(c client.Client, _ admission.Decoder, recorder events.EventRecorder) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		if resp := h.handler(ctx, c, req, recorder); resp != nil {
-			return resp
-		}
-
-		// Make sure resources are kept longer than other resources with finalizers
-		// this prevents cases where eg. a pod awas given a finalizer and a cr netpol is deleted first
-		// providing the pod with no guardrails.
-		return namespaceHasFinalizers(ctx, c, req.Namespace)
+		return nil
 	}
 }
 

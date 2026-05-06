@@ -1,7 +1,7 @@
 // Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package caches
+package invalidator
 
 import (
 	"context"
@@ -12,7 +12,7 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 )
 
-func (r *Manager) rebuildJSONPathCache(ctx context.Context, log logr.Logger) error {
+func (r *CacheInvalidator) rebuildJSONPathCache(ctx context.Context, log logr.Logger) error {
 	customQuotas := &capsulev1beta2.CustomQuotaList{}
 	if err := r.Client.List(ctx, customQuotas); err != nil {
 		return err

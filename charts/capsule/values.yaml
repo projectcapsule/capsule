@@ -916,7 +916,7 @@ webhooks:
             - '*'
           scope: "Namespaced"
 
-    replicas:
+    replications:
       # -- Enable the Hook
       enabled: true
       # -- Capsule Hook Options
@@ -931,7 +931,7 @@ webhooks:
           - key:  projectcapsule.dev/created-by
             operator: In
             values:
-              - "resources"
+              - "replications"
       # -- [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector)
       namespaceSelector:
         matchExpressions:
@@ -1025,5 +1025,5 @@ webhooks:
       # -- Deprecated, use webhooks.hooks.pods instead
       pods: {}
 
-    # -- Deprecated, use webhooks.hooks.managed instead
+    # -- Deprecated, use webhooks.hooks.replications instead
     tenantResourceObjects: {}

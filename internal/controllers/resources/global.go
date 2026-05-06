@@ -384,18 +384,39 @@ func (r *globalResourceController) gatherResources(
 
 	// Collect Available Generated Items
 	for resourceIndex, resource := range tntResource.Spec.Resources {
-		for _, tnt := range tnts.Items {
-			ilog := log.WithValues("tenant", tnt.GetName(), "resource", resourceIndex)
+		switch tntResource.Spec.Scope {
+		case api.ResourceScopeNone:
+			ilog := log.WithValues("tenant", "Cluster", "resource", resourceIndex)
+			ilog.V(5).Info("replicating once for cluster scope")
 
-			var resourceError error
+			clusterTenant := &capsulev1beta2.Tenant{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "None",
+				},
+			}
 
-			switch tntResource.Spec.Scope {
-			case api.ResourceScopeTenant:
+			opts.Iterator = NewCollectorIteratorOptions(clusterTenant, nil, resource)
+
+			if err := r.collector.Collect(
+				ctx,
+				c,
+				opts,
+				clusterTenant,
+				strconv.Itoa(resourceIndex),
+				resource,
+				nil,
+			); err != nil {
+				return err
+			}
+
+		case api.ResourceScopeTenant:
+			for _, tnt := range tnts.Items {
+				ilog := log.WithValues("tenant", tnt.GetName(), "resource", resourceIndex)
 				ilog.V(5).Info("replicating for each tenant")
 
 				opts.Iterator = NewCollectorIteratorOptions(&tnt, nil, resource)
 
-				resourceError = r.collector.Collect(
+				if err := r.collector.Collect(
 					ctx,
 					c,
 					opts,
@@ -403,8 +424,14 @@ func (r *globalResourceController) gatherResources(
 					strconv.Itoa(resourceIndex),
 					resource,
 					nil,
-				)
-			default:
+				); err != nil {
+					return err
+				}
+			}
+
+		default:
+			for _, tnt := range tnts.Items {
+				ilog := log.WithValues("tenant", tnt.GetName(), "resource", resourceIndex)
 				ilog.V(5).Info("replicating for each namespace")
 
 				opts.AllowCrossNamespaceSelection = true
@@ -423,8 +450,6 @@ func (r *globalResourceController) gatherResources(
 					return err
 				}
 
-				i := 0
-
 				opts.AllowCrossNamespaceSelection = false
 
 				for _, innerNs := range namespaces {
@@ -439,34 +464,30 @@ func (r *globalResourceController) gatherResources(
 						sanitize.SanitizeObject(target, c.Scheme(), r.collector.objectSanitizeOptions)
 						target.SetNamespace(innerNs.GetName())
 
-						log.V(4).Info("adding replication for namespaced item", "name", target.GetName(), "namespace", target.GetNamespace(), "kind", target.GetKind())
+						log.V(4).Info(
+							"adding replication for namespaced item",
+							"name", target.GetName(),
+							"namespace", target.GetNamespace(),
+							"kind", target.GetKind(),
+						)
 
-						err = r.collector.AddToAccumulation(&tnt, innerNs, opts, resource, target, "replica", false)
-						if err != nil {
+						if err := r.collector.AddToAccumulation(&tnt, innerNs, opts, resource, target, "replica", false); err != nil {
 							return err
 						}
 					}
 
-					err = r.collector.Collect(
+					if err := r.collector.Collect(
 						ctx,
 						c,
 						opts,
 						&tnt,
-						strconv.Itoa((resourceIndex)),
+						strconv.Itoa(resourceIndex),
 						resource,
 						innerNs,
-					)
-					if err != nil {
+					); err != nil {
 						return err
 					}
-
-					i++
 				}
-			}
-
-			// Only start pruning when the resource item itself did not throw an error
-			if resourceError != nil {
-				return resourceError
 			}
 		}
 	}

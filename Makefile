@@ -185,6 +185,7 @@ dev-setup:
 		--namespace capsule-system \
 		--create-namespace \
 		--version=$(CHART_VERSION) \
+		--set 'proxy.enabled=true' \
 		--set 'crds.install=true' \
 		--set 'crds.exclusive=true'\
 		--set 'crds.createConfig=true'\

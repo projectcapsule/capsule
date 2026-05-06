@@ -22,3 +22,26 @@ spec:
               - admin
             kind: ServiceAccount
             name: "system:serviceaccount:{{namespace}}:gitops-reconciler"
+---
+apiVersion: capsule.clastix.io/v1beta2
+kind: GlobalTenantResource
+metadata:
+  name: cluster-replication
+spec:
+  resyncPeriod: 60s
+  scope: None
+  resources:
+    - additionalMetadata:
+        labels:
+          "replicated-by": "capsule"
+      rawItems:
+        - apiVersion: capsule.clastix.io/v1beta2
+          kind: TenantOwner
+          metadata:
+            name: "default-owner"
+          spec:
+            clusterRoles:
+              - capsule-namespace-deleter
+              - admin
+            kind: ServiceAccount
+            name: "system:serviceaccount:{{namespace}}:gitops-reconciler"

@@ -6,9 +6,10 @@ package api
 const (
 	ResourceScopeNamespace ResourceScope = "Namespace"
 	ResourceScopeTenant    ResourceScope = "Tenant"
+	ResourceScopeNone      ResourceScope = "None"
 )
 
-// +kubebuilder:validation:Enum=Namespace;Tenant
+// +kubebuilder:validation:Enum=Namespace;Tenant;None
 type ResourceScope string
 
 func (p ResourceScope) String() string {

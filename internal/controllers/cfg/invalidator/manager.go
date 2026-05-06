@@ -1,13 +1,12 @@
 // Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package caches
+package invalidator
 
 import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
@@ -16,7 +15,6 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -32,7 +30,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/runtime/predicates"
 )
 
-type Manager struct {
+type CacheInvalidator struct {
 	client.Client
 
 	Rest *rest.Config
@@ -47,20 +45,24 @@ type Manager struct {
 	ImpersonationCache *cache.ImpersonationCache
 }
 
+func (r *CacheInvalidator) NeedLeaderElection() bool {
+	return false
+}
+
 // Start is the Runnable function triggered upon Manager start-up to perform cache population.
-func (r *Manager) Start(ctx context.Context) error {
+func (r *CacheInvalidator) Start(ctx context.Context) error {
 	if err := r.rebuildCaches(ctx, r.Log); err != nil {
 		r.Log.Error(err, "cache population failed")
 
 		return nil
 	}
 
-	r.Log.Info("caches populated")
+	<-ctx.Done()
 
 	return nil
 }
 
-func (r *Manager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.ControllerOptions) (err error) {
+func (r *CacheInvalidator) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.ControllerOptions) (err error) {
 	r.configName = ctrlConfig.ConfigurationName
 
 	err = ctrl.NewControllerManagedBy(mgr).
@@ -132,7 +134,7 @@ func (r *Manager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.Controller
 	return mgr.Add(r)
 }
 
-func (r *Manager) Reconcile(ctx context.Context, request reconcile.Request) (res reconcile.Result, err error) {
+func (r *CacheInvalidator) Reconcile(ctx context.Context, request reconcile.Request) (res reconcile.Result, err error) {
 	log := r.Log.WithValues("configuration", request.Name)
 
 	cfg := configuration.NewCapsuleConfiguration(ctx, r.Client, r.Rest, request.Name)
@@ -158,14 +160,11 @@ func (r *Manager) Reconcile(ctx context.Context, request reconcile.Request) (res
 		}
 	}()
 
-	interval := cfg.CacheInvalidation()
-	if cache.ShouldInvalidate(ptr.To(instance.Status.LastCacheInvalidation), time.Now(), interval.Duration) {
-		log.V(3).Info("invalidating caches")
-
-		if err := r.rebuildCaches(ctx, log); err != nil {
-			return res, err
-		}
+	if err := r.rebuildCaches(ctx, log); err != nil {
+		return res, err
 	}
+
+	interval := cfg.CacheInvalidation()
 
 	return reconcile.Result{
 		Requeue:      true,
@@ -173,7 +172,7 @@ func (r *Manager) Reconcile(ctx context.Context, request reconcile.Request) (res
 	}, err
 }
 
-func (r *Manager) updateConfigStatus(
+func (r *CacheInvalidator) updateConfigStatus(
 	ctx context.Context,
 	instance *capsulev1beta2.CapsuleConfiguration,
 ) error {
@@ -190,7 +189,7 @@ func (r *Manager) updateConfigStatus(
 }
 
 // invalidateCaches invokes for all caches their invalidation functions.
-func (r *Manager) rebuildCaches(
+func (r *CacheInvalidator) rebuildCaches(
 	ctx context.Context,
 	log logr.Logger,
 ) error {

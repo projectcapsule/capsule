@@ -8,6 +8,7 @@ import (
 	"sort"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,6 +30,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
+	capevents "github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 	index "github.com/projectcapsule/capsule/pkg/runtime/indexers/customquota"
 	"github.com/projectcapsule/capsule/pkg/runtime/quota"
@@ -86,16 +88,32 @@ func (h *objectCalculationHandler) OnCreate(c client.Client, decoder admission.D
 			matched, err := h.matchAllQuotas(ctx, c, req, u)
 			if err != nil {
 				finalResp = ad.ErroredResponse(err)
+
 				return nil
 			}
+
 			if len(matched) == 0 {
-				finalResp = nil
 				return nil
 			}
 
 			evaluated, err := h.evaluateMatchedQuotas(ctx, u, matched)
 			if err != nil {
-				finalResp = ad.ErroredResponse(err)
+				for _, mq := range matched {
+					recordQuotaCalculationEvent(ctx, c, recorder, mq, err)
+				}
+
+				resp := admission.Denied(
+					fmt.Sprintf(
+						"creating resource %s/%s (%s) cannot be admitted because custom quota usage could not be calculated: %v",
+						req.Namespace,
+						req.Name,
+						req.Kind.String(),
+						err,
+					),
+				)
+
+				finalResp = &resp
+
 				return nil
 			}
 
@@ -103,10 +121,12 @@ func (h *objectCalculationHandler) OnCreate(c client.Client, decoder admission.D
 				LedgerKey     types.NamespacedName
 				ReservationID string
 			}
+
 			applied := make([]appliedReservation, 0, len(evaluated))
 
 			for _, item := range evaluated {
 				ledgerKey := quantityLedgerKeyForMatchedQuota(item)
+
 				reservation := buildReservation(req, u, item.Usage)
 
 				allowed, effectiveUsed, reserved, err := mutateLedger(
@@ -120,6 +140,7 @@ func (h *objectCalculationHandler) OnCreate(c client.Client, decoder admission.D
 					for _, a := range applied {
 						_ = deleteLedgerReservation(ctx, c, a.LedgerKey, a.ReservationID)
 					}
+
 					return err
 				}
 
@@ -133,6 +154,17 @@ func (h *objectCalculationHandler) OnCreate(c client.Client, decoder admission.D
 					if available.Sign() < 0 {
 						available = resource.MustParse("0")
 					}
+
+					recordQuotaExceededEvent(
+						ctx,
+						c,
+						recorder,
+						item,
+						item.Usage,
+						effectiveUsed,
+						available,
+						reserved,
+					)
 
 					log.V(5).Info("denying create due to quota",
 						"quotaKey", item.Key,
@@ -168,6 +200,7 @@ func (h *objectCalculationHandler) OnCreate(c client.Client, decoder admission.D
 			}
 
 			finalResp = nil
+
 			return nil
 		})
 		if err != nil {
@@ -207,24 +240,56 @@ func (h *objectCalculationHandler) OnUpdate(c client.Client, _ admission.Decoder
 			oldMatched, err := h.matchAllQuotas(ctx, c, req, oldObj)
 			if err != nil {
 				finalResp = ad.ErroredResponse(err)
+
 				return nil
 			}
 
 			newMatched, err := h.matchAllQuotas(ctx, c, req, newObj)
 			if err != nil {
 				finalResp = ad.ErroredResponse(err)
+
 				return nil
 			}
 
 			oldEvaluated, err := h.evaluateMatchedQuotas(ctx, oldObj, oldMatched)
 			if err != nil {
-				finalResp = ad.ErroredResponse(err)
+				for _, mq := range oldMatched {
+					recordQuotaCalculationEvent(ctx, c, recorder, mq, err)
+				}
+
+				resp := admission.Denied(
+					fmt.Sprintf(
+						"updating resource %s/%s (%s) cannot be admitted because previous custom quota usage could not be calculated: %v",
+						req.Namespace,
+						req.Name,
+						req.Kind.String(),
+						err,
+					),
+				)
+
+				finalResp = &resp
+
 				return nil
 			}
 
 			newEvaluated, err := h.evaluateMatchedQuotas(ctx, newObj, newMatched)
 			if err != nil {
-				finalResp = ad.ErroredResponse(err)
+				for _, mq := range newMatched {
+					recordQuotaCalculationEvent(ctx, c, recorder, mq, err)
+				}
+
+				resp := admission.Denied(
+					fmt.Sprintf(
+						"updating resource %s/%s (%s) cannot be admitted because new custom quota usage could not be calculated: %v",
+						req.Namespace,
+						req.Name,
+						req.Kind.String(),
+						err,
+					),
+				)
+
+				finalResp = &resp
+
 				return nil
 			}
 
@@ -285,6 +350,7 @@ func (h *objectCalculationHandler) OnUpdate(c client.Client, _ admission.Decoder
 						Name:       oldObj.GetName(),
 						UID:        oldObj.GetUID(),
 					}
+
 					pendingDelete = &objRef
 				}
 
@@ -301,6 +367,7 @@ func (h *objectCalculationHandler) OnUpdate(c client.Client, _ admission.Decoder
 					for _, a := range applied {
 						_ = deleteLedgerReservation(ctx, c, a.LedgerKey, a.ReservationID)
 					}
+
 					return err
 				}
 
@@ -315,6 +382,17 @@ func (h *objectCalculationHandler) OnUpdate(c client.Client, _ admission.Decoder
 						available = resource.MustParse("0")
 					}
 
+					recordQuotaExceededEvent(
+						ctx,
+						c,
+						recorder,
+						base,
+						targetUsage,
+						effectiveUsed,
+						available,
+						reserved,
+					)
+
 					resp := admission.Denied(
 						fmt.Sprintf(
 							"updating resource exceeds limit for %s %q (requested=%s, currentUsed=%s, available=%s, limit=%s, inflightReserved=%s)",
@@ -327,7 +405,9 @@ func (h *objectCalculationHandler) OnUpdate(c client.Client, _ admission.Decoder
 							reserved.String(),
 						),
 					)
+
 					finalResp = &resp
+
 					return nil
 				}
 
@@ -338,6 +418,7 @@ func (h *objectCalculationHandler) OnUpdate(c client.Client, _ admission.Decoder
 			}
 
 			finalResp = nil
+
 			return nil
 		})
 		if err != nil {
@@ -760,7 +841,14 @@ func (h *objectCalculationHandler) evaluateMatchedQuotas(
 
 		usage, err := quota.ParseQuantityFromUnstructured(u, mq.CompiledPath)
 		if err != nil {
-			return nil, fmt.Errorf("parse quantity from path %q: %w", mq.Path, err)
+			return nil, fmt.Errorf(
+				"%s %q source path %q op %q did not resolve to a valid quantity: %w",
+				quotaTypeName(mq.IsGlobal),
+				mq.Name,
+				mq.Path,
+				mq.Operation,
+				err,
+			)
 		}
 
 		log.V(5).Info("parsed usage", "path", mq.Path, "parsed", usage.String())
@@ -1023,4 +1111,120 @@ func evaluatedByKey(in []evaluatedQuota) map[string]evaluatedQuota {
 	}
 
 	return out
+}
+
+func recordQuotaCalculationEvent(
+	ctx context.Context,
+	c client.Client,
+	recorder events.EventRecorder,
+	mq quota.MatchedQuota,
+	err error,
+) {
+	if recorder == nil {
+		return
+	}
+
+	if mq.IsGlobal {
+		obj := &capsulev1beta2.GlobalCustomQuota{}
+		if getErr := c.Get(ctx, types.NamespacedName{Name: mq.Name}, obj); getErr != nil {
+			return
+		}
+
+		recorder.Eventf(
+			obj,
+			nil,
+			corev1.EventTypeWarning,
+			"UsageCalculationFailed",
+			"UsageCalculationFailed",
+			"failed to calculate usage for path %q op %q: %v",
+			mq.Path,
+			mq.Operation,
+			err,
+		)
+
+		return
+	}
+
+	obj := &capsulev1beta2.CustomQuota{}
+	if getErr := c.Get(ctx, types.NamespacedName{
+		Name:      mq.Name,
+		Namespace: mq.Namespace,
+	}, obj); getErr != nil {
+		return
+	}
+
+	recorder.Eventf(
+		obj,
+		nil,
+		corev1.EventTypeWarning,
+		"UsageCalculationFailed",
+		"UsageCalculationFailed",
+		"failed to calculate usage for path %q op %q: %v",
+		mq.Path,
+		mq.Operation,
+		err,
+	)
+}
+
+func recordQuotaExceededEvent(
+	ctx context.Context,
+	c client.Client,
+	recorder events.EventRecorder,
+	item evaluatedQuota,
+	requested resource.Quantity,
+	effectiveUsed resource.Quantity,
+	available resource.Quantity,
+	reserved resource.Quantity,
+) {
+	if recorder == nil {
+		return
+	}
+
+	message := fmt.Sprintf(
+		"quota exceeded for path %q op %q: requested=%s currentUsed=%s available=%s limit=%s inflightReserved=%s",
+		item.Path,
+		item.Operation,
+		requested.String(),
+		effectiveUsed.String(),
+		available.String(),
+		item.Limit.String(),
+		reserved.String(),
+	)
+
+	if item.IsGlobal {
+		obj := &capsulev1beta2.GlobalCustomQuota{}
+		if err := c.Get(ctx, types.NamespacedName{Name: item.Name}, obj); err != nil {
+			return
+		}
+
+		recorder.Eventf(
+			obj,
+			nil,
+			corev1.EventTypeWarning,
+			capevents.ReasonQuotaExceeded,
+			capevents.ActionValidationDenied,
+			"%s",
+			message,
+		)
+
+		return
+	}
+
+	obj := &capsulev1beta2.CustomQuota{}
+	if err := c.Get(ctx, types.NamespacedName{
+		Name:      item.Name,
+		Namespace: item.Namespace,
+	}, obj); err != nil {
+		return
+	}
+
+	recorder.Eventf(
+		obj,
+		nil,
+		corev1.EventTypeWarning,
+		capevents.ReasonQuotaExceeded,
+		capevents.ActionValidationDenied,
+		"%s",
+		message,
+	)
 }

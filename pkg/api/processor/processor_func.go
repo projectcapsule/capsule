@@ -300,7 +300,7 @@ func (r *Processor) handleRemoveManagedMetadata(
 	}
 
 	// Remove Managed Labels
-	if v, ok := existingObject.GetLabels()[meta.NewManagedByCapsuleLabel]; !ok || v != meta.ValueControllerResources {
+	if v, ok := existingObject.GetLabels()[meta.NewManagedByCapsuleLabel]; !ok || v != meta.ValueControllerReplications {
 		return patches, nil
 	}
 
@@ -404,7 +404,7 @@ func (r *Processor) handleCreatedMetadata(
 
 		labels := existingObject.GetLabels()
 
-		if v, ok := labels[meta.CreatedByCapsuleLabel]; ok && v == meta.ValueControllerResources {
+		if v, ok := labels[meta.CreatedByCapsuleLabel]; ok && v == meta.ValueControllerReplications {
 			created = true
 		}
 
@@ -423,24 +423,24 @@ func (r *Processor) handleCreatedMetadata(
 			patches = append(patches, clt.AddOwnerReferencePatch(existingObject.GetOwnerReferences(), ownerreference)...)
 		}
 
-		if v, ok := existingObject.GetLabels()[meta.CreatedByCapsuleLabel]; !ok || v != meta.ValueControllerResources {
+		if v, ok := existingObject.GetLabels()[meta.CreatedByCapsuleLabel]; !ok || v != meta.ValueControllerReplications {
 			patches = append(patches, clt.AddLabelsPatch(existingObject.GetLabels(), map[string]string{
-				meta.CreatedByCapsuleLabel: meta.ValueControllerResources,
+				meta.CreatedByCapsuleLabel: meta.ValueControllerReplications,
 			})...)
 
 			// Ensure There are labels otherwise the next patch overwrites labels struct
 			if existingObject.GetLabels() == nil {
 				existingObject.SetLabels(map[string]string{
-					meta.CreatedByCapsuleLabel: meta.ValueControllerResources,
+					meta.CreatedByCapsuleLabel: meta.ValueControllerReplications,
 				})
 			}
 		}
 	}
 
 	if created || allowAdoption {
-		if v, ok := existingObject.GetLabels()[meta.NewManagedByCapsuleLabel]; !ok || v != meta.ValueControllerResources {
+		if v, ok := existingObject.GetLabels()[meta.NewManagedByCapsuleLabel]; !ok || v != meta.ValueControllerReplications {
 			patches = append(patches, clt.AddLabelsPatch(existingObject.GetLabels(), map[string]string{
-				meta.NewManagedByCapsuleLabel: meta.ValueControllerResources,
+				meta.NewManagedByCapsuleLabel: meta.ValueControllerReplications,
 			})...)
 		}
 

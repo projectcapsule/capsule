@@ -25,7 +25,6 @@ func stringContains(s, substr string) bool {
 	}
 	return false
 }
-
 func TestParseQuantities(t *testing.T) {
 	t.Parallel()
 
@@ -37,16 +36,16 @@ func TestParseQuantities(t *testing.T) {
 		errContains string
 	}{
 		{
-			name:    "empty string returns zero",
-			input:   "",
-			want:    resource.Quantity{},
-			wantErr: false,
+			name:        "empty string returns error",
+			input:       "",
+			wantErr:     true,
+			errContains: "no quantity values found",
 		},
 		{
-			name:    "whitespace only returns zero",
-			input:   "   \n\t   ",
-			want:    resource.Quantity{},
-			wantErr: false,
+			name:        "whitespace only returns error",
+			input:       "   \n\t   ",
+			wantErr:     true,
+			errContains: "no quantity values found",
 		},
 		{
 			name:    "single quantity",
@@ -146,6 +145,89 @@ func TestParseQuantities_ReturnsZeroOnFirstInvalidValue(t *testing.T) {
 	}
 }
 
+func TestParseQuantityFromUnstructured_Success(t *testing.T) {
+	t.Parallel()
+
+	u := unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"spec": map[string]interface{}{
+				"resources": map[string]interface{}{
+					"requests": map[string]interface{}{
+						"cpu": "250m",
+					},
+				},
+			},
+		},
+	}
+
+	jp, err := jsonpath.CompileJSONPath(".spec.resources.requests.cpu")
+	if err != nil {
+		t.Fatalf("expected no error compiling jsonpath, got %v", err)
+	}
+
+	got, err := quota.ParseQuantityFromUnstructured(u, jp)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	want := resource.MustParse("250m")
+	if got.Cmp(want) != 0 {
+		t.Fatalf("expected quantity %q, got %q", want.String(), got.String())
+	}
+}
+
+func TestParseQuantityFromUnstructured_MissingPathReturnsError(t *testing.T) {
+	t.Parallel()
+
+	u := unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"spec": map[string]interface{}{},
+		},
+	}
+
+	jp, err := jsonpath.CompileJSONPath(".spec.resources.requests.cpu")
+	if err != nil {
+		t.Fatalf("expected no error compiling jsonpath, got %v", err)
+	}
+
+	_, err = quota.ParseQuantityFromUnstructured(u, jp)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+
+	if !contains(err.Error(), "did not resolve to any value") &&
+		!contains(err.Error(), "no quantity values found") {
+		t.Fatalf("expected missing quantity error, got %q", err.Error())
+	}
+}
+
+func TestParseQuantityFromUnstructured_WhitespaceOnlyReturnsError(t *testing.T) {
+	t.Parallel()
+
+	u := unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"spec": map[string]interface{}{
+				"value": "   \n\t   ",
+			},
+		},
+	}
+
+	jp, err := jsonpath.CompileJSONPath(".spec.value")
+	if err != nil {
+		t.Fatalf("expected no error compiling jsonpath, got %v", err)
+	}
+
+	_, err = quota.ParseQuantityFromUnstructured(u, jp)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+
+	if !contains(err.Error(), "did not resolve to any value") &&
+		!contains(err.Error(), "no quantity values found") {
+		t.Fatalf("expected empty quantity error, got %q", err.Error())
+	}
+}
+
 func TestParseUsageFromUnstructured_Success(t *testing.T) {
 	u := unstructured.Unstructured{
 		Object: map[string]interface{}{
@@ -218,18 +300,11 @@ func TestParseUsageFromUnstructured_MissingPath(t *testing.T) {
 }
 
 func TestParseUsageFromUnstructured_InvalidJSONPath(t *testing.T) {
-	u := unstructured.Unstructured{
-		Object: map[string]interface{}{},
-	}
+	t.Parallel()
 
-	jp, err := jsonpath.CompileJSONPath(".spec[")
+	_, err := jsonpath.CompileJSONPath(".spec[")
 	if err == nil {
-		t.Fatal("expected no error, got error", err)
-	}
-
-	_, err = quota.ParseUsageFromUnstructured(u, jp)
-	if err == nil {
-		t.Fatal("expected error, got nil")
+		t.Fatal("expected compile error, got nil")
 	}
 }
 

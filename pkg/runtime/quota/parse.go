@@ -50,6 +50,9 @@ func ConditionsMatch(u unstructured.Unstructured, conditions []*jsonpath.Compile
 
 func ParseQuantities(value string) (resource.Quantity, error) {
 	fields := strings.Fields(value)
+	if len(fields) == 0 {
+		return resource.Quantity{}, fmt.Errorf("no quantity values found")
+	}
 
 	total := resource.Quantity{}
 
@@ -76,6 +79,10 @@ func ParseQuantityFromUnstructured(u unstructured.Unstructured, compiled *jsonpa
 	usage, err := ParseUsageFromUnstructured(u, compiled)
 	if err != nil {
 		return resource.Quantity{}, err
+	}
+
+	if strings.TrimSpace(usage) == "" {
+		return resource.Quantity{}, fmt.Errorf("quantity path did not resolve to any value")
 	}
 
 	return ParseQuantities(usage)

@@ -4,13 +4,11 @@
 package template
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"strconv"
-	"text/template"
 
 	k8smeta "k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/labels"
@@ -29,9 +27,10 @@ func (t *TemplateContext) GatherContext(
 	ctx context.Context,
 	kubeClient client.Client,
 	restMapper k8smeta.RESTMapper,
-	data map[string]any,
+	templateContext map[string]string,
 	namespace string,
 	additionSelectors []labels.Selector,
+	validateNamespace NamespaceValidator,
 ) (ReferenceContext, error) {
 	result := ReferenceContext{}
 
@@ -41,13 +40,6 @@ func (t *TemplateContext) GatherContext(
 
 	var errs []error
 
-	// Template Context
-	if len(data) != 0 {
-		if err := t.selfTemplate(data); err != nil {
-			return result, fmt.Errorf("could not template: %w", err)
-		}
-	}
-
 	// Load external resources
 	for index, resource := range t.Resources {
 		res, err := resource.LoadResources(
@@ -56,8 +48,9 @@ func (t *TemplateContext) GatherContext(
 			restMapper,
 			namespace,
 			additionSelectors,
-			map[string]string{},
+			templateContext,
 			true,
+			validateNamespace,
 		)
 		if err != nil {
 			errs = append(errs, err)
@@ -86,40 +79,6 @@ func (t *TemplateContext) GatherContext(
 	}
 
 	return result, errors.Join(errs...)
-}
-
-// Templates itself with the option to populate tenant fields.
-func (t *TemplateContext) selfTemplate(
-	data map[string]any,
-) (err error) {
-	dataBytes, err := json.Marshal(t)
-	if err != nil {
-		return fmt.Errorf("error marshaling TemplateContext: %w", err)
-	}
-
-	if err := json.Unmarshal(dataBytes, &data); err != nil {
-		return fmt.Errorf("error unmarshaling TemplateContext into map: %w", err)
-	}
-
-	tmpl, err := template.New("tpl").Option("missingkey=error").Funcs(ExtraFuncMap()).Parse(string(dataBytes))
-	if err != nil {
-		return fmt.Errorf("error parsing template: %w", err)
-	}
-
-	var rendered bytes.Buffer
-	if err := tmpl.Execute(&rendered, data); err != nil {
-		return fmt.Errorf("error executing template: %w", err)
-	}
-
-	tplContext := &TemplateContext{}
-	if err := json.Unmarshal(rendered.Bytes(), tplContext); err != nil {
-		return fmt.Errorf("error unmarshaling JSON into TemplateContext: %w", err)
-	}
-
-	// Reassing templated context
-	*t = *tplContext
-
-	return nil
 }
 
 // +kubebuilder:object:generate=false

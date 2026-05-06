@@ -370,6 +370,7 @@ spec:
                 enum:
                 - Namespace
                 - Tenant
+                - None
                 type: string
               serviceAccount:
                 description: |-

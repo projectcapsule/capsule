@@ -8,8 +8,10 @@ metadata:
   name: "{{ include "capsule.post-upgrade.name" . }}"
   namespace: {{ $.Release.Namespace }}
   labels:
-    app.kubernetes.io/component: {{ include "capsule.post-upgrade.component" . | quote }}
-    {{- include "capsule.labels" . | nindent 4 }}
+    app.kubernetes.io/component: {{ include "capsule.post-install.component" . | quote }}
+    app.kubernetes.io/name: {{ include "capsule.post-install.component" . | quote }}
+    {{- include "capsule.baselabels" . | nindent 4 }}
+    {{- include "capsule.selectorLabelInstance" . | nindent 4 }}
     {{- with $Values.labels }}
       {{- . | toYaml | nindent 4 }}
     {{- end }}
@@ -32,8 +34,9 @@ spec:
           {{- toYaml . | nindent 8 }}
         {{- end }}
       labels:
-        app.kubernetes.io/component: {{ include "capsule.post-upgrade.component" . | quote }}
-        {{- include "capsule.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: {{ include "capsule.post-install.component" . | quote }}
+        app.kubernetes.io/name: {{ include "capsule.post-install.component" . | quote }}
+        {{- include "capsule.selectorLabelInstance" . | nindent 8 }}
         {{- with $Values.podLabels }}
           {{- toYaml . | nindent 8 }}
         {{- end }}

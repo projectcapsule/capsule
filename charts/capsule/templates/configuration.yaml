@@ -498,17 +498,17 @@ spec:
         timeoutSeconds: {{ $.Values.webhooks.validatingWebhooksTimeoutSeconds }}
         {{- end }}
       {{- end }}
-      {{- with  .Values.webhooks.hooks.replicas }}
+      {{- with  .Values.webhooks.hooks.replications }}
         {{- if .enabled }}
           {{- $any = true }}
-      - name: replicas.projectcapsule.dev
+      - name: replications.projectcapsule.dev
         {{- with .opts }}
         opts:
           {{- toYaml . |  nindent 10 }}
         {{- end }}
         admissionReviewVersions:
           - v1
-        path: "/generic/replicas"
+        path: "/generic/replications"
         failurePolicy: {{ .failurePolicy }}
         matchPolicy: {{ .matchPolicy }}
         {{- with .namespaceSelector }}

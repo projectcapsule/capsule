@@ -1,7 +1,7 @@
 // Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package caches
+package invalidator
 
 import (
 	"context"
@@ -17,7 +17,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/runtime/indexers/tenantresource"
 )
 
-func (r *Manager) rebuildImpersonationCache(
+func (r *CacheInvalidator) rebuildImpersonationCache(
 	ctx context.Context,
 	log logr.Logger,
 ) error {
@@ -125,7 +125,7 @@ func (r *Manager) rebuildImpersonationCache(
 	return nil
 }
 
-func (r *Manager) invalidateServiceAccount(
+func (r *CacheInvalidator) invalidateServiceAccount(
 	ctx context.Context,
 	sa *corev1.ServiceAccount,
 ) error {
@@ -143,7 +143,7 @@ func (r *Manager) invalidateServiceAccount(
 	return nil
 }
 
-func (r *Manager) checkServiceAccountReferences(
+func (r *CacheInvalidator) checkServiceAccountReferences(
 	ctx context.Context,
 	sa *corev1.ServiceAccount,
 ) (ref bool, err error) {

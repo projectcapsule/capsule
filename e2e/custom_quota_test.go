@@ -8,6 +8,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	"github.com/projectcapsule/capsule/pkg/runtime/quota"
 	"github.com/projectcapsule/capsule/pkg/runtime/selectors"
@@ -81,6 +82,97 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Label("na
 				}
 			}
 		}
+	})
+
+	It("marks the quota not ready when an existing matching object has no value at the configured quantity path", func() {
+		q := &capsulev1beta2.CustomQuota{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "cq-missing-path-not-ready",
+				Namespace: testNamespace,
+				Labels: map[string]string{
+					"e2e.capsule.dev/test-suite": "customquota-ledger",
+				},
+			},
+			Spec: capsulev1beta2.CustomQuotaSpec{
+				Limit: resource.MustParse("10Gi"),
+				Sources: []capsulev1beta2.CustomQuotaSpecSource{
+					{
+						GroupVersionKind: metav1.GroupVersionKind{
+							Group:   "",
+							Version: "v1",
+							Kind:    "Pod",
+						},
+						Operation: quota.OpAdd,
+						Path:      ".spec.volumes[*].emptyDir.sizeLimit",
+					},
+				},
+			},
+		}
+
+		pod := MakePod(testNamespace, "cq-missing-emptydir-size", nil, nil, "nginx:1.27.0", "", "")
+
+		EventuallyCreation(func() error {
+			pod.ResourceVersion = ""
+			return k8sClient.Create(ctx, pod)
+		}).Should(Succeed())
+
+		EventuallyCreation(func() error {
+			return k8sClient.Create(ctx, q)
+		}).Should(Succeed())
+
+		Eventually(func(g Gomega) {
+			obj := &capsulev1beta2.CustomQuota{}
+			g.Expect(k8sClient.Get(ctx, types.NamespacedName{
+				Name:      q.GetName(),
+				Namespace: testNamespace,
+			}, obj)).To(Succeed())
+
+			cond := obj.Status.Conditions.GetConditionByType(meta.ReadyCondition)
+			g.Expect(cond).NotTo(BeNil())
+			g.Expect(cond.Status).To(Equal(metav1.ConditionFalse))
+			g.Expect(cond.Message).To(ContainSubstring("did not resolve to any value"))
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+	})
+
+	It("denies creating a matching object when the configured quantity path resolves to no value", func() {
+		q := &capsulev1beta2.CustomQuota{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "cq-missing-path-deny-create",
+				Namespace: testNamespace,
+				Labels: map[string]string{
+					"e2e.capsule.dev/test-suite": "customquota-ledger",
+				},
+			},
+			Spec: capsulev1beta2.CustomQuotaSpec{
+				Limit: resource.MustParse("10Gi"),
+				Sources: []capsulev1beta2.CustomQuotaSpecSource{
+					{
+						GroupVersionKind: metav1.GroupVersionKind{
+							Group:   "",
+							Version: "v1",
+							Kind:    "Pod",
+						},
+						Operation: quota.OpAdd,
+						Path:      ".spec.volumes[*].emptyDir.sizeLimit",
+					},
+				},
+			},
+		}
+
+		EventuallyCreation(func() error {
+			return k8sClient.Create(ctx, q)
+		}).Should(Succeed())
+		awaitCustomQuotaReady(ctx, testNamespace, q.GetName())
+
+		Eventually(func() error {
+			pod := MakePod(testNamespace, "cq-missing-path-denied", nil, nil, "nginx:1.27.0", "", "")
+			return k8sClient.Create(ctx, pod)
+		}, defaultTimeoutInterval, defaultPollInterval).Should(
+			MatchError(ContainSubstring("did not resolve to any value")),
+		)
+
+		expectCustomQuotaUsedAndClaims(ctx, testNamespace, q.GetName(), "0", 0)
+		expectLedgerSettled(ctx, testNamespace, q.GetName())
 	})
 
 	It("remains consistent under concurrent pod creations for a CustomQuota", func() {

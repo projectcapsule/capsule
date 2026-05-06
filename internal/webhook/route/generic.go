@@ -22,7 +22,7 @@ func (w *replicasResourcesHandler) GetHandlers() []handlers.Handler {
 }
 
 func (w *replicasResourcesHandler) GetPath() string {
-	return "/generic/replicas"
+	return "/generic/replications"
 }
 
 type genericCustomResourcesHandler struct {

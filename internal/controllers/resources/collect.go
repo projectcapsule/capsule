@@ -27,6 +27,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api/processor"
 	"github.com/projectcapsule/capsule/pkg/runtime/gvk"
 	"github.com/projectcapsule/capsule/pkg/runtime/sanitize"
+	"github.com/projectcapsule/capsule/pkg/template"
 	tpl "github.com/projectcapsule/capsule/pkg/template"
 	"github.com/projectcapsule/capsule/pkg/tenant"
 	"github.com/projectcapsule/capsule/pkg/utils"
@@ -44,12 +45,14 @@ type CollectorOptions struct {
 	AllowCrossNamespaceSelection bool
 	Accumulator                  processor.Accumulator
 	Iterator                     CollectorIteratorOptions
+	ValidatorNamespaces          template.NamespaceValidator
 }
 
 type CollectorIteratorOptions struct {
-	Labels      map[string]string
-	Annotations map[string]string
-	FastContext map[string]string
+	Labels         map[string]string
+	Annotations    map[string]string
+	FastContext    map[string]string
+	FastContextAny map[string]any
 }
 
 func NewCollectorIteratorOptions(
@@ -117,9 +120,10 @@ func (co *Collector) Collect(
 			ctx,
 			c,
 			co.mapper,
-			nil,
+			opts.Iterator.FastContext,
 			namespace,
 			nil,
+			opts.ValidatorNamespaces,
 		)
 		if err != nil {
 			return err
@@ -291,7 +295,7 @@ func (co *Collector) CollectNamespacedItems(
 	// A TenantResource is created by a TenantOwner, and potentially, they could point to a resource in a non-owned
 	// Namespace: this must be blocked by checking it this is the case.
 	if !opts.AllowCrossNamespaceSelection && !tntNamespaces.Has(namespace) {
-		err = fmt.Errorf("cross-namespace selection is not allowed. Referring a Namespace that is not part of the given Tenant")
+		err = fmt.Errorf("cross-namespace selection is not allowed. Referring a Namespace (%s) that is not part of the given Tenant (allowed %s)", namespace, tntNamespaces)
 
 		return nil, err
 	}
@@ -302,7 +306,7 @@ func (co *Collector) CollectNamespacedItems(
 	}
 
 	for _, item := range spec.NamespacedItems {
-		p, err := item.LoadResources(ctx, c, co.mapper, namespace, []labels.Selector{selector}, opts.Iterator.FastContext, false)
+		p, err := item.LoadResources(ctx, c, co.mapper, namespace, []labels.Selector{selector}, opts.Iterator.FastContext, false, opts.ValidatorNamespaces)
 		if err != nil {
 			totalError = errors.Join(totalError, err)
 

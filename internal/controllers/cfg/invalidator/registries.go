@@ -1,7 +1,7 @@
 // Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package caches
+package invalidator
 
 import (
 	"context"
@@ -13,7 +13,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 )
 
-func (r *Manager) rebuildRuleStatusRegistryCache(ctx context.Context, log logr.Logger) error {
+func (r *CacheInvalidator) rebuildRuleStatusRegistryCache(ctx context.Context, log logr.Logger) error {
 	rsList := &capsulev1beta2.RuleStatusList{}
 	if err := r.List(ctx, rsList,
 		client.MatchingLabels{

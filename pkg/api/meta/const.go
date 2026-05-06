@@ -4,8 +4,9 @@
 package meta
 
 const (
-	ValueTrue                string = "true"
-	ValueFalse               string = "false"
-	ValueController          string = "controller"
-	ValueControllerResources string = "resources"
+	ValueTrue                   string = "true"
+	ValueFalse                  string = "false"
+	ValueController             string = "controller"
+	ValueControllerResources    string = "resources"
+	ValueControllerReplications string = "replications"
 )

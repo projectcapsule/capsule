@@ -1,28 +1,62 @@
 ---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: dotfile-secret-3
+  namespace: kube-system
+  labels:
+    pullsecret.company.com: "true"
+data:
+  .secret-file: dmFsdWUtMg0KDQo=
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: dotfile-secret-1
+  namespace: solar-prod
+  labels:
+    pullsecret.company.com: "true"
+data:
+  .secret-file: dmFsdWUtMg0KDQo=
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: dotfile-secret-2
+  namespace: solar-prod
+  labels:
+    pullsecret.company.com: "true"
+data:
+  .secret-file: dmFsdWUtMg0KDQo=
+---
 apiVersion: capsule.clastix.io/v1beta2
-kind: GlobalTenantResource
+kind: TenantResource
 metadata:
   name: tenant-cluster-rbac
+  namespace: solar-system
 spec:
-  scope: Tenant
+  resyncPeriod: 5s
   resources:
-    - additionalMetadata:
-        labels:
-          k8s.company.com/tenant: "{{tenant.name}}"
-        annotations:
-          k8s.company.com/cost-center: "inv-120"
-      templates:
+    - context:
+        resources:
+          - index: secrets
+            apiVersion: v1
+            kind: Secret
+            namespace: "solar-prod"
+            selector:
+              matchLabels:
+                pullsecret.company.com: "true"
+            # Replicate all Configmaps labeled with projectcapsule.dev/replicate: "true"
+      generators:
         - missingKey: error
           template: |
             ---
-            apiVersion: rbac.authorization.k8s.io/v1
-            kind: ClusterRole
+            apiVersion: v1
+            kind: ConfigMap
             metadata:
-              name: tenant:{{$.tenant.metadata.name}}:priority
-              labels:
-                k8s.company.com/tenant: "test"
-            rules:
-              - apiGroups: ["scheduling.k8s.io"]
-                verbs: ["get"]
-                resources: ["priorityclasses"]
-
+              name: show-context
+            data:
+              count: '{{ if $.secrets }}{{ len $.secrets }}{{ else }}0{{ end }}'
+              context.yaml: |
+                {{- toYAML $.secrets | nindent 4 }}

@@ -6,6 +6,7 @@ package resources
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"strconv"
 
 	"github.com/go-logr/logr"
@@ -14,6 +15,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/cluster-api/util/patch"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -21,6 +23,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
@@ -35,6 +38,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	"github.com/projectcapsule/capsule/pkg/runtime/predicates"
 	"github.com/projectcapsule/capsule/pkg/runtime/sanitize"
+	tpl "github.com/projectcapsule/capsule/pkg/template"
 	"github.com/projectcapsule/capsule/pkg/tenant"
 )
 
@@ -89,6 +93,36 @@ func (r *namespacedResourceController) SetupWithManager(mgr ctrl.Manager, cfg ut
 			handler.EnqueueRequestsFromMapFunc(r.enqueueTenantResourcesForNamespace),
 			builder.WithPredicates(
 				predicates.LabelPresentPredicate{Label: meta.TenantLabel},
+			),
+		).
+		Watches(
+			&capsulev1beta2.Tenant{},
+			handler.EnqueueRequestsFromMapFunc(r.enqueueTenantResourcesForTenant),
+			builder.WithPredicates(
+				predicate.Funcs{
+					CreateFunc: func(e event.CreateEvent) bool {
+						return true
+					},
+					DeleteFunc: func(e event.DeleteEvent) bool {
+						return true
+					},
+					UpdateFunc: func(e event.UpdateEvent) bool {
+						oldObj, okOld := e.ObjectOld.(*capsulev1beta2.Tenant)
+						newObj, okNew := e.ObjectNew.(*capsulev1beta2.Tenant)
+						if !okOld || !okNew {
+							return false
+						}
+
+						if !reflect.DeepEqual(oldObj.Status.Namespaces, newObj.Status.Namespaces) {
+							return true
+						}
+
+						return false
+					},
+					GenericFunc: func(e event.GenericEvent) bool {
+						return false
+					},
+				},
 			),
 		).
 		WithOptions(controller.Options{MaxConcurrentReconciles: cfg.MaxConcurrentReconciles}).
@@ -200,6 +234,37 @@ func (r *namespacedResourceController) Reconcile(ctx context.Context, request re
 		Requeue:      true,
 		RequeueAfter: tntResource.Spec.ResyncPeriod.Duration,
 	}, err
+}
+
+func (r *namespacedResourceController) enqueueTenantResourcesForTenant(ctx context.Context, obj client.Object) []reconcile.Request {
+	tnt, ok := obj.(*capsulev1beta2.Tenant)
+	if !ok {
+		return nil
+	}
+
+	seen := map[types.NamespacedName]struct{}{}
+	out := make([]reconcile.Request, 0)
+
+	for _, ns := range tnt.Status.Namespaces {
+		list := &capsulev1beta2.TenantResourceList{}
+		if err := r.client.List(ctx, list, client.InNamespace(ns)); err != nil {
+			continue
+		}
+
+		for i := range list.Items {
+			key := types.NamespacedName{
+				Name:      list.Items[i].Name,
+				Namespace: list.Items[i].Namespace,
+			}
+			if _, exists := seen[key]; exists {
+				continue
+			}
+			seen[key] = struct{}{}
+			out = append(out, reconcile.Request{NamespacedName: key})
+		}
+	}
+
+	return out
 }
 
 func (r *namespacedResourceController) enqueueDependentTenantResources(
@@ -393,6 +458,7 @@ func (r *namespacedResourceController) gatherResources(
 	opts := CollectorOptions{
 		Accumulator:                  acc,
 		AllowCrossNamespaceSelection: false,
+		ValidatorNamespaces:          tpl.NewNamespaceValidator(false, sets.New[string](tnt.Status.Namespaces...)),
 	}
 
 	for resourceIndex, resource := range tntResource.Spec.Resources {

@@ -41,7 +41,7 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/internal/cache"
 	"github.com/projectcapsule/capsule/internal/controllers/admission"
-	cachecontroller "github.com/projectcapsule/capsule/internal/controllers/cfg/caches"
+	cacheinvalidator "github.com/projectcapsule/capsule/internal/controllers/cfg/invalidator"
 	configcontroller "github.com/projectcapsule/capsule/internal/controllers/cfg/status"
 	customquotacontroller "github.com/projectcapsule/capsule/internal/controllers/customquotas"
 	podlabelscontroller "github.com/projectcapsule/capsule/internal/controllers/pod"
@@ -656,16 +656,18 @@ func main() {
 
 	setupLog.Info("initializing", "controller")
 
-	if err = (&cachecontroller.Manager{
-		Log:                ctrl.Log.WithName("capsule.ctrl").WithName("caches"),
+	localInvalidator := &cacheinvalidator.CacheInvalidator{
+		Log:                ctrl.Log.WithName("capsule.ctrl").WithName("invalidator"),
 		Client:             manager.GetClient(),
 		Configuration:      directCfg,
 		ImpersonationCache: impersonationCache,
 		RegistryCache:      registryCache,
 		JSONPathCache:      jsonPathCache,
 		TargetsCache:       targetsCache,
-	}).SetupWithManager(manager, controllerConfig); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "caches")
+	}
+
+	if err := manager.Add(localInvalidator); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "invalidator")
 		os.Exit(1)
 	}
 
