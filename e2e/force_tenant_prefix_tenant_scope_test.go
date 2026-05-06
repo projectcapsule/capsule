@@ -11,20 +11,20 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api/rbac"
 )
 
-var _ = Describe("creating a Namespace with Tenant name prefix enforcement at Tenant scope", Label("tenant", "config"), func() {
+var _ = Describe("creating a Namespace with Tenant name prefix enforcement at Tenant scope", Label("tenant", "config", "prefix"), func() {
 	t1 := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "awesome",
 		},
 		Spec: capsulev1beta2.TenantSpec{
 			ForceTenantPrefix: &[]bool{true}[0],
-			Owners: api.OwnerListSpec{
+			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: api.CoreOwnerSpec{
-						UserSpec: api.UserSpec{
+					CoreOwnerSpec: rbac.CoreOwnerSpec{
+						UserSpec: rbac.UserSpec{
 							Name: "john",
 							Kind: "User",
 						},
@@ -39,10 +39,10 @@ var _ = Describe("creating a Namespace with Tenant name prefix enforcement at Te
 		},
 		Spec: capsulev1beta2.TenantSpec{
 			ForceTenantPrefix: &[]bool{false}[0],
-			Owners: api.OwnerListSpec{
+			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: api.CoreOwnerSpec{
-						UserSpec: api.UserSpec{
+					CoreOwnerSpec: rbac.CoreOwnerSpec{
+						UserSpec: rbac.UserSpec{
 							Name: "john",
 							Kind: "User",
 						},
@@ -63,8 +63,8 @@ var _ = Describe("creating a Namespace with Tenant name prefix enforcement at Te
 		}).Should(Succeed())
 	})
 	JustAfterEach(func() {
-		Expect(k8sClient.Delete(context.TODO(), t1)).Should(Succeed())
-		Expect(k8sClient.Delete(context.TODO(), t2)).Should(Succeed())
+		EventuallyDeletion(t1)
+		EventuallyDeletion(t2)
 
 		ModifyCapsuleConfigurationOpts(func(configuration *capsulev1beta2.CapsuleConfiguration) {
 			configuration.Spec.ForceTenantPrefix = false

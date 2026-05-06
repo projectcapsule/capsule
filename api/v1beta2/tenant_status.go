@@ -8,14 +8,16 @@ import (
 
 	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
+	"github.com/projectcapsule/capsule/pkg/api/rbac"
 )
 
-// +kubebuilder:validation:Enum=Cordoned;Active
+// +kubebuilder:validation:Enum=Cordoned;Active;Terminating
 type tenantState string
 
 const (
-	TenantStateActive   tenantState = "Active"
-	TenantStateCordoned tenantState = "Cordoned"
+	TenantStateActive        tenantState = "Active"
+	TenantStateCordoned      tenantState = "Cordoned"
+	TerminatingStateCordoned tenantState = "Terminating"
 )
 
 // Returns the observed state of the Tenant.
@@ -24,9 +26,11 @@ type TenantStatus struct {
 	TenantAvailableStatus `json:",inline"`
 
 	// Collected owners for this tenant
-	Owners api.OwnerStatusListSpec `json:"owners,omitempty"`
+	Owners rbac.OwnerStatusListSpec `json:"owners,omitempty"`
+	// Promoted ServiceAccounts across the Tenant
+	Promotions rbac.OwnerStatusListSpec `json:"promotions,omitempty"`
 	// +kubebuilder:default=Active
-	// The operational state of the Tenant. Possible values are "Active", "Cordoned".
+	// The operational state of the Tenant. Possible values are "Active", "Cordoned" or "Terminating".
 	State tenantState `json:"state"`
 	// How many namespaces are assigned to the Tenant.
 	Size uint `json:"size"`

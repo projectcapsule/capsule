@@ -13,11 +13,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
+	"github.com/projectcapsule/capsule/pkg/api/rbac"
 )
 
-var _ = Describe("Administrators", Label("namespace", "permissions"), func() {
+var _ = Describe("Administrators", Label("namespace", "permissions", "administrators"), func() {
 	originConfig := &capsulev1beta2.CapsuleConfiguration{}
 
 	tnt1 := &capsulev1beta2.Tenant{
@@ -25,10 +25,10 @@ var _ = Describe("Administrators", Label("namespace", "permissions"), func() {
 			Name: "tnt-admins-1",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: api.OwnerListSpec{
+			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: api.CoreOwnerSpec{
-						UserSpec: api.UserSpec{
+					CoreOwnerSpec: rbac.CoreOwnerSpec{
+						UserSpec: rbac.UserSpec{
 							Name: "paul",
 							Kind: "User",
 						},
@@ -43,10 +43,10 @@ var _ = Describe("Administrators", Label("namespace", "permissions"), func() {
 			Name: "tnt-admins-2",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: api.OwnerListSpec{
+			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: api.CoreOwnerSpec{
-						UserSpec: api.UserSpec{
+					CoreOwnerSpec: rbac.CoreOwnerSpec{
+						UserSpec: rbac.UserSpec{
 							Name: "george",
 							Kind: "User",
 						},
@@ -56,7 +56,7 @@ var _ = Describe("Administrators", Label("namespace", "permissions"), func() {
 		},
 	}
 
-	admin := api.UserSpec{
+	admin := rbac.UserSpec{
 		Name: "admin",
 		Kind: "User",
 	}
@@ -74,14 +74,14 @@ var _ = Describe("Administrators", Label("namespace", "permissions"), func() {
 		}
 
 		ModifyCapsuleConfigurationOpts(func(configuration *capsulev1beta2.CapsuleConfiguration) {
-			configuration.Spec.Administrators = []api.UserSpec{admin}
+			configuration.Spec.Administrators = []rbac.UserSpec{admin}
 		})
 
 	})
 
 	JustAfterEach(func() {
 		for _, tnt := range []*capsulev1beta2.Tenant{tnt1, tnt2} {
-			Expect(k8sClient.Delete(context.TODO(), tnt)).Should(Succeed())
+			EventuallyDeletion(tnt)
 		}
 
 		Eventually(func() error {
@@ -138,20 +138,25 @@ var _ = Describe("Administrators", Label("namespace", "permissions"), func() {
 		By("verifing tenant state", func() {
 			TenantNamespaceList(tnt1, defaultTimeoutInterval).Should(ContainElements(ns1.GetName()))
 
-			t := &capsulev1beta2.Tenant{}
-			Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: tnt1.GetName()}, t)).Should(Succeed())
-			Expect(t.Status.Size).To(Equal(uint(1)))
+			Eventually(func(g Gomega) {
+				t := &capsulev1beta2.Tenant{}
+				g.Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: tnt1.GetName()}, t)).To(Succeed())
+				g.Expect(t.Status.Size).To(Equal(uint(1)))
 
-			instance := t.Status.GetInstance(&capsulev1beta2.TenantStatusNamespaceItem{Name: ns1.GetName(), UID: ns1.GetUID()})
-			Expect(instance).NotTo(BeNil(), "Namespace instance should not be nil")
+				instance := t.Status.GetInstance(&capsulev1beta2.TenantStatusNamespaceItem{
+					Name: ns1.GetName(),
+					UID:  ns1.GetUID(),
+				})
+				g.Expect(instance).ToNot(BeNil(), "Namespace instance should not be nil")
 
-			condition := instance.Conditions.GetConditionByType(meta.ReadyCondition)
-			Expect(condition).NotTo(BeNil(), "Condition instance should not be nil")
+				condition := instance.Conditions.GetConditionByType(meta.ReadyCondition)
+				g.Expect(condition).ToNot(BeNil(), "Condition instance should not be nil")
 
-			Expect(instance.Name).To(Equal(ns1.GetName()))
-			Expect(condition.Status).To(Equal(metav1.ConditionTrue), "Expected namespace condition status to be True")
-			Expect(condition.Type).To(Equal(meta.ReadyCondition), "Expected namespace condition type to be Ready")
-			Expect(condition.Reason).To(Equal(meta.SucceededReason), "Expected namespace condition reason to be Succeeded")
+				g.Expect(instance.Name).To(Equal(ns1.GetName()))
+				g.Expect(condition.Status).To(Equal(metav1.ConditionTrue), "Expected namespace condition status to be True")
+				g.Expect(condition.Type).To(Equal(meta.ReadyCondition), "Expected namespace condition type to be Ready")
+				g.Expect(condition.Reason).To(Equal(meta.SucceededReason), "Expected namespace condition reason to be Succeeded")
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		})
 
 		ns2 := NewNamespace("", map[string]string{
@@ -165,21 +170,23 @@ var _ = Describe("Administrators", Label("namespace", "permissions"), func() {
 		By("verifing tenant state", func() {
 			TenantNamespaceList(tnt2, defaultTimeoutInterval).Should(ContainElements(ns2.GetName()))
 
-			t := &capsulev1beta2.Tenant{}
-			Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: tnt2.GetName()}, t)).Should(Succeed())
+			Eventually(func(g Gomega) {
+				t := &capsulev1beta2.Tenant{}
+				g.Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: tnt2.GetName()}, t)).Should(Succeed())
 
-			Expect(t.Status.Size).To(Equal(uint(1)))
+				g.Expect(t.Status.Size).To(Equal(uint(1)))
 
-			instance := t.Status.GetInstance(&capsulev1beta2.TenantStatusNamespaceItem{Name: ns2.GetName(), UID: ns2.GetUID()})
-			Expect(instance).NotTo(BeNil(), "Namespace instance should not be nil")
+				instance := t.Status.GetInstance(&capsulev1beta2.TenantStatusNamespaceItem{Name: ns2.GetName(), UID: ns2.GetUID()})
+				g.Expect(instance).NotTo(BeNil(), "Namespace instance should not be nil")
 
-			condition := instance.Conditions.GetConditionByType(meta.ReadyCondition)
-			Expect(condition).NotTo(BeNil(), "Condition instance should not be nil")
+				condition := instance.Conditions.GetConditionByType(meta.ReadyCondition)
+				g.Expect(condition).NotTo(BeNil(), "Condition instance should not be nil")
 
-			Expect(instance.Name).To(Equal(ns2.GetName()))
-			Expect(condition.Status).To(Equal(metav1.ConditionTrue), "Expected namespace condition status to be True")
-			Expect(condition.Type).To(Equal(meta.ReadyCondition), "Expected namespace condition type to be Ready")
-			Expect(condition.Reason).To(Equal(meta.SucceededReason), "Expected namespace condition reason to be Succeeded")
+				g.Expect(instance.Name).To(Equal(ns2.GetName()))
+				g.Expect(condition.Status).To(Equal(metav1.ConditionTrue), "Expected namespace condition status to be True")
+				g.Expect(condition.Type).To(Equal(meta.ReadyCondition), "Expected namespace condition type to be Ready")
+				g.Expect(condition.Reason).To(Equal(meta.SucceededReason), "Expected namespace condition reason to be Succeeded")
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		})
 
 		By("deleting namespace", func() {

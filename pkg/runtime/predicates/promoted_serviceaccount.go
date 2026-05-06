@@ -7,6 +7,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/event"
 
 	"github.com/projectcapsule/capsule/pkg/api/meta"
+	"github.com/projectcapsule/capsule/pkg/utils"
 )
 
 type PromotedServiceaccountPredicate struct{}
@@ -18,9 +19,15 @@ func (PromotedServiceaccountPredicate) Create(e event.CreateEvent) bool {
 		return false
 	}
 
-	v, ok := e.Object.GetLabels()[meta.OwnerPromotionLabel]
+	if v := e.Object.GetLabels()[meta.OwnerPromotionLabel]; v == meta.ValueTrue {
+		return true
+	}
 
-	return ok && v == meta.ValueTrue
+	if v := e.Object.GetLabels()[meta.ServiceAccountPromotionLabel]; v == meta.ValueTrue {
+		return true
+	}
+
+	return false
 }
 
 func (PromotedServiceaccountPredicate) Delete(e event.DeleteEvent) bool {
@@ -28,9 +35,15 @@ func (PromotedServiceaccountPredicate) Delete(e event.DeleteEvent) bool {
 		return false
 	}
 
-	v, ok := e.Object.GetLabels()[meta.OwnerPromotionLabel]
+	if v := e.Object.GetLabels()[meta.OwnerPromotionLabel]; v == meta.ValueTrue {
+		return true
+	}
 
-	return ok && v == meta.ValueTrue
+	if v := e.Object.GetLabels()[meta.ServiceAccountPromotionLabel]; v == meta.ValueTrue {
+		return true
+	}
+
+	return false
 }
 
 func (PromotedServiceaccountPredicate) Update(e event.UpdateEvent) bool {
@@ -38,8 +51,9 @@ func (PromotedServiceaccountPredicate) Update(e event.UpdateEvent) bool {
 		return false
 	}
 
-	oldVal, oldOK := e.ObjectOld.GetLabels()[meta.OwnerPromotionLabel]
-	newVal, newOK := e.ObjectNew.GetLabels()[meta.OwnerPromotionLabel]
+	if !utils.MapEqual(e.ObjectOld.GetLabels(), e.ObjectNew.GetLabels()) {
+		return true
+	}
 
-	return oldOK != newOK || oldVal != newVal
+	return false
 }

@@ -13,6 +13,7 @@ import (
 	capsulev1beta1 "github.com/projectcapsule/capsule/api/v1beta1"
 	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
+	"github.com/projectcapsule/capsule/pkg/api/rbac"
 )
 
 func (in *Tenant) ConvertFrom(raw conversion.Hub) error {
@@ -27,28 +28,28 @@ func (in *Tenant) ConvertFrom(raw conversion.Hub) error {
 	}
 
 	in.ObjectMeta = src.ObjectMeta
-	in.Spec.Owners = make(api.OwnerListSpec, 0, len(src.Spec.Owners))
+	in.Spec.Owners = make(rbac.OwnerListSpec, 0, len(src.Spec.Owners))
 
 	for index, owner := range src.Spec.Owners {
-		proxySettings := make([]api.ProxySettings, 0, len(owner.ProxyOperations))
+		proxySettings := make([]rbac.ProxySettings, 0, len(owner.ProxyOperations))
 
 		for _, proxyOp := range owner.ProxyOperations {
-			ops := make([]api.ProxyOperation, 0, len(proxyOp.Operations))
+			ops := make([]rbac.ProxyOperation, 0, len(proxyOp.Operations))
 
 			for _, op := range proxyOp.Operations {
-				ops = append(ops, api.ProxyOperation(op))
+				ops = append(ops, rbac.ProxyOperation(op))
 			}
 
-			proxySettings = append(proxySettings, api.ProxySettings{
-				Kind:       api.ProxyServiceKind(proxyOp.Kind),
+			proxySettings = append(proxySettings, rbac.ProxySettings{
+				Kind:       rbac.ProxyServiceKind(proxyOp.Kind),
 				Operations: ops,
 			})
 		}
 
-		in.Spec.Owners = append(in.Spec.Owners, api.OwnerSpec{
-			CoreOwnerSpec: api.CoreOwnerSpec{
-				UserSpec: api.UserSpec{
-					Kind: api.OwnerKind(owner.Kind),
+		in.Spec.Owners = append(in.Spec.Owners, rbac.OwnerSpec{
+			CoreOwnerSpec: rbac.CoreOwnerSpec{
+				UserSpec: rbac.UserSpec{
+					Kind: rbac.OwnerKind(owner.Kind),
 					Name: owner.Name,
 				},
 				ClusterRoles: owner.GetRoles(*src, index),
@@ -281,6 +282,7 @@ func (in *Tenant) ConvertTo(raw conversion.Hub) error {
 	dst.Status.Size = in.Status.Size
 	dst.Status.Namespaces = in.Status.Namespaces
 
+	//nolint:exhaustive
 	switch in.Status.State {
 	case TenantStateActive:
 		dst.Status.State = capsulev1beta1.TenantStateActive

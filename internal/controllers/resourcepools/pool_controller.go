@@ -112,10 +112,10 @@ func (r resourcePoolController) Reconcile(ctx context.Context, request ctrl.Requ
 
 		r.metrics.ResourceUsageMetrics(instance)
 
-		if e := patchHelper.Patch(ctx, instance); e != nil {
-			err = e
-
-			return
+		if e := patchHelper.Patch(ctx, instance); err != nil {
+			if !apierrors.IsNotFound(err) {
+				err = e
+			}
 		}
 	}()
 
@@ -877,17 +877,17 @@ func (r *resourcePoolController) garbageCollectNamespace(
 	return nil
 }
 
-func (r *resourcePoolController) updateStatus(ctx context.Context, pool *capsulev1beta2.ResourcePool, reconcileError error) error {
+func (r *resourcePoolController) updateStatus(ctx context.Context, instance *capsulev1beta2.ResourcePool, reconcileError error) error {
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
 		latest := &capsulev1beta2.ResourcePool{}
-		if err = r.Get(ctx, types.NamespacedName{Name: pool.GetName()}, latest); err != nil {
+		if err = r.Get(ctx, types.NamespacedName{Name: instance.GetName()}, latest); err != nil {
 			return err
 		}
 
-		latest.Status = pool.Status
+		latest.Status = instance.Status
 
 		// Set Ready Condition
-		readyCondition := meta.NewReadyCondition(pool)
+		readyCondition := meta.NewReadyCondition(instance)
 		if reconcileError != nil {
 			readyCondition.Message = reconcileError.Error()
 			readyCondition.Status = metav1.ConditionFalse
@@ -897,7 +897,7 @@ func (r *resourcePoolController) updateStatus(ctx context.Context, pool *capsule
 		latest.Status.Conditions.UpdateConditionByType(readyCondition)
 
 		// Set Exhaustion Condition
-		exCondition := meta.NewExhaustedCondition(pool)
+		exCondition := meta.NewExhaustedCondition(instance)
 		if len(latest.Status.Exhaustions) != 0 {
 			exCondition.Message = "Pool has exhaustions"
 			exCondition.Status = metav1.ConditionTrue
@@ -906,6 +906,13 @@ func (r *resourcePoolController) updateStatus(ctx context.Context, pool *capsule
 
 		latest.Status.Conditions.UpdateConditionByType(exCondition)
 
-		return r.Client.Status().Update(ctx, latest)
+		if err := r.Client.Status().Update(ctx, latest); err != nil {
+			return err
+		}
+
+		// Keep the in-memory object aligned with what we just wrote.
+		instance.Status = latest.Status
+
+		return nil
 	})
 }

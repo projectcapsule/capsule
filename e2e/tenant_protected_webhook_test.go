@@ -12,7 +12,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api/rbac"
 )
 
 var _ = Describe("Deleting a tenant with protected annotation", Label("tenant"), func() {
@@ -22,10 +22,10 @@ var _ = Describe("Deleting a tenant with protected annotation", Label("tenant"),
 		},
 		Spec: capsulev1beta2.TenantSpec{
 			PreventDeletion: true,
-			Owners: api.OwnerListSpec{
+			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: api.CoreOwnerSpec{
-						UserSpec: api.UserSpec{
+					CoreOwnerSpec: rbac.CoreOwnerSpec{
+						UserSpec: rbac.UserSpec{
 							Name: "john",
 							Kind: "User",
 						},

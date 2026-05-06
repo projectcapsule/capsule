@@ -21,6 +21,7 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api/rbac"
 	"github.com/projectcapsule/capsule/pkg/utils"
 )
 
@@ -30,10 +31,10 @@ var _ = Describe("when Tenant handles Ingress classes with networking.k8s.io/v1"
 			Name: "ic-selector-networking-v1",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: []api.OwnerSpec{
+			Owners: []rbac.OwnerSpec{
 				{
-					CoreOwnerSpec: api.CoreOwnerSpec{
-						UserSpec: api.UserSpec{
+					CoreOwnerSpec: rbac.CoreOwnerSpec{
+						UserSpec: rbac.UserSpec{
 							Name: "ingress-selector",
 							Kind: "User",
 						},
@@ -63,10 +64,10 @@ var _ = Describe("when Tenant handles Ingress classes with networking.k8s.io/v1"
 			Name: "ic-default-networking-v1",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: []api.OwnerSpec{
+			Owners: []rbac.OwnerSpec{
 				{
-					CoreOwnerSpec: api.CoreOwnerSpec{
-						UserSpec: api.UserSpec{
+					CoreOwnerSpec: rbac.CoreOwnerSpec{
+						UserSpec: rbac.UserSpec{
 							Name: "ingress-default",
 							Kind: "User",
 						},
@@ -145,9 +146,7 @@ var _ = Describe("when Tenant handles Ingress classes with networking.k8s.io/v1"
 
 	JustAfterEach(func() {
 		for _, tnt := range []*capsulev1beta2.Tenant{tntWithDefault, tntNoDefault} {
-			Eventually(func() error {
-				return k8sClient.Delete(context.TODO(), tnt)
-			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+			EventuallyDeletion(tnt)
 		}
 
 		Eventually(func() (err error) {

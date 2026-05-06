@@ -11,32 +11,32 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api/rbac"
 )
 
-var _ = Describe("defining dynamic Tenant Owner Cluster Roles", Label("tenant"), func() {
+var _ = Describe("defining dynamic Tenant Owner Cluster Roles", Label("tenant", "permissions", "rolebindings"), func() {
 	tnt := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "dynamic-tenant-owner-clusterroles",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: api.OwnerListSpec{
+			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: api.CoreOwnerSpec{
-						UserSpec: api.UserSpec{
+					CoreOwnerSpec: rbac.CoreOwnerSpec{
+						UserSpec: rbac.UserSpec{
 							Kind: "User",
 							Name: "michonne",
 						},
-						ClusterRoles: []string{"editor", "manager"},
+						ClusterRoles: []string{"edit", "admin"},
 					},
 				},
 				{
-					CoreOwnerSpec: api.CoreOwnerSpec{
-						UserSpec: api.UserSpec{
+					CoreOwnerSpec: rbac.CoreOwnerSpec{
+						UserSpec: rbac.UserSpec{
 							Name: "kingdom",
 							Kind: "Group",
 						},
-						ClusterRoles: []string{"readonly"},
+						ClusterRoles: []string{"view"},
 					},
 				},
 			},
@@ -52,7 +52,7 @@ var _ = Describe("defining dynamic Tenant Owner Cluster Roles", Label("tenant"),
 	})
 
 	JustAfterEach(func() {
-		Expect(k8sClient.Delete(context.TODO(), tnt)).Should(Succeed())
+		EventuallyDeletion(tnt)
 	})
 
 	It("namespace should contains the dynamic rolebindings", func() {
@@ -61,8 +61,8 @@ var _ = Describe("defining dynamic Tenant Owner Cluster Roles", Label("tenant"),
 			NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 			TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
-			Eventually(CheckForOwnerRoleBindings(ns, tnt.Spec.Owners[0], map[string]bool{"editor": false, "manager": false}), defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
-			Eventually(CheckForOwnerRoleBindings(ns, tnt.Spec.Owners[1], map[string]bool{"readonly": false}), defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+			Eventually(CheckForOwnerRoleBindings(ns, tnt.Spec.Owners[0], map[string]bool{"edit": false, "admin": false}), defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+			Eventually(CheckForOwnerRoleBindings(ns, tnt.Spec.Owners[1], map[string]bool{"view": false}), defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		}
 	})
 })

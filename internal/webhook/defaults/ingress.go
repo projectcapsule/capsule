@@ -17,12 +17,13 @@ import (
 	capsuleingress "github.com/projectcapsule/capsule/internal/webhook/ingress"
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
 	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
+	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 )
 
 func mutateIngressDefaults(ctx context.Context, req admission.Request, version *version.Version, c client.Client, decoder admission.Decoder, namespace string) *admission.Response {
 	ingress, err := capsuleingress.FromRequest(req, decoder)
 	if err != nil {
-		return utils.ErroredResponse(err)
+		return ad.ErroredResponse(err)
 	}
 
 	ingress.SetNamespace(namespace)
@@ -31,7 +32,7 @@ func mutateIngressDefaults(ctx context.Context, req admission.Request, version *
 
 	tnt, err = capsuleingress.TenantFromIngress(ctx, c, ingress)
 	if err != nil {
-		return utils.ErroredResponse(err)
+		return ad.ErroredResponse(err)
 	}
 
 	if tnt == nil {

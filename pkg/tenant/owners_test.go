@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api/rbac"
 	"github.com/projectcapsule/capsule/pkg/tenant"
 )
 
@@ -26,10 +26,10 @@ func TestGetOwnersWithKinds_SingleOwner(t *testing.T) {
 
 	tnt := &capsulev1beta2.Tenant{
 		Status: capsulev1beta2.TenantStatus{
-			Owners: []api.CoreOwnerSpec{
+			Owners: []rbac.CoreOwnerSpec{
 				{
-					UserSpec: api.UserSpec{
-						Kind: api.UserOwner,
+					UserSpec: rbac.UserSpec{
+						Kind: rbac.UserOwner,
 						Name: "alice",
 					},
 				},
@@ -48,16 +48,16 @@ func TestGetOwnersWithKinds_SingleOwner(t *testing.T) {
 func TestGetOwnersWithKinds_MultipleOwners_PreservesOrder(t *testing.T) {
 	tnt := &capsulev1beta2.Tenant{
 		Status: capsulev1beta2.TenantStatus{
-			Owners: []api.CoreOwnerSpec{
+			Owners: []rbac.CoreOwnerSpec{
 				{
-					UserSpec: api.UserSpec{
-						Kind: api.GroupOwner,
+					UserSpec: rbac.UserSpec{
+						Kind: rbac.GroupOwner,
 						Name: "admins",
 					},
 				},
 				{
-					UserSpec: api.UserSpec{
-						Kind: api.UserOwner,
+					UserSpec: rbac.UserSpec{
+						Kind: rbac.UserOwner,
 						Name: "bob",
 					},
 				},
@@ -79,10 +79,10 @@ func TestGetOwnersWithKinds_MultipleOwners_PreservesOrder(t *testing.T) {
 func TestGetOwnersWithKinds_EmptyNameStillIncluded(t *testing.T) {
 	tnt := &capsulev1beta2.Tenant{
 		Status: capsulev1beta2.TenantStatus{
-			Owners: []api.CoreOwnerSpec{
+			Owners: []rbac.CoreOwnerSpec{
 				{
-					UserSpec: api.UserSpec{
-						Kind: api.UserOwner,
+					UserSpec: rbac.UserSpec{
+						Kind: rbac.UserOwner,
 						Name: "",
 					},
 				},

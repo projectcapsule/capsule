@@ -22,6 +22,7 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api/rbac"
 	"github.com/projectcapsule/capsule/pkg/utils"
 )
 
@@ -79,10 +80,10 @@ var _ = Describe("when Tenant handles Gateway classes", Label("tenant", "classes
 			Name: "e2e-gateway-default-and-label-selector",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: []api.OwnerSpec{
+			Owners: []rbac.OwnerSpec{
 				{
-					CoreOwnerSpec: api.CoreOwnerSpec{
-						UserSpec: api.UserSpec{
+					CoreOwnerSpec: rbac.CoreOwnerSpec{
+						UserSpec: rbac.UserSpec{
 							Name: "gateway-default-and-label-selector",
 							Kind: "User",
 						},
@@ -112,10 +113,10 @@ var _ = Describe("when Tenant handles Gateway classes", Label("tenant", "classes
 			Name: "e2e-gateway-label-selector-only",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: []api.OwnerSpec{
+			Owners: []rbac.OwnerSpec{
 				{
-					CoreOwnerSpec: api.CoreOwnerSpec{
-						UserSpec: api.UserSpec{
+					CoreOwnerSpec: rbac.CoreOwnerSpec{
+						UserSpec: rbac.UserSpec{
 							Name: "gateway-with-label-selector-only",
 							Kind: "User",
 						},
@@ -144,10 +145,10 @@ var _ = Describe("when Tenant handles Gateway classes", Label("tenant", "classes
 			Name: "e2e-gateway-no-restrictions",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: []api.OwnerSpec{
+			Owners: []rbac.OwnerSpec{
 				{
-					CoreOwnerSpec: api.CoreOwnerSpec{
-						UserSpec: api.UserSpec{
+					CoreOwnerSpec: rbac.CoreOwnerSpec{
+						UserSpec: rbac.UserSpec{
 							Name: "e2e-gateway-no-restrictions",
 							Kind: "User",
 						},
@@ -183,9 +184,7 @@ var _ = Describe("when Tenant handles Gateway classes", Label("tenant", "classes
 	JustAfterEach(func() {
 		utilruntime.Must(gatewayv1.Install(scheme.Scheme))
 		for _, tnt := range []*capsulev1beta2.Tenant{tntWithDefault, tntWithoutDefault, tntNoRestrictions} {
-			EventuallyCreation(func() error {
-				return ignoreNotFound(k8sClient.Delete(context.TODO(), tnt))
-			}).Should(Succeed())
+			EventuallyDeletion(tnt)
 		}
 
 		if err := k8sClient.List(context.Background(), &gatewayv1.GatewayClassList{}); err != nil {

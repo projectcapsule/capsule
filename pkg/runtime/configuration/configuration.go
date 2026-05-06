@@ -4,12 +4,15 @@
 package configuration
 
 import (
+	"context"
 	"regexp"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/rest"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	capsuleapi "github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api/rbac"
 )
 
 const (
@@ -17,6 +20,8 @@ const (
 )
 
 type Configuration interface {
+	GetConfigObject() *capsulev1beta2.CapsuleConfiguration
+
 	ProtectedNamespaceRegexp() (*regexp.Regexp, error)
 	ForceTenantPrefix() bool
 	// EnableTLSConfiguration enabled the TLS reconciler, responsible for creating CA and TLS certificate required
@@ -29,12 +34,14 @@ type Configuration interface {
 	TenantCRDName() string
 	UserNames() []string
 	UserGroups() []string
-	Users() capsuleapi.UserListSpec
-	GetUsersByStatus() capsuleapi.UserListSpec
+	Users() rbac.UserListSpec
+	GetUsersByStatus() rbac.UserListSpec
 	IgnoreUserWithGroups() []string
 	ForbiddenUserNodeLabels() *capsuleapi.ForbiddenListSpec
 	ForbiddenUserNodeAnnotations() *capsuleapi.ForbiddenListSpec
-	Administrators() capsuleapi.UserListSpec
+	Administrators() rbac.UserListSpec
+	ServiceAccountClientProperties() capsulev1beta2.ServiceAccountClient
+	ServiceAccountClient(context.Context) (*rest.Config, error)
 	Admission() capsulev1beta2.DynamicAdmission
 	RBAC() *capsulev1beta2.RBACConfiguration
 	CacheInvalidation() metav1.Duration

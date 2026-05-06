@@ -15,6 +15,7 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api/rbac"
 )
 
 var _ = Describe("creating a LoadBalancer service when it is enabled for Tenant", Label("tenant"), func() {
@@ -23,10 +24,10 @@ var _ = Describe("creating a LoadBalancer service when it is enabled for Tenant"
 			Name: "enable-loadbalancer-service",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: api.OwnerListSpec{
+			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: api.CoreOwnerSpec{
-						UserSpec: api.UserSpec{
+					CoreOwnerSpec: rbac.CoreOwnerSpec{
+						UserSpec: rbac.UserSpec{
 							Name: "netflix",
 							Kind: "User",
 						},
@@ -48,7 +49,7 @@ var _ = Describe("creating a LoadBalancer service when it is enabled for Tenant"
 	})
 
 	JustAfterEach(func() {
-		Expect(k8sClient.Delete(context.TODO(), tnt)).Should(Succeed())
+		EventuallyDeletion(tnt)
 	})
 
 	It("should succeed creating a service with LoadBalancer type", func() {

@@ -12,6 +12,7 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api/rbac"
 )
 
 var _ = Describe("creating a tenant with various forbidden regexes", Label("tenant"), func() {
@@ -66,10 +67,10 @@ var _ = Describe("creating a tenant with various forbidden regexes", Label("tena
 					Name: "namespace",
 				},
 				Spec: capsulev1beta2.TenantSpec{
-					Owners: api.OwnerListSpec{
+					Owners: rbac.OwnerListSpec{
 						{
-							CoreOwnerSpec: api.CoreOwnerSpec{
-								UserSpec: api.UserSpec{
+							CoreOwnerSpec: rbac.CoreOwnerSpec{
+								UserSpec: rbac.UserSpec{
 									Name: "alice",
 									Kind: "User",
 								},
@@ -89,7 +90,7 @@ var _ = Describe("creating a tenant with various forbidden regexes", Label("tena
 				}
 				return k8sClient.Create(context.TODO(), tnt)
 			}).Should(Succeed())
-			Expect(k8sClient.Delete(context.TODO(), tnt)).Should(Succeed())
+			EventuallyDeletion(tnt)
 
 			EventuallyCreation(func() error {
 				tnt.SetResourceVersion("")
@@ -101,7 +102,7 @@ var _ = Describe("creating a tenant with various forbidden regexes", Label("tena
 				}
 				return k8sClient.Create(context.TODO(), tnt)
 			}).Should(Succeed())
-			Expect(k8sClient.Delete(context.TODO(), tnt)).Should(Succeed())
+			EventuallyDeletion(tnt)
 		})
 	}
 })

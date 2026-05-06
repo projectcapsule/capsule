@@ -13,8 +13,8 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/runtime/selectors"
 )
 
@@ -34,7 +34,7 @@ type ResourceReference struct {
 	Name string `json:"name,omitempty"`
 	// Namespace of the values referent.
 	// +optional
-	Namespace meta.RFC1123SubdomainName `json:"namespace,omitempty"`
+	Namespace string `json:"namespace,omitempty"`
 	// Selector which allows to get any amount of these resources based on labels
 	// +optional
 	Selector *metav1.LabelSelector `json:"selector,omitempty"`
@@ -48,7 +48,7 @@ func (t ResourceReference) RequiresTemplating() bool {
 		return true
 	}
 
-	if RequiresFastTemplate(string(t.Namespace)) {
+	if RequiresFastTemplate(t.Namespace) {
 		return true
 	}
 
@@ -72,9 +72,7 @@ func (t ResourceReference) LoadTemplated(templateContext map[string]string) (Res
 	}
 
 	if out.Namespace != "" {
-		out.Namespace = meta.RFC1123SubdomainName(
-			FastTemplate(string(out.Namespace), templateContext),
-		)
+		out.Namespace = FastTemplate(out.Namespace, templateContext)
 	}
 
 	// Selector
@@ -98,6 +96,7 @@ func (t ResourceReference) LoadResources(
 	additionSelectors []labels.Selector,
 	templateContext map[string]string,
 	allowClusterScoped bool,
+	validateNamespace NamespaceValidator,
 ) ([]*unstructured.Unstructured, error) {
 	isNamespaced, err := t.IsNamespacedGVK(restMapper)
 	if err != nil {
@@ -113,7 +112,18 @@ func (t ResourceReference) LoadResources(
 		return nil, err
 	}
 
-	return ref.loadResources(ctx, kubeClient, restMapper, namespace, additionSelectors)
+	ns := ref.Namespace
+	if ns == "" && namespace != "" {
+		ns = namespace
+	}
+
+	if validateNamespace != nil && ns != "" {
+		if err := validateNamespace(ns); err != nil {
+			return nil, err
+		}
+	}
+
+	return ref.loadResources(ctx, kubeClient, ns, additionSelectors)
 }
 
 func (t ResourceReference) IsNamespacedGVK(
@@ -139,15 +149,17 @@ func (t ResourceReference) IsNamespacedGVK(
 func (t ResourceReference) loadResources(
 	ctx context.Context,
 	kubeClient client.Client,
-	restMapper k8smeta.RESTMapper,
 	namespace string,
 	additionSelectors []labels.Selector,
 ) ([]*unstructured.Unstructured, error) {
-	ns := t.Namespace
+	log := log.FromContext(ctx)
 
-	if namespace != "" {
-		ns = meta.RFC1123SubdomainName(namespace)
-	}
+	log.V(5).Info("gathering resources",
+		"apiVersion", t.APIVersion,
+		"kind", t.Kind,
+		"name", t.Name,
+		"namespace", namespace,
+	)
 
 	// GET path (single object)
 	if t.Name != "" {
@@ -157,7 +169,7 @@ func (t ResourceReference) loadResources(
 
 		key := client.ObjectKey{
 			Name:      t.Name,
-			Namespace: string(ns),
+			Namespace: namespace,
 		}
 
 		if err := kubeClient.Get(ctx, key, obj); err != nil {
@@ -176,11 +188,10 @@ func (t ResourceReference) loadResources(
 	list.SetKind(t.Kind + "List")
 
 	var opts []client.ListOption
-	if ns != "" {
-		opts = append(opts, client.InNamespace(string(ns)))
+	if namespace != "" {
+		opts = append(opts, client.InNamespace(namespace))
 	}
 
-	// Convert t.Selector (metav1) to labels.Selector if present
 	var tenantSel labels.Selector
 
 	if t.Selector != nil {
@@ -206,7 +217,26 @@ func (t ResourceReference) loadResources(
 
 	if len(all) > 0 {
 		combined := selectors.CombineSelectors(all...)
+
+		selectorStrings := make([]string, 0, len(all))
+
+		for _, s := range all {
+			if s != nil {
+				selectorStrings = append(selectorStrings, s.String())
+			}
+		}
+
+		log.V(5).Info("applying combined label selector",
+			"namespace", namespace,
+			"selectors", selectorStrings,
+			"combinedSelector", combined.String(),
+		)
+
 		opts = append(opts, client.MatchingLabelsSelector{Selector: combined})
+	} else {
+		log.V(5).Info("listing without label selector",
+			"namespace", namespace,
+		)
 	}
 
 	if err := kubeClient.List(ctx, list, opts...); err != nil {
@@ -217,6 +247,11 @@ func (t ResourceReference) loadResources(
 	for i := range list.Items {
 		results = append(results, list.Items[i].DeepCopy())
 	}
+
+	log.V(5).Info("gathered resources",
+		"namespace", namespace,
+		"count", len(results),
+	)
 
 	return results, nil
 }

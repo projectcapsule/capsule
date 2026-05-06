@@ -21,10 +21,13 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
+	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/client-go/util/workqueue"
+	"sigs.k8s.io/cluster-api/util/patch"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -38,8 +41,8 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/internal/controllers/utils"
 	"github.com/projectcapsule/capsule/internal/metrics"
-	"github.com/projectcapsule/capsule/pkg/api"
 	meta "github.com/projectcapsule/capsule/pkg/api/meta"
+	"github.com/projectcapsule/capsule/pkg/api/rbac"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	"github.com/projectcapsule/capsule/pkg/runtime/gvk"
 	"github.com/projectcapsule/capsule/pkg/runtime/predicates"
@@ -47,6 +50,9 @@ import (
 
 type Manager struct {
 	client.Client
+
+	DiscoveryClient discovery.DiscoveryInterface
+	DynamicClient   dynamic.Interface
 
 	Metrics       *metrics.TenantRecorder
 	Log           logr.Logger
@@ -81,7 +87,7 @@ func (r *Manager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.Controller
 			&capsulev1beta2.CapsuleConfiguration{},
 			handler.EnqueueRequestsFromMapFunc(r.enqueueAllTenants),
 			builder.WithPredicates(
-				predicates.CapsuleConfigSpecChangedPredicate{},
+				predicates.CapsuleConfigSpecAdministratorsChangedPredicate{},
 				predicates.NamesMatchingPredicate{Names: []string{ctrlConfig.ConfigurationName}},
 			),
 		).
@@ -184,7 +190,7 @@ func (r *Manager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.Controller
 					r.enqueueForTenantsWithCondition(ctx, e.Object, q, func(tnt *capsulev1beta2.Tenant, c client.Object) bool {
 						_, found := tnt.Status.Owners.FindOwner(
 							serviceaccount.ServiceAccountUsernamePrefix+c.GetNamespace()+":"+c.GetName(),
-							api.ServiceAccountOwner,
+							rbac.ServiceAccountOwner,
 						)
 
 						return found
@@ -256,33 +262,35 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 		return result, err
 	}
 
-	defer func() {
-		r.syncTenantStatusMetrics(instance)
+	patchHelper, err := patch.NewHelper(instance, r.Client)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
 
+	defer func() {
 		if uerr := r.updateTenantStatus(ctx, instance, err); uerr != nil {
 			err = fmt.Errorf("cannot update tenant status: %w", uerr)
 
 			return
 		}
+
+		r.syncTenantStatusMetrics(instance)
+
+		if e := patchHelper.Patch(ctx, instance); err != nil {
+			if !apierrors.IsNotFound(err) {
+				err = e
+			}
+		}
+
+		// Controller-Runtime should never receive error
+		err = nil
 	}()
 
-	// Collect Ownership for Status
-	if err = r.collectOwners(ctx, instance); err != nil {
-		err = fmt.Errorf("cannot collect available owners: %w", err)
+	// Collect Ownership/Promotions for Status
+	if err = r.collectRBAC(ctx, instance); err != nil {
+		err = fmt.Errorf("cannot collect available rbac: %w", err)
 
 		return result, err
-	}
-
-	// Ensuring Metadata.
-	err, updated := r.ensureMetadata(ctx, instance)
-	if err != nil {
-		err = fmt.Errorf("cannot ensure metadata: %w", err)
-
-		return result, err
-	}
-
-	if updated {
-		return result, nil
 	}
 
 	// Reconcile Namespaces
@@ -290,6 +298,14 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 
 	if err = r.reconcileNamespaces(ctx, instance); err != nil {
 		err = fmt.Errorf("namespace(s) had reconciliation errors")
+
+		return result, err
+	}
+
+	// Ensuring Metadata.
+	err = r.ensureMetadata(ctx, instance)
+	if err != nil {
+		err = fmt.Errorf("cannot ensure metadata: %w", err)
 
 		return result, err
 	}
@@ -333,7 +349,7 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 	// Ensuring RoleBinding resources
 	r.Log.V(4).Info("Ensuring RoleBindings for Owners and Tenant")
 
-	if err = r.syncRoleBindings(ctx, instance); err != nil {
+	if err = r.syncRoleBindings(ctx, r.Log, instance); err != nil {
 		err = fmt.Errorf("cannot sync rolebindings items: %w", err)
 
 		return result, err
@@ -346,22 +362,27 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 		return result, err
 	}
 
+	var reconcileError error
+	if err != nil {
+		reconcileError = fmt.Errorf("tenant had errors reconciling, check tenant's status")
+	}
+
 	r.Log.V(4).Info("Tenant reconciling completed")
 
-	return ctrl.Result{}, err
+	return ctrl.Result{}, reconcileError
 }
 
-func (r *Manager) updateTenantStatus(ctx context.Context, tnt *capsulev1beta2.Tenant, reconcileError error) error {
+func (r *Manager) updateTenantStatus(ctx context.Context, instance *capsulev1beta2.Tenant, reconcileError error) error {
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
 		latest := &capsulev1beta2.Tenant{}
-		if err = r.Get(ctx, types.NamespacedName{Name: tnt.GetName()}, latest); err != nil {
+		if err = r.Get(ctx, types.NamespacedName{Name: instance.GetName()}, latest); err != nil {
 			return err
 		}
 
-		latest.Status = tnt.Status
+		latest.Status = instance.Status
 
 		// Set Ready Condition
-		readyCondition := meta.NewReadyCondition(tnt)
+		readyCondition := meta.NewReadyCondition(instance)
 		if reconcileError != nil {
 			readyCondition.Message = reconcileError.Error()
 			readyCondition.Status = metav1.ConditionFalse
@@ -371,9 +392,9 @@ func (r *Manager) updateTenantStatus(ctx context.Context, tnt *capsulev1beta2.Te
 		latest.Status.Conditions.UpdateConditionByType(readyCondition)
 
 		// Set Cordoned Condition
-		cordonedCondition := meta.NewCordonedCondition(tnt)
+		cordonedCondition := meta.NewCordonedCondition(instance)
 
-		if tnt.Spec.Cordoned {
+		if instance.Spec.Cordoned {
 			latest.Status.State = capsulev1beta2.TenantStateCordoned
 
 			cordonedCondition.Reason = meta.CordonedReason
@@ -385,6 +406,13 @@ func (r *Manager) updateTenantStatus(ctx context.Context, tnt *capsulev1beta2.Te
 
 		latest.Status.Conditions.UpdateConditionByType(cordonedCondition)
 
-		return r.Client.Status().Update(ctx, latest)
+		if err := r.Client.Status().Update(ctx, latest); err != nil {
+			return err
+		}
+
+		// Keep the in-memory object aligned with what we just wrote.
+		instance.Status = latest.Status
+
+		return nil
 	})
 }

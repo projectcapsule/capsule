@@ -11,7 +11,7 @@ import (
 
 	authenticationv1 "k8s.io/api/authentication/v1"
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -23,7 +23,7 @@ import (
 
 func TenantByStatusNamespace(
 	ctx context.Context,
-	c client.Client,
+	c client.Reader,
 	namespace string,
 ) (*capsulev1beta2.Tenant, error) {
 	var tntList capsulev1beta2.TenantList
@@ -74,11 +74,74 @@ func IsNamespaceInTenant(
 	return true, nil
 }
 
+func GetTenantNameByNamespace(
+	ctx context.Context,
+	c client.Reader,
+	namespace string,
+) (tnt string, err error) {
+	var ns corev1.Namespace
+	if err := c.Get(ctx, client.ObjectKey{Name: namespace}, &ns); err != nil {
+		return "", err
+	}
+
+	tntName, ok := GetTenantNameByOwnerreferences(ns.OwnerReferences)
+	if !ok {
+		return "", nil
+	}
+
+	return tntName, nil
+}
+
+func GetTenantByNamespace(
+	ctx context.Context,
+	r client.Reader,
+	namespace string,
+) (*capsulev1beta2.Tenant, error) {
+	var ns corev1.Namespace
+	if err := r.Get(ctx, client.ObjectKey{Name: namespace}, &ns); err != nil {
+		return nil, err
+	}
+
+	for _, or := range ns.GetOwnerReferences() {
+		if !IsTenantOwnerReference(or) {
+			continue
+		}
+
+		tnt := &capsulev1beta2.Tenant{}
+		if err := r.Get(ctx, client.ObjectKey{Name: or.Name}, tnt); err != nil {
+			return nil, err
+		}
+
+		if or.UID != "" && tnt.UID != or.UID {
+			return nil, fmt.Errorf(
+				"tenant ownerReference UID mismatch for %q: namespace references UID %q but tenant has UID %q",
+				or.Name, or.UID, tnt.UID,
+			)
+		}
+
+		return tnt, nil
+	}
+
+	return nil, nil
+}
+
+func GetTenantNameByOwnerreferences(
+	refs []metav1.OwnerReference,
+) (string, bool) {
+	for _, or := range refs {
+		if IsTenantOwnerReference(or) {
+			return or.Name, true
+		}
+	}
+
+	return "", false
+}
+
 // getNamespaceTenant returns namespace owner tenant.
 func GetTenantByOwnerreferences(
 	ctx context.Context,
-	c client.Client,
-	refs []v1.OwnerReference,
+	c client.Reader,
+	refs []metav1.OwnerReference,
 ) (tnt *capsulev1beta2.Tenant, err error) {
 	for _, or := range refs {
 		if !IsTenantOwnerReference(or) {
@@ -98,7 +161,7 @@ func GetTenantByOwnerreferences(
 
 func GetTenantByUserInfo(
 	ctx context.Context,
-	c client.Client,
+	c client.Reader,
 	cfg configuration.Configuration,
 	ns *corev1.Namespace,
 	username string,
@@ -158,7 +221,7 @@ func GetTenantByUserInfo(
 // getTenantByLabels returns tenant from labels.
 func GetTenantByLabels(
 	ctx context.Context,
-	c client.Client,
+	c client.Reader,
 	ns *corev1.Namespace,
 ) (*capsulev1beta2.Tenant, error) {
 	if label, ok := ns.Labels[meta.TenantLabel]; ok {
@@ -176,7 +239,7 @@ func GetTenantByLabels(
 
 func GetTenantByLabelsAndUser(
 	ctx context.Context,
-	c client.Client,
+	c client.Reader,
 	cfg configuration.Configuration,
 	ns *corev1.Namespace,
 	userInfo authenticationv1.UserInfo,
@@ -187,7 +250,7 @@ func GetTenantByLabelsAndUser(
 	}
 
 	if tnt != nil {
-		if ok := users.IsTenantOwnerByStatus(ctx, c, cfg, tnt, userInfo); !ok {
+		if ok := users.IsTenantOwnerByStatus(tnt, userInfo); !ok {
 			return nil, fmt.Errorf("can not assign the desired namespace to a non-owned Tenant")
 		}
 

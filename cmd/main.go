@@ -4,27 +4,35 @@
 package main
 
 import (
+	"crypto/tls"
 	goflag "flag"
 	"fmt"
 	"os"
+	"path/filepath"
 	goRuntime "runtime"
 
 	flag "github.com/spf13/pflag"
 	_ "go.uber.org/automaxprocs"
 	"go.uber.org/zap/zapcore"
+	admissionv1 "k8s.io/api/admissionregistration/v1"
 	corev1 "k8s.io/api/core/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	utilVersion "k8s.io/apimachinery/pkg/util/version"
+	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/dynamic"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/certwatcher"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	"sigs.k8s.io/controller-runtime/pkg/metrics/filters"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	ctrlwebhook "sigs.k8s.io/controller-runtime/pkg/webhook"
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
@@ -33,7 +41,9 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/internal/cache"
 	"github.com/projectcapsule/capsule/internal/controllers/admission"
-	configcontroller "github.com/projectcapsule/capsule/internal/controllers/cfg"
+	cacheinvalidator "github.com/projectcapsule/capsule/internal/controllers/cfg/invalidator"
+	configcontroller "github.com/projectcapsule/capsule/internal/controllers/cfg/status"
+	customquotacontroller "github.com/projectcapsule/capsule/internal/controllers/customquotas"
 	podlabelscontroller "github.com/projectcapsule/capsule/internal/controllers/pod"
 	"github.com/projectcapsule/capsule/internal/controllers/pv"
 	rbaccontroller "github.com/projectcapsule/capsule/internal/controllers/rbac"
@@ -46,11 +56,12 @@ import (
 	"github.com/projectcapsule/capsule/internal/metrics"
 	"github.com/projectcapsule/capsule/internal/webhook"
 	cfgvalidation "github.com/projectcapsule/capsule/internal/webhook/cfg"
+	customquotavalidation "github.com/projectcapsule/capsule/internal/webhook/customquota"
 	"github.com/projectcapsule/capsule/internal/webhook/defaults"
 	"github.com/projectcapsule/capsule/internal/webhook/dra"
 	"github.com/projectcapsule/capsule/internal/webhook/gateway"
+	"github.com/projectcapsule/capsule/internal/webhook/generic"
 	"github.com/projectcapsule/capsule/internal/webhook/ingress"
-	"github.com/projectcapsule/capsule/internal/webhook/misc"
 	namespacemutation "github.com/projectcapsule/capsule/internal/webhook/namespace/mutation"
 	namespacevalidation "github.com/projectcapsule/capsule/internal/webhook/namespace/validation"
 	"github.com/projectcapsule/capsule/internal/webhook/node"
@@ -62,11 +73,10 @@ import (
 	"github.com/projectcapsule/capsule/internal/webhook/serviceaccounts"
 	tenantmutation "github.com/projectcapsule/capsule/internal/webhook/tenant/mutation"
 	tenantvalidation "github.com/projectcapsule/capsule/internal/webhook/tenant/validation"
-	tntresource "github.com/projectcapsule/capsule/internal/webhook/tenantresource"
-	"github.com/projectcapsule/capsule/internal/webhook/utils"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 	"github.com/projectcapsule/capsule/pkg/runtime/indexers"
+	"github.com/projectcapsule/capsule/pkg/utils"
 )
 
 var (
@@ -81,6 +91,7 @@ func init() {
 	utilruntime.Must(capsulev1beta2.AddToScheme(scheme))
 	utilruntime.Must(apiextensionsv1.AddToScheme(scheme))
 	utilruntime.Must(gatewayv1.Install(scheme))
+	utilruntime.Must(admissionv1.AddToScheme(scheme))
 }
 
 func printVersion() {
@@ -91,27 +102,112 @@ func printVersion() {
 	setupLog.Info(fmt.Sprintf("Go OS/Arch: %s/%s", goRuntime.GOOS, goRuntime.GOARCH))
 }
 
-//nolint:maintidx,cyclop
+//nolint:maintidx,gocyclo,cyclop
 func main() {
 	controllerConfig := utilscontroller.ControllerOptions{}
 
-	var enableLeaderElection, enablePprof, version bool
-
-	var metricsAddr, ns string
-
-	var webhookPort int
+	var (
+		metricsAddr, metricsCertPath, metricsCertName, metricsCertKey          string
+		webhookCertPath, webhookCertName, webhookCertKey                       string
+		enableLeaderElection, enablePprof, version, secureMetrics, enableHTTP2 bool
+		webhookPort                                                            int
+	)
 
 	var goFlagSet goflag.FlagSet
 
-	flag.IntVar(&controllerConfig.MaxConcurrentReconciles, "workers", 1, "MaxConcurrentReconciles is the maximum number of concurrent Reconciles which can be run.")
-	flag.IntVar(&webhookPort, "webhook-port", 9443, "The port the webhook server binds to.")
-	flag.StringVar(&metricsAddr, "metrics-addr", ":8080", "The address the metric endpoint binds to.")
-	flag.BoolVar(&enableLeaderElection, "enable-leader-election", false,
+	var tlsOpts []func(*tls.Config)
+
+	flag.StringVar(
+		&controllerConfig.ConfigurationName,
+		"configuration-name",
+		"default",
+		"The CapsuleConfiguration resource name to use",
+	)
+
+	flag.BoolVar(
+		&enableLeaderElection,
+		"enable-leader-election",
+		false,
 		"Enable leader election for controller manager. "+
-			"Enabling this will ensure there is only one active controller manager.")
-	flag.BoolVar(&version, "version", false, "Print the Capsule version and exit")
-	flag.StringVar(&controllerConfig.ConfigurationName, "configuration-name", "default", "The CapsuleConfiguration resource name to use")
-	flag.BoolVar(&enablePprof, "enable-pprof", false, "Enables Pprof endpoint for profiling (not recommend in production)")
+			"Enabling this will ensure there is only one active controller manager.",
+	)
+	flag.IntVar(
+		&controllerConfig.MaxConcurrentReconciles,
+		"workers",
+		1,
+		"MaxConcurrentReconciles is the maximum number of concurrent Reconciles which can be run.",
+	)
+	flag.StringVar(
+		&metricsAddr,
+		"metrics-addr",
+		":8080",
+		"The address the metric endpoint binds to.",
+	)
+	flag.BoolVar(
+		&secureMetrics,
+		"metrics-secure",
+		false,
+		"If set, the metrics endpoint is served securely via HTTPS. Use --metrics-secure=false to use HTTP instead.",
+	)
+	flag.StringVar(
+		&metricsCertPath,
+		"metrics-cert-path",
+		"",
+		"The directory that contains the metrics server certificate.",
+	)
+	flag.StringVar(
+		&metricsCertName,
+		"metrics-cert-name",
+		"tls.crt",
+		"The name of the metrics server certificate file.",
+	)
+	flag.StringVar(
+		&metricsCertKey,
+		"metrics-cert-key",
+		"tls.key",
+		"The name of the metrics server key file.",
+	)
+	flag.IntVar(
+		&webhookPort,
+		"webhook-port",
+		9443,
+		"The port the webhook server binds to.",
+	)
+	flag.StringVar(
+		&webhookCertPath,
+		"webhook-cert-path",
+		"/tmp/k8s-webhook-server/serving-certs",
+		"The directory that contains the webhook certificate.",
+	)
+	flag.StringVar(
+		&webhookCertName,
+		"webhook-cert-name",
+		"tls.crt",
+		"The name of the webhook certificate file.",
+	)
+	flag.StringVar(
+		&webhookCertKey,
+		"webhook-cert-key",
+		"tls.key",
+		"The name of the webhook key file.",
+	)
+	flag.BoolVar(
+		&enableHTTP2,
+		"enable-http2", false,
+		"If set, HTTP/2 will be enabled for the metrics and webhook servers",
+	)
+	flag.BoolVar(
+		&enablePprof,
+		"enable-pprof",
+		false,
+		"Enables Pprof endpoint for profiling (not recommend in production)",
+	)
+	flag.BoolVar(
+		&version,
+		"version",
+		false,
+		"Print the Capsule version and exit",
+	)
 
 	opts := zap.Options{
 		EncoderConfigOptions: append([]zap.EncoderConfigOption{}, func(config *zapcore.EncoderConfig) {
@@ -133,8 +229,15 @@ func main() {
 
 	setupLog.V(5).Info("Controller", "Options", controllerConfig)
 
-	if ns = os.Getenv("NAMESPACE"); len(ns) == 0 {
-		setupLog.Error(fmt.Errorf("unable to determinate the Namespace Capsule is running on"), "unable to start manager")
+	var ns string
+
+	if ns = os.Getenv(configuration.EnvironmentControllerNamespace); len(ns) == 0 {
+		setupLog.Error(fmt.Errorf("unable to determinate the Namespace Capsule is running on. Please export %s", configuration.EnvironmentControllerNamespace), "unable to start manager")
+		os.Exit(1)
+	}
+
+	if serviceAccountName := os.Getenv(configuration.EnvironmentServiceaccountName); len(serviceAccountName) == 0 {
+		setupLog.Error(fmt.Errorf("unable to determinate the ServiceAccount Capsule is running with. Please export %s", configuration.EnvironmentServiceaccountName), "unable to start manager")
 		os.Exit(1)
 	}
 
@@ -143,13 +246,113 @@ func main() {
 		os.Exit(1)
 	}
 
+	// if the enable-http2 flag is false (the default), http/2 should be disabled
+	// due to its vulnerabilities. More specifically, disabling http/2 will
+	// prevent from being vulnerable to the HTTP/2 Stream Cancellation and
+	// Rapid Reset CVEs. For more information see:
+	// - https://github.com/advisories/GHSA-qppj-fm5r-hxr3
+	// - https://github.com/advisories/GHSA-4374-p667-p6c8
+	disableHTTP2 := func(c *tls.Config) {
+		setupLog.Info("disabling http/2")
+
+		c.NextProtos = []string{"http/1.1"}
+	}
+
+	if !enableHTTP2 {
+		tlsOpts = append(tlsOpts, disableHTTP2)
+	}
+
+	// Create watchers for metrics and webhooks certificates
+	var metricsCertWatcher, webhookCertWatcher *certwatcher.CertWatcher
+
+	// Initial webhook TLS options
+	webhookTLSOpts := tlsOpts
+
+	if len(webhookCertPath) > 0 {
+		setupLog.Info(
+			"Initializing webhook certificate watcher using provided certificates",
+			"webhook-cert-path",
+			webhookCertPath,
+			"webhook-cert-name",
+			webhookCertName,
+			"webhook-cert-key",
+			webhookCertKey,
+		)
+
+		var err error
+
+		webhookCertWatcher, err = certwatcher.New(
+			filepath.Join(webhookCertPath, webhookCertName),
+			filepath.Join(webhookCertPath, webhookCertKey),
+		)
+		if err != nil {
+			setupLog.Error(err, "Failed to initialize webhook certificate watcher")
+			os.Exit(1)
+		}
+
+		webhookTLSOpts = append(webhookTLSOpts, func(config *tls.Config) {
+			config.GetCertificate = webhookCertWatcher.GetCertificate
+		})
+	}
+
+	// Metrics endpoint is enabled in 'config/default/kustomization.yaml'. The Metrics options configure the server.
+	// More info:
+	// - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.20.4/pkg/metrics/server
+	// - https://book.kubebuilder.io/reference/metrics.html
+	metricsServerOptions := metricsserver.Options{
+		BindAddress:   metricsAddr,
+		SecureServing: secureMetrics,
+		TLSOpts:       tlsOpts,
+	}
+
+	if secureMetrics {
+		// FilterProvider is used to protect the metrics endpoint with authn/authz.
+		// These configurations ensure that only authorized users and service accounts
+		// can access the metrics endpoint. The RBAC are configured in 'config/rbac/kustomization.yaml'. More info:
+		// https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.20.4/pkg/metrics/filters#WithAuthenticationAndAuthorization
+		metricsServerOptions.FilterProvider = filters.WithAuthenticationAndAuthorization
+	}
+
+	// If the certificate is not specified, controller-runtime will automatically
+	// generate self-signed certificates for the metrics server. While convenient for development and testing,
+	// this setup is not recommended for production.
+	//
+	if len(metricsCertPath) > 0 {
+		setupLog.Info(
+			"Initializing metrics certificate watcher using provided certificates",
+			"metrics-cert-path",
+			metricsCertPath,
+			"metrics-cert-name",
+			metricsCertName,
+			"metrics-cert-key",
+			metricsCertKey,
+		)
+
+		var err error
+
+		metricsCertWatcher, err = certwatcher.New(
+			filepath.Join(metricsCertPath, metricsCertName),
+			filepath.Join(metricsCertPath, metricsCertKey),
+		)
+		if err != nil {
+			setupLog.Error(err, "to initialize metrics certificate watcher", "error", err)
+			os.Exit(1)
+		}
+
+		metricsServerOptions.TLSOpts = append(
+			metricsServerOptions.TLSOpts,
+			func(config *tls.Config) {
+				config.GetCertificate = metricsCertWatcher.GetCertificate
+			},
+		)
+	}
+
 	ctrlOpts := ctrl.Options{
-		Scheme: scheme,
-		Metrics: metricsserver.Options{
-			BindAddress: metricsAddr,
-		},
+		Scheme:  scheme,
+		Metrics: metricsServerOptions,
 		WebhookServer: ctrlwebhook.NewServer(ctrlwebhook.Options{
-			Port: webhookPort,
+			Port:    webhookPort,
+			TLSOpts: webhookTLSOpts,
 		}),
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       "42c733ea.clastix.capsule.io",
@@ -165,6 +368,8 @@ func main() {
 		ctrlOpts.PprofBindAddress = ":8082"
 	}
 
+	setupLog.Info("initializing manager")
+
 	manager, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrlOpts)
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
@@ -176,7 +381,21 @@ func main() {
 
 	ctx := ctrl.SetupSignalHandler()
 
-	cfg := configuration.NewCapsuleConfiguration(ctx, manager.GetClient(), controllerConfig.ConfigurationName)
+	dc, err := discovery.NewDiscoveryClientForConfig(manager.GetConfig())
+	if err != nil {
+		setupLog.Error(err, "unable to create discovery client")
+		os.Exit(1)
+	}
+
+	dynamicClient, err := dynamic.NewForConfig(manager.GetConfig())
+	if err != nil {
+		setupLog.Error(err, "unable to create dynamic client")
+		os.Exit(1)
+	}
+
+	setupLog.Info("initializing capsule configuration")
+
+	cfg := configuration.NewCapsuleConfiguration(ctx, manager.GetClient(), manager.GetConfig(), controllerConfig.ConfigurationName)
 
 	directClient, err := client.New(ctrl.GetConfigOrDie(), client.Options{
 		Scheme: manager.GetScheme(),
@@ -187,7 +406,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	directCfg := configuration.NewCapsuleConfiguration(ctx, directClient, controllerConfig.ConfigurationName)
+	directCfg := configuration.NewCapsuleConfiguration(ctx, directClient, manager.GetConfig(), controllerConfig.ConfigurationName)
 
 	if directCfg.EnableTLSConfiguration() {
 		tlsReconciler := &tlscontroller.Reconciler{
@@ -215,15 +434,28 @@ func main() {
 		}
 	}
 
+	setupLog.Info("initializing caches")
+
+	// Initialize Notifiers (Channels)
+	customQuotaCh := make(chan event.TypedGenericEvent[*capsulev1beta2.CustomQuota], 1024)
+	globalCustomQuotaCh := make(chan event.TypedGenericEvent[*capsulev1beta2.GlobalCustomQuota], 1024)
+
+	// Initialize Caches
+	impersonationCache := cache.NewImpersonationCache()
 	registryCache := cache.NewRegistryRuleSetCache()
+	customQuotaQuantityCache := cache.NewQuantityCache[string]()
+	jsonPathCache := cache.NewJSONPathCache()
+	targetsCache := cache.NewCompiledTargetsCache[string]()
 
 	if err = (&tenantcontroller.Manager{
-		RESTConfig:    manager.GetConfig(),
-		Client:        manager.GetClient(),
-		Metrics:       metrics.MustMakeTenantRecorder(),
-		Log:           ctrl.Log.WithName("capsule.ctrl").WithName("tenant"),
-		Recorder:      manager.GetEventRecorder("tenant-controller"),
-		Configuration: cfg,
+		RESTConfig:      manager.GetConfig(),
+		Client:          manager.GetClient(),
+		DynamicClient:   dynamicClient,
+		DiscoveryClient: dc,
+		Metrics:         metrics.MustMakeTenantRecorder(),
+		Log:             ctrl.Log.WithName("capsule.ctrl").WithName("tenant"),
+		Recorder:        manager.GetEventRecorder("tenant-controller"),
+		Configuration:   cfg,
 	}).SetupWithManager(manager, controllerConfig); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Tenant")
 		os.Exit(1)
@@ -234,6 +466,8 @@ func main() {
 		os.Exit(1)
 	}
 
+	setupLog.Info("registering indexers")
+
 	if err = indexers.AddToManager(ctx, setupLog, manager); err != nil {
 		setupLog.Error(err, "unable to setup indexers")
 		os.Exit(1)
@@ -241,14 +475,18 @@ func main() {
 
 	var kubeVersion *utilVersion.Version
 
-	if kubeVersion, err = utils.GetK8sVersion(); err != nil {
+	if kubeVersion, err = utils.GetK8sVersionFromConfig(dc); err != nil {
 		setupLog.Error(err, "unable to get kubernetes version")
 		os.Exit(1)
 	}
 
+	setupLog.Info("registering webhooks")
+
 	// webhooks: the order matters, don't change it and just append
 	webhooksList := append(
 		make([]handlers.Webhook, 0),
+		route.GenericReplicasHandler(),
+		route.GenericManagedHandler(cfg),
 		route.Pod(
 			pod.Handler(
 				pod.ImagePullPolicy(),
@@ -270,15 +508,15 @@ func main() {
 				service.Validating(),
 			),
 		),
-		route.TenantResourceObjects(handlers.InCapsuleGroups(cfg, tntresource.WriteOpsHandler())),
-		route.Cordoning(handlers.InCapsuleGroups(cfg, misc.CordoningHandler(cfg))),
 		route.Node(handlers.InCapsuleGroups(cfg, node.UserMetadataHandler(cfg, kubeVersion))),
+		route.Cordoning(handlers.InCapsuleGroups(cfg, generic.CordoningHandler(cfg))),
 		route.ServiceAccounts(
 			serviceaccounts.Handler(
-				serviceaccounts.Validating(cfg),
+				serviceaccounts.Promotion(cfg),
+				serviceaccounts.OwnerPromotion(cfg),
 			),
 		),
-		route.MiscCustomResources(misc.ResourceCounterHandler(manager.GetClient())),
+		route.GenericCustomResources(generic.ResourceCounterHandler(manager.GetClient())),
 		route.Gateway(gateway.Class(cfg)),
 		route.DeviceClass(dra.DeviceClass()),
 		route.Defaults(defaults.Handler(cfg, kubeVersion)),
@@ -300,6 +538,7 @@ func main() {
 				tenantvalidation.ProtectedHandler(),
 				tenantvalidation.RequiredMetadataHandler(),
 				tenantvalidation.WarningHandler(cfg),
+				tenantvalidation.RemainingNamespaceHandler(),
 			),
 		),
 		route.NamespaceValidation(
@@ -325,14 +564,28 @@ func main() {
 		route.ResourcePoolValidation((resourcepool.PoolValidationHandler(ctrl.Log.WithName("webhooks").WithName("resourcepool")))),
 		route.ResourcePoolClaimMutation((resourcepool.ClaimMutationHandler(ctrl.Log.WithName("webhooks").WithName("resourcepoolclaims")))),
 		route.ResourcePoolClaimValidation((resourcepool.ClaimValidationHandler(ctrl.Log.WithName("webhooks").WithName("resourcepoolclaims")))),
-		route.MiscTenantAssignment(
-			misc.TenantAssignmentHandler(),
+		route.CustomQuotaValidation((customquotavalidation.CustomQuotaValidationHandler(
+			targetsCache,
+			jsonPathCache,
+		))),
+		route.GlobalCustomQuotaValidation((customquotavalidation.GlobalCustomQuotaValidationHandler(
+			targetsCache,
+			jsonPathCache,
+		))),
+		route.CalculationCustomQuotas(
+			customquotavalidation.ObjectCalculationHandler(
+				targetsCache,
+				jsonPathCache,
+			),
 		),
-		route.MiscManagedValidation(
-			handlers.InCapsuleGroups(cfg, misc.ManagedValidatingHandler()),
+		route.GenericTenantAssignment(
+			generic.TenantAssignmentHandler(),
 		),
 		route.ConfigValidation(
-			cfgvalidation.WarningHandler(),
+			cfgvalidation.Handler(cfg,
+				cfgvalidation.WarningHandler(),
+				cfgvalidation.ServiceAccountHandler(),
+			),
 		),
 	)
 
@@ -389,21 +642,39 @@ func main() {
 	}
 
 	if err = (&configcontroller.Manager{
-		Client:        manager.GetClient(),
-		RegistryCache: registryCache,
-		Log:           ctrl.Log.WithName("capsule.ctrl").WithName("configuration"),
+		Rest:   manager.GetConfig(),
+		Client: manager.GetClient(),
+		Log:    ctrl.Log.WithName("capsule.ctrl").WithName("configuration"),
 	}).SetupWithManager(manager, controllerConfig); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "CapsuleConfiguration")
 		os.Exit(1)
 	}
 
-	if err = (&resources.Global{}).SetupWithManager(manager, controllerConfig); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "resources.Global")
+	setupLog.Info("initializing controllers")
+
+	localInvalidator := &cacheinvalidator.CacheInvalidator{
+		Log:                ctrl.Log.WithName("capsule.ctrl").WithName("invalidator"),
+		Client:             manager.GetClient(),
+		Configuration:      directCfg,
+		ImpersonationCache: impersonationCache,
+		RegistryCache:      registryCache,
+		JSONPathCache:      jsonPathCache,
+		TargetsCache:       targetsCache,
+	}
+
+	if err := localInvalidator.SetupWithManager(manager, controllerConfig); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "invalidator")
 		os.Exit(1)
 	}
 
-	if err = (&resources.Namespaced{}).SetupWithManager(manager, controllerConfig); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "resources.Namespaced")
+	if err := resources.Add(
+		ctrl.Log.WithName("controllers").WithName("TenantResources"),
+		manager,
+		cfg,
+		controllerConfig,
+		impersonationCache,
+	); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "tenantresources")
 		os.Exit(1)
 	}
 
@@ -412,7 +683,7 @@ func main() {
 		manager,
 		manager.GetEventRecorder("admission-ctrl"),
 		controllerConfig,
-		cfg,
+		directCfg,
 	); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "admission")
 		os.Exit(1)
@@ -425,6 +696,20 @@ func main() {
 		controllerConfig,
 	); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "resourcepools")
+		os.Exit(1)
+	}
+
+	if err = customquotacontroller.Add(ctrl.Log.WithName("controllers").WithName("CustomQuotas"),
+		manager,
+		manager.GetEventRecorder("customquotas-ctrl"),
+		controllerConfig,
+		customQuotaQuantityCache,
+		jsonPathCache,
+		targetsCache,
+		customQuotaCh,
+		globalCustomQuotaCh,
+	); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "customquotas")
 		os.Exit(1)
 	}
 

@@ -6,11 +6,15 @@ package meta
 import (
 	"strings"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/labels"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
+	ResourcesLabel = "capsule.clastix.io/resources"
+
 	TenantNameLabel = "kubernetes.io/metadata.name"
 
 	TenantLabel    = "capsule.clastix.io/tenant"
@@ -20,15 +24,15 @@ const (
 
 	FreezeLabel = "projectcapsule.dev/freeze"
 
-	OwnerPromotionLabel = "owner.projectcapsule.dev/promote"
+	OwnerPromotionLabel          = "owner.projectcapsule.dev/promote"
+	ServiceAccountPromotionLabel = "projectcapsule.dev/promote"
 
 	CordonedLabel = "projectcapsule.dev/cordoned"
 
 	CapsuleNameLabel = "projectcapsule.dev/name"
 
 	CreatedByCapsuleLabel = "projectcapsule.dev/created-by"
-
-	CustomResourcesLabel = "projectcapsule.dev/custom-resources"
+	CustomResourcesLabel  = "projectcapsule.dev/custom-resources"
 
 	NewManagedByCapsuleLabel = "projectcapsule.dev/managed-by"
 	ManagedByCapsuleLabel    = "capsule.clastix.io/managed-by"
@@ -109,4 +113,28 @@ func LabelsChanged(keys []string, oldLabels, newLabels map[string]string) bool {
 	}
 
 	return false
+}
+
+func LabelsChangedUnstructured(oldObj, newObj unstructured.Unstructured) bool {
+	return !labels.Equals(labels.Set(oldObj.GetLabels()), labels.Set(newObj.GetLabels()))
+}
+
+// Collect all mentioned keys from a LabelSelector.
+func LabelSelectorKeys(sel *metav1.LabelSelector) map[string]struct{} {
+	out := map[string]struct{}{}
+	if sel == nil {
+		return out
+	}
+
+	for k := range sel.MatchLabels {
+		out[k] = struct{}{}
+	}
+
+	for _, expr := range sel.MatchExpressions {
+		if expr.Key != "" {
+			out[expr.Key] = struct{}{}
+		}
+	}
+
+	return out
 }

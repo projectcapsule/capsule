@@ -11,7 +11,9 @@ metadata:
     {{- include "capsule.post-install.annotations" . | nindent 4 }}
   labels:
     app.kubernetes.io/component: {{ include "capsule.post-install.component" . | quote }}
-    {{- include "capsule.labels" . | nindent 4 }}
+    app.kubernetes.io/name: {{ include "capsule.post-install.component" . | quote }}
+    {{- include "capsule.baselabels" . | nindent 4 }}
+    {{- include "capsule.selectorLabelInstance" . | nindent 4 }}
 rules:
 - apiGroups:
   - ""
@@ -31,7 +33,9 @@ metadata:
     {{- include "capsule.post-install.annotations" . | nindent 4 }}
   labels:
     app.kubernetes.io/component: {{ include "capsule.post-install.component" . | quote }}
-    {{- include "capsule.labels" . | nindent 4 }}
+    app.kubernetes.io/name: {{ include "capsule.post-install.component" . | quote }}
+    {{- include "capsule.baselabels" . | nindent 4 }}
+    {{- include "capsule.selectorLabelInstance" . | nindent 4 }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role

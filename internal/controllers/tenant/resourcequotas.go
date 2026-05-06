@@ -185,8 +185,13 @@ func (r *Manager) syncResourceQuotas(ctx context.Context, tenant *capsulev1beta2
 
 	group := new(errgroup.Group)
 
-	for _, ns := range tenant.Status.Namespaces {
-		namespace := ns
+	for _, ns := range tenant.Status.Spaces {
+		namespace := ns.Name
+
+		cond := ns.Conditions.GetConditionByType(meta.ReadyCondition)
+		if cond != nil && cond.Reason == meta.TerminatingReason {
+			continue
+		}
 
 		group.Go(func() error {
 			return r.syncResourceQuota(ctx, tenant, namespace, keys)
@@ -233,6 +238,7 @@ func (r *Manager) syncResourceQuota(ctx context.Context, tenant *capsulev1beta2.
 				delete(targetLabels, meta.TenantLabel)
 
 				target.SetLabels(targetLabels)
+
 				target.Spec.Scopes = resQuota.Scopes
 				target.Spec.ScopeSelector = resQuota.ScopeSelector
 

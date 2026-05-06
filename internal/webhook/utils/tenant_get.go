@@ -54,7 +54,7 @@ func GetNamespaceTenant(
 
 	if len(tnts) == 1 {
 		// Check if namespace needs Tenant name prefix
-		if !validateNamespacePrefix(ns, &tnts[0]) {
+		if !validateNamespacePrefix(cfg, ns, &tnts[0]) {
 			response := admission.Denied(fmt.Sprintf("The Namespace name must start with '%s-' when ForceTenantPrefix is enabled in the Tenant.", tnts[0].GetName()))
 
 			return nil, &response
@@ -78,13 +78,16 @@ func GetNamespaceTenant(
 	return nil, nil
 }
 
-func validateNamespacePrefix(ns *corev1.Namespace, tenant *capsulev1beta2.Tenant) bool {
-	// Check if ForceTenantPrefix is true
-	if tenant.Spec.ForceTenantPrefix != nil && *tenant.Spec.ForceTenantPrefix {
-		if !strings.HasPrefix(ns.GetName(), fmt.Sprintf("%s-", tenant.GetName())) {
-			return false
-		}
+func validateNamespacePrefix(cfg configuration.Configuration, ns *corev1.Namespace, tenant *capsulev1beta2.Tenant) bool {
+	enforce := cfg.ForceTenantPrefix()
+
+	if tenant.Spec.ForceTenantPrefix != nil {
+		enforce = *tenant.Spec.ForceTenantPrefix
 	}
 
-	return true
+	if !enforce {
+		return true
+	}
+
+	return strings.HasPrefix(ns.GetName(), tenant.GetName()+"-")
 }

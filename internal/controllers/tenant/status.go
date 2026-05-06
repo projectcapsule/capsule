@@ -25,7 +25,7 @@ import (
 )
 
 // Sets a label on the Tenant object with it's name.
-func (r *Manager) collectOwners(ctx context.Context, tnt *capsulev1beta2.Tenant) (err error) {
+func (r *Manager) collectRBAC(ctx context.Context, tnt *capsulev1beta2.Tenant) (err error) {
 	owners, err := tenant.CollectOwners(
 		ctx,
 		r.Client,
@@ -36,8 +36,19 @@ func (r *Manager) collectOwners(ctx context.Context, tnt *capsulev1beta2.Tenant)
 		return err
 	}
 
-	// No Direct Update needed as status is always posted
 	tnt.Status.Owners = owners
+
+	promotions, err := tenant.CollectPromotions(
+		ctx,
+		r.Client,
+		tnt,
+		r.Configuration,
+	)
+	if err != nil {
+		return err
+	}
+
+	tnt.Status.Promotions = promotions
 
 	return nil
 }

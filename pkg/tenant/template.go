@@ -5,12 +5,31 @@ package tenant
 
 import (
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/runtime/sanitize"
+	"github.com/projectcapsule/capsule/pkg/utils"
 )
 
+// NewTenantContext returns the context for the tenant.
+func NewTenantContext(tnt *capsulev1beta2.Tenant, scheme *runtime.Scheme, opts sanitize.SanitizeOptions) (map[string]any, error) {
+	if err := sanitize.SanitizeObject(tnt, scheme, opts); err != nil {
+		return nil, err
+	}
+
+	context, err := utils.ToUnstructuredMap(tnt)
+	if err != nil {
+		return nil, err
+	}
+
+	context["rbac"] = tnt.GetClusterRolesBySubject(nil)
+
+	return context, nil
+}
+
 // TemplateForTenantAndNamespace applies templatingto the provided string.
-func ContextForTenantAndNamespace(tnt *capsulev1beta2.Tenant, ns *corev1.Namespace) map[string]string {
+func FastContextForTenantAndNamespace(tnt *capsulev1beta2.Tenant, ns *corev1.Namespace) map[string]string {
 	values := map[string]string{}
 
 	if tnt != nil {

@@ -8,12 +8,12 @@ import (
 
 	rbacv1 "k8s.io/api/rbac/v1"
 
-	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api/rbac"
 	"github.com/projectcapsule/capsule/pkg/utils"
 )
 
 func TestRoleBindingHashFunc_Deterministic(t *testing.T) {
-	b := api.AdditionalRoleBindingsSpec{
+	b := rbac.AdditionalRoleBindingsSpec{
 		ClusterRoleName: "admin",
 		Subjects: []rbacv1.Subject{
 			{Kind: "User", Name: "alice"},
@@ -33,11 +33,11 @@ func TestRoleBindingHashFunc_Deterministic(t *testing.T) {
 }
 
 func TestRoleBindingHashFunc_ChangesWhenClusterRoleChanges(t *testing.T) {
-	b1 := api.AdditionalRoleBindingsSpec{
+	b1 := rbac.AdditionalRoleBindingsSpec{
 		ClusterRoleName: "admin",
 		Subjects:        []rbacv1.Subject{{Kind: "User", Name: "alice"}},
 	}
-	b2 := api.AdditionalRoleBindingsSpec{
+	b2 := rbac.AdditionalRoleBindingsSpec{
 		ClusterRoleName: "view",
 		Subjects:        []rbacv1.Subject{{Kind: "User", Name: "alice"}},
 	}
@@ -51,11 +51,11 @@ func TestRoleBindingHashFunc_ChangesWhenClusterRoleChanges(t *testing.T) {
 }
 
 func TestRoleBindingHashFunc_ChangesWhenSubjectKindChanges(t *testing.T) {
-	b1 := api.AdditionalRoleBindingsSpec{
+	b1 := rbac.AdditionalRoleBindingsSpec{
 		ClusterRoleName: "admin",
 		Subjects:        []rbacv1.Subject{{Kind: "User", Name: "alice"}},
 	}
-	b2 := api.AdditionalRoleBindingsSpec{
+	b2 := rbac.AdditionalRoleBindingsSpec{
 		ClusterRoleName: "admin",
 		Subjects:        []rbacv1.Subject{{Kind: "Group", Name: "alice"}},
 	}
@@ -69,11 +69,11 @@ func TestRoleBindingHashFunc_ChangesWhenSubjectKindChanges(t *testing.T) {
 }
 
 func TestRoleBindingHashFunc_ChangesWhenSubjectNameChanges(t *testing.T) {
-	b1 := api.AdditionalRoleBindingsSpec{
+	b1 := rbac.AdditionalRoleBindingsSpec{
 		ClusterRoleName: "admin",
 		Subjects:        []rbacv1.Subject{{Kind: "User", Name: "alice"}},
 	}
-	b2 := api.AdditionalRoleBindingsSpec{
+	b2 := rbac.AdditionalRoleBindingsSpec{
 		ClusterRoleName: "admin",
 		Subjects:        []rbacv1.Subject{{Kind: "User", Name: "bob"}},
 	}
@@ -87,7 +87,7 @@ func TestRoleBindingHashFunc_ChangesWhenSubjectNameChanges(t *testing.T) {
 }
 
 func TestRoleBindingHashFunc_EmptyInputsStillProduceHash(t *testing.T) {
-	b := api.AdditionalRoleBindingsSpec{
+	b := rbac.AdditionalRoleBindingsSpec{
 		ClusterRoleName: "",
 		Subjects:        nil,
 	}
@@ -101,14 +101,14 @@ func TestRoleBindingHashFunc_EmptyInputsStillProduceHash(t *testing.T) {
 func TestRoleBindingHashFunc_SubjectOrderMatters_CurrentBehavior(t *testing.T) {
 	// This test documents the CURRENT behavior:
 	// the hash is order-dependent because subjects are written in slice order.
-	b1 := api.AdditionalRoleBindingsSpec{
+	b1 := rbac.AdditionalRoleBindingsSpec{
 		ClusterRoleName: "admin",
 		Subjects: []rbacv1.Subject{
 			{Kind: "User", Name: "alice"},
 			{Kind: "Group", Name: "devops"},
 		},
 	}
-	b2 := api.AdditionalRoleBindingsSpec{
+	b2 := rbac.AdditionalRoleBindingsSpec{
 		ClusterRoleName: "admin",
 		Subjects: []rbacv1.Subject{
 			{Kind: "Group", Name: "devops"},

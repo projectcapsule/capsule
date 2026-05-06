@@ -5,20 +5,28 @@ metadata:
   name: solar
   labels:
     customer: a
-spec:
+spec:  
   owners:
   - name: alice
     kind: User
   permissions:
+    promotions:
+      rules:
+      - clusterRoles: 
+        - "configmap-replicator"
+      - clusterRoles: 
+        - "secret-replicator"
+        selector:
+          matchLabels:
+            super: "account"
+          
+
     matchOwners:
     - matchLabels:
         team: platform
     - matchLabels:
         tenant: solar
   namespaceOptions:
-    requiredMetadata:
-      labels:
-        env: "prod|test|dev"
     additionalMetadata:
       labels:
         team: platform
@@ -33,6 +41,16 @@ spec:
     - apiGroup: rbac.authorization.k8s.io
       kind: User
       name: joe
+  resourceQuotas:
+    scope: Tenant
+    items:
+    - hard:
+        limits.cpu: "8"
+        limits.memory: 16Gi
+        requests.cpu: "8"
+        requests.memory: 16Gi
+    - hard:
+        pods: "10"
 ---
 apiVersion: capsule.clastix.io/v1beta2
 kind: Tenant
@@ -41,10 +59,6 @@ metadata:
   labels:
     customer: a
 spec:
-  namespaceOptions:
-    requiredMetadata:
-      labels:
-        env: "prod|test|dev"
   permissions:
     matchOwners:
     - matchLabels:
@@ -60,23 +74,23 @@ spec:
     - apiGroup: rbac.authorization.k8s.io
       kind: User
       name: alice
-  rules:
-    - enforce:
-        registries:
-        - url: "harbor/.*"
-          policy:
-          - "Never"
-    - namespaceSelector:
-        matchExpressions:
-          - key: env
-            operator: In
-            values:
-            - "prod"
-      enforce:
-        registries:
-        - url: "harbor/v2/customer-registry/prod-image/.*"
-          policy:
-          - "Always"
+  #rules:
+  #  - enforce:
+  #      registries:
+  #      - url: "harbor/.*"
+  #        policy:
+  #        - "Never"
+  #  - namespaceSelector:
+  #      matchExpressions:
+  #        - key: env
+  #          operator: In
+  #          values:
+  #          - "prod"
+  #    enforce:
+  #      registries:
+  #      - url: "harbor/v2/customer-registry/prod-image/.*"
+  #        policy:
+  #        - "Always"
 ---
 apiVersion: capsule.clastix.io/v1beta2
 kind: Tenant
@@ -92,6 +106,7 @@ spec:
   owners:
   - name: joe
     kind: User
+
   additionalRoleBindings:
   - clusterRoleName: 'view'
     subjects:

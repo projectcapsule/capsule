@@ -4,17 +4,23 @@
 package sanitize
 
 type SanitizeOptions struct {
-	StripUID           bool
-	StripManagedFields bool
-	StripLastApplied   bool
-	StripStatus        bool
+	StripResourceVersion bool
+	StripOwnerreferences bool
+	StripGeneration      bool
+	StripUID             bool
+	StripManagedFields   bool
+	StripLastApplied     bool
+	StripStatus          bool
 }
 
 func DefaultSanitizeOptions() SanitizeOptions {
 	return SanitizeOptions{
-		StripUID:           true,
-		StripManagedFields: true,
-		StripLastApplied:   true,
-		StripStatus:        true,
+		StripResourceVersion: true,
+		StripOwnerreferences: true,
+		StripGeneration:      true,
+		StripUID:             true,
+		StripManagedFields:   true,
+		StripLastApplied:     true,
+		StripStatus:          true,
 	}
 }

@@ -24,15 +24,13 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/internal/controllers/utils"
-	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
+	"github.com/projectcapsule/capsule/pkg/api/rbac"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	"github.com/projectcapsule/capsule/pkg/runtime/predicates"
 )
 
-const (
-	controllerManager = "rbac-controller"
-)
+const controllerManager = "rbac-controller"
 
 type Manager struct {
 	Log           logr.Logger
@@ -109,17 +107,17 @@ func (r *Manager) Reconcile(ctx context.Context, request reconcile.Request) (res
 }
 
 func (r *Manager) EnsureClusterRoleBindingsProvisioner(ctx context.Context) error {
-	rbac := r.Configuration.RBAC()
+	cfg := r.Configuration.RBAC()
 
 	crb := &rbacv1.ClusterRoleBinding{
-		ObjectMeta: metav1.ObjectMeta{Name: rbac.ProvisionerClusterRole},
+		ObjectMeta: metav1.ObjectMeta{Name: cfg.ProvisionerClusterRole},
 	}
 
 	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		_, err := controllerutil.CreateOrUpdate(ctx, r.Client, crb, func() error {
 			crb.RoleRef = rbacv1.RoleRef{
 				Kind:     "ClusterRole",
-				Name:     rbac.ProvisionerClusterRole,
+				Name:     cfg.ProvisionerClusterRole,
 				APIGroup: rbacv1.GroupName,
 			}
 
@@ -141,17 +139,17 @@ func (r *Manager) EnsureClusterRoleBindingsProvisioner(ctx context.Context) erro
 
 			for _, entity := range users {
 				switch entity.Kind {
-				case api.UserOwner:
+				case rbac.UserOwner:
 					crb.Subjects = append(crb.Subjects, rbacv1.Subject{
 						Kind: rbacv1.UserKind,
 						Name: entity.Name,
 					})
-				case api.GroupOwner:
+				case rbac.GroupOwner:
 					crb.Subjects = append(crb.Subjects, rbacv1.Subject{
 						Kind: rbacv1.GroupKind,
 						Name: entity.Name,
 					})
-				case api.ServiceAccountOwner:
+				case rbac.ServiceAccountOwner:
 					namespace, name, err := serviceaccount.SplitUsername(entity.Name)
 					if err != nil {
 						return err

@@ -1,6 +1,7 @@
 
+{{- if or (and $.Values.crds.exclusive $.Values.crds.createDiagnostics) (not $.Values.crds.exclusive) }}
 {{- if $.Values.monitoring.diagnostics.enabled }}
-  {{ range $path, $_ :=  .Files.Glob "dashboards/**-dashboard.json" }}
+  {{ range $path, $_ :=  .Files.Glob "diagnostics/**-dashboard.json" }}
     {{- with $ }}
       {{- $content := (.Files.Get $path) }}
 ---
@@ -48,4 +49,5 @@ spec:
   {{- end }}
     {{- end }}
   {{- end }}
+{{- end }}
 {{- end }}

@@ -11,6 +11,7 @@ import (
 	. "github.com/onsi/gomega"
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api/rbac"
 	"github.com/projectcapsule/capsule/pkg/utils"
 	resources "k8s.io/api/resource/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -83,10 +84,10 @@ var _ = Describe("when Tenant handles Device classes", Label("tenant", "classes"
 			Name: "e2e-authorized-deviceclass",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: []api.OwnerSpec{
+			Owners: []rbac.OwnerSpec{
 				{
-					CoreOwnerSpec: api.CoreOwnerSpec{
-						UserSpec: api.UserSpec{
+					CoreOwnerSpec: rbac.CoreOwnerSpec{
+						UserSpec: rbac.UserSpec{
 							Name: "authorized-deviceclass",
 							Kind: "User",
 						},
@@ -107,10 +108,10 @@ var _ = Describe("when Tenant handles Device classes", Label("tenant", "classes"
 			Name: "e2e-unauthorized-deviceclass",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: []api.OwnerSpec{
+			Owners: []rbac.OwnerSpec{
 				{
-					CoreOwnerSpec: api.CoreOwnerSpec{
-						UserSpec: api.UserSpec{
+					CoreOwnerSpec: rbac.CoreOwnerSpec{
+						UserSpec: rbac.UserSpec{
 							Name: "unauthorized-deviceclass",
 							Kind: "User",
 						},
@@ -150,9 +151,7 @@ var _ = Describe("when Tenant handles Device classes", Label("tenant", "classes"
 	})
 	JustAfterEach(func() {
 		for _, tnt := range []*capsulev1beta2.Tenant{tntWithAuthorized, tntWithUnauthorized} {
-			EventuallyCreation(func() error {
-				return ignoreNotFound(k8sClient.Delete(context.TODO(), tnt))
-			}).Should(Succeed())
+			EventuallyDeletion(tnt)
 		}
 
 		if err := k8sClient.List(context.Background(), &resources.DeviceClassList{}); err != nil {

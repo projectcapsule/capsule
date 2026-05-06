@@ -4,26 +4,19 @@
 package v1beta2
 
 import (
-	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
+	"github.com/projectcapsule/capsule/pkg/api/rbac"
+	"github.com/projectcapsule/capsule/pkg/runtime/admission"
 )
 
 // CapsuleConfigurationSpec defines the Capsule configuration.
 type CapsuleConfigurationSpec struct {
 	// Define entities which are considered part of the Capsule construct
 	// Users not mentioned here will be ignored by Capsule
-	Users api.UserListSpec `json:"users,omitempty"`
-	// Deprecated: use users property instead (https://projectcapsule.dev/docs/operating/setup/configuration/#users)
-	//
-	// Names of the users considered as Capsule users.
-	UserNames []string `json:"userNames,omitempty"`
-	// Deprecated: use users property instead (https://projectcapsule.dev/docs/operating/setup/configuration/#users)
-	//
-	// Names of the groups considered as Capsule users.
-	UserGroups []string `json:"userGroups,omitempty"`
+	Users rbac.UserListSpec `json:"users,omitempty"`
 	// Define groups which when found in the request of a user will be ignored by the Capsule
 	// this might be useful if you have one group where all the users are in, but you want to separate administrators from normal users with additional groups.
 	IgnoreUserWithGroups []string `json:"ignoreUserWithGroups,omitempty"`
@@ -54,7 +47,7 @@ type CapsuleConfigurationSpec struct {
 	// These entities are automatically owners for all existing tenants. Meaning they can add namespaces to any tenant. However they must be specific by using the capsule label
 	// for interacting with namespaces. Because if that label is not defined, it's assumed that namespace interaction was not targeted towards a tenant and will therefor
 	// be ignored by capsule.
-	Administrators api.UserListSpec `json:"administrators,omitempty"`
+	Administrators rbac.UserListSpec `json:"administrators,omitempty"`
 	// Configuration for dynamic Validating and Mutating Admission webhooks managed by Capsule.
 	Admission DynamicAdmission `json:"admission,omitempty"`
 	// Define Properties for managed ClusterRoles by Capsule
@@ -63,6 +56,18 @@ type CapsuleConfigurationSpec struct {
 	// Define the period of time upon a cache invalidation is executed for all caches.
 	// +kubebuilder:default="24h"
 	CacheInvalidation metav1.Duration `json:"cacheInvalidation"`
+	// Service Account Client configuration for impersonation properties
+	// +optional
+	Impersonation ServiceAccountClient `json:"impersonation,omitzero"`
+
+	// Deprecated: use users property instead (https://projectcapsule.dev/docs/operating/setup/configuration/#users)
+	//
+	// Names of the users considered as Capsule users.
+	UserNames []string `json:"userNames,omitempty"`
+	// Deprecated: use users property instead (https://projectcapsule.dev/docs/operating/setup/configuration/#users)
+	//
+	// Names of the groups considered as Capsule users.
+	UserGroups []string `json:"userGroups,omitempty"`
 }
 
 type RBACConfiguration struct {
@@ -82,23 +87,26 @@ type RBACConfiguration struct {
 
 type DynamicAdmission struct {
 	// Configure dynamic Mutating Admission for Capsule
-	Mutating DynamicAdmissionConfig `json:"mutating,omitempty"`
+	Mutating *DynamicMutatingAdmissionConfig `json:"mutating,omitempty"`
 
 	// Configure dynamic Validating Admission for Capsule
-	Validating DynamicAdmissionConfig `json:"validating,omitempty"`
+	Validating *DynamicValidatingAdmissionConfig `json:"validating,omitempty"`
 }
 
-type DynamicAdmissionConfig struct {
-	// Name the Admission Webhook
-	Name meta.RFC1123Name `json:"name,omitempty"`
-	// Labels added to the Admission Webhook
+type DynamicValidatingAdmissionConfig struct {
+	admission.DynamicAdmissionConfig `json:",inline"`
+
+	// Define Dynamic Admission Webhooks
 	// +optional
-	Labels map[string]string `json:"labels,omitempty"`
-	// Annotations added to the Admission Webhook
+	Webhooks []*admission.ValidatingWebhook `json:"webhooks,omitempty"`
+}
+
+type DynamicMutatingAdmissionConfig struct {
+	admission.DynamicAdmissionConfig `json:",inline"`
+
+	// Define Dynamic Admission Webhooks
 	// +optional
-	Annotations map[string]string `json:"annotations,omitempty"`
-	// From the upstram struct
-	Client admissionregistrationv1.WebhookClientConfig `json:"client"`
+	Webhooks []*admission.MutatingWebhook `json:"webhooks,omitempty"`
 }
 
 type NodeMetadata struct {
@@ -115,12 +123,45 @@ type CapsuleResources struct {
 	// Must be in the same Namespace where the Capsule Deployment is deployed.
 	// +kubebuilder:default=capsule-tls
 	TLSSecretName string `json:"TLSSecretName"` //nolint:tagliatelle
+	// Deprecated: use dynamic admission instead
+	//
 	// Name of the MutatingWebhookConfiguration which contains the dynamic admission controller paths and resources.
 	// +kubebuilder:default=capsule-mutating-webhook-configuration
 	MutatingWebhookConfigurationName string `json:"mutatingWebhookConfigurationName"`
+	// Deprecated: use dynamic admission instead
+	//
 	// Name of the ValidatingWebhookConfiguration which contains the dynamic admission controller paths and resources.
 	// +kubebuilder:default=capsule-validating-webhook-configuration
 	ValidatingWebhookConfigurationName string `json:"validatingWebhookConfigurationName"`
+}
+
+// +kubebuilder:object:generate=true
+type ServiceAccountClient struct {
+	// Kubernetes API Endpoint to use for impersonation
+	Endpoint string `json:"endpoint,omitempty"`
+	// Namespace where the CA certificate secret is located
+	CASecretNamespace meta.RFC1123SubdomainName `json:"caSecretNamespace,omitempty"`
+	// Name of the secret containing the CA certificate
+	CASecretName meta.RFC1123Name `json:"caSecretName,omitempty"`
+	// Key in the secret that holds the CA certificate (e.g., "ca.crt")
+	// +kubebuilder:default=ca.crt
+	CASecretKey string `json:"caSecretKey,omitempty"`
+	// If true, TLS certificate verification is skipped (not recommended for production)
+	// +kubebuilder:default=false
+	SkipTLSVerify bool `json:"skipTlsVerify,omitempty"`
+	// Default ServiceAccount for global resources (GlobalTenantResource)
+	// When defined, users are required to use this ServiceAccount anywhere in the cluster
+	// unless they explicitly provide their own.
+	GlobalDefaultServiceAccount meta.RFC1123Name `json:"globalDefaultServiceAccount,omitempty"`
+	// Default ServiceAccount for global resources (GlobalTenantResource)
+	// When defined, users are required to use this ServiceAccount anywhere in the cluster
+	// unless they explicitly provide their own.
+	// +optional
+	GlobalDefaultServiceAccountNamespace meta.RFC1123SubdomainName `json:"globalDefaultServiceAccountNamespace,omitempty"`
+	// Default ServiceAccount for namespaced resources (TenantResource)
+	// When defined, users are required to use this ServiceAccount within the namespace
+	// where they deploy the resource, unless they explicitly provide their own.
+	TenantDefaultServiceAccount meta.RFC1123Name `json:"tenantDefaultServiceAccount,omitempty"`
 }
 
 // +kubebuilder:object:root=true

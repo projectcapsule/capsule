@@ -158,6 +158,8 @@ subjectAltName = @alt_names
 IP.1   = $(LAPTOP_HOST_IP)
 endef
 export TLS_CNF
+CHART           ?= "./charts/capsule"
+CHART_VERSION   ?= "./charts/capsule"
 dev-setup:
 	$(KUBECTL) -n capsule-system scale deployment capsule-controller-manager --replicas=0 || true
 	mkdir -p /tmp/k8s-webhook-server/serving-certs
@@ -175,22 +177,40 @@ dev-setup:
 	export WEBHOOK_URL="https://$${LAPTOP_HOST_IP}:9443"; \
 	export CA_BUNDLE=`openssl base64 -in /tmp/k8s-webhook-server/serving-certs/tls.crt | tr -d '\n'`; \
 	$(HELM) upgrade \
-	    --dependency-update \
+		--dependency-update \
 		--force-conflicts \
+		--take-ownership \
 		--debug \
 		--install \
 		--namespace capsule-system \
 		--create-namespace \
+		--version=$(CHART_VERSION) \
+		--set 'proxy.enabled=true' \
 		--set 'crds.install=true' \
 		--set 'crds.exclusive=true'\
-        --set 'crds.createConfig=true'\
-        --set "tls.enableController=false"\
+		--set 'crds.createConfig=true'\
+		--set 'crds.createRBAC=true'\
+		--set 'crds.createDiagnostics=true'\
+		--set "monitoring.diagnostics.enabled=true"\
+		--set "manager.rbac.minimal=true"\
+		--set "tls.enableController=false"\
 		--set "webhooks.exclusive=true"\
 		--set "webhooks.hooks.nodes.enabled=true"\
 		--set "webhooks.service.url=$${WEBHOOK_URL}" \
 		--set "webhooks.service.caBundle=$${CA_BUNDLE}" \
+		--set 'webhooks.hooks.calculations.enabled=true' \
+		--set 'webhooks.hooks.calculations.rules[0].apiGroups[0]=*' \
+		--set 'webhooks.hooks.calculations.rules[0].apiVersions[0]=*' \
+		--set 'webhooks.hooks.calculations.rules[0].operations[0]=CREATE' \
+		--set 'webhooks.hooks.calculations.rules[0].operations[1]=UPDATE' \
+		--set 'webhooks.hooks.calculations.rules[0].operations[2]=DELETE' \
+		--set 'webhooks.hooks.calculations.rules[0].resources[0]=*' \
+		--set 'webhooks.hooks.calculations.rules[0].scope=Namespaced' \
 		capsule \
-		./charts/capsule || true
+		$(CHART)
+	mkdir -p ./hack/generated/ || true
+	$(KUBECTL) label clusterrole admin projectcapsule.dev/aggregate-to-controller=true
+	bash ./hack/kubeconfig-for-sa.sh $(CLUSTER_NAME) "capsule-system" "capsule" "./hack/generated/kubeconfig.yaml"
 
 setup-monitoring: dev-setup-fluxcd
 
@@ -249,13 +269,13 @@ wait-for-helmreleases:
 
 
 ENTERPRISE_VERSION  ?= "0.13.0-rc.2"
-ENTERPRISE_REGISTRY ?= "oci.peakscale.ch"
+ENTERPRISE_REGISTRY ?= "registry.projectcapsule.dev"
 
 enterprise-prerelease:
 	mkdir -p ./builds
-	$(MAKE) CAPSULE_IMG=$(ENTERPRISE_REGISTRY)/prereleases/images/capsule VERSION=$(ENTERPRISE_VERSION) ko-publish-capsule
+	$(MAKE) CAPSULE_IMG=$(ENTERPRISE_REGISTRY)/prereleases/capsule VERSION=$(ENTERPRISE_VERSION) ko-publish-capsule
 	$(HELM) package ./charts/capsule --app-version=$(ENTERPRISE_VERSION) --version=$(ENTERPRISE_VERSION) --destination ./builds/
-	$(HELM) push ./builds/capsule-$(ENTERPRISE_VERSION).tgz oci://$(ENTERPRISE_REGISTRY)/prereleases/charts/
+	$(HELM) push ./builds/capsule-$(ENTERPRISE_VERSION).tgz oci://$(ENTERPRISE_REGISTRY)/charts/prereleases/
 	$(MAKE) deploy-enterprise
 	rm -rf ./builds
 
@@ -273,12 +293,12 @@ deploy-enterprise:
 	@echo "2) Deploy Capsule:"
 	@echo ""
 	@echo "helm upgrade --install capsule \\"
-	@echo "  oci://$(ENTERPRISE_REGISTRY)/prereleases/charts/capsule \\"
+	@echo "  oci://$(ENTERPRISE_REGISTRY)/charts/prereleases/capsule \\"
 	@echo "  --namespace capsule-system \\"
 	@echo "  --version $(ENTERPRISE_VERSION) \\"
 	@echo "  --reuse-values \\"
 	@echo "  --set manager.image.registry=$(ENTERPRISE_REGISTRY) \\"
-	@echo "  --set manager.image.repository=prereleases/images/capsule \\"
+	@echo "  --set manager.image.repository=prereleases/capsule \\"
 	@echo "  --set manager.image.tag=$(ENTERPRISE_VERSION) \\"
 	@echo "  --set manager.image.pullPolicy=Always \\"
 	@echo "  --set 'serviceAccount.imagePullSecrets={capsule-enterprise}'"
@@ -384,6 +404,7 @@ e2e-build: kind
 .PHONY: e2e-install
 e2e-install: helm-controller-version ko-build-all
 	$(MAKE) e2e-load-image CLUSTER_NAME=$(CLUSTER_NAME) IMAGE=$(CAPSULE_IMG) VERSION=$(VERSION)
+	$(KUBECTL) label clusterrole admin projectcapsule.dev/aggregate-to-controller=true
 	$(HELM) upgrade \
 	    --dependency-update \
 		--debug \
@@ -395,9 +416,18 @@ e2e-install: helm-controller-version ko-build-all
 		--set 'manager.resources=null'\
 		--set "manager.image.tag=$(VERSION)" \
 		--set 'manager.livenessProbe.failureThreshold=10' \
+		--set 'manager.options.logLevel=debug' \
+		--set 'manager.rbac.minimal=true' \
 		--set 'webhooks.hooks.nodes.enabled=true' \
 		--set "webhooks.exclusive=true"\
-		--set "manager.options.logLevel=debug"\
+		--set 'webhooks.hooks.calculations.enabled=true' \
+		--set 'webhooks.hooks.calculations.rules[0].apiGroups[0]=*' \
+		--set 'webhooks.hooks.calculations.rules[0].apiVersions[0]=*' \
+		--set 'webhooks.hooks.calculations.rules[0].operations[0]=CREATE' \
+		--set 'webhooks.hooks.calculations.rules[0].operations[1]=UPDATE' \
+		--set 'webhooks.hooks.calculations.rules[0].operations[2]=DELETE' \
+		--set 'webhooks.hooks.calculations.rules[0].resources[0]=*' \
+		--set 'webhooks.hooks.calculations.rules[0].scope=Namespaced' \
 		capsule \
 		./charts/capsule
 

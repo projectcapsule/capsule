@@ -6,6 +6,7 @@ package selectors
 import (
 	"context"
 	"fmt"
+	"sort"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -24,10 +25,10 @@ type NamespaceSelector struct {
 // GetMatchingNamespaces retrieves the list of namespaces that match the NamespaceSelector.
 func (s *NamespaceSelector) GetMatchingNamespaces(
 	ctx context.Context,
-	c client.Client,
+	c client.Reader,
 ) ([]corev1.Namespace, error) {
 	if s.LabelSelector == nil {
-		return nil, nil // No namespace selector means all namespaces
+		return nil, nil
 	}
 
 	nsSelector, err := metav1.LabelSelectorAsSelector(s.LabelSelector)
@@ -51,6 +52,62 @@ func (s *NamespaceSelector) GetMatchingNamespaces(
 	return matchingNamespaces, nil
 }
 
+// Takes a list of NamespaceSelectors and returns unique ordered Namespaces.
+func GetNamespacesMatchingSelectors(
+	ctx context.Context,
+	c client.Reader,
+	namespaceSelector []NamespaceSelector,
+) (namespaces []corev1.Namespace, err error) {
+	if len(namespaceSelector) == 0 {
+		return nil, nil
+	}
+
+	byName := make(map[string]corev1.Namespace)
+
+	for _, selector := range namespaceSelector {
+		matches, err := selector.GetMatchingNamespaces(ctx, c)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, ns := range matches {
+			byName[ns.Name] = ns
+		}
+	}
+
+	names := make([]string, 0, len(byName))
+	for name := range byName {
+		names = append(names, name)
+	}
+
+	sort.Strings(names)
+
+	result := make([]corev1.Namespace, 0, len(names))
+	for _, name := range names {
+		result = append(result, byName[name])
+	}
+
+	return result, nil
+}
+
+func GetNamespacesMatchingSelectorsStrings(
+	ctx context.Context,
+	c client.Reader,
+	namespaceSelector []NamespaceSelector,
+) ([]string, error) {
+	namespaces, err := GetNamespacesMatchingSelectors(ctx, c, namespaceSelector)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]string, 0, len(namespaces))
+	for _, ns := range namespaces {
+		result = append(result, ns.Name)
+	}
+
+	return result, nil
+}
+
 // Selector for resources and their labels or selecting origin namespaces
 // +kubebuilder:object:generate=true
 type SelectorWithNamespaceSelector struct {
@@ -64,7 +121,7 @@ type SelectorWithNamespaceSelector struct {
 
 func (s *SelectorWithNamespaceSelector) MatchObjects(
 	ctx context.Context,
-	c client.Client,
+	c client.Reader,
 	objects []metav1.Object,
 ) ([]metav1.Object, error) {
 	if s == nil {
