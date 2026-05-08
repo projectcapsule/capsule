@@ -7,18 +7,34 @@ import (
 	capsulewebhook "github.com/projectcapsule/capsule/internal/webhook"
 )
 
-type pvc struct {
+type pvcValidating struct {
 	handlers []capsulewebhook.Handler
 }
 
-func PVC(handler ...capsulewebhook.Handler) capsulewebhook.Webhook {
-	return &pvc{handlers: handler}
+func PVCValidating(handler ...capsulewebhook.Handler) capsulewebhook.Webhook {
+	return &pvcValidating{handlers: handler}
 }
 
-func (w *pvc) GetHandlers() []capsulewebhook.Handler {
+func (w *pvcValidating) GetHandlers() []capsulewebhook.Handler {
 	return w.handlers
 }
 
-func (w *pvc) GetPath() string {
-	return "/persistentvolumeclaims"
+func (pvcValidating) GetPath() string {
+	return "/persistentvolumeclaims/validating"
+}
+
+type pvcMutating struct {
+	handlers []capsulewebhook.Handler
+}
+
+func PVCMutating(handler ...capsulewebhook.Handler) capsulewebhook.Webhook {
+	return &pvcMutating{handlers: handler}
+}
+
+func (w *pvcMutating) GetHandlers() []capsulewebhook.Handler {
+	return w.handlers
+}
+
+func (pvcMutating) GetPath() string {
+	return "/persistentvolumeclaims/mutating"
 }

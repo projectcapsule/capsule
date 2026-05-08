@@ -18,13 +18,13 @@ import (
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
 )
 
-type validating struct{}
+type persistentVolumeValidatingClass struct{}
 
-func Validating() capsulewebhook.TypedHandlerWithTenant[*corev1.PersistentVolumeClaim] {
-	return &validating{}
+func PersistentVolumeValidatingClass() capsulewebhook.TypedHandlerWithTenant[*corev1.PersistentVolumeClaim] {
+	return &persistentVolumeValidatingClass{}
 }
 
-func (h *validating) OnCreate(
+func (h *persistentVolumeValidatingClass) OnCreate(
 	c client.Client,
 	pvc *corev1.PersistentVolumeClaim,
 	decoder admission.Decoder,
@@ -80,7 +80,7 @@ func (h *validating) OnCreate(
 	}
 }
 
-func (h *validating) OnUpdate(
+func (h *persistentVolumeValidatingClass) OnUpdate(
 	client.Client,
 	*corev1.PersistentVolumeClaim,
 	*corev1.PersistentVolumeClaim,
@@ -93,7 +93,7 @@ func (h *validating) OnUpdate(
 	}
 }
 
-func (h *validating) OnDelete(
+func (h *persistentVolumeValidatingClass) OnDelete(
 	client.Client,
 	*corev1.PersistentVolumeClaim,
 	admission.Decoder,

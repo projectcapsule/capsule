@@ -313,7 +313,7 @@ webhooks:
     - v1
     - v1beta1
   clientConfig:
-    {{- include "capsule.webhooks.service" (dict "path" "/persistentvolumeclaims" "ctx" $) | nindent 4 }}
+    {{- include "capsule.webhooks.service" (dict "path" "/persistentvolumeclaims/validating" "ctx" $) | nindent 4 }}
   failurePolicy: {{ .failurePolicy }}
   matchPolicy: {{ .matchPolicy }}
   {{- with .namespaceSelector }}

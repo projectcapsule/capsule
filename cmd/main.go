@@ -254,12 +254,18 @@ func main() {
 			),
 		),
 		route.Ingress(ingress.Class(cfg, kubeVersion), ingress.Hostnames(cfg), ingress.Collision(cfg), ingress.Wildcard()),
-		route.PVC(
+		route.PVCValidating(
 			pvc.Handler(
-				pvc.Validating(),
-				pvc.PersistentVolumeReuse(),
+				pvc.PersistentVolumeValidatingVolume(),
+				pvc.PersistentVolumeValidatingClass(),
 			),
 		),
+		route.PVCMutating(
+			pvc.Handler(
+				pvc.PersistentVolumeMutatingVolume(),
+			),
+		),
+
 		route.Service(
 			service.Handler(
 				service.Validating(),
