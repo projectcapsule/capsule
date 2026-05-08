@@ -116,29 +116,9 @@ type Permissions struct {
 	// in the Status.Owners specification of the Tenant.
 	MatchOwners []*metav1.LabelSelector `json:"matchOwners,omitempty"`
 
-	// Define Promotion Rules which distributed additional ClusterRoles across the Tenant
-	// for promoted ServiceAccounts.
-	Promotions PromotionSpec `json:"promotions,omitempty"`
-}
-
-type PromotionSpec struct {
 	// ClusterRoles granted to the promoted ServiceAccounts across the Tenant
 	//+kubebuilder:default:=true
 	AllowOwnerPromotion bool `json:"allowOwnerPromotion,omitempty"`
-
-	// Define Promotion Rules which distributed additional ClusterRoles across the Tenant
-	// for promoted ServiceAccounts.
-	Rules []*PromotionRule `json:"rules,omitempty"`
-}
-
-type PromotionRule struct {
-	// ClusterRoles granted to the promoted ServiceAccounts across the Tenant
-	// kubebuilder:validation:Minimum=1
-	ClusterRoles []string `json:"clusterRoles,omitempty"`
-
-	// Match ServiceAccounts which are promoted which are granted these additional ClusterRoles
-	// across the Tenant
-	Selector *metav1.LabelSelector `json:"selector,omitempty"`
 }
 
 func (p *Permissions) ListMatchingOwners(
@@ -179,10 +159,6 @@ type Tenant struct {
 
 	// +optional
 	Status TenantStatus `json:"status,omitzero"`
-}
-
-func (in *Tenant) GetNamespaces() (res []string) {
-	return in.Status.Namespaces
 }
 
 // +kubebuilder:object:root=true

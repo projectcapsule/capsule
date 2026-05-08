@@ -58,6 +58,11 @@ func BuildNamespaceRuleBodyForNamespace(
 		if len(rule.Enforce.Registries) > 0 {
 			out.Enforce.Registries = append(out.Enforce.Registries, rule.Enforce.Registries...)
 		}
+
+		// Merge Promotions
+		if len(rule.Permissions.Promotions) > 0 {
+			out.Permissions.Promotions = append(out.Permissions.Promotions, rule.Permissions.Promotions...)
+		}
 	}
 
 	return out, nil

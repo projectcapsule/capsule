@@ -31,9 +31,7 @@ var _ = Describe("Promoting ServiceAccounts to Owners", Label("config"), Label("
 		},
 		Spec: capsulev1beta2.TenantSpec{
 			Permissions: capsulev1beta2.Permissions{
-				Promotions: capsulev1beta2.PromotionSpec{
-					AllowOwnerPromotion: true,
-				},
+				AllowOwnerPromotion: true,
 			},
 			Owners: rbac.OwnerListSpec{
 				{
@@ -188,7 +186,7 @@ var _ = Describe("Promoting ServiceAccounts to Owners", Label("config"), Label("
 
 		t := &capsulev1beta2.Tenant{}
 		Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: tnt.GetName()}, t)).To(Succeed())
-		t.Spec.Permissions.Promotions.AllowOwnerPromotion = false
+		t.Spec.Permissions.AllowOwnerPromotion = false
 		Expect(k8sClient.Update(context.TODO(), t)).To(Succeed())
 
 		ns := NewNamespace("", map[string]string{

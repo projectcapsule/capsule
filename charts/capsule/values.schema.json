@@ -900,6 +900,7 @@
                     "type": "object",
                     "properties": {
                         "calculations": {
+                            "description": "Webhook for Custom Quota Calculations ([Read More](https://projectcapsule.dev/docs/resource-management/customquotas/#admission))",
                             "type": "object",
                             "properties": {
                                 "enabled": {
@@ -943,39 +944,8 @@
                                     "type": "object"
                                 },
                                 "rules": {
-                                    "type": "array",
-                                    "items": {
-                                        "type": "object",
-                                        "properties": {
-                                            "apiGroups": {
-                                                "type": "array",
-                                                "items": {
-                                                    "type": "string"
-                                                }
-                                            },
-                                            "apiVersions": {
-                                                "type": "array",
-                                                "items": {
-                                                    "type": "string"
-                                                }
-                                            },
-                                            "operations": {
-                                                "type": "array",
-                                                "items": {
-                                                    "type": "string"
-                                                }
-                                            },
-                                            "resources": {
-                                                "type": "array",
-                                                "items": {
-                                                    "type": "string"
-                                                }
-                                            },
-                                            "scope": {
-                                                "type": "string"
-                                            }
-                                        }
-                                    }
+                                    "description": "[Rules](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-rules)",
+                                    "type": "array"
                                 }
                             }
                         },
@@ -1876,7 +1846,7 @@
                                 }
                             }
                         },
-                        "replicas": {
+                        "replications": {
                             "type": "object",
                             "properties": {
                                 "enabled": {
@@ -2172,7 +2142,7 @@
                             }
                         },
                         "tenantResourceObjects": {
-                            "description": "Deprecated, use webhooks.hooks.managed instead",
+                            "description": "Deprecated, use webhooks.hooks.replications instead",
                             "type": "object"
                         },
                         "tenants": {

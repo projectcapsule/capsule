@@ -86,7 +86,7 @@ func (h *ownerPromotion) handle(
 		return &response
 	}
 
-	if !tnt.Spec.Permissions.Promotions.AllowOwnerPromotion {
+	if !tnt.Spec.Permissions.AllowOwnerPromotion {
 		response := admission.Denied(
 			"service account owner promotion is disabled for this tenant. Contact your system administrators",
 		)

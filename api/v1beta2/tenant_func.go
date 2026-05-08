@@ -4,10 +4,14 @@
 package v1beta2
 
 import (
+	"context"
 	"sort"
 
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/selection"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/projectcapsule/capsule/pkg/api/rbac"
 )
@@ -19,9 +23,9 @@ func (in *Tenant) GetRoleBindings() []rbac.AdditionalRoleBindingsSpec {
 		roleBindings = append(roleBindings, owner.ToAdditionalRolebindings()...)
 	}
 
-	for _, promotion := range in.Status.Promotions {
-		roleBindings = append(roleBindings, promotion.ToAdditionalRolebindings()...)
-	}
+	//for _, promotion := range in.Status.Promotions {
+	//	roleBindings = append(roleBindings, promotion.ToAdditionalRolebindings()...)
+	//}
 
 	roleBindings = append(roleBindings, in.Spec.AdditionalRoleBindings...)
 
@@ -48,6 +52,36 @@ func (in *Tenant) AssignNamespaces(namespaces []corev1.Namespace) {
 
 	in.Status.Namespaces = l
 	in.Status.Size = uint(len(l))
+}
+
+func (in *Tenant) GetNamespaces() (res []string) {
+	return in.Status.Namespaces
+}
+
+// Fetch all namespaces defined in the status
+func (in *Tenant) GetNamespaceObjects(ctx context.Context, c client.Reader) (namespaces []corev1.Namespace, err error) {
+	nsList := &corev1.NamespaceList{}
+
+	if len(in.Status.Namespaces) == 0 {
+		return nsList.Items, nil
+	}
+
+	req, err := labels.NewRequirement(
+		corev1.LabelMetadataName,
+		selection.In,
+		in.Status.Namespaces,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	selector := labels.NewSelector().Add(*req)
+
+	if err := c.List(ctx, nsList, client.MatchingLabelsSelector{Selector: selector}); err != nil {
+		return nil, err
+	}
+
+	return nsList.Items, nil
 }
 
 func (in *Tenant) GetOwnerProxySettings(name string, kind rbac.OwnerKind) []rbac.ProxySettings {

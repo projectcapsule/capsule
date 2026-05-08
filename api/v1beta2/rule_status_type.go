@@ -7,6 +7,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// RuleStatus contains the accumulated rules applying to namespace it's deployed in.
+// +kubebuilder:object:generate=true
+type RuleStatusSpec struct {
+	// Managed Enforcement properties per Namespace (aggregated from rules)
+	//+optional
+	Rule NamespaceRuleBody `json:"rule,omitzero"`
+}
+
 // +kubebuilder:object:root=true
 // +kubebuilder:storageversion
 // +kubebuilder:subresource:status
@@ -33,12 +41,4 @@ type RuleStatusList struct {
 
 func init() {
 	SchemeBuilder.Register(&RuleStatus{}, &RuleStatusList{})
-}
-
-// RuleStatus contains the accumulated rules applying to namespace it's deployed in.
-// +kubebuilder:object:generate=true
-type RuleStatusSpec struct {
-	// Managed Enforcement properties per Namespace (aggregated from rules)
-	//+optional
-	Rule NamespaceRuleBody `json:"rule,omitzero"`
 }

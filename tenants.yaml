@@ -1,0 +1,127 @@
+---
+apiVersion: capsule.clastix.io/v1beta2
+kind: Tenant
+metadata:
+  name: solar
+  labels:
+    customer: a
+spec:  
+  owners:
+  - name: alice
+    kind: User
+  rules:
+    - permissions:
+        promotions:
+          - clusterRoles: 
+            - "configmap-replicator"
+          - clusterRoles: 
+            - "secret-replicator"
+            selector:
+              matchLabels:
+                super: "account"
+            targetNamespaces:
+              matchExpressions:
+                - key: env
+                  operator: In
+                  values:
+                  - "prod"
+
+              
+
+
+    - namespaceSelector:
+        matchExpressions:
+          - key: env
+            operator: In
+            values:
+            - "prod"
+      enforce:
+        registries:
+        - url: "harbor/v2/customer-registry/prod-image/.*"
+          policy:
+          - "Always"
+
+
+
+  permissions:
+    promotions:
+      rules:
+      - clusterRoles: 
+        - "configmap-replicator"
+      - clusterRoles: 
+        - "secret-replicator"
+        selector:
+          matchLabels:
+            super: "account"
+          
+
+    matchOwners:
+    - matchLabels:
+        team: platform
+    - matchLabels:
+        tenant: solar
+  namespaceOptions:
+    additionalMetadata:
+      labels:
+        team: platform
+      annotations:
+        owner: "team-platform"
+    additionalMetadataList:
+      - labels:
+          customer: a
+  additionalRoleBindings:
+  - clusterRoleName: 'view'
+    subjects:
+    - apiGroup: rbac.authorization.k8s.io
+      kind: User
+      name: joe
+  resourceQuotas:
+    scope: Tenant
+    items:
+    - hard:
+        limits.cpu: "8"
+        limits.memory: 16Gi
+        requests.cpu: "8"
+        requests.memory: 16Gi
+    - hard:
+        pods: "10"
+---
+apiVersion: capsule.clastix.io/v1beta2
+kind: Tenant
+metadata:
+  name: green
+  labels:
+    customer: a
+spec:
+  permissions:
+    matchOwners:
+    - matchLabels:
+        team: devops
+    - matchLabels:
+        tenant: green
+  owners:
+  - name: bob
+    kind: User
+  additionalRoleBindings:
+  - clusterRoleName: 'view'
+    subjects:
+    - apiGroup: rbac.authorization.k8s.io
+      kind: User
+      name: alice
+  #rules:
+  #  - enforce:
+  #      registries:
+  #      - url: "harbor/.*"
+  #        policy:
+  #        - "Never"
+  #  - namespaceSelector:
+  #      matchExpressions:
+  #        - key: env
+  #          operator: In
+  #          values:
+  #          - "prod"
+  #    enforce:
+  #      registries:
+  #      - url: "harbor/v2/customer-registry/prod-image/.*"
+  #        policy:
+  #        - "Always"

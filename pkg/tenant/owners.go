@@ -26,7 +26,7 @@ func CollectOwners(
 	owners := tnt.Spec.Owners.ToStatusOwners()
 
 	if cfg.AllowServiceAccountPromotion() &&
-		tnt.Spec.Permissions.Promotions.AllowOwnerPromotion &&
+		tnt.Spec.Permissions.AllowOwnerPromotion &&
 		len(tnt.Status.Namespaces) > 0 {
 		nsSet := make(map[string]struct{}, len(tnt.Status.Namespaces))
 		for _, ns := range tnt.Status.Namespaces {
