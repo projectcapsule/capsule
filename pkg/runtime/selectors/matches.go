@@ -28,3 +28,18 @@ func MatchesSelectors(objLabels labels.Set, selectors []metav1.LabelSelector) bo
 
 	return false
 }
+
+// Attempt so verify multiple selector objects against a labels.Set
+// If selectors are not set, it is always considered a match.
+func MatchesSelector(objLabels labels.Set, selector metav1.LabelSelector) (bool, error) {
+	sel, err := metav1.LabelSelectorAsSelector(&selector)
+	if err != nil {
+		return false, err
+	}
+
+	if sel.Matches(objLabels) {
+		return true, nil
+	}
+
+	return false, nil
+}

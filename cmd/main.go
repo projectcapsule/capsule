@@ -49,6 +49,7 @@ import (
 	rbaccontroller "github.com/projectcapsule/capsule/internal/controllers/rbac"
 	"github.com/projectcapsule/capsule/internal/controllers/resourcepools"
 	"github.com/projectcapsule/capsule/internal/controllers/resources"
+	rulestatuscontroller "github.com/projectcapsule/capsule/internal/controllers/rulestatus"
 	servicelabelscontroller "github.com/projectcapsule/capsule/internal/controllers/servicelabels"
 	tenantcontroller "github.com/projectcapsule/capsule/internal/controllers/tenant"
 	tlscontroller "github.com/projectcapsule/capsule/internal/controllers/tls"
@@ -497,10 +498,15 @@ func main() {
 			),
 		),
 		route.Ingress(ingress.Class(cfg, kubeVersion), ingress.Hostnames(cfg), ingress.Collision(cfg), ingress.Wildcard()),
-		route.PVC(
+		route.PVCValidating(
 			pvc.Handler(
-				pvc.Validating(),
-				pvc.PersistentVolumeReuse(),
+				pvc.PersistentVolumeValidatingVolume(),
+				pvc.PersistentVolumeValidatingClass(),
+			),
+		),
+		route.PVCMutating(
+			pvc.Handler(
+				pvc.PersistentVolumeMutatingVolume(),
 			),
 		),
 		route.Service(
@@ -647,6 +653,14 @@ func main() {
 		Log:    ctrl.Log.WithName("capsule.ctrl").WithName("configuration"),
 	}).SetupWithManager(manager, controllerConfig); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "CapsuleConfiguration")
+		os.Exit(1)
+	}
+
+	if err = (&rulestatuscontroller.Manager{
+		Client: manager.GetClient(),
+		Log:    ctrl.Log.WithName("capsule.ctrl").WithName("ruleset"),
+	}).SetupWithManager(manager, controllerConfig); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "RuleSet")
 		os.Exit(1)
 	}
 

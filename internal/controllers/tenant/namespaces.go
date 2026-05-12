@@ -218,15 +218,11 @@ func (r *Manager) reconcileNamespace(ctx context.Context, namespace *corev1.Name
 
 	if !cleanup {
 		// Collect Rules for namespace
-		ruleBody, err := tenant.BuildNamespaceRuleBodyForNamespace(namespace, tnt)
+		err := r.reconcileRuleStatus(ctx, tnt, namespace)
 		if err != nil {
 			return stat, err
 		}
 
-		err = r.ensureRuleStatus(ctx, namespace, tnt, ruleBody, namespace.GetName())
-		if err != nil {
-			return stat, err
-		}
 	} else {
 		obj := &capsulev1beta2.RuleStatus{
 			ObjectMeta: metav1.ObjectMeta{
@@ -254,51 +250,6 @@ func (r *Manager) reconcileNamespace(ctx context.Context, namespace *corev1.Name
 	})
 
 	return stat, err
-}
-
-func (r *Manager) ensureRuleStatus(
-	ctx context.Context,
-	ns *corev1.Namespace,
-	tnt *capsulev1beta2.Tenant,
-	rule *capsulev1beta2.NamespaceRuleBody,
-	namespace string,
-) error {
-	nsStatus := &capsulev1beta2.RuleStatus{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      meta.NameForManagedRuleStatus(),
-			Namespace: namespace,
-		},
-	}
-
-	_, err := controllerutil.CreateOrUpdate(ctx, r.Client, nsStatus, func() error {
-		labels := nsStatus.GetLabels()
-		if labels == nil {
-			labels = make(map[string]string)
-		}
-
-		labels[meta.NewManagedByCapsuleLabel] = meta.ValueController
-		labels[meta.CapsuleNameLabel] = nsStatus.Name
-
-		nsStatus.SetLabels(labels)
-
-		err := controllerutil.SetOwnerReference(tnt, nsStatus, r.Scheme())
-		if err != nil {
-			return err
-		}
-
-		return controllerutil.SetOwnerReference(ns, nsStatus, r.Scheme())
-	})
-	if err != nil {
-		return err
-	}
-
-	nsStatus.Status.Rule = *rule
-
-	if err := r.Status().Update(ctx, nsStatus); err != nil {
-		return err
-	}
-
-	return nil
 }
 
 //nolint:nestif

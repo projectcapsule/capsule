@@ -15,14 +15,15 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/tenant"
 )
 
 type TypedHandlerWithTenantWithRuleset[T client.Object] interface {
-	OnCreate(c client.Client, obj T, decoder admission.Decoder, recorder events.EventRecorder, tnt *capsulev1beta2.Tenant, rule *capsulev1beta2.NamespaceRuleBody) Func
-	OnUpdate(c client.Client, obj T, old T, decoder admission.Decoder, recorder events.EventRecorder, tnt *capsulev1beta2.Tenant, rule *capsulev1beta2.NamespaceRuleBody) Func
-	OnDelete(c client.Client, obj T, decoder admission.Decoder, recorder events.EventRecorder, tnt *capsulev1beta2.Tenant, rule *capsulev1beta2.NamespaceRuleBody) Func
+	OnCreate(c client.Client, obj T, decoder admission.Decoder, recorder events.EventRecorder, tnt *capsulev1beta2.Tenant, rule *api.NamespaceRuleBodyNamespace) Func
+	OnUpdate(c client.Client, obj T, old T, decoder admission.Decoder, recorder events.EventRecorder, tnt *capsulev1beta2.Tenant, rule *api.NamespaceRuleBodyNamespace) Func
+	OnDelete(c client.Client, obj T, decoder admission.Decoder, recorder events.EventRecorder, tnt *capsulev1beta2.Tenant, rule *api.NamespaceRuleBodyNamespace) Func
 }
 
 type TypedTenantWithRulesetHandler[T client.Object] struct {
@@ -144,7 +145,7 @@ func (h *TypedTenantWithRulesetHandler[T]) resolveRuleset(
 	req admission.Request,
 	namespace string,
 	tnt *capsulev1beta2.Tenant,
-) (*capsulev1beta2.NamespaceRuleBody, error) {
+) (*api.NamespaceRuleBodyNamespace, error) {
 	rs := &capsulev1beta2.RuleStatus{}
 	key := types.NamespacedName{
 		Namespace: namespace,
@@ -152,9 +153,7 @@ func (h *TypedTenantWithRulesetHandler[T]) resolveRuleset(
 	}
 
 	if err := c.Get(ctx, key, rs); err == nil {
-		rule := rs.Status.Rule
-
-		return &rule, nil
+		return &rs.Status.Rule, nil
 	} else if !apierrors.IsNotFound(err) {
 		return nil, err
 	}
@@ -164,5 +163,5 @@ func (h *TypedTenantWithRulesetHandler[T]) resolveRuleset(
 		return nil, err
 	}
 
-	return tenant.BuildNamespaceRuleBodyForNamespace(ns, tnt)
+	return tenant.BuildNamespaceRuleBodyStatus(ctx, c, ns, tnt)
 }

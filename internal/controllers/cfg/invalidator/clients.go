@@ -31,6 +31,10 @@ func (r *CacheInvalidator) rebuildImpersonationCache(
 	}
 
 	for _, item := range gtr.Items {
+		if item.Status.ServiceAccount == nil {
+			continue
+		}
+
 		saName := item.Status.ServiceAccount.Name
 		saNamespace := item.Status.ServiceAccount.Namespace
 
@@ -65,6 +69,10 @@ func (r *CacheInvalidator) rebuildImpersonationCache(
 	}
 
 	for _, item := range ntr.Items {
+		if item.Status.ServiceAccount == nil {
+			continue
+		}
+
 		saName := item.Status.ServiceAccount.Name
 		saNamespace := item.Status.ServiceAccount.Namespace
 

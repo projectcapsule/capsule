@@ -12,6 +12,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/api"
 	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
@@ -34,7 +35,7 @@ func (h *containerRegistryLegacyHandler) OnCreate(
 	decoder admission.Decoder,
 	recorder events.EventRecorder,
 	tnt *capsulev1beta2.Tenant,
-	_ *capsulev1beta2.NamespaceRuleBody,
+	_ *api.NamespaceRuleBodyNamespace,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		return h.validate(req, pod, tnt, recorder)
@@ -48,7 +49,7 @@ func (h *containerRegistryLegacyHandler) OnUpdate(
 	decoder admission.Decoder,
 	recorder events.EventRecorder,
 	tnt *capsulev1beta2.Tenant,
-	_ *capsulev1beta2.NamespaceRuleBody,
+	_ *api.NamespaceRuleBodyNamespace,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		return h.validate(req, pod, tnt, recorder)
@@ -61,7 +62,7 @@ func (h *containerRegistryLegacyHandler) OnDelete(
 	admission.Decoder,
 	events.EventRecorder,
 	*capsulev1beta2.Tenant,
-	*capsulev1beta2.NamespaceRuleBody,
+	*api.NamespaceRuleBodyNamespace,
 ) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil

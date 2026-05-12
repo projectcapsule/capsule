@@ -28,7 +28,7 @@ type TenantStatus struct {
 	// Collected owners for this tenant
 	Owners rbac.OwnerStatusListSpec `json:"owners,omitempty"`
 	// Promoted ServiceAccounts across the Tenant
-	Promotions rbac.OwnerStatusListSpec `json:"promotions,omitempty"`
+	Promotions rbac.PromotionStatusListSpec `json:"rules,omitempty"`
 	// +kubebuilder:default=Active
 	// The operational state of the Tenant. Possible values are "Active", "Cordoned" or "Terminating".
 	State tenantState `json:"state"`
@@ -54,6 +54,18 @@ type TenantStatusNamespaceItem struct {
 	// Managed Metadata
 	//+optional
 	Enforce TenantStatusNamespaceEnforcement `json:"enforce,omitzero"`
+	// Promotions
+	Promotions rbac.PromotionStatusListSpec `json:"promotions,omitzero"`
+}
+
+// RuleStatus contains the accumulated rules applying to namespace it's deployed in.
+// +kubebuilder:object:generate=true
+type TenantStatusRuleStatusItem struct {
+	// Promotions originating from this namespace
+	Promotions rbac.OwnerStatusListSpec `json:"promotions,omitempty"`
+
+	// Target Namespaces for this rule
+	TargetNamespaces []meta.RFC1123SubdomainName `json:"namespaces,omitempty"`
 }
 
 type TenantStatusNamespaceEnforcement struct {

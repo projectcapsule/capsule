@@ -26,12 +26,12 @@ func CollectPromotions(
 	c client.Client,
 	tnt *capsulev1beta2.Tenant,
 	cfg configuration.Configuration,
-) (promotions rbac.OwnerStatusListSpec, err error) {
-	if len(tnt.Spec.Rules) == 0 || len(tnt.Status.Namespaces) == 0 {
+) (promotions rbac.PromotionStatusListSpec, err error) {
+	if len(tnt.Status.Namespaces) == 0 {
 		return nil, nil
 	}
 
-	promotions = rbac.OwnerStatusListSpec{}
+	promotions = rbac.PromotionStatusListSpec{}
 
 	promoReq, err := labels.NewRequirement(meta.ServiceAccountPromotionLabel, selection.Equals, []string{meta.ValueTrue})
 	if err != nil {
@@ -47,27 +47,30 @@ func CollectPromotions(
 
 	for _, ns := range namespaces {
 		for _, ruleset := range tnt.Spec.Rules {
+			var ruleSelector labels.Selector
+
 			if ruleset.NamespaceSelector != nil {
-				targetSel, err := metav1.LabelSelectorAsSelector(ruleset.NamespaceSelector)
+				ruleSelector, err = metav1.LabelSelectorAsSelector(ruleset.NamespaceSelector)
 				if err != nil {
 					return nil, fmt.Errorf("invalid promotion targetSelector for tenant %s: %w", tnt.Name, err)
 				}
 
-				if !targetSel.Matches(labels.Set(ns.Labels)) {
+				if !ruleSelector.Matches(labels.Set(ns.Labels)) {
 					continue
 				}
 			}
 
 			for _, promotion := range ruleset.Permissions.Promotions {
-				if promotion.TargetNamespaceSelector != nil {
-					targetSel, err := metav1.LabelSelectorAsSelector(promotion.TargetNamespaceSelector)
-					if err != nil {
-						return nil, fmt.Errorf("invalid promotion targetSelector for tenant %s: %w", tnt.Name, err)
+				var targetNamespaces []string
+
+				for _, tenantNamespace := range namespaces {
+					if ruleset.NamespaceSelector != nil {
+						if !ruleSelector.Matches(labels.Set(tenantNamespace.Labels)) {
+							continue
+						}
 					}
 
-					if !targetSel.Matches(labels.Set(ns.Labels)) {
-						continue
-					}
+					targetNamespaces = append(targetNamespaces, tenantNamespace.GetName())
 				}
 
 				combinedSel := staticSel
@@ -91,7 +94,7 @@ func CollectPromotions(
 				}
 
 				for _, sa := range saList.Items {
-					promotions.Upsert(rbac.CoreOwnerSpec{
+					promotions.Upsert(rbac.PromotionSpec{
 						UserSpec: rbac.UserSpec{
 							Kind: rbac.ServiceAccountOwner,
 							Name: users.GetServiceAccountFullName(meta.NamespacedRFC1123ObjectReferenceWithNamespace{
@@ -100,48 +103,10 @@ func CollectPromotions(
 							}),
 						},
 						ClusterRoles: promotion.ClusterRoles,
+						Targets:      targetNamespaces,
 					})
 				}
 
-			}
-		}
-	}
-
-	for _, ns := range tnt.Status.Namespaces {
-		namespace := ns
-
-		for _, rule := range tnt.Spec.Permissions.Promotions.Rules {
-			combinedSel := staticSel
-
-			if rule.Selector != nil {
-				ruleSel, err := metav1.LabelSelectorAsSelector(rule.Selector)
-				if err != nil {
-					return nil, fmt.Errorf("invalid promotion selector for tenant %s: %w", tnt.Name, err)
-				}
-
-				combinedSel = selectors.CombineSelectors(staticSel, ruleSel)
-			}
-
-			saList := &corev1.ServiceAccountList{}
-
-			if err := c.List(ctx, saList,
-				client.InNamespace(namespace),
-				client.MatchingLabelsSelector{Selector: combinedSel},
-			); err != nil {
-				return nil, err
-			}
-
-			for _, sa := range saList.Items {
-				promotions.Upsert(rbac.CoreOwnerSpec{
-					UserSpec: rbac.UserSpec{
-						Kind: rbac.ServiceAccountOwner,
-						Name: users.GetServiceAccountFullName(meta.NamespacedRFC1123ObjectReferenceWithNamespace{
-							Name:      meta.RFC1123Name(sa.Name),
-							Namespace: meta.RFC1123SubdomainName(sa.Namespace),
-						}),
-					},
-					ClusterRoles: rule.ClusterRoles,
-				})
 			}
 		}
 	}

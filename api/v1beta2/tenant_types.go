@@ -32,7 +32,7 @@ type TenantSpec struct {
 	//
 	// Read More: https://projectcapsule.dev/docs/tenants/rules/
 	//+optional
-	Rules []*NamespaceRule `json:"rules,omitzero"`
+	Rules []*api.NamespaceRuleBodyTenant `json:"rules,omitzero"`
 
 	// Specifies the owners of the Tenant.
 	// Optional

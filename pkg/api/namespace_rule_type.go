@@ -1,28 +1,27 @@
 // Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package v1beta2
+package api
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	"github.com/projectcapsule/capsule/pkg/api"
 )
 
+// For future inmplementatiosn where users might manage RuleStatus CRs tehmselves
 // +kubebuilder:object:generate=true
-type NamespaceRule struct {
-	// Enforce these properties via Rules
-	NamespaceRuleBody `json:",inline"`
-
-	// Select namespaces which are going to usese
-	NamespaceSelector *metav1.LabelSelector `json:"namespaceSelector,omitempty"`
-}
-
-// +kubebuilder:object:generate=true
-type NamespaceRuleBody struct {
+type NamespaceRuleBodyNamespace struct {
 	// Enforcement for given rule
 	//+optional
 	Enforce NamespaceRuleEnforceBody `json:"enforce,omitzero"`
+}
+
+// Rules Distributed via Tenants
+// +kubebuilder:object:generate=true
+type NamespaceRuleBodyTenant struct {
+	NamespaceRuleBodyNamespace `json:",inline"`
+
+	// Select namespaces which are going to be targeted with this rule
+	NamespaceSelector *metav1.LabelSelector `json:"namespaceSelector,omitempty"`
 
 	// Permissions for given rule
 	//+optional
@@ -33,7 +32,7 @@ type NamespaceRuleBody struct {
 type NamespaceRuleEnforceBody struct {
 	// Define registries which are allowed to be used within this tenant
 	// The rules are aggregated, since you can use Regular Expressions the match registry endpoints
-	Registries []api.OCIRegistry `json:"registries,omitempty"`
+	Registries []OCIRegistry `json:"registries,omitempty"`
 }
 
 // +kubebuilder:object:generate=true
@@ -43,6 +42,7 @@ type NamespaceRulePermissionBody struct {
 	Promotions []*NamespaceRulePromotionRule `json:"rules,omitempty"`
 }
 
+// +kubebuilder:object:generate=true
 type NamespaceRulePromotionRule struct {
 	// ClusterRoles granted to the promoted ServiceAccounts across the Tenant
 	// kubebuilder:validation:Minimum=1
@@ -51,7 +51,4 @@ type NamespaceRulePromotionRule struct {
 	// Match ServiceAccounts which are promoted which are granted these additional ClusterRoles
 	// across the Tenant
 	Selector *metav1.LabelSelector `json:"selector,omitempty"`
-
-	// Select namespaces which this promotion will apply to (in which namespaces the rbac will be created)
-	TargetNamespaceSelector *metav1.LabelSelector `json:"targetNamespaceSelector,omitempty"`
 }

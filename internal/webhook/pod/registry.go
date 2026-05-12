@@ -41,7 +41,7 @@ func (h *registryHandler) OnCreate(
 	decoder admission.Decoder,
 	recorder events.EventRecorder,
 	tnt *capsulev1beta2.Tenant,
-	rule *capsulev1beta2.NamespaceRuleBody,
+	rule *api.NamespaceRuleBodyNamespace,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		return h.validate(req, pod, tnt, recorder, rule)
@@ -55,7 +55,7 @@ func (h *registryHandler) OnUpdate(
 	decoder admission.Decoder,
 	recorder events.EventRecorder,
 	tnt *capsulev1beta2.Tenant,
-	rule *capsulev1beta2.NamespaceRuleBody,
+	rule *api.NamespaceRuleBodyNamespace,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		return h.validate(req, pod, tnt, recorder, rule)
@@ -68,7 +68,7 @@ func (h *registryHandler) OnDelete(
 	admission.Decoder,
 	events.EventRecorder,
 	*capsulev1beta2.Tenant,
-	*capsulev1beta2.NamespaceRuleBody,
+	*api.NamespaceRuleBodyNamespace,
 ) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
@@ -80,7 +80,7 @@ func (h *registryHandler) validate(
 	pod *corev1.Pod,
 	tnt *capsulev1beta2.Tenant,
 	recorder events.EventRecorder,
-	rule *capsulev1beta2.NamespaceRuleBody,
+	rule *api.NamespaceRuleBodyNamespace,
 ) *admission.Response {
 	if rule == nil || len(rule.Enforce.Registries) == 0 {
 		resp := admission.Allowed("no registry rules")

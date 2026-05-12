@@ -3,7 +3,11 @@
 
 package rbac
 
-import rbacv1 "k8s.io/api/rbac/v1"
+import (
+	rbacv1 "k8s.io/api/rbac/v1"
+
+	"github.com/projectcapsule/capsule/pkg/api/meta"
+)
 
 // +kubebuilder:object:generate=true
 
@@ -15,4 +19,11 @@ type AdditionalRoleBindingsSpec struct {
 	Labels map[string]string `json:"labels,omitempty"`
 	// Additional Annotations for the synchronized rolebindings
 	Annotations map[string]string `json:"annotations,omitempty"`
+}
+
+type AdditionalRoleBindingsWithNamespaceSpec struct {
+	AdditionalRoleBindingsSpec `json:",inline"`
+
+	// Target Namespace
+	Namespace meta.RFC1123SubdomainName `json:"namespace"`
 }

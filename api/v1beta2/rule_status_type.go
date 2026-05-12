@@ -5,6 +5,9 @@ package v1beta2
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api/meta"
 )
 
 // RuleStatus contains the accumulated rules applying to namespace it's deployed in.
@@ -12,7 +15,9 @@ import (
 type RuleStatusSpec struct {
 	// Managed Enforcement properties per Namespace (aggregated from rules)
 	//+optional
-	Rule NamespaceRuleBody `json:"rule,omitzero"`
+	Rule api.NamespaceRuleBodyNamespace `json:"rule,omitzero"`
+	// Conditions
+	Conditions meta.ConditionList `json:"conditions"`
 }
 
 // +kubebuilder:object:root=true
@@ -24,6 +29,8 @@ type RuleStatus struct {
 
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitzero"`
+
+	Spec []*api.NamespaceRuleBodyNamespace `json:"spec"`
 
 	// +optional
 	Status RuleStatusSpec `json:"status,omitzero"`

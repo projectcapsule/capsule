@@ -1,4 +1,4 @@
-// Copyright 2020-2026 Project Capsule Authors
+// Copyright 2020-2025 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package pvc
@@ -8,25 +8,25 @@ import (
 	"net/http"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
-	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
+	"github.com/projectcapsule/capsule/pkg/api/errors"
 	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
 
-type validating struct{}
+type persistentVolumeValidatingClass struct{}
 
-func Validating() handlers.TypedHandlerWithTenant[*corev1.PersistentVolumeClaim] {
-	return &validating{}
+func PersistentVolumeValidatingClass() handlers.TypedHandlerWithTenant[*corev1.PersistentVolumeClaim] {
+	return &persistentVolumeValidatingClass{}
 }
 
-func (h *validating) OnCreate(
+func (h *persistentVolumeValidatingClass) OnCreate(
 	c client.Client,
 	pvc *corev1.PersistentVolumeClaim,
 	decoder admission.Decoder,
@@ -52,7 +52,7 @@ func (h *validating) OnCreate(
 				"Requires a StorageClass",
 			)
 
-			response := admission.Denied(caperrors.NewStorageClassNotValid(*tnt.Spec.StorageClasses).Error())
+			response := admission.Denied(errors.NewStorageClassNotValid(*tnt.Spec.StorageClasses).Error())
 
 			return &response
 		}
@@ -62,7 +62,7 @@ func (h *validating) OnCreate(
 		// Verify if the StorageClass exists and matches the label selector/expression
 		if len(allowed.MatchExpressions) > 0 || len(allowed.MatchLabels) > 0 {
 			storageClassObj, err := utils.GetStorageClassByName(ctx, c, *storageClass)
-			if err != nil && !errors.IsNotFound(err) {
+			if err != nil && !apierrors.IsNotFound(err) {
 				response := admission.Errored(http.StatusInternalServerError, err)
 
 				return &response
@@ -88,14 +88,14 @@ func (h *validating) OnCreate(
 				evt.ActionValidationDenied,
 				"StorageClass %s is forbidden for the Tenant %s", *storageClass, tnt.GetName())
 
-			response := admission.Denied(caperrors.NewStorageClassForbidden(*pvc.Spec.StorageClassName, *tnt.Spec.StorageClasses).Error())
+			response := admission.Denied(errors.NewStorageClassForbidden(*pvc.Spec.StorageClassName, *tnt.Spec.StorageClasses).Error())
 
 			return &response
 		}
 	}
 }
 
-func (h *validating) OnUpdate(
+func (h *persistentVolumeValidatingClass) OnUpdate(
 	client.Client,
 	*corev1.PersistentVolumeClaim,
 	*corev1.PersistentVolumeClaim,
@@ -108,7 +108,7 @@ func (h *validating) OnUpdate(
 	}
 }
 
-func (h *validating) OnDelete(
+func (h *persistentVolumeValidatingClass) OnDelete(
 	client.Client,
 	*corev1.PersistentVolumeClaim,
 	admission.Decoder,

@@ -9,18 +9,17 @@ spec:
   owners:
   - name: alice
     kind: User
+  rules:
+    - permissions:
+        rules:
+          - clusterRoles: 
+            - "configmap-replicator"
+          - clusterRoles: 
+            - "secret-replicator"
+            selector:
+              matchLabels:
+                super: "account"
   permissions:
-    promotions:
-      rules:
-      - clusterRoles: 
-        - "configmap-replicator"
-      - clusterRoles: 
-        - "secret-replicator"
-        selector:
-          matchLabels:
-            super: "account"
-          
-
     matchOwners:
     - matchLabels:
         team: platform

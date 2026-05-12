@@ -419,6 +419,7 @@ spec:
               - v1
             operations:
               - CREATE
+              - UPDATE
             resources:
               - persistentvolumeclaims
             scope: Namespaced
@@ -891,6 +892,50 @@ spec:
         timeoutSeconds: {{ $.Values.webhooks.mutatingWebhooksTimeoutSeconds }}
         {{- end }}
       {{- end }}
+
+      {{- with .Values.webhooks.hooks.persistentvolumeclaims }}
+        {{- if .enabled }}
+          {{- $any = true }}
+      - name: pvc.projectcapsule.dev
+        {{- with .opts }}
+        opts:
+          {{- toYaml . |  nindent 10 }}
+        {{- end }}
+        admissionReviewVersions:
+          - v1
+          - v1beta1
+        path: "/persistentvolumeclaims/mutating"
+        failurePolicy: {{ .failurePolicy }}
+        matchPolicy: {{ .matchPolicy }}
+        reinvocationPolicy: {{ .reinvocationPolicy }}
+        {{- with .namespaceSelector }}
+        namespaceSelector:
+          {{- toYaml . |  nindent 10 }}
+        {{- end }}
+        {{- with .objectSelector }}
+        objectSelector:
+          {{- toYaml . |  nindent 10 }}
+        {{- end }}
+        {{- with .matchConditions }}
+        matchConditions:
+          {{- toYaml . |  nindent 10 }}
+        {{- end }}
+        rules:
+          - apiGroups:
+              - ""
+            apiVersions:
+              - v1
+            operations:
+              - CREATE
+              - UPDATE
+            resources:
+              - persistentvolumeclaims
+            scope: Namespaced
+        sideEffects: None
+        timeoutSeconds: {{ $.Values.webhooks.validatingWebhooksTimeoutSeconds }}
+        {{- end }}
+      {{- end }}
+
       {{- with (mergeOverwrite .Values.webhooks.hooks.pods .Values.webhooks.hooks.defaults.pods) }}
         {{- if .enabled }}
           {{- $any = true }}
