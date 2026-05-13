@@ -81,7 +81,7 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 
 	defer func() {
 		if uerr := r.updateStatus(ctx, instance, err); uerr != nil {
-			err = fmt.Errorf("cannot update tenant status: %w", uerr)
+			err = fmt.Errorf("cannot update status: %w", uerr)
 
 			return
 		}
@@ -105,10 +105,10 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 
 	var reconcileError error
 	if err != nil {
-		reconcileError = fmt.Errorf("tenant had errors reconciling, check tenant's status")
+		reconcileError = fmt.Errorf("had errors reconciling")
 	}
 
-	r.Log.V(4).Info("Rulestatus reconciling completed")
+	r.Log.V(4).Info("reconciling completed")
 
 	return ctrl.Result{}, reconcileError
 }
@@ -137,7 +137,7 @@ func (r Manager) reconcile(ctx context.Context, instance *capsulev1beta2.RuleSta
 func (r *Manager) updateStatus(ctx context.Context, instance *capsulev1beta2.RuleStatus, reconcileError error) error {
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
 		latest := &capsulev1beta2.RuleStatus{}
-		if err = r.Get(ctx, types.NamespacedName{Name: instance.GetName()}, latest); err != nil {
+		if err = r.Get(ctx, types.NamespacedName{Name: instance.GetName(), Namespace: instance.GetNamespace()}, latest); err != nil {
 			return err
 		}
 

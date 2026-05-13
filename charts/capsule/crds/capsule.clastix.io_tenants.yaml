@@ -2978,7 +2978,7 @@ spec:
                   - name
                   type: object
                 type: array
-              rules:
+              promotions:
                 description: Promoted ServiceAccounts across the Tenant
                 items:
                   properties:
@@ -3131,48 +3131,12 @@ spec:
                     name:
                       description: Namespace Name
                       type: string
-                    promotions:
-                      description: Promotions
-                      items:
-                        properties:
-                          clusterRoles:
-                            default:
-                            - admin
-                            - capsule-namespace-deleter
-                            description: Defines additional cluster-roles for the
-                              specific Owner.
-                            items:
-                              type: string
-                            type: array
-                          kind:
-                            description: Kind of entity. Possible values are "User",
-                              "Group", and "ServiceAccount"
-                            enum:
-                            - User
-                            - Group
-                            - ServiceAccount
-                            type: string
-                          name:
-                            description: Name of the entity.
-                            type: string
-                          targets:
-                            description: Defines additional cluster-roles for the
-                              specific Owner.
-                            items:
-                              type: string
-                            type: array
-                        required:
-                        - kind
-                        - name
-                        type: object
-                      type: array
                     uid:
                       description: Namespace UID
                       type: string
                   required:
                   - conditions
                   - name
-                  - promotions
                   type: object
                 type: array
               state:

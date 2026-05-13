@@ -66,13 +66,6 @@ func (r *Manager) ensureRuleStatus(
 
 		return controllerutil.SetControllerReference(tnt, rule, r.Scheme())
 	})
-	if err != nil {
-		return err
-	}
 
-	if err := r.Status().Update(ctx, rule); err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }

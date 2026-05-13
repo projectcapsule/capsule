@@ -41,10 +41,10 @@ var _ = Describe("enforcing a Container Registry", Label("tenant", "rules", "ima
 					},
 				},
 			},
-			Rules: []*capsulev1beta2.NamespaceRule{
+			Rules: []*api.NamespaceRuleBodyTenant{
 				{
-					NamespaceRuleBody: capsulev1beta2.NamespaceRuleBody{
-						Enforce: capsulev1beta2.NamespaceRuleEnforceBody{
+					NamespaceRuleBodyNamespace: api.NamespaceRuleBodyNamespace{
+						Enforce: api.NamespaceRuleEnforceBody{
 							Registries: []api.OCIRegistry{
 								// Global: allow any registry, but require PullPolicy Always (images+volumes)
 								{
@@ -73,8 +73,8 @@ var _ = Describe("enforcing a Container Registry", Label("tenant", "rules", "ima
 							"environment": "prod",
 						},
 					},
-					NamespaceRuleBody: capsulev1beta2.NamespaceRuleBody{
-						Enforce: capsulev1beta2.NamespaceRuleEnforceBody{
+					NamespaceRuleBodyNamespace: api.NamespaceRuleBodyNamespace{
+						Enforce: api.NamespaceRuleEnforceBody{
 							Registries: []api.OCIRegistry{
 								// Prod-only special-case
 								{
