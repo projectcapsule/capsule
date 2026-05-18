@@ -10,7 +10,6 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	schedulev1 "k8s.io/api/scheduling/v1"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
@@ -54,7 +53,9 @@ func mutatePodDefaults(ctx context.Context, req admission.Request, c client.Clie
 		return ad.ErroredResponse(err)
 	}
 
-	return ptr.To(admission.PatchResponseFromRaw(req.Object.Raw, marshaled))
+	resp := admission.PatchResponseFromRaw(req.Object.Raw, marshaled)
+
+	return &resp
 }
 
 func handleRuntimeClassDefault(allowed *api.DefaultAllowedListSpec, pod *corev1.Pod) (mutated bool) {

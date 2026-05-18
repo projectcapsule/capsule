@@ -111,8 +111,8 @@ func (h *runtimeClass) validate(
 		return nil
 	case !allowed.MatchSelectByName(class):
 		recorder.Eventf(
-			tnt,
 			pod,
+			tnt,
 			corev1.EventTypeWarning,
 			evt.ReasonForbiddenRuntimeClass,
 			evt.ActionValidationDenied,

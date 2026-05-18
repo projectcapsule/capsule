@@ -23,11 +23,17 @@ func (in *Tenant) GetRoleBindings() []rbac.AdditionalRoleBindingsSpec {
 		roleBindings = append(roleBindings, owner.ToAdditionalRolebindings()...)
 	}
 
-	//for _, promotion := range in.Status.Promotions {
-	//	roleBindings = append(roleBindings, promotion.ToAdditionalRolebindings()...)
-	//}
-
 	roleBindings = append(roleBindings, in.Spec.AdditionalRoleBindings...)
+
+	return roleBindings
+}
+
+func (in *Tenant) GetPromotionRoleBindings() []rbac.AdditionalRoleBindingsWithNamespaceSpec {
+	roleBindings := make([]rbac.AdditionalRoleBindingsWithNamespaceSpec, 0, len(in.Status.Promotions))
+
+	for _, promotion := range in.Status.Promotions {
+		roleBindings = append(roleBindings, promotion.ToAdditionalRolebindings()...)
+	}
 
 	return roleBindings
 }
@@ -58,7 +64,7 @@ func (in *Tenant) GetNamespaces() (res []string) {
 	return in.Status.Namespaces
 }
 
-// Fetch all namespaces defined in the status
+// Fetch all namespaces defined in the status.
 func (in *Tenant) GetNamespaceObjects(ctx context.Context, c client.Reader) (namespaces []corev1.Namespace, err error) {
 	nsList := &corev1.NamespaceList{}
 

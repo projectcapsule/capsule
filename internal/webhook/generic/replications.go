@@ -79,11 +79,17 @@ func (h *replicaHandler) handler(ctx context.Context, c client.Reader, req admis
 	}
 
 	if len(global.Items) > 0 {
-		if isAllowedServiceAccount(req.UserInfo.Username, global.Items[0].Status.ServiceAccount) {
-			return nil
+		for i := range global.Items {
+			if isAllowedServiceAccount(req.UserInfo.Username, global.Items[i].Status.ServiceAccount) {
+				return nil
+			}
 		}
 
-		resp := admission.Denied(fmt.Sprintf("resource %s is managed by a global capsule replication '%s'", req.Name, global.Items[0].GetName()))
+		resp := admission.Denied(fmt.Sprintf(
+			"resource %s is managed by a global capsule replication %s",
+			req.Name,
+			global.Items[0].GetName(),
+		))
 
 		return &resp
 	}
@@ -100,8 +106,10 @@ func (h *replicaHandler) handler(ctx context.Context, c client.Reader, req admis
 	}
 
 	if len(local.Items) > 0 {
-		if isAllowedServiceAccount(req.UserInfo.Username, local.Items[0].Status.ServiceAccount) {
-			return nil
+		for i := range global.Items {
+			if isAllowedServiceAccount(req.UserInfo.Username, local.Items[i].Status.ServiceAccount) {
+				return nil
+			}
 		}
 
 		resp := admission.Denied(fmt.Sprintf("resource %s is managed by a tenant capsule replication %s/%s", req.Name, local.Items[0].GetName(), local.Items[0].GetNamespace()))

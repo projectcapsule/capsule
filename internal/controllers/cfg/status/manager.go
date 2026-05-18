@@ -121,7 +121,7 @@ func (r *Manager) Reconcile(ctx context.Context, request reconcile.Request) (res
 	instance := &capsulev1beta2.CapsuleConfiguration{}
 	if err = r.Get(ctx, request.NamespacedName, instance); err != nil {
 		if apierrors.IsNotFound(err) {
-			log.V(3).Info("requested object not found, could have been deleted after reconcile request")
+			log.V(5).Info("requested object not found, could have been deleted after reconcile request")
 
 			return reconcile.Result{}, nil
 		}

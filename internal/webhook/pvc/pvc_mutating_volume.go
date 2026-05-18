@@ -103,6 +103,7 @@ func (h persistentVolumeMutatingVolume) OnDelete(
 		return nil
 	}
 }
+
 func addTenantSelectorExpression(
 	selector *metav1.LabelSelector,
 	tenantName string,
@@ -122,6 +123,7 @@ func addTenantSelectorExpression(
 
 	// Remove any existing tenant expression, regardless of operator or value.
 	matchExpressions := make([]metav1.LabelSelectorRequirement, 0, len(selector.MatchExpressions))
+
 	for _, expression := range selector.MatchExpressions {
 		if expression.Key == meta.TenantLabel {
 			continue
@@ -130,11 +132,13 @@ func addTenantSelectorExpression(
 		matchExpressions = append(matchExpressions, expression)
 	}
 
-	selector.MatchExpressions = append(matchExpressions, metav1.LabelSelectorRequirement{
+	matchExpressions = append(matchExpressions, metav1.LabelSelectorRequirement{
 		Key:      meta.TenantLabel,
 		Operator: metav1.LabelSelectorOpIn,
 		Values:   []string{tenantName},
 	})
+
+	selector.MatchExpressions = matchExpressions
 
 	return selector
 }

@@ -17,6 +17,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
+	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 	"github.com/projectcapsule/capsule/pkg/tenant"
 	"github.com/projectcapsule/capsule/pkg/users"
@@ -81,6 +82,7 @@ func (h *handler) OnDelete(c client.Client, decoder admission.Decoder, recorder 
 	}
 }
 
+//nolint:gocognit
 func (h *handler) OnUpdate(c client.Client, decoder admission.Decoder, recorder events.EventRecorder) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		userIsAdmin := users.IsAdminUser(req, h.cfg.Administrators())
@@ -99,13 +101,32 @@ func (h *handler) OnUpdate(c client.Client, decoder admission.Decoder, recorder 
 			return ad.ErroredResponse(err)
 		}
 
+		oldHasTenantReference := hasTenantReference(oldNs)
+		newHasTenantReference := hasTenantReference(ns)
+
+		if !userIsAdmin {
+			if !oldHasTenantReference && newHasTenantReference {
+				response := admission.Denied("namespace can not be patched into a tenant")
+
+				return &response
+			}
+
+			if oldHasTenantReference && !newHasTenantReference {
+				response := admission.Denied("namespace can not remove tenant ownership")
+
+				return &response
+			}
+
+			if !oldHasTenantReference && !newHasTenantReference {
+				response := admission.Denied("namespace patch denied")
+
+				return &response
+			}
+		}
+
 		oldTenant, err := h.verifyReference(ctx, c, oldNs)
 		if err != nil {
 			return ad.ErroredResponse(err)
-		}
-
-		if oldTenant == nil {
-			return nil
 		}
 
 		newTenant, err := h.verifyReference(ctx, c, ns)
@@ -113,10 +134,49 @@ func (h *handler) OnUpdate(c client.Client, decoder admission.Decoder, recorder 
 			return ad.ErroredResponse(err)
 		}
 
-		if newTenant.GetName() != oldTenant.GetName() && newTenant.GetUID() != oldTenant.GetUID() {
-			err := fmt.Errorf("namespace can not be migrated between tenants")
+		if !userIsAdmin {
+			if oldTenant == nil || newTenant == nil {
+				response := admission.Denied("namespace tenant ownership is incomplete")
 
-			return ad.ErroredResponse(err)
+				return &response
+			}
+
+			if newTenant.GetName() != oldTenant.GetName() || newTenant.GetUID() != oldTenant.GetUID() {
+				response := admission.Denied("namespace can not be migrated between tenants")
+
+				return &response
+			}
+		}
+
+		if userIsAdmin {
+			if newTenant == nil {
+				return nil
+			}
+
+			for _, hndl := range h.handlers {
+				if response := hndl.OnUpdate(c, ns, oldNs, decoder, recorder, newTenant)(ctx, req); response != nil {
+					return response
+				}
+			}
+
+			return nil
+		}
+
+		// Disallow owned patches
+		if owned := tenant.NamespaceIsOwned(ctx, c, h.cfg, oldNs, oldTenant, req.UserInfo); !owned {
+			recorder.Eventf(
+				oldNs,
+				oldTenant,
+				corev1.EventTypeWarning,
+				"NamespacePatch",
+				evt.ActionValidationDenied,
+				"Namespace %s can not be patched",
+				oldNs.GetName(),
+			)
+
+			response := admission.Denied("denied patch request for this namespace")
+
+			return &response
 		}
 
 		if terminating := h.rejectOnTermination(
@@ -162,6 +222,21 @@ func (h *handler) verifyReference(
 	}
 
 	return tenantByOwnerreference, nil
+}
+
+func hasTenantReference(ns *corev1.Namespace) bool {
+	if ns.Labels != nil && ns.Labels[meta.TenantLabel] != "" {
+		return true
+	}
+
+	//nolint:modernize
+	for _, ref := range ns.OwnerReferences {
+		if tenant.IsTenantOwnerReference(ref) {
+			return true
+		}
+	}
+
+	return false
 }
 
 func (h *handler) rejectOnTermination(

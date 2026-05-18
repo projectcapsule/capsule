@@ -11,6 +11,7 @@ import (
 
 	authenticationv1 "k8s.io/api/authentication/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -81,6 +82,10 @@ func GetTenantNameByNamespace(
 ) (tnt string, err error) {
 	var ns corev1.Namespace
 	if err := c.Get(ctx, client.ObjectKey{Name: namespace}, &ns); err != nil {
+		if apierrors.IsNotFound(err) {
+			return "", nil
+		}
+
 		return "", err
 	}
 
@@ -99,6 +104,10 @@ func GetTenantByNamespace(
 ) (*capsulev1beta2.Tenant, error) {
 	var ns corev1.Namespace
 	if err := r.Get(ctx, client.ObjectKey{Name: namespace}, &ns); err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil, nil
+		}
+
 		return nil, err
 	}
 
@@ -109,6 +118,10 @@ func GetTenantByNamespace(
 
 		tnt := &capsulev1beta2.Tenant{}
 		if err := r.Get(ctx, client.ObjectKey{Name: or.Name}, tnt); err != nil {
+			if apierrors.IsNotFound(err) {
+				return nil, nil
+			}
+
 			return nil, err
 		}
 

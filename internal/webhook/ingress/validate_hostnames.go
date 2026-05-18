@@ -54,14 +54,14 @@ func (r *hostnames) validate(ctx context.Context, client client.Client, req admi
 		return ad.ErroredResponse(err)
 	}
 
-	var tenant *capsulev1beta2.Tenant
+	var tnt *capsulev1beta2.Tenant
 
-	tenant, err = TenantFromIngress(ctx, client, ingress)
+	tnt, err = TenantFromIngress(ctx, client, ingress)
 	if err != nil {
 		return ad.ErroredResponse(err)
 	}
 
-	if tenant == nil || tenant.Spec.IngressOptions.AllowedHostnames == nil {
+	if tnt == nil || tnt.Spec.IngressOptions.AllowedHostnames == nil {
 		return nil
 	}
 
@@ -69,21 +69,21 @@ func (r *hostnames) validate(ctx context.Context, client client.Client, req admi
 
 	for hostname := range ingress.HostnamePathsPairs() {
 		if len(hostname) == 0 {
-			recorder.Eventf(tenant, nil, corev1.EventTypeWarning, evt.ReasonIngressHostnameEmpty, evt.ActionValidationDenied, "Ingress %s/%s hostname is empty", ingress.Namespace(), ingress.Name())
+			recorder.Eventf(ingress.GetClientObject(), tnt, corev1.EventTypeWarning, evt.ReasonIngressHostnameEmpty, evt.ActionValidationDenied, "Ingress %s/%s hostname is empty", ingress.Namespace(), ingress.Name())
 
-			return ad.ErroredResponse(caperrors.NewEmptyIngressHostname(*tenant.Spec.IngressOptions.AllowedHostnames))
+			return ad.ErroredResponse(caperrors.NewEmptyIngressHostname(*tnt.Spec.IngressOptions.AllowedHostnames))
 		}
 
 		hostnameList.Insert(hostname)
 	}
 
-	if err = r.validateHostnames(*tenant, hostnameList); err == nil {
+	if err = r.validateHostnames(*tnt, hostnameList); err == nil {
 		return nil
 	}
 
 	var hostnameNotValidErr *caperrors.IngressHostnameNotValidError
 	if errors.As(err, &hostnameNotValidErr) {
-		recorder.Eventf(tenant, nil, corev1.EventTypeWarning, evt.ReasonIngressHostnameNotValid, evt.ActionValidationDenied, "Ingress %s/%s hostname is not valid", ingress.Namespace(), ingress.Name())
+		recorder.Eventf(ingress.GetClientObject(), tnt, corev1.EventTypeWarning, evt.ReasonIngressHostnameNotValid, evt.ActionValidationDenied, "Ingress %s/%s hostname is not valid", ingress.Namespace(), ingress.Name())
 
 		response := admission.Denied(err.Error())
 

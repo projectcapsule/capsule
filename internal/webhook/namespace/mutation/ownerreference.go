@@ -21,6 +21,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
+	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 	"github.com/projectcapsule/capsule/pkg/tenant"
 )
@@ -53,7 +54,7 @@ func (h *ownerReferenceHandler) OnCreate(c client.Client, ns *corev1.Namespace, 
 		tenant.AddTenantNameLabel(labels, tnt)
 		ns.SetLabels(labels)
 
-		if err := assignToTenant(c, tnt, ns); err != nil {
+		if err := assignToTenant(c, tnt, ns, recorder); err != nil {
 			return ad.ErroredResponse(err)
 		}
 
@@ -76,7 +77,7 @@ func (h *ownerReferenceHandler) OnDelete(client.Client, *corev1.Namespace, admis
 	}
 }
 
-func (h *ownerReferenceHandler) OnUpdate(c client.Client, newNs *corev1.Namespace, oldNs *corev1.Namespace, decoder admission.Decoder, _ events.EventRecorder) handlers.Func {
+func (h *ownerReferenceHandler) OnUpdate(c client.Client, newNs *corev1.Namespace, oldNs *corev1.Namespace, decoder admission.Decoder, recorder events.EventRecorder) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		tnt, err := resolveTenantForNamespaceUpdate(ctx, c, h.cfg, oldNs, newNs, req.UserInfo)
 		if err != nil {
@@ -87,7 +88,7 @@ func (h *ownerReferenceHandler) OnUpdate(c client.Client, newNs *corev1.Namespac
 			return nil
 		}
 
-		if err := assignToTenant(c, tnt, oldNs); err != nil {
+		if err := assignToTenant(c, tnt, oldNs, recorder); err != nil {
 			return ad.ErroredResponse(err)
 		}
 
@@ -154,6 +155,7 @@ func assignToTenant(
 	c client.Client,
 	tnt *capsulev1beta2.Tenant,
 	ns *corev1.Namespace,
+	recorder events.EventRecorder,
 ) error {
 	has, err := controllerutil.HasOwnerReference(ns.OwnerReferences, tnt, c.Scheme())
 	if err != nil {
@@ -164,5 +166,15 @@ func assignToTenant(
 		return nil
 	}
 
-	return controllerutil.SetOwnerReference(tnt, ns, c.Scheme())
+	tnt.SetGroupVersionKind(capsulev1beta2.GroupVersion.WithKind("Tenant"))
+
+	if err := controllerutil.SetOwnerReference(tnt, ns, c.Scheme()); err != nil {
+		recorder.Eventf(ns, tnt, corev1.EventTypeWarning, evt.ReasonNamespaceHijack, evt.ActionValidationDenied, "Namespace %s cannot be assigned to the desired tenant %s", ns.GetName(), tnt.GetName())
+
+		return err
+	}
+
+	recorder.Eventf(ns, tnt, corev1.EventTypeNormal, evt.ReasonTenantAssigned, evt.ActionMutated, "Namespace %s has been assigned to the desired tenant %s", ns.GetName(), tnt.GetName())
+
+	return nil
 }

@@ -25,6 +25,7 @@ func updateStatusAndEmitEvent(
 	c client.Client,
 	recorder events.EventRecorder,
 	claim *capsulev1beta2.ResourcePoolClaim,
+	pool *capsulev1beta2.ResourcePool,
 	condition meta.Condition,
 ) (err error) {
 	updated := claim.Status.Conditions.UpdateConditionByTypeWithStatus(condition)
@@ -54,7 +55,7 @@ func updateStatusAndEmitEvent(
 
 	recorder.Eventf(
 		claim,
-		claim,
+		pool,
 		eventType,
 		condition.Reason,
 		evt.ActionReconciled,

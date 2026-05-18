@@ -59,24 +59,24 @@ func (r *collision) validate(ctx context.Context, client client.Client, req admi
 		return ad.ErroredResponse(err)
 	}
 
-	var tenant *capsulev1beta2.Tenant
+	var tnt *capsulev1beta2.Tenant
 
-	tenant, err = TenantFromIngress(ctx, client, ing)
+	tnt, err = TenantFromIngress(ctx, client, ing)
 	if err != nil {
 		return ad.ErroredResponse(err)
 	}
 
-	if tenant == nil || tenant.Spec.IngressOptions.HostnameCollisionScope == api.HostnameCollisionScopeDisabled {
+	if tnt == nil || tnt.Spec.IngressOptions.HostnameCollisionScope == api.HostnameCollisionScopeDisabled {
 		return nil
 	}
 
-	if err = r.validateCollision(ctx, client, ing, tenant.Spec.IngressOptions.HostnameCollisionScope); err == nil {
+	if err = r.validateCollision(ctx, client, ing, tnt.Spec.IngressOptions.HostnameCollisionScope); err == nil {
 		return nil
 	}
 
 	var collisionErr *caperrors.IngressHostnameCollisionError
 	if errors.As(err, &collisionErr) {
-		recorder.Eventf(tenant, nil, corev1.EventTypeWarning, evt.ReasonIngressHostnameCollision, evt.ActionValidationDenied, "Ingress %s/%s hostname is colliding", ing.Namespace(), ing.Name())
+		recorder.Eventf(ing.GetClientObject(), tnt, corev1.EventTypeWarning, evt.ReasonIngressHostnameCollision, evt.ActionValidationDenied, "Ingress %s/%s hostname is colliding", ing.Namespace(), ing.Name())
 	}
 
 	response := admission.Denied(err.Error())

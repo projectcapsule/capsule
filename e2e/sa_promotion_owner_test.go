@@ -22,7 +22,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api/rbac"
 )
 
-var _ = Describe("Promoting ServiceAccounts to Owners", Label("config"), Label("promotion"), func() {
+var _ = Describe("Promoting ServiceAccounts to Owners", Label("config", "permissions", "owners", "promotion"), func() {
 	originConfig := &capsulev1beta2.CapsuleConfiguration{}
 
 	tnt := &capsulev1beta2.Tenant{

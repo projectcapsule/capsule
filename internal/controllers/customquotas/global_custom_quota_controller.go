@@ -114,7 +114,7 @@ func (r *clusterCustomQuotaClaimController) Reconcile(ctx context.Context, reque
 	instance := &capsulev1beta2.GlobalCustomQuota{}
 	if err := r.Get(ctx, request.NamespacedName, instance); err != nil {
 		if apierrors.IsNotFound(err) {
-			log.V(3).Info("Request object not found, could have been deleted after reconcile request")
+			log.V(5).Info("Request object not found, could have been deleted after reconcile request")
 			r.metrics.DeleteAllMetricsForGlobalCustomQuota(request.Name)
 
 			return reconcile.Result{}, nil
@@ -290,7 +290,7 @@ func (r *clusterCustomQuotaClaimController) reconcile(
 			itemsByGVK[gvk] = items
 		}
 
-		log.V(3).Info("listed resources for target",
+		log.V(5).Info("listed resources for target",
 			"gvk", gvk.String(),
 			"count", len(items),
 			"namespaces", namespaces,

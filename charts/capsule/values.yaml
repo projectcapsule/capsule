@@ -87,8 +87,6 @@ crds:
   # -- Create Diagnostic Dashboards even if CRDs are exclusive
   createDiagnostics: false
 
-
-
 # Secret Options
 tls:
   # -- Start the Capsule controller that injects the CA into mutating and validating webhooks, and CRD as well.
@@ -681,8 +679,7 @@ webhooks:
       # -- Enable the Hook
       enabled: true
       # -- Capsule Hook Options
-      opts:
-        capsuleUsers: true
+      opts: {}
       # -- [FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy)
       failurePolicy: Fail
       # -- [MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
@@ -891,7 +888,7 @@ webhooks:
       # -- [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector)
       objectSelector:
         matchExpressions:
-          - key:  projectcapsule.dev/managed-by
+          - key: projectcapsule.dev/managed-by
             operator: In
             values:
               - "controller"
@@ -928,7 +925,7 @@ webhooks:
       # -- [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector)
       objectSelector:
         matchExpressions:
-          - key:  projectcapsule.dev/created-by
+          - key: projectcapsule.dev/created-by
             operator: In
             values:
               - "replications"

@@ -252,12 +252,24 @@ dev-setup-capsule: dev-setup-fluxcd
 
 dev-setup-capsule-example: dev-setup-fluxcd
 	@$(KUBECTL) kustomize --load-restrictor='LoadRestrictionsNone' hack/distro/capsule/example-setup | envsubst | kubectl apply -f -
+	@$(KUBECTL) create ns wind-uat --as joe --as-group projectcapsule.dev || true
+	@$(KUBECTL) label ns wind-uat env=test
 	@$(KUBECTL) create ns wind-test --as joe --as-group projectcapsule.dev || true
+	@$(KUBECTL) label ns wind-test env=test
 	@$(KUBECTL) create ns wind-prod --as joe --as-group projectcapsule.dev || true
+	@$(KUBECTL) label ns wind-prod env=prod
+	@$(KUBECTL) create ns green-uat --as bob --as-group projectcapsule.dev || true
+	@$(KUBECTL) label ns green-uat env=test
 	@$(KUBECTL) create ns green-test --as bob --as-group projectcapsule.dev || true
+	@$(KUBECTL) label ns green-test env=test
 	@$(KUBECTL) create ns green-prod --as bob --as-group projectcapsule.dev || true
+	@$(KUBECTL) label ns green-prod env=prod
+	@$(KUBECTL) create ns solar-uat --as alice --as-group projectcapsule.dev || true
+	@$(KUBECTL) label ns solar-uat env=test
 	@$(KUBECTL) create ns solar-test --as alice --as-group projectcapsule.dev || true
+	@$(KUBECTL) label ns solar-test env=test
 	@$(KUBECTL) create ns solar-prod --as alice --as-group projectcapsule.dev || true
+	@$(KUBECTL) label ns solar-prod env=prod
 	@$(KUBECTL) apply -f hack/distro/capsule/example-setup/claims.yaml
 
 
@@ -267,10 +279,12 @@ wait-for-helmreleases:
 	  sleep 5; \
 	done
 
+####################
+# -- Enterprise Release
+####################
 
-ENTERPRISE_VERSION  ?= "0.13.0-rc.2"
+ENTERPRISE_VERSION  ?= "dirty"
 ENTERPRISE_REGISTRY ?= "registry.projectcapsule.dev"
-
 
 enterprise-release:
 	mkdir -p ./builds
@@ -300,8 +314,6 @@ deploy-enterprise:
 	@echo "  --reuse-values \\"
 	@echo "  --set manager.image.registry=$(ENTERPRISE_REGISTRY) \\"
 	@echo "  --set manager.image.repository=enterprise/capsule \\"
-	@echo "  --set manager.image.tag=v$(ENTERPRISE_VERSION) \\"
-	@echo "  --set manager.image.pullPolicy=Always \\"
 	@echo "  --set 'serviceAccount.imagePullSecrets={capsule-enterprise}'"
 	@echo ""
 
@@ -621,7 +633,7 @@ nwa:
 	$(call go-install-tool,$(NWA),github.com/$(NWA_LOOKUP)@$(NWA_VERSION))
 
 GOLANGCI_LINT          := $(LOCALBIN)/golangci-lint
-GOLANGCI_LINT_VERSION  := v2.8.0
+GOLANGCI_LINT_VERSION  := v2.12.2
 GOLANGCI_LINT_LOOKUP   := golangci/golangci-lint
 golangci-lint: ## Download golangci-lint locally if necessary.
 	@test -s $(GOLANGCI_LINT) && $(GOLANGCI_LINT) -h | grep -q $(GOLANGCI_LINT_VERSION) || \

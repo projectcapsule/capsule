@@ -5,27 +5,27 @@ package rbac
 
 import (
 	"sort"
+	"strings"
 )
 
 // +kubebuilder:object:generate=true
 
 type PromotionStatusListSpec []PromotionSpec
 
-func (o *PromotionStatusListSpec) Upsert(
-	newPromotion PromotionSpec,
-) {
+func (o *PromotionStatusListSpec) Upsert(newPromotion PromotionSpec) {
+	newPromotion.ClusterRoles = mergeSortedStrings(nil, newPromotion.ClusterRoles)
+	newPromotion.Targets = mergeSortedStrings(nil, newPromotion.Targets)
+
 	promotions := *o
 
-	sort.Sort(GetPromotionByKindAndName(promotions))
+	for i := range promotions {
+		if !samePromotionIdentity(promotions[i], newPromotion) {
+			continue
+		}
 
-	idx := sort.Search(len(promotions), func(i int) bool {
-		return !promotionLess(promotions[i], newPromotion)
-	})
+		promotions[i].ClusterRoles = mergeSortedStrings(promotions[i].ClusterRoles, newPromotion.ClusterRoles)
 
-	if idx < len(promotions) && promotionEqual(promotions[idx], newPromotion) {
-		existing := &promotions[idx]
-
-		sort.Strings(existing.ClusterRoles)
+		sort.Sort(GetPromotionByKindNameAndTargets(promotions))
 
 		*o = promotions
 
@@ -33,76 +33,49 @@ func (o *PromotionStatusListSpec) Upsert(
 	}
 
 	promotions = append(promotions, newPromotion)
-	sort.Sort(GetPromotionByKindAndName(promotions))
+	sort.Sort(GetPromotionByKindNameAndTargets(promotions))
 
 	*o = promotions
 }
 
-func (o PromotionStatusListSpec) IsOwner(name string, groups []string) bool {
-	var groupSet map[string]struct{}
-
-	if len(groups) > 0 {
-		groupSet = make(map[string]struct{}, len(groups))
-
-		for _, group := range groups {
-			groupSet[group] = struct{}{}
-		}
-	}
-
-	for _, owner := range o {
-		switch owner.Kind {
-		case UserOwner, ServiceAccountOwner:
-			if owner.Name == name {
-				return true
-			}
-
-		case GroupOwner:
-			if groupSet == nil {
-				continue
-			}
-
-			if _, ok := groupSet[owner.Name]; ok {
-				return true
-			}
-		}
-	}
-
-	return false
-}
-
-//nolint:dupl
 func (o PromotionStatusListSpec) FindUser(name string, kind OwnerKind) (PromotionSpec, bool) {
-	sort.Sort(GetPromotionByKindAndName(o))
-
-	target := PromotionSpec{
+	result := PromotionSpec{
 		UserSpec: UserSpec{
 			Name: name,
 			Kind: kind,
 		},
 	}
 
-	idx := sort.Search(len(o), func(i int) bool {
-		return !promotionLess(o[i], target)
-	})
+	found := false
 
-	if idx < len(o) && promotionEqual(o[idx], target) {
-		return o[idx], true
+	for _, promotion := range o {
+		if promotion.Name != name || promotion.Kind != kind {
+			continue
+		}
+
+		found = true
+		result.ClusterRoles = mergeSortedStrings(result.ClusterRoles, promotion.ClusterRoles)
+		result.Targets = mergeSortedStrings(result.Targets, promotion.Targets)
 	}
 
-	return PromotionSpec{}, false
+	if !found {
+		return PromotionSpec{}, false
+	}
+
+	return result, true
 }
 
-type GetPromotionByKindAndName PromotionStatusListSpec
+type GetPromotionByKindNameAndTargets PromotionStatusListSpec
 
-func (b GetPromotionByKindAndName) Len() int {
+func (b GetPromotionByKindNameAndTargets) Len() int {
 	return len(b)
 }
 
-func (b GetPromotionByKindAndName) Less(i, j int) bool {
+func (b GetPromotionByKindNameAndTargets) Less(i, j int) bool {
 	return promotionLess(b[i], b[j])
 }
 
-func (b GetPromotionByKindAndName) Swap(i, j int) {
+func (b GetPromotionByKindNameAndTargets) Swap(i, j int) {
 	b[i], b[j] = b[j], b[i]
 }
 
@@ -111,11 +84,33 @@ func promotionLess(a, b PromotionSpec) bool {
 		return a.Kind.String() < b.Kind.String()
 	}
 
-	return a.Name < b.Name
+	if a.Name != b.Name {
+		return a.Name < b.Name
+	}
+
+	return stringSliceKey(a.Targets) < stringSliceKey(b.Targets)
 }
 
-func promotionEqual(a, b PromotionSpec) bool {
-	return !promotionLess(a, b) && !promotionLess(b, a)
+func samePromotionIdentity(a, b PromotionSpec) bool {
+	return a.Kind == b.Kind &&
+		a.Name == b.Name &&
+		stringSliceKey(a.Targets) == stringSliceKey(b.Targets)
+}
+
+func stringSliceKey(values []string) string {
+	sorted := mergeSortedStrings(nil, values)
+
+	var key strings.Builder
+
+	for i, value := range sorted {
+		if i > 0 {
+			key.WriteString("\x00")
+		}
+
+		key.WriteString(value)
+	}
+
+	return key.String()
 }
 
 func mergeSortedStrings(existing []string, incoming []string) []string {

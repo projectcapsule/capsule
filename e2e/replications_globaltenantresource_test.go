@@ -22,6 +22,7 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api/meta"
 	apimeta "github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/api/rbac"
 	"github.com/projectcapsule/capsule/pkg/template"
@@ -391,7 +392,7 @@ var _ = Describe("GlobalTenantResource", Label("replications", "global", "global
 						Namespace: ns,
 					}, cm)).To(Succeed())
 					g.Expect(cm.Data).To(HaveKeyWithValue("owner", "first"))
-					g.Expect(cm.Labels).To(HaveKeyWithValue(managedByLabel, resourcesLabel))
+					g.Expect(cm.Labels).To(HaveKeyWithValue(managedByLabel, meta.ValueControllerReplications))
 				}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 			}
 		})
@@ -721,7 +722,7 @@ data:
 					g.Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "gtr-adopt-me-enabled", Namespace: ns}, cm)).To(Succeed())
 					g.Expect(cm.Data).To(HaveKeyWithValue("mode", "adopted"))
 					g.Expect(cm.Data).To(HaveKeyWithValue("foo", "bar"))
-					g.Expect(cm.Labels).To(HaveKeyWithValue(managedByLabel, resourcesLabel))
+					g.Expect(cm.Labels).To(HaveKeyWithValue(managedByLabel, meta.ValueControllerReplications))
 				}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 			}
 		})
@@ -1082,7 +1083,7 @@ kind: ConfigMap
 metadata:
   name: gtr-shared-merge
 data:
-  generated-{{ namespace }}: "true"
+  generated-{{ .namespace.metadata.name }}: "true"
 `,
 							}},
 						}},
@@ -1099,6 +1100,7 @@ data:
 				})
 			}
 		})
+
 	})
 
 	Context("context loading", func() {

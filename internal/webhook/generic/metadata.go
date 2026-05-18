@@ -7,6 +7,7 @@ import (
 	"context"
 
 	admissionv1 "k8s.io/api/admission/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -55,6 +56,10 @@ func (r *tenantAssignmentHandler) handle(ctx context.Context, c client.Client, d
 
 	tnt, err := tenant.GetTenantNameByNamespace(ctx, c, req.Namespace)
 	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
+
 		return ad.ErroredResponse(err)
 	}
 

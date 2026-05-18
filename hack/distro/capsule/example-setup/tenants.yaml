@@ -5,20 +5,35 @@ metadata:
   name: solar
   labels:
     customer: a
-spec:  
+spec:
   owners:
   - name: alice
     kind: User
   rules:
     - permissions:
         rules:
-          - clusterRoles: 
+          - clusterRoles:
             - "configmap-replicator"
-          - clusterRoles: 
+    - namespaceSelector:
+        matchExpressions:
+          - key: env
+            operator: In
+            values:
+              - "test"
+      permissions:
+        rules:
+          - clusterRoles:
             - "secret-replicator"
-            selector:
-              matchLabels:
-                super: "account"
+    - namespaceSelector:
+        matchExpressions:
+          - key: env
+            operator: In
+            values:
+              - "prod"
+      permissions:
+        rules:
+          - clusterRoles:
+            - "sade-boi"
   permissions:
     matchOwners:
     - matchLabels:
@@ -73,23 +88,29 @@ spec:
     - apiGroup: rbac.authorization.k8s.io
       kind: User
       name: alice
-  #rules:
-  #  - enforce:
-  #      registries:
-  #      - url: "harbor/.*"
-  #        policy:
-  #        - "Never"
-  #  - namespaceSelector:
-  #      matchExpressions:
-  #        - key: env
-  #          operator: In
-  #          values:
-  #          - "prod"
-  #    enforce:
-  #      registries:
-  #      - url: "harbor/v2/customer-registry/prod-image/.*"
-  #        policy:
-  #        - "Always"
+  rules:
+    - enforce:
+        registries:
+        - url: "harbor/.*"
+          policy:
+          - "Never"
+    - enforce:
+        registries:
+        - url: "custom/.*"
+          policy:
+          - "Never"
+
+    - namespaceSelector:
+        matchExpressions:
+          - key: env
+            operator: In
+            values:
+            - "prod"
+      enforce:
+        registries:
+        - url: "harbor/v2/customer-registry/prod-image/.*"
+          policy:
+          - "Always"
 ---
 apiVersion: capsule.clastix.io/v1beta2
 kind: Tenant
@@ -105,7 +126,6 @@ spec:
   owners:
   - name: joe
     kind: User
-
   additionalRoleBindings:
   - clusterRoleName: 'view'
     subjects:

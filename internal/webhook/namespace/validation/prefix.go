@@ -62,8 +62,8 @@ func (h *prefixHandler) OnCreate(
 		expectedPrefix := tnt.GetName() + "-"
 		if !strings.HasPrefix(ns.GetName(), expectedPrefix) {
 			recorder.Eventf(
-				tnt,
 				ns,
+				tnt,
 				corev1.EventTypeWarning,
 				evt.ReasonInvalidTenantPrefix,
 				evt.ActionValidationDenied,

@@ -6,6 +6,7 @@ package tenant
 import (
 	"context"
 	"fmt"
+	"slices"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -45,45 +46,47 @@ func CollectPromotions(
 		return nil, err
 	}
 
-	for _, ns := range namespaces {
-		for _, ruleset := range tnt.Spec.Rules {
-			var ruleSelector labels.Selector
+	for _, ruleset := range tnt.Spec.Rules {
+		var namespaceSelector labels.Selector
 
-			if ruleset.NamespaceSelector != nil {
-				ruleSelector, err = metav1.LabelSelectorAsSelector(ruleset.NamespaceSelector)
-				if err != nil {
-					return nil, fmt.Errorf("invalid promotion targetSelector for tenant %s: %w", tnt.Name, err)
-				}
+		if ruleset.NamespaceSelector != nil {
+			namespaceSelector, err = metav1.LabelSelectorAsSelector(ruleset.NamespaceSelector)
+			if err != nil {
+				return nil, fmt.Errorf("invalid promotion namespaceSelector for tenant %s: %w", tnt.Name, err)
+			}
+		}
 
-				if !ruleSelector.Matches(labels.Set(ns.Labels)) {
-					continue
-				}
+		var (
+			matchingNamespaces []corev1.Namespace
+			targetNamespaces   []string
+		)
+
+		for _, ns := range namespaces {
+			if namespaceSelector != nil && !namespaceSelector.Matches(labels.Set(ns.Labels)) {
+				continue
 			}
 
-			for _, promotion := range ruleset.Permissions.Promotions {
-				var targetNamespaces []string
+			matchingNamespaces = append(matchingNamespaces, ns)
+			targetNamespaces = append(targetNamespaces, ns.GetName())
+		}
 
-				for _, tenantNamespace := range namespaces {
-					if ruleset.NamespaceSelector != nil {
-						if !ruleSelector.Matches(labels.Set(tenantNamespace.Labels)) {
-							continue
-						}
-					}
+		if len(matchingNamespaces) == 0 {
+			continue
+		}
 
-					targetNamespaces = append(targetNamespaces, tenantNamespace.GetName())
+		for _, promotion := range ruleset.Permissions.Promotions {
+			combinedSel := staticSel
+
+			if promotion.Selector != nil {
+				ruleSel, err := metav1.LabelSelectorAsSelector(promotion.Selector)
+				if err != nil {
+					return nil, fmt.Errorf("invalid promotion selector for tenant %s: %w", tnt.Name, err)
 				}
 
-				combinedSel := staticSel
+				combinedSel = selectors.CombineSelectors(staticSel, ruleSel)
+			}
 
-				if promotion.Selector != nil {
-					ruleSel, err := metav1.LabelSelectorAsSelector(promotion.Selector)
-					if err != nil {
-						return nil, fmt.Errorf("invalid promotion selector for tenant %s: %w", tnt.Name, err)
-					}
-
-					combinedSel = selectors.CombineSelectors(staticSel, ruleSel)
-				}
-
+			for _, ns := range matchingNamespaces {
 				saList := &corev1.ServiceAccountList{}
 
 				if err := c.List(ctx, saList,
@@ -94,6 +97,8 @@ func CollectPromotions(
 				}
 
 				for _, sa := range saList.Items {
+					targets := appendTargetNamespace(targetNamespaces, sa.Namespace)
+
 					promotions.Upsert(rbac.PromotionSpec{
 						UserSpec: rbac.UserSpec{
 							Kind: rbac.ServiceAccountOwner,
@@ -103,13 +108,22 @@ func CollectPromotions(
 							}),
 						},
 						ClusterRoles: promotion.ClusterRoles,
-						Targets:      targetNamespaces,
+						Targets:      targets,
 					})
 				}
-
 			}
 		}
 	}
 
 	return promotions, nil
+}
+
+func appendTargetNamespace(targets []string, namespace string) []string {
+	result := append([]string(nil), targets...)
+
+	if slices.Contains(result, namespace) {
+		return result
+	}
+
+	return append(result, namespace)
 }

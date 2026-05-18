@@ -135,14 +135,14 @@ func (r *CacheInvalidator) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.C
 func (r *CacheInvalidator) Reconcile(ctx context.Context, request reconcile.Request) (res reconcile.Result, err error) {
 	log := r.Log.WithValues("configuration", request.Name)
 
-	log.Info("BUILDING CACHEEEEEEEE AFTER INTERVAL")
+	log.V(5).Info("invalidating and rebuilding caches")
 
 	cfg := configuration.NewCapsuleConfiguration(ctx, r.Client, r.Rest, request.Name)
 
 	instance := &capsulev1beta2.CapsuleConfiguration{}
 	if err = r.Get(ctx, request.NamespacedName, instance); err != nil {
 		if apierrors.IsNotFound(err) {
-			log.V(3).Info("requested object not found, could have been deleted after reconcile request")
+			log.V(5).Info("requested object not found, could have been deleted after reconcile request")
 
 			return reconcile.Result{}, nil
 		}

@@ -64,7 +64,7 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 	instance := &capsulev1beta2.RuleStatus{}
 	if err = r.Get(ctx, request.NamespacedName, instance); err != nil {
 		if apierrors.IsNotFound(err) {
-			r.Log.V(3).Info("request object not found, could have been deleted after reconcile request")
+			r.Log.V(5).Info("request object not found, could have been deleted after reconcile request")
 
 			return reconcile.Result{}, nil
 		}
@@ -131,7 +131,6 @@ func (r Manager) reconcile(ctx context.Context, instance *capsulev1beta2.RuleSta
 	instance.Status.Rule = out
 
 	return nil
-
 }
 
 func (r *Manager) updateStatus(ctx context.Context, instance *capsulev1beta2.RuleStatus, reconcileError error) error {

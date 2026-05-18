@@ -37,14 +37,14 @@ func (h *deviceClass) OnCreate(c client.Client, decoder admission.Decoder, recor
 				return ad.ErroredResponse(err)
 			}
 
-			return h.validateResourceRequest(ctx, c, decoder, recorder, req, rc.Namespace, rc.Spec.Devices.Requests)
+			return h.validateResourceRequest(ctx, c, decoder, recorder, req, rc.Namespace, rc.Spec.Devices.Requests, rc)
 		case "ResourceClaimTemplate":
 			rct := &resources.ResourceClaimTemplate{}
 			if err := decoder.Decode(req, rct); err != nil {
 				return ad.ErroredResponse(err)
 			}
 
-			return h.validateResourceRequest(ctx, c, decoder, recorder, req, rct.Namespace, rct.Spec.Spec.Devices.Requests)
+			return h.validateResourceRequest(ctx, c, decoder, recorder, req, rct.Namespace, rct.Spec.Spec.Devices.Requests, rct)
 		default:
 			return nil
 		}
@@ -63,7 +63,16 @@ func (h *deviceClass) OnUpdate(client.Client, admission.Decoder, events.EventRec
 	}
 }
 
-func (h *deviceClass) validateResourceRequest(ctx context.Context, c client.Client, _ admission.Decoder, recorder events.EventRecorder, req admission.Request, namespace string, requests []resources.DeviceRequest) *admission.Response {
+func (h *deviceClass) validateResourceRequest(
+	ctx context.Context,
+	c client.Client,
+	_ admission.Decoder,
+	recorder events.EventRecorder,
+	req admission.Request,
+	namespace string,
+	requests []resources.DeviceRequest,
+	obj client.Object,
+) *admission.Response {
 	tnt, err := tenant.TenantByStatusNamespace(ctx, c, namespace)
 	if err != nil {
 		return ad.ErroredResponse(err)
@@ -98,7 +107,7 @@ func (h *deviceClass) validateResourceRequest(ctx context.Context, c client.Clie
 		case allowed.Match(dc.Name) || selector:
 			return nil
 		default:
-			recorder.Eventf(tnt, dc, corev1.EventTypeWarning, evt.ReasonForbiddenDeviceClass, evt.ActionValidationDenied, "%s %s/%s DeviceClass %s is forbidden for the current Tenant", req.Kind.Kind, req.Namespace, req.Name, &dc)
+			recorder.Eventf(obj, tnt, corev1.EventTypeWarning, evt.ReasonForbiddenDeviceClass, evt.ActionValidationDenied, "%s %s/%s DeviceClass %s is forbidden for the current Tenant", req.Kind.Kind, req.Namespace, req.Name, &dc)
 
 			response := admission.Denied(caperrors.NewDeviceClassForbidden(dc.Name, *allowed).Error())
 

@@ -1694,12 +1694,7 @@
                                 },
                                 "opts": {
                                     "description": "Capsule Hook Options",
-                                    "type": "object",
-                                    "properties": {
-                                        "capsuleUsers": {
-                                            "type": "boolean"
-                                        }
-                                    }
+                                    "type": "object"
                                 },
                                 "reinvocationPolicy": {
                                     "description": "[ReinvocationPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#reinvocation-policy)",

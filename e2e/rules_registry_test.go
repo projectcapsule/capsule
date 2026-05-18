@@ -176,7 +176,9 @@ var _ = Describe("enforcing a Container Registry", Label("tenant", "rules", "ima
 	})
 
 	It("aggregates enforcement rules into NamespaceStatus for a non-prod namespace", func() {
-		ns := NewNamespace("")
+		ns := NewNamespace("", map[string]string{
+			meta.TenantLabel: tnt.GetName(),
+		})
 		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 
 		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
@@ -202,7 +204,8 @@ var _ = Describe("enforcing a Container Registry", Label("tenant", "rules", "ima
 
 	It("aggregates enforcement rules into NamespaceStatus for a prod namespace", func() {
 		ns := NewNamespace("", map[string]string{
-			"environment": "prod",
+			"environment":    "prod",
+			meta.TenantLabel: tnt.GetName(),
 		})
 
 		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
@@ -230,7 +233,11 @@ var _ = Describe("enforcing a Container Registry", Label("tenant", "rules", "ima
 	})
 
 	It("denies a container image when pullPolicy is not explicitly set under restriction (dev)", func() {
-		ns := NewNamespace("")
+		ns := NewNamespace("",
+			map[string]string{
+				meta.TenantLabel: tnt.GetName(),
+			},
+		)
 		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 
 		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
@@ -254,7 +261,9 @@ var _ = Describe("enforcing a Container Registry", Label("tenant", "rules", "ima
 	})
 
 	It("denies a harbor image with pullPolicy IfNotPresent because global Always must still apply (dev)", func() {
-		ns := NewNamespace("")
+		ns := NewNamespace("", map[string]string{
+			meta.TenantLabel: tnt.GetName(),
+		})
 		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 
 		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
@@ -281,7 +290,9 @@ var _ = Describe("enforcing a Container Registry", Label("tenant", "rules", "ima
 	})
 
 	It("allows a harbor image with pullPolicy Always (dev)", func() {
-		ns := NewNamespace("")
+		ns := NewNamespace("", map[string]string{
+			meta.TenantLabel: tnt.GetName(),
+		})
 		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 
 		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
@@ -304,7 +315,9 @@ var _ = Describe("enforcing a Container Registry", Label("tenant", "rules", "ima
 	})
 
 	It("denies initContainers when they violate policy (dev) and includes the correct location in the message", func() {
-		ns := NewNamespace("")
+		ns := NewNamespace("", map[string]string{
+			meta.TenantLabel: tnt.GetName(),
+		})
 		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 
 		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
@@ -338,7 +351,9 @@ var _ = Describe("enforcing a Container Registry", Label("tenant", "rules", "ima
 	})
 
 	It("denies volume image pullPolicy if not allowed (dev)", Label("skip-on-openshift"), func() {
-		ns := NewNamespace("")
+		ns := NewNamespace("", map[string]string{
+			meta.TenantLabel: tnt.GetName(),
+		})
 		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 
 		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
@@ -374,7 +389,8 @@ var _ = Describe("enforcing a Container Registry", Label("tenant", "rules", "ima
 
 	It("allows prod-specific image only with Always, still enforcing global policy", func() {
 		ns := NewNamespace("", map[string]string{
-			"environment": "prod",
+			"environment":    "prod",
+			meta.TenantLabel: tnt.GetName(),
 		})
 
 		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
@@ -409,7 +425,9 @@ var _ = Describe("enforcing a Container Registry", Label("tenant", "rules", "ima
 	})
 
 	It("denies adding an ephemeral container with wrong pullPolicy on UPDATE", func() {
-		ns := NewNamespace("")
+		ns := NewNamespace("", map[string]string{
+			meta.TenantLabel: tnt.GetName(),
+		})
 		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 
 		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
@@ -468,7 +486,9 @@ var _ = Describe("enforcing a Container Registry", Label("tenant", "rules", "ima
 	})
 
 	It("denies a pod when volume image reference changes to a disallowed pullPolicy (recreate)", Label("skip-on-openshift"), func() {
-		ns := NewNamespace("")
+		ns := NewNamespace("", map[string]string{
+			meta.TenantLabel: tnt.GetName(),
+		})
 		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 
 		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())

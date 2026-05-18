@@ -4,8 +4,9 @@
 package rbac
 
 import (
-	"github.com/projectcapsule/capsule/pkg/api/meta"
 	rbacv1 "k8s.io/api/rbac/v1"
+
+	"github.com/projectcapsule/capsule/pkg/api/meta"
 )
 
 // +kubebuilder:object:generate=true
@@ -34,7 +35,6 @@ func (o PromotionSpec) ToAdditionalRolebindings() []AdditionalRoleBindingsWithNa
 					},
 				},
 			})
-
 		}
 	}
 

@@ -287,7 +287,7 @@ The following Values have changed key or Value:
 | webhooks.hooks.namespaces.matchPolicy | string | `"Equivalent"` | [MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy) |
 | webhooks.hooks.namespaces.namespaceSelector | object | `{}` | [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector) |
 | webhooks.hooks.namespaces.objectSelector | object | `{}` | [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector) |
-| webhooks.hooks.namespaces.opts | object | `{"capsuleUsers":true}` | Capsule Hook Options |
+| webhooks.hooks.namespaces.opts | object | `{}` | Capsule Hook Options |
 | webhooks.hooks.namespaces.reinvocationPolicy | string | `"Never"` | [ReinvocationPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#reinvocation-policy) |
 | webhooks.hooks.nodes.enabled | bool | `false` | Enable the Hook |
 | webhooks.hooks.nodes.failurePolicy | string | `"Fail"` | [FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy) |

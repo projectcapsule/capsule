@@ -102,8 +102,8 @@ func (h *validating) handle(
 
 	if svc.Spec.Type == corev1.ServiceTypeLoadBalancer && tnt.Spec.ServiceOptions != nil && tnt.Spec.ServiceOptions.AllowedServices != nil && !*tnt.Spec.ServiceOptions.AllowedServices.LoadBalancer {
 		recorder.Eventf(
-			tnt,
 			svc,
+			tnt,
 			corev1.EventTypeWarning,
 			evt.ReasonForbiddenLoadBalancer,
 			evt.ActionValidationDenied,

@@ -35,7 +35,7 @@ func (h *freezedHandler) OnCreate(
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		if tnt.Spec.Cordoned {
-			recorder.Eventf(tnt, ns, corev1.EventTypeWarning, evt.ReasonCordoning, evt.ActionValidationDenied, "Namespace %s cannot be attached, the current Tenant is freezed", ns.GetName())
+			recorder.Eventf(ns, tnt, corev1.EventTypeWarning, evt.ReasonCordoning, evt.ActionValidationDenied, "Namespace %s cannot be attached, the current Tenant is freezed", ns.GetName())
 
 			response := admission.Denied("the selected Tenant is freezed")
 
@@ -55,7 +55,7 @@ func (h *freezedHandler) OnDelete(
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		if tnt.Spec.Cordoned && users.IsCapsuleUser(ctx, c, h.cfg, req.UserInfo.Username, req.UserInfo.Groups) {
-			recorder.Eventf(tnt, ns, corev1.EventTypeWarning, "TenantFreezed", "Denied", "Namespace %s cannot be deleted, the current Tenant is freezed", req.Name)
+			recorder.Eventf(ns, tnt, corev1.EventTypeWarning, "TenantFreezed", "Denied", "Namespace %s cannot be deleted, the current Tenant is freezed", req.Name)
 
 			response := admission.Denied("the selected Tenant is freezed")
 
@@ -76,7 +76,7 @@ func (h *freezedHandler) OnUpdate(
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		if tnt.Spec.Cordoned && users.IsCapsuleUser(ctx, c, h.cfg, req.UserInfo.Username, req.UserInfo.Groups) {
-			recorder.Eventf(tnt, ns, corev1.EventTypeWarning, "TenantFreezed", "Denied", "Namespace %s cannot be updated, the current Tenant is freezed", ns.GetName())
+			recorder.Eventf(ns, tnt, corev1.EventTypeWarning, "TenantFreezed", "Denied", "Namespace %s cannot be updated, the current Tenant is freezed", ns.GetName())
 
 			response := admission.Denied("the selected Tenant is freezed")
 

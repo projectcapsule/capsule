@@ -50,7 +50,7 @@ func Mapify(data any) map[string]any {
 	v := reflect.ValueOf(data)
 
 	// If the provided data is a pointer, resolve to the underlying value
-	if v.Kind() == reflect.Ptr {
+	if v.Kind() == reflect.Pointer {
 		if v.IsNil() {
 			return result // Return empty map for nil pointers
 		}
@@ -73,7 +73,7 @@ func Mapify(data any) map[string]any {
 			// Handle different types with recursive or base handling
 			//nolint:exhaustive
 			switch value.Kind() {
-			case reflect.Ptr:
+			case reflect.Pointer:
 				if !value.IsNil() {
 					result[field.Name] = Mapify(value.Interface())
 				}

@@ -21,7 +21,6 @@ func (r *Manager) reconcileRuleStatus(
 	tnt *capsulev1beta2.Tenant,
 	ns *corev1.Namespace,
 ) error {
-
 	// Collect Rules for namespace
 	ruleBody, err := tenant.BuildNamespaceRuleBodyStatus(ctx, r.Client, ns, tnt)
 	if err != nil {
@@ -49,10 +48,6 @@ func (r *Manager) ensureRuleStatus(
 		},
 	}
 
-	if body != nil {
-		rule.Status.Rule = *body
-	}
-
 	_, err := controllerutil.CreateOrUpdate(ctx, r.Client, rule, func() error {
 		labels := rule.GetLabels()
 		if labels == nil {
@@ -63,6 +58,10 @@ func (r *Manager) ensureRuleStatus(
 		labels[meta.CapsuleNameLabel] = rule.GetName()
 
 		rule.SetLabels(labels)
+
+		if body != nil {
+			rule.Spec = []*api.NamespaceRuleBodyNamespace{body}
+		}
 
 		return controllerutil.SetControllerReference(tnt, rule, r.Scheme())
 	})

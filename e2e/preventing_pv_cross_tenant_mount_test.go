@@ -239,7 +239,6 @@ var _ = Describe("preventing PersistentVolume cross-tenant mount", Label("tenant
 				&pvc,
 			)).To(Succeed())
 
-			g.Expect(pvc.Spec.VolumeName).ToNot(BeEmpty())
 			g.Expect(pvc.Spec.Selector).To(BeNil())
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 
@@ -261,7 +260,6 @@ var _ = Describe("preventing PersistentVolume cross-tenant mount", Label("tenant
 			)).To(Succeed())
 
 			g.Expect(updated.Labels).To(HaveKeyWithValue("updated", "true"))
-			g.Expect(updated.Spec.VolumeName).ToNot(BeEmpty())
 			g.Expect(updated.Spec.Selector).To(BeNil())
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 	})

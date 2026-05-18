@@ -222,7 +222,6 @@ func (r *Manager) reconcileNamespace(ctx context.Context, namespace *corev1.Name
 		if err != nil {
 			return stat, err
 		}
-
 	} else {
 		obj := &capsulev1beta2.RuleStatus{
 			ObjectMeta: metav1.ObjectMeta{

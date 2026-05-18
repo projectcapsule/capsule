@@ -17,6 +17,7 @@ import (
 	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
+	indexer "github.com/projectcapsule/capsule/pkg/runtime/indexers/tenant"
 )
 
 type wildcard struct{}
@@ -46,7 +47,7 @@ func (h *wildcard) OnUpdate(client client.Client, decoder admission.Decoder, rec
 func (h *wildcard) validate(ctx context.Context, clt client.Client, req admission.Request, recorder events.EventRecorder, decoder admission.Decoder) *admission.Response {
 	tntList := &capsulev1beta2.TenantList{}
 
-	if err := clt.List(ctx, tntList, client.MatchingFields{".status.namespaces": req.Namespace}); err != nil {
+	if err := clt.List(ctx, tntList, client.MatchingFields{indexer.NamespaceIndexerFieldName: req.Namespace}); err != nil {
 		return ad.ErroredResponse(err)
 	}
 
@@ -68,7 +69,7 @@ func (h *wildcard) validate(ctx context.Context, clt client.Client, req admissio
 			// Check if one of the host has wildcard.
 			if strings.HasPrefix(host, "*") {
 				// In case of wildcard, generate an event and then return.
-				recorder.Eventf(&tnt, nil, corev1.EventTypeWarning, evt.ReasonWildcardDenied, evt.ActionValidationDenied, "%s %s/%s cannot be %s", req.Kind.String(), req.Namespace, req.Name, strings.ToLower(string(req.Operation)))
+				recorder.Eventf(ingress.GetClientObject(), &tnt, corev1.EventTypeWarning, evt.ReasonWildcardDenied, evt.ActionValidationDenied, "%s %s/%s cannot be %s", req.Kind.String(), req.Namespace, req.Name, strings.ToLower(string(req.Operation)))
 
 				response := admission.Denied(fmt.Sprintf("Wildcard denied for tenant %s\n", tnt.GetName()))
 

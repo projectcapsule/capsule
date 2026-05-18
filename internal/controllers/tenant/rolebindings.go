@@ -22,22 +22,44 @@ import (
 // Sync the dynamic Tenant Owner specific cluster-roles and additional Role Bindings, which can be used in many ways:
 // applying Pod Security Policies or giving access to CRDs or specific API groups.
 func (r *Manager) syncRoleBindings(ctx context.Context, log logr.Logger, tenant *capsulev1beta2.Tenant) (err error) {
-	roleBindings := tenant.GetRoleBindings()
+	namespaceBindings := map[string]map[string]rbac.AdditionalRoleBindingsSpec{}
 
-	// Hashing
-	hashes := map[string]rbac.AdditionalRoleBindingsSpec{}
+	for _, ns := range tenant.Status.Spaces {
+		namespace := ns.Name
 
-	for _, binding := range roleBindings {
+		if _, ok := namespaceBindings[namespace]; !ok {
+			namespaceBindings[namespace] = map[string]rbac.AdditionalRoleBindingsSpec{}
+		}
+	}
+
+	for _, binding := range tenant.GetRoleBindings() {
 		hash := utils.RoleBindingHashFunc(binding)
 
-		hashes[hash] = binding
+		for namespace := range namespaceBindings {
+			namespaceBindings[namespace][hash] = binding
+		}
+	}
+
+	// Does not target all namespaces
+	for _, promotion := range tenant.GetPromotionRoleBindings() {
+		namespace := string(promotion.Namespace)
+
+		if _, ok := namespaceBindings[namespace]; !ok {
+			// Ignore namespaces that are not part of the tenant.
+			continue
+		}
+
+		binding := promotion.AdditionalRoleBindingsSpec
+		hash := utils.RoleBindingHashFunc(binding)
+
+		namespaceBindings[namespace][hash] = binding
 	}
 
 	group := new(errgroup.Group)
 
 	for _, ns := range tenant.Status.Spaces {
-		cleanup := false
 		namespace := ns.Name
+		cleanup := false
 
 		cond := ns.Conditions.GetConditionByType(meta.TerminatingCondition)
 		if cond != nil {
@@ -48,8 +70,10 @@ func (r *Manager) syncRoleBindings(ctx context.Context, log logr.Logger, tenant 
 			}
 		}
 
+		bindings := namespaceBindings[namespace]
+
 		group.Go(func() error {
-			return r.syncAdditionalRoleBinding(ctx, tenant, namespace, hashes, cleanup)
+			return r.syncAdditionalRoleBinding(ctx, tenant, namespace, bindings, cleanup)
 		})
 	}
 

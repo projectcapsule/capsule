@@ -30,7 +30,8 @@ type RuleStatus struct {
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitzero"`
 
-	Spec []*api.NamespaceRuleBodyNamespace `json:"spec"`
+	// +optional
+	Spec []*api.NamespaceRuleBodyNamespace `json:"spec,omitzero"`
 
 	// +optional
 	Status RuleStatusSpec `json:"status,omitzero"`

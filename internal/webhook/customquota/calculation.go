@@ -1152,7 +1152,7 @@ func recordQuotaCalculationEvent(
 
 		recorder.Eventf(
 			obj,
-			nil,
+			obj,
 			corev1.EventTypeWarning,
 			"UsageCalculationFailed",
 			"UsageCalculationFailed",
@@ -1175,7 +1175,7 @@ func recordQuotaCalculationEvent(
 
 	recorder.Eventf(
 		obj,
-		nil,
+		obj,
 		corev1.EventTypeWarning,
 		"UsageCalculationFailed",
 		"UsageCalculationFailed",
@@ -1219,7 +1219,7 @@ func recordQuotaExceededEvent(
 
 		recorder.Eventf(
 			obj,
-			nil,
+			obj,
 			corev1.EventTypeWarning,
 			capevents.ReasonQuotaExceeded,
 			capevents.ActionValidationDenied,
@@ -1240,7 +1240,7 @@ func recordQuotaExceededEvent(
 
 	recorder.Eventf(
 		obj,
-		nil,
+		obj,
 		corev1.EventTypeWarning,
 		capevents.ReasonQuotaExceeded,
 		capevents.ActionValidationDenied,

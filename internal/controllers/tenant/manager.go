@@ -253,7 +253,7 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 	instance := &capsulev1beta2.Tenant{}
 	if err = r.Get(ctx, request.NamespacedName, instance); err != nil {
 		if apierrors.IsNotFound(err) {
-			r.Log.V(3).Info("request object not found, could have been deleted after reconcile request")
+			r.Log.V(5).Info("request object not found, could have been deleted after reconcile request")
 
 			// If tenant was deleted or cannot be found, clean up metrics
 			r.Metrics.DeleteAllMetricsForTenant(request.Name)

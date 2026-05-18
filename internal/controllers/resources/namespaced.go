@@ -138,7 +138,7 @@ func (r *namespacedResourceController) Reconcile(ctx context.Context, request re
 	tntResource := &capsulev1beta2.TenantResource{}
 	if err := r.client.Get(ctx, request.NamespacedName, tntResource); err != nil {
 		if apierrors.IsNotFound(err) {
-			log.V(3).Info("Request object not found, could have been deleted after reconcile request")
+			log.V(5).Info("Request object not found, could have been deleted after reconcile request")
 
 			r.metrics.DeleteMetrics(request.Name, request.Namespace)
 
@@ -153,9 +153,11 @@ func (r *namespacedResourceController) Reconcile(ctx context.Context, request re
 		return reconcile.Result{}, gherrors.Wrap(err, "failed to init patch helper")
 	}
 
+	var statusErr error
+
 	defer func() {
-		if uerr := r.updateStatus(ctx, tntResource, err); uerr != nil {
-			err = fmt.Errorf("cannot update tenantresource status: %w", uerr)
+		if uerr := r.updateStatus(ctx, tntResource, statusErr); uerr != nil {
+			statusErr = fmt.Errorf("cannot update tenantresource status: %w", uerr)
 
 			return
 		}
@@ -175,7 +177,7 @@ func (r *namespacedResourceController) Reconcile(ctx context.Context, request re
 	if *tntResource.Spec.Cordoned {
 		log.V(5).Info("tenant resource cordoned")
 
-		return reconcile.Result{}, err
+		return reconcile.Result{}, nil
 	}
 
 	for _, dep := range tntResource.Spec.DependsOn {
@@ -204,14 +206,16 @@ func (r *namespacedResourceController) Reconcile(ctx context.Context, request re
 		}
 	}
 
-	err = r.updateReconcilingStatus(ctx, tntResource)
-	if err != nil {
-		return reconcile.Result{}, gherrors.Wrap(err, "failed to update status")
-	}
-
+	// Load client must be first since it updates the new serviceaccount used which can then be directly
+	// posted to the status
 	c, err := r.loadClient(ctx, log, tntResource)
 	if err != nil {
 		return reconcile.Result{}, gherrors.Wrap(err, "failed to load serviceaccount client")
+	}
+
+	err = r.updateReconcilingStatus(ctx, tntResource)
+	if err != nil {
+		return reconcile.Result{}, gherrors.Wrap(err, "failed to update status")
 	}
 
 	if c == nil {
@@ -591,6 +595,8 @@ func (r *namespacedResourceController) updateReconcilingStatus(ctx context.Conte
 		if err = r.client.Get(ctx, types.NamespacedName{Name: instance.GetName(), Namespace: instance.GetNamespace()}, latest); err != nil {
 			return err
 		}
+
+		latest.Status.ServiceAccount = instance.Status.ServiceAccount
 
 		latest.Status.Conditions.UpdateConditionByType(meta.NewReadyConditionReconcilingReason(instance))
 

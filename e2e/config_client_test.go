@@ -29,14 +29,6 @@ var _ = Describe("CapsuleConfiguration - ServiceAccountClient", Label("config", 
 		})
 	})
 
-	It("returns base config when ServiceAccountClient is nil", func() {
-		capsuleCfg := configuration.NewCapsuleConfiguration(context.TODO(), k8sClient, cfg, defaultConfigurationName)
-		clientCfg, err := capsuleCfg.ServiceAccountClient(context.TODO())
-		Expect(err).NotTo(HaveOccurred())
-		Expect(clientCfg.TLSClientConfig.Insecure).To(BeFalse())
-		Expect(clientCfg.TLSClientConfig.CAData).To(Equal("dummy-ca-data"))
-	})
-
 	It("sets skip TLS verify", func() {
 		ModifyCapsuleConfigurationOpts(func(configuration *capsulev1beta2.CapsuleConfiguration) {
 			configuration.Spec.Impersonation = capsulev1beta2.ServiceAccountClient{

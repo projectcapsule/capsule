@@ -30,7 +30,7 @@ func (o OwnerListSpec) IsOwner(name string, groups []string) bool {
 }
 
 func (o OwnerListSpec) ToStatusOwners() OwnerStatusListSpec {
-	list := OwnerStatusListSpec{}
+	list := make(OwnerStatusListSpec, 0, len(o))
 	for _, owner := range o {
 		list = append(list, owner.CoreOwnerSpec)
 	}

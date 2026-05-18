@@ -19,7 +19,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
-	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -240,6 +239,9 @@ func (r *Reconciler) updateTenantCustomResourceDefinition(ctx context.Context, n
 			return err
 		}
 
+		path := "/convert"
+		port := int32(443)
+
 		_, err = controllerutil.CreateOrUpdate(ctx, r.Client, crd, func() error {
 			crd.Spec.Conversion = &apiextensionsv1.CustomResourceConversion{
 				Strategy: "Webhook",
@@ -248,8 +250,8 @@ func (r *Reconciler) updateTenantCustomResourceDefinition(ctx context.Context, n
 						Service: &apiextensionsv1.ServiceReference{
 							Namespace: r.Namespace,
 							Name:      "capsule-webhook-service",
-							Path:      ptr.To("/convert"),
-							Port:      ptr.To(int32(443)),
+							Path:      &path,
+							Port:      &port,
 						},
 						CABundle: caBundle,
 					},

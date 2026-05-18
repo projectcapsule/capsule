@@ -84,7 +84,7 @@ func (r resourcePoolController) Reconcile(ctx context.Context, request ctrl.Requ
 	instance := &capsulev1beta2.ResourcePool{}
 	if err = r.Get(ctx, request.NamespacedName, instance); err != nil {
 		if apierrors.IsNotFound(err) {
-			log.V(3).Info("Request object not found, could have been deleted after reconcile request")
+			log.V(5).Info("Request object not found, could have been deleted after reconcile request")
 
 			r.metrics.DeleteResourcePoolMetric(request.Name)
 
@@ -230,7 +230,7 @@ func (r *resourcePoolController) reconcile(
 		cond.Reason = meta.FailedReason
 		cond.Message = "claim causes exhaustions"
 
-		if err := updateStatusAndEmitEvent(ctx, r.Client, r.recorder, cl, cond); err != nil {
+		if err := updateStatusAndEmitEvent(ctx, r.Client, r.recorder, cl, pool, cond); err != nil {
 			errs = append(errs, fmt.Errorf("update exhausted claim condition %s/%s: %w", cl.Namespace, cl.Name, err))
 		}
 	}
@@ -348,6 +348,7 @@ func (r *resourcePoolController) reconcileResourceClaim(
 
 		queued, err = r.handleClaimOrderedExhaustion(
 			ctx,
+			pool,
 			claim,
 			exhaustion,
 		)
@@ -369,6 +370,7 @@ func (r *resourcePoolController) reconcileResourceClaim(
 
 		return r.handleClaimResourceExhaustion(
 			ctx,
+			pool,
 			claim,
 			exhaustions,
 			exhaustion,
@@ -412,6 +414,7 @@ func (r *resourcePoolController) canClaimWithinNamespace(
 // Handles exhaustions when a exhaustion was already declared in the given map.
 func (r *resourcePoolController) handleClaimOrderedExhaustion(
 	ctx context.Context,
+	pool *capsulev1beta2.ResourcePool,
 	claim *capsulev1beta2.ResourcePoolClaim,
 	exhaustions map[string]api.PoolExhaustionResource,
 ) (queued bool, err error) {
@@ -441,7 +444,7 @@ func (r *resourcePoolController) handleClaimOrderedExhaustion(
 		cond.Reason = meta.QueueExhaustedReason
 		cond.Message = strings.Join(status, "; ")
 
-		return queued, updateStatusAndEmitEvent(ctx, r.Client, r.recorder, claim, cond)
+		return queued, updateStatusAndEmitEvent(ctx, r.Client, r.recorder, claim, pool, cond)
 	}
 
 	return queued, err
@@ -449,6 +452,7 @@ func (r *resourcePoolController) handleClaimOrderedExhaustion(
 
 func (r *resourcePoolController) handleClaimResourceExhaustion(
 	ctx context.Context,
+	pool *capsulev1beta2.ResourcePool,
 	claim *capsulev1beta2.ResourcePoolClaim,
 	currentExhaustions map[string]api.PoolExhaustionResource,
 	exhaustions map[string]api.PoolExhaustionResource,
@@ -490,7 +494,7 @@ func (r *resourcePoolController) handleClaimResourceExhaustion(
 		cond.Reason = meta.PoolExhaustedReason
 		cond.Message = strings.Join(status, "; ")
 
-		return updateStatusAndEmitEvent(ctx, r.Client, r.recorder, claim, cond)
+		return updateStatusAndEmitEvent(ctx, r.Client, r.recorder, claim, pool, cond)
 	}
 
 	return err
@@ -506,7 +510,7 @@ func (r *resourcePoolController) handleClaimToPoolBinding(
 	cond.Reason = meta.NoExhaustionsReason
 	cond.Message = "resource claimable from pool"
 
-	if err = updateStatusAndEmitEvent(ctx, r.Client, r.recorder, claim, cond); err != nil {
+	if err = updateStatusAndEmitEvent(ctx, r.Client, r.recorder, claim, pool, cond); err != nil {
 		return err
 	}
 
@@ -562,8 +566,8 @@ func (r *resourcePoolController) handleClaimDisassociation(
 		}
 
 		r.recorder.Eventf(
-			pool,
 			current,
+			pool,
 			corev1.EventTypeNormal,
 			evt.ReasonDisassociated,
 			evt.ActionDisassociating,

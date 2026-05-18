@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"sync"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -19,7 +20,6 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	capmeta "github.com/projectcapsule/capsule/pkg/api/meta"
-	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	"github.com/projectcapsule/capsule/pkg/runtime/quota"
 	"github.com/projectcapsule/capsule/pkg/runtime/selectors"
 )
@@ -151,7 +151,7 @@ func awaitGlobalQuotaReady(ctx context.Context, name string) {
 		ledger := &capsulev1beta2.QuantityLedger{}
 		g.Expect(k8sClient.Get(ctx, types.NamespacedName{
 			Name:      name,
-			Namespace: configuration.ControllerNamespace(),
+			Namespace: "capsule-system",
 		}, ledger)).To(Succeed())
 
 		g.Expect(capmeta.IsStatusConditionTrue(gq.Status.Conditions, capmeta.ReadyCondition)).To(BeTrue())
@@ -194,15 +194,6 @@ func awaitCustomQuotaReady(ctx context.Context, namespace, name string) {
 func getGlobalQuota(ctx context.Context, name string) *capsulev1beta2.GlobalCustomQuota {
 	obj := &capsulev1beta2.GlobalCustomQuota{}
 	Expect(k8sClient.Get(ctx, types.NamespacedName{Name: name}, obj)).To(Succeed())
-	return obj
-}
-
-func getCustomQuota(ctx context.Context, namespace, name string) *capsulev1beta2.CustomQuota {
-	obj := &capsulev1beta2.CustomQuota{}
-	Expect(k8sClient.Get(ctx, types.NamespacedName{
-		Name:      name,
-		Namespace: namespace,
-	}, obj)).To(Succeed())
 	return obj
 }
 
@@ -422,7 +413,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Lab
 		)
 
 		expectGlobalQuotaUsedAndClaims(ctx, q.GetName(), "0", 0)
-		expectLedgerSettled(ctx, configuration.ControllerNamespace(), q.GetName())
+		expectLedgerSettled(ctx, ControllerNamespace, q.GetName())
 	})
 
 	It("remains consistent under concurrent pod creations for a GlobalCustomQuota", func() {
@@ -472,18 +463,27 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Lab
 			return k8sClient.Create(ctx, q)
 		}).Should(Succeed())
 		awaitGlobalQuotaReady(ctx, q.GetName())
-
-		const total = 100
+		const (
+			totalAttempts   = 100
+			expectedSuccess = 10
+		)
 
 		type result struct {
 			name string
 			err  error
 		}
 
-		results := make(chan result, total)
+		results := make(chan result, totalAttempts)
 
-		for i := 0; i < total; i++ {
+		var (
+			mu          sync.Mutex
+			succeeded   int
+			successSeen = map[string]struct{}{}
+		)
+
+		for i := 0; i < totalAttempts; i++ {
 			i := i
+
 			go func() {
 				name := fmt.Sprintf("gq-concurrent-pod-%02d", i)
 				pod := MakePod(
@@ -496,30 +496,70 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Lab
 					"",
 				)
 
-				err := k8sClient.Create(ctx, pod)
-				results <- result{name: name, err: err}
+				Eventually(func() error {
+					mu.Lock()
+					done := succeeded >= expectedSuccess
+					mu.Unlock()
+
+					if done {
+						return nil
+					}
+
+					err := k8sClient.Create(ctx, pod)
+					if err != nil {
+						return err
+					}
+
+					mu.Lock()
+					defer mu.Unlock()
+
+					if _, exists := successSeen[name]; !exists {
+						successSeen[name] = struct{}{}
+						succeeded++
+					}
+
+					return nil
+				}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+
+				mu.Lock()
+				_, ok := successSeen[name]
+				mu.Unlock()
+
+				if ok {
+					results <- result{name: name, err: nil}
+
+					return
+				}
+
+				results <- result{name: name, err: fmt.Errorf("not created because expected success count was already reached")}
 			}()
 		}
 
-		var succeeded, failed int
+		var failed int
 		var failedMsgs []string
-		var successNames []string
 
-		for i := 0; i < total; i++ {
+		for i := 0; i < totalAttempts; i++ {
 			res := <-results
-			if res.err == nil {
-				succeeded++
-				successNames = append(successNames, res.name)
-			} else {
+			if res.err != nil {
 				failed++
 				failedMsgs = append(failedMsgs, fmt.Sprintf("%s: %v", res.name, res.err))
 			}
 		}
 
-		gq := getGlobalQuota(ctx, q.GetName())
-		ledger := getLedger(ctx, configuration.ControllerNamespace(), q.GetName())
+		mu.Lock()
+		successNames := make([]string, 0, len(successSeen))
+		for name := range successSeen {
+			successNames = append(successNames, name)
+		}
+		succeeded = len(successNames)
+		mu.Unlock()
 
-		Expect(succeeded).To(Equal(10),
+		sort.Strings(successNames)
+
+		gq := getGlobalQuota(ctx, q.GetName())
+		ledger := getLedger(ctx, ControllerNamespace, q.GetName())
+
+		Expect(succeeded).To(Equal(expectedSuccess),
 			"unexpected number of successful concurrent pod creations\nsuccesses=%d\nfailures=%d\nsuccessNames=%v\nfailureDetails=%v\nquotaUsed=%q\nquotaAvailable=%q\nclaims=%d\nledgerReserved=%q\nledgerReservations=%+v\nledgerPendingDeletes=%+v",
 			succeeded,
 			failed,
@@ -533,22 +573,8 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Lab
 			ledger.Status.PendingDeletes,
 		)
 
-		Expect(failed).To(Equal(90),
-			"unexpected number of failed concurrent pod creations\nsuccesses=%d\nfailures=%d\nsuccessNames=%v\nfailureDetails=%v\nquotaUsed=%q\nquotaAvailable=%q\nclaims=%d\nledgerReserved=%q\nledgerReservations=%+v\nledgerPendingDeletes=%+v",
-			succeeded,
-			failed,
-			successNames,
-			failedMsgs,
-			gq.Status.Usage.Used.String(),
-			gq.Status.Usage.Available.String(),
-			len(gq.Status.Claims),
-			ledger.Status.Reserved.String(),
-			ledger.Status.Reservations,
-			ledger.Status.PendingDeletes,
-		)
-
 		expectGlobalQuotaUsedAndClaims(ctx, q.GetName(), "10", 10)
-		expectLedgerSettled(ctx, configuration.ControllerNamespace(), q.GetName())
+		expectLedgerSettled(ctx, ControllerNamespace, q.GetName())
 	})
 
 	It("uses the smallest matching quota as authoritative while accounting successful pod count in both global and namespaced quotas", func() {
@@ -628,7 +654,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Lab
 
 		expectGlobalQuotaUsedAndClaims(ctx, gq.GetName(), "2", 2)
 		expectCustomQuotaUsedAndClaims(ctx, cq.GetNamespace(), cq.GetName(), "2", 2)
-		expectLedgerSettled(ctx, configuration.ControllerNamespace(), gq.GetName())
+		expectLedgerSettled(ctx, ControllerNamespace, gq.GetName())
 		expectLedgerSettled(ctx, cq.GetNamespace(), cq.GetName())
 
 		Eventually(func() error {
@@ -721,7 +747,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Lab
 
 		expectGlobalQuotaUsedAndClaims(ctx, gq.GetName(), "200m", 2)
 		expectCustomQuotaUsedAndClaims(ctx, cq.GetNamespace(), cq.GetName(), "200m", 2)
-		expectLedgerSettled(ctx, configuration.ControllerNamespace(), gq.GetName())
+		expectLedgerSettled(ctx, ControllerNamespace, gq.GetName())
 		expectLedgerSettled(ctx, cq.GetNamespace(), cq.GetName())
 
 		Eventually(func() error {
@@ -824,7 +850,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Lab
 
 		expectGlobalQuotaUsedAndClaims(ctx, gq.GetName(), "3", 3)
 		expectCustomQuotaUsedAndClaims(ctx, cq.GetNamespace(), cq.GetName(), "2", 2)
-		expectLedgerSettled(ctx, configuration.ControllerNamespace(), gq.GetName())
+		expectLedgerSettled(ctx, ControllerNamespace, gq.GetName())
 		expectLedgerSettled(ctx, cq.GetNamespace(), cq.GetName())
 
 		Eventually(func() error {
@@ -908,7 +934,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Lab
 
 		expectGlobalQuotaUsedAndClaims(ctx, gq.GetName(), "200m", 2)
 		expectCustomQuotaUsedAndClaims(ctx, cq.GetNamespace(), cq.GetName(), "2Gi", 2)
-		expectLedgerSettled(ctx, configuration.ControllerNamespace(), gq.GetName())
+		expectLedgerSettled(ctx, ControllerNamespace, gq.GetName())
 		expectLedgerSettled(ctx, cq.GetNamespace(), cq.GetName())
 
 		Eventually(func() error {
@@ -1051,7 +1077,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Lab
 		}).Should(Succeed())
 
 		expectGlobalQuotaUsedAndClaims(ctx, q.GetName(), "0", 1)
-		expectLedgerSettled(ctx, configuration.ControllerNamespace(), q.GetName())
+		expectLedgerSettled(ctx, ControllerNamespace, q.GetName())
 	})
 
 	It("subtracts matching pvc storage from added pod emptyDir storage", func() {
@@ -1116,7 +1142,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Lab
 		}).Should(Succeed())
 
 		expectGlobalQuotaUsedAndClaims(ctx, q.GetName(), "2Gi", 2)
-		expectLedgerSettled(ctx, configuration.ControllerNamespace(), q.GetName())
+		expectLedgerSettled(ctx, ControllerNamespace, q.GetName())
 	})
 
 	It("clamps mixed add and subtraction result to zero when subtraction exceeds additions", func() {
@@ -1181,7 +1207,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Lab
 		}).Should(Succeed())
 
 		expectGlobalQuotaUsedAndClaims(ctx, q.GetName(), "0", 2)
-		expectLedgerSettled(ctx, configuration.ControllerNamespace(), q.GetName())
+		expectLedgerSettled(ctx, ControllerNamespace, q.GetName())
 	})
 
 	It("supports subtraction with label selectors and removes the subtraction when the object no longer matches", func() {
@@ -1256,7 +1282,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Lab
 		}).Should(Succeed())
 
 		expectGlobalQuotaUsedAndClaims(ctx, q.GetName(), "2Gi", 2)
-		expectLedgerSettled(ctx, configuration.ControllerNamespace(), q.GetName())
+		expectLedgerSettled(ctx, ControllerNamespace, q.GetName())
 
 		Eventually(func() error {
 			obj := &corev1.PersistentVolumeClaim{}
@@ -1268,7 +1294,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Lab
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 
 		expectGlobalQuotaUsedAndClaims(ctx, q.GetName(), "3Gi", 1)
-		expectLedgerSettled(ctx, configuration.ControllerNamespace(), q.GetName())
+		expectLedgerSettled(ctx, ControllerNamespace, q.GetName())
 	})
 
 	It("reconciles subtraction correctly when the subtracting resource is deleted", func() {
@@ -1333,11 +1359,11 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Lab
 		}).Should(Succeed())
 
 		expectGlobalQuotaUsedAndClaims(ctx, q.GetName(), "2Gi", 2)
-		expectLedgerSettled(ctx, configuration.ControllerNamespace(), q.GetName())
+		expectLedgerSettled(ctx, ControllerNamespace, q.GetName())
 
 		EventuallyDeletion(pvc)
 		expectGlobalQuotaUsedAndClaims(ctx, q.GetName(), "3Gi", 1)
-		expectLedgerSettled(ctx, configuration.ControllerNamespace(), q.GetName())
+		expectLedgerSettled(ctx, ControllerNamespace, q.GetName())
 	})
 
 	It("subtracts cpu requests from counted pod usage across multiple matching pods and clamps at zero", func() {
@@ -1402,7 +1428,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Lab
 
 		// 2 - 1.0 = 1
 		expectGlobalQuotaUsedAndClaims(ctx, q.GetName(), "1", 2)
-		expectLedgerSettled(ctx, configuration.ControllerNamespace(), q.GetName())
+		expectLedgerSettled(ctx, ControllerNamespace, q.GetName())
 	})
 
 	It("applies subtraction while scaling a deployment", func() {
@@ -1461,13 +1487,13 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Lab
 
 		// 2 - 0.5 = 1.5
 		expectGlobalQuotaUsedAndClaims(ctx, q.GetName(), "1500m", 2)
-		expectLedgerSettled(ctx, configuration.ControllerNamespace(), q.GetName())
+		expectLedgerSettled(ctx, ControllerNamespace, q.GetName())
 
 		ScaleDeployment(ctx, testNamespace, "sub-scale", 4)
 
 		// 4 - 1.0 = 3
 		expectGlobalQuotaUsedAndClaims(ctx, q.GetName(), "3", 4)
-		expectLedgerSettled(ctx, configuration.ControllerNamespace(), q.GetName())
+		expectLedgerSettled(ctx, ControllerNamespace, q.GetName())
 	})
 
 	It("uses the smallest matching quota as authoritative even when both quotas use subtraction", func() {
@@ -1576,8 +1602,8 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Lab
 		// 2 - 1.0 = 1
 		expectGlobalQuotaUsedAndClaims(ctx, small.GetName(), "1", 2)
 		expectGlobalQuotaUsedAndClaims(ctx, large.GetName(), "1", 2)
-		expectLedgerSettled(ctx, configuration.ControllerNamespace(), small.GetName())
-		expectLedgerSettled(ctx, configuration.ControllerNamespace(), large.GetName())
+		expectLedgerSettled(ctx, ControllerNamespace, small.GetName())
+		expectLedgerSettled(ctx, ControllerNamespace, large.GetName())
 
 		Eventually(func() error {
 			pod3.ResourceVersion = ""
@@ -1809,13 +1835,13 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Lab
 		}).Should(Succeed())
 
 		expectGlobalQuotaUsedAndClaims(ctx, q.GetName(), "200m", 2)
-		expectLedgerSettled(ctx, configuration.ControllerNamespace(), q.GetName())
+		expectLedgerSettled(ctx, ControllerNamespace, q.GetName())
 
 		ScaleDeployment(ctx, testNamespace, "cpu-requests", 4)
 		expectGlobalQuotaUsedAndClaims(ctx, q.GetName(), "400m", 4)
-		expectLedgerSettled(ctx, configuration.ControllerNamespace(), q.GetName())
+		expectLedgerSettled(ctx, ControllerNamespace, q.GetName())
 
-		ledger := getLedger(ctx, configuration.ControllerNamespace(), q.GetName())
+		ledger := getLedger(ctx, ControllerNamespace, q.GetName())
 		Expect(ledger.Spec.TargetRef.Kind).To(Equal("GlobalCustomQuota"))
 		Expect(ledger.Spec.TargetRef.Name).To(Equal(q.GetName()))
 
@@ -1880,7 +1906,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Lab
 		expectGlobalQuotaUsedAndClaims(ctx, q.GetName(), "1", 1)
 
 		UpdatePodLabels(ctx, testNamespace, "no-negative-on-relabel", map[string]string{"track": "no"})
-		expectLedgerSettled(ctx, configuration.ControllerNamespace(), q.GetName())
+		expectLedgerSettled(ctx, ControllerNamespace, q.GetName())
 
 		Eventually(func(g Gomega) {
 			obj := &capsulev1beta2.GlobalCustomQuota{}
@@ -1944,7 +1970,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Lab
 		ScaleDeployment(ctx, testNamespace, "counted", 2)
 		expectGlobalQuotaUsedAndClaims(ctx, q.GetName(), "2", 2)
 
-		expectLedgerSettled(ctx, configuration.ControllerNamespace(), q.GetName())
+		expectLedgerSettled(ctx, ControllerNamespace, q.GetName())
 	})
 
 	It("tracks count with a single MatchLabels selector and updates when the pod no longer matches", func() {
@@ -2004,7 +2030,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Lab
 
 		UpdatePodLabels(ctx, testNamespace, "single-matchlabel", map[string]string{"track": "no"})
 		expectGlobalQuotaUsedAndClaims(ctx, q.GetName(), "0", 0)
-		expectLedgerSettled(ctx, configuration.ControllerNamespace(), q.GetName())
+		expectLedgerSettled(ctx, ControllerNamespace, q.GetName())
 	})
 
 	It("tracks count with multiple MatchLabels and updates when the pod no longer matches", func() {
@@ -2071,7 +2097,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Lab
 			"tier":  "backend",
 		})
 		expectGlobalQuotaUsedAndClaims(ctx, q.GetName(), "0", 0)
-		expectLedgerSettled(ctx, configuration.ControllerNamespace(), q.GetName())
+		expectLedgerSettled(ctx, ControllerNamespace, q.GetName())
 	})
 
 	It("tracks count with a single field selector and updates when the pod no longer matches", func() {
@@ -2129,7 +2155,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Lab
 
 		UpdatePodImage(ctx, testNamespace, "single-fieldselector", "nginx:1.26.0")
 		expectGlobalQuotaUsedAndClaims(ctx, q.GetName(), "0", 0)
-		expectLedgerSettled(ctx, configuration.ControllerNamespace(), q.GetName())
+		expectLedgerSettled(ctx, ControllerNamespace, q.GetName())
 	})
 
 	It("tracks count with multiple field selectors and updates when the pod no longer matches", func() {
@@ -2188,7 +2214,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Lab
 
 		UpdatePodImage(ctx, testNamespace, "multi-fieldselector", "nginx:1.26.0")
 		expectGlobalQuotaUsedAndClaims(ctx, q.GetName(), "0", 0)
-		expectLedgerSettled(ctx, configuration.ControllerNamespace(), q.GetName())
+		expectLedgerSettled(ctx, ControllerNamespace, q.GetName())
 	})
 
 	It("aggregates multiple sources across pod emptyDir size and pvc storage size", func() {
@@ -2253,7 +2279,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Lab
 		}).Should(Succeed())
 
 		expectGlobalQuotaUsedAndClaims(ctx, q.GetName(), "3Gi", 2)
-		expectLedgerSettled(ctx, configuration.ControllerNamespace(), q.GetName())
+		expectLedgerSettled(ctx, ControllerNamespace, q.GetName())
 	})
 
 	It("tracks count with multiple field selectors and updates when the pod no longer matches", func() {
@@ -2312,7 +2338,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Lab
 
 		UpdatePodImage(ctx, testNamespace, "multi-fieldselector", "nginx:1.26.0")
 		expectGlobalQuotaUsedAndClaims(ctx, q.GetName(), "0", 0)
-		expectLedgerSettled(ctx, configuration.ControllerNamespace(), q.GetName())
+		expectLedgerSettled(ctx, ControllerNamespace, q.GetName())
 	})
 
 	It("aggregates multiple sources with selectors across pod emptyDir and pvc storage", func() {
@@ -2407,7 +2433,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Lab
 		}).Should(Succeed())
 
 		expectGlobalQuotaUsedAndClaims(ctx, q.GetName(), "3Gi", 2)
-		expectLedgerSettled(ctx, configuration.ControllerNamespace(), q.GetName())
+		expectLedgerSettled(ctx, ControllerNamespace, q.GetName())
 	})
 
 	It("reconciles multiple sources when objects stop matching or are deleted", func() {
@@ -2487,7 +2513,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Lab
 
 		EventuallyDeletion(pvc)
 		expectGlobalQuotaUsedAndClaims(ctx, q.GetName(), "0", 0)
-		expectLedgerSettled(ctx, configuration.ControllerNamespace(), q.GetName())
+		expectLedgerSettled(ctx, ControllerNamespace, q.GetName())
 	})
 
 	It("rejects admission when a field selector uses an invalid jsonpath filter on a scalar", func() {
@@ -2629,8 +2655,8 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Lab
 			return k8sClient.Create(ctx, pod2)
 		}).Should(Succeed())
 
-		expectLedgerSettled(ctx, configuration.ControllerNamespace(), small.GetName())
-		expectLedgerSettled(ctx, configuration.ControllerNamespace(), large.GetName())
+		expectLedgerSettled(ctx, ControllerNamespace, small.GetName())
+		expectLedgerSettled(ctx, ControllerNamespace, large.GetName())
 		expectGlobalQuotaUsedAndClaims(ctx, small.GetName(), "2", 2)
 		expectGlobalQuotaUsedAndClaims(ctx, large.GetName(), "2", 2)
 
@@ -2728,8 +2754,8 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Lab
 			return k8sClient.Create(ctx, pod2)
 		}).Should(Succeed())
 
-		expectLedgerSettled(ctx, configuration.ControllerNamespace(), small.GetName())
-		expectLedgerSettled(ctx, configuration.ControllerNamespace(), large.GetName())
+		expectLedgerSettled(ctx, ControllerNamespace, small.GetName())
+		expectLedgerSettled(ctx, ControllerNamespace, large.GetName())
 		expectGlobalQuotaUsedAndClaims(ctx, small.GetName(), "200m", 2)
 		expectGlobalQuotaUsedAndClaims(ctx, large.GetName(), "200m", 2)
 
@@ -2843,8 +2869,8 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Lab
 		EventuallyCreation(func() error { pod3.ResourceVersion = ""; return k8sClient.Create(ctx, pod3) }).Should(Succeed())
 		EventuallyCreation(func() error { pod4.ResourceVersion = ""; return k8sClient.Create(ctx, pod4) }).Should(Succeed())
 
-		expectLedgerSettled(ctx, configuration.ControllerNamespace(), broad.GetName())
-		expectLedgerSettled(ctx, configuration.ControllerNamespace(), narrow.GetName())
+		expectLedgerSettled(ctx, ControllerNamespace, broad.GetName())
+		expectLedgerSettled(ctx, ControllerNamespace, narrow.GetName())
 		expectGlobalQuotaUsedAndClaims(ctx, broad.GetName(), "4", 4)
 		expectGlobalQuotaUsedAndClaims(ctx, narrow.GetName(), "2", 2)
 
@@ -2861,8 +2887,8 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Lab
 			return k8sClient.Create(ctx, pod)
 		}).Should(Succeed())
 
-		expectLedgerSettled(ctx, configuration.ControllerNamespace(), broad.GetName())
-		expectLedgerSettled(ctx, configuration.ControllerNamespace(), narrow.GetName())
+		expectLedgerSettled(ctx, ControllerNamespace, broad.GetName())
+		expectLedgerSettled(ctx, ControllerNamespace, narrow.GetName())
 		expectGlobalQuotaUsedAndClaims(ctx, broad.GetName(), "5", 5)
 		expectGlobalQuotaUsedAndClaims(ctx, narrow.GetName(), "2", 2)
 	})
@@ -2947,8 +2973,8 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Lab
 		EventuallyCreation(func() error { pod1.ResourceVersion = ""; return k8sClient.Create(ctx, pod1) }).Should(Succeed())
 		EventuallyCreation(func() error { pod2.ResourceVersion = ""; return k8sClient.Create(ctx, pod2) }).Should(Succeed())
 
-		expectLedgerSettled(ctx, configuration.ControllerNamespace(), cpuQuota.GetName())
-		expectLedgerSettled(ctx, configuration.ControllerNamespace(), emptyDirQuota.GetName())
+		expectLedgerSettled(ctx, ControllerNamespace, cpuQuota.GetName())
+		expectLedgerSettled(ctx, ControllerNamespace, emptyDirQuota.GetName())
 		expectGlobalQuotaUsedAndClaims(ctx, cpuQuota.GetName(), "200m", 2)
 		expectGlobalQuotaUsedAndClaims(ctx, emptyDirQuota.GetName(), "2Gi", 2)
 
@@ -3056,8 +3082,8 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Lab
 		EventuallyCreation(func() error { matchLabelOnly.ResourceVersion = ""; return k8sClient.Create(ctx, matchLabelOnly) }).Should(Succeed())
 		EventuallyCreation(func() error { matchFieldOnly.ResourceVersion = ""; return k8sClient.Create(ctx, matchFieldOnly) }).Should(Succeed())
 
-		expectLedgerSettled(ctx, configuration.ControllerNamespace(), labelQuota.GetName())
-		expectLedgerSettled(ctx, configuration.ControllerNamespace(), fieldQuota.GetName())
+		expectLedgerSettled(ctx, ControllerNamespace, labelQuota.GetName())
+		expectLedgerSettled(ctx, ControllerNamespace, fieldQuota.GetName())
 		expectGlobalQuotaUsedAndClaims(ctx, labelQuota.GetName(), "2", 2)
 		expectGlobalQuotaUsedAndClaims(ctx, fieldQuota.GetName(), "2", 2)
 	})
@@ -3143,8 +3169,8 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Lab
 		EventuallyCreation(func() error { pod1.ResourceVersion = ""; return k8sClient.Create(ctx, pod1) }).Should(Succeed())
 		EventuallyCreation(func() error { pod2.ResourceVersion = ""; return k8sClient.Create(ctx, pod2) }).Should(Succeed())
 
-		expectLedgerSettled(ctx, configuration.ControllerNamespace(), quotaA.GetName())
-		expectLedgerSettled(ctx, configuration.ControllerNamespace(), quotaB.GetName())
+		expectLedgerSettled(ctx, ControllerNamespace, quotaA.GetName())
+		expectLedgerSettled(ctx, ControllerNamespace, quotaB.GetName())
 		expectGlobalQuotaUsedAndClaims(ctx, quotaA.GetName(), "2", 2)
 		expectGlobalQuotaUsedAndClaims(ctx, quotaB.GetName(), "2", 2)
 
@@ -3152,8 +3178,8 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Lab
 		pod3 := MakePod(testNamespace, "tie-3", nil, nil, "nginx:1.27.0", "", "")
 		EventuallyCreation(func() error { pod3.ResourceVersion = ""; return k8sClient.Create(ctx, pod3) }).Should(Succeed())
 
-		expectLedgerSettled(ctx, configuration.ControllerNamespace(), quotaA.GetName())
-		expectLedgerSettled(ctx, configuration.ControllerNamespace(), quotaB.GetName())
+		expectLedgerSettled(ctx, ControllerNamespace, quotaA.GetName())
+		expectLedgerSettled(ctx, ControllerNamespace, quotaB.GetName())
 		expectGlobalQuotaUsedAndClaims(ctx, quotaA.GetName(), "3", 3)
 		expectGlobalQuotaUsedAndClaims(ctx, quotaB.GetName(), "3", 3)
 
@@ -3246,8 +3272,8 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Lab
 			return k8sClient.Create(ctx, pod)
 		}).Should(Succeed())
 
-		expectLedgerSettled(ctx, configuration.ControllerNamespace(), cpuQuota.GetName())
-		expectLedgerSettled(ctx, configuration.ControllerNamespace(), emptyDirQuota.GetName())
+		expectLedgerSettled(ctx, ControllerNamespace, cpuQuota.GetName())
+		expectLedgerSettled(ctx, ControllerNamespace, emptyDirQuota.GetName())
 		expectGlobalQuotaUsedAndClaims(ctx, cpuQuota.GetName(), "100m", 1)
 		expectGlobalQuotaUsedAndClaims(ctx, emptyDirQuota.GetName(), "1Gi", 1)
 

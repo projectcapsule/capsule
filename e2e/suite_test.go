@@ -39,6 +39,10 @@ var (
 
 var log = ctrl.Log.WithName("e2e-tests")
 
+const (
+	ControllerNamespace string = "capsule-system"
+)
+
 func TestAPIs(t *testing.T) {
 	RegisterFailHandler(Fail)
 

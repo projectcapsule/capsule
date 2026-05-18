@@ -80,7 +80,7 @@ func (r *class) validate(ctx context.Context, client client.Client, req admissio
 	}
 
 	if gatewayClass == nil {
-		recorder.Eventf(tnt, gatewayClass, corev1.EventTypeWarning, evt.ReasonMissingGatewayClass, evt.ActionValidationDenied, "Gateway %s/%s is missing GatewayClass", req.Namespace, req.Name)
+		recorder.Eventf(gatewayObj, tnt, corev1.EventTypeWarning, evt.ReasonMissingGatewayClass, evt.ActionValidationDenied, "Gateway %s/%s is missing GatewayClass", req.Namespace, req.Name)
 
 		response := admission.Denied(caperrors.NewGatewayClassUndefined(*allowed).Error())
 
@@ -109,7 +109,7 @@ func (r *class) validate(ctx context.Context, client client.Client, req admissio
 	case allowed.Match(gatewayClass.Name) || selector:
 		return nil
 	default:
-		recorder.Eventf(tnt, gatewayClass, corev1.EventTypeWarning, evt.ReasonForbiddenGatewayClass, evt.ActionValidationDenied, "Gateway %s/%s GatewayClass %s is forbidden for the current Tenant", req.Namespace, req.Name, &gatewayClass)
+		recorder.Eventf(gatewayObj, tnt, corev1.EventTypeWarning, evt.ReasonForbiddenGatewayClass, evt.ActionValidationDenied, "Gateway %s/%s GatewayClass %s is forbidden for the current Tenant", req.Namespace, req.Name, &gatewayClass)
 
 		response := admission.Denied(caperrors.NewGatewayClassForbidden(gatewayObj.Name, *allowed).Error())
 

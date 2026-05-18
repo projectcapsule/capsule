@@ -36,7 +36,7 @@ func (h *userMetadataHandler) OnCreate(
 			err := api.ValidateForbidden(ns.Annotations, tnt.Spec.NamespaceOptions.ForbiddenAnnotations)
 			if err != nil {
 				err = errors.Wrap(err, "namespace annotations validation failed")
-				recorder.Eventf(tnt, ns, corev1.EventTypeWarning, evt.ReasonForbiddenAnnotation, evt.ActionValidationDenied, err.Error())
+				recorder.Eventf(ns, tnt, corev1.EventTypeWarning, evt.ReasonForbiddenAnnotation, evt.ActionValidationDenied, err.Error())
 				response := admission.Denied(err.Error())
 
 				return &response
@@ -45,7 +45,7 @@ func (h *userMetadataHandler) OnCreate(
 			err = api.ValidateForbidden(ns.Labels, tnt.Spec.NamespaceOptions.ForbiddenLabels)
 			if err != nil {
 				err = errors.Wrap(err, "namespace labels validation failed")
-				recorder.Eventf(tnt, ns, corev1.EventTypeWarning, evt.ReasonForbiddenLabel, evt.ActionValidationDenied, err.Error())
+				recorder.Eventf(ns, tnt, corev1.EventTypeWarning, evt.ReasonForbiddenLabel, evt.ActionValidationDenied, err.Error())
 				response := admission.Denied(err.Error())
 
 				return &response
@@ -70,7 +70,7 @@ func (h *userMetadataHandler) OnUpdate(
 			if !ok {
 				response := admission.Denied("the node-selector annotation is enforced, cannot be removed")
 
-				recorder.Eventf(tnt, oldNs, corev1.EventTypeWarning, "ForbiddenNodeSelectorDeletion", "Denied", string(response.Result.Reason))
+				recorder.Eventf(oldNs, tnt, corev1.EventTypeWarning, "ForbiddenNodeSelectorDeletion", "Denied", string(response.Result.Reason))
 
 				return &response
 			}
@@ -78,7 +78,7 @@ func (h *userMetadataHandler) OnUpdate(
 			if v != oldNs.GetAnnotations()["scheduler.alpha.kubernetes.io/node-selector"] {
 				response := admission.Denied("the node-selector annotation is enforced, cannot be updated")
 
-				recorder.Eventf(tnt, oldNs, corev1.EventTypeWarning, "ForbiddenNodeSelectorUpdate", "Denied", string(response.Result.Reason))
+				recorder.Eventf(oldNs, tnt, corev1.EventTypeWarning, "ForbiddenNodeSelectorUpdate", "Denied", string(response.Result.Reason))
 
 				return &response
 			}
@@ -128,7 +128,7 @@ func (h *userMetadataHandler) OnUpdate(
 			err := api.ValidateForbidden(annotations, tnt.Spec.NamespaceOptions.ForbiddenAnnotations)
 			if err != nil {
 				err = errors.Wrap(err, "namespace annotations validation failed")
-				recorder.Eventf(tnt, oldNs, corev1.EventTypeWarning, evt.ReasonForbiddenAnnotation, evt.ActionValidationDenied, err.Error())
+				recorder.Eventf(oldNs, tnt, corev1.EventTypeWarning, evt.ReasonForbiddenAnnotation, evt.ActionValidationDenied, err.Error())
 				response := admission.Denied(err.Error())
 
 				return &response
@@ -137,7 +137,7 @@ func (h *userMetadataHandler) OnUpdate(
 			err = api.ValidateForbidden(labels, tnt.Spec.NamespaceOptions.ForbiddenLabels)
 			if err != nil {
 				err = errors.Wrap(err, "namespace labels validation failed")
-				recorder.Eventf(tnt, oldNs, corev1.EventTypeWarning, evt.ReasonForbiddenLabel, evt.ActionValidationDenied, err.Error())
+				recorder.Eventf(oldNs, tnt, corev1.EventTypeWarning, evt.ReasonForbiddenLabel, evt.ActionValidationDenied, err.Error())
 				response := admission.Denied(err.Error())
 
 				return &response

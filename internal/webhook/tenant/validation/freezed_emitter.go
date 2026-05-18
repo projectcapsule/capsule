@@ -44,9 +44,9 @@ func (h *freezedEmitterHandler) OnUpdate(
 	return func(_ context.Context, req admission.Request) *admission.Response {
 		switch {
 		case !old.Spec.Cordoned && tnt.Spec.Cordoned:
-			recorder.Eventf(tnt, tnt, corev1.EventTypeNormal, evt.ReasonCordoning, evt.ActionCordoned, "Tenant has been cordoned", "")
+			recorder.Eventf(tnt, nil, corev1.EventTypeNormal, evt.ReasonCordoning, evt.ActionCordoned, "Tenant has been cordoned", "")
 		case old.Spec.Cordoned && !tnt.Spec.Cordoned:
-			recorder.Eventf(tnt, tnt, corev1.EventTypeNormal, evt.ReasonCordoning, evt.ActionUncordoned, "Tenant has been uncordoned", "")
+			recorder.Eventf(tnt, nil, corev1.EventTypeNormal, evt.ReasonCordoning, evt.ActionUncordoned, "Tenant has been uncordoned", "")
 		}
 
 		return nil
