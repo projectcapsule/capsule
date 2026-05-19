@@ -203,13 +203,16 @@ var _ = Describe("enforcing a Runtime Class", Label("pod", "classes"), func() {
 							Namespace: ns.GetName(),
 						},
 						Spec: corev1.PodSpec{
+							SecurityContext:  nobodyPodSecurityContext(),
+							RuntimeClassName: &class,
 							Containers: []corev1.Container{
 								{
-									Name:  "container",
-									Image: "quay.io/google-containers/pause-amd64:3.0",
+									Name:            "container",
+									Image:           "gcr.io/google_containers/pause-amd64:3.0",
+									ImagePullPolicy: corev1.PullIfNotPresent,
+									SecurityContext: restrictedContainerSecurityContext(),
 								},
 							},
-							RuntimeClassName: &class,
 						},
 					}
 
@@ -248,13 +251,16 @@ var _ = Describe("enforcing a Runtime Class", Label("pod", "classes"), func() {
 					Name: "container",
 				},
 				Spec: corev1.PodSpec{
+					SecurityContext:  nobodyPodSecurityContext(),
+					RuntimeClassName: &disallowed.Name,
 					Containers: []corev1.Container{
 						{
-							Name:  "container",
-							Image: "quay.io/google-containers/pause-amd64:3.0",
+							Name:            "container",
+							Image:           "gcr.io/google_containers/pause-amd64:3.0",
+							ImagePullPolicy: corev1.PullIfNotPresent,
+							SecurityContext: restrictedContainerSecurityContext(),
 						},
 					},
-					RuntimeClassName: &disallowed.Name,
 				},
 			}
 
@@ -290,13 +296,16 @@ var _ = Describe("enforcing a Runtime Class", Label("pod", "classes"), func() {
 				Name: "container",
 			},
 			Spec: corev1.PodSpec{
+				SecurityContext:  nobodyPodSecurityContext(),
+				RuntimeClassName: &legacy.Name,
 				Containers: []corev1.Container{
 					{
-						Name:  "container",
-						Image: "quay.io/google-containers/pause-amd64:3.0",
+						Name:            "container",
+						Image:           "gcr.io/google_containers/pause-amd64:3.0",
+						ImagePullPolicy: corev1.PullIfNotPresent,
+						SecurityContext: restrictedContainerSecurityContext(),
 					},
 				},
-				RuntimeClassName: &legacy.Name,
 			},
 		}
 
@@ -328,13 +337,16 @@ var _ = Describe("enforcing a Runtime Class", Label("pod", "classes"), func() {
 					Name: rt,
 				},
 				Spec: corev1.PodSpec{
+					SecurityContext:  nobodyPodSecurityContext(),
+					RuntimeClassName: &runtimeName,
 					Containers: []corev1.Container{
 						{
-							Name:  "container",
-							Image: "quay.io/google-containers/pause-amd64:3.0",
+							Name:            "container",
+							Image:           "gcr.io/google_containers/pause-amd64:3.0",
+							ImagePullPolicy: corev1.PullIfNotPresent,
+							SecurityContext: restrictedContainerSecurityContext(),
 						},
 					},
-					RuntimeClassName: &runtimeName,
 				},
 			}
 
@@ -374,13 +386,16 @@ var _ = Describe("enforcing a Runtime Class", Label("pod", "classes"), func() {
 					Name: rt,
 				},
 				Spec: corev1.PodSpec{
+					SecurityContext:  nobodyPodSecurityContext(),
+					RuntimeClassName: &runtimeName,
 					Containers: []corev1.Container{
 						{
-							Name:  "container",
-							Image: "quay.io/google-containers/pause-amd64:3.0",
+							Name:            "container",
+							Image:           "gcr.io/google_containers/pause-amd64:3.0",
+							ImagePullPolicy: corev1.PullIfNotPresent,
+							SecurityContext: restrictedContainerSecurityContext(),
 						},
 					},
-					RuntimeClassName: &runtimeName,
 				},
 			}
 
@@ -422,10 +437,13 @@ var _ = Describe("enforcing a Runtime Class", Label("pod", "classes"), func() {
 				Namespace: ns.Name,
 			},
 			Spec: corev1.PodSpec{
+				SecurityContext: nobodyPodSecurityContext(),
 				Containers: []corev1.Container{
 					{
-						Name:  "container",
-						Image: "quay.io/google-containers/pause-amd64:3.0",
+						Name:            "container",
+						Image:           "gcr.io/google_containers/pause-amd64:3.0",
+						ImagePullPolicy: corev1.PullIfNotPresent,
+						SecurityContext: restrictedContainerSecurityContext(),
 					},
 				},
 			},

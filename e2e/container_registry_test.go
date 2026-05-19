@@ -100,10 +100,12 @@ var _ = Describe("enforcing a Container Registry", Label("tenant", "images", "re
 				Name: "container",
 			},
 			Spec: corev1.PodSpec{
+				SecurityContext: nobodyPodSecurityContext(),
 				Containers: []corev1.Container{
 					{
-						Name:  "container",
-						Image: "gcr.io/google_containers/pause-amd64:3.0",
+						Name:            "container",
+						Image:           "gcr.io/google_containers/pause-amd64:3.0",
+						SecurityContext: restrictedContainerSecurityContext(),
 					},
 				},
 			},
@@ -129,10 +131,12 @@ var _ = Describe("enforcing a Container Registry", Label("tenant", "images", "re
 				Name: "container",
 			},
 			Spec: corev1.PodSpec{
+				SecurityContext: nobodyPodSecurityContext(),
 				Containers: []corev1.Container{
 					{
-						Name:  "container",
-						Image: "myregistry.azurecr.io/myapp:latest",
+						Name:            "container",
+						Image:           "myregistry.azurecr.io/myapp:latest",
+						SecurityContext: restrictedContainerSecurityContext(),
 					},
 				},
 			},
@@ -169,10 +173,12 @@ var _ = Describe("enforcing a Container Registry", Label("tenant", "images", "re
 				Name: "container",
 			},
 			Spec: corev1.PodSpec{
+				SecurityContext: nobodyPodSecurityContext(),
 				Containers: []corev1.Container{
 					{
-						Name:  "container",
-						Image: "myregistry.azurecr.io/myapp:latest",
+						Name:            "container",
+						Image:           "myregistry.azurecr.io/myapp:latest",
+						SecurityContext: restrictedContainerSecurityContext(),
 					},
 				},
 			},
@@ -223,10 +229,12 @@ var _ = Describe("enforcing a Container Registry", Label("tenant", "images", "re
 				Name: "container",
 			},
 			Spec: corev1.PodSpec{
+				SecurityContext: nobodyPodSecurityContext(),
 				Containers: []corev1.Container{
 					{
-						Name:  "container",
-						Image: "docker.io/google-containers/pause-amd64:3.0",
+						Name:            "container",
+						Image:           "docker.io/google-containers/pause-amd64:3.0",
+						SecurityContext: restrictedContainerSecurityContext(),
 					},
 				},
 			},
@@ -306,16 +314,19 @@ var _ = Describe("enforcing a Container Registry", Label("tenant", "images", "re
 				Name: "container",
 			},
 			Spec: corev1.PodSpec{
+				SecurityContext: nobodyPodSecurityContext(),
 				InitContainers: []corev1.Container{
 					{
-						Name:  "init",
-						Image: "myregistry.azurecr.io/myapp:latest",
+						Name:            "init",
+						Image:           "myregistry.azurecr.io/myapp:latest",
+						SecurityContext: restrictedContainerSecurityContext(),
 					},
 				},
 				Containers: []corev1.Container{
 					{
-						Name:  "container",
-						Image: "myregistry.azurecr.io/myapp:latest",
+						Name:            "container",
+						Image:           "myregistry.azurecr.io/myapp:latest",
+						SecurityContext: restrictedContainerSecurityContext(),
 					},
 				},
 			},
@@ -355,10 +366,12 @@ var _ = Describe("enforcing a Container Registry", Label("tenant", "images", "re
 				Name: "container",
 			},
 			Spec: corev1.PodSpec{
+				SecurityContext: nobodyPodSecurityContext(),
 				Containers: []corev1.Container{
 					{
-						Name:  "container",
-						Image: "myregistry.azurecr.io/myapp:latest",
+						Name:            "container",
+						Image:           "myregistry.azurecr.io/myapp:latest",
+						SecurityContext: restrictedContainerSecurityContext(),
 					},
 				},
 			},
@@ -398,10 +411,12 @@ var _ = Describe("enforcing a Container Registry", Label("tenant", "images", "re
 				Name: "container",
 			},
 			Spec: corev1.PodSpec{
+				SecurityContext: nobodyPodSecurityContext(),
 				Containers: []corev1.Container{
 					{
-						Name:  "container",
-						Image: "docker.io/google-containers/pause-amd64:3.0",
+						Name:            "container",
+						Image:           "docker.io/google-containers/pause-amd64:3.0",
+						SecurityContext: restrictedContainerSecurityContext(),
 					},
 				},
 			},
@@ -481,16 +496,20 @@ var _ = Describe("enforcing a Container Registry", Label("tenant", "images", "re
 				Name: "container",
 			},
 			Spec: corev1.PodSpec{
+				SecurityContext: nobodyPodSecurityContext(),
 				InitContainers: []corev1.Container{
 					{
-						Name:  "init",
-						Image: "myregistry.azurecr.io/myapp:latest",
+						Name:            "init",
+						Image:           "myregistry.azurecr.io/myapp:latest",
+						SecurityContext: restrictedContainerSecurityContext(),
 					},
 				},
+
 				Containers: []corev1.Container{
 					{
-						Name:  "container",
-						Image: "docker.io/google-containers/pause-amd64:3.0",
+						Name:            "container",
+						Image:           "docker.io/google-containers/pause-amd64:3.0",
+						SecurityContext: restrictedContainerSecurityContext(),
 					},
 				},
 			},
@@ -556,10 +575,12 @@ var _ = Describe("enforcing a Container Registry", Label("tenant", "images", "re
 				Name: "container",
 			},
 			Spec: corev1.PodSpec{
+				SecurityContext: nobodyPodSecurityContext(),
 				Containers: []corev1.Container{
 					{
-						Name:  "container",
-						Image: "quay.io/google-containers/pause-amd64:3.0",
+						Name:            "container",
+						Image:           "quay.io/google-containers/pause-amd64:3.0",
+						SecurityContext: restrictedContainerSecurityContext(),
 					},
 				},
 			},

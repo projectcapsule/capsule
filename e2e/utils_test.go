@@ -698,10 +698,12 @@ func MakePod(namespace, name string, labels map[string]string, annotations map[s
 			Annotations: annotations,
 		},
 		Spec: corev1.PodSpec{
+			SecurityContext: nobodyPodSecurityContext(),
 			Containers: []corev1.Container{
 				{
-					Name:  "main",
-					Image: image,
+					Name:            "main",
+					Image:           image,
+					SecurityContext: restrictedContainerSecurityContext(),
 				},
 			},
 			RestartPolicy: corev1.RestartPolicyAlways,
@@ -754,10 +756,12 @@ func MakeDeployment(namespace, name string, replicas int32, labels map[string]st
 					Labels: mergeMaps(map[string]string{"app": name}, labels),
 				},
 				Spec: corev1.PodSpec{
+					SecurityContext: nobodyPodSecurityContext(),
 					Containers: []corev1.Container{
 						{
-							Name:  "nginx",
-							Image: "nginx:1.27.0",
+							Name:            "nginx",
+							Image:           "nginx:1.27.0",
+							SecurityContext: restrictedContainerSecurityContext(),
 						},
 					},
 				},
@@ -772,6 +776,28 @@ func MakeDeployment(namespace, name string, replicas int32, labels map[string]st
 	}
 
 	return dep
+}
+
+func nobodyPodSecurityContext() *corev1.PodSecurityContext {
+	return &corev1.PodSecurityContext{
+		RunAsNonRoot: ptr.To(true),
+		RunAsUser:    ptr.To[int64](65534),
+		RunAsGroup:   ptr.To[int64](65534),
+		SeccompProfile: &corev1.SeccompProfile{
+			Type: corev1.SeccompProfileTypeRuntimeDefault,
+		},
+	}
+}
+
+func restrictedContainerSecurityContext() *corev1.SecurityContext {
+	return &corev1.SecurityContext{
+		AllowPrivilegeEscalation: ptr.To(false),
+		Capabilities: &corev1.Capabilities{
+			Drop: []corev1.Capability{
+				"ALL",
+			},
+		},
+	}
 }
 
 func MakePVC(namespace, name, size string) *corev1.PersistentVolumeClaim {

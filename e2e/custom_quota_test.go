@@ -9,7 +9,7 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
-	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
+	"github.com/projectcapsule/capsule/pkg/runtime/gvk"
 	"github.com/projectcapsule/capsule/pkg/runtime/quota"
 	"github.com/projectcapsule/capsule/pkg/runtime/selectors"
 	corev1 "k8s.io/api/core/v1"
@@ -97,13 +97,14 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Label("na
 				Limit: resource.MustParse("10Gi"),
 				Sources: []capsulev1beta2.CustomQuotaSpecSource{
 					{
-						GroupVersionKind: metav1.GroupVersionKind{
-							Group:   "",
-							Version: "v1",
-							Kind:    "Pod",
+						VersionKind: gvk.VersionKind{
+							APIVersion: "v1",
+							Kind:       "Pod",
 						},
-						Operation: quota.OpAdd,
-						Path:      ".spec.volumes[*].emptyDir.sizeLimit",
+						CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
+							Operation: quota.OpAdd,
+							Path:      ".spec.volumes[*].emptyDir.sizeLimit",
+						},
 					},
 				},
 			},
@@ -147,13 +148,14 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Label("na
 				Limit: resource.MustParse("10Gi"),
 				Sources: []capsulev1beta2.CustomQuotaSpecSource{
 					{
-						GroupVersionKind: metav1.GroupVersionKind{
-							Group:   "",
-							Version: "v1",
-							Kind:    "Pod",
+						VersionKind: gvk.VersionKind{
+							APIVersion: "v1",
+							Kind:       "Pod",
 						},
-						Operation: quota.OpAdd,
-						Path:      ".spec.volumes[*].emptyDir.sizeLimit",
+						CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
+							Operation: quota.OpAdd,
+							Path:      ".spec.volumes[*].emptyDir.sizeLimit",
+						},
 					},
 				},
 			},
@@ -188,17 +190,18 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Label("na
 				Limit: resource.MustParse("10"),
 				Sources: []capsulev1beta2.CustomQuotaSpecSource{
 					{
-						GroupVersionKind: metav1.GroupVersionKind{
-							Group:   "",
-							Version: "v1",
-							Kind:    "Pod",
+						VersionKind: gvk.VersionKind{
+							APIVersion: "v1",
+							Kind:       "Pod",
 						},
-						Operation: quota.OpCount,
-						Selectors: []selectors.SelectorWithFields{
-							{
-								LabelSelector: &metav1.LabelSelector{
-									MatchLabels: map[string]string{
-										"track": "yes",
+						CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
+							Operation: quota.OpCount,
+							Selectors: []selectors.SelectorWithFields{
+								{
+									LabelSelector: &metav1.LabelSelector{
+										MatchLabels: map[string]string{
+											"track": "yes",
+										},
 									},
 								},
 							},
@@ -270,13 +273,14 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Label("na
 					Limit: resource.MustParse("500m"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							GroupVersionKind: metav1.GroupVersionKind{
-								Group:   "",
-								Version: "v1",
-								Kind:    "Pod",
+							VersionKind: gvk.VersionKind{
+								APIVersion: "v1",
+								Kind:       "Pod",
 							},
-							Operation: quota.OpAdd,
-							Path:      ".spec.containers[*].resources.requests.cpu",
+							CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
+								Operation: quota.OpAdd,
+								Path:      ".spec.containers[*].resources.requests.cpu",
+							},
 						},
 					},
 				},
@@ -304,13 +308,14 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Label("na
 				Limit: resource.MustParse("2Gi"),
 				Sources: []capsulev1beta2.CustomQuotaSpecSource{
 					{
-						GroupVersionKind: metav1.GroupVersionKind{
-							Group:   "",
-							Version: "v1",
-							Kind:    "Pod",
+						VersionKind: gvk.VersionKind{
+							APIVersion: "v1",
+							Kind:       "Pod",
 						},
-						Operation: quota.OpAdd,
-						Path:      ".spec.volumes[*].emptyDir.sizeLimit",
+						CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
+							Operation: quota.OpAdd,
+							Path:      ".spec.volumes[*].emptyDir.sizeLimit",
+						},
 					},
 				},
 			},
@@ -330,7 +335,7 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Label("na
 
 		expectGlobalQuotaUsedAndClaims(ctx, gq.GetName(), "200m", 2)
 		expectCustomQuotaUsedAndClaims(ctx, testNamespace, cq.GetName(), "2Gi", 2)
-		expectLedgerSettled(ctx, configuration.ControllerNamespace(), gq.GetName())
+		expectLedgerSettled(ctx, ControllerNamespace, gq.GetName())
 		expectLedgerSettled(ctx, testNamespace, cq.GetName())
 
 		Eventually(func() error {
@@ -341,7 +346,7 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Label("na
 		)
 	})
 
-	It("treats missing quantity paths as zero contribution", func() {
+	It("treats missing quantity paths as error", func() {
 		q := &capsulev1beta2.CustomQuota{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "cq-wrong-path-zero",
@@ -354,22 +359,24 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Label("na
 				Limit: resource.MustParse("10Gi"),
 				Sources: []capsulev1beta2.CustomQuotaSpecSource{
 					{
-						GroupVersionKind: metav1.GroupVersionKind{
-							Group:   "",
-							Version: "v1",
-							Kind:    "Pod",
+						VersionKind: gvk.VersionKind{
+							APIVersion: "v1",
+							Kind:       "Pod",
 						},
-						Operation: quota.OpAdd,
-						Path:      ".spec.volumes[*].doesNotExist.sizeLimit",
+						CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
+							Operation: quota.OpAdd,
+							Path:      ".spec.volumes[*].doesNotExist.sizeLimit",
+						},
 					},
 					{
-						GroupVersionKind: metav1.GroupVersionKind{
-							Group:   "",
-							Version: "v1",
-							Kind:    "PersistentVolumeClaim",
+						VersionKind: gvk.VersionKind{
+							APIVersion: "v1",
+							Kind:       "PersistentVolumeClaim",
 						},
-						Operation: quota.OpAdd,
-						Path:      ".spec.resources.requests.thisDoesNotExist",
+						CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
+							Operation: quota.OpAdd,
+							Path:      ".spec.resources.requests.thisDoesNotExist",
+						},
 					},
 				},
 			},
@@ -386,13 +393,13 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Label("na
 		EventuallyCreation(func() error {
 			pod.ResourceVersion = ""
 			return k8sClient.Create(ctx, pod)
-		}).Should(Succeed())
+		}).ShouldNot(Succeed())
 		EventuallyCreation(func() error {
 			pvc.ResourceVersion = ""
 			return k8sClient.Create(ctx, pvc)
-		}).Should(Succeed())
+		}).ShouldNot(Succeed())
 
-		expectCustomQuotaUsedAndClaims(ctx, testNamespace, q.GetName(), "0", 2)
+		expectCustomQuotaUsedAndClaims(ctx, testNamespace, q.GetName(), "0", 0)
 		expectLedgerSettled(ctx, testNamespace, q.GetName())
 	})
 
@@ -409,18 +416,19 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Label("na
 				Limit: resource.MustParse("500m"),
 				Sources: []capsulev1beta2.CustomQuotaSpecSource{
 					{
-						GroupVersionKind: metav1.GroupVersionKind{
-							Group:   "",
-							Version: "v1",
-							Kind:    "Pod",
+						VersionKind: gvk.VersionKind{
+							APIVersion: "v1",
+							Kind:       "Pod",
 						},
-						Operation: quota.OpAdd,
-						Path:      ".spec.containers[*].resources.requests.cpu",
-						Selectors: []selectors.SelectorWithFields{
-							{
-								LabelSelector: &metav1.LabelSelector{
-									MatchLabels: map[string]string{
-										"track": "yes",
+						CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
+							Operation: quota.OpAdd,
+							Path:      ".spec.containers[*].resources.requests.cpu",
+							Selectors: []selectors.SelectorWithFields{
+								{
+									LabelSelector: &metav1.LabelSelector{
+										MatchLabels: map[string]string{
+											"track": "yes",
+										},
 									},
 								},
 							},
@@ -469,12 +477,13 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Label("na
 				Limit: resource.MustParse("5"),
 				Sources: []capsulev1beta2.CustomQuotaSpecSource{
 					{
-						GroupVersionKind: metav1.GroupVersionKind{
-							Group:   "",
-							Version: "v1",
-							Kind:    "Pod",
+						VersionKind: gvk.VersionKind{
+							APIVersion: "v1",
+							Kind:       "Pod",
 						},
-						Operation: quota.OpCount,
+						CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
+							Operation: quota.OpCount,
+						},
 					},
 				},
 			},
@@ -515,17 +524,18 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Label("na
 				Limit: resource.MustParse("10"),
 				Sources: []capsulev1beta2.CustomQuotaSpecSource{
 					{
-						GroupVersionKind: metav1.GroupVersionKind{
-							Group:   "",
-							Version: "v1",
-							Kind:    "Pod",
+						VersionKind: gvk.VersionKind{
+							APIVersion: "v1",
+							Kind:       "Pod",
 						},
-						Operation: quota.OpCount,
-						Selectors: []selectors.SelectorWithFields{
-							{
-								LabelSelector: &metav1.LabelSelector{
-									MatchLabels: map[string]string{
-										"track": "yes",
+						CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
+							Operation: quota.OpCount,
+							Selectors: []selectors.SelectorWithFields{
+								{
+									LabelSelector: &metav1.LabelSelector{
+										MatchLabels: map[string]string{
+											"track": "yes",
+										},
 									},
 								},
 							},
@@ -566,18 +576,19 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Label("na
 				Limit: resource.MustParse("10"),
 				Sources: []capsulev1beta2.CustomQuotaSpecSource{
 					{
-						GroupVersionKind: metav1.GroupVersionKind{
-							Group:   "",
-							Version: "v1",
-							Kind:    "Pod",
+						VersionKind: gvk.VersionKind{
+							APIVersion: "v1",
+							Kind:       "Pod",
 						},
-						Operation: quota.OpCount,
-						Selectors: []selectors.SelectorWithFields{
-							{
-								LabelSelector: &metav1.LabelSelector{
-									MatchLabels: map[string]string{
-										"track": "yes",
-										"tier":  "frontend",
+						CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
+							Operation: quota.OpCount,
+							Selectors: []selectors.SelectorWithFields{
+								{
+									LabelSelector: &metav1.LabelSelector{
+										MatchLabels: map[string]string{
+											"track": "yes",
+											"tier":  "frontend",
+										},
 									},
 								},
 							},
@@ -624,16 +635,17 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Label("na
 				Limit: resource.MustParse("10"),
 				Sources: []capsulev1beta2.CustomQuotaSpecSource{
 					{
-						GroupVersionKind: metav1.GroupVersionKind{
-							Group:   "",
-							Version: "v1",
-							Kind:    "Pod",
+						VersionKind: gvk.VersionKind{
+							APIVersion: "v1",
+							Kind:       "Pod",
 						},
-						Operation: quota.OpCount,
-						Selectors: []selectors.SelectorWithFields{
-							{
-								FieldSelectors: []string{
-									`.spec.containers[?(@.image=="nginx:1.27.0")]`,
+						CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
+							Operation: quota.OpCount,
+							Selectors: []selectors.SelectorWithFields{
+								{
+									FieldSelectors: []string{
+										`.spec.containers[?(@.image=="nginx:1.27.0")]`,
+									},
 								},
 							},
 						},
@@ -673,17 +685,18 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Label("na
 				Limit: resource.MustParse("10"),
 				Sources: []capsulev1beta2.CustomQuotaSpecSource{
 					{
-						GroupVersionKind: metav1.GroupVersionKind{
-							Group:   "",
-							Version: "v1",
-							Kind:    "Pod",
+						VersionKind: gvk.VersionKind{
+							APIVersion: "v1",
+							Kind:       "Pod",
 						},
-						Operation: quota.OpCount,
-						Selectors: []selectors.SelectorWithFields{
-							{
-								FieldSelectors: []string{
-									`.spec.containers[?(@.image=="nginx:1.27.0")]`,
-									`.spec.containers[?(@.name=="main")]`,
+						CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
+							Operation: quota.OpCount,
+							Selectors: []selectors.SelectorWithFields{
+								{
+									FieldSelectors: []string{
+										`.spec.containers[?(@.image=="nginx:1.27.0")]`,
+										`.spec.containers[?(@.name=="main")]`,
+									},
 								},
 							},
 						},
@@ -723,22 +736,24 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Label("na
 				Limit: resource.MustParse("3Gi"),
 				Sources: []capsulev1beta2.CustomQuotaSpecSource{
 					{
-						GroupVersionKind: metav1.GroupVersionKind{
-							Group:   "",
-							Version: "v1",
-							Kind:    "Pod",
+						VersionKind: gvk.VersionKind{
+							APIVersion: "v1",
+							Kind:       "Pod",
 						},
-						Operation: quota.OpAdd,
-						Path:      ".spec.volumes[*].emptyDir.sizeLimit",
+						CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
+							Operation: quota.OpAdd,
+							Path:      ".spec.volumes[*].emptyDir.sizeLimit",
+						},
 					},
 					{
-						GroupVersionKind: metav1.GroupVersionKind{
-							Group:   "",
-							Version: "v1",
-							Kind:    "PersistentVolumeClaim",
+						VersionKind: gvk.VersionKind{
+							APIVersion: "v1",
+							Kind:       "PersistentVolumeClaim",
 						},
-						Operation: quota.OpAdd,
-						Path:      ".spec.resources.requests.storage",
+						CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
+							Operation: quota.OpAdd,
+							Path:      ".spec.resources.requests.storage",
+						},
 					},
 				},
 			},
@@ -779,35 +794,37 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Label("na
 				Limit: resource.MustParse("10Gi"),
 				Sources: []capsulev1beta2.CustomQuotaSpecSource{
 					{
-						GroupVersionKind: metav1.GroupVersionKind{
-							Group:   "",
-							Version: "v1",
-							Kind:    "Pod",
+						VersionKind: gvk.VersionKind{
+							APIVersion: "v1",
+							Kind:       "Pod",
 						},
-						Path:      ".spec.volumes[*].emptyDir.sizeLimit",
-						Operation: quota.OpAdd,
-						Selectors: []selectors.SelectorWithFields{
-							{
-								LabelSelector: &metav1.LabelSelector{
-									MatchLabels: map[string]string{
-										"track": "yes",
+						CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
+							Path:      ".spec.volumes[*].emptyDir.sizeLimit",
+							Operation: quota.OpAdd,
+							Selectors: []selectors.SelectorWithFields{
+								{
+									LabelSelector: &metav1.LabelSelector{
+										MatchLabels: map[string]string{
+											"track": "yes",
+										},
 									},
 								},
 							},
 						},
 					},
 					{
-						GroupVersionKind: metav1.GroupVersionKind{
-							Group:   "",
-							Version: "v1",
-							Kind:    "PersistentVolumeClaim",
+						VersionKind: gvk.VersionKind{
+							APIVersion: "v1",
+							Kind:       "PersistentVolumeClaim",
 						},
-						Path:      ".spec.resources.requests.storage",
-						Operation: quota.OpAdd,
-						Selectors: []selectors.SelectorWithFields{
-							{
-								FieldSelectors: []string{
-									`.spec.accessModes[?(@=="ReadWriteOnce")]`,
+						CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
+							Path:      ".spec.resources.requests.storage",
+							Operation: quota.OpAdd,
+							Selectors: []selectors.SelectorWithFields{
+								{
+									FieldSelectors: []string{
+										`.spec.accessModes[?(@=="ReadWriteOnce")]`,
+									},
 								},
 							},
 						},
@@ -865,13 +882,14 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Label("na
 				Limit: resource.MustParse("10Gi"),
 				Sources: []capsulev1beta2.CustomQuotaSpecSource{
 					{
-						GroupVersionKind: metav1.GroupVersionKind{
-							Group:   "",
-							Version: "v1",
-							Kind:    "PersistentVolumeClaim",
+						VersionKind: gvk.VersionKind{
+							APIVersion: "v1",
+							Kind:       "PersistentVolumeClaim",
 						},
-						Operation: quota.OpSub,
-						Path:      ".spec.resources.requests.storage",
+						CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
+							Operation: quota.OpSub,
+							Path:      ".spec.resources.requests.storage",
+						},
 					},
 				},
 			},
@@ -905,22 +923,24 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Label("na
 				Limit: resource.MustParse("10Gi"),
 				Sources: []capsulev1beta2.CustomQuotaSpecSource{
 					{
-						GroupVersionKind: metav1.GroupVersionKind{
-							Group:   "",
-							Version: "v1",
-							Kind:    "Pod",
+						VersionKind: gvk.VersionKind{
+							APIVersion: "v1",
+							Kind:       "Pod",
 						},
-						Operation: quota.OpAdd,
-						Path:      ".spec.volumes[*].emptyDir.sizeLimit",
+						CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
+							Operation: quota.OpAdd,
+							Path:      ".spec.volumes[*].emptyDir.sizeLimit",
+						},
 					},
 					{
-						GroupVersionKind: metav1.GroupVersionKind{
-							Group:   "",
-							Version: "v1",
-							Kind:    "PersistentVolumeClaim",
+						VersionKind: gvk.VersionKind{
+							APIVersion: "v1",
+							Kind:       "PersistentVolumeClaim",
 						},
-						Operation: quota.OpSub,
-						Path:      ".spec.resources.requests.storage",
+						CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
+							Operation: quota.OpSub,
+							Path:      ".spec.resources.requests.storage",
+						},
 					},
 				},
 			},
@@ -960,22 +980,24 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Label("na
 				Limit: resource.MustParse("10Gi"),
 				Sources: []capsulev1beta2.CustomQuotaSpecSource{
 					{
-						GroupVersionKind: metav1.GroupVersionKind{
-							Group:   "",
-							Version: "v1",
-							Kind:    "Pod",
+						VersionKind: gvk.VersionKind{
+							APIVersion: "v1",
+							Kind:       "Pod",
 						},
-						Operation: quota.OpAdd,
-						Path:      ".spec.volumes[*].emptyDir.sizeLimit",
+						CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
+							Operation: quota.OpAdd,
+							Path:      ".spec.volumes[*].emptyDir.sizeLimit",
+						},
 					},
 					{
-						GroupVersionKind: metav1.GroupVersionKind{
-							Group:   "",
-							Version: "v1",
-							Kind:    "PersistentVolumeClaim",
+						VersionKind: gvk.VersionKind{
+							APIVersion: "v1",
+							Kind:       "PersistentVolumeClaim",
 						},
-						Operation: quota.OpSub,
-						Path:      ".spec.resources.requests.storage",
+						CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
+							Operation: quota.OpSub,
+							Path:      ".spec.resources.requests.storage",
+						},
 					},
 				},
 			},
@@ -1015,27 +1037,29 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Label("na
 				Limit: resource.MustParse("10Gi"),
 				Sources: []capsulev1beta2.CustomQuotaSpecSource{
 					{
-						GroupVersionKind: metav1.GroupVersionKind{
-							Group:   "",
-							Version: "v1",
-							Kind:    "Pod",
+						VersionKind: gvk.VersionKind{
+							APIVersion: "v1",
+							Kind:       "Pod",
 						},
-						Operation: quota.OpAdd,
-						Path:      ".spec.volumes[*].emptyDir.sizeLimit",
+						CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
+							Operation: quota.OpAdd,
+							Path:      ".spec.volumes[*].emptyDir.sizeLimit",
+						},
 					},
 					{
-						GroupVersionKind: metav1.GroupVersionKind{
-							Group:   "",
-							Version: "v1",
-							Kind:    "PersistentVolumeClaim",
+						VersionKind: gvk.VersionKind{
+							APIVersion: "v1",
+							Kind:       "PersistentVolumeClaim",
 						},
-						Operation: quota.OpSub,
-						Path:      ".spec.resources.requests.storage",
-						Selectors: []selectors.SelectorWithFields{
-							{
-								LabelSelector: &metav1.LabelSelector{
-									MatchLabels: map[string]string{
-										"discount": "yes",
+						CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
+							Operation: quota.OpSub,
+							Path:      ".spec.resources.requests.storage",
+							Selectors: []selectors.SelectorWithFields{
+								{
+									LabelSelector: &metav1.LabelSelector{
+										MatchLabels: map[string]string{
+											"discount": "yes",
+										},
 									},
 								},
 							},
@@ -1092,22 +1116,24 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Label("na
 				Limit: resource.MustParse("10Gi"),
 				Sources: []capsulev1beta2.CustomQuotaSpecSource{
 					{
-						GroupVersionKind: metav1.GroupVersionKind{
-							Group:   "",
-							Version: "v1",
-							Kind:    "Pod",
+						VersionKind: gvk.VersionKind{
+							APIVersion: "v1",
+							Kind:       "Pod",
 						},
-						Operation: quota.OpAdd,
-						Path:      ".spec.volumes[*].emptyDir.sizeLimit",
+						CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
+							Operation: quota.OpAdd,
+							Path:      ".spec.volumes[*].emptyDir.sizeLimit",
+						},
 					},
 					{
-						GroupVersionKind: metav1.GroupVersionKind{
-							Group:   "",
-							Version: "v1",
-							Kind:    "PersistentVolumeClaim",
+						VersionKind: gvk.VersionKind{
+							APIVersion: "v1",
+							Kind:       "PersistentVolumeClaim",
 						},
-						Operation: quota.OpSub,
-						Path:      ".spec.resources.requests.storage",
+						CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
+							Operation: quota.OpSub,
+							Path:      ".spec.resources.requests.storage",
+						},
 					},
 				},
 			},
@@ -1151,12 +1177,13 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Label("na
 				Limit: resource.MustParse("2"),
 				Sources: []capsulev1beta2.CustomQuotaSpecSource{
 					{
-						GroupVersionKind: metav1.GroupVersionKind{
-							Group:   "",
-							Version: "v1",
-							Kind:    "Pod",
+						VersionKind: gvk.VersionKind{
+							APIVersion: "v1",
+							Kind:       "Pod",
 						},
-						Operation: quota.OpCount,
+						CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
+							Operation: quota.OpCount,
+						},
 					},
 				},
 			},
@@ -1174,12 +1201,13 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Label("na
 				Limit: resource.MustParse("5"),
 				Sources: []capsulev1beta2.CustomQuotaSpecSource{
 					{
-						GroupVersionKind: metav1.GroupVersionKind{
-							Group:   "",
-							Version: "v1",
-							Kind:    "Pod",
+						VersionKind: gvk.VersionKind{
+							APIVersion: "v1",
+							Kind:       "Pod",
 						},
-						Operation: quota.OpCount,
+						CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
+							Operation: quota.OpCount,
+						},
 					},
 				},
 			},
@@ -1229,13 +1257,14 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Label("na
 				Limit: resource.MustParse("200m"),
 				Sources: []capsulev1beta2.CustomQuotaSpecSource{
 					{
-						GroupVersionKind: metav1.GroupVersionKind{
-							Group:   "",
-							Version: "v1",
-							Kind:    "Pod",
+						VersionKind: gvk.VersionKind{
+							APIVersion: "v1",
+							Kind:       "Pod",
 						},
-						Operation: quota.OpAdd,
-						Path:      ".spec.containers[*].resources.requests.cpu",
+						CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
+							Operation: quota.OpAdd,
+							Path:      ".spec.containers[*].resources.requests.cpu",
+						},
 					},
 				},
 			},
@@ -1253,13 +1282,14 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Label("na
 				Limit: resource.MustParse("500m"),
 				Sources: []capsulev1beta2.CustomQuotaSpecSource{
 					{
-						GroupVersionKind: metav1.GroupVersionKind{
-							Group:   "",
-							Version: "v1",
-							Kind:    "Pod",
+						VersionKind: gvk.VersionKind{
+							APIVersion: "v1",
+							Kind:       "Pod",
 						},
-						Operation: quota.OpAdd,
-						Path:      ".spec.containers[*].resources.requests.cpu",
+						CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
+							Operation: quota.OpAdd,
+							Path:      ".spec.containers[*].resources.requests.cpu",
+						},
 					},
 				},
 			},
@@ -1309,17 +1339,18 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Label("na
 				Limit: resource.MustParse("5"),
 				Sources: []capsulev1beta2.CustomQuotaSpecSource{
 					{
-						GroupVersionKind: metav1.GroupVersionKind{
-							Group:   "",
-							Version: "v1",
-							Kind:    "Pod",
+						VersionKind: gvk.VersionKind{
+							APIVersion: "v1",
+							Kind:       "Pod",
 						},
-						Operation: quota.OpCount,
-						Selectors: []selectors.SelectorWithFields{
-							{
-								LabelSelector: &metav1.LabelSelector{
-									MatchLabels: map[string]string{
-										"track": "yes",
+						CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
+							Operation: quota.OpCount,
+							Selectors: []selectors.SelectorWithFields{
+								{
+									LabelSelector: &metav1.LabelSelector{
+										MatchLabels: map[string]string{
+											"track": "yes",
+										},
 									},
 								},
 							},
@@ -1341,18 +1372,19 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Label("na
 				Limit: resource.MustParse("2"),
 				Sources: []capsulev1beta2.CustomQuotaSpecSource{
 					{
-						GroupVersionKind: metav1.GroupVersionKind{
-							Group:   "",
-							Version: "v1",
-							Kind:    "Pod",
+						VersionKind: gvk.VersionKind{
+							APIVersion: "v1",
+							Kind:       "Pod",
 						},
-						Operation: quota.OpCount,
-						Selectors: []selectors.SelectorWithFields{
-							{
-								LabelSelector: &metav1.LabelSelector{
-									MatchLabels: map[string]string{
-										"track": "yes",
-										"tier":  "frontend",
+						CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
+							Operation: quota.OpCount,
+							Selectors: []selectors.SelectorWithFields{
+								{
+									LabelSelector: &metav1.LabelSelector{
+										MatchLabels: map[string]string{
+											"track": "yes",
+											"tier":  "frontend",
+										},
 									},
 								},
 							},
@@ -1412,13 +1444,14 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Label("na
 				Limit: resource.MustParse("400m"),
 				Sources: []capsulev1beta2.CustomQuotaSpecSource{
 					{
-						GroupVersionKind: metav1.GroupVersionKind{
-							Group:   "",
-							Version: "v1",
-							Kind:    "Pod",
+						VersionKind: gvk.VersionKind{
+							APIVersion: "v1",
+							Kind:       "Pod",
 						},
-						Operation: quota.OpAdd,
-						Path:      ".spec.containers[*].resources.requests.cpu",
+						CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
+							Operation: quota.OpAdd,
+							Path:      ".spec.containers[*].resources.requests.cpu",
+						},
 					},
 				},
 			},
@@ -1436,13 +1469,14 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Label("na
 				Limit: resource.MustParse("2Gi"),
 				Sources: []capsulev1beta2.CustomQuotaSpecSource{
 					{
-						GroupVersionKind: metav1.GroupVersionKind{
-							Group:   "",
-							Version: "v1",
-							Kind:    "Pod",
+						VersionKind: gvk.VersionKind{
+							APIVersion: "v1",
+							Kind:       "Pod",
 						},
-						Operation: quota.OpAdd,
-						Path:      ".spec.volumes[*].emptyDir.sizeLimit",
+						CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
+							Operation: quota.OpAdd,
+							Path:      ".spec.volumes[*].emptyDir.sizeLimit",
+						},
 					},
 				},
 			},
@@ -1486,12 +1520,13 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Label("na
 				Limit: resource.MustParse("3"),
 				Sources: []capsulev1beta2.CustomQuotaSpecSource{
 					{
-						GroupVersionKind: metav1.GroupVersionKind{
-							Group:   "",
-							Version: "v1",
-							Kind:    "Pod",
+						VersionKind: gvk.VersionKind{
+							APIVersion: "v1",
+							Kind:       "Pod",
 						},
-						Operation: quota.OpCount,
+						CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
+							Operation: quota.OpCount,
+						},
 					},
 				},
 			},
@@ -1509,12 +1544,13 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Label("na
 				Limit: resource.MustParse("10"),
 				Sources: []capsulev1beta2.CustomQuotaSpecSource{
 					{
-						GroupVersionKind: metav1.GroupVersionKind{
-							Group:   "",
-							Version: "v1",
-							Kind:    "Pod",
+						VersionKind: gvk.VersionKind{
+							APIVersion: "v1",
+							Kind:       "Pod",
 						},
-						Operation: quota.OpCount,
+						CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
+							Operation: quota.OpCount,
+						},
 					},
 				},
 			},
@@ -1566,12 +1602,13 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Label("na
 					Limit: resource.MustParse("5"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							GroupVersionKind: metav1.GroupVersionKind{
-								Group:   "",
-								Version: "v1",
-								Kind:    "Pod",
+							VersionKind: gvk.VersionKind{
+								APIVersion: "v1",
+								Kind:       "Pod",
 							},
-							Operation: quota.OpCount,
+							CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
+								Operation: quota.OpCount,
+							},
 						},
 					},
 				},
@@ -1599,12 +1636,13 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Label("na
 				Limit: resource.MustParse("2"),
 				Sources: []capsulev1beta2.CustomQuotaSpecSource{
 					{
-						GroupVersionKind: metav1.GroupVersionKind{
-							Group:   "",
-							Version: "v1",
-							Kind:    "Pod",
+						VersionKind: gvk.VersionKind{
+							APIVersion: "v1",
+							Kind:       "Pod",
 						},
-						Operation: quota.OpCount,
+						CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
+							Operation: quota.OpCount,
+						},
 					},
 				},
 			},
@@ -1624,7 +1662,7 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Label("na
 
 		expectGlobalQuotaUsedAndClaims(ctx, gq.GetName(), "2", 2)
 		expectCustomQuotaUsedAndClaims(ctx, testNamespace, cq.GetName(), "2", 2)
-		expectLedgerSettled(ctx, configuration.ControllerNamespace(), gq.GetName())
+		expectLedgerSettled(ctx, ControllerNamespace, gq.GetName())
 		expectLedgerSettled(ctx, testNamespace, cq.GetName())
 
 		Eventually(func() error {
@@ -1648,13 +1686,14 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Label("na
 					Limit: resource.MustParse("500m"),
 					Sources: []capsulev1beta2.CustomQuotaSpecSource{
 						{
-							GroupVersionKind: metav1.GroupVersionKind{
-								Group:   "",
-								Version: "v1",
-								Kind:    "Pod",
+							VersionKind: gvk.VersionKind{
+								APIVersion: "v1",
+								Kind:       "Pod",
 							},
-							Operation: quota.OpAdd,
-							Path:      ".spec.containers[*].resources.requests.cpu",
+							CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
+								Operation: quota.OpAdd,
+								Path:      ".spec.containers[*].resources.requests.cpu",
+							},
 						},
 					},
 				},
@@ -1682,13 +1721,14 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Label("na
 				Limit: resource.MustParse("200m"),
 				Sources: []capsulev1beta2.CustomQuotaSpecSource{
 					{
-						GroupVersionKind: metav1.GroupVersionKind{
-							Group:   "",
-							Version: "v1",
-							Kind:    "Pod",
+						VersionKind: gvk.VersionKind{
+							APIVersion: "v1",
+							Kind:       "Pod",
 						},
-						Operation: quota.OpAdd,
-						Path:      ".spec.containers[*].resources.requests.cpu",
+						CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
+							Operation: quota.OpAdd,
+							Path:      ".spec.containers[*].resources.requests.cpu",
+						},
 					},
 				},
 			},
@@ -1708,7 +1748,7 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Label("na
 
 		expectGlobalQuotaUsedAndClaims(ctx, gq.GetName(), "200m", 2)
 		expectCustomQuotaUsedAndClaims(ctx, testNamespace, cq.GetName(), "200m", 2)
-		expectLedgerSettled(ctx, configuration.ControllerNamespace(), gq.GetName())
+		expectLedgerSettled(ctx, ControllerNamespace, gq.GetName())
 		expectLedgerSettled(ctx, testNamespace, cq.GetName())
 
 		Eventually(func() error {
@@ -1732,31 +1772,33 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Label("na
 				Limit: resource.MustParse("10Gi"),
 				Sources: []capsulev1beta2.CustomQuotaSpecSource{
 					{
-						GroupVersionKind: metav1.GroupVersionKind{
-							Group:   "",
-							Version: "v1",
-							Kind:    "Pod",
+						VersionKind: gvk.VersionKind{
+							APIVersion: "v1",
+							Kind:       "Pod",
 						},
-						Operation: quota.OpAdd,
-						Path:      ".spec.volumes[*].emptyDir.sizeLimit",
-						Selectors: []selectors.SelectorWithFields{
-							{
-								LabelSelector: &metav1.LabelSelector{
-									MatchLabels: map[string]string{
-										"track": "yes",
+						CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
+							Operation: quota.OpAdd,
+							Path:      ".spec.volumes[*].emptyDir.sizeLimit",
+							Selectors: []selectors.SelectorWithFields{
+								{
+									LabelSelector: &metav1.LabelSelector{
+										MatchLabels: map[string]string{
+											"track": "yes",
+										},
 									},
 								},
 							},
 						},
 					},
 					{
-						GroupVersionKind: metav1.GroupVersionKind{
-							Group:   "",
-							Version: "v1",
-							Kind:    "PersistentVolumeClaim",
+						VersionKind: gvk.VersionKind{
+							APIVersion: "v1",
+							Kind:       "PersistentVolumeClaim",
 						},
-						Operation: quota.OpAdd,
-						Path:      ".spec.resources.requests.storage",
+						CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
+							Operation: quota.OpAdd,
+							Path:      ".spec.resources.requests.storage",
+						},
 					},
 				},
 			},
@@ -1804,17 +1846,18 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Label("na
 				Limit: resource.MustParse("10"),
 				Sources: []capsulev1beta2.CustomQuotaSpecSource{
 					{
-						GroupVersionKind: metav1.GroupVersionKind{
-							Group:   "",
-							Version: "v1",
-							Kind:    "Pod",
+						VersionKind: gvk.VersionKind{
+							APIVersion: "v1",
+							Kind:       "Pod",
 						},
-						Operation: quota.OpCount,
-						Selectors: []selectors.SelectorWithFields{
-							{
-								LabelSelector: &metav1.LabelSelector{
-									MatchLabels: map[string]string{
-										"track": "yes",
+						CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
+							Operation: quota.OpCount,
+							Selectors: []selectors.SelectorWithFields{
+								{
+									LabelSelector: &metav1.LabelSelector{
+										MatchLabels: map[string]string{
+											"track": "yes",
+										},
 									},
 								},
 							},
@@ -1855,18 +1898,19 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Label("na
 				Limit: resource.MustParse("10Gi"),
 				Sources: []capsulev1beta2.CustomQuotaSpecSource{
 					{
-						GroupVersionKind: metav1.GroupVersionKind{
-							Group:   "",
-							Version: "v1",
-							Kind:    "Pod",
+						VersionKind: gvk.VersionKind{
+							APIVersion: "v1",
+							Kind:       "Pod",
 						},
-						Operation: quota.OpAdd,
-						Path:      ".spec.volumes[*].emptyDir.sizeLimit",
-						Selectors: []selectors.SelectorWithFields{
-							{
-								LabelSelector: &metav1.LabelSelector{
-									MatchLabels: map[string]string{
-										"track": "yes",
+						CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
+							Operation: quota.OpAdd,
+							Path:      ".spec.volumes[*].emptyDir.sizeLimit",
+							Selectors: []selectors.SelectorWithFields{
+								{
+									LabelSelector: &metav1.LabelSelector{
+										MatchLabels: map[string]string{
+											"track": "yes",
+										},
 									},
 								},
 							},
@@ -1907,17 +1951,18 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Label("na
 				Limit: resource.MustParse("10"),
 				Sources: []capsulev1beta2.CustomQuotaSpecSource{
 					{
-						GroupVersionKind: metav1.GroupVersionKind{
-							Group:   "",
-							Version: "v1",
-							Kind:    "Pod",
+						VersionKind: gvk.VersionKind{
+							APIVersion: "v1",
+							Kind:       "Pod",
 						},
-						Operation: quota.OpCount,
-						Selectors: []selectors.SelectorWithFields{
-							{
-								LabelSelector: &metav1.LabelSelector{
-									MatchLabels: map[string]string{
-										"track": "yes",
+						CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
+							Operation: quota.OpCount,
+							Selectors: []selectors.SelectorWithFields{
+								{
+									LabelSelector: &metav1.LabelSelector{
+										MatchLabels: map[string]string{
+											"track": "yes",
+										},
 									},
 								},
 							},
@@ -1939,16 +1984,17 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Label("na
 				Limit: resource.MustParse("10"),
 				Sources: []capsulev1beta2.CustomQuotaSpecSource{
 					{
-						GroupVersionKind: metav1.GroupVersionKind{
-							Group:   "",
-							Version: "v1",
-							Kind:    "Pod",
+						VersionKind: gvk.VersionKind{
+							APIVersion: "v1",
+							Kind:       "Pod",
 						},
-						Operation: quota.OpCount,
-						Selectors: []selectors.SelectorWithFields{
-							{
-								FieldSelectors: []string{
-									`.spec.containers[?(@.image=="nginx:1.27.0")]`,
+						CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
+							Operation: quota.OpCount,
+							Selectors: []selectors.SelectorWithFields{
+								{
+									FieldSelectors: []string{
+										`.spec.containers[?(@.image=="nginx:1.27.0")]`,
+									},
 								},
 							},
 						},
@@ -1990,12 +2036,13 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Label("na
 				Limit: resource.MustParse("3"),
 				Sources: []capsulev1beta2.CustomQuotaSpecSource{
 					{
-						GroupVersionKind: metav1.GroupVersionKind{
-							Group:   "",
-							Version: "v1",
-							Kind:    "Pod",
+						VersionKind: gvk.VersionKind{
+							APIVersion: "v1",
+							Kind:       "Pod",
 						},
-						Operation: quota.OpCount,
+						CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
+							Operation: quota.OpCount,
+						},
 					},
 				},
 			},
@@ -2013,12 +2060,13 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Label("na
 				Limit: resource.MustParse("4"),
 				Sources: []capsulev1beta2.CustomQuotaSpecSource{
 					{
-						GroupVersionKind: metav1.GroupVersionKind{
-							Group:   "",
-							Version: "v1",
-							Kind:    "Pod",
+						VersionKind: gvk.VersionKind{
+							APIVersion: "v1",
+							Kind:       "Pod",
 						},
-						Operation: quota.OpCount,
+						CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
+							Operation: quota.OpCount,
+						},
 					},
 				},
 			},
@@ -2066,13 +2114,14 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Label("na
 				Limit: resource.MustParse("300m"),
 				Sources: []capsulev1beta2.CustomQuotaSpecSource{
 					{
-						GroupVersionKind: metav1.GroupVersionKind{
-							Group:   "",
-							Version: "v1",
-							Kind:    "Pod",
+						VersionKind: gvk.VersionKind{
+							APIVersion: "v1",
+							Kind:       "Pod",
 						},
-						Operation: quota.OpAdd,
-						Path:      ".spec.containers[*].resources.requests.cpu",
+						CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
+							Operation: quota.OpAdd,
+							Path:      ".spec.containers[*].resources.requests.cpu",
+						},
 					},
 				},
 			},
@@ -2090,13 +2139,14 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Label("na
 				Limit: resource.MustParse("3Gi"),
 				Sources: []capsulev1beta2.CustomQuotaSpecSource{
 					{
-						GroupVersionKind: metav1.GroupVersionKind{
-							Group:   "",
-							Version: "v1",
-							Kind:    "Pod",
+						VersionKind: gvk.VersionKind{
+							APIVersion: "v1",
+							Kind:       "Pod",
 						},
-						Operation: quota.OpAdd,
-						Path:      ".spec.volumes[*].emptyDir.sizeLimit",
+						CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
+							Operation: quota.OpAdd,
+							Path:      ".spec.volumes[*].emptyDir.sizeLimit",
+						},
 					},
 				},
 			},
@@ -2133,16 +2183,17 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Label("na
 				Limit: resource.MustParse("10"),
 				Sources: []capsulev1beta2.CustomQuotaSpecSource{
 					{
-						GroupVersionKind: metav1.GroupVersionKind{
-							Group:   "",
-							Version: "v1",
-							Kind:    "Pod",
+						VersionKind: gvk.VersionKind{
+							APIVersion: "v1",
+							Kind:       "Pod",
 						},
-						Operation: quota.OpCount,
-						Selectors: []selectors.SelectorWithFields{
-							{
-								FieldSelectors: []string{
-									`.spec.restartPolicy[?(@=="Always")]`,
+						CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
+							Operation: quota.OpCount,
+							Selectors: []selectors.SelectorWithFields{
+								{
+									FieldSelectors: []string{
+										`.spec.restartPolicy[?(@=="Always")]`,
+									},
 								},
 							},
 						},

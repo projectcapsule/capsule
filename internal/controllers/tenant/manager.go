@@ -261,8 +261,6 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 			return reconcile.Result{}, nil
 		}
 
-		r.Log.Error(err, "error reading the object")
-
 		return result, err
 	}
 

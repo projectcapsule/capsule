@@ -35,7 +35,7 @@ func (h *freezedHandler) OnCreate(
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		if tnt.Spec.Cordoned {
-			recorder.Eventf(ns, tnt, corev1.EventTypeWarning, evt.ReasonCordoning, evt.ActionValidationDenied, "Namespace %s cannot be attached, the current Tenant is freezed", ns.GetName())
+			recorder.Eventf(ns, nil, corev1.EventTypeWarning, evt.ReasonCordoning, evt.ActionValidationDenied, "Namespace %s cannot be attached, the current Tenant is freezed", ns.GetName())
 
 			response := admission.Denied("the selected Tenant is freezed")
 

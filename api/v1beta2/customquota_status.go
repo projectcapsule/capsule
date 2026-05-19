@@ -44,7 +44,8 @@ type CustomQuotaClaimItem struct {
 }
 
 type CustomQuotaStatusTarget struct {
-	CustomQuotaSpecSource `json:",inline"`
+	metav1.GroupVersionKind     `json:",inline"`
+	CustomQuotaSpecSourceConfig `json:",inline"`
 
 	// Path on GVK where usage is evaluated
 	Scope k8smeta.RESTScopeName `json:"scope,omitempty"`

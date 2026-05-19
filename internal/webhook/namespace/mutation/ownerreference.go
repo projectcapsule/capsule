@@ -21,7 +21,6 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
-	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 	"github.com/projectcapsule/capsule/pkg/tenant"
 )
@@ -169,12 +168,12 @@ func assignToTenant(
 	tnt.SetGroupVersionKind(capsulev1beta2.GroupVersion.WithKind("Tenant"))
 
 	if err := controllerutil.SetOwnerReference(tnt, ns, c.Scheme()); err != nil {
-		recorder.Eventf(ns, tnt, corev1.EventTypeWarning, evt.ReasonNamespaceHijack, evt.ActionValidationDenied, "Namespace %s cannot be assigned to the desired tenant %s", ns.GetName(), tnt.GetName())
+		//	recorder.Eventf(ns, nil, corev1.EventTypeWarning, evt.ReasonNamespaceHijack, evt.ActionValidationDenied, "Namespace %s cannot be assigned to the desired tenant %s", ns.GetName(), tnt.GetName())
 
 		return err
 	}
 
-	recorder.Eventf(ns, tnt, corev1.EventTypeNormal, evt.ReasonTenantAssigned, evt.ActionMutated, "Namespace %s has been assigned to the desired tenant %s", ns.GetName(), tnt.GetName())
+	//recorder.Eventf(ns, nil, corev1.EventTypeNormal, evt.ReasonTenantAssigned, evt.ActionMutated, "Namespace %s has been assigned to the desired tenant %s", ns.GetName(), tnt.GetName())
 
 	return nil
 }

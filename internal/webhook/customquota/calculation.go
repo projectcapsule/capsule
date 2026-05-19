@@ -1088,7 +1088,8 @@ func (h *objectCalculationHandler) getOrCompileCustomQuotaTargets(
 		targets := make([]capsulev1beta2.CustomQuotaStatusTarget, 0, len(cq.Spec.Sources))
 		for _, src := range cq.Spec.Sources {
 			targets = append(targets, capsulev1beta2.CustomQuotaStatusTarget{
-				CustomQuotaSpecSource: src,
+				GroupVersionKind:            metav1.GroupVersionKind(src.GroupVersionKind()),
+				CustomQuotaSpecSourceConfig: src.CustomQuotaSpecSourceConfig,
 			})
 		}
 
@@ -1105,7 +1106,8 @@ func (h *objectCalculationHandler) getOrCompileGlobalCustomQuotaTargets(
 		targets := make([]capsulev1beta2.CustomQuotaStatusTarget, 0, len(gcq.Spec.Sources))
 		for _, src := range gcq.Spec.Sources {
 			targets = append(targets, capsulev1beta2.CustomQuotaStatusTarget{
-				CustomQuotaSpecSource: src,
+				GroupVersionKind:            metav1.GroupVersionKind(src.GroupVersionKind()),
+				CustomQuotaSpecSourceConfig: src.CustomQuotaSpecSourceConfig,
 			})
 		}
 
@@ -1152,7 +1154,7 @@ func recordQuotaCalculationEvent(
 
 		recorder.Eventf(
 			obj,
-			obj,
+			nil,
 			corev1.EventTypeWarning,
 			"UsageCalculationFailed",
 			"UsageCalculationFailed",
@@ -1175,7 +1177,7 @@ func recordQuotaCalculationEvent(
 
 	recorder.Eventf(
 		obj,
-		obj,
+		nil,
 		corev1.EventTypeWarning,
 		"UsageCalculationFailed",
 		"UsageCalculationFailed",
@@ -1219,7 +1221,7 @@ func recordQuotaExceededEvent(
 
 		recorder.Eventf(
 			obj,
-			obj,
+			nil,
 			corev1.EventTypeWarning,
 			capevents.ReasonQuotaExceeded,
 			capevents.ActionValidationDenied,
@@ -1240,7 +1242,7 @@ func recordQuotaExceededEvent(
 
 	recorder.Eventf(
 		obj,
-		obj,
+		nil,
 		corev1.EventTypeWarning,
 		capevents.ReasonQuotaExceeded,
 		capevents.ActionValidationDenied,

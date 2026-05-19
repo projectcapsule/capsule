@@ -127,6 +127,86 @@ var _ = Describe("TenantResource SSA", Label("replications", "namespace", "tenan
 		})
 	})
 
+	It("allows multiple TenantResources to adopt and co-manage the same preexisting object with non-conflicting fields", func() {
+		By("creating the preexisting object in all target namespaces")
+		for _, ns := range targetNamespaces {
+			cm := &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "shared-adopted-config",
+					Namespace: ns,
+				},
+				Data: map[string]string{
+					"existing": "true",
+				},
+			}
+			EventuallyCreation(func() error {
+				cm.ResourceVersion = ""
+				return k8sClient.Create(ctx, cm)
+			}).Should(Succeed())
+		}
+
+		trA := newRawConfigMapTenantResource(baseNamespace, "adopt-shared-a", map[string]string{
+			"foo": "one",
+		})
+		trA.Spec.Resources[0].RawItems[0] = capsulev1beta2.RawExtension{
+			RawExtension: runtime.RawExtension{
+				Object: &corev1.ConfigMap{
+					TypeMeta: metav1.TypeMeta{
+						APIVersion: "v1",
+						Kind:       "ConfigMap",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "shared-adopted-config",
+					},
+					Data: map[string]string{
+						"foo": "one",
+					},
+				},
+			},
+		}
+		trA.Spec.Settings.Adopt = ptr.To(true)
+
+		trB := newRawConfigMapTenantResource(baseNamespace, "adopt-shared-b", map[string]string{
+			"bar": "two",
+		})
+		trB.Spec.Resources[0].RawItems[0] = capsulev1beta2.RawExtension{
+			RawExtension: runtime.RawExtension{
+				Object: &corev1.ConfigMap{
+					TypeMeta: metav1.TypeMeta{
+						APIVersion: "v1",
+						Kind:       "ConfigMap",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "shared-adopted-config",
+					},
+					Data: map[string]string{
+						"bar": "two",
+					},
+				},
+			},
+		}
+		trB.Spec.Settings.Adopt = ptr.To(true)
+
+		By("creating both TenantResources")
+		EventuallyCreation(func() error { return k8sClient.Create(ctx, trA) }).Should(Succeed())
+		EventuallyCreation(func() error { return k8sClient.Create(ctx, trB) }).Should(Succeed())
+
+		expectTenantResourceReady(baseNamespace, trA.Name)
+		expectTenantResourceFailed(baseNamespace, trB.Name, "applying of 1 resources failed")
+
+		By("verifying the final object contains the merged fields and is adopted, not created")
+		for _, ns := range targetNamespaces {
+			Eventually(func(g Gomega) {
+				cm := &corev1.ConfigMap{}
+				g.Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "shared-adopted-config", Namespace: ns}, cm)).To(Succeed())
+				g.Expect(cm.Data).To(HaveKeyWithValue("existing", "true"))
+				g.Expect(cm.Data).To(HaveKeyWithValue("foo", "one"))
+				g.Expect(cm.Labels).To(HaveKeyWithValue(apimeta.NewManagedByCapsuleLabel, apimeta.ValueControllerReplications))
+				g.Expect(cm.Labels).ToNot(HaveKey(apimeta.CreatedByCapsuleLabel))
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		}
+	})
+
 	It("aligns objects created by the legacy resource label implementation", func() {
 		By("creating legacy-labelled objects in all target namespaces")
 		for _, ns := range targetNamespaces {
@@ -297,9 +377,11 @@ var _ = Describe("TenantResource SSA", Label("replications", "namespace", "tenan
 								Resources: []*template.TemplateResourceReference{{
 									Index: "secrets",
 									ResourceReference: template.ResourceReference{
-										APIVersion: "v1",
-										Kind:       "Secret",
-										Namespace:  "solar-one",
+										VersionKind: gvk.VersionKind{
+											APIVersion: "v1",
+											Kind:       "Secret",
+										},
+										Namespace: "solar-one",
 										Selector: &metav1.LabelSelector{
 											MatchLabels: map[string]string{
 												"pullsecret.company.com": "true",
@@ -429,9 +511,11 @@ data:
 						PruningOnDelete: ptr.To(true),
 						Resources: []capsulev1beta2.ResourceSpec{{
 							NamespacedItems: []template.ResourceReference{{
-								APIVersion: "v1",
-								Kind:       "Secret",
-								Namespace:  baseNamespace,
+								VersionKind: gvk.VersionKind{
+									APIVersion: "v1",
+									Kind:       "Secret",
+								},
+								Namespace: baseNamespace,
 								Selector: &metav1.LabelSelector{
 									MatchLabels: map[string]string{
 										"replicate": "true",
@@ -456,87 +540,6 @@ data:
 	})
 
 	Context("advanced TenantResource ownership and namespace behavior", func() {
-		It("allows multiple TenantResources to adopt and co-manage the same preexisting object with non-conflicting fields", func() {
-			By("creating the preexisting object in all target namespaces")
-			for _, ns := range targetNamespaces {
-				cm := &corev1.ConfigMap{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "shared-adopted-config",
-						Namespace: ns,
-					},
-					Data: map[string]string{
-						"existing": "true",
-					},
-				}
-				EventuallyCreation(func() error {
-					cm.ResourceVersion = ""
-					return k8sClient.Create(ctx, cm)
-				}).Should(Succeed())
-			}
-
-			trA := newRawConfigMapTenantResource(baseNamespace, "adopt-shared-a", map[string]string{
-				"foo": "one",
-			})
-			trA.Spec.Resources[0].RawItems[0] = capsulev1beta2.RawExtension{
-				RawExtension: runtime.RawExtension{
-					Object: &corev1.ConfigMap{
-						TypeMeta: metav1.TypeMeta{
-							APIVersion: "v1",
-							Kind:       "ConfigMap",
-						},
-						ObjectMeta: metav1.ObjectMeta{
-							Name: "shared-adopted-config",
-						},
-						Data: map[string]string{
-							"foo": "one",
-						},
-					},
-				},
-			}
-			trA.Spec.Settings.Adopt = ptr.To(true)
-
-			trB := newRawConfigMapTenantResource(baseNamespace, "adopt-shared-b", map[string]string{
-				"bar": "two",
-			})
-			trB.Spec.Resources[0].RawItems[0] = capsulev1beta2.RawExtension{
-				RawExtension: runtime.RawExtension{
-					Object: &corev1.ConfigMap{
-						TypeMeta: metav1.TypeMeta{
-							APIVersion: "v1",
-							Kind:       "ConfigMap",
-						},
-						ObjectMeta: metav1.ObjectMeta{
-							Name: "shared-adopted-config",
-						},
-						Data: map[string]string{
-							"bar": "two",
-						},
-					},
-				},
-			}
-			trB.Spec.Settings.Adopt = ptr.To(true)
-
-			By("creating both TenantResources")
-			EventuallyCreation(func() error { return k8sClient.Create(ctx, trA) }).Should(Succeed())
-			EventuallyCreation(func() error { return k8sClient.Create(ctx, trB) }).Should(Succeed())
-
-			expectTenantResourceReady(baseNamespace, trA.Name)
-			expectTenantResourceReady(baseNamespace, trB.Name)
-
-			By("verifying the final object contains the merged fields and is adopted, not created")
-			for _, ns := range targetNamespaces {
-				Eventually(func(g Gomega) {
-					cm := &corev1.ConfigMap{}
-					g.Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "shared-adopted-config", Namespace: ns}, cm)).To(Succeed())
-					g.Expect(cm.Data).To(HaveKeyWithValue("existing", "true"))
-					g.Expect(cm.Data).To(HaveKeyWithValue("foo", "one"))
-					g.Expect(cm.Data).To(HaveKeyWithValue("bar", "two"))
-					g.Expect(cm.Labels).To(HaveKeyWithValue(apimeta.NewManagedByCapsuleLabel, apimeta.ValueControllerReplications))
-					g.Expect(cm.Labels).ToNot(HaveKey(apimeta.CreatedByCapsuleLabel))
-				}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
-			}
-		})
-
 		It("fails when multiple TenantResources target the same preexisting object without adoption", func() {
 			By("creating the preexisting object in all target namespaces")
 			for _, ns := range targetNamespaces {
@@ -999,9 +1002,11 @@ data:
 								Resources: []*template.TemplateResourceReference{{
 									Index: "secrets",
 									ResourceReference: template.ResourceReference{
-										APIVersion: "v1",
-										Kind:       "Secret",
-										Namespace:  "solar-one",
+										VersionKind: gvk.VersionKind{
+											APIVersion: "v1",
+											Kind:       "Secret",
+										},
+										Namespace: "solar-one",
 										Selector: &metav1.LabelSelector{
 											MatchLabels: map[string]string{
 												"pullsecret.company.com": "true",
@@ -1049,9 +1054,11 @@ data:
 								Resources: []*template.TemplateResourceReference{{
 									Index: "secrets",
 									ResourceReference: template.ResourceReference{
-										APIVersion: "v1",
-										Kind:       "Secret",
-										Namespace:  "{{ namespace }}",
+										VersionKind: gvk.VersionKind{
+											APIVersion: "v1",
+											Kind:       "Secret",
+										},
+										Namespace: "{{ namespace }}",
 										Selector: &metav1.LabelSelector{
 											MatchLabels: map[string]string{
 												"pullsecret.company.com": "true",
@@ -1112,9 +1119,11 @@ data:
 								Resources: []*template.TemplateResourceReference{{
 									Index: "secrets",
 									ResourceReference: template.ResourceReference{
-										APIVersion: "v1",
-										Kind:       "Secret",
-										Namespace:  "{{.namespace}}",
+										VersionKind: gvk.VersionKind{
+											APIVersion: "v1",
+											Kind:       "Secret",
+										},
+										Namespace: "{{.namespace}}",
 										Selector: &metav1.LabelSelector{
 											MatchLabels: map[string]string{
 												"pullsecret.company.com": "true",
@@ -1176,9 +1185,11 @@ data:
 								Resources: []*template.TemplateResourceReference{{
 									Index: "secrets",
 									ResourceReference: template.ResourceReference{
-										APIVersion: "v1",
-										Kind:       "Secret",
-										Namespace:  "kube-system",
+										VersionKind: gvk.VersionKind{
+											APIVersion: "v1",
+											Kind:       "Secret",
+										},
+										Namespace: "kube-system",
 										Selector: &metav1.LabelSelector{
 											MatchLabels: map[string]string{
 												"pullsecret.company.com": "true",
@@ -1250,9 +1261,11 @@ data:
 						ResyncPeriod:    resyncPeriod,
 						Resources: []capsulev1beta2.ResourceSpec{{
 							NamespacedItems: []template.ResourceReference{{
-								APIVersion: "v1",
-								Kind:       "Secret",
-								Namespace:  "kube-system",
+								VersionKind: gvk.VersionKind{
+									APIVersion: "v1",
+									Kind:       "Secret",
+								},
+								Namespace: "kube-system",
 								Selector: &metav1.LabelSelector{
 									MatchLabels: map[string]string{
 										"pullsecret.company.com": "true",
@@ -1316,9 +1329,11 @@ data:
 								Resources: []*template.TemplateResourceReference{{
 									Index: "secrets",
 									ResourceReference: template.ResourceReference{
-										APIVersion: "v1",
-										Kind:       "Secret",
-										Namespace:  "{{ forbiddenNamespace }}",
+										VersionKind: gvk.VersionKind{
+											APIVersion: "v1",
+											Kind:       "Secret",
+										},
+										Namespace: "{{ forbiddenNamespace }}",
 										Selector: &metav1.LabelSelector{
 											MatchLabels: map[string]string{
 												"pullsecret.company.com": "true",
@@ -1491,9 +1506,11 @@ data:
 						ResyncPeriod:    resyncPeriod,
 						Resources: []capsulev1beta2.ResourceSpec{{
 							NamespacedItems: []template.ResourceReference{{
-								APIVersion: "v1",
-								Kind:       "Secret",
-								Namespace:  baseNamespace,
+								VersionKind: gvk.VersionKind{
+									APIVersion: "v1",
+									Kind:       "Secret",
+								},
+								Namespace: baseNamespace,
 								Selector: &metav1.LabelSelector{MatchLabels: map[string]string{
 									"replicate": "true",
 								}},

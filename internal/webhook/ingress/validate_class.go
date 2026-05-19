@@ -86,7 +86,7 @@ func (r *class) validate(
 	ingressClass := ingress.IngressClass()
 
 	if ingressClass == nil {
-		recorder.Eventf(ingress.GetClientObject(), tnt, corev1.EventTypeWarning, evt.ReasonMissingIngressClass, evt.ActionValidationDenied, "Ingress %s/%s is missing IngressClass", req.Namespace, req.Name)
+		recorder.Eventf(ingress.GetClientObject(), nil, corev1.EventTypeWarning, evt.ReasonMissingIngressClass, evt.ActionValidationDenied, "Ingress %s/%s is missing IngressClass", req.Namespace, req.Name)
 
 		response := admission.Denied(caperrors.NewIngressClassUndefined(*allowed).Error())
 
@@ -116,7 +116,7 @@ func (r *class) validate(
 	case allowed.Match(*ingressClass) || selector:
 		return nil
 	default:
-		recorder.Eventf(ingress.GetClientObject(), tnt, corev1.EventTypeWarning, evt.ReasonForbiddenIngressClass, evt.ActionValidationDenied, "Ingress %s/%s IngressClass %s is forbidden for the current Tenant", req.Namespace, req.Name, &ingressClass)
+		recorder.Eventf(ingress.GetClientObject(), nil, corev1.EventTypeWarning, evt.ReasonForbiddenIngressClass, evt.ActionValidationDenied, "Ingress %s/%s IngressClass %s is forbidden for the current Tenant", req.Namespace, req.Name, &ingressClass)
 
 		response := admission.Denied(caperrors.NewIngressClassForbidden(*ingressClass, *allowed).Error())
 

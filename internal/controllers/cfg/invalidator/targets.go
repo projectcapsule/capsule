@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	"github.com/go-logr/logr"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/internal/controllers/customquotas"
@@ -68,7 +69,8 @@ func customQuotaStatusTargetsFromSources(
 
 	for _, source := range sources {
 		targets = append(targets, capsulev1beta2.CustomQuotaStatusTarget{
-			CustomQuotaSpecSource: source,
+			GroupVersionKind:            metav1.GroupVersionKind(source.GroupVersionKind()),
+			CustomQuotaSpecSourceConfig: source.CustomQuotaSpecSourceConfig,
 		})
 	}
 

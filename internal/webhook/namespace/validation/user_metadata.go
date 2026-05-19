@@ -36,7 +36,7 @@ func (h *userMetadataHandler) OnCreate(
 			err := api.ValidateForbidden(ns.Annotations, tnt.Spec.NamespaceOptions.ForbiddenAnnotations)
 			if err != nil {
 				err = errors.Wrap(err, "namespace annotations validation failed")
-				recorder.Eventf(ns, tnt, corev1.EventTypeWarning, evt.ReasonForbiddenAnnotation, evt.ActionValidationDenied, err.Error())
+				recorder.Eventf(ns, nil, corev1.EventTypeWarning, evt.ReasonForbiddenAnnotation, evt.ActionValidationDenied, err.Error())
 				response := admission.Denied(err.Error())
 
 				return &response
@@ -45,7 +45,7 @@ func (h *userMetadataHandler) OnCreate(
 			err = api.ValidateForbidden(ns.Labels, tnt.Spec.NamespaceOptions.ForbiddenLabels)
 			if err != nil {
 				err = errors.Wrap(err, "namespace labels validation failed")
-				recorder.Eventf(ns, tnt, corev1.EventTypeWarning, evt.ReasonForbiddenLabel, evt.ActionValidationDenied, err.Error())
+				recorder.Eventf(ns, nil, corev1.EventTypeWarning, evt.ReasonForbiddenLabel, evt.ActionValidationDenied, err.Error())
 				response := admission.Denied(err.Error())
 
 				return &response
@@ -128,7 +128,7 @@ func (h *userMetadataHandler) OnUpdate(
 			err := api.ValidateForbidden(annotations, tnt.Spec.NamespaceOptions.ForbiddenAnnotations)
 			if err != nil {
 				err = errors.Wrap(err, "namespace annotations validation failed")
-				recorder.Eventf(oldNs, tnt, corev1.EventTypeWarning, evt.ReasonForbiddenAnnotation, evt.ActionValidationDenied, err.Error())
+				recorder.Eventf(oldNs, nil, corev1.EventTypeWarning, evt.ReasonForbiddenAnnotation, evt.ActionValidationDenied, err.Error())
 				response := admission.Denied(err.Error())
 
 				return &response
@@ -137,7 +137,7 @@ func (h *userMetadataHandler) OnUpdate(
 			err = api.ValidateForbidden(labels, tnt.Spec.NamespaceOptions.ForbiddenLabels)
 			if err != nil {
 				err = errors.Wrap(err, "namespace labels validation failed")
-				recorder.Eventf(oldNs, tnt, corev1.EventTypeWarning, evt.ReasonForbiddenLabel, evt.ActionValidationDenied, err.Error())
+				recorder.Eventf(oldNs, nil, corev1.EventTypeWarning, evt.ReasonForbiddenLabel, evt.ActionValidationDenied, err.Error())
 				response := admission.Denied(err.Error())
 
 				return &response

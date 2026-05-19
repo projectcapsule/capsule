@@ -77,7 +77,7 @@ func (h *quotaHandler) handle(
 			return nil
 		}
 
-		recorder.Eventf(ns, tnt, corev1.EventTypeWarning, evt.ReasonOverprovision, evt.ActionValidationDenied, "Namespace %s cannot be attached, quota exceeded for the current Tenant", ns.GetName())
+		recorder.Eventf(ns, nil, corev1.EventTypeWarning, evt.ReasonOverprovision, evt.ActionValidationDenied, "Namespace %s cannot be attached, quota exceeded for the current Tenant", ns.GetName())
 
 		response := admission.Denied(caperrors.NewNamespaceQuotaExceededError().Error())
 

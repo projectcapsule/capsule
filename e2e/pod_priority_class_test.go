@@ -238,13 +238,16 @@ var _ = Describe("enforcing a Priority Class", Label("pod", "classes"), func() {
 							Namespace: ns.GetName(),
 						},
 						Spec: corev1.PodSpec{
+							SecurityContext:   nobodyPodSecurityContext(),
+							PriorityClassName: class,
 							Containers: []corev1.Container{
 								{
-									Name:  "container",
-									Image: "quay.io/google-containers/pause-amd64:3.0",
+									Name:            "container",
+									Image:           "gcr.io/google_containers/pause-amd64:3.0",
+									ImagePullPolicy: corev1.PullIfNotPresent,
+									SecurityContext: restrictedContainerSecurityContext(),
 								},
 							},
-							PriorityClassName: class,
 						},
 					}
 
@@ -282,13 +285,16 @@ var _ = Describe("enforcing a Priority Class", Label("pod", "classes"), func() {
 				Name: "container",
 			},
 			Spec: corev1.PodSpec{
+				SecurityContext:   nobodyPodSecurityContext(),
+				PriorityClassName: "system-node-critical",
 				Containers: []corev1.Container{
 					{
-						Name:  "container",
-						Image: "quay.io/google-containers/pause-amd64:3.0",
+						Name:            "container",
+						Image:           "gcr.io/google_containers/pause-amd64:3.0",
+						ImagePullPolicy: corev1.PullIfNotPresent,
+						SecurityContext: restrictedContainerSecurityContext(),
 					},
 				},
-				PriorityClassName: "system-node-critical",
 			},
 		}
 
@@ -319,13 +325,16 @@ var _ = Describe("enforcing a Priority Class", Label("pod", "classes"), func() {
 					Name: pc,
 				},
 				Spec: corev1.PodSpec{
+					SecurityContext:   nobodyPodSecurityContext(),
+					PriorityClassName: class.GetName(),
 					Containers: []corev1.Container{
 						{
-							Name:  "container",
-							Image: "quay.io/google-containers/pause-amd64:3.0",
+							Name:            "container",
+							Image:           "gcr.io/google_containers/pause-amd64:3.0",
+							ImagePullPolicy: corev1.PullIfNotPresent,
+							SecurityContext: restrictedContainerSecurityContext(),
 						},
 					},
-					PriorityClassName: class.GetName(),
 				},
 			}
 
@@ -367,13 +376,16 @@ var _ = Describe("enforcing a Priority Class", Label("pod", "classes"), func() {
 				Name: "container",
 			},
 			Spec: corev1.PodSpec{
+				SecurityContext:   nobodyPodSecurityContext(),
+				PriorityClassName: "customer-gold",
 				Containers: []corev1.Container{
 					{
-						Name:  "container",
-						Image: "quay.io/google-containers/pause-amd64:3.0",
+						Name:            "container",
+						Image:           "gcr.io/google_containers/pause-amd64:3.0",
+						ImagePullPolicy: corev1.PullIfNotPresent,
+						SecurityContext: restrictedContainerSecurityContext(),
 					},
 				},
-				PriorityClassName: "customer-gold",
 			},
 		}
 
@@ -396,13 +408,16 @@ var _ = Describe("enforcing a Priority Class", Label("pod", "classes"), func() {
 						Namespace: ns.GetName(),
 					},
 					Spec: corev1.PodSpec{
+						SecurityContext:   nobodyPodSecurityContext(),
+						PriorityClassName: class,
 						Containers: []corev1.Container{
 							{
-								Name:  "container",
-								Image: "quay.io/google-containers/pause-amd64:3.0",
+								Name:            "container",
+								Image:           "gcr.io/google_containers/pause-amd64:3.0",
+								ImagePullPolicy: corev1.PullIfNotPresent,
+								SecurityContext: restrictedContainerSecurityContext(),
 							},
 						},
-						PriorityClassName: class,
 					},
 				}
 
@@ -432,13 +447,16 @@ var _ = Describe("enforcing a Priority Class", Label("pod", "classes"), func() {
 						Name: pc,
 					},
 					Spec: corev1.PodSpec{
+						SecurityContext:   nobodyPodSecurityContext(),
+						PriorityClassName: class.GetName(),
 						Containers: []corev1.Container{
 							{
-								Name:  "container",
-								Image: "quay.io/google-containers/pause-amd64:3.0",
+								Name:            "container",
+								Image:           "gcr.io/google_containers/pause-amd64:3.0",
+								ImagePullPolicy: corev1.PullIfNotPresent,
+								SecurityContext: restrictedContainerSecurityContext(),
 							},
 						},
-						PriorityClassName: class.GetName(),
 					},
 				}
 
@@ -479,10 +497,13 @@ var _ = Describe("enforcing a Priority Class", Label("pod", "classes"), func() {
 					Name: "tenant-default",
 				},
 				Spec: corev1.PodSpec{
+					SecurityContext: nobodyPodSecurityContext(),
 					Containers: []corev1.Container{
 						{
-							Name:  "container",
-							Image: "quay.io/google-containers/pause-amd64:3.0",
+							Name:            "container",
+							Image:           "gcr.io/google_containers/pause-amd64:3.0",
+							ImagePullPolicy: corev1.PullIfNotPresent,
+							SecurityContext: restrictedContainerSecurityContext(),
 						},
 					},
 				},
@@ -534,10 +555,13 @@ var _ = Describe("enforcing a Priority Class", Label("pod", "classes"), func() {
 					Namespace: ns.GetName(),
 				},
 				Spec: corev1.PodSpec{
+					SecurityContext: nobodyPodSecurityContext(),
 					Containers: []corev1.Container{
 						{
-							Name:  "container",
-							Image: "quay.io/google-containers/pause-amd64:3.0",
+							Name:            "container",
+							Image:           "gcr.io/google_containers/pause-amd64:3.0",
+							ImagePullPolicy: corev1.PullIfNotPresent,
+							SecurityContext: restrictedContainerSecurityContext(),
 						},
 					},
 				},
@@ -589,10 +613,13 @@ var _ = Describe("enforcing a Priority Class", Label("pod", "classes"), func() {
 				Namespace: ns.GetName(),
 			},
 			Spec: corev1.PodSpec{
+				SecurityContext: nobodyPodSecurityContext(),
 				Containers: []corev1.Container{
 					{
-						Name:  "container",
-						Image: "quay.io/google-containers/pause-amd64:3.0",
+						Name:            "container",
+						Image:           "gcr.io/google_containers/pause-amd64:3.0",
+						ImagePullPolicy: corev1.PullIfNotPresent,
+						SecurityContext: restrictedContainerSecurityContext(),
 					},
 				},
 			},
@@ -642,10 +669,13 @@ var _ = Describe("enforcing a Priority Class", Label("pod", "classes"), func() {
 				Namespace: ns.GetName(),
 			},
 			Spec: corev1.PodSpec{
+				SecurityContext: nobodyPodSecurityContext(),
 				Containers: []corev1.Container{
 					{
-						Name:  "container",
-						Image: "quay.io/google-containers/pause-amd64:3.0",
+						Name:            "container",
+						Image:           "gcr.io/google_containers/pause-amd64:3.0",
+						ImagePullPolicy: corev1.PullIfNotPresent,
+						SecurityContext: restrictedContainerSecurityContext(),
 					},
 				},
 			},

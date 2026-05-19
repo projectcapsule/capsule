@@ -91,8 +91,7 @@ func sourcesChanged(a, b []capsulev1beta2.CustomQuotaSpecSource) bool {
 	}
 
 	for i := range a {
-		if a[i].Group != b[i].Group ||
-			a[i].Version != b[i].Version ||
+		if a[i].APIVersion != b[i].APIVersion ||
 			a[i].Kind != b[i].Kind ||
 			a[i].Path != b[i].Path ||
 			a[i].Operation != b[i].Operation {

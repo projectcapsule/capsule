@@ -15,17 +15,15 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
+	"github.com/projectcapsule/capsule/pkg/runtime/gvk"
 	"github.com/projectcapsule/capsule/pkg/runtime/selectors"
 )
 
 // Reference
 // +kubebuilder:object:generate=true
 type ResourceReference struct {
-	// Kind of the referent.
-	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
-	Kind string `json:"kind" protobuf:"bytes,1,opt,name=kind"`
-	// API version of the referent.
-	APIVersion string `json:"apiVersion" protobuf:"bytes,5,opt,name=apiVersion"`
+	gvk.VersionKind `json:",inline"`
+
 	// Name of the values referent. This is useful
 	// when you traying to get a specific resource
 	// +kubebuilder:validation:MinLength=1

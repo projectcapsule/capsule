@@ -66,11 +66,13 @@ var _ = Describe("terminating namespace with guardrails", Label("namespace", "te
 				Finalizers: []string{"e2e.capsule.io/block-delete"},
 			},
 			Spec: corev1.PodSpec{
+				SecurityContext: nobodyPodSecurityContext(),
 				Containers: []corev1.Container{
 					{
-						Name:    "pause",
-						Image:   "registry.k8s.io/pause:3.9",
-						Command: []string{"/pause"},
+						Name:            "pause",
+						Image:           "registry.k8s.io/pause:3.9",
+						Command:         []string{"/pause"},
+						SecurityContext: restrictedContainerSecurityContext(),
 					},
 				},
 			},

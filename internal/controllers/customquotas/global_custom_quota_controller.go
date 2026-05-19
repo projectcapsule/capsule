@@ -120,8 +120,6 @@ func (r *clusterCustomQuotaClaimController) Reconcile(ctx context.Context, reque
 			return reconcile.Result{}, nil
 		}
 
-		log.Error(err, "Error reading the object")
-
 		return reconcile.Result{}, err
 	}
 
@@ -141,7 +139,7 @@ func (r *clusterCustomQuotaClaimController) Reconcile(ctx context.Context, reque
 	reconcileErr := r.reconcile(ctx, log, instance)
 
 	if err := r.updateStatus(ctx, instance, reconcileErr); err != nil {
-		return reconcile.Result{}, fmt.Errorf("cannot update status: %w", err)
+		return reconcile.Result{}, client.IgnoreNotFound(fmt.Errorf("cannot update status: %w", err))
 	}
 
 	if err := patchHelper.Patch(ctx, instance); err != nil {
@@ -158,7 +156,7 @@ func (r *clusterCustomQuotaClaimController) Reconcile(ctx context.Context, reque
 	}
 
 	if requeueAfter != nil {
-		log.V(3).Info("ledger still has pending work, requeueing",
+		log.V(5).Info("ledger still has pending work, requeueing",
 			"customQuota", instance.Name,
 			"after", requeueAfter.String(),
 		)
@@ -223,11 +221,7 @@ func (r *clusterCustomQuotaClaimController) reconcile(
 	instance.Status.Claims = nil
 
 	for _, src := range instance.Spec.Sources {
-		kind := schema.GroupVersionKind{
-			Group:   src.Group,
-			Version: src.Version,
-			Kind:    src.Kind,
-		}
+		kind := src.GroupVersionKind()
 
 		mapping, err := r.mapper.RESTMapping(kind.GroupKind(), kind.Version)
 		if err != nil {
@@ -235,8 +229,9 @@ func (r *clusterCustomQuotaClaimController) reconcile(
 		}
 
 		instance.Status.Targets = append(instance.Status.Targets, capsulev1beta2.CustomQuotaStatusTarget{
-			CustomQuotaSpecSource: src,
-			Scope:                 mapping.Scope.Name(),
+			GroupVersionKind:            metav1.GroupVersionKind(kind),
+			CustomQuotaSpecSourceConfig: src.CustomQuotaSpecSourceConfig,
+			Scope:                       mapping.Scope.Name(),
 		})
 	}
 
@@ -425,7 +420,7 @@ func (r *clusterCustomQuotaClaimController) reconcileLedger(
 			materialized := reservationMaterializedLedger(res, instance.Status.Claims)
 			expired := res.ExpiresAt != nil && res.ExpiresAt.Before(&now)
 
-			log.V(3).Info("evaluating ledger reservation",
+			log.V(5).Info("evaluating ledger reservation",
 				"ledger", key.String(),
 				"reservationID", res.ID,
 				"usage", res.Usage.String(),
@@ -456,7 +451,7 @@ func (r *clusterCustomQuotaClaimController) reconcileLedger(
 			stillPresent := pendingDeleteStillPresent(pd, instance.Status.Claims)
 			expired := now.Sub(pd.CreatedAt.Time) >= pendingDeleteTTL
 
-			log.V(3).Info("evaluating pending delete",
+			log.V(5).Info("evaluating pending delete",
 				"ledger", key.String(),
 				"uid", string(pd.ObjectRef.UID),
 				"group", pd.ObjectRef.APIGroup,

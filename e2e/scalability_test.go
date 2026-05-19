@@ -165,13 +165,12 @@ func newTrafficDeployment(ns string, replicas int32) *appsv1.Deployment {
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{Labels: labels},
 				Spec: corev1.PodSpec{
-					// pause container keeps footprint tiny
+					SecurityContext: nobodyPodSecurityContext(),
 					Containers: []corev1.Container{
 						{
-							Name:  "pause",
-							Image: "registry.k8s.io/pause:3.9",
-							// No resources specified => requests/limits default to zero.
-							// Resources: corev1.ResourceRequirements{},
+							Name:            "pause",
+							Image:           "registry.k8s.io/pause:3.9",
+							SecurityContext: restrictedContainerSecurityContext(),
 						},
 					},
 				},

@@ -379,12 +379,14 @@ var _ = Describe("ResourcePoolClaim Tests", Label("resourcepool"), func() {
 					},
 				},
 				Spec: corev1.PodSpec{
+					SecurityContext: nobodyPodSecurityContext(),
 					// optional: helps schedule quickly, avoid restarts
 					RestartPolicy: corev1.RestartPolicyNever,
 					Containers: []corev1.Container{
 						{
-							Name:  "pause",
-							Image: "registry.k8s.io/pause:3.9",
+							Name:            "pause",
+							Image:           "registry.k8s.io/pause:3.9",
+							SecurityContext: restrictedContainerSecurityContext(),
 							Resources: corev1.ResourceRequirements{
 								Requests: corev1.ResourceList{
 									corev1.ResourceCPU:    resource.MustParse("10m"),

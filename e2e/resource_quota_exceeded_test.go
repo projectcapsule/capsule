@@ -151,10 +151,12 @@ var _ = Describe("exceeding a Tenant resource quota", Label("resourcequota"), fu
 								},
 							},
 							Spec: corev1.PodSpec{
+								SecurityContext: nobodyPodSecurityContext(),
 								Containers: []corev1.Container{
 									{
-										Name:  "my-pause",
-										Image: "gcr.io/google_containers/pause-amd64:3.0",
+										Name:            "my-pause",
+										Image:           "gcr.io/google_containers/pause-amd64:3.0",
+										SecurityContext: restrictedContainerSecurityContext(),
 									},
 								},
 							},
@@ -185,10 +187,12 @@ var _ = Describe("exceeding a Tenant resource quota", Label("resourcequota"), fu
 						Name: "container",
 					},
 					Spec: corev1.PodSpec{
+						SecurityContext: nobodyPodSecurityContext(),
 						Containers: []corev1.Container{
 							{
-								Name:  "container",
-								Image: "quay.io/google-containers/pause-amd64:3.0",
+								Name:            "container",
+								Image:           "gcr.io/google_containers/pause-amd64:3.0",
+								SecurityContext: restrictedContainerSecurityContext(),
 							},
 						},
 					},

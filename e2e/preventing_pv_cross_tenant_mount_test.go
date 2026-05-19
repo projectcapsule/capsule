@@ -106,11 +106,13 @@ var _ = Describe("preventing PersistentVolume cross-tenant mount", Label("tenant
 				Namespace: ns.Name,
 			},
 			Spec: corev1.PodSpec{
+				SecurityContext: nobodyPodSecurityContext(),
 				Containers: []corev1.Container{
 					{
 						Name:            "container",
 						Image:           "gcr.io/google_containers/pause-amd64:3.0",
 						ImagePullPolicy: corev1.PullAlways,
+						SecurityContext: restrictedContainerSecurityContext(),
 						VolumeMounts: []corev1.VolumeMount{
 							{
 								Name:      "data",

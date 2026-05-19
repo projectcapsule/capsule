@@ -57,10 +57,12 @@ var _ = Describe("cordoning a Tenant", Label("tenant"), func() {
 				Name: "container",
 			},
 			Spec: corev1.PodSpec{
+				SecurityContext: nobodyPodSecurityContext(),
 				Containers: []corev1.Container{
 					{
-						Name:  "container",
-						Image: "gcr.io/google_containers/pause-amd64:3.0",
+						Name:            "container",
+						Image:           "quay.io/google-containers/pause-amd64:3.0",
+						SecurityContext: restrictedContainerSecurityContext(),
 					},
 				},
 			},

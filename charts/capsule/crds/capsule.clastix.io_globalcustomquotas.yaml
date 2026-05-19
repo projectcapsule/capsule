@@ -184,9 +184,13 @@ spec:
                 description: Target resource
                 items:
                   properties:
-                    group:
+                    apiVersion:
+                      description: API version of the referent.
                       type: string
                     kind:
+                      description: |-
+                        Kind of the referent.
+                        More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
                       type: string
                     op:
                       default: add
@@ -260,12 +264,9 @@ spec:
                         type: object
                         x-kubernetes-map-type: atomic
                       type: array
-                    version:
-                      type: string
                   required:
-                  - group
+                  - apiVersion
                   - kind
-                  - version
                   type: object
                   x-kubernetes-validations:
                   - message: path must be empty when op is 'count'; otherwise path
@@ -471,11 +472,6 @@ spec:
                   - kind
                   - version
                   type: object
-                  x-kubernetes-validations:
-                  - message: path must be empty when op is 'count'; otherwise path
-                      must be set and non-empty
-                    rule: 'self.op == ''count'' ? !has(self.path) || size(self.path)
-                      == 0 : has(self.path) && size(self.path) > 0'
                 type: array
               usage:
                 description: Usage measurements

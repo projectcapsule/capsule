@@ -272,11 +272,13 @@ var _ = Describe("enforcing a Container Registry", Label("tenant", "rules", "ima
 		pod := &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{Name: "harbor-wrong-policy"},
 			Spec: corev1.PodSpec{
+				SecurityContext: nobodyPodSecurityContext(),
 				Containers: []corev1.Container{
 					{
 						Name:            "c",
 						Image:           "harbor/some-team/app:1",
 						ImagePullPolicy: corev1.PullIfNotPresent,
+						SecurityContext: restrictedContainerSecurityContext(),
 					},
 				},
 			},
@@ -301,11 +303,13 @@ var _ = Describe("enforcing a Container Registry", Label("tenant", "rules", "ima
 		pod := &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{Name: "harbor-always"},
 			Spec: corev1.PodSpec{
+				SecurityContext: nobodyPodSecurityContext(),
 				Containers: []corev1.Container{
 					{
 						Name:            "c",
 						Image:           "harbor/some-team/app:1",
 						ImagePullPolicy: corev1.PullAlways,
+						SecurityContext: restrictedContainerSecurityContext(),
 					},
 				},
 			},
@@ -326,18 +330,22 @@ var _ = Describe("enforcing a Container Registry", Label("tenant", "rules", "ima
 		pod := &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{Name: "init-deny"},
 			Spec: corev1.PodSpec{
+				SecurityContext: nobodyPodSecurityContext(),
 				InitContainers: []corev1.Container{
 					{
 						Name:            "init",
 						Image:           "harbor/some-team/init:1",
 						ImagePullPolicy: corev1.PullIfNotPresent, // should be denied
+						SecurityContext: restrictedContainerSecurityContext(),
 					},
 				},
+
 				Containers: []corev1.Container{
 					{
 						Name:            "c",
 						Image:           "harbor/some-team/app:1",
 						ImagePullPolicy: corev1.PullAlways,
+						SecurityContext: restrictedContainerSecurityContext(),
 					},
 				},
 			},
@@ -362,9 +370,14 @@ var _ = Describe("enforcing a Container Registry", Label("tenant", "rules", "ima
 		pod := &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{Name: "volume-deny"},
 			Spec: corev1.PodSpec{
+				SecurityContext: nobodyPodSecurityContext(),
 				Containers: []corev1.Container{
-					// main container must exist
-					{Name: "c", Image: "harbor/some-team/app:1", ImagePullPolicy: corev1.PullAlways},
+					{
+						Name:            "c",
+						Image:           "harbor/some-team/app:1",
+						ImagePullPolicy: corev1.PullAlways,
+						SecurityContext: restrictedContainerSecurityContext(),
+					},
 				},
 				Volumes: []corev1.Volume{
 					{
@@ -402,8 +415,9 @@ var _ = Describe("enforcing a Container Registry", Label("tenant", "rules", "ima
 		bad := &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{Name: "prod-bad"},
 			Spec: corev1.PodSpec{
+				SecurityContext: nobodyPodSecurityContext(),
 				Containers: []corev1.Container{
-					{Name: "c", Image: "harbor/production-image/app:1", ImagePullPolicy: corev1.PullNever},
+					{Name: "c", Image: "harbor/production-image/app:1", ImagePullPolicy: corev1.PullNever, SecurityContext: restrictedContainerSecurityContext()},
 				},
 			},
 		}
@@ -416,8 +430,9 @@ var _ = Describe("enforcing a Container Registry", Label("tenant", "rules", "ima
 		good := &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{Name: "prod-good"},
 			Spec: corev1.PodSpec{
+				SecurityContext: nobodyPodSecurityContext(),
 				Containers: []corev1.Container{
-					{Name: "c", Image: "harbor/production-image/app:1", ImagePullPolicy: corev1.PullAlways},
+					{Name: "c", Image: "harbor/production-image/app:1", ImagePullPolicy: corev1.PullAlways, SecurityContext: restrictedContainerSecurityContext()},
 				},
 			},
 		}
@@ -441,8 +456,14 @@ var _ = Describe("enforcing a Container Registry", Label("tenant", "rules", "ima
 		pod := &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{Name: "base"},
 			Spec: corev1.PodSpec{
+				SecurityContext: nobodyPodSecurityContext(),
 				Containers: []corev1.Container{
-					{Name: "c", Image: "harbor/some-team/app:1", ImagePullPolicy: corev1.PullAlways},
+					{
+						Name:            "c",
+						Image:           "harbor/some-team/app:1",
+						ImagePullPolicy: corev1.PullAlways,
+						SecurityContext: restrictedContainerSecurityContext(),
+					},
 				},
 			},
 		}
@@ -454,6 +475,7 @@ var _ = Describe("enforcing a Container Registry", Label("tenant", "rules", "ima
 				Name:            "debug",
 				Image:           "harbor/some-team/debug:1",
 				ImagePullPolicy: corev1.PullIfNotPresent,
+				SecurityContext: restrictedContainerSecurityContext(),
 			},
 		}
 
@@ -498,8 +520,9 @@ var _ = Describe("enforcing a Container Registry", Label("tenant", "rules", "ima
 		pod1 := &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{Name: "vol-ok"},
 			Spec: corev1.PodSpec{
+				SecurityContext: nobodyPodSecurityContext(),
 				Containers: []corev1.Container{
-					{Name: "c", Image: "harbor/some-team/app:1", ImagePullPolicy: corev1.PullAlways},
+					{Name: "c", Image: "harbor/some-team/app:1", ImagePullPolicy: corev1.PullAlways, SecurityContext: restrictedContainerSecurityContext()},
 				},
 				Volumes: []corev1.Volume{
 					{
@@ -519,8 +542,9 @@ var _ = Describe("enforcing a Container Registry", Label("tenant", "rules", "ima
 		pod2 := &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{Name: "vol-bad"},
 			Spec: corev1.PodSpec{
+				SecurityContext: nobodyPodSecurityContext(),
 				Containers: []corev1.Container{
-					{Name: "c", Image: "harbor/some-team/app:1", ImagePullPolicy: corev1.PullAlways},
+					{Name: "c", Image: "harbor/some-team/app:1", ImagePullPolicy: corev1.PullAlways, SecurityContext: restrictedContainerSecurityContext()},
 				},
 				Volumes: []corev1.Volume{
 					{

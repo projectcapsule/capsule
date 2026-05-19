@@ -21,12 +21,10 @@ var _ = Describe("CompiledTargetsCache", func() {
 	target := func(kind string) CompiledTarget {
 		return CompiledTarget{
 			CustomQuotaStatusTarget: capsulev1beta2.CustomQuotaStatusTarget{
-				CustomQuotaSpecSource: capsulev1beta2.CustomQuotaSpecSource{
-					GroupVersionKind: metav1.GroupVersionKind{
-						Group:   "",
-						Version: "v1",
-						Kind:    kind,
-					},
+				GroupVersionKind: metav1.GroupVersionKind{
+					Group:   "",
+					Version: "v1",
+					Kind:    kind,
 				},
 			},
 		}

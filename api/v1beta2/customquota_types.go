@@ -7,6 +7,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"github.com/projectcapsule/capsule/pkg/runtime/gvk"
 	"github.com/projectcapsule/capsule/pkg/runtime/quota"
 	"github.com/projectcapsule/capsule/pkg/runtime/selectors"
 )
@@ -34,8 +35,11 @@ type CustomQuotaOptionsSpec struct {
 
 // +kubebuilder:validation:XValidation:rule="self.op == 'count' ? !has(self.path) || size(self.path) == 0 : has(self.path) && size(self.path) > 0",message="path must be empty when op is 'count'; otherwise path must be set and non-empty"
 type CustomQuotaSpecSource struct {
-	metav1.GroupVersionKind `json:",inline"`
+	gvk.VersionKind             `json:",inline"`
+	CustomQuotaSpecSourceConfig `json:",inline"`
+}
 
+type CustomQuotaSpecSourceConfig struct {
 	// Path on GVK where usage is evaluated.
 	// Must be empty when op is "count".
 	// Required and non-empty for all other operations.

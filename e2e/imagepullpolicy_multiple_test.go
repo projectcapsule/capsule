@@ -96,11 +96,13 @@ var _ = Describe("enforcing some defined ImagePullPolicy", Label("tenant", "imag
 					Name: "pull-always",
 				},
 				Spec: corev1.PodSpec{
+					SecurityContext: nobodyPodSecurityContext(),
 					Containers: []corev1.Container{
 						{
 							Name:            "container",
 							Image:           "gcr.io/google_containers/pause-amd64:3.0",
 							ImagePullPolicy: corev1.PullAlways,
+							SecurityContext: restrictedContainerSecurityContext(),
 						},
 					},
 				},
@@ -119,6 +121,7 @@ var _ = Describe("enforcing some defined ImagePullPolicy", Label("tenant", "imag
 							Name:            "dbg",
 							Image:           "gcr.io/google_containers/pause-amd64:3.0",
 							ImagePullPolicy: corev1.PullAlways,
+							SecurityContext: restrictedContainerSecurityContext(),
 						},
 					},
 				}
@@ -138,11 +141,13 @@ var _ = Describe("enforcing some defined ImagePullPolicy", Label("tenant", "imag
 					Name: "if-not-present",
 				},
 				Spec: corev1.PodSpec{
+					SecurityContext: nobodyPodSecurityContext(),
 					Containers: []corev1.Container{
 						{
 							Name:            "container",
 							Image:           "gcr.io/google_containers/pause-amd64:3.0",
 							ImagePullPolicy: corev1.PullIfNotPresent,
+							SecurityContext: restrictedContainerSecurityContext(),
 						},
 					},
 				},
@@ -161,6 +166,7 @@ var _ = Describe("enforcing some defined ImagePullPolicy", Label("tenant", "imag
 							Name:            "dbg",
 							Image:           "gcr.io/google_containers/pause-amd64:3.0",
 							ImagePullPolicy: corev1.PullIfNotPresent,
+							SecurityContext: restrictedContainerSecurityContext(),
 						},
 					},
 				}
@@ -179,11 +185,13 @@ var _ = Describe("enforcing some defined ImagePullPolicy", Label("tenant", "imag
 					Name: "never",
 				},
 				Spec: corev1.PodSpec{
+					SecurityContext: nobodyPodSecurityContext(),
 					Containers: []corev1.Container{
 						{
 							Name:            "container",
 							Image:           "gcr.io/google_containers/pause-amd64:3.0",
 							ImagePullPolicy: corev1.PullNever,
+							SecurityContext: restrictedContainerSecurityContext(),
 						},
 					},
 				},
@@ -202,6 +210,7 @@ var _ = Describe("enforcing some defined ImagePullPolicy", Label("tenant", "imag
 							Name:            "dbg",
 							Image:           "gcr.io/google_containers/pause-amd64:3.0",
 							ImagePullPolicy: corev1.PullNever,
+							SecurityContext: restrictedContainerSecurityContext(),
 						},
 					},
 				}

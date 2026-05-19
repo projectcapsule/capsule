@@ -25,6 +25,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	apimeta "github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/api/rbac"
+	"github.com/projectcapsule/capsule/pkg/runtime/gvk"
 	"github.com/projectcapsule/capsule/pkg/template"
 )
 
@@ -209,9 +210,11 @@ var _ = Describe("GlobalTenantResource", Label("replications", "global", "global
 					PruningOnDelete: ptr.To(true),
 					Resources: []capsulev1beta2.ResourceSpec{{
 						NamespacedItems: []template.ResourceReference{{
-							APIVersion: "v1",
-							Kind:       "Secret",
-							Namespace:  sourceNs,
+							VersionKind: gvk.VersionKind{
+								APIVersion: "v1",
+								Kind:       "Secret",
+							},
+							Namespace: sourceNs,
 							Selector: &metav1.LabelSelector{
 								MatchLabels: map[string]string{
 									"replicate": "true",
@@ -476,9 +479,11 @@ var _ = Describe("GlobalTenantResource", Label("replications", "global", "global
 								Resources: []*template.TemplateResourceReference{{
 									Index: "secrets",
 									ResourceReference: template.ResourceReference{
-										APIVersion: "v1",
-										Kind:       "Secret",
-										Namespace:  sourceNs,
+										VersionKind: gvk.VersionKind{
+											APIVersion: "v1",
+											Kind:       "Secret",
+										},
+										Namespace: sourceNs,
 										Selector: &metav1.LabelSelector{
 											MatchLabels: map[string]string{
 												"pullsecret.company.com": "true",
@@ -561,9 +566,11 @@ data:
 						PruningOnDelete: ptr.To(true),
 						Resources: []capsulev1beta2.ResourceSpec{{
 							NamespacedItems: []template.ResourceReference{{
-								APIVersion: "v1",
-								Kind:       "Secret",
-								Namespace:  sourceNs,
+								VersionKind: gvk.VersionKind{
+									APIVersion: "v1",
+									Kind:       "Secret",
+								},
+								Namespace: sourceNs,
 								Selector: &metav1.LabelSelector{
 									MatchLabels: map[string]string{
 										"replicate": "true",
@@ -1150,9 +1157,11 @@ data:
 								Resources: []*template.TemplateResourceReference{{
 									Index: "secrets",
 									ResourceReference: template.ResourceReference{
-										APIVersion: "v1",
-										Kind:       "Secret",
-										Namespace:  sourceNs,
+										VersionKind: gvk.VersionKind{
+											APIVersion: "v1",
+											Kind:       "Secret",
+										},
+										Namespace: sourceNs,
 										Selector: &metav1.LabelSelector{
 											MatchLabels: map[string]string{
 												"pullsecret.company.com": "true",

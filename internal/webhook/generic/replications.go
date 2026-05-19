@@ -72,7 +72,7 @@ func (h *replicaHandler) handler(ctx context.Context, c client.Reader, req admis
 		ctx,
 		global,
 		client.MatchingFieldsSelector{
-			Selector: fields.OneTermEqualSelector(tenantresource.ProcessedIndexerFieldName, gvkKey),
+			Selector: fields.OneTermEqualSelector(tenantresource.CreatedIndexerFieldName, gvkKey),
 		},
 	); err != nil {
 		return ad.ErroredResponse(err)
@@ -99,7 +99,7 @@ func (h *replicaHandler) handler(ctx context.Context, c client.Reader, req admis
 		ctx,
 		local,
 		client.MatchingFieldsSelector{
-			Selector: fields.OneTermEqualSelector(tenantresource.ProcessedIndexerFieldName, gvkKey),
+			Selector: fields.OneTermEqualSelector(tenantresource.CreatedIndexerFieldName, gvkKey),
 		},
 	); err != nil {
 		return ad.ErroredResponse(err)

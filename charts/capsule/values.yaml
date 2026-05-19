@@ -935,14 +935,14 @@ webhooks:
           - key: "capsule.clastix.io/tenant"
             operator: Exists
       # -- [MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
-      matchConditions:
-        - name: "exclude-privileged-users"
-          expression: >
-            !(
-              request.userInfo.username in [
-                "kubernetes-admin"
-              ]
-            )
+      matchConditions: []
+      #  - name: "exclude-privileged-users"
+      #    expression: >
+      #      !(
+      #        request.userInfo.username in [
+      #          "kubernetes-admin"
+      #        ]
+      #      )
 
       # -- [Rules](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-rules)
       rules:

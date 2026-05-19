@@ -161,10 +161,12 @@ var _ = Describe("adding metadata to Service objects", Label("tenant", "service"
 					Name: "container",
 				},
 				Spec: corev1.PodSpec{
+					SecurityContext: nobodyPodSecurityContext(),
 					Containers: []corev1.Container{
 						{
-							Name:  "container",
-							Image: "quay.io/google-containers/pause-amd64:3.0",
+							Name:            "container",
+							Image:           "quay.io/google-containers/pause-amd64:3.0",
+							SecurityContext: restrictedContainerSecurityContext(),
 						},
 					},
 				},

@@ -1246,10 +1246,6 @@ spec:
             description: CapsuleConfigurationStatus defines the Capsule configuration
               status.
             properties:
-              lastCacheInvalidation:
-                description: Last time all caches were invalided
-                format: date-time
-                type: string
               users:
                 description: Users which are considered Capsule Users and are bound
                   to the Capsule Tenant construct.

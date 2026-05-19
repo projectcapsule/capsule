@@ -93,12 +93,11 @@ func (r *globalResourceController) SetupWithManager(mgr ctrl.Manager, cfg utils.
 		WithOptions(controller.Options{MaxConcurrentReconciles: cfg.MaxConcurrentReconciles}).
 		Complete(r)
 }
-
 func (r *globalResourceController) Reconcile(ctx context.Context, request reconcile.Request) (res reconcile.Result, err error) {
 	log := ctrllog.FromContext(ctx)
 
 	log.V(5).Info("start processing")
-	// Retrieving the GlobalTenantResource
+
 	tntResource := &capsulev1beta2.GlobalTenantResource{}
 	if err = r.client.Get(ctx, request.NamespacedName, tntResource); err != nil {
 		if apierrors.IsNotFound(err) {
@@ -112,13 +111,26 @@ func (r *globalResourceController) Reconcile(ctx context.Context, request reconc
 		return reconcile.Result{}, err
 	}
 
+	requeue := reconcile.Result{
+		Requeue:      true,
+		RequeueAfter: tntResource.Spec.ResyncPeriod.Duration,
+	}
+
 	patchHelper, err := patch.NewHelper(tntResource, r.client)
 	if err != nil {
 		return reconcile.Result{}, gherrors.Wrap(err, "failed to init patch helper")
 	}
 
+	var statusErr error
+
 	defer func() {
-		if uerr := r.updateStatus(ctx, tntResource, err); uerr != nil {
+		if uerr := r.updateStatus(ctx, tntResource, statusErr); uerr != nil {
+			if apierrors.IsNotFound(uerr) {
+				err = nil
+
+				return
+			}
+
 			err = fmt.Errorf("cannot update globaltenantresource status: %w", uerr)
 
 			return
@@ -127,72 +139,75 @@ func (r *globalResourceController) Reconcile(ctx context.Context, request reconc
 		r.metrics.RecordConditions(tntResource)
 
 		if e := patchHelper.Patch(ctx, tntResource); e != nil {
-			if err == nil {
-				err = gherrors.Wrap(e, "failed to patch GlobalTenantResource")
+			if apierrors.IsNotFound(e) {
+				err = nil
+
+				return
 			}
+
+			err = gherrors.Wrap(e, "failed to patch GlobalTenantResource")
+
+			return
 		}
 
-		// Controller-Runtime should never receive error
+		// Controller-runtime should not receive handled reconciliation errors.
 		err = nil
 	}()
 
 	if *tntResource.Spec.Cordoned {
 		log.V(5).Info("global tenant resource cordoned")
 
-		return reconcile.Result{}, err
+		return reconcile.Result{}, nil
 	}
 
 	for _, dep := range tntResource.Spec.DependsOn {
 		d := &capsulev1beta2.GlobalTenantResource{}
 
-		err = r.client.Get(ctx, types.NamespacedName{Name: dep.Name.String(), Namespace: ""}, d)
-		if err != nil {
-			if apierrors.IsNotFound(err) {
-				err = fmt.Errorf("dependency %s not found", dep.Name)
+		if getErr := r.client.Get(ctx, types.NamespacedName{Name: dep.Name.String()}, d); getErr != nil {
+			if apierrors.IsNotFound(getErr) {
+				statusErr = fmt.Errorf("dependency %s not found", dep.Name)
+			} else {
+				statusErr = getErr
 			}
 
-			return reconcile.Result{
-				Requeue:      true,
-				RequeueAfter: tntResource.Spec.ResyncPeriod.Duration,
-			}, err
+			return requeue, nil
 		}
 
 		stat := d.Status.Conditions.GetConditionByType(meta.ReadyCondition)
 		if stat.Status != metav1.ConditionTrue {
-			err = fmt.Errorf("dependency %s not ready", dep.Name)
+			statusErr = fmt.Errorf("dependency %s not ready", dep.Name)
 
-			return reconcile.Result{
-				Requeue:      true,
-				RequeueAfter: tntResource.Spec.ResyncPeriod.Duration,
-			}, err
+			return requeue, nil
 		}
 	}
 
 	// Load client must be first since it updates the new serviceaccount used which can then be directly
-	// posted to the status
-	c, err := r.loadClient(ctx, log, tntResource)
-	if err != nil {
-		err = gherrors.Wrap(err, "failed to load serviceaccount client")
+	// posted to the status.
+	c, loadErr := r.loadClient(ctx, log, tntResource)
+	if loadErr != nil {
+		statusErr = gherrors.Wrap(loadErr, "failed to load serviceaccount client")
 
-		return reconcile.Result{}, err
+		return requeue, nil
 	}
 
-	err = r.updateReconcilingStatus(ctx, tntResource)
-	if err != nil {
-		err := gherrors.Wrap(err, "failed to update status")
+	if updateErr := r.updateReconcilingStatus(ctx, tntResource); updateErr != nil {
+		if apierrors.IsNotFound(updateErr) {
+			return reconcile.Result{}, nil
+		}
 
-		return reconcile.Result{}, err
+		statusErr = gherrors.Wrap(updateErr, "failed to update status")
+
+		return requeue, nil
 	}
 
 	if c == nil {
-		err = fmt.Errorf("received empty client for serviceaccount")
+		statusErr = fmt.Errorf("received empty client for serviceaccount")
 
-		return reconcile.Result{}, nil
+		return requeue, nil
 	}
 
-	err = r.reconcile(ctx, c, tntResource)
+	statusErr = r.reconcile(ctx, c, tntResource)
 
-	// Finalizers
 	if len(tntResource.Status.ProcessedItems) > 0 {
 		controllerutil.AddFinalizer(tntResource, meta.ControllerFinalizer)
 	} else {
@@ -201,10 +216,7 @@ func (r *globalResourceController) Reconcile(ctx context.Context, request reconc
 
 	controllerutil.RemoveFinalizer(tntResource, meta.LegacyResourceFinalizer)
 
-	return reconcile.Result{
-		Requeue:      true,
-		RequeueAfter: tntResource.Spec.ResyncPeriod.Duration,
-	}, err
+	return requeue, nil
 }
 
 //nolint:dupl

@@ -470,7 +470,6 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "Tenant")
 		os.Exit(1)
 	}
-
 	if err = (&capsulev1beta1.Tenant{}).SetupWebhookWithManager(manager); err != nil {
 		setupLog.Error(err, "unable to create conversion webhook", "webhook", "capsulev1beta1.Tenant")
 		os.Exit(1)

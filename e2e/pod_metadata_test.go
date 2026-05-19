@@ -71,12 +71,15 @@ var _ = Describe("adding metadata to Pod objects", Label("pod"), func() {
 				Name:      "pod-metadata",
 				Namespace: ns.GetName(),
 			},
+
 			Spec: corev1.PodSpec{
+				SecurityContext: nobodyPodSecurityContext(),
 				Containers: []corev1.Container{
 					{
 						Name:            "container",
 						Image:           "quay.io/google-containers/pause-amd64:3.0",
 						ImagePullPolicy: "IfNotPresent",
+						SecurityContext: restrictedContainerSecurityContext(),
 					},
 				},
 				RestartPolicy: "Always",

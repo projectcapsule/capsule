@@ -166,7 +166,7 @@ func (h *handler) OnUpdate(c client.Client, decoder admission.Decoder, recorder 
 		if owned := tenant.NamespaceIsOwned(ctx, c, h.cfg, oldNs, oldTenant, req.UserInfo); !owned {
 			recorder.Eventf(
 				oldNs,
-				oldTenant,
+				nil,
 				corev1.EventTypeWarning,
 				"NamespacePatch",
 				evt.ActionValidationDenied,
