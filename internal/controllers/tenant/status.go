@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"sort"
 
+	corev1 "k8s.io/api/core/v1"
 	nodev1 "k8s.io/api/node/v1"
 	resources "k8s.io/api/resource/v1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
@@ -112,7 +113,44 @@ func (r *Manager) collectAvailableResources(ctx context.Context, tnt *capsulev1b
 
 	log.V(5).Info("collected available runtimeclasses", "size", len(tnt.Status.Classes.RuntimeClasses))
 
+	if err = r.collectAvailableNodes(ctx, tnt); err != nil {
+		return err
+	}
+
+	log.V(5).Info("collected available nodes", "size", len(tnt.Status.Nodes))
+
 	return nil
+}
+
+func (r *Manager) collectAvailableNodes(ctx context.Context, tnt *capsulev1beta2.Tenant) (err error) {
+	nodeList := &corev1.NodeList{}
+	if err = r.List(ctx, nodeList); err != nil {
+		return err
+	}
+
+	nodes := make([]string, 0, len(nodeList.Items))
+	for i := range nodeList.Items {
+		n := &nodeList.Items[i]
+		if !tenantNodeSelectorMatch(tnt, n) {
+			continue
+		}
+
+		nodes = append(nodes, n.GetName())
+	}
+
+	sort.Strings(nodes)
+
+	tnt.Status.Nodes = nodes
+
+	return nil
+}
+
+func tenantNodeSelectorMatch(tnt *capsulev1beta2.Tenant, obj client.Object) bool {
+	if len(tnt.Spec.NodeSelector) == 0 {
+		return true
+	}
+
+	return labels.SelectorFromSet(tnt.Spec.NodeSelector).Matches(labels.Set(obj.GetLabels()))
 }
 
 func (r *Manager) collectAvailableDeviceClasses(ctx context.Context, tnt *capsulev1beta2.Tenant) (err error) {

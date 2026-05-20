@@ -117,6 +117,10 @@ func (r *Manager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.Controller
 			builder.WithPredicates(predicates.UpdatedLabelsPredicate{}),
 		).
 		Watches(
+			&corev1.Node{},
+			r.statusOnlyHandlerNodes(),
+		).
+		Watches(
 			&capsulev1beta2.TenantOwner{},
 			handler.TypedFuncs[client.Object, ctrl.Request]{
 				CreateFunc: func(
