@@ -13,13 +13,18 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/api/rbac"
 )
 
-var _ = Describe("creating a Namespace for a Tenant with additional metadata", Label("namespace"), func() {
+var _ = Describe("creating a Namespace for a Tenant with additional metadata", Ordered, Label("namespace"), func() {
 	tnt := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "tenant-metadata-controller",
+			Name: "e2e-tenant-metadata",
+			Labels: map[string]string{
+				"env": "e2e",
+			},
+
 			OwnerReferences: []metav1.OwnerReference{
 				{
 					APIVersion: "cap",
@@ -59,15 +64,18 @@ var _ = Describe("creating a Namespace for a Tenant with additional metadata", L
 		EventuallyCreation(func() error {
 			return k8sClient.Create(context.TODO(), tnt)
 		}).Should(Succeed())
+		TenantReady(tnt, metav1.ConditionTrue, defaultTimeoutInterval)
 	})
 	JustAfterEach(func() {
 		EventuallyDeletion(tnt)
 	})
 
 	It("should contain Namespace metadata after tenant update", func() {
-		ns := NewNamespace("")
+		ns := NewNamespace("", map[string]string{
+			meta.TenantLabel: tnt.GetName(),
+		})
 		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
-		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
+		NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
 
 		By("checking labels", func() {
 			Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: ns.GetName()}, ns)).Should(Succeed())

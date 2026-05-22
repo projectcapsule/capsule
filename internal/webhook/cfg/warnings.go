@@ -23,6 +23,7 @@ func WarningHandler() handlers.TypedHandler[*capsulev1beta2.CapsuleConfiguration
 
 func (h *warningHandler) OnCreate(
 	_ client.Client,
+	_ client.Reader,
 	cfg *capsulev1beta2.CapsuleConfiguration,
 	decoder admission.Decoder,
 	_ events.EventRecorder,
@@ -32,7 +33,13 @@ func (h *warningHandler) OnCreate(
 	}
 }
 
-func (h *warningHandler) OnDelete(client.Client, *capsulev1beta2.CapsuleConfiguration, admission.Decoder, events.EventRecorder) handlers.Func {
+func (h *warningHandler) OnDelete(
+	client.Client,
+	client.Reader,
+	*capsulev1beta2.CapsuleConfiguration,
+	admission.Decoder,
+	events.EventRecorder,
+) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
@@ -40,6 +47,7 @@ func (h *warningHandler) OnDelete(client.Client, *capsulev1beta2.CapsuleConfigur
 
 func (h *warningHandler) OnUpdate(
 	_ client.Client,
+	_ client.Reader,
 	cfg *capsulev1beta2.CapsuleConfiguration,
 	_ *capsulev1beta2.CapsuleConfiguration,
 	decoder admission.Decoder,

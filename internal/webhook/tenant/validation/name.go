@@ -23,6 +23,7 @@ func NameHandler() handlers.TypedHandler[*capsulev1beta2.Tenant] {
 
 func (h *nameHandler) OnCreate(
 	_ client.Client,
+	_ client.Reader,
 	tnt *capsulev1beta2.Tenant,
 	decoder admission.Decoder,
 	_ events.EventRecorder,
@@ -41,6 +42,7 @@ func (h *nameHandler) OnCreate(
 
 func (h *nameHandler) OnDelete(
 	client.Client,
+	client.Reader,
 	*capsulev1beta2.Tenant,
 	admission.Decoder,
 	events.EventRecorder,
@@ -52,6 +54,7 @@ func (h *nameHandler) OnDelete(
 
 func (h *nameHandler) OnUpdate(
 	client.Client,
+	client.Reader,
 	*capsulev1beta2.Tenant,
 	*capsulev1beta2.Tenant,
 	admission.Decoder,

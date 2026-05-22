@@ -28,21 +28,36 @@ func ClaimMutationHandler(log logr.Logger) handlers.Handler {
 	return &claimMutationHandler{log: log}
 }
 
-func (h *claimMutationHandler) OnUpdate(c client.Client, decoder admission.Decoder, _ events.EventRecorder) handlers.Func {
+func (h *claimMutationHandler) OnUpdate(
+	c client.Client,
+	_ client.Reader,
+	decoder admission.Decoder,
+	_ events.EventRecorder,
+) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		return h.handle(ctx, req, decoder, c, h.handleReleaseAnnotation)
+		return h.handle(ctx, c, req, decoder, h.handleReleaseAnnotation)
 	}
 }
 
-func (h *claimMutationHandler) OnDelete(client.Client, admission.Decoder, events.EventRecorder) handlers.Func {
+func (h *claimMutationHandler) OnDelete(
+	client.Client,
+	client.Reader,
+	admission.Decoder,
+	events.EventRecorder,
+) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (h *claimMutationHandler) OnCreate(c client.Client, decoder admission.Decoder, _ events.EventRecorder) handlers.Func {
+func (h *claimMutationHandler) OnCreate(
+	c client.Client,
+	_ client.Reader,
+	decoder admission.Decoder,
+	_ events.EventRecorder,
+) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		return h.handle(ctx, req, decoder, c, func(claim *capsulev1beta2.ResourcePoolClaim) {
+		return h.handle(ctx, c, req, decoder, func(claim *capsulev1beta2.ResourcePoolClaim) {
 			meta.ReleaseAnnotationRemove(claim)
 		})
 	}
@@ -50,9 +65,9 @@ func (h *claimMutationHandler) OnCreate(c client.Client, decoder admission.Decod
 
 func (h *claimMutationHandler) handle(
 	ctx context.Context,
+	c client.Client,
 	req admission.Request,
 	decoder admission.Decoder,
-	c client.Client,
 	annoHandler func(c *capsulev1beta2.ResourcePoolClaim),
 ) *admission.Response {
 	claim := &capsulev1beta2.ResourcePoolClaim{}

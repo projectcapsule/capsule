@@ -11,6 +11,7 @@ import (
 
 	"golang.org/x/sync/errgroup"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -242,7 +243,7 @@ func (r *Manager) syncResourceQuota(ctx context.Context, tenant *capsulev1beta2.
 				target.Spec.Scopes = resQuota.Scopes
 				target.Spec.ScopeSelector = resQuota.ScopeSelector
 
-				// In case of Namespace scope for the ResourceQuota we can easily apply the bare specification
+				// In case of Namespace scope for the ResourceQuota we can easily apply the bare specification.
 				if tenant.Spec.ResourceQuota.Scope == api.ResourceQuotaScopeNamespace {
 					target.Spec.Hard = resQuota.Hard
 				}
@@ -253,11 +254,22 @@ func (r *Manager) syncResourceQuota(ctx context.Context, tenant *capsulev1beta2.
 			return retryErr
 		})
 
-		r.Log.V(4).Info("resource Quota sync result: "+string(res), "name", target.Name, "namespace", target.Namespace)
-
 		if err != nil {
+			if apierrors.HasStatusCause(err, corev1.NamespaceTerminatingCause) {
+				r.Log.V(4).Info(
+					"skipping ResourceQuota sync because namespace is terminating",
+					"name", target.Name,
+					"namespace", target.Namespace,
+					"tenant", tenant.Name,
+				)
+
+				return nil
+			}
+
 			return err
 		}
+
+		r.Log.V(4).Info("resource Quota sync result: "+string(res), "name", target.Name, "namespace", target.Namespace)
 	}
 
 	return nil

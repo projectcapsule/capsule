@@ -26,6 +26,7 @@ import (
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/events"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/certwatcher"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -108,10 +109,19 @@ func main() {
 	controllerConfig := utilscontroller.ControllerOptions{}
 
 	var (
-		metricsAddr, metricsCertPath, metricsCertName, metricsCertKey          string
-		webhookCertPath, webhookCertName, webhookCertKey                       string
-		enableLeaderElection, enablePprof, version, secureMetrics, enableHTTP2 bool
-		webhookPort                                                            int
+		metricsAddr, metricsCertPath, metricsCertName, metricsCertKey string
+		webhookCertPath, webhookCertName, webhookCertKey              string
+
+		enableLeaderElection bool
+		enablePprof          bool
+		version              bool
+		secureMetrics        bool
+		enableHTTP2          bool
+
+		clientConnectionQPS   float32
+		clientConnectionBurst int32
+
+		webhookPort int
 	)
 
 	var goFlagSet goflag.FlagSet
@@ -197,6 +207,19 @@ func main() {
 		"enable-http2", false,
 		"If set, HTTP/2 will be enabled for the metrics and webhook servers",
 	)
+	flag.Float32Var(
+		&clientConnectionQPS,
+		"client-connection-qps",
+		20.0,
+		"QPS to use for interacting with kubernetes apiserver.",
+	)
+	flag.Int32Var(
+		&clientConnectionBurst,
+		"client-connection-burst",
+		30,
+		"Burst to use for interacting with kubernetes apiserver.",
+	)
+
 	flag.BoolVar(
 		&enablePprof,
 		"enable-pprof",
@@ -379,6 +402,8 @@ func main() {
 
 	// Suppress Warnings
 	restConfig.WarningHandler = rest.NoWarnings{}
+	restConfig.QPS = clientConnectionQPS
+	restConfig.Burst = int(clientConnectionBurst)
 
 	manager, err := ctrl.NewManager(restConfig, ctrlOpts)
 	if err != nil {
@@ -464,7 +489,7 @@ func main() {
 		DiscoveryClient: dc,
 		Metrics:         metrics.MustMakeTenantRecorder(),
 		Log:             ctrl.Log.WithName("capsule.ctrl").WithName("tenant"),
-		Recorder:        manager.GetEventRecorder("tenant-controller"),
+		Recorder:        events.EventRecorder(manager.GetEventRecorder("tenant-controller")),
 		Configuration:   cfg,
 	}).SetupWithManager(manager, controllerConfig); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Tenant")
@@ -552,7 +577,6 @@ func main() {
 				tenantvalidation.ProtectedHandler(),
 				tenantvalidation.RequiredMetadataHandler(),
 				tenantvalidation.WarningHandler(cfg),
-				tenantvalidation.RemainingNamespaceHandler(),
 			),
 		),
 		route.NamespaceValidation(

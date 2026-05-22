@@ -65,6 +65,8 @@ spec:
         - --zap-log-level={{ default 4 .Values.manager.options.logLevel }}
         - --configuration-name={{ .Values.manager.options.capsuleConfiguration }}
         - --workers={{ .Values.manager.options.workers }}
+        - --client-connection-qps={{ .Values.manager.options.clientConnectionQPS }}
+        - --client-connection-burst={{ .Values.manager.options.clientConnectionBurst }}
         {{- with .Values.manager.extraArgs }}
           {{- toYaml . | nindent 8 }}
         {{- end }}

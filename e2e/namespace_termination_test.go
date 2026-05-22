@@ -20,12 +20,15 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api/rbac"
 )
 
-var _ = Describe("terminating namespace with guardrails", Label("namespace", "termination"), func() {
+var _ = Describe("terminating namespace with guardrails", Ordered, Label("namespace", "termination"), func() {
 	ctx := context.TODO()
 
 	tnt := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "tenant-termination",
+			Name: "e2e-termination",
+			Labels: map[string]string{
+				"env": "e2e",
+			},
 		},
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: rbac.OwnerListSpec{
@@ -52,11 +55,15 @@ var _ = Describe("terminating namespace with guardrails", Label("namespace", "te
 			return k8sClient.Create(ctx, tnt)
 		}).Should(Succeed())
 
-		// Create namespace as tenant owner
-		ns := NewNamespace("")
+		TenantReady(tnt, metav1.ConditionTrue, defaultTimeoutInterval)
+
+		ns := NewNamespace("", map[string]string{
+			meta.TenantLabel: tnt.GetName(),
+		})
 		nsName = ns.GetName()
 
 		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+		NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
 
 		// Create a pod with a finalizer so the namespace can't complete deletion
 		pod := &corev1.Pod{

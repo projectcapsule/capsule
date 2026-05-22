@@ -30,7 +30,8 @@ func PersistentVolumeValidatingVolume() handlers.TypedHandlerWithTenant[*corev1.
 }
 
 func (h persistentVolumeValidatingVolume) OnCreate(
-	c client.Client,
+	_ client.Client,
+	reader client.Reader,
 	pvc *corev1.PersistentVolumeClaim,
 	decoder admission.Decoder,
 	recorder events.EventRecorder,
@@ -41,12 +42,13 @@ func (h persistentVolumeValidatingVolume) OnCreate(
 			return ad.ErroredResponse(err)
 		}
 
-		return validatePVCVolumeName(ctx, c, pvc, tnt)
+		return validatePVCVolumeName(ctx, reader, pvc, tnt)
 	}
 }
 
 func (h persistentVolumeValidatingVolume) OnUpdate(
-	c client.Client,
+	_ client.Client,
+	reader client.Reader,
 	oldPVC *corev1.PersistentVolumeClaim,
 	newPVC *corev1.PersistentVolumeClaim,
 	decoder admission.Decoder,
@@ -58,12 +60,13 @@ func (h persistentVolumeValidatingVolume) OnUpdate(
 			return ad.ErroredResponse(err)
 		}
 
-		return validatePVCVolumeName(ctx, c, newPVC, tnt)
+		return validatePVCVolumeName(ctx, reader, newPVC, tnt)
 	}
 }
 
 func (h persistentVolumeValidatingVolume) OnDelete(
 	client.Client,
+	client.Reader,
 	*corev1.PersistentVolumeClaim,
 	admission.Decoder,
 	events.EventRecorder,
@@ -115,7 +118,7 @@ func validatePVCSelector(
 
 func validatePVCVolumeName(
 	ctx context.Context,
-	c client.Client,
+	c client.Reader,
 	pvc *corev1.PersistentVolumeClaim,
 	tnt *capsulev1beta2.Tenant,
 ) *admission.Response {

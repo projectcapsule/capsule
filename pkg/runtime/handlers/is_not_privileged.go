@@ -29,7 +29,7 @@ type isNotPrivileged struct {
 }
 
 //nolint:dupl
-func (h *isNotPrivileged) OnCreate(client client.Client, decoder admission.Decoder, recorder events.EventRecorder) Func {
+func (h *isNotPrivileged) OnCreate(client client.Client, reader client.Reader, decoder admission.Decoder, recorder events.EventRecorder) Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		if users.IsAdminUser(req, h.configuration.Administrators()) {
 			return nil
@@ -43,7 +43,7 @@ func (h *isNotPrivileged) OnCreate(client client.Client, decoder admission.Decod
 		}
 
 		for _, hndl := range h.handlers {
-			if response := hndl.OnCreate(client, decoder, recorder)(ctx, req); response != nil {
+			if response := hndl.OnCreate(client, reader, decoder, recorder)(ctx, req); response != nil {
 				return response
 			}
 		}
@@ -53,7 +53,7 @@ func (h *isNotPrivileged) OnCreate(client client.Client, decoder admission.Decod
 }
 
 //nolint:dupl
-func (h *isNotPrivileged) OnDelete(client client.Client, decoder admission.Decoder, recorder events.EventRecorder) Func {
+func (h *isNotPrivileged) OnDelete(client client.Client, reader client.Reader, decoder admission.Decoder, recorder events.EventRecorder) Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		if users.IsAdminUser(req, h.configuration.Administrators()) {
 			return nil
@@ -67,7 +67,7 @@ func (h *isNotPrivileged) OnDelete(client client.Client, decoder admission.Decod
 		}
 
 		for _, hndl := range h.handlers {
-			if response := hndl.OnDelete(client, decoder, recorder)(ctx, req); response != nil {
+			if response := hndl.OnDelete(client, reader, decoder, recorder)(ctx, req); response != nil {
 				return response
 			}
 		}
@@ -77,7 +77,7 @@ func (h *isNotPrivileged) OnDelete(client client.Client, decoder admission.Decod
 }
 
 //nolint:dupl
-func (h *isNotPrivileged) OnUpdate(client client.Client, decoder admission.Decoder, recorder events.EventRecorder) Func {
+func (h *isNotPrivileged) OnUpdate(client client.Client, reader client.Reader, decoder admission.Decoder, recorder events.EventRecorder) Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		if users.IsAdminUser(req, h.configuration.Administrators()) {
 			return nil
@@ -91,7 +91,7 @@ func (h *isNotPrivileged) OnUpdate(client client.Client, decoder admission.Decod
 		}
 
 		for _, hndl := range h.handlers {
-			if response := hndl.OnUpdate(client, decoder, recorder)(ctx, req); response != nil {
+			if response := hndl.OnUpdate(client, reader, decoder, recorder)(ctx, req); response != nil {
 				return response
 			}
 		}

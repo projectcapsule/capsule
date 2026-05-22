@@ -29,7 +29,12 @@ type handler struct {
 }
 
 //nolint:dupl
-func (h *handler) OnCreate(c client.Client, decoder admission.Decoder, recorder events.EventRecorder) handlers.Func {
+func (h *handler) OnCreate(
+	c client.Client,
+	reader client.Reader,
+	decoder admission.Decoder,
+	recorder events.EventRecorder,
+) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		config := &capsulev1beta2.CapsuleConfiguration{}
 		if err := decoder.Decode(req, config); err != nil {
@@ -37,7 +42,7 @@ func (h *handler) OnCreate(c client.Client, decoder admission.Decoder, recorder 
 		}
 
 		for _, hndl := range h.handlers {
-			if response := hndl.OnCreate(c, config, decoder, recorder)(ctx, req); response != nil {
+			if response := hndl.OnCreate(c, reader, config, decoder, recorder)(ctx, req); response != nil {
 				return response
 			}
 		}
@@ -47,7 +52,12 @@ func (h *handler) OnCreate(c client.Client, decoder admission.Decoder, recorder 
 }
 
 //nolint:dupl
-func (h *handler) OnDelete(c client.Client, decoder admission.Decoder, recorder events.EventRecorder) handlers.Func {
+func (h *handler) OnDelete(
+	c client.Client,
+	reader client.Reader,
+	decoder admission.Decoder,
+	recorder events.EventRecorder,
+) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		config := &capsulev1beta2.CapsuleConfiguration{}
 		if err := decoder.Decode(req, config); err != nil {
@@ -55,7 +65,7 @@ func (h *handler) OnDelete(c client.Client, decoder admission.Decoder, recorder 
 		}
 
 		for _, hndl := range h.handlers {
-			if response := hndl.OnDelete(c, config, decoder, recorder)(ctx, req); response != nil {
+			if response := hndl.OnDelete(c, reader, config, decoder, recorder)(ctx, req); response != nil {
 				return response
 			}
 		}
@@ -64,7 +74,12 @@ func (h *handler) OnDelete(c client.Client, decoder admission.Decoder, recorder 
 	}
 }
 
-func (h *handler) OnUpdate(c client.Client, decoder admission.Decoder, recorder events.EventRecorder) handlers.Func {
+func (h *handler) OnUpdate(
+	c client.Client,
+	reader client.Reader,
+	decoder admission.Decoder,
+	recorder events.EventRecorder,
+) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		config := &capsulev1beta2.CapsuleConfiguration{}
 		if err := decoder.Decode(req, config); err != nil {
@@ -77,7 +92,7 @@ func (h *handler) OnUpdate(c client.Client, decoder admission.Decoder, recorder 
 		}
 
 		for _, hndl := range h.handlers {
-			if response := hndl.OnUpdate(c, config, old, decoder, recorder)(ctx, req); response != nil {
+			if response := hndl.OnUpdate(c, reader, config, old, decoder, recorder)(ctx, req); response != nil {
 				return response
 			}
 		}

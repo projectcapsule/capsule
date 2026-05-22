@@ -27,7 +27,8 @@ func PriorityClass() handlers.TypedHandlerWithTenantWithRuleset[*corev1.Pod] {
 }
 
 func (h *priorityClass) OnCreate(
-	c client.Client,
+	_ client.Client,
+	reader client.Reader,
 	pod *corev1.Pod,
 	decoder admission.Decoder,
 	recorder events.EventRecorder,
@@ -52,7 +53,7 @@ func (h *priorityClass) OnCreate(
 
 		// Verify if the StorageClass exists and matches the label selector/expression
 		if len(allowed.MatchExpressions) > 0 || len(allowed.MatchLabels) > 0 {
-			priorityClassObj, err := utils.GetPriorityClassByName(ctx, c, priorityClassName)
+			priorityClassObj, err := utils.GetPriorityClassByName(ctx, reader, priorityClassName)
 			if err != nil {
 				response := admission.Errored(http.StatusInternalServerError, err)
 
@@ -90,6 +91,7 @@ func (h *priorityClass) OnCreate(
 
 func (h *priorityClass) OnUpdate(
 	client.Client,
+	client.Reader,
 	*corev1.Pod,
 	*corev1.Pod,
 	admission.Decoder,
@@ -104,6 +106,7 @@ func (h *priorityClass) OnUpdate(
 
 func (h *priorityClass) OnDelete(
 	client.Client,
+	client.Reader,
 	*corev1.Pod,
 	admission.Decoder,
 	events.EventRecorder,

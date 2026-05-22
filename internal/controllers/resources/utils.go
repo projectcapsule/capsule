@@ -15,7 +15,7 @@ func getFieldOwner(name string, namespace string) string {
 		namespace = "cluster"
 	}
 
-	return meta.FieldManagerCapsulePrefix + "/" + "resource" + "/" + namespace + "/" + name + "/"
+	return namespace + "/" + name + "/"
 }
 
 func getSelectorForCreatedResourcesExclusion() (labels.Selector, error) {

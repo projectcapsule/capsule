@@ -33,25 +33,46 @@ func Class(configuration configuration.Configuration) handlers.Handler {
 	}
 }
 
-func (r *class) OnCreate(client client.Client, decoder admission.Decoder, recorder events.EventRecorder) handlers.Func {
+func (r *class) OnCreate(
+	c client.Client,
+	_ client.Reader,
+	decoder admission.Decoder,
+	recorder events.EventRecorder,
+) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		return r.validate(ctx, client, req, decoder, recorder)
+		return r.validate(ctx, c, req, decoder, recorder)
 	}
 }
 
-func (r *class) OnUpdate(client client.Client, decoder admission.Decoder, recorder events.EventRecorder) handlers.Func {
+func (r *class) OnUpdate(
+	c client.Client,
+	_ client.Reader,
+	decoder admission.Decoder,
+	recorder events.EventRecorder,
+) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		return r.validate(ctx, client, req, decoder, recorder)
+		return r.validate(ctx, c, req, decoder, recorder)
 	}
 }
 
-func (r *class) OnDelete(client.Client, admission.Decoder, events.EventRecorder) handlers.Func {
+func (r *class) OnDelete(
+	client.Client,
+	client.Reader,
+	admission.Decoder,
+	events.EventRecorder,
+) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (r *class) validate(ctx context.Context, client client.Client, req admission.Request, decoder admission.Decoder, recorder events.EventRecorder) *admission.Response {
+func (r *class) validate(
+	ctx context.Context,
+	c client.Client,
+	req admission.Request,
+	decoder admission.Decoder,
+	recorder events.EventRecorder,
+) *admission.Response {
 	gatewayObj := &gatewayv1.Gateway{}
 	if err := decoder.Decode(req, gatewayObj); err != nil {
 		return ad.ErroredResponse(err)
@@ -59,7 +80,7 @@ func (r *class) validate(ctx context.Context, client client.Client, req admissio
 
 	var tnt *capsulev1beta2.Tenant
 
-	tnt, err := TenantFromGateway(ctx, client, gatewayObj)
+	tnt, err := TenantFromGateway(ctx, c, gatewayObj)
 	if err != nil {
 		return ad.ErroredResponse(err)
 	}
@@ -74,7 +95,7 @@ func (r *class) validate(ctx context.Context, client client.Client, req admissio
 		return nil
 	}
 
-	gatewayClass, err := utils.GetGatewayClassClassByObjectName(ctx, client, gatewayObj.Spec.GatewayClassName)
+	gatewayClass, err := utils.GetGatewayClassClassByObjectName(ctx, c, gatewayObj.Spec.GatewayClassName)
 	if err != nil {
 		return ad.ErroredResponse(err)
 	}
@@ -90,7 +111,7 @@ func (r *class) validate(ctx context.Context, client client.Client, req admissio
 	selector := false
 	// Verify if the GatewayClass exists and matches the label selector/expression
 	if len(allowed.MatchExpressions) > 0 || len(allowed.MatchLabels) > 0 {
-		gatewayClassObj, err := utils.GetGatewayClassClassByObjectName(ctx, client, gatewayObj.Spec.GatewayClassName)
+		gatewayClassObj, err := utils.GetGatewayClassClassByObjectName(ctx, c, gatewayObj.Spec.GatewayClassName)
 		if err != nil && !k8serrors.IsNotFound(err) {
 			response := admission.Errored(http.StatusInternalServerError, err)
 

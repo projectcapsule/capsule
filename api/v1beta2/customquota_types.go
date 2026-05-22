@@ -57,6 +57,7 @@ type CustomQuotaSpecSourceConfig struct {
 }
 
 // +kubebuilder:object:root=true
+// +kubebuilder:resource:scope=Namespaced,shortName=cq
 // +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="Limit",type="string",JSONPath=".spec.limit",description="The total limit available"
 // +kubebuilder:printcolumn:name="Used",type="string",JSONPath=".status.usage.used",description="The total used amount"

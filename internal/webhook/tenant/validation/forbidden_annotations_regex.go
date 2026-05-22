@@ -24,6 +24,7 @@ func ForbiddenAnnotationsRegexHandler() handlers.TypedHandler[*capsulev1beta2.Te
 
 func (h *forbiddenAnnotationsRegexHandler) OnCreate(
 	_ client.Client,
+	_ client.Reader,
 	tnt *capsulev1beta2.Tenant,
 	_ admission.Decoder,
 	_ events.EventRecorder,
@@ -39,6 +40,7 @@ func (h *forbiddenAnnotationsRegexHandler) OnCreate(
 
 func (h *forbiddenAnnotationsRegexHandler) OnDelete(
 	client.Client,
+	client.Reader,
 	*capsulev1beta2.Tenant,
 	admission.Decoder,
 	events.EventRecorder,
@@ -50,6 +52,7 @@ func (h *forbiddenAnnotationsRegexHandler) OnDelete(
 
 func (h *forbiddenAnnotationsRegexHandler) OnUpdate(
 	_ client.Client,
+	_ client.Reader,
 	tnt *capsulev1beta2.Tenant,
 	old *capsulev1beta2.Tenant,
 	_ admission.Decoder,

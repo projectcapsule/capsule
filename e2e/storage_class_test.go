@@ -25,13 +25,17 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/api/rbac"
 )
 
-var _ = Describe("when Tenant handles Storage classes", Label("tenant", "classes", "storage"), func() {
+var _ = Describe("when Tenant handles Storage classes", Ordered, Label("tenant", "storage", "classes", "storageclass"), func() {
 	tntNoDefaults := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "storage-class-selector",
+			Name: "e2e-storage-class-selector",
+			Labels: map[string]string{
+				"env": "e2e",
+			},
 		},
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: rbac.OwnerListSpec{
@@ -52,7 +56,7 @@ var _ = Describe("when Tenant handles Storage classes", Label("tenant", "classes
 					},
 					LabelSelector: metav1.LabelSelector{
 						MatchLabels: map[string]string{
-							"env": "customer",
+							"environment": "customer",
 						},
 					},
 				},
@@ -62,7 +66,10 @@ var _ = Describe("when Tenant handles Storage classes", Label("tenant", "classes
 
 	tntWithDefault := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "storage-class-default",
+			Name: "e2e-storage-class-default",
+			Labels: map[string]string{
+				"env": "e2e",
+			},
 		},
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: rbac.OwnerListSpec{
@@ -91,6 +98,9 @@ var _ = Describe("when Tenant handles Storage classes", Label("tenant", "classes
 	tntNoRestrictions := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "e2e-storage-no-restrictions",
+			Labels: map[string]string{
+				"env": "e2e",
+			},
 		},
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: rbac.OwnerListSpec{
@@ -110,8 +120,9 @@ var _ = Describe("when Tenant handles Storage classes", Label("tenant", "classes
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "cephfs",
 			Labels: map[string]string{
-				"name": "cephfs",
-				"env":  "e2e",
+				"name":        "cephfs",
+				"environment": "internal",
+				"env":         "e2e",
 			},
 		},
 		Provisioner: "kubernetes.io/no-provisioner",
@@ -121,8 +132,9 @@ var _ = Describe("when Tenant handles Storage classes", Label("tenant", "classes
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "tenant-default",
 			Labels: map[string]string{
-				"name": "tenant-default",
-				"env":  "e2e",
+				"name":        "tenant-default",
+				"environment": "internal",
+				"env":         "e2e",
 			},
 		},
 		Provisioner: "kubernetes.io/no-provisioner",
@@ -131,7 +143,8 @@ var _ = Describe("when Tenant handles Storage classes", Label("tenant", "classes
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "global-default",
 			Labels: map[string]string{
-				"env": "customer",
+				"environment": "customer",
+				"env":         "e2e",
 			},
 		},
 		Provisioner: "kubernetes.io/no-provisioner",
@@ -140,8 +153,9 @@ var _ = Describe("when Tenant handles Storage classes", Label("tenant", "classes
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "disallowed-global-default",
 			Labels: map[string]string{
-				"name": "disallowed-global-default",
-				"env":  "e2e",
+				"name":        "disallowed-global-default",
+				"environment": "internal",
+				"env":         "e2e",
 			},
 		},
 		Provisioner: "kubernetes.io/no-provisioner",
@@ -154,6 +168,8 @@ var _ = Describe("when Tenant handles Storage classes", Label("tenant", "classes
 
 				return k8sClient.Create(context.TODO(), tnt)
 			}).Should(Succeed())
+
+			TenantReady(tnt, metav1.ConditionTrue, defaultTimeoutInterval)
 		}
 
 		for _, class := range []storagev1.StorageClass{exact, tenantDefault, globalDefault, disallowedGlobalDefault} {
@@ -168,15 +184,21 @@ var _ = Describe("when Tenant handles Storage classes", Label("tenant", "classes
 			EventuallyDeletion(tnt)
 		}
 
-		Eventually(func() (err error) {
-			req, _ := labels.NewRequirement("env", selection.Exists, nil)
+		req, err := labels.NewRequirement("env", selection.Equals, []string{"e2e"})
+		Expect(err).NotTo(HaveOccurred())
 
-			return k8sClient.DeleteAllOf(context.TODO(), &storagev1.StorageClass{}, &client.DeleteAllOfOptions{
-				ListOptions: client.ListOptions{
-					LabelSelector: labels.NewSelector().Add(*req),
-				},
-			})
-		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		var list storagev1.StorageClassList
+		Expect(k8sClient.List(
+			context.TODO(),
+			&list,
+			client.MatchingLabelsSelector{
+				Selector: labels.NewSelector().Add(*req),
+			},
+		)).Should(Succeed())
+
+		for i := range list.Items {
+			EventuallyDeletion(&list.Items[i])
+		}
 	})
 
 	It("should allow all classes", Label("skip-on-openshift"), func() {
@@ -196,9 +218,11 @@ var _ = Describe("when Tenant handles Storage classes", Label("tenant", "classes
 				Should(ConsistOf("standard", exact.GetName(), tenantDefault.GetName(), globalDefault.GetName(), disallowedGlobalDefault.GetName()))
 		})
 
-		ns := NewNamespace("")
+		ns := NewNamespace("", map[string]string{
+			meta.TenantLabel: tntNoRestrictions.GetName(),
+		})
 		NamespaceCreation(ns, tntNoRestrictions.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
-		TenantNamespaceList(tntNoRestrictions, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
+		NamespaceIsPartOfTenant(tntNoRestrictions, ns).Should(Succeed())
 
 		By("providing any storageclass", func() {
 			for _, class := range []storagev1.StorageClass{exact, tenantDefault, globalDefault, disallowedGlobalDefault} {
@@ -227,7 +251,7 @@ var _ = Describe("when Tenant handles Storage classes", Label("tenant", "classes
 
 		By("Verify Status (Deletion)", func() {
 			for _, class := range []storagev1.StorageClass{exact, tenantDefault} {
-				Expect(ignoreNotFound(k8sClient.Delete(context.TODO(), &class))).To(Succeed())
+				EventuallyDeletion(&class)
 			}
 			Eventually(func() ([]string, error) {
 				t := &capsulev1beta2.Tenant{}
@@ -264,9 +288,11 @@ var _ = Describe("when Tenant handles Storage classes", Label("tenant", "classes
 				Should(ConsistOf(exact.GetName(), globalDefault.GetName()))
 		})
 
-		ns := NewNamespace("")
+		ns := NewNamespace("", map[string]string{
+			meta.TenantLabel: tntNoDefaults.GetName(),
+		})
 		NamespaceCreation(ns, tntNoDefaults.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
-		TenantNamespaceList(tntNoDefaults, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
+		NamespaceIsPartOfTenant(tntNoDefaults, ns).Should(Succeed())
 
 		By("non-specifying it", func() {
 			Eventually(func() (err error) {
@@ -315,12 +341,29 @@ var _ = Describe("when Tenant handles Storage classes", Label("tenant", "classes
 					ObjectMeta: metav1.ObjectMeta{
 						Name: fmt.Sprintf("sc-%s", storageName),
 						Labels: map[string]string{
-							"env": "internal",
+							"environment": "internal",
+							"env":         "e2e",
 						},
 					},
 					Provisioner: "kubernetes.io/no-provisioner",
 				}
 				Expect(k8sClient.Create(context.TODO(), class)).Should(Succeed())
+
+				By("Verify Status", func() {
+					Eventually(func() ([]string, error) {
+						t := &capsulev1beta2.Tenant{}
+						if err := k8sClient.Get(
+							context.TODO(),
+							types.NamespacedName{Name: tntNoDefaults.GetName()},
+							t,
+						); err != nil {
+							return nil, err
+						}
+
+						return t.Status.Classes.StorageClasses, nil
+					}, defaultTimeoutInterval, defaultPollInterval).
+						ShouldNot(ContainElement(class.GetName()))
+				})
 
 				p := &corev1.PersistentVolumeClaim{
 					ObjectMeta: metav1.ObjectMeta{
@@ -367,11 +410,14 @@ var _ = Describe("when Tenant handles Storage classes", Label("tenant", "classes
 				Should(ConsistOf(exact.GetName(), globalDefault.GetName()))
 		})
 
-		ns := NewNamespace("")
+		ns := NewNamespace("", map[string]string{
+			meta.TenantLabel: tntNoDefaults.GetName(),
+		})
 		cs := ownerClient(tntNoDefaults.Spec.Owners[0].UserSpec)
 
 		NamespaceCreation(ns, tntNoDefaults.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
-		TenantNamespaceList(tntNoDefaults, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
+		NamespaceIsPartOfTenant(tntNoDefaults, ns).Should(Succeed())
+
 		By("using exact matches", func() {
 			for _, c := range tntNoDefaults.Spec.StorageClasses.Exact {
 
@@ -423,12 +469,29 @@ var _ = Describe("when Tenant handles Storage classes", Label("tenant", "classes
 					ObjectMeta: metav1.ObjectMeta{
 						Name: storageName,
 						Labels: map[string]string{
-							"env": "customer",
+							"environment": "customer",
+							"env":         "e2e",
 						},
 					},
 					Provisioner: "kubernetes.io/no-provisioner",
 				}
 				Expect(k8sClient.Create(context.TODO(), class)).Should(Succeed())
+
+				By("Verify Status", func() {
+					Eventually(func() ([]string, error) {
+						t := &capsulev1beta2.Tenant{}
+						if err := k8sClient.Get(
+							context.TODO(),
+							types.NamespacedName{Name: tntNoDefaults.GetName()},
+							t,
+						); err != nil {
+							return nil, err
+						}
+
+						return t.Status.Classes.StorageClasses, nil
+					}, defaultTimeoutInterval, defaultPollInterval).
+						Should(ContainElement(class.GetName()))
+				})
 
 				EventuallyCreation(func() error {
 					p := &corev1.PersistentVolumeClaim{
@@ -488,9 +551,11 @@ var _ = Describe("when Tenant handles Storage classes", Label("tenant", "classes
 				Should(ConsistOf(tenantDefault.GetName()))
 		})
 
-		ns := NewNamespace("")
+		ns := NewNamespace("", map[string]string{
+			meta.TenantLabel: tntWithDefault.GetName(),
+		})
 		NamespaceCreation(ns, tntWithDefault.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
-		TenantNamespaceList(tntWithDefault, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
+		NamespaceIsPartOfTenant(tntWithDefault, ns).Should(Succeed())
 
 		By("Patch Tenant Default", func() {
 			p := &corev1.PersistentVolumeClaim{
@@ -515,9 +580,27 @@ var _ = Describe("when Tenant handles Storage classes", Label("tenant", "classes
 	})
 
 	It("should mutate to default tenant StorageClass (class exists)", func() {
-		ns := NewNamespace("")
+		ns := NewNamespace("", map[string]string{
+			meta.TenantLabel: tntWithDefault.GetName(),
+		})
 		NamespaceCreation(ns, tntWithDefault.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
-		TenantNamespaceList(tntWithDefault, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
+		NamespaceIsPartOfTenant(tntWithDefault, ns).Should(Succeed())
+
+		By("Verify Status (Creation)", func() {
+			Eventually(func() ([]string, error) {
+				t := &capsulev1beta2.Tenant{}
+				if err := k8sClient.Get(
+					context.TODO(),
+					types.NamespacedName{Name: tntWithDefault.GetName()},
+					t,
+				); err != nil {
+					return nil, err
+				}
+
+				return t.Status.Classes.StorageClasses, nil
+			}, defaultTimeoutInterval, defaultPollInterval).
+				Should(ConsistOf(tenantDefault.GetName()))
+		})
 
 		p := &corev1.PersistentVolumeClaim{
 			ObjectMeta: metav1.ObjectMeta{
@@ -541,9 +624,27 @@ var _ = Describe("when Tenant handles Storage classes", Label("tenant", "classes
 	})
 
 	It("should mutate to default tenant StorageClass although cluster global ons is not allowed", func() {
-		ns := NewNamespace("")
+		ns := NewNamespace("", map[string]string{
+			meta.TenantLabel: tntWithDefault.GetName(),
+		})
 		NamespaceCreation(ns, tntWithDefault.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
-		TenantNamespaceList(tntWithDefault, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
+		NamespaceIsPartOfTenant(tntWithDefault, ns).Should(Succeed())
+
+		By("Verify Status (Creation)", func() {
+			Eventually(func() ([]string, error) {
+				t := &capsulev1beta2.Tenant{}
+				if err := k8sClient.Get(
+					context.TODO(),
+					types.NamespacedName{Name: tntWithDefault.GetName()},
+					t,
+				); err != nil {
+					return nil, err
+				}
+
+				return t.Status.Classes.StorageClasses, nil
+			}, defaultTimeoutInterval, defaultPollInterval).
+				Should(ConsistOf(tenantDefault.GetName()))
+		})
 
 		p := &corev1.PersistentVolumeClaim{
 			ObjectMeta: metav1.ObjectMeta{
@@ -566,9 +667,27 @@ var _ = Describe("when Tenant handles Storage classes", Label("tenant", "classes
 	})
 
 	It("should mutate to default tenant StorageClass although cluster global ons is allowed", func() {
-		ns := NewNamespace("")
+		ns := NewNamespace("", map[string]string{
+			meta.TenantLabel: tntWithDefault.GetName(),
+		})
 		NamespaceCreation(ns, tntWithDefault.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
-		TenantNamespaceList(tntWithDefault, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
+		NamespaceIsPartOfTenant(tntWithDefault, ns).Should(Succeed())
+
+		By("Verify Status (Creation)", func() {
+			Eventually(func() ([]string, error) {
+				t := &capsulev1beta2.Tenant{}
+				if err := k8sClient.Get(
+					context.TODO(),
+					types.NamespacedName{Name: tntWithDefault.GetName()},
+					t,
+				); err != nil {
+					return nil, err
+				}
+
+				return t.Status.Classes.StorageClasses, nil
+			}, defaultTimeoutInterval, defaultPollInterval).
+				Should(ConsistOf(tenantDefault.GetName()))
+		})
 
 		p := &corev1.PersistentVolumeClaim{
 			ObjectMeta: metav1.ObjectMeta{

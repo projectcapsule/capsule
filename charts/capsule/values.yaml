@@ -193,6 +193,10 @@ manager:
     workers: 1
     # -- Set the log verbosity of the capsule with a value from 1 to 5
     logLevel: "info"
+    # -- QPS to use for interacting with kubernetes apiserver
+    clientConnectionQPS: 20.0
+    # -- Burst to use for interacting with kubernetes apiserver
+    clientConnectionBurst: 30
     # -- Define entities which are considered part of the Capsule construct.
     # Users not mentioned here will be ignored by Capsule
     users:
@@ -564,10 +568,10 @@ webhooks:
       # -- [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector)
       objectSelector: {}
       # -- [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector)
-      namespaceSelector:
-        matchExpressions:
-          - key: capsule.clastix.io/tenant
-            operator: Exists
+      namespaceSelector: {}
+      #  matchExpressions:
+      #    - key: capsule.clastix.io/tenant
+      #      operator: Exists
       # -- [MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
       matchConditions: []
       # -- [Rules](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-rules)

@@ -28,7 +28,8 @@ func Validating() handlers.TypedHandlerWithTenant[*corev1.Service] {
 }
 
 func (h *validating) OnCreate(
-	c client.Client,
+	_ client.Client,
+	_ client.Reader,
 	svc *corev1.Service,
 	decoder admission.Decoder,
 	recorder events.EventRecorder,
@@ -40,7 +41,8 @@ func (h *validating) OnCreate(
 }
 
 func (h *validating) OnUpdate(
-	c client.Client,
+	_ client.Client,
+	_ client.Reader,
 	old *corev1.Service,
 	svc *corev1.Service,
 	decoder admission.Decoder,
@@ -54,6 +56,7 @@ func (h *validating) OnUpdate(
 
 func (h *validating) OnDelete(
 	client.Client,
+	client.Reader,
 	*corev1.Service,
 	admission.Decoder,
 	events.EventRecorder,

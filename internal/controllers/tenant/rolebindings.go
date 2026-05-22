@@ -9,7 +9,9 @@ import (
 
 	"github.com/go-logr/logr"
 	"golang.org/x/sync/errgroup"
+	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
@@ -59,13 +61,9 @@ func (r *Manager) syncRoleBindings(ctx context.Context, log logr.Logger, tenant 
 
 	for _, ns := range tenant.Status.Spaces {
 		namespace := ns.Name
-		cleanup := false
-
 		cond := ns.Conditions.GetConditionByType(meta.TerminatingCondition)
 		if cond != nil {
 			if cond.Status == metav1.ConditionTrue {
-				cleanup = true
-			} else {
 				continue
 			}
 		}
@@ -73,76 +71,81 @@ func (r *Manager) syncRoleBindings(ctx context.Context, log logr.Logger, tenant 
 		bindings := namespaceBindings[namespace]
 
 		group.Go(func() error {
-			return r.syncAdditionalRoleBinding(ctx, tenant, namespace, bindings, cleanup)
+			return r.syncAdditionalRoleBinding(ctx, tenant, namespace, bindings)
 		})
 	}
 
 	return group.Wait()
 }
-
 func (r *Manager) syncAdditionalRoleBinding(
 	ctx context.Context,
 	tenant *capsulev1beta2.Tenant,
 	ns string,
 	bindings map[string]rbac.AdditionalRoleBindingsSpec,
-	cleanup bool,
 ) (err error) {
 	keys := []string{}
 
-	if !cleanup {
-		for hash, roleBinding := range bindings {
-			name := meta.NameForManagedRoleBindings(hash)
+	for hash, roleBinding := range bindings {
+		name := meta.NameForManagedRoleBindings(hash)
 
-			keys = append(keys, hash)
+		keys = append(keys, hash)
 
-			target := &rbacv1.RoleBinding{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      name,
-					Namespace: ns,
-				},
-			}
-
-			var res controllerutil.OperationResult
-
-			res, err = controllerutil.CreateOrUpdate(ctx, r.Client, target, func() error {
-				target.Labels = map[string]string{}
-				target.Annotations = map[string]string{}
-
-				if roleBinding.Labels != nil {
-					target.Labels = roleBinding.Labels
-				}
-
-				target.Labels[meta.NewTenantLabel] = tenant.Name
-				target.Labels[meta.RolebindingLabel] = hash
-				target.Labels[meta.NewManagedByCapsuleLabel] = meta.ValueController
-
-				// Remove Legacy labels
-				delete(target.Labels, meta.TenantLabel)
-
-				if roleBinding.Annotations != nil {
-					target.Annotations = roleBinding.Annotations
-				}
-
-				target.RoleRef = rbacv1.RoleRef{
-					APIGroup: rbacv1.GroupName,
-					Kind:     "ClusterRole",
-					Name:     roleBinding.ClusterRoleName,
-				}
-
-				target.Subjects = roleBinding.Subjects
-
-				return controllerutil.SetControllerReference(tenant, target, r.Scheme())
-			})
-			if err != nil {
-				r.Log.Error(err, "cannot sync RoleBinding")
-			}
-
-			r.Log.V(4).Info(fmt.Sprintf("roleBinding sync result: %s", string(res)), "name", target.Name, "namespace", target.Namespace)
-
-			if err != nil {
-				return fmt.Errorf("%w (role: %s)", err, roleBinding.ClusterRoleName)
-			}
+		target := &rbacv1.RoleBinding{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      name,
+				Namespace: ns,
+			},
 		}
+
+		var res controllerutil.OperationResult
+
+		res, err = controllerutil.CreateOrUpdate(ctx, r.Client, target, func() error {
+			target.Labels = map[string]string{}
+			target.Annotations = map[string]string{}
+
+			if roleBinding.Labels != nil {
+				target.Labels = roleBinding.Labels
+			}
+
+			target.Labels[meta.NewTenantLabel] = tenant.Name
+			target.Labels[meta.RolebindingLabel] = hash
+			target.Labels[meta.NewManagedByCapsuleLabel] = meta.ValueController
+
+			// Remove Legacy labels
+			delete(target.Labels, meta.TenantLabel)
+
+			if roleBinding.Annotations != nil {
+				target.Annotations = roleBinding.Annotations
+			}
+
+			target.RoleRef = rbacv1.RoleRef{
+				APIGroup: rbacv1.GroupName,
+				Kind:     "ClusterRole",
+				Name:     roleBinding.ClusterRoleName,
+			}
+
+			target.Subjects = roleBinding.Subjects
+
+			return controllerutil.SetControllerReference(tenant, target, r.Scheme())
+		})
+		if err != nil {
+			if apierrors.HasStatusCause(err, corev1.NamespaceTerminatingCause) {
+				r.Log.V(4).Info(
+					"skipping RoleBinding sync because namespace is terminating",
+					"name", target.Name,
+					"namespace", target.Namespace,
+					"clusterRole", roleBinding.ClusterRoleName,
+				)
+
+				continue
+			}
+
+			r.Log.Error(err, "cannot sync RoleBinding")
+
+			return fmt.Errorf("%w (role: %s)", err, roleBinding.ClusterRoleName)
+		}
+
+		r.Log.V(4).Info(fmt.Sprintf("roleBinding sync result: %s", string(res)), "name", target.Name, "namespace", target.Namespace)
 	}
 
 	// Prune at finish to prevent gaps

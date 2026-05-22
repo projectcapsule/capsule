@@ -269,30 +269,42 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 		return reconcile.Result{}, err
 	}
 
+	reconcileError := r.reconcile(ctx, instance)
+
 	defer func() {
-		if uerr := r.updateTenantStatus(ctx, instance, err); uerr != nil {
-			err = fmt.Errorf("cannot update tenant status: %w", uerr)
-
-			return
-		}
-
 		r.syncTenantStatusMetrics(instance)
-
-		if e := patchHelper.Patch(ctx, instance); err != nil {
-			if !apierrors.IsNotFound(err) {
-				err = e
-			}
-		}
-
-		// Controller-Runtime should never receive error
-		err = nil
 	}()
 
+	if e := patchHelper.Patch(ctx, instance); err != nil {
+		if !apierrors.IsNotFound(err) {
+			err = e
+		}
+	}
+
+	r.syncTenantStatusMetrics(instance)
+
+	// Collect available resources
+	if err = r.collectAvailableResources(ctx, instance); err != nil {
+		err = fmt.Errorf("cannot collect available resources: %w", err)
+
+		return reconcile.Result{}, err
+	}
+
+	if err = r.updateTenantStatus(ctx, instance, reconcileError); err != nil {
+		err = fmt.Errorf("cannot update tenant status: %w", err)
+
+		return reconcile.Result{}, err
+	}
+
+	return reconcile.Result{}, nil
+}
+
+func (r Manager) reconcile(ctx context.Context, instance *capsulev1beta2.Tenant) (err error) {
 	// Collect Ownership/Promotions for Status
 	if err = r.collectRBAC(ctx, instance); err != nil {
 		err = fmt.Errorf("cannot collect available rbac: %w", err)
 
-		return result, err
+		return err
 	}
 
 	// Reconcile Namespaces
@@ -301,7 +313,7 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 	if err = r.reconcileNamespaces(ctx, instance); err != nil {
 		err = fmt.Errorf("namespace(s) had reconciliation errors")
 
-		return result, err
+		return err
 	}
 
 	// Ensuring Metadata.
@@ -309,7 +321,7 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 	if err != nil {
 		err = fmt.Errorf("cannot ensure metadata: %w", err)
 
-		return result, err
+		return err
 	}
 
 	// Ensuring ResourceQuota
@@ -318,7 +330,7 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 	if err = r.syncCustomResourceQuotaUsages(ctx, instance); err != nil {
 		err = fmt.Errorf("cannot count limited resources: %w", err)
 
-		return result, err
+		return err
 	}
 
 	// Ensuring NetworkPolicy resources
@@ -327,7 +339,7 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 	if err = r.syncNetworkPolicies(ctx, instance); err != nil {
 		err = fmt.Errorf("cannot sync networkPolicy items: %w", err)
 
-		return result, err
+		return err
 	}
 
 	// Ensuring LimitRange resources
@@ -336,7 +348,7 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 	if err = r.syncLimitRanges(ctx, instance); err != nil {
 		err = fmt.Errorf("cannot sync limitrange items: %w", err)
 
-		return result, err
+		return err
 	}
 
 	// Ensuring ResourceQuota resources
@@ -345,7 +357,7 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 	if err = r.syncResourceQuotas(ctx, instance); err != nil {
 		err = fmt.Errorf("cannot sync resourcequota items: %w", err)
 
-		return result, err
+		return err
 	}
 
 	// Ensuring RoleBinding resources
@@ -354,36 +366,27 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 	if err = r.syncRoleBindings(ctx, r.Log, instance); err != nil {
 		err = fmt.Errorf("cannot sync rolebindings items: %w", err)
 
-		return result, err
-	}
-
-	// Collect available resources
-	if err = r.collectAvailableResources(ctx, instance); err != nil {
-		err = fmt.Errorf("cannot collect available resources: %w", err)
-
-		return result, err
-	}
-
-	var reconcileError error
-	if err != nil {
-		reconcileError = fmt.Errorf("tenant had errors reconciling, check tenant's status")
+		return err
 	}
 
 	r.Log.V(4).Info("Tenant reconciling completed")
 
-	return ctrl.Result{}, reconcileError
+	return err
 }
 
 func (r *Manager) updateTenantStatus(ctx context.Context, instance *capsulev1beta2.Tenant, reconcileError error) error {
-	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		latest := &capsulev1beta2.Tenant{}
-		if err = r.Get(ctx, types.NamespacedName{Name: instance.GetName()}, latest); err != nil {
+		if err := r.Get(ctx, types.NamespacedName{Name: instance.GetName()}, latest); err != nil {
+			if apierrors.IsNotFound(err) {
+				return nil
+			}
+
 			return err
 		}
 
 		latest.Status = instance.Status
 
-		// Set Ready Condition
 		readyCondition := meta.NewReadyCondition(instance)
 		if reconcileError != nil {
 			readyCondition.Message = reconcileError.Error()
@@ -393,7 +396,6 @@ func (r *Manager) updateTenantStatus(ctx context.Context, instance *capsulev1bet
 
 		latest.Status.Conditions.UpdateConditionByType(readyCondition)
 
-		// Set Cordoned Condition
 		cordonedCondition := meta.NewCordonedCondition(instance)
 
 		if instance.Spec.Cordoned {
@@ -409,10 +411,13 @@ func (r *Manager) updateTenantStatus(ctx context.Context, instance *capsulev1bet
 		latest.Status.Conditions.UpdateConditionByType(cordonedCondition)
 
 		if err := r.Client.Status().Update(ctx, latest); err != nil {
+			if apierrors.IsNotFound(err) {
+				return nil
+			}
+
 			return err
 		}
 
-		// Keep the in-memory object aligned with what we just wrote.
 		instance.Status = latest.Status
 
 		return nil

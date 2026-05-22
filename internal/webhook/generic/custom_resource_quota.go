@@ -33,12 +33,17 @@ func ResourceCounterHandler(client client.Client) handlers.Handler {
 	}
 }
 
-func (r *resourceCounterHandler) OnCreate(clt client.Client, _ admission.Decoder, recorder events.EventRecorder) handlers.Func {
+func (r *resourceCounterHandler) OnCreate(
+	c client.Client,
+	reader client.Reader,
+	_ admission.Decoder,
+	recorder events.EventRecorder,
+) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		var tntName string
 
 		var err error
-		if tntName, err = r.getTenantName(ctx, clt, req); err != nil {
+		if tntName, err = r.getTenantName(ctx, c, req); err != nil {
 			return ad.ErroredResponse(err)
 		}
 
@@ -53,7 +58,7 @@ func (r *resourceCounterHandler) OnCreate(clt client.Client, _ admission.Decoder
 		var limit int64
 
 		err = retry.RetryOnConflict(retry.DefaultRetry, func() (retryErr error) {
-			if retryErr = clt.Get(ctx, types.NamespacedName{Name: tntName}, tnt); err != nil {
+			if retryErr = reader.Get(ctx, types.NamespacedName{Name: tntName}, tnt); err != nil {
 				return retryErr
 			}
 
@@ -72,7 +77,7 @@ func (r *resourceCounterHandler) OnCreate(clt client.Client, _ admission.Decoder
 
 			tnt.Annotations[capsulev1beta2.UsedAnnotationForResource(kgv)] = fmt.Sprintf("%d", used+1)
 
-			return clt.Update(ctx, tnt)
+			return c.Update(ctx, tnt)
 		})
 		if err != nil {
 			if errors.As(err, &caperrors.CustomResourceQuotaError{}) {
@@ -86,12 +91,17 @@ func (r *resourceCounterHandler) OnCreate(clt client.Client, _ admission.Decoder
 	}
 }
 
-func (r *resourceCounterHandler) OnDelete(clt client.Client, _ admission.Decoder, _ events.EventRecorder) handlers.Func {
+func (r *resourceCounterHandler) OnDelete(
+	c client.Client,
+	reader client.Reader,
+	_ admission.Decoder,
+	_ events.EventRecorder,
+) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		var tntName string
 
 		var err error
-		if tntName, err = r.getTenantName(ctx, clt, req); err != nil {
+		if tntName, err = r.getTenantName(ctx, c, req); err != nil {
 			return ad.ErroredResponse(err)
 		}
 
@@ -103,7 +113,7 @@ func (r *resourceCounterHandler) OnDelete(clt client.Client, _ admission.Decoder
 
 		err = retry.RetryOnConflict(retry.DefaultRetry, func() (retryErr error) {
 			tnt := &capsulev1beta2.Tenant{}
-			if retryErr = clt.Get(ctx, types.NamespacedName{Name: tntName}, tnt); err != nil {
+			if retryErr = reader.Get(ctx, types.NamespacedName{Name: tntName}, tnt); err != nil {
 				return retryErr
 			}
 
@@ -119,7 +129,7 @@ func (r *resourceCounterHandler) OnDelete(clt client.Client, _ admission.Decoder
 
 			tnt.Annotations[capsulev1beta2.UsedAnnotationForResource(kgv)] = fmt.Sprintf("%d", used-1)
 
-			return clt.Update(ctx, tnt)
+			return c.Update(ctx, tnt)
 		})
 		if err != nil {
 			return ad.ErroredResponse(err)
@@ -129,13 +139,22 @@ func (r *resourceCounterHandler) OnDelete(clt client.Client, _ admission.Decoder
 	}
 }
 
-func (r *resourceCounterHandler) OnUpdate(client.Client, admission.Decoder, events.EventRecorder) handlers.Func {
+func (r *resourceCounterHandler) OnUpdate(
+	client.Client,
+	client.Reader,
+	admission.Decoder,
+	events.EventRecorder,
+) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (r *resourceCounterHandler) getTenantName(ctx context.Context, clt client.Client, req admission.Request) (string, error) {
+func (r *resourceCounterHandler) getTenantName(
+	ctx context.Context,
+	clt client.Client,
+	req admission.Request,
+) (string, error) {
 	tnt, err := tenant.TenantByStatusNamespace(ctx, clt, req.Namespace)
 	if err != nil {
 		return "", err

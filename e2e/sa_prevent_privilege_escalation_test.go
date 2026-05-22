@@ -18,13 +18,17 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/api/rbac"
 )
 
-var _ = Describe("trying to escalate from a Tenant Namespace ServiceAccount", Label("tenant"), func() {
+var _ = Describe("trying to escalate from a Tenant Namespace ServiceAccount", Ordered, Label("tenant"), func() {
 	tnt := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "sa-privilege-escalation",
+			Name: "e2e-sa-privilege-escalation",
+			Labels: map[string]string{
+				"env": "e2e",
+			},
 		},
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: rbac.OwnerListSpec{
@@ -43,15 +47,17 @@ var _ = Describe("trying to escalate from a Tenant Namespace ServiceAccount", La
 		},
 	}
 
-	ns := NewNamespace("attack")
+	ns := NewNamespace("e2e-sa-privilege-escalation-attack", map[string]string{
+		meta.TenantLabel: tnt.GetName(),
+	})
 
 	JustBeforeEach(func() {
 		EventuallyCreation(func() error {
 			return k8sClient.Create(context.TODO(), tnt)
 		}).Should(Succeed())
-
+		TenantReady(tnt, metav1.ConditionTrue, defaultTimeoutInterval)
 		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
-		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
+		NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
 	})
 
 	JustAfterEach(func() {

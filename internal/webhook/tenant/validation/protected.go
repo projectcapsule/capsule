@@ -22,6 +22,7 @@ func ProtectedHandler() handlers.TypedHandler[*capsulev1beta2.Tenant] {
 
 func (h *protectedHandler) OnCreate(
 	client.Client,
+	client.Reader,
 	*capsulev1beta2.Tenant,
 	admission.Decoder,
 	events.EventRecorder,
@@ -32,7 +33,8 @@ func (h *protectedHandler) OnCreate(
 }
 
 func (h *protectedHandler) OnDelete(
-	c client.Client,
+	_ client.Client,
+	_ client.Reader,
 	tnt *capsulev1beta2.Tenant,
 	_ admission.Decoder,
 	_ events.EventRecorder,
@@ -48,7 +50,14 @@ func (h *protectedHandler) OnDelete(
 	}
 }
 
-func (h *protectedHandler) OnUpdate(client.Client, *capsulev1beta2.Tenant, *capsulev1beta2.Tenant, admission.Decoder, events.EventRecorder) handlers.Func {
+func (h *protectedHandler) OnUpdate(
+	client.Client,
+	client.Reader,
+	*capsulev1beta2.Tenant,
+	*capsulev1beta2.Tenant,
+	admission.Decoder,
+	events.EventRecorder,
+) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}

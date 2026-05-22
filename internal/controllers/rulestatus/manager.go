@@ -137,6 +137,10 @@ func (r *Manager) updateStatus(ctx context.Context, instance *capsulev1beta2.Rul
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
 		latest := &capsulev1beta2.RuleStatus{}
 		if err = r.Get(ctx, types.NamespacedName{Name: instance.GetName(), Namespace: instance.GetNamespace()}, latest); err != nil {
+			if apierrors.IsNotFound(err) {
+				return nil
+			}
+
 			return err
 		}
 

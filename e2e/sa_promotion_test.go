@@ -255,12 +255,15 @@ func expectNoRoleBindingForPromotion(
 	}, 2*time.Second, defaultPollInterval).Should(Succeed())
 }
 
-var _ = Describe("Promoting ServiceAccounts", Label("config", "permissions", "promotion", "rbac"), func() {
+var _ = Describe("Promoting ServiceAccounts", Ordered, Label("config", "permissions", "promotion", "rbac"), func() {
 	originConfig := &capsulev1beta2.CapsuleConfiguration{}
 
 	tnt := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "tenant-sa-promotion",
+			Name: "e2e-sa-promotion",
+			Labels: map[string]string{
+				"env": "e2e",
+			},
 		},
 		Spec: capsulev1beta2.TenantSpec{
 			Rules: []*api.NamespaceRuleBodyTenant{
@@ -407,6 +410,7 @@ var _ = Describe("Promoting ServiceAccounts", Label("config", "permissions", "pr
 			return k8sClient.Create(context.TODO(), tnt)
 		}).Should(Succeed())
 
+		TenantReady(tnt, metav1.ConditionTrue, defaultTimeoutInterval)
 	})
 
 	JustAfterEach(func() {
@@ -433,6 +437,7 @@ var _ = Describe("Promoting ServiceAccounts", Label("config", "permissions", "pr
 			meta.TenantLabel: tnt.GetName(),
 		})
 		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+		NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
 
 		sa := &corev1.ServiceAccount{
 			ObjectMeta: metav1.ObjectMeta{
@@ -502,6 +507,7 @@ var _ = Describe("Promoting ServiceAccounts", Label("config", "permissions", "pr
 			meta.TenantLabel: tnt.GetName(),
 		})
 		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+		NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
 
 		sa := &corev1.ServiceAccount{
 			ObjectMeta: metav1.ObjectMeta{
@@ -549,12 +555,14 @@ var _ = Describe("Promoting ServiceAccounts", Label("config", "permissions", "pr
 			"environment":    "dev",
 		})
 		NamespaceCreation(dev, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+		NamespaceIsPartOfTenant(tnt, dev).Should(Succeed())
 
 		test := NewNamespace("", map[string]string{
 			meta.TenantLabel: tnt.GetName(),
 			"environment":    "test",
 		})
 		NamespaceCreation(test, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+		NamespaceIsPartOfTenant(tnt, test).Should(Succeed())
 
 		sa := &corev1.ServiceAccount{
 			ObjectMeta: metav1.ObjectMeta{
@@ -584,18 +592,21 @@ var _ = Describe("Promoting ServiceAccounts", Label("config", "permissions", "pr
 			"environment":    "dev",
 		})
 		NamespaceCreation(dev, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+		NamespaceIsPartOfTenant(tnt, dev).Should(Succeed())
 
 		prod := NewNamespace("", map[string]string{
 			meta.TenantLabel: tnt.GetName(),
 			"environment":    "prod",
 		})
 		NamespaceCreation(prod, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+		NamespaceIsPartOfTenant(tnt, prod).Should(Succeed())
 
 		stage := NewNamespace("", map[string]string{
 			meta.TenantLabel: tnt.GetName(),
 			"environment":    "stage",
 		})
 		NamespaceCreation(stage, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+		NamespaceIsPartOfTenant(tnt, stage).Should(Succeed())
 
 		sa := &corev1.ServiceAccount{
 			ObjectMeta: metav1.ObjectMeta{
@@ -624,18 +635,21 @@ var _ = Describe("Promoting ServiceAccounts", Label("config", "permissions", "pr
 			"environment":    "dev",
 		})
 		NamespaceCreation(dev, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+		NamespaceIsPartOfTenant(tnt, dev).Should(Succeed())
 
 		prod := NewNamespace("", map[string]string{
 			meta.TenantLabel: tnt.GetName(),
 			"environment":    "prod",
 		})
 		NamespaceCreation(prod, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+		NamespaceIsPartOfTenant(tnt, prod).Should(Succeed())
 
 		stage := NewNamespace("", map[string]string{
 			meta.TenantLabel: tnt.GetName(),
 			"environment":    "stage",
 		})
 		NamespaceCreation(stage, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+		NamespaceIsPartOfTenant(tnt, stage).Should(Succeed())
 
 		sa := &corev1.ServiceAccount{
 			ObjectMeta: metav1.ObjectMeta{
@@ -666,12 +680,14 @@ var _ = Describe("Promoting ServiceAccounts", Label("config", "permissions", "pr
 			"environment":    "dev",
 		})
 		NamespaceCreation(dev, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+		NamespaceIsPartOfTenant(tnt, dev).Should(Succeed())
 
 		prod := NewNamespace("", map[string]string{
 			meta.TenantLabel: tnt.GetName(),
 			"environment":    "prod",
 		})
 		NamespaceCreation(prod, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+		NamespaceIsPartOfTenant(tnt, prod).Should(Succeed())
 
 		sa := &corev1.ServiceAccount{
 			ObjectMeta: metav1.ObjectMeta{
@@ -701,18 +717,21 @@ var _ = Describe("Promoting ServiceAccounts", Label("config", "permissions", "pr
 			"environment":    "dev",
 		})
 		NamespaceCreation(dev, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+		NamespaceIsPartOfTenant(tnt, dev).Should(Succeed())
 
 		prod := NewNamespace("", map[string]string{
 			meta.TenantLabel: tnt.GetName(),
 			"environment":    "prod",
 		})
 		NamespaceCreation(prod, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+		NamespaceIsPartOfTenant(tnt, prod).Should(Succeed())
 
 		stage := NewNamespace("", map[string]string{
 			meta.TenantLabel: tnt.GetName(),
 			"environment":    "prod",
 		})
 		NamespaceCreation(stage, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+		NamespaceIsPartOfTenant(tnt, stage).Should(Succeed())
 
 		saTest := &corev1.ServiceAccount{
 			ObjectMeta: metav1.ObjectMeta{
@@ -757,18 +776,21 @@ var _ = Describe("Promoting ServiceAccounts", Label("config", "permissions", "pr
 			"environment":    "dev",
 		})
 		NamespaceCreation(dev, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+		NamespaceIsPartOfTenant(tnt, dev).Should(Succeed())
 
 		prodA := NewNamespace("", map[string]string{
 			meta.TenantLabel: tnt.GetName(),
 			"environment":    "prod",
 		})
 		NamespaceCreation(prodA, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+		NamespaceIsPartOfTenant(tnt, prodA).Should(Succeed())
 
 		prodB := NewNamespace("", map[string]string{
 			meta.TenantLabel: tnt.GetName(),
 			"environment":    "prod",
 		})
 		NamespaceCreation(prodB, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+		NamespaceIsPartOfTenant(tnt, prodB).Should(Succeed())
 
 		stage := NewNamespace("", map[string]string{
 			meta.TenantLabel: tnt.GetName(),
@@ -823,12 +845,14 @@ var _ = Describe("Promoting ServiceAccounts", Label("config", "permissions", "pr
 			"environment":    "dev",
 		})
 		NamespaceCreation(dev, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+		NamespaceIsPartOfTenant(tnt, dev).Should(Succeed())
 
 		prod := NewNamespace("", map[string]string{
 			meta.TenantLabel: tnt.GetName(),
 			"environment":    "prod",
 		})
 		NamespaceCreation(prod, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+		NamespaceIsPartOfTenant(tnt, prod).Should(Succeed())
 
 		sa := &corev1.ServiceAccount{
 			ObjectMeta: metav1.ObjectMeta{
@@ -858,18 +882,21 @@ var _ = Describe("Promoting ServiceAccounts", Label("config", "permissions", "pr
 			"environment":    "dev",
 		})
 		NamespaceCreation(dev, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+		NamespaceIsPartOfTenant(tnt, dev).Should(Succeed())
 
 		prod := NewNamespace("", map[string]string{
 			meta.TenantLabel: tnt.GetName(),
 			"environment":    "prod",
 		})
 		NamespaceCreation(prod, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+		NamespaceIsPartOfTenant(tnt, prod).Should(Succeed())
 
 		stage := NewNamespace("", map[string]string{
 			meta.TenantLabel: tnt.GetName(),
 			"environment":    "prod",
 		})
 		NamespaceCreation(stage, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+		NamespaceIsPartOfTenant(tnt, stage).Should(Succeed())
 
 		sa := &corev1.ServiceAccount{
 			ObjectMeta: metav1.ObjectMeta{

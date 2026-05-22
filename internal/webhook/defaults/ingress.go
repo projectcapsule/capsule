@@ -20,7 +20,14 @@ import (
 	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 )
 
-func mutateIngressDefaults(ctx context.Context, req admission.Request, version *version.Version, c client.Client, decoder admission.Decoder, namespace string) *admission.Response {
+func mutateIngressDefaults(
+	ctx context.Context,
+	req admission.Request,
+	version *version.Version,
+	c client.Client,
+	decoder admission.Decoder,
+	namespace string,
+) *admission.Response {
 	ingress, err := capsuleingress.FromRequest(req, decoder)
 	if err != nil {
 		return ad.ErroredResponse(err)

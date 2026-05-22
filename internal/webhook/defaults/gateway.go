@@ -19,7 +19,13 @@ import (
 	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 )
 
-func mutateGatewayDefaults(ctx context.Context, req admission.Request, c client.Client, decoder admission.Decoder, namespce string) *admission.Response {
+func mutateGatewayDefaults(
+	ctx context.Context,
+	req admission.Request,
+	c client.Client,
+	decoder admission.Decoder,
+	namespce string,
+) *admission.Response {
 	gatewayObj := &gatewayv1.Gateway{}
 	if err := decoder.Decode(req, gatewayObj); err != nil {
 		return ad.ErroredResponse(err)

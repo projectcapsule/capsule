@@ -26,28 +26,49 @@ func Wildcard() handlers.Handler {
 	return &wildcard{}
 }
 
-func (h *wildcard) OnCreate(client client.Client, decoder admission.Decoder, recorder events.EventRecorder) handlers.Func {
+func (h *wildcard) OnCreate(
+	c client.Client,
+	_ client.Reader,
+	decoder admission.Decoder,
+	recorder events.EventRecorder,
+) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		return h.validate(ctx, client, req, recorder, decoder)
+		return h.validate(ctx, c, req, recorder, decoder)
 	}
 }
 
-func (h *wildcard) OnDelete(client.Client, admission.Decoder, events.EventRecorder) handlers.Func {
+func (h *wildcard) OnDelete(
+	client.Client,
+	client.Reader,
+	admission.Decoder,
+	events.EventRecorder,
+) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (h *wildcard) OnUpdate(client client.Client, decoder admission.Decoder, recorder events.EventRecorder) handlers.Func {
+func (h *wildcard) OnUpdate(
+	c client.Client,
+	_ client.Reader,
+	decoder admission.Decoder,
+	recorder events.EventRecorder,
+) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		return h.validate(ctx, client, req, recorder, decoder)
+		return h.validate(ctx, c, req, recorder, decoder)
 	}
 }
 
-func (h *wildcard) validate(ctx context.Context, clt client.Client, req admission.Request, recorder events.EventRecorder, decoder admission.Decoder) *admission.Response {
+func (h *wildcard) validate(
+	ctx context.Context,
+	c client.Client,
+	req admission.Request,
+	recorder events.EventRecorder,
+	decoder admission.Decoder,
+) *admission.Response {
 	tntList := &capsulev1beta2.TenantList{}
 
-	if err := clt.List(ctx, tntList, client.MatchingFields{indexer.NamespaceIndexerFieldName: req.Namespace}); err != nil {
+	if err := c.List(ctx, tntList, client.MatchingFields{indexer.NamespaceIndexerFieldName: req.Namespace}); err != nil {
 		return ad.ErroredResponse(err)
 	}
 

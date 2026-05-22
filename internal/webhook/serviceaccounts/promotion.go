@@ -29,19 +29,21 @@ func Promotion(cfg configuration.Configuration) handlers.TypedHandlerWithTenant[
 }
 
 func (h *promotion) OnCreate(
-	c client.Client,
+	_ client.Client,
+	_ client.Reader,
 	sa *corev1.ServiceAccount,
 	decoder admission.Decoder,
 	recorder events.EventRecorder,
 	tnt *capsulev1beta2.Tenant,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		return h.handle(ctx, c, req, recorder, sa, tnt)
+		return h.handle(req, recorder, sa, tnt)
 	}
 }
 
 func (h *promotion) OnUpdate(
-	c client.Client,
+	_ client.Client,
+	_ client.Reader,
 	old *corev1.ServiceAccount,
 	sa *corev1.ServiceAccount,
 	decoder admission.Decoder,
@@ -49,12 +51,13 @@ func (h *promotion) OnUpdate(
 	tnt *capsulev1beta2.Tenant,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		return h.handle(ctx, c, req, recorder, sa, tnt)
+		return h.handle(req, recorder, sa, tnt)
 	}
 }
 
 func (h *promotion) OnDelete(
 	client.Client,
+	client.Reader,
 	*corev1.ServiceAccount,
 	admission.Decoder,
 	events.EventRecorder,
@@ -66,8 +69,6 @@ func (h *promotion) OnDelete(
 }
 
 func (h *promotion) handle(
-	ctx context.Context,
-	c client.Client,
 	req admission.Request,
 	recorder events.EventRecorder,
 	sa *corev1.ServiceAccount,

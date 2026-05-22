@@ -35,7 +35,12 @@ type handler struct {
 	handlers []handlers.TypedHandlerWithTenant[*corev1.Namespace]
 }
 
-func (h *handler) OnCreate(c client.Client, decoder admission.Decoder, recorder events.EventRecorder) handlers.Func {
+func (h *handler) OnCreate(
+	c client.Client,
+	reader client.Reader,
+	decoder admission.Decoder,
+	recorder events.EventRecorder,
+) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		userIsAdmin := users.IsAdminUser(req, h.cfg.Administrators())
 
@@ -48,7 +53,7 @@ func (h *handler) OnCreate(c client.Client, decoder admission.Decoder, recorder 
 			return ad.ErroredResponse(err)
 		}
 
-		tnt, err := h.verifyReference(ctx, c, ns)
+		tnt, err := h.verifyReference(ctx, reader, ns)
 		if err != nil {
 			return ad.ErroredResponse(err)
 		}
@@ -67,7 +72,7 @@ func (h *handler) OnCreate(c client.Client, decoder admission.Decoder, recorder 
 		}
 
 		for _, hndl := range h.handlers {
-			if response := hndl.OnCreate(c, ns, decoder, recorder, tnt)(ctx, req); response != nil {
+			if response := hndl.OnCreate(c, reader, ns, decoder, recorder, tnt)(ctx, req); response != nil {
 				return response
 			}
 		}
@@ -76,14 +81,24 @@ func (h *handler) OnCreate(c client.Client, decoder admission.Decoder, recorder 
 	}
 }
 
-func (h *handler) OnDelete(c client.Client, decoder admission.Decoder, recorder events.EventRecorder) handlers.Func {
+func (h *handler) OnDelete(
+	c client.Client,
+	reader client.Reader,
+	decoder admission.Decoder,
+	recorder events.EventRecorder,
+) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		return nil
 	}
 }
 
 //nolint:gocognit
-func (h *handler) OnUpdate(c client.Client, decoder admission.Decoder, recorder events.EventRecorder) handlers.Func {
+func (h *handler) OnUpdate(
+	c client.Client,
+	reader client.Reader,
+	decoder admission.Decoder,
+	recorder events.EventRecorder,
+) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		userIsAdmin := users.IsAdminUser(req, h.cfg.Administrators())
 
@@ -124,12 +139,12 @@ func (h *handler) OnUpdate(c client.Client, decoder admission.Decoder, recorder 
 			}
 		}
 
-		oldTenant, err := h.verifyReference(ctx, c, oldNs)
+		oldTenant, err := h.verifyReference(ctx, reader, oldNs)
 		if err != nil {
 			return ad.ErroredResponse(err)
 		}
 
-		newTenant, err := h.verifyReference(ctx, c, ns)
+		newTenant, err := h.verifyReference(ctx, reader, ns)
 		if err != nil {
 			return ad.ErroredResponse(err)
 		}
@@ -154,7 +169,7 @@ func (h *handler) OnUpdate(c client.Client, decoder admission.Decoder, recorder 
 			}
 
 			for _, hndl := range h.handlers {
-				if response := hndl.OnUpdate(c, ns, oldNs, decoder, recorder, newTenant)(ctx, req); response != nil {
+				if response := hndl.OnUpdate(c, reader, ns, oldNs, decoder, recorder, newTenant)(ctx, req); response != nil {
 					return response
 				}
 			}
@@ -189,7 +204,7 @@ func (h *handler) OnUpdate(c client.Client, decoder admission.Decoder, recorder 
 		}
 
 		for _, hndl := range h.handlers {
-			if response := hndl.OnUpdate(c, ns, oldNs, decoder, recorder, oldTenant)(ctx, req); response != nil {
+			if response := hndl.OnUpdate(c, reader, ns, oldNs, decoder, recorder, oldTenant)(ctx, req); response != nil {
 				return response
 			}
 		}
@@ -200,7 +215,7 @@ func (h *handler) OnUpdate(c client.Client, decoder admission.Decoder, recorder 
 
 func (h *handler) verifyReference(
 	ctx context.Context,
-	c client.Client,
+	c client.Reader,
 	ns *corev1.Namespace,
 ) (*capsulev1beta2.Tenant, error) {
 	tenantByOwnerreference, err := tenant.GetTenantByOwnerreferences(ctx, c, ns.OwnerReferences)
@@ -241,7 +256,7 @@ func hasTenantReference(ns *corev1.Namespace) bool {
 
 func (h *handler) rejectOnTermination(
 	ctx context.Context,
-	c client.Client,
+	c client.Reader,
 	ns *corev1.Namespace,
 	t *capsulev1beta2.Tenant,
 ) *admission.Response {

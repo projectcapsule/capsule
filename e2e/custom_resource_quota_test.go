@@ -19,13 +19,17 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/api/rbac"
 )
 
-var _ = Describe("when Tenant limits custom Resource Quota", Label("resourcequota"), func() {
+var _ = Describe("when Tenant limits custom Resource Quota", Ordered, Label("resourcequota"), func() {
 	tnt := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "limiting-resources",
+			Name: "e2e-limiting-resources",
+			Labels: map[string]string{
+				"env": "e2e",
+			},
 			Annotations: map[string]string{
 				"quota.resources.capsule.clastix.io/foos.test.clastix.io_v1": "3",
 			},
@@ -93,6 +97,7 @@ var _ = Describe("when Tenant limits custom Resource Quota", Label("resourcequot
 		EventuallyCreation(func() error {
 			return k8sClient.Create(context.TODO(), tnt)
 		}).Should(Succeed())
+		TenantReady(tnt, metav1.ConditionTrue, defaultTimeoutInterval)
 	})
 
 	JustAfterEach(func() {
@@ -105,10 +110,12 @@ var _ = Describe("when Tenant limits custom Resource Quota", Label("resourcequot
 		dynamicClient := dynamic.NewForConfigOrDie(cfg)
 
 		for _, i := range []int{1, 2, 3} {
-			ns := NewNamespace(fmt.Sprintf("limiting-resources-ns-%d", i))
+			ns := NewNamespace(fmt.Sprintf("e2e-limiting-resources-ns-%d", i), map[string]string{
+				meta.TenantLabel: tnt.GetName(),
+			})
 
 			NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
-			TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
+			NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
 
 			obj := &unstructured.Unstructured{
 				Object: map[string]interface{}{
@@ -127,7 +134,9 @@ var _ = Describe("when Tenant limits custom Resource Quota", Label("resourcequot
 		}
 
 		for _, i := range []int{1, 2, 3} {
-			ns := NewNamespace(fmt.Sprintf("limiting-resources-ns-%d", i))
+			ns := NewNamespace(fmt.Sprintf("limiting-resources-ns-%d", i), map[string]string{
+				meta.TenantLabel: tnt.GetName(),
+			})
 
 			obj := &unstructured.Unstructured{
 				Object: map[string]interface{}{

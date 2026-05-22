@@ -25,9 +25,10 @@ func ImagePullPolicy() handlers.TypedHandlerWithTenantWithRuleset[*corev1.Pod] {
 }
 
 func (h *imagePullPolicy) OnCreate(
-	c client.Client,
+	_ client.Client,
+	_ client.Reader,
 	pod *corev1.Pod,
-	decoder admission.Decoder,
+	_ admission.Decoder,
 	recorder events.EventRecorder,
 	tnt *capsulev1beta2.Tenant,
 	_ *api.NamespaceRuleBodyNamespace,
@@ -38,10 +39,11 @@ func (h *imagePullPolicy) OnCreate(
 }
 
 func (h *imagePullPolicy) OnUpdate(
-	c client.Client,
+	_ client.Client,
+	_ client.Reader,
 	old *corev1.Pod,
 	pod *corev1.Pod,
-	decoder admission.Decoder,
+	_ admission.Decoder,
 	recorder events.EventRecorder,
 	tnt *capsulev1beta2.Tenant,
 	_ *api.NamespaceRuleBodyNamespace,
@@ -53,6 +55,7 @@ func (h *imagePullPolicy) OnUpdate(
 
 func (h *imagePullPolicy) OnDelete(
 	client.Client,
+	client.Reader,
 	*corev1.Pod,
 	admission.Decoder,
 	events.EventRecorder,

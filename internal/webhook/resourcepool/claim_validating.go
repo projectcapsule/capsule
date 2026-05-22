@@ -26,13 +26,23 @@ func ClaimValidationHandler(log logr.Logger) handlers.Handler {
 	return &claimValidationHandler{log: log}
 }
 
-func (h *claimValidationHandler) OnCreate(client.Client, admission.Decoder, events.EventRecorder) handlers.Func {
+func (h *claimValidationHandler) OnCreate(
+	client.Client,
+	client.Reader,
+	admission.Decoder,
+	events.EventRecorder,
+) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (h *claimValidationHandler) OnDelete(_ client.Client, decoder admission.Decoder, _ events.EventRecorder) handlers.Func {
+func (h *claimValidationHandler) OnDelete(
+	_ client.Client,
+	_ client.Reader,
+	decoder admission.Decoder,
+	_ events.EventRecorder,
+) handlers.Func {
 	return func(_ context.Context, req admission.Request) *admission.Response {
 		claim := &capsulev1beta2.ResourcePoolClaim{}
 
@@ -50,7 +60,12 @@ func (h *claimValidationHandler) OnDelete(_ client.Client, decoder admission.Dec
 	}
 }
 
-func (h *claimValidationHandler) OnUpdate(_ client.Client, decoder admission.Decoder, _ events.EventRecorder) handlers.Func {
+func (h *claimValidationHandler) OnUpdate(
+	_ client.Client,
+	_ client.Reader,
+	decoder admission.Decoder,
+	_ events.EventRecorder,
+) handlers.Func {
 	return func(_ context.Context, req admission.Request) *admission.Response {
 		oldClaim := &capsulev1beta2.ResourcePoolClaim{}
 		newClaim := &capsulev1beta2.ResourcePoolClaim{}

@@ -14,7 +14,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api/rbac"
 )
 
-var _ = Describe("creating a Tenant with wrong name", Label("tenant"), func() {
+var _ = Describe("creating a Tenant with wrong name", Ordered, Label("tenant"), func() {
 	tnt := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "non_rfc_dns_1123",

@@ -885,6 +885,10 @@ func (r *resourcePoolController) updateStatus(ctx context.Context, instance *cap
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
 		latest := &capsulev1beta2.ResourcePool{}
 		if err = r.Get(ctx, types.NamespacedName{Name: instance.GetName()}, latest); err != nil {
+			if apierrors.IsNotFound(err) {
+				return nil
+			}
+
 			return err
 		}
 

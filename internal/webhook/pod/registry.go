@@ -36,9 +36,10 @@ func ContainerRegistry(configuration configuration.Configuration, cache *cache.R
 }
 
 func (h *registryHandler) OnCreate(
-	c client.Client,
+	_ client.Client,
+	_ client.Reader,
 	pod *corev1.Pod,
-	decoder admission.Decoder,
+	_ admission.Decoder,
 	recorder events.EventRecorder,
 	tnt *capsulev1beta2.Tenant,
 	rule *api.NamespaceRuleBodyNamespace,
@@ -49,10 +50,11 @@ func (h *registryHandler) OnCreate(
 }
 
 func (h *registryHandler) OnUpdate(
-	c client.Client,
+	_ client.Client,
+	_ client.Reader,
 	old *corev1.Pod,
 	pod *corev1.Pod,
-	decoder admission.Decoder,
+	_ admission.Decoder,
 	recorder events.EventRecorder,
 	tnt *capsulev1beta2.Tenant,
 	rule *api.NamespaceRuleBodyNamespace,
@@ -64,6 +66,7 @@ func (h *registryHandler) OnUpdate(
 
 func (h *registryHandler) OnDelete(
 	client.Client,
+	client.Reader,
 	*corev1.Pod,
 	admission.Decoder,
 	events.EventRecorder,

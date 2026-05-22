@@ -67,7 +67,12 @@ func ObjectCalculationHandler(
 	}
 }
 
-func (h *objectCalculationHandler) OnCreate(c client.Client, decoder admission.Decoder, recorder events.EventRecorder) handlers.Func {
+func (h *objectCalculationHandler) OnCreate(
+	c client.Client,
+	reader client.Reader,
+	decoder admission.Decoder,
+	recorder events.EventRecorder,
+) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		log := log.FromContext(ctx).WithValues(
 			"op", "create",
@@ -226,7 +231,12 @@ func (h *objectCalculationHandler) OnCreate(c client.Client, decoder admission.D
 }
 
 //nolint:gocognit,cyclop,maintidx
-func (h *objectCalculationHandler) OnUpdate(c client.Client, _ admission.Decoder, recorder events.EventRecorder) handlers.Func {
+func (h *objectCalculationHandler) OnUpdate(
+	c client.Client,
+	reader client.Reader,
+	_ admission.Decoder,
+	recorder events.EventRecorder,
+) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		oldObj, err := getUnstructured(req.OldObject)
 		if err != nil {
@@ -450,7 +460,12 @@ func (h *objectCalculationHandler) OnUpdate(c client.Client, _ admission.Decoder
 	}
 }
 
-func (h *objectCalculationHandler) OnDelete(c client.Client, _ admission.Decoder, recorder events.EventRecorder) handlers.Func {
+func (h *objectCalculationHandler) OnDelete(
+	c client.Client,
+	reader client.Reader,
+	_ admission.Decoder,
+	recorder events.EventRecorder,
+) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		oldObj, err := getUnstructured(req.OldObject)
 		if err != nil {

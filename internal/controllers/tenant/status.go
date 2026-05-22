@@ -6,6 +6,7 @@ package tenant
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"sort"
 
 	nodev1 "k8s.io/api/node/v1"
@@ -274,6 +275,22 @@ func listObjectNamesBySelector(
 		}
 
 		selected[name] = struct{}{}
+	}
+
+	var regex *regexp.Regexp
+	if allowed.Regex != "" {
+		regex, err = regexp.Compile(allowed.Regex)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if regex != nil {
+		for name := range allNames {
+			if regex.MatchString(name) {
+				selected[name] = struct{}{}
+			}
+		}
 	}
 
 	for name := range selected {

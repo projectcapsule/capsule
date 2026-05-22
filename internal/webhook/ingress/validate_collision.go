@@ -35,25 +35,46 @@ func Collision(configuration configuration.Configuration) handlers.Handler {
 	return &collision{configuration: configuration}
 }
 
-func (r *collision) OnCreate(client client.Client, decoder admission.Decoder, recorder events.EventRecorder) handlers.Func {
+func (r *collision) OnCreate(
+	c client.Client,
+	_ client.Reader,
+	decoder admission.Decoder,
+	recorder events.EventRecorder,
+) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		return r.validate(ctx, client, req, decoder, recorder)
+		return r.validate(ctx, c, req, decoder, recorder)
 	}
 }
 
-func (r *collision) OnUpdate(client client.Client, decoder admission.Decoder, recorder events.EventRecorder) handlers.Func {
+func (r *collision) OnUpdate(
+	c client.Client,
+	_ client.Reader,
+	decoder admission.Decoder,
+	recorder events.EventRecorder,
+) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		return r.validate(ctx, client, req, decoder, recorder)
+		return r.validate(ctx, c, req, decoder, recorder)
 	}
 }
 
-func (r *collision) OnDelete(client.Client, admission.Decoder, events.EventRecorder) handlers.Func {
+func (r *collision) OnDelete(
+	client.Client,
+	client.Reader,
+	admission.Decoder,
+	events.EventRecorder,
+) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (r *collision) validate(ctx context.Context, client client.Client, req admission.Request, decoder admission.Decoder, recorder events.EventRecorder) *admission.Response {
+func (r *collision) validate(
+	ctx context.Context,
+	reader client.Client,
+	req admission.Request,
+	decoder admission.Decoder,
+	recorder events.EventRecorder,
+) *admission.Response {
 	ing, err := FromRequest(req, decoder)
 	if err != nil {
 		return ad.ErroredResponse(err)
@@ -61,7 +82,7 @@ func (r *collision) validate(ctx context.Context, client client.Client, req admi
 
 	var tnt *capsulev1beta2.Tenant
 
-	tnt, err = TenantFromIngress(ctx, client, ing)
+	tnt, err = TenantFromIngress(ctx, reader, ing)
 	if err != nil {
 		return ad.ErroredResponse(err)
 	}
@@ -70,7 +91,7 @@ func (r *collision) validate(ctx context.Context, client client.Client, req admi
 		return nil
 	}
 
-	if err = r.validateCollision(ctx, client, ing, tnt.Spec.IngressOptions.HostnameCollisionScope); err == nil {
+	if err = r.validateCollision(ctx, reader, ing, tnt.Spec.IngressOptions.HostnameCollisionScope); err == nil {
 		return nil
 	}
 
@@ -85,7 +106,12 @@ func (r *collision) validate(ctx context.Context, client client.Client, req admi
 }
 
 //nolint:gocognit,gocyclo,cyclop
-func (r *collision) validateCollision(ctx context.Context, clt client.Client, ing Ingress, scope api.HostnameCollisionScope) error {
+func (r *collision) validateCollision(
+	ctx context.Context,
+	reader client.Reader,
+	ing Ingress,
+	scope api.HostnameCollisionScope,
+) error {
 	for hostname, paths := range ing.HostnamePathsPairs() {
 		for path := range paths {
 			var ingressObjList client.ObjectList
@@ -104,7 +130,7 @@ func (r *collision) validateCollision(ctx context.Context, clt client.Client, in
 			switch scope {
 			case api.HostnameCollisionScopeCluster:
 				tenantList := &capsulev1beta2.TenantList{}
-				if err := clt.List(ctx, tenantList); err != nil {
+				if err := reader.List(ctx, tenantList); err != nil {
 					return err
 				}
 
@@ -113,7 +139,7 @@ func (r *collision) validateCollision(ctx context.Context, clt client.Client, in
 				}
 			case api.HostnameCollisionScopeTenant:
 				tenantList := &capsulev1beta2.TenantList{}
-				if err := clt.List(ctx, tenantList, client.MatchingFields{".status.namespaces": ing.Namespace()}); err != nil {
+				if err := reader.List(ctx, tenantList, client.MatchingFields{".status.namespaces": ing.Namespace()}); err != nil {
 					return err
 				}
 
@@ -124,7 +150,7 @@ func (r *collision) validateCollision(ctx context.Context, clt client.Client, in
 				namespaces.Insert(ing.Namespace())
 			}
 
-			if err := clt.List(ctx, ingressObjList, client.MatchingFields{ingress.HostPathPair: fmt.Sprintf("%s;%s", hostname, path)}); err != nil {
+			if err := reader.List(ctx, ingressObjList, client.MatchingFields{ingress.HostPathPair: fmt.Sprintf("%s;%s", hostname, path)}); err != nil {
 				return err
 			}
 

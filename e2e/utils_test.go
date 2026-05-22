@@ -17,17 +17,20 @@ import (
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	. "github.com/onsi/gomega"
 	"github.com/stretchr/testify/assert"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	nodev1 "k8s.io/api/node/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	versionUtil "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/retry"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
@@ -37,11 +40,20 @@ import (
 )
 
 const (
-	defaultTimeoutInterval            = 40 * time.Second
-	defaultTerminationTimeoutInterval = 60 * time.Second
-	defaultPollInterval               = time.Second
-	defaultConfigurationName          = "default"
+	defaultTimeoutInterval                    = 60 * time.Second
+	defaultTerminationTimeoutInterval         = 60 * time.Second
+	defaultPollInterval                       = 3 * time.Second
+	defaultConfigurationName                  = "default"
+	e2eClientQPS                      float32 = 200
+	e2eClientBurst                    int     = 400
 )
+
+func tuneE2ERestConfig(c *rest.Config) *rest.Config {
+	c.QPS = e2eClientQPS
+	c.Burst = e2eClientBurst
+
+	return c
+}
 
 func mergeMaps(base map[string]string, extra map[string]string) map[string]string {
 	out := map[string]string{}
@@ -168,12 +180,64 @@ func NamespaceCreation(ns *corev1.Namespace, owner rbac.UserSpec, timeout time.D
 	}, timeout, defaultPollInterval)
 }
 
-func NamespaceIsPartOfTenant(
+func TenantNamespaceReady(
 	tnt *capsulev1beta2.Tenant,
 	ns *corev1.Namespace,
-) func() error {
+	expectedSize uint,
+) {
+	Eventually(func(g Gomega) {
+		t := &capsulev1beta2.Tenant{}
+		err := k8sClient.Get(context.TODO(), types.NamespacedName{Name: tnt.GetName()}, t)
+		g.Expect(err).NotTo(HaveOccurred())
 
-	return func() error {
+		g.Expect(t.Status.Size).To(
+			Equal(expectedSize),
+			"expected tenant %s status size to be %d, got %d",
+			t.GetName(),
+			expectedSize,
+			t.Status.Size,
+		)
+
+		currentNS := &corev1.Namespace{}
+		err = k8sClient.Get(context.TODO(), types.NamespacedName{Name: ns.GetName()}, currentNS)
+		g.Expect(err).NotTo(HaveOccurred())
+
+		instance := t.Status.GetInstance(&capsulev1beta2.TenantStatusNamespaceItem{
+			Name: currentNS.GetName(),
+			UID:  currentNS.GetUID(),
+		})
+		g.Expect(instance).NotTo(BeNil(), "Namespace instance should not be nil")
+
+		condition := instance.Conditions.GetConditionByType(meta.ReadyCondition)
+		g.Expect(condition).NotTo(BeNil(), "Condition instance should not be nil")
+
+		g.Expect(instance.Name).To(Equal(currentNS.GetName()))
+		g.Expect(condition.Status).To(Equal(metav1.ConditionTrue), "Expected namespace condition status to be True")
+		g.Expect(condition.Type).To(Equal(meta.ReadyCondition), "Expected namespace condition type to be Ready")
+		g.Expect(condition.Reason).To(Equal(meta.SucceededReason), "Expected namespace condition reason to be Succeeded")
+	}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+}
+
+func NamespaceIsNotPartOfTenant(
+	tnt *capsulev1beta2.Tenant,
+	ns *corev1.Namespace,
+) AsyncAssertion {
+	return Eventually(func() error {
+		currentNS := &corev1.Namespace{}
+		nsUID := ns.GetUID()
+
+		if err := k8sClient.Get(
+			context.TODO(),
+			types.NamespacedName{Name: ns.GetName()},
+			currentNS,
+		); err != nil {
+			if !apierrors.IsNotFound(err) {
+				return fmt.Errorf("failed to get namespace %s: %w", ns.GetName(), err)
+			}
+		} else {
+			nsUID = currentNS.GetUID()
+		}
+
 		t := &capsulev1beta2.Tenant{}
 		if err := k8sClient.Get(
 			context.TODO(),
@@ -183,31 +247,84 @@ func NamespaceIsPartOfTenant(
 			return fmt.Errorf("failed to get tenant: %w", err)
 		}
 
-		// reuse existing helper
-		namespaces := TenantNamespaceList(t, defaultTimeoutInterval)
-		if ok, _ := ContainElements(ns.GetName()).Match(namespaces); ok {
+		namespaces := t.Status.Namespaces
+		if ok, _ := ContainElement(ns.GetName()).Match(namespaces); ok {
 			return fmt.Errorf(
-				"expected tenant %s to contain namespace %s, but got: %v",
-				t.GetName(), ns.GetName(), namespaces,
+				"expected tenant %s not to contain namespace %s, but got: %v",
+				t.GetName(),
+				ns.GetName(),
+				namespaces,
 			)
 		}
 
-		// reuse your existing method
-		instance := t.Status.GetInstance(
-			&capsulev1beta2.TenantStatusNamespaceItem{
-				Name: ns.GetName(),
-				UID:  ns.GetUID(),
-			})
-
-		if instance == nil {
+		instance := t.Status.GetInstance(&capsulev1beta2.TenantStatusNamespaceItem{
+			Name: ns.GetName(),
+			UID:  nsUID,
+		})
+		if instance != nil {
 			return fmt.Errorf(
-				"tenant %s does not contain instance for namespace %s (uid=%s)",
-				t.GetName(), ns.GetName(), ns.GetUID(),
+				"expected tenant %s not to contain instance for namespace %s (uid=%s), but got: %+v",
+				t.GetName(),
+				ns.GetName(),
+				nsUID,
+				instance,
 			)
 		}
 
 		return nil
-	}
+	}, defaultTimeoutInterval, defaultPollInterval)
+}
+
+func NamespaceIsPartOfTenant(
+	tnt *capsulev1beta2.Tenant,
+	ns *corev1.Namespace,
+) AsyncAssertion {
+	return Eventually(func() error {
+		currentNS := &corev1.Namespace{}
+		if err := k8sClient.Get(
+			context.TODO(),
+			types.NamespacedName{Name: ns.GetName()},
+			currentNS,
+		); err != nil {
+			return fmt.Errorf("failed to get namespace %s: %w", ns.GetName(), err)
+		}
+
+		t := &capsulev1beta2.Tenant{}
+		if err := k8sClient.Get(
+			context.TODO(),
+			types.NamespacedName{Name: tnt.GetName()},
+			t,
+		); err != nil {
+			return fmt.Errorf("failed to get tenant: %w", err)
+		}
+
+		namespaces := t.Status.Namespaces
+		if ok, _ := ContainElement(currentNS.GetName()).Match(namespaces); !ok {
+			return fmt.Errorf(
+				"expected tenant %s to contain namespace %s, but got: %v",
+				t.GetName(),
+				currentNS.GetName(),
+				namespaces,
+			)
+		}
+
+		instance := t.Status.GetInstance(
+			&capsulev1beta2.TenantStatusNamespaceItem{
+				Name: currentNS.GetName(),
+				UID:  currentNS.GetUID(),
+			},
+		)
+		if instance == nil {
+			return fmt.Errorf(
+				"expected tenant %s to contain instance for namespace %s (uid=%s)",
+				t.GetName(),
+				currentNS.GetName(),
+				currentNS.GetUID(),
+			)
+		}
+
+		return nil
+	}, defaultTimeoutInterval, defaultPollInterval)
 }
 
 func GetTenantOwnerReference(
@@ -847,5 +964,84 @@ func UpdatePodImage(ctx context.Context, namespace, name, image string) {
 		}
 		pod.Spec.Containers[0].Image = image
 		return k8sClient.Update(ctx, pod)
+	}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+}
+
+func TenantReadyTrue(tnt *capsulev1beta2.Tenant) {
+	TenantReady(tnt, metav1.ConditionTrue, defaultTimeoutInterval)
+}
+
+func TenantReadyFalse(tnt *capsulev1beta2.Tenant) {
+	TenantReady(tnt, metav1.ConditionFalse, defaultTimeoutInterval)
+}
+
+func TenantReady(
+	tnt *capsulev1beta2.Tenant,
+	expected metav1.ConditionStatus,
+	timeoutInterval time.Duration,
+) {
+	Eventually(func(g Gomega) {
+		current := &capsulev1beta2.Tenant{}
+		err := k8sClient.Get(context.TODO(), client.ObjectKey{Name: tnt.GetName()}, current)
+		g.Expect(err).NotTo(HaveOccurred())
+
+		condition := current.Status.Conditions.GetConditionByType(meta.ReadyCondition)
+		g.Expect(condition).NotTo(BeNil(), "expected Tenant %q to have Ready condition", tnt.GetName())
+
+		g.Expect(condition.Status).To(
+			Equal(expected),
+			"expected Tenant %q Ready condition to be %s, got %s: reason=%q message=%q",
+			tnt.GetName(),
+			expected,
+			condition.Status,
+			condition.Reason,
+			condition.Message,
+		)
+
+		for _, owner := range current.Spec.Owners {
+			g.Expect(current.Status.Owners).To(
+				ContainElement(owner.CoreOwnerSpec),
+				"expected Tenant %q status.owners to contain spec owner %+v; current status.owners=%+v",
+				tnt.GetName(),
+				owner.CoreOwnerSpec,
+				current.Status.Owners,
+			)
+		}
+	}, timeoutInterval, defaultPollInterval).Should(Succeed())
+}
+
+func EnsureRuntimeClass(ctx context.Context, rtc *nodev1.RuntimeClass) {
+	Eventually(func() error {
+		desired := rtc.DeepCopy()
+		desired.ResourceVersion = ""
+
+		_, err := controllerutil.CreateOrUpdate(ctx, k8sClient, desired, func() error {
+			desired.Handler = rtc.Handler
+			desired.Overhead = rtc.Overhead
+			desired.Scheduling = rtc.Scheduling
+
+			labels := desired.GetLabels()
+			if labels == nil {
+				labels = map[string]string{}
+			}
+			for key, value := range rtc.GetLabels() {
+				labels[key] = value
+			}
+			labels["env"] = "e2e"
+			desired.SetLabels(labels)
+
+			annotations := desired.GetAnnotations()
+			if annotations == nil {
+				annotations = map[string]string{}
+			}
+			for key, value := range rtc.GetAnnotations() {
+				annotations[key] = value
+			}
+			desired.SetAnnotations(annotations)
+
+			return nil
+		})
+
+		return err
 	}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 }

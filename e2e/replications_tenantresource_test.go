@@ -29,7 +29,7 @@ var (
 	resyncPeriod = metav1.Duration{Duration: 10 * time.Second}
 )
 
-var _ = Describe("TenantResource SSA", Label("replications", "namespace", "tenantresource"), Ordered, func() {
+var _ = Describe("TenantResource SSA", Ordered, Label("replications", "namespace", "tenantresource"), Ordered, func() {
 	var (
 		ctx                   context.Context
 		tnt                   *capsulev1beta2.Tenant
@@ -46,15 +46,20 @@ var _ = Describe("TenantResource SSA", Label("replications", "namespace", "tenan
 
 	BeforeEach(func() {
 		ctx = context.Background()
-		baseNamespace = "solar-system"
-		targetNamespaces = []string{"solar-one", "solar-two", "solar-three"}
+		baseNamespace = "e2e-tenantresource-ssa-system"
+		targetNamespaces = []string{"e2e-tenantresource-ssa-one", "e2e-tenantresource-ssa-two", "e2e-tenantresource-ssa-three"}
 		tenantOwner = rbac.UserSpec{Name: "solar-user", Kind: rbac.OwnerKind("User")}
 		additionalBindingUser = rbac.UserSpec{Name: "bob", Kind: rbac.OwnerKind("User")}
 
 		Expect(k8sClient.Get(context.Background(), client.ObjectKey{Name: defaultConfigurationName}, originalConfig)).To(Succeed())
 
 		tnt = &capsulev1beta2.Tenant{
-			ObjectMeta: metav1.ObjectMeta{Name: "tenantresource-ssa"},
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "e2e-tenantresource-ssa",
+				Labels: map[string]string{
+					"env": "e2e",
+				},
+			},
 			Spec: capsulev1beta2.TenantSpec{
 				Owners: rbac.OwnerListSpec{{
 					CoreOwnerSpec: rbac.CoreOwnerSpec{UserSpec: tenantOwner},
@@ -82,7 +87,7 @@ var _ = Describe("TenantResource SSA", Label("replications", "namespace", "tenan
 		contextSecretOne = &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "pull-secret-one",
-				Namespace: "solar-one",
+				Namespace: "e2e-tenantresource-ssa-one",
 				Labels:    map[string]string{"pullsecret.company.com": "true"},
 			},
 			Type:       corev1.SecretTypeOpaque,
@@ -91,7 +96,7 @@ var _ = Describe("TenantResource SSA", Label("replications", "namespace", "tenan
 		contextSecretTwo = &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "pull-secret-two",
-				Namespace: "solar-one",
+				Namespace: "e2e-tenantresource-ssa-one",
 				Labels:    map[string]string{"pullsecret.company.com": "true"},
 			},
 			Type:       corev1.SecretTypeOpaque,
@@ -104,10 +109,12 @@ var _ = Describe("TenantResource SSA", Label("replications", "namespace", "tenan
 			tnt.ResourceVersion = ""
 			return k8sClient.Create(ctx, tnt)
 		}).Should(Succeed())
+		TenantReady(tnt, metav1.ConditionTrue, defaultTimeoutInterval)
 
 		for _, ns := range append(append([]string{}, targetNamespaces...), baseNamespace) {
 			namespace := NewNamespace(ns, map[string]string{apimeta.TenantLabel: tnt.GetName()})
 			NamespaceCreation(namespace, tenantOwner, defaultTimeoutInterval).Should(Succeed())
+			NamespaceIsPartOfTenant(tnt, namespace).Should(Succeed())
 		}
 	})
 
@@ -284,7 +291,7 @@ var _ = Describe("TenantResource SSA", Label("replications", "namespace", "tenan
 			EventuallyCreation(func() error { return k8sClient.Create(ctx, tr) }).Should(Succeed())
 
 			By("defaulting to the controller service account")
-			expectResolvedServiceAccount(baseNamespace, tr.Name, "capsule", "capsule-system")
+			expectResolvedServiceAccount(baseNamespace, tr.Name, "capsule", ControllerNamespace)
 
 			By("configuring a tenant default service account")
 			ModifyCapsuleConfigurationOpts(func(configuration *capsulev1beta2.CapsuleConfiguration) {
@@ -347,7 +354,7 @@ var _ = Describe("TenantResource SSA", Label("replications", "namespace", "tenan
 			sec := &corev1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "ctx-secret",
-					Namespace: "solar-one",
+					Namespace: "e2e-tenantresource-ssa-one",
 					Labels: map[string]string{
 						"pullsecret.company.com": "true",
 					},
@@ -361,7 +368,7 @@ var _ = Describe("TenantResource SSA", Label("replications", "namespace", "tenan
 			for _, ns := range targetNamespaces {
 				bindServiceAccountToConfigMapWriter(baseNamespace, saName, ns)
 			}
-			// But do NOT grant get/list on secrets in solar-one.
+			// But do NOT grant get/list on secrets in e2e-tenantresource-ssa-one.
 
 			tr := &capsulev1beta2.TenantResource{
 				ObjectMeta: metav1.ObjectMeta{Name: "sa-no-context-read", Namespace: baseNamespace},
@@ -381,7 +388,7 @@ var _ = Describe("TenantResource SSA", Label("replications", "namespace", "tenan
 											APIVersion: "v1",
 											Kind:       "Secret",
 										},
-										Namespace: "solar-one",
+										Namespace: "e2e-tenantresource-ssa-one",
 										Selector: &metav1.LabelSelector{
 											MatchLabels: map[string]string{
 												"pullsecret.company.com": "true",
@@ -604,8 +611,8 @@ data:
 			EventuallyCreation(func() error { return k8sClient.Create(ctx, trA) }).Should(Succeed())
 			EventuallyCreation(func() error { return k8sClient.Create(ctx, trB) }).Should(Succeed())
 
-			expectTenantResourceFailed(baseNamespace, trA.Name, "applying of 3 resources failed")
-			expectTenantResourceFailed(baseNamespace, trB.Name, "applying of 3 resources failed")
+			expectTenantResourceFailed(baseNamespace, trA.Name, "applying of 4 resources failed")
+			expectTenantResourceFailed(baseNamespace, trB.Name, "applying of 4 resources failed")
 
 			By("verifying the preexisting object remains unchanged")
 			for _, ns := range targetNamespaces {
@@ -819,7 +826,7 @@ data:
 	Context("adoption", func() {
 		It("fails without adopt and succeeds with adopt", func() {
 			preexisting := &corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{Name: "adopt-me", Namespace: "solar-one"},
+				ObjectMeta: metav1.ObjectMeta{Name: "adopt-me", Namespace: "e2e-tenantresource-ssa-one"},
 				Data:       map[string]string{"existing": "true"},
 			}
 			EventuallyCreation(func() error { return k8sClient.Create(ctx, preexisting) }).Should(Succeed())
@@ -838,7 +845,7 @@ data:
 
 			EventuallyCreation(func() error { return k8sClient.Create(ctx, withoutAdopt) }).Should(Succeed())
 			expectTenantResourceFailed(baseNamespace, withoutAdopt.Name, "applying of")
-			expectProcessedItemStatus(baseNamespace, withoutAdopt.Name, configMapRID(tnt.Name, "solar-one", "adopt-me", "0/generator-0-0"), metav1.ConditionFalse, false, "cannot be adopted")
+			expectProcessedItemStatus(baseNamespace, withoutAdopt.Name, configMapRID(tnt.Name, "e2e-tenantresource-ssa-one", "adopt-me", "0/generator-0-0"), metav1.ConditionFalse, false, "cannot be adopted")
 
 			By("recreating a second resource with adoption enabled")
 			withAdopt := newGeneratorConfigMapTenantResource(baseNamespace, "adopt-enabled", `---
@@ -855,15 +862,15 @@ data:
 
 			EventuallyCreation(func() error { return k8sClient.Create(ctx, withAdopt) }).Should(Succeed())
 			expectTenantResourceReady(baseNamespace, withAdopt.Name)
-			expectConfigMapData("solar-one", "adopt-me", map[string]string{"source": "generator", "namespace": "solar-one"})
+			expectConfigMapData("e2e-tenantresource-ssa-one", "adopt-me", map[string]string{"source": "generator", "namespace": "e2e-tenantresource-ssa-one"})
 
 			Eventually(func(g Gomega) {
 				cm := &corev1.ConfigMap{}
-				g.Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "adopt-me", Namespace: "solar-one"}, cm)).To(Succeed())
+				g.Expect(k8sClient.Get(ctx, types.NamespacedName{Name: "adopt-me", Namespace: "e2e-tenantresource-ssa-one"}, cm)).To(Succeed())
 				g.Expect(cm.Labels).To(HaveKeyWithValue(apimeta.NewManagedByCapsuleLabel, apimeta.ValueControllerReplications))
 				g.Expect(cm.Labels).ToNot(HaveKey(apimeta.CreatedByCapsuleLabel))
 			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
-			expectProcessedItemStatus(baseNamespace, withAdopt.Name, configMapRID(tnt.Name, "solar-one", "adopt-me", "0/generator-0-0"), metav1.ConditionTrue, false, "")
+			expectProcessedItemStatus(baseNamespace, withAdopt.Name, configMapRID(tnt.Name, "e2e-tenantresource-ssa-one", "adopt-me", "0/generator-0-0"), metav1.ConditionTrue, false, "")
 		})
 	})
 
@@ -1006,7 +1013,7 @@ data:
 											APIVersion: "v1",
 											Kind:       "Secret",
 										},
-										Namespace: "solar-one",
+										Namespace: "e2e-tenantresource-ssa-one",
 										Selector: &metav1.LabelSelector{
 											MatchLabels: map[string]string{
 												"pullsecret.company.com": "true",
@@ -1034,9 +1041,9 @@ data:
 			EventuallyCreation(func() error { return k8sClient.Create(ctx, tr) }).Should(Succeed())
 			expectTenantResourceReady(baseNamespace, tr.Name)
 
-			expectConfigMapData("solar-one", "show-context", map[string]string{"count": "2"})
-			expectConfigMapData("solar-two", "show-context", map[string]string{"count": "2"})
-			expectConfigMapData("solar-three", "show-context", map[string]string{"count": "2"})
+			expectConfigMapData("e2e-tenantresource-ssa-one", "show-context", map[string]string{"count": "2"})
+			expectConfigMapData("e2e-tenantresource-ssa-two", "show-context", map[string]string{"count": "2"})
+			expectConfigMapData("e2e-tenantresource-ssa-three", "show-context", map[string]string{"count": "2"})
 		})
 
 		It("loads context from the current iterating namespace", func() {
@@ -1086,9 +1093,9 @@ data:
 			EventuallyCreation(func() error { return k8sClient.Create(ctx, tr) }).Should(Succeed())
 			expectTenantResourceReady(baseNamespace, tr.Name)
 
-			expectConfigMapData("solar-one", "show-context", map[string]string{"count": "2"})
-			expectConfigMapData("solar-two", "show-context", map[string]string{"count": "0"})
-			expectConfigMapData("solar-three", "show-context", map[string]string{"count": "0"})
+			expectConfigMapData("e2e-tenantresource-ssa-one", "show-context", map[string]string{"count": "2"})
+			expectConfigMapData("e2e-tenantresource-ssa-two", "show-context", map[string]string{"count": "0"})
+			expectConfigMapData("e2e-tenantresource-ssa-three", "show-context", map[string]string{"count": "0"})
 		})
 
 		It("loads context per rendered namespace", func() {
@@ -1097,8 +1104,8 @@ data:
 
 			solarTwoSecret := &corev1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "pull-secret-solar-two",
-					Namespace: "solar-two",
+					Name:      "pull-secret-e2e-tenantresource-ssa-two",
+					Namespace: "e2e-tenantresource-ssa-two",
 					Labels: map[string]string{
 						"pullsecret.company.com": "true",
 					},
@@ -1151,9 +1158,9 @@ data:
 			EventuallyCreation(func() error { return k8sClient.Create(ctx, tr) }).Should(Succeed())
 			expectTenantResourceReady(baseNamespace, tr.Name)
 
-			expectConfigMapData("solar-one", "show-context", map[string]string{"count": "2"})
-			expectConfigMapData("solar-two", "show-context", map[string]string{"count": "1"})
-			expectConfigMapData("solar-three", "show-context", map[string]string{"count": "0"})
+			expectConfigMapData("e2e-tenantresource-ssa-one", "show-context", map[string]string{"count": "2"})
+			expectConfigMapData("e2e-tenantresource-ssa-two", "show-context", map[string]string{"count": "1"})
+			expectConfigMapData("e2e-tenantresource-ssa-three", "show-context", map[string]string{"count": "0"})
 		})
 
 		It("fails when context tries to load from a namespace outside the tenant", func() {

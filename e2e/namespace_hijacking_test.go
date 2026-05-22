@@ -22,10 +22,13 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api/rbac"
 )
 
-var _ = Describe("creating several Namespaces for a Tenant", Label("namespace", "hijack"), func() {
-	tnt_1 := &capsulev1beta2.Tenant{
+var _ = Describe("creating several Namespaces for a Tenant", Ordered, Label("namespace", "hijack"), func() {
+	t1 := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "capsule-ns-attack-1",
+			Name: "e2e-ns-attack-1",
+			Labels: map[string]string{
+				"env": "e2e",
+			},
 		},
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: rbac.OwnerListSpec{
@@ -57,9 +60,12 @@ var _ = Describe("creating several Namespaces for a Tenant", Label("namespace", 
 		},
 	}
 
-	tnt_2 := &capsulev1beta2.Tenant{
+	t2 := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "capsule-ns-attack-2",
+			Name: "e2e-ns-attack-2",
+			Labels: map[string]string{
+				"env": "e2e",
+			},
 		},
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: rbac.OwnerListSpec{
@@ -141,29 +147,31 @@ var _ = Describe("creating several Namespaces for a Tenant", Label("namespace", 
 
 	JustBeforeEach(func() {
 		EventuallyCreation(func() error {
-			tnt_1.ResourceVersion = ""
+			t1.ResourceVersion = ""
 
-			return k8sClient.Create(context.TODO(), tnt_1)
+			return k8sClient.Create(context.TODO(), t1)
 		}).Should(Succeed())
+		TenantReady(t1, metav1.ConditionTrue, defaultTimeoutInterval)
 
 		EventuallyCreation(func() error {
-			tnt_2.ResourceVersion = ""
+			t2.ResourceVersion = ""
 
-			return k8sClient.Create(context.TODO(), tnt_2)
+			return k8sClient.Create(context.TODO(), t2)
 		}).Should(Succeed())
+		TenantReady(t2, metav1.ConditionTrue, defaultTimeoutInterval)
 	})
 
 	JustAfterEach(func() {
-		EventuallyDeletion(tnt_1)
-		EventuallyDeletion(tnt_2)
+		EventuallyDeletion(t1)
+		EventuallyDeletion(t2)
 	})
 
 	It("Can't hijack offlimits namespace (Ownerreferences)", func() {
-		tenant := getTenant(tnt_1.Name)
+		tenant := getTenant(t1.Name)
 
 		Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: kubeSystem.GetName()}, kubeSystem)).Should(Succeed())
 
-		for _, owner := range tnt_1.Spec.Owners {
+		for _, owner := range t1.Spec.Owners {
 			cs := ownerClient(owner.UserSpec)
 
 			patch := []byte(fmt.Sprintf(
@@ -179,11 +187,11 @@ var _ = Describe("creating several Namespaces for a Tenant", Label("namespace", 
 	})
 
 	It("Can't hijack offlimits namespace (Labels)", func() {
-		tenant := getTenant(tnt_1.Name)
+		tenant := getTenant(t1.Name)
 
 		Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: kubeSystem.GetName()}, kubeSystem)).Should(Succeed())
 
-		for _, owner := range tnt_1.Spec.Owners {
+		for _, owner := range t1.Spec.Owners {
 			cs := ownerClient(owner.UserSpec)
 
 			patch := []byte(fmt.Sprintf(
@@ -198,11 +206,11 @@ var _ = Describe("creating several Namespaces for a Tenant", Label("namespace", 
 	})
 
 	It("Can't hijack offlimits namespace (Annotations)", func() {
-		tenant := getTenant(tnt_1.Name)
+		tenant := getTenant(t1.Name)
 
 		Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: kubeSystem.GetName()}, kubeSystem)).Should(Succeed())
 
-		for _, owner := range tnt_1.Spec.Owners {
+		for _, owner := range t1.Spec.Owners {
 			cs := ownerClient(owner.UserSpec)
 
 			patch := []byte(fmt.Sprintf(
@@ -217,15 +225,16 @@ var _ = Describe("creating several Namespaces for a Tenant", Label("namespace", 
 	})
 
 	It("Owners can patch managed namespaces but ownerReference changes should be reverted", func() {
-		tenant := getTenant(tnt_1.Name)
+		tenant := getTenant(t1.Name)
 
-		for _, owner := range tnt_1.Spec.Owners {
+		for _, owner := range t1.Spec.Owners {
 			cs := ownerClient(owner.UserSpec)
 
 			ns := NewNamespace("", map[string]string{
 				meta.TenantLabel: tenant.GetName(),
 			})
 			NamespaceCreation(ns, owner.UserSpec, defaultTimeoutInterval).Should(Succeed())
+			NamespaceIsPartOfTenant(t1, ns).Should(Succeed())
 
 			randomName, randomUID := randomTenantReference()
 
@@ -247,15 +256,16 @@ var _ = Describe("creating several Namespaces for a Tenant", Label("namespace", 
 	})
 
 	It("Owners can patch managed namespaces but tenant label changes should be reverted", func() {
-		tenant := getTenant(tnt_1.Name)
+		tenant := getTenant(t1.Name)
 
-		for _, owner := range tnt_1.Spec.Owners {
+		for _, owner := range t1.Spec.Owners {
 			cs := ownerClient(owner.UserSpec)
 
 			ns := NewNamespace("", map[string]string{
 				meta.TenantLabel: tenant.GetName(),
 			})
 			NamespaceCreation(ns, owner.UserSpec, defaultTimeoutInterval).Should(Succeed())
+			NamespaceIsPartOfTenant(t1, ns).Should(Succeed())
 
 			randomName, _ := randomTenantReference()
 
@@ -273,15 +283,16 @@ var _ = Describe("creating several Namespaces for a Tenant", Label("namespace", 
 	})
 
 	It("Owners can patch managed namespaces but combined ownership changes should be reverted", func() {
-		tenant := getTenant(tnt_1.Name)
+		tenant := getTenant(t1.Name)
 
-		for _, owner := range tnt_1.Spec.Owners {
+		for _, owner := range t1.Spec.Owners {
 			cs := ownerClient(owner.UserSpec)
 
 			ns := NewNamespace("", map[string]string{
 				meta.TenantLabel: tenant.GetName(),
 			})
 			NamespaceCreation(ns, owner.UserSpec, defaultTimeoutInterval).Should(Succeed())
+			NamespaceIsPartOfTenant(t1, ns).Should(Succeed())
 
 			randomName, randomUID := randomTenantReference()
 
@@ -306,16 +317,17 @@ var _ = Describe("creating several Namespaces for a Tenant", Label("namespace", 
 	})
 
 	It("Owners can not migrate managed namespaces to another Tenant", func() {
-		tenantA := getTenant(tnt_1.Name)
-		tenantB := getTenant(tnt_2.Name)
+		tenantA := getTenant(t1.Name)
+		tenantB := getTenant(t2.Name)
 
-		for _, owner := range tnt_1.Spec.Owners {
+		for _, owner := range t1.Spec.Owners {
 			cs := ownerClient(owner.UserSpec)
 
 			ns := NewNamespace("", map[string]string{
 				meta.TenantLabel: tenantA.GetName(),
 			})
 			NamespaceCreation(ns, owner.UserSpec, defaultTimeoutInterval).Should(Succeed())
+			NamespaceIsPartOfTenant(t1, ns).Should(Succeed())
 
 			patch := []byte(fmt.Sprintf(
 				`{"metadata":{"labels":{"%s":"%s"},"ownerReferences":[{"apiVersion":"%s","kind":"Tenant","name":"%s","uid":"%s"}]}}`,
@@ -338,15 +350,16 @@ var _ = Describe("creating several Namespaces for a Tenant", Label("namespace", 
 	})
 
 	It("Owners can not remove tenant ownership from managed namespaces", func() {
-		tenant := getTenant(tnt_1.Name)
+		tenant := getTenant(t1.Name)
 
-		for _, owner := range tnt_1.Spec.Owners {
+		for _, owner := range t1.Spec.Owners {
 			cs := ownerClient(owner.UserSpec)
 
 			ns := NewNamespace("", map[string]string{
 				meta.TenantLabel: tenant.GetName(),
 			})
 			NamespaceCreation(ns, owner.UserSpec, defaultTimeoutInterval).Should(Succeed())
+			NamespaceIsPartOfTenant(t1, ns).Should(Succeed())
 
 			patchRemoveOwnerReferences := []byte(`{"metadata":{"ownerReferences":[]}}`)
 
@@ -368,12 +381,12 @@ var _ = Describe("creating several Namespaces for a Tenant", Label("namespace", 
 	})
 
 	It("Owners can not patch unmanaged namespaces into a Tenant", func() {
-		tenant := getTenant(tnt_1.Name)
+		tenant := getTenant(t1.Name)
 
 		unmanaged := NewNamespace("")
 		Expect(k8sClient.Create(context.TODO(), unmanaged)).Should(Succeed())
 
-		for _, owner := range tnt_1.Spec.Owners {
+		for _, owner := range t1.Spec.Owners {
 			cs := ownerClient(owner.UserSpec)
 
 			patchLabel := []byte(fmt.Sprintf(
@@ -400,20 +413,21 @@ var _ = Describe("creating several Namespaces for a Tenant", Label("namespace", 
 	})
 
 	It("Namespace status updates by owners can not change tenant ownerReferences", func() {
-		tenant := getTenant(tnt_1.Name)
+		tenant := getTenant(t1.Name)
 
 		createNamespaceStatusRBACForOwner(tenant)
 		DeferCleanup(func(tnt *capsulev1beta2.Tenant) {
 			deleteNamespaceStatusRBACForOwner(tnt)
 		}, tenant)
 
-		for _, owner := range tnt_1.Spec.Owners {
+		for _, owner := range t1.Spec.Owners {
 			cs := ownerClient(owner.UserSpec)
 
 			ns := NewNamespace("", map[string]string{
 				meta.TenantLabel: tenant.GetName(),
 			})
 			NamespaceCreation(ns, owner.UserSpec, defaultTimeoutInterval).Should(Succeed())
+			NamespaceIsPartOfTenant(t1, ns).Should(Succeed())
 
 			randomName, randomUID := randomTenantReference()
 
@@ -444,20 +458,21 @@ var _ = Describe("creating several Namespaces for a Tenant", Label("namespace", 
 	})
 
 	It("Namespace status updates by owners can not change tenant labels", func() {
-		tenant := getTenant(tnt_1.Name)
+		tenant := getTenant(t1.Name)
 
 		createNamespaceStatusRBACForOwner(tenant)
 		DeferCleanup(func(tnt *capsulev1beta2.Tenant) {
 			deleteNamespaceStatusRBACForOwner(tnt)
 		}, tenant)
 
-		for _, owner := range tnt_1.Spec.Owners {
+		for _, owner := range t1.Spec.Owners {
 			cs := ownerClient(owner.UserSpec)
 
 			ns := NewNamespace("", map[string]string{
 				meta.TenantLabel: tenant.GetName(),
 			})
 			NamespaceCreation(ns, owner.UserSpec, defaultTimeoutInterval).Should(Succeed())
+			NamespaceIsPartOfTenant(t1, ns).Should(Succeed())
 
 			randomName, _ := randomTenantReference()
 
@@ -482,8 +497,8 @@ var _ = Describe("creating several Namespaces for a Tenant", Label("namespace", 
 	})
 
 	It("Namespace status updates by owners can not migrate namespaces to another Tenant", func() {
-		tenantA := getTenant(tnt_1.Name)
-		tenantB := getTenant(tnt_2.Name)
+		tenantA := getTenant(t1.Name)
+		tenantB := getTenant(t2.Name)
 
 		createNamespaceStatusRBACForOwner(tenantA)
 		DeferCleanup(func(tnt *capsulev1beta2.Tenant) {
@@ -495,13 +510,14 @@ var _ = Describe("creating several Namespaces for a Tenant", Label("namespace", 
 			deleteNamespaceStatusRBACForOwner(tnt)
 		}, tenantB)
 
-		for _, owner := range tnt_1.Spec.Owners {
+		for _, owner := range t1.Spec.Owners {
 			cs := ownerClient(owner.UserSpec)
 
 			ns := NewNamespace("", map[string]string{
 				meta.TenantLabel: tenantA.GetName(),
 			})
 			NamespaceCreation(ns, owner.UserSpec, defaultTimeoutInterval).Should(Succeed())
+			NamespaceIsPartOfTenant(t1, ns).Should(Succeed())
 
 			statusNs, err := cs.CoreV1().Namespaces().Get(context.TODO(), ns.Name, metav1.GetOptions{})
 			Expect(err).ToNot(HaveOccurred())
@@ -540,7 +556,7 @@ var _ = Describe("creating several Namespaces for a Tenant", Label("namespace", 
 	})
 
 	It("Namespace status updates by owners can not patch unmanaged namespaces into a Tenant", func() {
-		tenant := getTenant(tnt_1.Name)
+		tenant := getTenant(t1.Name)
 
 		createNamespaceStatusRBACForOwner(tenant)
 		DeferCleanup(func(tnt *capsulev1beta2.Tenant) {
@@ -550,7 +566,7 @@ var _ = Describe("creating several Namespaces for a Tenant", Label("namespace", 
 		unmanaged := NewNamespace("")
 		Expect(k8sClient.Create(context.TODO(), unmanaged)).Should(Succeed())
 
-		for _, owner := range tnt_1.Spec.Owners {
+		for _, owner := range t1.Spec.Owners {
 			cs := ownerClient(owner.UserSpec)
 
 			statusNs, err := cs.CoreV1().Namespaces().Get(context.TODO(), unmanaged.Name, metav1.GetOptions{})

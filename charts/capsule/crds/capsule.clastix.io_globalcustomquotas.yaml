@@ -11,6 +11,8 @@ spec:
     kind: GlobalCustomQuota
     listKind: GlobalCustomQuotaList
     plural: globalcustomquotas
+    shortNames:
+    - gcq
     singular: globalcustomquota
   scope: Cluster
   versions:

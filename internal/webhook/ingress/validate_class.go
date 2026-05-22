@@ -35,19 +35,34 @@ func Class(configuration configuration.Configuration, version *version.Version) 
 	}
 }
 
-func (r *class) OnCreate(client client.Client, decoder admission.Decoder, recorder events.EventRecorder) handlers.Func {
+func (r *class) OnCreate(
+	c client.Client,
+	_ client.Reader,
+	decoder admission.Decoder,
+	recorder events.EventRecorder,
+) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		return r.validate(ctx, r.version, client, req, decoder, recorder)
+		return r.validate(ctx, r.version, c, req, decoder, recorder)
 	}
 }
 
-func (r *class) OnUpdate(client client.Client, decoder admission.Decoder, recorder events.EventRecorder) handlers.Func {
+func (r *class) OnUpdate(
+	c client.Client,
+	_ client.Reader,
+	decoder admission.Decoder,
+	recorder events.EventRecorder,
+) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		return r.validate(ctx, r.version, client, req, decoder, recorder)
+		return r.validate(ctx, r.version, c, req, decoder, recorder)
 	}
 }
 
-func (r *class) OnDelete(client.Client, admission.Decoder, events.EventRecorder) handlers.Func {
+func (r *class) OnDelete(
+	client.Client,
+	client.Reader,
+	admission.Decoder,
+	events.EventRecorder,
+) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
@@ -86,7 +101,7 @@ func (r *class) validate(
 	ingressClass := ingress.IngressClass()
 
 	if ingressClass == nil {
-		recorder.Eventf(ingress.GetClientObject(), nil, corev1.EventTypeWarning, evt.ReasonMissingIngressClass, evt.ActionValidationDenied, "Ingress %s/%s is missing IngressClass", req.Namespace, req.Name)
+		recorder.Eventf(ingress.GetClientObject(), tnt, corev1.EventTypeWarning, evt.ReasonMissingIngressClass, evt.ActionValidationDenied, "Ingress %s/%s is missing IngressClass", req.Namespace, req.Name)
 
 		response := admission.Denied(caperrors.NewIngressClassUndefined(*allowed).Error())
 
@@ -116,7 +131,7 @@ func (r *class) validate(
 	case allowed.Match(*ingressClass) || selector:
 		return nil
 	default:
-		recorder.Eventf(ingress.GetClientObject(), nil, corev1.EventTypeWarning, evt.ReasonForbiddenIngressClass, evt.ActionValidationDenied, "Ingress %s/%s IngressClass %s is forbidden for the current Tenant", req.Namespace, req.Name, &ingressClass)
+		recorder.Eventf(ingress.GetClientObject(), tnt, corev1.EventTypeWarning, evt.ReasonForbiddenIngressClass, evt.ActionValidationDenied, "Ingress %s/%s IngressClass %s is forbidden for the current Tenant", req.Namespace, req.Name, &ingressClass)
 
 		response := admission.Denied(caperrors.NewIngressClassForbidden(*ingressClass, *allowed).Error())
 

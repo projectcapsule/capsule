@@ -35,7 +35,7 @@ const (
 	resourcesLabel = "resources"
 )
 
-var _ = Describe("GlobalTenantResource", Label("replications", "global", "globaltenantresource"), Ordered, func() {
+var _ = Describe("GlobalTenantResource", Ordered, Label("replications", "global", "globaltenantresource"), Ordered, func() {
 	var (
 		ctx          context.Context
 		originConfig *capsulev1beta2.CapsuleConfiguration
@@ -58,16 +58,17 @@ var _ = Describe("GlobalTenantResource", Label("replications", "global", "global
 		tenantAOwner = rbac.UserSpec{Name: "solar-user", Kind: rbac.OwnerKind("User")}
 		tenantBOwner = rbac.UserSpec{Name: "lunar-user", Kind: rbac.OwnerKind("User")}
 
-		tenantANamespaces = []string{"gtr-a-one", "gtr-a-two", "gtr-a-system"}
-		tenantBNamespaces = []string{"gtr-b-one", "gtr-b-two"}
+		tenantANamespaces = []string{"e2e-gtr-tenant-a-one", "e2e-gtr-tenant-a-two", "e2e-gtr-tenant-a-system"}
+		tenantBNamespaces = []string{"e2e-gtr-tenant-b-one", "e2e-gtr-tenant-b-two"}
 		allNamespaces = append(append([]string{}, tenantANamespaces...), tenantBNamespaces...)
 
 		tenantA = &capsulev1beta2.Tenant{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: "gtr-tenant-a",
+				Name: "e2e-gtr-tenant-a",
 				Labels: map[string]string{
 					"energy": "solar",
 					"group":  "alpha",
+					"env":    "e2e",
 				},
 			},
 			Spec: capsulev1beta2.TenantSpec{
@@ -86,10 +87,11 @@ var _ = Describe("GlobalTenantResource", Label("replications", "global", "global
 
 		tenantB = &capsulev1beta2.Tenant{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: "gtr-tenant-b",
+				Name: "e2e-gtr-tenant-b",
 				Labels: map[string]string{
 					"energy": "lunar",
 					"group":  "beta",
+					"env":    "e2e",
 				},
 			},
 			Spec: capsulev1beta2.TenantSpec{
@@ -105,11 +107,13 @@ var _ = Describe("GlobalTenantResource", Label("replications", "global", "global
 			tenantA.ResourceVersion = ""
 			return k8sClient.Create(ctx, tenantA)
 		}).Should(Succeed())
+		TenantReady(tenantA, metav1.ConditionTrue, defaultTimeoutInterval)
 
 		EventuallyCreation(func() error {
 			tenantB.ResourceVersion = ""
 			return k8sClient.Create(ctx, tenantB)
 		}).Should(Succeed())
+		TenantReady(tenantB, metav1.ConditionTrue, defaultTimeoutInterval)
 
 		for _, ns := range tenantANamespaces {
 			namespace := NewNamespace(ns, map[string]string{
@@ -775,7 +779,7 @@ data:
 		})
 
 		It("prunes objects from namespaces that stop matching namespaceSelector", func() {
-			for _, ns := range []string{"gtr-a-one", "gtr-a-two"} {
+			for _, ns := range []string{"e2e-gtr-tenant-a-one", "e2e-gtr-tenant-a-two"} {
 				Eventually(func() error {
 					n := &corev1.Namespace{}
 					if err := k8sClient.Get(ctx, types.NamespacedName{Name: ns}, n); err != nil {
@@ -801,12 +805,12 @@ data:
 
 			EventuallyCreation(func() error { return k8sClient.Create(ctx, gtr) }).Should(Succeed())
 
-			expectConfigMapData("gtr-a-one", "gtr-namespace-selector-prune", map[string]string{"mode": "selected"})
-			expectConfigMapData("gtr-a-two", "gtr-namespace-selector-prune", map[string]string{"mode": "selected"})
+			expectConfigMapData("e2e-gtr-tenant-a-one", "gtr-namespace-selector-prune", map[string]string{"mode": "selected"})
+			expectConfigMapData("e2e-gtr-tenant-a-two", "gtr-namespace-selector-prune", map[string]string{"mode": "selected"})
 
 			Eventually(func() error {
 				n := &corev1.Namespace{}
-				if err := k8sClient.Get(ctx, types.NamespacedName{Name: "gtr-a-two"}, n); err != nil {
+				if err := k8sClient.Get(ctx, types.NamespacedName{Name: "e2e-gtr-tenant-a-two"}, n); err != nil {
 					return err
 				}
 				lbls := n.GetLabels()
@@ -815,8 +819,8 @@ data:
 				return k8sClient.Update(ctx, n)
 			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 
-			expectConfigMapData("gtr-a-one", "gtr-namespace-selector-prune", map[string]string{"mode": "selected"})
-			expectConfigMapDeleted("gtr-a-two", "gtr-namespace-selector-prune")
+			expectConfigMapData("e2e-gtr-tenant-a-one", "gtr-namespace-selector-prune", map[string]string{"mode": "selected"})
+			expectConfigMapDeleted("e2e-gtr-tenant-a-two", "gtr-namespace-selector-prune")
 		})
 	})
 
@@ -872,7 +876,7 @@ data:
 		})
 
 		It("applies only to namespaces matching namespaceSelector within the selected tenants", func() {
-			for _, ns := range []string{"gtr-a-one", "gtr-a-two"} {
+			for _, ns := range []string{"e2e-gtr-tenant-a-one", "e2e-gtr-tenant-a-two"} {
 				Eventually(func() error {
 					n := &corev1.Namespace{}
 					if err := k8sClient.Get(ctx, types.NamespacedName{Name: ns}, n); err != nil {
@@ -898,9 +902,9 @@ data:
 
 			EventuallyCreation(func() error { return k8sClient.Create(ctx, gtr) }).Should(Succeed())
 
-			expectConfigMapData("gtr-a-one", "gtr-filtered-config", map[string]string{"mode": "filtered"})
-			expectConfigMapData("gtr-a-two", "gtr-filtered-config", map[string]string{"mode": "filtered"})
-			expectConfigMapAbsent("gtr-a-system", "gtr-filtered-config")
+			expectConfigMapData("e2e-gtr-tenant-a-one", "gtr-filtered-config", map[string]string{"mode": "filtered"})
+			expectConfigMapData("e2e-gtr-tenant-a-two", "gtr-filtered-config", map[string]string{"mode": "filtered"})
+			expectConfigMapAbsent("e2e-gtr-tenant-a-system", "gtr-filtered-config")
 
 			for _, ns := range tenantBNamespaces {
 				expectConfigMapAbsent(ns, "gtr-filtered-config")

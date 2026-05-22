@@ -11,6 +11,8 @@ spec:
     kind: CustomQuota
     listKind: CustomQuotaList
     plural: customquotas
+    shortNames:
+    - cq
     singular: customquota
   scope: Namespaced
   versions:

@@ -13,13 +13,17 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/api/rbac"
 )
 
-var _ = Describe("creating a nodePort service when it is enabled for Tenant", Label("tenant", "service", "nodeport"), func() {
+var _ = Describe("creating a nodePort service when it is enabled for Tenant", Ordered, Label("tenant", "networking", "service"), func() {
 	tnt := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "enable-node-ports",
+			Name: "e2e-enable-node-ports",
+			Labels: map[string]string{
+				"env": "e2e",
+			},
 		},
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: rbac.OwnerListSpec{
@@ -40,14 +44,19 @@ var _ = Describe("creating a nodePort service when it is enabled for Tenant", La
 			tnt.ResourceVersion = ""
 			return k8sClient.Create(context.TODO(), tnt)
 		}).Should(Succeed())
+
+		TenantReady(tnt, metav1.ConditionTrue, defaultTimeoutInterval)
 	})
 	JustAfterEach(func() {
 		EventuallyDeletion(tnt)
 	})
 
 	It("should allow creating a service with NodePort type", func() {
-		ns := NewNamespace("")
+		ns := NewNamespace("", map[string]string{
+			meta.TenantLabel: tnt.GetName(),
+		})
 		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+		NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
 
 		svc := &corev1.Service{
 			ObjectMeta: metav1.ObjectMeta{

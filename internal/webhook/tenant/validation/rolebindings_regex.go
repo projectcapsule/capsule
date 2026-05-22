@@ -26,6 +26,7 @@ func RoleBindingRegexHandler() handlers.TypedHandler[*capsulev1beta2.Tenant] {
 
 func (h *rbRegexHandler) OnCreate(
 	_ client.Client,
+	_ client.Reader,
 	tnt *capsulev1beta2.Tenant,
 	decoder admission.Decoder,
 	_ events.EventRecorder,
@@ -37,6 +38,7 @@ func (h *rbRegexHandler) OnCreate(
 
 func (h *rbRegexHandler) OnDelete(
 	client.Client,
+	client.Reader,
 	*capsulev1beta2.Tenant,
 	admission.Decoder,
 	events.EventRecorder,
@@ -48,6 +50,7 @@ func (h *rbRegexHandler) OnDelete(
 
 func (h *rbRegexHandler) OnUpdate(
 	_ client.Client,
+	_ client.Reader,
 	tnt *capsulev1beta2.Tenant,
 	old *capsulev1beta2.Tenant,
 	decoder admission.Decoder,

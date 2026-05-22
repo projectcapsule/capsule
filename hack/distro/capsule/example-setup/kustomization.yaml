@@ -3,7 +3,7 @@ kind: Kustomization
 resources:
   - owners.yaml
   - tenants.yaml
-  - resource-legacy.yaml
+  - resource.yaml
   - pools.yaml
   - rbac.yaml
   - custom-quotas.yaml

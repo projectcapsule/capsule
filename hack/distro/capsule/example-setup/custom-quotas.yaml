@@ -9,14 +9,12 @@ spec:
   - matchLabels:
       capsule.clastix.io/tenant: wind
   sources:
-    - group: ""
-      version: v1
+    - apiVersion: v1
       kind: Pod
       op: add
       path: ".spec.volumes[*].ephemeral.volumeClaimTemplate.spec.resources.requests.storage"
 
-    - group: ""
-      version: v1
+    - apiVersion: v1
       kind: PersistentVolumeClaim
       op: add
       path: ".spec.resources.requests.storage"
@@ -34,13 +32,11 @@ spec:
   - matchLabels:
       capsule.clastix.io/tenant: wind
   sources:
-  - group: ""
+  - apiVersion: "v1"
     kind: Pod
     op: add
     path: .spec.containers[*].resources.limits.cpu
-    version: v1
-  - group: ""
+  - apiVersion: "v1"
     kind: Pod
     op: add
     path: .spec.initContainers[*].resources.limits.cpu
-    version: v1

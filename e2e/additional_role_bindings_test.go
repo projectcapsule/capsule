@@ -13,13 +13,17 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/api/rbac"
 )
 
-var _ = Describe("creating a Namespace with an additional Role Binding", Label("tenant", "rolebindings"), func() {
+var _ = Describe("creating a Namespace with an additional Role Binding", Ordered, Label("tenant", "rolebindings"), func() {
 	tnt := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "additional-role-binding",
+			Name: "e2e-additional-role-binding",
+			Labels: map[string]string{
+				"env": "e2e",
+			},
 		},
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: rbac.OwnerListSpec{
@@ -52,15 +56,30 @@ var _ = Describe("creating a Namespace with an additional Role Binding", Label("
 			tnt.ResourceVersion = ""
 			return k8sClient.Create(context.TODO(), tnt)
 		}).Should(Succeed())
+
+		TenantReady(tnt, metav1.ConditionTrue, defaultTimeoutInterval)
 	})
+
 	JustAfterEach(func() {
 		EventuallyDeletion(tnt)
 	})
 
 	It("should be assigned to each Namespace", func() {
+		ns1 := NewNamespace("", map[string]string{
+			meta.TenantLabel: tnt.GetName(),
+		})
+		NamespaceCreation(ns1, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+
+		ns2 := NewNamespace("", map[string]string{
+			meta.TenantLabel: tnt.GetName(),
+		})
+		NamespaceCreation(ns2, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 
 		t := &capsulev1beta2.Tenant{}
 		Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: tnt.GetName()}, t)).Should(Succeed())
+
+		NamespaceIsPartOfTenant(tnt, ns1).Should(Succeed())
+		NamespaceIsPartOfTenant(tnt, ns2).Should(Succeed())
 
 		VerifyTenantRoleBindings(t)
 	})

@@ -21,6 +21,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
+	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 	"github.com/projectcapsule/capsule/pkg/tenant"
 )
@@ -35,9 +36,15 @@ func OwnerReferenceHandler(cfg configuration.Configuration) handlers.TypedHandle
 	}
 }
 
-func (h *ownerReferenceHandler) OnCreate(c client.Client, ns *corev1.Namespace, decoder admission.Decoder, recorder events.EventRecorder) handlers.Func {
+func (h *ownerReferenceHandler) OnCreate(
+	c client.Client,
+	reader client.Reader,
+	ns *corev1.Namespace,
+	decoder admission.Decoder,
+	recorder events.EventRecorder,
+) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		tnt, errResponse := utils.GetNamespaceTenant(ctx, c, ns, req, h.cfg, recorder)
+		tnt, errResponse := utils.GetNamespaceTenant(ctx, reader, c, ns, req, h.cfg, recorder)
 		if errResponse != nil {
 			return errResponse
 		}
@@ -70,15 +77,28 @@ func (h *ownerReferenceHandler) OnCreate(c client.Client, ns *corev1.Namespace, 
 	}
 }
 
-func (h *ownerReferenceHandler) OnDelete(client.Client, *corev1.Namespace, admission.Decoder, events.EventRecorder) handlers.Func {
+func (h *ownerReferenceHandler) OnDelete(
+	client.Client,
+	client.Reader,
+	*corev1.Namespace,
+	admission.Decoder,
+	events.EventRecorder,
+) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (h *ownerReferenceHandler) OnUpdate(c client.Client, newNs *corev1.Namespace, oldNs *corev1.Namespace, decoder admission.Decoder, recorder events.EventRecorder) handlers.Func {
+func (h *ownerReferenceHandler) OnUpdate(
+	c client.Client,
+	reader client.Reader,
+	newNs *corev1.Namespace,
+	oldNs *corev1.Namespace,
+	decoder admission.Decoder,
+	recorder events.EventRecorder,
+) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		tnt, err := resolveTenantForNamespaceUpdate(ctx, c, h.cfg, oldNs, newNs, req.UserInfo)
+		tnt, err := resolveTenantForNamespaceUpdate(ctx, reader, h.cfg, oldNs, newNs, req.UserInfo)
 		if err != nil {
 			return ad.ErroredResponse(err)
 		}
@@ -127,7 +147,7 @@ func (h *ownerReferenceHandler) OnUpdate(c client.Client, newNs *corev1.Namespac
 
 func resolveTenantForNamespaceUpdate(
 	ctx context.Context,
-	c client.Client,
+	c client.Reader,
 	cfg configuration.Configuration,
 	oldNs, newNs *corev1.Namespace,
 	userInfo authenticationv1.UserInfo,
@@ -165,15 +185,13 @@ func assignToTenant(
 		return nil
 	}
 
-	tnt.SetGroupVersionKind(capsulev1beta2.GroupVersion.WithKind("Tenant"))
-
 	if err := controllerutil.SetOwnerReference(tnt, ns, c.Scheme()); err != nil {
-		//	recorder.Eventf(ns, nil, corev1.EventTypeWarning, evt.ReasonNamespaceHijack, evt.ActionValidationDenied, "Namespace %s cannot be assigned to the desired tenant %s", ns.GetName(), tnt.GetName())
+		recorder.Eventf(ns, nil, corev1.EventTypeWarning, evt.ReasonNamespaceHijack, evt.ActionValidationDenied, "Namespace %s cannot be assigned to the desired tenant %s", ns.GetName(), tnt.GetName())
 
 		return err
 	}
 
-	//recorder.Eventf(ns, nil, corev1.EventTypeNormal, evt.ReasonTenantAssigned, evt.ActionMutated, "Namespace %s has been assigned to the desired tenant %s", ns.GetName(), tnt.GetName())
+	recorder.Eventf(ns, nil, corev1.EventTypeNormal, evt.ReasonTenantAssigned, evt.ActionMutated, "Namespace %s has been assigned to the desired tenant %s", ns.GetName(), tnt.GetName())
 
 	return nil
 }

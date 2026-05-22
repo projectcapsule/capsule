@@ -25,6 +25,7 @@ func RequiredMetadataHandler() handlers.TypedHandlerWithTenant[*corev1.Namespace
 
 func (h *requiredMetadataHandler) OnCreate(
 	_ client.Client,
+	_ client.Reader,
 	ns *corev1.Namespace,
 	_ admission.Decoder,
 	_ events.EventRecorder,
@@ -60,6 +61,7 @@ func (h *requiredMetadataHandler) OnCreate(
 
 func (h *requiredMetadataHandler) OnUpdate(
 	_ client.Client,
+	_ client.Reader,
 	newNs *corev1.Namespace,
 	oldNs *corev1.Namespace,
 	_ admission.Decoder,
@@ -98,6 +100,7 @@ func (h *requiredMetadataHandler) OnUpdate(
 
 func (h *requiredMetadataHandler) OnDelete(
 	client.Client,
+	client.Reader,
 	*corev1.Namespace,
 	admission.Decoder,
 	events.EventRecorder,

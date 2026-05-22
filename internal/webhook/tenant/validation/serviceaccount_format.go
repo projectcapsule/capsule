@@ -26,6 +26,7 @@ func ServiceAccountNameHandler() handlers.TypedHandler[*capsulev1beta2.Tenant] {
 
 func (h *saNameHandler) OnCreate(
 	_ client.Client,
+	_ client.Reader,
 	tnt *capsulev1beta2.Tenant,
 	_ admission.Decoder,
 	_ events.EventRecorder,
@@ -35,7 +36,13 @@ func (h *saNameHandler) OnCreate(
 	}
 }
 
-func (h *saNameHandler) OnDelete(client.Client, *capsulev1beta2.Tenant, admission.Decoder, events.EventRecorder) handlers.Func {
+func (h *saNameHandler) OnDelete(
+	client.Client,
+	client.Reader,
+	*capsulev1beta2.Tenant,
+	admission.Decoder,
+	events.EventRecorder,
+) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
@@ -43,6 +50,7 @@ func (h *saNameHandler) OnDelete(client.Client, *capsulev1beta2.Tenant, admissio
 
 func (h *saNameHandler) OnUpdate(
 	_ client.Client,
+	_ client.Reader,
 	tnt *capsulev1beta2.Tenant,
 	old *capsulev1beta2.Tenant,
 	_ admission.Decoder,

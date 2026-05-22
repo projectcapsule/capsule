@@ -64,6 +64,8 @@ var _ = BeforeSuite(func() {
 
 	Expect(capsulev1beta2.AddToScheme(scheme.Scheme)).NotTo(HaveOccurred())
 
+	tuneE2ERestConfig(cfg)
+
 	ctrlClient, err := client.New(cfg, client.Options{Scheme: scheme.Scheme})
 	Expect(err).ToNot(HaveOccurred())
 	Expect(ctrlClient).ToNot(BeNil())
@@ -71,45 +73,73 @@ var _ = BeforeSuite(func() {
 	k8sClient = &e2eClient{Client: ctrlClient}
 })
 
-var _ = AfterSuite(func() {
-	Eventually(func() error {
-		var nsList corev1.NamespaceList
+var _ = SynchronizedAfterSuite(
+	func() {
+		// Runs on every parallel process.
+		// Keep this empty, or put per-worker cleanup here.
+	},
+	func() {
+		Eventually(func() error {
+			var tnts capsulev1beta2.TenantList
 
-		// List all namespaces with env=e2e
-		if err := k8sClient.List(
-			context.TODO(),
-			&nsList,
-			client.MatchingLabels{"env": "e2e"},
-		); err != nil {
-			return err
-		}
-
-		// If none left, we’re done
-		if len(nsList.Items) == 0 {
-			return nil
-		}
-
-		// Try deleting all; if any delete fails with something other than NotFound,
-		// return the error so Eventually keeps retrying.
-		for i := range nsList.Items {
-			ns := &nsList.Items[i]
-			if err := k8sClient.Delete(context.TODO(), ns); err != nil && !apierrors.IsNotFound(err) {
+			if err := k8sClient.List(
+				context.TODO(),
+				&tnts,
+				client.MatchingLabels{"env": "e2e"},
+			); err != nil {
 				return err
 			}
-		}
 
-		// Return a non-nil error to tell Eventually "not done yet"
-		return fmt.Errorf("still have %d namespaces with env=e2e", len(nsList.Items))
-	}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+			if len(tnts.Items) == 0 {
+				return nil
+			}
 
-	By("tearing down the test environment")
+			for i := range tnts.Items {
+				ns := &tnts.Items[i]
+				if err := k8sClient.Delete(context.TODO(), ns); err != nil && !apierrors.IsNotFound(err) {
+					return err
+				}
+			}
 
-	Expect(testEnv.Stop()).ToNot(HaveOccurred())
-})
+			return fmt.Errorf("still have %d tenants with env=e2e", len(tnts.Items))
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+
+		Eventually(func() error {
+			var nsList corev1.NamespaceList
+
+			if err := k8sClient.List(
+				context.TODO(),
+				&nsList,
+				client.MatchingLabels{"env": "e2e"},
+			); err != nil {
+				return err
+			}
+
+			if len(nsList.Items) == 0 {
+				return nil
+			}
+
+			for i := range nsList.Items {
+				ns := &nsList.Items[i]
+				if err := k8sClient.Delete(context.TODO(), ns); err != nil && !apierrors.IsNotFound(err) {
+					return err
+				}
+			}
+
+			return fmt.Errorf("still have %d namespaces with env=e2e", len(nsList.Items))
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+
+		By("tearing down the test environment")
+
+		Expect(testEnv.Stop()).ToNot(HaveOccurred())
+	},
+)
 
 func ownerClient(owner rbac.UserSpec) (cs kubernetes.Interface) {
 	c, err := config.GetConfig()
 	Expect(err).ToNot(HaveOccurred())
+	tuneE2ERestConfig(c)
+
 	c.Impersonate.Groups = []string{"projectcapsule.dev", owner.Name}
 	c.Impersonate.UserName = owner.Name
 	cs, err = kubernetes.NewForConfig(c)
@@ -121,6 +151,8 @@ func ownerClient(owner rbac.UserSpec) (cs kubernetes.Interface) {
 func impersonationClientSet(user string, groups []string) (cs kubernetes.Interface) {
 	c, err := config.GetConfig()
 	Expect(err).ToNot(HaveOccurred())
+	tuneE2ERestConfig(c)
+
 	c.Impersonate.Groups = groups
 	c.Impersonate.UserName = user
 	cs, err = kubernetes.NewForConfig(c)
@@ -131,6 +163,8 @@ func impersonationClientSet(user string, groups []string) (cs kubernetes.Interfa
 
 func impersonationClient(user string, groups []string) client.Client {
 	impersonatedCfg := rest.CopyConfig(cfg)
+	tuneE2ERestConfig(impersonatedCfg)
+
 	impersonatedCfg.Impersonate = rest.ImpersonationConfig{
 		UserName: user,
 		Groups:   groups,

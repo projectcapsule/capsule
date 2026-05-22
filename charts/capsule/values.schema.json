@@ -390,6 +390,14 @@
                             "description": "DEPRECATED: use users properties. Names of the users considered as Capsule users.",
                             "type": "array"
                         },
+                        "clientConnectionBurst": {
+                            "description": "Burst to use for interacting with kubernetes apiserver",
+                            "type": "integer"
+                        },
+                        "clientConnectionQPS": {
+                            "description": "QPS to use for interacting with kubernetes apiserver",
+                            "type": "number"
+                        },
                         "createConfiguration": {
                             "description": "Create Configuration",
                             "type": "boolean"
@@ -1854,18 +1862,7 @@
                                 },
                                 "matchConditions": {
                                     "description": "[MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)",
-                                    "type": "array",
-                                    "items": {
-                                        "type": "object",
-                                        "properties": {
-                                            "expression": {
-                                                "type": "string"
-                                            },
-                                            "name": {
-                                                "type": "string"
-                                            }
-                                        }
-                                    }
+                                    "type": "array"
                                 },
                                 "matchPolicy": {
                                     "description": "[MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)",

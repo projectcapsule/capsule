@@ -22,7 +22,8 @@ import (
 // getNamespaceTenant returns namespace owner tenant.
 func GetNamespaceTenant(
 	ctx context.Context,
-	client client.Client,
+	client client.Reader,
+	cache client.Client,
 	ns *corev1.Namespace,
 	req admission.Request,
 	cfg configuration.Configuration,
@@ -39,7 +40,7 @@ func GetNamespaceTenant(
 		return tnt, nil
 	}
 
-	tnts, err := tenant.GetTenantByUserInfo(ctx, client, cfg, ns, req.UserInfo.Username, req.UserInfo.Groups)
+	tnts, err := tenant.GetTenantByUserInfo(ctx, cache, cfg, ns, req.UserInfo.Username, req.UserInfo.Groups)
 	if err != nil {
 		response := admission.Errored(http.StatusBadRequest, err)
 

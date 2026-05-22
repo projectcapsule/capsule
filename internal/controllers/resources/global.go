@@ -145,6 +145,7 @@ func (r *globalResourceController) Reconcile(ctx context.Context, request reconc
 				return
 			}
 
+			res = reconcile.Result{}
 			err = gherrors.Wrap(e, "failed to patch GlobalTenantResource")
 
 			return
@@ -154,30 +155,33 @@ func (r *globalResourceController) Reconcile(ctx context.Context, request reconc
 		err = nil
 	}()
 
-	if *tntResource.Spec.Cordoned {
-		log.V(5).Info("global tenant resource cordoned")
+	// On Deletion these checks are skipped
+	if tntResource.DeletionTimestamp.IsZero() {
+		if *tntResource.Spec.Cordoned {
+			log.V(5).Info("global tenant resource cordoned")
 
-		return reconcile.Result{}, nil
-	}
-
-	for _, dep := range tntResource.Spec.DependsOn {
-		d := &capsulev1beta2.GlobalTenantResource{}
-
-		if getErr := r.client.Get(ctx, types.NamespacedName{Name: dep.Name.String()}, d); getErr != nil {
-			if apierrors.IsNotFound(getErr) {
-				statusErr = fmt.Errorf("dependency %s not found", dep.Name)
-			} else {
-				statusErr = getErr
-			}
-
-			return requeue, nil
+			return reconcile.Result{}, nil
 		}
 
-		stat := d.Status.Conditions.GetConditionByType(meta.ReadyCondition)
-		if stat.Status != metav1.ConditionTrue {
-			statusErr = fmt.Errorf("dependency %s not ready", dep.Name)
+		for _, dep := range tntResource.Spec.DependsOn {
+			d := &capsulev1beta2.GlobalTenantResource{}
 
-			return requeue, nil
+			if getErr := r.client.Get(ctx, types.NamespacedName{Name: dep.Name.String()}, d); getErr != nil {
+				if apierrors.IsNotFound(getErr) {
+					statusErr = fmt.Errorf("dependency %s not found", dep.Name)
+				} else {
+					statusErr = getErr
+				}
+
+				return requeue, nil
+			}
+
+			stat := d.Status.Conditions.GetConditionByType(meta.ReadyCondition)
+			if stat.Status != metav1.ConditionTrue {
+				statusErr = fmt.Errorf("dependency %s not ready", dep.Name)
+
+				return requeue, nil
+			}
 		}
 	}
 
@@ -620,6 +624,10 @@ func (r *globalResourceController) updateStatus(ctx context.Context, instance *c
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
 		latest := &capsulev1beta2.GlobalTenantResource{}
 		if err = r.client.Get(ctx, types.NamespacedName{Name: instance.GetName()}, latest); err != nil {
+			if apierrors.IsNotFound(err) {
+				return nil
+			}
+
 			return err
 		}
 

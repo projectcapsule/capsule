@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/api/rbac"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -22,10 +23,13 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 )
 
-var _ = Describe("creating namespaces within a Tenant with resources", Label("tenant", "managed"), func() {
+var _ = Describe("creating namespaces within a Tenant with resources", Ordered, Label("tenant", "managed"), func() {
 	tnt := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "tenant-managed-resources",
+			Name: "e2e-tenant-managed-resources",
+			Labels: map[string]string{
+				"env": "e2e",
+			},
 		},
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: rbac.OwnerListSpec{
@@ -163,11 +167,16 @@ var _ = Describe("creating namespaces within a Tenant with resources", Label("te
 		EventuallyCreation(func() error {
 			return k8sClient.Create(context.TODO(), tnt)
 		}).Should(Succeed())
+
+		TenantReady(tnt, metav1.ConditionTrue, defaultTimeoutInterval)
+
 		By("creating the Namespaces", func() {
 			for _, i := range nsl {
-				ns := NewNamespace(i)
+				ns := NewNamespace(i, map[string]string{
+					meta.TenantLabel: tnt.GetName(),
+				})
 				NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
-				TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
+				NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
 			}
 		})
 	})

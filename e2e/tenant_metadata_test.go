@@ -24,12 +24,13 @@ func getLabels(tnt capsulev1beta2.Tenant) (map[string]string, error) {
 	return current.GetLabels(), nil
 }
 
-var _ = Describe("adding metadata to a Tenant", Label("tenant"), func() {
+var _ = Describe("adding metadata to a Tenant", Ordered, Label("tenant"), func() {
 	tnt := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "tenant-metadata",
+			Name: "e2e-tenant-metadata",
 			Labels: map[string]string{
 				"custom-label": "test",
+				"env":          "e2e",
 			},
 		},
 		Spec: capsulev1beta2.TenantSpec{
@@ -49,6 +50,8 @@ var _ = Describe("adding metadata to a Tenant", Label("tenant"), func() {
 		EventuallyCreation(func() error {
 			return k8sClient.Create(context.TODO(), tnt)
 		}).Should(Succeed())
+
+		TenantReady(tnt, metav1.ConditionTrue, defaultTimeoutInterval)
 	})
 
 	JustAfterEach(func() {
@@ -58,7 +61,7 @@ var _ = Describe("adding metadata to a Tenant", Label("tenant"), func() {
 	It("Should ensure label metadata", func() {
 		By("Default labels", func() {
 			currentlabels, _ := getLabels(*tnt)
-			Expect(currentlabels["kubernetes.io/metadata.name"]).To(Equal("tenant-metadata"))
+			Expect(currentlabels["kubernetes.io/metadata.name"]).To(Equal(tnt.GetName()))
 			Expect(currentlabels["custom-label"]).To(Equal("test"))
 		})
 		By("Disallow name overwrite", func() {

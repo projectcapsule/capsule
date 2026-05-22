@@ -25,6 +25,7 @@ func RemainingNamespaceHandler() handlers.TypedHandler[*capsulev1beta2.Tenant] {
 
 func (h *remainingNamespaceHandler) OnCreate(
 	client.Client,
+	client.Reader,
 	*capsulev1beta2.Tenant,
 	admission.Decoder,
 	events.EventRecorder,
@@ -37,7 +38,8 @@ func (h *remainingNamespaceHandler) OnCreate(
 // This happens when a tenant has not yet reconciled it's namespaces but is deleted
 // and in the meantime a new namespace was created referencing the same tenant.
 func (h *remainingNamespaceHandler) OnDelete(
-	c client.Client,
+	_ client.Client,
+	reader client.Reader,
 	tnt *capsulev1beta2.Tenant,
 	_ admission.Decoder,
 	_ events.EventRecorder,
@@ -45,7 +47,7 @@ func (h *remainingNamespaceHandler) OnDelete(
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		list := &corev1.NamespaceList{}
 
-		err := c.List(ctx, list, client.MatchingFields{namespaceindex.OwnerReferenceIndex: tnt.GetName()})
+		err := reader.List(ctx, list, client.MatchingFields{namespaceindex.OwnerReferenceIndex: tnt.GetName()})
 		if err != nil {
 			return ad.ErroredResponse(err)
 		}
@@ -71,7 +73,14 @@ func (h *remainingNamespaceHandler) OnDelete(
 	}
 }
 
-func (h *remainingNamespaceHandler) OnUpdate(client.Client, *capsulev1beta2.Tenant, *capsulev1beta2.Tenant, admission.Decoder, events.EventRecorder) handlers.Func {
+func (h *remainingNamespaceHandler) OnUpdate(
+	client.Client,
+	client.Reader,
+	*capsulev1beta2.Tenant,
+	*capsulev1beta2.Tenant,
+	admission.Decoder,
+	events.EventRecorder,
+) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}

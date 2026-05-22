@@ -16,14 +16,18 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/api/rbac"
 	"github.com/projectcapsule/capsule/pkg/utils"
 )
 
-var _ = Describe("when handling Cluster scoped Ingress hostnames collision", Label("ingress"), func() {
+var _ = Describe("when handling Cluster scoped Ingress hostnames collision", Ordered, Label("tenant", "networking", "ingress"), func() {
 	tnt1 := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "hostnames-collision-cluster-one",
+			Name: "e2e-hostnames-collision-one",
+			Labels: map[string]string{
+				"env": "e2e",
+			},
 		},
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: rbac.OwnerListSpec{
@@ -43,7 +47,10 @@ var _ = Describe("when handling Cluster scoped Ingress hostnames collision", Lab
 	}
 	tnt2 := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "hostnames-collision-cluster-two",
+			Name: "e2e-hostnames-collision-two",
+			Labels: map[string]string{
+				"env": "e2e",
+			},
 		},
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: rbac.OwnerListSpec{
@@ -135,12 +142,14 @@ var _ = Describe("when handling Cluster scoped Ingress hostnames collision", Lab
 
 			return k8sClient.Create(context.TODO(), tnt1)
 		}).Should(Succeed())
+		TenantReady(tnt1, metav1.ConditionTrue, defaultTimeoutInterval)
 
 		EventuallyCreation(func() error {
 			tnt2.ResourceVersion = ""
 
 			return k8sClient.Create(context.TODO(), tnt2)
 		}).Should(Succeed())
+		TenantReady(tnt2, metav1.ConditionTrue, defaultTimeoutInterval)
 	})
 
 	JustAfterEach(func() {
@@ -149,15 +158,19 @@ var _ = Describe("when handling Cluster scoped Ingress hostnames collision", Lab
 	})
 
 	It("should ensure Cluster scope for Ingress hostname and path collision", func() {
-		ns1 := NewNamespace("")
+		ns1 := NewNamespace("", map[string]string{
+			meta.TenantLabel: tnt1.GetName(),
+		})
 		cs1 := ownerClient(tnt1.Spec.Owners[0].UserSpec)
 		NamespaceCreation(ns1, tnt1.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
-		TenantNamespaceList(tnt1, defaultTimeoutInterval).Should(ContainElement(ns1.GetName()))
+		NamespaceIsPartOfTenant(tnt1, ns1).Should(Succeed())
 
-		ns2 := NewNamespace("")
+		ns2 := NewNamespace("", map[string]string{
+			meta.TenantLabel: tnt2.GetName(),
+		})
 		cs2 := ownerClient(tnt2.Spec.Owners[0].UserSpec)
 		NamespaceCreation(ns2, tnt2.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
-		TenantNamespaceList(tnt2, defaultTimeoutInterval).Should(ContainElement(ns2.GetName()))
+		NamespaceIsPartOfTenant(tnt2, ns2).Should(Succeed())
 
 		By("testing networking.k8s.io", func() {
 			if err := k8sClient.List(context.Background(), &networkingv1.IngressList{}); err != nil {

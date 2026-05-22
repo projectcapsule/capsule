@@ -7,6 +7,7 @@ import (
 	"context"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
@@ -65,6 +66,20 @@ func (r *Manager) ensureRuleStatus(
 
 		return controllerutil.SetControllerReference(tnt, rule, r.Scheme())
 	})
+	if err != nil {
+		if apierrors.HasStatusCause(err, corev1.NamespaceTerminatingCause) {
+			r.Log.V(4).Info(
+				"skipping RuleStatus sync because namespace is terminating",
+				"name", rule.Name,
+				"namespace", rule.Namespace,
+				"tenant", tnt.Name,
+			)
 
-	return err
+			return nil
+		}
+
+		return err
+	}
+
+	return nil
 }

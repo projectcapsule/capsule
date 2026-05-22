@@ -27,19 +27,34 @@ func PoolValidationHandler(log logr.Logger) handlers.Handler {
 	return &poolValidationHandler{log: log}
 }
 
-func (h *poolValidationHandler) OnCreate(client.Client, admission.Decoder, events.EventRecorder) handlers.Func {
+func (h *poolValidationHandler) OnCreate(
+	client.Client,
+	client.Reader,
+	admission.Decoder,
+	events.EventRecorder,
+) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (h *poolValidationHandler) OnDelete(client.Client, admission.Decoder, events.EventRecorder) handlers.Func {
+func (h *poolValidationHandler) OnDelete(
+	client.Client,
+	client.Reader,
+	admission.Decoder,
+	events.EventRecorder,
+) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (h *poolValidationHandler) OnUpdate(_ client.Client, decoder admission.Decoder, _ events.EventRecorder) handlers.Func {
+func (h *poolValidationHandler) OnUpdate(
+	_ client.Client,
+	_ client.Reader,
+	decoder admission.Decoder,
+	_ events.EventRecorder,
+) handlers.Func {
 	return func(_ context.Context, req admission.Request) *admission.Response {
 		oldPool := &capsulev1beta2.ResourcePool{}
 		if err := decoder.DecodeRaw(req.OldObject, oldPool); err != nil {

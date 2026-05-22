@@ -21,9 +21,9 @@ import (
 )
 
 type TypedHandlerWithTenantWithRuleset[T client.Object] interface {
-	OnCreate(c client.Client, obj T, decoder admission.Decoder, recorder events.EventRecorder, tnt *capsulev1beta2.Tenant, rule *api.NamespaceRuleBodyNamespace) Func
-	OnUpdate(c client.Client, obj T, old T, decoder admission.Decoder, recorder events.EventRecorder, tnt *capsulev1beta2.Tenant, rule *api.NamespaceRuleBodyNamespace) Func
-	OnDelete(c client.Client, obj T, decoder admission.Decoder, recorder events.EventRecorder, tnt *capsulev1beta2.Tenant, rule *api.NamespaceRuleBodyNamespace) Func
+	OnCreate(c client.Client, reader client.Reader, obj T, decoder admission.Decoder, recorder events.EventRecorder, tnt *capsulev1beta2.Tenant, rule *api.NamespaceRuleBodyNamespace) Func
+	OnUpdate(c client.Client, reader client.Reader, obj T, old T, decoder admission.Decoder, recorder events.EventRecorder, tnt *capsulev1beta2.Tenant, rule *api.NamespaceRuleBodyNamespace) Func
+	OnDelete(c client.Client, reader client.Reader, obj T, decoder admission.Decoder, recorder events.EventRecorder, tnt *capsulev1beta2.Tenant, rule *api.NamespaceRuleBodyNamespace) Func
 }
 
 type TypedTenantWithRulesetHandler[T client.Object] struct {
@@ -31,9 +31,9 @@ type TypedTenantWithRulesetHandler[T client.Object] struct {
 	Handlers []TypedHandlerWithTenantWithRuleset[T]
 }
 
-func (h *TypedTenantWithRulesetHandler[T]) OnCreate(c client.Client, decoder admission.Decoder, recorder events.EventRecorder) Func {
+func (h *TypedTenantWithRulesetHandler[T]) OnCreate(c client.Client, reader client.Reader, decoder admission.Decoder, recorder events.EventRecorder) Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		tnt, err := h.resolveTenant(ctx, c, req)
+		tnt, err := h.resolveTenant(ctx, reader, req)
 		if err != nil {
 			return ErroredResponse(err)
 		}
@@ -53,7 +53,7 @@ func (h *TypedTenantWithRulesetHandler[T]) OnCreate(c client.Client, decoder adm
 		}
 
 		for _, hndl := range h.Handlers {
-			if response := hndl.OnCreate(c, obj, decoder, recorder, tnt, rule)(ctx, req); response != nil {
+			if response := hndl.OnCreate(c, reader, obj, decoder, recorder, tnt, rule)(ctx, req); response != nil {
 				return response
 			}
 		}
@@ -62,7 +62,7 @@ func (h *TypedTenantWithRulesetHandler[T]) OnCreate(c client.Client, decoder adm
 	}
 }
 
-func (h *TypedTenantWithRulesetHandler[T]) OnUpdate(c client.Client, decoder admission.Decoder, recorder events.EventRecorder) Func {
+func (h *TypedTenantWithRulesetHandler[T]) OnUpdate(c client.Client, reader client.Reader, decoder admission.Decoder, recorder events.EventRecorder) Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		tnt, err := h.resolveTenant(ctx, c, req)
 		if err != nil {
@@ -89,7 +89,7 @@ func (h *TypedTenantWithRulesetHandler[T]) OnUpdate(c client.Client, decoder adm
 		}
 
 		for _, hndl := range h.Handlers {
-			if response := hndl.OnUpdate(c, oldObj, newObj, decoder, recorder, tnt, rule)(ctx, req); response != nil {
+			if response := hndl.OnUpdate(c, reader, oldObj, newObj, decoder, recorder, tnt, rule)(ctx, req); response != nil {
 				return response
 			}
 		}
@@ -98,9 +98,9 @@ func (h *TypedTenantWithRulesetHandler[T]) OnUpdate(c client.Client, decoder adm
 	}
 }
 
-func (h *TypedTenantWithRulesetHandler[T]) OnDelete(c client.Client, decoder admission.Decoder, recorder events.EventRecorder) Func {
+func (h *TypedTenantWithRulesetHandler[T]) OnDelete(c client.Client, reader client.Reader, decoder admission.Decoder, recorder events.EventRecorder) Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		tnt, err := h.resolveTenant(ctx, c, req)
+		tnt, err := h.resolveTenant(ctx, reader, req)
 		if err != nil {
 			return ErroredResponse(err)
 		}
@@ -120,7 +120,7 @@ func (h *TypedTenantWithRulesetHandler[T]) OnDelete(c client.Client, decoder adm
 		}
 
 		for _, hndl := range h.Handlers {
-			if response := hndl.OnDelete(c, obj, decoder, recorder, tnt, rule)(ctx, req); response != nil {
+			if response := hndl.OnDelete(c, reader, obj, decoder, recorder, tnt, rule)(ctx, req); response != nil {
 				return response
 			}
 		}
@@ -129,7 +129,7 @@ func (h *TypedTenantWithRulesetHandler[T]) OnDelete(c client.Client, decoder adm
 	}
 }
 
-func (h *TypedTenantWithRulesetHandler[T]) resolveTenant(ctx context.Context, c client.Client, req admission.Request) (*capsulev1beta2.Tenant, error) {
+func (h *TypedTenantWithRulesetHandler[T]) resolveTenant(ctx context.Context, c client.Reader, req admission.Request) (*capsulev1beta2.Tenant, error) {
 	if req.Namespace == "" {
 		return nil, nil
 	}
@@ -141,7 +141,7 @@ func (h *TypedTenantWithRulesetHandler[T]) resolveTenant(ctx context.Context, c 
 // If not yet present try to calculate it.
 func (h *TypedTenantWithRulesetHandler[T]) resolveRuleset(
 	ctx context.Context,
-	c client.Client,
+	c client.Reader,
 	req admission.Request,
 	namespace string,
 	tnt *capsulev1beta2.Tenant,

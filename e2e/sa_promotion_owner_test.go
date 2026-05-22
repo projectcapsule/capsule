@@ -22,12 +22,15 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api/rbac"
 )
 
-var _ = Describe("Promoting ServiceAccounts to Owners", Label("config", "permissions", "owners", "promotion"), func() {
+var _ = Describe("Promoting ServiceAccounts to Owners", Ordered, Label("config", "permissions", "owners", "promotion"), func() {
 	originConfig := &capsulev1beta2.CapsuleConfiguration{}
 
 	tnt := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "tenant-owner-promotion",
+			Name: "e2e-tenant-owner-promotion",
+			Labels: map[string]string{
+				"env": "e2e",
+			},
 		},
 		Spec: capsulev1beta2.TenantSpec{
 			Permissions: capsulev1beta2.Permissions{
@@ -68,6 +71,8 @@ var _ = Describe("Promoting ServiceAccounts to Owners", Label("config", "permiss
 			tnt.ResourceVersion = ""
 			return k8sClient.Create(context.TODO(), tnt)
 		}).Should(Succeed())
+
+		TenantReady(tnt, metav1.ConditionTrue, defaultTimeoutInterval)
 	})
 	JustAfterEach(func() {
 		EventuallyDeletion(tnt)
@@ -413,9 +418,7 @@ var _ = Describe("Promoting ServiceAccounts to Owners", Label("config", "permiss
 				meta.TenantLabel: tnt.GetName(),
 			})
 			Expect(saClient.Create(context.TODO(), newNs)).To(Succeed())
-
-			TenantNamespaceList(tnt, defaultTimeoutInterval).
-				Should(ContainElements(ns.GetName(), newNs.GetName()))
+			NamespaceIsPartOfTenant(tnt, newNs).Should(Succeed())
 
 			Eventually(func(g Gomega) {
 				// Deletion should eventually be forbidden / fail
@@ -470,7 +473,7 @@ var _ = Describe("Promoting ServiceAccounts to Owners", Label("config", "permiss
 			return saClient.Create(context.TODO(), secondNs)
 		}, defaultTimeoutInterval, defaultPollInterval).ShouldNot(Succeed())
 
-		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(Not(ContainElements(secondNs.GetName())))
+		NamespaceIsNotPartOfTenant(tnt, secondNs).Should(Succeed())
 
 		Expect(saClient.Delete(context.TODO(), secondNs)).To(Not(Succeed()))
 

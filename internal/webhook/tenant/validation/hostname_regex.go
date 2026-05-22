@@ -24,6 +24,7 @@ func HostnameRegexHandler() handlers.TypedHandler[*capsulev1beta2.Tenant] {
 
 func (h *hostnameRegexHandler) OnCreate(
 	_ client.Client,
+	_ client.Reader,
 	tnt *capsulev1beta2.Tenant,
 	decoder admission.Decoder,
 	_ events.EventRecorder,
@@ -37,7 +38,13 @@ func (h *hostnameRegexHandler) OnCreate(
 	}
 }
 
-func (h *hostnameRegexHandler) OnDelete(client.Client, *capsulev1beta2.Tenant, admission.Decoder, events.EventRecorder) handlers.Func {
+func (h *hostnameRegexHandler) OnDelete(
+	client.Client,
+	client.Reader,
+	*capsulev1beta2.Tenant,
+	admission.Decoder,
+	events.EventRecorder,
+) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
@@ -45,6 +52,7 @@ func (h *hostnameRegexHandler) OnDelete(client.Client, *capsulev1beta2.Tenant, a
 
 func (h *hostnameRegexHandler) OnUpdate(
 	_ client.Client,
+	_ client.Reader,
 	old *capsulev1beta2.Tenant,
 	tnt *capsulev1beta2.Tenant,
 	decoder admission.Decoder,

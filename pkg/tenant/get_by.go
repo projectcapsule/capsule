@@ -24,7 +24,7 @@ import (
 
 func TenantByStatusNamespace(
 	ctx context.Context,
-	c client.Reader,
+	c client.Client,
 	namespace string,
 ) (*capsulev1beta2.Tenant, error) {
 	var tntList capsulev1beta2.TenantList
@@ -174,7 +174,7 @@ func GetTenantByOwnerreferences(
 
 func GetTenantByUserInfo(
 	ctx context.Context,
-	c client.Reader,
+	c client.Client,
 	cfg configuration.Configuration,
 	ns *corev1.Namespace,
 	username string,

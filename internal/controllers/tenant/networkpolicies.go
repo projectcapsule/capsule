@@ -9,7 +9,9 @@ import (
 	"strconv"
 
 	"golang.org/x/sync/errgroup"
+	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
@@ -31,37 +33,26 @@ func (r *Manager) syncNetworkPolicies(ctx context.Context, tenant *capsulev1beta
 	group := new(errgroup.Group)
 
 	for _, ns := range tenant.Status.Spaces {
-		cleanup := false
 		namespace := ns.Name
 
 		cond := ns.Conditions.GetConditionByType(meta.TerminatingCondition)
 		if cond != nil {
 			if cond.Status == metav1.ConditionTrue {
-				cleanup = true
-			} else {
 				continue
 			}
 		}
 
 		group.Go(func() error {
-			return r.syncNetworkPolicy(ctx, tenant, namespace, keys, cleanup)
+			return r.syncNetworkPolicy(ctx, tenant, namespace, keys)
 		})
 	}
 
 	return group.Wait()
 }
 
-func (r *Manager) syncNetworkPolicy(ctx context.Context, tenant *capsulev1beta2.Tenant, namespace string, keys []string, cleanup bool) (err error) {
-	if cleanup {
-		keys = []string{}
-	}
-
+func (r *Manager) syncNetworkPolicy(ctx context.Context, tenant *capsulev1beta2.Tenant, namespace string, keys []string) (err error) {
 	if err = r.pruningResources(ctx, namespace, keys, &networkingv1.NetworkPolicy{}); err != nil {
 		return err
-	}
-
-	if cleanup {
-		return nil
 	}
 
 	//nolint:staticcheck
@@ -93,12 +84,22 @@ func (r *Manager) syncNetworkPolicy(ctx context.Context, tenant *capsulev1beta2.
 
 			return controllerutil.SetControllerReference(tenant, target, r.Scheme())
 		})
-
-		r.Log.V(4).Info("network Policy sync result: "+string(res), "name", target.Name, "namespace", target.Namespace)
-
 		if err != nil {
+			if apierrors.HasStatusCause(err, corev1.NamespaceTerminatingCause) {
+				r.Log.V(4).Info(
+					"skipping NetworkPolicy sync because namespace is terminating",
+					"name", target.Name,
+					"namespace", target.Namespace,
+					"tenant", tenant.Name,
+				)
+
+				return nil
+			}
+
 			return err
 		}
+
+		r.Log.V(4).Info("network Policy sync result: "+string(res), "name", target.Name, "namespace", target.Namespace)
 	}
 
 	return nil

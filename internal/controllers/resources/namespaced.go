@@ -40,7 +40,6 @@ import (
 	"github.com/projectcapsule/capsule/pkg/runtime/sanitize"
 	tpl "github.com/projectcapsule/capsule/pkg/template"
 	"github.com/projectcapsule/capsule/pkg/tenant"
-	"github.com/projectcapsule/capsule/pkg/utils"
 )
 
 type namespacedResourceController struct {
@@ -163,7 +162,7 @@ func (r *namespacedResourceController) Reconcile(ctx context.Context, request re
 
 	defer func() {
 		if uerr := r.updateStatus(ctx, tntResource, statusErr); uerr != nil {
-			if apierrors.IsNotFound(uerr) {
+			if apierrors.IsNotFound(uerr) || apierrors.HasStatusCause(uerr, corev1.NamespaceTerminatingCause) {
 				err = nil
 
 				return
@@ -177,12 +176,13 @@ func (r *namespacedResourceController) Reconcile(ctx context.Context, request re
 		r.metrics.RecordConditions(tntResource)
 
 		if e := patchHelper.Patch(ctx, tntResource); e != nil {
-			if ignored := utils.IgnoreWrappedNotFound(e); ignored == nil {
+			if apierrors.IsNotFound(err) || apierrors.HasStatusCause(err, corev1.NamespaceTerminatingCause) {
 				err = nil
 
 				return
 			}
 
+			res = reconcile.Result{}
 			err = gherrors.Wrap(e, "failed to patch TenantResource")
 
 			return
@@ -192,30 +192,33 @@ func (r *namespacedResourceController) Reconcile(ctx context.Context, request re
 		err = nil
 	}()
 
-	if *tntResource.Spec.Cordoned {
-		log.V(5).Info("tenant resource cordoned")
+	// On Deletion these checks are skipped
+	if tntResource.DeletionTimestamp.IsZero() {
+		if *tntResource.Spec.Cordoned {
+			log.V(5).Info("tenant resource cordoned")
 
-		return reconcile.Result{}, nil
-	}
-
-	for _, dep := range tntResource.Spec.DependsOn {
-		d := &capsulev1beta2.TenantResource{}
-
-		if getErr := r.client.Get(ctx, types.NamespacedName{Name: dep.Name.String(), Namespace: tntResource.GetNamespace()}, d); getErr != nil {
-			if apierrors.IsNotFound(getErr) {
-				statusErr = fmt.Errorf("dependency %s not found", dep.Name)
-			} else {
-				statusErr = getErr
-			}
-
-			return requeue, nil
+			return reconcile.Result{}, nil
 		}
 
-		stat := d.Status.Conditions.GetConditionByType(meta.ReadyCondition)
-		if stat.Status != metav1.ConditionTrue {
-			statusErr = fmt.Errorf("dependency %s not ready", dep.Name)
+		for _, dep := range tntResource.Spec.DependsOn {
+			d := &capsulev1beta2.TenantResource{}
 
-			return requeue, nil
+			if getErr := r.client.Get(ctx, types.NamespacedName{Name: dep.Name.String(), Namespace: tntResource.GetNamespace()}, d); getErr != nil {
+				if apierrors.IsNotFound(getErr) {
+					statusErr = fmt.Errorf("dependency %s not found", dep.Name)
+				} else {
+					statusErr = getErr
+				}
+
+				return requeue, nil
+			}
+
+			stat := d.Status.Conditions.GetConditionByType(meta.ReadyCondition)
+			if stat.Status != metav1.ConditionTrue {
+				statusErr = fmt.Errorf("dependency %s not ready", dep.Name)
+
+				return requeue, nil
+			}
 		}
 	}
 
@@ -256,6 +259,7 @@ func (r *namespacedResourceController) Reconcile(ctx context.Context, request re
 
 	return requeue, nil
 }
+
 func (r *namespacedResourceController) enqueueTenantResourcesForTenant(ctx context.Context, obj client.Object) []reconcile.Request {
 	tnt, ok := obj.(*capsulev1beta2.Tenant)
 	if !ok {
@@ -625,6 +629,10 @@ func (r *namespacedResourceController) updateStatus(ctx context.Context, instanc
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
 		latest := &capsulev1beta2.TenantResource{}
 		if err = r.client.Get(ctx, types.NamespacedName{Name: instance.GetName(), Namespace: instance.GetNamespace()}, latest); err != nil {
+			if apierrors.IsNotFound(err) {
+				return nil
+			}
+
 			return err
 		}
 

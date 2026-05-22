@@ -20,12 +20,15 @@ import (
 	"github.com/projectcapsule/capsule/pkg/utils"
 )
 
-var _ = Describe("modifying node labels and annotations", Label("config", "nodes"), func() {
+var _ = Describe("modifying node labels and annotations", Ordered, Label("config", "nodes"), func() {
 	originConfig := &capsulev1beta2.CapsuleConfiguration{}
 
 	tnt := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "tenant-node-user-metadata-forbidden",
+			Name: "e2e-node-user-metadata-forbidden",
+			Labels: map[string]string{
+				"env": "e2e",
+			},
 		},
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: rbac.OwnerListSpec{
@@ -86,6 +89,8 @@ var _ = Describe("modifying node labels and annotations", Label("config", "nodes
 			tnt.ResourceVersion = ""
 			return k8sClient.Create(context.TODO(), tnt)
 		}).Should(Succeed())
+		TenantReady(tnt, metav1.ConditionTrue, defaultTimeoutInterval)
+
 		EventuallyCreation(func() error {
 			cr.ResourceVersion = ""
 			return k8sClient.Create(context.TODO(), cr)

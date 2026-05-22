@@ -22,6 +22,7 @@ func ServiceAccountHandler() handlers.TypedHandler[*capsulev1beta2.CapsuleConfig
 
 func (h *serviceAccountHandler) OnCreate(
 	_ client.Client,
+	_ client.Reader,
 	cfg *capsulev1beta2.CapsuleConfiguration,
 	_ admission.Decoder,
 	_ events.EventRecorder,
@@ -31,7 +32,13 @@ func (h *serviceAccountHandler) OnCreate(
 	}
 }
 
-func (h *serviceAccountHandler) OnDelete(client.Client, *capsulev1beta2.CapsuleConfiguration, admission.Decoder, events.EventRecorder) handlers.Func {
+func (h *serviceAccountHandler) OnDelete(
+	client.Client,
+	client.Reader,
+	*capsulev1beta2.CapsuleConfiguration,
+	admission.Decoder,
+	events.EventRecorder,
+) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
@@ -39,6 +46,7 @@ func (h *serviceAccountHandler) OnDelete(client.Client, *capsulev1beta2.CapsuleC
 
 func (h *serviceAccountHandler) OnUpdate(
 	_ client.Client,
+	_ client.Reader,
 	cfg *capsulev1beta2.CapsuleConfiguration,
 	old *capsulev1beta2.CapsuleConfiguration,
 	_ admission.Decoder,

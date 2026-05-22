@@ -26,9 +26,10 @@ func PersistentVolumeMutatingVolume() handlers.TypedHandlerWithTenant[*corev1.Pe
 }
 
 func (h persistentVolumeMutatingVolume) OnCreate(
-	c client.Client,
+	_ client.Client,
+	_ client.Reader,
 	pvc *corev1.PersistentVolumeClaim,
-	decoder admission.Decoder,
+	_ admission.Decoder,
 	recorder events.EventRecorder,
 	tnt *capsulev1beta2.Tenant,
 ) handlers.Func {
@@ -57,10 +58,11 @@ func (h persistentVolumeMutatingVolume) OnCreate(
 }
 
 func (h persistentVolumeMutatingVolume) OnUpdate(
-	c client.Client,
+	_ client.Client,
+	_ client.Reader,
 	oldPVC *corev1.PersistentVolumeClaim,
 	newPVC *corev1.PersistentVolumeClaim,
-	decoder admission.Decoder,
+	_ admission.Decoder,
 	recorder events.EventRecorder,
 	tnt *capsulev1beta2.Tenant,
 ) handlers.Func {
@@ -94,6 +96,7 @@ func (h persistentVolumeMutatingVolume) OnUpdate(
 
 func (h persistentVolumeMutatingVolume) OnDelete(
 	client.Client,
+	client.Reader,
 	*corev1.PersistentVolumeClaim,
 	admission.Decoder,
 	events.EventRecorder,

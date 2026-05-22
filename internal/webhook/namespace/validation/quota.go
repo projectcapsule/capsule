@@ -25,19 +25,21 @@ func QuotaHandler() handlers.TypedHandlerWithTenant[*corev1.Namespace] {
 }
 
 func (h *quotaHandler) OnCreate(
-	c client.Client,
+	_ client.Client,
+	reader client.Reader,
 	ns *corev1.Namespace,
-	decoder admission.Decoder,
+	_ admission.Decoder,
 	recorder events.EventRecorder,
 	tnt *capsulev1beta2.Tenant,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		return h.handle(ctx, c, recorder, ns, tnt)
+		return h.handle(ctx, reader, recorder, ns, tnt)
 	}
 }
 
 func (h *quotaHandler) OnDelete(
 	client.Client,
+	client.Reader,
 	*corev1.Namespace,
 	admission.Decoder,
 	events.EventRecorder,
@@ -49,21 +51,22 @@ func (h *quotaHandler) OnDelete(
 }
 
 func (h *quotaHandler) OnUpdate(
-	c client.Client,
+	_ client.Client,
+	reader client.Reader,
 	ns *corev1.Namespace,
 	_ *corev1.Namespace,
-	decoder admission.Decoder,
+	_ admission.Decoder,
 	recorder events.EventRecorder,
 	tnt *capsulev1beta2.Tenant,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		return h.handle(ctx, c, recorder, ns, tnt)
+		return h.handle(ctx, reader, recorder, ns, tnt)
 	}
 }
 
 func (h *quotaHandler) handle(
 	ctx context.Context,
-	c client.Client,
+	c client.Reader,
 	recorder events.EventRecorder,
 	ns *corev1.Namespace,
 	tnt *capsulev1beta2.Tenant,

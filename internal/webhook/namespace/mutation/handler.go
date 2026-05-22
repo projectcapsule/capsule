@@ -31,7 +31,12 @@ type handler struct {
 	handlers []handlers.TypedHandler[*corev1.Namespace]
 }
 
-func (h *handler) OnCreate(c client.Client, decoder admission.Decoder, recorder events.EventRecorder) handlers.Func {
+func (h *handler) OnCreate(
+	c client.Client,
+	reader client.Reader,
+	decoder admission.Decoder,
+	recorder events.EventRecorder,
+) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		userIsAdmin := users.IsAdminUser(req, h.cfg.Administrators())
 
@@ -44,7 +49,7 @@ func (h *handler) OnCreate(c client.Client, decoder admission.Decoder, recorder 
 			return ad.ErroredResponse(err)
 		}
 
-		tnt, err := tenant.GetTenantByLabels(ctx, c, ns)
+		tnt, err := tenant.GetTenantByLabels(ctx, reader, ns)
 		if err != nil {
 			return ad.ErroredResponse(err)
 		}
@@ -54,7 +59,7 @@ func (h *handler) OnCreate(c client.Client, decoder admission.Decoder, recorder 
 		}
 
 		for _, hndl := range h.handlers {
-			if response := hndl.OnCreate(c, ns, decoder, recorder)(ctx, req); response != nil {
+			if response := hndl.OnCreate(c, reader, ns, decoder, recorder)(ctx, req); response != nil {
 				return response
 			}
 		}
@@ -63,13 +68,23 @@ func (h *handler) OnCreate(c client.Client, decoder admission.Decoder, recorder 
 	}
 }
 
-func (h *handler) OnDelete(c client.Client, decoder admission.Decoder, recorder events.EventRecorder) handlers.Func {
+func (h *handler) OnDelete(
+	client.Client,
+	client.Reader,
+	admission.Decoder,
+	events.EventRecorder,
+) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (h *handler) OnUpdate(c client.Client, decoder admission.Decoder, recorder events.EventRecorder) handlers.Func {
+func (h *handler) OnUpdate(
+	c client.Client,
+	reader client.Reader,
+	decoder admission.Decoder,
+	recorder events.EventRecorder,
+) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		userIsAdmin := users.IsAdminUser(req, h.cfg.Administrators())
 
@@ -87,7 +102,7 @@ func (h *handler) OnUpdate(c client.Client, decoder admission.Decoder, recorder 
 			return ad.ErroredResponse(err)
 		}
 
-		tnt, err := tenant.GetTenantByOwnerreferences(ctx, c, oldNs.OwnerReferences)
+		tnt, err := tenant.GetTenantByOwnerreferences(ctx, reader, oldNs.OwnerReferences)
 		if err != nil {
 			return ad.ErroredResponse(err)
 		}
@@ -95,7 +110,7 @@ func (h *handler) OnUpdate(c client.Client, decoder admission.Decoder, recorder 
 		//nolint:nestif
 		if userIsAdmin {
 			if tnt == nil {
-				tnt, err = tenant.GetTenantByLabels(ctx, c, ns)
+				tnt, err = tenant.GetTenantByLabels(ctx, reader, ns)
 				if err != nil {
 					return ad.ErroredResponse(err)
 				}
@@ -105,7 +120,7 @@ func (h *handler) OnUpdate(c client.Client, decoder admission.Decoder, recorder 
 				}
 			}
 		} else {
-			if owned := tenant.NamespaceIsOwned(ctx, c, h.cfg, oldNs, tnt, req.UserInfo); !owned {
+			if owned := tenant.NamespaceIsOwned(ctx, reader, h.cfg, oldNs, tnt, req.UserInfo); !owned {
 				if tnt != nil {
 					recorder.Eventf(oldNs, nil, corev1.EventTypeWarning, "NamespacePatch", evt.ActionValidationDenied, "Namespace %s can not be patched", oldNs.GetName())
 				}
@@ -117,7 +132,7 @@ func (h *handler) OnUpdate(c client.Client, decoder admission.Decoder, recorder 
 		}
 
 		for _, hndl := range h.handlers {
-			if response := hndl.OnUpdate(c, ns, oldNs, decoder, recorder)(ctx, req); response != nil {
+			if response := hndl.OnUpdate(c, reader, ns, oldNs, decoder, recorder)(ctx, req); response != nil {
 				return response
 			}
 		}

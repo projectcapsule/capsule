@@ -28,7 +28,12 @@ func DeviceClass() handlers.Handler {
 	return &deviceClass{}
 }
 
-func (h *deviceClass) OnCreate(c client.Client, decoder admission.Decoder, recorder events.EventRecorder) handlers.Func {
+func (h *deviceClass) OnCreate(
+	c client.Client,
+	reader client.Reader,
+	decoder admission.Decoder,
+	recorder events.EventRecorder,
+) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		switch res := req.Kind.Kind; res {
 		case "ResourceClaim":
@@ -51,13 +56,23 @@ func (h *deviceClass) OnCreate(c client.Client, decoder admission.Decoder, recor
 	}
 }
 
-func (h *deviceClass) OnDelete(client.Client, admission.Decoder, events.EventRecorder) handlers.Func {
+func (h *deviceClass) OnDelete(
+	client.Client,
+	client.Reader,
+	admission.Decoder,
+	events.EventRecorder,
+) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (h *deviceClass) OnUpdate(client.Client, admission.Decoder, events.EventRecorder) handlers.Func {
+func (h *deviceClass) OnUpdate(
+	client.Client,
+	client.Reader,
+	admission.Decoder,
+	events.EventRecorder,
+) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}

@@ -22,28 +22,39 @@ func CordoningHandler(configuration configuration.Configuration) handlers.Handle
 }
 
 func (h *cordoningHandler) OnCreate(
-	c client.Client,
+	_ client.Client,
+	_ client.Reader,
 	_ admission.Decoder,
 	_ events.EventRecorder,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		return h.cordonHandler(ctx, c, req)
+		return h.cordonHandler(req)
 	}
 }
 
-func (h *cordoningHandler) OnDelete(c client.Client, _ admission.Decoder, recorder events.EventRecorder) handlers.Func {
+func (h *cordoningHandler) OnDelete(
+	_ client.Client,
+	_ client.Reader,
+	_ admission.Decoder,
+	recorder events.EventRecorder,
+) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		return h.cordonHandler(ctx, c, req)
+		return h.cordonHandler(req)
 	}
 }
 
-func (h *cordoningHandler) OnUpdate(c client.Client, _ admission.Decoder, recorder events.EventRecorder) handlers.Func {
+func (h *cordoningHandler) OnUpdate(
+	_ client.Client,
+	_ client.Reader,
+	_ admission.Decoder,
+	recorder events.EventRecorder,
+) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		return h.cordonHandler(ctx, c, req)
+		return h.cordonHandler(req)
 	}
 }
 
-func (h *cordoningHandler) cordonHandler(ctx context.Context, c client.Client, req admission.Request) *admission.Response {
+func (h *cordoningHandler) cordonHandler(req admission.Request) *admission.Response {
 	msg := fmt.Sprintf("The current namespace '%s' is cordoned. The attempted operation %s for %s/%s/%s/%s is not permitted during cordoning status.", req.Namespace, req.Operation, req.RequestKind.Group, req.RequestKind.Version, req.RequestKind.Kind, req.Name)
 
 	response := admission.Denied(msg)

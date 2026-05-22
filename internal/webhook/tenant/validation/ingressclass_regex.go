@@ -24,6 +24,7 @@ func IngressClassRegexHandler() handlers.TypedHandler[*capsulev1beta2.Tenant] {
 
 func (h *ingressClassRegexHandler) OnCreate(
 	_ client.Client,
+	_ client.Reader,
 	tnt *capsulev1beta2.Tenant,
 	_ admission.Decoder,
 	_ events.EventRecorder,
@@ -39,6 +40,7 @@ func (h *ingressClassRegexHandler) OnCreate(
 
 func (h *ingressClassRegexHandler) OnDelete(
 	client.Client,
+	client.Reader,
 	*capsulev1beta2.Tenant,
 	admission.Decoder,
 	events.EventRecorder,
@@ -50,6 +52,7 @@ func (h *ingressClassRegexHandler) OnDelete(
 
 func (h *ingressClassRegexHandler) OnUpdate(
 	_ client.Client,
+	_ client.Reader,
 	tnt *capsulev1beta2.Tenant,
 	old *capsulev1beta2.Tenant,
 	decoder admission.Decoder,

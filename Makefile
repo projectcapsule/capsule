@@ -199,12 +199,13 @@ dev-setup:
 		--set "webhooks.service.url=$${WEBHOOK_URL}" \
 		--set "webhooks.service.caBundle=$${CA_BUNDLE}" \
 		--set 'webhooks.hooks.calculations.enabled=true' \
-		--set 'webhooks.hooks.calculations.rules[0].apiGroups[0]=*' \
-		--set 'webhooks.hooks.calculations.rules[0].apiVersions[0]=*' \
+		--set-string 'webhooks.hooks.calculations.rules[0].apiGroups[0]=' \
+		--set 'webhooks.hooks.calculations.rules[0].apiVersions[0]=v1' \
 		--set 'webhooks.hooks.calculations.rules[0].operations[0]=CREATE' \
 		--set 'webhooks.hooks.calculations.rules[0].operations[1]=UPDATE' \
 		--set 'webhooks.hooks.calculations.rules[0].operations[2]=DELETE' \
-		--set 'webhooks.hooks.calculations.rules[0].resources[0]=*' \
+		--set 'webhooks.hooks.calculations.rules[0].resources[0]=pods' \
+		--set 'webhooks.hooks.calculations.rules[0].resources[1]=persistentvolumeclaims' \
 		--set 'webhooks.hooks.calculations.rules[0].scope=Namespaced' \
 		capsule \
 		$(CHART)
@@ -464,16 +465,20 @@ e2e-install: helm-controller-version ko-build-all
 		--set "manager.image.tag=$(VERSION)" \
 		--set 'manager.livenessProbe.failureThreshold=10' \
 		--set 'manager.options.logLevel=debug' \
+		--set 'manager.options.workers=4' \
+		--set 'manager.options.clientConnectionQPS=800' \
+		--set 'manager.options.clientConnectionQPS=400' \
 		--set 'manager.rbac.minimal=true' \
 		--set 'webhooks.hooks.nodes.enabled=true' \
 		--set "webhooks.exclusive=true"\
 		--set 'webhooks.hooks.calculations.enabled=true' \
-		--set 'webhooks.hooks.calculations.rules[0].apiGroups[0]=*' \
-		--set 'webhooks.hooks.calculations.rules[0].apiVersions[0]=*' \
+		--set-string 'webhooks.hooks.calculations.rules[0].apiGroups[0]=' \
+		--set 'webhooks.hooks.calculations.rules[0].apiVersions[0]=v1' \
 		--set 'webhooks.hooks.calculations.rules[0].operations[0]=CREATE' \
 		--set 'webhooks.hooks.calculations.rules[0].operations[1]=UPDATE' \
 		--set 'webhooks.hooks.calculations.rules[0].operations[2]=DELETE' \
-		--set 'webhooks.hooks.calculations.rules[0].resources[0]=*' \
+		--set 'webhooks.hooks.calculations.rules[0].resources[0]=pods' \
+		--set 'webhooks.hooks.calculations.rules[0].resources[1]=persistentvolumeclaims' \
 		--set 'webhooks.hooks.calculations.rules[0].scope=Namespaced' \
 		capsule \
 		./charts/capsule
@@ -547,7 +552,12 @@ e2e-load-image-openshift: minc
 
 .PHONY: e2e-exec
 e2e-exec: ginkgo
-	$(GINKGO) -v -tags e2e $(FILTER) ./e2e
+	$(GINKGO) -v -p -tags e2e $(FILTER) --label-filter="!config" ./e2e
+	$(MAKE) e2e-exec-config
+
+.PHONY: e2e-exec-config
+e2e-exec-config: ginkgo
+	$(GINKGO) -v  -tags e2e $(FILTER) --label-filter="config" ./e2e
 
 .PHONY: e2e-destroy
 e2e-destroy: dev-destroy

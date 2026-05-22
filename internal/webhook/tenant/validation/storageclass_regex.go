@@ -24,6 +24,7 @@ func StorageClassRegexHandler() handlers.TypedHandler[*capsulev1beta2.Tenant] {
 
 func (h *storageClassRegexHandler) OnCreate(
 	_ client.Client,
+	_ client.Reader,
 	tnt *capsulev1beta2.Tenant,
 	decoder admission.Decoder,
 	_ events.EventRecorder,
@@ -39,6 +40,7 @@ func (h *storageClassRegexHandler) OnCreate(
 
 func (h *storageClassRegexHandler) OnDelete(
 	client.Client,
+	client.Reader,
 	*capsulev1beta2.Tenant,
 	admission.Decoder,
 	events.EventRecorder,
@@ -50,6 +52,7 @@ func (h *storageClassRegexHandler) OnDelete(
 
 func (h *storageClassRegexHandler) OnUpdate(
 	_ client.Client,
+	_ client.Reader,
 	tnt *capsulev1beta2.Tenant,
 	old *capsulev1beta2.Tenant,
 	_ admission.Decoder,

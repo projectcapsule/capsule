@@ -28,21 +28,36 @@ func Handler(cfg configuration.Configuration, version *version.Version) handlers
 	}
 }
 
-func (h *handler) OnCreate(client client.Client, decoder admission.Decoder, _ events.EventRecorder) handlers.Func {
+func (h *handler) OnCreate(
+	c client.Client,
+	_ client.Reader,
+	decoder admission.Decoder,
+	_ events.EventRecorder,
+) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		return h.mutate(ctx, req, client, decoder)
+		return h.mutate(ctx, req, c, decoder)
 	}
 }
 
-func (h *handler) OnDelete(client.Client, admission.Decoder, events.EventRecorder) handlers.Func {
+func (h *handler) OnDelete(
+	client.Client,
+	client.Reader,
+	admission.Decoder,
+	events.EventRecorder,
+) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (h *handler) OnUpdate(client client.Client, decoder admission.Decoder, _ events.EventRecorder) handlers.Func {
+func (h *handler) OnUpdate(
+	c client.Client,
+	_ client.Reader,
+	decoder admission.Decoder,
+	_ events.EventRecorder,
+) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		return h.mutate(ctx, req, client, decoder)
+		return h.mutate(ctx, req, c, decoder)
 	}
 }
 

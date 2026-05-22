@@ -6,6 +6,8 @@ package tenant
 import (
 	"context"
 
+	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/types"
@@ -171,12 +173,27 @@ func (r *Manager) pruningResources(ctx context.Context, ns string, keys []string
 	r.Log.V(4).Info("pruning objects with label selector " + selector.String())
 
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		return r.DeleteAllOf(ctx, obj, &client.DeleteAllOfOptions{
+		err := r.DeleteAllOf(ctx, obj, &client.DeleteAllOfOptions{
 			ListOptions: client.ListOptions{
 				LabelSelector: selector,
 				Namespace:     ns,
 			},
 			DeleteOptions: client.DeleteOptions{},
 		})
+		if err != nil {
+			if apierrors.IsNotFound(err) || apierrors.HasStatusCause(err, corev1.NamespaceTerminatingCause) {
+				r.Log.V(4).Info(
+					"skipping pruning because target namespace or object is gone/terminating",
+					"namespace", ns,
+					"labelSelector", selector.String(),
+				)
+
+				return nil
+			}
+
+			return err
+		}
+
+		return nil
 	})
 }

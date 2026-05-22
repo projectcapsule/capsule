@@ -28,7 +28,8 @@ func RuntimeClass() handlers.TypedHandlerWithTenantWithRuleset[*corev1.Pod] {
 }
 
 func (h *runtimeClass) OnCreate(
-	c client.Client,
+	_ client.Client,
+	reader client.Reader,
 	pod *corev1.Pod,
 	decoder admission.Decoder,
 	recorder events.EventRecorder,
@@ -36,12 +37,13 @@ func (h *runtimeClass) OnCreate(
 	_ *api.NamespaceRuleBodyNamespace,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		return h.validate(ctx, c, recorder, req, pod, tnt)
+		return h.validate(ctx, reader, recorder, req, pod, tnt)
 	}
 }
 
 func (h *runtimeClass) OnUpdate(
 	client.Client,
+	client.Reader,
 	*corev1.Pod,
 	*corev1.Pod,
 	admission.Decoder,
@@ -56,6 +58,7 @@ func (h *runtimeClass) OnUpdate(
 
 func (h *runtimeClass) OnDelete(
 	client.Client,
+	client.Reader,
 	*corev1.Pod,
 	admission.Decoder,
 	events.EventRecorder,
@@ -67,7 +70,7 @@ func (h *runtimeClass) OnDelete(
 	}
 }
 
-func (h *runtimeClass) class(ctx context.Context, c client.Client, name string) (client.Object, error) {
+func (h *runtimeClass) class(ctx context.Context, c client.Reader, name string) (client.Object, error) {
 	if len(name) == 0 {
 		return nil, nil
 	}
@@ -82,7 +85,7 @@ func (h *runtimeClass) class(ctx context.Context, c client.Client, name string) 
 
 func (h *runtimeClass) validate(
 	ctx context.Context,
-	c client.Client,
+	c client.Reader,
 	recorder events.EventRecorder,
 	req admission.Request,
 	pod *corev1.Pod,

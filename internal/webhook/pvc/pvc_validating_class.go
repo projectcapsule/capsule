@@ -27,7 +27,8 @@ func PersistentVolumeValidatingClass() handlers.TypedHandlerWithTenant[*corev1.P
 }
 
 func (h *persistentVolumeValidatingClass) OnCreate(
-	c client.Client,
+	_ client.Client,
+	reader client.Reader,
 	pvc *corev1.PersistentVolumeClaim,
 	decoder admission.Decoder,
 	recorder events.EventRecorder,
@@ -61,7 +62,7 @@ func (h *persistentVolumeValidatingClass) OnCreate(
 
 		// Verify if the StorageClass exists and matches the label selector/expression
 		if len(allowed.MatchExpressions) > 0 || len(allowed.MatchLabels) > 0 {
-			storageClassObj, err := utils.GetStorageClassByName(ctx, c, *storageClass)
+			storageClassObj, err := utils.GetStorageClassByName(ctx, reader, *storageClass)
 			if err != nil && !apierrors.IsNotFound(err) {
 				response := admission.Errored(http.StatusInternalServerError, err)
 
@@ -97,6 +98,7 @@ func (h *persistentVolumeValidatingClass) OnCreate(
 
 func (h *persistentVolumeValidatingClass) OnUpdate(
 	client.Client,
+	client.Reader,
 	*corev1.PersistentVolumeClaim,
 	*corev1.PersistentVolumeClaim,
 	admission.Decoder,
@@ -110,6 +112,7 @@ func (h *persistentVolumeValidatingClass) OnUpdate(
 
 func (h *persistentVolumeValidatingClass) OnDelete(
 	client.Client,
+	client.Reader,
 	*corev1.PersistentVolumeClaim,
 	admission.Decoder,
 	events.EventRecorder,

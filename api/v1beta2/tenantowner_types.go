@@ -26,7 +26,7 @@ type TenantOwnerStatus struct{}
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:scope=Cluster
+// +kubebuilder:resource:scope=Cluster,shortName=to
 
 // TenantOwner is the Schema for the tenantowners API.
 type TenantOwner struct {

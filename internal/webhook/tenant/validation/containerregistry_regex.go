@@ -24,6 +24,7 @@ func ContainerRegistryRegexHandler() handlers.TypedHandler[*capsulev1beta2.Tenan
 
 func (h *containerRegistryRegexHandler) OnCreate(
 	_ client.Client,
+	_ client.Reader,
 	tnt *capsulev1beta2.Tenant,
 	decoder admission.Decoder,
 	_ events.EventRecorder,
@@ -39,6 +40,7 @@ func (h *containerRegistryRegexHandler) OnCreate(
 
 func (h *containerRegistryRegexHandler) OnDelete(
 	client.Client,
+	client.Reader,
 	*capsulev1beta2.Tenant,
 	admission.Decoder,
 	events.EventRecorder,
@@ -50,6 +52,7 @@ func (h *containerRegistryRegexHandler) OnDelete(
 
 func (h *containerRegistryRegexHandler) OnUpdate(
 	_ client.Client,
+	_ client.Reader,
 	tnt *capsulev1beta2.Tenant,
 	old *capsulev1beta2.Tenant,
 	decoder admission.Decoder,

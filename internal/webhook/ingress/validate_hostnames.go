@@ -30,25 +30,46 @@ func Hostnames(configuration configuration.Configuration) handlers.Handler {
 	return &hostnames{configuration: configuration}
 }
 
-func (r *hostnames) OnCreate(c client.Client, decoder admission.Decoder, recorder events.EventRecorder) handlers.Func {
+func (r *hostnames) OnCreate(
+	c client.Client,
+	_ client.Reader,
+	decoder admission.Decoder,
+	recorder events.EventRecorder,
+) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		return r.validate(ctx, c, req, decoder, recorder)
 	}
 }
 
-func (r *hostnames) OnUpdate(c client.Client, decoder admission.Decoder, recorder events.EventRecorder) handlers.Func {
+func (r *hostnames) OnUpdate(
+	c client.Client,
+	_ client.Reader,
+	decoder admission.Decoder,
+	recorder events.EventRecorder,
+) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		return r.validate(ctx, c, req, decoder, recorder)
 	}
 }
 
-func (r *hostnames) OnDelete(client.Client, admission.Decoder, events.EventRecorder) handlers.Func {
+func (r *hostnames) OnDelete(
+	client.Client,
+	client.Reader,
+	admission.Decoder,
+	events.EventRecorder,
+) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (r *hostnames) validate(ctx context.Context, client client.Client, req admission.Request, decoder admission.Decoder, recorder events.EventRecorder) *admission.Response {
+func (r *hostnames) validate(
+	ctx context.Context,
+	c client.Client,
+	req admission.Request,
+	decoder admission.Decoder,
+	recorder events.EventRecorder,
+) *admission.Response {
 	ingress, err := FromRequest(req, decoder)
 	if err != nil {
 		return ad.ErroredResponse(err)
@@ -56,7 +77,7 @@ func (r *hostnames) validate(ctx context.Context, client client.Client, req admi
 
 	var tnt *capsulev1beta2.Tenant
 
-	tnt, err = TenantFromIngress(ctx, client, ingress)
+	tnt, err = TenantFromIngress(ctx, c, ingress)
 	if err != nil {
 		return ad.ErroredResponse(err)
 	}

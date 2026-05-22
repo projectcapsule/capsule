@@ -35,13 +35,14 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/internal/cache"
-	"github.com/projectcapsule/capsule/internal/controllers/utils"
+	cutils "github.com/projectcapsule/capsule/internal/controllers/utils"
 	"github.com/projectcapsule/capsule/internal/metrics"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	"github.com/projectcapsule/capsule/pkg/runtime/predicates"
 	"github.com/projectcapsule/capsule/pkg/runtime/quota"
 	"github.com/projectcapsule/capsule/pkg/runtime/selectors"
+	"github.com/projectcapsule/capsule/pkg/utils"
 )
 
 type clusterCustomQuotaClaimController struct {
@@ -56,7 +57,7 @@ type clusterCustomQuotaClaimController struct {
 	targetsCache  *cache.CompiledTargetsCache[string]
 }
 
-func (r *clusterCustomQuotaClaimController) SetupWithManager(mgr ctrl.Manager, cfg utils.ControllerOptions) error {
+func (r *clusterCustomQuotaClaimController) SetupWithManager(mgr ctrl.Manager, cfg cutils.ControllerOptions) error {
 	r.mapper = mgr.GetRESTMapper()
 
 	return ctrl.NewControllerManagedBy(mgr).
@@ -133,31 +134,42 @@ func (r *clusterCustomQuotaClaimController) Reconcile(ctx context.Context, reque
 	}
 
 	if err := r.ensureQuotaLedger(ctx, instance); err != nil {
+		if instance.DeletionTimestamp != nil || shouldIgnoreLedgerEnsureError(err) {
+			log.V(4).Info("skipping QuantityLedger ensure because CustomQuota or namespace is terminating",
+				"customQuota", request.NamespacedName.String(),
+				"error", err,
+			)
+
+			return reconcile.Result{}, nil
+		}
+
 		return reconcile.Result{}, err
 	}
 
 	reconcileErr := r.reconcile(ctx, log, instance)
 
-	if err := r.updateStatus(ctx, instance, reconcileErr); err != nil {
+	requeueAfter, ledgerErr := r.reconcileLedger(ctx, log, instance)
+
+	statusErr := errors.Join(reconcileErr, ledgerErr)
+
+	if err := r.updateStatus(ctx, instance, statusErr); err != nil {
 		return reconcile.Result{}, client.IgnoreNotFound(fmt.Errorf("cannot update status: %w", err))
 	}
 
+	r.emitMetrics(instance)
+
 	if err := patchHelper.Patch(ctx, instance); err != nil {
-		return reconcile.Result{}, client.IgnoreNotFound(fmt.Errorf("failed to patch claim: %w", err))
-	}
+		if ignored := utils.IgnoreWrappedNotFound(err); ignored == nil {
+			return reconcile.Result{}, nil
+		}
 
-	if reconcileErr != nil {
-		return reconcile.Result{}, reconcileErr
-	}
-
-	requeueAfter, ledgerErr := r.reconcileLedger(ctx, log, instance)
-	if ledgerErr != nil {
-		return reconcile.Result{}, ledgerErr
+		return reconcile.Result{}, fmt.Errorf("failed to patch: %w", err)
 	}
 
 	if requeueAfter != nil {
 		log.V(5).Info("ledger still has pending work, requeueing",
 			"customQuota", instance.Name,
+			"namespace", instance.Namespace,
 			"after", requeueAfter.String(),
 		)
 
@@ -580,6 +592,10 @@ func (r *clusterCustomQuotaClaimController) updateStatus(
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
 		latest := &capsulev1beta2.GlobalCustomQuota{}
 		if err = r.Get(ctx, types.NamespacedName{Name: instance.GetName()}, latest); err != nil {
+			if apierrors.IsNotFound(err) {
+				return nil
+			}
+
 			return err
 		}
 

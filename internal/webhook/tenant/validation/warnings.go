@@ -30,6 +30,7 @@ func WarningHandler(cfg configuration.Configuration) handlers.TypedHandler[*caps
 
 func (h *warningHandler) OnCreate(
 	_ client.Client,
+	_ client.Reader,
 	tnt *capsulev1beta2.Tenant,
 	_ admission.Decoder,
 	_ events.EventRecorder,
@@ -39,7 +40,13 @@ func (h *warningHandler) OnCreate(
 	}
 }
 
-func (h *warningHandler) OnDelete(client.Client, *capsulev1beta2.Tenant, admission.Decoder, events.EventRecorder) handlers.Func {
+func (h *warningHandler) OnDelete(
+	client.Client,
+	client.Reader,
+	*capsulev1beta2.Tenant,
+	admission.Decoder,
+	events.EventRecorder,
+) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
@@ -47,6 +54,7 @@ func (h *warningHandler) OnDelete(client.Client, *capsulev1beta2.Tenant, admissi
 
 func (h *warningHandler) OnUpdate(
 	_ client.Client,
+	_ client.Reader,
 	tnt *capsulev1beta2.Tenant,
 	old *capsulev1beta2.Tenant,
 	_ admission.Decoder,

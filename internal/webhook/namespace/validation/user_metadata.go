@@ -25,18 +25,21 @@ func UserMetadataHandler() handlers.TypedHandlerWithTenant[*corev1.Namespace] {
 }
 
 func (h *userMetadataHandler) OnCreate(
-	c client.Client,
+	_ client.Client,
+	_ client.Reader,
 	ns *corev1.Namespace,
-	decoder admission.Decoder,
+	_ admission.Decoder,
 	recorder events.EventRecorder,
 	tnt *capsulev1beta2.Tenant,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
+		ns.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("Namespace"))
+
 		if tnt.Spec.NamespaceOptions != nil {
 			err := api.ValidateForbidden(ns.Annotations, tnt.Spec.NamespaceOptions.ForbiddenAnnotations)
 			if err != nil {
 				err = errors.Wrap(err, "namespace annotations validation failed")
-				recorder.Eventf(ns, nil, corev1.EventTypeWarning, evt.ReasonForbiddenAnnotation, evt.ActionValidationDenied, err.Error())
+				recorder.Eventf(ns, ns, corev1.EventTypeWarning, evt.ReasonForbiddenAnnotation, evt.ActionValidationDenied, err.Error())
 				response := admission.Denied(err.Error())
 
 				return &response
@@ -45,7 +48,7 @@ func (h *userMetadataHandler) OnCreate(
 			err = api.ValidateForbidden(ns.Labels, tnt.Spec.NamespaceOptions.ForbiddenLabels)
 			if err != nil {
 				err = errors.Wrap(err, "namespace labels validation failed")
-				recorder.Eventf(ns, nil, corev1.EventTypeWarning, evt.ReasonForbiddenLabel, evt.ActionValidationDenied, err.Error())
+				recorder.Eventf(ns, ns, corev1.EventTypeWarning, evt.ReasonForbiddenLabel, evt.ActionValidationDenied, err.Error())
 				response := admission.Denied(err.Error())
 
 				return &response
@@ -57,10 +60,11 @@ func (h *userMetadataHandler) OnCreate(
 }
 
 func (h *userMetadataHandler) OnUpdate(
-	client client.Client,
+	_ client.Client,
+	_ client.Reader,
 	newNs *corev1.Namespace,
 	oldNs *corev1.Namespace,
-	decoder admission.Decoder,
+	_ admission.Decoder,
 	recorder events.EventRecorder,
 	tnt *capsulev1beta2.Tenant,
 ) handlers.Func {
@@ -70,7 +74,7 @@ func (h *userMetadataHandler) OnUpdate(
 			if !ok {
 				response := admission.Denied("the node-selector annotation is enforced, cannot be removed")
 
-				recorder.Eventf(oldNs, tnt, corev1.EventTypeWarning, "ForbiddenNodeSelectorDeletion", "Denied", string(response.Result.Reason))
+				recorder.Eventf(oldNs, oldNs, corev1.EventTypeWarning, "ForbiddenNodeSelectorDeletion", "Denied", string(response.Result.Reason))
 
 				return &response
 			}
@@ -78,7 +82,7 @@ func (h *userMetadataHandler) OnUpdate(
 			if v != oldNs.GetAnnotations()["scheduler.alpha.kubernetes.io/node-selector"] {
 				response := admission.Denied("the node-selector annotation is enforced, cannot be updated")
 
-				recorder.Eventf(oldNs, tnt, corev1.EventTypeWarning, "ForbiddenNodeSelectorUpdate", "Denied", string(response.Result.Reason))
+				recorder.Eventf(oldNs, oldNs, corev1.EventTypeWarning, "ForbiddenNodeSelectorUpdate", "Denied", string(response.Result.Reason))
 
 				return &response
 			}
@@ -128,7 +132,7 @@ func (h *userMetadataHandler) OnUpdate(
 			err := api.ValidateForbidden(annotations, tnt.Spec.NamespaceOptions.ForbiddenAnnotations)
 			if err != nil {
 				err = errors.Wrap(err, "namespace annotations validation failed")
-				recorder.Eventf(oldNs, nil, corev1.EventTypeWarning, evt.ReasonForbiddenAnnotation, evt.ActionValidationDenied, err.Error())
+				recorder.Eventf(oldNs, oldNs, corev1.EventTypeWarning, evt.ReasonForbiddenAnnotation, evt.ActionValidationDenied, err.Error())
 				response := admission.Denied(err.Error())
 
 				return &response
@@ -137,7 +141,7 @@ func (h *userMetadataHandler) OnUpdate(
 			err = api.ValidateForbidden(labels, tnt.Spec.NamespaceOptions.ForbiddenLabels)
 			if err != nil {
 				err = errors.Wrap(err, "namespace labels validation failed")
-				recorder.Eventf(oldNs, nil, corev1.EventTypeWarning, evt.ReasonForbiddenLabel, evt.ActionValidationDenied, err.Error())
+				recorder.Eventf(oldNs, oldNs, corev1.EventTypeWarning, evt.ReasonForbiddenLabel, evt.ActionValidationDenied, err.Error())
 				response := admission.Denied(err.Error())
 
 				return &response
@@ -150,6 +154,7 @@ func (h *userMetadataHandler) OnUpdate(
 
 func (h *userMetadataHandler) OnDelete(
 	client.Client,
+	client.Reader,
 	*corev1.Namespace,
 	admission.Decoder,
 	events.EventRecorder,

@@ -33,19 +33,34 @@ func UserMetadataHandler(configuration configuration.Configuration, ver *version
 	}
 }
 
-func (r *userMetadataHandler) OnCreate(client.Client, admission.Decoder, events.EventRecorder) handlers.Func {
+func (r *userMetadataHandler) OnCreate(
+	client.Client,
+	client.Reader,
+	admission.Decoder,
+	events.EventRecorder,
+) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (r *userMetadataHandler) OnDelete(client.Client, admission.Decoder, events.EventRecorder) handlers.Func {
+func (r *userMetadataHandler) OnDelete(
+	client.Client,
+	client.Reader,
+	admission.Decoder,
+	events.EventRecorder,
+) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (r *userMetadataHandler) OnUpdate(_ client.Client, decoder admission.Decoder, recorder events.EventRecorder) handlers.Func {
+func (r *userMetadataHandler) OnUpdate(
+	_ client.Client,
+	_ client.Reader,
+	decoder admission.Decoder,
+	recorder events.EventRecorder,
+) handlers.Func {
 	return func(_ context.Context, req admission.Request) *admission.Response {
 		nodeWebhookSupported, _ := caputils.NodeWebhookSupported(r.version)
 

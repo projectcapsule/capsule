@@ -26,7 +26,12 @@ func ManagedValidatingHandler(configuration configuration.Configuration) handler
 	}
 }
 
-func (h *managedValidatingHandler) OnCreate(c client.Client, decoder admission.Decoder, _ events.EventRecorder) handlers.Func {
+func (h *managedValidatingHandler) OnCreate(
+	c client.Client,
+	_ client.Reader,
+	decoder admission.Decoder,
+	_ events.EventRecorder,
+) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		if !users.IsCapsuleUser(ctx, c, h.configuration, req.UserInfo.Username, req.UserInfo.Groups) {
 			return nil
@@ -40,21 +45,31 @@ func (h *managedValidatingHandler) OnCreate(c client.Client, decoder admission.D
 	}
 }
 
-func (h *managedValidatingHandler) OnDelete(c client.Client, _ admission.Decoder, recorder events.EventRecorder) handlers.Func {
+func (h *managedValidatingHandler) OnDelete(
+	c client.Client,
+	_ client.Reader,
+	_ admission.Decoder,
+	recorder events.EventRecorder,
+) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		if users.IsCapsuleUser(ctx, c, h.configuration, req.UserInfo.Username, req.UserInfo.Groups) {
-			msg := fmt.Sprintf("The attempted operation %s for %s/%s/%s/%s/%s is not permitted for controller managed resources.", req.Operation, req.Namespace, req.RequestKind.Group, req.RequestKind.Version, req.RequestKind.Kind, req.Name)
-
-			response := admission.Denied(msg)
-
-			return &response
+		if !users.IsCapsuleUser(ctx, c, h.configuration, req.UserInfo.Username, req.UserInfo.Groups) {
+			return nil
 		}
 
-		return namespaceHasFinalizers(ctx, c, req.Namespace)
+		msg := fmt.Sprintf("The attempted operation %s for %s/%s/%s/%s/%s is not permitted for controller managed resources.", req.Operation, req.Namespace, req.RequestKind.Group, req.RequestKind.Version, req.RequestKind.Kind, req.Name)
+
+		response := admission.Denied(msg)
+
+		return &response
 	}
 }
 
-func (h *managedValidatingHandler) OnUpdate(c client.Client, _ admission.Decoder, recorder events.EventRecorder) handlers.Func {
+func (h *managedValidatingHandler) OnUpdate(
+	c client.Client,
+	_ client.Reader,
+	_ admission.Decoder,
+	recorder events.EventRecorder,
+) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		if !users.IsCapsuleUser(ctx, c, h.configuration, req.UserInfo.Username, req.UserInfo.Groups) {
 			return nil

@@ -31,9 +31,15 @@ func MetadataHandler(cfg configuration.Configuration) handlers.TypedHandler[*cor
 	}
 }
 
-func (h *metadataHandler) OnCreate(client client.Client, ns *corev1.Namespace, decoder admission.Decoder, recorder events.EventRecorder) handlers.Func {
+func (h *metadataHandler) OnCreate(
+	c client.Client,
+	reader client.Reader,
+	ns *corev1.Namespace,
+	decoder admission.Decoder,
+	recorder events.EventRecorder,
+) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		tnt, errResponse := utils.GetNamespaceTenant(ctx, client, ns, req, h.cfg, recorder)
+		tnt, errResponse := utils.GetNamespaceTenant(ctx, reader, c, ns, req, h.cfg, recorder)
 		if errResponse != nil {
 			return errResponse
 		}
@@ -74,15 +80,28 @@ func (h *metadataHandler) OnCreate(client client.Client, ns *corev1.Namespace, d
 	}
 }
 
-func (h *metadataHandler) OnDelete(client.Client, *corev1.Namespace, admission.Decoder, events.EventRecorder) handlers.Func {
+func (h *metadataHandler) OnDelete(
+	client.Client,
+	client.Reader,
+	*corev1.Namespace,
+	admission.Decoder,
+	events.EventRecorder,
+) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (h *metadataHandler) OnUpdate(c client.Client, newNs *corev1.Namespace, oldNs *corev1.Namespace, decoder admission.Decoder, recorder events.EventRecorder) handlers.Func {
+func (h *metadataHandler) OnUpdate(
+	c client.Client,
+	reader client.Reader,
+	newNs *corev1.Namespace,
+	oldNs *corev1.Namespace,
+	decoder admission.Decoder,
+	recorder events.EventRecorder,
+) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		tnt, errResponse := utils.GetNamespaceTenant(ctx, c, oldNs, req, h.cfg, recorder)
+		tnt, errResponse := utils.GetNamespaceTenant(ctx, reader, c, oldNs, req, h.cfg, recorder)
 		if errResponse != nil {
 			return errResponse
 		}

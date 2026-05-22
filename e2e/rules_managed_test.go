@@ -16,12 +16,17 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-var _ = Describe("NamespaceStatus objects", Label("tenant", "rules", "status"), func() {
+var _ = Describe("NamespaceStatus objects", Ordered, Label("tenant", "rules", "status"), func() {
 	ctx := context.Background()
 
 	// Two tenants, each with one owner (reuse your existing ownerClient/NamespaceCreation helpers)
 	tntA := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{Name: "nsstatus-a"},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "e2e-rule-status-a",
+			Labels: map[string]string{
+				"env": "e2e",
+			},
+		},
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: rbac.OwnerListSpec{
 				{
@@ -34,7 +39,12 @@ var _ = Describe("NamespaceStatus objects", Label("tenant", "rules", "status"), 
 	}
 
 	tntB := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{Name: "nsstatus-b"},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "e2e-rule-status-b",
+			Labels: map[string]string{
+				"env": "e2e",
+			},
+		},
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: rbac.OwnerListSpec{
 				{
@@ -59,18 +69,22 @@ var _ = Describe("NamespaceStatus objects", Label("tenant", "rules", "status"), 
 			return k8sClient.Create(ctx, tntA)
 		}).Should(Succeed())
 
+		TenantReady(tntA, metav1.ConditionTrue, defaultTimeoutInterval)
+
 		EventuallyCreation(func() error {
 			tntB.ResourceVersion = ""
 			return k8sClient.Create(ctx, tntB)
 		}).Should(Succeed())
 
-		nsA1 = NewNamespace("rule-status-ns1", map[string]string{
+		TenantReady(tntB, metav1.ConditionTrue, defaultTimeoutInterval)
+
+		nsA1 = NewNamespace("e2e-rule-status-a-1", map[string]string{
 			meta.TenantLabel: tntA.GetName(),
 		})
-		nsA2 = NewNamespace("rule-status-ns2", map[string]string{
+		nsA2 = NewNamespace("e2e-rule-status-a-2", map[string]string{
 			meta.TenantLabel: tntA.GetName(),
 		})
-		nsB1 = NewNamespace("rule-status-ns3", map[string]string{
+		nsB1 = NewNamespace("e2e-rule-status-b-1", map[string]string{
 			meta.TenantLabel: tntB.GetName(),
 		})
 
@@ -79,8 +93,9 @@ var _ = Describe("NamespaceStatus objects", Label("tenant", "rules", "status"), 
 		NamespaceCreation(nsB1, tntB.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 
 		// Wait until tenants list their namespaces (optional but makes debugging easier)
-		TenantNamespaceList(tntA, defaultTimeoutInterval).Should(ContainElements(nsA1.GetName(), nsA2.GetName()))
-		TenantNamespaceList(tntB, defaultTimeoutInterval).Should(ContainElement(nsB1.GetName()))
+		NamespaceIsPartOfTenant(tntA, nsA1).Should(Succeed())
+		NamespaceIsPartOfTenant(tntA, nsA2).Should(Succeed())
+		NamespaceIsPartOfTenant(tntB, nsB1).Should(Succeed())
 	})
 
 	JustAfterEach(func() {

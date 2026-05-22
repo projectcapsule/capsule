@@ -16,14 +16,18 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/api/rbac"
 	"github.com/projectcapsule/capsule/pkg/utils"
 )
 
-var _ = Describe("when Tenant handles Ingress hostnames", Label("ingress"), func() {
+var _ = Describe("when Tenant handles Ingress hostnames", Ordered, Label("tenant", "networking", "ingress"), func() {
 	tnt := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "ingress-hostnames",
+			Name: "e2e-ingress-hostnames",
+			Labels: map[string]string{
+				"env": "e2e",
+			},
 		},
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: rbac.OwnerListSpec{
@@ -119,6 +123,7 @@ var _ = Describe("when Tenant handles Ingress hostnames", Label("ingress"), func
 			tnt.ResourceVersion = ""
 			return k8sClient.Create(context.TODO(), tnt)
 		}).Should(Succeed())
+		TenantReady(tnt, metav1.ConditionTrue, defaultTimeoutInterval)
 	})
 
 	JustAfterEach(func() {
@@ -126,11 +131,13 @@ var _ = Describe("when Tenant handles Ingress hostnames", Label("ingress"), func
 	})
 
 	It("should block an empty hostname", func() {
-		ns := NewNamespace("")
+		ns := NewNamespace("", map[string]string{
+			meta.TenantLabel: tnt.GetName(),
+		})
 		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 
 		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
-		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
+		NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
 
 		By("testing networking.k8s.io", func() {
 			if err := k8sClient.List(context.Background(), &networkingv1.IngressList{}); err != nil {
@@ -148,11 +155,13 @@ var _ = Describe("when Tenant handles Ingress hostnames", Label("ingress"), func
 	})
 
 	It("should block a non allowed Hostname", func() {
-		ns := NewNamespace("")
+		ns := NewNamespace("", map[string]string{
+			meta.TenantLabel: tnt.GetName(),
+		})
 		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 
 		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
-		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
+		NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
 
 		By("testing networking.k8s.io", func() {
 			if err := k8sClient.List(context.Background(), &networkingv1.IngressList{}); err != nil {
@@ -170,11 +179,13 @@ var _ = Describe("when Tenant handles Ingress hostnames", Label("ingress"), func
 	})
 
 	It("should block a non allowed Hostname", func() {
-		ns := NewNamespace("")
+		ns := NewNamespace("", map[string]string{
+			meta.TenantLabel: tnt.GetName(),
+		})
 		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 
 		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
-		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
+		NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
 
 		By("testing extensions", func() {
 			if err := k8sClient.List(context.Background(), &extensionsv1beta1.IngressList{}); err != nil {
@@ -192,11 +203,13 @@ var _ = Describe("when Tenant handles Ingress hostnames", Label("ingress"), func
 	})
 
 	It("should allow Hostnames in list", func() {
-		ns := NewNamespace("")
+		ns := NewNamespace("", map[string]string{
+			meta.TenantLabel: tnt.GetName(),
+		})
 		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 
 		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
-		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
+		NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
 
 		By("testing networking.k8s.io", func() {
 			if err := k8sClient.List(context.Background(), &networkingv1.IngressList{}); err != nil {
@@ -216,11 +229,13 @@ var _ = Describe("when Tenant handles Ingress hostnames", Label("ingress"), func
 	})
 
 	It("should allow Hostnames in list", func() {
-		ns := NewNamespace("")
+		ns := NewNamespace("", map[string]string{
+			meta.TenantLabel: tnt.GetName(),
+		})
 		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 
 		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
-		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
+		NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
 
 		By("testing extensions", func() {
 			if err := k8sClient.List(context.Background(), &extensionsv1beta1.IngressList{}); err != nil {
@@ -240,11 +255,13 @@ var _ = Describe("when Tenant handles Ingress hostnames", Label("ingress"), func
 	})
 
 	It("should allow Hostnames in regex", func() {
-		ns := NewNamespace("")
+		ns := NewNamespace("", map[string]string{
+			meta.TenantLabel: tnt.GetName(),
+		})
 		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 
 		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
-		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
+		NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
 
 		By("testing networking.k8s.io", func() {
 			if err := k8sClient.List(context.Background(), &networkingv1.IngressList{}); err != nil {
@@ -264,11 +281,13 @@ var _ = Describe("when Tenant handles Ingress hostnames", Label("ingress"), func
 	})
 
 	It("should allow Hostnames in regex", func() {
-		ns := NewNamespace("")
+		ns := NewNamespace("", map[string]string{
+			meta.TenantLabel: tnt.GetName(),
+		})
 		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 
 		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
-		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
+		NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
 
 		By("testing extensions", func() {
 			if err := k8sClient.List(context.Background(), &extensionsv1beta1.IngressList{}); err != nil {

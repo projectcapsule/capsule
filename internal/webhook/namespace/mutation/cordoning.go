@@ -32,33 +32,46 @@ func CordoningLabelHandler(cfg configuration.Configuration) handlers.TypedHandle
 	}
 }
 
-func (h *cordoningLabelHandler) OnCreate(client.Client, *corev1.Namespace, admission.Decoder, events.EventRecorder) handlers.Func {
+func (h *cordoningLabelHandler) OnCreate(
+	client.Client,
+	client.Reader,
+	*corev1.Namespace,
+	admission.Decoder,
+	events.EventRecorder,
+) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (h *cordoningLabelHandler) OnDelete(client.Client, *corev1.Namespace, admission.Decoder, events.EventRecorder) handlers.Func {
+func (h *cordoningLabelHandler) OnDelete(
+	client.Client,
+	client.Reader,
+	*corev1.Namespace,
+	admission.Decoder,
+	events.EventRecorder,
+) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
 func (h *cordoningLabelHandler) OnUpdate(
-	c client.Client,
+	_ client.Client,
+	reader client.Reader,
 	ns *corev1.Namespace,
 	old *corev1.Namespace,
 	decoder admission.Decoder,
 	_ events.EventRecorder,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		return h.handle(ctx, c, req, ns)
+		return h.handle(ctx, reader, req, ns)
 	}
 }
 
 func (h *cordoningLabelHandler) handle(
 	ctx context.Context,
-	c client.Client,
+	c client.Reader,
 	req admission.Request,
 	ns *corev1.Namespace,
 ) *admission.Response {

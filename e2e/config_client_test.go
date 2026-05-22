@@ -16,7 +16,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 )
 
-var _ = Describe("CapsuleConfiguration - ServiceAccountClient", Label("config", "impersonation"), func() {
+var _ = Describe("CapsuleConfiguration - ServiceAccountClient", Ordered, Label("config", "impersonation"), func() {
 	originalConfig := &capsulev1beta2.CapsuleConfiguration{}
 
 	BeforeEach(func() {

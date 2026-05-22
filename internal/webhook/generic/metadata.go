@@ -26,25 +26,45 @@ func TenantAssignmentHandler() handlers.Handler {
 	return &tenantAssignmentHandler{}
 }
 
-func (r *tenantAssignmentHandler) OnCreate(c client.Client, decoder admission.Decoder, _ events.EventRecorder) handlers.Func {
+func (r *tenantAssignmentHandler) OnCreate(
+	_ client.Client,
+	reader client.Reader,
+	decoder admission.Decoder,
+	_ events.EventRecorder,
+) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		return r.handle(ctx, c, decoder, req)
+		return r.handle(ctx, reader, decoder, req)
 	}
 }
 
-func (r *tenantAssignmentHandler) OnDelete(client.Client, admission.Decoder, events.EventRecorder) handlers.Func {
+func (r *tenantAssignmentHandler) OnDelete(
+	client.Client,
+	client.Reader,
+	admission.Decoder,
+	events.EventRecorder,
+) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (r *tenantAssignmentHandler) OnUpdate(c client.Client, decoder admission.Decoder, _ events.EventRecorder) handlers.Func {
+func (r *tenantAssignmentHandler) OnUpdate(
+	_ client.Client,
+	reader client.Reader,
+	decoder admission.Decoder,
+	_ events.EventRecorder,
+) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		return r.handle(ctx, c, decoder, req)
+		return r.handle(ctx, reader, decoder, req)
 	}
 }
 
-func (r *tenantAssignmentHandler) handle(ctx context.Context, c client.Client, decoder admission.Decoder, req admission.Request) *admission.Response {
+func (r *tenantAssignmentHandler) handle(
+	ctx context.Context,
+	c client.Reader,
+	decoder admission.Decoder,
+	req admission.Request,
+) *admission.Response {
 	if req.Namespace == "" {
 		return nil
 	}

@@ -25,10 +25,13 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 )
 
-var _ = Describe("changing Tenant managed Kubernetes resources", Label("tenant", "managed"), func() {
+var _ = Describe("changing Tenant managed Kubernetes resources", Ordered, Label("tenant", "managed"), func() {
 	tnt := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "tenant-resources-changes",
+			Name: "e2e-tenant-managed-changes",
+			Labels: map[string]string{
+				"env": "e2e",
+			},
 		},
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: rbac.OwnerListSpec{
@@ -167,17 +170,24 @@ var _ = Describe("changing Tenant managed Kubernetes resources", Label("tenant",
 			tnt.ResourceVersion = ""
 			return k8sClient.Create(context.TODO(), tnt)
 		}).Should(Succeed())
+
+		TenantReady(tnt, metav1.ConditionTrue, defaultTimeoutInterval)
+
 		By("creating the Namespaces", func() {
 			for _, i := range nsl {
-				ns := NewNamespace(i)
+				ns := NewNamespace(i, map[string]string{
+					meta.TenantLabel: tnt.GetName(),
+				})
 				NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
-				TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
+				NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
 			}
 		})
 	})
+
 	JustAfterEach(func() {
 		EventuallyDeletion(tnt)
 	})
+
 	It("should reapply the original resources upon third party change", func() {
 
 		sampleUser := "test@user.com"

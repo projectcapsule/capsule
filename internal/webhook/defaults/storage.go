@@ -20,7 +20,13 @@ import (
 	"github.com/projectcapsule/capsule/pkg/tenant"
 )
 
-func mutatePVCDefaults(ctx context.Context, req admission.Request, c client.Client, decoder admission.Decoder, namespace string) *admission.Response {
+func mutatePVCDefaults(
+	ctx context.Context,
+	req admission.Request,
+	c client.Client,
+	decoder admission.Decoder,
+	namespace string,
+) *admission.Response {
 	var err error
 
 	pvc := &corev1.PersistentVolumeClaim{}

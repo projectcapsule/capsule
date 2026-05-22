@@ -17,12 +17,15 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api/rbac"
 )
 
-var _ = Describe("Owners", Label("tenant", "permissions", "owners"), func() {
+var _ = Describe("Owners", Ordered, Label("config", "tenant", "permissions", "owners"), func() {
 	originConfig := &capsulev1beta2.CapsuleConfiguration{}
 
 	tnt1 := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "e2e-owners-1",
+			Labels: map[string]string{
+				"env": "e2e",
+			},
 		},
 		Spec: capsulev1beta2.TenantSpec{
 			Permissions: capsulev1beta2.Permissions{
@@ -71,6 +74,9 @@ var _ = Describe("Owners", Label("tenant", "permissions", "owners"), func() {
 	tnt2 := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "e2e-owners-2",
+			Labels: map[string]string{
+				"env": "e2e",
+			},
 		},
 		Spec: capsulev1beta2.TenantSpec{
 			Permissions: capsulev1beta2.Permissions{
@@ -232,6 +238,8 @@ var _ = Describe("Owners", Label("tenant", "permissions", "owners"), func() {
 
 				return k8sClient.Create(context.TODO(), tnt)
 			}).Should(Succeed())
+
+			TenantReady(tnt, metav1.ConditionTrue, defaultTimeoutInterval)
 		}
 
 		for _, tnt := range []*capsulev1beta2.TenantOwner{ownersInfra, ownersDevops, ownersCommon, userOwnersCommon, tnt1Owner} {
@@ -366,7 +374,7 @@ var _ = Describe("Owners", Label("tenant", "permissions", "owners"), func() {
 					meta.TenantLabel: tnt1.GetName(),
 				})
 				NamespaceCreation(ns, u, defaultTimeoutInterval).Should(Succeed())
-				TenantNamespaceList(tnt1, defaultTimeoutInterval).Should(ContainElements(ns.GetName()))
+				NamespaceIsPartOfTenant(tnt1, ns).Should(Succeed())
 			}
 		})
 
@@ -446,7 +454,7 @@ var _ = Describe("Owners", Label("tenant", "permissions", "owners"), func() {
 					meta.TenantLabel: tnt2.GetName(),
 				})
 				NamespaceCreation(ns, u, defaultTimeoutInterval).Should(Succeed())
-				TenantNamespaceList(tnt2, defaultTimeoutInterval).Should(ContainElements(ns.GetName()))
+				NamespaceIsPartOfTenant(tnt2, ns).Should(Succeed())
 			}
 		})
 

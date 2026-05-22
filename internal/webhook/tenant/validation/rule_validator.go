@@ -25,6 +25,7 @@ func RuleHandler() handlers.TypedHandler[*capsulev1beta2.Tenant] {
 
 func (h *RuleValidationHandler) OnCreate(
 	_ client.Client,
+	_ client.Reader,
 	tnt *capsulev1beta2.Tenant,
 	decoder admission.Decoder,
 	_ events.EventRecorder,
@@ -38,7 +39,13 @@ func (h *RuleValidationHandler) OnCreate(
 	}
 }
 
-func (h *RuleValidationHandler) OnDelete(client.Client, *capsulev1beta2.Tenant, admission.Decoder, events.EventRecorder) handlers.Func {
+func (h *RuleValidationHandler) OnDelete(
+	client.Client,
+	client.Reader,
+	*capsulev1beta2.Tenant,
+	admission.Decoder,
+	events.EventRecorder,
+) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
@@ -46,6 +53,7 @@ func (h *RuleValidationHandler) OnDelete(client.Client, *capsulev1beta2.Tenant, 
 
 func (h *RuleValidationHandler) OnUpdate(
 	_ client.Client,
+	_ client.Reader,
 	tnt *capsulev1beta2.Tenant,
 	old *capsulev1beta2.Tenant,
 	decoder admission.Decoder,

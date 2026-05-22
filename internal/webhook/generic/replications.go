@@ -28,25 +28,45 @@ func ReplicaHandler() handlers.Handler {
 	return &replicaHandler{}
 }
 
-func (h *replicaHandler) OnCreate(client.Client, admission.Decoder, events.EventRecorder) handlers.Func {
+func (h *replicaHandler) OnCreate(
+	client.Client,
+	client.Reader,
+	admission.Decoder,
+	events.EventRecorder,
+) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (h *replicaHandler) OnDelete(c client.Client, _ admission.Decoder, recorder events.EventRecorder) handlers.Func {
+func (h *replicaHandler) OnDelete(
+	_ client.Client,
+	reader client.Reader,
+	_ admission.Decoder,
+	recorder events.EventRecorder,
+) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (h *replicaHandler) OnUpdate(c client.Client, _ admission.Decoder, recorder events.EventRecorder) handlers.Func {
+func (h *replicaHandler) OnUpdate(
+	c client.Client,
+	_ client.Reader,
+	_ admission.Decoder,
+	recorder events.EventRecorder,
+) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		return h.handler(ctx, c, req, recorder)
 	}
 }
 
-func (h *replicaHandler) handler(ctx context.Context, c client.Reader, req admission.Request, recorder events.EventRecorder) *admission.Response {
+func (h *replicaHandler) handler(
+	ctx context.Context,
+	c client.Client,
+	req admission.Request,
+	recorder events.EventRecorder,
+) *admission.Response {
 	tnt, err := tenant.TenantByStatusNamespace(ctx, c, req.Namespace)
 	if err != nil {
 		return ad.ErroredResponse(err)

@@ -18,7 +18,7 @@ type GlobalCustomQuotaSpec struct {
 }
 
 // +kubebuilder:object:root=true
-// +kubebuilder:resource:scope=Cluster
+// +kubebuilder:resource:scope=Cluster,shortName=gcq
 // +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="Limit",type="string",JSONPath=".spec.limit",description="The total limit available"
 // +kubebuilder:printcolumn:name="Used",type="string",JSONPath=".status.usage.used",description="The total used amount"

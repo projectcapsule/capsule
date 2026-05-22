@@ -17,12 +17,15 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api/rbac"
 )
 
-var _ = Describe("Administrators", Label("namespace", "permissions", "administrators"), func() {
+var _ = Describe("Administrators", Ordered, Label("namespace", "permissions", "administrators", "config"), func() {
 	originConfig := &capsulev1beta2.CapsuleConfiguration{}
 
 	tnt1 := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "tnt-admins-1",
+			Name: "e2e-tnt-admins-1",
+			Labels: map[string]string{
+				"env": "e2e",
+			},
 		},
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: rbac.OwnerListSpec{
@@ -41,6 +44,9 @@ var _ = Describe("Administrators", Label("namespace", "permissions", "administra
 	tnt2 := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "tnt-admins-2",
+			Labels: map[string]string{
+				"env": "e2e",
+			},
 		},
 		Spec: capsulev1beta2.TenantSpec{
 			Owners: rbac.OwnerListSpec{
@@ -71,6 +77,7 @@ var _ = Describe("Administrators", Label("namespace", "permissions", "administra
 				return k8sClient.Create(context.TODO(), tnt)
 			}).Should(Succeed())
 
+			TenantReady(tnt, metav1.ConditionTrue, defaultTimeoutInterval)
 		}
 
 		ModifyCapsuleConfigurationOpts(func(configuration *capsulev1beta2.CapsuleConfiguration) {
@@ -121,8 +128,7 @@ var _ = Describe("Administrators", Label("namespace", "permissions", "administra
 			Expect(len(ns.OwnerReferences)).To(Equal(0))
 
 			PatchTenantLabelForNamespace(tnt1, ns, ownerClient(admin), defaultTimeoutInterval).Should(Succeed())
-
-			NamespaceIsPartOfTenant(tnt1, ns)
+			NamespaceIsPartOfTenant(tnt1, ns).Should(Succeed())
 		})
 	})
 
@@ -136,7 +142,7 @@ var _ = Describe("Administrators", Label("namespace", "permissions", "administra
 		})
 
 		By("verifing tenant state", func() {
-			TenantNamespaceList(tnt1, defaultTimeoutInterval).Should(ContainElements(ns1.GetName()))
+			NamespaceIsPartOfTenant(tnt1, ns1).Should(Succeed())
 
 			Eventually(func(g Gomega) {
 				t := &capsulev1beta2.Tenant{}
@@ -168,7 +174,7 @@ var _ = Describe("Administrators", Label("namespace", "permissions", "administra
 		})
 
 		By("verifing tenant state", func() {
-			TenantNamespaceList(tnt2, defaultTimeoutInterval).Should(ContainElements(ns2.GetName()))
+			NamespaceIsPartOfTenant(tnt2, ns2).Should(Succeed())
 
 			Eventually(func(g Gomega) {
 				t := &capsulev1beta2.Tenant{}

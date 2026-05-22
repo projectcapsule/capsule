@@ -28,13 +28,14 @@ func FreezeHandler(configuration configuration.Configuration) handlers.TypedHand
 
 func (h *freezedHandler) OnCreate(
 	c client.Client,
+	_ client.Reader,
 	ns *corev1.Namespace,
-	decoder admission.Decoder,
+	_ admission.Decoder,
 	recorder events.EventRecorder,
 	tnt *capsulev1beta2.Tenant,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		if tnt.Spec.Cordoned {
+		if tnt.Spec.Cordoned && users.IsCapsuleUser(ctx, c, h.cfg, req.UserInfo.Username, req.UserInfo.Groups) {
 			recorder.Eventf(ns, nil, corev1.EventTypeWarning, evt.ReasonCordoning, evt.ActionValidationDenied, "Namespace %s cannot be attached, the current Tenant is freezed", ns.GetName())
 
 			response := admission.Denied("the selected Tenant is freezed")
@@ -48,8 +49,9 @@ func (h *freezedHandler) OnCreate(
 
 func (h *freezedHandler) OnDelete(
 	c client.Client,
+	_ client.Reader,
 	ns *corev1.Namespace,
-	decoder admission.Decoder,
+	_ admission.Decoder,
 	recorder events.EventRecorder,
 	tnt *capsulev1beta2.Tenant,
 ) handlers.Func {
@@ -68,9 +70,10 @@ func (h *freezedHandler) OnDelete(
 
 func (h *freezedHandler) OnUpdate(
 	c client.Client,
+	_ client.Reader,
 	ns *corev1.Namespace,
 	old *corev1.Namespace,
-	decoder admission.Decoder,
+	_ admission.Decoder,
 	recorder events.EventRecorder,
 	tnt *capsulev1beta2.Tenant,
 ) handlers.Func {

@@ -20,7 +20,13 @@ import (
 	"github.com/projectcapsule/capsule/pkg/tenant"
 )
 
-func mutatePodDefaults(ctx context.Context, req admission.Request, c client.Client, decoder admission.Decoder, namespace string) *admission.Response {
+func mutatePodDefaults(
+	ctx context.Context,
+	req admission.Request,
+	c client.Client,
+	decoder admission.Decoder,
+	namespace string,
+) *admission.Response {
 	var pod corev1.Pod
 	if err := decoder.Decode(req, &pod); err != nil {
 		return ad.ErroredResponse(err)
@@ -79,7 +85,12 @@ func handleRuntimeClassDefault(allowed *api.DefaultAllowedListSpec, pod *corev1.
 	}
 }
 
-func handlePriorityClassDefault(ctx context.Context, c client.Client, allowed *api.DefaultAllowedListSpec, pod *corev1.Pod) (mutated bool, err error) {
+func handlePriorityClassDefault(
+	ctx context.Context,
+	c client.Reader,
+	allowed *api.DefaultAllowedListSpec,
+	pod *corev1.Pod,
+) (mutated bool, err error) {
 	if allowed == nil || allowed.Default == "" {
 		return false, nil
 	}

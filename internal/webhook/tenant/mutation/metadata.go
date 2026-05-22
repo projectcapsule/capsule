@@ -24,19 +24,34 @@ func MetaHandler() handlers.Handler {
 	return &metaHandler{}
 }
 
-func (h *metaHandler) OnCreate(_ client.Client, decoder admission.Decoder, _ events.EventRecorder) handlers.Func {
+func (h *metaHandler) OnCreate(
+	_ client.Client,
+	_ client.Reader,
+	decoder admission.Decoder,
+	_ events.EventRecorder,
+) handlers.Func {
 	return func(_ context.Context, req admission.Request) *admission.Response {
 		return h.handle(decoder, req)
 	}
 }
 
-func (h *metaHandler) OnUpdate(_ client.Client, decoder admission.Decoder, _ events.EventRecorder) handlers.Func {
+func (h *metaHandler) OnUpdate(
+	_ client.Client,
+	_ client.Reader,
+	decoder admission.Decoder,
+	_ events.EventRecorder,
+) handlers.Func {
 	return func(_ context.Context, req admission.Request) *admission.Response {
 		return h.handle(decoder, req)
 	}
 }
 
-func (h *metaHandler) OnDelete(client.Client, admission.Decoder, events.EventRecorder) handlers.Func {
+func (h *metaHandler) OnDelete(
+	client.Client,
+	client.Reader,
+	admission.Decoder,
+	events.EventRecorder,
+) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}

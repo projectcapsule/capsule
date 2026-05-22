@@ -30,7 +30,8 @@ func PrefixHandler(configuration configuration.Configuration) handlers.TypedHand
 }
 
 func (h *prefixHandler) OnCreate(
-	c client.Client,
+	_ client.Client,
+	_ client.Reader,
 	ns *corev1.Namespace,
 	decoder admission.Decoder,
 	recorder events.EventRecorder,
@@ -87,6 +88,7 @@ func (h *prefixHandler) OnCreate(
 
 func (h *prefixHandler) OnUpdate(
 	client.Client,
+	client.Reader,
 	*corev1.Namespace,
 	*corev1.Namespace,
 	admission.Decoder,
@@ -100,6 +102,7 @@ func (h *prefixHandler) OnUpdate(
 
 func (h *prefixHandler) OnDelete(
 	client.Client,
+	client.Reader,
 	*corev1.Namespace,
 	admission.Decoder,
 	events.EventRecorder,
