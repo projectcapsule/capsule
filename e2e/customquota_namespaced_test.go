@@ -450,11 +450,13 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Ordered, 
 			dep.ResourceVersion = ""
 			return k8sClient.Create(ctx, dep)
 		}).Should(Succeed())
+		ExpectPodsForDeployment(ctx, testNamespace, "cpu-requests", 2)
 
 		expectCustomQuotaUsedAndClaims(ctx, testNamespace, q.GetName(), "200m", 2)
 		expectLedgerSettled(ctx, testNamespace, q.GetName())
 
 		ScaleDeployment(ctx, testNamespace, "cpu-requests", 4)
+		ExpectPodsForDeployment(ctx, testNamespace, "cpu-requests", 4)
 		expectCustomQuotaUsedAndClaims(ctx, testNamespace, q.GetName(), "400m", 4)
 		expectLedgerSettled(ctx, testNamespace, q.GetName())
 
@@ -500,12 +502,15 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Ordered, 
 			return k8sClient.Create(ctx, dep)
 		}).Should(Succeed())
 
+		ExpectPodsForDeployment(ctx, testNamespace, "counted", 1)
 		expectCustomQuotaUsedAndClaims(ctx, testNamespace, q.GetName(), "1", 1)
 
 		ScaleDeployment(ctx, testNamespace, "counted", 3)
+		ExpectPodsForDeployment(ctx, testNamespace, "counted", 3)
 		expectCustomQuotaUsedAndClaims(ctx, testNamespace, q.GetName(), "3", 3)
 
 		ScaleDeployment(ctx, testNamespace, "counted", 2)
+		ExpectPodsForDeployment(ctx, testNamespace, "counted", 2)
 		expectCustomQuotaUsedAndClaims(ctx, testNamespace, q.GetName(), "2", 2)
 
 		expectLedgerSettled(ctx, testNamespace, q.GetName())
@@ -1567,11 +1572,13 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Ordered, 
 			dep.ResourceVersion = ""
 			return k8sClient.Create(ctx, dep)
 		}).Should(Succeed())
+		ExpectPodsForDeployment(ctx, testNamespace, "cq-scale", 1)
 
 		expectCustomQuotaUsedAndClaims(ctx, testNamespace, small.GetName(), "1", 1)
 		expectCustomQuotaUsedAndClaims(ctx, testNamespace, large.GetName(), "1", 1)
 
 		ScaleDeployment(ctx, testNamespace, "cq-scale", 3)
+		ExpectPodsForDeployment(ctx, testNamespace, "cq-scale", 3)
 		expectCustomQuotaUsedAndClaims(ctx, testNamespace, small.GetName(), "3", 3)
 		expectCustomQuotaUsedAndClaims(ctx, testNamespace, large.GetName(), "3", 3)
 
@@ -1586,6 +1593,7 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Ordered, 
 			g.Expect(obj.Status.Usage.Used.Cmp(resource.MustParse("3"))).To(Equal(0))
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 
+		ExpectPodsForDeployment(ctx, testNamespace, "cq-scale", 3)
 		expectCustomQuotaUsedAndClaims(ctx, testNamespace, large.GetName(), "3", 3)
 	})
 
@@ -2214,5 +2222,4 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Ordered, 
 			MatchError(ContainSubstring("is not array or slice and cannot be filtered")),
 		)
 	})
-
 })

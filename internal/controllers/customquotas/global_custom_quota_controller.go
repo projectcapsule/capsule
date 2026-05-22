@@ -15,10 +15,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	k8smeta "k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/util/retry"
@@ -40,7 +37,6 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	"github.com/projectcapsule/capsule/pkg/runtime/predicates"
-	"github.com/projectcapsule/capsule/pkg/runtime/quota"
 	"github.com/projectcapsule/capsule/pkg/runtime/selectors"
 	"github.com/projectcapsule/capsule/pkg/utils"
 )
@@ -228,25 +224,6 @@ func (r *clusterCustomQuotaClaimController) reconcile(
 	log logr.Logger,
 	instance *capsulev1beta2.GlobalCustomQuota,
 ) error {
-	instance.Status.Targets = []capsulev1beta2.CustomQuotaStatusTarget{}
-	instance.Status.Usage = capsulev1beta2.CustomQuotaStatusUsage{}
-	instance.Status.Claims = nil
-
-	for _, src := range instance.Spec.Sources {
-		kind := src.GroupVersionKind()
-
-		mapping, err := r.mapper.RESTMapping(kind.GroupKind(), kind.Version)
-		if err != nil {
-			return fmt.Errorf("failed to resolve REST mapping for %s: %w", kind.String(), err)
-		}
-
-		instance.Status.Targets = append(instance.Status.Targets, capsulev1beta2.CustomQuotaStatusTarget{
-			GroupVersionKind:            metav1.GroupVersionKind(kind),
-			CustomQuotaSpecSourceConfig: src.CustomQuotaSpecSourceConfig,
-			Scope:                       mapping.Scope.Name(),
-		})
-	}
-
 	var namespaces []string
 
 	var err error
@@ -266,138 +243,30 @@ func (r *clusterCustomQuotaClaimController) reconcile(
 
 	instance.Status.Namespaces = namespaces
 
-	var errs []error
+	result, err := reconcileQuotaUsage(ctx, quotaUsageReconcileInput{
+		Log: log,
 
-	seenClaims := make(map[types.UID]struct{})
-	itemsByGVK := make(map[schema.GroupVersionKind][]unstructured.Unstructured, len(instance.Status.Targets))
+		Client: r.Client,
+		Mapper: r.mapper,
 
-	targets, err := CompileTargets(r.jsonPathCache, instance.Status.Targets)
-	if err != nil {
-		return err
-	}
+		JSONPathCache: r.jsonPathCache,
 
-	r.targetsCache.Set(MakeGlobalCustomQuotaCacheKey(instance.GetName()), targets)
+		Sources:        instance.Spec.Sources,
+		ScopeSelectors: instance.Spec.ScopeSelectors,
 
-	for _, target := range targets {
-		gvk := schema.GroupVersionKind{
-			Group:   target.Group,
-			Version: target.Version,
-			Kind:    target.Kind,
-		}
+		Namespaces: namespaces,
 
-		items, ok := itemsByGVK[gvk]
-		if !ok {
-			items, err = getResourcesByGVK(ctx, gvk, r.Client, instance.Spec.ScopeSelectors, namespaces...)
-			if err != nil {
-				errs = append(errs, fmt.Errorf("list resources for %s: %w", gvk.String(), err))
+		RequireNamespacedTargets: false,
 
-				continue
-			}
+		CacheKey:     MakeGlobalCustomQuotaCacheKey(instance.GetName()),
+		TargetsCache: r.targetsCache,
+	}, instance.Spec.Limit)
 
-			itemsByGVK[gvk] = items
-		}
+	instance.Status.Targets = result.Targets
+	instance.Status.Usage = result.Usage
+	instance.Status.Claims = result.Claims
 
-		log.V(5).Info("listed resources for target",
-			"gvk", gvk.String(),
-			"count", len(items),
-			"namespaces", namespaces,
-			"scopeSelectors", instance.Spec.ScopeSelectors,
-		)
-
-		for _, item := range items {
-			matches, err := MatchesCompiledSelectorsWithFields(item, target.CompiledSelectors)
-			if err != nil {
-				errs = append(errs, fmt.Errorf(
-					"evaluate selectors for %s/%s (%s): %w",
-					item.GetNamespace(),
-					item.GetName(),
-					item.GetObjectKind().GroupVersionKind().String(),
-					err,
-				))
-
-				continue
-			}
-
-			if !matches {
-				continue
-			}
-
-			var usage resource.Quantity
-
-			switch target.Operation {
-			case quota.OpCount:
-				usage = *resource.NewQuantity(1, resource.DecimalSI)
-
-			case quota.OpAdd, quota.OpSub:
-				usage, err = quota.ParseQuantityFromUnstructured(item, target.CompiledPath)
-				if err != nil {
-					errs = append(errs, fmt.Errorf(
-						"get usage from %s/%s (%s) path %q op %q: %w",
-						item.GetNamespace(),
-						item.GetName(),
-						item.GetObjectKind().GroupVersionKind().String(),
-						target.Path,
-						target.Operation,
-						err,
-					))
-
-					continue
-				}
-
-			default:
-				errs = append(errs, fmt.Errorf(
-					"unsupported operation %q for %s/%s (%s)",
-					target.Operation,
-					item.GetNamespace(),
-					item.GetName(),
-					item.GetObjectKind().GroupVersionKind().String(),
-				))
-
-				continue
-			}
-
-			switch target.Operation {
-			case quota.OpSub:
-				usage.Neg()
-				instance.Status.Usage.Used.Add(usage)
-				quota.ClampQuantityToZero(&instance.Status.Usage.Used)
-			case quota.OpAdd, quota.OpCount:
-				instance.Status.Usage.Used.Add(usage)
-			}
-
-			uid := item.GetUID()
-			if _, exists := seenClaims[uid]; !exists {
-				seenClaims[uid] = struct{}{}
-
-				instance.Status.Claims = append(instance.Status.Claims, capsulev1beta2.CustomQuotaClaimItem{
-					GroupVersionKind: metav1.GroupVersionKind(item.GroupVersionKind()),
-					NamespacedObjectWithUIDReference: meta.NamespacedObjectWithUIDReference{
-						Name:      item.GetName(),
-						Namespace: meta.RFC1123SubdomainName(item.GetNamespace()),
-						UID:       uid,
-					},
-					Usage: usage,
-				})
-			}
-		}
-	}
-
-	if instance.Status.Usage.Used.Sign() < 0 {
-		instance.Status.Usage.Used = resource.MustParse("0")
-	}
-
-	instance.Status.Usage.Available = instance.Spec.Limit.DeepCopy()
-	instance.Status.Usage.Available.Sub(instance.Status.Usage.Used)
-
-	if instance.Status.Usage.Available.Sign() < 0 {
-		instance.Status.Usage.Available = resource.MustParse("0")
-	}
-
-	if len(errs) > 0 {
-		return errors.Join(errs...)
-	}
-
-	return nil
+	return err
 }
 
 //nolint:dupl
@@ -411,95 +280,14 @@ func (r *clusterCustomQuotaClaimController) reconcileLedger(
 		Namespace: configuration.ControllerNamespace(),
 	}
 
-	var requeueAfter *time.Duration
-
-	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		ledger := &capsulev1beta2.QuantityLedger{}
-		if err := r.Get(ctx, key, ledger); err != nil {
-			if apierrors.IsNotFound(err) {
-				return nil
-			}
-
-			return err
-		}
-
-		now := metav1.Now()
-		pendingDeleteTTL := 30 * time.Second
-
-		activeReservations := make([]capsulev1beta2.QuantityLedgerReservation, 0, len(ledger.Status.Reservations))
-
-		for _, res := range ledger.Status.Reservations {
-			materialized := reservationMaterializedLedger(res, instance.Status.Claims)
-			expired := res.ExpiresAt != nil && res.ExpiresAt.Before(&now)
-
-			log.V(5).Info("evaluating ledger reservation",
-				"ledger", key.String(),
-				"reservationID", res.ID,
-				"usage", res.Usage.String(),
-				"uid", string(res.ObjectRef.UID),
-				"group", res.ObjectRef.APIGroup,
-				"version", res.ObjectRef.APIVersion,
-				"kind", res.ObjectRef.Kind,
-				"namespace", res.ObjectRef.Namespace,
-				"name", res.ObjectRef.Name,
-				"materialized", materialized,
-				"expired", expired,
-			)
-
-			if materialized || expired {
-				continue
-			}
-
-			activeReservations = append(activeReservations, res)
-
-			if res.ExpiresAt != nil {
-				requeueAfter = minDurationPtr(requeueAfter, time.Until(res.ExpiresAt.Time))
-			}
-		}
-
-		activeDeletes := make([]capsulev1beta2.QuantityLedgerPendingDelete, 0, len(ledger.Status.PendingDeletes))
-
-		for _, pd := range ledger.Status.PendingDeletes {
-			stillPresent := pendingDeleteStillPresent(pd, instance.Status.Claims)
-			expired := now.Sub(pd.CreatedAt.Time) >= pendingDeleteTTL
-
-			log.V(5).Info("evaluating pending delete",
-				"ledger", key.String(),
-				"uid", string(pd.ObjectRef.UID),
-				"group", pd.ObjectRef.APIGroup,
-				"version", pd.ObjectRef.APIVersion,
-				"kind", pd.ObjectRef.Kind,
-				"namespace", pd.ObjectRef.Namespace,
-				"name", pd.ObjectRef.Name,
-				"stillPresent", stillPresent,
-				"expired", expired,
-			)
-
-			switch {
-			case stillPresent:
-				activeDeletes = append(activeDeletes, pd)
-				requeueAfter = minDurationPtr(requeueAfter, immediatePendingDeleteRequeue)
-			case expired:
-			default:
-			}
-		}
-
-		ledger.Status.Reservations = activeReservations
-		ledger.Status.PendingDeletes = activeDeletes
-
-		ledger.Status.Reserved = resource.MustParse("0")
-
-		for _, res := range activeReservations {
-			ledger.Status.Reserved.Add(res.Usage)
-		}
-
-		return r.Status().Update(ctx, ledger)
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	return requeueAfter, nil
+	return reconcileQuantityLedgerAllocation(
+		ctx,
+		r.Client,
+		log,
+		key,
+		instance.Status.Usage.Used.DeepCopy(),
+		instance.Status.Claims,
+	)
 }
 
 func (r *clusterCustomQuotaClaimController) ensureQuotaLedger(

@@ -21,8 +21,8 @@ type DynamicAdmissionConfig struct {
 	// Annotations added to the Admission Webhook
 	// +optional
 	Annotations map[string]string `json:"annotations,omitempty"`
-	// From the upstram struct
-	Client admissionregistrationv1.WebhookClientConfig `json:"client"`
+	//
+	Client *admissionregistrationv1.WebhookClientConfig `json:"client,omitzero"`
 }
 
 func DynamicClientWithPath(

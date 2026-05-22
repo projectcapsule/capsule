@@ -1027,15 +1027,18 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 			dep.ResourceVersion = ""
 			return k8sClient.Create(ctx, dep)
 		}).Should(Succeed())
+		ExpectPodsForDeployment(ctx, testNamespace, "mixed-scale", 1)
 
 		expectGlobalQuotaUsedAndClaims(ctx, gq.GetName(), "1", 1)
 		expectCustomQuotaUsedAndClaims(ctx, cq.GetNamespace(), cq.GetName(), "1", 1)
 
 		ScaleDeployment(ctx, testNamespace, "mixed-scale", 3)
+		ExpectPodsForDeployment(ctx, testNamespace, "mixed-scale", 3)
 		expectGlobalQuotaUsedAndClaims(ctx, gq.GetName(), "3", 3)
 		expectCustomQuotaUsedAndClaims(ctx, cq.GetNamespace(), cq.GetName(), "3", 3)
 
 		ScaleDeployment(ctx, testNamespace, "mixed-scale", 4)
+		ExpectPodsForDeployment(ctx, testNamespace, "mixed-scale", 3)
 
 		Eventually(func(g Gomega) {
 			obj := &capsulev1beta2.CustomQuota{}
@@ -1511,12 +1514,14 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 			dep.ResourceVersion = ""
 			return k8sClient.Create(ctx, dep)
 		}).Should(Succeed())
+		ExpectPodsForDeployment(ctx, testNamespace, "sub-scale", 2)
 
 		// 2 - 0.5 = 1.5
 		expectGlobalQuotaUsedAndClaims(ctx, q.GetName(), "1500m", 2)
 		expectLedgerSettled(ctx, ControllerNamespace, q.GetName())
 
 		ScaleDeployment(ctx, testNamespace, "sub-scale", 4)
+		ExpectPodsForDeployment(ctx, testNamespace, "sub-scale", 4)
 
 		// 4 - 1.0 = 3
 		expectGlobalQuotaUsedAndClaims(ctx, q.GetName(), "3", 4)
@@ -1868,11 +1873,13 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 			dep.ResourceVersion = ""
 			return k8sClient.Create(ctx, dep)
 		}).Should(Succeed())
+		ExpectPodsForDeployment(ctx, testNamespace, "cpu-requests", 2)
 
 		expectGlobalQuotaUsedAndClaims(ctx, q.GetName(), "200m", 2)
 		expectLedgerSettled(ctx, ControllerNamespace, q.GetName())
 
 		ScaleDeployment(ctx, testNamespace, "cpu-requests", 4)
+		ExpectPodsForDeployment(ctx, testNamespace, "cpu-requests", 4)
 		expectGlobalQuotaUsedAndClaims(ctx, q.GetName(), "400m", 4)
 		expectLedgerSettled(ctx, ControllerNamespace, q.GetName())
 
@@ -1998,13 +2005,16 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 			dep.ResourceVersion = ""
 			return k8sClient.Create(ctx, dep)
 		}).Should(Succeed())
+		ExpectPodsForDeployment(ctx, testNamespace, "counted", 1)
 
 		expectGlobalQuotaUsedAndClaims(ctx, q.GetName(), "1", 1)
 
 		ScaleDeployment(ctx, testNamespace, "counted", 3)
+		ExpectPodsForDeployment(ctx, testNamespace, "counted", 3)
 		expectGlobalQuotaUsedAndClaims(ctx, q.GetName(), "3", 3)
 
 		ScaleDeployment(ctx, testNamespace, "counted", 2)
+		ExpectPodsForDeployment(ctx, testNamespace, "counted", 2)
 		expectGlobalQuotaUsedAndClaims(ctx, q.GetName(), "2", 2)
 
 		expectLedgerSettled(ctx, ControllerNamespace, q.GetName())

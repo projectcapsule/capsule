@@ -98,6 +98,15 @@ spec:
               QuantityLedgerStatus contains the mutable coordination state used by admission
               and quota controllers.
             properties:
+              allocated:
+                anyOf:
+                - type: integer
+                - type: string
+                description: |-
+                  Allocated is the admission-owned total that has been accepted by the webhook.
+                  It must be updated only through optimistic concurrency on QuantityLedger.
+                pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                x-kubernetes-int-or-string: true
               conditions:
                 description: Conditions for the resource claim
                 items:

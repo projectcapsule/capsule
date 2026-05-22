@@ -8,7 +8,6 @@ import (
 	"sort"
 	"time"
 
-	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -30,7 +29,6 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
-	capevents "github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 	index "github.com/projectcapsule/capsule/pkg/runtime/indexers/customquota"
 	"github.com/projectcapsule/capsule/pkg/runtime/quota"
@@ -46,10 +44,10 @@ var customAdmissionBackoff = wait.Backoff{
 }
 
 var ledgerMutationBackoff = wait.Backoff{
-	Steps:    1,
-	Duration: 0,
-	Factor:   1,
-	Jitter:   0,
+	Steps:    8,
+	Duration: 10 * time.Millisecond,
+	Factor:   1.6,
+	Jitter:   0.2,
 }
 
 type objectCalculationHandler struct {
@@ -103,10 +101,6 @@ func (h *objectCalculationHandler) OnCreate(
 
 			evaluated, err := h.evaluateMatchedQuotas(ctx, u, matched)
 			if err != nil {
-				for _, mq := range matched {
-					recordQuotaCalculationEvent(ctx, c, recorder, mq, err)
-				}
-
 				resp := admission.Denied(
 					fmt.Sprintf(
 						"creating resource %s/%s (%s) cannot be admitted because custom quota usage could not be calculated: %v",
@@ -128,22 +122,21 @@ func (h *objectCalculationHandler) OnCreate(
 			}
 
 			applied := make([]appliedReservation, 0, len(evaluated))
-
 			for _, item := range evaluated {
 				ledgerKey := quantityLedgerKeyForMatchedQuota(item)
 
-				reservation := buildReservation(req, u, item.Usage)
+				reservation := buildReservation(req, u, item.Usage, item.Key)
 
-				allowed, effectiveUsed, reserved, err := mutateLedger(
+				allowed, effectiveUsed, reserved, err := reserveCreateOnLedger(
 					ctx,
 					c,
+					reader,
 					item,
 					&reservation,
-					nil,
 				)
 				if err != nil {
 					for _, a := range applied {
-						_ = deleteLedgerReservation(ctx, c, a.LedgerKey, a.ReservationID)
+						_ = deleteLedgerReservation(ctx, c, reader, a.LedgerKey, a.ReservationID)
 					}
 
 					return err
@@ -151,7 +144,7 @@ func (h *objectCalculationHandler) OnCreate(
 
 				if !allowed {
 					for _, a := range applied {
-						_ = deleteLedgerReservation(ctx, c, a.LedgerKey, a.ReservationID)
+						_ = deleteLedgerReservation(ctx, c, reader, a.LedgerKey, a.ReservationID)
 					}
 
 					available := item.Limit.DeepCopy()
@@ -160,17 +153,6 @@ func (h *objectCalculationHandler) OnCreate(
 					if available.Sign() < 0 {
 						available = resource.MustParse("0")
 					}
-
-					recordQuotaExceededEvent(
-						ctx,
-						c,
-						recorder,
-						item,
-						item.Usage,
-						effectiveUsed,
-						available,
-						reserved,
-					)
 
 					log.V(5).Info("denying create due to quota",
 						"quotaKey", item.Key,
@@ -267,10 +249,6 @@ func (h *objectCalculationHandler) OnUpdate(
 
 			oldEvaluated, err := h.evaluateMatchedQuotas(ctx, oldObj, oldMatched)
 			if err != nil {
-				for _, mq := range oldMatched {
-					recordQuotaCalculationEvent(ctx, c, recorder, mq, err)
-				}
-
 				resp := admission.Denied(
 					fmt.Sprintf(
 						"updating resource %s/%s (%s) cannot be admitted because previous custom quota usage could not be calculated: %v",
@@ -288,10 +266,6 @@ func (h *objectCalculationHandler) OnUpdate(
 
 			newEvaluated, err := h.evaluateMatchedQuotas(ctx, newObj, newMatched)
 			if err != nil {
-				for _, mq := range newMatched {
-					recordQuotaCalculationEvent(ctx, c, recorder, mq, err)
-				}
-
 				resp := admission.Denied(
 					fmt.Sprintf(
 						"updating resource %s/%s (%s) cannot be admitted because new custom quota usage could not be calculated: %v",
@@ -328,12 +302,14 @@ func (h *objectCalculationHandler) OnUpdate(
 				return nil
 			}
 
-			type appliedReservation struct {
+			type appliedUpdate struct {
 				LedgerKey     types.NamespacedName
 				ReservationID string
+				OldUsage      resource.Quantity
+				NewUsage      resource.Quantity
 			}
 
-			applied := make([]appliedReservation, 0, len(oldByKey)+len(newByKey))
+			applied := make([]appliedUpdate, 0, len(oldByKey)+len(newByKey))
 
 			for _, key := range allKeys(oldByKey, newByKey) {
 				oldItem, hadOld := oldByKey[key]
@@ -350,17 +326,21 @@ func (h *objectCalculationHandler) OnUpdate(
 					continue
 				}
 
-				targetUsage := resource.MustParse("0")
+				oldUsage := resource.MustParse("0")
+				if hadOld {
+					oldUsage = oldItem.Usage.DeepCopy()
+				}
+
+				newUsage := resource.MustParse("0")
 				if hadNew {
-					targetUsage = newItem.Usage.DeepCopy()
+					newUsage = newItem.Usage.DeepCopy()
 				}
 
 				ledgerKey := quantityLedgerKeyForMatchedQuota(base)
 
 				var pendingDelete *capsulev1beta2.QuantityLedgerObjectRef
-
-				if hadOld && !hadNew {
-					objRef := capsulev1beta2.QuantityLedgerObjectRef{
+				if hadOld {
+					pendingDelete = &capsulev1beta2.QuantityLedgerObjectRef{
 						APIGroup:   req.Kind.Group,
 						APIVersion: req.Kind.Version,
 						Kind:       req.Kind.Kind,
@@ -368,30 +348,51 @@ func (h *objectCalculationHandler) OnUpdate(
 						Name:       oldObj.GetName(),
 						UID:        oldObj.GetUID(),
 					}
-
-					pendingDelete = &objRef
 				}
 
-				reservation := buildReservation(req, newObj, targetUsage)
+				var reservation *capsulev1beta2.QuantityLedgerReservation
+				if hadNew && newUsage.Sign() > 0 {
+					r := buildReservation(req, newObj, newUsage, base.Key)
+					reservation = &r
+				}
 
-				allowed, effectiveUsed, reserved, err := mutateLedger(
+				allowed, effectiveUsed, reserved, err := replaceUsageOnLedger(
 					ctx,
 					c,
+					reader,
 					base,
-					&reservation,
+					oldUsage,
+					newUsage,
+					reservation,
 					pendingDelete,
 				)
 				if err != nil {
-					for _, a := range applied {
-						_ = deleteLedgerReservation(ctx, c, a.LedgerKey, a.ReservationID)
+					for i := len(applied) - 1; i >= 0; i-- {
+						_ = rollbackUsageReplacementOnLedger(
+							ctx,
+							c,
+							reader,
+							applied[i].LedgerKey,
+							applied[i].ReservationID,
+							applied[i].OldUsage,
+							applied[i].NewUsage,
+						)
 					}
 
 					return err
 				}
 
 				if !allowed {
-					for _, a := range applied {
-						_ = deleteLedgerReservation(ctx, c, a.LedgerKey, a.ReservationID)
+					for i := len(applied) - 1; i >= 0; i-- {
+						_ = rollbackUsageReplacementOnLedger(
+							ctx,
+							c,
+							reader,
+							applied[i].LedgerKey,
+							applied[i].ReservationID,
+							applied[i].OldUsage,
+							applied[i].NewUsage,
+						)
 					}
 
 					available := base.Limit.DeepCopy()
@@ -401,23 +402,12 @@ func (h *objectCalculationHandler) OnUpdate(
 						available = resource.MustParse("0")
 					}
 
-					recordQuotaExceededEvent(
-						ctx,
-						c,
-						recorder,
-						base,
-						targetUsage,
-						effectiveUsed,
-						available,
-						reserved,
-					)
-
 					resp := admission.Denied(
 						fmt.Sprintf(
 							"updating resource exceeds limit for %s %q (requested=%s, currentUsed=%s, available=%s, limit=%s, inflightReserved=%s)",
 							quotaTypeName(base.IsGlobal),
 							base.Name,
-							targetUsage.String(),
+							newUsage.String(),
 							effectiveUsed.String(),
 							available.String(),
 							base.Limit.String(),
@@ -430,9 +420,16 @@ func (h *objectCalculationHandler) OnUpdate(
 					return nil
 				}
 
-				applied = append(applied, appliedReservation{
+				reservationID := ""
+				if reservation != nil {
+					reservationID = reservation.ID
+				}
+
+				applied = append(applied, appliedUpdate{
 					LedgerKey:     ledgerKey,
-					ReservationID: reservation.ID,
+					ReservationID: reservationID,
+					OldUsage:      oldUsage.DeepCopy(),
+					NewUsage:      newUsage.DeepCopy(),
 				})
 			}
 
@@ -499,7 +496,7 @@ func (h *objectCalculationHandler) OnDelete(
 				Namespace: nscq.GetNamespace(),
 			}
 
-			if err := addLedgerPendingDelete(ctx, c, ledgerKey, objRef); err != nil {
+			if err := addLedgerPendingDelete(ctx, c, reader, ledgerKey, objRef); err != nil {
 				return ad.ErroredResponse(err)
 			}
 		}
@@ -517,7 +514,7 @@ func (h *objectCalculationHandler) OnDelete(
 				Namespace: configuration.ControllerNamespace(),
 			}
 
-			if err := addLedgerPendingDelete(ctx, c, ledgerKey, objRef); err != nil {
+			if err := addLedgerPendingDelete(ctx, c, reader, ledgerKey, objRef); err != nil {
 				return ad.ErroredResponse(err)
 			}
 		}
@@ -529,12 +526,13 @@ func (h *objectCalculationHandler) OnDelete(
 func deleteLedgerReservation(
 	ctx context.Context,
 	c client.Client,
+	reader client.Reader,
 	ledgerKey types.NamespacedName,
 	reservationID string,
 ) error {
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		ledger := &capsulev1beta2.QuantityLedger{}
-		if err := c.Get(ctx, ledgerKey, ledger); err != nil {
+		if err := reader.Get(ctx, ledgerKey, ledger); err != nil {
 			if apierrors.IsNotFound(err) {
 				return nil
 			}
@@ -543,22 +541,33 @@ func deleteLedgerReservation(
 		}
 
 		active := make([]capsulev1beta2.QuantityLedgerReservation, 0, len(ledger.Status.Reservations))
+		released := resource.MustParse("0")
 
 		for _, res := range ledger.Status.Reservations {
 			if res.ID == reservationID {
+				released.Add(res.Usage)
 				continue
 			}
 
 			active = append(active, res)
 		}
 
-		ledger.Status.Reservations = active
-
-		ledger.Status.Reserved = resource.MustParse("0")
-
-		for _, res := range active {
-			ledger.Status.Reserved.Add(res.Usage)
+		if released.Sign() == 0 {
+			return nil
 		}
+
+		allocated := ledger.Status.Allocated.DeepCopy()
+		allocated.Sub(released)
+		quota.ClampQuantityToZero(&allocated)
+
+		reserved := resource.MustParse("0")
+		for _, res := range active {
+			reserved.Add(res.Usage)
+		}
+
+		ledger.Status.Reservations = active
+		ledger.Status.Reserved = reserved
+		ledger.Status.Allocated = allocated
 
 		return c.Status().Update(ctx, ledger)
 	})
@@ -625,17 +634,8 @@ func (h *objectCalculationHandler) matchAllQuotas(
 	out = append(out, global...)
 
 	sort.SliceStable(out, func(i, j int) bool {
-		availI := h.effectiveAvailableForSort(ctx, c, out[i])
-		availJ := h.effectiveAvailableForSort(ctx, c, out[j])
-
-		cmp := availI.Cmp(availJ)
-		if cmp != 0 {
-			return cmp < 0
-		}
-
-		cmp = out[i].Limit.Cmp(out[j].Limit)
-		if cmp != 0 {
-			return cmp < 0
+		if out[i].Limit.Cmp(out[j].Limit) != 0 {
+			return out[i].Limit.Cmp(out[j].Limit) < 0
 		}
 
 		if out[i].IsGlobal != out[j].IsGlobal {
@@ -644,6 +644,10 @@ func (h *objectCalculationHandler) matchAllQuotas(
 
 		if out[i].Namespace != out[j].Namespace {
 			return out[i].Namespace < out[j].Namespace
+		}
+
+		if out[i].SourceRank != out[j].SourceRank {
+			return out[i].SourceRank < out[j].SourceRank
 		}
 
 		return out[i].Name < out[j].Name
@@ -932,6 +936,7 @@ func (h *objectCalculationHandler) evaluateMatchedQuotas(
 func mutateLedger(
 	ctx context.Context,
 	c client.Client,
+	reader client.Reader,
 	item evaluatedQuota,
 	reservation *capsulev1beta2.QuantityLedgerReservation,
 	pendingDelete *capsulev1beta2.QuantityLedgerObjectRef,
@@ -945,13 +950,13 @@ func mutateLedger(
 	ledgerKey := quantityLedgerKeyForMatchedQuota(item)
 
 	err := retry.RetryOnConflict(ledgerMutationBackoff, func() error {
-		latestUsed, err := latestPersistedUsedForQuota(ctx, c, item)
+		latestUsed, err := latestPersistedUsedForQuota(ctx, reader, item)
 		if err != nil {
 			return err
 		}
 
 		ledger := &capsulev1beta2.QuantityLedger{}
-		if err := c.Get(ctx, ledgerKey, ledger); err != nil {
+		if err := reader.Get(ctx, ledgerKey, ledger); err != nil {
 			return err
 		}
 
@@ -1042,7 +1047,7 @@ func mutateLedger(
 
 func latestPersistedUsedForQuota(
 	ctx context.Context,
-	c client.Client,
+	c client.Reader,
 	item evaluatedQuota,
 ) (resource.Quantity, error) {
 	if item.IsGlobal {
@@ -1068,12 +1073,13 @@ func latestPersistedUsedForQuota(
 func addLedgerPendingDelete(
 	ctx context.Context,
 	c client.Client,
+	reader client.Reader,
 	ledgerKey types.NamespacedName,
 	objRef capsulev1beta2.QuantityLedgerObjectRef,
 ) error {
 	return retry.RetryOnConflict(ledgerMutationBackoff, func() error {
 		ledger := &capsulev1beta2.QuantityLedger{}
-		if err := c.Get(ctx, ledgerKey, ledger); err != nil {
+		if err := reader.Get(ctx, ledgerKey, ledger); err != nil {
 			return err
 		}
 
@@ -1148,120 +1154,4 @@ func evaluatedByKey(in []evaluatedQuota) map[string]evaluatedQuota {
 	}
 
 	return out
-}
-
-func recordQuotaCalculationEvent(
-	ctx context.Context,
-	c client.Client,
-	recorder events.EventRecorder,
-	mq quota.MatchedQuota,
-	err error,
-) {
-	if recorder == nil {
-		return
-	}
-
-	if mq.IsGlobal {
-		obj := &capsulev1beta2.GlobalCustomQuota{}
-		if getErr := c.Get(ctx, types.NamespacedName{Name: mq.Name}, obj); getErr != nil {
-			return
-		}
-
-		recorder.Eventf(
-			obj,
-			nil,
-			corev1.EventTypeWarning,
-			"UsageCalculationFailed",
-			"UsageCalculationFailed",
-			"failed to calculate usage for path %q op %q: %v",
-			mq.Path,
-			mq.Operation,
-			err,
-		)
-
-		return
-	}
-
-	obj := &capsulev1beta2.CustomQuota{}
-	if getErr := c.Get(ctx, types.NamespacedName{
-		Name:      mq.Name,
-		Namespace: mq.Namespace,
-	}, obj); getErr != nil {
-		return
-	}
-
-	recorder.Eventf(
-		obj,
-		nil,
-		corev1.EventTypeWarning,
-		"UsageCalculationFailed",
-		"UsageCalculationFailed",
-		"failed to calculate usage for path %q op %q: %v",
-		mq.Path,
-		mq.Operation,
-		err,
-	)
-}
-
-func recordQuotaExceededEvent(
-	ctx context.Context,
-	c client.Client,
-	recorder events.EventRecorder,
-	item evaluatedQuota,
-	requested resource.Quantity,
-	effectiveUsed resource.Quantity,
-	available resource.Quantity,
-	reserved resource.Quantity,
-) {
-	if recorder == nil {
-		return
-	}
-
-	message := fmt.Sprintf(
-		"quota exceeded for path %q op %q: requested=%s currentUsed=%s available=%s limit=%s inflightReserved=%s",
-		item.Path,
-		item.Operation,
-		requested.String(),
-		effectiveUsed.String(),
-		available.String(),
-		item.Limit.String(),
-		reserved.String(),
-	)
-
-	if item.IsGlobal {
-		obj := &capsulev1beta2.GlobalCustomQuota{}
-		if err := c.Get(ctx, types.NamespacedName{Name: item.Name}, obj); err != nil {
-			return
-		}
-
-		recorder.Eventf(
-			obj,
-			nil,
-			corev1.EventTypeWarning,
-			capevents.ReasonQuotaExceeded,
-			capevents.ActionValidationDenied,
-			"%s",
-			message,
-		)
-
-		return
-	}
-
-	obj := &capsulev1beta2.CustomQuota{}
-	if err := c.Get(ctx, types.NamespacedName{
-		Name:      item.Name,
-		Namespace: item.Namespace,
-	}, obj); err != nil {
-		return
-	}
-
-	recorder.Eventf(
-		obj,
-		nil,
-		corev1.EventTypeWarning,
-		capevents.ReasonQuotaExceeded,
-		capevents.ActionValidationDenied,
-		"%s",
-		message,
-	)
 }

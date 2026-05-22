@@ -13,12 +13,16 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/go-logr/logr"
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/internal/cache"
 	"github.com/projectcapsule/capsule/pkg/runtime/jsonpath"
@@ -339,24 +343,181 @@ func pendingDeleteStillPresent(
 	return false
 }
 
+const unresolvedReservationRequeue = 250 * time.Millisecond
+
+func nextReservationMaterializationRequeue(
+	now metav1.Time,
+	res capsulev1beta2.QuantityLedgerReservation,
+) time.Duration {
+	if res.ExpiresAt == nil {
+		return unresolvedReservationRequeue
+	}
+
+	untilExpiry := time.Until(res.ExpiresAt.Time)
+	if untilExpiry <= 0 {
+		return 0
+	}
+
+	if untilExpiry < unresolvedReservationRequeue {
+		return untilExpiry
+	}
+
+	return unresolvedReservationRequeue
+}
+func reconcileQuantityLedgerAllocation(
+	ctx context.Context,
+	c client.Client,
+	log logr.Logger,
+	key types.NamespacedName,
+	observedUsed resource.Quantity,
+	claims []capsulev1beta2.CustomQuotaClaimItem,
+) (*time.Duration, error) {
+	var requeueAfter *time.Duration
+
+	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		ledger := &capsulev1beta2.QuantityLedger{}
+		if err := c.Get(ctx, key, ledger); err != nil {
+			if apierrors.IsNotFound(err) {
+				return nil
+			}
+
+			return err
+		}
+
+		now := metav1.Now()
+		pendingDeleteTTL := 30 * time.Second
+
+		activeReservations := make([]capsulev1beta2.QuantityLedgerReservation, 0, len(ledger.Status.Reservations))
+
+		for _, res := range ledger.Status.Reservations {
+			materialized := reservationMaterializedLedger(res, claims)
+			expired := res.ExpiresAt != nil && res.ExpiresAt.Before(&now)
+
+			log.V(5).Info("evaluating ledger reservation",
+				"ledger", key.String(),
+				"reservationID", res.ID,
+				"usage", res.Usage.String(),
+				"uid", string(res.ObjectRef.UID),
+				"group", res.ObjectRef.APIGroup,
+				"version", res.ObjectRef.APIVersion,
+				"kind", res.ObjectRef.Kind,
+				"namespace", res.ObjectRef.Namespace,
+				"name", res.ObjectRef.Name,
+				"materialized", materialized,
+				"expired", expired,
+			)
+
+			switch {
+			case materialized:
+				continue
+
+			case expired:
+				continue
+
+			default:
+				activeReservations = append(activeReservations, res)
+
+				requeueAfter = minDurationPtr(
+					requeueAfter,
+					nextReservationMaterializationRequeue(now, res),
+				)
+			}
+		}
+
+		activeDeletes := make([]capsulev1beta2.QuantityLedgerPendingDelete, 0, len(ledger.Status.PendingDeletes))
+
+		for _, pd := range ledger.Status.PendingDeletes {
+			stillPresent := pendingDeleteStillPresent(pd, claims)
+			expired := now.Sub(pd.CreatedAt.Time) >= pendingDeleteTTL
+
+			log.V(5).Info("evaluating pending delete",
+				"ledger", key.String(),
+				"uid", string(pd.ObjectRef.UID),
+				"group", pd.ObjectRef.APIGroup,
+				"version", pd.ObjectRef.APIVersion,
+				"kind", pd.ObjectRef.Kind,
+				"namespace", pd.ObjectRef.Namespace,
+				"name", pd.ObjectRef.Name,
+				"stillPresent", stillPresent,
+				"expired", expired,
+			)
+
+			switch {
+			case stillPresent:
+				activeDeletes = append(activeDeletes, pd)
+				requeueAfter = minDurationPtr(requeueAfter, immediatePendingDeleteRequeue)
+
+			case expired:
+				// Drop stale delete marker.
+
+			default:
+				// Object is gone from observed claims. observedUsed already excludes it.
+			}
+		}
+
+		reserved := resource.MustParse("0")
+		for _, res := range activeReservations {
+			reserved.Add(res.Usage)
+		}
+
+		allocated := observedUsed.DeepCopy()
+		allocated.Add(reserved)
+		quota.ClampQuantityToZero(&allocated)
+
+		ledger.Status.Reservations = activeReservations
+		ledger.Status.PendingDeletes = activeDeletes
+		ledger.Status.Reserved = reserved
+		ledger.Status.Allocated = allocated
+
+		return c.Status().Update(ctx, ledger)
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return requeueAfter, nil
+}
+
 //nolint:dupl
 func reservationMaterializedLedger(
 	res capsulev1beta2.QuantityLedgerReservation,
 	claims []capsulev1beta2.CustomQuotaClaimItem,
 ) bool {
 	for _, claim := range claims {
-		if res.ObjectRef.UID != "" && claim.UID != "" && res.ObjectRef.UID == claim.UID {
-			return true
+		if !sameLedgerObject(res.ObjectRef, claim) {
+			continue
 		}
 
-		if res.ObjectRef.APIGroup == claim.Group &&
-			res.ObjectRef.APIVersion == claim.Version &&
-			res.ObjectRef.Kind == claim.Kind &&
-			res.ObjectRef.Namespace == string(claim.Namespace) &&
-			res.ObjectRef.Name == claim.Name {
-			return true
+		// Important for updates:
+		// UID/name match alone is not enough. The controller must have observed
+		// the same usage that the webhook reserved.
+		if claim.Usage.Cmp(res.Usage) != 0 {
+			continue
 		}
+
+		return true
 	}
 
 	return false
+}
+
+func sameLedgerObject(
+	ref capsulev1beta2.QuantityLedgerObjectRef,
+	claim capsulev1beta2.CustomQuotaClaimItem,
+) bool {
+	if ref.APIGroup != claim.Group ||
+		ref.APIVersion != claim.Version ||
+		ref.Kind != claim.Kind ||
+		ref.Namespace != string(claim.Namespace) ||
+		ref.Name != claim.Name {
+		return false
+	}
+
+	// CREATE admissions often do not have a UID yet.
+	if ref.UID != "" && claim.UID != "" {
+		return ref.UID == claim.UID
+	}
+
+	return true
 }

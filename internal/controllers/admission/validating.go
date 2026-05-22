@@ -27,7 +27,6 @@ import (
 	"github.com/projectcapsule/capsule/internal/controllers/utils"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/runtime/admission"
-	clt "github.com/projectcapsule/capsule/pkg/runtime/client"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	"github.com/projectcapsule/capsule/pkg/runtime/predicates"
 )
@@ -93,12 +92,16 @@ func (r *validatingReconciler) reconcileValidatingConfiguration(
 ) error {
 	desiredName := string(cfg.Name)
 
-	hooks, err := r.validatingWebhooks(ctx, cfg)
+	if cfg.Client != nil {
+
+	}
+
+	desiredHooks, err := r.validatingWebhooks(ctx, cfg)
 	if err != nil {
 		return err
 	}
 
-	if len(hooks) == 0 {
+	if len(desiredHooks) == 0 {
 		managed, err := r.listManagedValidatingWebhookConfigs(ctx)
 		if err != nil {
 			return err
@@ -113,44 +116,54 @@ func (r *validatingReconciler) reconcileValidatingConfiguration(
 		return nil
 	}
 
-	sort.Slice(hooks, func(i, j int) bool { return hooks[i].Name < hooks[j].Name })
+	sort.Slice(desiredHooks, func(i, j int) bool { return desiredHooks[i].Name < desiredHooks[j].Name })
 
 	obj := &admissionv1.ValidatingWebhookConfiguration{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: admissionv1.SchemeGroupVersion.String(),
 			Kind:       "ValidatingWebhookConfiguration",
 		},
-		ObjectMeta: metav1.ObjectMeta{Name: string(cfg.Name)},
-		Webhooks:   hooks,
+		ObjectMeta: metav1.ObjectMeta{
+			Name: string(cfg.Name),
+		},
 	}
 
-	if err := controllerutil.SetOwnerReference(r.configuration.GetConfigObject(), obj, r.client.Scheme()); err != nil {
-		return err
-	}
+	_, err = controllerutil.CreateOrUpdate(ctx, r.client, obj, func() error {
+		if err := controllerutil.SetOwnerReference(
+			r.configuration.GetConfigObject(),
+			obj,
+			r.client.Scheme(),
+		); err != nil {
+			return err
+		}
 
-	labels := obj.GetLabels()
-	if labels == nil {
-		labels = make(map[string]string)
-	}
+		labels := obj.GetLabels()
+		if labels == nil {
+			labels = make(map[string]string)
+		}
 
-	maps.Copy(labels, cfg.Labels)
+		maps.Copy(labels, cfg.Labels)
 
-	labels[meta.CreatedByCapsuleLabel] = meta.ValueController
+		labels[meta.CreatedByCapsuleLabel] = meta.ValueController
 
-	obj.SetLabels(labels)
+		obj.SetLabels(labels)
 
-	annotations := obj.GetAnnotations()
-	if annotations == nil {
-		annotations = make(map[string]string)
-	}
+		annotations := obj.GetAnnotations()
+		if annotations == nil {
+			annotations = make(map[string]string)
+		}
 
-	maps.Copy(annotations, cfg.Annotations)
+		maps.Copy(annotations, cfg.Annotations)
 
-	obj.SetAnnotations(annotations)
+		obj.SetAnnotations(annotations)
 
-	if err := clt.PatchApply(ctx, r.client, obj, meta.FieldManagerCapsuleController, true); err != nil {
-		return err
-	}
+		// Do not overwrite caBundle. cert-manager or the legacy TLS reconciler owns it.
+		if cfg.Client != nil {
+			obj.Webhooks = preserveValidatingWebhookCABundles(obj.Webhooks, desiredHooks)
+		}
+
+		return nil
+	})
 
 	// Garbage-collect any old managed validating webhook configs with different name
 	managed, err := r.listManagedValidatingWebhookConfigs(ctx)
@@ -204,7 +217,7 @@ func (r *validatingReconciler) validatingWebhooks(
 	cfg *capsulev1beta2.DynamicValidatingAdmissionConfig,
 ) (hooks []admissionv1.ValidatingWebhook, err error) {
 	for _, hook := range cfg.Webhooks {
-		h, err := admission.NewValidatingWebhook(hook, cfg.Client, r.configuration.Users(), r.configuration.Administrators())
+		h, err := admission.NewValidatingWebhook(hook, *cfg.Client, r.configuration.Users(), r.configuration.Administrators())
 		if err != nil {
 			return nil, err
 		}
@@ -213,4 +226,31 @@ func (r *validatingReconciler) validatingWebhooks(
 	}
 
 	return hooks, nil
+}
+
+func preserveValidatingWebhookCABundles(
+	existing []admissionv1.ValidatingWebhook,
+	desired []admissionv1.ValidatingWebhook,
+) []admissionv1.ValidatingWebhook {
+	existingByName := make(map[string][]byte, len(existing))
+
+	for _, hook := range existing {
+		if len(hook.ClientConfig.CABundle) == 0 {
+			continue
+		}
+
+		existingByName[hook.Name] = append([]byte(nil), hook.ClientConfig.CABundle...)
+	}
+
+	for i := range desired {
+		if len(desired[i].ClientConfig.CABundle) > 0 {
+			continue
+		}
+
+		if caBundle, ok := existingByName[desired[i].Name]; ok {
+			desired[i].ClientConfig.CABundle = append([]byte(nil), caBundle...)
+		}
+	}
+
+	return desired
 }

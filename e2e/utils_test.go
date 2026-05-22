@@ -895,6 +895,25 @@ func MakeDeployment(namespace, name string, replicas int32, labels map[string]st
 	return dep
 }
 
+func ExpectPodsForDeployment(ctx context.Context, namespace, app string, expected int) {
+	Eventually(func(g Gomega) {
+		pods := &corev1.PodList{}
+
+		g.Expect(k8sClient.List(ctx, pods,
+			client.InNamespace(namespace),
+			client.MatchingLabels{
+				"app": app,
+			},
+		)).To(Succeed())
+
+		g.Expect(len(pods.Items)).To(Equal(expected),
+			"unexpected pod count for deployment app=%q in namespace %s",
+			app,
+			namespace,
+		)
+	}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+}
+
 func nobodyPodSecurityContext() *corev1.PodSecurityContext {
 	return &corev1.PodSecurityContext{
 		RunAsNonRoot: ptr.To(true),

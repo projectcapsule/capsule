@@ -61,4 +61,8 @@ type QuantityLedgerStatus struct {
 	// Conditions for the resource claim
 	// +optional
 	Conditions meta.ConditionList `json:"conditions,omitzero"`
+
+	// Allocated is the admission-owned total that has been accepted by the webhook.
+	// It must be updated only through optimistic concurrency on QuantityLedger.
+	Allocated resource.Quantity `json:"allocated,omitempty"`
 }
