@@ -68,6 +68,13 @@ metadata:
     {{- toYaml . | nindent 4 }}
   {{- end }}
 rules:
+- apiGroups:
+    - "*"
+  resources:
+    - "*"
+  verbs:
+    - delete
+    - deletecollection
 - apiGroups: [""]
   resources: ["serviceaccounts"]
   verbs: ["impersonate"]
@@ -206,6 +213,8 @@ rules:
   - "watch"
   - "patch"
   - "update"
+  - "delete"
+  - "deletecollection"
 - apiGroups:
   - "rbac.authorization.k8s.io"
   resources:
@@ -279,12 +288,17 @@ rules:
   - admissionregistration.k8s.io
   resources:
   - mutatingwebhookconfigurations
+  verbs:
+  - create
+- apiGroups:
+  - admissionregistration.k8s.io
+  resources:
+  - mutatingwebhookconfigurations
   resourceNames:
   - "{{ include "capsule.fullname" . }}-mutating-webhook-configuration"
   - "{{ include "capsule.fullname" . }}-dynamic-webhook"
   verbs:
   - get
-  - create
   - patch
   - update
   - delete
@@ -296,6 +310,12 @@ rules:
   - watch
   - list
 - apiGroups:
+    - admissionregistration.k8s.io
+  resources:
+    - validatingwebhookconfigurations
+  verbs:
+    - create
+- apiGroups:
   - admissionregistration.k8s.io
   resources:
   - validatingwebhookconfigurations
@@ -304,7 +324,6 @@ rules:
   - "{{ include "capsule.fullname" . }}-dynamic-webhook"
   verbs:
   - get
-  - create
   - patch
   - update
   - delete

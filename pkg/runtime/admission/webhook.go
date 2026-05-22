@@ -23,7 +23,7 @@ type WebhookOptions struct {
 	Administrators bool `json:"administrators"`
 }
 
-func NewValidatingWebhook(in *ValidatingWebhook, c admissionregistrationv1.WebhookClientConfig, users rbac.UserListSpec, admins rbac.UserListSpec) (admissionregistrationv1.ValidatingWebhook, error) {
+func NewValidatingWebhook(in *ValidatingWebhook, c *admissionregistrationv1.WebhookClientConfig, users rbac.UserListSpec, admins rbac.UserListSpec) (admissionregistrationv1.ValidatingWebhook, error) {
 	out := admissionregistrationv1.ValidatingWebhook{
 		Name:                    in.Name,
 		Rules:                   in.Rules,
@@ -36,8 +36,12 @@ func NewValidatingWebhook(in *ValidatingWebhook, c admissionregistrationv1.Webho
 		AdmissionReviewVersions: in.AdmissionReviewVersions,
 	}
 
-	// Path lives under ClientConfig in upstream
-	out.ClientConfig = DynamicClientWithPath(c, *in.Path)
+	webhookPath := ""
+	if in.Path != nil {
+		webhookPath = *in.Path
+	}
+
+	out.ClientConfig = DynamicClientWithPath(*c, webhookPath)
 
 	if len(in.MatchConditions) > 0 {
 		out.MatchConditions = append([]admissionregistrationv1.MatchCondition(nil), in.MatchConditions...)
@@ -207,7 +211,7 @@ type ValidatingWebhook struct {
 	MatchConditions []admissionregistrationv1.MatchCondition `json:"matchConditions,omitempty" patchMergeKey:"name" patchStrategy:"merge" protobuf:"bytes,11,opt,name=matchConditions"`
 }
 
-func NewMutatingWebhook(in *MutatingWebhook, c admissionregistrationv1.WebhookClientConfig, users rbac.UserListSpec, admins rbac.UserListSpec) (admissionregistrationv1.MutatingWebhook, error) {
+func NewMutatingWebhook(in *MutatingWebhook, c *admissionregistrationv1.WebhookClientConfig, users rbac.UserListSpec, admins rbac.UserListSpec) (admissionregistrationv1.MutatingWebhook, error) {
 	out := admissionregistrationv1.MutatingWebhook{
 		Name:                    in.Name,
 		Rules:                   in.Rules,
@@ -221,8 +225,12 @@ func NewMutatingWebhook(in *MutatingWebhook, c admissionregistrationv1.WebhookCl
 		AdmissionReviewVersions: in.AdmissionReviewVersions,
 	}
 
-	// Path lives under ClientConfig in upstream
-	out.ClientConfig = DynamicClientWithPath(c, *in.Path)
+	webhookPath := ""
+	if in.Path != nil {
+		webhookPath = *in.Path
+	}
+
+	out.ClientConfig = DynamicClientWithPath(*c, webhookPath)
 
 	if len(in.MatchConditions) > 0 {
 		out.MatchConditions = append([]admissionregistrationv1.MatchCondition(nil), in.MatchConditions...)

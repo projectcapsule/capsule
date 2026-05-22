@@ -5,6 +5,7 @@ package tenant
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -53,6 +54,7 @@ func (r *Manager) syncResourceQuotas(ctx context.Context, tenant *capsulev1beta2
 
 	//nolint:nestif
 	if tenant.Spec.ResourceQuota.Scope == api.ResourceQuotaScopeTenant {
+		scopeErrs := make(chan error, len(tenant.Spec.ResourceQuota.Items))
 		group := new(errgroup.Group)
 
 		for i, q := range tenant.Spec.ResourceQuota.Items {
@@ -64,6 +66,12 @@ func (r *Manager) syncResourceQuotas(ctx context.Context, tenant *capsulev1beta2
 			}
 
 			group.Go(func() (scopeErr error) {
+				defer func() {
+					if scopeErr != nil {
+						scopeErrs <- fmt.Errorf("resource quota %d: %w", index, scopeErr)
+					}
+				}()
+
 				// Calculating the Resource Budget at Tenant scope just if this is put in place.
 				// Requirement to list ResourceQuota of the current Tenant
 				var tntRequirement *labels.Requirement
@@ -81,7 +89,7 @@ func (r *Manager) syncResourceQuotas(ctx context.Context, tenant *capsulev1beta2
 				// These are required since Capsule is going to sum all the used quota to
 				// sum them and get the Tenant one.
 				list := &corev1.ResourceQuotaList{}
-				if scopeErr = r.List(ctx, list, &client.ListOptions{LabelSelector: labels.NewSelector().Add(*tntRequirement).Add(*indexRequirement)}); scopeErr != nil {
+				if scopeErr = r.reader.List(ctx, list, &client.ListOptions{LabelSelector: labels.NewSelector().Add(*tntRequirement).Add(*indexRequirement)}); scopeErr != nil {
 					r.Log.Error(scopeErr, "cannot list ResourceQuota", "tenantFilter", tntRequirement.String(), "indexFilter", indexRequirement.String())
 
 					return scopeErr
@@ -169,14 +177,22 @@ func (r *Manager) syncResourceQuotas(ctx context.Context, tenant *capsulev1beta2
 					}
 				}
 
-				return scopeErr
+				return nil
 			})
 		}
-		// Waiting the update of all ResourceQuotas
-		if err = group.Wait(); err != nil {
+
+		_ = group.Wait()
+		close(scopeErrs)
+
+		var joined []error
+		for scopeErr := range scopeErrs {
+			joined = append(joined, scopeErr)
+		}
+		if err = errors.Join(joined...); err != nil {
 			return err
 		}
 	}
+
 	// getting requested ResourceQuota keys
 	keys := make([]string, 0, len(tenant.Spec.ResourceQuota.Items))
 

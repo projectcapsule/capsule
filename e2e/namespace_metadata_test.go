@@ -602,7 +602,7 @@ var _ = Describe("creating a Namespace for a Tenant with additional metadata", O
 				}
 
 				return k8sClient.Update(context.TODO(), t)
-			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+			}, defaultTimeoutInterval, defaultPollInterval).ShouldNot(Succeed())
 		})
 
 		By("verify metadata lifecycle (faulty update)", func() {

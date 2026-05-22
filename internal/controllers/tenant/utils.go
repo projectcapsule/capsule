@@ -5,9 +5,13 @@ package tenant
 
 import (
 	"context"
+	"errors"
+	"fmt"
 
+	"golang.org/x/sync/errgroup"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/types"
@@ -19,8 +23,60 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/utils"
 )
+
+func readyTenantNamespaces(tnt *capsulev1beta2.Tenant) []string {
+	namespaces := make([]string, 0, len(tnt.Status.Spaces))
+
+	for _, ns := range tnt.Status.Spaces {
+		ready := ns.Conditions.GetConditionByType(meta.ReadyCondition)
+		if ready != nil && ready.Status != metav1.ConditionTrue {
+			continue
+		}
+
+		terminating := ns.Conditions.GetConditionByType(meta.TerminatingCondition)
+		if terminating != nil && terminating.Status == metav1.ConditionTrue {
+			continue
+		}
+
+		namespaces = append(namespaces, ns.Name)
+	}
+
+	return namespaces
+}
+
+func runForTenantNamespaces(
+	ctx context.Context,
+	tnt *capsulev1beta2.Tenant,
+	fn func(context.Context, string) error,
+) error {
+	errs := make(chan error, len(tnt.Status.Spaces))
+	group := new(errgroup.Group)
+
+	for _, namespace := range readyTenantNamespaces(tnt) {
+		namespace := namespace
+
+		group.Go(func() error {
+			if err := fn(ctx, namespace); err != nil {
+				errs <- fmt.Errorf("namespace %q: %w", namespace, err)
+			}
+
+			return nil
+		})
+	}
+
+	_ = group.Wait()
+	close(errs)
+
+	var joined []error
+	for err := range errs {
+		joined = append(joined, err)
+	}
+
+	return errors.Join(joined...)
+}
 
 func (r *Manager) statusOnlyHandlerClasses(
 	fn func(ctx context.Context, perTenant func(context.Context, *capsulev1beta2.Tenant) error) error,

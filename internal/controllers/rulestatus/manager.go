@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	"github.com/go-logr/logr"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -33,6 +34,7 @@ import (
 
 type Manager struct {
 	client.Client
+	reader client.Reader
 
 	Metrics       *metrics.TenantRecorder
 	Log           logr.Logger
@@ -42,6 +44,8 @@ type Manager struct {
 }
 
 func (r *Manager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.ControllerOptions) error {
+	r.reader = mgr.GetAPIReader()
+
 	ctrlBuilder := ctrl.NewControllerManagedBy(mgr).
 		Named("capsule/rule-status").
 		For(
@@ -80,16 +84,29 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 	}
 
 	defer func() {
-		if uerr := r.updateStatus(ctx, instance, err); uerr != nil {
-			err = fmt.Errorf("cannot update status: %w", uerr)
+		if e := r.updateStatus(ctx, instance, err); e != nil {
+			if apierrors.IsNotFound(err) || apierrors.HasStatusCause(err, corev1.NamespaceTerminatingCause) {
+				err = nil
+
+				return
+			}
+
+			err = fmt.Errorf("cannot update status: %w", e)
 
 			return
 		}
 
 		if e := patchHelper.Patch(ctx, instance); err != nil {
-			if !apierrors.IsNotFound(err) {
-				err = e
+			if apierrors.IsNotFound(e) || apierrors.HasStatusCause(e, corev1.NamespaceTerminatingCause) {
+				err = nil
+
+				return
 			}
+
+			err = fmt.Errorf("cannot patch: %w", e)
+
+			return
+
 		}
 
 		// Controller-Runtime should never receive error
@@ -136,7 +153,7 @@ func (r Manager) reconcile(ctx context.Context, instance *capsulev1beta2.RuleSta
 func (r *Manager) updateStatus(ctx context.Context, instance *capsulev1beta2.RuleStatus, reconcileError error) error {
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
 		latest := &capsulev1beta2.RuleStatus{}
-		if err = r.Get(ctx, types.NamespacedName{Name: instance.GetName(), Namespace: instance.GetNamespace()}, latest); err != nil {
+		if err = r.reader.Get(ctx, types.NamespacedName{Name: instance.GetName(), Namespace: instance.GetNamespace()}, latest); err != nil {
 			if apierrors.IsNotFound(err) {
 				return nil
 			}

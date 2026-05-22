@@ -41,7 +41,7 @@ func CollectOwners(
 					meta.OwnerPromotionLabel: meta.ValueTrue,
 				},
 			); err != nil {
-				return nil, err
+				return owners, err
 			}
 
 			for _, sa := range saList.Items {
@@ -65,7 +65,7 @@ func CollectOwners(
 
 	listed, err := tnt.Spec.Permissions.ListMatchingOwners(ctx, c, tnt.GetName())
 	if err != nil {
-		return nil, err
+		return owners, err
 	}
 
 	for _, o := range listed {

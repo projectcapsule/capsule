@@ -31,6 +31,7 @@ import (
 
 type resourceClaimController struct {
 	client.Client
+	reader client.Reader
 
 	metrics  *metrics.ClaimRecorder
 	log      logr.Logger
@@ -38,6 +39,8 @@ type resourceClaimController struct {
 }
 
 func (r *resourceClaimController) SetupWithManager(mgr ctrl.Manager, cfg utils.ControllerOptions) error {
+	r.reader = mgr.GetAPIReader()
+
 	return ctrl.NewControllerManagedBy(mgr).
 		Named("capsule/resourcepools/claims").
 		For(
@@ -267,7 +270,7 @@ func (r *resourceClaimController) updateStatus(
 ) error {
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
 		latest := &capsulev1beta2.ResourcePoolClaim{}
-		if err = r.Get(ctx, types.NamespacedName{Name: instance.GetName(), Namespace: instance.GetNamespace()}, latest); err != nil {
+		if err = r.reader.Get(ctx, types.NamespacedName{Name: instance.GetName(), Namespace: instance.GetNamespace()}, latest); err != nil {
 			if apierrors.IsNotFound(err) {
 				return nil
 			}

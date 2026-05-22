@@ -33,11 +33,11 @@ func (r *Manager) collectRBAC(ctx context.Context, tnt *capsulev1beta2.Tenant) (
 		tnt,
 		r.Configuration,
 	)
+	tnt.Status.Owners = owners
+
 	if err != nil {
 		return err
 	}
-
-	tnt.Status.Owners = owners
 
 	promotions, err := tenant.CollectPromotions(
 		ctx,
@@ -45,11 +45,11 @@ func (r *Manager) collectRBAC(ctx context.Context, tnt *capsulev1beta2.Tenant) (
 		tnt,
 		r.Configuration,
 	)
+	tnt.Status.Promotions = promotions
+
 	if err != nil {
 		return err
 	}
-
-	tnt.Status.Promotions = promotions
 
 	return nil
 }

@@ -77,9 +77,7 @@ spec:
                         description: Annotations added to the Admission Webhook
                         type: object
                       client:
-                        description: |-
-                          WebhookClientConfig contains the information to make a TLS
-                          connection with the webhook
+                        description: whats the problem
                         properties:
                           caBundle:
                             description: |-
@@ -563,9 +561,7 @@ spec:
                         description: Annotations added to the Admission Webhook
                         type: object
                       client:
-                        description: |-
-                          WebhookClientConfig contains the information to make a TLS
-                          connection with the webhook
+                        description: whats the problem
                         properties:
                           caBundle:
                             description: |-
@@ -1187,6 +1183,11 @@ spec:
                     default: capsule-namespace-deleter
                     description: Name for the ClusterRole required to grant Namespace
                       Deletion permissions.
+                    type: string
+                  namespaceFinalizer:
+                    default: capsule:controller:namespace-finalizer
+                    description: Name for the ClusterRole required for the capsule
+                      controller to finalize namespaced content
                     type: string
                   promotionClusterRoles:
                     default:

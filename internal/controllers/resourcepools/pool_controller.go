@@ -38,6 +38,7 @@ import (
 
 type resourcePoolController struct {
 	client.Client
+	reader client.Reader
 
 	metrics  *metrics.ResourcePoolRecorder
 	log      logr.Logger
@@ -45,6 +46,8 @@ type resourcePoolController struct {
 }
 
 func (r *resourcePoolController) SetupWithManager(mgr ctrl.Manager, cfg ctrlutils.ControllerOptions) error {
+	r.reader = mgr.GetAPIReader()
+
 	return ctrl.NewControllerManagedBy(mgr).
 		Named("capsule/resourcepools/pools").
 		For(&capsulev1beta2.ResourcePool{}).
@@ -884,7 +887,7 @@ func (r *resourcePoolController) garbageCollectNamespace(
 func (r *resourcePoolController) updateStatus(ctx context.Context, instance *capsulev1beta2.ResourcePool, reconcileError error) error {
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
 		latest := &capsulev1beta2.ResourcePool{}
-		if err = r.Get(ctx, types.NamespacedName{Name: instance.GetName()}, latest); err != nil {
+		if err = r.reader.Get(ctx, types.NamespacedName{Name: instance.GetName()}, latest); err != nil {
 			if apierrors.IsNotFound(err) {
 				return nil
 			}

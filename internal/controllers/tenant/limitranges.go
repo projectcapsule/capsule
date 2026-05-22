@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"strconv"
 
-	"golang.org/x/sync/errgroup"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -30,24 +29,9 @@ func (r *Manager) syncLimitRanges(ctx context.Context, tenant *capsulev1beta2.Te
 		keys = append(keys, strconv.Itoa(i))
 	}
 
-	group := new(errgroup.Group)
-
-	for _, ns := range tenant.Status.Spaces {
-		namespace := ns.Name
-
-		cond := ns.Conditions.GetConditionByType(meta.TerminatingCondition)
-		if cond != nil {
-			if cond.Status == metav1.ConditionTrue {
-				continue
-			}
-		}
-
-		group.Go(func() error {
-			return r.syncLimitRange(ctx, tenant, namespace, keys)
-		})
-	}
-
-	return group.Wait()
+	return runForTenantNamespaces(ctx, tenant, func(ctx context.Context, namespace string) error {
+		return r.syncLimitRange(ctx, tenant, namespace, keys)
+	})
 }
 
 func (r *Manager) syncLimitRange(ctx context.Context, tenant *capsulev1beta2.Tenant, namespace string, keys []string) (err error) {

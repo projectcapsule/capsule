@@ -253,7 +253,6 @@ manager:
     # -- Impersonation
     impersonation: {}
 
-
     # -- DEPRECATED: use users properties.
     # Names of the users considered as Capsule users.
     userNames: []
@@ -583,7 +582,7 @@ webhooks:
       # -- Capsule Hook Options
       opts: {}
       # -- [FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy)
-      failurePolicy: Fail
+      failurePolicy: Ignore
       # -- [MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy)
       matchPolicy: Equivalent
       # -- [ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector)

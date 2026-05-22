@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	k8smeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,11 +33,11 @@ import (
 	"github.com/projectcapsule/capsule/internal/metrics"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/runtime/predicates"
-	"github.com/projectcapsule/capsule/pkg/utils"
 )
 
 type customQuotaClaimController struct {
 	client.Client
+	reader client.Reader
 
 	log      logr.Logger
 	recorder events.EventRecorder
@@ -49,6 +50,7 @@ type customQuotaClaimController struct {
 
 func (r *customQuotaClaimController) SetupWithManager(mgr ctrl.Manager, cfg cutils.ControllerOptions) error {
 	r.mapper = mgr.GetRESTMapper()
+	r.reader = mgr.GetAPIReader()
 
 	return ctrl.NewControllerManagedBy(mgr).
 		For(
@@ -114,17 +116,21 @@ func (r *customQuotaClaimController) Reconcile(ctx context.Context, request ctrl
 	statusErr := errors.Join(reconcileErr, ledgerErr)
 
 	if err := r.updateStatus(ctx, instance, statusErr); err != nil {
-		return reconcile.Result{}, client.IgnoreNotFound(fmt.Errorf("cannot update status: %w", err))
+		if apierrors.IsNotFound(err) || apierrors.HasStatusCause(err, corev1.NamespaceTerminatingCause) {
+			err = nil
+		}
+
+		return reconcile.Result{}, fmt.Errorf("cannot update status: %w", err)
 	}
 
 	r.emitMetrics(instance)
 
 	if err := patchHelper.Patch(ctx, instance); err != nil {
-		if ignored := utils.IgnoreWrappedNotFound(err); ignored == nil {
-			return reconcile.Result{}, nil
+		if apierrors.IsNotFound(err) || apierrors.HasStatusCause(err, corev1.NamespaceTerminatingCause) {
+			err = nil
 		}
 
-		return reconcile.Result{}, fmt.Errorf("failed to patch: %w", err)
+		return reconcile.Result{}, fmt.Errorf("cannot patch: %w", err)
 	}
 
 	if requeueAfter != nil {
@@ -284,7 +290,7 @@ func (r *customQuotaClaimController) updateStatus(
 ) error {
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
 		latest := &capsulev1beta2.CustomQuota{}
-		if err = r.Get(ctx, types.NamespacedName{Name: instance.GetName(), Namespace: instance.GetNamespace()}, latest); err != nil {
+		if err = r.reader.Get(ctx, types.NamespacedName{Name: instance.GetName(), Namespace: instance.GetNamespace()}, latest); err != nil {
 			if apierrors.IsNotFound(err) {
 				return nil
 			}

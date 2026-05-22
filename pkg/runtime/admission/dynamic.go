@@ -21,8 +21,45 @@ type DynamicAdmissionConfig struct {
 	// Annotations added to the Admission Webhook
 	// +optional
 	Annotations map[string]string `json:"annotations,omitempty"`
-	//
-	Client *admissionregistrationv1.WebhookClientConfig `json:"client,omitzero"`
+	// whats the problem
+	Client *admissionregistrationv1.WebhookClientConfig `json:"client"`
+}
+
+func DynamicWebhookURL(baseURL *string, webhookPath string) *string {
+	cleanPath := normalizePath(webhookPath)
+	if cleanPath == "" {
+		if baseURL == nil || *baseURL == "" {
+			return nil
+		}
+
+		u := *baseURL
+
+		return &u
+	}
+
+	if baseURL == nil || *baseURL == "" {
+		u := cleanPath
+
+		return &u
+	}
+
+	base := strings.TrimRight(*baseURL, "/")
+
+	if base == strings.TrimRight(cleanPath, "/") {
+		u := cleanPath
+
+		return &u
+	}
+
+	if strings.HasSuffix(base, cleanPath) {
+		u := base
+
+		return &u
+	}
+
+	u := base + cleanPath
+
+	return &u
 }
 
 func DynamicClientWithPath(
@@ -31,31 +68,14 @@ func DynamicClientWithPath(
 ) admissionregistrationv1.WebhookClientConfig {
 	out := in
 
-	cleanPath := normalizePath(webhookPath)
-	if cleanPath == "" {
+	if out.URL != nil {
+		out.URL = DynamicWebhookURL(out.URL, webhookPath)
+
 		return out
 	}
 
-	if out.URL != nil && *out.URL != "" {
-		base := strings.TrimRight(*out.URL, "/")
-
-		if base == strings.TrimRight(cleanPath, "/") {
-			u := cleanPath
-			out.URL = &u
-
-			return out
-		}
-
-		if strings.HasSuffix(base, cleanPath) {
-			u := base
-			out.URL = &u
-
-			return out
-		}
-
-		u := base + cleanPath
-		out.URL = &u
-
+	cleanPath := normalizePath(webhookPath)
+	if cleanPath == "" {
 		return out
 	}
 

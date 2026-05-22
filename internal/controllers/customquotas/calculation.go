@@ -121,6 +121,7 @@ func reconcileQuotaUsage(
 			items, err = getResourcesByGVK(ctx, gvk, in.Client, in.ScopeSelectors, in.Namespaces...)
 			if err != nil {
 				errs = append(errs, fmt.Errorf("list resources for %s: %w", gvk.String(), err))
+
 				continue
 			}
 
@@ -155,6 +156,7 @@ func reconcileQuotaUsage(
 			rawUsage, err := usageForTarget(item, target)
 			if err != nil {
 				errs = append(errs, err)
+
 				continue
 			}
 
@@ -207,9 +209,16 @@ func reconcileQuotaUsage(
 				}
 			}
 
-			// Claims store the raw positive contribution of a matching object.
-			// The operation sign is only applied to status.usage.used.
-			claim.Usage.Add(rawUsage)
+			// Claims must mirror the same net per-object contribution used by admission reservations.
+			// This is required so reservationMaterializedLedger(res, claims) can clear reservations.
+			//
+			// For pure subtraction sources, the claim remains present but clamps to zero.
+			// Example:
+			//   claim usage = max(0 - 2Gi, 0) = 0
+			//
+			// For mixed sources, e.g. count + sub cpu:
+			//   claim usage = max(1 - 500m, 0) = 500m
+			claim.Usage.Add(accountingUsage)
 			quota.ClampQuantityToZero(&claim.Usage)
 
 			claimsByKey[key] = claim

@@ -9,10 +9,13 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -294,18 +297,20 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 	AfterEach(func() {
 		ForceDeleteNamespace(ctx, testNamespace)
 
-		// delete all global quotas used by tests
-		quotaList := &capsulev1beta2.GlobalCustomQuotaList{}
-		if err := k8sClient.List(ctx, quotaList); err == nil {
-			for i := range quotaList.Items {
-				item := quotaList.Items[i]
-				if item.Name == "" {
-					continue
-				}
-				if item.Labels["e2e.capsule.dev/test-suite"] == "globalcustomquota-ledger" {
-					EventuallyDeletion(&item)
-				}
-			}
+		req, err := labels.NewRequirement("e2e.capsule.dev/test-suite", selection.Equals, []string{"globalcustomquota-ledger"})
+		Expect(err).NotTo(HaveOccurred())
+
+		var list capsulev1beta2.GlobalCustomQuotaList
+		Expect(k8sClient.List(
+			context.TODO(),
+			&list,
+			client.MatchingLabelsSelector{
+				Selector: labels.NewSelector().Add(*req),
+			},
+		)).Should(Succeed())
+
+		for i := range list.Items {
+			EventuallyDeletion(&list.Items[i])
 		}
 	})
 

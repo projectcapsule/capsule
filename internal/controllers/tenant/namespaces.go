@@ -5,6 +5,7 @@ package tenant
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"maps"
 
@@ -36,7 +37,12 @@ func (r *Manager) reconcileNamespaces(ctx context.Context, tnt *capsulev1beta2.T
 			if err := r.Delete(ctx, ns, &client.DeleteOptions{
 				PropagationPolicy: ptr.To(metav1.DeletePropagationBackground),
 			}); err != nil && !apierrors.IsNotFound(err) {
-				r.Log.V(1).Error(err, "unable to delete namespace", "namespace", ns.Name)
+				r.Log.Error(err, "unable to delete tenant namespace",
+					"tenant", tnt.GetName(),
+					"namespace", ns.Name,
+				)
+
+				return err
 			}
 		}
 	}
@@ -60,6 +66,8 @@ func (r *Manager) reconcileNamespaces(ctx context.Context, tnt *capsulev1beta2.T
 
 	results := make(chan *capsulev1beta2.TenantStatusNamespaceItem, len(list.Items))
 
+	errs := make(chan error, len(list.Items))
+
 	for i := range list.Items {
 		ns := list.Items[i]
 
@@ -69,15 +77,28 @@ func (r *Manager) reconcileNamespaces(ctx context.Context, tnt *capsulev1beta2.T
 				results <- stat
 			}
 
-			return err
+			if err != nil {
+				r.Log.Error(err, "failed to reconcile namespace",
+					"tenant", tnt.GetName(),
+					"namespace", ns.GetName(),
+				)
+
+				errs <- fmt.Errorf("namespace %q: %w", ns.Name, err)
+			}
+
+			return nil
 		})
 	}
 
-	if err = group.Wait(); err != nil {
-		err = fmt.Errorf("cannot sync Namespaces: %w", err)
-	}
-
+	_ = group.Wait()
 	close(results)
+	close(errs)
+
+	var joined []error
+	for itemErr := range errs {
+		joined = append(joined, itemErr)
+	}
+	err = errors.Join(joined...)
 
 	desiredStatus := make(map[string]struct{}, len(list.Items))
 

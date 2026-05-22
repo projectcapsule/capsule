@@ -19,6 +19,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -56,25 +57,16 @@ func (r *validatingReconciler) SetupWithManager(mgr ctrl.Manager, ctrlConfig uti
 				}}
 			}),
 			builder.WithPredicates(
-				predicates.CapsuleConfigSpecAdmissionChangedPredicate{},
+				predicate.Or(
+					predicate.Funcs{
+						CreateFunc: func(e event.CreateEvent) bool {
+							return e.Object.GetName() == ctrlConfig.ConfigurationName
+						},
+					},
+					predicates.CapsuleConfigSpecAdmissionChangedPredicate{},
+				),
 				predicates.NamesMatchingPredicate{Names: []string{ctrlConfig.ConfigurationName}},
 			),
-		).
-		Watches(
-			&capsulev1beta2.CustomQuota{},
-			handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
-				return []reconcile.Request{{
-					NamespacedName: types.NamespacedName{Name: string(r.configuration.Admission().Validating.Name)},
-				}}
-			}),
-		).
-		Watches(
-			&capsulev1beta2.GlobalCustomQuota{},
-			handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
-				return []reconcile.Request{{
-					NamespacedName: types.NamespacedName{Name: string(r.configuration.Admission().Validating.Name)},
-				}}
-			}),
 		).
 		WithOptions(controller.Options{MaxConcurrentReconciles: ctrlConfig.MaxConcurrentReconciles}).
 		Complete(r)
@@ -158,12 +150,17 @@ func (r *validatingReconciler) reconcileValidatingConfiguration(
 		obj.SetAnnotations(annotations)
 
 		// Do not overwrite caBundle. cert-manager or the legacy TLS reconciler owns it.
-		if cfg.Client != nil {
+		if cfg.Client.CABundle == nil {
 			obj.Webhooks = preserveValidatingWebhookCABundles(obj.Webhooks, desiredHooks)
+		} else {
+			obj.Webhooks = desiredHooks
 		}
 
-		return nil
+		return err
 	})
+	if err != nil {
+		return err
+	}
 
 	// Garbage-collect any old managed validating webhook configs with different name
 	managed, err := r.listManagedValidatingWebhookConfigs(ctx)
@@ -217,7 +214,7 @@ func (r *validatingReconciler) validatingWebhooks(
 	cfg *capsulev1beta2.DynamicValidatingAdmissionConfig,
 ) (hooks []admissionv1.ValidatingWebhook, err error) {
 	for _, hook := range cfg.Webhooks {
-		h, err := admission.NewValidatingWebhook(hook, *cfg.Client, r.configuration.Users(), r.configuration.Administrators())
+		h, err := admission.NewValidatingWebhook(hook, cfg.Client, r.configuration.Users(), r.configuration.Administrators())
 		if err != nil {
 			return nil, err
 		}

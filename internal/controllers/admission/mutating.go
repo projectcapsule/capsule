@@ -19,6 +19,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -27,7 +28,6 @@ import (
 	"github.com/projectcapsule/capsule/internal/controllers/utils"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/runtime/admission"
-	clt "github.com/projectcapsule/capsule/pkg/runtime/client"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	"github.com/projectcapsule/capsule/pkg/runtime/predicates"
 )
@@ -57,7 +57,14 @@ func (r *mutatingReconciler) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils
 				}}
 			}),
 			builder.WithPredicates(
-				predicates.CapsuleConfigSpecAdmissionChangedPredicate{},
+				predicate.Or(
+					predicate.Funcs{
+						CreateFunc: func(e event.CreateEvent) bool {
+							return e.Object.GetName() == ctrlConfig.ConfigurationName
+						},
+					},
+					predicates.CapsuleConfigSpecAdmissionChangedPredicate{},
+				),
 				predicates.NamesMatchingPredicate{Names: []string{ctrlConfig.ConfigurationName}},
 			),
 		).
@@ -77,12 +84,12 @@ func (r *mutatingReconciler) reconcileConfiguration(
 ) error {
 	desiredName := string(cfg.Name)
 
-	hooks, err := r.webhooks(ctx, cfg)
+	desiredHooks, err := r.webhooks(ctx, cfg)
 	if err != nil {
 		return err
 	}
 
-	if len(hooks) == 0 {
+	if len(desiredHooks) == 0 {
 		managed, err := r.listManagedWebhookConfigs(ctx)
 		if err != nil {
 			return err
@@ -97,7 +104,7 @@ func (r *mutatingReconciler) reconcileConfiguration(
 		return nil
 	}
 
-	sort.Slice(hooks, func(i, j int) bool { return hooks[i].Name < hooks[j].Name })
+	sort.Slice(desiredHooks, func(i, j int) bool { return desiredHooks[i].Name < desiredHooks[j].Name })
 
 	obj := &admissionv1.MutatingWebhookConfiguration{
 		TypeMeta: metav1.TypeMeta{
@@ -105,34 +112,49 @@ func (r *mutatingReconciler) reconcileConfiguration(
 			Kind:       "MutatingWebhookConfiguration",
 		},
 		ObjectMeta: metav1.ObjectMeta{Name: string(cfg.Name)},
-		Webhooks:   hooks,
 	}
 
-	if err := controllerutil.SetOwnerReference(r.configuration.GetConfigObject(), obj, r.client.Scheme()); err != nil {
+	_, err = controllerutil.CreateOrUpdate(ctx, r.client, obj, func() error {
+		if err := controllerutil.SetOwnerReference(
+			r.configuration.GetConfigObject(),
+			obj,
+			r.client.Scheme(),
+		); err != nil {
+			return err
+		}
+
+		labels := obj.GetLabels()
+		if labels == nil {
+			labels = make(map[string]string)
+		}
+
+		maps.Copy(labels, cfg.Labels)
+
+		labels[meta.CreatedByCapsuleLabel] = meta.ValueController
+
+		obj.SetLabels(labels)
+
+		annotations := obj.GetAnnotations()
+		if annotations == nil {
+			annotations = make(map[string]string)
+		}
+
+		maps.Copy(annotations, cfg.Annotations)
+
+		obj.SetAnnotations(annotations)
+
+		obj.Webhooks = desiredHooks
+
+		// Do not overwrite caBundle. cert-manager or the legacy TLS reconciler owns it.
+		//if cfg.Client.CABundle == nil {
+		//	obj.Webhooks = preserveMutatingWebhookCABundles(obj.Webhooks, desiredHooks)
+		//} else {
+		//	obj.Webhooks = desiredHooks
+		//}
+
 		return err
-	}
-
-	labels := obj.GetLabels()
-	if labels == nil {
-		labels = make(map[string]string)
-	}
-
-	maps.Copy(labels, cfg.Labels)
-
-	labels[meta.CreatedByCapsuleLabel] = meta.ValueController
-
-	obj.SetLabels(labels)
-
-	annotations := obj.GetAnnotations()
-	if annotations == nil {
-		annotations = make(map[string]string)
-	}
-
-	maps.Copy(annotations, cfg.Annotations)
-
-	obj.SetAnnotations(annotations)
-
-	if err := clt.PatchApply(ctx, r.client, obj, meta.FieldManagerCapsuleController, true); err != nil {
+	})
+	if err != nil {
 		return err
 	}
 
@@ -188,7 +210,7 @@ func (r *mutatingReconciler) webhooks(
 	cfg *capsulev1beta2.DynamicMutatingAdmissionConfig,
 ) (hooks []admissionv1.MutatingWebhook, err error) {
 	for _, hook := range cfg.Webhooks {
-		h, err := admission.NewMutatingWebhook(hook, *cfg.Client, r.configuration.Users(), r.configuration.Administrators())
+		h, err := admission.NewMutatingWebhook(hook, cfg.Client, r.configuration.Users(), r.configuration.Administrators())
 		if err != nil {
 			return nil, err
 		}
@@ -197,4 +219,27 @@ func (r *mutatingReconciler) webhooks(
 	}
 
 	return hooks, nil
+}
+
+func preserveMutatingWebhookCABundles(
+	existing []admissionv1.MutatingWebhook,
+	desired []admissionv1.MutatingWebhook,
+) []admissionv1.MutatingWebhook {
+	existingByName := make(map[string][]byte, len(existing))
+
+	for _, hook := range existing {
+		if len(hook.ClientConfig.CABundle) == 0 {
+			continue
+		}
+
+		existingByName[hook.Name] = append([]byte(nil), hook.ClientConfig.CABundle...)
+	}
+
+	for i := range desired {
+		if caBundle, ok := existingByName[desired[i].Name]; ok {
+			desired[i].ClientConfig.CABundle = append([]byte(nil), caBundle...)
+		}
+	}
+
+	return desired
 }

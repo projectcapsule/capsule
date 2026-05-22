@@ -8,7 +8,6 @@ import (
 	"fmt"
 
 	"github.com/go-logr/logr"
-	"golang.org/x/sync/errgroup"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -57,26 +56,11 @@ func (r *Manager) syncRoleBindings(ctx context.Context, log logr.Logger, tenant 
 		namespaceBindings[namespace][hash] = binding
 	}
 
-	group := new(errgroup.Group)
-
-	for _, ns := range tenant.Status.Spaces {
-		namespace := ns.Name
-		cond := ns.Conditions.GetConditionByType(meta.TerminatingCondition)
-		if cond != nil {
-			if cond.Status == metav1.ConditionTrue {
-				continue
-			}
-		}
-
-		bindings := namespaceBindings[namespace]
-
-		group.Go(func() error {
-			return r.syncAdditionalRoleBinding(ctx, tenant, namespace, bindings)
-		})
-	}
-
-	return group.Wait()
+	return runForTenantNamespaces(ctx, tenant, func(ctx context.Context, namespace string) error {
+		return r.syncAdditionalRoleBinding(ctx, tenant, namespace, namespaceBindings[namespace])
+	})
 }
+
 func (r *Manager) syncAdditionalRoleBinding(
 	ctx context.Context,
 	tenant *capsulev1beta2.Tenant,
@@ -139,8 +123,6 @@ func (r *Manager) syncAdditionalRoleBinding(
 
 				continue
 			}
-
-			r.Log.Error(err, "cannot sync RoleBinding")
 
 			return fmt.Errorf("%w (role: %s)", err, roleBinding.ClusterRoleName)
 		}

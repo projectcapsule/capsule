@@ -38,11 +38,11 @@ import (
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	"github.com/projectcapsule/capsule/pkg/runtime/predicates"
 	"github.com/projectcapsule/capsule/pkg/runtime/selectors"
-	"github.com/projectcapsule/capsule/pkg/utils"
 )
 
 type clusterCustomQuotaClaimController struct {
 	client.Client
+	reader client.Reader
 
 	log      logr.Logger
 	recorder events.EventRecorder
@@ -55,6 +55,7 @@ type clusterCustomQuotaClaimController struct {
 
 func (r *clusterCustomQuotaClaimController) SetupWithManager(mgr ctrl.Manager, cfg cutils.ControllerOptions) error {
 	r.mapper = mgr.GetRESTMapper()
+	r.reader = mgr.GetAPIReader()
 
 	return ctrl.NewControllerManagedBy(mgr).
 		For(
@@ -149,14 +150,18 @@ func (r *clusterCustomQuotaClaimController) Reconcile(ctx context.Context, reque
 	statusErr := errors.Join(reconcileErr, ledgerErr)
 
 	if err := r.updateStatus(ctx, instance, statusErr); err != nil {
+		if apierrors.IsNotFound(err) {
+			err = nil
+		}
+
 		return reconcile.Result{}, client.IgnoreNotFound(fmt.Errorf("cannot update status: %w", err))
 	}
 
 	r.emitMetrics(instance)
 
 	if err := patchHelper.Patch(ctx, instance); err != nil {
-		if ignored := utils.IgnoreWrappedNotFound(err); ignored == nil {
-			return reconcile.Result{}, nil
+		if apierrors.IsNotFound(err) {
+			err = nil
 		}
 
 		return reconcile.Result{}, fmt.Errorf("failed to patch: %w", err)
@@ -379,7 +384,7 @@ func (r *clusterCustomQuotaClaimController) updateStatus(
 ) error {
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
 		latest := &capsulev1beta2.GlobalCustomQuota{}
-		if err = r.Get(ctx, types.NamespacedName{Name: instance.GetName()}, latest); err != nil {
+		if err = r.reader.Get(ctx, types.NamespacedName{Name: instance.GetName()}, latest); err != nil {
 			if apierrors.IsNotFound(err) {
 				return nil
 			}

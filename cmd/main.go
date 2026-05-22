@@ -565,6 +565,7 @@ func main() {
 		route.TenantValidation(
 			tenantvalidation.Handler(cfg,
 				tenantvalidation.NameHandler(),
+				tenantvalidation.NamespaceMetadataHandler(),
 				tenantvalidation.RoleBindingRegexHandler(),
 				tenantvalidation.IngressClassRegexHandler(),
 				tenantvalidation.StorageClassRegexHandler(),

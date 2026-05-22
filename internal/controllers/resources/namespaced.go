@@ -43,7 +43,9 @@ import (
 )
 
 type namespacedResourceController struct {
-	client        client.Client
+	client client.Client
+	reader client.Reader
+
 	log           logr.Logger
 	processor     processor.Processor
 	collector     Collector
@@ -55,6 +57,8 @@ type namespacedResourceController struct {
 
 func (r *namespacedResourceController) SetupWithManager(mgr ctrl.Manager, cfg cutils.ControllerOptions) error {
 	r.client = mgr.GetClient()
+	r.reader = mgr.GetAPIReader()
+
 	r.processor = processor.Processor{
 		Configuration:                r.configuration,
 		AllowCrossNamespaceSelection: false,
@@ -176,7 +180,7 @@ func (r *namespacedResourceController) Reconcile(ctx context.Context, request re
 		r.metrics.RecordConditions(tntResource)
 
 		if e := patchHelper.Patch(ctx, tntResource); e != nil {
-			if apierrors.IsNotFound(err) || apierrors.HasStatusCause(err, corev1.NamespaceTerminatingCause) {
+			if apierrors.IsNotFound(e) || apierrors.HasStatusCause(e, corev1.NamespaceTerminatingCause) {
 				err = nil
 
 				return
@@ -611,7 +615,7 @@ func (r *namespacedResourceController) impersonatedServiceAccount(
 func (r *namespacedResourceController) updateReconcilingStatus(ctx context.Context, instance *capsulev1beta2.TenantResource) error {
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
 		latest := &capsulev1beta2.TenantResource{}
-		if err = r.client.Get(ctx, types.NamespacedName{Name: instance.GetName(), Namespace: instance.GetNamespace()}, latest); err != nil {
+		if err = r.reader.Get(ctx, types.NamespacedName{Name: instance.GetName(), Namespace: instance.GetNamespace()}, latest); err != nil {
 			return err
 		}
 
@@ -628,11 +632,7 @@ func (r *namespacedResourceController) updateStatus(ctx context.Context, instanc
 
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
 		latest := &capsulev1beta2.TenantResource{}
-		if err = r.client.Get(ctx, types.NamespacedName{Name: instance.GetName(), Namespace: instance.GetNamespace()}, latest); err != nil {
-			if apierrors.IsNotFound(err) {
-				return nil
-			}
-
+		if err = r.reader.Get(ctx, types.NamespacedName{Name: instance.GetName(), Namespace: instance.GetNamespace()}, latest); err != nil {
 			return err
 		}
 

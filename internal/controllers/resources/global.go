@@ -10,6 +10,7 @@ import (
 
 	"github.com/go-logr/logr"
 	gherrors "github.com/pkg/errors"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -41,6 +42,7 @@ import (
 
 type globalResourceController struct {
 	client client.Client
+	reader client.Reader
 
 	log           logr.Logger
 	processor     processor.Processor
@@ -53,6 +55,8 @@ type globalResourceController struct {
 
 func (r *globalResourceController) SetupWithManager(mgr ctrl.Manager, cfg utils.ControllerOptions) error {
 	r.client = mgr.GetClient()
+	r.reader = mgr.GetAPIReader()
+
 	r.processor = processor.Processor{
 		Configuration:                r.configuration,
 		GatherClient:                 mgr.GetAPIReader(),
@@ -125,7 +129,7 @@ func (r *globalResourceController) Reconcile(ctx context.Context, request reconc
 
 	defer func() {
 		if uerr := r.updateStatus(ctx, tntResource, statusErr); uerr != nil {
-			if apierrors.IsNotFound(uerr) {
+			if apierrors.IsNotFound(uerr) || apierrors.HasStatusCause(uerr, corev1.NamespaceTerminatingCause) {
 				err = nil
 
 				return
@@ -139,7 +143,7 @@ func (r *globalResourceController) Reconcile(ctx context.Context, request reconc
 		r.metrics.RecordConditions(tntResource)
 
 		if e := patchHelper.Patch(ctx, tntResource); e != nil {
-			if apierrors.IsNotFound(e) {
+			if apierrors.IsNotFound(e) || apierrors.HasStatusCause(e, corev1.NamespaceTerminatingCause) {
 				err = nil
 
 				return
@@ -335,7 +339,7 @@ func (r *globalResourceController) reconcile(
 
 	// Use Controller Client.
 	tntList := capsulev1beta2.TenantList{}
-	if err = r.client.List(ctx, &tntList, &client.MatchingLabelsSelector{Selector: tntSelector}); err != nil {
+	if err = r.reader.List(ctx, &tntList, &client.MatchingLabelsSelector{Selector: tntSelector}); err != nil {
 		log.Error(err, "cannot list Tenants matching the provided selector")
 
 		return err
@@ -606,7 +610,7 @@ func (r *globalResourceController) impersonatedServiceAccount(
 func (r *globalResourceController) updateReconcilingStatus(ctx context.Context, instance *capsulev1beta2.GlobalTenantResource) error {
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
 		latest := &capsulev1beta2.GlobalTenantResource{}
-		if err = r.client.Get(ctx, types.NamespacedName{Name: instance.GetName()}, latest); err != nil {
+		if err = r.reader.Get(ctx, types.NamespacedName{Name: instance.GetName()}, latest); err != nil {
 			return err
 		}
 
@@ -623,7 +627,7 @@ func (r *globalResourceController) updateStatus(ctx context.Context, instance *c
 
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
 		latest := &capsulev1beta2.GlobalTenantResource{}
-		if err = r.client.Get(ctx, types.NamespacedName{Name: instance.GetName()}, latest); err != nil {
+		if err = r.reader.Get(ctx, types.NamespacedName{Name: instance.GetName()}, latest); err != nil {
 			if apierrors.IsNotFound(err) {
 				return nil
 			}

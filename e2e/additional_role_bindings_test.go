@@ -17,7 +17,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api/rbac"
 )
 
-var _ = Describe("creating a Namespace with an additional Role Binding", Ordered, Label("tenant", "rolebindings"), func() {
+var _ = Describe("creating a Namespace with an additional Role Binding", Ordered, Label("tenant", "permissions", "rolebindings"), func() {
 	tnt := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "e2e-additional-role-binding",
@@ -38,7 +38,7 @@ var _ = Describe("creating a Namespace with an additional Role Binding", Ordered
 			},
 			AdditionalRoleBindings: []rbac.AdditionalRoleBindingsSpec{
 				{
-					ClusterRoleName: "crds-rolebinding",
+					ClusterRoleName: "view",
 					Subjects: []rbacv1.Subject{
 						{
 							Kind:     "Group",
