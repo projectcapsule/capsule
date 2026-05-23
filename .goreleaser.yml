@@ -75,7 +75,7 @@ release:
     >
     > | Kubernetes version | Minimum required |
     > |--------------------|------------------|
-    > | `v1.35`            | `>= 1.35.0`      |
+    > | `v1.36`            | `>= 1.36.0`      |
 
 
     Thanks to all the contributors! 🚀 🦄
