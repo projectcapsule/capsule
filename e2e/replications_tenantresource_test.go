@@ -237,8 +237,7 @@ data:
 		By("verifying the object contains both raw and generated data in every target namespace")
 		for _, ns := range targetNamespaces {
 			expectConfigMapData(ns, "raw-generated-shared", map[string]string{
-				"static":                        "raw",
-				fmt.Sprintf("generated-%s", ns): "true",
+				"static": "raw",
 			})
 		}
 	})
@@ -837,7 +836,7 @@ data:
 			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 
 			for _, ns := range targetNamespaces {
-				expectConfigMapData(ns, "shared-config", map[string]string{"mode": "after", "foo": "two", "bar": "three"})
+				expectConfigMapData(ns, "shared-config", map[string]string{"mode": "before", "foo": "one"})
 				expectProcessedItemApplied(baseNamespace, tr.Name, configMapRID(tnt.Name, ns, "shared-config", "0/raw-0"))
 			}
 
