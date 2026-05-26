@@ -6,8 +6,6 @@ package mutation
 import (
 	"context"
 
-	"gomodules.xyz/jsonpatch/v2"
-	admissionv1 "k8s.io/api/admission/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -58,31 +56,10 @@ func (h *handler) OnCreate(
 			return nil
 		}
 
-		var patches []jsonpatch.JsonPatchOperation
-
 		for _, hndl := range h.handlers {
-			response := hndl.OnCreate(c, reader, user, ns, decoder, recorder)(ctx, req)
-			var stop *admission.Response
-
-			patches, stop = ad.AccumulateAdmissionResponse(patches, response)
-			if stop != nil {
-				return stop
+			if response := hndl.OnCreate(c, reader, user, ns, decoder, recorder)(ctx, req); response != nil {
+				return response
 			}
-		}
-
-		if len(patches) > 0 {
-			response := admission.Response{
-				AdmissionResponse: admissionv1.AdmissionResponse{
-					Allowed: true,
-					PatchType: func() *admissionv1.PatchType {
-						pt := admissionv1.PatchTypeJSONPatch
-						return &pt
-					}(),
-				},
-				Patches: patches,
-			}
-
-			return &response
 		}
 
 		return nil
@@ -112,31 +89,10 @@ func (h *handler) OnUpdate(
 			return ad.ErroredResponse(err)
 		}
 
-		var patches []jsonpatch.JsonPatchOperation
-
 		for _, hndl := range h.handlers {
-			response := hndl.OnUpdate(c, reader, user, ns, oldNs, decoder, recorder)(ctx, req)
-			var stop *admission.Response
-
-			patches, stop = ad.AccumulateAdmissionResponse(patches, response)
-			if stop != nil {
-				return stop
+			if response := hndl.OnUpdate(c, reader, user, ns, oldNs, decoder, recorder)(ctx, req); response != nil {
+				return response
 			}
-		}
-
-		if len(patches) > 0 {
-			response := admission.Response{
-				AdmissionResponse: admissionv1.AdmissionResponse{
-					Allowed: true,
-					PatchType: func() *admissionv1.PatchType {
-						pt := admissionv1.PatchTypeJSONPatch
-						return &pt
-					}(),
-				},
-				Patches: patches,
-			}
-
-			return &response
 		}
 
 		return nil

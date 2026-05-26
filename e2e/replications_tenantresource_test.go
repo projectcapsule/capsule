@@ -134,6 +134,60 @@ var _ = Describe("TenantResource SSA", Ordered, Label("replications", "namespace
 		})
 	})
 
+	It("places generated objects into the current tenant namespace even when the template sets metadata.namespace to a foreign namespace", func() {
+		tr := &capsulev1beta2.TenantResource{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "generator-enforce-target-namespace",
+				Namespace: baseNamespace,
+			},
+			Spec: capsulev1beta2.TenantResourceSpec{
+				TenantResourceCommonSpec: capsulev1beta2.TenantResourceCommonSpec{
+					PruningOnDelete: ptr.To(true),
+					ResyncPeriod:    resyncPeriod,
+					Resources: []capsulev1beta2.ResourceSpec{{
+						Generators: []capsulev1beta2.TemplateItemSpec{{
+							MissingKey: "error",
+							Template: `---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: generated-namespace-locked
+  namespace: kube-system
+data:
+  source: generator
+  renderedFor: "{{ $.namespace.metadata.name }}"
+`,
+						}},
+					}},
+				},
+			},
+		}
+
+		EventuallyCreation(func() error { return k8sClient.Create(ctx, tr) }).Should(Succeed())
+		expectTenantResourceReady(baseNamespace, tr.Name)
+
+		By("verifying the generated object is created in each tenant namespace, not in the foreign namespace")
+		for _, ns := range targetNamespaces {
+			Eventually(func(g Gomega) {
+				cm := &corev1.ConfigMap{}
+				g.Expect(k8sClient.Get(ctx, types.NamespacedName{
+					Name:      "generated-namespace-locked",
+					Namespace: ns,
+				}, cm)).To(Succeed())
+				g.Expect(cm.Namespace).To(Equal(ns))
+				g.Expect(cm.Data).To(HaveKeyWithValue("source", "generator"))
+				g.Expect(cm.Data).To(HaveKeyWithValue("renderedFor", ns))
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		}
+
+		Consistently(func() error {
+			return k8sClient.Get(ctx, types.NamespacedName{
+				Name:      "generated-namespace-locked",
+				Namespace: "kube-system",
+			}, &corev1.ConfigMap{})
+		}, 5*time.Second, defaultPollInterval).Should(HaveOccurred())
+	})
+
 	It("merges rawItems and generators when they target the same object", func() {
 		tr := &capsulev1beta2.TenantResource{
 			ObjectMeta: metav1.ObjectMeta{
@@ -178,7 +232,7 @@ data:
 		}
 
 		EventuallyCreation(func() error { return k8sClient.Create(ctx, tr) }).Should(Succeed())
-		expectTenantResourceReady(baseNamespace, tr.Name)
+		expectTenantResourceFailed(baseNamespace, tr.Name, "applying of 1 resources failed")
 
 		By("verifying the object contains both raw and generated data in every target namespace")
 		for _, ns := range targetNamespaces {
