@@ -5,8 +5,6 @@ package mutation
 
 import (
 	"context"
-	"encoding/json"
-	"net/http"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -64,16 +62,7 @@ func (h *ownerReferenceHandler) OnCreate(
 			return ad.ErroredResponse(err)
 		}
 
-		marshaled, err := json.Marshal(ns)
-		if err != nil {
-			response := admission.Errored(http.StatusInternalServerError, err)
-
-			return &response
-		}
-
-		response := admission.PatchResponseFromRaw(req.Object.Raw, marshaled)
-
-		return &response
+		return nil
 	}
 }
 
@@ -109,41 +98,28 @@ func (h *ownerReferenceHandler) OnUpdate(
 			return nil
 		}
 
-		if err := assignToTenant(c, tnt, oldNs, recorder); err != nil {
-			return ad.ErroredResponse(err)
-		}
-
-		var refs []metav1.OwnerReference
-
-		for _, ref := range oldNs.OwnerReferences {
-			if tenant.IsTenantOwnerReferenceForTenant(ref, tnt) {
-				refs = append(refs, ref)
-			}
-		}
+		refs := make([]metav1.OwnerReference, 0, len(newNs.OwnerReferences))
 
 		for _, ref := range newNs.OwnerReferences {
-			if !tenant.IsTenantOwnerReference(ref) {
-				refs = append(refs, ref)
+			if tenant.IsTenantOwnerReference(ref) && !tenant.IsTenantOwnerReferenceForTenant(ref, tnt) {
+				continue
 			}
+
+			refs = append(refs, ref)
 		}
 
 		newNs.OwnerReferences = refs
+
+		if err := assignToTenant(c, tnt, newNs, recorder); err != nil {
+			return ad.ErroredResponse(err)
+		}
 
 		labels := newNs.GetLabels()
 		tenant.AddNamespaceNameLabels(labels, oldNs)
 		tenant.AddTenantNameLabel(labels, tnt)
 		newNs.SetLabels(labels)
 
-		marshaled, err := json.Marshal(newNs)
-		if err != nil {
-			response := admission.Errored(http.StatusInternalServerError, err)
-
-			return &response
-		}
-
-		response := admission.PatchResponseFromRaw(req.Object.Raw, marshaled)
-
-		return &response
+		return nil
 	}
 }
 

@@ -26,7 +26,6 @@ import (
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/events"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/certwatcher"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -489,12 +488,13 @@ func main() {
 		DiscoveryClient: dc,
 		Metrics:         metrics.MustMakeTenantRecorder(),
 		Log:             ctrl.Log.WithName("capsule.ctrl").WithName("tenant"),
-		Recorder:        events.EventRecorder(manager.GetEventRecorder("tenant-controller")),
+		Recorder:        manager.GetEventRecorder("tenant-controller"),
 		Configuration:   cfg,
 	}).SetupWithManager(manager, controllerConfig); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Tenant")
 		os.Exit(1)
 	}
+
 	if err = (&capsulev1beta1.Tenant{}).SetupWebhookWithManager(manager); err != nil {
 		setupLog.Error(err, "unable to create conversion webhook", "webhook", "capsulev1beta1.Tenant")
 		os.Exit(1)
@@ -566,7 +566,7 @@ func main() {
 		route.TenantValidation(
 			tenantvalidation.Handler(cfg,
 				tenantvalidation.NameHandler(),
-				//tenantvalidation.NamespaceMetadataHandler(),
+				tenantvalidation.NamespaceMetadataHandler(),
 				tenantvalidation.RoleBindingRegexHandler(),
 				tenantvalidation.IngressClassRegexHandler(),
 				tenantvalidation.StorageClassRegexHandler(),

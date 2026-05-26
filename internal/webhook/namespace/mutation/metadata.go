@@ -5,9 +5,7 @@ package mutation
 
 import (
 	"context"
-	"encoding/json"
 	"maps"
-	"net/http"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -76,16 +74,7 @@ func (h *metadataHandler) OnCreate(
 			return response
 		}
 
-		marshaled, err := json.Marshal(ns)
-		if err != nil {
-			response := admission.Errored(http.StatusInternalServerError, err)
-
-			return &response
-		}
-
-		response := admission.PatchResponseFromRaw(req.Object.Raw, marshaled)
-
-		return &response
+		return nil
 	}
 }
 
@@ -140,20 +129,7 @@ func (h *metadataHandler) OnUpdate(
 		newNs.SetLabels(labels)
 		newNs.SetAnnotations(annotations)
 
-		if response := h.handleCordoning(tnt, newNs); response != nil {
-			return response
-		}
-
-		obj, err := json.Marshal(newNs)
-		if err != nil {
-			response := admission.Errored(http.StatusInternalServerError, err)
-
-			return &response
-		}
-
-		response := admission.PatchResponseFromRaw(req.Object.Raw, obj)
-
-		return &response
+		return nil
 	}
 }
 

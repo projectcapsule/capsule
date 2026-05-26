@@ -31,6 +31,7 @@ import (
 
 type resourceClaimController struct {
 	client.Client
+
 	reader client.Reader
 
 	metrics  *metrics.ClaimRecorder
@@ -84,6 +85,7 @@ func (r resourceClaimController) Reconcile(ctx context.Context, request ctrl.Req
 	defer func() {
 		if uerr := r.updateStatus(ctx, instance, err); uerr != nil {
 			err = uerr
+
 			return
 		}
 
@@ -92,10 +94,12 @@ func (r resourceClaimController) Reconcile(ctx context.Context, request ctrl.Req
 		if e := patchHelper.Patch(ctx, instance); e != nil {
 			if apierrors.IsNotFound(e) {
 				err = nil
+
 				return
 			}
 
 			err = e
+
 			return
 		}
 

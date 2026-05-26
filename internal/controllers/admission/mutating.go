@@ -143,14 +143,12 @@ func (r *mutatingReconciler) reconcileConfiguration(
 
 		obj.SetAnnotations(annotations)
 
-		obj.Webhooks = desiredHooks
-
 		// Do not overwrite caBundle. cert-manager or the legacy TLS reconciler owns it.
-		//if cfg.Client.CABundle == nil {
-		//	obj.Webhooks = preserveMutatingWebhookCABundles(obj.Webhooks, desiredHooks)
-		//} else {
-		//	obj.Webhooks = desiredHooks
-		//}
+		if cfg.Client.CABundle == nil {
+			obj.Webhooks = preserveMutatingWebhookCABundles(obj.Webhooks, desiredHooks)
+		} else {
+			obj.Webhooks = desiredHooks
+		}
 
 		return err
 	})

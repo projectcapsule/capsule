@@ -42,6 +42,7 @@ import (
 //
 // In case of Namespace-scoped Resource Budget, we're just replicating the resources across all registered Namespaces.
 
+//nolint:cyclop
 func (r *Manager) syncResourceQuotas(ctx context.Context, tenant *capsulev1beta2.Tenant) (err error) { //nolint:gocognit
 	// Remove prior metrics, to avoid cleaning up for metrics of deleted ResourceQuotas
 	r.Metrics.DeleteTenantResourceMetrics(tenant.Name)
@@ -182,12 +183,14 @@ func (r *Manager) syncResourceQuotas(ctx context.Context, tenant *capsulev1beta2
 		}
 
 		_ = group.Wait()
+
 		close(scopeErrs)
 
 		var joined []error
 		for scopeErr := range scopeErrs {
 			joined = append(joined, scopeErr)
 		}
+
 		if err = errors.Join(joined...); err != nil {
 			return err
 		}
@@ -269,7 +272,6 @@ func (r *Manager) syncResourceQuota(ctx context.Context, tenant *capsulev1beta2.
 
 			return retryErr
 		})
-
 		if err != nil {
 			if apierrors.HasStatusCause(err, corev1.NamespaceTerminatingCause) {
 				r.Log.V(4).Info(

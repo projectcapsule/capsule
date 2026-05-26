@@ -1,7 +1,6 @@
 // Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
-//nolint:dupl
 package handlers
 
 import (
@@ -27,7 +26,6 @@ type isNotPrivileged struct {
 	handlers      []Handler
 }
 
-//nolint:dupl
 func (h *isNotPrivileged) OnCreate(client client.Client, reader client.Reader, decoder admission.Decoder, recorder events.EventRecorder) Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		if users.IsAdminUser(req, h.configuration.Administrators()) {
@@ -44,7 +42,6 @@ func (h *isNotPrivileged) OnCreate(client client.Client, reader client.Reader, d
 	}
 }
 
-//nolint:dupl
 func (h *isNotPrivileged) OnDelete(client client.Client, reader client.Reader, decoder admission.Decoder, recorder events.EventRecorder) Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		if users.IsAdminUser(req, h.configuration.Administrators()) {
@@ -61,7 +58,6 @@ func (h *isNotPrivileged) OnDelete(client client.Client, reader client.Reader, d
 	}
 }
 
-//nolint:dupl
 func (h *isNotPrivileged) OnUpdate(client client.Client, reader client.Reader, decoder admission.Decoder, recorder events.EventRecorder) Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		if users.IsAdminUser(req, h.configuration.Administrators()) {

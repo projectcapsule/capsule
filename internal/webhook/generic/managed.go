@@ -5,15 +5,14 @@ package generic
 
 import (
 	"context"
-	"fmt"
 
 	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
+	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
-	"github.com/projectcapsule/capsule/pkg/users"
 )
 
 type managedValidatingHandler struct {
@@ -33,15 +32,7 @@ func (h *managedValidatingHandler) OnCreate(
 	_ events.EventRecorder,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		if !users.IsCapsuleUser(ctx, c, h.configuration, req.UserInfo.Username, req.UserInfo.Groups) {
-			return nil
-		}
-
-		msg := "Labeling resources as controller managed can only be done by the controller or administrators"
-
-		response := admission.Denied(msg)
-
-		return &response
+		return h.handle(ctx, req, c)
 	}
 }
 
@@ -52,15 +43,7 @@ func (h *managedValidatingHandler) OnDelete(
 	recorder events.EventRecorder,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		if !users.IsCapsuleUser(ctx, c, h.configuration, req.UserInfo.Username, req.UserInfo.Groups) {
-			return nil
-		}
-
-		msg := fmt.Sprintf("The attempted operation %s for %s/%s/%s/%s/%s is not permitted for controller managed resources.", req.Operation, req.Namespace, req.RequestKind.Group, req.RequestKind.Version, req.RequestKind.Kind, req.Name)
-
-		response := admission.Denied(msg)
-
-		return &response
+		return h.handle(ctx, req, c)
 	}
 }
 
@@ -71,14 +54,20 @@ func (h *managedValidatingHandler) OnUpdate(
 	recorder events.EventRecorder,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		if !users.IsCapsuleUser(ctx, c, h.configuration, req.UserInfo.Username, req.UserInfo.Groups) {
-			return nil
-		}
-
-		msg := fmt.Sprintf("The attempted operation %s for %s/%s/%s/%s/%s is not permitted for controller managed resources.", req.Operation, req.Namespace, req.RequestKind.Group, req.RequestKind.Version, req.RequestKind.Kind, req.Name)
-
-		response := admission.Denied(msg)
-
-		return &response
+		return h.handle(ctx, req, c)
 	}
+}
+
+func (h *managedValidatingHandler) handle(
+	ctx context.Context,
+	req admission.Request,
+	c client.Client,
+) *admission.Response {
+	user := handlers.ResolveAdmissionUser(ctx, c, req, h.configuration)
+
+	if user.IsAdmin() {
+		return nil
+	}
+
+	return ad.Deny("Labeling resources as controller managed can only be done by the controller or administrators")
 }

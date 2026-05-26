@@ -91,6 +91,7 @@ func (r *Manager) reconcileNamespaces(ctx context.Context, tnt *capsulev1beta2.T
 	}
 
 	_ = group.Wait()
+
 	close(results)
 	close(errs)
 
@@ -98,6 +99,7 @@ func (r *Manager) reconcileNamespaces(ctx context.Context, tnt *capsulev1beta2.T
 	for itemErr := range errs {
 		joined = append(joined, itemErr)
 	}
+
 	err = errors.Join(joined...)
 
 	desiredStatus := make(map[string]struct{}, len(list.Items))

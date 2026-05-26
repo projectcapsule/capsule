@@ -5,6 +5,7 @@ package mutation
 
 import (
 	"context"
+	"encoding/json"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/events"
@@ -57,12 +58,30 @@ func (h *handler) OnCreate(
 		}
 
 		for _, hndl := range h.handlers {
-			if response := hndl.OnCreate(c, reader, user, ns, decoder, recorder)(ctx, req); response != nil {
+			response := hndl.OnCreate(c, reader, user, ns, decoder, recorder)(ctx, req)
+
+			if response == nil {
+				continue
+			}
+
+			if !response.Allowed {
 				return response
 			}
 		}
 
-		return nil
+		marshaled, err := json.Marshal(ns)
+		if err != nil {
+			return ad.ErroredResponse(err)
+		}
+
+		response := admission.PatchResponseFromRaw(req.Object.Raw, marshaled)
+		if len(response.Patches) == 0 {
+			allowed := admission.Allowed("")
+
+			return &allowed
+		}
+
+		return &response
 	}
 }
 
@@ -90,12 +109,29 @@ func (h *handler) OnUpdate(
 		}
 
 		for _, hndl := range h.handlers {
-			if response := hndl.OnUpdate(c, reader, user, ns, oldNs, decoder, recorder)(ctx, req); response != nil {
+			response := hndl.OnUpdate(c, reader, user, ns, oldNs, decoder, recorder)(ctx, req)
+			if response == nil {
+				continue
+			}
+
+			if !response.Allowed {
 				return response
 			}
 		}
 
-		return nil
+		marshaled, err := json.Marshal(ns)
+		if err != nil {
+			return ad.ErroredResponse(err)
+		}
+
+		response := admission.PatchResponseFromRaw(req.Object.Raw, marshaled)
+		if len(response.Patches) == 0 {
+			allowed := admission.Allowed("")
+
+			return &allowed
+		}
+
+		return &response
 	}
 }
 

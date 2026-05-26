@@ -17,7 +17,7 @@ IMG_BASE        ?= $(REPOSITORY)
 IMG             ?= $(IMG_BASE):$(VERSION)
 CAPSULE_IMG     ?= $(REGISTRY)/$(IMG_BASE)
 CLUSTER_NAME    ?= capsule
-FILTER		 	?= --label-filter="!skip"
+FILTER		 	?= && !skip
 ## Kubernetes Version Support
 KUBERNETES_SUPPORTED_VERSION ?= "v1.35.0"
 
@@ -425,7 +425,7 @@ golint-fix: golangci-lint
 
 .PHONY: e2e-openshift
 e2e-openshift: ginkgo
-	$(MAKE) e2e-build-openshift && $(MAKE) e2e-exec FILTER='--label-filter="!skip && !skip-on-openshift"' && $(MAKE) e2e-destroy-openshift
+	$(MAKE) e2e-build-openshift && $(MAKE) e2e-exec FILTER='&& !skip && !skip-on-openshift' && $(MAKE) e2e-destroy-openshift
 
 e2e-build-openshift: minc
 	$(MINC) config set provider docker
@@ -466,8 +466,8 @@ e2e-install: helm-controller-version ko-build-all
 		--set 'manager.livenessProbe.failureThreshold=10' \
 		--set 'manager.options.logLevel=debug' \
 		--set 'manager.options.workers=4' \
-		--set 'manager.options.clientConnectionQPS=800' \
-		--set 'manager.options.clientConnectionQPS=400' \
+		--set 'manager.options.clientConnectionQPS=2000' \
+		--set 'manager.options.clientConnectionQPS=1000' \
 		--set 'manager.rbac.minimal=true' \
 		--set 'webhooks.hooks.nodes.enabled=true' \
 		--set "webhooks.exclusive=true"\
@@ -552,12 +552,12 @@ e2e-load-image-openshift: minc
 
 .PHONY: e2e-exec
 e2e-exec: ginkgo
-	$(GINKGO) -v -p -tags e2e $(FILTER) --label-filter="!config" ./e2e
+	$(GINKGO) -v -p -tags e2e --label-filter="!config $(FILTER)" ./e2e
 	$(MAKE) e2e-exec-config
 
 .PHONY: e2e-exec-config
 e2e-exec-config: ginkgo
-	$(GINKGO) -v  -tags e2e $(FILTER) --label-filter="config" ./e2e
+	$(GINKGO) -v  -tags e2e --label-filter="config $(FILTER)" ./e2e
 
 .PHONY: e2e-destroy
 e2e-destroy: dev-destroy

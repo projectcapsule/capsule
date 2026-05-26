@@ -116,7 +116,6 @@ func (h *handler) OnDelete(
 	}
 }
 
-//nolint:gocognit
 func (h *handler) OnUpdate(
 	c client.Client,
 	reader client.Reader,

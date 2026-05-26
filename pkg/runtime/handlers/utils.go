@@ -6,10 +6,11 @@ package handlers
 import (
 	"context"
 
-	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
-	"github.com/projectcapsule/capsule/pkg/users"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+
+	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
+	"github.com/projectcapsule/capsule/pkg/users"
 )
 
 type NewObjectFunc[T client.Object] func() T
@@ -24,16 +25,19 @@ func ResolveAdmissionUser(
 
 	if user.IsControllerServiceAccount() {
 		user.Type = users.AdmissionUserAdmin
+
 		return user
 	}
 
 	if config.Administrators().IsPresent(req.UserInfo.Username, req.UserInfo.Groups) {
 		user.Type = users.AdmissionUserAdmin
+
 		return user
 	}
 
 	if users.IsCapsuleUser(ctx, c, config, req.UserInfo.Username, req.UserInfo.Groups) {
 		user.Type = users.AdmissionUserCapsule
+
 		return user
 	}
 

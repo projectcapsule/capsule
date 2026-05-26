@@ -97,6 +97,7 @@ func (r *globalResourceController) SetupWithManager(mgr ctrl.Manager, cfg utils.
 		WithOptions(controller.Options{MaxConcurrentReconciles: cfg.MaxConcurrentReconciles}).
 		Complete(r)
 }
+
 func (r *globalResourceController) Reconcile(ctx context.Context, request reconcile.Request) (res reconcile.Result, err error) {
 	log := ctrllog.FromContext(ctx)
 
@@ -127,6 +128,7 @@ func (r *globalResourceController) Reconcile(ctx context.Context, request reconc
 
 	var statusErr error
 
+	//nolint:dupl
 	defer func() {
 		reconcileErr := err
 		if statusErr != nil {
@@ -136,10 +138,12 @@ func (r *globalResourceController) Reconcile(ctx context.Context, request reconc
 		if uerr := r.updateStatus(ctx, tntResource, reconcileErr); uerr != nil {
 			if caperrors.IgnoreGone(uerr) {
 				err = nil
+
 				return
 			}
 
 			err = fmt.Errorf("cannot update globaltenantresource status: %w", uerr)
+
 			return
 		}
 
@@ -148,11 +152,13 @@ func (r *globalResourceController) Reconcile(ctx context.Context, request reconc
 		if e := patchHelper.Patch(ctx, tntResource); e != nil {
 			if caperrors.IgnoreGone(e) {
 				err = nil
+
 				return
 			}
 
 			res = reconcile.Result{}
 			err = gherrors.Wrap(e, "failed to patch GlobalTenantResource")
+
 			return
 		}
 
@@ -161,6 +167,7 @@ func (r *globalResourceController) Reconcile(ctx context.Context, request reconc
 	}()
 
 	// On Deletion these checks are skipped.
+	//nolint:nestif
 	if tntResource.DeletionTimestamp.IsZero() {
 		if tntResource.Spec.Cordoned != nil && *tntResource.Spec.Cordoned {
 			log.V(5).Info("global tenant resource cordoned")

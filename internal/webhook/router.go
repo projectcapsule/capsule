@@ -17,7 +17,7 @@ import (
 )
 
 func Register(manager controllerruntime.Manager, webhookList ...handlers.Webhook) error {
-	recorder := events.EventRecorder(manager.GetEventRecorder("admission"))
+	recorder := manager.GetEventRecorder("admission")
 
 	server := manager.GetWebhookServer()
 

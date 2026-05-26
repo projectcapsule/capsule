@@ -15,6 +15,7 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api"
+	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 	"github.com/projectcapsule/capsule/pkg/template"
 )
@@ -52,8 +53,8 @@ func (h *namespaceMetadataHandler) OnDelete(
 func (h *namespaceMetadataHandler) OnUpdate(
 	_ client.Client,
 	_ client.Reader,
-	_ *capsulev1beta2.Tenant,
 	newTnt *capsulev1beta2.Tenant,
+	_ *capsulev1beta2.Tenant,
 	_ admission.Decoder,
 	_ events.EventRecorder,
 ) handlers.Func {
@@ -71,12 +72,13 @@ func validateTenantNamespaceMetadata(tnt *capsulev1beta2.Tenant) *admission.Resp
 		return nil
 	}
 
-	var errs []string
+	errs := make([]string, 0, 1+len(tnt.Spec.NamespaceOptions.AdditionalMetadataList))
 
 	errs = append(
 		errs,
 		validateAdditionalMetadata(
 			"spec.namespaceOptions.additionalMetadata",
+			//nolint:staticcheck
 			tnt.Spec.NamespaceOptions.AdditionalMetadata,
 		)...,
 	)
@@ -95,9 +97,7 @@ func validateTenantNamespaceMetadata(tnt *capsulev1beta2.Tenant) *admission.Resp
 	}
 
 	if len(errs) > 0 {
-		resp := admission.Denied(strings.Join(errs, "; "))
-
-		return &resp
+		return ad.Deny(strings.Join(errs, "; "))
 	}
 
 	return nil
@@ -107,11 +107,11 @@ func validateAdditionalMetadata(
 	fieldPath string,
 	metadata *api.AdditionalMetadataSpec,
 ) []string {
-	var errs []string
-
 	if metadata == nil {
-		return errs
+		return nil
 	}
+
+	errs := make([]string, 0, len(metadata.Labels)*2+len(metadata.Annotations)*2)
 
 	errs = append(errs, validateLabelMap(fieldPath+".labels", metadata.Labels)...)
 	errs = append(errs, validateAnnotationMap(fieldPath+".annotations", metadata.Annotations)...)
@@ -120,13 +120,13 @@ func validateAdditionalMetadata(
 }
 
 func validateLabelMap(fieldPath string, labels map[string]string) []string {
-	var errs []string
+	errs := make([]string, 0, len(labels)*2)
 
 	for key, value := range labels {
 		errs = append(
 			errs,
 			template.ValidateKubernetesStringOrAllowedTemplates(
-				fmt.Sprintf("%s[%q]", fieldPath, key),
+				fmt.Sprintf("%s[%q].key", fieldPath, key),
 				key,
 				validation.IsQualifiedName,
 			)...,
@@ -135,7 +135,7 @@ func validateLabelMap(fieldPath string, labels map[string]string) []string {
 		errs = append(
 			errs,
 			template.ValidateKubernetesStringOrAllowedTemplates(
-				fmt.Sprintf("%s[%q]", fieldPath, key),
+				fmt.Sprintf("%s[%q].value", fieldPath, key),
 				value,
 				validation.IsValidLabelValue,
 			)...,
@@ -146,17 +146,23 @@ func validateLabelMap(fieldPath string, labels map[string]string) []string {
 }
 
 func validateAnnotationMap(fieldPath string, annotations map[string]string) []string {
-	var errs []string
+	errs := make([]string, 0, len(annotations)*2)
 
-	for key := range annotations {
+	for key, value := range annotations {
 		errs = append(
 			errs,
 			template.ValidateKubernetesStringOrAllowedTemplates(
-				fmt.Sprintf("%s[%q]", fieldPath, key),
+				fmt.Sprintf("%s[%q].key", fieldPath, key),
 				key,
-				func(value string) []string {
-					return validation.IsQualifiedName(strings.ToLower(value))
-				},
+				validation.IsQualifiedName,
+			)...,
+		)
+
+		errs = append(
+			errs,
+			template.ValidateAllowedTemplatesOnly(
+				fmt.Sprintf("%s[%q].value", fieldPath, key),
+				value,
 			)...,
 		)
 	}

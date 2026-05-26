@@ -126,7 +126,7 @@ func (h *replicaHandler) handler(
 	}
 
 	if len(local.Items) > 0 {
-		for i := range global.Items {
+		for i := range local.Items {
 			if isAllowedServiceAccount(req.UserInfo.Username, local.Items[i].Status.ServiceAccount) {
 				return nil
 			}

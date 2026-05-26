@@ -84,10 +84,6 @@ func (r *validatingReconciler) reconcileValidatingConfiguration(
 ) error {
 	desiredName := string(cfg.Name)
 
-	if cfg.Client != nil {
-
-	}
-
 	desiredHooks, err := r.validatingWebhooks(ctx, cfg)
 	if err != nil {
 		return err

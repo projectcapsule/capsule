@@ -1,6 +1,7 @@
 // Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
+//nolint:dupl
 package tenant
 
 import (
@@ -20,7 +21,7 @@ import (
 
 // Ensuring all the NetworkPolicies are applied to each Namespace handled by the Tenant.
 //
-//nolint:dupl
+
 func (r *Manager) syncNetworkPolicies(ctx context.Context, tenant *capsulev1beta2.Tenant) error {
 	keys := make([]string, 0, len(tenant.Spec.NetworkPolicies.Items)) //nolint:staticcheck
 

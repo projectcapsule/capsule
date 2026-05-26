@@ -52,6 +52,44 @@ var _ = Describe("creating a Namespace for a Tenant with additional metadata", O
 		EventuallyDeletion(tnt)
 	})
 
+	It("should reject invalid additional metadata on tenant create", func() {
+		tnt := &capsulev1beta2.Tenant{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "e2e-invalid-metadata-create",
+				Labels: map[string]string{
+					"env": "e2e",
+				},
+			},
+			Spec: capsulev1beta2.TenantSpec{
+				Owners: rbac.OwnerListSpec{
+					{
+						CoreOwnerSpec: rbac.CoreOwnerSpec{
+							UserSpec: rbac.UserSpec{
+								Name: "e2e-invalid-metadata-create",
+								Kind: "User",
+							},
+						},
+					},
+				},
+				NamespaceOptions: &capsulev1beta2.NamespaceOptions{
+					ManagedMetadataOnly: false,
+					AdditionalMetadataList: []api.AdditionalMetadataSelectorSpec{
+						{
+							Labels: map[string]string{
+								"clastix.io???custom-label": "bar",
+							},
+						},
+					},
+				},
+			},
+		}
+
+		Eventually(func() error {
+			tnt.ResourceVersion = ""
+			return k8sClient.Create(context.TODO(), tnt)
+		}, defaultTimeoutInterval, defaultPollInterval).ShouldNot(Succeed())
+	})
+
 	It("should contain additional Namespace metadata", func() {
 		By("prepare tenant", func() {
 			tnt.Spec.NamespaceOptions = &capsulev1beta2.NamespaceOptions{
@@ -440,11 +478,11 @@ var _ = Describe("creating a Namespace for a Tenant with additional metadata", O
 					tnt = GetTenantEventually(tnt)
 
 					condition := tnt.Status.Conditions.GetConditionByType(meta.ReadyCondition)
-					Expect(condition).NotTo(BeNil(), "Condition instance should not be nil")
+					g.Expect(condition).NotTo(BeNil(), "Condition instance should not be nil")
 
-					Expect(condition.Status).To(Equal(metav1.ConditionTrue), "Expected tenant condition status to be True")
-					Expect(condition.Type).To(Equal(meta.ReadyCondition), "Expected tenant condition type to be Ready")
-					Expect(condition.Reason).To(Equal(meta.SucceededReason), "Expected tenant condition reason to be Succeeded")
+					g.Expect(condition.Status).To(Equal(metav1.ConditionTrue), "Expected tenant condition status to be True")
+					g.Expect(condition.Type).To(Equal(meta.ReadyCondition), "Expected tenant condition type to be Ready")
+					g.Expect(condition.Reason).To(Equal(meta.SucceededReason), "Expected tenant condition reason to be Succeeded")
 				}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 			})
 
@@ -597,7 +635,10 @@ var _ = Describe("creating a Namespace for a Tenant with additional metadata", O
 		})
 
 		By("change managed additional metadata (provoke an error)", func() {
-			UpdateTenantEventually(tnt, func(t *capsulev1beta2.Tenant) {
+			Eventually(func() error {
+				t := &capsulev1beta2.Tenant{}
+				Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: tnt.GetName()}, t)).To(Succeed())
+
 				t.Spec.NamespaceOptions = &capsulev1beta2.NamespaceOptions{
 					ManagedMetadataOnly: false,
 					AdditionalMetadataList: []api.AdditionalMetadataSelectorSpec{
@@ -608,9 +649,11 @@ var _ = Describe("creating a Namespace for a Tenant with additional metadata", O
 						},
 					},
 				}
-			})
 
-			TenantReadyFalse(tnt)
+				return k8sClient.Update(context.TODO(), t)
+			}, defaultTimeoutInterval, defaultPollInterval).ShouldNot(Succeed())
+
+			TenantReadyTrue(tnt)
 		})
 
 		By("verify metadata lifecycle (faulty update)", func() {
@@ -655,32 +698,37 @@ var _ = Describe("creating a Namespace for a Tenant with additional metadata", O
 			By("verify tenant status", func() {
 				Eventually(func(g Gomega) {
 					t := &capsulev1beta2.Tenant{}
-					Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: tnt.GetName()}, t)).To(Succeed())
+
+					g.Expect(k8sClient.Get(
+						context.TODO(),
+						types.NamespacedName{Name: tnt.GetName()},
+						t,
+					)).To(Succeed())
 
 					condition := t.Status.Conditions.GetConditionByType(meta.ReadyCondition)
-					Expect(condition).NotTo(BeNil(), "Condition instance should not be nil")
+					g.Expect(condition).NotTo(BeNil(), "Condition instance should not be nil")
 
-					Expect(condition.Status).To(Equal(metav1.ConditionFalse), "Expected tenant condition status to be True")
-					Expect(condition.Type).To(Equal(meta.ReadyCondition), "Expected tenant condition type to be Ready")
-					Expect(condition.Reason).To(Equal(meta.FailedReason), "Expected tenant condition reason to be Succeeded")
+					g.Expect(condition.Type).To(Equal(meta.ReadyCondition), "Expected tenant condition type to be Ready")
+					g.Expect(condition.Status).To(Equal(metav1.ConditionTrue), "Expected tenant condition status to be False")
+					g.Expect(condition.Reason).To(Equal(meta.SucceededReason), "Expected tenant condition reason to be Failed")
 				}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 			})
 
 			By("verify namespace status", func() {
 				Eventually(func(g Gomega) {
 					t := &capsulev1beta2.Tenant{}
-					Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: tnt.GetName()}, t)).To(Succeed())
+					g.Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: tnt.GetName()}, t)).To(Succeed())
 
 					instance := t.Status.GetInstance(&capsulev1beta2.TenantStatusNamespaceItem{Name: ns.GetName(), UID: ns.GetUID()})
-					Expect(instance).NotTo(BeNil(), "Namespace instance should not be nil")
+					g.Expect(instance).NotTo(BeNil(), "Namespace instance should not be nil")
 
 					condition := instance.Conditions.GetConditionByType(meta.ReadyCondition)
-					Expect(condition).NotTo(BeNil(), "Condition instance should not be nil")
+					g.Expect(condition).NotTo(BeNil(), "Condition instance should not be nil")
 
-					Expect(instance.Name).To(Equal(ns.GetName()))
-					Expect(condition.Status).To(Equal(metav1.ConditionFalse), "Expected namespace condition status to be True")
-					Expect(condition.Type).To(Equal(meta.ReadyCondition), "Expected namespace condition type to be Ready")
-					Expect(condition.Reason).To(Equal(meta.FailedReason), "Expected namespace condition reason to be Succeeded")
+					g.Expect(instance.Name).To(Equal(ns.GetName()))
+					g.Expect(condition.Status).To(Equal(metav1.ConditionTrue), "Expected namespace condition status to be True")
+					g.Expect(condition.Type).To(Equal(meta.ReadyCondition), "Expected namespace condition type to be Ready")
+					g.Expect(condition.Reason).To(Equal(meta.SucceededReason), "Expected namespace condition reason to be Succeeded")
 
 					expectedMetadata := &capsulev1beta2.TenantStatusNamespaceMetadata{
 						Labels: map[string]string{
@@ -691,7 +739,7 @@ var _ = Describe("creating a Namespace for a Tenant with additional metadata", O
 						},
 					}
 
-					Expect(instance.Metadata).To(Equal(expectedMetadata))
+					g.Expect(instance.Metadata).To(Equal(expectedMetadata))
 				}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 			})
 		})
@@ -769,21 +817,21 @@ var _ = Describe("creating a Namespace for a Tenant with additional metadata", O
 			By("verify namespace status", func() {
 				Eventually(func(g Gomega) {
 					t := &capsulev1beta2.Tenant{}
-					Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: tnt.GetName()}, t)).To(Succeed())
+					g.Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: tnt.GetName()}, t)).To(Succeed())
 
 					instance := t.Status.GetInstance(&capsulev1beta2.TenantStatusNamespaceItem{Name: ns.GetName(), UID: ns.GetUID()})
-					Expect(instance).NotTo(BeNil(), "Namespace instance should not be nil")
+					g.Expect(instance).NotTo(BeNil(), "Namespace instance should not be nil")
 
 					condition := instance.Conditions.GetConditionByType(meta.ReadyCondition)
-					Expect(condition).NotTo(BeNil(), "Condition instance should not be nil")
+					g.Expect(condition).NotTo(BeNil(), "Condition instance should not be nil")
 
-					Expect(instance.Name).To(Equal(ns.GetName()))
-					Expect(condition.Status).To(Equal(metav1.ConditionTrue), "Expected namespace condition status to be True")
-					Expect(condition.Type).To(Equal(meta.ReadyCondition), "Expected namespace condition type to be Ready")
-					Expect(condition.Reason).To(Equal(meta.SucceededReason), "Expected namespace condition reason to be Succeeded")
+					g.Expect(instance.Name).To(Equal(ns.GetName()))
+					g.Expect(condition.Status).To(Equal(metav1.ConditionTrue), "Expected namespace condition status to be True")
+					g.Expect(condition.Type).To(Equal(meta.ReadyCondition), "Expected namespace condition type to be Ready")
+					g.Expect(condition.Reason).To(Equal(meta.SucceededReason), "Expected namespace condition reason to be Succeeded")
 
 					expectedMetadata := &capsulev1beta2.TenantStatusNamespaceMetadata{}
-					Expect(instance.Metadata).To(Equal(expectedMetadata))
+					g.Expect(instance.Metadata).To(Equal(expectedMetadata))
 				}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 			})
 		})

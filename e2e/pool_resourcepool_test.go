@@ -329,16 +329,46 @@ var _ = Describe("ResourcePool Tests", Ordered, Label("resourcepool", "pool"), f
 		})
 
 		By("Update the ResourcePool", func() {
-			pool.Spec.Defaults = corev1.ResourceList{
-				corev1.ResourceLimitsCPU:       resource.MustParse("1"),
-				corev1.ResourceLimitsMemory:    resource.MustParse("1Gi"),
-				corev1.ResourceRequestsCPU:     resource.MustParse("1"),
-				corev1.ResourceRequestsMemory:  resource.MustParse("1Gi"),
-				corev1.ResourceRequestsStorage: resource.MustParse("5Gi"),
+			Eventually(func() error {
+				current := &capsulev1beta2.ResourcePool{}
+				if err := k8sClient.Get(
+					context.TODO(),
+					client.ObjectKey{Name: pool.Name},
+					current,
+				); err != nil {
+					return err
+				}
+
+				current.Spec.Defaults = corev1.ResourceList{
+					corev1.ResourceLimitsCPU:       resource.MustParse("1"),
+					corev1.ResourceLimitsMemory:    resource.MustParse("1Gi"),
+					corev1.ResourceRequestsCPU:     resource.MustParse("1"),
+					corev1.ResourceRequestsMemory:  resource.MustParse("1Gi"),
+					corev1.ResourceRequestsStorage: resource.MustParse("5Gi"),
+				}
+
+				return k8sClient.Update(context.TODO(), current)
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		})
+
+		By("Wait for ResourcePool allocation after defaults update", func() {
+			expected := capsulev1beta2.ResourcePoolQuotaStatus{
+				Hard: pool.Spec.Quota.Hard,
+				Claimed: corev1.ResourceList{
+					corev1.ResourceLimitsCPU:      resource.MustParse("0"),
+					corev1.ResourceRequestsMemory: resource.MustParse("0"),
+					corev1.ResourceRequestsCPU:    resource.MustParse("0"),
+					corev1.ResourceLimitsMemory:   resource.MustParse("640Mi"),
+				},
+				Available: corev1.ResourceList{
+					corev1.ResourceLimitsCPU:      resource.MustParse("2"),
+					corev1.ResourceRequestsMemory: resource.MustParse("2Gi"),
+					corev1.ResourceRequestsCPU:    resource.MustParse("2"),
+					corev1.ResourceLimitsMemory:   resource.MustParse("1408Mi"),
+				},
 			}
 
-			err := k8sClient.Update(context.TODO(), pool)
-			Expect(err).Should(Succeed(), "Failed to update ResourcePool %s", pool)
+			ExpectResourcePoolAllocationEventually(pool.Name, expected)
 		})
 
 		By("Verify ResourceQuotas for namespaces", func() {
@@ -476,8 +506,7 @@ var _ = Describe("ResourcePool Tests", Ordered, Label("resourcepool", "pool"), f
 		})
 
 		By("Delete Resourcepool", func() {
-			err := k8sClient.Delete(context.TODO(), pool)
-			Expect(err).Should(Succeed())
+			EventuallyDeletion(pool)
 		})
 
 		By("Ensure ResourceQuotas are cleaned up", func() {
@@ -1514,10 +1543,30 @@ var _ = Describe("ResourcePool Tests", Ordered, Label("resourcepool", "pool"), f
 				},
 			}
 
-			EventuallyCreation(ns1).Should(Succeed(), "Failed to create Namespace %s", ns1.Name)
-			EventuallyCreation(ns2).Should(Succeed(), "Failed to create Namespace %s", ns2.Name)
-			EventuallyCreation(claim1).Should(Succeed(), "Failed to create Claim %s/%s", claim1.Namespace, claim1.Name)
-			EventuallyCreation(claim2).Should(Succeed(), "Failed to create Claim %s/%s", claim2.Namespace, claim2.Name)
+			EventuallyCreation(func() error {
+				ns1.ResourceVersion = ""
+				return k8sClient.Create(context.TODO(), ns1)
+			}).Should(Succeed(), "Failed to create Namespace %s", ns1.Name)
+
+			EventuallyCreation(func() error {
+				ns2.ResourceVersion = ""
+				return k8sClient.Create(context.TODO(), ns2)
+			}).Should(Succeed(), "Failed to create Namespace %s", ns2.Name)
+
+			ExpectResourcePoolNamespacesEventually(pool.Name, []string{
+				ns1.Name,
+				ns2.Name,
+			})
+
+			EventuallyCreation(func() error {
+				claim1.ResourceVersion = ""
+				return k8sClient.Create(context.TODO(), claim1)
+			}).Should(Succeed(), "Failed to create Claim %s/%s", claim1.Namespace, claim1.Name)
+
+			EventuallyCreation(func() error {
+				claim2.ResourceVersion = ""
+				return k8sClient.Create(context.TODO(), claim2)
+			}).Should(Succeed(), "Failed to create Claim %s/%s", claim2.Namespace, claim2.Name)
 
 			isSuccessfullyBoundAndUnsedToPool(pool, claim1)
 			isSuccessfullyBoundAndUnsedToPool(pool, claim2)
@@ -1632,10 +1681,30 @@ var _ = Describe("ResourcePool Tests", Ordered, Label("resourcepool", "pool"), f
 				},
 			}
 
-			EventuallyCreation(ns1).Should(Succeed(), "Failed to create Namespace %s", ns1.Name)
-			EventuallyCreation(ns2).Should(Succeed(), "Failed to create Namespace %s", ns2.Name)
-			EventuallyCreation(claim1).Should(Succeed(), "Failed to create Claim %s/%s", claim1.Namespace, claim1.Name)
-			EventuallyCreation(claim2).Should(Succeed(), "Failed to create Claim %s/%s", claim2.Namespace, claim2.Name)
+			EventuallyCreation(func() error {
+				ns1.ResourceVersion = ""
+				return k8sClient.Create(context.TODO(), ns1)
+			}).Should(Succeed(), "Failed to create Namespace %s", ns1.Name)
+
+			EventuallyCreation(func() error {
+				ns2.ResourceVersion = ""
+				return k8sClient.Create(context.TODO(), ns2)
+			}).Should(Succeed(), "Failed to create Namespace %s", ns2.Name)
+
+			ExpectResourcePoolNamespacesEventually(pool.Name, []string{
+				ns1.Name,
+				ns2.Name,
+			})
+
+			EventuallyCreation(func() error {
+				claim1.ResourceVersion = ""
+				return k8sClient.Create(context.TODO(), claim1)
+			}).Should(Succeed(), "Failed to create Claim %s/%s", claim1.Namespace, claim1.Name)
+
+			EventuallyCreation(func() error {
+				claim2.ResourceVersion = ""
+				return k8sClient.Create(context.TODO(), claim2)
+			}).Should(Succeed(), "Failed to create Claim %s/%s", claim2.Namespace, claim2.Name)
 
 			isSuccessfullyBoundAndUnsedToPool(pool, claim1)
 			isSuccessfullyBoundAndUnsedToPool(pool, claim2)
@@ -2168,5 +2237,58 @@ func ExpectPoolAllocation(name string, expected capsulev1beta2.ResourcePoolQuota
 
 		ok, msg := DeepCompare(expected, current.Status.Allocation)
 		g.Expect(ok).To(BeTrue(), "Mismatch for resource allocation: %s", msg)
+	}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+}
+
+func ExpectNamespaceInResourcePoolEventually(poolName string, namespace string) {
+	Eventually(func(g Gomega) {
+		current := &capsulev1beta2.ResourcePool{}
+
+		g.Expect(k8sClient.Get(
+			context.TODO(),
+			client.ObjectKey{Name: poolName},
+			current,
+		)).To(Succeed())
+
+		g.Expect(current.Status.Namespaces).To(ContainElement(namespace))
+		g.Expect(current.Status.NamespaceSize).To(BeNumerically(">", 0))
+
+		condition := current.Status.Conditions.GetConditionByType(meta.ReadyCondition)
+		g.Expect(condition).NotTo(BeNil(), "ResourcePool Ready condition should exist")
+		g.Expect(condition.Status).To(Equal(metav1.ConditionTrue))
+		g.Expect(condition.Reason).To(Equal(meta.SucceededReason))
+	}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+}
+
+func ExpectResourcePoolAllocationEventually(
+	poolName string,
+	expected capsulev1beta2.ResourcePoolQuotaStatus,
+) {
+	Eventually(func(g Gomega) {
+		current := &capsulev1beta2.ResourcePool{}
+
+		g.Expect(k8sClient.Get(
+			context.TODO(),
+			client.ObjectKey{Name: poolName},
+			current,
+		)).To(Succeed())
+
+		ok, msg := DeepCompare(expected, current.Status.Allocation)
+		g.Expect(ok).To(BeTrue(), "Mismatch for expected status allocation: %s", msg)
+	}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+}
+
+func ExpectResourcePoolNamespacesEventually(poolName string, expected []string) {
+	Eventually(func(g Gomega) {
+		current := &capsulev1beta2.ResourcePool{}
+
+		g.Expect(k8sClient.Get(
+			context.TODO(),
+			client.ObjectKey{Name: poolName},
+			current,
+		)).To(Succeed())
+
+		g.Expect(current.Status.Namespaces).To(ConsistOf(expected))
+		g.Expect(current.Status.NamespaceSize).To(Equal(uint(len(expected))))
 	}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 }

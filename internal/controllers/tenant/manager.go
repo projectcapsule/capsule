@@ -49,6 +49,7 @@ import (
 
 type Manager struct {
 	client.Client
+
 	reader client.Reader
 
 	DiscoveryClient discovery.DiscoveryInterface
@@ -273,7 +274,8 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 	if e := patchHelper.Patch(ctx, instance); e != nil {
 		if caperrors.IgnoreGone(e) {
 			err = nil
-			return
+
+			return result, err
 		}
 
 		return reconcile.Result{}, e

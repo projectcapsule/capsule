@@ -1184,11 +1184,6 @@ spec:
                     description: Name for the ClusterRole required to grant Namespace
                       Deletion permissions.
                     type: string
-                  namespaceFinalizer:
-                    default: capsule:controller:namespace-finalizer
-                    description: Name for the ClusterRole required for the capsule
-                      controller to finalize namespaced content
-                    type: string
                   promotionClusterRoles:
                     default:
                     - capsule-namespace-provisioner

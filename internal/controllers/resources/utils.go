@@ -4,12 +4,8 @@
 package resources
 
 import (
-	"crypto/sha256"
-	"strconv"
-
-	"encoding/hex"
 	"hash/fnv"
-	"strings"
+	"strconv"
 
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
@@ -28,25 +24,6 @@ func getFieldOwner(name string, namespace string) string {
 	_, _ = h.Write([]byte(name))
 
 	return strconv.FormatUint(h.Sum64(), 36)
-}
-
-func shortHash(value string, length int) string {
-	sum := sha256.Sum256([]byte(value))
-	encoded := hex.EncodeToString(sum[:])
-
-	if length > len(encoded) {
-		return encoded
-	}
-
-	return encoded[:length]
-}
-
-func truncate(value string, max int) string {
-	if len(value) <= max {
-		return value
-	}
-
-	return strings.TrimRight(value[:max], "-_.")
 }
 
 func getSelectorForCreatedResourcesExclusion() (labels.Selector, error) {

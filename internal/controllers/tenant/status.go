@@ -5,7 +5,6 @@ package tenant
 
 import (
 	"context"
-	"fmt"
 	"regexp"
 	"sort"
 
@@ -32,11 +31,13 @@ import (
 func setTenantStatusState(tnt *capsulev1beta2.Tenant) {
 	if tnt.DeletionTimestamp != nil {
 		tnt.Status.State = capsulev1beta2.TenantStateTerminating
+
 		return
 	}
 
 	if tnt.Spec.Cordoned {
 		tnt.Status.State = capsulev1beta2.TenantStateCordoned
+
 		return
 	}
 
@@ -114,46 +115,6 @@ func (r *Manager) updateReconcilingStatus(ctx context.Context, instance *capsule
 		instance.Status = latest.Status
 
 		return nil
-
-	})
-}
-
-func (r *Manager) updateTenantClassStatus(ctx context.Context, instance *capsulev1beta2.Tenant, reconcileError error) error {
-	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		latest := &capsulev1beta2.Tenant{}
-		if err := r.reader.Get(ctx, types.NamespacedName{Name: instance.GetName()}, latest); err != nil {
-			if apierrors.IsNotFound(err) {
-				return nil
-			}
-
-			return err
-		}
-
-		latest.Status.Classes = instance.Status.Classes
-		setTenantStatusState(latest)
-
-		readyCondition := capmeta.NewReadyCondition(latest)
-		if reconcileError != nil {
-			readyCondition.Message = reconcileError.Error()
-			readyCondition.Status = metav1.ConditionFalse
-			readyCondition.Reason = capmeta.FailedReason
-
-			r.Log.Error(reconcileError, "failed reconciling classes")
-		}
-
-		latest.Status.Conditions.UpdateConditionByType(readyCondition)
-
-		if err := r.Client.Status().Update(ctx, latest); err != nil {
-			if apierrors.IsNotFound(err) {
-				return nil
-			}
-
-			return err
-		}
-
-		instance.Status = latest.Status
-
-		return nil
 	})
 }
 
@@ -184,35 +145,6 @@ func (r *Manager) collectRBAC(ctx context.Context, tnt *capsulev1beta2.Tenant) (
 	}
 
 	return nil
-}
-
-func (r Manager) reconcileClassStatus(
-	ctx context.Context,
-	fn func(context.Context, *capsulev1beta2.Tenant) error,
-) (err error) {
-	tntList := &capsulev1beta2.TenantList{}
-	if err = r.List(ctx, tntList); err != nil {
-		return err
-	}
-
-	for i := range tntList.Items {
-		t := &tntList.Items[i]
-
-		// Collect Ownership for Status
-		if err = fn(ctx, t); err != nil {
-			err = fmt.Errorf("cannot collect available classes: %w", err)
-
-			return err
-		}
-
-		if err = r.updateTenantClassStatus(ctx, t, err); err != nil {
-			err = fmt.Errorf("cannot update tenant status: %w", err)
-
-			return err
-		}
-	}
-
-	return err
 }
 
 func (r *Manager) collectAvailableResources(ctx context.Context, tnt *capsulev1beta2.Tenant) (err error) {
@@ -410,6 +342,8 @@ func listObjectNamesBySelector(
 	}
 
 	var regex *regexp.Regexp
+
+	//nolint:staticcheck
 	if allowed.Regex != "" {
 		regex, err = regexp.Compile(allowed.Regex)
 		if err != nil {

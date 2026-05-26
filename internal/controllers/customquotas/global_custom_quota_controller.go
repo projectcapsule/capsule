@@ -43,6 +43,7 @@ import (
 
 type clusterCustomQuotaClaimController struct {
 	client.Client
+
 	reader client.Reader
 
 	log      logr.Logger
@@ -106,6 +107,7 @@ func (r *clusterCustomQuotaClaimController) SetupWithManager(mgr ctrl.Manager, c
 		WithOptions(controller.Options{MaxConcurrentReconciles: cfg.MaxConcurrentReconciles}).
 		Complete(r)
 }
+
 func (r *clusterCustomQuotaClaimController) Reconcile(ctx context.Context, request ctrl.Request) (ctrl.Result, error) {
 	log := r.log.WithValues("Request.Name", request.Name)
 
@@ -129,7 +131,7 @@ func (r *clusterCustomQuotaClaimController) Reconcile(ctx context.Context, reque
 	if err := r.ensureQuotaLedger(ctx, instance); err != nil {
 		if instance.DeletionTimestamp != nil || shouldIgnoreLedgerEnsureError(err) {
 			log.V(4).Info("skipping QuantityLedger ensure because CustomQuota or namespace is terminating",
-				"customQuota", request.NamespacedName.String(),
+				"customQuota", request.String(),
 				"error", err,
 			)
 
@@ -270,7 +272,6 @@ func (r *clusterCustomQuotaClaimController) reconcile(
 	return err
 }
 
-//nolint:dupl
 func (r *clusterCustomQuotaClaimController) reconcileLedger(
 	ctx context.Context,
 	log logr.Logger,

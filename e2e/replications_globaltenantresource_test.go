@@ -991,12 +991,19 @@ data:
 			renameFirstRawConfigMap(gtr, "gtr-kept")
 
 			EventuallyCreation(func() error { return k8sClient.Create(ctx, gtr) }).Should(Succeed())
+
+			for _, ns := range tenantANamespaces {
+				expectConfigMapData(ns, "gtr-kept", map[string]string{"mode": "keep"})
+			}
+
 			Expect(k8sClient.Delete(ctx, gtr)).To(Succeed())
 
 			for _, ns := range tenantANamespaces {
 				expectConfigMapData(ns, "gtr-kept", map[string]string{"mode": "keep"})
 			}
+
 		})
+
 	})
 
 	Context("namespace target enforcement", func() {

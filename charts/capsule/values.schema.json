@@ -929,23 +929,7 @@
                                 },
                                 "namespaceSelector": {
                                     "description": "[NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector)",
-                                    "type": "object",
-                                    "properties": {
-                                        "matchExpressions": {
-                                            "type": "array",
-                                            "items": {
-                                                "type": "object",
-                                                "properties": {
-                                                    "key": {
-                                                        "type": "string"
-                                                    },
-                                                    "operator": {
-                                                        "type": "string"
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
+                                    "type": "object"
                                 },
                                 "objectSelector": {
                                     "description": "[ObjectSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-objectselector)",

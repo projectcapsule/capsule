@@ -5,6 +5,7 @@ package customquota
 import (
 	"context"
 	"fmt"
+	"slices"
 	"sort"
 	"time"
 
@@ -122,6 +123,7 @@ func (h *objectCalculationHandler) OnCreate(
 			}
 
 			applied := make([]appliedReservation, 0, len(evaluated))
+
 			for _, item := range evaluated {
 				ledgerKey := quantityLedgerKeyForMatchedQuota(item)
 
@@ -351,6 +353,7 @@ func (h *objectCalculationHandler) OnUpdate(
 				}
 
 				var reservation *capsulev1beta2.QuantityLedgerReservation
+
 				if hadNew && newUsage.Sign() > 0 {
 					r := buildReservation(req, newObj, newUsage, base.Key)
 					reservation = &r
@@ -367,15 +370,15 @@ func (h *objectCalculationHandler) OnUpdate(
 					pendingDelete,
 				)
 				if err != nil {
-					for i := len(applied) - 1; i >= 0; i-- {
+					for _, v := range slices.Backward(applied) {
 						_ = rollbackUsageReplacementOnLedger(
 							ctx,
 							c,
 							reader,
-							applied[i].LedgerKey,
-							applied[i].ReservationID,
-							applied[i].OldUsage,
-							applied[i].NewUsage,
+							v.LedgerKey,
+							v.ReservationID,
+							v.OldUsage,
+							v.NewUsage,
 						)
 					}
 
@@ -383,15 +386,15 @@ func (h *objectCalculationHandler) OnUpdate(
 				}
 
 				if !allowed {
-					for i := len(applied) - 1; i >= 0; i-- {
+					for _, v := range slices.Backward(applied) {
 						_ = rollbackUsageReplacementOnLedger(
 							ctx,
 							c,
 							reader,
-							applied[i].LedgerKey,
-							applied[i].ReservationID,
-							applied[i].OldUsage,
-							applied[i].NewUsage,
+							v.LedgerKey,
+							v.ReservationID,
+							v.OldUsage,
+							v.NewUsage,
 						)
 					}
 
@@ -546,6 +549,7 @@ func deleteLedgerReservation(
 		for _, res := range ledger.Status.Reservations {
 			if res.ID == reservationID {
 				released.Add(res.Usage)
+
 				continue
 			}
 
@@ -571,44 +575,6 @@ func deleteLedgerReservation(
 
 		return c.Status().Update(ctx, ledger)
 	})
-}
-
-func (h *objectCalculationHandler) effectiveAvailableForSort(
-	ctx context.Context,
-	c client.Client,
-	mq quota.MatchedQuota,
-) resource.Quantity {
-	used := mq.Used.DeepCopy()
-
-	var ledgerKey types.NamespacedName
-	if mq.IsGlobal {
-		ledgerKey = types.NamespacedName{
-			Name:      mq.Name,
-			Namespace: configuration.ControllerNamespace(),
-		}
-	} else {
-		ledgerKey = types.NamespacedName{
-			Name:      mq.Name,
-			Namespace: mq.Namespace,
-		}
-	}
-
-	ledger := &capsulev1beta2.QuantityLedger{}
-	if err := c.Get(ctx, ledgerKey, ledger); err == nil {
-		used.Add(ledger.Status.Reserved)
-
-		quota.ClampQuantityToZero(&used)
-	}
-
-	available := mq.Limit.DeepCopy()
-
-	available.Sub(used)
-
-	if available.Sign() < 0 {
-		return resource.MustParse("0")
-	}
-
-	return available
 }
 
 func (h *objectCalculationHandler) matchAllQuotas(
@@ -931,143 +897,6 @@ func (h *objectCalculationHandler) evaluateMatchedQuotas(
 	}
 
 	return out, nil
-}
-
-func mutateLedger(
-	ctx context.Context,
-	c client.Client,
-	reader client.Reader,
-	item evaluatedQuota,
-	reservation *capsulev1beta2.QuantityLedgerReservation,
-	pendingDelete *capsulev1beta2.QuantityLedgerObjectRef,
-) (bool, resource.Quantity, resource.Quantity, error) {
-	var (
-		allowed       bool
-		effectiveUsed resource.Quantity
-		reserved      resource.Quantity
-	)
-
-	ledgerKey := quantityLedgerKeyForMatchedQuota(item)
-
-	err := retry.RetryOnConflict(ledgerMutationBackoff, func() error {
-		latestUsed, err := latestPersistedUsedForQuota(ctx, reader, item)
-		if err != nil {
-			return err
-		}
-
-		ledger := &capsulev1beta2.QuantityLedger{}
-		if err := reader.Get(ctx, ledgerKey, ledger); err != nil {
-			return err
-		}
-
-		now := metav1.Now()
-
-		activeReservations := make([]capsulev1beta2.QuantityLedgerReservation, 0, len(ledger.Status.Reservations))
-		foundReservation := false
-
-		for _, existing := range ledger.Status.Reservations {
-			if existing.ExpiresAt != nil && existing.ExpiresAt.Before(&now) {
-				continue
-			}
-
-			if reservation != nil && existing.ID == reservation.ID {
-				existing.Usage = reservation.Usage.DeepCopy()
-				existing.ObjectRef = reservation.ObjectRef
-				existing.UpdatedAt = now
-				existing.ExpiresAt = reservation.ExpiresAt
-				foundReservation = true
-			}
-
-			activeReservations = append(activeReservations, existing)
-		}
-
-		if reservation != nil && !foundReservation {
-			activeReservations = append(activeReservations, *reservation)
-		}
-
-		activeDeletes := make([]capsulev1beta2.QuantityLedgerPendingDelete, 0, len(ledger.Status.PendingDeletes))
-		activeDeletes = append(activeDeletes, ledger.Status.PendingDeletes...)
-
-		if pendingDelete != nil {
-			exists := false
-
-			for _, pd := range activeDeletes {
-				if pd.ObjectRef.UID != "" && pd.ObjectRef.UID == pendingDelete.UID {
-					exists = true
-
-					break
-				}
-			}
-
-			if !exists {
-				activeDeletes = append(activeDeletes, capsulev1beta2.QuantityLedgerPendingDelete{
-					ObjectRef: *pendingDelete,
-					CreatedAt: now,
-				})
-			}
-		}
-
-		newReserved := resource.MustParse("0")
-		for _, r := range activeReservations {
-			newReserved.Add(r.Usage)
-		}
-
-		newEffectiveUsed := latestUsed.DeepCopy()
-		newEffectiveUsed.Add(newReserved)
-
-		if newEffectiveUsed.Sign() < 0 {
-			newEffectiveUsed = resource.MustParse("0")
-		}
-
-		if newEffectiveUsed.Cmp(item.Limit) > 0 {
-			allowed = false
-			effectiveUsed = newEffectiveUsed
-			reserved = newReserved
-
-			return nil
-		}
-
-		ledger.Status.Reservations = activeReservations
-		ledger.Status.PendingDeletes = activeDeletes
-		ledger.Status.Reserved = newReserved
-
-		if err := c.Status().Update(ctx, ledger); err != nil {
-			return err
-		}
-
-		allowed = true
-		effectiveUsed = newEffectiveUsed
-		reserved = newReserved
-
-		return nil
-	})
-
-	return allowed, effectiveUsed, reserved, err
-}
-
-func latestPersistedUsedForQuota(
-	ctx context.Context,
-	c client.Reader,
-	item evaluatedQuota,
-) (resource.Quantity, error) {
-	if item.IsGlobal {
-		obj := &capsulev1beta2.GlobalCustomQuota{}
-		if err := c.Get(ctx, types.NamespacedName{Name: item.Name}, obj); err != nil {
-			return resource.Quantity{}, err
-		}
-
-		return obj.Status.Usage.Used.DeepCopy(), nil
-	}
-
-	obj := &capsulev1beta2.CustomQuota{}
-	if err := c.Get(ctx, types.NamespacedName{
-		Name:      item.Name,
-		Namespace: item.Namespace,
-	}, obj); err != nil {
-		return resource.Quantity{}, err
-	}
-
-	return obj.Status.Usage.Used.DeepCopy(), nil
 }
 
 func addLedgerPendingDelete(

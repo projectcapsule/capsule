@@ -37,6 +37,7 @@ import (
 
 type customQuotaClaimController struct {
 	client.Client
+
 	reader client.Reader
 
 	log      logr.Logger
@@ -99,7 +100,7 @@ func (r *customQuotaClaimController) Reconcile(ctx context.Context, request ctrl
 	if err := r.ensureQuotaLedger(ctx, instance); err != nil {
 		if instance.DeletionTimestamp != nil || shouldIgnoreLedgerEnsureError(err) {
 			log.V(4).Info("skipping QuantityLedger ensure because CustomQuota or namespace is terminating",
-				"customQuota", request.NamespacedName.String(),
+				"customQuota", request.String(),
 				"error", err,
 			)
 
@@ -177,8 +178,6 @@ func (r *customQuotaClaimController) reconcile(
 	return err
 }
 
-//nolint:dupl
-//nolint:dupl
 func (r *customQuotaClaimController) reconcileLedger(
 	ctx context.Context,
 	log logr.Logger,

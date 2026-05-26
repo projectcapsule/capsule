@@ -4,9 +4,10 @@
 package users
 
 import (
-	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	authenticationv1 "k8s.io/api/authentication/v1"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
+
+	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 )
 
 type AdmissionUserType string

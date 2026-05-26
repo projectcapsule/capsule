@@ -213,10 +213,10 @@ var _ = Describe("ResourcePoolClaim Tests", Ordered, Label("resourcepool", "clai
 			Eventually(func(g Gomega) {
 				stat := &capsulev1beta2.ResourcePool{}
 				err := k8sClient.Get(context.TODO(), client.ObjectKey{Name: pool1.Name}, stat)
-				Expect(err).Should(Succeed())
+				g.Expect(err).Should(Succeed())
 
-				Expect(stat.Status.Namespaces).To(Equal(expectedNamespaces))
-				Expect(stat.Status.NamespaceSize).To(Equal(uint(2)))
+				g.Expect(stat.Status.Namespaces).To(Equal(expectedNamespaces))
+				g.Expect(stat.Status.NamespaceSize).To(Equal(uint(2)))
 			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		})
 
@@ -257,17 +257,17 @@ var _ = Describe("ResourcePoolClaim Tests", Ordered, Label("resourcepool", "clai
 			Eventually(func(g Gomega) {
 				stat := &capsulev1beta2.ResourcePoolClaim{}
 				err := k8sClient.Get(context.TODO(), client.ObjectKey{Name: claim.Name, Namespace: claim.Namespace}, stat)
-				Expect(err).Should(Succeed())
+				g.Expect(err).Should(Succeed())
 
 				expectedPool := meta.LocalRFC1123ObjectReferenceWithUID{}
-				Expect(stat.Status.Pool).To(Equal(expectedPool), "expected pool name to be empty")
+				g.Expect(stat.Status.Pool).To(Equal(expectedPool), "expected pool name to be empty")
 
-				Expect(len(stat.Status.Conditions)).To(Equal(1), "expected single condition")
-				Expect(len(stat.OwnerReferences)).To(Equal(0), "expected no ownerreferences")
+				g.Expect(len(stat.Status.Conditions)).To(Equal(1), "expected single condition")
+				g.Expect(len(stat.OwnerReferences)).To(Equal(0), "expected no ownerreferences")
 				assigned := stat.Status.Conditions.GetConditionByType(meta.ReadyCondition)
-				Expect(assigned.Status).To(Equal(metav1.ConditionFalse), "failed to verify condition status")
-				Expect(assigned.Type).To(Equal(meta.ReadyCondition), "failed to verify condition type")
-				Expect(assigned.Reason).To(Equal(meta.FailedReason), "failed to verify condition reason")
+				g.Expect(assigned.Status).To(Equal(metav1.ConditionFalse), "failed to verify condition status")
+				g.Expect(assigned.Type).To(Equal(meta.ReadyCondition), "failed to verify condition type")
+				g.Expect(assigned.Reason).To(Equal(meta.FailedReason), "failed to verify condition reason")
 			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		})
 	})
@@ -352,14 +352,14 @@ var _ = Describe("ResourcePoolClaim Tests", Ordered, Label("resourcepool", "clai
 			Eventually(func(g Gomega) {
 				stat := &capsulev1beta2.ResourcePoolClaim{}
 				err := k8sClient.Get(context.TODO(), client.ObjectKey{Name: claim.Name, Namespace: claim.Namespace}, stat)
-				Expect(err).Should(Succeed())
+				g.Expect(err).Should(Succeed())
 
 				expectedPool := meta.LocalRFC1123ObjectReferenceWithUID{
 					Name: meta.RFC1123Name(pool.Name),
 					UID:  pool.GetUID(),
 				}
 
-				Expect(stat.Status.Pool).To(Equal(expectedPool), "expected pool name to match")
+				g.Expect(stat.Status.Pool).To(Equal(expectedPool), "expected pool name to match")
 			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 
 			isBoundAndUnusedCondition(claim)
@@ -486,7 +486,7 @@ var _ = Describe("ResourcePoolClaim Tests", Ordered, Label("resourcepool", "clai
 			Eventually(func(g Gomega) {
 				stat := &capsulev1beta2.ResourcePoolClaim{}
 				err := k8sClient.Get(context.TODO(), client.ObjectKey{Name: claim.Name, Namespace: claim.Namespace}, stat)
-				Expect(err).Should(Succeed())
+				g.Expect(err).Should(Succeed())
 
 				expectedPool := meta.LocalRFC1123ObjectReferenceWithUID{
 					Name: meta.RFC1123Name(pool.Name),
@@ -494,7 +494,7 @@ var _ = Describe("ResourcePoolClaim Tests", Ordered, Label("resourcepool", "clai
 				}
 
 				isBoundAndUnusedCondition(stat)
-				Expect(stat.Status.Pool).To(Equal(expectedPool), "expected pool name to match")
+				g.Expect(stat.Status.Pool).To(Equal(expectedPool), "expected pool name to match")
 			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		})
 
@@ -699,18 +699,27 @@ var _ = Describe("ResourcePoolClaim Tests", Ordered, Label("resourcepool", "clai
 				},
 			}
 
-			err := k8sClient.Create(context.TODO(), ns)
-			Expect(err).Should(Succeed())
+			EventuallyCreation(func() error {
+				return k8sClient.Create(context.TODO(), ns)
+			}).Should(Succeed())
 
-			err = k8sClient.Create(context.TODO(), claim)
-			Expect(err).Should(Succeed(), "Failed to create Claim %s", claim)
+			ExpectNamespaceInResourcePoolEventually(pool1.Name, ns.Name)
+
+			EventuallyCreation(func() error {
+				claim.ResourceVersion = ""
+				return k8sClient.Create(context.TODO(), claim)
+			}).Should(Succeed(), "Failed to create Claim %s/%s", claim.Namespace, claim.Name)
 
 			Eventually(func(g Gomega) {
 				stat := &capsulev1beta2.ResourcePoolClaim{}
-				err = k8sClient.Get(context.TODO(), client.ObjectKey{Name: claim.Name, Namespace: claim.Namespace}, stat)
-				Expect(err).Should(Succeed())
 
-				Expect(stat.Spec.Pool).To(Equal(pool1.Name), "expected pool name to match")
+				g.Expect(k8sClient.Get(
+					context.TODO(),
+					client.ObjectKey{Name: claim.Name, Namespace: claim.Namespace},
+					stat,
+				)).To(Succeed())
+
+				g.Expect(stat.Spec.Pool).To(Equal(pool1.Name), "expected pool name to match")
 			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		})
 
@@ -741,15 +750,17 @@ var _ = Describe("ResourcePoolClaim Tests", Ordered, Label("resourcepool", "clai
 			err := k8sClient.Create(context.TODO(), ns)
 			Expect(err).Should(Succeed())
 
+			ExpectNamespaceInResourcePoolEventually(pool2.Name, ns.Name)
+
 			err = k8sClient.Create(context.TODO(), claim)
 			Expect(err).Should(Succeed(), "Failed to create Claim %s", claim)
 
 			Eventually(func(g Gomega) {
 				stat := &capsulev1beta2.ResourcePoolClaim{}
 				err = k8sClient.Get(context.TODO(), client.ObjectKey{Name: claim.Name, Namespace: claim.Namespace}, stat)
-				Expect(err).Should(Succeed())
+				g.Expect(err).Should(Succeed())
 
-				Expect(stat.Spec.Pool).To(Equal(pool2.Name), "expected pool name to match")
+				g.Expect(stat.Spec.Pool).To(Equal(pool2.Name), "expected pool name to match")
 			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		})
 
@@ -779,15 +790,17 @@ var _ = Describe("ResourcePoolClaim Tests", Ordered, Label("resourcepool", "clai
 			err := k8sClient.Create(context.TODO(), ns)
 			Expect(err).Should(Succeed())
 
+			ExpectNamespaceInResourcePoolEventually(pool1.Name, ns.Name)
+
 			err = k8sClient.Create(context.TODO(), claim)
 			Expect(err).Should(Succeed(), "Failed to create Claim %s", claim)
 
 			Eventually(func(g Gomega) {
 				stat := &capsulev1beta2.ResourcePoolClaim{}
 				err = k8sClient.Get(context.TODO(), client.ObjectKey{Name: claim.Name, Namespace: claim.Namespace}, stat)
-				Expect(err).Should(Succeed())
+				g.Expect(err).Should(Succeed())
 
-				Expect(stat.Spec.Pool).To(Equal(""), "expected pool name to match")
+				g.Expect(stat.Spec.Pool).To(Equal(""), "expected pool name to match")
 			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		})
 	})

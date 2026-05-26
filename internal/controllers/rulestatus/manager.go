@@ -34,6 +34,7 @@ import (
 
 type Manager struct {
 	client.Client
+
 	reader client.Reader
 
 	Metrics       *metrics.TenantRecorder
@@ -106,7 +107,6 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 			err = fmt.Errorf("cannot patch: %w", e)
 
 			return
-
 		}
 
 		// Controller-Runtime should never receive error

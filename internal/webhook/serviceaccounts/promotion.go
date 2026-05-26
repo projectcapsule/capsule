@@ -95,7 +95,7 @@ func (h *promotion) handle(
 		return nil
 	}
 
-	msg := fmt.Sprintf("%s not allowed to promote serviceaccount to tenant owner", user)
+	msg := fmt.Sprintf("%s not allowed to promote serviceaccount to tenant owner", user.Username)
 
 	recorder.Eventf(
 		sa,

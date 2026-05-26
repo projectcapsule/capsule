@@ -1,7 +1,6 @@
 // Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
-//nolint:dupl
 package tenantresource
 
 import (
@@ -25,6 +24,7 @@ func (g GlobalCreatedItems) Func() client.IndexerFunc {
 		tgr := object.(*capsulev1beta2.GlobalTenantResource) //nolint:forcetypeassert
 
 		out := make([]string, 0, len(tgr.Status.ProcessedItems))
+
 		for _, pi := range tgr.Status.ProcessedItems {
 			if pi.Created {
 				out = append(out, pi.GetGVKKey(""))

@@ -156,7 +156,7 @@ spec:
         admissionReviewVersions:
           - v1
           - v1beta1
-        path: "/misc/cordoning"
+        path: "/generic/cordoning"
         failurePolicy: {{ .failurePolicy }}
         matchPolicy: {{ .matchPolicy }}
         {{- with .namespaceSelector }}

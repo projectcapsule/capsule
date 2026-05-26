@@ -186,6 +186,7 @@ func replaceUsageOnLedger(
 			for _, pd := range activeDeletes {
 				if pd.ObjectRef.UID != "" && pd.ObjectRef.UID == pendingDelete.UID {
 					exists = true
+
 					break
 				}
 			}

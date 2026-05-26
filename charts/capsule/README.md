@@ -274,7 +274,7 @@ The following Values have changed key or Value:
 | webhooks.hooks.managed.opts | object | `{}` | Capsule Hook Options |
 | webhooks.hooks.managed.rules | list | `[{"apiGroups":["*"],"apiVersions":["*"],"operations":["CREATE","UPDATE","DELETE"],"resources":["*"],"scope":"Namespaced"}]` | [Rules](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-rules) |
 | webhooks.hooks.metadata.enabled | bool | `true` | Enable the Hook |
-| webhooks.hooks.metadata.failurePolicy | string | `"Fail"` | [FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy) |
+| webhooks.hooks.metadata.failurePolicy | string | `"Ignore"` | [FailurePolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#failure-policy) |
 | webhooks.hooks.metadata.matchConditions | list | `[{"expression":"!has(request.subResource) || request.subResource == \"\"","name":"ignore-subresources"},{"expression":"request.resource.resource != \"events\"","name":"ignore-events"}]` | [MatchConditions](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy) |
 | webhooks.hooks.metadata.matchPolicy | string | `"Equivalent"` | [MatchPolicy](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-matchpolicy) |
 | webhooks.hooks.metadata.namespaceSelector | object | `{"matchExpressions":[{"key":"capsule.clastix.io/tenant","operator":"Exists"}]}` | [NamespaceSelector](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#matching-requests-namespaceselector) |

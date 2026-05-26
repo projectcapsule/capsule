@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -22,7 +23,6 @@ import (
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/go-logr/logr"
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/internal/cache"
 	"github.com/projectcapsule/capsule/pkg/runtime/jsonpath"
@@ -321,7 +321,6 @@ func minDurationPtr(cur *time.Duration, cand time.Duration) *time.Duration {
 	return cur
 }
 
-//nolint:dupl
 func pendingDeleteStillPresent(
 	pd capsulev1beta2.QuantityLedgerPendingDelete,
 	claims []capsulev1beta2.CustomQuotaClaimItem,
@@ -364,6 +363,7 @@ func nextReservationMaterializationRequeue(
 
 	return unresolvedReservationRequeue
 }
+
 func reconcileQuantityLedgerAllocation(
 	ctx context.Context,
 	c client.Client,
@@ -442,16 +442,9 @@ func reconcileQuantityLedgerAllocation(
 				"expired", expired,
 			)
 
-			switch {
-			case stillPresent:
+			if stillPresent {
 				activeDeletes = append(activeDeletes, pd)
 				requeueAfter = minDurationPtr(requeueAfter, immediatePendingDeleteRequeue)
-
-			case expired:
-				// Drop stale delete marker.
-
-			default:
-				// Object is gone from observed claims. observedUsed already excludes it.
 			}
 		}
 
@@ -471,7 +464,6 @@ func reconcileQuantityLedgerAllocation(
 
 		return c.Status().Update(ctx, ledger)
 	})
-
 	if err != nil {
 		return nil, err
 	}
@@ -479,7 +471,6 @@ func reconcileQuantityLedgerAllocation(
 	return requeueAfter, nil
 }
 
-//nolint:dupl
 func reservationMaterializedLedger(
 	res capsulev1beta2.QuantityLedgerReservation,
 	claims []capsulev1beta2.CustomQuotaClaimItem,

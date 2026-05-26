@@ -18,8 +18,6 @@ import (
 	"k8s.io/client-go/util/retry"
 	"k8s.io/client-go/util/workqueue"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/event"
-	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
@@ -56,8 +54,6 @@ func runForTenantNamespaces(
 	group := new(errgroup.Group)
 
 	for _, namespace := range readyTenantNamespaces(tnt) {
-		namespace := namespace
-
 		group.Go(func() error {
 			if err := fn(ctx, namespace); err != nil {
 				errs <- fmt.Errorf("namespace %q: %w", namespace, err)
@@ -68,6 +64,7 @@ func runForTenantNamespaces(
 	}
 
 	_ = group.Wait()
+
 	close(errs)
 
 	var joined []error
@@ -76,42 +73,6 @@ func runForTenantNamespaces(
 	}
 
 	return errors.Join(joined...)
-}
-
-func (r *Manager) statusOnlyHandlerClasses(
-	fn func(ctx context.Context, perTenant func(context.Context, *capsulev1beta2.Tenant) error) error,
-	perTenant func(context.Context, *capsulev1beta2.Tenant) error,
-	errMsg string,
-) *handler.TypedFuncs[client.Object, reconcile.Request] {
-	return &handler.TypedFuncs[client.Object, reconcile.Request]{
-		CreateFunc: func(
-			ctx context.Context,
-			_ event.TypedCreateEvent[client.Object],
-			_ workqueue.TypedRateLimitingInterface[reconcile.Request],
-		) {
-			if err := fn(ctx, perTenant); err != nil {
-				r.Log.Error(err, errMsg)
-			}
-		},
-		UpdateFunc: func(
-			ctx context.Context,
-			_ event.TypedUpdateEvent[client.Object],
-			_ workqueue.TypedRateLimitingInterface[reconcile.Request],
-		) {
-			if err := fn(ctx, perTenant); err != nil {
-				r.Log.Error(err, errMsg)
-			}
-		},
-		DeleteFunc: func(
-			ctx context.Context,
-			_ event.TypedDeleteEvent[client.Object],
-			_ workqueue.TypedRateLimitingInterface[reconcile.Request],
-		) {
-			if err := fn(ctx, perTenant); err != nil {
-				r.Log.Error(err, errMsg)
-			}
-		},
-	}
 }
 
 func (r *Manager) enqueueTenantsForTenantOwner(

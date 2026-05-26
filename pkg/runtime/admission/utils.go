@@ -11,6 +11,7 @@ import (
 
 func Deny(message string) *admission.Response {
 	response := admission.Denied(message)
+
 	return &response
 }
 

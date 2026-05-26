@@ -11,9 +11,10 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/projectcapsule/capsule/pkg/template/functions"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	kyaml "k8s.io/apimachinery/pkg/util/yaml"
+
+	"github.com/projectcapsule/capsule/pkg/template/functions"
 )
 
 // RenderUnstructuredItems attempts to render a given string template into a list of unstructured resources.
@@ -66,6 +67,7 @@ func withLineNumbers(s string) string {
 	lines := strings.Split(s, "\n")
 
 	width := len(fmt.Sprintf("%d", len(lines)))
+
 	var b strings.Builder
 
 	for i, line := range lines {

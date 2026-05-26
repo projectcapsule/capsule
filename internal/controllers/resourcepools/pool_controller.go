@@ -39,6 +39,7 @@ import (
 
 type resourcePoolController struct {
 	client.Client
+
 	reader client.Reader
 
 	metrics  *metrics.ResourcePoolRecorder
@@ -110,10 +111,12 @@ func (r resourcePoolController) Reconcile(ctx context.Context, request ctrl.Requ
 		if uerr := r.updateStatus(ctx, instance, err); uerr != nil {
 			if caperrors.IgnoreGone(uerr) {
 				err = nil
+
 				return
 			}
 
 			err = fmt.Errorf("cannot update pool status: %w", uerr)
+
 			return
 		}
 
@@ -122,10 +125,12 @@ func (r resourcePoolController) Reconcile(ctx context.Context, request ctrl.Requ
 		if e := patchHelper.Patch(ctx, instance); e != nil {
 			if caperrors.IgnoreGone(e) {
 				err = nil
+
 				return
 			}
 
 			err = gherrors.Wrap(e, "failed to patch ResourcePool")
+
 			return
 		}
 
