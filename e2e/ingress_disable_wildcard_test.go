@@ -37,7 +37,7 @@ var _ = Describe("creating an Ingress with a wildcard when it is denied for the 
 				{
 					CoreOwnerSpec: rbac.CoreOwnerSpec{
 						UserSpec: rbac.UserSpec{
-							Name: "scott",
+							Name: "e2e-denied-ingress-wildcard",
 							Kind: "User",
 						},
 					},

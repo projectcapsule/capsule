@@ -34,7 +34,7 @@ var _ = Describe("when Tenant handles Ingress hostnames", Ordered, Label("tenant
 				{
 					CoreOwnerSpec: rbac.CoreOwnerSpec{
 						UserSpec: rbac.UserSpec{
-							Name: "hostname",
+							Name: "e2e-ingress-hostnames",
 							Kind: "User",
 						},
 					},

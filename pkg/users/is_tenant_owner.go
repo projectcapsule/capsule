@@ -33,9 +33,13 @@ func IsTenantOwner(
 
 func IsTenantOwnerByStatus(
 	tnt *capsulev1beta2.Tenant,
-	userInfo authenticationv1.UserInfo,
+	user AdmissionUser,
 ) bool {
-	return tnt.Status.Owners.IsOwner(userInfo.Username, userInfo.Groups)
+	if user.IsAdmin() {
+		return true
+	}
+
+	return tnt.Status.Owners.IsOwner(user.Username, user.Groups)
 }
 
 func IsCommonOwner(

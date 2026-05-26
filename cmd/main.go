@@ -551,6 +551,7 @@ func main() {
 		route.Cordoning(handlers.InCapsuleGroups(cfg, generic.CordoningHandler(cfg))),
 		route.ServiceAccounts(
 			serviceaccounts.Handler(
+				cfg,
 				serviceaccounts.Promotion(cfg),
 				serviceaccounts.OwnerPromotion(cfg),
 			),
@@ -565,7 +566,7 @@ func main() {
 		route.TenantValidation(
 			tenantvalidation.Handler(cfg,
 				tenantvalidation.NameHandler(),
-				tenantvalidation.NamespaceMetadataHandler(),
+				//tenantvalidation.NamespaceMetadataHandler(),
 				tenantvalidation.RoleBindingRegexHandler(),
 				tenantvalidation.IngressClassRegexHandler(),
 				tenantvalidation.StorageClassRegexHandler(),
@@ -583,7 +584,7 @@ func main() {
 		route.NamespaceValidation(
 			namespacevalidation.NamespaceHandler(
 				cfg,
-				namespacevalidation.FreezeHandler(cfg),
+				namespacevalidation.CordoningHandler(cfg),
 				namespacevalidation.QuotaHandler(),
 				namespacevalidation.PrefixHandler(cfg),
 				namespacevalidation.UserMetadataHandler(),
@@ -595,7 +596,7 @@ func main() {
 				cfg,
 				namespacemutation.OwnerReferenceHandler(cfg),
 				namespacemutation.MetadataHandler(cfg),
-				namespacemutation.CordoningLabelHandler(cfg),
+				namespacemutation.NamespacePatchGuardHandler(cfg),
 			),
 		),
 		route.ResourcePoolMutation((resourcepool.PoolMutationHandler(ctrl.Log.WithName("webhooks").WithName("resourcepool")))),

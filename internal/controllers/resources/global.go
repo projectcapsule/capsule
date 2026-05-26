@@ -10,7 +10,6 @@ import (
 
 	"github.com/go-logr/logr"
 	gherrors "github.com/pkg/errors"
-	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -33,6 +32,7 @@ import (
 	"github.com/projectcapsule/capsule/internal/controllers/utils"
 	"github.com/projectcapsule/capsule/internal/metrics"
 	"github.com/projectcapsule/capsule/pkg/api"
+	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/api/processor"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
@@ -128,30 +128,31 @@ func (r *globalResourceController) Reconcile(ctx context.Context, request reconc
 	var statusErr error
 
 	defer func() {
-		if uerr := r.updateStatus(ctx, tntResource, statusErr); uerr != nil {
-			if apierrors.IsNotFound(uerr) || apierrors.HasStatusCause(uerr, corev1.NamespaceTerminatingCause) {
-				err = nil
+		reconcileErr := err
+		if statusErr != nil {
+			reconcileErr = statusErr
+		}
 
+		if uerr := r.updateStatus(ctx, tntResource, reconcileErr); uerr != nil {
+			if caperrors.IgnoreGone(uerr) {
+				err = nil
 				return
 			}
 
 			err = fmt.Errorf("cannot update globaltenantresource status: %w", uerr)
-
 			return
 		}
 
 		r.metrics.RecordConditions(tntResource)
 
 		if e := patchHelper.Patch(ctx, tntResource); e != nil {
-			if apierrors.IsNotFound(e) || apierrors.HasStatusCause(e, corev1.NamespaceTerminatingCause) {
+			if caperrors.IgnoreGone(e) {
 				err = nil
-
 				return
 			}
 
 			res = reconcile.Result{}
 			err = gherrors.Wrap(e, "failed to patch GlobalTenantResource")
-
 			return
 		}
 
@@ -159,9 +160,9 @@ func (r *globalResourceController) Reconcile(ctx context.Context, request reconc
 		err = nil
 	}()
 
-	// On Deletion these checks are skipped
+	// On Deletion these checks are skipped.
 	if tntResource.DeletionTimestamp.IsZero() {
-		if *tntResource.Spec.Cordoned {
+		if tntResource.Spec.Cordoned != nil && *tntResource.Spec.Cordoned {
 			log.V(5).Info("global tenant resource cordoned")
 
 			return reconcile.Result{}, nil
@@ -181,7 +182,7 @@ func (r *globalResourceController) Reconcile(ctx context.Context, request reconc
 			}
 
 			stat := d.Status.Conditions.GetConditionByType(meta.ReadyCondition)
-			if stat.Status != metav1.ConditionTrue {
+			if stat == nil || stat.Status != metav1.ConditionTrue {
 				statusErr = fmt.Errorf("dependency %s not ready", dep.Name)
 
 				return requeue, nil
@@ -199,7 +200,7 @@ func (r *globalResourceController) Reconcile(ctx context.Context, request reconc
 	}
 
 	if updateErr := r.updateReconcilingStatus(ctx, tntResource); updateErr != nil {
-		if apierrors.IsNotFound(updateErr) {
+		if caperrors.IgnoreGone(updateErr) {
 			return reconcile.Result{}, nil
 		}
 

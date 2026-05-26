@@ -14,16 +14,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	"github.com/projectcapsule/capsule/pkg/api/meta"
 	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 	"github.com/projectcapsule/capsule/pkg/tenant"
-	"github.com/projectcapsule/capsule/pkg/users"
 )
 
-func NamespaceHandler(configuration configuration.Configuration, hndlers ...handlers.TypedHandlerWithTenant[*corev1.Namespace]) handlers.Handler {
+func NamespaceHandler(configuration configuration.Configuration, hndlers ...handlers.TypedHandlerWithTenantUser[*corev1.Namespace]) handlers.Handler {
 	return &handler{
 		cfg:      configuration,
 		handlers: hndlers,
@@ -32,7 +30,7 @@ func NamespaceHandler(configuration configuration.Configuration, hndlers ...hand
 
 type handler struct {
 	cfg      configuration.Configuration
-	handlers []handlers.TypedHandlerWithTenant[*corev1.Namespace]
+	handlers []handlers.TypedHandlerWithTenantUser[*corev1.Namespace]
 }
 
 func (h *handler) OnCreate(
@@ -42,20 +40,24 @@ func (h *handler) OnCreate(
 	recorder events.EventRecorder,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		userIsAdmin := users.IsAdminUser(req, h.cfg.Administrators())
-
-		if !userIsAdmin && !users.IsCapsuleUser(ctx, c, h.cfg, req.UserInfo.Username, req.UserInfo.Groups) {
-			return nil
-		}
+		user := handlers.ResolveAdmissionUser(ctx, c, req, h.cfg)
 
 		ns := &corev1.Namespace{}
 		if err := decoder.Decode(req, ns); err != nil {
 			return ad.ErroredResponse(err)
 		}
 
-		tnt, err := h.verifyReference(ctx, reader, ns)
+		if !user.IsAdmin() && !user.IsCapsule() && !tenant.HasTenantReference(ns) {
+			return nil
+		}
+
+		tnt, err := tenant.ResolveNamespaceTenant(ctx, reader, ns)
 		if err != nil {
 			return ad.ErroredResponse(err)
+		}
+
+		if !user.IsAdmin() && !user.IsCapsule() && tnt != nil {
+			return ad.Deny("only tenant owners can create tenant-owned namespaces")
 		}
 
 		if tnt == nil {
@@ -72,7 +74,7 @@ func (h *handler) OnCreate(
 		}
 
 		for _, hndl := range h.handlers {
-			if response := hndl.OnCreate(c, reader, ns, decoder, recorder, tnt)(ctx, req); response != nil {
+			if response := hndl.OnCreate(c, reader, user, ns, decoder, recorder, tnt)(ctx, req); response != nil {
 				return response
 			}
 		}
@@ -88,6 +90,28 @@ func (h *handler) OnDelete(
 	recorder events.EventRecorder,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
+		user := handlers.ResolveAdmissionUser(ctx, c, req, h.cfg)
+
+		oldNs := &corev1.Namespace{}
+		if err := decoder.DecodeRaw(req.OldObject, oldNs); err != nil {
+			return ad.ErroredResponse(err)
+		}
+
+		tnt, err := tenant.ResolveNamespaceTenant(ctx, reader, oldNs)
+		if err != nil {
+			return ad.ErroredResponse(err)
+		}
+
+		if tnt == nil {
+			return nil
+		}
+
+		for _, hndl := range h.handlers {
+			if response := hndl.OnDelete(c, reader, user, oldNs, decoder, recorder, tnt)(ctx, req); response != nil {
+				return response
+			}
+		}
+
 		return nil
 	}
 }
@@ -100,11 +124,7 @@ func (h *handler) OnUpdate(
 	recorder events.EventRecorder,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		userIsAdmin := users.IsAdminUser(req, h.cfg.Administrators())
-
-		if !userIsAdmin && !users.IsCapsuleUser(ctx, c, h.cfg, req.UserInfo.Username, req.UserInfo.Groups) {
-			return nil
-		}
+		user := handlers.ResolveAdmissionUser(ctx, c, req, h.cfg)
 
 		ns := &corev1.Namespace{}
 		if err := decoder.Decode(req, ns); err != nil {
@@ -116,142 +136,75 @@ func (h *handler) OnUpdate(
 			return ad.ErroredResponse(err)
 		}
 
-		oldHasTenantReference := hasTenantReference(oldNs)
-		newHasTenantReference := hasTenantReference(ns)
+		oldHasTenantReference := tenant.HasTenantReference(oldNs)
+		newHasTenantReference := tenant.HasTenantReference(ns)
 
-		if !userIsAdmin {
-			if !oldHasTenantReference && newHasTenantReference {
-				response := admission.Denied("namespace can not be patched into a tenant")
-
-				return &response
-			}
-
-			if oldHasTenantReference && !newHasTenantReference {
-				response := admission.Denied("namespace can not remove tenant ownership")
-
-				return &response
-			}
-
-			if !oldHasTenantReference && !newHasTenantReference {
-				response := admission.Denied("namespace patch denied")
-
-				return &response
-			}
-		}
-
-		oldTenant, err := h.verifyReference(ctx, reader, oldNs)
-		if err != nil {
-			return ad.ErroredResponse(err)
-		}
-
-		newTenant, err := h.verifyReference(ctx, reader, ns)
-		if err != nil {
-			return ad.ErroredResponse(err)
-		}
-
-		if !userIsAdmin {
-			if oldTenant == nil || newTenant == nil {
-				response := admission.Denied("namespace tenant ownership is incomplete")
-
-				return &response
-			}
-
-			if newTenant.GetName() != oldTenant.GetName() || newTenant.GetUID() != oldTenant.GetUID() {
-				response := admission.Denied("namespace can not be migrated between tenants")
-
-				return &response
-			}
-		}
-
-		if userIsAdmin {
-			if newTenant == nil {
+		if !user.IsAdmin() {
+			switch {
+			case !oldHasTenantReference && newHasTenantReference:
+				return ad.Deny("namespace can not be patched into a tenant")
+			case oldHasTenantReference && !newHasTenantReference:
+				return ad.Deny("namespace can not remove tenant ownership")
+			case !oldHasTenantReference && !newHasTenantReference:
 				return nil
 			}
+		}
 
-			for _, hndl := range h.handlers {
-				if response := hndl.OnUpdate(c, reader, ns, oldNs, decoder, recorder, newTenant)(ctx, req); response != nil {
-					return response
-				}
+		oldTenant, err := tenant.ResolveNamespaceTenant(ctx, reader, oldNs)
+		if err != nil {
+			return ad.ErroredResponse(err)
+		}
+
+		newTenant, err := tenant.ResolveNamespaceTenant(ctx, reader, ns)
+		if err != nil {
+			return ad.ErroredResponse(err)
+		}
+
+		if !user.IsAdmin() {
+			if oldTenant == nil || newTenant == nil {
+				return ad.Deny("namespace tenant ownership is incomplete")
 			}
 
-			return nil
+			if oldTenant.GetName() != newTenant.GetName() || oldTenant.GetUID() != newTenant.GetUID() {
+				return ad.Deny("namespace can not be migrated between tenants")
+			}
+
+			if user.IsCapsule() && !tenant.NamespaceIsOwned(ctx, c, h.cfg, oldNs, oldTenant, user) {
+				recorder.Eventf(
+					oldNs,
+					nil,
+					corev1.EventTypeWarning,
+					"NamespacePatch",
+					evt.ActionValidationDenied,
+					"Namespace %s can not be patched",
+					oldNs.GetName(),
+				)
+
+				return ad.Deny("denied patch request for this namespace")
+			}
 		}
 
-		// Disallow owned patches
-		if owned := tenant.NamespaceIsOwned(ctx, c, h.cfg, oldNs, oldTenant, req.UserInfo); !owned {
-			recorder.Eventf(
-				oldNs,
-				nil,
-				corev1.EventTypeWarning,
-				"NamespacePatch",
-				evt.ActionValidationDenied,
-				"Namespace %s can not be patched",
-				oldNs.GetName(),
-			)
-
-			response := admission.Denied("denied patch request for this namespace")
-
-			return &response
-		}
-
-		if terminating := h.rejectOnTermination(
-			ctx,
-			c,
-			ns,
-			newTenant,
-		); terminating != nil {
+		if terminating := h.rejectOnTermination(ctx, c, ns, newTenant); terminating != nil {
 			return terminating
 		}
 
+		tnt := newTenant
+		if !user.IsAdmin() {
+			tnt = oldTenant
+		}
+
+		if tnt == nil {
+			return nil
+		}
+
 		for _, hndl := range h.handlers {
-			if response := hndl.OnUpdate(c, reader, ns, oldNs, decoder, recorder, oldTenant)(ctx, req); response != nil {
+			if response := hndl.OnUpdate(c, reader, user, ns, oldNs, decoder, recorder, tnt)(ctx, req); response != nil {
 				return response
 			}
 		}
 
 		return nil
 	}
-}
-
-func (h *handler) verifyReference(
-	ctx context.Context,
-	c client.Reader,
-	ns *corev1.Namespace,
-) (*capsulev1beta2.Tenant, error) {
-	tenantByOwnerreference, err := tenant.GetTenantByOwnerreferences(ctx, c, ns.OwnerReferences)
-	if err != nil {
-		return nil, err
-	}
-
-	name := ""
-	if tenantByOwnerreference != nil {
-		name = tenantByOwnerreference.GetName()
-	}
-
-	if name != ns.Labels[meta.TenantLabel] {
-		return nil, fmt.Errorf(
-			"namespace label %q does not match owner reference %q",
-			ns.Labels[meta.TenantLabel],
-			name,
-		)
-	}
-
-	return tenantByOwnerreference, nil
-}
-
-func hasTenantReference(ns *corev1.Namespace) bool {
-	if ns.Labels != nil && ns.Labels[meta.TenantLabel] != "" {
-		return true
-	}
-
-	//nolint:modernize
-	for _, ref := range ns.OwnerReferences {
-		if tenant.IsTenantOwnerReference(ref) {
-			return true
-		}
-	}
-
-	return false
 }
 
 func (h *handler) rejectOnTermination(

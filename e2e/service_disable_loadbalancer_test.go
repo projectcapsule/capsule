@@ -32,7 +32,7 @@ var _ = Describe("creating a LoadBalancer service when it is disabled for Tenant
 				{
 					CoreOwnerSpec: rbac.CoreOwnerSpec{
 						UserSpec: rbac.UserSpec{
-							Name: "amazon",
+							Name: "e2e-disable-loadbalancer-service",
 							Kind: "User",
 						},
 					},

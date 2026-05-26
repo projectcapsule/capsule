@@ -62,7 +62,7 @@ func (r resourceClaimController) Reconcile(ctx context.Context, request ctrl.Req
 	log := r.log.WithValues("Request.Name", request.Name)
 
 	instance := &capsulev1beta2.ResourcePoolClaim{}
-	if err = r.Get(ctx, request.NamespacedName, instance); err != nil {
+	if err = r.reader.Get(ctx, request.NamespacedName, instance); err != nil {
 		if apierrors.IsNotFound(err) {
 			log.V(5).Info("Request object not found, could have been deleted after reconcile request")
 
@@ -84,22 +84,19 @@ func (r resourceClaimController) Reconcile(ctx context.Context, request ctrl.Req
 	defer func() {
 		if uerr := r.updateStatus(ctx, instance, err); uerr != nil {
 			err = uerr
-
 			return
 		}
 
 		r.metrics.RecordClaimCondition(instance)
 
 		if e := patchHelper.Patch(ctx, instance); e != nil {
-			err = e
-
-			return
-		}
-
-		if e := patchHelper.Patch(ctx, instance); err != nil {
-			if !apierrors.IsNotFound(err) {
-				err = e
+			if apierrors.IsNotFound(e) {
+				err = nil
+				return
 			}
+
+			err = e
+			return
 		}
 
 		err = nil
@@ -122,7 +119,7 @@ func (r *resourceClaimController) claimsWithoutPoolFromNamespaces(ctx context.Co
 
 	for _, ns := range pool.Status.Namespaces {
 		claimList := &capsulev1beta2.ResourcePoolClaimList{}
-		if err := r.List(ctx, claimList, client.InNamespace(ns)); err != nil {
+		if err := r.reader.List(ctx, claimList, client.InNamespace(ns)); err != nil {
 			r.log.Error(err, "Failed to list claims in namespace", "namespace", ns)
 
 			continue
@@ -280,8 +277,7 @@ func (r *resourceClaimController) updateStatus(
 
 		latest.Status = instance.Status
 
-		// Set Ready Condition
-		readyCondition := meta.NewReadyCondition(instance)
+		readyCondition := meta.NewReadyCondition(latest)
 		if reconcileError != nil {
 			readyCondition.Message = reconcileError.Error()
 			readyCondition.Status = metav1.ConditionFalse

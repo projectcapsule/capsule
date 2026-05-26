@@ -30,7 +30,7 @@ var _ = Describe("creating a Namespace with an additional Role Binding", Ordered
 				{
 					CoreOwnerSpec: rbac.CoreOwnerSpec{
 						UserSpec: rbac.UserSpec{
-							Name: "dale",
+							Name: "e2e-additional-role-binding",
 							Kind: "User",
 						},
 					},

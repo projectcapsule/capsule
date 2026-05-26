@@ -29,7 +29,7 @@ var _ = Describe("creating a Namespace creation with no Tenant assigned", Ordere
 					{
 						CoreOwnerSpec: rbac.CoreOwnerSpec{
 							UserSpec: rbac.UserSpec{
-								Name: "missing",
+								Name: "e2e-missing-user",
 								Kind: "User",
 							},
 						},

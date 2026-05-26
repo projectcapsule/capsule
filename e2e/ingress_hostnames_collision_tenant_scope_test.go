@@ -34,7 +34,7 @@ var _ = Describe("when handling Tenant scoped Ingress hostnames collision", Orde
 				{
 					CoreOwnerSpec: rbac.CoreOwnerSpec{
 						UserSpec: rbac.UserSpec{
-							Name: "ingress-tenant",
+							Name: "e2e-hostnames-collision-tenant",
 							Kind: "User",
 						},
 					},

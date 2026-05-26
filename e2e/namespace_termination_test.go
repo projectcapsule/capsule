@@ -35,7 +35,7 @@ var _ = Describe("terminating namespace with guardrails", Ordered, Label("namesp
 				{
 					CoreOwnerSpec: rbac.CoreOwnerSpec{
 						UserSpec: rbac.UserSpec{
-							Name: "gatsby",
+							Name: "e2e-termination",
 							Kind: "User",
 						},
 					},

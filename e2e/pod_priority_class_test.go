@@ -37,7 +37,7 @@ var _ = Describe("enforcing a Priority Class", Ordered, Label("pod", "classes", 
 				{
 					CoreOwnerSpec: rbac.CoreOwnerSpec{
 						UserSpec: rbac.UserSpec{
-							Name: "paul",
+							Name: "e2e-pod-priority-1",
 							Kind: "User",
 						},
 					},
@@ -68,7 +68,7 @@ var _ = Describe("enforcing a Priority Class", Ordered, Label("pod", "classes", 
 				{
 					CoreOwnerSpec: rbac.CoreOwnerSpec{
 						UserSpec: rbac.UserSpec{
-							Name: "george",
+							Name: "e2e-pod-priority-2",
 							Kind: "User",
 						},
 					},

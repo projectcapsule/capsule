@@ -7,7 +7,6 @@ package handlers
 import (
 	"context"
 
-	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -35,13 +34,6 @@ func (h *isNotPrivileged) OnCreate(client client.Client, reader client.Reader, d
 			return nil
 		}
 
-		namespace, name, err := serviceaccount.SplitUsername(req.UserInfo.Username)
-		if err == nil {
-			if configuration.IsControllerServiceAccount(name, namespace) {
-				return nil
-			}
-		}
-
 		for _, hndl := range h.handlers {
 			if response := hndl.OnCreate(client, reader, decoder, recorder)(ctx, req); response != nil {
 				return response
@@ -59,13 +51,6 @@ func (h *isNotPrivileged) OnDelete(client client.Client, reader client.Reader, d
 			return nil
 		}
 
-		namespace, name, err := serviceaccount.SplitUsername(req.UserInfo.Username)
-		if err == nil {
-			if configuration.IsControllerServiceAccount(name, namespace) {
-				return nil
-			}
-		}
-
 		for _, hndl := range h.handlers {
 			if response := hndl.OnDelete(client, reader, decoder, recorder)(ctx, req); response != nil {
 				return response
@@ -81,13 +66,6 @@ func (h *isNotPrivileged) OnUpdate(client client.Client, reader client.Reader, d
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		if users.IsAdminUser(req, h.configuration.Administrators()) {
 			return nil
-		}
-
-		namespace, name, err := serviceaccount.SplitUsername(req.UserInfo.Username)
-		if err == nil {
-			if configuration.IsControllerServiceAccount(name, namespace) {
-				return nil
-			}
 		}
 
 		for _, hndl := range h.handlers {

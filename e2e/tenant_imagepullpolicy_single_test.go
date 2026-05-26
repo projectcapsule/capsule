@@ -31,7 +31,7 @@ var _ = Describe("enforcing a defined ImagePullPolicy", Ordered, Label("tenant",
 				{
 					CoreOwnerSpec: rbac.CoreOwnerSpec{
 						UserSpec: rbac.UserSpec{
-							Name: "axel",
+							Name: "e2e-image-pull-policy",
 							Kind: "User",
 						},
 					},

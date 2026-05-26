@@ -38,7 +38,7 @@ var _ = Describe("changing Tenant managed Kubernetes resources", Ordered, Label(
 				{
 					CoreOwnerSpec: rbac.CoreOwnerSpec{
 						UserSpec: rbac.UserSpec{
-							Name: "laura",
+							Name: "e2e-tenant-managed-changes",
 							Kind: "User",
 						},
 					},

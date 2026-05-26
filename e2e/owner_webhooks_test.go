@@ -34,7 +34,7 @@ var _ = Describe("when Tenant owner interacts with the webhooks", Ordered, Label
 				{
 					CoreOwnerSpec: rbac.CoreOwnerSpec{
 						UserSpec: rbac.UserSpec{
-							Name: "ruby",
+							Name: "e2e-owner-admission",
 							Kind: "User",
 						},
 					},

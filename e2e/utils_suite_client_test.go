@@ -15,7 +15,7 @@ type e2eClient struct {
 }
 
 func (e *e2eClient) sleep() {
-	time.Sleep(250 * time.Millisecond)
+	time.Sleep(50 * time.Millisecond)
 }
 
 func (e *e2eClient) Get(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {

@@ -195,9 +195,9 @@ dev-setup:
 		--set "manager.rbac.minimal=true"\
 		--set "tls.enableController=false"\
 		--set "webhooks.exclusive=true"\
-		--set "webhooks.hooks.nodes.enabled=true"\
 		--set "webhooks.service.url=$${WEBHOOK_URL}" \
 		--set "webhooks.service.caBundle=$${CA_BUNDLE}" \
+		--set "webhooks.hooks.nodes.enabled=true"\
 		--set 'webhooks.hooks.calculations.enabled=true' \
 		--set-string 'webhooks.hooks.calculations.rules[0].apiGroups[0]=' \
 		--set 'webhooks.hooks.calculations.rules[0].apiVersions[0]=v1' \

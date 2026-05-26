@@ -48,8 +48,8 @@ var _ = Describe("TenantResource SSA", Ordered, Label("replications", "namespace
 		ctx = context.Background()
 		baseNamespace = "e2e-tenantresource-ssa-system"
 		targetNamespaces = []string{"e2e-tenantresource-ssa-one", "e2e-tenantresource-ssa-two", "e2e-tenantresource-ssa-three"}
-		tenantOwner = rbac.UserSpec{Name: "solar-user", Kind: rbac.OwnerKind("User")}
-		additionalBindingUser = rbac.UserSpec{Name: "bob", Kind: rbac.OwnerKind("User")}
+		tenantOwner = rbac.UserSpec{Name: "e2e-tr-owner", Kind: rbac.OwnerKind("User")}
+		additionalBindingUser = rbac.UserSpec{Name: "e2e-tr-additional", Kind: rbac.OwnerKind("User")}
 
 		Expect(k8sClient.Get(context.Background(), client.ObjectKey{Name: defaultConfigurationName}, originalConfig)).To(Succeed())
 
@@ -132,6 +132,61 @@ var _ = Describe("TenantResource SSA", Ordered, Label("replications", "namespace
 		ModifyCapsuleConfigurationOpts(func(configuration *capsulev1beta2.CapsuleConfiguration) {
 			configuration.Spec = originalConfig.Spec
 		})
+	})
+
+	It("merges rawItems and generators when they target the same object", func() {
+		tr := &capsulev1beta2.TenantResource{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "raw-and-generator-same-object",
+				Namespace: baseNamespace,
+			},
+			Spec: capsulev1beta2.TenantResourceSpec{
+				TenantResourceCommonSpec: capsulev1beta2.TenantResourceCommonSpec{
+					PruningOnDelete: ptr.To(true),
+					ResyncPeriod:    resyncPeriod,
+					Resources: []capsulev1beta2.ResourceSpec{{
+						RawItems: []capsulev1beta2.RawExtension{{
+							RawExtension: runtime.RawExtension{
+								Object: &corev1.ConfigMap{
+									TypeMeta: metav1.TypeMeta{
+										APIVersion: "v1",
+										Kind:       "ConfigMap",
+									},
+									ObjectMeta: metav1.ObjectMeta{
+										Name: "raw-generated-shared",
+									},
+									Data: map[string]string{
+										"static": "raw",
+									},
+								},
+							},
+						}},
+						Generators: []capsulev1beta2.TemplateItemSpec{{
+							MissingKey: "zero",
+							Template: `---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: raw-generated-shared
+data:
+  generated-{{ $.namespace.metadata.name }}: "true"
+`,
+						}},
+					}},
+				},
+			},
+		}
+
+		EventuallyCreation(func() error { return k8sClient.Create(ctx, tr) }).Should(Succeed())
+		expectTenantResourceReady(baseNamespace, tr.Name)
+
+		By("verifying the object contains both raw and generated data in every target namespace")
+		for _, ns := range targetNamespaces {
+			expectConfigMapData(ns, "raw-generated-shared", map[string]string{
+				"static":                        "raw",
+				fmt.Sprintf("generated-%s", ns): "true",
+			})
+		}
 	})
 
 	It("allows multiple TenantResources to adopt and co-manage the same preexisting object with non-conflicting fields", func() {
@@ -676,61 +731,6 @@ data:
 
 			By("verifying the ConfigMap was not created in the foreign namespace")
 			expectConfigMapAbsent("kube-system", "raw-namespace-enforced")
-		})
-
-		It("merges rawItems and generators when they target the same object", func() {
-			tr := &capsulev1beta2.TenantResource{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "raw-and-generator-same-object",
-					Namespace: baseNamespace,
-				},
-				Spec: capsulev1beta2.TenantResourceSpec{
-					TenantResourceCommonSpec: capsulev1beta2.TenantResourceCommonSpec{
-						PruningOnDelete: ptr.To(true),
-						ResyncPeriod:    resyncPeriod,
-						Resources: []capsulev1beta2.ResourceSpec{{
-							RawItems: []capsulev1beta2.RawExtension{{
-								RawExtension: runtime.RawExtension{
-									Object: &corev1.ConfigMap{
-										TypeMeta: metav1.TypeMeta{
-											APIVersion: "v1",
-											Kind:       "ConfigMap",
-										},
-										ObjectMeta: metav1.ObjectMeta{
-											Name: "raw-generated-shared",
-										},
-										Data: map[string]string{
-											"static": "raw",
-										},
-									},
-								},
-							}},
-							Generators: []capsulev1beta2.TemplateItemSpec{{
-								MissingKey: "zero",
-								Template: `---
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: raw-generated-shared
-data:
-  generated-{{ $.namespace.metadata.name }}: "true"
-`,
-							}},
-						}},
-					},
-				},
-			}
-
-			EventuallyCreation(func() error { return k8sClient.Create(ctx, tr) }).Should(Succeed())
-			expectTenantResourceReady(baseNamespace, tr.Name)
-
-			By("verifying the object contains both raw and generated data in every target namespace")
-			for _, ns := range targetNamespaces {
-				expectConfigMapData(ns, "raw-generated-shared", map[string]string{
-					"static":                        "raw",
-					fmt.Sprintf("generated-%s", ns): "true",
-				})
-			}
 		})
 	})
 

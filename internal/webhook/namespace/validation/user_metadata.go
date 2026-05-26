@@ -16,17 +16,19 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api"
 	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
+	"github.com/projectcapsule/capsule/pkg/users"
 )
 
 type userMetadataHandler struct{}
 
-func UserMetadataHandler() handlers.TypedHandlerWithTenant[*corev1.Namespace] {
+func UserMetadataHandler() handlers.TypedHandlerWithTenantUser[*corev1.Namespace] {
 	return &userMetadataHandler{}
 }
 
 func (h *userMetadataHandler) OnCreate(
 	_ client.Client,
 	_ client.Reader,
+	_ users.AdmissionUser,
 	ns *corev1.Namespace,
 	_ admission.Decoder,
 	recorder events.EventRecorder,
@@ -62,6 +64,7 @@ func (h *userMetadataHandler) OnCreate(
 func (h *userMetadataHandler) OnUpdate(
 	_ client.Client,
 	_ client.Reader,
+	_ users.AdmissionUser,
 	newNs *corev1.Namespace,
 	oldNs *corev1.Namespace,
 	_ admission.Decoder,
@@ -155,6 +158,7 @@ func (h *userMetadataHandler) OnUpdate(
 func (h *userMetadataHandler) OnDelete(
 	client.Client,
 	client.Reader,
+	users.AdmissionUser,
 	*corev1.Namespace,
 	admission.Decoder,
 	events.EventRecorder,

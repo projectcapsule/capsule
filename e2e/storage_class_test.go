@@ -42,7 +42,7 @@ var _ = Describe("when Tenant handles Storage classes", Ordered, Label("tenant",
 				{
 					CoreOwnerSpec: rbac.CoreOwnerSpec{
 						UserSpec: rbac.UserSpec{
-							Name: "selector",
+							Name: "e2e-storage-class-selector",
 							Kind: "User",
 						},
 					},
@@ -76,7 +76,7 @@ var _ = Describe("when Tenant handles Storage classes", Ordered, Label("tenant",
 				{
 					CoreOwnerSpec: rbac.CoreOwnerSpec{
 						UserSpec: rbac.UserSpec{
-							Name: "default",
+							Name: "e2e-storage-class-default",
 							Kind: "User",
 						},
 					},
@@ -107,7 +107,7 @@ var _ = Describe("when Tenant handles Storage classes", Ordered, Label("tenant",
 				{
 					CoreOwnerSpec: rbac.CoreOwnerSpec{
 						UserSpec: rbac.UserSpec{
-							Name: "no-restrictions",
+							Name: "e2e-storage-no-restrictions",
 							Kind: "User",
 						},
 					},

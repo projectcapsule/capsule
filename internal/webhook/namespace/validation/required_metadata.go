@@ -15,17 +15,19 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
+	"github.com/projectcapsule/capsule/pkg/users"
 )
 
 type requiredMetadataHandler struct{}
 
-func RequiredMetadataHandler() handlers.TypedHandlerWithTenant[*corev1.Namespace] {
+func RequiredMetadataHandler() handlers.TypedHandlerWithTenantUser[*corev1.Namespace] {
 	return &requiredMetadataHandler{}
 }
 
 func (h *requiredMetadataHandler) OnCreate(
 	_ client.Client,
 	_ client.Reader,
+	_ users.AdmissionUser,
 	ns *corev1.Namespace,
 	_ admission.Decoder,
 	_ events.EventRecorder,
@@ -62,6 +64,7 @@ func (h *requiredMetadataHandler) OnCreate(
 func (h *requiredMetadataHandler) OnUpdate(
 	_ client.Client,
 	_ client.Reader,
+	_ users.AdmissionUser,
 	newNs *corev1.Namespace,
 	oldNs *corev1.Namespace,
 	_ admission.Decoder,
@@ -101,6 +104,7 @@ func (h *requiredMetadataHandler) OnUpdate(
 func (h *requiredMetadataHandler) OnDelete(
 	client.Client,
 	client.Reader,
+	users.AdmissionUser,
 	*corev1.Namespace,
 	admission.Decoder,
 	events.EventRecorder,

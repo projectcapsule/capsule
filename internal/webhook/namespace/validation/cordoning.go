@@ -12,65 +12,65 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 	"github.com/projectcapsule/capsule/pkg/users"
 )
 
-type freezedHandler struct {
+type cordoningHandler struct {
 	cfg configuration.Configuration
 }
 
-func FreezeHandler(configuration configuration.Configuration) handlers.TypedHandlerWithTenant[*corev1.Namespace] {
-	return &freezedHandler{cfg: configuration}
+func CordoningHandler(configuration configuration.Configuration) handlers.TypedHandlerWithTenantUser[*corev1.Namespace] {
+	return &cordoningHandler{cfg: configuration}
 }
 
-func (h *freezedHandler) OnCreate(
+func (h *cordoningHandler) OnCreate(
 	c client.Client,
 	_ client.Reader,
+	user users.AdmissionUser,
 	ns *corev1.Namespace,
 	_ admission.Decoder,
 	recorder events.EventRecorder,
 	tnt *capsulev1beta2.Tenant,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		if tnt.Spec.Cordoned && users.IsCapsuleUser(ctx, c, h.cfg, req.UserInfo.Username, req.UserInfo.Groups) {
-			recorder.Eventf(ns, nil, corev1.EventTypeWarning, evt.ReasonCordoning, evt.ActionValidationDenied, "Namespace %s cannot be attached, the current Tenant is freezed", ns.GetName())
+		if tnt.Spec.Cordoned && user.IsCapsule() {
+			recorder.Eventf(ns, nil, corev1.EventTypeWarning, evt.ReasonCordoning, evt.ActionValidationDenied, "Namespace %s cannot be attached, the current Tenant is cordoned", ns.GetName())
 
-			response := admission.Denied("the selected Tenant is freezed")
-
-			return &response
+			return ad.Deny("the selected Tenant is cordoned")
 		}
 
 		return nil
 	}
 }
 
-func (h *freezedHandler) OnDelete(
+func (h *cordoningHandler) OnDelete(
 	c client.Client,
 	_ client.Reader,
+	user users.AdmissionUser,
 	ns *corev1.Namespace,
 	_ admission.Decoder,
 	recorder events.EventRecorder,
 	tnt *capsulev1beta2.Tenant,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		if tnt.Spec.Cordoned && users.IsCapsuleUser(ctx, c, h.cfg, req.UserInfo.Username, req.UserInfo.Groups) {
-			recorder.Eventf(ns, tnt, corev1.EventTypeWarning, "TenantFreezed", "Denied", "Namespace %s cannot be deleted, the current Tenant is freezed", req.Name)
+		if tnt.Spec.Cordoned && user.IsCapsule() {
+			recorder.Eventf(ns, tnt, corev1.EventTypeWarning, "TenantFreezed", "Denied", "Namespace %s cannot be deleted, the current Tenant is cordoned", req.Name)
 
-			response := admission.Denied("the selected Tenant is freezed")
-
-			return &response
+			return ad.Deny("the selected Tenant is cordoned")
 		}
 
 		return nil
 	}
 }
 
-func (h *freezedHandler) OnUpdate(
+func (h *cordoningHandler) OnUpdate(
 	c client.Client,
 	_ client.Reader,
+	user users.AdmissionUser,
 	ns *corev1.Namespace,
 	old *corev1.Namespace,
 	_ admission.Decoder,
@@ -78,12 +78,10 @@ func (h *freezedHandler) OnUpdate(
 	tnt *capsulev1beta2.Tenant,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		if tnt.Spec.Cordoned && users.IsCapsuleUser(ctx, c, h.cfg, req.UserInfo.Username, req.UserInfo.Groups) {
-			recorder.Eventf(ns, tnt, corev1.EventTypeWarning, "TenantFreezed", "Denied", "Namespace %s cannot be updated, the current Tenant is freezed", ns.GetName())
+		if tnt.Spec.Cordoned && user.IsCapsule() {
+			recorder.Eventf(ns, tnt, corev1.EventTypeWarning, "TenantFreezed", "Denied", "Namespace %s cannot be updated, the current Tenant is cordoned", ns.GetName())
 
-			response := admission.Denied("the selected Tenant is freezed")
-
-			return &response
+			return ad.Deny("the selected Tenant is cordoned")
 		}
 
 		return nil

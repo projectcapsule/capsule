@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"net/http"
 
-	authenticationv1 "k8s.io/api/authentication/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/events"
@@ -17,20 +16,20 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	"github.com/projectcapsule/capsule/internal/webhook/utils"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 	"github.com/projectcapsule/capsule/pkg/tenant"
+	"github.com/projectcapsule/capsule/pkg/users"
 )
 
 type ownerReferenceHandler struct {
 	cfg configuration.Configuration
 }
 
-func OwnerReferenceHandler(cfg configuration.Configuration) handlers.TypedHandler[*corev1.Namespace] {
+func OwnerReferenceHandler(cfg configuration.Configuration) handlers.TypedHandlerWithUser[*corev1.Namespace] {
 	return &ownerReferenceHandler{
 		cfg: cfg,
 	}
@@ -39,14 +38,15 @@ func OwnerReferenceHandler(cfg configuration.Configuration) handlers.TypedHandle
 func (h *ownerReferenceHandler) OnCreate(
 	c client.Client,
 	reader client.Reader,
+	user users.AdmissionUser,
 	ns *corev1.Namespace,
 	decoder admission.Decoder,
 	recorder events.EventRecorder,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		tnt, errResponse := utils.GetNamespaceTenant(ctx, reader, c, ns, req, h.cfg, recorder)
-		if errResponse != nil {
-			return errResponse
+		tnt, err := resolveTenantForNamespaceCreate(ctx, reader, user, h.cfg, ns)
+		if err != nil {
+			return ad.ErroredResponse(err)
 		}
 
 		if tnt == nil {
@@ -80,6 +80,7 @@ func (h *ownerReferenceHandler) OnCreate(
 func (h *ownerReferenceHandler) OnDelete(
 	client.Client,
 	client.Reader,
+	users.AdmissionUser,
 	*corev1.Namespace,
 	admission.Decoder,
 	events.EventRecorder,
@@ -92,13 +93,14 @@ func (h *ownerReferenceHandler) OnDelete(
 func (h *ownerReferenceHandler) OnUpdate(
 	c client.Client,
 	reader client.Reader,
+	user users.AdmissionUser,
 	newNs *corev1.Namespace,
 	oldNs *corev1.Namespace,
 	decoder admission.Decoder,
 	recorder events.EventRecorder,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		tnt, err := resolveTenantForNamespaceUpdate(ctx, reader, h.cfg, oldNs, newNs, req.UserInfo)
+		tnt, err := resolveTenantForNamespaceUpdate(ctx, reader, user, h.cfg, oldNs, newNs)
 		if err != nil {
 			return ad.ErroredResponse(err)
 		}
@@ -145,12 +147,26 @@ func (h *ownerReferenceHandler) OnUpdate(
 	}
 }
 
+func resolveTenantForNamespaceCreate(
+	ctx context.Context,
+	c client.Reader,
+	user users.AdmissionUser,
+	cfg configuration.Configuration,
+	ns *corev1.Namespace,
+) (*capsulev1beta2.Tenant, error) {
+	if user.IsAdmin() {
+		return tenant.GetTenantByLabels(ctx, c, ns)
+	}
+
+	return tenant.GetTenantByLabelsAndUser(ctx, c, cfg, ns, user)
+}
+
 func resolveTenantForNamespaceUpdate(
 	ctx context.Context,
 	c client.Reader,
+	user users.AdmissionUser,
 	cfg configuration.Configuration,
 	oldNs, newNs *corev1.Namespace,
-	userInfo authenticationv1.UserInfo,
 ) (*capsulev1beta2.Tenant, error) {
 	// 1) try old ownerRefs
 	if tnt, err := tenant.GetTenantByOwnerreferences(ctx, c, oldNs.OwnerReferences); err != nil {
@@ -166,8 +182,13 @@ func resolveTenantForNamespaceUpdate(
 		return tnt, nil
 	}
 
-	// 3) fall back to labels + user
-	return tenant.GetTenantByLabelsAndUser(ctx, c, cfg, newNs, userInfo)
+	// 3) Controller/admin is allowed to resolve by label only.
+	if user.IsAdmin() {
+		return tenant.GetTenantByLabels(ctx, c, newNs)
+	}
+
+	// 4) fall back to labels + user
+	return tenant.GetTenantByLabelsAndUser(ctx, c, cfg, newNs, user)
 }
 
 func assignToTenant(

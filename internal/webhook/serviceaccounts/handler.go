@@ -6,14 +6,16 @@ package serviceaccounts
 import (
 	corev1 "k8s.io/api/core/v1"
 
+	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
 
-func Handler(handler ...handlers.TypedHandlerWithTenant[*corev1.ServiceAccount]) handlers.Handler {
-	return &handlers.TypedTenantHandler[*corev1.ServiceAccount]{
+func Handler(cfg configuration.Configuration, handler ...handlers.TypedHandlerWithTenantUser[*corev1.ServiceAccount]) handlers.Handler {
+	return &handlers.TypedTenantWithUserHandler[*corev1.ServiceAccount]{
 		Factory: func() *corev1.ServiceAccount {
 			return &corev1.ServiceAccount{}
 		},
-		Handlers: handler,
+		Handlers:      handler,
+		Configuration: cfg,
 	}
 }

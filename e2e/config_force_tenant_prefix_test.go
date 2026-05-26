@@ -27,7 +27,7 @@ var _ = Describe("creating a Namespace with Tenant name prefix enforcement", Ord
 				{
 					CoreOwnerSpec: rbac.CoreOwnerSpec{
 						UserSpec: rbac.UserSpec{
-							Name: "john",
+							Name: "e2e-prefix",
 							Kind: "User",
 						},
 					},
@@ -47,7 +47,7 @@ var _ = Describe("creating a Namespace with Tenant name prefix enforcement", Ord
 				{
 					CoreOwnerSpec: rbac.CoreOwnerSpec{
 						UserSpec: rbac.UserSpec{
-							Name: "john",
+							Name: "e2e-prefix",
 							Kind: "User",
 						},
 					},

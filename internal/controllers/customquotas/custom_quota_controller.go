@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
-	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	k8smeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -31,6 +30,7 @@ import (
 	"github.com/projectcapsule/capsule/internal/cache"
 	cutils "github.com/projectcapsule/capsule/internal/controllers/utils"
 	"github.com/projectcapsule/capsule/internal/metrics"
+	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/runtime/predicates"
 )
@@ -116,8 +116,8 @@ func (r *customQuotaClaimController) Reconcile(ctx context.Context, request ctrl
 	statusErr := errors.Join(reconcileErr, ledgerErr)
 
 	if err := r.updateStatus(ctx, instance, statusErr); err != nil {
-		if apierrors.IsNotFound(err) || apierrors.HasStatusCause(err, corev1.NamespaceTerminatingCause) {
-			err = nil
+		if caperrors.IgnoreGone(err) {
+			return reconcile.Result{}, nil
 		}
 
 		return reconcile.Result{}, fmt.Errorf("cannot update status: %w", err)
@@ -126,8 +126,8 @@ func (r *customQuotaClaimController) Reconcile(ctx context.Context, request ctrl
 	r.emitMetrics(instance)
 
 	if err := patchHelper.Patch(ctx, instance); err != nil {
-		if apierrors.IsNotFound(err) || apierrors.HasStatusCause(err, corev1.NamespaceTerminatingCause) {
-			err = nil
+		if caperrors.IgnoreGone(err) {
+			return reconcile.Result{}, nil
 		}
 
 		return reconcile.Result{}, fmt.Errorf("cannot patch: %w", err)

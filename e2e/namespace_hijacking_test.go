@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"sort"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -16,10 +17,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
+	"k8s.io/utils/ptr"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/api/rbac"
+	clt "github.com/projectcapsule/capsule/pkg/runtime/client"
+	"github.com/projectcapsule/capsule/pkg/tenant"
 )
 
 var _ = Describe("creating several Namespaces for a Tenant", Ordered, Label("namespace", "hijack"), func() {
@@ -73,6 +77,25 @@ var _ = Describe("creating several Namespaces for a Tenant", Ordered, Label("nam
 					CoreOwnerSpec: rbac.CoreOwnerSpec{
 						UserSpec: rbac.UserSpec{
 							Name: "gatsby",
+							Kind: "User",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	t3 := &capsulev1beta2.Tenant{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   "e2e-ns-attack-3",
+			Labels: map[string]string{"env": "e2e"},
+		},
+		Spec: capsulev1beta2.TenantSpec{
+			Owners: rbac.OwnerListSpec{
+				{
+					CoreOwnerSpec: rbac.CoreOwnerSpec{
+						UserSpec: rbac.UserSpec{
+							Name: "different-owner",
 							Kind: "User",
 						},
 					},
@@ -159,11 +182,265 @@ var _ = Describe("creating several Namespaces for a Tenant", Ordered, Label("nam
 			return k8sClient.Create(context.TODO(), t2)
 		}).Should(Succeed())
 		TenantReady(t2, metav1.ConditionTrue, defaultTimeoutInterval)
+
+		EventuallyCreation(func() error {
+			t3.ResourceVersion = ""
+
+			return k8sClient.Create(context.TODO(), t3)
+		}).Should(Succeed())
+		TenantReady(t3, metav1.ConditionTrue, defaultTimeoutInterval)
+
 	})
 
 	JustAfterEach(func() {
 		EventuallyDeletion(t1)
 		EventuallyDeletion(t2)
+		EventuallyDeletion(t3)
+	})
+
+	It("Owners can not add a second Tenant ownerReference to a managed namespace", func() {
+		tenantA := getTenant(t1.Name)
+		tenantB := getTenant(t2.Name)
+
+		for _, owner := range t1.Spec.Owners {
+			cs := ownerClient(owner.UserSpec)
+
+			ns := NewNamespace("", map[string]string{
+				meta.TenantLabel: tenantA.GetName(),
+			})
+
+			NamespaceCreation(ns, owner.UserSpec, defaultTimeoutInterval).Should(Succeed())
+			NamespaceIsPartOfTenant(t1, ns).Should(Succeed())
+
+			current, err := cs.CoreV1().Namespaces().Get(
+				context.TODO(),
+				ns.Name,
+				metav1.GetOptions{},
+			)
+			Expect(err).ToNot(HaveOccurred())
+
+			current.OwnerReferences = append(current.OwnerReferences, metav1.OwnerReference{
+				APIVersion: capsulev1beta2.GroupVersion.String(),
+				Kind:       "Tenant",
+				Name:       tenantB.GetName(),
+				UID:        tenantB.GetUID(),
+			})
+
+			_, err = cs.CoreV1().Namespaces().Update(
+				context.TODO(),
+				current,
+				metav1.UpdateOptions{},
+			)
+
+			Expect(err).To(HaveOccurred())
+
+			Eventually(func(g Gomega) {
+				updated := &corev1.Namespace{}
+
+				err := k8sClient.Get(
+					context.TODO(),
+					types.NamespacedName{Name: ns.Name},
+					updated,
+				)
+				g.Expect(err).ToNot(HaveOccurred())
+
+				g.Expect(tenantOwnerReferences(updated)).To(Equal([]string{tenantA.GetName()}))
+				g.Expect(updated.Labels).To(HaveKeyWithValue(meta.TenantLabel, tenantA.GetName()))
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		}
+	})
+
+	It("Owners can not hijack unmanaged namespaces with multiple Tenant ownerReferences", func() {
+		tenantA := getTenant(t1.Name)
+		tenantB := getTenant(t2.Name)
+
+		unmanaged := NewNamespace("")
+		Expect(k8sClient.Create(context.TODO(), unmanaged)).Should(Succeed())
+
+		for _, owner := range t1.Spec.Owners {
+			cs := ownerClient(owner.UserSpec)
+
+			patch := []byte(fmt.Sprintf(`{
+			"metadata": {
+				"ownerReferences": [
+					{
+						"apiVersion": "%s",
+						"kind": "Tenant",
+						"name": "%s",
+						"uid": "%s"
+					},
+					{
+						"apiVersion": "%s",
+						"kind": "Tenant",
+						"name": "%s",
+						"uid": "%s"
+					}
+				]
+			}
+		}`,
+				capsulev1beta2.GroupVersion.String(),
+				tenantA.GetName(),
+				tenantA.GetUID(),
+				capsulev1beta2.GroupVersion.String(),
+				tenantB.GetName(),
+				tenantB.GetUID(),
+			))
+
+			_, err := cs.CoreV1().Namespaces().Patch(
+				context.TODO(),
+				unmanaged.Name,
+				types.StrategicMergePatchType,
+				patch,
+				metav1.PatchOptions{},
+			)
+
+			Expect(err).To(HaveOccurred())
+
+			Eventually(func(g Gomega) {
+				updated := &corev1.Namespace{}
+
+				err := k8sClient.Get(
+					context.TODO(),
+					types.NamespacedName{Name: unmanaged.Name},
+					updated,
+				)
+				g.Expect(err).ToNot(HaveOccurred())
+
+				g.Expect(tenantOwnerReferences(updated)).To(BeEmpty())
+				g.Expect(updated.Labels).ToNot(HaveKey(meta.TenantLabel))
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		}
+	})
+
+	It("Tenant A owners can not adopt unmanaged namespaces into Tenant B", func() {
+		tenantB := getTenant(t3.Name)
+
+		unmanaged := NewNamespace("")
+		Expect(k8sClient.Create(context.TODO(), unmanaged)).Should(Succeed())
+
+		for _, owner := range t1.Spec.Owners {
+			cs := ownerClient(owner.UserSpec)
+
+			patch := []byte(fmt.Sprintf(
+				`{"metadata":{"labels":{"%s":"%s"},"ownerReferences":[{"apiVersion":"%s","kind":"Tenant","name":"%s","uid":"%s"}]}}`,
+				meta.TenantLabel,
+				tenantB.GetName(),
+				capsulev1beta2.GroupVersion.String(),
+				tenantB.GetName(),
+				tenantB.GetUID(),
+			))
+
+			_, err := cs.CoreV1().Namespaces().Patch(
+				context.TODO(),
+				unmanaged.Name,
+				types.StrategicMergePatchType,
+				patch,
+				metav1.PatchOptions{},
+			)
+
+			Expect(err).To(HaveOccurred())
+			expectNoTenantOwnership(unmanaged.Name, tenantB)
+		}
+	})
+
+	It("Owners can not hijack unmanaged namespaces with controller ownerReference flags", func() {
+		tenant := getTenant(t1.Name)
+
+		unmanaged := NewNamespace("")
+		Expect(k8sClient.Create(context.TODO(), unmanaged)).Should(Succeed())
+
+		for _, owner := range t1.Spec.Owners {
+			cs := ownerClient(owner.UserSpec)
+
+			patch := []byte(fmt.Sprintf(`{
+			"metadata":{
+				"ownerReferences":[{
+					"apiVersion":"%s",
+					"kind":"Tenant",
+					"name":"%s",
+					"uid":"%s",
+					"controller":true,
+					"blockOwnerDeletion":true
+				}]
+			}
+		}`, capsulev1beta2.GroupVersion.String(), tenant.GetName(), tenant.GetUID()))
+
+			_, err := cs.CoreV1().Namespaces().Patch(
+				context.TODO(),
+				unmanaged.Name,
+				types.StrategicMergePatchType,
+				patch,
+				metav1.PatchOptions{},
+			)
+
+			Expect(err).To(HaveOccurred())
+			expectNoTenantOwnership(unmanaged.Name, tenant)
+		}
+	})
+
+	It("Owners can not smuggle Tenant ownerReference beside unrelated ownerReferences", func() {
+		tenant := getTenant(t1.Name)
+
+		unmanaged := NewNamespace("")
+		Expect(k8sClient.Create(context.TODO(), unmanaged)).Should(Succeed())
+
+		for _, owner := range t1.Spec.Owners {
+			cs := ownerClient(owner.UserSpec)
+
+			patch := []byte(fmt.Sprintf(`{
+			"metadata":{
+				"ownerReferences":[
+					{"apiVersion":"v1","kind":"ConfigMap","name":"dummy","uid":"%s"},
+					{"apiVersion":"%s","kind":"Tenant","name":"%s","uid":"%s"}
+				]
+			}
+		}`, types.UID("12345"), capsulev1beta2.GroupVersion.String(), tenant.GetName(), tenant.GetUID()))
+
+			_, err := cs.CoreV1().Namespaces().Patch(
+				context.TODO(),
+				unmanaged.Name,
+				types.StrategicMergePatchType,
+				patch,
+				metav1.PatchOptions{},
+			)
+
+			Expect(err).To(HaveOccurred())
+			expectNoTenantOwnership(unmanaged.Name, tenant)
+		}
+	})
+
+	It("Owners can not create an ownership gap then patch managed namespace metadata", func() {
+		tenant := getTenant(t1.Name)
+
+		for _, owner := range t1.Spec.Owners {
+			cs := ownerClient(owner.UserSpec)
+
+			ns := NewNamespace("", map[string]string{meta.TenantLabel: tenant.GetName()})
+			NamespaceCreation(ns, owner.UserSpec, defaultTimeoutInterval).Should(Succeed())
+			NamespaceIsPartOfTenant(t1, ns).Should(Succeed())
+
+			remove := []byte(fmt.Sprintf(`{"metadata":{"labels":{"%s":null}}}`, meta.TenantLabel))
+			_, err := cs.CoreV1().Namespaces().Patch(
+				context.TODO(),
+				ns.Name,
+				types.StrategicMergePatchType,
+				remove,
+				metav1.PatchOptions{},
+			)
+			Expect(err).ToNot(HaveOccurred())
+			expectOriginalTenantOwnership(ns.Name, tenant)
+
+			patch := []byte(`{"metadata":{"labels":{"attacker.example.com/touched":"true"}}}`)
+			_, err = cs.CoreV1().Namespaces().Patch(
+				context.TODO(),
+				ns.Name,
+				types.StrategicMergePatchType,
+				patch,
+				metav1.PatchOptions{},
+			)
+			Expect(err).ToNot(HaveOccurred())
+			expectOriginalTenantOwnership(ns.Name, tenant)
+		}
 	})
 
 	It("Can't hijack offlimits namespace (Ownerreferences)", func() {
@@ -221,6 +498,220 @@ var _ = Describe("creating several Namespaces for a Tenant", Ordered, Label("nam
 
 			_, err := cs.CoreV1().Namespaces().Patch(context.TODO(), kubeSystem.Name, types.StrategicMergePatchType, patch, metav1.PatchOptions{})
 			Expect(err).To(HaveOccurred())
+		}
+	})
+
+	It("Owners can not hijack unmanaged namespaces using JSONPatch add label", func() {
+		tenant := getTenant(t1.Name)
+
+		unmanaged := NewNamespace("")
+		Expect(k8sClient.Create(context.TODO(), unmanaged)).Should(Succeed())
+
+		for _, owner := range t1.Spec.Owners {
+			cs := ownerClient(owner.UserSpec)
+
+			patch := []byte(fmt.Sprintf(`[
+			{"op":"add","path":"/metadata/labels","value":{}},
+			{"op":"add","path":"/metadata/labels/%s","value":"%s"}
+		]`, clt.EscapeJSONPointer(meta.TenantLabel), tenant.GetName()))
+
+			_, err := cs.CoreV1().Namespaces().Patch(
+				context.TODO(),
+				unmanaged.Name,
+				types.JSONPatchType,
+				patch,
+				metav1.PatchOptions{},
+			)
+
+			Expect(err).To(HaveOccurred())
+			expectNoTenantOwnership(unmanaged.Name, tenant)
+		}
+	})
+
+	It("Owners can not hijack unmanaged namespaces using JSONPatch add ownerReference", func() {
+		tenant := getTenant(t1.Name)
+
+		unmanaged := NewNamespace("")
+		Expect(k8sClient.Create(context.TODO(), unmanaged)).Should(Succeed())
+
+		for _, owner := range t1.Spec.Owners {
+			cs := ownerClient(owner.UserSpec)
+
+			patch := []byte(fmt.Sprintf(`[
+			{"op":"add","path":"/metadata/ownerReferences","value":[
+				{"apiVersion":"%s","kind":"Tenant","name":"%s","uid":"%s"}
+			]}
+		]`, capsulev1beta2.GroupVersion.String(), tenant.GetName(), tenant.GetUID()))
+
+			_, err := cs.CoreV1().Namespaces().Patch(
+				context.TODO(),
+				unmanaged.Name,
+				types.JSONPatchType,
+				patch,
+				metav1.PatchOptions{},
+			)
+
+			Expect(err).To(HaveOccurred())
+			expectNoTenantOwnership(unmanaged.Name, tenant)
+		}
+	})
+
+	It("Owners can not hijack unmanaged namespaces with matching label and forged ownerReference UID", func() {
+		tenant := getTenant(t1.Name)
+
+		unmanaged := NewNamespace("")
+		Expect(k8sClient.Create(context.TODO(), unmanaged)).Should(Succeed())
+
+		for _, owner := range t1.Spec.Owners {
+			cs := ownerClient(owner.UserSpec)
+
+			_, fakeUID := randomTenantReference()
+			patch := []byte(fmt.Sprintf(
+				`{"metadata":{"labels":{"%s":"%s"},"ownerReferences":[{"apiVersion":"%s","kind":"Tenant","name":"%s","uid":"%s"}]}}`,
+				meta.TenantLabel,
+				tenant.GetName(),
+				capsulev1beta2.GroupVersion.String(),
+				tenant.GetName(),
+				fakeUID,
+			))
+
+			_, err := cs.CoreV1().Namespaces().Patch(
+				context.TODO(),
+				unmanaged.Name,
+				types.StrategicMergePatchType,
+				patch,
+				metav1.PatchOptions{},
+			)
+
+			Expect(err).To(HaveOccurred())
+			expectNoTenantOwnership(unmanaged.Name, tenant)
+		}
+	})
+
+	It("Owners can not hijack unmanaged namespaces using server-side apply", func() {
+		tenant := getTenant(t1.Name)
+
+		unmanaged := NewNamespace("")
+		Expect(k8sClient.Create(context.TODO(), unmanaged)).Should(Succeed())
+
+		for _, owner := range t1.Spec.Owners {
+			cs := ownerClient(owner.UserSpec)
+
+			apply := []byte(fmt.Sprintf(`{
+			"apiVersion":"v1",
+			"kind":"Namespace",
+			"metadata":{
+				"name":"%s",
+				"labels":{"%s":"%s"},
+				"ownerReferences":[{
+					"apiVersion":"%s",
+					"kind":"Tenant",
+					"name":"%s",
+					"uid":"%s"
+				}]
+			}
+		}`,
+				unmanaged.Name,
+				meta.TenantLabel,
+				tenant.GetName(),
+				capsulev1beta2.GroupVersion.String(),
+				tenant.GetName(),
+				tenant.GetUID(),
+			))
+
+			_, err := cs.CoreV1().Namespaces().Patch(
+				context.TODO(),
+				unmanaged.Name,
+				types.ApplyPatchType,
+				apply,
+				metav1.PatchOptions{
+					FieldManager: "attacker",
+					Force:        ptr.To(true),
+				},
+			)
+
+			Expect(err).To(HaveOccurred())
+			expectNoTenantOwnership(unmanaged.Name, tenant)
+		}
+	})
+
+	It("Owners can not combine status and metadata patches to adopt unmanaged namespaces", func() {
+		tenant := getTenant(t1.Name)
+		createNamespaceStatusRBACForOwner(tenant)
+		DeferCleanup(func(tnt *capsulev1beta2.Tenant) {
+			deleteNamespaceStatusRBACForOwner(tnt)
+		}, tenant)
+
+		unmanaged := NewNamespace("")
+		Expect(k8sClient.Create(context.TODO(), unmanaged)).Should(Succeed())
+
+		for _, owner := range t1.Spec.Owners {
+			cs := ownerClient(owner.UserSpec)
+
+			statusNs, err := cs.CoreV1().Namespaces().Get(context.TODO(), unmanaged.Name, metav1.GetOptions{})
+			Expect(err).ToNot(HaveOccurred())
+
+			if statusNs.Labels == nil {
+				statusNs.Labels = map[string]string{}
+			}
+
+			statusNs.Labels[meta.TenantLabel] = tenant.GetName()
+			statusNs.OwnerReferences = []metav1.OwnerReference{{
+				APIVersion: capsulev1beta2.GroupVersion.String(),
+				Kind:       "Tenant",
+				Name:       tenant.GetName(),
+				UID:        tenant.GetUID(),
+			}}
+
+			_, _ = cs.CoreV1().Namespaces().UpdateStatus(context.TODO(), statusNs, metav1.UpdateOptions{})
+
+			patch := []byte(fmt.Sprintf(
+				`{"metadata":{"labels":{"%s":"%s"}}}`,
+				meta.TenantLabel,
+				tenant.GetName(),
+			))
+
+			_, err = cs.CoreV1().Namespaces().Patch(
+				context.TODO(),
+				unmanaged.Name,
+				types.StrategicMergePatchType,
+				patch,
+				metav1.PatchOptions{},
+			)
+
+			Expect(err).To(HaveOccurred())
+			expectNoTenantOwnership(unmanaged.Name, tenant)
+		}
+	})
+
+	It("Owners can not hijack unmanaged namespaces with valid ownerReference and mismatching label", func() {
+		tenant := getTenant(t1.Name)
+
+		unmanaged := NewNamespace("")
+		Expect(k8sClient.Create(context.TODO(), unmanaged)).Should(Succeed())
+
+		for _, owner := range t1.Spec.Owners {
+			cs := ownerClient(owner.UserSpec)
+
+			patch := []byte(fmt.Sprintf(
+				`{"metadata":{"labels":{"%s":"not-%s"},"ownerReferences":[{"apiVersion":"%s","kind":"Tenant","name":"%s","uid":"%s"}]}}`,
+				meta.TenantLabel,
+				tenant.GetName(),
+				capsulev1beta2.GroupVersion.String(),
+				tenant.GetName(),
+				tenant.GetUID(),
+			))
+
+			_, err := cs.CoreV1().Namespaces().Patch(
+				context.TODO(),
+				unmanaged.Name,
+				types.StrategicMergePatchType,
+				patch,
+				metav1.PatchOptions{},
+			)
+
+			Expect(err).To(HaveOccurred())
+			expectNoTenantOwnership(unmanaged.Name, tenant)
 		}
 	})
 
@@ -681,4 +1172,18 @@ func deleteNamespaceStatusRBACForOwner(tnt *capsulev1beta2.Tenant) {
 	if err != nil && !apierrors.IsNotFound(err) {
 		Expect(err).NotTo(HaveOccurred())
 	}
+}
+
+func tenantOwnerReferences(ns *corev1.Namespace) []string {
+	var refs []string
+
+	for _, ref := range ns.GetOwnerReferences() {
+		if tenant.IsTenantOwnerReference(ref) {
+			refs = append(refs, ref.Name)
+		}
+	}
+
+	sort.Strings(refs)
+
+	return refs
 }

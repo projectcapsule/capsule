@@ -30,7 +30,7 @@ var _ = Describe("creating several Namespaces for a Tenant", Ordered, Label("nam
 				{
 					CoreOwnerSpec: rbac.CoreOwnerSpec{
 						UserSpec: rbac.UserSpec{
-							Name: "charlie",
+							Name: "e2e-managed-labels",
 							Kind: "User",
 						},
 					},

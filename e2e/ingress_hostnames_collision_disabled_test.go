@@ -34,7 +34,7 @@ var _ = Describe("when disabling Ingress hostnames collision", Ordered, Label("t
 				{
 					CoreOwnerSpec: rbac.CoreOwnerSpec{
 						UserSpec: rbac.UserSpec{
-							Name: "ingress-disabled",
+							Name: "e2e-hostnames-collision-disabled",
 							Kind: "User",
 						},
 					},

@@ -40,7 +40,7 @@ var _ = Describe("Promoting ServiceAccounts to Owners", Ordered, Label("config",
 				{
 					CoreOwnerSpec: rbac.CoreOwnerSpec{
 						UserSpec: rbac.UserSpec{
-							Name: "alice",
+							Name: "e2e-sa-owner-promotion",
 							Kind: "User",
 						},
 					},

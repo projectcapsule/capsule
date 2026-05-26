@@ -31,7 +31,7 @@ var _ = Describe("enforcing an allowed set of Service external IPs", Ordered, La
 				{
 					CoreOwnerSpec: rbac.CoreOwnerSpec{
 						UserSpec: rbac.UserSpec{
-							Name: "google",
+							Name: "e2e-svc-external-svc",
 							Kind: "User",
 						},
 					},

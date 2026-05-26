@@ -29,7 +29,7 @@ var _ = Describe("creating a Namespace trying to select a third Tenant", Ordered
 				{
 					CoreOwnerSpec: rbac.CoreOwnerSpec{
 						UserSpec: rbac.UserSpec{
-							Name: "undefined",
+							Name: "e2e-tenant-non-owned",
 							Kind: "User",
 						},
 					},
@@ -53,7 +53,7 @@ var _ = Describe("creating a Namespace trying to select a third Tenant", Ordered
 			meta.TenantLabel: tnt.Name,
 		})
 
-		cs := ownerClient(rbac.UserSpec{Name: "dale", Kind: "User"})
+		cs := ownerClient(rbac.UserSpec{Name: "e2e-tenant-non-owned-fail", Kind: "User"})
 		_, err := cs.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{})
 		Expect(err).To(HaveOccurred())
 	})

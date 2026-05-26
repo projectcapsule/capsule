@@ -34,7 +34,7 @@ var _ = Describe("when Tenant handles Ingress classes with extensions/v1beta1", 
 				{
 					CoreOwnerSpec: rbac.CoreOwnerSpec{
 						UserSpec: rbac.UserSpec{
-							Name: "ingress",
+							Name: "e2e-ingress-class-extensions-v1beta1",
 							Kind: "User",
 						},
 					},

@@ -31,7 +31,7 @@ var _ = Describe("creating a Namespace as Tenant owner with custom --capsule-gro
 				{
 					CoreOwnerSpec: rbac.CoreOwnerSpec{
 						UserSpec: rbac.UserSpec{
-							Name: "alice",
+							Name: "e2e-assigned-custom-group-1",
 							Kind: "User",
 						},
 					},
@@ -39,7 +39,7 @@ var _ = Describe("creating a Namespace as Tenant owner with custom --capsule-gro
 				{
 					CoreOwnerSpec: rbac.CoreOwnerSpec{
 						UserSpec: rbac.UserSpec{
-							Name: "bob",
+							Name: "e2e-assigned-custom-group-2",
 							Kind: "User",
 						},
 					},

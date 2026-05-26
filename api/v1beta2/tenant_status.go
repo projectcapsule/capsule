@@ -15,9 +15,9 @@ import (
 type tenantState string
 
 const (
-	TenantStateActive        tenantState = "Active"
-	TenantStateCordoned      tenantState = "Cordoned"
-	TerminatingStateCordoned tenantState = "Terminating"
+	TenantStateActive      tenantState = "Active"
+	TenantStateCordoned    tenantState = "Cordoned"
+	TenantStateTerminating tenantState = "Terminating"
 )
 
 // Returns the observed state of the Tenant.

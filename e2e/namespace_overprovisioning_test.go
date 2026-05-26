@@ -29,7 +29,7 @@ var _ = Describe("creating a Namespace in over-quota of three", Ordered, Label("
 				{
 					CoreOwnerSpec: rbac.CoreOwnerSpec{
 						UserSpec: rbac.UserSpec{
-							Name: "bob",
+							Name: "e2e-ns-overprovision",
 							Kind: "User",
 						},
 					},

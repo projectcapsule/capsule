@@ -34,7 +34,7 @@ var _ = Describe("when handling Namespace scoped Ingress hostnames collision", O
 				{
 					CoreOwnerSpec: rbac.CoreOwnerSpec{
 						UserSpec: rbac.UserSpec{
-							Name: "ingress-namespace",
+							Name: "e2e-hostnames-collision-namespace",
 							Kind: "User",
 						},
 					},

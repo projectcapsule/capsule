@@ -55,8 +55,8 @@ var _ = Describe("GlobalTenantResource", Ordered, Label("replications", "global"
 		ctx = context.Background()
 		originConfig = &capsulev1beta2.CapsuleConfiguration{}
 
-		tenantAOwner = rbac.UserSpec{Name: "solar-user", Kind: rbac.OwnerKind("User")}
-		tenantBOwner = rbac.UserSpec{Name: "lunar-user", Kind: rbac.OwnerKind("User")}
+		tenantAOwner = rbac.UserSpec{Name: "e2e-gtr-tenant-a", Kind: rbac.OwnerKind("User")}
+		tenantBOwner = rbac.UserSpec{Name: "e2e-gtr-tenant-b", Kind: rbac.OwnerKind("User")}
 
 		tenantANamespaces = []string{"e2e-gtr-tenant-a-one", "e2e-gtr-tenant-a-two", "e2e-gtr-tenant-a-system"}
 		tenantBNamespaces = []string{"e2e-gtr-tenant-b-one", "e2e-gtr-tenant-b-two"}

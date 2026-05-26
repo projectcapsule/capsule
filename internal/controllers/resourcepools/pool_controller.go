@@ -31,6 +31,7 @@ import (
 	ctrlutils "github.com/projectcapsule/capsule/internal/controllers/utils"
 	"github.com/projectcapsule/capsule/internal/metrics"
 	"github.com/projectcapsule/capsule/pkg/api"
+	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/utils"
@@ -59,7 +60,7 @@ func (r *resourcePoolController) SetupWithManager(mgr ctrl.Manager, cfg ctrlutil
 			handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, _ client.Object) []reconcile.Request {
 				// Fetch all GlobalResourceQuota objects
 				grqList := &capsulev1beta2.ResourcePoolList{}
-				if err := mgr.GetClient().List(ctx, grqList); err != nil {
+				if err := r.reader.List(ctx, grqList); err != nil {
 					r.log.Error(err, "Failed to list ResourcePools objects")
 
 					return nil
@@ -83,7 +84,6 @@ func (r *resourcePoolController) SetupWithManager(mgr ctrl.Manager, cfg ctrlutil
 func (r resourcePoolController) Reconcile(ctx context.Context, request ctrl.Request) (result ctrl.Result, err error) {
 	log := r.log.WithValues("Request.Name", request.Name)
 
-	// Fetch the Tenant instance
 	instance := &capsulev1beta2.ResourcePool{}
 	if err = r.Get(ctx, request.NamespacedName, instance); err != nil {
 		if apierrors.IsNotFound(err) {
@@ -108,21 +108,30 @@ func (r resourcePoolController) Reconcile(ctx context.Context, request ctrl.Requ
 		r.finalize(ctx, instance)
 
 		if uerr := r.updateStatus(ctx, instance, err); uerr != nil {
-			err = fmt.Errorf("cannot update pool status: %w", uerr)
+			if caperrors.IgnoreGone(uerr) {
+				err = nil
+				return
+			}
 
+			err = fmt.Errorf("cannot update pool status: %w", uerr)
 			return
 		}
 
 		r.metrics.ResourceUsageMetrics(instance)
 
-		if e := patchHelper.Patch(ctx, instance); err != nil {
-			if !apierrors.IsNotFound(err) {
-				err = e
+		if e := patchHelper.Patch(ctx, instance); e != nil {
+			if caperrors.IgnoreGone(e) {
+				err = nil
+				return
 			}
+
+			err = gherrors.Wrap(e, "failed to patch ResourcePool")
+			return
 		}
+
+		err = nil
 	}()
 
-	// ResourceQuota Reconciliation
 	err = r.reconcile(ctx, log, instance)
 
 	return ctrl.Result{}, err
@@ -212,7 +221,7 @@ func (r *resourcePoolController) reconcile(
 	pool.CalculateClaimedResources()
 	pool.AssignClaims()
 
-	if err := r.syncResourceQuotas(ctx, r.Client, pool, namespaces); err != nil {
+	if err := r.syncResourceQuotas(ctx, r.Client, r.reader, pool, namespaces); err != nil {
 		return fmt.Errorf("sync resourcequotas: %w", err)
 	}
 
@@ -275,7 +284,7 @@ func (r *resourcePoolController) reconcileClaimsInUseForNamespace(
 ) error {
 	// Fetch the quota we manage for this namespace
 	rq := &corev1.ResourceQuota{}
-	if err := r.Get(ctx, types.NamespacedName{
+	if err := r.reader.Get(ctx, types.NamespacedName{
 		Name: pool.GetQuotaName(), Namespace: namespace,
 	}, rq); err != nil {
 		if apierrors.IsNotFound(err) {
@@ -315,7 +324,7 @@ func (r *resourcePoolController) reconcileClaimsInUseForNamespace(
 
 		err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 			current := &capsulev1beta2.ResourcePoolClaim{}
-			if err := r.Get(ctx, client.ObjectKeyFromObject(cl), current); err != nil {
+			if err := r.reader.Get(ctx, client.ObjectKeyFromObject(cl), current); err != nil {
 				return fmt.Errorf("failed to refetch instance before update: %w", err)
 			}
 
@@ -538,7 +547,7 @@ func (r *resourcePoolController) handleClaimDisassociation(
 	}
 
 	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		if err := r.Get(ctx, types.NamespacedName{
+		if err := r.reader.Get(ctx, types.NamespacedName{
 			Name:      claim.Name.String(),
 			Namespace: claim.Namespace.String(),
 		}, current); err != nil {
@@ -594,6 +603,7 @@ func (r *resourcePoolController) handleClaimDisassociation(
 func (r *resourcePoolController) syncResourceQuotas(
 	ctx context.Context,
 	c client.Client,
+	reader client.Reader,
 	quota *capsulev1beta2.ResourcePool,
 	namespaces []corev1.Namespace,
 ) (err error) {
@@ -603,7 +613,7 @@ func (r *resourcePoolController) syncResourceQuotas(
 		namespace := ns
 
 		group.Go(func() error {
-			return r.syncResourceQuota(ctx, c, quota, namespace)
+			return r.syncResourceQuota(ctx, c, reader, quota, namespace)
 		})
 	}
 
@@ -614,6 +624,7 @@ func (r *resourcePoolController) syncResourceQuotas(
 func (r *resourcePoolController) syncResourceQuota(
 	ctx context.Context,
 	c client.Client,
+	reader client.Reader,
 	pool *capsulev1beta2.ResourcePool,
 	namespace corev1.Namespace,
 ) (err error) {
@@ -631,7 +642,7 @@ func (r *resourcePoolController) syncResourceQuota(
 		},
 	}
 
-	if err := c.Get(ctx, types.NamespacedName{Name: target.Name, Namespace: target.Namespace}, target); err != nil && !apierrors.IsNotFound(err) {
+	if err := reader.Get(ctx, types.NamespacedName{Name: target.Name, Namespace: target.Namespace}, target); err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}
 
@@ -693,7 +704,7 @@ func (r *resourcePoolController) gatherMatchingNamespaces(
 	}
 
 	for _, selector := range pool.Spec.Selectors {
-		selected, serr := selector.GetMatchingNamespaces(ctx, r.Client)
+		selected, serr := selector.GetMatchingNamespaces(ctx, r.reader)
 		if serr != nil {
 			log.Error(err, "Cannot get matching namespaces")
 
@@ -845,7 +856,7 @@ func (r *resourcePoolController) garbageCollectNamespace(
 
 	// Check if the namespace still exists
 	ns := &corev1.Namespace{}
-	if err := r.Get(ctx, types.NamespacedName{Name: namespace}, ns); err != nil {
+	if err := r.reader.Get(ctx, types.NamespacedName{Name: namespace}, ns); err != nil {
 		if apierrors.IsNotFound(err) {
 			r.log.V(5).Info("Namespace does not exist, skipping garbage collection", "namespace", namespace)
 
@@ -865,7 +876,7 @@ func (r *resourcePoolController) garbageCollectNamespace(
 		},
 	}
 
-	err := r.Get(ctx, types.NamespacedName{Namespace: namespace, Name: target.GetName()}, target)
+	err := r.reader.Get(ctx, types.NamespacedName{Namespace: namespace, Name: target.GetName()}, target)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			r.log.V(5).Info("ResourceQuota already deleted", "namespace", namespace, "name", name)

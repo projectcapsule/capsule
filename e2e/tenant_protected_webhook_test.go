@@ -26,7 +26,7 @@ var _ = Describe("Deleting a tenant with protected annotation", Ordered, Label("
 				{
 					CoreOwnerSpec: rbac.CoreOwnerSpec{
 						UserSpec: rbac.UserSpec{
-							Name: "john",
+							Name: "e2e-protected-tenant",
 							Kind: "User",
 						},
 					},

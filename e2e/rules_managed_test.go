@@ -31,7 +31,7 @@ var _ = Describe("NamespaceStatus objects", Ordered, Label("tenant", "rules", "s
 			Owners: rbac.OwnerListSpec{
 				{
 					CoreOwnerSpec: rbac.CoreOwnerSpec{
-						UserSpec: rbac.UserSpec{Name: "matt", Kind: "User"},
+						UserSpec: rbac.UserSpec{Name: "e2e-rule-status-a", Kind: "User"},
 					},
 				},
 			},
@@ -49,7 +49,7 @@ var _ = Describe("NamespaceStatus objects", Ordered, Label("tenant", "rules", "s
 			Owners: rbac.OwnerListSpec{
 				{
 					CoreOwnerSpec: rbac.CoreOwnerSpec{
-						UserSpec: rbac.UserSpec{Name: "matt", Kind: "User"},
+						UserSpec: rbac.UserSpec{Name: "e2e-rule-status-b", Kind: "User"},
 					},
 				},
 			},

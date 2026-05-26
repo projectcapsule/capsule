@@ -32,7 +32,7 @@ var _ = Describe("Administrators", Ordered, Label("namespace", "permissions", "a
 				{
 					CoreOwnerSpec: rbac.CoreOwnerSpec{
 						UserSpec: rbac.UserSpec{
-							Name: "paul",
+							Name: "e2e-tnt-admins-1",
 							Kind: "User",
 						},
 					},
@@ -43,7 +43,7 @@ var _ = Describe("Administrators", Ordered, Label("namespace", "permissions", "a
 
 	tnt2 := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "tnt-admins-2",
+			Name: "e2e-tnt-admins-2",
 			Labels: map[string]string{
 				"env": "e2e",
 			},
@@ -53,7 +53,7 @@ var _ = Describe("Administrators", Ordered, Label("namespace", "permissions", "a
 				{
 					CoreOwnerSpec: rbac.CoreOwnerSpec{
 						UserSpec: rbac.UserSpec{
-							Name: "george",
+							Name: "e2e-tnt-admins-2",
 							Kind: "User",
 						},
 					},

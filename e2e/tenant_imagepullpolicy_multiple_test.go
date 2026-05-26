@@ -31,7 +31,7 @@ var _ = Describe("enforcing some defined ImagePullPolicy", Ordered, Label("tenan
 				{
 					CoreOwnerSpec: rbac.CoreOwnerSpec{
 						UserSpec: rbac.UserSpec{
-							Name: "alex",
+							Name: "e2e-image-pull-policies",
 							Kind: "User",
 						},
 					},

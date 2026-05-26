@@ -30,7 +30,7 @@ var _ = Describe("adding metadata to Pod objects", Ordered, Label("pod"), func()
 				{
 					CoreOwnerSpec: rbac.CoreOwnerSpec{
 						UserSpec: rbac.UserSpec{
-							Name: "gatsby",
+							Name: "e2e-pod-metadata",
 							Kind: "User",
 						},
 					},

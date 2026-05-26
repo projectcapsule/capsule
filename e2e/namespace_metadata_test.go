@@ -11,7 +11,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api"
@@ -40,7 +39,7 @@ var _ = Describe("creating a Namespace for a Tenant with additional metadata", O
 				{
 					CoreOwnerSpec: rbac.CoreOwnerSpec{
 						UserSpec: rbac.UserSpec{
-							Name: "gatsby",
+							Name: "e2e-tenant-metadata-admission",
 							Kind: "User",
 						},
 					},
@@ -76,7 +75,7 @@ var _ = Describe("creating a Namespace for a Tenant with additional metadata", O
 			}).Should(Succeed())
 			TenantReady(tnt, metav1.ConditionTrue, defaultTimeoutInterval)
 
-			Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: tnt.GetName()}, tnt)).Should(Succeed())
+			tnt = GetTenantEventually(tnt)
 		})
 
 		ns := NewNamespace("", map[string]string{
@@ -87,7 +86,7 @@ var _ = Describe("creating a Namespace for a Tenant with additional metadata", O
 
 		By("checking additional labels", func() {
 			Eventually(func() (ok bool) {
-				Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: ns.GetName()}, ns)).Should(Succeed())
+				ns = GetNamespaceEventually(ns.GetName())
 				for k, v := range tnt.Spec.NamespaceOptions.AdditionalMetadata.Labels {
 					if k == "capsule.clastix.io/tenant" || k == "kubernetes.io/metadata.name" {
 						continue // this label is managed and shouldn't be set by the user
@@ -101,7 +100,7 @@ var _ = Describe("creating a Namespace for a Tenant with additional metadata", O
 		})
 		By("checking managed labels", func() {
 			Eventually(func() (ok bool) {
-				Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: ns.GetName()}, ns)).Should(Succeed())
+				ns = GetNamespaceEventually(ns.GetName())
 				if ok, _ = HaveKeyWithValue("capsule.clastix.io/tenant", tnt.GetName()).Match(ns.Labels); !ok {
 					return
 				}
@@ -114,7 +113,7 @@ var _ = Describe("creating a Namespace for a Tenant with additional metadata", O
 
 		By("checking additional annotations", func() {
 			Eventually(func() (ok bool) {
-				Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: ns.GetName()}, ns)).Should(Succeed())
+				ns = GetNamespaceEventually(ns.GetName())
 				for k, v := range tnt.Spec.NamespaceOptions.AdditionalMetadata.Annotations {
 					if ok, _ = HaveKeyWithValue(k, v).Match(ns.Annotations); !ok {
 						return
@@ -191,7 +190,7 @@ var _ = Describe("creating a Namespace for a Tenant with additional metadata", O
 				return k8sClient.Create(context.TODO(), tnt)
 			}).Should(Succeed())
 
-			Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: tnt.GetName()}, tnt)).Should(Succeed())
+			tnt = GetTenantEventually(tnt)
 		})
 
 		ns := NewNamespace("", map[string]string{
@@ -203,7 +202,7 @@ var _ = Describe("creating a Namespace for a Tenant with additional metadata", O
 
 		By("checking templated annotations", func() {
 			Eventually(func() (ok bool) {
-				Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: ns.GetName()}, ns)).Should(Succeed())
+				ns = GetNamespaceEventually(ns.GetName())
 				if ok, _ = HaveKeyWithValue("projectcapsule.dev/templated-tenant-annotation", tnt.Name).Match(ns.Annotations); !ok {
 					return
 				}
@@ -215,7 +214,7 @@ var _ = Describe("creating a Namespace for a Tenant with additional metadata", O
 		})
 		By("checking templated labels", func() {
 			Eventually(func() (ok bool) {
-				Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: ns.GetName()}, ns)).Should(Succeed())
+				ns = GetNamespaceEventually(ns.GetName())
 				if ok, _ = HaveKeyWithValue("projectcapsule.dev/templated-tenant-label", tnt.Name).Match(ns.Labels); !ok {
 					return
 				}
@@ -227,7 +226,7 @@ var _ = Describe("creating a Namespace for a Tenant with additional metadata", O
 		})
 		By("checking additional labels from entry without node selector", func() {
 			Eventually(func() (ok bool) {
-				Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: ns.GetName()}, ns)).Should(Succeed())
+				ns = GetNamespaceEventually(ns.GetName())
 				for k, v := range tnt.Spec.NamespaceOptions.AdditionalMetadataList[0].Labels {
 					if ok, _ = HaveKeyWithValue(k, v).Match(ns.Labels); !ok {
 						return
@@ -238,7 +237,7 @@ var _ = Describe("creating a Namespace for a Tenant with additional metadata", O
 		})
 		By("checking additional labels from entry with matching node selector", func() {
 			Eventually(func() (ok bool) {
-				Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: ns.GetName()}, ns)).Should(Succeed())
+				ns = GetNamespaceEventually(ns.GetName())
 				for k, v := range tnt.Spec.NamespaceOptions.AdditionalMetadataList[1].Labels {
 					if ok, _ = HaveKeyWithValue(k, v).Match(ns.Labels); !ok {
 						return
@@ -249,7 +248,7 @@ var _ = Describe("creating a Namespace for a Tenant with additional metadata", O
 		})
 		By("checking additional labels from entry with non-matching node selector", func() {
 			Eventually(func() (ok bool) {
-				Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: ns.GetName()}, ns)).Should(Succeed())
+				ns = GetNamespaceEventually(ns.GetName())
 				for k, v := range tnt.Spec.NamespaceOptions.AdditionalMetadataList[2].Labels {
 					if ok, _ = HaveKeyWithValue(k, v).Match(ns.Labels); !ok {
 						return
@@ -260,7 +259,7 @@ var _ = Describe("creating a Namespace for a Tenant with additional metadata", O
 		})
 		By("checking additional annotations from entry without node selector", func() {
 			Eventually(func() (ok bool) {
-				Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: ns.GetName()}, ns)).Should(Succeed())
+				ns = GetNamespaceEventually(ns.GetName())
 				for k, v := range tnt.Spec.NamespaceOptions.AdditionalMetadataList[0].Annotations {
 					if ok, _ = HaveKeyWithValue(k, v).Match(ns.Annotations); !ok {
 						return
@@ -271,7 +270,7 @@ var _ = Describe("creating a Namespace for a Tenant with additional metadata", O
 		})
 		By("checking additional annotations from entry with matching node selector", func() {
 			Eventually(func() (ok bool) {
-				Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: ns.GetName()}, ns)).Should(Succeed())
+				ns = GetNamespaceEventually(ns.GetName())
 				for k, v := range tnt.Spec.NamespaceOptions.AdditionalMetadataList[1].Annotations {
 					if ok, _ = HaveKeyWithValue(k, v).Match(ns.Annotations); !ok {
 						return
@@ -282,7 +281,7 @@ var _ = Describe("creating a Namespace for a Tenant with additional metadata", O
 		})
 		By("checking additional annotations from entry with non-matching node selector", func() {
 			Eventually(func() (ok bool) {
-				Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: ns.GetName()}, ns)).Should(Succeed())
+				ns = GetNamespaceEventually(ns.GetName())
 				for k, v := range tnt.Spec.NamespaceOptions.AdditionalMetadataList[2].Annotations {
 					if ok, _ = HaveKeyWithValue(k, v).Match(ns.Annotations); !ok {
 						return
@@ -333,7 +332,7 @@ var _ = Describe("creating a Namespace for a Tenant with additional metadata", O
 
 		By("checking additional labels", func() {
 			Eventually(func() (ok bool) {
-				Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: ns.GetName()}, ns)).Should(Succeed())
+				ns = GetNamespaceEventually(ns.GetName())
 				for _, mv := range tnt.Spec.NamespaceOptions.AdditionalMetadataList {
 					for k, v := range mv.Labels {
 						if k == "capsule.clastix.io/tenant" || k == "kubernetes.io/metadata.name" {
@@ -350,7 +349,7 @@ var _ = Describe("creating a Namespace for a Tenant with additional metadata", O
 		})
 		By("checking managed labels", func() {
 			Eventually(func() (ok bool) {
-				Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: ns.GetName()}, ns)).Should(Succeed())
+				ns = GetNamespaceEventually(ns.GetName())
 				if ok, _ = HaveKeyWithValue("capsule.clastix.io/tenant", tnt.GetName()).Match(ns.Labels); !ok {
 					return
 				}
@@ -363,7 +362,7 @@ var _ = Describe("creating a Namespace for a Tenant with additional metadata", O
 
 		By("checking additional annotations", func() {
 			Eventually(func() (ok bool) {
-				Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: ns.GetName()}, ns)).Should(Succeed())
+				ns = GetNamespaceEventually(ns.GetName())
 				for _, mv := range tnt.Spec.NamespaceOptions.AdditionalMetadataList {
 					for k, v := range mv.Annotations {
 						if ok, _ = HaveKeyWithValue(k, v).Match(ns.Annotations); !ok {
@@ -377,20 +376,25 @@ var _ = Describe("creating a Namespace for a Tenant with additional metadata", O
 		})
 
 		By("patching labels and annotations on the Namespace", func() {
-			Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: ns.GetName()}, ns)).To(Succeed())
+			PatchNamespaceEventually(ns, func(current *corev1.Namespace) {
+				if current.Labels == nil {
+					current.Labels = map[string]string{}
+				}
+				if current.Annotations == nil {
+					current.Annotations = map[string]string{}
+				}
 
-			before := ns.DeepCopy()
-			ns.Labels["test-label"] = "test-value"
-			ns.Labels["k8s.io/custom-label"] = "foo-value"
-			ns.Annotations["test-annotation"] = "test-value"
-			ns.Annotations["k8s.io/custom-annotation"] = "bizz-value"
+				current.Labels["test-label"] = "test-value"
+				current.Labels["k8s.io/custom-label"] = "foo-value"
+				current.Annotations["test-annotation"] = "test-value"
+				current.Annotations["k8s.io/custom-annotation"] = "bizz-value"
+			})
 
-			Expect(k8sClient.Patch(context.TODO(), ns, client.MergeFrom(before))).To(Succeed())
-			Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: tnt.GetName()}, tnt)).Should(Succeed())
+			tnt = GetTenantEventually(tnt)
 		})
 
 		By("Add additional annotations (Tenant Owner)", func() {
-			Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: ns.GetName()}, ns)).Should(Succeed())
+			ns = GetNamespaceEventually(ns.GetName())
 
 			expectedLabels := map[string]string{
 				"test-label":                  "test-value",
@@ -432,46 +436,56 @@ var _ = Describe("creating a Namespace for a Tenant with additional metadata", O
 			}, defaultTimeoutInterval, defaultPollInterval).Should(Equal(expectedAnnotations))
 
 			By("verify tenant status", func() {
-				condition := tnt.Status.Conditions.GetConditionByType(meta.ReadyCondition)
-				Expect(condition).NotTo(BeNil(), "Condition instance should not be nil")
+				Eventually(func(g Gomega) {
+					tnt = GetTenantEventually(tnt)
 
-				Expect(condition.Status).To(Equal(metav1.ConditionTrue), "Expected tenant condition status to be True")
-				Expect(condition.Type).To(Equal(meta.ReadyCondition), "Expected tenant condition type to be Ready")
-				Expect(condition.Reason).To(Equal(meta.SucceededReason), "Expected tenant condition reason to be Succeeded")
+					condition := tnt.Status.Conditions.GetConditionByType(meta.ReadyCondition)
+					Expect(condition).NotTo(BeNil(), "Condition instance should not be nil")
+
+					Expect(condition.Status).To(Equal(metav1.ConditionTrue), "Expected tenant condition status to be True")
+					Expect(condition.Type).To(Equal(meta.ReadyCondition), "Expected tenant condition type to be Ready")
+					Expect(condition.Reason).To(Equal(meta.SucceededReason), "Expected tenant condition reason to be Succeeded")
+
+				})
 			})
 
 			By("verify namespace status", func() {
-				instance := tnt.Status.GetInstance(&capsulev1beta2.TenantStatusNamespaceItem{Name: ns.GetName(), UID: ns.GetUID()})
-				Expect(instance).NotTo(BeNil(), "Namespace instance should not be nil")
+				Eventually(func(g Gomega) {
+					currentTenant := GetTenantEventually(tnt)
+					currentNamespace := GetNamespaceEventually(ns.GetName())
 
-				condition := instance.Conditions.GetConditionByType(meta.ReadyCondition)
-				Expect(condition).NotTo(BeNil(), "Condition instance should not be nil")
+					instance := currentTenant.Status.GetInstance(&capsulev1beta2.TenantStatusNamespaceItem{
+						Name: currentNamespace.GetName(),
+						UID:  currentNamespace.GetUID(),
+					})
+					g.Expect(instance).NotTo(BeNil(), "Namespace instance should not be nil")
 
-				Expect(instance.Name).To(Equal(ns.GetName()))
-				Expect(condition.Status).To(Equal(metav1.ConditionTrue), "Expected namespace condition status to be True")
-				Expect(condition.Type).To(Equal(meta.ReadyCondition), "Expected namespace condition type to be Ready")
-				Expect(condition.Reason).To(Equal(meta.SucceededReason), "Expected namespace condition reason to be Succeeded")
+					condition := instance.Conditions.GetConditionByType(meta.ReadyCondition)
+					g.Expect(condition).NotTo(BeNil(), "Condition instance should not be nil")
 
-				expectedMetadata := &capsulev1beta2.TenantStatusNamespaceMetadata{
-					Labels: map[string]string{
-						"clastix.io/custom-label": "bar",
-						"k8s.io/custom-label":     "foo",
-					},
-					Annotations: map[string]string{
-						"clastix.io/custom-annotation": "buzz",
-						"k8s.io/custom-annotation":     "bizz",
-					},
-				}
+					g.Expect(instance.Name).To(Equal(currentNamespace.GetName()))
+					g.Expect(condition.Status).To(Equal(metav1.ConditionTrue))
+					g.Expect(condition.Type).To(Equal(meta.ReadyCondition))
+					g.Expect(condition.Reason).To(Equal(meta.SucceededReason))
 
-				Expect(instance.Metadata).To(Equal(expectedMetadata))
+					expectedMetadata := &capsulev1beta2.TenantStatusNamespaceMetadata{
+						Labels: map[string]string{
+							"clastix.io/custom-label": "bar",
+							"k8s.io/custom-label":     "foo",
+						},
+						Annotations: map[string]string{
+							"clastix.io/custom-annotation": "buzz",
+							"k8s.io/custom-annotation":     "bizz",
+						},
+					}
+
+					g.Expect(instance.Metadata).To(Equal(expectedMetadata))
+				}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 			})
 		})
 
 		By("change managed additional metadata", func() {
-			Eventually(func() error {
-				t := &capsulev1beta2.Tenant{}
-				Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: tnt.GetName()}, t)).To(Succeed())
-
+			UpdateTenantEventually(tnt, func(t *capsulev1beta2.Tenant) {
 				t.Spec.NamespaceOptions = &capsulev1beta2.NamespaceOptions{
 					ManagedMetadataOnly: false,
 					AdditionalMetadataList: []api.AdditionalMetadataSelectorSpec{
@@ -487,9 +501,7 @@ var _ = Describe("creating a Namespace for a Tenant with additional metadata", O
 						},
 					},
 				}
-
-				return k8sClient.Update(context.TODO(), t)
-			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+			})
 		})
 
 		By("verify metadata lifecycle (valid update)", func() {
@@ -586,10 +598,7 @@ var _ = Describe("creating a Namespace for a Tenant with additional metadata", O
 		})
 
 		By("change managed additional metadata (provoke an error)", func() {
-			Eventually(func() error {
-				t := &capsulev1beta2.Tenant{}
-				Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: tnt.GetName()}, t)).To(Succeed())
-
+			UpdateTenantEventually(tnt, func(t *capsulev1beta2.Tenant) {
 				t.Spec.NamespaceOptions = &capsulev1beta2.NamespaceOptions{
 					ManagedMetadataOnly: false,
 					AdditionalMetadataList: []api.AdditionalMetadataSelectorSpec{
@@ -600,9 +609,9 @@ var _ = Describe("creating a Namespace for a Tenant with additional metadata", O
 						},
 					},
 				}
+			})
 
-				return k8sClient.Update(context.TODO(), t)
-			}, defaultTimeoutInterval, defaultPollInterval).ShouldNot(Succeed())
+			TenantReadyFalse(tnt)
 		})
 
 		By("verify metadata lifecycle (faulty update)", func() {

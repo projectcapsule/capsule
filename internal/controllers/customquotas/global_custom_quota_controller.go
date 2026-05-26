@@ -34,6 +34,7 @@ import (
 	"github.com/projectcapsule/capsule/internal/cache"
 	cutils "github.com/projectcapsule/capsule/internal/controllers/utils"
 	"github.com/projectcapsule/capsule/internal/metrics"
+	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	"github.com/projectcapsule/capsule/pkg/runtime/predicates"
@@ -105,7 +106,6 @@ func (r *clusterCustomQuotaClaimController) SetupWithManager(mgr ctrl.Manager, c
 		WithOptions(controller.Options{MaxConcurrentReconciles: cfg.MaxConcurrentReconciles}).
 		Complete(r)
 }
-
 func (r *clusterCustomQuotaClaimController) Reconcile(ctx context.Context, request ctrl.Request) (ctrl.Result, error) {
 	log := r.log.WithValues("Request.Name", request.Name)
 
@@ -120,10 +120,6 @@ func (r *clusterCustomQuotaClaimController) Reconcile(ctx context.Context, reque
 
 		return reconcile.Result{}, err
 	}
-
-	defer func() {
-		r.emitMetrics(instance)
-	}()
 
 	patchHelper, err := patch.NewHelper(instance, r.Client)
 	if err != nil {
@@ -150,18 +146,18 @@ func (r *clusterCustomQuotaClaimController) Reconcile(ctx context.Context, reque
 	statusErr := errors.Join(reconcileErr, ledgerErr)
 
 	if err := r.updateStatus(ctx, instance, statusErr); err != nil {
-		if apierrors.IsNotFound(err) {
-			err = nil
+		if caperrors.IgnoreGone(err) {
+			return reconcile.Result{}, nil
 		}
 
-		return reconcile.Result{}, client.IgnoreNotFound(fmt.Errorf("cannot update status: %w", err))
+		return reconcile.Result{}, fmt.Errorf("cannot update status: %w", err)
 	}
 
 	r.emitMetrics(instance)
 
 	if err := patchHelper.Patch(ctx, instance); err != nil {
-		if apierrors.IsNotFound(err) {
-			err = nil
+		if caperrors.IgnoreGone(err) {
+			return reconcile.Result{}, nil
 		}
 
 		return reconcile.Result{}, fmt.Errorf("failed to patch: %w", err)

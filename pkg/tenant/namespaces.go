@@ -233,6 +233,48 @@ func processResourceType(
 	return cleanedAny, errors.Join(errs...)
 }
 
+func ResolveNamespaceTenant(
+	ctx context.Context,
+	reader client.Reader,
+	ns *corev1.Namespace,
+) (*capsulev1beta2.Tenant, error) {
+	if ns == nil {
+		return nil, nil
+	}
+
+	label := TenanLabelValue(ns)
+	refs := TenantOwnerReferences(ns)
+
+	switch {
+	case label == "" && len(refs) == 0:
+		return nil, nil
+
+	case len(refs) > 1:
+		return nil, fmt.Errorf("namespace can not have multiple Tenant ownerReferences")
+
+	case label == "" && len(refs) == 1:
+		return nil, fmt.Errorf("namespace has Tenant ownerReference %q but no tenant label", refs[0].Name)
+
+	case label != "" && len(refs) == 0:
+		return nil, fmt.Errorf("namespace has tenant label %q but no Tenant ownerReference", label)
+	}
+
+	tnt, err := GetTenantByOwnerreferences(ctx, reader, refs)
+	if err != nil {
+		return nil, err
+	}
+
+	if tnt == nil {
+		return nil, fmt.Errorf("namespace references unknown Tenant %q", refs[0].Name)
+	}
+
+	if tnt.GetName() != label {
+		return nil, fmt.Errorf("namespace label %q does not match owner reference %q", label, tnt.GetName())
+	}
+
+	return tnt, nil
+}
+
 func CollectTenantNamespaceByLabel(
 	ctx context.Context,
 	c client.Client,

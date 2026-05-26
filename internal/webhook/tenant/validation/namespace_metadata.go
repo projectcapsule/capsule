@@ -16,6 +16,7 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
+	"github.com/projectcapsule/capsule/pkg/template"
 )
 
 type namespaceMetadataHandler struct{}
@@ -63,6 +64,10 @@ func (h *namespaceMetadataHandler) OnUpdate(
 
 func validateTenantNamespaceMetadata(tnt *capsulev1beta2.Tenant) *admission.Response {
 	if tnt == nil {
+		return nil
+	}
+
+	if tnt.Spec.NamespaceOptions == nil {
 		return nil
 	}
 
@@ -118,13 +123,23 @@ func validateLabelMap(fieldPath string, labels map[string]string) []string {
 	var errs []string
 
 	for key, value := range labels {
-		for _, msg := range validation.IsQualifiedName(key) {
-			errs = append(errs, fmt.Sprintf("%s[%q]: invalid label key: %s", fieldPath, key, msg))
-		}
+		errs = append(
+			errs,
+			template.ValidateKubernetesStringOrAllowedTemplates(
+				fmt.Sprintf("%s[%q]", fieldPath, key),
+				key,
+				validation.IsQualifiedName,
+			)...,
+		)
 
-		for _, msg := range validation.IsValidLabelValue(value) {
-			errs = append(errs, fmt.Sprintf("%s[%q]: invalid label value %q: %s", fieldPath, key, value, msg))
-		}
+		errs = append(
+			errs,
+			template.ValidateKubernetesStringOrAllowedTemplates(
+				fmt.Sprintf("%s[%q]", fieldPath, key),
+				value,
+				validation.IsValidLabelValue,
+			)...,
+		)
 	}
 
 	return errs
@@ -134,11 +149,16 @@ func validateAnnotationMap(fieldPath string, annotations map[string]string) []st
 	var errs []string
 
 	for key := range annotations {
-		// Kubernetes validates annotation keys like qualified names, but treats
-		// case as insignificant for the validation check.
-		for _, msg := range validation.IsQualifiedName(strings.ToLower(key)) {
-			errs = append(errs, fmt.Sprintf("%s[%q]: invalid annotation key: %s", fieldPath, key, msg))
-		}
+		errs = append(
+			errs,
+			template.ValidateKubernetesStringOrAllowedTemplates(
+				fmt.Sprintf("%s[%q]", fieldPath, key),
+				key,
+				func(value string) []string {
+					return validation.IsQualifiedName(strings.ToLower(value))
+				},
+			)...,
+		)
 	}
 
 	return errs

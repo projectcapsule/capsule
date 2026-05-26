@@ -24,26 +24,28 @@ type promotion struct {
 	cfg configuration.Configuration
 }
 
-func Promotion(cfg configuration.Configuration) handlers.TypedHandlerWithTenant[*corev1.ServiceAccount] {
+func Promotion(cfg configuration.Configuration) handlers.TypedHandlerWithTenantUser[*corev1.ServiceAccount] {
 	return &promotion{cfg: cfg}
 }
 
 func (h *promotion) OnCreate(
 	_ client.Client,
 	_ client.Reader,
+	user users.AdmissionUser,
 	sa *corev1.ServiceAccount,
 	decoder admission.Decoder,
 	recorder events.EventRecorder,
 	tnt *capsulev1beta2.Tenant,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		return h.handle(req, recorder, sa, tnt)
+		return h.handle(user, recorder, sa, tnt)
 	}
 }
 
 func (h *promotion) OnUpdate(
 	_ client.Client,
 	_ client.Reader,
+	user users.AdmissionUser,
 	old *corev1.ServiceAccount,
 	sa *corev1.ServiceAccount,
 	decoder admission.Decoder,
@@ -51,13 +53,14 @@ func (h *promotion) OnUpdate(
 	tnt *capsulev1beta2.Tenant,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		return h.handle(req, recorder, sa, tnt)
+		return h.handle(user, recorder, sa, tnt)
 	}
 }
 
 func (h *promotion) OnDelete(
 	client.Client,
 	client.Reader,
+	users.AdmissionUser,
 	*corev1.ServiceAccount,
 	admission.Decoder,
 	events.EventRecorder,
@@ -69,7 +72,7 @@ func (h *promotion) OnDelete(
 }
 
 func (h *promotion) handle(
-	req admission.Request,
+	user users.AdmissionUser,
 	recorder events.EventRecorder,
 	sa *corev1.ServiceAccount,
 	tnt *capsulev1beta2.Tenant,
@@ -88,11 +91,11 @@ func (h *promotion) handle(
 	}
 
 	// We don't want to allow promoted serviceaccounts to promote other serviceaccounts
-	if ok := users.IsTenantOwnerByStatus(tnt, req.UserInfo); ok {
+	if ok := users.IsTenantOwnerByStatus(tnt, user); ok {
 		return nil
 	}
 
-	msg := fmt.Sprintf("%s not allowed to promote serviceaccount to tenant owner", req.UserInfo.Username)
+	msg := fmt.Sprintf("%s not allowed to promote serviceaccount to tenant owner", user)
 
 	recorder.Eventf(
 		sa,

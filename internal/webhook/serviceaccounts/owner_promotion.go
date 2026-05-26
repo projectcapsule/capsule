@@ -24,26 +24,28 @@ type ownerPromotion struct {
 	cfg configuration.Configuration
 }
 
-func OwnerPromotion(cfg configuration.Configuration) handlers.TypedHandlerWithTenant[*corev1.ServiceAccount] {
+func OwnerPromotion(cfg configuration.Configuration) handlers.TypedHandlerWithTenantUser[*corev1.ServiceAccount] {
 	return &ownerPromotion{cfg: cfg}
 }
 
 func (h *ownerPromotion) OnCreate(
 	_ client.Client,
 	_ client.Reader,
+	user users.AdmissionUser,
 	sa *corev1.ServiceAccount,
 	decoder admission.Decoder,
 	recorder events.EventRecorder,
 	tnt *capsulev1beta2.Tenant,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		return h.handle(req, recorder, sa, tnt)
+		return h.handle(user, recorder, sa, tnt)
 	}
 }
 
 func (h *ownerPromotion) OnUpdate(
 	_ client.Client,
 	_ client.Reader,
+	user users.AdmissionUser,
 	old *corev1.ServiceAccount,
 	sa *corev1.ServiceAccount,
 	decoder admission.Decoder,
@@ -51,13 +53,14 @@ func (h *ownerPromotion) OnUpdate(
 	tnt *capsulev1beta2.Tenant,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		return h.handle(req, recorder, sa, tnt)
+		return h.handle(user, recorder, sa, tnt)
 	}
 }
 
 func (h *ownerPromotion) OnDelete(
 	client.Client,
 	client.Reader,
+	users.AdmissionUser,
 	*corev1.ServiceAccount,
 	admission.Decoder,
 	events.EventRecorder,
@@ -69,7 +72,7 @@ func (h *ownerPromotion) OnDelete(
 }
 
 func (h *ownerPromotion) handle(
-	req admission.Request,
+	user users.AdmissionUser,
 	recorder events.EventRecorder,
 	sa *corev1.ServiceAccount,
 	tnt *capsulev1beta2.Tenant,
@@ -96,11 +99,11 @@ func (h *ownerPromotion) handle(
 	}
 
 	// We don't want to allow promoted serviceaccounts to promote other serviceaccounts
-	if ok := users.IsTenantOwnerByStatus(tnt, req.UserInfo); ok {
+	if ok := users.IsTenantOwnerByStatus(tnt, user); ok {
 		return nil
 	}
 
-	msg := fmt.Sprintf("%s not allowed to promote serviceaccount to tenant owner", req.UserInfo.Username)
+	msg := fmt.Sprintf("%s not allowed to promote serviceaccount to tenant owner", user.Username)
 
 	recorder.Eventf(
 		sa,

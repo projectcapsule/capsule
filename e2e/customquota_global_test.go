@@ -213,7 +213,7 @@ func getLedger(ctx context.Context, namespace, name string) *capsulev1beta2.Quan
 var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ordered, Label("global", "globalcustomquota", "customquota", "ledger"), Ordered, func() {
 	const (
 		testNamespace = "global-custom-quota-e2e-test"
-		tenantLabel   = "capsule.clastix.io/tenant"
+		tenantLabel   = "e2e.capsule.dev/test-suite"
 		tenantValue   = "global-custom-quota-e2e"
 	)
 
@@ -342,7 +342,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 					{
 						LabelSelector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
-								meta.TenantLabel: tenantValue,
+								tenantLabel: tenantValue,
 							},
 						},
 					},
@@ -400,7 +400,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 					{
 						LabelSelector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
-								meta.TenantLabel: tenantValue,
+								tenantLabel: tenantValue,
 							},
 						},
 					},
@@ -460,7 +460,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 					{
 						LabelSelector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
-								meta.TenantLabel: tenantValue,
+								tenantLabel: tenantValue,
 							},
 						},
 					},
@@ -1080,7 +1080,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 					{
 						LabelSelector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
-								meta.TenantLabel: tenantValue,
+								tenantLabel: tenantValue,
 							},
 						},
 					},
@@ -1141,7 +1141,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 					{
 						LabelSelector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
-								meta.TenantLabel: tenantValue,
+								tenantLabel: tenantValue,
 							},
 						},
 					},
@@ -1208,7 +1208,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 					{
 						LabelSelector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
-								meta.TenantLabel: tenantValue,
+								tenantLabel: tenantValue,
 							},
 						},
 					},
@@ -1284,7 +1284,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 					{
 						LabelSelector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
-								meta.TenantLabel: tenantValue,
+								tenantLabel: tenantValue,
 							},
 						},
 					},
@@ -1364,7 +1364,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 					{
 						LabelSelector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
-								meta.TenantLabel: tenantValue,
+								tenantLabel: tenantValue,
 							},
 						},
 					},
@@ -1434,7 +1434,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 					{
 						LabelSelector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
-								meta.TenantLabel: tenantValue,
+								tenantLabel: tenantValue,
 							},
 						},
 					},
@@ -1501,7 +1501,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 					{
 						LabelSelector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
-								meta.TenantLabel: tenantValue,
+								tenantLabel: tenantValue,
 							},
 						},
 					},
@@ -1570,7 +1570,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 					{
 						LabelSelector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
-								meta.TenantLabel: tenantValue,
+								tenantLabel: tenantValue,
 							},
 						},
 					},
@@ -1614,7 +1614,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 					{
 						LabelSelector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
-								meta.TenantLabel: tenantValue,
+								tenantLabel: tenantValue,
 							},
 						},
 					},
@@ -1932,7 +1932,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 					{
 						LabelSelector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
-								meta.TenantLabel: tenantValue,
+								tenantLabel: tenantValue,
 							},
 						},
 					},
@@ -1992,7 +1992,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 					{
 						LabelSelector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
-								meta.TenantLabel: tenantValue,
+								tenantLabel: tenantValue,
 							},
 						},
 					},
@@ -2061,7 +2061,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 					{
 						LabelSelector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
-								meta.TenantLabel: tenantValue,
+								tenantLabel: tenantValue,
 							},
 						},
 					},
@@ -2123,7 +2123,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 					{
 						LabelSelector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
-								meta.TenantLabel: tenantValue,
+								tenantLabel: tenantValue,
 							},
 						},
 					},
@@ -2188,7 +2188,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 					{
 						LabelSelector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
-								meta.TenantLabel: tenantValue,
+								tenantLabel: tenantValue,
 							},
 						},
 					},
@@ -2248,7 +2248,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 					{
 						LabelSelector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
-								meta.TenantLabel: tenantValue,
+								tenantLabel: tenantValue,
 							},
 						},
 					},
@@ -2311,7 +2311,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 					{
 						LabelSelector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
-								meta.TenantLabel: tenantValue,
+								tenantLabel: tenantValue,
 							},
 						},
 					},
@@ -2375,7 +2375,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 					{
 						LabelSelector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
-								meta.TenantLabel: tenantValue,
+								tenantLabel: tenantValue,
 							},
 						},
 					},
@@ -2454,7 +2454,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 					{
 						LabelSelector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
-								meta.TenantLabel: tenantValue,
+								tenantLabel: tenantValue,
 							},
 						},
 					},
@@ -2544,7 +2544,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 					{
 						LabelSelector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
-								meta.TenantLabel: tenantValue,
+								tenantLabel: tenantValue,
 							},
 						},
 					},
@@ -2613,7 +2613,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 					{
 						LabelSelector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
-								meta.TenantLabel: tenantValue,
+								tenantLabel: tenantValue,
 							},
 						},
 					},
@@ -2662,7 +2662,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 					{
 						LabelSelector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
-								meta.TenantLabel: tenantValue,
+								tenantLabel: tenantValue,
 							},
 						},
 					},
@@ -2696,7 +2696,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 					{
 						LabelSelector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
-								meta.TenantLabel: tenantValue,
+								tenantLabel: tenantValue,
 							},
 						},
 					},
@@ -2762,7 +2762,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 					{
 						LabelSelector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
-								meta.TenantLabel: tenantValue,
+								tenantLabel: tenantValue,
 							},
 						},
 					},
@@ -2797,7 +2797,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 					{
 						LabelSelector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
-								meta.TenantLabel: tenantValue,
+								tenantLabel: tenantValue,
 							},
 						},
 					},
@@ -2872,7 +2872,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 					{
 						LabelSelector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
-								meta.TenantLabel: tenantValue,
+								tenantLabel: tenantValue,
 							},
 						},
 					},
@@ -2916,7 +2916,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 					{
 						LabelSelector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
-								meta.TenantLabel: tenantValue,
+								tenantLabel: tenantValue,
 							},
 						},
 					},
@@ -2991,7 +2991,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 					{
 						LabelSelector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
-								meta.TenantLabel: tenantValue,
+								tenantLabel: tenantValue,
 							},
 						},
 					},
@@ -3026,7 +3026,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 					{
 						LabelSelector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
-								meta.TenantLabel: tenantValue,
+								tenantLabel: tenantValue,
 							},
 						},
 					},
@@ -3094,7 +3094,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 					{
 						LabelSelector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
-								meta.TenantLabel: tenantValue,
+								tenantLabel: tenantValue,
 							},
 						},
 					},
@@ -3135,7 +3135,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 					{
 						LabelSelector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
-								meta.TenantLabel: tenantValue,
+								tenantLabel: tenantValue,
 							},
 						},
 					},
@@ -3189,7 +3189,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 					{
 						LabelSelector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
-								meta.TenantLabel: tenantValue,
+								tenantLabel: tenantValue,
 							},
 						},
 					},
@@ -3223,7 +3223,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 					{
 						LabelSelector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
-								meta.TenantLabel: tenantValue,
+								tenantLabel: tenantValue,
 							},
 						},
 					},
@@ -3296,7 +3296,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 					{
 						LabelSelector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
-								meta.TenantLabel: tenantValue,
+								tenantLabel: tenantValue,
 							},
 						},
 					},
@@ -3331,7 +3331,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 					{
 						LabelSelector: &metav1.LabelSelector{
 							MatchLabels: map[string]string{
-								meta.TenantLabel: tenantValue,
+								tenantLabel: tenantValue,
 							},
 						},
 					},

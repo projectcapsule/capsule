@@ -23,7 +23,7 @@ import (
 var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Ordered, Label("namespaced", "namespacedcustomquota", "customquota", "ledger"), Ordered, func() {
 	const (
 		testNamespace = "custom-quota-e2e-test"
-		tenantLabel   = "capsule.clastix.io/tenant"
+		tenantLabel   = "e2e.capsule.dev/test-suite"
 		tenantValue   = "custom-quota-e2e"
 	)
 

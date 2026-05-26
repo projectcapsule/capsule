@@ -6,6 +6,8 @@ package mutation
 import (
 	"context"
 
+	"gomodules.xyz/jsonpatch/v2"
+	admissionv1 "k8s.io/api/admission/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -13,13 +15,11 @@ import (
 
 	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
-	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 	"github.com/projectcapsule/capsule/pkg/tenant"
-	"github.com/projectcapsule/capsule/pkg/users"
 )
 
-func NamespaceHandler(configuration configuration.Configuration, handlers ...handlers.TypedHandler[*corev1.Namespace]) handlers.Handler {
+func NamespaceHandler(configuration configuration.Configuration, handlers ...handlers.TypedHandlerWithUser[*corev1.Namespace]) handlers.Handler {
 	return &handler{
 		cfg:      configuration,
 		handlers: handlers,
@@ -28,7 +28,7 @@ func NamespaceHandler(configuration configuration.Configuration, handlers ...han
 
 type handler struct {
 	cfg      configuration.Configuration
-	handlers []handlers.TypedHandler[*corev1.Namespace]
+	handlers []handlers.TypedHandlerWithUser[*corev1.Namespace]
 }
 
 func (h *handler) OnCreate(
@@ -38,9 +38,9 @@ func (h *handler) OnCreate(
 	recorder events.EventRecorder,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		userIsAdmin := users.IsAdminUser(req, h.cfg.Administrators())
+		user := handlers.ResolveAdmissionUser(ctx, c, req, h.cfg)
 
-		if !userIsAdmin && !users.IsCapsuleUser(ctx, c, h.cfg, req.UserInfo.Username, req.UserInfo.Groups) {
+		if !user.IsAdmin() && !user.IsCapsule() {
 			return nil
 		}
 
@@ -54,27 +54,37 @@ func (h *handler) OnCreate(
 			return ad.ErroredResponse(err)
 		}
 
-		if tnt == nil && userIsAdmin {
+		if tnt == nil && user.IsAdmin() {
 			return nil
 		}
 
+		var patches []jsonpatch.JsonPatchOperation
+
 		for _, hndl := range h.handlers {
-			if response := hndl.OnCreate(c, reader, ns, decoder, recorder)(ctx, req); response != nil {
-				return response
+			response := hndl.OnCreate(c, reader, user, ns, decoder, recorder)(ctx, req)
+			var stop *admission.Response
+
+			patches, stop = ad.AccumulateAdmissionResponse(patches, response)
+			if stop != nil {
+				return stop
 			}
 		}
 
-		return nil
-	}
-}
+		if len(patches) > 0 {
+			response := admission.Response{
+				AdmissionResponse: admissionv1.AdmissionResponse{
+					Allowed: true,
+					PatchType: func() *admissionv1.PatchType {
+						pt := admissionv1.PatchTypeJSONPatch
+						return &pt
+					}(),
+				},
+				Patches: patches,
+			}
 
-func (h *handler) OnDelete(
-	client.Client,
-	client.Reader,
-	admission.Decoder,
-	events.EventRecorder,
-) handlers.Func {
-	return func(context.Context, admission.Request) *admission.Response {
+			return &response
+		}
+
 		return nil
 	}
 }
@@ -86,9 +96,9 @@ func (h *handler) OnUpdate(
 	recorder events.EventRecorder,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		userIsAdmin := users.IsAdminUser(req, h.cfg.Administrators())
+		user := handlers.ResolveAdmissionUser(ctx, c, req, h.cfg)
 
-		if !userIsAdmin && !users.IsCapsuleUser(ctx, c, h.cfg, req.UserInfo.Username, req.UserInfo.Groups) {
+		if !user.IsAdmin() && !user.IsCapsule() {
 			return nil
 		}
 
@@ -102,41 +112,44 @@ func (h *handler) OnUpdate(
 			return ad.ErroredResponse(err)
 		}
 
-		tnt, err := tenant.GetTenantByOwnerreferences(ctx, reader, oldNs.OwnerReferences)
-		if err != nil {
-			return ad.ErroredResponse(err)
-		}
-
-		//nolint:nestif
-		if userIsAdmin {
-			if tnt == nil {
-				tnt, err = tenant.GetTenantByLabels(ctx, reader, ns)
-				if err != nil {
-					return ad.ErroredResponse(err)
-				}
-
-				if tnt == nil {
-					return nil
-				}
-			}
-		} else {
-			if owned := tenant.NamespaceIsOwned(ctx, reader, h.cfg, oldNs, tnt, req.UserInfo); !owned {
-				if tnt != nil {
-					recorder.Eventf(oldNs, nil, corev1.EventTypeWarning, "NamespacePatch", evt.ActionValidationDenied, "Namespace %s can not be patched", oldNs.GetName())
-				}
-
-				response := admission.Denied("Denied patch request for this namespace")
-
-				return &response
-			}
-		}
+		var patches []jsonpatch.JsonPatchOperation
 
 		for _, hndl := range h.handlers {
-			if response := hndl.OnUpdate(c, reader, ns, oldNs, decoder, recorder)(ctx, req); response != nil {
-				return response
+			response := hndl.OnUpdate(c, reader, user, ns, oldNs, decoder, recorder)(ctx, req)
+			var stop *admission.Response
+
+			patches, stop = ad.AccumulateAdmissionResponse(patches, response)
+			if stop != nil {
+				return stop
 			}
 		}
 
+		if len(patches) > 0 {
+			response := admission.Response{
+				AdmissionResponse: admissionv1.AdmissionResponse{
+					Allowed: true,
+					PatchType: func() *admissionv1.PatchType {
+						pt := admissionv1.PatchTypeJSONPatch
+						return &pt
+					}(),
+				},
+				Patches: patches,
+			}
+
+			return &response
+		}
+
+		return nil
+	}
+}
+
+func (h *handler) OnDelete(
+	client.Client,
+	client.Reader,
+	admission.Decoder,
+	events.EventRecorder,
+) handlers.Func {
+	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }

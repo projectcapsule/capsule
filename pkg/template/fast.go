@@ -6,12 +6,77 @@ package template
 import (
 	"fmt"
 	"io"
+	"regexp"
 	"slices"
 	"strings"
 
 	"github.com/valyala/fasttemplate"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
+
+var AllowedNamespaceMetadataTemplates = sets.New[string](
+	"tenant.name",
+	"namespace",
+)
+
+var FastTemplateExpression = regexp.MustCompile(`{{\s*([^{}]+)\s*}}`)
+
+func ValidateKubernetesStringOrAllowedTemplates(
+	fieldPath string,
+	value string,
+	validate func(string) []string,
+) []string {
+	if !RequiresFastTemplate(value) {
+		return prefixValidationErrors(fieldPath, validate(value))
+	}
+
+	matches := FastTemplateExpression.FindAllStringSubmatch(value, -1)
+	if len(matches) == 0 {
+		return []string{fmt.Sprintf("%s: malformed template %q", fieldPath, value)}
+	}
+
+	checkValue := value
+
+	for _, match := range matches {
+		raw := match[0]
+		name := strings.TrimSpace(match[1])
+
+		if !AllowedNamespaceMetadataTemplates.Has(name) {
+			return []string{
+				fmt.Sprintf(
+					"%s: unsupported template %q in %q, allowed templates are {{tenant.name}} and {{namespace}}",
+					fieldPath,
+					name,
+					value,
+				),
+			}
+		}
+
+		// Not real rendering. Only a Kubernetes-safe placeholder so the
+		// surrounding static key/value structure can still be validated.
+		checkValue = strings.ReplaceAll(checkValue, raw, "template")
+	}
+
+	if strings.Contains(checkValue, "{{") || strings.Contains(checkValue, "}}") {
+		return []string{fmt.Sprintf("%s: malformed template %q", fieldPath, value)}
+	}
+
+	return prefixValidationErrors(fieldPath, validate(checkValue))
+}
+
+func prefixValidationErrors(fieldPath string, messages []string) []string {
+	if len(messages) == 0 {
+		return nil
+	}
+
+	errs := make([]string, 0, len(messages))
+	for _, msg := range messages {
+		errs = append(errs, fmt.Sprintf("%s: %s", fieldPath, msg))
+	}
+
+	return errs
+}
 
 // RequiresFastTemplate evaluates if given string requires templating.
 func RequiresFastTemplate(

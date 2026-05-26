@@ -35,7 +35,7 @@ var _ = Describe("trying to escalate from a Tenant Namespace ServiceAccount", Or
 				{
 					CoreOwnerSpec: rbac.CoreOwnerSpec{
 						UserSpec: rbac.UserSpec{
-							Name: "mario",
+							Name: "e2e-sa-escalation",
 							Kind: "User",
 						},
 					},

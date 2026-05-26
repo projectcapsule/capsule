@@ -33,7 +33,7 @@ var _ = Describe("preventing PersistentVolume cross-tenant mount", Ordered, Labe
 				{
 					CoreOwnerSpec: rbac.CoreOwnerSpec{
 						UserSpec: rbac.UserSpec{
-							Name: "jessica",
+							Name: "e2e-pv-cross-one",
 							Kind: "User",
 						},
 					},
@@ -54,7 +54,7 @@ var _ = Describe("preventing PersistentVolume cross-tenant mount", Ordered, Labe
 				{
 					CoreOwnerSpec: rbac.CoreOwnerSpec{
 						UserSpec: rbac.UserSpec{
-							Name: "leto",
+							Name: "e2e-pv-cross-two",
 							Kind: "User",
 						},
 					},

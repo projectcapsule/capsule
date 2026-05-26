@@ -39,7 +39,7 @@ var _ = Describe("when Tenant limits custom Resource Quota", Ordered, Label("res
 				{
 					CoreOwnerSpec: rbac.CoreOwnerSpec{
 						UserSpec: rbac.UserSpec{
-							Name: "resource",
+							Name: "e2e-limiting-resources",
 							Kind: "User",
 						},
 					},

@@ -9,7 +9,6 @@ import (
 	"sort"
 	"strings"
 
-	authenticationv1 "k8s.io/api/authentication/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -177,15 +176,14 @@ func GetTenantByUserInfo(
 	c client.Client,
 	cfg configuration.Configuration,
 	ns *corev1.Namespace,
-	username string,
-	groups []string,
+	user users.AdmissionUser,
 ) (sortedTenants, error) {
 	var tenants sortedTenants
 
 	// User tenants.
 	userTntList := &capsulev1beta2.TenantList{}
 	fields := client.MatchingFields{
-		".spec.owner.ownerkind": fmt.Sprintf("User:%s", username),
+		".spec.owner.ownerkind": fmt.Sprintf("User:%s", user.Username),
 	}
 
 	err := c.List(ctx, userTntList, fields)
@@ -196,10 +194,10 @@ func GetTenantByUserInfo(
 	tenants = userTntList.Items
 
 	// ServiceAccount tenants.
-	if strings.HasPrefix(username, "system:serviceaccount:") {
+	if strings.HasPrefix(user.Username, "system:serviceaccount:") {
 		saTntList := &capsulev1beta2.TenantList{}
 		fields = client.MatchingFields{
-			".spec.owner.ownerkind": fmt.Sprintf("ServiceAccount:%s", username),
+			".spec.owner.ownerkind": fmt.Sprintf("ServiceAccount:%s", user.Username),
 		}
 
 		err = c.List(ctx, saTntList, fields)
@@ -213,7 +211,7 @@ func GetTenantByUserInfo(
 	// Group tenants.
 	groupTntList := &capsulev1beta2.TenantList{}
 
-	for _, group := range groups {
+	for _, group := range user.Groups {
 		fields = client.MatchingFields{
 			".spec.owner.ownerkind": fmt.Sprintf("Group:%s", group),
 		}
@@ -255,7 +253,7 @@ func GetTenantByLabelsAndUser(
 	c client.Reader,
 	cfg configuration.Configuration,
 	ns *corev1.Namespace,
-	userInfo authenticationv1.UserInfo,
+	user users.AdmissionUser,
 ) (*capsulev1beta2.Tenant, error) {
 	tnt, err := GetTenantByLabels(ctx, c, ns)
 	if err != nil {
@@ -263,7 +261,7 @@ func GetTenantByLabelsAndUser(
 	}
 
 	if tnt != nil {
-		if ok := users.IsTenantOwnerByStatus(tnt, userInfo); !ok {
+		if ok := users.IsTenantOwnerByStatus(tnt, user); !ok {
 			return nil, fmt.Errorf("can not assign the desired namespace to a non-owned Tenant")
 		}
 

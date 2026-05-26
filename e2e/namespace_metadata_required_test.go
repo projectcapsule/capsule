@@ -16,7 +16,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api/rbac"
 )
 
-var _ = Describe("creating a Namespace for a Tenant with required metadata", Ordered, Label("namespace", "metadata", "me"), func() {
+var _ = Describe("creating a Namespace for a Tenant with required metadata", Ordered, Label("namespace", "metadata", "forbidden"), func() {
 	tnt := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "e2e-metadata-required",
@@ -29,7 +29,7 @@ var _ = Describe("creating a Namespace for a Tenant with required metadata", Ord
 				{
 					CoreOwnerSpec: rbac.CoreOwnerSpec{
 						UserSpec: rbac.UserSpec{
-							Name: "gatsby",
+							Name: "e2e-metadata-required",
 							Kind: "User",
 						},
 					},

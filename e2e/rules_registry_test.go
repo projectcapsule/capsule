@@ -36,7 +36,7 @@ var _ = Describe("enforcing a Container Registry", Ordered, Label("tenant", "rul
 				{
 					CoreOwnerSpec: rbac.CoreOwnerSpec{
 						UserSpec: rbac.UserSpec{
-							Name: "matt",
+							Name: "e2e-rules-registry",
 							Kind: "User",
 						},
 					},

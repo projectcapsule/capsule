@@ -5,6 +5,7 @@ package e2e
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/api/rbac"
@@ -15,6 +16,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/kubernetes"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 )
@@ -32,13 +34,59 @@ var _ = Describe("cordoning a Tenant", Ordered, Label("tenant", "operations", "c
 				{
 					CoreOwnerSpec: rbac.CoreOwnerSpec{
 						UserSpec: rbac.UserSpec{
-							Name: "jim",
+							Name: "e2e-cordoning",
 							Kind: "User",
 						},
 					},
 				},
 			},
 		},
+	}
+
+	patchNamespaceCordonedLabel := func(cs kubernetes.Interface, nsName string, value string) error {
+		labels := map[string]any{
+			meta.CordonedLabel: value,
+		}
+
+		if value == "" {
+			labels[meta.CordonedLabel] = nil
+		}
+
+		patch, err := json.Marshal(map[string]any{
+			"metadata": map[string]any{
+				"labels": labels,
+			},
+		})
+		if err != nil {
+			return err
+		}
+
+		_, err = cs.CoreV1().Namespaces().Patch(
+			context.TODO(),
+			nsName,
+			types.StrategicMergePatchType,
+			patch,
+			metav1.PatchOptions{},
+		)
+
+		return err
+	}
+
+	expectNamespaceExists := func(name string) {
+		Eventually(func() error {
+			current := &corev1.Namespace{}
+
+			return k8sClient.Get(context.TODO(), types.NamespacedName{Name: name}, current)
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+	}
+
+	expectNamespaceDeleted := func(name string) {
+		Eventually(func() bool {
+			current := &corev1.Namespace{}
+			err := k8sClient.Get(context.TODO(), types.NamespacedName{Name: name}, current)
+
+			return apierrors.IsNotFound(err)
+		}, defaultTimeoutInterval, defaultPollInterval).Should(BeTrue())
 	}
 
 	expectTenantCordonedCondition := func(expectedStatus metav1.ConditionStatus, expectedReason string) {
@@ -85,6 +133,8 @@ var _ = Describe("cordoning a Tenant", Ordered, Label("tenant", "operations", "c
 
 	JustBeforeEach(func() {
 		EventuallyCreation(func() error {
+			tnt.ResourceVersion = ""
+
 			return k8sClient.Create(context.TODO(), tnt)
 		}).Should(Succeed())
 
@@ -93,6 +143,102 @@ var _ = Describe("cordoning a Tenant", Ordered, Label("tenant", "operations", "c
 
 	JustAfterEach(func() {
 		EventuallyDeletion(tnt)
+	})
+
+	It("should allow tenant owner to cordon a namespace by patching the cordoned label", func() {
+		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
+
+		ns := NewNamespace("", map[string]string{
+			meta.TenantLabel: tnt.GetName(),
+		})
+
+		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+		NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
+
+		By("patching the namespace cordoned label as tenant owner")
+		Expect(patchNamespaceCordonedLabel(cs, ns.GetName(), meta.ValueTrue)).To(Succeed())
+		expectNamespaceCordonedLabel(ns.GetName(), true)
+	})
+
+	It("should block namespace membership changes while Tenant is cordoned", func() {
+		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
+
+		existing := NewNamespace("", map[string]string{
+			meta.TenantLabel: tnt.GetName(),
+		})
+
+		By("creating an initial namespace before cordoning")
+		NamespaceCreation(existing, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+		NamespaceIsPartOfTenant(tnt, existing).Should(Succeed())
+
+		By("cordoning the Tenant")
+		setTenantCordoned(true)
+		expectTenantCordonedCondition(metav1.ConditionTrue, meta.CordonedReason)
+		expectNamespaceCordonedLabel(existing.GetName(), true)
+
+		By("rejecting new namespace assignment to the cordoned Tenant")
+		blocked := NewNamespace("", map[string]string{
+			meta.TenantLabel: tnt.GetName(),
+		})
+
+		_, err := cs.CoreV1().Namespaces().Create(context.TODO(), blocked, metav1.CreateOptions{})
+		Expect(err).To(HaveOccurred())
+
+		By("rejecting deletion of an existing namespace while cordoned")
+		err = cs.CoreV1().Namespaces().Delete(context.TODO(), existing.GetName(), metav1.DeleteOptions{})
+		Expect(err).To(HaveOccurred())
+
+		expectNamespaceExists(existing.GetName())
+
+		By("uncordoning the Tenant allows namespace deletion again")
+		setTenantCordoned(false)
+		expectTenantCordonedCondition(metav1.ConditionFalse, meta.ActiveReason)
+		expectNamespaceCordonedLabel(existing.GetName(), false)
+
+		Expect(cs.CoreV1().Namespaces().Delete(context.TODO(), existing.GetName(), metav1.DeleteOptions{})).To(Succeed())
+		expectNamespaceDeleted(existing.GetName())
+	})
+
+	It("should block content changes inside a namespace cordoned by tenant owner", func() {
+		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
+
+		ns := NewNamespace("", map[string]string{
+			meta.TenantLabel: tnt.GetName(),
+		})
+
+		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+		NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
+
+		By("cordoning the namespace directly")
+		Expect(patchNamespaceCordonedLabel(cs, ns.GetName(), meta.ValueTrue)).To(Succeed())
+		expectNamespaceCordonedLabel(ns.GetName(), true)
+
+		pod := &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "blocked-create",
+			},
+			Spec: corev1.PodSpec{
+				SecurityContext: nobodyPodSecurityContext(),
+				Containers: []corev1.Container{
+					{
+						Name:            "container",
+						Image:           "quay.io/google-containers/pause-amd64:3.0",
+						SecurityContext: restrictedContainerSecurityContext(),
+					},
+				},
+			},
+		}
+
+		By("rejecting content creation inside the cordoned namespace")
+		_, err := cs.CoreV1().Pods(ns.GetName()).Create(context.TODO(), pod, metav1.CreateOptions{})
+		Expect(err).To(HaveOccurred())
+
+		By("uncordoning the namespace allows content creation again")
+		Expect(patchNamespaceCordonedLabel(cs, ns.GetName(), "")).To(Succeed())
+		expectNamespaceCordonedLabel(ns.GetName(), false)
+
+		_, err = cs.CoreV1().Pods(ns.GetName()).Create(context.TODO(), pod, metav1.CreateOptions{})
+		Expect(err).ToNot(HaveOccurred())
 	})
 
 	It("should block or allow operations", func() {
@@ -178,4 +324,5 @@ var _ = Describe("cordoning a Tenant", Ordered, Label("tenant", "operations", "c
 			expectTenantCordonedCondition(metav1.ConditionFalse, meta.ActiveReason)
 		})
 	})
+
 })

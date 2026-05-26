@@ -29,7 +29,7 @@ var _ = Describe("creating namespace with status lifecycle", Ordered, Label("nam
 				{
 					CoreOwnerSpec: rbac.CoreOwnerSpec{
 						UserSpec: rbac.UserSpec{
-							Name: "gatsby",
+							Name: "e2e-tenant-status",
 							Kind: "User",
 						},
 					},

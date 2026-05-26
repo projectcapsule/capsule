@@ -42,7 +42,7 @@ var _ = Describe("creating a Namespace with user-specified labels and annotation
 				{
 					CoreOwnerSpec: rbac.CoreOwnerSpec{
 						UserSpec: rbac.UserSpec{
-							Name: "gatsby",
+							Name: "e2e-user-metadata-forbidden",
 							Kind: "User",
 						},
 					},

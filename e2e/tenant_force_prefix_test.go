@@ -29,7 +29,7 @@ var _ = Describe("creating a Namespace with Tenant name prefix enforcement at Te
 				{
 					CoreOwnerSpec: rbac.CoreOwnerSpec{
 						UserSpec: rbac.UserSpec{
-							Name: "john",
+							Name: "e2e-tenant-force-prefix",
 							Kind: "User",
 						},
 					},

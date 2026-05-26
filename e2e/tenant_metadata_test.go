@@ -38,7 +38,7 @@ var _ = Describe("adding metadata to a Tenant", Ordered, Label("tenant"), func()
 				{
 					CoreOwnerSpec: rbac.CoreOwnerSpec{
 						UserSpec: rbac.UserSpec{
-							Name: "jim",
+							Name: "e2e-tenant-metadata",
 							Kind: "User",
 						},
 					},

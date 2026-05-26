@@ -35,7 +35,7 @@ var _ = Describe("creating a tenant with various forbidden regexes", Ordered, La
 						{
 							CoreOwnerSpec: rbac.CoreOwnerSpec{
 								UserSpec: rbac.UserSpec{
-									Name: "alice",
+									Name: "e2e-namespace-regex",
 									Kind: "User",
 								},
 							},

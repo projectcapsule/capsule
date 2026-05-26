@@ -19,15 +19,12 @@ import (
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/events"
-	"k8s.io/client-go/util/retry"
 	"k8s.io/client-go/util/workqueue"
 	"sigs.k8s.io/cluster-api/util/patch"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -43,7 +40,6 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/internal/controllers/utils"
 	"github.com/projectcapsule/capsule/internal/metrics"
-	meta "github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/api/rbac"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	"github.com/projectcapsule/capsule/pkg/runtime/gvk"
@@ -274,6 +270,14 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 		return reconcile.Result{}, err
 	}
 
+	if updateErr := r.updateReconcilingStatus(ctx, instance); updateErr != nil {
+		if apierrors.IsNotFound(updateErr) {
+			return reconcile.Result{}, nil
+		}
+
+		return reconcile.Result{}, err
+	}
+
 	reconcileError := r.reconcile(ctx, instance)
 
 	defer func() {
@@ -285,8 +289,6 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 			return reconcile.Result{}, e
 		}
 	}
-
-	r.syncTenantStatusMetrics(instance)
 
 	// Collect available resources
 	if err = r.collectAvailableResources(ctx, instance); err != nil {
@@ -371,54 +373,4 @@ func (r Manager) reconcile(ctx context.Context, instance *capsulev1beta2.Tenant)
 	r.Log.V(4).Info("Tenant reconciling completed")
 
 	return err
-}
-
-func (r *Manager) updateTenantStatus(ctx context.Context, instance *capsulev1beta2.Tenant, reconcileError error) error {
-	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		latest := &capsulev1beta2.Tenant{}
-		if err := r.reader.Get(ctx, types.NamespacedName{Name: instance.GetName()}, latest); err != nil {
-			if apierrors.IsNotFound(err) {
-				return nil
-			}
-
-			return err
-		}
-
-		latest.Status = instance.Status
-
-		readyCondition := meta.NewReadyCondition(instance)
-		if reconcileError != nil {
-			readyCondition.Message = reconcileError.Error()
-			readyCondition.Status = metav1.ConditionFalse
-			readyCondition.Reason = meta.FailedReason
-		}
-
-		latest.Status.Conditions.UpdateConditionByType(readyCondition)
-
-		cordonedCondition := meta.NewCordonedCondition(instance)
-
-		if instance.Spec.Cordoned {
-			latest.Status.State = capsulev1beta2.TenantStateCordoned
-
-			cordonedCondition.Reason = meta.CordonedReason
-			cordonedCondition.Message = "Tenant is cordoned"
-			cordonedCondition.Status = metav1.ConditionTrue
-		} else {
-			latest.Status.State = capsulev1beta2.TenantStateActive
-		}
-
-		latest.Status.Conditions.UpdateConditionByType(cordonedCondition)
-
-		if err := r.Client.Status().Update(ctx, latest); err != nil {
-			if apierrors.IsNotFound(err) {
-				return nil
-			}
-
-			return err
-		}
-
-		instance.Status = latest.Status
-
-		return nil
-	})
 }

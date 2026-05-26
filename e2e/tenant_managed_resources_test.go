@@ -36,7 +36,7 @@ var _ = Describe("creating namespaces within a Tenant with resources", Ordered, 
 				{
 					CoreOwnerSpec: rbac.CoreOwnerSpec{
 						UserSpec: rbac.UserSpec{
-							Name: "john",
+							Name: "e2e-tenant-managed-resources",
 							Kind: "User",
 						},
 					},

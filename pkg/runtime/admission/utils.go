@@ -5,7 +5,14 @@ package admission
 import (
 	"path"
 	"strings"
+
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
+
+func Deny(message string) *admission.Response {
+	response := admission.Denied(message)
+	return &response
+}
 
 func normalizePath(p string) string {
 	if p == "" {

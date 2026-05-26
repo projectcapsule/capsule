@@ -32,7 +32,7 @@ var _ = Describe("creating a nodePort service when it is disabled for Tenant", O
 				{
 					CoreOwnerSpec: rbac.CoreOwnerSpec{
 						UserSpec: rbac.UserSpec{
-							Name: "google",
+							Name: "e2e-disable-node-ports",
 							Kind: "User",
 						},
 					},

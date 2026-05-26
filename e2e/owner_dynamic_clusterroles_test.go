@@ -29,7 +29,7 @@ var _ = Describe("defining dynamic Tenant Owner Cluster Roles", Ordered, Label("
 					CoreOwnerSpec: rbac.CoreOwnerSpec{
 						UserSpec: rbac.UserSpec{
 							Kind: "User",
-							Name: "michonne",
+							Name: "e2e-dynamic-to-clusterroles",
 						},
 						ClusterRoles: []string{"edit", "admin"},
 					},
@@ -37,7 +37,7 @@ var _ = Describe("defining dynamic Tenant Owner Cluster Roles", Ordered, Label("
 				{
 					CoreOwnerSpec: rbac.CoreOwnerSpec{
 						UserSpec: rbac.UserSpec{
-							Name: "kingdom",
+							Name: "group:e2e-dynamic-to-clusterroles",
 							Kind: "Group",
 						},
 						ClusterRoles: []string{"view"},

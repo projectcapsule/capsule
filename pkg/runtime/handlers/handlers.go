@@ -11,6 +11,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/users"
 )
 
 type Func func(ctx context.Context, req admission.Request) *admission.Response
@@ -31,4 +32,10 @@ type TypedHandler[T client.Object] interface {
 	OnCreate(c client.Client, reader client.Reader, obj T, decoder admission.Decoder, recorder events.EventRecorder) Func
 	OnUpdate(c client.Client, reader client.Reader, obj T, old T, decoder admission.Decoder, recorder events.EventRecorder) Func
 	OnDelete(c client.Client, reader client.Reader, obj T, decoder admission.Decoder, recorder events.EventRecorder) Func
+}
+
+type TypedHandlerWithUser[T client.Object] interface {
+	OnCreate(c client.Client, reader client.Reader, user users.AdmissionUser, obj T, decoder admission.Decoder, recorder events.EventRecorder) Func
+	OnUpdate(c client.Client, reader client.Reader, user users.AdmissionUser, obj T, old T, decoder admission.Decoder, recorder events.EventRecorder) Func
+	OnDelete(c client.Client, reader client.Reader, user users.AdmissionUser, obj T, decoder admission.Decoder, recorder events.EventRecorder) Func
 }

@@ -38,7 +38,7 @@ var _ = Describe("adding metadata to Service objects", Ordered, Label("tenant", 
 				{
 					CoreOwnerSpec: rbac.CoreOwnerSpec{
 						UserSpec: rbac.UserSpec{
-							Name: "gatsby",
+							Name: "e2e-service-metadata",
 							Kind: "User",
 						},
 					},

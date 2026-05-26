@@ -17,6 +17,7 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	"github.com/projectcapsule/capsule/pkg/tenant"
+	"github.com/projectcapsule/capsule/pkg/users"
 )
 
 // getNamespaceTenant returns namespace owner tenant.
@@ -25,11 +26,11 @@ func GetNamespaceTenant(
 	client client.Reader,
 	cache client.Client,
 	ns *corev1.Namespace,
-	req admission.Request,
+	user users.AdmissionUser,
 	cfg configuration.Configuration,
 	recorder events.EventRecorder,
 ) (*capsulev1beta2.Tenant, *admission.Response) {
-	tnt, err := tenant.GetTenantByLabelsAndUser(ctx, client, cfg, ns, req.UserInfo)
+	tnt, err := tenant.GetTenantByLabelsAndUser(ctx, client, cfg, ns, user)
 	if err != nil {
 		response := admission.Errored(http.StatusBadRequest, err)
 
@@ -40,7 +41,7 @@ func GetNamespaceTenant(
 		return tnt, nil
 	}
 
-	tnts, err := tenant.GetTenantByUserInfo(ctx, cache, cfg, ns, req.UserInfo.Username, req.UserInfo.Groups)
+	tnts, err := tenant.GetTenantByUserInfo(ctx, cache, cfg, ns, user)
 	if err != nil {
 		response := admission.Errored(http.StatusBadRequest, err)
 

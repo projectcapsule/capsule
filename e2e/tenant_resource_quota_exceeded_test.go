@@ -36,7 +36,7 @@ var _ = Describe("exceeding a Tenant resource quota", Ordered, Label("resourcequ
 				{
 					CoreOwnerSpec: rbac.CoreOwnerSpec{
 						UserSpec: rbac.UserSpec{
-							Name: "bobby",
+							Name: "e2e-quota-changes",
 							Kind: "User",
 						},
 					},

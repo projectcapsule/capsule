@@ -30,7 +30,7 @@ var _ = Describe("creating a nodePort service when it is enabled for Tenant", Or
 				{
 					CoreOwnerSpec: rbac.CoreOwnerSpec{
 						UserSpec: rbac.UserSpec{
-							Name: "google",
+							Name: "e2e-enable-node-ports",
 							Kind: "User",
 						},
 					},

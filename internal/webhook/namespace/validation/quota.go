@@ -16,17 +16,19 @@ import (
 	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
 	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
+	"github.com/projectcapsule/capsule/pkg/users"
 )
 
 type quotaHandler struct{}
 
-func QuotaHandler() handlers.TypedHandlerWithTenant[*corev1.Namespace] {
+func QuotaHandler() handlers.TypedHandlerWithTenantUser[*corev1.Namespace] {
 	return &quotaHandler{}
 }
 
 func (h *quotaHandler) OnCreate(
 	_ client.Client,
 	reader client.Reader,
+	_ users.AdmissionUser,
 	ns *corev1.Namespace,
 	_ admission.Decoder,
 	recorder events.EventRecorder,
@@ -40,6 +42,7 @@ func (h *quotaHandler) OnCreate(
 func (h *quotaHandler) OnDelete(
 	client.Client,
 	client.Reader,
+	users.AdmissionUser,
 	*corev1.Namespace,
 	admission.Decoder,
 	events.EventRecorder,
@@ -53,6 +56,7 @@ func (h *quotaHandler) OnDelete(
 func (h *quotaHandler) OnUpdate(
 	_ client.Client,
 	reader client.Reader,
+	_ users.AdmissionUser,
 	ns *corev1.Namespace,
 	_ *corev1.Namespace,
 	_ admission.Decoder,

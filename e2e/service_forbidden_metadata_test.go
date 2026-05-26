@@ -41,7 +41,7 @@ var _ = Describe("creating a Service with user-specified labels and annotations"
 				{
 					CoreOwnerSpec: rbac.CoreOwnerSpec{
 						UserSpec: rbac.UserSpec{
-							Name: "gatsby",
+							Name: "e2e-service-user-metadata-forbidden",
 							Kind: "User",
 						},
 					},

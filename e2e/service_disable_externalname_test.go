@@ -32,7 +32,7 @@ var _ = Describe("creating an ExternalName service when it is disabled for Tenan
 				{
 					CoreOwnerSpec: rbac.CoreOwnerSpec{
 						UserSpec: rbac.UserSpec{
-							Name: "google",
+							Name: "disable-external-service",
 							Kind: "User",
 						},
 					},

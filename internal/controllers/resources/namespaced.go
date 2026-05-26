@@ -33,6 +33,7 @@ import (
 	"github.com/projectcapsule/capsule/internal/cache"
 	cutils "github.com/projectcapsule/capsule/internal/controllers/utils"
 	"github.com/projectcapsule/capsule/internal/metrics"
+	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/api/processor"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
@@ -133,7 +134,6 @@ func (r *namespacedResourceController) SetupWithManager(mgr ctrl.Manager, cfg cu
 		WithOptions(controller.Options{MaxConcurrentReconciles: cfg.MaxConcurrentReconciles}).
 		Complete(r)
 }
-
 func (r *namespacedResourceController) Reconcile(ctx context.Context, request reconcile.Request) (res reconcile.Result, err error) {
 	log := ctrllog.FromContext(ctx)
 
@@ -165,30 +165,31 @@ func (r *namespacedResourceController) Reconcile(ctx context.Context, request re
 	var statusErr error
 
 	defer func() {
-		if uerr := r.updateStatus(ctx, tntResource, statusErr); uerr != nil {
-			if apierrors.IsNotFound(uerr) || apierrors.HasStatusCause(uerr, corev1.NamespaceTerminatingCause) {
-				err = nil
+		reconcileErr := err
+		if statusErr != nil {
+			reconcileErr = statusErr
+		}
 
+		if uerr := r.updateStatus(ctx, tntResource, reconcileErr); uerr != nil {
+			if caperrors.IgnoreGone(uerr) {
+				err = nil
 				return
 			}
 
 			err = fmt.Errorf("cannot update tenantresource status: %w", uerr)
-
 			return
 		}
 
 		r.metrics.RecordConditions(tntResource)
 
 		if e := patchHelper.Patch(ctx, tntResource); e != nil {
-			if apierrors.IsNotFound(e) || apierrors.HasStatusCause(e, corev1.NamespaceTerminatingCause) {
+			if caperrors.IgnoreGone(e) {
 				err = nil
-
 				return
 			}
 
 			res = reconcile.Result{}
 			err = gherrors.Wrap(e, "failed to patch TenantResource")
-
 			return
 		}
 
@@ -196,9 +197,9 @@ func (r *namespacedResourceController) Reconcile(ctx context.Context, request re
 		err = nil
 	}()
 
-	// On Deletion these checks are skipped
+	// On Deletion these checks are skipped.
 	if tntResource.DeletionTimestamp.IsZero() {
-		if *tntResource.Spec.Cordoned {
+		if tntResource.Spec.Cordoned != nil && *tntResource.Spec.Cordoned {
 			log.V(5).Info("tenant resource cordoned")
 
 			return reconcile.Result{}, nil
@@ -207,7 +208,10 @@ func (r *namespacedResourceController) Reconcile(ctx context.Context, request re
 		for _, dep := range tntResource.Spec.DependsOn {
 			d := &capsulev1beta2.TenantResource{}
 
-			if getErr := r.client.Get(ctx, types.NamespacedName{Name: dep.Name.String(), Namespace: tntResource.GetNamespace()}, d); getErr != nil {
+			if getErr := r.client.Get(ctx, types.NamespacedName{
+				Name:      dep.Name.String(),
+				Namespace: tntResource.GetNamespace(),
+			}, d); getErr != nil {
 				if apierrors.IsNotFound(getErr) {
 					statusErr = fmt.Errorf("dependency %s not found", dep.Name)
 				} else {
@@ -218,7 +222,7 @@ func (r *namespacedResourceController) Reconcile(ctx context.Context, request re
 			}
 
 			stat := d.Status.Conditions.GetConditionByType(meta.ReadyCondition)
-			if stat.Status != metav1.ConditionTrue {
+			if stat == nil || stat.Status != metav1.ConditionTrue {
 				statusErr = fmt.Errorf("dependency %s not ready", dep.Name)
 
 				return requeue, nil
@@ -236,7 +240,7 @@ func (r *namespacedResourceController) Reconcile(ctx context.Context, request re
 	}
 
 	if updateErr := r.updateReconcilingStatus(ctx, tntResource); updateErr != nil {
-		if apierrors.IsNotFound(updateErr) {
+		if caperrors.IgnoreGone(updateErr) {
 			return reconcile.Result{}, nil
 		}
 

@@ -34,7 +34,7 @@ var _ = Describe("when handling Cluster scoped Ingress hostnames collision", Ord
 				{
 					CoreOwnerSpec: rbac.CoreOwnerSpec{
 						UserSpec: rbac.UserSpec{
-							Name: "ingress-tenant-one",
+							Name: "e2e-hostnames-collision-one",
 							Kind: "User",
 						},
 					},
@@ -57,7 +57,7 @@ var _ = Describe("when handling Cluster scoped Ingress hostnames collision", Ord
 				{
 					CoreOwnerSpec: rbac.CoreOwnerSpec{
 						UserSpec: rbac.UserSpec{
-							Name: "ingress-tenant-two",
+							Name: "e2e-hostnames-collision-two",
 							Kind: "User",
 						},
 					},

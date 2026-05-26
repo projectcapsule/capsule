@@ -27,7 +27,7 @@ var _ = Describe("creating a Namespace without a Tenant selector when user owns 
 				{
 					CoreOwnerSpec: rbac.CoreOwnerSpec{
 						UserSpec: rbac.UserSpec{
-							Name: "john",
+							Name: "e2e-tenant-fail",
 							Kind: "User",
 						},
 					},
@@ -47,7 +47,7 @@ var _ = Describe("creating a Namespace without a Tenant selector when user owns 
 				{
 					CoreOwnerSpec: rbac.CoreOwnerSpec{
 						UserSpec: rbac.UserSpec{
-							Name: "john",
+							Name: "e2e-tenant-fail",
 							Kind: "User",
 						},
 					},
@@ -67,7 +67,7 @@ var _ = Describe("creating a Namespace without a Tenant selector when user owns 
 				{
 					CoreOwnerSpec: rbac.CoreOwnerSpec{
 						UserSpec: rbac.UserSpec{
-							Name: "john",
+							Name: "e2e-tenant-fail",
 							Kind: "Group",
 						},
 					},
@@ -87,7 +87,7 @@ var _ = Describe("creating a Namespace without a Tenant selector when user owns 
 				{
 					CoreOwnerSpec: rbac.CoreOwnerSpec{
 						UserSpec: rbac.UserSpec{
-							Name: "john",
+							Name: "e2e-tenant-fail",
 							Kind: "Group",
 						},
 					},

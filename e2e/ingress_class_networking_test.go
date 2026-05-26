@@ -39,7 +39,7 @@ var _ = Describe("when Tenant handles Ingress classes with networking.k8s.io/v1"
 				{
 					CoreOwnerSpec: rbac.CoreOwnerSpec{
 						UserSpec: rbac.UserSpec{
-							Name: "ingress-selector",
+							Name: "e2e-ic-selector-networking-v1",
 							Kind: "User",
 						},
 					},
@@ -75,7 +75,7 @@ var _ = Describe("when Tenant handles Ingress classes with networking.k8s.io/v1"
 				{
 					CoreOwnerSpec: rbac.CoreOwnerSpec{
 						UserSpec: rbac.UserSpec{
-							Name: "ingress-default",
+							Name: "e2e-ic-default-networking-v1",
 							Kind: "User",
 						},
 					},
@@ -523,7 +523,10 @@ var _ = Describe("when Tenant handles Ingress classes with networking.k8s.io/v1"
 	})
 
 	It("should mutate to default tenant IngressClass (class not does not exist)", func() {
-		ns := NewNamespace("")
+		ns := NewNamespace("", map[string]string{
+			meta.TenantLabel: tntWithDefault.GetName(),
+		})
+
 		NamespaceCreation(ns, tntWithDefault.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 		NamespaceIsPartOfTenant(tntWithDefault, ns).Should(Succeed())
 

@@ -42,10 +42,10 @@ import (
 const (
 	defaultTimeoutInterval                    = 60 * time.Second
 	defaultTerminationTimeoutInterval         = 60 * time.Second
-	defaultPollInterval                       = 3 * time.Second
+	defaultPollInterval                       = 2 * time.Second
 	defaultConfigurationName                  = "default"
-	e2eClientQPS                      float32 = 200
-	e2eClientBurst                    int     = 400
+	e2eClientQPS                      float32 = 1000
+	e2eClientBurst                    int     = 2000
 )
 
 func tuneE2ERestConfig(c *rest.Config) *rest.Config {
@@ -438,6 +438,66 @@ func PatchTenantOwnerReferenceForNamespace(
 
 		return err
 	}, timeout, defaultPollInterval)
+}
+
+func GetTenantEventually(tnt *capsulev1beta2.Tenant) *capsulev1beta2.Tenant {
+	t := &capsulev1beta2.Tenant{}
+
+	Eventually(func() error {
+		return k8sClient.Get(context.TODO(), types.NamespacedName{Name: tnt.GetName()}, t)
+	}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+
+	return t
+}
+
+func GetNamespaceEventually(name string) *corev1.Namespace {
+	ns := &corev1.Namespace{}
+
+	Eventually(func() error {
+		return k8sClient.Get(context.TODO(), types.NamespacedName{Name: name}, ns)
+	}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+
+	return ns
+}
+
+func UpdateTenantEventually(tnt *capsulev1beta2.Tenant, mutator func(*capsulev1beta2.Tenant)) {
+	Eventually(func() error {
+		current := &capsulev1beta2.Tenant{}
+		if err := k8sClient.Get(context.TODO(), types.NamespacedName{Name: tnt.GetName()}, current); err != nil {
+			return err
+		}
+
+		mutator(current)
+
+		return k8sClient.Update(context.TODO(), current)
+	}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+}
+
+func UpdateTenantEventuallyShouldFail(tnt *capsulev1beta2.Tenant, mutator func(*capsulev1beta2.Tenant)) {
+	Eventually(func() error {
+		current := &capsulev1beta2.Tenant{}
+		if err := k8sClient.Get(context.TODO(), types.NamespacedName{Name: tnt.GetName()}, current); err != nil {
+			return err
+		}
+
+		mutator(current)
+
+		return k8sClient.Update(context.TODO(), current)
+	}, defaultTimeoutInterval, defaultPollInterval).ShouldNot(Succeed())
+}
+
+func PatchNamespaceEventually(ns *corev1.Namespace, mutator func(*corev1.Namespace)) {
+	Eventually(func() error {
+		current := &corev1.Namespace{}
+		if err := k8sClient.Get(context.TODO(), types.NamespacedName{Name: ns.GetName()}, current); err != nil {
+			return err
+		}
+
+		before := current.DeepCopy()
+		mutator(current)
+
+		return k8sClient.Patch(context.TODO(), current, client.MergeFrom(before))
+	}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 }
 
 func TenantNamespaceList(tnt *capsulev1beta2.Tenant, timeout time.Duration) AsyncAssertion {

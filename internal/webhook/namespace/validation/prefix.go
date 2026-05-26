@@ -17,13 +17,14 @@ import (
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
+	"github.com/projectcapsule/capsule/pkg/users"
 )
 
 type prefixHandler struct {
 	cfg configuration.Configuration
 }
 
-func PrefixHandler(configuration configuration.Configuration) handlers.TypedHandlerWithTenant[*corev1.Namespace] {
+func PrefixHandler(configuration configuration.Configuration) handlers.TypedHandlerWithTenantUser[*corev1.Namespace] {
 	return &prefixHandler{
 		cfg: configuration,
 	}
@@ -32,6 +33,7 @@ func PrefixHandler(configuration configuration.Configuration) handlers.TypedHand
 func (h *prefixHandler) OnCreate(
 	_ client.Client,
 	_ client.Reader,
+	_ users.AdmissionUser,
 	ns *corev1.Namespace,
 	decoder admission.Decoder,
 	recorder events.EventRecorder,
@@ -89,6 +91,7 @@ func (h *prefixHandler) OnCreate(
 func (h *prefixHandler) OnUpdate(
 	client.Client,
 	client.Reader,
+	users.AdmissionUser,
 	*corev1.Namespace,
 	*corev1.Namespace,
 	admission.Decoder,
@@ -103,6 +106,7 @@ func (h *prefixHandler) OnUpdate(
 func (h *prefixHandler) OnDelete(
 	client.Client,
 	client.Reader,
+	users.AdmissionUser,
 	*corev1.Namespace,
 	admission.Decoder,
 	events.EventRecorder,

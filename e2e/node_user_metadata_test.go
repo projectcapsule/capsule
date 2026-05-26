@@ -35,7 +35,7 @@ var _ = Describe("modifying node labels and annotations", Ordered, Label("config
 				{
 					CoreOwnerSpec: rbac.CoreOwnerSpec{
 						UserSpec: rbac.UserSpec{
-							Name: "gatsby",
+							Name: "e2e-node-user-metadata-forbidden",
 							Kind: "User",
 						},
 					},

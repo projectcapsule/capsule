@@ -28,7 +28,7 @@ var _ = Describe("creating a Namespaces as different type of Tenant owners", Ord
 				{
 					CoreOwnerSpec: rbac.CoreOwnerSpec{
 						UserSpec: rbac.UserSpec{
-							Name: "alice",
+							Name: "e2e-ns-creation-1",
 							Kind: "User",
 						},
 					},
@@ -36,7 +36,7 @@ var _ = Describe("creating a Namespaces as different type of Tenant owners", Ord
 				{
 					CoreOwnerSpec: rbac.CoreOwnerSpec{
 						UserSpec: rbac.UserSpec{
-							Name: "bob",
+							Name: "e2e-ns-creation-2",
 							Kind: "User",
 						},
 					},

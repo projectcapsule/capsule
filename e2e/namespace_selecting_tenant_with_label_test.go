@@ -31,7 +31,7 @@ var _ = Describe("creating a Namespace with Tenant selector when user owns multi
 				{
 					CoreOwnerSpec: rbac.CoreOwnerSpec{
 						UserSpec: rbac.UserSpec{
-							Name: "john",
+							Name: "e2e-tenant-label",
 							Kind: "User",
 						},
 					},
@@ -51,7 +51,7 @@ var _ = Describe("creating a Namespace with Tenant selector when user owns multi
 				{
 					CoreOwnerSpec: rbac.CoreOwnerSpec{
 						UserSpec: rbac.UserSpec{
-							Name: "john",
+							Name: "e2e-tenant-label",
 							Kind: "User",
 						},
 					},
@@ -113,7 +113,7 @@ var _ = Describe("creating a Namespace with Tenant selector when user owns multi
 			new := &corev1.Namespace{}
 			k8sClient.Get(context.TODO(), types.NamespacedName{Name: ns.GetName()}, new)
 
-			NamespaceIsPartOfTenant(t2, new).Should(Succeed())
+			NamespaceIsPartOfTenant(t1, new).Should(Succeed())
 		})
 
 		By("assigning to the Namespace the Capsule Tenant label (Attempt Ownerreference Patch)", func() {
@@ -215,7 +215,7 @@ var _ = Describe("creating a Namespace with Tenant selector when user owns multi
 			new := &corev1.Namespace{}
 			k8sClient.Get(context.TODO(), types.NamespacedName{Name: ns.GetName()}, new)
 
-			NamespaceIsPartOfTenant(t1, new).Should(Succeed())
+			NamespaceIsPartOfTenant(t1, ns).Should(Succeed())
 		})
 	})
 })

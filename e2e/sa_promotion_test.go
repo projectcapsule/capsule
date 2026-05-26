@@ -325,7 +325,7 @@ var _ = Describe("Promoting ServiceAccounts", Ordered, Label("config", "permissi
 				{
 					CoreOwnerSpec: rbac.CoreOwnerSpec{
 						UserSpec: rbac.UserSpec{
-							Name: "alice",
+							Name: "e2e-sa-promotion",
 							Kind: "User",
 						},
 					},

@@ -356,26 +356,6 @@ var _ = Describe("when Tenant handles Device classes", Ordered, Label("tenant", 
 		NamespaceCreation(ns, tntWithAuthorized.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 		NamespaceIsPartOfTenant(tntWithAuthorized, ns).Should(Succeed())
 
-		By("Verify Status", func() {
-			for _, class := range []*resources.DeviceClass{authorized} {
-				Expect(ignoreNotFound(k8sClient.Delete(context.TODO(), class))).To(Succeed())
-			}
-
-			Eventually(func() ([]string, error) {
-				t := &capsulev1beta2.Tenant{}
-				if err := k8sClient.Get(
-					context.TODO(),
-					types.NamespacedName{Name: tntWithAuthorized.GetName()},
-					t,
-				); err != nil {
-					return nil, err
-				}
-
-				return t.Status.Classes.DeviceClasses, nil
-			}, defaultTimeoutInterval, defaultPollInterval).
-				ShouldNot(ConsistOf(authorized.GetName(), authorized2.GetName()))
-		})
-
 		By("providing authorized device class", func() {
 			for _, class := range []*resources.DeviceClass{authorized} {
 				Eventually(func() (err error) {
@@ -599,5 +579,26 @@ var _ = Describe("when Tenant handles Device classes", Ordered, Label("tenant", 
 				}, defaultTimeoutInterval, defaultPollInterval).ShouldNot(Succeed())
 			}
 		})
+
+		By("Verify Status", func() {
+			for _, class := range []*resources.DeviceClass{authorized} {
+				Expect(ignoreNotFound(k8sClient.Delete(context.TODO(), class))).To(Succeed())
+			}
+
+			Eventually(func() ([]string, error) {
+				t := &capsulev1beta2.Tenant{}
+				if err := k8sClient.Get(
+					context.TODO(),
+					types.NamespacedName{Name: tntWithAuthorized.GetName()},
+					t,
+				); err != nil {
+					return nil, err
+				}
+
+				return t.Status.Classes.DeviceClasses, nil
+			}, defaultTimeoutInterval, defaultPollInterval).
+				ShouldNot(ConsistOf(authorized.GetName(), authorized2.GetName()))
+		})
+
 	})
 })

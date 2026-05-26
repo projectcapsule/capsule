@@ -38,7 +38,7 @@ var _ = Describe("enforcing a Runtime Class", Ordered, Label("pod", "classes", "
 				{
 					CoreOwnerSpec: rbac.CoreOwnerSpec{
 						UserSpec: rbac.UserSpec{
-							Name: "george",
+							Name: "e2e-runtimeclass-1",
 							Kind: "User",
 						},
 					},
@@ -73,7 +73,7 @@ var _ = Describe("enforcing a Runtime Class", Ordered, Label("pod", "classes", "
 				{
 					CoreOwnerSpec: rbac.CoreOwnerSpec{
 						UserSpec: rbac.UserSpec{
-							Name: "e2e-gateway-no-restrictions",
+							Name: "e2e-runtimeclass-2",
 							Kind: "User",
 						},
 					},

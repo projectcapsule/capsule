@@ -31,7 +31,7 @@ var _ = Describe("creating a Namespace with a protected Namespace regex enabled"
 				{
 					CoreOwnerSpec: rbac.CoreOwnerSpec{
 						UserSpec: rbac.UserSpec{
-							Name: "alice",
+							Name: "e2e-protected-namespace",
 							Kind: "User",
 						},
 					},
