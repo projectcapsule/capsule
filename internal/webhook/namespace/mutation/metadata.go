@@ -123,13 +123,6 @@ func (h *metadataHandler) OnUpdate(
 			return &response
 		}
 
-		o, err := json.Marshal(newNs.DeepCopy())
-		if err != nil {
-			response := admission.Errored(http.StatusInternalServerError, err)
-
-			return &response
-		}
-
 		labels, annotations, err := tenant.BuildNamespaceMetadataForTenant(newNs, tnt)
 		if err != nil {
 			return ad.ErroredResponse(err)
@@ -158,7 +151,7 @@ func (h *metadataHandler) OnUpdate(
 			return &response
 		}
 
-		response := admission.PatchResponseFromRaw(o, obj)
+		response := admission.PatchResponseFromRaw(req.Object.Raw, obj)
 
 		return &response
 	}

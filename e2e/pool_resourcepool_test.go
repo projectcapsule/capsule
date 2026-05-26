@@ -306,30 +306,18 @@ var _ = Describe("ResourcePool Tests", Ordered, Label("resourcepool", "pool"), f
 		})
 
 		By("Verify Status was correctly initialized", func() {
-			Eventually(func(g Gomega) {
-				err := k8sClient.Get(context.TODO(), client.ObjectKey{Name: pool.Name}, pool)
-				Expect(err).Should(Succeed())
+			expected := capsulev1beta2.ResourcePoolQuotaStatus{
+				Hard: pool.Spec.Quota.Hard,
+				Claimed: corev1.ResourceList{
+					corev1.ResourceLimitsCPU:      resource.MustParse("0"),
+					corev1.ResourceLimitsMemory:   resource.MustParse("0"),
+					corev1.ResourceRequestsCPU:    resource.MustParse("0"),
+					corev1.ResourceRequestsMemory: resource.MustParse("0"),
+				},
+				Available: pool.Spec.Quota.Hard,
+			}
 
-				expected := &capsulev1beta2.ResourcePoolQuotaStatus{
-					Hard: pool.Spec.Quota.Hard,
-					Claimed: corev1.ResourceList{
-						corev1.ResourceLimitsCPU:      resource.MustParse("0"),
-						corev1.ResourceRequestsMemory: resource.MustParse("0"),
-						corev1.ResourceRequestsCPU:    resource.MustParse("0"),
-						corev1.ResourceLimitsMemory:   resource.MustParse("640Mi"),
-					},
-					Available: corev1.ResourceList{
-						corev1.ResourceLimitsCPU:      resource.MustParse("2"),
-						corev1.ResourceRequestsMemory: resource.MustParse("2Gi"),
-						corev1.ResourceRequestsCPU:    resource.MustParse("2"),
-						corev1.ResourceLimitsMemory:   resource.MustParse("1408Mi"),
-					},
-				}
-
-				ok, msg := DeepCompare(*expected, pool.Status.Allocation)
-				Expect(ok).To(BeTrue(), "Mismatch for expected status allocation: %s", msg)
-			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
-
+			expectResourcePoolAllocationEventually(pool.Name, expected)
 		})
 
 		By("Pool Has Finalizer", func() {
@@ -347,31 +335,14 @@ var _ = Describe("ResourcePool Tests", Ordered, Label("resourcepool", "pool"), f
 				"ns-3-default-pool": nil,
 			}
 
-			quotaLabel, err := utils.GetTypeLabel(&capsulev1beta2.ResourcePool{})
-			Expect(err).Should(Succeed())
-
-			for _, ns := range namespaces {
-				rq := &corev1.ResourceQuota{}
-
-				err := k8sClient.Get(context.TODO(), client.ObjectKey{
-					Name:      pool.GetQuotaName(),
-					Namespace: ns},
-					rq)
-				Expect(err).Should(Succeed())
-
-				Expect(rq.ObjectMeta.Labels[quotaLabel]).To(Equal(pool.Name), "Expected "+quotaLabel+" to be set to "+pool.Name)
-
-				ok, msg := DeepCompare(status[ns], rq.Spec.Hard)
-				Expect(ok).To(BeTrue(), "Mismatch for resources for resourcequota: %s", msg)
-
-				found := false
-				for _, ref := range rq.OwnerReferences {
-					if ref.Kind == "ResourcePool" && ref.UID == pool.UID {
-						found = true
-						break
-					}
-				}
-				Expect(found).To(BeTrue(), "Expected ResourcePool to be owner of ResourceQuota in namespace %s", ns)
+			for ns, expected := range status {
+				expectResourceQuotaEventually(
+					ns,
+					pool.GetQuotaName(),
+					expected,
+					pool.Name,
+					pool.UID,
+				)
 			}
 		})
 
@@ -414,43 +385,35 @@ var _ = Describe("ResourcePool Tests", Ordered, Label("resourcepool", "pool"), f
 				},
 			}
 
-			err := k8sClient.Get(context.TODO(), client.ObjectKey{Name: pool.Name}, pool)
-			Expect(err).Should(Succeed())
-
-			for _, ns := range namespaces {
-				rq := &corev1.ResourceQuota{}
-
-				err := k8sClient.Get(context.TODO(), client.ObjectKey{
-					Name:      pool.GetQuotaName(),
-					Namespace: ns},
-					rq)
-				Expect(err).Should(Succeed())
-
-				ok, msg := DeepCompare(status[ns], rq.Spec.Hard)
-				Expect(ok).To(BeTrue(), "Mismatch for resources for resourcequota: %s", msg)
+			for ns, expected := range status {
+				expectResourceQuotaEventually(
+					ns,
+					pool.GetQuotaName(),
+					expected,
+					pool.Name,
+					pool.UID,
+				)
 			}
 		})
 
 		By("Remove namespace from being selected (Patch Labels)", func() {
-			ns := &corev1.Namespace{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "ns-2-default-pool",
-				},
-			}
-
-			Eventually(func(g Gomega) {
+			Eventually(func() error {
 				stat := &corev1.Namespace{}
-				err := k8sClient.Get(context.TODO(), types.NamespacedName{Name: ns.Name}, stat)
-				Expect(err).Should(Succeed())
+				if err := k8sClient.Get(
+					context.TODO(),
+					types.NamespacedName{Name: "ns-2-default-pool"},
+					stat,
+				); err != nil {
+					return err
+				}
 
-				stat.ObjectMeta.Labels = map[string]string{
+				stat.Labels = map[string]string{
 					"e2e-resourcepool":           "test",
 					"e2e.capsule.dev/test-suite": "do-not-select",
 				}
 
-				err = k8sClient.Update(context.TODO(), stat)
-				Expect(err).Should(Succeed())
-			}).Should(Succeed())
+				return k8sClient.Update(context.TODO(), stat)
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		})
 
 		By("Verify Namespaces were removed as allowed targets", func() {
@@ -2253,5 +2216,81 @@ func ExpectPoolAllocation(name string, expected capsulev1beta2.ResourcePoolQuota
 
 		ok, msg := DeepCompare(expected, current.Status.Allocation)
 		g.Expect(ok).To(BeTrue(), "Mismatch for resource allocation: %s", msg)
+	}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+}
+
+func expectResourcePoolAllocationEventually(
+	poolName string,
+	expected capsulev1beta2.ResourcePoolQuotaStatus,
+) {
+	Eventually(func(g Gomega) {
+		current := &capsulev1beta2.ResourcePool{}
+		g.Expect(k8sClient.Get(
+			context.TODO(),
+			client.ObjectKey{Name: poolName},
+			current,
+		)).To(Succeed())
+
+		ok, msg := DeepCompare(expected, current.Status.Allocation)
+		g.Expect(ok).To(BeTrue(), "Mismatch for expected status allocation: %s", msg)
+	}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+}
+
+func expectResourceQuotaEventually(
+	namespace string,
+	name string,
+	expected corev1.ResourceList,
+	expectedPoolName string,
+	expectedPoolUID types.UID,
+) {
+	quotaLabel, err := utils.GetTypeLabel(&capsulev1beta2.ResourcePool{})
+	Expect(err).To(Succeed())
+
+	Eventually(func(g Gomega) {
+		rq := &corev1.ResourceQuota{}
+		g.Expect(k8sClient.Get(
+			context.TODO(),
+			client.ObjectKey{Name: name, Namespace: namespace},
+			rq,
+		)).To(Succeed())
+
+		g.Expect(rq.Labels).To(HaveKeyWithValue(quotaLabel, expectedPoolName))
+
+		ok, msg := DeepCompare(expected, rq.Spec.Hard)
+		g.Expect(ok).To(BeTrue(), "Mismatch for resourcequota %s/%s: %s", namespace, name, msg)
+
+		g.Expect(rq.OwnerReferences).To(ContainElement(SatisfyAll(
+			WithTransform(func(ref metav1.OwnerReference) string {
+				return ref.Kind
+			}, Equal("ResourcePool")),
+			WithTransform(func(ref metav1.OwnerReference) types.UID {
+				return ref.UID
+			}, Equal(expectedPoolUID)),
+		)), "Expected ResourcePool to be owner of ResourceQuota in namespace %s", namespace)
+	}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+}
+
+func expectResourceQuotaDeletedEventually(namespace string, name string) {
+	Eventually(func() bool {
+		err := k8sClient.Get(
+			context.TODO(),
+			client.ObjectKey{Name: name, Namespace: namespace},
+			&corev1.ResourceQuota{},
+		)
+
+		return apierrors.IsNotFound(err)
+	}, defaultTimeoutInterval, defaultPollInterval).Should(BeTrue())
+}
+
+func expectResourcePoolFinalizerEventually(poolName string, present bool) {
+	Eventually(func(g Gomega) {
+		current := &capsulev1beta2.ResourcePool{}
+		g.Expect(k8sClient.Get(
+			context.TODO(),
+			client.ObjectKey{Name: poolName},
+			current,
+		)).To(Succeed())
+
+		g.Expect(controllerutil.ContainsFinalizer(current, meta.ControllerFinalizer)).To(Equal(present))
 	}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 }

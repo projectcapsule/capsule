@@ -40,6 +40,7 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/internal/controllers/utils"
 	"github.com/projectcapsule/capsule/internal/metrics"
+	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
 	"github.com/projectcapsule/capsule/pkg/api/rbac"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	"github.com/projectcapsule/capsule/pkg/runtime/gvk"
@@ -102,30 +103,15 @@ func (r *Manager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.Controller
 		).
 		Watches(
 			&storagev1.StorageClass{},
-			r.statusOnlyHandlerClasses(
-				r.reconcileClassStatus,
-				r.collectAvailableStorageClasses,
-				"cannot collect storage classes",
-			),
-			builder.WithPredicates(predicates.UpdatedLabelsPredicate{}),
+			handler.EnqueueRequestsFromMapFunc(r.enqueueAllTenants),
 		).
 		Watches(
 			&schedulingv1.PriorityClass{},
-			r.statusOnlyHandlerClasses(
-				r.reconcileClassStatus,
-				r.collectAvailablePriorityClasses,
-				"cannot collect priority classes",
-			),
-			builder.WithPredicates(predicates.UpdatedLabelsPredicate{}),
+			handler.EnqueueRequestsFromMapFunc(r.enqueueAllTenants),
 		).
 		Watches(
 			&nodev1.RuntimeClass{},
-			r.statusOnlyHandlerClasses(
-				r.reconcileClassStatus,
-				r.collectAvailableRuntimeClasses,
-				"cannot collect runtime classes",
-			),
-			builder.WithPredicates(predicates.UpdatedLabelsPredicate{}),
+			handler.EnqueueRequestsFromMapFunc(r.enqueueAllTenants),
 		).
 		Watches(
 			&capsulev1beta2.TenantOwner{},
@@ -216,12 +202,7 @@ func (r *Manager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.Controller
 	if r.classes.gateway {
 		ctrlBuilder = ctrlBuilder.Watches(
 			&gatewayv1.GatewayClass{},
-			r.statusOnlyHandlerClasses(
-				r.reconcileClassStatus,
-				r.collectAvailableGatewayClasses,
-				"cannot collect gateway classes",
-			),
-			builder.WithPredicates(predicates.UpdatedLabelsPredicate{}),
+			handler.EnqueueRequestsFromMapFunc(r.enqueueAllTenants),
 		)
 	}
 
@@ -235,12 +216,7 @@ func (r *Manager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.Controller
 	if r.classes.device {
 		ctrlBuilder = ctrlBuilder.Watches(
 			&resourcesv1.DeviceClass{},
-			r.statusOnlyHandlerClasses(
-				r.reconcileClassStatus,
-				r.collectAvailableDeviceClasses,
-				"cannot collect device classes",
-			),
-			builder.WithPredicates(predicates.UpdatedLabelsPredicate{}),
+			handler.EnqueueRequestsFromMapFunc(r.enqueueAllTenants),
 		)
 	}
 
@@ -275,30 +251,37 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 			return reconcile.Result{}, nil
 		}
 
-		return reconcile.Result{}, err
+		return reconcile.Result{}, updateErr
 	}
 
 	reconcileError := r.reconcile(ctx, instance)
 
 	defer func() {
 		r.syncTenantStatusMetrics(instance)
+
+		if statusErr := r.updateTenantStatus(ctx, instance, reconcileError); statusErr != nil {
+			statusErr = fmt.Errorf("cannot update tenant status: %w", statusErr)
+
+			if err == nil {
+				err = statusErr
+			} else {
+				err = errors.Join(err, statusErr)
+			}
+		}
 	}()
 
-	if e := patchHelper.Patch(ctx, instance); err != nil {
-		if !apierrors.IsNotFound(err) {
-			return reconcile.Result{}, e
+	if e := patchHelper.Patch(ctx, instance); e != nil {
+		if caperrors.IgnoreGone(e) {
+			err = nil
+			return
 		}
+
+		return reconcile.Result{}, e
 	}
 
 	// Collect available resources
 	if err = r.collectAvailableResources(ctx, instance); err != nil {
 		err = fmt.Errorf("cannot collect available resources: %w", err)
-
-		return reconcile.Result{}, err
-	}
-
-	if err = r.updateTenantStatus(ctx, instance, reconcileError); err != nil {
-		err = fmt.Errorf("cannot update tenant status: %w", err)
 
 		return reconcile.Result{}, err
 	}

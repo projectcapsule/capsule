@@ -445,8 +445,7 @@ var _ = Describe("creating a Namespace for a Tenant with additional metadata", O
 					Expect(condition.Status).To(Equal(metav1.ConditionTrue), "Expected tenant condition status to be True")
 					Expect(condition.Type).To(Equal(meta.ReadyCondition), "Expected tenant condition type to be Ready")
 					Expect(condition.Reason).To(Equal(meta.SucceededReason), "Expected tenant condition reason to be Succeeded")
-
-				})
+				}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 			})
 
 			By("verify namespace status", func() {
@@ -751,14 +750,19 @@ var _ = Describe("creating a Namespace for a Tenant with additional metadata", O
 			By("verify tenant status", func() {
 				Eventually(func(g Gomega) {
 					t := &capsulev1beta2.Tenant{}
-					Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: tnt.GetName()}, t)).To(Succeed())
+
+					g.Expect(k8sClient.Get(
+						context.TODO(),
+						types.NamespacedName{Name: tnt.GetName()},
+						t,
+					)).To(Succeed())
 
 					condition := t.Status.Conditions.GetConditionByType(meta.ReadyCondition)
-					Expect(condition).NotTo(BeNil(), "Condition instance should not be nil")
+					g.Expect(condition).NotTo(BeNil(), "Condition instance should not be nil")
 
-					Expect(condition.Status).To(Equal(metav1.ConditionTrue), "Expected tenant condition status to be True")
-					Expect(condition.Type).To(Equal(meta.ReadyCondition), "Expected tenant condition type to be Ready")
-					Expect(condition.Reason).To(Equal(meta.SucceededReason), "Expected tenant condition reason to be Succeeded")
+					g.Expect(condition.Type).To(Equal(meta.ReadyCondition), "Expected tenant condition type to be Ready")
+					g.Expect(condition.Status).To(Equal(metav1.ConditionTrue), "Expected tenant condition status to be True")
+					g.Expect(condition.Reason).To(Equal(meta.SucceededReason), "Expected tenant condition reason to be Succeeded")
 				}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 			})
 

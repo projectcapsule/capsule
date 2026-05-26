@@ -325,7 +325,7 @@ var _ = Describe("when Tenant handles Device classes", Ordered, Label("tenant", 
 
 		By("Verify Status (Deletion)", func() {
 			for _, class := range []*resources.DeviceClass{authorized} {
-				Expect(ignoreNotFound(k8sClient.Delete(context.TODO(), class))).To(Succeed())
+				EventuallyDeletion(class)
 			}
 
 			Eventually(func() ([]string, error) {
@@ -340,7 +340,7 @@ var _ = Describe("when Tenant handles Device classes", Ordered, Label("tenant", 
 
 				return t.Status.Classes.DeviceClasses, nil
 			}, defaultTimeoutInterval, defaultPollInterval).
-				ShouldNot(ConsistOf(authorized.GetName(), authorized2.GetName()))
+				Should(ConsistOf(authorized2.GetName()))
 		})
 	})
 	It("ResourceClaimTemplates", func() {
