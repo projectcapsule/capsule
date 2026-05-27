@@ -106,7 +106,6 @@ func (r Reconciler) Reconcile(ctx context.Context, request ctrl.Request) (ctrl.R
 		certSecret = &corev1.Secret{}
 		certSecret.Name = request.Name
 		certSecret.Namespace = request.Namespace
-		certSecret.Type = corev1.SecretTypeTLS
 		certSecret.Data = map[string][]byte{}
 	}
 
@@ -140,7 +139,7 @@ func (r Reconciler) ReconcileCertificates(ctx context.Context, certSecret *corev
 
 		opts := cert.NewCertOpts(
 			time.Now().Add(certificateValidity),
-			fmt.Sprintf("capsule-webhook-service.%s.svc", r.Namespace),
+			fmt.Sprintf("%s.%s.svc", r.Configuration.Admission().ServiceName, r.Namespace),
 		)
 
 		crt, key, err := ca.GenerateCertificate(opts)

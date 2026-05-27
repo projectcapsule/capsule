@@ -78,7 +78,7 @@ rules:
 - apiGroups: [""]
   resources: ["serviceaccounts"]
   verbs: ["impersonate"]
-- apiGroups: [""]
+- apiGroups: ["events.k8s.io"]
   resources: ["events"]
   verbs: ["create", "patch"]
 - apiGroups:

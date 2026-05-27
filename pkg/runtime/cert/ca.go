@@ -90,7 +90,7 @@ func GenerateCertificateAuthority() (s *CapsuleCA, err error) {
 		certificate: &x509.Certificate{
 			SerialNumber: big.NewInt(2019),
 			Subject: pkix.Name{
-				Organization:  []string{"Clastix"},
+				Organization:  []string{"Projectcapsule"},
 				Country:       []string{"UK"},
 				Province:      []string{""},
 				Locality:      []string{"London"},
@@ -155,7 +155,7 @@ func (c *CapsuleCA) GenerateCertificate(opts CertificateOptions) (certificatePem
 	cert := &x509.Certificate{
 		SerialNumber: big.NewInt(1658),
 		Subject: pkix.Name{
-			Organization:  []string{"Clastix"},
+			Organization:  []string{"Projectcapsule"},
 			Country:       []string{"UK"},
 			Province:      []string{""},
 			Locality:      []string{"London"},

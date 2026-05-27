@@ -19,7 +19,7 @@ CAPSULE_IMG     ?= $(REGISTRY)/$(IMG_BASE)
 CLUSTER_NAME    ?= capsule
 FILTER		 	?= && !skip
 ## Kubernetes Version Support
-KUBERNETES_SUPPORTED_VERSION ?= "v1.35.0"
+KUBERNETES_SUPPORTED_VERSION ?= "v1.32.0"
 
 ## Openshift Version Support
 OS_SUPPORTED_VERSION ?= "4.22.0-okd-scos.ec.10"
