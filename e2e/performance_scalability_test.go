@@ -1,0 +1,194 @@
+// Copyright 2020-2023 Project Capsule Authors.
+// SPDX-License-Identifier: Apache-2.0
+
+package e2e
+
+import (
+	"context"
+	"fmt"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+
+	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/api/meta"
+	"github.com/projectcapsule/capsule/pkg/api/rbac"
+)
+
+var _ = Describe("verify scalability", Ordered, Label("performance", "scalability"), func() {
+	tnt := &capsulev1beta2.Tenant{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "e2e-perf-scalability",
+		},
+		Spec: capsulev1beta2.TenantSpec{
+			Owners: rbac.OwnerListSpec{
+				{
+					CoreOwnerSpec: rbac.CoreOwnerSpec{
+						UserSpec: rbac.UserSpec{
+							Name: "e2e-perf-scalability",
+							Kind: "User",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	JustBeforeEach(func() {
+		EventuallyCreation(func() error {
+			tnt.ResourceVersion = ""
+			return k8sClient.Create(context.TODO(), tnt)
+		}).Should(Succeed())
+
+		TenantReady(tnt, metav1.ConditionTrue, defaultTimeoutInterval)
+	})
+	JustAfterEach(func() {
+		EventuallyDeletion(tnt)
+	})
+
+	It("verify lifecycle (scalability)", func() {
+		const amount = 50
+		const podsPerNamespace int32 = 1
+
+		getTenant := func() *capsulev1beta2.Tenant {
+			t := &capsulev1beta2.Tenant{}
+			Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: tnt.GetName()}, t)).To(Succeed())
+
+			return t
+		}
+
+		waitTenantNamespacesReady := func(namespaces []*corev1.Namespace) {
+			Eventually(func() error {
+				t := getTenant()
+
+				if t.Status.Size != uint(len(namespaces)) {
+					return fmt.Errorf("tenant size=%d, want %d", t.Status.Size, len(namespaces))
+				}
+
+				for _, ns := range namespaces {
+					inst := t.Status.GetInstance(&capsulev1beta2.TenantStatusNamespaceItem{
+						Name: ns.GetName(),
+						UID:  ns.GetUID(),
+					})
+					if inst == nil {
+						return fmt.Errorf("instance not found for ns=%q uid=%q", ns.GetName(), ns.GetUID())
+					}
+
+					cond := inst.Conditions.GetConditionByType(meta.ReadyCondition)
+					if cond == nil {
+						return fmt.Errorf("namespace %q missing %q condition", ns.GetName(), meta.ReadyCondition)
+					}
+
+					if cond.Status != metav1.ConditionTrue {
+						return fmt.Errorf("namespace %q ready status=%q, want %q", ns.GetName(), cond.Status, metav1.ConditionTrue)
+					}
+
+					if cond.Reason != meta.SucceededReason {
+						return fmt.Errorf("namespace %q ready reason=%q, want %q", ns.GetName(), cond.Reason, meta.SucceededReason)
+					}
+				}
+
+				return nil
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		}
+
+		waitTenantNamespacesGone := func() {
+			Eventually(func() uint {
+				return getTenant().Status.Size
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Equal(uint(0)))
+		}
+
+		namespaces := make([]*corev1.Namespace, 0, amount)
+
+		By("creating namespaces")
+		for i := 0; i < amount; i++ {
+			ns := NewNamespace(fmt.Sprintf("e2e-scale-%d", i), map[string]string{
+				meta.TenantLabel: tnt.GetName(),
+			})
+
+			NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+			namespaces = append(namespaces, ns)
+		}
+
+		By("waiting for all namespaces to be reflected in tenant status")
+		waitTenantNamespacesReady(namespaces)
+
+		By("creating low-impact deployments")
+		for _, ns := range namespaces {
+			dep := newTrafficDeployment(ns.GetName(), podsPerNamespace)
+			EventuallyCreation(func() error {
+				return k8sClient.Create(context.TODO(), dep)
+			}).Should(Succeed())
+		}
+
+		By("waiting for deployments")
+		for _, ns := range namespaces {
+			waitDeploymentReady(context.TODO(), ns.GetName(), "traffic-pause", podsPerNamespace)
+		}
+
+		By("deleting namespaces")
+		for _, ns := range namespaces {
+			Expect(k8sClient.Delete(context.TODO(), ns)).To(Succeed())
+		}
+
+		By("waiting for tenant status to be empty")
+		waitTenantNamespacesGone()
+	})
+
+})
+
+func newTrafficDeployment(ns string, replicas int32) *appsv1.Deployment {
+	labels := map[string]string{"app": "traffic-pause"}
+
+	return &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "traffic-pause",
+			Namespace: ns,
+		},
+		Spec: appsv1.DeploymentSpec{
+			Replicas: &replicas,
+			Selector: &metav1.LabelSelector{MatchLabels: labels},
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{Labels: labels},
+				Spec: corev1.PodSpec{
+					SecurityContext: nobodyPodSecurityContext(),
+					Containers: []corev1.Container{
+						{
+							Name:            "pause",
+							Image:           "registry.k8s.io/pause:3.9",
+							SecurityContext: restrictedContainerSecurityContext(),
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func scaleDeployment(ctx context.Context, ns, name string, replicas int32) {
+	Eventually(func() error {
+		d := &appsv1.Deployment{}
+		if err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: name}, d); err != nil {
+			return err
+		}
+		*d.Spec.Replicas = replicas
+		return k8sClient.Update(ctx, d)
+	}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+
+	waitDeploymentReady(ctx, ns, name, replicas)
+}
+
+func waitDeploymentReady(ctx context.Context, ns, name string, replicas int32) {
+	Eventually(func() (int32, error) {
+		d := &appsv1.Deployment{}
+		err := k8sClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: name}, d)
+		if err != nil {
+			return 0, err
+		}
+		return d.Status.ReadyReplicas, nil
+	}, defaultTimeoutInterval, defaultPollInterval).Should(Equal(replicas))
+}

@@ -13,6 +13,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
 
@@ -24,6 +25,7 @@ func ForbiddenAnnotationsRegexHandler() handlers.TypedHandler[*capsulev1beta2.Te
 
 func (h *forbiddenAnnotationsRegexHandler) OnCreate(
 	_ client.Client,
+	_ client.Reader,
 	tnt *capsulev1beta2.Tenant,
 	_ admission.Decoder,
 	_ events.EventRecorder,
@@ -39,6 +41,7 @@ func (h *forbiddenAnnotationsRegexHandler) OnCreate(
 
 func (h *forbiddenAnnotationsRegexHandler) OnDelete(
 	client.Client,
+	client.Reader,
 	*capsulev1beta2.Tenant,
 	admission.Decoder,
 	events.EventRecorder,
@@ -50,6 +53,7 @@ func (h *forbiddenAnnotationsRegexHandler) OnDelete(
 
 func (h *forbiddenAnnotationsRegexHandler) OnUpdate(
 	_ client.Client,
+	_ client.Reader,
 	tnt *capsulev1beta2.Tenant,
 	old *capsulev1beta2.Tenant,
 	_ admission.Decoder,
@@ -76,9 +80,7 @@ func (h *forbiddenAnnotationsRegexHandler) validate(tnt *capsulev1beta2.Tenant, 
 
 	for scope, annotation := range annotationsToCheck {
 		if _, err := regexp.Compile(tnt.Spec.NamespaceOptions.ForbiddenLabels.Regex); err != nil {
-			response := admission.Denied(fmt.Sprintf("unable to compile %s regex for forbidden %s", annotation, scope))
-
-			return &response
+			return ad.Deny(fmt.Sprintf("unable to compile %s regex for forbidden %s", annotation, scope))
 		}
 	}
 

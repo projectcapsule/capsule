@@ -13,11 +13,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	"github.com/projectcapsule/capsule/internal/webhook/utils"
 	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
+	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
+	caputils "github.com/projectcapsule/capsule/pkg/utils"
 )
 
 type userMetadataHandler struct {
@@ -32,21 +33,36 @@ func UserMetadataHandler(configuration configuration.Configuration, ver *version
 	}
 }
 
-func (r *userMetadataHandler) OnCreate(client.Client, admission.Decoder, events.EventRecorder) handlers.Func {
+func (r *userMetadataHandler) OnCreate(
+	client.Client,
+	client.Reader,
+	admission.Decoder,
+	events.EventRecorder,
+) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (r *userMetadataHandler) OnDelete(client.Client, admission.Decoder, events.EventRecorder) handlers.Func {
+func (r *userMetadataHandler) OnDelete(
+	client.Client,
+	client.Reader,
+	admission.Decoder,
+	events.EventRecorder,
+) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (r *userMetadataHandler) OnUpdate(_ client.Client, decoder admission.Decoder, recorder events.EventRecorder) handlers.Func {
+func (r *userMetadataHandler) OnUpdate(
+	_ client.Client,
+	_ client.Reader,
+	decoder admission.Decoder,
+	recorder events.EventRecorder,
+) handlers.Func {
 	return func(_ context.Context, req admission.Request) *admission.Response {
-		nodeWebhookSupported, _ := utils.NodeWebhookSupported(r.version)
+		nodeWebhookSupported, _ := caputils.NodeWebhookSupported(r.version)
 
 		if !nodeWebhookSupported {
 			return nil
@@ -54,12 +70,12 @@ func (r *userMetadataHandler) OnUpdate(_ client.Client, decoder admission.Decode
 
 		oldNode := &corev1.Node{}
 		if err := decoder.DecodeRaw(req.OldObject, oldNode); err != nil {
-			return utils.ErroredResponse(err)
+			return ad.ErroredResponse(err)
 		}
 
 		newNode := &corev1.Node{}
 		if err := decoder.Decode(req, newNode); err != nil {
-			return utils.ErroredResponse(err)
+			return ad.ErroredResponse(err)
 		}
 
 		if r.configuration.ForbiddenUserNodeLabels() != nil {
@@ -67,11 +83,9 @@ func (r *userMetadataHandler) OnUpdate(_ client.Client, decoder admission.Decode
 			newNodeForbiddenLabels := r.getForbiddenNodeLabels(newNode)
 
 			if !reflect.DeepEqual(oldNodeForbiddenLabels, newNodeForbiddenLabels) {
-				recorder.Eventf(newNode, oldNode, corev1.EventTypeWarning, evt.ReasonForbiddenLabel, evt.ActionValidationDenied, "Denied modifying forbidden labels on node")
+				recorder.Eventf(newNode, nil, corev1.EventTypeWarning, evt.ReasonForbiddenLabel, evt.ActionValidationDenied, "Denied modifying forbidden labels on node")
 
-				response := admission.Denied(caperrors.NewNodeLabelForbiddenError(r.configuration.ForbiddenUserNodeLabels()).Error())
-
-				return &response
+				return ad.Deny(caperrors.NewNodeLabelForbiddenError(r.configuration.ForbiddenUserNodeLabels()).Error())
 			}
 		}
 
@@ -80,11 +94,9 @@ func (r *userMetadataHandler) OnUpdate(_ client.Client, decoder admission.Decode
 			newNodeForbiddenAnnotations := r.getForbiddenNodeAnnotations(newNode)
 
 			if !reflect.DeepEqual(oldNodeForbiddenAnnotations, newNodeForbiddenAnnotations) {
-				recorder.Eventf(newNode, oldNode, corev1.EventTypeWarning, evt.ReasonForbiddenLabel, evt.ActionValidationDenied, "Denied modifying forbidden annotations on node")
+				recorder.Eventf(newNode, nil, corev1.EventTypeWarning, evt.ReasonForbiddenLabel, evt.ActionValidationDenied, "Denied modifying forbidden annotations on node")
 
-				response := admission.Denied(caperrors.NewNodeAnnotationForbiddenError(r.configuration.ForbiddenUserNodeAnnotations()).Error())
-
-				return &response
+				return ad.Deny(caperrors.NewNodeAnnotationForbiddenError(r.configuration.ForbiddenUserNodeAnnotations()).Error())
 			}
 		}
 

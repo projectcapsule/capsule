@@ -16,9 +16,9 @@ import (
 )
 
 type TypedHandlerWithTenant[T client.Object] interface {
-	OnCreate(c client.Client, obj T, decoder admission.Decoder, recorder events.EventRecorder, tnt *capsulev1beta2.Tenant) Func
-	OnUpdate(c client.Client, obj T, old T, decoder admission.Decoder, recorder events.EventRecorder, tnt *capsulev1beta2.Tenant) Func
-	OnDelete(c client.Client, obj T, decoder admission.Decoder, recorder events.EventRecorder, tnt *capsulev1beta2.Tenant) Func
+	OnCreate(c client.Client, reader client.Reader, obj T, decoder admission.Decoder, recorder events.EventRecorder, tnt *capsulev1beta2.Tenant) Func
+	OnUpdate(c client.Client, reader client.Reader, obj T, old T, decoder admission.Decoder, recorder events.EventRecorder, tnt *capsulev1beta2.Tenant) Func
+	OnDelete(c client.Client, reader client.Reader, obj T, decoder admission.Decoder, recorder events.EventRecorder, tnt *capsulev1beta2.Tenant) Func
 }
 
 type TypedTenantHandler[T client.Object] struct {
@@ -26,9 +26,9 @@ type TypedTenantHandler[T client.Object] struct {
 	Handlers []TypedHandlerWithTenant[T]
 }
 
-func (h *TypedTenantHandler[T]) OnCreate(c client.Client, decoder admission.Decoder, recorder events.EventRecorder) Func {
+func (h *TypedTenantHandler[T]) OnCreate(c client.Client, reader client.Reader, decoder admission.Decoder, recorder events.EventRecorder) Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		tnt, err := h.resolveTenant(ctx, c, req)
+		tnt, err := h.resolveTenant(ctx, reader, req)
 		if err != nil {
 			return ErroredResponse(err)
 		}
@@ -43,7 +43,7 @@ func (h *TypedTenantHandler[T]) OnCreate(c client.Client, decoder admission.Deco
 		}
 
 		for _, hndl := range h.Handlers {
-			if response := hndl.OnCreate(c, obj, decoder, recorder, tnt)(ctx, req); response != nil {
+			if response := hndl.OnCreate(c, reader, obj, decoder, recorder, tnt)(ctx, req); response != nil {
 				return response
 			}
 		}
@@ -52,9 +52,9 @@ func (h *TypedTenantHandler[T]) OnCreate(c client.Client, decoder admission.Deco
 	}
 }
 
-func (h *TypedTenantHandler[T]) OnUpdate(c client.Client, decoder admission.Decoder, recorder events.EventRecorder) Func {
+func (h *TypedTenantHandler[T]) OnUpdate(c client.Client, reader client.Reader, decoder admission.Decoder, recorder events.EventRecorder) Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		tnt, err := h.resolveTenant(ctx, c, req)
+		tnt, err := h.resolveTenant(ctx, reader, req)
 		if err != nil {
 			return ErroredResponse(err)
 		}
@@ -74,7 +74,7 @@ func (h *TypedTenantHandler[T]) OnUpdate(c client.Client, decoder admission.Deco
 		}
 
 		for _, hndl := range h.Handlers {
-			if response := hndl.OnUpdate(c, oldObj, newObj, decoder, recorder, tnt)(ctx, req); response != nil {
+			if response := hndl.OnUpdate(c, reader, oldObj, newObj, decoder, recorder, tnt)(ctx, req); response != nil {
 				return response
 			}
 		}
@@ -83,9 +83,9 @@ func (h *TypedTenantHandler[T]) OnUpdate(c client.Client, decoder admission.Deco
 	}
 }
 
-func (h *TypedTenantHandler[T]) OnDelete(c client.Client, decoder admission.Decoder, recorder events.EventRecorder) Func {
+func (h *TypedTenantHandler[T]) OnDelete(c client.Client, reader client.Reader, decoder admission.Decoder, recorder events.EventRecorder) Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		tnt, err := h.resolveTenant(ctx, c, req)
+		tnt, err := h.resolveTenant(ctx, reader, req)
 		if err != nil {
 			return ErroredResponse(err)
 		}
@@ -100,7 +100,7 @@ func (h *TypedTenantHandler[T]) OnDelete(c client.Client, decoder admission.Deco
 		}
 
 		for _, hndl := range h.Handlers {
-			if response := hndl.OnDelete(c, obj, decoder, recorder, tnt)(ctx, req); response != nil {
+			if response := hndl.OnDelete(c, reader, obj, decoder, recorder, tnt)(ctx, req); response != nil {
 				return response
 			}
 		}
@@ -109,10 +109,10 @@ func (h *TypedTenantHandler[T]) OnDelete(c client.Client, decoder admission.Deco
 	}
 }
 
-func (h *TypedTenantHandler[T]) resolveTenant(ctx context.Context, c client.Client, req admission.Request) (*capsulev1beta2.Tenant, error) {
+func (h *TypedTenantHandler[T]) resolveTenant(ctx context.Context, c client.Reader, req admission.Request) (*capsulev1beta2.Tenant, error) {
 	if req.Namespace == "" {
 		return nil, nil
 	}
 
-	return tenant.TenantByStatusNamespace(ctx, c, req.Namespace)
+	return tenant.GetTenantByNamespace(ctx, c, req.Namespace)
 }

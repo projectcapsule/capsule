@@ -11,6 +11,8 @@ import (
 	. "github.com/onsi/gomega"
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api/meta"
+	"github.com/projectcapsule/capsule/pkg/api/rbac"
 	"github.com/projectcapsule/capsule/pkg/utils"
 	resources "k8s.io/api/resource/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -21,13 +23,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-var _ = Describe("when Tenant handles Device classes", Label("tenant", "classes", "device"), func() {
+var _ = Describe("when Tenant handles Device classes", Ordered, Label("tenant", "classes", "deviceclass"), func() {
 	erm := "nvidia.com/gpu"
 	authorized := &resources.DeviceClass{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "gpu.example.com",
 			Labels: map[string]string{
-				"env": "authorized",
+				"environment": "authorized",
+				"env":         "e2e",
 			},
 		},
 		Spec: resources.DeviceClassSpec{
@@ -45,7 +48,8 @@ var _ = Describe("when Tenant handles Device classes", Label("tenant", "classes"
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "gpu2.example.com",
 			Labels: map[string]string{
-				"env": "authorized",
+				"environment": "authorized",
+				"env":         "e2e",
 			},
 		},
 		Spec: resources.DeviceClassSpec{
@@ -63,7 +67,8 @@ var _ = Describe("when Tenant handles Device classes", Label("tenant", "classes"
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "gpu3.example.com",
 			Labels: map[string]string{
-				"env": "unauthorized",
+				"environment": "unauthorized",
+				"env":         "e2e",
 			},
 		},
 		Spec: resources.DeviceClassSpec{
@@ -81,12 +86,15 @@ var _ = Describe("when Tenant handles Device classes", Label("tenant", "classes"
 	tntWithAuthorized := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "e2e-authorized-deviceclass",
+			Labels: map[string]string{
+				"env": "e2e",
+			},
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: []api.OwnerSpec{
+			Owners: []rbac.OwnerSpec{
 				{
-					CoreOwnerSpec: api.CoreOwnerSpec{
-						UserSpec: api.UserSpec{
+					CoreOwnerSpec: rbac.CoreOwnerSpec{
+						UserSpec: rbac.UserSpec{
 							Name: "authorized-deviceclass",
 							Kind: "User",
 						},
@@ -96,7 +104,7 @@ var _ = Describe("when Tenant handles Device classes", Label("tenant", "classes"
 			DeviceClasses: &api.SelectorAllowedListSpec{
 				LabelSelector: v1.LabelSelector{
 					MatchLabels: map[string]string{
-						"env": "authorized",
+						"environment": "authorized",
 					},
 				},
 			},
@@ -105,12 +113,15 @@ var _ = Describe("when Tenant handles Device classes", Label("tenant", "classes"
 	tntWithUnauthorized := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "e2e-unauthorized-deviceclass",
+			Labels: map[string]string{
+				"env": "e2e",
+			},
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: []api.OwnerSpec{
+			Owners: []rbac.OwnerSpec{
 				{
-					CoreOwnerSpec: api.CoreOwnerSpec{
-						UserSpec: api.UserSpec{
+					CoreOwnerSpec: rbac.CoreOwnerSpec{
+						UserSpec: rbac.UserSpec{
 							Name: "unauthorized-deviceclass",
 							Kind: "User",
 						},
@@ -120,7 +131,7 @@ var _ = Describe("when Tenant handles Device classes", Label("tenant", "classes"
 			DeviceClasses: &api.SelectorAllowedListSpec{
 				LabelSelector: v1.LabelSelector{
 					MatchLabels: map[string]string{
-						"env": "production",
+						"environment": "production",
 					},
 				},
 			},
@@ -133,6 +144,7 @@ var _ = Describe("when Tenant handles Device classes", Label("tenant", "classes"
 			EventuallyCreation(func() error {
 				return k8sClient.Create(context.TODO(), tnt)
 			}).Should(Succeed())
+			TenantReady(tnt, metav1.ConditionTrue, defaultTimeoutInterval)
 		}
 
 		if err := k8sClient.List(context.Background(), &resources.DeviceClassList{}); err != nil {
@@ -150,9 +162,7 @@ var _ = Describe("when Tenant handles Device classes", Label("tenant", "classes"
 	})
 	JustAfterEach(func() {
 		for _, tnt := range []*capsulev1beta2.Tenant{tntWithAuthorized, tntWithUnauthorized} {
-			EventuallyCreation(func() error {
-				return ignoreNotFound(k8sClient.Delete(context.TODO(), tnt))
-			}).Should(Succeed())
+			EventuallyDeletion(tnt)
 		}
 
 		if err := k8sClient.List(context.Background(), &resources.DeviceClassList{}); err != nil {
@@ -161,16 +171,23 @@ var _ = Describe("when Tenant handles Device classes", Label("tenant", "classes"
 			}
 		}
 
-		Eventually(func() (err error) {
-			req, _ := labels.NewRequirement("env", selection.Exists, nil)
+		req, err := labels.NewRequirement("env", selection.Equals, []string{"e2e"})
+		Expect(err).NotTo(HaveOccurred())
 
-			return k8sClient.DeleteAllOf(context.TODO(), &resources.DeviceClass{}, &client.DeleteAllOfOptions{
-				ListOptions: client.ListOptions{
-					LabelSelector: labels.NewSelector().Add(*req),
-				},
-			})
-		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		var list resources.DeviceClassList
+		Expect(k8sClient.List(
+			context.TODO(),
+			&list,
+			client.MatchingLabelsSelector{
+				Selector: labels.NewSelector().Add(*req),
+			},
+		)).Should(Succeed())
+
+		for i := range list.Items {
+			EventuallyDeletion(&list.Items[i])
+		}
 	})
+
 	It("ResourceClaims", func() {
 		if err := k8sClient.List(context.Background(), &resources.DeviceClassList{}); err != nil {
 			if utils.IsUnsupportedAPI(err) {
@@ -194,9 +211,12 @@ var _ = Describe("when Tenant handles Device classes", Label("tenant", "classes"
 				Should(ConsistOf(authorized.GetName(), authorized2.GetName()))
 		})
 
-		ns := NewNamespace("")
+		ns := NewNamespace("", map[string]string{
+			meta.TenantLabel: tntWithAuthorized.GetName(),
+		})
+
 		NamespaceCreation(ns, tntWithAuthorized.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
-		TenantNamespaceList(tntWithAuthorized, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
+		NamespaceIsPartOfTenant(tntWithAuthorized, ns).Should(Succeed())
 
 		By("providing authorized device class", func() {
 			for _, class := range []*resources.DeviceClass{authorized} {
@@ -305,7 +325,7 @@ var _ = Describe("when Tenant handles Device classes", Label("tenant", "classes"
 
 		By("Verify Status (Deletion)", func() {
 			for _, class := range []*resources.DeviceClass{authorized} {
-				Expect(ignoreNotFound(k8sClient.Delete(context.TODO(), class))).To(Succeed())
+				EventuallyDeletion(class)
 			}
 
 			Eventually(func() ([]string, error) {
@@ -320,7 +340,7 @@ var _ = Describe("when Tenant handles Device classes", Label("tenant", "classes"
 
 				return t.Status.Classes.DeviceClasses, nil
 			}, defaultTimeoutInterval, defaultPollInterval).
-				ShouldNot(ConsistOf(authorized.GetName(), authorized2.GetName()))
+				Should(ConsistOf(authorized2.GetName()))
 		})
 	})
 	It("ResourceClaimTemplates", func() {
@@ -330,9 +350,11 @@ var _ = Describe("when Tenant handles Device classes", Label("tenant", "classes"
 			}
 		}
 
-		ns := NewNamespace("")
+		ns := NewNamespace("", map[string]string{
+			meta.TenantLabel: tntWithAuthorized.GetName(),
+		})
 		NamespaceCreation(ns, tntWithAuthorized.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
-		TenantNamespaceList(tntWithAuthorized, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
+		NamespaceIsPartOfTenant(tntWithAuthorized, ns).Should(Succeed())
 
 		By("providing authorized device class", func() {
 			for _, class := range []*resources.DeviceClass{authorized} {
@@ -557,5 +579,26 @@ var _ = Describe("when Tenant handles Device classes", Label("tenant", "classes"
 				}, defaultTimeoutInterval, defaultPollInterval).ShouldNot(Succeed())
 			}
 		})
+
+		By("Verify Status", func() {
+			for _, class := range []*resources.DeviceClass{authorized} {
+				Expect(ignoreNotFound(k8sClient.Delete(context.TODO(), class))).To(Succeed())
+			}
+
+			Eventually(func() ([]string, error) {
+				t := &capsulev1beta2.Tenant{}
+				if err := k8sClient.Get(
+					context.TODO(),
+					types.NamespacedName{Name: tntWithAuthorized.GetName()},
+					t,
+				); err != nil {
+					return nil, err
+				}
+
+				return t.Status.Classes.DeviceClasses, nil
+			}, defaultTimeoutInterval, defaultPollInterval).
+				ShouldNot(ConsistOf(authorized.GetName(), authorized2.GetName()))
+		})
+
 	})
 })

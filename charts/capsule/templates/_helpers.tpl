@@ -31,11 +31,10 @@ Create chart name and version as used by the chart label.
 {{- end }}
 
 {{/*
-Common labels
+Base labels
 */}}
-{{- define "capsule.labels" -}}
+{{- define "capsule.baselabels" -}}
 helm.sh/chart: {{ include "capsule.chart" . }}
-{{ include "capsule.selectorLabels" . }}
 {{- if .Chart.AppVersion }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 {{- end }}
@@ -46,10 +45,22 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end }}
 
 {{/*
+Common labels
+*/}}
+{{- define "capsule.labels" -}}
+{{ include "capsule.baselabels" . }}
+{{ include "capsule.selectorLabels" . }}
+{{- end }}
+
+{{/*
 Selector labels
 */}}
 {{- define "capsule.selectorLabels" -}}
 app.kubernetes.io/name: {{ include "capsule.name" . }}
+{{ include "capsule.selectorLabelInstance" . }}
+{{- end }}
+
+{{- define "capsule.selectorLabelInstance" -}}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
@@ -150,7 +161,7 @@ url: {{ printf "%s/%s" (trimSuffix "/" $.ctx.Values.webhooks.service.url ) (trim
 service:
   name: {{ default (printf "%s-webhook-service" (include "capsule.fullname" $.ctx)) $.ctx.Values.webhooks.service.name }}
   namespace: {{ default $.ctx.Release.Namespace $.ctx.Values.webhooks.service.namespace }}
-  port: {{ default 443 $.ctx.Values.webhooks.service.port }}
+  port: {{ default 9443 $.ctx.Values.webhooks.service.port }}
   path: {{ required "Path is required for the function" $.path }}
   {{- end }}
 {{- end }}
@@ -158,7 +169,6 @@ service:
 
 {{/*
 Capsule Webhook service (Without Path)
-
 */}}
 {{- define "capsule.webhooks.serviceConfig" -}}
   {{- include "capsule.webhooks.cabundle" $ | nindent 0 }}
@@ -168,10 +178,9 @@ url: {{ trimSuffix "/" $.Values.webhooks.service.url }}
 service:
   name: {{ default (printf "%s-webhook-service" (include "capsule.fullname" $)) $.Values.webhooks.service.name }}
   namespace: {{ default $.Release.Namespace $.Values.webhooks.service.namespace }}
-  port: {{ default 443 $.Values.webhooks.service.port }}
+  port: {{ default 9443 $.Values.webhooks.service.port }}
   {{- end }}
 {{- end }}
-
 
 {{/*
 Capsule Webhook endpoint CA Bundle

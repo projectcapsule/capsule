@@ -13,6 +13,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
 
@@ -24,6 +25,7 @@ func ContainerRegistryRegexHandler() handlers.TypedHandler[*capsulev1beta2.Tenan
 
 func (h *containerRegistryRegexHandler) OnCreate(
 	_ client.Client,
+	_ client.Reader,
 	tnt *capsulev1beta2.Tenant,
 	decoder admission.Decoder,
 	_ events.EventRecorder,
@@ -39,6 +41,7 @@ func (h *containerRegistryRegexHandler) OnCreate(
 
 func (h *containerRegistryRegexHandler) OnDelete(
 	client.Client,
+	client.Reader,
 	*capsulev1beta2.Tenant,
 	admission.Decoder,
 	events.EventRecorder,
@@ -50,6 +53,7 @@ func (h *containerRegistryRegexHandler) OnDelete(
 
 func (h *containerRegistryRegexHandler) OnUpdate(
 	_ client.Client,
+	_ client.Reader,
 	tnt *capsulev1beta2.Tenant,
 	old *capsulev1beta2.Tenant,
 	decoder admission.Decoder,
@@ -71,9 +75,7 @@ func (h *containerRegistryRegexHandler) validate(
 ) *admission.Response {
 	if tnt.Spec.ContainerRegistries != nil && len(tnt.Spec.ContainerRegistries.Regex) > 0 {
 		if _, err := regexp.Compile(tnt.Spec.ContainerRegistries.Regex); err != nil {
-			response := admission.Denied("unable to compile containerRegistries allowedRegex")
-
-			return &response
+			return ad.Deny("unable to compile containerRegistries allowedRegex")
 		}
 	}
 

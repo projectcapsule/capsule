@@ -5,6 +5,7 @@ run:
 linters:
   default: all
   disable:
+    - goconst
     - godoclint
     - depguard
     - err113

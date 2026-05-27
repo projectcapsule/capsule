@@ -1,0 +1,479 @@
+// Copyright 2020-2023 Project Capsule Authors.
+// SPDX-License-Identifier: Apache-2.0
+
+package e2e
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+	otypes "github.com/onsi/gomega/types"
+	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/api/meta"
+	"github.com/projectcapsule/capsule/pkg/api/rbac"
+)
+
+var _ = Describe("Promoting ServiceAccounts to Owners", Ordered, Label("config", "permissions", "owners", "promotion"), func() {
+	originConfig := &capsulev1beta2.CapsuleConfiguration{}
+
+	tnt := &capsulev1beta2.Tenant{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "e2e-tenant-owner-promotion",
+			Labels: map[string]string{
+				"env": "e2e",
+			},
+		},
+		Spec: capsulev1beta2.TenantSpec{
+			Permissions: capsulev1beta2.Permissions{
+				AllowOwnerPromotion: true,
+			},
+			Owners: rbac.OwnerListSpec{
+				{
+					CoreOwnerSpec: rbac.CoreOwnerSpec{
+						UserSpec: rbac.UserSpec{
+							Name: "e2e-sa-owner-promotion",
+							Kind: "User",
+						},
+					},
+				},
+			},
+			AdditionalRoleBindings: []rbac.AdditionalRoleBindingsSpec{
+				{
+					ClusterRoleName: "admin",
+					Subjects: []rbacv1.Subject{
+						{
+							Kind: "ServiceAccount",
+							Name: "default",
+						},
+						{
+							Kind: "User",
+							Name: "bob",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	JustBeforeEach(func() {
+		Expect(k8sClient.Get(context.Background(), client.ObjectKey{Name: defaultConfigurationName}, originConfig)).To(Succeed())
+
+		EventuallyCreation(func() error {
+			tnt.ResourceVersion = ""
+			return k8sClient.Create(context.TODO(), tnt)
+		}).Should(Succeed())
+
+		TenantReady(tnt, metav1.ConditionTrue, defaultTimeoutInterval)
+	})
+	JustAfterEach(func() {
+		EventuallyDeletion(tnt)
+
+		// Restore Configuration
+		Eventually(func() error {
+			c := &capsulev1beta2.CapsuleConfiguration{}
+			if err := k8sClient.Get(context.Background(), client.ObjectKey{Name: originConfig.Name}, c); err != nil {
+				return err
+			}
+			// Apply the initial configuration from originConfig to c
+			c.Spec = originConfig.Spec
+			return k8sClient.Update(context.Background(), c)
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+	})
+
+	It("Deny Owner promotion even when feature is disabled", func() {
+		ModifyCapsuleConfigurationOpts(func(configuration *capsulev1beta2.CapsuleConfiguration) {
+			configuration.Spec.AllowServiceAccountPromotion = false
+		})
+
+		ns := NewNamespace("", map[string]string{
+			meta.TenantLabel: tnt.GetName(),
+		})
+		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+		NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
+
+		// Create a ServiceAccount inside the tenant namespace
+		sa := &corev1.ServiceAccount{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-sa",
+				Namespace: ns.Name,
+			},
+		}
+		Expect(k8sClient.Create(context.TODO(), sa)).Should(Succeed())
+
+		// Table of personas: client + expected result
+		personas := map[string]struct {
+			client  client.Client
+			matcher otypes.GomegaMatcher
+		}{
+			"owner":   {client: impersonationClient(tnt.Spec.Owners[0].Name, withDefaultGroups(make([]string, 0))), matcher: Not(Succeed())},
+			"rb-user": {client: impersonationClient("bob", withDefaultGroups(make([]string, 0))), matcher: Not(Succeed())},
+			"rb-sa":   {client: impersonationClient("system:serviceaccount:"+sa.GetNamespace()+":default", withDefaultGroups(make([]string, 0))), matcher: Not(Succeed())},
+		}
+
+		for name, tc := range personas {
+			By(fmt.Sprintf("trying to promote SA as %s (Setting Trigger)", name))
+
+			Eventually(func() error {
+				saCopy := &corev1.ServiceAccount{}
+				Expect(tc.client.Get(context.TODO(), client.ObjectKeyFromObject(sa), saCopy)).To(Succeed())
+
+				if saCopy.Labels == nil {
+					saCopy.Labels = map[string]string{}
+				}
+				saCopy.Labels[meta.OwnerPromotionLabel] = meta.ValueTrue
+
+				return tc.client.Update(context.TODO(), saCopy)
+			}, defaultTimeoutInterval, defaultPollInterval).Should(tc.matcher, "persona=%s", name)
+		}
+
+		for name, tc := range personas {
+			By(fmt.Sprintf("trying to promote SA as %s (Setting Any Value)", name))
+
+			Eventually(func() error {
+				saCopy := &corev1.ServiceAccount{}
+				Expect(tc.client.Get(context.TODO(), client.ObjectKeyFromObject(sa), saCopy)).To(Succeed())
+
+				if saCopy.Labels == nil {
+					saCopy.Labels = map[string]string{}
+				}
+				saCopy.Labels[meta.OwnerPromotionLabel] = "false"
+
+				return tc.client.Update(context.TODO(), saCopy)
+			}, defaultTimeoutInterval, defaultPollInterval).Should(tc.matcher, "persona=%s", name)
+		}
+
+		for name, tc := range personas {
+			By(fmt.Sprintf("trying to allow deletion SA as %s (Setting Any Value)", name))
+
+			Eventually(func() error {
+				saCopy := &corev1.ServiceAccount{}
+				Expect(tc.client.Get(context.TODO(), client.ObjectKeyFromObject(sa), saCopy)).To(Succeed())
+
+				if saCopy.Labels == nil {
+					saCopy.Labels = map[string]string{}
+				}
+				saCopy.Labels[meta.OwnerPromotionLabel] = "false"
+
+				return tc.client.Update(context.TODO(), saCopy)
+			}, defaultTimeoutInterval, defaultPollInterval).Should(tc.matcher, "persona=%s", name)
+		}
+
+		for name, tc := range personas {
+			By(fmt.Sprintf("trying to allow deletion SA as %s (Setting Any Value)", name))
+
+			Eventually(func() error {
+				saCopy := &corev1.ServiceAccount{}
+				Expect(tc.client.Get(context.TODO(), client.ObjectKeyFromObject(sa), saCopy)).To(Succeed())
+
+				if saCopy.Labels == nil {
+					saCopy.Labels = map[string]string{}
+				}
+				saCopy.Labels[meta.OwnerPromotionLabel] = "false"
+
+				return tc.client.Update(context.TODO(), saCopy)
+			}, defaultTimeoutInterval, defaultPollInterval).Should(tc.matcher, "persona=%s", name)
+		}
+	})
+
+	It("Deny Owner promotion even when feature is disabled on tenant", func() {
+		ModifyCapsuleConfigurationOpts(func(configuration *capsulev1beta2.CapsuleConfiguration) {
+			configuration.Spec.AllowServiceAccountPromotion = true
+		})
+
+		t := &capsulev1beta2.Tenant{}
+		Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: tnt.GetName()}, t)).To(Succeed())
+		t.Spec.Permissions.AllowOwnerPromotion = false
+		Expect(k8sClient.Update(context.TODO(), t)).To(Succeed())
+
+		ns := NewNamespace("", map[string]string{
+			meta.TenantLabel: tnt.GetName(),
+		})
+		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+		NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
+
+		// Create a ServiceAccount inside the tenant namespace
+		sa := &corev1.ServiceAccount{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-sa",
+				Namespace: ns.Name,
+			},
+		}
+		Expect(k8sClient.Create(context.TODO(), sa)).Should(Succeed())
+
+		// Table of personas: client + expected result
+		personas := map[string]struct {
+			client  client.Client
+			matcher otypes.GomegaMatcher
+		}{
+			"owner":   {client: impersonationClient(tnt.Spec.Owners[0].Name, withDefaultGroups(make([]string, 0))), matcher: Not(Succeed())},
+			"rb-user": {client: impersonationClient("bob", withDefaultGroups(make([]string, 0))), matcher: Not(Succeed())},
+			"rb-sa":   {client: impersonationClient("system:serviceaccount:"+sa.GetNamespace()+":default", withDefaultGroups(make([]string, 0))), matcher: Not(Succeed())},
+		}
+
+		for name, tc := range personas {
+			By(fmt.Sprintf("trying to promote SA as %s (Setting Trigger)", name))
+
+			Eventually(func() error {
+				saCopy := &corev1.ServiceAccount{}
+				Expect(tc.client.Get(context.TODO(), client.ObjectKeyFromObject(sa), saCopy)).To(Succeed())
+
+				if saCopy.Labels == nil {
+					saCopy.Labels = map[string]string{}
+				}
+				saCopy.Labels[meta.OwnerPromotionLabel] = meta.ValueTrue
+
+				return tc.client.Update(context.TODO(), saCopy)
+			}, defaultTimeoutInterval, defaultPollInterval).Should(tc.matcher, "persona=%s", name)
+		}
+
+		for name, tc := range personas {
+			By(fmt.Sprintf("trying to promote SA as %s (Setting Any Value)", name))
+
+			Eventually(func() error {
+				saCopy := &corev1.ServiceAccount{}
+				Expect(tc.client.Get(context.TODO(), client.ObjectKeyFromObject(sa), saCopy)).To(Succeed())
+
+				if saCopy.Labels == nil {
+					saCopy.Labels = map[string]string{}
+				}
+				saCopy.Labels[meta.OwnerPromotionLabel] = "false"
+
+				return tc.client.Update(context.TODO(), saCopy)
+			}, defaultTimeoutInterval, defaultPollInterval).Should(tc.matcher, "persona=%s", name)
+		}
+
+		for name, tc := range personas {
+			By(fmt.Sprintf("trying to allow deletion SA as %s (Setting Any Value)", name))
+
+			Eventually(func() error {
+				saCopy := &corev1.ServiceAccount{}
+				Expect(tc.client.Get(context.TODO(), client.ObjectKeyFromObject(sa), saCopy)).To(Succeed())
+
+				if saCopy.Labels == nil {
+					saCopy.Labels = map[string]string{}
+				}
+				saCopy.Labels[meta.OwnerPromotionLabel] = "false"
+
+				return tc.client.Update(context.TODO(), saCopy)
+			}, defaultTimeoutInterval, defaultPollInterval).Should(tc.matcher, "persona=%s", name)
+		}
+
+		for name, tc := range personas {
+			By(fmt.Sprintf("trying to allow deletion SA as %s (Setting Any Value)", name))
+
+			Eventually(func() error {
+				saCopy := &corev1.ServiceAccount{}
+				Expect(tc.client.Get(context.TODO(), client.ObjectKeyFromObject(sa), saCopy)).To(Succeed())
+
+				if saCopy.Labels == nil {
+					saCopy.Labels = map[string]string{}
+				}
+				saCopy.Labels[meta.OwnerPromotionLabel] = "false"
+
+				return tc.client.Update(context.TODO(), saCopy)
+			}, defaultTimeoutInterval, defaultPollInterval).Should(tc.matcher, "persona=%s", name)
+		}
+	})
+
+	It("Allow Owner promotion by Owners", func() {
+		ModifyCapsuleConfigurationOpts(func(configuration *capsulev1beta2.CapsuleConfiguration) {
+			configuration.Spec.AllowServiceAccountPromotion = true
+		})
+
+		ns := NewNamespace("", map[string]string{
+			meta.TenantLabel: tnt.GetName(),
+		})
+		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+		NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
+
+		// Create a ServiceAccount inside the tenant namespace
+		sa := &corev1.ServiceAccount{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-sa",
+				Namespace: ns.Name,
+			},
+		}
+		Expect(k8sClient.Create(context.TODO(), sa)).Should(Succeed())
+
+		// Table of personas: client + expected result
+		personas := map[string]struct {
+			client  client.Client
+			matcher otypes.GomegaMatcher
+		}{
+			"rb-user": {client: impersonationClient("bob", withDefaultGroups(make([]string, 0))), matcher: Not(Succeed())},
+			"rb-sa":   {client: impersonationClient("system:serviceaccount:"+sa.GetNamespace()+":default", withDefaultGroups(make([]string, 0))), matcher: Not(Succeed())},
+			"owner":   {client: impersonationClient(tnt.Spec.Owners[0].Name, withDefaultGroups(make([]string, 0))), matcher: Succeed()},
+		}
+
+		for name, tc := range personas {
+			By(fmt.Sprintf("trying to promote SA as %s (Setting Trigger)", name))
+
+			Eventually(func() error {
+				saCopy := &corev1.ServiceAccount{}
+				err := tc.client.Get(context.TODO(), client.ObjectKeyFromObject(sa), saCopy)
+				if err != nil {
+					return err
+				}
+
+				if saCopy.Labels == nil {
+					saCopy.Labels = map[string]string{}
+				}
+				saCopy.Labels[meta.OwnerPromotionLabel] = meta.ValueTrue
+
+				return tc.client.Update(context.TODO(), saCopy)
+			}, defaultTimeoutInterval, defaultPollInterval).Should(tc.matcher, "persona=%s", name)
+		}
+
+		for name, tc := range personas {
+			By(fmt.Sprintf("trying to promote SA as %s (Setting Generic)", name))
+
+			Eventually(func() error {
+				saCopy := &corev1.ServiceAccount{}
+				Expect(tc.client.Get(context.TODO(), client.ObjectKeyFromObject(sa), saCopy)).To(Succeed())
+
+				if saCopy.Labels == nil {
+					saCopy.Labels = map[string]string{}
+				}
+				saCopy.Labels[meta.OwnerPromotionLabel] = "false"
+
+				return tc.client.Update(context.TODO(), saCopy)
+			}, defaultTimeoutInterval, defaultPollInterval).Should(tc.matcher, "persona=%s", name)
+		}
+	})
+
+	It("Allow Promoted ServiceAccount to interact with Tenant Namespaces", func() {
+		ModifyCapsuleConfigurationOpts(func(configuration *capsulev1beta2.CapsuleConfiguration) {
+			configuration.Spec.AllowServiceAccountPromotion = true
+		})
+
+		ns := NewNamespace("", map[string]string{
+			meta.TenantLabel: tnt.GetName(),
+		})
+		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+		NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
+
+		// Create a ServiceAccount inside the tenant namespace
+		sa := &corev1.ServiceAccount{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-sa",
+				Namespace: ns.Name,
+			},
+		}
+		Expect(k8sClient.Create(context.TODO(), sa)).Should(Succeed())
+
+		// Table of personas: client + expected result
+		personas := map[string]struct {
+			client  client.Client
+			matcher otypes.GomegaMatcher
+		}{
+			"owner": {client: impersonationClient(tnt.Spec.Owners[0].Name, withDefaultGroups(make([]string, 0))), matcher: Succeed()},
+		}
+
+		for name, tc := range personas {
+			By(fmt.Sprintf("trying to promote SA as %s", name))
+
+			Eventually(func() error {
+				saCopy := &corev1.ServiceAccount{}
+				Expect(tc.client.Get(context.TODO(), client.ObjectKeyFromObject(sa), saCopy)).To(Succeed())
+
+				if saCopy.Labels == nil {
+					saCopy.Labels = map[string]string{}
+				}
+				saCopy.Labels[meta.OwnerPromotionLabel] = meta.ValueTrue
+
+				return tc.client.Update(context.TODO(), saCopy)
+			}, defaultTimeoutInterval, defaultPollInterval).Should(tc.matcher, "persona=%s", name)
+		}
+
+		time.Sleep(250 * time.Millisecond)
+
+		Eventually(func(g Gomega) []rbacv1.Subject {
+			crb := &rbacv1.ClusterRoleBinding{}
+			err := k8sClient.Get(context.TODO(), types.NamespacedName{Name: originConfig.Spec.RBAC.ProvisionerClusterRole}, crb)
+			g.Expect(err).NotTo(HaveOccurred())
+
+			return crb.Subjects
+		}, defaultTimeoutInterval, defaultPollInterval).Should(ContainElement(rbacv1.Subject{
+			Kind:      rbacv1.ServiceAccountKind,
+			Name:      "test-sa",
+			Namespace: ns.Name,
+		}), "expected ServiceAccount test-sa to be present in CRB subjects")
+
+		saClient := impersonationClient(
+			fmt.Sprintf("system:serviceaccount:%s:%s", ns.Name, sa.Name),
+			nil,
+		)
+
+		By("preventing the service account from deleting the namespace", func() {
+			newNs := NewNamespace("", map[string]string{
+				meta.TenantLabel: tnt.GetName(),
+			})
+			Expect(saClient.Create(context.TODO(), newNs)).To(Succeed())
+			NamespaceIsPartOfTenant(tnt, newNs).Should(Succeed())
+
+			Eventually(func(g Gomega) {
+				// Deletion should eventually be forbidden / fail
+				g.Expect(saClient.Delete(context.TODO(), newNs)).
+					ToNot(Succeed())
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		})
+
+		for name, tc := range personas {
+			By(fmt.Sprintf("trying to promote SA as %s", name))
+
+			Eventually(func() error {
+				saCopy := &corev1.ServiceAccount{}
+				Expect(tc.client.Get(context.TODO(), client.ObjectKeyFromObject(sa), saCopy)).To(Succeed())
+
+				if saCopy.Labels == nil {
+					saCopy.Labels = map[string]string{}
+				}
+				saCopy.Labels[meta.OwnerPromotionLabel] = "false"
+
+				return tc.client.Update(context.TODO(), saCopy)
+			}, defaultTimeoutInterval, defaultPollInterval).Should(tc.matcher, "persona=%s", name)
+
+			Eventually(func() (string, error) {
+				latest := &corev1.ServiceAccount{}
+				if err := k8sClient.Get(context.TODO(), client.ObjectKeyFromObject(sa), latest); err != nil {
+					return "", err
+				}
+				return latest.Labels[meta.OwnerPromotionLabel], nil
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Equal("false"), "expected label to be set for persona=%s", name)
+
+		}
+
+		Eventually(func(g Gomega) []rbacv1.Subject {
+			crb := &rbacv1.ClusterRoleBinding{}
+			err := k8sClient.Get(context.TODO(), types.NamespacedName{Name: originConfig.Spec.RBAC.ProvisionerClusterRole}, crb)
+			g.Expect(err).NotTo(HaveOccurred())
+
+			return crb.Subjects
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Not(ContainElement(rbacv1.Subject{
+			Kind:      rbacv1.ServiceAccountKind,
+			Name:      "test-sa",
+			Namespace: ns.Name,
+		})), "expected ServiceAccount test-sa not to be present in CRB subjects")
+
+		secondNs := NewNamespace("", map[string]string{
+			meta.TenantLabel: tnt.GetName(),
+		})
+		Eventually(func() error {
+			return saClient.Create(context.TODO(), secondNs)
+		}, defaultTimeoutInterval, defaultPollInterval).ShouldNot(Succeed())
+
+		NamespaceIsNotPartOfTenant(tnt, secondNs).Should(Succeed())
+
+		Expect(saClient.Delete(context.TODO(), secondNs)).To(Not(Succeed()))
+
+	})
+})

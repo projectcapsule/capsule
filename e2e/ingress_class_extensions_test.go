@@ -16,20 +16,25 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api/meta"
+	"github.com/projectcapsule/capsule/pkg/api/rbac"
 	"github.com/projectcapsule/capsule/pkg/utils"
 )
 
-var _ = Describe("when Tenant handles Ingress classes with extensions/v1beta1", Label("ingress"), func() {
+var _ = Describe("when Tenant handles Ingress classes with extensions/v1beta1", Ordered, Label("tenant", "networking", "ingress"), func() {
 	tnt := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "ingress-class-extensions-v1beta1",
+			Name: "e2e-ingress-class-extensions-v1beta1",
+			Labels: map[string]string{
+				"env": "e2e",
+			},
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: api.OwnerListSpec{
+			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: api.CoreOwnerSpec{
-						UserSpec: api.UserSpec{
-							Name: "ingress",
+					CoreOwnerSpec: rbac.CoreOwnerSpec{
+						UserSpec: rbac.UserSpec{
+							Name: "e2e-ingress-class-extensions-v1beta1",
 							Kind: "User",
 						},
 					},
@@ -59,17 +64,20 @@ var _ = Describe("when Tenant handles Ingress classes with extensions/v1beta1", 
 			tnt.ResourceVersion = ""
 			return k8sClient.Create(context.TODO(), tnt)
 		}).Should(Succeed())
+		TenantReady(tnt, metav1.ConditionTrue, defaultTimeoutInterval)
 	})
 	JustAfterEach(func() {
-		Expect(k8sClient.Delete(context.TODO(), tnt)).Should(Succeed())
+		EventuallyDeletion(tnt)
 	})
 
 	It("should block a non allowed class for extensions/v1beta1", func() {
-		ns := NewNamespace("")
+		ns := NewNamespace("", map[string]string{
+			meta.TenantLabel: tnt.GetName(),
+		})
 		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 
 		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
-		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
+		NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
 
 		By("non-specifying at all", func() {
 			if err := k8sClient.List(context.Background(), &extensionsv1beta1.IngressList{}); err != nil {
@@ -147,11 +155,13 @@ var _ = Describe("when Tenant handles Ingress classes with extensions/v1beta1", 
 	})
 
 	It("should allow enabled class using the deprecated annotation", func() {
-		ns := NewNamespace("")
+		ns := NewNamespace("", map[string]string{
+			meta.TenantLabel: tnt.GetName(),
+		})
 		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 
 		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
-		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
+		NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
 
 		for _, c := range tnt.Spec.IngressOptions.AllowedClasses.Exact {
 			Eventually(func() (err error) {
@@ -192,11 +202,13 @@ var _ = Describe("when Tenant handles Ingress classes with extensions/v1beta1", 
 			Skip("Running test on Kubernetes " + version.String() + ", doesn't provide .spec.ingressClassName")
 		}
 
-		ns := NewNamespace("")
+		ns := NewNamespace("", map[string]string{
+			meta.TenantLabel: tnt.GetName(),
+		})
 		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 
 		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
-		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
+		NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
 
 		for _, c := range tnt.Spec.IngressOptions.AllowedClasses.Exact {
 			Eventually(func() (err error) {
@@ -219,12 +231,14 @@ var _ = Describe("when Tenant handles Ingress classes with extensions/v1beta1", 
 	})
 
 	It("should allow enabled Ingress by regex using the deprecated annotation", func() {
-		ns := NewNamespace("")
+		ns := NewNamespace("", map[string]string{
+			meta.TenantLabel: tnt.GetName(),
+		})
 		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 		ingressClass := "oil-ingress"
 
 		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
-		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
+		NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
 
 		Eventually(func() (err error) {
 			if err := k8sClient.List(context.Background(), &extensionsv1beta1.IngressList{}); err != nil {
@@ -253,12 +267,14 @@ var _ = Describe("when Tenant handles Ingress classes with extensions/v1beta1", 
 	})
 
 	It("should allow enabled Ingress by regex using the ingressClassName field", func() {
-		ns := NewNamespace("")
+		ns := NewNamespace("", map[string]string{
+			meta.TenantLabel: tnt.GetName(),
+		})
 		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 		ingressClass := "oil-haproxy"
 
 		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
-		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
+		NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
 
 		Eventually(func() (err error) {
 			if err := k8sClient.List(context.Background(), &extensionsv1beta1.IngressList{}); err != nil {

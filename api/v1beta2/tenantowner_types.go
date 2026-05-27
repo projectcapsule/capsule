@@ -6,13 +6,13 @@ package v1beta2
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api/rbac"
 )
 
 // TenantOwnerSpec defines the desired state of TenantOwner.
 type TenantOwnerSpec struct {
 	// Subject
-	api.CoreOwnerSpec `json:",inline"`
+	rbac.CoreOwnerSpec `json:",inline"`
 
 	// Adds the given subject as capsule user. When enabled this subject does not have to be
 	// mentioned in the CapsuleConfiguration as Capsule User. In almost all scenarios Tenant Owners
@@ -26,7 +26,7 @@ type TenantOwnerStatus struct{}
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:scope=Cluster
+// +kubebuilder:resource:scope=Cluster,shortName=to
 
 // TenantOwner is the Schema for the tenantowners API.
 type TenantOwner struct {

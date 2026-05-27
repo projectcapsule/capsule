@@ -13,6 +13,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
 
@@ -26,6 +27,7 @@ func ServiceAccountNameHandler() handlers.TypedHandler[*capsulev1beta2.Tenant] {
 
 func (h *saNameHandler) OnCreate(
 	_ client.Client,
+	_ client.Reader,
 	tnt *capsulev1beta2.Tenant,
 	_ admission.Decoder,
 	_ events.EventRecorder,
@@ -35,7 +37,13 @@ func (h *saNameHandler) OnCreate(
 	}
 }
 
-func (h *saNameHandler) OnDelete(client.Client, *capsulev1beta2.Tenant, admission.Decoder, events.EventRecorder) handlers.Func {
+func (h *saNameHandler) OnDelete(
+	client.Client,
+	client.Reader,
+	*capsulev1beta2.Tenant,
+	admission.Decoder,
+	events.EventRecorder,
+) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
@@ -43,6 +51,7 @@ func (h *saNameHandler) OnDelete(client.Client, *capsulev1beta2.Tenant, admissio
 
 func (h *saNameHandler) OnUpdate(
 	_ client.Client,
+	_ client.Reader,
 	tnt *capsulev1beta2.Tenant,
 	old *capsulev1beta2.Tenant,
 	_ admission.Decoder,
@@ -60,9 +69,7 @@ func (h *saNameHandler) validateServiceAccountName(tnt *capsulev1beta2.Tenant, r
 		}
 
 		if !compiler.MatchString(owner.Name) {
-			response := admission.Denied(fmt.Sprintf("owner name %s is not a valid Service Account name ", owner.Name))
-
-			return &response
+			return ad.Deny(fmt.Sprintf("owner name %s is not a valid Service Account name ", owner.Name))
 		}
 	}
 

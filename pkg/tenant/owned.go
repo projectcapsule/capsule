@@ -6,7 +6,6 @@ package tenant
 import (
 	"context"
 
-	authenticationv1 "k8s.io/api/authentication/v1"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -17,18 +16,18 @@ import (
 
 func NamespaceIsOwned(
 	ctx context.Context,
-	c client.Client,
+	c client.Reader,
 	cfg configuration.Configuration,
 	ns *corev1.Namespace,
 	tnt *capsulev1beta2.Tenant,
-	userInfo authenticationv1.UserInfo,
+	user users.AdmissionUser,
 ) bool {
 	for _, ownerRef := range ns.OwnerReferences {
 		if !IsTenantOwnerReferenceForTenant(ownerRef, tnt) {
 			continue
 		}
 
-		return users.IsTenantOwnerByStatus(ctx, c, cfg, tnt, userInfo)
+		return users.IsTenantOwnerByStatus(tnt, user)
 	}
 
 	return false

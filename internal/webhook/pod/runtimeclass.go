@@ -15,7 +15,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/api"
 	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
+	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
@@ -27,26 +29,28 @@ func RuntimeClass() handlers.TypedHandlerWithTenantWithRuleset[*corev1.Pod] {
 }
 
 func (h *runtimeClass) OnCreate(
-	c client.Client,
+	_ client.Client,
+	reader client.Reader,
 	pod *corev1.Pod,
 	decoder admission.Decoder,
 	recorder events.EventRecorder,
 	tnt *capsulev1beta2.Tenant,
-	_ *capsulev1beta2.NamespaceRuleBody,
+	_ *api.NamespaceRuleBodyNamespace,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		return h.validate(ctx, c, recorder, req, pod, tnt)
+		return h.validate(ctx, reader, recorder, req, pod, tnt)
 	}
 }
 
 func (h *runtimeClass) OnUpdate(
 	client.Client,
+	client.Reader,
 	*corev1.Pod,
 	*corev1.Pod,
 	admission.Decoder,
 	events.EventRecorder,
 	*capsulev1beta2.Tenant,
-	*capsulev1beta2.NamespaceRuleBody,
+	*api.NamespaceRuleBodyNamespace,
 ) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
@@ -55,18 +59,19 @@ func (h *runtimeClass) OnUpdate(
 
 func (h *runtimeClass) OnDelete(
 	client.Client,
+	client.Reader,
 	*corev1.Pod,
 	admission.Decoder,
 	events.EventRecorder,
 	*capsulev1beta2.Tenant,
-	*capsulev1beta2.NamespaceRuleBody,
+	*api.NamespaceRuleBodyNamespace,
 ) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (h *runtimeClass) class(ctx context.Context, c client.Client, name string) (client.Object, error) {
+func (h *runtimeClass) class(ctx context.Context, c client.Reader, name string) (client.Object, error) {
 	if len(name) == 0 {
 		return nil, nil
 	}
@@ -81,7 +86,7 @@ func (h *runtimeClass) class(ctx context.Context, c client.Client, name string) 
 
 func (h *runtimeClass) validate(
 	ctx context.Context,
-	c client.Client,
+	c client.Reader,
 	recorder events.EventRecorder,
 	req admission.Request,
 	pod *corev1.Pod,
@@ -110,17 +115,15 @@ func (h *runtimeClass) validate(
 		return nil
 	case !allowed.MatchSelectByName(class):
 		recorder.Eventf(
-			tnt,
 			pod,
+			tnt,
 			corev1.EventTypeWarning,
 			evt.ReasonForbiddenRuntimeClass,
 			evt.ActionValidationDenied,
 			"Using Runtime Class %s is forbidden for the tenant %s", runtimeClassName, tnt.GetName(),
 		)
 
-		response := admission.Denied(caperrors.NewPodRuntimeClassForbidden(runtimeClassName, *allowed).Error())
-
-		return &response
+		return ad.Deny(caperrors.NewPodRuntimeClassForbidden(runtimeClassName, *allowed).Error())
 	default:
 		return nil
 	}

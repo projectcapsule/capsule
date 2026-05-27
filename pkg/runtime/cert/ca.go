@@ -41,6 +41,33 @@ func NewCertificateAuthorityFromBytes(certBytes, keyBytes []byte) (*CapsuleCA, e
 	}, nil
 }
 
+func (c *CapsuleCA) ExpiresIn(now time.Time) (time.Duration, error) {
+	if c == nil || c.certificate == nil {
+		return 0, errors.New("CA certificate is nil")
+	}
+
+	return c.certificate.NotAfter.Sub(now), nil
+}
+
+func (c *CapsuleCA) ValidateCert(certificate *x509.Certificate) error {
+	if c == nil || c.certificate == nil {
+		return errors.New("CA certificate is nil")
+	}
+
+	if certificate == nil {
+		return errors.New("certificate is nil")
+	}
+
+	roots := x509.NewCertPool()
+	roots.AddCert(c.certificate)
+
+	_, err := certificate.Verify(x509.VerifyOptions{
+		Roots: roots,
+	})
+
+	return err
+}
+
 func (c CapsuleCA) CACertificatePem() (b *bytes.Buffer, err error) {
 	var crtBytes []byte
 
@@ -90,7 +117,7 @@ func GenerateCertificateAuthority() (s *CapsuleCA, err error) {
 		certificate: &x509.Certificate{
 			SerialNumber: big.NewInt(2019),
 			Subject: pkix.Name{
-				Organization:  []string{"Clastix"},
+				Organization:  []string{"Projectcapsule"},
 				Country:       []string{"UK"},
 				Province:      []string{""},
 				Locality:      []string{"London"},
@@ -155,7 +182,7 @@ func (c *CapsuleCA) GenerateCertificate(opts CertificateOptions) (certificatePem
 	cert := &x509.Certificate{
 		SerialNumber: big.NewInt(1658),
 		Subject: pkix.Name{
-			Organization:  []string{"Clastix"},
+			Organization:  []string{"Projectcapsule"},
 			Country:       []string{"UK"},
 			Province:      []string{""},
 			Locality:      []string{"London"},

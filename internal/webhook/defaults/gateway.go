@@ -16,19 +16,26 @@ import (
 	capsulegateway "github.com/projectcapsule/capsule/internal/webhook/gateway"
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
 	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
+	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 )
 
-func mutateGatewayDefaults(ctx context.Context, req admission.Request, c client.Client, decoder admission.Decoder, namespce string) *admission.Response {
+func mutateGatewayDefaults(
+	ctx context.Context,
+	req admission.Request,
+	c client.Client,
+	decoder admission.Decoder,
+	namespce string,
+) *admission.Response {
 	gatewayObj := &gatewayv1.Gateway{}
 	if err := decoder.Decode(req, gatewayObj); err != nil {
-		return utils.ErroredResponse(err)
+		return ad.ErroredResponse(err)
 	}
 
 	gatewayObj.SetNamespace(namespce)
 
 	tnt, err := capsulegateway.TenantFromGateway(ctx, c, gatewayObj)
 	if err != nil {
-		return utils.ErroredResponse(err)
+		return ad.ErroredResponse(err)
 	}
 
 	if tnt == nil {
@@ -49,17 +56,13 @@ func mutateGatewayDefaults(ctx context.Context, req admission.Request, c client.
 		if gatewayObj.Spec.GatewayClassName == ("") {
 			mutate = true
 		} else {
-			response := admission.Denied(caperrors.NewGatewayError(gatewayObj.Spec.GatewayClassName, err).Error())
-
-			return &response
+			return ad.Deny(caperrors.NewGatewayError(gatewayObj.Spec.GatewayClassName, err).Error())
 		}
 	}
 
 	if gatewayClass != nil && gatewayClass.Name != allowed.Default {
 		if err != nil && !k8serrors.IsNotFound(err) {
-			response := admission.Denied(caperrors.NewGatewayClassError(gatewayClass.Name, err).Error())
-
-			return &response
+			return ad.Deny(caperrors.NewGatewayClassError(gatewayClass.Name, err).Error())
 		}
 	} else {
 		mutate = true

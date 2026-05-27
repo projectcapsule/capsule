@@ -21,20 +21,25 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api/meta"
+	"github.com/projectcapsule/capsule/pkg/api/rbac"
 	"github.com/projectcapsule/capsule/pkg/utils"
 )
 
-var _ = Describe("when Tenant handles Ingress classes with networking.k8s.io/v1", Label("ingress"), func() {
+var _ = Describe("when Tenant handles Ingress classes with networking.k8s.io/v1", Ordered, Label("tenant", "networking", "ingress"), func() {
 	tntNoDefault := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "ic-selector-networking-v1",
+			Name: "e2e-ic-selector-networking-v1",
+			Labels: map[string]string{
+				"env": "e2e",
+			},
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: []api.OwnerSpec{
+			Owners: []rbac.OwnerSpec{
 				{
-					CoreOwnerSpec: api.CoreOwnerSpec{
-						UserSpec: api.UserSpec{
-							Name: "ingress-selector",
+					CoreOwnerSpec: rbac.CoreOwnerSpec{
+						UserSpec: rbac.UserSpec{
+							Name: "e2e-ic-selector-networking-v1",
 							Kind: "User",
 						},
 					},
@@ -60,14 +65,17 @@ var _ = Describe("when Tenant handles Ingress classes with networking.k8s.io/v1"
 
 	tntWithDefault := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "ic-default-networking-v1",
+			Name: "e2e-ic-default-networking-v1",
+			Labels: map[string]string{
+				"env": "e2e",
+			},
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: []api.OwnerSpec{
+			Owners: []rbac.OwnerSpec{
 				{
-					CoreOwnerSpec: api.CoreOwnerSpec{
-						UserSpec: api.UserSpec{
-							Name: "ingress-default",
+					CoreOwnerSpec: rbac.CoreOwnerSpec{
+						UserSpec: rbac.UserSpec{
+							Name: "e2e-ic-default-networking-v1",
 							Kind: "User",
 						},
 					},
@@ -140,14 +148,13 @@ var _ = Describe("when Tenant handles Ingress classes with networking.k8s.io/v1"
 
 				return k8sClient.Create(context.TODO(), tnt)
 			}).Should(Succeed())
+			TenantReady(tnt, metav1.ConditionTrue, defaultTimeoutInterval)
 		}
 	})
 
 	JustAfterEach(func() {
 		for _, tnt := range []*capsulev1beta2.Tenant{tntWithDefault, tntNoDefault} {
-			Eventually(func() error {
-				return k8sClient.Delete(context.TODO(), tnt)
-			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+			EventuallyDeletion(tnt)
 		}
 
 		Eventually(func() (err error) {
@@ -168,11 +175,13 @@ var _ = Describe("when Tenant handles Ingress classes with networking.k8s.io/v1"
 			}
 		}
 
-		ns := NewNamespace("")
+		ns := NewNamespace("", map[string]string{
+			meta.TenantLabel: tntNoDefault.GetName(),
+		})
 		cs := ownerClient(tntNoDefault.Spec.Owners[0].UserSpec)
 
 		NamespaceCreation(ns, tntNoDefault.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
-		TenantNamespaceList(tntNoDefault, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
+		NamespaceIsPartOfTenant(tntNoDefault, ns).Should(Succeed())
 
 		By("non-specifying at all", func() {
 			Eventually(func() (err error) {
@@ -250,11 +259,13 @@ var _ = Describe("when Tenant handles Ingress classes with networking.k8s.io/v1"
 			}
 		}
 
-		ns := NewNamespace("")
+		ns := NewNamespace("", map[string]string{
+			meta.TenantLabel: tntNoDefault.GetName(),
+		})
 		cs := ownerClient(tntNoDefault.Spec.Owners[0].UserSpec)
 
 		NamespaceCreation(ns, tntNoDefault.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
-		TenantNamespaceList(tntNoDefault, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
+		NamespaceIsPartOfTenant(tntNoDefault, ns).Should(Succeed())
 
 		for _, c := range tntNoDefault.Spec.IngressOptions.AllowedClasses.Exact {
 			Eventually(func() (err error) {
@@ -289,11 +300,13 @@ var _ = Describe("when Tenant handles Ingress classes with networking.k8s.io/v1"
 			}
 		}
 
-		ns := NewNamespace("")
+		ns := NewNamespace("", map[string]string{
+			meta.TenantLabel: tntNoDefault.GetName(),
+		})
 		cs := ownerClient(tntNoDefault.Spec.Owners[0].UserSpec)
 
 		NamespaceCreation(ns, tntNoDefault.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
-		TenantNamespaceList(tntNoDefault, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
+		NamespaceIsPartOfTenant(tntNoDefault, ns).Should(Succeed())
 
 		for _, c := range tntNoDefault.Spec.IngressOptions.AllowedClasses.Exact {
 			Eventually(func() (err error) {
@@ -326,12 +339,14 @@ var _ = Describe("when Tenant handles Ingress classes with networking.k8s.io/v1"
 			}
 		}
 
-		ns := NewNamespace("")
+		ns := NewNamespace("", map[string]string{
+			meta.TenantLabel: tntNoDefault.GetName(),
+		})
 		cs := ownerClient(tntNoDefault.Spec.Owners[0].UserSpec)
 		ingressClass := "oil-ingress"
 
 		NamespaceCreation(ns, tntNoDefault.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
-		TenantNamespaceList(tntNoDefault, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
+		NamespaceIsPartOfTenant(tntNoDefault, ns).Should(Succeed())
 
 		Eventually(func() (err error) {
 			i := &networkingv1.Ingress{
@@ -364,12 +379,14 @@ var _ = Describe("when Tenant handles Ingress classes with networking.k8s.io/v1"
 			}
 		}
 
-		ns := NewNamespace("")
+		ns := NewNamespace("", map[string]string{
+			meta.TenantLabel: tntNoDefault.GetName(),
+		})
 		cs := ownerClient(tntNoDefault.Spec.Owners[0].UserSpec)
 		ingressClass := "oil-haproxy"
 
 		NamespaceCreation(ns, tntNoDefault.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
-		TenantNamespaceList(tntNoDefault, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
+		NamespaceIsPartOfTenant(tntNoDefault, ns).Should(Succeed())
 
 		Eventually(func() (err error) {
 			i := &networkingv1.Ingress{
@@ -435,11 +452,13 @@ var _ = Describe("when Tenant handles Ingress classes with networking.k8s.io/v1"
 				},
 			}
 
-			ns := NewNamespace("")
+			ns := NewNamespace("", map[string]string{
+				meta.TenantLabel: tntNoDefault.GetName(),
+			})
 			cs := ownerClient(tntNoDefault.Spec.Owners[0].UserSpec)
 
 			NamespaceCreation(ns, tntNoDefault.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
-			TenantNamespaceList(tntNoDefault, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
+			NamespaceIsPartOfTenant(tntNoDefault, ns).Should(Succeed())
 
 			EventuallyCreation(func() error {
 				_, err := cs.NetworkingV1().Ingresses(ns.GetName()).Create(context.TODO(), i, metav1.CreateOptions{})
@@ -488,11 +507,13 @@ var _ = Describe("when Tenant handles Ingress classes with networking.k8s.io/v1"
 				},
 			}
 
-			ns := NewNamespace("")
+			ns := NewNamespace("", map[string]string{
+				meta.TenantLabel: tntNoDefault.GetName(),
+			})
 			cs := ownerClient(tntNoDefault.Spec.Owners[0].UserSpec)
 
 			NamespaceCreation(ns, tntNoDefault.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
-			TenantNamespaceList(tntNoDefault, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
+			NamespaceIsPartOfTenant(tntNoDefault, ns).Should(Succeed())
 
 			EventuallyCreation(func() error {
 				_, err := cs.NetworkingV1().Ingresses(ns.GetName()).Create(context.TODO(), i, metav1.CreateOptions{})
@@ -502,9 +523,12 @@ var _ = Describe("when Tenant handles Ingress classes with networking.k8s.io/v1"
 	})
 
 	It("should mutate to default tenant IngressClass (class not does not exist)", func() {
-		ns := NewNamespace("")
+		ns := NewNamespace("", map[string]string{
+			meta.TenantLabel: tntWithDefault.GetName(),
+		})
+
 		NamespaceCreation(ns, tntWithDefault.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
-		TenantNamespaceList(tntWithDefault, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
+		NamespaceIsPartOfTenant(tntWithDefault, ns).Should(Succeed())
 
 		i := &networkingv1.Ingress{
 			ObjectMeta: metav1.ObjectMeta{
@@ -541,9 +565,11 @@ var _ = Describe("when Tenant handles Ingress classes with networking.k8s.io/v1"
 		class := tenantDefault
 		Expect(k8sClient.Create(context.TODO(), &class)).Should(Succeed())
 
-		ns := NewNamespace("")
+		ns := NewNamespace("", map[string]string{
+			meta.TenantLabel: tntWithDefault.GetName(),
+		})
 		NamespaceCreation(ns, tntWithDefault.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
-		TenantNamespaceList(tntWithDefault, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
+		NamespaceIsPartOfTenant(tntWithDefault, ns).Should(Succeed())
 
 		i := &networkingv1.Ingress{
 			ObjectMeta: metav1.ObjectMeta{
@@ -583,9 +609,11 @@ var _ = Describe("when Tenant handles Ingress classes with networking.k8s.io/v1"
 		Expect(k8sClient.Create(context.TODO(), &class)).Should(Succeed())
 		Expect(k8sClient.Create(context.TODO(), &global)).Should(Succeed())
 
-		ns := NewNamespace("")
+		ns := NewNamespace("", map[string]string{
+			meta.TenantLabel: tntWithDefault.GetName(),
+		})
 		NamespaceCreation(ns, tntWithDefault.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
-		TenantNamespaceList(tntWithDefault, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
+		NamespaceIsPartOfTenant(tntWithDefault, ns).Should(Succeed())
 
 		i := &networkingv1.Ingress{
 			ObjectMeta: metav1.ObjectMeta{
@@ -629,9 +657,11 @@ var _ = Describe("when Tenant handles Ingress classes with networking.k8s.io/v1"
 		Expect(k8sClient.Create(context.TODO(), &class)).Should(Succeed())
 		Expect(k8sClient.Create(context.TODO(), &global)).Should(Succeed())
 
-		ns := NewNamespace("")
+		ns := NewNamespace("", map[string]string{
+			meta.TenantLabel: tntWithDefault.GetName(),
+		})
 		NamespaceCreation(ns, tntWithDefault.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
-		TenantNamespaceList(tntWithDefault, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
+		NamespaceIsPartOfTenant(tntWithDefault, ns).Should(Succeed())
 
 		i := &networkingv1.Ingress{
 			ObjectMeta: metav1.ObjectMeta{

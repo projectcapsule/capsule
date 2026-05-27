@@ -176,6 +176,13 @@ func (c *RegistryRuleSetCache) Has(id string) bool {
 	return ok
 }
 
+func (c *RegistryRuleSetCache) Reset() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.rs = make(map[string]*RuleSet)
+}
+
 // InsertForTest can be behind a build tag if you prefer, but it's fine to keep simple.
 //
 //nolint:unused

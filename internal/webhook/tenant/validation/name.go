@@ -12,6 +12,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
 
@@ -23,6 +24,7 @@ func NameHandler() handlers.TypedHandler[*capsulev1beta2.Tenant] {
 
 func (h *nameHandler) OnCreate(
 	_ client.Client,
+	_ client.Reader,
 	tnt *capsulev1beta2.Tenant,
 	decoder admission.Decoder,
 	_ events.EventRecorder,
@@ -30,9 +32,7 @@ func (h *nameHandler) OnCreate(
 	return func(_ context.Context, req admission.Request) *admission.Response {
 		matched, _ := regexp.MatchString(`[a-z0-9]([-a-z0-9]*[a-z0-9])?`, tnt.GetName())
 		if !matched {
-			response := admission.Denied("tenant name has forbidden characters")
-
-			return &response
+			return ad.Deny("tenant name has forbidden characters")
 		}
 
 		return nil
@@ -41,6 +41,7 @@ func (h *nameHandler) OnCreate(
 
 func (h *nameHandler) OnDelete(
 	client.Client,
+	client.Reader,
 	*capsulev1beta2.Tenant,
 	admission.Decoder,
 	events.EventRecorder,
@@ -52,6 +53,7 @@ func (h *nameHandler) OnDelete(
 
 func (h *nameHandler) OnUpdate(
 	client.Client,
+	client.Reader,
 	*capsulev1beta2.Tenant,
 	*capsulev1beta2.Tenant,
 	admission.Decoder,

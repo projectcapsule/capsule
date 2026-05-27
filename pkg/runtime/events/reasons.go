@@ -56,4 +56,8 @@ const (
 
 	// ResourcePools.
 	ReasonDisassociated string = "Disassociated"
+
+	// CustomQuotas.
+	ReasonUsageCalculationFailed = "UsageCalculationFailed"
+	ReasonQuotaExceeded          = "QuotaExceeded"
 )

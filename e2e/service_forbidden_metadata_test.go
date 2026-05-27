@@ -14,12 +14,17 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api/meta"
+	"github.com/projectcapsule/capsule/pkg/api/rbac"
 )
 
-var _ = Describe("creating a Service with user-specified labels and annotations", Label("tenant", "service"), func() {
+var _ = Describe("creating a Service with user-specified labels and annotations", Ordered, Label("tenant", "networking", "service"), func() {
 	tnt := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "tenant-user-metadata-forbidden",
+			Name: "e2e-service-user-metadata-forbidden",
+			Labels: map[string]string{
+				"env": "e2e",
+			},
 		},
 		Spec: capsulev1beta2.TenantSpec{
 			ServiceOptions: &api.ServiceOptions{
@@ -32,11 +37,11 @@ var _ = Describe("creating a Service with user-specified labels and annotations"
 					Regex: "^gatsby-.*$",
 				},
 			},
-			Owners: api.OwnerListSpec{
+			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: api.CoreOwnerSpec{
-						UserSpec: api.UserSpec{
-							Name: "gatsby",
+					CoreOwnerSpec: rbac.CoreOwnerSpec{
+						UserSpec: rbac.UserSpec{
+							Name: "e2e-service-user-metadata-forbidden",
 							Kind: "User",
 						},
 					},
@@ -50,16 +55,20 @@ var _ = Describe("creating a Service with user-specified labels and annotations"
 			tnt.ResourceVersion = ""
 			return k8sClient.Create(context.TODO(), tnt)
 		}).Should(Succeed())
+
+		TenantReady(tnt, metav1.ConditionTrue, defaultTimeoutInterval)
 	})
 	JustAfterEach(func() {
-		Expect(k8sClient.Delete(context.TODO(), tnt)).Should(Succeed())
+		EventuallyDeletion(tnt)
 	})
 
 	It("should allow", func() {
 		By("specifying non-forbidden labels", func() {
-			ns := NewNamespace("")
+			ns := NewNamespace("", map[string]string{
+				meta.TenantLabel: tnt.GetName(),
+			})
 			NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
-			TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
+			NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
 
 			svc := NewService(types.NamespacedName{
 				Namespace: ns.GetName(),
@@ -69,9 +78,11 @@ var _ = Describe("creating a Service with user-specified labels and annotations"
 			ServiceCreation(svc, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 		})
 		By("specifying non-forbidden annotations", func() {
-			ns := NewNamespace("")
+			ns := NewNamespace("", map[string]string{
+				meta.TenantLabel: tnt.GetName(),
+			})
 			NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
-			TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
+			NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
 
 			svc := NewService(types.NamespacedName{
 				Namespace: ns.GetName(),
@@ -84,9 +95,11 @@ var _ = Describe("creating a Service with user-specified labels and annotations"
 
 	It("should fail when creating a Service", func() {
 		By("specifying forbidden labels using exact match", func() {
-			ns := NewNamespace("")
+			ns := NewNamespace("", map[string]string{
+				meta.TenantLabel: tnt.GetName(),
+			})
 			NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
-			TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
+			NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
 
 			svc := NewService(types.NamespacedName{
 				Namespace: ns.GetName(),
@@ -96,9 +109,11 @@ var _ = Describe("creating a Service with user-specified labels and annotations"
 			ServiceCreation(svc, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).ShouldNot(Succeed())
 		})
 		By("specifying forbidden labels using regex match", func() {
-			ns := NewNamespace("")
+			ns := NewNamespace("", map[string]string{
+				meta.TenantLabel: tnt.GetName(),
+			})
 			NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
-			TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
+			NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
 
 			svc := NewService(types.NamespacedName{
 				Namespace: ns.GetName(),
@@ -108,9 +123,11 @@ var _ = Describe("creating a Service with user-specified labels and annotations"
 			ServiceCreation(svc, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).ShouldNot(Succeed())
 		})
 		By("specifying forbidden annotations using exact match", func() {
-			ns := NewNamespace("")
+			ns := NewNamespace("", map[string]string{
+				meta.TenantLabel: tnt.GetName(),
+			})
 			NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
-			TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
+			NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
 
 			svc := NewService(types.NamespacedName{
 				Namespace: ns.GetName(),
@@ -120,9 +137,11 @@ var _ = Describe("creating a Service with user-specified labels and annotations"
 			ServiceCreation(svc, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).ShouldNot(Succeed())
 		})
 		By("specifying forbidden annotations using regex match", func() {
-			ns := NewNamespace("")
+			ns := NewNamespace("", map[string]string{
+				meta.TenantLabel: tnt.GetName(),
+			})
 			NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
-			TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
+			NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
 
 			svc := NewService(types.NamespacedName{
 				Namespace: ns.GetName(),
@@ -137,9 +156,11 @@ var _ = Describe("creating a Service with user-specified labels and annotations"
 		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 
 		By("specifying forbidden labels using exact match", func() {
-			ns := NewNamespace("")
+			ns := NewNamespace("", map[string]string{
+				meta.TenantLabel: tnt.GetName(),
+			})
 			NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
-			TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
+			NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
 
 			svc := NewService(types.NamespacedName{
 				Namespace: ns.GetName(),
@@ -159,9 +180,11 @@ var _ = Describe("creating a Service with user-specified labels and annotations"
 			}, 10*time.Second, time.Second).ShouldNot(Succeed())
 		})
 		By("specifying forbidden labels using regex match", func() {
-			ns := NewNamespace("")
+			ns := NewNamespace("", map[string]string{
+				meta.TenantLabel: tnt.GetName(),
+			})
 			NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
-			TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
+			NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
 
 			svc := NewService(types.NamespacedName{
 				Namespace: ns.GetName(),
@@ -182,9 +205,11 @@ var _ = Describe("creating a Service with user-specified labels and annotations"
 			}, 3*time.Second, time.Second).ShouldNot(Succeed())
 		})
 		By("specifying forbidden annotations using exact match", func() {
-			ns := NewNamespace("")
+			ns := NewNamespace("", map[string]string{
+				meta.TenantLabel: tnt.GetName(),
+			})
 			NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
-			TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
+			NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
 
 			svc := NewService(types.NamespacedName{
 				Namespace: ns.GetName(),
@@ -205,9 +230,11 @@ var _ = Describe("creating a Service with user-specified labels and annotations"
 			}, 10*time.Second, time.Second).ShouldNot(Succeed())
 		})
 		By("specifying forbidden annotations using regex match", func() {
-			ns := NewNamespace("")
+			ns := NewNamespace("", map[string]string{
+				meta.TenantLabel: tnt.GetName(),
+			})
 			NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
-			TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
+			NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
 
 			svc := NewService(types.NamespacedName{
 				Namespace: ns.GetName(),

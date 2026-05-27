@@ -12,7 +12,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/api"
 	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
+	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
@@ -24,12 +26,13 @@ func ImagePullPolicy() handlers.TypedHandlerWithTenantWithRuleset[*corev1.Pod] {
 }
 
 func (h *imagePullPolicy) OnCreate(
-	c client.Client,
+	_ client.Client,
+	_ client.Reader,
 	pod *corev1.Pod,
-	decoder admission.Decoder,
+	_ admission.Decoder,
 	recorder events.EventRecorder,
 	tnt *capsulev1beta2.Tenant,
-	_ *capsulev1beta2.NamespaceRuleBody,
+	_ *api.NamespaceRuleBodyNamespace,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		return h.validate(req, pod, tnt, recorder)
@@ -37,13 +40,14 @@ func (h *imagePullPolicy) OnCreate(
 }
 
 func (h *imagePullPolicy) OnUpdate(
-	c client.Client,
+	_ client.Client,
+	_ client.Reader,
 	old *corev1.Pod,
 	pod *corev1.Pod,
-	decoder admission.Decoder,
+	_ admission.Decoder,
 	recorder events.EventRecorder,
 	tnt *capsulev1beta2.Tenant,
-	_ *capsulev1beta2.NamespaceRuleBody,
+	_ *api.NamespaceRuleBodyNamespace,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		return h.validate(req, pod, tnt, recorder)
@@ -52,11 +56,12 @@ func (h *imagePullPolicy) OnUpdate(
 
 func (h *imagePullPolicy) OnDelete(
 	client.Client,
+	client.Reader,
 	*corev1.Pod,
 	admission.Decoder,
 	events.EventRecorder,
 	*capsulev1beta2.Tenant,
-	*capsulev1beta2.NamespaceRuleBody,
+	*api.NamespaceRuleBodyNamespace,
 ) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
@@ -114,9 +119,7 @@ func (h *imagePullPolicy) verifyPullPolicy(
 			"PullPolicy %s is forbidden for the tenant %s", usedPullPolicy, tnt.GetName(),
 		)
 
-		response := admission.Denied(caperrors.NewImagePullPolicyForbidden(usedPullPolicy, container, policy.AllowedPullPolicies()).Error())
-
-		return &response
+		return ad.Deny(caperrors.NewImagePullPolicyForbidden(usedPullPolicy, container, policy.AllowedPullPolicies()).Error())
 	}
 
 	return nil

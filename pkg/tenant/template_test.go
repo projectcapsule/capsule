@@ -14,7 +14,7 @@ import (
 )
 
 func TestContextForTenantAndNamespace_BothNil(t *testing.T) {
-	ctx := tenant.ContextForTenantAndNamespace(nil, nil)
+	ctx := tenant.FastContextForTenantAndNamespace(nil, nil)
 
 	if ctx == nil {
 		t.Fatalf("expected non-nil map")
@@ -31,7 +31,7 @@ func TestContextForTenantAndNamespace_OnlyTenant(t *testing.T) {
 		},
 	}
 
-	ctx := tenant.ContextForTenantAndNamespace(tnt, nil)
+	ctx := tenant.FastContextForTenantAndNamespace(tnt, nil)
 
 	if got := ctx["tenant.name"]; got != "wind" {
 		t.Fatalf("expected tenant.name=wind, got %q", got)
@@ -51,7 +51,7 @@ func TestContextForTenantAndNamespace_OnlyNamespace(t *testing.T) {
 		},
 	}
 
-	ctx := tenant.ContextForTenantAndNamespace(nil, ns)
+	ctx := tenant.FastContextForTenantAndNamespace(nil, ns)
 
 	if got := ctx["namespace"]; got != "wind-prod" {
 		t.Fatalf("expected namespace=wind-prod, got %q", got)
@@ -76,7 +76,7 @@ func TestContextForTenantAndNamespace_BothSet(t *testing.T) {
 		},
 	}
 
-	ctx := tenant.ContextForTenantAndNamespace(tnt, ns)
+	ctx := tenant.FastContextForTenantAndNamespace(tnt, ns)
 
 	if got := ctx["tenant.name"]; got != "wind" {
 		t.Fatalf("expected tenant.name=wind, got %q", got)

@@ -22,10 +22,12 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api/meta"
+	"github.com/projectcapsule/capsule/pkg/api/rbac"
 	"github.com/projectcapsule/capsule/pkg/utils"
 )
 
-var _ = Describe("when Tenant handles Gateway classes", Label("tenant", "classes", "gateway"), func() {
+var _ = Describe("when Tenant handles Gateway classes", Ordered, Label("tenant", "classes", "gatewayclass"), func() {
 	authorized := &gatewayv1.GatewayClass{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "customer-class",
@@ -77,12 +79,15 @@ var _ = Describe("when Tenant handles Gateway classes", Label("tenant", "classes
 	tntWithDefault := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "e2e-gateway-default-and-label-selector",
+			Labels: map[string]string{
+				"env": "e2e",
+			},
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: []api.OwnerSpec{
+			Owners: []rbac.OwnerSpec{
 				{
-					CoreOwnerSpec: api.CoreOwnerSpec{
-						UserSpec: api.UserSpec{
+					CoreOwnerSpec: rbac.CoreOwnerSpec{
+						UserSpec: rbac.UserSpec{
 							Name: "gateway-default-and-label-selector",
 							Kind: "User",
 						},
@@ -110,12 +115,15 @@ var _ = Describe("when Tenant handles Gateway classes", Label("tenant", "classes
 	tntWithoutDefault := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "e2e-gateway-label-selector-only",
+			Labels: map[string]string{
+				"env": "e2e",
+			},
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: []api.OwnerSpec{
+			Owners: []rbac.OwnerSpec{
 				{
-					CoreOwnerSpec: api.CoreOwnerSpec{
-						UserSpec: api.UserSpec{
+					CoreOwnerSpec: rbac.CoreOwnerSpec{
+						UserSpec: rbac.UserSpec{
 							Name: "gateway-with-label-selector-only",
 							Kind: "User",
 						},
@@ -144,10 +152,10 @@ var _ = Describe("when Tenant handles Gateway classes", Label("tenant", "classes
 			Name: "e2e-gateway-no-restrictions",
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: []api.OwnerSpec{
+			Owners: []rbac.OwnerSpec{
 				{
-					CoreOwnerSpec: api.CoreOwnerSpec{
-						UserSpec: api.UserSpec{
+					CoreOwnerSpec: rbac.CoreOwnerSpec{
+						UserSpec: rbac.UserSpec{
 							Name: "e2e-gateway-no-restrictions",
 							Kind: "User",
 						},
@@ -163,6 +171,7 @@ var _ = Describe("when Tenant handles Gateway classes", Label("tenant", "classes
 			EventuallyCreation(func() error {
 				return k8sClient.Create(context.TODO(), tnt)
 			}).Should(Succeed())
+			TenantReady(tnt, metav1.ConditionTrue, defaultTimeoutInterval)
 		}
 
 		if err := k8sClient.List(context.Background(), &gatewayv1.GatewayClassList{}); err != nil {
@@ -183,9 +192,7 @@ var _ = Describe("when Tenant handles Gateway classes", Label("tenant", "classes
 	JustAfterEach(func() {
 		utilruntime.Must(gatewayv1.Install(scheme.Scheme))
 		for _, tnt := range []*capsulev1beta2.Tenant{tntWithDefault, tntWithoutDefault, tntNoRestrictions} {
-			EventuallyCreation(func() error {
-				return ignoreNotFound(k8sClient.Delete(context.TODO(), tnt))
-			}).Should(Succeed())
+			EventuallyDeletion(tnt)
 		}
 
 		if err := k8sClient.List(context.Background(), &gatewayv1.GatewayClassList{}); err != nil {
@@ -227,9 +234,11 @@ var _ = Describe("when Tenant handles Gateway classes", Label("tenant", "classes
 				Should(ConsistOf(exact.GetName(), exactU.GetName(), authorized.GetName(), unauthorized.GetName()))
 		})
 
-		ns := NewNamespace("")
+		ns := NewNamespace("", map[string]string{
+			meta.TenantLabel: tntNoRestrictions.GetName(),
+		})
 		NamespaceCreation(ns, tntNoRestrictions.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
-		TenantNamespaceList(tntNoRestrictions, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
+		NamespaceIsPartOfTenant(tntNoRestrictions, ns).Should(Succeed())
 
 		By("providing any storageclass", func() {
 			for _, class := range []*gatewayv1.GatewayClass{authorized, unauthorized, exact, exactU} {
@@ -283,7 +292,7 @@ var _ = Describe("when Tenant handles Gateway classes", Label("tenant", "classes
 
 		By("Verify Status (Deletion)", func() {
 			for _, crd := range []*gatewayv1.GatewayClass{authorized} {
-				Expect(ignoreNotFound(k8sClient.Delete(context.TODO(), crd))).To(Succeed())
+				EventuallyDeletion(crd)
 			}
 			Eventually(func() ([]string, error) {
 				t := &capsulev1beta2.Tenant{}
@@ -327,9 +336,11 @@ var _ = Describe("when Tenant handles Gateway classes", Label("tenant", "classes
 				Should(ConsistOf(exactU.GetName(), authorized.GetName()))
 		})
 
-		ns := NewNamespace("")
+		ns := NewNamespace("", map[string]string{
+			meta.TenantLabel: tntWithDefault.GetName(),
+		})
 		NamespaceCreation(ns, tntWithDefault.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
-		TenantNamespaceList(tntWithDefault, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
+		NamespaceIsPartOfTenant(tntWithDefault, ns).Should(Succeed())
 
 		By("providing unauthorized gatewayClassName", func() {
 			Eventually(func() (err error) {
@@ -379,7 +390,7 @@ var _ = Describe("when Tenant handles Gateway classes", Label("tenant", "classes
 
 		By("Verify Status (Deletion)", func() {
 			for _, crd := range []*gatewayv1.GatewayClass{authorized} {
-				Expect(ignoreNotFound(k8sClient.Delete(context.TODO(), crd))).To(Succeed())
+				EventuallyDeletion(crd)
 			}
 			Eventually(func() ([]string, error) {
 				t := &capsulev1beta2.Tenant{}
@@ -398,7 +409,7 @@ var _ = Describe("when Tenant handles Gateway classes", Label("tenant", "classes
 				Should(ConsistOf(exactU.GetName()))
 
 			for _, crd := range []*gatewayv1.GatewayClass{exactU} {
-				Expect(ignoreNotFound(k8sClient.Delete(context.TODO(), crd))).To(Succeed())
+				EventuallyDeletion(crd)
 			}
 			Eventually(func() ([]string, error) {
 				t := &capsulev1beta2.Tenant{}
@@ -443,9 +454,12 @@ var _ = Describe("when Tenant handles Gateway classes", Label("tenant", "classes
 				Should(ConsistOf(exactU.GetName(), authorized.GetName()))
 		})
 
-		ns := NewNamespace("")
+		ns := NewNamespace("", map[string]string{
+			meta.TenantLabel: tntWithDefault.GetName(),
+		})
 		NamespaceCreation(ns, tntWithDefault.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
-		TenantNamespaceList(tntWithDefault, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
+		NamespaceIsPartOfTenant(tntWithDefault, ns).Should(Succeed())
+
 		By("providing authorized class", func() {
 			Eventually(func() (err error) {
 				g := &gatewayv1.Gateway{
@@ -541,9 +555,12 @@ var _ = Describe("when Tenant handles Gateway classes", Label("tenant", "classes
 				Should(ConsistOf(exact.GetName(), authorized.GetName()))
 		})
 
-		ns := NewNamespace("")
+		ns := NewNamespace("", map[string]string{
+			meta.TenantLabel: tntWithoutDefault.GetName(),
+		})
 		NamespaceCreation(ns, tntWithoutDefault.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
-		TenantNamespaceList(tntWithoutDefault, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
+		NamespaceIsPartOfTenant(tntWithoutDefault, ns).Should(Succeed())
+
 		By("providing empty GatewayClassName", func() {
 			Eventually(func() (err error) {
 				g := &gatewayv1.Gateway{
@@ -568,7 +585,7 @@ var _ = Describe("when Tenant handles Gateway classes", Label("tenant", "classes
 
 		By("Verify Status (Deletion)", func() {
 			for _, crd := range []*gatewayv1.GatewayClass{authorized} {
-				Expect(ignoreNotFound(k8sClient.Delete(context.TODO(), crd))).To(Succeed())
+				EventuallyDeletion(crd)
 			}
 			Eventually(func() ([]string, error) {
 				t := &capsulev1beta2.Tenant{}
@@ -587,7 +604,7 @@ var _ = Describe("when Tenant handles Gateway classes", Label("tenant", "classes
 				Should(ConsistOf(exact.GetName()))
 
 			for _, crd := range []*gatewayv1.GatewayClass{exact} {
-				Expect(ignoreNotFound(k8sClient.Delete(context.TODO(), crd))).To(Succeed())
+				EventuallyDeletion(crd)
 			}
 			Eventually(func() ([]string, error) {
 				t := &capsulev1beta2.Tenant{}

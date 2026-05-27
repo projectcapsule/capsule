@@ -1,0 +1,31 @@
+// Copyright 2020-2026 Project Capsule Authors
+// SPDX-License-Identifier: Apache-2.0
+
+package tenantresource
+
+import (
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+)
+
+type NamespacedResourceNamespace struct{}
+
+func (g NamespacedResourceNamespace) Object() client.Object {
+	return &capsulev1beta2.TenantResource{}
+}
+
+func (g NamespacedResourceNamespace) Field() string {
+	return NamespaceIndexerFieldName
+}
+
+func (g NamespacedResourceNamespace) Func() client.IndexerFunc {
+	return func(object client.Object) []string {
+		tr := object.(*capsulev1beta2.TenantResource) //nolint:forcetypeassert
+		if tr.Namespace == "" {
+			return nil
+		}
+
+		return []string{tr.Namespace}
+	}
+}

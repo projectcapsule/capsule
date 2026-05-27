@@ -15,7 +15,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	"github.com/projectcapsule/capsule/internal/webhook/utils"
+	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
 
@@ -27,28 +27,43 @@ func PoolValidationHandler(log logr.Logger) handlers.Handler {
 	return &poolValidationHandler{log: log}
 }
 
-func (h *poolValidationHandler) OnCreate(client.Client, admission.Decoder, events.EventRecorder) handlers.Func {
+func (h *poolValidationHandler) OnCreate(
+	client.Client,
+	client.Reader,
+	admission.Decoder,
+	events.EventRecorder,
+) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (h *poolValidationHandler) OnDelete(client.Client, admission.Decoder, events.EventRecorder) handlers.Func {
+func (h *poolValidationHandler) OnDelete(
+	client.Client,
+	client.Reader,
+	admission.Decoder,
+	events.EventRecorder,
+) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (h *poolValidationHandler) OnUpdate(_ client.Client, decoder admission.Decoder, _ events.EventRecorder) handlers.Func {
+func (h *poolValidationHandler) OnUpdate(
+	_ client.Client,
+	_ client.Reader,
+	decoder admission.Decoder,
+	_ events.EventRecorder,
+) handlers.Func {
 	return func(_ context.Context, req admission.Request) *admission.Response {
 		oldPool := &capsulev1beta2.ResourcePool{}
 		if err := decoder.DecodeRaw(req.OldObject, oldPool); err != nil {
-			return utils.ErroredResponse(err)
+			return ad.ErroredResponse(err)
 		}
 
 		pool := &capsulev1beta2.ResourcePool{}
 		if err := decoder.Decode(req, pool); err != nil {
-			return utils.ErroredResponse(err)
+			return ad.ErroredResponse(err)
 		}
 
 		// Verify if resource decrease is allowed or no
@@ -64,24 +79,23 @@ func (h *poolValidationHandler) OnUpdate(_ client.Client, decoder admission.Deco
 						continue
 					}
 
-					response := admission.Denied(fmt.Sprintf(
-						"can not remove resource %s as it is still being allocated. Remove corresponding claims or keep the resources in the pool",
-						resourceName,
-					))
-
-					return &response
+					return ad.Deny(
+						fmt.Sprintf(
+							"can not remove resource %s as it is still being allocated. Remove corresponding claims or keep the resources in the pool",
+							resourceName,
+						),
+					)
 				}
 
 				if allocation.Cmp(qt) < 0 {
-					response := admission.Denied(
+					return ad.Deny(
 						fmt.Sprintf(
 							"can not reduce %s usage to %s because quantity %s is claimed . Remove corresponding claims or keep the resources in the pool",
 							resourceName,
 							allocation.String(),
 							qt.String(),
-						))
-
-					return &response
+						),
+					)
 				}
 			}
 		}

@@ -6,16 +6,23 @@ package v1beta2
 import (
 	"context"
 
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
+	"github.com/projectcapsule/capsule/pkg/api/rbac"
 	"github.com/projectcapsule/capsule/pkg/runtime/selectors"
 )
 
 // TenantSpec defines the desired state of Tenant.
 type TenantSpec struct {
+	// Specify additional data relating to the tenant.
+	// Mainly useable in templating and more accessible than labels/annotations.
+	// +optional
+	Data apiextensionsv1.JSON `json:"data"`
+
 	// Specify Permissions for the Tenant.
 	// +optional
 	Permissions Permissions `json:"permissions,omitzero"`
@@ -25,11 +32,11 @@ type TenantSpec struct {
 	//
 	// Read More: https://projectcapsule.dev/docs/tenants/rules/
 	//+optional
-	Rules []*NamespaceRule `json:"rules,omitzero"`
+	Rules []*api.NamespaceRuleBodyTenant `json:"rules,omitzero"`
 
 	// Specifies the owners of the Tenant.
 	// Optional
-	Owners api.OwnerListSpec `json:"owners,omitempty"`
+	Owners rbac.OwnerListSpec `json:"owners,omitempty"`
 	// Specifies options for the Namespaces, such as additional metadata or maximum number of namespaces allowed for that Tenant. Once the namespace quota assigned to the Tenant has been reached, the Tenant owner cannot create further namespaces. Optional.
 	NamespaceOptions *NamespaceOptions `json:"namespaceOptions,omitempty"`
 	// Specifies options for the Service, such as additional metadata or block of certain type of Services. Optional.
@@ -50,7 +57,7 @@ type TenantSpec struct {
 	// +optional
 	ResourceQuota api.ResourceQuotaSpec `json:"resourceQuotas,omitzero"`
 	// Specifies additional RoleBindings assigned to the Tenant. Capsule will ensure that all namespaces in the Tenant always contain the RoleBinding for the given ClusterRole. Optional.
-	AdditionalRoleBindings []api.AdditionalRoleBindingsSpec `json:"additionalRoleBindings,omitempty"`
+	AdditionalRoleBindings []rbac.AdditionalRoleBindingsSpec `json:"additionalRoleBindings,omitempty"`
 	// Specifies the allowed RuntimeClasses assigned to the Tenant.
 	// Capsule assures that all Pods resources created in the Tenant can use only one of the allowed RuntimeClasses.
 	// Optional.
@@ -108,11 +115,15 @@ type Permissions struct {
 	// The elements are OR operations and independent. You can see the resulting Tenant Owners
 	// in the Status.Owners specification of the Tenant.
 	MatchOwners []*metav1.LabelSelector `json:"matchOwners,omitempty"`
+
+	// ClusterRoles granted to the promoted ServiceAccounts across the Tenant
+	//+kubebuilder:default:=true
+	AllowOwnerPromotion bool `json:"allowOwnerPromotion,omitempty"`
 }
 
 func (p *Permissions) ListMatchingOwners(
 	ctx context.Context,
-	c client.Client,
+	c client.Reader,
 	tnt string,
 	opts ...client.ListOption,
 ) ([]*TenantOwner, error) {
@@ -148,10 +159,6 @@ type Tenant struct {
 
 	// +optional
 	Status TenantStatus `json:"status,omitzero"`
-}
-
-func (in *Tenant) GetNamespaces() (res []string) {
-	return in.Status.Namespaces
 }
 
 // +kubebuilder:object:root=true

@@ -7,49 +7,65 @@ import (
 	"context"
 	"fmt"
 
-	"golang.org/x/sync/errgroup"
+	"github.com/go-logr/logr"
+	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
+	"github.com/projectcapsule/capsule/pkg/api/rbac"
 	"github.com/projectcapsule/capsule/pkg/utils"
 )
 
 // Sync the dynamic Tenant Owner specific cluster-roles and additional Role Bindings, which can be used in many ways:
 // applying Pod Security Policies or giving access to CRDs or specific API groups.
-func (r *Manager) syncRoleBindings(ctx context.Context, tenant *capsulev1beta2.Tenant) (err error) {
-	roleBindings := tenant.GetRoleBindings()
+func (r *Manager) syncRoleBindings(ctx context.Context, log logr.Logger, tenant *capsulev1beta2.Tenant) (err error) {
+	namespaceBindings := map[string]map[string]rbac.AdditionalRoleBindingsSpec{}
 
-	// Hashing
-	hashes := map[string]api.AdditionalRoleBindingsSpec{}
+	for _, ns := range tenant.Status.Spaces {
+		namespace := ns.Name
 
-	for _, binding := range roleBindings {
+		if _, ok := namespaceBindings[namespace]; !ok {
+			namespaceBindings[namespace] = map[string]rbac.AdditionalRoleBindingsSpec{}
+		}
+	}
+
+	for _, binding := range tenant.GetRoleBindings() {
 		hash := utils.RoleBindingHashFunc(binding)
 
-		hashes[hash] = binding
+		for namespace := range namespaceBindings {
+			namespaceBindings[namespace][hash] = binding
+		}
 	}
 
-	group := new(errgroup.Group)
+	// Does not target all namespaces
+	for _, promotion := range tenant.GetPromotionRoleBindings() {
+		namespace := string(promotion.Namespace)
 
-	for _, ns := range tenant.Status.Namespaces {
-		namespace := ns
+		if _, ok := namespaceBindings[namespace]; !ok {
+			// Ignore namespaces that are not part of the tenant.
+			continue
+		}
 
-		group.Go(func() error {
-			return r.syncAdditionalRoleBinding(ctx, tenant, namespace, hashes)
-		})
+		binding := promotion.AdditionalRoleBindingsSpec
+		hash := utils.RoleBindingHashFunc(binding)
+
+		namespaceBindings[namespace][hash] = binding
 	}
 
-	return group.Wait()
+	return runForTenantNamespaces(ctx, tenant, func(ctx context.Context, namespace string) error {
+		return r.syncAdditionalRoleBinding(ctx, tenant, namespace, namespaceBindings[namespace])
+	})
 }
 
 func (r *Manager) syncAdditionalRoleBinding(
 	ctx context.Context,
 	tenant *capsulev1beta2.Tenant,
 	ns string,
-	bindings map[string]api.AdditionalRoleBindingsSpec,
+	bindings map[string]rbac.AdditionalRoleBindingsSpec,
 ) (err error) {
 	keys := []string{}
 
@@ -97,14 +113,21 @@ func (r *Manager) syncAdditionalRoleBinding(
 			return controllerutil.SetControllerReference(tenant, target, r.Scheme())
 		})
 		if err != nil {
-			r.Log.Error(err, "cannot sync RoleBinding")
+			if apierrors.HasStatusCause(err, corev1.NamespaceTerminatingCause) {
+				r.Log.V(4).Info(
+					"skipping RoleBinding sync because namespace is terminating",
+					"name", target.Name,
+					"namespace", target.Namespace,
+					"clusterRole", roleBinding.ClusterRoleName,
+				)
+
+				continue
+			}
+
+			return fmt.Errorf("%w (role: %s)", err, roleBinding.ClusterRoleName)
 		}
 
 		r.Log.V(4).Info(fmt.Sprintf("roleBinding sync result: %s", string(res)), "name", target.Name, "namespace", target.Namespace)
-
-		if err != nil {
-			return err
-		}
 	}
 
 	// Prune at finish to prevent gaps
