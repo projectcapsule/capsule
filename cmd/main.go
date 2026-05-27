@@ -17,6 +17,7 @@ import (
 	admissionv1 "k8s.io/api/admissionregistration/v1"
 	corev1 "k8s.io/api/core/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -103,7 +104,7 @@ func printVersion() {
 	setupLog.Info(fmt.Sprintf("Go OS/Arch: %s/%s", goRuntime.GOOS, goRuntime.GOARCH))
 }
 
-//nolint:maintidx,gocyclo,cyclop
+//nolint:maintidx,gocyclo,cyclop,gocognit
 func main() {
 	controllerConfig := utilscontroller.ControllerOptions{}
 
@@ -304,10 +305,21 @@ func main() {
 
 		tlsCert := &corev1.Secret{}
 
-		if err = directClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: directCfg.TLSSecretName()}, tlsCert); err != nil {
-			setupLog.Error(err, "unable to get Capsule TLS secret")
-			os.Exit(1)
+		if err = directClient.Get(ctx, types.NamespacedName{
+			Namespace: ns,
+			Name:      directCfg.TLSSecretName(),
+		}, tlsCert); err != nil {
+			if !apierrors.IsNotFound(err) {
+				setupLog.Error(err, "unable to get Capsule TLS secret")
+				os.Exit(1)
+			}
+
+			tlsCert = &corev1.Secret{}
+			tlsCert.Name = directCfg.TLSSecretName()
+			tlsCert.Namespace = ns
+			tlsCert.Data = map[string][]byte{}
 		}
+
 		// Reconcile TLS certificates before starting controllers and webhooks
 		if err = tlsReconciler.ReconcileCertificates(ctx, tlsCert); err != nil {
 			setupLog.Error(err, "unable to reconcile Capsule TLS secret")
@@ -447,6 +459,20 @@ func main() {
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
 		os.Exit(1)
+	}
+
+	if metricsCertWatcher != nil {
+		if err := manager.Add(metricsCertWatcher); err != nil {
+			setupLog.Error(err, "unable to add metrics certificate watcher")
+			os.Exit(1)
+		}
+	}
+
+	if webhookCertWatcher != nil {
+		if err := manager.Add(webhookCertWatcher); err != nil {
+			setupLog.Error(err, "unable to add webhook certificate watcher")
+			os.Exit(1)
+		}
 	}
 
 	_ = manager.AddReadyzCheck("ping", healthz.Ping)

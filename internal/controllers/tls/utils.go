@@ -3,6 +3,14 @@
 
 package tls
 
+import (
+	"fmt"
+
+	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
+
+	capsuleclient "github.com/projectcapsule/capsule/pkg/runtime/client"
+)
+
 type ManagedCRD struct {
 	Name                     string
 	ManageConversion         bool
@@ -78,4 +86,54 @@ func (r Reconciler) conversionManagedCRDs() map[string]ManagedCRD {
 	}
 
 	return out
+}
+
+func validatingWebhookCABundlePatches(
+	webhooks []admissionregistrationv1.ValidatingWebhook,
+	caBundle []byte,
+) []capsuleclient.JSONPatch {
+	patches := make([]capsuleclient.JSONPatch, 0, len(webhooks))
+
+	for i := range webhooks {
+		if webhooks[i].ClientConfig.Service == nil {
+			continue
+		}
+
+		if equalBytes(webhooks[i].ClientConfig.CABundle, caBundle) {
+			continue
+		}
+
+		patches = append(patches, capsuleclient.JSONPatch{
+			Operation: capsuleclient.JSONPatchAdd,
+			Path:      fmt.Sprintf("/webhooks/%d/clientConfig/caBundle", i),
+			Value:     caBundle,
+		})
+	}
+
+	return patches
+}
+
+func mutatingWebhookCABundlePatches(
+	webhooks []admissionregistrationv1.MutatingWebhook,
+	caBundle []byte,
+) []capsuleclient.JSONPatch {
+	patches := make([]capsuleclient.JSONPatch, 0, len(webhooks))
+
+	for i := range webhooks {
+		if webhooks[i].ClientConfig.Service == nil {
+			continue
+		}
+
+		if equalBytes(webhooks[i].ClientConfig.CABundle, caBundle) {
+			continue
+		}
+
+		patches = append(patches, capsuleclient.JSONPatch{
+			Operation: capsuleclient.JSONPatchAdd,
+			Path:      fmt.Sprintf("/webhooks/%d/clientConfig/caBundle", i),
+			Value:     caBundle,
+		})
+	}
+
+	return patches
 }

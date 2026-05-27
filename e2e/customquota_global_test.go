@@ -315,6 +315,72 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 		}
 	})
 
+	It("aggregates a custom pod quantity path and settles the corresponding ledger", func() {
+		q := &capsulev1beta2.GlobalCustomQuota{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "gq-pod-cpu-requests",
+				Labels: map[string]string{
+					"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
+				},
+			},
+			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
+				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
+					Limit: resource.MustParse("500m"),
+					Sources: []capsulev1beta2.CustomQuotaSpecSource{
+						{
+							VersionKind: gvk.VersionKind{
+								APIVersion: "v1",
+								Kind:       "Pod",
+							},
+							CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
+								Operation: quota.OpAdd,
+								Path:      ".spec.containers[*].resources.requests.cpu",
+								Selectors: []selectors.SelectorWithFields{
+									{
+										LabelSelector: &metav1.LabelSelector{
+											MatchLabels: map[string]string{
+												"track": "yes",
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		EventuallyCreation(func() error {
+			return k8sClient.Create(ctx, q)
+		}).Should(Succeed())
+		awaitGlobalQuotaReady(ctx, q.GetName())
+
+		dep := MakeDeployment(testNamespace, "cpu-requests", 2, map[string]string{
+			"track": "yes",
+		}, "100m")
+		EventuallyCreation(func() error {
+			dep.ResourceVersion = ""
+			return k8sClient.Create(ctx, dep)
+		}).Should(Succeed())
+		ExpectPodsForDeployment(ctx, testNamespace, "cpu-requests", 2)
+
+		expectGlobalQuotaUsedAndClaims(ctx, q.GetName(), "200m", 2)
+		expectLedgerSettled(ctx, ControllerNamespace, q.GetName())
+
+		ScaleDeployment(ctx, testNamespace, "cpu-requests", 4)
+		ExpectPodsForDeployment(ctx, testNamespace, "cpu-requests", 4)
+		expectGlobalQuotaUsedAndClaims(ctx, q.GetName(), "400m", 4)
+		expectLedgerSettled(ctx, ControllerNamespace, q.GetName())
+
+		ledger := getLedger(ctx, ControllerNamespace, q.GetName())
+		Expect(ledger.Spec.TargetRef.Kind).To(Equal("GlobalCustomQuota"))
+		Expect(ledger.Spec.TargetRef.Name).To(Equal(q.GetName()))
+
+		gq := getGlobalQuota(ctx, q.GetName())
+		Expect(gq.Status.Usage.Used.Cmp(resource.MustParse("400m"))).To(Equal(0))
+	})
+
 	It("marks the quota not ready when an existing matching object has no value at the configured quantity path", func() {
 		q := &capsulev1beta2.GlobalCustomQuota{
 			ObjectMeta: metav1.ObjectMeta{
@@ -1829,72 +1895,6 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 
 		NamespaceDeletionAdmin(ns, defaultTimeoutInterval).Should(Succeed())
 		expectGlobalQuotaNamespaces(quota.GetName())
-	})
-
-	It("aggregates a custom pod quantity path and settles the corresponding ledger", func() {
-		q := &capsulev1beta2.GlobalCustomQuota{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "gq-pod-cpu-requests",
-				Labels: map[string]string{
-					"e2e.capsule.dev/test-suite": "globalcustomquota-ledger",
-				},
-			},
-			Spec: capsulev1beta2.GlobalCustomQuotaSpec{
-				CustomQuotaSpec: capsulev1beta2.CustomQuotaSpec{
-					Limit: resource.MustParse("500m"),
-					Sources: []capsulev1beta2.CustomQuotaSpecSource{
-						{
-							VersionKind: gvk.VersionKind{
-								APIVersion: "v1",
-								Kind:       "Pod",
-							},
-							CustomQuotaSpecSourceConfig: capsulev1beta2.CustomQuotaSpecSourceConfig{
-								Operation: quota.OpAdd,
-								Path:      ".spec.containers[*].resources.requests.cpu",
-								Selectors: []selectors.SelectorWithFields{
-									{
-										LabelSelector: &metav1.LabelSelector{
-											MatchLabels: map[string]string{
-												"track": "yes",
-											},
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-		}
-
-		EventuallyCreation(func() error {
-			return k8sClient.Create(ctx, q)
-		}).Should(Succeed())
-		awaitGlobalQuotaReady(ctx, q.GetName())
-
-		dep := MakeDeployment(testNamespace, "cpu-requests", 2, map[string]string{
-			"track": "yes",
-		}, "100m")
-		EventuallyCreation(func() error {
-			dep.ResourceVersion = ""
-			return k8sClient.Create(ctx, dep)
-		}).Should(Succeed())
-		ExpectPodsForDeployment(ctx, testNamespace, "cpu-requests", 2)
-
-		expectGlobalQuotaUsedAndClaims(ctx, q.GetName(), "200m", 2)
-		expectLedgerSettled(ctx, ControllerNamespace, q.GetName())
-
-		ScaleDeployment(ctx, testNamespace, "cpu-requests", 4)
-		ExpectPodsForDeployment(ctx, testNamespace, "cpu-requests", 4)
-		expectGlobalQuotaUsedAndClaims(ctx, q.GetName(), "400m", 4)
-		expectLedgerSettled(ctx, ControllerNamespace, q.GetName())
-
-		ledger := getLedger(ctx, ControllerNamespace, q.GetName())
-		Expect(ledger.Spec.TargetRef.Kind).To(Equal("GlobalCustomQuota"))
-		Expect(ledger.Spec.TargetRef.Name).To(Equal(q.GetName()))
-
-		gq := getGlobalQuota(ctx, q.GetName())
-		Expect(gq.Status.Usage.Used.Cmp(resource.MustParse("400m"))).To(Equal(0))
 	})
 
 	It("does not produce negative usage when a matching pod is relabeled to no longer match", func() {
