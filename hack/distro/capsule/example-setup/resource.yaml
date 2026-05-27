@@ -44,5 +44,3 @@ spec:
               data: |
                 identity: {{ $$key.Identity | quote }}
                 recipient: {{ $$key.Recipient | quote }}
-                
-

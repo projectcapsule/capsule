@@ -72,14 +72,14 @@ func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 			&admissionregistrationv1.ValidatingWebhookConfiguration{},
 			enqueueFn,
 			builder.WithPredicates(predicate.NewPredicateFuncs(func(object client.Object) bool {
-				return object.GetName() == r.Configuration.ValidatingWebhookConfigurationName()
+				return object.GetName() == string(r.Configuration.Admission().Validating.Name)
 			})),
 		).
 		Watches(
 			&admissionregistrationv1.MutatingWebhookConfiguration{},
 			enqueueFn,
 			builder.WithPredicates(predicate.NewPredicateFuncs(func(object client.Object) bool {
-				return object.GetName() == r.Configuration.MutatingWebhookConfigurationName()
+				return object.GetName() == string(r.Configuration.Admission().Mutating.Name)
 			})),
 		).
 		Watches(
@@ -326,11 +326,11 @@ func (r Reconciler) updateValidatingWebhookConfiguration(ctx context.Context, ca
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		vw := &admissionregistrationv1.ValidatingWebhookConfiguration{}
 
-		if err := r.Get(ctx, types.NamespacedName{Name: r.Configuration.ValidatingWebhookConfigurationName()}, vw); err != nil {
+		if err := r.Get(ctx, types.NamespacedName{Name: string(r.Configuration.Admission().Validating.Name)}, vw); err != nil {
 			if apierrors.IsNotFound(err) {
-				r.Log.V(4).Info(
+				r.Log.V(3).Info(
 					"skipping missing ValidatingWebhookConfiguration",
-					"name", r.Configuration.ValidatingWebhookConfigurationName(),
+					"name", string(r.Configuration.Admission().Validating.Name),
 				)
 
 				return nil
@@ -356,11 +356,11 @@ func (r Reconciler) updateMutatingWebhookConfiguration(ctx context.Context, caBu
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		mw := &admissionregistrationv1.MutatingWebhookConfiguration{}
 
-		if err := r.Get(ctx, types.NamespacedName{Name: r.Configuration.MutatingWebhookConfigurationName()}, mw); err != nil {
+		if err := r.Get(ctx, types.NamespacedName{Name: string(r.Configuration.Admission().Mutating.Name)}, mw); err != nil {
 			if apierrors.IsNotFound(err) {
-				r.Log.V(4).Info(
+				r.Log.V(3).Info(
 					"skipping missing MutatingWebhookConfiguration",
-					"name", r.Configuration.MutatingWebhookConfigurationName(),
+					"name", string(r.Configuration.Admission().Mutating.Name),
 				)
 
 				return nil
