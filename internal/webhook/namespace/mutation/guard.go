@@ -117,7 +117,5 @@ func denyNamespacePatch(
 		)
 	}
 
-	response := admission.Denied(message)
-
-	return &response
+	return ad.Deny(message)
 }

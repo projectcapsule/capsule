@@ -13,6 +13,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
 
@@ -68,9 +69,7 @@ func (h *saNameHandler) validateServiceAccountName(tnt *capsulev1beta2.Tenant, r
 		}
 
 		if !compiler.MatchString(owner.Name) {
-			response := admission.Denied(fmt.Sprintf("owner name %s is not a valid Service Account name ", owner.Name))
-
-			return &response
+			return ad.Deny(fmt.Sprintf("owner name %s is not a valid Service Account name ", owner.Name))
 		}
 	}
 

@@ -98,7 +98,7 @@ var _ = Describe("Promoting ServiceAccounts to Owners", Ordered, Label("config",
 			meta.TenantLabel: tnt.GetName(),
 		})
 		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
-		time.Sleep(250 * time.Millisecond)
+		NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
 
 		// Create a ServiceAccount inside the tenant namespace
 		sa := &corev1.ServiceAccount{
@@ -198,7 +198,7 @@ var _ = Describe("Promoting ServiceAccounts to Owners", Ordered, Label("config",
 			meta.TenantLabel: tnt.GetName(),
 		})
 		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
-		time.Sleep(250 * time.Millisecond)
+		NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
 
 		// Create a ServiceAccount inside the tenant namespace
 		sa := &corev1.ServiceAccount{
@@ -293,7 +293,7 @@ var _ = Describe("Promoting ServiceAccounts to Owners", Ordered, Label("config",
 			meta.TenantLabel: tnt.GetName(),
 		})
 		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
-		time.Sleep(250 * time.Millisecond)
+		NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
 
 		// Create a ServiceAccount inside the tenant namespace
 		sa := &corev1.ServiceAccount{
@@ -359,7 +359,7 @@ var _ = Describe("Promoting ServiceAccounts to Owners", Ordered, Label("config",
 			meta.TenantLabel: tnt.GetName(),
 		})
 		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
-		time.Sleep(250 * time.Millisecond)
+		NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
 
 		// Create a ServiceAccount inside the tenant namespace
 		sa := &corev1.ServiceAccount{
@@ -463,8 +463,6 @@ var _ = Describe("Promoting ServiceAccounts to Owners", Ordered, Label("config",
 			Name:      "test-sa",
 			Namespace: ns.Name,
 		})), "expected ServiceAccount test-sa not to be present in CRB subjects")
-
-		time.Sleep(250 * time.Millisecond)
 
 		secondNs := NewNamespace("", map[string]string{
 			meta.TenantLabel: tnt.GetName(),

@@ -60,9 +60,7 @@ func mutatePVCDefaults(
 	if storageClassName := pvc.Spec.StorageClassName; storageClassName != nil && *storageClassName != allowed.Default {
 		csc, err = utils.GetStorageClassByName(ctx, c, *storageClassName)
 		if err != nil && !k8serrors.IsNotFound(err) {
-			response := admission.Denied(caperrors.NewStorageClassError(*storageClassName, err).Error())
-
-			return &response
+			return ad.Deny(caperrors.NewStorageClassError(*storageClassName, err).Error())
 		}
 	} else {
 		mutate = true

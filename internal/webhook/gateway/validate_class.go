@@ -103,9 +103,7 @@ func (r *class) validate(
 	if gatewayClass == nil {
 		recorder.Eventf(gatewayObj, tnt, corev1.EventTypeWarning, evt.ReasonMissingGatewayClass, evt.ActionValidationDenied, "Gateway %s/%s is missing GatewayClass", req.Namespace, req.Name)
 
-		response := admission.Denied(caperrors.NewGatewayClassUndefined(*allowed).Error())
-
-		return &response
+		return ad.Deny(caperrors.NewGatewayClassUndefined(*allowed).Error())
 	}
 
 	selector := false
@@ -132,8 +130,6 @@ func (r *class) validate(
 	default:
 		recorder.Eventf(gatewayObj, tnt, corev1.EventTypeWarning, evt.ReasonForbiddenGatewayClass, evt.ActionValidationDenied, "Gateway %s/%s GatewayClass %s is forbidden for the current Tenant", req.Namespace, req.Name, &gatewayClass)
 
-		response := admission.Denied(caperrors.NewGatewayClassForbidden(gatewayObj.Name, *allowed).Error())
-
-		return &response
+		return ad.Deny(caperrors.NewGatewayClassForbidden(gatewayObj.Name, *allowed).Error())
 	}
 }

@@ -11,6 +11,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
 
@@ -41,9 +42,7 @@ func (h *protectedHandler) OnDelete(
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		if tnt.Spec.PreventDeletion {
-			response := admission.Denied("tenant is protected and cannot be deleted")
-
-			return &response
+			return ad.Deny("tenant is protected and cannot be deleted")
 		}
 
 		return nil

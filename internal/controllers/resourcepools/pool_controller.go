@@ -129,7 +129,7 @@ func (r resourcePoolController) Reconcile(ctx context.Context, request ctrl.Requ
 				return
 			}
 
-			err = gherrors.Wrap(e, "failed to patch ResourcePool")
+			err = gherrors.Wrap(e, "failed to patch")
 
 			return
 		}

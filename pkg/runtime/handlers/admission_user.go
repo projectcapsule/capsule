@@ -29,6 +29,10 @@ func ResolveAdmissionUser(
 		return user
 	}
 
+	if users.HasIgnoredGroup(req.UserInfo.Groups, config.IgnoreUserWithGroups()) {
+		return user
+	}
+
 	if config.Administrators().IsPresent(req.UserInfo.Username, req.UserInfo.Groups) {
 		user.Type = users.AdmissionUserAdmin
 

@@ -14,6 +14,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
@@ -42,14 +43,12 @@ func (h *prefixHandler) OnCreate(
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		if exp, _ := h.cfg.ProtectedNamespaceRegexp(); exp != nil {
 			if exp.MatchString(ns.GetName()) {
-				response := admission.Denied(
+				return ad.Deny(
 					fmt.Sprintf(
 						"Creating namespaces with name matching %s regexp is not allowed; please, reach out to the system administrators",
 						exp.String(),
 					),
 				)
-
-				return &response
 			}
 		}
 
@@ -74,14 +73,12 @@ func (h *prefixHandler) OnCreate(
 				ns.GetName(),
 			)
 
-			response := admission.Denied(
+			return ad.Deny(
 				fmt.Sprintf(
 					"The namespace doesn't match the tenant prefix, expected prefix %q",
 					expectedPrefix,
 				),
 			)
-
-			return &response
 		}
 
 		return nil

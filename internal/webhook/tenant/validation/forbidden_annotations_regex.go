@@ -13,6 +13,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
 
@@ -79,9 +80,7 @@ func (h *forbiddenAnnotationsRegexHandler) validate(tnt *capsulev1beta2.Tenant, 
 
 	for scope, annotation := range annotationsToCheck {
 		if _, err := regexp.Compile(tnt.Spec.NamespaceOptions.ForbiddenLabels.Regex); err != nil {
-			response := admission.Denied(fmt.Sprintf("unable to compile %s regex for forbidden %s", annotation, scope))
-
-			return &response
+			return ad.Deny(fmt.Sprintf("unable to compile %s regex for forbidden %s", annotation, scope))
 		}
 	}
 

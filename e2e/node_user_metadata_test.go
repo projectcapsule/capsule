@@ -70,7 +70,7 @@ var _ = Describe("modifying node labels and annotations", Ordered, Label("config
 			{
 				Kind:     rbacv1.UserKind,
 				APIGroup: rbacv1.GroupName,
-				Name:     "gatsby",
+				Name:     "e2e-node-user-metadata-forbidden",
 			},
 		},
 	}

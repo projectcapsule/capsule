@@ -552,6 +552,10 @@ spec:
                     required:
                     - client
                     type: object
+                  serviceName:
+                    default: capsule-webhook-service
+                    description: Service Name of the Admission Service
+                    type: string
                   validating:
                     description: Configure dynamic Validating Admission for Capsule
                     properties:

@@ -85,9 +85,7 @@ func (r *userMetadataHandler) OnUpdate(
 			if !reflect.DeepEqual(oldNodeForbiddenLabels, newNodeForbiddenLabels) {
 				recorder.Eventf(newNode, nil, corev1.EventTypeWarning, evt.ReasonForbiddenLabel, evt.ActionValidationDenied, "Denied modifying forbidden labels on node")
 
-				response := admission.Denied(caperrors.NewNodeLabelForbiddenError(r.configuration.ForbiddenUserNodeLabels()).Error())
-
-				return &response
+				return ad.Deny(caperrors.NewNodeLabelForbiddenError(r.configuration.ForbiddenUserNodeLabels()).Error())
 			}
 		}
 
@@ -98,9 +96,7 @@ func (r *userMetadataHandler) OnUpdate(
 			if !reflect.DeepEqual(oldNodeForbiddenAnnotations, newNodeForbiddenAnnotations) {
 				recorder.Eventf(newNode, nil, corev1.EventTypeWarning, evt.ReasonForbiddenLabel, evt.ActionValidationDenied, "Denied modifying forbidden annotations on node")
 
-				response := admission.Denied(caperrors.NewNodeAnnotationForbiddenError(r.configuration.ForbiddenUserNodeAnnotations()).Error())
-
-				return &response
+				return ad.Deny(caperrors.NewNodeAnnotationForbiddenError(r.configuration.ForbiddenUserNodeAnnotations()).Error())
 			}
 		}
 

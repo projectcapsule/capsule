@@ -38,8 +38,8 @@ func (h *remainingNamespaceHandler) OnCreate(
 // This happens when a tenant has not yet reconciled it's namespaces but is deleted
 // and in the meantime a new namespace was created referencing the same tenant.
 func (h *remainingNamespaceHandler) OnDelete(
-	_ client.Client,
-	reader client.Reader,
+	c client.Client,
+	_ client.Reader,
 	tnt *capsulev1beta2.Tenant,
 	_ admission.Decoder,
 	_ events.EventRecorder,
@@ -47,7 +47,7 @@ func (h *remainingNamespaceHandler) OnDelete(
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		list := &corev1.NamespaceList{}
 
-		err := reader.List(ctx, list, client.MatchingFields{namespaceindex.OwnerReferenceIndex: tnt.GetName()})
+		err := c.List(ctx, list, client.MatchingFields{namespaceindex.OwnerReferenceIndex: tnt.GetName()})
 		if err != nil {
 			return ad.ErroredResponse(err)
 		}
@@ -63,9 +63,7 @@ func (h *remainingNamespaceHandler) OnDelete(
 			})
 
 			if instance == nil {
-				response := admission.Denied("tenant has remaining namespace referencing it (" + ns.GetName() + ")")
-
-				return &response
+				return ad.Deny("tenant has remaining namespace referencing it (" + ns.GetName() + ")")
 			}
 		}
 

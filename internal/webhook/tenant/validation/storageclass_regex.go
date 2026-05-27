@@ -13,6 +13,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
 
@@ -71,9 +72,7 @@ func (h *storageClassRegexHandler) validate(tnt *capsulev1beta2.Tenant, req admi
 	//nolint:staticcheck
 	if tnt.Spec.StorageClasses != nil && len(tnt.Spec.StorageClasses.Regex) > 0 {
 		if _, err := regexp.Compile(tnt.Spec.StorageClasses.Regex); err != nil {
-			response := admission.Denied("unable to compile storageClasses allowedRegex")
-
-			return &response
+			return ad.Deny("unable to compile storageClasses allowedRegex")
 		}
 	}
 

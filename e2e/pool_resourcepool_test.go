@@ -1789,6 +1789,12 @@ var _ = Describe("ResourcePool Tests", Ordered, Label("resourcepool", "pool"), f
 
 			err = k8sClient.Create(context.TODO(), ns2)
 			Expect(err).Should(Succeed())
+
+			ExpectResourcePoolNamespacesEventually(pool.Name, []string{
+				ns1.Name,
+				ns2.Name,
+			})
+
 		})
 
 		By("Create claims", func() {

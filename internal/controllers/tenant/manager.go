@@ -38,6 +38,7 @@ import (
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/internal/cache"
 	"github.com/projectcapsule/capsule/internal/controllers/utils"
 	"github.com/projectcapsule/capsule/internal/metrics"
 	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
@@ -61,6 +62,8 @@ type Manager struct {
 	Configuration configuration.Configuration
 	RESTConfig    *rest.Config
 	classes       supportedClasses
+
+	discoveryCache cache.DiscoveryNamespacedResourceCache
 }
 
 type supportedClasses struct {
@@ -70,6 +73,7 @@ type supportedClasses struct {
 
 func (r *Manager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.ControllerOptions) error {
 	r.reader = mgr.GetAPIReader()
+	r.discoveryCache = cache.NewDiscoveryNamespacedResourceCache()
 
 	ctrlBuilder := ctrl.NewControllerManagedBy(mgr).
 		Named("capsule/tenants").
@@ -149,7 +153,14 @@ func (r *Manager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.Controller
 					e event.TypedDeleteEvent[client.Object],
 					q workqueue.TypedRateLimitingInterface[reconcile.Request],
 				) {
-					r.enqueueTenantsForTenantOwner(ctx, e.Object, q)
+					r.enqueueForTenantsWithCondition(
+						ctx,
+						e.Object,
+						q,
+						func(tnt *capsulev1beta2.Tenant, _ client.Object) bool {
+							return len(tnt.Spec.Permissions.MatchOwners) > 0
+						},
+					)
 				},
 			},
 		).
@@ -224,7 +235,7 @@ func (r *Manager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.Controller
 	return ctrlBuilder.Complete(r)
 }
 
-func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ctrl.Result, err error) {
+func (r *Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ctrl.Result, err error) {
 	r.Log = r.Log.WithValues("Request.Name", request.Name)
 
 	// Fetch the Tenant instance
@@ -295,7 +306,7 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 	return reconcile.Result{}, reconcileError
 }
 
-func (r Manager) reconcile(ctx context.Context, instance *capsulev1beta2.Tenant) (err error) {
+func (r *Manager) reconcile(ctx context.Context, instance *capsulev1beta2.Tenant) (err error) {
 	var errs []error
 
 	// Collect Ownership/Promotions for Status

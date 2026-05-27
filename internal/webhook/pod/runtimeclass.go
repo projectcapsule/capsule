@@ -17,6 +17,7 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api"
 	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
+	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
@@ -122,9 +123,7 @@ func (h *runtimeClass) validate(
 			"Using Runtime Class %s is forbidden for the tenant %s", runtimeClassName, tnt.GetName(),
 		)
 
-		response := admission.Denied(caperrors.NewPodRuntimeClassForbidden(runtimeClassName, *allowed).Error())
-
-		return &response
+		return ad.Deny(caperrors.NewPodRuntimeClassForbidden(runtimeClassName, *allowed).Error())
 	default:
 		return nil
 	}

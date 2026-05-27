@@ -73,16 +73,59 @@ func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 			enqueueFn,
 			builder.WithPredicates(predicate.NewPredicateFuncs(func(object client.Object) bool {
 				return object.GetName() == r.Configuration.ValidatingWebhookConfigurationName()
-			},
-			)),
+			})),
 		).
-		Watches(&admissionregistrationv1.MutatingWebhookConfiguration{}, enqueueFn, builder.WithPredicates(predicate.NewPredicateFuncs(func(object client.Object) bool {
-			return object.GetName() == r.Configuration.MutatingWebhookConfigurationName()
-		}))).
-		Watches(&apiextensionsv1.CustomResourceDefinition{}, enqueueFn, builder.WithPredicates(predicate.NewPredicateFuncs(func(object client.Object) bool {
-			return object.GetName() == r.Configuration.TenantCRDName()
-		}))).
+		Watches(
+			&admissionregistrationv1.MutatingWebhookConfiguration{},
+			enqueueFn,
+			builder.WithPredicates(predicate.NewPredicateFuncs(func(object client.Object) bool {
+				return object.GetName() == r.Configuration.MutatingWebhookConfigurationName()
+			})),
+		).
+		Watches(
+			&apiextensionsv1.CustomResourceDefinition{},
+			enqueueFn,
+			builder.WithPredicates(
+				predicates.NamesMatchingPredicate{Names: r.managedCRDNames()},
+			),
+		).
 		Complete(r)
+}
+
+func (r Reconciler) Reconcile(ctx context.Context, request ctrl.Request) (ctrl.Result, error) {
+	r.Log = r.Log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
+
+	certSecret := &corev1.Secret{}
+
+	if err := r.Get(ctx, request.NamespacedName, certSecret); err != nil {
+		if !apierrors.IsNotFound(err) {
+			return reconcile.Result{}, err
+		}
+
+		certSecret = &corev1.Secret{}
+		certSecret.Name = request.Name
+		certSecret.Namespace = request.Namespace
+		certSecret.Type = corev1.SecretTypeTLS
+		certSecret.Data = map[string][]byte{}
+	}
+
+	if err := r.ReconcileCertificates(ctx, certSecret); err != nil {
+		return reconcile.Result{}, err
+	}
+
+	certificate, err := cert.GetCertificateFromBytes(certSecret.Data[corev1.TLSCertKey])
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+
+	now := time.Now()
+	requeueTime := certificate.NotAfter.Add(-(certificateExpirationThreshold - 1*time.Second))
+	requeueAfter := requeueTime.Sub(now)
+	requeueAfter = max(requeueAfter, 0)
+
+	r.Log.V(4).Info("Reconciliation completed, processing back in " + requeueAfter.String())
+
+	return reconcile.Result{Requeue: true, RequeueAfter: requeueAfter}, nil
 }
 
 func (r Reconciler) ReconcileCertificates(ctx context.Context, certSecret *corev1.Secret) error {
@@ -94,7 +137,10 @@ func (r Reconciler) ReconcileCertificates(ctx context.Context, certSecret *corev
 			return err
 		}
 
-		opts := cert.NewCertOpts(time.Now().Add(certificateValidity), fmt.Sprintf("capsule-webhook-service.%s.svc", r.Namespace))
+		opts := cert.NewCertOpts(
+			time.Now().Add(certificateValidity),
+			fmt.Sprintf("capsule-webhook-service.%s.svc", r.Namespace),
+		)
 
 		crt, key, err := ca.GenerateCertificate(opts)
 		if err != nil {
@@ -111,9 +157,13 @@ func (r Reconciler) ReconcileCertificates(ctx context.Context, certSecret *corev
 			corev1.ServiceAccountRootCAKey: caCrt.Bytes(),
 		}
 
-		t := &corev1.Secret{ObjectMeta: certSecret.ObjectMeta}
+		t := &corev1.Secret{
+			ObjectMeta: certSecret.ObjectMeta,
+			Type:       corev1.SecretTypeTLS,
+		}
 
 		_, err = controllerutil.CreateOrUpdate(ctx, r.Client, t, func() error {
+			t.Type = corev1.SecretTypeTLS
 			t.Data = certSecret.Data
 
 			return nil
@@ -125,36 +175,39 @@ func (r Reconciler) ReconcileCertificates(ctx context.Context, certSecret *corev
 		}
 	}
 
-	var caBundle []byte
-
-	var ok bool
-
-	if caBundle, ok = certSecret.Data[corev1.ServiceAccountRootCAKey]; !ok {
+	caBundle, ok := certSecret.Data[corev1.ServiceAccountRootCAKey]
+	if !ok {
 		return fmt.Errorf("missing %s field in %s secret", corev1.ServiceAccountRootCAKey, r.Configuration.TLSSecretName())
 	}
 
-	r.Log.V(4).Info("Updating caBundle in webhooks and crd")
+	r.Log.V(4).Info("Updating caBundle in webhooks and CRDs")
 
-	group := new(errgroup.Group)
+	group, ctx := errgroup.WithContext(ctx)
+
 	group.Go(func() error {
 		return r.updateMutatingWebhookConfiguration(ctx, caBundle)
 	})
+
 	group.Go(func() error {
 		return r.updateValidatingWebhookConfiguration(ctx, caBundle)
 	})
-	group.Go(func() error {
-		return r.updateTenantCustomResourceDefinition(ctx, "tenants.capsule.clastix.io", caBundle)
-	})
-	group.Go(func() error {
-		return r.updateTenantCustomResourceDefinition(ctx, "capsuleconfigurations.capsule.clastix.io", caBundle)
-	})
+
+	for key, crd := range r.conversionManagedCRDs() {
+		group.Go(func() error {
+			if err := r.updateManagedCustomResourceDefinition(ctx, crd, caBundle); err != nil {
+				return fmt.Errorf("cannot update managed CRD %q (%s): %w", key, crd.Name, err)
+			}
+
+			return nil
+		})
+	}
 
 	operatorPods, err := r.getOperatorPods(ctx)
 	if err != nil {
 		if errors.As(err, &caperrors.RunningInOutOfClusterModeError{}) {
 			r.Log.Info("skipping annotation of Pods for cert-manager", "error", err.Error())
 
-			return nil
+			return group.Wait()
 		}
 
 		return err
@@ -177,40 +230,23 @@ func (r Reconciler) ReconcileCertificates(ctx context.Context, certSecret *corev
 	return nil
 }
 
-func (r Reconciler) Reconcile(ctx context.Context, request ctrl.Request) (ctrl.Result, error) {
-	r.Log = r.Log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
-
-	certSecret := &corev1.Secret{}
-
-	if err := r.Get(ctx, request.NamespacedName, certSecret); err != nil {
-		// Error reading the object - requeue the request.
-		return reconcile.Result{}, err
-	}
-
-	if err := r.ReconcileCertificates(ctx, certSecret); err != nil {
-		return reconcile.Result{}, err
-	}
-
-	certificate, err := cert.GetCertificateFromBytes(certSecret.Data[corev1.TLSCertKey])
-	if err != nil {
-		return reconcile.Result{}, err
-	}
-
-	now := time.Now()
-	requeueTime := certificate.NotAfter.Add(-(certificateExpirationThreshold - 1*time.Second))
-	rq := requeueTime.Sub(now)
-
-	r.Log.V(4).Info("Reconciliation completed, processing back in " + rq.String())
-
-	return reconcile.Result{Requeue: true, RequeueAfter: rq}, nil
-}
-
 func (r Reconciler) shouldUpdateCertificate(secret *corev1.Secret) bool {
+	if secret == nil {
+		return true
+	}
+
+	if secret.Data == nil {
+		return true
+	}
+
 	if _, ok := secret.Data[corev1.ServiceAccountRootCAKey]; !ok {
 		return true
 	}
 
-	certificate, key, err := cert.GetCertificateWithPrivateKeyFromBytes(secret.Data[corev1.TLSCertKey], secret.Data[corev1.TLSPrivateKeyKey])
+	certificate, key, err := cert.GetCertificateWithPrivateKeyFromBytes(
+		secret.Data[corev1.TLSCertKey],
+		secret.Data[corev1.TLSPrivateKeyKey],
+	)
 	if err != nil {
 		return true
 	}
@@ -226,36 +262,56 @@ func (r Reconciler) shouldUpdateCertificate(secret *corev1.Secret) bool {
 	return false
 }
 
-// By default helm doesn't allow to use templates in CRD (https://helm.sh/docs/chart_best_practices/custom_resource_definitions/#method-1-let-helm-do-it-for-you).
-// In order to overcome this, we are setting conversion strategy in helm chart to None, and then update it with CA and namespace information.
-func (r *Reconciler) updateTenantCustomResourceDefinition(ctx context.Context, name string, caBundle []byte) error {
-	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
+func (r *Reconciler) updateManagedCustomResourceDefinition(
+	ctx context.Context,
+	managed ManagedCRD,
+	caBundle []byte,
+) error {
+	if !managed.ManageConversion {
+		return nil
+	}
+
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		crd := &apiextensionsv1.CustomResourceDefinition{}
 
-		err = r.Get(ctx, types.NamespacedName{Name: name}, crd)
-		if err != nil {
-			r.Log.Error(err, "cannot retrieve CustomResourceDefinition")
+		if err := r.Get(ctx, types.NamespacedName{Name: managed.Name}, crd); err != nil {
+			if apierrors.IsNotFound(err) {
+				r.Log.V(4).Info("skipping missing managed CustomResourceDefinition", "name", managed.Name)
+
+				return nil
+			}
+
+			r.Log.Error(err, "cannot retrieve CustomResourceDefinition", "name", managed.Name)
 
 			return err
 		}
 
-		path := "/convert"
+		path := managed.ConversionPath
+		if path == "" {
+			path = "/convert"
+		}
+
+		versions := managed.ConversionReviewVersions
+		if len(versions) == 0 {
+			versions = []string{"v1", "v1beta1"}
+		}
+
 		port := int32(443)
 
-		_, err = controllerutil.CreateOrUpdate(ctx, r.Client, crd, func() error {
+		_, err := controllerutil.CreateOrUpdate(ctx, r.Client, crd, func() error {
 			crd.Spec.Conversion = &apiextensionsv1.CustomResourceConversion{
-				Strategy: "Webhook",
+				Strategy: apiextensionsv1.WebhookConverter,
 				Webhook: &apiextensionsv1.WebhookConversion{
 					ClientConfig: &apiextensionsv1.WebhookClientConfig{
 						Service: &apiextensionsv1.ServiceReference{
 							Namespace: r.Namespace,
-							Name:      "capsule-webhook-service",
+							Name:      r.Configuration.Admission().ServiceName,
 							Path:      &path,
 							Port:      &port,
 						},
 						CABundle: caBundle,
 					},
-					ConversionReviewVersions: []string{"v1beta1", "v1beta2"},
+					ConversionReviewVersions: versions,
 				},
 			}
 
@@ -268,18 +324,25 @@ func (r *Reconciler) updateTenantCustomResourceDefinition(ctx context.Context, n
 
 //nolint:dupl
 func (r Reconciler) updateValidatingWebhookConfiguration(ctx context.Context, caBundle []byte) error {
-	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		vw := &admissionregistrationv1.ValidatingWebhookConfiguration{}
 
-		err = r.Get(ctx, types.NamespacedName{Name: r.Configuration.ValidatingWebhookConfigurationName()}, vw)
-		if err != nil {
+		if err := r.Get(ctx, types.NamespacedName{Name: r.Configuration.ValidatingWebhookConfigurationName()}, vw); err != nil {
+			if apierrors.IsNotFound(err) {
+				r.Log.V(4).Info(
+					"skipping missing ValidatingWebhookConfiguration",
+					"name", r.Configuration.ValidatingWebhookConfigurationName(),
+				)
+
+				return nil
+			}
+
 			r.Log.Error(err, "cannot retrieve ValidatingWebhookConfiguration")
 
 			return err
 		}
 
 		for i, w := range vw.Webhooks {
-			// Updating CABundle only in case of an internal service reference
 			if w.ClientConfig.Service != nil {
 				vw.Webhooks[i].ClientConfig.CABundle = caBundle
 			}
@@ -291,18 +354,25 @@ func (r Reconciler) updateValidatingWebhookConfiguration(ctx context.Context, ca
 
 //nolint:dupl
 func (r Reconciler) updateMutatingWebhookConfiguration(ctx context.Context, caBundle []byte) error {
-	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		mw := &admissionregistrationv1.MutatingWebhookConfiguration{}
 
-		err = r.Get(ctx, types.NamespacedName{Name: r.Configuration.MutatingWebhookConfigurationName()}, mw)
-		if err != nil {
+		if err := r.Get(ctx, types.NamespacedName{Name: r.Configuration.MutatingWebhookConfigurationName()}, mw); err != nil {
+			if apierrors.IsNotFound(err) {
+				r.Log.V(4).Info(
+					"skipping missing MutatingWebhookConfiguration",
+					"name", r.Configuration.MutatingWebhookConfigurationName(),
+				)
+
+				return nil
+			}
+
 			r.Log.Error(err, "cannot retrieve MutatingWebhookConfiguration")
 
 			return err
 		}
 
 		for i, w := range mw.Webhooks {
-			// Updating CABundle only in case of an internal service reference
 			if w.ClientConfig.Service != nil {
 				mw.Webhooks[i].ClientConfig.CABundle = caBundle
 			}
@@ -314,10 +384,13 @@ func (r Reconciler) updateMutatingWebhookConfiguration(ctx context.Context, caBu
 
 func (r Reconciler) updateOperatorPod(ctx context.Context, pod corev1.Pod) error {
 	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		// Need to get latest version of pod
 		p := &corev1.Pod{}
 
-		if err := r.Get(ctx, types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}, p); err != nil && !apierrors.IsNotFound(err) {
+		if err := r.Get(ctx, types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}, p); err != nil {
+			if apierrors.IsNotFound(err) {
+				return nil
+			}
+
 			r.Log.Error(err, "cannot get pod", "name", pod.Name, "namespace", pod.Namespace)
 
 			return err

@@ -14,6 +14,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/internal/webhook/utils"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
@@ -42,13 +43,17 @@ func (h *ownerReferenceHandler) OnCreate(
 	recorder events.EventRecorder,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		tnt, err := resolveTenantForNamespaceCreate(ctx, reader, user, h.cfg, ns)
-		if err != nil {
-			return ad.ErroredResponse(err)
+		tnt, errResponse := utils.GetNamespaceTenant(ctx, reader, c, ns, user, h.cfg, recorder)
+		if errResponse != nil {
+			return errResponse
 		}
 
 		if tnt == nil {
-			response := admission.Denied("Unable to assign namespace to tenant. Please use " + meta.TenantLabel + " label when creating a namespace")
+			response := admission.Denied(
+				"Unable to assign namespace to tenant. Please use " +
+					meta.TenantLabel +
+					" label when creating a namespace",
+			)
 
 			return &response
 		}
@@ -115,26 +120,12 @@ func (h *ownerReferenceHandler) OnUpdate(
 		}
 
 		labels := newNs.GetLabels()
-		tenant.AddNamespaceNameLabels(labels, oldNs)
+		tenant.AddNamespaceNameLabels(labels, newNs)
 		tenant.AddTenantNameLabel(labels, tnt)
 		newNs.SetLabels(labels)
 
 		return nil
 	}
-}
-
-func resolveTenantForNamespaceCreate(
-	ctx context.Context,
-	c client.Reader,
-	user users.AdmissionUser,
-	cfg configuration.Configuration,
-	ns *corev1.Namespace,
-) (*capsulev1beta2.Tenant, error) {
-	if user.IsAdmin() {
-		return tenant.GetTenantByLabels(ctx, c, ns)
-	}
-
-	return tenant.GetTenantByLabelsAndUser(ctx, c, cfg, ns, user)
 }
 
 func resolveTenantForNamespaceUpdate(

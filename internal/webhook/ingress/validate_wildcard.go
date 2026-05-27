@@ -92,9 +92,7 @@ func (h *wildcard) validate(
 				// In case of wildcard, generate an event and then return.
 				recorder.Eventf(ingress.GetClientObject(), &tnt, corev1.EventTypeWarning, evt.ReasonWildcardDenied, evt.ActionValidationDenied, "%s %s/%s cannot be %s", req.Kind.String(), req.Namespace, req.Name, strings.ToLower(string(req.Operation)))
 
-				response := admission.Denied(fmt.Sprintf("Wildcard denied for tenant %s\n", tnt.GetName()))
-
-				return &response
+				return ad.Deny(fmt.Sprintf("Wildcard denied for tenant %s\n", tnt.GetName()))
 			}
 		}
 	}

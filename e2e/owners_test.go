@@ -289,9 +289,6 @@ var _ = Describe("Owners", Ordered, Label("config", "tenant", "permissions", "ow
 		})
 
 		By("checking owners (e2e-owners-1)", func() {
-			t := &capsulev1beta2.Tenant{}
-			Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: tnt1.GetName()}, t)).Should(Succeed())
-
 			expectedOwners := rbac.OwnerStatusListSpec{
 				{
 					UserSpec: rbac.UserSpec{
@@ -337,9 +334,10 @@ var _ = Describe("Owners", Ordered, Label("config", "tenant", "permissions", "ow
 				},
 			}
 
-			Expect(normalizeOwners(t.Status.Owners)).
-				To(Equal(normalizeOwners(expectedOwners)))
+			t := &capsulev1beta2.Tenant{}
+			Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: tnt1.GetName()}, t)).Should(Succeed())
 
+			t = ExpectTenantOwnersEventually(tnt1.GetName(), expectedOwners)
 			VerifyTenantRoleBindings(t)
 		})
 
@@ -421,9 +419,7 @@ var _ = Describe("Owners", Ordered, Label("config", "tenant", "permissions", "ow
 				},
 			}
 
-			Expect(normalizeOwners(t.Status.Owners)).
-				To(Equal(normalizeOwners(expectedOwners)))
-
+			t = ExpectTenantOwnersEventually(tnt2.GetName(), expectedOwners)
 			VerifyTenantRoleBindings(t)
 		})
 
@@ -459,7 +455,7 @@ var _ = Describe("Owners", Ordered, Label("config", "tenant", "permissions", "ow
 		})
 
 		By("remove common tenant-owners", func() {
-			Expect(k8sClient.Delete(context.TODO(), ownersCommon)).Should(Succeed())
+			EventuallyDeletion(ownersCommon)
 		})
 
 		By("checking configuration", func() {
@@ -532,9 +528,7 @@ var _ = Describe("Owners", Ordered, Label("config", "tenant", "permissions", "ow
 				},
 			}
 
-			Expect(normalizeOwners(t.Status.Owners)).
-				To(Equal(normalizeOwners(expectedOwners)))
-
+			t = ExpectTenantOwnersEventually(tnt1.GetName(), expectedOwners)
 			VerifyTenantRoleBindings(t)
 		})
 
@@ -580,9 +574,7 @@ var _ = Describe("Owners", Ordered, Label("config", "tenant", "permissions", "ow
 				},
 			}
 
-			Expect(normalizeOwners(t.Status.Owners)).
-				To(Equal(normalizeOwners(expectedOwners)))
-
+			t = ExpectTenantOwnersEventually(tnt2.GetName(), expectedOwners)
 			VerifyTenantRoleBindings(t)
 		})
 
@@ -659,9 +651,7 @@ var _ = Describe("Owners", Ordered, Label("config", "tenant", "permissions", "ow
 				},
 			}
 
-			Expect(normalizeOwners(t.Status.Owners)).
-				To(Equal(normalizeOwners(expectedOwners)))
-
+			t = ExpectTenantOwnersEventually(tnt1.GetName(), expectedOwners)
 			VerifyTenantRoleBindings(t)
 		})
 
@@ -700,14 +690,12 @@ var _ = Describe("Owners", Ordered, Label("config", "tenant", "permissions", "ow
 				},
 			}
 
-			Expect(normalizeOwners(t.Status.Owners)).
-				To(Equal(normalizeOwners(expectedOwners)))
-
+			t = ExpectTenantOwnersEventually(tnt2.GetName(), expectedOwners)
 			VerifyTenantRoleBindings(t)
 		})
 
 		By("remove admin tenant-owners", func() {
-			Expect(k8sClient.Delete(context.TODO(), ownersDevops)).Should(Succeed())
+			EventuallyDeletion(ownersDevops)
 		})
 
 		By("checking configuration", func() {
@@ -771,9 +759,7 @@ var _ = Describe("Owners", Ordered, Label("config", "tenant", "permissions", "ow
 				},
 			}
 
-			Expect(normalizeOwners(t.Status.Owners)).
-				To(Equal(normalizeOwners(expectedOwners)))
-
+			t = ExpectTenantOwnersEventually(tnt1.GetName(), expectedOwners)
 			VerifyTenantRoleBindings(t)
 		})
 
@@ -812,10 +798,30 @@ var _ = Describe("Owners", Ordered, Label("config", "tenant", "permissions", "ow
 				},
 			}
 
-			Expect(normalizeOwners(t.Status.Owners)).
-				To(Equal(normalizeOwners(expectedOwners)))
-
+			t = ExpectTenantOwnersEventually(tnt2.GetName(), expectedOwners)
 			VerifyTenantRoleBindings(t)
 		})
 	})
 })
+
+func ExpectTenantOwnersEventually(
+	tenantName string,
+	expected rbac.OwnerStatusListSpec,
+) *capsulev1beta2.Tenant {
+	var current *capsulev1beta2.Tenant
+
+	Eventually(func(g Gomega) {
+		current = &capsulev1beta2.Tenant{}
+
+		g.Expect(k8sClient.Get(
+			context.TODO(),
+			types.NamespacedName{Name: tenantName},
+			current,
+		)).To(Succeed())
+
+		g.Expect(normalizeOwners(current.Status.Owners)).
+			To(Equal(normalizeOwners(expected)))
+	}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+
+	return current
+}

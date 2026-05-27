@@ -103,9 +103,7 @@ func (r *class) validate(
 	if ingressClass == nil {
 		recorder.Eventf(ingress.GetClientObject(), tnt, corev1.EventTypeWarning, evt.ReasonMissingIngressClass, evt.ActionValidationDenied, "Ingress %s/%s is missing IngressClass", req.Namespace, req.Name)
 
-		response := admission.Denied(caperrors.NewIngressClassUndefined(*allowed).Error())
-
-		return &response
+		return ad.Deny(caperrors.NewIngressClassUndefined(*allowed).Error())
 	}
 
 	selector := false
@@ -133,8 +131,6 @@ func (r *class) validate(
 	default:
 		recorder.Eventf(ingress.GetClientObject(), tnt, corev1.EventTypeWarning, evt.ReasonForbiddenIngressClass, evt.ActionValidationDenied, "Ingress %s/%s IngressClass %s is forbidden for the current Tenant", req.Namespace, req.Name, &ingressClass)
 
-		response := admission.Denied(caperrors.NewIngressClassForbidden(*ingressClass, *allowed).Error())
-
-		return &response
+		return ad.Deny(caperrors.NewIngressClassForbidden(*ingressClass, *allowed).Error())
 	}
 }

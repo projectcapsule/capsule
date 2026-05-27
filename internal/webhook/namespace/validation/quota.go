@@ -14,6 +14,7 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
+	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 	"github.com/projectcapsule/capsule/pkg/users"
@@ -86,9 +87,7 @@ func (h *quotaHandler) handle(
 
 		recorder.Eventf(ns, nil, corev1.EventTypeWarning, evt.ReasonOverprovision, evt.ActionValidationDenied, "Namespace %s cannot be attached, quota exceeded for the current Tenant", ns.GetName())
 
-		response := admission.Denied(caperrors.NewNamespaceQuotaExceededError().Error())
-
-		return &response
+		return ad.Deny(caperrors.NewNamespaceQuotaExceededError().Error())
 	}
 
 	return nil

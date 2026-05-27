@@ -48,9 +48,7 @@ func (h *metadataHandler) OnCreate(
 		}
 
 		if tnt == nil {
-			response := admission.Denied("Unable to assign namespace to tenant.")
-
-			return &response
+			return ad.Deny("Unable to assign namespace to tenant.")
 		}
 
 		labels, annotations, err := tenant.BuildNamespaceMetadataForTenant(ns, tnt)
@@ -101,15 +99,13 @@ func (h *metadataHandler) OnUpdate(
 	recorder events.EventRecorder,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		tnt, errResponse := utils.GetNamespaceTenant(ctx, reader, c, oldNs, user, h.cfg, recorder)
+		tnt, errResponse := h.resolveTenantForUpdate(ctx, reader, c, oldNs, newNs, user, recorder)
 		if errResponse != nil {
 			return errResponse
 		}
 
 		if tnt == nil {
-			response := admission.Denied("Unable to assign namespace to tenant.")
-
-			return &response
+			return ad.Deny("Unable to assign namespace to tenant.")
 		}
 
 		labels, annotations, err := tenant.BuildNamespaceMetadataForTenant(newNs, tnt)
@@ -117,13 +113,15 @@ func (h *metadataHandler) OnUpdate(
 			return ad.ErroredResponse(err)
 		}
 
-		managedMetadataOnly := tnt.Spec.NamespaceOptions != nil && tnt.Spec.NamespaceOptions.ManagedMetadataOnly
+		managedMetadataOnly := tnt.Spec.NamespaceOptions != nil &&
+			tnt.Spec.NamespaceOptions.ManagedMetadataOnly
+
 		if !managedMetadataOnly {
 			labels = mergeStringMap(newNs.GetLabels(), labels)
 			annotations = mergeStringMap(newNs.GetAnnotations(), annotations)
 		}
 
-		tenant.AddNamespaceNameLabels(labels, oldNs)
+		tenant.AddNamespaceNameLabels(labels, newNs)
 		tenant.AddTenantNameLabel(labels, tnt)
 
 		newNs.SetLabels(labels)
@@ -170,4 +168,39 @@ func (h *metadataHandler) handleCordoning(
 	ns.SetLabels(labels)
 
 	return nil
+}
+
+func (h *metadataHandler) resolveTenantForUpdate(
+	ctx context.Context,
+	reader client.Reader,
+	cache client.Client,
+	oldNs *corev1.Namespace,
+	newNs *corev1.Namespace,
+	user users.AdmissionUser,
+	recorder events.EventRecorder,
+) (*capsulev1beta2.Tenant, *admission.Response) {
+	if user.IsAdmin() {
+		tnt, err := tenant.GetTenantByLabels(ctx, reader, newNs)
+		if err != nil {
+			return nil, ad.ErroredResponse(err)
+		}
+
+		if tnt != nil {
+			return tnt, nil
+		}
+
+		tnt, err = tenant.GetTenantByLabels(ctx, reader, oldNs)
+		if err != nil {
+			return nil, ad.ErroredResponse(err)
+		}
+
+		return tnt, nil
+	}
+
+	tnt, errResponse := utils.GetNamespaceTenant(ctx, reader, cache, oldNs, user, h.cfg, recorder)
+	if errResponse != nil {
+		return nil, errResponse
+	}
+
+	return tnt, nil
 }

@@ -105,13 +105,13 @@ func (h *replicaHandler) handler(
 			}
 		}
 
-		resp := admission.Denied(fmt.Sprintf(
-			"resource %s is managed by a global capsule replication %s",
-			req.Name,
-			global.Items[0].GetName(),
-		))
-
-		return &resp
+		return ad.Deny(
+			fmt.Sprintf(
+				"resource %s is managed by a global capsule replication %s",
+				req.Name,
+				global.Items[0].GetName(),
+			),
+		)
 	}
 
 	local := &capsulev1beta2.TenantResourceList{}
@@ -132,9 +132,14 @@ func (h *replicaHandler) handler(
 			}
 		}
 
-		resp := admission.Denied(fmt.Sprintf("resource %s is managed by a tenant capsule replication %s/%s", req.Name, local.Items[0].GetName(), local.Items[0].GetNamespace()))
-
-		return &resp
+		return ad.Deny(
+			fmt.Sprintf(
+				"resource %s is managed by a tenant capsule replication %s/%s",
+				req.Name,
+				local.Items[0].GetName(),
+				local.Items[0].GetNamespace(),
+			),
+		)
 	}
 
 	return nil

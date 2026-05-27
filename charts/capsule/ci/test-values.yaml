@@ -4,6 +4,10 @@ manager:
     requests:
       cpu: 200m
       memory: 128Mi
+  options:
+    capsuleUserGroups: ["custom-group-1", "custom-group-2"]
+    userNames: ["custom-user-1", "custom-user-2"]
+
   rbac:
     create: true
     existingClusterRoles:

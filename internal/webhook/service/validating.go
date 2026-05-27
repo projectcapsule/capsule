@@ -17,6 +17,7 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api"
 	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
+	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
@@ -83,9 +84,7 @@ func (h *validating) handle(
 			"Cannot be type of NodePort for the Tenant %s", tnt.GetName(),
 		)
 
-		response := admission.Denied(caperrors.NewNodePortDisabledError().Error())
-
-		return &response
+		return ad.Deny(caperrors.NewExternalNameDisabledError().Error())
 	}
 
 	if svc.Spec.Type == corev1.ServiceTypeExternalName && tnt.Spec.ServiceOptions != nil && tnt.Spec.ServiceOptions.AllowedServices != nil && !*tnt.Spec.ServiceOptions.AllowedServices.ExternalName {
@@ -98,9 +97,7 @@ func (h *validating) handle(
 			"Cannot be type of ExternalName for the Tenant %s", tnt.GetName(),
 		)
 
-		response := admission.Denied(caperrors.NewExternalNameDisabledError().Error())
-
-		return &response
+		return ad.Deny(caperrors.NewExternalNameDisabledError().Error())
 	}
 
 	if svc.Spec.Type == corev1.ServiceTypeLoadBalancer && tnt.Spec.ServiceOptions != nil && tnt.Spec.ServiceOptions.AllowedServices != nil && !*tnt.Spec.ServiceOptions.AllowedServices.LoadBalancer {
@@ -113,9 +110,7 @@ func (h *validating) handle(
 			"Cannot be type of LoadBalancer for the Tenant %s", tnt.GetName(),
 		)
 
-		response := admission.Denied(caperrors.NewLoadBalancerDisabled().Error())
-
-		return &response
+		return ad.Deny(caperrors.NewLoadBalancerDisabled().Error())
 	}
 
 	if tnt.Spec.ServiceOptions != nil {
@@ -132,9 +127,7 @@ func (h *validating) handle(
 				err.Error(),
 			)
 
-			response := admission.Denied(err.Error())
-
-			return &response
+			return ad.Deny(err.Error())
 		}
 
 		err = api.ValidateForbidden(svc.Labels, tnt.Spec.ServiceOptions.ForbiddenLabels)
@@ -150,9 +143,7 @@ func (h *validating) handle(
 				err.Error(),
 			)
 
-			response := admission.Denied(err.Error())
-
-			return &response
+			return ad.Deny(err.Error())
 		}
 	}
 
@@ -189,9 +180,7 @@ func (h *validating) handle(
 				"External IP %s is forbidden for the Tenant %s", ip.String(), tnt.GetName(),
 			)
 
-			response := admission.Denied(caperrors.NewExternalServiceIPForbidden(tnt.Spec.ServiceOptions.ExternalServiceIPs.Allowed).Error())
-
-			return &response
+			return ad.Deny(caperrors.NewExternalServiceIPForbidden(tnt.Spec.ServiceOptions.ExternalServiceIPs.Allowed).Error())
 		}
 	}
 

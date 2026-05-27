@@ -100,9 +100,7 @@ func (r *collision) validate(
 		recorder.Eventf(ing.GetClientObject(), tnt, corev1.EventTypeWarning, evt.ReasonIngressHostnameCollision, evt.ActionValidationDenied, "Ingress %s/%s hostname is colliding", ing.Namespace(), ing.Name())
 	}
 
-	response := admission.Denied(err.Error())
-
-	return &response
+	return ad.Deny(err.Error())
 }
 
 //nolint:gocognit,gocyclo,cyclop

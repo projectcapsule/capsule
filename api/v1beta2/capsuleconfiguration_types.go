@@ -86,6 +86,10 @@ type RBACConfiguration struct {
 }
 
 type DynamicAdmission struct {
+	// Service Name of the Admission Service
+	// +kubebuilder:default=capsule-webhook-service
+	ServiceName string `json:"serviceName,omitempty"`
+
 	// Configure dynamic Mutating Admission for Capsule
 	Mutating *DynamicMutatingAdmissionConfig `json:"mutating,omitempty"`
 

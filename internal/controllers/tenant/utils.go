@@ -75,41 +75,6 @@ func runForTenantNamespaces(
 	return errors.Join(joined...)
 }
 
-func (r *Manager) enqueueTenantsForTenantOwner(
-	ctx context.Context,
-	tenantOwner client.Object,
-	q workqueue.TypedRateLimitingInterface[reconcile.Request],
-) {
-	var tenants capsulev1beta2.TenantList
-	if err := r.List(ctx, &tenants); err != nil {
-		r.Log.Error(err, "failed to list Tenants for Tenant Owner event")
-
-		return
-	}
-
-	owner, ok := tenantOwner.(*capsulev1beta2.TenantOwner)
-	if !ok {
-		return
-	}
-
-	for i := range tenants.Items {
-		tnt := &tenants.Items[i]
-
-		if _, found := tnt.Status.Owners.FindOwner(
-			owner.Spec.Name,
-			owner.Spec.Kind,
-		); !found {
-			continue
-		}
-
-		q.Add(reconcile.Request{
-			NamespacedName: types.NamespacedName{
-				Name: tnt.Name,
-			},
-		})
-	}
-}
-
 func (r *Manager) enqueueForTenantsWithCondition(
 	ctx context.Context,
 	obj client.Object,

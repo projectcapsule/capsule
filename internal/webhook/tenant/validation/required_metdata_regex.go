@@ -12,6 +12,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 	"github.com/projectcapsule/capsule/pkg/utils"
 )
@@ -79,17 +80,13 @@ func (h *requiredMetadataHandler) validate(tnt *capsulev1beta2.Tenant, req admis
 
 	for _, exp := range tnt.Spec.NamespaceOptions.RequiredMetadata.Labels {
 		if _, err := regexp.Compile(exp); err != nil {
-			response := admission.Denied("unable to compile required label")
-
-			return &response
+			return ad.Deny("unable to compile required label")
 		}
 	}
 
 	for _, exp := range tnt.Spec.NamespaceOptions.RequiredMetadata.Annotations {
 		if _, err := regexp.Compile(exp); err != nil {
-			response := admission.Denied("unable to compile required annotation")
-
-			return &response
+			return ad.Deny("unable to compile required annotation")
 		}
 	}
 

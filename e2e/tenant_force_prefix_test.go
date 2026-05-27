@@ -47,7 +47,7 @@ var _ = Describe("creating a Namespace with Tenant name prefix enforcement at Te
 				{
 					CoreOwnerSpec: rbac.CoreOwnerSpec{
 						UserSpec: rbac.UserSpec{
-							Name: "john",
+							Name: "e2e-tenant-force-prefix",
 							Kind: "User",
 						},
 					},
@@ -95,14 +95,14 @@ var _ = Describe("creating a Namespace with Tenant name prefix enforcement at Te
 
 	It("should fail using prefix without capsule.clastix.io/tenant label, where the user owns more than one Tenant, for a tenant with ForceTenantPrefix true and global ForceTenantPrefix false", func() {
 		ns := NewNamespace("e2e-tenant-force-prefix-namespace")
-		NamespaceCreation(ns, t1.Spec.Owners[0].UserSpec, defaultTimeoutInterval).ShouldNot(Succeed())
-		NamespaceIsNotPartOfTenant(t1, ns).Should(Succeed())
+		NamespaceCreation(ns, t1.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+		NamespaceIsPartOfTenant(t1, ns).Should(Succeed())
 	})
 
 	It("should fail using prefix without capsule.clastix.io/tenant label, where the user owns more than one Tenant, for a tenant with ForceTenantPrefix false and global ForceTenantPrefix true", func() {
-		ns := NewNamespace("e2e-tenant-force-prefix-namespace")
-		NamespaceCreation(ns, t2.Spec.Owners[0].UserSpec, defaultTimeoutInterval).ShouldNot(Succeed())
-		NamespaceIsNotPartOfTenant(t2, ns).Should(Succeed())
+		ns := NewNamespace("e2e-tenant-force-prefix-tenant-namespace")
+		NamespaceCreation(ns, t2.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+		NamespaceIsPartOfTenant(t2, ns).Should(Succeed())
 	})
 
 	It("should succeed and be assigned with prefix and label, for a tenant with ForceTenantPrefix true and global ForceTenantPrefix false", func() {
@@ -122,8 +122,22 @@ var _ = Describe("creating a Namespace with Tenant name prefix enforcement at Te
 		ns := NewNamespace("e2e-tenant-force-prefix", map[string]string{
 			meta.TenantLabel: t1.GetName(),
 		})
+
 		NamespaceCreation(ns, t1.Spec.Owners[0].UserSpec, defaultTimeoutInterval).ShouldNot(Succeed())
-		NamespaceIsPartOfTenant(t1, ns).Should(Succeed())
+		NamespaceIsPartOfTenant(t1, ns).ShouldNot(Succeed())
+	})
+
+	It("should fail when not using prefix, with tenant label for a tenant with ForceTenantPrefix true and global ForceTenantPrefix true", func() {
+		ModifyCapsuleConfigurationOpts(func(configuration *capsulev1beta2.CapsuleConfiguration) {
+			configuration.Spec.ForceTenantPrefix = true
+		})
+
+		ns := NewNamespace("e2e-tenant-force-none", map[string]string{
+			meta.TenantLabel: t1.GetName(),
+		})
+
+		NamespaceCreation(ns, t1.Spec.Owners[0].UserSpec, defaultTimeoutInterval).ShouldNot(Succeed())
+		NamespaceIsPartOfTenant(t1, ns).ShouldNot(Succeed())
 	})
 
 	It("should succeed and be assigned with prefix and label, for a tenant with ForceTenantPrefix true and global ForceTenantPrefix true", func() {
@@ -136,15 +150,6 @@ var _ = Describe("creating a Namespace with Tenant name prefix enforcement at Te
 		})
 		NamespaceCreation(ns, t1.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 		NamespaceIsPartOfTenant(t1, ns).Should(Succeed())
-	})
-
-	It("should fail using prefix without capsule.clastix.io/tenant label, for a tenant with ForceTenantPrefix true and global ForceTenantPrefix true", func() {
-		ModifyCapsuleConfigurationOpts(func(configuration *capsulev1beta2.CapsuleConfiguration) {
-			configuration.Spec.ForceTenantPrefix = true
-		})
-		ns := NewNamespace("e2e-tenant-force-prefix-namespace")
-		NamespaceCreation(ns, t1.Spec.Owners[0].UserSpec, defaultTimeoutInterval).ShouldNot(Succeed())
-		NamespaceIsNotPartOfTenant(t1, ns).Should(Succeed())
 	})
 
 	It("should succeed when not using prefix, with tenant label for a tenant with ForceTenantPrefix false and global ForceTenantPrefix false", func() {
@@ -165,5 +170,15 @@ var _ = Describe("creating a Namespace with Tenant name prefix enforcement at Te
 		})
 		NamespaceCreation(ns, t2.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 		NamespaceIsPartOfTenant(t2, ns).Should(Succeed())
+	})
+
+	It("should fail using prefix without capsule.clastix.io/tenant label, for a tenant with ForceTenantPrefix true and global ForceTenantPrefix true", func() {
+		ModifyCapsuleConfigurationOpts(func(configuration *capsulev1beta2.CapsuleConfiguration) {
+			configuration.Spec.ForceTenantPrefix = true
+		})
+		ns := NewNamespace("e2e-tenant-force-prefix-tenant-namespace")
+		NamespaceCreation(ns, t2.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+		NamespaceIsPartOfTenant(t2, ns).Should(Succeed())
+		NamespaceIsNotPartOfTenant(t1, ns).Should(Succeed())
 	})
 })

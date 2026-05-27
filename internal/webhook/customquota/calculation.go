@@ -102,7 +102,7 @@ func (h *objectCalculationHandler) OnCreate(
 
 			evaluated, err := h.evaluateMatchedQuotas(ctx, u, matched)
 			if err != nil {
-				resp := admission.Denied(
+				finalResp = ad.Deny(
 					fmt.Sprintf(
 						"creating resource %s/%s (%s) cannot be admitted because custom quota usage could not be calculated: %v",
 						req.Namespace,
@@ -111,8 +111,6 @@ func (h *objectCalculationHandler) OnCreate(
 						err,
 					),
 				)
-
-				finalResp = &resp
 
 				return nil
 			}
@@ -167,7 +165,7 @@ func (h *objectCalculationHandler) OnCreate(
 						"inflightReserved", reserved.String(),
 					)
 
-					resp := admission.Denied(
+					finalResp = ad.Deny(
 						fmt.Sprintf(
 							"creating resource exceeds limit for %s %q (requested=%s, currentUsed=%s, available=%s, limit=%s, inflightReserved=%s)",
 							quotaTypeName(item.IsGlobal),
@@ -179,7 +177,6 @@ func (h *objectCalculationHandler) OnCreate(
 							reserved.String(),
 						),
 					)
-					finalResp = &resp
 
 					return nil
 				}
@@ -196,15 +193,13 @@ func (h *objectCalculationHandler) OnCreate(
 		})
 		if err != nil {
 			if apierrors.IsConflict(err) {
-				resp := admission.Denied(
+				return ad.Deny(
 					fmt.Sprintf(
 						"custom quota admission could not reserve usage due to concurrent quota updates after %d attempts; please retry the request: %v",
 						customAdmissionBackoff.Steps,
 						err,
 					),
 				)
-
-				return &resp
 			}
 
 			return ad.ErroredResponse(err)
@@ -251,7 +246,7 @@ func (h *objectCalculationHandler) OnUpdate(
 
 			oldEvaluated, err := h.evaluateMatchedQuotas(ctx, oldObj, oldMatched)
 			if err != nil {
-				resp := admission.Denied(
+				finalResp = ad.Deny(
 					fmt.Sprintf(
 						"updating resource %s/%s (%s) cannot be admitted because previous custom quota usage could not be calculated: %v",
 						req.Namespace,
@@ -261,14 +256,12 @@ func (h *objectCalculationHandler) OnUpdate(
 					),
 				)
 
-				finalResp = &resp
-
 				return nil
 			}
 
 			newEvaluated, err := h.evaluateMatchedQuotas(ctx, newObj, newMatched)
 			if err != nil {
-				resp := admission.Denied(
+				finalResp = ad.Deny(
 					fmt.Sprintf(
 						"updating resource %s/%s (%s) cannot be admitted because new custom quota usage could not be calculated: %v",
 						req.Namespace,
@@ -277,8 +270,6 @@ func (h *objectCalculationHandler) OnUpdate(
 						err,
 					),
 				)
-
-				finalResp = &resp
 
 				return nil
 			}
@@ -405,7 +396,7 @@ func (h *objectCalculationHandler) OnUpdate(
 						available = resource.MustParse("0")
 					}
 
-					resp := admission.Denied(
+					finalResp = ad.Deny(
 						fmt.Sprintf(
 							"updating resource exceeds limit for %s %q (requested=%s, currentUsed=%s, available=%s, limit=%s, inflightReserved=%s)",
 							quotaTypeName(base.IsGlobal),
@@ -417,8 +408,6 @@ func (h *objectCalculationHandler) OnUpdate(
 							reserved.String(),
 						),
 					)
-
-					finalResp = &resp
 
 					return nil
 				}
@@ -442,15 +431,13 @@ func (h *objectCalculationHandler) OnUpdate(
 		})
 		if err != nil {
 			if apierrors.IsConflict(err) {
-				resp := admission.Denied(
+				return ad.Deny(
 					fmt.Sprintf(
 						"custom quota admission could not reserve usage due to concurrent quota updates after %d attempts; please retry the request: %v",
 						customAdmissionBackoff.Steps,
 						err,
 					),
 				)
-
-				return &resp
 			}
 
 			return ad.ErroredResponse(err)

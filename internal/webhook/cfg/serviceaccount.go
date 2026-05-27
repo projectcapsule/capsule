@@ -11,6 +11,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
 
@@ -62,9 +63,9 @@ func (h *serviceAccountHandler) handle(config *capsulev1beta2.CapsuleConfigurati
 	nsSet := config.Spec.Impersonation.GlobalDefaultServiceAccountNamespace != ""
 
 	if nameSet != nsSet {
-		response := admission.Denied("both globalDefaultServiceAccount and globalDefaultServiceAccountNamespace must be set together")
-
-		return &response
+		return ad.Deny(
+			"both globalDefaultServiceAccount and globalDefaultServiceAccountNamespace must be set together",
+		)
 	}
 
 	return nil

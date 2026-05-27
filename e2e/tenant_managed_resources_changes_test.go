@@ -233,7 +233,10 @@ var _ = Describe("changing Tenant managed Kubernetes resources", Ordered, Label(
 
 					c := lr.DeepCopy()
 					c.Spec.Limits = []corev1.LimitRangeItem{}
-					Expect(k8sClient.Update(context.TODO(), c, &client.UpdateOptions{})).Should(Succeed())
+					Expect(k8sClient.Update(context.TODO(), c, &client.UpdateOptions{})).ShouldNot(Succeed())
+
+					controllerAccount := impersonationClient(ControllerServiceAccountFull, nil)
+					Expect(controllerAccount.Update(context.TODO(), c, &client.UpdateOptions{})).Should(Succeed())
 
 					Eventually(func() corev1.LimitRangeSpec {
 						Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: n, Namespace: ns}, lr)).Should(Succeed())
@@ -276,7 +279,10 @@ var _ = Describe("changing Tenant managed Kubernetes resources", Ordered, Label(
 					c := np.DeepCopy()
 					c.Spec.Egress = []networkingv1.NetworkPolicyEgressRule{}
 					c.Spec.Ingress = []networkingv1.NetworkPolicyIngressRule{}
-					Expect(k8sClient.Update(context.TODO(), c, &client.UpdateOptions{})).Should(Succeed())
+					Expect(k8sClient.Update(context.TODO(), c, &client.UpdateOptions{})).ShouldNot(Succeed())
+
+					controllerAccount := impersonationClient(ControllerServiceAccountFull, nil)
+					Expect(controllerAccount.Update(context.TODO(), c, &client.UpdateOptions{})).Should(Succeed())
 
 					Eventually(func() networkingv1.NetworkPolicySpec {
 						Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: n, Namespace: ns}, np)).Should(Succeed())
@@ -316,7 +322,10 @@ var _ = Describe("changing Tenant managed Kubernetes resources", Ordered, Label(
 
 					c := rq.DeepCopy()
 					c.Spec.Hard = map[corev1.ResourceName]resource.Quantity{}
-					Expect(k8sClient.Update(context.TODO(), c, &client.UpdateOptions{})).Should(Succeed())
+					Expect(k8sClient.Update(context.TODO(), c, &client.UpdateOptions{})).ShouldNot(Succeed())
+
+					controllerAccount := impersonationClient(ControllerServiceAccountFull, nil)
+					Expect(controllerAccount.Update(context.TODO(), c, &client.UpdateOptions{})).Should(Succeed())
 
 					Eventually(func() corev1.ResourceQuotaSpec {
 						Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: n, Namespace: ns}, rq)).Should(Succeed())

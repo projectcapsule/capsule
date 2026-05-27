@@ -26,6 +26,14 @@ spec:
     {{- toYaml .Values.manager.options.administrators | nindent 4 }}
   users:
     {{- toYaml .Values.manager.options.users | nindent 4 }}
+    {{- range $_, $subject :=  .Values.manager.options.userNames }}
+    - kind: "User"
+      name: {{ $subject | quote }}
+    {{- end }}
+    {{- range $_, $subject :=  .Values.manager.options.capsuleUserGroups }}
+    - kind: "Group"
+      name: {{ $subject | quote }}
+    {{- end }}
   enableTLSReconciler: {{ .Values.tls.enableController }}
   overrides:
     mutatingWebhookConfigurationName: {{ include "capsule.fullname" . }}-mutating-webhook-configuration
@@ -33,10 +41,6 @@ spec:
     validatingWebhookConfigurationName: {{ include "capsule.fullname" . }}-validating-webhook-configuration
   forceTenantPrefix: {{ .Values.manager.options.forceTenantPrefix }}
   allowServiceAccountPromotion: {{ .Values.manager.options.allowServiceAccountPromotion }}
-  userGroups:
-    {{- toYaml .Values.manager.options.capsuleUserGroups  | nindent 4 }}
-  userNames:
-    {{- toYaml .Values.manager.options.userNames | nindent 4 }}
   ignoreUserWithGroups:
     {{- toYaml .Values.manager.options.ignoreUserWithGroups | nindent 4 }}
   protectedNamespaceRegex: {{ .Values.manager.options.protectedNamespaceRegex | quote }}
@@ -45,6 +49,7 @@ spec:
     {{- toYaml . | nindent 4 }}
   {{- end }}
   admission:
+    serviceName: {{ include "capsule.fullname" . }}-webhook-service
     validating:
       name: "{{ include "capsule.fullname" . }}-dynamic-webhook"
       client:

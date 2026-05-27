@@ -51,9 +51,7 @@ func (h *claimValidationHandler) OnDelete(
 		}
 
 		if claim.IsBoundInResourcePool() {
-			response := admission.Denied(fmt.Sprintf("cannot delete the pool while claim is used in resourcepool %s", claim.Status.Pool.Name))
-
-			return &response
+			return ad.Deny(fmt.Sprintf("cannot delete the pool while claim is used in resourcepool %s", claim.Status.Pool.Name))
 		}
 
 		return nil
@@ -80,9 +78,7 @@ func (h *claimValidationHandler) OnUpdate(
 
 		if oldClaim.IsBoundInResourcePool() {
 			if oldClaim.Spec.Pool != newClaim.Spec.Pool || !reflect.DeepEqual(oldClaim.Spec.ResourceClaims, newClaim.Spec.ResourceClaims) {
-				response := admission.Denied(fmt.Sprintf("cannot change the requested resources while claim is allocated to a resourcepool %s", oldClaim.Status.Pool.Name))
-
-				return &response
+				return ad.Deny(fmt.Sprintf("cannot change the requested resources while claim is allocated to a resourcepool %s", oldClaim.Status.Pool.Name))
 			}
 		}
 

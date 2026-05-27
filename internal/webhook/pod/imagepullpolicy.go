@@ -14,6 +14,7 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api"
 	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
+	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
@@ -118,9 +119,7 @@ func (h *imagePullPolicy) verifyPullPolicy(
 			"PullPolicy %s is forbidden for the tenant %s", usedPullPolicy, tnt.GetName(),
 		)
 
-		response := admission.Denied(caperrors.NewImagePullPolicyForbidden(usedPullPolicy, container, policy.AllowedPullPolicies()).Error())
-
-		return &response
+		return ad.Deny(caperrors.NewImagePullPolicyForbidden(usedPullPolicy, container, policy.AllowedPullPolicies()).Error())
 	}
 
 	return nil

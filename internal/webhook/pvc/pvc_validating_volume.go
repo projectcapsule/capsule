@@ -142,16 +142,16 @@ func validatePVCVolumeName(
 	}
 
 	if pv.GetLabels() == nil {
-		return ad.ErroredResponse(errors.NewMissingTenantPVLabelsError(pv.GetName(), evt.ActionValidationDenied))
+		return ad.Deny(errors.NewMissingTenantPVLabelsError(pv.GetName(), evt.ActionValidationDenied).Error())
 	}
 
 	value, ok := pv.GetLabels()[meta.TenantLabel]
 	if !ok {
-		return ad.ErroredResponse(errors.NewMissingTenantPVLabelsError(pv.GetName(), evt.ActionValidationDenied))
+		return ad.Deny(errors.NewMissingTenantPVLabelsError(pv.GetName(), evt.ActionValidationDenied).Error())
 	}
 
 	if value != tnt.Name {
-		return ad.ErroredResponse(errors.NewCrossTenantPVMountError(pv.GetName(), evt.ActionValidationDenied))
+		return ad.Deny(errors.NewCrossTenantPVMountError(pv.GetName(), evt.ActionValidationDenied).Error())
 	}
 
 	return nil

@@ -13,6 +13,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
 
@@ -74,9 +75,7 @@ func (h *hostnameRegexHandler) validate(
 ) *admission.Response {
 	if tnt.Spec.IngressOptions.AllowedHostnames != nil && len(tnt.Spec.IngressOptions.AllowedHostnames.Regex) > 0 {
 		if _, err := regexp.Compile(tnt.Spec.IngressOptions.AllowedHostnames.Regex); err != nil {
-			response := admission.Denied("unable to compile allowedHostnames allowedRegex")
-
-			return &response
+			return ad.Deny("unable to compile allowedHostnames allowedRegex")
 		}
 	}
 

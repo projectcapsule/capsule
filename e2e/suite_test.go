@@ -40,8 +40,11 @@ var (
 var log = ctrl.Log.WithName("e2e-tests")
 
 const (
-	ControllerNamespace string = "capsule-system"
+	ControllerNamespace      string = "capsule-system"
+	ControllerServiceAccount string = "capsule"
 )
+
+var ControllerServiceAccountFull = "system:serviceaccount:" + ControllerNamespace + ":" + ControllerServiceAccount
 
 func TestAPIs(t *testing.T) {
 	RegisterFailHandler(Fail)

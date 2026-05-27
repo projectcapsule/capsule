@@ -89,7 +89,7 @@ var _ = Describe("creating a Namespace as Tenant owner with custom --capsule-gro
 		ModifyCapsuleConfigurationOpts(func(configuration *capsulev1beta2.CapsuleConfiguration) {
 			configuration.Spec.UserNames = []string{}
 			configuration.Spec.UserGroups = []string{}
-			configuration.Spec.Users = []rbac.UserSpec{{Kind: rbac.UserOwner, Name: "alice"}, {Kind: rbac.GroupOwner, Name: "test"}}
+			configuration.Spec.Users = []rbac.UserSpec{{Kind: rbac.UserOwner, Name: "e2e-assigned-custom-group-1"}, {Kind: rbac.GroupOwner, Name: "test"}}
 		})
 
 		ns := NewNamespace("", map[string]string{
@@ -173,7 +173,7 @@ var _ = Describe("creating a Namespace as Tenant owner with custom --capsule-gro
 			meta.TenantLabel: tnt.GetName(),
 		})
 
-		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).ShouldNot(Succeed())
+		NamespaceCreation(ns, tnt.Spec.Owners[1].UserSpec, defaultTimeoutInterval).ShouldNot(Succeed())
 		NamespaceIsNotPartOfTenant(tnt, ns).Should(Succeed())
 	})
 

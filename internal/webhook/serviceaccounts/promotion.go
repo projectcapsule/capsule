@@ -14,6 +14,7 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
+	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
@@ -83,11 +84,7 @@ func (h *promotion) handle(
 	}
 
 	if !h.cfg.AllowServiceAccountPromotion() {
-		response := admission.Denied(
-			"service account promotion is disabled. Contact cluster administrators",
-		)
-
-		return &response
+		return ad.Deny("service account promotion is disabled. Contact cluster administrators")
 	}
 
 	// We don't want to allow promoted serviceaccounts to promote other serviceaccounts

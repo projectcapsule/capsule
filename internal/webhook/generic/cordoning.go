@@ -11,6 +11,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
+	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
@@ -55,9 +56,5 @@ func (h *cordoningHandler) OnUpdate(
 }
 
 func (h *cordoningHandler) cordonHandler(req admission.Request) *admission.Response {
-	msg := fmt.Sprintf("The current namespace '%s' is cordoned. The attempted operation %s for %s/%s/%s/%s is not permitted during cordoning status.", req.Namespace, req.Operation, req.RequestKind.Group, req.RequestKind.Version, req.RequestKind.Kind, req.Name)
-
-	response := admission.Denied(msg)
-
-	return &response
+	return ad.Deny(fmt.Sprintf("The current namespace '%s' is cordoned. The attempted operation %s for %s/%s/%s/%s is not permitted during cordoning status.", req.Namespace, req.Operation, req.RequestKind.Group, req.RequestKind.Version, req.RequestKind.Kind, req.Name))
 }

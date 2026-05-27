@@ -12,6 +12,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
 
@@ -31,9 +32,7 @@ func (h *nameHandler) OnCreate(
 	return func(_ context.Context, req admission.Request) *admission.Response {
 		matched, _ := regexp.MatchString(`[a-z0-9]([-a-z0-9]*[a-z0-9])?`, tnt.GetName())
 		if !matched {
-			response := admission.Denied("tenant name has forbidden characters")
-
-			return &response
+			return ad.Deny("tenant name has forbidden characters")
 		}
 
 		return nil

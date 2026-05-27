@@ -14,6 +14,7 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
+	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
@@ -83,19 +84,11 @@ func (h *ownerPromotion) handle(
 	}
 
 	if !h.cfg.AllowServiceAccountPromotion() {
-		response := admission.Denied(
-			"service account owner promotion is disabled. Contact your system administrators",
-		)
-
-		return &response
+		return ad.Deny("service account owner promotion is disabled. Contact your system administrators")
 	}
 
 	if !tnt.Spec.Permissions.AllowOwnerPromotion {
-		response := admission.Denied(
-			"service account owner promotion is disabled for this tenant. Contact your system administrators",
-		)
-
-		return &response
+		return ad.Deny("service account owner promotion is disabled for this tenant. Contact your system administrators")
 	}
 
 	// We don't want to allow promoted serviceaccounts to promote other serviceaccounts

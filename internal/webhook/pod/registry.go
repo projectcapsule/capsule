@@ -18,6 +18,7 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/internal/cache"
 	"github.com/projectcapsule/capsule/pkg/api"
+	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
@@ -165,9 +166,9 @@ func (h *registryHandler) validateVolumes(
 
 		ref := strings.TrimSpace(v.Image.Reference)
 		if ref == "" {
-			resp := admission.Denied(fmt.Sprintf("volume %q has empty image.reference", v.Name))
-
-			return &resp
+			return ad.Deny(
+				fmt.Sprintf("volume %q has empty image.reference", v.Name),
+			)
 		}
 
 		if resp := h.verifyOCIReference(
@@ -239,8 +240,6 @@ func (h *registryHandler) verifyOCIReference(
 	if ref == "" {
 		msg := fmt.Sprintf("%s has empty reference", where)
 
-		resp := admission.Denied(msg)
-
 		recorder.Eventf(
 			pod,
 			tnt,
@@ -250,7 +249,7 @@ func (h *registryHandler) verifyOCIReference(
 			msg,
 		)
 
-		return &resp
+		return ad.Deny(msg)
 	}
 
 	// Match rules against the FULL OCI reference string.
@@ -259,8 +258,6 @@ func (h *registryHandler) verifyOCIReference(
 	if !cfg.allowed {
 		msg := fmt.Sprintf("%s reference %q is not allowed", where, ref)
 
-		resp := admission.Denied(msg)
-
 		recorder.Eventf(
 			pod,
 			tnt,
@@ -270,7 +267,7 @@ func (h *registryHandler) verifyOCIReference(
 			msg,
 		)
 
-		return &resp
+		return ad.Deny(msg)
 	}
 
 	// No defaulting: enforce only if restricted; empty pullPolicy is rejected under restriction.
@@ -283,8 +280,6 @@ func (h *registryHandler) verifyOCIReference(
 				where, ref, allowed,
 			)
 
-			resp := admission.Denied(msg)
-
 			recorder.Eventf(
 				pod,
 				tnt,
@@ -294,7 +289,7 @@ func (h *registryHandler) verifyOCIReference(
 				msg,
 			)
 
-			return &resp
+			return ad.Deny(msg)
 		}
 
 		if _, ok := cfg.allowedPolicy[pullPolicy]; !ok {
@@ -303,8 +298,6 @@ func (h *registryHandler) verifyOCIReference(
 				where, ref, pullPolicy, allowed,
 			)
 
-			resp := admission.Denied(msg)
-
 			recorder.Eventf(
 				pod,
 				tnt,
@@ -314,7 +307,7 @@ func (h *registryHandler) verifyOCIReference(
 				msg,
 			)
 
-			return &resp
+			return ad.Deny(msg)
 		}
 	}
 

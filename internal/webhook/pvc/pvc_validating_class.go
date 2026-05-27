@@ -16,6 +16,7 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
 	"github.com/projectcapsule/capsule/pkg/api/errors"
+	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
@@ -53,9 +54,7 @@ func (h *persistentVolumeValidatingClass) OnCreate(
 				"Requires a StorageClass",
 			)
 
-			response := admission.Denied(errors.NewStorageClassNotValid(*tnt.Spec.StorageClasses).Error())
-
-			return &response
+			return ad.Deny(errors.NewStorageClassNotValid(*tnt.Spec.StorageClasses).Error())
 		}
 
 		selector := false
@@ -89,9 +88,7 @@ func (h *persistentVolumeValidatingClass) OnCreate(
 				evt.ActionValidationDenied,
 				"StorageClass %s is forbidden for the Tenant %s", *storageClass, tnt.GetName())
 
-			response := admission.Denied(errors.NewStorageClassForbidden(*pvc.Spec.StorageClassName, *tnt.Spec.StorageClasses).Error())
-
-			return &response
+			return ad.Deny(errors.NewStorageClassForbidden(*pvc.Spec.StorageClassName, *tnt.Spec.StorageClasses).Error())
 		}
 	}
 }

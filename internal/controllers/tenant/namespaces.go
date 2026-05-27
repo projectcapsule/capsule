@@ -25,7 +25,6 @@ import (
 
 // Ensuring all annotations are applied to each Namespace handled by the Tenant.
 func (r *Manager) reconcileNamespaces(ctx context.Context, tnt *capsulev1beta2.Tenant) (err error) {
-	// Issue Cascading delete if tenant is being removed
 	if tnt.DeletionTimestamp != nil {
 		for _, ns := range tnt.Status.Spaces {
 			ns := &corev1.Namespace{
@@ -57,22 +56,17 @@ func (r *Manager) reconcileNamespaces(ctx context.Context, tnt *capsulev1beta2.T
 		oldStatus[tnt.Status.Spaces[i].Name] = struct{}{}
 	}
 
-	active := map[string]*corev1.Namespace{}
-	for _, item := range list.Items {
-		active[item.GetName()] = &item
-	}
-
-	group := new(errgroup.Group)
+	group, ctx := errgroup.WithContext(ctx)
+	group.SetLimit(8)
 
 	results := make(chan *capsulev1beta2.TenantStatusNamespaceItem, len(list.Items))
-
 	errs := make(chan error, len(list.Items))
 
 	for i := range list.Items {
-		ns := list.Items[i]
+		ns := list.Items[i].DeepCopy()
 
 		group.Go(func() error {
-			stat, err := r.reconcileNamespace(ctx, &ns, tnt)
+			stat, err := r.reconcileNamespace(ctx, ns, tnt)
 			if stat != nil {
 				results <- stat
 			}
@@ -120,10 +114,12 @@ func (r *Manager) reconcileNamespaces(ctx context.Context, tnt *capsulev1beta2.T
 		}
 
 		r.Metrics.DeleteAllMetricsForNamespace(name)
+
 		tnt.Status.RemoveInstance(&capsulev1beta2.TenantStatusNamespaceItem{Name: name})
 	}
 
 	tnt.Status.Size = uint(len(tnt.Status.Spaces))
+
 	tnt.AssignNamespaces(list.Items)
 
 	return err
@@ -147,8 +143,18 @@ func (r *Manager) reconcileNamespace(ctx context.Context, namespace *corev1.Name
 		stat = instance
 	}
 
+	dropFromStatus := false
+
 	// Always update tenant status condition after reconciliation
 	defer func() {
+		if dropFromStatus {
+			stat = nil
+
+			r.Metrics.DeleteAllMetricsForNamespace(namespace.GetName())
+
+			return
+		}
+
 		readCondition := meta.NewReadyCondition(namespace)
 
 		switch {
@@ -186,8 +192,6 @@ func (r *Manager) reconcileNamespace(ctx context.Context, namespace *corev1.Name
 	}()
 
 	// Verify if namespace is still active or terminating
-	cleanup := false
-
 	if namespace.DeletionTimestamp != nil {
 		terminating = true
 
@@ -198,6 +202,7 @@ func (r *Manager) reconcileNamespace(ctx context.Context, namespace *corev1.Name
 			terminatingState.Reason = meta.FailedReason
 			terminatingState.Status = metav1.ConditionFalse
 			terminatingState.Message = err.Error()
+			stat.Conditions.UpdateConditionByType(terminatingState)
 
 			return stat, err
 		}
@@ -206,18 +211,17 @@ func (r *Manager) reconcileNamespace(ctx context.Context, namespace *corev1.Name
 			terminatingState.Reason = meta.PendingUnmanagedContentReason
 			terminatingState.Status = metav1.ConditionFalse
 			terminatingState.Message = "waiting for pods to finalize"
-
 			stat.Conditions.UpdateConditionByType(terminatingState)
 
 			return stat, nil
 		}
 
-		// Initiate Cascading Cleanup
-		cleaned, err := tenant.NamespacedCascadingCleanup(ctx, r.Client, r.DiscoveryClient, r.DynamicClient, namespace)
+		cleaned, err := tenant.NamespacedCascadingCleanup(ctx, r.Client, r.DiscoveryClient, &r.discoveryCache, r.DynamicClient, namespace)
 		if err != nil {
 			terminatingState.Reason = meta.FailedReason
 			terminatingState.Status = metav1.ConditionFalse
 			terminatingState.Message = err.Error()
+			stat.Conditions.UpdateConditionByType(terminatingState)
 
 			return stat, err
 		}
@@ -226,38 +230,24 @@ func (r *Manager) reconcileNamespace(ctx context.Context, namespace *corev1.Name
 			terminatingState.Reason = meta.PendingUnmanagedContentReason
 			terminatingState.Status = metav1.ConditionFalse
 			terminatingState.Message = "performing cascading deletion"
-
 			stat.Conditions.UpdateConditionByType(terminatingState)
 
 			return stat, nil
 		}
 
 		terminatingState.Message = "removed managed resources"
-
 		stat.Conditions.UpdateConditionByType(terminatingState)
 
-		cleanup = true
+		r.Metrics.DeleteAllMetricsForNamespace(namespace.GetName())
+
+		dropFromStatus = true
+
+		return nil, nil
 	}
 
-	if !cleanup {
-		// Collect Rules for namespace
-		err := r.reconcileRuleStatus(ctx, tnt, namespace)
-		if err != nil {
-			return stat, err
-		}
-	} else {
-		obj := &capsulev1beta2.RuleStatus{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      meta.NameForManagedRuleStatus(),
-				Namespace: namespace.GetName(),
-			},
-		}
-
-		err := r.Delete(ctx, obj)
-		if apierrors.IsNotFound(err) {
-			err = nil
-		}
-
+	// Collect Rules for namespace
+	err = r.reconcileRuleStatus(ctx, tnt, namespace)
+	if err != nil {
 		return stat, err
 	}
 

@@ -23,8 +23,11 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
-	"github.com/projectcapsule/capsule/pkg/runtime/gvk"
 )
+
+type NamespacedResourceCache interface {
+	Get(disco discovery.DiscoveryInterface) ([]schema.GroupVersionResource, error)
+}
 
 func NamespaceIsPendingPodTerminating(
 	ctx context.Context,
@@ -75,10 +78,11 @@ func NamespacedCascadingCleanup(
 	ctx context.Context,
 	c client.Reader,
 	disco discovery.DiscoveryInterface,
+	resourceCache NamespacedResourceCache,
 	dyn dynamic.Interface,
 	ns *corev1.Namespace,
 ) (cleaned bool, err error) {
-	_, err = removeFinalizersFromRemainingNamespacedResources(ctx, disco, dyn, ns.Name, []string{})
+	_, err = removeFinalizersFromRemainingNamespacedResources(ctx, disco, dyn, resourceCache, ns.Name, []string{})
 	if err != nil {
 		return true, err
 	}
@@ -90,21 +94,13 @@ func removeFinalizersFromRemainingNamespacedResources(
 	ctx context.Context,
 	disco discovery.DiscoveryInterface,
 	dyn dynamic.Interface,
+	resourceCache NamespacedResourceCache,
 	namespace string,
 	ignoredFinalizers []string,
 ) (bool, error) {
 	var errs []error
 
-	resourceLists, err := disco.ServerPreferredNamespacedResources()
-	if err != nil {
-		if len(resourceLists) == 0 {
-			return false, fmt.Errorf("discover namespaced resources: %w", err)
-		}
-
-		errs = append(errs, fmt.Errorf("partial discovery failure: %w", err))
-	}
-
-	gvrs, err := gvk.NamespacedListableResources(resourceLists)
+	gvrs, err := resourceCache.Get(disco)
 	if err != nil {
 		return false, err
 	}
@@ -120,7 +116,7 @@ func removeFinalizersFromRemainingNamespacedResources(
 	)
 
 	g, ctx := errgroup.WithContext(ctx)
-	// g.SetLimit(8)
+	g.SetLimit(4)
 
 	for _, gvr := range gvrs {
 		g.Go(func() error {
@@ -141,9 +137,7 @@ func removeFinalizersFromRemainingNamespacedResources(
 		})
 	}
 
-	if err := g.Wait(); err != nil {
-		return cleanedAny, err
-	}
+	_ = g.Wait()
 
 	return cleanedAny, errors.Join(errs...)
 }

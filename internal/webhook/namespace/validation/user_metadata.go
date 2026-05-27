@@ -14,6 +14,7 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api"
+	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 	"github.com/projectcapsule/capsule/pkg/users"
@@ -42,18 +43,16 @@ func (h *userMetadataHandler) OnCreate(
 			if err != nil {
 				err = errors.Wrap(err, "namespace annotations validation failed")
 				recorder.Eventf(ns, ns, corev1.EventTypeWarning, evt.ReasonForbiddenAnnotation, evt.ActionValidationDenied, err.Error())
-				response := admission.Denied(err.Error())
 
-				return &response
+				return ad.Deny(err.Error())
 			}
 
 			err = api.ValidateForbidden(ns.Labels, tnt.Spec.NamespaceOptions.ForbiddenLabels)
 			if err != nil {
 				err = errors.Wrap(err, "namespace labels validation failed")
 				recorder.Eventf(ns, ns, corev1.EventTypeWarning, evt.ReasonForbiddenLabel, evt.ActionValidationDenied, err.Error())
-				response := admission.Denied(err.Error())
 
-				return &response
+				return ad.Deny(err.Error())
 			}
 		}
 
@@ -75,19 +74,19 @@ func (h *userMetadataHandler) OnUpdate(
 		if len(tnt.Spec.NodeSelector) > 0 {
 			v, ok := newNs.GetAnnotations()["scheduler.alpha.kubernetes.io/node-selector"]
 			if !ok {
-				response := admission.Denied("the node-selector annotation is enforced, cannot be removed")
+				msg := "the node-selector annotation is enforced, cannot be removed"
 
-				recorder.Eventf(oldNs, oldNs, corev1.EventTypeWarning, "ForbiddenNodeSelectorDeletion", "Denied", string(response.Result.Reason))
+				recorder.Eventf(oldNs, oldNs, corev1.EventTypeWarning, "ForbiddenNodeSelectorDeletion", "Denied", msg)
 
-				return &response
+				return ad.Deny(msg)
 			}
 
 			if v != oldNs.GetAnnotations()["scheduler.alpha.kubernetes.io/node-selector"] {
-				response := admission.Denied("the node-selector annotation is enforced, cannot be updated")
+				msg := "the node-selector annotation is enforced, cannot be updated"
 
-				recorder.Eventf(oldNs, oldNs, corev1.EventTypeWarning, "ForbiddenNodeSelectorUpdate", "Denied", string(response.Result.Reason))
+				recorder.Eventf(oldNs, oldNs, corev1.EventTypeWarning, "ForbiddenNodeSelectorUpdate", "Denied", msg)
 
-				return &response
+				return ad.Deny(msg)
 			}
 		}
 
@@ -136,18 +135,16 @@ func (h *userMetadataHandler) OnUpdate(
 			if err != nil {
 				err = errors.Wrap(err, "namespace annotations validation failed")
 				recorder.Eventf(oldNs, oldNs, corev1.EventTypeWarning, evt.ReasonForbiddenAnnotation, evt.ActionValidationDenied, err.Error())
-				response := admission.Denied(err.Error())
 
-				return &response
+				return ad.Deny(err.Error())
 			}
 
 			err = api.ValidateForbidden(labels, tnt.Spec.NamespaceOptions.ForbiddenLabels)
 			if err != nil {
 				err = errors.Wrap(err, "namespace labels validation failed")
 				recorder.Eventf(oldNs, oldNs, corev1.EventTypeWarning, evt.ReasonForbiddenLabel, evt.ActionValidationDenied, err.Error())
-				response := admission.Denied(err.Error())
 
-				return &response
+				return ad.Deny(err.Error())
 			}
 		}
 

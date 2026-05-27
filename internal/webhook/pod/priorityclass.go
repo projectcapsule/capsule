@@ -16,6 +16,7 @@ import (
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
 	"github.com/projectcapsule/capsule/pkg/api"
 	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
+	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
@@ -82,9 +83,7 @@ func (h *priorityClass) OnCreate(
 				"Using Priority Class %s is forbidden for the tenant %s", priorityClassName, tnt.GetName(),
 			)
 
-			response := admission.Denied(caperrors.NewPodPriorityClassForbidden(priorityClassName, *allowed).Error())
-
-			return &response
+			return ad.Deny(caperrors.NewPodPriorityClassForbidden(priorityClassName, *allowed).Error())
 		}
 	}
 }

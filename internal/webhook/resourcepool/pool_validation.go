@@ -79,24 +79,23 @@ func (h *poolValidationHandler) OnUpdate(
 						continue
 					}
 
-					response := admission.Denied(fmt.Sprintf(
-						"can not remove resource %s as it is still being allocated. Remove corresponding claims or keep the resources in the pool",
-						resourceName,
-					))
-
-					return &response
+					return ad.Deny(
+						fmt.Sprintf(
+							"can not remove resource %s as it is still being allocated. Remove corresponding claims or keep the resources in the pool",
+							resourceName,
+						),
+					)
 				}
 
 				if allocation.Cmp(qt) < 0 {
-					response := admission.Denied(
+					return ad.Deny(
 						fmt.Sprintf(
 							"can not reduce %s usage to %s because quantity %s is claimed . Remove corresponding claims or keep the resources in the pool",
 							resourceName,
 							allocation.String(),
 							qt.String(),
-						))
-
-					return &response
+						),
+					)
 				}
 			}
 		}

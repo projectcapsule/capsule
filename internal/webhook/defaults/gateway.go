@@ -56,17 +56,13 @@ func mutateGatewayDefaults(
 		if gatewayObj.Spec.GatewayClassName == ("") {
 			mutate = true
 		} else {
-			response := admission.Denied(caperrors.NewGatewayError(gatewayObj.Spec.GatewayClassName, err).Error())
-
-			return &response
+			return ad.Deny(caperrors.NewGatewayError(gatewayObj.Spec.GatewayClassName, err).Error())
 		}
 	}
 
 	if gatewayClass != nil && gatewayClass.Name != allowed.Default {
 		if err != nil && !k8serrors.IsNotFound(err) {
-			response := admission.Denied(caperrors.NewGatewayClassError(gatewayClass.Name, err).Error())
-
-			return &response
+			return ad.Deny(caperrors.NewGatewayClassError(gatewayClass.Name, err).Error())
 		}
 	} else {
 		mutate = true

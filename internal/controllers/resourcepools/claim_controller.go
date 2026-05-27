@@ -26,6 +26,7 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/internal/controllers/utils"
 	"github.com/projectcapsule/capsule/internal/metrics"
+	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 )
 
@@ -92,13 +93,13 @@ func (r resourceClaimController) Reconcile(ctx context.Context, request ctrl.Req
 		r.metrics.RecordClaimCondition(instance)
 
 		if e := patchHelper.Patch(ctx, instance); e != nil {
-			if apierrors.IsNotFound(e) {
+			if caperrors.IgnoreGone(e) {
 				err = nil
 
 				return
 			}
 
-			err = e
+			err = gherrors.Wrap(e, "failed to patch")
 
 			return
 		}

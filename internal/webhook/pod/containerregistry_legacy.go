@@ -14,6 +14,7 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api"
 	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
+	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
@@ -126,9 +127,7 @@ func (h *containerRegistryLegacyHandler) verifyContainerRegistry(
 		)
 
 		//nolint:staticcheck
-		response := admission.Denied(caperrors.NewContainerRegistryForbidden(image, *tnt.Spec.ContainerRegistries).Error())
-
-		return &response
+		return ad.Deny(caperrors.NewContainerRegistryForbidden(image, *tnt.Spec.ContainerRegistries).Error())
 	}
 
 	//nolint:staticcheck
@@ -148,9 +147,7 @@ func (h *containerRegistryLegacyHandler) verifyContainerRegistry(
 		)
 
 		//nolint:staticcheck
-		response := admission.Denied(caperrors.NewContainerRegistryForbidden(reg.FQCI(), *tnt.Spec.ContainerRegistries).Error())
-
-		return &response
+		return ad.Deny(caperrors.NewContainerRegistryForbidden(reg.FQCI(), *tnt.Spec.ContainerRegistries).Error())
 	}
 
 	return nil

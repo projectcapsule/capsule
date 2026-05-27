@@ -111,9 +111,7 @@ func (h *deviceClass) validateResourceRequest(
 		}
 
 		if dc == nil {
-			response := admission.Denied(caperrors.NewDeviceClassUndefined(*allowed).Error())
-
-			return &response
+			return ad.Deny(caperrors.NewDeviceClassUndefined(*allowed).Error())
 		}
 
 		selector := allowed.SelectorMatch(dc)
@@ -124,9 +122,7 @@ func (h *deviceClass) validateResourceRequest(
 		default:
 			recorder.Eventf(obj, tnt, corev1.EventTypeWarning, evt.ReasonForbiddenDeviceClass, evt.ActionValidationDenied, "%s %s/%s DeviceClass %s is forbidden for the current Tenant", req.Kind.Kind, req.Namespace, req.Name, &dc)
 
-			response := admission.Denied(caperrors.NewDeviceClassForbidden(dc.Name, *allowed).Error())
-
-			return &response
+			return ad.Deny(caperrors.NewDeviceClassForbidden(dc.Name, *allowed).Error())
 		}
 	}
 

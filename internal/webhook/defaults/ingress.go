@@ -58,9 +58,7 @@ func mutateIngressDefaults(
 
 	if ingressClassName := ingress.IngressClass(); ingressClassName != nil && *ingressClassName != allowed.Default {
 		if ingressClass, err = utils.GetIngressClassByName(ctx, version, c, ingressClassName); err != nil && !k8serrors.IsNotFound(err) {
-			response := admission.Denied(caperrors.NewIngressClassError(*ingressClassName, err).Error())
-
-			return &response
+			return ad.Deny(caperrors.NewIngressClassError(*ingressClassName, err).Error())
 		}
 	} else {
 		mutate = true
