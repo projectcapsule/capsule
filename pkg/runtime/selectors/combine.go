@@ -15,7 +15,6 @@ func CombineSelectors(selectors ...labels.Selector) labels.Selector {
 
 		reqs, selectable := sel.Requirements()
 		if !selectable {
-			// Defensive: if selector can't be expressed as requirements, match nothing.
 			return labels.Nothing()
 		}
 

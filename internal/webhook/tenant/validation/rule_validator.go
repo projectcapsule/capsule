@@ -14,6 +14,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
 
@@ -25,6 +26,7 @@ func RuleHandler() handlers.TypedHandler[*capsulev1beta2.Tenant] {
 
 func (h *RuleValidationHandler) OnCreate(
 	_ client.Client,
+	_ client.Reader,
 	tnt *capsulev1beta2.Tenant,
 	decoder admission.Decoder,
 	_ events.EventRecorder,
@@ -38,7 +40,13 @@ func (h *RuleValidationHandler) OnCreate(
 	}
 }
 
-func (h *RuleValidationHandler) OnDelete(client.Client, *capsulev1beta2.Tenant, admission.Decoder, events.EventRecorder) handlers.Func {
+func (h *RuleValidationHandler) OnDelete(
+	client.Client,
+	client.Reader,
+	*capsulev1beta2.Tenant,
+	admission.Decoder,
+	events.EventRecorder,
+) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
@@ -46,6 +54,7 @@ func (h *RuleValidationHandler) OnDelete(client.Client, *capsulev1beta2.Tenant, 
 
 func (h *RuleValidationHandler) OnUpdate(
 	_ client.Client,
+	_ client.Reader,
 	tnt *capsulev1beta2.Tenant,
 	old *capsulev1beta2.Tenant,
 	decoder admission.Decoder,
@@ -74,22 +83,18 @@ func ValidateRule(tnt *capsulev1beta2.Tenant, req admission.Request) *admission.
 		// Validate NamespaceSelector (if provided)
 		if rule.NamespaceSelector != nil {
 			if _, err := metav1.LabelSelectorAsSelector(rule.NamespaceSelector); err != nil {
-				resp := admission.Denied(
+				return ad.Deny(
 					fmt.Sprintf("rules[%d].namespaceSelector is invalid: %v", i, err),
 				)
-
-				return &resp
 			}
 		}
 
 		// Validate Registries
 		for _, r := range rule.Enforce.Registries {
 			if _, err := regexp.Compile(r.Registry); err != nil {
-				resp := admission.Denied(
+				return ad.Deny(
 					fmt.Sprintf("unable to compile regex %q: %v", r.Registry, err),
 				)
-
-				return &resp
 			}
 		}
 	}

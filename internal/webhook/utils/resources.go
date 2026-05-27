@@ -21,7 +21,7 @@ import (
 const TRUE string = "true"
 
 // Get PriorityClass by name (Does not return error if not found).
-func GetPriorityClassByName(ctx context.Context, c client.Client, name string) (*schedulev1.PriorityClass, error) {
+func GetPriorityClassByName(ctx context.Context, c client.Reader, name string) (*schedulev1.PriorityClass, error) {
 	class := &schedulev1.PriorityClass{}
 	if err := c.Get(ctx, types.NamespacedName{Name: name}, class); err != nil {
 		return nil, err
@@ -31,7 +31,7 @@ func GetPriorityClassByName(ctx context.Context, c client.Client, name string) (
 }
 
 // Get StorageClass by name (Does not return error if not found).
-func GetStorageClassByName(ctx context.Context, c client.Client, name string) (*storagev1.StorageClass, error) {
+func GetStorageClassByName(ctx context.Context, c client.Reader, name string) (*storagev1.StorageClass, error) {
 	class := &storagev1.StorageClass{}
 	if err := c.Get(ctx, types.NamespacedName{Name: name}, class); err != nil {
 		return nil, err
@@ -41,7 +41,7 @@ func GetStorageClassByName(ctx context.Context, c client.Client, name string) (*
 }
 
 // Get IngressClass by name (Does not return error if not found).
-func GetIngressClassByName(ctx context.Context, version *version.Version, c client.Client, ingressClassName *string) (client.Object, error) {
+func GetIngressClassByName(ctx context.Context, version *version.Version, c client.Reader, ingressClassName *string) (client.Object, error) {
 	if ingressClassName == nil {
 		return nil, nil
 	}
@@ -67,7 +67,7 @@ func GetIngressClassByName(ctx context.Context, version *version.Version, c clie
 }
 
 // Get GatewayClassClass by name (Does not return error if not found).
-func GetGatewayClassClassByObjectName(ctx context.Context, c client.Client, gatewayClassName gatewayv1.ObjectName) (*gatewayv1.GatewayClass, error) {
+func GetGatewayClassClassByObjectName(ctx context.Context, c client.Reader, gatewayClassName gatewayv1.ObjectName) (*gatewayv1.GatewayClass, error) {
 	objName := reflect.ValueOf(gatewayClassName).String()
 	gatewayClass := &gatewayv1.GatewayClass{}
 
@@ -79,7 +79,7 @@ func GetGatewayClassClassByObjectName(ctx context.Context, c client.Client, gate
 }
 
 // Get DeviceClass by name (Does not return error if not found).
-func GetDeviceClassByName(ctx context.Context, c client.Client, name string) (*resources.DeviceClass, error) {
+func GetDeviceClassByName(ctx context.Context, c client.Reader, name string) (*resources.DeviceClass, error) {
 	class := &resources.DeviceClass{}
 	if err := c.Get(ctx, types.NamespacedName{Name: name}, class); err != nil {
 		return nil, err

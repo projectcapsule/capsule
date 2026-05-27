@@ -10,6 +10,7 @@ import (
 	networkingv1 "k8s.io/api/networking/v1"
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
@@ -23,10 +24,15 @@ type Ingress interface {
 	HostnamePathsPairs() map[string]sets.Set[string]
 	SetIngressClass(string)
 	SetNamespace(string)
+	GetClientObject() client.Object
 }
 
 type NetworkingV1 struct {
 	*networkingv1.Ingress
+}
+
+func (n NetworkingV1) GetClientObject() client.Object {
+	return n.Ingress
 }
 
 func (n NetworkingV1) Name() string {
@@ -99,6 +105,10 @@ type NetworkingV1Beta1 struct {
 	*networkingv1beta1.Ingress
 }
 
+func (n NetworkingV1Beta1) GetClientObject() client.Object {
+	return n.Ingress
+}
+
 func (n NetworkingV1Beta1) Name() string {
 	return n.GetName()
 }
@@ -167,6 +177,10 @@ func (n NetworkingV1Beta1) HostnamePathsPairs() (pairs map[string]sets.Set[strin
 
 type Extension struct {
 	*extensionsv1beta1.Ingress
+}
+
+func (n Extension) GetClientObject() client.Object {
+	return n.Ingress
 }
 
 func (e Extension) Name() string {

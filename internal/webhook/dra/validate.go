@@ -16,6 +16,7 @@ import (
 
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
 	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
+	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 	"github.com/projectcapsule/capsule/pkg/tenant"
@@ -27,45 +28,69 @@ func DeviceClass() handlers.Handler {
 	return &deviceClass{}
 }
 
-func (h *deviceClass) OnCreate(c client.Client, decoder admission.Decoder, recorder events.EventRecorder) handlers.Func {
+func (h *deviceClass) OnCreate(
+	c client.Client,
+	reader client.Reader,
+	decoder admission.Decoder,
+	recorder events.EventRecorder,
+) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		switch res := req.Kind.Kind; res {
 		case "ResourceClaim":
 			rc := &resources.ResourceClaim{}
 			if err := decoder.Decode(req, rc); err != nil {
-				return utils.ErroredResponse(err)
+				return ad.ErroredResponse(err)
 			}
 
-			return h.validateResourceRequest(ctx, c, decoder, recorder, req, rc.Namespace, rc.Spec.Devices.Requests)
+			return h.validateResourceRequest(ctx, c, decoder, recorder, req, rc.Namespace, rc.Spec.Devices.Requests, rc)
 		case "ResourceClaimTemplate":
 			rct := &resources.ResourceClaimTemplate{}
 			if err := decoder.Decode(req, rct); err != nil {
-				return utils.ErroredResponse(err)
+				return ad.ErroredResponse(err)
 			}
 
-			return h.validateResourceRequest(ctx, c, decoder, recorder, req, rct.Namespace, rct.Spec.Spec.Devices.Requests)
+			return h.validateResourceRequest(ctx, c, decoder, recorder, req, rct.Namespace, rct.Spec.Spec.Devices.Requests, rct)
 		default:
 			return nil
 		}
 	}
 }
 
-func (h *deviceClass) OnDelete(client.Client, admission.Decoder, events.EventRecorder) handlers.Func {
+func (h *deviceClass) OnDelete(
+	client.Client,
+	client.Reader,
+	admission.Decoder,
+	events.EventRecorder,
+) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (h *deviceClass) OnUpdate(client.Client, admission.Decoder, events.EventRecorder) handlers.Func {
+func (h *deviceClass) OnUpdate(
+	client.Client,
+	client.Reader,
+	admission.Decoder,
+	events.EventRecorder,
+) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (h *deviceClass) validateResourceRequest(ctx context.Context, c client.Client, _ admission.Decoder, recorder events.EventRecorder, req admission.Request, namespace string, requests []resources.DeviceRequest) *admission.Response {
+func (h *deviceClass) validateResourceRequest(
+	ctx context.Context,
+	c client.Client,
+	_ admission.Decoder,
+	recorder events.EventRecorder,
+	req admission.Request,
+	namespace string,
+	requests []resources.DeviceRequest,
+	obj client.Object,
+) *admission.Response {
 	tnt, err := tenant.TenantByStatusNamespace(ctx, c, namespace)
 	if err != nil {
-		return utils.ErroredResponse(err)
+		return ad.ErroredResponse(err)
 	}
 
 	if tnt == nil {
@@ -86,11 +111,7 @@ func (h *deviceClass) validateResourceRequest(ctx context.Context, c client.Clie
 		}
 
 		if dc == nil {
-			recorder.Eventf(tnt, dc, corev1.EventTypeWarning, evt.ReasonMissingDeviceClass, evt.ActionValidationDenied, "%s %s/%s is missing DeviceClass", req.Kind.Kind, req.Namespace, req.Name)
-
-			response := admission.Denied(caperrors.NewDeviceClassUndefined(*allowed).Error())
-
-			return &response
+			return ad.Deny(caperrors.NewDeviceClassUndefined(*allowed).Error())
 		}
 
 		selector := allowed.SelectorMatch(dc)
@@ -99,11 +120,9 @@ func (h *deviceClass) validateResourceRequest(ctx context.Context, c client.Clie
 		case allowed.Match(dc.Name) || selector:
 			return nil
 		default:
-			recorder.Eventf(tnt, dc, corev1.EventTypeWarning, evt.ReasonForbiddenDeviceClass, evt.ActionValidationDenied, "%s %s/%s DeviceClass %s is forbidden for the current Tenant", req.Kind.Kind, req.Namespace, req.Name, &dc)
+			recorder.Eventf(obj, tnt, corev1.EventTypeWarning, evt.ReasonForbiddenDeviceClass, evt.ActionValidationDenied, "%s %s/%s DeviceClass %s is forbidden for the current Tenant", req.Kind.Kind, req.Namespace, req.Name, &dc)
 
-			response := admission.Denied(caperrors.NewDeviceClassForbidden(dc.Name, *allowed).Error())
-
-			return &response
+			return ad.Deny(caperrors.NewDeviceClassForbidden(dc.Name, *allowed).Error())
 		}
 	}
 

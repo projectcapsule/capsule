@@ -13,21 +13,24 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
+	"github.com/projectcapsule/capsule/pkg/api/rbac"
 )
 
-var _ = Describe("creating several Namespaces for a Tenant", Label("namespace"), func() {
+var _ = Describe("creating several Namespaces for a Tenant", Ordered, Label("namespace"), func() {
 	tnt := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "capsule-labels",
+			Name: "e2e-managed-labels",
+			Labels: map[string]string{
+				"env": "e2e",
+			},
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: api.OwnerListSpec{
+			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: api.CoreOwnerSpec{
-						UserSpec: api.UserSpec{
-							Name: "charlie",
+					CoreOwnerSpec: rbac.CoreOwnerSpec{
+						UserSpec: rbac.UserSpec{
+							Name: "e2e-managed-labels",
 							Kind: "User",
 						},
 					},
@@ -41,19 +44,29 @@ var _ = Describe("creating several Namespaces for a Tenant", Label("namespace"),
 			tnt.ResourceVersion = ""
 			return k8sClient.Create(context.TODO(), tnt)
 		}).Should(Succeed())
+		TenantReady(tnt, metav1.ConditionTrue, defaultTimeoutInterval)
 	})
+
 	JustAfterEach(func() {
-		Expect(k8sClient.Delete(context.TODO(), tnt)).Should(Succeed())
+		EventuallyDeletion(tnt)
 	})
 
 	It("should contains the default Capsule label", func() {
 		namespaces := []*v1.Namespace{
-			NewNamespace(""),
-			NewNamespace(""),
-			NewNamespace(""),
+			NewNamespace("", map[string]string{
+				meta.TenantLabel: tnt.GetName(),
+			}),
+			NewNamespace("", map[string]string{
+				meta.TenantLabel: tnt.GetName(),
+			}),
+			NewNamespace("", map[string]string{
+				meta.TenantLabel: tnt.GetName(),
+			}),
 		}
 		for _, ns := range namespaces {
 			NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+			NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
+
 			Eventually(func() (ok bool) {
 				Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: ns.GetName()}, ns)).Should(Succeed())
 				ok, _ = HaveKeyWithValue(meta.TenantLabel, tnt.Name).Match(ns.Labels)

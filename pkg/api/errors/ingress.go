@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/projectcapsule/capsule/internal/webhook/utils"
 	"github.com/projectcapsule/capsule/pkg/api"
 )
 
@@ -42,7 +41,7 @@ func NewIngressClassForbidden(class string, spec api.DefaultAllowedListSpec) err
 func (i IngressClassForbiddenError) Error() string {
 	err := fmt.Sprintf("Ingress Class %s is forbidden for the current Tenant: ", i.ingressClassName)
 
-	return utils.DefaultAllowedValuesErrorMessage(i.spec, err)
+	return DefaultAllowedValuesErrorMessage(i.spec, err)
 }
 
 type IngressHostnameNotValidError struct {
@@ -97,7 +96,7 @@ func NewIngressClassUndefined(spec api.DefaultAllowedListSpec) error {
 }
 
 func (i IngressClassUndefinedError) Error() string {
-	return utils.DefaultAllowedValuesErrorMessage(i.spec, "No Ingress Class is forbidden for the current Tenant. Specify a Ingress Class which is allowed within the Tenant: ")
+	return DefaultAllowedValuesErrorMessage(i.spec, "No Ingress Class is forbidden for the current Tenant. Specify a Ingress Class which is allowed within the Tenant: ")
 }
 
 type IngressClassNotValidError struct {
@@ -115,7 +114,7 @@ func NewIngressClassNotValid(class string, spec api.DefaultAllowedListSpec) erro
 func (i IngressClassNotValidError) Error() string {
 	err := fmt.Sprintf("Ingress Class %s is forbidden for the current Tenant: ", i.ingressClassName)
 
-	return utils.DefaultAllowedValuesErrorMessage(i.spec, err)
+	return DefaultAllowedValuesErrorMessage(i.spec, err)
 }
 
 //nolint:predeclared,revive

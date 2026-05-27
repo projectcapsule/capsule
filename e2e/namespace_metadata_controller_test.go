@@ -8,17 +8,24 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api/meta"
+	"github.com/projectcapsule/capsule/pkg/api/rbac"
 )
 
-var _ = Describe("creating a Namespace for a Tenant with additional metadata", Label("namespace"), func() {
+var _ = Describe("creating a Namespace for a Tenant with additional metadata", Ordered, Label("namespace", "metadata"), func() {
 	tnt := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "tenant-metadata-controller",
+			Name: "e2e-tenant-metadata",
+			Labels: map[string]string{
+				"env": "e2e",
+			},
+
 			OwnerReferences: []metav1.OwnerReference{
 				{
 					APIVersion: "cap",
@@ -29,11 +36,11 @@ var _ = Describe("creating a Namespace for a Tenant with additional metadata", L
 			},
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: api.OwnerListSpec{
+			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: api.CoreOwnerSpec{
-						UserSpec: api.UserSpec{
-							Name: "gatsby",
+					CoreOwnerSpec: rbac.CoreOwnerSpec{
+						UserSpec: rbac.UserSpec{
+							Name: "e2e-tenant-metadata",
 							Kind: "User",
 						},
 					},
@@ -58,43 +65,85 @@ var _ = Describe("creating a Namespace for a Tenant with additional metadata", L
 		EventuallyCreation(func() error {
 			return k8sClient.Create(context.TODO(), tnt)
 		}).Should(Succeed())
+		TenantReady(tnt, metav1.ConditionTrue, defaultTimeoutInterval)
 	})
 	JustAfterEach(func() {
-		Expect(k8sClient.Delete(context.TODO(), tnt)).Should(Succeed())
+		EventuallyDeletion(tnt)
 	})
 
 	It("should contain Namespace metadata after tenant update", func() {
-		ns := NewNamespace("")
+		ns := NewNamespace("", map[string]string{
+			meta.TenantLabel: tnt.GetName(),
+		})
 		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
-		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
+		NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
 
 		By("checking labels", func() {
 			Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: ns.GetName()}, ns)).Should(Succeed())
 			Expect(ns.Labels).ShouldNot(HaveKeyWithValue("newlabel", "foobazbar"))
 
-			Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: tnt.GetName()}, tnt)).Should(Succeed())
-			tnt.Spec.NamespaceOptions.AdditionalMetadata.Labels["newlabel"] = "foobazbar"
-			Expect(k8sClient.Update(context.TODO(), tnt)).Should(Succeed())
+			Eventually(func() error {
+				current := &capsulev1beta2.Tenant{}
+				if err := k8sClient.Get(context.TODO(), types.NamespacedName{Name: tnt.GetName()}, current); err != nil {
+					return err
+				}
 
-			Eventually(func() (ok bool) {
-				Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: ns.GetName()}, ns)).Should(Succeed())
-				ok, _ = Equal(ns.Labels["newlabel"]).Match("foobazbar")
-				return
-			}, defaultTimeoutInterval, defaultPollInterval).Should(BeTrue())
+				if current.Spec.NamespaceOptions == nil {
+					current.Spec.NamespaceOptions = &capsulev1beta2.NamespaceOptions{}
+				}
+
+				if current.Spec.NamespaceOptions.AdditionalMetadata == nil {
+					current.Spec.NamespaceOptions.AdditionalMetadata = &api.AdditionalMetadataSpec{}
+				}
+
+				if current.Spec.NamespaceOptions.AdditionalMetadata.Labels == nil {
+					current.Spec.NamespaceOptions.AdditionalMetadata.Labels = map[string]string{}
+				}
+
+				current.Spec.NamespaceOptions.AdditionalMetadata.Labels["newlabel"] = "foobazbar"
+
+				return k8sClient.Update(context.TODO(), current)
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+
+			Eventually(func(g Gomega) {
+				current := &corev1.Namespace{}
+				g.Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: ns.GetName()}, current)).Should(Succeed())
+				g.Expect(current.Labels).Should(HaveKeyWithValue("newlabel", "foobazbar"))
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		})
+
 		By("checking annotations", func() {
 			Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: ns.GetName()}, ns)).Should(Succeed())
-			Expect(ns.Labels).ShouldNot(HaveKeyWithValue("newannotation", "foobazbar"))
+			Expect(ns.Annotations).ShouldNot(HaveKeyWithValue("newannotation", "foobazbar"))
 
-			Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: tnt.GetName()}, tnt)).Should(Succeed())
-			tnt.Spec.NamespaceOptions.AdditionalMetadata.Annotations["newannotation"] = "foobazbar"
-			Expect(k8sClient.Update(context.TODO(), tnt)).Should(Succeed())
+			Eventually(func() error {
+				current := &capsulev1beta2.Tenant{}
+				if err := k8sClient.Get(context.TODO(), types.NamespacedName{Name: tnt.GetName()}, current); err != nil {
+					return err
+				}
 
-			Eventually(func() (ok bool) {
-				Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: ns.GetName()}, ns)).Should(Succeed())
-				ok, _ = Equal(ns.Annotations["newannotation"]).Match("foobazbar")
-				return
-			}, defaultTimeoutInterval, defaultPollInterval).Should(BeTrue())
+				if current.Spec.NamespaceOptions == nil {
+					current.Spec.NamespaceOptions = &capsulev1beta2.NamespaceOptions{}
+				}
+
+				if current.Spec.NamespaceOptions.AdditionalMetadata == nil {
+					current.Spec.NamespaceOptions.AdditionalMetadata = &api.AdditionalMetadataSpec{}
+				}
+
+				if current.Spec.NamespaceOptions.AdditionalMetadata.Annotations == nil {
+					current.Spec.NamespaceOptions.AdditionalMetadata.Annotations = map[string]string{}
+				}
+
+				current.Spec.NamespaceOptions.AdditionalMetadata.Annotations["newannotation"] = "foobazbar"
+
+				return k8sClient.Update(context.TODO(), current)
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+
+			Eventually(func(g Gomega) {
+				current := &corev1.Namespace{}
+				g.Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: ns.GetName()}, current)).Should(Succeed())
+				g.Expect(current.Annotations).Should(HaveKeyWithValue("newannotation", "foobazbar"))
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 		})
 	})
 })

@@ -13,6 +13,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
 
@@ -24,6 +25,7 @@ func HostnameRegexHandler() handlers.TypedHandler[*capsulev1beta2.Tenant] {
 
 func (h *hostnameRegexHandler) OnCreate(
 	_ client.Client,
+	_ client.Reader,
 	tnt *capsulev1beta2.Tenant,
 	decoder admission.Decoder,
 	_ events.EventRecorder,
@@ -37,7 +39,13 @@ func (h *hostnameRegexHandler) OnCreate(
 	}
 }
 
-func (h *hostnameRegexHandler) OnDelete(client.Client, *capsulev1beta2.Tenant, admission.Decoder, events.EventRecorder) handlers.Func {
+func (h *hostnameRegexHandler) OnDelete(
+	client.Client,
+	client.Reader,
+	*capsulev1beta2.Tenant,
+	admission.Decoder,
+	events.EventRecorder,
+) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
@@ -45,6 +53,7 @@ func (h *hostnameRegexHandler) OnDelete(client.Client, *capsulev1beta2.Tenant, a
 
 func (h *hostnameRegexHandler) OnUpdate(
 	_ client.Client,
+	_ client.Reader,
 	old *capsulev1beta2.Tenant,
 	tnt *capsulev1beta2.Tenant,
 	decoder admission.Decoder,
@@ -66,9 +75,7 @@ func (h *hostnameRegexHandler) validate(
 ) *admission.Response {
 	if tnt.Spec.IngressOptions.AllowedHostnames != nil && len(tnt.Spec.IngressOptions.AllowedHostnames.Regex) > 0 {
 		if _, err := regexp.Compile(tnt.Spec.IngressOptions.AllowedHostnames.Regex); err != nil {
-			response := admission.Denied("unable to compile allowedHostnames allowedRegex")
-
-			return &response
+			return ad.Deny("unable to compile allowedHostnames allowedRegex")
 		}
 	}
 

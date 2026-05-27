@@ -4,8 +4,14 @@
 package meta
 
 import (
+	"context"
 	"strings"
+	"time"
 
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -38,6 +44,35 @@ func ReleaseAnnotationTriggers(obj client.Object) bool {
 
 func ReleaseAnnotationRemove(obj client.Object) {
 	annotationRemove(obj, ReleaseAnnotation)
+}
+
+func TriggerRequestReconcileAnnotation(
+	ctx context.Context,
+	c client.Client,
+	gvk schema.GroupVersionKind,
+	key types.NamespacedName,
+) error {
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		obj := &unstructured.Unstructured{}
+		obj.SetGroupVersionKind(gvk)
+
+		if err := c.Get(ctx, key, obj); err != nil {
+			return err
+		}
+
+		base := obj.DeepCopy()
+
+		annotations := obj.GetAnnotations()
+		if annotations == nil {
+			annotations = map[string]string{}
+		}
+
+		annotations[ReconcileAnnotation] = time.Now().UTC().Format(time.RFC3339Nano)
+
+		obj.SetAnnotations(annotations)
+
+		return c.Patch(ctx, obj, client.MergeFrom(base))
+	})
 }
 
 func annotationRemove(obj client.Object, anno string) {

@@ -17,6 +17,7 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
 	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
+	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
@@ -32,35 +33,56 @@ func Class(configuration configuration.Configuration) handlers.Handler {
 	}
 }
 
-func (r *class) OnCreate(client client.Client, decoder admission.Decoder, recorder events.EventRecorder) handlers.Func {
+func (r *class) OnCreate(
+	c client.Client,
+	_ client.Reader,
+	decoder admission.Decoder,
+	recorder events.EventRecorder,
+) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		return r.validate(ctx, client, req, decoder, recorder)
+		return r.validate(ctx, c, req, decoder, recorder)
 	}
 }
 
-func (r *class) OnUpdate(client client.Client, decoder admission.Decoder, recorder events.EventRecorder) handlers.Func {
+func (r *class) OnUpdate(
+	c client.Client,
+	_ client.Reader,
+	decoder admission.Decoder,
+	recorder events.EventRecorder,
+) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		return r.validate(ctx, client, req, decoder, recorder)
+		return r.validate(ctx, c, req, decoder, recorder)
 	}
 }
 
-func (r *class) OnDelete(client.Client, admission.Decoder, events.EventRecorder) handlers.Func {
+func (r *class) OnDelete(
+	client.Client,
+	client.Reader,
+	admission.Decoder,
+	events.EventRecorder,
+) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (r *class) validate(ctx context.Context, client client.Client, req admission.Request, decoder admission.Decoder, recorder events.EventRecorder) *admission.Response {
+func (r *class) validate(
+	ctx context.Context,
+	c client.Client,
+	req admission.Request,
+	decoder admission.Decoder,
+	recorder events.EventRecorder,
+) *admission.Response {
 	gatewayObj := &gatewayv1.Gateway{}
 	if err := decoder.Decode(req, gatewayObj); err != nil {
-		return utils.ErroredResponse(err)
+		return ad.ErroredResponse(err)
 	}
 
 	var tnt *capsulev1beta2.Tenant
 
-	tnt, err := TenantFromGateway(ctx, client, gatewayObj)
+	tnt, err := TenantFromGateway(ctx, c, gatewayObj)
 	if err != nil {
-		return utils.ErroredResponse(err)
+		return ad.ErroredResponse(err)
 	}
 
 	if tnt == nil {
@@ -73,23 +95,21 @@ func (r *class) validate(ctx context.Context, client client.Client, req admissio
 		return nil
 	}
 
-	gatewayClass, err := utils.GetGatewayClassClassByObjectName(ctx, client, gatewayObj.Spec.GatewayClassName)
+	gatewayClass, err := utils.GetGatewayClassClassByObjectName(ctx, c, gatewayObj.Spec.GatewayClassName)
 	if err != nil {
-		return utils.ErroredResponse(err)
+		return ad.ErroredResponse(err)
 	}
 
 	if gatewayClass == nil {
-		recorder.Eventf(tnt, gatewayClass, corev1.EventTypeWarning, evt.ReasonMissingGatewayClass, evt.ActionValidationDenied, "Gateway %s/%s is missing GatewayClass", req.Namespace, req.Name)
+		recorder.Eventf(gatewayObj, tnt, corev1.EventTypeWarning, evt.ReasonMissingGatewayClass, evt.ActionValidationDenied, "Gateway %s/%s is missing GatewayClass", req.Namespace, req.Name)
 
-		response := admission.Denied(caperrors.NewGatewayClassUndefined(*allowed).Error())
-
-		return &response
+		return ad.Deny(caperrors.NewGatewayClassUndefined(*allowed).Error())
 	}
 
 	selector := false
 	// Verify if the GatewayClass exists and matches the label selector/expression
 	if len(allowed.MatchExpressions) > 0 || len(allowed.MatchLabels) > 0 {
-		gatewayClassObj, err := utils.GetGatewayClassClassByObjectName(ctx, client, gatewayObj.Spec.GatewayClassName)
+		gatewayClassObj, err := utils.GetGatewayClassClassByObjectName(ctx, c, gatewayObj.Spec.GatewayClassName)
 		if err != nil && !k8serrors.IsNotFound(err) {
 			response := admission.Errored(http.StatusInternalServerError, err)
 
@@ -108,10 +128,8 @@ func (r *class) validate(ctx context.Context, client client.Client, req admissio
 	case allowed.Match(gatewayClass.Name) || selector:
 		return nil
 	default:
-		recorder.Eventf(tnt, gatewayClass, corev1.EventTypeWarning, evt.ReasonForbiddenGatewayClass, evt.ActionValidationDenied, "Gateway %s/%s GatewayClass %s is forbidden for the current Tenant", req.Namespace, req.Name, &gatewayClass)
+		recorder.Eventf(gatewayObj, tnt, corev1.EventTypeWarning, evt.ReasonForbiddenGatewayClass, evt.ActionValidationDenied, "Gateway %s/%s GatewayClass %s is forbidden for the current Tenant", req.Namespace, req.Name, &gatewayClass)
 
-		response := admission.Denied(caperrors.NewGatewayClassForbidden(gatewayObj.Name, *allowed).Error())
-
-		return &response
+		return ad.Deny(caperrors.NewGatewayClassForbidden(gatewayObj.Name, *allowed).Error())
 	}
 }

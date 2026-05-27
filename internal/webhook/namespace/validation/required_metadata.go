@@ -14,17 +14,21 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
+	"github.com/projectcapsule/capsule/pkg/users"
 )
 
 type requiredMetadataHandler struct{}
 
-func RequiredMetadataHandler() handlers.TypedHandlerWithTenant[*corev1.Namespace] {
+func RequiredMetadataHandler() handlers.TypedHandlerWithTenantUser[*corev1.Namespace] {
 	return &requiredMetadataHandler{}
 }
 
 func (h *requiredMetadataHandler) OnCreate(
 	_ client.Client,
+	_ client.Reader,
+	_ users.AdmissionUser,
 	ns *corev1.Namespace,
 	_ admission.Decoder,
 	_ events.EventRecorder,
@@ -60,6 +64,8 @@ func (h *requiredMetadataHandler) OnCreate(
 
 func (h *requiredMetadataHandler) OnUpdate(
 	_ client.Client,
+	_ client.Reader,
+	_ users.AdmissionUser,
 	newNs *corev1.Namespace,
 	oldNs *corev1.Namespace,
 	_ admission.Decoder,
@@ -98,6 +104,8 @@ func (h *requiredMetadataHandler) OnUpdate(
 
 func (h *requiredMetadataHandler) OnDelete(
 	client.Client,
+	client.Reader,
+	users.AdmissionUser,
 	*corev1.Namespace,
 	admission.Decoder,
 	events.EventRecorder,
@@ -110,22 +118,16 @@ func validateRequiredMapCreate(kind string, required map[string]string, actual m
 	for key, exp := range required {
 		val, ok := actual[key]
 		if !ok {
-			resp := admission.Denied(fmt.Sprintf("required %s %q not present", kind, key))
-
-			return &resp
+			return ad.Deny(fmt.Sprintf("required %s %q not present", kind, key))
 		}
 
 		re, reErr := regexp.Compile(exp)
 		if reErr != nil {
-			resp := admission.Denied(fmt.Sprintf("invalid required %s regex for %q: %q: %v", kind, key, exp, reErr))
-
-			return &resp
+			return ad.Deny(fmt.Sprintf("invalid required %s regex for %q: %q: %v", kind, key, exp, reErr))
 		}
 
 		if !re.MatchString(val) {
-			resp := admission.Denied(fmt.Sprintf("required %s %q value %q does not match regex %q", kind, key, val, exp))
-
-			return &resp
+			return ad.Deny(fmt.Sprintf("required %s %q value %q does not match regex %q", kind, key, val, exp))
 		}
 	}
 
@@ -147,22 +149,16 @@ func validateRequiredMapUpdate(kind string, required map[string]string, newMap, 
 		}
 
 		if !newOK {
-			resp := admission.Denied(fmt.Sprintf("required %s %q not present", kind, key))
-
-			return &resp
+			return ad.Deny(fmt.Sprintf("required %s %q not present", kind, key))
 		}
 
 		re, reErr := regexp.Compile(exp)
 		if reErr != nil {
-			resp := admission.Denied(fmt.Sprintf("invalid required %s regex for %q: %q: %v", kind, key, exp, reErr))
-
-			return &resp
+			return ad.Deny(fmt.Sprintf("invalid required %s regex for %q: %q: %v", kind, key, exp, reErr))
 		}
 
 		if !re.MatchString(valNew) {
-			resp := admission.Denied(fmt.Sprintf("required %s %q value %q does not match regex %q", mismatchKind, key, valNew, exp))
-
-			return &resp
+			return ad.Deny(fmt.Sprintf("required %s %q value %q does not match regex %q", mismatchKind, key, valNew, exp))
 		}
 	}
 

@@ -5,21 +5,20 @@ package mutation
 
 import (
 	"context"
+	"encoding/json"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	"github.com/projectcapsule/capsule/internal/webhook/utils"
+	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
-	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 	"github.com/projectcapsule/capsule/pkg/tenant"
-	"github.com/projectcapsule/capsule/pkg/users"
 )
 
-func NamespaceHandler(configuration configuration.Configuration, handlers ...handlers.TypedHandler[*corev1.Namespace]) handlers.Handler {
+func NamespaceHandler(configuration configuration.Configuration, handlers ...handlers.TypedHandlerWithUser[*corev1.Namespace]) handlers.Handler {
 	return &handler{
 		cfg:      configuration,
 		handlers: handlers,
@@ -28,98 +27,121 @@ func NamespaceHandler(configuration configuration.Configuration, handlers ...han
 
 type handler struct {
 	cfg      configuration.Configuration
-	handlers []handlers.TypedHandler[*corev1.Namespace]
+	handlers []handlers.TypedHandlerWithUser[*corev1.Namespace]
 }
 
-func (h *handler) OnCreate(c client.Client, decoder admission.Decoder, recorder events.EventRecorder) handlers.Func {
+func (h *handler) OnCreate(
+	c client.Client,
+	reader client.Reader,
+	decoder admission.Decoder,
+	recorder events.EventRecorder,
+) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		userIsAdmin := users.IsAdminUser(req, h.cfg.Administrators())
+		user := handlers.ResolveAdmissionUser(ctx, c, req, h.cfg)
 
-		if !userIsAdmin && !users.IsCapsuleUser(ctx, c, h.cfg, req.UserInfo.Username, req.UserInfo.Groups) {
+		if !user.IsAdmin() && !user.IsCapsule() {
 			return nil
 		}
 
 		ns := &corev1.Namespace{}
 		if err := decoder.Decode(req, ns); err != nil {
-			return utils.ErroredResponse(err)
+			return ad.ErroredResponse(err)
 		}
 
-		tnt, err := tenant.GetTenantByLabels(ctx, c, ns)
+		tnt, err := tenant.GetTenantByLabels(ctx, reader, ns)
 		if err != nil {
-			return utils.ErroredResponse(err)
+			return ad.ErroredResponse(err)
 		}
 
-		if tnt == nil && userIsAdmin {
+		if tnt == nil && user.IsAdmin() {
 			return nil
 		}
 
 		for _, hndl := range h.handlers {
-			if response := hndl.OnCreate(c, ns, decoder, recorder)(ctx, req); response != nil {
+			response := hndl.OnCreate(c, reader, user, ns, decoder, recorder)(ctx, req)
+
+			if response == nil {
+				continue
+			}
+
+			if !response.Allowed {
 				return response
 			}
 		}
 
-		return nil
+		marshaled, err := json.Marshal(ns)
+		if err != nil {
+			return ad.ErroredResponse(err)
+		}
+
+		response := admission.PatchResponseFromRaw(req.Object.Raw, marshaled)
+		if len(response.Patches) == 0 {
+			allowed := admission.Allowed("")
+
+			return &allowed
+		}
+
+		return &response
 	}
 }
 
-func (h *handler) OnDelete(c client.Client, decoder admission.Decoder, recorder events.EventRecorder) handlers.Func {
-	return func(context.Context, admission.Request) *admission.Response {
-		return nil
-	}
-}
-
-func (h *handler) OnUpdate(c client.Client, decoder admission.Decoder, recorder events.EventRecorder) handlers.Func {
+func (h *handler) OnUpdate(
+	c client.Client,
+	reader client.Reader,
+	decoder admission.Decoder,
+	recorder events.EventRecorder,
+) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		userIsAdmin := users.IsAdminUser(req, h.cfg.Administrators())
+		user := handlers.ResolveAdmissionUser(ctx, c, req, h.cfg)
 
-		if !userIsAdmin && !users.IsCapsuleUser(ctx, c, h.cfg, req.UserInfo.Username, req.UserInfo.Groups) {
+		if !user.IsAdmin() && !user.IsCapsule() {
 			return nil
 		}
 
 		ns := &corev1.Namespace{}
 		if err := decoder.Decode(req, ns); err != nil {
-			return utils.ErroredResponse(err)
+			return ad.ErroredResponse(err)
 		}
 
 		oldNs := &corev1.Namespace{}
 		if err := decoder.DecodeRaw(req.OldObject, oldNs); err != nil {
-			return utils.ErroredResponse(err)
-		}
-
-		tnt, err := tenant.GetTenantByOwnerreferences(ctx, c, oldNs.OwnerReferences)
-		if err != nil {
-			return utils.ErroredResponse(err)
-		}
-
-		//nolint:nestif
-		if userIsAdmin {
-			if tnt == nil {
-				tnt, err = tenant.GetTenantByLabels(ctx, c, ns)
-				if err != nil {
-					return utils.ErroredResponse(err)
-				}
-
-				if tnt == nil {
-					return nil
-				}
-			}
-		} else {
-			if owned := tenant.NamespaceIsOwned(ctx, c, h.cfg, oldNs, tnt, req.UserInfo); !owned {
-				recorder.Eventf(tnt, oldNs, corev1.EventTypeWarning, "NamespacePatch", evt.ActionValidationDenied, "Namespace %s can not be patched", oldNs.GetName())
-
-				response := admission.Denied("Denied patch request for this namespace")
-
-				return &response
-			}
+			return ad.ErroredResponse(err)
 		}
 
 		for _, hndl := range h.handlers {
-			if response := hndl.OnUpdate(c, ns, oldNs, decoder, recorder)(ctx, req); response != nil {
+			response := hndl.OnUpdate(c, reader, user, ns, oldNs, decoder, recorder)(ctx, req)
+			if response == nil {
+				continue
+			}
+
+			if !response.Allowed {
 				return response
 			}
 		}
 
+		marshaled, err := json.Marshal(ns)
+		if err != nil {
+			return ad.ErroredResponse(err)
+		}
+
+		response := admission.PatchResponseFromRaw(req.Object.Raw, marshaled)
+		if len(response.Patches) == 0 {
+			allowed := admission.Allowed("")
+
+			return &allowed
+		}
+
+		return &response
+	}
+}
+
+func (h *handler) OnDelete(
+	client.Client,
+	client.Reader,
+	admission.Decoder,
+	events.EventRecorder,
+) handlers.Func {
+	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }

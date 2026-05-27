@@ -5,7 +5,6 @@ package v1beta2
 
 import (
 	"errors"
-	"fmt"
 	"sort"
 
 	corev1 "k8s.io/api/core/v1"
@@ -15,7 +14,7 @@ import (
 )
 
 func (r *ResourcePool) GetQuotaName() string {
-	return fmt.Sprintf("capsule-pool-%s", r.GetName())
+	return meta.NameForManagedPoolResourceQuota(r.GetName())
 }
 
 func (r *ResourcePool) AssignNamespaces(namespaces []corev1.Namespace) {

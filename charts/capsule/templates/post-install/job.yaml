@@ -1,7 +1,7 @@
 {{- $Values := mergeOverwrite $.Values.global.jobs.kubectl $.Values.jobs -}}
-
-{{- if .Values.tls.create }}
-  {{- if and (not $.Values.crds.exclusive) $.Values.global.jobs.postInstall.enabled }}
+{{- if and (not $.Values.crds.exclusive) $.Values.global.jobs.postInstall.enabled }}
+  {{- if .Values.tls.create }}
+---
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -9,7 +9,9 @@ metadata:
   namespace: {{ $.Release.Namespace }}
   labels:
     app.kubernetes.io/component: {{ include "capsule.post-install.component" . | quote }}
-    {{- include "capsule.labels" . | nindent 4 }}
+    app.kubernetes.io/name: {{ include "capsule.post-install.component" . | quote }}
+    {{- include "capsule.baselabels" . | nindent 4 }}
+    {{- include "capsule.selectorLabelInstance" . | nindent 4 }}
     {{- with $Values.labels }}
       {{- . | toYaml | nindent 4 }}
     {{- end }}
@@ -33,7 +35,8 @@ spec:
         {{- end }}
       labels:
         app.kubernetes.io/component: {{ include "capsule.post-install.component" . | quote }}
-        {{- include "capsule.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/name: {{ include "capsule.post-install.component" . | quote }}
+        {{- include "capsule.selectorLabelInstance" . | nindent 8 }}
         {{- with $Values.podLabels }}
           {{- toYaml . | nindent 8 }}
         {{- end }}
@@ -70,7 +73,7 @@ spec:
       {{- end }}
       serviceAccountName: {{ include "capsule.post-install.name" . }}
       containers:
-      - name: post-install
+      - name: tls
         image: {{ include "capsule.jobsFullyQualifiedDockerImage" . }}
         imagePullPolicy: {{ $Values.image.pullPolicy }}
         command:

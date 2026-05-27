@@ -17,7 +17,7 @@ import (
 // match ANY of the provided LabelSelectors. The result is unique by namespace/name.
 func ListBySelectors[T client.Object](
 	ctx context.Context,
-	c client.Client,
+	c client.Reader,
 	list client.ObjectList,
 	selectors []*metav1.LabelSelector,
 ) ([]T, error) {

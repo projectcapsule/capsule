@@ -20,30 +20,32 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
+	"github.com/projectcapsule/capsule/pkg/api/rbac"
 )
 
-var _ = Describe("enforcing a Container Registry", Label("tenant", "rules", "images", "registry"), func() {
-	originConfig := &capsulev1beta2.CapsuleConfiguration{}
-
+var _ = Describe("enforcing a Container Registry", Ordered, Label("tenant", "rules", "images", "registry"), func() {
 	tnt := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "container-registry",
+			Name: "e2e-rule-registry",
+			Labels: map[string]string{
+				"env": "e2e",
+			},
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: api.OwnerListSpec{
+			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: api.CoreOwnerSpec{
-						UserSpec: api.UserSpec{
-							Name: "matt",
+					CoreOwnerSpec: rbac.CoreOwnerSpec{
+						UserSpec: rbac.UserSpec{
+							Name: "e2e-rules-registry",
 							Kind: "User",
 						},
 					},
 				},
 			},
-			Rules: []*capsulev1beta2.NamespaceRule{
+			Rules: []*api.NamespaceRuleBodyTenant{
 				{
-					NamespaceRuleBody: capsulev1beta2.NamespaceRuleBody{
-						Enforce: capsulev1beta2.NamespaceRuleEnforceBody{
+					NamespaceRuleBodyNamespace: api.NamespaceRuleBodyNamespace{
+						Enforce: api.NamespaceRuleEnforceBody{
 							Registries: []api.OCIRegistry{
 								// Global: allow any registry, but require PullPolicy Always (images+volumes)
 								{
@@ -72,8 +74,8 @@ var _ = Describe("enforcing a Container Registry", Label("tenant", "rules", "ima
 							"environment": "prod",
 						},
 					},
-					NamespaceRuleBody: capsulev1beta2.NamespaceRuleBody{
-						Enforce: capsulev1beta2.NamespaceRuleEnforceBody{
+					NamespaceRuleBodyNamespace: api.NamespaceRuleBodyNamespace{
+						Enforce: api.NamespaceRuleEnforceBody{
 							Registries: []api.OCIRegistry{
 								// Prod-only special-case
 								{
@@ -152,34 +154,26 @@ var _ = Describe("enforcing a Container Registry", Label("tenant", "rules", "ima
 	}
 
 	JustBeforeEach(func() {
-		Expect(k8sClient.Get(context.Background(), client.ObjectKey{Name: defaultConfigurationName}, originConfig)).To(Succeed())
-
 		EventuallyCreation(func() error {
 			tnt.ResourceVersion = ""
 			return k8sClient.Create(context.TODO(), tnt)
 		}).Should(Succeed())
+
+		TenantReady(tnt, metav1.ConditionTrue, defaultTimeoutInterval)
 	})
 
 	JustAfterEach(func() {
-		Expect(k8sClient.Delete(context.TODO(), tnt)).Should(Succeed())
-
-		// Restore Configuration
-		Eventually(func() error {
-			c := &capsulev1beta2.CapsuleConfiguration{}
-			if err := k8sClient.Get(context.Background(), client.ObjectKey{Name: originConfig.Name}, c); err != nil {
-				return err
-			}
-			c.Spec = originConfig.Spec
-			return k8sClient.Update(context.Background(), c)
-		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		EventuallyDeletion(tnt)
 	})
 
 	It("aggregates enforcement rules into NamespaceStatus for a non-prod namespace", func() {
-		ns := NewNamespace("")
+		ns := NewNamespace("", map[string]string{
+			meta.TenantLabel: tnt.GetName(),
+		})
 		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 
 		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
-		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
+		NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
 
 		// Non-prod: should include only the global rule body (two registries in order)
 		expectNamespaceStatusRegistries(ns.GetName(), []string{
@@ -201,13 +195,14 @@ var _ = Describe("enforcing a Container Registry", Label("tenant", "rules", "ima
 
 	It("aggregates enforcement rules into NamespaceStatus for a prod namespace", func() {
 		ns := NewNamespace("", map[string]string{
-			"environment": "prod",
+			"environment":    "prod",
+			meta.TenantLabel: tnt.GetName(),
 		})
 
 		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 
 		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
-		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
+		NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
 
 		// Prod: should include global + prod rule (3 registries in order)
 		expectNamespaceStatusRegistries(ns.GetName(), []string{
@@ -229,11 +224,15 @@ var _ = Describe("enforcing a Container Registry", Label("tenant", "rules", "ima
 	})
 
 	It("denies a container image when pullPolicy is not explicitly set under restriction (dev)", func() {
-		ns := NewNamespace("")
+		ns := NewNamespace("",
+			map[string]string{
+				meta.TenantLabel: tnt.GetName(),
+			},
+		)
 		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 
 		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
-		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
+		NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
 
 		// No ImagePullPolicy set => "" => should be denied because global rule restricts policy to Always
 		pod := &corev1.Pod{
@@ -253,20 +252,24 @@ var _ = Describe("enforcing a Container Registry", Label("tenant", "rules", "ima
 	})
 
 	It("denies a harbor image with pullPolicy IfNotPresent because global Always must still apply (dev)", func() {
-		ns := NewNamespace("")
+		ns := NewNamespace("", map[string]string{
+			meta.TenantLabel: tnt.GetName(),
+		})
 		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 
 		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
-		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
+		NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
 
 		pod := &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{Name: "harbor-wrong-policy"},
 			Spec: corev1.PodSpec{
+				SecurityContext: nobodyPodSecurityContext(),
 				Containers: []corev1.Container{
 					{
 						Name:            "c",
 						Image:           "harbor/some-team/app:1",
 						ImagePullPolicy: corev1.PullIfNotPresent,
+						SecurityContext: restrictedContainerSecurityContext(),
 					},
 				},
 			},
@@ -280,20 +283,24 @@ var _ = Describe("enforcing a Container Registry", Label("tenant", "rules", "ima
 	})
 
 	It("allows a harbor image with pullPolicy Always (dev)", func() {
-		ns := NewNamespace("")
+		ns := NewNamespace("", map[string]string{
+			meta.TenantLabel: tnt.GetName(),
+		})
 		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 
 		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
-		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
+		NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
 
 		pod := &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{Name: "harbor-always"},
 			Spec: corev1.PodSpec{
+				SecurityContext: nobodyPodSecurityContext(),
 				Containers: []corev1.Container{
 					{
 						Name:            "c",
 						Image:           "harbor/some-team/app:1",
 						ImagePullPolicy: corev1.PullAlways,
+						SecurityContext: restrictedContainerSecurityContext(),
 					},
 				},
 			},
@@ -303,27 +310,33 @@ var _ = Describe("enforcing a Container Registry", Label("tenant", "rules", "ima
 	})
 
 	It("denies initContainers when they violate policy (dev) and includes the correct location in the message", func() {
-		ns := NewNamespace("")
+		ns := NewNamespace("", map[string]string{
+			meta.TenantLabel: tnt.GetName(),
+		})
 		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 
 		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
-		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
+		NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
 
 		pod := &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{Name: "init-deny"},
 			Spec: corev1.PodSpec{
+				SecurityContext: nobodyPodSecurityContext(),
 				InitContainers: []corev1.Container{
 					{
 						Name:            "init",
 						Image:           "harbor/some-team/init:1",
 						ImagePullPolicy: corev1.PullIfNotPresent, // should be denied
+						SecurityContext: restrictedContainerSecurityContext(),
 					},
 				},
+
 				Containers: []corev1.Container{
 					{
 						Name:            "c",
 						Image:           "harbor/some-team/app:1",
 						ImagePullPolicy: corev1.PullAlways,
+						SecurityContext: restrictedContainerSecurityContext(),
 					},
 				},
 			},
@@ -337,18 +350,25 @@ var _ = Describe("enforcing a Container Registry", Label("tenant", "rules", "ima
 	})
 
 	It("denies volume image pullPolicy if not allowed (dev)", Label("skip-on-openshift"), func() {
-		ns := NewNamespace("")
+		ns := NewNamespace("", map[string]string{
+			meta.TenantLabel: tnt.GetName(),
+		})
 		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 
 		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
-		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
+		NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
 
 		pod := &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{Name: "volume-deny"},
 			Spec: corev1.PodSpec{
+				SecurityContext: nobodyPodSecurityContext(),
 				Containers: []corev1.Container{
-					// main container must exist
-					{Name: "c", Image: "harbor/some-team/app:1", ImagePullPolicy: corev1.PullAlways},
+					{
+						Name:            "c",
+						Image:           "harbor/some-team/app:1",
+						ImagePullPolicy: corev1.PullAlways,
+						SecurityContext: restrictedContainerSecurityContext(),
+					},
 				},
 				Volumes: []corev1.Volume{
 					{
@@ -373,20 +393,22 @@ var _ = Describe("enforcing a Container Registry", Label("tenant", "rules", "ima
 
 	It("allows prod-specific image only with Always, still enforcing global policy", func() {
 		ns := NewNamespace("", map[string]string{
-			"environment": "prod",
+			"environment":    "prod",
+			meta.TenantLabel: tnt.GetName(),
 		})
 
 		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 
 		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
-		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
+		NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
 
 		// Wrong policy => denied
 		bad := &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{Name: "prod-bad"},
 			Spec: corev1.PodSpec{
+				SecurityContext: nobodyPodSecurityContext(),
 				Containers: []corev1.Container{
-					{Name: "c", Image: "harbor/production-image/app:1", ImagePullPolicy: corev1.PullNever},
+					{Name: "c", Image: "harbor/production-image/app:1", ImagePullPolicy: corev1.PullNever, SecurityContext: restrictedContainerSecurityContext()},
 				},
 			},
 		}
@@ -399,8 +421,9 @@ var _ = Describe("enforcing a Container Registry", Label("tenant", "rules", "ima
 		good := &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{Name: "prod-good"},
 			Spec: corev1.PodSpec{
+				SecurityContext: nobodyPodSecurityContext(),
 				Containers: []corev1.Container{
-					{Name: "c", Image: "harbor/production-image/app:1", ImagePullPolicy: corev1.PullAlways},
+					{Name: "c", Image: "harbor/production-image/app:1", ImagePullPolicy: corev1.PullAlways, SecurityContext: restrictedContainerSecurityContext()},
 				},
 			},
 		}
@@ -408,11 +431,14 @@ var _ = Describe("enforcing a Container Registry", Label("tenant", "rules", "ima
 	})
 
 	It("denies adding an ephemeral container with wrong pullPolicy on UPDATE", func() {
-		ns := NewNamespace("")
+		ns := NewNamespace("", map[string]string{
+			meta.TenantLabel: tnt.GetName(),
+		})
 		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 
 		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
-		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
+		NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
+
 		expectNamespaceStatusRegistries(ns.GetName(), []string{".*", "harbor/.*"})
 
 		cleanupRBAC := GrantEphemeralContainersUpdate(ns.Name, tnt.Spec.Owners[0].UserSpec.Name)
@@ -422,8 +448,14 @@ var _ = Describe("enforcing a Container Registry", Label("tenant", "rules", "ima
 		pod := &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{Name: "base"},
 			Spec: corev1.PodSpec{
+				SecurityContext: nobodyPodSecurityContext(),
 				Containers: []corev1.Container{
-					{Name: "c", Image: "harbor/some-team/app:1", ImagePullPolicy: corev1.PullAlways},
+					{
+						Name:            "c",
+						Image:           "harbor/some-team/app:1",
+						ImagePullPolicy: corev1.PullAlways,
+						SecurityContext: restrictedContainerSecurityContext(),
+					},
 				},
 			},
 		}
@@ -435,6 +467,7 @@ var _ = Describe("enforcing a Container Registry", Label("tenant", "rules", "ima
 				Name:            "debug",
 				Image:           "harbor/some-team/debug:1",
 				ImagePullPolicy: corev1.PullIfNotPresent,
+				SecurityContext: restrictedContainerSecurityContext(),
 			},
 		}
 
@@ -467,18 +500,22 @@ var _ = Describe("enforcing a Container Registry", Label("tenant", "rules", "ima
 	})
 
 	It("denies a pod when volume image reference changes to a disallowed pullPolicy (recreate)", Label("skip-on-openshift"), func() {
-		ns := NewNamespace("")
+		ns := NewNamespace("", map[string]string{
+			meta.TenantLabel: tnt.GetName(),
+		})
 		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 
 		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
-		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
+		NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
+
 		expectNamespaceStatusRegistries(ns.GetName(), []string{".*", "harbor/.*"})
 
 		pod1 := &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{Name: "vol-ok"},
 			Spec: corev1.PodSpec{
+				SecurityContext: nobodyPodSecurityContext(),
 				Containers: []corev1.Container{
-					{Name: "c", Image: "harbor/some-team/app:1", ImagePullPolicy: corev1.PullAlways},
+					{Name: "c", Image: "harbor/some-team/app:1", ImagePullPolicy: corev1.PullAlways, SecurityContext: restrictedContainerSecurityContext()},
 				},
 				Volumes: []corev1.Volume{
 					{
@@ -498,8 +535,9 @@ var _ = Describe("enforcing a Container Registry", Label("tenant", "rules", "ima
 		pod2 := &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{Name: "vol-bad"},
 			Spec: corev1.PodSpec{
+				SecurityContext: nobodyPodSecurityContext(),
 				Containers: []corev1.Container{
-					{Name: "c", Image: "harbor/some-team/app:1", ImagePullPolicy: corev1.PullAlways},
+					{Name: "c", Image: "harbor/some-team/app:1", ImagePullPolicy: corev1.PullAlways, SecurityContext: restrictedContainerSecurityContext()},
 				},
 				Volumes: []corev1.Volume{
 					{

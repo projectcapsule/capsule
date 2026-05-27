@@ -22,13 +22,25 @@ func FreezedEmitter() handlers.TypedHandler[*capsulev1beta2.Tenant] {
 	return &freezedEmitterHandler{}
 }
 
-func (h *freezedEmitterHandler) OnCreate(client.Client, *capsulev1beta2.Tenant, admission.Decoder, events.EventRecorder) handlers.Func {
+func (h *freezedEmitterHandler) OnCreate(
+	client.Client,
+	client.Reader,
+	*capsulev1beta2.Tenant,
+	admission.Decoder,
+	events.EventRecorder,
+) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (h *freezedEmitterHandler) OnDelete(client.Client, *capsulev1beta2.Tenant, admission.Decoder, events.EventRecorder) handlers.Func {
+func (h *freezedEmitterHandler) OnDelete(
+	client.Client,
+	client.Reader,
+	*capsulev1beta2.Tenant,
+	admission.Decoder,
+	events.EventRecorder,
+) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
@@ -36,6 +48,7 @@ func (h *freezedEmitterHandler) OnDelete(client.Client, *capsulev1beta2.Tenant, 
 
 func (h *freezedEmitterHandler) OnUpdate(
 	_ client.Client,
+	_ client.Reader,
 	tnt *capsulev1beta2.Tenant,
 	old *capsulev1beta2.Tenant,
 	decoder admission.Decoder,
@@ -44,9 +57,9 @@ func (h *freezedEmitterHandler) OnUpdate(
 	return func(_ context.Context, req admission.Request) *admission.Response {
 		switch {
 		case !old.Spec.Cordoned && tnt.Spec.Cordoned:
-			recorder.Eventf(tnt, tnt, corev1.EventTypeNormal, evt.ReasonCordoning, evt.ActionCordoned, "Tenant has been cordoned", "")
+			recorder.Eventf(tnt, nil, corev1.EventTypeNormal, evt.ReasonCordoning, evt.ActionCordoned, "Tenant has been cordoned")
 		case old.Spec.Cordoned && !tnt.Spec.Cordoned:
-			recorder.Eventf(tnt, tnt, corev1.EventTypeNormal, evt.ReasonCordoning, evt.ActionUncordoned, "Tenant has been uncordoned", "")
+			recorder.Eventf(tnt, nil, corev1.EventTypeNormal, evt.ReasonCordoning, evt.ActionUncordoned, "Tenant has been uncordoned")
 		}
 
 		return nil

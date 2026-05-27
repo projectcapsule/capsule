@@ -9,7 +9,6 @@ import (
 
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 
-	"github.com/projectcapsule/capsule/internal/webhook/utils"
 	"github.com/projectcapsule/capsule/pkg/api"
 )
 
@@ -60,7 +59,7 @@ func NewGatewayClassForbidden(class string, spec api.DefaultAllowedListSpec) err
 func (i GatewayClassForbiddenError) Error() string {
 	err := fmt.Sprintf("Gateway Class %s is forbidden for the current Tenant: ", i.gatewayClassName)
 
-	return utils.DefaultAllowedValuesErrorMessage(i.spec, err)
+	return DefaultAllowedValuesErrorMessage(i.spec, err)
 }
 
 type GatewayClassUndefinedError struct {
@@ -74,5 +73,5 @@ func NewGatewayClassUndefined(spec api.DefaultAllowedListSpec) error {
 }
 
 func (i GatewayClassUndefinedError) Error() string {
-	return utils.DefaultAllowedValuesErrorMessage(i.spec, "No gateway Class is forbidden for the current Tenant. Specify a gateway Class which is allowed within the Tenant: ")
+	return DefaultAllowedValuesErrorMessage(i.spec, "No gateway Class is forbidden for the current Tenant. Specify a gateway Class which is allowed within the Tenant: ")
 }

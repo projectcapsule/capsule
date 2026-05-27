@@ -14,41 +14,45 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api"
+	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
+	"github.com/projectcapsule/capsule/pkg/users"
 )
 
 type userMetadataHandler struct{}
 
-func UserMetadataHandler() handlers.TypedHandlerWithTenant[*corev1.Namespace] {
+func UserMetadataHandler() handlers.TypedHandlerWithTenantUser[*corev1.Namespace] {
 	return &userMetadataHandler{}
 }
 
 func (h *userMetadataHandler) OnCreate(
-	c client.Client,
+	_ client.Client,
+	_ client.Reader,
+	_ users.AdmissionUser,
 	ns *corev1.Namespace,
-	decoder admission.Decoder,
+	_ admission.Decoder,
 	recorder events.EventRecorder,
 	tnt *capsulev1beta2.Tenant,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
+		ns.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("Namespace"))
+
 		if tnt.Spec.NamespaceOptions != nil {
 			err := api.ValidateForbidden(ns.Annotations, tnt.Spec.NamespaceOptions.ForbiddenAnnotations)
 			if err != nil {
 				err = errors.Wrap(err, "namespace annotations validation failed")
-				recorder.Eventf(tnt, ns, corev1.EventTypeWarning, evt.ReasonForbiddenAnnotation, evt.ActionValidationDenied, err.Error())
-				response := admission.Denied(err.Error())
+				recorder.Eventf(ns, ns, corev1.EventTypeWarning, evt.ReasonForbiddenAnnotation, evt.ActionValidationDenied, err.Error())
 
-				return &response
+				return ad.Deny(err.Error())
 			}
 
 			err = api.ValidateForbidden(ns.Labels, tnt.Spec.NamespaceOptions.ForbiddenLabels)
 			if err != nil {
 				err = errors.Wrap(err, "namespace labels validation failed")
-				recorder.Eventf(tnt, ns, corev1.EventTypeWarning, evt.ReasonForbiddenLabel, evt.ActionValidationDenied, err.Error())
-				response := admission.Denied(err.Error())
+				recorder.Eventf(ns, ns, corev1.EventTypeWarning, evt.ReasonForbiddenLabel, evt.ActionValidationDenied, err.Error())
 
-				return &response
+				return ad.Deny(err.Error())
 			}
 		}
 
@@ -57,10 +61,12 @@ func (h *userMetadataHandler) OnCreate(
 }
 
 func (h *userMetadataHandler) OnUpdate(
-	client client.Client,
+	_ client.Client,
+	_ client.Reader,
+	_ users.AdmissionUser,
 	newNs *corev1.Namespace,
 	oldNs *corev1.Namespace,
-	decoder admission.Decoder,
+	_ admission.Decoder,
 	recorder events.EventRecorder,
 	tnt *capsulev1beta2.Tenant,
 ) handlers.Func {
@@ -68,19 +74,19 @@ func (h *userMetadataHandler) OnUpdate(
 		if len(tnt.Spec.NodeSelector) > 0 {
 			v, ok := newNs.GetAnnotations()["scheduler.alpha.kubernetes.io/node-selector"]
 			if !ok {
-				response := admission.Denied("the node-selector annotation is enforced, cannot be removed")
+				msg := "the node-selector annotation is enforced, cannot be removed"
 
-				recorder.Eventf(tnt, oldNs, corev1.EventTypeWarning, "ForbiddenNodeSelectorDeletion", "Denied", string(response.Result.Reason))
+				recorder.Eventf(oldNs, oldNs, corev1.EventTypeWarning, "ForbiddenNodeSelectorDeletion", "Denied", msg)
 
-				return &response
+				return ad.Deny(msg)
 			}
 
 			if v != oldNs.GetAnnotations()["scheduler.alpha.kubernetes.io/node-selector"] {
-				response := admission.Denied("the node-selector annotation is enforced, cannot be updated")
+				msg := "the node-selector annotation is enforced, cannot be updated"
 
-				recorder.Eventf(tnt, oldNs, corev1.EventTypeWarning, "ForbiddenNodeSelectorUpdate", "Denied", string(response.Result.Reason))
+				recorder.Eventf(oldNs, oldNs, corev1.EventTypeWarning, "ForbiddenNodeSelectorUpdate", "Denied", msg)
 
-				return &response
+				return ad.Deny(msg)
 			}
 		}
 
@@ -128,19 +134,17 @@ func (h *userMetadataHandler) OnUpdate(
 			err := api.ValidateForbidden(annotations, tnt.Spec.NamespaceOptions.ForbiddenAnnotations)
 			if err != nil {
 				err = errors.Wrap(err, "namespace annotations validation failed")
-				recorder.Eventf(tnt, oldNs, corev1.EventTypeWarning, evt.ReasonForbiddenAnnotation, evt.ActionValidationDenied, err.Error())
-				response := admission.Denied(err.Error())
+				recorder.Eventf(oldNs, oldNs, corev1.EventTypeWarning, evt.ReasonForbiddenAnnotation, evt.ActionValidationDenied, err.Error())
 
-				return &response
+				return ad.Deny(err.Error())
 			}
 
 			err = api.ValidateForbidden(labels, tnt.Spec.NamespaceOptions.ForbiddenLabels)
 			if err != nil {
 				err = errors.Wrap(err, "namespace labels validation failed")
-				recorder.Eventf(tnt, oldNs, corev1.EventTypeWarning, evt.ReasonForbiddenLabel, evt.ActionValidationDenied, err.Error())
-				response := admission.Denied(err.Error())
+				recorder.Eventf(oldNs, oldNs, corev1.EventTypeWarning, evt.ReasonForbiddenLabel, evt.ActionValidationDenied, err.Error())
 
-				return &response
+				return ad.Deny(err.Error())
 			}
 		}
 
@@ -150,6 +154,8 @@ func (h *userMetadataHandler) OnUpdate(
 
 func (h *userMetadataHandler) OnDelete(
 	client.Client,
+	client.Reader,
+	users.AdmissionUser,
 	*corev1.Namespace,
 	admission.Decoder,
 	events.EventRecorder,

@@ -5,12 +5,14 @@ package tenant
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
 
 	"golang.org/x/sync/errgroup"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -40,6 +42,7 @@ import (
 //
 // In case of Namespace-scoped Resource Budget, we're just replicating the resources across all registered Namespaces.
 
+//nolint:cyclop
 func (r *Manager) syncResourceQuotas(ctx context.Context, tenant *capsulev1beta2.Tenant) (err error) { //nolint:gocognit
 	// Remove prior metrics, to avoid cleaning up for metrics of deleted ResourceQuotas
 	r.Metrics.DeleteTenantResourceMetrics(tenant.Name)
@@ -52,6 +55,7 @@ func (r *Manager) syncResourceQuotas(ctx context.Context, tenant *capsulev1beta2
 
 	//nolint:nestif
 	if tenant.Spec.ResourceQuota.Scope == api.ResourceQuotaScopeTenant {
+		scopeErrs := make(chan error, len(tenant.Spec.ResourceQuota.Items))
 		group := new(errgroup.Group)
 
 		for i, q := range tenant.Spec.ResourceQuota.Items {
@@ -63,6 +67,12 @@ func (r *Manager) syncResourceQuotas(ctx context.Context, tenant *capsulev1beta2
 			}
 
 			group.Go(func() (scopeErr error) {
+				defer func() {
+					if scopeErr != nil {
+						scopeErrs <- fmt.Errorf("resource quota %d: %w", index, scopeErr)
+					}
+				}()
+
 				// Calculating the Resource Budget at Tenant scope just if this is put in place.
 				// Requirement to list ResourceQuota of the current Tenant
 				var tntRequirement *labels.Requirement
@@ -80,7 +90,7 @@ func (r *Manager) syncResourceQuotas(ctx context.Context, tenant *capsulev1beta2
 				// These are required since Capsule is going to sum all the used quota to
 				// sum them and get the Tenant one.
 				list := &corev1.ResourceQuotaList{}
-				if scopeErr = r.List(ctx, list, &client.ListOptions{LabelSelector: labels.NewSelector().Add(*tntRequirement).Add(*indexRequirement)}); scopeErr != nil {
+				if scopeErr = r.reader.List(ctx, list, &client.ListOptions{LabelSelector: labels.NewSelector().Add(*tntRequirement).Add(*indexRequirement)}); scopeErr != nil {
 					r.Log.Error(scopeErr, "cannot list ResourceQuota", "tenantFilter", tntRequirement.String(), "indexFilter", indexRequirement.String())
 
 					return scopeErr
@@ -168,14 +178,24 @@ func (r *Manager) syncResourceQuotas(ctx context.Context, tenant *capsulev1beta2
 					}
 				}
 
-				return scopeErr
+				return nil
 			})
 		}
-		// Waiting the update of all ResourceQuotas
-		if err = group.Wait(); err != nil {
+
+		_ = group.Wait()
+
+		close(scopeErrs)
+
+		var joined []error
+		for scopeErr := range scopeErrs {
+			joined = append(joined, scopeErr)
+		}
+
+		if err = errors.Join(joined...); err != nil {
 			return err
 		}
 	}
+
 	// getting requested ResourceQuota keys
 	keys := make([]string, 0, len(tenant.Spec.ResourceQuota.Items))
 
@@ -185,8 +205,13 @@ func (r *Manager) syncResourceQuotas(ctx context.Context, tenant *capsulev1beta2
 
 	group := new(errgroup.Group)
 
-	for _, ns := range tenant.Status.Namespaces {
-		namespace := ns
+	for _, ns := range tenant.Status.Spaces {
+		namespace := ns.Name
+
+		cond := ns.Conditions.GetConditionByType(meta.ReadyCondition)
+		if cond != nil && cond.Reason == meta.TerminatingReason {
+			continue
+		}
 
 		group.Go(func() error {
 			return r.syncResourceQuota(ctx, tenant, namespace, keys)
@@ -233,10 +258,11 @@ func (r *Manager) syncResourceQuota(ctx context.Context, tenant *capsulev1beta2.
 				delete(targetLabels, meta.TenantLabel)
 
 				target.SetLabels(targetLabels)
+
 				target.Spec.Scopes = resQuota.Scopes
 				target.Spec.ScopeSelector = resQuota.ScopeSelector
 
-				// In case of Namespace scope for the ResourceQuota we can easily apply the bare specification
+				// In case of Namespace scope for the ResourceQuota we can easily apply the bare specification.
 				if tenant.Spec.ResourceQuota.Scope == api.ResourceQuotaScopeNamespace {
 					target.Spec.Hard = resQuota.Hard
 				}
@@ -246,12 +272,22 @@ func (r *Manager) syncResourceQuota(ctx context.Context, tenant *capsulev1beta2.
 
 			return retryErr
 		})
-
-		r.Log.V(4).Info("resource Quota sync result: "+string(res), "name", target.Name, "namespace", target.Namespace)
-
 		if err != nil {
+			if apierrors.HasStatusCause(err, corev1.NamespaceTerminatingCause) {
+				r.Log.V(4).Info(
+					"skipping ResourceQuota sync because namespace is terminating",
+					"name", target.Name,
+					"namespace", target.Namespace,
+					"tenant", tenant.Name,
+				)
+
+				return nil
+			}
+
 			return err
 		}
+
+		r.Log.V(4).Info("resource Quota sync result: "+string(res), "name", target.Name, "namespace", target.Namespace)
 	}
 
 	return nil

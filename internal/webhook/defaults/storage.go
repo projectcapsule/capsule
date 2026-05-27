@@ -16,15 +16,22 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
 	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
+	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/tenant"
 )
 
-func mutatePVCDefaults(ctx context.Context, req admission.Request, c client.Client, decoder admission.Decoder, namespace string) *admission.Response {
+func mutatePVCDefaults(
+	ctx context.Context,
+	req admission.Request,
+	c client.Client,
+	decoder admission.Decoder,
+	namespace string,
+) *admission.Response {
 	var err error
 
 	pvc := &corev1.PersistentVolumeClaim{}
 	if err = decoder.Decode(req, pvc); err != nil {
-		return utils.ErroredResponse(err)
+		return ad.ErroredResponse(err)
 	}
 
 	pvc.SetNamespace(namespace)
@@ -33,7 +40,7 @@ func mutatePVCDefaults(ctx context.Context, req admission.Request, c client.Clie
 
 	tnt, err = tenant.TenantByStatusNamespace(ctx, c, pvc.Namespace)
 	if err != nil {
-		return utils.ErroredResponse(err)
+		return ad.ErroredResponse(err)
 	}
 
 	if tnt == nil {
@@ -53,9 +60,7 @@ func mutatePVCDefaults(ctx context.Context, req admission.Request, c client.Clie
 	if storageClassName := pvc.Spec.StorageClassName; storageClassName != nil && *storageClassName != allowed.Default {
 		csc, err = utils.GetStorageClassByName(ctx, c, *storageClassName)
 		if err != nil && !k8serrors.IsNotFound(err) {
-			response := admission.Denied(caperrors.NewStorageClassError(*storageClassName, err).Error())
-
-			return &response
+			return ad.Deny(caperrors.NewStorageClassError(*storageClassName, err).Error())
 		}
 	} else {
 		mutate = true
@@ -69,7 +74,7 @@ func mutatePVCDefaults(ctx context.Context, req admission.Request, c client.Clie
 	// Marshal Manifest
 	marshaled, err := json.Marshal(pvc)
 	if err != nil {
-		return utils.ErroredResponse(err)
+		return ad.ErroredResponse(err)
 	}
 
 	response := admission.PatchResponseFromRaw(req.Object.Raw, marshaled)

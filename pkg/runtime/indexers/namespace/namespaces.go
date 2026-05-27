@@ -19,7 +19,7 @@ func (o OwnerReference) Object() client.Object {
 }
 
 func (o OwnerReference) Field() string {
-	return ".metadata.ownerReferences[*].capsule"
+	return OwnerReferenceIndex
 }
 
 func (o OwnerReference) Func() client.IndexerFunc {

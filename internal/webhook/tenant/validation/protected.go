@@ -11,6 +11,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
 
@@ -22,6 +23,7 @@ func ProtectedHandler() handlers.TypedHandler[*capsulev1beta2.Tenant] {
 
 func (h *protectedHandler) OnCreate(
 	client.Client,
+	client.Reader,
 	*capsulev1beta2.Tenant,
 	admission.Decoder,
 	events.EventRecorder,
@@ -32,23 +34,29 @@ func (h *protectedHandler) OnCreate(
 }
 
 func (h *protectedHandler) OnDelete(
-	c client.Client,
+	_ client.Client,
+	_ client.Reader,
 	tnt *capsulev1beta2.Tenant,
 	_ admission.Decoder,
 	_ events.EventRecorder,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		if tnt.Spec.PreventDeletion {
-			response := admission.Denied("tenant is protected and cannot be deleted")
-
-			return &response
+			return ad.Deny("tenant is protected and cannot be deleted")
 		}
 
 		return nil
 	}
 }
 
-func (h *protectedHandler) OnUpdate(client.Client, *capsulev1beta2.Tenant, *capsulev1beta2.Tenant, admission.Decoder, events.EventRecorder) handlers.Func {
+func (h *protectedHandler) OnUpdate(
+	client.Client,
+	client.Reader,
+	*capsulev1beta2.Tenant,
+	*capsulev1beta2.Tenant,
+	admission.Decoder,
+	events.EventRecorder,
+) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}

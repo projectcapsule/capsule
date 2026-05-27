@@ -28,14 +28,14 @@ type handler struct {
 }
 
 //nolint:dupl
-func (h *handler) OnCreate(client client.Client, decoder admission.Decoder, recorder events.EventRecorder) Func {
+func (h *handler) OnCreate(client client.Client, reader client.Reader, decoder admission.Decoder, recorder events.EventRecorder) Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		if !users.IsCapsuleUser(ctx, client, h.configuration, req.UserInfo.Username, req.UserInfo.Groups) {
 			return nil
 		}
 
 		for _, hndl := range h.handlers {
-			if response := hndl.OnCreate(client, decoder, recorder)(ctx, req); response != nil {
+			if response := hndl.OnCreate(client, reader, decoder, recorder)(ctx, req); response != nil {
 				return response
 			}
 		}
@@ -45,14 +45,14 @@ func (h *handler) OnCreate(client client.Client, decoder admission.Decoder, reco
 }
 
 //nolint:dupl
-func (h *handler) OnDelete(client client.Client, decoder admission.Decoder, recorder events.EventRecorder) Func {
+func (h *handler) OnDelete(client client.Client, reader client.Reader, decoder admission.Decoder, recorder events.EventRecorder) Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		if !users.IsCapsuleUser(ctx, client, h.configuration, req.UserInfo.Username, req.UserInfo.Groups) {
 			return nil
 		}
 
 		for _, hndl := range h.handlers {
-			if response := hndl.OnDelete(client, decoder, recorder)(ctx, req); response != nil {
+			if response := hndl.OnDelete(client, reader, decoder, recorder)(ctx, req); response != nil {
 				return response
 			}
 		}
@@ -62,14 +62,14 @@ func (h *handler) OnDelete(client client.Client, decoder admission.Decoder, reco
 }
 
 //nolint:dupl
-func (h *handler) OnUpdate(client client.Client, decoder admission.Decoder, recorder events.EventRecorder) Func {
+func (h *handler) OnUpdate(client client.Client, reader client.Reader, decoder admission.Decoder, recorder events.EventRecorder) Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		if !users.IsCapsuleUser(ctx, client, h.configuration, req.UserInfo.Username, req.UserInfo.Groups) {
 			return nil
 		}
 
 		for _, hndl := range h.handlers {
-			if response := hndl.OnUpdate(client, decoder, recorder)(ctx, req); response != nil {
+			if response := hndl.OnUpdate(client, reader, decoder, recorder)(ctx, req); response != nil {
 				return response
 			}
 		}

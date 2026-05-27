@@ -15,6 +15,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
 
@@ -26,6 +27,7 @@ func RoleBindingRegexHandler() handlers.TypedHandler[*capsulev1beta2.Tenant] {
 
 func (h *rbRegexHandler) OnCreate(
 	_ client.Client,
+	_ client.Reader,
 	tnt *capsulev1beta2.Tenant,
 	decoder admission.Decoder,
 	_ events.EventRecorder,
@@ -37,6 +39,7 @@ func (h *rbRegexHandler) OnCreate(
 
 func (h *rbRegexHandler) OnDelete(
 	client.Client,
+	client.Reader,
 	*capsulev1beta2.Tenant,
 	admission.Decoder,
 	events.EventRecorder,
@@ -48,6 +51,7 @@ func (h *rbRegexHandler) OnDelete(
 
 func (h *rbRegexHandler) OnUpdate(
 	_ client.Client,
+	_ client.Reader,
 	tnt *capsulev1beta2.Tenant,
 	old *capsulev1beta2.Tenant,
 	decoder admission.Decoder,
@@ -65,9 +69,7 @@ func (h *rbRegexHandler) validate(tnt *capsulev1beta2.Tenant, decoder admission.
 				if subject.Kind == rbacv1.ServiceAccountKind {
 					err := validation.IsDNS1123Subdomain(subject.Name)
 					if len(err) > 0 {
-						response := admission.Denied(fmt.Sprintf("Subject Name '%v' for binding '%v' is invalid. %v", subject.Name, binding.ClusterRoleName, strings.Join(err, ", ")))
-
-						return &response
+						return ad.Deny(fmt.Sprintf("Subject Name '%v' for binding '%v' is invalid. %v", subject.Name, binding.ClusterRoleName, strings.Join(err, ", ")))
 					}
 				}
 			}

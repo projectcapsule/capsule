@@ -11,6 +11,8 @@ spec:
     kind: TenantOwner
     listKind: TenantOwnerList
     plural: tenantowners
+    shortNames:
+    - to
     singular: tenantowner
   scope: Cluster
   versions:

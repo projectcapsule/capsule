@@ -8,12 +8,71 @@ import (
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	tpl "github.com/projectcapsule/capsule/pkg/template"
 	"github.com/projectcapsule/capsule/pkg/utils"
 )
+
+func TenanLabelValue(ns *corev1.Namespace) string {
+	if ns.GetLabels() == nil {
+		return ""
+	}
+
+	return ns.GetLabels()[meta.TenantLabel]
+}
+
+func HasTenantReference(ns *corev1.Namespace) bool {
+	if ns.Labels != nil && ns.Labels[meta.TenantLabel] != "" {
+		return true
+	}
+
+	//nolint:modernize
+	for _, ref := range ns.OwnerReferences {
+		if IsTenantOwnerReference(ref) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func TenantOwnerReferences(ns *corev1.Namespace) []metav1.OwnerReference {
+	if ns == nil {
+		return nil
+	}
+
+	refs := make([]metav1.OwnerReference, 0)
+
+	for _, ref := range ns.GetOwnerReferences() {
+		if IsTenantOwnerReference(ref) {
+			refs = append(refs, ref)
+		}
+	}
+
+	return refs
+}
+
+func TenantOwnerReferenceName(ns *corev1.Namespace) string {
+	for _, ref := range ns.GetOwnerReferences() {
+		if IsTenantOwnerReference(ref) {
+			return ref.Name
+		}
+	}
+
+	return ""
+}
+
+func HasTenantOwnership(ns *corev1.Namespace) bool {
+	return TenanLabelValue(ns) != "" || TenantOwnerReferenceName(ns) != ""
+}
+
+func TenantOwnershipChanged(oldNs, newNs *corev1.Namespace) bool {
+	return TenanLabelValue(oldNs) != TenanLabelValue(newNs) ||
+		HasTenantOwnership(oldNs) != HasTenantOwnership(newNs)
+}
 
 func AddNamespaceNameLabels(labels map[string]string, ns *corev1.Namespace) {
 	labels["kubernetes.io/metadata.name"] = ns.GetName()
@@ -58,7 +117,7 @@ func BuildNamespaceMetadataForTenant(ns *corev1.Namespace, tnt *capsulev1beta2.T
 	annotations = BuildNamespaceAnnotationsForTenant(tnt)
 	labels = BuildNamespaceLabelsForTenant(tnt)
 
-	fastContext := ContextForTenantAndNamespace(tnt, ns)
+	fastContext := FastContextForTenantAndNamespace(tnt, ns)
 
 	if opts := tnt.Spec.NamespaceOptions; opts != nil && len(opts.AdditionalMetadataList) > 0 {
 		for _, md := range opts.AdditionalMetadataList {

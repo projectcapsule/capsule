@@ -12,21 +12,21 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api/rbac"
 )
 
-var _ = Describe("Deleting a tenant with protected annotation", Label("tenant"), func() {
+var _ = Describe("Deleting a tenant with protected annotation", Ordered, Label("tenant"), func() {
 	tnt := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "protected-tenant",
+			Name: "e2e-protected-tenant",
 		},
 		Spec: capsulev1beta2.TenantSpec{
 			PreventDeletion: true,
-			Owners: api.OwnerListSpec{
+			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: api.CoreOwnerSpec{
-						UserSpec: api.UserSpec{
-							Name: "john",
+					CoreOwnerSpec: rbac.CoreOwnerSpec{
+						UserSpec: rbac.UserSpec{
+							Name: "e2e-protected-tenant",
 							Kind: "User",
 						},
 					},
@@ -44,6 +44,7 @@ var _ = Describe("Deleting a tenant with protected annotation", Label("tenant"),
 
 	It("should fail", func() {
 		Expect(k8sClient.Create(context.TODO(), tnt)).Should(Succeed())
+		TenantReady(tnt, metav1.ConditionTrue, defaultTimeoutInterval)
 		Expect(k8sClient.Delete(context.TODO(), tnt)).ShouldNot(Succeed())
 	})
 })

@@ -18,7 +18,7 @@ func (o NamespacesReference) Object() client.Object {
 }
 
 func (o NamespacesReference) Field() string {
-	return ".status.namespaces"
+	return NamespaceIndexerFieldName
 }
 
 func (o NamespacesReference) Func() client.IndexerFunc {

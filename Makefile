@@ -17,9 +17,9 @@ IMG_BASE        ?= $(REPOSITORY)
 IMG             ?= $(IMG_BASE):$(VERSION)
 CAPSULE_IMG     ?= $(REGISTRY)/$(IMG_BASE)
 CLUSTER_NAME    ?= capsule
-FILTER		 	?= --label-filter="!skip"
+FILTER		 	?= && !skip
 ## Kubernetes Version Support
-KUBERNETES_SUPPORTED_VERSION ?= "v1.35.0"
+KUBERNETES_SUPPORTED_VERSION ?= "v1.32.0"
 
 ## Openshift Version Support
 OS_SUPPORTED_VERSION ?= "4.22.0-okd-scos.ec.10"
@@ -109,7 +109,7 @@ helm-test-exec: ct helm-controller-version ko-build-all
 # Setup development env
 dev-build: kind
 	$(KIND) create cluster --wait=60s --name $(CLUSTER_NAME) --image kindest/node:$(KUBERNETES_SUPPORTED_VERSION) --config ./hack/kind-cluster.yaml
-	$(MAKE) dev-install-deps
+	$(MAKE) dev-install-gw-api-crds
 
 .PHONY: dev-destroy
 dev-destroy: kind
@@ -158,6 +158,8 @@ subjectAltName = @alt_names
 IP.1   = $(LAPTOP_HOST_IP)
 endef
 export TLS_CNF
+CHART           ?= "./charts/capsule"
+CHART_VERSION   ?= "./charts/capsule"
 dev-setup:
 	$(KUBECTL) -n capsule-system scale deployment capsule-controller-manager --replicas=0 || true
 	mkdir -p /tmp/k8s-webhook-server/serving-certs
@@ -175,22 +177,44 @@ dev-setup:
 	export WEBHOOK_URL="https://$${LAPTOP_HOST_IP}:9443"; \
 	export CA_BUNDLE=`openssl base64 -in /tmp/k8s-webhook-server/serving-certs/tls.crt | tr -d '\n'`; \
 	$(HELM) upgrade \
-	    --dependency-update \
+		--dependency-update \
 		--force-conflicts \
+		--take-ownership \
 		--debug \
 		--install \
 		--namespace capsule-system \
 		--create-namespace \
+		--version=$(CHART_VERSION) \
+		--set 'proxy.enabled=true' \
 		--set 'crds.install=true' \
 		--set 'crds.exclusive=true'\
-        --set 'crds.createConfig=true'\
-        --set "tls.enableController=false"\
+		--set 'crds.createConfig=true'\
+		--set 'crds.createRBAC=true'\
+		--set 'crds.createDiagnostics=true'\
+		--set "monitoring.diagnostics.enabled=true"\
+		--set "manager.rbac.minimal=true"\
+		--set 'certManager.generateCertificates=false' \
+		--set 'tls.enableController=true' \
+		--set 'tls.create=true' \
 		--set "webhooks.exclusive=true"\
-		--set "webhooks.hooks.nodes.enabled=true"\
 		--set "webhooks.service.url=$${WEBHOOK_URL}" \
 		--set "webhooks.service.caBundle=$${CA_BUNDLE}" \
+		--set "webhooks.hooks.nodes.enabled=true"\
+		--set 'webhooks.hooks.calculations.enabled=true' \
+		--set-string 'webhooks.hooks.calculations.rules[0].apiGroups[0]=' \
+		--set 'webhooks.hooks.calculations.rules[0].apiVersions[0]=v1' \
+		--set 'webhooks.hooks.calculations.rules[0].operations[0]=CREATE' \
+		--set 'webhooks.hooks.calculations.rules[0].operations[1]=UPDATE' \
+		--set 'webhooks.hooks.calculations.rules[0].operations[2]=DELETE' \
+		--set 'webhooks.hooks.calculations.rules[0].resources[0]=pods' \
+		--set 'webhooks.hooks.calculations.rules[0].resources[1]=persistentvolumeclaims' \
+		--set 'webhooks.hooks.calculations.rules[0].scope=Namespaced' \
+		--set 'webhooks.hooks.calculations.namespaceSelector.matchLabels.env=e2e' \
 		capsule \
-		./charts/capsule || true
+		$(CHART)
+	mkdir -p ./hack/generated/ || true
+	$(KUBECTL) label clusterrole admin projectcapsule.dev/aggregate-to-controller=true
+	bash ./hack/kubeconfig-for-sa.sh $(CLUSTER_NAME) "capsule-system" "capsule" "./hack/generated/kubeconfig.yaml"
 
 setup-monitoring: dev-setup-fluxcd
 
@@ -232,12 +256,24 @@ dev-setup-capsule: dev-setup-fluxcd
 
 dev-setup-capsule-example: dev-setup-fluxcd
 	@$(KUBECTL) kustomize --load-restrictor='LoadRestrictionsNone' hack/distro/capsule/example-setup | envsubst | kubectl apply -f -
+	@$(KUBECTL) create ns wind-uat --as joe --as-group projectcapsule.dev || true
+	@$(KUBECTL) label ns wind-uat env=test
 	@$(KUBECTL) create ns wind-test --as joe --as-group projectcapsule.dev || true
+	@$(KUBECTL) label ns wind-test env=test
 	@$(KUBECTL) create ns wind-prod --as joe --as-group projectcapsule.dev || true
+	@$(KUBECTL) label ns wind-prod env=prod
+	@$(KUBECTL) create ns green-uat --as bob --as-group projectcapsule.dev || true
+	@$(KUBECTL) label ns green-uat env=test
 	@$(KUBECTL) create ns green-test --as bob --as-group projectcapsule.dev || true
+	@$(KUBECTL) label ns green-test env=test
 	@$(KUBECTL) create ns green-prod --as bob --as-group projectcapsule.dev || true
+	@$(KUBECTL) label ns green-prod env=prod
+	@$(KUBECTL) create ns solar-uat --as alice --as-group projectcapsule.dev || true
+	@$(KUBECTL) label ns solar-uat env=test
 	@$(KUBECTL) create ns solar-test --as alice --as-group projectcapsule.dev || true
+	@$(KUBECTL) label ns solar-test env=test
 	@$(KUBECTL) create ns solar-prod --as alice --as-group projectcapsule.dev || true
+	@$(KUBECTL) label ns solar-prod env=prod
 	@$(KUBECTL) apply -f hack/distro/capsule/example-setup/claims.yaml
 
 
@@ -247,19 +283,53 @@ wait-for-helmreleases:
 	  sleep 5; \
 	done
 
+####################
+# -- Enterprise Release
+####################
 
-ENTERPRISE_VERSION  ?= "0.13.0-rc.2"
-ENTERPRISE_REGISTRY ?= "oci.peakscale.ch"
+ENTERPRISE_VERSION  ?= "dirty"
+ENTERPRISE_REGISTRY ?= "registry.projectcapsule.dev"
 
-enterprise-prerelease:
+enterprise-release:
 	mkdir -p ./builds
-	$(MAKE) CAPSULE_IMG=$(ENTERPRISE_REGISTRY)/prereleases/images/capsule VERSION=$(ENTERPRISE_VERSION) ko-publish-capsule
+	$(MAKE) CAPSULE_IMG=$(ENTERPRISE_REGISTRY)/enterprise/capsule VERSION=v$(ENTERPRISE_VERSION) ko-publish-capsule
 	$(HELM) package ./charts/capsule --app-version=$(ENTERPRISE_VERSION) --version=$(ENTERPRISE_VERSION) --destination ./builds/
-	$(HELM) push ./builds/capsule-$(ENTERPRISE_VERSION).tgz oci://$(ENTERPRISE_REGISTRY)/prereleases/charts/
+	$(HELM) push ./builds/capsule-$(ENTERPRISE_VERSION).tgz oci://$(ENTERPRISE_REGISTRY)/charts/
 	$(MAKE) deploy-enterprise
 	rm -rf ./builds
 
 deploy-enterprise:
+	@echo ""
+	@echo "Deploying Capsule (Enterprise) $(ENTERPRISE_VERSION)"
+	@echo ""
+	@echo "1) Create image pull secret (Change the credentials with the ones provided to you):"
+	@echo ""
+	@echo "kubectl create secret docker-registry capsule-enterprise -n capsule-system \\"
+	@echo "  --docker-username='robot\$$name' \\"
+	@echo "  --docker-password='serviceaccount-password' \\"
+	@echo "  --docker-server='$(ENTERPRISE_REGISTRY)'"
+	@echo ""
+	@echo "2) Deploy Capsule:"
+	@echo ""
+	@echo "helm upgrade --install capsule \\"
+	@echo "  oci://$(ENTERPRISE_REGISTRY)/charts/capsule \\"
+	@echo "  --namespace capsule-system \\"
+	@echo "  --version $(ENTERPRISE_VERSION) \\"
+	@echo "  --reuse-values \\"
+	@echo "  --set manager.image.registry=$(ENTERPRISE_REGISTRY) \\"
+	@echo "  --set manager.image.repository=enterprise/capsule \\"
+	@echo "  --set 'serviceAccount.imagePullSecrets={capsule-enterprise}'"
+	@echo ""
+
+enterprise-prerelease:
+	mkdir -p ./builds
+	$(MAKE) CAPSULE_IMG=$(ENTERPRISE_REGISTRY)/prereleases/capsule VERSION=v$(ENTERPRISE_VERSION) ko-publish-capsule
+	$(HELM) package ./charts/capsule --app-version=$(ENTERPRISE_VERSION) --version=$(ENTERPRISE_VERSION) --destination ./builds/
+	$(HELM) push ./builds/capsule-$(ENTERPRISE_VERSION).tgz oci://$(ENTERPRISE_REGISTRY)/charts/prereleases/
+	$(MAKE) deploy-enterprise-prerelease
+	rm -rf ./builds
+
+deploy-enterprise-prerelease:
 	@echo ""
 	@echo "Deploying Capsule Prerelease (Enterprise) $(ENTERPRISE_VERSION)"
 	@echo ""
@@ -273,16 +343,17 @@ deploy-enterprise:
 	@echo "2) Deploy Capsule:"
 	@echo ""
 	@echo "helm upgrade --install capsule \\"
-	@echo "  oci://$(ENTERPRISE_REGISTRY)/prereleases/charts/capsule \\"
+	@echo "  oci://$(ENTERPRISE_REGISTRY)/charts/prereleases/capsule \\"
 	@echo "  --namespace capsule-system \\"
 	@echo "  --version $(ENTERPRISE_VERSION) \\"
 	@echo "  --reuse-values \\"
 	@echo "  --set manager.image.registry=$(ENTERPRISE_REGISTRY) \\"
-	@echo "  --set manager.image.repository=prereleases/images/capsule \\"
-	@echo "  --set manager.image.tag=$(ENTERPRISE_VERSION) \\"
+	@echo "  --set manager.image.repository=prereleases/capsule \\"
+	@echo "  --set manager.image.tag=v$(ENTERPRISE_VERSION) \\"
 	@echo "  --set manager.image.pullPolicy=Always \\"
 	@echo "  --set 'serviceAccount.imagePullSecrets={capsule-enterprise}'"
 	@echo ""
+
 
 ####################
 # -- Docker
@@ -357,7 +428,7 @@ golint-fix: golangci-lint
 
 .PHONY: e2e-openshift
 e2e-openshift: ginkgo
-	$(MAKE) e2e-build-openshift && $(MAKE) e2e-exec FILTER='--label-filter="!skip && !skip-on-openshift"' && $(MAKE) e2e-destroy-openshift
+	$(MAKE) e2e-build-openshift && $(MAKE) e2e-exec FILTER='&& !skip && !skip-on-openshift' && $(MAKE) e2e-destroy-openshift
 
 e2e-build-openshift: minc
 	$(MINC) config set provider docker
@@ -384,6 +455,7 @@ e2e-build: kind
 .PHONY: e2e-install
 e2e-install: helm-controller-version ko-build-all
 	$(MAKE) e2e-load-image CLUSTER_NAME=$(CLUSTER_NAME) IMAGE=$(CAPSULE_IMG) VERSION=$(VERSION)
+	$(KUBECTL) label clusterrole admin projectcapsule.dev/aggregate-to-controller=true
 	$(HELM) upgrade \
 	    --dependency-update \
 		--debug \
@@ -391,13 +463,30 @@ e2e-install: helm-controller-version ko-build-all
 		--namespace capsule-system \
 		--create-namespace \
 		--set 'replicaCount=2'\
+		--set 'certManager.generateCertificates=false' \
+		--set 'tls.enableController=true' \
+		--set 'tls.create=true' \
 		--set 'manager.image.pullPolicy=Never' \
 		--set 'manager.resources=null'\
 		--set "manager.image.tag=$(VERSION)" \
 		--set 'manager.livenessProbe.failureThreshold=10' \
+		--set 'manager.options.logLevel=debug' \
+		--set 'manager.options.workers=4' \
+		--set 'manager.options.clientConnectionQPS=2000' \
+		--set 'manager.options.clientConnectionQPS=1000' \
+		--set 'manager.rbac.minimal=true' \
 		--set 'webhooks.hooks.nodes.enabled=true' \
 		--set "webhooks.exclusive=true"\
-		--set "manager.options.logLevel=debug"\
+		--set 'webhooks.hooks.calculations.enabled=true' \
+		--set-string 'webhooks.hooks.calculations.rules[0].apiGroups[0]=' \
+		--set 'webhooks.hooks.calculations.rules[0].apiVersions[0]=v1' \
+		--set 'webhooks.hooks.calculations.rules[0].operations[0]=CREATE' \
+		--set 'webhooks.hooks.calculations.rules[0].operations[1]=UPDATE' \
+		--set 'webhooks.hooks.calculations.rules[0].operations[2]=DELETE' \
+		--set 'webhooks.hooks.calculations.rules[0].resources[0]=pods' \
+		--set 'webhooks.hooks.calculations.rules[0].resources[1]=persistentvolumeclaims' \
+		--set 'webhooks.hooks.calculations.rules[0].scope=Namespaced' \
+		--set 'webhooks.hooks.calculations.namespaceSelector.matchLabels.env=e2e' \
 		capsule \
 		./charts/capsule
 
@@ -470,7 +559,12 @@ e2e-load-image-openshift: minc
 
 .PHONY: e2e-exec
 e2e-exec: ginkgo
-	$(GINKGO) -v -tags e2e $(FILTER) ./e2e
+	$(GINKGO) -v -p -tags e2e --label-filter="!config $(FILTER)" ./e2e
+	$(MAKE) e2e-exec-config
+
+.PHONY: e2e-exec-config
+e2e-exec-config: ginkgo
+	$(GINKGO) -v  -tags e2e --label-filter="config $(FILTER)" ./e2e
 
 .PHONY: e2e-destroy
 e2e-destroy: dev-destroy
@@ -556,7 +650,7 @@ nwa:
 	$(call go-install-tool,$(NWA),github.com/$(NWA_LOOKUP)@$(NWA_VERSION))
 
 GOLANGCI_LINT          := $(LOCALBIN)/golangci-lint
-GOLANGCI_LINT_VERSION  := v2.8.0
+GOLANGCI_LINT_VERSION  := v2.12.2
 GOLANGCI_LINT_LOOKUP   := golangci/golangci-lint
 golangci-lint: ## Download golangci-lint locally if necessary.
 	@test -s $(GOLANGCI_LINT) && $(GOLANGCI_LINT) -h | grep -q $(GOLANGCI_LINT_VERSION) || \

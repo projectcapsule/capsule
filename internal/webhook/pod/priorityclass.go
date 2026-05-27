@@ -14,7 +14,9 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
+	"github.com/projectcapsule/capsule/pkg/api"
 	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
+	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
@@ -26,12 +28,13 @@ func PriorityClass() handlers.TypedHandlerWithTenantWithRuleset[*corev1.Pod] {
 }
 
 func (h *priorityClass) OnCreate(
-	c client.Client,
+	_ client.Client,
+	reader client.Reader,
 	pod *corev1.Pod,
 	decoder admission.Decoder,
 	recorder events.EventRecorder,
 	tnt *capsulev1beta2.Tenant,
-	_ *capsulev1beta2.NamespaceRuleBody,
+	_ *api.NamespaceRuleBodyNamespace,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		allowed := tnt.Spec.PriorityClasses
@@ -51,7 +54,7 @@ func (h *priorityClass) OnCreate(
 
 		// Verify if the StorageClass exists and matches the label selector/expression
 		if len(allowed.MatchExpressions) > 0 || len(allowed.MatchLabels) > 0 {
-			priorityClassObj, err := utils.GetPriorityClassByName(ctx, c, priorityClassName)
+			priorityClassObj, err := utils.GetPriorityClassByName(ctx, reader, priorityClassName)
 			if err != nil {
 				response := admission.Errored(http.StatusInternalServerError, err)
 
@@ -80,21 +83,20 @@ func (h *priorityClass) OnCreate(
 				"Using Priority Class %s is forbidden for the tenant %s", priorityClassName, tnt.GetName(),
 			)
 
-			response := admission.Denied(caperrors.NewPodPriorityClassForbidden(priorityClassName, *allowed).Error())
-
-			return &response
+			return ad.Deny(caperrors.NewPodPriorityClassForbidden(priorityClassName, *allowed).Error())
 		}
 	}
 }
 
 func (h *priorityClass) OnUpdate(
 	client.Client,
+	client.Reader,
 	*corev1.Pod,
 	*corev1.Pod,
 	admission.Decoder,
 	events.EventRecorder,
 	*capsulev1beta2.Tenant,
-	*capsulev1beta2.NamespaceRuleBody,
+	*api.NamespaceRuleBodyNamespace,
 ) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
@@ -103,11 +105,12 @@ func (h *priorityClass) OnUpdate(
 
 func (h *priorityClass) OnDelete(
 	client.Client,
+	client.Reader,
 	*corev1.Pod,
 	admission.Decoder,
 	events.EventRecorder,
 	*capsulev1beta2.Tenant,
-	*capsulev1beta2.NamespaceRuleBody,
+	*api.NamespaceRuleBodyNamespace,
 ) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil

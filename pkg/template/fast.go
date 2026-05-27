@@ -6,18 +6,109 @@ package template
 import (
 	"fmt"
 	"io"
+	"regexp"
 	"slices"
 	"strings"
 
 	"github.com/valyala/fasttemplate"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
+var AllowedNamespaceMetadataTemplates = sets.New[string](
+	"tenant.name",
+	"namespace",
+)
+
+var FastTemplateExpression = regexp.MustCompile(`{{\s*([^{}]+)\s*}}`)
+
+func ValidateKubernetesStringOrAllowedTemplates(
+	fieldPath string,
+	value string,
+	validate func(string) []string,
+) []string {
+	checkValue, errs := validateAllowedTemplatesAndReplace(fieldPath, value)
+	if len(errs) > 0 {
+		return errs
+	}
+
+	return prefixValidationErrors(fieldPath, validate(checkValue))
+}
+
+func ValidateAllowedTemplatesOnly(
+	fieldPath string,
+	value string,
+) []string {
+	_, errs := validateAllowedTemplatesAndReplace(fieldPath, value)
+
+	return errs
+}
+
+func validateAllowedTemplatesAndReplace(
+	fieldPath string,
+	value string,
+) (string, []string) {
+	if !ContainsFastTemplateSyntax(value) {
+		return value, nil
+	}
+
+	matches := FastTemplateExpression.FindAllStringSubmatch(value, -1)
+	if len(matches) == 0 {
+		return value, []string{
+			fmt.Sprintf("%s: malformed template %q", fieldPath, value),
+		}
+	}
+
+	checkValue := value
+
+	for _, match := range matches {
+		raw := match[0]
+		name := strings.TrimSpace(match[1])
+
+		if !AllowedNamespaceMetadataTemplates.Has(name) {
+			return value, []string{
+				fmt.Sprintf(
+					"%s: unsupported template %q in %q, allowed templates are {{tenant.name}} and {{namespace}}",
+					fieldPath,
+					name,
+					value,
+				),
+			}
+		}
+
+		checkValue = strings.ReplaceAll(checkValue, raw, "template")
+	}
+
+	if strings.Contains(checkValue, "{{") || strings.Contains(checkValue, "}}") {
+		return value, []string{
+			fmt.Sprintf("%s: malformed template %q", fieldPath, value),
+		}
+	}
+
+	return checkValue, nil
+}
+
+func prefixValidationErrors(fieldPath string, messages []string) []string {
+	if len(messages) == 0 {
+		return nil
+	}
+
+	errs := make([]string, 0, len(messages))
+
+	for _, msg := range messages {
+		errs = append(errs, fmt.Sprintf("%s: %s", fieldPath, msg))
+	}
+
+	return errs
+}
+
+func ContainsFastTemplateSyntax(value string) bool {
+	return strings.Contains(value, "{{") || strings.Contains(value, "}}")
+}
+
 // RequiresFastTemplate evaluates if given string requires templating.
-func RequiresFastTemplate(
-	template string,
-) bool {
-	return strings.Contains(template, "{{") && strings.Contains(template, "}}")
+func RequiresFastTemplate(value string) bool {
+	return strings.Contains(value, "{{") && strings.Contains(value, "}}")
 }
 
 // FastTemplate applies templating to the provided string.
@@ -51,6 +142,7 @@ func FastTemplateMap(
 	}
 
 	out := make(map[string]string, len(m))
+
 	for k, v := range m {
 		out[FastTemplate(k, templateContext)] = FastTemplate(v, templateContext)
 	}
@@ -58,7 +150,6 @@ func FastTemplateMap(
 	return out
 }
 
-// FastTemplateMap evaluates if given LabelSelector requires templating.
 func SelectorRequiresTemplating(sel *metav1.LabelSelector) bool {
 	if sel == nil {
 		return false
@@ -83,7 +174,6 @@ func SelectorRequiresTemplating(sel *metav1.LabelSelector) bool {
 	return false
 }
 
-// FastTemplateMap templates a Labelselector (all keys and values).
 func FastTemplateLabelSelector(
 	in *metav1.LabelSelector,
 	templateContext map[string]string,
@@ -93,7 +183,6 @@ func FastTemplateLabelSelector(
 	}
 
 	out := in.DeepCopy()
-
 	out.MatchLabels = FastTemplateMap(in.MatchLabels, templateContext)
 
 	for i := range out.MatchExpressions {

@@ -12,3 +12,7 @@ func NameForManagedRuleStatus() string {
 func NameForManagedRoleBindings(hash string) string {
 	return fmt.Sprintf("capsule:managed:%s", hash)
 }
+
+func NameForManagedPoolResourceQuota(name string) string {
+	return fmt.Sprintf("capsule-pool-%s", name)
+}

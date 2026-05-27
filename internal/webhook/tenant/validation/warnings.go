@@ -5,6 +5,7 @@ package validation
 
 import (
 	"context"
+	"strings"
 
 	admissionv1 "k8s.io/api/admission/v1"
 	"k8s.io/client-go/tools/events"
@@ -12,6 +13,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
@@ -28,6 +30,7 @@ func WarningHandler(cfg configuration.Configuration) handlers.TypedHandler[*caps
 
 func (h *warningHandler) OnCreate(
 	_ client.Client,
+	_ client.Reader,
 	tnt *capsulev1beta2.Tenant,
 	_ admission.Decoder,
 	_ events.EventRecorder,
@@ -37,7 +40,13 @@ func (h *warningHandler) OnCreate(
 	}
 }
 
-func (h *warningHandler) OnDelete(client.Client, *capsulev1beta2.Tenant, admission.Decoder, events.EventRecorder) handlers.Func {
+func (h *warningHandler) OnDelete(
+	client.Client,
+	client.Reader,
+	*capsulev1beta2.Tenant,
+	admission.Decoder,
+	events.EventRecorder,
+) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
@@ -45,6 +54,7 @@ func (h *warningHandler) OnDelete(client.Client, *capsulev1beta2.Tenant, admissi
 
 func (h *warningHandler) OnUpdate(
 	_ client.Client,
+	_ client.Reader,
 	tnt *capsulev1beta2.Tenant,
 	old *capsulev1beta2.Tenant,
 	_ admission.Decoder,
@@ -119,6 +129,16 @@ func (h *warningHandler) handle(tnt *capsulev1beta2.Tenant, req admission.Reques
 		response.Warnings = append(response.Warnings,
 			"The `regex` selector for RuntimeClasses is deprecated and will be removed in a future release.",
 		)
+	}
+
+	if tnt.GetAnnotations() != nil {
+		for k := range tnt.GetAnnotations() {
+			if strings.HasPrefix(k, meta.ResourceQuotaAnnotationPrefix) {
+				response.Warnings = append(response.Warnings,
+					"custom quotas via tenant annotations are deprecated and will be removed in a future release.  Please migrate to GlobalCustomQuotas. See: https://projectcapsule.dev/docs/resource-management/customquotas/#globalcustomquota.",
+				)
+			}
+		}
 	}
 
 	return response

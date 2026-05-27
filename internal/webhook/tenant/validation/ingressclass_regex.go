@@ -13,6 +13,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
 
@@ -24,6 +25,7 @@ func IngressClassRegexHandler() handlers.TypedHandler[*capsulev1beta2.Tenant] {
 
 func (h *ingressClassRegexHandler) OnCreate(
 	_ client.Client,
+	_ client.Reader,
 	tnt *capsulev1beta2.Tenant,
 	_ admission.Decoder,
 	_ events.EventRecorder,
@@ -39,6 +41,7 @@ func (h *ingressClassRegexHandler) OnCreate(
 
 func (h *ingressClassRegexHandler) OnDelete(
 	client.Client,
+	client.Reader,
 	*capsulev1beta2.Tenant,
 	admission.Decoder,
 	events.EventRecorder,
@@ -50,6 +53,7 @@ func (h *ingressClassRegexHandler) OnDelete(
 
 func (h *ingressClassRegexHandler) OnUpdate(
 	_ client.Client,
+	_ client.Reader,
 	tnt *capsulev1beta2.Tenant,
 	old *capsulev1beta2.Tenant,
 	decoder admission.Decoder,
@@ -68,9 +72,7 @@ func (h *ingressClassRegexHandler) validate(tnt *capsulev1beta2.Tenant, req admi
 	//nolint:staticcheck
 	if tnt.Spec.IngressOptions.AllowedClasses != nil && len(tnt.Spec.IngressOptions.AllowedClasses.Regex) > 0 {
 		if _, err := regexp.Compile(tnt.Spec.IngressOptions.AllowedClasses.Regex); err != nil {
-			response := admission.Denied("unable to compile ingressClasses allowedRegex")
-
-			return &response
+			return ad.Deny("unable to compile ingressClasses allowedRegex")
 		}
 	}
 

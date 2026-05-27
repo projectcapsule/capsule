@@ -4,28 +4,45 @@
 package tenant
 
 import (
+	"context"
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api/meta"
+	"github.com/projectcapsule/capsule/pkg/runtime/selectors"
 )
+
+func GetManagedRuleStatus(
+	ctx context.Context,
+	c client.Reader,
+	ns *corev1.Namespace,
+) (*capsulev1beta2.RuleStatus, error) {
+	obj := &capsulev1beta2.RuleStatus{}
+
+	err := c.Get(ctx, types.NamespacedName{Name: meta.NameForManagedRuleStatus(), Namespace: ns.GetName()}, obj)
+	if err != nil {
+		return nil, err
+	}
+
+	return obj, err
+}
 
 // BuildNamespaceRuleBodyForNamespace returns the aggregated rule body that applies to `ns`.
 // - Rules with nil NamespaceSelector match all namespaces.
 // - Matching rules are combined in the order they appear in tnt.Spec.Rules (important for "later wins" semantics).
-func BuildNamespaceRuleBodyForNamespace(
+func BuildNamespaceRuleBodyStatus(
+	ctx context.Context,
+	c client.Reader,
 	ns *corev1.Namespace,
 	tnt *capsulev1beta2.Tenant,
-) (*capsulev1beta2.NamespaceRuleBody, error) {
-	out := &capsulev1beta2.NamespaceRuleBody{
-		Enforce: capsulev1beta2.NamespaceRuleEnforceBody{
-			Registries: make([]api.OCIRegistry, 0),
-		},
-	}
+) (*api.NamespaceRuleBodyNamespace, error) {
+	out := &api.NamespaceRuleBodyNamespace{}
 
 	if tnt == nil || ns == nil {
 		return out, nil
@@ -44,13 +61,15 @@ func BuildNamespaceRuleBodyForNamespace(
 			continue
 		}
 
-		matches, err := namespaceRuleMatches(nsLabels, rule.NamespaceSelector)
-		if err != nil {
-			return nil, fmt.Errorf("invalid namespaceSelector in rules[%d]: %w", i, err)
-		}
+		if rule.NamespaceSelector != nil {
+			matches, err := selectors.MatchesSelector(nsLabels, *rule.NamespaceSelector)
+			if err != nil {
+				return nil, fmt.Errorf("invalid namespaceSelector in rules[%d]: %w", i, err)
+			}
 
-		if !matches {
-			continue
+			if !matches {
+				continue
+			}
 		}
 
 		// Merge enforce body (for now: only registries)
@@ -61,18 +80,4 @@ func BuildNamespaceRuleBodyForNamespace(
 	}
 
 	return out, nil
-}
-
-func namespaceRuleMatches(nsLabels labels.Set, sel *metav1.LabelSelector) (bool, error) {
-	// nil selector => match all
-	if sel == nil {
-		return true, nil
-	}
-
-	s, err := metav1.LabelSelectorAsSelector(sel)
-	if err != nil {
-		return false, err
-	}
-
-	return s.Matches(nsLabels), nil
 }

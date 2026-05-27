@@ -5,12 +5,12 @@ package tls
 
 import (
 	"context"
+	"crypto/rsa"
+	"crypto/x509"
 	"fmt"
-	"os"
 	"time"
 
 	"github.com/go-logr/logr"
-	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -19,25 +19,27 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
-	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
-	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	"github.com/projectcapsule/capsule/internal/controllers/utils"
-	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
 	"github.com/projectcapsule/capsule/pkg/runtime/cert"
+	capsuleclient "github.com/projectcapsule/capsule/pkg/runtime/client"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
+	"github.com/projectcapsule/capsule/pkg/runtime/predicates"
 )
 
 const (
 	certificateExpirationThreshold = 3 * 24 * time.Hour
 	certificateValidity            = 6 * 30 * 24 * time.Hour
-	PodUpdateAnnotationName        = "capsule.clastix.io/updated"
+
+	// caPrivateKeyKey is intentionally not a Kubernetes core constant.
+	// The TLS Secret remains type kubernetes.io/tls, but we persist the CA key
+	// so serving cert renewal does not require CA rotation.
+	caPrivateKeyKey = "ca.key"
 )
 
 type Reconciler struct {
@@ -62,286 +64,536 @@ func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 	})
 
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&corev1.Secret{}, utils.NamesMatchingPredicate(r.Configuration.TLSSecretName())).
+		For(
+			&corev1.Secret{},
+			builder.WithPredicates(
+				predicates.NamesMatchingPredicate{
+					Names: []string{r.Configuration.TLSSecretName()},
+				},
+			),
+		).
 		Named("capsule/tls").
-		Watches(&admissionregistrationv1.ValidatingWebhookConfiguration{}, enqueueFn, builder.WithPredicates(predicate.NewPredicateFuncs(func(object client.Object) bool {
-			return object.GetName() == r.Configuration.ValidatingWebhookConfigurationName()
-		}))).
-		Watches(&admissionregistrationv1.MutatingWebhookConfiguration{}, enqueueFn, builder.WithPredicates(predicate.NewPredicateFuncs(func(object client.Object) bool {
-			return object.GetName() == r.Configuration.MutatingWebhookConfigurationName()
-		}))).
-		Watches(&apiextensionsv1.CustomResourceDefinition{}, enqueueFn, builder.WithPredicates(predicate.NewPredicateFuncs(func(object client.Object) bool {
-			return object.GetName() == r.Configuration.TenantCRDName()
-		}))).
+		Watches(
+			&admissionregistrationv1.ValidatingWebhookConfiguration{},
+			enqueueFn,
+			builder.WithPredicates(
+				predicates.NamesMatchingPredicate{
+					Names: []string{string(r.Configuration.Admission().Validating.Name)},
+				},
+			),
+		).
+		Watches(
+			&admissionregistrationv1.MutatingWebhookConfiguration{},
+			enqueueFn,
+			builder.WithPredicates(
+				predicates.NamesMatchingPredicate{
+					Names: []string{string(r.Configuration.Admission().Mutating.Name)},
+				},
+			),
+		).
+		Watches(
+			&apiextensionsv1.CustomResourceDefinition{},
+			enqueueFn,
+			builder.WithPredicates(
+				predicates.NamesMatchingPredicate{
+					Names: r.managedCRDNames(),
+				},
+			),
+		).
 		Complete(r)
 }
 
-func (r Reconciler) ReconcileCertificates(ctx context.Context, certSecret *corev1.Secret) error {
-	if r.shouldUpdateCertificate(certSecret) {
-		r.Log.V(3).Info("Generating new TLS certificate")
+func (r *Reconciler) Reconcile(ctx context.Context, request ctrl.Request) (ctrl.Result, error) {
+	r.Log = r.Log.WithValues(
+		"Request.Namespace", request.Namespace,
+		"Request.Name", request.Name,
+	)
 
-		ca, err := cert.GenerateCertificateAuthority()
-		if err != nil {
-			return err
-		}
-
-		opts := cert.NewCertOpts(time.Now().Add(certificateValidity), fmt.Sprintf("capsule-webhook-service.%s.svc", r.Namespace))
-
-		crt, key, err := ca.GenerateCertificate(opts)
-		if err != nil {
-			r.Log.Error(err, "Cannot generate new TLS certificate")
-
-			return err
-		}
-
-		caCrt, _ := ca.CACertificatePem()
-
-		certSecret.Data = map[string][]byte{
-			corev1.TLSCertKey:              crt.Bytes(),
-			corev1.TLSPrivateKeyKey:        key.Bytes(),
-			corev1.ServiceAccountRootCAKey: caCrt.Bytes(),
-		}
-
-		t := &corev1.Secret{ObjectMeta: certSecret.ObjectMeta}
-
-		_, err = controllerutil.CreateOrUpdate(ctx, r.Client, t, func() error {
-			t.Data = certSecret.Data
-
-			return nil
-		})
-		if err != nil {
-			r.Log.Error(err, "cannot update Capsule TLS")
-
-			return err
-		}
+	if request.Namespace == "" {
+		request.Namespace = r.Namespace
 	}
 
-	var caBundle []byte
-
-	var ok bool
-
-	if caBundle, ok = certSecret.Data[corev1.ServiceAccountRootCAKey]; !ok {
-		return fmt.Errorf("missing %s field in %s secret", corev1.ServiceAccountRootCAKey, r.Configuration.TLSSecretName())
+	if request.Name == "" {
+		request.Name = r.Configuration.TLSSecretName()
 	}
 
-	r.Log.V(4).Info("Updating caBundle in webhooks and crd")
+	certSecret := &corev1.Secret{}
+	if err := r.Get(ctx, request.NamespacedName, certSecret); err != nil {
+		if !apierrors.IsNotFound(err) {
+			return ctrl.Result{}, err
+		}
 
-	group := new(errgroup.Group)
-	group.Go(func() error {
-		return r.updateMutatingWebhookConfiguration(ctx, caBundle)
-	})
-	group.Go(func() error {
-		return r.updateValidatingWebhookConfiguration(ctx, caBundle)
-	})
-	group.Go(func() error {
-		return r.updateTenantCustomResourceDefinition(ctx, "tenants.capsule.clastix.io", caBundle)
-	})
-	group.Go(func() error {
-		return r.updateTenantCustomResourceDefinition(ctx, "capsuleconfigurations.capsule.clastix.io", caBundle)
-	})
+		certSecret = &corev1.Secret{}
+		certSecret.Name = request.Name
+		certSecret.Namespace = request.Namespace
+		certSecret.Data = map[string][]byte{}
+	}
 
-	operatorPods, err := r.getOperatorPods(ctx)
+	if err := r.ReconcileCertificates(ctx, certSecret); err != nil {
+		return ctrl.Result{}, err
+	}
+
+	servingCert, err := cert.GetCertificateFromBytes(certSecret.Data[corev1.TLSCertKey])
 	if err != nil {
-		if errors.As(err, &caperrors.RunningInOutOfClusterModeError{}) {
-			r.Log.Info("skipping annotation of Pods for cert-manager", "error", err.Error())
+		return ctrl.Result{}, err
+	}
 
-			return nil
-		}
+	requeueTime := servingCert.NotAfter.Add(-(certificateExpirationThreshold - time.Second))
 
+	requeueAfter := max(time.Until(requeueTime), 0)
+
+	r.Log.V(4).Info("TLS reconciliation completed", "requeueAfter", requeueAfter.String())
+
+	return ctrl.Result{
+		Requeue:      true,
+		RequeueAfter: requeueAfter,
+	}, nil
+}
+
+func (r *Reconciler) ReconcileCertificates(ctx context.Context, certSecret *corev1.Secret) error {
+	dnsName := r.webhookDNSName()
+
+	ca, caBundle, rotateServingCert, err := r.ensureCertificateMaterial(certSecret, dnsName)
+	if err != nil {
 		return err
 	}
 
-	r.Log.V(4).Info("Updating capsule operator pods")
+	if rotateServingCert {
+		if ca == nil {
+			return fmt.Errorf("cannot rotate serving certificate without CA private key")
+		}
 
-	for _, pod := range operatorPods.Items {
-		p := pod
+		r.Log.V(3).Info("Generating new serving TLS certificate", "dnsName", dnsName)
 
-		group.Go(func() error {
-			return r.updateOperatorPod(ctx, p)
+		crt, key, err := ca.GenerateCertificate(cert.NewCertOpts(
+			time.Now().Add(certificateValidity),
+			dnsName,
+		))
+		if err != nil {
+			r.Log.Error(err, "cannot generate serving TLS certificate")
+
+			return err
+		}
+
+		certSecret.Data[corev1.TLSCertKey] = crt.Bytes()
+		certSecret.Data[corev1.TLSPrivateKeyKey] = key.Bytes()
+
+		if err := r.validateSecretCertificate(certSecret, dnsName); err != nil {
+			return err
+		}
+
+		if err := r.upsertTLSSecret(ctx, certSecret); err != nil {
+			return err
+		}
+	}
+
+	caBundle = certSecret.Data[corev1.ServiceAccountRootCAKey]
+	if len(caBundle) == 0 {
+		return fmt.Errorf("missing %q field in %q secret", corev1.ServiceAccountRootCAKey, r.Configuration.TLSSecretName())
+	}
+
+	r.Log.V(4).Info("Patching caBundle in webhooks and managed CRD conversions")
+
+	patchGroup, groupCtx := errgroup.WithContext(ctx)
+
+	patchGroup.Go(func() error {
+		return r.patchMutatingWebhookConfigurationCABundle(groupCtx, caBundle)
+	})
+
+	patchGroup.Go(func() error {
+		return r.patchValidatingWebhookConfigurationCABundle(groupCtx, caBundle)
+	})
+
+	for key, managed := range r.conversionManagedCRDs() {
+		patchGroup.Go(func() error {
+			if err := r.updateManagedCustomResourceDefinition(groupCtx, managed, caBundle); err != nil {
+				return fmt.Errorf("cannot update managed CRD %q (%s): %w", key, managed.Name, err)
+			}
+
+			return nil
 		})
 	}
 
-	if err := group.Wait(); err != nil {
+	return patchGroup.Wait()
+}
+
+// ensureCertificateMaterial ensures that the Secret contains a stable CA
+// certificate/key pair and decides whether the serving certificate must be
+// regenerated.
+//
+// Important behavior:
+//   - Missing Secret or missing ca.key creates a new CA.
+//   - Existing valid CA is reused.
+//   - Serving certificate renewal never rotates the CA.
+//   - Legacy Secrets without ca.key rotate once into the stable format.
+func (r *Reconciler) ensureCertificateMaterial(
+	certSecret *corev1.Secret,
+	dnsName string,
+) (*cert.CapsuleCA, []byte, bool, error) {
+	if certSecret.Data == nil {
+		certSecret.Data = map[string][]byte{}
+	}
+
+	caBundle := certSecret.Data[corev1.ServiceAccountRootCAKey]
+	caKey := certSecret.Data[caPrivateKeyKey]
+	tlsCrt := certSecret.Data[corev1.TLSCertKey]
+	tlsKey := certSecret.Data[corev1.TLSPrivateKeyKey]
+
+	hasCA := len(caBundle) > 0
+	hasCAKey := len(caKey) > 0
+	hasServingCert := len(tlsCrt) > 0 && len(tlsKey) > 0
+
+	// Fresh empty Secret or completely broken Secret.
+	if !hasCA || !hasServingCert {
+		r.Log.Info(
+			"Generating new certificate authority and serving certificate",
+			"reason", "missing ca.crt or serving certificate",
+			"secret", certSecret.Name,
+			"namespace", certSecret.Namespace,
+		)
+
+		ca, newCABundle, newCAKey, err := generateCertificateAuthorityMaterial()
+		if err != nil {
+			return nil, nil, false, err
+		}
+
+		certSecret.Data[corev1.ServiceAccountRootCAKey] = newCABundle
+		certSecret.Data[caPrivateKeyKey] = newCAKey
+
+		return ca, newCABundle, true, nil
+	}
+
+	// Legacy mode:
+	// The Secret has a CA and serving cert, but not the CA private key.
+	// If the serving cert is still valid and chains to ca.crt, do NOT rotate now.
+	// Rotating here causes a temporary caBundle/server-cert mismatch during startup.
+	if !hasCAKey {
+		if err := r.validateSecretCertificate(certSecret, dnsName); err == nil {
+			r.Log.Info(
+				"TLS Secret is using legacy CA material without ca.key; keeping existing CA and serving certificate",
+				"secret", certSecret.Name,
+				"namespace", certSecret.Namespace,
+			)
+
+			return nil, caBundle, false, nil
+		}
+
+		r.Log.Info(
+			"TLS Secret is missing ca.key and serving certificate is invalid or expiring; rotating CA",
+			"secret", certSecret.Name,
+			"namespace", certSecret.Namespace,
+		)
+
+		ca, newCABundle, newCAKey, err := generateCertificateAuthorityMaterial()
+		if err != nil {
+			return nil, nil, false, err
+		}
+
+		certSecret.Data[corev1.ServiceAccountRootCAKey] = newCABundle
+		certSecret.Data[caPrivateKeyKey] = newCAKey
+
+		return ca, newCABundle, true, nil
+	}
+
+	ca, err := cert.NewCertificateAuthorityFromBytes(caBundle, caKey)
+	if err != nil {
+		r.Log.Error(err, "existing CA material is invalid, regenerating CA")
+
+		newCA, newCABundle, newCAKey, err := generateCertificateAuthorityMaterial()
+		if err != nil {
+			return nil, nil, false, err
+		}
+
+		certSecret.Data[corev1.ServiceAccountRootCAKey] = newCABundle
+		certSecret.Data[caPrivateKeyKey] = newCAKey
+
+		return newCA, newCABundle, true, nil
+	}
+
+	if err := validateCAKeyPair(caBundle, caKey); err != nil {
+		r.Log.Error(err, "existing CA certificate/key pair is invalid, regenerating CA")
+
+		newCA, newCABundle, newCAKey, err := generateCertificateAuthorityMaterial()
+		if err != nil {
+			return nil, nil, false, err
+		}
+
+		certSecret.Data[corev1.ServiceAccountRootCAKey] = newCABundle
+		certSecret.Data[caPrivateKeyKey] = newCAKey
+
+		return newCA, newCABundle, true, nil
+	}
+
+	if err := r.validateSecretCertificate(certSecret, dnsName); err != nil {
+		r.Log.Info("serving certificate requires renewal", "reason", err.Error())
+
+		return ca, caBundle, true, nil
+	}
+
+	r.Log.V(4).Info("Skipping TLS certificate generation as existing certificate is valid")
+
+	return ca, caBundle, false, nil
+}
+
+func generateCertificateAuthorityMaterial() (*cert.CapsuleCA, []byte, []byte, error) {
+	ca, err := cert.GenerateCertificateAuthority()
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	caCrt, err := ca.CACertificatePem()
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	caKey, err := ca.CAPrivateKeyPem()
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	return ca, caCrt.Bytes(), caKey.Bytes(), nil
+}
+
+func (r *Reconciler) upsertTLSSecret(ctx context.Context, certSecret *corev1.Secret) error {
+	desired := &corev1.Secret{
+		ObjectMeta: certSecret.ObjectMeta,
+		Type:       corev1.SecretTypeTLS,
+	}
+
+	_, err := controllerutil.CreateOrUpdate(ctx, r.Client, desired, func() error {
+		if desired.Labels == nil {
+			desired.Labels = map[string]string{}
+		}
+
+		if desired.Annotations == nil {
+			desired.Annotations = map[string]string{}
+		}
+
+		desired.Data = copySecretData(certSecret.Data)
+
+		return nil
+	})
+	if err != nil {
+		r.Log.Error(err, "cannot update Capsule TLS Secret")
+
 		return err
+	}
+
+	certSecret.ObjectMeta = desired.ObjectMeta
+	certSecret.Data = copySecretData(desired.Data)
+
+	return nil
+}
+
+func (r *Reconciler) validateSecretCertificate(secret *corev1.Secret, dnsName string) error {
+	if secret == nil {
+		return fmt.Errorf("secret is nil")
+	}
+
+	if secret.Data == nil {
+		return fmt.Errorf("secret data is nil")
+	}
+
+	caBundle := secret.Data[corev1.ServiceAccountRootCAKey]
+	if len(caBundle) == 0 {
+		return fmt.Errorf("missing %q", corev1.ServiceAccountRootCAKey)
+	}
+
+	leafPEM := secret.Data[corev1.TLSCertKey]
+	if len(leafPEM) == 0 {
+		return fmt.Errorf("missing %q", corev1.TLSCertKey)
+	}
+
+	keyPEM := secret.Data[corev1.TLSPrivateKeyKey]
+	if len(keyPEM) == 0 {
+		return fmt.Errorf("missing %q", corev1.TLSPrivateKeyKey)
+	}
+
+	leaf, key, err := cert.GetCertificateWithPrivateKeyFromBytes(leafPEM, keyPEM)
+	if err != nil {
+		return fmt.Errorf("cannot parse serving certificate/key pair: %w", err)
+	}
+
+	if err := cert.ValidateCertificate(leaf, key, certificateExpirationThreshold); err != nil {
+		return fmt.Errorf("serving certificate is invalid or expiring: %w", err)
+	}
+
+	roots := x509.NewCertPool()
+	if !roots.AppendCertsFromPEM(caBundle) {
+		return fmt.Errorf("cannot parse caBundle")
+	}
+
+	if _, err := leaf.Verify(x509.VerifyOptions{
+		DNSName: dnsName,
+		Roots:   roots,
+		KeyUsages: []x509.ExtKeyUsage{
+			x509.ExtKeyUsageServerAuth,
+		},
+	}); err != nil {
+		return fmt.Errorf("serving certificate does not verify against caBundle: %w", err)
 	}
 
 	return nil
 }
 
-func (r Reconciler) Reconcile(ctx context.Context, request ctrl.Request) (ctrl.Result, error) {
-	r.Log = r.Log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
-
-	certSecret := &corev1.Secret{}
-
-	if err := r.Get(ctx, request.NamespacedName, certSecret); err != nil {
-		// Error reading the object - requeue the request.
-		return reconcile.Result{}, err
-	}
-
-	if err := r.ReconcileCertificates(ctx, certSecret); err != nil {
-		return reconcile.Result{}, err
-	}
-
-	certificate, err := cert.GetCertificateFromBytes(certSecret.Data[corev1.TLSCertKey])
+func validateCAKeyPair(caCertPEM, caKeyPEM []byte) error {
+	caCert, caKey, err := cert.GetCertificateWithPrivateKeyFromBytes(caCertPEM, caKeyPEM)
 	if err != nil {
-		return reconcile.Result{}, err
+		return fmt.Errorf("cannot parse CA certificate/key pair: %w", err)
+	}
+
+	if !caCert.IsCA {
+		return fmt.Errorf("ca.crt is not a CA certificate")
+	}
+
+	if !publicKeysEqual(caCert.PublicKey, &caKey.PublicKey) {
+		return fmt.Errorf("ca.crt does not match ca.key")
 	}
 
 	now := time.Now()
-	requeueTime := certificate.NotAfter.Add(-(certificateExpirationThreshold - 1*time.Second))
-	rq := requeueTime.Sub(now)
+	if now.Before(caCert.NotBefore) {
+		return fmt.Errorf("CA certificate is not valid yet")
+	}
 
-	r.Log.V(4).Info("Reconciliation completed, processing back in " + rq.String())
+	if now.After(caCert.NotAfter.Add(-certificateExpirationThreshold)) {
+		return fmt.Errorf("CA certificate expired or expires soon")
+	}
 
-	return reconcile.Result{Requeue: true, RequeueAfter: rq}, nil
+	return nil
 }
 
-func (r Reconciler) shouldUpdateCertificate(secret *corev1.Secret) bool {
-	if _, ok := secret.Data[corev1.ServiceAccountRootCAKey]; !ok {
-		return true
+func publicKeysEqual(a any, b *rsa.PublicKey) bool {
+	pub, ok := a.(*rsa.PublicKey)
+	if !ok {
+		return false
 	}
 
-	certificate, key, err := cert.GetCertificateWithPrivateKeyFromBytes(secret.Data[corev1.TLSCertKey], secret.Data[corev1.TLSPrivateKeyKey])
-	if err != nil {
-		return true
-	}
-
-	if err := cert.ValidateCertificate(certificate, key, certificateExpirationThreshold); err != nil {
-		r.Log.Error(err, "failed to validate certificate, generating new one")
-
-		return true
-	}
-
-	r.Log.V(4).Info("Skipping TLS certificate generation as it is still valid")
-
-	return false
-}
-
-// By default helm doesn't allow to use templates in CRD (https://helm.sh/docs/chart_best_practices/custom_resource_definitions/#method-1-let-helm-do-it-for-you).
-// In order to overcome this, we are setting conversion strategy in helm chart to None, and then update it with CA and namespace information.
-func (r *Reconciler) updateTenantCustomResourceDefinition(ctx context.Context, name string, caBundle []byte) error {
-	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
-		crd := &apiextensionsv1.CustomResourceDefinition{}
-
-		err = r.Get(ctx, types.NamespacedName{Name: name}, crd)
-		if err != nil {
-			r.Log.Error(err, "cannot retrieve CustomResourceDefinition")
-
-			return err
-		}
-
-		_, err = controllerutil.CreateOrUpdate(ctx, r.Client, crd, func() error {
-			crd.Spec.Conversion = &apiextensionsv1.CustomResourceConversion{
-				Strategy: "Webhook",
-				Webhook: &apiextensionsv1.WebhookConversion{
-					ClientConfig: &apiextensionsv1.WebhookClientConfig{
-						Service: &apiextensionsv1.ServiceReference{
-							Namespace: r.Namespace,
-							Name:      "capsule-webhook-service",
-							Path:      ptr.To("/convert"),
-							Port:      ptr.To(int32(443)),
-						},
-						CABundle: caBundle,
-					},
-					ConversionReviewVersions: []string{"v1beta1", "v1beta2"},
-				},
-			}
-
-			return nil
-		})
-
-		return err
-	})
+	return pub.Equal(b)
 }
 
 //nolint:dupl
-func (r Reconciler) updateValidatingWebhookConfiguration(ctx context.Context, caBundle []byte) error {
-	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
+func (r *Reconciler) patchValidatingWebhookConfigurationCABundle(ctx context.Context, caBundle []byte) error {
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		vw := &admissionregistrationv1.ValidatingWebhookConfiguration{}
-
-		err = r.Get(ctx, types.NamespacedName{Name: r.Configuration.ValidatingWebhookConfigurationName()}, vw)
-		if err != nil {
-			r.Log.Error(err, "cannot retrieve ValidatingWebhookConfiguration")
+		if err := r.Get(ctx, types.NamespacedName{
+			Name: string(r.Configuration.Admission().Validating.Name),
+		}, vw); err != nil {
+			if apierrors.IsNotFound(err) {
+				return nil
+			}
 
 			return err
 		}
 
-		for i, w := range vw.Webhooks {
-			// Updating CABundle only in case of an internal service reference
-			if w.ClientConfig.Service != nil {
-				vw.Webhooks[i].ClientConfig.CABundle = caBundle
-			}
+		patches := r.validatingWebhookCABundlePatches(vw.Webhooks, caBundle)
+		if len(patches) == 0 {
+			return nil
 		}
 
-		return r.Update(ctx, vw, &client.UpdateOptions{})
+		return capsuleclient.ApplyPatches(ctx, r.Client, vw, patches, "capsule-tls-controller")
 	})
 }
 
 //nolint:dupl
-func (r Reconciler) updateMutatingWebhookConfiguration(ctx context.Context, caBundle []byte) error {
-	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
+func (r *Reconciler) patchMutatingWebhookConfigurationCABundle(ctx context.Context, caBundle []byte) error {
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		mw := &admissionregistrationv1.MutatingWebhookConfiguration{}
-
-		err = r.Get(ctx, types.NamespacedName{Name: r.Configuration.MutatingWebhookConfigurationName()}, mw)
-		if err != nil {
-			r.Log.Error(err, "cannot retrieve MutatingWebhookConfiguration")
-
-			return err
-		}
-
-		for i, w := range mw.Webhooks {
-			// Updating CABundle only in case of an internal service reference
-			if w.ClientConfig.Service != nil {
-				mw.Webhooks[i].ClientConfig.CABundle = caBundle
+		if err := r.Get(ctx, types.NamespacedName{
+			Name: string(r.Configuration.Admission().Mutating.Name),
+		}, mw); err != nil {
+			if apierrors.IsNotFound(err) {
+				return nil
 			}
+
+			return err
 		}
 
-		return r.Update(ctx, mw, &client.UpdateOptions{})
+		patches := r.mutatingWebhookCABundlePatches(mw.Webhooks, caBundle)
+		if len(patches) == 0 {
+			return nil
+		}
+
+		return capsuleclient.ApplyPatches(ctx, r.Client, mw, patches, "capsule-tls-controller")
 	})
 }
 
-func (r Reconciler) updateOperatorPod(ctx context.Context, pod corev1.Pod) error {
-	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		// Need to get latest version of pod
-		p := &corev1.Pod{}
-
-		if err := r.Get(ctx, types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}, p); err != nil && !apierrors.IsNotFound(err) {
-			r.Log.Error(err, "cannot get pod", "name", pod.Name, "namespace", pod.Namespace)
-
-			return err
-		}
-
-		if p.Annotations == nil {
-			p.Annotations = map[string]string{}
-		}
-
-		p.Annotations[PodUpdateAnnotationName] = time.Now().Format(time.RFC3339Nano)
-
-		if err := r.Update(ctx, p, &client.UpdateOptions{}); err != nil {
-			r.Log.Error(err, "cannot update pod", "name", pod.Name, "namespace", pod.Namespace)
-
-			return err
-		}
-
+func (r *Reconciler) updateManagedCustomResourceDefinition(
+	ctx context.Context,
+	managed ManagedCRD,
+	caBundle []byte,
+) error {
+	if !managed.ManageConversion {
 		return nil
+	}
+
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		crd := &apiextensionsv1.CustomResourceDefinition{}
+		if err := r.Get(ctx, types.NamespacedName{Name: managed.Name}, crd); err != nil {
+			if apierrors.IsNotFound(err) {
+				return nil
+			}
+
+			return err
+		}
+
+		before := crd.DeepCopy()
+
+		path := managed.ConversionPath
+		if path == "" {
+			path = "/convert"
+		}
+
+		versions := managed.ConversionReviewVersions
+		if len(versions) == 0 {
+			versions = []string{"v1", "v1beta1"}
+		}
+
+		port := int32(443)
+
+		crd.Spec.Conversion = &apiextensionsv1.CustomResourceConversion{
+			Strategy: apiextensionsv1.WebhookConverter,
+			Webhook: &apiextensionsv1.WebhookConversion{
+				ClientConfig: &apiextensionsv1.WebhookClientConfig{
+					Service: &apiextensionsv1.ServiceReference{
+						Namespace: r.Namespace,
+						Name:      r.Configuration.Admission().ServiceName,
+						Path:      &path,
+						Port:      &port,
+					},
+					CABundle: caBundle,
+				},
+				ConversionReviewVersions: versions,
+			},
+		}
+
+		return r.Patch(ctx, crd, client.MergeFrom(before))
 	})
 }
 
-func (r Reconciler) getOperatorPods(ctx context.Context) (*corev1.PodList, error) {
-	hostname, _ := os.Hostname()
+func (r *Reconciler) webhookDNSName() string {
+	return fmt.Sprintf("%s.%s.svc", r.Configuration.Admission().ServiceName, r.Namespace)
+}
 
-	leaderPod := &corev1.Pod{}
+func copySecretData(in map[string][]byte) map[string][]byte {
+	out := make(map[string][]byte, len(in))
 
-	if err := r.Get(ctx, types.NamespacedName{Namespace: os.Getenv("NAMESPACE"), Name: hostname}, leaderPod); err != nil {
-		return nil, caperrors.RunningInOutOfClusterModeError{}
+	for key, value := range in {
+		out[key] = append([]byte(nil), value...)
 	}
 
-	podList := &corev1.PodList{}
-	if err := r.List(ctx, podList, client.MatchingLabels(leaderPod.Labels)); err != nil {
-		r.Log.Error(err, "cannot retrieve list of Capsule pods")
+	return out
+}
 
-		return nil, err
+func equalBytes(a, b []byte) bool {
+	if len(a) != len(b) {
+		return false
 	}
 
-	return podList, nil
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+
+	return true
 }

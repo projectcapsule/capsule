@@ -25,6 +25,18 @@ func SanitizeObject(obj client.Object, scheme *runtime.Scheme, opts SanitizeOpti
 		obj.SetUID("")
 	}
 
+	if opts.StripResourceVersion {
+		obj.SetResourceVersion("")
+	}
+
+	if opts.StripOwnerreferences {
+		obj.SetOwnerReferences(nil)
+	}
+
+	if opts.StripGeneration {
+		obj.SetGeneration(0)
+	}
+
 	if opts.StripManagedFields {
 		accessor, err := apiMeta.Accessor(obj)
 		if err == nil {
