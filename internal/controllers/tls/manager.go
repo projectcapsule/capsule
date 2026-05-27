@@ -44,12 +44,6 @@ const (
 
 type Reconciler struct {
 	client.Client
-
-	// APIReader bypasses the controller-runtime cache. This is important for
-	// webhook configuration patching because admission and TLS reconcilers both
-	// touch the same cluster-scoped objects.
-	APIReader client.Reader
-
 	Log           logr.Logger
 	Scheme        *runtime.Scheme
 	Namespace     string
@@ -57,10 +51,6 @@ type Reconciler struct {
 }
 
 func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
-	if r.APIReader == nil {
-		r.APIReader = mgr.GetAPIReader()
-	}
-
 	enqueueFn := handler.EnqueueRequestsFromMapFunc(func(context.Context, client.Object) []reconcile.Request {
 		return []reconcile.Request{
 			{
@@ -441,7 +431,7 @@ func publicKeysEqual(a any, b *rsa.PublicKey) bool {
 func (r *Reconciler) patchValidatingWebhookConfigurationCABundle(ctx context.Context, caBundle []byte) error {
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		vw := &admissionregistrationv1.ValidatingWebhookConfiguration{}
-		if err := r.APIReader.Get(ctx, types.NamespacedName{
+		if err := r.Get(ctx, types.NamespacedName{
 			Name: string(r.Configuration.Admission().Validating.Name),
 		}, vw); err != nil {
 			if apierrors.IsNotFound(err) {
@@ -464,7 +454,7 @@ func (r *Reconciler) patchValidatingWebhookConfigurationCABundle(ctx context.Con
 func (r *Reconciler) patchMutatingWebhookConfigurationCABundle(ctx context.Context, caBundle []byte) error {
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		mw := &admissionregistrationv1.MutatingWebhookConfiguration{}
-		if err := r.APIReader.Get(ctx, types.NamespacedName{
+		if err := r.Get(ctx, types.NamespacedName{
 			Name: string(r.Configuration.Admission().Mutating.Name),
 		}, mw); err != nil {
 			if apierrors.IsNotFound(err) {
@@ -494,7 +484,7 @@ func (r *Reconciler) updateManagedCustomResourceDefinition(
 
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		crd := &apiextensionsv1.CustomResourceDefinition{}
-		if err := r.APIReader.Get(ctx, types.NamespacedName{Name: managed.Name}, crd); err != nil {
+		if err := r.Get(ctx, types.NamespacedName{Name: managed.Name}, crd); err != nil {
 			if apierrors.IsNotFound(err) {
 				return nil
 			}
