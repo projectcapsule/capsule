@@ -44,6 +44,7 @@ const (
 
 type Reconciler struct {
 	client.Client
+
 	Log           logr.Logger
 	Scheme        *runtime.Scheme
 	Namespace     string
@@ -158,6 +159,10 @@ func (r *Reconciler) ReconcileCertificates(ctx context.Context, certSecret *core
 	}
 
 	if rotateServingCert {
+		if ca == nil {
+			return fmt.Errorf("cannot rotate serving certificate without CA private key")
+		}
+
 		r.Log.V(3).Info("Generating new serving TLS certificate", "dnsName", dnsName)
 
 		crt, key, err := ca.GenerateCertificate(cert.NewCertOpts(
@@ -224,18 +229,57 @@ func (r *Reconciler) ReconcileCertificates(ctx context.Context, certSecret *core
 func (r *Reconciler) ensureCertificateMaterial(
 	certSecret *corev1.Secret,
 	dnsName string,
-) (cert.CA, []byte, bool, error) {
+) (*cert.CapsuleCA, []byte, bool, error) {
 	if certSecret.Data == nil {
 		certSecret.Data = map[string][]byte{}
 	}
 
 	caBundle := certSecret.Data[corev1.ServiceAccountRootCAKey]
 	caKey := certSecret.Data[caPrivateKeyKey]
+	tlsCrt := certSecret.Data[corev1.TLSCertKey]
+	tlsKey := certSecret.Data[corev1.TLSPrivateKeyKey]
 
-	if len(caBundle) == 0 || len(caKey) == 0 {
+	hasCA := len(caBundle) > 0
+	hasCAKey := len(caKey) > 0
+	hasServingCert := len(tlsCrt) > 0 && len(tlsKey) > 0
+
+	// Fresh empty Secret or completely broken Secret.
+	if !hasCA || !hasServingCert {
 		r.Log.Info(
-			"Generating new certificate authority",
-			"reason", "missing ca.crt or ca.key",
+			"Generating new certificate authority and serving certificate",
+			"reason", "missing ca.crt or serving certificate",
+			"secret", certSecret.Name,
+			"namespace", certSecret.Namespace,
+		)
+
+		ca, newCABundle, newCAKey, err := generateCertificateAuthorityMaterial()
+		if err != nil {
+			return nil, nil, false, err
+		}
+
+		certSecret.Data[corev1.ServiceAccountRootCAKey] = newCABundle
+		certSecret.Data[caPrivateKeyKey] = newCAKey
+
+		return ca, newCABundle, true, nil
+	}
+
+	// Legacy mode:
+	// The Secret has a CA and serving cert, but not the CA private key.
+	// If the serving cert is still valid and chains to ca.crt, do NOT rotate now.
+	// Rotating here causes a temporary caBundle/server-cert mismatch during startup.
+	if !hasCAKey {
+		if err := r.validateSecretCertificate(certSecret, dnsName); err == nil {
+			r.Log.Info(
+				"TLS Secret is using legacy CA material without ca.key; keeping existing CA and serving certificate",
+				"secret", certSecret.Name,
+				"namespace", certSecret.Namespace,
+			)
+
+			return nil, caBundle, false, nil
+		}
+
+		r.Log.Info(
+			"TLS Secret is missing ca.key and serving certificate is invalid or expiring; rotating CA",
 			"secret", certSecret.Name,
 			"namespace", certSecret.Namespace,
 		)
@@ -291,7 +335,7 @@ func (r *Reconciler) ensureCertificateMaterial(
 	return ca, caBundle, false, nil
 }
 
-func generateCertificateAuthorityMaterial() (cert.CA, []byte, []byte, error) {
+func generateCertificateAuthorityMaterial() (*cert.CapsuleCA, []byte, []byte, error) {
 	ca, err := cert.GenerateCertificateAuthority()
 	if err != nil {
 		return nil, nil, nil, err
@@ -441,7 +485,7 @@ func (r *Reconciler) patchValidatingWebhookConfigurationCABundle(ctx context.Con
 			return err
 		}
 
-		patches := validatingWebhookCABundlePatches(vw.Webhooks, caBundle)
+		patches := r.validatingWebhookCABundlePatches(vw.Webhooks, caBundle)
 		if len(patches) == 0 {
 			return nil
 		}
@@ -464,7 +508,7 @@ func (r *Reconciler) patchMutatingWebhookConfigurationCABundle(ctx context.Conte
 			return err
 		}
 
-		patches := mutatingWebhookCABundlePatches(mw.Webhooks, caBundle)
+		patches := r.mutatingWebhookCABundlePatches(mw.Webhooks, caBundle)
 		if len(patches) == 0 {
 			return nil
 		}

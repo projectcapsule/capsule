@@ -157,8 +157,11 @@ var _ = Describe("ResourcePoolClaim Tests", Ordered, Label("resourcepool", "clai
 		}
 
 		By("Create the ResourcePool", func() {
-			err := k8sClient.Create(context.TODO(), pool1)
-			Expect(err).Should(Succeed(), "Failed to create ResourcePool %s", pool1)
+			EventuallyCreation(func() error {
+				pool1.ResourceVersion = ""
+
+				return k8sClient.Create(context.TODO(), pool1)
+			}).Should(Succeed(), "Failed to create ResourcePool %s", pool1)
 		})
 
 		By("Get Applied revision", func() {
@@ -331,16 +334,26 @@ var _ = Describe("ResourcePoolClaim Tests", Ordered, Label("resourcepool", "clai
 				},
 			}
 
-			err := k8sClient.Create(context.TODO(), ns)
-			Expect(err).Should(Succeed())
+			EventuallyCreation(func() error {
+				ns.ResourceVersion = ""
 
-			err = k8sClient.Create(context.TODO(), claim)
-			Expect(err).Should(Succeed(), "Failed to create Claim %s", claim)
+				return k8sClient.Create(context.TODO(), ns)
+			}).Should(Succeed(), "Failed to create %s", ns)
+
+			EventuallyCreation(func() error {
+				claim.ResourceVersion = ""
+
+				return k8sClient.Create(context.TODO(), claim)
+			}).Should(Succeed(), "Failed to create %s", claim)
+
 		})
 
 		By("Create the ResourcePool", func() {
-			err := k8sClient.Create(context.TODO(), pool)
-			Expect(err).Should(Succeed(), "Failed to create ResourcePool %s", pool)
+			EventuallyCreation(func() error {
+				pool.ResourceVersion = ""
+
+				return k8sClient.Create(context.TODO(), pool)
+			}).Should(Succeed(), "Failed to create %s", pool)
 		})
 
 		By("Get Applied revision", func() {
@@ -668,11 +681,17 @@ var _ = Describe("ResourcePoolClaim Tests", Ordered, Label("resourcepool", "clai
 		}
 
 		By("Create the ResourcePools", func() {
-			err := k8sClient.Create(context.TODO(), pool1)
-			Expect(err).Should(Succeed(), "Failed to create ResourcePool %s", pool1)
+			EventuallyCreation(func() error {
+				pool1.ResourceVersion = ""
 
-			err = k8sClient.Create(context.TODO(), pool2)
-			Expect(err).Should(Succeed(), "Failed to create ResourcePool %s", pool2)
+				return k8sClient.Create(context.TODO(), pool1)
+			}).Should(Succeed(), "Failed to create %s", pool1)
+
+			EventuallyCreation(func() error {
+				pool2.ResourceVersion = ""
+
+				return k8sClient.Create(context.TODO(), pool2)
+			}).Should(Succeed(), "Failed to create %s", pool2)
 		})
 
 		By("Auto Assign Claim (CPU)", func() {
@@ -787,17 +806,23 @@ var _ = Describe("ResourcePoolClaim Tests", Ordered, Label("resourcepool", "clai
 				},
 			}
 
-			err := k8sClient.Create(context.TODO(), ns)
-			Expect(err).Should(Succeed())
+			EventuallyCreation(func() error {
+				ns.ResourceVersion = ""
+
+				return k8sClient.Create(context.TODO(), ns)
+			}).Should(Succeed(), "Failed to create %s", ns)
 
 			ExpectNamespaceInResourcePoolEventually(pool1.Name, ns.Name)
 
-			err = k8sClient.Create(context.TODO(), claim)
-			Expect(err).Should(Succeed(), "Failed to create Claim %s", claim)
+			EventuallyCreation(func() error {
+				claim.ResourceVersion = ""
+
+				return k8sClient.Create(context.TODO(), claim)
+			}).Should(Succeed(), "Failed to create %s", claim)
 
 			Eventually(func(g Gomega) {
 				stat := &capsulev1beta2.ResourcePoolClaim{}
-				err = k8sClient.Get(context.TODO(), client.ObjectKey{Name: claim.Name, Namespace: claim.Namespace}, stat)
+				err := k8sClient.Get(context.TODO(), client.ObjectKey{Name: claim.Name, Namespace: claim.Namespace}, stat)
 				g.Expect(err).Should(Succeed())
 
 				g.Expect(stat.Spec.Pool).To(Equal(""), "expected pool name to match")

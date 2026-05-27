@@ -4,6 +4,8 @@
 package tls
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
@@ -88,7 +90,8 @@ func (r Reconciler) conversionManagedCRDs() map[string]ManagedCRD {
 	return out
 }
 
-func validatingWebhookCABundlePatches(
+//nolint:dupl
+func (r *Reconciler) validatingWebhookCABundlePatches(
 	webhooks []admissionregistrationv1.ValidatingWebhook,
 	caBundle []byte,
 ) []capsuleclient.JSONPatch {
@@ -103,6 +106,13 @@ func validatingWebhookCABundlePatches(
 			continue
 		}
 
+		r.Log.V(3).Info(
+			"Patching webhook caBundle",
+			"webhook", webhooks[i].Name,
+			"old", certFingerprint(webhooks[i].ClientConfig.CABundle),
+			"new", certFingerprint(caBundle),
+		)
+
 		patches = append(patches, capsuleclient.JSONPatch{
 			Operation: capsuleclient.JSONPatchAdd,
 			Path:      fmt.Sprintf("/webhooks/%d/clientConfig/caBundle", i),
@@ -113,7 +123,8 @@ func validatingWebhookCABundlePatches(
 	return patches
 }
 
-func mutatingWebhookCABundlePatches(
+//nolint:dupl
+func (r *Reconciler) mutatingWebhookCABundlePatches(
 	webhooks []admissionregistrationv1.MutatingWebhook,
 	caBundle []byte,
 ) []capsuleclient.JSONPatch {
@@ -128,6 +139,13 @@ func mutatingWebhookCABundlePatches(
 			continue
 		}
 
+		r.Log.V(3).Info(
+			"Patching webhook caBundle",
+			"webhook", webhooks[i].Name,
+			"old", certFingerprint(webhooks[i].ClientConfig.CABundle),
+			"new", certFingerprint(caBundle),
+		)
+
 		patches = append(patches, capsuleclient.JSONPatch{
 			Operation: capsuleclient.JSONPatchAdd,
 			Path:      fmt.Sprintf("/webhooks/%d/clientConfig/caBundle", i),
@@ -136,4 +154,10 @@ func mutatingWebhookCABundlePatches(
 	}
 
 	return patches
+}
+
+func certFingerprint(pemBytes []byte) string {
+	sum := sha256.Sum256(pemBytes)
+
+	return hex.EncodeToString(sum[:8])
 }
