@@ -61,7 +61,6 @@ The following Values have changed key or Value:
 | global.jobs.kubectl.topologySpreadConstraints | list | `[]` | Set Topology Spread Constraints |
 | global.jobs.kubectl.ttlSecondsAfterFinished | int | `60` | Sets the ttl in seconds after a finished certgen job is deleted. Set to -1 to never delete. |
 | global.jobs.postInstall.enabled | bool | `true` | Enable Post Install Job |
-| global.jobs.postUpgrade.enabled | bool | `true` | Enable Post Upgrade Job |
 | global.jobs.preDelete.enabled | bool | `true` | Enable Pre Delete Job |
 
 ### General Parameters

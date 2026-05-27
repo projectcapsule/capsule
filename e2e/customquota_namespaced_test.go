@@ -43,6 +43,7 @@ var _ = Describe("when CustomQuota uses ledger-backed reconciliation", Ordered, 
 				Name: testNamespace,
 				Labels: map[string]string{
 					tenantLabel: tenantValue,
+					"env":       "e2e",
 				},
 			},
 		}

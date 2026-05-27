@@ -284,6 +284,7 @@ var _ = Describe("when GlobalCustomQuota uses ledger-backed reconciliation", Ord
 				Name: testNamespace,
 				Labels: map[string]string{
 					tenantLabel: tenantValue,
+					"env":       "e2e",
 				},
 			},
 		}

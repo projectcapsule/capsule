@@ -7,9 +7,6 @@ global:
     postInstall:
       # -- Enable Post Install Job
       enabled: true
-    postUpgrade:
-      # -- Enable Post Upgrade Job
-      enabled: true
     preDelete:
       # -- Enable Pre Delete Job
       enabled: true

@@ -1,11 +1,11 @@
 {{- $Values := mergeOverwrite $.Values.global.jobs.kubectl $.Values.jobs -}}
-{{- if and (not $.Values.crds.exclusive) $.Values.global.jobs.postUpgrade.enabled }}
+{{- if and (not $.Values.crds.exclusive) $.Values.global.jobs.postInstall.enabled }}
   {{- if .Values.tls.create }}
 ---
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: "{{ include "capsule.post-upgrade.name" . }}"
+  name: "{{ include "capsule.post-install.name" . }}"
   namespace: {{ $.Release.Namespace }}
   labels:
     app.kubernetes.io/component: {{ include "capsule.post-install.component" . | quote }}
@@ -17,7 +17,7 @@ metadata:
     {{- end }}
   annotations:
     "helm.sh/hook-weight": "-1"
-    {{- include "capsule.post-upgrade.annotations" . | nindent 4 }}
+    {{- include "capsule.post-install.annotations" . | nindent 4 }}
     {{- with $Values.annotations }}
       {{- . | toYaml | nindent 4 }}
     {{- end }}
@@ -71,7 +71,7 @@ spec:
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      serviceAccountName: {{ include "capsule.post-upgrade.name" . }}
+      serviceAccountName: {{ include "capsule.post-install.name" . }}
       containers:
       - name: tls
         image: {{ include "capsule.jobsFullyQualifiedDockerImage" . }}

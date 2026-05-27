@@ -247,15 +247,6 @@
                                 }
                             }
                         },
-                        "postUpgrade": {
-                            "type": "object",
-                            "properties": {
-                                "enabled": {
-                                    "description": "Enable Post Upgrade Job",
-                                    "type": "boolean"
-                                }
-                            }
-                        },
                         "preDelete": {
                             "type": "object",
                             "properties": {

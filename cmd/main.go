@@ -250,6 +250,8 @@ func main() {
 		os.Exit(0)
 	}
 
+	ctx := ctrl.SetupSignalHandler()
+
 	setupLog.V(5).Info("Controller", "Options", controllerConfig)
 
 	var ns string
@@ -267,6 +269,48 @@ func main() {
 	if len(controllerConfig.ConfigurationName) == 0 {
 		setupLog.Error(fmt.Errorf("missing CapsuleConfiguration resource name"), "unable to start manager")
 		os.Exit(1)
+	}
+
+	restConfig, err := ctrl.GetConfig()
+	if err != nil {
+		setupLog.Error(err, "unable to start manager")
+		os.Exit(1)
+	}
+
+	// Suppress Warnings
+	restConfig.WarningHandler = rest.NoWarnings{}
+	restConfig.QPS = clientConnectionQPS
+	restConfig.Burst = int(clientConnectionBurst)
+
+	directClient, err := client.New(ctrl.GetConfigOrDie(), client.Options{
+		Scheme: scheme,
+	})
+	if err != nil {
+		setupLog.Error(err, "unable to create the direct client")
+		os.Exit(1)
+	}
+
+	directCfg := configuration.NewCapsuleConfiguration(ctx, directClient, restConfig, controllerConfig.ConfigurationName)
+
+	if directCfg.EnableTLSConfiguration() {
+		tlsReconciler := &tlscontroller.Reconciler{
+			Client:        directClient,
+			Log:           ctrl.Log.WithName("capsule.ctrl").WithName("tls"),
+			Namespace:     ns,
+			Configuration: directCfg,
+		}
+
+		tlsCert := &corev1.Secret{}
+
+		if err = directClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: directCfg.TLSSecretName()}, tlsCert); err != nil {
+			setupLog.Error(err, "unable to get Capsule TLS secret")
+			os.Exit(1)
+		}
+		// Reconcile TLS certificates before starting controllers and webhooks
+		if err = tlsReconciler.ReconcileCertificates(ctx, tlsCert); err != nil {
+			setupLog.Error(err, "unable to reconcile Capsule TLS secret")
+			os.Exit(1)
+		}
 	}
 
 	// if the enable-http2 flag is false (the default), http/2 should be disabled
@@ -287,37 +331,6 @@ func main() {
 
 	// Create watchers for metrics and webhooks certificates
 	var metricsCertWatcher, webhookCertWatcher *certwatcher.CertWatcher
-
-	// Initial webhook TLS options
-	webhookTLSOpts := tlsOpts
-
-	if len(webhookCertPath) > 0 {
-		setupLog.Info(
-			"Initializing webhook certificate watcher using provided certificates",
-			"webhook-cert-path",
-			webhookCertPath,
-			"webhook-cert-name",
-			webhookCertName,
-			"webhook-cert-key",
-			webhookCertKey,
-		)
-
-		var err error
-
-		webhookCertWatcher, err = certwatcher.New(
-			filepath.Join(webhookCertPath, webhookCertName),
-			filepath.Join(webhookCertPath, webhookCertKey),
-		)
-		if err != nil {
-			setupLog.Error(err, "Failed to initialize webhook certificate watcher")
-			os.Exit(1)
-		}
-
-		webhookTLSOpts = append(webhookTLSOpts, func(config *tls.Config) {
-			config.GetCertificate = webhookCertWatcher.GetCertificate
-		})
-	}
-
 	// Metrics endpoint is enabled in 'config/default/kustomization.yaml'. The Metrics options configure the server.
 	// More info:
 	// - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.20.4/pkg/metrics/server
@@ -370,6 +383,36 @@ func main() {
 		)
 	}
 
+	// Initial webhook TLS options
+	webhookTLSOpts := tlsOpts
+
+	if len(webhookCertPath) > 0 {
+		setupLog.Info(
+			"Initializing webhook certificate watcher using provided certificates",
+			"webhook-cert-path",
+			webhookCertPath,
+			"webhook-cert-name",
+			webhookCertName,
+			"webhook-cert-key",
+			webhookCertKey,
+		)
+
+		var err error
+
+		webhookCertWatcher, err = certwatcher.New(
+			filepath.Join(webhookCertPath, webhookCertName),
+			filepath.Join(webhookCertPath, webhookCertKey),
+		)
+		if err != nil {
+			setupLog.Error(err, "Failed to initialize webhook certificate watcher")
+			os.Exit(1)
+		}
+
+		webhookTLSOpts = append(webhookTLSOpts, func(config *tls.Config) {
+			config.GetCertificate = webhookCertWatcher.GetCertificate
+		})
+	}
+
 	ctrlOpts := ctrl.Options{
 		Scheme:  scheme,
 		Metrics: metricsServerOptions,
@@ -393,12 +436,6 @@ func main() {
 
 	setupLog.Info("initializing manager")
 
-	restConfig, err := ctrl.GetConfig()
-	if err != nil {
-		setupLog.Error(err, "unable to start manager")
-		os.Exit(1)
-	}
-
 	// Suppress Warnings
 	restConfig.WarningHandler = rest.NoWarnings{}
 	restConfig.QPS = clientConnectionQPS
@@ -412,8 +449,6 @@ func main() {
 
 	_ = manager.AddReadyzCheck("ping", healthz.Ping)
 	_ = manager.AddHealthzCheck("ping", healthz.Ping)
-
-	ctx := ctrl.SetupSignalHandler()
 
 	dc, err := discovery.NewDiscoveryClientForConfig(manager.GetConfig())
 	if err != nil {
@@ -430,43 +465,6 @@ func main() {
 	setupLog.Info("initializing capsule configuration")
 
 	cfg := configuration.NewCapsuleConfiguration(ctx, manager.GetClient(), manager.GetConfig(), controllerConfig.ConfigurationName)
-
-	directClient, err := client.New(ctrl.GetConfigOrDie(), client.Options{
-		Scheme: manager.GetScheme(),
-		Mapper: manager.GetRESTMapper(),
-	})
-	if err != nil {
-		setupLog.Error(err, "unable to create the direct client")
-		os.Exit(1)
-	}
-
-	directCfg := configuration.NewCapsuleConfiguration(ctx, directClient, manager.GetConfig(), controllerConfig.ConfigurationName)
-
-	if directCfg.EnableTLSConfiguration() {
-		tlsReconciler := &tlscontroller.Reconciler{
-			Client:        directClient,
-			Log:           ctrl.Log.WithName("capsule.ctrl").WithName("tls"),
-			Namespace:     ns,
-			Configuration: directCfg,
-		}
-
-		if err = tlsReconciler.SetupWithManager(manager); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "Namespace")
-			os.Exit(1)
-		}
-
-		tlsCert := &corev1.Secret{}
-
-		if err = directClient.Get(ctx, types.NamespacedName{Namespace: ns, Name: directCfg.TLSSecretName()}, tlsCert); err != nil {
-			setupLog.Error(err, "unable to get Capsule TLS secret")
-			os.Exit(1)
-		}
-		// Reconcile TLS certificates before starting controllers and webhooks
-		if err = tlsReconciler.ReconcileCertificates(ctx, tlsCert); err != nil {
-			setupLog.Error(err, "unable to reconcile Capsule TLS secret")
-			os.Exit(1)
-		}
-	}
 
 	setupLog.Info("initializing caches")
 

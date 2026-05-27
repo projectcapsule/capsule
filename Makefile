@@ -109,7 +109,7 @@ helm-test-exec: ct helm-controller-version ko-build-all
 # Setup development env
 dev-build: kind
 	$(KIND) create cluster --wait=60s --name $(CLUSTER_NAME) --image kindest/node:$(KUBERNETES_SUPPORTED_VERSION) --config ./hack/kind-cluster.yaml
-	$(MAKE) dev-install-deps
+	$(MAKE) dev-install-gw-api-crds
 
 .PHONY: dev-destroy
 dev-destroy: kind
@@ -193,7 +193,9 @@ dev-setup:
 		--set 'crds.createDiagnostics=true'\
 		--set "monitoring.diagnostics.enabled=true"\
 		--set "manager.rbac.minimal=true"\
-		--set "tls.enableController=false"\
+		--set 'certManager.generateCertificates=false' \
+		--set 'tls.enableController=true' \
+		--set 'tls.create=true' \
 		--set "webhooks.exclusive=true"\
 		--set "webhooks.service.url=$${WEBHOOK_URL}" \
 		--set "webhooks.service.caBundle=$${CA_BUNDLE}" \
@@ -207,6 +209,7 @@ dev-setup:
 		--set 'webhooks.hooks.calculations.rules[0].resources[0]=pods' \
 		--set 'webhooks.hooks.calculations.rules[0].resources[1]=persistentvolumeclaims' \
 		--set 'webhooks.hooks.calculations.rules[0].scope=Namespaced' \
+		--set 'webhooks.hooks.calculations.namespaceSelector.matchLabels.env=e2e' \
 		capsule \
 		$(CHART)
 	mkdir -p ./hack/generated/ || true
@@ -460,6 +463,9 @@ e2e-install: helm-controller-version ko-build-all
 		--namespace capsule-system \
 		--create-namespace \
 		--set 'replicaCount=2'\
+		--set 'certManager.generateCertificates=false' \
+		--set 'tls.enableController=true' \
+		--set 'tls.create=true' \
 		--set 'manager.image.pullPolicy=Never' \
 		--set 'manager.resources=null'\
 		--set "manager.image.tag=$(VERSION)" \
@@ -480,6 +486,7 @@ e2e-install: helm-controller-version ko-build-all
 		--set 'webhooks.hooks.calculations.rules[0].resources[0]=pods' \
 		--set 'webhooks.hooks.calculations.rules[0].resources[1]=persistentvolumeclaims' \
 		--set 'webhooks.hooks.calculations.rules[0].scope=Namespaced' \
+		--set 'webhooks.hooks.calculations.namespaceSelector.matchLabels.env=e2e' \
 		capsule \
 		./charts/capsule
 

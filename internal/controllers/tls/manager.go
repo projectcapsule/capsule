@@ -163,7 +163,6 @@ func (r Reconciler) ReconcileCertificates(ctx context.Context, certSecret *corev
 		}
 
 		_, err = controllerutil.CreateOrUpdate(ctx, r.Client, t, func() error {
-			t.Type = corev1.SecretTypeTLS
 			t.Data = certSecret.Data
 
 			return nil
