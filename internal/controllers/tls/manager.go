@@ -13,9 +13,11 @@ import (
 	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
+	admissionv1 "k8s.io/api/admissionregistration/v1"
 	corev1 "k8s.io/api/core/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
@@ -24,7 +26,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
-	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
@@ -71,16 +72,16 @@ func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Watches(
 			&admissionregistrationv1.ValidatingWebhookConfiguration{},
 			enqueueFn,
-			builder.WithPredicates(predicate.NewPredicateFuncs(func(object client.Object) bool {
-				return object.GetName() == string(r.Configuration.Admission().Validating.Name)
-			})),
+			builder.WithPredicates(
+				predicates.NamesMatchingPredicate{Names: []string{string(r.Configuration.Admission().Validating.Name)}},
+			),
 		).
 		Watches(
 			&admissionregistrationv1.MutatingWebhookConfiguration{},
 			enqueueFn,
-			builder.WithPredicates(predicate.NewPredicateFuncs(func(object client.Object) bool {
-				return object.GetName() == string(r.Configuration.Admission().Mutating.Name)
-			})),
+			builder.WithPredicates(
+				predicates.NamesMatchingPredicate{Names: []string{string(r.Configuration.Admission().Mutating.Name)}},
+			),
 		).
 		Watches(
 			&apiextensionsv1.CustomResourceDefinition{},
@@ -181,18 +182,18 @@ func (r Reconciler) ReconcileCertificates(ctx context.Context, certSecret *corev
 
 	r.Log.V(4).Info("Updating caBundle in webhooks and CRDs")
 
-	group, ctx := errgroup.WithContext(ctx)
+	patchGroup := new(errgroup.Group)
 
-	group.Go(func() error {
+	patchGroup.Go(func() error {
 		return r.updateMutatingWebhookConfiguration(ctx, caBundle)
 	})
 
-	group.Go(func() error {
+	patchGroup.Go(func() error {
 		return r.updateValidatingWebhookConfiguration(ctx, caBundle)
 	})
 
 	for key, crd := range r.conversionManagedCRDs() {
-		group.Go(func() error {
+		patchGroup.Go(func() error {
 			if err := r.updateManagedCustomResourceDefinition(ctx, crd, caBundle); err != nil {
 				return fmt.Errorf("cannot update managed CRD %q (%s): %w", key, crd.Name, err)
 			}
@@ -201,32 +202,45 @@ func (r Reconciler) ReconcileCertificates(ctx context.Context, certSecret *corev
 		})
 	}
 
+	if err := patchGroup.Wait(); err != nil {
+		return err
+	}
+
+	r.annotateOperatorPodsBestEffort(ctx)
+
+	return nil
+}
+
+func (r Reconciler) annotateOperatorPodsBestEffort(ctx context.Context) {
 	operatorPods, err := r.getOperatorPods(ctx)
 	if err != nil {
 		if errors.As(err, &caperrors.RunningInOutOfClusterModeError{}) {
 			r.Log.Info("skipping annotation of Pods for cert-manager", "error", err.Error())
-
-			return group.Wait()
+			return
 		}
 
-		return err
+		r.Log.Error(err, "cannot retrieve Capsule operator pods for TLS reload")
+		return
 	}
 
 	r.Log.V(4).Info("Updating capsule operator pods")
+
+	group := new(errgroup.Group)
+	group.SetLimit(4)
 
 	for _, pod := range operatorPods.Items {
 		p := pod
 
 		group.Go(func() error {
-			return r.updateOperatorPod(ctx, p)
+			if err := r.updateOperatorPod(ctx, p); err != nil {
+				r.Log.Error(err, "cannot update capsule operator pod", "name", p.Name, "namespace", p.Namespace)
+			}
+
+			return nil
 		})
 	}
 
-	if err := group.Wait(); err != nil {
-		return err
-	}
-
-	return nil
+	_ = group.Wait()
 }
 
 func (r Reconciler) shouldUpdateCertificate(secret *corev1.Secret) bool {
@@ -274,14 +288,6 @@ func (r *Reconciler) updateManagedCustomResourceDefinition(
 		crd := &apiextensionsv1.CustomResourceDefinition{}
 
 		if err := r.Get(ctx, types.NamespacedName{Name: managed.Name}, crd); err != nil {
-			if apierrors.IsNotFound(err) {
-				r.Log.V(4).Info("skipping missing managed CustomResourceDefinition", "name", managed.Name)
-
-				return nil
-			}
-
-			r.Log.Error(err, "cannot retrieve CustomResourceDefinition", "name", managed.Name)
-
 			return err
 		}
 
@@ -328,15 +334,8 @@ func (r Reconciler) updateValidatingWebhookConfiguration(ctx context.Context, ca
 
 		if err := r.Get(ctx, types.NamespacedName{Name: string(r.Configuration.Admission().Validating.Name)}, vw); err != nil {
 			if apierrors.IsNotFound(err) {
-				r.Log.V(3).Info(
-					"skipping missing ValidatingWebhookConfiguration",
-					"name", string(r.Configuration.Admission().Validating.Name),
-				)
-
 				return nil
 			}
-
-			r.Log.Error(err, "cannot retrieve ValidatingWebhookConfiguration")
 
 			return err
 		}
@@ -354,21 +353,17 @@ func (r Reconciler) updateValidatingWebhookConfiguration(ctx context.Context, ca
 //nolint:dupl
 func (r Reconciler) updateMutatingWebhookConfiguration(ctx context.Context, caBundle []byte) error {
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		mw := &admissionregistrationv1.MutatingWebhookConfiguration{}
+		mw := &admissionv1.MutatingWebhookConfiguration{
+			TypeMeta: metav1.TypeMeta{
+				APIVersion: admissionv1.SchemeGroupVersion.String(),
+				Kind:       "MutatingWebhookConfiguration",
+			},
+		}
 
 		if err := r.Get(ctx, types.NamespacedName{Name: string(r.Configuration.Admission().Mutating.Name)}, mw); err != nil {
 			if apierrors.IsNotFound(err) {
-				r.Log.V(3).Info(
-					"skipping missing MutatingWebhookConfiguration",
-					"name", string(r.Configuration.Admission().Mutating.Name),
-				)
-
 				return nil
 			}
-
-			r.Log.Error(err, "cannot retrieve MutatingWebhookConfiguration")
-
-			return err
 		}
 
 		for i, w := range mw.Webhooks {

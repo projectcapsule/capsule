@@ -40,4 +40,3 @@ spec:
     kind: Pod
     op: add
     path: .spec.initContainers[*].resources.limits.cpu
-  

@@ -292,8 +292,10 @@ func main() {
 
 	directCfg := configuration.NewCapsuleConfiguration(ctx, directClient, restConfig, controllerConfig.ConfigurationName)
 
+	tlsReconciler := &tlscontroller.Reconciler{}
+
 	if directCfg.EnableTLSConfiguration() {
-		tlsReconciler := &tlscontroller.Reconciler{
+		tlsReconciler = &tlscontroller.Reconciler{
 			Client:        directClient,
 			Log:           ctrl.Log.WithName("capsule.ctrl").WithName("tls"),
 			Namespace:     ns,
@@ -478,6 +480,13 @@ func main() {
 	customQuotaQuantityCache := cache.NewQuantityCache[string]()
 	jsonPathCache := cache.NewJSONPathCache()
 	targetsCache := cache.NewCompiledTargetsCache[string]()
+
+	if directCfg.EnableTLSConfiguration() {
+		if err = tlsReconciler.SetupWithManager(manager); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "Namespace")
+			os.Exit(1)
+		}
+	}
 
 	if err = (&tenantcontroller.Manager{
 		RESTConfig:      manager.GetConfig(),
