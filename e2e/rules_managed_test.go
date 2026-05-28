@@ -8,25 +8,30 @@ import (
 	. "github.com/onsi/gomega"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
+	"github.com/projectcapsule/capsule/pkg/api/rbac"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-var _ = Describe("NamespaceStatus objects", Label("tenant", "rules"), func() {
+var _ = Describe("NamespaceStatus objects", Ordered, Label("tenant", "rules", "status"), func() {
 	ctx := context.Background()
 
 	// Two tenants, each with one owner (reuse your existing ownerClient/NamespaceCreation helpers)
 	tntA := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{Name: "nsstatus-a"},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "e2e-rule-status-a",
+			Labels: map[string]string{
+				"env": "e2e",
+			},
+		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: api.OwnerListSpec{
+			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: api.CoreOwnerSpec{
-						UserSpec: api.UserSpec{Name: "matt", Kind: "User"},
+					CoreOwnerSpec: rbac.CoreOwnerSpec{
+						UserSpec: rbac.UserSpec{Name: "e2e-rule-status-a", Kind: "User"},
 					},
 				},
 			},
@@ -34,12 +39,17 @@ var _ = Describe("NamespaceStatus objects", Label("tenant", "rules"), func() {
 	}
 
 	tntB := &capsulev1beta2.Tenant{
-		ObjectMeta: metav1.ObjectMeta{Name: "nsstatus-b"},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "e2e-rule-status-b",
+			Labels: map[string]string{
+				"env": "e2e",
+			},
+		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: api.OwnerListSpec{
+			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: api.CoreOwnerSpec{
-						UserSpec: api.UserSpec{Name: "matt", Kind: "User"},
+					CoreOwnerSpec: rbac.CoreOwnerSpec{
+						UserSpec: rbac.UserSpec{Name: "e2e-rule-status-b", Kind: "User"},
 					},
 				},
 			},
@@ -59,19 +69,22 @@ var _ = Describe("NamespaceStatus objects", Label("tenant", "rules"), func() {
 			return k8sClient.Create(ctx, tntA)
 		}).Should(Succeed())
 
+		TenantReady(tntA, metav1.ConditionTrue, defaultTimeoutInterval)
+
 		EventuallyCreation(func() error {
 			tntB.ResourceVersion = ""
 			return k8sClient.Create(ctx, tntB)
 		}).Should(Succeed())
 
-		// Create namespaces for each tenant using your helper
-		nsA1 = NewNamespace("rule-status-ns1", map[string]string{
+		TenantReady(tntB, metav1.ConditionTrue, defaultTimeoutInterval)
+
+		nsA1 = NewNamespace("e2e-rule-status-a-1", map[string]string{
 			meta.TenantLabel: tntA.GetName(),
 		})
-		nsA2 = NewNamespace("rule-status-ns2", map[string]string{
+		nsA2 = NewNamespace("e2e-rule-status-a-2", map[string]string{
 			meta.TenantLabel: tntA.GetName(),
 		})
-		nsB1 = NewNamespace("rule-status-ns3", map[string]string{
+		nsB1 = NewNamespace("e2e-rule-status-b-1", map[string]string{
 			meta.TenantLabel: tntB.GetName(),
 		})
 
@@ -80,8 +93,9 @@ var _ = Describe("NamespaceStatus objects", Label("tenant", "rules"), func() {
 		NamespaceCreation(nsB1, tntB.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 
 		// Wait until tenants list their namespaces (optional but makes debugging easier)
-		TenantNamespaceList(tntA, defaultTimeoutInterval).Should(ContainElements(nsA1.GetName(), nsA2.GetName()))
-		TenantNamespaceList(tntB, defaultTimeoutInterval).Should(ContainElement(nsB1.GetName()))
+		NamespaceIsPartOfTenant(tntA, nsA1).Should(Succeed())
+		NamespaceIsPartOfTenant(tntA, nsA2).Should(Succeed())
+		NamespaceIsPartOfTenant(tntB, nsB1).Should(Succeed())
 	})
 
 	JustAfterEach(func() {
@@ -95,17 +109,15 @@ var _ = Describe("NamespaceStatus objects", Label("tenant", "rules"), func() {
 
 		// Delete tenants
 		if tntA != nil {
-			_ = k8sClient.Delete(ctx, tntA)
+			EventuallyDeletion(tntA)
 		}
 		if tntB != nil {
-			_ = k8sClient.Delete(ctx, tntB)
+			EventuallyDeletion(tntB)
 		}
 	})
 
-	// --- Helpers ---
-
-	expectNamespaceStatusFor := func(ns *corev1.Namespace, tenantName string) {
-		By(fmt.Sprintf("verifying NamespaceStatus for namespace %q (tenant=%q)", ns.Name, tenantName))
+	expectNamespaceStatusFor := func(ns *corev1.Namespace, tenant *capsulev1beta2.Tenant) {
+		By(fmt.Sprintf("verifying NamespaceStatus for namespace %q (tenant=%q)", ns.Name, tenant.GetName()))
 
 		Eventually(func(g Gomega) {
 			// Re-read namespace to get UID reliably (in case local object is stale)
@@ -120,29 +132,38 @@ var _ = Describe("NamespaceStatus objects", Label("tenant", "rules"), func() {
 
 			var found bool
 			for _, or := range nsStatus.OwnerReferences {
-				if or.APIVersion == "v1" &&
-					or.Kind == "Namespace" &&
-					or.Name == curNS.Name &&
-					or.UID == curNS.UID {
+				if or.APIVersion == capsulev1beta2.GroupVersion.String() &&
+					or.Kind == "Tenant" &&
+					or.Name == tenant.Name &&
+					or.UID == tenant.UID {
 
 					found = true
 
 					break
 				}
 			}
-			g.Expect(found).To(BeTrue(), "expected NamespaceStatus to have Namespace controller OwnerReference")
+			g.Expect(found).To(BeTrue(), "expected NamespaceStatus to have Tenant controller OwnerReference")
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 	}
 
 	It("creates one NamespaceStatus per namespace, with correct Status.Tenant and Namespace controller OwnerReference", func() {
-		expectNamespaceStatusFor(nsA1, tntA.Name)
-		expectNamespaceStatusFor(nsA2, tntA.Name)
-		expectNamespaceStatusFor(nsB1, tntB.Name)
+		getTenantA := &capsulev1beta2.Tenant{}
+		Expect(k8sClient.Get(ctx, client.ObjectKey{Name: tntA.GetName()}, getTenantA)).To(Succeed())
+
+		getTenantB := &capsulev1beta2.Tenant{}
+		Expect(k8sClient.Get(ctx, client.ObjectKey{Name: tntB.GetName()}, getTenantB)).To(Succeed())
+
+		expectNamespaceStatusFor(nsA1, getTenantA)
+		expectNamespaceStatusFor(nsA2, getTenantA)
+		expectNamespaceStatusFor(nsB1, getTenantB)
 	})
 
 	It("removes NamespaceStatus when the Namespace is deleted (ownerReference GC)", func() {
+		getTenantA := &capsulev1beta2.Tenant{}
+		Expect(k8sClient.Get(ctx, client.ObjectKey{Name: tntA.GetName()}, getTenantA)).To(Succeed())
+
 		// Ensure it exists first
-		expectNamespaceStatusFor(nsA1, tntA.Name)
+		expectNamespaceStatusFor(nsA1, getTenantA)
 
 		// Delete namespace
 		Expect(k8sClient.Delete(ctx, nsA1)).To(Succeed())

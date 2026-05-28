@@ -15,9 +15,6 @@ spec:
       labels:
         app: capsule
       annotations:
-        prometheus.io/scrape: 'true'
-        prometheus.io/path: '/metrics'
-        prometheus.io/port: '8080'
         profiles.grafana.com/memory.scrape: "true"
         profiles.grafana.com/memory.port: "8082"
         profiles.grafana.com/cpu.scrape: "true"
@@ -26,11 +23,13 @@ spec:
         profiles.grafana.com/goroutine.port: "8082"
     spec:
       containers:
-        - name: tcp-proxy
+        - name: capsule
           image: alpine/socat
           ports:
-            - containerPort: 8080
-            - containerPort: 8082
+            - name: metrics
+              containerPort: 8080
+            - name: profiling
+              containerPort: 8082
           command: ["sh", "-c"]
           args:
             - |

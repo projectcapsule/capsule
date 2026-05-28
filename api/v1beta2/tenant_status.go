@@ -8,14 +8,16 @@ import (
 
 	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
+	"github.com/projectcapsule/capsule/pkg/api/rbac"
 )
 
-// +kubebuilder:validation:Enum=Cordoned;Active
+// +kubebuilder:validation:Enum=Cordoned;Active;Terminating
 type tenantState string
 
 const (
-	TenantStateActive   tenantState = "Active"
-	TenantStateCordoned tenantState = "Cordoned"
+	TenantStateActive      tenantState = "Active"
+	TenantStateCordoned    tenantState = "Cordoned"
+	TenantStateTerminating tenantState = "Terminating"
 )
 
 // Returns the observed state of the Tenant.
@@ -24,9 +26,11 @@ type TenantStatus struct {
 	TenantAvailableStatus `json:",inline"`
 
 	// Collected owners for this tenant
-	Owners api.OwnerStatusListSpec `json:"owners,omitempty"`
+	Owners rbac.OwnerStatusListSpec `json:"owners,omitempty"`
+	// Promoted ServiceAccounts across the Tenant
+	Promotions rbac.PromotionStatusListSpec `json:"promotions,omitempty"`
 	// +kubebuilder:default=Active
-	// The operational state of the Tenant. Possible values are "Active", "Cordoned".
+	// The operational state of the Tenant. Possible values are "Active", "Cordoned" or "Terminating".
 	State tenantState `json:"state"`
 	// How many namespaces are assigned to the Tenant.
 	Size uint `json:"size"`
@@ -50,6 +54,16 @@ type TenantStatusNamespaceItem struct {
 	// Managed Metadata
 	//+optional
 	Enforce TenantStatusNamespaceEnforcement `json:"enforce,omitzero"`
+}
+
+// RuleStatus contains the accumulated rules applying to namespace it's deployed in.
+// +kubebuilder:object:generate=true
+type TenantStatusRuleStatusItem struct {
+	// Promotions originating from this namespace
+	Promotions rbac.OwnerStatusListSpec `json:"promotions,omitempty"`
+
+	// Target Namespaces for this rule
+	TargetNamespaces []meta.RFC1123SubdomainName `json:"namespaces,omitempty"`
 }
 
 type TenantStatusNamespaceEnforcement struct {

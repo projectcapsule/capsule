@@ -5,8 +5,10 @@ package tenant
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
+	"time"
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
@@ -17,14 +19,14 @@ import (
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
+	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/events"
-	"k8s.io/client-go/util/retry"
 	"k8s.io/client-go/util/workqueue"
+	"sigs.k8s.io/cluster-api/util/patch"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -36,10 +38,11 @@ import (
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/internal/cache"
 	"github.com/projectcapsule/capsule/internal/controllers/utils"
 	"github.com/projectcapsule/capsule/internal/metrics"
-	"github.com/projectcapsule/capsule/pkg/api"
-	meta "github.com/projectcapsule/capsule/pkg/api/meta"
+	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
+	"github.com/projectcapsule/capsule/pkg/api/rbac"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	"github.com/projectcapsule/capsule/pkg/runtime/gvk"
 	"github.com/projectcapsule/capsule/pkg/runtime/predicates"
@@ -48,12 +51,19 @@ import (
 type Manager struct {
 	client.Client
 
+	reader client.Reader
+
+	DiscoveryClient discovery.DiscoveryInterface
+	DynamicClient   dynamic.Interface
+
 	Metrics       *metrics.TenantRecorder
 	Log           logr.Logger
 	Recorder      events.EventRecorder
 	Configuration configuration.Configuration
 	RESTConfig    *rest.Config
 	classes       supportedClasses
+
+	discoveryCache cache.DiscoveryNamespacedResourceCache
 }
 
 type supportedClasses struct {
@@ -62,12 +72,18 @@ type supportedClasses struct {
 }
 
 func (r *Manager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.ControllerOptions) error {
+	r.reader = mgr.GetAPIReader()
+	r.discoveryCache = cache.NewDiscoveryNamespacedResourceCache()
+
 	ctrlBuilder := ctrl.NewControllerManagedBy(mgr).
 		Named("capsule/tenants").
 		For(
 			&capsulev1beta2.Tenant{},
 			builder.WithPredicates(
-				predicate.GenerationChangedPredicate{},
+				predicate.Or(
+					predicate.GenerationChangedPredicate{},
+					predicates.UpdatedMetadataPredicate{},
+				),
 			),
 		).
 		Owns(&networkingv1.NetworkPolicy{}).
@@ -78,7 +94,7 @@ func (r *Manager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.Controller
 			&capsulev1beta2.CapsuleConfiguration{},
 			handler.EnqueueRequestsFromMapFunc(r.enqueueAllTenants),
 			builder.WithPredicates(
-				predicates.CapsuleConfigSpecChangedPredicate{},
+				predicates.CapsuleConfigSpecAdministratorsChangedPredicate{},
 				predicates.NamesMatchingPredicate{Names: []string{ctrlConfig.ConfigurationName}},
 			),
 		).
@@ -87,31 +103,20 @@ func (r *Manager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.Controller
 			handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &capsulev1beta2.Tenant{}),
 		).
 		Watches(
+			&capsulev1beta2.RuleStatus{},
+			handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &capsulev1beta2.Tenant{}),
+		).
+		Watches(
 			&storagev1.StorageClass{},
-			r.statusOnlyHandlerClasses(
-				r.reconcileClassStatus,
-				r.collectAvailableStorageClasses,
-				"cannot collect storage classes",
-			),
-			builder.WithPredicates(predicates.UpdatedLabelsPredicate{}),
+			handler.EnqueueRequestsFromMapFunc(r.enqueueAllTenants),
 		).
 		Watches(
 			&schedulingv1.PriorityClass{},
-			r.statusOnlyHandlerClasses(
-				r.reconcileClassStatus,
-				r.collectAvailablePriorityClasses,
-				"cannot collect priority classes",
-			),
-			builder.WithPredicates(predicates.UpdatedLabelsPredicate{}),
+			handler.EnqueueRequestsFromMapFunc(r.enqueueAllTenants),
 		).
 		Watches(
 			&nodev1.RuntimeClass{},
-			r.statusOnlyHandlerClasses(
-				r.reconcileClassStatus,
-				r.collectAvailableRuntimeClasses,
-				"cannot collect runtime classes",
-			),
-			builder.WithPredicates(predicates.UpdatedLabelsPredicate{}),
+			handler.EnqueueRequestsFromMapFunc(r.enqueueAllTenants),
 		).
 		Watches(
 			&capsulev1beta2.TenantOwner{},
@@ -148,7 +153,14 @@ func (r *Manager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.Controller
 					e event.TypedDeleteEvent[client.Object],
 					q workqueue.TypedRateLimitingInterface[reconcile.Request],
 				) {
-					r.enqueueTenantsForTenantOwner(ctx, e.Object, q)
+					r.enqueueForTenantsWithCondition(
+						ctx,
+						e.Object,
+						q,
+						func(tnt *capsulev1beta2.Tenant, _ client.Object) bool {
+							return len(tnt.Spec.Permissions.MatchOwners) > 0
+						},
+					)
 				},
 			},
 		).
@@ -181,7 +193,7 @@ func (r *Manager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.Controller
 					r.enqueueForTenantsWithCondition(ctx, e.Object, q, func(tnt *capsulev1beta2.Tenant, c client.Object) bool {
 						_, found := tnt.Status.Owners.FindOwner(
 							serviceaccount.ServiceAccountUsernamePrefix+c.GetNamespace()+":"+c.GetName(),
-							api.ServiceAccountOwner,
+							rbac.ServiceAccountOwner,
 						)
 
 						return found
@@ -202,12 +214,7 @@ func (r *Manager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.Controller
 	if r.classes.gateway {
 		ctrlBuilder = ctrlBuilder.Watches(
 			&gatewayv1.GatewayClass{},
-			r.statusOnlyHandlerClasses(
-				r.reconcileClassStatus,
-				r.collectAvailableGatewayClasses,
-				"cannot collect gateway classes",
-			),
-			builder.WithPredicates(predicates.UpdatedLabelsPredicate{}),
+			handler.EnqueueRequestsFromMapFunc(r.enqueueAllTenants),
 		)
 	}
 
@@ -221,26 +228,21 @@ func (r *Manager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.Controller
 	if r.classes.device {
 		ctrlBuilder = ctrlBuilder.Watches(
 			&resourcesv1.DeviceClass{},
-			r.statusOnlyHandlerClasses(
-				r.reconcileClassStatus,
-				r.collectAvailableDeviceClasses,
-				"cannot collect device classes",
-			),
-			builder.WithPredicates(predicates.UpdatedLabelsPredicate{}),
+			handler.EnqueueRequestsFromMapFunc(r.enqueueAllTenants),
 		)
 	}
 
 	return ctrlBuilder.Complete(r)
 }
 
-func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ctrl.Result, err error) {
+func (r *Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ctrl.Result, err error) {
 	r.Log = r.Log.WithValues("Request.Name", request.Name)
 
 	// Fetch the Tenant instance
 	instance := &capsulev1beta2.Tenant{}
 	if err = r.Get(ctx, request.NamespacedName, instance); err != nil {
 		if apierrors.IsNotFound(err) {
-			r.Log.V(3).Info("request object not found, could have been deleted after reconcile request")
+			r.Log.V(5).Info("request object not found, could have been deleted after reconcile request")
 
 			// If tenant was deleted or cannot be found, clean up metrics
 			r.Metrics.DeleteAllMetricsForTenant(request.Name)
@@ -248,140 +250,123 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 			return reconcile.Result{}, nil
 		}
 
-		r.Log.Error(err, "error reading the object")
-
 		return result, err
 	}
+
+	patchHelper, err := patch.NewHelper(instance, r.Client)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+
+	if updateErr := r.updateReconcilingStatus(ctx, instance); updateErr != nil {
+		if apierrors.IsNotFound(updateErr) {
+			return reconcile.Result{}, nil
+		}
+
+		return reconcile.Result{}, updateErr
+	}
+
+	reconcileError := r.reconcile(ctx, instance)
 
 	defer func() {
 		r.syncTenantStatusMetrics(instance)
 
-		if uerr := r.updateTenantStatus(ctx, instance, err); uerr != nil {
-			err = fmt.Errorf("cannot update tenant status: %w", uerr)
+		if statusErr := r.updateTenantStatus(ctx, instance, reconcileError); statusErr != nil {
+			statusErr = fmt.Errorf("cannot update tenant status: %w", statusErr)
 
-			return
+			if err == nil {
+				err = statusErr
+			} else {
+				err = errors.Join(err, statusErr)
+			}
 		}
 	}()
 
-	// Collect Ownership for Status
-	if err = r.collectOwners(ctx, instance); err != nil {
-		err = fmt.Errorf("cannot collect available owners: %w", err)
+	if e := patchHelper.Patch(ctx, instance); e != nil {
+		if caperrors.IgnoreGone(e) {
+			err = nil
 
-		return result, err
-	}
+			return result, err
+		}
 
-	// Ensuring Metadata.
-	err, updated := r.ensureMetadata(ctx, instance)
-	if err != nil {
-		err = fmt.Errorf("cannot ensure metadata: %w", err)
-
-		return result, err
-	}
-
-	if updated {
-		return result, nil
-	}
-
-	// Ensuring ResourceQuota
-	r.Log.V(4).Info("ensuring limit resources count is updated")
-
-	if err = r.syncCustomResourceQuotaUsages(ctx, instance); err != nil {
-		err = fmt.Errorf("cannot count limited resources: %w", err)
-
-		return result, err
-	}
-
-	// Reconcile Namespaces
-	r.Log.V(4).Info("starting processing of Namespaces", "items", len(instance.Status.Namespaces))
-
-	if err = r.reconcileNamespaces(ctx, instance); err != nil {
-		err = fmt.Errorf("namespace(s) had reconciliation errors")
-
-		return result, err
-	}
-
-	// Ensuring NetworkPolicy resources
-	r.Log.V(4).Info("starting processing of Network Policies")
-
-	if err = r.syncNetworkPolicies(ctx, instance); err != nil {
-		err = fmt.Errorf("cannot sync networkPolicy items: %w", err)
-
-		return result, err
-	}
-
-	// Ensuring LimitRange resources
-	r.Log.V(4).Info("Starting processing of Limit Ranges", "items", len(instance.Spec.LimitRanges.Items)) //nolint:staticcheck
-
-	if err = r.syncLimitRanges(ctx, instance); err != nil {
-		err = fmt.Errorf("cannot sync limitrange items: %w", err)
-
-		return result, err
-	}
-
-	// Ensuring ResourceQuota resources
-	r.Log.V(4).Info("Starting processing of Resource Quotas", "items", len(instance.Spec.ResourceQuota.Items))
-
-	if err = r.syncResourceQuotas(ctx, instance); err != nil {
-		err = fmt.Errorf("cannot sync resourcequota items: %w", err)
-
-		return result, err
-	}
-
-	// Ensuring RoleBinding resources
-	r.Log.V(4).Info("Ensuring RoleBindings for Owners and Tenant")
-
-	if err = r.syncRoleBindings(ctx, instance); err != nil {
-		err = fmt.Errorf("cannot sync rolebindings items: %w", err)
-
-		return result, err
+		return reconcile.Result{}, e
 	}
 
 	// Collect available resources
 	if err = r.collectAvailableResources(ctx, instance); err != nil {
 		err = fmt.Errorf("cannot collect available resources: %w", err)
 
-		return result, err
+		return reconcile.Result{}, err
+	}
+
+	if instance.DeletionTimestamp != nil && len(instance.Status.Spaces) > 0 {
+		return reconcile.Result{RequeueAfter: 2 * time.Second}, nil
+	}
+
+	return reconcile.Result{}, reconcileError
+}
+
+func (r *Manager) reconcile(ctx context.Context, instance *capsulev1beta2.Tenant) (err error) {
+	var errs []error
+
+	// Collect Ownership/Promotions for Status
+	if err = r.collectRBAC(ctx, instance); err != nil {
+		errs = append(errs, fmt.Errorf("cannot collect available rbac: %w", err))
+	}
+
+	// Reconcile Namespaces
+	r.Log.V(4).Info("starting processing of Namespaces", "items", len(instance.Status.Namespaces))
+
+	if err = r.reconcileNamespaces(ctx, instance); err != nil {
+		errs = append(errs, fmt.Errorf("namespace(s) had reconciliation errors: %w", err))
+	}
+
+	// Ensuring Metadata.
+	err = r.ensureMetadata(ctx, instance)
+	if err != nil {
+		errs = append(errs, fmt.Errorf("cannot ensure metadata: %w", err))
+	}
+
+	// Ensuring ResourceQuota
+	r.Log.V(4).Info("ensuring limit resources count is updated")
+
+	if err = r.syncCustomResourceQuotaUsages(ctx, instance); err != nil {
+		errs = append(errs, fmt.Errorf("cannot count limited resources: %w", err))
+	}
+
+	// Ensuring NetworkPolicy resources
+	r.Log.V(4).Info("starting processing of Network Policies")
+
+	if err = r.syncNetworkPolicies(ctx, instance); err != nil {
+		errs = append(errs, fmt.Errorf("cannot sync networkPolicy items: %w", err))
+	}
+
+	// Ensuring LimitRange resources
+	r.Log.V(4).Info("Starting processing of Limit Ranges", "items", len(instance.Spec.LimitRanges.Items)) //nolint:staticcheck
+
+	if err = r.syncLimitRanges(ctx, instance); err != nil {
+		errs = append(errs, fmt.Errorf("cannot sync limitrange items: %w", err))
+	}
+
+	// Ensuring ResourceQuota resources
+	r.Log.V(4).Info("Starting processing of Resource Quotas", "items", len(instance.Spec.ResourceQuota.Items))
+
+	if err = r.syncResourceQuotas(ctx, instance); err != nil {
+		errs = append(errs, fmt.Errorf("cannot sync resourcequota items: %w", err))
+	}
+
+	// Ensuring RoleBinding resources
+	r.Log.V(4).Info("Ensuring RoleBindings for Owners and Tenant")
+
+	if err = r.syncRoleBindings(ctx, r.Log, instance); err != nil {
+		errs = append(errs, fmt.Errorf("cannot sync rolebindings items: %w", err))
+	}
+
+	if err = errors.Join(errs...); err != nil {
+		return err
 	}
 
 	r.Log.V(4).Info("Tenant reconciling completed")
 
-	return ctrl.Result{}, err
-}
-
-func (r *Manager) updateTenantStatus(ctx context.Context, tnt *capsulev1beta2.Tenant, reconcileError error) error {
-	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
-		latest := &capsulev1beta2.Tenant{}
-		if err = r.Get(ctx, types.NamespacedName{Name: tnt.GetName()}, latest); err != nil {
-			return err
-		}
-
-		latest.Status = tnt.Status
-
-		// Set Ready Condition
-		readyCondition := meta.NewReadyCondition(tnt)
-		if reconcileError != nil {
-			readyCondition.Message = reconcileError.Error()
-			readyCondition.Status = metav1.ConditionFalse
-			readyCondition.Reason = meta.FailedReason
-		}
-
-		latest.Status.Conditions.UpdateConditionByType(readyCondition)
-
-		// Set Cordoned Condition
-		cordonedCondition := meta.NewCordonedCondition(tnt)
-
-		if tnt.Spec.Cordoned {
-			latest.Status.State = capsulev1beta2.TenantStateCordoned
-
-			cordonedCondition.Reason = meta.CordonedReason
-			cordonedCondition.Message = "Tenant is cordoned"
-			cordonedCondition.Status = metav1.ConditionTrue
-		} else {
-			latest.Status.State = capsulev1beta2.TenantStateActive
-		}
-
-		latest.Status.Conditions.UpdateConditionByType(cordonedCondition)
-
-		return r.Client.Status().Update(ctx, latest)
-	})
+	return err
 }

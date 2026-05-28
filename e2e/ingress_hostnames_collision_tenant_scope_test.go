@@ -16,20 +16,25 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api/meta"
+	"github.com/projectcapsule/capsule/pkg/api/rbac"
 	"github.com/projectcapsule/capsule/pkg/utils"
 )
 
-var _ = Describe("when handling Tenant scoped Ingress hostnames collision", Label("ingress"), func() {
+var _ = Describe("when handling Tenant scoped Ingress hostnames collision", Ordered, Label("tenant", "networking", "ingress"), func() {
 	tnt := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "hostnames-collision-tenant",
+			Name: "e2e-hostnames-collision-tenant",
+			Labels: map[string]string{
+				"env": "e2e",
+			},
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: api.OwnerListSpec{
+			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: api.CoreOwnerSpec{
-						UserSpec: api.UserSpec{
-							Name: "ingress-tenant",
+					CoreOwnerSpec: rbac.CoreOwnerSpec{
+						UserSpec: rbac.UserSpec{
+							Name: "e2e-hostnames-collision-tenant",
 							Kind: "User",
 						},
 					},
@@ -113,24 +118,30 @@ var _ = Describe("when handling Tenant scoped Ingress hostnames collision", Labe
 			tnt.ResourceVersion = ""
 			return k8sClient.Create(context.TODO(), tnt)
 		}).Should(Succeed())
+		TenantReady(tnt, metav1.ConditionTrue, defaultTimeoutInterval)
 	})
 
 	JustAfterEach(func() {
-		Expect(k8sClient.Delete(context.TODO(), tnt)).Should(Succeed())
+		EventuallyDeletion(tnt)
 	})
 
 	It("should ensure Tenant scope for Ingress hostname and path collision", func() {
 
-		ns1 := NewNamespace("")
+		ns1 := NewNamespace("", map[string]string{
+			meta.TenantLabel: tnt.GetName(),
+		})
 
-		ns2 := NewNamespace("")
+		ns2 := NewNamespace("", map[string]string{
+			meta.TenantLabel: tnt.GetName(),
+		})
 
 		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
 
 		NamespaceCreation(ns1, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+		NamespaceIsPartOfTenant(tnt, ns1).Should(Succeed())
+
 		NamespaceCreation(ns2, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
-		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns1.GetName()))
-		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns2.GetName()))
+		NamespaceIsPartOfTenant(tnt, ns2).Should(Succeed())
 
 		By("testing networking.k8s.io", func() {
 			if err := k8sClient.List(context.Background(), &networkingv1.IngressList{}); err != nil {

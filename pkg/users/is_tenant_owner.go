@@ -19,7 +19,7 @@ import (
 
 func IsTenantOwner(
 	ctx context.Context,
-	c client.Client,
+	c client.Reader,
 	cfg configuration.Configuration,
 	tnt *capsulev1beta2.Tenant,
 	userInfo authenticationv1.UserInfo,
@@ -32,18 +32,19 @@ func IsTenantOwner(
 }
 
 func IsTenantOwnerByStatus(
-	ctx context.Context,
-	c client.Client,
-	cfg configuration.Configuration,
 	tnt *capsulev1beta2.Tenant,
-	userInfo authenticationv1.UserInfo,
+	user AdmissionUser,
 ) bool {
-	return tnt.Status.Owners.IsOwner(userInfo.Username, userInfo.Groups)
+	if user.IsAdmin() {
+		return true
+	}
+
+	return tnt.Status.Owners.IsOwner(user.Username, user.Groups)
 }
 
 func IsCommonOwner(
 	ctx context.Context,
-	c client.Client,
+	c client.Reader,
 	cfg configuration.Configuration,
 	tnt *capsulev1beta2.Tenant,
 	userInfo authenticationv1.UserInfo,
@@ -64,7 +65,7 @@ func IsCommonOwner(
 		if err := c.List(ctx, saList,
 			client.InNamespace(parts[2]),
 			client.MatchingLabels{
-				meta.OwnerPromotionLabel: meta.OwnerPromotionLabelTrigger,
+				meta.OwnerPromotionLabel: meta.ValueTrue,
 			}); err != nil {
 			return false, err
 		}

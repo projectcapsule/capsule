@@ -14,30 +14,36 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
+	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
+	"github.com/projectcapsule/capsule/pkg/users"
 )
 
 type quotaHandler struct{}
 
-func QuotaHandler() handlers.TypedHandlerWithTenant[*corev1.Namespace] {
+func QuotaHandler() handlers.TypedHandlerWithTenantUser[*corev1.Namespace] {
 	return &quotaHandler{}
 }
 
 func (h *quotaHandler) OnCreate(
-	c client.Client,
+	_ client.Client,
+	reader client.Reader,
+	_ users.AdmissionUser,
 	ns *corev1.Namespace,
-	decoder admission.Decoder,
+	_ admission.Decoder,
 	recorder events.EventRecorder,
 	tnt *capsulev1beta2.Tenant,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		return h.handle(ctx, c, recorder, ns, tnt)
+		return h.handle(ctx, reader, recorder, ns, tnt)
 	}
 }
 
 func (h *quotaHandler) OnDelete(
 	client.Client,
+	client.Reader,
+	users.AdmissionUser,
 	*corev1.Namespace,
 	admission.Decoder,
 	events.EventRecorder,
@@ -49,21 +55,23 @@ func (h *quotaHandler) OnDelete(
 }
 
 func (h *quotaHandler) OnUpdate(
-	c client.Client,
+	_ client.Client,
+	reader client.Reader,
+	_ users.AdmissionUser,
 	ns *corev1.Namespace,
 	_ *corev1.Namespace,
-	decoder admission.Decoder,
+	_ admission.Decoder,
 	recorder events.EventRecorder,
 	tnt *capsulev1beta2.Tenant,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		return h.handle(ctx, c, recorder, ns, tnt)
+		return h.handle(ctx, reader, recorder, ns, tnt)
 	}
 }
 
 func (h *quotaHandler) handle(
 	ctx context.Context,
-	c client.Client,
+	c client.Reader,
 	recorder events.EventRecorder,
 	ns *corev1.Namespace,
 	tnt *capsulev1beta2.Tenant,
@@ -77,11 +85,9 @@ func (h *quotaHandler) handle(
 			return nil
 		}
 
-		recorder.Eventf(tnt, ns, corev1.EventTypeWarning, evt.ReasonOverprovision, evt.ActionValidationDenied, "Namespace %s cannot be attached, quota exceeded for the current Tenant", ns.GetName())
+		recorder.Eventf(ns, nil, corev1.EventTypeWarning, evt.ReasonOverprovision, evt.ActionValidationDenied, "Namespace %s cannot be attached, quota exceeded for the current Tenant", ns.GetName())
 
-		response := admission.Denied(caperrors.NewNamespaceQuotaExceededError().Error())
-
-		return &response
+		return ad.Deny(caperrors.NewNamespaceQuotaExceededError().Error())
 	}
 
 	return nil

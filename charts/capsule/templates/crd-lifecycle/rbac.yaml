@@ -3,7 +3,7 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: {{ include "capsule.crds.name" . }}
+  name: capsule:{{ .Release.Name }}:crds
   namespace: {{ .Release.Namespace | quote }}
   annotations:
     # create hook dependencies in the right order
@@ -11,7 +11,9 @@ metadata:
     {{- include "capsule.crds.annotations" . | nindent 4 }}
   labels:
     app.kubernetes.io/component: {{ include "capsule.crds.component" . | quote }}
-    {{- include "capsule.labels" . | nindent 4 }}
+    app.kubernetes.io/name: {{ include "capsule.crds.component" . | quote }}
+    {{- include "capsule.selectorLabelInstance" . | nindent 4 }}
+    {{- include "capsule.baselabels" . | nindent 4 }}
 rules:
 - apiGroups:
   - ""
@@ -33,6 +35,9 @@ rules:
   - tenants.capsule.clastix.io
   - tenantowners.capsule.clastix.io
   - rulestatuses.capsule.clastix.io
+  - customquotas.capsule.clastix.io
+  - globalcustomquotas.capsule.clastix.io
+  - quantityledgers.capsule.clastix.io
   verbs:
   - create
   - delete
@@ -43,7 +48,7 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: {{ include "capsule.crds.name" . }}
+  name: capsule:{{ .Release.Name }}:crds
   namespace: {{ .Release.Namespace | quote }}
   annotations:
     # create hook dependencies in the right order
@@ -51,11 +56,13 @@ metadata:
     {{- include "capsule.crds.annotations" . | nindent 4 }}
   labels:
     app.kubernetes.io/component: {{ include "capsule.crds.component" . | quote }}
-    {{- include "capsule.labels" . | nindent 4 }}
+    app.kubernetes.io/name: {{ include "capsule.crds.component" . | quote }}
+    {{- include "capsule.selectorLabelInstance" . | nindent 4 }}
+    {{- include "capsule.baselabels" . | nindent 4 }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: {{ include "capsule.crds.name" . }}
+  name: capsule:{{ .Release.Name }}:crds
 subjects:
   - kind: ServiceAccount
     name: {{ include "capsule.crds.name" . }}

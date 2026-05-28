@@ -1,19 +1,26 @@
-- Capsule Operator Helm Chart deployed:
+✅ Capsule Operator Helm Chart deployed:
 
    # Check the capsule logs
-   $ kubectl logs -f deployment/{{ template "capsule.fullname" . }}-controller-manager -c manager -n {{ .Release.Namespace }}
-
+   kubectl logs -f deployment/{{ template "capsule.fullname" . }}-controller-manager -c manager -n {{ .Release.Namespace }}
 
    # Check the capsule logs
-   $ kubectl logs -f deployment/{{ template "capsule.fullname" . }}-controller-manager -c manager -n {{ .Release.Namespace }}
+   kubectl logs -f deployment/{{ template "capsule.fullname" . }}-controller-manager -c manager -n {{ .Release.Namespace }}
 
-- Manage this chart:
+👉 Consult resources on how to enhance the installation of Project Capsule based on your needs:
+
+   📄 Production Setup: https://projectcapsule.dev/docs/operating/setup/installation/#production
+
+   📄 Admission Policies: https://projectcapsule.dev/docs/operating/admission-policies/
+
+   📄 Capsule Proxy: https://projectcapsule.dev/docs/proxy/
+
+⏳ Manage this chart:
 
    # Upgrade Capsule
-   $ helm upgrade {{ .Release.Name }} -f <values.yaml> capsule -n {{ .Release.Namespace }}
+   helm upgrade {{ .Release.Name }} -f <values.yaml> capsule -n {{ .Release.Namespace }}
 
    # Show this status again
-   $ helm status {{ .Release.Name }} -n {{ .Release.Namespace }}
+   helm status {{ .Release.Name }} -n {{ .Release.Namespace }}
 
    # Uninstall Capsule
-   $ helm uninstall {{ .Release.Name }} -n {{ .Release.Namespace }}
+   helm uninstall {{ .Release.Name }} -n {{ .Release.Namespace }}

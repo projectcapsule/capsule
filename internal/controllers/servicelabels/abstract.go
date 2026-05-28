@@ -11,7 +11,6 @@ import (
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	apierr "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
@@ -22,6 +21,7 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
+	"github.com/projectcapsule/capsule/pkg/tenant"
 	"github.com/projectcapsule/capsule/pkg/utils"
 )
 
@@ -63,17 +63,6 @@ func (r *abstractServiceLabelsReconciler) Reconcile(ctx context.Context, request
 	})
 
 	return reconcile.Result{}, err
-}
-
-func (r *abstractServiceLabelsReconciler) IsNamespaceInTenant(ctx context.Context, namespace string) bool {
-	tl := &capsulev1beta2.TenantList{}
-	if err := r.client.List(ctx, tl, client.MatchingFieldsSelector{
-		Selector: fields.OneTermEqualSelector(".status.namespaces", namespace),
-	}); err != nil {
-		return false
-	}
-
-	return len(tl.Items) > 0
 }
 
 func (r *abstractServiceLabelsReconciler) getTenant(ctx context.Context, namespacedName types.NamespacedName, client client.Client) (*capsulev1beta2.Tenant, error) {
@@ -118,6 +107,11 @@ func (r *abstractServiceLabelsReconciler) sync(available map[string]string, tena
 
 func (r *abstractServiceLabelsReconciler) forOptionPerInstanceName(ctx context.Context) builder.ForOption {
 	return builder.WithPredicates(predicate.NewPredicateFuncs(func(object client.Object) bool {
-		return r.IsNamespaceInTenant(ctx, object.GetNamespace())
+		status, err := tenant.IsNamespaceInTenant(ctx, r.client, object.GetNamespace())
+		if err != nil {
+			r.log.Error(err, "failed resolving instances")
+		}
+
+		return status
 	}))
 }

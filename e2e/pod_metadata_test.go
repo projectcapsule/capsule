@@ -5,28 +5,32 @@ package e2e
 
 import (
 	"context"
-	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api/meta"
+	"github.com/projectcapsule/capsule/pkg/api/rbac"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
 
-var _ = Describe("adding metadata to Pod objects", Label("pod"), func() {
+var _ = Describe("adding metadata to Pod objects", Ordered, Label("pod"), func() {
 	tnt := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "pod-metadata",
+			Name: "e2e-pod-metadata",
+			Labels: map[string]string{
+				"env": "e2e",
+			},
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: api.OwnerListSpec{
+			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: api.CoreOwnerSpec{
-						UserSpec: api.UserSpec{
-							Name: "gatsby",
+					CoreOwnerSpec: rbac.CoreOwnerSpec{
+						UserSpec: rbac.UserSpec{
+							Name: "e2e-pod-metadata",
 							Kind: "User",
 						},
 					},
@@ -53,29 +57,35 @@ var _ = Describe("adding metadata to Pod objects", Label("pod"), func() {
 			tnt.ResourceVersion = ""
 			return k8sClient.Create(context.TODO(), tnt)
 		}).Should(Succeed())
+
+		TenantReady(tnt, metav1.ConditionTrue, defaultTimeoutInterval)
 	})
 
 	JustAfterEach(func() {
-		Expect(k8sClient.Delete(context.TODO(), tnt)).Should(Succeed())
+		EventuallyDeletion(tnt)
 	})
 
 	It("should apply them to Pod", func() {
-		ns := NewNamespace("")
+		ns := NewNamespace("", map[string]string{
+			meta.TenantLabel: tnt.GetName(),
+		})
 		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
-		fmt.Sprint("namespace created")
-		//TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
-		fmt.Sprint("tenant contains list namespace")
+		NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
+
 		pod := &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "pod-metadata",
 				Namespace: ns.GetName(),
 			},
+
 			Spec: corev1.PodSpec{
+				SecurityContext: nobodyPodSecurityContext(),
 				Containers: []corev1.Container{
 					{
 						Name:            "container",
 						Image:           "quay.io/google-containers/pause-amd64:3.0",
 						ImagePullPolicy: "IfNotPresent",
+						SecurityContext: restrictedContainerSecurityContext(),
 					},
 				},
 				RestartPolicy: "Always",

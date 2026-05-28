@@ -9,8 +9,8 @@ import (
 	"fmt"
 	"strconv"
 
-	"golang.org/x/sync/errgroup"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
@@ -19,7 +19,9 @@ import (
 )
 
 // Ensuring all the LimitRange are applied to each Namespace handled by the Tenant.
-func (r *Manager) syncLimitRanges(ctx context.Context, tenant *capsulev1beta2.Tenant) error { //nolint:dupl
+//
+
+func (r *Manager) syncLimitRanges(ctx context.Context, tenant *capsulev1beta2.Tenant) error {
 	// getting requested LimitRange keys
 	keys := make([]string, 0, len(tenant.Spec.LimitRanges.Items)) //nolint:staticcheck
 
@@ -28,17 +30,9 @@ func (r *Manager) syncLimitRanges(ctx context.Context, tenant *capsulev1beta2.Te
 		keys = append(keys, strconv.Itoa(i))
 	}
 
-	group := new(errgroup.Group)
-
-	for _, ns := range tenant.Status.Namespaces {
-		namespace := ns
-
-		group.Go(func() error {
-			return r.syncLimitRange(ctx, tenant, namespace, keys)
-		})
-	}
-
-	return group.Wait()
+	return runForTenantNamespaces(ctx, tenant, func(ctx context.Context, namespace string) error {
+		return r.syncLimitRange(ctx, tenant, namespace, keys)
+	})
 }
 
 func (r *Manager) syncLimitRange(ctx context.Context, tenant *capsulev1beta2.Tenant, namespace string, keys []string) (err error) {
@@ -47,7 +41,7 @@ func (r *Manager) syncLimitRange(ctx context.Context, tenant *capsulev1beta2.Ten
 	}
 
 	//nolint:staticcheck
-	for i, spec := range tenant.Spec.LimitRanges.Items { //nolint:dupl
+	for i, spec := range tenant.Spec.LimitRanges.Items {
 		target := &corev1.LimitRange{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      fmt.Sprintf("capsule-%s-%d", tenant.Name, i),
@@ -63,20 +57,34 @@ func (r *Manager) syncLimitRange(ctx context.Context, tenant *capsulev1beta2.Ten
 				labels = map[string]string{}
 			}
 
-			labels[meta.TenantLabel] = tenant.Name
+			labels[meta.NewManagedByCapsuleLabel] = meta.ValueController
+			labels[meta.NewTenantLabel] = tenant.Name
 			labels[meta.LimitRangeLabel] = strconv.Itoa(i)
+
+			// Remove Legacy labels
+			delete(labels, meta.TenantLabel)
 
 			target.SetLabels(labels)
 			target.Spec = spec
 
 			return controllerutil.SetControllerReference(tenant, target, r.Scheme())
 		})
-
-		r.Log.V(4).Info("LimitRange sync result: "+string(res), "name", target.Name, "namespace", target.Namespace)
-
 		if err != nil {
+			if apierrors.HasStatusCause(err, corev1.NamespaceTerminatingCause) {
+				r.Log.V(4).Info(
+					"skipping LimitRange sync because namespace is terminating",
+					"name", target.Name,
+					"namespace", target.Namespace,
+					"tenant", tenant.Name,
+				)
+
+				return nil
+			}
+
 			return err
 		}
+
+		r.Log.V(4).Info("LimitRange sync result: "+string(res), "name", target.Name, "namespace", target.Namespace)
 	}
 
 	return nil

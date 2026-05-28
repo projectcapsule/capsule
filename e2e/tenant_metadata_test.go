@@ -12,7 +12,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api/rbac"
 )
 
 func getLabels(tnt capsulev1beta2.Tenant) (map[string]string, error) {
@@ -24,20 +24,21 @@ func getLabels(tnt capsulev1beta2.Tenant) (map[string]string, error) {
 	return current.GetLabels(), nil
 }
 
-var _ = Describe("adding metadata to a Tenant", Label("tenant"), func() {
+var _ = Describe("adding metadata to a Tenant", Ordered, Label("tenant"), func() {
 	tnt := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "tenant-metadata",
+			Name: "e2e-tenant-metadata",
 			Labels: map[string]string{
 				"custom-label": "test",
+				"env":          "e2e",
 			},
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: api.OwnerListSpec{
+			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: api.CoreOwnerSpec{
-						UserSpec: api.UserSpec{
-							Name: "jim",
+					CoreOwnerSpec: rbac.CoreOwnerSpec{
+						UserSpec: rbac.UserSpec{
+							Name: "e2e-tenant-metadata",
 							Kind: "User",
 						},
 					},
@@ -49,16 +50,18 @@ var _ = Describe("adding metadata to a Tenant", Label("tenant"), func() {
 		EventuallyCreation(func() error {
 			return k8sClient.Create(context.TODO(), tnt)
 		}).Should(Succeed())
+
+		TenantReady(tnt, metav1.ConditionTrue, defaultTimeoutInterval)
 	})
 
 	JustAfterEach(func() {
-		Expect(k8sClient.Delete(context.TODO(), tnt)).Should(Succeed())
+		EventuallyDeletion(tnt)
 	})
 
 	It("Should ensure label metadata", func() {
 		By("Default labels", func() {
 			currentlabels, _ := getLabels(*tnt)
-			Expect(currentlabels["kubernetes.io/metadata.name"]).To(Equal("tenant-metadata"))
+			Expect(currentlabels["kubernetes.io/metadata.name"]).To(Equal(tnt.GetName()))
 			Expect(currentlabels["custom-label"]).To(Equal("test"))
 		})
 		By("Disallow name overwrite", func() {

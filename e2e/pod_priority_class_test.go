@@ -20,19 +20,24 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api/meta"
+	"github.com/projectcapsule/capsule/pkg/api/rbac"
 )
 
-var _ = Describe("enforcing a Priority Class", Label("pod", "classes"), func() {
+var _ = Describe("enforcing a Priority Class", Ordered, Label("pod", "classes", "priorityclass"), func() {
 	tntWithDefaults := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "priority-class-defaults",
+			Name: "e2e-priority-class-defaults",
+			Labels: map[string]string{
+				"env": "e2e",
+			},
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: api.OwnerListSpec{
+			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: api.CoreOwnerSpec{
-						UserSpec: api.UserSpec{
-							Name: "paul",
+					CoreOwnerSpec: rbac.CoreOwnerSpec{
+						UserSpec: rbac.UserSpec{
+							Name: "e2e-pod-priority-1",
 							Kind: "User",
 						},
 					},
@@ -43,7 +48,7 @@ var _ = Describe("enforcing a Priority Class", Label("pod", "classes"), func() {
 				SelectorAllowedListSpec: api.SelectorAllowedListSpec{
 					LabelSelector: metav1.LabelSelector{
 						MatchLabels: map[string]string{
-							"env": "customer",
+							"environment": "customer",
 						},
 					},
 				},
@@ -53,14 +58,17 @@ var _ = Describe("enforcing a Priority Class", Label("pod", "classes"), func() {
 
 	tntNoDefaults := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "priority-class-no-defaults",
+			Name: "e2e-priority-class-no-defaults",
+			Labels: map[string]string{
+				"env": "e2e",
+			},
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: api.OwnerListSpec{
+			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: api.CoreOwnerSpec{
-						UserSpec: api.UserSpec{
-							Name: "george",
+					CoreOwnerSpec: rbac.CoreOwnerSpec{
+						UserSpec: rbac.UserSpec{
+							Name: "e2e-pod-priority-2",
 							Kind: "User",
 						},
 					},
@@ -74,7 +82,7 @@ var _ = Describe("enforcing a Priority Class", Label("pod", "classes"), func() {
 					},
 					LabelSelector: metav1.LabelSelector{
 						MatchLabels: map[string]string{
-							"env": "customer",
+							"environment": "customer",
 						},
 					},
 				},
@@ -85,12 +93,15 @@ var _ = Describe("enforcing a Priority Class", Label("pod", "classes"), func() {
 	tntNoRestrictions := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "e2e-priority-class-no-restrictions",
+			Labels: map[string]string{
+				"env": "e2e",
+			},
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: []api.OwnerSpec{
+			Owners: []rbac.OwnerSpec{
 				{
-					CoreOwnerSpec: api.CoreOwnerSpec{
-						UserSpec: api.UserSpec{
+					CoreOwnerSpec: rbac.CoreOwnerSpec{
+						UserSpec: rbac.UserSpec{
 							Name: "e2e-priority-class-no-restrictions",
 							Kind: "User",
 						},
@@ -105,7 +116,8 @@ var _ = Describe("enforcing a Priority Class", Label("pod", "classes"), func() {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "tenant-default",
 			Labels: map[string]string{
-				"env": "e2e",
+				"environment": "shared",
+				"env":         "e2e",
 			},
 		},
 		Description:      "tenant default priorityclass",
@@ -118,7 +130,8 @@ var _ = Describe("enforcing a Priority Class", Label("pod", "classes"), func() {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "global-default",
 			Labels: map[string]string{
-				"env": "customer",
+				"environment": "customer",
+				"env":         "e2e",
 			},
 		},
 		Description:   "global default priorityclass",
@@ -130,7 +143,8 @@ var _ = Describe("enforcing a Priority Class", Label("pod", "classes"), func() {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "disallowed-global-default",
 			Labels: map[string]string{
-				"env": "e2e",
+				"environment": "internal",
+				"env":         "e2e",
 			},
 		},
 		Description:   "global default priorityclass",
@@ -142,7 +156,8 @@ var _ = Describe("enforcing a Priority Class", Label("pod", "classes"), func() {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "customer-bronze",
 			Labels: map[string]string{
-				"env": "customer",
+				"environment": "customer",
+				"env":         "e2e",
 			},
 		},
 		Description: "fake PriorityClass for e2e",
@@ -153,7 +168,8 @@ var _ = Describe("enforcing a Priority Class", Label("pod", "classes"), func() {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "customer-silver",
 			Labels: map[string]string{
-				"env": "e2e",
+				"environment": "internal",
+				"env":         "e2e",
 			},
 		},
 		Description: "fake PriorityClass for e2e",
@@ -164,7 +180,8 @@ var _ = Describe("enforcing a Priority Class", Label("pod", "classes"), func() {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "customer-gold",
 			Labels: map[string]string{
-				"env": "e2e",
+				"environment": "internal",
+				"env":         "e2e",
 			},
 		},
 		Description: "fake PriorityClass for e2e",
@@ -178,6 +195,8 @@ var _ = Describe("enforcing a Priority Class", Label("pod", "classes"), func() {
 
 				return k8sClient.Create(context.TODO(), tnt)
 			}).Should(Succeed())
+
+			TenantReady(tnt, metav1.ConditionTrue, defaultTimeoutInterval)
 		}
 
 		for _, crd := range []*schedulingv1.PriorityClass{customerBronze, customerSilver, customerGold} {
@@ -190,22 +209,34 @@ var _ = Describe("enforcing a Priority Class", Label("pod", "classes"), func() {
 
 	JustAfterEach(func() {
 		for _, tnt := range []*capsulev1beta2.Tenant{tntWithDefaults, tntNoDefaults, tntNoRestrictions} {
-			Expect(k8sClient.Delete(context.TODO(), tnt)).Should(Succeed())
+			EventuallyDeletion(tnt)
 		}
 
-		Eventually(func() (err error) {
-			req, _ := labels.NewRequirement("env", selection.Exists, nil)
+		req, err := labels.NewRequirement("env", selection.Equals, []string{"e2e"})
+		Expect(err).NotTo(HaveOccurred())
 
-			return k8sClient.DeleteAllOf(context.TODO(), &schedulingv1.PriorityClass{}, &client.DeleteAllOfOptions{
-				ListOptions: client.ListOptions{
-					LabelSelector: labels.NewSelector().Add(*req),
-				},
-			})
-		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		var list schedulingv1.PriorityClassList
+		Expect(k8sClient.List(
+			context.TODO(),
+			&list,
+			client.MatchingLabelsSelector{
+				Selector: labels.NewSelector().Add(*req),
+			},
+		)).Should(Succeed())
+
+		for i := range list.Items {
+			EventuallyDeletion(&list.Items[i])
+		}
 	})
 
-	It("should allow all classes", func() {
+	It("should allow all classes", Label("skip-on-openshift"), func() {
 		all := []string{"system-cluster-critical", "system-node-critical", customerBronze.GetName(), customerSilver.GetName(), customerGold.GetName()}
+
+		ns := NewNamespace("", map[string]string{
+			meta.TenantLabel: tntNoRestrictions.GetName(),
+		})
+		NamespaceCreation(ns, tntNoRestrictions.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+		NamespaceIsPartOfTenant(tntNoRestrictions, ns).Should(Succeed())
 
 		By("Verify Status (Creation)", func() {
 			Eventually(func() ([]string, error) {
@@ -223,10 +254,6 @@ var _ = Describe("enforcing a Priority Class", Label("pod", "classes"), func() {
 				Should(ConsistOf(all))
 		})
 
-		ns := NewNamespace("")
-		NamespaceCreation(ns, tntNoRestrictions.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
-		TenantNamespaceList(tntNoRestrictions, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
-
 		By("providing any priorityclass", func() {
 			for _, class := range all {
 				Eventually(func() (err error) {
@@ -237,13 +264,16 @@ var _ = Describe("enforcing a Priority Class", Label("pod", "classes"), func() {
 							Namespace: ns.GetName(),
 						},
 						Spec: corev1.PodSpec{
+							SecurityContext:   nobodyPodSecurityContext(),
+							PriorityClassName: class,
 							Containers: []corev1.Container{
 								{
-									Name:  "container",
-									Image: "quay.io/google-containers/pause-amd64:3.0",
+									Name:            "container",
+									Image:           "gcr.io/google_containers/pause-amd64:3.0",
+									ImagePullPolicy: corev1.PullIfNotPresent,
+									SecurityContext: restrictedContainerSecurityContext(),
 								},
 							},
-							PriorityClassName: class,
 						},
 					}
 
@@ -254,7 +284,7 @@ var _ = Describe("enforcing a Priority Class", Label("pod", "classes"), func() {
 
 		By("Verify Status (Deletion)", func() {
 			for _, crd := range []*schedulingv1.PriorityClass{customerGold} {
-				Expect(ignoreNotFound(k8sClient.Delete(context.TODO(), crd))).To(Succeed())
+				EventuallyDeletion(crd)
 			}
 			Eventually(func() ([]string, error) {
 				t := &capsulev1beta2.Tenant{}
@@ -272,22 +302,44 @@ var _ = Describe("enforcing a Priority Class", Label("pod", "classes"), func() {
 		})
 	})
 
-	It("should block non allowed Priority Class", func() {
-		ns := NewNamespace("")
+	It("should block non allowed Priority Class", Label("skip-on-openshift"), func() {
+		ns := NewNamespace("", map[string]string{
+			meta.TenantLabel: tntNoDefaults.GetName(),
+		})
 		NamespaceCreation(ns, tntNoDefaults.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+		NamespaceIsPartOfTenant(tntNoDefaults, ns).Should(Succeed())
+
+		By("Verify Status", func() {
+			Eventually(func() ([]string, error) {
+				t := &capsulev1beta2.Tenant{}
+				if err := k8sClient.Get(
+					context.TODO(),
+					types.NamespacedName{Name: tntNoDefaults.GetName()},
+					t,
+				); err != nil {
+					return nil, err
+				}
+
+				return t.Status.Classes.PriorityClasses, nil
+			}, defaultTimeoutInterval, defaultPollInterval).
+				Should(ConsistOf(customerGold.GetName(), customerBronze.GetName(), customerSilver.GetName()))
+		})
 
 		pod := &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "container",
 			},
 			Spec: corev1.PodSpec{
+				SecurityContext:   nobodyPodSecurityContext(),
+				PriorityClassName: "system-node-critical",
 				Containers: []corev1.Container{
 					{
-						Name:  "container",
-						Image: "quay.io/google-containers/pause-amd64:3.0",
+						Name:            "container",
+						Image:           "gcr.io/google_containers/pause-amd64:3.0",
+						ImagePullPolicy: corev1.PullIfNotPresent,
+						SecurityContext: restrictedContainerSecurityContext(),
 					},
 				},
-				PriorityClassName: "system-node-critical",
 			},
 		}
 
@@ -305,7 +357,8 @@ var _ = Describe("enforcing a Priority Class", Label("pod", "classes"), func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: priorityName,
 					Labels: map[string]string{
-						"env": "internal",
+						"environment": "internal",
+						"env":         "e2e",
 					},
 				},
 				Description: "fake PriorityClass for e2e",
@@ -318,29 +371,58 @@ var _ = Describe("enforcing a Priority Class", Label("pod", "classes"), func() {
 					Name: pc,
 				},
 				Spec: corev1.PodSpec{
+					SecurityContext:   nobodyPodSecurityContext(),
+					PriorityClassName: class.GetName(),
 					Containers: []corev1.Container{
 						{
-							Name:  "container",
-							Image: "quay.io/google-containers/pause-amd64:3.0",
+							Name:            "container",
+							Image:           "gcr.io/google_containers/pause-amd64:3.0",
+							ImagePullPolicy: corev1.PullIfNotPresent,
+							SecurityContext: restrictedContainerSecurityContext(),
 						},
 					},
-					PriorityClassName: class.GetName(),
 				},
 			}
 
-			ns := NewNamespace("")
+			ns := NewNamespace("", map[string]string{
+				meta.TenantLabel: tntNoDefaults.GetName(),
+			})
 			cs := ownerClient(tntNoDefaults.Spec.Owners[0].UserSpec)
 
 			NamespaceCreation(ns, tntNoDefaults.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
-			TenantNamespaceList(tntNoDefaults, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
+			NamespaceIsPartOfTenant(tntNoDefaults, ns).Should(Succeed())
+
+			By("Verify Status", func() {
+				Eventually(func() ([]string, error) {
+					t := &capsulev1beta2.Tenant{}
+					if err := k8sClient.Get(
+						context.TODO(),
+						types.NamespacedName{Name: tntNoDefaults.GetName()},
+						t,
+					); err != nil {
+						return nil, err
+					}
+
+					return t.Status.Classes.PriorityClasses, nil
+				}, defaultTimeoutInterval, defaultPollInterval).
+					Should(ConsistOf(customerGold.GetName(), customerBronze.GetName(), customerSilver.GetName()))
+			})
 
 			EventuallyCreation(func() error {
 				_, err := cs.CoreV1().Pods(ns.GetName()).Create(context.Background(), pod, metav1.CreateOptions{})
 				return err
 			}).ShouldNot(Succeed())
 		}
+	})
 
-		By("verify Status (Creation)", func() {
+	It("should allow exact match", func() {
+		ns := NewNamespace("", map[string]string{
+			meta.TenantLabel: tntNoDefaults.GetName(),
+		})
+		NamespaceCreation(ns, tntNoDefaults.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+		NamespaceIsPartOfTenant(tntNoDefaults, ns).Should(Succeed())
+
+		By("Verify Status", func() {
 			Eventually(func() ([]string, error) {
 				t := &capsulev1beta2.Tenant{}
 				if err := k8sClient.Get(
@@ -353,26 +435,24 @@ var _ = Describe("enforcing a Priority Class", Label("pod", "classes"), func() {
 
 				return t.Status.Classes.PriorityClasses, nil
 			}, defaultTimeoutInterval, defaultPollInterval).
-				Should(ConsistOf(customerGold.GetName(), customerBronze.GetName()))
+				Should(ConsistOf(customerGold.GetName(), customerBronze.GetName(), customerSilver.GetName()))
 		})
-	})
-
-	It("should allow exact match", func() {
-		ns := NewNamespace("")
-		NamespaceCreation(ns, tntNoDefaults.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 
 		pod := &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "container",
 			},
 			Spec: corev1.PodSpec{
+				SecurityContext:   nobodyPodSecurityContext(),
+				PriorityClassName: "customer-gold",
 				Containers: []corev1.Container{
 					{
-						Name:  "container",
-						Image: "quay.io/google-containers/pause-amd64:3.0",
+						Name:            "container",
+						Image:           "gcr.io/google_containers/pause-amd64:3.0",
+						ImagePullPolicy: corev1.PullIfNotPresent,
+						SecurityContext: restrictedContainerSecurityContext(),
 					},
 				},
-				PriorityClassName: "customer-gold",
 			},
 		}
 
@@ -383,9 +463,28 @@ var _ = Describe("enforcing a Priority Class", Label("pod", "classes"), func() {
 		}).Should(Succeed())
 	})
 
-	It("should allow regex match", func() {
-		ns := NewNamespace("")
+	It("should allow regex match", Label("skip-on-openshift"), func() {
+		ns := NewNamespace("", map[string]string{
+			meta.TenantLabel: tntNoDefaults.GetName(),
+		})
 		NamespaceCreation(ns, tntNoDefaults.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+		NamespaceIsPartOfTenant(tntNoDefaults, ns).Should(Succeed())
+
+		By("Verify Status", func() {
+			Eventually(func() ([]string, error) {
+				t := &capsulev1beta2.Tenant{}
+				if err := k8sClient.Get(
+					context.TODO(),
+					types.NamespacedName{Name: tntNoDefaults.GetName()},
+					t,
+				); err != nil {
+					return nil, err
+				}
+
+				return t.Status.Classes.PriorityClasses, nil
+			}, defaultTimeoutInterval, defaultPollInterval).
+				Should(ConsistOf(customerGold.GetName(), customerBronze.GetName(), customerSilver.GetName()))
+		})
 
 		for _, class := range []string{customerBronze.GetName(), customerSilver.GetName(), customerGold.GetName()} {
 			EventuallyCreation(func() error {
@@ -395,13 +494,16 @@ var _ = Describe("enforcing a Priority Class", Label("pod", "classes"), func() {
 						Namespace: ns.GetName(),
 					},
 					Spec: corev1.PodSpec{
+						SecurityContext:   nobodyPodSecurityContext(),
+						PriorityClassName: class,
 						Containers: []corev1.Container{
 							{
-								Name:  "container",
-								Image: "quay.io/google-containers/pause-amd64:3.0",
+								Name:            "container",
+								Image:           "gcr.io/google_containers/pause-amd64:3.0",
+								ImagePullPolicy: corev1.PullIfNotPresent,
+								SecurityContext: restrictedContainerSecurityContext(),
 							},
 						},
-						PriorityClassName: class,
 					},
 				}
 
@@ -418,7 +520,8 @@ var _ = Describe("enforcing a Priority Class", Label("pod", "classes"), func() {
 					ObjectMeta: metav1.ObjectMeta{
 						Name: priorityName,
 						Labels: map[string]string{
-							"env": "customer",
+							"environment": "customer",
+							"env":         "e2e",
 						},
 					},
 					Description: "fake PriorityClass for e2e",
@@ -426,26 +529,48 @@ var _ = Describe("enforcing a Priority Class", Label("pod", "classes"), func() {
 				}
 				Expect(k8sClient.Create(context.TODO(), class)).Should(Succeed())
 
+				ns := NewNamespace("", map[string]string{
+					meta.TenantLabel: tntNoDefaults.GetName(),
+				})
+
+				NamespaceCreation(ns, tntNoDefaults.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+				NamespaceIsPartOfTenant(tntNoDefaults, ns).Should(Succeed())
+
+				By("Verify Status", func() {
+					Eventually(func() ([]string, error) {
+						t := &capsulev1beta2.Tenant{}
+						if err := k8sClient.Get(
+							context.TODO(),
+							types.NamespacedName{Name: tntNoDefaults.GetName()},
+							t,
+						); err != nil {
+							return nil, err
+						}
+
+						return t.Status.Classes.PriorityClasses, nil
+					}, defaultTimeoutInterval, defaultPollInterval).
+						Should(ContainElement(class.GetName()))
+				})
+
 				pod := &corev1.Pod{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: pc,
 					},
 					Spec: corev1.PodSpec{
+						SecurityContext:   nobodyPodSecurityContext(),
+						PriorityClassName: class.GetName(),
 						Containers: []corev1.Container{
 							{
-								Name:  "container",
-								Image: "quay.io/google-containers/pause-amd64:3.0",
+								Name:            "container",
+								Image:           "gcr.io/google_containers/pause-amd64:3.0",
+								ImagePullPolicy: corev1.PullIfNotPresent,
+								SecurityContext: restrictedContainerSecurityContext(),
 							},
 						},
-						PriorityClassName: class.GetName(),
 					},
 				}
 
-				ns := NewNamespace("")
 				cs := ownerClient(tntNoDefaults.Spec.Owners[0].UserSpec)
-
-				NamespaceCreation(ns, tntNoDefaults.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
-				TenantNamespaceList(tntNoDefaults, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 				EventuallyCreation(func() error {
 					_, err := cs.CoreV1().Pods(ns.GetName()).Create(context.Background(), pod, metav1.CreateOptions{})
@@ -467,7 +592,7 @@ var _ = Describe("enforcing a Priority Class", Label("pod", "classes"), func() {
 
 				return t.Status.Classes.PriorityClasses, nil
 			}, defaultTimeoutInterval, defaultPollInterval).
-				Should(ConsistOf("internal-bronze-new-0", "internal-silver-new-1", "internal-gold-new-2", customerGold.GetName(), customerBronze.GetName()))
+				Should(ConsistOf("internal-bronze-new-0", "internal-silver-new-1", "internal-gold-new-2", customerGold.GetName(), customerBronze.GetName(), customerSilver.GetName()))
 		})
 	})
 
@@ -478,20 +603,41 @@ var _ = Describe("enforcing a Priority Class", Label("pod", "classes"), func() {
 					Name: "tenant-default",
 				},
 				Spec: corev1.PodSpec{
+					SecurityContext: nobodyPodSecurityContext(),
 					Containers: []corev1.Container{
 						{
-							Name:  "container",
-							Image: "quay.io/google-containers/pause-amd64:3.0",
+							Name:            "container",
+							Image:           "gcr.io/google_containers/pause-amd64:3.0",
+							ImagePullPolicy: corev1.PullIfNotPresent,
+							SecurityContext: restrictedContainerSecurityContext(),
 						},
 					},
 				},
 			}
 
-			ns := NewNamespace("")
+			ns := NewNamespace("", map[string]string{
+				meta.TenantLabel: tntWithDefaults.GetName(),
+			})
 			cs := ownerClient(tntWithDefaults.Spec.Owners[0].UserSpec)
 
 			NamespaceCreation(ns, tntWithDefaults.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
-			TenantNamespaceList(tntWithDefaults, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
+			NamespaceIsPartOfTenant(tntWithDefaults, ns).Should(Succeed())
+
+			By("verify Status (Creation)", func() {
+				Eventually(func() ([]string, error) {
+					t := &capsulev1beta2.Tenant{}
+					if err := k8sClient.Get(
+						context.TODO(),
+						types.NamespacedName{Name: tntWithDefaults.GetName()},
+						t,
+					); err != nil {
+						return nil, err
+					}
+
+					return t.Status.Classes.PriorityClasses, nil
+				}, defaultTimeoutInterval, defaultPollInterval).
+					Should(ConsistOf(customerBronze.GetName()))
+			})
 
 			EventuallyCreation(func() error {
 				_, err := cs.CoreV1().Pods(ns.GetName()).Create(context.Background(), pod, metav1.CreateOptions{})
@@ -499,33 +645,35 @@ var _ = Describe("enforcing a Priority Class", Label("pod", "classes"), func() {
 				return err
 			}).ShouldNot(Succeed())
 		})
-
-		By("verify Status (Creation)", func() {
-			Eventually(func() ([]string, error) {
-				t := &capsulev1beta2.Tenant{}
-				if err := k8sClient.Get(
-					context.TODO(),
-					types.NamespacedName{Name: tntWithDefaults.GetName()},
-					t,
-				); err != nil {
-					return nil, err
-				}
-
-				return t.Status.Classes.PriorityClasses, nil
-			}, defaultTimeoutInterval, defaultPollInterval).
-				Should(ConsistOf(customerBronze.GetName()))
-		})
 	})
 
-	It("should mutate to default tenant PriorityClass", func() {
+	It("should mutate to default tenant PriorityClass", Label("skip-on-openshift"), func() {
 		By("creating default tenant class", func() {
 			class := tenantDefault.DeepCopy()
 			class.SetResourceVersion("")
 			Expect(k8sClient.Create(context.TODO(), class)).Should(Succeed())
 
-			ns := NewNamespace("")
+			ns := NewNamespace("", map[string]string{
+				meta.TenantLabel: tntWithDefaults.GetName(),
+			})
 			NamespaceCreation(ns, tntWithDefaults.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
-			TenantNamespaceList(tntWithDefaults, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
+			NamespaceIsPartOfTenant(tntWithDefaults, ns).Should(Succeed())
+
+			By("verify Status (Creation)", func() {
+				Eventually(func() ([]string, error) {
+					t := &capsulev1beta2.Tenant{}
+					if err := k8sClient.Get(
+						context.TODO(),
+						types.NamespacedName{Name: tntWithDefaults.GetName()},
+						t,
+					); err != nil {
+						return nil, err
+					}
+
+					return t.Status.Classes.PriorityClasses, nil
+				}, defaultTimeoutInterval, defaultPollInterval).
+					Should(ConsistOf(tenantDefault.GetName(), customerBronze.GetName()))
+			})
 
 			pod := corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
@@ -533,10 +681,13 @@ var _ = Describe("enforcing a Priority Class", Label("pod", "classes"), func() {
 					Namespace: ns.GetName(),
 				},
 				Spec: corev1.PodSpec{
+					SecurityContext: nobodyPodSecurityContext(),
 					Containers: []corev1.Container{
 						{
-							Name:  "container",
-							Image: "quay.io/google-containers/pause-amd64:3.0",
+							Name:            "container",
+							Image:           "gcr.io/google_containers/pause-amd64:3.0",
+							ImagePullPolicy: corev1.PullIfNotPresent,
+							SecurityContext: restrictedContainerSecurityContext(),
 						},
 					},
 				},
@@ -550,25 +701,9 @@ var _ = Describe("enforcing a Priority Class", Label("pod", "classes"), func() {
 			Expect(pod.Spec.Priority).To(Equal(&class.Value))
 			Expect(pod.Spec.PreemptionPolicy).To(Equal(class.PreemptionPolicy))
 		})
-
-		By("verify Status (Creation)", func() {
-			Eventually(func() ([]string, error) {
-				t := &capsulev1beta2.Tenant{}
-				if err := k8sClient.Get(
-					context.TODO(),
-					types.NamespacedName{Name: tntWithDefaults.GetName()},
-					t,
-				); err != nil {
-					return nil, err
-				}
-
-				return t.Status.Classes.PriorityClasses, nil
-			}, defaultTimeoutInterval, defaultPollInterval).
-				Should(ConsistOf(tenantDefault.GetName(), customerBronze.GetName()))
-		})
 	})
 
-	It("should mutate to default tenant PriorityClass although the cluster global one is not allowed", func() {
+	It("should mutate to default tenant PriorityClass although the cluster global one is not allowed", Label("skip-on-openshift"), func() {
 		class := tenantDefault.DeepCopy()
 		class.SetResourceVersion("")
 
@@ -578,32 +713,11 @@ var _ = Describe("enforcing a Priority Class", Label("pod", "classes"), func() {
 		Expect(k8sClient.Create(context.TODO(), class)).Should(Succeed())
 		Expect(k8sClient.Create(context.TODO(), global)).Should(Succeed())
 
-		ns := NewNamespace("")
+		ns := NewNamespace("", map[string]string{
+			meta.TenantLabel: tntWithDefaults.GetName(),
+		})
 		NamespaceCreation(ns, tntWithDefaults.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
-		TenantNamespaceList(tntWithDefaults, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
-
-		pod := &corev1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "tenant-default-global-default",
-				Namespace: ns.GetName(),
-			},
-			Spec: corev1.PodSpec{
-				Containers: []corev1.Container{
-					{
-						Name:  "container",
-						Image: "quay.io/google-containers/pause-amd64:3.0",
-					},
-				},
-			},
-		}
-
-		EventuallyCreation(func() error {
-			return k8sClient.Create(context.Background(), pod)
-		}).Should(Succeed())
-		// Check if correct applied
-		Expect(pod.Spec.PriorityClassName).To(Equal(class.GetName()))
-		Expect(pod.Spec.Priority).To(Equal(&class.Value))
-		Expect(pod.Spec.PreemptionPolicy).To(Equal(class.PreemptionPolicy))
+		NamespaceIsPartOfTenant(tntWithDefaults, ns).Should(Succeed())
 
 		By("verify Status (Creation)", func() {
 			Eventually(func() ([]string, error) {
@@ -620,31 +734,20 @@ var _ = Describe("enforcing a Priority Class", Label("pod", "classes"), func() {
 			}, defaultTimeoutInterval, defaultPollInterval).
 				Should(ConsistOf(tenantDefault.GetName(), customerBronze.GetName()))
 		})
-	})
-
-	It("should mutate to default tenant PriorityClass although the cluster global one is allowed", func() {
-		class := tenantDefault.DeepCopy()
-		class.SetResourceVersion("")
-		Expect(k8sClient.Create(context.TODO(), class)).Should(Succeed())
-
-		global := globalDefault.DeepCopy()
-		global.SetResourceVersion("")
-		Expect(k8sClient.Create(context.TODO(), global)).Should(Succeed())
-
-		ns := NewNamespace("")
-		NamespaceCreation(ns, tntWithDefaults.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
-		TenantNamespaceList(tntWithDefaults, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
 
 		pod := &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      "tenant-default-allowed",
+				Name:      "tenant-default-global-default",
 				Namespace: ns.GetName(),
 			},
 			Spec: corev1.PodSpec{
+				SecurityContext: nobodyPodSecurityContext(),
 				Containers: []corev1.Container{
 					{
-						Name:  "container",
-						Image: "quay.io/google-containers/pause-amd64:3.0",
+						Name:            "container",
+						Image:           "gcr.io/google_containers/pause-amd64:3.0",
+						ImagePullPolicy: corev1.PullIfNotPresent,
+						SecurityContext: restrictedContainerSecurityContext(),
 					},
 				},
 			},
@@ -653,9 +756,27 @@ var _ = Describe("enforcing a Priority Class", Label("pod", "classes"), func() {
 		EventuallyCreation(func() error {
 			return k8sClient.Create(context.Background(), pod)
 		}).Should(Succeed())
-		// Check if correctly applied
+
+		// Check if correct applied
 		Expect(pod.Spec.PriorityClassName).To(Equal(class.GetName()))
-		Expect(*pod.Spec.Priority).To(Equal(class.Value))
+		Expect(pod.Spec.Priority).To(Equal(&class.Value))
+		Expect(pod.Spec.PreemptionPolicy).To(Equal(class.PreemptionPolicy))
+	})
+
+	It("should mutate to default tenant PriorityClass although the cluster global one is allowed", Label("skip-on-openshift"), func() {
+		class := tenantDefault.DeepCopy()
+		class.SetResourceVersion("")
+		Expect(k8sClient.Create(context.TODO(), class)).Should(Succeed())
+
+		global := globalDefault.DeepCopy()
+		global.SetResourceVersion("")
+		Expect(k8sClient.Create(context.TODO(), global)).Should(Succeed())
+
+		ns := NewNamespace("", map[string]string{
+			meta.TenantLabel: tntWithDefaults.GetName(),
+		})
+		NamespaceCreation(ns, tntWithDefaults.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+		NamespaceIsPartOfTenant(tntWithDefaults, ns).Should(Succeed())
 
 		By("verify Status (Creation)", func() {
 			Eventually(func() ([]string, error) {
@@ -672,5 +793,30 @@ var _ = Describe("enforcing a Priority Class", Label("pod", "classes"), func() {
 			}, defaultTimeoutInterval, defaultPollInterval).
 				Should(ConsistOf(global.GetName(), tenantDefault.GetName(), customerBronze.GetName()))
 		})
+
+		pod := &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "tenant-default-allowed",
+				Namespace: ns.GetName(),
+			},
+			Spec: corev1.PodSpec{
+				SecurityContext: nobodyPodSecurityContext(),
+				Containers: []corev1.Container{
+					{
+						Name:            "container",
+						Image:           "gcr.io/google_containers/pause-amd64:3.0",
+						ImagePullPolicy: corev1.PullIfNotPresent,
+						SecurityContext: restrictedContainerSecurityContext(),
+					},
+				},
+			},
+		}
+
+		EventuallyCreation(func() error {
+			return k8sClient.Create(context.Background(), pod)
+		}).Should(Succeed())
+		// Check if correctly applied
+		Expect(pod.Spec.PriorityClassName).To(Equal(class.GetName()))
+		Expect(*pod.Spec.Priority).To(Equal(class.Value))
 	})
 })

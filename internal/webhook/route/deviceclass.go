@@ -18,5 +18,5 @@ func (w *deviceClass) GetHandlers() []handlers.Handler {
 }
 
 func (w *deviceClass) GetPath() string {
-	return "/devices"
+	return "/devices/validating"
 }

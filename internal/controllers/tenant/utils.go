@@ -5,90 +5,74 @@ package tenant
 
 import (
 	"context"
+	"errors"
+	"fmt"
 
+	"golang.org/x/sync/errgroup"
+	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/client-go/util/workqueue"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/event"
-	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/utils"
 )
 
-func (r *Manager) statusOnlyHandlerClasses(
-	fn func(ctx context.Context, perTenant func(context.Context, *capsulev1beta2.Tenant) error) error,
-	perTenant func(context.Context, *capsulev1beta2.Tenant) error,
-	errMsg string,
-) *handler.TypedFuncs[client.Object, reconcile.Request] {
-	return &handler.TypedFuncs[client.Object, reconcile.Request]{
-		CreateFunc: func(
-			ctx context.Context,
-			_ event.TypedCreateEvent[client.Object],
-			_ workqueue.TypedRateLimitingInterface[reconcile.Request],
-		) {
-			if err := fn(ctx, perTenant); err != nil {
-				r.Log.Error(err, errMsg)
-			}
-		},
-		UpdateFunc: func(
-			ctx context.Context,
-			_ event.TypedUpdateEvent[client.Object],
-			_ workqueue.TypedRateLimitingInterface[reconcile.Request],
-		) {
-			if err := fn(ctx, perTenant); err != nil {
-				r.Log.Error(err, errMsg)
-			}
-		},
-		DeleteFunc: func(
-			ctx context.Context,
-			_ event.TypedDeleteEvent[client.Object],
-			_ workqueue.TypedRateLimitingInterface[reconcile.Request],
-		) {
-			if err := fn(ctx, perTenant); err != nil {
-				r.Log.Error(err, errMsg)
-			}
-		},
-	}
-}
+func readyTenantNamespaces(tnt *capsulev1beta2.Tenant) []string {
+	namespaces := make([]string, 0, len(tnt.Status.Spaces))
 
-func (r *Manager) enqueueTenantsForTenantOwner(
-	ctx context.Context,
-	tenantOwner client.Object,
-	q workqueue.TypedRateLimitingInterface[reconcile.Request],
-) {
-	var tenants capsulev1beta2.TenantList
-	if err := r.List(ctx, &tenants); err != nil {
-		r.Log.Error(err, "failed to list Tenants for Tenant Owner event")
-
-		return
-	}
-
-	owner, ok := tenantOwner.(*capsulev1beta2.TenantOwner)
-	if !ok {
-		return
-	}
-
-	for i := range tenants.Items {
-		tnt := &tenants.Items[i]
-
-		if _, found := tnt.Status.Owners.FindOwner(
-			owner.Spec.Name,
-			owner.Spec.Kind,
-		); !found {
+	for _, ns := range tnt.Status.Spaces {
+		ready := ns.Conditions.GetConditionByType(meta.ReadyCondition)
+		if ready != nil && ready.Status != metav1.ConditionTrue {
 			continue
 		}
 
-		q.Add(reconcile.Request{
-			NamespacedName: types.NamespacedName{
-				Name: tnt.Name,
-			},
+		terminating := ns.Conditions.GetConditionByType(meta.TerminatingCondition)
+		if terminating != nil && terminating.Status == metav1.ConditionTrue {
+			continue
+		}
+
+		namespaces = append(namespaces, ns.Name)
+	}
+
+	return namespaces
+}
+
+func runForTenantNamespaces(
+	ctx context.Context,
+	tnt *capsulev1beta2.Tenant,
+	fn func(context.Context, string) error,
+) error {
+	errs := make(chan error, len(tnt.Status.Spaces))
+	group := new(errgroup.Group)
+
+	for _, namespace := range readyTenantNamespaces(tnt) {
+		group.Go(func() error {
+			if err := fn(ctx, namespace); err != nil {
+				errs <- fmt.Errorf("namespace %q: %w", namespace, err)
+			}
+
+			return nil
 		})
 	}
+
+	_ = group.Wait()
+
+	close(errs)
+
+	var joined []error
+	for err := range errs {
+		joined = append(joined, err)
+	}
+
+	return errors.Join(joined...)
 }
 
 func (r *Manager) enqueueForTenantsWithCondition(
@@ -171,12 +155,27 @@ func (r *Manager) pruningResources(ctx context.Context, ns string, keys []string
 	r.Log.V(4).Info("pruning objects with label selector " + selector.String())
 
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-		return r.DeleteAllOf(ctx, obj, &client.DeleteAllOfOptions{
+		err := r.DeleteAllOf(ctx, obj, &client.DeleteAllOfOptions{
 			ListOptions: client.ListOptions{
 				LabelSelector: selector,
 				Namespace:     ns,
 			},
 			DeleteOptions: client.DeleteOptions{},
 		})
+		if err != nil {
+			if apierrors.IsNotFound(err) || apierrors.HasStatusCause(err, corev1.NamespaceTerminatingCause) {
+				r.Log.V(4).Info(
+					"skipping pruning because target namespace or object is gone/terminating",
+					"namespace", ns,
+					"labelSelector", selector.String(),
+				)
+
+				return nil
+			}
+
+			return err
+		}
+
+		return nil
 	})
 }

@@ -1,0 +1,95 @@
+// Copyright 2020-2023 Project Capsule Authors.
+// SPDX-License-Identifier: Apache-2.0
+
+package e2e
+
+import (
+	"context"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/utils/ptr"
+
+	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api/meta"
+	"github.com/projectcapsule/capsule/pkg/api/rbac"
+)
+
+var _ = Describe("creating a LoadBalancer service when it is enabled for Tenant", Ordered, Label("tenant", "networking", "service"), func() {
+	tnt := &capsulev1beta2.Tenant{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "e2e-loadbalancer-service",
+			Labels: map[string]string{
+				"env": "e2e",
+			},
+		},
+		Spec: capsulev1beta2.TenantSpec{
+			Owners: rbac.OwnerListSpec{
+				{
+					CoreOwnerSpec: rbac.CoreOwnerSpec{
+						UserSpec: rbac.UserSpec{
+							Name: "e2e-loadbalancer-service",
+							Kind: "User",
+						},
+					},
+				},
+			},
+			ServiceOptions: &api.ServiceOptions{
+				AllowedServices: &api.AllowedServices{
+					LoadBalancer: ptr.To(true),
+				},
+			},
+		},
+	}
+
+	JustBeforeEach(func() {
+		EventuallyCreation(func() error {
+			return k8sClient.Create(context.TODO(), tnt)
+		}).Should(Succeed())
+
+		TenantReady(tnt, metav1.ConditionTrue, defaultTimeoutInterval)
+	})
+
+	JustAfterEach(func() {
+		EventuallyDeletion(tnt)
+	})
+
+	It("should succeed creating a service with LoadBalancer type", func() {
+		ns := NewNamespace("", map[string]string{
+			meta.TenantLabel: tnt.GetName(),
+		})
+		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+		NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
+
+		EventuallyCreation(func() error {
+			svc := &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "enable-loadbalancer-service",
+					Namespace: ns.GetName(),
+				},
+				Spec: corev1.ServiceSpec{
+					Type: corev1.ServiceTypeLoadBalancer,
+					Ports: []corev1.ServicePort{
+						{
+							Port: 9999,
+							TargetPort: intstr.IntOrString{
+								Type:   intstr.Int,
+								IntVal: 9999,
+							},
+							Protocol: corev1.ProtocolTCP,
+						},
+					},
+				},
+			}
+
+			cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
+			_, err := cs.CoreV1().Services(ns.Name).Create(context.Background(), svc, metav1.CreateOptions{})
+
+			return err
+		}).Should(Succeed())
+	})
+})

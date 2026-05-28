@@ -12,16 +12,15 @@ import (
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	networkingv1 "k8s.io/api/networking/v1"
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
-	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	"github.com/projectcapsule/capsule/internal/webhook/utils"
 	"github.com/projectcapsule/capsule/pkg/api"
 	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
+	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
@@ -36,57 +35,81 @@ func Collision(configuration configuration.Configuration) handlers.Handler {
 	return &collision{configuration: configuration}
 }
 
-func (r *collision) OnCreate(client client.Client, decoder admission.Decoder, recorder events.EventRecorder) handlers.Func {
+func (r *collision) OnCreate(
+	c client.Client,
+	_ client.Reader,
+	decoder admission.Decoder,
+	recorder events.EventRecorder,
+) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		return r.validate(ctx, client, req, decoder, recorder)
+		return r.validate(ctx, c, req, decoder, recorder)
 	}
 }
 
-func (r *collision) OnUpdate(client client.Client, decoder admission.Decoder, recorder events.EventRecorder) handlers.Func {
+func (r *collision) OnUpdate(
+	c client.Client,
+	_ client.Reader,
+	decoder admission.Decoder,
+	recorder events.EventRecorder,
+) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		return r.validate(ctx, client, req, decoder, recorder)
+		return r.validate(ctx, c, req, decoder, recorder)
 	}
 }
 
-func (r *collision) OnDelete(client.Client, admission.Decoder, events.EventRecorder) handlers.Func {
+func (r *collision) OnDelete(
+	client.Client,
+	client.Reader,
+	admission.Decoder,
+	events.EventRecorder,
+) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (r *collision) validate(ctx context.Context, client client.Client, req admission.Request, decoder admission.Decoder, recorder events.EventRecorder) *admission.Response {
+func (r *collision) validate(
+	ctx context.Context,
+	reader client.Client,
+	req admission.Request,
+	decoder admission.Decoder,
+	recorder events.EventRecorder,
+) *admission.Response {
 	ing, err := FromRequest(req, decoder)
 	if err != nil {
-		return utils.ErroredResponse(err)
+		return ad.ErroredResponse(err)
 	}
 
-	var tenant *capsulev1beta2.Tenant
+	var tnt *capsulev1beta2.Tenant
 
-	tenant, err = TenantFromIngress(ctx, client, ing)
+	tnt, err = TenantFromIngress(ctx, reader, ing)
 	if err != nil {
-		return utils.ErroredResponse(err)
+		return ad.ErroredResponse(err)
 	}
 
-	if tenant == nil || tenant.Spec.IngressOptions.HostnameCollisionScope == api.HostnameCollisionScopeDisabled {
+	if tnt == nil || tnt.Spec.IngressOptions.HostnameCollisionScope == api.HostnameCollisionScopeDisabled {
 		return nil
 	}
 
-	if err = r.validateCollision(ctx, client, ing, tenant.Spec.IngressOptions.HostnameCollisionScope); err == nil {
+	if err = r.validateCollision(ctx, reader, ing, tnt.Spec.IngressOptions.HostnameCollisionScope); err == nil {
 		return nil
 	}
 
 	var collisionErr *caperrors.IngressHostnameCollisionError
 	if errors.As(err, &collisionErr) {
-		recorder.Eventf(tenant, nil, corev1.EventTypeWarning, evt.ReasonIngressHostnameCollision, evt.ActionValidationDenied, "Ingress %s/%s hostname is colliding", ing.Namespace(), ing.Name())
+		recorder.Eventf(ing.GetClientObject(), tnt, corev1.EventTypeWarning, evt.ReasonIngressHostnameCollision, evt.ActionValidationDenied, "Ingress %s/%s hostname is colliding", ing.Namespace(), ing.Name())
 	}
 
-	response := admission.Denied(err.Error())
-
-	return &response
+	return ad.Deny(err.Error())
 }
 
 //nolint:gocognit,gocyclo,cyclop
-func (r *collision) validateCollision(ctx context.Context, clt client.Client, ing Ingress, scope api.HostnameCollisionScope) error {
+func (r *collision) validateCollision(
+	ctx context.Context,
+	reader client.Reader,
+	ing Ingress,
+	scope api.HostnameCollisionScope,
+) error {
 	for hostname, paths := range ing.HostnamePathsPairs() {
 		for path := range paths {
 			var ingressObjList client.ObjectList
@@ -105,7 +128,7 @@ func (r *collision) validateCollision(ctx context.Context, clt client.Client, in
 			switch scope {
 			case api.HostnameCollisionScopeCluster:
 				tenantList := &capsulev1beta2.TenantList{}
-				if err := clt.List(ctx, tenantList); err != nil {
+				if err := reader.List(ctx, tenantList); err != nil {
 					return err
 				}
 
@@ -113,10 +136,8 @@ func (r *collision) validateCollision(ctx context.Context, clt client.Client, in
 					namespaces.Insert(tenant.Status.Namespaces...)
 				}
 			case api.HostnameCollisionScopeTenant:
-				selector := client.MatchingFieldsSelector{Selector: fields.OneTermEqualSelector(".status.namespaces", ing.Namespace())}
-
 				tenantList := &capsulev1beta2.TenantList{}
-				if err := clt.List(ctx, tenantList, selector); err != nil {
+				if err := reader.List(ctx, tenantList, client.MatchingFields{".status.namespaces": ing.Namespace()}); err != nil {
 					return err
 				}
 
@@ -127,9 +148,7 @@ func (r *collision) validateCollision(ctx context.Context, clt client.Client, in
 				namespaces.Insert(ing.Namespace())
 			}
 
-			fieldSelector := fields.OneTermEqualSelector(ingress.HostPathPair, fmt.Sprintf("%s;%s", hostname, path))
-
-			if err := clt.List(ctx, ingressObjList, client.MatchingFieldsSelector{Selector: fieldSelector}); err != nil {
+			if err := reader.List(ctx, ingressObjList, client.MatchingFields{ingress.HostPathPair: fmt.Sprintf("%s;%s", hostname, path)}); err != nil {
 				return err
 			}
 

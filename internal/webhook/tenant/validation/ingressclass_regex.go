@@ -13,19 +13,25 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	"github.com/projectcapsule/capsule/internal/webhook/utils"
+	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
 
 type ingressClassRegexHandler struct{}
 
-func IngressClassRegexHandler() handlers.Handler {
+func IngressClassRegexHandler() handlers.TypedHandler[*capsulev1beta2.Tenant] {
 	return &ingressClassRegexHandler{}
 }
 
-func (h *ingressClassRegexHandler) OnCreate(_ client.Client, decoder admission.Decoder, _ events.EventRecorder) handlers.Func {
+func (h *ingressClassRegexHandler) OnCreate(
+	_ client.Client,
+	_ client.Reader,
+	tnt *capsulev1beta2.Tenant,
+	_ admission.Decoder,
+	_ events.EventRecorder,
+) handlers.Func {
 	return func(_ context.Context, req admission.Request) *admission.Response {
-		if response := h.validate(decoder, req); response != nil {
+		if response := h.validate(tnt, req); response != nil {
 			return response
 		}
 
@@ -33,15 +39,28 @@ func (h *ingressClassRegexHandler) OnCreate(_ client.Client, decoder admission.D
 	}
 }
 
-func (h *ingressClassRegexHandler) OnDelete(client.Client, admission.Decoder, events.EventRecorder) handlers.Func {
+func (h *ingressClassRegexHandler) OnDelete(
+	client.Client,
+	client.Reader,
+	*capsulev1beta2.Tenant,
+	admission.Decoder,
+	events.EventRecorder,
+) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (h *ingressClassRegexHandler) OnUpdate(_ client.Client, decoder admission.Decoder, _ events.EventRecorder) handlers.Func {
+func (h *ingressClassRegexHandler) OnUpdate(
+	_ client.Client,
+	_ client.Reader,
+	tnt *capsulev1beta2.Tenant,
+	old *capsulev1beta2.Tenant,
+	decoder admission.Decoder,
+	_ events.EventRecorder,
+) handlers.Func {
 	return func(_ context.Context, req admission.Request) *admission.Response {
-		if err := h.validate(decoder, req); err != nil {
+		if err := h.validate(tnt, req); err != nil {
 			return err
 		}
 
@@ -49,18 +68,11 @@ func (h *ingressClassRegexHandler) OnUpdate(_ client.Client, decoder admission.D
 	}
 }
 
-func (h *ingressClassRegexHandler) validate(decoder admission.Decoder, req admission.Request) *admission.Response {
-	tenant := &capsulev1beta2.Tenant{}
-	if err := decoder.Decode(req, tenant); err != nil {
-		return utils.ErroredResponse(err)
-	}
-
+func (h *ingressClassRegexHandler) validate(tnt *capsulev1beta2.Tenant, req admission.Request) *admission.Response {
 	//nolint:staticcheck
-	if tenant.Spec.IngressOptions.AllowedClasses != nil && len(tenant.Spec.IngressOptions.AllowedClasses.Regex) > 0 {
-		if _, err := regexp.Compile(tenant.Spec.IngressOptions.AllowedClasses.Regex); err != nil {
-			response := admission.Denied("unable to compile ingressClasses allowedRegex")
-
-			return &response
+	if tnt.Spec.IngressOptions.AllowedClasses != nil && len(tnt.Spec.IngressOptions.AllowedClasses.Regex) > 0 {
+		if _, err := regexp.Compile(tnt.Spec.IngressOptions.AllowedClasses.Regex); err != nil {
+			return ad.Deny("unable to compile ingressClasses allowedRegex")
 		}
 	}
 

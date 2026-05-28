@@ -10,14 +10,13 @@ import (
 	"net/http"
 
 	"github.com/go-logr/logr"
-	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	"github.com/projectcapsule/capsule/internal/webhook/utils"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
+	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
 
@@ -29,43 +28,61 @@ func ClaimMutationHandler(log logr.Logger) handlers.Handler {
 	return &claimMutationHandler{log: log}
 }
 
-func (h *claimMutationHandler) OnUpdate(c client.Client, decoder admission.Decoder, _ events.EventRecorder) handlers.Func {
+func (h *claimMutationHandler) OnUpdate(
+	c client.Client,
+	_ client.Reader,
+	decoder admission.Decoder,
+	_ events.EventRecorder,
+) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		return h.handle(ctx, req, decoder, c)
+		return h.handle(ctx, c, req, decoder, h.handleReleaseAnnotation)
 	}
 }
 
-func (h *claimMutationHandler) OnDelete(client.Client, admission.Decoder, events.EventRecorder) handlers.Func {
+func (h *claimMutationHandler) OnDelete(
+	client.Client,
+	client.Reader,
+	admission.Decoder,
+	events.EventRecorder,
+) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
 	}
 }
 
-func (h *claimMutationHandler) OnCreate(c client.Client, decoder admission.Decoder, _ events.EventRecorder) handlers.Func {
+func (h *claimMutationHandler) OnCreate(
+	c client.Client,
+	_ client.Reader,
+	decoder admission.Decoder,
+	_ events.EventRecorder,
+) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		return h.handle(ctx, req, decoder, c)
+		return h.handle(ctx, c, req, decoder, func(claim *capsulev1beta2.ResourcePoolClaim) {
+			meta.ReleaseAnnotationRemove(claim)
+		})
 	}
 }
 
 func (h *claimMutationHandler) handle(
 	ctx context.Context,
+	c client.Client,
 	req admission.Request,
 	decoder admission.Decoder,
-	c client.Client,
+	annoHandler func(c *capsulev1beta2.ResourcePoolClaim),
 ) *admission.Response {
 	claim := &capsulev1beta2.ResourcePoolClaim{}
 
 	if err := decoder.Decode(req, claim); err != nil {
-		return utils.ErroredResponse(fmt.Errorf("failed to decode new object: %w", err))
+		return ad.ErroredResponse(fmt.Errorf("failed to decode new object: %w", err))
 	}
+
+	annoHandler(claim)
 
 	if err := h.autoAssignPools(ctx, c, claim); err != nil {
 		response := admission.Errored(http.StatusInternalServerError, err)
 
 		return &response
 	}
-
-	h.handleReleaseAnnotation(claim)
 
 	marshaled, err := json.Marshal(claim)
 	if err != nil {
@@ -87,7 +104,7 @@ func (h *claimMutationHandler) handleReleaseAnnotation(
 		return
 	}
 
-	if !claim.IsBoundToResourcePool() {
+	if !claim.IsBoundInResourcePool() {
 		return
 	}
 
@@ -104,9 +121,7 @@ func (h *claimMutationHandler) autoAssignPools(
 	}
 
 	poolList := &capsulev1beta2.ResourcePoolList{}
-	if err := c.List(ctx, poolList, client.MatchingFieldsSelector{
-		Selector: fields.OneTermEqualSelector(".status.namespaces", claim.Namespace),
-	}); err != nil {
+	if err := c.List(ctx, poolList, client.MatchingFields{".status.namespaces": claim.Namespace}); err != nil {
 		return err
 	}
 

@@ -15,23 +15,27 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	"github.com/projectcapsule/capsule/internal/webhook/utils"
 	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api/rbac"
+	"github.com/projectcapsule/capsule/pkg/utils"
 )
 
-var _ = Describe("modifying node labels and annotations", Label("config", "nodes"), func() {
+var _ = Describe("modifying node labels and annotations", Ordered, Label("config", "nodes"), func() {
 	originConfig := &capsulev1beta2.CapsuleConfiguration{}
 
 	tnt := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "tenant-node-user-metadata-forbidden",
+			Name: "e2e-node-user-metadata-forbidden",
+			Labels: map[string]string{
+				"env": "e2e",
+			},
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: api.OwnerListSpec{
+			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: api.CoreOwnerSpec{
-						UserSpec: api.UserSpec{
-							Name: "gatsby",
+					CoreOwnerSpec: rbac.CoreOwnerSpec{
+						UserSpec: rbac.UserSpec{
+							Name: "e2e-node-user-metadata-forbidden",
 							Kind: "User",
 						},
 					},
@@ -66,7 +70,7 @@ var _ = Describe("modifying node labels and annotations", Label("config", "nodes
 			{
 				Kind:     rbacv1.UserKind,
 				APIGroup: rbacv1.GroupName,
-				Name:     "gatsby",
+				Name:     "e2e-node-user-metadata-forbidden",
 			},
 		},
 	}
@@ -85,6 +89,8 @@ var _ = Describe("modifying node labels and annotations", Label("config", "nodes
 			tnt.ResourceVersion = ""
 			return k8sClient.Create(context.TODO(), tnt)
 		}).Should(Succeed())
+		TenantReady(tnt, metav1.ConditionTrue, defaultTimeoutInterval)
+
 		EventuallyCreation(func() error {
 			cr.ResourceVersion = ""
 			return k8sClient.Create(context.TODO(), cr)
@@ -95,9 +101,10 @@ var _ = Describe("modifying node labels and annotations", Label("config", "nodes
 		}).Should(Succeed())
 	})
 	JustAfterEach(func() {
-		Expect(k8sClient.Delete(context.TODO(), tnt)).Should(Succeed())
-		Expect(k8sClient.Delete(context.TODO(), crb)).Should(Succeed())
-		Expect(k8sClient.Delete(context.TODO(), cr)).Should(Succeed())
+		EventuallyDeletion(tnt)
+		EventuallyDeletion(crb)
+		EventuallyDeletion(cr)
+
 		EventuallyCreation(func() error {
 			return ModifyNode(func(node *corev1.Node) error {
 				annotations := node.GetAnnotations()

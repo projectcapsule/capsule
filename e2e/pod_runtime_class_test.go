@@ -19,21 +19,26 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api/meta"
+	"github.com/projectcapsule/capsule/pkg/api/rbac"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 )
 
-var _ = Describe("enforcing a Runtime Class", Label("pod", "classes", "current"), func() {
+var _ = Describe("enforcing a Runtime Class", Ordered, Label("pod", "classes", "runtimeclass"), func() {
 	tntWithDefault := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "e2e-runtime-selection",
+			Labels: map[string]string{
+				"env": "e2e",
+			},
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: api.OwnerListSpec{
+			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: api.CoreOwnerSpec{
-						UserSpec: api.UserSpec{
-							Name: "george",
+					CoreOwnerSpec: rbac.CoreOwnerSpec{
+						UserSpec: rbac.UserSpec{
+							Name: "e2e-runtimeclass-1",
 							Kind: "User",
 						},
 					},
@@ -48,7 +53,7 @@ var _ = Describe("enforcing a Runtime Class", Label("pod", "classes", "current")
 					},
 					LabelSelector: metav1.LabelSelector{
 						MatchLabels: map[string]string{
-							"env": "customers",
+							"environment": "customers",
 						},
 					},
 				},
@@ -59,13 +64,16 @@ var _ = Describe("enforcing a Runtime Class", Label("pod", "classes", "current")
 	tntNoRestrictions := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "e2e-runtime-no-restrictions",
+			Labels: map[string]string{
+				"env": "e2e",
+			},
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: []api.OwnerSpec{
+			Owners: []rbac.OwnerSpec{
 				{
-					CoreOwnerSpec: api.CoreOwnerSpec{
-						UserSpec: api.UserSpec{
-							Name: "e2e-gateway-no-restrictions",
+					CoreOwnerSpec: rbac.CoreOwnerSpec{
+						UserSpec: rbac.UserSpec{
+							Name: "e2e-runtimeclass-2",
 							Kind: "User",
 						},
 					},
@@ -78,8 +86,9 @@ var _ = Describe("enforcing a Runtime Class", Label("pod", "classes", "current")
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "default-runtime",
 			Labels: map[string]string{
-				"name": "default-runtime",
-				"env":  "customers",
+				"name":        "default-runtime",
+				"environment": "customers",
+				"env":         "e2e",
 			},
 		},
 		Handler: "custom-handler",
@@ -89,7 +98,8 @@ var _ = Describe("enforcing a Runtime Class", Label("pod", "classes", "current")
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "legacy",
 			Labels: map[string]string{
-				"env": "e2e",
+				"environment": "disallowed",
+				"env":         "e2e",
 			},
 		},
 		Handler: "custom-handler",
@@ -99,7 +109,8 @@ var _ = Describe("enforcing a Runtime Class", Label("pod", "classes", "current")
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "disallowed",
 			Labels: map[string]string{
-				"env": "e2e",
+				"environment": "disallowed",
+				"env":         "e2e",
 			},
 		},
 		Handler: "custom-handler",
@@ -109,8 +120,9 @@ var _ = Describe("enforcing a Runtime Class", Label("pod", "classes", "current")
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "customer-containerd",
 			Labels: map[string]string{
-				"name": "customer-containerd",
-				"env":  "customers",
+				"name":        "customer-containerd",
+				"environment": "customers",
+				"env":         "e2e",
 			},
 		},
 		Handler: "custom-handler",
@@ -120,8 +132,9 @@ var _ = Describe("enforcing a Runtime Class", Label("pod", "classes", "current")
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "customer-virt",
 			Labels: map[string]string{
-				"name": "customer-virt",
-				"env":  "customers",
+				"name":        "customer-virt",
+				"environment": "customers",
+				"env":         "e2e",
 			},
 		},
 		Handler: "custom-handler",
@@ -144,7 +157,10 @@ var _ = Describe("enforcing a Runtime Class", Label("pod", "classes", "current")
 			EventuallyCreation(func() error {
 				return k8sClient.Create(context.TODO(), tnt)
 			}).Should(Succeed())
+
+			TenantReady(tnt, metav1.ConditionTrue, defaultTimeoutInterval)
 		}
+
 		for _, crd := range []*nodev1.RuntimeClass{legacy, disallowed, customerUni, customerKubevirt, customerContainerd} {
 			Eventually(func() error {
 				crd.ResourceVersion = ""
@@ -155,24 +171,34 @@ var _ = Describe("enforcing a Runtime Class", Label("pod", "classes", "current")
 	JustAfterEach(func() {
 
 		for _, tnt := range []*capsulev1beta2.Tenant{tntWithDefault, tntNoRestrictions} {
-			EventuallyCreation(func() error {
-				return ignoreNotFound(k8sClient.Delete(context.TODO(), tnt))
-			}).Should(Succeed())
+			EventuallyDeletion(tnt)
 		}
 
-		Eventually(func() (err error) {
-			req, _ := labels.NewRequirement("env", selection.Exists, nil)
+		req, err := labels.NewRequirement("env", selection.Equals, []string{"e2e"})
+		Expect(err).NotTo(HaveOccurred())
 
-			return k8sClient.DeleteAllOf(context.TODO(), &nodev1.RuntimeClass{}, &client.DeleteAllOfOptions{
-				ListOptions: client.ListOptions{
-					LabelSelector: labels.NewSelector().Add(*req),
-				},
-			})
-		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		var list nodev1.RuntimeClassList
+		Expect(k8sClient.List(
+			context.TODO(),
+			&list,
+			client.MatchingLabelsSelector{
+				Selector: labels.NewSelector().Add(*req),
+			},
+		)).Should(Succeed())
+
+		for i := range list.Items {
+			EventuallyDeletion(&list.Items[i])
+		}
 	})
 
-	It("should allow all classes", func() {
+	It("should allow all classes", Label("skip-on-openshift"), func() {
 		all := []string{customerUni.GetName(), customerKubevirt.GetName(), customerContainerd.GetName(), legacy.GetName(), disallowed.GetName()}
+
+		ns := NewNamespace("", map[string]string{
+			meta.TenantLabel: tntNoRestrictions.GetName(),
+		})
+		NamespaceCreation(ns, tntNoRestrictions.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+		NamespaceIsPartOfTenant(tntNoRestrictions, ns).Should(Succeed())
 
 		By("Verify Status (Creation)", func() {
 			Eventually(func() ([]string, error) {
@@ -190,10 +216,6 @@ var _ = Describe("enforcing a Runtime Class", Label("pod", "classes", "current")
 				Should(ConsistOf(all))
 		})
 
-		ns := NewNamespace("")
-		NamespaceCreation(ns, tntNoRestrictions.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
-		TenantNamespaceList(tntNoRestrictions, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
-
 		By("providing any runtimeclass", func() {
 			for _, class := range all {
 				Eventually(func() (err error) {
@@ -204,13 +226,16 @@ var _ = Describe("enforcing a Runtime Class", Label("pod", "classes", "current")
 							Namespace: ns.GetName(),
 						},
 						Spec: corev1.PodSpec{
+							SecurityContext:  nobodyPodSecurityContext(),
+							RuntimeClassName: &class,
 							Containers: []corev1.Container{
 								{
-									Name:  "container",
-									Image: "quay.io/google-containers/pause-amd64:3.0",
+									Name:            "container",
+									Image:           "gcr.io/google_containers/pause-amd64:3.0",
+									ImagePullPolicy: corev1.PullIfNotPresent,
+									SecurityContext: restrictedContainerSecurityContext(),
 								},
 							},
-							RuntimeClassName: &class,
 						},
 					}
 
@@ -221,8 +246,9 @@ var _ = Describe("enforcing a Runtime Class", Label("pod", "classes", "current")
 
 		By("Verify Status (Deletion)", func() {
 			for _, crd := range []*nodev1.RuntimeClass{customerKubevirt} {
-				Expect(ignoreNotFound(k8sClient.Delete(context.TODO(), crd))).To(Succeed())
+				EventuallyDeletion(crd)
 			}
+
 			Eventually(func() ([]string, error) {
 				t := &capsulev1beta2.Tenant{}
 				if err := k8sClient.Get(
@@ -241,21 +267,43 @@ var _ = Describe("enforcing a Runtime Class", Label("pod", "classes", "current")
 
 	It("should block non allowed Runtime Class", func() {
 		By("blocked disallowed runtime", func() {
-			ns := NewNamespace("rt-disallow")
+			ns := NewNamespace("rt-disallow", map[string]string{
+				meta.TenantLabel: tntWithDefault.GetName(),
+			})
 			NamespaceCreation(ns, tntWithDefault.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+			NamespaceIsPartOfTenant(tntWithDefault, ns).Should(Succeed())
+
+			By("verify status", func() {
+				Eventually(func() ([]string, error) {
+					t := &capsulev1beta2.Tenant{}
+					if err := k8sClient.Get(
+						context.TODO(),
+						types.NamespacedName{Name: tntWithDefault.GetName()},
+						t,
+					); err != nil {
+						return nil, err
+					}
+
+					return t.Status.Classes.RuntimeClasses, nil
+				}, defaultTimeoutInterval, defaultPollInterval).
+					Should(ConsistOf(customerContainerd.GetName(), customerKubevirt.GetName(), legacy.GetName()))
+			})
 
 			pod := &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "container",
 				},
 				Spec: corev1.PodSpec{
+					SecurityContext:  nobodyPodSecurityContext(),
+					RuntimeClassName: &disallowed.Name,
 					Containers: []corev1.Container{
 						{
-							Name:  "container",
-							Image: "quay.io/google-containers/pause-amd64:3.0",
+							Name:            "container",
+							Image:           "gcr.io/google_containers/pause-amd64:3.0",
+							ImagePullPolicy: corev1.PullIfNotPresent,
+							SecurityContext: restrictedContainerSecurityContext(),
 						},
 					},
-					RuntimeClassName: &disallowed.Name,
 				},
 			}
 
@@ -265,6 +313,14 @@ var _ = Describe("enforcing a Runtime Class", Label("pod", "classes", "current")
 				return err
 			}).ShouldNot(Succeed())
 		})
+	})
+
+	It("should allow exact match", func() {
+		ns := NewNamespace("rt-exact-match", map[string]string{
+			meta.TenantLabel: tntWithDefault.GetName(),
+		})
+		NamespaceCreation(ns, tntWithDefault.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+		NamespaceIsPartOfTenant(tntWithDefault, ns).Should(Succeed())
 
 		By("verify status", func() {
 			Eventually(func() ([]string, error) {
@@ -281,23 +337,22 @@ var _ = Describe("enforcing a Runtime Class", Label("pod", "classes", "current")
 			}, defaultTimeoutInterval, defaultPollInterval).
 				Should(ConsistOf(customerContainerd.GetName(), customerKubevirt.GetName(), legacy.GetName()))
 		})
-	})
 
-	It("should allow exact match", func() {
-		ns := NewNamespace("rt-exact-match")
-		NamespaceCreation(ns, tntWithDefault.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 		pod := &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "container",
 			},
 			Spec: corev1.PodSpec{
+				SecurityContext:  nobodyPodSecurityContext(),
+				RuntimeClassName: &legacy.Name,
 				Containers: []corev1.Container{
 					{
-						Name:  "container",
-						Image: "quay.io/google-containers/pause-amd64:3.0",
+						Name:            "container",
+						Image:           "gcr.io/google_containers/pause-amd64:3.0",
+						ImagePullPolicy: corev1.PullIfNotPresent,
+						SecurityContext: restrictedContainerSecurityContext(),
 					},
 				},
-				RuntimeClassName: &legacy.Name,
 			},
 		}
 
@@ -309,33 +364,73 @@ var _ = Describe("enforcing a Runtime Class", Label("pod", "classes", "current")
 	})
 
 	It("should allow regex match", func() {
-		ns := NewNamespace("rc-regex-match")
-
+		ns := NewNamespace("rc-regex-match", map[string]string{
+			meta.TenantLabel: tntWithDefault.GetName(),
+		})
 		NamespaceCreation(ns, tntWithDefault.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+		NamespaceIsPartOfTenant(tntWithDefault, ns).Should(Succeed())
+
+		By("verify status", func() {
+			Eventually(func() ([]string, error) {
+				t := &capsulev1beta2.Tenant{}
+				if err := k8sClient.Get(
+					context.TODO(),
+					types.NamespacedName{Name: tntWithDefault.GetName()},
+					t,
+				); err != nil {
+					return nil, err
+				}
+
+				return t.Status.Classes.RuntimeClasses, nil
+			}, defaultTimeoutInterval, defaultPollInterval).
+				Should(ConsistOf(customerContainerd.GetName(), customerKubevirt.GetName(), legacy.GetName()))
+		})
 
 		for i, rt := range []string{"hardened-crio", "hardened-containerd", "hardened-dockerd"} {
 			runtimeName := strings.Join([]string{rt, "-", strconv.Itoa(i)}, "")
 			runtime := &nodev1.RuntimeClass{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: runtimeName,
+					Labels: map[string]string{
+						"env": "e2e",
+					},
 				},
 				Handler: "custom-handler",
 			}
 
 			Expect(k8sClient.Create(context.TODO(), runtime)).Should(Succeed())
 
+			By("verify status", func() {
+				Eventually(func() ([]string, error) {
+					t := &capsulev1beta2.Tenant{}
+					if err := k8sClient.Get(
+						context.TODO(),
+						types.NamespacedName{Name: tntWithDefault.GetName()},
+						t,
+					); err != nil {
+						return nil, err
+					}
+
+					return t.Status.Classes.RuntimeClasses, nil
+				}, defaultTimeoutInterval, defaultPollInterval).
+					Should(ContainElement(runtime.GetName()))
+			})
+
 			pod := &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: rt,
 				},
 				Spec: corev1.PodSpec{
+					SecurityContext:  nobodyPodSecurityContext(),
+					RuntimeClassName: &runtimeName,
 					Containers: []corev1.Container{
 						{
-							Name:  "container",
-							Image: "quay.io/google-containers/pause-amd64:3.0",
+							Name:            "container",
+							Image:           "gcr.io/google_containers/pause-amd64:3.0",
+							ImagePullPolicy: corev1.PullIfNotPresent,
+							SecurityContext: restrictedContainerSecurityContext(),
 						},
 					},
-					RuntimeClassName: &runtimeName,
 				},
 			}
 
@@ -346,14 +441,16 @@ var _ = Describe("enforcing a Runtime Class", Label("pod", "classes", "current")
 				return err
 			}).Should(Succeed())
 
-			Expect(k8sClient.Delete(context.TODO(), runtime)).Should(Succeed())
+			EventuallyDeletion(runtime)
 		}
 	})
 
 	It("should allow selector match", func() {
-		ns := NewNamespace("rc-selector-match")
-
+		ns := NewNamespace("rc-selector-match", map[string]string{
+			meta.TenantLabel: tntWithDefault.GetName(),
+		})
 		NamespaceCreation(ns, tntWithDefault.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+		NamespaceIsPartOfTenant(tntWithDefault, ns).Should(Succeed())
 
 		for i, rt := range []string{"customer-containerd", "customer-crio", "customer-dockerd"} {
 			runtimeName := strings.Join([]string{rt, "-", strconv.Itoa(i)}, "")
@@ -361,8 +458,9 @@ var _ = Describe("enforcing a Runtime Class", Label("pod", "classes", "current")
 				ObjectMeta: metav1.ObjectMeta{
 					Name: runtimeName,
 					Labels: map[string]string{
-						"name": runtimeName,
-						"env":  "customers",
+						"name":        runtimeName,
+						"env":         "e2e",
+						"environment": "customers",
 					},
 				},
 				Handler: "custom-handler",
@@ -370,18 +468,37 @@ var _ = Describe("enforcing a Runtime Class", Label("pod", "classes", "current")
 
 			Expect(k8sClient.Create(context.TODO(), runtime)).Should(Succeed())
 
+			By("verify status", func() {
+				Eventually(func() ([]string, error) {
+					t := &capsulev1beta2.Tenant{}
+					if err := k8sClient.Get(
+						context.TODO(),
+						types.NamespacedName{Name: tntWithDefault.GetName()},
+						t,
+					); err != nil {
+						return nil, err
+					}
+
+					return t.Status.Classes.RuntimeClasses, nil
+				}, defaultTimeoutInterval, defaultPollInterval).
+					Should(ContainElement(runtime.GetName()))
+			})
+
 			pod := &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: rt,
 				},
 				Spec: corev1.PodSpec{
+					SecurityContext:  nobodyPodSecurityContext(),
+					RuntimeClassName: &runtimeName,
 					Containers: []corev1.Container{
 						{
-							Name:  "container",
-							Image: "quay.io/google-containers/pause-amd64:3.0",
+							Name:            "container",
+							Image:           "gcr.io/google_containers/pause-amd64:3.0",
+							ImagePullPolicy: corev1.PullIfNotPresent,
+							SecurityContext: restrictedContainerSecurityContext(),
 						},
 					},
-					RuntimeClassName: &runtimeName,
 				},
 			}
 
@@ -411,11 +528,29 @@ var _ = Describe("enforcing a Runtime Class", Label("pod", "classes", "current")
 	})
 
 	It("should auto assign the default", func() {
-		ns := NewNamespace("rc-default")
-
+		ns := NewNamespace("rc-default", map[string]string{
+			meta.TenantLabel: tntWithDefault.GetName(),
+		})
 		NamespaceCreation(ns, tntWithDefault.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+		NamespaceIsPartOfTenant(tntWithDefault, ns).Should(Succeed())
 
 		Expect(k8sClient.Create(context.TODO(), defaultRuntime)).Should(Succeed())
+
+		By("verify status", func() {
+			Eventually(func() ([]string, error) {
+				t := &capsulev1beta2.Tenant{}
+				if err := k8sClient.Get(
+					context.TODO(),
+					types.NamespacedName{Name: tntWithDefault.GetName()},
+					t,
+				); err != nil {
+					return nil, err
+				}
+
+				return t.Status.Classes.RuntimeClasses, nil
+			}, defaultTimeoutInterval, defaultPollInterval).
+				Should(ConsistOf(defaultRuntime.GetName(), customerContainerd.GetName(), customerKubevirt.GetName(), legacy.GetName()))
+		})
 
 		pod := corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
@@ -423,10 +558,13 @@ var _ = Describe("enforcing a Runtime Class", Label("pod", "classes", "current")
 				Namespace: ns.Name,
 			},
 			Spec: corev1.PodSpec{
+				SecurityContext: nobodyPodSecurityContext(),
 				Containers: []corev1.Container{
 					{
-						Name:  "container",
-						Image: "quay.io/google-containers/pause-amd64:3.0",
+						Name:            "container",
+						Image:           "gcr.io/google_containers/pause-amd64:3.0",
+						ImagePullPolicy: corev1.PullIfNotPresent,
+						SecurityContext: restrictedContainerSecurityContext(),
 					},
 				},
 			},
@@ -445,21 +583,5 @@ var _ = Describe("enforcing a Runtime Class", Label("pod", "classes", "current")
 		Expect(createdPod.Spec.RuntimeClassName).NotTo(BeNil())
 		_, err := Equal(createdPod.Spec.RuntimeClassName).Match(tntWithDefault.Spec.RuntimeClasses.Default)
 		Expect(err).NotTo(HaveOccurred())
-
-		By("verify status", func() {
-			Eventually(func() ([]string, error) {
-				t := &capsulev1beta2.Tenant{}
-				if err := k8sClient.Get(
-					context.TODO(),
-					types.NamespacedName{Name: tntWithDefault.GetName()},
-					t,
-				); err != nil {
-					return nil, err
-				}
-
-				return t.Status.Classes.RuntimeClasses, nil
-			}, defaultTimeoutInterval, defaultPollInterval).
-				Should(ConsistOf(defaultRuntime.GetName(), customerContainerd.GetName(), customerKubevirt.GetName(), legacy.GetName()))
-		})
 	})
 })

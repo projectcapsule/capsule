@@ -1,7 +1,7 @@
 // Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package cert
+package cert_test
 
 import (
 	"bytes"
@@ -12,14 +12,16 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+
+	"github.com/projectcapsule/capsule/pkg/runtime/cert"
 )
 
 func TestNewCertificateAuthorityFromBytes(t *testing.T) {
-	var ca *CapsuleCA
+	var ca *cert.CapsuleCA
 
 	var err error
 
-	ca, err = GenerateCertificateAuthority()
+	ca, err = cert.GenerateCertificateAuthority()
 	assert.Nil(t, err)
 
 	var crt *bytes.Buffer
@@ -30,7 +32,7 @@ func TestNewCertificateAuthorityFromBytes(t *testing.T) {
 	key, err = ca.CAPrivateKeyPem()
 	assert.Nil(t, err)
 
-	_, err = NewCertificateAuthorityFromBytes(crt.Bytes(), key.Bytes())
+	_, err = cert.NewCertificateAuthorityFromBytes(crt.Bytes(), key.Bytes())
 	assert.Nil(t, err)
 }
 
@@ -44,17 +46,17 @@ func TestCapsuleCa_GenerateCertificate(t *testing.T) {
 		"SAN":     {[]string{"capsule-webhook-service.capsule-system.svc", "capsule-webhook-service.capsule-system.default.cluster"}},
 	} {
 		t.Run(name, func(t *testing.T) {
-			var ca *CapsuleCA
+			var ca *cert.CapsuleCA
 			var err error
 
 			e := time.Now().AddDate(1, 0, 0)
 
-			ca, err = GenerateCertificateAuthority()
+			ca, err = cert.GenerateCertificateAuthority()
 			assert.Nil(t, err)
 
 			var crt *bytes.Buffer
 			var key *bytes.Buffer
-			crt, key, err = ca.GenerateCertificate(NewCertOpts(e, c.dnsNames...))
+			crt, key, err = ca.GenerateCertificate(cert.NewCertOpts(e, c.dnsNames...))
 			assert.Nil(t, err)
 
 			var b *pem.Block

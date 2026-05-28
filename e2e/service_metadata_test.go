@@ -20,20 +20,25 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api/meta"
+	"github.com/projectcapsule/capsule/pkg/api/rbac"
 	"github.com/projectcapsule/capsule/pkg/utils"
 )
 
-var _ = Describe("adding metadata to Service objects", Label("tenant", "service"), func() {
+var _ = Describe("adding metadata to Service objects", Ordered, Label("tenant", "networking", "service"), func() {
 	tnt := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "service-metadata",
+			Name: "e2e-service-metadata",
+			Labels: map[string]string{
+				"env": "e2e",
+			},
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Owners: api.OwnerListSpec{
+			Owners: rbac.OwnerListSpec{
 				{
-					CoreOwnerSpec: api.CoreOwnerSpec{
-						UserSpec: api.UserSpec{
-							Name: "gatsby",
+					CoreOwnerSpec: rbac.CoreOwnerSpec{
+						UserSpec: rbac.UserSpec{
+							Name: "e2e-service-metadata",
 							Kind: "User",
 						},
 					},
@@ -60,16 +65,20 @@ var _ = Describe("adding metadata to Service objects", Label("tenant", "service"
 			tnt.ResourceVersion = ""
 			return k8sClient.Create(context.TODO(), tnt)
 		}).Should(Succeed())
+
+		TenantReady(tnt, metav1.ConditionTrue, defaultTimeoutInterval)
 	})
 
 	JustAfterEach(func() {
-		Expect(k8sClient.Delete(context.TODO(), tnt)).Should(Succeed())
+		EventuallyDeletion(tnt)
 	})
 
 	It("should apply them to Service", func() {
-		ns := NewNamespace("")
+		ns := NewNamespace("", map[string]string{
+			meta.TenantLabel: tnt.GetName(),
+		})
 		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
-		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
+		NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
 
 		svc := &corev1.Service{
 			ObjectMeta: metav1.ObjectMeta{
@@ -150,9 +159,12 @@ var _ = Describe("adding metadata to Service objects", Label("tenant", "service"
 			}
 		}
 
-		ns := NewNamespace("")
+		ns := NewNamespace("", map[string]string{
+			meta.TenantLabel: tnt.GetName(),
+		})
 		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
-		TenantNamespaceList(tnt, defaultTimeoutInterval).Should(ContainElement(ns.GetName()))
+		NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
+
 		// Waiting for the reconciliation of required RBAC
 		EventuallyCreation(func() (err error) {
 			pod := &corev1.Pod{
@@ -160,10 +172,12 @@ var _ = Describe("adding metadata to Service objects", Label("tenant", "service"
 					Name: "container",
 				},
 				Spec: corev1.PodSpec{
+					SecurityContext: nobodyPodSecurityContext(),
 					Containers: []corev1.Container{
 						{
-							Name:  "container",
-							Image: "quay.io/google-containers/pause-amd64:3.0",
+							Name:            "container",
+							Image:           "quay.io/google-containers/pause-amd64:3.0",
+							SecurityContext: restrictedContainerSecurityContext(),
 						},
 					},
 				},

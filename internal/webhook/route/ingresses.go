@@ -18,5 +18,5 @@ func (w *ingress) GetHandlers() []handlers.Handler {
 }
 
 func (w *ingress) GetPath() string {
-	return "/ingresses"
+	return "/ingresses/validating"
 }

@@ -1,0 +1,91 @@
+// Copyright 2020-2023 Project Capsule Authors.
+// SPDX-License-Identifier: Apache-2.0
+
+package e2e
+
+import (
+	"context"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/api/meta"
+	"github.com/projectcapsule/capsule/pkg/api/rbac"
+)
+
+var _ = Describe("creating a Namespace with a protected Namespace regex enabled", Ordered, Label("config", "namespace"), func() {
+	originConfig := &capsulev1beta2.CapsuleConfiguration{}
+
+	tnt := &capsulev1beta2.Tenant{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "e2e-protected-namespace",
+			Labels: map[string]string{
+				"env": "e2e",
+			},
+		},
+		Spec: capsulev1beta2.TenantSpec{
+			Owners: rbac.OwnerListSpec{
+				{
+					CoreOwnerSpec: rbac.CoreOwnerSpec{
+						UserSpec: rbac.UserSpec{
+							Name: "e2e-protected-namespace",
+							Kind: "User",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	JustBeforeEach(func() {
+		Expect(k8sClient.Get(context.Background(), client.ObjectKey{Name: defaultConfigurationName}, originConfig)).To(Succeed())
+
+		EventuallyCreation(func() error {
+			tnt.ResourceVersion = ""
+			return k8sClient.Create(context.TODO(), tnt)
+		}).Should(Succeed())
+		TenantReady(tnt, metav1.ConditionTrue, defaultTimeoutInterval)
+	})
+	JustAfterEach(func() {
+		EventuallyDeletion(tnt)
+
+		// Restore Configuration
+		Eventually(func() error {
+			c := &capsulev1beta2.CapsuleConfiguration{}
+			if err := k8sClient.Get(context.Background(), client.ObjectKey{Name: originConfig.Name}, c); err != nil {
+				return err
+			}
+			// Apply the initial configuration from originConfig to c
+			c.Spec = originConfig.Spec
+			return k8sClient.Update(context.Background(), c)
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+	})
+
+	It("should succeed and be available in Tenant namespaces list", func() {
+		ModifyCapsuleConfigurationOpts(func(configuration *capsulev1beta2.CapsuleConfiguration) {
+			configuration.Spec.ProtectedNamespaceRegexpString = `^.*[-.]system$`
+		})
+
+		ns := NewNamespace("e2e-protected-namespace-ok", map[string]string{
+			meta.TenantLabel: tnt.GetName(),
+		})
+
+		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+		NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
+	})
+
+	It("should fail using a value non matching the regex", func() {
+		ns := NewNamespace("e2e-protected-namespace-system", map[string]string{
+			meta.TenantLabel: tnt.GetName(),
+		})
+		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).ShouldNot(Succeed())
+		NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
+
+		ModifyCapsuleConfigurationOpts(func(configuration *capsulev1beta2.CapsuleConfiguration) {
+			configuration.Spec.ProtectedNamespaceRegexpString = ""
+		})
+	})
+})

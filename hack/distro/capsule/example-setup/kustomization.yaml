@@ -4,3 +4,6 @@ resources:
   - owners.yaml
   - tenants.yaml
   - resource.yaml
+  - pools.yaml
+  - rbac.yaml
+  - custom-quotas.yaml

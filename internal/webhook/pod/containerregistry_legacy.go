@@ -12,7 +12,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/pkg/api"
 	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
+	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
@@ -29,12 +31,13 @@ func ContainerRegistryLegacy(configuration configuration.Configuration) handlers
 }
 
 func (h *containerRegistryLegacyHandler) OnCreate(
-	c client.Client,
+	_ client.Client,
+	_ client.Reader,
 	pod *corev1.Pod,
-	decoder admission.Decoder,
+	_ admission.Decoder,
 	recorder events.EventRecorder,
 	tnt *capsulev1beta2.Tenant,
-	_ *capsulev1beta2.NamespaceRuleBody,
+	_ *api.NamespaceRuleBodyNamespace,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		return h.validate(req, pod, tnt, recorder)
@@ -42,13 +45,14 @@ func (h *containerRegistryLegacyHandler) OnCreate(
 }
 
 func (h *containerRegistryLegacyHandler) OnUpdate(
-	c client.Client,
+	_ client.Client,
+	_ client.Reader,
 	old *corev1.Pod,
 	pod *corev1.Pod,
-	decoder admission.Decoder,
+	_ admission.Decoder,
 	recorder events.EventRecorder,
 	tnt *capsulev1beta2.Tenant,
-	_ *capsulev1beta2.NamespaceRuleBody,
+	_ *api.NamespaceRuleBodyNamespace,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		return h.validate(req, pod, tnt, recorder)
@@ -57,11 +61,12 @@ func (h *containerRegistryLegacyHandler) OnUpdate(
 
 func (h *containerRegistryLegacyHandler) OnDelete(
 	client.Client,
+	client.Reader,
 	*corev1.Pod,
 	admission.Decoder,
 	events.EventRecorder,
 	*capsulev1beta2.Tenant,
-	*capsulev1beta2.NamespaceRuleBody,
+	*api.NamespaceRuleBodyNamespace,
 ) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
@@ -122,9 +127,7 @@ func (h *containerRegistryLegacyHandler) verifyContainerRegistry(
 		)
 
 		//nolint:staticcheck
-		response := admission.Denied(caperrors.NewContainerRegistryForbidden(image, *tnt.Spec.ContainerRegistries).Error())
-
-		return &response
+		return ad.Deny(caperrors.NewContainerRegistryForbidden(image, *tnt.Spec.ContainerRegistries).Error())
 	}
 
 	//nolint:staticcheck
@@ -144,9 +147,7 @@ func (h *containerRegistryLegacyHandler) verifyContainerRegistry(
 		)
 
 		//nolint:staticcheck
-		response := admission.Denied(caperrors.NewContainerRegistryForbidden(reg.FQCI(), *tnt.Spec.ContainerRegistries).Error())
-
-		return &response
+		return ad.Deny(caperrors.NewContainerRegistryForbidden(reg.FQCI(), *tnt.Spec.ContainerRegistries).Error())
 	}
 
 	return nil

@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Project Capsule Authors
+// Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package predicates_test
@@ -9,14 +9,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/event"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api/rbac"
 	"github.com/projectcapsule/capsule/pkg/runtime/predicates"
 )
 
-func TestCapsuleConfigSpecChangedPredicate_StaticFuncs(t *testing.T) {
+func TestCapsuleConfigSpecAdministratorsChangedPredicate_StaticFuncs(t *testing.T) {
 	t.Parallel()
 
-	p := predicates.CapsuleConfigSpecChangedPredicate{}
+	p := predicates.CapsuleConfigSpecAdministratorsChangedPredicate{}
 
 	if got := p.Create(event.CreateEvent{}); got {
 		t.Fatalf("Create() = %v, want false", got)
@@ -29,10 +29,10 @@ func TestCapsuleConfigSpecChangedPredicate_StaticFuncs(t *testing.T) {
 	}
 }
 
-func TestCapsuleConfigSpecChangedPredicate_Update(t *testing.T) {
+func TestCapsuleConfigSpecAdministratorsChangedPredicate_Update(t *testing.T) {
 	t.Parallel()
 
-	p := predicates.CapsuleConfigSpecChangedPredicate{}
+	p := predicates.CapsuleConfigSpecAdministratorsChangedPredicate{}
 
 	t.Run("returns false when types are not CapsuleConfiguration", func(t *testing.T) {
 		t.Parallel()
@@ -60,12 +60,12 @@ func TestCapsuleConfigSpecChangedPredicate_Update(t *testing.T) {
 		}
 
 		// same length (2)
-		oldObj.Spec.Administrators = []api.UserSpec{
+		oldObj.Spec.Administrators = []rbac.UserSpec{
 			{Name: "a"},
 			{Name: "b"},
 		}
 
-		newObj.Spec.Administrators = []api.UserSpec{
+		newObj.Spec.Administrators = []rbac.UserSpec{
 			{Name: "x"},
 			{Name: "y"},
 		}
@@ -82,11 +82,11 @@ func TestCapsuleConfigSpecChangedPredicate_Update(t *testing.T) {
 		oldObj := &capsulev1beta2.CapsuleConfiguration{}
 		newObj := &capsulev1beta2.CapsuleConfiguration{}
 
-		oldObj.Spec.Administrators = []api.UserSpec{
+		oldObj.Spec.Administrators = []rbac.UserSpec{
 			{Name: "a"},
 		}
 
-		newObj.Spec.Administrators = []api.UserSpec{
+		newObj.Spec.Administrators = []rbac.UserSpec{
 			{Name: "a"},
 			{Name: "b"},
 		}

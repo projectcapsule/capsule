@@ -5,15 +5,13 @@ package users
 
 import (
 	"context"
-	"os"
 
-	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api/rbac"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 )
 
@@ -32,16 +30,23 @@ func IsCapsuleUser(
 		return false
 	}
 
+	capsuleUsers := cfg.GetUsersByStatus()
+
 	//nolint:nestif
 	if sets.NewString(groups...).Has("system:serviceaccounts") {
 		namespace, name, err := serviceaccount.SplitUsername(user)
 		if err == nil {
-			if namespace == os.Getenv("NAMESPACE") && name == os.Getenv("SERVICE_ACCOUNT") {
+			if configuration.IsControllerServiceAccount(name, namespace) {
 				return false
 			}
 
-			tl := &capsulev1beta2.TenantList{}
-			if err := c.List(ctx, tl, client.MatchingFieldsSelector{Selector: fields.OneTermEqualSelector(".status.namespaces", namespace)}); err != nil {
+			serviceaccounts := capsuleUsers.GetByKinds([]rbac.OwnerKind{rbac.ServiceAccountOwner})
+			if len(serviceaccounts) > 0 && sets.New[string](serviceaccounts...).Has(user) {
+				return true
+			}
+
+			var tl capsulev1beta2.TenantList
+			if err := c.List(ctx, &tl, client.MatchingFields{".status.namespaces": namespace}); err != nil {
 				return false
 			}
 
@@ -51,10 +56,8 @@ func IsCapsuleUser(
 		}
 	}
 
-	capsuleUsers := cfg.GetUsersByStatus()
-
 	//nolint:modernize
-	for _, group := range capsuleUsers.GetByKinds([]api.OwnerKind{api.GroupOwner}) {
+	for _, group := range capsuleUsers.GetByKinds([]rbac.OwnerKind{rbac.GroupOwner}) {
 		if groupList.Find(group) {
 			if len(cfg.IgnoreUserWithGroups()) > 0 {
 				for _, ignoreGroup := range cfg.IgnoreUserWithGroups() {
@@ -68,7 +71,7 @@ func IsCapsuleUser(
 		}
 	}
 
-	users := capsuleUsers.GetByKinds([]api.OwnerKind{api.UserOwner})
+	users := capsuleUsers.GetByKinds([]rbac.OwnerKind{rbac.UserOwner})
 	if len(users) > 0 && sets.New[string](users...).Has(user) {
 		return true
 	}

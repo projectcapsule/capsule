@@ -6,24 +6,27 @@ package tenant
 import (
 	"context"
 
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 )
 
 // Sets a label on the Tenant object with it's name.
-func (r *Manager) ensureMetadata(ctx context.Context, tnt *capsulev1beta2.Tenant) (err error, changed bool) {
-	// Assign Labels
+func (r *Manager) ensureMetadata(ctx context.Context, tnt *capsulev1beta2.Tenant) (err error) {
 	if tnt.Labels == nil {
-		tnt.Labels = make(map[string]string)
+		tnt.Labels = map[string]string{}
 	}
 
 	if v, ok := tnt.Labels[meta.TenantNameLabel]; !ok || v != tnt.Name {
-		if err := r.Update(ctx, tnt); err != nil {
-			return err, false
-		}
-
-		return nil, true
+		tnt.Labels[meta.TenantNameLabel] = tnt.Name
 	}
 
-	return nil, false
+	if len(tnt.Status.Spaces) == 0 {
+		controllerutil.RemoveFinalizer(tnt, meta.ControllerFinalizer)
+	} else {
+		controllerutil.AddFinalizer(tnt, meta.ControllerFinalizer)
+	}
+
+	return nil
 }

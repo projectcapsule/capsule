@@ -19,7 +19,7 @@ func (w *namespace) GetHandlers() []handlers.Handler {
 }
 
 func (w *namespace) GetPath() string {
-	return "/namespaces"
+	return "/namespaces/validating"
 }
 
 type namespacePatch struct {
@@ -35,5 +35,5 @@ func (w *namespacePatch) GetHandlers() []handlers.Handler {
 }
 
 func (w *namespacePatch) GetPath() string {
-	return "/namespace-patch"
+	return "/namespaces/mutating"
 }

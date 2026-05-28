@@ -6,11 +6,15 @@ package meta
 import (
 	"strings"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/labels"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
+	ResourcesLabel = "capsule.clastix.io/resources"
+
 	TenantNameLabel = "kubernetes.io/metadata.name"
 
 	TenantLabel    = "capsule.clastix.io/tenant"
@@ -18,18 +22,17 @@ const (
 
 	ResourcePoolLabel = "projectcapsule.dev/pool"
 
-	FreezeLabel        = "projectcapsule.dev/freeze"
-	FreezeLabelTrigger = "true"
+	FreezeLabel = "projectcapsule.dev/freeze"
 
-	OwnerPromotionLabel        = "owner.projectcapsule.dev/promote"
-	OwnerPromotionLabelTrigger = "true"
+	OwnerPromotionLabel          = "owner.projectcapsule.dev/promote"
+	ServiceAccountPromotionLabel = "projectcapsule.dev/promote"
 
-	CordonedLabel        = "projectcapsule.dev/cordoned"
-	CordonedLabelTrigger = "true"
+	CordonedLabel = "projectcapsule.dev/cordoned"
 
 	CapsuleNameLabel = "projectcapsule.dev/name"
 
 	CreatedByCapsuleLabel = "projectcapsule.dev/created-by"
+	CustomResourcesLabel  = "projectcapsule.dev/custom-resources"
 
 	NewManagedByCapsuleLabel = "projectcapsule.dev/managed-by"
 	ManagedByCapsuleLabel    = "capsule.clastix.io/managed-by"
@@ -38,12 +41,10 @@ const (
 	NetworkPolicyLabel = "capsule.clastix.io/network-policy"
 	ResourceQuotaLabel = "capsule.clastix.io/resource-quota"
 	RolebindingLabel   = "capsule.clastix.io/role-binding"
-
-	ControllerValue = "controller"
 )
 
 func FreezeLabelTriggers(obj client.Object) bool {
-	return labelTriggers(obj, FreezeLabel, FreezeLabelTrigger)
+	return labelTriggers(obj, FreezeLabel, ValueTrue)
 }
 
 func FreezeLabelRemove(obj client.Object) {
@@ -51,7 +52,7 @@ func FreezeLabelRemove(obj client.Object) {
 }
 
 func OwnerPromotionLabelTriggers(obj client.Object) bool {
-	return labelTriggers(obj, OwnerPromotionLabel, OwnerPromotionLabelTrigger)
+	return labelTriggers(obj, OwnerPromotionLabel, ValueTrue)
 }
 
 func OwnerPromotionLabelRemove(obj client.Object) {
@@ -98,4 +99,42 @@ func SetFilteredLabels(obj *unstructured.Unstructured, filter map[string]struct{
 	}
 
 	obj.SetLabels(labels)
+}
+
+// LabelsChanged indicates if the given label keys have changed.
+func LabelsChanged(keys []string, oldLabels, newLabels map[string]string) bool {
+	for _, key := range keys {
+		oldVal, oldOK := oldLabels[key]
+		newVal, newOK := newLabels[key]
+
+		if oldOK != newOK || oldVal != newVal {
+			return true
+		}
+	}
+
+	return false
+}
+
+func LabelsChangedUnstructured(oldObj, newObj unstructured.Unstructured) bool {
+	return !labels.Equals(labels.Set(oldObj.GetLabels()), labels.Set(newObj.GetLabels()))
+}
+
+// Collect all mentioned keys from a LabelSelector.
+func LabelSelectorKeys(sel *metav1.LabelSelector) map[string]struct{} {
+	out := map[string]struct{}{}
+	if sel == nil {
+		return out
+	}
+
+	for k := range sel.MatchLabels {
+		out[k] = struct{}{}
+	}
+
+	for _, expr := range sel.MatchExpressions {
+		if expr.Key != "" {
+			out[expr.Key] = struct{}{}
+		}
+	}
+
+	return out
 }

@@ -10,27 +10,33 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	schedulev1 "k8s.io/api/scheduling/v1"
-	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
 	"github.com/projectcapsule/capsule/pkg/api"
 	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
+	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/tenant"
 )
 
-func mutatePodDefaults(ctx context.Context, req admission.Request, c client.Client, decoder admission.Decoder, namespace string) *admission.Response {
+func mutatePodDefaults(
+	ctx context.Context,
+	req admission.Request,
+	c client.Client,
+	decoder admission.Decoder,
+	namespace string,
+) *admission.Response {
 	var pod corev1.Pod
 	if err := decoder.Decode(req, &pod); err != nil {
-		return utils.ErroredResponse(err)
+		return ad.ErroredResponse(err)
 	}
 
 	pod.SetNamespace(namespace)
 
 	tnt, tErr := tenant.TenantByStatusNamespace(ctx, c, pod.Namespace)
 	if tErr != nil {
-		return utils.ErroredResponse(tErr)
+		return ad.ErroredResponse(tErr)
 	} else if tnt == nil {
 		return nil
 	}
@@ -39,7 +45,7 @@ func mutatePodDefaults(ctx context.Context, req admission.Request, c client.Clie
 
 	pcMutated, pcErr := handlePriorityClassDefault(ctx, c, tnt.Spec.PriorityClasses, &pod)
 	if pcErr != nil {
-		return utils.ErroredResponse(pcErr)
+		return ad.ErroredResponse(pcErr)
 	}
 
 	rcMutated := handleRuntimeClassDefault(tnt.Spec.RuntimeClasses, &pod)
@@ -50,10 +56,12 @@ func mutatePodDefaults(ctx context.Context, req admission.Request, c client.Clie
 	var marshaled []byte
 
 	if marshaled, err = json.Marshal(pod); err != nil {
-		return utils.ErroredResponse(err)
+		return ad.ErroredResponse(err)
 	}
 
-	return ptr.To(admission.PatchResponseFromRaw(req.Object.Raw, marshaled))
+	resp := admission.PatchResponseFromRaw(req.Object.Raw, marshaled)
+
+	return &resp
 }
 
 func handleRuntimeClassDefault(allowed *api.DefaultAllowedListSpec, pod *corev1.Pod) (mutated bool) {
@@ -77,7 +85,12 @@ func handleRuntimeClassDefault(allowed *api.DefaultAllowedListSpec, pod *corev1.
 	}
 }
 
-func handlePriorityClassDefault(ctx context.Context, c client.Client, allowed *api.DefaultAllowedListSpec, pod *corev1.Pod) (mutated bool, err error) {
+func handlePriorityClassDefault(
+	ctx context.Context,
+	c client.Reader,
+	allowed *api.DefaultAllowedListSpec,
+	pod *corev1.Pod,
+) (mutated bool, err error) {
 	if allowed == nil || allowed.Default == "" {
 		return false, nil
 	}

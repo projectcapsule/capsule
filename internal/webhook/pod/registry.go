@@ -18,6 +18,7 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/internal/cache"
 	"github.com/projectcapsule/capsule/pkg/api"
+	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
@@ -36,12 +37,13 @@ func ContainerRegistry(configuration configuration.Configuration, cache *cache.R
 }
 
 func (h *registryHandler) OnCreate(
-	c client.Client,
+	_ client.Client,
+	_ client.Reader,
 	pod *corev1.Pod,
-	decoder admission.Decoder,
+	_ admission.Decoder,
 	recorder events.EventRecorder,
 	tnt *capsulev1beta2.Tenant,
-	rule *capsulev1beta2.NamespaceRuleBody,
+	rule *api.NamespaceRuleBodyNamespace,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		return h.validate(req, pod, tnt, recorder, rule)
@@ -49,13 +51,14 @@ func (h *registryHandler) OnCreate(
 }
 
 func (h *registryHandler) OnUpdate(
-	c client.Client,
+	_ client.Client,
+	_ client.Reader,
 	old *corev1.Pod,
 	pod *corev1.Pod,
-	decoder admission.Decoder,
+	_ admission.Decoder,
 	recorder events.EventRecorder,
 	tnt *capsulev1beta2.Tenant,
-	rule *capsulev1beta2.NamespaceRuleBody,
+	rule *api.NamespaceRuleBodyNamespace,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		return h.validate(req, pod, tnt, recorder, rule)
@@ -64,11 +67,12 @@ func (h *registryHandler) OnUpdate(
 
 func (h *registryHandler) OnDelete(
 	client.Client,
+	client.Reader,
 	*corev1.Pod,
 	admission.Decoder,
 	events.EventRecorder,
 	*capsulev1beta2.Tenant,
-	*capsulev1beta2.NamespaceRuleBody,
+	*api.NamespaceRuleBodyNamespace,
 ) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
@@ -80,7 +84,7 @@ func (h *registryHandler) validate(
 	pod *corev1.Pod,
 	tnt *capsulev1beta2.Tenant,
 	recorder events.EventRecorder,
-	rule *capsulev1beta2.NamespaceRuleBody,
+	rule *api.NamespaceRuleBodyNamespace,
 ) *admission.Response {
 	if rule == nil || len(rule.Enforce.Registries) == 0 {
 		resp := admission.Allowed("no registry rules")
@@ -162,9 +166,9 @@ func (h *registryHandler) validateVolumes(
 
 		ref := strings.TrimSpace(v.Image.Reference)
 		if ref == "" {
-			resp := admission.Denied(fmt.Sprintf("volume %q has empty image.reference", v.Name))
-
-			return &resp
+			return ad.Deny(
+				fmt.Sprintf("volume %q has empty image.reference", v.Name),
+			)
 		}
 
 		if resp := h.verifyOCIReference(
@@ -236,8 +240,6 @@ func (h *registryHandler) verifyOCIReference(
 	if ref == "" {
 		msg := fmt.Sprintf("%s has empty reference", where)
 
-		resp := admission.Denied(msg)
-
 		recorder.Eventf(
 			pod,
 			tnt,
@@ -247,7 +249,7 @@ func (h *registryHandler) verifyOCIReference(
 			msg,
 		)
 
-		return &resp
+		return ad.Deny(msg)
 	}
 
 	// Match rules against the FULL OCI reference string.
@@ -256,8 +258,6 @@ func (h *registryHandler) verifyOCIReference(
 	if !cfg.allowed {
 		msg := fmt.Sprintf("%s reference %q is not allowed", where, ref)
 
-		resp := admission.Denied(msg)
-
 		recorder.Eventf(
 			pod,
 			tnt,
@@ -267,7 +267,7 @@ func (h *registryHandler) verifyOCIReference(
 			msg,
 		)
 
-		return &resp
+		return ad.Deny(msg)
 	}
 
 	// No defaulting: enforce only if restricted; empty pullPolicy is rejected under restriction.
@@ -280,8 +280,6 @@ func (h *registryHandler) verifyOCIReference(
 				where, ref, allowed,
 			)
 
-			resp := admission.Denied(msg)
-
 			recorder.Eventf(
 				pod,
 				tnt,
@@ -291,7 +289,7 @@ func (h *registryHandler) verifyOCIReference(
 				msg,
 			)
 
-			return &resp
+			return ad.Deny(msg)
 		}
 
 		if _, ok := cfg.allowedPolicy[pullPolicy]; !ok {
@@ -300,8 +298,6 @@ func (h *registryHandler) verifyOCIReference(
 				where, ref, pullPolicy, allowed,
 			)
 
-			resp := admission.Denied(msg)
-
 			recorder.Eventf(
 				pod,
 				tnt,
@@ -311,7 +307,7 @@ func (h *registryHandler) verifyOCIReference(
 				msg,
 			)
 
-			return &resp
+			return ad.Deny(msg)
 		}
 	}
 
