@@ -22,6 +22,11 @@
       "matchManagers": ["github-actions", "flux"],
       "groupName": "all-ci-updates",
       "updateTypes": ["major", "minor", "patch"]
+    },
+    {
+      "matchManagers": ["github-actions"],
+      "matchPackageNames": ["sigstore/cosign-installer"],
+      "enabled": false
     }
   ],
   "customManagers": [
