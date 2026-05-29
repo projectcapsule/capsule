@@ -38,7 +38,7 @@
                             "type": "string"
                         },
                         "port": {
-                            "description": "Custom service port for the webhook service",
+                            "description": "(integer, null) Custom service port for the webhook service",
                             "type": [
                                 "integer",
                                 "null"
@@ -2178,7 +2178,7 @@
                             "type": "string"
                         },
                         "port": {
-                            "description": "Custom service port for the webhook service",
+                            "description": "(integer, null) Custom service port for the webhook service",
                             "type": [
                                 "integer",
                                 "null"
