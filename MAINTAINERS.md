@@ -1,7 +1,7 @@
-The current Maintainers Group for the [TODO: Projectname] Project consists of:
+The current Maintainers Group for the Capsule project consists of:
 
 | Name                    | Employer    | Responsibilities   |
-|-------------------------| ----------- |--------------------|
+|-------------------------|-------------|--------------------|
 | Adriano Pezzuto         | Clastix     | Maintainer         |
 | Dario Tranchitella      | Clastix     | Maintainer         |
 | Maksim Fedotov          | Wargaming   | Maintainer         |
