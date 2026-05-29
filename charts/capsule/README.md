@@ -73,7 +73,7 @@ The following Values have changed key or Value:
 | conversions.service.caBundle | string | `""` | CABundle for the webhook service |
 | conversions.service.name | string | `""` | Custom service name for the webhook service |
 | conversions.service.namespace | string | `""` | Custom service namespace for the webhook service |
-| conversions.service.port | string | `nil` | Custom service port for the webhook service |
+| conversions.service.port | integer, null | `nil` | Custom service port for the webhook service |
 | conversions.service.url | string | `""` | The URL where the capsule webhook services are running (Overwrites cluster scoped service definition) |
 | customAnnotations | object | `{}` | Additional annotations which will be added to all resources created by Capsule helm chart |
 | customLabels | object | `{}` | Additional labels which will be added to all resources created by Capsule helm chart |
@@ -365,7 +365,7 @@ The following Values have changed key or Value:
 | webhooks.service.caBundle | string | `""` | CABundle for the webhook service |
 | webhooks.service.name | string | `""` | Custom service name for the webhook service |
 | webhooks.service.namespace | string | `""` | Custom service namespace for the webhook service |
-| webhooks.service.port | string | `nil` | Custom service port for the webhook service |
+| webhooks.service.port | integer, null | `nil` | Custom service port for the webhook service |
 | webhooks.service.url | string | `""` | The URL where the capsule webhook services are running (Overwrites cluster scoped service definition) |
 | webhooks.validatingWebhooksTimeoutSeconds | int | `30` | Timeout in seconds for validating webhooks |
 

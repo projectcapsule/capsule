@@ -465,7 +465,7 @@ conversions:
     name: ""
     # -- Custom service namespace for the webhook service
     namespace: ""
-    # -- Custom service port for the webhook service
+    # -- (integer, null) Custom service port for the webhook service
     port: # @schema type:[integer, null]
 
 
@@ -494,7 +494,7 @@ webhooks:
     name: ""
     # -- Custom service namespace for the webhook service
     namespace: ""
-    # -- Custom service port for the webhook service
+    # -- (integer, null) Custom service port for the webhook service
     port: # @schema type:[integer, null]
 
   # Admission Webhook Configuration
