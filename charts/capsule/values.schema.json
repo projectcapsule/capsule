@@ -38,8 +38,11 @@
                             "type": "string"
                         },
                         "port": {
-                            "description": "Custom service port for the webhook service",
-                            "type": "null"
+                            "description": "(integer, null) Custom service port for the webhook service",
+                            "type": [
+                                "integer",
+                                "null"
+                            ]
                         },
                         "url": {
                             "description": "The URL where the capsule webhook services are running (Overwrites cluster scoped service definition)",
@@ -2175,8 +2178,11 @@
                             "type": "string"
                         },
                         "port": {
-                            "description": "Custom service port for the webhook service",
-                            "type": "null"
+                            "description": "(integer, null) Custom service port for the webhook service",
+                            "type": [
+                                "integer",
+                                "null"
+                            ]
                         },
                         "url": {
                             "description": "The URL where the capsule webhook services are running (Overwrites cluster scoped service definition)",
