@@ -12,10 +12,10 @@ metadata:
   {{- end }}
 spec:
   ports:
-  - port: {{ .Values.manager.webhookPort }}
+  - port: {{ default $.Values.manager.webhookPort $.Values.webhooks.service.port }}
     name: admission
     protocol: TCP
-    targetPort: {{ .Values.manager.webhookPort }}
+    targetPort: {{ default $.Values.manager.webhookPort $.Values.webhooks.service.port }}
   selector:
     {{- include "capsule.selectorLabels" . | nindent 4 }}
   sessionAffinity: None

@@ -61,7 +61,7 @@ spec:
   containers:
     - name: manager
       args:
-        - --webhook-port={{ .Values.manager.webhookPort }}
+        - --webhook-port={{ default $.Values.manager.webhookPort $.Values.webhooks.service.port }}
         - --zap-log-level={{ default 4 .Values.manager.options.logLevel }}
         - --configuration-name={{ .Values.manager.options.capsuleConfiguration }}
         - --workers={{ .Values.manager.options.workers }}
@@ -88,7 +88,7 @@ spec:
         {{- if not (.Values.manager.hostNetwork) }}
         - name: admission
           protocol: TCP
-          containerPort: {{ .Values.manager.webhookPort }}
+          containerPort: {{ default $.Values.manager.webhookPort $.Values.webhooks.service.port }}
         - name: metrics
           containerPort: 8080
           protocol: TCP

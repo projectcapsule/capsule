@@ -178,7 +178,7 @@ url: {{ trimSuffix "/" $.Values.webhooks.service.url }}
 service:
   name: {{ default (printf "%s-webhook-service" (include "capsule.fullname" $)) $.Values.webhooks.service.name }}
   namespace: {{ default $.Release.Namespace $.Values.webhooks.service.namespace }}
-  port: {{ default 9443 $.Values.webhooks.service.port }}
+  port: {{ default $.Values.manager.webhookPort $.Values.webhooks.service.port }}
   {{- end }}
 {{- end }}
 
