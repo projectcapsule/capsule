@@ -3,6 +3,7 @@ module github.com/projectcapsule/capsule
 go 1.26.3
 
 require (
+	filippo.io/age v1.3.1
 	github.com/BurntSushi/toml v1.6.0
 	github.com/fluxcd/pkg/apis/kustomize v1.15.0
 	github.com/fluxcd/pkg/ssa v0.64.0
@@ -24,7 +25,7 @@ require (
 	k8s.io/apimachinery v0.35.5
 	k8s.io/apiserver v0.35.5
 	k8s.io/client-go v0.35.5
-	k8s.io/utils v0.0.0-20260108192941-914a6e750570
+	k8s.io/utils v0.0.0-20260507154919-ff6756f316d2
 	sigs.k8s.io/cluster-api v1.12.2
 	sigs.k8s.io/controller-runtime v0.23.0
 	sigs.k8s.io/gateway-api v1.4.1
@@ -34,7 +35,6 @@ require (
 require (
 	cel.dev/expr v0.25.1 // indirect
 	dario.cat/mergo v1.0.2 // indirect
-	filippo.io/age v1.3.1 // indirect
 	filippo.io/hpke v0.4.0 // indirect
 	github.com/Masterminds/semver/v3 v3.4.0 // indirect
 	github.com/antlr4-go/antlr/v4 v4.13.0 // indirect
