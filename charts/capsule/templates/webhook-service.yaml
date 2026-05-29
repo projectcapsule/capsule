@@ -12,9 +12,10 @@ metadata:
   {{- end }}
 spec:
   ports:
-  - name: admission
+  - port: {{ .Values.manager.webhookPort }}
+    name: admission
     protocol: TCP
-    port: 9443
+    targetPort: {{ .Values.manager.webhookPort }}
   selector:
     {{- include "capsule.selectorLabels" . | nindent 4 }}
   sessionAffinity: None
