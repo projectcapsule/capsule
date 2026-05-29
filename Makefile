@@ -125,7 +125,7 @@ dev-install-gw-api-crds:
 	@$(KUBECTL) apply --force-conflicts --server-side=true -f https://github.com/$(API_GW_LOOKUP)/releases/download/$(API_GW_VERSION)/standard-install.yaml
 
 GRAFANA         := none
-GRAFANA_VERSION := v5.18.0
+GRAFANA_VERSION := v5.22.2
 GRAFANA_LOOKUP  := grafana/grafana-operator
 dev-install-grafana-operator-crds:
 	@$(KUBECTL) apply --force-conflicts --server-side=true -f https://github.com/grafana/grafana-operator/releases/download/$(GRAFANA_VERSION)/crds.yaml
