@@ -1,5 +1,5 @@
 {
-  "minimumReleaseAge": "14 days",
+  "minimumReleaseAge": null,
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": ["config:recommended", ":dependencyDashboard"],
   "baseBranches": ["main"],
@@ -10,9 +10,7 @@
   "commitMessageLowerCase": "auto",
   "semanticCommits": "enabled",
   "semanticCommitType": "feat",
-  "ignorePaths": [
-      "docs"
-  ],
+  "ignorePaths": ["docs"],
   "labels": ["renovate"],
   "flux": {
     "fileMatch": ["^.*flux\\.yaml$"]
@@ -27,6 +25,21 @@
       "matchManagers": ["github-actions"],
       "matchPackageNames": ["sigstore/cosign-installer"],
       "enabled": false
+    },
+    {
+      "matchManagers": [
+        "github-actions",
+        "flux",
+        "gomod",
+        "dockerfile",
+        "docker-compose",
+        "regex"
+      ],
+      "minimumReleaseAge": "14 days"
+    },
+    {
+      "matchManagers": ["helmv3","helm-values"],
+      "minimumReleaseAge": null
     }
   ],
   "customManagers": [
@@ -45,7 +58,7 @@
       "customType": "regex",
       "fileMatch": [".*\\.pre-commit-config\\.ya?ml$"],
       "matchStrings": [
-         "repo:\\s*https://github\\.com/(?<lookupValue>[^/]+/[^\\s]+)[\\s\\S]*?rev:\\s*(?<currentValue>v?\\d+\\.\\d+\\.\\d+)"
+        "repo:\\s*https://github\\.com/(?<lookupValue>[^/]+/[^\\s]+)[\\s\\S]*?rev:\\s*(?<currentValue>v?\\d+\\.\\d+\\.\\d+)"
       ],
       "depNameTemplate": "{{lookupValue}}",
       "datasourceTemplate": "github-tags",
