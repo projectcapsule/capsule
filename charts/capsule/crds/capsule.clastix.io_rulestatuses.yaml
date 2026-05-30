@@ -145,6 +145,11 @@ spec:
                   - type
                   type: object
                 type: array
+              observedGeneration:
+                description: ObservedGeneration is the most recent generation the
+                  controller has observed.
+                format: int64
+                type: integer
               rule:
                 description: Managed Enforcement properties per Namespace (aggregated
                   from rules)

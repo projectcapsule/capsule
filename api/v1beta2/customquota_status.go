@@ -14,6 +14,9 @@ import (
 
 // CustomQuotaStatus defines the observed state of GlobalResourceQuota.
 type CustomQuotaStatus struct {
+	// ObservedGeneration is the most recent generation the controller has observed.
+	// +optional
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 	// Usage measurements
 	// +optional
 	Usage CustomQuotaStatusUsage `json:"usage,omitempty"`
