@@ -172,6 +172,8 @@ type ServiceAccountClient struct {
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:scope=Cluster
 // +kubebuilder:storageversion
+// +kubebuilder:printcolumn:name="Ready",type="string",JSONPath=".status.conditions[?(@.type==\"Ready\")].status",description="Reconcile status"
+// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 
 // CapsuleConfiguration is the Schema for the Capsule configuration API.
 type CapsuleConfiguration struct {
