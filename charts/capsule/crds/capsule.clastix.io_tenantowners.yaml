@@ -16,7 +16,20 @@ spec:
     singular: tenantowner
   scope: Cluster
   versions:
-  - name: v1beta2
+  - additionalPrinterColumns:
+    - description: Number of Tenants this TenantOwner is matched to
+      jsonPath: .status.matchedTenants
+      name: Matched Tenants
+      type: integer
+    - description: Reconcile status of this TenantOwner
+      jsonPath: .status.conditions[?(@.type=="Ready")].status
+      name: Ready
+      type: string
+    - description: Age
+      jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1beta2
     schema:
       openAPIV3Schema:
         description: TenantOwner is the Schema for the tenantowners API.
@@ -75,6 +88,77 @@ spec:
           status:
             description: status defines the observed state of TenantOwner.
             properties:
+              conditions:
+                description: Conditions contains the reconciliation conditions for
+                  this TenantOwner.
+                items:
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+              matchedTenantNames:
+                description: |-
+                  MatchedTenantNames lists the names of all Tenants that this TenantOwner is currently matched to
+                  via the Tenant's spec.permissions.matchOwners selectors.
+                items:
+                  type: string
+                type: array
+                x-kubernetes-list-type: atomic
+              matchedTenants:
+                description: MatchedTenants is the total count of Tenants this TenantOwner
+                  is matched to.
+                format: int64
+                type: integer
               observedGeneration:
                 description: ObservedGeneration is the most recent generation the
                   controller has observed.

@@ -6,6 +6,7 @@ package v1beta2
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/api/rbac"
 )
 
@@ -23,6 +24,20 @@ type TenantOwnerSpec struct {
 
 // TenantOwnerStatus defines the observed state of TenantOwner.
 type TenantOwnerStatus struct {
+	// MatchedTenants is the total count of Tenants this TenantOwner is matched to.
+	// +optional
+	MatchedTenants *int64 `json:"matchedTenants,omitempty"`
+
+	// MatchedTenantNames lists the names of all Tenants that this TenantOwner is currently matched to
+	// via the Tenant's spec.permissions.matchOwners selectors.
+	// +optional
+	// +listType=atomic
+	MatchedTenantNames []string `json:"matchedTenantNames,omitempty"`
+
+	// Conditions contains the reconciliation conditions for this TenantOwner.
+	// +optional
+	Conditions meta.ConditionList `json:"conditions,omitempty"`
+
 	// ObservedGeneration is the most recent generation the controller has observed.
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
@@ -31,6 +46,9 @@ type TenantOwnerStatus struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:scope=Cluster,shortName=to
+// +kubebuilder:printcolumn:name="Matched Tenants",type="integer",JSONPath=".status.matchedTenants",description="Number of Tenants this TenantOwner is matched to"
+// +kubebuilder:printcolumn:name="Ready",type="string",JSONPath=".status.conditions[?(@.type==\"Ready\")].status",description="Reconcile status of this TenantOwner"
+// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp",description="Age"
 
 // TenantOwner is the Schema for the tenantowners API.
 type TenantOwner struct {
