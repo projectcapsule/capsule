@@ -162,6 +162,7 @@ func (r *Manager) updateStatus(ctx context.Context, instance *capsulev1beta2.Rul
 		}
 
 		latest.Status = instance.Status
+		latest.Status.ObservedGeneration = instance.GetGeneration()
 
 		// Set Ready Condition
 		readyCondition := meta.NewReadyCondition(instance)

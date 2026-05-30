@@ -21,6 +21,9 @@ type ResourcePoolClaimSpec struct {
 
 // ResourceQuotaClaimStatus defines the observed state of ResourceQuotaClaim.
 type ResourcePoolClaimStatus struct {
+	// ObservedGeneration is the most recent generation the controller has observed.
+	// +optional
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 	// Reference to the GlobalQuota being claimed from
 	// +optional
 	Pool meta.LocalRFC1123ObjectReferenceWithUID `json:"pool,omitzero"`
