@@ -56,6 +56,7 @@ func (r *Manager) updateTenantStatus(ctx context.Context, instance *capsulev1bet
 		}
 
 		latest.Status = instance.Status
+		latest.Status.ObservedGeneration = instance.GetGeneration()
 		setTenantStatusState(latest)
 
 		readyCondition := capmeta.NewReadyCondition(instance)

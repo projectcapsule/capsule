@@ -648,6 +648,7 @@ func (r *namespacedResourceController) updateStatus(ctx context.Context, instanc
 		}
 
 		latest.Status = instance.Status
+		latest.Status.ObservedGeneration = instance.GetGeneration()
 
 		// Set Ready Condition
 		readyCondition := meta.NewReadyCondition(instance)

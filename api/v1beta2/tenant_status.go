@@ -25,6 +25,10 @@ type TenantStatus struct {
 	// Allowed Cluster Objects within Tenant
 	TenantAvailableStatus `json:",inline"`
 
+	// ObservedGeneration is the most recent generation the controller has observed.
+	// +optional
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+
 	// Collected owners for this tenant
 	Owners rbac.OwnerStatusListSpec `json:"owners,omitempty"`
 	// Promoted ServiceAccounts across the Tenant

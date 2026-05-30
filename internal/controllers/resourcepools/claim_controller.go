@@ -281,8 +281,9 @@ func (r *resourceClaimController) updateStatus(
 		}
 
 		latest.Status = instance.Status
+		latest.Status.ObservedGeneration = instance.GetGeneration()
 
-		readyCondition := meta.NewReadyCondition(latest)
+		readyCondition := meta.NewReadyCondition(instance)
 		if reconcileError != nil {
 			readyCondition.Message = reconcileError.Error()
 			readyCondition.Status = metav1.ConditionFalse
