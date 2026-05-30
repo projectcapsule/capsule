@@ -528,6 +528,14 @@ func main() {
 		os.Exit(1)
 	}
 
+	if err = (&tenantcontroller.TenantOwnerManager{
+		Client: manager.GetClient(),
+		Log:    ctrl.Log.WithName("capsule.ctrl").WithName("tenant-owner-status"),
+	}).SetupWithManager(manager, controllerConfig); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "TenantOwnerStatus")
+		os.Exit(1)
+	}
+
 	if err = (&capsulev1beta1.Tenant{}).SetupWebhookWithManager(manager); err != nil {
 		setupLog.Error(err, "unable to create conversion webhook", "webhook", "capsulev1beta1.Tenant")
 		os.Exit(1)
