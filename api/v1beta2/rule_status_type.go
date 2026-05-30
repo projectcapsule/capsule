@@ -12,7 +12,7 @@ import (
 
 // RuleStatus contains the accumulated rules applying to namespace it's deployed in.
 // +kubebuilder:object:generate=true
-type RuleStatusSpec struct {
+type RuleStatusStatus struct {
 	// ObservedGeneration is the most recent generation the controller has observed.
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
@@ -37,7 +37,7 @@ type RuleStatus struct {
 	Spec []*api.NamespaceRuleBodyNamespace `json:"spec,omitzero"`
 
 	// +optional
-	Status RuleStatusSpec `json:"status,omitzero"`
+	Status RuleStatusStatus `json:"status,omitzero"`
 }
 
 // +kubebuilder:object:root=true
