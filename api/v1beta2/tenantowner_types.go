@@ -22,7 +22,11 @@ type TenantOwnerSpec struct {
 }
 
 // TenantOwnerStatus defines the observed state of TenantOwner.
-type TenantOwnerStatus struct{}
+type TenantOwnerStatus struct {
+	// ObservedGeneration is the most recent generation the controller has observed.
+	// +optional
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+}
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status

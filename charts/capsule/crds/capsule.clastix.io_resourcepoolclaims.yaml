@@ -230,6 +230,11 @@ spec:
                   - type
                   type: object
                 type: array
+              observedGeneration:
+                description: ObservedGeneration is the most recent generation the
+                  controller has observed.
+                format: int64
+                type: integer
               pool:
                 description: Reference to the GlobalQuota being claimed from
                 properties:

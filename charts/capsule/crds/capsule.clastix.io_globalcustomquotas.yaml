@@ -384,6 +384,11 @@ spec:
                 items:
                   type: string
                 type: array
+              observedGeneration:
+                description: ObservedGeneration is the most recent generation the
+                  controller has observed.
+                format: int64
+                type: integer
               targets:
                 description: Targeting GVK
                 items:

@@ -13,6 +13,9 @@ import (
 // RuleStatus contains the accumulated rules applying to namespace it's deployed in.
 // +kubebuilder:object:generate=true
 type RuleStatusSpec struct {
+	// ObservedGeneration is the most recent generation the controller has observed.
+	// +optional
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 	// Managed Enforcement properties per Namespace (aggregated from rules)
 	//+optional
 	Rule api.NamespaceRuleBodyNamespace `json:"rule,omitzero"`

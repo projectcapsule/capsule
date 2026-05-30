@@ -1250,6 +1250,11 @@ spec:
             description: CapsuleConfigurationStatus defines the Capsule configuration
               status.
             properties:
+              observedGeneration:
+                description: ObservedGeneration is the most recent generation the
+                  controller has observed.
+                format: int64
+                type: integer
               users:
                 description: Users which are considered Capsule Users and are bound
                   to the Capsule Tenant construct.
