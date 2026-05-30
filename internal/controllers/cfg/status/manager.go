@@ -10,6 +10,7 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/retry"
@@ -23,6 +24,7 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/internal/controllers/utils"
+	capmeta "github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/api/rbac"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	"github.com/projectcapsule/capsule/pkg/runtime/predicates"
@@ -62,6 +64,21 @@ func (r *Manager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.Controller
 			}),
 			builder.WithPredicates(
 				predicates.TenantStatusOwnersChangedPredicate{},
+			),
+		).
+		Watches(
+			&capsulev1beta2.Tenant{},
+			handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
+				return []reconcile.Request{
+					{
+						NamespacedName: types.NamespacedName{
+							Name: ctrlConfig.ConfigurationName,
+						},
+					},
+				}
+			}),
+			builder.WithPredicates(
+				predicates.TenantCountOrSizeChangedPredicate{},
 			),
 		).
 		Watches(
@@ -132,7 +149,7 @@ func (r *Manager) Reconcile(ctx context.Context, request reconcile.Request) (res
 	}
 
 	defer func() {
-		if uerr := r.updateConfigStatus(ctx, instance); uerr != nil {
+		if uerr := r.updateConfigStatus(ctx, instance, err); uerr != nil {
 			err = fmt.Errorf("cannot update config status: %w", uerr)
 
 			return
@@ -149,6 +166,10 @@ func (r *Manager) Reconcile(ctx context.Context, request reconcile.Request) (res
 	}
 
 	log.V(5).Info("gathering capsule users", "users", len(instance.Status.Users))
+
+	if err := r.gatherTenantCounts(ctx, instance); err != nil {
+		return reconcile.Result{}, err
+	}
 
 	return reconcile.Result{}, err
 }
@@ -183,9 +204,32 @@ func (r *Manager) gatherCapsuleUsers(
 	return nil
 }
 
+func (r *Manager) gatherTenantCounts(
+	ctx context.Context,
+	instance *capsulev1beta2.CapsuleConfiguration,
+) error {
+	tenantList := &capsulev1beta2.TenantList{}
+	if err := r.List(ctx, tenantList); err != nil {
+		return fmt.Errorf("listing Tenants: %w", err)
+	}
+
+	var namespaceCount uint64
+	for i := range tenantList.Items {
+		namespaceCount += uint64(tenantList.Items[i].Status.Size)
+	}
+
+	tc := int64(len(tenantList.Items))
+	mnc := int64(namespaceCount)
+	instance.Status.TenantCount = &tc
+	instance.Status.ManagedNamespaceCount = &mnc
+
+	return nil
+}
+
 func (r *Manager) updateConfigStatus(
 	ctx context.Context,
 	instance *capsulev1beta2.CapsuleConfiguration,
+	reconcileErr error,
 ) error {
 	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
 		latest := &capsulev1beta2.CapsuleConfiguration{}
@@ -195,6 +239,17 @@ func (r *Manager) updateConfigStatus(
 
 		latest.Status = instance.Status
 		latest.Status.ObservedGeneration = instance.GetGeneration()
+
+		readyCondition := capmeta.NewReadyCondition(latest)
+		readyCondition.ObservedGeneration = instance.GetGeneration()
+
+		if reconcileErr != nil {
+			readyCondition.Message = reconcileErr.Error()
+			readyCondition.Status = metav1.ConditionFalse
+			readyCondition.Reason = capmeta.FailedReason
+		}
+
+		latest.Status.Conditions.UpdateConditionByType(readyCondition)
 
 		return r.Client.Status().Update(ctx, latest)
 	})
