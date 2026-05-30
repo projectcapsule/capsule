@@ -12,7 +12,11 @@ import (
 
 // RuleStatus contains the accumulated rules applying to namespace it's deployed in.
 // +kubebuilder:object:generate=true
+<<<<<<< HEAD
 type RuleStatusStatus struct {
+=======
+type RuleStatusSpec struct {
+>>>>>>> 7b2cf58 (feat: add observedgeneration to status object of all crds)
 	// ObservedGeneration is the most recent generation the controller has observed.
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
