@@ -108,6 +108,19 @@ func (h *handler) OnUpdate(
 			return ad.ErroredResponse(err)
 		}
 
+		tnt, err := tenant.GetTenantByLabels(ctx, reader, ns)
+		if err != nil {
+			return ad.ErroredResponse(err)
+		}
+
+		// An admin updating a namespace that belongs to no tenant has nothing to
+		// mutate, so short-circuit and allow it. OnCreate already does this; the
+		// symmetric guard was missing on OnUpdate, which made the sub-handlers
+		// deny admin updates of tenant-less namespaces.
+		if tnt == nil && user.IsAdmin() {
+			return nil
+		}
+
 		for _, hndl := range h.handlers {
 			response := hndl.OnUpdate(c, reader, user, ns, oldNs, decoder, recorder)(ctx, req)
 			if response == nil {
