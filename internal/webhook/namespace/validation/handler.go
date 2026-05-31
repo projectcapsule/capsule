@@ -159,6 +159,7 @@ func (h *handler) OnUpdate(
 			return ad.ErroredResponse(err)
 		}
 
+		tnt := newTenant
 		if !user.IsAdmin() {
 			if oldTenant == nil || newTenant == nil {
 				return ad.Deny("namespace tenant ownership is incomplete")
@@ -181,19 +182,16 @@ func (h *handler) OnUpdate(
 
 				return ad.Deny("denied patch request for this namespace")
 			}
-		}
 
-		if terminating := h.rejectOnTermination(ctx, c, ns, newTenant); terminating != nil {
-			return terminating
-		}
-
-		tnt := newTenant
-		if !user.IsAdmin() {
 			tnt = oldTenant
 		}
 
 		if tnt == nil {
 			return nil
+		}
+
+		if terminating := h.rejectOnTermination(ctx, c, ns, tnt); terminating != nil {
+			return terminating
 		}
 
 		for _, hndl := range h.handlers {
