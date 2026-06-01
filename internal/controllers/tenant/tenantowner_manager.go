@@ -14,6 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
+	"k8s.io/client-go/util/workqueue"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -22,6 +23,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/internal/controllers/utils"
@@ -45,28 +47,66 @@ type TenantOwnerManager struct {
 func (r *TenantOwnerManager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.ControllerOptions) error {
 	r.reader = mgr.GetAPIReader()
 
-	// enqueueAllTenantOwners maps any Tenant event to a reconcile request for
-	// every existing TenantOwner, because a matchOwners selector change can
-	// affect any TenantOwner.
-	enqueueAllTenantOwners := handler.EnqueueRequestsFromMapFunc(
-		func(ctx context.Context, _ client.Object) []reconcile.Request {
+	// enqueueForSelectors enqueues reconcile requests for all TenantOwners that
+	// are matched by at least one of the given selectors. Duplicate requests are
+	// deduplicated by the workqueue itself.
+	enqueueForSelectors := func(
+		ctx context.Context,
+		selectors []*metav1.LabelSelector,
+		q workqueue.TypedRateLimitingInterface[reconcile.Request],
+	) {
+		seen := make(map[string]struct{})
+
+		for _, sel := range selectors {
+			if sel == nil {
+				continue
+			}
+
+			selector, err := metav1.LabelSelectorAsSelector(sel)
+			if err != nil {
+				r.Log.Error(err, "invalid matchOwners selector, skipping")
+
+				continue
+			}
+
 			list := &capsulev1beta2.TenantOwnerList{}
-			if err := r.List(ctx, list); err != nil {
+			if err := r.List(ctx, list, &client.ListOptions{LabelSelector: selector}); err != nil {
 				r.Log.Error(err, "cannot list TenantOwners for re-enqueue")
 
-				return nil
+				continue
 			}
 
-			requests := make([]reconcile.Request, len(list.Items))
 			for i := range list.Items {
-				requests[i] = reconcile.Request{
-					NamespacedName: types.NamespacedName{Name: list.Items[i].Name},
+				name := list.Items[i].Name
+				if _, ok := seen[name]; ok {
+					continue
 				}
-			}
 
-			return requests
+				seen[name] = struct{}{}
+
+				q.Add(reconcile.Request{NamespacedName: types.NamespacedName{Name: name}})
+			}
+		}
+	}
+
+	// tenantEventHandler maps Tenant events to reconcile requests for only the
+	// TenantOwners that are actually affected by the changed selectors, rather
+	// than fan-out to all TenantOwners on every Tenant event.
+	tenantEventHandler := handler.TypedFuncs[*capsulev1beta2.Tenant, reconcile.Request]{
+		CreateFunc: func(ctx context.Context, e event.TypedCreateEvent[*capsulev1beta2.Tenant], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+			enqueueForSelectors(ctx, e.Object.Spec.Permissions.MatchOwners, q)
 		},
-	)
+		UpdateFunc: func(ctx context.Context, e event.TypedUpdateEvent[*capsulev1beta2.Tenant], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+			// Union of old AND new selectors: TenantOwners that dropped out of
+			// the old selector also need to be reconciled to clear the Tenant
+			// from their status.
+			enqueueForSelectors(ctx, e.ObjectOld.Spec.Permissions.MatchOwners, q)
+			enqueueForSelectors(ctx, e.ObjectNew.Spec.Permissions.MatchOwners, q)
+		},
+		DeleteFunc: func(ctx context.Context, e event.TypedDeleteEvent[*capsulev1beta2.Tenant], q workqueue.TypedRateLimitingInterface[reconcile.Request]) {
+			enqueueForSelectors(ctx, e.Object.Spec.Permissions.MatchOwners, q)
+		},
+	}
 
 	return ctrl.NewControllerManagedBy(mgr).
 		Named("capsule/tenant-owner-status").
@@ -79,14 +119,7 @@ func (r *TenantOwnerManager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils
 				),
 			),
 		).
-		Watches(
-			&capsulev1beta2.Tenant{},
-			enqueueAllTenantOwners,
-			builder.WithPredicates(predicate.Or(
-				predicate.GenerationChangedPredicate{},
-				predicate.Funcs{DeleteFunc: func(event.DeleteEvent) bool { return true }},
-			)),
-		).
+		WatchesRawSource(source.Kind(mgr.GetCache(), &capsulev1beta2.Tenant{}, tenantEventHandler)).
 		WithOptions(controller.Options{MaxConcurrentReconciles: ctrlConfig.MaxConcurrentReconciles}).
 		Complete(r)
 }
@@ -141,7 +174,9 @@ func (r *TenantOwnerManager) reconcileMatchedTenants(ctx context.Context, to *ca
 
 			selector, err := metav1.LabelSelectorAsSelector(sel)
 			if err != nil {
-				return nil, fmt.Errorf("invalid matchOwners selector on Tenant %q: %w", tnt.Name, err)
+				r.Log.Error(err, "invalid matchOwners selector, skipping", "tenant", tnt.Name)
+
+				continue
 			}
 
 			if selector.Matches(toLabels) {
