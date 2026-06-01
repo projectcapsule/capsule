@@ -31,7 +31,12 @@ maintainers:
     - https://github.com/projectcapsule/capsule-proxy
 - name: Hristo Hristov
   github: https://github.com/Svarrogh1337
-  company: Vaerolabs
+  company: Independent
   projects:
     - https://github.com/projectcapsule/capsule
     - https://github.com/projectcapsule/capsule-proxy
+- name: Sander Tervoert
+  github: https://github.com/sandert-k8s
+  company: ODC-Noord
+  projects:
+    - https://github.com/projectcapsule/website
