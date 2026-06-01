@@ -1086,6 +1086,14 @@ func TenantReady(
 				current.Status.Owners,
 			)
 		}
+
+		g.Expect(current.Status.ObservedGeneration).To(
+			Equal(current.GetGeneration()),
+			"expected Tenant %q status.observedGeneration (%d) to equal metadata.generation (%d)",
+			tnt.GetName(),
+			current.Status.ObservedGeneration,
+			current.GetGeneration(),
+		)
 	}, timeoutInterval, defaultPollInterval).Should(Succeed())
 }
 

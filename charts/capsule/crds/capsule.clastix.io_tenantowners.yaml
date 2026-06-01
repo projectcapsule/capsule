@@ -74,6 +74,12 @@ spec:
             type: object
           status:
             description: status defines the observed state of TenantOwner.
+            properties:
+              observedGeneration:
+                description: ObservedGeneration is the most recent generation the
+                  controller has observed.
+                format: int64
+                type: integer
             type: object
         required:
         - spec
