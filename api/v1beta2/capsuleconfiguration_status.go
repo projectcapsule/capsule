@@ -9,6 +9,9 @@ import (
 
 // CapsuleConfigurationStatus defines the Capsule configuration status.
 type CapsuleConfigurationStatus struct {
+	// ObservedGeneration is the most recent generation the controller has observed.
+	// +optional
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 	// Users which are considered Capsule Users and are bound to the Capsule Tenant construct.
 	Users rbac.UserListSpec `json:"users,omitempty"`
 }

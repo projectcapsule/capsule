@@ -13,6 +13,9 @@ import (
 
 // GlobalResourceQuotaStatus defines the observed state of GlobalResourceQuota.
 type ResourcePoolStatus struct {
+	// ObservedGeneration is the most recent generation the controller has observed.
+	// +optional
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 	// How many namespaces are considered
 	// +kubebuilder:default=0
 	NamespaceSize uint `json:"namespaceCount,omitempty"`
