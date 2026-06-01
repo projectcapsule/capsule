@@ -2949,6 +2949,11 @@ spec:
                 items:
                   type: string
                 type: array
+              observedGeneration:
+                description: ObservedGeneration is the most recent generation the
+                  controller has observed.
+                format: int64
+                type: integer
               owners:
                 description: Collected owners for this tenant
                 items:

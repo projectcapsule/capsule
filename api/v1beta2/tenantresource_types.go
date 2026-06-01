@@ -13,6 +13,9 @@ import (
 )
 
 type TenantResourceCommonStatus struct {
+	// ObservedGeneration is the most recent generation the controller has observed.
+	// +optional
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 	// Condition of the GlobalTenantResource.
 	Conditions meta.ConditionList `json:"conditions,omitempty"`
 

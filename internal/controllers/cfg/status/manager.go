@@ -194,6 +194,7 @@ func (r *Manager) updateConfigStatus(
 		}
 
 		latest.Status = instance.Status
+		latest.Status.ObservedGeneration = instance.GetGeneration()
 
 		return r.Client.Status().Update(ctx, latest)
 	})

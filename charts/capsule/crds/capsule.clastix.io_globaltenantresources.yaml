@@ -521,6 +521,11 @@ spec:
                   - type
                   type: object
                 type: array
+              observedGeneration:
+                description: ObservedGeneration is the most recent generation the
+                  controller has observed.
+                format: int64
+                type: integer
               processedItems:
                 description: List of the replicated resources for the given TenantResource.
                 items:

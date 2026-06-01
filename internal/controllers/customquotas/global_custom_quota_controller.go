@@ -390,6 +390,7 @@ func (r *clusterCustomQuotaClaimController) updateStatus(
 		}
 
 		latest.Status = instance.Status
+		latest.Status.ObservedGeneration = instance.GetGeneration()
 
 		// Set Ready Condition
 		readyCondition := meta.NewReadyCondition(instance)
