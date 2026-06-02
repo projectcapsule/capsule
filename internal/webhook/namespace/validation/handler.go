@@ -183,10 +183,6 @@ func (h *handler) OnUpdate(
 			}
 		}
 
-		if terminating := h.rejectOnTermination(ctx, c, ns, newTenant); terminating != nil {
-			return terminating
-		}
-
 		tnt := newTenant
 		if !user.IsAdmin() {
 			tnt = oldTenant
@@ -194,6 +190,10 @@ func (h *handler) OnUpdate(
 
 		if tnt == nil {
 			return nil
+		}
+
+		if terminating := h.rejectOnTermination(ctx, c, ns, newTenant); terminating != nil {
+			return terminating
 		}
 
 		for _, hndl := range h.handlers {
@@ -212,6 +212,10 @@ func (h *handler) rejectOnTermination(
 	ns *corev1.Namespace,
 	t *capsulev1beta2.Tenant,
 ) *admission.Response {
+	if t == nil {
+		return nil
+	}
+
 	tnt := &capsulev1beta2.Tenant{}
 
 	_ = c.Get(ctx, types.NamespacedName{Name: t.GetName()}, tnt)
