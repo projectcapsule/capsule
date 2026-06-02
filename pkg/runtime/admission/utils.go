@@ -15,6 +15,12 @@ func Deny(message string) *admission.Response {
 	return &response
 }
 
+func Allow(message string) *admission.Response {
+	response := admission.Allowed(message)
+
+	return &response
+}
+
 func normalizePath(p string) string {
 	if p == "" {
 		return ""

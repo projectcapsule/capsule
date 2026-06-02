@@ -103,6 +103,86 @@ var _ = Describe("Administrators", Ordered, Label("namespace", "permissions", "a
 
 	})
 
+	It("interaction with non-tenant namespaces", func() {
+		ctx := context.TODO()
+
+		ns1 := NewNamespace("", map[string]string{})
+
+		By("creating namespace with explicit empty labels", func() {
+			NamespaceCreation(ns1, admin, defaultTimeoutInterval).Should(Succeed())
+		})
+
+		By("verifying no ownerReferences and no tenant label", func() {
+			ExpectNamespaceNotAssignedToTenant(ctx, ns1.Name)
+		})
+
+		By("updating unassigned namespace as administrator", func() {
+			Eventually(func() error {
+				current := NewNamespace(ns1.Name)
+
+				if err := k8sClient.Get(ctx, types.NamespacedName{Name: ns1.Name}, current); err != nil {
+					return err
+				}
+
+				original := current.DeepCopy()
+
+				if current.Annotations == nil {
+					current.Annotations = map[string]string{}
+				}
+
+				current.Annotations["e2e.capsule.clastix.io/admin-non-tenant-update"] = "true"
+
+				return impersonationClient(admin.Name, nil).Patch(ctx, current, client.MergeFrom(original))
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		})
+
+		By("verifying namespace is still not assigned after administrator update", func() {
+			ExpectNamespaceNotAssignedToTenant(ctx, ns1.Name)
+		})
+
+		ns2 := NewNamespace("")
+
+		By("creating namespace with nil labels", func() {
+			NamespaceCreation(ns2, admin, defaultTimeoutInterval).Should(Succeed())
+		})
+
+		By("verifying no ownerReferences and no tenant label", func() {
+			ExpectNamespaceNotAssignedToTenant(ctx, ns2.Name)
+		})
+
+		By("updating unassigned namespace with nil labels as administrator", func() {
+			Eventually(func() error {
+				current := NewNamespace(ns2.Name)
+
+				if err := k8sClient.Get(ctx, types.NamespacedName{Name: ns2.Name}, current); err != nil {
+					return err
+				}
+
+				original := current.DeepCopy()
+
+				if current.Annotations == nil {
+					current.Annotations = map[string]string{}
+				}
+
+				current.Annotations["e2e.capsule.clastix.io/admin-non-tenant-update"] = "true"
+
+				return impersonationClient(admin.Name, nil).Patch(ctx, current, client.MergeFrom(original))
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		})
+
+		By("verifying namespace is still not assigned after administrator update", func() {
+			ExpectNamespaceNotAssignedToTenant(ctx, ns2.Name)
+		})
+
+		By("deleting namespace", func() {
+			Expect(k8sClient.Delete(ctx, ns2)).Should(Succeed())
+		})
+
+		By("deleting namespace", func() {
+			Expect(k8sClient.Delete(ctx, ns1)).Should(Succeed())
+		})
+	})
+
 	It("capsule is triggered for administrators based on namespace label", func() {
 		By("creating namespace with faulty label", func() {
 			ns := NewNamespace("", map[string]string{
