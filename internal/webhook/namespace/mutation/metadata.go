@@ -48,7 +48,7 @@ func (h *metadataHandler) OnCreate(
 		}
 
 		if tnt == nil {
-			return ad.Deny("Unable to assign namespace to tenant.")
+			return nil
 		}
 
 		labels, annotations, err := tenant.BuildNamespaceMetadataForTenant(ns, tnt)
@@ -105,7 +105,7 @@ func (h *metadataHandler) OnUpdate(
 		}
 
 		if tnt == nil {
-			return ad.Deny("Unable to assign namespace to tenant.")
+			return nil
 		}
 
 		labels, annotations, err := tenant.BuildNamespaceMetadataForTenant(newNs, tnt)

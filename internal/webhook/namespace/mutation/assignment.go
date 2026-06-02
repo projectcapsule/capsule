@@ -48,6 +48,12 @@ func (h *ownerReferenceHandler) OnCreate(
 			return errResponse
 		}
 
+		// Administrators are allowed to create namespaces that are not managed
+		// by Capsule. In that case there is intentionally no tenant to assign.
+		if tnt == nil && user.IsAdmin() {
+			return ad.Allow("")
+		}
+
 		if tnt == nil {
 			response := admission.Denied(
 				"Unable to assign namespace to tenant. Please use " +
