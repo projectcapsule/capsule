@@ -17,7 +17,7 @@ require (
 	github.com/stretchr/testify v1.11.1
 	github.com/valyala/fasttemplate v1.2.2
 	go.uber.org/automaxprocs v1.6.0
-	go.uber.org/zap v1.27.1
+	go.uber.org/zap v1.28.0
 	golang.org/x/sync v0.20.0
 	gomodules.xyz/jsonpatch/v2 v2.5.0
 	gomodules.xyz/jsonpatch/v3 v3.0.1
