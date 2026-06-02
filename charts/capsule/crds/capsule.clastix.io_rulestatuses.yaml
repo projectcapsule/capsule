@@ -42,8 +42,8 @@ spec:
             type: object
           spec:
             items:
-              description: For future inmplementatiosn where users might manage RuleStatus
-                CRs tehmselves
+              description: For future implementation where users might manage RuleStatus
+                CRs themselves
               properties:
                 enforce:
                   description: Enforcement for given rule
