@@ -39,7 +39,7 @@ Versions follow [Semantic Versioning](https://semver.org/) terminology and are e
 
 Security fixes, may be backported to the three most recent minor releases, depending on severity and feasibility.
 
-Prereleases are marked as `-rc.x` (release candidate) and may refere to any type of version bump.
+Prereleases are marked as `-rc.x` (release candidate) and may refer to any type of version bump.
 
 ## Pull Requests
 
