@@ -17,7 +17,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api/rbac"
 )
 
-var _ = Describe("Owners", Ordered, Label("config", "tenant", "permissions", "owners"), func() {
+var _ = Describe("Owners", Ordered, Label("config", "tenantowner", "tenant", "permissions", "owners"), func() {
 	originConfig := &capsulev1beta2.CapsuleConfiguration{}
 
 	tnt1 := &capsulev1beta2.Tenant{
@@ -32,12 +32,14 @@ var _ = Describe("Owners", Ordered, Label("config", "tenant", "permissions", "ow
 				MatchOwners: []*metav1.LabelSelector{
 					{
 						MatchLabels: map[string]string{
-							"customer": "x",
+							"customer":               "x",
+							"e2e.suite.capsule/name": "owner_test",
 						},
 					},
 					{
 						MatchLabels: map[string]string{
-							"team": "devops",
+							"team":                   "devops",
+							"e2e.suite.capsule/name": "owner_test",
 						},
 					},
 				},
@@ -83,12 +85,14 @@ var _ = Describe("Owners", Ordered, Label("config", "tenant", "permissions", "ow
 				MatchOwners: []*metav1.LabelSelector{
 					{
 						MatchLabels: map[string]string{
-							"customer": "x",
+							"customer":               "x",
+							"e2e.suite.capsule/name": "owner_test",
 						},
 					},
 					{
 						MatchLabels: map[string]string{
-							"team": "infrastructure",
+							"team":                   "infrastructure",
+							"e2e.suite.capsule/name": "owner_test",
 						},
 					},
 				},
@@ -126,7 +130,8 @@ var _ = Describe("Owners", Ordered, Label("config", "tenant", "permissions", "ow
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "e2e-owners-infra",
 			Labels: map[string]string{
-				"team": "infrastructure",
+				"team":                   "infrastructure",
+				"e2e.suite.capsule/name": "owner_test",
 			},
 		},
 		Spec: capsulev1beta2.TenantOwnerSpec{
@@ -147,7 +152,8 @@ var _ = Describe("Owners", Ordered, Label("config", "tenant", "permissions", "ow
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "e2e-owners-devops",
 			Labels: map[string]string{
-				"team": "devops",
+				"team":                   "devops",
+				"e2e.suite.capsule/name": "owner_test",
 			},
 		},
 		Spec: capsulev1beta2.TenantOwnerSpec{
@@ -168,8 +174,9 @@ var _ = Describe("Owners", Ordered, Label("config", "tenant", "permissions", "ow
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "e2e-owners-common",
 			Labels: map[string]string{
-				"team":     "infrastructure",
-				"customer": "x",
+				"team":                   "infrastructure",
+				"customer":               "x",
+				"e2e.suite.capsule/name": "owner_test",
 			},
 		},
 		Spec: capsulev1beta2.TenantOwnerSpec{
@@ -211,8 +218,9 @@ var _ = Describe("Owners", Ordered, Label("config", "tenant", "permissions", "ow
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "e2e-owners-common-user",
 			Labels: map[string]string{
-				"team":     "infrastructure",
-				"customer": "x",
+				"team":                   "infrastructure",
+				"customer":               "x",
+				"e2e.suite.capsule/name": "owner_test",
 			},
 		},
 		Spec: capsulev1beta2.TenantOwnerSpec{
