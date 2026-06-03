@@ -23,8 +23,10 @@ import (
 //
 
 func (r *Manager) syncNetworkPolicies(ctx context.Context, log logr.Logger, tenant *capsulev1beta2.Tenant) error {
+	//nolint:staticcheck
 	keys := make([]string, 0, len(tenant.Spec.NetworkPolicies.Items))
 
+	//nolint:staticcheck
 	for i := range tenant.Spec.NetworkPolicies.Items {
 		keys = append(keys, strconv.Itoa(i))
 	}
@@ -39,6 +41,7 @@ func (r *Manager) syncNetworkPolicy(ctx context.Context, log logr.Logger, tenant
 		return err
 	}
 
+	//nolint:staticcheck
 	for i, spec := range tenant.Spec.NetworkPolicies.Items {
 		target := &networkingv1.NetworkPolicy{
 			ObjectMeta: metav1.ObjectMeta{
