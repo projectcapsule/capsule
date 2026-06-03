@@ -474,7 +474,7 @@ e2e-install: helm-controller-version ko-build-all dev-install-gw-api-crds
 		--set-string 'manager.options.logLevel=5' \
 		--set 'manager.options.workers=4' \
 		--set 'manager.options.clientConnectionQPS=2000' \
-		--set 'manager.options.clientConnectionQPS=1000' \
+		--set 'manager.options.clientConnectionBurst=1000' \
 		--set 'manager.rbac.minimal=true' \
 		--set 'webhooks.hooks.nodes.enabled=true' \
 		--set "webhooks.exclusive=true"\

@@ -344,7 +344,7 @@ func (r *Manager) reconcile(ctx context.Context, log logr.Logger, instance *caps
 	// Ensuring LimitRange resources
 	r.Log.V(4).Info("Starting processing of Limit Ranges", "items", len(instance.Spec.LimitRanges.Items))
 
-	if err = r.syncLimitRanges(ctx, instance); err != nil {
+	if err = r.syncLimitRanges(ctx, log, instance); err != nil {
 		errs = append(errs, fmt.Errorf("cannot sync limitrange items: %w", err))
 	}
 

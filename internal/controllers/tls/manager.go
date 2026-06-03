@@ -183,10 +183,6 @@ func (r *Reconciler) ReconcileCertificates(
 			sans,
 		))
 		if err != nil {
-			return err
-		}
-
-		if err != nil {
 			log.Error(err, "cannot generate serving TLS certificate")
 
 			return err
@@ -468,6 +464,28 @@ func (r *Reconciler) validateSecretCertificate(
 			certSecret.Name,
 			err,
 		)
+	}
+
+	keyPEM := certSecret.Data[corev1.TLSPrivateKeyKey]
+	if len(keyPEM) == 0 {
+		return fmt.Errorf("missing %q in TLS Secret %s/%s",
+			corev1.TLSPrivateKeyKey,
+			certSecret.Namespace,
+			certSecret.Name,
+		)
+	}
+
+	key, err := cert.GetPrivateKeyFromBytes(keyPEM)
+	if err != nil {
+		return fmt.Errorf("parse serving private key from TLS Secret %s/%s: %w",
+			certSecret.Namespace,
+			certSecret.Name,
+			err,
+		)
+	}
+
+	if err := cert.ValidateCertificate(leaf, key, certificateExpirationThreshold); err != nil {
+		return fmt.Errorf("serving certificate/key pair is invalid or expiring: %w", err)
 	}
 
 	normalized := sans.Normalize()
