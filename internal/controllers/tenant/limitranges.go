@@ -8,12 +8,12 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
-	"github.com/go-logr/logr"
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 )
@@ -23,8 +23,10 @@ import (
 
 func (r *Manager) syncLimitRanges(ctx context.Context, log logr.Logger, tenant *capsulev1beta2.Tenant) error {
 	// getting requested LimitRange keys
+	//nolint:staticcheck
 	keys := make([]string, 0, len(tenant.Spec.LimitRanges.Items))
 
+	//nolint:staticcheck
 	for i := range tenant.Spec.LimitRanges.Items {
 		keys = append(keys, strconv.Itoa(i))
 	}
@@ -45,6 +47,7 @@ func (r *Manager) syncLimitRange(
 		return err
 	}
 
+	//nolint:staticcheck
 	for i, spec := range tenant.Spec.LimitRanges.Items {
 		target := &corev1.LimitRange{
 			ObjectMeta: metav1.ObjectMeta{

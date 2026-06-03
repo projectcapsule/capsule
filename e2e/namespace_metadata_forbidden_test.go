@@ -31,11 +31,22 @@ var _ = Describe("creating a Namespace with user-specified labels and annotation
 			NamespaceOptions: &capsulev1beta2.NamespaceOptions{
 				ForbiddenLabels: api.ForbiddenListSpec{
 					Exact: []string{"foo", "bar"},
-					Regex: "^gatsby-.*$",
+					Regex: "^gatsby-.*$|^managed\\.projectcapsule\\.dev/",
 				},
 				ForbiddenAnnotations: api.ForbiddenListSpec{
 					Exact: []string{"foo", "bar"},
-					Regex: "^gatsby-.*$",
+					Regex: "^gatsby-.*$|^managed\\.projectcapsule\\.dev/",
+				},
+				AdditionalMetadataList: []api.AdditionalMetadataSelectorSpec{
+					{
+						Labels: map[string]string{
+							"managed.projectcapsule.dev/customer": "acme",
+							"managed.projectcapsule.dev/tenant":   "{{ tenant.name }}",
+						},
+						Annotations: map[string]string{
+							"managed.projectcapsule.dev/source": "capsule",
+						},
+					},
 				},
 			},
 			Owners: rbac.OwnerListSpec{
@@ -54,10 +65,13 @@ var _ = Describe("creating a Namespace with user-specified labels and annotation
 	JustBeforeEach(func() {
 		EventuallyCreation(func() error {
 			tnt.ResourceVersion = ""
+
 			return k8sClient.Create(context.TODO(), tnt)
 		}).Should(Succeed())
+
 		TenantReady(tnt, metav1.ConditionTrue, defaultTimeoutInterval)
 	})
+
 	JustAfterEach(func() {
 		EventuallyDeletion(tnt)
 	})
@@ -68,18 +82,37 @@ var _ = Describe("creating a Namespace with user-specified labels and annotation
 				"bim":            "baz",
 				meta.TenantLabel: tnt.GetName(),
 			})
+
 			NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 			NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
-
 		})
+
 		By("specifying non-forbidden annotations", func() {
 			ns := NewNamespace("", map[string]string{
 				meta.TenantLabel: tnt.GetName(),
 			})
 			ns.SetAnnotations(map[string]string{"bim": "baz"})
+
+			NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+			NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
+		})
+
+		By("allowing forbidden-prefix labels and annotations when they are managed by Capsule", func() {
+			ns := NewNamespace("", map[string]string{
+				meta.TenantLabel: tnt.GetName(),
+			})
+
 			NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 			NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
 
+			Eventually(func(g Gomega) {
+				err := k8sClient.Get(context.Background(), types.NamespacedName{Name: ns.GetName()}, ns)
+				g.Expect(err).ToNot(HaveOccurred())
+
+				g.Expect(ns.GetLabels()).To(HaveKeyWithValue("managed.projectcapsule.dev/customer", "acme"))
+				g.Expect(ns.GetLabels()).To(HaveKeyWithValue("managed.projectcapsule.dev/tenant", tnt.GetName()))
+				g.Expect(ns.GetAnnotations()).To(HaveKeyWithValue("managed.projectcapsule.dev/source", "capsule"))
+			}, defaultTimeoutInterval, time.Second).Should(Succeed())
 		})
 	})
 
@@ -89,35 +122,61 @@ var _ = Describe("creating a Namespace with user-specified labels and annotation
 				"foo":            "bar",
 				meta.TenantLabel: tnt.GetName(),
 			})
+
 			NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).ShouldNot(Succeed())
 			NamespaceIsNotPartOfTenant(tnt, ns).Should(Succeed())
-
 		})
+
 		By("specifying forbidden labels using regex match", func() {
 			ns := NewNamespace("", map[string]string{
 				meta.TenantLabel: tnt.GetName(),
 				"gatsby-foo":     "bar",
 			})
+
 			NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).ShouldNot(Succeed())
 			NamespaceIsNotPartOfTenant(tnt, ns).Should(Succeed())
 		})
+
 		By("specifying forbidden annotations using exact match", func() {
 			ns := NewNamespace("", map[string]string{
 				meta.TenantLabel: tnt.GetName(),
 			})
 			ns.SetAnnotations(map[string]string{"foo": "bar"})
+
 			NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).ShouldNot(Succeed())
 			NamespaceIsNotPartOfTenant(tnt, ns).Should(Succeed())
-
 		})
+
 		By("specifying forbidden annotations using regex match", func() {
 			ns := NewNamespace("", map[string]string{
 				meta.TenantLabel: tnt.GetName(),
 			})
 			ns.SetAnnotations(map[string]string{"gatsby-foo": "bar"})
+
 			NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).ShouldNot(Succeed())
 			NamespaceIsNotPartOfTenant(tnt, ns).Should(Succeed())
+		})
 
+		By("specifying forbidden-prefix labels that are not managed by Capsule", func() {
+			ns := NewNamespace("", map[string]string{
+				meta.TenantLabel:                        tnt.GetName(),
+				"managed.projectcapsule.dev/user-label": "should-be-denied",
+			})
+
+			NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).ShouldNot(Succeed())
+			NamespaceIsNotPartOfTenant(tnt, ns).Should(Succeed())
+		})
+
+		By("specifying forbidden-prefix annotations that are not managed by Capsule", func() {
+			ns := NewNamespace("", map[string]string{
+				meta.TenantLabel: tnt.GetName(),
+			})
+			ns.SetAnnotations(map[string]string{
+				"managed.projectcapsule.dev/user-annotation": "should-be-denied",
+			})
+
+			NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).ShouldNot(Succeed())
+			NamespaceIsNotPartOfTenant(tnt, ns).Should(Succeed())
 		})
 	})
 
@@ -169,81 +228,249 @@ var _ = Describe("creating a Namespace with user-specified labels and annotation
 			ns := NewNamespace("forbidden-labels-exact-match", map[string]string{
 				meta.TenantLabel: tnt.GetName(),
 			})
+
 			NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 			NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
 
 			rbacPatch(ns.GetName())
+
 			Consistently(func() error {
 				if err := k8sClient.Get(context.Background(), types.NamespacedName{Name: ns.GetName()}, ns); err != nil {
 					return nil
 				}
 
-				ns.SetLabels(map[string]string{"foo": "bar"})
+				labels := ns.GetLabels()
+				if labels == nil {
+					labels = map[string]string{}
+				}
+				labels["foo"] = "bar"
+				ns.SetLabels(labels)
 
 				_, err := cs.CoreV1().Namespaces().Update(context.Background(), ns, metav1.UpdateOptions{})
 
 				return err
 			}, 10*time.Second, time.Second).ShouldNot(Succeed())
 		})
+
 		By("specifying forbidden labels using regex match", func() {
 			ns := NewNamespace("forbidden-labels-regex-match", map[string]string{
 				meta.TenantLabel: tnt.GetName(),
 			})
+
 			NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 			NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
 
 			rbacPatch(ns.GetName())
+
 			Consistently(func() error {
 				if err := k8sClient.Get(context.Background(), types.NamespacedName{Name: ns.GetName()}, ns); err != nil {
 					return nil
 				}
 
-				ns.SetLabels(map[string]string{"gatsby-foo": "bar"})
+				labels := ns.GetLabels()
+				if labels == nil {
+					labels = map[string]string{}
+				}
+				labels["gatsby-foo"] = "bar"
+				ns.SetLabels(labels)
 
 				_, err := cs.CoreV1().Namespaces().Update(context.Background(), ns, metav1.UpdateOptions{})
 
 				return err
 			}, 3*time.Second, time.Second).ShouldNot(Succeed())
 		})
+
 		By("specifying forbidden annotations using exact match", func() {
 			ns := NewNamespace("forbidden-annotations-exact-match", map[string]string{
 				meta.TenantLabel: tnt.GetName(),
 			})
+
 			NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 			NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
 
 			rbacPatch(ns.GetName())
+
 			Consistently(func() error {
 				if err := k8sClient.Get(context.Background(), types.NamespacedName{Name: ns.GetName()}, ns); err != nil {
 					return nil
 				}
 
-				ns.SetAnnotations(map[string]string{"foo": "bar"})
+				annotations := ns.GetAnnotations()
+				if annotations == nil {
+					annotations = map[string]string{}
+				}
+				annotations["foo"] = "bar"
+				ns.SetAnnotations(annotations)
 
 				_, err := cs.CoreV1().Namespaces().Update(context.Background(), ns, metav1.UpdateOptions{})
 
 				return err
 			}, 10*time.Second, time.Second).ShouldNot(Succeed())
 		})
+
 		By("specifying forbidden annotations using regex match", func() {
 			ns := NewNamespace("forbidden-annotations-regex-match", map[string]string{
 				meta.TenantLabel: tnt.GetName(),
 			})
+
 			NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 			NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
 
 			rbacPatch(ns.GetName())
+
 			Consistently(func() error {
 				if err := k8sClient.Get(context.Background(), types.NamespacedName{Name: ns.GetName()}, ns); err != nil {
 					return nil
 				}
 
-				ns.SetAnnotations(map[string]string{"gatsby-foo": "bar"})
+				annotations := ns.GetAnnotations()
+				if annotations == nil {
+					annotations = map[string]string{}
+				}
+				annotations["gatsby-foo"] = "bar"
+				ns.SetAnnotations(annotations)
 
 				_, err := cs.CoreV1().Namespaces().Update(context.Background(), ns, metav1.UpdateOptions{})
 
 				return err
 			}, 10*time.Second, time.Second).ShouldNot(Succeed())
+		})
+
+		By("specifying forbidden-prefix labels that are not managed by Capsule", func() {
+			ns := NewNamespace("forbidden-managed-prefix-label-update", map[string]string{
+				meta.TenantLabel: tnt.GetName(),
+			})
+
+			NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+			NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
+
+			rbacPatch(ns.GetName())
+
+			Consistently(func() error {
+				if err := k8sClient.Get(context.Background(), types.NamespacedName{Name: ns.GetName()}, ns); err != nil {
+					return nil
+				}
+
+				labels := ns.GetLabels()
+				if labels == nil {
+					labels = map[string]string{}
+				}
+				labels["managed.projectcapsule.dev/user-label"] = "should-be-denied"
+				ns.SetLabels(labels)
+
+				_, err := cs.CoreV1().Namespaces().Update(context.Background(), ns, metav1.UpdateOptions{})
+
+				return err
+			}, 10*time.Second, time.Second).ShouldNot(Succeed())
+		})
+
+		By("specifying forbidden-prefix annotations that are not managed by Capsule", func() {
+			ns := NewNamespace("forbidden-managed-prefix-annotation-update", map[string]string{
+				meta.TenantLabel: tnt.GetName(),
+			})
+
+			NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+			NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
+
+			rbacPatch(ns.GetName())
+
+			Consistently(func() error {
+				if err := k8sClient.Get(context.Background(), types.NamespacedName{Name: ns.GetName()}, ns); err != nil {
+					return nil
+				}
+
+				annotations := ns.GetAnnotations()
+				if annotations == nil {
+					annotations = map[string]string{}
+				}
+				annotations["managed.projectcapsule.dev/user-annotation"] = "should-be-denied"
+				ns.SetAnnotations(annotations)
+
+				_, err := cs.CoreV1().Namespaces().Update(context.Background(), ns, metav1.UpdateOptions{})
+
+				return err
+			}, 10*time.Second, time.Second).ShouldNot(Succeed())
+		})
+
+		By("restoring a Capsule-managed forbidden-prefix label value on update", func() {
+			ns := NewNamespace("forbidden-managed-label-value-update", map[string]string{
+				meta.TenantLabel: tnt.GetName(),
+			})
+
+			NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+			NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
+
+			Eventually(func(g Gomega) {
+				err := k8sClient.Get(context.Background(), types.NamespacedName{Name: ns.GetName()}, ns)
+				g.Expect(err).ToNot(HaveOccurred())
+				g.Expect(ns.GetLabels()).To(HaveKeyWithValue("managed.projectcapsule.dev/customer", "acme"))
+			}, defaultTimeoutInterval, time.Second).Should(Succeed())
+
+			rbacPatch(ns.GetName())
+
+			Eventually(func(g Gomega) {
+				err := k8sClient.Get(context.Background(), types.NamespacedName{Name: ns.GetName()}, ns)
+				g.Expect(err).ToNot(HaveOccurred())
+
+				labels := ns.GetLabels()
+				if labels == nil {
+					labels = map[string]string{}
+				}
+
+				labels["managed.projectcapsule.dev/customer"] = "tampered"
+				ns.SetLabels(labels)
+
+				_, err = cs.CoreV1().Namespaces().Update(context.Background(), ns, metav1.UpdateOptions{})
+				g.Expect(err).ToNot(HaveOccurred())
+			}, defaultTimeoutInterval, time.Second).Should(Succeed())
+
+			Eventually(func(g Gomega) {
+				err := k8sClient.Get(context.Background(), types.NamespacedName{Name: ns.GetName()}, ns)
+				g.Expect(err).ToNot(HaveOccurred())
+
+				g.Expect(ns.GetLabels()).To(HaveKeyWithValue("managed.projectcapsule.dev/customer", "acme"))
+				g.Expect(ns.GetLabels()).To(HaveKeyWithValue("managed.projectcapsule.dev/tenant", tnt.GetName()))
+			}, defaultTimeoutInterval, time.Second).Should(Succeed())
+		})
+
+		By("restoring a Capsule-managed forbidden-prefix annotation value on update", func() {
+			ns := NewNamespace("forbidden-managed-annotation-value-update", map[string]string{
+				meta.TenantLabel: tnt.GetName(),
+			})
+
+			NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+			NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
+
+			Eventually(func(g Gomega) {
+				err := k8sClient.Get(context.Background(), types.NamespacedName{Name: ns.GetName()}, ns)
+				g.Expect(err).ToNot(HaveOccurred())
+				g.Expect(ns.GetAnnotations()).To(HaveKeyWithValue("managed.projectcapsule.dev/source", "capsule"))
+			}, defaultTimeoutInterval, time.Second).Should(Succeed())
+
+			rbacPatch(ns.GetName())
+
+			Eventually(func(g Gomega) {
+				err := k8sClient.Get(context.Background(), types.NamespacedName{Name: ns.GetName()}, ns)
+				g.Expect(err).ToNot(HaveOccurred())
+
+				annotations := ns.GetAnnotations()
+				if annotations == nil {
+					annotations = map[string]string{}
+				}
+
+				annotations["managed.projectcapsule.dev/source"] = "tampered"
+				ns.SetAnnotations(annotations)
+
+				_, err = cs.CoreV1().Namespaces().Update(context.Background(), ns, metav1.UpdateOptions{})
+				g.Expect(err).ToNot(HaveOccurred())
+			}, defaultTimeoutInterval, time.Second).Should(Succeed())
+
+			Eventually(func(g Gomega) {
+				err := k8sClient.Get(context.Background(), types.NamespacedName{Name: ns.GetName()}, ns)
+				g.Expect(err).ToNot(HaveOccurred())
+
+				g.Expect(ns.GetAnnotations()).To(HaveKeyWithValue("managed.projectcapsule.dev/source", "capsule"))
+			}, defaultTimeoutInterval, time.Second).Should(Succeed())
 		})
 	})
 })

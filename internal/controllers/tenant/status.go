@@ -342,6 +342,7 @@ func listObjectNamesBySelector(
 
 	var regex *regexp.Regexp
 
+	//nolint:staticcheck
 	if allowed.Regex != "" {
 		regex, err = regexp.Compile(allowed.Regex)
 		if err != nil {
