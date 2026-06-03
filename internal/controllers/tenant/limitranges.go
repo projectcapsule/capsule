@@ -1,7 +1,6 @@
 // Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
-//nolint:dupl
 package tenant
 
 import (
@@ -23,9 +22,8 @@ import (
 
 func (r *Manager) syncLimitRanges(ctx context.Context, tenant *capsulev1beta2.Tenant) error {
 	// getting requested LimitRange keys
-	keys := make([]string, 0, len(tenant.Spec.LimitRanges.Items)) //nolint:staticcheck
+	keys := make([]string, 0, len(tenant.Spec.LimitRanges.Items))
 
-	//nolint:staticcheck
 	for i := range tenant.Spec.LimitRanges.Items {
 		keys = append(keys, strconv.Itoa(i))
 	}
@@ -40,7 +38,6 @@ func (r *Manager) syncLimitRange(ctx context.Context, tenant *capsulev1beta2.Ten
 		return err
 	}
 
-	//nolint:staticcheck
 	for i, spec := range tenant.Spec.LimitRanges.Items {
 		target := &corev1.LimitRange{
 			ObjectMeta: metav1.ObjectMeta{

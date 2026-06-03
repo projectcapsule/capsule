@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"sort"
 
+	"github.com/go-logr/logr"
 	nodev1 "k8s.io/api/node/v1"
 	resources "k8s.io/api/resource/v1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
@@ -19,7 +20,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
@@ -148,9 +148,7 @@ func (r *Manager) collectRBAC(ctx context.Context, tnt *capsulev1beta2.Tenant) (
 	return nil
 }
 
-func (r *Manager) collectAvailableResources(ctx context.Context, tnt *capsulev1beta2.Tenant) (err error) {
-	log := log.FromContext(ctx)
-
+func (r *Manager) collectAvailableResources(ctx context.Context, log logr.Logger, tnt *capsulev1beta2.Tenant) (err error) {
 	if r.classes.device {
 		log.V(5).Info("collecting available deviceclasses")
 
@@ -344,7 +342,6 @@ func listObjectNamesBySelector(
 
 	var regex *regexp.Regexp
 
-	//nolint:staticcheck
 	if allowed.Regex != "" {
 		regex, err = regexp.Compile(allowed.Regex)
 		if err != nil {

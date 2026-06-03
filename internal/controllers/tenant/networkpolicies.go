@@ -1,7 +1,6 @@
 // Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
-//nolint:dupl
 package tenant
 
 import (
@@ -9,6 +8,7 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -22,25 +22,23 @@ import (
 // Ensuring all the NetworkPolicies are applied to each Namespace handled by the Tenant.
 //
 
-func (r *Manager) syncNetworkPolicies(ctx context.Context, tenant *capsulev1beta2.Tenant) error {
-	keys := make([]string, 0, len(tenant.Spec.NetworkPolicies.Items)) //nolint:staticcheck
+func (r *Manager) syncNetworkPolicies(ctx context.Context, log logr.Logger, tenant *capsulev1beta2.Tenant) error {
+	keys := make([]string, 0, len(tenant.Spec.NetworkPolicies.Items))
 
-	//nolint:staticcheck
 	for i := range tenant.Spec.NetworkPolicies.Items {
 		keys = append(keys, strconv.Itoa(i))
 	}
 
 	return runForTenantNamespaces(ctx, tenant, func(ctx context.Context, namespace string) error {
-		return r.syncNetworkPolicy(ctx, tenant, namespace, keys)
+		return r.syncNetworkPolicy(ctx, log, tenant, namespace, keys)
 	})
 }
 
-func (r *Manager) syncNetworkPolicy(ctx context.Context, tenant *capsulev1beta2.Tenant, namespace string, keys []string) (err error) {
+func (r *Manager) syncNetworkPolicy(ctx context.Context, log logr.Logger, tenant *capsulev1beta2.Tenant, namespace string, keys []string) (err error) {
 	if err = r.pruningResources(ctx, namespace, keys, &networkingv1.NetworkPolicy{}); err != nil {
 		return err
 	}
 
-	//nolint:staticcheck
 	for i, spec := range tenant.Spec.NetworkPolicies.Items {
 		target := &networkingv1.NetworkPolicy{
 			ObjectMeta: metav1.ObjectMeta{
@@ -71,7 +69,7 @@ func (r *Manager) syncNetworkPolicy(ctx context.Context, tenant *capsulev1beta2.
 		})
 		if err != nil {
 			if apierrors.HasStatusCause(err, corev1.NamespaceTerminatingCause) {
-				r.Log.V(4).Info(
+				log.V(4).Info(
 					"skipping NetworkPolicy sync because namespace is terminating",
 					"name", target.Name,
 					"namespace", target.Namespace,
@@ -84,7 +82,7 @@ func (r *Manager) syncNetworkPolicy(ctx context.Context, tenant *capsulev1beta2.
 			return err
 		}
 
-		r.Log.V(4).Info("network Policy sync result: "+string(res), "name", target.Name, "namespace", target.Namespace)
+		log.V(4).Info("network Policy sync result: "+string(res), "name", target.Name, "namespace", target.Namespace)
 	}
 
 	return nil

@@ -57,12 +57,13 @@ func (r *Manager) syncRoleBindings(ctx context.Context, log logr.Logger, tenant 
 	}
 
 	return runForTenantNamespaces(ctx, tenant, func(ctx context.Context, namespace string) error {
-		return r.syncAdditionalRoleBinding(ctx, tenant, namespace, namespaceBindings[namespace])
+		return r.syncAdditionalRoleBinding(ctx, log, tenant, namespace, namespaceBindings[namespace])
 	})
 }
 
 func (r *Manager) syncAdditionalRoleBinding(
 	ctx context.Context,
+	log logr.Logger,
 	tenant *capsulev1beta2.Tenant,
 	ns string,
 	bindings map[string]rbac.AdditionalRoleBindingsSpec,
@@ -114,7 +115,7 @@ func (r *Manager) syncAdditionalRoleBinding(
 		})
 		if err != nil {
 			if apierrors.HasStatusCause(err, corev1.NamespaceTerminatingCause) {
-				r.Log.V(4).Info(
+				log.V(4).Info(
 					"skipping RoleBinding sync because namespace is terminating",
 					"name", target.Name,
 					"namespace", target.Namespace,
@@ -127,7 +128,7 @@ func (r *Manager) syncAdditionalRoleBinding(
 			return fmt.Errorf("%w (role: %s)", err, roleBinding.ClusterRoleName)
 		}
 
-		r.Log.V(4).Info(fmt.Sprintf("roleBinding sync result: %s", string(res)), "name", target.Name, "namespace", target.Namespace)
+		log.V(4).Info(fmt.Sprintf("roleBinding sync result: %s", string(res)), "name", target.Name, "namespace", target.Namespace)
 	}
 
 	// Prune at finish to prevent gaps
