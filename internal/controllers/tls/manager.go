@@ -169,7 +169,7 @@ func (r *Reconciler) ReconcileCertificates(
 	}
 
 	log.V(4).Info(
-		"certificate requies rotation",
+		"certificate requires rotation",
 		"rotation", rotateServingCert,
 	)
 
@@ -205,7 +205,7 @@ func (r *Reconciler) ReconcileCertificates(
 		return fmt.Errorf("missing %q field in %q secret", corev1.ServiceAccountRootCAKey, r.Configuration.TLSSecretName())
 	}
 
-	log.V(5).Info("Patching caBundle in webhooks and managed CRD conversions")
+	log.V(5).Info("Patching caBundle in managed CRD conversions")
 
 	patchGroup, groupCtx := errgroup.WithContext(ctx)
 
