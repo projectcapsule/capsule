@@ -86,14 +86,6 @@ func (h *userMetadataHandler) OnUpdate(
 		labels := maps.Clone(oldNs.GetLabels())
 		annotations := maps.Clone(oldNs.GetAnnotations())
 
-		if labels == nil {
-			labels = map[string]string{}
-		}
-
-		if annotations == nil {
-			annotations = map[string]string{}
-		}
-
 		for key, value := range newNs.GetLabels() {
 			v, ok := labels[key]
 			if !ok {

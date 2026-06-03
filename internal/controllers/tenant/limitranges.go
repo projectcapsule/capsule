@@ -23,8 +23,10 @@ import (
 
 func (r *Manager) syncLimitRanges(ctx context.Context, log logr.Logger, tenant *capsulev1beta2.Tenant) error {
 	// getting requested LimitRange keys
+	//nolint:staticcheck
 	keys := make([]string, 0, len(tenant.Spec.LimitRanges.Items))
 
+	//nolint:staticcheck
 	for i := range tenant.Spec.LimitRanges.Items {
 		keys = append(keys, strconv.Itoa(i))
 	}
@@ -45,6 +47,7 @@ func (r *Manager) syncLimitRange(
 		return err
 	}
 
+	//nolint:staticcheck
 	for i, spec := range tenant.Spec.LimitRanges.Items {
 		target := &corev1.LimitRange{
 			ObjectMeta: metav1.ObjectMeta{
