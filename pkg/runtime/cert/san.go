@@ -38,6 +38,7 @@ func (s CertificateSANs) Normalize() CertificateSANs {
 		}
 
 		dnsSet[name] = struct{}{}
+
 		dnsNames = append(dnsNames, name)
 	}
 
@@ -55,6 +56,7 @@ func (s CertificateSANs) Normalize() CertificateSANs {
 		}
 
 		ipSet[normalized] = struct{}{}
+
 		ipAddrs = append(ipAddrs, ip)
 	}
 
@@ -124,40 +126,33 @@ func (s *CertificateSANs) AddURL(rawURL *string) error {
 	return nil
 }
 
-func (s CertificateSANs) CoveredByCertificate(certificate *x509.Certificate) bool {
-	desired := s.Normalize()
-
-	actualDNS := make(map[string]struct{}, len(certificate.DNSNames))
-	for _, name := range certificate.DNSNames {
-		name = strings.TrimSpace(strings.ToLower(name))
-		if name == "" {
-			continue
-		}
-
-		actualDNS[name] = struct{}{}
+func (s CertificateSANs) MatchesCertificate(certificate *x509.Certificate) bool {
+	if certificate == nil {
+		return false
 	}
 
-	for _, name := range desired.DNSNames {
-		if _, ok := actualDNS[name]; !ok {
+	desired := s.Normalize()
+	actual := CertificateSANs{
+		DNSNames: append([]string(nil), certificate.DNSNames...),
+		IPAddrs:  append([]net.IP(nil), certificate.IPAddresses...),
+	}.Normalize()
+
+	if len(desired.DNSNames) != len(actual.DNSNames) {
+		return false
+	}
+
+	for i := range desired.DNSNames {
+		if desired.DNSNames[i] != actual.DNSNames[i] {
 			return false
 		}
 	}
 
-	actualIPs := make(map[string]struct{}, len(certificate.IPAddresses))
-	for _, ip := range certificate.IPAddresses {
-		if ip == nil {
-			continue
-		}
-
-		actualIPs[ip.String()] = struct{}{}
+	if len(desired.IPAddrs) != len(actual.IPAddrs) {
+		return false
 	}
 
-	for _, ip := range desired.IPAddrs {
-		if ip == nil {
-			continue
-		}
-
-		if _, ok := actualIPs[ip.String()]; !ok {
+	for i := range desired.IPAddrs {
+		if desired.IPAddrs[i].String() != actual.IPAddrs[i].String() {
 			return false
 		}
 	}

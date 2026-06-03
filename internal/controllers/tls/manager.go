@@ -1,12 +1,12 @@
 // Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
+//nolint:nestif
 package tls
 
 import (
 	"bytes"
 	"context"
-	"crypto/rsa"
 	"crypto/x509"
 	"fmt"
 	"time"
@@ -35,11 +35,6 @@ import (
 const (
 	certificateExpirationThreshold = 3 * 24 * time.Hour
 	certificateValidity            = 6 * 30 * 24 * time.Hour
-
-	// caPrivateKeyKey is intentionally not a Kubernetes core constant.
-	// The TLS Secret remains type kubernetes.io/tls, but we persist the CA key
-	// so serving cert renewal does not require CA rotation.
-	caPrivateKeyKey = "ca.key"
 )
 
 type Reconciler struct {
@@ -56,7 +51,7 @@ func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 		return []reconcile.Request{
 			{
 				NamespacedName: types.NamespacedName{
-					Namespace: r.Namespace,
+					Namespace: configuration.ControllerNamespace(),
 					Name:      r.Configuration.TLSSecretName(),
 				},
 			},
@@ -104,7 +99,7 @@ func (r *Reconciler) SetupWithManager(mgr ctrl.Manager) error {
 }
 
 func (r *Reconciler) Reconcile(ctx context.Context, request ctrl.Request) (ctrl.Result, error) {
-	r.Log = r.Log.WithValues(
+	log := r.Log.WithValues(
 		"Request.Namespace", request.Namespace,
 		"Request.Name", request.Name,
 	)
@@ -116,6 +111,8 @@ func (r *Reconciler) Reconcile(ctx context.Context, request ctrl.Request) (ctrl.
 	if request.Name == "" {
 		request.Name = r.Configuration.TLSSecretName()
 	}
+
+	log.V(4).Info("TLS reconciliation started")
 
 	certSecret := &corev1.Secret{}
 	if err := r.Get(ctx, request.NamespacedName, certSecret); err != nil {
@@ -129,7 +126,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, request ctrl.Request) (ctrl.
 		certSecret.Data = map[string][]byte{}
 	}
 
-	if err := r.ReconcileCertificates(ctx, certSecret); err != nil {
+	if err := r.ReconcileCertificates(ctx, log, certSecret); err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -142,7 +139,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, request ctrl.Request) (ctrl.
 
 	requeueAfter := max(time.Until(requeueTime), 0)
 
-	r.Log.V(4).Info("TLS reconciliation completed", "requeueAfter", requeueAfter.String())
+	log.V(4).Info("TLS reconciliation completed", "requeueAfter", requeueAfter.String())
 
 	return ctrl.Result{
 		Requeue:      true,
@@ -150,22 +147,31 @@ func (r *Reconciler) Reconcile(ctx context.Context, request ctrl.Request) (ctrl.
 	}, nil
 }
 
-func (r *Reconciler) ReconcileCertificates(ctx context.Context, certSecret *corev1.Secret) error {
+func (r *Reconciler) ReconcileCertificates(
+	ctx context.Context,
+	log logr.Logger,
+	certSecret *corev1.Secret,
+) error {
 	sans, err := r.desiredWebhookSANs(ctx)
 	if err != nil {
 		return err
 	}
 
-	r.Log.V(4).Info(
+	log.V(4).Info(
 		"Resolved desired webhook certificate SANs",
 		"dnsNames", sans.DNSNames,
 		"ipAddresses", cert.IPsToStrings(sans.IPAddrs),
 	)
 
-	ca, caBundle, rotateServingCert, err := r.ensureCertificateMaterial(certSecret, sans)
+	ca, caBundle, rotateServingCert, err := r.ensureCertificateMaterial(log, certSecret, sans)
 	if err != nil {
 		return err
 	}
+
+	log.V(4).Info(
+		"certificate requies rotation",
+		"rotation", rotateServingCert,
+	)
 
 	if rotateServingCert {
 		if ca == nil {
@@ -179,8 +185,9 @@ func (r *Reconciler) ReconcileCertificates(ctx context.Context, certSecret *core
 		if err != nil {
 			return err
 		}
+
 		if err != nil {
-			r.Log.Error(err, "cannot generate serving TLS certificate")
+			log.Error(err, "cannot generate serving TLS certificate")
 
 			return err
 		}
@@ -202,7 +209,7 @@ func (r *Reconciler) ReconcileCertificates(ctx context.Context, certSecret *core
 		return fmt.Errorf("missing %q field in %q secret", corev1.ServiceAccountRootCAKey, r.Configuration.TLSSecretName())
 	}
 
-	r.Log.Info("Patching caBundle in webhooks and managed CRD conversions")
+	log.V(5).Info("Patching caBundle in webhooks and managed CRD conversions")
 
 	patchGroup, groupCtx := errgroup.WithContext(ctx)
 
@@ -229,6 +236,7 @@ func (r *Reconciler) ReconcileCertificates(ctx context.Context, certSecret *core
 //   - Serving certificate renewal never rotates the CA.
 //   - Legacy Secrets without ca.key rotate once into the stable format.
 func (r *Reconciler) ensureCertificateMaterial(
+	log logr.Logger,
 	certSecret *corev1.Secret,
 	sans cert.CertificateSANs,
 ) (*cert.CapsuleCA, []byte, bool, error) {
@@ -249,13 +257,14 @@ func (r *Reconciler) ensureCertificateMaterial(
 	hasCAKey := len(caKey) > 0
 
 	var ca *cert.CapsuleCA
+
 	rotateServingCert := false
 
 	switch {
 	case hasCABundle && hasCAKey:
 		loadedCA, err := cert.NewCertificateAuthorityFromBytes(caBundle, caKey)
 		if err != nil {
-			r.Log.Info(
+			log.V(3).Info(
 				"Existing CA material is invalid, generating new CA",
 				"error", err.Error(),
 			)
@@ -279,7 +288,7 @@ func (r *Reconciler) ensureCertificateMaterial(
 	case hasCABundle && !hasCAKey:
 		// Legacy mode: we can validate and patch caBundle, but we cannot issue
 		// a new serving certificate without the CA private key.
-		r.Log.Info(
+		log.V(10).Info(
 			"TLS Secret contains CA bundle but no CA private key; running in legacy CA mode",
 			"secret", client.ObjectKeyFromObject(certSecret).String(),
 		)
@@ -295,7 +304,7 @@ func (r *Reconciler) ensureCertificateMaterial(
 		return nil, caBundle, false, nil
 
 	default:
-		r.Log.Info(
+		log.V(10).Info(
 			"TLS Secret is missing CA material, generating new CA",
 			"secret", client.ObjectKeyFromObject(certSecret).String(),
 		)
@@ -318,7 +327,7 @@ func (r *Reconciler) ensureCertificateMaterial(
 	servingKeyPEM := certSecret.Data[corev1.TLSPrivateKeyKey]
 
 	if len(servingCertPEM) == 0 || len(servingKeyPEM) == 0 {
-		r.Log.Info(
+		log.V(10).Info(
 			"TLS Secret is missing serving certificate material, rotating serving certificate",
 			"secret", client.ObjectKeyFromObject(certSecret).String(),
 		)
@@ -327,7 +336,7 @@ func (r *Reconciler) ensureCertificateMaterial(
 	} else {
 		servingCert, err := cert.GetCertificateFromBytes(servingCertPEM)
 		if err != nil {
-			r.Log.Info(
+			log.V(10).Info(
 				"Failed to parse serving certificate, rotating serving certificate",
 				"secret", client.ObjectKeyFromObject(certSecret).String(),
 				"error", err.Error(),
@@ -336,7 +345,7 @@ func (r *Reconciler) ensureCertificateMaterial(
 			rotateServingCert = true
 		} else {
 			if time.Until(servingCert.NotAfter) <= certificateExpirationThreshold {
-				r.Log.Info(
+				log.V(10).Info(
 					"Serving certificate is close to expiry, rotating serving certificate",
 					"secret", client.ObjectKeyFromObject(certSecret).String(),
 					"notAfter", servingCert.NotAfter,
@@ -345,9 +354,9 @@ func (r *Reconciler) ensureCertificateMaterial(
 				rotateServingCert = true
 			}
 
-			if !sans.CoveredByCertificate(servingCert) {
-				r.Log.Info(
-					"Serving certificate does not cover desired SANs, rotating serving certificate",
+			if !sans.MatchesCertificate(servingCert) {
+				log.V(3).Info(
+					"Serving certificate SANs differ from desired SANs, rotating serving certificate",
 					"secret", client.ObjectKeyFromObject(certSecret).String(),
 					"desiredDNSNames", sans.DNSNames,
 					"desiredIPAddresses", cert.IPsToStrings(sans.IPAddrs),
@@ -359,7 +368,7 @@ func (r *Reconciler) ensureCertificateMaterial(
 			}
 
 			if err := r.validateSecretCertificate(certSecret, sans); err != nil {
-				r.Log.Info(
+				log.V(10).Info(
 					"Serving certificate failed validation, rotating serving certificate",
 					"secret", client.ObjectKeyFromObject(certSecret).String(),
 					"error", err.Error(),
@@ -493,40 +502,6 @@ func (r *Reconciler) validateSecretCertificate(
 	return nil
 }
 
-func validateCAKeyPair(caCertPEM, caKeyPEM []byte) error {
-	caCert, caKey, err := cert.GetCertificateWithPrivateKeyFromBytes(caCertPEM, caKeyPEM)
-	if err != nil {
-		return fmt.Errorf("cannot parse CA certificate/key pair: %w", err)
-	}
-
-	if !caCert.IsCA {
-		return fmt.Errorf("ca.crt is not a CA certificate")
-	}
-
-	if !publicKeysEqual(caCert.PublicKey, &caKey.PublicKey) {
-		return fmt.Errorf("ca.crt does not match ca.key")
-	}
-
-	now := time.Now()
-	if now.Before(caCert.NotBefore) {
-		return fmt.Errorf("CA certificate is not valid yet")
-	}
-
-	if now.After(caCert.NotAfter.Add(-certificateExpirationThreshold)) {
-		return fmt.Errorf("CA certificate expired or expires soon")
-	}
-
-	return nil
-}
-
-func publicKeysEqual(a any, b *rsa.PublicKey) bool {
-	pub, ok := a.(*rsa.PublicKey)
-	if !ok {
-		return false
-	}
-
-	return pub.Equal(b)
-}
 func (r *Reconciler) updateManagedCustomResourceDefinition(
 	ctx context.Context,
 	managed ManagedCRD,
@@ -566,10 +541,6 @@ func (r *Reconciler) updateManagedCustomResourceDefinition(
 	})
 }
 
-func (r *Reconciler) webhookDNSName() string {
-	return fmt.Sprintf("%s.%s.svc", r.Configuration.Admission().ServiceName, r.Namespace)
-}
-
 func copySecretData(in map[string][]byte) map[string][]byte {
 	out := make(map[string][]byte, len(in))
 
@@ -578,18 +549,4 @@ func copySecretData(in map[string][]byte) map[string][]byte {
 	}
 
 	return out
-}
-
-func equalBytes(a, b []byte) bool {
-	if len(a) != len(b) {
-		return false
-	}
-
-	for i := range a {
-		if a[i] != b[i] {
-			return false
-		}
-	}
-
-	return true
 }

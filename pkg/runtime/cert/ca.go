@@ -142,20 +142,40 @@ func GenerateCertificateAuthority() (s *CapsuleCA, err error) {
 	return s, err
 }
 
-func GetCertificateFromBytes(certBytes []byte) (*x509.Certificate, error) {
-	var b *pem.Block
+func GetCertificateFromBytes(raw []byte) (*x509.Certificate, error) {
+	block, _ := pem.Decode(raw)
+	if block == nil {
+		return nil, fmt.Errorf("failed to decode certificate PEM")
+	}
 
-	b, _ = pem.Decode(certBytes)
+	if block.Type != "CERTIFICATE" {
+		return nil, fmt.Errorf("expected CERTIFICATE PEM block, got %q", block.Type)
+	}
 
-	return x509.ParseCertificate(b.Bytes)
+	certificate, err := x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		return nil, fmt.Errorf("parse certificate: %w", err)
+	}
+
+	return certificate, nil
 }
 
-func GetPrivateKeyFromBytes(keyBytes []byte) (*rsa.PrivateKey, error) {
-	var b *pem.Block
+func GetPrivateKeyFromBytes(raw []byte) (*rsa.PrivateKey, error) {
+	block, _ := pem.Decode(raw)
+	if block == nil {
+		return nil, fmt.Errorf("failed to decode private key PEM")
+	}
 
-	b, _ = pem.Decode(keyBytes)
+	if block.Type != "RSA PRIVATE KEY" {
+		return nil, fmt.Errorf("expected RSA PRIVATE KEY PEM block, got %q", block.Type)
+	}
 
-	return x509.ParsePKCS1PrivateKey(b.Bytes)
+	privateKey, err := x509.ParsePKCS1PrivateKey(block.Bytes)
+	if err != nil {
+		return nil, fmt.Errorf("parse RSA private key: %w", err)
+	}
+
+	return privateKey, nil
 }
 
 func GetCertificateWithPrivateKeyFromBytes(certBytes, keyBytes []byte) (*x509.Certificate, *rsa.PrivateKey, error) {

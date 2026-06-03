@@ -195,8 +195,8 @@ dev-setup:
 		--set "monitoring.diagnostics.enabled=true"\
 		--set "manager.rbac.minimal=true"\
 		--set 'certManager.generateCertificates=false' \
-		--set 'tls.enableController=true' \
-		--set 'tls.create=true' \
+		--set 'tls.enableController=false' \
+		--set 'tls.create=false' \
 		--set "webhooks.exclusive=true"\
 		--set "webhooks.service.url=$${WEBHOOK_URL}" \
 		--set "webhooks.service.caBundle=$${CA_BUNDLE}" \
@@ -471,7 +471,7 @@ e2e-install: helm-controller-version ko-build-all dev-install-gw-api-crds
 		--set 'manager.resources=null'\
 		--set "manager.image.tag=$(VERSION)" \
 		--set 'manager.livenessProbe.failureThreshold=10' \
-		--set 'manager.options.logLevel=debug' \
+		--set-string 'manager.options.logLevel=5' \
 		--set 'manager.options.workers=4' \
 		--set 'manager.options.clientConnectionQPS=2000' \
 		--set 'manager.options.clientConnectionQPS=1000' \
