@@ -214,7 +214,7 @@ make helm-test
 
 ### Documentation
 
-Documentation of the chart is done with [helm-docs](https://github.com/norwoodj/helm-docs). Therefor all documentation relevant changes for the chart must be done in the [README.md.gotmpl](./charts/capsule/README.md.gotmpl) file. You can run this locally with this command (requires running docker daemon):
+Documentation of the chart is done with [helm-docs](https://github.com/norwoodj/helm-docs). Therefore all documentation relevant changes for the chart must be done in the [README.md.gotmpl](./charts/capsule/README.md.gotmpl) file. You can run this locally with this command (requires running docker daemon):
 
 ```bash
 make helm-docs
