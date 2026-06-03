@@ -37,9 +37,10 @@ var _ = Describe("Deleting a tenant with protected annotation", Ordered, Label("
 
 	JustAfterEach(func() {
 		Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: tnt.GetName()}, tnt)).Should(Succeed())
-		tnt.Spec.PreventDeletion = false
-		Expect(k8sClient.Update(context.TODO(), tnt)).Should(Succeed())
-		Expect(k8sClient.Delete(context.TODO(), tnt)).Should(Succeed())
+
+		UpdateTenantEventually(tnt, func(t *capsulev1beta2.Tenant) {
+			t.Spec.PreventDeletion = false
+		})
 	})
 
 	It("should fail", func() {
