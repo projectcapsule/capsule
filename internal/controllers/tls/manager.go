@@ -169,7 +169,7 @@ func (r *Reconciler) ReconcileCertificates(
 	}
 
 	log.V(4).Info(
-		"certificate requies rotation",
+		"certificate requires rotation",
 		"rotation", rotateServingCert,
 	)
 
