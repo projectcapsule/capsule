@@ -5,6 +5,7 @@ package validation
 
 import (
 	"context"
+	"maps"
 
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
@@ -17,6 +18,7 @@ import (
 	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
+	"github.com/projectcapsule/capsule/pkg/tenant"
 	"github.com/projectcapsule/capsule/pkg/users"
 )
 
@@ -36,23 +38,14 @@ func (h *userMetadataHandler) OnCreate(
 	tnt *capsulev1beta2.Tenant,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		ns.SetGroupVersionKind(corev1.SchemeGroupVersion.WithKind("Namespace"))
-
 		if tnt.Spec.NamespaceOptions != nil {
-			err := api.ValidateForbidden(ns.Annotations, tnt.Spec.NamespaceOptions.ForbiddenAnnotations)
+			labels, annotations, err := userMetadataForValidation(ns, nil, tnt)
 			if err != nil {
-				err = errors.Wrap(err, "namespace annotations validation failed")
-				recorder.Eventf(ns, ns, corev1.EventTypeWarning, evt.ReasonForbiddenAnnotation, evt.ActionValidationDenied, err.Error())
-
-				return ad.Deny(err.Error())
+				return ad.ErroredResponse(err)
 			}
 
-			err = api.ValidateForbidden(ns.Labels, tnt.Spec.NamespaceOptions.ForbiddenLabels)
-			if err != nil {
-				err = errors.Wrap(err, "namespace labels validation failed")
-				recorder.Eventf(ns, ns, corev1.EventTypeWarning, evt.ReasonForbiddenLabel, evt.ActionValidationDenied, err.Error())
-
-				return ad.Deny(err.Error())
+			if response := validateUserMetadata(ns, labels, annotations, tnt.Spec.NamespaceOptions, recorder); response != nil {
+				return response
 			}
 		}
 
@@ -90,14 +83,15 @@ func (h *userMetadataHandler) OnUpdate(
 			}
 		}
 
-		labels, annotations := oldNs.GetLabels(), oldNs.GetAnnotations()
+		labels := maps.Clone(oldNs.GetLabels())
+		annotations := maps.Clone(oldNs.GetAnnotations())
 
 		if labels == nil {
-			labels = make(map[string]string)
+			labels = map[string]string{}
 		}
 
 		if annotations == nil {
-			annotations = make(map[string]string)
+			annotations = map[string]string{}
 		}
 
 		for key, value := range newNs.GetLabels() {
@@ -131,20 +125,13 @@ func (h *userMetadataHandler) OnUpdate(
 		}
 
 		if tnt.Spec.NamespaceOptions != nil {
-			err := api.ValidateForbidden(annotations, tnt.Spec.NamespaceOptions.ForbiddenAnnotations)
+			labels, annotations, err := userMetadataForValidation(newNs, oldNs, tnt)
 			if err != nil {
-				err = errors.Wrap(err, "namespace annotations validation failed")
-				recorder.Eventf(oldNs, oldNs, corev1.EventTypeWarning, evt.ReasonForbiddenAnnotation, evt.ActionValidationDenied, err.Error())
-
-				return ad.Deny(err.Error())
+				return ad.ErroredResponse(err)
 			}
 
-			err = api.ValidateForbidden(labels, tnt.Spec.NamespaceOptions.ForbiddenLabels)
-			if err != nil {
-				err = errors.Wrap(err, "namespace labels validation failed")
-				recorder.Eventf(oldNs, oldNs, corev1.EventTypeWarning, evt.ReasonForbiddenLabel, evt.ActionValidationDenied, err.Error())
-
-				return ad.Deny(err.Error())
+			if response := validateUserMetadata(oldNs, labels, annotations, tnt.Spec.NamespaceOptions, recorder); response != nil {
+				return response
 			}
 		}
 
@@ -163,5 +150,91 @@ func (h *userMetadataHandler) OnDelete(
 ) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
+	}
+}
+
+func validateUserMetadata(
+	ns *corev1.Namespace,
+	labels map[string]string,
+	annotations map[string]string,
+	options *capsulev1beta2.NamespaceOptions,
+	recorder events.EventRecorder,
+) *admission.Response {
+	err := api.ValidateForbidden(annotations, options.ForbiddenAnnotations)
+	if err != nil {
+		err = errors.Wrap(err, "namespace annotations validation failed")
+		recorder.Eventf(ns, ns, corev1.EventTypeWarning, evt.ReasonForbiddenAnnotation, evt.ActionValidationDenied, err.Error())
+
+		return ad.Deny(err.Error())
+	}
+
+	err = api.ValidateForbidden(labels, options.ForbiddenLabels)
+	if err != nil {
+		err = errors.Wrap(err, "namespace labels validation failed")
+		recorder.Eventf(ns, ns, corev1.EventTypeWarning, evt.ReasonForbiddenLabel, evt.ActionValidationDenied, err.Error())
+
+		return ad.Deny(err.Error())
+	}
+
+	return nil
+}
+
+func userMetadataForValidation(
+	newNs *corev1.Namespace,
+	oldNs *corev1.Namespace,
+	tnt *capsulev1beta2.Tenant,
+) (map[string]string, map[string]string, error) {
+	labels := metadataForValidation(newNs.GetLabels(), nil)
+	annotations := metadataForValidation(newNs.GetAnnotations(), nil)
+
+	// On update, validate only metadata that was added or changed by the request.
+	if oldNs != nil {
+		labels = metadataForValidation(newNs.GetLabels(), oldNs.GetLabels())
+		annotations = metadataForValidation(newNs.GetAnnotations(), oldNs.GetAnnotations())
+	}
+
+	managedLabels, managedAnnotations, err := tenant.BuildNamespaceMetadataForTenant(newNs, tnt)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	tenant.AddNamespaceNameLabels(managedLabels, newNs)
+	tenant.AddTenantNameLabel(managedLabels, tnt)
+
+	removeManagedMetadata(labels, managedLabels)
+	removeManagedMetadata(annotations, managedAnnotations)
+
+	return labels, annotations, nil
+}
+
+func metadataForValidation(newMetadata, oldMetadata map[string]string) map[string]string {
+	if oldMetadata == nil {
+		return maps.Clone(newMetadata)
+	}
+
+	metadata := make(map[string]string)
+
+	for key, newValue := range newMetadata {
+		oldValue, ok := oldMetadata[key]
+		if !ok || oldValue != newValue {
+			metadata[key] = newValue
+		}
+	}
+
+	return metadata
+}
+
+func removeManagedMetadata(metadata map[string]string, managed map[string]string) {
+	for key, managedValue := range managed {
+		value, ok := metadata[key]
+		if !ok {
+			continue
+		}
+
+		// Only ignore metadata Capsule itself would manage.
+		// Same key with a different value is still user-controlled and must be validated.
+		if value == managedValue {
+			delete(metadata, key)
+		}
 	}
 }
