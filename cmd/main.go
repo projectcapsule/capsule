@@ -322,7 +322,7 @@ func main() {
 		}
 
 		// Reconcile TLS certificates before starting controllers and webhooks
-		if err = tlsReconciler.ReconcileCertificates(ctx, tlsCert); err != nil {
+		if err = tlsReconciler.ReconcileCertificates(ctx, ctrl.Log.WithName("capsule.setup").WithName("tls"), tlsCert); err != nil {
 			setupLog.Error(err, "unable to reconcile Capsule TLS secret")
 			os.Exit(1)
 		}

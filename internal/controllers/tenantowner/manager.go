@@ -12,9 +12,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
+	"k8s.io/client-go/util/workqueue"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -22,8 +24,8 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/internal/controllers/utils"
 	capmeta "github.com/projectcapsule/capsule/pkg/api/meta"
+	"github.com/projectcapsule/capsule/pkg/api/rbac"
 	indexer "github.com/projectcapsule/capsule/pkg/runtime/indexers/tenant"
-	"github.com/projectcapsule/capsule/pkg/runtime/predicates"
 	"github.com/projectcapsule/capsule/pkg/tenant"
 )
 
@@ -35,6 +37,7 @@ import (
 // changes, because a single Tenant change can affect any subset of TenantOwners.
 type TenantOwnerManager struct {
 	client.Client
+
 	reader client.Reader
 
 	Log logr.Logger
@@ -56,25 +59,56 @@ func (r *TenantOwnerManager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils
 		).
 		Watches(
 			&capsulev1beta2.Tenant{},
-			handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
-				tnt, ok := obj.(*capsulev1beta2.Tenant)
-				if !ok {
-					return nil
-				}
+			handler.TypedFuncs[client.Object, ctrl.Request]{
+				CreateFunc: func(
+					ctx context.Context,
+					e event.TypedCreateEvent[client.Object],
+					q workqueue.TypedRateLimitingInterface[reconcile.Request],
+				) {
+					tnt, ok := e.Object.(*capsulev1beta2.Tenant)
+					if !ok {
+						return
+					}
 
-				requests := make([]reconcile.Request, 0, len(tnt.Status.Owners))
+					r.enqueueTenantOwnerRequests(ctx, q, tnt.Status.Owners)
+				},
+				UpdateFunc: func(
+					ctx context.Context,
+					e event.TypedUpdateEvent[client.Object],
+					q workqueue.TypedRateLimitingInterface[reconcile.Request],
+				) {
+					oldTnt, ok1 := e.ObjectOld.(*capsulev1beta2.Tenant)
 
-				for _, owner := range tnt.Status.Owners {
-					requests = append(requests, reconcile.Request{
-						NamespacedName: types.NamespacedName{
-							Name: owner.Name,
-						},
-					})
-				}
+					newTnt, ok2 := e.ObjectNew.(*capsulev1beta2.Tenant)
+					if !ok1 || !ok2 {
+						return
+					}
 
-				return requests
-			}),
-			builder.WithPredicates(predicates.TenantStatusOwnersChangedPredicate{}),
+					owners := make(
+						rbac.OwnerStatusListSpec,
+						0,
+						len(oldTnt.Status.Owners)+len(newTnt.Status.Owners),
+					)
+
+					owners = append(owners, oldTnt.Status.Owners...)
+					owners = append(owners, newTnt.Status.Owners...)
+
+					r.enqueueTenantOwnerRequests(ctx, q, owners)
+				},
+
+				DeleteFunc: func(
+					ctx context.Context,
+					e event.TypedDeleteEvent[client.Object],
+					q workqueue.TypedRateLimitingInterface[reconcile.Request],
+				) {
+					tnt, ok := e.Object.(*capsulev1beta2.Tenant)
+					if !ok {
+						return
+					}
+
+					r.enqueueTenantOwnerRequests(ctx, q, tnt.Status.Owners)
+				},
+			},
 		).
 		Complete(r)
 }
@@ -91,7 +125,7 @@ func (r *TenantOwnerManager) Reconcile(ctx context.Context, req ctrl.Request) (r
 		return reconcile.Result{}, err
 	}
 
-	matchedTenants, reconcileErr := r.reconcileMatchedTenants(ctx, instance)
+	matchedTenants, reconcileErr := r.reconcileMatchedTenants(ctx, log, instance)
 
 	log.V(5).Info("matched tenants", "count", len(matchedTenants))
 
@@ -109,7 +143,7 @@ func (r *TenantOwnerManager) Reconcile(ctx context.Context, req ctrl.Request) (r
 // reconcileMatchedTenants lists all Tenants and returns the sorted names of
 // those whose spec.permissions.matchOwners selectors select this TenantOwner.
 // All work is done against the in-memory cache — no direct API server calls.
-func (r *TenantOwnerManager) reconcileMatchedTenants(ctx context.Context, to *capsulev1beta2.TenantOwner) ([]string, error) {
+func (r *TenantOwnerManager) reconcileMatchedTenants(ctx context.Context, log logr.Logger, to *capsulev1beta2.TenantOwner) ([]string, error) {
 	if to.Spec.Name == "" || to.Spec.Kind.String() == "" {
 		return nil, fmt.Errorf(
 			"TenantOwner %s has incomplete owner reference: kind=%q name=%q",
@@ -137,6 +171,8 @@ func (r *TenantOwnerManager) reconcileMatchedTenants(ctx context.Context, to *ca
 			err,
 		)
 	}
+
+	log.V(4).Info("found tenant references", "tenants", len(tnts.Items))
 
 	matched := make([]string, 0, len(tnts.Items))
 

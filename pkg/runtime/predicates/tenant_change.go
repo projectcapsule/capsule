@@ -12,9 +12,32 @@ import (
 
 type TenantStatusOwnersChangedPredicate struct{}
 
-func (TenantStatusOwnersChangedPredicate) Create(event.CreateEvent) bool   { return false }
-func (TenantStatusOwnersChangedPredicate) Delete(event.DeleteEvent) bool   { return false }
-func (TenantStatusOwnersChangedPredicate) Generic(event.GenericEvent) bool { return false }
+func (TenantStatusOwnersChangedPredicate) Create(e event.CreateEvent) bool {
+	tenant, ok := e.Object.(*capsulev1beta2.Tenant)
+	if !ok {
+		return false
+	}
+
+	return len(tenant.Status.Owners) > 0
+}
+
+func (TenantStatusOwnersChangedPredicate) Delete(e event.DeleteEvent) bool {
+	tenant, ok := e.Object.(*capsulev1beta2.Tenant)
+	if !ok {
+		return false
+	}
+
+	return len(tenant.Status.Owners) > 0
+}
+
+func (TenantStatusOwnersChangedPredicate) Generic(e event.GenericEvent) bool {
+	tenant, ok := e.Object.(*capsulev1beta2.Tenant)
+	if !ok {
+		return false
+	}
+
+	return len(tenant.Status.Owners) > 0
+}
 
 func (TenantStatusOwnersChangedPredicate) Update(e event.UpdateEvent) bool {
 	oldObj, ok1 := e.ObjectOld.(*capsulev1beta2.Tenant)

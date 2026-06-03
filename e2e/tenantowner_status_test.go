@@ -232,6 +232,9 @@ var _ = Describe("TenantOwner status with 10 matched Tenants", Ordered, Label("t
 			tnts[i] = &capsulev1beta2.Tenant{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: fmt.Sprintf("e2e-to-status-10match-tnt-%d", i),
+					Labels: map[string]string{
+						"e2e.suite.capsule/name": "owner_status_test",
+					},
 				},
 				Spec: capsulev1beta2.TenantSpec{
 					Permissions: capsulev1beta2.Permissions{

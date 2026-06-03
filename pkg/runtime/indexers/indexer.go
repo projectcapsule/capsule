@@ -20,6 +20,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/runtime/indexers/namespace"
 	"github.com/projectcapsule/capsule/pkg/runtime/indexers/resourcepool"
 	"github.com/projectcapsule/capsule/pkg/runtime/indexers/tenant"
+	"github.com/projectcapsule/capsule/pkg/runtime/indexers/tenantowner"
 	"github.com/projectcapsule/capsule/pkg/runtime/indexers/tenantresource"
 	"github.com/projectcapsule/capsule/pkg/utils"
 )
@@ -32,6 +33,7 @@ type CustomIndexer interface {
 
 func AddToManager(ctx context.Context, log logr.Logger, mgr manager.Manager) error {
 	indexers := []CustomIndexer{
+		tenantowner.OwnerNameReference{},
 		tenant.NamespacesReference{Obj: &capsulev1beta2.Tenant{}},
 		tenantresource.GlobalServiceAccount{},
 		tenantresource.GlobalProcessedItems{},
