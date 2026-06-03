@@ -39,6 +39,18 @@ func (TenantStatusOwnersChangedPredicate) Generic(e event.GenericEvent) bool {
 	return len(tenant.Status.Owners) > 0
 }
 
+// TenantCountChangedPredicate fires on Tenant create/delete only.
+// Update events are ignored because only create and delete change the set of
+// tenants; updates to labels, spec, or status do not affect tenant membership.
+// Kept separate from TenantStatusOwnersChangedPredicate which intentionally ignores
+// create/delete because those do not affect user aggregation.
+type TenantCountChangedPredicate struct{}
+
+func (TenantCountChangedPredicate) Create(event.CreateEvent) bool   { return true }
+func (TenantCountChangedPredicate) Delete(event.DeleteEvent) bool   { return true }
+func (TenantCountChangedPredicate) Generic(event.GenericEvent) bool { return false }
+func (TenantCountChangedPredicate) Update(event.UpdateEvent) bool   { return false }
+
 func (TenantStatusOwnersChangedPredicate) Update(e event.UpdateEvent) bool {
 	oldObj, ok1 := e.ObjectOld.(*capsulev1beta2.Tenant)
 	newObj, ok2 := e.ObjectNew.(*capsulev1beta2.Tenant)

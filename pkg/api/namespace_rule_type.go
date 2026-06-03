@@ -7,7 +7,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// For future inmplementatiosn where users might manage RuleStatus CRs tehmselves
+// For future implementation where users might manage RuleStatus CRs themselves
 // +kubebuilder:object:generate=true
 type NamespaceRuleBodyNamespace struct {
 	// Enforcement for given rule
