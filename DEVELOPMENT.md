@@ -172,7 +172,7 @@ kubectl patch crd capsuleconfigurations.capsule.clastix.io \
 When the Development Environment is set up, we can run Capsule controllers with webhooks outside of the Kubernetes cluster:
 
 ```bash
-$ export NAMESPACE=capsule-system && export TMPDIR=/tmp/
+$ export NAMESPACE=capsule-system && export TMPDIR=/tmp/ && export SERVICE_ACCOUNT=capsule
 $ go run .
 ```
 
