@@ -186,6 +186,7 @@ dev-setup:
 		--create-namespace \
 		--version=$(CHART_VERSION) \
 		--set 'proxy.enabled=true' \
+		--set 'proxy.certManager.generateCertificates=false' \
 		--set 'crds.install=true' \
 		--set 'crds.exclusive=true'\
 		--set 'crds.createConfig=true'\
@@ -453,7 +454,7 @@ e2e-build: kind
 	$(MAKE) e2e-install
 
 .PHONY: e2e-install
-e2e-install: helm-controller-version ko-build-all
+e2e-install: helm-controller-version ko-build-all dev-install-gw-api-crds
 	$(MAKE) e2e-load-image CLUSTER_NAME=$(CLUSTER_NAME) IMAGE=$(CAPSULE_IMG) VERSION=$(VERSION)
 	$(KUBECTL) label clusterrole admin projectcapsule.dev/aggregate-to-controller=true
 	$(HELM) upgrade \

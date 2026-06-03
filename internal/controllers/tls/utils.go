@@ -4,13 +4,15 @@
 package tls
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
+	"context"
 	"fmt"
 
-	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	capsuleclient "github.com/projectcapsule/capsule/pkg/runtime/client"
+	"github.com/projectcapsule/capsule/pkg/runtime/cert"
+	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 )
 
 type ManagedCRD struct {
@@ -90,74 +92,90 @@ func (r Reconciler) conversionManagedCRDs() map[string]ManagedCRD {
 	return out
 }
 
-//nolint:dupl
-func (r *Reconciler) validatingWebhookCABundlePatches(
-	webhooks []admissionregistrationv1.ValidatingWebhook,
-	caBundle []byte,
-) []capsuleclient.JSONPatch {
-	patches := make([]capsuleclient.JSONPatch, 0, len(webhooks))
+// Collects required SANs for certificate
+// desiredWebhookSANs collects required SANs for the webhook serving certificate.
+func (r *Reconciler) desiredWebhookSANs(ctx context.Context) (cert.CertificateSANs, error) {
+	sans := cert.CertificateSANs{}
 
-	for i := range webhooks {
-		if webhooks[i].ClientConfig.Service == nil {
-			continue
+	sans.AddDNSNames(
+		r.Configuration.Admission().ServiceName,
+		fmt.Sprintf("%s.%s", r.Configuration.Admission().ServiceName, r.Namespace),
+		fmt.Sprintf("%s.%s.svc", r.Configuration.Admission().ServiceName, r.Namespace),
+		fmt.Sprintf("%s.%s.svc.cluster.local", r.Configuration.Admission().ServiceName, r.Namespace),
+	)
+
+	mutating := r.Configuration.Admission().Mutating.Client
+	if mutating != nil {
+		sans.AddServiceReference(mutating.Service, configuration.ControllerNamespace())
+
+		if err := sans.AddURL(mutating.URL); err != nil {
+			return cert.CertificateSANs{}, fmt.Errorf("mutating admission client URL: %w", err)
 		}
-
-		if equalBytes(webhooks[i].ClientConfig.CABundle, caBundle) {
-			continue
-		}
-
-		r.Log.V(3).Info(
-			"Patching webhook caBundle",
-			"webhook", webhooks[i].Name,
-			"old", certFingerprint(webhooks[i].ClientConfig.CABundle),
-			"new", certFingerprint(caBundle),
-		)
-
-		patches = append(patches, capsuleclient.JSONPatch{
-			Operation: capsuleclient.JSONPatchAdd,
-			Path:      fmt.Sprintf("/webhooks/%d/clientConfig/caBundle", i),
-			Value:     caBundle,
-		})
 	}
 
-	return patches
-}
+	validating := r.Configuration.Admission().Validating.Client
+	if validating != nil {
+		sans.AddServiceReference(validating.Service, configuration.ControllerNamespace())
 
-//nolint:dupl
-func (r *Reconciler) mutatingWebhookCABundlePatches(
-	webhooks []admissionregistrationv1.MutatingWebhook,
-	caBundle []byte,
-) []capsuleclient.JSONPatch {
-	patches := make([]capsuleclient.JSONPatch, 0, len(webhooks))
-
-	for i := range webhooks {
-		if webhooks[i].ClientConfig.Service == nil {
-			continue
+		if err := sans.AddURL(validating.URL); err != nil {
+			return cert.CertificateSANs{}, fmt.Errorf("validating admission client URL: %w", err)
 		}
-
-		if equalBytes(webhooks[i].ClientConfig.CABundle, caBundle) {
-			continue
-		}
-
-		r.Log.V(3).Info(
-			"Patching webhook caBundle",
-			"webhook", webhooks[i].Name,
-			"old", certFingerprint(webhooks[i].ClientConfig.CABundle),
-			"new", certFingerprint(caBundle),
-		)
-
-		patches = append(patches, capsuleclient.JSONPatch{
-			Operation: capsuleclient.JSONPatchAdd,
-			Path:      fmt.Sprintf("/webhooks/%d/clientConfig/caBundle", i),
-			Value:     caBundle,
-		})
 	}
 
-	return patches
+	sans = sans.Normalize()
+
+	if sans.Empty() {
+		return cert.CertificateSANs{}, fmt.Errorf("no webhook SANs could be resolved")
+	}
+
+	r.Log.V(5).Info(
+		"Evaluated required SANs for TLS controller",
+		"dnsNames", sans.DNSNames,
+		"ipAddresses", cert.IPsToStrings(sans.IPAddrs),
+	)
+
+	return sans, nil
 }
 
-func certFingerprint(pemBytes []byte) string {
-	sum := sha256.Sum256(pemBytes)
+func FetchCurrentCaBundleForAdmission(
+	ctx context.Context,
+	c client.Reader,
+	cfg configuration.Configuration,
+	configuredCABundle []byte,
+) ([]byte, error) {
+	// Explicit configuration wins.
+	if len(configuredCABundle) > 0 {
+		return append([]byte(nil), configuredCABundle...), nil
+	}
 
-	return hex.EncodeToString(sum[:8])
+	// Internal Capsule TLS enabled: source of truth is the TLS Secret.
+	if cfg.EnableTLSConfiguration() {
+		secret := &corev1.Secret{}
+
+		if err := c.Get(ctx, types.NamespacedName{
+			Namespace: configuration.ControllerNamespace(),
+			Name:      cfg.TLSSecretName(),
+		}, secret); err != nil {
+			return nil, fmt.Errorf("get TLS Secret %s/%s: %w",
+				configuration.ControllerNamespace(),
+				cfg.TLSSecretName(),
+				err,
+			)
+		}
+
+		caBundle := secret.Data[corev1.ServiceAccountRootCAKey]
+		if len(caBundle) == 0 {
+			return nil, fmt.Errorf("TLS Secret %s/%s missing %q",
+				secret.Namespace,
+				secret.Name,
+				corev1.ServiceAccountRootCAKey,
+			)
+		}
+
+		return append([]byte(nil), caBundle...), nil
+	}
+
+	// cert-manager / external injector mode:
+	// return nil and preserve current webhook caBundle.
+	return nil, nil
 }

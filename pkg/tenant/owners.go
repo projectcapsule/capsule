@@ -77,8 +77,12 @@ func CollectOwners(
 
 func GetOwnersWithKinds(tenant *capsulev1beta2.Tenant) (owners []string) {
 	for _, owner := range tenant.Status.Owners {
-		owners = append(owners, fmt.Sprintf("%s:%s", owner.Kind.String(), owner.Name))
+		owners = append(owners, OwnerKindIndexKey(owner.Kind.String(), owner.Name))
 	}
 
 	return owners
+}
+
+func OwnerKindIndexKey(kind, name string) string {
+	return fmt.Sprintf("%s:%s", kind, name)
 }

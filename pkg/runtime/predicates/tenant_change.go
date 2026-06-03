@@ -33,7 +33,7 @@ func ownersChanged(a, b rbac.OwnerStatusListSpec) bool {
 	}
 
 	for i := range a {
-		if a[i].Name == b[i].Name && a[i].Kind == b[i].Kind {
+		if a[i].Name != b[i].Name || a[i].Kind != b[i].Kind {
 			return true
 		}
 	}

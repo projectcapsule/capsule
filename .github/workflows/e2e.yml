@@ -64,10 +64,9 @@ jobs:
       fail-fast: false
       matrix:
         k8s-version:
-          - 'v1.31.0'
           - 'v1.32.0'
-          - 'v1.33.0'
-          - 'v1.34.0'
+          - 'v1.33.12'
+          - 'v1.34.8'
     runs-on:
       labels: ubuntu-latest-8-cores
     steps:

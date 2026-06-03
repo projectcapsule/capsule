@@ -6,6 +6,7 @@ package v1beta2
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/api/rbac"
 )
 
@@ -26,11 +27,23 @@ type TenantOwnerStatus struct {
 	// ObservedGeneration is the most recent generation the controller has observed.
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+
+	// Tenants lists the names of all Tenants that this TenantOwner is currently matched to
+	// via the Tenant's spec.permissions.matchOwners selectors.
+	// +optional
+	// +listType=atomic
+	Tenants []string `json:"tenants,omitempty"`
+
+	// Conditions contains the reconciliation conditions for this TenantOwner.
+	// +optional
+	Conditions meta.ConditionList `json:"conditions,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:scope=Cluster,shortName=to
+// +kubebuilder:printcolumn:name="Ready",type="string",JSONPath=".status.conditions[?(@.type==\"Ready\")].status",description="Reconcile status of this TenantOwner"
+// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp",description="Age"
 
 // TenantOwner is the Schema for the tenantowners API.
 type TenantOwner struct {
