@@ -53,6 +53,7 @@ import (
 	rulestatuscontroller "github.com/projectcapsule/capsule/internal/controllers/rulestatus"
 	servicelabelscontroller "github.com/projectcapsule/capsule/internal/controllers/servicelabels"
 	tenantcontroller "github.com/projectcapsule/capsule/internal/controllers/tenant"
+	tenantownercontroller "github.com/projectcapsule/capsule/internal/controllers/tenantowner"
 	tlscontroller "github.com/projectcapsule/capsule/internal/controllers/tls"
 	utilscontroller "github.com/projectcapsule/capsule/internal/controllers/utils"
 	"github.com/projectcapsule/capsule/internal/metrics"
@@ -321,7 +322,7 @@ func main() {
 		}
 
 		// Reconcile TLS certificates before starting controllers and webhooks
-		if err = tlsReconciler.ReconcileCertificates(ctx, tlsCert); err != nil {
+		if err = tlsReconciler.ReconcileCertificates(ctx, ctrl.Log.WithName("capsule.setup").WithName("tls"), tlsCert); err != nil {
 			setupLog.Error(err, "unable to reconcile Capsule TLS secret")
 			os.Exit(1)
 		}
@@ -684,6 +685,14 @@ func main() {
 
 	if err = rbacManager.SetupWithManager(ctx, manager, controllerConfig); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Rbac")
+		os.Exit(1)
+	}
+
+	if err = (&tenantownercontroller.TenantOwnerManager{
+		Log:    ctrl.Log.WithName("capsule.ctrl").WithName("tenantowners"),
+		Client: manager.GetClient(),
+	}).SetupWithManager(manager, controllerConfig); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "TenantOwners")
 		os.Exit(1)
 	}
 

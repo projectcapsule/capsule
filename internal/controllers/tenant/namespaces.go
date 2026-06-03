@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"maps"
 
+	"github.com/go-logr/logr"
 	"golang.org/x/sync/errgroup"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -24,7 +25,7 @@ import (
 )
 
 // Ensuring all annotations are applied to each Namespace handled by the Tenant.
-func (r *Manager) reconcileNamespaces(ctx context.Context, tnt *capsulev1beta2.Tenant) (err error) {
+func (r *Manager) reconcileNamespaces(ctx context.Context, log logr.Logger, tnt *capsulev1beta2.Tenant) (err error) {
 	if tnt.DeletionTimestamp != nil {
 		for _, ns := range tnt.Status.Spaces {
 			ns := &corev1.Namespace{
@@ -36,7 +37,7 @@ func (r *Manager) reconcileNamespaces(ctx context.Context, tnt *capsulev1beta2.T
 			if err := r.Delete(ctx, ns, &client.DeleteOptions{
 				PropagationPolicy: ptr.To(metav1.DeletePropagationBackground),
 			}); err != nil && !apierrors.IsNotFound(err) {
-				r.Log.Error(err, "unable to delete tenant namespace",
+				log.Error(err, "unable to delete tenant namespace",
 					"tenant", tnt.GetName(),
 					"namespace", ns.Name,
 				)
@@ -66,13 +67,13 @@ func (r *Manager) reconcileNamespaces(ctx context.Context, tnt *capsulev1beta2.T
 		ns := list.Items[i].DeepCopy()
 
 		group.Go(func() error {
-			stat, err := r.reconcileNamespace(ctx, ns, tnt)
+			stat, err := r.reconcileNamespace(ctx, log, ns, tnt)
 			if stat != nil {
 				results <- stat
 			}
 
 			if err != nil {
-				r.Log.Error(err, "failed to reconcile namespace",
+				log.Error(err, "failed to reconcile namespace",
 					"tenant", tnt.GetName(),
 					"namespace", ns.GetName(),
 				)
@@ -125,7 +126,7 @@ func (r *Manager) reconcileNamespaces(ctx context.Context, tnt *capsulev1beta2.T
 	return err
 }
 
-func (r *Manager) reconcileNamespace(ctx context.Context, namespace *corev1.Namespace, tnt *capsulev1beta2.Tenant) (
+func (r *Manager) reconcileNamespace(ctx context.Context, log logr.Logger, namespace *corev1.Namespace, tnt *capsulev1beta2.Tenant) (
 	stat *capsulev1beta2.TenantStatusNamespaceItem,
 	err error,
 ) {
@@ -246,7 +247,7 @@ func (r *Manager) reconcileNamespace(ctx context.Context, namespace *corev1.Name
 	}
 
 	// Collect Rules for namespace
-	err = r.reconcileRuleStatus(ctx, tnt, namespace)
+	err = r.reconcileRuleStatus(ctx, log, tnt, namespace)
 	if err != nil {
 		return stat, err
 	}

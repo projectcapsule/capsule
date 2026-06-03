@@ -236,13 +236,13 @@ func (r *Manager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.Controller
 }
 
 func (r *Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ctrl.Result, err error) {
-	r.Log = r.Log.WithValues("Request.Name", request.Name)
+	log := r.Log.WithValues("Request.Name", request.Name)
 
 	// Fetch the Tenant instance
 	instance := &capsulev1beta2.Tenant{}
 	if err = r.Get(ctx, request.NamespacedName, instance); err != nil {
 		if apierrors.IsNotFound(err) {
-			r.Log.V(5).Info("request object not found, could have been deleted after reconcile request")
+			log.V(5).Info("request object not found, could have been deleted after reconcile request")
 
 			// If tenant was deleted or cannot be found, clean up metrics
 			r.Metrics.DeleteAllMetricsForTenant(request.Name)
@@ -266,7 +266,7 @@ func (r *Manager) Reconcile(ctx context.Context, request ctrl.Request) (result c
 		return reconcile.Result{}, updateErr
 	}
 
-	reconcileError := r.reconcile(ctx, instance)
+	reconcileError := r.reconcile(ctx, log, instance)
 
 	defer func() {
 		r.syncTenantStatusMetrics(instance)
@@ -293,7 +293,7 @@ func (r *Manager) Reconcile(ctx context.Context, request ctrl.Request) (result c
 	}
 
 	// Collect available resources
-	if err = r.collectAvailableResources(ctx, instance); err != nil {
+	if err = r.collectAvailableResources(ctx, log, instance); err != nil {
 		err = fmt.Errorf("cannot collect available resources: %w", err)
 
 		return reconcile.Result{}, err
@@ -306,7 +306,7 @@ func (r *Manager) Reconcile(ctx context.Context, request ctrl.Request) (result c
 	return reconcile.Result{}, reconcileError
 }
 
-func (r *Manager) reconcile(ctx context.Context, instance *capsulev1beta2.Tenant) (err error) {
+func (r *Manager) reconcile(ctx context.Context, log logr.Logger, instance *capsulev1beta2.Tenant) (err error) {
 	var errs []error
 
 	// Collect Ownership/Promotions for Status
@@ -315,9 +315,9 @@ func (r *Manager) reconcile(ctx context.Context, instance *capsulev1beta2.Tenant
 	}
 
 	// Reconcile Namespaces
-	r.Log.V(4).Info("starting processing of Namespaces", "items", len(instance.Status.Namespaces))
+	log.V(4).Info("starting processing of Namespaces", "items", len(instance.Status.Namespaces))
 
-	if err = r.reconcileNamespaces(ctx, instance); err != nil {
+	if err = r.reconcileNamespaces(ctx, log, instance); err != nil {
 		errs = append(errs, fmt.Errorf("namespace(s) had reconciliation errors: %w", err))
 	}
 
@@ -328,37 +328,37 @@ func (r *Manager) reconcile(ctx context.Context, instance *capsulev1beta2.Tenant
 	}
 
 	// Ensuring ResourceQuota
-	r.Log.V(4).Info("ensuring limit resources count is updated")
+	log.V(4).Info("ensuring limit resources count is updated")
 
 	if err = r.syncCustomResourceQuotaUsages(ctx, instance); err != nil {
 		errs = append(errs, fmt.Errorf("cannot count limited resources: %w", err))
 	}
 
 	// Ensuring NetworkPolicy resources
-	r.Log.V(4).Info("starting processing of Network Policies")
+	log.V(4).Info("starting processing of Network Policies")
 
-	if err = r.syncNetworkPolicies(ctx, instance); err != nil {
+	if err = r.syncNetworkPolicies(ctx, log, instance); err != nil {
 		errs = append(errs, fmt.Errorf("cannot sync networkPolicy items: %w", err))
 	}
 
 	// Ensuring LimitRange resources
-	r.Log.V(4).Info("Starting processing of Limit Ranges", "items", len(instance.Spec.LimitRanges.Items)) //nolint:staticcheck
+	r.Log.V(4).Info("Starting processing of Limit Ranges", "items", len(instance.Spec.LimitRanges.Items))
 
-	if err = r.syncLimitRanges(ctx, instance); err != nil {
+	if err = r.syncLimitRanges(ctx, log, instance); err != nil {
 		errs = append(errs, fmt.Errorf("cannot sync limitrange items: %w", err))
 	}
 
 	// Ensuring ResourceQuota resources
-	r.Log.V(4).Info("Starting processing of Resource Quotas", "items", len(instance.Spec.ResourceQuota.Items))
+	log.V(4).Info("Starting processing of Resource Quotas", "items", len(instance.Spec.ResourceQuota.Items))
 
-	if err = r.syncResourceQuotas(ctx, instance); err != nil {
+	if err = r.syncResourceQuotas(ctx, log, instance); err != nil {
 		errs = append(errs, fmt.Errorf("cannot sync resourcequota items: %w", err))
 	}
 
 	// Ensuring RoleBinding resources
-	r.Log.V(4).Info("Ensuring RoleBindings for Owners and Tenant")
+	log.V(4).Info("Ensuring RoleBindings for Owners and Tenant")
 
-	if err = r.syncRoleBindings(ctx, r.Log, instance); err != nil {
+	if err = r.syncRoleBindings(ctx, log, instance); err != nil {
 		errs = append(errs, fmt.Errorf("cannot sync rolebindings items: %w", err))
 	}
 
@@ -366,7 +366,7 @@ func (r *Manager) reconcile(ctx context.Context, instance *capsulev1beta2.Tenant
 		return err
 	}
 
-	r.Log.V(4).Info("Tenant reconciling completed")
+	log.V(4).Info("Tenant reconciling completed")
 
 	return err
 }

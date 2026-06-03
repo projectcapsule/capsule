@@ -6,6 +6,7 @@ package tenant
 import (
 	"context"
 
+	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -19,6 +20,7 @@ import (
 
 func (r *Manager) reconcileRuleStatus(
 	ctx context.Context,
+	log logr.Logger,
 	tnt *capsulev1beta2.Tenant,
 	ns *corev1.Namespace,
 ) error {
@@ -30,6 +32,7 @@ func (r *Manager) reconcileRuleStatus(
 
 	return r.ensureRuleStatus(
 		ctx,
+		log,
 		tnt,
 		ns,
 		ruleBody,
@@ -38,6 +41,7 @@ func (r *Manager) reconcileRuleStatus(
 
 func (r *Manager) ensureRuleStatus(
 	ctx context.Context,
+	log logr.Logger,
 	tnt *capsulev1beta2.Tenant,
 	namespace *corev1.Namespace,
 	body *api.NamespaceRuleBodyNamespace,
@@ -68,7 +72,7 @@ func (r *Manager) ensureRuleStatus(
 	})
 	if err != nil {
 		if apierrors.HasStatusCause(err, corev1.NamespaceTerminatingCause) {
-			r.Log.V(4).Info(
+			log.V(4).Info(
 				"skipping RuleStatus sync because namespace is terminating",
 				"name", rule.Name,
 				"namespace", rule.Namespace,

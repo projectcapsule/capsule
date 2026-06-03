@@ -10,6 +10,7 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
+	"fmt"
 	"math/big"
 	"time"
 
@@ -141,20 +142,40 @@ func GenerateCertificateAuthority() (s *CapsuleCA, err error) {
 	return s, err
 }
 
-func GetCertificateFromBytes(certBytes []byte) (*x509.Certificate, error) {
-	var b *pem.Block
+func GetCertificateFromBytes(raw []byte) (*x509.Certificate, error) {
+	block, _ := pem.Decode(raw)
+	if block == nil {
+		return nil, fmt.Errorf("failed to decode certificate PEM")
+	}
 
-	b, _ = pem.Decode(certBytes)
+	if block.Type != "CERTIFICATE" {
+		return nil, fmt.Errorf("expected CERTIFICATE PEM block, got %q", block.Type)
+	}
 
-	return x509.ParseCertificate(b.Bytes)
+	certificate, err := x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		return nil, fmt.Errorf("parse certificate: %w", err)
+	}
+
+	return certificate, nil
 }
 
-func GetPrivateKeyFromBytes(keyBytes []byte) (*rsa.PrivateKey, error) {
-	var b *pem.Block
+func GetPrivateKeyFromBytes(raw []byte) (*rsa.PrivateKey, error) {
+	block, _ := pem.Decode(raw)
+	if block == nil {
+		return nil, fmt.Errorf("failed to decode private key PEM")
+	}
 
-	b, _ = pem.Decode(keyBytes)
+	if block.Type != "RSA PRIVATE KEY" {
+		return nil, fmt.Errorf("expected RSA PRIVATE KEY PEM block, got %q", block.Type)
+	}
 
-	return x509.ParsePKCS1PrivateKey(b.Bytes)
+	privateKey, err := x509.ParsePKCS1PrivateKey(block.Bytes)
+	if err != nil {
+		return nil, fmt.Errorf("parse RSA private key: %w", err)
+	}
+
+	return privateKey, nil
 }
 
 func GetCertificateWithPrivateKeyFromBytes(certBytes, keyBytes []byte) (*x509.Certificate, *rsa.PrivateKey, error) {
@@ -171,12 +192,17 @@ func GetCertificateWithPrivateKeyFromBytes(certBytes, keyBytes []byte) (*x509.Ce
 	return cert, key, nil
 }
 
-func (c *CapsuleCA) GenerateCertificate(opts CertificateOptions) (certificatePem *bytes.Buffer, certificateKey *bytes.Buffer, err error) {
+func (c *CapsuleCA) GenerateCertificate(opts CertOpts) (certificatePem *bytes.Buffer, certificateKey *bytes.Buffer, err error) {
 	var certPrivKey *rsa.PrivateKey
 
 	certPrivKey, err = rsa.GenerateKey(rand.Reader, 4096)
 	if err != nil {
 		return nil, nil, err
+	}
+
+	sans := opts.SAN
+	if sans.Empty() {
+		return nil, nil, fmt.Errorf("cannot generate certificate without SANs")
 	}
 
 	cert := &x509.Certificate{
@@ -189,9 +215,10 @@ func (c *CapsuleCA) GenerateCertificate(opts CertificateOptions) (certificatePem
 			StreetAddress: []string{"27, Old Gloucester Street"},
 			PostalCode:    []string{"WC1N 3AX"},
 		},
-		DNSNames:     opts.DNSNames(),
+		DNSNames:     sans.DNSNames,
+		IPAddresses:  sans.IPAddrs,
 		NotBefore:    time.Now().AddDate(0, 0, -1),
-		NotAfter:     opts.ExpirationDate(),
+		NotAfter:     opts.GetExpirationDate(),
 		SubjectKeyId: []byte{1, 2, 3, 4, 6},
 		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
 		KeyUsage:     x509.KeyUsageDigitalSignature,
