@@ -7,6 +7,15 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+const (
+	ActionTypeAllow ActionType = "allow"
+	ActionTypeDeny  ActionType = "deny"
+	ActionTypeAudit ActionType = "audit"
+)
+
+// +kubebuilder:validation:Enum=allow;deny;audit
+type ActionType string
+
 // For future implementation where users might manage RuleStatus CRs themselves
 // +kubebuilder:object:generate=true
 type NamespaceRuleBodyNamespace struct {
@@ -30,6 +39,13 @@ type NamespaceRuleBodyTenant struct {
 
 // +kubebuilder:object:generate=true
 type NamespaceRuleEnforceBody struct {
+	// Declare the action being performed on the enforcement rule:
+	// deny: On match, deny admission request
+	// allow: On match, allowed admission request
+	// audit: On match, audit (post event) of admission request
+	//+kubebuilder:default:=deny
+	Action ActionType `json:"action,omitempty"`
+
 	// Define registries which are allowed to be used within this tenant
 	// The rules are aggregated, since you can use Regular Expressions the match registry endpoints
 	Registries []OCIRegistry `json:"registries,omitempty"`
