@@ -141,13 +141,7 @@ func FetchCurrentCaBundleForAdmission(
 	ctx context.Context,
 	c client.Reader,
 	cfg configuration.Configuration,
-	configuredCABundle []byte,
 ) ([]byte, error) {
-	// Explicit configuration wins.
-	if len(configuredCABundle) > 0 {
-		return append([]byte(nil), configuredCABundle...), nil
-	}
-
 	// Internal Capsule TLS enabled: source of truth is the TLS Secret.
 	if cfg.EnableTLSConfiguration() {
 		secret := &corev1.Secret{}
@@ -175,7 +169,6 @@ func FetchCurrentCaBundleForAdmission(
 		return append([]byte(nil), caBundle...), nil
 	}
 
-	// cert-manager / external injector mode:
-	// return nil and preserve current webhook caBundle.
+	// TLS Controller not enabled
 	return nil, nil
 }

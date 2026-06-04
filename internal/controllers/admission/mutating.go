@@ -144,14 +144,27 @@ func (r *mutatingReconciler) reconcileConfiguration(
 
 		obj.SetAnnotations(annotations)
 
+		// Preserve existing CA Information (cert-manager)
+		existingCABundles := mutatingWebhookCABundlesByName(obj.Webhooks)
+
 		obj.Webhooks = desiredHooks
 
-		caCert, err := tls.FetchCurrentCaBundleForAdmission(ctx, r.client, r.configuration, cfg.Client.CABundle)
-		if err != nil {
-			return err
+		var caCert []byte
+
+		if r.configuration.EnableTLSConfiguration() {
+			caCert, err = tls.FetchCurrentCaBundleForAdmission(ctx, r.client, r.configuration)
+			if err != nil {
+				return err
+			}
+		} else {
+			caCert = cfg.Client.CABundle
 		}
 
-		preserveMutatingWebhookCABundles(obj.Webhooks, caCert)
+		if len(caCert) > 0 {
+			preserveMutatingWebhookCABundles(obj.Webhooks, caCert)
+		} else {
+			restoreMutatingWebhookCABundles(obj.Webhooks, existingCABundles)
+		}
 
 		return err
 	})
@@ -222,10 +235,44 @@ func (r *mutatingReconciler) webhooks(
 	return hooks, nil
 }
 
+func mutatingWebhookCABundlesByName(
+	hooks []admissionv1.MutatingWebhook,
+) map[string][]byte {
+	out := make(map[string][]byte, len(hooks))
+
+	for _, hook := range hooks {
+		if hook.Name == "" || len(hook.ClientConfig.CABundle) == 0 {
+			continue
+		}
+
+		out[hook.Name] = append([]byte(nil), hook.ClientConfig.CABundle...)
+	}
+
+	return out
+}
+
+func restoreMutatingWebhookCABundles(
+	hooks []admissionv1.MutatingWebhook,
+	existingCABundles map[string][]byte,
+) {
+	for i := range hooks {
+		existingCABundle := existingCABundles[hooks[i].Name]
+		if len(existingCABundle) == 0 {
+			continue
+		}
+
+		hooks[i].ClientConfig.CABundle = append([]byte(nil), existingCABundle...)
+	}
+}
+
 func preserveMutatingWebhookCABundles(
 	hooks []admissionv1.MutatingWebhook,
 	caBundle []byte,
 ) {
+	if len(caBundle) == 0 {
+		return
+	}
+
 	for i := range hooks {
 		hooks[i].ClientConfig.CABundle = append([]byte(nil), caBundle...)
 	}
