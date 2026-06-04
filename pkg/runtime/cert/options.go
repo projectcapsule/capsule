@@ -6,23 +6,26 @@ package cert
 import "time"
 
 type CertificateOptions interface {
-	DNSNames() []string
-	ExpirationDate() time.Time
+	GetDNSNames() CertificateSANs
+	GetExpirationDate() time.Time
 }
 
-type certOpts struct {
-	dnsNames       []string
-	expirationDate time.Time
+type CertOpts struct {
+	SAN            CertificateSANs
+	ExpirationDate time.Time
 }
 
-func (c certOpts) DNSNames() []string {
-	return c.dnsNames
+func NewCertOpts(expirationDate time.Time, sans CertificateSANs) CertOpts {
+	return CertOpts{
+		ExpirationDate: expirationDate,
+		SAN:            sans.Normalize(),
+	}
 }
 
-func (c certOpts) ExpirationDate() time.Time {
-	return c.expirationDate
+func (c CertOpts) GetDNSNames() CertificateSANs {
+	return c.SAN
 }
 
-func NewCertOpts(expirationDate time.Time, dnsNames ...string) CertificateOptions {
-	return &certOpts{dnsNames: dnsNames, expirationDate: expirationDate}
+func (c CertOpts) GetExpirationDate() time.Time {
+	return c.ExpirationDate
 }

@@ -67,7 +67,7 @@ spec:
       {{- with .Values.webhooks.hooks.namespaces }}
         {{- if .enabled }}
           {{- $any = true }}
-      - name: namespaces.projectcapsule.dev
+      - name: namespaces.validating.projectcapsule.dev
         {{- with .opts }}
         opts:
           {{- toYaml . |  nindent 10 }}
@@ -111,7 +111,7 @@ spec:
       {{- with .Values.webhooks.hooks.customresources }}
         {{- if .enabled }}
           {{- $any = true }}
-      - name: customresources.projectcapsule.dev
+      - name: customresources.validating.projectcapsule.dev
         {{- with .opts }}
         opts:
           {{- toYaml . |  nindent 10 }}
@@ -153,7 +153,7 @@ spec:
       {{- with .Values.webhooks.hooks.cordoning }}
         {{- if .enabled }}
           {{- $any = true }}
-      - name: cordoning.projectcapsule.dev
+      - name: cordoning.validating.projectcapsule.dev
         {{- with .opts }}
         opts:
           {{- toYaml . |  nindent 10 }}
@@ -187,7 +187,7 @@ spec:
       {{- with .Values.webhooks.hooks.devices }}
         {{- if .enabled }}
           {{- $any = true }}
-      - name: devices.projectcapsule.dev
+      - name: devices.validating.projectcapsule.dev
         {{- with .opts }}
         opts:
           {{- toYaml . |  nindent 10 }}
@@ -229,7 +229,7 @@ spec:
       {{- with .Values.webhooks.hooks.gateways }}
         {{- if .enabled }}
           {{- $any = true }}
-      - name: gateway.projectcapsule.dev
+      - name: gateway.validating.projectcapsule.dev
         {{- with .opts }}
         opts:
           {{- toYaml . |  nindent 10 }}
@@ -270,7 +270,7 @@ spec:
       {{- with .Values.webhooks.hooks.ingresses }}
         {{- if .enabled }}
           {{- $any = true }}
-      - name: ingress.projectcapsule.dev
+      - name: ingress.validating.projectcapsule.dev
         {{- with .opts }}
         opts:
           {{- toYaml . |  nindent 10 }}
@@ -313,7 +313,7 @@ spec:
       {{- with .Values.webhooks.hooks.nodes }}
         {{- if .enabled }}
           {{- $any = true }}
-      - name: nodes.projectcapsule.dev
+      - name: nodes.validating.projectcapsule.dev
         {{- with .opts }}
         opts:
           {{- toYaml . |  nindent 10 }}
@@ -352,7 +352,7 @@ spec:
       {{- with .Values.webhooks.hooks.pods }}
         {{- if .enabled }}
           {{- $any = true }}
-      - name: pods.projectcapsule.dev
+      - name: pods.validating.projectcapsule.dev
         {{- with .opts }}
         opts:
           {{- toYaml . |  nindent 10 }}
@@ -394,7 +394,7 @@ spec:
       {{- with .Values.webhooks.hooks.persistentvolumeclaims }}
         {{- if .enabled }}
           {{- $any = true }}
-      - name: pvc.projectcapsule.dev
+      - name: pvc.validating.projectcapsule.dev
         {{- with .opts }}
         opts:
           {{- toYaml . |  nindent 10 }}
@@ -435,7 +435,7 @@ spec:
       {{- with .Values.webhooks.hooks.services }}
         {{- if .enabled }}
           {{- $any = true }}
-      - name: services.projectcapsule.dev
+      - name: services.validating.projectcapsule.dev
         {{- with .opts }}
         opts:
           {{- toYaml . |  nindent 10 }}
@@ -476,7 +476,7 @@ spec:
       {{- with (mergeOverwrite .Values.webhooks.hooks.managed .Values.webhooks.hooks.tenantResourceObjects) }}
         {{- if .enabled }}
           {{- $any = true }}
-      - name: managed.tenant.projectcapsule.dev
+      - name: managed.validating.projectcapsule.dev
         {{- with .opts }}
         opts:
           {{- toYaml . |  nindent 10 }}
@@ -507,7 +507,7 @@ spec:
       {{- with  .Values.webhooks.hooks.replications }}
         {{- if .enabled }}
           {{- $any = true }}
-      - name: replications.projectcapsule.dev
+      - name: replications.validating.projectcapsule.dev
         {{- with .opts }}
         opts:
           {{- toYaml . |  nindent 10 }}
@@ -538,7 +538,7 @@ spec:
       {{- with .Values.webhooks.hooks.tenants }}
         {{- if .enabled }}
           {{- $any = true }}
-      - name: tenants.projectcapsule.dev
+      - name: tenants.validating.projectcapsule.dev
         {{- with .opts }}
         opts:
           {{- toYaml . |  nindent 10 }}
@@ -580,7 +580,7 @@ spec:
       {{- with .Values.webhooks.hooks.resourcepools.pools }}
         {{- if .enabled }}
           {{- $any = true }}
-      - name: resourcepools.projectcapsule.dev
+      - name: resourcepools.validating.projectcapsule.dev
         {{- with .opts }}
         opts:
           {{- toYaml . |  nindent 10 }}
@@ -621,7 +621,7 @@ spec:
       {{- with .Values.webhooks.hooks.resourcepools.pools }}
         {{- if .enabled }}
           {{- $any = true }}
-      - name: resourcepoolclaims.projectcapsule.dev
+      - name: resourcepoolclaims.validating.projectcapsule.dev
         {{- with .opts }}
         opts:
           {{- toYaml . |  nindent 10 }}
@@ -663,7 +663,7 @@ spec:
       {{- with .Values.webhooks.hooks.serviceaccounts }}
         {{- if .enabled }}
           {{- $any = true }}
-      - name: serviceaccounts.projectcapsule.dev
+      - name: serviceaccounts.validating.projectcapsule.dev
         {{- with .opts }}
         opts:
           {{- toYaml . |  nindent 10 }}
@@ -704,7 +704,7 @@ spec:
       {{- with .Values.webhooks.hooks.config }}
         {{- if .enabled }}
           {{- $any = true }}
-      - name: config.projectcapsule.dev
+      - name: config.validating.projectcapsule.dev
         {{- with .opts }}
         opts:
           {{- toYaml . |  nindent 10 }}
@@ -744,7 +744,7 @@ spec:
       {{- with .Values.webhooks.hooks.customquotas }}
         {{- if .enabled }}
           {{- $any = true }}
-      - name: namespaced.custom-quotas.projectcapsule.dev
+      - name: namespaced.custom-quotas.validating.projectcapsule.dev
         {{- with .opts }}
         opts:
           {{- toYaml . |  nindent 10 }}
@@ -776,7 +776,7 @@ spec:
       {{- with .Values.webhooks.hooks.globalcustomquotas }}
         {{- if .enabled }}
           {{- $any = true }}
-      - name: cluster.custom-quotas.projectcapsule.dev
+      - name: cluster.custom-quotas.validating.projectcapsule.dev
         {{- with .opts }}
         opts:
           {{- toYaml . |  nindent 10 }}
@@ -808,7 +808,7 @@ spec:
       {{- with .Values.webhooks.hooks.calculations }}
         {{- if .enabled }}
           {{- $any = true }}
-      - name: calculation.custom-quotas.projectcapsule.dev
+      - name: calculation.custom-quotas.validating.projectcapsule.dev
         {{- with .opts }}
         opts:
           {{- toYaml . |  nindent 10 }}
@@ -858,7 +858,7 @@ spec:
       {{- with (mergeOverwrite .Values.webhooks.hooks.namespaces .Values.webhooks.hooks.namespaceOwnerReference) }}
         {{- if .enabled }}
           {{- $any = true }}
-      - name: namespaces.tenants.projectcapsule.dev
+      - name: namespaces.mutating.projectcapsule.dev
         {{- with .opts }}
         opts:
           {{- toYaml . |  nindent 10 }}
@@ -901,7 +901,7 @@ spec:
       {{- with .Values.webhooks.hooks.persistentvolumeclaims }}
         {{- if .enabled }}
           {{- $any = true }}
-      - name: pvc.projectcapsule.dev
+      - name: pvc.mutating.projectcapsule.dev
         {{- with .opts }}
         opts:
           {{- toYaml . |  nindent 10 }}
@@ -944,7 +944,7 @@ spec:
       {{- with (mergeOverwrite .Values.webhooks.hooks.pods .Values.webhooks.hooks.defaults.pods) }}
         {{- if .enabled }}
           {{- $any = true }}
-      - name: pod.defaults.projectcapsule.dev
+      - name: pod.mutating.projectcapsule.dev
         {{- with .opts }}
         opts:
           {{- toYaml . |  nindent 10 }}
@@ -984,7 +984,7 @@ spec:
       {{- with (mergeOverwrite .Values.webhooks.hooks.persistentvolumeclaims .Values.webhooks.hooks.defaults.pvc) }}
         {{- if .enabled }}
           {{- $any = true }}
-      - name: storage.defaults.projectcapsule.dev
+      - name: storage.mutating.projectcapsule.dev
         {{- with .opts }}
         opts:
           {{- toYaml . |  nindent 10 }}
@@ -1024,7 +1024,7 @@ spec:
       {{- with (mergeOverwrite .Values.webhooks.hooks.ingresses .Values.webhooks.hooks.defaults.ingress) }}
         {{- if .enabled }}
           {{- $any = true }}
-      - name: ingress.defaults.projectcapsule.dev
+      - name: ingress.mutating.projectcapsule.dev
         {{- with .opts }}
         opts:
           {{- toYaml . |  nindent 10 }}
@@ -1066,7 +1066,7 @@ spec:
       {{- with .Values.webhooks.hooks.gateways }}
         {{- if .enabled }}
           {{- $any = true }}
-      - name: gateway.defaults.projectcapsule.dev
+      - name: gateway.mutating.projectcapsule.dev
         {{- with .opts }}
         opts:
           {{- toYaml . |  nindent 10 }}
@@ -1107,7 +1107,7 @@ spec:
       {{- with .Values.webhooks.hooks.resourcepools.pools }}
         {{- if .enabled }}
           {{- $any = true }}
-      - name: resourcepools.projectcapsule.dev
+      - name: resourcepools.mutating.projectcapsule.dev
         {{- with .opts }}
         opts:
           {{- toYaml . |  nindent 10 }}
@@ -1149,7 +1149,7 @@ spec:
       {{- with .Values.webhooks.hooks.resourcepools.claims }}
         {{- if .enabled }}
           {{- $any = true }}
-      - name: resourcepoolclaims.projectcapsule.dev
+      - name: resourcepoolclaims.mutating.projectcapsule.dev
         {{- with .opts }}
         opts:
           {{- toYaml . |  nindent 10 }}
@@ -1191,7 +1191,7 @@ spec:
       {{- with .Values.webhooks.hooks.tenants }}
         {{- if .enabled }}
           {{- $any = true }}
-      - name: tenants.projectcapsule.dev
+      - name: tenants.mutating.projectcapsule.dev
         {{- with .opts }}
         opts:
           {{- toYaml . |  nindent 10 }}
@@ -1234,7 +1234,7 @@ spec:
       {{- with .Values.webhooks.hooks.metadata }}
         {{- if .enabled }}
           {{- $any = true }}
-      - name: metadata.misc.projectcapsule.dev
+      - name: metadata.mutating.projectcapsule.dev
         {{- with .opts }}
         opts:
           {{- toYaml . |  nindent 10 }}

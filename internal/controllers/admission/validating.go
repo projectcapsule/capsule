@@ -25,6 +25,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
+	"github.com/projectcapsule/capsule/internal/controllers/tls"
 	"github.com/projectcapsule/capsule/internal/controllers/utils"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/runtime/admission"
@@ -145,12 +146,14 @@ func (r *validatingReconciler) reconcileValidatingConfiguration(
 
 		obj.SetAnnotations(annotations)
 
-		// Do not overwrite caBundle. cert-manager or the legacy TLS reconciler owns it.
-		if cfg.Client.CABundle == nil {
-			obj.Webhooks = preserveValidatingWebhookCABundles(obj.Webhooks, desiredHooks)
-		} else {
-			obj.Webhooks = desiredHooks
+		obj.Webhooks = desiredHooks
+
+		caCert, err := tls.FetchCurrentCaBundleForAdmission(ctx, r.client, r.configuration, cfg.Client.CABundle)
+		if err != nil {
+			return err
 		}
+
+		preserveValidatingWebhookCABundles(obj.Webhooks, caCert)
 
 		return err
 	})
@@ -222,28 +225,10 @@ func (r *validatingReconciler) validatingWebhooks(
 }
 
 func preserveValidatingWebhookCABundles(
-	existing []admissionv1.ValidatingWebhook,
-	desired []admissionv1.ValidatingWebhook,
-) []admissionv1.ValidatingWebhook {
-	existingByName := make(map[string][]byte, len(existing))
-
-	for _, hook := range existing {
-		if len(hook.ClientConfig.CABundle) == 0 {
-			continue
-		}
-
-		existingByName[hook.Name] = append([]byte(nil), hook.ClientConfig.CABundle...)
+	hooks []admissionv1.ValidatingWebhook,
+	caBundle []byte,
+) {
+	for i := range hooks {
+		hooks[i].ClientConfig.CABundle = append([]byte(nil), caBundle...)
 	}
-
-	for i := range desired {
-		if len(desired[i].ClientConfig.CABundle) > 0 {
-			continue
-		}
-
-		if caBundle, ok := existingByName[desired[i].Name]; ok {
-			desired[i].ClientConfig.CABundle = append([]byte(nil), caBundle...)
-		}
-	}
-
-	return desired
 }

@@ -20,6 +20,17 @@ var AllowedNamespaceMetadataTemplates = sets.New[string](
 	"namespace",
 )
 
+func AllowedNamespaceMetadataTemplatesString() string {
+	templates := AllowedNamespaceMetadataTemplates.UnsortedList()
+	slices.Sort(templates)
+
+	for i, tpl := range templates {
+		templates[i] = fmt.Sprintf("{{%s}}", tpl)
+	}
+
+	return strings.Join(templates, ", ")
+}
+
 var FastTemplateExpression = regexp.MustCompile(`{{\s*([^{}]+)\s*}}`)
 
 func ValidateKubernetesStringOrAllowedTemplates(
@@ -63,15 +74,16 @@ func validateAllowedTemplatesAndReplace(
 
 	for _, match := range matches {
 		raw := match[0]
-		name := strings.TrimSpace(match[1])
+		name := FastTemplateNormalize(match[1])
 
 		if !AllowedNamespaceMetadataTemplates.Has(name) {
 			return value, []string{
 				fmt.Sprintf(
-					"%s: unsupported template %q in %q, allowed templates are {{tenant.name}} and {{namespace}}",
+					"%s: unsupported template %q in %q, allowed templates are %s",
 					fieldPath,
 					name,
 					value,
+					AllowedNamespaceMetadataTemplatesString(),
 				),
 			}
 		}
@@ -123,13 +135,17 @@ func FastTemplate(
 	t := fasttemplate.New(template, "{{", "}}")
 
 	return t.ExecuteFuncString(func(w io.Writer, tag string) (int, error) {
-		key := strings.TrimSpace(tag)
+		key := FastTemplateNormalize(tag)
 		if v, ok := templateContext[key]; ok {
 			return w.Write([]byte(v))
 		}
 
 		return 0, nil
 	})
+}
+
+func FastTemplateNormalize(key string) string {
+	return strings.TrimSpace(key)
 }
 
 // FastTemplateMap applies templating to all values in the provided map in place.

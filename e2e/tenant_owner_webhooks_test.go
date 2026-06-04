@@ -21,7 +21,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api/rbac"
 )
 
-var _ = Describe("when Tenant owner interacts with the webhooks", Ordered, Label("tenant"), func() {
+var _ = Describe("when Tenant owner interacts with the webhooks", Ordered, Label("tenant", "permissions", "owners"), func() {
 	tnt := &capsulev1beta2.Tenant{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "e2e-owner-admission",

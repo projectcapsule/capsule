@@ -55,6 +55,10 @@ func GetNamespaceTenant(
 		return nil, &response
 	}
 
+	if len(tnts) == 0 && user.IsAdmin() {
+		return nil, nil
+	}
+
 	if len(tnts) == 0 {
 		return nil, ad.Deny("You do not have any Tenant assigned: please, reach out to the system administrators")
 	}

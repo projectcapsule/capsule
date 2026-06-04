@@ -1,7 +1,6 @@
 // Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
-//nolint:dupl
 package tenant
 
 import (
@@ -9,6 +8,7 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -21,9 +21,10 @@ import (
 // Ensuring all the LimitRange are applied to each Namespace handled by the Tenant.
 //
 
-func (r *Manager) syncLimitRanges(ctx context.Context, tenant *capsulev1beta2.Tenant) error {
+func (r *Manager) syncLimitRanges(ctx context.Context, log logr.Logger, tenant *capsulev1beta2.Tenant) error {
 	// getting requested LimitRange keys
-	keys := make([]string, 0, len(tenant.Spec.LimitRanges.Items)) //nolint:staticcheck
+	//nolint:staticcheck
+	keys := make([]string, 0, len(tenant.Spec.LimitRanges.Items))
 
 	//nolint:staticcheck
 	for i := range tenant.Spec.LimitRanges.Items {
@@ -31,11 +32,17 @@ func (r *Manager) syncLimitRanges(ctx context.Context, tenant *capsulev1beta2.Te
 	}
 
 	return runForTenantNamespaces(ctx, tenant, func(ctx context.Context, namespace string) error {
-		return r.syncLimitRange(ctx, tenant, namespace, keys)
+		return r.syncLimitRange(ctx, log, tenant, namespace, keys)
 	})
 }
 
-func (r *Manager) syncLimitRange(ctx context.Context, tenant *capsulev1beta2.Tenant, namespace string, keys []string) (err error) {
+func (r *Manager) syncLimitRange(
+	ctx context.Context,
+	log logr.Logger,
+	tenant *capsulev1beta2.Tenant,
+	namespace string,
+	keys []string,
+) (err error) {
 	if err = r.pruningResources(ctx, namespace, keys, &corev1.LimitRange{}); err != nil {
 		return err
 	}
@@ -71,7 +78,7 @@ func (r *Manager) syncLimitRange(ctx context.Context, tenant *capsulev1beta2.Ten
 		})
 		if err != nil {
 			if apierrors.HasStatusCause(err, corev1.NamespaceTerminatingCause) {
-				r.Log.V(4).Info(
+				log.Info(
 					"skipping LimitRange sync because namespace is terminating",
 					"name", target.Name,
 					"namespace", target.Namespace,
@@ -84,7 +91,7 @@ func (r *Manager) syncLimitRange(ctx context.Context, tenant *capsulev1beta2.Ten
 			return err
 		}
 
-		r.Log.V(4).Info("LimitRange sync result: "+string(res), "name", target.Name, "namespace", target.Namespace)
+		log.Info("LimitRange sync result: "+string(res), "name", target.Name, "namespace", target.Namespace)
 	}
 
 	return nil

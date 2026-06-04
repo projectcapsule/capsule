@@ -45,7 +45,7 @@ type CapsuleConfigurationSpec struct {
 	EnableTLSReconciler bool `json:"enableTLSReconciler"` //nolint:tagliatelle
 	// Define entities which can act as Administrators in the capsule construct
 	// These entities are automatically owners for all existing tenants. Meaning they can add namespaces to any tenant. However they must be specific by using the capsule label
-	// for interacting with namespaces. Because if that label is not defined, it's assumed that namespace interaction was not targeted towards a tenant and will therefor
+	// for interacting with namespaces. Because if that label is not defined, it's assumed that namespace interaction was not targeted towards a tenant and will therefore
 	// be ignored by capsule.
 	Administrators rbac.UserListSpec `json:"administrators,omitempty"`
 	// Configuration for dynamic Validating and Mutating Admission webhooks managed by Capsule.
@@ -172,6 +172,8 @@ type ServiceAccountClient struct {
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:scope=Cluster
 // +kubebuilder:storageversion
+// +kubebuilder:printcolumn:name="Ready",type="string",JSONPath=".status.conditions[?(@.type==\"Ready\")].status",description="Reconcile status"
+// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 
 // CapsuleConfiguration is the Schema for the Capsule configuration API.
 type CapsuleConfiguration struct {

@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/go-logr/logr"
 	"golang.org/x/sync/errgroup"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -43,7 +44,7 @@ import (
 // In case of Namespace-scoped Resource Budget, we're just replicating the resources across all registered Namespaces.
 
 //nolint:cyclop
-func (r *Manager) syncResourceQuotas(ctx context.Context, tenant *capsulev1beta2.Tenant) (err error) { //nolint:gocognit
+func (r *Manager) syncResourceQuotas(ctx context.Context, log logr.Logger, tenant *capsulev1beta2.Tenant) (err error) { //nolint:gocognit
 	// Remove prior metrics, to avoid cleaning up for metrics of deleted ResourceQuotas
 	r.Metrics.DeleteTenantResourceMetrics(tenant.Name)
 	// Expose the namespace quota and usage as metrics for the tenant
@@ -78,20 +79,20 @@ func (r *Manager) syncResourceQuotas(ctx context.Context, tenant *capsulev1beta2
 				var tntRequirement *labels.Requirement
 
 				if tntRequirement, scopeErr = labels.NewRequirement(meta.NewTenantLabel, selection.Equals, []string{tenant.Name}); scopeErr != nil {
-					r.Log.Error(scopeErr, "cannot build ResourceQuota Tenant requirement")
+					log.Error(scopeErr, "cannot build ResourceQuota Tenant requirement")
 				}
 				// Requirement to list ResourceQuota for the current index
 				var indexRequirement *labels.Requirement
 
 				if indexRequirement, scopeErr = labels.NewRequirement(meta.ResourceQuotaLabel, selection.Equals, []string{strconv.Itoa(index)}); scopeErr != nil {
-					r.Log.Error(scopeErr, "cannot build ResourceQuota index requirement")
+					log.Error(scopeErr, "cannot build ResourceQuota index requirement")
 				}
 				// Listing all the ResourceQuota according to the said requirements.
 				// These are required since Capsule is going to sum all the used quota to
 				// sum them and get the Tenant one.
 				list := &corev1.ResourceQuotaList{}
 				if scopeErr = r.reader.List(ctx, list, &client.ListOptions{LabelSelector: labels.NewSelector().Add(*tntRequirement).Add(*indexRequirement)}); scopeErr != nil {
-					r.Log.Error(scopeErr, "cannot list ResourceQuota", "tenantFilter", tntRequirement.String(), "indexFilter", indexRequirement.String())
+					log.Error(scopeErr, "cannot list ResourceQuota", "tenantFilter", tntRequirement.String(), "indexFilter", indexRequirement.String())
 
 					return scopeErr
 				}
@@ -102,7 +103,7 @@ func (r *Manager) syncResourceQuotas(ctx context.Context, tenant *capsulev1beta2
 				// For this case, we're going to block the Quota setting the Hard as the
 				// used one.
 				for name, hardQuota := range resourceQuota.Hard {
-					r.Log.V(4).Info("desired hard " + name.String() + " quota is " + hardQuota.String())
+					log.V(4).Info("desired hard " + name.String() + " quota is " + hardQuota.String())
 
 					// Getting the whole usage across all the Tenant Namespaces
 					var quantity resource.Quantity
@@ -110,7 +111,7 @@ func (r *Manager) syncResourceQuotas(ctx context.Context, tenant *capsulev1beta2
 						quantity.Add(item.Status.Used[name])
 					}
 
-					r.Log.V(4).Info("computed " + name.String() + " quota for the whole Tenant is " + quantity.String())
+					log.V(4).Info("computed " + name.String() + " quota for the whole Tenant is " + quantity.String())
 
 					// Expose usage and limit metrics for the resource (name) of the ResourceQuota (index)
 					r.Metrics.TenantResourceUsageGauge.WithLabelValues(
@@ -171,8 +172,8 @@ func (r *Manager) syncResourceQuotas(ctx context.Context, tenant *capsulev1beta2
 						}
 					}
 
-					if scopeErr = r.resourceQuotasUpdate(ctx, name, quantity, toKeep, resourceQuota.Hard[name], list.Items...); scopeErr != nil {
-						r.Log.Error(scopeErr, "cannot proceed with outer ResourceQuota")
+					if scopeErr = r.resourceQuotasUpdate(ctx, log, name, quantity, toKeep, resourceQuota.Hard[name], list.Items...); scopeErr != nil {
+						log.Error(scopeErr, "cannot proceed with outer ResourceQuota")
 
 						return scopeErr
 					}
@@ -214,14 +215,14 @@ func (r *Manager) syncResourceQuotas(ctx context.Context, tenant *capsulev1beta2
 		}
 
 		group.Go(func() error {
-			return r.syncResourceQuota(ctx, tenant, namespace, keys)
+			return r.syncResourceQuota(ctx, log, tenant, namespace, keys)
 		})
 	}
 
 	return group.Wait()
 }
 
-func (r *Manager) syncResourceQuota(ctx context.Context, tenant *capsulev1beta2.Tenant, namespace string, keys []string) (err error) {
+func (r *Manager) syncResourceQuota(ctx context.Context, log logr.Logger, tenant *capsulev1beta2.Tenant, namespace string, keys []string) (err error) {
 	// getting ResourceQuota labels for the mutateFn
 	var typeLabel string
 
@@ -274,7 +275,7 @@ func (r *Manager) syncResourceQuota(ctx context.Context, tenant *capsulev1beta2.
 		})
 		if err != nil {
 			if apierrors.HasStatusCause(err, corev1.NamespaceTerminatingCause) {
-				r.Log.V(4).Info(
+				log.V(4).Info(
 					"skipping ResourceQuota sync because namespace is terminating",
 					"name", target.Name,
 					"namespace", target.Namespace,
@@ -287,7 +288,7 @@ func (r *Manager) syncResourceQuota(ctx context.Context, tenant *capsulev1beta2.
 			return err
 		}
 
-		r.Log.V(4).Info("resource Quota sync result: "+string(res), "name", target.Name, "namespace", target.Namespace)
+		log.V(4).Info("resource Quota sync result: "+string(res), "name", target.Name, "namespace", target.Namespace)
 	}
 
 	return nil
@@ -296,7 +297,15 @@ func (r *Manager) syncResourceQuota(ctx context.Context, tenant *capsulev1beta2.
 // Serial ResourceQuota processing is expensive: using Go routines we can speed it up.
 // In case of multiple errors these are logged properly, returning a generic error since we have to repush back the
 // reconciliation loop.
-func (r *Manager) resourceQuotasUpdate(ctx context.Context, resourceName corev1.ResourceName, actual resource.Quantity, toKeep sets.Set[corev1.ResourceName], limit resource.Quantity, list ...corev1.ResourceQuota) (err error) {
+func (r *Manager) resourceQuotasUpdate(
+	ctx context.Context,
+	log logr.Logger,
+	resourceName corev1.ResourceName,
+	actual resource.Quantity,
+	toKeep sets.Set[corev1.ResourceName],
+	limit resource.Quantity,
+	list ...corev1.ResourceQuota,
+) (err error) {
 	group := new(errgroup.Group)
 
 	annotationsToKeep := sets.New[string]()
@@ -372,7 +381,7 @@ func (r *Manager) resourceQuotasUpdate(ctx context.Context, resourceName corev1.
 	if err = group.Wait(); err != nil {
 		// We had an error and we mark the whole transaction as failed
 		// to process it another time according to the Tenant controller back-off factor.
-		r.Log.Error(err, "cannot update outer ResourceQuotas", "resourceName", resourceName.String())
+		log.Error(err, "cannot update outer ResourceQuotas", "resourceName", resourceName.String())
 		err = fmt.Errorf("update of outer ResourceQuota items has failed: %w", err)
 	}
 

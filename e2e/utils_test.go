@@ -500,6 +500,17 @@ func PatchNamespaceEventually(ns *corev1.Namespace, mutator func(*corev1.Namespa
 	}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 }
 
+func ExpectNamespaceNotAssignedToTenant(ctx context.Context, name string) {
+	ns := &corev1.Namespace{}
+
+	Eventually(func(g Gomega) {
+		g.Expect(k8sClient.Get(ctx, types.NamespacedName{Name: name}, ns)).To(Succeed())
+
+		g.Expect(ns.GetOwnerReferences()).To(BeEmpty(), "namespace must not have ownerReferences")
+		g.Expect(ns.GetLabels()).NotTo(HaveKey(meta.TenantLabel), "namespace must not have tenant label")
+	}).WithTimeout(defaultTimeoutInterval).Should(Succeed())
+}
+
 func TenantNamespaceList(tnt *capsulev1beta2.Tenant, timeout time.Duration) AsyncAssertion {
 	t := &capsulev1beta2.Tenant{}
 	return Eventually(func() []string {

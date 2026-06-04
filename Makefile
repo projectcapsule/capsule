@@ -185,7 +185,9 @@ dev-setup:
 		--namespace capsule-system \
 		--create-namespace \
 		--version=$(CHART_VERSION) \
-		--set 'proxy.enabled=true' \
+		--set 'proxy.enabled=false' \
+		--set 'proxy.certManager.generateCertificates=false' \
+		--set 'proxy.options.generateCertificates=true' \
 		--set 'crds.install=true' \
 		--set 'crds.exclusive=true'\
 		--set 'crds.createConfig=true'\
@@ -194,8 +196,8 @@ dev-setup:
 		--set "monitoring.diagnostics.enabled=true"\
 		--set "manager.rbac.minimal=true"\
 		--set 'certManager.generateCertificates=false' \
-		--set 'tls.enableController=true' \
-		--set 'tls.create=true' \
+		--set 'tls.enableController=false' \
+		--set 'tls.create=false' \
 		--set "webhooks.exclusive=true"\
 		--set "webhooks.service.url=$${WEBHOOK_URL}" \
 		--set "webhooks.service.caBundle=$${CA_BUNDLE}" \
@@ -453,7 +455,7 @@ e2e-build: kind
 	$(MAKE) e2e-install
 
 .PHONY: e2e-install
-e2e-install: helm-controller-version ko-build-all
+e2e-install: helm-controller-version ko-build-all dev-install-gw-api-crds
 	$(MAKE) e2e-load-image CLUSTER_NAME=$(CLUSTER_NAME) IMAGE=$(CAPSULE_IMG) VERSION=$(VERSION)
 	$(KUBECTL) label clusterrole admin projectcapsule.dev/aggregate-to-controller=true
 	$(HELM) upgrade \
@@ -470,10 +472,10 @@ e2e-install: helm-controller-version ko-build-all
 		--set 'manager.resources=null'\
 		--set "manager.image.tag=$(VERSION)" \
 		--set 'manager.livenessProbe.failureThreshold=10' \
-		--set 'manager.options.logLevel=debug' \
+		--set-string 'manager.options.logLevel=5' \
 		--set 'manager.options.workers=4' \
 		--set 'manager.options.clientConnectionQPS=2000' \
-		--set 'manager.options.clientConnectionQPS=1000' \
+		--set 'manager.options.clientConnectionBurst=1000' \
 		--set 'manager.rbac.minimal=true' \
 		--set 'webhooks.hooks.nodes.enabled=true' \
 		--set "webhooks.exclusive=true"\
@@ -604,7 +606,7 @@ helm-doc:
 # -- Tools
 ####################
 CONTROLLER_GEN         := $(LOCALBIN)/controller-gen
-CONTROLLER_GEN_VERSION ?= v0.20.0
+CONTROLLER_GEN_VERSION ?= v0.21.0
 CONTROLLER_GEN_LOOKUP  := kubernetes-sigs/controller-tools
 controller-gen:
 	@test -s $(CONTROLLER_GEN) && $(CONTROLLER_GEN) --version | grep -q $(CONTROLLER_GEN_VERSION) || \
