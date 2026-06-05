@@ -39,3 +39,115 @@ func EvaluateTruthyFromCompiled(u unstructured.Unstructured, compiled *CompiledJ
 		return true, nil
 	}
 }
+
+func SplitFieldSelectorEquals(raw string) (path string, value string, ok bool) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return "", "", false
+	}
+
+	idx, width := findTopLevelEquals(raw)
+	if idx < 0 {
+		return "", "", false
+	}
+
+	path = strings.TrimSpace(raw[:idx])
+	value = strings.TrimSpace(raw[idx+width:])
+
+	if path == "" || value == "" {
+		return "", "", false
+	}
+
+	value = trimMatchingQuotes(value)
+
+	return path, value, true
+}
+
+func findTopLevelEquals(raw string) (idx int, width int) {
+	var (
+		bracketDepth int
+		braceDepth   int
+		parenDepth   int
+		quote        byte
+		escaped      bool
+	)
+
+	for i := range len(raw) {
+		ch := raw[i]
+
+		if escaped {
+			escaped = false
+
+			continue
+		}
+
+		if quote != 0 {
+			switch ch {
+			case '\\':
+				escaped = true
+			case quote:
+				quote = 0
+			}
+
+			continue
+		}
+
+		switch ch {
+		case '\'', '"':
+			quote = ch
+
+		case '[':
+			bracketDepth++
+		case ']':
+			if bracketDepth > 0 {
+				bracketDepth--
+			}
+
+		case '{':
+			braceDepth++
+		case '}':
+			if braceDepth > 0 {
+				braceDepth--
+			}
+
+		case '(':
+			parenDepth++
+		case ')':
+			if parenDepth > 0 {
+				parenDepth--
+			}
+
+		case '=':
+			if bracketDepth != 0 || braceDepth != 0 || parenDepth != 0 {
+				continue
+			}
+
+			if i+1 < len(raw) && raw[i+1] == '=' {
+				return i, 2
+			}
+
+			return i, 1
+		}
+	}
+
+	return -1, 0
+}
+
+func trimMatchingQuotes(value string) string {
+	if len(value) < 2 {
+		return value
+	}
+
+	first := value[0]
+	last := value[len(value)-1]
+
+	if first != last {
+		return value
+	}
+
+	if first != '"' && first != '\'' {
+		return value
+	}
+
+	return strings.TrimSpace(value[1 : len(value)-1])
+}

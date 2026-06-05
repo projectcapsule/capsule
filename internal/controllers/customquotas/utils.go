@@ -28,6 +28,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/runtime/jsonpath"
 	"github.com/projectcapsule/capsule/pkg/runtime/quota"
 	"github.com/projectcapsule/capsule/pkg/runtime/selectors"
+	"github.com/projectcapsule/capsule/pkg/utils"
 )
 
 const immediatePendingDeleteRequeue = 500 * time.Millisecond
@@ -112,7 +113,7 @@ func MatchesCompiledSelectorsWithFields(
 		allFieldsMatch := true
 
 		for _, matcher := range sel.FieldMatchers {
-			ok, err := jsonpath.EvaluateTruthyFromCompiled(u, matcher)
+			ok, err := evaluateCompiledFieldSelector(u, matcher)
 			if err != nil {
 				return false, err
 			}
@@ -130,6 +131,27 @@ func MatchesCompiledSelectorsWithFields(
 	}
 
 	return false, nil
+}
+
+func evaluateCompiledFieldSelector(
+	u unstructured.Unstructured,
+	matcher selectors.CompiledFieldSelector,
+) (bool, error) {
+	switch matcher.Operator {
+	case selectors.FieldSelectorTruthy:
+		return jsonpath.EvaluateTruthyFromCompiled(u, matcher.Compiled)
+
+	case selectors.FieldSelectorEquals:
+		actual, err := matcher.Compiled.Execute(u)
+		if err != nil {
+			return false, err
+		}
+
+		return strings.TrimSpace(actual) == matcher.Value, nil
+
+	default:
+		return false, fmt.Errorf("unsupported field selector operator %q", matcher.Operator)
+	}
 }
 
 func MakeCustomQuotaCacheKey(namespace, name string) string {
@@ -162,15 +184,15 @@ func CompileSelectorsWithFields(
 			lblSel = compiled
 		}
 
-		fieldMatchers := make([]*jsonpath.CompiledJSONPath, 0, len(selector.FieldSelectors))
+		fieldMatchers := make([]selectors.CompiledFieldSelector, 0, len(selector.FieldSelectors))
 
-		for _, path := range selector.FieldSelectors {
-			compiledPath, err := cache.GetOrCompile(path)
+		for _, raw := range selector.FieldSelectors {
+			compiledSelector, err := utils.CompileFieldSelector(cache, raw)
 			if err != nil {
-				return nil, fmt.Errorf("compile field selector path %q: %w", path, err)
+				return nil, fmt.Errorf("compile field selector %q: %w", raw, err)
 			}
 
-			fieldMatchers = append(fieldMatchers, compiledPath)
+			fieldMatchers = append(fieldMatchers, compiledSelector)
 		}
 
 		out = append(out, selectors.CompiledSelectorWithFields{
