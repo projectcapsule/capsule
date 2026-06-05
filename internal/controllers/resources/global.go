@@ -206,14 +206,13 @@ func (r *globalResourceController) Reconcile(ctx context.Context, request reconc
 		return requeue, nil
 	}
 
+	// Best-Effort for Updating the status
 	if updateErr := r.updateReconcilingStatus(ctx, tntResource); updateErr != nil {
 		if caperrors.IgnoreGone(updateErr) {
 			return reconcile.Result{}, nil
 		}
 
-		statusErr = gherrors.Wrap(updateErr, "failed to update status")
-
-		return requeue, nil
+		log.Error(updateErr, "failed to update status")
 	}
 
 	if c == nil {
