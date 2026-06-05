@@ -10,6 +10,13 @@ import (
 	"github.com/projectcapsule/capsule/pkg/runtime/jsonpath"
 )
 
+type FieldSelectorOperator string
+
+const (
+	FieldSelectorTruthy FieldSelectorOperator = "truthy"
+	FieldSelectorEquals FieldSelectorOperator = "equals"
+)
+
 // +kubebuilder:object:generate=true
 type SelectorWithFields struct {
 	// Select Items based on their labels.
@@ -23,5 +30,13 @@ type SelectorWithFields struct {
 
 type CompiledSelectorWithFields struct {
 	LabelSelector labels.Selector
-	FieldMatchers []*jsonpath.CompiledJSONPath
+	FieldMatchers []CompiledFieldSelector
+}
+
+type CompiledFieldSelector struct {
+	Raw      string
+	Path     string
+	Operator FieldSelectorOperator
+	Value    string
+	Compiled *jsonpath.CompiledJSONPath
 }

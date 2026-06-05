@@ -2,6 +2,23 @@
 apiVersion: capsule.clastix.io/v1beta2
 kind: GlobalCustomQuota
 metadata:
+  name: service-aggregate
+spec:
+  limit: 5
+  namespaceSelectors:
+  - matchLabels:
+      capsule.clastix.io/tenant: wind
+  sources:
+    - apiVersion: v1
+      kind: Service
+      op: count
+      selectors:
+        - fieldSelectors:
+            - .spec.type=="ClusterIP"
+---
+apiVersion: capsule.clastix.io/v1beta2
+kind: GlobalCustomQuota
+metadata:
   name: storage-aggregate
 spec:
   limit: 5Gi
