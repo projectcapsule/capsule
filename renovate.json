@@ -1,7 +1,7 @@
 {
   "minimumReleaseAge": null,
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["config:recommended", ":dependencyDashboard"],
+  "extends": ["config:recommended", ":dependencyDashboard", "helpers:pinGitHubActionDigests"],
   "baseBranches": ["main"],
   "prHourlyLimit": 0,
   "prConcurrentLimit": 0,
