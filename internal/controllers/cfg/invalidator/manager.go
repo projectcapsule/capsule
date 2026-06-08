@@ -172,6 +172,10 @@ func (r *CacheInvalidator) rebuildCaches(
 ) error {
 	var errs []error
 
+	if err := r.rebuildRegexCache(ctx, log); err != nil {
+		errs = append(errs, fmt.Errorf("rebuild Regex cache: %w", err))
+	}
+
 	if err := r.rebuildJSONPathCache(ctx, log); err != nil {
 		errs = append(errs, fmt.Errorf("rebuild JSONPath cache: %w", err))
 	}

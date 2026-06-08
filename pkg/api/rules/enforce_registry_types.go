@@ -31,7 +31,7 @@ type OCIRegistry struct {
 	// Deprecated: Use exp field
 	//
 	// OCI Registry endpoint, is treated as regular expression.
-	Registry string `json:"url,omitzero"`
+	Registry string `json:"url,omitempty"`
 
 	// Allowed PullPolicy for the given registry. Supplying no value allows all policies.
 	// +optional

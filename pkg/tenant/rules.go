@@ -83,6 +83,7 @@ func BuildNamespaceRuleBodyStatus(
 		if normalized.Enforce.Action == "" {
 			normalized.Enforce.Action = rules.ActionTypeDeny
 		}
+
 		if len(normalized.Enforce.Registries) == 0 {
 			continue
 		}

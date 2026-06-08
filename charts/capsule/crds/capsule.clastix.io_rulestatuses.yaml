@@ -106,8 +106,6 @@ spec:
                               - pod/volumes
                               type: string
                             type: array
-                        required:
-                        - url
                         type: object
                       type: array
                   type: object
@@ -237,8 +235,6 @@ spec:
                                 - pod/volumes
                                 type: string
                               type: array
-                          required:
-                          - url
                           type: object
                         type: array
                     type: object
@@ -304,8 +300,6 @@ spec:
                                   - pod/volumes
                                   type: string
                                 type: array
-                            required:
-                            - url
                             type: object
                           type: array
                       type: object

@@ -90,15 +90,18 @@ spec:
       name: alice
   rules:
     - enforce:
-        action: "allow"
+        action: "deny"
         registries:
         - url: "harbor/.*"
+
     - enforce:
-        action: "deny"
+        action: "allow"
         registries:
         - url: "harbor/customer/.*"
           policy:
           - "Never"
+
+
     - namespaceSelector:
         matchExpressions:
           - key: env

@@ -236,6 +236,7 @@ func (h *registryHandler) validateVolumes(
 
 	return nil
 }
+
 func (h *registryHandler) verifyOCIReference(
 	recorder events.EventRecorder,
 	req admission.Request,
@@ -321,6 +322,22 @@ func (h *registryHandler) verifyOCIReference(
 			msg,
 		)
 
+	case rules.ActionTypeAudit:
+		msg := fmt.Sprintf(
+			"%s reference %q matched audit registry rule %q",
+			where,
+			ref,
+			evaluation.Decision.Matched.Expression.Expression,
+		)
+
+		h.auditWithEvent(recorder, tnt, pod, msg)
+
+		if warnings != nil {
+			*warnings = append(*warnings, msg)
+		}
+
+		return nil
+
 	default:
 		resp := admission.Errored(
 			http.StatusInternalServerError,
@@ -332,8 +349,8 @@ func (h *registryHandler) verifyOCIReference(
 }
 
 type registryDecision struct {
-	Action  rules.ActionType
-	Rule    *rules.NamespaceRuleBodyNamespace
+	rules.RuleDecision
+
 	Matched *cache.CompiledRule
 }
 
@@ -347,7 +364,7 @@ func (h *registryHandler) evaluateOCIReference(
 	target rules.RegistryValidationTarget,
 	ref string,
 ) (*registryEvaluation, error) {
-	out := &registryEvaluation{}
+	evaluation := &registryEvaluation{}
 
 	for _, rule := range ruleBlocks {
 		if rule == nil || len(rule.Enforce.Registries) == 0 {
@@ -378,25 +395,27 @@ func (h *registryHandler) evaluateOCIReference(
 		}
 
 		decision := &registryDecision{
-			Action:  action,
-			Rule:    rule,
+			RuleDecision: rules.RuleDecision{
+				Action: action,
+				Rule:   rule,
+			},
 			Matched: matched,
 		}
 
 		switch action {
 		case rules.ActionTypeAllow, rules.ActionTypeDeny:
 			// Last matching allow/deny wins.
-			out.Decision = decision
+			evaluation.Decision = decision
 
 		case rules.ActionTypeAudit:
-			out.Audits = append(out.Audits, decision)
+			evaluation.Audits = append(evaluation.Audits, decision)
 
 		default:
 			return nil, fmt.Errorf("unsupported namespace rule action %q", action)
 		}
 	}
 
-	return out, nil
+	return evaluation, nil
 }
 
 func (h *registryHandler) validateAllowedPullPolicy(

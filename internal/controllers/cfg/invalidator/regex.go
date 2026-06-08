@@ -35,7 +35,6 @@ func (r *CacheInvalidator) rebuildRegexCache(ctx context.Context, log logr.Logge
 
 		collectRegexExpressionsFromNamespaceRules(expressions, rs.Spec)
 		collectRegexExpressionsFromNamespaceRules(expressions, rs.Status.Rules)
-		collectRegexExpressionsFromNamespaceRule(expressions, &rs.Status.Rule)
 	}
 
 	for _, expr := range expressions {
