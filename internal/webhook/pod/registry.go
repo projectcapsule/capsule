@@ -17,7 +17,7 @@ import (
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/internal/cache"
-	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api/rules"
 	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
@@ -43,7 +43,7 @@ func (h *registryHandler) OnCreate(
 	_ admission.Decoder,
 	recorder events.EventRecorder,
 	tnt *capsulev1beta2.Tenant,
-	rule *api.NamespaceRuleBodyNamespace,
+	rule *rules.NamespaceRuleBodyNamespace,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		return h.validate(req, pod, tnt, recorder, rule)
@@ -58,7 +58,7 @@ func (h *registryHandler) OnUpdate(
 	_ admission.Decoder,
 	recorder events.EventRecorder,
 	tnt *capsulev1beta2.Tenant,
-	rule *api.NamespaceRuleBodyNamespace,
+	rule *rules.NamespaceRuleBodyNamespace,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		return h.validate(req, pod, tnt, recorder, rule)
@@ -72,7 +72,7 @@ func (h *registryHandler) OnDelete(
 	admission.Decoder,
 	events.EventRecorder,
 	*capsulev1beta2.Tenant,
-	*api.NamespaceRuleBodyNamespace,
+	*rules.NamespaceRuleBodyNamespace,
 ) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
@@ -84,8 +84,14 @@ func (h *registryHandler) validate(
 	pod *corev1.Pod,
 	tnt *capsulev1beta2.Tenant,
 	recorder events.EventRecorder,
-	rule *api.NamespaceRuleBodyNamespace,
+	rule *rules.NamespaceRuleBodyNamespace,
 ) *admission.Response {
+	if h.cache == nil {
+		resp := admission.Errored(http.StatusInternalServerError, fmt.Errorf("registry rule set cache is nil"))
+
+		return &resp
+	}
+
 	if rule == nil || len(rule.Enforce.Registries) == 0 {
 		resp := admission.Allowed("no registry rules")
 
@@ -106,13 +112,13 @@ func (h *registryHandler) validate(
 	}
 
 	if rs.HasImages {
-		if resp := h.validateContainers(req, pod, tnt, recorder, rs); resp != nil {
+		if resp := h.validateContainers(req, pod, tnt, recorder, rule, rs); resp != nil {
 			return resp
 		}
 	}
 
 	if rs.HasVolumes {
-		if resp := h.validateVolumes(req, pod, tnt, recorder, rs); resp != nil {
+		if resp := h.validateVolumes(req, pod, tnt, recorder, rule, rs); resp != nil {
 			return resp
 		}
 	}
@@ -125,25 +131,62 @@ func (h *registryHandler) validateContainers(
 	pod *corev1.Pod,
 	tnt *capsulev1beta2.Tenant,
 	recorder events.EventRecorder,
+	rule *rules.NamespaceRuleBodyNamespace,
 	rs *cache.RuleSet,
 ) *admission.Response {
 	for i := range pod.Spec.InitContainers {
 		c := pod.Spec.InitContainers[i]
-		if resp := h.verifyOCIReference(recorder, req, tnt, pod, rs, api.ValidateImages, c.Image, c.ImagePullPolicy, fmt.Sprintf("initContainers[%d]", i)); resp != nil {
+
+		if resp := h.verifyOCIReference(
+			recorder,
+			req,
+			tnt,
+			pod,
+			rule,
+			rs,
+			rules.ValidateImages,
+			c.Image,
+			c.ImagePullPolicy,
+			fmt.Sprintf("initContainers[%d]", i),
+		); resp != nil {
 			return resp
 		}
 	}
 
 	for i := range pod.Spec.EphemeralContainers {
 		c := pod.Spec.EphemeralContainers[i]
-		if resp := h.verifyOCIReference(recorder, req, tnt, pod, rs, api.ValidateImages, c.Image, c.ImagePullPolicy, fmt.Sprintf("ephemeralContainers[%d]", i)); resp != nil {
+
+		if resp := h.verifyOCIReference(
+			recorder,
+			req,
+			tnt,
+			pod,
+			rule,
+			rs,
+			rules.ValidateImages,
+			c.Image,
+			c.ImagePullPolicy,
+			fmt.Sprintf("ephemeralContainers[%d]", i),
+		); resp != nil {
 			return resp
 		}
 	}
 
 	for i := range pod.Spec.Containers {
 		c := pod.Spec.Containers[i]
-		if resp := h.verifyOCIReference(recorder, req, tnt, pod, rs, api.ValidateImages, c.Image, c.ImagePullPolicy, fmt.Sprintf("containers[%d]", i)); resp != nil {
+
+		if resp := h.verifyOCIReference(
+			recorder,
+			req,
+			tnt,
+			pod,
+			rule,
+			rs,
+			rules.ValidateImages,
+			c.Image,
+			c.ImagePullPolicy,
+			fmt.Sprintf("containers[%d]", i),
+		); resp != nil {
 			return resp
 		}
 	}
@@ -156,6 +199,7 @@ func (h *registryHandler) validateVolumes(
 	pod *corev1.Pod,
 	tnt *capsulev1beta2.Tenant,
 	recorder events.EventRecorder,
+	rule *rules.NamespaceRuleBodyNamespace,
 	rs *cache.RuleSet,
 ) *admission.Response {
 	for i := range pod.Spec.Volumes {
@@ -166,15 +210,25 @@ func (h *registryHandler) validateVolumes(
 
 		ref := strings.TrimSpace(v.Image.Reference)
 		if ref == "" {
-			return ad.Deny(
+			return h.denyWithEvent(
+				recorder,
+				tnt,
+				pod,
+				evt.ReasonForbiddenContainerRegistry,
 				fmt.Sprintf("volume %q has empty image.reference", v.Name),
 			)
 		}
 
 		if resp := h.verifyOCIReference(
-			recorder, req, tnt, pod,
-			rs, api.ValidateVolumes,
-			ref, v.Image.PullPolicy,
+			recorder,
+			req,
+			tnt,
+			pod,
+			rule,
+			rs,
+			rules.ValidateVolumes,
+			ref,
+			v.Image.PullPolicy,
 			fmt.Sprintf("volumes[%d](%s)", i, v.Name),
 		); resp != nil {
 			return resp
@@ -184,134 +238,180 @@ func (h *registryHandler) validateVolumes(
 	return nil
 }
 
-type resolvedRegistryConfig struct {
-	allowed       bool
-	allowedPolicy map[corev1.PullPolicy]struct{} // nil => no restriction
-}
-
-func resolveRegistryConfig(
-	rules []cache.CompiledRule,
-	ref string,
-	target api.RegistryValidationTarget,
-) resolvedRegistryConfig {
-	var res resolvedRegistryConfig
-
-	for i := range rules {
-		r := rules[i]
-
-		switch target {
-		case api.ValidateImages:
-			if !r.ValidateImages { // adjust field name
-				continue
-			}
-		case api.ValidateVolumes:
-			if !r.ValidateVolumes { // adjust field name
-				continue
-			}
-		}
-
-		if !r.RE.MatchString(ref) { // adjust field name
-			continue
-		}
-
-		res.allowed = true
-
-		// only override pullpolicy restriction when explicitly set by a later matching rule
-		if len(r.AllowedPolicy) > 0 { // adjust field name
-			res.allowedPolicy = r.AllowedPolicy
-		}
-	}
-
-	return res
-}
-
 func (h *registryHandler) verifyOCIReference(
 	recorder events.EventRecorder,
 	req admission.Request,
 	tnt *capsulev1beta2.Tenant,
 	pod *corev1.Pod,
+	rule *rules.NamespaceRuleBodyNamespace,
 	rs *cache.RuleSet,
-	target api.RegistryValidationTarget,
+	target rules.RegistryValidationTarget,
 	reference string,
 	pullPolicy corev1.PullPolicy,
 	where string,
 ) *admission.Response {
 	ref := strings.TrimSpace(reference)
 	if ref == "" {
-		msg := fmt.Sprintf("%s has empty reference", where)
-
-		recorder.Eventf(
-			pod,
+		return h.denyWithEvent(
+			recorder,
 			tnt,
-			corev1.EventTypeWarning,
+			pod,
 			evt.ReasonForbiddenContainerRegistry,
-			evt.ActionValidationDenied,
+			fmt.Sprintf("%s has empty reference", where),
+		)
+	}
+
+	matched, err := h.cache.MatchReference(rs, ref, target)
+	if err != nil {
+		resp := admission.Errored(http.StatusInternalServerError, err)
+
+		return &resp
+	}
+
+	if matched == nil {
+		return nil
+	}
+
+	action := rule.Enforce.Action
+	if action == "" {
+		action = rules.ActionTypeDeny
+	}
+
+	switch action {
+	case rules.ActionTypeAllow:
+		if resp := h.validateAllowedPullPolicy(recorder, tnt, pod, matched, ref, pullPolicy, where); resp != nil {
+			return resp
+		}
+
+		return nil
+
+	case rules.ActionTypeAudit:
+		h.auditWithEvent(
+			recorder,
+			tnt,
+			pod,
+			fmt.Sprintf(
+				"%s reference %q matched audit registry rule %q",
+				where,
+				ref,
+				matched.Expression.Expression,
+			),
+		)
+
+		return nil
+
+	case rules.ActionTypeDeny:
+		msg := fmt.Sprintf(
+			"%s reference %q is denied by registry rule %q",
+			where,
+			ref,
+			matched.Expression.Expression,
+		)
+
+		return h.denyWithEvent(
+			recorder,
+			tnt,
+			pod,
+			evt.ReasonForbiddenContainerRegistry,
 			msg,
 		)
 
-		return ad.Deny(msg)
-	}
-
-	// Match rules against the FULL OCI reference string.
-	// This avoids relying on parsing logic and supports nested paths, digests, etc.
-	cfg := resolveRegistryConfig(rs.Compiled, ref, target)
-	if !cfg.allowed {
-		msg := fmt.Sprintf("%s reference %q is not allowed", where, ref)
-
-		recorder.Eventf(
-			pod,
-			tnt,
-			corev1.EventTypeWarning,
-			evt.ReasonForbiddenContainerRegistry,
-			evt.ActionValidationDenied,
-			msg,
+	default:
+		resp := admission.Errored(
+			http.StatusInternalServerError,
+			fmt.Errorf("unsupported namespace rule action %q", action),
 		)
 
-		return ad.Deny(msg)
+		return &resp
+	}
+}
+
+func (h *registryHandler) validateAllowedPullPolicy(
+	recorder events.EventRecorder,
+	tnt *capsulev1beta2.Tenant,
+	pod *corev1.Pod,
+	matched *cache.CompiledRule,
+	ref string,
+	pullPolicy corev1.PullPolicy,
+	where string,
+) *admission.Response {
+	if matched == nil || len(matched.AllowedPolicy) == 0 {
+		return nil
 	}
 
-	// No defaulting: enforce only if restricted; empty pullPolicy is rejected under restriction.
-	if cfg.allowedPolicy != nil {
-		allowed := formatAllowedPullPolicies(cfg.allowedPolicy)
+	allowed := formatAllowedPullPolicies(matched.AllowedPolicy)
 
-		if pullPolicy == "" {
-			msg := fmt.Sprintf(
-				"%s reference %q must explicitly set pullPolicy (allowed: %s)",
-				where, ref, allowed,
-			)
+	if pullPolicy == "" {
+		msg := fmt.Sprintf(
+			"%s reference %q must explicitly set pullPolicy (allowed: %s)",
+			where,
+			ref,
+			allowed,
+		)
 
-			recorder.Eventf(
-				pod,
-				tnt,
-				corev1.EventTypeWarning,
-				evt.ReasonForbiddenPullPolicy,
-				evt.ActionValidationDenied,
-				msg,
-			)
+		return h.denyWithEvent(
+			recorder,
+			tnt,
+			pod,
+			evt.ReasonForbiddenPullPolicy,
+			msg,
+		)
+	}
 
-			return ad.Deny(msg)
-		}
+	if _, ok := matched.AllowedPolicy[pullPolicy]; !ok {
+		msg := fmt.Sprintf(
+			"%s reference %q uses pullPolicy=%s which is not allowed (allowed: %s)",
+			where,
+			ref,
+			pullPolicy,
+			allowed,
+		)
 
-		if _, ok := cfg.allowedPolicy[pullPolicy]; !ok {
-			msg := fmt.Sprintf(
-				"%s reference %q uses pullPolicy=%s which is not allowed (allowed: %s)",
-				where, ref, pullPolicy, allowed,
-			)
-
-			recorder.Eventf(
-				pod,
-				tnt,
-				corev1.EventTypeWarning,
-				evt.ReasonForbiddenPullPolicy,
-				evt.ActionValidationDenied,
-				msg,
-			)
-
-			return ad.Deny(msg)
-		}
+		return h.denyWithEvent(
+			recorder,
+			tnt,
+			pod,
+			evt.ReasonForbiddenPullPolicy,
+			msg,
+		)
 	}
 
 	return nil
+}
+
+func (h *registryHandler) auditWithEvent(
+	recorder events.EventRecorder,
+	tnt *capsulev1beta2.Tenant,
+	pod *corev1.Pod,
+	msg string,
+) {
+	recorder.Eventf(
+		pod,
+		tnt,
+		corev1.EventTypeWarning,
+		evt.ReasonForbiddenContainerRegistry,
+		evt.ActionValidationDenied,
+		msg,
+	)
+}
+
+func (h *registryHandler) denyWithEvent(
+	recorder events.EventRecorder,
+	tnt *capsulev1beta2.Tenant,
+	pod *corev1.Pod,
+	reason string,
+	msg string,
+) *admission.Response {
+	recorder.Eventf(
+		pod,
+		tnt,
+		corev1.EventTypeWarning,
+		reason,
+		evt.ActionValidationDenied,
+		msg,
+	)
+
+	return ad.Deny(msg)
 }
 
 func formatAllowedPullPolicies(policies map[corev1.PullPolicy]struct{}) string {

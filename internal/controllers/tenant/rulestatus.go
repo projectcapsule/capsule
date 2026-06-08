@@ -13,8 +13,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
+	"github.com/projectcapsule/capsule/pkg/api/rules"
 	"github.com/projectcapsule/capsule/pkg/tenant"
 )
 
@@ -44,7 +44,7 @@ func (r *Manager) ensureRuleStatus(
 	log logr.Logger,
 	tnt *capsulev1beta2.Tenant,
 	namespace *corev1.Namespace,
-	body *api.NamespaceRuleBodyNamespace,
+	body *rules.NamespaceRuleBodyNamespace,
 ) error {
 	rule := &capsulev1beta2.RuleStatus{
 		ObjectMeta: metav1.ObjectMeta{
@@ -65,7 +65,7 @@ func (r *Manager) ensureRuleStatus(
 		rule.SetLabels(labels)
 
 		if body != nil {
-			rule.Spec = []*api.NamespaceRuleBodyNamespace{body}
+			rule.Spec = []*rules.NamespaceRuleBodyNamespace{body}
 		}
 
 		return controllerutil.SetControllerReference(tnt, rule, r.Scheme())

@@ -1,9 +1,13 @@
 // Copyright 2020-2026 Project Capsule Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package api
+package rules
 
-import corev1 "k8s.io/api/core/v1"
+import (
+	corev1 "k8s.io/api/core/v1"
+
+	"github.com/projectcapsule/capsule/pkg/api"
+)
 
 // +kubebuilder:validation:Enum=Always;Never;IfNotPresent
 type ImagePullPolicySpec string
@@ -22,6 +26,10 @@ const (
 
 // +kubebuilder:object:generate=true
 type OCIRegistry struct {
+	api.RegExpression `json:",inline"`
+
+	// Deprecated: Use exp field
+	//
 	// OCI Registry endpoint, is treated as regular expression.
 	Registry string `json:"url,omitzero"`
 
@@ -33,4 +41,15 @@ type OCIRegistry struct {
 	// Requesting Resources
 	//+kubebuilder:default:={pod/images,pod/volumes}
 	Validation []RegistryValidationTarget `json:"validation,omitempty"`
+}
+
+func (r OCIRegistry) Expression() api.RegExpression {
+	if r.RegExpression.Expression != "" {
+		return r.RegExpression
+	}
+
+	return api.RegExpression{
+		Expression: r.Registry,
+		Negate:     false,
+	}
 }

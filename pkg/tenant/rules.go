@@ -13,8 +13,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
+	"github.com/projectcapsule/capsule/pkg/api/rules"
 	"github.com/projectcapsule/capsule/pkg/runtime/selectors"
 )
 
@@ -41,8 +41,8 @@ func BuildNamespaceRuleBodyStatus(
 	c client.Reader,
 	ns *corev1.Namespace,
 	tnt *capsulev1beta2.Tenant,
-) (*api.NamespaceRuleBodyNamespace, error) {
-	out := &api.NamespaceRuleBodyNamespace{}
+) (*rules.NamespaceRuleBodyNamespace, error) {
+	out := &rules.NamespaceRuleBodyNamespace{}
 
 	if tnt == nil || ns == nil {
 		return out, nil

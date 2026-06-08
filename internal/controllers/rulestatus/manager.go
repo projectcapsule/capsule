@@ -26,8 +26,9 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/internal/controllers/utils"
 	"github.com/projectcapsule/capsule/internal/metrics"
-	"github.com/projectcapsule/capsule/pkg/api"
+	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
 	meta "github.com/projectcapsule/capsule/pkg/api/meta"
+	"github.com/projectcapsule/capsule/pkg/api/rules"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 	"github.com/projectcapsule/capsule/pkg/runtime/predicates"
 )
@@ -64,17 +65,17 @@ func (r *Manager) SetupWithManager(mgr ctrl.Manager, ctrlConfig utils.Controller
 }
 
 func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ctrl.Result, err error) {
-	r.Log = r.Log.WithValues("Request.Name", request.Name)
+	log := r.Log.WithValues("Request.Name", request.Name)
 
 	instance := &capsulev1beta2.RuleStatus{}
 	if err = r.Get(ctx, request.NamespacedName, instance); err != nil {
 		if apierrors.IsNotFound(err) {
-			r.Log.V(5).Info("request object not found, could have been deleted after reconcile request")
+			log.V(5).Info("request object not found, could have been deleted after reconcile request")
 
 			return reconcile.Result{}, nil
 		}
 
-		r.Log.Error(err, "error reading the object")
+		log.Error(err, "error reading the object")
 
 		return result, err
 	}
@@ -113,6 +114,15 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 		err = nil
 	}()
 
+	// Best-Effort for Updating the status
+	if updateErr := r.updateReconcilingStatus(ctx, instance); updateErr != nil {
+		if caperrors.IgnoreGone(updateErr) {
+			return reconcile.Result{}, nil
+		}
+
+		log.Error(updateErr, "failed to update status")
+	}
+
 	// Reconcile
 	if err = r.reconcile(ctx, instance); err != nil {
 		err = fmt.Errorf("cannot collect available resources: %w", err)
@@ -125,27 +135,36 @@ func (r Manager) Reconcile(ctx context.Context, request ctrl.Request) (result ct
 		reconcileError = fmt.Errorf("had errors reconciling")
 	}
 
-	r.Log.V(4).Info("reconciling completed")
+	log.V(4).Info("reconciling completed")
 
 	return ctrl.Result{}, reconcileError
 }
 
-func (r Manager) reconcile(ctx context.Context, instance *capsulev1beta2.RuleStatus) (err error) {
-	out := api.NamespaceRuleBodyNamespace{}
+func (r Manager) reconcile(ctx context.Context, instance *capsulev1beta2.RuleStatus) error {
+	ruleStatus := make([]*rules.NamespaceRuleBodyNamespace, 0, len(instance.Spec))
 
 	for _, rule := range instance.Spec {
 		if rule == nil {
 			continue
 		}
 
-		// Merge enforce body (for now: only registries)
-		// Preserve order: append in the order rules are declared.
-		if len(rule.Enforce.Registries) > 0 {
-			out.Enforce.Registries = append(out.Enforce.Registries, rule.Enforce.Registries...)
+		normalized := *rule
+		normalized.Enforce = rule.Enforce
+
+		normalized.Enforce.Registries = append(
+			[]rules.OCIRegistry(nil),
+			rule.Enforce.Registries...,
+		)
+
+		// Keep status compact: skip empty enforce blocks.
+		if len(normalized.Enforce.Registries) == 0 {
+			continue
 		}
+
+		ruleStatus = append(ruleStatus, &normalized)
 	}
 
-	instance.Status.Rule = out
+	instance.Status.Rules = ruleStatus
 
 	return nil
 }
@@ -182,5 +201,18 @@ func (r *Manager) updateStatus(ctx context.Context, instance *capsulev1beta2.Rul
 		instance.Status = latest.Status
 
 		return nil
+	})
+}
+
+func (r *Manager) updateReconcilingStatus(ctx context.Context, instance *capsulev1beta2.RuleStatus) error {
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() (err error) {
+		latest := &capsulev1beta2.RuleStatus{}
+		if err = r.reader.Get(ctx, types.NamespacedName{Name: instance.GetName(), Namespace: instance.GetNamespace()}, latest); err != nil {
+			return err
+		}
+
+		latest.Status.Conditions.UpdateConditionByType(meta.NewReadyConditionReconcilingReason(instance))
+
+		return r.Status().Update(ctx, latest)
 	})
 }

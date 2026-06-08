@@ -153,7 +153,11 @@ func (c *capsuleConfiguration) UserGroups() []string {
 
 //nolint:staticcheck
 func (c *capsuleConfiguration) UserNames() []string {
-	return append(c.retrievalFn().Spec.UserNames, c.retrievalFn().Spec.Users.GetByKinds([]rbac.OwnerKind{rbac.UserOwner, rbac.ServiceAccountOwner})...)
+	return append(c.retrievalFn().Spec.UserNames, c.retrievalFn().Spec.Users.GetByKinds([]rbac.OwnerKind{rbac.UserOwner})...)
+}
+
+func (c *capsuleConfiguration) ServiceAccounts() []string {
+	return append(c.retrievalFn().Spec.UserNames, c.retrievalFn().Spec.Users.GetByKinds([]rbac.OwnerKind{rbac.ServiceAccountOwner})...)
 }
 
 func (c *capsuleConfiguration) Users() rbac.UserListSpec {
@@ -162,6 +166,13 @@ func (c *capsuleConfiguration) Users() rbac.UserListSpec {
 	for _, user := range c.UserNames() {
 		out.Upsert(rbac.UserSpec{
 			Kind: rbac.UserOwner,
+			Name: user,
+		})
+	}
+
+	for _, user := range c.ServiceAccounts() {
+		out.Upsert(rbac.UserSpec{
+			Kind: rbac.ServiceAccountOwner,
 			Name: user,
 		})
 	}

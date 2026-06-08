@@ -15,15 +15,15 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
+	"github.com/projectcapsule/capsule/pkg/api/rules"
 	"github.com/projectcapsule/capsule/pkg/tenant"
 )
 
 type TypedHandlerWithTenantWithRuleset[T client.Object] interface {
-	OnCreate(c client.Client, reader client.Reader, obj T, decoder admission.Decoder, recorder events.EventRecorder, tnt *capsulev1beta2.Tenant, rule *api.NamespaceRuleBodyNamespace) Func
-	OnUpdate(c client.Client, reader client.Reader, obj T, old T, decoder admission.Decoder, recorder events.EventRecorder, tnt *capsulev1beta2.Tenant, rule *api.NamespaceRuleBodyNamespace) Func
-	OnDelete(c client.Client, reader client.Reader, obj T, decoder admission.Decoder, recorder events.EventRecorder, tnt *capsulev1beta2.Tenant, rule *api.NamespaceRuleBodyNamespace) Func
+	OnCreate(c client.Client, reader client.Reader, obj T, decoder admission.Decoder, recorder events.EventRecorder, tnt *capsulev1beta2.Tenant, rule *rules.NamespaceRuleBodyNamespace) Func
+	OnUpdate(c client.Client, reader client.Reader, obj T, old T, decoder admission.Decoder, recorder events.EventRecorder, tnt *capsulev1beta2.Tenant, rule *rules.NamespaceRuleBodyNamespace) Func
+	OnDelete(c client.Client, reader client.Reader, obj T, decoder admission.Decoder, recorder events.EventRecorder, tnt *capsulev1beta2.Tenant, rule *rules.NamespaceRuleBodyNamespace) Func
 }
 
 type TypedTenantWithRulesetHandler[T client.Object] struct {
@@ -145,7 +145,7 @@ func (h *TypedTenantWithRulesetHandler[T]) resolveRuleset(
 	req admission.Request,
 	namespace string,
 	tnt *capsulev1beta2.Tenant,
-) (*api.NamespaceRuleBodyNamespace, error) {
+) (*rules.NamespaceRuleBodyNamespace, error) {
 	rs := &capsulev1beta2.RuleStatus{}
 	key := types.NamespacedName{
 		Namespace: namespace,

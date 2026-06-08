@@ -41,6 +41,7 @@ type CacheInvalidator struct {
 	TargetsCache       *cache.CompiledTargetsCache[string]
 	JSONPathCache      *cache.JSONPathCache
 	ImpersonationCache *cache.ImpersonationCache
+	RegexCache         *cache.RegexCache
 }
 
 func (r *CacheInvalidator) NeedLeaderElection() bool {

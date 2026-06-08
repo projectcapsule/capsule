@@ -503,7 +503,8 @@ func main() {
 
 	// Initialize Caches
 	impersonationCache := cache.NewImpersonationCache()
-	registryCache := cache.NewRegistryRuleSetCache()
+	regexCache := cache.NewRegexCache()
+	registryCache := cache.NewRegistryRuleSetCache(regexCache)
 	customQuotaQuantityCache := cache.NewQuantityCache[string]()
 	jsonPathCache := cache.NewJSONPathCache()
 	targetsCache := cache.NewCompiledTargetsCache[string]()
