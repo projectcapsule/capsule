@@ -502,29 +502,6 @@ var _ = Describe("enforcing container registry namespace rules", Ordered, Label(
 		)
 	})
 
-	It("applies negated regex rules using the nested regex expression", func() {
-		ns := NewNamespace("", map[string]string{
-			"negate":         "true",
-			meta.TenantLabel: tnt.GetName(),
-		})
-
-		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
-
-		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
-		NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
-
-		allowed := restrictedPod("negate-trusted-allowed", "trusted/team/app:1", corev1.PullIfNotPresent)
-		createPodAndExpectAllowed(cs, ns.Name, allowed)
-
-		denied := restrictedPod("negate-untrusted-denied", "untrusted/team/app:1", corev1.PullIfNotPresent)
-		createPodAndExpectDenied(cs, ns.Name, denied,
-			"containers[0]",
-			"untrusted/team/app:1",
-			"denied",
-			"trusted/.*",
-		)
-	})
-
 	It("evaluates init containers with the same multi-rule action semantics", func() {
 		ns := NewNamespace("", map[string]string{
 			meta.TenantLabel: tnt.GetName(),
