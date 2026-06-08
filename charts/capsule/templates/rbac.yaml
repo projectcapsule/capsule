@@ -1,5 +1,41 @@
 {{- if or (and $.Values.crds.exclusive $.Values.crds.createRBAC) (not $.Values.crds.exclusive) }}
   {{- if $.Values.manager.rbac.create }}
+{{- with .Values.manager.rbac.role.extraResources }}
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: capsule:{{ include "capsule.fullname" $ }}:extra
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "capsule.labels" $ | nindent 4 }}
+  {{- with $.Values.customAnnotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: capsule:{{ $.Release.Name }}:extra
+subjects:
+- kind: ServiceAccount
+  name: {{ include "capsule.serviceAccountName" $ }}
+  namespace: {{ $.Release.Namespace }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: capsule:{{ $.Release.Name }}:extra
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "capsule.labels" $ | nindent 4 }}
+  {{- with $.Values.customAnnotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+rules:
+  {{- toYaml . | nindent 2 }}
+{{- end }}
     {{- with .Values.manager.rbac.clusterRole.extraResources }}
 ---
 kind: ClusterRoleBinding
@@ -403,40 +439,6 @@ rules:
   - update
   - patch
   - delete
-{{- with .Values.manager.rbac.role.extraResources }}
----
-kind: RoleBinding
-apiVersion: rbac.authorization.k8s.io/v1
-metadata:
-  name: capsule:{{ include "capsule.fullname" $ }}:extra
-  labels:
-    {{- include "capsule.labels" $ | nindent 4 }}
-  {{- with $.Values.customAnnotations }}
-  annotations:
-    {{- toYaml . | nindent 4 }}
-  {{- end }}
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: Role
-  name: capsule:{{ $.Release.Name }}:extra
-subjects:
-- kind: ServiceAccount
-  name: {{ include "capsule.serviceAccountName" $ }}
-  namespace: {{ $.Release.Namespace }}
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  name: capsule:{{ $.Release.Name }}:extra
-  labels:
-    {{- include "capsule.labels" $ | nindent 4 }}
-  {{- with $.Values.customAnnotations }}
-  annotations:
-    {{- toYaml . | nindent 4 }}
-  {{- end }}
-rules:
-  {{- toYaml . | nindent 2 }}
-{{- end }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role

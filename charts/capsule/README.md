@@ -143,11 +143,11 @@ The following Values have changed key or Value:
 | manager.options.userNames | list | `[]` | DEPRECATED: use users properties. Names of the users considered as Capsule users. |
 | manager.options.users | list | `[{"kind":"Group","name":"projectcapsule.dev"}]` | Define entities which are considered part of the Capsule construct. Users not mentioned here will be ignored by Capsule |
 | manager.options.workers | int | `1` | Workers (MaxConcurrentReconciles) is the maximum number of concurrent Reconciles which can be run (ALPHA). |
-| manager.rbac.clusterRole.extraResources | list | `[]` |  |
+| manager.rbac.clusterRole.extraResources | list | `[]` | Extra cluster-scoped RBAC PolicyRules to add to a ClusterRole created by this chart and bound to the Capsule ServiceAccount. |
 | manager.rbac.create | bool | `true` | Specifies whether RBAC resources should be created. |
 | manager.rbac.existingClusterRoles | list | `[]` | Specifies further cluster roles to be added to the Capsule manager service account. |
 | manager.rbac.existingRoles | list | `[]` | Specifies further cluster roles to be added to the Capsule manager service account. |
-| manager.rbac.role.extraResources | list | `[]` |  |
+| manager.rbac.role.extraResources | list | `[]` | Extra namespaced RBAC PolicyRules to add to a Role created by this chart and bound to the Capsule ServiceAccount. |
 | manager.rbac.strict | bool | `false` | Strongly restrict the RBAC assigned to Capsule Controller. When set to true you must aggregate further permissions by yourself. |
 | manager.readinessProbe | object | `{"httpGet":{"path":"/readyz","port":10080}}` | Configure the readiness probe using Deployment probe spec |
 | manager.resources | object | `{}` | Set the resource requests/limits for the Capsule manager container |
