@@ -508,6 +508,15 @@
                 "rbac": {
                     "type": "object",
                     "properties": {
+                        "clusterRole": {
+                            "type": "object",
+                            "properties": {
+                                "extraResources": {
+                                    "description": "Extra cluster-scoped RBAC PolicyRules to add to a ClusterRole created by this chart and bound to the Capsule ServiceAccount.",
+                                    "type": "array"
+                                }
+                            }
+                        },
                         "create": {
                             "description": "Specifies whether RBAC resources should be created.",
                             "type": "boolean"
@@ -519,6 +528,15 @@
                         "existingRoles": {
                             "description": "Specifies further cluster roles to be added to the Capsule manager service account.",
                             "type": "array"
+                        },
+                        "role": {
+                            "type": "object",
+                            "properties": {
+                                "extraResources": {
+                                    "description": "Extra namespaced RBAC PolicyRules to add to a Role created by this chart and bound to the Capsule ServiceAccount.",
+                                    "type": "array"
+                                }
+                            }
                         },
                         "strict": {
                             "description": "Strongly restrict the RBAC assigned to Capsule Controller. When set to true you must aggregate further permissions by yourself.",
