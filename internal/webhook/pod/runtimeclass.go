@@ -35,7 +35,7 @@ func (h *runtimeClass) OnCreate(
 	decoder admission.Decoder,
 	recorder events.EventRecorder,
 	tnt *capsulev1beta2.Tenant,
-	_ *rules.NamespaceRuleBodyNamespace,
+	_ []*rules.NamespaceRuleBodyNamespace,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		return h.validate(ctx, reader, recorder, req, pod, tnt)
@@ -50,7 +50,7 @@ func (h *runtimeClass) OnUpdate(
 	admission.Decoder,
 	events.EventRecorder,
 	*capsulev1beta2.Tenant,
-	*rules.NamespaceRuleBodyNamespace,
+	[]*rules.NamespaceRuleBodyNamespace,
 ) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
@@ -64,7 +64,7 @@ func (h *runtimeClass) OnDelete(
 	admission.Decoder,
 	events.EventRecorder,
 	*capsulev1beta2.Tenant,
-	*rules.NamespaceRuleBodyNamespace,
+	[]*rules.NamespaceRuleBodyNamespace,
 ) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil

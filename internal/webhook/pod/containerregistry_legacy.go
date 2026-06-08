@@ -37,7 +37,7 @@ func (h *containerRegistryLegacyHandler) OnCreate(
 	_ admission.Decoder,
 	recorder events.EventRecorder,
 	tnt *capsulev1beta2.Tenant,
-	_ *rules.NamespaceRuleBodyNamespace,
+	_ []*rules.NamespaceRuleBodyNamespace,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		return h.validate(req, pod, tnt, recorder)
@@ -52,7 +52,7 @@ func (h *containerRegistryLegacyHandler) OnUpdate(
 	_ admission.Decoder,
 	recorder events.EventRecorder,
 	tnt *capsulev1beta2.Tenant,
-	_ *rules.NamespaceRuleBodyNamespace,
+	_ []*rules.NamespaceRuleBodyNamespace,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		return h.validate(req, pod, tnt, recorder)
@@ -66,7 +66,7 @@ func (h *containerRegistryLegacyHandler) OnDelete(
 	admission.Decoder,
 	events.EventRecorder,
 	*capsulev1beta2.Tenant,
-	*rules.NamespaceRuleBodyNamespace,
+	[]*rules.NamespaceRuleBodyNamespace,
 ) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil

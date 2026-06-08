@@ -4,11 +4,10 @@
 package api
 
 // +kubebuilder:object:generate=true
-
 type RegExpression struct {
 	// Expression used to evaluate regex
-	Expression string `json:"exp,omitzero"`
+	Expression string `json:"exp,omitempty"`
 	// Negate regular Expression
 	//+kubebuilder:default:=false
-	Negate bool `json:"negate,omitzero"`
+	Negate bool `json:"negate,omitempty"`
 }

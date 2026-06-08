@@ -18,9 +18,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/api/rbac"
+	"github.com/projectcapsule/capsule/pkg/api/rules"
 )
 
 var _ = Describe("enforcing a Container Registry", Ordered, Label("tenant", "rules", "images", "registry"), func() {
@@ -42,26 +42,26 @@ var _ = Describe("enforcing a Container Registry", Ordered, Label("tenant", "rul
 					},
 				},
 			},
-			Rules: []*api.NamespaceRuleBodyTenant{
+			Rules: []*rules.NamespaceRuleBodyTenant{
 				{
-					NamespaceRuleBodyNamespace: api.NamespaceRuleBodyNamespace{
-						Enforce: api.NamespaceRuleEnforceBody{
-							Registries: []api.OCIRegistry{
+					NamespaceRuleBodyNamespace: rules.NamespaceRuleBodyNamespace{
+						Enforce: rules.NamespaceRuleEnforceBody{
+							Registries: []rules.OCIRegistry{
 								// Global: allow any registry, but require PullPolicy Always (images+volumes)
 								{
 									Registry: ".*",
-									Validation: []api.RegistryValidationTarget{
-										api.ValidateImages,
-										api.ValidateVolumes,
+									Validation: []rules.RegistryValidationTarget{
+										rules.ValidateImages,
+										rules.ValidateVolumes,
 									},
 									Policy: []corev1.PullPolicy{corev1.PullAlways},
 								},
 								// More specific harbor rule (no policy override => should NOT remove Always restriction)
 								{
 									Registry: "harbor/.*",
-									Validation: []api.RegistryValidationTarget{
-										api.ValidateImages,
-										api.ValidateVolumes,
+									Validation: []rules.RegistryValidationTarget{
+										rules.ValidateImages,
+										rules.ValidateVolumes,
 									},
 								},
 							},
@@ -74,15 +74,15 @@ var _ = Describe("enforcing a Container Registry", Ordered, Label("tenant", "rul
 							"environment": "prod",
 						},
 					},
-					NamespaceRuleBodyNamespace: api.NamespaceRuleBodyNamespace{
-						Enforce: api.NamespaceRuleEnforceBody{
-							Registries: []api.OCIRegistry{
+					NamespaceRuleBodyNamespace: rules.NamespaceRuleBodyNamespace{
+						Enforce: rules.NamespaceRuleEnforceBody{
+							Registries: []rules.OCIRegistry{
 								// Prod-only special-case
 								{
 									Registry: "harbor/production-image/.*",
-									Validation: []api.RegistryValidationTarget{
-										api.ValidateImages,
-										api.ValidateVolumes,
+									Validation: []rules.RegistryValidationTarget{
+										rules.ValidateImages,
+										rules.ValidateVolumes,
 									},
 									Policy: []corev1.PullPolicy{corev1.PullAlways},
 								},

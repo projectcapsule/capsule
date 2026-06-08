@@ -34,7 +34,7 @@ func (h *priorityClass) OnCreate(
 	decoder admission.Decoder,
 	recorder events.EventRecorder,
 	tnt *capsulev1beta2.Tenant,
-	_ *rules.NamespaceRuleBodyNamespace,
+	_ []*rules.NamespaceRuleBodyNamespace,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		allowed := tnt.Spec.PriorityClasses
@@ -96,7 +96,7 @@ func (h *priorityClass) OnUpdate(
 	admission.Decoder,
 	events.EventRecorder,
 	*capsulev1beta2.Tenant,
-	*rules.NamespaceRuleBodyNamespace,
+	[]*rules.NamespaceRuleBodyNamespace,
 ) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
@@ -110,7 +110,7 @@ func (h *priorityClass) OnDelete(
 	admission.Decoder,
 	events.EventRecorder,
 	*capsulev1beta2.Tenant,
-	*rules.NamespaceRuleBodyNamespace,
+	[]*rules.NamespaceRuleBodyNamespace,
 ) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil

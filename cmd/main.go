@@ -750,6 +750,7 @@ func main() {
 		RegistryCache:      registryCache,
 		JSONPathCache:      jsonPathCache,
 		TargetsCache:       targetsCache,
+		RegexCache:         regexCache,
 	}
 
 	if err := localInvalidator.SetupWithManager(manager, controllerConfig); err != nil {

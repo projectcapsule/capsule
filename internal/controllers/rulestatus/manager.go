@@ -165,6 +165,7 @@ func (r Manager) reconcile(ctx context.Context, instance *capsulev1beta2.RuleSta
 	}
 
 	instance.Status.Rules = ruleStatus
+	instance.Status.Rule = rules.NamespaceRuleBodyNamespace{}
 
 	return nil
 }

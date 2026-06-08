@@ -11,3 +11,8 @@ const (
 
 // +kubebuilder:validation:Enum=allow;deny;audit
 type ActionType string
+
+type RuleDecision struct {
+	Action ActionType
+	Rule   *NamespaceRuleBodyNamespace
+}

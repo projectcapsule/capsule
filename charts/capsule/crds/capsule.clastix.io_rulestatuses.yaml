@@ -15,6 +15,14 @@ spec:
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
+    - description: Ready Status
+      jsonPath: .status.conditions[?(@.type=="Ready")].status
+      name: Ready
+      type: string
+    - description: Ready Message
+      jsonPath: .status.conditions[?(@.type=="Ready")].message
+      name: Message
+      type: string
     - description: Age
       jsonPath: .metadata.creationTimestamp
       name: Age
@@ -48,12 +56,31 @@ spec:
                 enforce:
                   description: Enforcement for given rule
                   properties:
+                    action:
+                      default: deny
+                      description: |-
+                        Declare the action being performed on the enforcement rule:
+                        deny: On match, deny admission request
+                        allow: On match, allowed admission request
+                        audit: On match, audit (post event) of admission request
+                      enum:
+                      - allow
+                      - deny
+                      - audit
+                      type: string
                     registries:
                       description: |-
                         Define registries which are allowed to be used within this tenant
                         The rules are aggregated, since you can use Regular Expressions the match registry endpoints
                       items:
                         properties:
+                          exp:
+                            description: Expression used to evaluate regex
+                            type: string
+                          negate:
+                            default: false
+                            description: Negate regular Expression
+                            type: boolean
                           policy:
                             description: Allowed PullPolicy for the given registry.
                               Supplying no value allows all policies.
@@ -63,8 +90,10 @@ spec:
                               type: string
                             type: array
                           url:
-                            description: OCI Registry endpoint, is treated as regular
-                              expression.
+                            description: |-
+                              Deprecated: Use exp field
+
+                              OCI Registry endpoint, is treated as regular expression.
                             type: string
                           validation:
                             default:
@@ -151,18 +180,38 @@ spec:
                 format: int64
                 type: integer
               rule:
-                description: Managed Enforcement properties per Namespace (aggregated
-                  from rules)
+                description: |-
+                  Deprecated: use Rules.
+                  Rule contains a legacy flattened view and cannot fully represent action-aware rules.
                 properties:
                   enforce:
                     description: Enforcement for given rule
                     properties:
+                      action:
+                        default: deny
+                        description: |-
+                          Declare the action being performed on the enforcement rule:
+                          deny: On match, deny admission request
+                          allow: On match, allowed admission request
+                          audit: On match, audit (post event) of admission request
+                        enum:
+                        - allow
+                        - deny
+                        - audit
+                        type: string
                       registries:
                         description: |-
                           Define registries which are allowed to be used within this tenant
                           The rules are aggregated, since you can use Regular Expressions the match registry endpoints
                         items:
                           properties:
+                            exp:
+                              description: Expression used to evaluate regex
+                              type: string
+                            negate:
+                              default: false
+                              description: Negate regular Expression
+                              type: boolean
                             policy:
                               description: Allowed PullPolicy for the given registry.
                                 Supplying no value allows all policies.
@@ -172,8 +221,10 @@ spec:
                                 type: string
                               type: array
                             url:
-                              description: OCI Registry endpoint, is treated as regular
-                                expression.
+                              description: |-
+                                Deprecated: Use exp field
+
+                                OCI Registry endpoint, is treated as regular expression.
                               type: string
                             validation:
                               default:
@@ -192,6 +243,74 @@ spec:
                         type: array
                     type: object
                 type: object
+              rules:
+                description: |-
+                  Rules contains the effective namespace rules after tenant rule selection.
+                  Order is preserved from the originating Tenant rules.
+                items:
+                  description: For future implementation where users might manage
+                    RuleStatus CRs themselves
+                  properties:
+                    enforce:
+                      description: Enforcement for given rule
+                      properties:
+                        action:
+                          default: deny
+                          description: |-
+                            Declare the action being performed on the enforcement rule:
+                            deny: On match, deny admission request
+                            allow: On match, allowed admission request
+                            audit: On match, audit (post event) of admission request
+                          enum:
+                          - allow
+                          - deny
+                          - audit
+                          type: string
+                        registries:
+                          description: |-
+                            Define registries which are allowed to be used within this tenant
+                            The rules are aggregated, since you can use Regular Expressions the match registry endpoints
+                          items:
+                            properties:
+                              exp:
+                                description: Expression used to evaluate regex
+                                type: string
+                              negate:
+                                default: false
+                                description: Negate regular Expression
+                                type: boolean
+                              policy:
+                                description: Allowed PullPolicy for the given registry.
+                                  Supplying no value allows all policies.
+                                items:
+                                  description: PullPolicy describes a policy for if/when
+                                    to pull a container image
+                                  type: string
+                                type: array
+                              url:
+                                description: |-
+                                  Deprecated: Use exp field
+
+                                  OCI Registry endpoint, is treated as regular expression.
+                                type: string
+                              validation:
+                                default:
+                                - pod/images
+                                - pod/volumes
+                                description: Requesting Resources
+                                items:
+                                  enum:
+                                  - pod/images
+                                  - pod/volumes
+                                  type: string
+                                type: array
+                            required:
+                            - url
+                            type: object
+                          type: array
+                      type: object
+                  type: object
+                type: array
             required:
             - conditions
             type: object

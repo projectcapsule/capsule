@@ -13,6 +13,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
@@ -43,25 +44,25 @@ func (h *registryHandler) OnCreate(
 	_ admission.Decoder,
 	recorder events.EventRecorder,
 	tnt *capsulev1beta2.Tenant,
-	rule *rules.NamespaceRuleBodyNamespace,
+	ruleBlocks []*rules.NamespaceRuleBodyNamespace,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		return h.validate(req, pod, tnt, recorder, rule)
+		return h.validate(ctx, req, pod, tnt, recorder, ruleBlocks)
 	}
 }
 
 func (h *registryHandler) OnUpdate(
 	_ client.Client,
 	_ client.Reader,
-	old *corev1.Pod,
+	_ *corev1.Pod,
 	pod *corev1.Pod,
 	_ admission.Decoder,
 	recorder events.EventRecorder,
 	tnt *capsulev1beta2.Tenant,
-	rule *rules.NamespaceRuleBodyNamespace,
+	ruleBlocks []*rules.NamespaceRuleBodyNamespace,
 ) handlers.Func {
 	return func(ctx context.Context, req admission.Request) *admission.Response {
-		return h.validate(req, pod, tnt, recorder, rule)
+		return h.validate(ctx, req, pod, tnt, recorder, ruleBlocks)
 	}
 }
 
@@ -72,7 +73,7 @@ func (h *registryHandler) OnDelete(
 	admission.Decoder,
 	events.EventRecorder,
 	*capsulev1beta2.Tenant,
-	*rules.NamespaceRuleBodyNamespace,
+	[]*rules.NamespaceRuleBodyNamespace,
 ) handlers.Func {
 	return func(context.Context, admission.Request) *admission.Response {
 		return nil
@@ -80,11 +81,12 @@ func (h *registryHandler) OnDelete(
 }
 
 func (h *registryHandler) validate(
+	ctx context.Context,
 	req admission.Request,
 	pod *corev1.Pod,
 	tnt *capsulev1beta2.Tenant,
 	recorder events.EventRecorder,
-	rule *rules.NamespaceRuleBodyNamespace,
+	ruleBlocks []*rules.NamespaceRuleBodyNamespace,
 ) *admission.Response {
 	if h.cache == nil {
 		resp := admission.Errored(http.StatusInternalServerError, fmt.Errorf("registry rule set cache is nil"))
@@ -92,35 +94,32 @@ func (h *registryHandler) validate(
 		return &resp
 	}
 
-	if rule == nil || len(rule.Enforce.Registries) == 0 {
-		resp := admission.Allowed("no registry rules")
+	log.FromContext(ctx).V(5).Info(
+		"handling pod registry rules",
+		"pod", pod.Name,
+		"namespace", pod.Namespace,
+		"rules", len(ruleBlocks),
+	)
+
+	if len(ruleBlocks) == 0 {
+		return nil
+	}
+
+	warnings := make([]string, 0)
+
+	if resp := h.validateContainers(req, pod, tnt, recorder, ruleBlocks, &warnings); resp != nil {
+		return resp
+	}
+
+	if resp := h.validateVolumes(req, pod, tnt, recorder, ruleBlocks, &warnings); resp != nil {
+		return resp
+	}
+
+	if len(warnings) > 0 {
+		resp := admission.Allowed("registry rules audited")
+		resp.Warnings = append(resp.Warnings, warnings...)
 
 		return &resp
-	}
-
-	rs, _, err := h.cache.GetOrBuild(rule.Enforce.Registries)
-	if err != nil {
-		resp := admission.Errored(http.StatusInternalServerError, err)
-
-		return &resp
-	}
-
-	if rs == nil {
-		resp := admission.Allowed("no registry rules")
-
-		return &resp
-	}
-
-	if rs.HasImages {
-		if resp := h.validateContainers(req, pod, tnt, recorder, rule, rs); resp != nil {
-			return resp
-		}
-	}
-
-	if rs.HasVolumes {
-		if resp := h.validateVolumes(req, pod, tnt, recorder, rule, rs); resp != nil {
-			return resp
-		}
 	}
 
 	return nil
@@ -131,8 +130,8 @@ func (h *registryHandler) validateContainers(
 	pod *corev1.Pod,
 	tnt *capsulev1beta2.Tenant,
 	recorder events.EventRecorder,
-	rule *rules.NamespaceRuleBodyNamespace,
-	rs *cache.RuleSet,
+	ruleBlocks []*rules.NamespaceRuleBodyNamespace,
+	warnings *[]string,
 ) *admission.Response {
 	for i := range pod.Spec.InitContainers {
 		c := pod.Spec.InitContainers[i]
@@ -142,12 +141,12 @@ func (h *registryHandler) validateContainers(
 			req,
 			tnt,
 			pod,
-			rule,
-			rs,
+			ruleBlocks,
 			rules.ValidateImages,
 			c.Image,
 			c.ImagePullPolicy,
 			fmt.Sprintf("initContainers[%d]", i),
+			warnings,
 		); resp != nil {
 			return resp
 		}
@@ -161,12 +160,12 @@ func (h *registryHandler) validateContainers(
 			req,
 			tnt,
 			pod,
-			rule,
-			rs,
+			ruleBlocks,
 			rules.ValidateImages,
 			c.Image,
 			c.ImagePullPolicy,
 			fmt.Sprintf("ephemeralContainers[%d]", i),
+			warnings,
 		); resp != nil {
 			return resp
 		}
@@ -180,12 +179,12 @@ func (h *registryHandler) validateContainers(
 			req,
 			tnt,
 			pod,
-			rule,
-			rs,
+			ruleBlocks,
 			rules.ValidateImages,
 			c.Image,
 			c.ImagePullPolicy,
 			fmt.Sprintf("containers[%d]", i),
+			warnings,
 		); resp != nil {
 			return resp
 		}
@@ -199,8 +198,8 @@ func (h *registryHandler) validateVolumes(
 	pod *corev1.Pod,
 	tnt *capsulev1beta2.Tenant,
 	recorder events.EventRecorder,
-	rule *rules.NamespaceRuleBodyNamespace,
-	rs *cache.RuleSet,
+	ruleBlocks []*rules.NamespaceRuleBodyNamespace,
+	warnings *[]string,
 ) *admission.Response {
 	for i := range pod.Spec.Volumes {
 		v := pod.Spec.Volumes[i]
@@ -224,12 +223,12 @@ func (h *registryHandler) validateVolumes(
 			req,
 			tnt,
 			pod,
-			rule,
-			rs,
+			ruleBlocks,
 			rules.ValidateVolumes,
 			ref,
 			v.Image.PullPolicy,
 			fmt.Sprintf("volumes[%d](%s)", i, v.Name),
+			warnings,
 		); resp != nil {
 			return resp
 		}
@@ -237,18 +236,17 @@ func (h *registryHandler) validateVolumes(
 
 	return nil
 }
-
 func (h *registryHandler) verifyOCIReference(
 	recorder events.EventRecorder,
 	req admission.Request,
 	tnt *capsulev1beta2.Tenant,
 	pod *corev1.Pod,
-	rule *rules.NamespaceRuleBodyNamespace,
-	rs *cache.RuleSet,
+	ruleBlocks []*rules.NamespaceRuleBodyNamespace,
 	target rules.RegistryValidationTarget,
 	reference string,
 	pullPolicy corev1.PullPolicy,
 	where string,
+	warnings *[]string,
 ) *admission.Response {
 	ref := strings.TrimSpace(reference)
 	if ref == "" {
@@ -261,42 +259,49 @@ func (h *registryHandler) verifyOCIReference(
 		)
 	}
 
-	matched, err := h.cache.MatchReference(rs, ref, target)
+	evaluation, err := h.evaluateOCIReference(ruleBlocks, target, ref)
 	if err != nil {
 		resp := admission.Errored(http.StatusInternalServerError, err)
 
 		return &resp
 	}
 
-	if matched == nil {
+	if evaluation == nil {
 		return nil
 	}
 
-	action := rule.Enforce.Action
-	if action == "" {
-		action = rules.ActionTypeDeny
-	}
+	for _, audit := range evaluation.Audits {
+		msg := fmt.Sprintf(
+			"%s reference %q matched audit registry rule %q",
+			where,
+			ref,
+			audit.Matched.Expression.Expression,
+		)
 
-	switch action {
-	case rules.ActionTypeAllow:
-		if resp := h.validateAllowedPullPolicy(recorder, tnt, pod, matched, ref, pullPolicy, where); resp != nil {
-			return resp
+		h.auditWithEvent(recorder, tnt, pod, msg)
+
+		if warnings != nil {
+			*warnings = append(*warnings, msg)
 		}
+	}
 
+	if evaluation.Decision == nil {
 		return nil
+	}
 
-	case rules.ActionTypeAudit:
-		h.auditWithEvent(
+	switch evaluation.Decision.Action {
+	case rules.ActionTypeAllow:
+		if resp := h.validateAllowedPullPolicy(
 			recorder,
 			tnt,
 			pod,
-			fmt.Sprintf(
-				"%s reference %q matched audit registry rule %q",
-				where,
-				ref,
-				matched.Expression.Expression,
-			),
-		)
+			evaluation.Decision.Matched,
+			ref,
+			pullPolicy,
+			where,
+		); resp != nil {
+			return resp
+		}
 
 		return nil
 
@@ -305,7 +310,7 @@ func (h *registryHandler) verifyOCIReference(
 			"%s reference %q is denied by registry rule %q",
 			where,
 			ref,
-			matched.Expression.Expression,
+			evaluation.Decision.Matched.Expression.Expression,
 		)
 
 		return h.denyWithEvent(
@@ -319,11 +324,79 @@ func (h *registryHandler) verifyOCIReference(
 	default:
 		resp := admission.Errored(
 			http.StatusInternalServerError,
-			fmt.Errorf("unsupported namespace rule action %q", action),
+			fmt.Errorf("unsupported namespace rule action %q", evaluation.Decision.Action),
 		)
 
 		return &resp
 	}
+}
+
+type registryDecision struct {
+	Action  rules.ActionType
+	Rule    *rules.NamespaceRuleBodyNamespace
+	Matched *cache.CompiledRule
+}
+
+type registryEvaluation struct {
+	Decision *registryDecision
+	Audits   []*registryDecision
+}
+
+func (h *registryHandler) evaluateOCIReference(
+	ruleBlocks []*rules.NamespaceRuleBodyNamespace,
+	target rules.RegistryValidationTarget,
+	ref string,
+) (*registryEvaluation, error) {
+	out := &registryEvaluation{}
+
+	for _, rule := range ruleBlocks {
+		if rule == nil || len(rule.Enforce.Registries) == 0 {
+			continue
+		}
+
+		rs, _, err := h.cache.GetOrBuild(rule.Enforce.Registries)
+		if err != nil {
+			return nil, err
+		}
+
+		if rs == nil {
+			continue
+		}
+
+		matched, err := h.cache.MatchReference(rs, ref, target)
+		if err != nil {
+			return nil, err
+		}
+
+		if matched == nil {
+			continue
+		}
+
+		action := rule.Enforce.Action
+		if action == "" {
+			action = rules.ActionTypeDeny
+		}
+
+		decision := &registryDecision{
+			Action:  action,
+			Rule:    rule,
+			Matched: matched,
+		}
+
+		switch action {
+		case rules.ActionTypeAllow, rules.ActionTypeDeny:
+			// Last matching allow/deny wins.
+			out.Decision = decision
+
+		case rules.ActionTypeAudit:
+			out.Audits = append(out.Audits, decision)
+
+		default:
+			return nil, fmt.Errorf("unsupported namespace rule action %q", action)
+		}
+	}
+
+	return out, nil
 }
 
 func (h *registryHandler) validateAllowedPullPolicy(

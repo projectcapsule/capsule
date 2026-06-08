@@ -44,7 +44,7 @@ func (r *Manager) ensureRuleStatus(
 	log logr.Logger,
 	tnt *capsulev1beta2.Tenant,
 	namespace *corev1.Namespace,
-	body *rules.NamespaceRuleBodyNamespace,
+	body []*rules.NamespaceRuleBodyNamespace,
 ) error {
 	rule := &capsulev1beta2.RuleStatus{
 		ObjectMeta: metav1.ObjectMeta{
@@ -65,7 +65,7 @@ func (r *Manager) ensureRuleStatus(
 		rule.SetLabels(labels)
 
 		if body != nil {
-			rule.Spec = []*rules.NamespaceRuleBodyNamespace{body}
+			rule.Spec = body
 		}
 
 		return controllerutil.SetControllerReference(tnt, rule, r.Scheme())
