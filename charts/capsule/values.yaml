@@ -131,6 +131,17 @@ manager:
     existingRoles: []
     # - namespace-admin
 
+    role:
+      # - Extra resources provided to the capsule controller ServiceAccount. This can be used to grant permissions for custom resources which are not managed by capsule, but still need to be accessed by the controller. When using this option, you need to provide the name of the ClusterRole which will be created with the specified rules and then bind it to the Capsule ServiceAccount.
+      extraResources: []
+
+    clusterRole:
+      # - Extra resources provided to the capsule controller ServiceAccount. This can be used to grant permissions for custom resources which are not managed by capsule, but still need to be accessed by the controller. When using this option, you need to provide the name of the ClusterRole which will be created with the specified rules and then bind it to the Capsule ServiceAccount.
+      extraResources: []
+      #  - apiGroups: ["storage.k8s.io"]
+      #    resources: ["storageclasses"]
+      #    verbs: ["get", "list", "watch", "update", "patch"]
+
   # -- Set the controller deployment mode as `Deployment` or `DaemonSet`.
   kind: Deployment
 

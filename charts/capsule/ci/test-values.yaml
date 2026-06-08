@@ -7,10 +7,19 @@ manager:
   options:
     capsuleUserGroups: ["custom-group-1", "custom-group-2"]
     userNames: ["custom-user-1", "custom-user-2"]
-
   rbac:
     create: true
     existingClusterRoles:
     - "view"
     existingRoles:
     - "some-role"
+    role:
+      extraResources:
+        - apiGroups: ["storage.k8s.io"]
+          resources: ["storageclasses"]
+          verbs: ["get", "list", "watch", "update", "patch"]
+    clusterRole:
+      extraResources:
+        - apiGroups: ["storage.k8s.io"]
+          resources: ["storageclasses"]
+          verbs: ["get", "list", "watch", "update", "patch"]
