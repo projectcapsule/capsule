@@ -122,6 +122,11 @@ var _ = Describe("enforcing container registry namespace rules", Ordered, Label(
 						},
 					},
 					{
+						NamespaceSelector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{
+								"negate": "true",
+							},
+						},
 						NamespaceRuleBodyNamespace: rules.NamespaceRuleBodyNamespace{
 							Enforce: rules.NamespaceRuleEnforceBody{
 								Action: rules.ActionTypeDeny,
@@ -136,11 +141,6 @@ var _ = Describe("enforcing container registry namespace rules", Ordered, Label(
 										},
 									},
 								},
-							},
-						},
-						NamespaceSelector: &metav1.LabelSelector{
-							MatchLabels: map[string]string{
-								"negate": "true",
 							},
 						},
 					},
@@ -370,6 +370,36 @@ var _ = Describe("enforcing container registry namespace rules", Ordered, Label(
 		})
 	})
 
+	It("stores namespace-selector matched negated regex rules as independent status rule blocks", func() {
+		ns := NewNamespace("", map[string]string{
+			"negate":         "true",
+			meta.TenantLabel: tnt.GetName(),
+		})
+
+		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+		NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
+
+		expectNamespaceStatusRules(ns.GetName(), []expectedStatusRule{
+			{
+				action:      rules.ActionTypeAllow,
+				expressions: []string{"harbor/.*"},
+			},
+			{
+				action:      rules.ActionTypeDeny,
+				expressions: []string{"harbor/customer/.*"},
+			},
+			{
+				action:      rules.ActionTypeAudit,
+				expressions: []string{"audit/.*"},
+			},
+			{
+				action:      rules.ActionTypeDeny,
+				expressions: []string{"trusted/.*"},
+				negated:     []bool{true},
+			},
+		})
+	})
+
 	It("allows a broad matching allow rule", func() {
 		ns := NewNamespace("", map[string]string{
 			meta.TenantLabel: tnt.GetName(),
@@ -469,6 +499,29 @@ var _ = Describe("enforcing container registry namespace rules", Ordered, Label(
 		expectAuditEvent(cs, ns.Name, pod.Name,
 			"matched audit registry rule",
 			"audit/.*",
+		)
+	})
+
+	It("applies negated regex rules using the nested regex expression", func() {
+		ns := NewNamespace("", map[string]string{
+			"negate":         "true",
+			meta.TenantLabel: tnt.GetName(),
+		})
+
+		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
+
+		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+		NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
+
+		allowed := restrictedPod("negate-trusted-allowed", "trusted/team/app:1", corev1.PullIfNotPresent)
+		createPodAndExpectAllowed(cs, ns.Name, allowed)
+
+		denied := restrictedPod("negate-untrusted-denied", "untrusted/team/app:1", corev1.PullIfNotPresent)
+		createPodAndExpectDenied(cs, ns.Name, denied,
+			"containers[0]",
+			"untrusted/team/app:1",
+			"denied",
+			"trusted/.*",
 		)
 	})
 
