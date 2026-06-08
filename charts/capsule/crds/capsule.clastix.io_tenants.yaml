@@ -2503,12 +2503,31 @@ spec:
                     enforce:
                       description: Enforcement for given rule
                       properties:
+                        action:
+                          default: deny
+                          description: |-
+                            Declare the action being performed on the enforcement rule:
+                            deny: On match, deny admission request
+                            allow: On match, allowed admission request
+                            audit: On match, audit (post event) of admission request
+                          enum:
+                          - allow
+                          - deny
+                          - audit
+                          type: string
                         registries:
                           description: |-
                             Define registries which are allowed to be used within this tenant
                             The rules are aggregated, since you can use Regular Expressions the match registry endpoints
                           items:
                             properties:
+                              exp:
+                                description: Expression used to evaluate regex
+                                type: string
+                              negate:
+                                default: false
+                                description: Negate regular Expression
+                                type: boolean
                               policy:
                                 description: Allowed PullPolicy for the given registry.
                                   Supplying no value allows all policies.
@@ -2518,8 +2537,10 @@ spec:
                                   type: string
                                 type: array
                               url:
-                                description: OCI Registry endpoint, is treated as
-                                  regular expression.
+                                description: |-
+                                  Deprecated: Use exp field
+
+                                  OCI Registry endpoint, is treated as regular expression.
                                 type: string
                               validation:
                                 default:
@@ -2532,8 +2553,6 @@ spec:
                                   - pod/volumes
                                   type: string
                                 type: array
-                            required:
-                            - url
                             type: object
                           type: array
                       type: object
@@ -3091,6 +3110,13 @@ spec:
                           description: Registries which are allowed within this namespace
                           items:
                             properties:
+                              exp:
+                                description: Expression used to evaluate regex
+                                type: string
+                              negate:
+                                default: false
+                                description: Negate regular Expression
+                                type: boolean
                               policy:
                                 description: Allowed PullPolicy for the given registry.
                                   Supplying no value allows all policies.
@@ -3100,8 +3126,10 @@ spec:
                                   type: string
                                 type: array
                               url:
-                                description: OCI Registry endpoint, is treated as
-                                  regular expression.
+                                description: |-
+                                  Deprecated: Use exp field
+
+                                  OCI Registry endpoint, is treated as regular expression.
                                 type: string
                               validation:
                                 default:
@@ -3114,8 +3142,6 @@ spec:
                                   - pod/volumes
                                   type: string
                                 type: array
-                            required:
-                            - url
                             type: object
                           type: array
                       type: object

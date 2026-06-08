@@ -10,6 +10,7 @@ package v1beta1
 import (
 	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/api/rbac"
+	"github.com/projectcapsule/capsule/pkg/api/rules"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -331,7 +332,7 @@ func (in *TenantSpec) DeepCopyInto(out *TenantSpec) {
 	}
 	if in.ImagePullPolicies != nil {
 		in, out := &in.ImagePullPolicies, &out.ImagePullPolicies
-		*out = make([]api.ImagePullPolicySpec, len(*in))
+		*out = make([]rules.ImagePullPolicySpec, len(*in))
 		copy(*out, *in)
 	}
 	if in.PriorityClasses != nil {

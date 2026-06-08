@@ -74,13 +74,11 @@ func ValidateRule(tnt *capsulev1beta2.Tenant, req admission.Request) *admission.
 		return nil
 	}
 
-	// Validate Rules
 	for i, rule := range tnt.Spec.Rules {
 		if rule == nil {
 			continue
 		}
 
-		// Validate NamespaceSelector (if provided)
 		if rule.NamespaceSelector != nil {
 			if _, err := metav1.LabelSelectorAsSelector(rule.NamespaceSelector); err != nil {
 				return ad.Deny(
@@ -89,11 +87,24 @@ func ValidateRule(tnt *capsulev1beta2.Tenant, req admission.Request) *admission.
 			}
 		}
 
-		// Validate Registries
-		for _, r := range rule.Enforce.Registries {
-			if _, err := regexp.Compile(r.Registry); err != nil {
+		for j, registry := range rule.Enforce.Registries {
+			expr := registry.Expression()
+
+			if expr.Expression == "" {
 				return ad.Deny(
-					fmt.Sprintf("unable to compile regex %q: %v", r.Registry, err),
+					fmt.Sprintf("rules[%d].enforce.registries[%d].exp must not be empty", i, j),
+				)
+			}
+
+			if _, err := regexp.Compile(expr.Expression); err != nil {
+				return ad.Deny(
+					fmt.Sprintf(
+						"rules[%d].enforce.registries[%d].exp %q is invalid: %v",
+						i,
+						j,
+						expr.Expression,
+						err,
+					),
 				)
 			}
 		}
