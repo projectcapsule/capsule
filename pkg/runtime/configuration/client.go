@@ -157,7 +157,7 @@ func (c *capsuleConfiguration) UserNames() []string {
 }
 
 func (c *capsuleConfiguration) ServiceAccounts() []string {
-	return append(c.retrievalFn().Spec.UserNames, c.retrievalFn().Spec.Users.GetByKinds([]rbac.OwnerKind{rbac.ServiceAccountOwner})...)
+	return c.retrievalFn().Spec.Users.GetByKinds([]rbac.OwnerKind{rbac.ServiceAccountOwner})
 }
 
 func (c *capsuleConfiguration) Users() rbac.UserListSpec {
