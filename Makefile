@@ -571,10 +571,6 @@ e2e-exec-config: ginkgo
 .PHONY: e2e-destroy
 e2e-destroy: dev-destroy
 
-SPELL_CHECKER = npx spellchecker-cli
-docs-lint:
-	cd docs/content && $(SPELL_CHECKER) -f "*.md" "*/*.md" "!general/crds-apis.md" -d dictionary.txt
-
 ####################
 # -- Helpers
 ####################
