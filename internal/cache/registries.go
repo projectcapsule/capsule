@@ -186,6 +186,7 @@ func (c *RegistryRuleSetCache) MatchReference(
 
 	return nil, nil
 }
+
 func (c *RegistryRuleSetCache) Stats() int {
 	if c == nil {
 		return 0
