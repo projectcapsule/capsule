@@ -34,3 +34,7 @@ func NegateQuantity(in resource.Quantity) resource.Quantity {
 
 	return out
 }
+
+func QuantityEqual(a, b resource.Quantity) bool {
+	return a.Cmp(b) == 0
+}

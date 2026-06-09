@@ -11,7 +11,7 @@ spec:
     kind: User
   rules:
     - permissions:
-        rules:
+        promotions:
           - clusterRoles:
             - "configmap-replicator"
     - namespaceSelector:
@@ -21,7 +21,7 @@ spec:
             values:
               - "test"
       permissions:
-        rules:
+        promotions:
           - clusterRoles:
             - "secret-replicator"
     - namespaceSelector:
@@ -31,7 +31,7 @@ spec:
             values:
               - "prod"
       permissions:
-        rules:
+        promotions:
           - clusterRoles:
             - "sade-boi"
   permissions:
@@ -89,16 +89,29 @@ spec:
       kind: User
       name: alice
   rules:
-    - enforce:
-        action: "deny"
-        registries:
-        - url: "harbor/.*"
+    - permissions:
+        promotions:
+          - clusterRoles:
+            - "admin"
+            selector:
+              matchLabels:
+                owner.projectcapsule.dev/role: "replication"
+
     - enforce:
         action: "allow"
-        registries:
-        - url: "harbor/customer/.*"
-          policy:
-          - "Never"
+        workloads:
+          registries:
+          - exp: ".*"
+    - enforce:
+        action: "deny"
+        workloads:
+          registries:
+          - exp: "harbor/.*"
+    - enforce:
+        action: "deny"
+        workloads:
+          registries:
+          - exp: "harbor/customer/.*"
     - namespaceSelector:
         matchExpressions:
           - key: env
@@ -107,10 +120,9 @@ spec:
             - "prod"
       enforce:
         action: "allow"
-        registries:
-        - url: "harbor/v2/customer-registry/prod-image/.*"
-          policy:
-          - "Always"
+        workloads:
+          registries:
+          - exp: "harbor/customer/prod-image/.*"
 ---
 apiVersion: capsule.clastix.io/v1beta2
 kind: Tenant

@@ -33,9 +33,10 @@ func GetManagedRuleStatus(
 	return obj, err
 }
 
-// BuildNamespaceRuleBodyForNamespace returns the aggregated rule body that applies to `ns`.
+// BuildNamespaceRuleBodyStatus returns the aggregated rule bodies that apply to ns.
 // - Rules with nil NamespaceSelector match all namespaces.
-// - Matching rules are combined in the order they appear in tnt.Spec.Rules (important for "later wins" semantics).
+// - Matching rules are returned in the order they appear in tnt.Spec.Rules.
+// - Order is important because registry/QoS evaluation uses "later allow/deny wins" semantics.
 func BuildNamespaceRuleBodyStatus(
 	ctx context.Context,
 	c client.Reader,
@@ -46,7 +47,6 @@ func BuildNamespaceRuleBodyStatus(
 		return nil, nil
 	}
 
-	// Treat nil labels map as empty.
 	nsLabels := labels.Set{}
 	if ns.Labels != nil {
 		nsLabels = labels.Set(ns.Labels)
@@ -70,25 +70,12 @@ func BuildNamespaceRuleBodyStatus(
 			}
 		}
 
-		normalized := rules.NamespaceRuleBodyNamespace{
-			Enforce: rules.NamespaceRuleEnforceBody{
-				Action: rule.Enforce.Action,
-				Registries: append(
-					[]rules.OCIRegistry(nil),
-					rule.Enforce.Registries...,
-				),
-			},
-		}
-
-		if normalized.Enforce.Action == "" {
-			normalized.Enforce.Action = rules.ActionTypeDeny
-		}
-
-		if len(normalized.Enforce.Registries) == 0 {
+		body := rule.NamespaceRuleBodyNamespace
+		if body == nil || body.Enforce == nil {
 			continue
 		}
 
-		out = append(out, &normalized)
+		out = append(out, body.DeepCopy())
 	}
 
 	return out, nil

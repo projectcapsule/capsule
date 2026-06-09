@@ -148,20 +148,31 @@ func (r Manager) reconcile(ctx context.Context, instance *capsulev1beta2.RuleSta
 			continue
 		}
 
-		normalized := *rule
-		normalized.Enforce = rule.Enforce
-
-		normalized.Enforce.Registries = append(
-			[]rules.OCIRegistry(nil),
-			rule.Enforce.Registries...,
-		)
-
-		// Keep status compact: skip empty enforce blocks.
-		if len(normalized.Enforce.Registries) == 0 {
+		if rule.Enforce == nil {
 			continue
 		}
 
-		ruleStatus = append(ruleStatus, &normalized)
+		normalized := &rules.NamespaceRuleBodyNamespace{
+			Enforce: &rules.NamespaceRuleEnforceBody{
+				Action: rule.Enforce.Action,
+				Workloads: rules.NamespaceRuleEnforceWorkloadsBody{
+					Targets: append(
+						[]rules.WorkloadValidationTarget(nil),
+						rule.Enforce.Workloads.Targets...,
+					),
+					Registries: append(
+						[]rules.OCIRegistry(nil),
+						rule.Enforce.Workloads.Registries...,
+					),
+					QoSClasses: append(
+						[]corev1.PodQOSClass(nil),
+						rule.Enforce.Workloads.QoSClasses...,
+					),
+				},
+			},
+		}
+
+		ruleStatus = append(ruleStatus, normalized)
 	}
 
 	instance.Status.Rules = ruleStatus

@@ -1143,3 +1143,62 @@ func EnsureRuntimeClass(ctx context.Context, rtc *nodev1.RuntimeClass) {
 		return err
 	}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 }
+
+const namespaceTerminationHoldFinalizer = "e2e.projectcapsule.dev/hold-termination"
+
+func holdNamespaceTerminating(ctx context.Context, name string) func() {
+	Eventually(func() error {
+		ns := &corev1.Namespace{}
+
+		if err := k8sClient.Get(ctx, types.NamespacedName{Name: name}, ns); err != nil {
+			return err
+		}
+
+		if controllerutil.AddFinalizer(ns, namespaceTerminationHoldFinalizer) {
+			return k8sClient.Update(ctx, ns)
+		}
+
+		return nil
+	}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+
+	Eventually(func() error {
+		ns := &corev1.Namespace{}
+
+		if err := k8sClient.Get(ctx, types.NamespacedName{Name: name}, ns); err != nil {
+			return err
+		}
+
+		if ns.DeletionTimestamp != nil {
+			return nil
+		}
+
+		return k8sClient.Delete(ctx, ns)
+	}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+
+	Eventually(func(g Gomega) {
+		ns := &corev1.Namespace{}
+
+		g.Expect(k8sClient.Get(ctx, types.NamespacedName{Name: name}, ns)).To(Succeed())
+		g.Expect(ns.DeletionTimestamp).ToNot(BeNil())
+	}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+
+	return func() {
+		Eventually(func() error {
+			ns := &corev1.Namespace{}
+
+			if err := k8sClient.Get(ctx, types.NamespacedName{Name: name}, ns); err != nil {
+				if apierrors.IsNotFound(err) {
+					return nil
+				}
+
+				return err
+			}
+
+			if controllerutil.RemoveFinalizer(ns, namespaceTerminationHoldFinalizer) {
+				return k8sClient.Update(ctx, ns)
+			}
+
+			return nil
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+	}
+}

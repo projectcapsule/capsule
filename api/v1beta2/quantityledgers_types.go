@@ -75,7 +75,6 @@ type QuantityLedgerSpec struct {
 // +kubebuilder:printcolumn:name="TargetNamespace",type=string,JSONPath=`.spec.targetRef.namespace`
 // +kubebuilder:printcolumn:name="TargetName",type=string,JSONPath=`.spec.targetRef.name`
 // +kubebuilder:printcolumn:name="Reserved",type=string,JSONPath=`.status.reserved`
-// +kubebuilder:printcolumn:name="Reservations",type=integer,JSONPath=`.status.reservations.size()`
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
 type QuantityLedger struct {
 	metav1.TypeMeta   `json:",inline"`

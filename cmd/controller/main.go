@@ -564,6 +564,7 @@ func main() {
 				pod.ContainerRegistry(cfg, registryCache),
 				pod.PriorityClass(),
 				pod.RuntimeClass(),
+				pod.QoSClass(cfg),
 			),
 		),
 		route.Ingress(ingress.Class(cfg, kubeVersion), ingress.Hostnames(cfg), ingress.Collision(cfg), ingress.Wildcard()),

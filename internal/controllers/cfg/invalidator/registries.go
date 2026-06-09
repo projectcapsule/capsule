@@ -36,11 +36,19 @@ func (r *CacheInvalidator) rebuildRuleStatusRegistryCache(ctx context.Context, l
 		item := &rsList.Items[i]
 
 		for _, rule := range item.Status.Rules {
-			if rule == nil || len(rule.Enforce.Registries) == 0 {
+			if rule == nil {
 				continue
 			}
 
-			if _, _, err := r.RegistryCache.GetOrBuild(rule.Enforce.Registries); err != nil {
+			if rule.Enforce == nil {
+				continue
+			}
+
+			if len(rule.Enforce.Workloads.Registries) == 0 {
+				continue
+			}
+
+			if _, _, err := r.RegistryCache.GetOrBuild(rule.Enforce.Workloads.Registries); err != nil {
 				return fmt.Errorf(
 					"build registry cache for RuleStatus %s/%s: %w",
 					item.Namespace,

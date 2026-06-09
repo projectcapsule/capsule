@@ -68,7 +68,11 @@ func collectRegexExpressionsFromNamespaceRule(
 		return
 	}
 
-	for _, registry := range rule.Enforce.Registries {
+	if rule.Enforce == nil {
+		return
+	}
+
+	for _, registry := range rule.Enforce.Workloads.Registries {
 		expr := registry.RegExpression
 		if expr.Expression == "" {
 			continue

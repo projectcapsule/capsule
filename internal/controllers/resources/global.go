@@ -130,6 +130,8 @@ func (r *globalResourceController) Reconcile(ctx context.Context, request reconc
 
 	//nolint:dupl
 	defer func() {
+		meta.RemoveReconcileTriggerAnnotation(tntResource)
+
 		reconcileErr := err
 		if statusErr != nil {
 			reconcileErr = statusErr
