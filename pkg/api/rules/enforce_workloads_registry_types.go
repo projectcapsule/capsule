@@ -24,10 +24,6 @@ type OCIRegistry struct {
 	// +optional
 	// +kubebuilder:validation:Items:Enum=Always;Never;IfNotPresent
 	Policy []corev1.PullPolicy `json:"policy,omitempty"`
-
-	// Requesting Resources
-	// +optional
-	Validation []WorkloadValidationTarget `json:"validation,omitempty"`
 }
 
 func (r OCIRegistry) Expression() api.RegExpression {

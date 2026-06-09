@@ -101,16 +101,6 @@ spec:
                                     to pull a container image
                                   type: string
                                 type: array
-                              validation:
-                                description: Requesting Resources
-                                items:
-                                  enum:
-                                  - pod/initcontainers
-                                  - pod/ephemeralcontainers
-                                  - pod/containers
-                                  - pod/volumes
-                                  type: string
-                                type: array
                             type: object
                           type: array
                         targets:
@@ -248,16 +238,6 @@ spec:
                                       if/when to pull a container image
                                     type: string
                                   type: array
-                                validation:
-                                  description: Requesting Resources
-                                  items:
-                                    enum:
-                                    - pod/initcontainers
-                                    - pod/ephemeralcontainers
-                                    - pod/containers
-                                    - pod/volumes
-                                    type: string
-                                  type: array
                               type: object
                             type: array
                           targets:
@@ -329,16 +309,6 @@ spec:
                                     items:
                                       description: PullPolicy describes a policy for
                                         if/when to pull a container image
-                                      type: string
-                                    type: array
-                                  validation:
-                                    description: Requesting Resources
-                                    items:
-                                      enum:
-                                      - pod/initcontainers
-                                      - pod/ephemeralcontainers
-                                      - pod/containers
-                                      - pod/volumes
                                       type: string
                                     type: array
                                 type: object

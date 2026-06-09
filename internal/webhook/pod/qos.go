@@ -250,68 +250,6 @@ func qosClassMatches(classes []corev1.PodQOSClass, got corev1.PodQOSClass) bool 
 	return slices.Contains(classes, got)
 }
 
-func ComputePodQoSClass(pod *corev1.Pod) corev1.PodQOSClass {
-	if pod == nil {
-		return corev1.PodQOSBestEffort
-	}
-
-	containers := make([]corev1.Container, 0,
-		len(pod.Spec.InitContainers)+
-			len(pod.Spec.Containers)+
-			len(pod.Spec.EphemeralContainers),
-	)
-
-	containers = append(containers, pod.Spec.InitContainers...)
-	containers = append(containers, pod.Spec.Containers...)
-
-	for _, c := range pod.Spec.EphemeralContainers {
-		containers = append(containers, corev1.Container{
-			Name:      c.Name,
-			Resources: c.Resources,
-		})
-	}
-
-	if len(containers) == 0 {
-		return corev1.PodQOSBestEffort
-	}
-
-	requestsOrLimitsFound := false
-	guaranteed := true
-
-	for _, c := range containers {
-		resources := c.Resources
-
-		if len(resources.Requests) > 0 || len(resources.Limits) > 0 {
-			requestsOrLimitsFound = true
-		}
-
-		cpuRequest, hasCPURequest := resources.Requests[corev1.ResourceCPU]
-		memoryRequest, hasMemoryRequest := resources.Requests[corev1.ResourceMemory]
-		cpuLimit, hasCPULimit := resources.Limits[corev1.ResourceCPU]
-		memoryLimit, hasMemoryLimit := resources.Limits[corev1.ResourceMemory]
-
-		if !hasCPURequest || !hasMemoryRequest || !hasCPULimit || !hasMemoryLimit {
-			guaranteed = false
-
-			continue
-		}
-
-		if !quantityEqual(cpuRequest, cpuLimit) || !quantityEqual(memoryRequest, memoryLimit) {
-			guaranteed = false
-		}
-	}
-
-	if guaranteed && requestsOrLimitsFound {
-		return corev1.PodQOSGuaranteed
-	}
-
-	if !requestsOrLimitsFound {
-		return corev1.PodQOSBestEffort
-	}
-
-	return corev1.PodQOSBurstable
-}
-
 func quantityEqual(a, b resource.Quantity) bool {
 	return a.Cmp(b) == 0
 }
