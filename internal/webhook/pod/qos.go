@@ -201,7 +201,7 @@ func evaluateQoSClass(
 	evaluation := &qosEvaluation{}
 
 	for _, rule := range ruleBlocks {
-		if rule == nil {
+		if rule == nil || rule.Enforce == nil {
 			continue
 		}
 

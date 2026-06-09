@@ -496,7 +496,22 @@ func (r *Processor) isNamespaceTerminatingForObject(
 	if obj.GroupVersionKind().Group == "" && obj.GetKind() == "Namespace" {
 		namespace = obj.GetName()
 
-		return r.isNamespaceTerminating(ctx, namespace, cache)
+		ns := &corev1.Namespace{}
+		if err := r.GatherClient.Get(ctx, types.NamespacedName{Name: namespace}, ns); err != nil {
+			if apierrors.IsNotFound(err) {
+				cache[namespace] = false
+
+				return false, namespace, nil
+			}
+
+			return false, namespace, err
+		}
+
+		terminating = ns.DeletionTimestamp != nil || ns.Status.Phase == corev1.NamespaceTerminating
+
+		cache[namespace] = terminating
+
+		return terminating, namespace, nil
 	}
 
 	mapping, err := r.Mapper.RESTMapping(
