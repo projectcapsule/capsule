@@ -10,7 +10,6 @@ import (
 	"slices"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -248,10 +247,6 @@ func evaluateQoSClass(
 
 func qosClassMatches(classes []corev1.PodQOSClass, got corev1.PodQOSClass) bool {
 	return slices.Contains(classes, got)
-}
-
-func quantityEqual(a, b resource.Quantity) bool {
-	return a.Cmp(b) == 0
 }
 
 func (h *qosHandler) auditWithEvent(
