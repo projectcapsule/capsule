@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/events"
@@ -70,12 +71,25 @@ func (h *RuleValidationHandler) OnUpdate(
 }
 
 func ValidateRule(tnt *capsulev1beta2.Tenant, req admission.Request) *admission.Response {
+	if tnt == nil {
+		return nil
+	}
+
 	if len(tnt.Spec.Rules) == 0 {
 		return nil
 	}
 
 	for i, rule := range tnt.Spec.Rules {
 		if rule == nil {
+			continue
+		}
+
+		body := rule.NamespaceRuleBodyNamespace
+		if body == nil {
+			continue
+		}
+
+		if rule.Enforce == nil {
 			continue
 		}
 
@@ -87,19 +101,19 @@ func ValidateRule(tnt *capsulev1beta2.Tenant, req admission.Request) *admission.
 			}
 		}
 
-		for j, registry := range rule.Enforce.Registries {
+		for j, registry := range rule.Enforce.Workloads.Registries {
 			expr := registry.Expression()
 
-			if expr.Expression == "" {
+			if strings.TrimSpace(expr.Expression) == "" {
 				return ad.Deny(
-					fmt.Sprintf("rules[%d].enforce.registries[%d].exp must not be empty", i, j),
+					fmt.Sprintf("rules[%d].enforce.workloads.registries[%d].exp must not be empty", i, j),
 				)
 			}
 
 			if _, err := regexp.Compile(expr.Expression); err != nil {
 				return ad.Deny(
 					fmt.Sprintf(
-						"rules[%d].enforce.registries[%d].exp %q is invalid: %v",
+						"rules[%d].enforce.workloads.registries[%d].exp %q is invalid: %v",
 						i,
 						j,
 						expr.Expression,

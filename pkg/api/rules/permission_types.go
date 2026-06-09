@@ -11,7 +11,7 @@ import (
 type NamespaceRulePermissionBody struct {
 	// Define Promotion Rules which distributed additional ClusterRoles across the Tenant
 	// for promoted ServiceAccounts.
-	Promotions []*NamespaceRulePromotionRule `json:"rules,omitempty"`
+	Promotions []*NamespaceRulePromotionRule `json:"promotions,omitempty"`
 }
 
 // +kubebuilder:object:generate=true

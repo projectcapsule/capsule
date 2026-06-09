@@ -12,13 +12,13 @@ import (
 type NamespaceRuleBodyNamespace struct {
 	// Enforcement for given rule
 	//+optional
-	Enforce NamespaceRuleEnforceBody `json:"enforce,omitzero"`
+	Enforce *NamespaceRuleEnforceBody `json:"enforce,omitzero"`
 }
 
 // Rules Distributed via Tenants
 // +kubebuilder:object:generate=true
 type NamespaceRuleBodyTenant struct {
-	NamespaceRuleBodyNamespace `json:",inline"`
+	*NamespaceRuleBodyNamespace `json:",inline"`
 
 	// Select namespaces which are going to be targeted with this rule
 	NamespaceSelector *metav1.LabelSelector `json:"namespaceSelector,omitempty"`

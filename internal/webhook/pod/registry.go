@@ -30,7 +30,10 @@ type registryHandler struct {
 	cache         *cache.RegistryRuleSetCache
 }
 
-func ContainerRegistry(configuration configuration.Configuration, cache *cache.RegistryRuleSetCache) handlers.TypedHandlerWithTenantWithRuleset[*corev1.Pod] {
+func ContainerRegistry(
+	configuration configuration.Configuration,
+	cache *cache.RegistryRuleSetCache,
+) handlers.TypedHandlerWithTenantWithRuleset[*corev1.Pod] {
 	return &registryHandler{
 		configuration: configuration,
 		cache:         cache,
@@ -89,7 +92,19 @@ func (h *registryHandler) validate(
 	ruleBlocks []*rules.NamespaceRuleBodyNamespace,
 ) *admission.Response {
 	if h.cache == nil {
-		resp := admission.Errored(http.StatusInternalServerError, fmt.Errorf("registry rule set cache is nil"))
+		resp := admission.Errored(
+			http.StatusInternalServerError,
+			fmt.Errorf("registry rule set cache is nil"),
+		)
+
+		return &resp
+	}
+
+	if pod == nil {
+		resp := admission.Errored(
+			http.StatusInternalServerError,
+			fmt.Errorf("pod is nil"),
+		)
 
 		return &resp
 	}
@@ -107,11 +122,23 @@ func (h *registryHandler) validate(
 
 	warnings := make([]string, 0)
 
-	if resp := h.validateContainers(req, pod, tnt, recorder, ruleBlocks, &warnings); resp != nil {
+	if resp := h.validateContainers(
+		recorder,
+		tnt,
+		pod,
+		ruleBlocks,
+		&warnings,
+	); resp != nil {
 		return resp
 	}
 
-	if resp := h.validateVolumes(req, pod, tnt, recorder, ruleBlocks, &warnings); resp != nil {
+	if resp := h.validateVolumes(
+		recorder,
+		tnt,
+		pod,
+		ruleBlocks,
+		&warnings,
+	); resp != nil {
 		return resp
 	}
 
@@ -126,10 +153,9 @@ func (h *registryHandler) validate(
 }
 
 func (h *registryHandler) validateContainers(
-	req admission.Request,
-	pod *corev1.Pod,
-	tnt *capsulev1beta2.Tenant,
 	recorder events.EventRecorder,
+	tnt *capsulev1beta2.Tenant,
+	pod *corev1.Pod,
 	ruleBlocks []*rules.NamespaceRuleBodyNamespace,
 	warnings *[]string,
 ) *admission.Response {
@@ -138,33 +164,13 @@ func (h *registryHandler) validateContainers(
 
 		if resp := h.verifyOCIReference(
 			recorder,
-			req,
 			tnt,
 			pod,
 			ruleBlocks,
-			rules.ValidateImages,
+			rules.ValidateInitContainers,
 			c.Image,
 			c.ImagePullPolicy,
 			fmt.Sprintf("initContainers[%d]", i),
-			warnings,
-		); resp != nil {
-			return resp
-		}
-	}
-
-	for i := range pod.Spec.EphemeralContainers {
-		c := pod.Spec.EphemeralContainers[i]
-
-		if resp := h.verifyOCIReference(
-			recorder,
-			req,
-			tnt,
-			pod,
-			ruleBlocks,
-			rules.ValidateImages,
-			c.Image,
-			c.ImagePullPolicy,
-			fmt.Sprintf("ephemeralContainers[%d]", i),
 			warnings,
 		); resp != nil {
 			return resp
@@ -176,14 +182,31 @@ func (h *registryHandler) validateContainers(
 
 		if resp := h.verifyOCIReference(
 			recorder,
-			req,
 			tnt,
 			pod,
 			ruleBlocks,
-			rules.ValidateImages,
+			rules.ValidateContainers,
 			c.Image,
 			c.ImagePullPolicy,
 			fmt.Sprintf("containers[%d]", i),
+			warnings,
+		); resp != nil {
+			return resp
+		}
+	}
+
+	for i := range pod.Spec.EphemeralContainers {
+		c := pod.Spec.EphemeralContainers[i]
+
+		if resp := h.verifyOCIReference(
+			recorder,
+			tnt,
+			pod,
+			ruleBlocks,
+			rules.ValidateEphemeralContainers,
+			c.Image,
+			c.ImagePullPolicy,
+			fmt.Sprintf("ephemeralContainers[%d]", i),
 			warnings,
 		); resp != nil {
 			return resp
@@ -194,10 +217,9 @@ func (h *registryHandler) validateContainers(
 }
 
 func (h *registryHandler) validateVolumes(
-	req admission.Request,
-	pod *corev1.Pod,
-	tnt *capsulev1beta2.Tenant,
 	recorder events.EventRecorder,
+	tnt *capsulev1beta2.Tenant,
+	pod *corev1.Pod,
 	ruleBlocks []*rules.NamespaceRuleBodyNamespace,
 	warnings *[]string,
 ) *admission.Response {
@@ -207,25 +229,13 @@ func (h *registryHandler) validateVolumes(
 			continue
 		}
 
-		ref := strings.TrimSpace(v.Image.Reference)
-		if ref == "" {
-			return h.denyWithEvent(
-				recorder,
-				tnt,
-				pod,
-				evt.ReasonForbiddenContainerRegistry,
-				fmt.Sprintf("volume %q has empty image.reference", v.Name),
-			)
-		}
-
 		if resp := h.verifyOCIReference(
 			recorder,
-			req,
 			tnt,
 			pod,
 			ruleBlocks,
 			rules.ValidateVolumes,
-			ref,
+			v.Image.Reference,
 			v.Image.PullPolicy,
 			fmt.Sprintf("volumes[%d](%s)", i, v.Name),
 			warnings,
@@ -239,11 +249,10 @@ func (h *registryHandler) validateVolumes(
 
 func (h *registryHandler) verifyOCIReference(
 	recorder events.EventRecorder,
-	req admission.Request,
 	tnt *capsulev1beta2.Tenant,
 	pod *corev1.Pod,
 	ruleBlocks []*rules.NamespaceRuleBodyNamespace,
-	target rules.RegistryValidationTarget,
+	target rules.WorkloadValidationTarget,
 	reference string,
 	pullPolicy corev1.PullPolicy,
 	where string,
@@ -361,17 +370,25 @@ type registryEvaluation struct {
 
 func (h *registryHandler) evaluateOCIReference(
 	ruleBlocks []*rules.NamespaceRuleBodyNamespace,
-	target rules.RegistryValidationTarget,
+	target rules.WorkloadValidationTarget,
 	ref string,
 ) (*registryEvaluation, error) {
 	evaluation := &registryEvaluation{}
 
 	for _, rule := range ruleBlocks {
-		if rule == nil || len(rule.Enforce.Registries) == 0 {
+		if rule == nil || rule.Enforce == nil {
 			continue
 		}
 
-		rs, _, err := h.cache.GetOrBuild(rule.Enforce.Registries)
+		if len(rule.Enforce.Workloads.Registries) == 0 {
+			continue
+		}
+
+		if !rule.Enforce.WorkloadTargetsAny(target) {
+			continue
+		}
+
+		rs, _, err := h.cache.GetOrBuild(rule.Enforce.Workloads.Registries)
 		if err != nil {
 			return nil, err
 		}
@@ -380,7 +397,10 @@ func (h *registryHandler) evaluateOCIReference(
 			continue
 		}
 
-		matched, err := h.cache.MatchReference(rs, ref, target)
+		// Important:
+		// Match by image reference only. Pull policy is validated after the
+		// final allow decision has been selected.
+		matched, err := h.cache.MatchReference(rs, ref)
 		if err != nil {
 			return nil, err
 		}
@@ -389,10 +409,7 @@ func (h *registryHandler) evaluateOCIReference(
 			continue
 		}
 
-		action := rule.Enforce.Action
-		if action == "" {
-			action = rules.ActionTypeDeny
-		}
+		action := rule.Enforce.Action.OrDefault()
 
 		decision := &registryDecision{
 			RuleDecision: rules.RuleDecision{

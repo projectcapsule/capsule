@@ -18,19 +18,15 @@ import (
 )
 
 type RuleSet struct {
-	ID         string
-	Compiled   []CompiledRule
-	HasImages  bool
-	HasVolumes bool
+	ID       string
+	Compiled []CompiledRule
 }
 
 type CompiledRule struct {
 	Expression api.RegExpression
 	RegexID    string
 
-	AllowedPolicy   map[corev1.PullPolicy]struct{} // nil/empty => allow any
-	ValidateImages  bool
-	ValidateVolumes bool
+	AllowedPolicy map[corev1.PullPolicy]struct{} // nil/empty => allow any
 }
 
 func (r *CompiledRule) AllowsPullPolicy(pullPolicy corev1.PullPolicy) bool {
@@ -41,17 +37,6 @@ func (r *CompiledRule) AllowsPullPolicy(pullPolicy corev1.PullPolicy) bool {
 	_, ok := r.AllowedPolicy[pullPolicy]
 
 	return ok
-}
-
-func (r *CompiledRule) MatchesTarget(target rules.RegistryValidationTarget) bool {
-	switch target {
-	case rules.ValidateImages:
-		return r.ValidateImages
-	case rules.ValidateVolumes:
-		return r.ValidateVolumes
-	default:
-		return false
-	}
 }
 
 type RegistryRuleSetCache struct {
@@ -91,7 +76,6 @@ func (c *RegistryRuleSetCache) GetOrBuild(specRules []rules.OCIRegistry) (rs *Ru
 		return rs, true, nil
 	}
 
-	// Build outside locks. Regex compilation is delegated to RegexCache.
 	built, err := c.buildRuleSet(id, specRules)
 	if err != nil {
 		return nil, false, err
@@ -113,15 +97,12 @@ func (c *RegistryRuleSetCache) GetOrBuild(specRules []rules.OCIRegistry) (rs *Ru
 	return built, false, nil
 }
 
-// Match matches a reference against target, regex and pullPolicy.
-// Admission deny/allow/audit evaluation should usually use MatchReference instead,
-// because it needs to distinguish "regex matched but pullPolicy is forbidden" from
-// "regex did not match".
+// Match matches reference, regex and pullPolicy.
+// Admission evaluation should usually use MatchReference instead.
 func (c *RegistryRuleSetCache) Match(
 	specRules []rules.OCIRegistry,
 	reference string,
 	pullPolicy corev1.PullPolicy,
-	target rules.RegistryValidationTarget,
 ) (*CompiledRule, error) {
 	rs, _, err := c.GetOrBuild(specRules)
 	if err != nil {
@@ -132,15 +113,13 @@ func (c *RegistryRuleSetCache) Match(
 		return nil, nil
 	}
 
-	return c.MatchRuleSet(rs, reference, pullPolicy, target)
+	return c.MatchRuleSet(rs, reference, pullPolicy)
 }
 
-// MatchRuleSet matches a reference against target, regex and pullPolicy.
 func (c *RegistryRuleSetCache) MatchRuleSet(
 	rs *RuleSet,
 	reference string,
 	pullPolicy corev1.PullPolicy,
-	target rules.RegistryValidationTarget,
 ) (*CompiledRule, error) {
 	if c == nil {
 		return nil, fmt.Errorf("registry rule set cache is nil")
@@ -156,10 +135,6 @@ func (c *RegistryRuleSetCache) MatchRuleSet(
 
 	for i := range rs.Compiled {
 		rule := &rs.Compiled[i]
-
-		if !rule.MatchesTarget(target) {
-			continue
-		}
 
 		if !rule.AllowsPullPolicy(pullPolicy) {
 			continue
@@ -178,12 +153,11 @@ func (c *RegistryRuleSetCache) MatchRuleSet(
 	return nil, nil
 }
 
-// MatchReference matches a reference against target and regex only.
+// MatchReference matches reference and regex only.
 // It intentionally does not check pullPolicy.
 func (c *RegistryRuleSetCache) MatchReference(
 	rs *RuleSet,
 	reference string,
-	target rules.RegistryValidationTarget,
 ) (*CompiledRule, error) {
 	if c == nil {
 		return nil, fmt.Errorf("registry rule set cache is nil")
@@ -200,10 +174,6 @@ func (c *RegistryRuleSetCache) MatchReference(
 	for i := range rs.Compiled {
 		rule := &rs.Compiled[i]
 
-		if !rule.MatchesTarget(target) {
-			continue
-		}
-
 		compiled, _, err := c.regexCache.GetOrCompile(rule.Expression)
 		if err != nil {
 			return nil, err
@@ -216,7 +186,6 @@ func (c *RegistryRuleSetCache) MatchReference(
 
 	return nil, nil
 }
-
 func (c *RegistryRuleSetCache) Stats() int {
 	if c == nil {
 		return 0
@@ -228,7 +197,6 @@ func (c *RegistryRuleSetCache) Stats() int {
 	return len(c.rs)
 }
 
-// activeIDs: set of ids currently referenced by RuleStatus in cluster.
 func (c *RegistryRuleSetCache) PruneActive(activeIDs map[string]struct{}) int {
 	if c == nil {
 		return 0
@@ -273,13 +241,6 @@ func (c *RegistryRuleSetCache) HashRules(specRules []rules.OCIRegistry) string {
 
 		sort.Strings(policies)
 
-		validations := make([]string, 0, len(r.Validation))
-		for _, v := range r.Validation {
-			validations = append(validations, strings.TrimSpace(string(v)))
-		}
-
-		sort.Strings(validations)
-
 		b.WriteString(strings.TrimSpace(expr.Expression))
 		b.WriteString(sepField)
 
@@ -299,16 +260,6 @@ func (c *RegistryRuleSetCache) HashRules(specRules []rules.OCIRegistry) string {
 			b.WriteString(p)
 		}
 
-		b.WriteString(sepField)
-
-		for i, v := range validations {
-			if i > 0 {
-				b.WriteString(sepList)
-			}
-
-			b.WriteString(v)
-		}
-
 		b.WriteString(sepRule)
 	}
 
@@ -317,7 +268,6 @@ func (c *RegistryRuleSetCache) HashRules(specRules []rules.OCIRegistry) string {
 	return hex.EncodeToString(sum[:])
 }
 
-// Has is useful in tests and debugging.
 func (c *RegistryRuleSetCache) Has(id string) bool {
 	if c == nil {
 		return false
@@ -342,8 +292,6 @@ func (c *RegistryRuleSetCache) Reset() {
 	c.rs = make(map[string]*RuleSet)
 }
 
-// InsertForTest can be behind a build tag if you prefer, but it is fine to keep simple.
-//
 //nolint:unused
 func (c *RegistryRuleSetCache) insertForTest(id string) {
 	c.mu.Lock()
@@ -384,24 +332,6 @@ func (c *RegistryRuleSetCache) buildRuleSet(id string, specRules []rules.OCIRegi
 
 			for _, p := range r.Policy {
 				cr.AllowedPolicy[p] = struct{}{}
-			}
-		}
-
-		if len(r.Validation) == 0 {
-			cr.ValidateImages = true
-			cr.ValidateVolumes = true
-			rs.HasImages = true
-			rs.HasVolumes = true
-		} else {
-			for _, v := range r.Validation {
-				switch v {
-				case rules.ValidateImages:
-					cr.ValidateImages = true
-					rs.HasImages = true
-				case rules.ValidateVolumes:
-					cr.ValidateVolumes = true
-					rs.HasVolumes = true
-				}
 			}
 		}
 

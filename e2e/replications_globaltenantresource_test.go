@@ -165,6 +165,62 @@ var _ = Describe("GlobalTenantResource", Ordered, Label("replications", "global"
 
 	})
 
+	It("skips applying resources to terminating namespaces and removes them from processedItems", func() {
+		terminatingNamespace := tenantANamespaces[2]
+		releaseNamespace := holdNamespaceTerminating(ctx, terminatingNamespace)
+		defer releaseNamespace()
+
+		gtr := newRawConfigMapGlobalTenantResource("gtr-skip-terminating-namespace", map[string]string{
+			"mode": "active",
+		})
+
+		gtr.Spec.TenantSelector = metav1.LabelSelector{
+			MatchLabels: map[string]string{"energy": "solar"},
+		}
+
+		renameFirstRawConfigMap(gtr, "gtr-skip-terminating")
+
+		EventuallyCreation(func() error {
+			return k8sClient.Create(ctx, gtr)
+		}).Should(Succeed())
+
+		By("verifying non-terminating selected namespaces still receive the resource")
+		for _, ns := range tenantANamespaces[:2] {
+			expectConfigMapData(ns, "gtr-skip-terminating", map[string]string{
+				"mode": "active",
+			})
+		}
+
+		By("verifying the terminating selected namespace is skipped")
+		Consistently(func() error {
+			return k8sClient.Get(ctx, types.NamespacedName{
+				Name:      "gtr-skip-terminating",
+				Namespace: terminatingNamespace,
+			}, &corev1.ConfigMap{})
+		}, 2*resyncPeriod.Duration, defaultPollInterval).Should(HaveOccurred())
+
+		By("verifying non-selected tenants do not receive the resource")
+		for _, ns := range tenantBNamespaces {
+			expectConfigMapAbsent(ns, "gtr-skip-terminating")
+		}
+
+		By("verifying the terminating namespace item is not kept in processedItems")
+		Eventually(func(g Gomega) {
+			current := &capsulev1beta2.GlobalTenantResource{}
+
+			g.Expect(k8sClient.Get(ctx, types.NamespacedName{
+				Name: gtr.Name,
+			}, current)).To(Succeed())
+
+			for _, item := range current.Status.ProcessedItems {
+				g.Expect(item.Name).To(Equal("gtr-skip-terminating"))
+
+				g.Expect(item.Namespace).ToNot(Equal(terminatingNamespace))
+				g.Expect(item.Status).To(Equal(metav1.ConditionTrue))
+			}
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+	})
+
 	It("fails to replicate namespacedItems when the impersonated service account cannot read source resources", func() {
 		saName := "gtr-no-namespaceditem-read"
 		ensureServiceAccount("capsule-system", saName)

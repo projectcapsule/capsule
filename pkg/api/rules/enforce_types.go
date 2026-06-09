@@ -12,7 +12,6 @@ type NamespaceRuleEnforceBody struct {
 	//+kubebuilder:default:=deny
 	Action ActionType `json:"action,omitempty"`
 
-	// Define registries which are allowed to be used within this tenant
-	// The rules are aggregated, since you can use Regular Expressions the match registry endpoints
-	Registries []OCIRegistry `json:"registries,omitempty"`
+	// Enforcement for Workloads (Pods)
+	Workloads NamespaceRuleEnforceWorkloadsBody `json:"workloads,omitempty"`
 }

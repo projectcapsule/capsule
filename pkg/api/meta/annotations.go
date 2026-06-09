@@ -5,6 +5,7 @@ package meta
 
 import (
 	"context"
+	"maps"
 	"strings"
 	"time"
 
@@ -73,6 +74,24 @@ func TriggerRequestReconcileAnnotation(
 
 		return c.Patch(ctx, obj, client.MergeFrom(base))
 	})
+}
+
+func RemoveReconcileTriggerAnnotation(
+	obj client.Object,
+) {
+	annotations := obj.GetAnnotations()
+	if _, ok := annotations[ReconcileAnnotation]; !ok {
+		return
+	}
+
+	annotations = maps.Clone(annotations)
+	delete(annotations, ReconcileAnnotation)
+
+	if len(annotations) == 0 {
+		obj.SetAnnotations(nil)
+	} else {
+		obj.SetAnnotations(annotations)
+	}
 }
 
 func annotationRemove(obj client.Object, anno string) {

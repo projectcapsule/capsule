@@ -95,6 +95,10 @@ func (c *RegexCache) GetOrCompile(expr api.RegExpression) (*CompiledRegex, bool,
 }
 
 func (c *RegexCache) Has(id string) bool {
+	if c == nil {
+		return false
+	}
+
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
@@ -104,6 +108,10 @@ func (c *RegexCache) Has(id string) bool {
 }
 
 func (c *RegexCache) Stats() int {
+	if c == nil {
+		return 0
+	}
+
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
@@ -111,6 +119,10 @@ func (c *RegexCache) Stats() int {
 }
 
 func (c *RegexCache) Reset() {
+	if c == nil {
+		return
+	}
+
 	c.mu.Lock()
 	defer c.mu.Unlock()
 

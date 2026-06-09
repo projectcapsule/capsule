@@ -16,22 +16,9 @@ func (i ImagePullPolicySpec) String() string {
 	return string(i)
 }
 
-// +kubebuilder:validation:Enum=pod/images;pod/volumes
-type RegistryValidationTarget string
-
-const (
-	ValidateImages  RegistryValidationTarget = "pod/images"
-	ValidateVolumes RegistryValidationTarget = "pod/volumes"
-)
-
 // +kubebuilder:object:generate=true
 type OCIRegistry struct {
 	api.RegExpression `json:",inline"`
-
-	// Deprecated: Use exp field
-	//
-	// OCI Registry endpoint, is treated as regular expression.
-	Registry string `json:"url,omitempty"`
 
 	// Allowed PullPolicy for the given registry. Supplying no value allows all policies.
 	// +optional
@@ -39,17 +26,10 @@ type OCIRegistry struct {
 	Policy []corev1.PullPolicy `json:"policy,omitempty"`
 
 	// Requesting Resources
-	//+kubebuilder:default:={pod/images,pod/volumes}
-	Validation []RegistryValidationTarget `json:"validation,omitempty"`
+	// +optional
+	Validation []WorkloadValidationTarget `json:"validation,omitempty"`
 }
 
 func (r OCIRegistry) Expression() api.RegExpression {
-	if r.RegExpression.Expression != "" {
-		return r.RegExpression
-	}
-
-	return api.RegExpression{
-		Expression: r.Registry,
-		Negate:     false,
-	}
+	return r.RegExpression
 }

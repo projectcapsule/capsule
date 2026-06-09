@@ -9,6 +9,71 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api"
 )
 
+func TestCompiledRegexMatchString(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		expression api.RegExpression
+		value      string
+		want       bool
+	}{
+		{
+			name: "normal expression matches matching value",
+			expression: api.RegExpression{
+				Expression: "trusted/.*",
+			},
+			value: "trusted/team/app:1",
+			want:  true,
+		},
+		{
+			name: "normal expression does not match non matching value",
+			expression: api.RegExpression{
+				Expression: "trusted/.*",
+			},
+			value: "docker.io/team/app:1",
+			want:  false,
+		},
+		{
+			name: "negated expression does not match matching value",
+			expression: api.RegExpression{
+				Expression: "trusted/.*",
+				Negate:     true,
+			},
+			value: "trusted/team/app:1",
+			want:  false,
+		},
+		{
+			name: "negated expression matches non matching value",
+			expression: api.RegExpression{
+				Expression: "trusted/.*",
+				Negate:     true,
+			},
+			value: "docker.io/team/app:1",
+			want:  true,
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			cache := NewRegexCache()
+
+			compiled, _, err := cache.GetOrCompile(tt.expression)
+			if err != nil {
+				t.Fatalf("expected no error, got %v", err)
+			}
+
+			if got := compiled.MatchString(tt.value); got != tt.want {
+				t.Fatalf("MatchString() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestRegexCache_GetOrCompile(t *testing.T) {
 	t.Parallel()
 

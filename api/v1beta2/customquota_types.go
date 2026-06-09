@@ -64,6 +64,7 @@ type CustomQuotaSpecSourceConfig struct {
 // +kubebuilder:printcolumn:name="Available",type="string",JSONPath=".status.usage.available",description="The total amount available"
 // +kubebuilder:printcolumn:name="Ready",type="string",JSONPath=".status.conditions[?(@.type==\"Ready\")].status",description="Reconcile Status"
 // +kubebuilder:printcolumn:name="Status",type="string",JSONPath=".status.conditions[?(@.type==\"Ready\")].message",description="Reconcile Message"
+// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp",description="Age"
 
 type CustomQuota struct {
 	metav1.TypeMeta `json:",inline"`

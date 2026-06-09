@@ -48,6 +48,8 @@ func (p *Processor) Reconcile(
 		return true
 	}
 
+	terminatingNamespaces := map[string]bool{}
+
 	for _, i := range *processed {
 		if _, exists := acc[i.GetKey("")]; exists {
 			continue
@@ -136,6 +138,31 @@ func (p *Processor) Reconcile(
 
 		for _, obj := range *item.Objects {
 			fieldOwner := opts.FieldOwnerPrefix + "/" + item.Resource.FieldOwner("")
+
+			terminating, namespace, err := p.isNamespaceTerminatingForObject(ctx, obj.Object, terminatingNamespaces)
+			if err != nil {
+				hadError = true
+				or.Status = metav1.ConditionFalse
+				or.Message = "checking namespace termination failed for item " + obj.Origin.Origin + ": " + err.Error()
+
+				processed.UpdateItem(or)
+
+				continue
+			}
+
+			if terminating {
+				log.V(4).Info(
+					"skipping apply because namespace is terminating",
+					"item", obj.Origin.Origin,
+					"namespace", namespace,
+					"Kind", obj.Object.GetKind(),
+					"Name", obj.Object.GetName(),
+				)
+
+				processed.RemoveItem(or)
+
+				continue
+			}
 
 			ver, created, err := p.Apply(
 				ctx,
@@ -457,4 +484,67 @@ func (r *Processor) handleCreatedMetadata(
 		existingObject.GetNamespace(),
 		existingObject.GetName(),
 	)
+}
+
+func (r *Processor) isNamespaceTerminatingForObject(
+	ctx context.Context,
+	obj *unstructured.Unstructured,
+	cache map[string]bool,
+) (terminating bool, namespace string, err error) {
+	// The Namespace object itself is cluster-scoped, but if Capsule is applying
+	// a Namespace which is already terminating, we should skip it as well.
+	if obj.GroupVersionKind().Group == "" && obj.GetKind() == "Namespace" {
+		namespace = obj.GetName()
+
+		return r.isNamespaceTerminating(ctx, namespace, cache)
+	}
+
+	mapping, err := r.Mapper.RESTMapping(
+		obj.GroupVersionKind().GroupKind(),
+		obj.GroupVersionKind().Version,
+	)
+	if err != nil {
+		return false, "", err
+	}
+
+	if mapping.Scope.Name() != k8smeta.RESTScopeNameNamespace {
+		return false, "", nil
+	}
+
+	namespace = obj.GetNamespace()
+	if namespace == "" {
+		return false, "", nil
+	}
+
+	return r.isNamespaceTerminating(ctx, namespace, cache)
+}
+
+func (r *Processor) isNamespaceTerminating(
+	ctx context.Context,
+	namespace string,
+	cache map[string]bool,
+) (bool, string, error) {
+	if namespace == "" {
+		return false, namespace, nil
+	}
+
+	if terminating, ok := cache[namespace]; ok {
+		return terminating, namespace, nil
+	}
+
+	ns := &corev1.Namespace{}
+	if err := r.GatherClient.Get(ctx, types.NamespacedName{Name: namespace}, ns); err != nil {
+		if apierrors.IsNotFound(err) {
+			cache[namespace] = true
+
+			return true, namespace, nil
+		}
+
+		return false, namespace, err
+	}
+
+	terminating := ns.DeletionTimestamp != nil || ns.Status.Phase == corev1.NamespaceTerminating
+	cache[namespace] = terminating
+
+	return terminating, namespace, nil
 }

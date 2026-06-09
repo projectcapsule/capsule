@@ -134,6 +134,79 @@ var _ = Describe("TenantResource SSA", Ordered, Label("replications", "namespace
 		})
 	})
 
+	It("skips applying resources to terminating namespaces and removes them from processedItems", func() {
+		terminatingNamespace := targetNamespaces[2]
+		releaseNamespace := holdNamespaceTerminating(ctx, terminatingNamespace)
+		defer releaseNamespace()
+
+		tr := &capsulev1beta2.TenantResource{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "skip-terminating-namespace",
+				Namespace: baseNamespace,
+			},
+			Spec: capsulev1beta2.TenantResourceSpec{
+				TenantResourceCommonSpec: capsulev1beta2.TenantResourceCommonSpec{
+					PruningOnDelete: ptr.To(true),
+					ResyncPeriod:    metav1.Duration{Duration: 5 * time.Second},
+					Resources: []capsulev1beta2.ResourceSpec{{
+						RawItems: []capsulev1beta2.RawExtension{{
+							RawExtension: runtime.RawExtension{
+								Object: &corev1.ConfigMap{
+									TypeMeta: metav1.TypeMeta{
+										APIVersion: "v1",
+										Kind:       "ConfigMap",
+									},
+									ObjectMeta: metav1.ObjectMeta{
+										Name: "tr-skip-terminating",
+									},
+									Data: map[string]string{
+										"mode": "active",
+									},
+								},
+							},
+						}},
+					}},
+				},
+			},
+		}
+
+		EventuallyCreation(func() error {
+			return k8sClient.Create(ctx, tr)
+		}).Should(Succeed())
+
+		By("verifying non-terminating namespaces still receive the resource")
+		for _, ns := range targetNamespaces[:2] {
+			expectConfigMapData(ns, "tr-skip-terminating", map[string]string{
+				"mode": "active",
+			})
+		}
+
+		By("verifying the terminating namespace is skipped")
+		Consistently(func() error {
+			return k8sClient.Get(ctx, types.NamespacedName{
+				Name:      "tr-skip-terminating",
+				Namespace: terminatingNamespace,
+			}, &corev1.ConfigMap{})
+		}, 2*resyncPeriod.Duration, defaultPollInterval).Should(HaveOccurred())
+
+		By("verifying the terminating namespace item is not kept in processedItems")
+		Eventually(func(g Gomega) {
+			current := &capsulev1beta2.TenantResource{}
+
+			g.Expect(k8sClient.Get(ctx, types.NamespacedName{
+				Name:      tr.Name,
+				Namespace: tr.Namespace,
+			}, current)).To(Succeed())
+
+			for _, item := range current.Status.ProcessedItems {
+				g.Expect(item.Name).To(Equal("tr-skip-terminating"))
+
+				g.Expect(item.Namespace).ToNot(Equal(terminatingNamespace))
+				g.Expect(item.Status).To(Equal(metav1.ConditionTrue))
+			}
+		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+	})
+
 	Context("generators and template context", func() {
 
 		It("fails when a templated namespace resolves to a forbidden namespace", func() {
