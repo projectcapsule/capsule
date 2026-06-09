@@ -15,7 +15,7 @@ import (
 )
 
 type LabeledEvent struct {
-	recorder *EventRecorder
+	recorder *eventRecorder
 
 	regarding runtime.Object
 	related   runtime.Object
@@ -29,7 +29,7 @@ type LabeledEvent struct {
 	annotations map[string]string
 }
 
-func (r *EventRecorder) LabeledEvent(
+func (r *eventRecorder) LabeledEvent(
 	regarding runtime.Object,
 	eventType string,
 	reason string,

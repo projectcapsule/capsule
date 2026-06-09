@@ -24,7 +24,12 @@ const (
 	ReportingInstance   = "capsule-admission"
 )
 
-type EventRecorder struct {
+type EventRecorder interface {
+	k8sevents.EventRecorder
+	LabeledEvent(regarding runtime.Object, eventType string, reason string, action string, note string) *LabeledEvent
+}
+
+type eventRecorder struct {
 	k8sevents.EventRecorder
 
 	client        client.Client
@@ -37,8 +42,8 @@ func NewEventRecorder(
 	log logr.Logger,
 	recorder k8sevents.EventRecorder,
 	configuration configuration.Configuration,
-) *EventRecorder {
-	return &EventRecorder{
+) EventRecorder {
+	return &eventRecorder{
 		EventRecorder: recorder,
 		client:        c,
 		log:           log.WithName("event-recorder"),
@@ -46,7 +51,7 @@ func NewEventRecorder(
 	}
 }
 
-func (r *EventRecorder) emitLabeledEvent(
+func (r *eventRecorder) emitLabeledEvent(
 	ctx context.Context,
 	e *LabeledEvent,
 ) {

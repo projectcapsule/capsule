@@ -1,0 +1,281 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.21.0
+  name: breakrequests.capsule.clastix.io
+spec:
+  group: capsule.clastix.io
+  names:
+    kind: BreakRequest
+    listKind: BreakRequestList
+    plural: breakrequests
+    singular: breakrequest
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.reason
+      name: Reason
+      type: date
+    - jsonPath: .status.review.verdict
+      name: Verdict
+      type: string
+    - jsonPath: .status.duration
+      name: ActiveFrom
+      priority: 10
+      type: string
+    - jsonPath: .status.activeUntil
+      name: Duration
+      priority: 10
+      type: string
+    - jsonPath: .status.activeFrom
+      name: ActiveUntil
+      priority: 10
+      type: string
+    - jsonPath: .status.phase
+      name: Phase
+      type: string
+    name: v1beta2
+    schema:
+      openAPIV3Schema:
+        description: BreakRequest is the Schema for the BreakRequests API.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: BreakRequestSpec defines the desired state of BreakRequest.
+            properties:
+              duration:
+                description: |-
+                  The duration of this BreakRequest should be valid for.
+                  If no duration was defined, the lifecycle is bound to the request itself -
+                  if the request is deleted, it's the end of the duration.
+                  The Request can also be Terminated by another automation via calling the ExpireRequest() API-Function.
+                type: string
+              params:
+                additionalProperties:
+                  type: object
+                  x-kubernetes-preserve-unknown-fields: true
+                description: Params the parameters to use for the template.
+                type: object
+              reason:
+                description: A reason on why the request is needed
+                type: string
+              requestor:
+                description: Requesting actor for the access request.
+                properties:
+                  name:
+                    description: The name of the entity
+                    type: string
+                  type:
+                    description: The type of the entity
+                    enum:
+                    - User
+                    - Group
+                    - System
+                    type: string
+                type: object
+              startTime:
+                description: |-
+                  Optional point in time when the access should begin. Must be in the future.
+                  If omitted, this is set to the current time. The Request must already be approved before the start time.
+                format: date-time
+                type: string
+              templateName:
+                description: TemplateName the name of the template to use for this
+                  request
+                type: string
+            required:
+            - templateName
+            type: object
+          status:
+            description: BreakRequestStatus defines the observed state of BreakRequest.
+            properties:
+              active:
+                description: Shows timestamps between approval and termination of
+                  the request.
+                properties:
+                  from:
+                    format: date-time
+                    type: string
+                  until:
+                    format: date-time
+                    type: string
+                type: object
+              approved:
+                description: The Approved properties are set when the request is approved.
+                properties:
+                  duration:
+                    type: string
+                  items:
+                    additionalProperties:
+                      type: object
+                      x-kubernetes-preserve-unknown-fields: true
+                    description: Items maps rendered items by name.
+                    type: object
+                  keepFor:
+                    pattern: ^(([0-9]+(\.[0-9]+)?)+(m|h|d|w))+$
+                    type: string
+                  startTime:
+                    format: date-time
+                    type: string
+                type: object
+              conditions:
+                description: |-
+                  Conditions applied to the request.
+                  Known conditions are "Requested", "Pending", "Denied", "Approved", "Active" and "Expired".
+                  The latest condition is reflected in the phase.
+                items:
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+              keepUntil:
+                description: The time when the request was created.
+                format: date-time
+                type: string
+              phase:
+                enum:
+                - Requested
+                - Pending
+                - Denied
+                - Approved
+                - Active
+                - Expired
+                type: string
+              review:
+                description: Review refers to the subject that either approved or
+                  denied the request
+                properties:
+                  message:
+                    description: Message with the review
+                    type: string
+                  reviewer:
+                    description: The Entity reviewing this request
+                    properties:
+                      name:
+                        description: The name of the entity
+                        type: string
+                      type:
+                        description: The type of the entity
+                        enum:
+                        - User
+                        - Group
+                        - System
+                        type: string
+                    type: object
+                  verdict:
+                    description: The verdict made by the reviewing entity
+                    enum:
+                    - Pending
+                    - Denied
+                    - Approved
+                    type: string
+                type: object
+              template:
+                description: Template properties copied from the assigned template
+                properties:
+                  defaultDuration:
+                    description: The default duration of the BreakRequest referencing
+                      this template should be valid for.
+                    type: string
+                  keepFor:
+                    description: |-
+                      The duration of this BreakRequest will be kept in the system after it has been expired (eg. auditing purposes)
+                      If not set, the BreakRequest will be deleted after expiring.
+                    pattern: ^(([0-9]+(\.[0-9]+)?)+(m|h|d|w))+$
+                    type: string
+                  maxDuration:
+                    description: The max allowed duration of the BreakRequest referencing
+                      this template should be valid for.
+                    type: string
+                  templateItems:
+                    additionalProperties:
+                      description: TemplateItem defines an item to be applied by a
+                        break request.
+                      properties:
+                        manifestTemplate:
+                          type: object
+                          x-kubernetes-preserve-unknown-fields: true
+                        paramSchema:
+                          type: object
+                          x-kubernetes-preserve-unknown-fields: true
+                      required:
+                      - manifestTemplate
+                      type: object
+                    description: The items that are created by this request, provided
+                      by the template.
+                    type: object
+                type: object
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
