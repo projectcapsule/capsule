@@ -49,9 +49,7 @@ all: manager
 # Run tests
 .PHONY: test
 test: test-clean generate manifests test-clean
-	@set -o pipefail; \
-	GO111MODULE=on go test -race -v $$(go list ./... | grep -v "e2e") -coverprofile coverage.out 2>&1 | \
-	grep -E "^(--- FAIL:|FAIL[[:space:]]|panic:|[[:space:]]+[a-zA-Z0-9_./-]+_test.go:[0-9]+:)" || true
+	@GO111MODULE=on go test -race -v $(shell go list ./... | grep -v "e2e") -coverprofile coverage.out
 
 .PHONY: test-clean
 test-clean: ## Clean tests cache

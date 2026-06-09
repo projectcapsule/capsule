@@ -144,18 +144,6 @@ func positiveResource(resources corev1.ResourceList, name corev1.ResourceName) (
 	return quantity, true
 }
 
-func addResource(resources corev1.ResourceList, name corev1.ResourceName, quantity resource.Quantity) {
-	current, ok := resources[name]
-	if !ok {
-		resources[name] = quantity.DeepCopy()
-
-		return
-	}
-
-	current.Add(quantity)
-	resources[name] = current
-}
-
 //nolint:exhaustive
 func isSupportedQoSComputeResource(name corev1.ResourceName) bool {
 	switch name {
