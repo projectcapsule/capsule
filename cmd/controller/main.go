@@ -44,6 +44,7 @@ import (
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/internal/cache"
 	"github.com/projectcapsule/capsule/internal/controllers/admission"
+	breaktheglasscontroller "github.com/projectcapsule/capsule/internal/controllers/breaktheglass"
 	cacheinvalidator "github.com/projectcapsule/capsule/internal/controllers/cfg/invalidator"
 	configcontroller "github.com/projectcapsule/capsule/internal/controllers/cfg/status"
 	customquotacontroller "github.com/projectcapsule/capsule/internal/controllers/customquotas"
@@ -61,6 +62,7 @@ import (
 	"github.com/projectcapsule/capsule/internal/metrics"
 	capsuleversion "github.com/projectcapsule/capsule/internal/version"
 	"github.com/projectcapsule/capsule/internal/webhook"
+	"github.com/projectcapsule/capsule/internal/webhook/breaktheglass"
 	cfgvalidation "github.com/projectcapsule/capsule/internal/webhook/cfg"
 	customquotavalidation "github.com/projectcapsule/capsule/internal/webhook/customquota"
 	"github.com/projectcapsule/capsule/internal/webhook/defaults"
@@ -802,6 +804,8 @@ func main() {
 			),
 		),
 		route.RulesValidating(manager.GetRESTMapper(), cfg),
+		route.BreakRequestValidation(breaktheglass.BreakRequestValidationHandler(ctrl.Log.WithName("webhooks").WithName("breakrequests"))),
+		route.BreakRequestTemplateValidation(breaktheglass.BreakRequestTemplateValidationHandler(ctrl.Log.WithName("webhooks").WithName("breakrequesttemplates"))),
 	)
 
 	nodeWebhookSupported, _ := utils.NodeWebhookSupported(kubeVersion)
@@ -892,6 +896,14 @@ func main() {
 		Metrics: metrics.MustMakeRuleStatusRecorder(),
 	}).SetupWithManager(manager, controllerConfig); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "RuleSet")
+		os.Exit(1)
+	}
+
+	if err = (&breaktheglasscontroller.BreakRequestReconciler{
+		Log:     ctrl.Log.WithName("capsule.ctrl").WithName("breakrequest"),
+		Metrics: *metrics.MustMakeBreakRequestsRecorder(),
+	}).SetupWithManager(manager, controllerConfig); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "BreakRequestReconciler")
 		os.Exit(1)
 	}
 
