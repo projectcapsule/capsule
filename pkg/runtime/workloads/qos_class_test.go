@@ -416,6 +416,38 @@ func TestGetPodQoSClass(t *testing.T) {
 			},
 			want: corev1.PodQOSGuaranteed,
 		},
+		{
+			name: "mismatched container requests/limits are Burstable even if totals match",
+			pod: &corev1.Pod{
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						containerWithResources(
+							"a",
+							corev1.ResourceList{
+								corev1.ResourceCPU:    resource.MustParse("100m"),
+								corev1.ResourceMemory: resource.MustParse("128Mi"),
+							},
+							corev1.ResourceList{
+								corev1.ResourceCPU:    resource.MustParse("200m"),
+								corev1.ResourceMemory: resource.MustParse("128Mi"),
+							},
+						),
+						containerWithResources(
+							"b",
+							corev1.ResourceList{
+								corev1.ResourceCPU:    resource.MustParse("200m"),
+								corev1.ResourceMemory: resource.MustParse("128Mi"),
+							},
+							corev1.ResourceList{
+								corev1.ResourceCPU:    resource.MustParse("100m"),
+								corev1.ResourceMemory: resource.MustParse("128Mi"),
+							},
+						),
+					},
+				},
+			},
+			want: corev1.PodQOSBurstable,
+		},
 	}
 
 	for _, tt := range tests {

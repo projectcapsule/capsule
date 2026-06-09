@@ -25,5 +25,5 @@ type NamespaceRuleBodyTenant struct {
 
 	// Permissions for given rule
 	//+optional
-	Permissions NamespaceRulePermissionBody `json:"permissions,omitzero"`
+	Permissions NamespaceRulePermissionBody `json:"permissions,omitempty"`
 }

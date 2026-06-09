@@ -64,8 +64,11 @@ func computePodLevelQoSClass(pod *corev1.Pod) (corev1.PodQOSClass, bool) {
 }
 
 func computeContainerLevelQoSClass(pod *corev1.Pod) corev1.PodQOSClass {
-	requests := corev1.ResourceList{}
-	limits := corev1.ResourceList{}
+	if pod == nil {
+		return corev1.PodQOSBestEffort
+	}
+
+	hasSupportedRequestOrLimit := false
 	isGuaranteed := true
 
 	containers := make([]corev1.Container, 0,
@@ -84,52 +87,38 @@ func computeContainerLevelQoSClass(pod *corev1.Pod) corev1.PodQOSClass {
 		})
 	}
 
+	if len(containers) == 0 {
+		return corev1.PodQOSBestEffort
+	}
+
 	for _, container := range containers {
-		containerLimitsFound := map[corev1.ResourceName]struct{}{}
+		requests := container.Resources.Requests
+		limits := container.Resources.Limits
 
-		for name, quantity := range container.Resources.Requests {
-			if !isSupportedQoSComputeResource(name) || quantity.Sign() <= 0 {
-				continue
-			}
+		cpuRequest, hasCPURequest := positiveResource(requests, corev1.ResourceCPU)
+		memoryRequest, hasMemoryRequest := positiveResource(requests, corev1.ResourceMemory)
+		cpuLimit, hasCPULimit := positiveResource(limits, corev1.ResourceCPU)
+		memoryLimit, hasMemoryLimit := positiveResource(limits, corev1.ResourceMemory)
 
-			addResource(requests, name, quantity)
+		if hasCPURequest || hasMemoryRequest || hasCPULimit || hasMemoryLimit {
+			hasSupportedRequestOrLimit = true
 		}
 
-		for name, quantity := range container.Resources.Limits {
-			if !isSupportedQoSComputeResource(name) || quantity.Sign() <= 0 {
-				continue
-			}
-
-			containerLimitsFound[name] = struct{}{}
-
-			addResource(limits, name, quantity)
-		}
-
-		if _, ok := containerLimitsFound[corev1.ResourceCPU]; !ok {
-			isGuaranteed = false
-		}
-
-		if _, ok := containerLimitsFound[corev1.ResourceMemory]; !ok {
+		if !hasCPURequest ||
+			!hasMemoryRequest ||
+			!hasCPULimit ||
+			!hasMemoryLimit ||
+			cpuRequest.Cmp(cpuLimit) != 0 ||
+			memoryRequest.Cmp(memoryLimit) != 0 {
 			isGuaranteed = false
 		}
 	}
 
-	if len(requests) == 0 && len(limits) == 0 {
+	if !hasSupportedRequestOrLimit {
 		return corev1.PodQOSBestEffort
 	}
 
 	if isGuaranteed {
-		for name, request := range requests {
-			limit, ok := limits[name]
-			if !ok || request.Cmp(limit) != 0 {
-				isGuaranteed = false
-
-				break
-			}
-		}
-	}
-
-	if isGuaranteed && len(requests) == len(limits) {
 		return corev1.PodQOSGuaranteed
 	}
 
