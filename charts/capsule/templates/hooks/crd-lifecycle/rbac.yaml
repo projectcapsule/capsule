@@ -39,6 +39,8 @@ rules:
   - globalcustomquotas.capsule.clastix.io
   - globalresourcequotas.capsule.clastix.io
   - quantityledgers.capsule.clastix.io
+  - breakrequests.capsule.clastix.io
+  - breakrequesttemplates.capsule.clastix.io
   verbs:
   - create
   - delete
