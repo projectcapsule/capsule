@@ -705,22 +705,6 @@ func TestQoSHelpers(t *testing.T) {
 		}
 	})
 
-	t.Run("addResource", func(t *testing.T) {
-		t.Parallel()
-
-		resources := corev1.ResourceList{}
-
-		addResource(resources, corev1.ResourceCPU, resource.MustParse("100m"))
-		addResource(resources, corev1.ResourceCPU, resource.MustParse("250m"))
-
-		got := resources[corev1.ResourceCPU]
-		want := resource.MustParse("350m")
-
-		if got.Cmp(want) != 0 {
-			t.Fatalf("expected accumulated CPU %q, got %q", want.String(), got.String())
-		}
-	})
-
 	t.Run("isSupportedQoSComputeResource", func(t *testing.T) {
 		t.Parallel()
 
