@@ -176,6 +176,10 @@ rules:
   - globalcustomquotas/status
   - quantityledgers
   - quantityledgers/status
+  - breakrequests
+  - breakrequests/status
+  - breakrequesttemplates
+  - breakrequesttemplates/status
   verbs:
   - create
   - delete
@@ -204,6 +208,8 @@ rules:
   - tenants.capsule.clastix.io
   - tenantowners.capsule.clastix.io
   - rulestatuses.capsule.clastix.io
+  - breakrequests.capsule.clastix.io
+  - breakrequesttemplates.capsule.clastix.io
   verbs:
   - get
   - patch

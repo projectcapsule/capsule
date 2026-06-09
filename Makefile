@@ -48,7 +48,7 @@ all: manager
 
 # Run tests
 .PHONY: test
-test: test-clean generate manifests test-clean
+test: test-clean generate manifests mocks setup-envtest test-clean
 	@GO111MODULE=on go test -race -v $(shell go list ./... | grep -v "e2e") -coverprofile coverage.out
 
 .PHONY: test-clean
@@ -433,6 +433,11 @@ golint: golangci-lint
 golint-fix: golangci-lint
 	$(GOLANGCI_LINT) run -c .golangci.yaml --verbose --fix
 
+# generate mocks
+.PHONY: mocks
+mocks: mockgen
+	$(MOCKGEN) -destination internal/mocks/client/mock.go sigs.k8s.io/controller-runtime/pkg/client Client,SubResourceWriter,Reader
+
 .PHONY: e2e-openshift
 e2e-openshift: ginkgo
 	$(MAKE) e2e-build-openshift && $(MAKE) e2e-exec FILTER='&& !skip && !skip-on-openshift' && $(MAKE) e2e-destroy-openshift
@@ -666,6 +671,13 @@ apidocs-gen: ## Download crdoc locally if necessary.
 	@test -s $(APIDOCS_GEN) && $(APIDOCS_GEN) --version | grep -q $(APIDOCS_GEN_VERSION) || \
 	$(call go-install-tool,$(APIDOCS_GEN),fybrik.io/crdoc@$(APIDOCS_GEN_VERSION))
 
+MOCKGEN         := $(LOCALBIN)/mockgen
+MOCKGEN_VERSION := v0.6.0
+MOCKGEN_LOOKUP  := go.uber.org/mock/mockgen
+mockgen:
+	@test -s $(MOCKGEN) && $(MOCKGEN) -version | grep -q $(MOCKGEN_VERSION) || \
+	$(call go-install-tool,$(MOCKGEN),$(MOCKGEN_LOOKUP)@$(MOCKGEN_VERSION))
+
 GORELEASER          := $(LOCALBIN)/goreleaser
 GORELEASER_VERSION  := 2.16.0
 GORELEASER_LOOKUP   := goreleaser/goreleaser
@@ -679,6 +691,20 @@ SYFT_LOOKUP   := anchore/syft
 syft: ## Download syft locally if necessary.
 		test -s $(SYFT) && $(SYFT) --version | grep -q $(SYFT_VERSION) ||  \
 	$(call go-install-tool,$(SYFT),github.com/$(SYFT_LOOKUP)/cmd/syft@v$(SYFT_VERSION))
+
+ENVTEST             ?= $(LOCALBIN)/setup-envtest
+ENVTEST_VERSION     ?= $(shell go list -m -f "{{ .Version }}" sigs.k8s.io/controller-runtime | awk -F'[v.]' '{printf "release-%d.%d", $$2, $$3}')
+ENVTEST_K8S_VERSION ?= $(shell go list -m -f "{{ .Version }}" k8s.io/api | awk -F'[v.]' '{printf "1.%d", $$3}')
+envtest:
+	$(call go-install-tool,$(ENVTEST),sigs.k8s.io/controller-runtime/tools/setup-envtest@$(ENVTEST_VERSION))
+
+.PHONY: setup-envtest
+setup-envtest: envtest ## Download the binaries required for ENVTEST in the local bin directory.
+	@echo "Setting up envtest binaries for Kubernetes version $(ENVTEST_K8S_VERSION)..."
+	@$(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path || { \
+		echo "Error: Failed to set up envtest binaries for version $(ENVTEST_K8S_VERSION)."; \
+		exit 1; \
+	}
 
 HARPOON         := $(LOCALBIN)/harpoon
 HARPOON_VERSION := v0.10.2
