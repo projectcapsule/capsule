@@ -12,7 +12,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
-	"github.com/projectcapsule/capsule/api/v1beta2"
+	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 )
 
@@ -21,7 +21,7 @@ func TestGetClaimFromStatus(t *testing.T) {
 	testUID := types.UID("test-uid")
 	otherUID := types.UID("wrong-uid")
 
-	claim := &v1beta2.ResourcePoolClaim{
+	claim := &capsulev1beta2.ResourcePoolClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "claim-a",
 			Namespace: ns,
@@ -29,11 +29,11 @@ func TestGetClaimFromStatus(t *testing.T) {
 		},
 	}
 
-	pool := &v1beta2.ResourcePool{
-		Status: v1beta2.ResourcePoolStatus{
-			Claims: v1beta2.ResourcePoolNamespaceClaimsStatus{
+	pool := &capsulev1beta2.ResourcePool{
+		Status: capsulev1beta2.ResourcePoolStatus{
+			Claims: capsulev1beta2.ResourcePoolNamespaceClaimsStatus{
 				ns: {
-					&v1beta2.ResourcePoolClaimsItem{
+					&capsulev1beta2.ResourcePoolClaimsItem{
 						NamespacedRFC1123ObjectReferenceWithNamespaceWithUID: meta.NamespacedRFC1123ObjectReferenceWithNamespaceWithUID{
 							UID: testUID,
 						},
@@ -77,21 +77,21 @@ func makeResourceList(cpu, memory string) corev1.ResourceList {
 	}
 }
 
-func makeClaim(name, ns string, uid types.UID, res corev1.ResourceList) *v1beta2.ResourcePoolClaim {
-	return &v1beta2.ResourcePoolClaim{
+func makeClaim(name, ns string, uid types.UID, res corev1.ResourceList) *capsulev1beta2.ResourcePoolClaim {
+	return &capsulev1beta2.ResourcePoolClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: ns,
 			UID:       uid,
 		},
-		Spec: v1beta2.ResourcePoolClaimSpec{
+		Spec: capsulev1beta2.ResourcePoolClaimSpec{
 			ResourceClaims: res,
 		},
 	}
 }
 
 func TestAssignNamespaces(t *testing.T) {
-	pool := &v1beta2.ResourcePool{}
+	pool := &capsulev1beta2.ResourcePool{}
 
 	namespaces := []corev1.Namespace{
 		{ObjectMeta: metav1.ObjectMeta{Name: "active-ns"}, Status: corev1.NamespaceStatus{Phase: corev1.NamespaceActive}},
@@ -105,12 +105,12 @@ func TestAssignNamespaces(t *testing.T) {
 }
 
 func TestAssignClaims(t *testing.T) {
-	pool := &v1beta2.ResourcePool{
-		Status: v1beta2.ResourcePoolStatus{
-			Claims: v1beta2.ResourcePoolNamespaceClaimsStatus{
+	pool := &capsulev1beta2.ResourcePool{
+		Status: capsulev1beta2.ResourcePoolStatus{
+			Claims: capsulev1beta2.ResourcePoolNamespaceClaimsStatus{
 				"ns": {
-					&v1beta2.ResourcePoolClaimsItem{},
-					&v1beta2.ResourcePoolClaimsItem{},
+					&capsulev1beta2.ResourcePoolClaimsItem{},
+					&capsulev1beta2.ResourcePoolClaimsItem{},
 				},
 			},
 		},
@@ -121,7 +121,7 @@ func TestAssignClaims(t *testing.T) {
 }
 
 func TestAddRemoveClaimToStatus(t *testing.T) {
-	pool := &v1beta2.ResourcePool{}
+	pool := &capsulev1beta2.ResourcePool{}
 
 	claim := makeClaim("claim-1", "ns", "uid-1", makeResourceList("1", "1Gi"))
 	pool.AddClaimToStatus(claim)
@@ -136,16 +136,16 @@ func TestAddRemoveClaimToStatus(t *testing.T) {
 }
 
 func TestCalculateResources(t *testing.T) {
-	pool := &v1beta2.ResourcePool{
-		Status: v1beta2.ResourcePoolStatus{
-			Allocation: v1beta2.ResourcePoolQuotaStatus{
+	pool := &capsulev1beta2.ResourcePool{
+		Status: capsulev1beta2.ResourcePoolStatus{
+			Allocation: capsulev1beta2.ResourcePoolQuotaStatus{
 				Hard: corev1.ResourceList{
 					corev1.ResourceLimitsCPU: resource.MustParse("2"),
 				},
 			},
-			Claims: v1beta2.ResourcePoolNamespaceClaimsStatus{
+			Claims: capsulev1beta2.ResourcePoolNamespaceClaimsStatus{
 				"ns": {
-					&v1beta2.ResourcePoolClaimsItem{
+					&capsulev1beta2.ResourcePoolClaimsItem{
 						Claims: corev1.ResourceList{
 							corev1.ResourceLimitsCPU: resource.MustParse("1"),
 						},
@@ -165,9 +165,9 @@ func TestCalculateResources(t *testing.T) {
 }
 
 func TestCanClaimFromPool(t *testing.T) {
-	pool := &v1beta2.ResourcePool{
-		Status: v1beta2.ResourcePoolStatus{
-			Allocation: v1beta2.ResourcePoolQuotaStatus{
+	pool := &capsulev1beta2.ResourcePool{
+		Status: capsulev1beta2.ResourcePoolStatus{
+			Allocation: capsulev1beta2.ResourcePoolQuotaStatus{
 				Hard: corev1.ResourceList{
 					corev1.ResourceLimitsMemory: resource.MustParse("1Gi"),
 				},
@@ -190,16 +190,16 @@ func TestCanClaimFromPool(t *testing.T) {
 }
 
 func TestGetResourceQuotaHardResources(t *testing.T) {
-	pool := &v1beta2.ResourcePool{
-		Spec: v1beta2.ResourcePoolSpec{
+	pool := &capsulev1beta2.ResourcePool{
+		Spec: capsulev1beta2.ResourcePoolSpec{
 			Defaults: corev1.ResourceList{
 				corev1.ResourceLimitsCPU: resource.MustParse("1"),
 			},
 		},
-		Status: v1beta2.ResourcePoolStatus{
-			Claims: v1beta2.ResourcePoolNamespaceClaimsStatus{
+		Status: capsulev1beta2.ResourcePoolStatus{
+			Claims: capsulev1beta2.ResourcePoolNamespaceClaimsStatus{
 				"ns": {
-					&v1beta2.ResourcePoolClaimsItem{
+					&capsulev1beta2.ResourcePoolClaimsItem{
 						Claims: corev1.ResourceList{
 							corev1.ResourceLimitsCPU: resource.MustParse("1"),
 						},
@@ -215,11 +215,11 @@ func TestGetResourceQuotaHardResources(t *testing.T) {
 }
 
 func TestGetNamespaceClaims(t *testing.T) {
-	pool := &v1beta2.ResourcePool{
-		Status: v1beta2.ResourcePoolStatus{
-			Claims: v1beta2.ResourcePoolNamespaceClaimsStatus{
+	pool := &capsulev1beta2.ResourcePool{
+		Status: capsulev1beta2.ResourcePoolStatus{
+			Claims: capsulev1beta2.ResourcePoolNamespaceClaimsStatus{
 				"ns": {
-					&v1beta2.ResourcePoolClaimsItem{
+					&capsulev1beta2.ResourcePoolClaimsItem{
 						NamespacedRFC1123ObjectReferenceWithNamespaceWithUID: meta.NamespacedRFC1123ObjectReferenceWithNamespaceWithUID{UID: "uid1"},
 						Claims: corev1.ResourceList{
 							corev1.ResourceLimitsCPU: resource.MustParse("1"),
@@ -237,11 +237,11 @@ func TestGetNamespaceClaims(t *testing.T) {
 }
 
 func TestGetClaimedByNamespaceClaims(t *testing.T) {
-	pool := &v1beta2.ResourcePool{
-		Status: v1beta2.ResourcePoolStatus{
-			Claims: v1beta2.ResourcePoolNamespaceClaimsStatus{
+	pool := &capsulev1beta2.ResourcePool{
+		Status: capsulev1beta2.ResourcePoolStatus{
+			Claims: capsulev1beta2.ResourcePoolNamespaceClaimsStatus{
 				"ns1": {
-					&v1beta2.ResourcePoolClaimsItem{
+					&capsulev1beta2.ResourcePoolClaimsItem{
 						Claims: makeResourceList("1", "1Gi"),
 					},
 				},
@@ -259,8 +259,8 @@ func TestGetClaimedByNamespaceClaims(t *testing.T) {
 
 func TestIsBoundToResourcePool_2(t *testing.T) {
 	t.Run("bound to resource pool (Assigned=True)", func(t *testing.T) {
-		claim := &v1beta2.ResourcePoolClaim{
-			Status: v1beta2.ResourcePoolClaimStatus{
+		claim := &capsulev1beta2.ResourcePoolClaim{
+			Status: capsulev1beta2.ResourcePoolClaimStatus{
 				Conditions: meta.ConditionList{},
 			},
 		}
@@ -269,8 +269,8 @@ func TestIsBoundToResourcePool_2(t *testing.T) {
 	})
 
 	t.Run("not bound - wrong condition type", func(t *testing.T) {
-		claim := &v1beta2.ResourcePoolClaim{
-			Status: v1beta2.ResourcePoolClaimStatus{
+		claim := &capsulev1beta2.ResourcePoolClaim{
+			Status: capsulev1beta2.ResourcePoolClaimStatus{
 				Conditions: meta.ConditionList{
 					meta.Condition{},
 				},
@@ -285,8 +285,8 @@ func TestIsBoundToResourcePool_2(t *testing.T) {
 	})
 
 	t.Run("not bound - condition not true", func(t *testing.T) {
-		claim := &v1beta2.ResourcePoolClaim{
-			Status: v1beta2.ResourcePoolClaimStatus{
+		claim := &capsulev1beta2.ResourcePoolClaim{
+			Status: capsulev1beta2.ResourcePoolClaimStatus{
 				Conditions: meta.ConditionList{
 					meta.Condition{},
 				},
@@ -301,8 +301,8 @@ func TestIsBoundToResourcePool_2(t *testing.T) {
 	})
 
 	t.Run("not bound - condition not true", func(t *testing.T) {
-		claim := &v1beta2.ResourcePoolClaim{
-			Status: v1beta2.ResourcePoolClaimStatus{
+		claim := &capsulev1beta2.ResourcePoolClaim{
+			Status: capsulev1beta2.ResourcePoolClaimStatus{
 				Conditions: meta.ConditionList{
 					meta.Condition{},
 				},

@@ -369,12 +369,12 @@ ifdef VERSION
 KO_TAGS         := $(KO_TAGS),$(VERSION)
 endif
 
-LD_FLAGS        := "-X main.Version=$(VERSION) \
-					-X main.GitCommit=$(GIT_HEAD_COMMIT) \
-					-X main.GitTag=$(VERSION) \
-					-X main.GitDirty=$(GIT_MODIFIED) \
-					-X main.BuildTime=$(BUILD_DATE) \
-					-X main.GitRepo=$(GIT_REPO)"
+LD_FLAGS        := "-X github.com/projectcapsule/capsule/internal/version.Version=$(VERSION) \
+					-X github.com/projectcapsule/capsule/internal/version.GitCommit=$(GIT_HEAD_COMMIT) \
+					-X github.com/projectcapsule/capsule/internal/version.GitTag=$(VERSION) \
+					-X github.com/projectcapsule/capsule/internal/version.GitDirty=$(GIT_MODIFIED) \
+					-X github.com/projectcapsule/capsule/internal/version.BuildTime=$(BUILD_DATE) \
+					-X github.com/projectcapsule/capsule/internal/version.GitRepo=$(GIT_REPO)"
 
 # Docker Image Build
 # ------------------
@@ -383,7 +383,7 @@ LD_FLAGS        := "-X main.Version=$(VERSION) \
 ko-build-capsule: ko
 	@echo Building Capsule $(KO_TAGS) for $(KO_PLATFORM) >&2
 	@LD_FLAGS=$(LD_FLAGS) KOCACHE=$(KOCACHE) KO_DOCKER_REPO=$(CAPSULE_IMG) \
-		$(KO) build ./cmd/ --bare --tags=$(KO_TAGS) --push=false --local --platform=$(KO_PLATFORM)
+		$(KO) build ./cmd/controller/ --bare --tags=$(KO_TAGS) --push=false --local --platform=$(KO_PLATFORM)
 
 .PHONY: ko-build-all
 ko-build-all: ko-build-capsule
@@ -409,10 +409,15 @@ ko-login: ko
 .PHONY: ko-publish-capsule
 ko-publish-capsule: ko-login ## Build and publish kyvernopre image (with ko)
 	@LD_FLAGS=$(LD_FLAGS) KOCACHE=$(KOCACHE) KO_DOCKER_REPO=$(CAPSULE_IMG) \
-		$(KO) build ./cmd/ --bare --tags=$(KO_TAGS)
+		$(KO) build ./cmd/controller/ --bare --tags=$(KO_TAGS)
 
 .PHONY: ko-publish-all
 ko-publish-all: ko-publish-capsule
+
+# goreleaser
+
+test-release: goreleaser syft
+	PATH=$(LOCALBIN):$${PATH} $(GORELEASER) --skip=publish,sign --snapshot --clean --parallelism 2
 
 # Sorting imports
 .PHONY: goimports
@@ -660,6 +665,20 @@ APIDOCS_GEN_LOOKUP  := fybrik/crdoc
 apidocs-gen: ## Download crdoc locally if necessary.
 	@test -s $(APIDOCS_GEN) && $(APIDOCS_GEN) --version | grep -q $(APIDOCS_GEN_VERSION) || \
 	$(call go-install-tool,$(APIDOCS_GEN),fybrik.io/crdoc@$(APIDOCS_GEN_VERSION))
+
+GORELEASER          := $(LOCALBIN)/goreleaser
+GORELEASER_VERSION  := 2.16.0
+GORELEASER_LOOKUP   := goreleaser/goreleaser
+goreleaser: ## Download goreleaser locally if necessary.
+		test -s $(GORELEASER) && $(GORELEASER) --version | grep -q $(GORELEASER_VERSION) ||  \
+	$(call go-install-tool,$(GORELEASER),github.com/$(GORELEASER_LOOKUP)/v2@v$(GORELEASER_VERSION))
+
+SYFT          := $(LOCALBIN)/syft
+SYFT_VERSION  := 1.45.1
+SYFT_LOOKUP   := anchore/syft
+syft: ## Download syft locally if necessary.
+		test -s $(SYFT) && $(SYFT) --version | grep -q $(SYFT_VERSION) ||  \
+	$(call go-install-tool,$(SYFT),github.com/$(SYFT_LOOKUP)/cmd/syft@v$(SYFT_VERSION))
 
 HARPOON         := $(LOCALBIN)/harpoon
 HARPOON_VERSION := v0.10.2
