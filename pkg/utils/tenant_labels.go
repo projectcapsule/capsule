@@ -12,15 +12,15 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/projectcapsule/capsule/api/v1beta1"
-	"github.com/projectcapsule/capsule/api/v1beta2"
+	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 )
 
 func GetTypeLabel(t runtime.Object) (label string, err error) {
 	switch v := t.(type) {
-	case *v1beta1.Tenant, *v1beta2.Tenant:
+	case *v1beta1.Tenant, *capsulev1beta2.Tenant:
 		return meta.TenantLabel, nil
-	case *v1beta2.ResourcePool:
+	case *capsulev1beta2.ResourcePool:
 		return meta.ResourcePoolLabel, nil
 	case *corev1.LimitRange:
 		return meta.LimitRangeLabel, nil
