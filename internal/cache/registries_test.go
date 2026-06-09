@@ -1,524 +1,656 @@
+// Copyright 2020-2026 Project Capsule Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package cache
 
 import (
-	"sync"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
 
 	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api/rules"
 )
 
-func set(ids ...string) map[string]struct{} {
-	m := make(map[string]struct{}, len(ids))
-	for _, id := range ids {
-		m[id] = struct{}{}
-	}
-	return m
-}
+func TestRegistryRuleSetCache_GetOrBuild(t *testing.T) {
+	t.Parallel()
 
-func TestRegistryRuleSetCache_GetOrBuild_ReturnsFromCacheFlag(t *testing.T) {
-	c := NewRegistryRuleSetCache()
-
-	rules := []api.OCIRegistry{
+	tests := []struct {
+		name           string
+		rules          []rules.OCIRegistry
+		wantNil        bool
+		wantErr        bool
+		wantFromCache  bool
+		wantRuleCount  int
+		wantHasImages  bool
+		wantHasVolumes bool
+	}{
 		{
-			Registry:   "harbor/.*",
-			Validation: []api.RegistryValidationTarget{api.ValidateImages, api.ValidateVolumes},
-			Policy:     []corev1.PullPolicy{corev1.PullNever},
+			name:    "empty rules return nil",
+			rules:   nil,
+			wantNil: true,
+		},
+		{
+			name: "build single rule",
+			rules: []rules.OCIRegistry{
+				{
+					RegExpression: api.RegExpression{
+						Expression: `^ghcr\.io/projectcapsule/.*`,
+					},
+					Policy: []corev1.PullPolicy{
+						corev1.PullIfNotPresent,
+					},
+					Validation: []rules.RegistryValidationTarget{
+						rules.ValidateImages,
+					},
+				},
+			},
+			wantRuleCount:  1,
+			wantHasImages:  true,
+			wantHasVolumes: false,
+		},
+		{
+			name: "empty validation defaults to images and volumes",
+			rules: []rules.OCIRegistry{
+				{
+					RegExpression: api.RegExpression{
+						Expression: `^ghcr\.io/projectcapsule/.*`,
+					},
+				},
+			},
+			wantRuleCount:  1,
+			wantHasImages:  true,
+			wantHasVolumes: true,
+		},
+		{
+			name: "invalid regex returns error",
+			rules: []rules.OCIRegistry{
+				{
+					RegExpression: api.RegExpression{
+						Expression: `[`,
+					},
+				},
+			},
+			wantErr: true,
 		},
 	}
 
-	rs1, fromCache1, err := c.GetOrBuild(rules)
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
-	if rs1 == nil {
-		t.Fatalf("expected ruleset, got nil")
-	}
-	if fromCache1 {
-		t.Fatalf("expected fromCache=false on first build, got true")
-	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	rs2, fromCache2, err := c.GetOrBuild(rules)
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
-	if rs2 == nil {
-		t.Fatalf("expected ruleset, got nil")
-	}
-	if !fromCache2 {
-		t.Fatalf("expected fromCache=true on second call, got false")
-	}
+			regexCache := NewRegexCache()
+			registryCache := NewRegistryRuleSetCache(regexCache)
 
-	if rs1 != rs2 {
-		t.Fatalf("expected same cached pointer, got rs1=%p rs2=%p", rs1, rs2)
+			rs, fromCache, err := registryCache.GetOrBuild(tt.rules)
+
+			if tt.wantErr {
+				if err == nil {
+					t.Fatal("expected error, got nil")
+				}
+
+				if rs != nil {
+					t.Fatalf("expected nil ruleset on error, got %#v", rs)
+				}
+
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("expected no error, got %v", err)
+			}
+
+			if tt.wantNil {
+				if rs != nil {
+					t.Fatalf("expected nil ruleset, got %#v", rs)
+				}
+
+				return
+			}
+
+			if rs == nil {
+				t.Fatal("expected ruleset, got nil")
+			}
+
+			if fromCache != tt.wantFromCache {
+				t.Fatalf("expected fromCache=%t, got %t", tt.wantFromCache, fromCache)
+			}
+
+			if len(rs.Compiled) != tt.wantRuleCount {
+				t.Fatalf("expected %d compiled rules, got %d", tt.wantRuleCount, len(rs.Compiled))
+			}
+
+			if rs.HasImages != tt.wantHasImages {
+				t.Fatalf("expected HasImages=%t, got %t", tt.wantHasImages, rs.HasImages)
+			}
+
+			if rs.HasVolumes != tt.wantHasVolumes {
+				t.Fatalf("expected HasVolumes=%t, got %t", tt.wantHasVolumes, rs.HasVolumes)
+			}
+
+			if got := registryCache.Stats(); got != 1 {
+				t.Fatalf("expected 1 registry ruleset cache entry, got %d", got)
+			}
+
+			if got := regexCache.Stats(); got != tt.wantRuleCount {
+				t.Fatalf("expected %d regex cache entries, got %d", tt.wantRuleCount, got)
+			}
+		})
 	}
 }
 
-func TestRuleSetCache_GetOrBuild_EmptyReturnsNil(t *testing.T) {
-	c := NewRegistryRuleSetCache()
+func TestRegistryRuleSetCache_GetOrBuild_ReusesCachedRuleSet(t *testing.T) {
+	t.Parallel()
 
-	rs, _, err := c.GetOrBuild(nil)
-	if err != nil {
-		t.Fatalf("expected nil error, got %v", err)
-	}
-	if rs != nil {
-		t.Fatalf("expected nil ruleset, got %#v", rs)
-	}
+	regexCache := NewRegexCache()
+	registryCache := NewRegistryRuleSetCache(regexCache)
 
-	rs, _, err = c.GetOrBuild([]api.OCIRegistry{})
-	if err != nil {
-		t.Fatalf("expected nil error, got %v", err)
-	}
-	if rs != nil {
-		t.Fatalf("expected nil ruleset, got %#v", rs)
-	}
-
-	if got := c.Stats(); got != 0 {
-		t.Fatalf("expected Stats()=0, got %d", got)
-	}
-}
-
-func TestRuleSetCache_GetOrBuild_InvalidRegexReturnsError(t *testing.T) {
-	c := NewRegistryRuleSetCache()
-
-	// invalid regex
-	rules := []api.OCIRegistry{
+	rules := []rules.OCIRegistry{
 		{
-			Registry:   "([",
-			Validation: []api.RegistryValidationTarget{api.ValidateImages},
-			Policy:     []corev1.PullPolicy{corev1.PullAlways},
+			RegExpression: api.RegExpression{
+				Expression: `^ghcr\.io/projectcapsule/.*`,
+			},
 		},
 	}
 
-	rs, _, err := c.GetOrBuild(rules)
-	if err == nil {
-		t.Fatalf("expected error, got nil")
-	}
-	if rs != nil {
-		t.Fatalf("expected nil ruleset on error, got %#v", rs)
+	first, fromCache, err := registryCache.GetOrBuild(rules)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
 	}
 
-	if got := c.Stats(); got != 0 {
-		t.Fatalf("expected Stats()=0 after failing build, got %d", got)
+	if fromCache {
+		t.Fatal("expected first lookup to build ruleset, got cache hit")
+	}
+
+	second, fromCache, err := registryCache.GetOrBuild(rules)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	if !fromCache {
+		t.Fatal("expected second lookup to hit cache")
+	}
+
+	if first != second {
+		t.Fatal("expected cached ruleset pointer to be reused")
+	}
+
+	if got := registryCache.Stats(); got != 1 {
+		t.Fatalf("expected 1 registry ruleset cache entry, got %d", got)
+	}
+
+	if got := regexCache.Stats(); got != 1 {
+		t.Fatalf("expected 1 regex cache entry, got %d", got)
 	}
 }
 
-func TestRuleSetCache_GetOrBuild_DeduplicatesByContent(t *testing.T) {
-	c := NewRegistryRuleSetCache()
+func TestRegistryRuleSetCache_Match(t *testing.T) {
+	t.Parallel()
 
-	rulesA := []api.OCIRegistry{
+	tests := []struct {
+		name       string
+		rules      []rules.OCIRegistry
+		image      string
+		pullPolicy corev1.PullPolicy
+		target     rules.RegistryValidationTarget
+		wantMatch  bool
+		wantErr    bool
+	}{
 		{
-			Registry:   "harbor/.*",
-			Validation: []api.RegistryValidationTarget{api.ValidateImages, api.ValidateVolumes},
-			Policy:     []corev1.PullPolicy{corev1.PullNever},
+			name: "match image with default validation and any pull policy",
+			rules: []rules.OCIRegistry{
+				{
+					RegExpression: api.RegExpression{
+						Expression: `^ghcr\.io/projectcapsule/.*`,
+					},
+				},
+			},
+			image:      "ghcr.io/projectcapsule/capsule:latest",
+			pullPolicy: corev1.PullIfNotPresent,
+			target:     rules.ValidateImages,
+			wantMatch:  true,
+		},
+		{
+			name: "match volume with default validation",
+			rules: []rules.OCIRegistry{
+				{
+					RegExpression: api.RegExpression{
+						Expression: `^ghcr\.io/projectcapsule/.*`,
+					},
+				},
+			},
+			image:      "ghcr.io/projectcapsule/capsule:latest",
+			pullPolicy: corev1.PullIfNotPresent,
+			target:     rules.ValidateVolumes,
+			wantMatch:  true,
+		},
+		{
+			name: "does not match wrong image",
+			rules: []rules.OCIRegistry{
+				{
+					RegExpression: api.RegExpression{
+						Expression: `^ghcr\.io/projectcapsule/.*`,
+					},
+				},
+			},
+			image:      "docker.io/library/nginx:latest",
+			pullPolicy: corev1.PullIfNotPresent,
+			target:     rules.ValidateImages,
+			wantMatch:  false,
+		},
+		{
+			name: "does not match wrong pull policy",
+			rules: []rules.OCIRegistry{
+				{
+					RegExpression: api.RegExpression{
+						Expression: `^ghcr\.io/projectcapsule/.*`,
+					},
+					Policy: []corev1.PullPolicy{
+						corev1.PullAlways,
+					},
+				},
+			},
+			image:      "ghcr.io/projectcapsule/capsule:latest",
+			pullPolicy: corev1.PullIfNotPresent,
+			target:     rules.ValidateImages,
+			wantMatch:  false,
+		},
+		{
+			name: "matches allowed pull policy",
+			rules: []rules.OCIRegistry{
+				{
+					RegExpression: api.RegExpression{
+						Expression: `^ghcr\.io/projectcapsule/.*`,
+					},
+					Policy: []corev1.PullPolicy{
+						corev1.PullIfNotPresent,
+					},
+				},
+			},
+			image:      "ghcr.io/projectcapsule/capsule:latest",
+			pullPolicy: corev1.PullIfNotPresent,
+			target:     rules.ValidateImages,
+			wantMatch:  true,
+		},
+		{
+			name: "does not match wrong validation target",
+			rules: []rules.OCIRegistry{
+				{
+					RegExpression: api.RegExpression{
+						Expression: `^ghcr\.io/projectcapsule/.*`,
+					},
+					Validation: []rules.RegistryValidationTarget{
+						rules.ValidateVolumes,
+					},
+				},
+			},
+			image:      "ghcr.io/projectcapsule/capsule:latest",
+			pullPolicy: corev1.PullIfNotPresent,
+			target:     rules.ValidateImages,
+			wantMatch:  false,
+		},
+		{
+			name: "matches configured validation target",
+			rules: []rules.OCIRegistry{
+				{
+					RegExpression: api.RegExpression{
+						Expression: `^ghcr\.io/projectcapsule/.*`,
+					},
+					Validation: []rules.RegistryValidationTarget{
+						rules.ValidateImages,
+					},
+				},
+			},
+			image:      "ghcr.io/projectcapsule/capsule:latest",
+			pullPolicy: corev1.PullIfNotPresent,
+			target:     rules.ValidateImages,
+			wantMatch:  true,
+		},
+		{
+			name: "negated regex matches non matching image",
+			rules: []rules.OCIRegistry{
+				{
+					RegExpression: api.RegExpression{
+						Expression: `^ghcr\.io/projectcapsule/.*`,
+						Negate:     true,
+					},
+				},
+			},
+			image:      "docker.io/library/nginx:latest",
+			pullPolicy: corev1.PullIfNotPresent,
+			target:     rules.ValidateImages,
+			wantMatch:  true,
+		},
+		{
+			name: "negated regex does not match matching image",
+			rules: []rules.OCIRegistry{
+				{
+					RegExpression: api.RegExpression{
+						Expression: `^ghcr\.io/projectcapsule/.*`,
+						Negate:     true,
+					},
+				},
+			},
+			image:      "ghcr.io/projectcapsule/capsule:latest",
+			pullPolicy: corev1.PullIfNotPresent,
+			target:     rules.ValidateImages,
+			wantMatch:  false,
+		},
+		{
+			name: "invalid regex returns error",
+			rules: []rules.OCIRegistry{
+				{
+					RegExpression: api.RegExpression{
+						Expression: `[`,
+					},
+				},
+			},
+			image:      "ghcr.io/projectcapsule/capsule:latest",
+			pullPolicy: corev1.PullIfNotPresent,
+			target:     rules.ValidateImages,
+			wantErr:    true,
+		},
+		{
+			name:       "empty rules do not match",
+			rules:      nil,
+			image:      "ghcr.io/projectcapsule/capsule:latest",
+			pullPolicy: corev1.PullIfNotPresent,
+			target:     rules.ValidateImages,
+			wantMatch:  false,
 		},
 	}
 
-	// same content but different backing slice
-	rulesB := []api.OCIRegistry{
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			registryCache := NewRegistryRuleSetCache(NewRegexCache())
+
+			matched, err := registryCache.Match(
+				tt.rules,
+				tt.image,
+				tt.pullPolicy,
+				tt.target,
+			)
+
+			if tt.wantErr {
+				if err == nil {
+					t.Fatal("expected error, got nil")
+				}
+
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("expected no error, got %v", err)
+			}
+
+			if tt.wantMatch && matched == nil {
+				t.Fatal("expected match, got nil")
+			}
+
+			if !tt.wantMatch && matched != nil {
+				t.Fatalf("expected no match, got %#v", matched)
+			}
+		})
+	}
+}
+
+func TestRegistryRuleSetCache_HashRules_NormalizesPolicyAndValidationOrder(t *testing.T) {
+	t.Parallel()
+
+	c := NewRegistryRuleSetCache(NewRegexCache())
+
+	a := []rules.OCIRegistry{
 		{
-			Registry:   "harbor/.*",
-			Validation: []api.RegistryValidationTarget{api.ValidateImages, api.ValidateVolumes},
-			Policy:     []corev1.PullPolicy{corev1.PullNever},
+			RegExpression: api.RegExpression{
+				Expression: `^ghcr\.io/projectcapsule/.*`,
+			},
+			Policy: []corev1.PullPolicy{
+				corev1.PullAlways,
+				corev1.PullIfNotPresent,
+			},
+			Validation: []rules.RegistryValidationTarget{
+				rules.ValidateImages,
+				rules.ValidateVolumes,
+			},
 		},
 	}
 
-	rs1, _, err := c.GetOrBuild(rulesA)
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
-	rs2, _, err := c.GetOrBuild(rulesB)
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
-
-	// the whole point: should be the exact same pointer
-	if rs1 != rs2 {
-		t.Fatalf("expected same cached pointer, got rs1=%p rs2=%p", rs1, rs2)
-	}
-
-	if got := c.Stats(); got != 1 {
-		t.Fatalf("expected Stats()=1, got %d", got)
-	}
-
-	// sanity: compiled fields are correct (no DeepEqual; check specific invariants)
-	if rs1.ID == "" {
-		t.Fatalf("expected non-empty ruleset ID")
-	}
-	if len(rs1.Compiled) != 1 {
-		t.Fatalf("expected 1 compiled rule, got %d", len(rs1.Compiled))
-	}
-	cr := rs1.Compiled[0]
-	if cr.RE == nil {
-		t.Fatalf("expected compiled regexp, got nil")
-	}
-	if cr.Registry != "harbor/.*" {
-		t.Fatalf("expected Registry to match input, got %q", cr.Registry)
-	}
-	if !cr.ValidateImages || !cr.ValidateVolumes {
-		t.Fatalf("expected ValidateImages and ValidateVolumes true, got images=%v volumes=%v", cr.ValidateImages, cr.ValidateVolumes)
-	}
-	if rs1.HasImages != true || rs1.HasVolumes != true {
-		t.Fatalf("expected ruleset flags HasImages/HasVolumes true, got images=%v volumes=%v", rs1.HasImages, rs1.HasVolumes)
-	}
-	if cr.AllowedPolicy == nil {
-		t.Fatalf("expected AllowedPolicy map non-nil")
-	}
-	if _, ok := cr.AllowedPolicy[corev1.PullNever]; !ok {
-		t.Fatalf("expected AllowedPolicy to contain PullNever")
-	}
-}
-
-func TestRuleSetCache_GetOrBuild_OrderMatters_LaterWins(t *testing.T) {
-	c := NewRegistryRuleSetCache()
-
-	// Two rules with same items but swapped order
-	// hashRules preserves rule order, so the IDs must differ.
-	rules1 := []api.OCIRegistry{
-		{Registry: ".*", Validation: []api.RegistryValidationTarget{api.ValidateImages}, Policy: []corev1.PullPolicy{corev1.PullAlways}},
-		{Registry: "harbor/.*", Validation: []api.RegistryValidationTarget{api.ValidateImages}},
-	}
-	rules2 := []api.OCIRegistry{
-		{Registry: "harbor/.*", Validation: []api.RegistryValidationTarget{api.ValidateImages}},
-		{Registry: ".*", Validation: []api.RegistryValidationTarget{api.ValidateImages}, Policy: []corev1.PullPolicy{corev1.PullAlways}},
-	}
-
-	rs1, _, err := c.GetOrBuild(rules1)
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
-	rs2, _, err := c.GetOrBuild(rules2)
-	if err != nil {
-		t.Fatalf("unexpected err: %v", err)
-	}
-
-	if rs1 == rs2 {
-		t.Fatalf("expected different cached entries due to different rule order, got same pointer %p", rs1)
-	}
-	if rs1.ID == rs2.ID {
-		t.Fatalf("expected different IDs for different order, got same %q", rs1.ID)
-	}
-	if got := c.Stats(); got != 2 {
-		t.Fatalf("expected Stats()=2, got %d", got)
-	}
-
-	// Verify compiled slice preserves the rule order we provided
-	if len(rs1.Compiled) != 2 {
-		t.Fatalf("expected 2 compiled rules, got %d", len(rs1.Compiled))
-	}
-	if rs1.Compiled[0].Registry != ".*" || rs1.Compiled[1].Registry != "harbor/.*" {
-		t.Fatalf("expected compiled order to match input for rules1, got %q then %q",
-			rs1.Compiled[0].Registry, rs1.Compiled[1].Registry)
-	}
-}
-
-func TestRuleSetCache_GetOrBuild_ConcurrentReturnsSamePointer(t *testing.T) {
-	c := NewRegistryRuleSetCache()
-
-	rules := []api.OCIRegistry{
+	b := []rules.OCIRegistry{
 		{
-			Registry:   "harbor/.*",
-			Validation: []api.RegistryValidationTarget{api.ValidateImages, api.ValidateVolumes},
-			Policy:     []corev1.PullPolicy{corev1.PullAlways, corev1.PullIfNotPresent},
+			RegExpression: api.RegExpression{
+				Expression: `^ghcr\.io/projectcapsule/.*`,
+			},
+			Policy: []corev1.PullPolicy{
+				corev1.PullIfNotPresent,
+				corev1.PullAlways,
+			},
+			Validation: []rules.RegistryValidationTarget{
+				rules.ValidateVolumes,
+				rules.ValidateImages,
+			},
 		},
 	}
 
-	const workers = 32
-	var wg sync.WaitGroup
-	wg.Add(workers)
-
-	results := make([]*RuleSet, workers)
-	errs := make([]error, workers)
-
-	for i := 0; i < workers; i++ {
-		go func(i int) {
-			defer wg.Done()
-			rs, _, err := c.GetOrBuild(rules)
-			results[i] = rs
-			errs[i] = err
-		}(i)
-	}
-
-	wg.Wait()
-
-	for i := 0; i < workers; i++ {
-		if errs[i] != nil {
-			t.Fatalf("worker %d got err: %v", i, errs[i])
-		}
-		if results[i] == nil {
-			t.Fatalf("worker %d got nil ruleset", i)
-		}
-	}
-
-	// all pointers must match the first
-	first := results[0]
-	for i := 1; i < workers; i++ {
-		if results[i] != first {
-			t.Fatalf("expected same cached pointer across goroutines; got %p vs %p", first, results[i])
-		}
+	if c.HashRules(a) != c.HashRules(b) {
+		t.Fatal("expected equal hashes when policy and validation values only differ by order")
 	}
 }
 
-func TestRegistryRuleSetCache_GetOrBuild_ConcurrentPointersAndFlags(t *testing.T) {
-	c := NewRegistryRuleSetCache()
+func TestRegistryRuleSetCache_HashRules_UsesNegate(t *testing.T) {
+	t.Parallel()
 
-	rules := []api.OCIRegistry{
-		{Registry: "harbor/.*", Validation: []api.RegistryValidationTarget{api.ValidateImages}},
+	c := NewRegistryRuleSetCache(NewRegexCache())
+
+	positive := []rules.OCIRegistry{
+		{
+			RegExpression: api.RegExpression{
+				Expression: `^ghcr\.io/.*`,
+			},
+		},
 	}
 
-	const workers = 32
-	var wg sync.WaitGroup
-	wg.Add(workers)
-
-	results := make([]*RuleSet, workers)
-	flags := make([]bool, workers)
-	errs := make([]error, workers)
-
-	for i := 0; i < workers; i++ {
-		go func(i int) {
-			defer wg.Done()
-			rs, fromCache, err := c.GetOrBuild(rules)
-			results[i] = rs
-			flags[i] = fromCache
-			errs[i] = err
-		}(i)
-	}
-	wg.Wait()
-
-	for i := 0; i < workers; i++ {
-		if errs[i] != nil {
-			t.Fatalf("worker %d err: %v", i, errs[i])
-		}
-		if results[i] == nil {
-			t.Fatalf("worker %d got nil ruleset", i)
-		}
+	negative := []rules.OCIRegistry{
+		{
+			RegExpression: api.RegExpression{
+				Expression: `^ghcr\.io/.*`,
+				Negate:     true,
+			},
+		},
 	}
 
-	first := results[0]
-	for i := 1; i < workers; i++ {
-		if results[i] != first {
-			t.Fatalf("expected same cached pointer across goroutines; got %p vs %p", first, results[i])
-		}
-	}
-
-	seenFalse := false
-	seenTrue := false
-	for i := 0; i < workers; i++ {
-		if flags[i] {
-			seenTrue = true
-		} else {
-			seenFalse = true
-		}
-	}
-
-	if !seenFalse {
-		t.Fatalf("expected at least one fromCache=false (builder), got none")
-	}
-
-	if !seenTrue {
-		t.Fatalf("expected at least one fromCache=true (builder), got none")
+	if c.HashRules(positive) == c.HashRules(negative) {
+		t.Fatal("expected different hashes for negated and non-negated registry expressions")
 	}
 }
 
-func TestRegistryRuleSetCache_InsertForTest_ThenHasAndLen(t *testing.T) {
-	c := NewRegistryRuleSetCache()
+func TestRegistryRuleSetCache_PruneActive(t *testing.T) {
+	t.Parallel()
 
-	if got := c.Stats(); got != 0 {
-		t.Fatalf("expected Len()=0, got %d", got)
-	}
-	if c.Has("x") {
-		t.Fatalf("expected Has(x)=false on empty cache")
-	}
+	registryCache := NewRegistryRuleSetCache(NewRegexCache())
 
-	c.insertForTest("x")
-
-	if !c.Has("x") {
-		t.Fatalf("expected Has(x)=true after insert")
-	}
-	if got := c.Stats(); got != 1 {
-		t.Fatalf("expected Len()=1 after insert, got %d", got)
-	}
-}
-
-func TestRegistryRuleSetCache_InsertForTest_DuplicateDoesNotIncreaseLen(t *testing.T) {
-	c := NewRegistryRuleSetCache()
-
-	c.insertForTest("x")
-	if got := c.Stats(); got != 1 {
-		t.Fatalf("expected Len()=1 after first insert, got %d", got)
+	keepRules := []rules.OCIRegistry{
+		{
+			RegExpression: api.RegExpression{
+				Expression: `^ghcr\.io/projectcapsule/.*`,
+			},
+		},
 	}
 
-	c.insertForTest("x")
-	if got := c.Stats(); got != 1 {
-		t.Fatalf("expected Len() to remain 1 after duplicate insert, got %d", got)
+	removeRules := []rules.OCIRegistry{
+		{
+			RegExpression: api.RegExpression{
+				Expression: `^docker\.io/library/.*`,
+			},
+		},
 	}
 
-	if !c.Has("x") {
-		t.Fatalf("expected Has(x)=true after duplicate insert")
-	}
-}
-
-func TestRegistryRuleSetCache_HasFalseForMissingKey(t *testing.T) {
-	c := NewRegistryRuleSetCache()
-
-	c.insertForTest("a")
-	if c.Has("b") {
-		t.Fatalf("expected Has(b)=false when only a exists")
-	}
-}
-
-func TestRegistryRuleSetCache_PruneActive_RemovesOnlyInactive(t *testing.T) {
-	c := NewRegistryRuleSetCache()
-	c.insertForTest("a")
-	c.insertForTest("b")
-	c.insertForTest("c")
-
-	removed := c.PruneActive(set("b"))
-
-	if removed != 2 {
-		t.Fatalf("expected removed=2, got %d", removed)
-	}
-	if got := c.Stats(); got != 1 {
-		t.Fatalf("expected Len()=1 after prune, got %d", got)
+	keep, _, err := registryCache.GetOrBuild(keepRules)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
 	}
 
-	if !c.Has("b") {
-		t.Fatalf("expected b to remain")
+	remove, _, err := registryCache.GetOrBuild(removeRules)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
 	}
-	if c.Has("a") || c.Has("c") {
-		t.Fatalf("expected a and c to be removed")
+
+	if got := registryCache.Stats(); got != 2 {
+		t.Fatalf("expected 2 cache entries before prune, got %d", got)
 	}
-}
 
-func TestRegistryRuleSetCache_PruneActive_AllActiveNoChange(t *testing.T) {
-	c := NewRegistryRuleSetCache()
-	c.insertForTest("a")
-	c.insertForTest("b")
-
-	removed := c.PruneActive(set("a", "b"))
-
-	if removed != 0 {
-		t.Fatalf("expected removed=0, got %d", removed)
-	}
-	if got := c.Stats(); got != 2 {
-		t.Fatalf("expected Len()=2, got %d", got)
-	}
-	if !c.Has("a") || !c.Has("b") {
-		t.Fatalf("expected both a and b to remain")
-	}
-}
-
-func TestRegistryRuleSetCache_PruneActive_EmptyActivePrunesAll(t *testing.T) {
-	c := NewRegistryRuleSetCache()
-	c.insertForTest("a")
-	c.insertForTest("b")
-
-	removed := c.PruneActive(set())
-
-	if removed != 2 {
-		t.Fatalf("expected removed=2, got %d", removed)
-	}
-	if got := c.Stats(); got != 0 {
-		t.Fatalf("expected Len()=0 after prune all, got %d", got)
-	}
-	if c.Has("a") || c.Has("b") {
-		t.Fatalf("expected cache to be empty after prune all")
-	}
-}
-
-func TestRegistryRuleSetCache_PruneActive_NilActivePrunesAll(t *testing.T) {
-	c := NewRegistryRuleSetCache()
-	c.insertForTest("a")
-
-	removed := c.PruneActive(nil)
+	removed := registryCache.PruneActive(map[string]struct{}{
+		keep.ID: {},
+	})
 
 	if removed != 1 {
-		t.Fatalf("expected removed=1, got %d", removed)
+		t.Fatalf("expected 1 pruned cache entry, got %d", removed)
 	}
-	if got := c.Stats(); got != 0 {
-		t.Fatalf("expected Len()=0 after prune, got %d", got)
+
+	if !registryCache.Has(keep.ID) {
+		t.Fatalf("expected kept ruleset id %q to remain", keep.ID)
 	}
-	if c.Has("a") {
-		t.Fatalf("expected a to be removed")
+
+	if registryCache.Has(remove.ID) {
+		t.Fatalf("expected removed ruleset id %q to be pruned", remove.ID)
+	}
+
+	if got := registryCache.Stats(); got != 1 {
+		t.Fatalf("expected 1 cache entry after prune, got %d", got)
 	}
 }
 
-func TestRegistryRuleSetCache_PruneActive_EmptyCacheNoop(t *testing.T) {
-	c := NewRegistryRuleSetCache()
+func TestRegistryRuleSetCache_Reset(t *testing.T) {
+	t.Parallel()
 
-	removed := c.PruneActive(set("a"))
+	registryCache := NewRegistryRuleSetCache(NewRegexCache())
 
-	if removed != 0 {
-		t.Fatalf("expected removed=0 on empty cache, got %d", removed)
+	rs, _, err := registryCache.GetOrBuild([]rules.OCIRegistry{
+		{
+			RegExpression: api.RegExpression{
+				Expression: `^ghcr\.io/projectcapsule/.*`,
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
 	}
-	if got := c.Stats(); got != 0 {
-		t.Fatalf("expected Len()=0, got %d", got)
+
+	if got := registryCache.Stats(); got != 1 {
+		t.Fatalf("expected 1 cache entry, got %d", got)
+	}
+
+	registryCache.Reset()
+
+	if got := registryCache.Stats(); got != 0 {
+		t.Fatalf("expected 0 cache entries after reset, got %d", got)
+	}
+
+	if registryCache.Has(rs.ID) {
+		t.Fatalf("expected ruleset id %q to be removed after reset", rs.ID)
 	}
 }
 
-func TestRegistryRuleSetCache_PruneActive_Idempotent(t *testing.T) {
-	c := NewRegistryRuleSetCache()
-	c.insertForTest("a")
-	c.insertForTest("b")
-	c.insertForTest("c")
+func TestCompiledRule_AllowsPullPolicy(t *testing.T) {
+	t.Parallel()
 
-	active := set("a")
+	tests := []struct {
+		name       string
+		rule       CompiledRule
+		pullPolicy corev1.PullPolicy
+		want       bool
+	}{
+		{
+			name:       "empty policy allows any",
+			rule:       CompiledRule{},
+			pullPolicy: corev1.PullAlways,
+			want:       true,
+		},
+		{
+			name: "configured policy allows matching value",
+			rule: CompiledRule{
+				AllowedPolicy: map[corev1.PullPolicy]struct{}{
+					corev1.PullIfNotPresent: {},
+				},
+			},
+			pullPolicy: corev1.PullIfNotPresent,
+			want:       true,
+		},
+		{
+			name: "configured policy rejects non matching value",
+			rule: CompiledRule{
+				AllowedPolicy: map[corev1.PullPolicy]struct{}{
+					corev1.PullIfNotPresent: {},
+				},
+			},
+			pullPolicy: corev1.PullAlways,
+			want:       false,
+		},
+	}
 
-	removed1 := c.PruneActive(active)
-	if removed1 != 2 {
-		t.Fatalf("expected first prune removed=2, got %d", removed1)
-	}
-	if got := c.Stats(); got != 1 {
-		t.Fatalf("expected Len()=1 after first prune, got %d", got)
-	}
-	if !c.Has("a") {
-		t.Fatalf("expected a to remain after first prune")
-	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	removed2 := c.PruneActive(active)
-	if removed2 != 0 {
-		t.Fatalf("expected second prune removed=0, got %d", removed2)
-	}
-	if got := c.Stats(); got != 1 {
-		t.Fatalf("expected Len()=1 after second prune, got %d", got)
+			if got := tt.rule.AllowsPullPolicy(tt.pullPolicy); got != tt.want {
+				t.Fatalf("expected %t, got %t", tt.want, got)
+			}
+		})
 	}
 }
 
-func TestRegistryRuleSetCache_PruneActive_RemovesCorrectCountWithLargerSet(t *testing.T) {
-	c := NewRegistryRuleSetCache()
+func TestCompiledRule_MatchesTarget(t *testing.T) {
+	t.Parallel()
 
-	// Insert 10 IDs: id0..id9
-	for i := 0; i < 10; i++ {
-		c.insertForTest("id" + itoa(i))
+	tests := []struct {
+		name   string
+		rule   CompiledRule
+		target rules.RegistryValidationTarget
+		want   bool
+	}{
+		{
+			name: "matches images",
+			rule: CompiledRule{
+				ValidateImages: true,
+			},
+			target: rules.ValidateImages,
+			want:   true,
+		},
+		{
+			name: "does not match images when only volumes configured",
+			rule: CompiledRule{
+				ValidateVolumes: true,
+			},
+			target: rules.ValidateImages,
+			want:   false,
+		},
+		{
+			name: "matches volumes",
+			rule: CompiledRule{
+				ValidateVolumes: true,
+			},
+			target: rules.ValidateVolumes,
+			want:   true,
+		},
+		{
+			name: "does not match unknown target",
+			rule: CompiledRule{
+				ValidateImages:  true,
+				ValidateVolumes: true,
+			},
+			target: rules.RegistryValidationTarget("unknown"),
+			want:   false,
+		},
 	}
 
-	// Keep 3: id0,id4,id9
-	removed := c.PruneActive(set("id0", "id4", "id9"))
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	if removed != 7 {
-		t.Fatalf("expected removed=7, got %d", removed)
+			if got := tt.rule.MatchesTarget(tt.target); got != tt.want {
+				t.Fatalf("expected %t, got %t", tt.want, got)
+			}
+		})
 	}
-	if got := c.Stats(); got != 3 {
-		t.Fatalf("expected Len()=3, got %d", got)
-	}
-	if !c.Has("id0") || !c.Has("id4") || !c.Has("id9") {
-		t.Fatalf("expected id0,id4,id9 to remain")
-	}
-}
-
-// tiny int->string without fmt (faster, no allocations beyond result)
-func itoa(i int) string {
-	// Enough for small test numbers
-	if i == 0 {
-		return "0"
-	}
-	var buf [20]byte
-	n := len(buf)
-	for i > 0 {
-		n--
-		buf[n] = byte('0' + (i % 10))
-		i /= 10
-	}
-	return string(buf[n:])
 }

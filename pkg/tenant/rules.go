@@ -13,8 +13,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
+	"github.com/projectcapsule/capsule/pkg/api/rules"
 	"github.com/projectcapsule/capsule/pkg/runtime/selectors"
 )
 
@@ -41,20 +41,18 @@ func BuildNamespaceRuleBodyStatus(
 	c client.Reader,
 	ns *corev1.Namespace,
 	tnt *capsulev1beta2.Tenant,
-) (*api.NamespaceRuleBodyNamespace, error) {
-	out := &api.NamespaceRuleBodyNamespace{}
-
+) ([]*rules.NamespaceRuleBodyNamespace, error) {
 	if tnt == nil || ns == nil {
-		return out, nil
+		return nil, nil
 	}
 
 	// Treat nil labels map as empty.
-	var nsLabels labels.Set
+	nsLabels := labels.Set{}
 	if ns.Labels != nil {
 		nsLabels = labels.Set(ns.Labels)
-	} else {
-		nsLabels = labels.Set{}
 	}
+
+	out := make([]*rules.NamespaceRuleBodyNamespace, 0, len(tnt.Spec.Rules))
 
 	for i, rule := range tnt.Spec.Rules {
 		if rule == nil {
@@ -72,11 +70,25 @@ func BuildNamespaceRuleBodyStatus(
 			}
 		}
 
-		// Merge enforce body (for now: only registries)
-		// Preserve order: append in the order rules are declared.
-		if len(rule.Enforce.Registries) > 0 {
-			out.Enforce.Registries = append(out.Enforce.Registries, rule.Enforce.Registries...)
+		normalized := rules.NamespaceRuleBodyNamespace{
+			Enforce: rules.NamespaceRuleEnforceBody{
+				Action: rule.Enforce.Action,
+				Registries: append(
+					[]rules.OCIRegistry(nil),
+					rule.Enforce.Registries...,
+				),
+			},
 		}
+
+		if normalized.Enforce.Action == "" {
+			normalized.Enforce.Action = rules.ActionTypeDeny
+		}
+
+		if len(normalized.Enforce.Registries) == 0 {
+			continue
+		}
+
+		out = append(out, &normalized)
 	}
 
 	return out, nil

@@ -13,9 +13,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/api/rbac"
+	"github.com/projectcapsule/capsule/pkg/api/rules"
 )
 
 var _ = Describe("enforcing a defined ImagePullPolicy", Ordered, Label("tenant", "pods", "images", "policy"), func() {
@@ -37,7 +37,7 @@ var _ = Describe("enforcing a defined ImagePullPolicy", Ordered, Label("tenant",
 					},
 				},
 			},
-			ImagePullPolicies: []api.ImagePullPolicySpec{"Always"},
+			ImagePullPolicies: []rules.ImagePullPolicySpec{"Always"},
 		},
 	}
 

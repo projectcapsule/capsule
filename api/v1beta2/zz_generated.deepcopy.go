@@ -11,6 +11,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/api/rbac"
+	"github.com/projectcapsule/capsule/pkg/api/rules"
 	"github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/runtime/selectors"
 	"github.com/projectcapsule/capsule/pkg/template"
@@ -1575,11 +1576,11 @@ func (in *RuleStatus) DeepCopyInto(out *RuleStatus) {
 	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
 	if in.Spec != nil {
 		in, out := &in.Spec, &out.Spec
-		*out = make([]*api.NamespaceRuleBodyNamespace, len(*in))
+		*out = make([]*rules.NamespaceRuleBodyNamespace, len(*in))
 		for i := range *in {
 			if (*in)[i] != nil {
 				in, out := &(*in)[i], &(*out)[i]
-				*out = new(api.NamespaceRuleBodyNamespace)
+				*out = new(rules.NamespaceRuleBodyNamespace)
 				(*in).DeepCopyInto(*out)
 			}
 		}
@@ -1641,6 +1642,17 @@ func (in *RuleStatusList) DeepCopyObject() runtime.Object {
 func (in *RuleStatusStatus) DeepCopyInto(out *RuleStatusStatus) {
 	*out = *in
 	in.Rule.DeepCopyInto(&out.Rule)
+	if in.Rules != nil {
+		in, out := &in.Rules, &out.Rules
+		*out = make([]*rules.NamespaceRuleBodyNamespace, len(*in))
+		for i := range *in {
+			if (*in)[i] != nil {
+				in, out := &(*in)[i], &(*out)[i]
+				*out = new(rules.NamespaceRuleBodyNamespace)
+				(*in).DeepCopyInto(*out)
+			}
+		}
+	}
 	if in.Conditions != nil {
 		in, out := &in.Conditions, &out.Conditions
 		*out = make(meta.ConditionList, len(*in))
@@ -2108,11 +2120,11 @@ func (in *TenantSpec) DeepCopyInto(out *TenantSpec) {
 	in.Permissions.DeepCopyInto(&out.Permissions)
 	if in.Rules != nil {
 		in, out := &in.Rules, &out.Rules
-		*out = make([]*api.NamespaceRuleBodyTenant, len(*in))
+		*out = make([]*rules.NamespaceRuleBodyTenant, len(*in))
 		for i := range *in {
 			if (*in)[i] != nil {
 				in, out := &(*in)[i], &(*out)[i]
-				*out = new(api.NamespaceRuleBodyTenant)
+				*out = new(rules.NamespaceRuleBodyTenant)
 				(*in).DeepCopyInto(*out)
 			}
 		}
@@ -2188,7 +2200,7 @@ func (in *TenantSpec) DeepCopyInto(out *TenantSpec) {
 	}
 	if in.ImagePullPolicies != nil {
 		in, out := &in.ImagePullPolicies, &out.ImagePullPolicies
-		*out = make([]api.ImagePullPolicySpec, len(*in))
+		*out = make([]rules.ImagePullPolicySpec, len(*in))
 		copy(*out, *in)
 	}
 	in.NetworkPolicies.DeepCopyInto(&out.NetworkPolicies)
@@ -2263,7 +2275,7 @@ func (in *TenantStatusNamespaceEnforcement) DeepCopyInto(out *TenantStatusNamesp
 	*out = *in
 	if in.Registries != nil {
 		in, out := &in.Registries, &out.Registries
-		*out = make([]api.OCIRegistry, len(*in))
+		*out = make([]rules.OCIRegistry, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
