@@ -39,10 +39,10 @@ func GetNamespaceTenant(
 
 	if tnt != nil {
 		if !validateNamespacePrefix(cfg, ns, tnt) {
-			return nil, ad.Deny(fmt.Sprintf(
+			return nil, ad.Denyf(
 				"The Namespace name must start with '%s-' when ForceTenantPrefix is enabled in the Tenant.",
 				tnt.GetName(),
-			))
+			)
 		}
 
 		return tnt, nil
@@ -65,10 +65,10 @@ func GetNamespaceTenant(
 
 	if len(tnts) == 1 {
 		if !validateNamespacePrefix(cfg, ns, &tnts[0]) {
-			return nil, ad.Deny(fmt.Sprintf(
+			return nil, ad.Denyf(
 				"The Namespace name must start with '%s-' when ForceTenantPrefix is enabled in the Tenant.",
 				tnts[0].GetName(),
-			))
+			)
 		}
 
 		return &tnts[0], nil
@@ -81,10 +81,10 @@ func GetNamespaceTenant(
 
 	if tnt != nil {
 		if !validateNamespacePrefix(cfg, ns, tnt) {
-			return nil, ad.Deny(fmt.Sprintf(
+			return nil, ad.Denyf(
 				"The Namespace name must start with '%s-' when ForceTenantPrefix is enabled in the Tenant.",
 				tnt.GetName(),
-			))
+			)
 		}
 
 		return tnt, nil

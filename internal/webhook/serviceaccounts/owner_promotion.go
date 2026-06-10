@@ -107,7 +107,5 @@ func (h *ownerPromotion) handle(
 		msg,
 	)
 
-	response := admission.Denied(msg)
-
-	return &response
+	return ad.Deny(msg)
 }

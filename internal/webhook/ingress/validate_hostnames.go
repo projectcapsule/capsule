@@ -106,9 +106,7 @@ func (r *hostnames) validate(
 	if errors.As(err, &hostnameNotValidErr) {
 		recorder.Eventf(ingress.GetClientObject(), tnt, corev1.EventTypeWarning, evt.ReasonIngressHostnameNotValid, evt.ActionValidationDenied, "Ingress %s/%s hostname is not valid", ingress.Namespace(), ingress.Name())
 
-		response := admission.Denied(err.Error())
-
-		return &response
+		return ad.Deny(err.Error())
 	}
 
 	return ad.ErroredResponse(err)

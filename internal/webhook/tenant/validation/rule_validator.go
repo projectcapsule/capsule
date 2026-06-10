@@ -5,7 +5,6 @@ package validation
 
 import (
 	"context"
-	"fmt"
 	"regexp"
 	"strings"
 
@@ -95,9 +94,7 @@ func ValidateRule(tnt *capsulev1beta2.Tenant, req admission.Request) *admission.
 
 		if rule.NamespaceSelector != nil {
 			if _, err := metav1.LabelSelectorAsSelector(rule.NamespaceSelector); err != nil {
-				return ad.Deny(
-					fmt.Sprintf("rules[%d].namespaceSelector is invalid: %v", i, err),
-				)
+				return ad.Denyf("rules[%d].namespaceSelector is invalid: %v", i, err)
 			}
 		}
 
@@ -105,20 +102,16 @@ func ValidateRule(tnt *capsulev1beta2.Tenant, req admission.Request) *admission.
 			expr := registry.Expression()
 
 			if strings.TrimSpace(expr.Expression) == "" {
-				return ad.Deny(
-					fmt.Sprintf("rules[%d].enforce.workloads.registries[%d].exp must not be empty", i, j),
-				)
+				return ad.Denyf("rules[%d].enforce.workloads.registries[%d].exp must not be empty", i, j)
 			}
 
 			if _, err := regexp.Compile(expr.Expression); err != nil {
-				return ad.Deny(
-					fmt.Sprintf(
-						"rules[%d].enforce.workloads.registries[%d].exp %q is invalid: %v",
-						i,
-						j,
-						expr.Expression,
-						err,
-					),
+				return ad.Denyf(
+					"rules[%d].enforce.workloads.registries[%d].exp %q is invalid: %v",
+					i,
+					j,
+					expr.Expression,
+					err,
 				)
 			}
 		}
