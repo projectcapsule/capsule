@@ -5,7 +5,6 @@ package validation
 
 import (
 	"context"
-	"fmt"
 	"regexp"
 
 	"k8s.io/client-go/tools/events"
@@ -80,7 +79,7 @@ func (h *forbiddenAnnotationsRegexHandler) validate(tnt *capsulev1beta2.Tenant, 
 
 	for scope, annotation := range annotationsToCheck {
 		if _, err := regexp.Compile(tnt.Spec.NamespaceOptions.ForbiddenLabels.Regex); err != nil {
-			return ad.Deny(fmt.Sprintf("unable to compile %s regex for forbidden %s", annotation, scope))
+			return ad.Denyf("unable to compile %s regex for forbidden %s", annotation, scope)
 		}
 	}
 
