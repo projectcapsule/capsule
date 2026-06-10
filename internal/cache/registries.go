@@ -7,7 +7,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -15,37 +14,56 @@ import (
 	corev1 "k8s.io/api/core/v1"
 
 	"github.com/projectcapsule/capsule/pkg/api"
+	"github.com/projectcapsule/capsule/pkg/api/rules"
 )
 
 type RuleSet struct {
-	ID         string
-	Compiled   []CompiledRule
-	HasImages  bool
-	HasVolumes bool
+	ID       string
+	Compiled []CompiledRule
 }
 
 type CompiledRule struct {
-	Registry        string
-	RE              *regexp.Regexp
-	AllowedPolicy   map[corev1.PullPolicy]struct{} // nil/empty => allow any
-	ValidateImages  bool
-	ValidateVolumes bool
+	Expression api.RegExpression
+	RegexID    string
+
+	AllowedPolicy map[corev1.PullPolicy]struct{} // nil/empty => allow any
+}
+
+func (r *CompiledRule) AllowsPullPolicy(pullPolicy corev1.PullPolicy) bool {
+	if len(r.AllowedPolicy) == 0 {
+		return true
+	}
+
+	_, ok := r.AllowedPolicy[pullPolicy]
+
+	return ok
 }
 
 type RegistryRuleSetCache struct {
+	regexCache *RegexCache
+
 	mu sync.RWMutex
 	rs map[string]*RuleSet
 }
 
-func NewRegistryRuleSetCache() *RegistryRuleSetCache {
+func NewRegistryRuleSetCache(regexCache *RegexCache) *RegistryRuleSetCache {
+	if regexCache == nil {
+		regexCache = NewRegexCache()
+	}
+
 	return &RegistryRuleSetCache{
-		rs: make(map[string]*RuleSet),
+		regexCache: regexCache,
+		rs:         make(map[string]*RuleSet),
 	}
 }
 
-func (c *RegistryRuleSetCache) GetOrBuild(specRules []api.OCIRegistry) (rs *RuleSet, fromCache bool, err error) {
+func (c *RegistryRuleSetCache) GetOrBuild(specRules []rules.OCIRegistry) (rs *RuleSet, fromCache bool, err error) {
 	if len(specRules) == 0 {
 		return nil, false, nil
+	}
+
+	if c == nil {
+		return nil, false, fmt.Errorf("registry rule set cache is nil")
 	}
 
 	id := c.HashRules(specRules)
@@ -58,13 +76,11 @@ func (c *RegistryRuleSetCache) GetOrBuild(specRules []api.OCIRegistry) (rs *Rule
 		return rs, true, nil
 	}
 
-	// Build outside locks (regex compile etc.)
-	built, err := buildRuleSet(id, specRules)
+	built, err := c.buildRuleSet(id, specRules)
 	if err != nil {
 		return nil, false, err
 	}
 
-	// Insert with double-check
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -72,7 +88,6 @@ func (c *RegistryRuleSetCache) GetOrBuild(specRules []api.OCIRegistry) (rs *Rule
 		c.rs = make(map[string]*RuleSet)
 	}
 
-	// Another goroutine may have inserted meanwhile
 	if rs = c.rs[id]; rs != nil {
 		return rs, true, nil
 	}
@@ -82,15 +97,112 @@ func (c *RegistryRuleSetCache) GetOrBuild(specRules []api.OCIRegistry) (rs *Rule
 	return built, false, nil
 }
 
+// Match matches reference, regex and pullPolicy.
+// Admission evaluation should usually use MatchReference instead.
+func (c *RegistryRuleSetCache) Match(
+	specRules []rules.OCIRegistry,
+	reference string,
+	pullPolicy corev1.PullPolicy,
+) (*CompiledRule, error) {
+	rs, _, err := c.GetOrBuild(specRules)
+	if err != nil {
+		return nil, err
+	}
+
+	if rs == nil {
+		return nil, nil
+	}
+
+	return c.MatchRuleSet(rs, reference, pullPolicy)
+}
+
+func (c *RegistryRuleSetCache) MatchRuleSet(
+	rs *RuleSet,
+	reference string,
+	pullPolicy corev1.PullPolicy,
+) (*CompiledRule, error) {
+	if c == nil {
+		return nil, fmt.Errorf("registry rule set cache is nil")
+	}
+
+	if c.regexCache == nil {
+		return nil, fmt.Errorf("regex cache is nil")
+	}
+
+	if rs == nil {
+		return nil, nil
+	}
+
+	for i := range rs.Compiled {
+		rule := &rs.Compiled[i]
+
+		if !rule.AllowsPullPolicy(pullPolicy) {
+			continue
+		}
+
+		compiled, _, err := c.regexCache.GetOrCompile(rule.Expression)
+		if err != nil {
+			return nil, err
+		}
+
+		if compiled.MatchString(reference) {
+			return rule, nil
+		}
+	}
+
+	return nil, nil
+}
+
+// MatchReference matches reference and regex only.
+// It intentionally does not check pullPolicy.
+func (c *RegistryRuleSetCache) MatchReference(
+	rs *RuleSet,
+	reference string,
+) (*CompiledRule, error) {
+	if c == nil {
+		return nil, fmt.Errorf("registry rule set cache is nil")
+	}
+
+	if c.regexCache == nil {
+		return nil, fmt.Errorf("regex cache is nil")
+	}
+
+	if rs == nil {
+		return nil, nil
+	}
+
+	for i := range rs.Compiled {
+		rule := &rs.Compiled[i]
+
+		compiled, _, err := c.regexCache.GetOrCompile(rule.Expression)
+		if err != nil {
+			return nil, err
+		}
+
+		if compiled.MatchString(reference) {
+			return rule, nil
+		}
+	}
+
+	return nil, nil
+}
+
 func (c *RegistryRuleSetCache) Stats() int {
+	if c == nil {
+		return 0
+	}
+
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
 	return len(c.rs)
 }
 
-// activeIDs: set of ids currently referenced by RuleStatus in cluster.
 func (c *RegistryRuleSetCache) PruneActive(activeIDs map[string]struct{}) int {
+	if c == nil {
+		return 0
+	}
+
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -109,10 +221,10 @@ func (c *RegistryRuleSetCache) PruneActive(activeIDs map[string]struct{}) int {
 	return removed
 }
 
-func (c *RegistryRuleSetCache) HashRules(specRules []api.OCIRegistry) string {
+func (c *RegistryRuleSetCache) HashRules(specRules []rules.OCIRegistry) string {
 	var b strings.Builder
 
-	b.Grow(len(specRules) * 64)
+	b.Grow(len(specRules) * 96)
 
 	const (
 		sepRule  = "\n"
@@ -121,7 +233,7 @@ func (c *RegistryRuleSetCache) HashRules(specRules []api.OCIRegistry) string {
 	)
 
 	for _, r := range specRules {
-		url := strings.TrimSpace(r.Registry)
+		expr := r.Expression()
 
 		policies := make([]string, 0, len(r.Policy))
 		for _, p := range r.Policy {
@@ -130,14 +242,15 @@ func (c *RegistryRuleSetCache) HashRules(specRules []api.OCIRegistry) string {
 
 		sort.Strings(policies)
 
-		validations := make([]string, 0, len(r.Validation))
-		for _, v := range r.Validation {
-			validations = append(validations, strings.TrimSpace(string(v)))
+		b.WriteString(strings.TrimSpace(expr.Expression))
+		b.WriteString(sepField)
+
+		if expr.Negate {
+			b.WriteString("1")
+		} else {
+			b.WriteString("0")
 		}
 
-		sort.Strings(validations)
-
-		b.WriteString(url)
 		b.WriteString(sepField)
 
 		for i, p := range policies {
@@ -148,16 +261,6 @@ func (c *RegistryRuleSetCache) HashRules(specRules []api.OCIRegistry) string {
 			b.WriteString(p)
 		}
 
-		b.WriteString(sepField)
-
-		for i, v := range validations {
-			if i > 0 {
-				b.WriteString(sepList)
-			}
-
-			b.WriteString(v)
-		}
-
 		b.WriteString(sepRule)
 	}
 
@@ -166,8 +269,11 @@ func (c *RegistryRuleSetCache) HashRules(specRules []api.OCIRegistry) string {
 	return hex.EncodeToString(sum[:])
 }
 
-// Has is useful in tests and debugging.
 func (c *RegistryRuleSetCache) Has(id string) bool {
+	if c == nil {
+		return false
+	}
+
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
@@ -177,14 +283,16 @@ func (c *RegistryRuleSetCache) Has(id string) bool {
 }
 
 func (c *RegistryRuleSetCache) Reset() {
+	if c == nil {
+		return
+	}
+
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	c.rs = make(map[string]*RuleSet)
 }
 
-// InsertForTest can be behind a build tag if you prefer, but it's fine to keep simple.
-//
 //nolint:unused
 func (c *RegistryRuleSetCache) insertForTest(id string) {
 	c.mu.Lock()
@@ -197,38 +305,34 @@ func (c *RegistryRuleSetCache) insertForTest(id string) {
 	c.rs[id] = &RuleSet{ID: id}
 }
 
-func buildRuleSet(id string, specRules []api.OCIRegistry) (*RuleSet, error) {
+func (c *RegistryRuleSetCache) buildRuleSet(id string, specRules []rules.OCIRegistry) (*RuleSet, error) {
+	if c.regexCache == nil {
+		return nil, fmt.Errorf("regex cache is nil")
+	}
+
 	rs := &RuleSet{
 		ID:       id,
 		Compiled: make([]CompiledRule, 0, len(specRules)),
 	}
 
 	for _, r := range specRules {
-		re, err := regexp.Compile(r.Registry)
+		expression := r.Expression()
+
+		compiled, _, err := c.regexCache.GetOrCompile(expression)
 		if err != nil {
-			return nil, fmt.Errorf("invalid registry regex %q: %w", r.Registry, err)
+			return nil, err
 		}
 
 		cr := CompiledRule{
-			Registry: r.Registry,
-			RE:       re,
+			Expression: expression,
+			RegexID:    compiled.ID,
 		}
 
 		if len(r.Policy) > 0 {
 			cr.AllowedPolicy = make(map[corev1.PullPolicy]struct{}, len(r.Policy))
+
 			for _, p := range r.Policy {
 				cr.AllowedPolicy[p] = struct{}{}
-			}
-		}
-
-		for _, v := range r.Validation {
-			switch v {
-			case api.ValidateImages:
-				cr.ValidateImages = true
-				rs.HasImages = true
-			case api.ValidateVolumes:
-				cr.ValidateVolumes = true
-				rs.HasVolumes = true
 			}
 		}
 

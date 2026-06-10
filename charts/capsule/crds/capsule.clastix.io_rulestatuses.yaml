@@ -15,6 +15,14 @@ spec:
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
+    - description: Ready Status
+      jsonPath: .status.conditions[?(@.type=="Ready")].status
+      name: Ready
+      type: string
+    - description: Ready Message
+      jsonPath: .status.conditions[?(@.type=="Ready")].message
+      name: Message
+      type: string
     - description: Age
       jsonPath: .metadata.creationTimestamp
       name: Age
@@ -48,39 +56,66 @@ spec:
                 enforce:
                   description: Enforcement for given rule
                   properties:
-                    registries:
+                    action:
+                      default: deny
                       description: |-
-                        Define registries which are allowed to be used within this tenant
-                        The rules are aggregated, since you can use Regular Expressions the match registry endpoints
-                      items:
-                        properties:
-                          policy:
-                            description: Allowed PullPolicy for the given registry.
-                              Supplying no value allows all policies.
-                            items:
-                              description: PullPolicy describes a policy for if/when
-                                to pull a container image
-                              type: string
-                            type: array
-                          url:
-                            description: OCI Registry endpoint, is treated as regular
-                              expression.
+                        Declare the action being performed on the enforcement rule:
+                        deny: On match, deny admission request
+                        allow: On match, allowed admission request
+                        audit: On match, audit (post event) of admission request
+                      enum:
+                      - allow
+                      - deny
+                      - audit
+                      type: string
+                    workloads:
+                      description: Enforcement for Workloads (Pods)
+                      properties:
+                        qosClasses:
+                          description: |-
+                            Define Pod QoS classes matched by this enforcement rule.
+                            Supported values are Guaranteed, Burstable and BestEffort.
+                          items:
+                            description: PodQOSClass defines the supported qos classes
+                              of Pods.
                             type: string
-                          validation:
-                            default:
-                            - pod/images
+                          type: array
+                        registries:
+                          description: |-
+                            Define registries which are allowed to be used within this tenant
+                            The rules are aggregated, since you can use Regular Expressions the match registry endpoints
+                          items:
+                            properties:
+                              exp:
+                                description: Expression used to evaluate regex
+                                type: string
+                              negate:
+                                default: false
+                                description: Negate regular Expression
+                                type: boolean
+                              policy:
+                                description: Allowed PullPolicy for the given registry.
+                                  Supplying no value allows all policies.
+                                items:
+                                  description: PullPolicy describes a policy for if/when
+                                    to pull a container image
+                                  type: string
+                                type: array
+                            type: object
+                          type: array
+                        targets:
+                          description: |-
+                            Define the enforcement targets this rule applies to.
+                            If empty, each webhook applies its own backwards-compatible default.
+                          items:
+                            enum:
+                            - pod/initcontainers
+                            - pod/ephemeralcontainers
+                            - pod/containers
                             - pod/volumes
-                            description: Requesting Resources
-                            items:
-                              enum:
-                              - pod/images
-                              - pod/volumes
-                              type: string
-                            type: array
-                        required:
-                        - url
-                        type: object
-                      type: array
+                            type: string
+                          type: array
+                      type: object
                   type: object
               type: object
             type: array
@@ -151,50 +186,154 @@ spec:
                 format: int64
                 type: integer
               rule:
-                description: Managed Enforcement properties per Namespace (aggregated
-                  from rules)
+                description: |-
+                  Deprecated: use Rules.
+                  Rule contains a legacy flattened view and cannot fully represent action-aware rules.
                 properties:
                   enforce:
                     description: Enforcement for given rule
                     properties:
-                      registries:
+                      action:
+                        default: deny
                         description: |-
-                          Define registries which are allowed to be used within this tenant
-                          The rules are aggregated, since you can use Regular Expressions the match registry endpoints
-                        items:
+                          Declare the action being performed on the enforcement rule:
+                          deny: On match, deny admission request
+                          allow: On match, allowed admission request
+                          audit: On match, audit (post event) of admission request
+                        enum:
+                        - allow
+                        - deny
+                        - audit
+                        type: string
+                      workloads:
+                        description: Enforcement for Workloads (Pods)
+                        properties:
+                          qosClasses:
+                            description: |-
+                              Define Pod QoS classes matched by this enforcement rule.
+                              Supported values are Guaranteed, Burstable and BestEffort.
+                            items:
+                              description: PodQOSClass defines the supported qos classes
+                                of Pods.
+                              type: string
+                            type: array
+                          registries:
+                            description: |-
+                              Define registries which are allowed to be used within this tenant
+                              The rules are aggregated, since you can use Regular Expressions the match registry endpoints
+                            items:
+                              properties:
+                                exp:
+                                  description: Expression used to evaluate regex
+                                  type: string
+                                negate:
+                                  default: false
+                                  description: Negate regular Expression
+                                  type: boolean
+                                policy:
+                                  description: Allowed PullPolicy for the given registry.
+                                    Supplying no value allows all policies.
+                                  items:
+                                    description: PullPolicy describes a policy for
+                                      if/when to pull a container image
+                                    type: string
+                                  type: array
+                              type: object
+                            type: array
+                          targets:
+                            description: |-
+                              Define the enforcement targets this rule applies to.
+                              If empty, each webhook applies its own backwards-compatible default.
+                            items:
+                              enum:
+                              - pod/initcontainers
+                              - pod/ephemeralcontainers
+                              - pod/containers
+                              - pod/volumes
+                              type: string
+                            type: array
+                        type: object
+                    type: object
+                type: object
+              rules:
+                description: |-
+                  Rules contains the effective namespace rules after tenant rule selection.
+                  Order is preserved from the originating Tenant rules.
+                items:
+                  description: For future implementation where users might manage
+                    RuleStatus CRs themselves
+                  properties:
+                    enforce:
+                      description: Enforcement for given rule
+                      properties:
+                        action:
+                          default: deny
+                          description: |-
+                            Declare the action being performed on the enforcement rule:
+                            deny: On match, deny admission request
+                            allow: On match, allowed admission request
+                            audit: On match, audit (post event) of admission request
+                          enum:
+                          - allow
+                          - deny
+                          - audit
+                          type: string
+                        workloads:
+                          description: Enforcement for Workloads (Pods)
                           properties:
-                            policy:
-                              description: Allowed PullPolicy for the given registry.
-                                Supplying no value allows all policies.
+                            qosClasses:
+                              description: |-
+                                Define Pod QoS classes matched by this enforcement rule.
+                                Supported values are Guaranteed, Burstable and BestEffort.
                               items:
-                                description: PullPolicy describes a policy for if/when
-                                  to pull a container image
+                                description: PodQOSClass defines the supported qos
+                                  classes of Pods.
                                 type: string
                               type: array
-                            url:
-                              description: OCI Registry endpoint, is treated as regular
-                                expression.
-                              type: string
-                            validation:
-                              default:
-                              - pod/images
-                              - pod/volumes
-                              description: Requesting Resources
+                            registries:
+                              description: |-
+                                Define registries which are allowed to be used within this tenant
+                                The rules are aggregated, since you can use Regular Expressions the match registry endpoints
+                              items:
+                                properties:
+                                  exp:
+                                    description: Expression used to evaluate regex
+                                    type: string
+                                  negate:
+                                    default: false
+                                    description: Negate regular Expression
+                                    type: boolean
+                                  policy:
+                                    description: Allowed PullPolicy for the given
+                                      registry. Supplying no value allows all policies.
+                                    items:
+                                      description: PullPolicy describes a policy for
+                                        if/when to pull a container image
+                                      type: string
+                                    type: array
+                                type: object
+                              type: array
+                            targets:
+                              description: |-
+                                Define the enforcement targets this rule applies to.
+                                If empty, each webhook applies its own backwards-compatible default.
                               items:
                                 enum:
-                                - pod/images
+                                - pod/initcontainers
+                                - pod/ephemeralcontainers
+                                - pod/containers
                                 - pod/volumes
                                 type: string
                               type: array
-                          required:
-                          - url
                           type: object
-                        type: array
-                    type: object
-                type: object
+                      type: object
+                  type: object
+                type: array
             required:
             - conditions
             type: object
+        required:
+        - metadata
         type: object
     served: true
     storage: true

@@ -57,6 +57,7 @@ import (
 	tlscontroller "github.com/projectcapsule/capsule/internal/controllers/tls"
 	utilscontroller "github.com/projectcapsule/capsule/internal/controllers/utils"
 	"github.com/projectcapsule/capsule/internal/metrics"
+	capsuleversion "github.com/projectcapsule/capsule/internal/version"
 	"github.com/projectcapsule/capsule/internal/webhook"
 	cfgvalidation "github.com/projectcapsule/capsule/internal/webhook/cfg"
 	customquotavalidation "github.com/projectcapsule/capsule/internal/webhook/customquota"
@@ -98,9 +99,9 @@ func init() {
 }
 
 func printVersion() {
-	setupLog.Info(fmt.Sprintf("Capsule Version %s %s%s", GitTag, GitCommit, GitDirty))
-	setupLog.Info(fmt.Sprintf("Build from: %s", GitRepo))
-	setupLog.Info(fmt.Sprintf("Build date: %s", BuildTime))
+	setupLog.Info(fmt.Sprintf("Capsule Version %s %s%s", capsuleversion.GitTag, capsuleversion.GitCommit, capsuleversion.GitDirty))
+	setupLog.Info(fmt.Sprintf("Build from: %s", capsuleversion.GitRepo))
+	setupLog.Info(fmt.Sprintf("Build date: %s", capsuleversion.BuildTime))
 	setupLog.Info(fmt.Sprintf("Go Version: %s", goRuntime.Version()))
 	setupLog.Info(fmt.Sprintf("Go OS/Arch: %s/%s", goRuntime.GOOS, goRuntime.GOARCH))
 }
@@ -503,7 +504,8 @@ func main() {
 
 	// Initialize Caches
 	impersonationCache := cache.NewImpersonationCache()
-	registryCache := cache.NewRegistryRuleSetCache()
+	regexCache := cache.NewRegexCache()
+	registryCache := cache.NewRegistryRuleSetCache(regexCache)
 	customQuotaQuantityCache := cache.NewQuantityCache[string]()
 	jsonPathCache := cache.NewJSONPathCache()
 	targetsCache := cache.NewCompiledTargetsCache[string]()
@@ -562,6 +564,7 @@ func main() {
 				pod.ContainerRegistry(cfg, registryCache),
 				pod.PriorityClass(),
 				pod.RuntimeClass(),
+				pod.QoSClass(cfg),
 			),
 		),
 		route.Ingress(ingress.Class(cfg, kubeVersion), ingress.Hostnames(cfg), ingress.Collision(cfg), ingress.Wildcard()),
@@ -633,18 +636,18 @@ func main() {
 				namespacemutation.NamespacePatchGuardHandler(cfg),
 			),
 		),
-		route.ResourcePoolMutation((resourcepool.PoolMutationHandler(ctrl.Log.WithName("webhooks").WithName("resourcepool")))),
-		route.ResourcePoolValidation((resourcepool.PoolValidationHandler(ctrl.Log.WithName("webhooks").WithName("resourcepool")))),
-		route.ResourcePoolClaimMutation((resourcepool.ClaimMutationHandler(ctrl.Log.WithName("webhooks").WithName("resourcepoolclaims")))),
-		route.ResourcePoolClaimValidation((resourcepool.ClaimValidationHandler(ctrl.Log.WithName("webhooks").WithName("resourcepoolclaims")))),
-		route.CustomQuotaValidation((customquotavalidation.CustomQuotaValidationHandler(
+		route.ResourcePoolMutation(resourcepool.PoolMutationHandler(ctrl.Log.WithName("webhooks").WithName("resourcepool"))),
+		route.ResourcePoolValidation(resourcepool.PoolValidationHandler(ctrl.Log.WithName("webhooks").WithName("resourcepool"))),
+		route.ResourcePoolClaimMutation(resourcepool.ClaimMutationHandler(ctrl.Log.WithName("webhooks").WithName("resourcepoolclaims"))),
+		route.ResourcePoolClaimValidation(resourcepool.ClaimValidationHandler(ctrl.Log.WithName("webhooks").WithName("resourcepoolclaims"))),
+		route.CustomQuotaValidation(customquotavalidation.CustomQuotaValidationHandler(
 			targetsCache,
 			jsonPathCache,
-		))),
-		route.GlobalCustomQuotaValidation((customquotavalidation.GlobalCustomQuotaValidationHandler(
+		)),
+		route.GlobalCustomQuotaValidation(customquotavalidation.GlobalCustomQuotaValidationHandler(
 			targetsCache,
 			jsonPathCache,
-		))),
+		)),
 		route.CalculationCustomQuotas(
 			customquotavalidation.ObjectCalculationHandler(
 				targetsCache,
@@ -749,6 +752,7 @@ func main() {
 		RegistryCache:      registryCache,
 		JSONPathCache:      jsonPathCache,
 		TargetsCache:       targetsCache,
+		RegexCache:         regexCache,
 	}
 
 	if err := localInvalidator.SetupWithManager(manager, controllerConfig); err != nil {

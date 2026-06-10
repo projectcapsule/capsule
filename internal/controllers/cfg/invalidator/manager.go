@@ -41,6 +41,7 @@ type CacheInvalidator struct {
 	TargetsCache       *cache.CompiledTargetsCache[string]
 	JSONPathCache      *cache.JSONPathCache
 	ImpersonationCache *cache.ImpersonationCache
+	RegexCache         *cache.RegexCache
 }
 
 func (r *CacheInvalidator) NeedLeaderElection() bool {
@@ -170,6 +171,10 @@ func (r *CacheInvalidator) rebuildCaches(
 	log logr.Logger,
 ) error {
 	var errs []error
+
+	if err := r.rebuildRegexCache(ctx, log); err != nil {
+		errs = append(errs, fmt.Errorf("rebuild Regex cache: %w", err))
+	}
 
 	if err := r.rebuildJSONPathCache(ctx, log); err != nil {
 		errs = append(errs, fmt.Errorf("rebuild JSONPath cache: %w", err))

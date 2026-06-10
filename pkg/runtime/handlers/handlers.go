@@ -22,7 +22,7 @@ type Handler interface {
 	OnUpdate(client client.Client, reader client.Reader, decoder admission.Decoder, recorder events.EventRecorder) Func
 }
 
-type HanderWithTenant interface {
+type HandlerWithTenant interface {
 	OnCreate(c client.Client, reader client.Reader, decoder admission.Decoder, recorder events.EventRecorder, tnt *capsulev1beta2.Tenant) Func
 	OnUpdate(c client.Client, reader client.Reader, decoder admission.Decoder, recorder events.EventRecorder, tnt *capsulev1beta2.Tenant) Func
 	OnDelete(c client.Client, reader client.Reader, decoder admission.Decoder, recorder events.EventRecorder, tnt *capsulev1beta2.Tenant) Func

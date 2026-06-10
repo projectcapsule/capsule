@@ -21,18 +21,19 @@ func (ReconcileRequestedPredicate) Update(e event.UpdateEvent) bool {
 		return false
 	}
 
-	oldA := e.ObjectOld.GetAnnotations()
-	newA := e.ObjectNew.GetAnnotations()
+	oldValue, oldPresent := e.ObjectOld.GetAnnotations()[meta.ReconcileAnnotation]
+	newValue, newPresent := e.ObjectNew.GetAnnotations()[meta.ReconcileAnnotation]
 
-	oldV := ""
-	if oldA != nil {
-		oldV = oldA[meta.ReconcileAnnotation]
+	oldPresent = oldPresent && oldValue != ""
+	newPresent = newPresent && newValue != ""
+
+	if !newPresent {
+		return false
 	}
 
-	newV := ""
-	if newA != nil {
-		newV = newA[meta.ReconcileAnnotation]
+	if !oldPresent {
+		return true
 	}
 
-	return newV != "" && newV != oldV
+	return oldValue != newValue
 }

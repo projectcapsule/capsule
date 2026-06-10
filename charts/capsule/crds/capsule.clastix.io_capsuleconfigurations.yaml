@@ -19,6 +19,10 @@ spec:
       jsonPath: .status.conditions[?(@.type=="Ready")].status
       name: Ready
       type: string
+    - description: Reconcile Message
+      jsonPath: .status.conditions[?(@.type=="Ready")].message
+      name: Status
+      type: string
     - jsonPath: .metadata.creationTimestamp
       name: Age
       type: date

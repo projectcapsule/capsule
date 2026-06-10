@@ -5,6 +5,7 @@ package invalidator
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/go-logr/logr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -25,26 +26,42 @@ func (r *CacheInvalidator) rebuildRuleStatusRegistryCache(ctx context.Context, l
 	}
 
 	log.V(5).Info("rebuilding registry cache from existing rules",
-		"rules", len(rsList.Items),
-		"cache_rules_before", r.RegistryCache.Stats(),
+		"ruleStatuses", len(rsList.Items),
+		"cacheRulesBefore", r.RegistryCache.Stats(),
 	)
 
 	r.RegistryCache.Reset()
 
-	for _, item := range rsList.Items {
-		regs := item.Status.Rule.Enforce.Registries
-		if len(regs) == 0 {
-			continue
-		}
+	for i := range rsList.Items {
+		item := &rsList.Items[i]
 
-		if _, _, err := r.RegistryCache.GetOrBuild(regs); err != nil {
-			return err
+		for _, rule := range item.Status.Rules {
+			if rule == nil {
+				continue
+			}
+
+			if rule.Enforce == nil {
+				continue
+			}
+
+			if len(rule.Enforce.Workloads.Registries) == 0 {
+				continue
+			}
+
+			if _, _, err := r.RegistryCache.GetOrBuild(rule.Enforce.Workloads.Registries); err != nil {
+				return fmt.Errorf(
+					"build registry cache for RuleStatus %s/%s: %w",
+					item.Namespace,
+					item.Name,
+					err,
+				)
+			}
 		}
 	}
 
 	log.V(5).Info("rebuilt registry cache from existing rules",
-		"rules", len(rsList.Items),
-		"cache_rules_after", r.RegistryCache.Stats(),
+		"ruleStatuses", len(rsList.Items),
+		"cacheRulesAfter", r.RegistryCache.Stats(),
 	)
 
 	return nil

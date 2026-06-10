@@ -20,9 +20,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
-	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/api/rbac"
+	"github.com/projectcapsule/capsule/pkg/api/rules"
 )
 
 var serviceAccountPromotionClusterRoles = []string{
@@ -266,10 +266,10 @@ var _ = Describe("Promoting ServiceAccounts", Ordered, Label("config", "permissi
 			},
 		},
 		Spec: capsulev1beta2.TenantSpec{
-			Rules: []*api.NamespaceRuleBodyTenant{
+			Rules: []*rules.NamespaceRuleBodyTenant{
 				{
-					Permissions: api.NamespaceRulePermissionBody{
-						Promotions: []*api.NamespaceRulePromotionRule{
+					Permissions: rules.NamespaceRulePermissionBody{
+						Promotions: []*rules.NamespaceRulePromotionRule{
 							{
 								ClusterRoles: []string{"view"},
 							},
@@ -290,8 +290,8 @@ var _ = Describe("Promoting ServiceAccounts", Ordered, Label("config", "permissi
 							"environment": "prod",
 						},
 					},
-					Permissions: api.NamespaceRulePermissionBody{
-						Promotions: []*api.NamespaceRulePromotionRule{
+					Permissions: rules.NamespaceRulePermissionBody{
+						Promotions: []*rules.NamespaceRulePromotionRule{
 							{
 								ClusterRoles: []string{"prod-view"},
 							},
@@ -312,8 +312,8 @@ var _ = Describe("Promoting ServiceAccounts", Ordered, Label("config", "permissi
 							"environment": "dev",
 						},
 					},
-					Permissions: api.NamespaceRulePermissionBody{
-						Promotions: []*api.NamespaceRulePromotionRule{
+					Permissions: rules.NamespaceRulePermissionBody{
+						Promotions: []*rules.NamespaceRulePromotionRule{
 							{
 								ClusterRoles: []string{"dev-view"},
 							},

@@ -13,6 +13,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/api/rbac"
+	"github.com/projectcapsule/capsule/pkg/api/rules"
 	"github.com/projectcapsule/capsule/pkg/runtime/selectors"
 )
 
@@ -32,7 +33,7 @@ type TenantSpec struct {
 	//
 	// Read More: https://projectcapsule.dev/docs/tenants/rules/
 	//+optional
-	Rules []*api.NamespaceRuleBodyTenant `json:"rules,omitzero"`
+	Rules []*rules.NamespaceRuleBodyTenant `json:"rules,omitzero"`
 
 	// Specifies the owners of the Tenant.
 	// Optional
@@ -96,7 +97,7 @@ type TenantSpec struct {
 	// Deprecated: Use Enforcement.Registries instead
 	//
 	// Specify the allowed values for the imagePullPolicies option in Pod resources. Capsule assures that all Pod resources created in the Tenant can use only one of the allowed policy. Optional.
-	ImagePullPolicies []api.ImagePullPolicySpec `json:"imagePullPolicies,omitempty"`
+	ImagePullPolicies []rules.ImagePullPolicySpec `json:"imagePullPolicies,omitempty"`
 
 	// Deprecated: Use Tenant Replications instead (https://projectcapsule.dev/docs/replications/)
 	//

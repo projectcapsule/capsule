@@ -29,9 +29,6 @@ spec:
     - jsonPath: .status.reserved
       name: Reserved
       type: string
-    - jsonPath: .status.reservations.size()
-      name: Reservations
-      type: integer
     - jsonPath: .metadata.creationTimestamp
       name: Age
       type: date

@@ -6,9 +6,9 @@ package v1beta2
 import (
 	k8stypes "k8s.io/apimachinery/pkg/types"
 
-	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/api/rbac"
+	"github.com/projectcapsule/capsule/pkg/api/rules"
 )
 
 // +kubebuilder:validation:Enum=Cordoned;Active;Terminating
@@ -72,7 +72,7 @@ type TenantStatusRuleStatusItem struct {
 
 type TenantStatusNamespaceEnforcement struct {
 	// Registries which are allowed within this namespace
-	Registries []api.OCIRegistry `json:"registry,omitempty"`
+	Registries []rules.OCIRegistry `json:"registry,omitempty"`
 }
 
 type TenantStatusNamespaceMetadata struct {

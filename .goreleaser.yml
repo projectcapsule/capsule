@@ -9,7 +9,7 @@ gomod:
   proxy: false
 builds:
   - id: "{{ .ProjectName }}"
-    main: ./cmd/
+    main: ./cmd/controller
     binary: "{{ .ProjectName }}-{{ .Os }}-{{ .Arch }}"
     env:
       - CGO_ENABLED=0
@@ -23,12 +23,12 @@ builds:
     mod_timestamp: '{{ .CommitTimestamp }}'
     ldflags:
       - >-
-          -X main.Version={{ .Tag }}
-          -X main.GitCommit={{ .Commit }}
-          -X main.GitTag={{ .Tag }}
-          -X main.GitDirty={{ .Date }}
-          -X main.BuildTime={{ .Date }}
-          -X main.GitRepo={{ .ProjectName }}
+        -X github.com/projectcapsule/capsule/internal/version.Version={{ .Tag }}
+        -X github.com/projectcapsule/capsule/internal/version.GitCommit={{ .Commit }}
+        -X github.com/projectcapsule/capsule/internal/version.GitTag={{ .Tag }}
+        -X github.com/projectcapsule/capsule/internal/version.GitDirty={{ .Date }}
+        -X github.com/projectcapsule/capsule/internal/version.BuildTime={{ .Date }}
+        -X github.com/projectcapsule/capsule/internal/version.GitRepo={{ .ProjectName }}
   # - id: "{{ .ProjectName }}-wasm"
   #   main: ./cmd/
   #   binary: "{{ .ProjectName }}.wasm"

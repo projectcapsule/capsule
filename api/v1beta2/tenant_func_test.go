@@ -9,13 +9,13 @@ import (
 
 	rbacv1 "k8s.io/api/rbac/v1"
 
-	"github.com/projectcapsule/capsule/api/v1beta2"
+	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	capsulerbac "github.com/projectcapsule/capsule/pkg/api/rbac"
 )
 
-func testTenant() *v1beta2.Tenant {
-	return &v1beta2.Tenant{
-		Spec: v1beta2.TenantSpec{
+func testTenant() *capsulev1beta2.Tenant {
+	return &capsulev1beta2.Tenant{
+		Spec: capsulev1beta2.TenantSpec{
 			AdditionalRoleBindings: []capsulerbac.AdditionalRoleBindingsSpec{
 				{
 					ClusterRoleName: "developer",
@@ -39,7 +39,7 @@ func testTenant() *v1beta2.Tenant {
 				},
 			},
 		},
-		Status: v1beta2.TenantStatus{
+		Status: capsulev1beta2.TenantStatus{
 			Owners: capsulerbac.OwnerStatusListSpec{
 				{
 					UserSpec: capsulerbac.UserSpec{
@@ -127,8 +127,8 @@ func TestGetSubjectsByClusterRoles(t *testing.T) {
 func TestGetClusterRolesBySubjectSorted(t *testing.T) {
 	t.Parallel()
 
-	tenant := &v1beta2.Tenant{
-		Spec: v1beta2.TenantSpec{
+	tenant := &capsulev1beta2.Tenant{
+		Spec: capsulev1beta2.TenantSpec{
 			AdditionalRoleBindings: []capsulerbac.AdditionalRoleBindingsSpec{
 				{
 					ClusterRoleName: "deployer",
@@ -150,7 +150,7 @@ func TestGetClusterRolesBySubjectSorted(t *testing.T) {
 				},
 			},
 		},
-		Status: v1beta2.TenantStatus{
+		Status: capsulev1beta2.TenantStatus{
 			Owners: capsulerbac.OwnerStatusListSpec{
 				{
 					UserSpec: capsulerbac.UserSpec{
@@ -229,7 +229,7 @@ func TestGetClusterRolesBySubjectSorted(t *testing.T) {
 	t.Run("empty tenant yields empty slice", func(t *testing.T) {
 		t.Parallel()
 
-		empty := &v1beta2.Tenant{}
+		empty := &capsulev1beta2.Tenant{}
 		got := empty.GetClusterRolesBySubject(nil)
 		if len(got) != 0 {
 			t.Fatalf("expected empty, got %#v", got)

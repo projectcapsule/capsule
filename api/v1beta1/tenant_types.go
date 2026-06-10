@@ -8,6 +8,7 @@ import (
 
 	"github.com/projectcapsule/capsule/pkg/api"
 	"github.com/projectcapsule/capsule/pkg/api/rbac"
+	"github.com/projectcapsule/capsule/pkg/api/rules"
 )
 
 // TenantSpec defines the desired state of Tenant.
@@ -39,7 +40,7 @@ type TenantSpec struct {
 	// Specifies additional RoleBindings assigned to the Tenant. Capsule will ensure that all namespaces in the Tenant always contain the RoleBinding for the given ClusterRole. Optional.
 	AdditionalRoleBindings []rbac.AdditionalRoleBindingsSpec `json:"additionalRoleBindings,omitempty"`
 	// Specify the allowed values for the imagePullPolicies option in Pod resources. Capsule assures that all Pod resources created in the Tenant can use only one of the allowed policy. Optional.
-	ImagePullPolicies []api.ImagePullPolicySpec `json:"imagePullPolicies,omitempty"`
+	ImagePullPolicies []rules.ImagePullPolicySpec `json:"imagePullPolicies,omitempty"`
 	// Specifies the allowed priorityClasses assigned to the Tenant. Capsule assures that all Pods resources created in the Tenant can use only one of the allowed PriorityClasses. Optional.
 	PriorityClasses *api.AllowedListSpec `json:"priorityClasses,omitempty"`
 }
