@@ -5,7 +5,6 @@ package validation
 
 import (
 	"context"
-	"fmt"
 	"regexp"
 
 	"k8s.io/client-go/tools/events"
@@ -69,7 +68,7 @@ func (h *saNameHandler) validateServiceAccountName(tnt *capsulev1beta2.Tenant, r
 		}
 
 		if !compiler.MatchString(owner.Name) {
-			return ad.Deny(fmt.Sprintf("owner name %s is not a valid Service Account name ", owner.Name))
+			return ad.Denyf("owner name %s is not a valid Service Account name", owner.Name)
 		}
 	}
 

@@ -5,7 +5,6 @@ package validation
 
 import (
 	"context"
-	"fmt"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -43,11 +42,9 @@ func (h *prefixHandler) OnCreate(
 	return func(ctx context.Context, req admission.Request) *admission.Response {
 		if exp, _ := h.cfg.ProtectedNamespaceRegexp(); exp != nil {
 			if exp.MatchString(ns.GetName()) {
-				return ad.Deny(
-					fmt.Sprintf(
-						"Creating namespaces with name matching %s regexp is not allowed; please, reach out to the system administrators",
-						exp.String(),
-					),
+				return ad.Denyf(
+					"Creating namespaces with name matching %s regexp is not allowed; please, reach out to the system administrators",
+					exp.String(),
 				)
 			}
 		}
@@ -73,11 +70,9 @@ func (h *prefixHandler) OnCreate(
 				ns.GetName(),
 			)
 
-			return ad.Deny(
-				fmt.Sprintf(
-					"The namespace doesn't match the tenant prefix, expected prefix %q",
-					expectedPrefix,
-				),
+			return ad.Denyf(
+				"The namespace doesn't match the tenant prefix, expected prefix %q",
+				expectedPrefix,
 			)
 		}
 
