@@ -27,9 +27,9 @@ make test
 
 ## E2E Test
 
-**New changes always require dedcated E2E tests. E2E help us to ensure the quality of the code and it's functionality.**
+**New changes always require dedicated E2E tests. E2E help us to ensure the quality of the code and it's functionality.**
 
-For E2E test we use the [ginkgo](https://github.com/onsi/ginkgo) framework. Ou can see all the test under [e2e](./e2e/).
+For E2E test we use the [ginkgo](https://github.com/onsi/ginkgo) framework. You can see all the test under [e2e](./e2e/).
 
 
 With the following command a new KinD cluster is created with the Kubernetes version `v1.20.7` (This can be done with any available Kubernetes version). A docker image is created and pushed and loaded into the KinD cluster. Then the E2E tests are executed against the KinD cluster.
