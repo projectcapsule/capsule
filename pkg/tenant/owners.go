@@ -86,3 +86,14 @@ func GetOwnersWithKinds(tenant *capsulev1beta2.Tenant) (owners []string) {
 func OwnerKindIndexKey(kind, name string) string {
 	return fmt.Sprintf("%s:%s", kind, name)
 }
+
+func ValidateTenantOwner(owner rbac.CoreOwnerSpec) error {
+	if owner.Kind == rbac.ServiceAccountOwner {
+		_, _, err := serviceaccount.SplitUsername(owner.Name)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
