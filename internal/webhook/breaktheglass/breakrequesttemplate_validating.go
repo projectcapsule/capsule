@@ -57,8 +57,6 @@ func validate(decoder admission.Decoder, req admission.Request) *admission.Respo
 		return ad.ErroredResponse(fmt.Errorf("failed to decode new object: %w", err))
 	}
 
-	// FIXME: validate whether capsule is allowed to manage the resource from the template
-
 	if !brt.Spec.AutoApprove {
 		if brt.Spec.ApprovalCondition != "" {
 			return ad.Denyf("approvalCondition should not be set when autoApprove is false")
