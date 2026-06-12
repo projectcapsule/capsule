@@ -20,6 +20,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
@@ -107,6 +108,8 @@ func (r *Manager) Reconcile(ctx context.Context, request reconcile.Request) (res
 }
 
 func (r *Manager) EnsureClusterRoleBindingsProvisioner(ctx context.Context) error {
+	log := log.FromContext(ctx)
+
 	cfg := r.Configuration.RBAC()
 
 	crb := &rbacv1.ClusterRoleBinding{
@@ -152,7 +155,14 @@ func (r *Manager) EnsureClusterRoleBindingsProvisioner(ctx context.Context) erro
 				case rbac.ServiceAccountOwner:
 					namespace, name, err := serviceaccount.SplitUsername(entity.Name)
 					if err != nil {
-						return err
+						log.Error(
+							err,
+							"can not parse serviceaccount reference",
+							"subject", entity.Name,
+							"kind", entity.Kind,
+						)
+
+						continue
 					}
 
 					crb.Subjects = append(crb.Subjects, rbacv1.Subject{
