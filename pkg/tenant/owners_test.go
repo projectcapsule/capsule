@@ -215,7 +215,7 @@ func TestValidateTenantOwner(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			err := tenant.ValidateTenantOwner(tt.owner)
+			err := tenant.ValidateTenantOwner(tt.owner.UserSpec)
 
 			if tt.wantErr && err == nil {
 				t.Fatalf("ValidateTenantOwner() expected error, got nil")

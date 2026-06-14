@@ -665,6 +665,7 @@ func main() {
 			cfgvalidation.Handler(cfg,
 				cfgvalidation.WarningHandler(),
 				cfgvalidation.ServiceAccountHandler(),
+				cfgvalidation.OwnerHandler(),
 			),
 		),
 	)

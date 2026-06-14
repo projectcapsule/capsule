@@ -67,7 +67,7 @@ func (h *ownersHandler) handle(
 	tnt *capsulev1beta2.Tenant,
 ) *admission.Response {
 	for _, owner := range tnt.Spec.Owners {
-		if err := tenant.ValidateTenantOwner(owner.CoreOwnerSpec); err != nil {
+		if err := tenant.ValidateTenantOwner(owner.UserSpec); err != nil {
 			return ad.Deny(
 				err.Error(),
 			)

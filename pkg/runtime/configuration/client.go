@@ -164,6 +164,7 @@ func (c *capsuleConfiguration) Users() rbac.UserListSpec {
 	out := rbac.UserListSpec{}
 
 	for _, user := range c.UserNames() {
+
 		out.Upsert(rbac.UserSpec{
 			Kind: rbac.UserOwner,
 			Name: user,

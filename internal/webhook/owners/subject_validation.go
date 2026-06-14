@@ -68,7 +68,7 @@ func (r *ownerSubjectHandler) OnDelete(
 func (h *ownerSubjectHandler) handle(
 	owner *capsulev1beta2.TenantOwner,
 ) *admission.Response {
-	if err := tenant.ValidateTenantOwner(owner.Spec.CoreOwnerSpec); err != nil {
+	if err := tenant.ValidateTenantOwner(owner.Spec.CoreOwnerSpec.UserSpec); err != nil {
 		return ad.Deny(
 			err.Error(),
 		)
