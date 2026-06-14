@@ -103,14 +103,12 @@ func (h *objectCalculationHandler) OnCreate(
 
 			evaluated, err := h.evaluateMatchedQuotas(ctx, u, matched)
 			if err != nil {
-				finalResp = ad.Deny(
-					fmt.Sprintf(
-						"creating resource %s/%s (%s) cannot be admitted because custom quota usage could not be calculated: %v",
-						req.Namespace,
-						req.Name,
-						req.Kind.String(),
-						err,
-					),
+				finalResp = ad.Denyf(
+					"creating resource %s/%s (%s) cannot be admitted because custom quota usage could not be calculated: %v",
+					req.Namespace,
+					req.Name,
+					req.Kind.String(),
+					err,
 				)
 
 				return nil
@@ -166,17 +164,15 @@ func (h *objectCalculationHandler) OnCreate(
 						"inflightReserved", reserved.String(),
 					)
 
-					finalResp = ad.Deny(
-						fmt.Sprintf(
-							"creating resource exceeds limit for %s %q (requested=%s, currentUsed=%s, available=%s, limit=%s, inflightReserved=%s)",
-							quotaTypeName(item.IsGlobal),
-							item.Name,
-							item.Usage.String(),
-							effectiveUsed.String(),
-							available.String(),
-							item.Limit.String(),
-							reserved.String(),
-						),
+					finalResp = ad.Denyf(
+						"creating resource exceeds limit for %s %q (requested=%s, currentUsed=%s, available=%s, limit=%s, inflightReserved=%s)",
+						quotaTypeName(item.IsGlobal),
+						item.Name,
+						item.Usage.String(),
+						effectiveUsed.String(),
+						available.String(),
+						item.Limit.String(),
+						reserved.String(),
 					)
 
 					return nil
@@ -194,12 +190,10 @@ func (h *objectCalculationHandler) OnCreate(
 		})
 		if err != nil {
 			if apierrors.IsConflict(err) {
-				return ad.Deny(
-					fmt.Sprintf(
-						"custom quota admission could not reserve usage due to concurrent quota updates after %d attempts; please retry the request: %v",
-						customAdmissionBackoff.Steps,
-						err,
-					),
+				return ad.Denyf(
+					"custom quota admission could not reserve usage due to concurrent quota updates after %d attempts; please retry the request: %v",
+					customAdmissionBackoff.Steps,
+					err,
 				)
 			}
 
@@ -247,14 +241,12 @@ func (h *objectCalculationHandler) OnUpdate(
 
 			oldEvaluated, err := h.evaluateMatchedQuotas(ctx, oldObj, oldMatched)
 			if err != nil {
-				finalResp = ad.Deny(
-					fmt.Sprintf(
-						"updating resource %s/%s (%s) cannot be admitted because previous custom quota usage could not be calculated: %v",
-						req.Namespace,
-						req.Name,
-						req.Kind.String(),
-						err,
-					),
+				finalResp = ad.Denyf(
+					"updating resource %s/%s (%s) cannot be admitted because previous custom quota usage could not be calculated: %v",
+					req.Namespace,
+					req.Name,
+					req.Kind.String(),
+					err,
 				)
 
 				return nil
@@ -262,14 +254,12 @@ func (h *objectCalculationHandler) OnUpdate(
 
 			newEvaluated, err := h.evaluateMatchedQuotas(ctx, newObj, newMatched)
 			if err != nil {
-				finalResp = ad.Deny(
-					fmt.Sprintf(
-						"updating resource %s/%s (%s) cannot be admitted because new custom quota usage could not be calculated: %v",
-						req.Namespace,
-						req.Name,
-						req.Kind.String(),
-						err,
-					),
+				finalResp = ad.Denyf(
+					"updating resource %s/%s (%s) cannot be admitted because new custom quota usage could not be calculated: %v",
+					req.Namespace,
+					req.Name,
+					req.Kind.String(),
+					err,
 				)
 
 				return nil
@@ -397,17 +387,15 @@ func (h *objectCalculationHandler) OnUpdate(
 						available = resource.MustParse("0")
 					}
 
-					finalResp = ad.Deny(
-						fmt.Sprintf(
-							"updating resource exceeds limit for %s %q (requested=%s, currentUsed=%s, available=%s, limit=%s, inflightReserved=%s)",
-							quotaTypeName(base.IsGlobal),
-							base.Name,
-							newUsage.String(),
-							effectiveUsed.String(),
-							available.String(),
-							base.Limit.String(),
-							reserved.String(),
-						),
+					finalResp = ad.Denyf(
+						"updating resource exceeds limit for %s %q (requested=%s, currentUsed=%s, available=%s, limit=%s, inflightReserved=%s)",
+						quotaTypeName(base.IsGlobal),
+						base.Name,
+						newUsage.String(),
+						effectiveUsed.String(),
+						available.String(),
+						base.Limit.String(),
+						reserved.String(),
 					)
 
 					return nil
@@ -432,12 +420,10 @@ func (h *objectCalculationHandler) OnUpdate(
 		})
 		if err != nil {
 			if apierrors.IsConflict(err) {
-				return ad.Deny(
-					fmt.Sprintf(
-						"custom quota admission could not reserve usage due to concurrent quota updates after %d attempts; please retry the request: %v",
-						customAdmissionBackoff.Steps,
-						err,
-					),
+				return ad.Denyf(
+					"custom quota admission could not reserve usage due to concurrent quota updates after %d attempts; please retry the request: %v",
+					customAdmissionBackoff.Steps,
+					err,
 				)
 			}
 

@@ -10,7 +10,5 @@ import (
 )
 
 func ErroredResponse(err error) *admission.Response {
-	response := admission.Errored(http.StatusInternalServerError, err)
-
-	return &response
+	return new(admission.Errored(http.StatusInternalServerError, err))
 }

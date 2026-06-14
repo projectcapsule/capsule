@@ -5,7 +5,6 @@ package resourcepool
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -79,22 +78,18 @@ func (h *poolValidationHandler) OnUpdate(
 						continue
 					}
 
-					return ad.Deny(
-						fmt.Sprintf(
-							"can not remove resource %s as it is still being allocated. Remove corresponding claims or keep the resources in the pool",
-							resourceName,
-						),
+					return ad.Denyf(
+						"can not remove resource %s as it is still being allocated. Remove corresponding claims or keep the resources in the pool",
+						resourceName,
 					)
 				}
 
 				if allocation.Cmp(qt) < 0 {
-					return ad.Deny(
-						fmt.Sprintf(
-							"can not reduce %s usage to %s because quantity %s is claimed . Remove corresponding claims or keep the resources in the pool",
-							resourceName,
-							allocation.String(),
-							qt.String(),
-						),
+					return ad.Denyf(
+						"can not reduce %s usage to %s because quantity %s is claimed . Remove corresponding claims or keep the resources in the pool",
+						resourceName,
+						allocation.String(),
+						qt.String(),
 					)
 				}
 			}

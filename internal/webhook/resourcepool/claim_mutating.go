@@ -104,7 +104,7 @@ func (h *claimMutationHandler) handleReleaseAnnotation(
 		return
 	}
 
-	if !claim.IsBoundInResourcePool() {
+	if claim.IsBoundInResourcePool() {
 		return
 	}
 

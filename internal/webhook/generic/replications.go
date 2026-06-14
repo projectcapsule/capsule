@@ -5,7 +5,6 @@ package generic
 
 import (
 	"context"
-	"fmt"
 
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
@@ -105,12 +104,10 @@ func (h *replicaHandler) handler(
 			}
 		}
 
-		return ad.Deny(
-			fmt.Sprintf(
-				"resource %s is managed by a global capsule replication %s",
-				req.Name,
-				global.Items[0].GetName(),
-			),
+		return ad.Denyf(
+			"resource %s is managed by a global capsule replication %s",
+			req.Name,
+			global.Items[0].GetName(),
 		)
 	}
 
@@ -132,13 +129,11 @@ func (h *replicaHandler) handler(
 			}
 		}
 
-		return ad.Deny(
-			fmt.Sprintf(
-				"resource %s is managed by a tenant capsule replication %s/%s",
-				req.Name,
-				local.Items[0].GetName(),
-				local.Items[0].GetNamespace(),
-			),
+		return ad.Denyf(
+			"resource %s is managed by a tenant capsule replication %s/%s",
+			req.Name,
+			local.Items[0].GetName(),
+			local.Items[0].GetNamespace(),
 		)
 	}
 
