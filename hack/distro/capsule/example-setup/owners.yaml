@@ -28,14 +28,3 @@ metadata:
 spec:
   kind: Group
   name: "oidc:org:platform"
-
----
-apiVersion: capsule.clastix.io/v1beta2
-kind: TenantOwner
-metadata:
-  labels:
-    team: platform
-  name: controller
-spec:
-  kind: ServiceAccount
-  name: "oidc:org:platform"

@@ -102,6 +102,7 @@ spec:
             resources:
               - namespaces
               - namespaces/status
+              - namespaces/finalize
             scope: '*'
         sideEffects: None
         timeoutSeconds: {{ $.Values.webhooks.validatingWebhooksTimeoutSeconds }}
