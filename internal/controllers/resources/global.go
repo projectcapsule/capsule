@@ -627,7 +627,18 @@ func (r *globalResourceController) updateReconcilingStatus(ctx context.Context, 
 
 		latest.Status.Conditions.UpdateConditionByType(meta.NewReadyConditionReconcilingReason(instance))
 
-		return r.client.Status().Update(ctx, latest)
+		if err := r.client.Status().Update(ctx, latest); err != nil {
+			if apierrors.IsNotFound(err) {
+				return nil
+			}
+
+			return err
+		}
+
+		// Keep the in-memory object aligned with what we just wrote.
+		instance.Status = latest.Status
+
+		return nil
 	})
 }
 
