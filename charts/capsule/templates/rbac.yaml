@@ -232,6 +232,8 @@ rules:
   - ""
   resources:
   - "namespaces"
+  - "namespaces/status"
+  - "namespaces/finalize"
   verbs:
   - "get"
   - "list"

@@ -14,6 +14,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -164,6 +165,18 @@ func (c *capsuleConfiguration) Users() rbac.UserListSpec {
 	out := rbac.UserListSpec{}
 
 	for _, user := range c.UserNames() {
+		// Old Spec.UserNames may contain ServiceAccount usernames.
+		// If SplitUsername succeeds, the value is a ServiceAccount.
+		_, _, err := serviceaccount.SplitUsername(user)
+		if err == nil {
+			out.Upsert(rbac.UserSpec{
+				Kind: rbac.ServiceAccountOwner,
+				Name: user,
+			})
+
+			continue
+		}
+
 		out.Upsert(rbac.UserSpec{
 			Kind: rbac.UserOwner,
 			Name: user,

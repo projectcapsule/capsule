@@ -104,6 +104,95 @@ var _ = Describe("creating several Namespaces for a Tenant", Ordered, Label("nam
 		},
 	}
 
+	grantNamespaceSubresourceUpdate := func(name string, subject rbacv1.Subject) {
+		clusterRole := &rbacv1.ClusterRole{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: name,
+			},
+			Rules: []rbacv1.PolicyRule{
+				{
+					APIGroups: []string{""},
+					Resources: []string{
+						"namespaces/status",
+						"namespaces/finalize",
+					},
+					Verbs: []string{
+						"get",
+						"update",
+						"patch",
+					},
+				},
+				{
+					APIGroups: []string{""},
+					Resources: []string{
+						"namespaces",
+					},
+					Verbs: []string{
+						"get",
+						"update",
+						"patch",
+					},
+				},
+			},
+		}
+
+		clusterRoleBinding := &rbacv1.ClusterRoleBinding{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: name,
+			},
+			Subjects: []rbacv1.Subject{
+				subject,
+			},
+			RoleRef: rbacv1.RoleRef{
+				APIGroup: rbacv1.GroupName,
+				Kind:     "ClusterRole",
+				Name:     name,
+			},
+		}
+
+		EventuallyCreation(func() error {
+			return k8sClient.Create(context.TODO(), clusterRole)
+		}).Should(Succeed())
+
+		EventuallyCreation(func() error {
+			return k8sClient.Create(context.TODO(), clusterRoleBinding)
+		}).Should(Succeed())
+	}
+
+	cleanupNamespaceSubresourceGrant := func(name string) {
+		Eventually(func() error {
+			return k8sClient.Delete(context.TODO(), &rbacv1.ClusterRoleBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: name,
+				},
+			})
+		}).Should(SatisfyAny(Succeed(), WithTransform(apierrors.IsNotFound, BeTrue())))
+
+		Eventually(func() error {
+			return k8sClient.Delete(context.TODO(), &rbacv1.ClusterRole{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: name,
+				},
+			})
+		}).Should(SatisfyAny(Succeed(), WithTransform(apierrors.IsNotFound, BeTrue())))
+	}
+
+	expectNoTenantHijackPersisted := func(nsName string, originalTenant, attackerTenant *capsulev1beta2.Tenant) {
+		Eventually(func(g Gomega) {
+			current := &corev1.Namespace{}
+			Expect(k8sClient.Get(context.TODO(), types.NamespacedName{Name: nsName}, current)).Should(Succeed())
+
+			g.Expect(current.Labels).To(HaveKeyWithValue(meta.TenantLabel, originalTenant.GetName()))
+			g.Expect(current.Labels).NotTo(HaveKeyWithValue(meta.TenantLabel, attackerTenant.GetName()))
+
+			g.Expect(hasTenantOwnerReferenceByNameAndUID(current, originalTenant.GetName(), originalTenant.GetUID())).
+				To(BeTrue(), "namespace should keep original tenant ownerReference")
+
+			g.Expect(hasTenantOwnerReferenceByNameAndUID(current, attackerTenant.GetName(), attackerTenant.GetUID())).
+				To(BeFalse(), "namespace must not gain attacker tenant ownerReference")
+		}).Should(Succeed())
+	}
+
 	kubeSystem := &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "kube-system",
@@ -196,6 +285,177 @@ var _ = Describe("creating several Namespaces for a Tenant", Ordered, Label("nam
 		EventuallyDeletion(t1)
 		EventuallyDeletion(t2)
 		EventuallyDeletion(t3)
+	})
+
+	It("Owners can not hijack Tenant ownership through namespaces/status", func() {
+		tenantA := getTenant(t1.Name)
+		tenantB := getTenant(t2.Name)
+
+		owner := t1.Spec.Owners[0].UserSpec
+		cs := ownerClient(owner)
+
+		grantName := "e2e-ns-status-hijack"
+		grantNamespaceSubresourceUpdate(grantName, rbacv1.Subject{
+			APIGroup: rbacv1.GroupName,
+			Kind:     rbacv1.UserKind,
+			Name:     owner.Name,
+		})
+		DeferCleanup(func() {
+			cleanupNamespaceSubresourceGrant(grantName)
+		})
+
+		ns := NewNamespace("", map[string]string{
+			meta.TenantLabel: tenantA.GetName(),
+		})
+
+		NamespaceCreation(ns, owner, defaultTimeoutInterval).Should(Succeed())
+		NamespaceIsPartOfTenant(t1, ns).Should(Succeed())
+
+		current, err := cs.CoreV1().Namespaces().Get(
+			context.TODO(),
+			ns.Name,
+			metav1.GetOptions{},
+		)
+		Expect(err).ToNot(HaveOccurred())
+
+		hijacked := current.DeepCopy()
+
+		if hijacked.Labels == nil {
+			hijacked.Labels = map[string]string{}
+		}
+
+		hijacked.Labels[meta.TenantLabel] = tenantB.GetName()
+
+		replaced := false
+		for i := range hijacked.OwnerReferences {
+			ref := &hijacked.OwnerReferences[i]
+
+			if ref.APIVersion != capsulev1beta2.GroupVersion.String() {
+				continue
+			}
+
+			if ref.Kind != "Tenant" {
+				continue
+			}
+
+			if ref.Name != tenantA.GetName() {
+				continue
+			}
+
+			if ref.UID != tenantA.GetUID() {
+				continue
+			}
+
+			ref.Name = tenantB.GetName()
+			ref.UID = tenantB.GetUID()
+			replaced = true
+
+			break
+		}
+
+		Expect(replaced).To(BeTrue(), "expected test namespace to contain Tenant ownerReference for %q", tenantA.GetName())
+
+		Expect(hasTenantOwnerReferenceByNameAndUID(hijacked, tenantA.GetName(), tenantA.GetUID())).
+			To(BeFalse(), "hijack payload should no longer contain original Tenant ownerReference")
+		Expect(hasTenantOwnerReferenceByNameAndUID(hijacked, tenantB.GetName(), tenantB.GetUID())).
+			To(BeTrue(), "hijack payload should contain attacker Tenant ownerReference")
+
+		_, err = cs.CoreV1().Namespaces().UpdateStatus(
+			context.TODO(),
+			hijacked,
+			metav1.UpdateOptions{},
+		)
+
+		if err != nil {
+			By(fmt.Sprintf("namespaces/status hijack attempt was rejected: %v", err))
+		}
+
+		expectNoTenantHijackPersisted(ns.Name, tenantA, tenantB)
+	})
+	It("Owners can not hijack Tenant ownership through namespaces/finalize", func() {
+		tenantA := getTenant(t1.Name)
+		tenantB := getTenant(t2.Name)
+
+		owner := t1.Spec.Owners[0].UserSpec
+		cs := ownerClient(owner)
+
+		grantName := "e2e-ns-finalize-hijack"
+		grantNamespaceSubresourceUpdate(grantName, rbacv1.Subject{
+			APIGroup: rbacv1.GroupName,
+			Kind:     rbacv1.UserKind,
+			Name:     owner.Name,
+		})
+		DeferCleanup(func() {
+			cleanupNamespaceSubresourceGrant(grantName)
+		})
+
+		ns := NewNamespace("", map[string]string{
+			meta.TenantLabel: tenantA.GetName(),
+		})
+
+		NamespaceCreation(ns, owner, defaultTimeoutInterval).Should(Succeed())
+		NamespaceIsPartOfTenant(t1, ns).Should(Succeed())
+
+		current, err := cs.CoreV1().Namespaces().Get(
+			context.TODO(),
+			ns.Name,
+			metav1.GetOptions{},
+		)
+		Expect(err).ToNot(HaveOccurred())
+
+		hijacked := current.DeepCopy()
+
+		if hijacked.Labels == nil {
+			hijacked.Labels = map[string]string{}
+		}
+
+		hijacked.Labels[meta.TenantLabel] = tenantB.GetName()
+
+		replaced := false
+		for i := range hijacked.OwnerReferences {
+			ref := &hijacked.OwnerReferences[i]
+
+			if ref.APIVersion != capsulev1beta2.GroupVersion.String() {
+				continue
+			}
+
+			if ref.Kind != "Tenant" {
+				continue
+			}
+
+			if ref.Name != tenantA.GetName() {
+				continue
+			}
+
+			if ref.UID != tenantA.GetUID() {
+				continue
+			}
+
+			ref.Name = tenantB.GetName()
+			ref.UID = tenantB.GetUID()
+			replaced = true
+
+			break
+		}
+
+		Expect(replaced).To(BeTrue(), "expected test namespace to contain Tenant ownerReference for %q", tenantA.GetName())
+
+		Expect(hasTenantOwnerReferenceByNameAndUID(hijacked, tenantA.GetName(), tenantA.GetUID())).
+			To(BeFalse(), "hijack payload should no longer contain original Tenant ownerReference")
+		Expect(hasTenantOwnerReferenceByNameAndUID(hijacked, tenantB.GetName(), tenantB.GetUID())).
+			To(BeTrue(), "hijack payload should contain attacker Tenant ownerReference")
+
+		_, err = cs.CoreV1().Namespaces().Finalize(
+			context.TODO(),
+			hijacked,
+			metav1.UpdateOptions{},
+		)
+
+		if err != nil {
+			By(fmt.Sprintf("namespaces/finalize hijack attempt was rejected: %v", err))
+		}
+
+		expectNoTenantHijackPersisted(ns.Name, tenantA, tenantB)
 	})
 
 	It("Owners can not add a second Tenant ownerReference to a managed namespace", func() {

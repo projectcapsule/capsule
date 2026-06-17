@@ -4,6 +4,16 @@ kind: TenantOwner
 metadata:
   labels:
     team: devops
+  name: devops-user
+spec:
+  kind: User
+  name: "some@user.com"
+---
+apiVersion: capsule.clastix.io/v1beta2
+kind: TenantOwner
+metadata:
+  labels:
+    team: devops
   name: devops
 spec:
   kind: Group
