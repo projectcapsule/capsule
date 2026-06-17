@@ -25,28 +25,136 @@ import (
 )
 
 // Ensuring all annotations are applied to each Namespace handled by the Tenant.
-func (r *Manager) reconcileNamespaces(ctx context.Context, log logr.Logger, tnt *capsulev1beta2.Tenant) (err error) {
+func (r *Manager) reconcileNamespaces(
+	ctx context.Context,
+	log logr.Logger,
+	tnt *capsulev1beta2.Tenant,
+) error {
 	if tnt.DeletionTimestamp != nil {
-		for _, ns := range tnt.Status.Spaces {
-			ns := &corev1.Namespace{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: ns.Name,
-				},
-			}
-
-			if err := r.Delete(ctx, ns, &client.DeleteOptions{
-				PropagationPolicy: ptr.To(metav1.DeletePropagationBackground),
-			}); err != nil && !apierrors.IsNotFound(err) {
-				log.Error(err, "unable to delete tenant namespace",
-					"tenant", tnt.GetName(),
-					"namespace", ns.Name,
-				)
-
-				return err
-			}
-		}
+		return r.reconcileDeletingTenantNamespaces(ctx, log, tnt)
 	}
 
+	return r.reconcileActiveTenantNamespaces(ctx, log, tnt)
+}
+
+func (r *Manager) reconcileDeletingTenantNamespaces(
+	ctx context.Context,
+	log logr.Logger,
+	tnt *capsulev1beta2.Tenant,
+) error {
+	group, ctx := errgroup.WithContext(ctx)
+	group.SetLimit(8)
+
+	results := make(chan *capsulev1beta2.TenantStatusNamespaceItem, len(tnt.Status.Spaces))
+	removed := make(chan string, len(tnt.Status.Spaces))
+	errs := make(chan error, len(tnt.Status.Spaces))
+
+	for i := range tnt.Status.Spaces {
+		statusNamespace := tnt.Status.Spaces[i]
+
+		group.Go(func() error {
+			namespace := &corev1.Namespace{}
+
+			err := r.Get(ctx, client.ObjectKey{Name: statusNamespace.Name}, namespace)
+			if apierrors.IsNotFound(err) {
+				removed <- statusNamespace.Name
+
+				return nil
+			}
+
+			if err != nil {
+				errs <- fmt.Errorf("get namespace %q: %w", statusNamespace.Name, err)
+
+				return nil
+			}
+
+			if namespace.DeletionTimestamp == nil {
+				if err := r.Delete(ctx, namespace, &client.DeleteOptions{
+					PropagationPolicy: ptr.To(metav1.DeletePropagationBackground),
+				}); err != nil && !apierrors.IsNotFound(err) {
+					log.Error(err, "unable to delete tenant namespace",
+						"tenant", tnt.GetName(),
+						"namespace", namespace.GetName(),
+					)
+
+					errs <- fmt.Errorf("delete namespace %q: %w", namespace.Name, err)
+
+					return nil
+				}
+
+				latest := &corev1.Namespace{}
+
+				err := r.Get(ctx, client.ObjectKey{Name: namespace.Name}, latest)
+				if apierrors.IsNotFound(err) {
+					removed <- statusNamespace.Name
+
+					return nil
+				}
+
+				if err != nil {
+					errs <- fmt.Errorf("get namespace %q after delete: %w", namespace.Name, err)
+
+					return nil
+				}
+
+				namespace = latest
+			}
+
+			stat, err := r.reconcileNamespace(ctx, log, namespace, tnt)
+			if stat != nil {
+				results <- stat
+			}
+
+			if err != nil {
+				log.Error(err, "failed to reconcile deleting namespace",
+					"tenant", tnt.GetName(),
+					"namespace", namespace.GetName(),
+				)
+
+				errs <- fmt.Errorf("namespace %q: %w", namespace.Name, err)
+			}
+
+			return nil
+		})
+	}
+
+	_ = group.Wait()
+
+	close(results)
+	close(removed)
+	close(errs)
+
+	for name := range removed {
+		r.Metrics.DeleteAllMetricsForNamespace(name)
+
+		tnt.Status.RemoveInstance(&capsulev1beta2.TenantStatusNamespaceItem{
+			Name: name,
+		})
+	}
+
+	for stat := range results {
+		if stat == nil {
+			continue
+		}
+
+		tnt.Status.UpdateInstance(stat)
+	}
+
+	var joined []error
+	for itemErr := range errs {
+		joined = append(joined, itemErr)
+	}
+
+	tnt.Status.Size = uint(len(tnt.Status.Spaces))
+
+	return errors.Join(joined...)
+}
+
+func (r *Manager) reconcileActiveTenantNamespaces(
+	ctx context.Context,
+	log logr.Logger,
+	tnt *capsulev1beta2.Tenant,
+) error {
 	list := &corev1.NamespaceList{}
 	if err := r.List(ctx, list, client.MatchingFields{".metadata.ownerReferences[*].capsule": tnt.GetName()}); err != nil {
 		return err
@@ -95,7 +203,7 @@ func (r *Manager) reconcileNamespaces(ctx context.Context, log logr.Logger, tnt 
 		joined = append(joined, itemErr)
 	}
 
-	err = errors.Join(joined...)
+	err := errors.Join(joined...)
 
 	desiredStatus := make(map[string]struct{}, len(list.Items))
 
@@ -126,7 +234,12 @@ func (r *Manager) reconcileNamespaces(ctx context.Context, log logr.Logger, tnt 
 	return err
 }
 
-func (r *Manager) reconcileNamespace(ctx context.Context, log logr.Logger, namespace *corev1.Namespace, tnt *capsulev1beta2.Tenant) (
+func (r *Manager) reconcileNamespace(
+	ctx context.Context,
+	log logr.Logger,
+	namespace *corev1.Namespace,
+	tnt *capsulev1beta2.Tenant,
+) (
 	stat *capsulev1beta2.TenantStatusNamespaceItem,
 	err error,
 ) {
@@ -144,18 +257,8 @@ func (r *Manager) reconcileNamespace(ctx context.Context, log logr.Logger, names
 		stat = instance
 	}
 
-	dropFromStatus := false
-
-	// Always update tenant status condition after reconciliation
+	// Always update tenant status condition after reconciliation.
 	defer func() {
-		if dropFromStatus {
-			stat = nil
-
-			r.Metrics.DeleteAllMetricsForNamespace(namespace.GetName())
-
-			return
-		}
-
 		readCondition := meta.NewReadyCondition(namespace)
 
 		switch {
@@ -192,7 +295,7 @@ func (r *Manager) reconcileNamespace(ctx context.Context, log logr.Logger, names
 		r.syncNamespaceStatusMetrics(tnt, namespace)
 	}()
 
-	// Verify if namespace is still active or terminating
+	// Verify if namespace is still active or terminating.
 	if namespace.DeletionTimestamp != nil {
 		terminating = true
 
@@ -236,17 +339,15 @@ func (r *Manager) reconcileNamespace(ctx context.Context, log logr.Logger, names
 			return stat, nil
 		}
 
-		terminatingState.Message = "removed managed resources"
+		terminatingState.Reason = meta.TerminatingReason
+		terminatingState.Status = metav1.ConditionFalse
+		terminatingState.Message = "waiting for namespace finalization"
 		stat.Conditions.UpdateConditionByType(terminatingState)
 
-		r.Metrics.DeleteAllMetricsForNamespace(namespace.GetName())
-
-		dropFromStatus = true
-
-		return nil, nil
+		return stat, nil
 	}
 
-	// Collect Rules for namespace
+	// Collect Rules for namespace.
 	err = r.reconcileRuleStatus(ctx, log, tnt, namespace)
 	if err != nil {
 		return stat, err
@@ -292,7 +393,7 @@ func (r *Manager) reconcileNamespaceMetadata(
 
 	managedMetadataOnly := tnt.Spec.NamespaceOptions != nil && tnt.Spec.NamespaceOptions.ManagedMetadataOnly
 
-	// Handle User-Defined Metadata, if allowed
+	// Handle User-Defined Metadata, if allowed.
 	if !managedMetadataOnly {
 		if originLabels != nil {
 			maps.Copy(originLabels, managedLabels)
@@ -302,7 +403,7 @@ func (r *Manager) reconcileNamespaceMetadata(
 			maps.Copy(originAnnotations, managedAnnotations)
 		}
 
-		// Cleanup old Metadata
+		// Cleanup old Metadata.
 		instance := tnt.Status.GetInstance(stat)
 		if instance != nil && instance.Metadata != nil {
 			for label := range instance.Metadata.Labels {

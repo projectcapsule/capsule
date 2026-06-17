@@ -621,6 +621,139 @@ var _ = Describe("ResourcePoolClaim Tests", Ordered, Label("resourcepool", "clai
 		})
 	})
 
+	It("Admission (Mutation) - Release Bound Claim", Label("skip-on-openshift"), func() {
+		pool := &capsulev1beta2.ResourcePool{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test-release-bound-claim",
+				Labels: map[string]string{
+					"e2e-resourcepoolclaims": "test",
+				},
+			},
+			Spec: capsulev1beta2.ResourcePoolSpec{
+				Config: capsulev1beta2.ResourcePoolSpecConfiguration{
+					DeleteBoundResources: ptr.To(false),
+				},
+				Selectors: []selectors.NamespaceSelector{
+					{
+						LabelSelector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{
+								"e2e.capsule.dev/test-suite": "release-bound-claim",
+							},
+						},
+					},
+				},
+				Quota: corev1.ResourceQuotaSpec{
+					Hard: corev1.ResourceList{
+						corev1.ResourceLimitsCPU:      resource.MustParse("2"),
+						corev1.ResourceLimitsMemory:   resource.MustParse("2Gi"),
+						corev1.ResourceRequestsCPU:    resource.MustParse("2"),
+						corev1.ResourceRequestsMemory: resource.MustParse("2Gi"),
+					},
+				},
+			},
+		}
+
+		claim := &capsulev1beta2.ResourcePoolClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "release-bound-claim",
+				Namespace: "ns-release-bound-claim",
+			},
+			Spec: capsulev1beta2.ResourcePoolClaimSpec{
+				Pool: pool.GetName(),
+				ResourceClaims: corev1.ResourceList{
+					corev1.ResourceLimitsCPU:      resource.MustParse("1"),
+					corev1.ResourceLimitsMemory:   resource.MustParse("1Gi"),
+					corev1.ResourceRequestsCPU:    resource.MustParse("1"),
+					corev1.ResourceRequestsMemory: resource.MustParse("1Gi"),
+				},
+			},
+		}
+
+		By("Create the ResourcePool and namespace", func() {
+			EventuallyCreation(func() error {
+				pool.ResourceVersion = ""
+
+				return k8sClient.Create(context.TODO(), pool)
+			}).Should(Succeed(), "Failed to create %s", pool)
+
+			ns := &corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: claim.Namespace,
+					Labels: map[string]string{
+						"e2e-resourcepoolclaims":     "test",
+						"e2e.capsule.dev/test-suite": "release-bound-claim",
+					},
+				},
+			}
+
+			EventuallyCreation(func() error {
+				ns.ResourceVersion = ""
+
+				return k8sClient.Create(context.TODO(), ns)
+			}).Should(Succeed(), "Failed to create %s", ns)
+		})
+
+		By("Bind the claim to the pool", func() {
+			EventuallyCreation(func() error {
+				claim.ResourceVersion = ""
+
+				return k8sClient.Create(context.TODO(), claim)
+			}).Should(Succeed(), "Failed to create %s", claim)
+
+			isSuccessfullyBoundAndUnsedToPool(pool, claim)
+		})
+
+		By("Release the bound claim with the release annotation", func() {
+			Eventually(func() error {
+				stat := &capsulev1beta2.ResourcePoolClaim{}
+				if err := k8sClient.Get(context.TODO(), client.ObjectKey{Name: claim.Name, Namespace: claim.Namespace}, stat); err != nil {
+					return err
+				}
+
+				if stat.Annotations == nil {
+					stat.Annotations = map[string]string{}
+				}
+
+				stat.Annotations[meta.ReleaseAnnotation] = meta.ReleaseAnnotationTrigger
+
+				return k8sClient.Update(context.TODO(), stat)
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		})
+
+		By("Verify the claim is disassociated and the release annotation was consumed", func() {
+			Eventually(func(g Gomega) {
+				stat := &capsulev1beta2.ResourcePoolClaim{}
+				g.Expect(k8sClient.Get(context.TODO(), client.ObjectKey{Name: claim.Name, Namespace: claim.Namespace}, stat)).To(Succeed())
+
+				bound := stat.Status.Conditions.GetConditionByType(meta.BoundCondition)
+
+				g.Expect(bound).ToNot(BeNil(), "Bound condition should not be nil")
+				g.Expect(bound.Status).To(Equal(metav1.ConditionFalse), "Bound condition status should be False")
+
+				g.Expect(stat.Annotations).NotTo(HaveKey(meta.ReleaseAnnotation))
+
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		})
+
+		By("Allow updating the released claim resources while the pool still exists", func() {
+			Eventually(func() error {
+				stat := &capsulev1beta2.ResourcePoolClaim{}
+				if err := k8sClient.Get(context.TODO(), client.ObjectKey{Name: claim.Name, Namespace: claim.Namespace}, stat); err != nil {
+					return err
+				}
+
+				stat.Spec.ResourceClaims = corev1.ResourceList{
+					corev1.ResourceLimitsCPU:      resource.MustParse("2"),
+					corev1.ResourceLimitsMemory:   resource.MustParse("2Gi"),
+					corev1.ResourceRequestsCPU:    resource.MustParse("2"),
+					corev1.ResourceRequestsMemory: resource.MustParse("2Gi"),
+				}
+
+				return k8sClient.Update(context.TODO(), stat)
+			}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+		})
+	})
+
 	It("Admission (Mutation) - Auto Pool Assign", Label("skip-on-openshift"), func() {
 		pool1 := &capsulev1beta2.ResourcePool{
 			ObjectMeta: metav1.ObjectMeta{

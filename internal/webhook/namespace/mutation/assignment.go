@@ -55,13 +55,11 @@ func (h *ownerReferenceHandler) OnCreate(
 		}
 
 		if tnt == nil {
-			response := admission.Denied(
+			return ad.Deny(
 				"Unable to assign namespace to tenant. Please use " +
 					meta.TenantLabel +
 					" label when creating a namespace",
 			)
-
-			return &response
 		}
 
 		labels := ns.GetLabels()

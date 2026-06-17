@@ -5,7 +5,6 @@ package validation
 
 import (
 	"context"
-	"fmt"
 	"regexp"
 
 	corev1 "k8s.io/api/core/v1"
@@ -118,16 +117,16 @@ func validateRequiredMapCreate(kind string, required map[string]string, actual m
 	for key, exp := range required {
 		val, ok := actual[key]
 		if !ok {
-			return ad.Deny(fmt.Sprintf("required %s %q not present", kind, key))
+			return ad.Denyf("required %s %q not present", kind, key)
 		}
 
 		re, reErr := regexp.Compile(exp)
 		if reErr != nil {
-			return ad.Deny(fmt.Sprintf("invalid required %s regex for %q: %q: %v", kind, key, exp, reErr))
+			return ad.Denyf("invalid required %s regex for %q: %q: %v", kind, key, exp, reErr)
 		}
 
 		if !re.MatchString(val) {
-			return ad.Deny(fmt.Sprintf("required %s %q value %q does not match regex %q", kind, key, val, exp))
+			return ad.Denyf("required %s %q value %q does not match regex %q", kind, key, val, exp)
 		}
 	}
 
@@ -149,16 +148,16 @@ func validateRequiredMapUpdate(kind string, required map[string]string, newMap, 
 		}
 
 		if !newOK {
-			return ad.Deny(fmt.Sprintf("required %s %q not present", kind, key))
+			return ad.Denyf("required %s %q not present", kind, key)
 		}
 
 		re, reErr := regexp.Compile(exp)
 		if reErr != nil {
-			return ad.Deny(fmt.Sprintf("invalid required %s regex for %q: %q: %v", kind, key, exp, reErr))
+			return ad.Denyf("invalid required %s regex for %q: %q: %v", kind, key, exp, reErr)
 		}
 
 		if !re.MatchString(valNew) {
-			return ad.Deny(fmt.Sprintf("required %s %q value %q does not match regex %q", mismatchKind, key, valNew, exp))
+			return ad.Denyf("required %s %q value %q does not match regex %q", mismatchKind, key, valNew, exp)
 		}
 	}
 

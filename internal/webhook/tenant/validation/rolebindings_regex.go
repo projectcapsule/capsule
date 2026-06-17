@@ -5,7 +5,6 @@ package validation
 
 import (
 	"context"
-	"fmt"
 	"strings"
 
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -69,7 +68,7 @@ func (h *rbRegexHandler) validate(tnt *capsulev1beta2.Tenant, decoder admission.
 				if subject.Kind == rbacv1.ServiceAccountKind {
 					err := validation.IsDNS1123Subdomain(subject.Name)
 					if len(err) > 0 {
-						return ad.Deny(fmt.Sprintf("Subject Name '%v' for binding '%v' is invalid. %v", subject.Name, binding.ClusterRoleName, strings.Join(err, ", ")))
+						return ad.Denyf("Subject Name '%v' for binding '%v' is invalid. %v", subject.Name, binding.ClusterRoleName, strings.Join(err, ", "))
 					}
 				}
 			}

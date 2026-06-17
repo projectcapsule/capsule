@@ -5,7 +5,6 @@ package generic
 
 import (
 	"context"
-	"fmt"
 
 	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -56,5 +55,5 @@ func (h *cordoningHandler) OnUpdate(
 }
 
 func (h *cordoningHandler) cordonHandler(req admission.Request) *admission.Response {
-	return ad.Deny(fmt.Sprintf("The current namespace '%s' is cordoned. The attempted operation %s for %s/%s/%s/%s is not permitted during cordoning status.", req.Namespace, req.Operation, req.RequestKind.Group, req.RequestKind.Version, req.RequestKind.Kind, req.Name))
+	return ad.Denyf("The current namespace '%s' is cordoned. The attempted operation %s for %s/%s/%s/%s is not permitted during cordoning status.", req.Namespace, req.Operation, req.RequestKind.Group, req.RequestKind.Version, req.RequestKind.Kind, req.Name)
 }

@@ -125,7 +125,7 @@ dev-install-gw-api-crds:
 	@$(KUBECTL) apply --force-conflicts --server-side=true -f https://github.com/$(API_GW_LOOKUP)/releases/download/$(API_GW_VERSION)/standard-install.yaml
 
 GRAFANA         := none
-GRAFANA_VERSION := v5.22.2
+GRAFANA_VERSION := v5.23.0
 GRAFANA_LOOKUP  := grafana/grafana-operator
 dev-install-grafana-operator-crds:
 	@$(KUBECTL) apply --force-conflicts --server-side=true -f https://github.com/grafana/grafana-operator/releases/download/$(GRAFANA_VERSION)/crds.yaml
@@ -632,7 +632,7 @@ minc:
 	$(call go-install-tool,$(MINC),github.com/$(MINC_LOOKUP)/cmd/minc@$(MINC_VERSION))
 
 KIND         := $(LOCALBIN)/kind
-KIND_VERSION := v0.31.0
+KIND_VERSION := v0.32.0
 KIND_LOOKUP  := kubernetes-sigs/kind
 kind:
 	@test -s $(KIND) && $(KIND) --version | grep -q $(KIND_VERSION) || \
@@ -646,7 +646,7 @@ ko:
 	$(call go-install-tool,$(KO),github.com/$(KO_LOOKUP)@$(KO_VERSION))
 
 NWA           := $(LOCALBIN)/nwa
-NWA_VERSION   := v0.7.8
+NWA_VERSION   := v0.8.0
 NWA_LOOKUP    := B1NARY-GR0UP/nwa
 nwa:
 	@test -s $(NWA) && $(NWA) -h | grep -q $(NWA_VERSION) || \

@@ -4,22 +4,27 @@
 package admission
 
 import (
+	"fmt"
 	"path"
 	"strings"
 
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
-func Deny(message string) *admission.Response {
-	response := admission.Denied(message)
+func Denyf(message string, args ...any) *admission.Response {
+	return Deny(fmt.Sprintf(message, args...))
+}
 
-	return &response
+func Deny(message string) *admission.Response {
+	return new(admission.Denied(message))
+}
+
+func Allowf(message string, args ...any) *admission.Response {
+	return Allow(fmt.Sprintf(message, args...))
 }
 
 func Allow(message string) *admission.Response {
-	response := admission.Allowed(message)
-
-	return &response
+	return new(admission.Allowed(message))
 }
 
 func normalizePath(p string) string {

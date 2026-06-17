@@ -49,9 +49,7 @@ func (h *customQuotaValidationHandler) OnCreate(
 		}
 
 		if err := quota.ValidateQuantity(q.Spec.Limit); err != nil {
-			response := admission.Denied(fmt.Sprintf("invalid spec.limit: %v", err))
-
-			return &response
+			return ad.Denyf("invalid spec.limit: %v", err)
 		}
 
 		return nil
@@ -103,7 +101,7 @@ func (h *customQuotaValidationHandler) OnUpdate(
 		}
 
 		if err := quota.ValidateQuantity(newQuota.Spec.Limit); err != nil {
-			return ad.Deny(fmt.Sprintf("invalid spec.limit: %v", err))
+			return ad.Denyf("invalid spec.limit: %v", err)
 		}
 
 		used := oldQuota.Status.Usage.Used
@@ -113,18 +111,16 @@ func (h *customQuotaValidationHandler) OnUpdate(
 
 		if hasUsage {
 			if sourcesChanged(oldQuota.Spec.Sources, newQuota.Spec.Sources) {
-				return ad.Deny(
-					fmt.Sprintf("spec.sources cannot be changed while usage is recorded (usage: %s); create a new CustomQuota instead", used.String()),
+				return ad.Denyf(
+					"spec.sources cannot be changed while usage is recorded (usage: %s); create a new CustomQuota instead", used.String(),
 				)
 			}
 
 			if newQuota.Spec.Limit.Cmp(used) < 0 {
-				return ad.Deny(
-					fmt.Sprintf(
-						"spec.limit cannot be lowered below current usage (%s); requested limit: %s",
-						used.String(),
-						newQuota.Spec.Limit.String(),
-					),
+				return ad.Denyf(
+					"spec.limit cannot be lowered below current usage (%s); requested limit: %s",
+					used.String(),
+					newQuota.Spec.Limit.String(),
 				)
 			}
 		}

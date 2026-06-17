@@ -69,6 +69,7 @@ import (
 	namespacemutation "github.com/projectcapsule/capsule/internal/webhook/namespace/mutation"
 	namespacevalidation "github.com/projectcapsule/capsule/internal/webhook/namespace/validation"
 	"github.com/projectcapsule/capsule/internal/webhook/node"
+	"github.com/projectcapsule/capsule/internal/webhook/owners"
 	"github.com/projectcapsule/capsule/internal/webhook/pod"
 	"github.com/projectcapsule/capsule/internal/webhook/pvc"
 	"github.com/projectcapsule/capsule/internal/webhook/resourcepool"
@@ -611,12 +612,15 @@ func main() {
 				tenantvalidation.RuleHandler(),
 				tenantvalidation.HostnameRegexHandler(),
 				tenantvalidation.FreezedEmitter(),
-				tenantvalidation.ServiceAccountNameHandler(),
+				tenantvalidation.OwnersHandler(),
 				tenantvalidation.ForbiddenAnnotationsRegexHandler(),
 				tenantvalidation.ProtectedHandler(),
 				tenantvalidation.RequiredMetadataHandler(),
 				tenantvalidation.WarningHandler(cfg),
 			),
+		),
+		route.TenantOwnersValidation(
+			owners.UserMetadataHandler(),
 		),
 		route.NamespaceValidation(
 			namespacevalidation.NamespaceHandler(
@@ -661,6 +665,7 @@ func main() {
 			cfgvalidation.Handler(cfg,
 				cfgvalidation.WarningHandler(),
 				cfgvalidation.ServiceAccountHandler(),
+				cfgvalidation.OwnerHandler(),
 			),
 		),
 	)
