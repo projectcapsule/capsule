@@ -632,7 +632,7 @@ minc:
 	$(call go-install-tool,$(MINC),github.com/$(MINC_LOOKUP)/cmd/minc@$(MINC_VERSION))
 
 KIND         := $(LOCALBIN)/kind
-KIND_VERSION := v0.31.0
+KIND_VERSION := v0.32.0
 KIND_LOOKUP  := kubernetes-sigs/kind
 kind:
 	@test -s $(KIND) && $(KIND) --version | grep -q $(KIND_VERSION) || \
