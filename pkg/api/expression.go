@@ -8,30 +8,32 @@ import (
 	"regexp"
 )
 
+// Exactly one of Name or Exp should be set.
 // +kubebuilder:object:generate=true
-type RegExpression struct {
-	// Expression used to evaluate regex
+// +kubebuilder:validation:XValidation:rule="has(self.name) != has(self.exp)",message="exactly one of name or exp must be set"
+type ExpressionMatch struct {
+	ExpressionRegex `json:",inline"`
+
+	// Name matches exactly
+	//
+	// +kubebuilder:validation:MinLength=1
+	// +optional
+	Name string `json:"name,omitempty"`
+}
+
+type ExpressionRegex struct {
+	// Exp matches regular expression.
+	//
+	// +kubebuilder:validation:MinLength=1
+	// +optional
 	Expression string `json:"exp,omitempty"`
 	// Negate regular Expression
 	//+kubebuilder:default:=false
 	Negate bool `json:"negate,omitempty"`
 }
 
-// Exactly one of Name or Exp should be set.
-// +kubebuilder:object:generate=true
-// +kubebuilder:validation:XValidation:rule="has(self.name) != has(self.exp)",message="exactly one of name or exp must be set"
-type ExpressionMatch struct {
-	// Name matches exactly
-	//
-	// +kubebuilder:validation:MinLength=1
-	// +optional
-	Name string `json:"name,omitempty"`
-
-	// Exp matches regular expression.
-	//
-	// +kubebuilder:validation:MinLength=1
-	// +optional
-	Expression string `json:"exp,omitempty"`
+type ExpressionRegexMatcher interface {
+	MatchRegex(ExpressionRegex, string) (bool, error)
 }
 
 func (m ExpressionMatch) Matches(value string) (bool, error) {
@@ -50,4 +52,25 @@ func (m ExpressionMatch) Matches(value string) (bool, error) {
 	default:
 		return false, fmt.Errorf("expression match must define either name or exp")
 	}
+}
+
+func (m ExpressionMatch) MatchesWithExpressionMatcher(matcher ExpressionRegexMatcher, value string) (bool, error) {
+	if m.Name != "" {
+		matched := m.Name == value
+		if m.Negate {
+			return !matched, nil
+		}
+
+		return matched, nil
+	}
+
+	if m.Expression == "" {
+		return false, fmt.Errorf("expression match must define either name or exp")
+	}
+
+	if matcher == nil {
+		return m.Matches(value)
+	}
+
+	return matcher.MatchRegex(m.ExpressionRegex, value)
 }

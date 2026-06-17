@@ -88,9 +88,9 @@ type RBACConfiguration struct {
 }
 
 type EventsConfiguration struct {
-	// Namespace where the events are logged for cluster scoped resources or deny events
-	// +kubebuilder:default={default}
-	ClusterEventNamespace []string `json:"namespace,omitempty"`
+	// Namespace where the events are logged for cluster scoped resources or deny events (default namespace)
+	// +kubebuilder:default=default
+	ClusterEventNamespace string `json:"namespace,omitempty"`
 }
 
 type DynamicAdmission struct {

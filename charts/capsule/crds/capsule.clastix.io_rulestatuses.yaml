@@ -87,7 +87,12 @@ spec:
                           items:
                             properties:
                               exp:
-                                description: Expression used to evaluate regex
+                                description: Exp matches regular expression.
+                                minLength: 1
+                                type: string
+                              name:
+                                description: Name matches exactly
+                                minLength: 1
                                 type: string
                               negate:
                                 default: false
@@ -102,6 +107,9 @@ spec:
                                   type: string
                                 type: array
                             type: object
+                            x-kubernetes-validations:
+                            - message: exactly one of name or exp must be set
+                              rule: has(self.name) != has(self.exp)
                           type: array
                         schedulers:
                           description: |-
@@ -120,6 +128,10 @@ spec:
                                 description: Name matches exactly
                                 minLength: 1
                                 type: string
+                              negate:
+                                default: false
+                                description: Negate regular Expression
+                                type: boolean
                             type: object
                             x-kubernetes-validations:
                             - message: exactly one of name or exp must be set
@@ -246,7 +258,12 @@ spec:
                             items:
                               properties:
                                 exp:
-                                  description: Expression used to evaluate regex
+                                  description: Exp matches regular expression.
+                                  minLength: 1
+                                  type: string
+                                name:
+                                  description: Name matches exactly
+                                  minLength: 1
                                   type: string
                                 negate:
                                   default: false
@@ -261,6 +278,9 @@ spec:
                                     type: string
                                   type: array
                               type: object
+                              x-kubernetes-validations:
+                              - message: exactly one of name or exp must be set
+                                rule: has(self.name) != has(self.exp)
                             type: array
                           schedulers:
                             description: |-
@@ -279,6 +299,10 @@ spec:
                                   description: Name matches exactly
                                   minLength: 1
                                   type: string
+                                negate:
+                                  default: false
+                                  description: Negate regular Expression
+                                  type: boolean
                               type: object
                               x-kubernetes-validations:
                               - message: exactly one of name or exp must be set
@@ -341,7 +365,12 @@ spec:
                               items:
                                 properties:
                                   exp:
-                                    description: Expression used to evaluate regex
+                                    description: Exp matches regular expression.
+                                    minLength: 1
+                                    type: string
+                                  name:
+                                    description: Name matches exactly
+                                    minLength: 1
                                     type: string
                                   negate:
                                     default: false
@@ -356,6 +385,9 @@ spec:
                                       type: string
                                     type: array
                                 type: object
+                                x-kubernetes-validations:
+                                - message: exactly one of name or exp must be set
+                                  rule: has(self.name) != has(self.exp)
                               type: array
                             schedulers:
                               description: |-
@@ -375,6 +407,10 @@ spec:
                                     description: Name matches exactly
                                     minLength: 1
                                     type: string
+                                  negate:
+                                    default: false
+                                    description: Negate regular Expression
+                                    type: boolean
                                 type: object
                                 x-kubernetes-validations:
                                 - message: exactly one of name or exp must be set

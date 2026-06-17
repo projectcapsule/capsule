@@ -37,6 +37,12 @@ const (
 
 	ResourceQuotaAnnotationPrefix = "quota.resources.capsule.clastix.io"
 	ResourceUsedAnnotationPrefix  = "used.resources.capsule.clastix.io"
+
+	// Audit Annotations
+	AuditRequestUID    = "audit.projectcapsule.dev/request-uid"
+	AuditUsername      = "audit.projectcapsule.dev/username"
+	AuditRuleSetName   = "audit.projectcapsule.dev/rule-set"
+	AuditRuleSetAction = "audit.projectcapsule.dev/rule-action"
 )
 
 func ReleaseAnnotationTriggers(obj client.Object) bool {

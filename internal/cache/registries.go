@@ -23,7 +23,7 @@ type RuleSet struct {
 }
 
 type CompiledRule struct {
-	Expression api.RegExpression
+	Expression api.ExpressionRegex
 	RegexID    string
 
 	AllowedPolicy map[corev1.PullPolicy]struct{} // nil/empty => allow any

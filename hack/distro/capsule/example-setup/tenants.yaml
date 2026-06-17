@@ -99,6 +99,17 @@ spec:
         workloads:
           schedulers:
           - exp: "custom-scheduler"
+    - enforce:
+        action: "audit"
+        workloads:
+          schedulers:
+          - exp: "custom-scheduler"
+
+    - enforce:
+        action: "allow"
+        workloads:
+          schedulers:
+          - exp: "custom-scheduler"
 
 
     - permissions:

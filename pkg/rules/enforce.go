@@ -1,6 +1,3 @@
-// Copyright 2020-2026 Project Capsule Authors
-// SPDX-License-Identifier: Apache-2.0
-
 package rules
 
 import (
@@ -14,11 +11,45 @@ type Value struct {
 	Path  string
 }
 
+type Decision struct {
+	SetName     string
+	EventReason string
+	Action      api.ActionType
+	Value       Value
+	Message     string
+}
+
+type DecisionError struct {
+	Decision *Decision
+}
+
+func (e *DecisionError) Error() string {
+	if e == nil || e.Decision == nil {
+		return "namespace rule decision denied request"
+	}
+
+	return e.Decision.Message
+}
+
+type Evaluation struct {
+	Audits   []*Decision
+	Blocking *Decision
+}
+
+func (e *Evaluation) BlockingError() error {
+	if e == nil || e.Blocking == nil {
+		return nil
+	}
+
+	return &DecisionError{
+		Decision: e.Blocking,
+	}
+}
+
 type Set[R any, T any] struct {
 	Name string
 
-	// EventReason is the Kubernetes event reason used by the admission layer
-	// when this rule set produces in deny decisions.
+	// EventReason is used when a matching rule produces an audit or blocking decision.
 	EventReason string
 
 	// Values extracts the values from the admitted object.
@@ -31,77 +62,6 @@ type Set[R any, T any] struct {
 	Matches func(R, Value) (bool, error)
 }
 
-type Decision struct {
-	Action api.ActionType
-
-	// SetName is the name of the evaluated rule set, e.g. "scheduler", "QoS class".
-	SetName string
-
-	// EventReason is the Kubernetes event reason used by the admission layer
-	// when this rule set produces in deny decisions.
-	EventReason string
-
-	// Value is the object value that matched or violated the rule set.
-	Value Value
-
-	// Enforce is the enforce body that produced the decision.
-	Enforce *api.NamespaceRuleEnforceBody
-
-	// Rule is the concrete matched rule item.
-	//
-	// This is intentionally any because Evaluation is non-generic and can be
-	// consumed by admission handlers without knowing the rule item type.
-	Rule any
-
-	// Message is the human-readable decision message.
-	Message string
-}
-
-type Evaluation struct {
-	// Decision is the blocking result.
-	//
-	// It is set for:
-	//   - explicit deny match
-	//   - allow-list miss
-	Decision *Decision
-
-	// Audits contains all matched audit rules.
-	//
-	// Audit decisions are non-blocking and should be converted to Kubernetes
-	// events / admission warnings by the admission handler.
-	Audits []*Decision
-}
-
-func (e *Evaluation) BlockingError() error {
-	if e == nil || e.Decision == nil {
-		return nil
-	}
-
-	return &DecisionError{
-		Decision: e.Decision,
-	}
-}
-
-type DecisionError struct {
-	Decision *Decision
-}
-
-func (e *DecisionError) Error() string {
-	if e == nil || e.Decision == nil {
-		return ""
-	}
-
-	return e.Decision.Message
-}
-
-// EvaluateEnforce evaluates one rule set against a list of enforce bodies.
-//
-// Semantics:
-//   - deny is immediately blocking on match
-//   - audit is non-blocking on match
-//   - allow behaves as an allow-list only when at least one allow rule exists
-//     for the current rule set
-//   - if allow rules exist and none matches the value, the value is rejected
 func EvaluateEnforce[R any, T any](
 	obj T,
 	enforceBodies []*api.NamespaceRuleEnforceBody,
@@ -136,7 +96,8 @@ func EvaluateEnforce[R any, T any](
 		}
 
 		hasAllowRule := false
-		allowedByRule := false
+
+		var lastDecision *Decision
 
 		for _, enforce := range enforceBodies {
 			if enforce == nil {
@@ -148,9 +109,7 @@ func EvaluateEnforce[R any, T any](
 				continue
 			}
 
-			action := enforce.Action.OrDefault()
-
-			switch action {
+			switch enforce.Action {
 			case api.ActionTypeAllow:
 				hasAllowRule = true
 
@@ -158,72 +117,61 @@ func EvaluateEnforce[R any, T any](
 				// Supported actions.
 
 			default:
-				return nil, fmt.Errorf(
+				return evaluation, fmt.Errorf(
 					"%s: unsupported rule action %q",
 					set.Name,
-					action,
+					enforce.Action,
 				)
 			}
 
 			for _, item := range items {
 				matched, err := set.Matches(item, value)
 				if err != nil {
-					return nil, fmt.Errorf("%s: invalid rule: %w", set.Name, err)
+					return evaluation, fmt.Errorf("%s: invalid rule: %w", set.Name, err)
 				}
 
 				if !matched {
 					continue
 				}
 
-				switch action {
-				case api.ActionTypeDeny:
-					evaluation.Decision = &Decision{
-						Action:      action,
-						SetName:     set.Name,
-						EventReason: set.EventReason,
-						Value:       value,
-						Enforce:     enforce,
-						Rule:        item,
-						Message: fmt.Sprintf(
-							"%s %q at %s is denied by tenant rule",
-							set.Name,
-							value.Value,
-							value.Path,
-						),
-					}
+				decision := &Decision{
+					SetName:     set.Name,
+					EventReason: set.EventReason,
+					Action:      enforce.Action,
+					Value:       value,
+					Message:     decisionMessage(set.Name, enforce.Action, value),
+				}
 
-					return evaluation, nil
-
-				case api.ActionTypeAllow:
-					allowedByRule = true
-
+				switch enforce.Action {
 				case api.ActionTypeAudit:
-					evaluation.Audits = append(evaluation.Audits, &Decision{
-						Action:      action,
-						SetName:     set.Name,
-						EventReason: set.EventReason,
-						Value:       value,
-						Enforce:     enforce,
-						Rule:        item,
-						Message: fmt.Sprintf(
-							"%s %q at %s matched audit tenant rule",
-							set.Name,
-							value.Value,
-							value.Path,
-						),
-					})
+					evaluation.Audits = append(evaluation.Audits, decision)
+
+				case api.ActionTypeAllow, api.ActionTypeDeny:
+					// Last matching allow/deny wins.
+					lastDecision = decision
 				}
 			}
 		}
 
-		if hasAllowRule && !allowedByRule {
-			evaluation.Decision = &Decision{
-				Action:      api.ActionTypeDeny,
+		if lastDecision != nil {
+			switch lastDecision.Action {
+			case api.ActionTypeAllow:
+				continue
+
+			case api.ActionTypeDeny:
+				evaluation.Blocking = lastDecision
+				return evaluation, nil
+			}
+		}
+
+		if hasAllowRule {
+			evaluation.Blocking = &Decision{
 				SetName:     set.Name,
 				EventReason: set.EventReason,
+				Action:      api.ActionTypeDeny,
 				Value:       value,
 				Message: fmt.Sprintf(
-					"%s %q at %s is not allowed by tenant rule",
+					"%s %q at %s is not allowed by namespace rule",
 					set.Name,
 					value.Value,
 					value.Path,
@@ -235,4 +183,45 @@ func EvaluateEnforce[R any, T any](
 	}
 
 	return evaluation, nil
+}
+
+func decisionMessage(
+	setName string,
+	action api.ActionType,
+	value Value,
+) string {
+	switch action {
+	case api.ActionTypeAudit:
+		return fmt.Sprintf(
+			"%s %q at %s matched audit namespace rule",
+			setName,
+			value.Value,
+			value.Path,
+		)
+
+	case api.ActionTypeDeny:
+		return fmt.Sprintf(
+			"%s %q at %s is denied by namespace rule",
+			setName,
+			value.Value,
+			value.Path,
+		)
+
+	case api.ActionTypeAllow:
+		return fmt.Sprintf(
+			"%s %q at %s is allowed by namespace rule",
+			setName,
+			value.Value,
+			value.Path,
+		)
+
+	default:
+		return fmt.Sprintf(
+			"%s %q at %s matched namespace rule action %q",
+			setName,
+			value.Value,
+			value.Path,
+			action,
+		)
+	}
 }

@@ -71,6 +71,7 @@ import (
 	"github.com/projectcapsule/capsule/internal/webhook/node"
 	"github.com/projectcapsule/capsule/internal/webhook/owners"
 	"github.com/projectcapsule/capsule/internal/webhook/pod"
+	podrules "github.com/projectcapsule/capsule/internal/webhook/pod/validation/rules"
 	"github.com/projectcapsule/capsule/internal/webhook/pvc"
 	"github.com/projectcapsule/capsule/internal/webhook/resourcepool"
 	"github.com/projectcapsule/capsule/internal/webhook/route"
@@ -561,7 +562,7 @@ func main() {
 		route.GenericManagedHandler(cfg),
 		route.Pod(
 			pod.Handler(
-				pod.PodRules(),
+				podrules.PodRules(regexCache),
 				pod.ImagePullPolicy(),
 				pod.ContainerRegistryLegacy(cfg),
 				pod.ContainerRegistry(cfg, registryCache),
@@ -676,7 +677,14 @@ func main() {
 		setupLog.Info("disabling node labels verification webhook as current Kubernetes version doesn't have fix for CVE-2021-25735")
 	}
 
-	if err = webhook.Register(manager, *evt.NewEventRecorder(manager.GetClient(), manager.GetEventRecorder("tenant-controller"), cfg), webhooksList...); err != nil {
+	if err = webhook.Register(
+		manager,
+		*evt.NewEventRecorder(
+			manager.GetClient(),
+			ctrl.Log.WithName("capsule.ctrl").WithName("events"),
+			manager.GetEventRecorder("tenant-controller"),
+			cfg,
+		), webhooksList...); err != nil {
 		setupLog.Error(err, "unable to setup webhooks")
 		os.Exit(1)
 	}

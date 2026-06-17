@@ -15,6 +15,7 @@ import (
 	k8sevents "k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/go-logr/logr"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
 )
 
@@ -28,82 +29,107 @@ type EventRecorder struct {
 
 	client        client.Client
 	configuration configuration.Configuration
+	log           logr.Logger
 }
 
 func NewEventRecorder(
 	c client.Client,
+	log logr.Logger,
 	recorder k8sevents.EventRecorder,
 	configuration configuration.Configuration,
 ) *EventRecorder {
 	return &EventRecorder{
 		EventRecorder: recorder,
 		client:        c,
+		log:           log.WithName("event-recorder"),
 		configuration: configuration,
 	}
 }
 
-func (r *EventRecorder) EmitLabeledEvent(
+func (r *EventRecorder) emitLabeledEvent(
 	ctx context.Context,
-	regarding runtime.Object,
-	related runtime.Object,
-	eventType string,
-	reason string,
-	action string,
-	note string,
-	labels map[string]string,
-) error {
+	e *LabeledEvent,
+) {
 	if r == nil {
-		return fmt.Errorf("event recorder is nil")
+		return
 	}
 
 	if r.client == nil {
-		return fmt.Errorf("event recorder client is nil")
+		r.log.Error(nil, "cannot emit labeled event: client is nil")
+		return
 	}
 
-	if reason == "" {
-		return fmt.Errorf("event reason is empty")
+	if e == nil {
+		r.log.Error(nil, "cannot emit labeled event: event is nil")
+		return
 	}
 
-	if action == "" {
-		return fmt.Errorf("event action is empty")
+	if e.reason == "" {
+		r.log.Error(nil, "cannot emit labeled event: reason is empty")
+		return
 	}
 
-	regardingRef, metaObj, err := objectReference(regarding)
+	if e.action == "" {
+		r.log.Error(nil, "cannot emit labeled event: action is empty")
+		return
+	}
+
+	regardingRef, metaObj, err := objectReference(e.regarding)
 	if err != nil {
-		return fmt.Errorf("build regarding reference: %w", err)
+		r.log.Error(err, "cannot emit labeled event: build regarding reference")
+		return
 	}
 
 	namespace := metaObj.GetNamespace()
 	if namespace == "" {
-		namespace = "default"
+		namespace = r.configuration.Events().ClusterEventNamespace
+	}
+
+	if namespace == "" {
+		r.log.Error(nil, "cannot emit labeled event: namespace is empty")
+		return
 	}
 
 	event := &eventsv1.Event{
 		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: metaObj.GetName() + ".",
+			GenerateName: metaObj.GetName(),
 			Namespace:    namespace,
-			Labels:       labels,
+			Labels:       e.labels,
+			Annotations:  e.annotations,
 		},
 		EventTime:           metav1.MicroTime{Time: time.Now()},
 		ReportingController: ReportingController,
 		ReportingInstance:   ReportingInstance,
-		Action:              action,
-		Reason:              reason,
+		Action:              e.action,
+		Reason:              e.reason,
 		Regarding:           regardingRef,
-		Note:                note,
-		Type:                eventType,
+		Note:                e.note,
+		Type:                e.eventType,
 	}
 
-	if related != nil {
-		relatedRef, _, err := objectReference(related)
+	if e.related != nil {
+		relatedRef, _, err := objectReference(e.related)
 		if err != nil {
-			return fmt.Errorf("build related reference: %w", err)
+			r.log.Error(err, "cannot emit labeled event: build related reference")
+			return
 		}
 
 		event.Related = &relatedRef
 	}
 
-	return r.client.Create(ctx, event)
+	if err := r.client.Create(ctx, event); err != nil {
+		r.log.Error(
+			err,
+			"cannot emit labeled event",
+			"reason", e.reason,
+			"action", e.action,
+			"type", e.eventType,
+			"regarding", regardingRef.Name,
+			"namespace", namespace,
+		)
+
+		return
+	}
 }
 
 func objectReference(obj runtime.Object) (corev1.ObjectReference, metav1.Object, error) {
