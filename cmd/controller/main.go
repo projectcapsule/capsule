@@ -79,6 +79,7 @@ import (
 	tenantmutation "github.com/projectcapsule/capsule/internal/webhook/tenant/mutation"
 	tenantvalidation "github.com/projectcapsule/capsule/internal/webhook/tenant/validation"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
+	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 	"github.com/projectcapsule/capsule/pkg/runtime/indexers"
 	"github.com/projectcapsule/capsule/pkg/utils"
@@ -560,12 +561,12 @@ func main() {
 		route.GenericManagedHandler(cfg),
 		route.Pod(
 			pod.Handler(
+				pod.PodRules(),
 				pod.ImagePullPolicy(),
 				pod.ContainerRegistryLegacy(cfg),
 				pod.ContainerRegistry(cfg, registryCache),
 				pod.PriorityClass(),
 				pod.RuntimeClass(),
-				pod.QoSClass(cfg),
 			),
 		),
 		route.Ingress(ingress.Class(cfg, kubeVersion), ingress.Hostnames(cfg), ingress.Collision(cfg), ingress.Wildcard()),
@@ -675,7 +676,7 @@ func main() {
 		setupLog.Info("disabling node labels verification webhook as current Kubernetes version doesn't have fix for CVE-2021-25735")
 	}
 
-	if err = webhook.Register(manager, webhooksList...); err != nil {
+	if err = webhook.Register(manager, *evt.NewEventRecorder(manager.GetClient(), manager.GetEventRecorder("tenant-controller"), cfg), webhooksList...); err != nil {
 		setupLog.Error(err, "unable to setup webhooks")
 		os.Exit(1)
 	}

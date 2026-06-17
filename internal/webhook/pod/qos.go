@@ -10,7 +10,6 @@ import (
 	"slices"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
@@ -18,7 +17,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api/rules"
 	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
-	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
+	"github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 	"github.com/projectcapsule/capsule/pkg/runtime/workloads"
 )
@@ -154,7 +153,7 @@ func (h *qosHandler) validate(
 			recorder,
 			tnt,
 			pod,
-			evt.ReasonForbiddenPodQoSClass,
+			events.ReasonForbiddenPodQoSClass,
 			msg,
 		)
 
@@ -259,8 +258,8 @@ func (h *qosHandler) auditWithEvent(
 		pod,
 		tnt,
 		corev1.EventTypeWarning,
-		evt.ReasonForbiddenPodQoSClass,
-		evt.ActionValidationDenied,
+		events.ReasonForbiddenPodQoSClass,
+		events.ActionValidationDenied,
 		msg,
 	)
 }
@@ -277,7 +276,7 @@ func (h *qosHandler) denyWithEvent(
 		tnt,
 		corev1.EventTypeWarning,
 		reason,
-		evt.ActionValidationDenied,
+		events.ActionValidationDenied,
 		msg,
 	)
 

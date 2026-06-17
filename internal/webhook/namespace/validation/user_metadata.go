@@ -9,14 +9,13 @@ import (
 
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api"
 	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
-	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
+	"github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 	"github.com/projectcapsule/capsule/pkg/tenant"
 	"github.com/projectcapsule/capsule/pkg/users"
@@ -155,7 +154,7 @@ func validateUserMetadata(
 	err := api.ValidateForbidden(annotations, options.ForbiddenAnnotations)
 	if err != nil {
 		err = errors.Wrap(err, "namespace annotations validation failed")
-		recorder.Eventf(ns, ns, corev1.EventTypeWarning, evt.ReasonForbiddenAnnotation, evt.ActionValidationDenied, err.Error())
+		recorder.Eventf(ns, ns, corev1.EventTypeWarning, events.ReasonForbiddenAnnotation, events.ActionValidationDenied, err.Error())
 
 		return ad.Deny(err.Error())
 	}
@@ -163,7 +162,7 @@ func validateUserMetadata(
 	err = api.ValidateForbidden(labels, options.ForbiddenLabels)
 	if err != nil {
 		err = errors.Wrap(err, "namespace labels validation failed")
-		recorder.Eventf(ns, ns, corev1.EventTypeWarning, evt.ReasonForbiddenLabel, evt.ActionValidationDenied, err.Error())
+		recorder.Eventf(ns, ns, corev1.EventTypeWarning, events.ReasonForbiddenLabel, events.ActionValidationDenied, err.Error())
 
 		return ad.Deny(err.Error())
 	}

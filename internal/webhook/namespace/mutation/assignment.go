@@ -8,7 +8,6 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -18,7 +17,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
-	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
+	"github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 	"github.com/projectcapsule/capsule/pkg/tenant"
 	"github.com/projectcapsule/capsule/pkg/users"
@@ -178,12 +177,12 @@ func assignToTenant(
 	}
 
 	if err := controllerutil.SetOwnerReference(tnt, ns, c.Scheme()); err != nil {
-		recorder.Eventf(ns, nil, corev1.EventTypeWarning, evt.ReasonNamespaceHijack, evt.ActionValidationDenied, "Namespace %s cannot be assigned to the desired tenant %s", ns.GetName(), tnt.GetName())
+		recorder.Eventf(ns, nil, corev1.EventTypeWarning, events.ReasonNamespaceHijack, events.ActionValidationDenied, "Namespace %s cannot be assigned to the desired tenant %s", ns.GetName(), tnt.GetName())
 
 		return err
 	}
 
-	recorder.Eventf(ns, nil, corev1.EventTypeNormal, evt.ReasonTenantAssigned, evt.ActionMutated, "Namespace %s has been assigned to the desired tenant %s", ns.GetName(), tnt.GetName())
+	recorder.Eventf(ns, nil, corev1.EventTypeNormal, events.ReasonTenantAssigned, events.ActionMutated, "Namespace %s has been assigned to the desired tenant %s", ns.GetName(), tnt.GetName())
 
 	return nil
 }

@@ -11,7 +11,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
@@ -19,7 +18,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api/errors"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
-	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
+	"github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
 
@@ -142,16 +141,16 @@ func validatePVCVolumeName(
 	}
 
 	if pv.GetLabels() == nil {
-		return ad.Deny(errors.NewMissingTenantPVLabelsError(pv.GetName(), evt.ActionValidationDenied).Error())
+		return ad.Deny(errors.NewMissingTenantPVLabelsError(pv.GetName(), events.ActionValidationDenied).Error())
 	}
 
 	value, ok := pv.GetLabels()[meta.TenantLabel]
 	if !ok {
-		return ad.Deny(errors.NewMissingTenantPVLabelsError(pv.GetName(), evt.ActionValidationDenied).Error())
+		return ad.Deny(errors.NewMissingTenantPVLabelsError(pv.GetName(), events.ActionValidationDenied).Error())
 	}
 
 	if value != tnt.Name {
-		return ad.Deny(errors.NewCrossTenantPVMountError(pv.GetName(), evt.ActionValidationDenied).Error())
+		return ad.Deny(errors.NewCrossTenantPVMountError(pv.GetName(), events.ActionValidationDenied).Error())
 	}
 
 	return nil

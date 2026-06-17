@@ -7,7 +7,6 @@ import (
 	"context"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
@@ -16,7 +15,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api/rules"
 	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
-	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
+	"github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
 
@@ -121,8 +120,8 @@ func (h *containerRegistryLegacyHandler) verifyContainerRegistry(
 			pod,
 			tnt,
 			corev1.EventTypeWarning,
-			evt.ReasonMissingFQCI,
-			evt.ActionValidationDenied,
+			events.ReasonMissingFQCI,
+			events.ActionValidationDenied,
 			"Using a fully qualified container image, cannot enforce registry for the tenant %s", reg.Registry(), tnt.GetName(),
 		)
 
@@ -141,8 +140,8 @@ func (h *containerRegistryLegacyHandler) verifyContainerRegistry(
 			pod,
 			tnt,
 			corev1.EventTypeWarning,
-			evt.ReasonForbiddenContainerRegistry,
-			evt.ActionValidationDenied,
+			events.ReasonForbiddenContainerRegistry,
+			events.ActionValidationDenied,
 			"Using a container hosted on registry %s that is forbidden for the tenant %s", reg.Registry(), tnt.GetName(),
 		)
 

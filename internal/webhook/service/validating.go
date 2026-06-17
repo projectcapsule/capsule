@@ -10,7 +10,6 @@ import (
 
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
@@ -18,7 +17,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api"
 	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
 	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
-	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
+	"github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
 
@@ -79,8 +78,8 @@ func (h *validating) handle(
 			svc,
 			tnt,
 			corev1.EventTypeWarning,
-			evt.ReasonForbiddenNodePort,
-			evt.ActionValidationDenied,
+			events.ReasonForbiddenNodePort,
+			events.ActionValidationDenied,
 			"Cannot be type of NodePort for the Tenant %s", tnt.GetName(),
 		)
 
@@ -92,8 +91,8 @@ func (h *validating) handle(
 			svc,
 			tnt,
 			corev1.EventTypeWarning,
-			evt.ReasonForbiddenExternalName,
-			evt.ActionValidationDenied,
+			events.ReasonForbiddenExternalName,
+			events.ActionValidationDenied,
 			"Cannot be type of ExternalName for the Tenant %s", tnt.GetName(),
 		)
 
@@ -105,8 +104,8 @@ func (h *validating) handle(
 			svc,
 			tnt,
 			corev1.EventTypeWarning,
-			evt.ReasonForbiddenLoadBalancer,
-			evt.ActionValidationDenied,
+			events.ReasonForbiddenLoadBalancer,
+			events.ActionValidationDenied,
 			"Cannot be type of LoadBalancer for the Tenant %s", tnt.GetName(),
 		)
 
@@ -122,8 +121,8 @@ func (h *validating) handle(
 				svc,
 				tnt,
 				corev1.EventTypeWarning,
-				evt.ReasonForbiddenAnnotation,
-				evt.ActionValidationDenied,
+				events.ReasonForbiddenAnnotation,
+				events.ActionValidationDenied,
 				err.Error(),
 			)
 
@@ -138,8 +137,8 @@ func (h *validating) handle(
 				svc,
 				tnt,
 				corev1.EventTypeWarning,
-				evt.ReasonForbiddenLabel,
-				evt.ActionValidationDenied,
+				events.ReasonForbiddenLabel,
+				events.ActionValidationDenied,
 				err.Error(),
 			)
 
@@ -175,8 +174,8 @@ func (h *validating) handle(
 				svc,
 				tnt,
 				corev1.EventTypeWarning,
-				evt.ReasonForbiddenExternalServiceIP,
-				evt.ActionValidationDenied,
+				events.ReasonForbiddenExternalServiceIP,
+				events.ActionValidationDenied,
 				"External IP %s is forbidden for the Tenant %s", ip.String(), tnt.GetName(),
 			)
 

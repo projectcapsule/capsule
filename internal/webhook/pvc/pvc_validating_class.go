@@ -9,7 +9,6 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
@@ -17,7 +16,7 @@ import (
 	"github.com/projectcapsule/capsule/internal/webhook/utils"
 	"github.com/projectcapsule/capsule/pkg/api/errors"
 	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
-	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
+	"github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
 
@@ -49,8 +48,8 @@ func (h *persistentVolumeValidatingClass) OnCreate(
 				pvc,
 				tnt,
 				corev1.EventTypeWarning,
-				evt.ReasonMissingStorageClass,
-				evt.ActionValidationDenied,
+				events.ReasonMissingStorageClass,
+				events.ActionValidationDenied,
 				"Requires a StorageClass",
 			)
 
@@ -84,8 +83,8 @@ func (h *persistentVolumeValidatingClass) OnCreate(
 				pvc,
 				tnt,
 				corev1.EventTypeWarning,
-				evt.ReasonForbiddenStorageClass,
-				evt.ActionValidationDenied,
+				events.ReasonForbiddenStorageClass,
+				events.ActionValidationDenied,
 				"StorageClass %s is forbidden for the Tenant %s", *storageClass, tnt.GetName())
 
 			return ad.Deny(errors.NewStorageClassForbidden(*pvc.Spec.StorageClassName, *tnt.Spec.StorageClasses).Error())

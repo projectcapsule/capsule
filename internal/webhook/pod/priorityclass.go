@@ -8,7 +8,6 @@ import (
 	"net/http"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
@@ -17,7 +16,7 @@ import (
 	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
 	"github.com/projectcapsule/capsule/pkg/api/rules"
 	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
-	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
+	"github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
 
@@ -78,8 +77,8 @@ func (h *priorityClass) OnCreate(
 				pod,
 				tnt,
 				corev1.EventTypeWarning,
-				evt.ReasonForbiddenPriorityClass,
-				evt.ActionValidationDenied,
+				events.ReasonForbiddenPriorityClass,
+				events.ActionValidationDenied,
 				"Using Priority Class %s is forbidden for the tenant %s", priorityClassName, tnt.GetName(),
 			)
 

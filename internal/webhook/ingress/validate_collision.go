@@ -13,7 +13,6 @@ import (
 	networkingv1 "k8s.io/api/networking/v1"
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
@@ -22,7 +21,7 @@ import (
 	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
 	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
-	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
+	"github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 	"github.com/projectcapsule/capsule/pkg/runtime/indexers/ingress"
 )
@@ -97,7 +96,7 @@ func (r *collision) validate(
 
 	var collisionErr *caperrors.IngressHostnameCollisionError
 	if errors.As(err, &collisionErr) {
-		recorder.Eventf(ing.GetClientObject(), tnt, corev1.EventTypeWarning, evt.ReasonIngressHostnameCollision, evt.ActionValidationDenied, "Ingress %s/%s hostname is colliding", ing.Namespace(), ing.Name())
+		recorder.Eventf(ing.GetClientObject(), tnt, corev1.EventTypeWarning, events.ReasonIngressHostnameCollision, events.ActionValidationDenied, "Ingress %s/%s hostname is colliding", ing.Namespace(), ing.Name())
 	}
 
 	return ad.Deny(err.Error())

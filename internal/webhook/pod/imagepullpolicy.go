@@ -7,7 +7,6 @@ import (
 	"context"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
@@ -15,7 +14,7 @@ import (
 	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
 	"github.com/projectcapsule/capsule/pkg/api/rules"
 	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
-	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
+	"github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
 
@@ -114,8 +113,8 @@ func (h *imagePullPolicy) verifyPullPolicy(
 			pod,
 			tnt,
 			corev1.EventTypeWarning,
-			evt.ReasonForbiddenPullPolicy,
-			evt.ActionValidationDenied,
+			events.ReasonForbiddenPullPolicy,
+			events.ActionValidationDenied,
 			"PullPolicy %s is forbidden for the tenant %s", usedPullPolicy, tnt.GetName(),
 		)
 

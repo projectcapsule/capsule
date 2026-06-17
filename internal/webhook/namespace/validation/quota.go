@@ -8,14 +8,13 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
 	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
-	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
+	"github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 	"github.com/projectcapsule/capsule/pkg/users"
 )
@@ -85,7 +84,7 @@ func (h *quotaHandler) handle(
 			return nil
 		}
 
-		recorder.Eventf(ns, nil, corev1.EventTypeWarning, evt.ReasonOverprovision, evt.ActionValidationDenied, "Namespace %s cannot be attached, quota exceeded for the current Tenant", ns.GetName())
+		recorder.Eventf(ns, nil, corev1.EventTypeWarning, events.ReasonOverprovision, events.ActionValidationDenied, "Namespace %s cannot be attached, quota exceeded for the current Tenant", ns.GetName())
 
 		return ad.Deny(caperrors.NewNamespaceQuotaExceededError().Error())
 	}

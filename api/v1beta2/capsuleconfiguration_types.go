@@ -59,6 +59,8 @@ type CapsuleConfigurationSpec struct {
 	// Service Account Client configuration for impersonation properties
 	// +optional
 	Impersonation ServiceAccountClient `json:"impersonation,omitzero"`
+	// Event (Audit) Configuration
+	Events EventsConfiguration `json:"events,omitzero"`
 
 	// Deprecated: use users property instead (https://projectcapsule.dev/docs/operating/setup/configuration/#users)
 	//
@@ -83,6 +85,12 @@ type RBACConfiguration struct {
 	// Name for the ClusterRole required to grant Namespace Provision permissions.
 	// +kubebuilder:default=capsule-namespace-provisioner
 	ProvisionerClusterRole string `json:"provisioner,omitempty"`
+}
+
+type EventsConfiguration struct {
+	// Namespace where the events are logged for cluster scoped resources or deny events
+	// +kubebuilder:default={default}
+	ClusterEventNamespace []string `json:"namespace,omitempty"`
 }
 
 type DynamicAdmission struct {

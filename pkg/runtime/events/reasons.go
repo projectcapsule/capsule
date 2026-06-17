@@ -13,6 +13,9 @@ const (
 	// ForbiddenAnnotationReason used as reason string to deny forbidden annotations.
 	ReasonForbiddenAnnotation string = "ForbiddenAnnotation"
 
+	// RuleStatus.
+	ReasonNamespaceRuleAudit string = "NamespaceRuleAudit"
+
 	// Namespace.
 	ReasonNamespaceHijack string = "ReasonNamespacePatch"
 

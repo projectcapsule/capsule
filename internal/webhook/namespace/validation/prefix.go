@@ -8,14 +8,13 @@ import (
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
-	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
+	"github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 	"github.com/projectcapsule/capsule/pkg/users"
 )
@@ -64,8 +63,8 @@ func (h *prefixHandler) OnCreate(
 				ns,
 				nil,
 				corev1.EventTypeWarning,
-				evt.ReasonInvalidTenantPrefix,
-				evt.ActionValidationDenied,
+				events.ReasonInvalidTenantPrefix,
+				events.ActionValidationDenied,
 				"Namespace %s does not match the expected prefix for the current Tenant",
 				ns.GetName(),
 			)

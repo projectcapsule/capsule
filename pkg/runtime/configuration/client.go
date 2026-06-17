@@ -232,6 +232,10 @@ func (c *capsuleConfiguration) Admission() capsulev1beta2.DynamicAdmission {
 	return c.retrievalFn().Spec.Admission
 }
 
+func (c *capsuleConfiguration) Events() capsulev1beta2.EventsConfiguration {
+	return c.retrievalFn().Spec.Events
+}
+
 func (c *capsuleConfiguration) RBAC() *capsulev1beta2.RBACConfiguration {
 	return c.retrievalFn().Spec.RBAC
 }

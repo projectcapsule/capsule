@@ -10,7 +10,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/version"
-	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
@@ -19,7 +18,7 @@ import (
 	caperrors "github.com/projectcapsule/capsule/pkg/api/errors"
 	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
 	"github.com/projectcapsule/capsule/pkg/runtime/configuration"
-	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
+	"github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 )
 
@@ -101,7 +100,7 @@ func (r *class) validate(
 	ingressClass := ingress.IngressClass()
 
 	if ingressClass == nil {
-		recorder.Eventf(ingress.GetClientObject(), tnt, corev1.EventTypeWarning, evt.ReasonMissingIngressClass, evt.ActionValidationDenied, "Ingress %s/%s is missing IngressClass", req.Namespace, req.Name)
+		recorder.Eventf(ingress.GetClientObject(), tnt, corev1.EventTypeWarning, events.ReasonMissingIngressClass, events.ActionValidationDenied, "Ingress %s/%s is missing IngressClass", req.Namespace, req.Name)
 
 		return ad.Deny(caperrors.NewIngressClassUndefined(*allowed).Error())
 	}
@@ -129,7 +128,7 @@ func (r *class) validate(
 	case allowed.Match(*ingressClass) || selector:
 		return nil
 	default:
-		recorder.Eventf(ingress.GetClientObject(), tnt, corev1.EventTypeWarning, evt.ReasonForbiddenIngressClass, evt.ActionValidationDenied, "Ingress %s/%s IngressClass %s is forbidden for the current Tenant", req.Namespace, req.Name, &ingressClass)
+		recorder.Eventf(ingress.GetClientObject(), tnt, corev1.EventTypeWarning, events.ReasonForbiddenIngressClass, events.ActionValidationDenied, "Ingress %s/%s IngressClass %s is forbidden for the current Tenant", req.Namespace, req.Name, &ingressClass)
 
 		return ad.Deny(caperrors.NewIngressClassForbidden(*ingressClass, *allowed).Error())
 	}

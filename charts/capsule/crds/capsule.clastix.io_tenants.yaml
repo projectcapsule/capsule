@@ -2550,6 +2550,29 @@ spec:
                                     type: array
                                 type: object
                               type: array
+                            schedulers:
+                              description: |-
+                                Schedulers defines schedulerName matchers for Pod admission.
+
+                                The rule is evaluated against pod.spec.schedulerName.
+                                Empty schedulerName is ignored and is not normalized to default-scheduler.
+                              items:
+                                description: Exactly one of Name or Exp should be
+                                  set.
+                                properties:
+                                  exp:
+                                    description: Exp matches regular expression.
+                                    minLength: 1
+                                    type: string
+                                  name:
+                                    description: Name matches exactly
+                                    minLength: 1
+                                    type: string
+                                type: object
+                                x-kubernetes-validations:
+                                - message: exactly one of name or exp must be set
+                                  rule: has(self.name) != has(self.exp)
+                              type: array
                             targets:
                               description: |-
                                 Define the enforcement targets this rule applies to.

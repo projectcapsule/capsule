@@ -8,13 +8,12 @@ import (
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/client-go/tools/events"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	ad "github.com/projectcapsule/capsule/pkg/runtime/admission"
-	evt "github.com/projectcapsule/capsule/pkg/runtime/events"
+	"github.com/projectcapsule/capsule/pkg/runtime/events"
 	"github.com/projectcapsule/capsule/pkg/runtime/handlers"
 	indexer "github.com/projectcapsule/capsule/pkg/runtime/indexers/tenant"
 )
@@ -89,7 +88,7 @@ func (h *wildcard) validate(
 			// Check if one of the host has wildcard.
 			if strings.HasPrefix(host, "*") {
 				// In case of wildcard, generate an event and then return.
-				recorder.Eventf(ingress.GetClientObject(), &tnt, corev1.EventTypeWarning, evt.ReasonWildcardDenied, evt.ActionValidationDenied, "%s %s/%s cannot be %s", req.Kind.String(), req.Namespace, req.Name, strings.ToLower(string(req.Operation)))
+				recorder.Eventf(ingress.GetClientObject(), &tnt, corev1.EventTypeWarning, events.ReasonWildcardDenied, events.ActionValidationDenied, "%s %s/%s cannot be %s", req.Kind.String(), req.Namespace, req.Name, strings.ToLower(string(req.Operation)))
 
 				return ad.Denyf("Wildcard denied for tenant %s", tnt.GetName())
 			}

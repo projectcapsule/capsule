@@ -8,6 +8,7 @@
 package rules
 
 import (
+	"github.com/projectcapsule/capsule/pkg/api"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -93,6 +94,11 @@ func (in *NamespaceRuleEnforceWorkloadsBody) DeepCopyInto(out *NamespaceRuleEnfo
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
+	}
+	if in.Schedulers != nil {
+		in, out := &in.Schedulers, &out.Schedulers
+		*out = make([]api.ExpressionMatch, len(*in))
+		copy(*out, *in)
 	}
 }
 

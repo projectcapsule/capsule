@@ -89,6 +89,18 @@ spec:
       kind: User
       name: alice
   rules:
+    - enforce:
+        action: "audit"
+        workloads:
+          schedulers:
+          - exp: "default-scheduler"
+    - enforce:
+        action: "deny"
+        workloads:
+          schedulers:
+          - exp: "custom-scheduler"
+
+
     - permissions:
         promotions:
           - clusterRoles:
