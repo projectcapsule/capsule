@@ -11,12 +11,18 @@ type Value struct {
 	Path  string
 }
 
+type Match struct {
+	Matched      bool
+	MatchedValue any
+}
+
 type Decision struct {
-	SetName     string
-	EventReason string
-	Action      api.ActionType
-	Value       Value
-	Message     string
+	SetName      string
+	EventReason  string
+	Action       api.ActionType
+	Value        Value
+	MatchedValue any
+	Message      string
 }
 
 type DecisionError struct {
@@ -32,8 +38,14 @@ func (e *DecisionError) Error() string {
 }
 
 type Evaluation struct {
-	Audits   []*Decision
+	// Final is the last matching allow/deny decision.
+	Final *Decision
+
+	// Blocking is set when the final result blocks admission.
 	Blocking *Decision
+
+	// Audits contains all matching audit decisions.
+	Audits []*Decision
 }
 
 func (e *Evaluation) BlockingError() error {
@@ -46,20 +58,34 @@ func (e *Evaluation) BlockingError() error {
 	}
 }
 
+func (e *Evaluation) Append(other *Evaluation) {
+	if e == nil || other == nil {
+		return
+	}
+
+	e.Audits = append(e.Audits, other.Audits...)
+
+	if other.Final != nil {
+		e.Final = other.Final
+	}
+
+	if other.Blocking != nil {
+		e.Blocking = other.Blocking
+	}
+}
+
 type Set[R any, T any] struct {
 	Name string
 
-	// EventReason is used when a matching rule produces an audit or blocking decision.
 	EventReason string
 
-	// Values extracts the values from the admitted object.
 	Values func(T) []Value
 
-	// Rules extracts rule entries from an enforce body.
 	Rules func(*api.NamespaceRuleEnforceBody) []R
 
-	// Matches checks whether a rule entry matches an extracted value.
-	Matches func(R, Value) (bool, error)
+	Matches func(R, Value) (Match, error)
+
+	Message func(action api.ActionType, value Value, matchedValue any) string
 }
 
 func EvaluateEnforce[R any, T any](
@@ -109,7 +135,9 @@ func EvaluateEnforce[R any, T any](
 				continue
 			}
 
-			switch enforce.Action {
+			action := enforce.Action.OrDefault()
+
+			switch action {
 			case api.ActionTypeAllow:
 				hasAllowRule = true
 
@@ -120,29 +148,30 @@ func EvaluateEnforce[R any, T any](
 				return evaluation, fmt.Errorf(
 					"%s: unsupported rule action %q",
 					set.Name,
-					enforce.Action,
+					action,
 				)
 			}
 
 			for _, item := range items {
-				matched, err := set.Matches(item, value)
+				match, err := set.Matches(item, value)
 				if err != nil {
 					return evaluation, fmt.Errorf("%s: invalid rule: %w", set.Name, err)
 				}
 
-				if !matched {
+				if !match.Matched {
 					continue
 				}
 
 				decision := &Decision{
-					SetName:     set.Name,
-					EventReason: set.EventReason,
-					Action:      enforce.Action,
-					Value:       value,
-					Message:     decisionMessage(set.Name, enforce.Action, value),
+					SetName:      set.Name,
+					EventReason:  set.EventReason,
+					Action:       action,
+					Value:        value,
+					MatchedValue: match.MatchedValue,
+					Message:      decisionMessage(set, action, value, match.MatchedValue),
 				}
 
-				switch enforce.Action {
+				switch action {
 				case api.ActionTypeAudit:
 					evaluation.Audits = append(evaluation.Audits, decision)
 
@@ -154,14 +183,14 @@ func EvaluateEnforce[R any, T any](
 		}
 
 		if lastDecision != nil {
-			switch lastDecision.Action {
-			case api.ActionTypeAllow:
-				continue
+			evaluation.Final = lastDecision
 
-			case api.ActionTypeDeny:
+			if lastDecision.Action == api.ActionTypeDeny {
 				evaluation.Blocking = lastDecision
 				return evaluation, nil
 			}
+
+			continue
 		}
 
 		if hasAllowRule {
@@ -185,16 +214,21 @@ func EvaluateEnforce[R any, T any](
 	return evaluation, nil
 }
 
-func decisionMessage(
-	setName string,
+func decisionMessage[R any, T any](
+	set Set[R, T],
 	action api.ActionType,
 	value Value,
+	matchedValue any,
 ) string {
+	if set.Message != nil {
+		return set.Message(action, value, matchedValue)
+	}
+
 	switch action {
 	case api.ActionTypeAudit:
 		return fmt.Sprintf(
 			"%s %q at %s matched audit namespace rule",
-			setName,
+			set.Name,
 			value.Value,
 			value.Path,
 		)
@@ -202,7 +236,7 @@ func decisionMessage(
 	case api.ActionTypeDeny:
 		return fmt.Sprintf(
 			"%s %q at %s is denied by namespace rule",
-			setName,
+			set.Name,
 			value.Value,
 			value.Path,
 		)
@@ -210,7 +244,7 @@ func decisionMessage(
 	case api.ActionTypeAllow:
 		return fmt.Sprintf(
 			"%s %q at %s is allowed by namespace rule",
-			setName,
+			set.Name,
 			value.Value,
 			value.Path,
 		)
@@ -218,7 +252,7 @@ func decisionMessage(
 	default:
 		return fmt.Sprintf(
 			"%s %q at %s matched namespace rule action %q",
-			setName,
+			set.Name,
 			value.Value,
 			value.Path,
 			action,

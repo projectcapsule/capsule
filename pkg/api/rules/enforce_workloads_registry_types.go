@@ -25,7 +25,3 @@ type OCIRegistry struct {
 	// +kubebuilder:validation:Items:Enum=Always;Never;IfNotPresent
 	Policy []corev1.PullPolicy `json:"policy,omitempty"`
 }
-
-func (r OCIRegistry) Expression() api.ExpressionRegex {
-	return r.ExpressionRegex
-}

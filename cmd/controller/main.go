@@ -562,10 +562,9 @@ func main() {
 		route.GenericManagedHandler(cfg),
 		route.Pod(
 			pod.Handler(
-				podrules.PodRules(regexCache),
+				podrules.PodRules(regexCache, registryCache),
 				pod.ImagePullPolicy(),
 				pod.ContainerRegistryLegacy(cfg),
-				pod.ContainerRegistry(cfg, registryCache),
 				pod.PriorityClass(),
 				pod.RuntimeClass(),
 			),

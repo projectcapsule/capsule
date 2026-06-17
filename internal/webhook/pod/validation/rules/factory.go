@@ -44,22 +44,25 @@ type podRuleValidator func(
 ) (*ruleengine.Evaluation, error)
 
 type podRules struct {
-	rules      []podRuleValidator
-	regexCache *cache.RegexCache
+	rules         []podRuleValidator
+	regexCache    *cache.RegexCache
+	registryCache *cache.RegistryRuleSetCache
 }
 
-func PodRules(regexCache *cache.RegexCache) handlers.TypedHandlerWithTenantWithRuleset[*corev1.Pod] {
+func PodRules(regexCache *cache.RegexCache, registryCache *cache.RegistryRuleSetCache) handlers.TypedHandlerWithTenantWithRuleset[*corev1.Pod] {
 	if regexCache == nil {
 		regexCache = cache.NewRegexCache()
 	}
 
 	h := &podRules{
-		regexCache: regexCache,
+		regexCache:    regexCache,
+		registryCache: registryCache,
 	}
 
 	h.rules = []podRuleValidator{
 		h.validateSchedulers,
 		h.validateQoSClasses,
+		h.validateRegistries,
 	}
 
 	return h

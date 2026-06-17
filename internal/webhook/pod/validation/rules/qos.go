@@ -37,8 +37,10 @@ func (h *podRules) validateQoSClasses(
 
 				return enforce.Workloads.QoSClasses
 			},
-			Matches: func(match corev1.PodQOSClass, value ruleengine.Value) (bool, error) {
-				return string(match) == value.Value, nil
+			Matches: func(match corev1.PodQOSClass, value ruleengine.Value) (ruleengine.Match, error) {
+				return ruleengine.Match{
+					Matched: string(match) == value.Value,
+				}, nil
 			},
 		},
 	)

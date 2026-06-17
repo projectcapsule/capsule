@@ -39,8 +39,15 @@ func (h *podRules) validateSchedulers(
 
 				return enforce.Workloads.Schedulers
 			},
-			Matches: func(match api.ExpressionMatch, value ruleengine.Value) (bool, error) {
-				return match.MatchesWithExpressionMatcher(h.regexCache, value.Value)
+			Matches: func(match api.ExpressionMatch, value ruleengine.Value) (ruleengine.Match, error) {
+				matched, err := match.MatchesWithExpressionMatcher(h.regexCache, value.Value)
+				if err != nil {
+					return ruleengine.Match{}, err
+				}
+
+				return ruleengine.Match{
+					Matched: matched,
+				}, nil
 			},
 		},
 	)

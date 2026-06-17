@@ -44,6 +44,46 @@ var _ = Describe("enforcing container registry namespace rules", Ordered, Label(
 
 	var tnt *capsulev1beta2.Tenant
 
+	registryByExpression := func(expression string) rules.OCIRegistry {
+		return rules.OCIRegistry{
+			ExpressionMatch: api.ExpressionMatch{
+				ExpressionRegex: api.ExpressionRegex{
+					Expression: expression,
+				},
+			},
+		}
+	}
+
+	registryByNegatedExpression := func(expression string) rules.OCIRegistry {
+		return rules.OCIRegistry{
+			ExpressionMatch: api.ExpressionMatch{
+				ExpressionRegex: api.ExpressionRegex{
+					Expression: expression,
+					Negate:     true,
+				},
+			},
+		}
+	}
+
+	registryByExact := func(exact ...string) rules.OCIRegistry {
+		return rules.OCIRegistry{
+			ExpressionMatch: api.ExpressionMatch{
+				Exact: exact,
+			},
+		}
+	}
+
+	registryByMatch := func(exact []string, expression string) rules.OCIRegistry {
+		return rules.OCIRegistry{
+			ExpressionMatch: api.ExpressionMatch{
+				ExpressionRegex: api.ExpressionRegex{
+					Expression: expression,
+				},
+				Exact: exact,
+			},
+		}
+	}
+
 	newTenant := func() *capsulev1beta2.Tenant {
 		return &capsulev1beta2.Tenant{
 			ObjectMeta: metav1.ObjectMeta{
@@ -70,11 +110,7 @@ var _ = Describe("enforcing container registry namespace rules", Ordered, Label(
 								Action: rules.ActionTypeAllow,
 								Workloads: rules.NamespaceRuleEnforceWorkloadsBody{
 									Registries: []rules.OCIRegistry{
-										{
-											RegExpression: api.RegExpression{
-												Expression: "harbor/.*",
-											},
-										},
+										registryByExpression("harbor/.*"),
 									},
 								},
 							},
@@ -87,11 +123,7 @@ var _ = Describe("enforcing container registry namespace rules", Ordered, Label(
 								Workloads: rules.NamespaceRuleEnforceWorkloadsBody{
 									Targets: targetContainers,
 									Registries: []rules.OCIRegistry{
-										{
-											RegExpression: api.RegExpression{
-												Expression: "harbor/customer/containers/.*",
-											},
-										},
+										registryByExpression("harbor/customer/containers/.*"),
 									},
 								},
 							},
@@ -104,11 +136,7 @@ var _ = Describe("enforcing container registry namespace rules", Ordered, Label(
 								Workloads: rules.NamespaceRuleEnforceWorkloadsBody{
 									Targets: targetInitContainers,
 									Registries: []rules.OCIRegistry{
-										{
-											RegExpression: api.RegExpression{
-												Expression: "harbor/customer/init/.*",
-											},
-										},
+										registryByExpression("harbor/customer/init/.*"),
 									},
 								},
 							},
@@ -121,11 +149,7 @@ var _ = Describe("enforcing container registry namespace rules", Ordered, Label(
 								Workloads: rules.NamespaceRuleEnforceWorkloadsBody{
 									Targets: targetEphemeralContainers,
 									Registries: []rules.OCIRegistry{
-										{
-											RegExpression: api.RegExpression{
-												Expression: "harbor/customer/debug/.*",
-											},
-										},
+										registryByExpression("harbor/customer/debug/.*"),
 									},
 								},
 							},
@@ -138,11 +162,7 @@ var _ = Describe("enforcing container registry namespace rules", Ordered, Label(
 								Workloads: rules.NamespaceRuleEnforceWorkloadsBody{
 									Targets: targetVolumes,
 									Registries: []rules.OCIRegistry{
-										{
-											RegExpression: api.RegExpression{
-												Expression: "harbor/customer/volume/.*",
-											},
-										},
+										registryByExpression("harbor/customer/volume/.*"),
 									},
 								},
 							},
@@ -155,11 +175,7 @@ var _ = Describe("enforcing container registry namespace rules", Ordered, Label(
 								Workloads: rules.NamespaceRuleEnforceWorkloadsBody{
 									Targets: targetContainers,
 									Registries: []rules.OCIRegistry{
-										{
-											RegExpression: api.RegExpression{
-												Expression: "audit/containers/.*",
-											},
-										},
+										registryByExpression("audit/containers/.*"),
 									},
 								},
 							},
@@ -172,11 +188,52 @@ var _ = Describe("enforcing container registry namespace rules", Ordered, Label(
 								Workloads: rules.NamespaceRuleEnforceWorkloadsBody{
 									Targets: targetVolumes,
 									Registries: []rules.OCIRegistry{
-										{
-											RegExpression: api.RegExpression{
-												Expression: "audit/volumes/.*",
-											},
-										},
+										registryByExpression("audit/volumes/.*"),
+									},
+								},
+							},
+						},
+					},
+					{
+						NamespaceRuleBodyNamespace: &rules.NamespaceRuleBodyNamespace{
+							Enforce: &rules.NamespaceRuleEnforceBody{
+								Action: rules.ActionTypeAllow,
+								Workloads: rules.NamespaceRuleEnforceWorkloadsBody{
+									Targets: targetContainers,
+									Registries: []rules.OCIRegistry{
+										registryByExact(
+											"exact/containers/app:1",
+											"exact/containers/app:2",
+										),
+									},
+								},
+							},
+						},
+					},
+					{
+						NamespaceRuleBodyNamespace: &rules.NamespaceRuleBodyNamespace{
+							Enforce: &rules.NamespaceRuleEnforceBody{
+								Action: rules.ActionTypeDeny,
+								Workloads: rules.NamespaceRuleEnforceWorkloadsBody{
+									Targets: targetContainers,
+									Registries: []rules.OCIRegistry{
+										registryByExact("exact/containers/blocked:1"),
+									},
+								},
+							},
+						},
+					},
+					{
+						NamespaceRuleBodyNamespace: &rules.NamespaceRuleBodyNamespace{
+							Enforce: &rules.NamespaceRuleEnforceBody{
+								Action: rules.ActionTypeAllow,
+								Workloads: rules.NamespaceRuleEnforceWorkloadsBody{
+									Targets: targetContainers,
+									Registries: []rules.OCIRegistry{
+										registryByMatch(
+											[]string{"combined/exact/app:1"},
+											"combined/regex/.*",
+										),
 									},
 								},
 							},
@@ -190,8 +247,10 @@ var _ = Describe("enforcing container registry namespace rules", Ordered, Label(
 									Targets: targetContainers,
 									Registries: []rules.OCIRegistry{
 										{
-											RegExpression: api.RegExpression{
-												Expression: "policy/.*",
+											ExpressionMatch: api.ExpressionMatch{
+												ExpressionRegex: api.ExpressionRegex{
+													Expression: "policy/.*",
+												},
 											},
 											Policy: []corev1.PullPolicy{
 												corev1.PullNever,
@@ -214,11 +273,7 @@ var _ = Describe("enforcing container registry namespace rules", Ordered, Label(
 								Workloads: rules.NamespaceRuleEnforceWorkloadsBody{
 									Targets: targetContainers,
 									Registries: []rules.OCIRegistry{
-										{
-											RegExpression: api.RegExpression{
-												Expression: "harbor/customer/containers/prod/.*",
-											},
-										},
+										registryByExpression("harbor/customer/containers/prod/.*"),
 									},
 								},
 							},
@@ -236,12 +291,7 @@ var _ = Describe("enforcing container registry namespace rules", Ordered, Label(
 								Workloads: rules.NamespaceRuleEnforceWorkloadsBody{
 									Targets: targetContainers,
 									Registries: []rules.OCIRegistry{
-										{
-											RegExpression: api.RegExpression{
-												Expression: "trusted/.*",
-												Negate:     true,
-											},
-										},
+										registryByNegatedExpression("trusted/.*"),
 									},
 								},
 							},
@@ -256,6 +306,7 @@ var _ = Describe("enforcing container registry namespace rules", Ordered, Label(
 		action      rules.ActionType
 		targets     []rules.WorkloadValidationTarget
 		expressions []string
+		exact       [][]string
 		negated     []bool
 	}
 
@@ -287,21 +338,109 @@ var _ = Describe("enforcing container registry namespace rules", Ordered, Label(
 					g.Expect(got.Enforce.Workloads.Targets).To(Equal(expected.targets))
 				}
 
-				g.Expect(got.Enforce.Workloads.Registries).To(HaveLen(len(expected.expressions)))
+				wantRegistries := len(expected.expressions)
+				if len(expected.exact) > wantRegistries {
+					wantRegistries = len(expected.exact)
+				}
 
-				for j, expectedExpression := range expected.expressions {
-					expr := got.Enforce.Workloads.Registries[j].Expression()
+				g.Expect(got.Enforce.Workloads.Registries).To(HaveLen(wantRegistries))
 
-					g.Expect(expr.Expression).To(Equal(expectedExpression))
+				for j := 0; j < wantRegistries; j++ {
+					match := got.Enforce.Workloads.Registries[j].ExpressionMatch
+
+					if len(expected.expressions) > j {
+						g.Expect(match.Expression).To(Equal(expected.expressions[j]))
+					} else {
+						g.Expect(match.Expression).To(BeEmpty())
+					}
+
+					if len(expected.exact) > j {
+						g.Expect(match.Exact).To(Equal(expected.exact[j]))
+					} else {
+						g.Expect(match.Exact).To(BeEmpty())
+					}
 
 					if len(expected.negated) > j {
-						g.Expect(expr.Negate).To(Equal(expected.negated[j]))
+						g.Expect(match.Negate).To(Equal(expected.negated[j]))
 					} else {
-						g.Expect(expr.Negate).To(BeFalse())
+						g.Expect(match.Negate).To(BeFalse())
 					}
 				}
 			}
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
+	}
+
+	baseStatusRules := func() []expectedStatusRule {
+		return []expectedStatusRule{
+			{
+				action:      rules.ActionTypeAllow,
+				expressions: []string{"harbor/.*"},
+			},
+			{
+				action:      rules.ActionTypeDeny,
+				targets:     targetContainers,
+				expressions: []string{"harbor/customer/containers/.*"},
+			},
+			{
+				action:      rules.ActionTypeDeny,
+				targets:     targetInitContainers,
+				expressions: []string{"harbor/customer/init/.*"},
+			},
+			{
+				action:      rules.ActionTypeDeny,
+				targets:     targetEphemeralContainers,
+				expressions: []string{"harbor/customer/debug/.*"},
+			},
+			{
+				action:      rules.ActionTypeDeny,
+				targets:     targetVolumes,
+				expressions: []string{"harbor/customer/volume/.*"},
+			},
+			{
+				action:      rules.ActionTypeAudit,
+				targets:     targetContainers,
+				expressions: []string{"audit/containers/.*"},
+			},
+			{
+				action:      rules.ActionTypeAudit,
+				targets:     targetVolumes,
+				expressions: []string{"audit/volumes/.*"},
+			},
+			{
+				action:  rules.ActionTypeAllow,
+				targets: targetContainers,
+				exact: [][]string{
+					{
+						"exact/containers/app:1",
+						"exact/containers/app:2",
+					},
+				},
+			},
+			{
+				action:  rules.ActionTypeDeny,
+				targets: targetContainers,
+				exact: [][]string{
+					{
+						"exact/containers/blocked:1",
+					},
+				},
+			},
+			{
+				action:      rules.ActionTypeAllow,
+				targets:     targetContainers,
+				expressions: []string{"combined/regex/.*"},
+				exact: [][]string{
+					{
+						"combined/exact/app:1",
+					},
+				},
+			},
+			{
+				action:      rules.ActionTypeAllow,
+				targets:     targetContainers,
+				expressions: []string{"policy/.*"},
+			},
+		}
 	}
 
 	createPodAndExpectDenied := func(cs kubernetes.Interface, nsName string, pod *corev1.Pod, substrings ...string) {
@@ -437,26 +576,6 @@ var _ = Describe("enforcing container registry namespace rules", Ordered, Label(
 		EventuallyDeletion(tnt)
 	})
 
-	It("denies an allowed registry reference when its pull policy is not permitted", func() {
-		ns := NewNamespace("", map[string]string{
-			meta.TenantLabel: tnt.GetName(),
-		})
-
-		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
-
-		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
-		NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
-
-		pod := restrictedPod("policy-denied", "policy/team/app:1", corev1.PullIfNotPresent)
-
-		createPodAndExpectDenied(cs, ns.Name, pod,
-			"containers[0]",
-			"policy/team/app:1",
-			"pullPolicy=IfNotPresent",
-			"allowed: Never",
-		)
-	})
-
 	It("stores matching tenant rules as independent status rule blocks", func() {
 		ns := NewNamespace("", map[string]string{
 			meta.TenantLabel: tnt.GetName(),
@@ -465,47 +584,7 @@ var _ = Describe("enforcing container registry namespace rules", Ordered, Label(
 		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 		NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
 
-		expectNamespaceStatusRules(ns.GetName(), []expectedStatusRule{
-			{
-				action:      rules.ActionTypeAllow,
-				expressions: []string{"harbor/.*"},
-			},
-			{
-				action:      rules.ActionTypeDeny,
-				targets:     targetContainers,
-				expressions: []string{"harbor/customer/containers/.*"},
-			},
-			{
-				action:      rules.ActionTypeDeny,
-				targets:     targetInitContainers,
-				expressions: []string{"harbor/customer/init/.*"},
-			},
-			{
-				action:      rules.ActionTypeDeny,
-				targets:     targetEphemeralContainers,
-				expressions: []string{"harbor/customer/debug/.*"},
-			},
-			{
-				action:      rules.ActionTypeDeny,
-				targets:     targetVolumes,
-				expressions: []string{"harbor/customer/volume/.*"},
-			},
-			{
-				action:      rules.ActionTypeAudit,
-				targets:     targetContainers,
-				expressions: []string{"audit/containers/.*"},
-			},
-			{
-				action:      rules.ActionTypeAudit,
-				targets:     targetVolumes,
-				expressions: []string{"audit/volumes/.*"},
-			},
-			{
-				action:      rules.ActionTypeAllow,
-				targets:     targetContainers,
-				expressions: []string{"policy/.*"},
-			},
-		})
+		expectNamespaceStatusRules(ns.GetName(), baseStatusRules())
 	})
 
 	It("stores namespace-selector matched rules as additional independent status rule blocks", func() {
@@ -517,52 +596,14 @@ var _ = Describe("enforcing container registry namespace rules", Ordered, Label(
 		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 		NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
 
-		expectNamespaceStatusRules(ns.GetName(), []expectedStatusRule{
-			{
-				action:      rules.ActionTypeAllow,
-				expressions: []string{"harbor/.*"},
-			},
-			{
-				action:      rules.ActionTypeDeny,
-				targets:     targetContainers,
-				expressions: []string{"harbor/customer/containers/.*"},
-			},
-			{
-				action:      rules.ActionTypeDeny,
-				targets:     targetInitContainers,
-				expressions: []string{"harbor/customer/init/.*"},
-			},
-			{
-				action:      rules.ActionTypeDeny,
-				targets:     targetEphemeralContainers,
-				expressions: []string{"harbor/customer/debug/.*"},
-			},
-			{
-				action:      rules.ActionTypeDeny,
-				targets:     targetVolumes,
-				expressions: []string{"harbor/customer/volume/.*"},
-			},
-			{
-				action:      rules.ActionTypeAudit,
-				targets:     targetContainers,
-				expressions: []string{"audit/containers/.*"},
-			},
-			{
-				action:      rules.ActionTypeAudit,
-				targets:     targetVolumes,
-				expressions: []string{"audit/volumes/.*"},
-			},
-			{
-				action:      rules.ActionTypeAllow,
-				targets:     targetContainers,
-				expressions: []string{"policy/.*"},
-			},
-			{
-				action:      rules.ActionTypeAllow,
-				targets:     targetContainers,
-				expressions: []string{"harbor/customer/containers/prod/.*"},
-			},
+		want := baseStatusRules()
+		want = append(want, expectedStatusRule{
+			action:      rules.ActionTypeAllow,
+			targets:     targetContainers,
+			expressions: []string{"harbor/customer/containers/prod/.*"},
 		})
+
+		expectNamespaceStatusRules(ns.GetName(), want)
 	})
 
 	It("stores namespace-selector matched negated regex rules as independent status rule blocks", func() {
@@ -574,53 +615,15 @@ var _ = Describe("enforcing container registry namespace rules", Ordered, Label(
 		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
 		NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
 
-		expectNamespaceStatusRules(ns.GetName(), []expectedStatusRule{
-			{
-				action:      rules.ActionTypeAllow,
-				expressions: []string{"harbor/.*"},
-			},
-			{
-				action:      rules.ActionTypeDeny,
-				targets:     targetContainers,
-				expressions: []string{"harbor/customer/containers/.*"},
-			},
-			{
-				action:      rules.ActionTypeDeny,
-				targets:     targetInitContainers,
-				expressions: []string{"harbor/customer/init/.*"},
-			},
-			{
-				action:      rules.ActionTypeDeny,
-				targets:     targetEphemeralContainers,
-				expressions: []string{"harbor/customer/debug/.*"},
-			},
-			{
-				action:      rules.ActionTypeDeny,
-				targets:     targetVolumes,
-				expressions: []string{"harbor/customer/volume/.*"},
-			},
-			{
-				action:      rules.ActionTypeAudit,
-				targets:     targetContainers,
-				expressions: []string{"audit/containers/.*"},
-			},
-			{
-				action:      rules.ActionTypeAudit,
-				targets:     targetVolumes,
-				expressions: []string{"audit/volumes/.*"},
-			},
-			{
-				action:      rules.ActionTypeAllow,
-				targets:     targetContainers,
-				expressions: []string{"policy/.*"},
-			},
-			{
-				action:      rules.ActionTypeDeny,
-				targets:     targetContainers,
-				expressions: []string{"trusted/.*"},
-				negated:     []bool{true},
-			},
+		want := baseStatusRules()
+		want = append(want, expectedStatusRule{
+			action:      rules.ActionTypeDeny,
+			targets:     targetContainers,
+			expressions: []string{"trusted/.*"},
+			negated:     []bool{true},
 		})
+
+		expectNamespaceStatusRules(ns.GetName(), want)
 	})
 
 	It("allows a broad matching allow rule", func() {
@@ -634,6 +637,70 @@ var _ = Describe("enforcing container registry namespace rules", Ordered, Label(
 		NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
 
 		pod := restrictedPod("harbor-allowed", "harbor/platform/app:1", corev1.PullIfNotPresent)
+
+		createPodAndExpectAllowed(cs, ns.Name, pod)
+	})
+
+	It("allows an exact array match", func() {
+		ns := NewNamespace("", map[string]string{
+			meta.TenantLabel: tnt.GetName(),
+		})
+
+		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
+
+		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+		NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
+
+		pod := restrictedPod("exact-array-allowed", "exact/containers/app:2", corev1.PullIfNotPresent)
+
+		createPodAndExpectAllowed(cs, ns.Name, pod)
+	})
+
+	It("denies a later exact array deny rule", func() {
+		ns := NewNamespace("", map[string]string{
+			meta.TenantLabel: tnt.GetName(),
+		})
+
+		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
+
+		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+		NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
+
+		pod := restrictedPod("exact-array-denied", "exact/containers/blocked:1", corev1.PullIfNotPresent)
+
+		createPodAndExpectDenied(cs, ns.Name, pod,
+			"containers[0]",
+			"exact/containers/blocked:1",
+			"denied",
+		)
+	})
+
+	It("allows a combined exact and regex matcher through the exact branch", func() {
+		ns := NewNamespace("", map[string]string{
+			meta.TenantLabel: tnt.GetName(),
+		})
+
+		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
+
+		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+		NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
+
+		pod := restrictedPod("combined-exact-allowed", "combined/exact/app:1", corev1.PullIfNotPresent)
+
+		createPodAndExpectAllowed(cs, ns.Name, pod)
+	})
+
+	It("allows a combined exact and regex matcher through the regex branch", func() {
+		ns := NewNamespace("", map[string]string{
+			meta.TenantLabel: tnt.GetName(),
+		})
+
+		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
+
+		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+		NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
+
+		pod := restrictedPod("combined-regex-allowed", "combined/regex/team/app:1", corev1.PullIfNotPresent)
 
 		createPodAndExpectAllowed(cs, ns.Name, pod)
 	})
@@ -932,6 +999,26 @@ var _ = Describe("enforcing container registry namespace rules", Ordered, Label(
 		pod := restrictedPod("policy-allowed", "policy/team/app:1", corev1.PullNever)
 
 		createPodAndExpectAllowed(cs, ns.Name, pod)
+	})
+
+	It("denies an allowed registry reference when its pull policy is not permitted", func() {
+		ns := NewNamespace("", map[string]string{
+			meta.TenantLabel: tnt.GetName(),
+		})
+
+		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
+
+		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+		NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
+
+		pod := restrictedPod("policy-denied", "policy/team/app:1", corev1.PullIfNotPresent)
+
+		createPodAndExpectDenied(cs, ns.Name, pod,
+			"containers[0]",
+			"policy/team/app:1",
+			"pullPolicy=IfNotPresent",
+			"allowed: Never",
+		)
 	})
 
 	It("applies namespace-selector matched negated regex rules after the base rules", func() {
