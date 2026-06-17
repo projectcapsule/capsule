@@ -60,7 +60,8 @@ type CapsuleConfigurationSpec struct {
 	// +optional
 	Impersonation ServiceAccountClient `json:"impersonation,omitzero"`
 	// Event (Audit) Configuration
-	Events EventsConfiguration `json:"events,omitzero"`
+	// +kubebuilder:default={namespace:default}
+	Events EventsConfiguration `json:"events,omitempty"`
 
 	// Deprecated: use users property instead (https://projectcapsule.dev/docs/operating/setup/configuration/#users)
 	//

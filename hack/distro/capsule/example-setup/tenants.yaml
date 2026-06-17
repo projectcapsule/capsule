@@ -93,17 +93,20 @@ spec:
         action: "audit"
         workloads:
           schedulers:
-          - exp: "default-scheduler"
+          - exact: 
+              - "default-scheduler"
     - enforce:
         action: "deny"
         workloads:
           schedulers:
-          - exp: "custom-scheduler"
+          - exact: 
+              - "custom-scheduler"
     - enforce:
         action: "audit"
         workloads:
           schedulers:
-          - exp: "custom-scheduler"
+          - exact: 
+              - "custom-scheduler"
 
     - enforce:
         action: "allow"

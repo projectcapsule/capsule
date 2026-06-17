@@ -8,17 +8,19 @@ import (
 	"regexp"
 )
 
-// Exactly one of Name or Exp should be set.
+// At least one of Exact or Exp must be set.
+// Both may be set together.
 // +kubebuilder:object:generate=true
-// +kubebuilder:validation:XValidation:rule="has(self.name) != has(self.exp)",message="exactly one of name or exp must be set"
+// +kubebuilder:validation:XValidation:rule="has(self.exact) || has(self.exp)",message="at least one of exact or exp must be set"
 type ExpressionMatch struct {
 	ExpressionRegex `json:",inline"`
 
-	// Name matches exactly
+	// Exact matches one of the provided values exactly.
 	//
-	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MinItems=1
+	// +kubebuilder:validation:items:MinLength=1
 	// +optional
-	Name string `json:"name,omitempty"`
+	Exact []string `json:"exact,omitempty"`
 }
 
 type ExpressionRegex struct {
@@ -37,40 +39,80 @@ type ExpressionRegexMatcher interface {
 }
 
 func (m ExpressionMatch) Matches(value string) (bool, error) {
-	switch {
-	case m.Name != "":
-		return m.Name == value, nil
-
-	case m.Expression != "":
-		re, err := regexp.Compile(m.Expression)
-		if err != nil {
-			return false, fmt.Errorf("compile regexp %q: %w", m.Expression, err)
-		}
-
-		return re.MatchString(value), nil
-
-	default:
-		return false, fmt.Errorf("expression match must define either name or exp")
+	matched, err := m.matches(value)
+	if err != nil {
+		return false, err
 	}
+
+	return m.applyNegate(matched), nil
 }
 
-func (m ExpressionMatch) MatchesWithExpressionMatcher(matcher ExpressionRegexMatcher, value string) (bool, error) {
-	if m.Name != "" {
-		matched := m.Name == value
-		if m.Negate {
-			return !matched, nil
-		}
+func (m ExpressionMatch) MatchesWithExpressionMatcher(
+	matcher ExpressionRegexMatcher,
+	value string,
+) (bool, error) {
+	if len(m.Exact) == 0 && m.Expression == "" {
+		return false, fmt.Errorf("expression match must define at least one of exact or exp")
+	}
 
-		return matched, nil
+	matched := containsExact(m.Exact, value)
+	if matched {
+		return m.applyNegate(true), nil
 	}
 
 	if m.Expression == "" {
-		return false, fmt.Errorf("expression match must define either name or exp")
+		return m.applyNegate(false), nil
 	}
 
 	if matcher == nil {
 		return m.Matches(value)
 	}
 
-	return matcher.MatchRegex(m.ExpressionRegex, value)
+	matched, err := matcher.MatchRegex(m.ExpressionRegex, value)
+	if err != nil {
+		return false, err
+	}
+
+	// Important: assume MatchRegex already applies ExpressionRegex.Negate.
+	// If your RegexCache.MatchRegex already handles Negate, return directly.
+	return matched, nil
+}
+
+func (m ExpressionMatch) matches(value string) (bool, error) {
+	if len(m.Exact) == 0 && m.Expression == "" {
+		return false, fmt.Errorf("expression match must define at least one of exact or exp")
+	}
+
+	if containsExact(m.Exact, value) {
+		return true, nil
+	}
+
+	if m.Expression == "" {
+		return false, nil
+	}
+
+	re, err := regexp.Compile(m.Expression)
+	if err != nil {
+		return false, fmt.Errorf("compile regexp %q: %w", m.Expression, err)
+	}
+
+	return re.MatchString(value), nil
+}
+
+func containsExact(values []string, value string) bool {
+	for _, exact := range values {
+		if exact == value {
+			return true
+		}
+	}
+
+	return false
+}
+
+func (m ExpressionMatch) applyNegate(matched bool) bool {
+	if m.Negate {
+		return !matched
+	}
+
+	return matched
 }

@@ -1054,6 +1054,8 @@ spec:
                   when not using an already provided CA and certificate, or when these are managed externally with Vault, or cert-manager.
                 type: boolean
               events:
+                default:
+                  namespace: default
                 description: Event (Audit) Configuration
                 properties:
                   namespace:
@@ -1265,7 +1267,6 @@ spec:
             required:
             - cacheInvalidation
             - enableTLSReconciler
-            - events
             - rbac
             type: object
           status:
