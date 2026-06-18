@@ -124,7 +124,7 @@ func EvaluateEnforce[R any, T any](
 			continue
 		}
 
-		hasAuditMatch := false
+		hasAllowRule := false
 
 		var lastDecision *Decision
 
@@ -141,7 +141,10 @@ func EvaluateEnforce[R any, T any](
 			action := enforce.Action.OrDefault()
 
 			switch action {
-			case api.ActionTypeAllow, api.ActionTypeDeny, api.ActionTypeAudit:
+			case api.ActionTypeAllow:
+				hasAllowRule = true
+
+			case api.ActionTypeDeny, api.ActionTypeAudit:
 				// Supported actions.
 
 			default:
@@ -173,8 +176,8 @@ func EvaluateEnforce[R any, T any](
 
 				switch action {
 				case api.ActionTypeAudit:
-					hasAuditMatch = true
-
+					// Audit is purely observational. It must not influence
+					// allow/deny evaluation.
 					evaluation.Audits = append(evaluation.Audits, decision)
 
 				case api.ActionTypeAllow, api.ActionTypeDeny:
@@ -196,10 +199,21 @@ func EvaluateEnforce[R any, T any](
 			continue
 		}
 
-		// Audit rules are non-blocking. If at least one audit rule matched and
-		// no explicit allow/deny matched, the value is admitted.
-		if hasAuditMatch {
-			continue
+		if hasAllowRule {
+			evaluation.Blocking = &Decision{
+				SetName:     set.Name,
+				EventReason: set.EventReason,
+				Action:      api.ActionTypeDeny,
+				Value:       value,
+				Message: fmt.Sprintf(
+					"%s %q at %s is not allowed by namespace rule",
+					set.Name,
+					value.Value,
+					value.Path,
+				),
+			}
+
+			return evaluation, nil
 		}
 	}
 

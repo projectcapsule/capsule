@@ -19,7 +19,7 @@ type ExpressionMatch struct {
 	// Exact matches one of the provided values exactly.
 	//
 	// +kubebuilder:validation:MinItems=1
-	// +kubebuilder:validation:items:MinLength=1
+	// +kubebuilder:validation:Items:MinLength=1
 	// +optional
 	Exact []string `json:"exact,omitempty"`
 }

@@ -122,9 +122,9 @@ func (h *containerRegistryLegacyHandler) verifyContainerRegistry(
 		recorder.LabeledEvent(
 			pod,
 			corev1.EventTypeWarning,
-			events.ReasonForbiddenContainerRegistry,
+			events.ReasonMissingFQCI,
 			events.ActionValidationDenied,
-			fmt.Sprintf("using a fully qualified container image, cannot enforce registry for the tenant %s", reg.Registry()),
+			fmt.Sprintf("container image %q is not fully qualified (missing registry), cannot enforce tenant registry rules", image),
 		).
 			WithRelated(tnt).
 			WithTenantLabel(tnt).

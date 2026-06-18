@@ -2537,7 +2537,6 @@ spec:
                                     description: Exact matches one of the provided
                                       values exactly.
                                     items:
-                                      minLength: 1
                                       type: string
                                     minItems: 1
                                     type: array
@@ -2577,7 +2576,6 @@ spec:
                                     description: Exact matches one of the provided
                                       values exactly.
                                     items:
-                                      minLength: 1
                                       type: string
                                     minItems: 1
                                     type: array
@@ -3166,7 +3164,6 @@ spec:
                                 description: Exact matches one of the provided values
                                   exactly.
                                 items:
-                                  minLength: 1
                                   type: string
                                 minItems: 1
                                 type: array

@@ -474,7 +474,7 @@ var _ = Describe("enforcing pod QoS namespace rules", Ordered, Label("tenant", "
 
 		createPodAndExpectAllowed(cs, ns.Name, pod)
 
-		expectAuditEvent(cs, ns.Name, pod.Name,
+		expectAuditEvent(clusterAdminClient(), ns.Name, pod.Name,
 			`QoS class "Burstable"`,
 			"status.qosClass",
 			"matched audit namespace rule",
@@ -530,7 +530,7 @@ var _ = Describe("enforcing pod QoS namespace rules", Ordered, Label("tenant", "
 
 		createPodAndExpectAllowed(cs, ns.Name, pod)
 
-		expectAuditEvent(cs, ns.Name, pod.Name,
+		expectAuditEvent(clusterAdminClient(), ns.Name, pod.Name,
 			`QoS class "Burstable"`,
 			"status.qosClass",
 			"matched audit namespace rule",

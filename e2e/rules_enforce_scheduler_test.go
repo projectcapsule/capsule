@@ -462,7 +462,7 @@ var _ = Describe("enforcing pod schedulerName namespace rules", Ordered, Label("
 
 		createPodAndExpectAllowed(cs, ns.Name, pod)
 
-		expectAuditEvent(cs, ns.Name, pod.Name,
+		expectAuditEvent(clusterAdminClient(), ns.Name, pod.Name,
 			`scheduler "audited-scheduler"`,
 			"spec.schedulerName",
 			"matched audit namespace rule",

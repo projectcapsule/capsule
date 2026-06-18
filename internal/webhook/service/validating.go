@@ -88,7 +88,7 @@ func (h *validating) handle(
 			WithRequestAnnotations(req).
 			Emit(ctx)
 
-		return ad.Deny(caperrors.NewExternalNameDisabledError().Error())
+		return ad.Deny(caperrors.NewNodePortDisabledError().Error())
 	}
 
 	if svc.Spec.Type == corev1.ServiceTypeExternalName && tnt.Spec.ServiceOptions != nil && tnt.Spec.ServiceOptions.AllowedServices != nil && !*tnt.Spec.ServiceOptions.AllowedServices.ExternalName {

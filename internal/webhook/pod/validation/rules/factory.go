@@ -49,9 +49,16 @@ type podRules struct {
 	registryCache *cache.RegistryRuleSetCache
 }
 
-func PodRules(regexCache *cache.RegexCache, registryCache *cache.RegistryRuleSetCache) handlers.TypedHandlerWithTenantWithRuleset[*corev1.Pod] {
+func PodRules(
+	regexCache *cache.RegexCache,
+	registryCache *cache.RegistryRuleSetCache,
+) handlers.TypedHandlerWithTenantWithRuleset[*corev1.Pod] {
 	if regexCache == nil {
 		regexCache = cache.NewRegexCache()
+	}
+
+	if registryCache == nil {
+		registryCache = cache.NewRegistryRuleSetCache(regexCache)
 	}
 
 	h := &podRules{
@@ -141,6 +148,8 @@ func (h *podRules) validatePodRules(
 			continue
 		}
 
+		// Audit is observational only. It must always be emitted when matched,
+		// but it must never influence allow/deny decisions.
 		for _, audit := range evaluation.Audits {
 			recorder.LabeledEvent(
 				pod,

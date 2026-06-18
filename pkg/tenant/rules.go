@@ -9,13 +9,16 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	capsulev1beta2 "github.com/projectcapsule/capsule/api/v1beta2"
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/api/rules"
+	"github.com/projectcapsule/capsule/pkg/runtime/sanitize"
 	"github.com/projectcapsule/capsule/pkg/runtime/selectors"
+	"github.com/projectcapsule/capsule/pkg/template"
 )
 
 func GetManagedRuleStatus(
@@ -38,8 +41,7 @@ func GetManagedRuleStatus(
 // - Matching rules are returned in the order they appear in tnt.Spec.Rules.
 // - Order is important because registry/QoS evaluation uses "later allow/deny wins" semantics.
 func BuildNamespaceRuleBodyStatus(
-	ctx context.Context,
-	c client.Reader,
+	scheme *runtime.Scheme,
 	ns *corev1.Namespace,
 	tnt *capsulev1beta2.Tenant,
 ) ([]*rules.NamespaceRuleBodyNamespace, error) {
@@ -52,7 +54,12 @@ func BuildNamespaceRuleBodyStatus(
 		nsLabels = labels.Set(ns.Labels)
 	}
 
-	out := make([]*rules.NamespaceRuleBodyNamespace, 0, len(tnt.Spec.Rules))
+	templateContext, err := NewTenantNamespaceContext(tnt, ns, scheme, sanitize.DefaultSanitizeOptions())
+	if err != nil {
+		return nil, fmt.Errorf("build namespace rule template context: %w", err)
+	}
+
+	selected := make([]*rules.NamespaceRuleBodyNamespace, 0, len(tnt.Spec.Rules))
 
 	for i, rule := range tnt.Spec.Rules {
 		if rule == nil {
@@ -75,7 +82,28 @@ func BuildNamespaceRuleBodyStatus(
 			continue
 		}
 
-		out = append(out, body.DeepCopy())
+		selected = append(selected, body.DeepCopy())
+	}
+
+	rendered, err := template.RenderNamespaceRuleBodies(
+		templateContext,
+		template.MissingKeyError,
+		selected,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("render namespace rule bodies: %w", err)
+	}
+
+	out := make([]*rules.NamespaceRuleBodyNamespace, 0, len(rendered))
+
+	for i, body := range rendered {
+		if body == nil || body.Enforce == nil {
+			continue
+		}
+
+		out = append(out, body)
+
+		_ = i
 	}
 
 	return out, nil

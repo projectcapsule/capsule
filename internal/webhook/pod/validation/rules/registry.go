@@ -73,6 +73,8 @@ func (h *podRules) validateRegistries(
 			return out, nil
 		}
 
+		// Pull policy constraints are enforced only after the final registry
+		// decision is an explicit allow. Audit rules do not influence this.
 		if evaluation.Final == nil || evaluation.Final.Action != apirules.ActionTypeAllow {
 			continue
 		}
@@ -227,7 +229,7 @@ func registryDecisionMessage(
 
 	rule := "<unknown>"
 	if matched != nil {
-		rule = matched.Match.Expression
+		rule = registryRuleDescription(matched)
 	}
 
 	switch action {
@@ -264,6 +266,35 @@ func registryDecisionMessage(
 			action,
 		)
 	}
+}
+
+func registryRuleDescription(matched *cache.CompiledRule) string {
+	if matched == nil {
+		return "<unknown>"
+	}
+
+	parts := make([]string, 0, 2)
+
+	if len(matched.Match.Exact) > 0 {
+		exact := append([]string(nil), matched.Match.Exact...)
+		sort.Strings(exact)
+
+		parts = append(parts, "exact="+strings.Join(exact, ","))
+	}
+
+	if matched.Match.Expression != "" {
+		if matched.Match.Negate {
+			parts = append(parts, "exp="+matched.Match.Expression+",negate=true")
+		} else {
+			parts = append(parts, "exp="+matched.Match.Expression)
+		}
+	}
+
+	if len(parts) == 0 {
+		return "<unknown>"
+	}
+
+	return strings.Join(parts, ";")
 }
 
 func registryPullPolicyDecision(

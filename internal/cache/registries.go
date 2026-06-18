@@ -238,10 +238,6 @@ func (c *RegistryRuleSetCache) HashRules(specRules []rules.OCIRegistry) string {
 		match := r.ExpressionMatch
 
 		exact := append([]string(nil), match.Exact...)
-		for i := range exact {
-			exact[i] = strings.TrimSpace(exact[i])
-		}
-
 		sort.Strings(exact)
 
 		policies := make([]string, 0, len(r.Policy))

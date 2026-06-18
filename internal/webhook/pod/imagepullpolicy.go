@@ -115,7 +115,7 @@ func (h *imagePullPolicy) verifyPullPolicy(
 		recorder.LabeledEvent(
 			pod,
 			corev1.EventTypeWarning,
-			events.ReasonForbiddenPriorityClass,
+			events.ReasonForbiddenPullPolicy,
 			events.ActionValidationDenied,
 			fmt.Sprintf("using pullpolicy %s is forbidden for the tenant", usedPullPolicy),
 		).

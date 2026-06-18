@@ -117,7 +117,7 @@ func (h *runtimeClass) validate(
 		recorder.LabeledEvent(
 			pod,
 			corev1.EventTypeWarning,
-			events.ReasonMissingStorageClass,
+			events.ReasonForbiddenRuntimeClass,
 			events.ActionValidationDenied,
 			fmt.Sprintf("using runtimeclass %s is forbidden for the tenant", runtimeClassName),
 		).

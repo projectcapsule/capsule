@@ -187,7 +187,7 @@ func (h *TypedTenantWithRulesetHandler[T]) resolveTenant(
 // If not yet present, try to calculate it.
 func (h *TypedTenantWithRulesetHandler[T]) resolveRuleset(
 	ctx context.Context,
-	c client.Reader,
+	c client.Client,
 	req admission.Request,
 	namespace string,
 	tnt *capsulev1beta2.Tenant,
@@ -209,5 +209,5 @@ func (h *TypedTenantWithRulesetHandler[T]) resolveRuleset(
 		return nil, err
 	}
 
-	return tenant.BuildNamespaceRuleBodyStatus(ctx, c, ns, tnt)
+	return tenant.BuildNamespaceRuleBodyStatus(c.Scheme(), ns, tnt)
 }

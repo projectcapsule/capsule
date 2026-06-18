@@ -22,6 +22,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api/meta"
 	"github.com/projectcapsule/capsule/pkg/api/rbac"
 	"github.com/projectcapsule/capsule/pkg/api/rules"
+	"github.com/projectcapsule/capsule/pkg/runtime/events"
 )
 
 var (
@@ -182,9 +183,45 @@ var _ = Describe("enforcing container registry namespace rules", Ordered, Label(
 						},
 					},
 					{
+						NamespaceSelector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{
+								"allow-audit-containers": "true",
+							},
+						},
+						NamespaceRuleBodyNamespace: &rules.NamespaceRuleBodyNamespace{
+							Enforce: &rules.NamespaceRuleEnforceBody{
+								Action: rules.ActionTypeAllow,
+								Workloads: rules.NamespaceRuleEnforceWorkloadsBody{
+									Targets: targetContainers,
+									Registries: []rules.OCIRegistry{
+										registryByExpression("audit/containers/.*"),
+									},
+								},
+							},
+						},
+					},
+					{
 						NamespaceRuleBodyNamespace: &rules.NamespaceRuleBodyNamespace{
 							Enforce: &rules.NamespaceRuleEnforceBody{
 								Action: rules.ActionTypeAudit,
+								Workloads: rules.NamespaceRuleEnforceWorkloadsBody{
+									Targets: targetVolumes,
+									Registries: []rules.OCIRegistry{
+										registryByExpression("audit/volumes/.*"),
+									},
+								},
+							},
+						},
+					},
+					{
+						NamespaceSelector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{
+								"allow-audit-volumes": "true",
+							},
+						},
+						NamespaceRuleBodyNamespace: &rules.NamespaceRuleBodyNamespace{
+							Enforce: &rules.NamespaceRuleEnforceBody{
+								Action: rules.ActionTypeAllow,
 								Workloads: rules.NamespaceRuleEnforceWorkloadsBody{
 									Targets: targetVolumes,
 									Registries: []rules.OCIRegistry{
@@ -292,6 +329,24 @@ var _ = Describe("enforcing container registry namespace rules", Ordered, Label(
 									Targets: targetContainers,
 									Registries: []rules.OCIRegistry{
 										registryByNegatedExpression("trusted/.*"),
+									},
+								},
+							},
+						},
+					},
+					{
+						NamespaceSelector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{
+								"negate": "true",
+							},
+						},
+						NamespaceRuleBodyNamespace: &rules.NamespaceRuleBodyNamespace{
+							Enforce: &rules.NamespaceRuleEnforceBody{
+								Action: rules.ActionTypeAllow,
+								Workloads: rules.NamespaceRuleEnforceWorkloadsBody{
+									Targets: targetContainers,
+									Registries: []rules.OCIRegistry{
+										registryByExpression("trusted/.*"),
 									},
 								},
 							},
@@ -528,23 +583,37 @@ var _ = Describe("enforcing container registry namespace rules", Ordered, Label(
 		}
 	}
 
-	expectAuditEvent := func(cs kubernetes.Interface, nsName string, podName string, substrings ...string) {
+	expectAuditEvent := func(
+		cs kubernetes.Interface,
+		namespace string,
+		podName string,
+		substrings ...string,
+	) {
 		Eventually(func() error {
-			events, err := cs.CoreV1().Events(nsName).List(context.Background(), metav1.ListOptions{})
+			evt, err := cs.CoreV1().Events(namespace).List(context.Background(), metav1.ListOptions{})
 			if err != nil {
 				return err
 			}
 
-			for _, event := range events.Items {
-				if event.InvolvedObject.Name != podName {
+			for _, e := range evt.Items {
+				if e.Reason != events.ReasonNamespaceRuleAudit {
 					continue
 				}
 
-				msg := event.Message
-				matched := true
+				if e.InvolvedObject.Kind != "Pod" {
+					continue
+				}
 
+				eventPodName := e.InvolvedObject.Name
+				if eventPodName != podName && !strings.HasPrefix(eventPodName, podName+"-") {
+					continue
+				}
+
+				message := e.Message
+
+				matched := true
 				for _, substring := range substrings {
-					if !strings.Contains(msg, substring) {
+					if !strings.Contains(message, substring) {
 						matched = false
 
 						break
@@ -556,7 +625,11 @@ var _ = Describe("enforcing container registry namespace rules", Ordered, Label(
 				}
 			}
 
-			return fmt.Errorf("expected audit event for pod %q containing %q", podName, substrings)
+			return fmt.Errorf(
+				"expected audit event for pod %q containing %q",
+				podName,
+				substrings,
+			)
 		}, defaultTimeoutInterval, defaultPollInterval).Should(Succeed())
 	}
 
@@ -574,6 +647,29 @@ var _ = Describe("enforcing container registry namespace rules", Ordered, Label(
 
 	JustAfterEach(func() {
 		EventuallyDeletion(tnt)
+	})
+
+	It("audits a matching image but still denies when no allow rule matches", func() {
+		ns := NewNamespace("", map[string]string{
+			meta.TenantLabel: tnt.GetName(),
+		})
+
+		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
+		NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
+
+		pod := restrictedPod("audit-denied", "audit/containers/team/app:1", corev1.PullIfNotPresent)
+
+		createPodAndExpectDenied(clusterAdminClient(), ns.Name, pod,
+			"containers[0]",
+			"audit/containers/team/app:1",
+			"not allowed",
+			"namespace rule",
+		)
+
+		expectAuditEvent(clusterAdminClient(), ns.Name, pod.Name,
+			"matched audit registry rule",
+			"audit/containers/.*",
+		)
 	})
 
 	It("stores matching tenant rules as independent status rule blocks", func() {
@@ -606,7 +702,7 @@ var _ = Describe("enforcing container registry namespace rules", Ordered, Label(
 		expectNamespaceStatusRules(ns.GetName(), want)
 	})
 
-	It("stores namespace-selector matched negated regex rules as independent status rule blocks", func() {
+	It("stores namespace-selector matched negated regex and explicit allow rules as independent status rule blocks", func() {
 		ns := NewNamespace("", map[string]string{
 			"negate":         "true",
 			meta.TenantLabel: tnt.GetName(),
@@ -616,12 +712,19 @@ var _ = Describe("enforcing container registry namespace rules", Ordered, Label(
 		NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
 
 		want := baseStatusRules()
-		want = append(want, expectedStatusRule{
-			action:      rules.ActionTypeDeny,
-			targets:     targetContainers,
-			expressions: []string{"trusted/.*"},
-			negated:     []bool{true},
-		})
+		want = append(want,
+			expectedStatusRule{
+				action:      rules.ActionTypeDeny,
+				targets:     targetContainers,
+				expressions: []string{"trusted/.*"},
+				negated:     []bool{true},
+			},
+			expectedStatusRule{
+				action:      rules.ActionTypeAllow,
+				targets:     targetContainers,
+				expressions: []string{"trusted/.*"},
+			},
+		)
 
 		expectNamespaceStatusRules(ns.GetName(), want)
 	})
@@ -772,26 +875,6 @@ var _ = Describe("enforcing container registry namespace rules", Ordered, Label(
 		createPodAndExpectAllowed(cs, ns.Name, allowed)
 	})
 
-	It("audits a matching image by allowing admission and emitting an event", func() {
-		ns := NewNamespace("", map[string]string{
-			meta.TenantLabel: tnt.GetName(),
-		})
-
-		cs := ownerClient(tnt.Spec.Owners[0].UserSpec)
-
-		NamespaceCreation(ns, tnt.Spec.Owners[0].UserSpec, defaultTimeoutInterval).Should(Succeed())
-		NamespaceIsPartOfTenant(tnt, ns).Should(Succeed())
-
-		pod := restrictedPod("audit-allowed", "audit/containers/team/app:1", corev1.PullIfNotPresent)
-
-		createPodAndExpectAllowed(cs, ns.Name, pod)
-
-		expectAuditEvent(cs, ns.Name, pod.Name,
-			"matched audit registry rule",
-			"audit/containers/.*",
-		)
-	})
-
 	It("evaluates init containers with the same multi-rule action semantics", func() {
 		ns := NewNamespace("", map[string]string{
 			meta.TenantLabel: tnt.GetName(),
@@ -881,7 +964,7 @@ var _ = Describe("enforcing container registry namespace rules", Ordered, Label(
 		)
 	})
 
-	It("audits image volumes independently from container decisions", Label("skip-on-openshift"), func() {
+	It("audits image volumes independently but still denies when no allow rule matches", Label("skip-on-openshift"), func() {
 		ns := NewNamespace("", map[string]string{
 			meta.TenantLabel: tnt.GetName(),
 		})
@@ -893,7 +976,7 @@ var _ = Describe("enforcing container registry namespace rules", Ordered, Label(
 
 		pod := &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: "volume-audit-allowed",
+				Name: "volume-audit-denied",
 			},
 			Spec: corev1.PodSpec{
 				SecurityContext: nobodyPodSecurityContext(),
@@ -919,9 +1002,14 @@ var _ = Describe("enforcing container registry namespace rules", Ordered, Label(
 			},
 		}
 
-		createPodAndExpectAllowed(cs, ns.Name, pod)
+		createPodAndExpectDenied(cs, ns.Name, pod,
+			"volumes[0](imgvol)",
+			"audit/volumes/team/app:1",
+			"not allowed",
+			"namespace rule",
+		)
 
-		expectAuditEvent(cs, ns.Name, pod.Name,
+		expectAuditEvent(clusterAdminClient(), ns.Name, pod.Name,
 			"matched audit registry rule",
 			"audit/volumes/.*",
 		)

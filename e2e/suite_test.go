@@ -138,6 +138,17 @@ var _ = SynchronizedAfterSuite(
 	},
 )
 
+func clusterAdminClient() (cs kubernetes.Interface) {
+	c, err := config.GetConfig()
+	Expect(err).ToNot(HaveOccurred())
+	tuneE2ERestConfig(c)
+
+	cs, err = kubernetes.NewForConfig(c)
+	Expect(err).ToNot(HaveOccurred())
+
+	return cs
+}
+
 func ownerClient(owner rbac.UserSpec) (cs kubernetes.Interface) {
 	c, err := config.GetConfig()
 	Expect(err).ToNot(HaveOccurred())
